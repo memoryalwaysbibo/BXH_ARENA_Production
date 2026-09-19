@@ -10926,9 +10926,45 @@ const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 /* ==== Production Public Beta Release Gate (2026-09-21 10:00 Asia/Taipei) ==== */
 const PUBLIC_BETA_OPEN_AT_MS = Date.parse("2026-09-21T10:00:00+08:00");
 let releaseGateTicker = null;
+let releaseGateClockVerified = false;
+let releaseGateServerEpochMs = 0;
+let releaseGatePerfAtSync = 0;
+let releaseGateLastSyncAttempt = 0;
 
+function releaseGateTrustedNow(){
+  if(releaseGateClockVerified && typeof performance!=="undefined"){
+    return releaseGateServerEpochMs + Math.max(0,performance.now()-releaseGatePerfAtSync);
+  }
+  return null;
+}
+async function syncReleaseGateServerClock(force=false){
+  const now=Date.now();
+  if(!force && now-releaseGateLastSyncAttempt<30000) return releaseGateClockVerified;
+  releaseGateLastSyncAttempt=now;
+  try{
+    const p0=(typeof performance!=="undefined")?performance.now():0;
+    const res=await fetch("/CNAME?release-clock="+encodeURIComponent(String(now)),{method:"HEAD",cache:"no-store",credentials:"same-origin"});
+    const dateHeader=res.headers.get("date");
+    const serverMs=Date.parse(dateHeader||"");
+    if(!res.ok || !Number.isFinite(serverMs)) throw new Error("server-date-unavailable");
+    const p1=(typeof performance!=="undefined")?performance.now():p0;
+    releaseGateServerEpochMs=serverMs+Math.max(0,(p1-p0)/2);
+    releaseGatePerfAtSync=p1;
+    releaseGateClockVerified=true;
+    try{ render(); }catch(e){}
+    return true;
+  }catch(e){
+    console.warn("BXH ARENA：Release Gate 伺服器時間驗證失敗，維持關閉狀態。",e);
+    return false;
+  }
+}
 function releaseGateIsActive(){
-  return Date.now() < PUBLIC_BETA_OPEN_AT_MS;
+  const trusted=releaseGateTrustedNow();
+  if(trusted===null){
+    syncReleaseGateServerClock(false);
+    return true;
+  }
+  return trusted < PUBLIC_BETA_OPEN_AT_MS;
 }
 function releaseGateIsSuperAdmin(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin");
@@ -10941,8 +10977,10 @@ function releaseGateShouldBlock(){
   if(releaseGateIsSuperAdmin()) return false;
   return !releaseGateLoginPhaseAllowed();
 }
-function releaseGateRemaining(now=Date.now()){
-  const total=Math.max(0,PUBLIC_BETA_OPEN_AT_MS-now);
+function releaseGateRemaining(now=null){
+  const trusted=releaseGateTrustedNow();
+  const basis=now===null?(trusted===null?Date.now():trusted):now;
+  const total=Math.max(0,PUBLIC_BETA_OPEN_AT_MS-basis);
   const seconds=Math.floor(total/1000);
   return {days:Math.floor(seconds/86400),hours:Math.floor((seconds%86400)/3600),minutes:Math.floor((seconds%3600)/60),seconds:seconds%60};
 }
@@ -10976,7 +11014,9 @@ function releaseGateStartTicker(){
   ensureReleaseGateStyles();
   if(releaseGateTicker) return;
   const tick=()=>{
+    if(!releaseGateClockVerified) syncReleaseGateServerClock(false);
     document.querySelectorAll("[data-release-countdown]").forEach(el=>{el.innerHTML=releaseGateCountdownMarkup();});
+    document.querySelectorAll("[data-release-clock-status]").forEach(el=>{el.textContent=releaseGateClockVerified?"伺服器時間已同步":"正在驗證伺服器時間…";});
     if(!releaseGateIsActive()){
       clearInterval(releaseGateTicker);
       releaseGateTicker=null;
@@ -10995,7 +11035,7 @@ function releaseGateLandingBannerHtml(){
     '<div class="release-count-title">公開測試即將開始</div>'+
     '<div class="release-count-date">2026.09.21 SUN · 10:00</div>'+
     '<div class="release-countdown" data-release-countdown>'+releaseGateCountdownMarkup()+'</div>'+
-    '<div class="release-count-note">BXH ARENA 正在進行開服前最後準備。<br>目前僅開放最高管理員進入系統檢查。</div>'+
+    '<div class="release-count-note">BXH ARENA 正在進行開服前最後準備。<br>目前僅開放最高管理員進入系統檢查。<br><span data-release-clock-status>'+(releaseGateClockVerified?'伺服器時間已同步':'正在驗證伺服器時間…')+'</span></div>'+
     '</div>';
 }
 function renderReleaseGateScreen(){
@@ -11014,7 +11054,7 @@ function renderReleaseGateScreen(){
       '<div class="release-count-card">'+
         '<div class="release-count-date">2026.09.21 SUN · 10:00</div>'+
         '<div class="release-countdown" data-release-countdown>'+releaseGateCountdownMarkup()+'</div>'+
-        '<div class="release-count-note">公測期間系統可能持續進行功能調整與優化。</div>'+
+        '<div class="release-count-note">公測期間系統可能持續進行功能調整與優化。<br><span data-release-clock-status>'+(releaseGateClockVerified?'伺服器時間已同步':'正在驗證伺服器時間…')+'</span></div>'+
       '</div>'+
       '<div class="release-gate-status">PRE-LAUNCH MODE · 目前僅最高管理員可進入</div>'+
       '<div class="btn-row" style="justify-content:center;margin-top:18px;">'+action+'</div>'+
