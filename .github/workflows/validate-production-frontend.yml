@@ -1,0 +1,38 @@
+name: Validate Production Frontend RC1
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify Production frontend invariants
+        run: node scripts/verify-production-frontend.cjs
+      - name: Verify no Beta runtime target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn --exclude-dir=.git --exclude-dir=tests --exclude='RELEASE_*.md' \
+            -E 'bxh-arena-beta|beta\.bxh\.com\.tw|BETA 測試站｜非正式環境' .; then
+            echo 'Forbidden Beta runtime marker detected.' >&2
+            exit 1
+          fi
+      - name: Verify no deployment workflows are bundled
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn -E 'firebase deploy|gcloud functions deploy|FirebaseExtended/action-hosting-deploy' .github/workflows; then
+            echo 'This candidate is validation-only; deployment action found.' >&2
+            exit 1
+          fi
