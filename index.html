@@ -14293,7 +14293,7 @@ function render(){
     syncReleaseAdminBadge();
     if(releaseGateShouldBlock()){
       app.innerHTML=renderReleaseGateScreen();
-      restoreRenderViewport(__viewportSnapshot);
+      finishRenderViewport(__viewportSnapshot);
       return;
     }
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
