@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RIn --exclude-dir=.git --exclude-dir=tests --exclude='RELEASE_*.md' \
+          if grep -RIn --exclude-dir=.git --exclude-dir=.github --exclude-dir=tests --exclude='RELEASE_*.md' \
             -E 'bxh-arena-beta|beta\.bxh\.com\.tw|BETA 測試站｜非正式環境' .; then
             echo 'Forbidden Beta runtime marker detected.' >&2
             exit 1
