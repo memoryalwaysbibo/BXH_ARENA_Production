@@ -10922,10 +10922,119 @@ const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 
 
 
+
+/* ==== Production Public Beta Release Gate (2026-09-21 10:00 Asia/Taipei) ==== */
+const PUBLIC_BETA_OPEN_AT_MS = Date.parse("2026-09-21T10:00:00+08:00");
+let releaseGateTicker = null;
+
+function releaseGateIsActive(){
+  return Date.now() < PUBLIC_BETA_OPEN_AT_MS;
+}
+function releaseGateIsSuperAdmin(){
+  return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin");
+}
+function releaseGateLoginPhaseAllowed(){
+  return appPhase==="landing" || appPhase==="admin-login" || appPhase==="player-login";
+}
+function releaseGateShouldBlock(){
+  if(!releaseGateIsActive()) return false;
+  if(releaseGateIsSuperAdmin()) return false;
+  return !releaseGateLoginPhaseAllowed();
+}
+function releaseGateRemaining(now=Date.now()){
+  const total=Math.max(0,PUBLIC_BETA_OPEN_AT_MS-now);
+  const seconds=Math.floor(total/1000);
+  return {days:Math.floor(seconds/86400),hours:Math.floor((seconds%86400)/3600),minutes:Math.floor((seconds%3600)/60),seconds:seconds%60};
+}
+function releaseGateCountdownMarkup(){
+  const t=releaseGateRemaining();
+  const unit=(v,label)=>'<span class="release-count-unit"><b>'+String(v).padStart(2,"0")+'</b><small>'+label+'</small></span>';
+  return unit(t.days,"DAY")+unit(t.hours,"HR")+unit(t.minutes,"MIN")+unit(t.seconds,"SEC");
+}
+function ensureReleaseGateStyles(){
+  if(document.getElementById("release-gate-styles")) return;
+  const style=document.createElement("style");
+  style.id="release-gate-styles";
+  style.textContent=
+    '.release-count-card{width:min(100%,520px);margin:18px auto 8px;padding:18px 18px 16px;border:1px solid rgba(212,175,55,.34);border-radius:18px;background:linear-gradient(160deg,rgba(212,175,55,.08),rgba(255,255,255,.025));box-shadow:0 18px 50px rgba(0,0,0,.22);text-align:center}'+
+    '.release-count-kicker{font-size:11px;letter-spacing:3px;color:var(--champagne-gold);font-weight:800}'+
+    '.release-count-title{margin-top:7px;font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--ivory)}'+
+    '.release-count-date{margin-top:5px;font-size:13px;color:var(--metal);letter-spacing:1px}'+
+    '.release-countdown{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:15px 0 10px}'+
+    '.release-count-unit{display:flex;min-width:0;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px;border-radius:12px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.08)}'+
+    '.release-count-unit b{font-family:var(--font-d);font-size:25px;line-height:1;color:var(--champagne-gold);font-variant-numeric:tabular-nums}'+
+    '.release-count-unit small{margin-top:6px;font-size:9px;letter-spacing:1.4px;color:var(--metal-dim)}'+
+    '.release-count-note{font-size:12px;line-height:1.65;color:var(--metal)}'+
+    '.release-gate-wrap{width:min(100%,590px);margin:auto;display:flex;flex-direction:column;align-items:center;text-align:center}'+
+    '.release-gate-lock{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;margin:8px auto 12px;border:1px solid rgba(212,175,55,.35);background:rgba(212,175,55,.08);font-size:27px}'+
+    '.release-gate-status{margin-top:14px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);font-size:12px;color:var(--metal)}'+
+    '#release-prelaunch-admin{position:fixed;z-index:99999;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:rgba(9,9,9,.92);border:1px solid rgba(212,175,55,.46);color:var(--champagne-gold);font-size:10px;font-weight:800;letter-spacing:.6px;box-shadow:0 8px 30px rgba(0,0,0,.35);pointer-events:none}'+
+    '@media(max-width:520px){.release-count-card{padding:15px 12px 14px}.release-count-unit b{font-size:21px}.release-countdown{gap:6px}}';
+  document.head.appendChild(style);
+}
+function releaseGateStartTicker(){
+  ensureReleaseGateStyles();
+  if(releaseGateTicker) return;
+  const tick=()=>{
+    document.querySelectorAll("[data-release-countdown]").forEach(el=>{el.innerHTML=releaseGateCountdownMarkup();});
+    if(!releaseGateIsActive()){
+      clearInterval(releaseGateTicker);
+      releaseGateTicker=null;
+      const badge=document.getElementById("release-prelaunch-admin"); if(badge) badge.remove();
+      try{ render(); }catch(e){}
+    }
+  };
+  tick();
+  releaseGateTicker=setInterval(tick,1000);
+}
+function releaseGateLandingBannerHtml(){
+  if(!releaseGateIsActive()) return "";
+  setTimeout(releaseGateStartTicker,0);
+  return '<div class="release-count-card" aria-label="BXH ARENA 公測倒數">'+
+    '<div class="release-count-kicker">PUBLIC BETA</div>'+
+    '<div class="release-count-title">公開測試即將開始</div>'+
+    '<div class="release-count-date">2026.09.21 SUN · 10:00</div>'+
+    '<div class="release-countdown" data-release-countdown>'+releaseGateCountdownMarkup()+'</div>'+
+    '<div class="release-count-note">BXH ARENA 正在進行開服前最後準備。<br>目前僅開放最高管理員進入系統檢查。</div>'+
+    '</div>';
+}
+function renderReleaseGateScreen(){
+  ensureReleaseGateStyles();
+  setTimeout(releaseGateStartTicker,0);
+  const action=firebaseUser
+    ? '<button class="btn btn-ghost" data-action="account-logout">登出並返回入口</button>'
+    : '<button class="btn btn-ghost" data-action="account-back-to-role">返回入口</button>';
+  return authShellOpen()+
+    '<div class="release-gate-wrap">'+
+      authBrandHeader()+
+      '<div class="release-gate-lock">🔒</div>'+
+      '<div class="release-count-kicker">BXH ARENA · PUBLIC BETA</div>'+
+      '<div class="auth-card-title" style="margin-top:8px;">系統尚未開放</div>'+
+      '<div class="auth-card-sub" style="max-width:450px;">你的連線與登入狀態正常。目前仍處於開服前準備階段，玩家與工作人員功能將於下列時間自動開放。</div>'+
+      '<div class="release-count-card">'+
+        '<div class="release-count-date">2026.09.21 SUN · 10:00</div>'+
+        '<div class="release-countdown" data-release-countdown>'+releaseGateCountdownMarkup()+'</div>'+
+        '<div class="release-count-note">公測期間系統可能持續進行功能調整與優化。</div>'+
+      '</div>'+
+      '<div class="release-gate-status">PRE-LAUNCH MODE · 目前僅最高管理員可進入</div>'+
+      '<div class="btn-row" style="justify-content:center;margin-top:18px;">'+action+'</div>'+
+    '</div>'+authShellClose();
+}
+function syncReleaseAdminBadge(){
+  ensureReleaseGateStyles();
+  let badge=document.getElementById("release-prelaunch-admin");
+  if(releaseGateIsActive() && releaseGateIsSuperAdmin()){
+    if(!badge){ badge=document.createElement("div"); badge.id="release-prelaunch-admin"; document.body.appendChild(badge); }
+    badge.textContent="🔐 PRE-LAUNCH MODE｜僅最高管理員可進入";
+  }else if(badge){ badge.remove(); }
+}
+/* ==== End Production Public Beta Release Gate ==== */
+
 function renderLandingScreen(){
   return authShellOpen() + `
     <div class="landing-home">
       ${authBrandHeader()}
+      ${releaseGateLandingBannerHtml()}
       <div class="auth-tagline">選擇身分，進入 <span class="landing-tagline-brand">BXH ARENA</span></div>
       <div class="role-cards landing-role-cards">
         <button class="role-card role-card-admin" data-action="select-role-admin">
@@ -14170,7 +14279,8 @@ function finishRenderViewport(snapshot){
   setTimeout(restore, 180);
 }
 function render(){
-  if(appPhase==='landing'&&!raffleLinkConsumed&&raffleIntent()){raffleContext().id=raffleIntent();appPhase='raffle-public';}
+  if(releaseGateIsActive() && appPhase==='landing' && !raffleLinkConsumed && raffleIntent()){raffleContext().id=null;}
+  if(!releaseGateIsActive() && appPhase==='landing'&&!raffleLinkConsumed&&raffleIntent()){raffleContext().id=raffleIntent();appPhase='raffle-public';}
   if(appPhase==='player-center')restoreRaffleIntent();
   const recipientPanel=document.getElementById('title-recipient-panel');
   if(recipientPanel&&titleRecipientState?.key===currentAuthUid()+':'+engagementSessionEpoch){titleRecipientState.open=recipientPanel.open;}
@@ -14180,6 +14290,12 @@ function render(){
   const __viewportSnapshot = captureRenderViewport();
   try{
     const app = document.getElementById("app");
+    syncReleaseAdminBadge();
+    if(releaseGateShouldBlock()){
+      app.innerHTML=renderReleaseGateScreen();
+      finishRenderViewport(__viewportSnapshot);
+      return;
+    }
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-login"){ app.innerHTML = renderAdminLoginScreen(); bindAuthInputs(); return; }
