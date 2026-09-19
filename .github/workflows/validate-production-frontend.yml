@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RIn -E 'firebase deploy|gcloud functions deploy|FirebaseExtended/action-hosting-deploy' .github/workflows; then
+          if grep -RIn --exclude='validate-production-frontend.yml' -E 'firebase deploy|gcloud functions deploy|FirebaseExtended/action-hosting-deploy' .github/workflows; then
             echo 'This candidate is validation-only; deployment action found.' >&2
             exit 1
           fi
