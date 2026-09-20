@@ -2023,3 +2023,1348 @@ button.btn-primary,
 @media(prefers-reduced-motion:reduce){
   .quick-confirm-modal #modal-confirm-btn{transition:none!important}
 }
+
+
+/* BXH ARENA account theme third-level disclosure v2.0.4 */
+.account-theme-picker{
+  margin:4px 0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  border:1px solid transparent!important;
+  border-radius:3px!important;
+  background:
+    linear-gradient(145deg,rgba(15,17,23,.30),rgba(7,9,13,.22)) padding-box,
+    linear-gradient(135deg,rgba(var(--accent-rgb),.18),rgba(255,255,255,.045),rgba(var(--accent-rgb),.08)) border-box!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.022)!important;
+}
+.account-theme-summary{
+  list-style:none;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 20px;
+  align-items:center;
+  gap:10px;
+  min-height:48px;
+  padding:9px 11px;
+  cursor:pointer;
+  user-select:none;
+  color:#e5e8ee;
+  transition:background .16s ease,color .16s ease,box-shadow .16s ease;
+}
+.account-theme-summary::-webkit-details-marker{display:none}
+.account-theme-summary::marker{content:""}
+.account-theme-summary:hover,
+.account-theme-summary:focus-visible{
+  outline:none;
+  color:var(--accent-color);
+  background:rgba(var(--accent-rgb),.055);
+  box-shadow:inset 0 0 12px rgba(var(--accent-rgb),.04);
+}
+.account-theme-summary-main{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  min-width:0;
+  line-height:1.18;
+}
+.account-theme-summary-label{
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.055em;
+}
+.account-theme-summary-main small{
+  margin-top:4px;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:rgba(222,226,234,.46);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.045em;
+}
+.account-theme-summary-caret{
+  color:var(--accent-color);
+  font-size:18px;
+  line-height:1;
+  text-align:center;
+  transform:rotate(0deg);
+  transition:transform .18s ease;
+}
+.account-theme-picker[open] .account-theme-summary-caret{transform:rotate(90deg)}
+.account-theme-picker[open] .account-theme-summary{
+  border-bottom:1px solid rgba(var(--accent-rgb),.13);
+  background:rgba(var(--accent-rgb),.038);
+}
+.account-theme-options{
+  margin-left:9px;
+  padding:8px 8px 9px 10px;
+  border-left:1px solid rgba(var(--accent-rgb),.18);
+  background:rgba(0,0,0,.12);
+}
+.account-theme-options-label{
+  margin:0 0 6px 2px;
+  color:rgba(222,226,234,.34);
+  font-size:8.5px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+.account-theme-picker .account-theme-swatches{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:5px!important;
+}
+.account-theme-picker .account-theme-swatch{
+  min-height:42px!important;
+  height:42px!important;
+}
+@media(max-width:700px){
+  .account-theme-picker{padding:0!important}
+  .account-theme-summary{min-height:46px;padding:8px 10px}
+  .account-theme-options{padding:7px 7px 8px 9px}
+}
+
+
+/* BXH ARENA check-in makeup v13.39.0 */
+.checkin-makeup-panel{
+  position:relative;
+  margin-top:12px;
+  padding:13px 14px 12px;
+  border:1px solid rgba(var(--accent-rgb),.17);
+  border-radius:14px;
+  background:
+    linear-gradient(145deg,rgba(14,17,19,.58),rgba(5,7,9,.44)) padding-box,
+    linear-gradient(135deg,rgba(var(--accent-rgb),.26),rgba(255,255,255,.045),rgba(var(--accent-rgb),.08)) border-box;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.checkin-makeup-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:7px;
+}
+.checkin-makeup-head>div{
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+  min-width:0;
+}
+.checkin-makeup-head strong{
+  color:#f0f2f4;
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:.05em;
+}
+.checkin-makeup-head>div>span{
+  color:rgba(220,225,228,.42);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.055em;
+}
+.checkin-makeup-counter{
+  flex:0 0 auto;
+  padding:4px 8px;
+  border:1px solid rgba(var(--accent-rgb),.21);
+  border-radius:999px;
+  color:var(--accent-color);
+  background:rgba(var(--accent-rgb),.055);
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.045em;
+}
+.checkin-makeup-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:10px;
+}
+.checkin-makeup-date{
+  min-width:58px!important;
+  border-color:rgba(var(--accent-rgb),.22)!important;
+}
+.checkin-makeup-date:hover,
+.checkin-makeup-date:focus-visible{
+  border-color:var(--accent-color)!important;
+  color:var(--accent-color)!important;
+  background:rgba(var(--accent-rgb),.07)!important;
+}
+.checkin-makeup-empty{
+  color:rgba(214,220,224,.42);
+  font-size:10px;
+  line-height:1.55;
+}
+.checkin-makeup-remaining{
+  margin-top:10px;
+  color:rgba(218,223,227,.45);
+  font-size:9.5px;
+  text-align:right;
+}
+.checkin-makeup-remaining b{
+  color:var(--accent-color);
+  font-size:12px;
+}
+.checkin-calendar button.checkin-day{
+  appearance:none;
+  font:inherit;
+  color:inherit;
+  cursor:pointer;
+}
+.checkin-day.makeup-eligible{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  border-style:dashed!important;
+  border-color:rgba(var(--accent-rgb),.44)!important;
+  color:#e8ebee;
+  background:rgba(var(--accent-rgb),.045)!important;
+  transition:border-color .16s ease,background .16s ease,color .16s ease,transform .12s ease;
+}
+.checkin-day.makeup-eligible small{
+  padding:1px 3px;
+  border-radius:4px;
+  color:var(--accent-color);
+  background:rgba(var(--accent-rgb),.10);
+  font-size:7px;
+  font-weight:900;
+  line-height:1.2;
+}
+.checkin-day.makeup-eligible:hover,
+.checkin-day.makeup-eligible:focus-visible{
+  outline:none;
+  border-color:var(--accent-color)!important;
+  color:var(--accent-color);
+  background:rgba(var(--accent-rgb),.10)!important;
+  transform:translateY(-1px);
+}
+.checkin-day.makeup-eligible:disabled{
+  cursor:default;
+  opacity:.45;
+  transform:none;
+}
+@media(max-width:520px){
+  .checkin-makeup-panel{padding:12px}
+  .checkin-makeup-head{align-items:flex-start}
+  .checkin-makeup-head>div{flex-direction:column;gap:2px}
+  .checkin-makeup-date{flex:1 1 calc(33.333% - 6px)}
+}
+
+
+/* BXH ARENA public raffle hierarchy v13.43.0 */
+.landing-raffle-cta{
+  border-color:rgba(220,177,65,.58)!important;
+  color:#e8c967!important;
+  background:linear-gradient(135deg,rgba(211,166,45,.10),rgba(255,255,255,.018))!important;
+  box-shadow:inset 0 1px 0 rgba(255,239,186,.05),0 0 18px rgba(203,157,38,.06)!important;
+}
+.landing-raffle-cta:hover,
+.landing-raffle-cta:focus-visible{
+  outline:none!important;
+  border-color:rgba(238,194,70,.88)!important;
+  color:#ffe28a!important;
+  background:linear-gradient(135deg,rgba(221,177,53,.17),rgba(255,255,255,.03))!important;
+  box-shadow:0 0 18px rgba(214,167,39,.13),inset 0 1px 0 rgba(255,245,202,.08)!important;
+}
+.auth-shell:has(.raffle-page-public){
+  padding-top:18px!important;
+}
+.auth-shell:has(.raffle-page-public) .auth-content{
+  width:min(760px,100%)!important;
+  justify-content:flex-start!important;
+  gap:12px!important;
+}
+.raffle-public-shellbar{
+  width:100%;
+  display:grid;
+  grid-template-columns:40px minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  margin:0 0 2px;
+  padding:8px 10px;
+  border:1px solid rgba(255,255,255,.055);
+  border-radius:14px;
+  background:rgba(8,10,12,.50);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.raffle-public-back{
+  appearance:none;
+  width:36px;
+  height:36px;
+  border:1px solid rgba(219,179,70,.26);
+  border-radius:10px;
+  color:#e8cd78;
+  background:rgba(211,170,54,.055);
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+}
+.raffle-public-back:hover,
+.raffle-public-back:focus-visible{
+  outline:none;
+  border-color:rgba(231,190,75,.62);
+  background:rgba(211,170,54,.10);
+}
+.raffle-public-shellbrand{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+.raffle-public-shellbrand strong{
+  color:#f4f1e9;
+  font:900 13px/1.15 var(--font-d);
+  letter-spacing:.16em;
+}
+.raffle-public-shellbrand span{
+  margin-top:3px;
+  color:rgba(218,190,108,.62);
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.18em;
+}
+.raffle-public-shellstatus{
+  padding:4px 8px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:999px;
+  color:rgba(220,224,226,.50);
+  background:rgba(255,255,255,.02);
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.06em;
+}
+.raffle-page-public{
+  margin:0!important;
+  padding:22px!important;
+  overflow:visible!important;
+  border:1px solid rgba(219,177,64,.16)!important;
+  border-radius:20px!important;
+  background:
+    radial-gradient(circle at 100% 0,rgba(221,180,68,.055),transparent 34%),
+    linear-gradient(155deg,rgba(16,18,19,.94),rgba(8,10,11,.97))!important;
+  box-shadow:0 20px 48px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.028)!important;
+}
+.raffle-page-public::before{display:none!important}
+.raffle-public-page-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:20px;
+  padding-bottom:17px;
+  border-bottom:1px solid rgba(255,255,255,.065);
+}
+.raffle-public-title-block{min-width:0}
+.raffle-public-kicker{
+  color:rgba(226,187,77,.62);
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.22em;
+}
+.raffle-public-title-block h1{
+  margin:5px 0 4px;
+  color:#f5f4ef;
+  font:900 clamp(24px,4vw,32px)/1.05 var(--font-d);
+  letter-spacing:.02em;
+}
+.raffle-public-title-block p{
+  margin:0;
+  color:rgba(207,212,215,.46);
+  font-size:10.5px;
+  line-height:1.45;
+}
+.raffle-page-public .raffle-toolbar{
+  flex:0 0 auto;
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.raffle-page-public .raffle-toolbar .raffle-filter{
+  min-height:36px!important;
+  padding:7px 11px!important;
+  border:1px solid rgba(255,255,255,.075)!important;
+  border-radius:10px!important;
+  color:rgba(223,227,230,.58)!important;
+  background:rgba(255,255,255,.018)!important;
+  box-shadow:none!important;
+}
+.raffle-page-public .raffle-toolbar .raffle-filter:hover,
+.raffle-page-public .raffle-toolbar .raffle-filter:focus-visible{
+  outline:none!important;
+  color:#f4e4b5!important;
+  border-color:rgba(221,178,63,.32)!important;
+  background:rgba(220,178,65,.05)!important;
+  transform:none!important;
+}
+.raffle-page-public .raffle-toolbar .raffle-filter.is-active{
+  color:#17130a!important;
+  border-color:rgba(241,202,91,.88)!important;
+  background:linear-gradient(135deg,#f2d477,#cda135)!important;
+  box-shadow:0 7px 18px rgba(196,147,31,.16),inset 0 1px 0 rgba(255,255,255,.42)!important;
+}
+.raffle-page-public .raffle-filter-refresh::before{
+  margin-right:5px;
+  font-size:14px;
+}
+.raffle-status-note{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:14px 0 0;
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,.065);
+  border-radius:12px;
+  color:rgba(219,224,227,.66);
+  background:rgba(255,255,255,.018);
+}
+.raffle-status-note>span{
+  flex:0 0 auto;
+  color:#e7d18b;
+  font-size:10px;
+  font-weight:900;
+}
+.raffle-status-note p{
+  flex:1;
+  margin:0;
+  color:rgba(216,221,224,.54);
+  font-size:10px;
+  line-height:1.45;
+}
+.raffle-status-note.is-warning{
+  border-color:rgba(222,174,61,.16);
+  background:rgba(211,162,45,.035);
+}
+.raffle-loading-state{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:120px;
+  color:rgba(211,216,219,.52);
+  font-size:11px;
+}
+.raffle-loading-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#d8b24d;
+  box-shadow:0 0 10px rgba(218,178,71,.36);
+  animation:raffle-public-pulse 1.25s ease-in-out infinite;
+}
+@keyframes raffle-public-pulse{0%,100%{opacity:.35;transform:scale(.82)}50%{opacity:1;transform:scale(1.08)}}
+.raffle-page-public .raffle-card-grid{
+  margin-top:16px;
+}
+.raffle-empty-state{
+  grid-column:1/-1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:230px;
+  padding:34px 18px;
+  text-align:center;
+  border:1px dashed rgba(255,255,255,.07);
+  border-radius:16px;
+  background:rgba(255,255,255,.012);
+}
+.raffle-empty-icon{
+  display:grid;
+  place-items:center;
+  width:48px;
+  height:48px;
+  margin-bottom:12px;
+  border:1px solid rgba(220,179,68,.18);
+  border-radius:15px;
+  color:#d7b659;
+  background:rgba(215,173,55,.045);
+  font-size:21px;
+  filter:saturate(.72);
+}
+.raffle-empty-state strong{
+  color:#e8e8e5;
+  font-size:14px;
+  font-weight:900;
+}
+.raffle-empty-state p{
+  margin:6px 0 14px;
+  color:rgba(203,209,212,.42);
+  font-size:10.5px;
+}
+@media(max-width:700px){
+  .auth-shell:has(.raffle-page-public){padding:12px 10px 26px!important}
+  .raffle-public-shellbar{grid-template-columns:38px minmax(0,1fr) auto;padding:7px 8px}
+  .raffle-public-shellstatus{display:none}
+  .raffle-page-public{padding:16px!important;border-radius:16px!important}
+  .raffle-public-page-head{align-items:stretch;flex-direction:column;gap:12px;padding-bottom:14px}
+  .raffle-page-public .raffle-toolbar{width:100%;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px!important}
+  .raffle-page-public .raffle-toolbar .raffle-filter{width:100%!important;min-width:0!important}
+  .raffle-page-public .raffle-toolbar .raffle-filter-refresh:last-child:nth-child(3){grid-column:1/-1}
+  .raffle-status-note{align-items:flex-start;flex-wrap:wrap}
+  .raffle-status-note p{flex-basis:calc(100% - 100px)}
+  .raffle-empty-state{min-height:200px;padding:28px 14px}
+}
+@media(prefers-reduced-motion:reduce){.raffle-loading-dot{animation:none!important}}
+
+
+/* BXH ARENA player bracket progress CTA v13.43.1 */
+.schedule-fold .player-bracket-progress-btn,
+.tournament-live-view-actions .player-bracket-progress-btn{
+  border-color:rgba(231,190,75,.78)!important;
+  background:linear-gradient(135deg,#f1d36e,#c99d32)!important;
+  color:#151006!important;
+  font-weight:900!important;
+  box-shadow:0 8px 20px rgba(202,154,37,.16),inset 0 1px 0 rgba(255,255,255,.42)!important;
+}
+.schedule-fold .player-bracket-progress-btn::before,
+.tournament-live-view-actions .player-bracket-progress-btn::before{
+  content:"⌘";
+  margin-right:5px;
+  font-size:.95em;
+}
+.schedule-fold .player-bracket-progress-btn:hover,
+.schedule-fold .player-bracket-progress-btn:focus-visible,
+.tournament-live-view-actions .player-bracket-progress-btn:hover,
+.tournament-live-view-actions .player-bracket-progress-btn:focus-visible{
+  outline:none!important;
+  filter:brightness(1.05);
+  box-shadow:0 10px 24px rgba(202,154,37,.22),0 0 14px rgba(231,190,75,.10),inset 0 1px 0 rgba(255,255,255,.48)!important;
+}
+.tournament-live-view-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+}
+@media(max-width:520px){
+  .schedule-fold .fe-card-action .player-bracket-progress-btn{
+    flex:1 1 100%!important;
+    order:-1;
+    min-height:42px!important;
+  }
+  .tournament-live-view-actions .btn{
+    flex:1 1 100%;
+  }
+}
+
+
+/* BXH ARENA schedule glass transparency v2.0.8 */
+/* My Schedule / BXH CALL only: lighter glass, preserve text contrast. */
+.schedule-fold .find-event-card{
+  background:
+    linear-gradient(145deg,rgba(18,24,34,.42),rgba(6,10,17,.48)) padding-box,
+    linear-gradient(135deg,rgba(var(--accent-rgb),.23),rgba(255,255,255,.028) 50%,rgba(var(--accent-rgb),.11)) border-box!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,235,175,.021),
+    inset 0 0 22px rgba(var(--accent-rgb),.014),
+    0 12px 28px rgba(0,0,0,.16)!important;
+  backdrop-filter:blur(9px) saturate(1.025)!important;
+  -webkit-backdrop-filter:blur(9px) saturate(1.025)!important;
+}
+.schedule-fold .find-event-card::after{
+  background:linear-gradient(110deg,transparent 18%,rgba(255,255,255,.008) 48%,transparent 74%)!important;
+  opacity:.62!important;
+}
+.schedule-fold .smart-call-box{
+  border-color:rgba(var(--accent-rgb),.17)!important;
+  background:
+    linear-gradient(135deg,rgba(var(--accent-rgb),.030),rgba(7,9,12,.44))!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.014),
+    0 8px 22px rgba(0,0,0,.09)!important;
+  backdrop-filter:blur(7px) saturate(1.015);
+  -webkit-backdrop-filter:blur(7px) saturate(1.015);
+}
+.schedule-fold .smart-call-body{
+  border-top-color:rgba(255,255,255,.045)!important;
+}
+.schedule-fold .smart-call-stat{
+  background:rgba(255,255,255,.016)!important;
+  border:1px solid rgba(255,255,255,.022);
+}
+.schedule-fold .smart-call-box .auth-error{
+  border-color:rgba(var(--accent-rgb),.13)!important;
+  background:rgba(11,13,18,.24)!important;
+  box-shadow:none!important;
+  backdrop-filter:blur(6px)!important;
+  -webkit-backdrop-filter:blur(6px)!important;
+}
+.schedule-fold .smart-call-status{
+  color:rgba(207,212,220,.76)!important;
+}
+.schedule-fold .smart-call-note,
+.schedule-fold .smart-call-box .hint{
+  color:rgba(188,195,198,.40)!important;
+}
+@supports not ((backdrop-filter:blur(8px)) or (-webkit-backdrop-filter:blur(8px))){
+  .schedule-fold .find-event-card{background:rgba(11,15,22,.66)!important}
+  .schedule-fold .smart-call-box{background:rgba(9,11,15,.60)!important}
+}
+
+
+/* BXH ARENA landing action buttons v13.43.2 */
+/* Unified BXH landing CTA geometry: compact esports corners, clear primary/secondary hierarchy. */
+.landing-home > .btn-row{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+  width:100%!important;
+  align-items:stretch!important;
+}
+.landing-home > .btn-row .btn{
+  position:relative!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  min-width:0!important;
+  min-height:46px!important;
+  height:46px!important;
+  padding:0 14px!important;
+  border-width:1px!important;
+  border-style:solid!important;
+  border-radius:6px!important;
+  font-size:12px!important;
+  font-weight:900!important;
+  line-height:1!important;
+  letter-spacing:.035em!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  transition:
+    transform .15s ease,
+    filter .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    box-shadow .18s ease!important;
+}
+
+/* Primary — Scan event QR */
+.landing-home > .btn-row .btn.btn-primary{
+  border-color:rgba(242,200,83,.88)!important;
+  color:#171106!important;
+  background:
+    linear-gradient(180deg,rgba(255,232,151,.24),transparent 42%),
+    linear-gradient(135deg,#e4c35d 0%,#c99a2e 58%,#ae7d18 100%)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,249,218,.42),
+    inset 0 -1px 0 rgba(73,48,5,.22),
+    0 8px 20px rgba(176,126,24,.16)!important;
+}
+
+/* Secondary — Member raffle */
+.landing-home > .btn-row .landing-raffle-cta{
+  border-color:rgba(218,174,58,.62)!important;
+  color:#e7c96d!important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.018),transparent),
+    linear-gradient(135deg,rgba(214,169,48,.055),rgba(5,8,11,.42))!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,241,193,.045),
+    inset 0 0 16px rgba(206,157,36,.025)!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+}
+
+.landing-home > .btn-row .btn:hover:not(:disabled),
+.landing-home > .btn-row .btn:focus-visible{
+  outline:none!important;
+  transform:translateY(-1px)!important;
+}
+.landing-home > .btn-row .btn.btn-primary:hover:not(:disabled),
+.landing-home > .btn-row .btn.btn-primary:focus-visible{
+  filter:brightness(1.06) saturate(1.03)!important;
+  border-color:#f3d06b!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,249,218,.50),
+    inset 0 -1px 0 rgba(73,48,5,.18),
+    0 10px 24px rgba(183,132,27,.22),
+    0 0 16px rgba(219,176,63,.09)!important;
+}
+.landing-home > .btn-row .landing-raffle-cta:hover:not(:disabled),
+.landing-home > .btn-row .landing-raffle-cta:focus-visible{
+  color:#f4d879!important;
+  border-color:rgba(238,194,70,.86)!important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.026),transparent),
+    linear-gradient(135deg,rgba(219,174,53,.09),rgba(7,9,12,.46))!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,245,205,.06),
+    0 0 16px rgba(214,167,39,.08)!important;
+}
+.landing-home > .btn-row .btn:active:not(:disabled){
+  transform:translateY(0) scale(.985)!important;
+}
+@media(max-width:380px){
+  .landing-home > .btn-row{gap:8px!important}
+  .landing-home > .btn-row .btn{
+    height:44px!important;
+    min-height:44px!important;
+    padding:0 10px!important;
+    font-size:11px!important;
+    gap:5px!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .landing-home > .btn-row .btn{transition:none!important}
+}
+
+
+/* BXH ARENA public raffle compact cards v13.43.3 */
+/* Compact equal-height landscape cards for MEMBER RAFFLE. */
+.raffle-page-public .raffle-card-grid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  grid-auto-rows:146px!important;
+  align-items:stretch!important;
+  gap:12px!important;
+  margin-top:14px!important;
+}
+
+.raffle-page-public .raffle-game-card{
+  position:relative!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:flex-start!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:146px!important;
+  min-height:0!important;
+  max-height:146px!important;
+  padding:13px 14px 12px 16px!important;
+  border-radius:6px!important;
+  overflow:hidden!important;
+  background:
+    linear-gradient(145deg,rgba(24,29,38,.88),rgba(8,12,19,.95))!important;
+  border:1px solid rgba(212,169,54,.34)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,245,206,.035),
+    0 9px 21px rgba(0,0,0,.19)!important;
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease!important;
+}
+
+.raffle-page-public .raffle-game-card::before{
+  width:3px!important;
+  box-shadow:0 0 10px rgba(226,178,55,.28)!important;
+}
+
+/* Action stays compact in the top-right instead of consuming card height. */
+.raffle-page-public .raffle-game-card::after{
+  top:11px!important;
+  right:11px!important;
+  bottom:auto!important;
+  color:rgba(229,194,94,.72)!important;
+  font-size:9px!important;
+  font-weight:850!important;
+  line-height:1!important;
+  letter-spacing:.02em!important;
+}
+.raffle-page-public .raffle-game-card.is-raffle-pending::after{
+  content:"進入 ›"!important;
+}
+.raffle-page-public .raffle-game-card.is-raffle-drawn::after{
+  content:"結果 ›"!important;
+}
+
+.raffle-page-public .raffle-game-card:hover{
+  transform:translateY(-2px)!important;
+  border-color:rgba(231,188,69,.52)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,245,206,.045),
+    0 12px 25px rgba(0,0,0,.24)!important;
+}
+
+.raffle-page-public .raffle-card-head{
+  width:100%!important;
+  min-width:0!important;
+  margin:0 0 7px!important;
+  padding-right:46px!important;
+  gap:6px!important;
+}
+
+.raffle-page-public .raffle-game-card > h3,
+.raffle-page-public .raffle-card-head h3{
+  margin:0 0 7px!important;
+  padding:0 46px 0 0!important;
+  max-width:100%!important;
+  color:#f4f5f7!important;
+  font-size:16px!important;
+  font-weight:900!important;
+  line-height:1.2!important;
+  letter-spacing:.01em!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.raffle-page-public .raffle-card-head h3{
+  flex:1 1 auto!important;
+  padding-right:0!important;
+  margin-bottom:0!important;
+}
+
+.raffle-page-public .raffle-game-card p:not(.hint){
+  display:inline-flex!important;
+  align-items:center!important;
+  flex:0 0 auto!important;
+  min-height:27px!important;
+  margin:0 0 7px!important;
+  padding:4px 9px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(230,186,67,.30)!important;
+  color:#ecd17e!important;
+  background:rgba(210,160,39,.075)!important;
+  font-size:10.5px!important;
+  font-weight:850!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+}
+
+.raffle-page-public .raffle-game-card .hint{
+  width:100%!important;
+  max-width:100%!important;
+  margin:auto 0 0!important;
+  padding:0 48px 0 0!important;
+  color:rgba(173,184,200,.72)!important;
+  font-size:10px!important;
+  line-height:1.42!important;
+}
+
+.raffle-page-public .raffle-winner-badge{
+  flex:0 0 auto!important;
+  padding:3px 6px!important;
+  font-size:8.5px!important;
+}
+
+.raffle-page-public .raffle-game-card.is-raffle-drawn{
+  background:
+    radial-gradient(circle at 100% 0,rgba(219,174,49,.08),transparent 44%),
+    linear-gradient(145deg,rgba(29,32,37,.92),rgba(10,14,20,.97))!important;
+}
+
+/* Tablet / narrow panel: keep the landscape two-column look. */
+@media(max-width:700px){
+  .raffle-page-public .raffle-card-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    grid-auto-rows:142px!important;
+    gap:10px!important;
+  }
+  .raffle-page-public .raffle-game-card{
+    height:142px!important;
+    max-height:142px!important;
+    padding:12px 11px 11px 14px!important;
+  }
+  .raffle-page-public .raffle-game-card > h3,
+  .raffle-page-public .raffle-card-head h3{
+    font-size:15px!important;
+  }
+  .raffle-page-public .raffle-game-card p:not(.hint){
+    min-height:25px!important;
+    padding:3px 8px!important;
+    font-size:10px!important;
+  }
+  .raffle-page-public .raffle-game-card .hint{
+    font-size:9.5px!important;
+    padding-right:40px!important;
+  }
+}
+
+/* Very narrow phones: one wide horizontal card per row. */
+@media(max-width:420px){
+  .raffle-page-public .raffle-card-grid{
+    grid-template-columns:1fr!important;
+    grid-auto-rows:126px!important;
+  }
+  .raffle-page-public .raffle-game-card{
+    height:126px!important;
+    max-height:126px!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .raffle-page-public .raffle-game-card{transition:none!important}
+}
+
+
+/* BXH ARENA public raffle landscape rows v13.43.4 */
+/* Final compact single-column member raffle cards. */
+.raffle-page-public .raffle-card-grid{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  grid-auto-rows:92px!important;
+  align-items:stretch!important;
+  gap:9px!important;
+  margin-top:14px!important;
+}
+
+.raffle-page-public .raffle-game-card{
+  position:relative!important;
+  display:block!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:92px!important;
+  min-height:92px!important;
+  max-height:92px!important;
+  padding:13px 14px 12px 16px!important;
+  border-radius:6px!important;
+  overflow:hidden!important;
+  border:1px solid rgba(212,169,54,.30)!important;
+  background:
+    linear-gradient(145deg,rgba(24,29,38,.88),rgba(8,12,19,.95))!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,245,206,.03),
+    0 8px 18px rgba(0,0,0,.16)!important;
+}
+
+.raffle-page-public .raffle-game-card::before{
+  position:absolute!important;
+  left:0!important;
+  top:0!important;
+  bottom:0!important;
+  width:3px!important;
+}
+
+/* Top-right action: keep fully inside the card. */
+.raffle-page-public .raffle-game-card::after{
+  position:absolute!important;
+  top:14px!important;
+  right:13px!important;
+  bottom:auto!important;
+  left:auto!important;
+  z-index:3!important;
+  width:auto!important;
+  max-width:none!important;
+  color:rgba(231,195,95,.78)!important;
+  font-size:10px!important;
+  font-weight:900!important;
+  line-height:1!important;
+  letter-spacing:.02em!important;
+  white-space:nowrap!important;
+  transform:none!important;
+}
+.raffle-page-public .raffle-game-card.is-raffle-pending::after{
+  content:"進入 ›"!important;
+}
+.raffle-page-public .raffle-game-card.is-raffle-drawn::after{
+  content:"結果 ›"!important;
+}
+
+/* Title: top-left. */
+.raffle-page-public .raffle-game-card > h3,
+.raffle-page-public .raffle-card-head h3{
+  position:absolute!important;
+  left:16px!important;
+  top:12px!important;
+  right:72px!important;
+  margin:0!important;
+  padding:0!important;
+  max-width:none!important;
+  color:#f5f6f8!important;
+  font-size:16px!important;
+  font-weight:900!important;
+  line-height:1.2!important;
+  letter-spacing:.01em!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.raffle-page-public .raffle-card-head{
+  position:static!important;
+  display:block!important;
+  width:auto!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* Status: bottom-left. */
+.raffle-page-public .raffle-game-card p:not(.hint){
+  position:absolute!important;
+  left:16px!important;
+  bottom:11px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  width:auto!important;
+  min-height:25px!important;
+  margin:0!important;
+  padding:3px 8px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(230,186,67,.28)!important;
+  color:#ecd17e!important;
+  background:rgba(210,160,39,.07)!important;
+  font-size:10px!important;
+  font-weight:850!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+}
+
+/* Deadline: bottom-right. */
+.raffle-page-public .raffle-game-card .hint{
+  position:absolute!important;
+  right:13px!important;
+  bottom:13px!important;
+  left:auto!important;
+  width:auto!important;
+  max-width:52%!important;
+  margin:0!important;
+  padding:0!important;
+  color:rgba(172,184,201,.72)!important;
+  font-size:9.5px!important;
+  line-height:1.25!important;
+  text-align:right!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+
+.raffle-page-public .raffle-winner-badge{
+  position:absolute!important;
+  top:38px!important;
+  right:13px!important;
+  z-index:2!important;
+  padding:2px 6px!important;
+  font-size:8px!important;
+}
+
+/* Keep hover restrained for list-style cards. */
+.raffle-page-public .raffle-game-card:hover{
+  transform:translateY(-1px)!important;
+  border-color:rgba(231,188,69,.48)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,245,206,.04),
+    0 10px 22px rgba(0,0,0,.20)!important;
+}
+
+/* Mobile keeps the same horizontal information pattern. */
+@media(max-width:700px){
+  .raffle-page-public .raffle-card-grid{
+    grid-template-columns:1fr!important;
+    grid-auto-rows:88px!important;
+    gap:8px!important;
+  }
+  .raffle-page-public .raffle-game-card{
+    height:88px!important;
+    min-height:88px!important;
+    max-height:88px!important;
+    padding:12px 12px 10px 14px!important;
+  }
+  .raffle-page-public .raffle-game-card > h3,
+  .raffle-page-public .raffle-card-head h3{
+    left:14px!important;
+    top:11px!important;
+    right:64px!important;
+    font-size:15px!important;
+  }
+  .raffle-page-public .raffle-game-card::after{
+    top:13px!important;
+    right:11px!important;
+    font-size:9.5px!important;
+  }
+  .raffle-page-public .raffle-game-card p:not(.hint){
+    left:14px!important;
+    bottom:10px!important;
+    min-height:23px!important;
+    padding:3px 7px!important;
+    font-size:9.5px!important;
+  }
+  .raffle-page-public .raffle-game-card .hint{
+    right:11px!important;
+    bottom:12px!important;
+    max-width:50%!important;
+    font-size:9px!important;
+  }
+}
+
+@media(max-width:390px){
+  .raffle-page-public .raffle-game-card .hint{
+    max-width:46%!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .raffle-page-public .raffle-game-card{transition:none!important}
+}
+
+
+/* BXH ARENA player entrance order v13.43.5 */
+/* Visual order: APPLY -> LOGIN -> LOOKUP. Scope only to the player-center entrance. */
+.auth-shell:has(.role-cards [data-action="player-goto-login"]) .role-cards
+  > [data-action^="player-goto-"]:nth-child(1){
+  order:2!important;
+}
+.auth-shell:has(.role-cards [data-action="player-goto-login"]) .role-cards
+  > [data-action^="player-goto-"]:nth-child(2){
+  order:1!important;
+}
+.auth-shell:has(.role-cards [data-action="player-goto-login"]) .role-cards
+  > [data-action^="player-goto-"]:nth-child(3){
+  order:3!important;
+}
+
+
+/* BXH ARENA topbar control geometry v13.43.6 */
+/* Unify mailbox + account selector into the same compact BXH rectangle. */
+.mailbox-trigger,
+.account-badge{
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:40px!important;
+  height:40px!important;
+  padding:0 12px!important;
+  border-width:1px!important;
+  border-style:solid!important;
+  border-radius:8px!important;
+  font-size:12px!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+}
+
+.mailbox-trigger{
+  border-color:rgba(var(--accent-rgb),.34)!important;
+  background:rgba(15,17,23,.40)!important;
+  color:rgba(235,219,164,.88)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important;
+  backdrop-filter:blur(12px) saturate(1.08)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(1.08)!important;
+}
+
+.account-badge{
+  border-color:rgba(var(--accent-rgb),.34)!important;
+  background:rgba(15,17,23,.40)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important;
+}
+
+.mailbox-trigger:hover,
+.mailbox-trigger:focus-visible,
+.mailbox-trigger.active,
+.account-badge:hover,
+.account-badge:focus-visible,
+.account-badge[aria-expanded="true"]{
+  outline:none!important;
+  border-color:var(--accent-color)!important;
+  background:rgba(var(--accent-rgb),.055)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    0 0 16px var(--accent-glow)!important;
+}
+
+@media(max-width:520px){
+  .mailbox-trigger,
+  .account-badge{
+    min-height:38px!important;
+    height:38px!important;
+    padding:0 10px!important;
+    border-radius:8px!important;
+  }
+}
+
+
+/* BXH ARENA generic modal button geometry v13.43.8 */
+/* Keep generic confirmation buttons' fill, border, hit area and radius perfectly aligned. */
+.modal-box:not(.quick-confirm-modal) > .btn-row{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:10px!important;
+  width:100%!important;
+  box-sizing:border-box!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn,
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-confirm-btn{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  min-width:0!important;
+  height:46px!important;
+  min-height:46px!important;
+  max-height:46px!important;
+  margin:0!important;
+  padding:0 14px!important;
+  box-sizing:border-box!important;
+  border-width:1px!important;
+  border-style:solid!important;
+  border-radius:8px!important;
+  overflow:hidden!important;
+  background-clip:border-box!important;
+  line-height:1!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn{
+  border-color:rgba(222,226,235,.18)!important;
+  background:rgba(255,255,255,.035)!important;
+  color:rgba(220,224,232,.62)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025)!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn:hover,
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn:focus-visible{
+  outline:none!important;
+  border-color:rgba(var(--accent-rgb),.34)!important;
+  background:rgba(var(--accent-rgb),.045)!important;
+  color:rgba(237,239,244,.80)!important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 0 12px rgba(var(--accent-rgb),.06)!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-confirm-btn{
+  border-radius:8px!important;
+}
+
+@media(max-width:520px){
+  .modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn,
+  .modal-box:not(.quick-confirm-modal) > .btn-row > #modal-confirm-btn{
+    height:46px!important;
+    min-height:46px!important;
+    max-height:46px!important;
+  }
+}
+
+
+/* BXH ARENA landing action hierarchy v13.43.9 */
+/* QR is the primary landing shortcut; raffle is a secondary service entry. */
+.landing-home > .btn-row{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  justify-items:stretch!important;
+  gap:9px!important;
+  width:100%!important;
+}
+
+.landing-home > .btn-row .btn.btn-primary{
+  width:100%!important;
+  min-height:50px!important;
+  height:50px!important;
+  justify-self:stretch!important;
+  font-size:13px!important;
+  letter-spacing:.04em!important;
+}
+
+.landing-home > .btn-row .landing-raffle-cta{
+  width:auto!important;
+  min-width:0!important;
+  min-height:36px!important;
+  height:36px!important;
+  justify-self:center!important;
+  padding:0 13px!important;
+  border-color:rgba(218,174,58,.28)!important;
+  border-radius:8px!important;
+  color:rgba(231,201,109,.80)!important;
+  background:rgba(255,255,255,.012)!important;
+  box-shadow:none!important;
+  font-size:11.5px!important;
+  font-weight:850!important;
+  letter-spacing:.03em!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+.landing-home > .btn-row .landing-raffle-cta:hover:not(:disabled),
+.landing-home > .btn-row .landing-raffle-cta:focus-visible{
+  transform:translateY(-1px)!important;
+  border-color:rgba(238,194,70,.52)!important;
+  color:#f1d57a!important;
+  background:rgba(216,171,51,.035)!important;
+  box-shadow:0 0 12px rgba(214,167,39,.055)!important;
+}
+
+@media(max-width:640px){
+  .landing-home > .btn-row{
+    gap:8px!important;
+  }
+  .landing-home > .btn-row .btn.btn-primary{
+    min-height:48px!important;
+    height:48px!important;
+    font-size:12.5px!important;
+  }
+  .landing-home > .btn-row .landing-raffle-cta{
+    min-height:34px!important;
+    height:34px!important;
+    padding:0 11px!important;
+    font-size:11px!important;
+  }
+}
+
+
+/* BXH ARENA generic modal action tray fix v13.43.10 */
+/* Remove legacy sticky action-tray backdrop that visually extends beyond the cancel button. */
+.modal-box:not(.quick-confirm-modal) > .btn-row{
+  position:static!important;
+  bottom:auto!important;
+  margin:18px 0 0!important;
+  margin-bottom:0!important;
+  padding:0!important;
+  background:none!important;
+  background-color:transparent!important;
+  box-shadow:none!important;
+  border:0!important;
+  overflow:visible!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row::before,
+.modal-box:not(.quick-confirm-modal) > .btn-row::after{
+  display:none!important;
+  content:none!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn,
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-confirm-btn{
+  position:relative!important;
+  inset:auto!important;
+  flex:none!important;
+  width:100%!important;
+  height:46px!important;
+  min-height:46px!important;
+  max-height:46px!important;
+  margin:0!important;
+  padding:0 14px!important;
+  box-sizing:border-box!important;
+  appearance:none!important;
+  -webkit-appearance:none!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn{
+  border:1px solid rgba(222,226,235,.18)!important;
+  border-radius:8px!important;
+  background:rgba(255,255,255,.035)!important;
+  background-image:none!important;
+  box-shadow:none!important;
+}
+
+@media(max-width:640px){
+  .modal-box:not(.quick-confirm-modal) > .btn-row{
+    bottom:auto!important;
+    margin-top:18px!important;
+    padding:0!important;
+    background:none!important;
+  }
+}
+
+
+/* BXH ARENA modal cancel same-surface fix v13.43.11 */
+/* Cancel button uses the modal surface itself: no separate gray fill block. */
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn{
+  border:1px solid rgba(var(--accent-rgb),.28)!important;
+  border-radius:8px!important;
+  background:transparent!important;
+  background-color:transparent!important;
+  background-image:none!important;
+  color:rgba(226,229,235,.72)!important;
+  box-shadow:none!important;
+}
+
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn:hover,
+.modal-box:not(.quick-confirm-modal) > .btn-row > #modal-cancel-btn:focus-visible{
+  outline:none!important;
+  border-color:rgba(var(--accent-rgb),.46)!important;
+  background:rgba(var(--accent-rgb),.025)!important;
+  color:#eef0f3!important;
+  box-shadow:none!important;
+}
