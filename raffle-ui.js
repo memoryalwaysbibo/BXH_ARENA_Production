@@ -146,10 +146,16 @@ async function handleRaffle(action,target){
 function captureRaffleDraft(e){const el=e.target,c=raffleContext();if(!c.editing||c.busy||c.pending)return;const field=el.getAttribute?.('data-raffle-field'),prize=el.getAttribute?.('data-raffle-prize'),rule=el.getAttribute?.('data-raffle-rule'),key=el.getAttribute?.('data-key');if(field&&Object.hasOwn(c.draft,field))c.draft[field]=el.type==='checkbox'?el.checked:el.value;if(prize!==null&&prize!==undefined&&c.draft.prizes[Number(prize)]&&['name','quantity','imageUrl'].includes(key))c.draft.prizes[Number(prize)][key]=key==='quantity'?Number(el.value):el.value;if(rule!==null&&rule!==undefined&&c.draft.conditions[Number(rule)]&&['unit','value','itemCode','quantity','mode','code','stage','note'].includes(key))c.draft.conditions[Number(rule)][key]=['value','quantity'].includes(key)?Number(el.value):el.value;}
 document.addEventListener('input',captureRaffleDraft);document.addEventListener('change',captureRaffleDraft);
 setInterval(()=>{
+ if(document.hidden)return;
  raffleAnnouncementsState.loaded=false;
  const c=raffleContext();
  if(!c.loading&&!c.busy&&!c.editing&&!c.pending&&c.id&&['open','freezing','locked'].includes(c.detail?.event?.state)&&(appPhase==='raffle-public'||appPhase==='player-center'&&playerActiveTab==='raffles'))loadRaffles();
 },60000);
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden)return;
+ const c=raffleContext();
+ if(!c.loading&&!c.busy&&!c.editing&&!c.pending&&c.id&&['open','freezing','locked'].includes(c.detail?.event?.state)&&(appPhase==='raffle-public'||appPhase==='player-center'&&playerActiveTab==='raffles'))loadRaffles();
+});
 function playRaffleReplay(detail){
  if(!detail?.drawnAt)return;
  window.bxhRaffleReplay?.open(detail);
