@@ -2755,7 +2755,8 @@ let mainTabNavCenterRequested = true;
 
 /* ==== leave tournament ==== */
 let leaveTournamentBusy = false;
-let publicWatchReturnContext = null; // "player-center" | "guest-lobby" when viewing a public room
+let publicWatchReturnContext = null; // "player-center" | "guest-lobby" when viewing from the lobby
+let publicWatchUsesPrivateData = false; // privileged operator entered from lobby but is subscribed to the full tournament document
 // "最近查看" — up to 3 entries, each ONLY {code, name, viewedAt}. Never stores
 // private tournament data, phone numbers, or a full tournament JSON blob.
 // Only ever populated from a REAL successful public join, never fabricated.
@@ -5548,7 +5549,8 @@ async function resolveAndJoinTournamentByCode(rawCode, opts){
   // Guests and players only ever get the safe, filtered public mirror.
   // Admin-tier gets the full document by default, unless the caller
   // explicitly asks to browse read-only (opts.forcePublic).
-  const usePublic = opts.forcePublic || currentRole==="guest" || currentRole==="player" || !hasAdminAccess();
+  const forcePrivate = opts.forcePrivate===true && hasPrivilegedTournamentProfile();
+  const usePublic = forcePrivate ? false : (opts.forcePublic || currentRole==="guest" || currentRole==="player" || !hasAdminAccess());
   const result = usePublic
     ? await window.cloudSync.joinRoomPublic(code)
     : await window.cloudSync.joinRoom(code);
@@ -5570,7 +5572,8 @@ async function previewTournamentByCode(rawCode, opts){
   if(code === state.cloudCode) return { ok:false, reason:"same-tournament", code };
   if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
   if(!cloudAvailable()) return { ok:false, reason:"network", code };
-  const usePublic = opts.forcePublic || currentRole==="guest" || currentRole==="player" || !hasAdminAccess();
+  const forcePrivate = opts.forcePrivate===true && hasPrivilegedTournamentProfile();
+  const usePublic = forcePrivate ? false : (opts.forcePublic || currentRole==="guest" || currentRole==="player" || !hasAdminAccess());
   const result = usePublic
     ? await window.cloudSync.joinRoomPublic(code)
     : await window.cloudSync.joinRoom(code);
@@ -6621,8 +6624,17 @@ const ADMIN_TIER_ONLY_ACTIONS = new Set([
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
+const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
+  "score","undo-score","rematch","confirm-result",
+  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status",
+  "skip-match","claim-skipped-match","open-quick-confirm"
+]);
 
 function hasAdminAccess(){ return currentRole === "admin" || currentRole === "tester"; }
+function hasPrivilegedTournamentProfile(){
+  return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
+    ["super_admin","admin","staff"].includes(userProfile.role));
+}
 function isCommunityRoom(){ return !!(state && state.meta && state.meta.eventAuthority==="community"); }
 function isOwnTesterSandboxRoom(st=state){
   const uid=currentAuthUid(),m=st&&st.meta||{};
@@ -6667,7 +6679,7 @@ function testSandboxBannerHtml(st=state){
   const label=expires?new Date(expires).toLocaleString():"建立後 7 天";
   return `<div class="banner warn test-sandbox-banner"><span><b>封測沙盒（測試）</b>｜所有新增與操作皆為測試資料，不會進入正式天梯；預計 ${esc(label)} 自動清除。</span></div>`;
 }
-function canOperateCurrentTournament(){ return (hasAdminAccess() && (!isTester() || isOwnTestTournament())) || isCommunityRoomOwner(); }
+function canOperateCurrentTournament(){ return (hasAdminAccess() && (!isTester() || isOwnTestTournament())) || (hasPrivilegedTournamentProfile() && !isCommunityRoom()) || isCommunityRoomOwner(); }
 function canConfigureCurrentTournament(){ return isAdminTierOrAbove() || isOwnTestTournament() || isCommunityRoomOwner(); }
 function canJoinCloudRoom(){ return currentRole === "admin" || currentRole === "guest" || currentRole === "player"; }
 function isSuperAdmin(){ return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin"); }
@@ -15093,7 +15105,7 @@ function renderApp(){
         <div class="spacer"></div>
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
-      ${publicWatchReturnContext?`<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">← 返回賽事大廳</button><span>目前為公開觀賽模式</span></div>`:""}
+      ${publicWatchReturnContext?`<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">← 返回賽事大廳</button><span>${publicWatchUsesPrivateData?"目前為管理觀賽模式":"目前為公開觀賽模式"}</span></div>`:""}
       <nav class="tabs">
         ${tabs.map(t=>`<button class="${activeTab===t[0]?'active':''}" data-action="switch-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}
       </nav>
@@ -15733,7 +15745,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     showToast("封測帳號只能在自己的測試賽事啟用測試天梯。", true);
     return;
   }
-  if(ADMIN_ONLY_ACTIONS.has(action) && !hasAdminAccess() && !(isCommunityRoomOwner() && COMMUNITY_OWNER_ACTIONS.has(action))){
+  const profileCanOperateLive = hasPrivilegedTournamentProfile() && !isCommunityRoom() && TOURNAMENT_LIVE_OPERATOR_ACTIONS.has(action);
+  if(ADMIN_ONLY_ACTIONS.has(action) && !hasAdminAccess() && !profileCanOperateLive && !(isCommunityRoomOwner() && COMMUNITY_OWNER_ACTIONS.has(action))){
     showToast("目前身分沒有此操作權限。", true);
     return;
   }
@@ -16382,8 +16395,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!code) return;
     publicWatchReturnContext = currentRole==="guest" ? "guest-lobby" : "player-center";
     (async()=>{
-      const result=await resolveAndJoinTournamentByCode(code,{forcePublic:true});
-      if(!result.ok){ publicWatchReturnContext=null; showToast(CODE_ENTRY_ERROR_MESSAGES[result.reason]||"無法開啟賽事",true); return; }
+      const privileged=hasPrivilegedTournamentProfile();
+      const result=await resolveAndJoinTournamentByCode(code,privileged?{forcePrivate:true}:{forcePublic:true});
+      if(!result.ok){ publicWatchReturnContext=null; publicWatchUsesPrivateData=false; showToast(CODE_ENTRY_ERROR_MESSAGES[result.reason]||"無法開啟賽事",true); return; }
+      publicWatchUsesPrivateData=result.usePublic===false;
       if(currentRole==="guest") await saveGuestSession(state.cloudCode);
       appPhase="app"; activeTab=requestedView; render();
     })();
@@ -16395,7 +16410,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     publicWatchReturnContext = currentRole==="guest" ? "guest-lobby" : "player-center";
     (async()=>{
       const result=await resolveAndJoinTournamentByCode(code,{forcePublic:true});
-      if(!result.ok){publicWatchReturnContext=null;showToast(CODE_ENTRY_ERROR_MESSAGES[result.reason]||"無法開啟賽事",true);return;}
+      if(!result.ok){publicWatchReturnContext=null;publicWatchUsesPrivateData=false;showToast(CODE_ENTRY_ERROR_MESSAGES[result.reason]||"無法開啟賽事",true);return;}
+      publicWatchUsesPrivateData=false;
       if(currentRole==="guest")await saveGuestSession(state.cloudCode);
       appPhase="app";activeTab="bracket";
       if(state.championId||state.runnerUpId||state.thirdId||state.fourthId){
@@ -16414,6 +16430,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     cloudStatus="local";
     const dest=publicWatchReturnContext || (currentRole==="guest"?"guest-lobby":"player-center");
     publicWatchReturnContext=null;
+    publicWatchUsesPrivateData=false;
     state=defaultState();
     resetTournamentDetailState();
     if(dest==="guest-lobby" || currentRole==="guest"){
@@ -21060,7 +21077,26 @@ if(testerSession){
         const normalized=String(code).toUpperCase();
         await fx.runTransaction(dbHandle,async tx=>{
           const ref=fx.doc(dbHandle,"tournaments",normalized),snap=await tx.get(ref);
-          if(snap.exists()&&Number(snap.data().callRevision||0)!==Number(data.callRevision||0))throw new Error("call-state-stale");
+          if(snap.exists()){
+            const remoteDoc=snap.data()||{};
+            if(Number(remoteDoc.callRevision||0)!==Number(data.callRevision||0)) throw new Error("call-state-stale");
+            let remoteState=null;
+            try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
+            if(remoteState){
+              // Completed results are irreversible through ordinary whole-state sync.
+              // A stale device must never roll a confirmed match (or completed archive)
+              // back to "in progress"; corrections must use the explicit correction flow.
+              if(remoteState.archiveStatus==="completed" && data.archiveStatus!=="completed") throw new Error("archive-state-stale");
+              const incomingById=new Map((data.matches||[]).map(m=>[m.id,m]));
+              for(const remoteMatch of (remoteState.matches||[])){
+                if(!remoteMatch || remoteMatch.isBye || !remoteMatch.completed) continue;
+                const incoming=incomingById.get(remoteMatch.id);
+                if(!incoming || !incoming.completed || incoming.winnerId!==remoteMatch.winnerId){
+                  throw new Error("match-state-stale");
+                }
+              }
+            }
+          }
           tx.set(ref,privatePayload,{merge:true});
           tx.set(fx.doc(dbHandle,"publicTournaments",normalized),publicPayload,{merge:true});
         });
