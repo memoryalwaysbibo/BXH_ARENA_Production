@@ -12867,6 +12867,12 @@ function lobbyRegistrationButtons(t, loggedIn){
 }
 function publicEventLifecycleStatus(t){
   const phase=canonicalPublicTournamentPhase(t);
+  if(phase==="waiting"){
+    const reg=getEffectiveRegistrationStatus(t);
+    const display=(reg==="open"||reg==="full")?"registration":"prestart";
+    const d=roomStatusDescriptor(display);
+    return {key:d.key,label:d.label,dot:d.dot,phase};
+  }
   const d=roomStatusDescriptor(phase);
   return {key:d.key,label:d.label,dot:d.dot,phase};
 }
@@ -13312,7 +13318,10 @@ function renderTournamentDetailScreen(){
   } else if(effStatus==="cancelled" || t.eventCancelled){
     actionHtml = `<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
   } else if(effStatus==="closed"){
-    actionHtml = `<div class="hint">報名已截止。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
+    const noOnlineRegistration=!t.registrationSelection && Number(t.capacity||0)<=0 && !normalizeDateTime(t.registrationOpenAt) && !normalizeDateTime(t.registrationCloseAt);
+    actionHtml = noOnlineRegistration
+      ? `<div class="hint">本場目前未開放線上報名，請依主辦公告參加。</div><button class="btn btn-ghost" disabled>未開放線上報名</button>`
+      : `<div class="hint">報名已截止。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
   } else if(effStatus==="scheduled"){
     actionHtml = `<div>${renderRegistrationCountdown(code,t.registrationOpenAt)}</div><button class="btn btn-ghost" disabled>尚未開放</button>`;
   } else if(!isLoggedIn){
