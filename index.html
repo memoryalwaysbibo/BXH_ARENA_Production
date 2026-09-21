@@ -11003,11 +11003,12 @@ async function syncReleaseGateServerClock(force=false){
 }
 function releaseGateIsActive(){
   const trusted=releaseGateTrustedNow();
-  if(trusted===null){
-    syncReleaseGateServerClock(false);
-    return true;
-  }
-  return trusted < PUBLIC_BETA_OPEN_AT_MS;
+  if(trusted!==null) return trusted < PUBLIC_BETA_OPEN_AT_MS;
+  syncReleaseGateServerClock(false);
+  // Post-launch fallback: once the fixed launch time has passed locally,
+  // do not keep Production locked solely because the server Date header
+  // could not be verified by this browser/CDN path.
+  return Date.now() < PUBLIC_BETA_OPEN_AT_MS;
 }
 function releaseGateIsSuperAdmin(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin");
