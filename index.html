@@ -20021,6 +20021,48 @@ init();
             excluded.push({ code: docSnap.id, reason: "parse-error" });
           }
         });
+
+        // Self-heal stale public lifecycle mirrors for documents this signed-in
+        // user is legitimately allowed to inspect privately. This covers:
+        // 1) super_admin/admin/staff accounts, and
+        // 2) a player viewing their own COMMUNITY room.
+        //
+        // The lobby itself remains public-only for ordinary viewers. We only use
+        // the private source as an authoritative consistency check, and only when
+        // the current account already has private-read permission for that room.
+        const actorUid=currentUserUidForWrites();
+        const actorPrivileged=!!(userProfile&&userProfile.active!==false&&userProfile.isTestAccount!==true&&["super_admin","admin","staff"].includes(userProfile.role));
+        for(let i=0;i<results.length;i++){
+          const pub=results[i];
+          const canInspectPrivate=actorPrivileged || (!!actorUid && pub.eventAuthority==="community" && pub.ownerUid===actorUid);
+          if(!canInspectPrivate) continue;
+          try{
+            const privateSnap=await fx.getDoc(fx.doc(dbHandle,"tournaments",pub.code));
+            if(!privateSnap.exists()) continue;
+            const privateDoc=privateSnap.data()||{};
+            let privateState=null;
+            try{ privateState=typeof privateDoc.data==="string"?JSON.parse(privateDoc.data):privateDoc.data; }catch(e){}
+            if(!privateState) continue;
+            const privatePhase=computeTournamentPhase(privateState);
+            const publicPhase=canonicalPublicTournamentPhase(pub);
+            const privateUpdated=Number(privateDoc.updatedAt||privateState.updatedAt||0);
+            const publicUpdated=Number(pub.updatedAt||0);
+            const stale=(privatePhase!==publicPhase) || (privateUpdated>publicUpdated);
+            if(!stale) continue;
+
+            const repaired=await this.repairTournamentLifecycle(pub.code);
+            if(!repaired||!repaired.ok) continue;
+            const freshPub=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",pub.code));
+            if(!freshPub.exists()) continue;
+            const freshData=freshPub.data()||{};
+            const reconstructed=reconstructPublicStateFromDoc(pub.code,freshData);
+            results[i]=Object.assign({code:pub.code},freshData,{parsedData:reconstructed});
+            console.warn("[queryPublicTournaments] repaired stale public mirror",pub.code,publicPhase,"=>",privatePhase);
+          }catch(e){
+            console.warn("[queryPublicTournaments] lifecycle self-heal skipped",pub.code,e);
+          }
+        }
+
         console.log("[queryPublicTournaments] raw doc count:", snap.size, "| usable:", results.length, "| excluded:", JSON.stringify(excluded));
         return { ok:true, items: results, rawCount: snap.size, excluded };
       }catch(e){
