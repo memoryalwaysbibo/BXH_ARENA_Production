@@ -12225,7 +12225,7 @@ async function handlePlayerCard(action,button){const c=cardContext();if(c.busy&&
 function bindPlayerCardInputs(){document.querySelectorAll('[data-card-privacy]').forEach(el=>{el.onchange=()=>{const c=cardContext();if(c.settings){c.settings[el.dataset.cardPrivacy]=el.checked;if(el.dataset.cardPrivacy==='cardPublic'&&!el.checked){c.settings.searchable=false;const b=document.querySelector('[data-card-privacy="searchable"]');if(b)b.checked=false;}}};});const q=document.getElementById('player-card-query');if(q){q.oninput=()=>cardContext().query=q.value;q.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();handlePlayerCard('card-search');}};}}
 
 function ladderLeaderboardTable(rows, adminMode=false){
-  if(!rows.length) return '<div class="empty-state">目前尚無天梯玩家資料</div>';
+  if(!rows.length) return '<div class="empty-state"><strong>排行尚未產生</strong><br>目前尚無玩家取得賽季積分。完成第一場積分賽後，排名將自動顯示。</div>';
   return `<div class="rank-scroll"><table class="rank-table ladder-rank-table">
     <thead><tr><th>排名</th><th>玩家姓名</th><th>目前階級</th><th>賽季積分</th><th>生涯積分</th><th>參賽場次</th><th>冠軍</th>${adminMode?'<th>管理</th>':''}</tr></thead>
     <tbody>${rows.map(p=>`<tr>
@@ -12281,9 +12281,10 @@ function renderLadderLeaderboardPage(adminMode=false){
   if(adminMode && isAdminTierOrAbove() && !ladderAdminLogsLoaded) setTimeout(()=>loadLadderAdminLogs(false),0);
   const control=ladderPublicData.control;
   const season=ladderPublicData.season;
-  const rows=rankLadderRows(ladderPublicData.players||[]);
-  const selected=ladderSelectedUid ? rows.find(x=>x.uid===ladderSelectedUid) : null;
-  const adjustment=ladderAdjustmentUid ? rows.find(x=>x.uid===ladderAdjustmentUid) : null;
+  const allRows=rankLadderRows(ladderPublicData.players||[]);
+  const rows=allRows.filter(p=>Number(p.seasonPoints||0)>0);
+  const selected=ladderSelectedUid ? allRows.find(x=>x.uid===ladderSelectedUid) : null;
+  const adjustment=ladderAdjustmentUid ? allRows.find(x=>x.uid===ladderAdjustmentUid) : null;
   const now=Date.now();
   const ended=control&&control.endAt&&now>=control.endAt;
   return `
