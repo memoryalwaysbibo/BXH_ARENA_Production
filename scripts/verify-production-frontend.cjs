@@ -34,7 +34,8 @@ must(/function\s+playerBracketNumber\(id\)/, 'Bracket seed/number resolver missi
 must(/function\s+playerBracketRowHtml\(playerId,name\)/, 'Bracket number-left row renderer missing');
 must(/\.board-canvas \.bye-placeholder\{[\s\S]*?display:none!important/, 'Board BYE placeholders must not consume layout space');
 must(/const DENSE_GAP=2;/, 'Dense bracket vertical gap must remain compact');
-must(/anchorRound[\s\S]*?match-box:not\(\.bye-placeholder\)/, 'Dense anchor-round layout missing');
+must(/match-box:not\(\.bye-placeholder\)/, 'Dense layout must exclude BYE placeholders');
+must(/let anchorRound=0,anchorCount=-1;/, 'Dense anchor-round selector missing');
 must(/WIP Phase 3: final Challonge-density cascade/, 'Final bracket-density cascade missing');
 if(html.indexOf('WIP Phase 3: final Challonge-density cascade') < html.indexOf('v14.0.6 compact bracket / mobile board density')) throw new Error('Final density cascade must override the legacy compact layer');
 const densityCases={8:4,16:8,32:16,34:2,64:32};
