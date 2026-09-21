@@ -737,6 +737,69 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
  .board-theme-select{grid-column:1/-1;}
 }
 
+/* ==== v14.0.7 Challonge-density core ==== */
+.match-box .mb-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+}
+.player-line{
+  display:grid;
+  grid-template-columns:28px minmax(0,1fr);
+  align-items:center;
+  min-width:0;
+}
+.seed-num{
+  align-self:stretch;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-width:28px;
+  margin:-8px 7px -8px -10px;
+  padding:0 4px;
+  border-right:1px solid var(--border-soft);
+  color:var(--metal);
+  font-family:var(--font-d);
+  font-variant-numeric:tabular-nums;
+  font-size:11px;
+}
+.seed-empty{color:transparent;}
+.player-line .nm{
+  display:block;
+  max-width:none!important;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.board-canvas .bye-placeholder{
+  display:none!important;
+}
+.board-canvas .se-col[data-round] .match-box{
+  position:absolute;
+  left:0;
+  right:0;
+  margin:0!important;
+}
+.board-canvas .player-line{
+  grid-template-columns:24px minmax(0,1fr);
+}
+.board-canvas .seed-num{
+  min-width:24px;
+  margin:-5px 5px -5px -7px;
+  padding:0 3px;
+  font-size:9.5px;
+}
+@media(max-width:640px){
+  .board-canvas .player-line{grid-template-columns:22px minmax(0,1fr);}
+  .board-canvas .seed-num{
+    min-width:22px;
+    margin:-4px 4px -4px -6px;
+    padding:0 2px;
+    font-size:8.5px;
+  }
+}
+
 /* ==== v14.0.6 compact bracket / mobile board density ==== */
 .board-shell{
   padding:12px;
@@ -9506,6 +9569,33 @@ function playerName(id){
   const p = state.players.find(pl=>pl.id===id);
   return participantDisplayName(p);
 }
+function playerBracketNumber(id){
+  if(!id) return "";
+  if((state.meta?.formatType||"single")==="single" && state.bracketSize>0){
+    const order=seedOrder(state.bracketSize);
+    const firstRound=matchesInRound(0);
+    for(const m of firstRound){
+      const base=(Number(m.indexInRound)||0)*2;
+      if(m.a?.playerId===id) return String(order[base]||"");
+      if(m.b?.playerId===id) return String(order[base+1]||"");
+      if(m.isBye && m.winnerId===id){
+        // A BYE winner has one visible side left in the stored opening match.
+        if(m.a?.playerId===id) return String(order[base]||"");
+        if(m.b?.playerId===id) return String(order[base+1]||"");
+      }
+    }
+    // Players that auto-advanced through a BYE may be absent from a/b after
+    // legacy normalization; recover the seed from the shuffled player order.
+    const pIndex=state.players.findIndex(p=>p&&p.id===id);
+    if(pIndex>=0) return String(pIndex+1);
+  }
+  const i=state.players.findIndex(p=>p&&p.id===id);
+  return i>=0?String(i+1):"";
+}
+function playerBracketRowHtml(playerId,name){
+  const n=playerBracketNumber(playerId);
+  return '<span class="player-line">'+(n?'<span class="seed-num">'+esc(n)+'</span>':'<span class="seed-num seed-empty"></span>')+'<span class="nm">'+esc(name)+'</span></span>';
+}
 
 // Registration status priority (per spec): cancelled > started > closed (past
 // deadline) > full (capacity reached) > scheduled (not yet open) > open.
@@ -9966,8 +10056,8 @@ function matchBoxHtml(m, headLabel){
   return `
   <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}" data-action="open-match" data-id="${m.id}">
     <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}</span><span>台${m.station}</span></div>
-    <div class="mb-row ${aWin?'winner':''}"><span class="nm">${esc(aName)}</span><span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
-    <div class="mb-row ${bWin?'winner':''}"><span class="nm">${esc(bName)}</span><span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
+    <div class="mb-row ${aWin?'winner':''}">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
+    <div class="mb-row ${bWin?'winner':''}">${playerBracketRowHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
     ${matchStatusBarHtml(m)}
   </div>`;
 }
@@ -10021,8 +10111,8 @@ function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
   if(m.isBye){
     return `<div class="match-box bye-placeholder" aria-hidden="true" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}">
       <div class="mb-head"><span>輪空</span><span></span></div>
-      <div class="mb-row" data-side="A"><span class="nm">輪空</span><span class="sc"></span></div>
-      <div class="mb-row" data-side="B"><span class="nm">輪空</span><span class="sc"></span></div>
+      <div class="mb-row" data-side="A">${playerBracketRowHtml(m.a?.playerId,"輪空")}<span class="sc"></span></div>
+      <div class="mb-row" data-side="B">${playerBracketRowHtml(m.b?.playerId,"輪空")}<span class="sc"></span></div>
       <div class="match-status-bar ms-bar-pending">等待中</div>
     </div>`;
   }
@@ -10033,8 +10123,8 @@ function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
   return `
   <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}">
     <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}</span><span>台${m.station}</span></div>
-    <div class="mb-row ${aWin?'winner':''}" data-side="A"><span class="nm">${esc(aName)}</span><span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
-    <div class="mb-row ${bWin?'winner':''}" data-side="B"><span class="nm">${esc(bName)}</span><span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
+    <div class="mb-row ${aWin?'winner':''}" data-side="A">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
+    <div class="mb-row ${bWin?'winner':''}" data-side="B">${playerBracketRowHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
     ${matchStatusBarHtml(m)}
   </div>`;
 }
@@ -10218,38 +10308,138 @@ function layoutSingleElimBracket(suffix){
   try{
     const outer = document.getElementById("se-bracket-outer"+suffix);
     if(!outer || typeof outer.querySelectorAll !== "function") return;
-    const round0Col = outer.querySelector('.se-col[data-round="0"]');
-    if(!round0Col) return;
-    const round0Boxes = Array.from(round0Col.querySelectorAll(".match-box"))
-      .sort((a,b)=> (+a.getAttribute("data-index")) - (+b.getAttribute("data-index")));
-    if(round0Boxes.length===0) return;
+    const allCols = Array.from(outer.querySelectorAll(".se-col[data-round]"))
+      .sort((a,b)=>(+a.getAttribute("data-round"))-(+b.getAttribute("data-round")));
+    if(!allCols.length) return;
+    const maxRound = allCols.reduce((mx,c)=>Math.max(mx,+c.getAttribute("data-round")),0);
+    const inBoard = !!outer.closest?.("#board-canvas") && suffix!=="-print";
 
-    const allCols = Array.from(outer.querySelectorAll(".se-col[data-round]"));
-    const maxRound = allCols.reduce((mx,c)=> Math.max(mx, +c.getAttribute("data-round")), 0);
-
-    let prevCenters = round0Boxes.map(b=> b.offsetTop + b.offsetHeight/2);
-    const round0Height = round0Col.scrollHeight;
-    allCols.forEach(c=>{ c.style.minHeight = round0Height + "px"; });
-
-    for(let r=1; r<=maxRound; r++){
-      const col = outer.querySelector('.se-col[data-round="'+r+'"]');
-      if(!col) break;
-      const boxes = Array.from(col.querySelectorAll(".match-box"))
-        .sort((a,b)=> (+a.getAttribute("data-index")) - (+b.getAttribute("data-index")));
-      const newCenters = [];
-      boxes.forEach((box,i)=>{
-        const c1 = prevCenters[i*2];
-        const c2 = prevCenters[i*2+1]!==undefined ? prevCenters[i*2+1] : c1;
-        const mid = (c1+c2)/2;
-        const h = box.offsetHeight;
-        box.style.top = Math.max(0, mid - h/2) + "px";
-        newCenters.push(mid);
-      });
-      prevCenters = newCenters;
+    if(!inBoard){
+      const round0Col = outer.querySelector('.se-col[data-round="0"]');
+      if(!round0Col) return;
+      const round0Boxes = Array.from(round0Col.querySelectorAll(".match-box"))
+        .sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index")));
+      if(round0Boxes.length===0) return;
+      let prevCenters = round0Boxes.map(b=>b.offsetTop+b.offsetHeight/2);
+      const round0Height = round0Col.scrollHeight;
+      allCols.forEach(c=>{c.style.minHeight=round0Height+"px";});
+      for(let r=1;r<=maxRound;r++){
+        const col=outer.querySelector('.se-col[data-round="'+r+'"]');
+        if(!col)break;
+        const boxes=Array.from(col.querySelectorAll(".match-box"))
+          .sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index")));
+        const next=[];
+        boxes.forEach((box,i)=>{
+          const c1=prevCenters[i*2],c2=prevCenters[i*2+1]!==undefined?prevCenters[i*2+1]:c1;
+          const mid=(c1+c2)/2;
+          box.style.top=Math.max(0,mid-box.offsetHeight/2)+"px";
+          next.push(mid);
+        });
+        prevCenters=next;
+      }
+      drawSingleElimConnectors(outer,allCols,maxRound,suffix);
+      return;
     }
 
-    drawSingleElimConnectors(outer, allCols, maxRound, suffix);
-  }catch(e){ /* no-op outside a real browser DOM */ }
+    // Challonge-style density: choose the round with the most REAL matches as
+    // the vertical anchor. This collapses hidden BYE placeholders instead of
+    // letting them reserve full rows and create huge dead zones.
+    const realBoxesByRound=new Map();
+    allCols.forEach(col=>{
+      const r=+col.getAttribute("data-round");
+      realBoxesByRound.set(r,Array.from(col.querySelectorAll(".match-box:not(.bye-placeholder)"))
+        .sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index"))));
+    });
+    let anchorRound=0,anchorCount=-1;
+    for(const [r,boxes] of realBoxesByRound){
+      if(boxes.length>anchorCount){anchorCount=boxes.length;anchorRound=r;}
+    }
+    const centers=new Map();
+    const DENSE_GAP=6;
+    const titleBase=col=>{
+      const t=col?.querySelector(".se-col-title");
+      return (t?t.offsetHeight:0)+5;
+    };
+    const setCenter=(box,center)=>{
+      const top=Math.max(titleBase(box.closest(".se-col")),center-box.offsetHeight/2);
+      box.style.top=top+"px";
+      centers.set(box.getAttribute("data-id"),top+box.offsetHeight/2);
+      return top+box.offsetHeight;
+    };
+
+    const anchorCol=outer.querySelector('.se-col[data-round="'+anchorRound+'"]');
+    const anchorBoxes=realBoxesByRound.get(anchorRound)||[];
+    let cursor=titleBase(anchorCol);
+    anchorBoxes.forEach(box=>{
+      box.style.top=cursor+"px";
+      centers.set(box.getAttribute("data-id"),cursor+box.offsetHeight/2);
+      cursor+=box.offsetHeight+DENSE_GAP;
+    });
+
+    // Later rounds sit midway between their two feeder matches.
+    for(let r=anchorRound+1;r<=maxRound;r++){
+      const logicalPrev=matchesInRound(r-1);
+      const boxes=realBoxesByRound.get(r)||[];
+      boxes.forEach(box=>{
+        const m=getMatch(box.getAttribute("data-id"));
+        if(!m)return;
+        const a=logicalPrev[m.indexInRound*2],b=logicalPrev[m.indexInRound*2+1];
+        const ca=a?centers.get(a.id):undefined,cb=b?centers.get(b.id):undefined;
+        const center=ca!=null&&cb!=null?(ca+cb)/2:(ca!=null?ca:(cb!=null?cb:titleBase(box.closest(".se-col"))+box.offsetHeight/2));
+        setCenter(box,center);
+      });
+    }
+
+    // Preliminary/play-in rounds before the anchor align directly with the
+    // destination player row. If both feeder matches are real, split them
+    // tightly above/below the destination center so they never overlap.
+    for(let r=anchorRound-1;r>=0;r--){
+      const boxes=realBoxesByRound.get(r)||[];
+      const nextLogical=matchesInRound(r+1);
+      const logicalHere=matchesInRound(r);
+      const desired=[];
+      boxes.forEach(box=>{
+        const m=getMatch(box.getAttribute("data-id"));
+        if(!m)return;
+        const dest=nextLogical[Math.floor(m.indexInRound/2)];
+        const destBox=dest?outer.querySelector('.match-box[data-id="'+dest.id+'"]'):null;
+        const siblingIndex=m.indexInRound%2===0?m.indexInRound+1:m.indexInRound-1;
+        const sibling=logicalHere[siblingIndex];
+        const siblingVisible=!!(sibling&&!sibling.isBye&&realBoxesByRound.get(r)?.some(x=>x.getAttribute("data-id")===sibling.id));
+        let center=dest?centers.get(dest.id):undefined;
+        if(destBox&&center!=null){
+          if(siblingVisible){
+            const dir=m.indexInRound%2===0?-1:1;
+            center+=dir*(box.offsetHeight+DENSE_GAP)/2;
+          }else{
+            const row=destBox.querySelectorAll(".mb-row")[m.indexInRound%2];
+            if(row)center=destBox.offsetTop+row.offsetTop+row.offsetHeight/2;
+          }
+        }
+        if(center==null)center=titleBase(box.closest(".se-col"))+box.offsetHeight/2;
+        desired.push({box,center});
+      });
+      desired.sort((a,b)=>a.center-b.center);
+      let minTop=titleBase(outer.querySelector('.se-col[data-round="'+r+'"]'));
+      desired.forEach(item=>{
+        let top=Math.max(minTop,item.center-item.box.offsetHeight/2);
+        item.box.style.top=top+"px";
+        const actualCenter=top+item.box.offsetHeight/2;
+        centers.set(item.box.getAttribute("data-id"),actualCenter);
+        minTop=top+item.box.offsetHeight+DENSE_GAP;
+      });
+    }
+
+    let maxBottom=0;
+    allCols.forEach(col=>{
+      const r=+col.getAttribute("data-round");
+      (realBoxesByRound.get(r)||[]).forEach(box=>{
+        maxBottom=Math.max(maxBottom,box.offsetTop+box.offsetHeight);
+      });
+    });
+    allCols.forEach(col=>{col.style.minHeight=Math.ceil(maxBottom+6)+"px";});
+    drawSingleElimConnectors(outer,allCols,maxRound,suffix);
+  }catch(e){ console.warn("[dense bracket layout]",e); }
 }
 
 function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
