@@ -3,9 +3,17 @@ const path=require('path');
 const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const cname=fs.readFileSync(path.join(root,'CNAME'),'utf8').trim();
+const version=JSON.parse(fs.readFileSync(path.join(root,'version.json'),'utf8'));
 function must(re,msg){if(!re.test(html))throw new Error(msg)}
 function mustNot(re,msg){if(re.test(html))throw new Error(msg)}
 if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
+const escapedBuild=String(version.build||'').replace(/[.*+?^$()|[\\]\\\\]/g,'\\\\if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
+');
+const escapedVersion=String(version.version||'').replace(/[.*+?^$()|[\\]\\\\]/g,'\\\\if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
+');
+must(new RegExp('<meta name="bxh-build" content="'+escapedBuild+'">'),'index.html bxh-build must match version.json');
+must(new RegExp('CURRENT_BUILD="'+escapedBuild+'"'),'CURRENT_BUILD must match version.json');
+must(new RegExp('const APP_VERSION = "'+escapedVersion+'"'),'APP_VERSION must match version.json');
 must(/projectId:\s*["']bxh-arena["']/, 'Production projectId missing');
 must(/authDomain:\s*["']bxh-arena\.firebaseapp\.com["']/, 'Production authDomain missing');
 must(/async\s+applyPlayerAccount\([\s\S]*?role:\s*["']player["'][\s\S]*?provider:\s*["']password["']/, 'Self-service signup must create role=player with password provider');
@@ -27,3 +35,4 @@ console.log('PASS Email/Password-only runtime');
 console.log('PASS self-service role=player');
 console.log('PASS tester official-event UI guard');
 console.log('PASS realtime lobby sync guard');
+console.log('PASS build/version metadata consistency');
