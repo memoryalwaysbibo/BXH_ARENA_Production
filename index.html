@@ -12625,7 +12625,15 @@ function renderPlayerCommunityHostTab(){
   ${foldSection('host-history','我的主辦紀錄',history.length,`<p class="hint">完成主辦場數（一般＋正式）：${hostAchievementCount===null?'同步中':hostAchievementCount<0?'暫時無法同步，請重新整理':hostAchievementCount}（經伺服器驗證；測試與系統關閉不計入）</p>`+history.map(h=>`<div class="community-history-card"><b>${esc(h.name||'未命名賽事')}</b><div class="hint">${esc(h.eventDate||'')}｜${Number(h.playerCount||0)} 人｜${esc(h.format||'')}</div><div class="hint">冠軍：${esc(h.championName||'—')}　亞軍：${esc(h.runnerUpName||'—')}</div></div>`).join(''),false)}`;
 }
 
+function communityDateTimeValue(ms){
+  if(!ms) return "";
+  const d=new Date(Number(ms));
+  if(isNaN(d.getTime())) return "";
+  const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,16);
+}
 function renderCommunityCreateScreen(){
+  const nowValue=communityDateTimeValue(Date.now());
   return authShellOpen()+`${authBrandHeader()}<div class="auth-card community-create-card">
     <div class="auth-card-title">建立一般賽事</div>
     <div class="banner"><span>玩家主辦｜一般賽事｜不計 BXH 天梯積分</span></div>
@@ -12635,16 +12643,35 @@ function renderCommunityCreateScreen(){
     <div class="field"><label>開賽時間</label><div class="half-hour-time" data-time-target="community-start"><select class="half-hour-hour"></select><span class="time-colon">:</span><select class="half-hour-minute"><option value="00">00</option><option value="30">30</option></select><input id="community-start" type="hidden" value="19:00"></div></div>
     <div class="field"><label>賽制</label><select id="community-format"><option value="single">單淘汰賽</option><option value="double">雙敗制</option><option value="roundrobin">單循環賽</option></select></div>
     <div class="field"><label>戰鬥台數</label><input id="community-stations" type="number" min="1" max="16" value="1"></div>
+    <div class="panel" style="margin-top:14px">
+      <label class="settings-check-row"><input id="community-registration-enabled" type="checkbox" checked><span><b>開放線上報名</b><small style="display:block;color:var(--metal-dim)">玩家可從賽事大廳或分享連結直接報名。</small></span></label>
+      <div class="grid grid-2" style="margin-top:12px">
+        <div class="field"><label>正取名額</label><input id="community-capacity" type="number" min="1" max="256" value="16"></div>
+        <div class="field"><label>備取名額</label><input id="community-waitlist" type="number" min="0" max="256" value="8"></div>
+        <div class="field"><label>報名開放時間</label><input id="community-reg-open" type="datetime-local" value="${esc(nowValue)}"></div>
+        <div class="field"><label>報名截止時間</label><input id="community-reg-close" type="datetime-local"></div>
+      </div>
+      <p class="hint">截止時間留白時，預設為活動開賽時間；取消報名期限同報名截止時間。</p>
+    </div>
     <button class="hoc-btn hoc-btn-primary btn-block" data-action="community-create-submit">建立一般賽事</button>
     <div class="auth-links"><button class="link-btn" data-action="community-create-cancel">返回我的房間</button></div>
   </div>`+authShellClose();
 }
 function renderCommunitySettings(){
-  const m=state.meta||{};
+  const m=state.meta||{},reg=!!m.registrationEnabled;
   return `<div class="panel"><div class="panel-title">一般賽事設定 <span class="badge badge-metal">COMMUNITY</span></div>
-    <div class="banner"><span>玩家一般賽事固定不計天梯，且不提供 BXH 官方線上報名／官方積分功能。</span></div>
+    <div class="banner"><span>玩家一般賽事可開放線上報名；固定不計 BXH 官方天梯積分。</span></div>
     <div class="grid grid-2"><div class="field"><label>賽事名稱</label><input id="cset-name" value="${esc(m.name||"")}"></div><div class="field"><label>活動日期</label><input id="cset-date" type="date" value="${esc(m.date||"")}"></div><div class="field"><label>活動地點</label><input id="cset-location" value="${esc(m.location||"")}"></div><div class="field"><label>開賽時間</label><input id="cset-start" type="time" step="1800" value="${esc(m.startTime||"19:00")}"></div></div>
     <div class="grid grid-2"><div class="field"><label>賽制</label><select id="cset-format"><option value="single" ${m.formatType==="single"?"selected":""}>單淘汰賽</option><option value="double" ${m.formatType==="double"?"selected":""}>雙敗制</option><option value="roundrobin" ${m.formatType==="roundrobin"?"selected":""}>單循環賽</option></select></div><div class="field"><label>戰鬥台數</label><input id="cset-stations" type="number" min="1" max="16" value="${Number(m.stations||1)}"></div></div>
+    <div class="panel" style="margin-top:14px">
+      <label class="settings-check-row"><input id="cset-registration-enabled" type="checkbox" ${reg?"checked":""}><span><b>開放線上報名</b><small style="display:block;color:var(--metal-dim)">大廳與分享頁會顯示可報名狀態。</small></span></label>
+      <div class="grid grid-2" style="margin-top:12px">
+        <div class="field"><label>正取名額</label><input id="cset-capacity" type="number" min="1" max="256" value="${Number(m.registrationCapacity||16)}"></div>
+        <div class="field"><label>備取名額</label><input id="cset-waitlist" type="number" min="0" max="256" value="${Number(m.waitlistCapacity||0)}"></div>
+        <div class="field"><label>報名開放時間</label><input id="cset-reg-open" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationOpenAt))}"></div>
+        <div class="field"><label>報名截止時間</label><input id="cset-reg-close" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationCloseAt))}"></div>
+      </div>
+    </div>
     <div class="btn-row"><button class="btn btn-primary" data-action="community-save-settings">儲存一般賽事設定</button><button class="btn btn-ghost" data-action="community-copy-code" data-code="${esc(state.cloudCode||"")}">複製房間代碼</button><button class="btn btn-ghost" data-action="open-share-modal">分享賽事／QR</button></div>
   </div>`;
 }
@@ -16162,6 +16189,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const startTime=document.getElementById("community-start")?.value||"19:00";
     const formatType=document.getElementById("community-format")?.value||"single";
     const stations=Math.max(1,parseInt(document.getElementById("community-stations")?.value||"1",10)||1);
+    const registrationEnabled=!!document.getElementById("community-registration-enabled")?.checked;
+    const registrationCapacity=Math.max(1,parseInt(document.getElementById("community-capacity")?.value||"16",10)||16);
+    const waitlistCapacity=Math.max(0,parseInt(document.getElementById("community-waitlist")?.value||"0",10)||0);
+    const openRaw=document.getElementById("community-reg-open")?.value||"";
+    const closeRaw=document.getElementById("community-reg-close")?.value||"";
     if(!name||!date||!location){ showToast("請完整填寫賽事名稱、活動日期與地點",true); return; }
     (async()=>{
       try{
@@ -16170,7 +16202,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const st=defaultState();
         st.meta.name=name; st.meta.date=date; st.meta.location=location; st.meta.startTime=startTime;
         st.meta.formatType=formatType; st.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; st.meta.stations=stations;
-        st.meta.eventAuthority="community"; st.meta.ladderMode="general"; st.meta.registrationEnabled=false; st.meta.publishedAt=Date.now(); st.meta.registrationStatus="closed";
+        st.meta.eventAuthority="community"; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.publishedAt=Date.now();
+        if(registrationEnabled){
+          const eventStart=Date.parse(date+"T"+startTime+":00");
+          const openAt=openRaw?new Date(openRaw).getTime():Date.now();
+          const closeAt=closeRaw?new Date(closeRaw).getTime():eventStart;
+          if(!Number.isFinite(closeAt)||closeAt<=openAt){ showToast("報名截止時間必須晚於開放時間",true); return; }
+          st.meta.registrationOpenAt=openAt; st.meta.registrationCloseAt=closeAt; st.meta.cancellationDeadline=closeAt;
+          st.meta.registrationCapacity=registrationCapacity; st.meta.waitlistCapacity=waitlistCapacity;
+          st.meta.registrationVisibility="public"; st.meta.registrationStatus=Date.now()<openAt?"scheduled":"open";
+        }else{
+          st.meta.registrationOpenAt=null; st.meta.registrationCloseAt=null; st.meta.cancellationDeadline=null;
+          st.meta.registrationCapacity=0; st.meta.waitlistCapacity=0; st.meta.registrationVisibility="public"; st.meta.registrationStatus="closed";
+        }
         st.ownerUid=firebaseUser.uid; st.createdByRole="player"; st.lastActivityAt=Date.now();
 
         // COMMUNITY host joins their own room by default. Host ownership and
@@ -16254,8 +16298,26 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const startTime=document.getElementById("cset-start")?.value||"19:00"; const formatType=document.getElementById("cset-format")?.value||"single"; const stations=Math.max(1,parseInt(document.getElementById("cset-stations")?.value||"1",10)||1);
     if(!name||!date||!location){showToast("請完整填寫名稱、日期與地點",true);return;}
     if(state.matches.length && formatType!==state.meta.formatType){showToast("已產生對戰表後不能直接更換賽制，請先清除／重建房間",true);return;}
+    const registrationEnabled=!!document.getElementById("cset-registration-enabled")?.checked;
+    const capacity=Math.max(1,parseInt(document.getElementById("cset-capacity")?.value||"16",10)||16);
+    const waitlist=Math.max(0,parseInt(document.getElementById("cset-waitlist")?.value||"0",10)||0);
+    const openRaw=document.getElementById("cset-reg-open")?.value||"";
+    const closeRaw=document.getElementById("cset-reg-close")?.value||"";
     state.meta.name=name; state.meta.date=date; state.meta.location=location; state.meta.startTime=startTime; state.meta.formatType=formatType; state.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; state.meta.stations=stations;
-    state.meta.eventAuthority="community"; state.meta.ladderMode="general"; state.meta.registrationEnabled=false; touchCommunityActivity(); saveState(); render(); showToast("一般賽事設定已儲存"); return;
+    state.meta.eventAuthority="community"; state.meta.ladderMode="general"; state.meta.registrationEnabled=registrationEnabled; state.meta.registrationVisibility="public";
+    if(registrationEnabled){
+      const openAt=openRaw?new Date(openRaw).getTime():Date.now();
+      const eventStart=Date.parse(date+"T"+startTime+":00");
+      const closeAt=closeRaw?new Date(closeRaw).getTime():eventStart;
+      if(!Number.isFinite(closeAt)||closeAt<=openAt){showToast("報名截止時間必須晚於開放時間",true);return;}
+      state.meta.registrationOpenAt=openAt; state.meta.registrationCloseAt=closeAt; state.meta.cancellationDeadline=closeAt;
+      state.meta.registrationCapacity=capacity; state.meta.waitlistCapacity=waitlist;
+      state.meta.registrationStatus=Date.now()<openAt?"scheduled":"open";
+    }else{
+      state.meta.registrationOpenAt=null; state.meta.registrationCloseAt=null; state.meta.cancellationDeadline=null;
+      state.meta.registrationCapacity=0; state.meta.waitlistCapacity=0; state.meta.registrationStatus="closed";
+    }
+    touchCommunityActivity(); saveState(); publicTournamentsCache=null; render(); showToast("一般賽事設定已儲存"); return;
   }
   if(action==="toggle-lobby-section"){
     const section=target.getAttribute("data-section");
@@ -20822,13 +20884,30 @@ init();
         // Player accounts must not perform a preflight read against public mirrors.
         const code=generateRoomCode();
         const now=Date.now();
-        data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.meta.ladderMode="general"; data.meta.registrationEnabled=false; data.meta.assignedStaffUids=[];
+        data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.meta.ladderMode="general"; data.meta.registrationEnabled=!!data.meta.registrationEnabled; data.meta.assignedStaffUids=[];
         data.ownerUid=uid; data.createdByRole="player"; data.lastActivityAt=now;
         const hasStructure=(data.players&&data.players.length)||(data.matches&&data.matches.length)||data.bracketSize;
         const expMs=data.expiresAtMs || now+(hasStructure?30:7)*24*60*60*1000; data.expiresAtMs=expMs;
+        const regEnabled=!!data.meta.registrationEnabled;
+        const regOpen=regEnabled?(data.meta.registrationOpenAt||now):null;
+        const eventStartMs=Date.parse(String(data.meta.date||"")+"T"+String(data.meta.startTime||"23:59")+":00");
+        const regClose=regEnabled?(data.meta.registrationCloseAt||(!isNaN(eventStartMs)?eventStartMs:now+7*24*60*60*1000)):null;
+        const capacity=regEnabled?Math.max(1,Number(data.meta.registrationCapacity)||16):0;
+        const waitlistCapacity=regEnabled?Math.max(0,Number(data.meta.waitlistCapacity)||0):0;
+        const cancellationDeadline=regEnabled?(data.meta.cancellationDeadline||regClose):null;
+        data.meta.registrationOpenAt=regOpen;
+        data.meta.registrationCloseAt=regClose;
+        data.meta.registrationCapacity=capacity;
+        data.meta.waitlistCapacity=waitlistCapacity;
+        data.meta.cancellationDeadline=cancellationDeadline;
+        data.meta.registrationVisibility="public";
+        data.meta.registrationStatus=regEnabled?"open":"closed";
         const base={
           eventAuthority:"community",ownerUid:uid,createdBy:uid,createdByName:currentUserDisplayNameForWrites(),createdByRole:"player",
-          ladderMode:"general",ladderPointsAwarded:false,registrationEnabled:false,registrationStatus:"closed",visibility:"public",
+          ladderMode:"general",ladderPointsAwarded:false,registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",visibility:"public",
+          registrationOpenAt:regOpen,registrationCloseAt:regClose,capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,
+          confirmedCount:0,waitlistCount:0,registrationVisibility:"public",publishedAt:data.meta.publishedAt||now,
+          cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
           tournamentPhase:computeTournamentPhase(data),archiveStatus:data.archiveStatus||"ongoing",name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",formatType:data.meta.formatType||"single",bracketSize:data.bracketSize||0,
           updatedAt:now,lastActivityAt:now,expiresAt:new Date(expMs)
         };
@@ -20837,7 +20916,11 @@ init();
         const batch=fx.writeBatch(dbHandle);
         batch.set(tournamentRef,Object.assign({},base,{data:JSON.stringify(data)}));
         batch.set(publicRef,{
-          bracketView:JSON.stringify(buildPublicMirrorFields(data)),updatedAt:now,visibility:"public",eventAuthority:"community",ownerUid:uid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed",tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
+          bracketView:JSON.stringify(buildPublicMirrorFields(data)),updatedAt:now,visibility:"public",eventAuthority:"community",ownerUid:uid,ladderMode:"general",
+          registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",registrationOpenAt:regOpen,registrationCloseAt:regClose,
+          capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,confirmedCount:0,waitlistCount:0,registrationVisibility:"public",
+          publishedAt:data.meta.publishedAt||now,cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
+          tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
         });
         await batch.commit();
         return code;
@@ -21134,8 +21217,8 @@ if(testerSession){
         if(community){ delete registrationFields.assignedStaffUids; delete registrationFields.refereeStationAssignments; delete registrationFields.refereeStationNames; delete registrationFields.refereeStationUids; delete registrationFields.refereeStationRestrictionEnabled; }
         const activityNow=Date.now();
         const communityExpiry=community && data.archiveStatus!=="completed" ? new Date(communityRoomExpiryMs(data)) : null;
-        const communityPrivate=community?{eventAuthority:"community",ownerUid:data.ownerUid,createdByRole:"player",createdBy:data.ownerUid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed",lastActivityAt:data.lastActivityAt||activityNow,expiresAt:communityExpiry}:{};
-        const communityPublic=community?{eventAuthority:"community",ownerUid:data.ownerUid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed",lastActivityAt:data.lastActivityAt||activityNow,expiresAt:communityExpiry}:{};
+        const communityPrivate=community?{eventAuthority:"community",ownerUid:data.ownerUid,createdByRole:"player",createdBy:data.ownerUid,ladderMode:"general",lastActivityAt:data.lastActivityAt||activityNow,expiresAt:communityExpiry}:{};
+        const communityPublic=community?{eventAuthority:"community",ownerUid:data.ownerUid,ladderMode:"general",lastActivityAt:data.lastActivityAt||activityNow,expiresAt:communityExpiry}:{};
         const testExpiry=testRoom?new Date(Number(data.testExpiresAtMs||data.expiresAtMs)):null;
         const testPrivate=testRoom?{testMode:true,testLabel:"（測試）",eventAuthority:"test",ownerUid:data.ownerUid,createdBy:data.createdBy,createdByRole:"tester",ladderMode:"general",ladderPointsAwarded:false,testCreatedAt:Number(data.testCreatedAt||data.createdAt),testExpiresAt:testExpiry,expiresAt:testExpiry}:{};
         const testPublic=testRoom?{testMode:true,testLabel:"（測試）",eventAuthority:"test",ownerUid:data.ownerUid,createdByRole:"tester",ladderMode:"general",testCreatedAt:Number(data.testCreatedAt||data.createdAt),testExpiresAt:testExpiry,expiresAt:testExpiry}:{};
