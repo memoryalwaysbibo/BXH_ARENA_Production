@@ -800,6 +800,139 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   }
 }
 
+/* ==== WIP Phase 2: Challonge-like match cards ==== */
+.board-canvas .match-box{
+  background:#17191d;
+  border:1px solid #30343b;
+  border-radius:3px;
+  box-shadow:none!important;
+  overflow:hidden;
+}
+.board-canvas .match-box:hover{border-color:#4a4f58;}
+.board-canvas .match-box .mb-head{
+  display:none;
+}
+.board-canvas .match-box .mb-row{
+  min-height:24px;
+  padding:0;
+  grid-template-columns:minmax(0,1fr) 22px;
+  font-size:11px;
+  line-height:1.1;
+  border-top:1px solid #2a2d33;
+  background:#1b1e23;
+}
+.board-canvas .match-box .mb-row:first-of-type{
+  border-top:0;
+}
+.board-canvas .player-line{
+  grid-template-columns:24px minmax(0,1fr);
+  min-height:24px;
+}
+.board-canvas .seed-num{
+  min-width:24px;
+  margin:0;
+  padding:0 3px;
+  align-self:stretch;
+  border-right:1px solid #30343b;
+  background:#23272d;
+  color:#aeb3bd;
+  font-size:9.5px;
+  line-height:1;
+}
+.board-canvas .player-line .nm{
+  padding:0 6px;
+  color:#f2f3f5;
+  font-size:10.8px;
+  line-height:24px;
+}
+.board-canvas .match-box .sc{
+  align-self:stretch;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-width:22px;
+  padding:0 3px;
+  border-left:1px solid #30343b;
+  background:#20242a;
+  color:#d7dae0;
+  font-size:10px;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.board-canvas .match-status-bar{
+  display:none;
+}
+.board-canvas .match-box.ms-card-in_progress{
+  border-color:#c79c2c;
+  background:#17191d;
+  box-shadow:0 0 0 1px rgba(199,156,44,.16)!important;
+  animation:none;
+}
+.board-canvas .match-box.ms-card-ready{
+  border-color:#4b9bc8;
+  background:#17191d;
+  box-shadow:none!important;
+  animation:none;
+}
+.board-canvas .match-box.ms-card-completed{
+  border-color:#51555d;
+}
+.board-canvas .match-box.ms-card-completed .mb-row.winner{
+  color:inherit;
+  background:#20241d;
+}
+.board-canvas .match-box.ms-card-completed .mb-row:not(.winner){
+  opacity:.64;
+}
+.board-canvas .match-box.ms-card-completed .mb-row.winner .nm{
+  color:#d6df9a;
+  font-weight:700;
+}
+.board-canvas .se-bracket-cols{
+  gap:14px;
+}
+.board-canvas .se-col{
+  min-width:164px;
+}
+.board-canvas .se-col-title{
+  margin-bottom:4px;
+  font-size:10px;
+  font-weight:600;
+  color:#a7abb4;
+  letter-spacing:0;
+}
+.board-canvas .se-bracket-svg path{
+  stroke-width:1.25;
+}
+@media(max-width:640px){
+  .board-canvas .se-bracket-cols{gap:10px;}
+  .board-canvas .se-col{min-width:154px;}
+  .board-canvas .match-box .mb-row{
+    min-height:22px;
+    grid-template-columns:minmax(0,1fr) 20px;
+    font-size:10.5px;
+  }
+  .board-canvas .player-line{
+    grid-template-columns:22px minmax(0,1fr);
+    min-height:22px;
+  }
+  .board-canvas .seed-num{
+    min-width:22px;
+    padding:0 2px;
+    font-size:8.5px;
+  }
+  .board-canvas .player-line .nm{
+    padding:0 5px;
+    font-size:10px;
+    line-height:22px;
+  }
+  .board-canvas .match-box .sc{
+    min-width:20px;
+    padding:0 2px;
+    font-size:9px;
+  }
+}
+
 /* ==== v14.0.6 compact bracket / mobile board density ==== */
 .board-shell{
   padding:12px;
@@ -10355,7 +10488,7 @@ function layoutSingleElimBracket(suffix){
       if(boxes.length>anchorCount){anchorCount=boxes.length;anchorRound=r;}
     }
     const centers=new Map();
-    const DENSE_GAP=6;
+    const DENSE_GAP=2;
     const titleBase=col=>{
       const t=col?.querySelector(".se-col-title");
       return (t?t.offsetHeight:0)+5;
