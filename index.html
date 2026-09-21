@@ -12796,6 +12796,12 @@ function lobbySummary(raw){
     fee:raw.fee, checkInAt:raw.checkInAt||m.checkin||"", eventDescription:raw.eventDescription||""
   };
 }
+function lobbyNewestFirst(a,b){
+  const aKnown=Number.isFinite(a&&a.startMs), bKnown=Number.isFinite(b&&b.startMs);
+  if(aKnown!==bKnown) return aKnown ? -1 : 1;
+  if(aKnown && bKnown && a.startMs!==b.startMs) return b.startMs-a.startMs;
+  return String(a&&a.code||"").localeCompare(String(b&&b.code||""));
+}
 function lobbyLists(rawList){
   const unique = new Map();
   (rawList||[]).forEach(r=>{ if(r&&r.code&&!unique.has(r.code)) unique.set(r.code,r); });
