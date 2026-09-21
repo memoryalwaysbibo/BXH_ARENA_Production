@@ -1977,7 +1977,7 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   background:rgba(217,185,92,.14);color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold-dim);
 }
 
-.player-avatar-large{width:92px;height:92px;}
+.profile-primary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px;}.profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px;margin:0 0 14px;border:1px solid rgba(217,185,92,.16);border-radius:12px;background:rgba(255,255,255,.018);}.profile-secondary-tabs .btn{min-height:40px;}.profile-hero{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:16px;padding:17px 18px;text-align:left!important;}.profile-hero-avatar{width:78px;height:78px;border-radius:50%;overflow:hidden;border:1px solid var(--gold-dim);background:rgba(217,185,92,.07);display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.2);}.profile-hero-avatar img{width:100%;height:100%;object-fit:cover;display:block;}.profile-hero-copy{min-width:0;}.profile-hero-name{font-family:var(--font-d);font-size:22px;font-weight:900;color:var(--ivory);line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.profile-hero-meta{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:6px;font-size:11px;color:var(--metal);}.profile-hero-verified{color:var(--gold);}.profile-hero-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}@media(max-width:520px){.profile-hero{grid-template-columns:68px minmax(0,1fr);gap:13px;padding:15px;}.profile-hero-avatar{width:68px;height:68px;}.profile-hero-name{font-size:20px;}}.player-avatar-large{width:92px;height:92px;}
 .player-avatar-large img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;}
 
 .half-hour-datetime{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -14077,19 +14077,20 @@ let playerProfileSection="basic", playerProfileSectionUid=null;
 function renderPlayerProfileTab(p){
   const profileUid=currentAuthUid();
   if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="basic";}
-  const sectionNav=`<div class="btn-row" role="tablist" aria-label="會員資料分類" style="margin-bottom:16px">
+  const sectionNav=`<div class="profile-primary-tabs" role="tablist" aria-label="會員資料分類">
     <button class="btn ${playerProfileSection==='basic'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='basic'}" data-action="profile-section" data-section="basic">基本資料</button>
     <button class="btn ${playerProfileSection==='titles'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='titles'}" data-action="profile-section" data-section="titles">我的稱號</button>
   </div>`;
   if(playerProfileSection==="titles") return sectionNav+safeEngagementRender(()=>renderPlayerTitleCenter(p));
-  return `${sectionNav}<button class="btn btn-primary" data-action="family-open" style="margin-bottom:16px">家庭選手／孩子資料</button>
-    <div class="panel" style="text-align:center;">
-      <div class="player-id-badge player-avatar-large" style="margin:0 auto;">${p.avatarUrl ? `<img src="${esc(p.avatarUrl)}" alt="玩家頭像">` : ROLE_ICON_PLAYER}</div>
-      <div class="btn-row" style="justify-content:center;margin-top:12px;">
-        <button class="btn btn-primary" data-action="player-select-avatar">${p.avatarUrl ? "更換頭像" : "新增頭像"}</button>
+  return `${sectionNav}<div class="profile-secondary-tabs" role="tablist" aria-label="基本資料分類"><button class="btn btn-primary" role="tab" aria-selected="true">個人資料</button><button class="btn btn-ghost" role="tab" aria-selected="false" data-action="family-open">家庭資料</button></div>
+    <div class="panel profile-hero">
+      <div class="profile-hero-avatar">${p.avatarUrl ? `<img src="${esc(p.avatarUrl)}" alt="玩家頭像">` : ROLE_ICON_PLAYER}</div>
+      <div class="profile-hero-copy">
+        <div class="profile-hero-name">${esc(effectiveGameId(p)||p.realName||"玩家")}</div>
+        <div class="profile-hero-meta"><span>${esc(playerDerivedId(p))}</span><span class="profile-hero-verified">${p.realNameVerified===true?"✓ 本名已確認":"⚠ 本名待確認"}</span></div>
+        <div class="profile-hero-actions"><button class="btn btn-ghost btn-sm" data-action="player-select-avatar">${p.avatarUrl ? "更換頭像" : "新增頭像"}</button><button class="btn btn-ghost btn-sm" data-action="player-edit-profile">編輯資料</button></div>
+        <input id="player-avatar-input" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
       </div>
-      <input id="player-avatar-input" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-      <div class="hint" style="margin-top:8px;">支援 JPG、PNG、WebP；系統會自動裁切成正方形並壓縮。</div>
     </div>
     <div class="panel">
       <div class="panel-title"><span>會員資料</span><span class="badge badge-metal">${APP_VERSION}</span></div>
