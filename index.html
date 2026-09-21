@@ -12971,7 +12971,7 @@ function lobbySectionHtml(key,title,count,body,defaultOpen=false){
 
 function renderTournamentLobby(opts={}){
   const loggedIn=!!opts.loggedIn;
-  if(publicTournamentsCache!==null) queuePublicTournamentsBackgroundRefresh();
+  if(publicTournamentsCache!==null && typeof queuePublicTournamentsBackgroundRefresh==="function") queuePublicTournamentsBackgroundRefresh();
   if(publicTournamentsCache===null){
     if(!publicTournamentsLoading) setTimeout(()=>handleAction("load-public-tournaments",{getAttribute:()=>null}),0);
     return `<div class="panel"><div class="empty-state">正在讀取賽事大廳……</div></div>`;
