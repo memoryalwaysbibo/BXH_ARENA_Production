@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.3">
+<meta name="bxh-build" content="20260921.4">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.3";
+  var CURRENT_BUILD="20260921.4";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -1958,6 +1958,27 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .test-roster-box .btn-row{gap:8px;flex-wrap:wrap;}
 
 .ladder-hero{border-color:var(--gold-dim);background:linear-gradient(150deg,rgba(217,185,92,.09),var(--panel));}
+.ladder-season-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px;}
+.ladder-season-grid .stat-box{min-height:116px;display:flex;flex-direction:column;justify-content:center;}
+.ladder-season-grid .value{font-size:29px;line-height:1.12;}
+.ladder-season-grid .season-status-card{position:relative;overflow:hidden;}
+.ladder-season-grid .season-status-card:after{content:"";position:absolute;inset:auto -24px -34px auto;width:92px;height:92px;border-radius:50%;background:rgba(217,185,92,.08);pointer-events:none;}
+.ladder-season-status-note{font-size:11px;color:var(--metal);margin-top:6px;}
+.ladder-season-progress{margin-top:16px;padding:13px 14px;border:1px solid rgba(217,185,92,.18);border-radius:10px;background:rgba(0,0,0,.16);}
+.ladder-season-progress-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--metal);margin-bottom:8px;}
+.ladder-season-progress-track{height:8px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;border:1px solid rgba(255,255,255,.04);}
+.ladder-season-progress-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--gold-dim),var(--gold));box-shadow:0 0 12px rgba(217,185,92,.22);}
+.ladder-season-progress-foot{display:flex;justify-content:space-between;gap:12px;margin-top:7px;font-size:10px;color:var(--metal-dim);}
+.ladder-season-state-pre .value{color:var(--ivory);}
+.ladder-season-state-live .value{color:var(--gold);}
+.ladder-season-state-urgent .value{color:#f0cf74;text-shadow:0 0 10px rgba(217,185,92,.18);}
+.ladder-season-state-ended .value{color:var(--metal);}
+@media(max-width:560px){
+  .ladder-season-grid{gap:10px;}
+  .ladder-season-grid .stat-box{min-height:106px;padding:14px 12px;}
+  .ladder-season-grid .value{font-size:25px;}
+  .ladder-season-progress{padding:12px;}
+}
 .ladder-rank-table .rank-num{min-width:64px;}
 .ladder-rank-table strong{color:var(--neon);font-family:var(--font-d);}
 .ladder-tier-0{color:#a9adb5;border-color:#545861;}
@@ -12368,6 +12389,31 @@ function renderTestLadderPanel(){
   </section>`;
 }
 
+function ladderSeasonDashboard(control){
+  const startAt=Number(control&&control.startAt||0);
+  const endAt=Number(control&&control.endAt||0);
+  const now=Date.now();
+  const dayMs=86400000;
+  const seasonId=(control&&control.currentSeason)||"S1";
+  if(!startAt||!endAt||endAt<=startAt){
+    return {label:"賽季狀態",value:"尚未設定",note:"等待賽季時間設定",state:"pre",progress:0,progressText:"尚未開始"};
+  }
+  if(now<startAt){
+    const days=Math.max(1,Math.ceil((startAt-now)/dayMs));
+    return {label:"距離開始",value:days+" 天",note:seasonId+" 尚未開始",state:"pre",progress:0,progressText:"賽季尚未開始"};
+  }
+  if(now>endAt){
+    return {label:"賽季狀態",value:"已結束",note:"等待下一賽季開啟",state:"ended",progress:100,progressText:"本季已結束"};
+  }
+  const remaining=Math.max(1,Math.ceil((endAt-now)/dayMs));
+  const total=endAt-startAt;
+  const progress=Math.max(0,Math.min(100,Math.round(((now-startAt)/total)*100)));
+  if(remaining<=7){
+    return {label:"賽季倒數",value:remaining+" 天",note:"把握最後積分機會",state:"urgent",progress,progressText:"賽季進度 "+progress+"%"};
+  }
+  return {label:"本季剩餘",value:remaining+" 天",note:"賽季進行中",state:"live",progress,progressText:"賽季進度 "+progress+"%"};
+}
+
 function renderLadderLeaderboardPage(adminMode=false){
   if(!ladderPublicLoaded && !ladderPublicLoading) setTimeout(()=>loadLadderPublic(false),0);
   if(adminMode && isAdminTierOrAbove() && !ladderAdminLogsLoaded) setTimeout(()=>loadLadderAdminLogs(false),0);
@@ -12379,16 +12425,27 @@ function renderLadderLeaderboardPage(adminMode=false){
   const adjustment=ladderAdjustmentUid ? allRows.find(x=>x.uid===ladderAdjustmentUid) : null;
   const now=Date.now();
   const ended=control&&control.endAt&&now>=control.endAt;
+  const seasonDash=ladderSeasonDashboard(control);
   return `
     ${adminMode?renderTestLadderPanel():""}
     ${playerSearchPanel()}
     <div class="panel ladder-hero">
       <div class="panel-title"><span>BXH 天梯排行</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="ladder-refresh">重新整理</button>${adminMode&&isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="ladder-new-season">開啟新賽季</button>`:""}</div></div>
       ${ladderPublicError?`<div class="auth-error">${esc(ladderPublicError)}</div>`:""}
-      <div class="grid grid-3">
-        <div class="stat-box"><div class="label">目前賽季</div><div class="value small">${esc((control&&control.currentSeason)||"S1")}</div></div>
-        <div class="stat-box"><div class="label">賽季開始</div><div class="value small">${formatLadderDate(control&&control.startAt)}</div></div>
-        <div class="stat-box"><div class="label">預計結束</div><div class="value small">${formatLadderDate(control&&control.endAt)}${ended?'　<span class="badge badge-danger">已到期</span>':''}</div></div>
+      <div class="ladder-season-grid">
+        <div class="stat-box"><div class="label">目前賽季</div><div class="value">${esc((control&&control.currentSeason)||"S1")}</div></div>
+        <div class="stat-box"><div class="label">賽季開始</div><div class="value">${formatLadderDate(control&&control.startAt)}</div></div>
+        <div class="stat-box"><div class="label">預計結束</div><div class="value">${formatLadderDate(control&&control.endAt)}</div></div>
+        <div class="stat-box season-status-card ladder-season-state-${seasonDash.state}">
+          <div class="label">${esc(seasonDash.label)}</div>
+          <div class="value">${esc(seasonDash.value)}</div>
+          <div class="ladder-season-status-note">${esc(seasonDash.note)}</div>
+        </div>
+      </div>
+      <div class="ladder-season-progress">
+        <div class="ladder-season-progress-head"><span>${esc((control&&control.currentSeason)||"S1")} 賽季進度</span><strong>${esc(seasonDash.progressText)}</strong></div>
+        <div class="ladder-season-progress-track"><div class="ladder-season-progress-fill" style="width:${seasonDash.progress}%"></div></div>
+        <div class="ladder-season-progress-foot"><span>${formatLadderDate(control&&control.startAt)}</span><span>${formatLadderDate(control&&control.endAt)}</span></div>
       </div>
       <div class="hint" style="margin-top:10px;">每 4 個月為一個賽季。S1：2026/10/01～2027/01/31。<br>同分依序比較：冠軍次數 → 亞軍 → 季軍 → 殿軍 → 生涯積分；仍相同則並列。</div>
     </div>
