@@ -1176,6 +1176,195 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   }
 }
 
+/* ==== WIP Phase 3: final Challonge-density cascade ==== */
+.board-shell{
+  padding:7px;
+  border-radius:9px;
+}
+.board-header{
+  gap:6px;
+  padding-bottom:4px;
+  margin-bottom:4px;
+}
+.board-header-left{gap:6px;align-items:center;}
+.board-logo{height:20px;}
+.board-title{font-size:13px;line-height:1.1;letter-spacing:.2px;}
+.board-sub{font-size:9px;gap:2px 5px;margin-top:1px;}
+.board-status-chip{font-size:8.5px;padding:1px 5px;}
+.board-header>.share-btn{width:31px;height:31px;min-width:31px;}
+
+.board-toolbar{
+  gap:3px;
+  margin:0;
+  padding:0 0 2px;
+}
+.board-toolbar>.btn,.board-theme-select{
+  min-height:26px;
+  padding:3px 6px;
+  font-size:9.5px;
+  border-radius:5px;
+}
+.board-zoom-group{
+  gap:1px;
+  padding:0 2px;
+  border-radius:5px;
+}
+.board-zoom-group .btn{
+  min-height:24px;
+  padding:2px 5px;
+}
+.board-zoom-pct{
+  min-width:30px;
+  font-size:9.5px;
+}
+.board-theme-select{min-width:78px;}
+.board-help{display:none;}
+
+.board-shell>.match-status-legend{
+  margin:0;
+  gap:6px;
+  padding:2px 0 4px;
+  font-size:8.5px;
+}
+.board-shell>.match-status-legend .legend-item{gap:3px;}
+.board-shell>.match-status-legend .legend-swatch{
+  width:8px;height:8px;border-width:1px;border-radius:2px;
+}
+
+.board-canvas{padding:4px;}
+.board-canvas .se-bracket-cols{
+  gap:7px;
+  padding:0;
+}
+.board-canvas .se-col{min-width:146px;}
+.board-canvas .se-col-title{
+  height:20px;
+  margin:0 0 3px;
+  padding:0 4px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  background:#292d33;
+  border:1px solid #3a3f47;
+  border-radius:2px;
+  color:#d7dbe2;
+  font-size:9px;
+  font-weight:600;
+  line-height:1;
+  letter-spacing:0;
+}
+.board-canvas .match-box{
+  border-radius:2px;
+  border-color:#333840;
+}
+.board-canvas .match-box .mb-row{
+  min-height:20px;
+  grid-template-columns:minmax(0,1fr) 19px;
+  background:#1b1e22;
+  border-color:#30343b;
+}
+.board-canvas .player-line{
+  grid-template-columns:20px minmax(0,1fr);
+  min-height:20px;
+}
+.board-canvas .seed-num{
+  min-width:20px;
+  padding:0 2px;
+  border-color:#343942;
+  background:#25292f;
+  font-size:8px;
+}
+.board-canvas .player-line .nm{
+  padding:0 4px;
+  font-size:9.25px;
+  line-height:20px;
+}
+.board-canvas .match-box .sc{
+  min-width:19px;
+  padding:0 2px;
+  border-color:#343942;
+  font-size:8.5px;
+}
+.board-canvas .se-bracket-svg path{
+  stroke-width:1;
+  shape-rendering:crispEdges;
+}
+.board-footer{margin-top:2px;}
+.board-code{font-size:8.5px;}
+
+.bracket-view-toggle{
+  gap:2px;
+  margin:0 0 5px;
+  padding:2px;
+  border-radius:8px;
+}
+.bvt-btn{
+  min-height:31px;
+  padding:4px 6px;
+  gap:4px;
+  border-radius:6px;
+  font-size:10px;
+}
+.bvt-btn svg{width:13px;height:13px;}
+
+@media(max-width:640px){
+  .board-shell{padding:6px;}
+  .board-header{gap:5px;padding-bottom:3px;margin-bottom:3px;}
+  .board-logo{height:18px;}
+  .board-title{font-size:12.5px;}
+  .board-sub{font-size:8.5px;}
+  .board-header>.share-btn{width:29px;height:29px;min-width:29px;}
+
+  .board-toolbar>.btn,.board-theme-select{
+    min-height:25px;
+    padding:2px 5px;
+    font-size:9px;
+  }
+  .board-zoom-group .btn{min-height:23px;padding:1px 4px;}
+  .board-zoom-pct{min-width:28px;font-size:9px;}
+  .board-theme-select{min-width:72px;}
+  .board-shell>.match-status-legend{
+    gap:5px;
+    padding:1px 0 3px;
+    font-size:8px;
+  }
+
+  .board-viewport{
+    height:72vh;
+    border-radius:5px;
+  }
+  .board-canvas{padding:3px;}
+  .board-canvas .se-bracket-cols{gap:5px;}
+  .board-canvas .se-col{min-width:140px;}
+  .board-canvas .se-col-title{
+    height:19px;
+    margin-bottom:2px;
+    font-size:8.5px;
+  }
+  .board-canvas .match-box .mb-row{
+    min-height:19px;
+    grid-template-columns:minmax(0,1fr) 18px;
+  }
+  .board-canvas .player-line{
+    min-height:19px;
+    grid-template-columns:19px minmax(0,1fr);
+  }
+  .board-canvas .seed-num{
+    min-width:19px;
+    font-size:7.5px;
+  }
+  .board-canvas .player-line .nm{
+    padding:0 3px;
+    font-size:8.75px;
+    line-height:19px;
+  }
+  .board-canvas .match-box .sc{
+    min-width:18px;
+    font-size:8px;
+  }
+}
+
 /* ==== version update page ==== */
 .version-page{max-width:760px;margin:0 auto;}
 .version-hero{
