@@ -13318,7 +13318,7 @@ function renderTournamentDetailScreen(){
   } else if(effStatus==="cancelled" || t.eventCancelled){
     actionHtml = `<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
   } else if(effStatus==="closed"){
-    const noOnlineRegistration=!t.registrationSelection && Number(t.capacity||0)<=0 && !normalizeDateTime(t.registrationOpenAt) && !normalizeDateTime(t.registrationCloseAt);
+    const noOnlineRegistration=!t.registrationSelection || Number(t.capacity||0)<=0 || !normalizeDateTime(t.registrationOpenAt) || !normalizeDateTime(t.registrationCloseAt);
     actionHtml = noOnlineRegistration
       ? `<div class="hint">本場目前未開放線上報名，請依主辦公告參加。</div><button class="btn btn-ghost" disabled>未開放線上報名</button>`
       : `<div class="hint">報名已截止。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
