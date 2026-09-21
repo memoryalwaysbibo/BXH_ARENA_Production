@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.10">
+<meta name="bxh-build" content="20260921.11">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.10";
+  var CURRENT_BUILD="20260921.11";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2944,9 +2944,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.0";
+const APP_VERSION = "v14.0.1";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.1",date:"2026/09/21",timezone:"Asia/Taipei",title:"S0 積分體驗版保護",updateLevel:"patch",added:["S0 體驗賽季辨識與說明","10/1 00:00 自動切換 S1 的管理提示"],changed:["S0 賽事只累積體驗賽季分與牌位，不增加正式生涯積分、最高牌位或永久成就","S0 手動更正不影響生涯積分","S0 期間停用手動換季入口"],fixed:["避免體驗賽事被誤列為正式 S1 生涯成果"],environment:"Production / HTML + Firebase",deployStatus:"前端保護版；後端排程與資料遷移另行部署",firebaseImpact:"沿用既有天梯集合並辨識 isTrialSeason",securityRulesImpact:"無",permissionImpact:"不變",publicSummary:"S0 作為積分體驗版，10/1 S1 正式從 0 分開始。"},
   {version:"v14.0.0",date:"2026/09/19",timezone:"Asia/Taipei",title:"BXH ARENA 正式版上線",updateLevel:"major",added:["正式 Production 環境與 arena.bxh.com.tw","獨立 Production Firebase、Firestore Rules 與 Cloud Functions","Email/Password 正式登入與 Production 安全權限","正式賽事結束後雲端同步與自動封存"],changed:["由 Beta 測試環境正式切換至 Production 發行流程","Production 採 Beta 驗證後再升版的發布制度"],fixed:["完成正式環境部署、登入保持與核心賽事生命週期驗收"],environment:"Production / HTML + Firebase",deployStatus:"Official Release",firebaseImpact:"正式專案 bxh-arena",securityRulesImpact:"Production Rules v13.40.3",permissionImpact:"正式玩家自助申請固定為 player；Tester 僅保留 Beta 沙盒用途",publicSummary:"BXH ARENA 首次正式上線，正式環境、登入、賽事與封存流程完成部署。"},
   {version:"v13.39.0",date:"2026/09/16",title:"賽事結束流程重構",updateLevel:"feature",added:["分開顯示對戰完成、結算處理、天梯結算、封存同步與已完成","封存失敗保留明確原因並提供重試","封存狀態可追蹤、可重試且維持冪等"],changed:["最後一場完成後先保存結果，再處理積分與封存"],fixed:["修正完成後長時間停在結算中卻無法判斷原因"],environment:"HTML + Firebase",deployStatus:"Beta-only",firebaseImpact:"沿用既有賽事文件，新增結算中繼狀態",securityRulesImpact:"無",permissionImpact:"不變",publicSummary:"改善賽事結束、結算與封存流程。"},
   {version:"v13.37.0",date:"2026/09/16",title:"家庭選手代報名與賽事身分",updateLevel:"feature",added:["一般賽事可選本人或一位孩子報名","家庭選手獨立賽事紀錄、由家長接收叫號"],changed:["孩子以獨立選手編號進入裁判名單"],fixed:["孩子戰績不歸入家長積分"],environment:"HTML + Firebase",deployStatus:"見 RELEASE_v13.37.0.md",firebaseImpact:"familyRegistration、courtCallService",securityRulesImpact:"沿用既有報名取消與候補規則",permissionImpact:"僅家長替自己的孩子報名",publicSummary:"開放一般賽事代報名；積分賽、超額抽籤與帳號移交尚未開放。"},
@@ -12551,12 +12552,13 @@ function renderLadderLeaderboardPage(adminMode=false){
   const adjustment=ladderAdjustmentUid ? allRows.find(x=>x.uid===ladderAdjustmentUid) : null;
   const now=Date.now();
   const ended=control&&control.endAt&&now>=control.endAt;
+  const isTrialSeason=String(control&&control.currentSeason||"").toUpperCase()==="S0"||control&&control.isTrialSeason===true;
   const seasonDash=ladderSeasonDashboard(control);
   return `
     ${adminMode?renderTestLadderPanel():""}
     ${playerSearchPanel()}
     <div class="panel ladder-hero">
-      <div class="panel-title"><span>BXH 天梯排行</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="ladder-refresh">重新整理</button>${adminMode&&isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="ladder-new-season">開啟新賽季</button>`:""}</div></div>
+      <div class="panel-title"><span>BXH 天梯排行</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="ladder-refresh">重新整理</button>${adminMode&&isSuperAdmin()?((ladderPublicData.control&&ladderPublicData.control.currentSeason)==="S0"?`<button class="btn btn-ghost btn-sm" disabled>S1 將於 10/1 00:00 自動啟用</button>`:`<button class="btn btn-primary btn-sm" data-action="ladder-new-season">開啟新賽季</button>`):""}</div></div>
       ${ladderPublicError?`<div class="auth-error">${esc(ladderPublicError)}</div>`:""}
       <div class="ladder-season-grid">
         <div class="stat-box"><div class="label">目前賽季</div><div class="value">${esc((control&&control.currentSeason)||"S1")}</div></div>
@@ -12573,7 +12575,7 @@ function renderLadderLeaderboardPage(adminMode=false){
         <div class="ladder-season-progress-track"><div class="ladder-season-progress-fill" style="width:${seasonDash.progress}%"></div></div>
         <div class="ladder-season-progress-foot"><span>${formatLadderDate(control&&control.startAt)}</span><span>${formatLadderDate(control&&control.endAt)}</span></div>
       </div>
-      <div class="hint" style="margin-top:10px;">每 4 個月為一個賽季。S1：2026/10/01～2027/01/31。<br>同分依序比較：冠軍次數 → 亞軍 → 季軍 → 殿軍 → 生涯積分；仍相同則並列。</div>
+      <div class="hint" style="margin-top:10px;">${isTrialSeason?"S0 為積分體驗版：賽季分與牌位照常計算，但不計入正式生涯積分、最高牌位與永久成就；10/1 00:00 將保存體驗紀錄並由 S1 重新從 0 分開始。":"每 4 個月為一個正式賽季。S1：2026/10/01～2027/01/31。"}<br>同分依序比較：冠軍次數 → 亞軍 → 季軍 → 殿軍 → 生涯積分；仍相同則並列。</div>
     </div>
     ${ladderLocationFilterHtml()}
     ${ladderRulesHtml()}
@@ -12586,7 +12588,7 @@ function renderLadderLeaderboardPage(adminMode=false){
       <div class="grid grid-2"><div class="stat-box"><div class="label">目前賽季積分</div><div class="value small">${Number(adjustment.seasonPoints||0)} PT</div></div><div class="stat-box"><div class="label">目前生涯積分</div><div class="value small">${Number(adjustment.careerPoints||0)} PT</div></div></div>
       <div class="field" style="margin-top:12px;"><label>更正後賽季積分</label><input id="ladder-adjust-points" type="number" min="0" value="${Number(adjustment.seasonPoints||0)}"></div>
       <div class="field"><label>更正原因（必填）</label><textarea id="ladder-adjust-reason" style="min-height:90px;" placeholder="例如：S1 第 12 場名次更正"></textarea></div>
-      <div class="hint">更正差額會同步套用至生涯積分，並寫入不可省略的操作紀錄。</div>
+      <div class="hint">${isTrialSeason?"S0 更正只影響體驗賽季分，不會變更生涯積分；操作仍會完整留存。":"更正差額會同步套用至生涯積分，並寫入不可省略的操作紀錄。"}</div>
       <div class="btn-row" style="margin-top:10px;"><button class="btn btn-primary" data-action="ladder-adjust-submit" data-uid="${esc(adjustment.uid)}">確認更正</button><button class="btn btn-ghost" data-action="ladder-adjust-cancel">取消</button></div>
     </div>`:""}
     ${adminMode&&selected?`<div class="panel"><div class="panel-title">${esc(selected.playerName||"")}｜賽季歷史</div>${renderLadderSeasonHistory(selected)}</div>`:""}
@@ -16503,7 +16505,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }catch(e){
         console.error(e);
         const msg=String(e&&e.message||e||"");
-        showToast(msg.includes("season-not-ended")?"目前賽季尚未結束，結束後才能開啟下一賽季":"新賽季切換失敗；可再次執行以安全續跑",true);
+        showToast(msg.includes("s0-auto-cutover")?"S0 將於 10/1 00:00 自動切換為 S1":(msg.includes("season-not-ended")?"目前賽季尚未結束，結束後才能開啟下一賽季":"新賽季切換失敗；可再次執行以安全續跑"),true);
       }
     }});
     return;
@@ -20916,6 +20918,7 @@ init();
         if(Number(control.startAt||0)&&seasonNow<Number(control.startAt)) return {ok:false,reason:"season-not-started",message:"本季天梯尚未開始，積分將於賽季開始後啟用"};
         if(Number(control.endAt||0)&&seasonNow>Number(control.endAt)) return {ok:false,reason:"season-ended",message:"本季天梯已結束，請先完成新賽季切換"};
         const seasonId=control.currentSeason||"S1";
+        const isTrialSeason=String(control.currentSeason||"").toUpperCase()==="S0"||control.isTrialSeason===true;
 
         const refs=resolved.map(x=>fx.doc(dbHandle,"ladderPlayers",x.playerUid));
         const [snaps,profiles]=await Promise.all([
@@ -20931,10 +20934,10 @@ init();
           if(old.currentSeason && old.currentSeason!==seasonId) return {ok:false,reason:"player-season-mismatch",message:"玩家賽季資料尚未完成切換，請先完成新賽季作業"};
           const oldSeason=Number(old.seasonPoints||0), oldCareer=Number(old.careerPoints||0);
           const pts=Number(item.pointsEarned||0);
-          const seasonPoints=oldSeason+pts, careerPoints=oldCareer+pts;
+          const seasonPoints=oldSeason+pts, careerPoints=isTrialSeason?oldCareer:oldCareer+pts;
           const rankTier=cloudLadderTier(seasonPoints);
           const oldHigh=old.highestRankTier||"黑鐵";
-          const highestRankTier=cloudLadderTierIndex(rankTier)>cloudLadderTierIndex(oldHigh)?rankTier:oldHigh;
+          const highestRankTier=isTrialSeason?oldHigh:(cloudLadderTierIndex(rankTier)>cloudLadderTierIndex(oldHigh)?rankTier:oldHigh);
           const placement=Number(item.placement||0)||null;
           const data={
             uid:item.playerUid, playerName:item.playerName||old.playerName||"",
@@ -20952,12 +20955,14 @@ init();
           };
           tx.set(refs[i],data,{merge:true});
           const logRef=fx.doc(dbHandle,"ladderTransactions",String(code).toUpperCase()+"_"+item.playerUid);
-          tx.set(logRef,{type:"event",eventCode:String(code).toUpperCase(),eventName:payload.eventName||tour.name||"",eventDate:payload.eventDate||tour.eventDate||"",formatType:payload.formatType||tour.formatType||"single",playerUid:item.playerUid,playerName:item.playerName||"",placement,wins:Number(item.wins||0),losses:Number(item.losses||0),pointsEarned:pts,scoring:item.scoring,delta:pts,seasonId,beforeSeasonPoints:oldSeason,afterSeasonPoints:seasonPoints,beforeCareerPoints:oldCareer,afterCareerPoints:careerPoints,actorUid,actorName:"",createdAt:fx.serverTimestamp()});
+          tx.set(logRef,{type:"event",eventCode:String(code).toUpperCase(),eventName:payload.eventName||tour.name||"",eventDate:payload.eventDate||tour.eventDate||"",formatType:payload.formatType||tour.formatType||"single",playerUid:item.playerUid,playerName:item.playerName||"",placement,wins:Number(item.wins||0),losses:Number(item.losses||0),pointsEarned:pts,scoring:item.scoring,delta:pts,seasonId,isTrialSeason,countsTowardCareer:!isTrialSeason,beforeSeasonPoints:oldSeason,afterSeasonPoints:seasonPoints,beforeCareerPoints:oldCareer,afterCareerPoints:careerPoints,actorUid,actorName:"",createdAt:fx.serverTimestamp()});
           results.push({playerId:item.playerUid,playerName:item.playerName||"",placement,pointsEarned:pts,scoring:item.scoring});
         }
         tx.update(tourRef,{
           ladderPointsAwarded:true,
           ladderSeasonId:seasonId,
+          ladderTrialSeason:isTrialSeason,
+          ladderCountsTowardCareer:!isTrialSeason,
           ladderResults:results,
           ladderSkippedPlayers:skipped,
           ladderAwardedAt:fx.serverTimestamp(),
@@ -20978,11 +20983,12 @@ init();
         const ps=await tx.get(playerRef), cs=await tx.get(controlRef);
         if(!ps.exists()) return {ok:false,reason:"not-found"};
         if(!cs.exists()||cs.data().rolloverInProgress===true) return {ok:false,reason:"season-unavailable"};
+        const control=cs.data(); const isTrialSeason=String(control.currentSeason||"").toUpperCase()==="S0"||control.isTrialSeason===true;
         const old=ps.data(); const before=Math.max(0,Number(old.seasonPoints||0)); const after=Math.max(0,Number(newSeasonPoints)||0); const delta=after-before;
-        const beforeCareer=Math.max(0,Number(old.careerPoints||0)); const afterCareer=Math.max(0,beforeCareer+delta);
-        const rankTier=cloudLadderTier(after); const oldHigh=old.highestRankTier||"黑鐵"; const highest=cloudLadderTierIndex(rankTier)>cloudLadderTierIndex(oldHigh)?rankTier:oldHigh;
+        const beforeCareer=Math.max(0,Number(old.careerPoints||0)); const afterCareer=isTrialSeason?beforeCareer:Math.max(0,beforeCareer+delta);
+        const rankTier=cloudLadderTier(after); const oldHigh=old.highestRankTier||"黑鐵"; const highest=isTrialSeason?oldHigh:(cloudLadderTierIndex(rankTier)>cloudLadderTierIndex(oldHigh)?rankTier:oldHigh);
         tx.update(playerRef,{seasonPoints:after,careerPoints:afterCareer,rankTier,highestRankTier:highest,lastPointsUpdatedAt:fx.serverTimestamp()});
-        tx.set(logRef,{type:"adjustment",playerUid:uid,playerName:old.playerName||"",seasonId:old.currentSeason||cs.data().currentSeason||"S1",beforeSeasonPoints:before,afterSeasonPoints:after,beforeCareerPoints:beforeCareer,afterCareerPoints:afterCareer,delta,reason,actorUid,actorName:actorName||"",createdAt:fx.serverTimestamp()});
+        tx.set(logRef,{type:"adjustment",playerUid:uid,playerName:old.playerName||"",seasonId:old.currentSeason||control.currentSeason||"S1",isTrialSeason,countsTowardCareer:!isTrialSeason,beforeSeasonPoints:before,afterSeasonPoints:after,beforeCareerPoints:beforeCareer,afterCareerPoints:afterCareer,delta,reason,actorUid,actorName:actorName||"",createdAt:fx.serverTimestamp()});
         return {ok:true,before,after,delta};
       });
     },
@@ -20997,6 +21003,7 @@ init();
       const lock=await fx.runTransaction(dbHandle,async tx=>{
         const cs=await tx.get(controlRef); if(!cs.exists()) return {ok:false,reason:"not-initialized"};
         const c=cs.data();
+        if(String(c.currentSeason||"").toUpperCase()==="S0") return {ok:false,reason:"s0-auto-cutover",message:"S0 將於 10/1 00:00 自動切換為 S1，不需手動開季"};
         if(c.rolloverInProgress!==true && c.lastRolloverCompletedAtMs && (Date.now()-Number(c.lastRolloverCompletedAtMs)) < 10*60*1000){
           return {ok:true,alreadyCompleted:true,oldSeason:c.lastRolloverFromSeason||null,newSeason:c.currentSeason||"S1"};
         }

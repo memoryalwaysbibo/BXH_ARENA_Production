@@ -59,5 +59,17 @@ async function setup(modify=()=>{},beforeTx=()=>{}){
  assert.equal((await duplicate.run()).reason,'duplicate-player-account');assert.equal(duplicate.writes,0);
  const legacy=await setup(db=>Object.assign(db.get('tournaments/TEST-LOCAL'),{ladderPointsAwarded:true,ladderResults:[{pointsEarned:10}]}));
  const lr=await legacy.run();assert.equal(lr.alreadyAwarded,true);assert.equal(lr.results[0].pointsEarned,10);assert.equal(legacy.writes,0);
- console.log('PASS saved-state scoring, metadata, retries, legacy preservation, season/auth-mode gates, stale/conflicting data and atomic failure');
+ const trial=await setup(db=>{
+  Object.assign(db.get('ladderSystem/current'),{currentSeason:'S0',isTrialSeason:true});
+  db.set('ladderPlayers/u0',{currentSeason:'S0',seasonPoints:5,careerPoints:55,highestRankTier:'黃金',totalEvents:2});
+ });
+ const tr=await trial.run();assert.equal(tr.ok,true);assert.equal(tr.seasonId,'S0');
+ assert.equal(trial.data.get('ladderPlayers/u0').seasonPoints,105);
+ assert.equal(trial.data.get('ladderPlayers/u0').careerPoints,55);
+ assert.equal(trial.data.get('ladderPlayers/u0').highestRankTier,'黃金');
+ assert.equal(trial.data.get('ladderPlayers/u0').totalEvents,3);
+ assert.equal(trial.data.get('ladderTransactions/TEST-LOCAL_u0').isTrialSeason,true);
+ assert.equal(trial.data.get('ladderTransactions/TEST-LOCAL_u0').countsTowardCareer,false);
+ assert.equal(trial.data.get('tournaments/TEST-LOCAL').ladderTrialSeason,true);
+ console.log('PASS saved-state scoring, S0 career isolation, metadata, retries, legacy preservation, season/auth-mode gates, stale/conflicting data and atomic failure');
 })().catch(e=>{console.error(e);process.exitCode=1});
