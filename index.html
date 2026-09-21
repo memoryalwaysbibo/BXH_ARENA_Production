@@ -26,16 +26,20 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.12">
+<meta name="bxh-build" content="20260922.01">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.12";
+  var CURRENT_BUILD="20260922.01";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
 
   function addUpdateBanner(nextBuild){
     if(document.getElementById("bxh-update-banner")) return;
+    try{
+      var attemptedAt=Number(sessionStorage.getItem("bxh_update_attempt_"+String(nextBuild||""))||0);
+      if(attemptedAt && Date.now()-attemptedAt<15000) return;
+    }catch(e){}
     var show=function(){
       if(document.getElementById("bxh-update-banner")) return;
       var bar=document.createElement("div");
@@ -49,9 +53,15 @@
       btn.textContent="立即更新";
       btn.style.cssText="flex:0 0 auto;border:0;border-radius:9px;padding:9px 13px;background:#d9b95c;color:#111;font-weight:800";
       btn.onclick=function(){
+        var targetBuild=String(nextBuild||Date.now());
+        btn.disabled=true;
+        btn.textContent="更新中…";
+        try{ sessionStorage.setItem("bxh_update_attempt_"+targetBuild,String(Date.now())); }catch(e){}
+        try{ bar.remove(); }catch(e){}
         try{
           var u=new URL(location.href);
-          u.searchParams.set("bxh_build",nextBuild||Date.now());
+          u.searchParams.set("bxh_build",targetBuild);
+          u.searchParams.set("bxh_force",Date.now().toString());
           location.replace(u.toString());
         }catch(e){
           location.reload();
@@ -2944,9 +2954,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.2";
+const APP_VERSION = "v14.0.4";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.4",date:"2026/09/22",timezone:"Asia/Taipei",title:"更新提示循環修復",updateLevel:"patch",added:["版本更新按鈕點擊後立即進入更新中狀態並移除提示","更新導向同時加入 build 與 force cache-busting 參數","短時間 CDN 舊頁回應時加入 15 秒重複提示冷卻"],changed:["首頁內建 build、APP_VERSION 與 version.json 改為同一發行版本"],fixed:["修正 version.json 已是新 build、但 index.html 仍宣告舊 build，造成按下『立即更新』後提示無限再次出現"],environment:"Production / HTML + Firebase",deployStatus:"Frontend hotfix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"修正更新提示按下後不消失、反覆要求更新的問題。"},
   {version:"v14.0.2",date:"2026/09/21",timezone:"Asia/Taipei",title:"正式積分結算可靠性修復",updateLevel:"patch",added:["正式積分賽改由受信任的 Cloud Function 統一結算","結算失敗保留後端實際原因供管理員判斷"],changed:["前端只傳送賽事代碼，分數一律由後端依已儲存賽果重新計算","結算成功後同步保存完整天梯結果"],fixed:["修正多人積分賽在前端 Firestore transaction 因權限或帳號狀態整批回滾","重試採冪等處理，不會重複加分"],environment:"Production / HTML + Firebase",deployStatus:"需同步部署 settleLadderTournament Function",firebaseImpact:"新增正式天梯後端結算 Callable Function",securityRulesImpact:"不需變更",permissionImpact:"僅啟用中的 admin／super_admin 可執行",publicSummary:"修正正式積分賽完成後無法結算與封存的問題。"},
   {version:"v14.0.1",date:"2026/09/21",timezone:"Asia/Taipei",title:"S0 積分體驗版保護",updateLevel:"patch",added:["S0 體驗賽季辨識與說明","10/1 00:00 自動切換 S1 的管理提示"],changed:["S0 賽事只累積體驗賽季分與牌位，不增加正式生涯積分、最高牌位或永久成就","S0 手動更正不影響生涯積分","S0 期間停用手動換季入口"],fixed:["避免體驗賽事被誤列為正式 S1 生涯成果"],environment:"Production / HTML + Firebase",deployStatus:"前端保護版；後端排程與資料遷移另行部署",firebaseImpact:"沿用既有天梯集合並辨識 isTrialSeason",securityRulesImpact:"無",permissionImpact:"不變",publicSummary:"S0 作為積分體驗版，10/1 S1 正式從 0 分開始。"},
   {version:"v14.0.0",date:"2026/09/19",timezone:"Asia/Taipei",title:"BXH ARENA 正式版上線",updateLevel:"major",added:["正式 Production 環境與 arena.bxh.com.tw","獨立 Production Firebase、Firestore Rules 與 Cloud Functions","Email/Password 正式登入與 Production 安全權限","正式賽事結束後雲端同步與自動封存"],changed:["由 Beta 測試環境正式切換至 Production 發行流程","Production 採 Beta 驗證後再升版的發布制度"],fixed:["完成正式環境部署、登入保持與核心賽事生命週期驗收"],environment:"Production / HTML + Firebase",deployStatus:"Official Release",firebaseImpact:"正式專案 bxh-arena",securityRulesImpact:"Production Rules v13.40.3",permissionImpact:"正式玩家自助申請固定為 player；Tester 僅保留 Beta 沙盒用途",publicSummary:"BXH ARENA 首次正式上線，正式環境、登入、賽事與封存流程完成部署。"},
