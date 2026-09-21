@@ -3368,3 +3368,22 @@ button.btn-primary,
   color:#eef0f3!important;
   box-shadow:none!important;
 }
+
+
+/* 2026-09-21 iOS community-create focus containment
+   Keep field-level focus styling, but prevent the entire create-room card from
+   entering the desktop card glow/translate state while the virtual keyboard is open. */
+@media (hover:none), (max-width:768px){
+  .community-create-card:focus-within{
+    transform:none!important;
+    filter:none!important;
+    border-color:transparent!important;
+    background:
+      linear-gradient(145deg,rgba(15,17,23,.46),rgba(15,17,23,.34)) padding-box,
+      linear-gradient(135deg,rgba(var(--accent-rgb),.40),rgba(255,255,255,.065) 50%,rgba(var(--accent-rgb),.17)) border-box!important;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.045),
+      inset 0 0 22px rgba(var(--accent-rgb),.018),
+      0 13px 30px rgba(0,0,0,.24)!important;
+  }
+}
