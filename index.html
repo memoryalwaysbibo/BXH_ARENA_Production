@@ -6281,6 +6281,35 @@ function mapRegistrationError(e){
   return REGISTRATION_ERROR_MESSAGES[code] || Object.entries(REGISTRATION_ERROR_MESSAGES).find(([key])=>String(e?.message||"").includes(key))?.[1] || "發生未知錯誤，請稍後再試";
 }
 let publicTournamentsLoading = false;
+let publicTournamentsLastRefreshAt = 0;
+let publicTournamentsBackgroundRefreshPromise = null;
+const PUBLIC_TOURNAMENTS_AUTO_REFRESH_MS = 15000;
+
+// Keep the lobby lifecycle fresh while it is visible. Previously renderTournamentLobby()
+// referenced queuePublicTournamentsBackgroundRefresh() behind a typeof guard, but the
+// function did not exist, so a room could remain visually stuck in "比賽中" until the
+// user manually pressed 重新整理.
+function queuePublicTournamentsBackgroundRefresh(){
+  if(publicTournamentsCache===null || publicTournamentsLoading || publicTournamentsBackgroundRefreshPromise) return;
+  if(Date.now()-publicTournamentsLastRefreshAt < PUBLIC_TOURNAMENTS_AUTO_REFRESH_MS) return;
+  if(!cloudAvailable() || !window.cloudSync || !window.cloudSync.queryPublicTournaments) return;
+  publicTournamentsLastRefreshAt=Date.now();
+  publicTournamentsBackgroundRefreshPromise=(async()=>{
+    try{
+      const result=await window.cloudSync.queryPublicTournaments();
+      if(result&&result.ok){
+        publicTournamentsCache=result.items;
+        publicTournamentsError=null;
+        if(typeof renderPreservingScroll==="function") renderPreservingScroll();
+        else render();
+      }
+    }catch(e){
+      console.warn("[lobby background refresh]",e);
+    }finally{
+      publicTournamentsBackgroundRefreshPromise=null;
+    }
+  })();
+}
 let findEventsFilters = { keyword:"", date:"", region:"", format:"all" };
 // Pure front-end display state for the "賽事資訊" tab — deliberately never
 // persisted to Firestore or even localStorage; resets to defaults whenever
@@ -16259,6 +16288,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="load-public-tournaments" || action==="refresh-public-tournaments"){
     if(publicTournamentsLoading) return;
+    publicTournamentsLastRefreshAt = Date.now();
     publicTournamentsLoading = true;
     publicTournamentsError = null;
     render();
