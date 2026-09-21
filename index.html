@@ -8559,6 +8559,7 @@ async function confirmResultWithCloudGuard(matchId){
   if(!state.celebrationShown && isTournamentFullyDecided()){
     state.celebrationShown = true;
     const archivedOk = await performAutoArchive();
+    publicTournamentsCache=null; publicTournamentsError=null;
     if(!archivedOk){ state.celebrationShown=false; render(); return true; }
     celebrationData = buildCelebrationData(state);
     celebrationOpen = true;
@@ -8710,6 +8711,7 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(!state.celebrationShown && isTournamentFullyDecided()){
     state.celebrationShown = true;
     const archivedOk = await performAutoArchive();
+    publicTournamentsCache=null; publicTournamentsError=null;
     if(!archivedOk){ state.celebrationShown=false; render(); return true; }
     celebrationData = buildCelebrationData(state);
     celebrationOpen = true;
@@ -16147,7 +16149,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="community-switch-room-tab"){ communityRoomActiveTab=target.getAttribute("data-tab")||"live"; render(); return; }
   if(action==="community-exit-room"){
     if(cloudUnsub){try{cloudUnsub();}catch(e){} cloudUnsub=null;}
-    appPhase="player-center"; playerActiveTab="host"; communityEventsCache=null; communityHistoryCache=null; render(); return;
+    appPhase="player-center"; playerActiveTab="host";
+    communityEventsCache=null; communityHistoryCache=null;
+    publicTournamentsCache=null; publicTournamentsError=null;
+    render(); return;
   }
   if(action==="community-copy-code"){ const code=target.getAttribute("data-code")||state.cloudCode||""; if(code) copyTextToClipboard(code,"已複製房間代碼："+code); return; }
   if(action==="community-delete-room"){
