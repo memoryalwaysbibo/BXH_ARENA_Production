@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.7">
+<meta name="bxh-build" content="20260921.8">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.7";
+  var CURRENT_BUILD="20260921.8";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -1513,24 +1513,25 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .account-menu button.danger{color:var(--danger);}
 .account-theme-entry{border-top:1px solid rgba(217,185,92,.14);border-bottom:1px solid rgba(217,185,92,.12);}
 .account-theme-trigger{
-  display:flex!important;align-items:center;justify-content:space-between;gap:12px;
+  display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;
+  width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box;
   padding:13px 14px!important;background:linear-gradient(90deg,rgba(217,185,92,.035),transparent)!important;
-  border-bottom:0!important;
+  border-bottom:0!important;overflow:hidden;
 }
 .account-theme-trigger:hover{background:rgba(217,185,92,.07)!important;}
 .account-theme-trigger-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .account-theme-trigger-title{font-size:13px;font-weight:800;color:var(--ivory);letter-spacing:.2px;}
 .account-theme-trigger-sub{font-size:10px;color:var(--metal-dim);letter-spacing:.5px;}
-.account-theme-current{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;max-width:138px;padding:6px 9px;border:1px solid rgba(217,185,92,.24);border-radius:999px;background:rgba(217,185,92,.055);}
+.account-theme-current{display:inline-grid;grid-template-columns:8px minmax(0,1fr) 10px;align-items:center;gap:6px;min-width:0;max-width:96px;padding:5px 0;border:0;background:transparent;}
 .account-theme-current-dot{width:8px;height:8px;border-radius:50%;background:var(--theme-dot);box-shadow:0 0 10px color-mix(in srgb,var(--theme-dot) 55%,transparent);}
-.account-theme-current-name{font-size:11px;font-weight:800;color:var(--ivory);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.account-theme-chevron{font-size:11px;color:var(--gold);transition:transform .18s ease;}
+.account-theme-current-name{min-width:0;max-width:62px;font-size:11px;font-weight:800;color:var(--ivory);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.account-theme-chevron{font-size:12px;color:var(--gold);transition:transform .18s ease;}
 .account-theme-entry.open .account-theme-chevron{transform:rotate(90deg);}
-.account-theme-panel{padding:10px 10px 12px;background:linear-gradient(180deg,rgba(255,255,255,.015),rgba(0,0,0,.10));}
+.account-theme-panel{width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:10px 10px 12px;background:linear-gradient(180deg,rgba(255,255,255,.015),rgba(0,0,0,.10));overflow:hidden;}
 .account-theme-panel-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;padding:2px 3px 9px;}
 .account-theme-panel-head strong{font-size:11px;color:var(--metal);letter-spacing:.8px;}
 .account-theme-panel-head span{font-size:9px;color:var(--metal-dim);}
-.account-theme-grid{display:grid;gap:7px;}
+.account-theme-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;min-width:0;}
 .account-theme-card{
   display:grid!important;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;
   padding:10px 11px!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:10px!important;
@@ -1546,6 +1547,14 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .account-theme-check{display:flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;border:1px solid rgba(255,255,255,.11);color:transparent;font-size:11px;}
 .account-theme-card.is-active .account-theme-check{border-color:var(--gold-dim);color:var(--gold);background:rgba(217,185,92,.08);}
 
+@media(max-width:420px){
+  .account-theme-trigger{padding-left:12px!important;padding-right:12px!important;}
+  .account-theme-trigger-title{font-size:12.5px;}
+  .account-theme-trigger-sub{font-size:8.5px;letter-spacing:.35px;}
+  .account-theme-current{max-width:88px;}
+  .account-theme-current-name{max-width:54px;font-size:10.5px;}
+  .account-theme-panel-head span{display:none;}
+}
 .mailbox-trigger{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:7px 11px;border:1px solid var(--gold-dim);border-radius:18px;background:rgba(217,185,92,.08);color:var(--ivory);font-family:var(--font-d);font-size:12px;white-space:nowrap;}
 .mailbox-trigger.active{border-color:var(--gold);color:var(--gold);background:rgba(217,185,92,.15);}
 .mailbox-unread{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#b72235;color:#fff;font-size:11px;font-weight:800;box-shadow:0 0 10px rgba(183,34,53,.45);}
