@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.1">
+<meta name="bxh-build" content="20260921.2">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.1";
+  var CURRENT_BUILD="20260921.2";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -11235,6 +11235,23 @@ function syncReleaseAdminBadge(){
 }
 /* ==== End Production Public Beta Release Gate ==== */
 
+async function bxhForceRefresh(){
+  try{
+    if("caches" in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+  }catch(e){ /* Cache Storage cleanup is best-effort. */ }
+  try{
+    const u=new URL(location.href);
+    u.searchParams.set("bxh_force",Date.now().toString());
+    u.searchParams.delete("bxh_build");
+    location.replace(u.toString());
+  }catch(e){
+    location.reload();
+  }
+}
+
 function renderLandingScreen(){
   return authShellOpen() + `
     <div class="landing-home">
@@ -11274,6 +11291,7 @@ function renderLandingScreen(){
       <div class="btn-row" style="justify-content:center;margin-top:18px;">
         <button class="btn btn-primary" data-action="open-qr-scanner" data-source="landing">掃描賽事 QR</button>
         <button class="btn btn-ghost" data-action="raffle-public">會員抽獎</button>
+        <button class="btn btn-ghost" data-action="force-refresh-version" title="強制重新載入最新版本">↻ 刷新版本</button>
       </div>
       <div class="auth-footnote landing-footnote">
         <span>BXH ARENA · TOURNAMENT MANAGEMENT SYSTEM</span>
@@ -15974,6 +15992,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       return;
     }
     doSwitch();
+    return;
+  }
+  if(action==="force-refresh-version"){
+    try{ showToast("正在取得最新版本…"); }catch(e){}
+    bxhForceRefresh();
     return;
   }
   if(action==="select-role-admin"){
