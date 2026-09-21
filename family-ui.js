@@ -23,7 +23,7 @@ function mergeFamilyOnlineRoster(players,registrations,checkinRequired,newId){
  const confirmed=registrations.filter(r=>r.status==='confirmed'),ids=new Set(confirmed.map(r=>String(r.uid||'')));
  const result=players.filter(p=>p.source!=='online'||!p.registrationUid||ids.has(p.registrationUid));
  for(const r of confirmed){
-  const name=String(r.displayName||r.publicName||r.realName||'').trim(),guardian=String(r.uid||'');if(!name||!guardian)continue;
+  const name=String(r.displayName||r.publicName||r.realName||'').trim(),guardian=String(r.guardianUid||r.uid||'');if(!name||!guardian)continue;
   const participant=r.registrationId||r.uid||guardian,i=result.findIndex(p=>p.registrationUid===guardian&&String(p.registrationId||p.participantId||p.uid||'')===String(participant)),old=i<0?null:result[i],same=(old?.familyPlayerId||null)===(r.familyPlayerId||null);
   const p={id:r.familyPlayerId?'family_'+r.familyPlayerId:(same&&old?.id||newId()),name,source:'online',registrationUid:guardian,registrationId:participant,checkedIn:same&&old?old.checkedIn:!checkinRequired};
   if(r.familyPlayerId)Object.assign(p,{familyPlayerId:r.familyPlayerId,participantId:r.familyPlayerId,guardianUid:guardian});

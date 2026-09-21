@@ -9238,6 +9238,53 @@ function currentTournamentRegistrationLocked(){
   return !!state.startedAt || phase==="live" || phase==="settling" || phase==="done" || phase==="cancelled";
 }
 
+// Hotfix 2026-09-21: before the explicit start lock, the online confirmed
+// registrations remain authoritative. Drawing a bracket must never silently
+// freeze an older roster snapshot.
+function currentBracketParticipantIds(){
+  const ids=new Set();
+  (state.matches||[]).forEach(m=>{
+    if(m&&m.a&&m.a.playerId) ids.add(String(m.a.playerId));
+    if(m&&m.b&&m.b.playerId) ids.add(String(m.b.playerId));
+    if(m&&m.winnerId) ids.add(String(m.winnerId));
+  });
+  return ids;
+}
+function eligibleRosterIds(){
+  return new Set(eligiblePlayers().map(p=>String(p.id)));
+}
+function sameStringSet(a,b){
+  if(a.size!==b.size) return false;
+  for(const x of a) if(!b.has(x)) return false;
+  return true;
+}
+function bracketRosterIsCurrent(){
+  if(!state.bracketSize || !(state.matches||[]).length) return false;
+  return sameStringSet(currentBracketParticipantIds(),eligibleRosterIds());
+}
+async function syncLatestOnlineRosterBeforeLock(){
+  if(!state.meta?.registrationEnabled || !state.cloudCode || state.startedAt) return {ok:true,changed:false,confirmed:0};
+  if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
+  if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
+  const regs=await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
+  adminRegistrationsCache=regs;
+  const confirmed=regs.filter(r=>r&&r.status==="confirmed");
+  const before=(state.players||[]).map(p=>[
+    String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
+    p.checkedIn===true?"1":"0",String(p.name||"")
+  ].join("|")).sort().join("\n");
+  state.players=mergeFamilyOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired,()=>uid("p"));
+  const after=(state.players||[]).map(p=>[
+    String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
+    p.checkedIn===true?"1":"0",String(p.name||"")
+  ].join("|")).sort().join("\n");
+  const changed=before!==after;
+  if(changed) await saveState();
+  publicTournamentsCache=null;
+  myRegistrationsCache=null;
+  return {ok:true,changed,confirmed:confirmed.length};
+}
+
 function canonicalPublicTournamentPhase(t){
   if(!t) return "waiting";
   const parsed=t.parsedData||{};
@@ -10796,7 +10843,7 @@ function renderPeopleManagement(){
 
   ${online ? `<div class="panel">
     <div class="panel-title">線上報名名單</div>
-    <p class="hint">從 Firebase 載入本場「正取」玩家到正式參賽名單。備取不會自動加入，需先在報名管理完成遞補。</p>
+    <p class="hint">開賽前可隨時同步最新正取名單；產生／刷新對戰表時也會自動重新同步。真正按下「賽事開始」後才鎖定參賽名單。</p>
     <div class="btn-row">
       <button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt?'disabled':''}>載入線上報名名單</button>
       <button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>重新整理報名資料</button>
@@ -19073,22 +19120,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="load-online-roster"){
     if(!state.meta.registrationEnabled){ showToast("此賽事未啟用線上報名", true); return; }
     if(!state.cloudCode){ showToast("此賽事尚未發布到雲端", true); return; }
-    if(state.startedAt||state.bracketSize||state.matches.length){ showToast("對戰表產生後不能重新載入名單，請先清除對戰表", true); return; }
+    if(state.startedAt){ showToast("賽事開始後參賽名單已鎖定", true); return; }
     (async ()=>{
       try{
-        if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
-        if(!window.cloudSync || !window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
-        const regs = await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
-        adminRegistrationsCache = regs;
-        const confirmed = regs.filter(r=>r.status==="confirmed");
-        const before=state.players.length;
-        state.players=mergeFamilyOnlineRoster(state.players,confirmed,state.meta.checkinRequired,()=>uid("p"));
-        const added=Math.max(0,state.players.length-before),skipped=confirmed.length-added;
-        state.meta.checkinClosedEarly = false;
-        state.meta.checkinClosedAt = null;
-        await saveState();
+        const result=await syncLatestOnlineRosterBeforeLock();
         render();
-        showToast("線上名單已同步，目前共 "+state.players.length+" 位選手");
+        if(state.bracketSize && !bracketRosterIsCurrent()){
+          showToast("線上名單已更新；對戰表已過期，請重新產生對戰表", true);
+        }else{
+          showToast(result.changed?"線上名單已同步，目前共 "+state.players.length+" 位選手":"線上名單已是最新資料");
+        }
       }catch(e){
         console.warn("[load-online-roster]",e);
         showToast("載入線上報名名單失敗，請稍後再試", true);
@@ -19111,71 +19152,109 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(state.startedAt){ showToast("賽事已經開始", true); return; }
     if(!state.bracketSize || state.matches.length===0){ showToast("請先產生對戰表", true); return; }
 
-    const eligible=eligiblePlayers().length;
-    const pending=state.meta.registrationEnabled && state.meta.checkinRequired
-      ? state.players.filter(p=>p.checkedIn!==true).length : 0;
-    const scheduledStart=scheduledTournamentStartMs(state.meta);
-    const now=Date.now();
-    const isEarly=scheduledStart!=null && now<scheduledStart;
+    (async ()=>{
+      try{
+        // The explicit "開始賽事" action is the roster lock. Until this exact
+        // point, pull the newest confirmed registrations so late entrants can
+        // still be checked in and included.
+        const syncResult=await syncLatestOnlineRosterBeforeLock();
+        if(syncResult.changed) render();
 
-    const actuallyStart=()=>{
-      (async ()=>{
-        state.startedAt=Date.now();
-        rebuildCourtAssignments();
-        state.rosterLocked=true;
-        state.meta.registrationStatus="started";
-        if(state.meta.registrationEnabled && state.meta.checkinRequired && !state.meta.checkinClosedEarly){
-          state.meta.checkinClosedEarly=true;
-          state.meta.checkinClosedAt=Date.now();
+        if(!bracketRosterIsCurrent()){
+          openModal({
+            type:"generic",
+            title:"參賽名單已更新，請重新產生對戰表",
+            message:"系統在開賽前重新核對線上報名，發現目前可編排名單與既有對戰表不一致。\n\n目前可編排："+eligiblePlayers().length+" 人\n既有對戰表："+currentBracketParticipantIds().size+" 人\n\n為避免漏掉後續報名／報到玩家，必須先重新產生對戰表才能開始。",
+            danger:true,
+            confirmLabel:"重新產生對戰表",
+            onConfirm:()=>{
+              const ok=generateBracket();
+              if(ok){ saveState(); render(); showToast("已依最新參賽名單重新產生對戰表，請再次確認後開始賽事"); }
+            }
+          });
+          return;
         }
 
-        // Do not announce success until the live/done phase has been pushed to
-        // both private + public tournament documents. This closes the window in
-        // which a player could still cancel from another device right after the
-        // organizer pressed "開始賽事".
-        const synced=await saveState();
-        publicTournamentsCache=null;
-        myRegistrationsCache=null;
-        resetAdminRegistrationsCache();
-        activeTab="referee";
-        render();
-        showToast(synced===false
-          ? "賽事已於本機開始，但雲端同步尚未完成；請確認網路後再操作報名資料"
-          : "賽事正式開始｜所有報名相關功能已鎖定",
-          synced===false);
-      })();
-    };
+        const eligible=eligiblePlayers().length;
+        const pending=state.meta.registrationEnabled && state.meta.checkinRequired
+          ? state.players.filter(p=>p.checkedIn!==true).length : 0;
+        const scheduledStart=scheduledTournamentStartMs(state.meta);
+        const now=Date.now();
+        const isEarly=scheduledStart!=null && now<scheduledStart;
 
-    if(isEarly){
-      const scheduledLabel=new Date(scheduledStart).toLocaleString("zh-TW",{hour12:false});
-      openModal({
-        type:"generic",
-        title:"活動時間還沒到，確認提前開始？",
-        message:"預定開賽時間："+scheduledLabel+
-          "\\n\\n目前尚未到活動開始時間。若確認提前開始："+
-          "\\n• 賽事立即切換為「進行中」"+
-          "\\n• 報名、備取、取消報名與遞補全部鎖定"+
-          "\\n• 參賽名單與對戰表鎖定"+
-          (pending?"\\n• 尚未報到："+pending+" 人，不列入本次對戰":""),
-        danger:true,
-        confirmLabel:"確認提前開始",
-        onConfirm:actuallyStart
-      });
-      return;
-    }
+        const actuallyStart=()=>{
+          (async ()=>{
+            // Re-check immediately before committing the lock. This narrows the
+            // race window between the confirmation dialog and the final start.
+            try{
+              await syncLatestOnlineRosterBeforeLock();
+              if(!bracketRosterIsCurrent()){
+                render();
+                showToast("開賽前名單又有異動，請重新產生對戰表後再開始", true);
+                return;
+              }
+            }catch(e){
+              console.warn("[start-tournament roster sync]",e);
+              showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
+              return;
+            }
+            state.startedAt=Date.now();
+            rebuildCourtAssignments();
+            state.rosterLocked=true;
+            state.meta.registrationStatus="started";
+            if(state.meta.registrationEnabled && state.meta.checkinRequired && !state.meta.checkinClosedEarly){
+              state.meta.checkinClosedEarly=true;
+              state.meta.checkinClosedAt=Date.now();
+            }
 
-    openModal({
-      type:"generic",
-      title:"確認開始賽事",
-      message:"請再次確認：\\n\\n參賽人數："+eligible+" 人"+
-        "\\n戰鬥台："+state.meta.stations+" 台"+
-        "\\n賽制："+(FORMAT_LABELS[state.meta.formatType]||state.meta.format)+
-        (pending?"\\n未報到："+pending+" 人（不列入本次對戰）":"")+
-        "\\n\\n開始後，報名、取消、備取與遞補功能將全部鎖定。",
-      danger:true,
-      confirmLabel:"確認賽事開始",
-      onConfirm:actuallyStart
-    });
+            const synced=await saveState();
+            publicTournamentsCache=null;
+            myRegistrationsCache=null;
+            resetAdminRegistrationsCache();
+            activeTab="referee";
+            render();
+            showToast(synced===false
+              ? "賽事已於本機開始，但雲端同步尚未完成；請確認網路後再操作報名資料"
+              : "賽事正式開始｜參賽名單與報名功能已鎖定",
+              synced===false);
+          })();
+        };
+
+        if(isEarly){
+          const scheduledLabel=new Date(scheduledStart).toLocaleString("zh-TW",{hour12:false});
+          openModal({
+            type:"generic",
+            title:"活動時間還沒到，確認提前開始？",
+            message:"預定開賽時間："+scheduledLabel+
+              "\n\n目前尚未到活動開始時間。若確認提前開始："+
+              "\n• 賽事立即切換為「進行中」"+
+              "\n• 報名、備取、取消報名與遞補全部鎖定"+
+              "\n• 參賽名單與對戰表鎖定"+
+              (pending?"\n• 尚未報到："+pending+" 人，不列入本次對戰":""),
+            danger:true,
+            confirmLabel:"確認提前開始",
+            onConfirm:actuallyStart
+          });
+          return;
+        }
+
+        openModal({
+          type:"generic",
+          title:"確認開始賽事",
+          message:"請再次確認：\n\n參賽人數："+eligible+" 人"+
+            "\n戰鬥台："+state.meta.stations+" 台"+
+            "\n賽制："+(FORMAT_LABELS[state.meta.formatType]||state.meta.format)+
+            (pending?"\n未報到："+pending+" 人（不列入本次對戰）":"")+
+            "\n\n開始後，報名、取消、備取與遞補功能將全部鎖定。",
+          danger:true,
+          confirmLabel:"確認賽事開始",
+          onConfirm:actuallyStart
+        });
+      }catch(e){
+        console.warn("[start-tournament roster preflight]",e);
+        showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
+      }
+    })();
     return;
   }
   if(action==="draw-bracket"){
@@ -19185,7 +19264,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         activeTab="people";
         saveState();
         render();
-        showToast("對戰表已產生，可直接確認後開始賽事");
+        showToast("對戰表已依最新參賽名單產生，可確認後開始賽事");
       }
     };
     const doCheckThenDraw = ()=>{
@@ -19202,9 +19281,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         doDraw();
       }
     };
+    const syncThenDraw=async()=>{
+      try{
+        await syncLatestOnlineRosterBeforeLock();
+        render();
+        doCheckThenDraw();
+      }catch(e){
+        console.warn("[draw-bracket roster sync]",e);
+        showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
+      }
+    };
     if(state.bracketSize){
-      openModal({ type:"generic", title:"重新抽籤", message:"目前已產生對戰表。重新抽籤將清除現有對戰編排；正式按下「賽事開始」後將不可重新抽籤。是否繼續？", danger:true, confirmLabel:"確定重新抽籤", onConfirm:doCheckThenDraw });
-    } else { doCheckThenDraw(); }
+      openModal({ type:"generic", title:"重新抽籤", message:"目前已產生對戰表。重新抽籤會先同步最新正取名單，再清除現有對戰編排；正式按下「賽事開始」後才會鎖定名單。是否繼續？", danger:true, confirmLabel:"同步名單並重新抽籤", onConfirm:syncThenDraw });
+    } else { syncThenDraw(); }
     return;
   }
   if(action==="view-changelog"){
