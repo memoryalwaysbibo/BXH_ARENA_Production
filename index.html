@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.9">
+<meta name="bxh-build" content="20260921.10">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.9";
+  var CURRENT_BUILD="20260921.10";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -1977,7 +1977,38 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   background:rgba(217,185,92,.14);color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold-dim);
 }
 
-.profile-primary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px;}.profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px;margin:0 0 14px;border:1px solid rgba(217,185,92,.16);border-radius:12px;background:rgba(255,255,255,.018);}.profile-secondary-tabs .btn{min-height:40px;}.profile-hero{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:16px;padding:17px 18px;text-align:left!important;}.profile-hero-avatar{width:78px;height:78px;border-radius:50%;overflow:hidden;border:1px solid var(--gold-dim);background:rgba(217,185,92,.07);display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.2);}.profile-hero-avatar img{width:100%;height:100%;object-fit:cover;display:block;}.profile-hero-copy{min-width:0;}.profile-hero-name{font-family:var(--font-d);font-size:22px;font-weight:900;color:var(--ivory);line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.profile-hero-meta{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:6px;font-size:11px;color:var(--metal);}.profile-hero-verified{color:var(--gold);}.profile-hero-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}@media(max-width:520px){.profile-hero{grid-template-columns:68px minmax(0,1fr);gap:13px;padding:15px;}.profile-hero-avatar{width:68px;height:68px;}.profile-hero-name{font-size:20px;}}.player-avatar-large{width:92px;height:92px;}
+.profile-primary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px;}
+.profile-primary-tabs .btn{min-height:44px;border-radius:11px;}
+.profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:0 0 14px;border:1px solid rgba(217,185,92,.15);border-radius:12px;background:rgba(255,255,255,.018);}
+.profile-secondary-tabs .btn{min-height:38px;border-radius:9px;font-size:12.5px;}
+.profile-hero{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:16px;padding:17px 18px;text-align:left!important;border-color:rgba(217,185,92,.28);background:linear-gradient(135deg,rgba(217,185,92,.075),rgba(18,19,21,.92));}
+.profile-hero-avatar{width:78px;height:78px;border-radius:50%;overflow:hidden;border:1px solid var(--gold-dim);background:rgba(217,185,92,.07);display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.2),0 0 0 3px rgba(217,185,92,.045);}
+.profile-hero-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+.profile-hero-copy{min-width:0;}
+.profile-hero-name{font-family:var(--font-d);font-size:22px;font-weight:900;color:var(--ivory);line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.profile-hero-meta{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:6px;font-size:11px;color:var(--metal);}
+.profile-hero-verified{color:var(--gold);}
+.profile-hero-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
+.profile-info-groups{display:grid;gap:12px;}
+.profile-info-group{border:1px solid rgba(255,255,255,.075);border-radius:12px;background:rgba(8,9,11,.34);overflow:hidden;}
+.profile-info-group-title{padding:10px 13px;border-bottom:1px solid rgba(255,255,255,.06);font-family:var(--font-d);font-size:12px;font-weight:900;letter-spacing:.7px;color:var(--gold);}
+.profile-info-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+.profile-info-row{min-width:0;padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.055);}
+.profile-info-row:nth-child(odd){border-right:1px solid rgba(255,255,255,.055);}
+.profile-info-row:nth-last-child(-n+2){border-bottom:0;}
+.profile-info-label{font-size:10.5px;color:var(--metal-dim);margin-bottom:4px;}
+.profile-info-value{font-size:13px;font-weight:800;color:var(--ivory);overflow-wrap:anywhere;}
+.profile-info-sub{font-size:9.5px;color:var(--metal);margin-top:3px;}
+.profile-account-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+@media(max-width:520px){
+  .profile-hero{grid-template-columns:68px minmax(0,1fr);gap:13px;padding:15px;}
+  .profile-hero-avatar{width:68px;height:68px;}
+  .profile-hero-name{font-size:20px;}
+  .profile-info-list{grid-template-columns:1fr;}
+  .profile-info-row,.profile-info-row:nth-child(odd){border-right:0;}
+  .profile-info-row:nth-last-child(-n+2){border-bottom:1px solid rgba(255,255,255,.055);}
+  .profile-info-row:last-child{border-bottom:0;}
+}.player-avatar-large{width:92px;height:92px;}
 .player-avatar-large img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;}
 
 .half-hour-datetime{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -14094,22 +14125,36 @@ function renderPlayerProfileTab(p){
     </div>
     <div class="panel">
       <div class="panel-title"><span>會員資料</span><span class="badge badge-metal">${APP_VERSION}</span></div>
-      <div class="grid grid-2 player-profile-data-grid">
-        <div class="stat-box"><div class="label">本名</div><div class="value small">${esc(p.realName||"—")}</div><div class="hint">${p.realNameVerified===true?"✓ 已確認":"⚠ 待後台確認"}</div></div>
-        <div class="stat-box"><div class="label">遊戲 ID</div><div class="value small">${esc(effectiveGameId(p)||"尚未設定")}</div></div>
-        <div class="stat-box"><div class="label">玩家編號</div><div class="value small">${esc(playerDerivedId(p))}</div></div>
-        <div class="stat-box"><div class="label">帳號狀態</div><div class="value small">${p.active?"正常":"已停用"}</div></div>
-        <div class="stat-box player-profile-wide"><div class="label">Email</div><div class="value small">${esc(p.email||"—")}</div></div>
-        <div class="stat-box"><div class="label">手機號碼</div><div class="value small">${esc(p.phone||"尚未設定")}</div></div>
-        <div class="stat-box"><div class="label">出生年月日</div><div class="value small">${esc(p.birthDate||"尚未設定")}</div></div>
-        <div class="stat-box"><div class="label">性別</div><div class="value small">${esc(({female:"女性",male:"男性",other:"其他／不指定"}[p.gender]||"尚未設定"))}</div></div>
-        <div class="stat-box"><div class="label">所在都市</div><div class="value small">${esc(profileLocationParts(p).city||"尚未設定")}</div></div>
-        <div class="stat-box"><div class="label">所在地區</div><div class="value small">${esc(profileLocationParts(p).region||"尚未設定")}</div></div>
-        <div class="stat-box"><div class="label">資料完整度</div><div class="value small">${profileCompletionPercent(p)}%</div></div>
-        <div class="stat-box"><div class="label">登入方式</div><div class="value small">${p.provider==="google"?"Google 帳號":"Email／密碼"}</div></div>
+      <div class="profile-info-groups">
+        <section class="profile-info-group">
+          <div class="profile-info-group-title">身分資訊</div>
+          <div class="profile-info-list">
+            <div class="profile-info-row"><div class="profile-info-label">本名</div><div class="profile-info-value">${esc(p.realName||"—")}</div><div class="profile-info-sub">${p.realNameVerified===true?"✓ 已確認":"⚠ 待後台確認"}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">遊戲 ID</div><div class="profile-info-value">${esc(effectiveGameId(p)||"尚未設定")}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">玩家編號</div><div class="profile-info-value">${esc(playerDerivedId(p))}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">帳號狀態</div><div class="profile-info-value">${p.active?"正常":"已停用"}</div></div>
+          </div>
+        </section>
+        <section class="profile-info-group">
+          <div class="profile-info-group-title">聯絡與基本資料</div>
+          <div class="profile-info-list">
+            <div class="profile-info-row"><div class="profile-info-label">Email</div><div class="profile-info-value">${esc(p.email||"—")}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">手機號碼</div><div class="profile-info-value">${esc(p.phone||"尚未設定")}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">出生年月日</div><div class="profile-info-value">${esc(p.birthDate||"尚未設定")}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">性別</div><div class="profile-info-value">${esc(({female:"女性",male:"男性",other:"其他／不指定"}[p.gender]||"尚未設定"))}</div></div>
+          </div>
+        </section>
+        <section class="profile-info-group">
+          <div class="profile-info-group-title">地區與帳號</div>
+          <div class="profile-info-list">
+            <div class="profile-info-row"><div class="profile-info-label">所在都市</div><div class="profile-info-value">${esc(profileLocationParts(p).city||"尚未設定")}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">所在地區</div><div class="profile-info-value">${esc(profileLocationParts(p).region||"尚未設定")}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">資料完整度</div><div class="profile-info-value">${profileCompletionPercent(p)}%</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">登入方式</div><div class="profile-info-value">${p.provider==="google"?"Google 帳號":"Email／密碼"}</div></div>
+          </div>
+        </section>
       </div>
-      <div class="btn-row" style="margin-top:14px;">
-        <button class="btn btn-ghost" data-action="player-edit-profile">編輯資料</button>
+      <div class="profile-account-actions">
         <button class="btn btn-ghost" data-action="player-change-password">修改密碼</button>
         <button class="btn btn-danger-solid" data-action="player-logout">登出</button>
       </div>
