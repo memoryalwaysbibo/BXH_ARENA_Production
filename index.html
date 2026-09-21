@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.6">
+<meta name="bxh-build" content="20260921.7">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.6";
+  var CURRENT_BUILD="20260921.7";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -1511,6 +1511,41 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .account-menu button:last-child{border-bottom:none;}
 .account-menu button:hover{background:var(--panel-2);}
 .account-menu button.danger{color:var(--danger);}
+.account-theme-entry{border-top:1px solid rgba(217,185,92,.14);border-bottom:1px solid rgba(217,185,92,.12);}
+.account-theme-trigger{
+  display:flex!important;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 14px!important;background:linear-gradient(90deg,rgba(217,185,92,.035),transparent)!important;
+  border-bottom:0!important;
+}
+.account-theme-trigger:hover{background:rgba(217,185,92,.07)!important;}
+.account-theme-trigger-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.account-theme-trigger-title{font-size:13px;font-weight:800;color:var(--ivory);letter-spacing:.2px;}
+.account-theme-trigger-sub{font-size:10px;color:var(--metal-dim);letter-spacing:.5px;}
+.account-theme-current{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;max-width:138px;padding:6px 9px;border:1px solid rgba(217,185,92,.24);border-radius:999px;background:rgba(217,185,92,.055);}
+.account-theme-current-dot{width:8px;height:8px;border-radius:50%;background:var(--theme-dot);box-shadow:0 0 10px color-mix(in srgb,var(--theme-dot) 55%,transparent);}
+.account-theme-current-name{font-size:11px;font-weight:800;color:var(--ivory);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.account-theme-chevron{font-size:11px;color:var(--gold);transition:transform .18s ease;}
+.account-theme-entry.open .account-theme-chevron{transform:rotate(90deg);}
+.account-theme-panel{padding:10px 10px 12px;background:linear-gradient(180deg,rgba(255,255,255,.015),rgba(0,0,0,.10));}
+.account-theme-panel-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;padding:2px 3px 9px;}
+.account-theme-panel-head strong{font-size:11px;color:var(--metal);letter-spacing:.8px;}
+.account-theme-panel-head span{font-size:9px;color:var(--metal-dim);}
+.account-theme-grid{display:grid;gap:7px;}
+.account-theme-card{
+  display:grid!important;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;
+  padding:10px 11px!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:10px!important;
+  background:rgba(8,9,11,.56)!important;transition:.16s ease;
+}
+.account-theme-card:hover{border-color:rgba(217,185,92,.28)!important;background:rgba(217,185,92,.045)!important;}
+.account-theme-card.is-active{border-color:var(--gold-dim)!important;background:linear-gradient(135deg,rgba(217,185,92,.11),rgba(12,13,15,.72))!important;box-shadow:inset 0 0 0 1px rgba(217,185,92,.06),0 5px 16px rgba(0,0,0,.16);}
+.account-theme-preview{position:relative;width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,color-mix(in srgb,var(--theme-dot) 44%,#111),#090a0c);}
+.account-theme-preview:after{content:"";position:absolute;left:7px;top:7px;width:10px;height:10px;border-radius:50%;background:var(--theme-dot);box-shadow:0 0 10px color-mix(in srgb,var(--theme-dot) 55%,transparent);}
+.account-theme-card-copy{display:flex;flex-direction:column;min-width:0;}
+.account-theme-card-copy strong{font-size:12px;color:var(--ivory);font-weight:800;line-height:1.2;}
+.account-theme-card-copy small{font-size:9px;color:var(--metal-dim);margin-top:2px;letter-spacing:.6px;}
+.account-theme-check{display:flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;border:1px solid rgba(255,255,255,.11);color:transparent;font-size:11px;}
+.account-theme-card.is-active .account-theme-check{border-color:var(--gold-dim);color:var(--gold);background:rgba(217,185,92,.08);}
+
 .mailbox-trigger{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:7px 11px;border:1px solid var(--gold-dim);border-radius:18px;background:rgba(217,185,92,.08);color:var(--ivory);font-family:var(--font-d);font-size:12px;white-space:nowrap;}
 .mailbox-trigger.active{border-color:var(--gold);color:var(--gold);background:rgba(217,185,92,.15);}
 .mailbox-unread{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#b72235;color:#fff;font-size:11px;font-weight:800;box-shadow:0 0 10px rgba(183,34,53,.45);}
@@ -14858,17 +14893,36 @@ function normalizeInterfaceTheme(value){
   return BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===value)?value:"gold";
 }
 let interfaceTheme=normalizeInterfaceTheme(document.documentElement.getAttribute("data-bxh-theme"));
+let accountThemeOpen=false;
 function applyInterfaceTheme(value,persist=true){
   interfaceTheme=normalizeInterfaceTheme(value);
   document.documentElement.setAttribute("data-bxh-theme",interfaceTheme);
   if(persist){try{localStorage.setItem(BXH_INTERFACE_THEME_KEY,interfaceTheme);}catch(e){}}
 }
 function themePickerHtml(){
-  return `<div class="account-theme-select-row" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);">
-    <label for="account-theme-select" style="flex:0 0 auto;font-size:15px;font-weight:700;color:var(--white);">介面主題</label>
-    <select id="account-theme-select" aria-label="介面主題" onchange="applyInterfaceTheme(this.value,true)" style="min-width:0;flex:1;height:40px;padding:0 34px 0 12px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);color:var(--white);font:inherit;outline:none;">
-      ${BXH_INTERFACE_THEME_OPTIONS.map(item=>`<option value="${item.id}" ${interfaceTheme===item.id?"selected":""}>${esc(item.label)} · ${esc(item.english)}</option>`).join("")}
-    </select>
+  const activeTheme=BXH_INTERFACE_THEME_OPTIONS.find(item=>item.id===interfaceTheme)||BXH_INTERFACE_THEME_OPTIONS[0];
+  return `<div class="account-theme-entry ${accountThemeOpen?"open":""}">
+    <button type="button" class="account-theme-trigger" data-action="toggle-account-theme" aria-expanded="${accountThemeOpen?"true":"false"}">
+      <span class="account-theme-trigger-copy">
+        <span class="account-theme-trigger-title">介面主題</span>
+        <span class="account-theme-trigger-sub">INTERFACE THEME</span>
+      </span>
+      <span class="account-theme-current" style="--theme-dot:${activeTheme.color}">
+        <span class="account-theme-current-dot"></span>
+        <span class="account-theme-current-name">${esc(activeTheme.label)}</span>
+        <span class="account-theme-chevron">›</span>
+      </span>
+    </button>
+    ${accountThemeOpen?`<div class="account-theme-panel">
+      <div class="account-theme-panel-head"><strong>主題風格</strong><span>選擇你偏好的系統配色</span></div>
+      <div class="account-theme-grid">
+        ${BXH_INTERFACE_THEME_OPTIONS.map(item=>`<button type="button" class="account-theme-card ${interfaceTheme===item.id?"is-active":""}" data-action="set-interface-theme" data-theme="${item.id}" style="--theme-dot:${item.color}">
+          <span class="account-theme-preview" aria-hidden="true"></span>
+          <span class="account-theme-card-copy"><strong>${esc(item.label)}</strong><small>${esc(item.english)}</small></span>
+          <span class="account-theme-check" aria-hidden="true">✓</span>
+        </button>`).join("")}
+      </div>
+    </div>`:""}
   </div>`;
 }
 
@@ -17294,12 +17348,18 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
-  if(action==="set-interface-theme"){
-    applyInterfaceTheme(target.getAttribute("data-theme"),true);
+  if(action==="toggle-account-theme"){
+    accountThemeOpen=!accountThemeOpen;
     render();
     return;
   }
-  if(action==="toggle-account-menu"){ accountMenuOpen=!accountMenuOpen; render(); return; }
+  if(action==="set-interface-theme"){
+    applyInterfaceTheme(target.getAttribute("data-theme"),true);
+    accountThemeOpen=false;
+    render();
+    return;
+  }
+  if(action==="toggle-account-menu"){ accountMenuOpen=!accountMenuOpen; if(!accountMenuOpen) accountThemeOpen=false; render(); return; }
   if(action==="super-admin-page"){ const page=target.getAttribute("data-page"); if(["accounts","checkin","titles"].includes(page)){ if(page==="titles"&&!engagementActionBusy){resetTitleRecipientForm();engagementAdminOverview=null;requestEngagementSnapshot(true);} superAdminManagementPage=page; accountMenuOpen=false; render(); } return; }
   if(action==="account-goto-home"){ accountMenuOpen=false; appPhase="app"; activeTab="live"; render(); return; }
   if(action==="account-change-password"){ accountMenuOpen=false; authFormError=""; appPhase="admin-change-password"; render(); return; }
