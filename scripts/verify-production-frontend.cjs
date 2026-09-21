@@ -27,9 +27,13 @@ must(/subscribePublicTournaments\(callback\)/, 'Realtime public tournament liste
 must(/visibilitychange[\s\S]*?reconcilePublicTournamentsNow\(["']foreground["']\)/, 'Foreground reconciliation missing');
 must(/window\.addEventListener\(["']focus["'][\s\S]*?reconcilePublicTournamentsNow\(["']focus["']\)/, 'Focus reconciliation missing');
 mustNot(/PUBLIC_TOURNAMENTS_AUTO_REFRESH_MS\s*=\s*15000/, 'Legacy 15-second lobby polling is still active');
+must(/data-action=["']reset-bracket["']/, 'Reset bracket control missing');
+must(/if\(action===["']reset-bracket["']\)/, 'Reset bracket action handler missing');
+must(/function\s+resetBracketBeforeStart\(\)/, 'Reset bracket helper missing');
 console.log('PASS Production frontend target');
 console.log('PASS Email/Password-only runtime');
 console.log('PASS self-service role=player');
 console.log('PASS tester official-event UI guard');
 console.log('PASS realtime lobby sync guard');
 console.log('PASS build/version metadata consistency');
+console.log('PASS pre-start reset bracket control');

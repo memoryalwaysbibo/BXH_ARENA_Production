@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.01">
+<meta name="bxh-build" content="20260922.02">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.01";
+  var CURRENT_BUILD="20260922.02";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2954,9 +2954,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.4";
+const APP_VERSION = "v14.0.5";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.5",date:"2026/09/22",timezone:"Asia/Taipei",title:"重設對戰表入口修復",updateLevel:"patch",added:["人員管理的對戰表區新增明確『重設對戰表』按鈕","重設只清除抽籤與對戰編排，保留玩家、報到與線上報名資料"],changed:["開賽前重設對戰表會解除舊版遺留的 rosterLocked，允許重新調整測試／正式名單"],fixed:["修正介面提示要求『先重設對戰表』但實際沒有提供重設入口的死路"],environment:"Production / HTML + Firebase",deployStatus:"Frontend hotfix",firebaseImpact:"重設後同步既有 tournament state，不新增欄位",securityRulesImpact:"無",permissionImpact:"沿用目前賽事操作權限；開賽後不可重設",publicSummary:"補回開賽前的重設對戰表入口，讓主辦可調整名單後重新抽籤。"},
   {version:"v14.0.4",date:"2026/09/22",timezone:"Asia/Taipei",title:"更新提示循環修復",updateLevel:"patch",added:["版本更新按鈕點擊後立即進入更新中狀態並移除提示","更新導向同時加入 build 與 force cache-busting 參數","短時間 CDN 舊頁回應時加入 15 秒重複提示冷卻"],changed:["首頁內建 build、APP_VERSION 與 version.json 改為同一發行版本"],fixed:["修正 version.json 已是新 build、但 index.html 仍宣告舊 build，造成按下『立即更新』後提示無限再次出現"],environment:"Production / HTML + Firebase",deployStatus:"Frontend hotfix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"修正更新提示按下後不消失、反覆要求更新的問題。"},
   {version:"v14.0.2",date:"2026/09/21",timezone:"Asia/Taipei",title:"正式積分結算可靠性修復",updateLevel:"patch",added:["正式積分賽改由受信任的 Cloud Function 統一結算","結算失敗保留後端實際原因供管理員判斷"],changed:["前端只傳送賽事代碼，分數一律由後端依已儲存賽果重新計算","結算成功後同步保存完整天梯結果"],fixed:["修正多人積分賽在前端 Firestore transaction 因權限或帳號狀態整批回滾","重試採冪等處理，不會重複加分"],environment:"Production / HTML + Firebase",deployStatus:"需同步部署 settleLadderTournament Function",firebaseImpact:"新增正式天梯後端結算 Callable Function",securityRulesImpact:"不需變更",permissionImpact:"僅啟用中的 admin／super_admin 可執行",publicSummary:"修正正式積分賽完成後無法結算與封存的問題。"},
   {version:"v14.0.1",date:"2026/09/21",timezone:"Asia/Taipei",title:"S0 積分體驗版保護",updateLevel:"patch",added:["S0 體驗賽季辨識與說明","10/1 00:00 自動切換 S1 的管理提示"],changed:["S0 賽事只累積體驗賽季分與牌位，不增加正式生涯積分、最高牌位或永久成就","S0 手動更正不影響生涯積分","S0 期間停用手動換季入口"],fixed:["避免體驗賽事被誤列為正式 S1 生涯成果"],environment:"Production / HTML + Firebase",deployStatus:"前端保護版；後端排程與資料遷移另行部署",firebaseImpact:"沿用既有天梯集合並辨識 isTrialSeason",securityRulesImpact:"無",permissionImpact:"不變",publicSummary:"S0 作為積分體驗版，10/1 S1 正式從 0 分開始。"},
@@ -7774,6 +7775,35 @@ function applyPropagatedSlots(m, newA, newB){
   }
 }
 
+function resetBracketBeforeStart(){
+  if(state.startedAt) return false;
+  state.bracketSize=0;
+  state.matches=[];
+  state.drawnAt=null;
+  state.currentMatchId=null;
+  state.championId=null;
+  state.runnerUpId=null;
+  state.thirdId=null;
+  state.fourthId=null;
+  state.gfMatchId=null;
+  state.gfResetMatchId=null;
+  state.bronzeMatchId=null;
+  state.rrRounds=0;
+  state.lbChampionDesc=null;
+  state.courtAssignments={};
+  state.celebrationShown=false;
+  // Before the explicit "賽事開始" lock, resetting the bracket must also
+  // release any legacy/pre-start roster lock so the participant list can change.
+  state.rosterLocked=false;
+  state.settlementPhase="idle";
+  state.settlementAttempt=0;
+  state.ladderPointsAwarded=false;
+  state.ladderSeasonId=null;
+  state.ladderAwardedAt=null;
+  state.ladderSkippedPlayers=[];
+  return true;
+}
+
 /* ==== dispatcher: generate bracket ==== */
 function generateBracket(){
   if(!entryRosterValid()){showToast("請先完成名額抽籤，並保持抽中的正式名單",true);return false;}
@@ -11016,6 +11046,7 @@ function renderPeopleManagement(){
     </div>
     <div class="btn-row">
       <button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||!entryRosterValid()?'disabled':''}>${state.bracketSize ? "重新抽籤並產生對戰表" : "產生對戰表"}</button>
+      ${state.bracketSize && !state.startedAt ? `<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>` : ''}
       ${state.bracketSize && !state.startedAt ? `<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>` : ''}
       ${state.startedAt ? (()=>{
         const ts=tournamentStatus();
@@ -19375,6 +19406,24 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
       }
     })();
+    return;
+  }
+  if(action==="reset-bracket"){
+    if(state.startedAt){ showToast("賽事開始後無法重設對戰表", true); return; }
+    if(!state.bracketSize && !(state.matches&&state.matches.length)){ showToast("目前尚未產生對戰表"); return; }
+    openModal({
+      type:"generic",
+      title:"重設對戰表？",
+      message:"這會清除目前的抽籤位置與對戰編排，但會保留參賽玩家、報到狀態與線上報名資料。\n\n重設後可重新調整名單，再重新產生對戰表。",
+      danger:true,
+      confirmLabel:"確認重設",
+      onConfirm:()=>{
+        if(!resetBracketBeforeStart()){ showToast("賽事開始後無法重設對戰表", true); return; }
+        saveState();
+        render();
+        showToast("已重設對戰表，可重新調整參賽名單");
+      }
+    });
     return;
   }
   if(action==="draw-bracket"){
