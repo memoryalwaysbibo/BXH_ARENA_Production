@@ -26,6 +26,68 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
+<meta name="bxh-build" content="20260921.1">
+<script>
+(function bxhFreshVersionGuard(){
+  var CURRENT_BUILD="20260921.1";
+  var CHECK_EVERY_MS=60000;
+  var lastCheck=0;
+  var checking=false;
+
+  function addUpdateBanner(nextBuild){
+    if(document.getElementById("bxh-update-banner")) return;
+    var show=function(){
+      if(document.getElementById("bxh-update-banner")) return;
+      var bar=document.createElement("div");
+      bar.id="bxh-update-banner";
+      bar.setAttribute("role","status");
+      bar.style.cssText="position:fixed;left:12px;right:12px;top:max(12px,env(safe-area-inset-top));z-index:2147483647;background:#17181b;color:#f4f5f2;border:1px solid #d9b95c;border-radius:12px;padding:12px 14px;box-shadow:0 10px 34px rgba(0,0,0,.45);font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;display:flex;align-items:center;justify-content:space-between;gap:12px";
+      var msg=document.createElement("div");
+      msg.innerHTML="<strong>BXH ARENA 已更新</strong><div style='font-size:12px;opacity:.78;margin-top:2px'>點一下即可載入最新版本，不需要清快取或開無痕模式。</div>";
+      var btn=document.createElement("button");
+      btn.type="button";
+      btn.textContent="立即更新";
+      btn.style.cssText="flex:0 0 auto;border:0;border-radius:9px;padding:9px 13px;background:#d9b95c;color:#111;font-weight:800";
+      btn.onclick=function(){
+        try{
+          var u=new URL(location.href);
+          u.searchParams.set("bxh_build",nextBuild||Date.now());
+          location.replace(u.toString());
+        }catch(e){
+          location.reload();
+        }
+      };
+      bar.appendChild(msg); bar.appendChild(btn);
+      document.body.appendChild(bar);
+    };
+    if(document.body) show(); else window.addEventListener("DOMContentLoaded",show,{once:true});
+  }
+
+  async function checkFreshVersion(force){
+    var now=Date.now();
+    if(checking || (!force && now-lastCheck<CHECK_EVERY_MS)) return;
+    checking=true; lastCheck=now;
+    try{
+      var url=new URL("version.json",document.baseURI);
+      url.searchParams.set("_",String(now));
+      var res=await fetch(url.toString(),{cache:"no-store",credentials:"same-origin"});
+      if(!res.ok) return;
+      var info=await res.json();
+      var next=String(info&&info.build||"");
+      if(next && next!==CURRENT_BUILD) addUpdateBanner(next);
+    }catch(e){
+      /* Update checks are best-effort and must never block app startup. */
+    }finally{
+      checking=false;
+    }
+  }
+
+  window.addEventListener("pageshow",function(){ checkFreshVersion(true); });
+  window.addEventListener("focus",function(){ checkFreshVersion(false); });
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) checkFreshVersion(true); });
+  setInterval(function(){ checkFreshVersion(false); },CHECK_EVERY_MS);
+})();
+</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
