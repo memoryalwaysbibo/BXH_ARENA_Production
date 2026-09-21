@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260921.11">
+<meta name="bxh-build" content="20260921.12">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260921.11";
+  var CURRENT_BUILD="20260921.12";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2944,9 +2944,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.1";
+const APP_VERSION = "v14.0.2";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.2",date:"2026/09/21",timezone:"Asia/Taipei",title:"正式積分結算可靠性修復",updateLevel:"patch",added:["正式積分賽改由受信任的 Cloud Function 統一結算","結算失敗保留後端實際原因供管理員判斷"],changed:["前端只傳送賽事代碼，分數一律由後端依已儲存賽果重新計算","結算成功後同步保存完整天梯結果"],fixed:["修正多人積分賽在前端 Firestore transaction 因權限或帳號狀態整批回滾","重試採冪等處理，不會重複加分"],environment:"Production / HTML + Firebase",deployStatus:"需同步部署 settleLadderTournament Function",firebaseImpact:"新增正式天梯後端結算 Callable Function",securityRulesImpact:"不需變更",permissionImpact:"僅啟用中的 admin／super_admin 可執行",publicSummary:"修正正式積分賽完成後無法結算與封存的問題。"},
   {version:"v14.0.1",date:"2026/09/21",timezone:"Asia/Taipei",title:"S0 積分體驗版保護",updateLevel:"patch",added:["S0 體驗賽季辨識與說明","10/1 00:00 自動切換 S1 的管理提示"],changed:["S0 賽事只累積體驗賽季分與牌位，不增加正式生涯積分、最高牌位或永久成就","S0 手動更正不影響生涯積分","S0 期間停用手動換季入口"],fixed:["避免體驗賽事被誤列為正式 S1 生涯成果"],environment:"Production / HTML + Firebase",deployStatus:"前端保護版；後端排程與資料遷移另行部署",firebaseImpact:"沿用既有天梯集合並辨識 isTrialSeason",securityRulesImpact:"無",permissionImpact:"不變",publicSummary:"S0 作為積分體驗版，10/1 S1 正式從 0 分開始。"},
   {version:"v14.0.0",date:"2026/09/19",timezone:"Asia/Taipei",title:"BXH ARENA 正式版上線",updateLevel:"major",added:["正式 Production 環境與 arena.bxh.com.tw","獨立 Production Firebase、Firestore Rules 與 Cloud Functions","Email/Password 正式登入與 Production 安全權限","正式賽事結束後雲端同步與自動封存"],changed:["由 Beta 測試環境正式切換至 Production 發行流程","Production 採 Beta 驗證後再升版的發布制度"],fixed:["完成正式環境部署、登入保持與核心賽事生命週期驗收"],environment:"Production / HTML + Firebase",deployStatus:"Official Release",firebaseImpact:"正式專案 bxh-arena",securityRulesImpact:"Production Rules v13.40.3",permissionImpact:"正式玩家自助申請固定為 player；Tester 僅保留 Beta 沙盒用途",publicSummary:"BXH ARENA 首次正式上線，正式環境、登入、賽事與封存流程完成部署。"},
   {version:"v13.39.0",date:"2026/09/16",title:"賽事結束流程重構",updateLevel:"feature",added:["分開顯示對戰完成、結算處理、天梯結算、封存同步與已完成","封存失敗保留明確原因並提供重試","封存狀態可追蹤、可重試且維持冪等"],changed:["最後一場完成後先保存結果，再處理積分與封存"],fixed:["修正完成後長時間停在結算中卻無法判斷原因"],environment:"HTML + Firebase",deployStatus:"Beta-only",firebaseImpact:"沿用既有賽事文件，新增結算中繼狀態",securityRulesImpact:"無",permissionImpact:"不變",publicSummary:"改善賽事結束、結算與封存流程。"},
@@ -7367,14 +7368,14 @@ async function performAutoArchive(){
     }
     try{
       await flushCloudStateWrites();
-      if(window.cloudSync.ensureLadderSystem){
-        const seasonReady=await window.cloudSync.ensureLadderSystem();
-        if(!seasonReady||seasonReady.ok!==true){ showToast("無法初始化目前天梯賽季",true); return false; }
-      }
       const settled=await window.cloudSync.settleLadderTournament(state.cloudCode,payload);
       if(!settled || !settled.ok){
         const missing=settled&&settled.unlinkedPlayers&&settled.unlinkedPlayers.length ? "："+settled.unlinkedPlayers.join("、") : "";
         const msg=(settled&&settled.reason)==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : (settled&&settled.message)||"天梯積分寫入失敗";
+        state.settlementError=msg;
+        state.settlementErrorCode=(settled&&settled.reason)||"ranked-settlement-failed";
+        state.settlementPhase="failed";
+        await saveRecord(state);
         showToast(msg,true);
         return false;
       }
@@ -7382,6 +7383,7 @@ async function performAutoArchive(){
       state.ladderSeasonId=settled.seasonId||null;
       state.ladderAwardedAt=settled.awardedAt||Date.now();
       state.ladderSkippedPlayers=Array.isArray(settled.skippedPlayers)?settled.skippedPlayers:[];
+      state.ladderResults=Array.isArray(settled.results)?settled.results:[];
       ladderPublicLoaded=false; ladderAdminLogsLoaded=false; myLadderProfileCache=null;
       if(settled.alreadyAwarded){
         showToast("本場天梯積分先前已完成結算，不會重複加分");
@@ -7392,7 +7394,14 @@ async function performAutoArchive(){
       }
     }catch(e){
       console.error("[ladder settlement]",e);
-      showToast("天梯積分結算失敗；賽事尚未封存，請確認網路後重試",true);
+      const raw=String((e&&e.message)||"");
+      const known={"admin-required":"只有管理員／最高管理員可以結算正式積分賽","inactive-account":"目前帳號已停用，無法結算","auth-required":"登入狀態已失效，請重新登入","service-unavailable":"積分結算服務尚未部署"};
+      const key=Object.keys(known).find(k=>raw.includes(k));
+      state.settlementError=key?known[key]:(raw&&raw!=="request-failed"?"天梯結算失敗："+raw:"天梯積分結算失敗；賽事尚未封存");
+      state.settlementErrorCode=(e&&e.code)||"ranked-settlement-exception";
+      state.settlementPhase="failed";
+      await saveRecord(state);
+      showToast(state.settlementError,true);
       return false;
     }
   }
@@ -20323,6 +20332,7 @@ init();
     async lotteryRegistration(payload){return callEngagementFunction("lotteryRegistration",payload,60000);},
     async manageRegistrationSelection(payload){return callEngagementFunction("manageRegistrationSelection",payload,120000);},
     async manageEntrySelection(payload){return callEngagementFunction("manageEntrySelection",payload,60000);},
+    async settleLadder(payload){return callEngagementFunction("settleLadderTournament",payload,120000);},
     async deleteTitleDefinition(payload){return callEngagementFunction("deleteTitleDefinition",payload);},
     async previewPioneerAwards(){return callEngagementFunction("previewPioneerAwards",{},120000);},
     async executePioneerAwards(payload){return callEngagementFunction("executePioneerAwards",payload,120000);},
@@ -20844,132 +20854,9 @@ init();
       if(!cloudEnabled||!code) return {ok:false,reason:"network"};
       const actorUid=authHandle&&authHandle.currentUser&&authHandle.currentUser.uid;
       if(!actorUid) return {ok:false,reason:"auth-required"};
+      if(!window.engagementService||typeof window.engagementService.settleLadder!=="function") throw new Error("service-unavailable");
+      return window.engagementService.settleLadder({code:String(code).toUpperCase()});
 
-      // Rebuild V1 awards from the saved tournament, never trust caller points/counts.
-      const sourceSnap=await fx.getDoc(fx.doc(dbHandle,'tournaments',String(code).toUpperCase()));
-      if(!sourceSnap.exists()) return {ok:false,reason:'not-found'};
-      const source=sourceSnap.data();
-      if(source.ladderPointsAwarded===true) return {ok:true,alreadyAwarded:true,seasonId:source.ladderSeasonId||null,results:source.ladderResults||[],skippedPlayers:source.ladderSkippedPlayers||[]};
-      if(source.testMode===true||source.eventAuthority!=='official'||source.ladderMode!=='ranked') return {ok:false,reason:'not-ranked'};
-      try{
-        const saved=typeof source.data==='string'?JSON.parse(source.data):source.data;
-        if(!saved?.matches?.length || saved.matches.some(m=>!m.isBye&&!m.completed)) throw new Error('仍有未完成對戰，不能結算積分');
-        payload=buildLadderSettlementPayload(saved);
-        if(payload.participants.filter(x=>x.placement>=1&&x.placement<=4).length<Math.min(4,payload.participants.length)) throw new Error('前四名尚未完整，請先完成名次判定');
-      }catch(e){return {ok:false,reason:'v1-invalid-results',message:e.message||'V1 積分資料不完整'};}
-
-      // Resolve tournament-local players to permanent BXH account UIDs.
-      // Online roster entries already carry uid. On-site names are accepted only
-      // when an exact realName query resolves to exactly one active account.
-      const resolved=[]; const skipped=[]; const cancelled=[];
-      for(const item of (payload.participants||[])){
-        // Explicit test players are never written into the official ladder.
-        if(item.source==="family"||item.source==="test"||item.isTestData===true||item.participantType==="onsite_guest"||item.ladderEligible===false){
-          skipped.push(item.playerName);
-          continue;
-        }
-
-        let uid=item.playerUid||null;
-        if(!uid){
-          try{
-            const q=fx.query(fx.collection(dbHandle,"users"),fx.where("realName","==",item.playerName),fx.limit(2));
-            const s=await fx.getDocs(q);
-            const candidates=s.docs.filter(d=>d.data()&&d.data().active===true);
-            if(candidates.length===1) uid=candidates[0].id;
-          }catch(e){ /* unresolved onsite player is skipped below */ }
-        }
-
-        // Manually-added / onsite players that cannot be linked to exactly one
-        // BXH player account are skipped instead of blocking the whole event.
-        if(!uid){
-          skipped.push(item.playerName);
-          continue;
-        }
-
-        // Online players stay strict. A cancelled / non-confirmed registration
-        // means the official roster is inconsistent and must be fixed first.
-        if(item.source==="online"){
-          try{
-            const rs=await fx.getDoc(fx.doc(dbHandle,"tournaments",String(code).toUpperCase(),"registrations",uid));
-            if(!rs.exists() || rs.data().status!=="confirmed"){ cancelled.push(item.playerName); continue; }
-          }catch(e){ cancelled.push(item.playerName); continue; }
-        }
-        resolved.push(Object.assign({},item,{playerUid:uid}));
-      }
-      if(cancelled.length) return {ok:false,reason:"cancelled-players",unlinkedPlayers:cancelled,message:"名單中含已取消或非正取玩家，請先修正參賽名單："+cancelled.join("、")};
-      const seen=new Set();
-      for(const x of resolved){ if(seen.has(x.playerUid)) return {ok:false,reason:"duplicate-player-account",message:"同一玩家帳號在本場名單中出現超過一次"}; seen.add(x.playerUid); }
-
-      const tourRef=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
-      const controlRef=fx.doc(dbHandle,"ladderSystem","current");
-      return await fx.runTransaction(dbHandle,async tx=>{
-        const tourSnap=await tx.get(tourRef);
-        const controlSnap=await tx.get(controlRef);
-        if(!tourSnap.exists()) return {ok:false,reason:"not-found"};
-        const tour=tourSnap.data();
-        if(tour.systemClosed===true) return {ok:false,reason:"system-closed",message:"系統關閉的賽事不能結算積分"};
-        if(tour.ladderPointsAwarded===true) return {ok:true,alreadyAwarded:true,seasonId:tour.ladderSeasonId||null,results:tour.ladderResults||[],skippedPlayers:tour.ladderSkippedPlayers||[]};
-        if(tour.data!==source.data) return {ok:false,reason:'v1-state-changed',message:'賽事資料已更新，請重新讀取後再結算'};
-        if(tour.testMode===true||tour.eventAuthority!=="official"||tour.ladderMode!=="ranked") return {ok:false,reason:"not-ranked"};
-        if(!controlSnap.exists()) return {ok:false,reason:"season-not-initialized"};
-        const control=controlSnap.data();
-        if(control.rolloverInProgress===true) return {ok:false,reason:"season-rollover-in-progress",message:"賽季切換進行中，請稍後再完成賽事"};
-        const seasonNow=Date.now();
-        if(Number(control.startAt||0)&&seasonNow<Number(control.startAt)) return {ok:false,reason:"season-not-started",message:"本季天梯尚未開始，積分將於賽季開始後啟用"};
-        if(Number(control.endAt||0)&&seasonNow>Number(control.endAt)) return {ok:false,reason:"season-ended",message:"本季天梯已結束，請先完成新賽季切換"};
-        const seasonId=control.currentSeason||"S1";
-        const isTrialSeason=String(control.currentSeason||"").toUpperCase()==="S0"||control.isTrialSeason===true;
-
-        const refs=resolved.map(x=>fx.doc(dbHandle,"ladderPlayers",x.playerUid));
-        const [snaps,profiles]=await Promise.all([
-          Promise.all(refs.map(ref=>tx.get(ref))),
-          Promise.all(resolved.map(item=>tx.get(fx.doc(dbHandle,"users",item.playerUid))))
-        ]);
-        if(snaps.some(s=>s.exists()&&s.data().currentSeason&&s.data().currentSeason!==seasonId)) return {ok:false,reason:'player-season-mismatch',message:'玩家賽季資料尚未完成切換，請先完成新賽季作業'};
-        const results=[];
-        for(let i=0;i<resolved.length;i++){
-          const item=resolved[i], snap=snaps[i], old=snap.exists()?snap.data():{};
-          const profile=profiles[i].exists()?profiles[i].data():null;
-          if(!profile||profile.active===false||profile.role==="tester"||profile.isTestAccount===true){if(!skipped.includes(item.playerName))skipped.push(item.playerName);continue;}
-          if(old.currentSeason && old.currentSeason!==seasonId) return {ok:false,reason:"player-season-mismatch",message:"玩家賽季資料尚未完成切換，請先完成新賽季作業"};
-          const oldSeason=Number(old.seasonPoints||0), oldCareer=Number(old.careerPoints||0);
-          const pts=Number(item.pointsEarned||0);
-          const seasonPoints=oldSeason+pts, careerPoints=isTrialSeason?oldCareer:oldCareer+pts;
-          const rankTier=cloudLadderTier(seasonPoints);
-          const oldHigh=old.highestRankTier||"黑鐵";
-          const highestRankTier=isTrialSeason?oldHigh:(cloudLadderTierIndex(rankTier)>cloudLadderTierIndex(oldHigh)?rankTier:oldHigh);
-          const placement=Number(item.placement||0)||null;
-          const data={
-            uid:item.playerUid, playerName:item.playerName||old.playerName||"",
-            region:String(profile.region||"").trim(),
-            seasonPoints,careerPoints,rankTier,currentSeason:seasonId,highestRankTier,
-            totalEvents:Number(old.totalEvents||0)+1,
-            championCount:Number(old.championCount||0)+(placement===1?1:0),
-            runnerUpCount:Number(old.runnerUpCount||0)+(placement===2?1:0),
-            thirdPlaceCount:Number(old.thirdPlaceCount||0)+(placement===3?1:0),
-            fourthPlaceCount:Number(old.fourthPlaceCount||0)+(placement===4?1:0),
-            rankedWins:Number(old.rankedWins||0)+Number(item.wins||0),
-            rankedLosses:Number(old.rankedLosses||0)+Number(item.losses||0),
-            lastPointsUpdatedAt:fx.serverTimestamp(),
-            seasonHistory:old.seasonHistory||{}
-          };
-          tx.set(refs[i],data,{merge:true});
-          const logRef=fx.doc(dbHandle,"ladderTransactions",String(code).toUpperCase()+"_"+item.playerUid);
-          tx.set(logRef,{type:"event",eventCode:String(code).toUpperCase(),eventName:payload.eventName||tour.name||"",eventDate:payload.eventDate||tour.eventDate||"",formatType:payload.formatType||tour.formatType||"single",playerUid:item.playerUid,playerName:item.playerName||"",placement,wins:Number(item.wins||0),losses:Number(item.losses||0),pointsEarned:pts,scoring:item.scoring,delta:pts,seasonId,isTrialSeason,countsTowardCareer:!isTrialSeason,beforeSeasonPoints:oldSeason,afterSeasonPoints:seasonPoints,beforeCareerPoints:oldCareer,afterCareerPoints:careerPoints,actorUid,actorName:"",createdAt:fx.serverTimestamp()});
-          results.push({playerId:item.playerUid,playerName:item.playerName||"",placement,pointsEarned:pts,scoring:item.scoring});
-        }
-        tx.update(tourRef,{
-          ladderPointsAwarded:true,
-          ladderSeasonId:seasonId,
-          ladderTrialSeason:isTrialSeason,
-          ladderCountsTowardCareer:!isTrialSeason,
-          ladderResults:results,
-          ladderSkippedPlayers:skipped,
-          ladderAwardedAt:fx.serverTimestamp(),
-          ladderAwardedBy:actorUid
-        });
-        return {ok:true,alreadyAwarded:false,seasonId,results,skippedPlayers:skipped,awardedAt:Date.now()};
-      });
     },
 
     async adjustLadderPoints(uid,newSeasonPoints,reason,actorName){
