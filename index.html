@@ -6450,50 +6450,143 @@ function mapRegistrationError(e){
 }
 let publicTournamentsLoading = false;
 let publicTournamentsLastRefreshAt = 0;
-let publicTournamentsBackgroundRefreshPromise = null;
-let publicTournamentsBackgroundRefreshTimer = null;
-const PUBLIC_TOURNAMENTS_AUTO_REFRESH_MS = 15000;
+let publicTournamentsRealtimeUnsub = null;
+let publicTournamentsRealtimeStarting = false;
+let publicTournamentsReconcilePromise = null;
+let publicTournamentsReconcileTimer = null;
+let publicTournamentsLastSignature = "";
+const PUBLIC_TOURNAMENTS_RECONCILE_MS = 90000;
 
 function isTournamentLobbyVisible(){
   return (appPhase==="player-center" && playerActiveTab==="home")
     || (appPhase==="guest-lobby" && guestActiveTab==="events");
 }
 
-// Keep the lobby lifecycle fresh while it is visible. This must be a REAL timer,
-// not just a timestamp check performed during render(), because a quiet lobby does
-// not re-render by itself. Without the timer, a room could remain stuck in an old
-// "比賽中" card indefinitely even after Firebase already moved it to done.
-function queuePublicTournamentsBackgroundRefresh(){
-  if(publicTournamentsBackgroundRefreshTimer || publicTournamentsBackgroundRefreshPromise) return;
-  if(publicTournamentsCache===null || publicTournamentsLoading || !isTournamentLobbyVisible()) return;
-  const elapsed=Date.now()-publicTournamentsLastRefreshAt;
-  const delay=Math.max(250, PUBLIC_TOURNAMENTS_AUTO_REFRESH_MS-elapsed);
-  publicTournamentsBackgroundRefreshTimer=setTimeout(async()=>{
-    publicTournamentsBackgroundRefreshTimer=null;
-    if(publicTournamentsCache===null || publicTournamentsLoading || !isTournamentLobbyVisible()) return;
-    if(!cloudAvailable() || !window.cloudSync || !window.cloudSync.queryPublicTournaments){
-      queuePublicTournamentsBackgroundRefresh();
-      return;
-    }
-    publicTournamentsLastRefreshAt=Date.now();
-    publicTournamentsBackgroundRefreshPromise=(async()=>{
-      try{
-        const result=await window.cloudSync.queryPublicTournaments();
-        if(result&&result.ok){
-          publicTournamentsCache=result.items;
-          publicTournamentsError=null;
-          if(typeof renderPreservingScroll==="function") renderPreservingScroll();
-          else render();
-        }
-      }catch(e){
-        console.warn("[lobby background refresh]",e);
-      }finally{
-        publicTournamentsBackgroundRefreshPromise=null;
-        if(isTournamentLobbyVisible()) queuePublicTournamentsBackgroundRefresh();
-      }
-    })();
-  },delay);
+function fastLobbyHash(value){
+  const str=String(value==null?"":value);
+  let h=2166136261;
+  for(let i=0;i<str.length;i++){
+    h^=str.charCodeAt(i);
+    h=Math.imul(h,16777619);
+  }
+  return (h>>>0).toString(36);
 }
+function publicTournamentListSignature(items){
+  return (Array.isArray(items)?items:[]).map(t=>[
+    String(t&&t.code||""),
+    Number(t&&t.updatedAt||0),
+    String(t&&t.tournamentPhase||""),
+    String(t&&t.registrationStatus||""),
+    Number(t&&t.confirmedCount||0),
+    Number(t&&t.waitlistCount||0),
+    Number(t&&t.capacity||0),
+    fastLobbyHash(t&&t.bracketView||"")
+  ].join(":")).sort().join("|");
+}
+function applyPublicTournamentItems(items,{renderIfChanged=true}={}){
+  const next=Array.isArray(items)?items:[];
+  const signature=publicTournamentListSignature(next);
+  const changed=publicTournamentsCache===null || signature!==publicTournamentsLastSignature;
+  publicTournamentsCache=next;
+  publicTournamentsLastSignature=signature;
+  publicTournamentsError=null;
+  publicTournamentsLastRefreshAt=Date.now();
+  if(changed && renderIfChanged && isTournamentLobbyVisible()){
+    if(typeof renderPreservingScroll==="function") renderPreservingScroll();
+    else render();
+  }
+  return changed;
+}
+function stopPublicTournamentsRealtime(){
+  if(publicTournamentsRealtimeUnsub){
+    try{ publicTournamentsRealtimeUnsub(); }catch(e){}
+    publicTournamentsRealtimeUnsub=null;
+  }
+  publicTournamentsRealtimeStarting=false;
+  if(publicTournamentsReconcileTimer){
+    clearTimeout(publicTournamentsReconcileTimer);
+    publicTournamentsReconcileTimer=null;
+  }
+}
+function schedulePublicTournamentsReconcile(delay=PUBLIC_TOURNAMENTS_RECONCILE_MS){
+  if(publicTournamentsReconcileTimer || !isTournamentLobbyVisible()) return;
+  publicTournamentsReconcileTimer=setTimeout(()=>{
+    publicTournamentsReconcileTimer=null;
+    reconcilePublicTournamentsNow("timer");
+  },Math.max(1000,Number(delay)||PUBLIC_TOURNAMENTS_RECONCILE_MS));
+}
+async function reconcilePublicTournamentsNow(reason="manual"){
+  if(publicTournamentsReconcilePromise) return publicTournamentsReconcilePromise;
+  if(!isTournamentLobbyVisible()) return false;
+  publicTournamentsReconcilePromise=(async()=>{
+    try{
+      if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
+      if(!cloudAvailable()||!window.cloudSync||!window.cloudSync.queryPublicTournaments) return false;
+      const result=await window.cloudSync.queryPublicTournaments();
+      if(result&&result.ok){
+        applyPublicTournamentItems(result.items,{renderIfChanged:true});
+        return true;
+      }
+      if(publicTournamentsCache===null){
+        publicTournamentsCache=[];
+        publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+        render();
+      }
+      return false;
+    }catch(e){
+      console.warn("[lobby reconcile]",reason,e);
+      return false;
+    }finally{
+      publicTournamentsReconcilePromise=null;
+      if(isTournamentLobbyVisible()) schedulePublicTournamentsReconcile();
+    }
+  })();
+  return publicTournamentsReconcilePromise;
+}
+function startPublicTournamentsRealtime(){
+  if(publicTournamentsRealtimeUnsub || publicTournamentsRealtimeStarting || !isTournamentLobbyVisible()) return;
+  if(!cloudAvailable() || !window.cloudSync || !window.cloudSync.subscribePublicTournaments){
+    schedulePublicTournamentsReconcile(5000);
+    return;
+  }
+  publicTournamentsRealtimeStarting=true;
+  try{
+    publicTournamentsRealtimeUnsub=window.cloudSync.subscribePublicTournaments((result)=>{
+      if(!isTournamentLobbyVisible()) return;
+      if(result&&result.ok){
+        applyPublicTournamentItems(result.items,{renderIfChanged:true});
+      }else if(publicTournamentsCache===null){
+        publicTournamentsCache=[];
+        publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+        render();
+      }
+    });
+  }catch(e){
+    console.warn("[lobby realtime subscribe]",e);
+    publicTournamentsRealtimeUnsub=null;
+  }finally{
+    publicTournamentsRealtimeStarting=false;
+    schedulePublicTournamentsReconcile();
+  }
+}
+function syncPublicTournamentsRealtimeState(){
+  if(isTournamentLobbyVisible()){
+    startPublicTournamentsRealtime();
+    schedulePublicTournamentsReconcile();
+  }else{
+    stopPublicTournamentsRealtime();
+  }
+}
+function queuePublicTournamentsBackgroundRefresh(){
+  syncPublicTournamentsRealtimeState();
+}
+document.addEventListener("visibilitychange",()=>{
+  syncPublicTournamentsRealtimeState();
+  if(!document.hidden && isTournamentLobbyVisible()) reconcilePublicTournamentsNow("foreground");
+});
+window.addEventListener("focus",()=>{
+  if(isTournamentLobbyVisible()) reconcilePublicTournamentsNow("focus");
+});
 let findEventsFilters = { keyword:"", date:"", region:"", format:"all" };
 // Pure front-end display state for the "賽事資訊" tab — deliberately never
 // persisted to Firestore or even localStorage; resets to defaults whenever
@@ -14953,6 +15046,7 @@ function render(){
   } finally {
     syncBoardFullscreen();
     scheduleCourtCallPoll();
+    syncPublicTournamentsRealtimeState();
     bindTitleEditor();
     bindPlayerCardInputs();
     renderPlayerCardOverlay();
@@ -16849,34 +16943,49 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="load-public-tournaments" || action==="refresh-public-tournaments"){
     if(publicTournamentsLoading) return;
-    publicTournamentsLastRefreshAt = Date.now();
-    publicTournamentsLoading = true;
-    publicTournamentsError = null;
-    render();
+    const initialLoad=publicTournamentsCache===null;
+    publicTournamentsLastRefreshAt=Date.now();
+    publicTournamentsLoading=true;
+    publicTournamentsError=null;
+    if(initialLoad) render();
     (async ()=>{
-      if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
-      if(cloudAvailable() && window.cloudSync.queryPublicTournaments){
-        const result = await window.cloudSync.queryPublicTournaments();
-        if(result.ok){
-          publicTournamentsCache = result.items;
-          publicTournamentsError = null;
-        } else {
-          // A real query failure is NEVER shown as "沒有賽事" — that message
-          // is reserved for a query that genuinely succeeded with 0 results.
-          // Cache stays an empty array (not null) so the tab doesn't loop
-          // back into re-triggering the load on every render; the error
-          // message takes priority over the empty-state text instead.
-          publicTournamentsCache = [];
-          publicTournamentsError = PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result.reason] || PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+      let changed=false;
+      try{
+        if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
+        if(cloudAvailable()&&window.cloudSync.queryPublicTournaments){
+          const result=await window.cloudSync.queryPublicTournaments();
+          if(result.ok){
+            changed=applyPublicTournamentItems(result.items,{renderIfChanged:false});
+          }else if(initialLoad){
+            publicTournamentsCache=[];
+            publicTournamentsLastSignature=publicTournamentListSignature([]);
+            publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+            changed=true;
+          }
+        }else if(initialLoad){
+          publicTournamentsCache=[];
+          publicTournamentsLastSignature=publicTournamentListSignature([]);
+          publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+          changed=true;
         }
-      } else {
-        publicTournamentsCache = [];
-        publicTournamentsError = PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+      }catch(e){
+        console.warn("[load public tournaments]",e);
+        if(initialLoad){
+          publicTournamentsCache=[];
+          publicTournamentsLastSignature=publicTournamentListSignature([]);
+          publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+          changed=true;
+        }
+      }finally{
+        publicTournamentsLoading=false;
+        publicTournamentsLastRefreshAt=Date.now();
+        if(initialLoad||changed){
+          if(typeof renderPreservingScroll==="function") renderPreservingScroll();
+          else render();
+        }
+        syncPublicTournamentsRealtimeState();
+        schedulePublicTournamentsReconcile();
       }
-      publicTournamentsLoading = false;
-      publicTournamentsLastRefreshAt = Date.now();
-      render();
-      queuePublicTournamentsBackgroundRefresh();
     })();
     return;
   }
@@ -20659,6 +20768,37 @@ init();
         else if(code==="failed-precondition") reason = "failed-precondition";
         else if(code==="unavailable") reason = "network";
         return { ok:false, reason, error: code, items:[] };
+      }
+    },
+
+    // Realtime lobby feed: Firestore pushes only actual public-tournament changes.
+    // The 90-second reconciliation path below remains as a low-frequency self-heal.
+    subscribePublicTournaments(callback){
+      if(!cloudEnabled || typeof callback!=="function") return ()=>{};
+      try{
+        const q=fx.query(fx.collection(dbHandle,"publicTournaments"),fx.where("visibility","==","public"));
+        return fx.onSnapshot(q,{includeMetadataChanges:true},snap=>{
+          const results=[],excluded=[];
+          snap.forEach(docSnap=>{
+            const d=docSnap.data();
+            try{
+              const reconstructed=reconstructPublicStateFromDoc(docSnap.id,d);
+              results.push(Object.assign({code:docSnap.id},d,{parsedData:reconstructed}));
+            }catch(e){
+              excluded.push({code:docSnap.id,reason:"parse-error"});
+            }
+          });
+          callback({ok:true,items:results,rawCount:snap.size,excluded,fromCache:!!(snap.metadata&&snap.metadata.fromCache)});
+        },err=>{
+          const code=(err&&err.code)||"unknown";
+          const reason=code==="permission-denied"?"permission-denied":code==="failed-precondition"?"failed-precondition":"network";
+          callback({ok:false,reason,error:code,items:[]});
+        });
+      }catch(e){
+        const code=(e&&e.code)||"unknown";
+        const reason=code==="permission-denied"?"permission-denied":code==="failed-precondition"?"failed-precondition":"network";
+        callback({ok:false,reason,error:code,items:[]});
+        return ()=>{};
       }
     },
 

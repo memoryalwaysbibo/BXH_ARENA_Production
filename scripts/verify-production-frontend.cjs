@@ -17,7 +17,13 @@ mustNot(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'GoogleAuthProvider
 mustNot(/getRedirectResult\(authHandle\)/, 'Google redirect result runtime is still active');
 mustNot(/popupRedirectResolver:\s*authMod\.browserPopupRedirectResolver/, 'Popup/redirect resolver is still active');
 mustNot(/role:\s*["']tester["'],\s*active:\s*true,\s*provider:\s*["'](?:password|google)["']/, 'Public signup/recovery still creates tester role');
+must(/PUBLIC_TOURNAMENTS_RECONCILE_MS\s*=\s*90000/, 'Lobby reconciliation must be 90 seconds');
+must(/subscribePublicTournaments\(callback\)/, 'Realtime public tournament listener missing');
+must(/visibilitychange[\s\S]*?reconcilePublicTournamentsNow\(["']foreground["']\)/, 'Foreground reconciliation missing');
+must(/window\.addEventListener\(["']focus["'][\s\S]*?reconcilePublicTournamentsNow\(["']focus["']\)/, 'Focus reconciliation missing');
+mustNot(/PUBLIC_TOURNAMENTS_AUTO_REFRESH_MS\s*=\s*15000/, 'Legacy 15-second lobby polling is still active');
 console.log('PASS Production frontend target');
 console.log('PASS Email/Password-only runtime');
 console.log('PASS self-service role=player');
 console.log('PASS tester official-event UI guard');
+console.log('PASS realtime lobby sync guard');
