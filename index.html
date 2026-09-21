@@ -16171,7 +16171,29 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         st.meta.name=name; st.meta.date=date; st.meta.location=location; st.meta.startTime=startTime;
         st.meta.formatType=formatType; st.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; st.meta.stations=stations;
         st.meta.eventAuthority="community"; st.meta.ladderMode="general"; st.meta.registrationEnabled=false; st.meta.publishedAt=Date.now(); st.meta.registrationStatus="closed";
-        st.ownerUid=firebaseUser.uid; st.createdByRole="player"; st.lastActivityAt=Date.now(); st.expiresAtMs=communityRoomExpiryMs(st);
+        st.ownerUid=firebaseUser.uid; st.createdByRole="player"; st.lastActivityAt=Date.now();
+
+        // COMMUNITY host joins their own room by default. Host ownership and
+        // participant membership are independent: removing this player later
+        // must NOT remove room ownership or management permission.
+        const hostProfile=userProfile||{};
+        const hostName=String(hostProfile.gameId||hostProfile.displayName||hostProfile.nickname||hostProfile.realName||firebaseUser.email||"房主").trim();
+        st.players=[{
+          id:uid("player"),
+          name:hostName,
+          checkedIn:true,
+          source:"host",
+          participantType:"account",
+          accountLinked:true,
+          playerUid:firebaseUser.uid,
+          accountUid:firebaseUser.uid,
+          uid:firebaseUser.uid,
+          playerId:hostProfile.playerId||null,
+          ladderEligible:false,
+          activityEligible:true,
+          isRoomOwner:true
+        }];
+        st.expiresAtMs=communityRoomExpiryMs(st);
         const code=await window.cloudSync.createCommunityRoom(st);
         if(!code) throw new Error("create-failed");
         st.cloudCode=code; state=st; await saveRecord(state); await setCurrentId(state.id);
