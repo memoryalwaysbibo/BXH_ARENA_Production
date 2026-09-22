@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.12">
+<meta name="bxh-build" content="20260922.13">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.12";
+  var CURRENT_BUILD="20260922.13";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3802,9 +3802,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.15";
+const APP_VERSION = "v14.0.16";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.16",date:"2026/09/22",timezone:"Asia/Taipei",title:"完整對戰表 PNG／相簿儲存流程",updateLevel:"patch",added:["匯出完整對戰表改為 PNG File 分享；支援裝置時直接開啟系統分享面板","iPhone 可由分享面板直接選『儲存影像』加入照片相簿","不支援檔案分享的瀏覽器自動退回 PNG 下載"],changed:["按鈕文字由『匯出完整對戰表』改為『儲存完整對戰表』"],fixed:["避免 iPhone 匯出後只能到檔案 Downloads 再手動搬移"],environment:"Production / HTML + Firebase",deployStatus:"Frontend export UX patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"完整對戰表仍輸出 PNG；iPhone 會優先開啟系統分享面板，可直接選儲存影像加入照片相簿。"},
   {version:"v14.0.15",date:"2026/09/22",timezone:"Asia/Taipei",title:"經典賽程樹連接線",updateLevel:"patch",added:[],changed:["樹狀圖改為標準 tournament bracket 連接方式：來源卡片中央出發、共用垂直主線、再由中央水平接入下一場中央","連接線統一淺灰白、直角、無勝方發光與無上下跳動"],fixed:["移除依 A/B 槽位或勝利者列產生的不規則毛毛蟲視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改成經典標準賽程樹樣式，與參考圖一致地從卡片中央規則連接。"},
   {version:"v14.0.14",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀圖連接線中線化／場次序號黑金化",updateLevel:"patch",added:[],changed:["樹狀圖往下一場的連接線固定從整個對戰卡垂直中點出發，不再從勝利者列出發","場次序號改為黑底、金字、金框並提高對比"],fixed:["改善勝方位於上／下列時連接線上下跳動造成的毛毛蟲感與不規則視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改由卡片中線出發，場次序號改黑金高對比，整體更整齊易讀。"},
   {version:"v14.0.13",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀圖正式場次序號",updateLevel:"patch",added:["樹狀圖每一場正式比賽左側新增場次序號","場次序號沿用 displayMatchNumber 正式連號，可直接供未來叫號使用"],changed:["各輪左右間距小幅增加，新增專用序號 gutter","維持原本對戰卡寬度與 Challonge 高密度布局"],fixed:["避免高密度樹狀圖過度緊貼，無空間辨識第幾場比賽"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖每場比賽前方新增正式場次編號，並稍微增加輪次間距，方便現場直接用『第幾場』叫號。"},
@@ -10751,7 +10752,7 @@ function renderBoardMode(){
     </div>
 
     <div class="board-toolbar">
-      <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 匯出完整對戰表</button>
+      <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 儲存完整對戰表</button>
       ${reshuffleAllowed?`<button class="btn btn-ghost btn-sm" data-action="board-reshuffle">${BOARD_ICON_SHUFFLE} 重新抽籤</button>`:""}
       <span class="board-zoom-group">
         <button class="btn btn-ghost btn-sm" data-action="board-zoom-out" aria-label="縮小對戰表">${BOARD_ICON_MINUS}</button>
@@ -17006,11 +17007,18 @@ function ensureHtml2Canvas(){
 }
 
 let boardExportBusy=false;
+function downloadBoardPng(blob,filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 async function exportBoardAsImage(){
   if(boardExportBusy)return;
   const shell=document.getElementById('board-shell'),content=document.getElementById('board-canvas'),viewport=document.getElementById('board-viewport');
   if(!shell||!content||!viewport){showToast('找不到看板內容，請先切換至賽事看板模式',true);return;}
-  boardExportBusy=true;showToast('正在產生完整對戰表圖片……');
+  boardExportBusy=true;showToast('正在產生完整對戰表 PNG……');
   try{
     await ensureHtml2Canvas();
     if(!shell.isConnected)throw Error('board-changed');
@@ -17028,13 +17036,36 @@ async function exportBoardAsImage(){
         copy.querySelectorAll('.board-toolbar,.board-help,.share-btn,.event-title-bar').forEach(el=>el.style.display='none');
       }
     });
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(Error('png-encode-failed')),'image/png'));
     const dateStr=new Date().toISOString().slice(0,10);
     const safeName=(state.meta.name||'賽事').replace(/[\\\/:*?"<>|]/g,'_');
-    const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='BXH_'+safeName+'_'+dateStr+'_完整對戰表.png';
-    document.body.appendChild(a);a.click();a.remove();
-    showToast('已送出完整對戰表圖片下載，請至瀏覽器下載項目查看。');
-  }catch(e){showToast('匯出圖片失敗，請稍後再試',true);}
-  finally{boardExportBusy=false;}
+    const filename='BXH_'+safeName+'_'+dateStr+'_完整對戰表.png';
+    let shared=false;
+    try{
+      if(typeof File==='function'&&navigator&&typeof navigator.share==='function'&&typeof navigator.canShare==='function'){
+        const file=new File([blob],filename,{type:'image/png'});
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({title:'BXH ARENA｜完整對戰表',text:state.meta.name||'完整對戰表',files:[file]});
+          shared=true;
+          showToast('已開啟系統分享；iPhone 請選「儲存影像」加入照片相簿。');
+        }
+      }
+    }catch(e){
+      if(e&&e.name==='AbortError'){
+        showToast('已取消儲存／分享');
+        return;
+      }
+    }
+    if(!shared){
+      downloadBoardPng(blob,filename);
+      showToast('已下載 PNG 圖檔；iPhone 可至下載項目開啟後存入照片。');
+    }
+  }catch(e){
+    console.warn('[board export]',e);
+    showToast('匯出圖片失敗，請稍後再試',true);
+  }finally{
+    boardExportBusy=false;
+  }
 }
 
 function bindBoardModeInteractions(){
