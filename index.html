@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.09">
+<meta name="bxh-build" content="20260922.10">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.09";
+  var CURRENT_BUILD="20260922.10";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -1379,6 +1379,75 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   .board-canvas .match-box .sc{
     min-width:18px;
     font-size:8px;
+  }
+}
+
+/* ==== v14.0.13 match sequence gutter ==== */
+/* Preserve the existing card width while adding a dedicated left gutter for
+   the official playable-match number. BYE nodes remain hidden and unnumbered. */
+.board-canvas .se-col{
+  min-width:168px;
+}
+.board-canvas .se-col[data-round] .match-box{
+  left:22px;
+  right:0;
+  overflow:visible;
+}
+.board-canvas .se-bracket-cols{
+  gap:10px;
+}
+.board-canvas .match-order-badge{
+  position:absolute;
+  left:-21px;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:5;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-width:17px;
+  height:17px;
+  padding:0 2px;
+  box-sizing:border-box;
+  border:1px solid #505660;
+  border-radius:3px;
+  background:#24282e;
+  color:#c8cdd5;
+  font-family:var(--font-d);
+  font-size:8px;
+  font-weight:800;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+  box-shadow:0 0 0 1px rgba(0,0,0,.22);
+}
+.board-canvas .match-box.ms-card-in_progress .match-order-badge{
+  border-color:#c79c2c;
+  color:#f0cf6a;
+  background:#29251a;
+}
+.board-canvas .match-box.ms-card-ready .match-order-badge{
+  border-color:#4b9bc8;
+  color:#9bd5f4;
+}
+.board-canvas .match-box.ms-card-completed .match-order-badge{
+  border-color:#5c616a;
+  color:#aeb4bd;
+}
+@media(max-width:640px){
+  .board-canvas .se-col{
+    min-width:162px;
+  }
+  .board-canvas .se-col[data-round] .match-box{
+    left:22px;
+  }
+  .board-canvas .se-bracket-cols{
+    gap:8px;
+  }
+  .board-canvas .match-order-badge{
+    left:-21px;
+    min-width:17px;
+    height:17px;
+    font-size:7.5px;
   }
 }
 
@@ -3687,9 +3756,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.12";
+const APP_VERSION = "v14.0.13";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.13",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀圖正式場次序號",updateLevel:"patch",added:["樹狀圖每一場正式比賽左側新增場次序號","場次序號沿用 displayMatchNumber 正式連號，可直接供未來叫號使用"],changed:["各輪左右間距小幅增加，新增專用序號 gutter","維持原本對戰卡寬度與 Challonge 高密度布局"],fixed:["避免高密度樹狀圖過度緊貼，無空間辨識第幾場比賽"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖每場比賽前方新增正式場次編號，並稍微增加輪次間距，方便現場直接用『第幾場』叫號。"},
   {version:"v14.0.12",date:"2026/09/22",timezone:"Asia/Taipei",title:"會員抽獎管理工具列重整",updateLevel:"patch",added:["會員抽獎管理新增獨立管理工具區，篩選與管理動作分組"],changed:["移除管理端大膠囊背景與自由換行按鈕排列","手機改為規則化 Grid：全部活動／我的活動一組，建立活動／重新整理／掃碼核銷一組","按鈕高度、圓角、邊框與字級統一"],fixed:["修正會員抽獎管理在手機上背景框變形、建立活動掉到第二列左側及按鈕高低不一"],environment:"Production / HTML + Firebase",deployStatus:"Frontend raffle management UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"會員抽獎管理工具列重新排版，手機版不再出現歪斜膠囊與亂跳按鈕。"},
   {version:"v14.0.11",date:"2026/09/22",timezone:"Asia/Taipei",title:"測試天梯說明預設收合",updateLevel:"patch",added:["測試天梯 TEST-S1 改為可展開／收合"],changed:["測試天梯說明、重新整理、空狀態與排行榜內容預設不直接佔用天梯首屏","只有展開後才載入測試天梯資料，減少不必要讀取"],fixed:["改善管理員天梯頁首屏被低頻測試資訊占用過多空間"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX patch",firebaseImpact:"無資料結構變更；測試天梯改為展開時才讀取",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"測試天梯改為預設收合，需要時再展開查看，正式天梯資訊更優先。"},
   {version:"v14.0.10",date:"2026/09/22",timezone:"Asia/Taipei",title:"管理員全域工具列精簡",updateLevel:"patch",added:["管理員內容區改為單列狀態 HUD","賽事代碼晶片可直接點擊複製","雲端連線異常時才顯示重試入口","抽獎與維護新增系統診斷區"],changed:["正常狀態移除重複的『雲端已同步』文字，改由 Header 的 BXH LIVE LINK 統一呈現","全域列移除複製代碼、切換賽事、測試雲端連線三個低頻按鈕","切換賽事集中至賽事管理中心；雲端測試集中至抽獎與維護"],fixed:["減少管理員各分頁重複固定工具列佔用手機首屏高度"],environment:"Production / HTML + Firebase",deployStatus:"Frontend admin UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"管理員全域工具列精簡為狀態與賽事代碼；低頻操作移回賽事管理與系統診斷，手機首屏更聚焦工作內容。"},
@@ -10562,12 +10632,14 @@ function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
       <div class="match-status-bar ms-bar-pending">等待中</div>
     </div>`;
   }
+  const matchNo=displayMatchNumber(m);
   const aName = m.a ? playerName(m.a.playerId) : (m.isBye ? "（輪空）" : "待定");
   const bName = m.b ? playerName(m.b.playerId) : (m.isBye ? "（輪空）" : "待定");
   const aWin = m.completed && m.winnerId && m.a && m.winnerId===m.a.playerId;
   const bWin = m.completed && m.winnerId && m.b && m.winnerId===m.b.playerId;
   return `
-  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}">
+  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
+    ${matchNo==null?'':`<span class="match-order-badge" aria-label="第 ${matchNo} 場">${matchNo}</span>`}
     <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}</span><span>台${m.station}</span></div>
     <div class="mb-row ${aWin?'winner':''}" data-side="A">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
     <div class="mb-row ${bWin?'winner':''}" data-side="B">${playerBracketRowHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
