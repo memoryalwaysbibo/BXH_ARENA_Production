@@ -79,7 +79,7 @@ must(/if\(action===["']delete-player["']\)[\s\S]*?p\.source===["']online["'][\s\
 console.log('PASS people roster second-level / atomic waitlist linkage');
 mustInclude('class="rank-table people-roster-table"','People roster table mobile scope missing');
 mustInclude('class="people-col-actions"','People roster action semantic cell missing');
-mustInclude('>移備取</button>','Mobile roster action label should be compact');
+mustInclude('>移至備取</button>','Roster overflow menu must retain the move-to-waitlist action label');
 must(/@media\(max-width:760px\)[\s\S]*?\.people-roster-table tr\{[\s\S]*?grid-template-areas:[\s\S]*?actions actions actions/, 'Mobile roster cards must place actions on a full-width row');
 must(/\.people-roster-actions\{[\s\S]*?grid-auto-flow:column[\s\S]*?grid-auto-columns:minmax\(0,1fr\)/, 'Mobile roster buttons must share available width evenly');
 console.log('PASS mobile people roster action layout');
