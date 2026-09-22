@@ -19093,7 +19093,15 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           await loadAdminTournamentList();
         }catch(e){
           console.warn("[deleteTournament] failed", e);
-          showToast((e&&e.code)==="permission-denied" ? "目前帳號沒有刪除賽事的權限" : "刪除失敗，請稍後再試", true);
+          const raw=String((e&&e.message)||"");
+          const message=(e&&e.code)==="permission-denied"||raw.includes("tournament-access-denied")
+            ? "目前帳號沒有刪除這場賽事的權限"
+            : raw.includes("delete-not-confirmed")||raw.includes("delete-verification-failed")
+              ? "雲端尚未確認刪除完成；已停止顯示成功，請稍後重試"
+              : raw.includes("delete-service-unavailable")
+                ? "安全刪除服務尚未就緒，請稍後再試"
+                : "刪除失敗，房間仍保留；請稍後再試";
+          showToast(message, true);
         }
       })();
     }});
@@ -21678,6 +21686,7 @@ init();
     async lotteryRegistration(payload){return callEngagementFunction("lotteryRegistration",payload,60000);},
     async manageRegistrationSelection(payload){return callEngagementFunction("manageRegistrationSelection",payload,120000);},
     async manageEntrySelection(payload){return callEngagementFunction("manageEntrySelection",payload,60000);},
+    async deleteTournamentSafely(payload){return callEngagementFunction("deleteTournamentSafely",payload,540000);},
     async settleLadder(payload){return callEngagementFunction("settleLadderTournament",payload,120000);},
     async deleteTitleDefinition(payload){return callEngagementFunction("deleteTitleDefinition",payload);},
     async previewPioneerAwards(){return callEngagementFunction("previewPioneerAwards",{},120000);},
@@ -22320,26 +22329,12 @@ init();
     async deleteTournament(code){
       if(!cloudEnabled || !code) throw new Error("cloud-unavailable");
       const normalized = String(code).toUpperCase();
-      const tourRef = fx.doc(dbHandle, "tournaments", normalized);
-      const pubRef = fx.doc(dbHandle, "publicTournaments", normalized);
-      const actorUid=currentUserUidForWrites();
-      const selectionSnap=await fx.getDoc(tourRef);if(selectionSnap.exists()&&selectionSnap.data().registrationSelection){await window.engagementService.manageRegistrationSelection({code:normalized,action:"delete",operationId:crypto.randomUUID()});return true;}
-      if(userProfile&&(userProfile.role==="tester"||userProfile.isTestAccount===true)){
-        const ownSnap=await fx.getDoc(tourRef);
-        const d=ownSnap.exists()?ownSnap.data():null;
-        if(!d||d.testMode!==true||d.eventAuthority!=="test"||d.createdBy!==actorUid||d.ownerUid!==actorUid) throw new Error("permission-denied");
-      }
-      for(const sub of ["registrations","participants"]){
-        const snap = await fx.getDocs(fx.collection(dbHandle, "tournaments", normalized, sub));
-        for(const d of snap.docs){
-          try{ await fx.deleteDoc(d.ref); }
-          catch(e){ console.warn("[deleteTournament] subcollection delete failed", sub, d.id, e); throw e; }
-        }
-      }
-      try{ await fx.deleteDoc(pubRef); }
-      catch(e){ console.warn("[deleteTournament] public mirror delete failed", normalized, e); throw e; }
-      try{ await fx.deleteDoc(tourRef); }
-      catch(e){ console.warn("[deleteTournament] tournament delete failed", normalized, e); throw e; }
+      if(!window.engagementService || !window.engagementService.deleteTournamentSafely) throw new Error("delete-service-unavailable");
+      const result=await window.engagementService.deleteTournamentSafely({code:normalized,operationId:crypto.randomUUID()});
+      if(!result || result.ok!==true || result.deleted!==true) throw new Error((result&&result.error)||"delete-failed");
+      // A success toast is allowed only after the public entry point is gone.
+      const publicAfter=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",normalized));
+      if(publicAfter.exists()) throw new Error("delete-not-confirmed");
       return true;
     },
 
@@ -22865,6 +22860,7 @@ init();
         const snap = await fx.getDoc(fx.doc(dbHandle,"publicTournaments",String(code).toUpperCase()));
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
+        if(d.deletionStatus==="deleting" || d.visibility!=="public" || d.eventCancelled===true) return { ok:false, reason:"not-found" };
         const reconstructed = reconstructPublicStateFromDoc(snap.id, d);
         return { ok:true, data: reconstructed };
       }catch(e){
