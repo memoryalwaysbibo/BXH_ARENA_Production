@@ -76,6 +76,12 @@ mustInclude('roster-sync-mismatch','Roster mutation must verify server round-tri
 mustInclude('results.push(Object.assign({registrationId:docSnap.id},docSnap.data()))','Admin registration rows must retain Firestore document id');
 must(/if\(action===["']delete-player["']\)[\s\S]*?p\.source===["']online["'][\s\S]*?peopleCancelOnline/, 'Online player delete must cancel authoritative registration');
 console.log('PASS people roster second-level / atomic waitlist linkage');
+mustInclude('class="rank-table people-roster-table"','People roster table mobile scope missing');
+mustInclude('class="people-col-actions"','People roster action semantic cell missing');
+mustInclude('>移備取</button>','Mobile roster action label should be compact');
+must(/@media\(max-width:760px\)[\s\S]*?\.people-roster-table tr\{[\s\S]*?grid-template-areas:[\s\S]*?actions actions actions/, 'Mobile roster cards must place actions on a full-width row');
+must(/\.people-roster-actions\{[\s\S]*?grid-auto-flow:column[\s\S]*?grid-auto-columns:minmax\(0,1fr\)/, 'Mobile roster buttons must share available width evenly');
+console.log('PASS mobile people roster action layout');
 mustInclude('if(appPhase==="guest-lobby"){ app.innerHTML = renderGuestLobbyScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','guest ladder must bind city/district filters');
 mustInclude('if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','player ladder must bind city/district filters');
 mustInclude('ladderLocationCity=normalizeTaiwanCityName(ladderCityFilter.value);','ladder city filter must update normalized city');
