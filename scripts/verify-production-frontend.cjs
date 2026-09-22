@@ -61,3 +61,8 @@ console.log('PASS build/version metadata consistency');
 console.log('PASS pre-start reset bracket control');
 console.log('PASS Challonge-density bracket invariants');
 console.log('PASS unified online/on-site check-in flow');
+mustInclude('if(appPhase==="guest-lobby"){ app.innerHTML = renderGuestLobbyScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','guest ladder must bind city/district filters');
+mustInclude('if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','player ladder must bind city/district filters');
+mustInclude('ladderLocationCity=normalizeTaiwanCityName(ladderCityFilter.value);','ladder city filter must update normalized city');
+mustInclude('ladderLocationRegion="";','ladder city change must reset district');
+console.log('PASS ladder city/district binding');
