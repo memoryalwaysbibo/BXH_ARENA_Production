@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.17">
+<meta name="bxh-build" content="20260922.18">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.17";
+  var CURRENT_BUILD="20260922.18";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -23348,5 +23348,6 @@ if(testerSession){
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
 </script>
+<script src="ladder-secondary-ui.js?v=14.0.21"></script>
 </body>
 </html>
