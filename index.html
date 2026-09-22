@@ -7955,7 +7955,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
   "import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
   "cloud-retry-connect","cloud-test-connection",
-  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match",
+  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start",
   "open-quick-confirm"
 ]);
 const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
@@ -7964,13 +7964,13 @@ const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "toggle-checkin-btn","delete-player","set-checkin-required","unlock-roster","clear-data","import-data",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
-  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle","set-ladder-mode"
+  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle","set-ladder-mode"
 ]);
 
 const COMMUNITY_OWNER_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result","draw-bracket","update-players","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
-  "start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","open-quick-confirm","goto-settings"
+  "start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","goto-settings"
 ]);
 const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
@@ -7989,7 +7989,7 @@ const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
 const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status",
-  "skip-match","claim-skipped-match","open-quick-confirm","archive-complete"
+  "skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","archive-complete"
 ]);
 
 function hasAdminAccess(){ return currentRole === "admin" || currentRole === "tester"; }
