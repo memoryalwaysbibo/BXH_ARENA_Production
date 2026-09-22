@@ -11624,6 +11624,84 @@ const refereeSwappedViews = new Set();
 function refereeViewKey(m){ return String(state.id)+":"+String(m.id); }
 function refereeViewClass(m){ return refereeSwappedViews.has(refereeViewKey(m))?" swapped":""; }
 function refereeSwapControl(m){ return `<div class="ref-vs-mark"><button class="btn btn-ghost ref-swap" data-action="referee-swap-view" data-id="${esc(m.id)}" aria-label="交換玩家位置" title="交換左右顯示位置">⇄</button></div>`; }
+function matchHasDecisionData(m){
+  return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)>0||Number(m.scoreB||0)>0||(Array.isArray(m.log)&&m.log.length)));
+}
+function canCourtSwapSource(m){
+  return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&!matchHasDecisionData(m)&&m.status!=="paused");
+}
+function canCourtSwapTarget(m,sourceMatch){
+  if(!m||!sourceMatch||m.id===sourceMatch.id||m.isBye||m.completed||!m.a||!m.b) return false;
+  if(m.status==="in_progress"||m.status==="paused"||m.skippedAt||m.callPass||matchHasDecisionData(m)) return false;
+  return true;
+}
+function courtSwapMatchClass(m){
+  if(!courtSwapDraft) return "";
+  const source=getMatch(courtSwapDraft.sourceMatchId);
+  if(m.id===courtSwapDraft.sourceMatchId) return " court-swap-source";
+  return canCourtSwapTarget(m,source)?" court-swap-candidate":" court-swap-unavailable";
+}
+function courtSwapMatchBadge(m){
+  if(!courtSwapDraft) return "";
+  if(m.id===courtSwapDraft.sourceMatchId) return '<span class="court-swap-badge source">原場次</span>';
+  const source=getMatch(courtSwapDraft.sourceMatchId);
+  return canCourtSwapTarget(m,source)?'<span class="court-swap-badge">可交換</span>':"";
+}
+function refereeCourtSwapButton(m,stationNum,stationLocked){
+  if(!state.startedAt||stationLocked||!canCourtSwapSource(m)) return "";
+  const cloudBlocked=!!state.cloudCode&&(!cloudAvailable()||cloudStatus!=="connected");
+  return '<button class="btn btn-ghost btn-sm" data-action="court-swap-start" data-id="'+esc(m.id)+'" data-station="'+stationNum+'" '+(cloudBlocked?"disabled":"")+'>申請換場</button>';
+}
+function renderCourtSwapSelectionBanner(){
+  if(!courtSwapDraft) return "";
+  const source=getMatch(courtSwapDraft.sourceMatchId);
+  if(!source){courtSwapDraft=null;return "";}
+  const names=source.a&&source.b?esc(playerName(source.a.playerId))+" vs "+esc(playerName(source.b.playerId)):"選手待定";
+  return '<div class="court-swap-selection-banner"><div><b>臨時換場｜Court '+Number(courtSwapDraft.sourceStation||source.station||0)+'</b><span>'+displayMatchLabel(source)+'｜'+names+'</span><small>請直接點選綠框「可交換」場次。只允許選手已確定、尚未開始、尚無比分的賽事。</small></div><button class="btn btn-ghost btn-sm" data-action="court-swap-cancel">取消換場</button></div>';
+}
+function clearCourtAssignmentRefs(st,matchIds){
+  const ids=new Set(matchIds.filter(Boolean));
+  Object.values((st&&st.courtAssignments)||{}).forEach(c=>{if(!c)return;if(ids.has(c.currentMatchId))c.currentMatchId=null;if(ids.has(c.nextMatchId))c.nextMatchId=null;});
+}
+function applyCourtSwapMutation(remoteState,sourceId,targetId){
+  const source=(remoteState.matches||[]).find(m=>m.id===sourceId);
+  const target=(remoteState.matches||[]).find(m=>m.id===targetId);
+  if(!canCourtSwapSource(source)) return {ok:false,reason:"source-no-longer-swappable"};
+  if(!canCourtSwapTarget(target,source)) return {ok:false,reason:"target-no-longer-swappable"};
+  const sourceStation=Number(source.station||0),targetStation=Number(target.station||sourceStation||0);
+  if(!sourceStation||!targetStation) return {ok:false,reason:"station-mismatch"};
+  const now=Date.now();
+  clearCourtAssignmentRefs(remoteState,[source.id,target.id]);
+  source.station=targetStation;source.status="pending";source.startedAt=null;source.updatedAt=now;source.dispatchPriorityAt=null;source.dispatchRevision=Number(source.dispatchRevision||0)+1;
+  target.station=sourceStation;target.status="ready";target.startedAt=null;target.updatedAt=now;target.dispatchPriorityAt=now;target.dispatchRevision=Number(target.dispatchRevision||0)+1;
+  remoteState.currentMatchId=target.id;
+  return {ok:true,state:remoteState};
+}
+function courtSwapErrorMessage(reason){
+  const map={"source-no-longer-swappable":"原場次已有比分、已完成或狀態已改變，無法交換。","target-no-longer-swappable":"選取的場次已開始、已有比分或狀態已改變，請重新選擇。","station-not-assigned":"你目前沒有此 Court 的換場權限。","station-mismatch":"場次所在 Court 已被其他裝置調整，請重新整理後再選。","dispatch-stale":"場次安排已更新，請重新選擇。","cloud-unavailable":"目前無法連線雲端，為避免多裁判資料衝突，暫停換場。","permission-denied":"目前帳號沒有換場權限。","auth-mismatch":"登入狀態已變更，請重新登入。"};
+  return map[reason]||("換場失敗（"+String(reason||"unknown")+"），請重新整理後再試。");
+}
+async function executeCourtSwap(targetId){
+  const draft=courtSwapDraft;if(!draft)return;
+  const source=getMatch(draft.sourceMatchId),target=getMatch(targetId);
+  if(!source||!canCourtSwapSource(source)){courtSwapDraft=null;render();showToast("原場次已無法交換",true);return;}
+  if(!canCourtSwapTarget(target,source)){showToast("只能選擇尚未開始、選手已確定且沒有比分的場次",true);return;}
+  const code=state.cloudCode,actorUid=currentAuthUid();let result;
+  if(code){
+    if(!cloudAvailable()||!window.cloudSync||!window.cloudSync.mutateMatchTransaction){showToast(courtSwapErrorMessage("cloud-unavailable"),true);return;}
+    result=await window.cloudSync.mutateMatchTransaction(code,source.id,Number(source.station||draft.sourceStation||0),(remoteState)=>applyCourtSwapMutation(remoteState,source.id,target.id),actorUid,{expectedRevision:Number(source.dispatchRevision||0),targetStation:Number(source.station||draft.sourceStation||0)});
+  }else{
+    result=applyCourtSwapMutation(state,source.id,target.id);
+    if(result.ok){rebuildPropagation();await saveState();}
+  }
+  if(!result||!result.ok){showToast(courtSwapErrorMessage(result&&result.reason),true);return;}
+  courtSwapDraft=null;
+  if(appPhase==="community-room") communityRoomActiveTab="referee"; else activeTab="referee";
+  if(result.state) applyRemoteState(result.state,true);
+  state.currentMatchId=target.id;rememberRefereeWorkstation();render();
+  setTimeout(()=>{const moved=getMatch(target.id);const courtNo=moved?Number(moved.station||0):Number(draft.sourceStation||0);const el=document.getElementById("court-card-"+courtNo);if(el&&el.scrollIntoView)try{el.scrollIntoView({behavior:"smooth",block:"start"});}catch(e){}},80);
+  showToast("換場完成｜新場次已送至 Court "+Number(draft.sourceStation||source.station||0));
+}
 const QD_PLAYER_ICON_SVG = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="20" r="10"/><path d="M12 54 C12 40 20 34 32 34 C44 34 52 40 52 54"/></svg>';
 
 function nextMatchPreviewHtml(court, stationNum){
