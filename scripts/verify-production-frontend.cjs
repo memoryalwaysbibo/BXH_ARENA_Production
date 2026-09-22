@@ -82,6 +82,16 @@ mustInclude('>移備取</button>','Mobile roster action label should be compact'
 must(/@media\(max-width:760px\)[\s\S]*?\.people-roster-table tr\{[\s\S]*?grid-template-areas:[\s\S]*?actions actions actions/, 'Mobile roster cards must place actions on a full-width row');
 must(/\.people-roster-actions\{[\s\S]*?grid-auto-flow:column[\s\S]*?grid-auto-columns:minmax\(0,1fr\)/, 'Mobile roster buttons must share available width evenly');
 console.log('PASS mobile people roster action layout');
+mustInclude('class="people-checkin-toggle','Attendance state must be a clickable compact control');
+mustInclude('people-checkin-dot','Attendance light indicator missing');
+mustInclude('class="people-more-menu"','Roster ellipsis menu missing');
+mustInclude('aria-label="更多選手操作"','Confirmed player overflow menu missing');
+mustInclude('title:"是否要取消報到？"','Checked-in second tap must ask before cancellation');
+mustInclude('confirmLabel:"是"','Cancel check-in confirmation yes label missing');
+mustInclude('cancelLabel:"否"','Cancel check-in confirmation no label missing');
+must(/@media\(max-width:760px\)[\s\S]*?grid-template-columns:30px minmax\(0,1fr\) auto 34px[\s\S]*?grid-template-areas:["']idx name status actions["']/, 'Mobile people rows must be a single horizontal line');
+must(/\.people-col-source\{display:none!important;\}/, 'Mobile source badge must leave the primary row');
+console.log('PASS compact single-line attendance roster');
 mustInclude('if(appPhase==="guest-lobby"){ app.innerHTML = renderGuestLobbyScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','guest ladder must bind city/district filters');
 mustInclude('if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','player ladder must bind city/district filters');
 mustInclude('ladderLocationCity=normalizeTaiwanCityName(ladderCityFilter.value);','ladder city filter must update normalized city');

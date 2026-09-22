@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.06">
+<meta name="bxh-build" content="20260923.07">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.06";
+  var CURRENT_BUILD="20260923.07";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3817,7 +3817,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 .court-swap-badge.source{background:rgba(217,185,92,.14);color:var(--gold);}
 @media(max-width:640px){.court-swap-selection-banner{align-items:flex-start;padding:8px 9px;gap:8px}.court-swap-selection-banner .btn{min-height:34px;padding:5px 8px;font-size:10.5px;white-space:nowrap}.match-box.court-swap-unavailable{opacity:.34}}
 
-/* ==== v14.0.29 people roster second-level navigation ==== */
+/* ==== v14.0.31 compact people roster / attendance light ==== */
 .people-subnav{
   display:grid;
   grid-template-columns:repeat(6,minmax(0,1fr));
@@ -3841,7 +3841,6 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   margin-bottom:10px;
 }
 .people-section-summary .hint{margin:0;}
-.people-roster-actions{display:flex;gap:6px;flex-wrap:wrap;}
 .people-wait-rank{
   display:inline-flex;
   min-width:46px;
@@ -3859,26 +3858,114 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   gap:10px;
   margin-bottom:12px;
 }
+.people-checkin-toggle{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:32px;
+  padding:5px 10px;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:999px;
+  background:rgba(255,255,255,.035);
+  color:var(--metal-dim);
+  font:700 11px var(--font-d);
+  white-space:nowrap;
+  cursor:pointer;
+}
+.people-checkin-toggle .people-checkin-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:#6d727c;
+  box-shadow:none;
+}
+.people-checkin-toggle.is-checked{
+  border-color:rgba(191,225,0,.72);
+  background:rgba(191,225,0,.08);
+  color:#d9ef4a;
+  box-shadow:0 0 12px rgba(191,225,0,.08);
+}
+.people-checkin-toggle.is-checked .people-checkin-dot{
+  background:#dfff22;
+  box-shadow:0 0 8px rgba(223,255,34,.9);
+}
+.people-checkin-toggle:disabled{cursor:default;opacity:.52;}
+.people-more-menu{position:relative;display:inline-block;}
+.people-more-menu>summary{
+  list-style:none;
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:32px;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:9px;
+  background:rgba(255,255,255,.025);
+  color:var(--metal);
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
+  user-select:none;
+}
+.people-more-menu>summary::-webkit-details-marker{display:none;}
+.people-more-menu[open]>summary{
+  border-color:rgba(217,185,92,.5);
+  color:var(--gold);
+  background:rgba(217,185,92,.07);
+}
+.people-more-popover{
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  z-index:80;
+  width:154px;
+  padding:7px;
+  border:1px solid rgba(217,185,92,.28);
+  border-radius:11px;
+  background:rgba(15,15,17,.98);
+  box-shadow:0 12px 28px rgba(0,0,0,.5);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.people-more-meta{
+  padding:3px 5px 7px;
+  color:var(--metal-dim);
+  font-size:10px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  margin-bottom:6px;
+}
+.people-more-popover .btn{
+  display:block;
+  width:100%;
+  min-height:34px;
+  margin:4px 0 0;
+  padding:6px 8px;
+  text-align:left;
+  font-size:11.5px;
+}
+.people-primary-inline{
+  min-height:32px!important;
+  padding:5px 9px!important;
+  border-radius:999px!important;
+  font-size:11px!important;
+  white-space:nowrap;
+}
+
 @media(max-width:760px){
   .people-subnav{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
-
+  .people-section-summary{margin-bottom:4px;}
+  .people-section-summary .hint{display:none;}
+  .people-roster-scroll{overflow:visible!important;}
   .people-roster-table,
-  .people-roster-table tbody{
-    display:block;
-    width:100%;
-  }
+  .people-roster-table tbody{display:block;width:100%;}
   .people-roster-table thead{display:none;}
   .people-roster-table tr{
     display:grid;
-    grid-template-columns:42px minmax(0,1fr) auto;
-    grid-template-areas:
-      "idx name source"
-      "idx status status"
-      "actions actions actions";
+    grid-template-columns:30px minmax(0,1fr) auto 34px;
+    grid-template-areas:"idx name status actions";
     align-items:center;
-    gap:8px 10px;
-    padding:14px 0;
-    border-bottom:1px solid rgba(255,255,255,.08);
+    gap:6px;
+    min-height:48px;
+    padding:7px 0;
+    border-bottom:1px solid rgba(255,255,255,.075);
   }
   .people-roster-table tr:last-child{border-bottom:0;}
   .people-roster-table td{
@@ -3889,41 +3976,49 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
     border:0!important;
     text-align:left!important;
   }
-  .people-col-index{grid-area:idx;align-self:center;color:var(--metal-dim);font:700 13px var(--font-d);}
-  .people-col-name{grid-area:name;font-size:15px;min-width:0;}
-  .people-col-source{grid-area:source;justify-self:end;}
-  .people-col-checkin{grid-area:status;}
-  .people-col-actions{grid-area:actions;width:100%!important;margin-top:2px;}
-  .people-col-checkin:empty{display:none;}
-  .people-roster-actions{
-    display:grid;
-    grid-auto-flow:column;
-    grid-auto-columns:minmax(0,1fr);
-    gap:7px;
-    width:100%;
+  .people-col-index{
+    grid-area:idx;
+    color:var(--metal-dim);
+    font:700 11.5px var(--font-d);
   }
-  .people-roster-actions .btn{
-    width:100%;
+  .people-col-name{
+    grid-area:name;
     min-width:0;
-    min-height:38px;
-    padding:7px 6px;
-    font-size:11.5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
     white-space:nowrap;
+    font-size:14px;
   }
-  .people-roster-table .badge{
-    max-width:100%;
-    white-space:nowrap;
+  .people-col-source{display:none!important;}
+  .people-col-checkin{
+    grid-area:status;
+    justify-self:end;
   }
+  .people-col-actions{
+    grid-area:actions;
+    justify-self:end;
+    width:34px!important;
+  }
+  .people-checkin-toggle{
+    min-height:30px;
+    padding:4px 8px;
+    font-size:10.5px;
+  }
+  .people-more-menu>summary{width:32px;height:30px;}
+  .people-more-popover{width:148px;}
+  .people-wait-rank{min-width:0;padding:3px 5px;font-size:10px;}
 }
 @media(max-width:390px){
   .people-roster-table tr{
-    grid-template-columns:36px minmax(0,1fr) auto;
-    gap:7px 8px;
+    grid-template-columns:27px minmax(0,1fr) auto 31px;
+    gap:5px;
+    min-height:46px;
+    padding:6px 0;
   }
-  .people-roster-actions{gap:5px;}
-  .people-roster-actions .btn{font-size:11px;padding-left:4px;padding-right:4px;}
+  .people-col-name{font-size:13px;}
+  .people-checkin-toggle{padding:4px 6px;font-size:10px;gap:4px;}
+  .people-more-menu>summary{width:30px;height:29px;font-size:18px;}
 }
-
 </style>
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
 </head>
@@ -4127,9 +4222,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.30";
+const APP_VERSION = "v14.0.31";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.31",date:"2026/09/23",timezone:"Asia/Taipei",title:"單列報到燈號／人員操作選單",updateLevel:"patch",added:["正取與待報到名單的報到狀態改為可直接點擊的燈號按鈕","每位選手新增 ⋯ 操作選單，移備取與刪除收進選單"],changed:["手機版每位選手壓成單一水平列：編號、姓名、報到狀態、操作選單","未報到顯示灰色熄燈；已報到顯示高亮亮燈","點未報到直接完成報到；再次點已報到會詢問是否取消報到","手機版來源標籤移出主列，改在 ⋯ 選單中顯示"],fixed:["大幅降低 50～100 人名單的垂直高度，避免報到頁需要長距離捲動"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact attendance roster UX",firebaseImpact:"無資料結構變更；沿用 players.checkedIn 與既有雲端同步",securityRulesImpact:"無",permissionImpact:"無；報到狀態仍受既有賽事操作與鎖定規則限制",publicSummary:"人員名單改成一人一列；點灰色未報到即可報到，已報到亮燈，再點一次會詢問是否取消；低頻操作收進 ⋯。"},
   {version:"v14.0.30",date:"2026/09/23",timezone:"Asia/Taipei",title:"手機人員名單操作區排版修正",updateLevel:"patch",added:[],changed:["手機版正取／待報到／備取名單改為卡片式表格排版","操作按鈕在手機版固定置於選手資料下方並平均分配寬度","『移至備取』按鈕文字縮短為『移備取』"],fixed:["修正手機窄螢幕操作欄被來源／報到欄擠壓，造成按鈕與文字重疊","避免已結束賽事停用按鈕在右側窄欄堆疊"],environment:"Production / HTML + Firebase",deployStatus:"Frontend responsive roster UI",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"人員管理在手機上改為更清楚的選手卡片排列，報到、移備取與刪除不再擠在右側。"},
   {version:"v14.0.29",date:"2026/09/23",timezone:"Asia/Taipei",title:"人員管理二階化／正備取原子聯動",updateLevel:"minor",added:["人員管理新增二階選單：正取、待報到、備取、新增／同步、工作人員、賽事編排","備取區可指定玩家升正取；正取選手可移至備取","正取已滿時可直接固定加開 8 名後升正取，加開次數不限","正備取異動加入伺服器讀回驗證，私人賽事、公開鏡像、報名文件與本場 roster 必須一致才顯示成功"],changed:["線上正備取異動改用同一 Firestore transaction，同步 capacity、confirmedCount、waitlistCount、registration 狀態、tournaments.data 與 publicTournaments.bracketView","線上選手刪除改走聯動取消，不再只從本機 roster 移除","人員管理長頁面改為一次只顯示一個二階區塊"],fixed:["避免人員管理名額已更新但賽事大廳、玩家報名狀態或其他管理裝置仍停在舊數字","避免正取轉備取後仍殘留在公開參賽 roster"],environment:"Production / HTML + Firebase",deployStatus:"Frontend roster control + atomic Firestore roster mutation",firebaseImpact:"沿用 tournaments/publicTournaments/registrations；私人 tournament state 新增 waitlistPlayers 僅保存現場／報到狀態陰影，不新增集合",securityRulesImpact:"無規則檔變更；沿用既有管理者賽事與報名 transaction 權限",permissionImpact:"僅既有賽事管理權限可異動；已產生對戰表或已開賽後鎖定",publicSummary:"人員管理改為精簡二階選單；正備取可以互轉，滿額時可每次加開 8 人，並同步所有賽事與報名畫面。"},
   {version:"v14.0.28",date:"2026/09/23",timezone:"Asia/Taipei",title:"裁判工作站恢復／獨立台次推進／臨時換場",updateLevel:"minor",added:["裁判工作站本機恢復：切去錄影或 iOS 回收頁面後，重新載入可回到原賽事、原 Court 與目前場次","裁判台新增「申請換場」；可切到對戰表點選尚未開始且選手已確定的場次進行交換","換場使用既有 Firestore transaction 讀取最新賽事後再交換，避免多裁判同時操作時以舊畫面覆蓋新結果"],changed:["單淘汰多戰鬥台不再被整輪／tier 全域柵欄綁住；同一 Court 完成本台目前階段後，只要後續場次兩位選手已確定即可直接接續","換場會把目標場次調到目前 Court，原場次回到目標場次原本的 Court 佇列；不改正式場次編號"],fixed:["修正某一台已完成但必須等待其他 Court 同階段全部結束，才會出現下一場可執行賽事的僵化排程","避免裁判切相機錄影後若瀏覽器被系統回收，重新載入只能回到一般頁面而需重新找 Court"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee resilience + transactional court scheduling",firebaseImpact:"無新增集合；沿用 tournaments/publicTournaments 與既有 mutateMatchTransaction",securityRulesImpact:"無",permissionImpact:"不擴權；換場仍受既有賽事操作權及 Court 指派限制",publicSummary:"多 Court 可各自往前跑；選手臨時無法出賽時可從對戰表挑另一場換入，裁判切去錄影後也能恢復原工作站。"},
@@ -12681,49 +12777,51 @@ function renderPeopleManagement(){
   const sourceBadge=p=>p.source==="online"
     ?'<span class="badge badge-neon">線上報名</span>'
     :(p.source==="test"?'<span class="badge badge-metal">測試名單</span>':'<span class="badge badge-metal">現場新增</span>');
+  const sourceText=p=>p.source==="online"?"線上報名":(p.source==="test"?"測試名單":"現場新增");
+  const checkinActionLocked=!!state.startedAt||state.archiveStatus==="completed"||checkinClosed;
+  const checkinToggle=p=>needsCheckin?`<button class="people-checkin-toggle ${p.checkedIn?'is-checked':'is-unchecked'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinActionLocked?'disabled':''} aria-label="${p.checkedIn?'已報到，點擊取消報到':'未報到，點擊完成報到'}"><span class="people-checkin-dot"></span>${p.checkedIn?'已報到':'未報到'}</button>`:"";
+  const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
 
   const confirmedRow=(p,i)=>`
     <tr>
       <td class="people-col-index">${String(i+1).padStart(2,"0")}</td>
       <td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td>
       <td class="people-col-source">${sourceBadge(p)}</td>
-      ${needsCheckin?`<td class="people-col-checkin"><span class="badge ${p.checkedIn?'badge-neon':'badge-metal'}">${p.checkedIn?'已報到':'未報到'}</span></td>`:''}
-      <td class="people-col-actions"><div class="people-roster-actions">
-        ${needsCheckin?`<button class="btn btn-sm ${p.checkedIn?'checkin-btn-done':'btn-primary'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinClosed&&!p.checkedIn?'disabled':''}>${p.checkedIn?'已報到':'報到'}</button>`:''}
-        <button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移備取</button>
-        <button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除</button>
-      </div></td>
+      ${needsCheckin?`<td class="people-col-checkin">${checkinToggle(p)}</td>`:''}
+      <td class="people-col-actions">${confirmedMoreMenu(p)}</td>
     </tr>`;
 
   const confirmedPanel=`
     <div class="panel">
-      <div class="people-section-summary"><div><div class="panel-title">正取選手（${confirmed.length}${capacity?" / "+capacity:""}）</div><p class="hint">正取與報到為兩個獨立狀態；移至備取後，既有報到狀態會保留供之後升回正取。</p></div></div>
+      <div class="people-section-summary"><div><div class="panel-title">正取選手（${confirmed.length}${capacity?" / "+capacity:""}）</div><p class="hint">點擊報到狀態即可切換；取消報到會再次詢問確認。移至備取後會保留既有報到狀態。</p></div></div>
       ${selectionManaged?'<div class="banner warn"><span>本場使用抽籤名額模式；正備取異動請由「參賽名額抽籤」處理，避免破壞抽籤結果。</span></div>':''}
-      ${confirmed.length===0?'<div class="empty-state">目前沒有正取選手</div>':`<div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>來源</th>${needsCheckin?'<th>報到</th>':''}<th>操作</th></tr></thead><tbody>${confirmed.map(confirmedRow).join('')}</tbody></table></div>`}
+      ${confirmed.length===0?'<div class="empty-state">目前沒有正取選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>來源</th>${needsCheckin?'<th>報到</th>':''}<th>操作</th></tr></thead><tbody>${confirmed.map(confirmedRow).join('')}</tbody></table></div>`}
     </div>`;
 
   const pendingPanel=`
     <div class="panel" style="border-color:rgba(255,180,0,.35);">
       <div class="panel-title">待報到（${pending.length}）</div>
-      <p class="hint">只列出正取但尚未完成現場報到的選手。</p>
-      ${!needsCheckin?'<div class="empty-state">本場設定為免報到</div>':pending.length===0?'<div class="empty-state">目前沒有待報到選手</div>':`<div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>來源</th><th>操作</th></tr></thead><tbody>${pending.map((p,i)=>`<tr><td class="people-col-index">${String(i+1).padStart(2,"0")}</td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-actions"><div class="people-roster-actions"><button class="btn btn-primary btn-sm" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinClosed?'disabled':''}>報到</button><button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除</button></div></td></tr>`).join('')}</tbody></table></div>`}
+      <p class="hint">只列出正取但尚未完成現場報到的選手；點灰色「未報到」即可完成報到。</p>
+      ${!needsCheckin?'<div class="empty-state">本場設定為免報到</div>':pending.length===0?'<div class="empty-state">目前沒有待報到選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>來源</th><th>報到</th><th>操作</th></tr></thead><tbody>${pending.map((p,i)=>`<tr><td class="people-col-index">${String(i+1).padStart(2,"0")}</td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin">${checkinToggle(p)}</td><td class="people-col-actions">${confirmedMoreMenu(p)}</td></tr>`).join('')}</tbody></table></div>`}
     </div>`;
 
   const waitOnlineRows=onlineWait.map((r,i)=>{
     const regId=peopleRegistrationIdOf(r),shadow=peopleWaitlistShadow(regId);
     const name=r.displayName||r.publicName||r.participantName||r.realName||"未命名選手";
     const rank=Number(r.waitRank||0)||(i+1);
-    return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(name)}</td><td class="people-col-source"><span class="badge badge-neon">線上報名</span></td>${needsCheckin?`<td class="people-col-checkin"><span class="badge ${shadow&&shadow.checkedIn?'badge-neon':'badge-metal'}">${shadow&&shadow.checkedIn?'已報到':'未報到'}</span></td>`:''}<td class="people-col-actions"><div class="people-roster-actions"><button class="btn btn-primary btn-sm" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消</button></div></td></tr>`;
+    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">線上報名</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消備取</button></div></details>`;
+    return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(name)}</td><td class="people-col-source"><span class="badge badge-neon">線上報名</span></td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const waitLocalRows=localWait.map((p,i)=>{
     const rank=Number(p.waitRank||0)||(onlineWait.length+i+1);
-    return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td>${needsCheckin?`<td class="people-col-checkin"><span class="badge ${p.checkedIn?'badge-neon':'badge-metal'}">${p.checkedIn?'已報到':'未報到'}</span></td>`:''}<td class="people-col-actions"><div class="people-roster-actions"><button class="btn btn-primary btn-sm" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除</button></div></td></tr>`;
+    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
+    return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const waitlistPanel=`
     <div class="panel">
       <div class="people-capacity-banner"><div><div class="panel-title">備取區（${waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
       ${selectionManaged?'<div class="banner warn"><span>本場為抽籤名額模式，請由「參賽名額抽籤」異動正備取。</span></div>':''}
-      ${adminRegistrationsLoading?'<div class="empty-state">正在同步線上備取名單……</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th>${needsCheckin?'<th>報到</th>':''}<th>操作</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
+      ${adminRegistrationsLoading?'<div class="empty-state">正在同步線上備取名單……</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th><th>升正取</th><th>更多</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
     </div>`;
 
   const toolsPanel=`
@@ -20497,13 +20595,29 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const pid = target.getAttribute("data-id");
     const p = state.players.find(x=>x.id===pid);
     if(!p) return;
-    if(!p.checkedIn){
-      p.checkedIn = true; saveState(); render();
+    if(state.startedAt || state.archiveStatus==="completed" || state.meta.checkinClosedEarly){
+      showToast("目前報到已鎖定，無法變更報到狀態",true);
       return;
     }
-    openModal({ type:"generic", title:"取消報到", message:"確定要取消此選手的報到狀態嗎？", danger:true, confirmLabel:"確定取消報到", onConfirm:()=>{
-      p.checkedIn = false; saveState(); render();
-    }});
+    if(!p.checkedIn){
+      p.checkedIn = true;
+      saveState(); render();
+      showToast("「"+p.name+"」已完成報到");
+      return;
+    }
+    openModal({
+      type:"generic",
+      title:"是否要取消報到？",
+      message:"「"+p.name+"」目前為已報到狀態。是否要取消報到？",
+      danger:true,
+      confirmLabel:"是",
+      cancelLabel:"否",
+      onConfirm:()=>{
+        p.checkedIn = false;
+        saveState(); render();
+        showToast("已取消「"+p.name+"」的報到");
+      }
+    });
     return;
   }
   if(action==="delete-player"){
