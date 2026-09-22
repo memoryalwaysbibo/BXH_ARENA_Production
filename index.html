@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.01">
+<meta name="bxh-build" content="20260923.02">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.01";
+  var CURRENT_BUILD="20260923.02";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3700,6 +3700,108 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   }
   .public-context-hud{width:100%;}
 }
+
+/* ==== v14.0.26 shared tournament context bar ==== */
+.mode-management-context:empty{
+  display:none!important;
+  margin:0!important;
+}
+.tournament-context-bar{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  min-height:46px;
+  padding:5px 12px;
+  background:rgba(217,185,92,.035);
+  border-bottom:1px solid rgba(217,185,92,.20);
+  box-sizing:border-box;
+}
+.tournament-context-left{display:flex;align-items:center;min-width:0;}
+.tournament-context-center{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-width:0;
+}
+.tournament-context-bar .status-pill,
+.tournament-context-bar .room-status{
+  margin:0!important;
+  min-height:28px;
+  padding:3px 8px;
+  white-space:nowrap;
+}
+.tournament-context-code{
+  min-height:30px;
+  max-width:100%;
+  flex:0 1 auto;
+}
+.tournament-context-sync{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  min-height:28px;
+  padding:3px 7px;
+  border-radius:8px;
+  color:var(--metal);
+  font:600 10.5px var(--font-d);
+  white-space:nowrap;
+}
+.tournament-context-sync.is-error{color:#ff8a8a;}
+.tournament-context-mode{
+  color:var(--metal-dim);
+  font:600 11px var(--font-d);
+  white-space:nowrap;
+}
+.tournament-context-back{
+  min-height:36px!important;
+  padding:6px 10px!important;
+  white-space:nowrap;
+}
+@media(max-width:640px){
+  .tournament-context-bar{
+    grid-template-columns:auto minmax(0,1fr);
+    gap:6px;
+    min-height:42px;
+    padding:4px 8px;
+  }
+  .tournament-context-center{
+    justify-content:flex-end;
+    gap:5px;
+  }
+  .tournament-context-mode{display:none;}
+  .tournament-context-back{
+    min-height:34px!important;
+    padding:5px 8px!important;
+    font-size:11px!important;
+  }
+  .tournament-context-bar .status-pill,
+  .tournament-context-bar .room-status{
+    min-height:26px;
+    padding:2px 7px;
+    font-size:10px;
+  }
+  .tournament-context-code{
+    min-height:28px;
+    padding:3px 7px;
+    font-size:10.5px;
+    letter-spacing:1px;
+  }
+  .tournament-context-sync{display:none;}
+}
+@media(max-width:390px){
+  .tournament-context-bar .status-pill,
+  .tournament-context-bar .room-status{
+    padding-left:6px;
+    padding-right:6px;
+  }
+  .tournament-context-code{
+    max-width:150px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+}
 </style>
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
 </head>
@@ -3900,9 +4002,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.25";
+const APP_VERSION = "v14.0.26";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.26",date:"2026/09/23",timezone:"Asia/Taipei",title:"賽事全分頁上下文列壓縮",updateLevel:"patch",added:["玩家／遊客進入賽事後，所有主分頁共用同一條精簡賽事上下文列","賽事狀態與房間代碼上移至主分頁上方，房間代碼維持整顆可點擊複製"],changed:["移除賽事內每個分頁重複的『玩家模式／遊客觀賽模式、V14、返回身分選擇』灰色資訊列","玩家唯讀提示改為精簡模式標籤；返回身分選擇移入右上帳號選單","公開觀賽／玩家唯讀的返回按鈕、賽事狀態、房間代碼整合在同一列"],fixed:["空的全域 context 容器不再保留 margin，真正釋出各分頁首屏垂直空間"],environment:"Production / HTML + Firebase",deployStatus:"Frontend shared tournament context UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事各分頁移除重複灰色模式區塊，狀態與房間代碼改放上方共用列，手機首屏更緊湊。"},
   {version:"v14.0.25",date:"2026/09/23",timezone:"Asia/Taipei",title:"公開觀賽工具列精簡／對戰表手動刷新",updateLevel:"patch",added:["公開觀賽對戰表新增手動刷新鍵，可直接重新讀取目前賽事的雲端資料"],changed:["公開瀏覽模式的中間工具列改為與管理者相同的精簡 HUD；正常連線時不再重複顯示『雲端已同步』","賽事代碼改為可直接點擊複製，移除獨立『複製代碼』與『切換賽事』按鈕；切換賽事沿用既有返回賽事大廳／身分入口"],fixed:["提供即時監聽未及更新時的手動重新讀取入口，刷新時直接向 Firestore 取得目前賽事最新資料並以權威狀態套用"],environment:"Production / HTML + Firebase",deployStatus:"Frontend public watch UX + manual refresh fallback",firebaseImpact:"無資料結構變更；刷新僅重新讀取既有 tournaments/publicTournaments 文件",securityRulesImpact:"無",permissionImpact:"無新增權限；公開觀賽仍只讀 publicTournaments",publicSummary:"公開觀賽介面更精簡；對戰表新增刷新鍵，遇到畫面未即時更新時可手動抓取最新賽況。"},
   {version:"v14.0.24",date:"2026/09/22",timezone:"Asia/Taipei",title:"本人／兒童雙軌報名入口",updateLevel:"patch",added:["一般公開賽事新增獨立本人報名與兒童報名入口","本人已報名後仍可繼續替家庭選手報名"],changed:["賽事詳細頁改讀取同帳號的所有有效家庭報名","兒童報名只列出尚未報名的家庭選手"],fixed:["修正本人報名後報名入口被取消按鈕取代，導致同帳號無法再替孩子報名"],environment:"Production / HTML + Firebase",deployStatus:"Frontend family registration UX",firebaseImpact:"無資料結構變更；沿用既有 familyRegistration callable",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"同一帳號可分別替本人與孩子報名同一場賽事；本人已報名後兒童報名入口仍會保留。"},
   {version:"v14.0.23",date:"2026/09/22",timezone:"Asia/Taipei",title:"賽果自動封存／更正權限收斂",updateLevel:"patch",added:["最終賽果完成後自動進入結算與封存，不再要求最高管理員再次確認"],changed:["封存失敗時僅提供重試，不再跳出二次確認視窗","已封存賽事的解除封存與結果更正入口僅最高管理員可使用"],fixed:["避免一般管理人員誤解除已完成賽事封存狀態"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament lifecycle UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"最高管理員保留歷史賽事更正權；賽果完成後封存改為自動流程",publicSummary:"比賽結果確認完成後會自動封存；只有最高管理員可以解除封存並更正歷史結果。"},
@@ -16411,7 +16514,7 @@ function accountMenuItemsHtml(){
     ${(userProfile && roleAllowsMode(userProfile.role,"admin",userProfile)) ? `<button data-action="switch-to-admin-mode">切換至管理模式</button>` : ""}
     <button data-action="account-open-checkin">每日簽到</button>
     ${themePickerHtml()}
-    <button data-action="account-back-to-role">返回系統首頁</button>
+    <button data-action="account-back-to-role">返回身分選擇</button>
     <button data-action="account-logout" class="danger">登出系統</button>
   ` : `
     <button data-action="account-goto-home">返回系統首頁</button>
@@ -16596,17 +16699,47 @@ function cloudStatusBarHtml(){
 }
 
 function publicManagementContextHtml(){
+  if(state.cloudCode) return "";
+  return statusBadge()+roleIndicatorHtml()+cloudStatusBarHtml();
+}
+
+function tournamentViewContextHeaderHtml(){
+  // Admin/tester keeps the compact management HUD in <main>; only preserve
+  // the existing return strip when an admin is temporarily browsing a public view.
+  if(hasAdminAccess()){
+    if(!publicWatchReturnContext) return "";
+    return `<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">${publicWatchReturnContext==="player-registered"?"← 返回我的賽程":"← 返回賽事大廳"}</button><span>${publicWatchUsesPrivateData?"目前為管理觀賽模式":"目前為公開觀賽模式"}</span></div>`;
+  }
+
   if(!state.cloudCode){
-    return statusBadge()+roleIndicatorHtml()+cloudStatusBarHtml();
+    if(!publicWatchReturnContext) return "";
+    return `<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">${publicWatchReturnContext==="player-registered"?"← 返回我的賽程":"← 返回賽事大廳"}</button></div>`;
   }
-  let cloudAlert="";
+
+  const returnBtn=publicWatchReturnContext
+    ? `<button class="btn btn-ghost tournament-context-back" data-action="back-from-public-watch">${publicWatchReturnContext==="player-registered"?"← 返回我的賽程":"← 返回賽事大廳"}</button>`
+    : (currentRole==="guest"
+      ? `<button class="btn btn-ghost tournament-context-back" data-action="account-back-to-role">← 返回</button>`
+      : "");
+
+  const modeLabel=currentRole==="player"
+    ? "玩家唯讀"
+    : (currentRole==="guest" ? "公開觀賽" : "唯讀模式");
+
+  const code=`<button class="admin-context-code tournament-context-code" data-action="cloud-copy-code" title="點一下複製賽事代碼" aria-label="複製賽事代碼 ${esc(state.cloudCode)}"><span>代碼 ${esc(state.cloudCode)}</span><span class="copy-mark">⧉</span></button>`;
+
+  let syncAlert="";
   if(cloudStatus==="error"){
-    cloudAlert=`<span class="admin-context-cloud-alert"><span class="cloud-dot-v2 red"></span>雲端連線異常</span>`;
+    syncAlert=`<span class="tournament-context-sync is-error"><span class="cloud-dot-v2 red"></span>連線異常</span>`;
   }else if(cloudStatus==="connecting"){
-    cloudAlert=`<span class="admin-context-cloud-alert warn"><span class="cloud-dot-v2 yellow"></span>同步中…</span>`;
+    syncAlert=`<span class="tournament-context-sync"><span class="cloud-dot-v2 yellow"></span>同步中</span>`;
   }
-  const code=`<button class="admin-context-code" data-action="cloud-copy-code" title="點一下複製賽事代碼" aria-label="複製賽事代碼 ${esc(state.cloudCode)}"><span>代碼 ${esc(state.cloudCode)}</span><span class="copy-mark">⧉</span></button>`;
-  return `${statusBadge()}${roleIndicatorHtml()}<div class="admin-context-hud public-context-hud">${code}${cloudAlert}</div>`;
+
+  return `<div class="tournament-context-bar">
+    <div class="tournament-context-left">${returnBtn}</div>
+    <div class="tournament-context-center">${statusBadge()}${code}${syncAlert}</div>
+    <span class="tournament-context-mode">${modeLabel}</span>
+  </div>`;
 }
 
 function adminManagementContextHtml(){
@@ -16968,7 +17101,7 @@ function renderApp(){
         <div class="spacer"></div>
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
-      ${publicWatchReturnContext?`<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">${publicWatchReturnContext==="player-registered"?"← 返回我的賽程":"← 返回賽事大廳"}</button><span>${publicWatchReturnContext==="player-registered"?"玩家唯讀樹狀圖":(publicWatchUsesPrivateData?"目前為管理觀賽模式":"目前為公開觀賽模式")}</span></div>`:""}
+      ${tournamentViewContextHeaderHtml()}
       <nav class="tabs">
         ${tabs.map(t=>`<button class="${activeTab===t[0]?'active':''}" data-action="switch-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}
       </nav>
