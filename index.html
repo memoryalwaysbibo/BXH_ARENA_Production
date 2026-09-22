@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.04">
+<meta name="bxh-build" content="20260922.05">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.04";
+  var CURRENT_BUILD="20260922.05";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -735,6 +735,23 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
  .board-toolbar>.btn,.board-theme-select{width:100%;min-width:0;white-space:normal;}
  .board-zoom-group{grid-column:1/-1;justify-content:center;}
  .board-theme-select{grid-column:1/-1;}
+}
+
+/* ==== v14.0.8 referee ↔ bracket roundtrip ==== */
+.ref-bracket-roundtrip{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  margin:0 0 8px;
+}
+.ref-bracket-roundtrip-btn{
+  min-height:34px;
+  white-space:nowrap;
+}
+@media(max-width:640px){
+  .ref-bracket-roundtrip{justify-content:stretch;}
+  .ref-bracket-roundtrip-btn{width:100%;}
 }
 
 /* ==== v14.0.7 Challonge-density core ==== */
@@ -3582,9 +3599,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.7";
+const APP_VERSION = "v14.0.8";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.8",date:"2026/09/22",timezone:"Asia/Taipei",title:"裁判台／對戰表快速往返",updateLevel:"patch",added:["裁判台新增「← 對戰表」快速返回按鈕","對戰表新增「裁判台 →」快速前往按鈕"],changed:["官方賽事沿用既有 switch-tab 權限流程；玩家一般賽事沿用 community-switch-room-tab，不新增第二套路由"],fixed:["減少現場裁判在裁判台與對戰表之間需返回上層再切分頁的操作步驟"],environment:"Production / HTML + Firebase",deployStatus:"Frontend navigation patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；按鈕僅在原本具裁判台存取權限的管理／房主情境顯示",publicSummary:"裁判台與對戰表新增雙向快速切換，現場查表與判定可一鍵往返。"},
   {version:"v14.0.7",date:"2026/09/22",timezone:"Asia/Taipei",title:"Challonge 高密度樹狀圖改版",updateLevel:"minor",added:["樹狀圖新增左側種子／選手編號欄","BYE 輪空不再保留整格高度","以實際比賽最多輪次作為密度排列基準"],changed:["手機樹狀圖改為高密度卡片、極小輪次欄距與緊湊上方控制列","Round 標題改為扁平深灰欄，連線縮細並縮短","上方標題、工具列、狀態圖例與分享按鈕同步壓縮"],fixed:["改善 34/47 人進 64 籤時因大量 BYE 造成巨大垂直空洞","改善場次上下距離及輪次左右間距過大"],environment:"Production / HTML + Firebase",deployStatus:"Frontend UI overhaul",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"BXH ARENA 樹狀圖改為接近 Challonge 的高密度對戰表，場次更緊湊、玩家編號置於姓名左側。"},
   {version:"v14.0.6",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀對戰表密度優化",updateLevel:"patch",added:["手機樹狀看板改為單列可橫向滑動的緊湊工具列","參考 Challonge 縮短輪次欄距、卡片高度與第一輪垂直間距"],changed:["看板標題、狀態、圖例與控制列整體壓縮，讓樹狀圖更早進入可視區","手機看板可視高度提高，減少上方控制區占用"],fixed:["改善大尺寸賽程樹間距過大、50% 縮放仍浪費大量空間的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend UI density patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀對戰表改為更接近 Challonge 的緊湊密度，上方工具列與各輪間距明顯縮小。"},
   {version:"v14.0.5",date:"2026/09/22",timezone:"Asia/Taipei",title:"重設對戰表入口修復",updateLevel:"patch",added:["人員管理的對戰表區新增明確『重設對戰表』按鈕","重設只清除抽籤與對戰編排，保留玩家、報到與線上報名資料"],changed:["開賽前重設對戰表會解除舊版遺留的 rosterLocked，允許重新調整測試／正式名單"],fixed:["修正介面提示要求『先重設對戰表』但實際沒有提供重設入口的死路"],environment:"Production / HTML + Firebase",deployStatus:"Frontend hotfix",firebaseImpact:"重設後同步既有 tournament state，不新增欄位",securityRulesImpact:"無",permissionImpact:"沿用目前賽事操作權限；開賽後不可重設",publicSummary:"補回開賽前的重設對戰表入口，讓主辦可調整名單後重新抽籤。"},
@@ -10385,6 +10403,18 @@ function matchBoxHtml(m, headLabel){
   </div>`;
 }
 
+function refereeBracketRoundtripNav(targetTab){
+  const inCommunity=appPhase==="community-room";
+  if(inCommunity){
+    if(!isCommunityRoomOwner()) return "";
+  }else if(!hasAdminAccess()){
+    return "";
+  }
+  const action=inCommunity?"community-switch-room-tab":"switch-tab";
+  const toReferee=targetTab==="referee";
+  return `<div class="ref-bracket-roundtrip" aria-label="裁判台與對戰表快速切換"><button class="btn btn-ghost btn-sm ref-bracket-roundtrip-btn" data-action="${action}" data-tab="${targetTab}">${toReferee?"裁判台 →":"← 對戰表"}</button></div>`;
+}
+
 function renderBracket(){
   if(!state.bracketSize){
     return `<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請至「賽事設定」輸入選手名單後產生對戰表</div>
@@ -10393,14 +10423,15 @@ function renderBracket(){
   }
   const treeIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v16M5 7h5M5 17h5M10 7v4h5M10 17v-4h5"/><rect x="15" y="8.5" width="5" height="7" rx="1.2"/></svg>';
   const listIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>';
+  const quickNav = refereeBracketRoundtripNav("referee");
   const modeToggle = `<div class="bracket-view-toggle" role="group" aria-label="對戰表檢視模式">
     <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
     <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
   </div>`;
   if(bracketViewMode==="board"){
-    return modeToggle + renderBoardMode();
+    return quickNav + modeToggle + renderBoardMode();
   }
-  return modeToggle + matchLegendHtml() + renderTournamentMatchList();
+  return quickNav + modeToggle + matchLegendHtml() + renderTournamentMatchList();
 }
 
 function tournamentMatchListGroup(m, fmt){
@@ -11189,12 +11220,13 @@ function renderSkippedMatches(){
   return `<section class="panel"><div class="panel-title">待承接場次（${skipped.length}）</div><div class="hint">保留原比分。閒置台立即承接；忙碌台安排在目前比賽之後。未承接的場次依原台佇列接續；跳過時沒有其他可執行場次，則保留待承接。</div>${skipped.map(m=>`<div class="panel" style="margin-top:12px"><strong>${esc(matchLabel(m))}｜${esc(playerName(m.a.playerId))} vs ${esc(playerName(m.b.playerId))}</strong><div class="hint">台${Number(m.station)} · ${m.callPass?'PASS：同台兩場後回補':m.resumeQueuedAt?'已安排承接':'已跳過'}</div>${!m.resumeQueuedAt&&!m.callPass&&canOperateCurrentTournament()&&state.archiveStatus!=="completed"?`<div class="btn-row">${targets.map(i=>`<button class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${i}" ${courtQueueBusy?'disabled':''}>${isAdminTierOrAbove()?'指派':'承接'}至台${i}</button>`).join("")}</div>`:""}</div>`).join("")}</section>`;
 }
 function renderReferee(){
+  const quickNav = refereeBracketRoundtripNav("bracket");
   if(!state.bracketSize){
-    return `<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請先至「賽事設定」產生對戰表</div></div></div>`;
+    return quickNav+`<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請先至「賽事設定」產生對戰表</div></div></div>`;
   }
   const rm = refereeMatches();
   if(rm.length===0){
-    return `<div class="panel"><div class="empty-state">沒有需要裁判的對戰</div></div>`;
+    return quickNav+`<div class="panel"><div class="empty-state">沒有需要裁判的對戰</div></div>`;
   }
   // Dynamic court count — always driven by state.meta.stations, never
   // hardcoded. Rebuild defensively here too (idempotent) in case something
@@ -11212,7 +11244,7 @@ function renderReferee(){
     : (n===2
       ? "court-grid court-grid-2"
       : (n===4 ? "court-grid court-grid-many court-grid-4fit" : "court-grid court-grid-many"));
-  return `${renderRefereeScoringControls()}${renderSkippedMatches()}${jumpNav}<div class="${gridClass}">${cards}</div>`;
+  return `${quickNav}${renderRefereeScoringControls()}${renderSkippedMatches()}${jumpNav}<div class="${gridClass}">${cards}</div>`;
 }
 
 /* ==== tab: settings ==== */
