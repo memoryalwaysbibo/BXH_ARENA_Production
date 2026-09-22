@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.07">
+<meta name="bxh-build" content="20260923.08">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.07";
+  var CURRENT_BUILD="20260923.08";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2846,6 +2846,16 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   background:rgba(217,185,92,.14);color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold-dim);
 }
 
+
+/* ==== v14.0.32 BXH HUNTER PROFILE P1 framework ==== */
+.hunter-profile-shell{display:grid;gap:12px}.hunter-profile-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:4px 2px 0}.hunter-profile-title h2{margin:2px 0 0;font-family:var(--font-d);font-size:25px;line-height:1.1;color:var(--ivory)}.hunter-kicker{font:800 10px/1.2 var(--font-d);letter-spacing:2.2px;color:var(--gold-dim)}.hunter-profile-tabs{margin:0 0 2px}
+.hunter-license-card{border-color:rgba(217,185,92,.34);background:linear-gradient(135deg,rgba(217,185,92,.10),rgba(10,11,13,.94));overflow:hidden;position:relative}.hunter-license-card:after{content:"HUNTER";position:absolute;right:-8px;bottom:-20px;font:900 58px/1 var(--font-d);letter-spacing:4px;color:rgba(217,185,92,.035);pointer-events:none}.hunter-license-head,.hunter-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.hunter-license-head .panel-title,.hunter-section-head .panel-title{margin:3px 0 0}.hunter-license-main{display:grid;grid-template-columns:82px minmax(0,1fr);gap:15px;align-items:center;margin-top:14px}.hunter-license-avatar{width:82px;height:82px;border-radius:50%;display:grid;place-items:center;overflow:hidden;border:1px solid var(--gold-dim);background:rgba(217,185,92,.08);color:var(--gold);font:900 30px var(--font-d);box-shadow:0 0 0 4px rgba(217,185,92,.035)}.hunter-license-avatar img{width:100%;height:100%;object-fit:cover;display:block}.hunter-license-copy{min-width:0}.hunter-license-name{font:900 23px/1.15 var(--font-d);color:var(--ivory);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hunter-license-meta{margin-top:5px;font-size:11px;color:var(--metal)}.hunter-license-rank-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px}.hunter-license-rank-row>div{padding:9px 10px;border:1px solid rgba(217,185,92,.14);border-radius:9px;background:rgba(0,0,0,.18)}.hunter-license-rank-row span{display:block;font-size:9.5px;color:var(--metal-dim)}.hunter-license-rank-row strong{display:block;margin-top:2px;color:var(--gold);font:900 18px var(--font-d)}
+.hunter-framework-note{margin-top:12px;padding:10px 12px;border:1px dashed rgba(217,185,92,.20);border-radius:9px;background:rgba(217,185,92,.035);font-size:11px;line-height:1.55;color:var(--metal)}.hunter-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.hunter-stat-grid .stat-box{min-height:78px;padding:12px}.hunter-stat-grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}.hunter-ladder-bridge{border-color:rgba(120,155,210,.20)}
+.hunter-period-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 0 4px}.hunter-period-tabs .btn{min-height:36px;padding:6px}.hunter-period-tabs .btn:disabled,.hunter-record-filters .btn:disabled{opacity:.82;cursor:default}.hunter-radar-shell{padding:10px 0 2px}.hunter-radar-placeholder{position:relative;width:min(100%,420px);aspect-ratio:1/1;margin:0 auto}.hunter-radar-octagon{position:absolute;inset:19%;display:grid;place-items:center;clip-path:polygon(29% 0,71% 0,100% 29%,100% 71%,71% 100%,29% 100%,0 71%,0 29%);background:linear-gradient(135deg,rgba(217,185,92,.12),rgba(33,40,54,.38));box-shadow:inset 0 0 0 1px rgba(217,185,92,.22)}.hunter-radar-octagon:before,.hunter-radar-octagon:after{content:"";position:absolute;inset:14%;clip-path:inherit;box-shadow:inset 0 0 0 1px rgba(153,167,188,.20)}.hunter-radar-octagon:after{inset:29%}.hunter-radar-octagon span{position:relative;z-index:2;font:800 12px var(--font-d);color:var(--metal);letter-spacing:.7px}.hunter-radar-placeholder .axis{position:absolute;z-index:3;min-width:62px;text-align:center;font:800 11px/1.25 var(--font-d);color:var(--ivory)}.hunter-radar-placeholder .axis b{color:var(--gold);font-size:15px}.hunter-radar-placeholder .axis.loss,.hunter-radar-placeholder .axis.loss b{color:#ff6868}.axis-xtreme{top:1%;left:50%;transform:translateX(-50%)}.axis-knockout{top:17%;right:3%}.axis-burst{top:47%;right:-1%;transform:translateY(-50%)}.axis-spin{bottom:17%;right:3%}.axis-taken-xtreme{bottom:1%;left:50%;transform:translateX(-50%)}.axis-taken-knockout{bottom:17%;left:3%}.axis-taken-burst{top:47%;left:-1%;transform:translateY(-50%)}.axis-taken-spin{top:17%;left:3%}
+.hunter-score-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px}.hunter-loss-panel{border-color:rgba(255,86,86,.22)}.hunter-score-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.hunter-score-list>div{display:flex;justify-content:space-between;gap:12px;padding:10px 11px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:rgba(0,0,0,.16);font-size:12px}.hunter-score-list b{color:var(--gold)}.hunter-loss-panel .hunter-score-list span,.hunter-loss-panel .hunter-score-list b{color:#ff6868}.hunter-analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}.hunter-analysis-grid>div{padding:11px 12px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:rgba(0,0,0,.14)}.hunter-analysis-grid span{display:block;font-size:10px;color:var(--metal-dim);margin-bottom:4px}.hunter-analysis-grid strong{font-size:12px;color:var(--ivory)}
+.hunter-record-filters{display:grid;gap:10px;margin-top:14px}.hunter-filter-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.hunter-filter-group>span{width:38px;font:800 10px var(--font-d);color:var(--metal-dim)}.hunter-record-empty{margin-top:14px;padding:34px 18px;text-align:center;border:1px dashed rgba(217,185,92,.18);border-radius:12px;background:rgba(0,0,0,.14)}.hunter-record-empty strong{display:block;color:var(--ivory);font:800 16px var(--font-d)}.hunter-record-empty p{margin:7px 0 3px;color:var(--metal);font-size:12px}.hunter-record-empty small{color:var(--metal-dim);font-size:10px}
+@media(max-width:640px){.hunter-profile-title h2{font-size:22px}.hunter-license-main{grid-template-columns:68px minmax(0,1fr);gap:12px}.hunter-license-avatar{width:68px;height:68px;font-size:25px}.hunter-license-name{font-size:20px}.hunter-license-rank-row{gap:5px}.hunter-license-rank-row>div{padding:8px 6px}.hunter-license-rank-row span{font-size:8.5px}.hunter-license-rank-row strong{font-size:16px}.hunter-stat-grid,.hunter-stat-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}.hunter-score-panels{grid-template-columns:1fr}.hunter-period-tabs{gap:4px}.hunter-period-tabs .btn{font-size:10px;padding:5px 2px}.hunter-analysis-grid{grid-template-columns:1fr}.hunter-filter-group>span{width:100%}}
+
 .profile-primary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px;}
 .profile-primary-tabs .btn{min-height:44px;border-radius:11px;}
 .profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:0 0 14px;border:1px solid rgba(217,185,92,.15);border-radius:12px;background:rgba(255,255,255,.018);}
@@ -4222,9 +4232,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.31";
+const APP_VERSION = "v14.0.32";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.32",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P1 框架",updateLevel:"minor",added:["玩家主選單『我的戰績』升級為『獵人檔案』","獵人檔案新增二階頁籤：獵人總覽、能力分析、對戰紀錄","獵人總覽新增獵人執照、生涯數據框架與現有天梯資料橋接","能力分析預留生涯／本季／本月／本週／今日、八角能力圖、進攻得分、防守失分與分析結論","對戰紀錄預留一般／積分與時間篩選框架"],changed:["原一般對戰／積分對戰／歷史紀錄三分頁改為獵人檔案資訊架構","尚未接線資料改顯示『—／資料累積中／尚未載入』，避免誤判玩家沒有紀錄"],fixed:["移除歷史紀錄尚未實作時固定顯示無資料的誤導"],environment:"Production frontend feature branch",deployStatus:"P1 UI framework only; no Firestore schema or scoring changes",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"建立 BXH HUNTER PROFILE 獵人檔案第一階段框架；保留既有天梯資料，能力評價與 Match／Round 於後續階段接線。"},
+
   {version:"v14.0.31",date:"2026/09/23",timezone:"Asia/Taipei",title:"單列報到燈號／人員操作選單",updateLevel:"patch",added:["正取與待報到名單的報到狀態改為可直接點擊的燈號按鈕","每位選手新增 ⋯ 操作選單，移備取與刪除收進選單"],changed:["手機版每位選手壓成單一水平列：編號、姓名、報到狀態、操作選單","未報到顯示灰色熄燈；已報到顯示高亮亮燈","點未報到直接完成報到；再次點已報到會詢問是否取消報到","手機版來源標籤移出主列，改在 ⋯ 選單中顯示"],fixed:["大幅降低 50～100 人名單的垂直高度，避免報到頁需要長距離捲動"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact attendance roster UX",firebaseImpact:"無資料結構變更；沿用 players.checkedIn 與既有雲端同步",securityRulesImpact:"無",permissionImpact:"無；報到狀態仍受既有賽事操作與鎖定規則限制",publicSummary:"人員名單改成一人一列；點灰色未報到即可報到，已報到亮燈，再點一次會詢問是否取消；低頻操作收進 ⋯。"},
   {version:"v14.0.30",date:"2026/09/23",timezone:"Asia/Taipei",title:"手機人員名單操作區排版修正",updateLevel:"patch",added:[],changed:["手機版正取／待報到／備取名單改為卡片式表格排版","操作按鈕在手機版固定置於選手資料下方並平均分配寬度","『移至備取』按鈕文字縮短為『移備取』"],fixed:["修正手機窄螢幕操作欄被來源／報到欄擠壓，造成按鈕與文字重疊","避免已結束賽事停用按鈕在右側窄欄堆疊"],environment:"Production / HTML + Firebase",deployStatus:"Frontend responsive roster UI",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"人員管理在手機上改為更清楚的選手卡片排列，報到、移備取與刪除不再擠在右側。"},
   {version:"v14.0.29",date:"2026/09/23",timezone:"Asia/Taipei",title:"人員管理二階化／正備取原子聯動",updateLevel:"minor",added:["人員管理新增二階選單：正取、待報到、備取、新增／同步、工作人員、賽事編排","備取區可指定玩家升正取；正取選手可移至備取","正取已滿時可直接固定加開 8 名後升正取，加開次數不限","正備取異動加入伺服器讀回驗證，私人賽事、公開鏡像、報名文件與本場 roster 必須一致才顯示成功"],changed:["線上正備取異動改用同一 Firestore transaction，同步 capacity、confirmedCount、waitlistCount、registration 狀態、tournaments.data 與 publicTournaments.bracketView","線上選手刪除改走聯動取消，不再只從本機 roster 移除","人員管理長頁面改為一次只顯示一個二階區塊"],fixed:["避免人員管理名額已更新但賽事大廳、玩家報名狀態或其他管理裝置仍停在舊數字","避免正取轉備取後仍殘留在公開參賽 roster"],environment:"Production / HTML + Firebase",deployStatus:"Frontend roster control + atomic Firestore roster mutation",firebaseImpact:"沿用 tournaments/publicTournaments/registrations；私人 tournament state 新增 waitlistPlayers 僅保存現場／報到狀態陰影，不新增集合",securityRulesImpact:"無規則檔變更；沿用既有管理者賽事與報名 transaction 權限",permissionImpact:"僅既有賽事管理權限可異動；已產生對戰表或已開賽後鎖定",publicSummary:"人員管理改為精簡二階選單；正備取可以互轉，滿額時可每次加開 8 人，並同步所有賽事與報名畫面。"},
@@ -7710,7 +7722,7 @@ let lineWarningShown = false;
 
 /* ---------- player center Phase 2: real tabbed UI ---------- */
 let playerActiveTab = "home";
-let playerStatsSubTab = "general"; // 'home'|'find'|'registered'|'stats'|'profile'
+let playerStatsSubTab = "overview"; // hunter profile P1: overview | analysis | records
 let publicTournamentsCache = null; // null = not yet fetched this session
 let publicTournamentsError = null; // set when the query itself failed — takes priority over the empty-state message
 const PUBLIC_TOURNAMENTS_ERROR_MESSAGES = {
@@ -7903,7 +7915,7 @@ let findEventsFilters = { keyword:"", date:"", region:"", format:"all" };
 let findEventsExpanded = { ongoing:false, open:false, upcoming:false };
 let findEventsFiltersOpen = false;
 let lobbySectionExpanded = { live:null, settling:false, registration:false, waiting:false, ended:false };
-const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["raffles","會員抽獎"],["items","我的道具"],["stats","我的戰績"],["ladder","天梯排行"],["profile","會員資料"]];
+const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["raffles","會員抽獎"],["items","我的道具"],["stats","獵人檔案"],["ladder","天梯排行"],["profile","會員資料"]];
 let engagementSnapshot=null;
 let engagementSnapshotUid="";
 let engagementLoading=false;
@@ -15924,54 +15936,52 @@ function renderPlayerRegisteredTab(){
 }
 
 function renderPlayerStatsTab(p){
-  const tabs=[["general","一般對戰"],["ranked","積分對戰"],["history","歷史紀錄"]];
+  const tabs=[["overview","獵人總覽"],["analysis","能力分析"],["records","對戰紀錄"]];
+  const playerName=(p&&((p.displayName||"").trim()||(p.realName||"").trim()))||"玩家";
+  const playerId=(typeof playerDerivedId==="function")?playerDerivedId(p):"—";
+  const gameId=(typeof effectiveGameId==="function")?effectiveGameId(p):"";
+  const avatar=p&&p.avatarUrl?'<img src="'+esc(p.avatarUrl)+'" alt="'+esc(playerName)+'">':'<span>'+esc(playerName.slice(0,1)||"獵")+'</span>';
   let body="";
-
-  if(playerStatsSubTab==="general"){
-    body=`
-      <div class="panel">
-        <div class="panel-title">一般對戰</div>
-        <div class="settings-overview">
-          <div class="stat-box"><div class="label">參賽場次</div><div class="value small">—</div></div>
-          <div class="stat-box"><div class="label">勝場</div><div class="value small">—</div></div>
-          <div class="stat-box"><div class="label">敗場</div><div class="value small">—</div></div>
-          <div class="stat-box"><div class="label">勝率</div><div class="value small">—%</div></div>
-        </div>
-        <div class="empty-state">尚無一般對戰紀錄</div>
-      </div>`;
-  }else if(playerStatsSubTab==="ranked"){
+  if(playerStatsSubTab==="overview"){
     if(!myLadderProfileCache && !myLadderProfileLoading) setTimeout(()=>loadMyLadderProfile(false),0);
     if(!ladderPublicLoaded && !ladderPublicLoading) setTimeout(()=>loadLadderPublic(false),0);
     const l=myLadderProfileCache || defaultLadderProfile((firebaseUser&&firebaseUser.uid)||"",p.displayName||p.realName||"",(ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1");
     const rankedRows=rankLadderRows(ladderPublicData.players||[]);
     const myRow=rankedRows.find(x=>x.uid===(firebaseUser&&firebaseUser.uid));
-    const played=(Number(l.rankedWins||0)+Number(l.rankedLosses||0));
+    const played=Number(l.rankedWins||0)+Number(l.rankedLosses||0);
     const winRate=played?Math.round(Number(l.rankedWins||0)/played*100):0;
-    body=`
-      <div class="panel">
-        <div class="panel-title">積分對戰</div>
-        <div class="settings-overview">
-          <div class="stat-box"><div class="label">目前積分</div><div class="value small">${Number(l.seasonPoints||0)} PT</div></div>
-          <div class="stat-box"><div class="label">排名</div><div class="value small">${myRow?`NO.${myRow.__rank}`:"—"}</div></div>
-          <div class="stat-box"><div class="label">積分賽場次</div><div class="value small">${Number(l.totalEvents||0)}</div></div>
-          <div class="stat-box"><div class="label">勝率</div><div class="value small">${winRate}%</div></div>
-        </div>
-        <div class="hint">目前階級：${esc(ladderDisplayTier(l))}　生涯積分：${Number(l.careerPoints||0)} PT</div>
-      </div>`;
+    const careerLabels=["對戰場次","勝場","敗場","勝率","總得分","總失分","淨得失分","有效回合"];
+    body='<section class="panel hunter-license-card">'+
+      '<div class="hunter-license-head"><div><div class="hunter-kicker">BXH HUNTER LICENSE</div><div class="panel-title">獵人執照</div></div><span class="badge badge-metal">P1 框架</span></div>'+
+      '<div class="hunter-license-main"><div class="hunter-license-avatar">'+avatar+'</div><div class="hunter-license-copy"><div class="hunter-license-name">'+esc(playerName)+'</div>'+
+      '<div class="hunter-license-meta">'+(gameId?('遊戲 ID '+esc(gameId)+'　｜　'):'')+'玩家編號 '+esc(playerId)+'</div>'+
+      '<div class="hunter-license-rank-row"><div><span>獵人等級</span><strong>—</strong></div><div><span>綜合評分</span><strong>—</strong></div><div><span>有效回合</span><strong>—</strong></div></div></div></div>'+
+      '<div class="hunter-framework-note">獵人等級與能力評價將於 Match／Round 資料接線完成後啟用；目前不產生假數據。</div></section>'+
+      '<section class="panel"><div class="panel-title">生涯數據</div><div class="hunter-stat-grid">'+careerLabels.map(label=>'<div class="stat-box"><div class="label">'+label+'</div><div class="value small">—</div></div>').join('')+
+      '</div><div class="hunter-framework-note">P2／P3 完成後，由同一份 Match 原始資料自動產生，不再以空白歷史頁判定為「無紀錄」。</div></section>'+
+      '<section class="panel hunter-ladder-bridge"><div class="panel-title">現有天梯資料 <span class="badge badge-metal">既有資料</span></div><div class="hunter-stat-grid hunter-stat-grid-4">'+
+      '<div class="stat-box"><div class="label">目前積分</div><div class="value small">'+Number(l.seasonPoints||0)+' PT</div></div>'+
+      '<div class="stat-box"><div class="label">排名</div><div class="value small">'+(myRow?('NO.'+myRow.__rank):'—')+'</div></div>'+
+      '<div class="stat-box"><div class="label">積分賽場次</div><div class="value small">'+Number(l.totalEvents||0)+'</div></div>'+
+      '<div class="stat-box"><div class="label">積分勝率</div><div class="value small">'+winRate+'%</div></div></div>'+
+      '<div class="hint">目前天梯階級：'+esc(ladderDisplayTier(l))+'　｜　生涯積分：'+Number(l.careerPoints||0)+' PT　｜　此區不等同獵人能力評價。</div></section>';
+  }else if(playerStatsSubTab==="analysis"){
+    body='<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HUNTER ANALYSIS</div><div class="panel-title">能力分析</div></div><span class="badge badge-metal">資料框架</span></div>'+
+      '<div class="hunter-period-tabs">'+["生涯","本季","本月","本週","今日"].map((label,i)=>'<button class="btn '+(i===0?'btn-primary':'btn-ghost')+' btn-sm" disabled>'+label+'</button>').join('')+'</div>'+
+      '<div class="hunter-radar-shell"><div class="hunter-radar-placeholder"><span class="axis axis-xtreme">極限<br><b>—</b></span><span class="axis axis-knockout">擊飛<br><b>—</b></span><span class="axis axis-burst">爆裂<br><b>—</b></span><span class="axis axis-spin">轉停<br><b>—</b></span>'+
+      '<span class="axis loss axis-taken-xtreme">被極限<br><b>—</b></span><span class="axis loss axis-taken-knockout">被擊飛<br><b>—</b></span><span class="axis loss axis-taken-burst">被爆裂<br><b>—</b></span><span class="axis loss axis-taken-spin">被轉停<br><b>—</b></span>'+
+      '<div class="hunter-radar-octagon"><span>資料累積中</span></div></div></div></section>'+
+      '<div class="hunter-score-panels"><section class="panel"><div class="panel-title">進攻得分統計</div><div class="hunter-score-list"><div><span>極限</span><b>—</b></div><div><span>擊飛</span><b>—</b></div><div><span>爆裂</span><b>—</b></div><div><span>轉停</span><b>—</b></div></div></section>'+
+      '<section class="panel hunter-loss-panel"><div class="panel-title">防守失分統計</div><div class="hunter-score-list"><div><span>被極限</span><b>—</b></div><div><span>被擊飛</span><b>—</b></div><div><span>被爆裂</span><b>—</b></div><div><span>被轉停</span><b>—</b></div></div></section></div>'+
+      '<section class="panel"><div class="panel-title">分析結論</div><div class="hunter-analysis-grid"><div><span>主要優勢</span><strong>資料累積中</strong></div><div><span>次要優勢</span><strong>資料累積中</strong></div><div><span>主要弱點</span><strong>資料累積中</strong></div><div><span>戰型判定</span><strong>資料累積中</strong></div></div></section>';
   }else{
-    body=`
-      <div class="panel">
-        <div class="panel-title">歷史紀錄</div>
-        <div class="empty-state">尚無歷史賽事紀錄</div>
-      </div>`;
+    body='<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">MATCH RECORDS</div><div class="panel-title">對戰紀錄</div></div><span class="badge badge-metal">P3 接線</span></div>'+
+      '<div class="hunter-record-filters"><div class="hunter-filter-group"><span>類型</span><button class="btn btn-primary btn-sm" disabled>全部</button><button class="btn btn-ghost btn-sm" disabled>一般對戰</button><button class="btn btn-ghost btn-sm" disabled>積分對戰</button></div>'+
+      '<div class="hunter-filter-group"><span>期間</span><button class="btn btn-primary btn-sm" disabled>生涯</button><button class="btn btn-ghost btn-sm" disabled>本季</button><button class="btn btn-ghost btn-sm" disabled>本月</button><button class="btn btn-ghost btn-sm" disabled>本週</button><button class="btn btn-ghost btn-sm" disabled>今日</button></div></div>'+
+      '<div class="hunter-record-empty"><strong>尚未載入對戰紀錄</strong><p>此畫面已完成框架；P3 將接入實際 Match 紀錄與逐回合得分資料。</p><small>目前不再以「尚無歷史賽事紀錄」代表玩家沒有比賽資料。</small></div></section>';
   }
-
-  return `
-    <div class="player-stats-subtabs">
-      ${tabs.map(([key,label])=>`<button class="player-stats-subtab ${playerStatsSubTab===key?'active':''}" data-action="player-stats-subtab" data-tab="${key}">${label}</button>`).join("")}
-    </div>
-    ${body}
-  `;
+  return '<section class="hunter-profile-shell"><div class="hunter-profile-title"><div><div class="hunter-kicker">BXH HUNTER PROFILE</div><h2>獵人檔案</h2></div><span class="badge badge-metal">P1</span></div>'+
+    '<div class="player-stats-subtabs hunter-profile-tabs">'+tabs.map(([key,label])=>'<button class="player-stats-subtab '+(playerStatsSubTab===key?'active':'')+'" data-action="player-stats-subtab" data-tab="'+key+'">'+label+'</button>').join('')+'</div>'+body+'</section>';
 }
 
 function legacyGameIdFromProfile(p){
@@ -18680,7 +18690,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="player-stats-subtab"){
     const subTab = target.getAttribute("data-tab");
-    if(["general","ranked","history"].includes(subTab)){
+    if(["overview","analysis","records"].includes(subTab)){
       playerStatsSubTab = subTab;
       render();
     }
