@@ -63,5 +63,3 @@
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)activityTick();});
 })();
 
-// Ladder history sort controls (admin ladder / recent score records).
-import("./ladder-history-sort.js?v=20260922.1").catch(e=>console.warn("[ladder-history-sort]",e));
