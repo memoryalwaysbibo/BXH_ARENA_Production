@@ -10924,8 +10924,8 @@ function matchBoxHtml(m, headLabel){
   const aWin = m.completed && m.winnerId && m.a && m.winnerId===m.a.playerId;
   const bWin = m.completed && m.winnerId && m.b && m.winnerId===m.b.playerId;
   return `
-  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}" data-action="open-match" data-id="${m.id}">
-    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}</span><span>台${m.station}</span></div>
+  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" data-action="open-match" data-id="${m.id}">
+    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${courtSwapMatchBadge(m)}</span><span>台${m.station}</span></div>
     <div class="mb-row ${aWin?'winner':''}">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
     <div class="mb-row ${bWin?'winner':''}">${playerBracketRowHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
     ${matchStatusBarHtml(m)}
@@ -11049,9 +11049,9 @@ function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
   const aWin = m.completed && m.winnerId && m.a && m.winnerId===m.a.playerId;
   const bWin = m.completed && m.winnerId && m.b && m.winnerId===m.b.playerId;
   return `
-  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
+  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
     ${matchNo==null?'':`<span class="match-order-badge" aria-label="第 ${matchNo} 場">${matchNo}</span>`}
-    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}</span><span>台${m.station}</span></div>
+    <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${courtSwapMatchBadge(m)}</span><span>台${m.station}</span></div>
     <div class="mb-row ${aWin?'winner':''}" data-side="A">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
     <div class="mb-row ${bWin?'winner':''}" data-side="B">${playerBracketRowHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
     ${matchStatusBarHtml(m)}
