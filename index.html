@@ -6655,6 +6655,7 @@ function applyRemoteState(remote, authoritative=false){
     state = Object.assign(defaultState(remote.id), remote);
     state.cloudCode = keepCode;
     refereeAssignmentDraftEnabled = null;
+    if(courtSwapDraft){const swapSource=getMatch(courtSwapDraft.sourceMatchId);if(!swapSource||!canCourtSwapSource(swapSource))courtSwapDraft=null;}
     // Court assignments are a PURE, deterministic function of state.matches +
     // state.meta.stations — never trust whatever courtAssignments value
     // happened to be included in the transmitted blob (the device that wrote
