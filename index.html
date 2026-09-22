@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.04">
+<meta name="bxh-build" content="20260923.05">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.04";
+  var CURRENT_BUILD="20260923.05";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3816,6 +3816,55 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 .court-swap-badge{display:inline-block;margin-left:6px;padding:1px 5px;border-radius:7px;background:rgba(61,220,132,.14);color:var(--ok);font-size:9px;font-weight:800;letter-spacing:.3px;vertical-align:1px;}
 .court-swap-badge.source{background:rgba(217,185,92,.14);color:var(--gold);}
 @media(max-width:640px){.court-swap-selection-banner{align-items:flex-start;padding:8px 9px;gap:8px}.court-swap-selection-banner .btn{min-height:34px;padding:5px 8px;font-size:10.5px;white-space:nowrap}.match-box.court-swap-unavailable{opacity:.34}}
+
+/* ==== v14.0.29 people roster second-level navigation ==== */
+.people-subnav{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:7px;
+  margin:0 0 12px;
+}
+.people-subnav .btn{
+  min-height:42px;
+  padding:7px 8px;
+  border-radius:10px;
+  font-size:12px;
+  white-space:normal;
+  line-height:1.25;
+}
+.people-subnav .btn strong{display:block;font-size:13px;color:inherit;}
+.people-section-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.people-section-summary .hint{margin:0;}
+.people-roster-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.people-wait-rank{
+  display:inline-flex;
+  min-width:46px;
+  justify-content:center;
+  padding:3px 7px;
+  border:1px solid rgba(217,185,92,.38);
+  border-radius:999px;
+  color:var(--gold);
+  font:700 11px var(--font-d);
+}
+.people-capacity-banner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:12px;
+}
+@media(max-width:760px){
+  .people-subnav{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+  .people-roster-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;}
+  .people-roster-actions .btn{width:100%;}
+}
+
 </style>
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
 </head>
@@ -4019,9 +4068,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.28";
+const APP_VERSION = "v14.0.29";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.29",date:"2026/09/23",timezone:"Asia/Taipei",title:"人員管理二階化／正備取原子聯動",updateLevel:"minor",added:["人員管理新增二階選單：正取、待報到、備取、新增／同步、工作人員、賽事編排","備取區可指定玩家升正取；正取選手可移至備取","正取已滿時可直接固定加開 8 名後升正取，加開次數不限","正備取異動加入伺服器讀回驗證，私人賽事、公開鏡像、報名文件與本場 roster 必須一致才顯示成功"],changed:["線上正備取異動改用同一 Firestore transaction，同步 capacity、confirmedCount、waitlistCount、registration 狀態、tournaments.data 與 publicTournaments.bracketView","線上選手刪除改走聯動取消，不再只從本機 roster 移除","人員管理長頁面改為一次只顯示一個二階區塊"],fixed:["避免人員管理名額已更新但賽事大廳、玩家報名狀態或其他管理裝置仍停在舊數字","避免正取轉備取後仍殘留在公開參賽 roster"],environment:"Production / HTML + Firebase",deployStatus:"Frontend roster control + atomic Firestore roster mutation",firebaseImpact:"沿用 tournaments/publicTournaments/registrations；私人 tournament state 新增 waitlistPlayers 僅保存現場／報到狀態陰影，不新增集合",securityRulesImpact:"無規則檔變更；沿用既有管理者賽事與報名 transaction 權限",permissionImpact:"僅既有賽事管理權限可異動；已產生對戰表或已開賽後鎖定",publicSummary:"人員管理改為精簡二階選單；正備取可以互轉，滿額時可每次加開 8 人，並同步所有賽事與報名畫面。"},
   {version:"v14.0.28",date:"2026/09/23",timezone:"Asia/Taipei",title:"裁判工作站恢復／獨立台次推進／臨時換場",updateLevel:"minor",added:["裁判工作站本機恢復：切去錄影或 iOS 回收頁面後，重新載入可回到原賽事、原 Court 與目前場次","裁判台新增「申請換場」；可切到對戰表點選尚未開始且選手已確定的場次進行交換","換場使用既有 Firestore transaction 讀取最新賽事後再交換，避免多裁判同時操作時以舊畫面覆蓋新結果"],changed:["單淘汰多戰鬥台不再被整輪／tier 全域柵欄綁住；同一 Court 完成本台目前階段後，只要後續場次兩位選手已確定即可直接接續","換場會把目標場次調到目前 Court，原場次回到目標場次原本的 Court 佇列；不改正式場次編號"],fixed:["修正某一台已完成但必須等待其他 Court 同階段全部結束，才會出現下一場可執行賽事的僵化排程","避免裁判切相機錄影後若瀏覽器被系統回收，重新載入只能回到一般頁面而需重新找 Court"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee resilience + transactional court scheduling",firebaseImpact:"無新增集合；沿用 tournaments/publicTournaments 與既有 mutateMatchTransaction",securityRulesImpact:"無",permissionImpact:"不擴權；換場仍受既有賽事操作權及 Court 指派限制",publicSummary:"多 Court 可各自往前跑；選手臨時無法出賽時可從對戰表挑另一場換入，裁判切去錄影後也能恢復原工作站。"},
   {version:"v14.0.27",date:"2026/09/23",timezone:"Asia/Taipei",title:"結算參賽人數統計修正",updateLevel:"patch",added:[],changed:["進行中／結算中摘要與賽後中心統一使用正式參賽名單計數"],fixed:["修正報到資料實際存於 players.checkedIn，但摘要誤讀 registrations.checkinStatus 導致已報到顯示 0","修正取消／未報到玩家仍留於歷史 roster 時被 state.players.length 算入正式參賽人數；要求報到的賽事改以已報到玩家／實際對戰表參賽者為準"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement statistics",firebaseImpact:"無資料結構變更；既有賽事重新整理即可套用新統計",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"結算頁的已報到與正式參賽人數現在以實際參賽名單統計，取消或未報到者不再被誤算。"},
   {version:"v14.0.26",date:"2026/09/23",timezone:"Asia/Taipei",title:"賽事全分頁上下文列壓縮",updateLevel:"patch",added:["玩家／遊客進入賽事後，所有主分頁共用同一條精簡賽事上下文列","賽事狀態與房間代碼上移至主分頁上方，房間代碼維持整顆可點擊複製"],changed:["移除賽事內每個分頁重複的『玩家模式／遊客觀賽模式、V14、返回身分選擇』灰色資訊列","玩家唯讀提示改為精簡模式標籤；返回身分選擇移入右上帳號選單","公開觀賽／玩家唯讀的返回按鈕、賽事狀態、房間代碼整合在同一列"],fixed:["空的全域 context 容器不再保留 margin，真正釋出各分頁首屏垂直空間"],environment:"Production / HTML + Firebase",deployStatus:"Frontend shared tournament context UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事各分頁移除重複灰色模式區塊，狀態與房間代碼改放上方共用列，手機首屏更緊湊。"},
@@ -7962,7 +8012,7 @@ function isLineInAppBrowser(){
 const ADMIN_ONLY_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result",
   "draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
-  "toggle-checkin-btn","delete-player","set-checkin-required","unlock-roster",
+  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster",
   "clear-data","import-data","export-data","goto-settings",
   "archive-complete","save-pause","unarchive-current",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility",
@@ -7977,7 +8027,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
 const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "set-registration-draft-name-mode","set-registration-draft-target-group","set-registration-draft-visibility","community-save-settings","save-staff-assignment",
   "score","undo-score","rematch","confirm-result","draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
-  "toggle-checkin-btn","delete-player","set-checkin-required","unlock-roster","clear-data","import-data",
+  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle","set-ladder-mode"
@@ -12387,6 +12437,8 @@ function shuffledCopy(arr){
 }
 
 let entryUI={key:'',busy:false,preview:null,message:''};
+let peopleRosterSection="confirmed";
+let peopleRosterBusy=false;
 function entryContext(){const key=currentAuthUid()+':'+engagementSessionEpoch+':'+state.cloudCode;if(entryUI.key!==key)entryUI={key,busy:false,preview:null,message:''};return entryUI;}
 function entryRosterValid(){const e=state.entrySelection;if(!e)return true;if(e.status!=='drawn'||Number(e.vacancies||0)>0)return false;const ids=e.selected.map(x=>x.playerId).sort();return JSON.stringify(ids)===JSON.stringify(state.players.map(x=>String(x.id)).sort());}
 function renderEntrySelection(){
@@ -12418,123 +12470,216 @@ async function handleEntrySelection(action){
  finally{if(entryContext().key===key){c.busy=false;render();}}
 }
 
+
+function peopleRosterMutationLocked(){
+  return !!state.startedAt || !!state.bracketSize || state.archiveStatus==="completed";
+}
+function peopleRegistrationSelectionManaged(){
+  return !!(state.entrySelection && state.entrySelection.mode==="registration");
+}
+function peopleLocalWaitlist(){
+  if(!Array.isArray(state.waitlistPlayers)) state.waitlistPlayers=[];
+  return state.waitlistPlayers;
+}
+function peopleRegistrationIdOf(row){
+  return String((row&&row.registrationId)||(row&&row.id)||(row&&row.uid)||"");
+}
+function peopleOnlineWaitlistRows(){
+  const rows=Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[];
+  return rows.filter(r=>r&&r.status==="waitlist").sort((a,b)=>{
+    const ar=Number(a.waitRank||0),br=Number(b.waitRank||0);
+    if(ar&&br&&ar!==br)return ar-br;
+    return (normalizeDateTime(a.createdAt)||0)-(normalizeDateTime(b.createdAt)||0);
+  });
+}
+function peopleWaitlistShadow(registrationId){
+  return peopleLocalWaitlist().find(p=>String(p.registrationId||"")===String(registrationId||""))||null;
+}
+function peopleMutationErrorMessage(e){
+  const code=String((e&&e.code)||(e&&e.message)||"");
+  if(code.includes("selection-managed")) return "本場使用抽籤名額模式，請先在「參賽名額抽籤」完成名額調整。";
+  if(code.includes("bracket-locked")) return "已產生對戰表或賽事已開始；請先重設對戰表後再調整正備取。";
+  if(code.includes("not-waitlist")) return "這位玩家目前已不是備取，名單可能已被其他裝置更新。";
+  if(code.includes("not-confirmed")) return "這位玩家目前已不是正取，名單可能已被其他裝置更新。";
+  if(code.includes("roster-sync-mismatch")) return "雲端已收到操作，但讀回資料尚未完全一致；請重新整理名單確認。";
+  if(code.includes("permission-denied")) return "目前帳號沒有異動這場賽事名單的權限。";
+  return mapRegistrationError(e)||"名單更新失敗，請重新整理後再試。";
+}
+async function peopleApplyCloudRosterResult(result,successMessage){
+  if(result&&result.state){
+    const code=state.cloudCode;
+    state=Object.assign({},result.state,{cloudCode:code});
+    await saveRecord(state);
+  }
+  resetRegistrationFormDraft();
+  publicTournamentsCache=null;
+  myRegistrationsCache=null;
+  resetAdminRegistrationsCache();
+  cloudStatus="connected";
+  cloudLastSyncAt=Date.now();
+  peopleRosterBusy=false;
+  render();
+  showToast(successMessage);
+}
+async function peoplePromoteOnline(registrationId,name,expandBy=0){
+  if(peopleRosterBusy)return;
+  peopleRosterBusy=true;render();
+  try{
+    if(!window.cloudSync||!window.cloudSync.mutateRegistrationRoster)throw Object.assign(new Error("network"),{code:"network"});
+    const result=await window.cloudSync.mutateRegistrationRoster(state.cloudCode,registrationId,"promote",{expandBy});
+    const cap=Number(result.capacity||state.meta.registrationCapacity||0);
+    await peopleApplyCloudRosterResult(result,(expandBy===8?"已加開至 "+cap+" 人；":"")+name+" 已升為正取");
+  }catch(e){
+    peopleRosterBusy=false;
+    if(String(e&&e.code||e&&e.message||"").includes("capacity-full")&&expandBy!==8){
+      const cap=Number(e.capacity||state.meta.registrationCapacity||0);
+      openModal({
+        type:"generic",
+        title:"正取名額已滿",
+        message:"目前正取上限為 "+cap+" 人。\n\n是否增加 8 個名額，並將「"+name+"」升為正取？\n調整後上限："+(cap+8)+" 人。\n\n每次固定增加 8 人，可重複加開。",
+        confirmLabel:"增加 8 名並升正取",
+        onConfirm:()=>peoplePromoteOnline(registrationId,name,8)
+      });
+      render();
+      return;
+    }
+    showToast(peopleMutationErrorMessage(e),true);render();
+  }
+}
+async function peopleDemoteOnline(player){
+  if(peopleRosterBusy)return;
+  peopleRosterBusy=true;render();
+  try{
+    if(!window.cloudSync||!window.cloudSync.mutateRegistrationRoster)throw Object.assign(new Error("network"),{code:"network"});
+    const result=await window.cloudSync.mutateRegistrationRoster(state.cloudCode,player.registrationId,"demote",{});
+    await peopleApplyCloudRosterResult(result,"「"+player.name+"」已移至備取區");
+  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+}
+async function peopleCancelOnline(registrationId,name){
+  if(peopleRosterBusy)return;
+  peopleRosterBusy=true;render();
+  try{
+    if(!window.cloudSync||!window.cloudSync.mutateRegistrationRoster)throw Object.assign(new Error("network"),{code:"network"});
+    const result=await window.cloudSync.mutateRegistrationRoster(state.cloudCode,registrationId,"cancel",{});
+    await peopleApplyCloudRosterResult(result,"已取消「"+name+"」的參賽名額");
+  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+}
+async function peoplePromoteLocal(waitId,name,expandCapacity){
+  const list=peopleLocalWaitlist(),idx=list.findIndex(p=>String(p.id)===String(waitId));
+  if(idx<0)return;
+  const p=list[idx];
+  const cap=Number(state.meta.registrationCapacity||0);
+  if(cap>0&&state.players.length>=cap&&!expandCapacity){
+    openModal({
+      type:"generic",title:"正取名額已滿",
+      message:"目前正取上限為 "+cap+" 人。\n\n是否增加 8 個名額，並將「"+name+"」升為正取？\n調整後上限："+(cap+8)+" 人。\n\n每次固定增加 8 人，可重複加開。",
+      confirmLabel:"增加 8 名並升正取",
+      onConfirm:()=>peoplePromoteLocal(waitId,name,true)
+    });
+    return;
+  }
+  if(cap>0&&state.players.length>=cap&&expandCapacity)state.meta.registrationCapacity=cap+8;
+  list.splice(idx,1);
+  const restored=Object.assign({},p);
+  delete restored.waitRank;delete restored.waitlistedAt;
+  state.players.push(restored);
+  const synced=await saveState();
+  resetRegistrationFormDraft();publicTournamentsCache=null;
+  render();
+  showToast((expandCapacity?"已加開至 "+state.meta.registrationCapacity+" 人；":"")+name+" 已升為正取",synced===false);
+}
+
 function renderPeopleManagement(){
-  const online = !!(state.meta && state.meta.registrationEnabled);
-  // Check-in is an event rule, not an online-registration feature. On-site
-  // rosters must be pre-loadable and checkable even when online signup is off.
-  const needsCheckin = !!(state.meta && state.meta.checkinRequired);
-  const checkinClosed = !!state.meta.checkinClosedEarly;
-  const checked = state.players.filter(p=>p && p.checkedIn===true);
-  const pending = needsCheckin ? state.players.filter(p=>p && p.checkedIn!==true) : [];
-  const normalList = needsCheckin ? checked : state.players;
-  const row = (p,i, pendingRow)=>`
+  const online=!!(state.meta&&state.meta.registrationEnabled);
+  const needsCheckin=!!(state.meta&&state.meta.checkinRequired);
+  const checkinClosed=!!state.meta.checkinClosedEarly;
+  const locked=peopleRosterMutationLocked();
+  const selectionManaged=peopleRegistrationSelectionManaged();
+
+  if(online&&state.cloudCode&&adminRegistrationsCache===null&&!adminRegistrationsLoading){
+    setTimeout(()=>{ if(activeTab==="people"&&adminRegistrationsCache===null) handleAction("load-admin-registrations",{getAttribute:()=>null}); },0);
+  }
+
+  const confirmed=state.players||[];
+  const pending=needsCheckin?confirmed.filter(p=>p&&p.checkedIn!==true):[];
+  const onlineWait=peopleOnlineWaitlistRows();
+  const onlineIds=new Set(onlineWait.map(peopleRegistrationIdOf).filter(Boolean));
+  const localWait=peopleLocalWaitlist().filter(p=>!p.registrationId||!onlineIds.has(String(p.registrationId)));
+  const waitCount=onlineWait.length+localWait.length;
+  const capacity=Number((selectionManaged&&state.entrySelection&&state.entrySelection.capacity)||state.meta.registrationCapacity||0);
+
+  const navItems=[
+    ["confirmed","正取",confirmed.length],
+    ["pending","待報到",pending.length],
+    ["waitlist","備取",waitCount],
+    ["tools","新增／同步",null],
+    ["staff","工作人員",null],
+    ["bracket","賽事編排",null]
+  ];
+  const subnav='<div class="people-subnav">'+navItems.map(x=>'<button class="btn '+(peopleRosterSection===x[0]?'btn-primary':'btn-ghost')+'" data-action="people-section" data-section="'+x[0]+'"><strong>'+x[1]+'</strong>'+(x[2]!=null?'<span>'+x[2]+' 人</span>':'')+'</button>').join('')+'</div>';
+
+  const sourceBadge=p=>p.source==="online"
+    ?'<span class="badge badge-neon">線上報名</span>'
+    :(p.source==="test"?'<span class="badge badge-metal">測試名單</span>':'<span class="badge badge-metal">現場新增</span>');
+
+  const confirmedRow=(p,i)=>`
     <tr>
-      <td>${i+1}</td>
+      <td>${String(i+1).padStart(2,"0")}</td>
       <td class="rank-name">${esc(participantDisplayName(p))}</td>
-      <td>${p.source==="online"
-        ? '<span class="badge badge-neon">線上報名</span>'
-        : (p.source==="test"
-          ? '<span class="badge badge-metal">測試名單</span>'
-          : '<span class="badge badge-metal">現場新增</span>')}</td>
-      ${needsCheckin ? `<td><span class="badge ${p.checkedIn?'badge-neon':'badge-metal'}">${p.checkedIn?'已報到':'未報到'}</span></td>` : ''}
-      <td><div class="btn-row" style="gap:6px;">
-        ${needsCheckin && !pendingRow ? `<button class="btn btn-sm checkin-btn-done" data-action="toggle-checkin-btn" data-id="${p.id}">已報到</button>` : ''}
-        ${needsCheckin && pendingRow ? `<button class="btn btn-sm btn-primary" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinClosed?'disabled':''}>報到</button>` : ''}
-        <button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt?'disabled':''}>刪除</button>
+      <td>${sourceBadge(p)}</td>
+      ${needsCheckin?`<td><span class="badge ${p.checkedIn?'badge-neon':'badge-metal'}">${p.checkedIn?'已報到':'未報到'}</span></td>`:''}
+      <td><div class="people-roster-actions">
+        ${needsCheckin?`<button class="btn btn-sm ${p.checkedIn?'checkin-btn-done':'btn-primary'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinClosed&&!p.checkedIn?'disabled':''}>${p.checkedIn?'已報到':'報到'}</button>`:''}
+        <button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button>
+        <button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除</button>
       </div></td>
     </tr>`;
 
-  return `
-  
+  const confirmedPanel=`
+    <div class="panel">
+      <div class="people-section-summary"><div><div class="panel-title">正取選手（${confirmed.length}${capacity?" / "+capacity:""}）</div><p class="hint">正取與報到為兩個獨立狀態；移至備取後，既有報到狀態會保留供之後升回正取。</p></div></div>
+      ${selectionManaged?'<div class="banner warn"><span>本場使用抽籤名額模式；正備取異動請由「參賽名額抽籤」處理，避免破壞抽籤結果。</span></div>':''}
+      ${confirmed.length===0?'<div class="empty-state">目前沒有正取選手</div>':`<div class="table-scroll"><table class="rank-table"><thead><tr><th>#</th><th>姓名</th><th>來源</th>${needsCheckin?'<th>報到</th>':''}<th>操作</th></tr></thead><tbody>${confirmed.map(confirmedRow).join('')}</tbody></table></div>`}
+    </div>`;
 
-  ${online ? `<div class="panel">
-    <div class="panel-title">線上報名名單</div>
-    <p class="hint">開賽前可隨時同步最新正取名單；產生／刷新對戰表時也會自動重新同步。真正按下「賽事開始」後才鎖定參賽名單。</p>
-    <div class="btn-row">
-      <button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt?'disabled':''}>載入線上報名名單</button>
-      <button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>重新整理報名資料</button>
-    </div>
-  </div>` : ''}
+  const pendingPanel=`
+    <div class="panel" style="border-color:rgba(255,180,0,.35);">
+      <div class="panel-title">待報到（${pending.length}）</div>
+      <p class="hint">只列出正取但尚未完成現場報到的選手。</p>
+      ${!needsCheckin?'<div class="empty-state">本場設定為免報到</div>':pending.length===0?'<div class="empty-state">目前沒有待報到選手</div>':`<div class="table-scroll"><table class="rank-table"><thead><tr><th>#</th><th>姓名</th><th>來源</th><th>操作</th></tr></thead><tbody>${pending.map((p,i)=>`<tr><td>${String(i+1).padStart(2,"0")}</td><td class="rank-name">${esc(participantDisplayName(p))}</td><td>${sourceBadge(p)}</td><td><div class="people-roster-actions"><button class="btn btn-primary btn-sm" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinClosed?'disabled':''}>報到</button><button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除</button></div></td></tr>`).join('')}</tbody></table></div>`}
+    </div>`;
 
-  ${needsCheckin ? `<div class="panel">
-    <div class="panel-title">報到管理</div>
-    <div class="btn-row">
-      <button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button>
-    </div>
-    <p class="hint">工作人員確認玩家到場並完成繳費後，再按「報到」。提前結束後，未報到人員會保留在下方名單，但不會進入對戰表。</p>
-    ${checkinClosed ? `<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>` : ''}
-  </div>` : ''}
+  const waitOnlineRows=onlineWait.map((r,i)=>{
+    const regId=peopleRegistrationIdOf(r),shadow=peopleWaitlistShadow(regId);
+    const name=r.displayName||r.publicName||r.participantName||r.realName||"未命名選手";
+    const rank=Number(r.waitRank||0)||(i+1);
+    return `<tr><td><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name">${esc(name)}</td><td><span class="badge badge-neon">線上報名</span></td>${needsCheckin?`<td><span class="badge ${shadow&&shadow.checkedIn?'badge-neon':'badge-metal'}">${shadow&&shadow.checkedIn?'已報到':'未報到'}</span></td>`:''}<td><div class="people-roster-actions"><button class="btn btn-primary btn-sm" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消</button></div></td></tr>`;
+  }).join('');
+  const waitLocalRows=localWait.map((p,i)=>{
+    const rank=Number(p.waitRank||0)||(onlineWait.length+i+1);
+    return `<tr><td><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name">${esc(participantDisplayName(p))}</td><td>${sourceBadge(p)}</td>${needsCheckin?`<td><span class="badge ${p.checkedIn?'badge-neon':'badge-metal'}">${p.checkedIn?'已報到':'未報到'}</span></td>`:''}<td><div class="people-roster-actions"><button class="btn btn-primary btn-sm" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除</button></div></td></tr>`;
+  }).join('');
+  const waitlistPanel=`
+    <div class="panel">
+      <div class="people-capacity-banner"><div><div class="panel-title">備取區（${waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
+      ${selectionManaged?'<div class="banner warn"><span>本場為抽籤名額模式，請由「參賽名額抽籤」異動正備取。</span></div>':''}
+      ${adminRegistrationsLoading?'<div class="empty-state">正在同步線上備取名單……</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll"><table class="rank-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th>${needsCheckin?'<th>報到</th>':''}<th>操作</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
+    </div>`;
 
-  <details class="settings-accordion">
-    <summary><span>工作人員分派</span><span class="hint">進階</span></summary>
-    <div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div>
-  </details>
+  const toolsPanel=`
+    ${online?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">載入後會以雲端正取／備取狀態為權威來源，並保留本機已完成的報到狀態。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
+    ${needsCheckin?`<div class="panel"><div class="panel-title">報到管理</div><div class="btn-row"><button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button></div><p class="hint">提前結束後，未報到正取不會進入對戰表。</p>${checkinClosed?`<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>`:''}</div>`:''}
+    <div class="panel"><div class="panel-title">現場新增選手</div><div class="field"><label>每行一位</label><textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea><div class="hint">${needsCheckin?'新增後先列為正取／未報到，玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入正取。'}現場玩家不需系統帳號。</div></div><div class="btn-row"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至正取待報到':'新增至正取'}</button></div></div>
+    <div class="panel"><div class="panel-title">測試名單</div><div class="hint" style="margin-bottom:10px;">建立指定人數的測試選手；會取代目前正取名單。</div><div class="btn-row"><button class="btn btn-ghost" data-action="random-test-roster" data-count="8" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 8 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="16" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 16 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="32" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 32 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="64" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 64 位</button></div></div>`;
 
-  ${renderRefereeStationAssignmentPanel()}
+  const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
-  <div class="panel">
-    <div class="panel-title">參賽人員</div>
-    <div class="field">
-      <label>現場新增選手</label>
-      <textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea>
-      <div class="hint">每行一位。${needsCheckin?'新增後先列為「未報到」，可事先完成名單；玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入可編排名單。'}現場玩家不需系統帳號，會保留本場排名，但不寫入天梯、個人戰績或活躍積分。</div>
-    </div>
-    <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至待報到名單':'新增選手'}</button></div>
+  const bracketPanel=`
+    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">可編排選手</div><div class="value small">${eligiblePlayers().length}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||!entryRosterValid()?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    ${renderEntrySelection()}`;
 
-    <div class="test-roster-box">
-      <div class="panel-title" style="font-size:14px;margin-bottom:6px;">測試名單</div>
-      <div class="hint" style="margin-bottom:10px;">從內建 64 位實驗玩家中隨機抽選，直接建立指定人數的參賽名單。再次按其他人數時會重新亂數產生新的測試名單。</div>
-      <div class="btn-row">
-        <button class="btn btn-ghost" data-action="random-test-roster" data-count="8" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 8 位</button>
-        <button class="btn btn-ghost" data-action="random-test-roster" data-count="16" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 16 位</button>
-        <button class="btn btn-ghost" data-action="random-test-roster" data-count="32" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 32 位</button>
-        <button class="btn btn-ghost" data-action="random-test-roster" data-count="64" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 64 位</button>
-      </div>
-      ${state.bracketSize ? '<div class="hint" style="margin-top:8px;">已產生對戰表，請先重設對戰表後再更換測試名單。</div>' : ''}
-    </div>
-
-    ${normalList.length===0 ? '<div class="empty-state">目前尚無正式參賽人員</div>' : `<div class="table-scroll"><table class="rank-table"><thead><tr><th>編號</th><th>姓名</th><th>來源</th>${needsCheckin?'<th>報到</th>':''}<th>操作</th></tr></thead><tbody>${normalList.map((p,i)=>row(p,i,false)).join('')}</tbody></table></div>`}
-  </div>
-
-  ${needsCheckin ? `<div class="panel" style="border-color:rgba(255,180,0,.35);">
-    <div class="panel-title">未報到人員（${pending.length}）</div>
-    <p class="hint">所有未報到玩家集中顯示於此區，不與已報到玩家混排。</p>
-    ${pending.length===0 ? '<div class="empty-state">目前沒有未報到人員</div>' : `<div class="table-scroll"><table class="rank-table"><thead><tr><th>編號</th><th>姓名</th><th>來源</th><th>報到</th><th>操作</th></tr></thead><tbody>${pending.map((p,i)=>row(p,i,true)).join('')}</tbody></table></div>`}
-  </div>` : ''}
-
-  <div class="settings-section-head">
-    <span class="settings-section-num">✓</span>
-    <span class="settings-section-title">對戰編排與開始賽事</span>
-    <span class="settings-section-desc">確認名單後再產生對戰表</span>
-  </div>
-
-  ${renderEntrySelection()}
-  <div class="panel">
-    <div class="panel-title">對戰表</div>
-    <div class="grid grid-3" style="margin-bottom:14px;">
-      <div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div>
-      <div class="stat-box"><div class="label">可編排選手</div><div class="value small">${eligiblePlayers().length}</div></div>
-      <div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize ? "已產生" : "尚未產生"}</div></div>
-    </div>
-    <div class="btn-row">
-      <button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||!entryRosterValid()?'disabled':''}>${state.bracketSize ? "重新抽籤並產生對戰表" : "產生對戰表"}</button>
-      ${state.bracketSize && !state.startedAt ? `<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>` : ''}
-      ${state.bracketSize && !state.startedAt ? `<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>` : ''}
-      ${state.startedAt ? (()=>{
-        const ts=tournamentStatus();
-        if(ts==="settling"){
-          return `<span class="badge badge-metal">🟠 結算中</span>`;
-        }
-        if(ts==="done"){
-          return `<span class="badge badge-neon">⚪ 已結束</span>`;
-        }
-        if(ts==="cancelled") return `<span class="badge badge-danger">🔴 已取消</span>`;
-        return `<span class="badge badge-neon">🟡 比賽中</span>`;
-      })() : ''}
-    </div>
-  </div>
-
-  `;
+  const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
+  return subnav+(panels[peopleRosterSection]||confirmedPanel);
 }
 
 function renderSettings(){
@@ -18040,6 +18185,51 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
+  if(action==="people-section"){
+    const section=target.getAttribute("data-section");
+    if(["confirmed","pending","waitlist","tools","staff","bracket"].includes(section)){
+      peopleRosterSection=section;
+      renderPreservingScroll();
+    }
+    return;
+  }
+  if(action==="people-promote-waitlist"){
+    if(peopleRosterMutationLocked()){showToast("已產生對戰表或賽事已開始，請先重設對戰表後再調整名單",true);return;}
+    if(peopleRegistrationSelectionManaged()){showToast("抽籤名額模式請由「參賽名額抽籤」調整正備取",true);return;}
+    const regId=target.getAttribute("data-registration-id");
+    const localId=target.getAttribute("data-local-id");
+    const name=target.getAttribute("data-name")||"此玩家";
+    if(regId){peoplePromoteOnline(regId,name,0);return;}
+    if(localId){peoplePromoteLocal(localId,name,false);return;}
+    showToast("找不到備取資料，請重新整理",true);return;
+  }
+  if(action==="people-move-to-waitlist"){
+    if(peopleRosterMutationLocked()){showToast("已產生對戰表或賽事已開始，請先重設對戰表後再調整名單",true);return;}
+    if(peopleRegistrationSelectionManaged()){showToast("抽籤名額模式請由「參賽名額抽籤」調整正備取",true);return;}
+    const pid=target.getAttribute("data-id"),p=state.players.find(x=>x.id===pid);
+    if(!p)return;
+    openModal({type:"generic",title:"移至備取？",message:"將「"+p.name+"」由正取移至備取區。\n\n原本的報到狀態會保留；若之後升回正取，不需要重新報到。",confirmLabel:"移至備取",onConfirm:()=>{
+      if(p.source==="online"){
+        if(!p.registrationId){showToast("線上報名識別資料不足，請先同步最新名單",true);return;}
+        peopleDemoteOnline(p);
+        return;
+      }
+      const wait=peopleLocalWaitlist();
+      state.players=state.players.filter(x=>x.id!==pid);
+      wait.push(Object.assign({},p,{waitRank:wait.length+peopleOnlineWaitlistRows().length+1,waitlistedAt:Date.now()}));
+      saveState();render();showToast("「"+p.name+"」已移至備取區");
+    }});
+    return;
+  }
+  if(action==="people-delete-waitlist"){
+    if(state.startedAt){showToast("賽事開始後無法刪除備取",true);return;}
+    const regId=target.getAttribute("data-registration-id"),localId=target.getAttribute("data-local-id"),name=target.getAttribute("data-name")||"此玩家";
+    openModal({type:"generic",title:"取消備取？",message:"確定要將「"+name+"」從本場備取名單取消嗎？",danger:true,confirmLabel:"確認取消",onConfirm:()=>{
+      if(regId){peopleCancelOnline(regId,name);return;}
+      if(localId){state.waitlistPlayers=peopleLocalWaitlist().filter(p=>String(p.id)!==String(localId));saveState();render();showToast("已移除備取「"+name+"」");}
+    }});
+    return;
+  }
   if(action==="admin-promote-waitlist"){
     if(currentTournamentRegistrationLocked()){ showToast("賽事已開始，報名管理已鎖定",true); return; }
     if(adminRegistrationsBusy) return;
@@ -20265,7 +20455,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       openModal({ type:"generic", title:"無法刪除選手", message:"此選手已進入賽事編排，無法直接刪除。請先重設對戰表。", confirmLabel:"我知道了", onConfirm:()=>{} });
       return;
     }
-    openModal({ type:"generic", title:"刪除選手", message:"確定要刪除選手『"+p.name+"』嗎？\n刪除後將從本場賽事名單中移除，此操作無法復原。", danger:true, confirmLabel:"確認刪除", onConfirm:()=>{
+    openModal({ type:"generic", title:"刪除選手", message:"確定要刪除選手『"+p.name+"』嗎？\n刪除後將從本場賽事名單中移除。線上報名選手會同步取消報名，不會只刪本機名單。", danger:true, confirmLabel:"確認刪除", onConfirm:()=>{
+      if(p.source==="online"){
+        if(!p.registrationId){showToast("線上報名識別資料不足，請先同步最新名單",true);return;}
+        peopleCancelOnline(p.registrationId,p.name);
+        return;
+      }
       state.players = state.players.filter(x=>x.id!==pid);
       saveState(); render();
       showToast("已刪除選手「"+p.name+"」");
@@ -22621,6 +22816,132 @@ init();
       return result;
     },
 
+    async mutateRegistrationRoster(code,registrationId,action,options={}){
+      const staffUid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
+      if(!staffUid)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
+      if(!["promote","demote","cancel"].includes(action))throw Object.assign(new Error("invalid-action"),{code:"invalid-action"});
+      const eventCode=String(code||"").toUpperCase(),regId=String(registrationId||"");
+      if(!eventCode||!regId)throw Object.assign(new Error("not-found"),{code:"not-found"});
+      const expandBy=Number(options.expandBy||0);
+      if(expandBy!==0&&expandBy!==8)throw Object.assign(new Error("invalid-capacity-step"),{code:"invalid-capacity-step"});
+
+      const tourRef=fx.doc(dbHandle,"tournaments",eventCode);
+      const pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
+      const regRef=fx.doc(dbHandle,"tournaments",eventCode,"registrations",regId);
+
+      const txResult=await fx.runTransaction(dbHandle,async tx=>{
+        const tourSnap=await tx.get(tourRef);
+        const pubSnap=await tx.get(pubRef);
+        const regSnap=await tx.get(regRef);
+        if(!tourSnap.exists()||!pubSnap.exists()||!regSnap.exists())throw Object.assign(new Error("not-found"),{code:"not-found"});
+
+        const tour=tourSnap.data()||{},pub=pubSnap.data()||{},reg=Object.assign({registrationId:regId},regSnap.data()||{});
+        let runtime={};
+        try{runtime=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});}catch(e){throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});}
+        runtime.meta=runtime.meta||{};
+        if(tour.registrationSelection||pub.registrationSelection||(runtime.entrySelection&&runtime.entrySelection.mode==="registration"))throw Object.assign(new Error("selection-managed"),{code:"selection-managed"});
+        if(runtime.startedAt||runtime.bracketSize||["live","settling","done","cancelled"].includes(String(pub.tournamentPhase||"")))throw Object.assign(new Error("bracket-locked"),{code:"bracket-locked"});
+
+        let capacity=Math.max(0,Number(pub.capacity||tour.capacity||runtime.meta.registrationCapacity||0));
+        let confirmed=Math.max(0,Number(pub.confirmedCount??tour.confirmedCount??0));
+        let waiting=Math.max(0,Number(pub.waitlistCount??tour.waitlistCount??0));
+        const oldStatus=String(reg.status||"");
+        const players=Array.isArray(runtime.players)?runtime.players.slice():[];
+        const waitlist=Array.isArray(runtime.waitlistPlayers)?runtime.waitlistPlayers.slice():[];
+        const guardian=String(reg.guardianUid||reg.uid||"");
+        const participant=String(reg.registrationId||regId);
+        const familyId=reg.familyPlayerId?String(reg.familyPlayerId):"";
+        const matchesPlayer=p=>{
+          if(!p)return false;
+          if(String(p.registrationId||"")===participant)return true;
+          if(guardian&&String(p.registrationUid||p.guardianUid||"")===guardian){
+            if(familyId)return String(p.familyPlayerId||"")===familyId;
+            return !p.familyPlayerId;
+          }
+          return false;
+        };
+        const existing=players.find(matchesPlayer)||waitlist.find(matchesPlayer)||null;
+        const displayName=String(reg.displayName||reg.publicName||reg.participantName||reg.realName||(existing&&existing.name)||"").trim();
+        const makePlayer=()=>{
+          const p=Object.assign({},existing||{});
+          p.id=familyId?"family_"+familyId:(p.id||("reg_"+participant.replace(/[^A-Za-z0-9_-]/g,"_")));
+          p.name=displayName||p.name||"未命名選手";
+          p.source="online";
+          p.registrationUid=guardian||String(reg.uid||"");
+          p.registrationId=participant;
+          p.checkedIn=existing?existing.checkedIn===true:!runtime.meta.checkinRequired;
+          if(familyId){p.familyPlayerId=familyId;p.participantId=familyId;p.guardianUid=guardian;}
+          return p;
+        };
+
+        let nextConfirmed=confirmed,nextWaiting=waiting,newCapacity=capacity;
+        let nextPlayers=players.filter(p=>!matchesPlayer(p));
+        let nextWait=waitlist.filter(p=>!matchesPlayer(p));
+        let regPatch={updatedAt:fx.serverTimestamp()};
+
+        if(action==="promote"){
+          if(oldStatus!=="waitlist")throw Object.assign(new Error("not-waitlist"),{code:"not-waitlist"});
+          if(capacity>0&&confirmed>=capacity){
+            if(expandBy!==8)throw Object.assign(new Error("capacity-full"),{code:"capacity-full",capacity,confirmedCount:confirmed});
+            newCapacity=capacity+8;
+          }
+          nextConfirmed=confirmed+1;nextWaiting=Math.max(0,waiting-1);
+          nextPlayers.push(makePlayer());
+          regPatch=Object.assign(regPatch,{status:"confirmed",promotedAt:fx.serverTimestamp(),promotedBy:staffUid});
+        }else if(action==="demote"){
+          if(oldStatus!=="confirmed")throw Object.assign(new Error("not-confirmed"),{code:"not-confirmed"});
+          nextConfirmed=Math.max(0,confirmed-1);nextWaiting=waiting+1;
+          const wp=makePlayer();wp.waitRank=waiting+1;wp.waitlistedAt=Date.now();nextWait.push(wp);
+          regPatch=Object.assign(regPatch,{status:"waitlist",waitRank:waiting+1});
+        }else{
+          if(oldStatus!=="confirmed"&&oldStatus!=="waitlist")throw Object.assign(new Error("nothing-to-cancel"),{code:"nothing-to-cancel"});
+          if(oldStatus==="confirmed")nextConfirmed=Math.max(0,confirmed-1);else nextWaiting=Math.max(0,waiting-1);
+          regPatch=Object.assign(regPatch,{status:"cancelled",cancelledAt:fx.serverTimestamp(),cancelledBy:staffUid});
+        }
+
+        runtime.players=nextPlayers;
+        runtime.waitlistPlayers=nextWait;
+        runtime.meta.registrationCapacity=newCapacity;
+        let nextRegStatus=String(pub.registrationStatus||tour.registrationStatus||runtime.meta.registrationStatus||"open");
+        if(nextRegStatus==="full"&&(!newCapacity||nextConfirmed<newCapacity))nextRegStatus="open";
+        if(newCapacity>0&&nextConfirmed>=newCapacity)nextRegStatus="full";
+        runtime.meta.registrationStatus=nextRegStatus;
+
+        const common={
+          capacity:newCapacity,
+          confirmedCount:nextConfirmed,
+          waitlistCount:nextWaiting,
+          registrationStatus:nextRegStatus,
+          updatedAt:Date.now(),
+          lastRegistrationMutationUid:regId,
+          lastRegistrationMutationType:action+(newCapacity!==capacity?"_expand8":""),
+          lastRegistrationMutationBy:staffUid
+        };
+        tx.update(regRef,regPatch);
+        tx.update(tourRef,Object.assign({},common,{data:JSON.stringify(runtime)}));
+        tx.update(pubRef,Object.assign({},common,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime))}));
+        return {capacity:newCapacity,confirmedCount:nextConfirmed,waitlistCount:nextWaiting,status:action==="cancel"?"cancelled":action==="demote"?"waitlist":"confirmed"};
+      });
+
+      // Server round-trip verification: do not announce success until all authoritative
+      // surfaces agree with the transaction result.
+      const [tourSnap,pubSnap,regSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef),fx.getDoc(regRef)]);
+      if(!tourSnap.exists()||!pubSnap.exists()||!regSnap.exists())throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+      const tour=tourSnap.data()||{},pub=pubSnap.data()||{},reg=regSnap.data()||{};
+      let remoteState={};try{remoteState=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});}catch(e){}
+      const expectedStatus=txResult.status;
+      const stateCap=Number(remoteState&&remoteState.meta&&remoteState.meta.registrationCapacity||0);
+      const countsOk=Number(tour.confirmedCount||0)===Number(txResult.confirmedCount)&&Number(pub.confirmedCount||0)===Number(txResult.confirmedCount)&&Number(tour.waitlistCount||0)===Number(txResult.waitlistCount)&&Number(pub.waitlistCount||0)===Number(txResult.waitlistCount);
+      const capOk=Number(tour.capacity||0)===Number(txResult.capacity)&&Number(pub.capacity||0)===Number(txResult.capacity)&&stateCap===Number(txResult.capacity);
+      const statusOk=String(reg.status||"")===String(expectedStatus);
+      let publicRuntime={};try{publicRuntime=pub.bracketView?JSON.parse(pub.bracketView):{};}catch(e){}
+      const pubPlayerIds=new Set((publicRuntime.players||[]).map(p=>String(p.id||"")));
+      const privateCandidate=(remoteState.players||[]).find(p=>String(p.registrationId||"")===regId)||null;
+      const rosterOk=action==="promote"?!!privateCandidate&&(pubPlayerIds.has(String(privateCandidate.id||""))):!(remoteState.players||[]).some(p=>String(p.registrationId||"")===regId);
+      if(!countsOk||!capOk||!statusOk||!rosterOk)throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+      return Object.assign({ok:true,verified:true,state:remoteState,registrationId:regId},txResult);
+    },
+
     async promoteEarliestWaitlist(code){
       const staffUid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
       if(!staffUid) throw { code: "auth-required" };
@@ -23131,7 +23452,7 @@ init();
       const q = fx.collection(dbHandle, "tournaments", code, "registrations");
       const snap = await fx.getDocs(q);
       const results = [];
-      snap.forEach(docSnap => { results.push(docSnap.data()); });
+      snap.forEach(docSnap => { results.push(Object.assign({registrationId:docSnap.id},docSnap.data())); });
       return results;
     },
 
