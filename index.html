@@ -11749,14 +11749,15 @@ function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
   const busy = !!(pendingModal && pendingModal.type==="confirm-quick" && pendingModal.busy);
   const preStartLocked=!state.startedAt;
+  const stationLocked=!canOperateStation(stationNum);
   const warnBanner = m.completed ? `<div class="banner warn"><span>此對戰已完成判定，任何操作將修改已確認的結果，請謹慎操作。</span></div>` : (preStartLocked?`<div class="banner warn"><span>賽事尚未開始。請由主辦先按「開始賽事」，裁判台才會開放判定。</span></div>`:"");
   return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
     ${refereeWorkstationHeader(m,stationNum)}${warnBanner}${renderCourtCallReferee(m)}
-    <div class="ref-match-toolbar"><span>${matchStatusBarHtml(m, true)}</span><div class="msc-btns">${state.startedAt&&m.status==="in_progress"?`<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}">暫停</button>`:""}${state.startedAt&&m.status==="paused"?`<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}">恢復</button>`:""}${state.startedAt&&m.status!=="completed"?`<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}">跳過</button>`:""}</div></div>
+    <div class="ref-match-toolbar"><span>${matchStatusBarHtml(m, true)}</span><div class="msc-btns">${state.startedAt&&m.status==="in_progress"?`<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>暫停</button>`:""}${state.startedAt&&m.status==="paused"?`<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>恢復</button>`:""}${state.startedAt&&m.status!=="completed"?`<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${stationLocked?'disabled':''}>跳過</button>`:""}${refereeCourtSwapButton(m,stationNum,stationLocked)}</div></div>
     <div class="ref-vs-arena quick${refereeViewClass(m)}">
-      <button class="ref-player-side side-a" data-action="open-quick-confirm" data-id="${m.id}" data-winner="${esc(m.a.playerId)}" ${m.completed||busy||preStartLocked?'disabled':''}><span class="ref-player-label">選手 A</span><strong>${esc(aName)}</strong><span class="ref-win-call">判定獲勝</span></button>
+      <button class="ref-player-side side-a" data-action="open-quick-confirm" data-id="${m.id}" data-winner="${esc(m.a.playerId)}" ${m.completed||busy||preStartLocked||stationLocked?'disabled':''}><span class="ref-player-label">選手 A</span><strong>${esc(aName)}</strong><span class="ref-win-call">判定獲勝</span></button>
       ${refereeSwapControl(m)}
-      <button class="ref-player-side side-b" data-action="open-quick-confirm" data-id="${m.id}" data-winner="${esc(m.b.playerId)}" ${m.completed||busy||preStartLocked?'disabled':''}><span class="ref-player-label">選手 B</span><strong>${esc(bName)}</strong><span class="ref-win-call">判定獲勝</span></button>
+      <button class="ref-player-side side-b" data-action="open-quick-confirm" data-id="${m.id}" data-winner="${esc(m.b.playerId)}" ${m.completed||busy||preStartLocked||stationLocked?'disabled':''}><span class="ref-player-label">選手 B</span><strong>${esc(bName)}</strong><span class="ref-win-call">判定獲勝</span></button>
     </div>
     <div class="ref-next-box"><span>下一場</span>${nextMatchPreviewHtml(court, stationNum)}</div>
   </div>`;
@@ -11824,6 +11825,7 @@ function renderCourtCard(stationNum){
         ${state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>暫停比賽</button>` : ""}
         ${state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>恢復比賽</button>` : ""}
         ${state.startedAt&&m.status!=="completed" ? `<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${stationLocked?'disabled':''}>跳過</button>` : ""}
+        ${refereeCourtSwapButton(m,stationNum,stationLocked)}
       </div>
     </div>
     <div class="ref-vs-arena standard${refereeViewClass(m)}">
