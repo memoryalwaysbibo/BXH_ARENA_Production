@@ -42,7 +42,8 @@ mustInclude('const officialPlayers=eligiblePlayers();','Live summary must derive
 mustInclude('${state.meta.checkinRequired ? officialCount+"／" : ""}${officialCount}','Live check-in / participant summary must use officialCount');
 mustNot(/state\.registrations\.filter\(r=>r\.checkinStatus===["']checked["']\)\.length\+["']／["']/, 'Live summary must not read obsolete registration check-in status');
 mustInclude('const officialParticipantCount=tournamentEligiblePlayers(rec.players,rec.meta,rec.matches).length;','History summary must use official participant count');
-must(/const needsCheckin = !!\(state\.meta && state\.meta\.checkinRequired\);[\s\S]*?新增至待報到名單/, 'People management must expose pending check-in for on-site rosters');
+mustInclude('const pending=needsCheckin?confirmed.filter(p=>p&&p.checkedIn!==true):[];','People management must derive pending check-in from players.checkedIn');
+mustInclude('["pending","待報到",pending.length]','People management must expose pending check-in as its own section');
 mustInclude('id="registration-result-panel"','Registration success result panel missing');
 mustInclude('下一步｜現場繳費與報到','On-site payment/check-in guidance missing');
 mustNot(/state\.meta\.registrationEnabled\s*&&\s*state\.meta\.checkinRequired/, 'Check-in must not depend on online registration being enabled');
@@ -97,3 +98,11 @@ mustInclude('if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterS
 mustInclude('ladderLocationCity=normalizeTaiwanCityName(ladderCityFilter.value);','ladder city filter must update normalized city');
 mustInclude('ladderLocationRegion="";','ladder city change must reset district');
 console.log('PASS ladder city/district binding');
+mustInclude('const REFEREE_RESUME_KEY = "bxh_referee_workstation_resume_v1"','Referee workstation resume key missing');
+mustInclude('function restoreRefereeWorkstationView(uid,intent)','Referee workstation reload restore helper missing');
+mustInclude('const laterReady=available.filter(m=>!isInActiveSingleElimPhase(m,phase));','Independent per-court progression fallback missing');
+mustInclude('let courtSwapDraft = null','Court swap draft state missing');
+mustInclude('function applyCourtSwapMutation(remoteState,sourceId,targetId)','Transactional court swap mutation helper missing');
+mustInclude('data-action="court-swap-start"','Court swap action control missing');
+mustInclude('window.cloudSync.mutateMatchTransaction','Court swap must use authoritative tournament transaction');
+console.log('PASS referee resume / independent court progression / court swap guards');
