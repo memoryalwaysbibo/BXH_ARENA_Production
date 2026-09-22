@@ -10992,6 +10992,7 @@ function renderBracket(){
   const treeIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4v16M5 7h5M5 17h5M10 7v4h5M10 17v-4h5"/><rect x="15" y="8.5" width="5" height="7" rx="1.2"/></svg>';
   const listIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>';
   const quickNav = refereeBracketRoundtripNav("referee");
+  const swapBanner = renderCourtSwapSelectionBanner();
   const modeToggle = `<div class="bracket-view-toggle" role="group" aria-label="對戰表檢視模式">
     <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
     <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
@@ -11002,9 +11003,9 @@ function renderBracket(){
     : "";
   const topControls=`<div class="bracket-top-controls">${modeToggle}${refreshBtn}</div>`;
   if(bracketViewMode==="board"){
-    return quickNav + topControls + renderBoardMode();
+    return swapBanner + quickNav + topControls + renderBoardMode();
   }
-  return quickNav + topControls + matchLegendHtml() + renderTournamentMatchList();
+  return swapBanner + quickNav + topControls + matchLegendHtml() + renderTournamentMatchList();
 }
 
 function tournamentMatchListGroup(m, fmt){
