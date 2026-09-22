@@ -7668,7 +7668,9 @@ function renderPlayerTitleCenter(p){
   const format=p.titleDisplayFormat||"realname_nickname_title";
   const equippedDef=titleById(equipped);
   const preview=formatTitleDisplay(p.realName,effectiveGameId(p),equippedDef&&equippedDef.name,format,displayEnabled);
-  const options=earned.map(x=>{const def=titleById(x.titleId); return def&&def.isActive!==false?`<option value="${esc(x.titleId)}" ${equipped===x.titleId?'selected':''}>${esc(def.name)}｜${esc(titleRarityLabel(def.rarity))}</option>`:"";}).join("");
+  // A title being inactive/archived only stops future awards. Players who
+  // already earned it must keep the right to equip and display it.
+  const options=earned.map(x=>{const def=titleById(x.titleId); return def?`<option value="${esc(x.titleId)}" ${equipped===x.titleId?'selected':''}>${esc(def.name)}｜${esc(titleRarityLabel(def.rarity))}${def.isActive===false?'｜已停止發放':''}</option>`:"";}).join("");
   return `<section class="panel engagement-panel">
     <div class="engagement-head"><div><div class="engagement-kicker">BXH TITLES</div><div class="engagement-title">我的稱號</div><div class="hint">已取得 ${earned.length} 個；一次只能裝備一個，也可以完全不顯示。</div></div>${equippedDef?`<span class="title-chip rarity-${esc(equippedDef.rarity||'common')}">${esc(equippedDef.name)}</span>`:""}</div>
     <div class="title-setting-grid">
