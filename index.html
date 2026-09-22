@@ -6867,6 +6867,8 @@ async function cloudJoinRoomByCode(rawCode){
 // history/archives, never resets anything beyond THIS device's own session
 // state for the tournament it's currently viewing.
 function commitLeaveTournament(){
+  clearRefereeResumeRecord();
+  courtSwapDraft=null;
   leaveTournamentBusy = true; render();
   const leftName = state.meta.name || "此賽事";
   // 1. Stop this device's own real-time listener for the tournament being left.
@@ -16405,6 +16407,7 @@ function rememberAuthenticatedView(){
  if(!firebaseUser?.uid||!userProfile||userProfile.active!==true||guestReadOnlyMode)return;
  if(!['app','account-management','player-center','tournament-detail'].includes(appPhase))return;
  try{sessionStorage.setItem(AUTH_VIEW_KEY,JSON.stringify({uid:firebaseUser.uid,phase:appPhase,mode:activeMode,tab:activeTab,playerTab:playerActiveTab,profileSection:playerProfileSection,adminPage:superAdminManagementPage,cloudCode:state.cloudCode||'',detailCode:tournamentDetailCode||''}));}catch(e){}
+ if(appPhase==="app"&&activeTab==="referee") rememberRefereeWorkstation();
 }
 function restoreAuthenticatedView(uid,intent){
  if(authViewRestoreAttempted)return false;
@@ -21459,6 +21462,7 @@ async function init(){
                   }
 
                   if(restoreRaffleIntent()){render();return;}
+                  if(restoringSession && restoreRefereeWorkstationView(fbUser.uid,intent)){render();return;}
                   if(restoringSession && restoreAuthenticatedView(fbUser.uid,intent)){render();return;}
                   if(appPhase==="landing" || appPhase==="admin-login" || appPhase==="admin-setup" || appPhase==="admin-success" || appPhase==="player-login" || appPhase==="player-apply" || currentRole==="guest"){
                     if(intent==="admin"){
