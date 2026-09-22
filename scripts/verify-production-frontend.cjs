@@ -106,3 +106,13 @@ mustInclude('function applyCourtSwapMutation(remoteState,sourceId,targetId)','Tr
 mustInclude('data-action="court-swap-start"','Court swap action control missing');
 mustInclude('window.cloudSync.mutateMatchTransaction','Court swap must use authoritative tournament transaction');
 console.log('PASS referee resume / independent court progression / court swap guards');
+mustInclude('const HUNTER_ROUND_SCHEMA_VERSION = 1;','Hunter round schema version missing');
+mustInclude('const HUNTER_SCORING_VERSION = "bxh-4pt-v1";','Hunter scoring version missing');
+mustInclude('function createHunterRoundEvent(match,side,type,points,at)','Hunter round event factory missing');
+mustInclude('function validateHunterRoundLedger(match)','Hunter round ledger validation missing');
+mustInclude('function buildHunterMatchRecord(st,match)','Hunter canonical match record builder missing');
+mustInclude('function buildHunterTournamentMatchRecords(st)','Hunter tournament match record builder missing');
+mustInclude('reason:"round-ledger-mismatch"','Hunter round/score mismatch guard missing');
+mustInclude('analyzable:false,roundCount:0','Quick decision must be excluded from Hunter round analysis');
+console.log('PASS Hunter Profile P2 round-ledger core');
+
