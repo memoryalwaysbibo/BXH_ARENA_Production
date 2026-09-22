@@ -115,4 +115,16 @@ mustInclude('function buildHunterTournamentMatchRecords(st)','Hunter tournament 
 mustInclude('reason:"round-ledger-mismatch"','Hunter round/score mismatch guard missing');
 mustInclude('analyzable:false,roundCount:0','Quick decision must be excluded from Hunter round analysis');
 console.log('PASS Hunter Profile P2 round-ledger core');
+mustInclude('async queryMyHunterMatches(){','Hunter P3 player match query missing');
+mustInclude('function loadHunterProfile(force=false)','Hunter P3 loader missing');
+mustInclude('function hunterCareerSummary(records)','Hunter P3 career aggregation missing');
+mustInclude('data-action="hunter-record-filter"','Hunter P3 type filter missing');
+mustInclude('data-action="hunter-period-filter"','Hunter P3 period filter missing');
+mustInclude('playerStatsSubTab="overview";','Hunter profile must default to overview');
+mustInclude('resultMethod:m.resultMethod||null','Public bracket mirror must retain safe result method');
+mustInclude('scoreA:m.scoreA==null?null:Number(m.scoreA)','Quick decision score must remain null in public mirror');
+mustInclude('analyzable:!quickDecision&&ledger.ok&&ledger.roundCount>0','Zero-round quick decisions must not become analyzable');
+mustInclude('identityConfidence="legacy-unique-name"','Legacy identity fallback must require a unique in-event name');
+mustInclude('無法安全辨識的舊資料不會用名字強制併入','Hunter history must explain conservative legacy identity handling');
+console.log('PASS Hunter Profile P3 match-history linkage');
 
