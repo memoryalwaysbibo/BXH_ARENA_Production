@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.13">
+<meta name="bxh-build" content="20260922.14">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.13";
+  var CURRENT_BUILD="20260922.14";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2680,6 +2680,45 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   .test-ladder-body{padding:0 12px 12px;}
 }
 
+/* ==== v14.0.17 compact player / guest context HUD ==== */
+.viewer-context-hud{
+  justify-content:flex-start;
+}
+.viewer-mode-chip,
+.viewer-context-code{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:3px 9px;
+  border:1px solid var(--border-soft);
+  border-radius:8px;
+  background:rgba(255,255,255,.018);
+  color:var(--metal);
+  font-family:var(--font-d);
+  font-size:11.5px;
+  font-weight:700;
+  line-height:1;
+  white-space:nowrap;
+}
+.viewer-context-code{
+  color:var(--gold);
+  border-color:rgba(217,185,92,.28);
+  letter-spacing:1.2px;
+}
+@media(max-width:640px){
+  .viewer-context-hud{
+    min-height:34px;
+    gap:6px;
+    margin-bottom:8px;
+  }
+  .viewer-mode-chip,
+  .viewer-context-code{
+    min-height:26px;
+    padding:3px 7px;
+    font-size:10.5px;
+  }
+}
+
 /* ==== v14.0.10 compact admin context HUD ==== */
 .admin-context-hud{
   display:flex;
@@ -3802,9 +3841,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.16";
+const APP_VERSION = "v14.0.17";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.17",date:"2026/09/22",timezone:"Asia/Taipei",title:"玩家／遊客全域工具列同步精簡",updateLevel:"patch",added:[],changed:["玩家模式與遊客模式在公開觀賽／對戰表頁改用與管理員一致的精簡單列 HUD","移除玩家／遊客全域列的複製代碼、切換賽事、輸入代碼與重複雲端同步操作","正常狀態只保留模式、賽事狀態、賽事代碼；異常時才顯示警示"],fixed:["修正先前全域工具列優化僅套用管理員模式，玩家與遊客仍保留舊版大型工具列"],environment:"Production / HTML + Firebase",deployStatus:"Frontend shared viewer UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"玩家與遊客觀賽頁同步採用精簡全域資訊列，三種模式視覺邏輯一致。"},
   {version:"v14.0.16",date:"2026/09/22",timezone:"Asia/Taipei",title:"完整對戰表 PNG／相簿儲存流程",updateLevel:"patch",added:["匯出完整對戰表改為 PNG File 分享；支援裝置時直接開啟系統分享面板","iPhone 可由分享面板直接選『儲存影像』加入照片相簿","不支援檔案分享的瀏覽器自動退回 PNG 下載"],changed:["按鈕文字由『匯出完整對戰表』改為『儲存完整對戰表』"],fixed:["避免 iPhone 匯出後只能到檔案 Downloads 再手動搬移"],environment:"Production / HTML + Firebase",deployStatus:"Frontend export UX patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"完整對戰表仍輸出 PNG；iPhone 會優先開啟系統分享面板，可直接選儲存影像加入照片相簿。"},
   {version:"v14.0.15",date:"2026/09/22",timezone:"Asia/Taipei",title:"經典賽程樹連接線",updateLevel:"patch",added:[],changed:["樹狀圖改為標準 tournament bracket 連接方式：來源卡片中央出發、共用垂直主線、再由中央水平接入下一場中央","連接線統一淺灰白、直角、無勝方發光與無上下跳動"],fixed:["移除依 A/B 槽位或勝利者列產生的不規則毛毛蟲視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改成經典標準賽程樹樣式，與參考圖一致地從卡片中央規則連接。"},
   {version:"v14.0.14",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀圖連接線中線化／場次序號黑金化",updateLevel:"patch",added:[],changed:["樹狀圖往下一場的連接線固定從整個對戰卡垂直中點出發，不再從勝利者列出發","場次序號改為黑底、金字、金框並提高對比"],fixed:["改善勝方位於上／下列時連接線上下跳動造成的毛毛蟲感與不規則視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改由卡片中線出發，場次序號改黑金高對比，整體更整齊易讀。"},
@@ -16397,7 +16437,18 @@ function cloudStatusBarHtml(){
 
 function adminManagementContextHtml(){
   if(!hasAdminAccess()){
-    return statusBadge()+roleIndicatorHtml()+cloudStatusBarHtml();
+    const phase=statusBadge();
+    const modeLabel=currentRole==="guest"?"遊客觀賽":"玩家模式";
+    const code=state.cloudCode
+      ? `<span class="viewer-context-code">代碼 ${esc(state.cloudCode)}</span>`
+      : "";
+    let cloudAlert="";
+    if(cloudStatus==="error"){
+      cloudAlert=`<span class="admin-context-cloud-alert"><span class="cloud-dot-v2 red"></span>連線異常</span>`;
+    }else if(cloudAccessLimited){
+      cloudAlert=`<span class="admin-context-cloud-alert warn"><span class="cloud-dot-v2 yellow"></span>權限受限</span>`;
+    }
+    return `<div class="admin-context-hud viewer-context-hud"><span class="viewer-mode-chip">${modeLabel}</span>${phase}${code}${cloudAlert}</div>`;
   }
   const phase=statusBadge();
   const configured=(typeof window!=="undefined"&&window.cloudSync&&window.cloudSync.isConfigured&&window.cloudSync.isConfigured());
