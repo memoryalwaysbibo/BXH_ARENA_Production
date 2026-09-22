@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.11">
+<meta name="bxh-build" content="20260922.12">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.11";
+  var CURRENT_BUILD="20260922.12";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -1477,6 +1477,23 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
     min-width:18px;
     height:18px;
     font-size:8px;
+  }
+}
+
+/* ==== v14.0.15 classic bracket connectors ==== */
+.board-canvas .se-bracket-svg .se-path-classic,
+.se-bracket-svg .se-path-classic{
+  stroke:rgba(235,235,235,.72)!important;
+  stroke-width:1.35!important;
+  stroke-linecap:square!important;
+  stroke-linejoin:miter!important;
+  shape-rendering:geometricPrecision!important;
+  filter:none!important;
+}
+@media(max-width:640px){
+  .board-canvas .se-bracket-svg .se-path-classic,
+  .se-bracket-svg .se-path-classic{
+    stroke-width:1.25!important;
   }
 }
 
@@ -3785,9 +3802,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.14";
+const APP_VERSION = "v14.0.15";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.15",date:"2026/09/22",timezone:"Asia/Taipei",title:"經典賽程樹連接線",updateLevel:"patch",added:[],changed:["樹狀圖改為標準 tournament bracket 連接方式：來源卡片中央出發、共用垂直主線、再由中央水平接入下一場中央","連接線統一淺灰白、直角、無勝方發光與無上下跳動"],fixed:["移除依 A/B 槽位或勝利者列產生的不規則毛毛蟲視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改成經典標準賽程樹樣式，與參考圖一致地從卡片中央規則連接。"},
   {version:"v14.0.14",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀圖連接線中線化／場次序號黑金化",updateLevel:"patch",added:[],changed:["樹狀圖往下一場的連接線固定從整個對戰卡垂直中點出發，不再從勝利者列出發","場次序號改為黑底、金字、金框並提高對比"],fixed:["改善勝方位於上／下列時連接線上下跳動造成的毛毛蟲感與不規則視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改由卡片中線出發，場次序號改黑金高對比，整體更整齊易讀。"},
   {version:"v14.0.13",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀圖正式場次序號",updateLevel:"patch",added:["樹狀圖每一場正式比賽左側新增場次序號","場次序號沿用 displayMatchNumber 正式連號，可直接供未來叫號使用"],changed:["各輪左右間距小幅增加，新增專用序號 gutter","維持原本對戰卡寬度與 Challonge 高密度布局"],fixed:["避免高密度樹狀圖過度緊貼，無空間辨識第幾場比賽"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖每場比賽前方新增正式場次編號，並稍微增加輪次間距，方便現場直接用『第幾場』叫號。"},
   {version:"v14.0.12",date:"2026/09/22",timezone:"Asia/Taipei",title:"會員抽獎管理工具列重整",updateLevel:"patch",added:["會員抽獎管理新增獨立管理工具區，篩選與管理動作分組"],changed:["移除管理端大膠囊背景與自由換行按鈕排列","手機改為規則化 Grid：全部活動／我的活動一組，建立活動／重新整理／掃碼核銷一組","按鈕高度、圓角、邊框與字級統一"],fixed:["修正會員抽獎管理在手機上背景框變形、建立活動掉到第二列左側及按鈕高低不一"],environment:"Production / HTML + Firebase",deployStatus:"Frontend raffle management UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"會員抽獎管理工具列重新排版，手機版不再出現歪斜膠囊與亂跳按鈕。"},
@@ -11008,37 +11026,52 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
     const prevCol = outer.querySelector('.se-col[data-round="'+(r-1)+'"]');
     const curCol = outer.querySelector('.se-col[data-round="'+r+'"]');
     if(!prevCol || !curCol) continue;
-    const prevBoxes = Array.from(prevCol.querySelectorAll(".match-box")).sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index")));
-    const curBoxes = Array.from(curCol.querySelectorAll(".match-box")).sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index")));
+
+    const prevBoxes = Array.from(prevCol.querySelectorAll(".match-box"))
+      .sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index")));
+    const curBoxes = Array.from(curCol.querySelectorAll(".match-box"))
+      .sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index")));
+
     curBoxes.forEach((curBox, i)=>{
-      const sources = [prevBoxes[i*2], prevBoxes[i*2+1]];
-      sources.forEach((srcBox, sideIdx)=>{
-        if(!srcBox) return;
-        const matchId = srcBox.getAttribute("data-id");
-        const m = getMatch(matchId);
-        if(!m || m.isBye) return;
-        const srcRect = srcBox.getBoundingClientRect();
-        const startX = (srcRect.right - outerRect.left) / geometryScale;
-        const startY = (srcRect.top - outerRect.top + srcRect.height/2) / geometryScale;
-
-        const curRowEls = curBox.querySelectorAll(".mb-row");
-        const destRowEl = curRowEls[sideIdx];
-        if(!destRowEl) return;
-        const curRect = curBox.getBoundingClientRect();
-        const destRowRect = destRowEl.getBoundingClientRect();
-        const endX = (curRect.left - outerRect.left) / geometryScale;
-        const endY = (destRowRect.top - outerRect.top + destRowRect.height/2) / geometryScale;
-
-        const midX = (startX+endX)/2;
-        const isWinnerPath = !!(m.completed && m.winnerId);
-        const stroke = isWinnerPath ? "#e9ff2e" : "rgba(130,132,138,0.28)";
-        const glowAttr = isWinnerPath ? ' filter="url(#se-glow'+suffix+')"' : "";
-        const pathClass = isWinnerPath ? "se-path-won" : "se-path-pending";
-        paths += `<path class="${pathClass}" d="M ${startX} ${startY} H ${midX} V ${endY} H ${endX}" fill="none" stroke="${stroke}" stroke-width="2"${glowAttr}/>`;
+      const sourceBoxes=[prevBoxes[i*2],prevBoxes[i*2+1]].filter(Boolean).filter(box=>{
+        const m=getMatch(box.getAttribute("data-id"));
+        return !!(m && !m.isBye);
       });
+      if(!sourceBoxes.length) return;
+
+      const curRect=curBox.getBoundingClientRect();
+      const endX=(curRect.left-outerRect.left)/geometryScale;
+      const targetY=(curRect.top-outerRect.top+curRect.height/2)/geometryScale;
+      const sourcePoints=sourceBoxes.map(srcBox=>{
+        const rect=srcBox.getBoundingClientRect();
+        return {
+          x:(rect.right-outerRect.left)/geometryScale,
+          y:(rect.top-outerRect.top+rect.height/2)/geometryScale
+        };
+      });
+      const furthestStartX=Math.max(...sourcePoints.map(p=>p.x));
+      const joinX=furthestStartX + Math.max(8,(endX-furthestStartX)*0.5);
+      const stroke="rgba(235,235,235,0.72)";
+      const cls="se-path-classic";
+
+      // Each source leaves from the card's exact vertical center.
+      sourcePoints.forEach(p=>{
+        paths += `<path class="${cls}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
+      });
+
+      // One shared vertical spine, Challonge-style.
+      const ys=sourcePoints.map(p=>p.y);
+      const minY=Math.min(...ys,targetY);
+      const maxY=Math.max(...ys,targetY);
+      if(maxY>minY){
+        paths += `<path class="${cls}" d="M ${joinX} ${minY} V ${maxY}" fill="none" stroke="${stroke}"/>`;
+      }
+
+      // One clean horizontal branch into the center of the next match.
+      paths += `<path class="${cls}" d="M ${joinX} ${targetY} H ${endX}" fill="none" stroke="${stroke}"/>`;
     });
   }
-  svg.innerHTML = '<defs><filter id="se-glow'+suffix+'" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' + paths;
+  svg.innerHTML = paths;
 }
 
 let __seRelayoutQueued = false;
