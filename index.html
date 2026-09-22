@@ -17952,6 +17952,9 @@ function handleAction(action, target){
 
   if(action.startsWith("account-batch-")){handleAccountBatch(action,target);return;}
   const id = target.getAttribute("data-id");
+  if(id&&activeTab==="referee"&&["score","undo-score","rematch","confirm-result","open-quick-confirm","pause-match-status","resume-match-status","skip-match","court-swap-start"].includes(action)){
+    state.currentMatchId=id;rememberRefereeWorkstation();
+  }
   if(action.startsWith("ops-")){handleTournamentOperationsAction(action,target);return;}
   // Tester accounts may operate their own TEST sandbox and their own player-
 // hosted general room. The latter is still a general/community room, so it
@@ -20295,13 +20298,40 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="jump-to-court"){
     const n = target.getAttribute("data-court");
+    const court=state.courtAssignments&&state.courtAssignments[courtKey(Number(n))];
+    if(court&&court.currentMatchId) state.currentMatchId=court.currentMatchId;
+    rememberRefereeWorkstation();
     const el = document.getElementById("court-card-"+n);
     if(el && el.scrollIntoView){ el.scrollIntoView({ behavior:"smooth", block:"start" }); }
     return;
   }
+  if(action==="court-swap-start"){
+    const source=getMatch(id);
+    const station=Number(target.getAttribute("data-station")||(source&&source.station)||0);
+    if(!source||!canCourtSwapSource(source)){showToast("此場已有比分、已完成或目前狀態不允許換場",true);return;}
+    if(!canOperateStation(station)){showToast("你目前沒有此 Court 的換場權限",true);return;}
+    if(state.cloudCode&&(!cloudAvailable()||cloudStatus!=="connected")){showToast(courtSwapErrorMessage("cloud-unavailable"),true);return;}
+    courtSwapDraft={sourceMatchId:source.id,sourceStation:station,createdAt:Date.now()};
+    state.currentMatchId=source.id;
+    if(appPhase==="community-room") communityRoomActiveTab="bracket"; else activeTab="bracket";
+    render();showToast("請在對戰表點選要交換進 Court "+station+" 的場次");return;
+  }
+  if(action==="court-swap-cancel"){
+    const source=courtSwapDraft&&getMatch(courtSwapDraft.sourceMatchId);
+    courtSwapDraft=null;if(source)state.currentMatchId=source.id;
+    if(appPhase==="community-room") communityRoomActiveTab="referee"; else activeTab="referee";
+    render();return;
+  }
   if(action==="open-match"){
     const m = getMatch(id);
-    if(m.isBye) return;
+    if(!m||m.isBye) return;
+    if(courtSwapDraft){
+      const source=getMatch(courtSwapDraft.sourceMatchId);
+      if(!canCourtSwapTarget(m,source)){showToast("只能選擇尚未開始、選手已確定且沒有比分的場次",true);return;}
+      const sourceLabel=source?displayMatchLabel(source):"原場次",targetLabel=displayMatchLabel(m);
+      openModal({type:"generic",title:"確認臨時換場",message:targetLabel+" 將移到 Court "+courtSwapDraft.sourceStation+" 立即接替；"+sourceLabel+" 會回到對方原本的 Court 佇列。正式場次編號不會改變。確定交換？",confirmLabel:"確認交換",onConfirm:()=>{executeCourtSwap(m.id);}});
+      return;
+    }
     state.currentMatchId = id; activeTab="referee"; render(); return;
   }
   if(action==="print-bracket"){
