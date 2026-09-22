@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.02">
+<meta name="bxh-build" content="20260923.03">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.02";
+  var CURRENT_BUILD="20260923.03";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4002,9 +4002,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.26";
+const APP_VERSION = "v14.0.27";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.27",date:"2026/09/23",timezone:"Asia/Taipei",title:"結算參賽人數統計修正",updateLevel:"patch",added:[],changed:["進行中／結算中摘要與賽後中心統一使用正式參賽名單計數"],fixed:["修正報到資料實際存於 players.checkedIn，但摘要誤讀 registrations.checkinStatus 導致已報到顯示 0","修正取消／未報到玩家仍留於歷史 roster 時被 state.players.length 算入正式參賽人數；要求報到的賽事改以已報到玩家／實際對戰表參賽者為準"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement statistics",firebaseImpact:"無資料結構變更；既有賽事重新整理即可套用新統計",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"結算頁的已報到與正式參賽人數現在以實際參賽名單統計，取消或未報到者不再被誤算。"},
   {version:"v14.0.26",date:"2026/09/23",timezone:"Asia/Taipei",title:"賽事全分頁上下文列壓縮",updateLevel:"patch",added:["玩家／遊客進入賽事後，所有主分頁共用同一條精簡賽事上下文列","賽事狀態與房間代碼上移至主分頁上方，房間代碼維持整顆可點擊複製"],changed:["移除賽事內每個分頁重複的『玩家模式／遊客觀賽模式、V14、返回身分選擇』灰色資訊列","玩家唯讀提示改為精簡模式標籤；返回身分選擇移入右上帳號選單","公開觀賽／玩家唯讀的返回按鈕、賽事狀態、房間代碼整合在同一列"],fixed:["空的全域 context 容器不再保留 margin，真正釋出各分頁首屏垂直空間"],environment:"Production / HTML + Firebase",deployStatus:"Frontend shared tournament context UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事各分頁移除重複灰色模式區塊，狀態與房間代碼改放上方共用列，手機首屏更緊湊。"},
   {version:"v14.0.25",date:"2026/09/23",timezone:"Asia/Taipei",title:"公開觀賽工具列精簡／對戰表手動刷新",updateLevel:"patch",added:["公開觀賽對戰表新增手動刷新鍵，可直接重新讀取目前賽事的雲端資料"],changed:["公開瀏覽模式的中間工具列改為與管理者相同的精簡 HUD；正常連線時不再重複顯示『雲端已同步』","賽事代碼改為可直接點擊複製，移除獨立『複製代碼』與『切換賽事』按鈕；切換賽事沿用既有返回賽事大廳／身分入口"],fixed:["提供即時監聽未及更新時的手動重新讀取入口，刷新時直接向 Firestore 取得目前賽事最新資料並以權威狀態套用"],environment:"Production / HTML + Firebase",deployStatus:"Frontend public watch UX + manual refresh fallback",firebaseImpact:"無資料結構變更；刷新僅重新讀取既有 tournaments/publicTournaments 文件",securityRulesImpact:"無",permissionImpact:"無新增權限；公開觀賽仍只讀 publicTournaments",publicSummary:"公開觀賽介面更精簡；對戰表新增刷新鍵，遇到畫面未即時更新時可手動抓取最新賽況。"},
   {version:"v14.0.24",date:"2026/09/22",timezone:"Asia/Taipei",title:"本人／兒童雙軌報名入口",updateLevel:"patch",added:["一般公開賽事新增獨立本人報名與兒童報名入口","本人已報名後仍可繼續替家庭選手報名"],changed:["賽事詳細頁改讀取同帳號的所有有效家庭報名","兒童報名只列出尚未報名的家庭選手"],fixed:["修正本人報名後報名入口被取消按鈕取代，導致同帳號無法再替孩子報名"],environment:"Production / HTML + Firebase",deployStatus:"Frontend family registration UX",firebaseImpact:"無資料結構變更；沿用既有 familyRegistration callable",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"同一帳號可分別替本人與孩子報名同一場賽事；本人已報名後兒童報名入口仍會保留。"},
@@ -9287,9 +9288,26 @@ function checkCanChangeStationCount(newCount){
 /* ======================================================================
    FORMAT 1: SINGLE ELIMINATION (existing, unchanged logic)
    ====================================================================== */
+function tournamentEligiblePlayers(players,meta,matches){
+  const list=Array.isArray(players)?players.filter(Boolean):[];
+  const needsCheckin=!!(meta&&meta.checkinRequired);
+  if(!needsCheckin) return list;
+
+  const checked=list.filter(p=>p.checkedIn===true);
+  if(checked.length || !Array.isArray(matches) || !matches.length) return checked;
+
+  // Historical/legacy fallback: once a check-in-required bracket exists, the
+  // bracket itself is authoritative for who actually entered the tournament.
+  const bracketIds=new Set();
+  matches.forEach(m=>{
+    if(m&&m.a&&m.a.playerId) bracketIds.add(m.a.playerId);
+    if(m&&m.b&&m.b.playerId) bracketIds.add(m.b.playerId);
+  });
+  return bracketIds.size ? list.filter(p=>bracketIds.has(p.id)) : checked;
+}
+
 function eligiblePlayers(){
-  const needsCheckin = !!(state.meta && state.meta.checkinRequired);
-  return state.players.filter(p => p && (!needsCheckin || p.checkedIn === true));
+  return tournamentEligiblePlayers(state.players,state.meta,state.matches);
 }
 
 function isPlayerInBracket(playerId){
@@ -10688,6 +10706,8 @@ function renderLive(){
   const predictedTotal = realMatches.length;
   const doneCount = realMatches.filter(m=>m.completed).length;
   const pct = predictedTotal ? Math.round(doneCount/predictedTotal*100) : 0;
+  const officialPlayers=eligiblePlayers();
+  const officialCount=officialPlayers.length;
 
   const stationCount=Math.max(1,Number(state.meta.stations)||1);
   const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1)).join("");
@@ -10736,7 +10756,7 @@ function renderLive(){
     <div class="grid grid-4">
       <div class="stat-box"><div class="label">活動日期</div><div class="value small">${esc(state.meta.date||"未設定")}</div></div>
       <div class="stat-box"><div class="label">活動地點</div><div class="value small">${esc(state.meta.location||"未設定")}</div></div>
-      <div class="stat-box"><div class="label">${state.meta.checkinRequired ? "已報到／正式參賽人數" : "本場免報到／正式參賽人數"}</div><div class="value">${state.meta.checkinRequired ? state.registrations.filter(r=>r.checkinStatus==="checked").length+"／" : ""}${state.players.length}</div></div>
+      <div class="stat-box"><div class="label">${state.meta.checkinRequired ? "已報到／正式參賽人數" : "本場免報到／正式參賽人數"}</div><div class="value">${state.meta.checkinRequired ? officialCount+"／" : ""}${officialCount}</div></div>
       <div class="stat-box"><div class="label">賽事完成率</div><div class="value">${pct}%</div></div>
     </div>
     <div class="grid grid-3" style="margin-top:12px;">
@@ -16150,6 +16170,7 @@ function renderHistoryDetail(rec){
   const completedMatches=realMatches.filter(m=>m.completed);
   const doneCount = completedMatches.length;
   const pct = realMatches.length ? Math.round(doneCount/realMatches.length*100) : 0;
+  const officialParticipantCount=tournamentEligiblePlayers(rec.players,rec.meta,rec.matches).length;
   const startedAt=Number(rec.startedAt||0), completedAt=Number(rec.completedAt||rec.archivedAt||0);
   const durationMin=(startedAt&&completedAt&&completedAt>=startedAt)?Math.round((completedAt-startedAt)/60000):null;
   const matchDurations=completedMatches.map(m=>Number(m.completedAt||0)-Number(m.startedAt||0)).filter(x=>x>0);
@@ -16171,7 +16192,7 @@ function renderHistoryDetail(rec){
     ${rec.testLadderSettlementNote?`<p role="status">${esc(rec.testLadderSettlementNote)}</p>`:""}
     <div class="hint">已完成賽事的結果、對戰表、逐場判決與參賽資料集中於此查閱。</div>
     <div class="grid grid-4" style="margin-top:14px;"><div class="stat-box"><div class="label">日期</div><div class="value small">${esc(rec.meta.date||"—")}</div></div><div class="stat-box"><div class="label">地點</div><div class="value small">${esc(rec.meta.location||"—")}</div></div><div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(FORMAT_LABELS[fmt]||"")}</div></div><div class="stat-box"><div class="label">狀態</div><div class="value small">${esc(ARCHIVE_LABELS[rec.archiveStatus]||rec.archiveStatus)}</div></div></div>
-    <div class="grid grid-4" style="margin-top:12px;"><div class="stat-box"><div class="label">參賽人數</div><div class="value">${(rec.players||[]).length}</div></div><div class="stat-box"><div class="label">完成場次</div><div class="value">${doneCount} / ${realMatches.length}</div></div><div class="stat-box"><div class="label">賽事耗時</div><div class="value small">${durationMin==null?"—":durationMin+" 分鐘"}</div></div><div class="stat-box"><div class="label">平均每場</div><div class="value small">${fmtDuration(avgMatchSec)}</div></div></div>
+    <div class="grid grid-4" style="margin-top:12px;"><div class="stat-box"><div class="label">參賽人數</div><div class="value">${officialParticipantCount}</div></div><div class="stat-box"><div class="label">完成場次</div><div class="value">${doneCount} / ${realMatches.length}</div></div><div class="stat-box"><div class="label">賽事耗時</div><div class="value small">${durationMin==null?"—":durationMin+" 分鐘"}</div></div><div class="stat-box"><div class="label">平均每場</div><div class="value small">${fmtDuration(avgMatchSec)}</div></div></div>
     ${rec.archiveStatus==="completed" && !(rec.systemClosure&&!rec.systemClosure.restoredAt)?`<div class="banner" style="margin-top:14px;"><span>唯讀歷史紀錄｜${isSuperAdmin()?"最高管理員可解除封存進行更正。":"如需更正，請由最高管理員處理。"}</span>${isSuperAdmin()?`<button class="btn btn-ghost btn-sm" data-action="unarchive-record" data-id="${rec.id}">解除封存並編輯</button>`:""}</div>`:""}
   </div>
   ${championHtml}

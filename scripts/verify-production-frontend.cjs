@@ -36,7 +36,12 @@ must(/\.board-canvas \.bye-placeholder\{[\s\S]*?display:none!important/, 'Board 
 must(/const DENSE_GAP=2;/, 'Dense bracket vertical gap must remain compact');
 must(/match-box:not\(\.bye-placeholder\)/, 'Dense layout must exclude BYE placeholders');
 must(/let anchorRound=0,anchorCount=-1;/, 'Dense anchor-round selector missing');
-must(/function eligiblePlayers\(\)\{[\s\S]*?const needsCheckin = !!\(state\.meta && state\.meta\.checkinRequired\);/, 'Eligible roster must honor on-site check-in without online registration');
+must(/function tournamentEligiblePlayers\(players,meta,matches\)\{[\s\S]*?p=>p\.checkedIn===true[\s\S]*?bracketIds/, 'Official participant helper must prefer checked-in players and preserve legacy bracket fallback');
+must(/function eligiblePlayers\(\)\{[\s\S]*?return tournamentEligiblePlayers\(state\.players,state\.meta,state\.matches\);/, 'Live eligible roster must use the official participant helper');
+mustInclude('const officialPlayers=eligiblePlayers();','Live summary must derive participant count from eligiblePlayers');
+mustInclude('${state.meta.checkinRequired ? officialCount+"／" : ""}${officialCount}','Live check-in / participant summary must use officialCount');
+mustNot(/state\.registrations\.filter\(r=>r\.checkinStatus===["']checked["']\)\.length\+["']／["']/, 'Live summary must not read obsolete registration check-in status');
+mustInclude('const officialParticipantCount=tournamentEligiblePlayers(rec.players,rec.meta,rec.matches).length;','History summary must use official participant count');
 must(/const needsCheckin = !!\(state\.meta && state\.meta\.checkinRequired\);[\s\S]*?新增至待報到名單/, 'People management must expose pending check-in for on-site rosters');
 mustInclude('id="registration-result-panel"','Registration success result panel missing');
 mustInclude('下一步｜現場繳費與報到','On-site payment/check-in guidance missing');
