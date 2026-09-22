@@ -30,6 +30,23 @@ mustNot(/PUBLIC_TOURNAMENTS_AUTO_REFRESH_MS\s*=\s*15000/, 'Legacy 15-second lobb
 must(/data-action=["']reset-bracket["']/, 'Reset bracket control missing');
 must(/if\(action===["']reset-bracket["']\)/, 'Reset bracket action handler missing');
 must(/function\s+resetBracketBeforeStart\(\)/, 'Reset bracket helper missing');
+must(/function\s+playerBracketNumber\(id\)/, 'Bracket seed/number resolver missing');
+must(/function\s+playerBracketRowHtml\(playerId,name\)/, 'Bracket number-left row renderer missing');
+must(/\.board-canvas \.bye-placeholder\{[\s\S]*?display:none!important/, 'Board BYE placeholders must not consume layout space');
+must(/const DENSE_GAP=2;/, 'Dense bracket vertical gap must remain compact');
+must(/match-box:not\(\.bye-placeholder\)/, 'Dense layout must exclude BYE placeholders');
+must(/let anchorRound=0,anchorCount=-1;/, 'Dense anchor-round selector missing');
+must(/WIP Phase 3: final Challonge-density cascade/, 'Final bracket-density cascade missing');
+if(html.indexOf('WIP Phase 3: final Challonge-density cascade') < html.indexOf('v14.0.6 compact bracket / mobile board density')) throw new Error('Final density cascade must override the legacy compact layer');
+const densityCases={8:4,16:8,32:16,34:2,47:15,64:32};
+function pow2(n){let p=2;while(p<n)p*=2;return p}
+function seeds(size){let order=[1];while(order.length<size){const total=order.length*2+1;const next=[];for(const x of order)next.push(x,total-x);order=next}return order}
+for(const [n,expected] of Object.entries(densityCases)){
+  const N=Number(n),size=pow2(N),order=seeds(size),slot=new Array(size).fill(false);
+  order.forEach((seed,pos)=>{slot[pos]=seed<=N});
+  let real=0;for(let i=0;i<size;i+=2)if(slot[i]&&slot[i+1])real++;
+  if(real!==expected)throw new Error('Unexpected opening-round real-match count for '+N+': '+real);
+}
 console.log('PASS Production frontend target');
 console.log('PASS Email/Password-only runtime');
 console.log('PASS self-service role=player');
@@ -37,3 +54,4 @@ console.log('PASS tester official-event UI guard');
 console.log('PASS realtime lobby sync guard');
 console.log('PASS build/version metadata consistency');
 console.log('PASS pre-start reset bracket control');
+console.log('PASS Challonge-density bracket invariants');
