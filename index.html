@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.19">
+<meta name="bxh-build" content="20260922.20">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.19";
+  var CURRENT_BUILD="20260922.20";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3852,9 +3852,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.22";
+const APP_VERSION = "v14.0.23";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.23",date:"2026/09/22",timezone:"Asia/Taipei",title:"賽果自動封存／更正權限收斂",updateLevel:"patch",added:["最終賽果完成後自動進入結算與封存，不再要求最高管理員再次確認"],changed:["封存失敗時僅提供重試，不再跳出二次確認視窗","已封存賽事的解除封存與結果更正入口僅最高管理員可使用"],fixed:["避免一般管理人員誤解除已完成賽事封存狀態"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament lifecycle UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"最高管理員保留歷史賽事更正權；賽果完成後封存改為自動流程",publicSummary:"比賽結果確認完成後會自動封存；只有最高管理員可以解除封存並更正歷史結果。"},
   {version:"v14.0.22",date:"2026/09/22",timezone:"Asia/Taipei",title:"近期積分排序介面精簡",updateLevel:"patch",added:[],changed:["近期積分紀錄僅保留單一排序方式選單"],fixed:["移除舊版重複排序器，避免兩組排序同時出現並互相覆蓋"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX cleanup",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"近期積分紀錄現在只保留一組排序選單，操作更直覺。"},
   {version:"v14.0.21",date:"2026/09/22",timezone:"Asia/Taipei",title:"天梯二階選單／近期積分紀錄",updateLevel:"patch",added:["天梯頁新增天梯積分排行與近期積分紀錄二階切換","近期積分紀錄新增積分、姓名筆畫、日期排序"],changed:["近期積分紀錄改為獨立頁籤，不再塞在排行榜最底部","玩家模式隱藏操作人欄位，管理模式保留完整稽核資訊"],fixed:["修正玩家模式無法看到近期積分紀錄入口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX",firebaseImpact:"無資料結構變更；沿用 ladderTransactions 讀取",securityRulesImpact:"無",permissionImpact:"依既有 ladderTransactions 讀取權限顯示",publicSummary:"天梯排行與近期積分紀錄可直接切換，並支援多種排序。"},
   {version:"v14.0.20",date:"2026/09/22",timezone:"Asia/Taipei",title:"活躍積分補發／地區篩選修復",updateLevel:"patch",added:["正式賽事完成後由可信後端發放真實對戰與房主完賽活躍積分","每小時安全回溯已完成賽事，補發觸發器部署前漏掉的紀錄"],changed:["活躍積分以玩家、賽事與對戰唯一鍵防止重複發放","玩家中心與訪客天梯共用都市／地區連動行為"],fixed:["修正完成正式賽事後未增加真實對戰與房主活躍積分","修正選擇台南市等都市後，所在地區選單仍停在請先選擇都市"],environment:"Production / HTML + Firebase Functions",deployStatus:"Frontend + trusted activity settlement",firebaseImpact:"沿用 activityPointLedgers、activityPointWallets 與 activityDaily；新增冪等完賽紀錄",securityRulesImpact:"無前端直寫權限變更",permissionImpact:"正式有效對戰及非測試房主由後端自動發放",publicSummary:"完成正式賽事後會自動取得活躍積分；都市與地區篩選恢復正常連動。"},
@@ -7816,7 +7817,7 @@ const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
   "open-account-management","super-admin-page","create-managed-user-submit","set-user-role","toggle-user-active",
   "account-role-filter","account-search-apply","account-clear-filters",
-  "unarchive-record","preview-cleanup-public-mirrors","run-cleanup-public-mirrors","ladder-new-season",
+  "unarchive-current","unarchive-record","preview-cleanup-public-mirrors","run-cleanup-public-mirrors","ladder-new-season",
   "admin-refresh-engagement","admin-seed-initial-titles","admin-save-engagement-settings","admin-grant-title","admin-revoke-title",
   "admin-load-engagement-overview","admin-update-title-definition","admin-backfill-preview","admin-backfill-execute","admin-backfill-restart","admin-engagement-diagnose"
 ]);
@@ -7829,7 +7830,7 @@ const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
 const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status",
-  "skip-match","claim-skipped-match","open-quick-confirm"
+  "skip-match","claim-skipped-match","open-quick-confirm","archive-complete"
 ]);
 
 function hasAdminAccess(){ return currentRole === "admin" || currentRole === "tester"; }
@@ -10474,17 +10475,30 @@ function renderArchiveControls(){
   const hasData = state.players.length>0 || state.matches.length>0;
   if(!hasData) return "";
   if(state.archiveStatus==="completed"){
-    return `<div class="banner" style="margin-top:14px;"><span>${state.testLadderSettlementNote?esc(state.testLadderSettlementNote)+"。":""}此賽事已封存為唯讀歷史紀錄（完成於 ${state.completedAt?new Date(state.completedAt).toLocaleString():""}）。</span>
-      <button class="btn btn-ghost btn-sm" data-action="unarchive-current">解除封存並編輯</button></div>`;
+    return `<div class="banner" style="margin-top:14px;"><span>${state.testLadderSettlementNote?esc(state.testLadderSettlementNote)+"。":""}此賽事已自動封存為唯讀歷史紀錄（完成於 ${state.completedAt?new Date(state.completedAt).toLocaleString():""}）。${isSuperAdmin()?"":" 如需更正，請由最高管理員處理。"}</span>
+      ${isSuperAdmin()?`<button class="btn btn-ghost btn-sm" data-action="unarchive-current">解除封存並編輯</button>`:""}</div>`;
   }
   const canArchive = tournamentStatus()==="settling";
   const phase=state.settlementPhase||"idle";
-  const phaseLabel={processing:"結算處理中",ladder:"天梯結算中",archive:"封存同步中","sync-pending":"等待雲端同步",failed:"封存失敗，可重試",completed:"已完成",idle:"待封存"}[phase]||"待封存";
+  if(canArchive && phase==="idle"){
+    setTimeout(()=>{
+      if(state.archiveStatus!=="completed" && tournamentStatus()==="settling" && (state.settlementPhase||"idle")==="idle"){
+        performAutoArchive().then(async ok=>{
+          if(ok){
+            recordIndex = await loadIndex();
+            historyCloudSyncLoaded = false;
+          }
+          render();
+        }).catch(e=>{ console.warn("[auto archive]",e); render(); });
+      }
+    },0);
+  }
+  const phaseLabel={processing:"結算處理中",ladder:"天梯結算中",archive:"封存同步中","sync-pending":"等待雲端同步",failed:"封存失敗，可重試",completed:"已完成",idle:"自動封存準備中"}[phase]||"自動封存準備中";
   return `<div class="btn-row" style="margin-top:14px;">
     <p class="hint" role="status">對戰已完成｜${esc(phaseLabel)}｜第 ${Number(state.settlementAttempt||0)} 次處理</p>
     ${state.settlementError?`<p role="alert">${esc(state.settlementError)}</p>`:""}
-    ${canArchive ? `<button class="btn btn-primary" data-action="archive-complete">${state.settlementError?"重試封存":state.meta.ladderMode==="ranked"?"執行天梯結算並完成賽事":"完成封存"}</button>` : ""}
-    <button class="btn btn-ghost" data-action="save-pause">儲存並暫停</button>
+    ${canArchive && phase==="failed" ? `<button class="btn btn-primary" data-action="archive-complete">重試封存</button>` : ""}
+    ${canArchive && phase!=="failed" ? `<span class="hint">最終結果確認後由系統自動結算並封存，不需最高管理員再次確認。</span>` : ""}
     <button class="btn btn-ghost" data-action="goto-history">前往賽事紀錄</button>
   </div>`;
 }
@@ -15945,7 +15959,7 @@ function renderHistoryDetail(rec){
     <div class="hint">已完成賽事的結果、對戰表、逐場判決與參賽資料集中於此查閱。</div>
     <div class="grid grid-4" style="margin-top:14px;"><div class="stat-box"><div class="label">日期</div><div class="value small">${esc(rec.meta.date||"—")}</div></div><div class="stat-box"><div class="label">地點</div><div class="value small">${esc(rec.meta.location||"—")}</div></div><div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(FORMAT_LABELS[fmt]||"")}</div></div><div class="stat-box"><div class="label">狀態</div><div class="value small">${esc(ARCHIVE_LABELS[rec.archiveStatus]||rec.archiveStatus)}</div></div></div>
     <div class="grid grid-4" style="margin-top:12px;"><div class="stat-box"><div class="label">參賽人數</div><div class="value">${(rec.players||[]).length}</div></div><div class="stat-box"><div class="label">完成場次</div><div class="value">${doneCount} / ${realMatches.length}</div></div><div class="stat-box"><div class="label">賽事耗時</div><div class="value small">${durationMin==null?"—":durationMin+" 分鐘"}</div></div><div class="stat-box"><div class="label">平均每場</div><div class="value small">${fmtDuration(avgMatchSec)}</div></div></div>
-    ${rec.archiveStatus==="completed" && !(rec.systemClosure&&!rec.systemClosure.restoredAt)?`<div class="banner" style="margin-top:14px;"><span>唯讀歷史紀錄｜如需更正，必須先解除封存。</span><button class="btn btn-ghost btn-sm" data-action="unarchive-record" data-id="${rec.id}">解除封存並編輯</button></div>`:""}
+    ${rec.archiveStatus==="completed" && !(rec.systemClosure&&!rec.systemClosure.restoredAt)?`<div class="banner" style="margin-top:14px;"><span>唯讀歷史紀錄｜${isSuperAdmin()?"最高管理員可解除封存進行更正。":"如需更正，請由最高管理員處理。"}</span>${isSuperAdmin()?`<button class="btn btn-ghost btn-sm" data-action="unarchive-record" data-id="${rec.id}">解除封存並編輯</button>`:""}</div>`:""}
   </div>
   ${championHtml}
   <div class="panel"><div class="panel-title">逐場判決紀錄</div>${matchRows?`<div class="rank-scroll"><table class="rank-table postmatch-match-table"><thead><tr><th>#</th><th>戰鬥台</th><th>比分</th><th>勝方</th><th>判決裁判</th><th>確認時間</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:`<div class="empty-state">尚無可追溯的完成場次</div>`}<div class="hint" style="margin-top:10px;">v13.22.0 起的正式判定會保存實際確認裁判；更舊紀錄可能顯示「舊版未記錄」。</div></div>
@@ -19447,15 +19461,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="archive-complete"){
-    openModal({ type:"generic", title:state.meta.ladderMode==="ranked"?"結算天梯並完成賽事":"完成並封存賽事", message:state.meta.ladderMode==="ranked"?"系統將先把本場天梯積分正式寫入 Firebase；全部玩家積分與本場結算紀錄成功後，才會封存為完成賽事。是否繼續？":"賽事已全部完成，封存後將保存為歷史紀錄，並預設為唯讀，避免誤改。是否繼續？", confirmLabel:state.meta.ladderMode==="ranked"?"確認結算並完成":"確定封存", onConfirm:async ()=>{
-      // v13.19.2：統一走 performAutoArchive()。
-      // 舊版在這裡只呼叫未 await 的 saveState()，隨即讀取 recordIndex，
-      // 造成索引尚未寫完就先刷新畫面，看起來像「封存成功但賽事紀錄是空的」。
-      await performAutoArchive();
+    (async()=>{
+      const ok=await performAutoArchive();
       recordIndex = await loadIndex();
       historyCloudSyncLoaded = false;
       render();
-    }});
+      if(!ok) showToast("自動封存尚未完成，請依畫面錯誤訊息處理後重試。",true);
+    })();
     return;
   }
   if(action==="save-pause"){
@@ -19475,6 +19487,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="unarchive-current"){
+    if(!isSuperAdmin()){ showToast("只有最高管理員可以解除封存並更正賽事結果。",true); return; }
     if(state.ladderPointsAwarded){ showToast("本場天梯積分已正式入帳，禁止直接解除封存；如需修正請使用天梯的『手動更正積分』並保留紀錄。", true); return; }
     openModal({ type:"generic", title:"解除封存並編輯", message:"這是已封存的歷史紀錄，解除封存後將可以再次編輯比分與結果，請確認是否繼續。", danger:true, confirmLabel:"確定解除封存", onConfirm:()=>{
       state.archiveStatus="ongoing";
