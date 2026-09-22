@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.07">
+<meta name="bxh-build" content="20260922.08">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.07";
+  var CURRENT_BUILD="20260922.08";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2539,6 +2539,32 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   .fe-filter-collapsed button{width:100%;min-height:44px;}
 }
 
+/* ==== v14.0.11 collapsible test ladder ==== */
+.test-ladder-toggle{
+  width:100%;
+  min-height:50px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  border:0;
+  background:transparent;
+  color:var(--white);
+  font:700 16px var(--font-d);
+  text-align:left;
+  cursor:pointer;
+}
+.test-ladder-toggle .hint{margin-left:auto;font-size:11px;font-weight:600;white-space:nowrap;}
+.test-ladder-toggle .chev{color:var(--gold);transition:transform .16s ease;}
+.test-ladder-toggle[aria-expanded="true"] .chev{transform:rotate(180deg);}
+.test-ladder-body{padding:0 14px 14px;border-top:1px solid rgba(255,255,255,.07);}
+.test-ladder-panel{padding:0!important;overflow:hidden;border-color:var(--gold-dim)!important;}
+@media(max-width:640px){
+  .test-ladder-toggle{min-height:46px;padding:10px 12px;font-size:15px;}
+  .test-ladder-body{padding:0 12px 12px;}
+}
+
 /* ==== v14.0.10 compact admin context HUD ==== */
 .admin-context-hud{
   display:flex;
@@ -3661,9 +3687,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.10";
+const APP_VERSION = "v14.0.11";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.11",date:"2026/09/22",timezone:"Asia/Taipei",title:"測試天梯說明預設收合",updateLevel:"patch",added:["測試天梯 TEST-S1 改為可展開／收合"],changed:["測試天梯說明、重新整理、空狀態與排行榜內容預設不直接佔用天梯首屏","只有展開後才載入測試天梯資料，減少不必要讀取"],fixed:["改善管理員天梯頁首屏被低頻測試資訊占用過多空間"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX patch",firebaseImpact:"無資料結構變更；測試天梯改為展開時才讀取",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"測試天梯改為預設收合，需要時再展開查看，正式天梯資訊更優先。"},
   {version:"v14.0.10",date:"2026/09/22",timezone:"Asia/Taipei",title:"管理員全域工具列精簡",updateLevel:"patch",added:["管理員內容區改為單列狀態 HUD","賽事代碼晶片可直接點擊複製","雲端連線異常時才顯示重試入口","抽獎與維護新增系統診斷區"],changed:["正常狀態移除重複的『雲端已同步』文字，改由 Header 的 BXH LIVE LINK 統一呈現","全域列移除複製代碼、切換賽事、測試雲端連線三個低頻按鈕","切換賽事集中至賽事管理中心；雲端測試集中至抽獎與維護"],fixed:["減少管理員各分頁重複固定工具列佔用手機首屏高度"],environment:"Production / HTML + Firebase",deployStatus:"Frontend admin UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"管理員全域工具列精簡為狀態與賽事代碼；低頻操作移回賽事管理與系統診斷，手機首屏更聚焦工作內容。"},
   {version:"v14.0.9",date:"2026/09/22",timezone:"Asia/Taipei",title:"玩家我的賽程／唯讀樹狀圖往返",updateLevel:"patch",added:["玩家『我的賽程』活動卡新增『查看樹狀圖』入口","玩家樹狀圖頂端新增『← 返回我的賽程』往返按鈕"],changed:["玩家樹狀圖固定使用 publicTournaments 公開安全鏡像，維持唯讀，不開放裁判、計分或管理操作","未產生對戰表時顯示『樹狀圖尚未產生』停用按鈕，避免進入空白頁"],fixed:["玩家從我的賽程進入對戰表後返回時，正確回到『我的賽程』而非賽事大廳首頁"],environment:"Production / HTML + Firebase",deployStatus:"Frontend player navigation patch",firebaseImpact:"無資料結構變更；只讀既有 publicTournaments",securityRulesImpact:"無",permissionImpact:"不擴張；玩家僅能瀏覽公開安全鏡像",publicSummary:"玩家可直接從我的賽程查看唯讀樹狀圖，並一鍵返回原本的我的賽程頁。"},
   {version:"v14.0.8",date:"2026/09/22",timezone:"Asia/Taipei",title:"裁判台／對戰表快速往返",updateLevel:"patch",added:["裁判台新增「← 對戰表」快速返回按鈕","對戰表新增「裁判台 →」快速前往按鈕"],changed:["官方賽事沿用既有 switch-tab 權限流程；玩家一般賽事沿用 community-switch-room-tab，不新增第二套路由"],fixed:["減少現場裁判在裁判台與對戰表之間需返回上層再切分頁的操作步驟"],environment:"Production / HTML + Firebase",deployStatus:"Frontend navigation patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；按鈕僅在原本具裁判台存取權限的管理／房主情境顯示",publicSummary:"裁判台與對戰表新增雙向快速切換，現場查表與判定可一鍵往返。"},
@@ -13525,6 +13552,7 @@ function ladderLeaderboardTable(rows, adminMode=false){
   </table></div>`;
 }
 let testLadderView = {uid:null,rows:[],loading:false,loaded:false,error:""};
+let testLadderPanelExpanded = false;
 function canReadTestLadder(){ return isTester() || isAdminTierOrAbove(); }
 async function loadTestLadder(force=false){
   if(!canReadTestLadder()) return;
@@ -13550,13 +13578,24 @@ function renderTestLadderPanel(){
   const uid=currentAuthUid();
   if(testLadderView.uid!==uid) testLadderView={uid,rows:[],loading:false,loaded:false,error:""};
   const v=testLadderView;
-  if(!v.loaded&&!v.loading) setTimeout(()=>loadTestLadder(),0);
-  return `<section class="panel" aria-label="測試天梯 TEST-S1" style="border-color:var(--gold-dim)">
-    <div class="panel-title"><span>🧪 測試天梯｜TEST-S1</span><button class="btn btn-ghost btn-sm" data-action="test-ladder-refresh" ${v.loading?'disabled':''}>重新整理測試天梯</button></div>
-    <p class="hint">64 位實驗玩家專用。此處顯示測試積分，不計入正式 BXH 天梯。</p>
-    ${v.error?`<p role="alert">${esc(v.error)}</p>`:""}
-    ${v.loading?'<p role="status">正在讀取測試天梯…</p>':!v.rows.length?'<p>尚無測試積分紀錄，完成一場測試積分賽後即可查看。</p>':`<div style="overflow-x:auto"><table aria-label="TEST-S1 排行榜" style="min-width:560px;width:100%"><thead><tr><th>排名</th><th>編號</th><th>姓名</th><th>積分</th><th>參賽場次</th><th>勝</th><th>敗</th></tr></thead><tbody>${v.rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.testPlayerKey)}</td><td>${esc(p.playerName||p.testPlayerKey)}</td><td><strong>${Number(p.seasonPoints||0)} PT</strong></td><td>${Number(p.totalEvents||0)}</td><td>${Number(p.wins||0)}</td><td>${Number(p.losses||0)}</td></tr>`).join("")}</tbody></table></div>`}
-    <p class="hint">排序：測試積分 → 勝場 → T 編號。手機可左右滑動表格。</p>
+  if(testLadderPanelExpanded && !v.loaded && !v.loading) setTimeout(()=>loadTestLadder(),0);
+  const body=testLadderPanelExpanded ? `
+    <div class="test-ladder-body">
+      <div class="btn-row" style="justify-content:flex-end;margin:12px 0 8px;">
+        <button class="btn btn-ghost btn-sm" data-action="test-ladder-refresh" ${v.loading?'disabled':''}>${v.loading?'讀取中…':'重新整理測試天梯'}</button>
+      </div>
+      <p class="hint">64 位實驗玩家專用。此處顯示測試積分，不計入正式 BXH 天梯。</p>
+      ${v.error?`<p role="alert">${esc(v.error)}</p>`:""}
+      ${v.loading?'<p role="status">正在讀取測試天梯…</p>':!v.rows.length?'<p>尚無測試積分紀錄，完成一場測試積分賽後即可查看。</p>':`<div style="overflow-x:auto"><table aria-label="TEST-S1 排行榜" style="min-width:560px;width:100%"><thead><tr><th>排名</th><th>編號</th><th>姓名</th><th>積分</th><th>參賽場次</th><th>勝</th><th>敗</th></tr></thead><tbody>${v.rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.testPlayerKey)}</td><td>${esc(p.playerName||p.testPlayerKey)}</td><td><strong>${Number(p.seasonPoints||0)} PT</strong></td><td>${Number(p.totalEvents||0)}</td><td>${Number(p.wins||0)}</td><td>${Number(p.losses||0)}</td></tr>`).join("")}</tbody></table></div>`}
+      <p class="hint">排序：測試積分 → 勝場 → T 編號。手機可左右滑動表格。</p>
+    </div>` : "";
+  return `<section class="panel test-ladder-panel" aria-label="測試天梯 TEST-S1">
+    <button type="button" class="test-ladder-toggle" data-action="test-ladder-toggle" aria-expanded="${testLadderPanelExpanded?'true':'false'}">
+      <span>🧪 測試天梯｜TEST-S1</span>
+      <span class="hint">${testLadderPanelExpanded?'收合':'展開'}</span>
+      <span class="chev" aria-hidden="true">⌄</span>
+    </button>
+    ${body}
   </section>`;
 }
 
@@ -17529,6 +17568,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(section!=="basic"&&section!=="titles") return;
     playerProfileSection=section;
     renderPreservingScroll(); return;
+  }
+  if(action==="test-ladder-toggle"){
+    if(!canReadTestLadder()) return;
+    testLadderPanelExpanded=!testLadderPanelExpanded;
+    renderPreservingScroll();
+    return;
   }
   if(action==="test-ladder-refresh"){
     if(canReadTestLadder()) loadTestLadder(true);
