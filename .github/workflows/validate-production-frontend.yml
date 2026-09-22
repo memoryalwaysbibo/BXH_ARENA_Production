@@ -19,7 +19,9 @@ jobs:
           node-version: 22
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
-      - name: Verify ladder V1 scoring and settlement
+      - name: Verify ladder V1 scoring and inline-script syntax
+        run: node --experimental-vm-modules tests/ladder-v1.cjs
+      - name: Verify ladder V1 settlement trust boundary
         run: node --experimental-vm-modules tests/ladder-settlement.cjs
       - name: Verify no Beta runtime target
         shell: bash
