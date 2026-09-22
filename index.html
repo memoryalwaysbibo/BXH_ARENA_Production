@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.21">
+<meta name="bxh-build" content="20260923.01">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.21";
+  var CURRENT_BUILD="20260923.01";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3652,6 +3652,54 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
     line-height:1.35;
   }
 }
+
+/* ==== v14.0.25 public bracket refresh controls ==== */
+.bracket-top-controls{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:stretch;
+  gap:8px;
+  margin:0 0 14px;
+}
+.bracket-top-controls .bracket-view-toggle{margin:0;}
+.bracket-refresh-btn{
+  min-width:84px;
+  min-height:44px;
+  padding:8px 12px;
+  white-space:nowrap;
+  border-color:rgba(217,185,92,.34);
+  color:var(--gold);
+}
+.bracket-refresh-btn:disabled{opacity:.55;cursor:wait;}
+.public-context-hud{width:max-content;max-width:100%;}
+@media(max-width:640px){
+  .bracket-top-controls{
+    position:sticky;
+    top:calc(var(--sticky-header-h, 0px) + 6px);
+    z-index:12;
+    gap:5px;
+    margin-bottom:6px;
+    border-radius:9px;
+    background:rgba(8,9,10,.78);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+  }
+  .bracket-top-controls .bracket-view-toggle{
+    position:static;
+    top:auto;
+    z-index:auto;
+    margin:0;
+    backdrop-filter:none;
+    -webkit-backdrop-filter:none;
+  }
+  .bracket-refresh-btn{
+    min-width:68px;
+    min-height:38px;
+    padding:5px 8px;
+    font-size:11px;
+  }
+  .public-context-hud{width:100%;}
+}
 </style>
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
 </head>
@@ -3852,9 +3900,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.24";
+const APP_VERSION = "v14.0.25";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.25",date:"2026/09/23",timezone:"Asia/Taipei",title:"公開觀賽工具列精簡／對戰表手動刷新",updateLevel:"patch",added:["公開觀賽對戰表新增手動刷新鍵，可直接重新讀取目前賽事的雲端資料"],changed:["公開瀏覽模式的中間工具列改為與管理者相同的精簡 HUD；正常連線時不再重複顯示『雲端已同步』","賽事代碼改為可直接點擊複製，移除獨立『複製代碼』與『切換賽事』按鈕；切換賽事沿用既有返回賽事大廳／身分入口"],fixed:["提供即時監聽未及更新時的手動重新讀取入口，刷新時直接向 Firestore 取得目前賽事最新資料並以權威狀態套用"],environment:"Production / HTML + Firebase",deployStatus:"Frontend public watch UX + manual refresh fallback",firebaseImpact:"無資料結構變更；刷新僅重新讀取既有 tournaments/publicTournaments 文件",securityRulesImpact:"無",permissionImpact:"無新增權限；公開觀賽仍只讀 publicTournaments",publicSummary:"公開觀賽介面更精簡；對戰表新增刷新鍵，遇到畫面未即時更新時可手動抓取最新賽況。"},
   {version:"v14.0.24",date:"2026/09/22",timezone:"Asia/Taipei",title:"本人／兒童雙軌報名入口",updateLevel:"patch",added:["一般公開賽事新增獨立本人報名與兒童報名入口","本人已報名後仍可繼續替家庭選手報名"],changed:["賽事詳細頁改讀取同帳號的所有有效家庭報名","兒童報名只列出尚未報名的家庭選手"],fixed:["修正本人報名後報名入口被取消按鈕取代，導致同帳號無法再替孩子報名"],environment:"Production / HTML + Firebase",deployStatus:"Frontend family registration UX",firebaseImpact:"無資料結構變更；沿用既有 familyRegistration callable",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"同一帳號可分別替本人與孩子報名同一場賽事；本人已報名後兒童報名入口仍會保留。"},
   {version:"v14.0.23",date:"2026/09/22",timezone:"Asia/Taipei",title:"賽果自動封存／更正權限收斂",updateLevel:"patch",added:["最終賽果完成後自動進入結算與封存，不再要求最高管理員再次確認"],changed:["封存失敗時僅提供重試，不再跳出二次確認視窗","已封存賽事的解除封存與結果更正入口僅最高管理員可使用"],fixed:["避免一般管理人員誤解除已完成賽事封存狀態"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament lifecycle UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"最高管理員保留歷史賽事更正權；賽果完成後封存改為自動流程",publicSummary:"比賽結果確認完成後會自動封存；只有最高管理員可以解除封存並更正歷史結果。"},
   {version:"v14.0.22",date:"2026/09/22",timezone:"Asia/Taipei",title:"近期積分排序介面精簡",updateLevel:"patch",added:[],changed:["近期積分紀錄僅保留單一排序方式選單"],fixed:["移除舊版重複排序器，避免兩組排序同時出現並互相覆蓋"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX cleanup",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"近期積分紀錄現在只保留一組排序選單，操作更直覺。"},
@@ -10698,6 +10747,45 @@ function refereeBracketRoundtripNav(targetTab){
   return `<div class="ref-bracket-roundtrip" aria-label="裁判台與對戰表快速切換"><button class="btn btn-ghost btn-sm ref-bracket-roundtrip-btn" data-action="${action}" data-tab="${targetTab}">${toReferee?"裁判台 →":"← 對戰表"}</button></div>`;
 }
 
+let bracketRefreshBusy=false;
+
+function bracketRefreshUsesPublicMirror(){
+  return currentRole==="guest" || currentRole==="player" || (!!publicWatchReturnContext && !publicWatchUsesPrivateData);
+}
+
+async function refreshBracketFromCloud(){
+  if(bracketRefreshBusy) return;
+  const code=String(state.cloudCode||"").trim().toUpperCase();
+  if(!code || !window.cloudSync){
+    showToast("目前沒有可更新的雲端賽事", true);
+    return;
+  }
+  bracketRefreshBusy=true;
+  renderPreservingScroll();
+  try{
+    if(window.cloudSync.connect) await window.cloudSync.connect();
+    if(!cloudAvailable()) throw new Error("network");
+    const result=bracketRefreshUsesPublicMirror()
+      ? await window.cloudSync.joinRoomPublic(code)
+      : await window.cloudSync.joinRoom(code);
+    if(!result || !result.ok){
+      bracketRefreshBusy=false;
+      renderPreservingScroll();
+      showToast(CODE_ENTRY_ERROR_MESSAGES[(result&&result.reason)||"network"] || "更新失敗，請稍後再試", true);
+      return;
+    }
+    bracketRefreshBusy=false;
+    cloudStatus="connected";
+    cloudLastSyncAt=Date.now();
+    applyRemoteState(result.data, true);
+    showToast("對戰表已更新");
+  }catch(e){
+    bracketRefreshBusy=false;
+    renderPreservingScroll();
+    showToast("更新失敗，請稍後再試", true);
+  }
+}
+
 function renderBracket(){
   if(!state.bracketSize){
     return `<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請至「賽事設定」輸入選手名單後產生對戰表</div>
@@ -10711,10 +10799,15 @@ function renderBracket(){
     <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
     <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
   </div>`;
+  const showManualRefresh=!!state.cloudCode && (currentRole==="guest" || currentRole==="player" || !!publicWatchReturnContext);
+  const refreshBtn=showManualRefresh
+    ? `<button class="btn btn-ghost btn-sm bracket-refresh-btn" data-action="bracket-refresh" ${bracketRefreshBusy?'disabled':''} aria-label="重新讀取最新對戰表">${bracketRefreshBusy?'更新中…':'↻ 刷新'}</button>`
+    : "";
+  const topControls=`<div class="bracket-top-controls">${modeToggle}${refreshBtn}</div>`;
   if(bracketViewMode==="board"){
-    return quickNav + modeToggle + renderBoardMode();
+    return quickNav + topControls + renderBoardMode();
   }
-  return quickNav + modeToggle + matchLegendHtml() + renderTournamentMatchList();
+  return quickNav + topControls + matchLegendHtml() + renderTournamentMatchList();
 }
 
 function tournamentMatchListGroup(m, fmt){
@@ -16502,9 +16595,23 @@ function cloudStatusBarHtml(){
   </div>`;
 }
 
+function publicManagementContextHtml(){
+  if(!state.cloudCode){
+    return statusBadge()+roleIndicatorHtml()+cloudStatusBarHtml();
+  }
+  let cloudAlert="";
+  if(cloudStatus==="error"){
+    cloudAlert=`<span class="admin-context-cloud-alert"><span class="cloud-dot-v2 red"></span>雲端連線異常</span>`;
+  }else if(cloudStatus==="connecting"){
+    cloudAlert=`<span class="admin-context-cloud-alert warn"><span class="cloud-dot-v2 yellow"></span>同步中…</span>`;
+  }
+  const code=`<button class="admin-context-code" data-action="cloud-copy-code" title="點一下複製賽事代碼" aria-label="複製賽事代碼 ${esc(state.cloudCode)}"><span>代碼 ${esc(state.cloudCode)}</span><span class="copy-mark">⧉</span></button>`;
+  return `${statusBadge()}${roleIndicatorHtml()}<div class="admin-context-hud public-context-hud">${code}${cloudAlert}</div>`;
+}
+
 function adminManagementContextHtml(){
   if(!hasAdminAccess()){
-    return statusBadge()+roleIndicatorHtml()+cloudStatusBarHtml();
+    return publicManagementContextHtml();
   }
   const phase=statusBadge();
   const configured=(typeof window!=="undefined"&&window.cloudSync&&window.cloudSync.isConfigured&&window.cloudSync.isConfigured());
@@ -19398,6 +19505,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="board-export-image"){
     exportBoardAsImage();
+    return;
+  }
+  if(action==="bracket-refresh"){
+    refreshBracketFromCloud();
     return;
   }
   if(action==="cloud-test-connection"){
