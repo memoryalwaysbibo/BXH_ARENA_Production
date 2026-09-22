@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.15">
+<meta name="bxh-build" content="20260922.16">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.15";
+  var CURRENT_BUILD="20260922.16";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3130,6 +3130,20 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .community-event-card:last-child,.community-history-card:last-child{border-bottom:none}.community-event-name{font-family:var(--font-d);font-weight:800;color:var(--ivory)}
 .community-room-notice{padding:8px 16px;background:rgba(89,140,255,.08);border-bottom:1px solid rgba(89,140,255,.18);font-size:12px;color:var(--metal)}
 .community-create-card{max-width:620px}.community-create-card .banner{margin-bottom:14px}
+.auth-shell.community-create-shell{
+  top:0;right:0;bottom:auto;left:0;
+  height:100vh;height:100dvh;max-height:100dvh;
+  box-sizing:border-box;overflow-x:hidden;overflow-y:scroll;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior-y:auto;
+  align-items:stretch;
+}
+.community-create-shell .auth-content.community-create-content{
+  display:block;flex:0 0 auto;width:100%;max-width:640px;min-height:max-content;
+  margin:0 auto;padding-bottom:max(24px,env(safe-area-inset-bottom));
+}
+.community-create-shell .community-create-card{width:100%;margin-left:auto;margin-right:auto;box-sizing:border-box}
+.community-create-topbar{position:sticky;top:0;z-index:20;width:100%;max-width:620px;margin:0 auto 8px;padding:4px 0 8px;background:linear-gradient(180deg,#0d0e0a 68%,rgba(13,14,10,0));}
+.community-create-topbar .btn{min-height:42px}
 @media(max-width:720px){.community-policy-grid{grid-template-columns:1fr}.community-event-card,.community-history-card{align-items:flex-start;flex-direction:column}.community-event-card .btn-row{width:100%}.community-event-card .btn-row .btn{flex:1}}
 
 /* ==== v13.22.0 lobby / lifecycle / referee workstation ==== */
@@ -3813,9 +3827,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.18";
+const APP_VERSION = "v14.0.19";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.19",date:"2026/09/22",timezone:"Asia/Taipei",title:"手機建立賽事捲動與返回修復",updateLevel:"patch",added:["建立一般賽事頁頂端新增固定可達的返回我的房間按鈕"],changed:["建立賽事長表單改為獨立的手機安全捲動容器","加入 iOS 慣性捲動、垂直觸控與動態視窗高度防護"],fixed:["修正 iPhone 建立一般賽事頁只能回彈、無法向下滑到提交與返回按鈕","避免使用者只能依賴瀏覽器上一頁離開"],environment:"Production / HTML + Firebase",deployStatus:"Frontend mobile scroll hotfix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"修正手機建立一般賽事頁無法下滑，並補上頂端返回入口。"},
   {version:"v14.0.18",date:"2026/09/22",timezone:"Asia/Taipei",title:"報名成功／現場報到流程整合",updateLevel:"minor",added:["玩家報名成功後顯示完整結果卡：賽事、參賽者、正備取、現場報到與費用提醒","純現場賽事也能先建立無帳號玩家，再逐一完成報到"],changed:["報名完成後自動捲動至結果，不必自行往下尋找","取消報名改為次要危險操作，不再成為結果頁唯一醒目按鈕","報到規則不再依賴是否啟用線上報名；線上與現場新增玩家共用同一套報到名單"],fixed:["修正純現場賽事設定需要報到時，現場新增玩家卻看不到報到按鈕","補足報名成功後未提示現場繳費與報到的流程缺口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend registration/check-in UX",firebaseImpact:"沿用既有 players.checkedIn 與報名資料，不新增欄位",securityRulesImpact:"無",permissionImpact:"玩家仍不能自行修改報到；僅既有賽事管理權限可確認報到",publicSummary:"報名成功後會清楚顯示下一步；線上與現場玩家皆可先進入待報到名單，繳費後由工作人員確認報到。"},
   {version:"v14.0.16",date:"2026/09/22",timezone:"Asia/Taipei",title:"完整對戰表 PNG／相簿儲存流程",updateLevel:"patch",added:["匯出完整對戰表改為 PNG File 分享；支援裝置時直接開啟系統分享面板","iPhone 可由分享面板直接選『儲存影像』加入照片相簿","不支援檔案分享的瀏覽器自動退回 PNG 下載"],changed:["按鈕文字由『匯出完整對戰表』改為『儲存完整對戰表』"],fixed:["避免 iPhone 匯出後只能到檔案 Downloads 再手動搬移"],environment:"Production / HTML + Firebase",deployStatus:"Frontend export UX patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"完整對戰表仍輸出 PNG；iPhone 會優先開啟系統分享面板，可直接選儲存影像加入照片相簿。"},
   {version:"v14.0.15",date:"2026/09/22",timezone:"Asia/Taipei",title:"經典賽程樹連接線",updateLevel:"patch",added:[],changed:["樹狀圖改為標準 tournament bracket 連接方式：來源卡片中央出發、共用垂直主線、再由中央水平接入下一場中央","連接線統一淺灰白、直角、無勝方發光與無上下跳動"],fixed:["移除依 A/B 槽位或勝利者列產生的不規則毛毛蟲視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改成經典標準賽程樹樣式，與參考圖一致地從卡片中央規則連接。"},
@@ -12379,8 +12394,8 @@ function renderCelebrationOverlay(){
 }
 
 /* ==== auth screens ==== */
-function authShellOpen(subtitle, contentClass=""){
-  return `<div class="auth-shell">
+function authShellOpen(subtitle, contentClass="", shellClass=""){
+  return `<div class="auth-shell ${esc(shellClass||"")}">
     <div class="auth-beams" aria-hidden="true"></div>
     <div class="auth-wm" aria-hidden="true"><img src="${LOGO_SRC}" alt=""></div>
     <div class="auth-particles" aria-hidden="true">${Array.from({length:14}).map((_,i)=>`<span class="auth-dust" style="left:${(i*7+5)%100}%;animation-delay:${(i*0.6).toFixed(1)}s;"></span>`).join("")}</div>
@@ -14125,7 +14140,7 @@ function communityDateTimeValue(ms){
 }
 function renderCommunityCreateScreen(){
   const nowValue=communityDateTimeValue(Date.now());
-  return authShellOpen()+`${authBrandHeader()}<div class="auth-card community-create-card">
+  return authShellOpen("","community-create-content","community-create-shell")+`<div class="community-create-topbar"><button class="btn btn-ghost" type="button" data-action="community-create-cancel">← 返回我的房間</button></div>${authBrandHeader()}<div class="auth-card community-create-card">
     <div class="auth-card-title">建立一般賽事</div>
     <div class="banner"><span>玩家主辦｜一般賽事｜不計 BXH 天梯積分</span></div>
     <div class="field"><label>賽事名稱</label><input id="community-name" type="text" placeholder="例如：好友交流賽"></div>
