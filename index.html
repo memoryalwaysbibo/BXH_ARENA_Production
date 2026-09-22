@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.17">
+<meta name="bxh-build" content="20260922.18">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.17";
+  var CURRENT_BUILD="20260922.18";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3852,9 +3852,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.20";
+const APP_VERSION = "v14.0.21";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.21",date:"2026/09/22",timezone:"Asia/Taipei",title:"天梯二階選單／近期積分紀錄",updateLevel:"patch",added:["天梯頁新增天梯積分排行與近期積分紀錄二階切換","近期積分紀錄新增積分、姓名筆畫、日期排序"],changed:["近期積分紀錄改為獨立頁籤，不再塞在排行榜最底部","玩家模式隱藏操作人欄位，管理模式保留完整稽核資訊"],fixed:["修正玩家模式無法看到近期積分紀錄入口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX",firebaseImpact:"無資料結構變更；沿用 ladderTransactions 讀取",securityRulesImpact:"無",permissionImpact:"依既有 ladderTransactions 讀取權限顯示",publicSummary:"天梯排行與近期積分紀錄可直接切換，並支援多種排序。"},
   {version:"v14.0.20",date:"2026/09/22",timezone:"Asia/Taipei",title:"活躍積分補發／地區篩選修復",updateLevel:"patch",added:["正式賽事完成後由可信後端發放真實對戰與房主完賽活躍積分","每小時安全回溯已完成賽事，補發觸發器部署前漏掉的紀錄"],changed:["活躍積分以玩家、賽事與對戰唯一鍵防止重複發放","玩家中心與訪客天梯共用都市／地區連動行為"],fixed:["修正完成正式賽事後未增加真實對戰與房主活躍積分","修正選擇台南市等都市後，所在地區選單仍停在請先選擇都市"],environment:"Production / HTML + Firebase Functions",deployStatus:"Frontend + trusted activity settlement",firebaseImpact:"沿用 activityPointLedgers、activityPointWallets 與 activityDaily；新增冪等完賽紀錄",securityRulesImpact:"無前端直寫權限變更",permissionImpact:"正式有效對戰及非測試房主由後端自動發放",publicSummary:"完成正式賽事後會自動取得活躍積分；都市與地區篩選恢復正常連動。"},
   {version:"v14.0.19",date:"2026/09/22",timezone:"Asia/Taipei",title:"手機建立賽事捲動與返回修復",updateLevel:"patch",added:["建立一般賽事頁頂端新增固定可達的返回我的房間按鈕"],changed:["建立賽事長表單改為獨立的手機安全捲動容器","加入 iOS 慣性捲動、垂直觸控與動態視窗高度防護"],fixed:["修正 iPhone 建立一般賽事頁只能回彈、無法向下滑到提交與返回按鈕","避免使用者只能依賴瀏覽器上一頁離開"],environment:"Production / HTML + Firebase",deployStatus:"Frontend mobile scroll hotfix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"修正手機建立一般賽事頁無法下滑，並補上頂端返回入口。"},
   {version:"v14.0.18",date:"2026/09/22",timezone:"Asia/Taipei",title:"報名成功／現場報到流程整合",updateLevel:"minor",added:["玩家報名成功後顯示完整結果卡：賽事、參賽者、正備取、現場報到與費用提醒","純現場賽事也能先建立無帳號玩家，再逐一完成報到"],changed:["報名完成後自動捲動至結果，不必自行往下尋找","取消報名改為次要危險操作，不再成為結果頁唯一醒目按鈕","報到規則不再依賴是否啟用線上報名；線上與現場新增玩家共用同一套報到名單"],fixed:["修正純現場賽事設定需要報到時，現場新增玩家卻看不到報到按鈕","補足報名成功後未提示現場繳費與報到的流程缺口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend registration/check-in UX",firebaseImpact:"沿用既有 players.checkedIn 與報名資料，不新增欄位",securityRulesImpact:"無",permissionImpact:"玩家仍不能自行修改報到；僅既有賽事管理權限可確認報到",publicSummary:"報名成功後會清楚顯示下一步；線上與現場玩家皆可先進入待報到名單，繳費後由工作人員確認報到。"},
@@ -23348,5 +23349,6 @@ if(testerSession){
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
 </script>
+<script src="ladder-secondary-ui.js?v=14.0.21"></script>
 </body>
 </html>
