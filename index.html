@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.08">
+<meta name="bxh-build" content="20260922.09">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.08";
+  var CURRENT_BUILD="20260922.09";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3488,7 +3488,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   }
 }
 </style>
-<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.3">
+<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
 </head>
 <body>
 
@@ -3517,7 +3517,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
 <script src="family-ui.js?v=13.42.1"></script>
-<script src="raffle-ui.js?v=13.40.0"></script>
+<script src="raffle-ui.js?v=14.0.12"></script>
 <script>
 // Standalone browsers do not provide the hosted artifact's window.storage API.
 // Preserve an existing provider; propagate storage failures to existing callers.
@@ -3687,9 +3687,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.11";
+const APP_VERSION = "v14.0.12";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.12",date:"2026/09/22",timezone:"Asia/Taipei",title:"會員抽獎管理工具列重整",updateLevel:"patch",added:["會員抽獎管理新增獨立管理工具區，篩選與管理動作分組"],changed:["移除管理端大膠囊背景與自由換行按鈕排列","手機改為規則化 Grid：全部活動／我的活動一組，建立活動／重新整理／掃碼核銷一組","按鈕高度、圓角、邊框與字級統一"],fixed:["修正會員抽獎管理在手機上背景框變形、建立活動掉到第二列左側及按鈕高低不一"],environment:"Production / HTML + Firebase",deployStatus:"Frontend raffle management UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"會員抽獎管理工具列重新排版，手機版不再出現歪斜膠囊與亂跳按鈕。"},
   {version:"v14.0.11",date:"2026/09/22",timezone:"Asia/Taipei",title:"測試天梯說明預設收合",updateLevel:"patch",added:["測試天梯 TEST-S1 改為可展開／收合"],changed:["測試天梯說明、重新整理、空狀態與排行榜內容預設不直接佔用天梯首屏","只有展開後才載入測試天梯資料，減少不必要讀取"],fixed:["改善管理員天梯頁首屏被低頻測試資訊占用過多空間"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX patch",firebaseImpact:"無資料結構變更；測試天梯改為展開時才讀取",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"測試天梯改為預設收合，需要時再展開查看，正式天梯資訊更優先。"},
   {version:"v14.0.10",date:"2026/09/22",timezone:"Asia/Taipei",title:"管理員全域工具列精簡",updateLevel:"patch",added:["管理員內容區改為單列狀態 HUD","賽事代碼晶片可直接點擊複製","雲端連線異常時才顯示重試入口","抽獎與維護新增系統診斷區"],changed:["正常狀態移除重複的『雲端已同步』文字，改由 Header 的 BXH LIVE LINK 統一呈現","全域列移除複製代碼、切換賽事、測試雲端連線三個低頻按鈕","切換賽事集中至賽事管理中心；雲端測試集中至抽獎與維護"],fixed:["減少管理員各分頁重複固定工具列佔用手機首屏高度"],environment:"Production / HTML + Firebase",deployStatus:"Frontend admin UX patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"管理員全域工具列精簡為狀態與賽事代碼；低頻操作移回賽事管理與系統診斷，手機首屏更聚焦工作內容。"},
   {version:"v14.0.9",date:"2026/09/22",timezone:"Asia/Taipei",title:"玩家我的賽程／唯讀樹狀圖往返",updateLevel:"patch",added:["玩家『我的賽程』活動卡新增『查看樹狀圖』入口","玩家樹狀圖頂端新增『← 返回我的賽程』往返按鈕"],changed:["玩家樹狀圖固定使用 publicTournaments 公開安全鏡像，維持唯讀，不開放裁判、計分或管理操作","未產生對戰表時顯示『樹狀圖尚未產生』停用按鈕，避免進入空白頁"],fixed:["玩家從我的賽程進入對戰表後返回時，正確回到『我的賽程』而非賽事大廳首頁"],environment:"Production / HTML + Firebase",deployStatus:"Frontend player navigation patch",firebaseImpact:"無資料結構變更；只讀既有 publicTournaments",securityRulesImpact:"無",permissionImpact:"不擴張；玩家僅能瀏覽公開安全鏡像",publicSummary:"玩家可直接從我的賽程查看唯讀樹狀圖，並一鍵返回原本的我的賽程頁。"},

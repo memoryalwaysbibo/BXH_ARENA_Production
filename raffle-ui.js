@@ -128,10 +128,21 @@ function renderRaffleEventGroups(c){
 function renderRafflePage(){
  const c=raffleContext(),management=isRaffleManagementView();if(!c.editing&&!c.loading&&!c.busy&&!c.error&&(c.id?!c.detail:c.events===null))setTimeout(()=>loadRaffles(),0);
  const d=c.detail,e=d?.event,locked=c.loading||c.busy||!!c.pending;
- const toolbar=`<div class="btn-row raffle-toolbar"><button class="btn btn-ghost btn-sm raffle-filter ${c.view!=='mine'?'is-active':''}" data-action="raffle-list">全部活動</button>${currentAuthUid()?`<button class="btn btn-ghost btn-sm raffle-filter ${c.view==='mine'?'is-active':''}" data-action="raffle-mine">我的活動</button>`:''}<button class="btn btn-ghost btn-sm raffle-filter raffle-filter-refresh" data-action="raffle-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button>${management?'<button class="btn btn-ghost btn-sm" data-action="raffle-claim-scan">掃碼核銷</button>':''}${management&&c.canCreate?'<button class="btn btn-primary btn-sm" data-action="raffle-new">建立活動</button>':''}</div>`;
+ const publicToolbar=`<div class="btn-row raffle-toolbar"><button class="btn btn-ghost btn-sm raffle-filter ${c.view!=='mine'?'is-active':''}" data-action="raffle-list">全部活動</button>${currentAuthUid()?`<button class="btn btn-ghost btn-sm raffle-filter ${c.view==='mine'?'is-active':''}" data-action="raffle-mine">我的活動</button>`:''}<button class="btn btn-ghost btn-sm raffle-filter raffle-filter-refresh" data-action="raffle-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>`;
+ const managementToolbar=management?`<div class="raffle-management-tools">
+   <div class="raffle-management-filters">
+     <button class="btn btn-ghost raffle-filter ${c.view!=='mine'?'is-active':''}" data-action="raffle-list">全部活動</button>
+     ${currentAuthUid()?`<button class="btn btn-ghost raffle-filter ${c.view==='mine'?'is-active':''}" data-action="raffle-mine">我的活動</button>`:''}
+   </div>
+   <div class="raffle-management-actions">
+     ${c.canCreate?'<button class="btn btn-primary" data-action="raffle-new">建立活動</button>':''}
+     <button class="btn btn-ghost raffle-filter-refresh" data-action="raffle-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button>
+     <button class="btn btn-ghost" data-action="raffle-claim-scan">掃碼核銷</button>
+   </div>
+ </div>`:'';
  const header=management
-  ?`<div class="panel-title"><span>🎰 會員抽獎管理</span>${toolbar}</div>`
-  :`<div class="raffle-public-page-head"><div class="raffle-public-title-block"><div class="raffle-public-kicker">MEMBER RAFFLE</div><h1>會員抽獎</h1><p>查看目前開放中的會員活動與開獎結果</p></div>${toolbar}</div>`;
+  ?`<div class="raffle-management-head"><div class="raffle-management-title">🎰 會員抽獎管理</div>${managementToolbar}</div>`
+  :`<div class="raffle-public-page-head"><div class="raffle-public-title-block"><div class="raffle-public-kicker">MEMBER RAFFLE</div><h1>會員抽獎</h1><p>查看目前開放中的會員活動與開獎結果</p></div>${publicToolbar}</div>`;
  return `<section class="panel raffle-page ${management?'raffle-page-management':'raffle-page-public'}">${header}${c.error?`<div class="raffle-status-note is-warning" role="alert"><span>狀態尚未同步</span><p>${esc(c.error)}</p><button class="btn btn-ghost btn-sm" data-action="raffle-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>`:''}${c.pending?`<div class="raffle-status-note"><span>有一筆操作等待確認</span><button class="btn btn-primary btn-sm" data-action="raffle-retry-pending" ${c.busy?'disabled':''}>重試原操作</button></div>`:''}${c.loading?'<div class="raffle-loading-state" role="status"><span class="raffle-loading-dot"></span>正在載入活動…</div>':''}
  ${management&&c.editing?renderRaffleEditor(c):e?`<article>${raffleShareUrl(e)?'<button class="btn btn-ghost" data-action="raffle-share">分享活動／QR</button>':''}<h2>${e.testMode?'（TEST）':''}${esc(e.title)}</h2><p class="hint">${esc(raffleStateLabels[e.state])}${e.delayed?'｜處理延遲，系統正在重試':''}｜${e.mode==='auto'?'線上自動開獎':'現場手動開獎'}</p><div class="mailbox-body">${esc(e.description)}</div><p>報名：${esc(mailboxDate(e.startAt))} ～ ${esc(mailboxDate(e.endAt))}<br>開獎：${esc(mailboxDate(e.drawAt))}（台灣時間）<br>領獎期限：${esc(mailboxDate(e.claimUntil))}</p><p class="hint">${e.conditions.length?(e.combination==='all'?'全部符合：':'符合任一項：')+e.conditions.map(raffleRuleLabel).map(esc).join('；'):'有效會員即可參加'}${e.checkedInOnly?'；只抽主辦已標記報到者':''}</p><div class="grid grid-2 inventory-grid">${e.prizes.map(p=>`<div class="panel inventory-card">${inventoryImage(p.imageUrl)?`<img class="inventory-image" src="${esc(p.imageUrl)}" alt="${esc(p.name)}" referrerpolicy="no-referrer">`:''}<span>${esc(p.name)} × ${p.quantity}</span></div>`).join('')}</div>
  <p>我的狀態：${esc(d.myEntry?({joined:'已參加',pending_review:'待主辦審核',rejected:'審核未通過',cancelled:'已取消'})[d.myEntry.status]||d.myEntry.status:currentAuthUid()?'尚未參加':'尚未登入')}${d.myEntry?.award?'｜'+esc(d.myEntry.award.prizeName)+'：'+esc(({pending:'已中獎／待領獎',claimed:'已領獎',forfeited:'已棄領',replaced:'已補抽'})[d.myEntry.award.status]||''):''}${d.myEntry?.refundedAt?'｜退票處理完成':''}</p>
