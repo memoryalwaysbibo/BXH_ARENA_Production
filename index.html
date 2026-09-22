@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.20">
+<meta name="bxh-build" content="20260922.21">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.20";
+  var CURRENT_BUILD="20260922.21";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3681,7 +3681,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
-<script src="family-ui.js?v=13.42.1"></script>
+<script src="family-ui.js?v=14.0.24"></script>
 <script src="raffle-ui.js?v=14.0.12"></script>
 <script>
 // Standalone browsers do not provide the hosted artifact's window.storage API.
@@ -3852,9 +3852,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.23";
+const APP_VERSION = "v14.0.24";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.24",date:"2026/09/22",timezone:"Asia/Taipei",title:"本人／兒童雙軌報名入口",updateLevel:"patch",added:["一般公開賽事新增獨立本人報名與兒童報名入口","本人已報名後仍可繼續替家庭選手報名"],changed:["賽事詳細頁改讀取同帳號的所有有效家庭報名","兒童報名只列出尚未報名的家庭選手"],fixed:["修正本人報名後報名入口被取消按鈕取代，導致同帳號無法再替孩子報名"],environment:"Production / HTML + Firebase",deployStatus:"Frontend family registration UX",firebaseImpact:"無資料結構變更；沿用既有 familyRegistration callable",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"同一帳號可分別替本人與孩子報名同一場賽事；本人已報名後兒童報名入口仍會保留。"},
   {version:"v14.0.23",date:"2026/09/22",timezone:"Asia/Taipei",title:"賽果自動封存／更正權限收斂",updateLevel:"patch",added:["最終賽果完成後自動進入結算與封存，不再要求最高管理員再次確認"],changed:["封存失敗時僅提供重試，不再跳出二次確認視窗","已封存賽事的解除封存與結果更正入口僅最高管理員可使用"],fixed:["避免一般管理人員誤解除已完成賽事封存狀態"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament lifecycle UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"最高管理員保留歷史賽事更正權；賽果完成後封存改為自動流程",publicSummary:"比賽結果確認完成後會自動封存；只有最高管理員可以解除封存並更正歷史結果。"},
   {version:"v14.0.22",date:"2026/09/22",timezone:"Asia/Taipei",title:"近期積分排序介面精簡",updateLevel:"patch",added:[],changed:["近期積分紀錄僅保留單一排序方式選單"],fixed:["移除舊版重複排序器，避免兩組排序同時出現並互相覆蓋"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX cleanup",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"近期積分紀錄現在只保留一組排序選單，操作更直覺。"},
   {version:"v14.0.21",date:"2026/09/22",timezone:"Asia/Taipei",title:"天梯二階選單／近期積分紀錄",updateLevel:"patch",added:["天梯頁新增天梯積分排行與近期積分紀錄二階切換","近期積分紀錄新增積分、姓名筆畫、日期排序"],changed:["近期積分紀錄改為獨立頁籤，不再塞在排行榜最底部","玩家模式隱藏操作人欄位，管理模式保留完整稽核資訊"],fixed:["修正玩家模式無法看到近期積分紀錄入口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend ladder UX",firebaseImpact:"無資料結構變更；沿用 ladderTransactions 讀取",securityRulesImpact:"無",permissionImpact:"依既有 ladderTransactions 讀取權限顯示",publicSummary:"天梯排行與近期積分紀錄可直接切換，並支援多種排序。"},
@@ -14479,7 +14480,7 @@ function lobbyRegistrationButtons(t, loggedIn){
   if(reg){
     const label=reg.status==="confirmed"?"已報名（正取）":reg.status==="pending_draw"?"待抽籤":"已報名（備取）";
     const canCancel=!!t.cancellationDeadline && now<t.cancellationDeadline;
-    return `<span class="fe-status-chip status-${esc(reg.status)}">${label}</span>${infoButton("查看賽事資訊")}${canCancel?`<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(t.code)}">取消報名</button>`:""}`;
+    return `<span class="fe-status-chip status-${esc(reg.status)}">${label}</span>${infoButton(t.registrationSelection?"查看賽事資訊":"查看／新增兒童報名")}${canCancel?`<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(t.code)}">取消報名</button>`:""}`;
   }
   if(t.regStatus==="scheduled"){
     return `<div class="lobby-registration-action-stack">${renderRegistrationCountdown(t.code,t.openAt)}${infoButton("查看賽事資訊")}</div>`;
@@ -14853,7 +14854,8 @@ let myRegistrationsCache = null; // null = not yet fetched this session
 // Tournament detail screen state (Phase 3)
 let tournamentDetailCode = null;
 let tournamentDetailData = null; // publicTournaments data for this code
-let tournamentDetailMyReg = null; // {status, ...} or null if never registered, or 'loading'
+let tournamentDetailMyReg = null; // primary registration shown for backward-compatible UI
+let tournamentDetailMyRegs = []; // all active registrations owned by this guardian account
 let tournamentDetailLoading = false;
 let tournamentDetailError = null;
 let tournamentDetailChildConfirmed = false;
@@ -14890,10 +14892,22 @@ async function loadTournamentDetail(code){
     if(!data){ tournamentDetailError = "找不到賽事"; tournamentDetailLoading = false; render(); return; }
     tournamentDetailData = data;
     const uid = (typeof firebaseUser!=="undefined" && firebaseUser) ? firebaseUser.uid : null;
-    if(uid && window.cloudSync.getMyRegistrationForTournament){
-      tournamentDetailMyReg = await window.cloudSync.getMyRegistrationForTournament(code);
-    } else {
-      tournamentDetailMyReg = null;
+    tournamentDetailMyRegs=[];
+    tournamentDetailMyReg=null;
+    if(uid){
+      let familyLoaded=false;
+      if(window.engagementService?.familyRegistration){
+        try{
+          const mine=await window.engagementService.familyRegistration({action:'mine',code});
+          tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist','pending_draw'].includes(row.status));
+          tournamentDetailMyReg=tournamentDetailMyRegs.find(row=>!row.familyPlayerId)||tournamentDetailMyRegs[0]||null;
+          familyLoaded=true;
+        }catch(e){console.warn('[BXH family registration mine failed; fallback to legacy registration read]',e)}
+      }
+      if(!familyLoaded&&window.cloudSync.getMyRegistrationForTournament){
+        tournamentDetailMyReg=await window.cloudSync.getMyRegistrationForTournament(code);
+        tournamentDetailMyRegs=tournamentDetailMyReg?[tournamentDetailMyReg]:[];
+      }
     }
     tournamentDetailError = null;
   }catch(e){
@@ -14904,7 +14918,7 @@ async function loadTournamentDetail(code){
 }
 
 function resetTournamentDetailState(){
-  tournamentDetailCode = null; tournamentDetailData = null; tournamentDetailMyReg = null;
+  tournamentDetailCode = null; tournamentDetailData = null; tournamentDetailMyReg = null; tournamentDetailMyRegs = [];
   tournamentDetailLoading = false; tournamentDetailError = null;
   tournamentDetailChildConfirmed = false; tournamentDetailBusy = false;
 }
@@ -14927,10 +14941,15 @@ function renderTournamentDetailScreen(){
   }), now);
   const confirmedRemaining = t.registrationSelection ? Math.max(0,t.registrationSelection.capacity-(t.confirmedCount||0)) : Math.max(0, (t.capacity||0) - (t.confirmedCount||0));
   const waitlistRemaining = Math.max(0, (t.waitlistCapacity||0) - (t.waitlistCount||0));
-  const isGuestMode = isGuestReadOnlyContext();
-  const myReg = isGuestMode ? null : tournamentDetailMyReg;
-  const isLoggedIn = !!(userProfile && firebaseUser);
-  const profileIncomplete = isLoggedIn && !userProfile.realName;
+  const isGuestMode=isGuestReadOnlyContext();
+  const activeMyRegs=isGuestMode?[]:(Array.isArray(tournamentDetailMyRegs)&&tournamentDetailMyRegs.length?tournamentDetailMyRegs:(tournamentDetailMyReg?[tournamentDetailMyReg]:[])).filter(row=>row&&['confirmed','waitlist','pending_draw'].includes(row.status));
+  const selfReg=activeMyRegs.find(row=>!row.familyPlayerId)||null;
+  const myReg=selfReg||activeMyRegs[0]||null;
+  const hasSelfRegistration=!!selfReg;
+  const isLoggedIn=!!(userProfile&&firebaseUser);
+  const profileIncomplete=isLoggedIn&&!userProfile.realName;
+  const childRegistrationAllowed=!t.registrationSelection&&!(t.ladderMode==='ranked'&&!t.testLadderEnabled);
+  const additionalRegistrationAvailable=confirmedRemaining>0||(t.waitlistEnabled&&waitlistRemaining>0);
 
   let actionHtml;
   if(publicTournamentRegistrationLocked(t)){
@@ -14939,29 +14958,24 @@ function renderTournamentDetailScreen(){
   } else if(isGuestMode){
     actionHtml = `<div class="hint">遊客模式僅供瀏覽公開賽事資訊，不提供報名／取消報名操作。</div>
       <button class="btn btn-primary" data-action="select-role-player">切換至玩家模式</button>`;
-  } else if(myReg && (["confirmed","waitlist","pending_draw"].includes(myReg.status))){
-    const statusLabel = t.registrationSelection?.status==='drawing'?'抽籤處理中':t.registrationSelection?.status==='open'||myReg.status==='pending_draw'?'待抽籤':myReg.status==='confirmed'?'正取':'備取'+(myReg.waitRank?'第 '+myReg.waitRank+' 位（原始順位）':'');
-    const canCancel = t.cancellationDeadline && now < t.cancellationDeadline && t.tournamentPhase==="waiting";
-    const participantName = myReg.participantName||myReg.displayName||myReg.realName||userProfile?.displayName||userProfile?.realName||"本人";
-    const requiresCheckin = t.checkinRequired===true || t.parsedData?.meta?.checkinRequired===true;
-    actionHtml = `
+  } else if(activeMyRegs.length){
+    const canCancel=t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
+    const requiresCheckin=t.checkinRequired===true||t.parsedData?.meta?.checkinRequired===true;
+    const participantCards=activeMyRegs.map(row=>{
+      const statusLabel=t.registrationSelection?.status==='drawing'?'抽籤處理中':t.registrationSelection?.status==='open'||row.status==='pending_draw'?'待抽籤':row.status==='confirmed'?'正取':'備取'+(row.waitRank?'第 '+row.waitRank+' 位（原始順位）':'');
+      const participantName=row.participantName||row.displayName||row.realName||(!row.familyPlayerId?(userProfile?.displayName||userProfile?.realName):'家庭選手')||'參賽者';
+      return '<div class="stat-box"><div class="label">'+esc(participantName)+'</div><div class="value small">'+esc(statusLabel)+'</div></div>';
+    }).join('');
+    const addSelfButton=additionalRegistrationAvailable&&t.targetGroup!=="children"&&!hasSelfRegistration?`<button class="btn btn-primary" data-action="submit-tournament-registration" data-participant-mode="self" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>本人報名</button>`:'';
+    const addChildButton=additionalRegistrationAvailable&&childRegistrationAllowed?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>兒童報名</button>`:'';
+    actionHtml=`
       <div id="registration-result-panel" class="registration-result-panel">
-        <div class="registration-result-head">
-          <span class="registration-result-icon">✓</span>
-          <div><div class="registration-result-title">報名成功</div><div class="registration-result-subtitle">您的名額已登記，請確認下方活動與參賽資料。</div></div>
-        </div>
-        <div class="registration-result-grid">
-          <div class="stat-box"><div class="label">賽事</div><div class="value small">${esc(t.name||code)}</div></div>
-          <div class="stat-box"><div class="label">參賽者</div><div class="value small">${esc(participantName)}</div></div>
-          <div class="stat-box"><div class="label">報名狀態</div><div class="value small">${esc(statusLabel)}</div></div>
-          <div class="stat-box"><div class="label">現場報到</div><div class="value small">${requiresCheckin?'尚未完成':'本場免報到'}</div></div>
-          <div class="stat-box"><div class="label">報到時間</div><div class="value small">${esc(t.checkInAt||'依主辦公告')}</div></div>
-          <div class="stat-box"><div class="label">報名費</div><div class="value small">${t.fee!=null?esc(String(t.fee))+' 元':'免費'}</div></div>
-        </div>
-        ${requiresCheckin?`<div class="registration-next-step"><b>下一步｜現場繳費與報到</b><br>活動當日請向工作人員完成繳費；由工作人員確認報到後，才會正式進入對戰名單。</div>`:''}
-        <div class="registration-cancel-row">${canCancel
-          ? `<button class="btn btn-sm registration-cancel-link" data-action="cancel-my-registration" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>取消這場報名</button>`
-          : `<span class="hint">${t.cancellationDeadline ? "已超過取消期限，無法取消" : "目前無法取消報名"}</span>`}</div>
+        <div class="registration-result-head"><span class="registration-result-icon">✓</span><div><div class="registration-result-title">我的報名（${activeMyRegs.length}）</div><div class="registration-result-subtitle">同一會員帳號下，每位參賽者各自保留獨立名額與狀態。</div></div></div>
+        <div class="registration-result-grid">${participantCards}</div>
+        ${requiresCheckin?`<div class="registration-next-step"><b>下一步｜現場繳費與報到</b><br>活動當日請向工作人員完成繳費；每位參賽者都要由工作人員確認報到後，才會正式進入對戰名單。</div>`:''}
+        ${t.targetGroup==="children"&&addChildButton?`<label class="checkbox-row"><input type="checkbox" id="child-eligibility-checkbox" ${tournamentDetailChildConfirmed?'checked':''}> 我確認報名兒童符合 6 歲以上、13 歲以下的參加資格</label>`:''}
+        ${addSelfButton||addChildButton?`<div class="btn-row" style="margin-top:12px;">${addSelfButton}${addChildButton}</div>`:''}
+        <div class="registration-cancel-row">${canCancel?`<button class="btn btn-sm registration-cancel-link" data-action="cancel-my-registration" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${activeMyRegs.length>1?'取消其中一位報名':'取消這場報名'}</button>`:`<span class="hint">${t.cancellationDeadline?"已超過取消期限，無法取消":"目前無法取消報名"}</span>`}</div>
       </div>
     `;
   } else if(effStatus==="cancelled" || t.eventCancelled){
@@ -14989,12 +15003,15 @@ function renderTournamentDetailScreen(){
     // open — either straight confirmed slot or waitlist
     const willBeWaitlist = !t.registrationSelection && confirmedRemaining<=0;
     if(t.targetGroup==="children"){
-      actionHtml = `
-        <label class="checkbox-row"><input type="checkbox" id="child-eligibility-checkbox" ${tournamentDetailChildConfirmed?'checked':''}> 我確認報名者符合 6 歲以上、13 歲以下的參加資格</label>
-        <button class="btn btn-primary" data-action="submit-tournament-registration" data-code="${esc(code)}" ${(tournamentDetailBusy)?'disabled':''}>${willBeWaitlist?'加入備取':'立即報名'}</button>
-      `;
-    } else {
-      actionHtml = `<button class="btn btn-primary" data-action="submit-tournament-registration" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'加入備取':'立即報名'}</button>`;
+      actionHtml=childRegistrationAllowed?`
+        <label class="checkbox-row"><input type="checkbox" id="child-eligibility-checkbox" ${tournamentDetailChildConfirmed?'checked':''}> 我確認報名兒童符合 6 歲以上、13 歲以下的參加資格</label>
+        <button class="btn btn-primary" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'兒童加入備取':'兒童報名'}</button>
+      `:'<div class="hint">此類賽事目前不開放家庭兒童代報名。</div><button class="btn btn-ghost" disabled>兒童報名未開放</button>';
+    }else{
+      actionHtml=`<div class="btn-row">
+        <button class="btn btn-primary" data-action="submit-tournament-registration" data-participant-mode="self" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'本人加入備取':'本人報名'}</button>
+        ${childRegistrationAllowed?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'兒童加入備取':'兒童報名'}</button>`:''}
+      </div>`;
     }
   }
 
@@ -18356,7 +18373,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可報名，請切換至玩家模式", true); return; }
     if(tournamentDetailData && publicTournamentRegistrationLocked(tournamentDetailData)){ showToast("賽事已開始，報名系統已鎖定",true); return; }
     if(tournamentDetailBusy) return;
-    const code = target.getAttribute("data-code");
+    const code=target.getAttribute("data-code");
+    const participantMode=target.getAttribute("data-participant-mode")==="children"?"children":"self";
     const t = tournamentDetailData;
     let childConfirmed = true;
     if(t && t.targetGroup==="children"){
@@ -18368,7 +18386,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async ()=>{
       try{
         if(!window.cloudSync || !window.cloudSync.joinTournamentAsPlayer) throw { code:"network" };
-        const result = await window.cloudSync.joinTournamentAsPlayer(code, childConfirmed);
+        const result=await window.cloudSync.joinTournamentAsPlayer(code,childConfirmed,participantMode);
         showToast(result.status==="pending_draw" ? "報名成功，等待抽籤" : result.status==="confirmed" ? "報名成功（正取）" : "報名成功（備取）");
         pendingRegistrationCode = null;
         clearRegistrationParamFromUrl();
@@ -22106,13 +22124,17 @@ init();
     // 查詢玩家自己的報名記錄。這四個函式尚未在真實 Firestore Emulator
     // 執行過，僅通過人工邏輯審查。====
 
-    async joinTournamentAsPlayer(code, childEligibilityConfirmed){
-      const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
-      if(!uid) throw { code: "auth-required" };
+    async joinTournamentAsPlayer(code,childEligibilityConfirmed,participantMode="self"){
+      const uid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
+      if(!uid)throw{code:"auth-required"};
       const selectionDoc=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
       if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
-      if(selectionDoc.exists()&&selectionDoc.data().registrationSelection)return window.engagementService.lotteryRegistration({code,action:'join',childEligibilityConfirmed});
-      const selection=await chooseFamilyParticipant(selectionDoc.exists()?selectionDoc.data():{},code,childEligibilityConfirmed);
+      const mode=participantMode==='children'?'children':'self';
+      if(selectionDoc.exists()&&selectionDoc.data().registrationSelection){
+        if(mode==='children')throw Error('child-registration-unavailable');
+        return window.engagementService.lotteryRegistration({code,action:'join',childEligibilityConfirmed});
+      }
+      const selection=await chooseFamilyParticipant(selectionDoc.exists()?selectionDoc.data():{},code,childEligibilityConfirmed,mode);
       if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
       return window.engagementService.familyRegistration({action:'join',code,childIds:selection.childIds,allocation:selection.allocation,childEligibilityConfirmed:childEligibilityConfirmed===true,operationId:crypto.randomUUID()});
     },

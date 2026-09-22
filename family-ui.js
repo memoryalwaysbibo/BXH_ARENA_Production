@@ -1,4 +1,4 @@
-/* v13.40.2 Community-room atomic deletion and Firestore diagnostics. */
+/* v14.0.24 Separate self/child registration entry; v13.40.2 community-room diagnostics retained. */
 function openFamilyPlayers(){
  document.getElementById('bxh-family-dialog')?.close();
  const uid=currentAuthUid(),epoch=engagementSessionEpoch,previous=document.activeElement,dialog=document.createElement('dialog');dialog.id='bxh-family-dialog';dialog.className='raffle-claim-dialog';
@@ -45,21 +45,74 @@ async function chooseFamilyRegistrationToCancel(rows){
  });
 }
 
-async function chooseFamilyParticipant(event,code,childEligibilityConfirmed){
+async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode='self'){
  const owner=currentAuthUid(),epoch=engagementSessionEpoch;
  const r=await window.engagementService.family({action:'list'});
  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
  if(!r?.ok)throw Error('unavailable');
- const children=(r.profiles||[]).filter(p=>!p.archived&&!p.accountUid),blocked=!!event.registrationSelection||(event.ladderMode==='ranked'&&!event.testLadderEnabled);
+ const children=(r.profiles||[]).filter(p=>!p.archived&&!p.accountUid);
+ const blocked=!!event.registrationSelection||(event.ladderMode==='ranked'&&!event.testLadderEnabled);
+ const requestedMode=mode==='children'?'children':'self';
+ let activeRows=[];
+ try{
+  const mine=await window.engagementService.familyRegistration({action:'mine',code});
+  activeRows=(mine?.rows||[]).filter(x=>x&&['confirmed','waitlist','pending_draw'].includes(x.status));
+ }catch(e){}
+ const activeFamilyIds=new Set(activeRows.filter(x=>x.familyPlayerId).map(x=>String(x.familyPlayerId)));
+ const selfRegistered=activeRows.some(x=>!x.familyPlayerId);
+ const availableChildren=children.filter(p=>!activeFamilyIds.has(String(p.id)));
+ if(requestedMode==='children'&&blocked)throw Error('child-registration-unavailable');
+ if(requestedMode==='self'&&selfRegistered)throw Error('already-registered');
  return new Promise((resolve,reject)=>{
-  const dialog=document.createElement('dialog'),focus=document.activeElement;dialog.className='raffle-claim-dialog';
-  dialog.innerHTML='<header><h2>選擇本場參賽者</h2><button class="btn btn-ghost" data-close>取消</button></header><p>可選本人及多位孩子；每位參賽者各占一個名額。孩子順序會固定為 C1、C2，不會重新排列。</p><form><fieldset><legend>參賽者</legend><label><input type="checkbox" name="participant" value="" checked> 本人參賽</label>'+children.map((p,i)=>{const code=p.displayCode||p.playerId||('C'+(i+1));return '<label><input type="checkbox" name="participant" value="'+esc(p.id)+'"'+(blocked?' disabled':'')+'> '+esc(p.name)+(p.nickname?'（'+esc(p.nickname)+'）':'')+' <span class="hint">'+esc(code)+'</span></label>';}).join('')+'</fieldset><p class="hint">'+(blocked?'本場為正式積分賽或超額抽籤，孩子代報名尚未開放。':children.length?'孩子的參賽姓名會依主辦設定顯示於名單及對戰表；生日不公開。叫號由家長帳號接收。':'如需替孩子報名，請先至會員資料 → 家庭選手／孩子資料建立資料。')+'</p><p data-family="allocation" role="status"></p><button class="btn btn-primary" type="submit">預覽名額並確認</button></form>';
-  let done=false;const finish=(error,value)=>{if(done)return;done=true;clearInterval(timer);dialog.close();dialog.remove();focus?.focus?.();if(error)reject(Error(error));else resolve(value)};
+  const dialog=document.createElement('dialog'),focus=document.activeElement;
+  dialog.className='raffle-claim-dialog';
+  const participantFields=requestedMode==='children'
+   ?(availableChildren.length
+     ?availableChildren.map((p,i)=>{
+       const childCode=p.displayCode||p.playerId||('C'+(i+1));
+       return '<label><input type="checkbox" name="participant" value="'+esc(p.id)+'"> '+esc(p.name)+(p.nickname?'（'+esc(p.nickname)+'）':'')+' <span class="hint">'+esc(childCode)+'</span></label>';
+      }).join('')
+     :'<p class="hint">目前沒有可報名的兒童資料。若尚未建立，請先到會員資料 → 家庭選手／孩子資料新增。</p>')
+   :'<label><input type="checkbox" name="participant" value="" checked> 本人參賽</label>';
+  dialog.innerHTML='<header><h2>'+(requestedMode==='children'?'兒童報名':'本人報名')+'</h2><button class="btn btn-ghost" data-close>取消</button></header>'
+   +'<p>'+(requestedMode==='children'?'請選擇要參加這場賽事的孩子；每位孩子各占一個名額。':'確認由目前登入會員本人參加這場賽事。')+'</p>'
+   +'<form><fieldset><legend>參賽者</legend>'+participantFields+'</fieldset>'
+   +'<p class="hint">'+(requestedMode==='children'?(availableChildren.length?'已報名的孩子不會重複出現在可選清單。':'可先建立孩子資料後再回到本場報名。'):'本人與兒童報名分開處理；之後仍可再使用「兒童報名」新增孩子。')+'</p>'
+   +'<p data-family="allocation" role="status"></p>'
+   +'<button class="btn btn-primary" type="submit" '+(requestedMode==='children'&&!availableChildren.length?'disabled':'')+'>預覽名額並確認</button></form>';
+  let done=false;
+  const finish=(error,value)=>{if(done)return;done=true;clearInterval(timer);dialog.close();dialog.remove();focus?.focus?.();if(error)reject(Error(error));else resolve(value)};
   const timer=setInterval(()=>{if(document.hidden)return;if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)finish('auth-required')},1000);
-  dialog.querySelector('[data-close]').onclick=()=>finish('registration-aborted');dialog.oncancel=e=>{e.preventDefault();finish('registration-aborted')};dialog.onclose=()=>finish('registration-aborted');
-  dialog.querySelector('form').onsubmit=async e=>{e.preventDefault();if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch){finish('auth-required');return}const ids=[...e.target.querySelectorAll('input[name="participant"]:checked')].map(x=>x.value||null);if(!ids.length||ids.some(id=>id!==null&&!children.some(p=>p.id===id))||(blocked&&ids.some(id=>id!==null)))return;const allocation=dialog.querySelector('[data-family="allocation"]');allocation.textContent='正在檢查名額…';try{const r=await window.engagementService.familyRegistration({action:'preview',code,childIds:ids,childEligibilityConfirmed:childEligibilityConfirmed===true});if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');if(!r?.ok)throw Error('preview-failed');allocation.textContent=(r.rows||[]).map(x=>`${x.participantName}：${x.status==='confirmed'?'正取':'備取'}`).join('、');if(!confirm('名額配置：'+allocation.textContent+'。確定送出報名？'))return;finish(null,{childIds:ids,allocation:r.allocation||[]})}catch(err){const raw=String(err?.details?.message||err?.message||err?.code||'unknown').replace(/^functions\//,'');const known={'auth-required':'請重新登入後再試。','not-found':'找不到這場賽事。','not-enabled':'此賽事尚未開放線上報名。','not-open-yet':'報名尚未開放。','closed':'報名已截止。','full':'正取與備取皆已額滿。','profile-incomplete':'請先完成會員資料。','already-registered':'您已完成報名。','registration-state-conflict':'報名人數尚未同步，請聯絡主辦重新發布賽事。','tournament-started':'賽事已開始，報名系統已鎖定。','test-event-required':'封測身分限制尚未更新，請重新整理後再試。'};allocation.textContent=known[raw]||Object.entries(known).find(([key])=>raw.includes(key))?.[1]||('名額檢查失敗（'+raw+'）');console.error('[BXH family registration preview failed]',err)}};document.body.appendChild(dialog);dialog.showModal();
+  dialog.querySelector('[data-close]').onclick=()=>finish('registration-aborted');
+  dialog.oncancel=e=>{e.preventDefault();finish('registration-aborted')};
+  dialog.onclose=()=>finish('registration-aborted');
+  dialog.querySelector('form').onsubmit=async e=>{
+   e.preventDefault();
+   if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch){finish('auth-required');return}
+   const ids=requestedMode==='self'?[null]:[...e.target.querySelectorAll('input[name="participant"]:checked')].map(x=>x.value).filter(Boolean);
+   const allocation=dialog.querySelector('[data-family="allocation"]');
+   if(requestedMode==='children'&&!ids.length){allocation.textContent='請至少選擇一位孩子。';return}
+   if(ids.some(id=>id!==null&&!availableChildren.some(p=>p.id===id))){allocation.textContent='參賽者資料已變更，請重新開啟報名。';return}
+   allocation.textContent='正在檢查名額…';
+   try{
+    const preview=await window.engagementService.familyRegistration({action:'preview',code,childIds:ids,childEligibilityConfirmed:childEligibilityConfirmed===true});
+    if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
+    if(!preview?.ok)throw Error('preview-failed');
+    allocation.textContent=(preview.rows||[]).map(x=>String(x.participantName||'參賽者')+'：'+(x.status==='confirmed'?'正取':'備取')).join('、');
+    if(!confirm('名額配置：'+allocation.textContent+'。確定送出報名？'))return;
+    finish(null,{childIds:ids,allocation:preview.allocation||[]});
+   }catch(err){
+    const raw=String(err?.details?.message||err?.message||err?.code||'unknown').replace(/^functions\//,'');
+    const known={'auth-required':'請重新登入後再試。','not-found':'找不到這場賽事。','not-enabled':'此賽事尚未開放線上報名。','not-open-yet':'報名尚未開放。','closed':'報名已截止。','full':'正取與備取皆已額滿。','profile-incomplete':'請先完成會員資料。','already-registered':'這位參賽者已完成報名。','registration-state-conflict':'報名人數尚未同步，請聯絡主辦重新發布賽事。','tournament-started':'賽事已開始，報名系統已鎖定。','test-event-required':'封測身分限制尚未更新，請重新整理後再試。'};
+    allocation.textContent=known[raw]||Object.entries(known).find(([key])=>raw.includes(key))?.[1]||('名額檢查失敗（'+raw+'）');
+    console.error('[BXH family registration preview failed]',err);
+   }
+  };
+  document.body.appendChild(dialog);
+  dialog.showModal();
  });
 }
+
 // v13.40.0 beta hotfix: tester-owned general rooms must sync and delete.
 (function installTesterGeneralRoomHotfix(){
   function currentProfile(){
