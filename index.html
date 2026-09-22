@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.05">
+<meta name="bxh-build" content="20260922.06">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.05";
+  var CURRENT_BUILD="20260922.06";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3573,7 +3573,7 @@ let mainTabNavCenterRequested = true;
 
 /* ==== leave tournament ==== */
 let leaveTournamentBusy = false;
-let publicWatchReturnContext = null; // "player-center" | "guest-lobby" when viewing from the lobby
+let publicWatchReturnContext = null; // "player-center" | "player-registered" | "guest-lobby"
 let publicWatchUsesPrivateData = false; // privileged operator entered from lobby but is subscribed to the full tournament document
 // "最近查看" — up to 3 entries, each ONLY {code, name, viewedAt}. Never stores
 // private tournament data, phone numbers, or a full tournament JSON blob.
@@ -3599,9 +3599,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.8";
+const APP_VERSION = "v14.0.9";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.9",date:"2026/09/22",timezone:"Asia/Taipei",title:"玩家我的賽程／唯讀樹狀圖往返",updateLevel:"patch",added:["玩家『我的賽程』活動卡新增『查看樹狀圖』入口","玩家樹狀圖頂端新增『← 返回我的賽程』往返按鈕"],changed:["玩家樹狀圖固定使用 publicTournaments 公開安全鏡像，維持唯讀，不開放裁判、計分或管理操作","未產生對戰表時顯示『樹狀圖尚未產生』停用按鈕，避免進入空白頁"],fixed:["玩家從我的賽程進入對戰表後返回時，正確回到『我的賽程』而非賽事大廳首頁"],environment:"Production / HTML + Firebase",deployStatus:"Frontend player navigation patch",firebaseImpact:"無資料結構變更；只讀既有 publicTournaments",securityRulesImpact:"無",permissionImpact:"不擴張；玩家僅能瀏覽公開安全鏡像",publicSummary:"玩家可直接從我的賽程查看唯讀樹狀圖，並一鍵返回原本的我的賽程頁。"},
   {version:"v14.0.8",date:"2026/09/22",timezone:"Asia/Taipei",title:"裁判台／對戰表快速往返",updateLevel:"patch",added:["裁判台新增「← 對戰表」快速返回按鈕","對戰表新增「裁判台 →」快速前往按鈕"],changed:["官方賽事沿用既有 switch-tab 權限流程；玩家一般賽事沿用 community-switch-room-tab，不新增第二套路由"],fixed:["減少現場裁判在裁判台與對戰表之間需返回上層再切分頁的操作步驟"],environment:"Production / HTML + Firebase",deployStatus:"Frontend navigation patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；按鈕僅在原本具裁判台存取權限的管理／房主情境顯示",publicSummary:"裁判台與對戰表新增雙向快速切換，現場查表與判定可一鍵往返。"},
   {version:"v14.0.7",date:"2026/09/22",timezone:"Asia/Taipei",title:"Challonge 高密度樹狀圖改版",updateLevel:"minor",added:["樹狀圖新增左側種子／選手編號欄","BYE 輪空不再保留整格高度","以實際比賽最多輪次作為密度排列基準"],changed:["手機樹狀圖改為高密度卡片、極小輪次欄距與緊湊上方控制列","Round 標題改為扁平深灰欄，連線縮細並縮短","上方標題、工具列、狀態圖例與分享按鈕同步壓縮"],fixed:["改善 34/47 人進 64 籤時因大量 BYE 造成巨大垂直空洞","改善場次上下距離及輪次左右間距過大"],environment:"Production / HTML + Firebase",deployStatus:"Frontend UI overhaul",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"BXH ARENA 樹狀圖改為接近 Challonge 的高密度對戰表，場次更緊湊、玩家編號置於姓名左側。"},
   {version:"v14.0.6",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀對戰表密度優化",updateLevel:"patch",added:["手機樹狀看板改為單列可橫向滑動的緊湊工具列","參考 Challonge 縮短輪次欄距、卡片高度與第一輪垂直間距"],changed:["看板標題、狀態、圖例與控制列整體壓縮，讓樹狀圖更早進入可視區","手機看板可視高度提高，減少上方控制區占用"],fixed:["改善大尺寸賽程樹間距過大、50% 縮放仍浪費大量空間的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend UI density patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀對戰表改為更接近 Challonge 的緊湊密度，上方工具列與各輪間距明顯縮小。"},
@@ -14868,6 +14869,8 @@ function renderPlayerRegisteredTab(){
       info.startAt ? `時間 ${info.startAt}` : "",
       info.location ? `地點 ${info.location}` : ""
     ].filter(Boolean);
+    const bracketData=info.parsedData||null;
+    const bracketReady=!!(bracketData && (Number(bracketData.bracketSize)>0 || (Array.isArray(bracketData.matches)&&bracketData.matches.length>0)));
     return `<div class="find-event-card">
       <div class="fe-name">${esc(info.name||r.tournamentCode)}</div>
       <div class="fe-meta">${esc(metaParts.length ? metaParts.join("　｜　") : "活動資訊待公布")}</div>
@@ -14877,6 +14880,9 @@ function renderPlayerRegisteredTab(){
       ${r.status==='confirmed' && schedulePhase(info)==='live' && smartCallModel(r,info).kind!=='done' ? smartCallCardHtml(r,info) : (schedulePhase(info)==='live'&&smartCallModel(r,info).kind==='done'?'<p class="hint">本次參賽已結束｜賽事進行中，名次待結算</p>':'')}
       <div class="fe-card-action">
         <button class="btn btn-ghost btn-sm" data-action="view-public-tournament" data-code="${esc(r.tournamentCode)}">查看詳情</button>
+        ${bracketReady
+          ? `<button class="btn btn-primary btn-sm" data-action="switch-to-player-watch" data-view="bracket" data-return="registered" data-code="${esc(r.tournamentCode)}">查看樹狀圖</button>`
+          : `<button class="btn btn-ghost btn-sm" disabled aria-disabled="true">樹狀圖尚未產生</button>`}
         ${(['confirmed','waitlist','pending_draw'].includes(r.status)) && !publicTournamentRegistrationLocked(info)
           ? `<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(r.tournamentCode)}">取消報名</button>`
           : ((r.status==='confirmed'||r.status==='waitlist'||r.status==='pending_draw') ? `<span class="fe-status-chip status-closed">賽事已開始｜報名鎖定</span>` : "")}
@@ -16495,7 +16501,7 @@ function renderApp(){
         <div class="spacer"></div>
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
-      ${publicWatchReturnContext?`<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">← 返回賽事大廳</button><span>${publicWatchUsesPrivateData?"目前為管理觀賽模式":"目前為公開觀賽模式"}</span></div>`:""}
+      ${publicWatchReturnContext?`<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">${publicWatchReturnContext==="player-registered"?"← 返回我的賽程":"← 返回賽事大廳"}</button><span>${publicWatchReturnContext==="player-registered"?"玩家唯讀樹狀圖":(publicWatchUsesPrivateData?"目前為管理觀賽模式":"目前為公開觀賽模式")}</span></div>`:""}
       <nav class="tabs">
         ${tabs.map(t=>`<button class="${activeTab===t[0]?'active':''}" data-action="switch-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}
       </nav>
@@ -17882,8 +17888,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="switch-to-player-watch"){
     const code=target.getAttribute("data-code");
     const requestedView=target.getAttribute("data-view")==="bracket"?"bracket":"live";
+    const requestedReturn=target.getAttribute("data-return")==="registered"?"player-registered":"player-center";
     if(!code) return;
-    publicWatchReturnContext = currentRole==="guest" ? "guest-lobby" : "player-center";
+    publicWatchReturnContext = currentRole==="guest" ? "guest-lobby" : requestedReturn;
     (async()=>{
       const privileged=hasPrivilegedTournamentProfile();
       const result=await resolveAndJoinTournamentByCode(code,privileged?{forcePrivate:true}:{forcePublic:true});
@@ -17928,7 +17935,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       guestActiveTab="events";
     }else{
       appPhase="player-center";
-      playerActiveTab="home";
+      playerActiveTab=dest==="player-registered"?"registered":"home";
       publicTournamentsCache=null;
     }
     render();
