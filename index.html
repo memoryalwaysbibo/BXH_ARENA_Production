@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.03">
+<meta name="bxh-build" content="20260923.04">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.03";
+  var CURRENT_BUILD="20260923.04";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3911,6 +3911,9 @@ const ARCHIVE_LABELS = { ongoing:"進行中", paused:"已暫停", completed:"已
 let state = defaultState();
 let activeTab = "live";
 let refereeIndex = 0;
+let courtSwapDraft = null;
+const REFEREE_RESUME_KEY = "bxh_referee_workstation_resume_v1";
+const REFEREE_RESUME_TTL_MS = 12*60*60*1000;
 let pendingModal = null;
 let recordIndex = [];
 let viewingRecordId = null;
@@ -4002,7 +4005,7 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.27";
+const APP_VERSION = "v14.0.28";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.0.27",date:"2026/09/23",timezone:"Asia/Taipei",title:"結算參賽人數統計修正",updateLevel:"patch",added:[],changed:["進行中／結算中摘要與賽後中心統一使用正式參賽名單計數"],fixed:["修正報到資料實際存於 players.checkedIn，但摘要誤讀 registrations.checkinStatus 導致已報到顯示 0","修正取消／未報到玩家仍留於歷史 roster 時被 state.players.length 算入正式參賽人數；要求報到的賽事改以已報到玩家／實際對戰表參賽者為準"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement statistics",firebaseImpact:"無資料結構變更；既有賽事重新整理即可套用新統計",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"結算頁的已報到與正式參賽人數現在以實際參賽名單統計，取消或未報到者不再被誤算。"},
@@ -9175,9 +9178,18 @@ function stationExecutionQueue(stationNum){
   let available=refereeMatches().filter(m=>m.station===stationNum&&!m.completed&&m.a&&m.b&&m.status!=="paused");
   if((state.meta.formatType||"single")==="single"){
     const phase=activeSingleElimSchedulePhase();
-    if(phase) available=available.filter(m=>isInActiveSingleElimPhase(m,phase));
+    if(phase){
+      const samePhase=available.filter(m=>isInActiveSingleElimPhase(m,phase));
+      const laterReady=available.filter(m=>!isInActiveSingleElimPhase(m,phase));
+      available=samePhase.concat(laterReady);
+    }
   }
-  const normal=available.filter(m=>!m.skippedAt);
+  const normal=available.filter(m=>!m.skippedAt).sort((a,b)=>{
+    const ap=Number(a.dispatchPriorityAt||0),bp=Number(b.dispatchPriorityAt||0);
+    if(!!ap!==!!bp) return ap?-1:1;
+    if(ap&&bp&&ap!==bp) return bp-ap;
+    return Number(a.seq||0)-Number(b.seq||0);
+  });
   const skipped=available.filter(m=>m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly).sort((a,b)=>a.skippedAt-b.skippedAt || String(a.id).localeCompare(String(b.id)));
   for(const m of skipped){
     if(!Array.isArray(m.skipWaitFor)) m.skipWaitFor=normal.slice(0,2).map(x=>x.id); // legacy rooms
@@ -9227,6 +9239,7 @@ function rebuildCourtAssignments(){
           current.status = "in_progress";
           if(!current.startedAt) current.startedAt = Date.now();
           current.updatedAt = Date.now();
+          current.dispatchPriorityAt = null;
           current.skippedAt = null; current.resumeQueuedAt=null; current.skipWaitFor=[]; current.skipManualOnly=false;
         }else{
           // 產生對戰表／預排裁判台不等於開賽。未按「開始賽事」前只能保持預備狀態。
