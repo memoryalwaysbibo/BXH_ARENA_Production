@@ -36,6 +36,11 @@ must(/\.board-canvas \.bye-placeholder\{[\s\S]*?display:none!important/, 'Board 
 must(/const DENSE_GAP=2;/, 'Dense bracket vertical gap must remain compact');
 must(/match-box:not\(\.bye-placeholder\)/, 'Dense layout must exclude BYE placeholders');
 must(/let anchorRound=0,anchorCount=-1;/, 'Dense anchor-round selector missing');
+must(/function eligiblePlayers\(\)\{[\s\S]*?const needsCheckin = !!\(state\.meta && state\.meta\.checkinRequired\);/, 'Eligible roster must honor on-site check-in without online registration');
+must(/const needsCheckin = !!\(state\.meta && state\.meta\.checkinRequired\);[\s\S]*?新增至待報到名單/, 'People management must expose pending check-in for on-site rosters');
+mustInclude('id="registration-result-panel"','Registration success result panel missing');
+mustInclude('下一步｜現場繳費與報到','On-site payment/check-in guidance missing');
+mustNot(/state\.meta\.registrationEnabled\s*&&\s*state\.meta\.checkinRequired/, 'Check-in must not depend on online registration being enabled');
 must(/WIP Phase 3: final Challonge-density cascade/, 'Final bracket-density cascade missing');
 if(html.indexOf('WIP Phase 3: final Challonge-density cascade') < html.indexOf('v14.0.6 compact bracket / mobile board density')) throw new Error('Final density cascade must override the legacy compact layer');
 const densityCases={8:4,16:8,32:16,34:2,47:15,64:32};
@@ -55,3 +60,4 @@ console.log('PASS realtime lobby sync guard');
 console.log('PASS build/version metadata consistency');
 console.log('PASS pre-start reset bracket control');
 console.log('PASS Challonge-density bracket invariants');
+console.log('PASS unified online/on-site check-in flow');

@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260922.13">
+<meta name="bxh-build" content="20260922.15">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260922.13";
+  var CURRENT_BUILD="20260922.15";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -373,6 +373,17 @@ input,select,textarea{max-width:100%;min-width:0;}
 .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger);}
 .btn-danger:hover{background:var(--danger-glow);}
 .btn-danger-solid{background:var(--danger);color:#fff;border-color:var(--danger);}
+.registration-result-panel{border-color:rgba(61,220,132,.42);background:linear-gradient(145deg,rgba(61,220,132,.08),rgba(217,185,92,.06) 46%,rgba(10,10,11,.88));scroll-margin-top:84px;}
+.registration-result-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;}
+.registration-result-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:50%;background:rgba(61,220,132,.16);border:1px solid rgba(61,220,132,.52);color:var(--ok);font-size:22px;font-weight:900;}
+.registration-result-title{color:var(--white);font:800 20px var(--font-d);}
+.registration-result-subtitle{margin-top:3px;color:var(--metal);font-size:13px;line-height:1.55;}
+.registration-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.registration-next-step{margin-top:12px;padding:12px 14px;border:1px solid rgba(217,185,92,.32);border-radius:10px;background:rgba(217,185,92,.08);color:var(--white);line-height:1.6;}
+.registration-cancel-row{display:flex;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);}
+.registration-cancel-link{background:transparent;color:rgba(255,102,112,.86);border-color:rgba(255,102,112,.38);box-shadow:none;}
+.registration-cancel-link:hover{background:rgba(255,75,87,.08);border-color:rgba(255,102,112,.7);}
+@media(max-width:600px){.registration-result-grid{grid-template-columns:1fr}.registration-cancel-row{justify-content:stretch}.registration-cancel-row .btn{width:100%}}
 .btn-ghost{background:transparent;border-color:var(--border);color:var(--metal);}
 .btn-ghost:hover{color:var(--white);}
 .btn-block{width:100%;}
@@ -3802,9 +3813,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.16";
+const APP_VERSION = "v14.0.18";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.18",date:"2026/09/22",timezone:"Asia/Taipei",title:"報名成功／現場報到流程整合",updateLevel:"minor",added:["玩家報名成功後顯示完整結果卡：賽事、參賽者、正備取、現場報到與費用提醒","純現場賽事也能先建立無帳號玩家，再逐一完成報到"],changed:["報名完成後自動捲動至結果，不必自行往下尋找","取消報名改為次要危險操作，不再成為結果頁唯一醒目按鈕","報到規則不再依賴是否啟用線上報名；線上與現場新增玩家共用同一套報到名單"],fixed:["修正純現場賽事設定需要報到時，現場新增玩家卻看不到報到按鈕","補足報名成功後未提示現場繳費與報到的流程缺口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend registration/check-in UX",firebaseImpact:"沿用既有 players.checkedIn 與報名資料，不新增欄位",securityRulesImpact:"無",permissionImpact:"玩家仍不能自行修改報到；僅既有賽事管理權限可確認報到",publicSummary:"報名成功後會清楚顯示下一步；線上與現場玩家皆可先進入待報到名單，繳費後由工作人員確認報到。"},
   {version:"v14.0.16",date:"2026/09/22",timezone:"Asia/Taipei",title:"完整對戰表 PNG／相簿儲存流程",updateLevel:"patch",added:["匯出完整對戰表改為 PNG File 分享；支援裝置時直接開啟系統分享面板","iPhone 可由分享面板直接選『儲存影像』加入照片相簿","不支援檔案分享的瀏覽器自動退回 PNG 下載"],changed:["按鈕文字由『匯出完整對戰表』改為『儲存完整對戰表』"],fixed:["避免 iPhone 匯出後只能到檔案 Downloads 再手動搬移"],environment:"Production / HTML + Firebase",deployStatus:"Frontend export UX patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"完整對戰表仍輸出 PNG；iPhone 會優先開啟系統分享面板，可直接選儲存影像加入照片相簿。"},
   {version:"v14.0.15",date:"2026/09/22",timezone:"Asia/Taipei",title:"經典賽程樹連接線",updateLevel:"patch",added:[],changed:["樹狀圖改為標準 tournament bracket 連接方式：來源卡片中央出發、共用垂直主線、再由中央水平接入下一場中央","連接線統一淺灰白、直角、無勝方發光與無上下跳動"],fixed:["移除依 A/B 槽位或勝利者列產生的不規則毛毛蟲視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改成經典標準賽程樹樣式，與參考圖一致地從卡片中央規則連接。"},
   {version:"v14.0.14",date:"2026/09/22",timezone:"Asia/Taipei",title:"樹狀圖連接線中線化／場次序號黑金化",updateLevel:"patch",added:[],changed:["樹狀圖往下一場的連接線固定從整個對戰卡垂直中點出發，不再從勝利者列出發","場次序號改為黑底、金字、金框並提高對比"],fixed:["改善勝方位於上／下列時連接線上下跳動造成的毛毛蟲感與不規則視覺"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket visual patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖連接線改由卡片中線出發，場次序號改黑金高對比，整體更整齊易讀。"},
@@ -9079,7 +9091,7 @@ function checkCanChangeStationCount(newCount){
    FORMAT 1: SINGLE ELIMINATION (existing, unchanged logic)
    ====================================================================== */
 function eligiblePlayers(){
-  const needsCheckin = !!(state.meta && state.meta.registrationEnabled && state.meta.checkinRequired);
+  const needsCheckin = !!(state.meta && state.meta.checkinRequired);
   return state.players.filter(p => p && (!needsCheckin || p.checkedIn === true));
 }
 
@@ -11963,7 +11975,9 @@ async function handleEntrySelection(action){
 
 function renderPeopleManagement(){
   const online = !!(state.meta && state.meta.registrationEnabled);
-  const needsCheckin = online && !!state.meta.checkinRequired;
+  // Check-in is an event rule, not an online-registration feature. On-site
+  // rosters must be pre-loadable and checkable even when online signup is off.
+  const needsCheckin = !!(state.meta && state.meta.checkinRequired);
   const checkinClosed = !!state.meta.checkinClosedEarly;
   const checked = state.players.filter(p=>p && p.checkedIn===true);
   const pending = needsCheckin ? state.players.filter(p=>p && p.checkedIn!==true) : [];
@@ -12002,7 +12016,7 @@ function renderPeopleManagement(){
     <div class="btn-row">
       <button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button>
     </div>
-    <p class="hint">提前結束後，未報到人員會保留在下方名單，但不會進入對戰表。</p>
+    <p class="hint">工作人員確認玩家到場並完成繳費後，再按「報到」。提前結束後，未報到人員會保留在下方名單，但不會進入對戰表。</p>
     ${checkinClosed ? `<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>` : ''}
   </div>` : ''}
 
@@ -12018,9 +12032,9 @@ function renderPeopleManagement(){
     <div class="field">
       <label>現場新增選手</label>
       <textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea>
-      <div class="hint">每行一位。系統會標示「（現場）」並保留本場排名，但不寫入天梯、個人戰績或活躍積分。建議優先請玩家申辦帳號後再報名。</div>
+      <div class="hint">每行一位。${needsCheckin?'新增後先列為「未報到」，可事先完成名單；玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入可編排名單。'}現場玩家不需系統帳號，會保留本場排名，但不寫入天梯、個人戰績或活躍積分。</div>
     </div>
-    <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>新增選手</button></div>
+    <div class="btn-row" style="margin-bottom:16px;"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至待報到名單':'新增選手'}</button></div>
 
     <div class="test-roster-box">
       <div class="panel-title" style="font-size:14px;margin-bottom:6px;">測試名單</div>
@@ -14871,11 +14885,27 @@ function renderTournamentDetailScreen(){
   } else if(myReg && (["confirmed","waitlist","pending_draw"].includes(myReg.status))){
     const statusLabel = t.registrationSelection?.status==='drawing'?'抽籤處理中':t.registrationSelection?.status==='open'||myReg.status==='pending_draw'?'待抽籤':myReg.status==='confirmed'?'正取':'備取'+(myReg.waitRank?'第 '+myReg.waitRank+' 位（原始順位）':'');
     const canCancel = t.cancellationDeadline && now < t.cancellationDeadline && t.tournamentPhase==="waiting";
+    const participantName = myReg.participantName||myReg.displayName||myReg.realName||userProfile?.displayName||userProfile?.realName||"本人";
+    const requiresCheckin = t.checkinRequired===true || t.parsedData?.meta?.checkinRequired===true;
     actionHtml = `
-      <div class="stat-box"><div class="label">您的報名狀態</div><div class="value small">${statusLabel}</div></div>
-      ${canCancel
-        ? `<button class="btn btn-danger-solid" data-action="cancel-my-registration" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>取消報名</button>`
-        : `<div class="hint">${t.cancellationDeadline ? "已超過取消期限，無法取消" : "目前無法取消報名"}</div>`}
+      <div id="registration-result-panel" class="registration-result-panel">
+        <div class="registration-result-head">
+          <span class="registration-result-icon">✓</span>
+          <div><div class="registration-result-title">報名成功</div><div class="registration-result-subtitle">您的名額已登記，請確認下方活動與參賽資料。</div></div>
+        </div>
+        <div class="registration-result-grid">
+          <div class="stat-box"><div class="label">賽事</div><div class="value small">${esc(t.name||code)}</div></div>
+          <div class="stat-box"><div class="label">參賽者</div><div class="value small">${esc(participantName)}</div></div>
+          <div class="stat-box"><div class="label">報名狀態</div><div class="value small">${esc(statusLabel)}</div></div>
+          <div class="stat-box"><div class="label">現場報到</div><div class="value small">${requiresCheckin?'尚未完成':'本場免報到'}</div></div>
+          <div class="stat-box"><div class="label">報到時間</div><div class="value small">${esc(t.checkInAt||'依主辦公告')}</div></div>
+          <div class="stat-box"><div class="label">報名費</div><div class="value small">${t.fee!=null?esc(String(t.fee))+' 元':'免費'}</div></div>
+        </div>
+        ${requiresCheckin?`<div class="registration-next-step"><b>下一步｜現場繳費與報到</b><br>活動當日請向工作人員完成繳費；由工作人員確認報到後，才會正式進入對戰名單。</div>`:''}
+        <div class="registration-cancel-row">${canCancel
+          ? `<button class="btn btn-sm registration-cancel-link" data-action="cancel-my-registration" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>取消這場報名</button>`
+          : `<span class="hint">${t.cancellationDeadline ? "已超過取消期限，無法取消" : "目前無法取消報名"}</span>`}</div>
+      </div>
     `;
   } else if(effStatus==="cancelled" || t.eventCancelled){
     actionHtml = `<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
@@ -15112,6 +15142,7 @@ function renderPlayerRegisteredTab(){
       <div class="fe-meta" style="margin-top:4px;color:var(--metal-dim);">賽事代碼 ${esc(r.tournamentCode)}</div>
       <div class="fe-status-row"><span class="fe-status-chip status-${r.status}">${esc(statusLabel)}</span></div>
       <p class="hint">參賽者：${esc(r.displayName||r.realName||"本人")}${r.familyPlayerId?"（孩子，由家長代報名）":""}</p>
+      ${r.status==='confirmed'&&info.checkInAt?`<p class="hint"><b>現場報到尚待完成：</b>請於 ${esc(info.checkInAt)} 向工作人員繳費並完成報到。</p>`:''}
       ${r.status==='confirmed' && schedulePhase(info)==='live' && smartCallModel(r,info).kind!=='done' ? smartCallCardHtml(r,info) : (schedulePhase(info)==='live'&&smartCallModel(r,info).kind==='done'?'<p class="hint">本次參賽已結束｜賽事進行中，名次待結算</p>':'')}
       <div class="fe-card-action">
         <button class="btn btn-ghost btn-sm" data-action="view-public-tournament" data-code="${esc(r.tournamentCode)}">查看詳情</button>
@@ -18288,6 +18319,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         myRegistrationsCache = null; // force refresh of 已報名 tab
         tournamentDetailBusy = false;
         await loadTournamentDetail(code);
+        setTimeout(()=>{
+          const resultPanel=document.getElementById("registration-result-panel");
+          if(resultPanel&&resultPanel.scrollIntoView) resultPanel.scrollIntoView({behavior:"smooth",block:"center"});
+        },80);
       }catch(e){
         tournamentDetailBusy = false;
         console.error("[BXH registration failed]", { code:e&&e.code, message:e&&e.message, raw:e });
@@ -20385,7 +20420,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="close-checkin-early"){
-    if(!(state.meta.registrationEnabled && state.meta.checkinRequired)){ showToast("此賽事不需要報到", true); return; }
+    if(!state.meta.checkinRequired){ showToast("此賽事不需要報到", true); return; }
     if(state.meta.checkinClosedEarly) return;
     const pending = state.players.filter(p=>p.checkedIn!==true).length;
     openModal({ type:"generic", title:"提前結束報到？", message:"目前還有 "+pending+" 位玩家尚未報到。\n\n提前結束後，這些玩家會保留在『未報到人員』區，但不會進入對戰表。是否確認結束報到？", danger:true, confirmLabel:"確認提前結束報到", onConfirm:()=>{
@@ -20423,7 +20458,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }
 
         const eligible=eligiblePlayers().length;
-        const pending=state.meta.registrationEnabled && state.meta.checkinRequired
+        const pending=state.meta.checkinRequired
           ? state.players.filter(p=>p.checkedIn!==true).length : 0;
         const scheduledStart=scheduledTournamentStartMs(state.meta);
         const now=Date.now();
@@ -20449,7 +20484,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             rebuildCourtAssignments();
             state.rosterLocked=true;
             state.meta.registrationStatus="started";
-            if(state.meta.registrationEnabled && state.meta.checkinRequired && !state.meta.checkinClosedEarly){
+            if(state.meta.checkinRequired && !state.meta.checkinClosedEarly){
               state.meta.checkinClosedEarly=true;
               state.meta.checkinClosedAt=Date.now();
             }
@@ -20535,7 +20570,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const doCheckThenDraw = ()=>{
       const total = state.players.length;
       const checkedCount = eligiblePlayers().length;
-      const notCheckedCount = (state.meta.registrationEnabled && state.meta.checkinRequired) ? (total - checkedCount) : 0;
+      const notCheckedCount = state.meta.checkinRequired ? (total - checkedCount) : 0;
       if(checkedCount<2){
         openModal({ type:"generic", title:"無法建立賽事", message:"完成報到的選手不足兩人，無法建立賽事。", confirmLabel:"我知道了", onConfirm:()=>{} });
         return;
