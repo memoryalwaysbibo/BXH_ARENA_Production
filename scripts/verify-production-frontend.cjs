@@ -260,7 +260,7 @@ mustInclude('if(!HUNTER_ACHIEVEMENT_ROUND_TYPES.includes(type)) return;','Hunter
 mustInclude('if(!Number.isFinite(expected)||Number(event.points)!==expected) return;','Hunter P6.1 Round achievements must validate canonical point values');
 mustInclude('ruleVersion:Number(definition&&definition.ruleVersion)||1','Hunter P6.1 rule version missing from evaluation');
 mustInclude('awardStatus:"preview_only"','Hunter P6.1 must not award badges yet');
-mustInclude('achievementCore:hunterBuildAchievementCore(canonicalRecords)','Hunter P6.1 achievement snapshot must use canonical Match records');
+mustInclude('const achievementCore=hunterBuildAchievementCore(canonicalRecords);','Hunter P6.1 achievement snapshot must use canonical Match records');
 console.log('PASS Hunter Profile P6.1 achievement core');
 
 mustInclude('achievementId:"matches_1"','Hunter P6.2 first-match milestone missing');
