@@ -170,4 +170,14 @@ mustInclude('本場防守失分','Hunter P5.2 defensive breakdown missing');
 mustInclude('Quick Decision｜本場沒有逐回合能力資料','Hunter P5.2 quick decision disclosure missing');
 mustInclude('return hunterRecordTimelineHtml(record);','Hunter P5.1 and P5.2 must share the same round timeline renderer');
 console.log('PASS Hunter Profile P5.2 single-match opponent detail');
+mustInclude('function resolveHunterOpponentIdentities(records)','Hunter P5.3 identity resolver missing');
+mustInclude('action:"event-card"','Hunter P5.3 must reuse event-card public identity service');
+mustInclude('scope:"cross-event"','Hunter P5.3 cross-event identity state missing');
+mustInclude('scope:"event-only"','Hunter P5.3 event-only fallback missing');
+mustInclude('查看公開玩家名片','Hunter P5.3 public-card link missing');
+mustInclude('僅本場識別','Hunter P5.3 conservative fallback label missing');
+mustInclude('跨賽事可識別','Hunter P5.3 stable identity label missing');
+mustNot(/players:\s*\(state\.players\|\|\[\]\)\.map\(p=>\(\{[^}]*registrationUid/s,'Public tournament mirror must not expose registrationUid');
+mustNot(/players:\s*\(state\.players\|\|\[\]\)\.map\(p=>\(\{[^}]*guardianUid/s,'Public tournament mirror must not expose guardianUid');
+console.log('PASS Hunter Profile P5.3 opponent identity layer');
 
