@@ -262,3 +262,24 @@ mustInclude('ruleVersion:Number(definition&&definition.ruleVersion)||1','Hunter 
 mustInclude('awardStatus:"preview_only"','Hunter P6.1 must not award badges yet');
 mustInclude('achievementCore:hunterBuildAchievementCore(canonicalRecords)','Hunter P6.1 achievement snapshot must use canonical Match records');
 console.log('PASS Hunter Profile P6.1 achievement core');
+
+mustInclude('achievementId:"matches_1"','Hunter P6.2 first-match milestone missing');
+mustInclude('achievementId:"matches_10"','Hunter P6.2 10-match milestone missing');
+mustInclude('achievementId:"matches_50"','Hunter P6.2 50-match milestone missing');
+mustInclude('achievementId:"matches_100"','Hunter P6.2 100-match milestone missing');
+mustInclude('achievementId:"wins_1"','Hunter P6.2 first-win milestone missing');
+mustInclude('achievementId:"wins_10"','Hunter P6.2 10-win milestone missing');
+mustInclude('achievementId:"wins_25"','Hunter P6.2 25-win milestone missing');
+mustInclude('achievementId:"wins_50"','Hunter P6.2 50-win milestone missing');
+mustInclude('achievementId:"wins_100"','Hunter P6.2 100-win milestone missing');
+mustInclude('unlockState:reached?"unlocked_derived":"locked"','Hunter P6.2 derived unlock state missing');
+mustInclude('remaining:Math.max(0,target-current)','Hunter P6.2 remaining progress missing');
+mustInclude('function hunterMatchAchievementCardHtml(item)','Hunter P6.2 milestone card renderer missing');
+mustInclude('function hunterMatchAchievementsHtml(core)','Hunter P6.2 achievement page missing');
+mustInclude('evaluations.filter(item=>item&&item.category==="match")','Hunter P6.2 UI must expose Match milestones only');
+mustInclude('["achievements","成就"]','Hunter P6.2 achievement tab missing');
+mustInclude('playerStatsSubTab==="achievements"','Hunter P6.2 achievement route missing');
+mustInclude('["overview","analysis","records","achievements"].includes(subTab)','Hunter P6.2 tab whitelist missing');
+mustInclude('逐筆 Evidence 展開留給 P6.5','Hunter P6.2 evidence UI scope disclosure missing');
+mustInclude('永久徽章尚未發放','Hunter P6.2 must not claim persistent awards');
+console.log('PASS Hunter Profile P6.2 Match milestones');

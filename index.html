@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.23">
+<meta name="bxh-build" content="20260923.24">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.23";
+  var CURRENT_BUILD="20260923.24";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2875,6 +2875,8 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 
 .hunter-h2h-directory{margin:10px 0 12px;padding:10px;border:1px solid rgba(217,185,92,.11);border-radius:9px;background:rgba(0,0,0,.10)}.hunter-h2h-directory-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.hunter-h2h-directory-head strong{font:800 10px var(--font-d);color:var(--ivory)}.hunter-h2h-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;margin-top:8px}.hunter-h2h-search-row input{min-width:0}.hunter-h2h-sort-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.hunter-h2h-quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.hunter-h2h-quick section{padding:8px;border:1px solid rgba(255,255,255,.045);border-radius:8px;background:rgba(255,255,255,.015)}.hunter-h2h-quick h4{margin:0 0 6px;font:800 9px var(--font-d);color:var(--metal)}.hunter-h2h-quick-list{display:flex;gap:5px;flex-wrap:wrap}.hunter-h2h-quick-btn{border:1px solid rgba(217,185,92,.14);border-radius:999px;background:rgba(217,185,92,.045);color:var(--ivory);font:800 8.5px var(--font-d);padding:5px 7px;cursor:pointer}.hunter-h2h-quick-btn small{color:var(--metal-dim);font-weight:700}.hunter-h2h-empty-search{padding:12px;text-align:center;color:var(--metal-dim);font-size:10px}@media(max-width:640px){.hunter-h2h-search-row{grid-template-columns:minmax(0,1fr) auto}.hunter-h2h-search-row .clear{grid-column:1/-1}.hunter-h2h-quick{grid-template-columns:1fr}}
 
+.hunter-achievement-panel{overflow:hidden}.hunter-achievement-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}.hunter-achievement-summary>div{padding:10px;border:1px solid rgba(217,185,92,.12);border-radius:9px;background:rgba(0,0,0,.14)}.hunter-achievement-summary span{display:block;font-size:9px;color:var(--metal-dim)}.hunter-achievement-summary b{display:block;margin-top:3px;font:900 18px var(--font-d);color:var(--gold)}.hunter-achievement-note{margin-top:10px;padding:9px 10px;border:1px dashed rgba(217,185,92,.16);border-radius:8px;font-size:9.5px;line-height:1.55;color:var(--metal)}.hunter-achievement-group{margin-top:14px}.hunter-achievement-group h3{margin:0 0 8px;font:900 11px var(--font-d);color:var(--ivory);letter-spacing:.5px}.hunter-achievement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.hunter-achievement-card{padding:11px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(0,0,0,.15)}.hunter-achievement-card.unlocked{border-color:rgba(217,185,92,.30);background:linear-gradient(135deg,rgba(217,185,92,.075),rgba(0,0,0,.12))}.hunter-achievement-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.hunter-achievement-card-head>div{min-width:0}.hunter-achievement-kicker{display:block;font:800 7.5px var(--font-d);letter-spacing:1.2px;color:var(--metal-dim)}.hunter-achievement-card-head strong{display:block;margin-top:2px;font:900 13px var(--font-d);color:var(--ivory)}.hunter-achievement-state{flex:0 0 auto;padding:3px 6px;border-radius:999px;border:1px solid rgba(255,255,255,.07);font:800 8px var(--font-d);color:var(--metal)}.hunter-achievement-card.unlocked .hunter-achievement-state{border-color:rgba(217,185,92,.26);color:var(--gold);background:rgba(217,185,92,.06)}.hunter-achievement-progress-line{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:10px}.hunter-achievement-progress-line b{font:900 16px var(--font-d);color:var(--gold)}.hunter-achievement-progress-line span{font-size:8.5px;color:var(--metal-dim);text-align:right}.hunter-achievement-track{height:6px;margin-top:7px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}.hunter-achievement-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,rgba(217,185,92,.42),var(--gold))}.hunter-achievement-meta{margin-top:8px;font-size:8.5px;line-height:1.45;color:var(--metal-dim)}@media(max-width:640px){.hunter-achievement-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.hunter-achievement-summary>div{padding:8px}.hunter-achievement-summary b{font-size:15px}.hunter-achievement-grid{grid-template-columns:1fr}}
+
 .profile-primary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px;}
 .profile-primary-tabs .btn{min-height:44px;border-radius:11px;}
 .profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:0 0 14px;border:1px solid rgba(217,185,92,.15);border-radius:12px;background:rgba(255,255,255,.018);}
@@ -4251,9 +4253,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.47";
+const APP_VERSION = "v14.0.48";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.48",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.2 Match 型里程碑",updateLevel:"minor",added:["獵人檔案新增「成就」分頁，先公開 Match 型里程碑進度與衍生解鎖狀態","Match 里程碑新增：首場對戰、10 場、50 場、100 場；勝場里程碑新增：首勝、10 勝、25 勝、50 勝、100 勝","每張里程碑卡顯示目前值、目標值、進度條、尚差數量或達成時間，以及已綁定的 Match Evidence 數量"],changed:["P6.1 preview-only 引擎增加 locked／unlocked_derived 狀態；達標僅代表 canonical Match 已足以證明條件成立，不等同永久 Award 已寫入","成就分頁目前只呈現 category=match；P6.1 已存在的 Round 型規則保留在核心但不提前公開，等待 P6.3","Achievement Evidence 仍維持 reference-first；P6.2 只顯示來源數量，逐筆來源 UI 留給 P6.5"],fixed:["避免玩家看到單一 100 場／50 勝終點卻無中間進度節點；Match 生涯里程碑現在以同一份 canonical Match 歷史逐級顯示"],environment:"Production feature branch",deployStatus:"P6.2 Match milestone UI + derived unlock only; no persistent awards",firebaseImpact:"無；不新增集合、不寫入永久 Achievement Award",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案新增成就分頁，可查看對戰場次與勝場的階段里程碑；目前達成狀態由可信比賽紀錄即時計算。"},
+
   {version:"v14.0.47",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.1 成就核心",updateLevel:"minor",added:["新增 Achievement Core v1：成就規則定義、進度計算、達標時間與 Evidence Reference 全部由 canonical Hunter Match／Round 動態產生","首批規則先建立 100 場對戰、50 勝、爆裂達人 50 次、極限專精 50 次的進度模型；目前全部為 preview-only，不發章、不寫入資料庫","新增 Match / Round Evidence Reference 與 resolver，可由成就來源反查原始 canonical Match 與 Round Event"],changed:["Hunter Profile 載入完成後同步建立 achievementCore snapshot，後續 P6.2～P6.5 直接沿用，不另建第二套統計來源","Round 類成就只接受 analyzable=true、perspective=for、合法得分類型與正確分值的可信回合；Quick Decision 不會產生 Round 型進度","成就規則固定帶 ruleVersion，未來調整門檻時可保留舊版取得依據"],fixed:["先封住成就系統最容易出現的重複計算、舊比分污染、無來源發章與規則改版後無法追溯等風險"],environment:"Production feature branch",deployStatus:"P6.1 core only; preview progress, no awards",firebaseImpact:"無；不新增集合、不寫入 Achievement Award，只在前端記憶體建立進度快照",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案已建立可追溯的成就核心；目前只計算進度與來源，不會正式發放徽章。"},
 
   {version:"v14.0.46",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 統計口徑封版修正",updateLevel:"patch",added:["Hunter Profile 載入層新增 canonical Match 去重，所有獵人頁面統一先取得同一份唯一對戰集合","最終統計口徑檢查固定驗證：期間統計、P4 能力分析、P5 單場與 H2H 都沿用同一份 canonical Hunter Match／Round 資料"],changed:["生涯場次、P4 生涯能力分析、XP、期間統計、對戰紀錄與 H2H 改為從載入完成後的唯一 Match 集合出發","H2H 對手場次仍只統計可安全跨賽事識別的對手；辨識中、辨識失敗與僅本場識別維持獨立揭露，不要求 H2H 加總等於全部生涯場次"],fixed:["修正同一賽事若因重複 registration reference 被讀取兩次時，生涯總場次與 P4 生涯分析可能重複計算，但期間統計、XP 與 H2H 已去重而造成口徑不一致的風險"],environment:"Production consistency audit branch",deployStatus:"P5 statistical-caliber seal; no P6 features",firebaseImpact:"無；純前端載入後去重與驗證，不修改 Firestore 文件",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案 P5 完成統計口徑封版：所有總覽、能力、單場與 H2H 從同一份去重後 Match／Round 資料計算。"},
@@ -16206,8 +16210,15 @@ const HUNTER_ACHIEVEMENT_SCHEMA_VERSION=1;
 const HUNTER_ACHIEVEMENT_ENGINE_VERSION="hunter-achievement-v1";
 const HUNTER_ACHIEVEMENT_ROUND_TYPES=["extreme","knockout","burst","spin"];
 const HUNTER_ACHIEVEMENT_DEFINITIONS=Object.freeze([
+  Object.freeze({achievementId:"matches_1",name:"首場對戰",category:"match",ruleVersion:1,metric:"matches",target:1,evidenceKind:"match",awardEnabled:false}),
+  Object.freeze({achievementId:"matches_10",name:"10 場對戰",category:"match",ruleVersion:1,metric:"matches",target:10,evidenceKind:"match",awardEnabled:false}),
+  Object.freeze({achievementId:"matches_50",name:"50 場對戰",category:"match",ruleVersion:1,metric:"matches",target:50,evidenceKind:"match",awardEnabled:false}),
   Object.freeze({achievementId:"matches_100",name:"100 場對戰",category:"match",ruleVersion:1,metric:"matches",target:100,evidenceKind:"match",awardEnabled:false}),
+  Object.freeze({achievementId:"wins_1",name:"首勝",category:"match",ruleVersion:1,metric:"wins",target:1,evidenceKind:"match",awardEnabled:false}),
+  Object.freeze({achievementId:"wins_10",name:"10 勝",category:"match",ruleVersion:1,metric:"wins",target:10,evidenceKind:"match",awardEnabled:false}),
+  Object.freeze({achievementId:"wins_25",name:"25 勝",category:"match",ruleVersion:1,metric:"wins",target:25,evidenceKind:"match",awardEnabled:false}),
   Object.freeze({achievementId:"wins_50",name:"50 勝",category:"match",ruleVersion:1,metric:"wins",target:50,evidenceKind:"match",awardEnabled:false}),
+  Object.freeze({achievementId:"wins_100",name:"100 勝",category:"match",ruleVersion:1,metric:"wins",target:100,evidenceKind:"match",awardEnabled:false}),
   Object.freeze({achievementId:"burst_50",name:"爆裂達人",category:"round",ruleVersion:1,metric:"round:burst",target:50,evidenceKind:"round",awardEnabled:false}),
   Object.freeze({achievementId:"extreme_50",name:"極限專精",category:"round",ruleVersion:1,metric:"round:extreme",target:50,evidenceKind:"round",awardEnabled:false})
 ]);
@@ -16319,6 +16330,8 @@ function hunterEvaluateAchievementDefinition(definition,context){
     progressPct:Math.max(0,Math.min(100,Math.round(current/target*100))),
     reached,
     reachedAt,
+    remaining:Math.max(0,target-current),
+    unlockState:reached?"unlocked_derived":"locked",
     awardEnabled:definition&&definition.awardEnabled===true,
     awardStatus:"preview_only",
     evidenceKind:String(definition&&definition.evidenceKind||""),
@@ -16347,6 +16360,45 @@ function hunterResolveAchievementEvidenceRef(ref,records){
     return ref.seq!=null&&Number(event&&event.seq)===Number(ref.seq)&&String(event&&event.type||"")===String(ref.type||"")&&String(event&&event.perspective||"")===String(ref.perspective||"");
   })||null;
   return round?{record,round}:null;
+}
+function hunterAchievementDateText(ts){
+  const value=Number(ts)||0;
+  if(!value) return "日期未記錄";
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime())) return "日期未記錄";
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
+  return y+"/"+m+"/"+day;
+}
+function hunterMatchAchievementCardHtml(item){
+  const unlocked=item&&item.unlockState==="unlocked_derived";
+  const current=Math.max(0,Number(item&&item.current)||0);
+  const target=Math.max(1,Number(item&&item.target)||1);
+  const pct=Math.max(0,Math.min(100,Number(item&&item.progressPct)||0));
+  const proofCount=Array.isArray(item&&item.evidenceRefs)?item.evidenceRefs.length:0;
+  const statusText=unlocked?("達成｜"+hunterAchievementDateText(item.reachedAt)):("還差 "+Math.max(0,target-current));
+  return '<article class="hunter-achievement-card '+(unlocked?"unlocked":"locked")+'">'+
+    '<div class="hunter-achievement-card-head"><div><span class="hunter-achievement-kicker">'+(item.metric==="wins"?"VICTORY":"MATCH")+'</span><strong>'+esc(item.name||"里程碑")+'</strong></div><span class="hunter-achievement-state">'+(unlocked?"已達成":"進行中")+'</span></div>'+
+    '<div class="hunter-achievement-progress-line"><b>'+current+' / '+target+'</b><span>'+esc(statusText)+'</span></div>'+
+    '<div class="hunter-achievement-track"><span style="width:'+pct+'%"></span></div>'+
+    '<div class="hunter-achievement-meta">Rule v'+Number(item.ruleVersion||1)+'｜已綁定 '+proofCount+' 筆 Match Evidence｜永久徽章尚未發放</div>'+
+    '</article>';
+}
+function hunterMatchAchievementsHtml(core){
+  const evaluations=core&&Array.isArray(core.evaluations)?core.evaluations:[];
+  const matchItems=evaluations.filter(item=>item&&item.category==="match");
+  const matchSeries=matchItems.filter(item=>item.metric==="matches").sort((a,b)=>a.target-b.target);
+  const winSeries=matchItems.filter(item=>item.metric==="wins").sort((a,b)=>a.target-b.target);
+  const unlocked=matchItems.filter(item=>item.unlockState==="unlocked_derived").length;
+  if(!matchItems.length){
+    return '<section class="panel"><div class="hunter-record-empty"><strong>成就資料準備中</strong><p>正在由 canonical Match 建立里程碑進度。</p></div></section>';
+  }
+  return '<section class="panel hunter-achievement-panel">'+
+    '<div class="hunter-section-head"><div><div class="hunter-kicker">ACHIEVEMENTS</div><div class="panel-title">Match 型里程碑</div></div><span class="badge badge-metal">P6.2</span></div>'+
+    '<div class="hunter-achievement-summary"><div><span>對戰</span><b>'+Number(core.metrics&&core.metrics.matches||0)+'</b></div><div><span>勝場</span><b>'+Number(core.metrics&&core.metrics.wins||0)+'</b></div><div><span>已達成節點</span><b>'+unlocked+' / '+matchItems.length+'</b></div></div>'+
+    '<div class="hunter-achievement-note">目前為「衍生達成」：系統已能由可信 Match 證明條件成立，但尚未寫入永久 Award。逐筆 Evidence 展開留給 P6.5。</div>'+
+    '<div class="hunter-achievement-group"><h3>對戰場次</h3><div class="hunter-achievement-grid">'+matchSeries.map(hunterMatchAchievementCardHtml).join("")+'</div></div>'+
+    '<div class="hunter-achievement-group"><h3>勝場累積</h3><div class="hunter-achievement-grid">'+winSeries.map(hunterMatchAchievementCardHtml).join("")+'</div></div>'+
+    '</section>';
 }
 function hunterLevelThreshold(level){
   const lv=Math.max(1,Math.floor(Number(level)||1));
@@ -16855,7 +16907,7 @@ async function loadHunterProfile(force=false){
 }
 
 function renderPlayerStatsTab(p){
-  const tabs=[["overview","獵人總覽"],["analysis","能力分析"],["records","對戰紀錄"]];
+  const tabs=[["overview","獵人總覽"],["analysis","能力分析"],["records","對戰紀錄"],["achievements","成就"]];
   const playerName=(p&&((p.displayName||"").trim()||(p.realName||"").trim()))||"玩家";
   const playerId=(typeof playerDerivedId==="function")?playerDerivedId(p):"—";
   const gameId=(typeof effectiveGameId==="function")?effectiveGameId(p):"";
@@ -16929,6 +16981,11 @@ function renderPlayerStatsTab(p){
       '<section class="panel hunter-loss-panel"><div class="panel-title">防守失分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.defense,type,"against")).join('')+'</div></section></div>'+
       '<section class="panel"><div class="panel-title">分析結論</div><div class="hunter-analysis-grid"><div><span>主要優勢</span><strong>'+esc(analysis.primary)+'</strong></div><div><span>次要優勢</span><strong>'+esc(analysis.secondary)+'</strong></div><div><span>主要弱點</span><strong>'+esc(analysis.mainWeakness)+'</strong></div><div><span>戰型判定</span><strong>'+esc(analysis.style)+'</strong></div></div>'+
       '<div class="hunter-framework-note">評分公式：60% 對戰勝率＋40% 得分效率。Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析。點擊任一進攻／防守項目，可追溯到對手、Match 與原始 Round Timeline。</div></section>';
+  }else if(playerStatsSubTab==="achievements"){
+    const achievementCore=hunterProfileCache&&hunterProfileCache.achievementCore
+      ? hunterProfileCache.achievementCore
+      : hunterBuildAchievementCore(allRecords);
+    body=hunterMatchAchievementsHtml(achievementCore);
   }else{
     const rows=hunterFilteredRecords();
     const seasonAvailable=hunterSeasonStartMs()>0;
@@ -16944,7 +17001,7 @@ function renderPlayerStatsTab(p){
         '<div class="hunter-record-empty"><strong>目前沒有符合條件的對戰紀錄</strong><p>'+(allRecords.length?'可調整類型或期間篩選。':'已完成的賽事 Match 將自動出現在這裡。')+'</p><small>無法安全辨識的舊資料不會用名字強制併入。</small></div>')+
       '</section>';
   }
-  return '<section class="hunter-profile-shell"><div class="hunter-profile-title"><div><div class="hunter-kicker">BXH HUNTER PROFILE</div><h2>獵人檔案</h2></div><span class="badge badge-metal">P5.6</span></div>'+
+  return '<section class="hunter-profile-shell"><div class="hunter-profile-title"><div><div class="hunter-kicker">BXH HUNTER PROFILE</div><h2>獵人檔案</h2></div><span class="badge badge-metal">P6.2</span></div>'+
     '<div class="player-stats-subtabs hunter-profile-tabs">'+tabs.map(([key,label])=>'<button class="player-stats-subtab '+(playerStatsSubTab===key?'active':'')+'" data-action="player-stats-subtab" data-tab="'+key+'">'+label+'</button>').join('')+'</div>'+body+'</section>';
 }
 
@@ -19654,7 +19711,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="player-stats-subtab"){
     const subTab = target.getAttribute("data-tab");
-    if(["overview","analysis","records"].includes(subTab)){
+    if(["overview","analysis","records","achievements"].includes(subTab)){
       playerStatsSubTab = subTab;
       render();
     }
