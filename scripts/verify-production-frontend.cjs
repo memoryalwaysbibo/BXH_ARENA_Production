@@ -127,4 +127,14 @@ mustInclude('analyzable:!quickDecision&&ledger.ok&&ledger.roundCount>0','Zero-ro
 mustInclude('identityConfidence="legacy-unique-name"','Legacy identity fallback must require a unique in-event name');
 mustInclude('無法安全辨識的舊資料不會用名字強制併入','Hunter history must explain conservative legacy identity handling');
 console.log('PASS Hunter Profile P3 match-history linkage');
+mustInclude('const HUNTER_ANALYSIS_MIN_MATCHES=3;','Hunter P4 minimum match threshold missing');
+mustInclude('const HUNTER_ANALYSIS_MIN_ROUNDS=8;','Hunter P4 minimum round threshold missing');
+mustInclude('function hunterBuildAnalysis(records)','Hunter P4 analysis engine missing');
+mustInclude('function hunterRadarSvg(analysis)','Hunter P4 radar renderer missing');
+mustInclude('data-action="hunter-analysis-period"','Hunter P4 period control missing');
+mustInclude('winRate*0.6+pointEfficiency*0.4','Hunter P4 transparent rating formula missing');
+mustInclude('analysis.eligible?careerAnalysis.overall','Hunter P4 overview rating linkage missing');
+mustInclude('Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析','Hunter P4 integrity note missing');
+mustInclude('50% 分布＝滿格','Hunter P4 radar visual scale disclosure missing');
+console.log('PASS Hunter Profile P4 analysis engine');
 
