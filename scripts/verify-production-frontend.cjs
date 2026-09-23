@@ -257,7 +257,7 @@ mustInclude('achievementId:"matches_100"','Hunter P6.1 100-match definition miss
 mustInclude('achievementId:"wins_50"','Hunter P6.1 50-win definition missing');
 mustInclude('achievementId:"burst_50"','Hunter P6.1 burst definition missing');
 mustInclude('achievementId:"extreme_50"','Hunter P6.1 extreme definition missing');
-mustInclude('awardEnabled:false','Hunter P6.1 definitions must remain preview-only');
+mustInclude('awardEnabled:true','Hunter P6.7 definitions must enable permanent awards');
 mustInclude('function hunterAchievementMatchEvidenceRef(record)','Hunter P6.1 Match evidence reference missing');
 mustInclude('function hunterAchievementRoundEvidenceRef(record,event)','Hunter P6.1 Round evidence reference missing');
 mustInclude('function hunterResolveAchievementEvidenceRef(ref,records)','Hunter P6.1 evidence resolver missing');
@@ -266,7 +266,7 @@ mustInclude('if(event&&event.perspective!=="for") return;','Hunter P6.1 Round ac
 mustInclude('if(!HUNTER_ACHIEVEMENT_ROUND_TYPES.includes(type)) return;','Hunter P6.1 Round achievements must reject unknown point types');
 mustInclude('if(!Number.isFinite(expected)||Number(event.points)!==expected) return;','Hunter P6.1 Round achievements must validate canonical point values');
 mustInclude('ruleVersion:Number(definition&&definition.ruleVersion)||1','Hunter P6.1 rule version missing from evaluation');
-mustInclude('awardStatus:"preview_only"','Hunter P6.1 must not award badges yet');
+mustInclude('awardStatus:"pending_server_sync"','Hunter P6.7 must wait for server-authoritative award state');
 mustInclude('const achievementCore=hunterBuildAchievementCore(canonicalRecords);','Hunter P6.1 achievement snapshot must use canonical Match records');
 console.log('PASS Hunter Profile P6.1 achievement core');
 
@@ -288,7 +288,7 @@ mustInclude('["achievements","成就"]','Hunter P6.2 achievement tab missing');
 mustInclude('playerStatsSubTab==="achievements"','Hunter P6.2 achievement route missing');
 mustInclude('["overview","analysis","records","achievements"].includes(subTab)','Hunter P6.2 tab whitelist missing');
 mustInclude('Evidence Chain 可逐筆核對來源','Hunter P6.2 evidence UI disclosure missing');
-mustInclude('永久徽章尚未發放','Hunter P6.2 must not claim persistent awards');
+mustInclude('永久徽章則由伺服器重新驗證本人報名與賽事歷史後發放','Hunter P6.7 server verification disclosure missing');
 console.log('PASS Hunter Profile P6.2 Match milestones');
 
 mustInclude('achievementId:"extreme_10"','Hunter P6.3 extreme 10 milestone missing');
@@ -363,14 +363,26 @@ mustInclude('quickDecision','Hunter P6.6 Quick Decision audit missing');
 mustInclude('trustedScore','Hunter P6.6 trusted score audit missing');
 mustInclude('nonAnalyzableMatches','Hunter P6.6 Round exclusion audit missing');
 mustInclude('unresolvedEvidence','Hunter P6.6 unresolved evidence audit missing');
-mustInclude('recalculationMode:"derived_read_only"','Hunter P6.6 must remain read-only recalculation');
-mustInclude('persistentAwardGate:"disabled"','Hunter P6.6 must keep persistent awards disabled');
+mustInclude('recalculationMode:"server_authoritative_award"','Hunter P6.7 server-authoritative recalculation mode missing');
+mustInclude('persistentAwardGate:"pending_server_sync"','Hunter P6.7 initial server award gate missing');
 mustInclude('function hunterAchievementIntegrityAuditHtml(audit)','Hunter P6.6 audit UI missing');
 mustInclude('歷史回算檢查','Hunter P6.6 audit panel label missing');
-mustInclude('系統不補寫舊資料、不因回算自動發永久 Award','Hunter P6.6 read-only disclosure missing');
+mustInclude('永久徽章只由伺服器複核並寫入','Hunter P6.7 server-only write disclosure missing');
 mustInclude('integrityAudit:hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore)','Hunter P6.6 load-time audit wiring missing');
 mustInclude('if(!result||result.ok!==true||!Array.isArray(result.records)) throw new Error("hunter-profile-invalid-response")','Hunter audit must reject failed responses');
 mustInclude('integrityAudit:null','Hunter audit must not report success after failed load');
 mustInclude('partial_read_failures','Hunter audit must identify skipped tournament reads');
 mustInclude('P6.6</span>','Hunter P6.6 profile badge missing');
 console.log('PASS Hunter Profile P6.6 historical recalculation integrity audit');
+
+mustInclude('async syncHunterAchievements(){ return callEngagementFunction("syncHunterAchievements",{},120000); }','Hunter P6.7 callable wrapper missing');
+mustInclude('function hunterApplyPermanentAchievementSnapshot(core,snapshot)','Hunter P6.7 award snapshot merger missing');
+mustInclude('awardStatus==="awarded"','Hunter P6.7 permanent award state missing');
+mustInclude('blocked_incomplete_history','Hunter P6.7 incomplete-history gate missing');
+mustInclude('function hunterPermanentAwardSummaryHtml(core)','Hunter P6.7 permanent award summary missing');
+mustInclude('PERMANENT AWARDS','Hunter P6.7 permanent award panel missing');
+mustInclude('P6.7</span>','Hunter P6.7 profile badge missing');
+mustInclude('window.engagementService.syncHunterAchievements','Hunter P6.7 load-time sync wiring missing');
+mustInclude('hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,permanentAwards||null)','Hunter P6.7 server snapshot application missing');
+mustInclude('hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,null)','Hunter P6.7 safe fallback missing');
+console.log('PASS Hunter Profile P6.7 permanent achievement awards');

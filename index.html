@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.29">
+<meta name="bxh-build" content="20260923.30">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.29";
+  var CURRENT_BUILD="20260923.30";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4259,9 +4259,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.53";
+const APP_VERSION = "v14.0.54";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.54",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.7 永久成就發放",updateLevel:"minor",added:["新增伺服器權威 syncHunterAchievements：由本人報名紀錄與公開賽事鏡像重建成就，不接受瀏覽器提交的進度或達成結果","達標後永久寫入 hunterAchievements，並同步保存 hunterAchievementProgress 與 hunterAchievementAuditLogs","成就頁新增永久徽章狀態、發放閘門與本次新發數量"],changed:["27 個 Match、勝場、Round、連勝與完封節點由 preview-only 升級為可永久發放","資料讀取或身分解析不完整時只更新進度，永久發放閘門會保守暫停；重試成功後可自動補發","重複同步採交易與固定 Award ID，已領成就不會重複建立"],fixed:["封住前端偽造成就、重複發章、部分歷史讀取失敗仍誤發、Quick Decision 被當成 Round／完封證據等風險"],environment:"Production",deployStatus:"P6.7 permanent awards",firebaseImpact:"新增 users/{uid}/hunterAchievements、hunterAchievementProgress 與 hunterAchievementAuditLogs；僅 Cloud Functions Admin SDK 寫入",securityRulesImpact:"無前端寫入需求；永久 Award 由 Callable Functions 寫入",permissionImpact:"登入且啟用中的正式帳號可同步本人永久成就；測試帳號不發章",publicSummary:"獵人成就已可永久保存；系統會在可信歷史完整時自動發放，資料不完整則安全暫停並等待重試。"},
   {version:"v14.0.53",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理儲存確認鍵修復",updateLevel:"patch",added:["帳號卡片恢復獨立「儲存變更」按鈕","角色、測試身分與帳號啟用改為先暫存、確認後一次送出","送出前顯示實際變更差異"],changed:["本名確認狀態與帳號設定儲存完全分離，不再互相取代","未修改資料時儲存鍵維持停用，避免誤送"],fixed:["修復帳號已完成本名確認後管理控制區只剩「本名已確認」、缺少確認／儲存入口的回歸問題","避免下拉或核取方塊一變更就立即寫入帳號設定"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；帳號修改仍僅限 super_admin",publicSummary:"帳號設定改回明確的修改→儲存→確認流程，本名確認狀態不再吃掉儲存鍵。"},
   {version:"v14.0.52",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.6 歷史回算／完整性驗證",updateLevel:"minor",added:["新增 Achievement Historical Integrity Audit：同步檢查原始 Match、canonical 去重、舊格式 fallback、Quick Decision、可信比分、Round 可分析性與 Evidence 可解析率","成就頁新增歷史回算檢查面板，揭露納入、排除與 fallback 狀態"],changed:["P6 成就回算標記為 derived_read_only：只讀重算，不補寫舊 Match、不自動發永久 Award","完整性拆成場次覆蓋、連勝時序、Round 覆蓋、Evidence 解析四個維度"],fixed:["封住重複 Match 灌高里程碑、舊資料缺時間戳影響連勝精度、無可信 Round／比分被誤當成就來源等風險"],environment:"Production feature branch",deployStatus:"P6.6 historical recalculation + integrity audit",firebaseImpact:"無；不補寫歷史資料、不新增集合、不發永久 Award",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"新增歷史回算檢查，可看到哪些舊資料被納入、保守排除或使用 fallback，並驗證成就來源是否仍可追溯。"},
 
@@ -16252,38 +16253,38 @@ function hunterUniqueRecords(records){
   return out;
 }
 
-/* ==== v14.0.47 HUNTER PROFILE P6.1: achievement core (preview-only) ==== */
+/* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
 const HUNTER_ACHIEVEMENT_SCHEMA_VERSION=1;
 const HUNTER_ACHIEVEMENT_ENGINE_VERSION="hunter-achievement-v1";
 const HUNTER_ACHIEVEMENT_ROUND_TYPES=["extreme","knockout","burst","spin"];
 const HUNTER_ACHIEVEMENT_DEFINITIONS=Object.freeze([
-  Object.freeze({achievementId:"matches_1",name:"首場對戰",category:"match",ruleVersion:1,metric:"matches",target:1,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"matches_10",name:"10 場對戰",category:"match",ruleVersion:1,metric:"matches",target:10,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"matches_50",name:"50 場對戰",category:"match",ruleVersion:1,metric:"matches",target:50,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"matches_100",name:"100 場對戰",category:"match",ruleVersion:1,metric:"matches",target:100,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"wins_1",name:"首勝",category:"match",ruleVersion:1,metric:"wins",target:1,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"wins_10",name:"10 勝",category:"match",ruleVersion:1,metric:"wins",target:10,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"wins_25",name:"25 勝",category:"match",ruleVersion:1,metric:"wins",target:25,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"wins_50",name:"50 勝",category:"match",ruleVersion:1,metric:"wins",target:50,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"wins_100",name:"100 勝",category:"match",ruleVersion:1,metric:"wins",target:100,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"extreme_10",name:"極限 10 次",category:"round",ruleVersion:1,metric:"round:extreme",target:10,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"extreme_25",name:"極限 25 次",category:"round",ruleVersion:1,metric:"round:extreme",target:25,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"extreme_50",name:"極限專精",category:"round",ruleVersion:1,metric:"round:extreme",target:50,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"knockout_10",name:"擊飛 10 次",category:"round",ruleVersion:1,metric:"round:knockout",target:10,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"knockout_25",name:"擊飛 25 次",category:"round",ruleVersion:1,metric:"round:knockout",target:25,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"knockout_50",name:"擊飛 50 次",category:"round",ruleVersion:1,metric:"round:knockout",target:50,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"burst_10",name:"爆裂 10 次",category:"round",ruleVersion:1,metric:"round:burst",target:10,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"burst_25",name:"爆裂 25 次",category:"round",ruleVersion:1,metric:"round:burst",target:25,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"burst_50",name:"爆裂達人",category:"round",ruleVersion:1,metric:"round:burst",target:50,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"spin_10",name:"轉停 10 次",category:"round",ruleVersion:1,metric:"round:spin",target:10,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"spin_25",name:"轉停 25 次",category:"round",ruleVersion:1,metric:"round:spin",target:25,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"spin_50",name:"轉停 50 次",category:"round",ruleVersion:1,metric:"round:spin",target:50,evidenceKind:"round",awardEnabled:false}),
-  Object.freeze({achievementId:"streak_3",name:"三連勝",category:"streak",ruleVersion:1,metric:"maxWinStreak",target:3,evidenceKind:"match-window",awardEnabled:false}),
-  Object.freeze({achievementId:"streak_5",name:"五連勝",category:"streak",ruleVersion:1,metric:"maxWinStreak",target:5,evidenceKind:"match-window",awardEnabled:false}),
-  Object.freeze({achievementId:"streak_10",name:"十連勝",category:"streak",ruleVersion:1,metric:"maxWinStreak",target:10,evidenceKind:"match-window",awardEnabled:false}),
-  Object.freeze({achievementId:"shutout_1",name:"首次完封",category:"special",ruleVersion:1,metric:"shutoutWins",target:1,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"shutout_10",name:"完封 10 勝",category:"special",ruleVersion:1,metric:"shutoutWins",target:10,evidenceKind:"match",awardEnabled:false}),
-  Object.freeze({achievementId:"shutout_25",name:"完封 25 勝",category:"special",ruleVersion:1,metric:"shutoutWins",target:25,evidenceKind:"match",awardEnabled:false})
+  Object.freeze({achievementId:"matches_1",name:"首場對戰",category:"match",ruleVersion:1,metric:"matches",target:1,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"matches_10",name:"10 場對戰",category:"match",ruleVersion:1,metric:"matches",target:10,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"matches_50",name:"50 場對戰",category:"match",ruleVersion:1,metric:"matches",target:50,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"matches_100",name:"100 場對戰",category:"match",ruleVersion:1,metric:"matches",target:100,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"wins_1",name:"首勝",category:"match",ruleVersion:1,metric:"wins",target:1,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"wins_10",name:"10 勝",category:"match",ruleVersion:1,metric:"wins",target:10,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"wins_25",name:"25 勝",category:"match",ruleVersion:1,metric:"wins",target:25,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"wins_50",name:"50 勝",category:"match",ruleVersion:1,metric:"wins",target:50,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"wins_100",name:"100 勝",category:"match",ruleVersion:1,metric:"wins",target:100,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"extreme_10",name:"極限 10 次",category:"round",ruleVersion:1,metric:"round:extreme",target:10,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"extreme_25",name:"極限 25 次",category:"round",ruleVersion:1,metric:"round:extreme",target:25,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"extreme_50",name:"極限專精",category:"round",ruleVersion:1,metric:"round:extreme",target:50,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"knockout_10",name:"擊飛 10 次",category:"round",ruleVersion:1,metric:"round:knockout",target:10,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"knockout_25",name:"擊飛 25 次",category:"round",ruleVersion:1,metric:"round:knockout",target:25,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"knockout_50",name:"擊飛 50 次",category:"round",ruleVersion:1,metric:"round:knockout",target:50,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"burst_10",name:"爆裂 10 次",category:"round",ruleVersion:1,metric:"round:burst",target:10,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"burst_25",name:"爆裂 25 次",category:"round",ruleVersion:1,metric:"round:burst",target:25,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"burst_50",name:"爆裂達人",category:"round",ruleVersion:1,metric:"round:burst",target:50,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"spin_10",name:"轉停 10 次",category:"round",ruleVersion:1,metric:"round:spin",target:10,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"spin_25",name:"轉停 25 次",category:"round",ruleVersion:1,metric:"round:spin",target:25,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"spin_50",name:"轉停 50 次",category:"round",ruleVersion:1,metric:"round:spin",target:50,evidenceKind:"round",awardEnabled:true}),
+  Object.freeze({achievementId:"streak_3",name:"三連勝",category:"streak",ruleVersion:1,metric:"maxWinStreak",target:3,evidenceKind:"match-window",awardEnabled:true}),
+  Object.freeze({achievementId:"streak_5",name:"五連勝",category:"streak",ruleVersion:1,metric:"maxWinStreak",target:5,evidenceKind:"match-window",awardEnabled:true}),
+  Object.freeze({achievementId:"streak_10",name:"十連勝",category:"streak",ruleVersion:1,metric:"maxWinStreak",target:10,evidenceKind:"match-window",awardEnabled:true}),
+  Object.freeze({achievementId:"shutout_1",name:"首次完封",category:"special",ruleVersion:1,metric:"shutoutWins",target:1,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"shutout_10",name:"完封 10 勝",category:"special",ruleVersion:1,metric:"shutoutWins",target:10,evidenceKind:"match",awardEnabled:true}),
+  Object.freeze({achievementId:"shutout_25",name:"完封 25 勝",category:"special",ruleVersion:1,metric:"shutoutWins",target:25,evidenceKind:"match",awardEnabled:true})
 ]);
 
 function hunterAchievementMatchKey(record){
@@ -16447,8 +16448,8 @@ function hunterEvaluateAchievementDefinition(definition,context){
     reachedAt,
     remaining:Math.max(0,target-current),
     unlockState:reached?"unlocked_derived":"locked",
-    awardEnabled:definition&&definition.awardEnabled===true,
-    awardStatus:"preview_only",
+    awardEnabled:true,
+    awardStatus:"pending_server_sync",
     evidenceKind:String(definition&&definition.evidenceKind||""),
     evidenceRefs:proofRefs
   };
@@ -16474,17 +16475,46 @@ function hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,ski
   refs.forEach(ref=>{if(hunterResolveAchievementEvidenceRef(ref,canonical))resolvedEvidence++;});
   const unresolvedEvidence=refs.length-resolvedEvidence;
   const readFailures=skippedRows.filter(row=>row&&row.reason==="read-failed").length;
-  return {version:HUNTER_ACHIEVEMENT_AUDIT_VERSION,recalculationMode:"derived_read_only",sourceRecords:source.length,canonicalRecords:canonical.length,duplicatesRemoved:Math.max(0,source.length-canonical.length),skippedIdentity:skippedRows.length,readFailures,legacyMatchKey,missingExactTime,quickDecision,trustedScore,analyzableMatches:analyzable,nonAnalyzableMatches:Math.max(0,canonical.length-analyzable),roundEvents,referencedEvidence:refs.length,resolvedEvidence,unresolvedEvidence,countCoverage:readFailures?"partial_read_failures":skippedRows.length===0?"loaded_history_complete":"partial_identity_exclusions",streakChronology:missingExactTime===0?"exact":"stable_fallback_used",roundCoverage:canonical.length===0?"no_matches":(analyzable===canonical.length?"all_matches_analyzable":"trusted_rounds_only"),evidenceResolution:unresolvedEvidence===0?"resolved":"needs_review",persistentAwardGate:"disabled"};
+  return {version:HUNTER_ACHIEVEMENT_AUDIT_VERSION,recalculationMode:"server_authoritative_award",sourceRecords:source.length,canonicalRecords:canonical.length,duplicatesRemoved:Math.max(0,source.length-canonical.length),skippedIdentity:skippedRows.length,readFailures,legacyMatchKey,missingExactTime,quickDecision,trustedScore,analyzableMatches:analyzable,nonAnalyzableMatches:Math.max(0,canonical.length-analyzable),roundEvents,referencedEvidence:refs.length,resolvedEvidence,unresolvedEvidence,countCoverage:readFailures?"partial_read_failures":skippedRows.length===0?"loaded_history_complete":"partial_identity_exclusions",streakChronology:missingExactTime===0?"exact":"stable_fallback_used",roundCoverage:canonical.length===0?"no_matches":(analyzable===canonical.length?"all_matches_analyzable":"trusted_rounds_only"),evidenceResolution:unresolvedEvidence===0?"resolved":"needs_review",persistentAwardGate:"pending_server_sync"};
 }
 function hunterBuildAchievementCore(records){
   const context=hunterBuildAchievementContext(records);
   return {
     schemaVersion:HUNTER_ACHIEVEMENT_SCHEMA_VERSION,
     engineVersion:HUNTER_ACHIEVEMENT_ENGINE_VERSION,
-    awardMode:"preview_only",
+    awardMode:"server_authoritative",
     metrics:context.metrics,
     evaluations:HUNTER_ACHIEVEMENT_DEFINITIONS.map(def=>hunterEvaluateAchievementDefinition(def,context))
   };
+}
+function hunterApplyPermanentAchievementSnapshot(core,snapshot){
+  if(!core)return core;
+  const earned=new Set(Array.isArray(snapshot&&snapshot.earnedAchievementIds)?snapshot.earnedAchievementIds.map(String):[]);
+  const serverRows=new Map((Array.isArray(snapshot&&snapshot.evaluations)?snapshot.evaluations:[]).map(row=>[String(row&&row.achievementId||""),row]));
+  const gate=String(snapshot&&snapshot.awardGate||"sync_unavailable");
+  core.awardMode="server_authoritative";
+  core.awardGate=gate;
+  core.awardsGranted=Array.isArray(snapshot&&snapshot.awardsGranted)?snapshot.awardsGranted.slice():[];
+  core.earnedAchievementIds=[...earned];
+  core.evaluations=(core.evaluations||[]).map(item=>{
+    const id=String(item&&item.achievementId||"");
+    const serverRow=serverRows.get(id)||null;
+    let awardStatus=earned.has(id)?"awarded":String(serverRow&&serverRow.awardStatus||"pending_server_sync");
+    if(awardStatus==="eligible"&&gate!=="open")awardStatus="blocked_incomplete_history";
+    return Object.assign({},item,{awardEnabled:true,awardStatus,serverCurrent:serverRow?Number(serverRow.currentValue||0):null});
+  });
+  return core;
+}
+function hunterAchievementAwardLabel(item){
+  if(item&&item.awardStatus==="awarded")return "永久徽章";
+  if(item&&item.unlockState==="unlocked_derived")return item.awardStatus==="blocked_incomplete_history"?"待完整驗證":"已達成";
+  return "進行中";
+}
+function hunterAchievementAwardMeta(item){
+  if(item&&item.awardStatus==="awarded")return "永久徽章已由伺服器發放";
+  if(item&&item.awardStatus==="blocked_incomplete_history")return "歷史資料不完整，已安全暫停永久發放";
+  if(item&&item.unlockState==="unlocked_derived")return "已達門檻，等待伺服器同步";
+  return "尚未達成永久徽章門檻";
 }
 function hunterResolveAchievementEvidenceRef(ref,records){
   if(!ref||!ref.key) return null;
@@ -16558,10 +16588,10 @@ function hunterMatchAchievementCardHtml(item,records){
   const proofCount=Array.isArray(item&&item.evidenceRefs)?item.evidenceRefs.length:0;
   const statusText=unlocked?("達成｜"+hunterAchievementDateText(item.reachedAt)):("還差 "+Math.max(0,target-current));
   return '<article class="hunter-achievement-card '+(unlocked?"unlocked":"locked")+'">'+
-    '<div class="hunter-achievement-card-head"><div><span class="hunter-achievement-kicker">'+(item.metric==="wins"?"VICTORY":"MATCH")+'</span><strong>'+esc(item.name||"里程碑")+'</strong></div><span class="hunter-achievement-state">'+(unlocked?"已達成":"進行中")+'</span></div>'+
+    '<div class="hunter-achievement-card-head"><div><span class="hunter-achievement-kicker">'+(item.metric==="wins"?"VICTORY":"MATCH")+'</span><strong>'+esc(item.name||"里程碑")+'</strong></div><span class="hunter-achievement-state">'+esc(hunterAchievementAwardLabel(item))+'</span></div>'+
     '<div class="hunter-achievement-progress-line"><b>'+current+' / '+target+'</b><span>'+esc(statusText)+'</span></div>'+
     '<div class="hunter-achievement-track"><span style="width:'+pct+'%"></span></div>'+
-    '<div class="hunter-achievement-meta">Rule v'+Number(item.ruleVersion||1)+'｜已綁定 '+proofCount+' 筆 Match Evidence｜永久徽章尚未發放</div>'+
+    '<div class="hunter-achievement-meta">Rule v'+Number(item.ruleVersion||1)+'｜已綁定 '+proofCount+' 筆 Match Evidence｜'+esc(hunterAchievementAwardMeta(item))+'</div>'+
     hunterAchievementEvidenceHtml(item,records)+
     '</article>';
 }
@@ -16577,7 +16607,7 @@ function hunterMatchAchievementsHtml(core,records){
   return '<section class="panel hunter-achievement-panel">'+
     '<div class="hunter-section-head"><div><div class="hunter-kicker">ACHIEVEMENTS</div><div class="panel-title">Match 型里程碑</div></div><span class="badge badge-metal">P6.2</span></div>'+
     '<div class="hunter-achievement-summary"><div><span>對戰</span><b>'+Number(core.metrics&&core.metrics.matches||0)+'</b></div><div><span>勝場</span><b>'+Number(core.metrics&&core.metrics.wins||0)+'</b></div><div><span>已達成節點</span><b>'+unlocked+' / '+matchItems.length+'</b></div></div>'+
-    '<div class="hunter-achievement-note">目前為「衍生達成」：系統已能由可信 Match 證明條件成立，但尚未寫入永久 Award。點開每張卡片下方的 Evidence Chain 可逐筆核對來源。</div>'+
+    '<div class="hunter-achievement-note">進度仍由 canonical Match 即時計算；永久徽章則由伺服器重新驗證本人報名與賽事歷史後發放。點開 Evidence Chain 可逐筆核對來源。</div>'+
     '<div class="hunter-achievement-group"><h3>對戰場次</h3><div class="hunter-achievement-grid">'+matchSeries.map(item=>hunterMatchAchievementCardHtml(item,records)).join("")+'</div></div>'+
     '<div class="hunter-achievement-group"><h3>勝場累積</h3><div class="hunter-achievement-grid">'+winSeries.map(item=>hunterMatchAchievementCardHtml(item,records)).join("")+'</div></div>'+
     '</section>';
@@ -16598,10 +16628,10 @@ function hunterRoundAchievementCardHtml(item,records){
   const proofCount=Array.isArray(item&&item.evidenceRefs)?item.evidenceRefs.length:0;
   const statusText=unlocked?("達成｜"+hunterAchievementDateText(item.reachedAt)):("還差 "+Math.max(0,target-current)+" 次");
   return '<article class="hunter-achievement-card hunter-round-achievement-card '+(unlocked?"unlocked":"locked")+'">'+
-    '<div class="hunter-achievement-card-head"><div><span class="hunter-achievement-kicker">'+esc(meta.kicker)+'</span><strong>'+esc(item.name||meta.label+"里程碑")+'</strong></div><span class="hunter-achievement-state">'+(unlocked?"已達成":"進行中")+'</span></div>'+
+    '<div class="hunter-achievement-card-head"><div><span class="hunter-achievement-kicker">'+esc(meta.kicker)+'</span><strong>'+esc(item.name||meta.label+"里程碑")+'</strong></div><span class="hunter-achievement-state">'+esc(hunterAchievementAwardLabel(item))+'</span></div>'+
     '<div class="hunter-achievement-progress-line"><b>'+current+' / '+target+' 次</b><span>'+esc(statusText)+'</span></div>'+
     '<div class="hunter-achievement-track"><span style="width:'+pct+'%"></span></div>'+
-    '<div class="hunter-achievement-meta">每次 '+esc(meta.label)+' = '+Number(meta.points||0)+' 分｜Rule v'+Number(item.ruleVersion||1)+'｜已綁定 '+proofCount+' 筆 Round Evidence｜永久徽章尚未發放</div>'+
+    '<div class="hunter-achievement-meta">每次 '+esc(meta.label)+' = '+Number(meta.points||0)+' 分｜Rule v'+Number(item.ruleVersion||1)+'｜已綁定 '+proofCount+' 筆 Round Evidence｜'+esc(hunterAchievementAwardMeta(item))+'</div>'+
     hunterAchievementEvidenceHtml(item,records)+
     '</article>';
 }
@@ -16621,7 +16651,7 @@ function hunterRoundAchievementsHtml(core,records){
     '<div class="hunter-round-achievement-summary">'+
       HUNTER_ACHIEVEMENT_ROUND_TYPES.map(type=>'<div><span>'+esc((HUNTER_ROUND_ACHIEVEMENT_META[type]||{}).label||type)+'</span><b>'+Number(metrics[type]||0)+' 次</b></div>').join("")+
     '</div>'+
-    '<div class="hunter-achievement-note">只計本人實際得分 Round：analyzable=true、perspective=for、類型與分值皆符合 canonical POINT_TYPES。Quick Decision 與防守失分不計入。已達成仍屬衍生狀態，永久 Award 尚未啟用。</div>'+
+    '<div class="hunter-achievement-note">只計本人實際得分 Round：analyzable=true、perspective=for、類型與分值皆符合 canonical POINT_TYPES。Quick Decision 與防守失分不計入；永久徽章由伺服器使用相同規則複核。</div>'+
     '<div class="hunter-achievement-meta hunter-round-achievement-total">Round 成就節點已達成 '+unlocked+' / '+roundItems.length+'｜每個節點都可展開 Round Evidence</div>'+
     groups+
     '</section>';
@@ -16636,10 +16666,10 @@ function hunterStreakSpecialAchievementCardHtml(item,records){
   const unit=isStreak?"連勝":"勝";
   const statusText=unlocked?("達成｜"+hunterAchievementDateText(item.reachedAt)):("還差 "+Math.max(0,target-current));
   return '<article class="hunter-achievement-card hunter-special-achievement-card '+(unlocked?"unlocked":"locked")+'">'+
-    '<div class="hunter-achievement-card-head"><div><span class="hunter-achievement-kicker">'+(isStreak?"WIN STREAK":"SHUTOUT")+'</span><strong>'+esc(item.name||"特殊里程碑")+'</strong></div><span class="hunter-achievement-state">'+(unlocked?"已達成":"進行中")+'</span></div>'+
+    '<div class="hunter-achievement-card-head"><div><span class="hunter-achievement-kicker">'+(isStreak?"WIN STREAK":"SHUTOUT")+'</span><strong>'+esc(item.name||"特殊里程碑")+'</strong></div><span class="hunter-achievement-state">'+esc(hunterAchievementAwardLabel(item))+'</span></div>'+
     '<div class="hunter-achievement-progress-line"><b>'+current+' / '+target+' '+unit+'</b><span>'+esc(statusText)+'</span></div>'+
     '<div class="hunter-achievement-track"><span style="width:'+pct+'%"></span></div>'+
-    '<div class="hunter-achievement-meta">Rule v'+Number(item.ruleVersion||1)+'｜已綁定 '+proofCount+' 筆 '+(isStreak?"連勝窗口":"Match")+' Evidence｜永久徽章尚未發放</div>'+
+    '<div class="hunter-achievement-meta">Rule v'+Number(item.ruleVersion||1)+'｜已綁定 '+proofCount+' 筆 '+(isStreak?"連勝窗口":"Match")+' Evidence｜'+esc(hunterAchievementAwardMeta(item))+'</div>'+
     hunterAchievementEvidenceHtml(item,records)+
     '</article>';
 }
@@ -16668,10 +16698,21 @@ function hunterAchievementIntegrityAuditHtml(audit){
   return '<section class="panel hunter-achievement-integrity-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HISTORICAL RECALCULATION</div><div class="panel-title">歷史回算檢查</div></div><span class="badge badge-metal">P6.6</span></div>'+
     '<div class="hunter-integrity-summary"><div><span>原始 Match</span><b>'+Number(audit.sourceRecords||0)+'</b></div><div><span>納入回算</span><b>'+Number(audit.canonicalRecords||0)+'</b></div><div><span>去除重複</span><b>'+Number(audit.duplicatesRemoved||0)+'</b></div><div><span>身分排除</span><b>'+Number(audit.skippedIdentity||0)+'</b></div></div>'+
     '<div class="hunter-integrity-grid"><div class="'+(identityOk?"ok":"warn")+'"><span>場次覆蓋</span><strong>'+esc(hunterAchievementIntegrityStatusLabel(audit.countCoverage))+'</strong><small>舊格式 Match key '+Number(audit.legacyMatchKey||0)+' 場</small></div><div class="'+(timeOk?"ok":"warn")+'"><span>連勝時序</span><strong>'+esc(hunterAchievementIntegrityStatusLabel(audit.streakChronology))+'</strong><small>缺精確完成時間 '+Number(audit.missingExactTime||0)+' 場</small></div><div class="'+(audit.roundCoverage==="all_matches_analyzable"?"ok":"warn")+'"><span>Round 覆蓋</span><strong>'+esc(hunterAchievementIntegrityStatusLabel(audit.roundCoverage))+'</strong><small>可分析 '+Number(audit.analyzableMatches||0)+'｜保守排除 '+Number(audit.nonAnalyzableMatches||0)+'｜Round Event '+Number(audit.roundEvents||0)+'</small></div><div class="'+(evidenceOk?"ok":"warn")+'"><span>Evidence</span><strong>'+esc(hunterAchievementIntegrityStatusLabel(audit.evidenceResolution))+'</strong><small>解析 '+Number(audit.resolvedEvidence||0)+' / '+Number(audit.referencedEvidence||0)+'｜未解析 '+Number(audit.unresolvedEvidence||0)+'</small></div></div>'+
-    '<div class="hunter-achievement-note">回算模式：derived_read_only。Quick Decision '+Number(audit.quickDecision||0)+' 場可提供 Match 勝敗，但不提供 Round／完封證據；可信比分 '+Number(audit.trustedScore||0)+' / '+Number(audit.canonicalRecords||0)+' 場。系統不補寫舊資料、不因回算自動發永久 Award。</div></section>';
+    '<div class="hunter-achievement-note">回算模式：server_authoritative_award。Quick Decision '+Number(audit.quickDecision||0)+' 場可提供 Match 勝敗，但不提供 Round／完封證據；可信比分 '+Number(audit.trustedScore||0)+' / '+Number(audit.canonicalRecords||0)+' 場。前端不補寫舊 Match；永久徽章只由伺服器複核並寫入。</div></section>';
+}
+function hunterPermanentAwardSummaryHtml(core){
+  if(!core)return "";
+  const earned=Array.isArray(core.earnedAchievementIds)?core.earnedAchievementIds.length:0;
+  const total=Array.isArray(core.evaluations)?core.evaluations.length:0;
+  const granted=Array.isArray(core.awardsGranted)?core.awardsGranted.length:0;
+  const gate=String(core.awardGate||"pending_server_sync");
+  const gateText=gate==="open"?"已開啟":gate==="blocked_incomplete_history"?"安全暫停":"同步中／暫不可用";
+  return '<section class="panel hunter-achievement-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">PERMANENT AWARDS</div><div class="panel-title">永久徽章發放</div></div><span class="badge badge-metal">P6.7</span></div>'+
+    '<div class="hunter-achievement-summary"><div><span>已永久取得</span><b>'+earned+' / '+total+'</b></div><div><span>發放閘門</span><b>'+esc(gateText)+'</b></div><div><span>本次新發</span><b>'+granted+'</b></div></div>'+
+    '<div class="hunter-achievement-note">所有 Award 都由 Cloud Functions 重新讀取可信賽事來源後以交易寫入；重複同步不會重複發章。歷史讀取或身分解析不完整時，系統會保留進度並暫停發放。</div></section>';
 }
 function hunterAchievementsHtml(core,records,audit){
-  return hunterAchievementIntegrityAuditHtml(audit)+hunterMatchAchievementsHtml(core,records)+hunterRoundAchievementsHtml(core,records)+hunterStreakSpecialAchievementsHtml(core,records);
+  return hunterPermanentAwardSummaryHtml(core)+hunterAchievementIntegrityAuditHtml(audit)+hunterMatchAchievementsHtml(core,records)+hunterRoundAchievementsHtml(core,records)+hunterStreakSpecialAchievementsHtml(core,records);
 }
 function hunterLevelThreshold(level){
   const lv=Math.max(1,Math.floor(Number(level)||1));
@@ -17166,7 +17207,19 @@ async function loadHunterProfile(force=false){
     const canonicalRecords=hunterUniqueRecords(sourceRecords);
     const skippedRecords=Array.isArray(result&&result.skipped)?result.skipped:[];
     const achievementCore=hunterBuildAchievementCore(canonicalRecords);
-    hunterProfileCache={records:canonicalRecords,skipped:skippedRecords,achievementCore,integrityAudit:hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore)};
+    hunterProfileCache={records:canonicalRecords,skipped:skippedRecords,achievementCore,integrityAudit:hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore),permanentAwards:null};
+    try{
+      if(window.engagementService&&window.engagementService.syncHunterAchievements){
+        const permanentAwards=await window.engagementService.syncHunterAchievements();
+        hunterProfileCache.permanentAwards=permanentAwards||null;
+        hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,permanentAwards||null);
+        if(hunterProfileCache.integrityAudit)hunterProfileCache.integrityAudit.persistentAwardGate=String(permanentAwards&&permanentAwards.awardGate||"sync_unavailable");
+      }
+    }catch(awardError){
+      console.warn("[Hunter Profile P6.7] permanent award sync unavailable",awardError);
+      hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,null);
+      if(hunterProfileCache.integrityAudit)hunterProfileCache.integrityAudit.persistentAwardGate="sync_unavailable";
+    }
     setTimeout(()=>resolveHunterOpponentIdentities(hunterProfileCache.records),0);
   }catch(e){
     console.warn("[Hunter Profile P3]",e);
@@ -23989,6 +24042,7 @@ init();
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
     async raffle(payload){return callEngagementFunction("memberRaffle",payload,540000,['list','get','announcements'].includes(payload?.action));},
     async getSnapshot(){ return callEngagementFunction("getEngagementSnapshot",{}); },
+    async syncHunterAchievements(){ return callEngagementFunction("syncHunterAchievements",{},120000); },
     async dailyCheckIn(){ return callEngagementFunction("dailyCheckIn",{}); },
     async setTitlePreferences(payload){ return callEngagementFunction("setTitlePreferences",payload); },
     async seedInitialTitles(){ return callEngagementFunction("seedInitialTitles",{}); },
