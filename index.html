@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.36">
+<meta name="bxh-build" content="20260923.37">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.36";
+  var CURRENT_BUILD="20260923.37";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -1505,6 +1505,74 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   .board-canvas .se-bracket-svg .se-path-classic,
   .se-bracket-svg .se-path-classic{
     stroke-width:1.25!important;
+  }
+}
+
+/* ==== v14.0.61 active-match court-color glow ==== */
+.match-box.ms-card-in_progress{
+  border-color:var(--court-accent,#D4AF37);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--court-accent,#D4AF37) 9%,transparent),var(--panel-2));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 62%,transparent),
+    0 0 14px color-mix(in srgb,var(--court-accent,#D4AF37) 38%,transparent);
+  animation:active-court-glow 1.8s ease-in-out infinite;
+}
+.match-box.ms-card-in_progress .mb-head{color:var(--court-accent,#D4AF37);}
+.match-box.ms-card-in_progress .mb-row .sc{color:color-mix(in srgb,var(--court-accent,#D4AF37) 78%,white);}
+@keyframes active-court-glow{
+  0%,100%{
+    border-color:color-mix(in srgb,var(--court-accent,#D4AF37) 78%,#111 22%);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 58%,transparent),
+      0 0 10px color-mix(in srgb,var(--court-accent,#D4AF37) 32%,transparent);
+  }
+  50%{
+    border-color:color-mix(in srgb,var(--court-accent,#D4AF37) 90%,white 10%);
+    box-shadow:
+      0 0 0 1.5px color-mix(in srgb,var(--court-accent,#D4AF37) 78%,transparent),
+      0 0 20px color-mix(in srgb,var(--court-accent,#D4AF37) 50%,transparent);
+  }
+}
+
+.board-canvas .match-box.ms-card-in_progress{
+  border-color:var(--court-accent,#D4AF37)!important;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--court-accent,#D4AF37) 10%,transparent),#17191d)!important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 78%,transparent),
+    0 0 10px color-mix(in srgb,var(--court-accent,#D4AF37) 64%,transparent),
+    0 0 24px color-mix(in srgb,var(--court-accent,#D4AF37) 44%,transparent)!important;
+  animation:board-active-court-glow 1.8s ease-in-out infinite!important;
+  z-index:4;
+}
+.board-canvas .match-box.ms-card-in_progress .match-order-badge{
+  border-color:var(--court-accent,#D4AF37)!important;
+  color:color-mix(in srgb,var(--court-accent,#D4AF37) 82%,white)!important;
+  background:#050607!important;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.76),
+    0 0 8px color-mix(in srgb,var(--court-accent,#D4AF37) 68%,transparent),
+    0 0 16px color-mix(in srgb,var(--court-accent,#D4AF37) 42%,transparent)!important;
+}
+@keyframes board-active-court-glow{
+  0%,100%{
+    box-shadow:
+      0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 68%,transparent),
+      0 0 8px color-mix(in srgb,var(--court-accent,#D4AF37) 54%,transparent),
+      0 0 18px color-mix(in srgb,var(--court-accent,#D4AF37) 34%,transparent);
+  }
+  50%{
+    box-shadow:
+      0 0 0 1.5px color-mix(in srgb,var(--court-accent,#D4AF37) 94%,white 6%),
+      0 0 13px color-mix(in srgb,var(--court-accent,#D4AF37) 76%,transparent),
+      0 0 30px color-mix(in srgb,var(--court-accent,#D4AF37) 52%,transparent);
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .match-box.ms-card-in_progress{animation:none!important;}
+  .board-canvas .match-box.ms-card-in_progress{
+    box-shadow:
+      0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 84%,transparent),
+      0 0 18px color-mix(in srgb,var(--court-accent,#D4AF37) 46%,transparent)!important;
   }
 }
 
@@ -4265,9 +4333,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.60";
+const APP_VERSION = "v14.0.61";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.61",date:"2026/09/23",timezone:"Asia/Taipei",title:"進行中場次依戰鬥台動態發光配色",updateLevel:"patch",added:["進行中的對戰框依戰鬥台編號自動套用不同發光色；戰鬥台增加時會自動產生新的辨識色，不需預先限制台數"],changed:["樹狀總覽與賽事清單共用戰鬥台動態色彩映射","進行中場次的外框與樹狀圖場次序號徽章同步使用該戰鬥台色彩"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket active-match court-color glow",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"進行中的比賽現在會依戰鬥台顯示不同發光框；開幾台就自動產生幾種不同辨識色。"},
   {version:"v14.0.60",date:"2026/09/23",timezone:"Asia/Taipei",title:"對戰表刷新鍵權限／空表狀態修復",updateLevel:"patch",added:[],changed:["對戰表的手動刷新鍵改為所有已連線雲端賽事角色皆可使用，包含最高管理員、管理員與工作人員","尚未產生對戰表時仍保留刷新入口，不再因 bracketSize 尚未建立而隱藏"],fixed:["修正管理角色進入對戰表看不到刷新鍵","修正賽事尚未產生對戰表時刷新鍵被提前 return 隱藏"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket refresh visibility hotfix",firebaseImpact:"無資料結構變更；沿用既有 joinRoom／joinRoomPublic 讀取流程",securityRulesImpact:"無",permissionImpact:"無新增資料權限；僅放寬既有刷新按鈕的 UI 顯示條件",publicSummary:"對戰表刷新鍵現在在管理端與尚未產生對戰表的狀態都會保留，可手動重新抓取最新雲端賽事資料。"},
   {version:"v14.0.59",date:"2026/09/23",timezone:"Asia/Taipei",title:"測試房／正式天梯結算前置分流",updateLevel:"patch",added:["新增結算路線分類：TEST-S1、測試不計分、正式 ranked、一般封存","系統 T001～T064 虛擬名單可在既有舊房自動辨識為測試資料"],changed:["正式天梯只在 eventAuthority=official 且非系統虛擬測試名單時執行","測試／虛擬玩家賽事完成後直接封存，不再撞正式天梯最低有效帳號驗證"],fixed:["修正 BXH-23DPJ8 類型房間因全為系統虛擬玩家卻進入正式天梯結算，造成完成賽事卡在結算中","正式 ranked 有效帳號不足時改顯示明確原因，仍維持至少兩位有效 BXH 帳號的防污染限制"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement routing hotfix",firebaseImpact:"新增賽事狀態稽核欄位 settlementRoute／syntheticTestRoster；不新增集合",securityRulesImpact:"無",permissionImpact:"無擴張；正式積分規則維持不變",publicSummary:"測試虛擬名單不再誤走正式天梯；正式積分賽仍必須至少兩位有效 BXH 玩家帳號。"},
   {version:"v14.0.58",date:"2026/09/23",timezone:"Asia/Taipei",title:"裁判分配競態同步修復",updateLevel:"patch",added:["裁判分配儲存前先排空既有一般雲端寫入佇列"],changed:["裁判分配欄位改由專用 transaction 作為權威來源；一般 pushUpdate 只保留雲端最新裁判設定，不再以舊快照回寫","重新進房時桌次限制同時支援 true 與 false 的頂層權威值"],fixed:["修正一般狀態同步與裁判分配 transaction 互相踩寫，造成 stale-assignment、儲存後勾選被還原或公開鏡像顯示舊裁判","修正頂層桌次限制為 false 時，重新進房仍可能沿用 data 內舊 true 值"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee assignment race hotfix",firebaseImpact:"無新增集合或欄位；調整既有 refereeStation* 欄位同步責任",securityRulesImpact:"無",permissionImpact:"沿用既有裁判分配權限",publicSummary:"修正裁判分配偶發無法儲存、儲存後被還原，以及雲端同步互相覆蓋的問題。"},
@@ -11359,6 +11428,13 @@ function matchStatusClass(m){
   const s = m.status || (m.completed ? "completed" : "pending");
   return "ms-card-"+s;
 }
+function activeMatchCourtAtmosphereStyle(m){
+  if(!m || m.isBye) return "";
+  const s=m.status || (m.completed ? "completed" : "pending");
+  const station=Number(m.station);
+  if(s!=="in_progress" || !Number.isFinite(station) || station<1) return "";
+  return courtAtmosphereStyle(Math.floor(station));
+}
 function matchStatusBarHtml(m, inline){
   if(m.isBye) return "";
   const s = m.status || (m.completed ? "completed" : "pending");
@@ -11398,7 +11474,7 @@ function matchBoxHtml(m, headLabel){
   const aWin = m.completed && m.winnerId && m.a && m.winnerId===m.a.playerId;
   const bWin = m.completed && m.winnerId && m.b && m.winnerId===m.b.playerId;
   return `
-  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" data-action="open-match" data-id="${m.id}">
+  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" style="${activeMatchCourtAtmosphereStyle(m)}" data-action="open-match" data-id="${m.id}">
     <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${courtSwapMatchBadge(m)}</span><span>台${m.station}</span></div>
     <div class="mb-row ${aWin?'winner':''}">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
     <div class="mb-row ${bWin?'winner':''}">${playerBracketRowHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
@@ -11527,7 +11603,7 @@ function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
   const aWin = m.completed && m.winnerId && m.a && m.winnerId===m.a.playerId;
   const bWin = m.completed && m.winnerId && m.b && m.winnerId===m.b.playerId;
   return `
-  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
+  <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" style="${activeMatchCourtAtmosphereStyle(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
     ${matchNo==null?'':`<span class="match-order-badge" aria-label="第 ${matchNo} 場">${matchNo}</span>`}
     <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${courtSwapMatchBadge(m)}</span><span>台${m.station}</span></div>
     <div class="mb-row ${aWin?'winner':''}" data-side="A">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
