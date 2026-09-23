@@ -215,6 +215,6 @@ mustInclude('if(hunterRecordHasTrustedScore(record)){','H2H totals must use trus
 mustInclude('const score=hunterRecordScoreText(record);','H2H recent row must use centralized score display');
 mustInclude('const score=hunterRecordScoreText(r);','Match record UI must use centralized score display');
 mustInclude('比分未驗證','Untrusted legacy score must be visibly distinguished');
-mustInclude('可信比分 '+String.raw`${periodSummary.scoredMatches}`,'Period summary must disclose trusted score sample');
+mustInclude("可信比分 '+periodSummary.scoredMatches+' / '+periodSummary.matches+' 場",'Period summary must disclose trusted score sample');
 console.log('PASS Hunter P5 end-to-end trusted-score consistency');
 
