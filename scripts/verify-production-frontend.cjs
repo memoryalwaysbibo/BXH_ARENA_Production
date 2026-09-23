@@ -77,6 +77,13 @@ mustInclude('roster-sync-mismatch','Roster mutation must verify server round-tri
 mustInclude('results.push(Object.assign({registrationId:docSnap.id},docSnap.data()))','Admin registration rows must retain Firestore document id');
 must(/if\(action===["']delete-player["']\)[\s\S]*?p\.source===["']online["'][\s\S]*?peopleCancelOnline/, 'Online player delete must cancel authoritative registration');
 console.log('PASS people roster second-level / atomic waitlist linkage');
+mustInclude('data-action="save-managed-account"','Per-account save button missing');
+mustInclude('function managedAccountPatch(user,draft)','Per-account account draft diff helper missing');
+mustInclude('captureManagedAccountDraft(el.getAttribute("data-uid"))','Account controls must stage edits locally');
+mustInclude('confirmLabel:"確認更新"','Account save confirmation dialog missing');
+mustNot(/changeSingleManagedAccount\(el\.getAttribute\("data-uid"\),\{\[field\]/,'Account controls must not auto-save directly on change');
+console.log('PASS account-management staged save confirmation');
+
 mustInclude('class="rank-table people-roster-table"','People roster table mobile scope missing');
 mustInclude('class="people-col-actions"','People roster action semantic cell missing');
 mustInclude('>移至備取</button>','Roster overflow menu must retain the move-to-waitlist action label');
