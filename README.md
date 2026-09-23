@@ -21,3 +21,16 @@ Shared scoring lives in `ladder-v1.js`. For official ranked events the browser n
 - Onsite guests can contribute actual participation to event size without receiving account points. Explicit test identities do not contribute to official size.
 
 Run `node --experimental-vm-modules tests/ladder-v1.cjs`, `node tests/ladder-settlement.cjs`, and `node scripts/verify-production-frontend.cjs`. Tests cover scoring through 512 entrants, script syntax, and the code-only callable trust boundary. Backend tests separately cover server-side scoring, duplicate protection, S0 isolation, roster validation, and atomic failure. No test points are written to production by these tests.
+
+
+## BXH CALL 2.0 — Web Push release checklist
+
+Phase B2 uses Firebase Cloud Messaging plus `firebase-messaging-sw.js` for background / lock-screen court-call notifications.
+
+- Set **only the public Web Push VAPID key** in `PRODUCTION_FIREBASE_WEB_CONFIG.json -> vapidKey`. Never commit a VAPID private key or Firebase service-account credential.
+- An empty `vapidKey` keeps the candidate functional with Firebase/default behavior where supported, but it is **not considered broad-release ready**.
+- iPhone/iPad Web Push must be tested from BXH ARENA installed to the Home Screen.
+- After enabling push on a device, use **「🧪 測試鎖屏推播」**. The server waits about 4 seconds so the tester can switch apps or lock the screen before sending.
+- Release order: deploy/verify `courtCallPushService` backend first, then ship the frontend candidate.
+- Required smoke tests: Android Chrome background + lock screen; iPhone Home-Screen app background + lock screen; notification tap returns to ARENA; logout/login account isolation.
+
