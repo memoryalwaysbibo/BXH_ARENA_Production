@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.18">
+<meta name="bxh-build" content="20260923.19">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.18";
+  var CURRENT_BUILD="20260923.19";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4251,9 +4251,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.42";
+const APP_VERSION = "v14.0.43";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.43",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 全鏈可信比分一致性修正",updateLevel:"patch",added:["新增 hunterRecordHasTrustedScore() 作為 P3～P5.6 唯一可信比分判定","新增 hunterRecordScoreText() 統一對戰卡、H2H 最近交手與單場詳細的比分顯示規則","期間統計補上可信比分場次，讓總得分／總失分的樣本來源可核對"],changed:["只有非 Quick Decision、analyzable=true、且 scoreFor/scoreAgainst 有效的 Match 才納入生涯／期間／H2H 得失分","舊 Quick Decision canonical Hunter record 強制 scoreA/scoreB=null，避免舊殘留數字被當成正式比分","Round ledger 不完整但仍帶有舊比分的歷史 Match 顯示『比分未驗證』，不再混入可信統計","H2H 若沒有任何可信比分，不再顯示 0/0 或淨 0，而顯示 —"],fixed:["修正舊 completed Match 無 Round Log 時雖被識別為 Quick Decision，仍可能把 scoreA/scoreB 帶入 Hunter record 的資料污染風險","修正 H2H 原本只判斷 score 非 null，可能把 Quick Decision／不可信歷史比分算入得失分","修正期間總得失分與 P4 Round 分析可能使用不同可信度資料來源的口徑不一致"],environment:"Production consistency audit branch",deployStatus:"P5 consistency fix only; no P6 features",firebaseImpact:"無；純前端 canonical record 與衍生統計修正，不修改既有 Firestore 文件",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案的比分統計改成只採用可由完整 Round ledger 驗證的對戰，判定模式與不完整歷史比分不再污染總分與 H2H。"},
+
   {version:"v14.0.42",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5.6 對手檔案",updateLevel:"minor",added:["H2H 對手統計新增『對手檔案』工具列，可搜尋玩家名稱或穩定 Player ID","新增最近交手捷徑，依最後交手時間顯示最近 3 位可識別對手","新增常遇對手捷徑，依交手場次顯示前 3 位可識別對手","新增 H2H 排序：交手最多、最近交手、名稱"],changed:["對手搜尋與排序只作用在目前的一般／積分與期間篩選結果，不建立第二套資料","搜尋結果仍沿用 P5.4 H2H 與 P5.5 對手戰型分析卡片，所有數字維持單一來源","搜尋只比對公開名稱與穩定 playerId，不以姓名建立身份關聯"],fixed:["改善 H2H 對手數量增加後難以快速找到特定玩家或近期／常遇對手的使用問題"],environment:"Production frontend feature branch",deployStatus:"P5.6 opponent directory UX only",firebaseImpact:"無；純前端整理既有 H2H 暫態資料",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"H2H 新增最近交手、常遇對手、搜尋與排序，對手資料更容易查找。"},
 
   {version:"v14.0.41",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5.5 對手戰型分析",updateLevel:"minor",added:["H2H 每位可識別對手新增四種進攻得分與四種防守失分分布","樣本達門檻後顯示『主要得分方式／主要失分方式』，未達門檻只呈現原始分布","對手分析門檻固定為至少 3 場可分析交手＋8 個有效回合，避免小樣本過度解讀"],changed:["對手戰型分析與 H2H 一樣受一般／積分與生涯／本季／本月／本週／今日篩選控制","Quick Decision 不進入對手戰型分析，只保留在 H2H 勝敗統計","分析只描述實際得失分分布，不產生宿敵、剋星或強弱標籤"],fixed:["補足 H2H 只能看勝敗與比分，無法知道面對特定玩家主要靠什麼得分、主要被什麼方式得分的資訊缺口"],environment:"Production frontend feature branch",deployStatus:"P5.5 opponent matchup analysis",firebaseImpact:"無；由既有 H2H Hunter Round records 暫態計算",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"H2H 現在能看出面對特定對手時的得分與失分方式分布，資料不足時不下結論。"},
@@ -10211,8 +10213,8 @@ function buildHunterMatchRecord(st,match){
     playerB:match.b&&match.b.playerId?hunterParticipantSummary(st,match.b.playerId):null,
     winnerLocalPlayerId:match.winnerId||null,
     loserLocalPlayerId:match.loserId||null,
-    scoreA:match.scoreA==null?null:Number(match.scoreA),
-    scoreB:match.scoreB==null?null:Number(match.scoreB),
+    scoreA:quickDecision?null:(match.scoreA==null?null:Number(match.scoreA)),
+    scoreB:quickDecision?null:(match.scoreB==null?null:Number(match.scoreB)),
     resultMethod:quickDecision?"quick_decision":(match.resultMethod||null),
     analyzable:!quickDecision&&ledger.ok&&ledger.roundCount>0,
     rounds:ledger.events,
@@ -16140,19 +16142,35 @@ function hunterFilteredRecords(){
     return true;
   });
 }
+function hunterRecordHasTrustedScore(record){
+  if(!record||record.resultMethod==="quick_decision"||record.analyzable!==true) return false;
+  if(record.scoreFor==null||record.scoreAgainst==null) return false;
+  const scoreFor=Number(record.scoreFor),scoreAgainst=Number(record.scoreAgainst);
+  return Number.isFinite(scoreFor)&&Number.isFinite(scoreAgainst)&&scoreFor>=0&&scoreAgainst>=0;
+}
+function hunterRecordScoreText(record){
+  if(record&&record.resultMethod==="quick_decision") return "判定";
+  if(hunterRecordHasTrustedScore(record)) return Number(record.scoreFor)+" : "+Number(record.scoreAgainst);
+  if(record&&record.scoreFor!=null&&record.scoreAgainst!=null) return "比分未驗證";
+  return "—";
+}
+
 function hunterCareerSummary(records){
   const rows=Array.isArray(records)?records:[];
-  let wins=0,losses=0,totalFor=0,totalAgainst=0,validRounds=0;
+  let wins=0,losses=0,totalFor=0,totalAgainst=0,validRounds=0,scoredMatches=0;
   rows.forEach(r=>{
     if(r.isWin) wins++; else losses++;
-    if(Number.isFinite(Number(r.scoreFor))) totalFor+=Number(r.scoreFor);
-    if(Number.isFinite(Number(r.scoreAgainst))) totalAgainst+=Number(r.scoreAgainst);
+    if(hunterRecordHasTrustedScore(r)){
+      scoredMatches++;
+      totalFor+=Number(r.scoreFor);
+      totalAgainst+=Number(r.scoreAgainst);
+    }
     if(r.analyzable) validRounds+=Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0;
   });
   return {
     matches:rows.length,wins,losses,
     winRate:rows.length?Math.round(wins/rows.length*100):0,
-    totalFor,totalAgainst,net:totalFor-totalAgainst,validRounds
+    totalFor,totalAgainst,net:totalFor-totalAgainst,validRounds,scoredMatches
   };
 }
 const HUNTER_GROWTH_VERSION="hunter-xp-v1";
@@ -16447,8 +16465,8 @@ function hunterBuildH2H(records){
     });
     const g=groups.get(key);
     g.matches++; if(record.isWin)g.wins++;else g.losses++;
-    const sf=Number(record.scoreFor),sa=Number(record.scoreAgainst);
-    if(record.scoreFor!=null&&record.scoreAgainst!=null&&Number.isFinite(sf)&&Number.isFinite(sa)){
+    if(hunterRecordHasTrustedScore(record)){
+      const sf=Number(record.scoreFor),sa=Number(record.scoreAgainst);
       g.scoredMatches++;g.totalFor+=sf;g.totalAgainst+=sa;
     }
     const ts=hunterRecordTimestamp(record);
@@ -16468,7 +16486,7 @@ function hunterBuildH2H(records){
   return {list,excluded,loading};
 }
 function hunterH2HMatchRow(record){
-  const score=(record.scoreFor==null||record.scoreAgainst==null)?"判定":(record.scoreFor+" : "+record.scoreAgainst);
+  const score=hunterRecordScoreText(record);
   return '<div class="hunter-h2h-match-row"><div><b>'+esc(record.eventName||record.eventCode||"BXH 賽事")+'</b><br><span>'+esc(record.eventDate||"日期未記錄")+'｜'+(record.isWin?"WIN":"LOSS")+'</span></div><div><b>'+esc(score)+'</b></div></div>';
 }
 const HUNTER_H2H_ANALYSIS_MIN_MATCHES=3;
@@ -16516,10 +16534,11 @@ function hunterOpponentAnalysisHtml(group){
 
 function hunterH2HItemHtml(group){
   const recent=group.records.slice(0,5);
-  const netText=(group.net>0?"+":"")+group.net;
+  const netText=group.scoredMatches?((group.net>0?"+":"")+group.net):"—";
+  const scoreText=group.scoredMatches?(group.totalFor+" / "+group.totalAgainst):"—";
   const latest=group.latestRecord||group.records[0]||null;
   return '<details class="hunter-h2h-item"><summary><div class="hunter-h2h-name"><strong>'+esc(group.name)+'</strong><small>玩家 '+esc(group.playerId)+'｜交手 '+group.matches+' 場</small></div><div class="hunter-h2h-summary"><b>'+group.winRate+'%</b><span>'+group.wins+' 勝 '+group.losses+' 敗</span></div></summary>'+
-    '<div class="hunter-h2h-body"><div class="hunter-h2h-grid"><div><span>交手</span><b>'+group.matches+' 場</b></div><div><span>勝敗</span><b>'+group.wins+'W / '+group.losses+'L</b></div><div><span>得失分</span><b>'+group.totalFor+' / '+group.totalAgainst+'</b></div><div><span>淨得失分</span><b>'+esc(netText)+'</b></div></div>'+
+    '<div class="hunter-h2h-body"><div class="hunter-h2h-grid"><div><span>交手</span><b>'+group.matches+' 場</b></div><div><span>勝敗</span><b>'+group.wins+'W / '+group.losses+'L</b></div><div><span>得失分</span><b>'+esc(scoreText)+'</b></div><div><span>淨得失分</span><b>'+esc(netText)+'</b></div></div>'+
     '<div class="hunter-evidence-meta">最近 5 場</div><div class="hunter-h2h-recent">'+recent.map(r=>'<span class="hunter-h2h-result '+(r.isWin?"win":"loss")+'" title="'+esc((r.eventDate||"")+" "+(r.eventName||r.eventCode||""))+'">'+(r.isWin?"W":"L")+'</span>').join('')+'</div>'+
     hunterOpponentAnalysisHtml(group)+
     '<div class="hunter-h2h-note">得失分僅統計 '+group.scoredMatches+' / '+group.matches+' 場有可信比分的對戰；Quick Decision 只計勝敗，也不進入對手戰型分析。</div>'+
@@ -16602,7 +16621,7 @@ function hunterRecordTimelineHtml(record){
 }
 function hunterRecordDetailHtml(r){
   const opp=(r.opponent&&r.opponent.name)||"未知對手";
-  const score=(r.scoreFor==null||r.scoreAgainst==null)?"判定":(r.scoreFor+" : "+r.scoreAgainst);
+  const score=hunterRecordScoreText(r);
   const roundLabel=Number.isFinite(Number(r.round))?"第 "+Number(r.round)+" 輪":"輪次未記錄";
   const court=Number(r.station)>0?"Court "+Number(r.station):"未記錄";
   const trust=hunterTrustLabel(r.dataTrust||(r.resultMethod==="quick_decision"?"quick-decision":(r.analyzable?"complete-round":"round-incomplete")));
@@ -16619,7 +16638,7 @@ function hunterRecordDetailHtml(r){
 function hunterRecordCardHtml(r){
   const resultClass=r.isWin?"win":"loss",resultText=r.isWin?"WIN":"LOSS";
   const opp=(r.opponent&&r.opponent.name)||"未知對手";
-  const score=(r.scoreFor==null||r.scoreAgainst==null)?"判定":(r.scoreFor+" : "+r.scoreAgainst);
+  const score=hunterRecordScoreText(r);
   const typeLabel=r.ladderMode==="ranked"?"積分對戰":"一般對戰";
   const roundLabel=Number.isFinite(Number(r.round))?"第 "+Number(r.round)+" 輪":"輪次未記錄";
   const station=Number(r.station)>0?"｜Court "+Number(r.station):"";
@@ -16701,7 +16720,7 @@ function renderPlayerStatsTab(p){
       '<div class="stat-box"><div class="label">淨得失分</div><div class="value small '+(periodSummary.net>0?"positive":periodSummary.net<0?"negative":"")+'">'+(dataReady?(periodSummary.net>0?"+":"")+periodSummary.net:"—")+'</div></div>'+
       '<div class="stat-box"><div class="label">有效回合</div><div class="value small">'+statValue(periodSummary.validRounds)+'</div></div>'+
       '<div class="stat-box"><div class="label">能力分</div><div class="value small">'+(dataReady&&periodSummary.analysisScore!=null?periodSummary.analysisScore:'—')+'</div></div></div>'+
-      '<div class="hunter-period-caption"><b>'+esc(periodLabel)+'</b>｜總得分 '+periodSummary.totalFor+'、總失分 '+periodSummary.totalAgainst+'、可分析對戰 '+periodSummary.analyzableMatches+' 場。能力分仍需符合 P4 樣本門檻。</div>'+
+      '<div class="hunter-period-caption"><b>'+esc(periodLabel)+'</b>｜可信比分 '+periodSummary.scoredMatches+' / '+periodSummary.matches+' 場、總得分 '+periodSummary.totalFor+'、總失分 '+periodSummary.totalAgainst+'、可分析對戰 '+periodSummary.analyzableMatches+' 場。能力分仍需符合 P4 樣本門檻。</div>'+
       (dataReady&&hunterProfileCache.skipped&&hunterProfileCache.skipped.length?'<div class="hunter-framework-note">有 '+hunterProfileCache.skipped.length+' 場舊賽事無法安全確認玩家身分，因此不計入 XP 或期間統計。</div>':'')+
       '</section>'+
       '<section class="panel hunter-ladder-bridge"><div class="panel-title">現有天梯資料 <span class="badge badge-metal">既有資料</span></div><div class="hunter-stat-grid hunter-stat-grid-4">'+
