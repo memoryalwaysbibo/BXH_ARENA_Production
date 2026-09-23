@@ -7858,10 +7858,23 @@ let aiCreateStructuredErrors = [];
 let aiCreateSelectedEventKey = "";
 let aiCreateLastApplied = null;
 let aiCreateReviewAcknowledged = false;
+let aiCreateParseBusy = false;
 
 const AI_CREATE_SCHEMA_VERSION = "bxh-arena.ai-create.v1";
+const AI_CREATE_CALLABLE_CONTRACT_VERSION = "bxh-arena.ai-create.callable.v1";
+const AI_CREATE_CALLABLE_NAME = "parseTournamentAnnouncementV1";
 const AI_CREATE_TIMEZONE = "Asia/Taipei";
+const AI_CREATE_LOCALE = "zh-Hant-TW";
 const AI_CREATE_MAX_EVENTS = 8;
+const AI_CREATE_MAX_SOURCE_CHARS = 12000;
+
+function aiCreateRemoteParserEnabled(){
+  try{
+    return !!(window.BXH_FEATURE_FLAGS && window.BXH_FEATURE_FLAGS.aiCreateRemoteParser===true);
+  }catch(e){
+    return false;
+  }
+}
 
 function aiCreateLooksLikeGoldenCase(text){
   const normalized=String(text||"").replace(/\s+/g," ");
@@ -7954,6 +7967,102 @@ function buildAiCreateGoldenCaseResult(){
       }
     ]
   };
+}
+
+function buildAiCreateCallableRequest(text){
+  return {
+    contractVersion:AI_CREATE_CALLABLE_CONTRACT_VERSION,
+    schemaVersion:AI_CREATE_SCHEMA_VERSION,
+    sourceText:String(text||"").slice(0,AI_CREATE_MAX_SOURCE_CHARS),
+    locale:AI_CREATE_LOCALE,
+    timezone:AI_CREATE_TIMEZONE,
+    limits:{
+      maxEvents:AI_CREATE_MAX_EVENTS,
+      maxSourceChars:AI_CREATE_MAX_SOURCE_CHARS
+    }
+  };
+}
+
+function validateAiCreateCallableEnvelope(raw){
+  const errors=[];
+  if(!raw || typeof raw!=="object" || Array.isArray(raw)) return {ok:false,errors:["Callable 回傳不是物件"]};
+  if(raw.ok!==true) errors.push(String(raw.error||raw.reason||"Callable 回傳 ok=false"));
+  if(raw.contractVersion!==AI_CREATE_CALLABLE_CONTRACT_VERSION) errors.push("Callable contractVersion 不相容");
+  if(raw.schemaVersion!==AI_CREATE_SCHEMA_VERSION) errors.push("Callable schemaVersion 不相容");
+  if(!raw.result || typeof raw.result!=="object" || Array.isArray(raw.result)) errors.push("Callable result 缺失");
+  return {ok:errors.length===0,errors,result:raw.result||null};
+}
+
+async function requestAiCreateStructuredResult(text){
+  if(!aiCreateRemoteParserEnabled()){
+    if(aiCreateLooksLikeGoldenCase(text)){
+      return {ok:true,result:buildAiCreateGoldenCaseResult(),source:"mock-golden-case"};
+    }
+    return {
+      ok:false,
+      reason:"remote-parser-disabled",
+      message:"P7.5 已接好 Firebase Callable 介面契約，但遠端 AI Parser 目前預設關閉。為避免假裝理解，現階段只執行 Golden Test Case。"
+    };
+  }
+  if(!window.engagementService || typeof window.engagementService.aiCreateParser!=="function"){
+    return {ok:false,reason:"service-unavailable",message:"AI Parser 服務尚未載入。"};
+  }
+  const response=await window.engagementService.aiCreateParser(buildAiCreateCallableRequest(text));
+  const envelope=validateAiCreateCallableEnvelope(response);
+  if(!envelope.ok){
+    return {ok:false,reason:"invalid-callable-response",message:envelope.errors.join("｜")};
+  }
+  return {ok:true,result:envelope.result,source:"remote-callable"};
+}
+
+async function runAiCreateParse(){
+  if(aiCreateParseBusy) return;
+  const input=document.getElementById("ai-create-source-text");
+  if(input) aiCreateSourceText=input.value;
+  const source=String(aiCreateSourceText||"").trim();
+  if(!source){
+    showToast("請先貼上活動文案",true);
+    return;
+  }
+  aiCreateStructuredResult=null;
+  aiCreateStructuredErrors=[];
+  aiCreateSelectedEventKey="";
+  aiCreateReviewAcknowledged=false;
+  aiCreateParseBusy=true;
+  aiCreateAssistantNotice=aiCreateRemoteParserEnabled()
+    ?"正在透過 Firebase Callable 解析文案；解析結果仍只會進入草稿預覽，不會建立或發布賽事。"
+    :"P7.5 安全測試模式：遠端 AI Parser 預設關閉，正在檢查 Golden Test Case。";
+  render();
+  try{
+    const parsed=await requestAiCreateStructuredResult(source);
+    if(!parsed.ok){
+      aiCreateAssistantNotice=parsed.message||"AI Parser 尚未啟用。";
+      return;
+    }
+    const candidate=parsed.result;
+    if(candidate && parsed.source==="remote-callable" && !candidate.sourceMode) candidate.sourceMode="remote-callable";
+    const validation=validateAiCreateStructuredResult(candidate);
+    if(!validation.ok){
+      aiCreateStructuredErrors=validation.errors;
+      aiCreateAssistantNotice="P7.5 Parser 回傳結構驗證失敗；資料已停止在預覽層，不會進入賽事草稿。";
+      return;
+    }
+    aiCreateStructuredResult=candidate;
+    aiCreateSelectedEventKey=(candidate.events&&candidate.events[0]&&candidate.events[0].key)||"";
+    aiCreateAssistantNotice=(parsed.source==="remote-callable"
+      ?"P7.5 遠端 Parser 已回傳標準結構。"
+      :"P7.5 Golden Test Case 已通過介面層。")
+      +" 請選擇要建立的賽事，再套用至 ARENA 草稿；套用後仍需通過 AI 審核閘門，且不會自動發布。";
+  }catch(e){
+    console.warn("AI create parser failed",e);
+    const raw=String((e&&e.message)||"");
+    aiCreateAssistantNotice=raw.includes("feature-disabled")
+      ?"後端 AI Parser 功能目前關閉；ARENA 已安全停止，不會改動賽事草稿。"
+      :"AI Parser 連線失敗；ARENA 已安全停止，不會改動賽事草稿。";
+  }finally{
+    aiCreateParseBusy=false;
+    render();
+  }
 }
 
 function validateAiCreateStructuredResult(raw){
@@ -8311,7 +8420,7 @@ function renderAiCreateAssistant(){
         <label for="ai-create-source-text" style="display:block;font-weight:800;color:var(--ivory);margin-bottom:8px;">活動文案</label>
         <textarea id="ai-create-source-text" class="ai-create-source" maxlength="12000" placeholder="請貼上活動文案……">${esc(aiCreateSourceText)}</textarea>
         <div class="ai-create-meta">
-          <span>支援長文與原始排版；第一層不會修改目前賽事。</span>
+          <span>${aiCreateRemoteParserEnabled()?"遠端 Parser 已啟用：文案會送往 Firebase Callable，由後端解析。":"安全測試模式：遠端 AI Parser 預設關閉；目前只允許 Golden Test Case。"}</span>
           <span id="ai-create-char-count">${charCount.toLocaleString("zh-TW")} / 12,000</span>
         </div>
         <div class="ai-create-fields" aria-label="預計可辨識欄位">
@@ -8330,7 +8439,7 @@ function renderAiCreateAssistant(){
         <div class="ai-create-actions">
           ${aiCreateStructuredResult?'<button type="button" class="btn btn-ghost ai-create-apply-btn" data-action="ai-create-apply">✓ 套用選定賽事至草稿</button>':""}
           <button type="button" class="btn btn-ghost" data-action="ai-create-close">取消</button>
-          <button type="button" class="btn btn-primary" data-action="ai-create-parse">${aiCreateStructuredResult?"重新解析":"✨ 開始解析"}</button>
+          <button type="button" class="btn btn-primary" data-action="ai-create-parse" ${aiCreateParseBusy?"disabled":""}>${aiCreateParseBusy?"解析中…":(aiCreateStructuredResult?"重新解析":"✨ 開始解析")}</button>
         </div>
       </div>
     </section>
@@ -20962,32 +21071,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="ai-create-parse"){
-    const input=document.getElementById("ai-create-source-text");
-    if(input) aiCreateSourceText=input.value;
-    if(!String(aiCreateSourceText||"").trim()){
-      showToast("請先貼上活動文案",true);
-      return;
-    }
-    aiCreateStructuredResult=null;
-    aiCreateStructuredErrors=[];
-    aiCreateSelectedEventKey="";
-    if(!aiCreateLooksLikeGoldenCase(aiCreateSourceText)){
-      aiCreateAssistantNotice="P7.2 尚未接真正 AI。為避免假裝理解，目前只對「中秋戰鬥陀螺交流賽」Golden Test Case 執行固定結構測試；其他文案不猜測、不套入欄位。";
-      render();
-      return;
-    }
-    const candidate=buildAiCreateGoldenCaseResult();
-    const validation=validateAiCreateStructuredResult(candidate);
-    if(!validation.ok){
-      aiCreateStructuredErrors=validation.errors;
-      aiCreateAssistantNotice="P7.2 結構驗證失敗；資料已停止在預覽層，不會進入賽事草稿。";
-      render();
-      return;
-    }
-    aiCreateStructuredResult=candidate;
-    aiCreateSelectedEventKey=(candidate.events&&candidate.events[0]&&candidate.events[0].key)||"";
-    aiCreateAssistantNotice="P7.3 已接通結構 → ARENA 草稿映射。請先選擇要建立的賽事，再按「套用選定賽事至草稿」；套用後仍不會儲存或發布。";
-    render();
+    runAiCreateParse();
     return;
   }
 
@@ -25417,6 +25501,7 @@ init();
     async mood(payload){return callEngagementFunction("moodStation",payload,20000);},
     async mailbox(payload){return callEngagementFunction("mailboxService",payload,30000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
+    async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
