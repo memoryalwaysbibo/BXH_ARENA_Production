@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.03">
+<meta name="bxh-build" content="20260924.04">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.03";
+  var CURRENT_BUILD="20260924.04";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -729,6 +729,37 @@ table.rank-table tr:last-child td{border-bottom:none;}
 .board-canvas .se-bronze-col .match-box,
 .board-canvas .bracket-col.se-bronze-col{border-color:#B87333;}
 .board-canvas .se-bronze-col .bracket-col-title{color:#B87333;}
+
+/* ==== v14.0.67 finals labels + inline champion card ==== */
+.se-stage-tag{display:none;}
+.board-canvas .se-final-stage-col,
+.board-canvas .se-bronze-col{position:relative;}
+.board-canvas .se-stage-tag{
+  display:block;position:absolute;left:0;right:0;z-index:6;
+  text-align:center;pointer-events:none;
+  font-family:var(--font-d);font-weight:900;font-size:13px;letter-spacing:2px;
+  color:#f0cf67;text-shadow:0 0 10px rgba(217,185,92,.3);
+}
+.board-canvas .se-stage-tag-bronze{color:#d99a66;text-shadow:0 0 10px rgba(184,115,51,.25);}
+.se-finals-champion-card{display:none;}
+.board-canvas .se-finals-champion-card{
+  display:flex;position:absolute;z-index:7;
+  width:190px;min-height:112px;box-sizing:border-box;
+  flex-direction:column;align-items:center;justify-content:center;
+  padding:14px 16px;border-radius:12px;
+  border:1px solid var(--board-accent);
+  background:linear-gradient(160deg,rgba(217,185,92,.11),rgba(5,5,6,.88));
+  box-shadow:0 10px 28px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.04);
+  text-align:center;pointer-events:none;
+}
+.board-canvas .se-finals-champion-card .board-trophy{width:36px;height:36px;}
+.board-canvas .se-finals-champion-card .board-champion-label{font-size:11px;letter-spacing:3px;margin-top:3px;}
+.board-canvas .se-finals-champion-card .board-champion-name{font-size:18px;margin-top:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+@media(max-width:640px){
+  .board-canvas .se-finals-champion-card{width:170px;min-height:102px;padding:12px 14px;}
+  .board-canvas .se-finals-champion-card .board-trophy{width:32px;height:32px;}
+  .board-canvas .se-finals-champion-card .board-champion-name{font-size:17px;max-width:142px;}
+}
 
 .board-export-freeze .match-box.ms-card-in_progress,
 .board-export-freeze .match-box.ms-card-ready{animation:none !important;}
@@ -4357,9 +4388,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.66";
+const APP_VERSION = "v14.0.67";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.67",date:"2026/09/24",timezone:"Asia/Taipei",title:"樹狀圖決賽區標示與冠軍卡整合",updateLevel:"patch",added:["單淘汰樹狀圖最後兩場新增「冠亞」「季殿」場次標示","冠軍產生後於決賽區上方空白區顯示冠軍卡"],changed:["單淘汰樹狀圖原「冠軍賽／季軍賽」決賽標示調整為「冠亞／季殿」","單淘汰看板原本位於樹狀圖下方的獨立冠軍卡移入決賽區；未產生冠軍時不顯示待定卡"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend single-elimination finals presentation refinement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖決賽區現在直接標示冠亞、季殿；冠軍產生後會在兩場決賽上方顯示冠軍卡。"},
   {version:"v14.0.66",date:"2026/09/24",timezone:"Asia/Taipei",title:"樹狀圖長按修正比分",updateLevel:"patch",added:["樹狀總覽已完成場次支援長按 1.5 秒開啟二階修正入口"],changed:["裁判台移除常駐的上一場修正／撤回區塊，釋放手機垂直空間","修正入口改為直接對指定已完成場次操作，不再侷限上一場","長按後先顯示場次與比分，再由「修正比分」進入安全撤回確認"],fixed:["保留既有後續賽程保護；後續場次已有實際得分或完成時仍會阻止回滾"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket long-press correction entry",firebaseImpact:"無資料結構變更；沿用既有 correction transaction 與稽核欄位",securityRulesImpact:"無",permissionImpact:"僅有既有賽事操作＋對應戰鬥台權限者可啟動",publicSummary:"比分修正不再常駐裁判台；有權限的人可在樹狀圖長按已完成場次開啟修正。"},
   {version:"v14.0.65",date:"2026/09/24",timezone:"Asia/Taipei",title:"裁判台判定模式極簡切換",updateLevel:"patch",added:["裁判台判定模式改為單列左右切換控制"],changed:["標準計分／簡易判定在裁判台顯示簡化為「正常／簡單」","移除裁判台判定模式的大型說明卡與描述文字，保留既有判定邏輯與切換確認"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee scoring mode compact toggle",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"沿用既有判定模式設定權限",publicSummary:"裁判台的判定模式改成更省空間的「正常／簡單」左右切換。"},
   {version:"v14.0.64",date:"2026/09/24",timezone:"Asia/Taipei",title:"裁判台下一場高對比提示卡",updateLevel:"patch",added:["裁判台標準計分、簡易判定與等待晉級狀態全面改用與即時戰況一致的高對比下一場提示卡"],changed:["下一場資訊由單行灰字改為 badge＋場次資訊＋獨立選手名稱列","裁判台內的下一場選手名稱額外放大並提高字重，VS 與外框沿用該戰鬥台專屬色"],fixed:["改善裁判台手機畫面中下一場人名灰度過低、不易辨識的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee next-match visibility enhancement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台的下一場現在會以醒目的雙層提示卡顯示，選手名稱更大、更亮，並跟隨戰鬥台專屬色。"},
@@ -11914,9 +11946,13 @@ function renderBoardMode(){
   const stLabel = st==="waiting" ? "尚未開始" : (st==="done" ? "已完成" : "進行中");
   const boardCode = state.cloudCode || "本機賽事";
   const reshuffleAllowed = isAdminTierOrAbove() && canReshuffleBracket();
-  const championHtml = state.championId ? `
-    <div class="board-champion-name">${esc(playerName(state.championId))}</div>
-  ` : `<div class="board-champion-name pending">待定</div>`;
+  const standaloneChampionHtml = (fmt!=="single" && state.championId) ? `
+    <div class="board-champion-area">
+      <span class="board-trophy">${trophySvg()}</span>
+      <div class="board-champion-label">冠軍</div>
+      <div class="board-champion-name">${esc(playerName(state.championId))}</div>
+    </div>
+  ` : "";
 
   return `<div class="board-shell" data-board-theme="${boardTheme}" id="board-shell">
     <div class="board-wm" aria-hidden="true"><img src="${LOGO_SRC}" alt=""></div>
@@ -11952,11 +11988,7 @@ function renderBoardMode(){
     <div class="board-viewport" id="board-viewport">
       <div class="board-canvas" id="board-canvas" style="transform: translate(${boardPanX}px, ${boardPanY}px) scale(${boardZoom});">
         ${inner}
-        <div class="board-champion-area">
-          <span class="board-trophy">${trophySvg()}</span>
-          <div class="board-champion-label">冠軍</div>
-          ${championHtml}
-        </div>
+        ${standaloneChampionHtml}
       </div>
     </div>
 
@@ -12019,14 +12051,16 @@ function renderSingleElimBracket(forceTree=false){
   let cols = "";
   for(let r=0;r<total;r++){
     const ms = matchesInRound(r);
-    const title = singleRoundTitle(r);
+    const isFinalRound=r===total-1;
+    const title = isFinalRound ? "冠亞" : singleRoundTitle(r);
     const boxes = ms.map((m,i)=> seMatchBoxHtml(m, r, i, displayMatchLabel(m))).join("");
-    cols += `<div class="se-col" data-round="${r}"><div class="se-col-title">${title}</div>${boxes}</div>`;
+    cols += `<div class="se-col ${isFinalRound?"se-final-stage-col":""}" data-round="${r}" ${isFinalRound?'data-final-stage="championship"':""}><div class="se-col-title">${title}</div>${isFinalRound?'<div class="se-stage-tag se-stage-tag-final">冠亞</div>':""}${boxes}</div>`;
   }
   let bronzeCol = "";
   const bronze = state.bronzeMatchId ? getMatch(state.bronzeMatchId) : null;
   if(bronze){
-    bronzeCol = `<div class="bracket-col se-bronze-col"><div class="bracket-col-title">季軍賽</div>${matchBoxHtml(bronze,"季軍賽")}</div>`;
+    const bronzeBox=matchBoxHtml(bronze,"季殿").replace('class="match-box','class="match-box se-bronze-match');
+    bronzeCol = `<div class="bracket-col se-bronze-col"><div class="bracket-col-title">季殿</div><div class="se-stage-tag se-stage-tag-bronze">季殿</div>${bronzeBox}</div>`;
   }
   const championHtml = state.championId ? `
   <div class="champion-box">
@@ -12035,8 +12069,15 @@ function renderSingleElimBracket(forceTree=false){
     ${state.runnerUpId ? `<div class="hint" style="margin-top:10px;">亞軍：${esc(playerName(state.runnerUpId))}</div>`:""}
     ${state.meta.bronzeMatch && state.thirdId ? `<div class="hint">季軍：${esc(playerName(state.thirdId))}　殿軍：${esc(playerName(state.fourthId))}</div>`:""}
   </div>` : "";
+  const finalsChampionHtml = state.championId ? `
+    <div class="se-finals-champion-card" aria-label="本場賽事冠軍">
+      <span class="board-trophy">${trophySvg()}</span>
+      <div class="board-champion-label">冠軍</div>
+      <div class="board-champion-name">${esc(playerName(state.championId))}</div>
+    </div>` : "";
   const treeHtml = `<div class="se-bracket-outer" id="se-bracket-outer">
     <svg class="se-bracket-svg" id="se-bracket-svg"></svg>
+    ${finalsChampionHtml}
     <div class="se-bracket-cols" id="se-bracket-cols">${cols}${bronzeCol}</div>
   </div>`;
   return `
@@ -12084,6 +12125,7 @@ function layoutSingleElimBracket(suffix){
         });
         prevCenters=next;
       }
+      positionSingleElimFinalDecorations(outer);
       drawSingleElimConnectors(outer,allCols,maxRound,suffix);
       return;
     }
@@ -12185,8 +12227,41 @@ function layoutSingleElimBracket(suffix){
       });
     });
     allCols.forEach(col=>{col.style.minHeight=Math.ceil(maxBottom+6)+"px";});
+    positionSingleElimFinalDecorations(outer);
     drawSingleElimConnectors(outer,allCols,maxRound,suffix);
   }catch(e){ console.warn("[dense bracket layout]",e); }
+}
+
+function positionSingleElimFinalDecorations(outer){
+  try{
+    if(!outer || !outer.closest?.("#board-canvas")) return;
+    const finalCol=outer.querySelector('.se-final-stage-col');
+    const finalBox=finalCol&&finalCol.querySelector('.match-box:not(.bye-placeholder)');
+    const finalTag=finalCol&&finalCol.querySelector('.se-stage-tag-final');
+    const bronzeCol=outer.querySelector('.se-bronze-col');
+    const bronzeBox=bronzeCol&&bronzeCol.querySelector('.match-box');
+    const bronzeTag=bronzeCol&&bronzeCol.querySelector('.se-stage-tag-bronze');
+    const placeTag=(tag,box)=>{
+      if(!tag||!box)return;
+      const h=tag.offsetHeight||18;
+      tag.style.top=Math.max(28,box.offsetTop-h-8)+"px";
+    };
+    placeTag(finalTag,finalBox);
+    placeTag(bronzeTag,bronzeBox);
+
+    const champion=outer.querySelector('.se-finals-champion-card');
+    if(champion&&finalCol&&finalBox){
+      const rightCol=bronzeCol||finalCol;
+      const zoneLeft=finalCol.offsetLeft;
+      const zoneRight=rightCol.offsetLeft+rightCol.offsetWidth;
+      const available=Math.max(0,zoneRight-zoneLeft);
+      const cardW=champion.offsetWidth||190;
+      const matchTop=Math.min(finalBox.offsetTop,bronzeBox?bronzeBox.offsetTop:finalBox.offsetTop);
+      const cardH=champion.offsetHeight||112;
+      champion.style.left=Math.round(zoneLeft+Math.max(0,(available-cardW)/2))+"px";
+      champion.style.top=Math.round(Math.max(34,matchTop-cardH-52))+"px";
+    }
+  }catch(e){ console.warn("[final decorations]",e); }
 }
 
 function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
