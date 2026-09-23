@@ -23543,6 +23543,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const newVal=target.getAttribute("data-value")==="true";
     settingsFormDraft.checkinRequired=newVal;
     settingsFormDraftDirty=true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23624,6 +23625,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     ensureRegistrationFormDraft();
     const enabled=target.getAttribute("data-value")==="true";
     registrationFormDraft.registrationEnabled=enabled;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
 
     const wasEnabled=!!state.meta.registrationEnabled;
     state.meta.registrationEnabled=enabled;
@@ -23646,6 +23648,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     ensureRegistrationFormDraft();
     registrationFormDraft.registrationVisibility = target.getAttribute("data-value");
     registrationFormDraftDirty = true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23656,6 +23659,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(val!=="realName" && val!=="gameId") return;
     registrationFormDraft.participantNameMode=val;
     registrationFormDraftDirty=true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23666,6 +23670,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     ensureRegistrationFormDraft();
     registrationFormDraft.targetGroup = val;
     registrationFormDraftDirty = true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23967,6 +23972,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     settingsFormDraft.ladderMode=mode;
     if(mode==="ranked" && settingsFormDraft.formatType==="single") settingsFormDraft.bronzeMatch=true;
     settingsFormDraftDirty=true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
