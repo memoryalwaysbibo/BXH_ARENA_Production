@@ -1,0 +1,34 @@
+name: Extract settlement routing
+
+on:
+  push:
+    branches:
+      - diag/settlement-routing-20260923
+    paths:
+      - 'scripts/extract-settlement-routing.cjs'
+      - '.github/workflows/extract-settlement-routing.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: diag/settlement-routing-20260923
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/extract-settlement-routing.cjs
+      - name: Commit diagnostic excerpt
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/settlement-routing-snippets.txt
+          git commit -m "diag: capture settlement routing snippets"
+          git push origin HEAD:diag/settlement-routing-20260923
