@@ -1,6 +1,36 @@
 /* BXH CALL 2.0 Phase B2 — Firebase Messaging Service Worker */
 'use strict';
 
+function safe(v,n=300){return String(v||'').slice(0,n);}
+function pushUrl(data){
+  try{
+    const raw=safe(data?.url||'https://arena.bxh.com.tw/',240);
+    const u=new URL(raw,self.location.origin);
+    return u.origin===self.location.origin?u.href:'https://arena.bxh.com.tw/';
+  }catch{return 'https://arena.bxh.com.tw/';}
+}
+
+// Firebase recommends registering custom notification-click behavior before
+// importing Messaging so the SDK cannot replace the app-specific handler.
+self.addEventListener('notificationclick',event=>{
+  event.stopImmediatePropagation?.();
+  event.notification.close();
+  const data=event.notification?.data||{};
+  const url=pushUrl(data);
+  event.waitUntil((async()=>{
+    const list=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const client of list){
+      try{
+        if(new URL(client.url).origin===self.location.origin){
+          try{client.postMessage({type:'BXH_CALL_PUSH_CLICK',data});}catch{}
+          return client.focus();
+        }
+      }catch{}
+    }
+    return self.clients.openWindow(url);
+  })());
+});
+
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js');
 
@@ -16,15 +46,6 @@ firebase.initializeApp({
 
 const messaging=firebase.messaging();
 
-function safe(v,n=300){return String(v||'').slice(0,n);}
-function pushUrl(data){
-  try{
-    const raw=safe(data?.url||'https://arena.bxh.com.tw/',240);
-    const u=new URL(raw,self.location.origin);
-    return u.origin===self.location.origin?u.href:'https://arena.bxh.com.tw/';
-  }catch{return 'https://arena.bxh.com.tw/';}
-}
-
 messaging.onBackgroundMessage(payload=>{
   const data=payload?.data||{};
   const title=safe(data.title||'BXH CALL',120);
@@ -32,8 +53,8 @@ messaging.onBackgroundMessage(payload=>{
   const tag=['bxh-call',data.kind,data.code,data.matchId,data.sequence].filter(Boolean).join(':').slice(0,220);
   return self.registration.showNotification(title,{
     body,
-    icon:'assets/icons/bxh-gold-icon-192.png?v=20260918',
-    badge:'assets/icons/bxh-gold-icon-192.png?v=20260918',
+    icon:'/assets/icons/bxh-gold-icon-192.png?v=20260918',
+    badge:'/assets/icons/bxh-gold-icon-192.png?v=20260918',
     tag:tag||'bxh-call',
     renotify:true,
     vibrate:[180,90,180],
@@ -47,25 +68,6 @@ messaging.onBackgroundMessage(payload=>{
     },
     actions:[{action:'open-arena',title:'開啟 ARENA'}]
   });
-});
-
-self.addEventListener('notificationclick',event=>{
-  event.notification.close();
-  const url=pushUrl(event.notification?.data||{});
-  event.waitUntil((async()=>{
-    const list=await self.clients.matchAll({type:'window',includeUncontrolled:true});
-    for(const client of list){
-      try{
-        const current=new URL(client.url);
-        const target=new URL(url);
-        if(current.origin===target.origin){
-          if('navigate' in client)await client.navigate(url);
-          return client.focus();
-        }
-      }catch{}
-    }
-    return self.clients.openWindow(url);
-  })());
 });
 
 self.addEventListener('install',()=>self.skipWaiting());
