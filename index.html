@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.04">
+<meta name="bxh-build" content="20260924.05">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.04";
+  var CURRENT_BUILD="20260924.05";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4211,7 +4211,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.0"></script>
-<script src="court-call-ui.js?v=13.33.0-build2"></script>
+<script src="court-call-ui.js?v=14.1.0"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -4390,9 +4390,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.67";
+const APP_VERSION = "v14.1.0";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.1.0",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0 Phase A｜前景叫號／一場 PASS／三方同步",updateLevel:"minor",added:["裁判人工叫號改為 ARENA 前景全域彈窗，玩家可直接回覆 OK／PASS","玩家、對手與裁判同步顯示回覆狀態與 PASS 結果","玩家登入 ARENA 後會在各頁持續輪詢本人正取賽事的人工叫號，不再綁定『我的賽程』或智慧 ETA 開關"],changed:["PASS 改為玩家自助立即生效，同台同輪自動延後 1 場，每人每賽事限一次","人工裁判叫號與智慧 ETA 分離；智慧叫號開關不再阻止裁判人工通知","人工叫號同步週期由 5 秒縮短至約 2–3 秒，未變更時不再重繪整個頁面"],fixed:["修正裁判已按『通知雙方選手』但玩家不在『我的賽程』或未開啟智慧叫號時完全看不到通知的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend Phase A ready; Production courtCallService backend rollout",firebaseImpact:"沿用 courtCalls 集合；PASS 交易會同步更新 tournaments 與 publicTournaments 公開鏡像，不新增集合",securityRulesImpact:"無 Firestore Rules 變更；沿用 callable 權限驗證",permissionImpact:"沿用參賽玩家本人與該 Court 裁判權限",publicSummary:"BXH CALL 人工叫號升級：ARENA 前景任何頁面都能直接收到裁判叫號，玩家可回覆 OK 或使用一次 PASS 延後一場，雙方選手與裁判會同步看到狀態。"},
   {version:"v14.0.67",date:"2026/09/24",timezone:"Asia/Taipei",title:"樹狀圖決賽區標示與冠軍卡整合",updateLevel:"patch",added:["單淘汰樹狀圖最後兩場新增「冠亞」「季殿」場次標示","冠軍產生後於決賽區上方空白區顯示冠軍卡"],changed:["單淘汰樹狀圖原「冠軍賽／季軍賽」決賽標示調整為「冠亞／季殿」","單淘汰看板原本位於樹狀圖下方的獨立冠軍卡移入決賽區；未產生冠軍時不顯示待定卡"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend single-elimination finals presentation refinement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖決賽區現在直接標示冠亞、季殿；冠軍產生後會在兩場決賽上方顯示冠軍卡。"},
   {version:"v14.0.66",date:"2026/09/24",timezone:"Asia/Taipei",title:"樹狀圖長按修正比分",updateLevel:"patch",added:["樹狀總覽已完成場次支援長按 1.5 秒開啟二階修正入口"],changed:["裁判台移除常駐的上一場修正／撤回區塊，釋放手機垂直空間","修正入口改為直接對指定已完成場次操作，不再侷限上一場","長按後先顯示場次與比分，再由「修正比分」進入安全撤回確認"],fixed:["保留既有後續賽程保護；後續場次已有實際得分或完成時仍會阻止回滾"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket long-press correction entry",firebaseImpact:"無資料結構變更；沿用既有 correction transaction 與稽核欄位",securityRulesImpact:"無",permissionImpact:"僅有既有賽事操作＋對應戰鬥台權限者可啟動",publicSummary:"比分修正不再常駐裁判台；有權限的人可在樹狀圖長按已完成場次開啟修正。"},
   {version:"v14.0.65",date:"2026/09/24",timezone:"Asia/Taipei",title:"裁判台判定模式極簡切換",updateLevel:"patch",added:["裁判台判定模式改為單列左右切換控制"],changed:["標準計分／簡易判定在裁判台顯示簡化為「正常／簡單」","移除裁判台判定模式的大型說明卡與描述文字，保留既有判定邏輯與切換確認"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee scoring mode compact toggle",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"沿用既有判定模式設定權限",publicSummary:"裁判台的判定模式改成更省空間的「正常／簡單」左右切換。"},
