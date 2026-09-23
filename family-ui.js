@@ -1,4 +1,4 @@
-/* v14.0.24 Separate self/child registration entry; v13.40.2 community-room diagnostics retained. */
+/* v14.0.53 Ranked family registration + independent reward identity; v13.40.2 community-room diagnostics retained. */
 function openFamilyPlayers(){
  document.getElementById('bxh-family-dialog')?.close();
  const uid=currentAuthUid(),epoch=engagementSessionEpoch,previous=document.activeElement,dialog=document.createElement('dialog');dialog.id='bxh-family-dialog';dialog.className='raffle-claim-dialog';
@@ -26,7 +26,7 @@ function mergeFamilyOnlineRoster(players,registrations,checkinRequired,newId){
   const name=String(r.displayName||r.publicName||r.realName||'').trim(),guardian=String(r.guardianUid||r.uid||'');if(!name||!guardian)continue;
   const participant=r.registrationId||r.uid||guardian,i=result.findIndex(p=>p.registrationUid===guardian&&String(p.registrationId||p.participantId||p.uid||'')===String(participant)),old=i<0?null:result[i],same=(old?.familyPlayerId||null)===(r.familyPlayerId||null);
   const p={id:r.familyPlayerId?'family_'+r.familyPlayerId:(same&&old?.id||newId()),name,source:'online',registrationUid:guardian,registrationId:participant,checkedIn:same&&old?old.checkedIn:!checkinRequired};
-  if(r.familyPlayerId)Object.assign(p,{familyPlayerId:r.familyPlayerId,participantId:r.familyPlayerId,guardianUid:guardian});
+  if(r.familyPlayerId)Object.assign(p,{familyPlayerId:r.familyPlayerId,participantId:r.familyPlayerId,guardianUid:guardian,ladderEligible:false,activityEligible:false});
   if(i<0)result.push(p);else result[i]=p;
  }
  return result;
@@ -51,7 +51,7 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
  if(!r?.ok)throw Error('unavailable');
  const children=(r.profiles||[]).filter(p=>!p.archived&&!p.accountUid);
- const blocked=!!event.registrationSelection||(event.ladderMode==='ranked'&&!event.testLadderEnabled);
+ const blocked=!!event.registrationSelection;
  const requestedMode=mode==='children'?'children':'self';
  let activeRows=[];
  try{
@@ -77,7 +77,7 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
   dialog.innerHTML='<header><h2>'+(requestedMode==='children'?'兒童報名':'本人報名')+'</h2><button class="btn btn-ghost" data-close>取消</button></header>'
    +'<p>'+(requestedMode==='children'?'請選擇要參加這場賽事的孩子；每位孩子各占一個名額。':'確認由目前登入會員本人參加這場賽事。')+'</p>'
    +'<form><fieldset><legend>參賽者</legend>'+participantFields+'</fieldset>'
-   +'<p class="hint">'+(requestedMode==='children'?(availableChildren.length?'已報名的孩子不會重複出現在可選清單。':'可先建立孩子資料後再回到本場報名。'):'本人與兒童報名分開處理；之後仍可再使用「兒童報名」新增孩子。')+'</p>'
+   +'<p class="hint">'+(requestedMode==='children'?(availableChildren.length?'已報名的孩子不會重複出現在可選清單；孩子以獨立 familyPlayerId 參賽，不會把天梯／活躍積分計入家長帳號。':'可先建立孩子資料後再回到本場報名。'):'本人與兒童報名分開處理；之後仍可再使用「兒童報名」新增孩子。')+'</p>'
    +'<p data-family="allocation" role="status"></p>'
    +'<button class="btn btn-primary" type="submit" '+(requestedMode==='children'&&!availableChildren.length?'disabled':'')+'>預覽名額並確認</button></form>';
   let done=false;
