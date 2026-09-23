@@ -188,4 +188,13 @@ mustInclude('Quick Decision 只計勝敗','Hunter P5.4 quick-decision score excl
 mustInclude('H2H 只使用穩定 playerId 聚合','Hunter P5.4 stable identity disclosure missing');
 mustInclude('hunterH2HPanelHtml(rows)','Hunter P5.4 records-page linkage missing');
 console.log('PASS Hunter Profile P5.4 H2H statistics');
+mustInclude('const HUNTER_H2H_ANALYSIS_MIN_MATCHES=3;','Hunter P5.5 minimum match threshold missing');
+mustInclude('const HUNTER_H2H_ANALYSIS_MIN_ROUNDS=8;','Hunter P5.5 minimum round threshold missing');
+mustInclude('function hunterBuildOpponentAnalysis(records)','Hunter P5.5 opponent analysis engine missing');
+mustInclude('function hunterOpponentAnalysisHtml(group)','Hunter P5.5 opponent analysis UI missing');
+mustInclude('主要得分方式','Hunter P5.5 primary offense label missing');
+mustInclude('主要失分方式','Hunter P5.5 primary concession label missing');
+mustInclude('Quick Decision 只計勝敗，也不進入對手戰型分析','Hunter P5.5 quick-decision exclusion missing');
+mustInclude('不產生宿敵、剋星或強弱標籤','Hunter P5.5 non-overclaim disclosure missing');
+console.log('PASS Hunter Profile P5.5 opponent matchup analysis');
 
