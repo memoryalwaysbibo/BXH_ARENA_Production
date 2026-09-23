@@ -24236,6 +24236,21 @@ init();
     async signOutUser(){
       try{sessionStorage.removeItem("bxh_prod_auth_view_v1");}catch(e){}
       if(!authReady) return;
+      const signedInUid=String((authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||"");
+      if(signedInUid){
+        const pushKey="bxh.call.push.token:"+signedInUid;
+        let pushToken="";
+        try{pushToken=String(localStorage.getItem(pushKey)||"");}catch(e){}
+        if(pushToken&&functionsHandle&&fnx&&typeof fnx.httpsCallable==="function"){
+          try{
+            const unregister=fnx.httpsCallable(functionsHandle,"courtCallPushService",{timeout:5000});
+            await withTimeout(unregister({action:"unregister",token:pushToken}),2500,null);
+          }catch(e){
+            console.warn("[BXH CALL push] logout unregister unavailable");
+          }
+        }
+        try{localStorage.removeItem(pushKey);}catch(e){}
+      }
       try{ await ax.signOut(authHandle); }catch(e){}
     },
 
