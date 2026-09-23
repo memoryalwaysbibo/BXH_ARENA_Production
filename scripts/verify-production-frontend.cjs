@@ -22,6 +22,7 @@ const pushImportIndex=messagingSw.indexOf("importScripts('https://www.gstatic.co
 if(pushClickIndex<0||pushImportIndex<0||pushClickIndex>pushImportIndex) throw new Error('Custom BXH CALL notificationclick must be registered before Firebase Messaging imports');
 if(!messagingSw.includes('messaging.onBackgroundMessage')) throw new Error('BXH CALL background message handler missing');
 if(!messagingSw.includes('renotify:false')) throw new Error('BXH CALL duplicate-notification vibration guard missing');
+if(!/async signOutUser\(\)\{[\s\S]*?courtCallPushService[\s\S]*?action:"unregister"[\s\S]*?localStorage\.removeItem\(pushKey\)[\s\S]*?ax\.signOut\(authHandle\)/.test(html)) throw new Error('BXH CALL push token must be unregistered and cleared before Firebase sign-out');
 console.log('PASS BXH CALL Phase B2 Web Push invariants');
 must(/projectId:\s*["']bxh-arena["']/, 'Production projectId missing');
 must(/authDomain:\s*["']bxh-arena\.firebaseapp\.com["']/, 'Production authDomain missing');
