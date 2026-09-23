@@ -206,4 +206,15 @@ mustInclude('data-action="hunter-h2h-search"','Hunter P5.6 search action missing
 mustInclude('data-action="hunter-h2h-sort"','Hunter P5.6 sort action missing');
 mustInclude('搜尋只比對公開名稱與穩定 playerId','Hunter P5.6 identity safety disclosure missing');
 console.log('PASS Hunter Profile P5.6 opponent directory');
+mustInclude('function hunterRecordHasTrustedScore(record)','Hunter trusted-score helper missing');
+mustInclude('function hunterRecordScoreText(record)','Hunter centralized score display helper missing');
+mustInclude('scoreA:quickDecision?null:','Canonical Quick Decision scoreA must be null');
+mustInclude('scoreB:quickDecision?null:','Canonical Quick Decision scoreB must be null');
+mustInclude('if(hunterRecordHasTrustedScore(r)){','Career totals must use trusted-score guard');
+mustInclude('if(hunterRecordHasTrustedScore(record)){','H2H totals must use trusted-score guard');
+mustInclude('const score=hunterRecordScoreText(record);','H2H recent row must use centralized score display');
+mustInclude('const score=hunterRecordScoreText(r);','Match record UI must use centralized score display');
+mustInclude('比分未驗證','Untrusted legacy score must be visibly distinguished');
+mustInclude('可信比分 '+String.raw`${periodSummary.scoredMatches}`,'Period summary must disclose trusted score sample');
+console.log('PASS Hunter P5 end-to-end trusted-score consistency');
 
