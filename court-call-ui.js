@@ -283,7 +283,14 @@ function scheduleCourtCallPoll(){
 
 async function loadCourtCalls(code){
  const c=courtCallContext(code);if(c.loading)return;c.loading=true;
- const oldRows=c.rows||[];
+ const oldRows=c.rows||[],oldUsed=!!c.used,oldError=c.error||'';
+ const oldSig=JSON.stringify(oldRows.map(r=>({
+  id:r.matchId,seq:r.sequence,calledAt:r.calledAt,
+  pass:r.pass?{status:r.pass.status,requestedAt:r.pass.requestedAt,waitFor:r.pass.waitFor}:null,
+  players:(r.players||[]).map(p=>[p.id,p.response,p.canPass,p.passUsed]),
+  waitingFor:r.waitingFor
+ })));
+ let changed=false;
  try{
   const result=await window.engagementService.courtCall({action:'list',code});
   if(c!==courtCallContext(code))return;
@@ -291,17 +298,26 @@ async function loadCourtCalls(code){
   const newRows=Array.isArray(result.rows)?result.rows:[];
   courtCallNotifyChanges(c,newRows,oldRows);
   c.rows=newRows;c.used=!!result.passUsed;c.error='';
+  const newSig=JSON.stringify(newRows.map(r=>({
+   id:r.matchId,seq:r.sequence,calledAt:r.calledAt,
+   pass:r.pass?{status:r.pass.status,requestedAt:r.pass.requestedAt,waitFor:r.pass.waitFor}:null,
+   players:(r.players||[]).map(p=>[p.id,p.response,p.canPass,p.passUsed]),
+   waitingFor:r.waitingFor
+  })));
+  changed=oldSig!==newSig||oldUsed!==c.used||oldError!=='';
  }catch(e){
   if(c===courtCallContext(code)){
    const msg=courtCallError(e);
    // Silent background discovery should not paint permission errors into unrelated pages.
    if((c.rows||[]).length||String(e?.message||e).includes('account-inactive'))c.error=msg;
+   changed=oldError!==c.error;
   }
  }finally{
   if(c===courtCallContext(code)){
    c.loading=false;c.next=Date.now()+2500;
    syncCourtCallGlobalOverlay();
-   try{renderPreservingScroll();}catch{}
+   const embedsCallUi=(()=>{try{return (appPhase==='player-center'&&playerActiveTab==='registered')||((appPhase==='app'&&activeTab==='referee')||(appPhase==='community-room'&&communityRoomActiveTab==='referee'));}catch{return false;}})();
+   if(changed&&embedsCallUi){try{renderPreservingScroll();}catch{}}
   }
  }
 }
