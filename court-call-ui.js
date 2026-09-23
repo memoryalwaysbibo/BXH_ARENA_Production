@@ -1,11 +1,73 @@
-/* v14.1.0 — BXH CALL 2.0 Phase A (P1-P3).
-   Foreground global call overlay + one-match self-service PASS + referee/opponent sync.
-   Background/lock-screen Web Push remains Phase P4. */
+/* v14.1.1 — BXH CALL 2.0 Phase B1.
+   Phase A: foreground global call overlay + one-match self-service PASS + referee/opponent sync.
+   Phase B1: browser background notifications while ARENA remains loaded.
+   Lock-screen / app-closed Web Push remains Phase B2. */
 'use strict';
 
 let courtCallCache=new Map(),courtCallTimer=null,courtCallIdentity='';
 let courtCallPlayerCodes=[],courtCallDiscoveryAt=0,courtCallDiscoveryBusy=false;
 const courtCallDelayDismissed=new Set();
+const courtCallSystemNotifySeen=new Set();
+
+function courtCallNotificationPermission(){
+ try{
+  if(typeof window==='undefined'||!('Notification' in window))return 'unsupported';
+  return Notification.permission||'default';
+ }catch{return 'unsupported';}
+}
+
+function courtCallNotificationHint(){
+ const p=courtCallNotificationPermission();
+ if(p==='granted')return '背景通知：已啟用';
+ if(p==='denied')return '背景通知：瀏覽器已封鎖，請到網站權限重新開啟';
+ if(p==='unsupported')return '背景通知：此瀏覽器不支援';
+ return '背景通知：尚未啟用';
+}
+
+async function courtCallEnableBackgroundNotifications(){
+ const p=courtCallNotificationPermission();
+ if(p==='unsupported'){showToast('此瀏覽器不支援系統背景通知',true);return false;}
+ if(p==='denied'){showToast('通知已被瀏覽器封鎖，請到網站權限重新開啟',true);return false;}
+ if(p==='granted'){showToast('BXH CALL 背景通知已啟用');return true;}
+ try{
+  const result=await Notification.requestPermission();
+  if(result==='granted'){
+   showToast('BXH CALL 背景通知已啟用');
+   courtCallSystemNotify('bxh-call-enabled','BXH CALL 已啟用','切換到其他分頁時，裁判叫號會顯示系統通知。',true);
+   return true;
+  }
+  showToast('尚未取得通知權限',true);
+ }catch{
+  showToast('無法取得通知權限，請稍後重試',true);
+ }
+ return false;
+}
+
+function courtCallSystemNotify(tag,title,body,force=false){
+ try{
+  if(typeof document!=='undefined'&&!force&&document.visibilityState==='visible')return false;
+  if(courtCallNotificationPermission()!=='granted')return false;
+  const dedupe=String(tag||title||body||'');
+  if(dedupe&&courtCallSystemNotifySeen.has(dedupe))return false;
+  const options={
+   body:String(body||''),
+   tag:dedupe||undefined,
+   renotify:true,
+   icon:'assets/icons/bxh-gold-icon-192.png?v=20260918',
+   badge:'assets/icons/bxh-gold-icon-192.png?v=20260918'
+  };
+  const note=new Notification(String(title||'BXH CALL'),options);
+  if(dedupe){
+   courtCallSystemNotifySeen.add(dedupe);
+   setTimeout(()=>courtCallSystemNotifySeen.delete(dedupe),60000);
+  }
+  note.onclick=()=>{
+   try{window.focus();}catch{}
+   try{note.close();}catch{}
+  };
+  return true;
+ }catch{return false;}
+}
 
 function callPassProtected(s,m){
  return !!(m&&(m.callPass&&!m.completed||(s.matches||[]).some(x=>!x.completed&&x.skippedAt&&x.callPass?.waitFor.includes(m.id))));
@@ -112,8 +174,13 @@ function renderCourtCallReferee(m){
 
 function renderCourtCallPlayer(code){
  const c=courtCallContext(code);
+ const np=courtCallNotificationPermission();
  return `<section>
    <p class="hint">裁判人工叫號與智慧 ETA 已分離｜人工叫號約每 2–3 秒同步｜PASS：${c.used?'本賽事已使用':'可使用 1 次，直接延後一場'}</p>
+   <div class="btn-row" style="align-items:center">
+    ${np==='default'?'<button class="btn btn-ghost" data-action="court-call-enable-notify">🔔 啟用背景通知</button>':''}
+    <span class="hint">${esc(courtCallNotificationHint())}</span>
+   </div>
    ${courtCallCommon(c)}
    ${c.rows.filter(r=>r.players.some(p=>p.me)).map(r=>courtCallRow(c,r,false)).join('')||'<p class="hint">等待裁判通知。</p>'}
  </section>`;
@@ -210,13 +277,25 @@ function courtCallNotifyChanges(c,newRows,oldRows){
   if(isMine&&newSequence&&mePlayers.some(p=>p.response==='unanswered')){
    showToast(`🔔 BXH CALL｜Court ${r.station} 裁判叫號，請立即回覆`);
    courtCallVibrate();
+   const names=(r.players||[]).map(p=>p.name||'選手');
+   courtCallSystemNotify(
+    `bxh-call:${c.code}:${r.matchId}:${r.sequence}`,
+    `🔔 BXH CALL｜Court ${r.station}`,
+    `${names[0]||'選手 A'} VS ${names[1]||'選手 B'}｜請前往 ${r.station} 號戰鬥台，開啟 ARENA 回覆 OK 或 PASS。`
+   );
   }
   if(prev){
    const oldPass=prev.pass?.status||'',newPass=r.pass?.status||'';
    if(newPass==='approved'&&oldPass!=='approved'){
     if(isMine){
-     showToast(r.pass?.requester?`PASS 已接受｜Court ${r.station} 本場延後 1 場`:`對手使用 PASS｜Court ${r.station} 本場延後 1 場`);
+     const passMessage=r.pass?.requester?`PASS 已接受｜Court ${r.station} 本場延後 1 場`:`對手使用 PASS｜Court ${r.station} 本場延後 1 場`;
+     showToast(passMessage);
      courtCallVibrate([120,70,120]);
+     courtCallSystemNotify(
+      `bxh-pass:${c.code}:${r.matchId}:${r.sequence}:${r.pass?.approvedAt||r.pass?.requestedAt||0}`,
+      `BXH CALL｜Court ${r.station}`,
+      `${passMessage}，完成前置場次後系統會再次叫號。`
+     );
     }
     if(r.isReferee)showToast(`Court ${r.station}｜${r.pass?.playerName||'選手'} 使用 PASS，已自動延後 1 場`);
    }
@@ -325,6 +404,11 @@ async function loadCourtCalls(code){
 }
 
 async function handleCourtCall(action,target){
+ if(action==='court-call-enable-notify'){
+  await courtCallEnableBackgroundNotifications();
+  try{renderPreservingScroll();}catch{}
+  return;
+ }
  if(action==='court-call-dismiss-delay'){
   const stamp=target.getAttribute('data-stamp');if(stamp)courtCallDelayDismissed.add(stamp);
   syncCourtCallGlobalOverlay();return;
