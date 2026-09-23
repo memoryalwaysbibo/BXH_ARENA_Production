@@ -16570,7 +16570,7 @@ function hunterH2HPanelHtml(records){
     '<div class="hint">依目前對戰類型與期間篩選｜'+h2h.list.length+' 位可識別對手'+esc(status)+'</div>'+
     hunterH2HDirectoryHtml(h2h)+
     (visible.length?'<div class="hunter-h2h-list">'+visible.map(hunterH2HItemHtml).join('')+'</div>':'<div class="hunter-h2h-empty-search">找不到符合「'+esc(hunterH2HQuery)+'」的對手。</div>')+
-    '<div class="hunter-framework-note">搜尋只比對公開名稱與穩定 playerId；不會使用名字建立跨賽事身分。P5.5 的回合分布分析仍直接沿用同一份 H2H records。</div></section>';
+    '<div class="hunter-framework-note">H2H 只使用穩定 playerId 聚合；搜尋只比對公開名稱與穩定 playerId，不會使用名字建立跨賽事身分。P5.5 的回合分布分析仍直接沿用同一份 H2H records。</div></section>';
 }
 
 function hunterSingleMatchBreakdown(record){
