@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.29">
+<meta name="bxh-build" content="20260923.30">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.29";
+  var CURRENT_BUILD="20260923.30";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4085,7 +4085,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
-<script src="family-ui.js?v=14.0.24"></script>
+<script src="family-ui.js?v=14.0.54"></script>
 <script src="raffle-ui.js?v=14.0.12"></script>
 <script>
 // Standalone browsers do not provide the hosted artifact's window.storage API.
@@ -4259,9 +4259,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.53";
+const APP_VERSION = "v14.0.54";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.54",date:"2026/09/23",timezone:"Asia/Taipei",title:"賽事詳情快速載入／積分賽兒童報名",updateLevel:"patch",added:["正式積分賽開放家長以 familyPlayerId 替孩子獨立報名","賽事詳細頁改為先顯示公開資訊，再背景同步本人／兒童報名狀態"],changed:["兒童選手明確不把天梯與活躍積分歸入家長帳號","家庭報名狀態同步失敗時只鎖定報名操作，不再讓整個賽事頁長時間停在讀取畫面"],fixed:["修正 familyRegistration 最長等待時整頁持續顯示正在讀取賽事資訊","修正正式積分賽本人已報名後看不到兒童報名入口"],environment:"Production / HTML + Firebase Functions",deployStatus:"Frontend staged loading + ranked family registration",firebaseImpact:"沿用 familyRegistration 與既有 registrations；兒童仍以獨立 familyPlayerId 儲存",securityRulesImpact:"無",permissionImpact:"僅家長替自己的家庭選手報名；兒童不繼承家長天梯／活躍積分",publicSummary:"賽事資訊會先快速顯示，報名狀態在背景同步；積分賽也可替孩子獨立報名，且不會把孩子的帳號型積分灌到家長。"},
   {version:"v14.0.53",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理儲存確認鍵修復",updateLevel:"patch",added:["帳號卡片恢復獨立「儲存變更」按鈕","角色、測試身分與帳號啟用改為先暫存、確認後一次送出","送出前顯示實際變更差異"],changed:["本名確認狀態與帳號設定儲存完全分離，不再互相取代","未修改資料時儲存鍵維持停用，避免誤送"],fixed:["修復帳號已完成本名確認後管理控制區只剩「本名已確認」、缺少確認／儲存入口的回歸問題","避免下拉或核取方塊一變更就立即寫入帳號設定"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；帳號修改仍僅限 super_admin",publicSummary:"帳號設定改回明確的修改→儲存→確認流程，本名確認狀態不再吃掉儲存鍵。"},
   {version:"v14.0.52",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.6 歷史回算／完整性驗證",updateLevel:"minor",added:["新增 Achievement Historical Integrity Audit：同步檢查原始 Match、canonical 去重、舊格式 fallback、Quick Decision、可信比分、Round 可分析性與 Evidence 可解析率","成就頁新增歷史回算檢查面板，揭露納入、排除與 fallback 狀態"],changed:["P6 成就回算標記為 derived_read_only：只讀重算，不補寫舊 Match、不自動發永久 Award","完整性拆成場次覆蓋、連勝時序、Round 覆蓋、Evidence 解析四個維度"],fixed:["封住重複 Match 灌高里程碑、舊資料缺時間戳影響連勝精度、無可信 Round／比分被誤當成就來源等風險"],environment:"Production feature branch",deployStatus:"P6.6 historical recalculation + integrity audit",firebaseImpact:"無；不補寫歷史資料、不新增集合、不發永久 Award",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"新增歷史回算檢查，可看到哪些舊資料被納入、保守排除或使用 fallback，並驗證成就來源是否仍可追溯。"},
 
@@ -15795,6 +15796,9 @@ let tournamentDetailMyReg = null; // primary registration shown for backward-com
 let tournamentDetailMyRegs = []; // all active registrations owned by this guardian account
 let tournamentDetailLoading = false;
 let tournamentDetailError = null;
+let tournamentDetailRegistrationLoading = false;
+let tournamentDetailRegistrationError = null;
+let tournamentDetailLoadGeneration = 0;
 let tournamentDetailChildConfirmed = false;
 let tournamentDetailBusy = false; // register/cancel button in-flight guard
 // Admin registration management (Phase 3)
@@ -15816,47 +15820,94 @@ const TARGET_GROUP_DESCRIPTIONS = {
 };
 
 async function loadTournamentDetail(code){
+  const generation=++tournamentDetailLoadGeneration;
   tournamentDetailLoading = true;
   tournamentDetailError = null;
+  tournamentDetailRegistrationLoading = false;
+  tournamentDetailRegistrationError = null;
+  tournamentDetailData = null;
+  tournamentDetailMyRegs = [];
+  tournamentDetailMyReg = null;
   render();
   try{
     if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
+    if(generation!==tournamentDetailLoadGeneration || code!==tournamentDetailCode) return;
     if(!cloudAvailable() || !window.cloudSync.getPublicTournamentFull){
       tournamentDetailError = PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
-      tournamentDetailLoading = false; render(); return;
+      tournamentDetailLoading = false;
+      render();
+      return;
     }
     const data = await window.cloudSync.getPublicTournamentFull(code);
-    if(!data){ tournamentDetailError = "找不到賽事"; tournamentDetailLoading = false; render(); return; }
+    if(generation!==tournamentDetailLoadGeneration || code!==tournamentDetailCode) return;
+    if(!data){
+      tournamentDetailError = "找不到賽事";
+      tournamentDetailLoading = false;
+      render();
+      return;
+    }
+
+    // Stage 1: paint public event data immediately. The family-registration
+    // lookup is secondary and must never keep the whole detail screen blank.
     tournamentDetailData = data;
+    tournamentDetailError = null;
+    tournamentDetailLoading = false;
     const uid = (typeof firebaseUser!=="undefined" && firebaseUser) ? firebaseUser.uid : null;
-    tournamentDetailMyRegs=[];
-    tournamentDetailMyReg=null;
-    if(uid){
-      let familyLoaded=false;
-      if(window.engagementService?.familyRegistration){
-        try{
-          const mine=await window.engagementService.familyRegistration({action:'mine',code});
-          tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist','pending_draw'].includes(row.status));
-          tournamentDetailMyReg=tournamentDetailMyRegs.find(row=>!row.familyPlayerId)||tournamentDetailMyRegs[0]||null;
-          familyLoaded=true;
-        }catch(e){console.warn('[BXH family registration mine failed; fallback to legacy registration read]',e)}
+    if(!uid){
+      tournamentDetailRegistrationLoading = false;
+      render();
+      return;
+    }
+
+    tournamentDetailRegistrationLoading = true;
+    render();
+
+    let registrationLoaded=false;
+    if(window.engagementService?.familyRegistration){
+      try{
+        const mine=await window.engagementService.familyRegistration({action:'mine',code});
+        if(generation!==tournamentDetailLoadGeneration || code!==tournamentDetailCode) return;
+        tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist','pending_draw'].includes(row.status));
+        tournamentDetailMyReg=tournamentDetailMyRegs.find(row=>!row.familyPlayerId)||tournamentDetailMyRegs[0]||null;
+        registrationLoaded=true;
+      }catch(e){
+        console.warn('[BXH family registration mine failed; event details remain available]',e);
       }
-      if(!familyLoaded&&window.cloudSync.getMyRegistrationForTournament){
+    }else if(window.cloudSync.getMyRegistrationForTournament){
+      try{
         tournamentDetailMyReg=await window.cloudSync.getMyRegistrationForTournament(code);
+        if(generation!==tournamentDetailLoadGeneration || code!==tournamentDetailCode) return;
         tournamentDetailMyRegs=tournamentDetailMyReg?[tournamentDetailMyReg]:[];
+        registrationLoaded=true;
+      }catch(e){
+        console.warn('[BXH legacy registration read failed]',e);
       }
     }
-    tournamentDetailError = null;
+
+    tournamentDetailRegistrationError=registrationLoaded
+      ? null
+      : "賽事資訊已載入，但你的報名狀態暫時無法同步。為避免重複佔位，請重新整理後再報名。";
   }catch(e){
-    tournamentDetailError = mapRegistrationError(e);
+    if(generation!==tournamentDetailLoadGeneration || code!==tournamentDetailCode) return;
+    if(tournamentDetailData){
+      tournamentDetailRegistrationError=mapRegistrationError(e);
+    }else{
+      tournamentDetailError = mapRegistrationError(e);
+    }
+  }finally{
+    if(generation===tournamentDetailLoadGeneration && code===tournamentDetailCode){
+      tournamentDetailLoading = false;
+      tournamentDetailRegistrationLoading = false;
+      render();
+    }
   }
-  tournamentDetailLoading = false;
-  render();
 }
 
 function resetTournamentDetailState(){
+  tournamentDetailLoadGeneration++;
   tournamentDetailCode = null; tournamentDetailData = null; tournamentDetailMyReg = null; tournamentDetailMyRegs = [];
   tournamentDetailLoading = false; tournamentDetailError = null;
+  tournamentDetailRegistrationLoading = false; tournamentDetailRegistrationError = null;
   tournamentDetailChildConfirmed = false; tournamentDetailBusy = false;
 }
 
@@ -15885,7 +15936,7 @@ function renderTournamentDetailScreen(){
   const hasSelfRegistration=!!selfReg;
   const isLoggedIn=!!(userProfile&&firebaseUser);
   const profileIncomplete=isLoggedIn&&!userProfile.realName;
-  const childRegistrationAllowed=!t.registrationSelection&&!(t.ladderMode==='ranked'&&!t.testLadderEnabled);
+  const childRegistrationAllowed=!t.registrationSelection;
   const additionalRegistrationAvailable=confirmedRemaining>0||(t.waitlistEnabled&&waitlistRemaining>0);
 
   let actionHtml;
@@ -15895,6 +15946,10 @@ function renderTournamentDetailScreen(){
   } else if(isGuestMode){
     actionHtml = `<div class="hint">遊客模式僅供瀏覽公開賽事資訊，不提供報名／取消報名操作。</div>
       <button class="btn btn-primary" data-action="select-role-player">切換至玩家模式</button>`;
+  } else if(isLoggedIn && tournamentDetailRegistrationLoading){
+    actionHtml = `<div class="registration-result-panel"><div class="registration-result-head"><span class="registration-result-icon">↻</span><div><div class="registration-result-title">賽事資訊已載入</div><div class="registration-result-subtitle">正在同步你的本人／兒童報名狀態；其他賽事資訊可以先查看。</div></div></div><button class="btn btn-ghost" disabled>同步報名狀態中…</button></div>`;
+  } else if(isLoggedIn && tournamentDetailRegistrationError){
+    actionHtml = `<div class="banner warn"><span>${esc(tournamentDetailRegistrationError)}</span></div><button class="btn btn-ghost" data-action="reload-tournament-detail" data-code="${esc(code)}">重新同步報名狀態</button>`;
   } else if(activeMyRegs.length){
     const canCancel=t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
     const requiresCheckin=t.checkinRequired===true||t.parsedData?.meta?.checkinRequired===true;
@@ -15912,6 +15967,7 @@ function renderTournamentDetailScreen(){
         ${requiresCheckin?`<div class="registration-next-step"><b>下一步｜現場繳費與報到</b><br>活動當日請向工作人員完成繳費；每位參賽者都要由工作人員確認報到後，才會正式進入對戰名單。</div>`:''}
         ${t.targetGroup==="children"&&addChildButton?`<label class="checkbox-row"><input type="checkbox" id="child-eligibility-checkbox" ${tournamentDetailChildConfirmed?'checked':''}> 我確認報名兒童符合 6 歲以上、13 歲以下的參加資格</label>`:''}
         ${addSelfButton||addChildButton?`<div class="btn-row" style="margin-top:12px;">${addSelfButton}${addChildButton}</div>`:''}
+        ${addChildButton&&t.ladderMode==='ranked'?'<div class="hint" style="margin-top:8px">兒童以獨立選手身分參賽；未綁定自己的會員帳號前，不會把天梯／活躍積分計入家長帳號。</div>':''}
         <div class="registration-cancel-row">${canCancel?`<button class="btn btn-sm registration-cancel-link" data-action="cancel-my-registration" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${activeMyRegs.length>1?'取消其中一位報名':'取消這場報名'}</button>`:`<span class="hint">${t.cancellationDeadline?"已超過取消期限，無法取消":"目前無法取消報名"}</span>`}</div>
       </div>
     `;
@@ -15948,7 +16004,8 @@ function renderTournamentDetailScreen(){
       actionHtml=`<div class="btn-row">
         <button class="btn btn-primary" data-action="submit-tournament-registration" data-participant-mode="self" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'本人加入備取':'本人報名'}</button>
         ${childRegistrationAllowed?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${willBeWaitlist?'兒童加入備取':'兒童報名'}</button>`:''}
-      </div>`;
+      </div>
+      ${childRegistrationAllowed&&t.ladderMode==='ranked'?'<div class="hint" style="margin-top:8px">兒童以獨立選手身分參賽；未綁定自己的會員帳號前，不會把天梯／活躍積分計入家長帳號。</div>':''}`;
     }
   }
 
