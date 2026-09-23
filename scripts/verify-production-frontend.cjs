@@ -137,4 +137,17 @@ mustInclude("careerAnalysis.eligible?careerAnalysis.overall:'—'",'Hunter P4 ov
 mustInclude('Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析','Hunter P4 integrity note missing');
 mustInclude('50% 分布＝滿格','Hunter P4 radar visual scale disclosure missing');
 console.log('PASS Hunter Profile P4 analysis engine');
+mustInclude('const HUNTER_GROWTH_VERSION="hunter-xp-v1";','Hunter P5 growth version missing');
+mustInclude('const HUNTER_XP_PER_MATCH=10;','Hunter P5 match XP missing');
+mustInclude('const HUNTER_XP_PER_VALID_ROUND=2;','Hunter P5 round XP missing');
+mustInclude('const HUNTER_XP_PER_EVENT=20;','Hunter P5 event XP missing');
+mustInclude('function hunterUniqueRecords(records)','Hunter P5 duplicate guard missing');
+mustInclude('function hunterLevelThreshold(level)','Hunter P5 level threshold missing');
+mustInclude('function hunterBuildGrowth(records)','Hunter P5 growth engine missing');
+mustInclude('function hunterPeriodSummary(period)','Hunter P5 period summary missing');
+mustInclude('data-action="hunter-overview-period"','Hunter P5 overview period switch missing');
+mustInclude('獵人等級只代表累積經驗','Hunter P5 level/rating separation disclosure missing');
+mustInclude('不計入 XP 或期間統計','Hunter P5 unresolved identity exclusion missing');
+mustInclude('天梯、獵人等級、綜合評分三者用途不同','Hunter P5 three-system separation note missing');
+console.log('PASS Hunter Profile P5 growth and period stats');
 
