@@ -280,7 +280,7 @@ mustInclude('evaluations.filter(item=>item&&item.category==="match")','Hunter P6
 mustInclude('["achievements","成就"]','Hunter P6.2 achievement tab missing');
 mustInclude('playerStatsSubTab==="achievements"','Hunter P6.2 achievement route missing');
 mustInclude('["overview","analysis","records","achievements"].includes(subTab)','Hunter P6.2 tab whitelist missing');
-mustInclude('逐筆 Evidence 展開留給 P6.5','Hunter P6.2 evidence UI scope disclosure missing');
+mustInclude('Evidence Chain 可逐筆核對來源','Hunter P6.2 evidence UI disclosure missing');
 mustInclude('永久徽章尚未發放','Hunter P6.2 must not claim persistent awards');
 console.log('PASS Hunter Profile P6.2 Match milestones');
 
@@ -328,3 +328,21 @@ mustInclude('Quick Decision 不會被當成完封','Hunter P6.4 Quick Decision s
 mustInclude('本區不產生「剋星、無敵」等主觀標籤','Hunter P6.4 non-overclaim disclosure missing');
 mustInclude('P6.4</span>','Hunter P6.4 profile badge missing');
 console.log('PASS Hunter Profile P6.4 streak and special records');
+
+mustInclude('function hunterAchievementEvidenceRowHtml(ref,records,index)','Hunter P6.5 evidence row renderer missing');
+mustInclude('function hunterAchievementEvidenceHtml(item,records)','Hunter P6.5 evidence chain renderer missing');
+mustInclude('hunterResolveAchievementEvidenceRef(ref,records)','Hunter P6.5 must resolve references through canonical evidence resolver');
+mustInclude('來源無法解析','Hunter P6.5 unresolved evidence warning missing');
+mustInclude('查看 Evidence Chain','Hunter P6.5 evidence disclosure control missing');
+mustInclude('canonical Hunter Match / Round','Hunter P6.5 canonical source disclosure missing');
+mustInclude('Round Event #','Hunter P6.5 Round event detail missing');
+mustInclude('Match "+matchId','Hunter P6.5 Match ID detail missing');
+mustInclude('VS "+esc(opponent)','Hunter P6.5 opponent evidence detail missing');
+mustInclude('hunterRecordScoreText(record)','Hunter P6.5 evidence must use trusted score display');
+mustInclude('hunterMatchAchievementCardHtml(item,records)','Hunter P6.5 Match cards must receive canonical records');
+mustInclude('hunterRoundAchievementCardHtml(item,records)','Hunter P6.5 Round cards must receive canonical records');
+mustInclude('hunterStreakSpecialAchievementCardHtml(item,records)','Hunter P6.5 streak/special cards must receive canonical records');
+mustInclude('function hunterAchievementsHtml(core,records)','Hunter P6.5 combined achievement renderer missing');
+mustInclude('body=hunterAchievementsHtml(achievementCore,allRecords);','Hunter P6.5 achievement route must pass canonical records');
+mustInclude('P6.5</span>','Hunter P6.5 profile badge missing');
+console.log('PASS Hunter Profile P6.5 achievement evidence chain UI');
