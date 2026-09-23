@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.01">
+<meta name="bxh-build" content="20260924.02">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.01";
+  var CURRENT_BUILD="20260924.02";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -611,6 +611,20 @@ table.rank-table tr:last-child td{border-bottom:none;}
 .smc-desc{font-size:12px;color:var(--metal);margin-top:4px;}
 @media (max-width:640px){
   .scoring-mode-cards{flex-direction:column;}
+}
+
+/* ==== v14.0.65 referee scoring mode compact toggle ==== */
+.referee-scoring-compact{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;}
+.referee-scoring-compact .rsc-label{font-family:var(--font-d);font-size:16px;font-weight:800;color:var(--gold);letter-spacing:.4px;white-space:nowrap;}
+.rsc-toggle{display:grid;grid-template-columns:1fr 1fr;width:150px;padding:3px;border:1px solid rgba(217,185,92,.32);border-radius:11px;background:rgba(6,7,8,.78);box-shadow:inset 0 1px 0 rgba(255,255,255,.025);}
+.rsc-option{min-height:34px;padding:6px 12px;border:0;border-radius:8px;background:transparent;color:var(--metal);font-family:var(--font-d);font-size:13px;font-weight:800;letter-spacing:.5px;cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease;}
+.rsc-option.active{color:#171307;background:linear-gradient(180deg,#f3d878,#c89c2b);box-shadow:0 4px 14px rgba(217,185,92,.2),inset 0 1px 0 rgba(255,255,255,.45);}
+.rsc-option:disabled{opacity:.45;cursor:not-allowed;}
+@media (max-width:420px){
+  .referee-scoring-settings{padding:10px 12px;}
+  .referee-scoring-compact .rsc-label{font-size:15px;}
+  .rsc-toggle{width:136px;}
+  .rsc-option{padding:6px 8px;font-size:12px;}
 }
 .round-scoring-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
 .round-scoring-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;background:var(--panel-2);border-radius:8px;}
@@ -4333,9 +4347,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.64";
+const APP_VERSION = "v14.0.65";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.65",date:"2026/09/24",timezone:"Asia/Taipei",title:"裁判台判定模式極簡切換",updateLevel:"patch",added:["裁判台判定模式改為單列左右切換控制"],changed:["標準計分／簡易判定在裁判台顯示簡化為「正常／簡單」","移除裁判台判定模式的大型說明卡與描述文字，保留既有判定邏輯與切換確認"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee scoring mode compact toggle",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"沿用既有判定模式設定權限",publicSummary:"裁判台的判定模式改成更省空間的「正常／簡單」左右切換。"},
   {version:"v14.0.64",date:"2026/09/24",timezone:"Asia/Taipei",title:"裁判台下一場高對比提示卡",updateLevel:"patch",added:["裁判台標準計分、簡易判定與等待晉級狀態全面改用與即時戰況一致的高對比下一場提示卡"],changed:["下一場資訊由單行灰字改為 badge＋場次資訊＋獨立選手名稱列","裁判台內的下一場選手名稱額外放大並提高字重，VS 與外框沿用該戰鬥台專屬色"],fixed:["改善裁判台手機畫面中下一場人名灰度過低、不易辨識的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee next-match visibility enhancement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台的下一場現在會以醒目的雙層提示卡顯示，選手名稱更大、更亮，並跟隨戰鬥台專屬色。"},
   {version:"v14.0.63",date:"2026/09/23",timezone:"Asia/Taipei",title:"即時戰況下一場提示卡強化",updateLevel:"patch",added:["即時戰鬥台的下一場改為獨立兩層提示卡，分離場次資訊與對戰選手","下一場標籤、外框、左側光條與 VS 重點色跟隨各戰鬥台專屬色"],changed:["手機版下一場資訊不再塞在單行灰字中；選手名稱提高字級與對比","等待晉級與本台完成狀態使用相同提示卡結構，資訊層級一致"],fixed:["改善即時戰況下一場資訊在手機上灰度過低、難以快速辨識的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend live court next-match card emphasis",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況的下一場現在會以高對比提示卡顯示，場次與對戰選手更醒目，並沿用各戰鬥台專屬色。"},
   {version:"v14.0.62",date:"2026/09/23",timezone:"Asia/Taipei",title:"裁判台上一場比分修正／結果撤回",updateLevel:"patch",added:["每個戰鬥台新增上一場快捷列，可直接修正上一場比分或撤回上一場結果重打","修正流程會以雲端 transaction 撤回勝負、Hunter Round 結果與下一輪尚未開打的晉級資料"],changed:["已確認場次不再允許用舊的直接加分／撤分捷徑繞過完整回滾；統一走安全修正流程"],fixed:["避免已完成場次只把 completed 改回 false、但 winner／loser／下一輪晉級仍殘留造成資料不一致"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee correction + transactional rollback",firebaseImpact:"無新增集合；沿用 tournaments／publicTournaments transaction，新增場次 correctionOpenedAt／correctionOpenedBy 稽核欄位",securityRulesImpact:"無",permissionImpact:"沿用既有裁判台與戰鬥台指派權限",publicSummary:"裁判送出結果後若發現錯誤，可在同一戰鬥台直接修正上一場；若後續相關比賽已實際得分，系統會阻止回滾避免破壞賽程。"},
@@ -12633,20 +12648,15 @@ function renderCourtCard(stationNum){
 
 function renderRefereeScoringControls(){
   const current=state.meta.scoringMode==="quick"?"quick":"standard";
+  const canChange=canConfigureCurrentTournament();
   return `<div class="panel referee-scoring-settings">
-    <div class="panel-title">判定模式</div>
-    <p class="hint" style="margin-bottom:10px;">設定尚未開始場次的預設判定方式。已開始或已完成場次不受影響。</p>
-    <div class="scoring-mode-cards">
-      <button class="scoring-mode-card ${current==="standard"?"active":""}" data-action="referee-set-scoring-mode" data-mode="standard" ${!canConfigureCurrentTournament()?'disabled':''}>
-        <div class="smc-title">標準計分</div>
-        <div class="smc-desc">記錄勝利方式與比分，先取得 4 分者獲勝。</div>
-      </button>
-      <button class="scoring-mode-card ${current==="quick"?"active":""}" data-action="referee-set-scoring-mode" data-mode="quick" ${!canConfigureCurrentTournament()?'disabled':''}>
-        <div class="smc-title">簡易判定</div>
-        <div class="smc-desc">不記比分，由裁判直接選擇勝方。</div>
-      </button>
+    <div class="referee-scoring-compact">
+      <div class="rsc-label">判定模式</div>
+      <div class="rsc-toggle" role="group" aria-label="判定模式">
+        <button type="button" class="rsc-option ${current==="standard"?"active":""}" data-action="referee-set-scoring-mode" data-mode="standard" aria-pressed="${current==="standard"?"true":"false"}" ${!canChange?'disabled':''}>正常</button>
+        <button type="button" class="rsc-option ${current==="quick"?"active":""}" data-action="referee-set-scoring-mode" data-mode="quick" aria-pressed="${current==="quick"?"true":"false"}" ${!canChange?'disabled':''}>簡單</button>
+      </div>
     </div>
-
   </div>`;
 }
 
