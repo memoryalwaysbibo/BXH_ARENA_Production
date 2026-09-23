@@ -17,6 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Verify BXH CALL Web Push scripts syntax
+        run: |
+          node --check court-call-ui.js
+          node --check firebase-messaging-sw.js
+
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
       - name: Verify ladder V1 scoring and inline-script syntax
