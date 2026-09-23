@@ -133,7 +133,7 @@ mustInclude('function hunterBuildAnalysis(records)','Hunter P4 analysis engine m
 mustInclude('function hunterRadarSvg(analysis)','Hunter P4 radar renderer missing');
 mustInclude('data-action="hunter-analysis-period"','Hunter P4 period control missing');
 mustInclude('winRate*0.6+pointEfficiency*0.4','Hunter P4 transparent rating formula missing');
-mustInclude('analysis.eligible?careerAnalysis.overall','Hunter P4 overview rating linkage missing');
+mustInclude("careerAnalysis.eligible?careerAnalysis.overall:'—'",'Hunter P4 overview rating linkage missing');
 mustInclude('Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析','Hunter P4 integrity note missing');
 mustInclude('50% 分布＝滿格','Hunter P4 radar visual scale disclosure missing');
 console.log('PASS Hunter Profile P4 analysis engine');
