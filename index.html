@@ -7974,6 +7974,13 @@ function aiCreateIsoToEpoch(value){
   return Number.isFinite(parsed)?parsed:null;
 }
 
+function aiCreateHalfHourCompatible(value){
+  if(!value) return true;
+  const m=String(value).match(/(?:T|^)(?:[01]\d|2[0-3]):([0-5]\d)/);
+  if(!m) return false;
+  return m[1]==="00" || m[1]==="30";
+}
+
 function aiCreateLocationText(activity){
   const venue=String(activity&&activity.locationName||"").trim();
   const address=String(activity&&activity.address||"").trim();
@@ -7987,10 +7994,18 @@ function aiCreateDraftMappingModel(){
   if(!result||!event) return null;
   const activity=result.activity||{};
   const warnings=[];
+  const checkinCompatible=aiCreateHalfHourCompatible(event.checkInStart);
+  const startCompatible=aiCreateHalfHourCompatible(event.startAt);
+  const openCompatible=aiCreateHalfHourCompatible(activity.registrationOpenAt);
+  const closeCompatible=aiCreateHalfHourCompatible(activity.registrationCloseAt);
   if(!activity.registrationCloseAt) warnings.push("報名截止時間未提供，套用後維持空白。");
+  if(activity.registrationOpenAt && !openCompatible) warnings.push("報名開放 "+String(activity.registrationOpenAt).slice(11,16)+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用，避免被系統靜默四捨五入。");
+  if(activity.registrationCloseAt && !closeCompatible) warnings.push("報名截止 "+String(activity.registrationCloseAt).slice(11,16)+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
+  if(event.checkInStart && !checkinCompatible) warnings.push("報到時間 "+event.checkInStart+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
+  if(event.startAt && !startCompatible) warnings.push("開賽時間 "+event.startAt+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
   if(event.participantRestrictions?.includes("female")) warnings.push("女性限定目前沒有 ARENA 原生組別欄位，不會自動轉成公開組／兒童組條件。");
   if(!event.formatType) warnings.push("文案未明確提供賽制，AI 不會覆蓋目前賽制預設值。");
-  if(event.checkInEnd) warnings.push("現行房間欄位只有單一「報到時間」；本次只套用報到開始 "+event.checkInStart+"。");
+  if(event.checkInEnd) warnings.push("現行房間欄位只有單一「報到時間」；本次只處理報到開始時間。");
   if(event.endAt) warnings.push("現行房間基本資料沒有活動結束時間欄位；"+event.endAt+" 不會寫入草稿。");
   if(Array.isArray(result.bundleOffers)&&result.bundleOffers.length) warnings.push("雙賽／套票優惠目前沒有對應房間欄位，本次不寫入。");
   return {
@@ -8000,15 +8015,15 @@ function aiCreateDraftMappingModel(){
       name:String(event.name||activity.name||"").trim(),
       date:String(event.date||activity.date||"").trim(),
       location:aiCreateLocationText(activity),
-      checkin:String(event.checkInStart||"").trim(),
-      startTime:String(event.startAt||"").trim(),
+      checkin:checkinCompatible?String(event.checkInStart||"").trim():"",
+      startTime:startCompatible?String(event.startAt||"").trim():"",
       formatType:event.formatType||null,
       checkinRequired:!!event.checkInStart
     },
     registration:{
       registrationEnabled:!!event.registrationEnabled,
-      registrationOpenAt:aiCreateIsoToEpoch(activity.registrationOpenAt),
-      registrationCloseAt:aiCreateIsoToEpoch(activity.registrationCloseAt),
+      registrationOpenAt:openCompatible?aiCreateIsoToEpoch(activity.registrationOpenAt):null,
+      registrationCloseAt:closeCompatible?aiCreateIsoToEpoch(activity.registrationCloseAt):null,
       registrationCapacity:event.capacity!=null?event.capacity:null,
       registrationFee:event.fee!=null?event.fee:null,
       targetGroup:(event.targetGroup==="open"||event.targetGroup==="children")?event.targetGroup:null
@@ -8039,7 +8054,7 @@ function applyAiCreateSelectedEventToDraft(){
   if(s.checkin){settingsFormDraft.checkin=s.checkin;mapped.push("報到時間");}
   if(s.startTime){settingsFormDraft.startTime=s.startTime;mapped.push("開賽時間");}
   if(s.formatType && ["single","double","roundrobin"].includes(s.formatType)){settingsFormDraft.formatType=s.formatType;mapped.push("賽制");}
-  if(s.checkinRequired){settingsFormDraft.checkinRequired=true;mapped.push("需要報到");}
+  if(s.checkinRequired && s.checkin){settingsFormDraft.checkinRequired=true;mapped.push("需要報到");}
 
   registrationFormDraft.registrationEnabled=r.registrationEnabled;
   mapped.push("報名方式");
