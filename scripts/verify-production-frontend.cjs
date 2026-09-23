@@ -217,4 +217,12 @@ mustInclude('const score=hunterRecordScoreText(r);','Match record UI must use ce
 mustInclude('比分未驗證','Untrusted legacy score must be visibly distinguished');
 mustInclude("可信比分 '+periodSummary.scoredMatches+' / '+periodSummary.matches+' 場",'Period summary must disclose trusted score sample');
 console.log('PASS Hunter P5 end-to-end trusted-score consistency');
+mustInclude('scope:"unresolved"','Hunter identity resolver must distinguish transient failures');
+mustInclude('source:"event-card-error"','Hunter identity resolver error source missing');
+mustInclude('if(value.scope!=="unresolved") hunterOpponentIdentityCache.set(ref,value);','Transient identity failures must not be cached as permanent conclusions');
+mustInclude('辨識失敗','Hunter identity failure label missing');
+mustInclude('重新整理可重試','Hunter identity retry guidance missing');
+mustInclude('let excluded=0,loading=0,unresolved=0;','H2H unresolved counter missing');
+mustInclude("statusParts.push(h2h.unresolved+' 場辨識失敗')",'H2H must disclose unresolved identity count');
+console.log('PASS Hunter P5 identity-resolution consistency');
 
