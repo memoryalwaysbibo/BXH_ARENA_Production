@@ -197,4 +197,13 @@ mustInclude('主要失分方式','Hunter P5.5 primary concession label missing')
 mustInclude('Quick Decision 只計勝敗，也不進入對手戰型分析','Hunter P5.5 quick-decision exclusion missing');
 mustInclude('不產生宿敵、剋星或強弱標籤','Hunter P5.5 non-overclaim disclosure missing');
 console.log('PASS Hunter Profile P5.5 opponent matchup analysis');
+mustInclude('let hunterH2HQuery = "";','Hunter P5.6 search state missing');
+mustInclude('function hunterH2HDirectoryView(h2h)','Hunter P5.6 directory filter missing');
+mustInclude('function hunterH2HDirectoryHtml(h2h)','Hunter P5.6 directory UI missing');
+mustInclude('最近交手','Hunter P5.6 recent opponents missing');
+mustInclude('常遇對手','Hunter P5.6 frequent opponents missing');
+mustInclude('data-action="hunter-h2h-search"','Hunter P5.6 search action missing');
+mustInclude('data-action="hunter-h2h-sort"','Hunter P5.6 sort action missing');
+mustInclude('搜尋只比對公開名稱與穩定 playerId','Hunter P5.6 identity safety disclosure missing');
+console.log('PASS Hunter Profile P5.6 opponent directory');
 
