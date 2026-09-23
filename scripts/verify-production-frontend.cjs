@@ -83,6 +83,14 @@ mustInclude('captureManagedAccountDraft(el.getAttribute("data-uid"))','Account c
 mustInclude('confirmLabel:"確認更新"','Account save confirmation dialog missing');
 mustNot(/changeSingleManagedAccount\(el\.getAttribute\("data-uid"\),\{\[field\]/,'Account controls must not auto-save directly on change');
 console.log('PASS account-management staged save confirmation');
+mustInclude('data-action="account-search-clear"','Account search clear control missing');
+mustInclude('if(action==="account-search-clear"){','Account search clear action missing');
+must(/if\(action===["']account-search-clear["']\)\{[\s\S]*?accountMgmtQuery=["']{2}[\s\S]*?render\(\); return;/,'Account search clear must only clear the keyword and rerender');
+mustInclude('.account-user-list{display:grid;gap:6px;}','Compact account list gap missing');
+mustInclude('.account-filter-search{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;}','Account search must provide input, search, and clear controls');
+mustInclude('.account-user-card>summary{grid-template-columns:28px minmax(0,1fr) auto;grid-template-rows:auto auto;gap:2px 8px;padding:8px 10px;}','Mobile compact account card layout missing');
+console.log('PASS compact account list / search clear');
+
 
 mustInclude('class="rank-table people-roster-table"','People roster table mobile scope missing');
 mustInclude('class="people-col-actions"','People roster action semantic cell missing');
