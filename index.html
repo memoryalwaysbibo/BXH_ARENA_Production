@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.33">
+<meta name="bxh-build" content="20260923.34">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.33";
+  var CURRENT_BUILD="20260923.34";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4264,9 +4264,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.57";
+const APP_VERSION = "v14.0.58";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.58",date:"2026/09/23",timezone:"Asia/Taipei",title:"裁判分配競態同步修復",updateLevel:"patch",added:["裁判分配儲存前先排空既有一般雲端寫入佇列"],changed:["裁判分配欄位改由專用 transaction 作為權威來源；一般 pushUpdate 只保留雲端最新裁判設定，不再以舊快照回寫","重新進房時桌次限制同時支援 true 與 false 的頂層權威值"],fixed:["修正一般狀態同步與裁判分配 transaction 互相踩寫，造成 stale-assignment、儲存後勾選被還原或公開鏡像顯示舊裁判","修正頂層桌次限制為 false 時，重新進房仍可能沿用 data 內舊 true 值"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee assignment race hotfix",firebaseImpact:"無新增集合或欄位；調整既有 refereeStation* 欄位同步責任",securityRulesImpact:"無",permissionImpact:"沿用既有裁判分配權限",publicSummary:"修正裁判分配偶發無法儲存、儲存後被還原，以及雲端同步互相覆蓋的問題。"},
   {version:"v14.0.57",date:"2026/09/23",timezone:"Asia/Taipei",title:"結算卡住手動恢復入口",updateLevel:"patch",added:["結算中的 processing／ladder／archive／sync-pending 狀態新增「重新嘗試結算」入口"],changed:["保留既有自動封存；手動重試沿用 performAutoArchive 冪等流程，不建立第二套結算邏輯"],fixed:["避免賽事完成後若停在天梯結算中，因非 failed 狀態而沒有任何可操作的恢復入口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement recovery hotfix",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"沿用既有賽事操作權限",publicSummary:"賽事若長時間停在結算中，管理者可直接安全重試結算，不必等待系統自行恢復。"},
   {version:"v14.0.56",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人系統 10/1 正式啟動與歸零排程",updateLevel:"minor",added:["新增 2026/09/30 23:58（台灣時間）獵人成就與進度歸零排程","新增 2026/10/01 00:00 正式統計起點，正式上線後只計算起點以後的 Match、Round、分析、連勝與成就"],changed:["9/30 前的賽事與原始對戰紀錄完整保留，但不納入正式獵人數據","重置範圍限於 hunterAchievements 與 hunterAchievementProgress；帳號、個資、稱號、天梯、賽事與報名全部保留","重置採完成標記與重試機制，重複執行或未來年度排程不會再次清除"],fixed:["避免 10/1 正式啟動時沿用測試期間戰績、分析與已發徽章","避免刪除原始比賽資料後失去日後查核能力"],environment:"Production",deployStatus:"Scheduled reset + official Hunter cutoff",firebaseImpact:"9/30 23:58 清除獵人成就與進度子集合；保留原始賽事及稽核紀錄",securityRulesImpact:"無；重置僅由排程 Functions Admin SDK 執行",permissionImpact:"無新增前端權限",publicSummary:"獵人系統將於 10/1 從零正式啟動；測試期比賽保留供查核，但不計入正式戰績與成就。"},
   {version:"v14.0.55",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理緊湊列表／搜尋清除",updateLevel:"patch",added:["搜尋姓名／帳號欄新增獨立「清除」鍵，只清除關鍵字、不重設角色／狀態／活躍度／排序","手機帳號卡改為緊湊三欄摘要：勾選、身分資訊、狀態標籤同屏排列"],changed:["帳號卡上下 padding、卡片間距、文字行距與狀態 badge 間距同步壓縮","手機收合卡重新配置 Email、本名／遊戲 ID 與狀態標籤，減少無效垂直空間"],fixed:["改善大量帳號名單需要過度長距離滑動的問題","避免清除搜尋時必須手動逐字刪除關鍵字"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management density patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"不變；帳號管理仍限 super_admin",publicSummary:"帳號管理列表更緊湊，同屏可看到更多帳號；搜尋新增一鍵清除且保留其他篩選條件。"},
@@ -22417,6 +22418,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     (async()=>{
       try{
+        // Referee assignment owns its own Firestore transaction. Drain older whole-state
+        // writes first so an earlier snapshot cannot land immediately before/after it.
+        await flushCloudStateWrites();
         const result = window.cloudSync&&window.cloudSync.saveRefereeStationAssignments&&state.cloudCode
           ? await window.cloudSync.saveRefereeStationAssignments(state.cloudCode,state,{assignments:previous.assignments,restrictionEnabled:previous.restrictionEnabled})
           : {ok:false,reason:"cloud-unavailable"};
@@ -25476,7 +25480,7 @@ init();
         if(Array.isArray(d.assignedStaffUids)) parsed.meta.assignedStaffUids=d.assignedStaffUids;
         if(d.refereeStationAssignments && typeof d.refereeStationAssignments==="object") parsed.meta.refereeStationAssignments=d.refereeStationAssignments;
         if(d.refereeStationNames && typeof d.refereeStationNames==="object") parsed.meta.refereeStationNames=d.refereeStationNames;
-        if(d.refereeStationRestrictionEnabled===true) parsed.meta.refereeStationRestrictionEnabled=true;
+        if(d.refereeStationRestrictionEnabled!==undefined) parsed.meta.refereeStationRestrictionEnabled=!!d.refereeStationRestrictionEnabled;
         return { ok:true, data: parsed };
       }catch(e){
         console.warn("加入雲端賽事代碼失敗", e);
@@ -25614,6 +25618,36 @@ if(testerSession){
                 }
               }
             }
+
+            // refereeStation* is transaction-owned. Whole-state saves may carry a stale
+            // local copy, so always rebase those fields from the newest remote document
+            // before writing the JSON blob or public mirror.
+            const remoteMeta=(remoteState&&remoteState.meta)||{};
+            const canonicalAssignments=(remoteDoc.refereeStationAssignments&&typeof remoteDoc.refereeStationAssignments==="object"&&!Array.isArray(remoteDoc.refereeStationAssignments))
+              ? remoteDoc.refereeStationAssignments
+              : ((remoteMeta.refereeStationAssignments&&typeof remoteMeta.refereeStationAssignments==="object"&&!Array.isArray(remoteMeta.refereeStationAssignments))?remoteMeta.refereeStationAssignments:{});
+            const canonicalNames=(remoteDoc.refereeStationNames&&typeof remoteDoc.refereeStationNames==="object"&&!Array.isArray(remoteDoc.refereeStationNames))
+              ? remoteDoc.refereeStationNames
+              : ((remoteMeta.refereeStationNames&&typeof remoteMeta.refereeStationNames==="object"&&!Array.isArray(remoteMeta.refereeStationNames))?remoteMeta.refereeStationNames:{});
+            const canonicalRestriction=remoteDoc.refereeStationRestrictionEnabled===undefined
+              ? !!remoteMeta.refereeStationRestrictionEnabled
+              : !!remoteDoc.refereeStationRestrictionEnabled;
+            const canonicalUids=Array.isArray(remoteDoc.refereeStationUids)
+              ? [...new Set(remoteDoc.refereeStationUids.map(String).filter(Boolean))]
+              : (()=>{ const out=[]; Object.values(canonicalAssignments).forEach(list=>{ if(Array.isArray(list)) list.forEach(uid=>{ uid=String(uid||""); if(uid&&!out.includes(uid)) out.push(uid); }); }); return out; })();
+            data.meta=data.meta||{};
+            data.meta.refereeStationAssignments=canonicalAssignments;
+            data.meta.refereeStationNames=canonicalNames;
+            data.meta.refereeStationRestrictionEnabled=canonicalRestriction;
+            const incomingAssigned=Array.isArray(data.meta.assignedStaffUids)?data.meta.assignedStaffUids.map(String).filter(Boolean):[];
+            data.meta.assignedStaffUids=[...new Set(incomingAssigned.concat(canonicalUids))];
+            privatePayload.data=JSON.stringify(data);
+            privatePayload.assignedStaffUids=data.meta.assignedStaffUids;
+            privatePayload.refereeStationAssignments=canonicalAssignments;
+            privatePayload.refereeStationNames=canonicalNames;
+            privatePayload.refereeStationUids=canonicalUids;
+            privatePayload.refereeStationRestrictionEnabled=canonicalRestriction;
+            publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
           }
           tx.set(ref,privatePayload,{merge:true});
           tx.set(fx.doc(dbHandle,"publicTournaments",normalized),publicPayload,{merge:true});
