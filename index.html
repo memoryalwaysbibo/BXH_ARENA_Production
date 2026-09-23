@@ -3252,6 +3252,69 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   border-radius:10px;background:rgba(102,180,255,.055);color:#cfe6ff;
   font-size:11px;line-height:1.6;
 }
+.ai-create-result{
+  margin-top:16px;border:1px solid rgba(255,255,255,.10);border-radius:12px;
+  overflow:hidden;background:rgba(255,255,255,.018);
+}
+.ai-create-result-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 13px;border-bottom:1px solid rgba(255,255,255,.08);
+}
+.ai-create-result-head strong{color:var(--ivory);font-size:13px;}
+.ai-create-schema-badge{
+  flex:0 0 auto;padding:4px 8px;border:1px solid rgba(85,184,255,.34);
+  border-radius:999px;background:rgba(85,184,255,.07);color:#9ed8ff;
+  font:800 9.5px var(--font-d);letter-spacing:.45px;
+}
+.ai-create-result-body{padding:13px;}
+.ai-create-shared-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+}
+.ai-create-data-box{
+  min-width:0;padding:9px 10px;border:1px solid rgba(255,255,255,.075);
+  border-radius:9px;background:rgba(0,0,0,.16);
+}
+.ai-create-data-box span{display:block;color:var(--metal-dim);font-size:9.5px;margin-bottom:3px;}
+.ai-create-data-box strong{
+  display:block;color:var(--white);font-size:12px;line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.ai-create-event-list{display:grid;gap:9px;margin-top:12px;}
+.ai-create-event-card{
+  padding:11px;border:1px solid rgba(217,185,92,.18);border-radius:10px;
+  background:rgba(217,185,92,.025);
+}
+.ai-create-event-title{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:8px;color:var(--ivory);font:800 13px var(--font-d);
+}
+.ai-create-event-tag{
+  padding:3px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.10);
+  color:var(--metal-dim);font-size:9px;font-weight:700;
+}
+.ai-create-event-meta{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+}
+.ai-create-event-meta div{
+  padding:7px 8px;border-radius:8px;background:rgba(0,0,0,.14);
+  color:var(--metal);font-size:10.5px;line-height:1.45;
+}
+.ai-create-warning-list{display:grid;gap:7px;margin-top:12px;}
+.ai-create-warning{
+  padding:9px 10px;border-radius:9px;font-size:10.5px;line-height:1.55;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);
+}
+.ai-create-warning.warning{border-color:rgba(255,193,85,.34);color:#ffd58a;background:rgba(255,193,85,.055);}
+.ai-create-warning.info{border-color:rgba(102,180,255,.24);color:#cfe6ff;background:rgba(102,180,255,.045);}
+.ai-create-schema-errors{
+  margin-top:12px;padding:10px 12px;border:1px solid rgba(255,105,105,.35);
+  border-radius:10px;background:rgba(255,80,80,.05);color:#ffb3b3;
+  font-size:10.5px;line-height:1.6;
+}
+.ai-create-draft-lock{
+  margin-top:12px;padding:9px 10px;border:1px dashed rgba(255,255,255,.13);
+  border-radius:9px;color:var(--metal-dim);font-size:10.5px;line-height:1.55;
+}
 .ai-create-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
 @media(max-width:720px){
   .settings-toolbar .btn-row{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row dense;width:100%;}
@@ -7722,6 +7785,187 @@ let settingsFormDraftDirty = false;
 let aiCreateAssistantOpen = false;
 let aiCreateSourceText = "";
 let aiCreateAssistantNotice = "";
+let aiCreateStructuredResult = null;
+let aiCreateStructuredErrors = [];
+
+const AI_CREATE_SCHEMA_VERSION = "bxh-arena.ai-create.v1";
+const AI_CREATE_TIMEZONE = "Asia/Taipei";
+const AI_CREATE_MAX_EVENTS = 8;
+
+function aiCreateLooksLikeGoldenCase(text){
+  const normalized=String(text||"").replace(/\s+/g," ");
+  return normalized.includes("中秋戰鬥陀螺交流賽") &&
+    normalized.includes("女神戰場") &&
+    normalized.includes("中秋大亂鬥");
+}
+
+function buildAiCreateGoldenCaseResult(){
+  return {
+    schemaVersion:AI_CREATE_SCHEMA_VERSION,
+    sourceMode:"mock-golden-case",
+    timezone:AI_CREATE_TIMEZONE,
+    activity:{
+      name:"BXH｜中秋戰鬥陀螺交流賽",
+      date:"2026-09-25",
+      locationName:"Loft 樂飛運動餐酒館",
+      address:"臺南市仁德區文華路三段440號（仁德交流道下方）",
+      registrationChannel:"Threads BXH 粉專",
+      registrationOpenAt:"2026-09-24T22:10:00+08:00",
+      registrationCloseAt:null
+    },
+    events:[
+      {
+        key:"goddess-battlefield",
+        name:"女神戰場",
+        date:"2026-09-25",
+        checkInStart:"17:00",
+        checkInEnd:"18:00",
+        startAt:"18:30",
+        endAt:"20:00",
+        endDate:"2026-09-25",
+        capacity:32,
+        fee:350,
+        registrationEnabled:true,
+        targetGroup:null,
+        participantRestrictions:["female"],
+        formatType:null
+      },
+      {
+        key:"mid-autumn-battle",
+        name:"中秋大亂鬥",
+        date:"2026-09-25",
+        checkInStart:"17:00",
+        checkInEnd:"18:00",
+        startAt:"20:00",
+        endAt:"00:00",
+        endDate:"2026-09-26",
+        capacity:96,
+        fee:350,
+        registrationEnabled:true,
+        targetGroup:"open",
+        participantRestrictions:[],
+        formatType:null
+      }
+    ],
+    bundleOffers:[
+      {
+        eventKeys:["goddess-battlefield","mid-autumn-battle"],
+        price:550,
+        regularPrice:700,
+        discount:150,
+        benefits:["飲品兌換券 2 張"]
+      }
+    ],
+    warnings:[
+      {
+        severity:"warning",
+        code:"weekday-mismatch",
+        field:"activity.registrationOpenAt",
+        message:"原文將 2026/09/24 標示為星期三；實際為星期四，請房主確認。"
+      },
+      {
+        severity:"warning",
+        code:"registration-close-missing",
+        field:"activity.registrationCloseAt",
+        message:"文案未提供報名截止時間。"
+      },
+      {
+        severity:"info",
+        code:"multi-event",
+        field:"events",
+        message:"同一活動包含 2 個賽事；P7.2 只驗證結構，尚未自動建立兩個房間。"
+      },
+      {
+        severity:"info",
+        code:"unsupported-target-group",
+        field:"events[0].participantRestrictions",
+        message:"女神戰場含女性限定條件；現行 ARENA targetGroup 只有公開組／兒童組，先保留為限制資訊，不自動映射。"
+      }
+    ]
+  };
+}
+
+function validateAiCreateStructuredResult(raw){
+  const errors=[];
+  const isObj=v=>!!v && typeof v==="object" && !Array.isArray(v);
+  const isDate=v=>v==null || /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+  const isTime=v=>v==null || /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(v));
+  if(!isObj(raw)) return {ok:false,errors:["解析結果不是物件"]};
+  if(raw.schemaVersion!==AI_CREATE_SCHEMA_VERSION) errors.push("schemaVersion 不相容");
+  if(raw.timezone!==AI_CREATE_TIMEZONE) errors.push("timezone 必須為 Asia/Taipei");
+  if(!isObj(raw.activity)) errors.push("activity 缺失");
+  else{
+    if(typeof raw.activity.name!=="string" || !raw.activity.name.trim()) errors.push("activity.name 缺失");
+    if(!isDate(raw.activity.date)) errors.push("activity.date 格式錯誤");
+    if(raw.activity.registrationOpenAt!=null && Number.isNaN(Date.parse(raw.activity.registrationOpenAt))) errors.push("activity.registrationOpenAt 格式錯誤");
+    if(raw.activity.registrationCloseAt!=null && Number.isNaN(Date.parse(raw.activity.registrationCloseAt))) errors.push("activity.registrationCloseAt 格式錯誤");
+  }
+  if(!Array.isArray(raw.events) || raw.events.length<1) errors.push("events 至少需要 1 筆");
+  else{
+    if(raw.events.length>AI_CREATE_MAX_EVENTS) errors.push("events 超過 "+AI_CREATE_MAX_EVENTS+" 筆上限");
+    raw.events.forEach((event,index)=>{
+      const p="events["+index+"]";
+      if(!isObj(event)){errors.push(p+" 不是物件");return;}
+      if(typeof event.key!=="string" || !event.key.trim()) errors.push(p+".key 缺失");
+      if(typeof event.name!=="string" || !event.name.trim()) errors.push(p+".name 缺失");
+      if(!isDate(event.date)) errors.push(p+".date 格式錯誤");
+      ["checkInStart","checkInEnd","startAt","endAt"].forEach(field=>{if(!isTime(event[field]))errors.push(p+"."+field+" 格式錯誤");});
+      if(event.capacity!=null && (!Number.isInteger(event.capacity) || event.capacity<=0)) errors.push(p+".capacity 必須為正整數");
+      if(event.fee!=null && (!Number.isFinite(event.fee) || event.fee<0)) errors.push(p+".fee 不合法");
+      if(![null,"open","children"].includes(event.targetGroup??null)) errors.push(p+".targetGroup 不支援");
+      if(![null,"single","double","roundrobin"].includes(event.formatType??null)) errors.push(p+".formatType 不支援");
+      if(typeof event.registrationEnabled!=="boolean") errors.push(p+".registrationEnabled 必須為 boolean");
+      if(!Array.isArray(event.participantRestrictions||[])) errors.push(p+".participantRestrictions 必須為陣列");
+    });
+  }
+  if(raw.warnings!=null && !Array.isArray(raw.warnings)) errors.push("warnings 必須為陣列");
+  if(raw.bundleOffers!=null && !Array.isArray(raw.bundleOffers)) errors.push("bundleOffers 必須為陣列");
+  return {ok:errors.length===0,errors};
+}
+
+function renderAiCreateStructuredPreview(){
+  const result=aiCreateStructuredResult;
+  if(!result && !aiCreateStructuredErrors.length) return "";
+  if(!result){
+    return `<div class="ai-create-schema-errors"><strong>結構驗證未通過</strong><br>${aiCreateStructuredErrors.map(esc).join("<br>")}</div>`;
+  }
+  const a=result.activity||{};
+  const events=Array.isArray(result.events)?result.events:[];
+  const warnings=Array.isArray(result.warnings)?result.warnings:[];
+  const openAt=a.registrationOpenAt?String(a.registrationOpenAt).replace("T"," ").replace(":00+08:00",""):"—";
+  return `<div class="ai-create-result">
+    <div class="ai-create-result-head">
+      <strong>P7.2｜結構化解析預覽</strong>
+      <span class="ai-create-schema-badge">${esc(result.schemaVersion)}</span>
+    </div>
+    <div class="ai-create-result-body">
+      <div class="ai-create-shared-grid">
+        <div class="ai-create-data-box"><span>主活動</span><strong>${esc(a.name||"—")}</strong></div>
+        <div class="ai-create-data-box"><span>活動日期</span><strong>${esc(a.date||"—")}</strong></div>
+        <div class="ai-create-data-box"><span>場地</span><strong>${esc(a.locationName||"—")}</strong></div>
+        <div class="ai-create-data-box"><span>報名開放</span><strong>${esc(openAt)}</strong></div>
+      </div>
+      <div class="ai-create-event-list">
+        ${events.map((event,index)=>`<div class="ai-create-event-card">
+          <div class="ai-create-event-title">
+            <span>${index+1}. ${esc(event.name||"未命名賽事")}</span>
+            <span class="ai-create-event-tag">${esc(event.key||"event")}</span>
+          </div>
+          <div class="ai-create-event-meta">
+            <div>日期｜${esc(event.date||"—")}</div>
+            <div>報到｜${esc(event.checkInStart||"—")}–${esc(event.checkInEnd||"—")}</div>
+            <div>開賽｜${esc(event.startAt||"—")}–${esc(event.endAt||"—")}${event.endDate&&event.endDate!==event.date?"（跨日）":""}</div>
+            <div>名額｜${event.capacity!=null?esc(String(event.capacity)):"—"} 人</div>
+            <div>費用｜${event.fee!=null?"NT$"+esc(String(event.fee)):"—"}</div>
+            <div>組別｜${event.targetGroup==="children"?"兒童組":event.targetGroup==="open"?"公開組":event.participantRestrictions?.includes("female")?"女性限定（待映射）":"待確認"}</div>
+          </div>
+        </div>`).join("")}
+      </div>
+      ${warnings.length?`<div class="ai-create-warning-list">${warnings.map(w=>`<div class="ai-create-warning ${w.severity==="warning"?"warning":"info"}">${w.severity==="warning"?"⚠️":"ℹ️"} ${esc(w.message||"")}</div>`).join("")}</div>`:""}
+      <div class="ai-create-draft-lock">🔒 本層只驗證「文案 → 標準資料結構」。目前尚未寫入 settingsFormDraft / registrationFormDraft，也不會建立或發布賽事。</div>
+    </div>
+  </div>`;
+}
 
 function renderAiCreateAssistant(){
   if(!aiCreateAssistantOpen) return "";
@@ -7755,6 +7999,7 @@ function renderAiCreateAssistant(){
         </div>
         <div class="ai-create-safety">🔒 AI 只負責產生「賽事設定草稿」。正式設計中將維持：AI 不直接建立房間、不直接寫入正式賽事資料，也沒有發布權；最後仍由房主確認。</div>
         ${aiCreateAssistantNotice?`<div class="ai-create-notice">${esc(aiCreateAssistantNotice)}</div>`:""}
+        ${renderAiCreateStructuredPreview()}
         <div class="ai-create-actions">
           <button type="button" class="btn btn-ghost" data-action="ai-create-close">取消</button>
           <button type="button" class="btn btn-primary" data-action="ai-create-parse">✨ 開始解析</button>
@@ -20002,6 +20247,8 @@ function bindDynamicInputs(){
         aiCreateSource.addEventListener("input",()=>{
           aiCreateSourceText=aiCreateSource.value;
           aiCreateAssistantNotice="";
+          aiCreateStructuredResult=null;
+          aiCreateStructuredErrors=[];
           const countEl=document.getElementById("ai-create-char-count");
           if(countEl) countEl.textContent=String(aiCreateSourceText.length).replace(/\B(?=(\d{3})+(?!\d))/g,",")+" / 12,000";
         });
@@ -20328,6 +20575,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     syncRegistrationDraftFromDom();
     aiCreateAssistantOpen=true;
     aiCreateAssistantNotice="";
+    if(!String(aiCreateSourceText||"").trim()){
+      aiCreateStructuredResult=null;
+      aiCreateStructuredErrors=[];
+    }
     render();
     setTimeout(()=>{try{document.getElementById("ai-create-source-text")?.focus({preventScroll:true});}catch(e){}},0);
     return;
@@ -20345,7 +20596,23 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       showToast("請先貼上活動文案",true);
       return;
     }
-    aiCreateAssistantNotice="第一層介面與文案輸入已接通；目前尚未呼叫 AI。下一階段將接入結構化解析與欄位預填。";
+    aiCreateStructuredResult=null;
+    aiCreateStructuredErrors=[];
+    if(!aiCreateLooksLikeGoldenCase(aiCreateSourceText)){
+      aiCreateAssistantNotice="P7.2 尚未接真正 AI。為避免假裝理解，目前只對「中秋戰鬥陀螺交流賽」Golden Test Case 執行固定結構測試；其他文案不猜測、不套入欄位。";
+      render();
+      return;
+    }
+    const candidate=buildAiCreateGoldenCaseResult();
+    const validation=validateAiCreateStructuredResult(candidate);
+    if(!validation.ok){
+      aiCreateStructuredErrors=validation.errors;
+      aiCreateAssistantNotice="P7.2 結構驗證失敗；資料已停止在預覽層，不會進入賽事草稿。";
+      render();
+      return;
+    }
+    aiCreateStructuredResult=candidate;
+    aiCreateAssistantNotice="P7.2 結構驗證通過：已將 Golden Test Case 整理為 1 個主活動 + 2 個賽事資料。這仍是本機固定測試結果，尚未呼叫 AI，也尚未套入 ARENA 欄位。";
     render();
     return;
   }
