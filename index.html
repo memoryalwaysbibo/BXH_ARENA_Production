@@ -1515,9 +1515,24 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   box-shadow:
     0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 62%,transparent),
     0 0 14px color-mix(in srgb,var(--court-accent,#D4AF37) 38%,transparent);
+  animation:active-court-glow 1.8s ease-in-out infinite;
 }
 .match-box.ms-card-in_progress .mb-head{color:var(--court-accent,#D4AF37);}
 .match-box.ms-card-in_progress .mb-row .sc{color:color-mix(in srgb,var(--court-accent,#D4AF37) 78%,white);}
+@keyframes active-court-glow{
+  0%,100%{
+    border-color:color-mix(in srgb,var(--court-accent,#D4AF37) 78%,#111 22%);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 58%,transparent),
+      0 0 10px color-mix(in srgb,var(--court-accent,#D4AF37) 32%,transparent);
+  }
+  50%{
+    border-color:color-mix(in srgb,var(--court-accent,#D4AF37) 90%,white 10%);
+    box-shadow:
+      0 0 0 1.5px color-mix(in srgb,var(--court-accent,#D4AF37) 78%,transparent),
+      0 0 20px color-mix(in srgb,var(--court-accent,#D4AF37) 50%,transparent);
+  }
+}
 
 .board-canvas .match-box.ms-card-in_progress{
   border-color:var(--court-accent,#D4AF37)!important;
@@ -1553,8 +1568,8 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   }
 }
 @media(prefers-reduced-motion:reduce){
+  .match-box.ms-card-in_progress{animation:none!important;}
   .board-canvas .match-box.ms-card-in_progress{
-    animation:none!important;
     box-shadow:
       0 0 0 1px color-mix(in srgb,var(--court-accent,#D4AF37) 84%,transparent),
       0 0 18px color-mix(in srgb,var(--court-accent,#D4AF37) 46%,transparent)!important;
