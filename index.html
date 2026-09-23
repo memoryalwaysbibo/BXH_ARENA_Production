@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.30">
+<meta name="bxh-build" content="20260923.31">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.30";
+  var CURRENT_BUILD="20260923.31";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2477,20 +2477,21 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .account-filter-chip:hover{border-color:var(--gold-dim);color:var(--ivory);}
 .account-filter-chip.active{border-color:var(--gold);background:rgba(217,178,73,.16);color:#f4d977;box-shadow:0 0 0 1px rgba(217,178,73,.08) inset;}
 .account-filter-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) repeat(3,minmax(130px,auto)) auto;gap:8px;align-items:end;margin-top:10px;}
-.account-filter-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;}
+.account-filter-search{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;}
 .account-filter-toolbar .field{margin:0;min-width:0;}
 .account-filter-toolbar input,.account-filter-toolbar select{width:100%;min-width:0;}
 .account-result-line{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:13px 2px 7px;color:var(--metal-dim);font-size:12px;}
-.account-user-list{display:grid;gap:9px;}
+.account-user-list{display:grid;gap:6px;}
 .account-user-card{border:1px solid rgba(255,255,255,.11);border-radius:13px;background:rgba(8,10,13,.76);overflow:hidden;transition:.16s ease;}
 .account-user-card[open]{border-color:rgba(217,178,73,.34);background:rgba(12,13,15,.9);}
-.account-user-card>summary{list-style:none;cursor:pointer;padding:13px 14px;display:grid;grid-template-columns:minmax(180px,1fr) minmax(210px,1.25fr) auto;gap:14px;align-items:center;}
+.account-user-card>summary{list-style:none;cursor:pointer;padding:9px 12px;display:grid;grid-template-columns:minmax(180px,1fr) minmax(210px,1.25fr) auto;gap:8px 10px;align-items:center;}
 .account-user-card>summary::-webkit-details-marker{display:none;}
 .account-user-identity{min-width:0;}
-.account-user-name{font-size:15px;font-weight:900;color:var(--ivory);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.account-user-gameid{font-size:11px;color:var(--metal-dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.account-user-email{min-width:0;color:#c8ccd2;font-size:12px;overflow-wrap:anywhere;}
-.account-user-badges{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;}
+.account-user-name{font-size:15px;font-weight:900;line-height:1.15;color:var(--ivory);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.account-user-gameid{font-size:11px;line-height:1.15;color:var(--metal-dim);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.account-user-email{min-width:0;color:#c8ccd2;font-size:12px;line-height:1.2;overflow-wrap:anywhere;}
+.account-user-badges{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap;}
+.account-user-badges .badge{padding:4px 8px;font-size:10.5px;line-height:1.1;white-space:nowrap;}
 .account-expand-caret{color:var(--gold);font-size:12px;margin-left:2px;}
 .account-user-detail{border-top:1px solid rgba(255,255,255,.07);padding:13px 14px 15px;}
 .account-detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;}
@@ -2519,9 +2520,12 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   .account-filter-toolbar{grid-template-columns:1fr;}
   .account-filter-search{grid-column:auto;}
   .account-filter-toolbar>.btn{width:100%;}
-  .account-user-card>summary{grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;}
-  .account-user-email{grid-column:1/-1;grid-row:2;}
-  .account-user-badges{grid-column:2;grid-row:1;max-width:145px;}
+  .account-user-card>summary{grid-template-columns:28px minmax(0,1fr) auto;grid-template-rows:auto auto;gap:2px 8px;padding:8px 10px;}
+  .account-user-card>summary>label{grid-column:1;grid-row:1/3;align-self:start;padding-top:2px;}
+  .account-user-email{grid-column:2;grid-row:1;}
+  .account-user-identity{grid-column:2;grid-row:2;}
+  .account-user-badges{grid-column:3;grid-row:1/3;align-self:start;max-width:138px;gap:3px;}
+  .account-filter-search .btn{padding-left:10px;padding-right:10px;}
   .account-detail-grid{grid-template-columns:1fr;}
   .account-user-controls{align-items:stretch;flex-direction:column;}
   .account-user-controls .field{width:100%;min-width:0;}
@@ -4259,9 +4263,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.54";
+const APP_VERSION = "v14.0.55";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.55",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理緊湊列表／搜尋清除",updateLevel:"patch",added:["搜尋姓名／帳號欄新增獨立「清除」鍵，只清除關鍵字、不重設角色／狀態／活躍度／排序","手機帳號卡改為緊湊三欄摘要：勾選、身分資訊、狀態標籤同屏排列"],changed:["帳號卡上下 padding、卡片間距、文字行距與狀態 badge 間距同步壓縮","手機收合卡重新配置 Email、本名／遊戲 ID 與狀態標籤，減少無效垂直空間"],fixed:["改善大量帳號名單需要過度長距離滑動的問題","避免清除搜尋時必須手動逐字刪除關鍵字"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management density patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"不變；帳號管理仍限 super_admin",publicSummary:"帳號管理列表更緊湊，同屏可看到更多帳號；搜尋新增一鍵清除且保留其他篩選條件。"},
   {version:"v14.0.54",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.7 永久成就發放",updateLevel:"minor",added:["新增伺服器權威 syncHunterAchievements：由本人報名紀錄與公開賽事鏡像重建成就，不接受瀏覽器提交的進度或達成結果","達標後永久寫入 hunterAchievements，並同步保存 hunterAchievementProgress 與 hunterAchievementAuditLogs","成就頁新增永久徽章狀態、發放閘門與本次新發數量"],changed:["27 個 Match、勝場、Round、連勝與完封節點由 preview-only 升級為可永久發放","資料讀取或身分解析不完整時只更新進度，永久發放閘門會保守暫停；重試成功後可自動補發","重複同步採交易與固定 Award ID，已領成就不會重複建立"],fixed:["封住前端偽造成就、重複發章、部分歷史讀取失敗仍誤發、Quick Decision 被當成 Round／完封證據等風險"],environment:"Production",deployStatus:"P6.7 permanent awards",firebaseImpact:"新增 users/{uid}/hunterAchievements、hunterAchievementProgress 與 hunterAchievementAuditLogs；僅 Cloud Functions Admin SDK 寫入",securityRulesImpact:"無前端寫入需求；永久 Award 由 Callable Functions 寫入",permissionImpact:"登入且啟用中的正式帳號可同步本人永久成就；測試帳號不發章",publicSummary:"獵人成就已可永久保存；系統會在可信歷史完整時自動發放，資料不完整則安全暫停並等待重試。"},
   {version:"v14.0.53",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理儲存確認鍵修復",updateLevel:"patch",added:["帳號卡片恢復獨立「儲存變更」按鈕","角色、測試身分與帳號啟用改為先暫存、確認後一次送出","送出前顯示實際變更差異"],changed:["本名確認狀態與帳號設定儲存完全分離，不再互相取代","未修改資料時儲存鍵維持停用，避免誤送"],fixed:["修復帳號已完成本名確認後管理控制區只剩「本名已確認」、缺少確認／儲存入口的回歸問題","避免下拉或核取方塊一變更就立即寫入帳號設定"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；帳號修改仍僅限 super_admin",publicSummary:"帳號設定改回明確的修改→儲存→確認流程，本名確認狀態不再吃掉儲存鍵。"},
   {version:"v14.0.52",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.6 歷史回算／完整性驗證",updateLevel:"minor",added:["新增 Achievement Historical Integrity Audit：同步檢查原始 Match、canonical 去重、舊格式 fallback、Quick Decision、可信比分、Round 可分析性與 Evidence 可解析率","成就頁新增歷史回算檢查面板，揭露納入、排除與 fallback 狀態"],changed:["P6 成就回算標記為 derived_read_only：只讀重算，不補寫舊 Match、不自動發永久 Award","完整性拆成場次覆蓋、連勝時序、Round 覆蓋、Evidence 解析四個維度"],fixed:["封住重複 Match 灌高里程碑、舊資料缺時間戳影響連勝精度、無可信 Round／比分被誤當成就來源等風險"],environment:"Production feature branch",deployStatus:"P6.6 historical recalculation + integrity audit",firebaseImpact:"無；不補寫歷史資料、不新增集合、不發永久 Award",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"新增歷史回算檢查，可看到哪些舊資料被納入、保守排除或使用 fallback，並驗證成就來源是否仍可追溯。"},
@@ -8278,7 +8283,7 @@ const COMMUNITY_OWNER_ACTIONS = new Set([
 const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
   "open-account-management","super-admin-page","create-managed-user-submit","set-user-role","toggle-user-active",
-  "account-role-filter","account-search-apply","account-clear-filters",
+  "account-role-filter","account-search-apply","account-search-clear","account-clear-filters",
   "unarchive-current","unarchive-record","preview-cleanup-public-mirrors","run-cleanup-public-mirrors","ladder-new-season",
   "admin-refresh-engagement","admin-seed-initial-titles","admin-save-engagement-settings","admin-grant-title","admin-revoke-title",
   "admin-load-engagement-overview","admin-update-title-definition","admin-backfill-preview","admin-backfill-execute","admin-backfill-restart","admin-engagement-diagnose"
@@ -14184,7 +14189,7 @@ function renderAccountManagementScreen(){
           ${ACCOUNT_ROLE_FILTERS.map(([key,label])=>`<button class="account-filter-chip ${accountMgmtRoleFilter===key?'active':''}" data-action="account-role-filter" data-role="${key}" aria-pressed="${accountMgmtRoleFilter===key?'true':'false'}">${label} ${accountRoleCount(users,key)}</button>`).join("")}
         </div>
         <div class="account-filter-toolbar">
-          <div class="field"><label>搜尋姓名／帳號</label><div class="account-filter-search"><input id="account-mgmt-search" value="${esc(accountMgmtQuery)}" placeholder="姓名、遊戲 ID 或 Email"><button class="btn btn-ghost" data-action="account-search-apply">搜尋</button></div></div>
+          <div class="field"><label>搜尋姓名／帳號</label><div class="account-filter-search"><input id="account-mgmt-search" value="${esc(accountMgmtQuery)}" placeholder="姓名、遊戲 ID 或 Email"><button class="btn btn-ghost" data-action="account-search-apply">搜尋</button><button class="btn btn-ghost" data-action="account-search-clear" aria-label="清除搜尋關鍵字">清除</button></div></div>
           <div class="field"><label>帳號狀態</label><select class="account-filter-select" data-filter-key="status"><option value="all" ${accountMgmtStatusFilter==='all'?'selected':''}>全部狀態</option><option value="active" ${accountMgmtStatusFilter==='active'?'selected':''}>啟用中</option><option value="inactive" ${accountMgmtStatusFilter==='inactive'?'selected':''}>已停用</option></select></div>
           <div class="field"><label>活躍度</label><select class="account-filter-select" data-filter-key="activity"><option value="all" ${accountMgmtActivityFilter==='all'?'selected':''}>全部活躍度</option><option value="daily" ${accountMgmtActivityFilter==='daily'?'selected':''}>今日活躍</option><option value="weekly" ${accountMgmtActivityFilter==='weekly'?'selected':''}>近 7 天活躍</option><option value="stale" ${accountMgmtActivityFilter==='stale'?'selected':''}>逾 7 天</option><option value="never" ${accountMgmtActivityFilter==='never'?'selected':''}>從未登入</option></select></div>
           <div class="field"><label>排序</label><select class="account-filter-select" data-filter-key="sort"><option value="created-desc" ${accountMgmtSort==='created-desc'?'selected':''}>申辦時間｜最新</option><option value="created-asc" ${accountMgmtSort==='created-asc'?'selected':''}>申辦時間｜最早</option><option value="activity-desc" ${accountMgmtSort==='activity-desc'?'selected':''}>最近登入</option><option value="name" ${accountMgmtSort==='name'?'selected':''}>姓名筆畫</option></select></div>
@@ -21024,6 +21029,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="account-search-apply"){
     const input=document.getElementById("account-mgmt-search");
     accountMgmtQuery=input?input.value.trim():"";
+    render(); return;
+  }
+  if(action==="account-search-clear"){
+    const input=document.getElementById("account-mgmt-search");
+    if(input) input.value="";
+    accountMgmtQuery="";
     render(); return;
   }
   if(action==="account-clear-filters"){
