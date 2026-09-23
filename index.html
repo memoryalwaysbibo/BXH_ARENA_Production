@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.17">
+<meta name="bxh-build" content="20260923.18">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.17";
+  var CURRENT_BUILD="20260923.18";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2873,6 +2873,8 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 
 .hunter-h2h-analysis{margin-top:10px;padding:9px;border:1px solid rgba(217,185,92,.10);border-radius:8px;background:rgba(0,0,0,.11)}.hunter-h2h-analysis-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.hunter-h2h-analysis-head strong{font:800 10px var(--font-d);color:var(--ivory)}.hunter-h2h-analysis-head span{font-size:8.5px;color:var(--metal-dim)}.hunter-h2h-analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.hunter-h2h-analysis-grid section{padding:8px;border:1px solid rgba(255,255,255,.045);border-radius:7px;background:rgba(255,255,255,.015)}.hunter-h2h-analysis-grid h4{margin:0 0 6px;font:800 9px var(--font-d);color:var(--metal)}.hunter-h2h-analysis-row{display:grid;grid-template-columns:42px minmax(0,1fr) 30px;gap:6px;align-items:center;padding:3px 0;font-size:8.5px}.hunter-h2h-analysis-bar{height:5px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}.hunter-h2h-analysis-fill{display:block;height:100%;border-radius:inherit;background:rgba(217,185,92,.75)}.hunter-h2h-analysis-grid section.loss .hunter-h2h-analysis-fill{background:rgba(255,105,105,.70)}.hunter-h2h-analysis-row b{font:800 8.5px var(--font-d);color:var(--ivory);text-align:right}.hunter-h2h-conclusion{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.hunter-h2h-conclusion>div{padding:7px 8px;border-radius:7px;background:rgba(255,255,255,.018);border:1px solid rgba(255,255,255,.045)}.hunter-h2h-conclusion span{display:block;font-size:8px;color:var(--metal-dim)}.hunter-h2h-conclusion b{display:block;margin-top:2px;font:800 10px var(--font-d);color:var(--gold)}.hunter-h2h-analysis-note{margin-top:7px;font-size:8.5px;color:var(--metal-dim)}@media(max-width:640px){.hunter-h2h-analysis-grid,.hunter-h2h-conclusion{grid-template-columns:1fr}}
 
+.hunter-h2h-directory{margin:10px 0 12px;padding:10px;border:1px solid rgba(217,185,92,.11);border-radius:9px;background:rgba(0,0,0,.10)}.hunter-h2h-directory-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.hunter-h2h-directory-head strong{font:800 10px var(--font-d);color:var(--ivory)}.hunter-h2h-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;margin-top:8px}.hunter-h2h-search-row input{min-width:0}.hunter-h2h-sort-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.hunter-h2h-quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.hunter-h2h-quick section{padding:8px;border:1px solid rgba(255,255,255,.045);border-radius:8px;background:rgba(255,255,255,.015)}.hunter-h2h-quick h4{margin:0 0 6px;font:800 9px var(--font-d);color:var(--metal)}.hunter-h2h-quick-list{display:flex;gap:5px;flex-wrap:wrap}.hunter-h2h-quick-btn{border:1px solid rgba(217,185,92,.14);border-radius:999px;background:rgba(217,185,92,.045);color:var(--ivory);font:800 8.5px var(--font-d);padding:5px 7px;cursor:pointer}.hunter-h2h-quick-btn small{color:var(--metal-dim);font-weight:700}.hunter-h2h-empty-search{padding:12px;text-align:center;color:var(--metal-dim);font-size:10px}@media(max-width:640px){.hunter-h2h-search-row{grid-template-columns:minmax(0,1fr) auto}.hunter-h2h-search-row .clear{grid-column:1/-1}.hunter-h2h-quick{grid-template-columns:1fr}}
+
 .profile-primary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px;}
 .profile-primary-tabs .btn{min-height:44px;border-radius:11px;}
 .profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:0 0 14px;border:1px solid rgba(217,185,92,.15);border-radius:12px;background:rgba(255,255,255,.018);}
@@ -4249,9 +4251,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.41";
+const APP_VERSION = "v14.0.42";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.42",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5.6 對手檔案",updateLevel:"minor",added:["H2H 對手統計新增『對手檔案』工具列，可搜尋玩家名稱或穩定 Player ID","新增最近交手捷徑，依最後交手時間顯示最近 3 位可識別對手","新增常遇對手捷徑，依交手場次顯示前 3 位可識別對手","新增 H2H 排序：交手最多、最近交手、名稱"],changed:["對手搜尋與排序只作用在目前的一般／積分與期間篩選結果，不建立第二套資料","搜尋結果仍沿用 P5.4 H2H 與 P5.5 對手戰型分析卡片，所有數字維持單一來源","搜尋只比對公開名稱與穩定 playerId，不以姓名建立身份關聯"],fixed:["改善 H2H 對手數量增加後難以快速找到特定玩家或近期／常遇對手的使用問題"],environment:"Production frontend feature branch",deployStatus:"P5.6 opponent directory UX only",firebaseImpact:"無；純前端整理既有 H2H 暫態資料",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"H2H 新增最近交手、常遇對手、搜尋與排序，對手資料更容易查找。"},
+
   {version:"v14.0.41",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5.5 對手戰型分析",updateLevel:"minor",added:["H2H 每位可識別對手新增四種進攻得分與四種防守失分分布","樣本達門檻後顯示『主要得分方式／主要失分方式』，未達門檻只呈現原始分布","對手分析門檻固定為至少 3 場可分析交手＋8 個有效回合，避免小樣本過度解讀"],changed:["對手戰型分析與 H2H 一樣受一般／積分與生涯／本季／本月／本週／今日篩選控制","Quick Decision 不進入對手戰型分析，只保留在 H2H 勝敗統計","分析只描述實際得失分分布，不產生宿敵、剋星或強弱標籤"],fixed:["補足 H2H 只能看勝敗與比分，無法知道面對特定玩家主要靠什麼得分、主要被什麼方式得分的資訊缺口"],environment:"Production frontend feature branch",deployStatus:"P5.5 opponent matchup analysis",firebaseImpact:"無；由既有 H2H Hunter Round records 暫態計算",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"H2H 現在能看出面對特定對手時的得分與失分方式分布，資料不足時不下結論。"},
 
   {version:"v14.0.40",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5.4 H2H 對戰統計",updateLevel:"minor",added:["對戰紀錄新增 H2H 對手統計，僅聚合 P5.3 已確認穩定 playerId 的對手","每位可識別對手顯示交手場次、勝場、敗場、勝率、有效比分場次、總得分、總失分與淨得失分","H2H 顯示最近 5 場交手結果與賽事／比分，可展開核對來源","H2H 與對戰紀錄既有一般／積分、期間篩選同步"],changed:["Quick Decision 只計入 H2H 勝敗，不納入得失分加總","僅本場識別、辨識中的對手不加入跨賽事 H2H；介面會顯示排除數量","H2H 不使用姓名作為 identity key，姓名只作顯示"],fixed:["補足 P5.3 已能識別同一對手但尚未提供跨賽事交手勝率與累積戰績的功能缺口"],environment:"Production frontend feature branch",deployStatus:"P5.4 H2H aggregation; stable identities only",firebaseImpact:"無；完全由本人 Hunter records 暫態聚合，不新增集合、不寫回資料",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案現在能查看自己對已確認同一位玩家的歷史交手場次、勝敗與勝率。"},
@@ -15721,6 +15725,8 @@ let hunterOverviewPeriod = "career"; // career | season | month | week | today
 let hunterOpponentIdentityLoading = false;
 let hunterOpponentIdentityGeneration = 0;
 const hunterOpponentIdentityCache = new Map();
+let hunterH2HQuery = "";
+let hunterH2HSort = "matches-desc"; // matches-desc | recent-desc | name-asc
 // Tournament detail screen state (Phase 3)
 let tournamentDetailCode = null;
 let tournamentDetailData = null; // publicTournaments data for this code
@@ -16520,17 +16526,51 @@ function hunterH2HItemHtml(group){
     (latest?'<div class="hunter-match-opponent-actions">'+hunterOpponentCardButton(latest)+'</div>':'')+
     '<div class="hunter-h2h-match-list">'+recent.map(hunterH2HMatchRow).join('')+'</div></div></details>';
 }
+function hunterH2HDirectoryView(h2h){
+  const source=(h2h&&Array.isArray(h2h.list))?h2h.list:[];
+  const query=String(hunterH2HQuery||"").trim().toLocaleLowerCase("zh-Hant");
+  let list=source.filter(group=>{
+    if(!query) return true;
+    return String(group.name||"").toLocaleLowerCase("zh-Hant").includes(query) ||
+      String(group.playerId||"").toLocaleLowerCase("zh-Hant").includes(query);
+  });
+  if(hunterH2HSort==="recent-desc"){
+    list.sort((a,b)=>b.latestAt-a.latestAt||b.matches-a.matches||String(a.name).localeCompare(String(b.name),"zh-Hant"));
+  }else if(hunterH2HSort==="name-asc"){
+    list.sort((a,b)=>String(a.name).localeCompare(String(b.name),"zh-Hant")||b.matches-a.matches);
+  }else{
+    list.sort((a,b)=>b.matches-a.matches||b.latestAt-a.latestAt||String(a.name).localeCompare(String(b.name),"zh-Hant"));
+  }
+  return list;
+}
+function hunterH2HQuickButton(group){
+  return '<button class="hunter-h2h-quick-btn" data-action="hunter-h2h-quick" data-value="'+esc(group.playerId)+'">'+esc(group.name)+' <small>'+group.matches+'場</small></button>';
+}
+function hunterH2HDirectoryHtml(h2h){
+  const source=(h2h&&Array.isArray(h2h.list))?h2h.list:[];
+  const recent=source.slice().sort((a,b)=>b.latestAt-a.latestAt||b.matches-a.matches).slice(0,3);
+  const frequent=source.slice().sort((a,b)=>b.matches-a.matches||b.latestAt-a.latestAt).slice(0,3);
+  const sortButtons=[["matches-desc","交手最多"],["recent-desc","最近交手"],["name-asc","名稱"]].map(([key,label])=>'<button class="btn '+(hunterH2HSort===key?'btn-primary':'btn-ghost')+' btn-sm" data-action="hunter-h2h-sort" data-value="'+key+'">'+label+'</button>').join('');
+  return '<div class="hunter-h2h-directory"><div class="hunter-h2h-directory-head"><strong>對手檔案</strong><span class="badge badge-metal">P5.6</span></div>'+
+    '<div class="hunter-h2h-search-row"><input id="hunter-h2h-query" type="search" maxlength="40" value="'+esc(hunterH2HQuery)+'" placeholder="搜尋對手名稱或 Player ID"><button class="btn btn-primary btn-sm" data-action="hunter-h2h-search">搜尋</button><button class="btn btn-ghost btn-sm clear" data-action="hunter-h2h-clear">清除</button></div>'+
+    '<div class="hunter-h2h-sort-row">'+sortButtons+'</div>'+
+    '<div class="hunter-h2h-quick"><section><h4>最近交手</h4><div class="hunter-h2h-quick-list">'+(recent.length?recent.map(hunterH2HQuickButton).join(''):'<span class="hint">尚無資料</span>')+'</div></section>'+
+    '<section><h4>常遇對手</h4><div class="hunter-h2h-quick-list">'+(frequent.length?frequent.map(hunterH2HQuickButton).join(''):'<span class="hint">尚無資料</span>')+'</div></section></div></div>';
+}
+
 function hunterH2HPanelHtml(records){
   const h2h=hunterBuildH2H(records);
+  const visible=hunterH2HDirectoryView(h2h);
   const status=h2h.loading?'｜另有 '+h2h.loading+' 場正在辨識':(h2h.excluded?'｜'+h2h.excluded+' 場僅本場識別未納入':'');
   if(!h2h.list.length){
-    return '<section class="panel hunter-h2h-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HEAD TO HEAD</div><div class="panel-title">H2H 對手統計</div></div><span class="badge badge-metal">P5.5</span></div>'+
+    return '<section class="panel hunter-h2h-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HEAD TO HEAD</div><div class="panel-title">H2H 對手統計</div></div><span class="badge badge-metal">P5.6</span></div>'+
       '<div class="hunter-record-empty"><strong>目前沒有可安全跨賽事聚合的對手</strong><p>'+(h2h.loading?'正在辨識公開玩家身分。':'只有 P5.3 確認到穩定玩家編號的對手才會出現在這裡。')+'</p></div></section>';
   }
-  return '<section class="panel hunter-h2h-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HEAD TO HEAD</div><div class="panel-title">H2H 對手統計</div></div><span class="badge badge-metal">P5.5</span></div>'+
+  return '<section class="panel hunter-h2h-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HEAD TO HEAD</div><div class="panel-title">H2H 對手統計</div></div><span class="badge badge-metal">P5.6</span></div>'+
     '<div class="hint">依目前對戰類型與期間篩選｜'+h2h.list.length+' 位可識別對手'+esc(status)+'</div>'+
-    '<div class="hunter-h2h-list">'+h2h.list.map(hunterH2HItemHtml).join('')+'</div>'+
-    '<div class="hunter-framework-note">H2H 只使用穩定 playerId 聚合；同名但無法確認身分的玩家不會被合併。P5.5 只描述面對該對手時的得失分方式分布，不產生宿敵、剋星或強弱標籤。</div></section>';
+    hunterH2HDirectoryHtml(h2h)+
+    (visible.length?'<div class="hunter-h2h-list">'+visible.map(hunterH2HItemHtml).join('')+'</div>':'<div class="hunter-h2h-empty-search">找不到符合「'+esc(hunterH2HQuery)+'」的對手。</div>')+
+    '<div class="hunter-framework-note">搜尋只比對公開名稱與穩定 playerId；不會使用名字建立跨賽事身分。P5.5 的回合分布分析仍直接沿用同一份 H2H records。</div></section>';
 }
 
 function hunterSingleMatchBreakdown(record){
@@ -16703,7 +16743,7 @@ function renderPlayerStatsTab(p){
         '<div class="hunter-record-empty"><strong>目前沒有符合條件的對戰紀錄</strong><p>'+(allRecords.length?'可調整類型或期間篩選。':'已完成的賽事 Match 將自動出現在這裡。')+'</p><small>無法安全辨識的舊資料不會用名字強制併入。</small></div>')+
       '</section>';
   }
-  return '<section class="hunter-profile-shell"><div class="hunter-profile-title"><div><div class="hunter-kicker">BXH HUNTER PROFILE</div><h2>獵人檔案</h2></div><span class="badge badge-metal">P5.5</span></div>'+
+  return '<section class="hunter-profile-shell"><div class="hunter-profile-title"><div><div class="hunter-kicker">BXH HUNTER PROFILE</div><h2>獵人檔案</h2></div><span class="badge badge-metal">P5.6</span></div>'+
     '<div class="player-stats-subtabs hunter-profile-tabs">'+tabs.map(([key,label])=>'<button class="player-stats-subtab '+(playerStatsSubTab===key?'active':'')+'" data-action="player-stats-subtab" data-tab="'+key+'">'+label+'</button>').join('')+'</div>'+body+'</section>';
 }
 
@@ -19664,7 +19704,28 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     hunterOpponentIdentityGeneration++;
     hunterOpponentIdentityLoading=false;
     hunterOpponentIdentityCache.clear();
+    hunterH2HQuery="";
     loadHunterProfile(true);
+    return;
+  }
+  if(action==="hunter-h2h-search"){
+    hunterH2HQuery=(document.getElementById("hunter-h2h-query")?.value||"").trim();
+    renderPreservingScroll();
+    return;
+  }
+  if(action==="hunter-h2h-clear"){
+    hunterH2HQuery="";
+    renderPreservingScroll();
+    return;
+  }
+  if(action==="hunter-h2h-sort"){
+    const value=target.getAttribute("data-value");
+    if(["matches-desc","recent-desc","name-asc"].includes(value)){hunterH2HSort=value;renderPreservingScroll();}
+    return;
+  }
+  if(action==="hunter-h2h-quick"){
+    hunterH2HQuery=target.getAttribute("data-value")||"";
+    renderPreservingScroll();
     return;
   }
   if(action==="hunter-overview-period"){
