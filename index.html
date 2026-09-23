@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.20">
+<meta name="bxh-build" content="20260923.21">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.20";
+  var CURRENT_BUILD="20260923.21";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4251,9 +4251,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.44";
+const APP_VERSION = "v14.0.45";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.45",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 Round 完整性顯示修正",updateLevel:"patch",added:["單場攻防拆解新增完整性守門：只有 analyzable=true 才顯示四種得失分拆解","Round Timeline 新增完整性守門；Quick Decision 與 ledger 未通過驗證時不再顯示部分事件","對戰卡回合 chip 只顯示已通過完整 Round ledger 驗證的事件"],changed:["Quick Decision 單場詳細只顯示『沒有逐回合能力資料』，不再列出 0 分／0 回的假性攻防面板","Round 資料不完整的歷史 Match 改顯示『未通過完整性驗證』，避免部分事件被誤認為完整 Timeline","P5.2 單場明細與 P5.1/P4 使用相同 analyzable 信任邊界"],fixed:["修正 analyzable=false 但仍殘留 normalized round events 時，P5.2 可能顯示部分攻防拆解與完整 Timeline 的誤導","修正 Quick Decision 顯示四種 0 分統計，容易被誤認為實際戰型資料"],environment:"Production consistency audit branch",deployStatus:"P5 round-integrity UI fix only",firebaseImpact:"無；不修改 Firestore，只收斂前端顯示條件",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"只有通過完整回合驗證的對戰才會顯示逐回合攻防；判定模式與不完整歷史資料不再展示部分事件。"},
+
   {version:"v14.0.44",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 對手身份解析一致性修正",updateLevel:"patch",added:["P5.3 對手身份新增『辨識失敗』狀態，與『僅本場識別』正式分離","H2H 統計新增 unresolved 計數，可分辨身份真的無法跨場與本次解析失敗"],changed:["只有 playerCardService 正常回覆但沒有穩定 playerId 時才標記 event-only／僅本場識別","playerCardService 拋錯或回傳失敗時標記 unresolved，不寫入 identity cache，手動重新整理可再次解析","H2H 狀態列可同時顯示辨識中、辨識失敗與僅本場識別數量，不再三選一"],fixed:["修正暫時性網路/API 失敗被誤判成永久『僅本場識別』，導致 H2H 少算且無法辨識原因","避免解析失敗結果被 cache 後在同一工作階段持續排除對手"],environment:"Production consistency audit branch",deployStatus:"P5 identity-resolution consistency fix only",firebaseImpact:"無；只調整既有 playerCardService 回應的前端狀態分類",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"對手身份查詢失敗不再被誤當成無法跨賽事識別；系統會明確標示並允許重新整理後重試。"},
 
   {version:"v14.0.43",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 全鏈可信比分一致性修正",updateLevel:"patch",added:["新增 hunterRecordHasTrustedScore() 作為 P3～P5.6 唯一可信比分判定","新增 hunterRecordScoreText() 統一對戰卡、H2H 最近交手與單場詳細的比分顯示規則","期間統計補上可信比分場次，讓總得分／總失分的樣本來源可核對"],changed:["只有非 Quick Decision、analyzable=true、且 scoreFor/scoreAgainst 有效的 Match 才納入生涯／期間／H2H 得失分","舊 Quick Decision canonical Hunter record 強制 scoreA/scoreB=null，避免舊殘留數字被當成正式比分","Round ledger 不完整但仍帶有舊比分的歷史 Match 顯示『比分未驗證』，不再混入可信統計","H2H 若沒有任何可信比分，不再顯示 0/0 或淨 0，而顯示 —"],fixed:["修正舊 completed Match 無 Round Log 時雖被識別為 Quick Decision，仍可能把 scoreA/scoreB 帶入 Hunter record 的資料污染風險","修正 H2H 原本只判斷 score 非 null，可能把 Quick Decision／不可信歷史比分算入得失分","修正期間總得失分與 P4 Round 分析可能使用不同可信度資料來源的口徑不一致"],environment:"Production consistency audit branch",deployStatus:"P5 consistency fix only; no P6 features",firebaseImpact:"無；純前端 canonical record 與衍生統計修正，不修改既有 Firestore 文件",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案的比分統計改成只採用可由完整 Round ledger 驗證的對戰，判定模式與不完整歷史比分不再污染總分與 H2H。"},
@@ -16617,14 +16619,23 @@ function hunterSingleMatchBreakdown(record){
   return {attack,defense};
 }
 function hunterSingleMatchBreakdownHtml(record){
+  if(!record||record.analyzable!==true){
+    const message=record&&record.resultMethod==="quick_decision"
+      ?"Quick Decision｜本場沒有逐回合能力資料。"
+      :"Round 資料未通過完整性驗證｜不顯示部分攻防拆解。";
+    return '<div class="hunter-record-warning">'+esc(message)+'</div>';
+  }
   const data=hunterSingleMatchBreakdown(record);
   const row=(bucket,type,prefix)=>'<div class="hunter-match-breakdown-row"><span>'+esc(prefix+HUNTER_ANALYSIS_LABELS[type])+'</span><b>'+Number(bucket[type].points||0)+' 分｜'+Number(bucket[type].events||0)+' 回</b></div>';
   return '<div class="hunter-match-breakdown"><section><h4>本場進攻得分</h4>'+HUNTER_ANALYSIS_TYPES.map(type=>row(data.attack,type,"")).join('')+'</section>'+
     '<section class="loss"><h4>本場防守失分</h4>'+HUNTER_ANALYSIS_TYPES.map(type=>row(data.defense,type,"被")).join('')+'</section></div>';
 }
 function hunterRecordTimelineHtml(record){
-  const rows=record&&Array.isArray(record.roundsPerspective)?record.roundsPerspective:[];
-  if(!rows.length) return '<div class="hunter-evidence-empty">'+(record&&record.resultMethod==="quick_decision"?"Quick Decision｜本場沒有逐回合能力資料。":"本場沒有可顯示的完整 Round Timeline。")+'</div>';
+  if(!record) return '<div class="hunter-evidence-empty">本場沒有可顯示的完整 Round Timeline。</div>';
+  if(record.resultMethod==="quick_decision") return '<div class="hunter-evidence-empty">Quick Decision｜本場沒有逐回合能力資料。</div>';
+  if(record.analyzable!==true) return '<div class="hunter-evidence-empty">Round 資料未通過完整性驗證｜不顯示部分 Timeline。</div>';
+  const rows=Array.isArray(record.roundsPerspective)?record.roundsPerspective:[];
+  if(!rows.length) return '<div class="hunter-evidence-empty">本場沒有可顯示的完整 Round Timeline。</div>';
   const opponentName=(record.opponent&&record.opponent.name)||"未知對手";
   return '<div class="hunter-timeline">'+rows.map((ev,index)=>{
     const against=ev.perspective==="against";
@@ -16655,12 +16666,12 @@ function hunterRecordCardHtml(r){
   const typeLabel=r.ladderMode==="ranked"?"積分對戰":"一般對戰";
   const roundLabel=Number.isFinite(Number(r.round))?"第 "+Number(r.round)+" 輪":"輪次未記錄";
   const station=Number(r.station)>0?"｜Court "+Number(r.station):"";
-  const rounds=(r.roundsPerspective||[]).map(ev=>'<span class="hunter-round-chip '+(ev.perspective==="against"?"against":"")+'">'+(ev.perspective==="against"?"−":"＋")+Number(ev.points||0)+' '+esc(hunterPointLabel(ev.type,ev.perspective))+'</span>').join("");
+  const rounds=r.analyzable===true?(r.roundsPerspective||[]).map(ev=>'<span class="hunter-round-chip '+(ev.perspective==="against"?"against":"")+'">'+(ev.perspective==="against"?"−":"＋")+Number(ev.points||0)+' '+esc(hunterPointLabel(ev.type,ev.perspective))+'</span>').join(""):"";
   return '<article class="hunter-record-card">'+
     '<div class="hunter-record-card-head"><div class="hunter-record-event"><strong>'+esc(r.eventName||r.eventCode||"BXH 賽事")+'</strong><small>'+esc(r.eventDate||"日期未記錄")+'｜'+esc(typeLabel)+'</small></div><span class="hunter-record-result '+resultClass+'">'+resultText+'</span></div>'+
     '<div class="hunter-record-score-row"><div class="hunter-record-opponent">VS <b>'+esc(opp)+'</b>'+hunterOpponentIdentityChip(r)+'</div><div class="hunter-record-score">'+esc(score)+'</div></div>'+
     '<div class="hunter-record-meta">'+esc(roundLabel+station+(r.eventCode?"｜"+r.eventCode:""))+'</div>'+
-    (rounds?'<div class="hunter-round-strip">'+rounds+'</div>':'<div class="hunter-record-warning">'+(r.resultMethod==="quick_decision"?"判定模式｜不納入回合能力分析":"本場沒有可分析的逐回合資料")+'</div>')+
+    (rounds?'<div class="hunter-round-strip">'+rounds+'</div>':'<div class="hunter-record-warning">'+(r.resultMethod==="quick_decision"?"判定模式｜不納入回合能力分析":r.analyzable===true?"本場沒有可分析的逐回合資料":"Round 資料未通過完整性驗證｜不納入能力分析")+'</div>')+
     hunterRecordDetailHtml(r)+
     '</article>';
 }

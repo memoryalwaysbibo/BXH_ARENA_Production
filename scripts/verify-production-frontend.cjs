@@ -225,4 +225,11 @@ mustInclude('重新整理可重試','Hunter identity retry guidance missing');
 mustInclude('let excluded=0,loading=0,unresolved=0;','H2H unresolved counter missing');
 mustInclude("statusParts.push(h2h.unresolved+' 場辨識失敗')",'H2H must disclose unresolved identity count');
 console.log('PASS Hunter P5 identity-resolution consistency');
+mustInclude('if(!record||record.analyzable!==true){','Hunter P5.2 breakdown must reject untrusted round data');
+mustInclude('Round 資料未通過完整性驗證｜不顯示部分攻防拆解。','Hunter P5.2 partial breakdown warning missing');
+mustInclude('if(record.analyzable!==true) return','Hunter P5.2 timeline must reject untrusted round data');
+mustInclude('不顯示部分 Timeline','Hunter P5.2 partial timeline warning missing');
+mustInclude('const rounds=r.analyzable===true?','Hunter record chips must require analyzable=true');
+mustInclude('Round 資料未通過完整性驗證｜不納入能力分析','Hunter record integrity warning missing');
+console.log('PASS Hunter P5 round-integrity display boundary');
 
