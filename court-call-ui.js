@@ -9,6 +9,7 @@ let courtCallPlayerCodes=[],courtCallDiscoveryAt=0,courtCallDiscoveryBusy=false;
 const courtCallDelayDismissed=new Set();
 const courtCallSystemNotifySeen=new Set();
 let courtCallPushBusy=false,courtCallPushSyncAt=0,courtCallPushError='',courtCallServiceWorkerListenerBound=false;
+let courtCallPushTestBusy=false,courtCallPushTestResult='',courtCallPushConfigMode='unknown';
 const COURT_CALL_PUSH_REFRESH_MS=15*60*1000;
 const COURT_CALL_FIREBASE_SDK='10.13.0';
 
@@ -71,7 +72,7 @@ function courtCallNotificationHint(){
  if(p==='denied')return '通知：瀏覽器已封鎖，請到網站權限重新開啟';
  if(p==='unsupported')return '通知：此瀏覽器不支援';
  if(p==='default')return '通知：尚未啟用';
- if(courtCallPushRegistered())return '鎖屏／離開 ARENA 推播：已啟用';
+ if(courtCallPushRegistered())return courtCallPushConfigMode==='default'?'鎖屏／離開 ARENA 推播：已啟用（預設 Web Push 金鑰）':'鎖屏／離開 ARENA 推播：已啟用';
  if(courtCallIsIos()&&!courtCallIsStandalone())return 'iPhone 鎖屏推播：請先將 ARENA 加入主畫面後再啟用';
  if(courtCallPushError)return '鎖屏推播：'+courtCallPushError;
  return '分頁通知：已啟用｜鎖屏推播：待註冊';
@@ -82,6 +83,7 @@ async function courtCallLoadFirebaseConfig(){
  if(!r.ok)throw Error('push-config-unavailable');
  const cfg=await r.json();
  if(!cfg||cfg.projectId!=='bxh-arena'||!cfg.appId||!cfg.messagingSenderId)throw Error('push-config-invalid');
+ courtCallPushConfigMode=String(cfg.vapidKey||'').trim()?'custom':'default';
  return cfg;
 }
 
@@ -298,11 +300,14 @@ function renderCourtCallPlayer(code){
  const notifyButton=np==='default'
   ? '<button class="btn btn-ghost" data-action="court-call-enable-notify">🔔 啟用背景通知</button>'
   : (np==='granted'&&!pushReady?'<button class="btn btn-ghost" data-action="court-call-enable-notify">📱 啟用鎖屏推播</button>':'');
+ const testButton=pushReady
+  ? `<button class="btn btn-ghost" data-action="court-call-test-push" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`
+  : '';
  return `<section>
    <p class="hint">裁判人工叫號與智慧 ETA 已分離｜人工叫號約每 2–3 秒同步｜PASS：${c.used?'本賽事已使用':'可使用 1 次，直接延後一場'}</p>
    <div class="btn-row" style="align-items:center">
-    ${notifyButton}
-    <span class="hint">${esc(courtCallNotificationHint())}</span>
+    ${notifyButton}${testButton}
+    <span class="hint">${esc(courtCallNotificationHint())}${courtCallPushTestResult?`｜${esc(courtCallPushTestResult)}`:''}</span>
    </div>
    ${courtCallCommon(c)}
    ${c.rows.filter(r=>r.players.some(p=>p.me)).map(r=>courtCallRow(c,r,false)).join('')||'<p class="hint">等待裁判通知。</p>'}
@@ -533,6 +538,35 @@ async function handleCourtCall(action,target){
  if(action==='court-call-enable-notify'){
   await courtCallEnableBackgroundNotifications();
   try{renderPreservingScroll();}catch{}
+  return;
+ }
+ if(action==='court-call-test-push'){
+  if(courtCallPushTestBusy)return;
+  if(!courtCallPushRegistered()){
+   showToast('請先啟用鎖屏推播',true);return;
+  }
+  if(!window.engagementService||typeof window.engagementService.courtCallPush!=='function'){
+   showToast('推播測試服務尚未載入',true);return;
+  }
+  courtCallPushTestBusy=true;
+  courtCallPushTestResult='4 秒後發送，請立即切到 LINE 或鎖定手機';
+  showToast('4 秒後發送測試推播，請立即切到其他 App 或鎖定手機');
+  try{renderPreservingScroll();}catch{}
+  try{
+   const result=await window.engagementService.courtCallPush({action:'selftest'});
+   if(!result?.ok)throw Error('push-selftest-failed');
+   const attempted=Number(result.attempted||0),sent=Number(result.sent||0),failed=Number(result.failed||0);
+   courtCallPushTestResult=sent>0?`測試已送出 ${sent}/${attempted} 個裝置`:(attempted?'測試送出失敗':'伺服器沒有有效推播裝置');
+   showToast(sent>0?'BXH CALL 測試推播已送出，請檢查通知':'測試推播沒有成功送達',sent===0||failed>0);
+  }catch(e){
+   const raw=String(e?.message||e);
+   courtCallPushTestResult=raw.includes('push-test-cooldown')?'請稍候 15 秒再測試':
+    raw.includes('push-not-registered')?'伺服器註冊已失效，請重新啟用推播':'測試失敗，請重新啟用推播後再試';
+   showToast(courtCallPushTestResult,true);
+  }finally{
+   courtCallPushTestBusy=false;
+   try{renderPreservingScroll();}catch{}
+  }
   return;
  }
  if(action==='court-call-dismiss-delay'){
