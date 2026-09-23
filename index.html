@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.29">
+<meta name="bxh-build" content="20260923.30">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.29";
+  var CURRENT_BUILD="20260923.30";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -2500,6 +2500,10 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .account-user-controls{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.1);}
 .account-user-controls .field{margin:0;min-width:190px;}
 .account-active-control{display:flex;align-items:center;gap:8px;min-height:38px;color:var(--ivory);font-size:12px;}
+.account-user-save-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:1 1 100%;width:100%;padding-top:3px;}
+.account-user-save-row .badge{flex:0 0 auto;}
+.account-user-save-button{min-width:150px;margin-left:auto;}
+.account-user-save-button:disabled{opacity:.44;cursor:not-allowed;filter:saturate(.35);}
 .account-tools-card{margin-top:14px;border:1px solid rgba(255,255,255,.11);border-radius:13px;background:rgba(8,10,13,.7);overflow:hidden;}
 .account-tools-card>summary{list-style:none;cursor:pointer;padding:13px 15px;font-weight:900;color:var(--ivory);display:flex;justify-content:space-between;align-items:center;gap:12px;}
 .account-tools-card>summary::-webkit-details-marker{display:none;}
@@ -2521,6 +2525,8 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   .account-detail-grid{grid-template-columns:1fr;}
   .account-user-controls{align-items:stretch;flex-direction:column;}
   .account-user-controls .field{width:100%;min-width:0;}
+  .account-user-save-row{align-items:stretch;flex-direction:column;}
+  .account-user-save-button{width:100%;margin-left:0;}
 }
 
 /* ---------- player center (Phase 2): tabbed shell ---------- */
@@ -4253,10 +4259,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.53";
+const APP_VERSION = "v14.0.54";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
-  {version:"v14.0.53",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.7 永久成就發放",updateLevel:"minor",added:["新增伺服器權威 syncHunterAchievements：由本人報名紀錄與公開賽事鏡像重建成就，不接受瀏覽器提交的進度或達成結果","達標後永久寫入 hunterAchievements，並同步保存 hunterAchievementProgress 與 hunterAchievementAuditLogs","成就頁新增永久徽章狀態、發放閘門與本次新發數量"],changed:["27 個 Match、勝場、Round、連勝與完封節點由 preview-only 升級為可永久發放","資料讀取或身分解析不完整時只更新進度，永久發放閘門會保守暫停；重試成功後可自動補發","重複同步採交易與固定 Award ID，已領成就不會重複建立"],fixed:["封住前端偽造成就、重複發章、部分歷史讀取失敗仍誤發、Quick Decision 被當成 Round／完封證據等風險"],environment:"Production",deployStatus:"P6.7 permanent awards",firebaseImpact:"新增 users/{uid}/hunterAchievements、hunterAchievementProgress 與 hunterAchievementAuditLogs；僅 Cloud Functions Admin SDK 寫入",securityRulesImpact:"無前端寫入需求；永久 Award 由 Callable Functions 寫入",permissionImpact:"登入且啟用中的正式帳號可同步本人永久成就；測試帳號不發章",publicSummary:"獵人成就已可永久保存；系統會在可信歷史完整時自動發放，資料不完整則安全暫停並等待重試。"},
+  {version:"v14.0.54",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.7 永久成就發放",updateLevel:"minor",added:["新增伺服器權威 syncHunterAchievements：由本人報名紀錄與公開賽事鏡像重建成就，不接受瀏覽器提交的進度或達成結果","達標後永久寫入 hunterAchievements，並同步保存 hunterAchievementProgress 與 hunterAchievementAuditLogs","成就頁新增永久徽章狀態、發放閘門與本次新發數量"],changed:["27 個 Match、勝場、Round、連勝與完封節點由 preview-only 升級為可永久發放","資料讀取或身分解析不完整時只更新進度，永久發放閘門會保守暫停；重試成功後可自動補發","重複同步採交易與固定 Award ID，已領成就不會重複建立"],fixed:["封住前端偽造成就、重複發章、部分歷史讀取失敗仍誤發、Quick Decision 被當成 Round／完封證據等風險"],environment:"Production",deployStatus:"P6.7 permanent awards",firebaseImpact:"新增 users/{uid}/hunterAchievements、hunterAchievementProgress 與 hunterAchievementAuditLogs；僅 Cloud Functions Admin SDK 寫入",securityRulesImpact:"無前端寫入需求；永久 Award 由 Callable Functions 寫入",permissionImpact:"登入且啟用中的正式帳號可同步本人永久成就；測試帳號不發章",publicSummary:"獵人成就已可永久保存；系統會在可信歷史完整時自動發放，資料不完整則安全暫停並等待重試。"},
+  {version:"v14.0.53",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理儲存確認鍵修復",updateLevel:"patch",added:["帳號卡片恢復獨立「儲存變更」按鈕","角色、測試身分與帳號啟用改為先暫存、確認後一次送出","送出前顯示實際變更差異"],changed:["本名確認狀態與帳號設定儲存完全分離，不再互相取代","未修改資料時儲存鍵維持停用，避免誤送"],fixed:["修復帳號已完成本名確認後管理控制區只剩「本名已確認」、缺少確認／儲存入口的回歸問題","避免下拉或核取方塊一變更就立即寫入帳號設定"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；帳號修改仍僅限 super_admin",publicSummary:"帳號設定改回明確的修改→儲存→確認流程，本名確認狀態不再吃掉儲存鍵。"},
   {version:"v14.0.52",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.6 歷史回算／完整性驗證",updateLevel:"minor",added:["新增 Achievement Historical Integrity Audit：同步檢查原始 Match、canonical 去重、舊格式 fallback、Quick Decision、可信比分、Round 可分析性與 Evidence 可解析率","成就頁新增歷史回算檢查面板，揭露納入、排除與 fallback 狀態"],changed:["P6 成就回算標記為 derived_read_only：只讀重算，不補寫舊 Match、不自動發永久 Award","完整性拆成場次覆蓋、連勝時序、Round 覆蓋、Evidence 解析四個維度"],fixed:["封住重複 Match 灌高里程碑、舊資料缺時間戳影響連勝精度、無可信 Round／比分被誤當成就來源等風險"],environment:"Production feature branch",deployStatus:"P6.6 historical recalculation + integrity audit",firebaseImpact:"無；不補寫歷史資料、不新增集合、不發永久 Award",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"新增歷史回算檢查，可看到哪些舊資料被納入、保守排除或使用 fallback，並驗證成就來源是否仍可追溯。"},
 
   {version:"v14.0.51",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.5 成就 Evidence Chain UI",updateLevel:"minor",added:["所有 Match、Round、連勝與特殊里程碑卡片新增可展開 Evidence Chain，可直接核對構成進度／達成的來源","Match Evidence 顯示賽事、日期、對手、WIN／LOSS、可信比分、賽事輪次、Court 與 Match ID","Round Evidence 額外顯示 Round Event seq、得分類型、分值；連勝則依窗口順序顯示每一場 Match"],changed:["P6.2～P6.4 原本只顯示 Evidence 數量，現在可逐筆展開完整來源；未達標里程碑也能查看目前已累積的證據","Evidence resolver 若找不到來源會明確顯示 unresolved，不會把缺失來源當成已驗證證據","成就頁仍只讀 canonical Hunter records，不建立第二套 Evidence 資料或永久 Award"],fixed:["完成成就系統從規則→進度→Evidence Reference→玩家可核對來源的閉環","避免達成徽章只剩一個數字、無法確認是哪場比賽或哪個 Round 累積而成"],environment:"Production feature branch",deployStatus:"P6.5 Evidence UI only; no persistent awards",firebaseImpact:"無；純前端解析既有 Evidence Reference，不新增集合",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"成就卡現在可直接展開來源，查看構成里程碑的賽事、對手、Match 與 Round Event。"},
@@ -13940,8 +13947,39 @@ function bindAccountBatchSelection(){
  });
 }
 
+const managedAccountDrafts=new Map();
+function managedAccountBaseline(user){
+ return {role:user?.role||"viewer",isTestAccount:user?.role==="tester"||user?.isTestAccount===true,active:user?.active!==false};
+}
+function managedAccountDraft(user){
+ const base=managedAccountBaseline(user);
+ const draft=managedAccountDrafts.get(user?.uid);
+ return draft?{role:draft.role,isTestAccount:!!draft.isTestAccount,active:!!draft.active}:base;
+}
+function managedAccountPatch(user,draft){
+ const base=managedAccountBaseline(user),patch={};
+ if(draft.role!==base.role)patch.role=draft.role;
+ if(!!draft.isTestAccount!==base.isTestAccount)patch.isTestAccount=!!draft.isTestAccount;
+ if(!!draft.active!==base.active)patch.active=!!draft.active;
+ return patch;
+}
+function managedAccountControl(selector,uid){
+ return Array.from(document.querySelectorAll(selector)).find(el=>el.getAttribute("data-uid")===uid)||null;
+}
+function captureManagedAccountDraft(uid){
+ const user=(accountMgmtUsers||[]).find(item=>item.uid===uid);if(!user)return null;
+ const base=managedAccountBaseline(user);
+ const roleEl=managedAccountControl(".mgmt-role-select",uid),testEl=managedAccountControl(".mgmt-test-box",uid),activeEl=managedAccountControl(".mgmt-active-box",uid);
+ const draft={role:roleEl?roleEl.value:base.role,isTestAccount:testEl?!!testEl.checked:base.isTestAccount,active:activeEl?!!activeEl.checked:base.active};
+ const patch=managedAccountPatch(user,draft);
+ if(Object.keys(patch).length)managedAccountDrafts.set(uid,draft);else managedAccountDrafts.delete(uid);
+ const saveButton=managedAccountControl(".account-user-save-button",uid);
+ if(saveButton)saveButton.disabled=!Object.keys(patch).length;
+ return {user,draft,patch};
+}
+
 async function changeSingleManagedAccount(uid,patch,el){
- if(!isSuperAdmin())return;const actor=currentAuthUid();el.disabled=true;
+ if(!isSuperAdmin())return;const actor=currentAuthUid();if(el)el.disabled=true;
  const key='bxh-account-single:'+actor+':'+uid;
  try{
   let payload=JSON.parse(sessionStorage.getItem(key)||'null');
@@ -13951,9 +13989,10 @@ async function changeSingleManagedAccount(uid,patch,el){
   if(actor!==currentAuthUid())return;
   if(!result.ok)throw Error('operation-failed');sessionStorage.removeItem(key);
   const outcome=result.results[0];showToast(outcome.status==='failed'?accountChangeError(outcome.reason):'帳號設定已更新',outcome.status==='failed');
+  if(outcome.status!=='failed')managedAccountDrafts.delete(uid);
   const users=await window.cloudAuth.listUsers();if(actor===currentAuthUid()&&isSuperAdmin())accountMgmtUsers=users;
  }catch(e){if(actor===currentAuthUid())showToast(accountChangeError(e.message),true);}
- finally{if(actor===currentAuthUid()){el.disabled=false;render();}}
+ finally{if(actor===currentAuthUid()){if(el)el.disabled=false;render();}}
 }
 
 function managedFeatureError(e){
@@ -14155,7 +14194,7 @@ function renderAccountManagementScreen(){
         <div class="account-result-line"><span>${loading?'正在讀取帳號……':`顯示 ${visibleUsers.length}／${users.length} 筆`}</span><span>點擊帳號查看詳細資料⌄</span></div>
         ${loading?'<div class="empty-state">正在讀取帳號資料……</div>':visibleUsers.length===0?'<div class="empty-state">沒有符合目前條件的帳號</div>':`
         <div class="account-user-list">
-          ${visibleUsers.map(user=>{const status=accountActivityStatus(user);const gameId=accountGameId(user);const active=user.active!==false;return `<details class="account-user-card">
+          ${visibleUsers.map(user=>{const status=accountActivityStatus(user);const gameId=accountGameId(user);const draft=managedAccountDraft(user);const active=draft.active;const dirty=Object.keys(managedAccountPatch(user,draft)).length>0;return `<details class="account-user-card">
             <summary>
               <label><input class="account-batch-checkbox" type="checkbox" aria-label="選取此帳號" data-uid="${esc(user.uid)}" ${accountBatchContext().selected.has(user.uid)?'checked':''} ${accountBatchContext().busy?'disabled':''}></label><div class="account-user-identity"><div class="account-user-name">${esc(accountPrimaryName(user))}</div><div class="account-user-gameid">${gameId?`遊戲 ID｜${esc(gameId)}`:'尚未設定遊戲 ID'}</div></div>
               <div class="account-user-email">${esc(user.email||"未提供 Email")}</div>
@@ -14171,10 +14210,10 @@ function renderAccountManagementScreen(){
                 <div class="account-detail-item"><div class="label">帳號 UID</div><div class="value">${esc(user.uid||"—")}</div></div>
               </div>
               <div class="account-user-controls">
-                <div class="field"><label>帳號分類</label><select class="mgmt-role-select" data-uid="${esc(user.uid)}">${["super_admin","admin","staff","tester","player","viewer"].map(role=>`<option value="${role}" ${user.role===role?'selected':''}>${roleDisplayLabel(role)}</option>`).join("")}</select></div>
-                <label class="account-active-control"><input type="checkbox" class="mgmt-test-box" data-uid="${esc(user.uid)}" ${user.role==='tester'||user.isTestAccount===true?'checked':''} style="width:20px;height:20px;">測試身分</label>
-                <label class="account-active-control"><input type="checkbox" class="mgmt-active-box" data-uid="${esc(user.uid)}" ${active?'checked':''} style="width:20px;height:20px;">帳號啟用</label>
-                ${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):""}
+                <div class="field"><label>帳號分類</label><select class="mgmt-role-select" data-uid="${esc(user.uid)}">${["super_admin","admin","staff","tester","player","viewer"].map(role=>`<option value="${role}" ${draft.role===role?'selected':''}>${roleDisplayLabel(role)}</option>`).join("")}</select></div>
+                <label class="account-active-control"><input type="checkbox" class="mgmt-test-box" data-uid="${esc(user.uid)}" ${draft.isTestAccount?'checked':''} style="width:20px;height:20px;">測試身分</label>
+                <label class="account-active-control"><input type="checkbox" class="mgmt-active-box" data-uid="${esc(user.uid)}" ${draft.active?'checked':''} style="width:20px;height:20px;">帳號啟用</label>
+                <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
               </div>
             </div>
           </details>`;}).join("")}
@@ -16214,7 +16253,7 @@ function hunterUniqueRecords(records){
   return out;
 }
 
-/* ==== v14.0.53 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
+/* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
 const HUNTER_ACHIEVEMENT_SCHEMA_VERSION=1;
 const HUNTER_ACHIEVEMENT_ENGINE_VERSION="hunter-achievement-v1";
 const HUNTER_ACHIEVEMENT_ROUND_TYPES=["extreme","knockout","burst","spin"];
@@ -19067,8 +19106,8 @@ function bindAuthInputs(){
       });
     }
     if(typeof document.querySelectorAll === "function"){
-      for(const [selector,field] of [[".mgmt-role-select","role"],[".mgmt-active-box","active"],[".mgmt-test-box","isTestAccount"]]){
-        document.querySelectorAll(selector).forEach(el=>el.addEventListener("change",()=>changeSingleManagedAccount(el.getAttribute("data-uid"),{[field]:field==='role'?el.value:el.checked},el)));
+      for(const selector of [".mgmt-role-select",".mgmt-active-box",".mgmt-test-box"]){
+        document.querySelectorAll(selector).forEach(el=>el.addEventListener("change",()=>captureManagedAccountDraft(el.getAttribute("data-uid"))));
       }
       document.querySelectorAll(".account-filter-select").forEach(el=>{
         el.addEventListener("change",()=>{
@@ -21116,6 +21155,21 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       })();
     };
     openModal({ type:"generic", title:"執行公開賽事資料清理", message:"即將檢查並重建 publicTournaments 集合中每份文件的公開安全欄位，移除舊版可能殘留的私人資料。不會刪除任何賽事，不會變更文件 ID 或賽事代碼。是否繼續？", confirmLabel:"確定執行", onConfirm:doCleanup });
+    return;
+  }
+  if(action==="save-managed-account"){
+    if(!isSuperAdmin()){showToast("只有最高管理員可修改帳號設定",true);return;}
+    const uid=target.getAttribute("data-uid")||"";
+    const captured=captureManagedAccountDraft(uid);
+    if(!captured){showToast("找不到帳號資料，請重新整理後再試",true);return;}
+    const {user,draft,patch}=captured;
+    if(!Object.keys(patch).length){showToast("目前沒有需要儲存的變更");return;}
+    const base=managedAccountBaseline(user),changes=[];
+    if(Object.prototype.hasOwnProperty.call(patch,"role"))changes.push("帳號分類："+roleDisplayLabel(base.role)+" → "+roleDisplayLabel(draft.role));
+    if(Object.prototype.hasOwnProperty.call(patch,"isTestAccount"))changes.push("測試身分："+(base.isTestAccount?"是":"否")+" → "+(draft.isTestAccount?"是":"否"));
+    if(Object.prototype.hasOwnProperty.call(patch,"active"))changes.push("帳號啟用："+(base.active?"啟用":"停用")+" → "+(draft.active?"啟用":"停用"));
+    const name=accountPrimaryName(user);
+    openModal({type:"generic",title:"儲存帳號變更",message:"確定要更新「"+name+"」的帳號設定嗎？\n\n"+changes.join("\n"),confirmLabel:"確認更新",onConfirm:()=>{(async()=>{await changeSingleManagedAccount(uid,patch,null);})();}});
     return;
   }
   if(action==="create-managed-user-submit"){
