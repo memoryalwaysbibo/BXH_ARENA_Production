@@ -344,7 +344,7 @@ mustInclude('hunterRoundAchievementCardHtml(item,records)','Hunter P6.5 Round ca
 mustInclude('hunterStreakSpecialAchievementCardHtml(item,records)','Hunter P6.5 streak/special cards must receive canonical records');
 mustInclude('function hunterAchievementsHtml(core,records,audit)','Hunter P6.5 combined achievement renderer missing');
 mustInclude('body=hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);','Hunter P6.5 achievement route must pass canonical records');
-mustInclude('P6.5</span>','Hunter P6.5 profile badge missing');
+mustInclude('P6.6</span>','Hunter profile badge must reflect current P6.6 stage');
 console.log('PASS Hunter Profile P6.5 achievement evidence chain UI');
 mustInclude('const HUNTER_ACHIEVEMENT_AUDIT_VERSION="hunter-achievement-audit-v1";','Hunter P6.6 audit version missing');
 mustInclude('function hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skipped,core)','Hunter P6.6 integrity audit engine missing');
