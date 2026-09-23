@@ -160,4 +160,14 @@ mustInclude('group.opponentName','Hunter P5.1 opponent evidence display missing'
 mustInclude('可展開來源','Hunter P5.1 expandable source UI missing');
 mustInclude('可追溯到對手、Match 與原始 Round Timeline','Hunter P5.1 traceability disclosure missing');
 console.log('PASS Hunter Profile P5.1 evidence chain');
+mustInclude('function hunterSingleMatchBreakdown(record)','Hunter P5.2 single-match breakdown missing');
+mustInclude('function hunterSingleMatchBreakdownHtml(record)','Hunter P5.2 breakdown UI missing');
+mustInclude('function hunterRecordTimelineHtml(record)','Hunter P5.2 shared match timeline missing');
+mustInclude('function hunterRecordDetailHtml(r)','Hunter P5.2 record detail renderer missing');
+mustInclude('查看本場對戰資料','Hunter P5.2 match detail expander missing');
+mustInclude('本場進攻得分','Hunter P5.2 offensive breakdown missing');
+mustInclude('本場防守失分','Hunter P5.2 defensive breakdown missing');
+mustInclude('Quick Decision｜本場沒有逐回合能力資料','Hunter P5.2 quick decision disclosure missing');
+mustInclude('return hunterRecordTimelineHtml(record);','Hunter P5.1 and P5.2 must share the same round timeline renderer');
+console.log('PASS Hunter Profile P5.2 single-match opponent detail');
 
