@@ -233,3 +233,13 @@ mustInclude('const rounds=r.analyzable===true?','Hunter record chips must requir
 mustInclude('Round 資料未通過完整性驗證｜不納入能力分析','Hunter record integrity warning missing');
 console.log('PASS Hunter P5 round-integrity display boundary');
 
+mustInclude('const sourceRecords=Array.isArray(result&&result.records)?result.records:[];','Hunter P5 seal source record normalization missing');
+mustInclude('hunterProfileCache={records:hunterUniqueRecords(sourceRecords)','Hunter P5 seal must canonicalize Match records at load boundary');
+mustInclude('const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));','Hunter period summary must preserve canonical Match dedupe');
+mustInclude('const rows=hunterUniqueRecords(records);','Hunter H2H/growth must preserve canonical Match dedupe');
+mustInclude('const analyzable=rows.filter(r=>r&&r.analyzable&&Array.isArray(r.roundsPerspective)&&r.roundsPerspective.length>0);','Hunter P4 analysis must use analyzable canonical rounds only');
+mustInclude('if(!HUNTER_ANALYSIS_TYPES.includes(ev.type)) return;','Hunter analysis must reject non-canonical point types');
+mustInclude('else if(scoreA!==expectedA||scoreB!==expectedB)','Hunter ledger totals must match final Match score');
+mustInclude('if(!record||record.analyzable!==true){','Hunter single-match analysis must share analyzable trust boundary');
+mustInclude('function hunterBuildH2H(records)','Hunter H2H canonical aggregation missing');
+console.log('PASS Hunter P5 statistical-caliber seal');
