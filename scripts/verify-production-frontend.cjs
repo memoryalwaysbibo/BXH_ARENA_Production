@@ -234,7 +234,7 @@ mustInclude('Round 資料未通過完整性驗證｜不納入能力分析','Hunt
 console.log('PASS Hunter P5 round-integrity display boundary');
 
 mustInclude('const sourceRecords=Array.isArray(result&&result.records)?result.records:[];','Hunter P5 seal source record normalization missing');
-mustInclude('hunterProfileCache={records:hunterUniqueRecords(sourceRecords)','Hunter P5 seal must canonicalize Match records at load boundary');
+mustInclude('const canonicalRecords=hunterUniqueRecords(sourceRecords);','Hunter P5 seal must canonicalize Match records at load boundary');
 mustInclude('const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));','Hunter period summary must preserve canonical Match dedupe');
 mustInclude('const rows=hunterUniqueRecords(records);','Hunter H2H/growth must preserve canonical Match dedupe');
 mustInclude('const analyzable=rows.filter(r=>r&&r.analyzable&&Array.isArray(r.roundsPerspective)&&r.roundsPerspective.length>0);','Hunter P4 analysis must use analyzable canonical rounds only');
@@ -243,3 +243,22 @@ mustInclude('else if(scoreA!==expectedA||scoreB!==expectedB)','Hunter ledger tot
 mustInclude('if(!record||record.analyzable!==true){','Hunter single-match analysis must share analyzable trust boundary');
 mustInclude('function hunterBuildH2H(records)','Hunter H2H canonical aggregation missing');
 console.log('PASS Hunter P5 statistical-caliber seal');
+
+mustInclude('const HUNTER_ACHIEVEMENT_SCHEMA_VERSION=1;','Hunter P6.1 achievement schema version missing');
+mustInclude('const HUNTER_ACHIEVEMENT_ENGINE_VERSION="hunter-achievement-v1";','Hunter P6.1 achievement engine version missing');
+mustInclude('achievementId:"matches_100"','Hunter P6.1 100-match definition missing');
+mustInclude('achievementId:"wins_50"','Hunter P6.1 50-win definition missing');
+mustInclude('achievementId:"burst_50"','Hunter P6.1 burst definition missing');
+mustInclude('achievementId:"extreme_50"','Hunter P6.1 extreme definition missing');
+mustInclude('awardEnabled:false','Hunter P6.1 definitions must remain preview-only');
+mustInclude('function hunterAchievementMatchEvidenceRef(record)','Hunter P6.1 Match evidence reference missing');
+mustInclude('function hunterAchievementRoundEvidenceRef(record,event)','Hunter P6.1 Round evidence reference missing');
+mustInclude('function hunterResolveAchievementEvidenceRef(ref,records)','Hunter P6.1 evidence resolver missing');
+mustInclude('if(!record||record.analyzable!==true||!Array.isArray(record.roundsPerspective)) return;','Hunter P6.1 Round achievements must require analyzable records');
+mustInclude('if(event&&event.perspective!=="for") return;','Hunter P6.1 Round achievements must count player scoring only');
+mustInclude('if(!HUNTER_ACHIEVEMENT_ROUND_TYPES.includes(type)) return;','Hunter P6.1 Round achievements must reject unknown point types');
+mustInclude('if(!Number.isFinite(expected)||Number(event.points)!==expected) return;','Hunter P6.1 Round achievements must validate canonical point values');
+mustInclude('ruleVersion:Number(definition&&definition.ruleVersion)||1','Hunter P6.1 rule version missing from evaluation');
+mustInclude('awardStatus:"preview_only"','Hunter P6.1 must not award badges yet');
+mustInclude('achievementCore:hunterBuildAchievementCore(canonicalRecords)','Hunter P6.1 achievement snapshot must use canonical Match records');
+console.log('PASS Hunter Profile P6.1 achievement core');
