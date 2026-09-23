@@ -248,7 +248,7 @@ mustInclude('const rounds=r.analyzable===true?','Hunter record chips must requir
 mustInclude('Round 資料未通過完整性驗證｜不納入能力分析','Hunter record integrity warning missing');
 console.log('PASS Hunter P5 round-integrity display boundary');
 
-mustInclude('const sourceRecords=Array.isArray(result&&result.records)?result.records:[];','Hunter P5 seal source record normalization missing');
+mustInclude('const allSourceRecords=Array.isArray(result&&result.records)?result.records:[];','Hunter P5 seal source record normalization missing');
 mustInclude('const canonicalRecords=hunterUniqueRecords(sourceRecords);','Hunter P5 seal must canonicalize Match records at load boundary');
 mustInclude('const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));','Hunter period summary must preserve canonical Match dedupe');
 mustInclude('const rows=hunterUniqueRecords(records);','Hunter H2H/growth must preserve canonical Match dedupe');
@@ -394,3 +394,9 @@ mustInclude('window.engagementService.syncHunterAchievements','Hunter P6.7 load-
 mustInclude('hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,permanentAwards||null)','Hunter P6.7 server snapshot application missing');
 mustInclude('hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,null)','Hunter P6.7 safe fallback missing');
 console.log('PASS Hunter Profile P6.7 permanent achievement awards');
+
+mustInclude('const HUNTER_OFFICIAL_LAUNCH_AT=Date.parse("2026-10-01T00:00:00+08:00");','Hunter official launch cutoff missing');
+mustInclude('const HUNTER_PRELAUNCH_RESET_AT=Date.parse("2026-09-30T23:58:00+08:00");','Hunter prelaunch reset boundary missing');
+mustInclude('return Date.now()<HUNTER_PRELAUNCH_RESET_AT||hunterRecordTimestamp(record)>=HUNTER_OFFICIAL_LAUNCH_AT;','Hunter test data must remain visible until the reset boundary');
+mustInclude('const sourceRecords=allSourceRecords.filter(hunterRecordIsOfficial);','Hunter official record filter missing');
+console.log('PASS Hunter 10/1 official launch boundary');

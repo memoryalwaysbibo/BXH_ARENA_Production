@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.31">
+<meta name="bxh-build" content="20260923.32">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.31";
+  var CURRENT_BUILD="20260923.32";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4264,9 +4264,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.55";
+const APP_VERSION = "v14.0.56";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.56",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人系統 10/1 正式啟動與歸零排程",updateLevel:"minor",added:["新增 2026/09/30 23:58（台灣時間）獵人成就與進度歸零排程","新增 2026/10/01 00:00 正式統計起點，正式上線後只計算起點以後的 Match、Round、分析、連勝與成就"],changed:["9/30 前的賽事與原始對戰紀錄完整保留，但不納入正式獵人數據","重置範圍限於 hunterAchievements 與 hunterAchievementProgress；帳號、個資、稱號、天梯、賽事與報名全部保留","重置採完成標記與重試機制，重複執行或未來年度排程不會再次清除"],fixed:["避免 10/1 正式啟動時沿用測試期間戰績、分析與已發徽章","避免刪除原始比賽資料後失去日後查核能力"],environment:"Production",deployStatus:"Scheduled reset + official Hunter cutoff",firebaseImpact:"9/30 23:58 清除獵人成就與進度子集合；保留原始賽事及稽核紀錄",securityRulesImpact:"無；重置僅由排程 Functions Admin SDK 執行",permissionImpact:"無新增前端權限",publicSummary:"獵人系統將於 10/1 從零正式啟動；測試期比賽保留供查核，但不計入正式戰績與成就。"},
   {version:"v14.0.55",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理緊湊列表／搜尋清除",updateLevel:"patch",added:["搜尋姓名／帳號欄新增獨立「清除」鍵，只清除關鍵字、不重設角色／狀態／活躍度／排序","手機帳號卡改為緊湊三欄摘要：勾選、身分資訊、狀態標籤同屏排列"],changed:["帳號卡上下 padding、卡片間距、文字行距與狀態 badge 間距同步壓縮","手機收合卡重新配置 Email、本名／遊戲 ID 與狀態標籤，減少無效垂直空間"],fixed:["改善大量帳號名單需要過度長距離滑動的問題","避免清除搜尋時必須手動逐字刪除關鍵字"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management density patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"不變；帳號管理仍限 super_admin",publicSummary:"帳號管理列表更緊湊，同屏可看到更多帳號；搜尋新增一鍵清除且保留其他篩選條件。"},
   {version:"v14.0.54",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P6.7 永久成就發放",updateLevel:"minor",added:["新增伺服器權威 syncHunterAchievements：由本人報名紀錄與公開賽事鏡像重建成就，不接受瀏覽器提交的進度或達成結果","達標後永久寫入 hunterAchievements，並同步保存 hunterAchievementProgress 與 hunterAchievementAuditLogs","成就頁新增永久徽章狀態、發放閘門與本次新發數量"],changed:["27 個 Match、勝場、Round、連勝與完封節點由 preview-only 升級為可永久發放","資料讀取或身分解析不完整時只更新進度，永久發放閘門會保守暫停；重試成功後可自動補發","重複同步採交易與固定 Award ID，已領成就不會重複建立"],fixed:["封住前端偽造成就、重複發章、部分歷史讀取失敗仍誤發、Quick Decision 被當成 Round／完封證據等風險"],environment:"Production",deployStatus:"P6.7 permanent awards",firebaseImpact:"新增 users/{uid}/hunterAchievements、hunterAchievementProgress 與 hunterAchievementAuditLogs；僅 Cloud Functions Admin SDK 寫入",securityRulesImpact:"無前端寫入需求；永久 Award 由 Callable Functions 寫入",permissionImpact:"登入且啟用中的正式帳號可同步本人永久成就；測試帳號不發章",publicSummary:"獵人成就已可永久保存；系統會在可信歷史完整時自動發放，資料不完整則安全暫停並等待重試。"},
   {version:"v14.0.53",date:"2026/09/23",timezone:"Asia/Taipei",title:"帳號管理儲存確認鍵修復",updateLevel:"patch",added:["帳號卡片恢復獨立「儲存變更」按鈕","角色、測試身分與帳號啟用改為先暫存、確認後一次送出","送出前顯示實際變更差異"],changed:["本名確認狀態與帳號設定儲存完全分離，不再互相取代","未修改資料時儲存鍵維持停用，避免誤送"],fixed:["修復帳號已完成本名確認後管理控制區只剩「本名已確認」、缺少確認／儲存入口的回歸問題","避免下拉或核取方塊一變更就立即寫入帳號設定"],environment:"Production / HTML + Firebase",deployStatus:"Frontend account-management patch",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"不擴張；帳號修改仍僅限 super_admin",publicSummary:"帳號設定改回明確的修改→儲存→確認流程，本名確認狀態不再吃掉儲存鍵。"},
@@ -16190,6 +16191,11 @@ function hunterRecordTimestamp(record){
   const parsed=Date.parse(String(record&&record.eventDate||""));
   return Number.isFinite(parsed)?parsed:0;
 }
+const HUNTER_OFFICIAL_LAUNCH_AT=Date.parse("2026-10-01T00:00:00+08:00");
+const HUNTER_PRELAUNCH_RESET_AT=Date.parse("2026-09-30T23:58:00+08:00");
+function hunterRecordIsOfficial(record){
+  return Date.now()<HUNTER_PRELAUNCH_RESET_AT||hunterRecordTimestamp(record)>=HUNTER_OFFICIAL_LAUNCH_AT;
+}
 function hunterSeasonStartMs(){
   const control=(ladderPublicData&&ladderPublicData.control)||{};
   const raw=control.seasonStartAt||control.startAt||control.currentSeasonStartAt||null;
@@ -17216,7 +17222,8 @@ async function loadHunterProfile(force=false){
     if(!cloudAvailable()||!window.cloudSync.queryMyHunterMatches) throw new Error("hunter-profile-unavailable");
     const result=await window.cloudSync.queryMyHunterMatches();
     if(!result||result.ok!==true||!Array.isArray(result.records)) throw new Error("hunter-profile-invalid-response");
-    const sourceRecords=Array.isArray(result&&result.records)?result.records:[];
+    const allSourceRecords=Array.isArray(result&&result.records)?result.records:[];
+    const sourceRecords=allSourceRecords.filter(hunterRecordIsOfficial);
     const canonicalRecords=hunterUniqueRecords(sourceRecords);
     const skippedRecords=Array.isArray(result&&result.skipped)?result.skipped:[];
     const achievementCore=hunterBuildAchievementCore(canonicalRecords);
