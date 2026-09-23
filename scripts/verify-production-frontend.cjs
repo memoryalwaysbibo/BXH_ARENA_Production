@@ -305,7 +305,7 @@ mustInclude('function hunterAchievementsHtml(core,records,audit)','Hunter P6.3 c
 mustInclude('evaluations.filter(item=>item&&item.category==="round")','Hunter P6.3 UI must expose Round category only in Round panel');
 mustInclude('analyzable=true、perspective=for','Hunter P6.3 trust-boundary disclosure missing');
 mustInclude('Quick Decision 與防守失分不計入','Hunter P6.3 exclusion disclosure missing');
-mustInclude('body=hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);','Hunter P6.3 achievement page linkage missing');
+mustInclude('hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);','Hunter P6.3 achievement page linkage missing');
 mustInclude('P6.3</span>','Hunter P6.3 profile badge missing');
 console.log('PASS Hunter Profile P6.3 Round achievements');
 
@@ -343,7 +343,7 @@ mustInclude('hunterMatchAchievementCardHtml(item,records)','Hunter P6.5 Match ca
 mustInclude('hunterRoundAchievementCardHtml(item,records)','Hunter P6.5 Round cards must receive canonical records');
 mustInclude('hunterStreakSpecialAchievementCardHtml(item,records)','Hunter P6.5 streak/special cards must receive canonical records');
 mustInclude('function hunterAchievementsHtml(core,records,audit)','Hunter P6.5 combined achievement renderer missing');
-mustInclude('body=hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);','Hunter P6.5 achievement route must pass canonical records');
+mustInclude('hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);','Hunter P6.5 achievement route must pass canonical records');
 mustInclude('P6.6</span>','Hunter profile badge must reflect current P6.6 stage');
 console.log('PASS Hunter Profile P6.5 achievement evidence chain UI');
 mustInclude('const HUNTER_ACHIEVEMENT_AUDIT_VERSION="hunter-achievement-audit-v1";','Hunter P6.6 audit version missing');
@@ -362,5 +362,8 @@ mustInclude('function hunterAchievementIntegrityAuditHtml(audit)','Hunter P6.6 a
 mustInclude('歷史回算檢查','Hunter P6.6 audit panel label missing');
 mustInclude('系統不補寫舊資料、不因回算自動發永久 Award','Hunter P6.6 read-only disclosure missing');
 mustInclude('integrityAudit:hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore)','Hunter P6.6 load-time audit wiring missing');
+mustInclude('if(!result||result.ok!==true||!Array.isArray(result.records)) throw new Error("hunter-profile-invalid-response")','Hunter audit must reject failed responses');
+mustInclude('integrityAudit:null','Hunter audit must not report success after failed load');
+mustInclude('partial_read_failures','Hunter audit must identify skipped tournament reads');
 mustInclude('P6.6</span>','Hunter P6.6 profile badge missing');
 console.log('PASS Hunter Profile P6.6 historical recalculation integrity audit');
