@@ -56,7 +56,7 @@ messaging.onBackgroundMessage(payload=>{
     icon:'/assets/icons/bxh-gold-icon-192.png?v=20260918',
     badge:'/assets/icons/bxh-gold-icon-192.png?v=20260918',
     tag:tag||'bxh-call',
-    renotify:true,
+    renotify:false,
     vibrate:[180,90,180],
     data:{
       url:pushUrl(data),
