@@ -16434,7 +16434,8 @@ function hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,ski
   const refs=hunterAchievementReferencedEvidence(core);let resolvedEvidence=0;
   refs.forEach(ref=>{if(hunterResolveAchievementEvidenceRef(ref,canonical))resolvedEvidence++;});
   const unresolvedEvidence=refs.length-resolvedEvidence;
-  return {version:HUNTER_ACHIEVEMENT_AUDIT_VERSION,recalculationMode:"derived_read_only",sourceRecords:source.length,canonicalRecords:canonical.length,duplicatesRemoved:Math.max(0,source.length-canonical.length),skippedIdentity:skippedRows.length,legacyMatchKey,missingExactTime,quickDecision,trustedScore,analyzableMatches:analyzable,nonAnalyzableMatches:Math.max(0,canonical.length-analyzable),roundEvents,referencedEvidence:refs.length,resolvedEvidence,unresolvedEvidence,countCoverage:skippedRows.length===0?"loaded_history_complete":"partial_identity_exclusions",streakChronology:missingExactTime===0?"exact":"stable_fallback_used",roundCoverage:canonical.length===0?"no_matches":(analyzable===canonical.length?"all_matches_analyzable":"trusted_rounds_only"),evidenceResolution:unresolvedEvidence===0?"resolved":"needs_review",persistentAwardGate:"disabled"};
+  const readFailures=skippedRows.filter(row=>row&&row.reason==="read-failed").length;
+  return {version:HUNTER_ACHIEVEMENT_AUDIT_VERSION,recalculationMode:"derived_read_only",sourceRecords:source.length,canonicalRecords:canonical.length,duplicatesRemoved:Math.max(0,source.length-canonical.length),skippedIdentity:skippedRows.length,readFailures,legacyMatchKey,missingExactTime,quickDecision,trustedScore,analyzableMatches:analyzable,nonAnalyzableMatches:Math.max(0,canonical.length-analyzable),roundEvents,referencedEvidence:refs.length,resolvedEvidence,unresolvedEvidence,countCoverage:readFailures?"partial_read_failures":skippedRows.length===0?"loaded_history_complete":"partial_identity_exclusions",streakChronology:missingExactTime===0?"exact":"stable_fallback_used",roundCoverage:canonical.length===0?"no_matches":(analyzable===canonical.length?"all_matches_analyzable":"trusted_rounds_only"),evidenceResolution:unresolvedEvidence===0?"resolved":"needs_review",persistentAwardGate:"disabled"};
 }
 function hunterBuildAchievementCore(records){
   const context=hunterBuildAchievementContext(records);
@@ -16620,7 +16621,7 @@ function hunterStreakSpecialAchievementsHtml(core,records){
     '</section>';
 }
 function hunterAchievementIntegrityStatusLabel(value){
-  return {loaded_history_complete:"已載入歷史無身分排除",partial_identity_exclusions:"部分舊資料因身分無法安全確認而排除",exact:"精確完成時間",stable_fallback_used:"部分舊資料使用穩定 fallback 排序",all_matches_analyzable:"全部 Match 具可信 Round",trusted_rounds_only:"僅可信 Round 納入 Round 成就",no_matches:"目前沒有 Match",resolved:"Evidence 全部可解析",needs_review:"存在無法解析 Evidence"}[value]||String(value||"—");
+  return {loaded_history_complete:"已載入歷史無身分排除",partial_identity_exclusions:"部分歷史資料已排除",partial_read_failures:"部分賽事讀取失敗，請重試",exact:"精確完成時間",stable_fallback_used:"部分舊資料使用穩定 fallback 排序",all_matches_analyzable:"全部 Match 具可信 Round",trusted_rounds_only:"僅可信 Round 納入 Round 成就",no_matches:"目前沒有 Match",resolved:"Evidence 全部可解析",needs_review:"存在無法解析 Evidence"}[value]||String(value||"—");
 }
 function hunterAchievementIntegrityAuditHtml(audit){
   if(!audit)return "";
@@ -17121,6 +17122,7 @@ async function loadHunterProfile(force=false){
     if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
     if(!cloudAvailable()||!window.cloudSync.queryMyHunterMatches) throw new Error("hunter-profile-unavailable");
     const result=await window.cloudSync.queryMyHunterMatches();
+    if(!result||result.ok!==true||!Array.isArray(result.records)) throw new Error("hunter-profile-invalid-response");
     const sourceRecords=Array.isArray(result&&result.records)?result.records:[];
     const canonicalRecords=hunterUniqueRecords(sourceRecords);
     const skippedRecords=Array.isArray(result&&result.skipped)?result.skipped:[];
@@ -17129,7 +17131,7 @@ async function loadHunterProfile(force=false){
     setTimeout(()=>resolveHunterOpponentIdentities(hunterProfileCache.records),0);
   }catch(e){
     console.warn("[Hunter Profile P3]",e);
-    hunterProfileCache={records:[],skipped:[],achievementCore:hunterBuildAchievementCore([]),integrityAudit:hunterBuildAchievementIntegrityAudit([],[],[],hunterBuildAchievementCore([]))};
+    hunterProfileCache={records:[],skipped:[],achievementCore:null,integrityAudit:null};
     hunterProfileError="對戰紀錄讀取失敗，請稍後重新整理。";
   }finally{
     hunterProfileLoading=false;
@@ -17216,7 +17218,9 @@ function renderPlayerStatsTab(p){
     const achievementCore=hunterProfileCache&&hunterProfileCache.achievementCore
       ? hunterProfileCache.achievementCore
       : hunterBuildAchievementCore(allRecords);
-    body=hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);
+    body=hunterProfileError?'<section class="panel"><div class="hunter-profile-error">'+esc(hunterProfileError)+'</div><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></section>':
+      hunterProfileLoading&&hunterProfileCache===null?'<section class="panel"><div class="hunter-record-empty"><strong>正在讀取成就資料</strong><p>歷史回算完成後顯示查核結果。</p></div></section>':
+      hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);
   }else{
     const rows=hunterFilteredRecords();
     const seasonAvailable=hunterSeasonStartMs()>0;
