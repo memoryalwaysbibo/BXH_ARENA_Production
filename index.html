@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.34">
+<meta name="bxh-build" content="20260923.35">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.34";
+  var CURRENT_BUILD="20260923.35";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4264,9 +4264,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.58";
+const APP_VERSION = "v14.0.59";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.59",date:"2026/09/23",timezone:"Asia/Taipei",title:"測試房／正式天梯結算前置分流",updateLevel:"patch",added:["新增結算路線分類：TEST-S1、測試不計分、正式 ranked、一般封存","系統 T001～T064 虛擬名單可在既有舊房自動辨識為測試資料"],changed:["正式天梯只在 eventAuthority=official 且非系統虛擬測試名單時執行","測試／虛擬玩家賽事完成後直接封存，不再撞正式天梯最低有效帳號驗證"],fixed:["修正 BXH-23DPJ8 類型房間因全為系統虛擬玩家卻進入正式天梯結算，造成完成賽事卡在結算中","正式 ranked 有效帳號不足時改顯示明確原因，仍維持至少兩位有效 BXH 帳號的防污染限制"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement routing hotfix",firebaseImpact:"新增賽事狀態稽核欄位 settlementRoute／syntheticTestRoster；不新增集合",securityRulesImpact:"無",permissionImpact:"無擴張；正式積分規則維持不變",publicSummary:"測試虛擬名單不再誤走正式天梯；正式積分賽仍必須至少兩位有效 BXH 玩家帳號。"},
   {version:"v14.0.58",date:"2026/09/23",timezone:"Asia/Taipei",title:"裁判分配競態同步修復",updateLevel:"patch",added:["裁判分配儲存前先排空既有一般雲端寫入佇列"],changed:["裁判分配欄位改由專用 transaction 作為權威來源；一般 pushUpdate 只保留雲端最新裁判設定，不再以舊快照回寫","重新進房時桌次限制同時支援 true 與 false 的頂層權威值"],fixed:["修正一般狀態同步與裁判分配 transaction 互相踩寫，造成 stale-assignment、儲存後勾選被還原或公開鏡像顯示舊裁判","修正頂層桌次限制為 false 時，重新進房仍可能沿用 data 內舊 true 值"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee assignment race hotfix",firebaseImpact:"無新增集合或欄位；調整既有 refereeStation* 欄位同步責任",securityRulesImpact:"無",permissionImpact:"沿用既有裁判分配權限",publicSummary:"修正裁判分配偶發無法儲存、儲存後被還原，以及雲端同步互相覆蓋的問題。"},
   {version:"v14.0.57",date:"2026/09/23",timezone:"Asia/Taipei",title:"結算卡住手動恢復入口",updateLevel:"patch",added:["結算中的 processing／ladder／archive／sync-pending 狀態新增「重新嘗試結算」入口"],changed:["保留既有自動封存；手動重試沿用 performAutoArchive 冪等流程，不建立第二套結算邏輯"],fixed:["避免賽事完成後若停在天梯結算中，因非 failed 狀態而沒有任何可操作的恢復入口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement recovery hotfix",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"沿用既有賽事操作權限",publicSummary:"賽事若長時間停在結算中，管理者可直接安全重試結算，不必等待系統自行恢復。"},
   {version:"v14.0.56",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人系統 10/1 正式啟動與歸零排程",updateLevel:"minor",added:["新增 2026/09/30 23:58（台灣時間）獵人成就與進度歸零排程","新增 2026/10/01 00:00 正式統計起點，正式上線後只計算起點以後的 Match、Round、分析、連勝與成就"],changed:["9/30 前的賽事與原始對戰紀錄完整保留，但不納入正式獵人數據","重置範圍限於 hunterAchievements 與 hunterAchievementProgress；帳號、個資、稱號、天梯、賽事與報名全部保留","重置採完成標記與重試機制，重複執行或未來年度排程不會再次清除"],fixed:["避免 10/1 正式啟動時沿用測試期間戰績、分析與已發徽章","避免刪除原始比賽資料後失去日後查核能力"],environment:"Production",deployStatus:"Scheduled reset + official Hunter cutoff",firebaseImpact:"9/30 23:58 清除獵人成就與進度子集合；保留原始賽事及稽核紀錄",securityRulesImpact:"無；重置僅由排程 Functions Admin SDK 執行",permissionImpact:"無新增前端權限",publicSummary:"獵人系統將於 10/1 從零正式啟動；測試期比賽保留供查核，但不計入正式戰績與成就。"},
@@ -8320,6 +8321,21 @@ function isOwnTesterSandboxRoom(st=state){
 function isCommunityRoomOwner(){ return !!(isCommunityRoom() && firebaseUser && state.ownerUid===firebaseUser.uid && (currentRole==="player" || currentRole==="tester")); }
 function isTester(){ return !!(userProfile && userProfile.active!==false && (userProfile.role==="tester"||userProfile.isTestAccount===true)); }
 function isTestTournament(st=state){ return !!(st && st.testMode===true && st.meta && st.meta.eventAuthority==="test"); }
+function isSystemSyntheticTestRoster(st=state){
+  const players=st&&Array.isArray(st.players)?st.players:[];
+  return players.length>=2 && players.every(p=>{
+    if(!p || p.source!=="test" || !/^T\d{3}$/.test(String(p.testPlayerKey||""))) return false;
+    const linked=p.familyPlayerId||p.registrationUid||p.accountUid||p.playerUid||p.uid||null;
+    return !linked && p.accountLinked!==true;
+  });
+}
+function settlementRouteForTournament(st=state){
+  const m=st&&st.meta||{};
+  if(st&&st.testLadderEnabled===true && isOwnTestTournament(st)) return "test-ranked";
+  if(isTestTournament(st) || isSystemSyntheticTestRoster(st)) return "test-no-ladder";
+  if(m.eventAuthority==="official" && m.ladderMode==="ranked") return "official-ranked";
+  return "no-ladder";
+}
 function isOwnTestTournament(st=state){
   const uid=currentAuthUid();
   return !!(isOwnTesterSandboxRoom(st) && uid && (st.createdBy===uid||st.ownerUid===uid));
@@ -8853,6 +8869,23 @@ async function writeArchiveStateToCloud(snapshot){
 async function performAutoArchive(){
   if(state.archiveStatus==="completed" && state.archivedAt) return true;
 
+  const settlementRoute=settlementRouteForTournament(state);
+  state.settlementRoute=settlementRoute;
+  if(settlementRoute==="test-no-ladder"){
+    const synthetic=isSystemSyntheticTestRoster(state);
+    if(synthetic){
+      state.testMode=true;
+      state.syntheticTestRoster=true;
+      state.officialLadderSkippedReason="synthetic-test-roster";
+      state.testLadderSettlementNote="系統虛擬玩家測試賽，不計正式天梯";
+    }else{
+      state.officialLadderSkippedReason="test-event";
+      state.testLadderSettlementNote=state.testLadderSettlementNote||"測試賽事，不計正式天梯";
+    }
+    state.testLadderSettlementStatus="skipped";
+    state.ladderPointsAwarded=false;
+  }
+
   state.settlementAttempt=Number(state.settlementAttempt||0)+1;
   state.settlementPhase="processing";
   state.settlementStartedAt=state.settlementStartedAt||Date.now();
@@ -8862,7 +8895,7 @@ async function performAutoArchive(){
   try{ await saveRecord(state); }catch(e){}
 
   // Tester ranked rooms use a completely isolated test ladder. Official ladderMode stays general.
-  if(isOwnTestTournament() && state.testLadderEnabled===true){
+  if(settlementRoute==="test-ranked"){
     state.settlementPhase="ladder";
     try{ await saveRecord(state); }catch(e){}
     if(!state.cloudCode || !cloudAvailable() || !window.cloudSync || !window.cloudSync.settleTestLadderTournament){
@@ -8892,7 +8925,7 @@ async function performAutoArchive(){
 
   // Ranked events are not considered completed until the database-backed
   // ladder transaction has succeeded (or the cloud proves it was already awarded).
-  if(state.meta && state.meta.ladderMode==="ranked"){
+  if(settlementRoute==="official-ranked"){
     state.settlementPhase="ladder";
     try{ await saveRecord(state); }catch(e){}
     if(!isAdminTierOrAbove()){
@@ -8923,7 +8956,10 @@ async function performAutoArchive(){
       const settled=await window.cloudSync.settleLadderTournament(state.cloudCode,payload);
       if(!settled || !settled.ok){
         const missing=settled&&settled.unlinkedPlayers&&settled.unlinkedPlayers.length ? "："+settled.unlinkedPlayers.join("、") : "";
-        const msg=(settled&&settled.reason)==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : (settled&&settled.message)||"天梯積分寫入失敗";
+        const reason=String((settled&&settled.reason)||"");
+        const rawMessage=String((settled&&settled.message)||"");
+        const insufficient=["insufficient-eligible-players","insufficient-valid-players","not-enough-eligible-players"].includes(reason) || /至少.*兩位.*有效/.test(rawMessage);
+        const msg=insufficient ? "正式積分賽至少需要兩位有效 BXH 玩家帳號" : reason==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : rawMessage||"天梯積分寫入失敗";
         state.settlementError=msg;
         state.settlementErrorCode=(settled&&settled.reason)||"ranked-settlement-failed";
         state.settlementPhase="failed";
@@ -8949,7 +8985,8 @@ async function performAutoArchive(){
       const raw=String((e&&e.message)||"");
       const known={"admin-required":"只有管理員／最高管理員可以結算正式積分賽","inactive-account":"目前帳號已停用，無法結算","auth-required":"登入狀態已失效，請重新登入","service-unavailable":"積分結算服務尚未部署"};
       const key=Object.keys(known).find(k=>raw.includes(k));
-      state.settlementError=key?known[key]:(raw&&raw!=="request-failed"?"天梯結算失敗："+raw:"天梯積分結算失敗；賽事尚未封存");
+      const insufficient=/至少.*兩位.*有效/.test(raw)||raw.includes("insufficient-eligible-players")||raw.includes("insufficient-valid-players")||raw.includes("not-enough-eligible-players");
+      state.settlementError=insufficient?"正式積分賽至少需要兩位有效 BXH 玩家帳號":key?known[key]:(raw&&raw!=="request-failed"?"天梯結算失敗："+raw:"天梯積分結算失敗；賽事尚未封存");
       state.settlementErrorCode=(e&&e.code)||"ranked-settlement-exception";
       state.settlementPhase="failed";
       await saveRecord(state);
@@ -9019,7 +9056,7 @@ async function performAutoArchive(){
           showToast("封存失敗：本機與雲端都沒有成功保存完成狀態，請確認網路或清理瀏覽器空間後重試",true);
           return false;
         }
-        if(state.meta && state.meta.ladderMode==="ranked"){
+        if(settlementRoute==="official-ranked"){
           state.archiveStatus="ongoing"; state.archivedAt=null; state.completedAt=previousCompletedAt;
           await saveRecord(state);
           showToast("天梯積分已入帳，但賽事完成狀態尚未同步成功；請重新執行完成賽事",true);
@@ -9039,7 +9076,7 @@ async function performAutoArchive(){
         showToast("封存失敗：本機與雲端都沒有成功保存完成狀態，請確認網路或清理瀏覽器空間後重試",true);
         return false;
       }
-      if(state.meta && state.meta.ladderMode==="ranked"){
+      if(settlementRoute==="official-ranked"){
         state.archiveStatus="ongoing"; state.archivedAt=null; state.completedAt=previousCompletedAt;
         await saveRecord(state);
         showToast("天梯積分已入帳，但賽事完成狀態尚未同步成功；請重新執行完成賽事",true);
