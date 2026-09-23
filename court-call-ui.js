@@ -1,13 +1,16 @@
-/* v14.1.1 — BXH CALL 2.0 Phase B1.
+/* v14.2.0 — BXH CALL 2.0 Phase B2.
    Phase A: foreground global call overlay + one-match self-service PASS + referee/opponent sync.
    Phase B1: browser background notifications while ARENA remains loaded.
-   Lock-screen / app-closed Web Push remains Phase B2. */
+   Phase B2: Firebase Web Push + Service Worker for lock-screen / app-closed delivery. */
 'use strict';
 
 let courtCallCache=new Map(),courtCallTimer=null,courtCallIdentity='';
 let courtCallPlayerCodes=[],courtCallDiscoveryAt=0,courtCallDiscoveryBusy=false;
 const courtCallDelayDismissed=new Set();
 const courtCallSystemNotifySeen=new Set();
+let courtCallPushBusy=false,courtCallPushSyncAt=0,courtCallPushError='';
+const COURT_CALL_PUSH_REFRESH_MS=15*60*1000;
+const COURT_CALL_FIREBASE_SDK='10.13.0';
 
 function courtCallNotificationPermission(){
  try{
@@ -16,36 +19,129 @@ function courtCallNotificationPermission(){
  }catch{return 'unsupported';}
 }
 
+function courtCallPushStorageKey(){
+ const uid=courtCallUserKey();
+ return uid?'bxh.call.push.token:'+uid:'';
+}
+function courtCallLoadPushToken(){
+ const key=courtCallPushStorageKey();if(!key)return '';
+ try{return String(localStorage.getItem(key)||'');}catch{return '';}
+}
+function courtCallSavePushToken(token){
+ const key=courtCallPushStorageKey();if(!key)return;
+ try{localStorage.setItem(key,String(token||''));}catch{}
+}
+function courtCallPushRegistered(){return !!courtCallLoadPushToken();}
+function courtCallPushSupported(){
+ return typeof window!=='undefined'&&'serviceWorker' in navigator&&'PushManager' in window&&courtCallNotificationPermission()!=='unsupported';
+}
+function courtCallIsIos(){
+ try{return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}catch{return false;}
+}
+function courtCallIsStandalone(){
+ try{return window.matchMedia?.('(display-mode: standalone)')?.matches===true||navigator.standalone===true;}catch{return false;}
+}
+
 function courtCallNotificationHint(){
  const p=courtCallNotificationPermission();
- if(p==='granted')return '背景通知：已啟用';
- if(p==='denied')return '背景通知：瀏覽器已封鎖，請到網站權限重新開啟';
- if(p==='unsupported')return '背景通知：此瀏覽器不支援';
- return '背景通知：尚未啟用';
+ if(p==='denied')return '通知：瀏覽器已封鎖，請到網站權限重新開啟';
+ if(p==='unsupported')return '通知：此瀏覽器不支援';
+ if(p==='default')return '通知：尚未啟用';
+ if(courtCallPushRegistered())return '鎖屏／離開 ARENA 推播：已啟用';
+ if(courtCallIsIos()&&!courtCallIsStandalone())return 'iPhone 鎖屏推播：請先將 ARENA 加入主畫面後再啟用';
+ if(courtCallPushError)return '鎖屏推播：'+courtCallPushError;
+ return '分頁通知：已啟用｜鎖屏推播：待註冊';
+}
+
+async function courtCallLoadFirebaseConfig(){
+ const r=await fetch('./PRODUCTION_FIREBASE_WEB_CONFIG.json?v=20260924',{cache:'no-store'});
+ if(!r.ok)throw Error('push-config-unavailable');
+ const cfg=await r.json();
+ if(!cfg||cfg.projectId!=='bxh-arena'||!cfg.appId||!cfg.messagingSenderId)throw Error('push-config-invalid');
+ return cfg;
+}
+
+async function courtCallEnsurePushRegistration(force=false){
+ const uid=courtCallUserKey();
+ if(!uid||courtCallPushBusy)return courtCallPushRegistered();
+ if(courtCallNotificationPermission()!=='granted'||!courtCallPushSupported())return false;
+ if(courtCallIsIos()&&!courtCallIsStandalone()){
+  courtCallPushError='iPhone 需加入主畫面';
+  return false;
+ }
+ if(!force&&courtCallPushRegistered()&&Date.now()-courtCallPushSyncAt<COURT_CALL_PUSH_REFRESH_MS)return true;
+ if(!window.engagementService||typeof window.engagementService.courtCallPush!=='function'){
+  courtCallPushError='推播服務尚未載入';
+  return false;
+ }
+ courtCallPushBusy=true;courtCallPushSyncAt=Date.now();courtCallPushError='';
+ try{
+  const reg=await navigator.serviceWorker.register('./firebase-messaging-sw.js',{scope:'./'});
+  await navigator.serviceWorker.ready;
+  const [cfg,appMod,msgMod]=await Promise.all([
+   courtCallLoadFirebaseConfig(),
+   import(`https://www.gstatic.com/firebasejs/${COURT_CALL_FIREBASE_SDK}/firebase-app.js`),
+   import(`https://www.gstatic.com/firebasejs/${COURT_CALL_FIREBASE_SDK}/firebase-messaging.js`)
+  ]);
+  if(!(await msgMod.isSupported()))throw Error('push-not-supported');
+  const app=appMod.getApps().length?appMod.getApp():appMod.initializeApp(cfg);
+  const messaging=msgMod.getMessaging(app);
+  const options={serviceWorkerRegistration:reg};
+  const vapid=String(window.BXH_CALL_VAPID_PUBLIC_KEY||'').trim();
+  if(vapid)options.vapidKey=vapid;
+  const token=await msgMod.getToken(messaging,options);
+  if(!token)throw Error('push-token-empty');
+  const result=await window.engagementService.courtCallPush({
+   action:'register',token,
+   platform:String(navigator.platform||'').slice(0,80),
+   userAgent:String(navigator.userAgent||'').slice(0,240)
+  });
+  if(!result?.ok)throw Error('push-register-failed');
+  courtCallSavePushToken(token);
+  courtCallPushError='';
+  return true;
+ }catch(e){
+  const raw=String(e?.message||e);
+  courtCallPushError=raw.includes('not-supported')?'裝置不支援':
+   raw.includes('permission')?'權限未開啟':
+   raw.includes('token')?'Token 建立失敗':'註冊失敗';
+  console.warn('[BXH CALL push]',e);
+  return false;
+ }finally{
+  courtCallPushBusy=false;
+ }
 }
 
 async function courtCallEnableBackgroundNotifications(){
  const p=courtCallNotificationPermission();
- if(p==='unsupported'){showToast('此瀏覽器不支援系統背景通知',true);return false;}
+ if(p==='unsupported'){showToast('此瀏覽器不支援系統通知',true);return false;}
  if(p==='denied'){showToast('通知已被瀏覽器封鎖，請到網站權限重新開啟',true);return false;}
- if(p==='granted'){showToast('BXH CALL 背景通知已啟用');return true;}
  try{
-  const result=await Notification.requestPermission();
-  if(result==='granted'){
-   showToast('BXH CALL 背景通知已啟用');
-   courtCallSystemNotify('bxh-call-enabled','BXH CALL 已啟用','切換到其他分頁時，裁判叫號會顯示系統通知。',true);
-   return true;
+  const granted=p==='granted'||await Notification.requestPermission()==='granted';
+  if(!granted){showToast('尚未取得通知權限',true);return false;}
+  const pushOk=await courtCallEnsurePushRegistration(true);
+  if(pushOk){
+   showToast('BXH CALL 鎖屏／離開 ARENA 推播已啟用');
+  }else if(courtCallIsIos()&&!courtCallIsStandalone()){
+   showToast('iPhone 請先將 BXH ARENA 加入主畫面，再開啟通知',true);
+  }else{
+   showToast('分頁通知已啟用；鎖屏推播尚未完成註冊',true);
+   courtCallSystemNotify('bxh-call-enabled','BXH CALL 已啟用','ARENA 保持開啟時可收到背景通知。',true);
   }
-  showToast('尚未取得通知權限',true);
- }catch{
-  showToast('無法取得通知權限，請稍後重試',true);
+  return true;
+ }catch(e){
+  console.warn('[BXH CALL notification permission]',e);
+  showToast('無法啟用通知，請稍後重試',true);
+  return false;
  }
- return false;
 }
 
 function courtCallSystemNotify(tag,title,body,force=false){
  try{
   if(typeof document!=='undefined'&&!force&&document.visibilityState==='visible')return false;
+  // When Web Push is registered, the Service Worker owns background delivery.
+  // Avoid showing a second local notification from the polling fallback.
+  if(!force&&courtCallPushRegistered())return false;
   if(courtCallNotificationPermission()!=='granted')return false;
   const dedupe=String(tag||title||body||'');
   if(dedupe&&courtCallSystemNotifySeen.has(dedupe))return false;
@@ -174,11 +270,14 @@ function renderCourtCallReferee(m){
 
 function renderCourtCallPlayer(code){
  const c=courtCallContext(code);
- const np=courtCallNotificationPermission();
+ const np=courtCallNotificationPermission(),pushReady=courtCallPushRegistered();
+ const notifyButton=np==='default'
+  ? '<button class="btn btn-ghost" data-action="court-call-enable-notify">🔔 啟用背景通知</button>'
+  : (np==='granted'&&!pushReady?'<button class="btn btn-ghost" data-action="court-call-enable-notify">📱 啟用鎖屏推播</button>':'');
  return `<section>
    <p class="hint">裁判人工叫號與智慧 ETA 已分離｜人工叫號約每 2–3 秒同步｜PASS：${c.used?'本賽事已使用':'可使用 1 次，直接延後一場'}</p>
    <div class="btn-row" style="align-items:center">
-    ${np==='default'?'<button class="btn btn-ghost" data-action="court-call-enable-notify">🔔 啟用背景通知</button>':''}
+    ${notifyButton}
     <span class="hint">${esc(courtCallNotificationHint())}</span>
    </div>
    ${courtCallCommon(c)}
@@ -352,6 +451,9 @@ function scheduleCourtCallPoll(){
  courtCallTimer=setTimeout(async()=>{
   courtCallTimer=null;
   await discoverCourtCallPlayerCodes(false);
+  if(courtCallNotificationPermission()==='granted'&&Date.now()-courtCallPushSyncAt>COURT_CALL_PUSH_REFRESH_MS){
+   courtCallEnsurePushRegistration(false).catch(()=>{});
+  }
   const list=courtCallVisibleCodes();
   for(const code of list){
    const c=courtCallContext(code);
