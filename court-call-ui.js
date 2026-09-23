@@ -260,7 +260,9 @@ function courtCallVisibleCodes(){
   }
  }catch{}
  try{
-  if(((appPhase==='app'&&activeTab==='referee')||(appPhase==='community-room'&&communityRoomActiveTab==='referee'))&&state.cloudCode&&canOperateCurrentTournament())codes.add(String(state.cloudCode).toUpperCase());
+  // Keep the active tournament's call channel alive for referees/admins even
+  // when they momentarily switch from the referee tab to bracket/roster/etc.
+  if(state&&state.cloudCode&&canOperateCurrentTournament())codes.add(String(state.cloudCode).toUpperCase());
  }catch{}
  return [...codes].filter(x=>/^BXH-[A-Z0-9]{4,16}$/.test(x)).slice(0,10);
 }
