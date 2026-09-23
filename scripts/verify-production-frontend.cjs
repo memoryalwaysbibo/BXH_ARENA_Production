@@ -308,3 +308,23 @@ mustInclude('Quick Decision 與防守失分不計入','Hunter P6.3 exclusion dis
 mustInclude('body=hunterAchievementsHtml(achievementCore);','Hunter P6.3 achievement page linkage missing');
 mustInclude('P6.3</span>','Hunter P6.3 profile badge missing');
 console.log('PASS Hunter Profile P6.3 Round achievements');
+
+mustInclude('achievementId:"streak_3"','Hunter P6.4 3-win streak milestone missing');
+mustInclude('achievementId:"streak_5"','Hunter P6.4 5-win streak milestone missing');
+mustInclude('achievementId:"streak_10"','Hunter P6.4 10-win streak milestone missing');
+mustInclude('achievementId:"shutout_1"','Hunter P6.4 first shutout milestone missing');
+mustInclude('achievementId:"shutout_10"','Hunter P6.4 10-shutout milestone missing');
+mustInclude('achievementId:"shutout_25"','Hunter P6.4 25-shutout milestone missing');
+mustInclude('function hunterAchievementHasExactMatchTime(record)','Hunter P6.4 exact ordering helper missing');
+mustInclude('streakWindowsByLength','Hunter P6.4 streak evidence windows missing');
+mustInclude('bestWinStreakRefs','Hunter P6.4 best streak evidence missing');
+mustInclude('currentWinStreakRefs:activeStreakRefs.slice()','Hunter P6.4 current streak snapshot missing');
+mustInclude('if(hunterRecordHasTrustedScore(record)&&Number(record.scoreAgainst)===0) shutoutRefs.push(matchRef);','Hunter P6.4 shutout must require trusted score');
+mustInclude('if(metric==="maxWinStreak")','Hunter P6.4 max streak evaluator missing');
+mustInclude('if(metric==="shutoutWins") return context.shutoutRefs;','Hunter P6.4 shutout evidence mapping missing');
+mustInclude('function hunterStreakSpecialAchievementsHtml(core)','Hunter P6.4 streak/special UI missing');
+mustInclude('Quick Decision 有可信勝敗，因此可計入連勝','Hunter P6.4 Quick Decision streak disclosure missing');
+mustInclude('Quick Decision 不會被當成完封','Hunter P6.4 Quick Decision shutout exclusion missing');
+mustInclude('本區不產生「剋星、無敵」等主觀標籤','Hunter P6.4 non-overclaim disclosure missing');
+mustInclude('P6.4</span>','Hunter P6.4 profile badge missing');
+console.log('PASS Hunter Profile P6.4 streak and special records');
