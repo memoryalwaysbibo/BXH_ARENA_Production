@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.02">
+<meta name="bxh-build" content="20260924.03">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.02";
+  var CURRENT_BUILD="20260924.03";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -625,6 +625,16 @@ table.rank-table tr:last-child td{border-bottom:none;}
   .referee-scoring-compact .rsc-label{font-size:15px;}
   .rsc-toggle{width:136px;}
   .rsc-option{padding:6px 8px;font-size:12px;}
+}
+
+/* ==== v14.0.66 bracket completed-match long press correction ==== */
+.board-shell .match-box.long-press-correctable{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+.board-shell .match-box.long-press-armed{
+  outline:2px solid rgba(243,216,120,.78);
+  outline-offset:2px;
+  filter:brightness(1.1);
 }
 .round-scoring-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
 .round-scoring-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;background:var(--panel-2);border-radius:8px;}
@@ -4347,9 +4357,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.65";
+const APP_VERSION = "v14.0.66";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.66",date:"2026/09/24",timezone:"Asia/Taipei",title:"樹狀圖長按修正比分",updateLevel:"patch",added:["樹狀總覽已完成場次支援長按 1.5 秒開啟二階修正入口"],changed:["裁判台移除常駐的上一場修正／撤回區塊，釋放手機垂直空間","修正入口改為直接對指定已完成場次操作，不再侷限上一場","長按後先顯示場次與比分，再由「修正比分」進入安全撤回確認"],fixed:["保留既有後續賽程保護；後續場次已有實際得分或完成時仍會阻止回滾"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket long-press correction entry",firebaseImpact:"無資料結構變更；沿用既有 correction transaction 與稽核欄位",securityRulesImpact:"無",permissionImpact:"僅有既有賽事操作＋對應戰鬥台權限者可啟動",publicSummary:"比分修正不再常駐裁判台；有權限的人可在樹狀圖長按已完成場次開啟修正。"},
   {version:"v14.0.65",date:"2026/09/24",timezone:"Asia/Taipei",title:"裁判台判定模式極簡切換",updateLevel:"patch",added:["裁判台判定模式改為單列左右切換控制"],changed:["標準計分／簡易判定在裁判台顯示簡化為「正常／簡單」","移除裁判台判定模式的大型說明卡與描述文字，保留既有判定邏輯與切換確認"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee scoring mode compact toggle",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"沿用既有判定模式設定權限",publicSummary:"裁判台的判定模式改成更省空間的「正常／簡單」左右切換。"},
   {version:"v14.0.64",date:"2026/09/24",timezone:"Asia/Taipei",title:"裁判台下一場高對比提示卡",updateLevel:"patch",added:["裁判台標準計分、簡易判定與等待晉級狀態全面改用與即時戰況一致的高對比下一場提示卡"],changed:["下一場資訊由單行灰字改為 badge＋場次資訊＋獨立選手名稱列","裁判台內的下一場選手名稱額外放大並提高字重，VS 與外框沿用該戰鬥台專屬色"],fixed:["改善裁判台手機畫面中下一場人名灰度過低、不易辨識的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee next-match visibility enhancement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台的下一場現在會以醒目的雙層提示卡顯示，選手名稱更大、更亮，並跟隨戰鬥台專屬色。"},
   {version:"v14.0.63",date:"2026/09/23",timezone:"Asia/Taipei",title:"即時戰況下一場提示卡強化",updateLevel:"patch",added:["即時戰鬥台的下一場改為獨立兩層提示卡，分離場次資訊與對戰選手","下一場標籤、外框、左側光條與 VS 重點色跟隨各戰鬥台專屬色"],changed:["手機版下一場資訊不再塞在單行灰字中；選手名稱提高字級與對比","等待晉級與本台完成狀態使用相同提示卡結構，資訊層級一致"],fixed:["改善即時戰況下一場資訊在手機上灰度過低、難以快速辨識的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend live court next-match card emphasis",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況的下一場現在會以高對比提示卡顯示，場次與對戰選手更醒目，並沿用各戰鬥台專屬色。"},
@@ -9767,17 +9778,17 @@ function applyCompletedMatchCorrection(st,matchId,mode,actor){
 }
 function correctionFailureMessage(reason){
   const map={
-    "not-found":"找不到上一場比賽，請重新整理後再試。",
-    "not-completed":"上一場目前不是已完成狀態，無需撤回。",
-    "court-already-started":"本戰鬥台的下一場已經有實際得分或完成判定，為避免破壞賽程，已阻止撤回。",
-    "downstream-started":"上一場的晉級結果已進入後續比賽，而且後續比賽已有實際得分或完成判定，無法直接撤回。",
-    "station-not-assigned":"此戰鬥台未指派給你，無法修改上一場。",
-    "station-mismatch":"上一場已改派到其他戰鬥台，請重新整理。",
+    "not-found":"找不到該場比賽，請重新整理後再試。",
+    "not-completed":"該場目前不是已完成狀態，無需修正。",
+    "court-already-started":"同戰鬥台的後續場次已經有實際得分或完成判定，為避免破壞賽程，已阻止修正。",
+    "downstream-started":"該場的晉級結果已進入後續比賽，而且後續比賽已有實際得分或完成判定，無法直接修正。",
+    "station-not-assigned":"此戰鬥台未指派給你，無法修改該場。",
+    "station-mismatch":"該場已改派到其他戰鬥台，請重新整理。",
     "dispatch-stale":"場次安排已變更，請重新整理後再試。",
     "cloud-unavailable":"目前無法連線雲端，請稍後再試。",
     "corrupt-data":"雲端賽事資料異常，已停止修改。"
   };
-  return map[reason]||("上一場修正失敗（"+reason+"），請重新整理後再試。");
+  return map[reason]||("場次修正失敗（"+reason+"），請重新整理後再試。");
 }
 async function reopenCompletedMatchForCorrection(matchId,mode){
   if(!canOperateCurrentTournament()){showToast("目前身分沒有此操作權限。",true);return false;}
@@ -9795,7 +9806,7 @@ async function reopenCompletedMatchForCorrection(matchId,mode){
     if(appPhase==="community-room") communityRoomActiveTab="referee"; else activeTab="referee";
     rememberRefereeWorkstation();
     render();
-    showToast(mode==="reset"?"已撤回上一場，比分已清零":"已撤回上一場結果，可開始修正比分");
+    showToast(mode==="reset"?"已撤回該場，比分已清零":"已撤回該場結果，可開始修正比分");
     return true;
   }
   const stationSyncOk=await flushStationMatchMutations();
@@ -9818,8 +9829,83 @@ async function reopenCompletedMatchForCorrection(matchId,mode){
   if(appPhase==="community-room") communityRoomActiveTab="referee"; else activeTab="referee";
   rememberRefereeWorkstation();
   render();
-  showToast(mode==="reset"?"已撤回上一場，比分已清零":"已撤回上一場結果，可開始修正比分");
+  showToast(mode==="reset"?"已撤回該場，比分已清零":"已撤回該場結果，可開始修正比分");
   return true;
+}
+
+function openCompletedMatchCorrectionConfirm(matchId){
+  const m=getMatch(matchId);
+  if(!m||!m.completed){showToast("找不到可修正的已完成場次",true);return;}
+  const modeLabel=(m.scoringMode==="quick"||m.resultMethod==="quick_decision")?"結果":"比分";
+  openModal({
+    type:"generic",
+    title:"確認修正"+modeLabel,
+    message:"系統會先安全撤回這場已確認的勝負與晉級，保留目前回合／比分資料，接著回到裁判台進行修正。\n\n若相關後續比賽已經有實際得分或完成判定，系統會自動阻止修正。",
+    danger:true,
+    confirmLabel:"撤回並修正",
+    onConfirm:()=>{reopenCompletedMatchForCorrection(matchId,"edit");}
+  });
+}
+
+function openCompletedMatchCorrectionMenu(matchId){
+  const m=getMatch(matchId);
+  if(!m||m.isBye||!m.completed){return;}
+  if(!canOperateCurrentTournament()){showToast("目前身分沒有修正比賽結果的權限",true);return;}
+  if(state.archiveStatus==="completed"){showToast("賽事已封存，無法直接修正比分",true);return;}
+  if(!canOperateStation(Number(m.station||0))){showToast("你目前沒有此戰鬥台的修正權限",true);return;}
+  const a=m.a&&m.a.playerId?playerName(m.a.playerId):"—";
+  const b=m.b&&m.b.playerId?playerName(m.b.playerId):"—";
+  const score=(m.scoringMode==="quick"||m.resultMethod==="quick_decision")
+    ?"簡單判定"
+    : String(m.scoreA==null?"—":m.scoreA)+"："+String(m.scoreB==null?"—":m.scoreB);
+  const label=displayMatchLabel(m)||("第 "+(displayMatchNumber(m)||"—")+" 場");
+  openModal({
+    type:"generic",
+    title:label,
+    message:a+"　"+score+"　"+b,
+    confirmLabel:"修正比分",
+    onConfirm:()=>{openCompletedMatchCorrectionConfirm(matchId);}
+  });
+}
+
+let bracketCorrectionSuppressClickId="";
+let bracketCorrectionSuppressClickUntil=0;
+function bindCompletedMatchCorrectionLongPress(viewport){
+  if(!viewport||typeof viewport.querySelectorAll!=="function") return;
+  const HOLD_MS=1500;
+  const MOVE_CANCEL_PX=14;
+  viewport.querySelectorAll('.match-box.done[data-action="open-match"][data-id]').forEach(box=>{
+    const id=box.getAttribute("data-id")||"";
+    const m=getMatch(id);
+    if(!m||m.isBye||!m.completed||!canOperateCurrentTournament()||state.archiveStatus==="completed"||!canOperateStation(Number(m.station||0))) return;
+    box.classList.add("long-press-correctable");
+    let timer=null,startX=0,startY=0,pointerId=null,triggered=false;
+    const clearHold=()=>{
+      if(timer){clearTimeout(timer);timer=null;}
+      box.classList.remove("long-press-armed");
+    };
+    box.addEventListener("pointerdown",(e)=>{
+      if(e.pointerType==="mouse"&&e.button!==0) return;
+      pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;triggered=false;
+      clearHold();
+      box.classList.add("long-press-armed");
+      timer=setTimeout(()=>{
+        timer=null;triggered=true;box.classList.remove("long-press-armed");
+        bracketCorrectionSuppressClickId=id;
+        bracketCorrectionSuppressClickUntil=Date.now()+1200;
+        try{if(navigator&&typeof navigator.vibrate==="function")navigator.vibrate(25);}catch(_){}
+        openCompletedMatchCorrectionMenu(id);
+      },HOLD_MS);
+    });
+    box.addEventListener("pointermove",(e)=>{
+      if(pointerId!==e.pointerId||!timer) return;
+      if(Math.hypot(e.clientX-startX,e.clientY-startY)>MOVE_CANCEL_PX) clearHold();
+    });
+    box.addEventListener("pointerup",(e)=>{if(pointerId===e.pointerId&&!triggered)clearHold();});
+    box.addEventListener("pointercancel",clearHold);
+    box.addEventListener("pointerleave",(e)=>{if(e.pointerType==="mouse")clearHold();});
+    box.addEventListener("contextmenu",(e)=>{e.preventDefault();});
+  });
 }
 
 /* ======================================================================
@@ -12531,7 +12617,7 @@ function refereeWorkstationHeader(m, stationNum){
   const assigned=refereeDisplayForStation(stationNum);
   const status=refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
-  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small></div></div>${previousMatchCorrectionHtml(stationNum,m&&m.id)}`;
+  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small></div></div>`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
@@ -19645,6 +19731,8 @@ function bindBoardModeInteractions(){
     const canvas = document.getElementById("board-canvas");
     if(!viewport || !canvas) return;
 
+    bindCompletedMatchCorrectionLongPress(viewport);
+
     viewport.addEventListener("wheel", (e)=>{
       if(!e.ctrlKey) return;
       e.preventDefault();
@@ -22440,10 +22528,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
 
   if(action==="correct-previous-score"){
-    const m=getMatch(id);
-    if(!m||!m.completed){showToast("找不到可修正的上一場",true);return;}
-    const modeLabel=(m.scoringMode==="quick"||m.resultMethod==="quick_decision")?"結果":"比分";
-    openModal({type:"generic",title:"修正上一場"+modeLabel,message:"將撤回這場已確認的勝負與晉級，但保留目前回合／比分資料，回到裁判台進行修正。\n\n若相關的後續比賽已經有實際得分，系統會自動阻止撤回。",danger:true,confirmLabel:"撤回並修正",onConfirm:()=>{reopenCompletedMatchForCorrection(id,"edit");}});
+    openCompletedMatchCorrectionConfirm(id);
     return;
   }
   if(action==="retract-previous-match"){
@@ -23579,6 +23664,14 @@ document.addEventListener("click", (e)=>{
   const target = e.target.closest("[data-action]");
   if(!target) return;
   const action = target.getAttribute("data-action");
+  if(action==="open-match"){
+    const matchId=target.getAttribute("data-id")||"";
+    if(matchId && matchId===bracketCorrectionSuppressClickId && Date.now()<bracketCorrectionSuppressClickUntil){
+      bracketCorrectionSuppressClickId="";bracketCorrectionSuppressClickUntil=0;
+      e.preventDefault();
+      return;
+    }
+  }
   if(action==="modal-overlay" && e.target!==target){ return; }
   if(action==="cloud-close-admin-list" && e.target!==target){ return; }
   if(action==="close-share-modal" && e.target!==target){ return; }
