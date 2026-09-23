@@ -150,4 +150,14 @@ mustInclude('獵人等級只代表累積經驗','Hunter P5 level/rating separati
 mustInclude('不計入 XP 或期間統計','Hunter P5 unresolved identity exclusion missing');
 mustInclude('天梯、獵人等級、綜合評分三者用途不同','Hunter P5 three-system separation note missing');
 console.log('PASS Hunter Profile P5 growth and period stats');
+mustInclude('function hunterEvidenceGroups(evidence)','Hunter P5.1 evidence grouping missing');
+mustInclude('function hunterEvidenceTimelineForGroup(group)','Hunter P5.1 round timeline missing');
+mustInclude('function hunterEvidenceHtml(bucket,type,perspective)','Hunter P5.1 evidence renderer missing');
+mustInclude('dataTrust:rec.resultMethod==="quick_decision"','Hunter P5.1 trust classification missing');
+mustInclude('target[ev.type].evidence.push','Hunter P5.1 analysis bucket evidence linkage missing');
+mustInclude('完整 Round Timeline','Hunter P5.1 full round timeline label missing');
+mustInclude('group.opponentName','Hunter P5.1 opponent evidence display missing');
+mustInclude('可展開來源','Hunter P5.1 expandable source UI missing');
+mustInclude('可追溯到對手、Match 與原始 Round Timeline','Hunter P5.1 traceability disclosure missing');
+console.log('PASS Hunter Profile P5.1 evidence chain');
 
