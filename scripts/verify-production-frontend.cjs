@@ -180,4 +180,12 @@ mustInclude('跨賽事可識別','Hunter P5.3 stable identity label missing');
 mustNot(/players:\s*\(state\.players\|\|\[\]\)\.map\(p=>\(\{[^}]*registrationUid/s,'Public tournament mirror must not expose registrationUid');
 mustNot(/players:\s*\(state\.players\|\|\[\]\)\.map\(p=>\(\{[^}]*guardianUid/s,'Public tournament mirror must not expose guardianUid');
 console.log('PASS Hunter Profile P5.3 opponent identity layer');
+mustInclude('function hunterBuildH2H(records)','Hunter P5.4 H2H aggregator missing');
+mustInclude('function hunterH2HItemHtml(group)','Hunter P5.4 H2H item renderer missing');
+mustInclude('function hunterH2HPanelHtml(records)','Hunter P5.4 H2H panel missing');
+mustInclude('identity.scope!=="cross-event"','Hunter P5.4 must exclude unstable opponent identities');
+mustInclude('Quick Decision 只計勝敗','Hunter P5.4 quick-decision score exclusion disclosure missing');
+mustInclude('H2H 只使用穩定 playerId 聚合','Hunter P5.4 stable identity disclosure missing');
+mustInclude('hunterH2HPanelHtml(rows)','Hunter P5.4 records-page linkage missing');
+console.log('PASS Hunter Profile P5.4 H2H statistics');
 
