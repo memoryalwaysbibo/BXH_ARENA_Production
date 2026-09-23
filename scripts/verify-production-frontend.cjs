@@ -337,7 +337,7 @@ mustInclude('查看 Evidence Chain','Hunter P6.5 evidence disclosure control mis
 mustInclude('canonical Hunter Match / Round','Hunter P6.5 canonical source disclosure missing');
 mustInclude('Round Event #','Hunter P6.5 Round event detail missing');
 mustInclude('Match "+matchId','Hunter P6.5 Match ID detail missing');
-mustInclude('VS "+esc(opponent)','Hunter P6.5 opponent evidence detail missing');
+mustInclude('const opponent=(record.opponent&&record.opponent.name)||"未知對手";','Hunter P6.5 opponent evidence detail missing');
 mustInclude('hunterRecordScoreText(record)','Hunter P6.5 evidence must use trusted score display');
 mustInclude('hunterMatchAchievementCardHtml(item,records)','Hunter P6.5 Match cards must receive canonical records');
 mustInclude('hunterRoundAchievementCardHtml(item,records)','Hunter P6.5 Round cards must receive canonical records');
