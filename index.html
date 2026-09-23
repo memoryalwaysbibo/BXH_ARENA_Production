@@ -23020,6 +23020,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state = isTester() ? markTesterSandboxState(ns) : ns;
       resetSettingsFormDraft();
       resetRegistrationFormDraft();
+      aiCreateLastApplied=null;
+      aiCreateStructuredResult=null;
+      aiCreateStructuredErrors=[];
+      aiCreateSelectedEventKey="";
+      aiCreateSourceText="";
       await saveRecord(state);
       await setCurrentId(state.id);
       recordIndex = await loadIndex();
@@ -23849,7 +23854,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state.championId=null; state.runnerUpId=null; state.thirdId=null; state.fourthId=null;
         state.gfMatchId=null; state.gfResetMatchId=null; state.bronzeMatchId=null; state.rrRounds=0;
         state.courtAssignments={};
-        resetSettingsFormDraft(); resetRegistrationFormDraft();
+        resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null;
         saveState(); render();
         showToast("賽制已更換，請重新產生對戰表");
       }});
@@ -23874,7 +23879,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     });
 
     rebuildCourtAssignments();
-    resetSettingsFormDraft(); resetRegistrationFormDraft();
+    resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null;
     saveState(); render();
     showToast("賽事設定已儲存");
     return;
