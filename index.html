@@ -3197,6 +3197,74 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   display:flex;align-items:flex-end;justify-content:space-between;gap:14px;
   margin:0 0 18px;padding:0 2px;
 }
+
+.ai-create-assist-btn{
+  border-color:rgba(217,185,92,.52)!important;
+  background:linear-gradient(135deg,rgba(217,185,92,.12),rgba(255,255,255,.025))!important;
+  color:var(--ivory)!important;
+}
+.ai-create-assist-btn:hover{border-color:var(--gold)!important;box-shadow:0 0 18px rgba(217,185,92,.10);}
+.ai-create-overlay{
+  position:fixed;inset:0;z-index:4200;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;background:rgba(0,0,0,.72);
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+}
+.ai-create-dialog{
+  width:min(760px,100%);max-height:min(88vh,860px);overflow:auto;
+  border:1px solid rgba(217,185,92,.42);border-radius:16px;
+  background:linear-gradient(180deg,rgba(25,25,27,.99),rgba(12,12,14,.99));
+  box-shadow:0 24px 80px rgba(0,0,0,.62),0 0 32px rgba(217,185,92,.06);
+}
+.ai-create-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);
+}
+.ai-create-kicker{font:800 11px var(--font-d);letter-spacing:1.4px;color:var(--gold);text-transform:uppercase;}
+.ai-create-title{margin-top:3px;font:800 22px var(--font-d);color:var(--white);}
+.ai-create-sub{margin-top:5px;font-size:12px;line-height:1.6;color:var(--metal-dim);}
+.ai-create-close{
+  flex:0 0 auto;width:38px;height:38px;border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;background:rgba(255,255,255,.03);color:var(--metal);
+  font-size:18px;cursor:pointer;
+}
+.ai-create-body{padding:18px;}
+.ai-create-source{
+  width:100%;min-height:250px;resize:vertical;
+  padding:14px;border:1px solid var(--border);border-radius:12px;
+  background:rgba(0,0,0,.28);color:var(--white);
+  font:500 14px/1.7 "Noto Sans TC",sans-serif;outline:none;
+}
+.ai-create-source:focus{border-color:var(--gold-dim);box-shadow:0 0 0 2px rgba(217,185,92,.07);}
+.ai-create-meta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;color:var(--metal-dim);font-size:10.5px;}
+.ai-create-fields{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;}
+.ai-create-chip{
+  padding:5px 9px;border:1px solid rgba(255,255,255,.1);border-radius:999px;
+  background:rgba(255,255,255,.025);color:var(--metal);font-size:10.5px;
+}
+.ai-create-safety{
+  margin-top:16px;padding:11px 12px;border:1px solid rgba(217,185,92,.18);
+  border-radius:10px;background:rgba(217,185,92,.045);color:var(--metal);
+  font-size:11px;line-height:1.65;
+}
+.ai-create-notice{
+  margin-top:12px;padding:10px 12px;border:1px solid rgba(102,180,255,.28);
+  border-radius:10px;background:rgba(102,180,255,.055);color:#cfe6ff;
+  font-size:11px;line-height:1.6;
+}
+.ai-create-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+@media(max-width:720px){
+  .settings-toolbar .btn-row{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row dense;width:100%;}
+  .settings-toolbar .btn-row .ai-create-assist-btn{grid-column:1/-1;grid-row:2;}
+  .ai-create-overlay{align-items:flex-end;padding:10px;}
+  .ai-create-dialog{width:100%;max-height:92vh;border-radius:16px 16px 12px 12px;}
+  .ai-create-head{padding:16px 14px 12px;}
+  .ai-create-body{padding:14px;}
+  .ai-create-source{min-height:230px;font-size:16px;}
+  .ai-create-meta{flex-direction:column;gap:3px;}
+  .ai-create-actions{display:grid;grid-template-columns:1fr 1fr;}
+  .ai-create-actions .btn{width:100%;}
+}
 .settings-page-title{font-family:var(--font-d);font-size:24px;font-weight:800;color:var(--white);}
 .settings-page-sub{font-size:12px;color:var(--metal-dim);margin-top:4px;line-height:1.5;}
 .settings-flow-panel{padding:18px;}
@@ -7647,6 +7715,55 @@ let registrationFormDraftDirty = false;
 let settingsFormDraft = null;
 let settingsFormDraftDirty = false;
 
+/* P7.1 — AI-assisted tournament creation shell.
+   Layer 1 is intentionally UI-only: it captures source copy and preserves the
+   existing settings/registration drafts, but performs no AI/network/Firebase
+   writes and can never publish a tournament. */
+let aiCreateAssistantOpen = false;
+let aiCreateSourceText = "";
+let aiCreateAssistantNotice = "";
+
+function renderAiCreateAssistant(){
+  if(!aiCreateAssistantOpen) return "";
+  const charCount=String(aiCreateSourceText||"").length;
+  return `<div class="ai-create-overlay" data-action="ai-create-close-overlay" role="presentation">
+    <section class="ai-create-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-create-title">
+      <div class="ai-create-head">
+        <div>
+          <div class="ai-create-kicker">ARENA AI</div>
+          <div class="ai-create-title" id="ai-create-title">✨ AI 協助建立賽事</div>
+          <div class="ai-create-sub">貼上 LINE、Threads、Facebook、Instagram 等活動文案。後續將由 AI 擷取資訊，再套入現有賽事設定草稿供房主審核。</div>
+        </div>
+        <button type="button" class="ai-create-close" data-action="ai-create-close" aria-label="關閉 AI 協助建立">✕</button>
+      </div>
+      <div class="ai-create-body">
+        <label for="ai-create-source-text" style="display:block;font-weight:800;color:var(--ivory);margin-bottom:8px;">活動文案</label>
+        <textarea id="ai-create-source-text" class="ai-create-source" maxlength="12000" placeholder="請貼上活動文案……">${esc(aiCreateSourceText)}</textarea>
+        <div class="ai-create-meta">
+          <span>支援長文與原始排版；第一層不會修改目前賽事。</span>
+          <span id="ai-create-char-count">${charCount.toLocaleString("zh-TW")} / 12,000</span>
+        </div>
+        <div class="ai-create-fields" aria-label="預計可辨識欄位">
+          <span class="ai-create-chip">賽事名稱</span>
+          <span class="ai-create-chip">活動日期</span>
+          <span class="ai-create-chip">活動地點</span>
+          <span class="ai-create-chip">報到時間</span>
+          <span class="ai-create-chip">開賽時間</span>
+          <span class="ai-create-chip">報名開放／截止</span>
+          <span class="ai-create-chip">名額</span>
+          <span class="ai-create-chip">費用</span>
+        </div>
+        <div class="ai-create-safety">🔒 AI 只負責產生「賽事設定草稿」。正式設計中將維持：AI 不直接建立房間、不直接寫入正式賽事資料，也沒有發布權；最後仍由房主確認。</div>
+        ${aiCreateAssistantNotice?`<div class="ai-create-notice">${esc(aiCreateAssistantNotice)}</div>`:""}
+        <div class="ai-create-actions">
+          <button type="button" class="btn btn-ghost" data-action="ai-create-close">取消</button>
+          <button type="button" class="btn btn-primary" data-action="ai-create-parse">✨ 開始解析</button>
+        </div>
+      </div>
+    </section>
+  </div>`;
+}
+
 function ensureSettingsFormDraft(){
   if(settingsFormDraft) return;
   const m=state.meta||{};
@@ -8429,7 +8546,8 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle",
-  "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment"
+  "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
+  "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse"
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
@@ -13591,9 +13709,12 @@ function renderSettings(){
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost btn-sm" data-action="cloud-open-admin-list">返回賽事管理</button>
+      <button class="btn btn-ghost btn-sm ai-create-assist-btn" data-action="ai-create-open">✨ AI 協助建立</button>
       <button class="btn btn-primary btn-sm" data-action="new-tournament-blank">＋ 新增賽事</button>
     </div>
   </div>
+
+  ${renderAiCreateAssistant()}
 
   <div class="settings-section-head" style="margin-top:0;">
     <span class="settings-section-num">1</span>
@@ -19876,6 +19997,15 @@ function bindDynamicInputs(){
       initHalfHourTimePickers(document);
       initHalfHourDatetimePickers(document);
       freezeArchivedControls();
+      const aiCreateSource=document.getElementById("ai-create-source-text");
+      if(aiCreateSource){
+        aiCreateSource.addEventListener("input",()=>{
+          aiCreateSourceText=aiCreateSource.value;
+          aiCreateAssistantNotice="";
+          const countEl=document.getElementById("ai-create-char-count");
+          if(countEl) countEl.textContent=String(aiCreateSourceText.length).replace(/\B(?=(\d{3})+(?!\d))/g,",")+" / 12,000";
+        });
+      }
       document.querySelectorAll("[data-settings-draft]").forEach(el=>{
         const update=()=>{
           ensureSettingsFormDraft();
@@ -20193,6 +20323,33 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     showToast("目前身分沒有此操作權限。", true);
     return;
   }
+  if(action==="ai-create-open"){
+    syncSettingsDraftFromDom();
+    syncRegistrationDraftFromDom();
+    aiCreateAssistantOpen=true;
+    aiCreateAssistantNotice="";
+    render();
+    setTimeout(()=>{try{document.getElementById("ai-create-source-text")?.focus({preventScroll:true});}catch(e){}},0);
+    return;
+  }
+  if(action==="ai-create-close" || action==="ai-create-close-overlay"){
+    aiCreateAssistantOpen=false;
+    aiCreateAssistantNotice="";
+    render();
+    return;
+  }
+  if(action==="ai-create-parse"){
+    const input=document.getElementById("ai-create-source-text");
+    if(input) aiCreateSourceText=input.value;
+    if(!String(aiCreateSourceText||"").trim()){
+      showToast("請先貼上活動文案",true);
+      return;
+    }
+    aiCreateAssistantNotice="第一層介面與文案輸入已接通；目前尚未呼叫 AI。下一階段將接入結構化解析與欄位預填。";
+    render();
+    return;
+  }
+
   // v13.27.0: completed tournament is a true read-only archive.
   if(courtQueueBusy && COMPLETED_TOURNAMENT_MUTATION_ACTIONS.has(action)){
     showToast("正在確認場次安排，請稍候再操作。",true);
@@ -23750,6 +23907,7 @@ document.addEventListener("click", (e)=>{
     }
   }
   if(action==="modal-overlay" && e.target!==target){ return; }
+  if(action==="ai-create-close-overlay" && e.target!==target){ return; }
   if(action==="cloud-close-admin-list" && e.target!==target){ return; }
   if(action==="close-share-modal" && e.target!==target){ return; }
   if(action==="cloud-close-join-modal" && e.target!==target){ return; }
