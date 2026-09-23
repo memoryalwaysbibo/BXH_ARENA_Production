@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.21">
+<meta name="bxh-build" content="20260923.22">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.21";
+  var CURRENT_BUILD="20260923.22";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4251,9 +4251,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.45";
+const APP_VERSION = "v14.0.46";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.46",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 統計口徑封版修正",updateLevel:"patch",added:["Hunter Profile 載入層新增 canonical Match 去重，所有獵人頁面統一先取得同一份唯一對戰集合","最終統計口徑檢查固定驗證：期間統計、P4 能力分析、P5 單場與 H2H 都沿用同一份 canonical Hunter Match／Round 資料"],changed:["生涯場次、P4 生涯能力分析、XP、期間統計、對戰紀錄與 H2H 改為從載入完成後的唯一 Match 集合出發","H2H 對手場次仍只統計可安全跨賽事識別的對手；辨識中、辨識失敗與僅本場識別維持獨立揭露，不要求 H2H 加總等於全部生涯場次"],fixed:["修正同一賽事若因重複 registration reference 被讀取兩次時，生涯總場次與 P4 生涯分析可能重複計算，但期間統計、XP 與 H2H 已去重而造成口徑不一致的風險"],environment:"Production consistency audit branch",deployStatus:"P5 statistical-caliber seal; no P6 features",firebaseImpact:"無；純前端載入後去重與驗證，不修改 Firestore 文件",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案 P5 完成統計口徑封版：所有總覽、能力、單場與 H2H 從同一份去重後 Match／Round 資料計算。"},
+
   {version:"v14.0.45",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 Round 完整性顯示修正",updateLevel:"patch",added:["單場攻防拆解新增完整性守門：只有 analyzable=true 才顯示四種得失分拆解","Round Timeline 新增完整性守門；Quick Decision 與 ledger 未通過驗證時不再顯示部分事件","對戰卡回合 chip 只顯示已通過完整 Round ledger 驗證的事件"],changed:["Quick Decision 單場詳細只顯示『沒有逐回合能力資料』，不再列出 0 分／0 回的假性攻防面板","Round 資料不完整的歷史 Match 改顯示『未通過完整性驗證』，避免部分事件被誤認為完整 Timeline","P5.2 單場明細與 P5.1/P4 使用相同 analyzable 信任邊界"],fixed:["修正 analyzable=false 但仍殘留 normalized round events 時，P5.2 可能顯示部分攻防拆解與完整 Timeline 的誤導","修正 Quick Decision 顯示四種 0 分統計，容易被誤認為實際戰型資料"],environment:"Production consistency audit branch",deployStatus:"P5 round-integrity UI fix only",firebaseImpact:"無；不修改 Firestore，只收斂前端顯示條件",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"只有通過完整回合驗證的對戰才會顯示逐回合攻防；判定模式與不完整歷史資料不再展示部分事件。"},
 
   {version:"v14.0.44",date:"2026/09/23",timezone:"Asia/Taipei",title:"獵人檔案 P5 對手身份解析一致性修正",updateLevel:"patch",added:["P5.3 對手身份新增『辨識失敗』狀態，與『僅本場識別』正式分離","H2H 統計新增 unresolved 計數，可分辨身份真的無法跨場與本次解析失敗"],changed:["只有 playerCardService 正常回覆但沒有穩定 playerId 時才標記 event-only／僅本場識別","playerCardService 拋錯或回傳失敗時標記 unresolved，不寫入 identity cache，手動重新整理可再次解析","H2H 狀態列可同時顯示辨識中、辨識失敗與僅本場識別數量，不再三選一"],fixed:["修正暫時性網路/API 失敗被誤判成永久『僅本場識別』，導致 H2H 少算且無法辨識原因","避免解析失敗結果被 cache 後在同一工作階段持續排除對手"],environment:"Production consistency audit branch",deployStatus:"P5 identity-resolution consistency fix only",firebaseImpact:"無；只調整既有 playerCardService 回應的前端狀態分類",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"對手身份查詢失敗不再被誤當成無法跨賽事識別；系統會明確標示並允許重新整理後重試。"},
@@ -16684,7 +16686,8 @@ async function loadHunterProfile(force=false){
     if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
     if(!cloudAvailable()||!window.cloudSync.queryMyHunterMatches) throw new Error("hunter-profile-unavailable");
     const result=await window.cloudSync.queryMyHunterMatches();
-    hunterProfileCache={records:Array.isArray(result&&result.records)?result.records:[],skipped:Array.isArray(result&&result.skipped)?result.skipped:[]};
+    const sourceRecords=Array.isArray(result&&result.records)?result.records:[];
+    hunterProfileCache={records:hunterUniqueRecords(sourceRecords),skipped:Array.isArray(result&&result.skipped)?result.skipped:[]};
     setTimeout(()=>resolveHunterOpponentIdentities(hunterProfileCache.records),0);
   }catch(e){
     console.warn("[Hunter Profile P3]",e);
