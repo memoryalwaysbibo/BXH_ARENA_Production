@@ -400,3 +400,8 @@ mustInclude('const HUNTER_PRELAUNCH_RESET_AT=Date.parse("2026-09-30T23:58:00+08:
 mustInclude('return Date.now()<HUNTER_PRELAUNCH_RESET_AT||hunterRecordTimestamp(record)>=HUNTER_OFFICIAL_LAUNCH_AT;','Hunter test data must remain visible until the reset boundary');
 mustInclude('const sourceRecords=allSourceRecords.filter(hunterRecordIsOfficial);','Hunter official record filter missing');
 console.log('PASS Hunter 10/1 official launch boundary');
+
+must(/canArchive && phase!==["']idle["'][\s\S]*?data-action=["']archive-complete["'][\s\S]*?重新嘗試結算/, 'Stuck settlement phases must expose a manual retry action');
+mustInclude('若狀態長時間未更新，可使用「重新嘗試結算」安全續跑。','Settlement recovery guidance missing');
+mustNot(/canArchive && phase===["']failed["'] \? `<button class="btn btn-primary" data-action="archive-complete">重試封存<\/button>`/, 'Settlement retry must not be limited to failed state only');
+console.log('PASS settlement stuck-state manual recovery');
