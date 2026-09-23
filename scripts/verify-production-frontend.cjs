@@ -129,6 +129,18 @@ mustInclude('function applyCourtSwapMutation(remoteState,sourceId,targetId)','Tr
 mustInclude('data-action="court-swap-start"','Court swap action control missing');
 mustInclude('window.cloudSync.mutateMatchTransaction','Court swap must use authoritative tournament transaction');
 console.log('PASS referee resume / independent court progression / court swap guards');
+mustInclude('data-action="correct-previous-score"','Previous match score correction button missing');
+mustInclude('data-action="retract-previous-match"','Previous match retract button missing');
+mustInclude('function correctionProbe(st,matchId)','Correction dependency preflight missing');
+mustInclude('function applyCompletedMatchCorrection(st,matchId,mode,actor)','Correction rollback mutation missing');
+mustInclude('function reopenCompletedMatchForCorrection(matchId,mode)','Correction cloud/local entry missing');
+mustInclude('window.cloudSync.confirmMatchTransaction(state.cloudCode','Correction must use authoritative cloud transaction');
+mustInclude('reason:"downstream-started"','Correction must block when downstream activity already exists');
+mustInclude('target.winnerId=null;','Correction must clear previous winner');
+mustInclude('target.hunterData=null;','Correction must clear previous Hunter result snapshot');
+mustInclude('reopened.status="in_progress";','Correction must reopen the match for referee scoring');
+mustInclude('請先使用「修正比分」安全撤回結果','Legacy completed-score shortcut must be blocked');
+console.log('PASS referee previous-match correction rollback');
 mustInclude('const HUNTER_ROUND_SCHEMA_VERSION = 1;','Hunter round schema version missing');
 mustInclude('const HUNTER_SCORING_VERSION = "bxh-4pt-v1";','Hunter scoring version missing');
 mustInclude('function createHunterRoundEvent(match,side,type,points,at)','Hunter round event factory missing');
