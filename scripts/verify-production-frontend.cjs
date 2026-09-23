@@ -283,3 +283,28 @@ mustInclude('["overview","analysis","records","achievements"].includes(subTab)',
 mustInclude('逐筆 Evidence 展開留給 P6.5','Hunter P6.2 evidence UI scope disclosure missing');
 mustInclude('永久徽章尚未發放','Hunter P6.2 must not claim persistent awards');
 console.log('PASS Hunter Profile P6.2 Match milestones');
+
+mustInclude('achievementId:"extreme_10"','Hunter P6.3 extreme 10 milestone missing');
+mustInclude('achievementId:"extreme_25"','Hunter P6.3 extreme 25 milestone missing');
+mustInclude('achievementId:"extreme_50"','Hunter P6.3 extreme 50 milestone missing');
+mustInclude('achievementId:"knockout_10"','Hunter P6.3 knockout 10 milestone missing');
+mustInclude('achievementId:"knockout_25"','Hunter P6.3 knockout 25 milestone missing');
+mustInclude('achievementId:"knockout_50"','Hunter P6.3 knockout 50 milestone missing');
+mustInclude('achievementId:"burst_10"','Hunter P6.3 burst 10 milestone missing');
+mustInclude('achievementId:"burst_25"','Hunter P6.3 burst 25 milestone missing');
+mustInclude('achievementId:"burst_50"','Hunter P6.3 burst 50 milestone missing');
+mustInclude('achievementId:"spin_10"','Hunter P6.3 spin 10 milestone missing');
+mustInclude('achievementId:"spin_25"','Hunter P6.3 spin 25 milestone missing');
+mustInclude('achievementId:"spin_50"','Hunter P6.3 spin 50 milestone missing');
+mustInclude('name:"爆裂達人"','Hunter P6.3 burst master label missing');
+mustInclude('name:"極限專精"','Hunter P6.3 extreme mastery label missing');
+mustInclude('roundRefs[type].sort((a,b)=>','Hunter P6.3 round evidence ordering missing');
+mustInclude('function hunterRoundAchievementCardHtml(item)','Hunter P6.3 Round card renderer missing');
+mustInclude('function hunterRoundAchievementsHtml(core)','Hunter P6.3 Round achievement panel missing');
+mustInclude('function hunterAchievementsHtml(core)','Hunter P6.3 combined achievement page missing');
+mustInclude('evaluations.filter(item=>item&&item.category==="round")','Hunter P6.3 UI must expose Round category only in Round panel');
+mustInclude('analyzable=true、perspective=for','Hunter P6.3 trust-boundary disclosure missing');
+mustInclude('Quick Decision 與防守失分不計入','Hunter P6.3 exclusion disclosure missing');
+mustInclude('body=hunterAchievementsHtml(achievementCore);','Hunter P6.3 achievement page linkage missing');
+mustInclude('P6.3</span>','Hunter P6.3 profile badge missing');
+console.log('PASS Hunter Profile P6.3 Round achievements');
