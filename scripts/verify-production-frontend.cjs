@@ -405,3 +405,15 @@ must(/canArchive && phase!==["']idle["'][\s\S]*?data-action=["']archive-complete
 mustInclude('若狀態長時間未更新，可使用「重新嘗試結算」安全續跑。','Settlement recovery guidance missing');
 mustNot(/canArchive && phase===["']failed["'] \? `<button class="btn btn-primary" data-action="archive-complete">重試封存<\/button>`/, 'Settlement retry must not be limited to failed state only');
 console.log('PASS settlement stuck-state manual recovery');
+
+mustInclude('function isSystemSyntheticTestRoster(st=state)','Synthetic TEST roster classifier missing');
+mustInclude('function settlementRouteForTournament(st=state)','Settlement route classifier missing');
+mustInclude('const settlementRoute=settlementRouteForTournament(state);','Settlement preflight route missing');
+mustInclude('state.officialLadderSkippedReason="synthetic-test-roster"','Synthetic TEST route audit marker missing');
+mustInclude('state.testMode=true;','Synthetic TEST archive must be marked as test data');
+mustInclude('系統虛擬玩家測試賽，不計正式天梯','Synthetic TEST archive note missing');
+mustInclude('if(settlementRoute==="test-ranked")','TEST-S1 route missing');
+mustInclude('if(settlementRoute==="official-ranked")','Official ranked route gate missing');
+mustInclude('正式積分賽至少需要兩位有效 BXH 玩家帳號','Official ranked minimum-player error missing');
+must(/function isSystemSyntheticTestRoster[\s\S]*?p\.source!==["']test["'][\s\S]*?\^T\\d\{3\}\$[\s\S]*?accountLinked!==true/, 'Synthetic roster classifier must require system TEST identity and no linked account');
+console.log('PASS settlement preflight routing / synthetic TEST isolation');
