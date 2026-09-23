@@ -301,11 +301,11 @@ mustInclude('name:"極限專精"','Hunter P6.3 extreme mastery label missing');
 mustInclude('roundRefs[type].sort((a,b)=>','Hunter P6.3 round evidence ordering missing');
 mustInclude('function hunterRoundAchievementCardHtml(item,records)','Hunter P6.3 Round card renderer missing');
 mustInclude('function hunterRoundAchievementsHtml(core,records)','Hunter P6.3 Round achievement panel missing');
-mustInclude('function hunterAchievementsHtml(core,records)','Hunter P6.3 combined achievement page missing');
+mustInclude('function hunterAchievementsHtml(core,records,audit)','Hunter P6.3 combined achievement page missing');
 mustInclude('evaluations.filter(item=>item&&item.category==="round")','Hunter P6.3 UI must expose Round category only in Round panel');
 mustInclude('analyzable=true、perspective=for','Hunter P6.3 trust-boundary disclosure missing');
 mustInclude('Quick Decision 與防守失分不計入','Hunter P6.3 exclusion disclosure missing');
-mustInclude('body=hunterAchievementsHtml(achievementCore,allRecords);','Hunter P6.3 achievement page linkage missing');
+mustInclude('body=hunterAchievementsHtml(achievementCore,allRecords,hunterProfileCache&&hunterProfileCache.integrityAudit);','Hunter P6.3 achievement page linkage missing');
 mustInclude('P6.3</span>','Hunter P6.3 profile badge missing');
 console.log('PASS Hunter Profile P6.3 Round achievements');
 
