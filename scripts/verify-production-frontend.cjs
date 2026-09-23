@@ -129,6 +129,12 @@ mustInclude('function applyCourtSwapMutation(remoteState,sourceId,targetId)','Tr
 mustInclude('data-action="court-swap-start"','Court swap action control missing');
 mustInclude('window.cloudSync.mutateMatchTransaction','Court swap must use authoritative tournament transaction');
 console.log('PASS referee resume / independent court progression / court swap guards');
+mustInclude('function liveNextMatchCardHtml(court,stationNum)','Live next-match structured card renderer missing');
+mustInclude('class="live-court-next-badge">下一場','Live next-match badge missing');
+mustInclude('.live-court-next-players{display:grid','Live next-match player row missing');
+mustInclude('const nextPreview=liveNextMatchCardHtml(safeCourt,stationNum);','Live court must use structured next-match card');
+mustNot(/<div class="live-court-next"><b>下一場<\/b>/,'Legacy single-line live next-match row must be removed');
+console.log('PASS emphasized live next-match card');
 mustInclude('data-action="correct-previous-score"','Previous match score correction button missing');
 mustInclude('data-action="retract-previous-match"','Previous match retract button missing');
 mustInclude('function correctionProbe(st,matchId)','Correction dependency preflight missing');
