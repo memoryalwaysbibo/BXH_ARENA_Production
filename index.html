@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260923.35">
+<meta name="bxh-build" content="20260923.36">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260923.35";
+  var CURRENT_BUILD="20260923.36";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3703,6 +3703,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   margin:0 0 14px;
 }
 .bracket-top-controls .bracket-view-toggle{margin:0;}
+.bracket-top-controls-refresh-only{display:flex;justify-content:flex-end;align-items:center;}
 .bracket-refresh-btn{
   min-width:84px;
   min-height:44px;
@@ -4264,9 +4265,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.0.59";
+const APP_VERSION = "v14.0.60";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.0.60",date:"2026/09/23",timezone:"Asia/Taipei",title:"對戰表刷新鍵權限／空表狀態修復",updateLevel:"patch",added:[],changed:["對戰表的手動刷新鍵改為所有已連線雲端賽事角色皆可使用，包含最高管理員、管理員與工作人員","尚未產生對戰表時仍保留刷新入口，不再因 bracketSize 尚未建立而隱藏"],fixed:["修正管理角色進入對戰表看不到刷新鍵","修正賽事尚未產生對戰表時刷新鍵被提前 return 隱藏"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket refresh visibility hotfix",firebaseImpact:"無資料結構變更；沿用既有 joinRoom／joinRoomPublic 讀取流程",securityRulesImpact:"無",permissionImpact:"無新增資料權限；僅放寬既有刷新按鈕的 UI 顯示條件",publicSummary:"對戰表刷新鍵現在在管理端與尚未產生對戰表的狀態都會保留，可手動重新抓取最新雲端賽事資料。"},
   {version:"v14.0.59",date:"2026/09/23",timezone:"Asia/Taipei",title:"測試房／正式天梯結算前置分流",updateLevel:"patch",added:["新增結算路線分類：TEST-S1、測試不計分、正式 ranked、一般封存","系統 T001～T064 虛擬名單可在既有舊房自動辨識為測試資料"],changed:["正式天梯只在 eventAuthority=official 且非系統虛擬測試名單時執行","測試／虛擬玩家賽事完成後直接封存，不再撞正式天梯最低有效帳號驗證"],fixed:["修正 BXH-23DPJ8 類型房間因全為系統虛擬玩家卻進入正式天梯結算，造成完成賽事卡在結算中","正式 ranked 有效帳號不足時改顯示明確原因，仍維持至少兩位有效 BXH 帳號的防污染限制"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement routing hotfix",firebaseImpact:"新增賽事狀態稽核欄位 settlementRoute／syntheticTestRoster；不新增集合",securityRulesImpact:"無",permissionImpact:"無擴張；正式積分規則維持不變",publicSummary:"測試虛擬名單不再誤走正式天梯；正式積分賽仍必須至少兩位有效 BXH 玩家帳號。"},
   {version:"v14.0.58",date:"2026/09/23",timezone:"Asia/Taipei",title:"裁判分配競態同步修復",updateLevel:"patch",added:["裁判分配儲存前先排空既有一般雲端寫入佇列"],changed:["裁判分配欄位改由專用 transaction 作為權威來源；一般 pushUpdate 只保留雲端最新裁判設定，不再以舊快照回寫","重新進房時桌次限制同時支援 true 與 false 的頂層權威值"],fixed:["修正一般狀態同步與裁判分配 transaction 互相踩寫，造成 stale-assignment、儲存後勾選被還原或公開鏡像顯示舊裁判","修正頂層桌次限制為 false 時，重新進房仍可能沿用 data 內舊 true 值"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee assignment race hotfix",firebaseImpact:"無新增集合或欄位；調整既有 refereeStation* 欄位同步責任",securityRulesImpact:"無",permissionImpact:"沿用既有裁判分配權限",publicSummary:"修正裁判分配偶發無法儲存、儲存後被還原，以及雲端同步互相覆蓋的問題。"},
   {version:"v14.0.57",date:"2026/09/23",timezone:"Asia/Taipei",title:"結算卡住手動恢復入口",updateLevel:"patch",added:["結算中的 processing／ladder／archive／sync-pending 狀態新增「重新嘗試結算」入口"],changed:["保留既有自動封存；手動重試沿用 performAutoArchive 冪等流程，不建立第二套結算邏輯"],fixed:["避免賽事完成後若停在天梯結算中，因非 failed 狀態而沒有任何可操作的恢復入口"],environment:"Production / HTML + Firebase",deployStatus:"Frontend settlement recovery hotfix",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"沿用既有賽事操作權限",publicSummary:"賽事若長時間停在結算中，管理者可直接安全重試結算，不必等待系統自行恢復。"},
@@ -11455,9 +11457,16 @@ async function refreshBracketFromCloud(){
   }
 }
 
+function bracketRefreshButtonHtml(){
+  if(!state.cloudCode) return "";
+  return `<button class="btn btn-ghost btn-sm bracket-refresh-btn" data-action="bracket-refresh" ${bracketRefreshBusy?'disabled':''} aria-label="重新讀取最新對戰表">${bracketRefreshBusy?'更新中…':'↻ 刷新'}</button>`;
+}
+
 function renderBracket(){
+  const refreshBtn=bracketRefreshButtonHtml();
   if(!state.bracketSize){
-    return `<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請至「賽事設定」輸入選手名單後產生對戰表</div>
+    const refreshOnly=refreshBtn ? `<div class="bracket-top-controls bracket-top-controls-refresh-only">${refreshBtn}</div>` : "";
+    return refreshOnly + `<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請至「賽事設定」輸入選手名單後產生對戰表</div>
     <div style="margin-top:16px;"><button class="btn btn-primary" data-action="goto-settings">前往賽事設定</button></div>
     </div></div>`;
   }
@@ -11469,10 +11478,6 @@ function renderBracket(){
     <button class="bvt-btn ${bracketViewMode==='board'?'active':''}" data-action="set-bracket-view-mode" data-mode="board" aria-pressed="${bracketViewMode==='board'}">${treeIcon}<span>樹狀總覽</span></button>
     <button class="bvt-btn ${bracketViewMode==='standard'?'active':''}" data-action="set-bracket-view-mode" data-mode="standard" aria-pressed="${bracketViewMode==='standard'}">${listIcon}<span>賽事清單</span></button>
   </div>`;
-  const showManualRefresh=!!state.cloudCode && (currentRole==="guest" || currentRole==="player" || !!publicWatchReturnContext);
-  const refreshBtn=showManualRefresh
-    ? `<button class="btn btn-ghost btn-sm bracket-refresh-btn" data-action="bracket-refresh" ${bracketRefreshBusy?'disabled':''} aria-label="重新讀取最新對戰表">${bracketRefreshBusy?'更新中…':'↻ 刷新'}</button>`
-    : "";
   const topControls=`<div class="bracket-top-controls">${modeToggle}${refreshBtn}</div>`;
   if(bracketViewMode==="board"){
     return swapBanner + quickNav + topControls + renderBoardMode();
