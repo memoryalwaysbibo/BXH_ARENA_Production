@@ -16,7 +16,8 @@ mustInclude('const APP_VERSION = "'+String(version.version||'')+'"','APP_VERSION
 mustInclude('async courtCallPush(payload){return callEngagementFunction("courtCallPushService",payload,60000);}','BXH CALL push callable wrapper missing');
 if(!courtCallUi.includes("navigator.serviceWorker.register('/firebase-messaging-sw.js',{scope:'/',updateViaCache:'none'})")) throw new Error('BXH CALL service worker must register at root scope without cache reuse');
 if(!courtCallUi.includes("window.BXH_CALL_VAPID_PUBLIC_KEY||cfg.vapidKey||''")) throw new Error('BXH CALL VAPID config fallback missing');
-if(!courtCallUi.includes("type:'BXH_CALL_PUSH_CLICK'")) throw new Error('BXH CALL service-worker click handoff listener missing');
+if(!courtCallUi.includes("message.type!=='BXH_CALL_PUSH_CLICK'")) throw new Error('BXH CALL client click handoff listener missing');
+if(!messagingSw.includes("type:'BXH_CALL_PUSH_CLICK'")) throw new Error('BXH CALL service-worker click handoff message missing');
 const pushClickIndex=messagingSw.indexOf("self.addEventListener('notificationclick'");
 const pushImportIndex=messagingSw.indexOf("importScripts('https://www.gstatic.com/firebasejs/");
 if(pushClickIndex<0||pushImportIndex<0||pushClickIndex>pushImportIndex) throw new Error('Custom BXH CALL notificationclick must be registered before Firebase Messaging imports');
