@@ -1,31 +1,26 @@
 const fs=require('fs');
 const html=fs.readFileSync('index.html','utf8');
 const needles=[
-  'function isOwnTestTournament',
-  'isOwnTestTournament()',
   'async settleTestLadderTournament',
-  'settleTestLadderTournament(code',
   '至少需要兩位有效參賽者才能結算積分',
-  'testLadderEnabled',
+  'source:"test"',
+  "source:'test'",
   'testPlayerKey:',
-  'testPlayerKey||',
-  'TEST-S1',
-  'function createTest',
-  '測試玩家',
-  'virtual',
-  '虛擬'
+  '測試名單',
+  'random-test',
+  'test-roster',
+  'TEST_PLAYER'
 ];
 let out='';
 for(const needle of needles){
-  out+='\n\n===== '+needle+' =====\n';
+  out+='\n===== '+needle+' =====\n';
   let pos=0,count=0;
-  while((pos=html.indexOf(needle,pos))>=0 && count<6){
-    const start=Math.max(0,pos-3000),end=Math.min(html.length,pos+5000);
-    out+='\n--- match '+(count+1)+' @ '+pos+' ---\n'+html.slice(start,end);
-    pos+=needle.length;count++;
+  while((pos=html.indexOf(needle,pos))>=0 && count<4){
+    out+='\n--- '+(++count)+' @'+pos+' ---\n'+html.slice(Math.max(0,pos-2200),Math.min(html.length,pos+5200));
+    pos+=needle.length;
   }
   if(!count)out+='(no match)\n';
 }
 fs.mkdirSync('diagnostics',{recursive:true});
 fs.writeFileSync('diagnostics/settlement-routing-snippets.txt',out);
-console.log('wrote diagnostics',out.length);
+console.log(out.length);
