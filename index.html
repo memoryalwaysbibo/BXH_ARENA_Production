@@ -3349,6 +3349,35 @@ button.ai-create-event-card.is-selected{
 }
 .ai-create-applied-banner strong{display:block;color:#b9f0cd;font-size:12.5px;margin-bottom:3px;}
 .ai-create-applied-warnings{margin-top:7px;color:#ffd58a;}
+.ai-create-review-panel{
+  margin:0 0 18px;padding:14px;border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;background:rgba(255,255,255,.018);
+}
+.ai-create-review-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;
+}
+.ai-create-review-head strong{display:block;color:var(--ivory);font-size:13px;}
+.ai-create-review-head span{display:block;color:var(--metal-dim);font-size:10px;margin-top:3px;line-height:1.5;}
+.ai-create-review-status{
+  flex:0 0 auto;padding:5px 9px;border-radius:999px;font:800 9.5px var(--font-d);letter-spacing:.35px;
+  border:1px solid rgba(255,255,255,.12);color:var(--metal);
+}
+.ai-create-review-status.blocked{border-color:rgba(255,105,105,.40);background:rgba(255,80,80,.07);color:#ffb3b3;}
+.ai-create-review-status.pending{border-color:rgba(255,193,85,.40);background:rgba(255,193,85,.065);color:#ffd58a;}
+.ai-create-review-status.ready{border-color:rgba(95,215,147,.36);background:rgba(95,215,147,.06);color:#b9f0cd;}
+.ai-create-review-list{display:grid;gap:7px;}
+.ai-create-review-item{
+  display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;
+  padding:9px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.075);background:rgba(0,0,0,.14);
+}
+.ai-create-review-item .icon{font-size:13px;line-height:1.4;}
+.ai-create-review-item b{display:block;color:var(--white);font-size:10.5px;margin-bottom:2px;}
+.ai-create-review-item p{margin:0;color:var(--metal);font-size:10px;line-height:1.55;}
+.ai-create-review-item.blocker{border-color:rgba(255,105,105,.28);background:rgba(255,80,80,.035);}
+.ai-create-review-item.warning{border-color:rgba(255,193,85,.25);background:rgba(255,193,85,.035);}
+.ai-create-review-item.info{opacity:.86;}
+.ai-create-review-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:11px;flex-wrap:wrap;}
+.ai-create-review-confirmed{color:#b9f0cd;font-size:10.5px;font-weight:800;}
 .ai-create-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
 .ai-create-apply-btn{border-color:rgba(95,215,147,.44)!important;}
 .ai-create-apply-btn:not(:disabled){background:rgba(95,215,147,.10)!important;color:#d8f7e4!important;}
@@ -7827,6 +7856,7 @@ let aiCreateStructuredResult = null;
 let aiCreateStructuredErrors = [];
 let aiCreateSelectedEventKey = "";
 let aiCreateLastApplied = null;
+let aiCreateReviewAcknowledged = false;
 
 const AI_CREATE_SCHEMA_VERSION = "bxh-arena.ai-create.v1";
 const AI_CREATE_TIMEZONE = "Asia/Taipei";
@@ -8074,6 +8104,7 @@ function applyAiCreateSelectedEventToDraft(){
     warnings:model.warnings.slice(),
     at:Date.now()
   };
+  aiCreateReviewAcknowledged=false;
   return {ok:true,model,mappedFields:aiCreateLastApplied.mappedFields,warnings:aiCreateLastApplied.warnings};
 }
 
@@ -8097,6 +8128,120 @@ function renderAiCreateMappingPreview(){
       <div>報名費｜<b>${r.registrationFee!=null?"NT$"+esc(String(r.registrationFee)):"—"}</b></div>
     </div>
     ${model.warnings.length?`<div class="ai-create-unmapped">⚠️ ${model.warnings.map(esc).join("　")}</div>`:""}
+  </div>`;
+}
+
+function aiCreateReviewReport(){
+  if(!aiCreateLastApplied) return {blockers:[],warnings:[],infos:[]};
+  ensureSettingsFormDraft();
+  ensureRegistrationFormDraft();
+  const d=settingsFormDraft||{},rd=registrationFormDraft||{};
+  const event=aiCreateSelectedEvent();
+  const result=aiCreateStructuredResult||{};
+  const blockers=[],warnings=[],infos=[];
+  const seen=new Set();
+  const add=(bucket,code,title,message)=>{
+    if(seen.has(code))return;
+    seen.add(code);bucket.push({code,title,message});
+  };
+
+  if(!String(d.name||"").trim()) add(blockers,"name-missing","賽事名稱未完成","請填寫賽事名稱。");
+  if(!String(d.date||"").trim()) add(blockers,"date-missing","活動日期未完成","請填寫活動日期。");
+  if(!String(d.location||"").trim()) add(blockers,"location-missing","活動地點未完成","請確認活動場地或地址。");
+  if(!String(d.startTime||"").trim()) add(blockers,"start-missing","開賽時間未完成","AI 沒有安全套用開賽時間，請由房主確認後填寫。");
+  if(d.checkinRequired && !String(d.checkin||"").trim()) add(blockers,"checkin-missing","報到時間未完成","本場需要報到，但目前沒有可用的報到時間。");
+
+  if(rd.registrationEnabled){
+    if(!rd.registrationOpenAt) add(blockers,"registration-open-missing","報名開放時間未完成","線上報名需要設定開放時間。若原文分鐘刻度不相容，請房主手動選擇時間。");
+    if(!rd.registrationCloseAt) add(blockers,"registration-close-missing","報名截止時間未完成","線上報名需要設定截止時間。");
+    if(!rd.registrationCapacity || Number(rd.registrationCapacity)<1) add(blockers,"capacity-missing","正取名額未完成","請設定至少 1 人的正取名額。");
+    if(rd.registrationOpenAt && rd.registrationCloseAt && Number(rd.registrationCloseAt)<=Number(rd.registrationOpenAt)){
+      add(blockers,"registration-order-invalid","報名時間順序錯誤","報名截止時間必須晚於開放時間。");
+    }
+  }
+
+  if(event && !event.formatType){
+    add(warnings,"format-unconfirmed","賽制需人工確認","文案沒有明確賽制；ARENA 目前保留原本的賽制值，請確認是否正確。");
+  }
+  if(event && event.participantRestrictions?.includes("female")){
+    add(warnings,"female-restriction-unmapped","女性限定條件未建立原生欄位","目前 ARENA 只有公開組／兒童組。女性限定不會被自動轉換，請確認活動說明與現場資格控管。");
+  }
+  const structuredWarnings=Array.isArray(result.warnings)?result.warnings:[];
+  structuredWarnings.forEach(item=>{
+    if(!item||!item.code)return;
+    if(item.code==="weekday-mismatch") add(warnings,"weekday-mismatch","日期與星期不一致",item.message||"原文日期與星期不一致，請確認。");
+    else if(item.code==="registration-close-missing" && !rd.registrationCloseAt) {
+      // Missing close time is already a blocker above; don't duplicate it.
+    } else if(item.code==="multi-event") add(infos,"multi-event","原文包含多場賽事",item.message||"目前只會套用房主選定的單一賽事。");
+    else if(item.code==="unsupported-target-group") add(infos,"unsupported-target-group","存在尚未映射的資格條件",item.message||"部分資格條件沒有原生欄位。");
+  });
+
+  if(result.activity?.registrationOpenAt && !aiCreateHalfHourCompatible(result.activity.registrationOpenAt) && !rd.registrationOpenAt){
+    add(infos,"open-minute-unsupported","原始報名時間未自動套用","原文 "+String(result.activity.registrationOpenAt).slice(11,16)+" 不符合目前 00／30 分鐘刻度，已保留給房主手動決定。");
+  }
+  if(event?.checkInEnd) add(infos,"checkin-end-unmapped","報到結束時間未映射","現行基本資料只有單一報到時間，本次只使用報到開始時間。");
+  if(event?.endAt) add(infos,"event-end-unmapped","活動結束時間未映射","現行基本資料沒有活動結束時間欄位，結束時間只保留在 AI 預覽。");
+  if(Array.isArray(result.bundleOffers)&&result.bundleOffers.length) add(infos,"bundle-unmapped","套票／雙賽優惠未映射","目前房間沒有套票欄位，優惠資訊不會寫入賽事設定。");
+
+  return {blockers,warnings,infos};
+}
+
+function aiCreateReviewGate(actionLabel="繼續"){
+  if(!aiCreateLastApplied) return true;
+  const report=aiCreateReviewReport();
+  if(report.blockers.length){
+    openModal({
+      type:"generic",
+      title:"AI 草稿尚有必填問題",
+      message:"請先處理以下項目，再"+actionLabel+"：\n"+report.blockers.map(x=>"• "+x.title+"｜"+x.message).join("\n"),
+      confirmLabel:"回去檢查",
+      onConfirm:()=>{setTimeout(()=>document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"}),0);}
+    });
+    return false;
+  }
+  if(report.warnings.length && !aiCreateReviewAcknowledged){
+    openModal({
+      type:"generic",
+      title:"AI 草稿仍有需人工確認的事項",
+      message:"請先在「AI 審核閘門」確認以下提醒：\n"+report.warnings.map(x=>"• "+x.title+"｜"+x.message).join("\n"),
+      confirmLabel:"前往確認",
+      onConfirm:()=>{setTimeout(()=>document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"}),0);}
+    });
+    return false;
+  }
+  return true;
+}
+
+function renderAiCreateReviewPanel(){
+  if(!aiCreateLastApplied || !(settingsFormDraftDirty||registrationFormDraftDirty)) return "";
+  const report=aiCreateReviewReport();
+  const blocked=report.blockers.length>0;
+  const pending=!blocked && report.warnings.length>0 && !aiCreateReviewAcknowledged;
+  const ready=!blocked && !pending;
+  const statusText=blocked?report.blockers.length+" 項必須修正":pending?report.warnings.length+" 項待人工確認":"可進入儲存流程";
+  const statusClass=blocked?"blocked":pending?"pending":"ready";
+  const item=(kind,x)=>`<div class="ai-create-review-item ${kind}">
+    <div class="icon">${kind==="blocker"?"⛔":kind==="warning"?"⚠️":"ℹ️"}</div>
+    <div><b>${esc(x.title)}</b><p>${esc(x.message)}</p></div>
+  </div>`;
+  return `<div class="ai-create-review-panel" id="ai-create-review-panel">
+    <div class="ai-create-review-head">
+      <div><strong>AI 審核閘門</strong><span>AI 只負責預填；這裡由 ARENA 檢查是否還有缺漏或需要房主判斷的內容。</span></div>
+      <div class="ai-create-review-status ${statusClass}">${esc(statusText)}</div>
+    </div>
+    <div class="ai-create-review-list">
+      ${report.blockers.map(x=>item("blocker",x)).join("")}
+      ${report.warnings.map(x=>item("warning",x)).join("")}
+      ${report.infos.map(x=>item("info",x)).join("")}
+      ${!report.blockers.length&&!report.warnings.length&&!report.infos.length?'<div class="ai-create-review-item info"><div class="icon">✅</div><div><b>沒有發現額外問題</b><p>仍請房主逐欄確認內容是否符合本場活動。</p></div></div>':""}
+    </div>
+    <div class="ai-create-review-actions">
+      ${report.warnings.length&&!blocked
+        ? (aiCreateReviewAcknowledged
+          ? '<span class="ai-create-review-confirmed">✓ 房主已確認 AI 提醒</span>'
+          : '<button type="button" class="btn btn-ghost btn-sm" data-action="ai-create-review-ack">我已確認以上 AI 提醒</button>')
+        : ""}
+    </div>
   </div>`;
 }
 
@@ -8974,7 +9119,7 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
-  "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply"
+  "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack"
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
@@ -14147,6 +14292,7 @@ function renderSettings(){
     <span>已填入：${aiCreateLastApplied.mappedFields.map(esc).join("、")}。目前只是未儲存草稿，請逐欄審核後再按「儲存賽事設定」。</span>
     ${aiCreateLastApplied.warnings.length?`<div class="ai-create-applied-warnings">⚠️ ${aiCreateLastApplied.warnings.map(esc).join("　")}</div>`:""}
   </div>`:""}
+  ${renderAiCreateReviewPanel()}
 
   <div class="settings-section-head" style="margin-top:0;">
     <span class="settings-section-num">1</span>
@@ -20437,6 +20583,7 @@ function bindDynamicInputs(){
           aiCreateStructuredResult=null;
           aiCreateStructuredErrors=[];
           aiCreateSelectedEventKey="";
+          aiCreateReviewAcknowledged=false;
           const countEl=document.getElementById("ai-create-char-count");
           if(countEl) countEl.textContent=String(aiCreateSourceText.length).replace(/\B(?=(\d{3})+(?!\d))/g,",")+" / 12,000";
         });
@@ -20452,6 +20599,7 @@ function bindDynamicInputs(){
           else value=el.value;
           settingsFormDraft[field]=value;
           settingsFormDraftDirty=true;
+          if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
         };
         el.addEventListener("input",update);
         el.addEventListener("change",update);
@@ -20495,6 +20643,7 @@ function bindDynamicInputs(){
           else { value = el.value; }
           registrationFormDraft[field] = value;
           registrationFormDraftDirty = true;
+          if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
         });
       });
       document.querySelectorAll(".reg-edit-input").forEach(el=>{
@@ -20777,11 +20926,23 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     return;
   }
+  if(action==="ai-create-review-ack"){
+    const report=aiCreateReviewReport();
+    if(report.blockers.length){
+      showToast("仍有 "+report.blockers.length+" 項必須修正，暫時不能確認",true);
+      return;
+    }
+    aiCreateReviewAcknowledged=true;
+    render();
+    showToast("已確認 AI 提醒；仍請在儲存前逐欄檢查");
+    return;
+  }
   if(action==="ai-create-select-event"){
     if(!aiCreateStructuredResult) return;
     const key=target.getAttribute("data-event-key")||"";
     if((aiCreateStructuredResult.events||[]).some(event=>event&&event.key===key)){
       aiCreateSelectedEventKey=key;
+      aiCreateReviewAcknowledged=false;
       render();
     }
     return;
@@ -23040,6 +23201,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       aiCreateStructuredErrors=[];
       aiCreateSelectedEventKey="";
       aiCreateSourceText="";
+      aiCreateReviewAcknowledged=false;
       await saveRecord(state);
       await setCurrentId(state.id);
       recordIndex = await loadIndex();
@@ -23711,6 +23873,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(!aiCreateReviewGate("進入發布預覽")) return;
 
     if(isTester()){
       d.name=ensureTestName(d.name);
@@ -23815,6 +23978,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(!aiCreateReviewGate("儲存賽事設定")) return;
     const requestedStations=Math.max(1,parseInt(d.stations,10)||1);
     const newFormatType=d.formatType||"single";
     const formatChanged=newFormatType!==(state.meta.formatType||"single");
@@ -23869,7 +24033,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state.championId=null; state.runnerUpId=null; state.thirdId=null; state.fourthId=null;
         state.gfMatchId=null; state.gfResetMatchId=null; state.bronzeMatchId=null; state.rrRounds=0;
         state.courtAssignments={};
-        resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null;
+        resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null; aiCreateReviewAcknowledged=false; aiCreateReviewAcknowledged=false;
         saveState(); render();
         showToast("賽制已更換，請重新產生對戰表");
       }});
