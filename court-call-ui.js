@@ -8,7 +8,7 @@ let courtCallCache=new Map(),courtCallTimer=null,courtCallIdentity='';
 let courtCallPlayerCodes=[],courtCallDiscoveryAt=0,courtCallDiscoveryBusy=false;
 const courtCallDelayDismissed=new Set();
 const courtCallSystemNotifySeen=new Set();
-let courtCallPushBusy=false,courtCallPushSyncAt=0,courtCallPushError='';
+let courtCallPushBusy=false,courtCallPushSyncAt=0,courtCallPushError='',courtCallServiceWorkerListenerBound=false;
 const COURT_CALL_PUSH_REFRESH_MS=15*60*1000;
 const COURT_CALL_FIREBASE_SDK='10.13.0';
 
@@ -41,6 +41,30 @@ function courtCallIsIos(){
 function courtCallIsStandalone(){
  try{return window.matchMedia?.('(display-mode: standalone)')?.matches===true||navigator.standalone===true;}catch{return false;}
 }
+
+function courtCallBindServiceWorkerMessages(){
+ if(courtCallServiceWorkerListenerBound||typeof navigator==='undefined'||!navigator.serviceWorker)return;
+ courtCallServiceWorkerListenerBound=true;
+ navigator.serviceWorker.addEventListener('message',event=>{
+  const message=event?.data||{};
+  if(message.type!=='BXH_CALL_PUSH_CLICK')return;
+  const code=String(message.data?.code||'').toUpperCase();
+  if(/^BXH-[A-Z0-9]{4,16}$/.test(code)&&!courtCallPlayerCodes.includes(code)){
+   courtCallPlayerCodes.unshift(code);
+   courtCallPlayerCodes=courtCallPlayerCodes.slice(0,10);
+  }
+  courtCallDiscoveryAt=0;
+  setTimeout(async()=>{
+   try{
+    if(code&&courtCallUserKey())await loadCourtCalls(code);
+    else await discoverCourtCallPlayerCodes(true);
+   }catch{}
+   syncCourtCallGlobalOverlay();
+   try{renderPreservingScroll();}catch{}
+  },0);
+ });
+}
+courtCallBindServiceWorkerMessages();
 
 function courtCallNotificationHint(){
  const p=courtCallNotificationPermission();
@@ -76,7 +100,7 @@ async function courtCallEnsurePushRegistration(force=false){
  }
  courtCallPushBusy=true;courtCallPushSyncAt=Date.now();courtCallPushError='';
  try{
-  const reg=await navigator.serviceWorker.register('./firebase-messaging-sw.js',{scope:'./'});
+  const reg=await navigator.serviceWorker.register('/firebase-messaging-sw.js',{scope:'/'});
   await navigator.serviceWorker.ready;
   const [cfg,appMod,msgMod]=await Promise.all([
    courtCallLoadFirebaseConfig(),
@@ -87,7 +111,7 @@ async function courtCallEnsurePushRegistration(force=false){
   const app=appMod.getApps().length?appMod.getApp():appMod.initializeApp(cfg);
   const messaging=msgMod.getMessaging(app);
   const options={serviceWorkerRegistration:reg};
-  const vapid=String(window.BXH_CALL_VAPID_PUBLIC_KEY||'').trim();
+  const vapid=String(window.BXH_CALL_VAPID_PUBLIC_KEY||cfg.vapidKey||'').trim();
   if(vapid)options.vapidKey=vapid;
   const token=await msgMod.getToken(messaging,options);
   if(!token)throw Error('push-token-empty');
