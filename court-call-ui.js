@@ -100,7 +100,7 @@ async function courtCallEnsurePushRegistration(force=false){
  }
  courtCallPushBusy=true;courtCallPushSyncAt=Date.now();courtCallPushError='';
  try{
-  const reg=await navigator.serviceWorker.register('/firebase-messaging-sw.js',{scope:'/'});
+  const reg=await navigator.serviceWorker.register('/firebase-messaging-sw.js',{scope:'/',updateViaCache:'none'});
   await navigator.serviceWorker.ready;
   const [cfg,appMod,msgMod]=await Promise.all([
    courtCallLoadFirebaseConfig(),
