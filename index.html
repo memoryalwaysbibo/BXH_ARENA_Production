@@ -4211,7 +4211,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.0"></script>
-<script src="court-call-ui.js?v=14.1.0-build2"></script>
+<script src="court-call-ui.js?v=14.2.0-b2"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -24607,7 +24607,7 @@ init();
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
-    async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
+    async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},\n    async courtCallPush(payload){return callEngagementFunction("courtCallPushService",payload,60000);},
     async raffle(payload){return callEngagementFunction("memberRaffle",payload,540000,['list','get','announcements'].includes(payload?.action));},
     async getSnapshot(){ return callEngagementFunction("getEngagementSnapshot",{}); },
     async syncHunterAchievements(){ return callEngagementFunction("syncHunterAchievements",{},120000); },
