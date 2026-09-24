@@ -254,6 +254,11 @@ function courtCallCommon(c){
  return `${c.error?`<p class="auth-error" role="alert">${esc(c.error)}</p>`:''}${c.pending?`<button class="btn btn-ghost" data-action="court-call-retry" data-code="${esc(c.code)}" ${c.busy?'disabled':''}>重試待確認操作</button>`:''}`;
 }
 
+function courtCallStationLabel(station){
+ const n=Number(station||0);
+ return n>0?`${n}號台`:'戰鬥台';
+}
+
 function courtCallPlayerResponseLabel(response){
  return ({unanswered:'未回覆',coming:'✅ 正在前往',pass:'⏸ PASS',ready:'✅ 已準備好'})[response]||response||'未回覆';
 }
@@ -294,7 +299,7 @@ function courtCallRow(c,r,ref){
  const legacyActions=ref&&r.canApprove?`<button class="btn btn-primary" data-action="court-call-approve" ${attrs} ${disabled}>核准舊版 PASS</button><button class="btn btn-ghost" data-action="court-call-reject" ${attrs} ${disabled}>拒絕</button>`:'';
  return `<div class="panel court-call-row">
    <div class="court-call-row-head">
-     <strong>Court ${r.station}｜第 ${Number(r.round)+1} 輪</strong>
+     <strong>${esc(courtCallStationLabel(r.station))}｜第 ${Number(r.round)+1} 輪</strong>
      <span class="court-call-time">叫號 ${esc(new Date(r.calledAt).toLocaleTimeString("zh-TW",{hour12:false}))}</span>
    </div>
    <div class="court-call-people">${playerStatus}</div>
@@ -316,32 +321,92 @@ function renderCourtCallReferee(m){
  </section>`;
 }
 
+function renderCourtCallHeaderControls(code){
+ ensureCourtCallGlobalStyles();
+ const np=courtCallNotificationPermission(),pushReady=courtCallPushRegistered();
+ const active=np==='granted'&&pushReady;
+ const action=active?'court-call-notify-status':'court-call-enable-notify';
+ const label=active?'背景通知已啟用':(np==='denied'?'背景通知已封鎖':'啟用背景通知');
+ return `<button class="court-call-notify-icon ${active?'is-active':''} ${np==='denied'?'is-blocked':''}" type="button"
+   data-action="${action}" data-code="${esc(code||'')}" data-court-call-help-hold="1"
+   aria-label="${esc(label)}；長按 1.5 秒查看叫號說明" title="${esc(label)}">🔔</button>`;
+}
+
 function renderCourtCallPlayer(code){
  const c=courtCallContext(code);
- const np=courtCallNotificationPermission(),pushReady=courtCallPushRegistered();
- const notifyButton=np==='default'
-  ? '<button class="btn btn-ghost court-call-notify-btn" data-action="court-call-enable-notify">🔔 啟用背景通知</button>'
-  : (np==='granted'&&!pushReady?'<button class="btn btn-ghost court-call-notify-btn" data-action="court-call-enable-notify">📱 啟用鎖屏推播</button>':'');
- const testButton=pushReady
-  ? `<button class="btn btn-ghost court-call-test-btn" data-action="court-call-test-push" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`
-  : '';
  const myRows=c.rows.filter(r=>r.players.some(p=>p.me));
  return `<section class="court-call-player-section">
-   <div class="court-call-compact-summary">
-     <span>人工叫號｜智慧 ETA｜PASS 每賽事 1 次${c.used?'（已使用）':''}</span>
-     <details class="court-call-help">
-       <summary>叫號說明</summary>
-       <div>裁判人工叫號與智慧 ETA 已分離。人工叫號約每 2–3 秒同步；PASS 每人每賽事 1 次，且需有同台同輪下一場可承接。智慧 ETA 以每場 3 分鐘為基準，並依進行中比分動態修正；3 分賽點會縮短估時。</div>
-     </details>
-   </div>
-   <div class="court-call-notify-row">
-     <div class="court-call-notify-actions">${notifyButton}${testButton}</div>
-     <span class="court-call-notify-state">${esc(courtCallNotificationHint())}${courtCallPushTestResult?`｜${esc(courtCallPushTestResult)}`:''}</span>
-   </div>
    ${courtCallCommon(c)}
    <div class="court-call-active-list">${myRows.map(r=>courtCallRow(c,r,false)).join('')||'<p class="court-call-empty">等待裁判通知。</p>'}</div>
  </section>`;
 }
+
+
+function closeCourtCallHelpOverlay(){
+ const el=typeof document!=='undefined'?document.getElementById('bxh-court-call-help-overlay'):null;
+ if(el)el.remove();
+}
+
+function showCourtCallHelpOverlay(code){
+ if(typeof document==='undefined'||!document.body)return;
+ ensureCourtCallGlobalStyles();
+ closeCourtCallHelpOverlay();
+ const pushReady=courtCallPushRegistered();
+ const status=courtCallNotificationHint();
+ const overlay=document.createElement('div');
+ overlay.id='bxh-court-call-help-overlay';
+ overlay.innerHTML=`<div class="bxh-call-help-sheet" role="dialog" aria-modal="true" aria-label="BXH CALL 叫號說明">
+   <div class="bxh-call-help-title"><span>🔔 BXH CALL｜叫號說明</span><button type="button" class="bxh-call-help-close" data-action="court-call-close-help" aria-label="關閉">×</button></div>
+   <div class="bxh-call-help-status">${esc(status)}</div>
+   <div class="bxh-call-help-copy">
+     <p>裁判人工叫號與智慧 ETA 分開運作；人工叫號約每 2–3 秒同步。</p>
+     <p>PASS 每人每賽事 1 次，且必須有同台同輪下一場可承接。</p>
+     <p>智慧 ETA 以每場 3 分鐘為基準，會依進行中比分動態修正；3 分賽點會縮短估時。</p>
+     <p>通知圖示：輕點可啟用背景／鎖屏通知；長按 1.5 秒可再次開啟本說明。</p>
+   </div>
+   ${pushReady?`<button class="btn btn-ghost bxh-call-help-test" data-action="court-call-test-push" data-code="${esc(code||'')}" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`:''}
+ </div>`;
+ document.body.appendChild(overlay);
+}
+
+let courtCallHelpHoldTimer=null;
+let courtCallHelpHoldTarget=null;
+let courtCallHelpHoldStart=null;
+function courtCallCancelHelpHold(){
+ if(courtCallHelpHoldTimer){clearTimeout(courtCallHelpHoldTimer);courtCallHelpHoldTimer=null;}
+ courtCallHelpHoldTarget=null;courtCallHelpHoldStart=null;
+}
+function bindCourtCallHelpLongPress(){
+ if(typeof document==='undefined'||document.documentElement.dataset.bxhCallHelpHoldBound==='1')return;
+ document.documentElement.dataset.bxhCallHelpHoldBound='1';
+ document.addEventListener('pointerdown',e=>{
+  const btn=e.target&&e.target.closest?e.target.closest('[data-court-call-help-hold]'):null;
+  if(!btn)return;
+  courtCallCancelHelpHold();
+  courtCallHelpHoldTarget=btn;
+  courtCallHelpHoldStart={x:e.clientX,y:e.clientY};
+  courtCallHelpHoldTimer=setTimeout(()=>{
+   if(courtCallHelpHoldTarget!==btn)return;
+   btn.dataset.courtCallLongpressFired='1';
+   showCourtCallHelpOverlay(btn.getAttribute('data-code')||'');
+   try{if(navigator.vibrate)navigator.vibrate(45);}catch{}
+   courtCallHelpHoldTimer=null;
+  },1500);
+ },{passive:true});
+ document.addEventListener('pointermove',e=>{
+  if(!courtCallHelpHoldTarget||!courtCallHelpHoldStart)return;
+  if(Math.hypot(e.clientX-courtCallHelpHoldStart.x,e.clientY-courtCallHelpHoldStart.y)>10)courtCallCancelHelpHold();
+ },{passive:true});
+ document.addEventListener('pointerup',courtCallCancelHelpHold,{passive:true});
+ document.addEventListener('pointercancel',courtCallCancelHelpHold,{passive:true});
+ document.addEventListener('click',e=>{
+  const btn=e.target&&e.target.closest?e.target.closest('[data-court-call-help-hold]'):null;
+  if(!btn||btn.dataset.courtCallLongpressFired!=='1')return;
+  delete btn.dataset.courtCallLongpressFired;
+  e.preventDefault();e.stopImmediatePropagation();
+ },true);
+}
+bindCourtCallHelpLongPress();
 
 function ensureCourtCallGlobalStyles(){
  if(typeof document==='undefined'||document.getElementById('bxh-court-call-global-style'))return;
@@ -358,7 +423,14 @@ function ensureCourtCallGlobalStyles(){
  .bxh-call-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.bxh-call-actions.one{grid-template-columns:1fr}
  .bxh-call-actions .btn{min-height:52px;font-size:15px;font-weight:900}
  .court-call-people{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0}.court-call-person{padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.04);font-size:12px}.court-call-person.is-replied{color:#f0cf67}
- @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}}
+ #bxh-court-call-help-overlay{position:fixed;inset:0;z-index:2147483250;display:flex;align-items:flex-end;justify-content:center;padding:18px;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+ .bxh-call-help-sheet{width:min(100%,430px);border:1px solid rgba(217,185,92,.45);border-radius:18px;background:linear-gradient(165deg,#17181b,#090a0b);box-shadow:0 24px 70px rgba(0,0,0,.65);padding:16px;color:#eef0f3}
+ .bxh-call-help-title{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#f0cf71;font-weight:900}
+ .bxh-call-help-close{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#eef0f3;font-size:20px;line-height:1}
+ .bxh-call-help-status{margin-top:8px;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.035);color:#bfc4cc;font-size:11px}
+ .bxh-call-help-copy{margin-top:10px;color:#cdd1d7;font-size:12px;line-height:1.55}.bxh-call-help-copy p{margin:6px 0}
+ .bxh-call-help-test{width:100%;margin-top:10px}
+ @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}.bxh-call-help-sheet{padding:14px}}
  `;
  document.head.appendChild(style);
 }
@@ -397,14 +469,14 @@ function syncCourtCallGlobalOverlay(){
  const html=x.type==='deferred'
   ? `<div class="bxh-call-modal" role="dialog" aria-modal="true" aria-label="PASS 已生效">
       <div class="bxh-call-kicker">BXH CALL｜PASS</div>
-      <div class="bxh-call-court">Court ${x.r.station}</div>
+      <div class="bxh-call-court">${esc(courtCallStationLabel(x.r.station))}</div>
       <div class="bxh-call-vs"><span>${esc(a)}</span><b>VS</b><span>${esc(b)}</span></div>
       <div class="bxh-call-message"><strong>${requesterIsMe?'PASS 已接受':'對手使用 PASS'}</strong><br>本場已自動延後 1 場，完成前置場次後系統會再次叫號。</div>
       <div class="bxh-call-actions one"><button class="btn btn-primary" data-action="court-call-dismiss-delay" data-stamp="${esc(x.stamp)}">知道了</button></div>
      </div>`
   : `<div class="bxh-call-modal" role="dialog" aria-modal="true" aria-label="裁判叫號">
       <div class="bxh-call-kicker">🔔 裁判叫號</div>
-      <div class="bxh-call-court">Court ${x.r.station}</div>
+      <div class="bxh-call-court">${esc(courtCallStationLabel(x.r.station))}</div>
       <div class="bxh-call-vs"><span>${esc(a)}</span><b>VS</b><span>${esc(b)}</span></div>
       <div class="bxh-call-message">請前往 <strong>${x.r.station} 號戰鬥台</strong> 準備比賽。<br>請選擇目前狀態。${passUnavailable?`<br><span style="display:inline-block;margin-top:8px;font-size:12px;color:#aeb1ba">⚠️ ${esc(passUnavailable)}</span>`:''}</div>
       <div class="bxh-call-actions">
@@ -433,12 +505,12 @@ function courtCallNotifyChanges(c,newRows,oldRows){
   const isMine=mePlayers.length>0;
   const newSequence=!prev||Number(prev.sequence)!==Number(r.sequence);
   if(isMine&&newSequence&&mePlayers.some(p=>p.response==='unanswered')){
-   showToast(`🔔 BXH CALL｜Court ${r.station} 裁判叫號，請立即回覆`);
+   showToast(`🔔 BXH CALL｜${courtCallStationLabel(r.station)} 裁判叫號，請立即回覆`);
    courtCallVibrate();
    const names=(r.players||[]).map(p=>p.name||'選手');
    courtCallSystemNotify(
     `bxh-call:${c.code}:${r.matchId}:${r.sequence}`,
-    `🔔 BXH CALL｜Court ${r.station}`,
+    `🔔 BXH CALL｜${courtCallStationLabel(r.station)}`,
     `${names[0]||'選手 A'} VS ${names[1]||'選手 B'}｜請前往 ${r.station} 號戰鬥台，開啟 ARENA 回覆 OK 或 PASS。`
    );
   }
@@ -446,22 +518,22 @@ function courtCallNotifyChanges(c,newRows,oldRows){
    const oldPass=prev.pass?.status||'',newPass=r.pass?.status||'';
    if(newPass==='approved'&&oldPass!=='approved'){
     if(isMine){
-     const passMessage=r.pass?.requester?`PASS 已接受｜Court ${r.station} 本場延後 1 場`:`對手使用 PASS｜Court ${r.station} 本場延後 1 場`;
+     const passMessage=r.pass?.requester?`PASS 已接受｜${courtCallStationLabel(r.station)} 本場延後 1 場`:`對手使用 PASS｜${courtCallStationLabel(r.station)} 本場延後 1 場`;
      showToast(passMessage);
      courtCallVibrate([120,70,120]);
      courtCallSystemNotify(
       `bxh-pass:${c.code}:${r.matchId}:${r.sequence}:${r.pass?.approvedAt||r.pass?.requestedAt||0}`,
-      `BXH CALL｜Court ${r.station}`,
+      `BXH CALL｜${courtCallStationLabel(r.station)}`,
       `${passMessage}，完成前置場次後系統會再次叫號。`
      );
     }
-    if(r.isReferee)showToast(`Court ${r.station}｜${r.pass?.playerName||'選手'} 使用 PASS，已自動延後 1 場`);
+    if(r.isReferee)showToast(`${courtCallStationLabel(r.station)}｜${r.pass?.playerName||'選手'} 使用 PASS，已自動延後 1 場`);
    }
    for(const p of r.players||[]){
     const before=(prev.players||[]).find(x=>x.id===p.id)?.response||'unanswered';
     if(before===p.response)continue;
-    if(r.isReferee&&p.response==='coming')showToast(`Court ${r.station}｜${p.name} 已回覆：正在前往`);
-    if(isMine&&!p.me&&p.response==='coming')showToast(`對手 ${p.name} 已回覆：正在前往 Court ${r.station}`);
+    if(r.isReferee&&p.response==='coming')showToast(`${courtCallStationLabel(r.station)}｜${p.name} 已回覆：正在前往`);
+    if(isMine&&!p.me&&p.response==='coming')showToast(`對手 ${p.name} 已回覆：正在前往 ${courtCallStationLabel(r.station)}`);
    }
   }
  }
@@ -565,6 +637,12 @@ async function loadCourtCalls(code){
 }
 
 async function handleCourtCall(action,target){
+ if(action==='court-call-close-help'){
+  closeCourtCallHelpOverlay();return;
+ }
+ if(action==='court-call-notify-status'){
+  showToast(courtCallNotificationHint());return;
+ }
  if(action==='court-call-enable-notify'){
   await courtCallEnableBackgroundNotifications();
   try{renderPreservingScroll();}catch{}
