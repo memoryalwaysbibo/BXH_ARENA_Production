@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.31">
+<meta name="bxh-build" content="20260924.32">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.31";
+  var CURRENT_BUILD="20260924.32";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5430,6 +5430,112 @@ const TEST_PLAYERS = ["黑爸","小宇","阿哲","育嘉","翔宇","阿豪","Ray
 
 function uid(prefix){ return prefix + "_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 
+/* P7.11A — Event Info V2 compatibility layer.
+   Legacy state.meta remains authoritative during this phase. Event Info V2 is
+   a structured shadow model that is refreshed before persistence so upcoming
+   AI/template/navigation features do not need to keep expanding meta. */
+const EVENT_INFO_SCHEMA_VERSION="bxh.event-info.v2";
+
+function emptyEventInfoV2(){
+  return {
+    schemaVersion:EVENT_INFO_SCHEMA_VERSION,
+    basic:{name:"",date:"",organizer:""},
+    schedule:{checkInStart:"",checkInEnd:"",startAt:"",endAt:""},
+    venue:{name:"",address:"",googleMapsUrl:"",navigationEnabled:false,legacyText:""},
+    registration:{enabled:false,openAt:null,closeAt:null,capacity:null,waitlistCapacity:0,fee:null,targetGroup:"open"},
+    prizes:[],
+    content:{customDescription:"",specialNotes:""},
+    standardTemplate:{enabled:false,templateId:null,version:null,snapshot:null},
+    source:{type:"manual",originalText:"",poster:null,parsedAt:null}
+  };
+}
+
+function splitLegacyVenueText(value){
+  const text=String(value||"").trim();
+  if(!text) return {name:"",address:"",legacyText:""};
+  const parts=text.split("｜").map(s=>s.trim()).filter(Boolean);
+  if(parts.length>=2) return {name:parts[0],address:parts.slice(1).join("｜"),legacyText:text};
+  return {name:text,address:"",legacyText:text};
+}
+
+function buildLegacyVenueText(venue){
+  const v=venue&&typeof venue==="object"?venue:{};
+  const name=String(v.name||"").trim();
+  const address=String(v.address||"").trim();
+  if(name&&address) return name+"｜"+address;
+  return name||address||String(v.legacyText||"").trim();
+}
+
+function normalizeEventInfoV2(raw){
+  const base=emptyEventInfoV2();
+  const input=raw&&typeof raw==="object"?raw:{};
+  const section=(key)=>input[key]&&typeof input[key]==="object"?input[key]:{};
+  return {
+    schemaVersion:EVENT_INFO_SCHEMA_VERSION,
+    basic:Object.assign({},base.basic,section("basic")),
+    schedule:Object.assign({},base.schedule,section("schedule")),
+    venue:Object.assign({},base.venue,section("venue")),
+    registration:Object.assign({},base.registration,section("registration")),
+    prizes:Array.isArray(input.prizes)?input.prizes.slice():[],
+    content:Object.assign({},base.content,section("content")),
+    standardTemplate:Object.assign({},base.standardTemplate,section("standardTemplate")),
+    source:Object.assign({},base.source,section("source"))
+  };
+}
+
+function syncEventInfoV2FromLegacy(st){
+  if(!st||typeof st!=="object") return emptyEventInfoV2();
+  const m=st.meta&&typeof st.meta==="object"?st.meta:{};
+  const info=normalizeEventInfoV2(st.eventInfo);
+  const venue=splitLegacyVenueText(m.location);
+  info.basic.name=String(m.name||"");
+  info.basic.date=String(m.date||"");
+  info.schedule.checkInStart=String(m.checkin||"");
+  info.schedule.startAt=String(m.startTime||"");
+  if(String(m.location||"").trim()){
+    info.venue.name=venue.name;
+    info.venue.address=venue.address;
+    info.venue.legacyText=venue.legacyText;
+  }
+  info.registration.enabled=!!m.registrationEnabled;
+  info.registration.openAt=m.registrationOpenAt||null;
+  info.registration.closeAt=m.registrationCloseAt||null;
+  info.registration.capacity=m.registrationCapacity==null?null:Number(m.registrationCapacity);
+  info.registration.waitlistCapacity=Math.max(0,Number(m.waitlistCapacity)||0);
+  info.registration.fee=m.registrationFee==null?null:Number(m.registrationFee);
+  info.registration.targetGroup=(m.targetGroup==="children")?"children":"open";
+  info.content.customDescription=String(m.eventDescription||"");
+  st.eventInfo=info;
+  return info;
+}
+
+/* Future-facing adapter: Event Info V2 can be applied back to legacy meta only
+   when an explicit workflow (AI review/template editor/etc.) chooses to do so.
+   P7.11A does NOT call this automatically. */
+function applyEventInfoV2ToLegacy(st){
+  if(!st||typeof st!=="object") return st;
+  if(!st.meta||typeof st.meta!=="object") st.meta={};
+  const info=normalizeEventInfoV2(st.eventInfo);
+  const m=st.meta;
+  m.name=String(info.basic.name||m.name||"");
+  m.date=String(info.basic.date||m.date||"");
+  const location=buildLegacyVenueText(info.venue);
+  if(location) m.location=location;
+  m.checkin=String(info.schedule.checkInStart||m.checkin||"");
+  m.startTime=String(info.schedule.startAt||m.startTime||"");
+  m.registrationEnabled=!!info.registration.enabled;
+  m.registrationOpenAt=info.registration.openAt||null;
+  m.registrationCloseAt=info.registration.closeAt||null;
+  m.registrationCapacity=info.registration.capacity==null?null:Number(info.registration.capacity);
+  m.waitlistCapacity=Math.max(0,Number(info.registration.waitlistCapacity)||0);
+  m.waitlistEnabled=m.waitlistCapacity>0;
+  m.registrationFee=info.registration.fee==null?null:Number(info.registration.fee);
+  m.targetGroup=info.registration.targetGroup==="children"?"children":"open";
+  m.eventDescription=String(info.content.customDescription||"");
+  st.eventInfo=info;
+  return st;
+}
+
 function defaultState(id){
   const now = Date.now();
   return {
@@ -5444,6 +5550,7 @@ function defaultState(id){
       registrationEnabled:false, registrationOpenAt:null, registrationCloseAt:null, registrationCapacity:null,
       waitlistEnabled:false, waitlistCapacity:0, registrationFee:null, targetGroup:"open", participantNameMode:"realName", cancellationDeadline:null,
       eventDescription:"", registrationNotes:"", registrationVisibility:"public", publishedAt:null, registrationStatus:"scheduled", eventCancelled:false, assignedStaffUids:[], refereeStationAssignments:{}, refereeStationNames:{}, refereeStationRestrictionEnabled:false },
+    eventInfo:emptyEventInfoV2(),
     players:[],
     registrations:[],
     rosterLocked:false,
@@ -5582,9 +5689,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.20";
+const APP_VERSION = "v14.2.21";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.21",date:"2026/09/24",timezone:"Asia/Taipei",title:"P7.11A Event Info V2 底層骨架",updateLevel:"patch",added:["新增 bxh.event-info.v2 結構化賽事資訊影子模型：basic／schedule／venue／registration／prizes／content／standardTemplate／source","新增 Legacy Adapter，可將既有 state.meta 安全同步至 Event Info V2，並預留 V2 回寫既有 meta 的顯式轉接器"],changed:["現階段 legacy state.meta 仍為唯一執行期權威；Event Info V2 僅在儲存快照前同步，不改變既有比賽、報名、裁判、天梯與玩家顯示流程","既有 location 可保守拆分店家與地址；新模型已預留 Google Maps URL、導航開關、公版版本快照、獎品與 AI 來源"],fixed:[],environment:"Production / Compatibility Layer",deployStatus:"P7.11A shadow model only",firebaseImpact:"私有賽事 JSON state 新增 eventInfo；無新增 Firestore collection、無公開欄位變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"ARENA 已建立新的結構化賽事資訊底座；目前畫面與比賽流程維持不變。"},
   {version:"v14.2.20",date:"2026/09/24",timezone:"Asia/Taipei",title:"AI 開房原文案自動帶入活動說明",updateLevel:"patch",added:["AI 套用賽事草稿時，若「活動說明（選填）」原本為空白，自動帶入房主貼給 AI 的完整原始活動文案","AI 套用預覽新增活動說明來源提示與原文案字數"],changed:["保留原始文案的換行、Emoji、規則與補充資訊，避免 AI 結構化後活動說明呈現空白","若房主已手動填寫活動說明，AI 不覆蓋既有內容"],fixed:[],environment:"Production / Restricted Beta",deployStatus:"Frontend AI Create draft mapping patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"AI 開房除了拆解欄位，也會把原始活動文案保留在活動說明；既有手動內容不會被覆蓋。"},
   {version:"v14.2.19",date:"2026/09/24",timezone:"Asia/Taipei",title:"AI 智能輔助開房 Restricted Beta",updateLevel:"minor",added:["最高管理員賽事設定頁新增「AI 協助建立 BETA」入口","可貼入 LINE、Threads、Facebook、Instagram 等活動文案，由後端 AI Parser 擷取賽事名稱、日期、地點、報到／開賽時間、名額、費用與組別等欄位","P7.10 Restricted Beta 僅開放 super_admin 與 allowlist admin；AI 僅產生草稿，不可自動建立或發布賽事"],changed:["AI 解析結果先通過後端 Schema Normalizer，再經前端 Schema 驗證後才可套入 settings／registration 草稿","缺少活動名稱或賽事名稱時不再由 AI 猜測；交由 Review Gate 阻擋並要求房主補填","event key 改由 Server 在模型未提供合法識別碼時自動生成"],fixed:["完成 P7.9 Live Shadow 9/9，Hard Failure 0、Quality Mismatch 0","修正 AI Shadow report artifact 路徑、nullable activity/event name、女性限制正規化與 event key fallback"],environment:"Production / Restricted Beta",deployStatus:"Backend Callable 已單函式部署；Frontend Restricted Beta 已上線",firebaseImpact:"新增 parseTournamentAnnouncementV1 Callable；AI 不直接寫 tournaments、publicTournaments 或 registrations",securityRulesImpact:"無",permissionImpact:"super_admin 可使用；admin 需 aiCreateBetaEnabled=true；staff/player/tester 不可使用",publicSummary:"最高管理員可在賽事設定頁使用 AI 協助建立活動草稿；AI 只填草稿，最後仍由房主人工確認與發布。"},
   {version:"v14.2.11",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事詳情第三區塊寬度統一／資訊列垂直間距減半",updateLevel:"patch",added:[],changed:["最下方報名操作區套用與賽事基本資訊、報名資訊相同的 tournament-info-panel 外框寬度與 padding 規格","3 欄資訊格維持左右間距不變，上下列間距由 6px 縮為 3px；窄螢幕由 5px 縮為 2.5px","若顯示本次報名資料區塊，也同步套用相同外框寬度規格"],fixed:["修正第三張報名卡片左右寬度與上方兩張卡片不一致","壓縮 3×3／3×2 資訊小卡上下空隙約 50%，降低賽事詳情頁垂直高度"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament detail width/density refinement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事詳情三張主要卡片現在同寬；資訊小卡上下列間距縮小一半，畫面更緊湊。"},
@@ -10598,6 +10706,7 @@ async function loadRecord(id){
   return null;
 }
 async function saveRecord(st){
+  syncEventInfoV2FromLegacy(st);
   let localOk = true;
   try{ await window.storage.set(recordKey(st.id), JSON.stringify(st)); }
   catch(e){ localOk = false; console.error("BXH ARENA：本機賽事紀錄寫入失敗", e && e.message); }
@@ -10606,6 +10715,7 @@ async function saveRecord(st){
   return localOk;
 }
 async function saveRecordDetailed(st){
+  syncEventInfoV2FromLegacy(st);
   const result={recordOk:false,indexOk:false,recordError:null,indexError:null};
   try{
     await window.storage.set(recordKey(st.id), JSON.stringify(st));
@@ -10711,8 +10821,15 @@ let cloudSyncQueueTimer = null;
 // earlier request from overwriting a newer state after it finishes late.
 let cloudWriteChain = Promise.resolve();
 function cloneStateForSave(st){
-  try{ return JSON.parse(JSON.stringify(st)); }
-  catch(e){ return st; }
+  try{
+    const cloned=JSON.parse(JSON.stringify(st));
+    syncEventInfoV2FromLegacy(cloned);
+    return cloned;
+  }
+  catch(e){
+    syncEventInfoV2FromLegacy(st);
+    return st;
+  }
 }
 function enqueueCloudStateWrite(code, snapshot){
   const normalizedCode = code;
