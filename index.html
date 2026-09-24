@@ -429,6 +429,104 @@ input,select,textarea{max-width:100%;min-width:0;}
   .registration-result-actions .btn{min-height:40px!important;padding:8px 10px!important;font-size:12px!important}
 }
 @media(max-width:380px){.registration-result-actions{grid-template-columns:1fr}}
+
+/* ==== v14.2.9 tournament detail 3x3 / 3x2 compact grid ==== */
+.tournament-summary-grid,
+.tournament-registration-grid{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:7px!important;
+}
+.tournament-summary-grid .stat-box,
+.tournament-registration-grid .stat-box{
+  min-width:0!important;
+  padding:9px 10px!important;
+  border-radius:10px!important;
+  background:linear-gradient(145deg,rgba(217,185,92,.055),rgba(255,255,255,.025))!important;
+  border:1px solid rgba(217,185,92,.17)!important;
+}
+.tournament-summary-grid .stat-box .label,
+.tournament-registration-grid .stat-box .label{
+  margin-bottom:3px!important;
+  font-size:10px!important;
+  line-height:1.2!important;
+  color:var(--metal-dim)!important;
+}
+.tournament-summary-grid .stat-box .value.small,
+.tournament-registration-grid .stat-box .value.small{
+  font-size:14px!important;
+  line-height:1.22!important;
+  font-weight:800!important;
+  color:var(--ivory)!important;
+  overflow-wrap:anywhere!important;
+  word-break:break-word!important;
+}
+.tournament-target-hint{
+  margin:7px 0 0!important;
+  font-size:10.5px!important;
+  line-height:1.35!important;
+  color:var(--metal-dim)!important;
+}
+.tournament-registration-info .field{
+  margin:8px 0 0!important;
+  padding-top:8px;
+  border-top:1px solid rgba(255,255,255,.055);
+}
+.tournament-registration-info .field label{
+  font-size:10.5px!important;
+  color:var(--metal-dim)!important;
+}
+.tournament-registration-info .field p{
+  margin:3px 0 0!important;
+  font-size:12px!important;
+  line-height:1.45!important;
+  color:var(--ivory)!important;
+}
+@media(max-width:600px){
+  .tournament-summary-grid,
+  .tournament-registration-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:6px!important;
+  }
+  .tournament-summary-panel,
+  .tournament-registration-info{
+    padding:10px!important;
+  }
+  .tournament-summary-panel .panel-title,
+  .tournament-registration-info .panel-title{
+    margin-bottom:7px!important;
+    font-size:16px!important;
+  }
+  .tournament-summary-grid .stat-box,
+  .tournament-registration-grid .stat-box{
+    padding:7px 7px!important;
+    border-radius:8px!important;
+  }
+  .tournament-summary-grid .stat-box .label,
+  .tournament-registration-grid .stat-box .label{
+    font-size:9px!important;
+    margin-bottom:2px!important;
+  }
+  .tournament-summary-grid .stat-box .value.small,
+  .tournament-registration-grid .stat-box .value.small{
+    font-size:12.5px!important;
+    line-height:1.18!important;
+  }
+  .tournament-target-hint{
+    margin-top:6px!important;
+    font-size:9.8px!important;
+  }
+}
+@media(max-width:380px){
+  .tournament-summary-grid,
+  .tournament-registration-grid{gap:5px!important;}
+  .tournament-summary-grid .stat-box,
+  .tournament-registration-grid .stat-box{padding:6px!important;}
+  .tournament-summary-grid .stat-box .label,
+  .tournament-registration-grid .stat-box .label{font-size:8.5px!important;}
+  .tournament-summary-grid .stat-box .value.small,
+  .tournament-registration-grid .stat-box .value.small{font-size:11.5px!important;}
+}
 .btn-ghost{background:transparent;border-color:var(--border);color:var(--metal);}
 .btn-ghost:hover{color:var(--white);}
 .btn-block{width:100%;}
@@ -4780,9 +4878,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.8";
+const APP_VERSION = "v14.2.9";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.9",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事詳情 3×3／3×2 高密度資訊排版",updateLevel:"patch",added:[],changed:["賽事基本資訊 9 項改為固定 3 欄 × 3 列；報名資訊 6 項改為固定 3 欄 × 2 列","手機版同步縮小資訊卡 padding、標籤字級、數值字級與卡片間距，保留所有原始欄位","活動對象說明、活動說明與報名注意事項降為次要資訊層級，減少垂直空間"],fixed:["改善公開賽事詳情原本 2 欄資訊卡造成頁面過長、需要大量下滑的問題","長地點、名額與時間內容允許在單一小卡內安全換行，避免撐寬版面"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament detail density refinement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事詳情改成 3×3＋3×2 高密度資訊卡，手機首屏可看到更多內容，功能與欄位全部保留。"},
   {version:"v14.2.8",date:"2026/09/24",timezone:"Asia/Taipei",title:"我的賽程卡片／BXH CALL 資訊層級重整",updateLevel:"minor",added:["BXH CALL 叫號說明改為可展開收合，完整保留人工叫號、智慧 ETA、PASS 與估時規則","叫號主卡新增精簡的 Court／輪次／叫號時間標題列與玩家回覆膠囊"],changed:["我的賽程基本資料改為緊湊資訊頭：賽事名稱、日期時間地點、賽事代碼、正備取與參賽者集中排列","背景通知與鎖屏推播控制改成獨立精簡列，保留通知狀態與測試推播功能","智慧叫號狀態／戰鬥台／預估等待固定三欄扁平資訊卡；對戰提示與 ETA 說明降階處理","底部查看詳情／樹狀圖／報名鎖定操作列維持等寬等高規格"],fixed:["降低我的賽程卡片多層框線與重複文字造成的垂直高度與視覺負擔","改善 BXH CALL 開關、通知列、Court 卡與 ETA 區塊的主次層級"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact schedule / BXH CALL layout",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無；所有既有叫號、PASS、背景通知、推播測試、賽程操作功能完整保留",publicSummary:"我的賽程與 BXH CALL 改成更精簡的資訊層級；功能完整保留，但主畫面更短、更容易看懂現在是否該上場。"},
   {version:"v14.2.7",date:"2026/09/24",timezone:"Asia/Taipei",title:"我的賽程操作列規格統一／智慧叫號預設開啟",updateLevel:"patch",added:[],changed:["我的賽程卡片底部操作列改為等寬、等高、相同圓角規格；查看詳情、查看樹狀圖與報名鎖定狀態維持各自語意配色","BXH CALL 智慧叫號改為每場預設開啟；僅在玩家明確關閉該場叫號時保存關閉偏好"],fixed:["修正我的賽程底部按鈕與狀態標籤尺寸不一致造成的視覺失衡","避免玩家加入進行中賽事後因未手動開啟智慧叫號而漏看 ETA 提醒"],environment:"Production / HTML + Firebase",deployStatus:"Frontend schedule action sizing + smart call default",firebaseImpact:"無資料結構變更；智慧叫號偏好仍使用本機 localStorage",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"我的賽程底部操作列統一尺寸；BXH CALL 智慧叫號預設開啟，玩家仍可自行關閉。"},
   {version:"v14.2.6",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳狀態優先順序調整",updateLevel:"patch",added:[],changed:["賽事大廳分類顯示順序調整為：比賽中 → 報名中 → 等待開始 → 結算中 → 已結束／已取消","僅調整分類呈現優先順序，不改變既有賽事狀態判定、資料分類與即時同步機制"],fixed:["讓玩家先看到正在進行與可立即報名的賽事，再看到等待開始與結算中的房間，降低操作優先級錯置"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby status priority",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳排序改為比賽中、報名中、等待開始、結算中、已結束／已取消。"},
@@ -17026,7 +17125,7 @@ function renderTournamentDetailScreen(){
     <div class="btn-row tournament-detail-back-row"><button class="btn btn-ghost" data-action="back-to-find-events">← 返回賽事列表</button></div>
     <div class="panel tournament-detail-panel tournament-summary-panel">
       <div class="panel-title">${esc(t.name||code)}</div>
-      <div class="grid grid-2 tournament-detail-grid">
+      <div class="grid tournament-detail-grid tournament-summary-grid">
         <div class="stat-box"><div class="label">賽事代碼</div><div class="value small">${esc(code)}</div></div>
         <div class="stat-box"><div class="label">賽事狀況</div><div class="value small">${esc(publicEventLifecycleStatus(t).label)}</div></div>
         <div class="stat-box"><div class="label">活動對象</div><div class="value small">${esc(TARGET_GROUP_LABELS[t.targetGroup]||"公開組")}</div></div>
@@ -17037,11 +17136,11 @@ function renderTournamentDetailScreen(){
         <div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(t.formatType==='single'?'單淘汰賽':(t.formatType||"—"))}</div></div>
         <div class="stat-box"><div class="label">報名費</div><div class="value small">${t.fee!=null?esc(String(t.fee))+" 元":"免費"}</div></div>
       </div>
-      <p class="hint" style="margin-top:8px;">${esc(TARGET_GROUP_DESCRIPTIONS[t.targetGroup]||TARGET_GROUP_DESCRIPTIONS.open)}</p>
+      <p class="hint tournament-target-hint">${esc(TARGET_GROUP_DESCRIPTIONS[t.targetGroup]||TARGET_GROUP_DESCRIPTIONS.open)}</p>
     </div>
     <div class="panel tournament-detail-panel tournament-registration-info">
       <div class="panel-title">報名資訊</div>
-      <div class="grid grid-2 tournament-detail-grid">
+      <div class="grid tournament-detail-grid tournament-registration-grid">
         <div class="stat-box"><div class="label">報名開放時間</div><div class="value small">${esc(formatTournamentDetailDateTime(t.registrationOpenAt))}</div></div>
         <div class="stat-box"><div class="label">報名截止時間</div><div class="value small">${esc(formatTournamentDetailDateTime(t.registrationCloseAt))}</div></div>
         <div class="stat-box"><div class="label">取消報名期限</div><div class="value small">${esc(formatTournamentDetailDateTime(t.cancellationDeadline))}</div></div>
