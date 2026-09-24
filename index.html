@@ -4476,6 +4476,79 @@ body .celebration-overlay{z-index:3000!important;}
   .smart-call-box .court-call-row{padding:7px 8px!important;}
 }
 
+/* ==== v14.2.18 BXH CALL centered status / opponent hierarchy ==== */
+.smart-call-box .court-call-people{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex-wrap:wrap!important;
+  gap:7px!important;
+  margin:7px 0 1px!important;
+  width:100%;
+  text-align:center;
+}
+.smart-call-box .court-call-person{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+  min-height:28px!important;
+  padding:4px 9px!important;
+  border-radius:999px!important;
+  text-align:center!important;
+  white-space:nowrap;
+}
+.smart-call-box .court-call-person b{
+  font-size:11.5px!important;
+  line-height:1.15!important;
+}
+.smart-call-focus{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:3px!important;
+  width:100%;
+  margin-top:6px!important;
+  padding-top:6px!important;
+  text-align:center!important;
+  border-top:1px solid rgba(255,255,255,.055);
+}
+.smart-call-focus-title{
+  display:block;
+  color:var(--gold)!important;
+  font-size:12.5px!important;
+  font-weight:900!important;
+  line-height:1.2!important;
+}
+.smart-call-opponent{
+  display:block!important;
+  color:#f0f2f6!important;
+  font-size:14px!important;
+  font-weight:850!important;
+  line-height:1.2!important;
+  letter-spacing:.01em;
+}
+.smart-call-focus .smart-call-note{
+  margin:1px 0 0!important;
+  max-width:100%;
+  color:var(--metal-dim)!important;
+  font-size:9.5px!important;
+  line-height:1.35!important;
+  text-align:center!important;
+}
+@media(max-width:420px){
+  .smart-call-box .court-call-people{gap:5px!important;margin-top:6px!important;}
+  .smart-call-box .court-call-person{
+    min-height:26px!important;
+    padding:3px 7px!important;
+    font-size:10px!important;
+  }
+  .smart-call-focus-title{font-size:12px!important;}
+  .smart-call-opponent{font-size:13px!important;}
+  .smart-call-focus .smart-call-note{font-size:9px!important;}
+}
+
 /* ==== v13.27.0 lifecycle / post-match / mobile header ==== */
 .tournament-owner-filter{display:flex;gap:6px;margin-top:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
 .tournament-owner-filter button{flex:0 0 auto;border:1px solid var(--border);background:var(--panel-2);color:var(--metal);border-radius:999px;padding:8px 13px;font-weight:700}
@@ -17717,10 +17790,10 @@ function smartCallCardHtml(r,info){
         <div class="smart-call-stat"><div class="k">預估等待</div><div class="v">${esc(smartCallEtaText(model.etaSec))}</div></div>
       </div>
       <div class="smart-call-focus">
-        <strong>${esc(focusText)}</strong>
+        <strong class="smart-call-focus-title">${esc(focusText)}</strong>
         ${model.opponent?`<span class="smart-call-opponent">VS ${esc(model.opponent)}</span>`:""}
+        <div class="smart-call-note">ETA 以每場 3 分鐘估算，會依比分動態修正。</div>
       </div>
-      <div class="smart-call-note">ETA 以每場 3 分鐘估算，會依比分動態修正。</div>
     </div>`:`<div class="smart-call-disabled">智慧提醒已關閉｜裁判正式叫號仍保留</div>`}
   </div>`;
 }
