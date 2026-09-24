@@ -20,6 +20,7 @@ jobs:
       - name: Verify BXH CALL Web Push scripts syntax
         run: |
           node --check court-call-ui.js
+          node --check raffle-ui.js
           node --check firebase-messaging-sw.js
 
       - name: Verify Production frontend invariants
