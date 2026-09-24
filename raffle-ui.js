@@ -1,4 +1,4 @@
-/* v13.32.3 | Independent member raffles. Results are always supplied by the server. */
+/* v13.32.4 | Independent member raffles. Results are always supplied by the server. */
 'use strict';
 let raffleState=null,raffleLinkConsumed=false;
 function canManageMemberRaffles(){return !!(userProfile&&userProfile.active===true&&!userProfile.deleted&&!['deleted','disabled','frozen'].includes(userProfile.accountStatus)&&(['staff','admin','super_admin','tester'].includes(userProfile.role)||userProfile.isTestAccount===true));}
@@ -241,22 +241,16 @@ async function handleRaffle(action,target){
  let joinPassword='';if(apiAction==='join'&&c.detail?.event?.passwordProtected){joinPassword=document.querySelector('[data-raffle-join-password]')?.value||'';if(!joinPassword){c.error='請輸入參加密碼。';render();return;}}
  if(apiAction==='join'){
   c.busy=true;c.error='';render();
-  let preview,legacyPreviewUnsupported=false;
+  let preview;
   try{
    preview=await window.engagementService.raffle({action:'joinPreview',id:c.id,password:joinPassword||undefined});
    if(c!==raffleContext())return;
    if(!preview?.ok)throw Error('preview-failed');
   }catch(e){
-   const msg=String(e?.message||e||'');
-   if(msg.includes('invalid-action'))legacyPreviewUnsupported=true;
-   else{if(c===raffleContext())c.error=raffleError(e);return;}
+   if(c===raffleContext())c.error=raffleError(e);
+   return;
   }finally{
    if(c===raffleContext()){c.busy=false;render();}
-  }
-  if(legacyPreviewUnsupported){
-   if(!confirm('目前系統正在切換新版票券確認流程。若活動含消耗票券，參加成功會依活動條件扣除；是否繼續參加？'))return;
-   await raffleMutate({action:'join',id:c.id,password:joinPassword||undefined,operationId:crypto.randomUUID()});
-   return;
   }
   if(preview.alreadyJoined){c.detail=null;await loadRaffles();return;}
   const approved=await openRaffleJoinConfirm(preview,c.detail?.event);
