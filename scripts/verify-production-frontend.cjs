@@ -166,9 +166,11 @@ mustNot(/<div class="ref-next-box"><span>下一場<\/span>\$\{nextMatchPreviewHt
 console.log('PASS emphasized referee next-match card');
 mustInclude('class="live-court-next-badge">下一場','Live next-match badge missing');
 mustInclude('.live-court-next-players{display:grid','Live next-match player row missing');
-mustInclude('const nextPreview=liveNextMatchCardHtml(safeCourt,stationNum);','Live court must use structured next-match card');
+mustInclude('function liveNextMatchCompactHtml(court,stationNum)','Live compact next-match renderer missing');
+mustInclude('const nextPreview=liveNextMatchCompactHtml(safeCourt,stationNum);','Live court must use compact next-match row');
+mustInclude('class="live-court-next live-court-next-compact"','Live compact next-match row class missing');
 mustNot(/<div class="live-court-next"><b>下一場<\/b>/,'Legacy single-line live next-match row must be removed');
-console.log('PASS emphasized live next-match card');
+console.log('PASS compact live next-match row / referee detailed next-match separation');
 mustInclude('data-action="correct-previous-score"','Previous match score correction button missing');
 mustInclude('data-action="retract-previous-match"','Previous match retract button missing');
 mustInclude('function correctionProbe(st,matchId)','Correction dependency preflight missing');
