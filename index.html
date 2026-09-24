@@ -9984,7 +9984,7 @@ function ensureSettingsFormDraft(){
     venueName,
     venueAddress,
     googleMapsUrl,
-    navigationEnabled:venue.navigationEnabled===true || !!googleMapsUrl || !!venueAddress,
+    navigationEnabled:venue.navigationEnabled===true || (!String(m.location||"").trim() && !state.cloudCode && !m.publishedAt),
     checkin:m.checkin||"",
     startTime:m.startTime||"",
     formatType:m.formatType||"single",
