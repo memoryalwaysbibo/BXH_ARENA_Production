@@ -4263,6 +4263,85 @@ body .celebration-overlay{z-index:3000!important;}
   .smart-call-box .smart-call-stat .v{font-size:10.5px!important;}
 }
 
+/* ==== v14.2.15 BXH CALL compact header / centered station / tighter vertical rhythm ==== */
+.smart-call-head-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex:0 0 auto;
+}
+.court-call-notify-icon{
+  appearance:none;
+  width:30px;
+  height:30px;
+  min-width:30px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:9px;
+  border:1px solid rgba(217,185,92,.30);
+  background:rgba(217,185,92,.055);
+  color:#d7b957;
+  font-size:15px;
+  line-height:1;
+  cursor:pointer;
+  -webkit-touch-callout:none;
+  user-select:none;
+  touch-action:manipulation;
+}
+.court-call-notify-icon.is-active{
+  border-color:rgba(88,230,147,.52);
+  background:rgba(61,196,117,.13);
+  color:#72efaa;
+  box-shadow:0 0 10px rgba(78,235,145,.12);
+}
+.court-call-notify-icon.is-blocked{
+  opacity:.48;
+  filter:grayscale(.45);
+}
+.court-call-player-section{margin-top:2px!important;}
+.court-call-active-list{margin-top:5px!important;}
+.smart-call-box .court-call-row{padding:8px 9px!important;}
+.court-call-row-head{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;
+  align-items:center!important;
+  gap:6px!important;
+  min-height:24px;
+}
+.court-call-row-head strong{
+  grid-column:2;
+  justify-self:center;
+  text-align:center;
+  font-size:13px!important;
+  line-height:1.15!important;
+  white-space:nowrap;
+}
+.court-call-time{
+  grid-column:3;
+  justify-self:end;
+  font-size:9px!important;
+}
+.smart-call-box .court-call-people{margin:6px 0 0!important;gap:5px!important;}
+.smart-call-box .court-call-person{min-height:26px!important;padding:3px 6px!important;}
+.smart-call-body{margin-top:6px!important;padding-top:6px!important;}
+.smart-call-box .smart-call-grid{gap:5px!important;}
+.smart-call-box .smart-call-grid .smart-call-stat{padding:6px 4px!important;}
+.smart-call-focus{margin-top:6px!important;padding-top:6px!important;}
+.smart-call-note{margin-top:3px!important;}
+@media(max-width:420px){
+  .smart-call-head{gap:7px!important;}
+  .smart-call-head-actions{gap:6px;}
+  .court-call-notify-icon{width:28px;height:28px;min-width:28px;border-radius:8px;font-size:14px;}
+  .smart-call-switch{width:40px!important;height:22px!important;}
+  .court-call-row-head{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;}
+  .court-call-row-head strong{font-size:12px!important;}
+  .court-call-time{font-size:8.5px!important;}
+  .smart-call-box .court-call-row{padding:7px 8px!important;}
+}
+
 /* ==== v13.27.0 lifecycle / post-match / mobile header ==== */
 .tournament-owner-filter{display:flex;gap:6px;margin-top:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
 .tournament-owner-filter button{flex:0 0 auto;border:1px solid var(--border);background:var(--panel-2);color:var(--metal);border-radius:999px;padding:8px 13px;font-weight:700}
@@ -9280,7 +9359,7 @@ function requireStationPermission(matchOrId, st=state){
   if(st&&st.archiveStatus==="completed"){ showToast("此賽事已完成並封存，目前為唯讀。",true); return false; }
   const m=typeof matchOrId==="string" ? ((st&&st.matches)||[]).find(x=>x.id===matchOrId) : matchOrId;
   if(!canOperateMatchStation(m,st)){
-    showToast(`此戰鬥台未指派給你${m&&m.station?`（Court ${m.station}）`:""}，目前僅可查看。`, true);
+    showToast(`此戰鬥台未指派給你${m&&m.station?`（${m.station}號台）`:""}，目前僅可查看。`, true);
     return false;
   }
   if(st.cloudCode && (!cloudAvailable() || cloudStatus!=="connected")){
@@ -9573,7 +9652,7 @@ function restoreRefereeWorkstationView(uid,intent){
     const courtNo=Number(match.station||station||0);
     const el=document.getElementById("court-card-"+courtNo);
     if(el&&el.scrollIntoView) try{el.scrollIntoView({block:"start"});}catch(e){}
-    showToast("已恢復 Court "+courtNo+" 裁判工作站");
+    showToast("已恢復 "+courtNo+"號台裁判工作站");
   },80);
   return true;
 }
@@ -17479,8 +17558,8 @@ function smartCallMaybeNotify(code,model){
   if(level>Number(prev.level||0)){
     let msg="";
     if(level===1) msg=`BXH CALL｜前方剩 ${model.ahead} 場，${smartCallEtaText(model.etaSec)}`;
-    if(level===2) msg=`BXH CALL｜下一場就是你，請前往 Court ${model.station||1} 準備`;
-    if(level===3) msg=`BXH CALL｜輪到你了｜Court ${model.station||1}`;
+    if(level===2) msg=`BXH CALL｜下一場就是你，請前往 ${model.station||1}號台準備`;
+    if(level===3) msg=`BXH CALL｜輪到你了｜${model.station||1}號台`;
     if(msg){ showToast(msg); try{ if(navigator.vibrate) navigator.vibrate(level>=2?[180,80,180]:120); }catch(e){} }
     all[uk][code]={level,at:Date.now()}; smartCallStorageWrite(SMART_CALL_LAST_KEY,all);
   }
@@ -17492,13 +17571,16 @@ function smartCallCardHtml(r,info){
   return `<div class="smart-call-box">
     <div class="smart-call-head">
       <div class="smart-call-title">🔔 BXH CALL｜智慧叫號</div>
-      <input class="smart-call-switch" type="checkbox" data-action="toggle-smart-call" data-code="${esc(r.tournamentCode)}" ${on?'checked':''} aria-label="智慧叫號">
+      <div class="smart-call-head-actions">
+        ${typeof renderCourtCallHeaderControls==='function'?renderCourtCallHeaderControls(r.tournamentCode):''}
+        <input class="smart-call-switch" type="checkbox" data-action="toggle-smart-call" data-code="${esc(r.tournamentCode)}" ${on?'checked':''} aria-label="智慧叫號">
+      </div>
     </div>
     ${renderCourtCallPlayer(r.tournamentCode)}
     ${on?`<div class="smart-call-body">
       <div class="smart-call-grid">
         <div class="smart-call-stat"><div class="k">狀態</div><div class="v">${esc(statusText)}</div></div>
-        <div class="smart-call-stat"><div class="k">戰鬥台</div><div class="v">${model.station?`Court ${esc(String(model.station))}`:"—"}</div></div>
+        <div class="smart-call-stat"><div class="k">戰鬥台</div><div class="v">${model.station?`${esc(String(model.station))}號台`:"—"}</div></div>
         <div class="smart-call-stat"><div class="k">預估等待</div><div class="v">${esc(smartCallEtaText(model.etaSec))}</div></div>
       </div>
       <div class="smart-call-focus">
