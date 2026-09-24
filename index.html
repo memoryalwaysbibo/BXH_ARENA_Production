@@ -549,7 +549,8 @@ input,select,textarea{max-width:100%;min-width:0;}
 .tournament-info-grid{
   display:grid!important;
   grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  gap:6px!important;
+  column-gap:6px!important;
+  row-gap:3px!important;
 }
 .tournament-info-grid .stat-box{
   box-sizing:border-box!important;
@@ -614,7 +615,8 @@ input,select,textarea{max-width:100%;min-width:0;}
   }
   .tournament-info-grid{
     grid-template-columns:repeat(3,minmax(0,1fr))!important;
-    gap:6px!important;
+    column-gap:6px!important;
+    row-gap:3px!important;
   }
   .tournament-info-grid .stat-box{
     height:68px!important;
@@ -640,7 +642,7 @@ input,select,textarea{max-width:100%;min-width:0;}
   .tournament-info-foot-text{font-size:10.8px!important}
 }
 @media(max-width:380px){
-  .tournament-info-grid{gap:5px!important}
+  .tournament-info-grid{column-gap:5px!important;row-gap:2.5px!important}
   .tournament-info-grid .stat-box{
     height:66px!important;
     min-height:66px!important;
@@ -648,6 +650,22 @@ input,select,textarea{max-width:100%;min-width:0;}
   }
   .tournament-info-grid .stat-box .label{font-size:8.3px!important}
   .tournament-info-grid .stat-box .value.small{font-size:11.3px!important}
+}
+
+/* ==== v14.2.11 detail panel width + vertical density ==== */
+.tournament-action-panel.tournament-info-panel,
+.tournament-detail-panel.tournament-info-panel{
+  width:100%!important;
+  max-width:none!important;
+  margin-left:0!important;
+  margin-right:0!important;
+  box-sizing:border-box!important;
+}
+.tournament-action-panel.tournament-info-panel{
+  padding:12px!important;
+}
+@media(max-width:600px){
+  .tournament-action-panel.tournament-info-panel{padding:10px!important;}
 }
 .btn-ghost{background:transparent;border-color:var(--border);color:var(--metal);}
 .btn-ghost:hover{color:var(--white);}
@@ -5000,9 +5018,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.10";
+const APP_VERSION = "v14.2.11";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.11",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事詳情第三區塊寬度統一／資訊列垂直間距減半",updateLevel:"patch",added:[],changed:["最下方報名操作區套用與賽事基本資訊、報名資訊相同的 tournament-info-panel 外框寬度與 padding 規格","3 欄資訊格維持左右間距不變，上下列間距由 6px 縮為 3px；窄螢幕由 5px 縮為 2.5px","若顯示本次報名資料區塊，也同步套用相同外框寬度規格"],fixed:["修正第三張報名卡片左右寬度與上方兩張卡片不一致","壓縮 3×3／3×2 資訊小卡上下空隙約 50%，降低賽事詳情頁垂直高度"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament detail width/density refinement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事詳情三張主要卡片現在同寬；資訊小卡上下列間距縮小一半，畫面更緊湊。"},
   {version:"v14.2.10",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事詳情上下資訊區塊尺寸統一",updateLevel:"patch",added:[],changed:["賽事基本資訊與報名資訊改用同一 tournament-info-panel 外框規格，寬度、padding、圓角、邊框與背景完全一致","3×3 與 3×2 兩組資訊卡共用 tournament-info-grid；每張資訊卡固定相同高度、內距、標籤與數值對齊方式","參賽說明、活動說明與報名注意事項統一為相同 footer 結構與分隔線"],fixed:["修正手機版上方賽事資訊外框與下方報名資訊外框寬度觀感不一致","修正上下兩組資訊卡高度、文字基線與卡片節奏不同造成的視覺不整齊"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament detail geometry normalization",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事詳情上下兩區塊現在使用同一套外框與資訊卡尺寸；3×3、3×2 只差列數，不再像兩套元件。"},
   {version:"v14.2.9",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事詳情 3×3／3×2 高密度資訊排版",updateLevel:"patch",added:[],changed:["賽事基本資訊 9 項改為固定 3 欄 × 3 列；報名資訊 6 項改為固定 3 欄 × 2 列","手機版同步縮小資訊卡 padding、標籤字級、數值字級與卡片間距，保留所有原始欄位","活動對象說明、活動說明與報名注意事項降為次要資訊層級，減少垂直空間"],fixed:["改善公開賽事詳情原本 2 欄資訊卡造成頁面過長、需要大量下滑的問題","長地點、名額與時間內容允許在單一小卡內安全換行，避免撐寬版面"],environment:"Production / HTML + Firebase",deployStatus:"Frontend tournament detail density refinement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事詳情改成 3×3＋3×2 高密度資訊卡，手機首屏可看到更多內容，功能與欄位全部保留。"},
   {version:"v14.2.8",date:"2026/09/24",timezone:"Asia/Taipei",title:"我的賽程卡片／BXH CALL 資訊層級重整",updateLevel:"minor",added:["BXH CALL 叫號說明改為可展開收合，完整保留人工叫號、智慧 ETA、PASS 與估時規則","叫號主卡新增精簡的 Court／輪次／叫號時間標題列與玩家回覆膠囊"],changed:["我的賽程基本資料改為緊湊資訊頭：賽事名稱、日期時間地點、賽事代碼、正備取與參賽者集中排列","背景通知與鎖屏推播控制改成獨立精簡列，保留通知狀態與測試推播功能","智慧叫號狀態／戰鬥台／預估等待固定三欄扁平資訊卡；對戰提示與 ETA 說明降階處理","底部查看詳情／樹狀圖／報名鎖定操作列維持等寬等高規格"],fixed:["降低我的賽程卡片多層框線與重複文字造成的垂直高度與視覺負擔","改善 BXH CALL 開關、通知列、Court 卡與 ETA 區塊的主次層級"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact schedule / BXH CALL layout",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無；所有既有叫號、PASS、背景通知、推播測試、賽程操作功能完整保留",publicSummary:"我的賽程與 BXH CALL 改成更精簡的資訊層級；功能完整保留，但主畫面更短、更容易看懂現在是否該上場。"},
@@ -17277,7 +17296,7 @@ function renderTournamentDetailScreen(){
       ${t.eventDescription ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">活動說明</div><p class="tournament-info-foot-text">${esc(t.eventDescription)}</p></div>` : ""}
       ${t.registrationNotes ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">報名注意事項</div><p class="tournament-info-foot-text">${esc(t.registrationNotes)}</p></div>` : ""}
     </div>
-    ${!isGuestMode && isLoggedIn && !myReg ? `<div class="panel tournament-detail-panel">
+    ${!isGuestMode && isLoggedIn && !myReg ? `<div class="panel tournament-detail-panel tournament-info-panel">
       <div class="panel-title">本次報名資料</div>
       <div class="grid grid-2 tournament-detail-grid">
         <div class="stat-box"><div class="label">姓名</div><div class="value small">${esc(userProfile.realName||"—")}</div></div>
@@ -17287,7 +17306,7 @@ function renderTournamentDetailScreen(){
       </div>
       <p class="hint" style="margin-top:8px;">以上資料已由您的 BXH 會員帳號自動帶入，不需要重新填寫。</p>
     </div>` : ""}
-    <div class="panel tournament-detail-panel tournament-action-panel">
+    <div class="panel tournament-detail-panel tournament-action-panel tournament-info-panel">
       <div class="panel-title">報名</div>
       ${actionHtml}
     </div>
