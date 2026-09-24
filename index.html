@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.06">
+<meta name="bxh-build" content="20260924.11">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.06";
+  var CURRENT_BUILD="20260924.11";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4211,7 +4211,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.0"></script>
-<script src="court-call-ui.js?v=14.1.0-build2"></script>
+<script src="court-call-ui.js?v=14.2.0-b2.3"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -4390,9 +4390,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.1.0";
+const APP_VERSION = "v14.2.0";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.0",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0 Phase B2｜鎖屏／離開 ARENA Web Push",updateLevel:"minor",added:["新增 Firebase Messaging Service Worker，ARENA 切到 LINE／IG、背景分頁或關閉視窗後仍可接收人工叫號推播","新增裝置 Push 註冊與伺服器 Token Registry；同一裝置換帳號時會轉移 Token 所有權，避免舊帳號持續收到通知","iPhone 會辨識主畫面安裝狀態；未加入主畫面時提示先安裝再啟用鎖屏推播","新增「測試鎖屏推播」：按下後約 4 秒發送本人測試通知，方便直接驗證背景／鎖屏是否正常"],changed:["通知點擊會優先喚醒既有 ARENA 視窗並立即刷新 BXH CALL 狀態","Push 發送改在叫號交易成功後執行；推播失敗不會回滾比賽或 PASS 操作","Service Worker 自訂 notificationclick 於 Firebase Messaging 載入前註冊，避免 SDK 覆蓋點擊行為","Production Web Push 已改用 Firebase 專案專屬公開 VAPID key 取得 FCM Token"],fixed:["修正 Phase B2 callable 串接曾出現字面 \\n 造成 module 語法錯誤的候選版問題","修正 Push Token 可能跨帳號殘留的所有權邊界"],environment:"Production candidate / HTML + Firebase Messaging",deployStatus:"Backend live-verified; Production public VAPID key configured; frontend pending final RC + real-device verification",firebaseImpact:"新增 users/{uid}/courtCallPushTokens、users/{uid}/courtCallPushMeta（server-only）與 courtCallPushTokenOwners 所有權索引；新增 courtCallPushService callable",securityRulesImpact:"無前端直寫權限；Token 註冊與推播皆經 callable / Admin SDK",permissionImpact:"通知僅送給該場雙方選手與對應裁判／賽事負責人",publicSummary:"BXH CALL 進入 Phase B2：裁判叫號可透過 Web Push 送到背景與鎖屏；點通知會回到 ARENA 並同步目前場次。"},
   {version:"v14.1.0",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0 Phase A｜前景叫號／一場 PASS／三方同步",updateLevel:"minor",added:["裁判人工叫號改為 ARENA 前景全域彈窗，玩家可直接回覆 OK／PASS","玩家、對手與裁判同步顯示回覆狀態與 PASS 結果","玩家登入 ARENA 後會在各頁持續輪詢本人正取賽事的人工叫號，不再綁定『我的賽程』或智慧 ETA 開關"],changed:["PASS 改為玩家自助立即生效，同台同輪自動延後 1 場，每人每賽事限一次","人工裁判叫號與智慧 ETA 分離；智慧叫號開關不再阻止裁判人工通知","人工叫號同步週期由 5 秒縮短至約 2–3 秒，未變更時不再重繪整個頁面"],fixed:["修正裁判已按『通知雙方選手』但玩家不在『我的賽程』或未開啟智慧叫號時完全看不到通知的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend Phase A ready; Production courtCallService backend rollout",firebaseImpact:"沿用 courtCalls 集合；PASS 交易會同步更新 tournaments 與 publicTournaments 公開鏡像，不新增集合",securityRulesImpact:"無 Firestore Rules 變更；沿用 callable 權限驗證",permissionImpact:"沿用參賽玩家本人與該 Court 裁判權限",publicSummary:"BXH CALL 人工叫號升級：ARENA 前景任何頁面都能直接收到裁判叫號，玩家可回覆 OK 或使用一次 PASS 延後一場，雙方選手與裁判會同步看到狀態。"},
   {version:"v14.0.67",date:"2026/09/24",timezone:"Asia/Taipei",title:"樹狀圖決賽區標示與冠軍卡整合",updateLevel:"patch",added:["單淘汰樹狀圖最後兩場新增「冠亞」「季殿」場次標示","冠軍產生後於決賽區上方空白區顯示冠軍卡"],changed:["單淘汰樹狀圖原「冠軍賽／季軍賽」決賽標示調整為「冠亞／季殿」","單淘汰看板原本位於樹狀圖下方的獨立冠軍卡移入決賽區；未產生冠軍時不顯示待定卡"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend single-elimination finals presentation refinement",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"樹狀圖決賽區現在直接標示冠亞、季殿；冠軍產生後會在兩場決賽上方顯示冠軍卡。"},
   {version:"v14.0.66",date:"2026/09/24",timezone:"Asia/Taipei",title:"樹狀圖長按修正比分",updateLevel:"patch",added:["樹狀總覽已完成場次支援長按 1.5 秒開啟二階修正入口"],changed:["裁判台移除常駐的上一場修正／撤回區塊，釋放手機垂直空間","修正入口改為直接對指定已完成場次操作，不再侷限上一場","長按後先顯示場次與比分，再由「修正比分」進入安全撤回確認"],fixed:["保留既有後續賽程保護；後續場次已有實際得分或完成時仍會阻止回滾"],environment:"Production / HTML + Firebase",deployStatus:"Frontend bracket long-press correction entry",firebaseImpact:"無資料結構變更；沿用既有 correction transaction 與稽核欄位",securityRulesImpact:"無",permissionImpact:"僅有既有賽事操作＋對應戰鬥台權限者可啟動",publicSummary:"比分修正不再常駐裁判台；有權限的人可在樹狀圖長按已完成場次開啟修正。"},
@@ -24235,6 +24236,21 @@ init();
     async signOutUser(){
       try{sessionStorage.removeItem("bxh_prod_auth_view_v1");}catch(e){}
       if(!authReady) return;
+      const signedInUid=String((authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||"");
+      if(signedInUid){
+        const pushKey="bxh.call.push.token:"+signedInUid;
+        let pushToken="";
+        try{pushToken=String(localStorage.getItem(pushKey)||"");}catch(e){}
+        if(pushToken&&functionsHandle&&fnx&&typeof fnx.httpsCallable==="function"){
+          try{
+            const unregister=fnx.httpsCallable(functionsHandle,"courtCallPushService",{timeout:5000});
+            await withTimeout(unregister({action:"unregister",token:pushToken}),2500,null);
+          }catch(e){
+            console.warn("[BXH CALL push] logout unregister unavailable");
+          }
+        }
+        try{localStorage.removeItem(pushKey);}catch(e){}
+      }
       try{ await ax.signOut(authHandle); }catch(e){}
     },
 
@@ -24608,6 +24624,7 @@ init();
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
+    async courtCallPush(payload){return callEngagementFunction("courtCallPushService",payload,60000);},
     async raffle(payload){return callEngagementFunction("memberRaffle",payload,540000,['list','get','announcements'].includes(payload?.action));},
     async getSnapshot(){ return callEngagementFunction("getEngagementSnapshot",{}); },
     async syncHunterAchievements(){ return callEngagementFunction("syncHunterAchievements",{},120000); },

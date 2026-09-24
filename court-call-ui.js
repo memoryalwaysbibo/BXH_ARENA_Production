@@ -1,11 +1,195 @@
-/* v14.1.0 — BXH CALL 2.0 Phase A (P1-P3).
-   Foreground global call overlay + one-match self-service PASS + referee/opponent sync.
-   Background/lock-screen Web Push remains Phase P4. */
+/* v14.2.0 — BXH CALL 2.0 Phase B2.
+   Phase A: foreground global call overlay + one-match self-service PASS + referee/opponent sync.
+   Phase B1: browser background notifications while ARENA remains loaded.
+   Phase B2: Firebase Web Push + Service Worker for lock-screen / app-closed delivery. */
 'use strict';
 
 let courtCallCache=new Map(),courtCallTimer=null,courtCallIdentity='';
 let courtCallPlayerCodes=[],courtCallDiscoveryAt=0,courtCallDiscoveryBusy=false;
 const courtCallDelayDismissed=new Set();
+const courtCallSystemNotifySeen=new Set();
+let courtCallPushBusy=false,courtCallPushSyncAt=0,courtCallPushError='',courtCallServiceWorkerListenerBound=false;
+let courtCallPushTestBusy=false,courtCallPushTestResult='',courtCallPushConfigMode='unknown';
+const COURT_CALL_PUSH_REFRESH_MS=15*60*1000;
+const COURT_CALL_FIREBASE_SDK='10.13.0';
+
+function courtCallNotificationPermission(){
+ try{
+  if(typeof window==='undefined'||!('Notification' in window))return 'unsupported';
+  return Notification.permission||'default';
+ }catch{return 'unsupported';}
+}
+
+function courtCallPushStorageKey(){
+ const uid=courtCallUserKey();
+ return uid?'bxh.call.push.token:'+uid:'';
+}
+function courtCallLoadPushToken(){
+ const key=courtCallPushStorageKey();if(!key)return '';
+ try{return String(localStorage.getItem(key)||'');}catch{return '';}
+}
+function courtCallSavePushToken(token){
+ const key=courtCallPushStorageKey();if(!key)return;
+ try{localStorage.setItem(key,String(token||''));}catch{}
+}
+function courtCallPushRegistered(){return !!courtCallLoadPushToken();}
+function courtCallPushSupported(){
+ return typeof window!=='undefined'&&'serviceWorker' in navigator&&'PushManager' in window&&courtCallNotificationPermission()!=='unsupported';
+}
+function courtCallIsIos(){
+ try{return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}catch{return false;}
+}
+function courtCallIsStandalone(){
+ try{return window.matchMedia?.('(display-mode: standalone)')?.matches===true||navigator.standalone===true;}catch{return false;}
+}
+
+function courtCallBindServiceWorkerMessages(){
+ if(courtCallServiceWorkerListenerBound||typeof navigator==='undefined'||!navigator.serviceWorker)return;
+ courtCallServiceWorkerListenerBound=true;
+ navigator.serviceWorker.addEventListener('message',event=>{
+  const message=event?.data||{};
+  if(message.type!=='BXH_CALL_PUSH_CLICK')return;
+  const code=String(message.data?.code||'').toUpperCase();
+  if(/^BXH-[A-Z0-9]{4,16}$/.test(code)&&!courtCallPlayerCodes.includes(code)){
+   courtCallPlayerCodes.unshift(code);
+   courtCallPlayerCodes=courtCallPlayerCodes.slice(0,10);
+  }
+  courtCallDiscoveryAt=0;
+  setTimeout(async()=>{
+   try{
+    if(code&&courtCallUserKey())await loadCourtCalls(code);
+    else await discoverCourtCallPlayerCodes(true);
+   }catch{}
+   syncCourtCallGlobalOverlay();
+   try{renderPreservingScroll();}catch{}
+  },0);
+ });
+}
+courtCallBindServiceWorkerMessages();
+
+function courtCallNotificationHint(){
+ const p=courtCallNotificationPermission();
+ if(p==='denied')return '通知：瀏覽器已封鎖，請到網站權限重新開啟';
+ if(p==='unsupported')return '通知：此瀏覽器不支援';
+ if(p==='default')return '通知：尚未啟用';
+ if(courtCallPushRegistered())return courtCallPushConfigMode==='default'?'鎖屏／離開 ARENA 推播：已啟用（預設 Web Push 金鑰）':'鎖屏／離開 ARENA 推播：已啟用';
+ if(courtCallIsIos()&&!courtCallIsStandalone())return 'iPhone 鎖屏推播：請先將 ARENA 加入主畫面後再啟用';
+ if(courtCallPushError)return '鎖屏推播：'+courtCallPushError;
+ return '分頁通知：已啟用｜鎖屏推播：待註冊';
+}
+
+async function courtCallLoadFirebaseConfig(){
+ const r=await fetch('./PRODUCTION_FIREBASE_WEB_CONFIG.json?v=20260924',{cache:'no-store'});
+ if(!r.ok)throw Error('push-config-unavailable');
+ const cfg=await r.json();
+ if(!cfg||cfg.projectId!=='bxh-arena'||!cfg.appId||!cfg.messagingSenderId)throw Error('push-config-invalid');
+ courtCallPushConfigMode=String(cfg.vapidKey||'').trim()?'custom':'default';
+ return cfg;
+}
+
+async function courtCallEnsurePushRegistration(force=false){
+ const uid=courtCallUserKey();
+ if(!uid||courtCallPushBusy)return courtCallPushRegistered();
+ if(courtCallNotificationPermission()!=='granted'||!courtCallPushSupported())return false;
+ if(courtCallIsIos()&&!courtCallIsStandalone()){
+  courtCallPushError='iPhone 需加入主畫面';
+  return false;
+ }
+ if(!force&&courtCallPushRegistered()&&Date.now()-courtCallPushSyncAt<COURT_CALL_PUSH_REFRESH_MS)return true;
+ if(!window.engagementService||typeof window.engagementService.courtCallPush!=='function'){
+  courtCallPushError='推播服務尚未載入';
+  return false;
+ }
+ courtCallPushBusy=true;courtCallPushSyncAt=Date.now();courtCallPushError='';
+ try{
+  const reg=await navigator.serviceWorker.register('/firebase-messaging-sw.js',{scope:'/',updateViaCache:'none'});
+  await navigator.serviceWorker.ready;
+  const [cfg,appMod,msgMod]=await Promise.all([
+   courtCallLoadFirebaseConfig(),
+   import(`https://www.gstatic.com/firebasejs/${COURT_CALL_FIREBASE_SDK}/firebase-app.js`),
+   import(`https://www.gstatic.com/firebasejs/${COURT_CALL_FIREBASE_SDK}/firebase-messaging.js`)
+  ]);
+  if(!(await msgMod.isSupported()))throw Error('push-not-supported');
+  const app=appMod.getApps().length?appMod.getApp():appMod.initializeApp(cfg);
+  const messaging=msgMod.getMessaging(app);
+  const options={serviceWorkerRegistration:reg};
+  const vapid=String(window.BXH_CALL_VAPID_PUBLIC_KEY||cfg.vapidKey||'').trim();
+  if(vapid)options.vapidKey=vapid;
+  const token=await msgMod.getToken(messaging,options);
+  if(!token)throw Error('push-token-empty');
+  const result=await window.engagementService.courtCallPush({
+   action:'register',token,
+   platform:String(navigator.platform||'').slice(0,80),
+   userAgent:String(navigator.userAgent||'').slice(0,240)
+  });
+  if(!result?.ok)throw Error('push-register-failed');
+  courtCallSavePushToken(token);
+  courtCallPushError='';
+  return true;
+ }catch(e){
+  const raw=String(e?.message||e);
+  courtCallPushError=raw.includes('not-supported')?'裝置不支援':
+   raw.includes('permission')?'權限未開啟':
+   raw.includes('token')?'Token 建立失敗':'註冊失敗';
+  console.warn('[BXH CALL push]',e);
+  return false;
+ }finally{
+  courtCallPushBusy=false;
+ }
+}
+
+async function courtCallEnableBackgroundNotifications(){
+ const p=courtCallNotificationPermission();
+ if(p==='unsupported'){showToast('此瀏覽器不支援系統通知',true);return false;}
+ if(p==='denied'){showToast('通知已被瀏覽器封鎖，請到網站權限重新開啟',true);return false;}
+ try{
+  const granted=p==='granted'||await Notification.requestPermission()==='granted';
+  if(!granted){showToast('尚未取得通知權限',true);return false;}
+  const pushOk=await courtCallEnsurePushRegistration(true);
+  if(pushOk){
+   showToast('BXH CALL 鎖屏／離開 ARENA 推播已啟用');
+  }else if(courtCallIsIos()&&!courtCallIsStandalone()){
+   showToast('iPhone 請先將 BXH ARENA 加入主畫面，再開啟通知',true);
+  }else{
+   showToast('分頁通知已啟用；鎖屏推播尚未完成註冊',true);
+   courtCallSystemNotify('bxh-call-enabled','BXH CALL 已啟用','ARENA 保持開啟時可收到背景通知。',true);
+  }
+  return true;
+ }catch(e){
+  console.warn('[BXH CALL notification permission]',e);
+  showToast('無法啟用通知，請稍後重試',true);
+  return false;
+ }
+}
+
+function courtCallSystemNotify(tag,title,body,force=false){
+ try{
+  if(typeof document!=='undefined'&&!force&&document.visibilityState==='visible')return false;
+  // When Web Push is registered, the Service Worker owns background delivery.
+  // Avoid showing a second local notification from the polling fallback.
+  if(!force&&courtCallPushRegistered())return false;
+  if(courtCallNotificationPermission()!=='granted')return false;
+  const dedupe=String(tag||title||body||'');
+  if(dedupe&&courtCallSystemNotifySeen.has(dedupe))return false;
+  const options={
+   body:String(body||''),
+   tag:dedupe||undefined,
+   renotify:true,
+   icon:'assets/icons/bxh-gold-icon-192.png?v=20260918',
+   badge:'assets/icons/bxh-gold-icon-192.png?v=20260918'
+  };
+  const note=new Notification(String(title||'BXH CALL'),options);
+  if(dedupe){
+   courtCallSystemNotifySeen.add(dedupe);
+   setTimeout(()=>courtCallSystemNotifySeen.delete(dedupe),60000);
+  }
+  note.onclick=()=>{
+   try{window.focus();}catch{}
+   try{note.close();}catch{}
+  };
+  return true;
+ }catch{return false;}
+}
 
 function callPassProtected(s,m){
  return !!(m&&(m.callPass&&!m.completed||(s.matches||[]).some(x=>!x.completed&&x.skippedAt&&x.callPass?.waitFor.includes(m.id))));
@@ -112,8 +296,19 @@ function renderCourtCallReferee(m){
 
 function renderCourtCallPlayer(code){
  const c=courtCallContext(code);
+ const np=courtCallNotificationPermission(),pushReady=courtCallPushRegistered();
+ const notifyButton=np==='default'
+  ? '<button class="btn btn-ghost" data-action="court-call-enable-notify">🔔 啟用背景通知</button>'
+  : (np==='granted'&&!pushReady?'<button class="btn btn-ghost" data-action="court-call-enable-notify">📱 啟用鎖屏推播</button>':'');
+ const testButton=pushReady
+  ? `<button class="btn btn-ghost" data-action="court-call-test-push" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`
+  : '';
  return `<section>
    <p class="hint">裁判人工叫號與智慧 ETA 已分離｜人工叫號約每 2–3 秒同步｜PASS：${c.used?'本賽事已使用':'可使用 1 次，直接延後一場'}</p>
+   <div class="btn-row" style="align-items:center">
+    ${notifyButton}${testButton}
+    <span class="hint">${esc(courtCallNotificationHint())}${courtCallPushTestResult?`｜${esc(courtCallPushTestResult)}`:''}</span>
+   </div>
    ${courtCallCommon(c)}
    ${c.rows.filter(r=>r.players.some(p=>p.me)).map(r=>courtCallRow(c,r,false)).join('')||'<p class="hint">等待裁判通知。</p>'}
  </section>`;
@@ -210,13 +405,25 @@ function courtCallNotifyChanges(c,newRows,oldRows){
   if(isMine&&newSequence&&mePlayers.some(p=>p.response==='unanswered')){
    showToast(`🔔 BXH CALL｜Court ${r.station} 裁判叫號，請立即回覆`);
    courtCallVibrate();
+   const names=(r.players||[]).map(p=>p.name||'選手');
+   courtCallSystemNotify(
+    `bxh-call:${c.code}:${r.matchId}:${r.sequence}`,
+    `🔔 BXH CALL｜Court ${r.station}`,
+    `${names[0]||'選手 A'} VS ${names[1]||'選手 B'}｜請前往 ${r.station} 號戰鬥台，開啟 ARENA 回覆 OK 或 PASS。`
+   );
   }
   if(prev){
    const oldPass=prev.pass?.status||'',newPass=r.pass?.status||'';
    if(newPass==='approved'&&oldPass!=='approved'){
     if(isMine){
-     showToast(r.pass?.requester?`PASS 已接受｜Court ${r.station} 本場延後 1 場`:`對手使用 PASS｜Court ${r.station} 本場延後 1 場`);
+     const passMessage=r.pass?.requester?`PASS 已接受｜Court ${r.station} 本場延後 1 場`:`對手使用 PASS｜Court ${r.station} 本場延後 1 場`;
+     showToast(passMessage);
      courtCallVibrate([120,70,120]);
+     courtCallSystemNotify(
+      `bxh-pass:${c.code}:${r.matchId}:${r.sequence}:${r.pass?.approvedAt||r.pass?.requestedAt||0}`,
+      `BXH CALL｜Court ${r.station}`,
+      `${passMessage}，完成前置場次後系統會再次叫號。`
+     );
     }
     if(r.isReferee)showToast(`Court ${r.station}｜${r.pass?.playerName||'選手'} 使用 PASS，已自動延後 1 場`);
    }
@@ -273,6 +480,9 @@ function scheduleCourtCallPoll(){
  courtCallTimer=setTimeout(async()=>{
   courtCallTimer=null;
   await discoverCourtCallPlayerCodes(false);
+  if(courtCallNotificationPermission()==='granted'&&Date.now()-courtCallPushSyncAt>COURT_CALL_PUSH_REFRESH_MS){
+   courtCallEnsurePushRegistration(false).catch(()=>{});
+  }
   const list=courtCallVisibleCodes();
   for(const code of list){
    const c=courtCallContext(code);
@@ -325,6 +535,40 @@ async function loadCourtCalls(code){
 }
 
 async function handleCourtCall(action,target){
+ if(action==='court-call-enable-notify'){
+  await courtCallEnableBackgroundNotifications();
+  try{renderPreservingScroll();}catch{}
+  return;
+ }
+ if(action==='court-call-test-push'){
+  if(courtCallPushTestBusy)return;
+  if(!courtCallPushRegistered()){
+   showToast('請先啟用鎖屏推播',true);return;
+  }
+  if(!window.engagementService||typeof window.engagementService.courtCallPush!=='function'){
+   showToast('推播測試服務尚未載入',true);return;
+  }
+  courtCallPushTestBusy=true;
+  courtCallPushTestResult='4 秒後發送，請立即切到 LINE 或鎖定手機';
+  showToast('4 秒後發送測試推播，請立即切到其他 App 或鎖定手機');
+  try{renderPreservingScroll();}catch{}
+  try{
+   const result=await window.engagementService.courtCallPush({action:'selftest'});
+   if(!result?.ok)throw Error('push-selftest-failed');
+   const attempted=Number(result.attempted||0),sent=Number(result.sent||0),failed=Number(result.failed||0);
+   courtCallPushTestResult=sent>0?`測試已送出 ${sent}/${attempted} 個裝置`:(attempted?'測試送出失敗':'伺服器沒有有效推播裝置');
+   showToast(sent>0?'BXH CALL 測試推播已送出，請檢查通知':'測試推播沒有成功送達',sent===0||failed>0);
+  }catch(e){
+   const raw=String(e?.message||e);
+   courtCallPushTestResult=raw.includes('push-test-cooldown')?'請稍候 15 秒再測試':
+    raw.includes('push-not-registered')?'伺服器註冊已失效，請重新啟用推播':'測試失敗，請重新啟用推播後再試';
+   showToast(courtCallPushTestResult,true);
+  }finally{
+   courtCallPushTestBusy=false;
+   try{renderPreservingScroll();}catch{}
+  }
+  return;
+ }
  if(action==='court-call-dismiss-delay'){
   const stamp=target.getAttribute('data-stamp');if(stamp)courtCallDelayDismissed.add(stamp);
   syncCourtCallGlobalOverlay();return;
