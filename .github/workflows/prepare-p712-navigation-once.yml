@@ -32,13 +32,15 @@ jobs:
           node --experimental-vm-modules tests/ladder-v1.cjs
           node --experimental-vm-modules tests/ladder-settlement.cjs
           git diff --check
-      - name: Commit tested patch to feature branch and remove preparation workflow
+      - name: Commit runtime content only to feature branch
         shell: bash
         run: |
           set -euo pipefail
+          # The bot has contents permission only. Workflow maintenance stays with the authorized connector.
+          git restore .github/workflows/validate-production-frontend.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/prepare-p712-navigation-once.yml
-          git add index.html version.json .github/workflows/validate-production-frontend.yml
+          git add index.html version.json
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
           git commit -m 'fix(venue): preserve explicit clears, safe maps and accessible navigation'
           git push origin HEAD:refs/heads/fix/p7-12-navigation-safety-20260925
