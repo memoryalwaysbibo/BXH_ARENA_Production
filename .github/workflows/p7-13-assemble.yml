@@ -1,0 +1,111 @@
+name: P7.13 assemble and verify feature branch
+on:
+  push:
+    branches: [feature/p7-13-poster-flow-20260925]
+    paths: ['.github/workflows/p7-13-assemble.yml']
+permissions:
+  contents: write
+concurrency:
+  group: p7-13-feature-assembly
+  cancel-in-progress: false
+jobs:
+  assemble:
+    if: github.ref == 'refs/heads/feature/p7-13-poster-flow-20260925'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify input integrity and exact baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/feature/p7-13-poster-flow-20260925'
+          test "$(git hash-object index.html)" = 'deaea802c6b5551f08b5dca36a4195f962a29de7'
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,zlib,base64,hashlib
+          encoded=''.join(Path(f'.p7-13-part-{i}.b64').read_text().strip() for i in range(5))
+          assert len(encoded)==16984,'Source transport length mismatch'
+          raw=zlib.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(raw).hexdigest()=='4b015716ba0308abd5718390c015bb0e6d55d22a4559568a5148282de7cda7cf','Source integrity mismatch'
+          files=json.loads(raw)
+          assert set(files)=={'scripts/apply-p7-13-poster.py','tests/ai-poster-ui.test.cjs','P7_13_POSTER_FRONTEND.md'}
+          assert hashlib.sha256(Path('ai-poster-ui.js').read_bytes()).hexdigest()=='56c91ad2d011e5232f81e34b011484bf7f3d09eb0414f597a674a6bb567d6967','Module differs from tested source'
+          for name,text in files.items():
+              assert isinstance(text,str)
+              Path(name).write_text(text)
+          print('Tested source integrity confirmed; no credentials or production data are read.')
+          PY
+      - name: Apply exact-anchor integration and remove one-time transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/apply-p7-13-poster.py
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow=Path('.github/workflows/validate-production-frontend.yml')
+          text=workflow.read_text()
+          anchor='      - name: Verify venue navigation regressions\n'
+          assert text.count(anchor)==1
+          text=text.replace(anchor,'      - name: Verify AI poster contract and draft boundary\n        run: |\n          node --check ai-poster-ui.js\n          node tests/ai-poster-ui.test.cjs\n\n'+anchor)
+          workflow.write_text(text)
+          for name in ['scripts/apply-p7-13-poster.py','.p7-13-assembly.b64','.github/workflows/p7-13-development.yml','.github/workflows/p7-13-assemble.yml']:
+              Path(name).unlink()
+          for p in Path('.').glob('.p7-13-part-*.b64'): p.unlink()
+          PY
+      - name: Run poster and all existing production regression gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            node --check ai-poster-ui.js
+            node --check court-call-ui.js
+            node --check raffle-ui.js
+            node --check firebase-messaging-sw.js
+            node tests/ai-poster-ui.test.cjs
+            node tests/venue-navigation.test.cjs
+            node tests/hunter-loop-p5-ui.test.cjs
+            node scripts/verify-production-frontend.cjs
+            node --experimental-vm-modules tests/ladder-v1.cjs
+            node --experimental-vm-modules tests/ladder-settlement.cjs
+            git diff --check
+          } 2>&1 | tee /tmp/p7-13-validation.log
+          if grep -RIn --exclude-dir=.git --exclude-dir=.github --exclude-dir=tests --exclude='RELEASE_*.md' -E 'bxh-arena-beta|beta\.bxh\.com\.tw|BETA 測試站｜非正式環境' .; then
+            echo 'Forbidden Beta runtime marker.' >&2; exit 1
+          fi
+      - name: Commit only verified P7.13 changes to isolated feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/feature/p7-13-poster-flow-20260925'
+          git add index.html version.json .github/workflows/validate-production-frontend.yml tests/ai-poster-ui.test.cjs P7_13_POSTER_FRONTEND.md
+          git add -u
+          python3 - <<'PY'
+          import subprocess
+          expected={'index.html','version.json','ai-poster-ui.js','tests/ai-poster-ui.test.cjs','P7_13_POSTER_FRONTEND.md','.github/workflows/validate-production-frontend.yml'}
+          actual=set(subprocess.check_output(['git','diff','--cached','--name-only','de9c340ead6b2a46ee31b0a7c5cc28c2364531e0'],text=True).splitlines())
+          assert actual==expected,(actual,expected)
+          PY
+          git diff --cached --stat de9c340ead6b2a46ee31b0a7c5cc28c2364531e0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(p7.13): connect poster upload, strict parser, draft mapping and owner review'
+          git push origin HEAD:refs/heads/feature/p7-13-poster-flow-20260925
+          git rev-parse HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p7-13-verified-frontend
+          path: |
+            index.html
+            ai-poster-ui.js
+            version.json
+            P7_13_POSTER_FRONTEND.md
+            tests/ai-poster-ui.test.cjs
+            /tmp/p7-13-validation.log
+          retention-days: 3
