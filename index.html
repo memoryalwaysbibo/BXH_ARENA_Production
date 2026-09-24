@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260925.34">
+<meta name="bxh-build" content="20260925.35">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260925.34";
+  var CURRENT_BUILD="20260925.35";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3774,6 +3774,32 @@ button.ai-create-event-card.is-selected{
 .ai-create-suggestion-card p{margin:4px 0 0;color:var(--metal);font-size:10px;line-height:1.55;}
 .ai-create-suggestion-value{margin-top:5px;color:#d9edff;font-size:10.5px;font-weight:750;}
 .ai-create-suggestion-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.venue-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.venue-settings-grid .venue-map-field{grid-column:1/-1;}
+.venue-nav-toggle{margin-top:2px;}
+.venue-detail-value{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.venue-detail-name{font-weight:800;color:var(--white);overflow-wrap:anywhere;}
+.venue-detail-address-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.venue-detail-address{color:var(--metal);font-size:10px;line-height:1.45;overflow-wrap:anywhere;}
+.venue-nav-menu{position:relative;display:inline-block;}
+.venue-nav-menu>summary{
+  list-style:none;display:inline-flex;align-items:center;gap:4px;cursor:pointer;
+  min-height:26px;padding:3px 8px;border:1px solid rgba(95,215,147,.30);border-radius:999px;
+  color:#b9f0cd;background:rgba(95,215,147,.055);font-size:9.5px;font-weight:800;white-space:nowrap;
+}
+.venue-nav-menu>summary::-webkit-details-marker{display:none;}
+.venue-nav-menu[open]>summary{border-color:rgba(95,215,147,.55);background:rgba(95,215,147,.10);}
+.venue-nav-options{
+  position:absolute;z-index:80;right:0;top:calc(100% + 5px);min-width:148px;
+  padding:6px;border:1px solid rgba(255,255,255,.12);border-radius:10px;
+  background:#17181b;box-shadow:0 12px 30px rgba(0,0,0,.42);
+}
+.venue-nav-options a{
+  display:block;padding:8px 9px;border-radius:7px;color:var(--white);font-size:10.5px;
+  text-decoration:none;white-space:nowrap;
+}
+.venue-nav-options a:hover{background:rgba(255,255,255,.06);}
+@media(max-width:600px){.venue-settings-grid{grid-template-columns:1fr}.venue-settings-grid .venue-map-field{grid-column:auto}.venue-nav-options{left:0;right:auto;}}
 .ai-create-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
 .ai-create-apply-btn{border-color:rgba(95,215,147,.44)!important;}
 .ai-create-apply-btn:not(:disabled){background:rgba(95,215,147,.10)!important;color:#d8f7e4!important;}
@@ -5495,6 +5521,85 @@ function buildLegacyVenueText(venue){
   return name||address||String(v.legacyText||"").trim();
 }
 
+function normalizeGoogleMapsUrl(value){
+  const raw=String(value||"").trim().replace(/[\]\)}>，。！？、,;；]+$/g,"");
+  if(!raw)return "";
+  try{
+    const u=new URL(raw);
+    if(u.protocol!=="https:")return "";
+    const host=u.hostname.toLowerCase();
+    if(host==="maps.app.goo.gl")return u.toString();
+    if(host==="maps.google.com")return u.toString();
+    if((host==="www.google.com"||host==="google.com")&&u.pathname.startsWith("/maps"))return u.toString();
+  }catch(e){}
+  return "";
+}
+function extractGoogleMapsUrlFromText(text){
+  const source=String(text||"");
+  const matches=source.match(/https:\/\/(?:maps\.app\.goo\.gl|maps\.google\.com|(?:www\.)?google\.com\/maps)\/[^\s)\]>]+/ig)||[];
+  for(const match of matches){
+    const normalized=normalizeGoogleMapsUrl(match);
+    if(normalized)return normalized;
+  }
+  return "";
+}
+function googleMapsNavigationUrl(venue){
+  const v=venue&&typeof venue==="object"?venue:{};
+  const direct=normalizeGoogleMapsUrl(v.googleMapsUrl);
+  if(direct)return direct;
+  const target=String(v.address||v.name||"").trim();
+  return target?"https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(target):"";
+}
+function appleMapsNavigationUrl(venue){
+  const v=venue&&typeof venue==="object"?venue:{};
+  const target=String(v.address||v.name||"").trim();
+  return target?"https://maps.apple.com/?daddr="+encodeURIComponent(target):"";
+}
+function applyVenueDraftToState(d,st=state){
+  if(!st||!d)return;
+  const info=normalizeEventInfoV2(st.eventInfo);
+  const venue={
+    name:String(d.venueName||"").trim(),
+    address:String(d.venueAddress||"").trim(),
+    googleMapsUrl:normalizeGoogleMapsUrl(d.googleMapsUrl),
+    navigationEnabled:!!d.navigationEnabled,
+    legacyText:""
+  };
+  venue.legacyText=buildLegacyVenueText(venue);
+  if(!venue.name&&!venue.address&&String(d.location||"").trim()){
+    const legacy=splitLegacyVenueText(d.location);
+    venue.name=legacy.name;venue.address=legacy.address;venue.legacyText=legacy.legacyText;
+  }
+  if(!venue.name&&!venue.address&&!venue.googleMapsUrl)venue.navigationEnabled=false;
+  info.venue=Object.assign({},info.venue,venue);
+  st.eventInfo=info;
+  st.meta=st.meta||{};
+  st.meta.location=venue.legacyText||String(d.location||"").trim();
+}
+function publicVenueFromTournament(t){
+  const raw=t&&t.parsedData&&t.parsedData.eventInfo&&t.parsedData.eventInfo.venue;
+  if(raw&&typeof raw==="object"){
+    return {
+      name:String(raw.name||"").trim(),
+      address:String(raw.address||"").trim(),
+      googleMapsUrl:normalizeGoogleMapsUrl(raw.googleMapsUrl),
+      navigationEnabled:raw.navigationEnabled===true
+    };
+  }
+  const legacy=splitLegacyVenueText(t&&t.location);
+  return {name:legacy.name,address:legacy.address,googleMapsUrl:"",navigationEnabled:false};
+}
+function renderVenueNavigationMenu(venue){
+  const v=venue&&typeof venue==="object"?venue:{};
+  if(v.navigationEnabled!==true)return "";
+  const google=googleMapsNavigationUrl(v),apple=appleMapsNavigationUrl(v);
+  if(!google&&!apple)return "";
+  return `<details class="venue-nav-menu"><summary>🧭 導航</summary><div class="venue-nav-options">
+    ${google?`<a href="${esc(google)}" target="_blank" rel="noopener noreferrer">Google Maps</a>`:""}
+    ${apple?`<a href="${esc(apple)}" target="_blank" rel="noopener noreferrer">Apple 地圖</a>`:""}
+  </div></details>`;
+}
+
 function normalizeEventInfoV2(raw){
   const base=emptyEventInfoV2();
   const input=raw&&typeof raw==="object"?raw:{};
@@ -5718,9 +5823,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.23";
+const APP_VERSION = "v14.2.24";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.24",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.12 結構化場地與雙地圖導航",updateLevel:"minor",added:["賽事設定將活動地點拆分為場地／店家名稱、活動地址、Google Maps 連結與導航開關","玩家賽事詳情的地址旁新增小型「🧭 導航」選單，可開啟 Google Maps 或 Apple 地圖","AI 開房會從原始文案自動辨識 maps.app.goo.gl／Google Maps 連結並帶入場地草稿","即使沒有 Google Maps 連結，只要有地址也能自動產生 Google／Apple 導航"],changed:["舊版 meta.location 仍由場地名稱＋地址自動產生，維持歷史紀錄、搜尋、賽事列表與舊功能相容","公開 eventInfo 僅白名單輸出場地名稱、地址、合法 Google Maps URL 與導航開關"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend venue/navigation layer",firebaseImpact:"沿用 eventInfo.venue；無新增 collection",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事場地改為結構化資料，玩家可直接從地址旁選擇 Google Maps 或 Apple 地圖導航。"},
   {version:"v14.2.23",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11C AI 智慧修正建議",updateLevel:"minor",added:["AI 草稿套用後新增「AI 智慧修正建議」卡片，可逐項勾選並一鍵確認套用","建議明確區分「原文資訊」與「系統建議」，避免把推算值偽裝成原始活動內容","可補開始報到、需要報到、開賽時間、報名開放／截止、正取名額與報名費","原文缺少報到開始時間但已有開賽時間時，可建議開賽前 30 分鐘開始報到；原文缺少開賽時間但有報到結束時間時，可建議以報到結束作為開賽時間"],changed:["所有系統推算值都必須由房主勾選並按「確認並套用」才會進入草稿","套用建議後會重新執行 AI 審核閘門，不直接儲存或發布"],fixed:[],environment:"Production / AI Create Restricted Beta",deployStatus:"Frontend suggestion layer",firebaseImpact:"無新增資料集合或 Rules 變更",securityRulesImpact:"無",permissionImpact:"沿用 AI Create Restricted Beta 權限",publicSummary:"AI 開房現在不只指出缺漏，也能提出可確認的一鍵修正方案；推算值會清楚標示，不會自行修改房間。"},
   {version:"v14.2.22",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11B BXH 賽事公版 CMS",updateLevel:"minor",added:["賽事設定新增「套用 BXH 賽事公版」勾選，官方新房間預設勾選","公版包含比賽規則、注意事項、BXH 賽事／法律定位，並保存每場賽事的版本快照","最高管理員可直接在 ARENA 編輯並發布新版公版；一般管理員只能套用／取消套用","公開賽事詳情新增公版版本與三個可展開內容區塊"],changed:["公版更新不會回寫已發布賽事；歷史房間固定使用當時 snapshot","公開鏡像只輸出 eventInfo.standardTemplate 的安全白名單，不公開 AI source 或其他私人 Event Info V2 欄位"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend + eventTemplateService",firebaseImpact:"新增 server-managed systemSettings/bxhEventTemplate 與 eventTemplateAudit；房間私有 state 保存 standardTemplate snapshot",securityRulesImpact:"無；公版寫入僅透過 Admin SDK Callable",permissionImpact:"super_admin 可修改公版；admin 僅能選擇是否套用",publicSummary:"BXH 賽事可直接套用統一公版；公版本體只有最高管理員能修改，每場活動會保留當時版本。"},
   {version:"v14.2.21",date:"2026/09/24",timezone:"Asia/Taipei",title:"P7.11A Event Info V2 底層骨架",updateLevel:"patch",added:["新增 bxh.event-info.v2 結構化賽事資訊影子模型：basic／schedule／venue／registration／prizes／content／standardTemplate／source","新增 Legacy Adapter，可將既有 state.meta 安全同步至 Event Info V2，並預留 V2 回寫既有 meta 的顯式轉接器"],changed:["現階段 legacy state.meta 仍為唯一執行期權威；Event Info V2 僅在儲存快照前同步，不改變既有比賽、報名、裁判、天梯與玩家顯示流程","既有 location 可保守拆分店家與地址；新模型已預留 Google Maps URL、導航開關、公版版本快照、獎品與 AI 來源"],fixed:[],environment:"Production / Compatibility Layer",deployStatus:"P7.11A shadow model only",firebaseImpact:"私有賽事 JSON state 新增 eventInfo；無新增 Firestore collection、無公開欄位變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"ARENA 已建立新的結構化賽事資訊底座；目前畫面與比賽流程維持不變。"},
@@ -9199,8 +9305,17 @@ function buildPublicEventInfo(st){
   const info=normalizeEventInfoV2(st&&st.eventInfo);
   const cfg=info.standardTemplate||{};
   const snapshot=cfg.snapshot&&typeof cfg.snapshot==="object"?cfg.snapshot:null;
+  const venue=info.venue||{};
+  const safeGoogleMapsUrl=normalizeGoogleMapsUrl(venue.googleMapsUrl);
+  const safeVenue={
+    name:String(venue.name||"").trim(),
+    address:String(venue.address||"").trim(),
+    googleMapsUrl:safeGoogleMapsUrl,
+    navigationEnabled:venue.navigationEnabled===true && !!(safeGoogleMapsUrl||String(venue.address||venue.name||"").trim())
+  };
   return {
     schemaVersion:EVENT_INFO_SCHEMA_VERSION,
+    venue:safeVenue,
     standardTemplate:(cfg.enabled===true && snapshot)?{
       enabled:true,
       templateId:String(cfg.templateId||snapshot.id||"bxh-standard"),
@@ -9519,6 +9634,10 @@ function aiCreateDraftMappingModel(){
     settings:{
       name:String(event.name||activity.name||"").trim(),
       date:String(event.date||activity.date||"").trim(),
+      venueName:String(activity.locationName||"").trim(),
+      venueAddress:String(activity.address||"").trim(),
+      googleMapsUrl:extractGoogleMapsUrlFromText(aiCreateSourceText),
+      navigationEnabled:!!(String(activity.address||"").trim()||extractGoogleMapsUrlFromText(aiCreateSourceText)),
       location:aiCreateLocationText(activity),
       checkin:checkinCompatible?String(event.checkInStart||"").trim():"",
       startTime:startCompatible?String(event.startAt||"").trim():"",
@@ -9556,6 +9675,10 @@ function applyAiCreateSelectedEventToDraft(){
   const s=model.settings,r=model.registration;
   if(s.name){settingsFormDraft.name=s.name;mapped.push("賽事名稱");}
   if(s.date){settingsFormDraft.date=s.date;mapped.push("活動日期");}
+  if(s.venueName){settingsFormDraft.venueName=s.venueName;mapped.push("場地名稱");}
+  if(s.venueAddress){settingsFormDraft.venueAddress=s.venueAddress;mapped.push("活動地址");}
+  if(s.googleMapsUrl){settingsFormDraft.googleMapsUrl=s.googleMapsUrl;mapped.push("Google Maps");}
+  if(s.navigationEnabled){settingsFormDraft.navigationEnabled=true;mapped.push("場地導航");}
   if(s.location){settingsFormDraft.location=s.location;mapped.push("活動地點");}
   if(s.checkin){settingsFormDraft.checkin=s.checkin;mapped.push("報到時間");}
   if(s.startTime){settingsFormDraft.startTime=s.startTime;mapped.push("開賽時間");}
@@ -9598,7 +9721,9 @@ function renderAiCreateMappingPreview(){
     <div class="ai-create-map-grid">
       <div>賽事名稱｜<b>${esc(s.name||"—")}</b></div>
       <div>日期｜<b>${esc(s.date||"—")}</b></div>
-      <div>地點｜<b>${esc(s.location||"—")}</b></div>
+      <div>場地｜<b>${esc(s.venueName||"—")}</b></div>
+      <div>地址｜<b>${esc(s.venueAddress||"—")}</b></div>
+      <div>地圖｜<b>${s.googleMapsUrl?"已辨識 Google Maps 連結":(s.venueAddress?"可由地址產生導航":"—")}</b></div>
       <div>報到｜<b>${esc(s.checkin||"—")}</b></div>
       <div>開賽｜<b>${esc(s.startTime||"—")}</b></div>
       <div>報名方式｜<b>${r.registrationEnabled?"線上報名":"現場報名"}</b></div>
@@ -9846,10 +9971,20 @@ function renderAiCreateAssistant(){
 function ensureSettingsFormDraft(){
   if(settingsFormDraft) return;
   const m=state.meta||{};
+  const eventInfo=normalizeEventInfoV2(state.eventInfo);
+  const legacyVenue=splitLegacyVenueText(m.location);
+  const venue=eventInfo.venue||{};
+  const venueName=String(venue.name||legacyVenue.name||"");
+  const venueAddress=String(venue.address||legacyVenue.address||"");
+  const googleMapsUrl=normalizeGoogleMapsUrl(venue.googleMapsUrl);
   settingsFormDraft={
     name:m.name||"",
     date:m.date||"",
-    location:m.location||"",
+    location:buildLegacyVenueText({name:venueName,address:venueAddress,legacyText:m.location||""}),
+    venueName,
+    venueAddress,
+    googleMapsUrl,
+    navigationEnabled:venue.navigationEnabled===true || !!googleMapsUrl || !!venueAddress,
     checkin:m.checkin||"",
     startTime:m.startTime||"",
     formatType:m.formatType||"single",
@@ -9876,7 +10011,12 @@ function syncSettingsDraftFromDom(){
   };
   settingsFormDraft.name=val("f-name",settingsFormDraft.name);
   settingsFormDraft.date=val("f-date",settingsFormDraft.date);
-  settingsFormDraft.location=val("f-location",settingsFormDraft.location);
+  settingsFormDraft.venueName=val("f-venue-name",settingsFormDraft.venueName||"");
+  settingsFormDraft.venueAddress=val("f-venue-address",settingsFormDraft.venueAddress||"");
+  settingsFormDraft.googleMapsUrl=val("f-google-maps-url",settingsFormDraft.googleMapsUrl||"");
+  const nav=document.getElementById("f-navigation-enabled");
+  if(nav)settingsFormDraft.navigationEnabled=!!nav.checked;
+  settingsFormDraft.location=buildLegacyVenueText({name:settingsFormDraft.venueName,address:settingsFormDraft.venueAddress,legacyText:settingsFormDraft.location});
   settingsFormDraft.checkin=val("f-checkin",settingsFormDraft.checkin);
   settingsFormDraft.startTime=val("f-start",settingsFormDraft.startTime);
   settingsFormDraft.formatType=val("f-format",settingsFormDraft.formatType)||"single";
@@ -16020,7 +16160,15 @@ function renderSettings(){
     <div class="settings-basic-stack">
       <div class="field"><label>賽事名稱</label><input type="text" id="f-name" data-settings-draft="name" value="${esc(d.name)}"></div>
       <div class="field"><label>活動日期</label><input type="date" id="f-date" data-settings-draft="date" value="${esc(d.date)}"></div>
-      <div class="field"><label>活動地點</label><input type="text" id="f-location" data-settings-draft="location" value="${esc(d.location)}"></div>
+      <div class="venue-settings-grid">
+        <div class="field"><label>場地／店家名稱</label><input type="text" id="f-venue-name" data-settings-draft="venueName" value="${esc(d.venueName||"")}" placeholder="例如：北京麻辣鍋"></div>
+        <div class="field"><label>活動地址</label><input type="text" id="f-venue-address" data-settings-draft="venueAddress" value="${esc(d.venueAddress||"")}" placeholder="例如：台南市南區健康路二段386號"></div>
+        <div class="field venue-map-field"><label>Google Maps 連結（選填）</label><input type="url" id="f-google-maps-url" data-settings-draft="googleMapsUrl" value="${esc(d.googleMapsUrl||"")}" placeholder="https://maps.app.goo.gl/..."></div>
+      </div>
+      <label class="settings-check-row venue-nav-toggle">
+        <input type="checkbox" id="f-navigation-enabled" data-settings-draft="navigationEnabled" data-settings-type="bool" ${d.navigationEnabled?"checked":""}>
+        <span>玩家端顯示「🧭 導航」按鈕（Google Maps／Apple 地圖）</span>
+      </label>
     </div>
 
     <div class="settings-inner-divider"></div>
@@ -18836,6 +18984,7 @@ function renderTournamentDetailScreen(){
   </div>`;
   }
   const t = tournamentDetailData;
+  const publicVenue=publicVenueFromTournament(t);
   const now = Date.now();
   const effStatus = getEffectiveRegistrationStatus(Object.assign({}, t, {
     registrationStatus: t.eventCancelled ? "cancelled" : t.registrationStatus
@@ -18928,7 +19077,10 @@ function renderTournamentDetailScreen(){
         <div class="stat-box"><div class="label">賽事狀況</div><div class="value small">${esc(publicEventLifecycleStatus(t).label)}</div></div>
         <div class="stat-box"><div class="label">活動對象</div><div class="value small">${esc(TARGET_GROUP_LABELS[t.targetGroup]||"公開組")}</div></div>
         <div class="stat-box"><div class="label">日期</div><div class="value small">${esc(t.eventDate||"—")}</div></div>
-        <div class="stat-box"><div class="label">地點</div><div class="value small">${esc(t.location||"—")}</div></div>
+        <div class="stat-box"><div class="label">地點</div><div class="value small venue-detail-value">
+          <span class="venue-detail-name">${esc(publicVenue.name||t.location||"—")}</span>
+          ${publicVenue.address?`<span class="venue-detail-address-row"><span class="venue-detail-address">${esc(publicVenue.address)}</span>${renderVenueNavigationMenu(publicVenue)}</span>`:renderVenueNavigationMenu(publicVenue)}
+        </div></div>
         <div class="stat-box"><div class="label">報到時間</div><div class="value small">${esc(t.checkInAt||"—")}</div></div>
         <div class="stat-box"><div class="label">開賽時間</div><div class="value small">${esc(t.startAt||"—")}</div></div>
         <div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(t.formatType==='single'?'單淘汰賽':(t.formatType||"—"))}</div></div>
@@ -25788,9 +25940,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       markTesterSandboxState(state);
     }
 
+    if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請確認連結是否來自 Google Maps",true);return;}
     state.meta.name=(d.name||"").trim()||"未命名賽事";
     state.meta.date=d.date||"";
-    state.meta.location=(d.location||"").trim();
+    applyVenueDraftToState(d,state);
     state.meta.checkin=d.checkin||"";
     state.meta.startTime=d.startTime||"";
     state.meta.formatType=d.formatType||"single";
@@ -25886,6 +26039,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
     if(!aiCreateReviewGate("儲存賽事設定")) return;
+    if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請貼上 maps.app.goo.gl 或 Google Maps 網址",true);return;}
     const requestedStations=Math.max(1,parseInt(d.stations,10)||1);
     const newFormatType=d.formatType||"single";
     const formatChanged=newFormatType!==(state.meta.formatType||"single");
@@ -25901,7 +26055,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const applyMeta=()=>{
       state.meta.name=isTester()?ensureTestName(d.name):((d.name||"").trim()||"未命名賽事");
       state.meta.date=d.date||"";
-      state.meta.location=(d.location||"").trim();
+      applyVenueDraftToState(d,state);
       state.meta.checkin=d.checkin||"";
       state.meta.startTime=d.startTime||"";
       state.meta.formatType=newFormatType;
