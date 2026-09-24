@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.14">
+<meta name="bxh-build" content="20260924.15">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.14";
+  var CURRENT_BUILD="20260924.15";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3394,32 +3394,38 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .ref-station-status.waiting{color:#b9bec6}.ref-station-status.ready{color:#f5d85f;border-color:rgba(245,216,95,.45)}.ref-station-status.live{color:#ff6b79;border-color:rgba(255,85,104,.52);box-shadow:0 0 12px rgba(255,85,104,.18)}.ref-station-status.paused{color:#ffb268;border-color:rgba(255,178,104,.42)}.ref-station-status.done{color:#7cebb8;border-color:rgba(124,235,184,.38)}
 @media(max-width:720px){.ref-workstation-identity{min-width:0}.ref-workstation-identity div{min-width:0}.ref-workstation-identity b{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ref-workstation-meta{flex:0 0 auto}}
 
-/* ==== v14.2.3 compact live summary ==== */
-.live-summary-panel{padding:14px 16px!important;overflow:hidden}
-.live-summary-head{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
-.live-summary-panel .status-pill{margin:0!important;padding:4px 8px!important;min-height:0!important;font-size:10px!important;line-height:1.15!important}
-.live-summary-progress{flex:0 0 auto;color:var(--neon);font-family:var(--font-d);font-size:22px;font-weight:900;line-height:1;white-space:nowrap}
-.live-summary-title-row{display:flex;align-items:center;gap:8px;min-width:0;margin-top:7px}
-.live-summary-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--white);font-family:var(--font-d);font-size:20px;font-weight:900;line-height:1.2}
-.live-summary-share{flex:0 0 32px!important;width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;border-radius:50%!important}
-.live-summary-share svg{width:15px!important;height:15px!important}
-.live-summary-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
-.live-summary-stat{min-width:0;padding:8px 10px;border:1px solid rgba(255,255,255,.055);border-radius:9px;background:rgba(255,255,255,.025)}
-.live-summary-stat b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--white);font-family:var(--font-d);font-size:16px;font-weight:850;line-height:1.2}
-.live-summary-stat small{display:block;margin-top:2px;color:var(--metal-dim);font-size:9.5px;line-height:1.25}
-.live-summary-meta{margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--metal-dim);font-size:9.5px;line-height:1.3}
+/* ==== v14.2.4 live dashboard summary ==== */
+.live-dashboard-panel{padding:12px!important;overflow:hidden}
+.live-summary-strip{padding:2px 2px 11px;border-bottom:1px solid rgba(255,255,255,.065)}
+.live-summary-line{display:flex;align-items:center;gap:8px;min-width:0}
+.live-summary-name{flex:1 1 auto;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--white);font-family:var(--font-d);font-size:18px;font-weight:900;line-height:1.2}
+.live-summary-chip{flex:0 0 auto;padding:4px 7px;border:1px solid rgba(255,255,255,.09);border-radius:999px;background:rgba(255,255,255,.025);color:#d9dde2;font-size:9.5px;font-weight:800;white-space:nowrap}
+.live-summary-refresh{flex:0 0 30px!important;width:30px!important;height:30px!important;min-height:30px!important;padding:0!important;border-radius:50%!important;font-size:16px!important;line-height:1!important}
+.live-summary-refresh.is-busy{animation:live-refresh-spin .72s linear infinite}
+@keyframes live-refresh-spin{to{transform:rotate(360deg)}}
+.live-energy-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:9px;margin-top:9px}
+.live-energy-track{position:relative;height:8px;border:1px solid rgba(217,185,92,.22);border-radius:999px;background:rgba(255,255,255,.045);overflow:hidden;box-shadow:inset 0 0 9px rgba(0,0,0,.5)}
+.live-energy-fill{position:absolute;inset:0 auto 0 0;width:var(--live-progress,0%);border-radius:inherit;background:linear-gradient(90deg,rgba(137,103,25,.82),rgba(217,185,92,.96) 58%,rgba(238,255,92,.98));box-shadow:0 0 13px rgba(223,255,27,.32);transition:width .35s ease}
+.live-energy-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 12%,rgba(255,255,255,.34) 47%,transparent 68%);transform:translateX(-100%);animation:live-energy-flow 1.8s linear infinite}
+.live-energy-tip{position:absolute;top:50%;left:var(--live-progress,0%);width:8px;height:8px;border-radius:50%;background:#efff6a;box-shadow:0 0 9px rgba(239,255,106,.82);transform:translate(-50%,-50%);transition:left .35s ease}
+@keyframes live-energy-flow{to{transform:translateX(180%)}}
+.live-energy-percent{color:var(--neon);font-family:var(--font-d);font-size:15px;font-weight:900;white-space:nowrap}
+.live-stage-nodes{display:flex;justify-content:space-between;gap:4px;margin-top:6px;padding-right:42px}
+.live-stage-node{min-width:0;color:#676d75;font-size:8.5px;font-weight:700;white-space:nowrap}
+.live-stage-node.is-done{color:#aaa87d}.live-stage-node.is-current{color:#efff6a;text-shadow:0 0 7px rgba(239,255,106,.25)}
+.live-dashboard-courts{padding-top:11px}
 @media(max-width:600px){
-  .live-summary-panel{padding:11px 12px!important}
-  .live-summary-progress{font-size:19px}
-  .live-summary-title-row{margin-top:5px}
-  .live-summary-name{font-size:18px}
-  .live-summary-share{flex-basis:30px!important;width:30px!important;height:30px!important;min-height:30px!important}
-  .live-summary-stats{gap:6px;margin-top:8px}
-  .live-summary-stat{padding:7px 8px}
-  .live-summary-stat b{font-size:15px}
-  .live-summary-stat small{font-size:9px}
-  .live-summary-meta{margin-top:5px;font-size:9px}
+  .live-dashboard-panel{padding:10px!important}
+  .live-summary-line{gap:6px;flex-wrap:wrap}
+  .live-summary-name{font-size:16.5px}
+  .live-summary-chip{font-size:9px;padding:3px 6px}
+  .live-summary-refresh{flex-basis:28px!important;width:28px!important;height:28px!important;min-height:28px!important}
+  .live-energy-row{margin-top:8px;gap:7px}
+  .live-energy-percent{font-size:14px}
+  .live-stage-nodes{padding-right:38px}
+  .live-stage-node{font-size:8px}
 }
+@media(prefers-reduced-motion:reduce){.live-energy-fill::after,.live-summary-refresh.is-busy{animation:none!important}}
 
 /* ==== v13.28.6 court-scoped live view / unclipped referee desktop ==== */
 .live-court-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -3437,6 +3443,49 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .live-ranking-panel>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:var(--font-d);font-weight:800;color:var(--white)}.live-ranking-panel>summary::-webkit-details-marker{display:none}.live-ranking-panel>summary::after{content:"展開";font-family:var(--font);font-size:11px;color:var(--gold)}.live-ranking-panel[open]>summary::after{content:"收合"}.live-ranking-body{margin-top:14px}
 @media(min-width:641px){.live-ranking-panel>summary{pointer-events:none}.live-ranking-panel>summary::after{display:none}.live-ranking-panel:not([open])>.live-ranking-body{display:block!important}}
 @media(max-width:640px){.live-court-grid{grid-template-columns:1fr}.live-court-match{gap:7px;padding:15px 11px}.live-court-player{font-size:15px}.live-court-score{font-size:27px}.live-court-next{margin:0 11px 12px;padding:10px 10px 11px 12px}.live-court-next-badge{font-size:10.5px;padding:5px 9px}.live-court-next-meta{font-size:11px}.live-court-next-player{font-size:14.5px}.live-court-next-players{gap:6px;margin-top:8px}.live-court-next-status{font-size:12px}.referee-workstation .live-court-next{margin:0 12px 13px;padding:11px 11px 12px 13px}.referee-workstation .live-court-next-badge{font-size:11px}.referee-workstation .live-court-next-meta{font-size:11.5px}.referee-workstation .live-court-next-player{font-size:16.5px}.referee-workstation .live-court-next-vs{font-size:11.5px}.referee-workstation .live-court-next-status{font-size:12.5px}.live-ranking-panel{padding:14px}.live-ranking-body{margin-top:12px}}
+
+/* ==== v14.2.4 live court hierarchy / score roll ==== */
+.live-dashboard-panel .live-court-grid{gap:9px}
+.live-dashboard-panel .live-court-card{border-color:color-mix(in srgb,var(--court-accent,var(--gold)) 45%,rgba(255,255,255,.08));box-shadow:inset 0 1px 0 var(--court-glow-soft,transparent)}
+.live-dashboard-panel .live-court-head{align-items:center;padding:10px 11px 8px}
+.live-court-titleline{display:flex;align-items:center;gap:7px;min-width:0}
+.live-dashboard-panel .court-badge{padding:4px 8px;font-size:11px}
+.live-court-ref{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c9ced4;font-size:10.5px;font-weight:700}
+.live-dashboard-panel .live-court-match{padding:14px 12px 8px;gap:8px}
+.live-dashboard-panel .live-court-player{font-size:18px;font-weight:900}
+.live-dashboard-panel .live-court-score{display:flex;align-items:center;justify-content:center;gap:5px;min-width:76px;font-size:34px;color:#f6f7f2;text-shadow:0 0 10px color-mix(in srgb,var(--court-accent,var(--gold)) 34%,transparent)}
+.live-score-slot{position:relative;display:inline-grid;place-items:center;width:.72em;height:1.05em;overflow:hidden;line-height:1}
+.live-score-current,.live-score-old,.live-score-new{grid-area:1/1}
+.live-score-old,.live-score-new{position:absolute;inset:0;display:grid;place-items:center}
+.live-score-slot.is-roll .live-score-old{animation:live-score-old-down .42s cubic-bezier(.2,.75,.3,1) both}
+.live-score-slot.is-roll .live-score-new{animation:live-score-new-down .42s cubic-bezier(.2,.75,.3,1) both}
+@keyframes live-score-old-down{0%{transform:translateY(0);opacity:1}100%{transform:translateY(105%);opacity:0}}
+@keyframes live-score-new-down{0%{transform:translateY(-105%);opacity:.1}65%{opacity:1}100%{transform:translateY(0);opacity:1}}
+.live-score-separator{opacity:.72;font-size:.7em}
+.live-court-stage{padding:0 12px 9px;text-align:center;color:#9097a0;font-size:9.5px;font-weight:700}
+.live-dashboard-panel .live-court-next{margin:0 10px 9px;padding:7px 8px;border-color:rgba(255,255,255,.075);border-radius:8px;background:rgba(255,255,255,.018);box-shadow:none}
+.live-next-line{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px;min-width:0}
+.live-next-label{color:#9da4ad;font-size:9.5px;font-weight:800;white-space:nowrap}
+.live-next-players{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d2d6dc;font-size:11.5px;font-weight:750;text-align:center}
+.live-next-players .live-next-vs{margin:0 4px;color:#7f8790;font-size:9px;font-weight:800}
+.live-next-eta{color:#c7caa2;font-size:10px;font-weight:800;white-space:nowrap}
+.live-next-muted{color:#858c95}
+.live-dashboard-panel .live-court-empty{padding:16px 12px}
+@media(max-width:640px){
+  .live-dashboard-panel .live-court-match{padding:13px 9px 7px;gap:5px}
+  .live-dashboard-panel .live-court-player{font-size:16.5px}
+  .live-dashboard-panel .live-court-score{font-size:31px;min-width:68px}
+  .live-dashboard-panel .live-court-head{padding:9px 9px 7px}
+  .live-dashboard-panel .court-badge{font-size:10.5px}
+  .live-court-ref{font-size:10px}
+  .live-court-stage{padding:0 9px 8px;font-size:9px}
+  .live-dashboard-panel .live-court-next{margin:0 8px 8px;padding:6px 7px}
+  .live-next-line{gap:5px}
+  .live-next-label{font-size:9px}
+  .live-next-players{font-size:10.8px}
+  .live-next-eta{font-size:9.5px}
+}
+@media(prefers-reduced-motion:reduce){.live-score-slot.is-roll .live-score-old,.live-score-slot.is-roll .live-score-new{animation:none!important}.live-score-slot.is-roll .live-score-old{display:none}}
 
 /* ==== v13.23.9 beta stability hardening ==== */
 .account-menu-wrap,.account-badge,.account-menu{pointer-events:auto;}
@@ -4462,9 +4511,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.3";
+const APP_VERSION = "v14.2.4";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.4",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況 Live Dashboard／比分拉霸／智慧倒數",updateLevel:"minor",added:["即時戰況新增充能式全場進度條與單淘汰階段節點","每個戰鬥台的下一場沿用智慧叫號比分估時模型，顯示動態倒數","即時戰況新增單一小型手動刷新鍵，可重新抓取全場最新雲端資料","比分變動時只讓變動側數字做一次短暫拉霸式滾動"],changed:["全場資訊與戰鬥台資訊合併為單一 Live Dashboard；移除重複的即時戰鬥台標題與說明","戰鬥台改顯示 1號台／2號台，責任裁判與台號置於同一資訊列","下一場改為低視覺權重單列，避免搶過目前對戰與比分","複數戰鬥台僅各自顯示該台專屬資訊；全場名稱、參賽人數、階段與進度只顯示一次"],fixed:["避免多 Court 模式重複全場資訊造成手機頁面過長","避免下一場卡片比目前對戰更醒目"],environment:"Production / HTML + Firebase",deployStatus:"Frontend live dashboard refinement",firebaseImpact:"無資料結構變更；沿用既有 match／courtAssignments／eligiblePlayers 與智慧叫號 ETA 模型",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況整合為一張全場進度＋多戰鬥台看板，比分會在變動時短暫滾動，下一場顯示智慧倒數。"},
   {version:"v14.2.3",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況概況卡極簡化",updateLevel:"patch",added:[],changed:["即時戰況原 7 格大型活動資訊 Dashboard 改為單張 Compact Live Summary","移除活動日期與重複的預計總場次／已完成場次獨立卡片；場次改合併為完成／總場次","完成率改為右上角輔助數字，正式參賽人數改為單一核心統計","活動地點與戰鬥台數量降為底部小字，分享按鈕同步縮小"],fixed:["降低即時戰況頁非必要資訊佔用，讓目前 Court 與即時排名更快進入手機首屏"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact live summary experiment",firebaseImpact:"無資料結構變更；沿用既有 eligiblePlayers 與 match 統計來源",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況概況區縮成單張薄卡，保留狀態、賽名、完成進度、正式參賽與完成率。"},
   {version:"v14.2.2",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0｜PASS 可用性提示優化",updateLevel:"patch",added:["叫號資料新增 PASS 可用性判定，玩家在操作前即可知道是否有同台同輪下一場可承接","PASS 不可用時顯示明確原因，不再讓玩家按下後才看到失敗"],changed:["叫號彈窗與我的賽程固定保留 PASS 按鈕；不可用時改為灰階停用並標示「後方無場次／非目前場次／已使用」","PASS 說明補充必須存在同台同輪下一場可承接"],fixed:["修正 2 人單場或同輪最後一場仍看似可按 PASS、造成操作像卡住的體驗"],environment:"Production / HTML + Firebase",deployStatus:"Frontend PASS availability UX + server-authoritative availability",firebaseImpact:"courtCallService list response 新增 passUnavailableReason；無新增集合",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"PASS 現在會在操作前直接判定是否可延後；後方無場次時按鈕會停用並說明原因。"},
   {version:"v14.2.1",date:"2026/09/24",timezone:"Asia/Taipei",title:"公開賽事詳情手機版精簡／報名成功快速返回",updateLevel:"patch",added:["報名成功卡新增「返回賽事列表」快捷鍵，不必再滑回頁面頂端","賽事詳情時間改為 MM/DD HH:mm 精簡格式，移除秒數與重複年份"],changed:["手機版賽事詳情品牌區、資訊面板、欄位卡片與間距全面縮減，提高首屏資訊密度","報名成功區操作改為返回／取消並列，窄螢幕自動改為單欄"],fixed:["避免正取名額與日期資訊因字串過長產生不必要的多行換行與超高卡片"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact tournament detail UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"公開賽事詳情手機版改得更緊湊；報名成功後可直接返回賽事列表。"},
@@ -11667,29 +11717,136 @@ function renderArchiveControls(){
 }
 
 /* ==== tab: live ==== */
-function liveCourtCardHtml(stationNum){
+const liveScoreSnapshot=new Map();
+const liveNextEtaAnchors=new Map();
+let liveRefreshBusy=false;
+
+function liveCurrentMatchForStation(stationNum){
   const court=(state.courtAssignments&&state.courtAssignments[courtKey(stationNum)])||null;
   let m=court&&court.currentMatchId?getMatch(court.currentMatchId):null;
   if(!m || m.completed){
-    m=state.matches.find(mm=>!mm.isBye&&mm.station===stationNum&&!mm.completed&&["in_progress","paused","ready"].includes(mm.status))||null;
+    m=state.matches.find(mm=>!mm.isBye&&Number(mm.station)===Number(stationNum)&&!mm.completed&&["in_progress","paused","ready"].includes(mm.status))||null;
   }
+  return {court,m};
+}
+
+function liveScoreCellHtml(m,side){
+  const value=Number(side==="A"?m.scoreA:m.scoreB)||0;
+  const key=String(state.id||"room")+"|"+String(m.id||"match")+"|"+side;
+  const previous=liveScoreSnapshot.get(key);
+  liveScoreSnapshot.set(key,value);
+  if(liveScoreSnapshot.size>512) liveScoreSnapshot.clear();
+  if(previous===undefined || previous===value){
+    return '<span class="live-score-slot"><span class="live-score-current">'+esc(String(value))+'</span></span>';
+  }
+  return '<span class="live-score-slot is-roll" aria-label="'+esc(String(value))+'"><span class="live-score-old">'+esc(String(previous))+'</span><span class="live-score-new">'+esc(String(value))+'</span></span>';
+}
+
+function liveTournamentStageInfo(realMatches,fmt){
+  const unfinished=(realMatches||[]).filter(m=>m&&!m.completed&&m.bracket!=="BZ");
+  if(fmt==="single"){
+    const size=Math.max(2,Number(state.bracketSize)||2);
+    const nodes=[];
+    for(let n=size;n>2;n=Math.max(2,Math.floor(n/2))) nodes.push(n+"強");
+    nodes.push("決賽");
+    if(!unfinished.length) return {label:"已完成",nodes,currentIndex:Math.max(0,nodes.length-1)};
+    const rounds=unfinished.map(m=>Number(m.round)).filter(Number.isFinite);
+    const round=rounds.length?Math.min(...rounds):0;
+    const remaining=Math.max(2,Math.round(size/Math.pow(2,round)));
+    const label=remaining<=2?"決賽":remaining+"強";
+    let currentIndex=nodes.indexOf(label); if(currentIndex<0) currentIndex=0;
+    return {label,nodes,currentIndex};
+  }
+  if(fmt==="roundrobin"){
+    if(!unfinished.length) return {label:"已完成",nodes:[],currentIndex:0};
+    const rounds=unfinished.map(m=>Number(m.round)).filter(Number.isFinite);
+    return {label:"第 "+((rounds.length?Math.min(...rounds):0)+1)+" 輪",nodes:[],currentIndex:0};
+  }
+  if(!unfinished.length) return {label:"已完成",nodes:[],currentIndex:0};
+  const active=unfinished.find(m=>m.status==="in_progress")||unfinished.find(m=>m.a&&m.b)||unfinished[0];
+  return {label:refereeStageLabel(active)||"進行中",nodes:[],currentIndex:0};
+}
+
+function liveStageNodesHtml(stage){
+  if(!stage||!Array.isArray(stage.nodes)||stage.nodes.length<2) return "";
+  return '<div class="live-stage-nodes">'+stage.nodes.map((label,index)=>{
+    const cls=index<stage.currentIndex?"is-done":index===stage.currentIndex?"is-current":"";
+    return '<span class="live-stage-node '+cls+'">'+esc(label)+'</span>';
+  }).join("")+'</div>';
+}
+
+function liveNextEtaState(court,stationNum){
+  const current=court&&court.currentMatchId?getMatch(court.currentMatchId):liveCurrentMatchForStation(stationNum).m;
+  if(!current) return {deadline:null,text:"即將上場"};
+  if(current.status==="paused") return {deadline:null,text:"前場暫停"};
+  if(current.status!=="in_progress") return {deadline:null,text:"等待前場"};
+  const estimate=Math.max(30,Number(smartCallRemainingSeconds(current))||180);
+  const signature=[current.id,current.status,Number(current.scoreA||0),Number(current.scoreB||0)].join("|");
+  const key=String(state.id||"room")+"|"+String(stationNum);
+  let anchor=liveNextEtaAnchors.get(key);
+  if(!anchor||anchor.signature!==signature){
+    anchor={signature,deadline:Date.now()+estimate*1000};
+    liveNextEtaAnchors.set(key,anchor);
+  }
+  return {deadline:anchor.deadline,text:liveEtaCountdownText(anchor.deadline)};
+}
+
+function liveEtaCountdownText(deadline){
+  if(!deadline) return "—";
+  const sec=Math.max(0,Math.ceil((Number(deadline)-Date.now())/1000));
+  if(sec<=30) return "即將上場";
+  const mm=Math.floor(sec/60),ss=sec%60;
+  return "約 "+String(mm).padStart(2,"0")+":"+String(ss).padStart(2,"0");
+}
+
+function tickLiveEtaCountdowns(){
+  if(typeof document==="undefined") return;
+  document.querySelectorAll("[data-live-eta-deadline]").forEach(el=>{
+    const deadline=Number(el.getAttribute("data-live-eta-deadline")||0);
+    if(deadline) el.textContent=liveEtaCountdownText(deadline);
+  });
+}
+setInterval(tickLiveEtaCountdowns,1000);
+
+async function refreshLiveFromCloud(){
+  if(liveRefreshBusy) return;
+  const code=String(state.cloudCode||"").trim().toUpperCase();
+  if(!code||!window.cloudSync){showToast("目前沒有可更新的雲端賽事",true);return;}
+  liveRefreshBusy=true;renderPreservingScroll();
+  try{
+    if(window.cloudSync.connect) await window.cloudSync.connect();
+    if(!cloudAvailable()) throw new Error("network");
+    const result=bracketRefreshUsesPublicMirror()?await window.cloudSync.joinRoomPublic(code):await window.cloudSync.joinRoom(code);
+    if(!result||!result.ok) throw new Error((result&&result.reason)||"network");
+    liveRefreshBusy=false;cloudStatus="connected";cloudLastSyncAt=Date.now();
+    applyRemoteState(result.data,true);
+    showToast("即時戰況已更新");
+  }catch(e){
+    liveRefreshBusy=false;renderPreservingScroll();showToast("更新失敗，請稍後再試",true);
+  }
+}
+
+function liveCourtCardHtml(stationNum){
+  const current=liveCurrentMatchForStation(stationNum);
+  const court=current.court,m=current.m;
   const assigned=refereeDisplayForStation(stationNum);
-  const completed=stationCompletedCount(stationNum);
-  const future=state.matches.some(mm=>!mm.isBye&&mm.station===stationNum&&!mm.completed);
+  const future=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===Number(stationNum)&&!mm.completed);
   const status=m?refereeStationStatus(m):(future?{label:"等待中",cls:"waiting"}:{label:"已完成",cls:"done"});
-  const stage=m?`${esc(refereeStageLabel(m))} · 第 ${Number(m.indexInRound||0)+1} 場`:(future?"等待安排場次":"本台賽程完成");
+  const stage=m?(esc(refereeStageLabel(m))+" · 第 "+(Number(m.indexInRound||0)+1)+" 場"):(future?"等待安排場次":"本台賽程完成");
   const safeCourt=court||{currentMatchId:m&&m.id||null,nextMatchId:null};
   const nextPreview=liveNextMatchCardHtml(safeCourt,stationNum);
   let body="";
   if(m&&m.a&&m.b){
-    const score=m.scoringMode==="quick"?"VS":`${Number(m.scoreA||0)} : ${Number(m.scoreB||0)}`;
-    body=`<div class="live-court-match"><div class="live-court-player" title="${esc(playerName(m.a.playerId))}">${esc(playerName(m.a.playerId))}</div><div class="live-court-score">${score}</div><div class="live-court-player" title="${esc(playerName(m.b.playerId))}">${esc(playerName(m.b.playerId))}</div></div>${nextPreview}`;
+    const score=m.scoringMode==="quick"
+      ? '<span class="live-score-current">VS</span>'
+      : liveScoreCellHtml(m,"A")+'<span class="live-score-separator">:</span>'+liveScoreCellHtml(m,"B");
+    body='<div class="live-court-match"><div class="live-court-player" title="'+esc(playerName(m.a.playerId))+'">'+esc(playerName(m.a.playerId))+'</div><div class="live-court-score">'+score+'</div><div class="live-court-player" title="'+esc(playerName(m.b.playerId))+'">'+esc(playerName(m.b.playerId))+'</div></div><div class="live-court-stage">'+stage+'</div>'+nextPreview;
   }else if(m){
-    body=`<div class="live-court-empty"><b>等待晉級結果</b><span>此場對戰選手尚未確定</span></div>`;
+    body='<div class="live-court-empty"><b>等待晉級結果</b><span>此場對戰選手尚未確定</span></div>'+nextPreview;
   }else{
-    body=`<div class="live-court-empty"><b>${future?"等待晉級結果":"本台賽程已完成"}</b><span>${future?"前序賽果確認後將自動安排":"目前沒有待執行場次"}</span></div>`;
+    body='<div class="live-court-empty"><b>'+(future?"等待晉級結果":"本台賽程已完成")+'</b><span>'+(future?"前序賽果確認後將自動安排":"目前沒有待執行場次")+'</span></div>'+(future?nextPreview:"");
   }
-  return `<section class="live-court-card" style="${courtAtmosphereStyle(stationNum)}"><div class="live-court-head"><div class="live-court-identity"><span class="court-badge">台${stationNum}</span><div><small>責任裁判</small><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="live-court-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${stage}｜已完成 ${completed} 場</small></div></div>${body}</section>`;
+  return '<section class="live-court-card" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
 }
 function renderLive(){
   const fmt = state.meta.formatType || "single";
@@ -11742,33 +11899,28 @@ function renderLive(){
   const spectatorNotice=spectatorSettling
     ? '<div class="banner warn"><span>所有對戰已完成，主辦正在處理最終結算；目前排名為暫定資訊，正式名次確認後會出現在「查看最終結果」。</span></div>'
     : "";
-  const liveMetaParts=[];
-  if(state.meta.location && state.meta.location!=="未設定") liveMetaParts.push(esc(state.meta.location));
-  liveMetaParts.push(stationCount+" 台");
-  const liveInfoHtml=`
-  <div class="panel live-summary-panel">
-    <div class="live-summary-head">
-      <div>${statusBadge()}</div>
-      <div class="live-summary-progress">${pct}%</div>
+  const liveStage=liveTournamentStageInfo(realMatches,fmt);
+  const liveDashboardHtml=`
+  <div class="panel live-dashboard-panel">
+    <div class="live-summary-strip">
+      <div class="live-summary-line">
+        <div class="live-summary-name" title="${esc(state.meta.name||"未命名賽事")}">${esc(state.meta.name||"未命名賽事")}</div>
+        <span class="live-summary-chip">${officialCount} 人</span>
+        <span class="live-summary-chip">目前 ${esc(liveStage.label)}</span>
+        ${state.cloudCode?`<button class="btn btn-ghost live-summary-refresh ${liveRefreshBusy?"is-busy":""}" data-action="live-refresh" ${liveRefreshBusy?"disabled":""} title="刷新即時戰況" aria-label="刷新即時戰況">↻</button>`:""}
+      </div>
+      <div class="live-energy-row">
+        <div class="live-energy-track" style="--live-progress:${pct}%"><div class="live-energy-fill"></div><i class="live-energy-tip"></i></div>
+        <strong class="live-energy-percent">${pct}%</strong>
+      </div>
+      ${liveStageNodesHtml(liveStage)}
     </div>
-    <div class="live-summary-title-row">
-      <div class="live-summary-name" title="${esc(state.meta.name||"未命名賽事")}">${esc(state.meta.name||"未命名賽事")}</div>
-      <button class="share-btn live-summary-share" data-action="open-share-modal" title="分享賽事" aria-label="分享賽事">${SHARE_ICON_SVG}</button>
+    <div class="live-dashboard-courts">
+      <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}">${liveCourtsHtml}</div>
     </div>
-    <div class="live-summary-stats">
-      <div class="live-summary-stat"><b>${doneCount} / ${predictedTotal} 場</b><small>場次進度</small></div>
-      <div class="live-summary-stat"><b>${officialCount} 人</b><small>正式參賽</small></div>
-    </div>
-    <div class="live-summary-meta">${liveMetaParts.join(" · ")}</div>
     ${publicWatchReturnContext?"":renderArchiveControls()}
   </div>`;
-  const liveCourtsPanelHtml=`  <div class="panel">
-    <div class="panel-title">${spectatorSettling?"已完成戰鬥台":"即時戰鬥台"}</div>
-    <div class="hint" style="margin-bottom:12px;">${spectatorSettling?"對戰已全部完成；以下保留各戰鬥台最後狀態供查閱。":"每個戰鬥台分別顯示責任裁判、目前場次、即時比分與下一場。"}</div>
-    <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}">${liveCourtsHtml}</div>
-  </div>`;
   const liveRankingHtml=`
-
   <details class="panel live-ranking-panel" ${(rankingOpen||spectatorSettling)?"open":""}>
     <summary>${spectatorSettling?"暫定選手排名":"即時選手排名"}</summary>
     <div class="live-ranking-body">
@@ -11782,12 +11934,8 @@ function renderLive(){
     </div>
   </details>
   `;
-  if(spectatorSettling){
-    return spectatorNotice + liveInfoHtml + liveRankingHtml + liveCourtsPanelHtml;
-  }
-  return publicWatchReturnContext
-    ? liveCourtsPanelHtml + liveInfoHtml + liveRankingHtml
-    : liveInfoHtml + liveCourtsPanelHtml + liveRankingHtml;
+  return spectatorNotice + liveDashboardHtml + liveRankingHtml;
+
 }
 
 /* ==== tab: bracket ==== */
@@ -12700,34 +12848,18 @@ function liveNextMatchCardHtml(court,stationNum){
   if(court&&court.nextMatchId){
     const nm=getMatch(court.nextMatchId);
     if(nm&&nm.a&&nm.b){
-      return `<div class="live-court-next">
-        <div class="live-court-next-head">
-          <span class="live-court-next-badge">下一場</span>
-          <span class="live-court-next-meta">${esc(matchLabel(nm))}・${esc(displayMatchLabel(nm))}</span>
-        </div>
-        <div class="live-court-next-players">
-          <span class="live-court-next-player" title="${esc(playerName(nm.a.playerId))}">${esc(playerName(nm.a.playerId))}</span>
-          <span class="live-court-next-vs">VS</span>
-          <span class="live-court-next-player" title="${esc(playerName(nm.b.playerId))}">${esc(playerName(nm.b.playerId))}</span>
-        </div>
-      </div>`;
+      const eta=liveNextEtaState(court,stationNum);
+      const etaAttr=eta.deadline?' data-live-eta-deadline="'+String(eta.deadline)+'"':"";
+      const title=esc(matchLabel(nm)+"・"+displayMatchLabel(nm));
+      return '<div class="live-court-next" title="'+title+'"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players" title="'+esc(playerName(nm.a.playerId))+' VS '+esc(playerName(nm.b.playerId))+'">'+esc(playerName(nm.a.playerId))+' <span class="live-next-vs">VS</span> '+esc(playerName(nm.b.playerId))+'</span><span class="live-next-eta"'+etaAttr+'>'+esc(eta.text)+'</span></div></div>';
     }
-    return `<div class="live-court-next">
-      <div class="live-court-next-head"><span class="live-court-next-badge">下一場</span><span class="live-court-next-meta">等待晉級</span></div>
-      <div class="live-court-next-status">等待晉級結果<span class="live-court-next-note">前序賽果確認後將自動顯示對戰選手</span></div>
-    </div>`;
+    return '<div class="live-court-next"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">等待晉級結果</span><span class="live-next-eta">待前場</span></div></div>';
   }
-  const stationHasFutureWork=state.matches.some(mm=>!mm.isBye&&mm.station===stationNum&&!mm.completed&&mm.id!==(court&&court.currentMatchId));
+  const stationHasFutureWork=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===Number(stationNum)&&!mm.completed&&mm.id!==(court&&court.currentMatchId));
   if(stationHasFutureWork){
-    return `<div class="live-court-next">
-      <div class="live-court-next-head"><span class="live-court-next-badge">下一場</span><span class="live-court-next-meta">等待安排</span></div>
-      <div class="live-court-next-status">等待晉級結果<span class="live-court-next-note">前序賽果確認後將自動安排</span></div>
-    </div>`;
+    return '<div class="live-court-next"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">等待安排</span><span class="live-next-eta">待前場</span></div></div>';
   }
-  return `<div class="live-court-next">
-    <div class="live-court-next-head"><span class="live-court-next-badge">下一場</span><span class="live-court-next-meta">本台完成</span></div>
-    <div class="live-court-next-status">本台賽程已完成<span class="live-court-next-note">目前沒有待執行場次</span></div>
-  </div>`;
+  return '<div class="live-court-next"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">本台目前完成</span><span class="live-next-eta">—</span></div></div>';
 }
 
 function currentRefereeIdentity(){
@@ -22239,6 +22371,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="board-export-image"){
     exportBoardAsImage();
+    return;
+  }
+  if(action==="live-refresh"){
+    refreshLiveFromCloud();
     return;
   }
   if(action==="bracket-refresh"){
