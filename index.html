@@ -2833,6 +2833,43 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .fe-status-chip.status-waiting{color:var(--metal);background:rgba(255,255,255,0.06);}
 .fe-status-chip.status-done{color:var(--metal-dim);background:rgba(255,255,255,0.05);}
 .fe-card-action{margin-top:10px;}
+.my-schedule-actions{
+  display:flex;
+  align-items:stretch;
+  gap:8px;
+  flex-wrap:nowrap;
+}
+.my-schedule-actions > .btn,
+.my-schedule-actions > .fe-status-chip{
+  flex:1 1 0;
+  min-width:0;
+  min-height:44px;
+  height:44px;
+  padding:0 10px;
+  border-radius:11px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-weight:700;
+  line-height:1.15;
+  white-space:normal;
+}
+.my-schedule-actions > .fe-status-chip{
+  border:1px solid var(--border-soft);
+  font-size:11px;
+}
+@media(max-width:420px){
+  .my-schedule-actions{gap:6px;}
+  .my-schedule-actions > .btn,
+  .my-schedule-actions > .fe-status-chip{
+    min-height:42px;
+    height:42px;
+    padding:0 6px;
+    font-size:10.5px;
+  }
+}
 .fe-action-col{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
 .fe-category{margin-bottom:4px;}
 .fe-category-title{font-family:var(--font-d);font-weight:700;font-size:14px;color:var(--gold);margin-bottom:8px;}
@@ -4573,9 +4610,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.6";
+const APP_VERSION = "v14.2.7";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.7",date:"2026/09/24",timezone:"Asia/Taipei",title:"我的賽程操作列規格統一／智慧叫號預設開啟",updateLevel:"patch",added:[],changed:["我的賽程卡片底部操作列改為等寬、等高、相同圓角規格；查看詳情、查看樹狀圖與報名鎖定狀態維持各自語意配色","BXH CALL 智慧叫號改為每場預設開啟；僅在玩家明確關閉該場叫號時保存關閉偏好"],fixed:["修正我的賽程底部按鈕與狀態標籤尺寸不一致造成的視覺失衡","避免玩家加入進行中賽事後因未手動開啟智慧叫號而漏看 ETA 提醒"],environment:"Production / HTML + Firebase",deployStatus:"Frontend schedule action sizing + smart call default",firebaseImpact:"無資料結構變更；智慧叫號偏好仍使用本機 localStorage",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"我的賽程底部操作列統一尺寸；BXH CALL 智慧叫號預設開啟，玩家仍可自行關閉。"},
   {version:"v14.2.6",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳狀態優先順序調整",updateLevel:"patch",added:[],changed:["賽事大廳分類顯示順序調整為：比賽中 → 報名中 → 等待開始 → 結算中 → 已結束／已取消","僅調整分類呈現優先順序，不改變既有賽事狀態判定、資料分類與即時同步機制"],fixed:["讓玩家先看到正在進行與可立即報名的賽事，再看到等待開始與結算中的房間，降低操作優先級錯置"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby status priority",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳排序改為比賽中、報名中、等待開始、結算中、已結束／已取消。"},
   {version:"v14.2.5",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳工具列極簡化",updateLevel:"patch",added:[],changed:["賽事大廳移除常駐大型搜尋框、搜尋按鈕、篩選按鈕與說明副標","頁首改為賽事大廳＋小型搜尋／篩選入口＋小型刷新鍵","搜尋與日期／地區／賽制篩選保留原功能，僅在需要時展開；套用或清除後自動收合","手動刷新改為圖示按鈕並保留即時同步作為主要更新機制"],fixed:["大幅降低賽事大廳首屏工具區高度，讓比賽中／結算中等分類更快進入手機畫面"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby compact toolbar",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳改為極簡工具列；搜尋篩選按需展開，刷新縮成小圖示。"},
   {version:"v14.2.4",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況 Live Dashboard／比分拉霸／智慧倒數",updateLevel:"minor",added:["即時戰況新增充能式全場進度條與單淘汰階段節點","每個戰鬥台的下一場沿用智慧叫號比分估時模型，顯示動態倒數","即時戰況新增單一小型手動刷新鍵，可重新抓取全場最新雲端資料","比分變動時只讓變動側數字做一次短暫拉霸式滾動"],changed:["全場資訊與戰鬥台資訊合併為單一 Live Dashboard；移除重複的即時戰鬥台標題與說明","戰鬥台改顯示 1號台／2號台，責任裁判與台號置於同一資訊列","下一場改為低視覺權重單列，避免搶過目前對戰與比分","複數戰鬥台僅各自顯示該台專屬資訊；全場名稱、參賽人數、階段與進度只顯示一次"],fixed:["避免多 Court 模式重複全場資訊造成手機頁面過長","避免下一場卡片比目前對戰更醒目"],environment:"Production / HTML + Firebase",deployStatus:"Frontend live dashboard refinement",firebaseImpact:"無資料結構變更；沿用既有 match／courtAssignments／eligiblePlayers 與智慧叫號 ETA 模型",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況整合為一張全場進度＋多戰鬥台看板，比分會在變動時短暫滾動，下一場顯示智慧倒數。"},
@@ -16873,7 +16911,7 @@ function smartCallStorageWrite(key,obj){
 }
 function smartCallUserKey(){ return (firebaseUser&&firebaseUser.uid)||"guest"; }
 function smartCallEnabled(code){
-  const all=smartCallStorageRead(SMART_CALL_PREF_KEY); const u=all[smartCallUserKey()]||{}; return u[code]===true;
+  const all=smartCallStorageRead(SMART_CALL_PREF_KEY); const u=all[smartCallUserKey()]||{}; return u[code]!==false;
 }
 function setSmartCallEnabled(code,on){
   const all=smartCallStorageRead(SMART_CALL_PREF_KEY); const uk=smartCallUserKey(); all[uk]=all[uk]||{}; all[uk][code]=!!on; smartCallStorageWrite(SMART_CALL_PREF_KEY,all);
@@ -17015,7 +17053,7 @@ function renderPlayerRegisteredTab(){
       <p class="hint">參賽者：${esc(r.displayName||r.realName||"本人")}${r.familyPlayerId?"（孩子，由家長代報名）":""}</p>
       ${r.status==='confirmed'&&info.checkInAt?`<p class="hint"><b>現場報到尚待完成：</b>請於 ${esc(info.checkInAt)} 向工作人員繳費並完成報到。</p>`:''}
       ${r.status==='confirmed' && schedulePhase(info)==='live' && smartCallModel(r,info).kind!=='done' ? smartCallCardHtml(r,info) : (schedulePhase(info)==='live'&&smartCallModel(r,info).kind==='done'?'<p class="hint">本次參賽已結束｜賽事進行中，名次待結算</p>':'')}
-      <div class="fe-card-action">
+      <div class="fe-card-action my-schedule-actions">
         <button class="btn btn-ghost btn-sm" data-action="view-public-tournament" data-code="${esc(r.tournamentCode)}">查看詳情</button>
         ${bracketReady
           ? `<button class="btn btn-primary btn-sm" data-action="switch-to-player-watch" data-view="bracket" data-return="registered" data-code="${esc(r.tournamentCode)}">查看樹狀圖</button>`
