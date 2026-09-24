@@ -11834,7 +11834,7 @@ function liveCourtCardHtml(stationNum){
   const status=m?refereeStationStatus(m):(future?{label:"等待中",cls:"waiting"}:{label:"已完成",cls:"done"});
   const stage=m?(esc(refereeStageLabel(m))+" · 第 "+(Number(m.indexInRound||0)+1)+" 場"):(future?"等待安排場次":"本台賽程完成");
   const safeCourt=court||{currentMatchId:m&&m.id||null,nextMatchId:null};
-  const nextPreview=liveNextMatchCardHtml(safeCourt,stationNum);
+  const nextPreview=liveNextMatchCompactHtml(safeCourt,stationNum);
   let body="";
   if(m&&m.a&&m.b){
     const score=m.scoringMode==="quick"
@@ -12848,18 +12848,52 @@ function liveNextMatchCardHtml(court,stationNum){
   if(court&&court.nextMatchId){
     const nm=getMatch(court.nextMatchId);
     if(nm&&nm.a&&nm.b){
+      return `<div class="live-court-next">
+        <div class="live-court-next-head">
+          <span class="live-court-next-badge">下一場</span>
+          <span class="live-court-next-meta">${esc(matchLabel(nm))}・${esc(displayMatchLabel(nm))}</span>
+        </div>
+        <div class="live-court-next-players">
+          <span class="live-court-next-player" title="${esc(playerName(nm.a.playerId))}">${esc(playerName(nm.a.playerId))}</span>
+          <span class="live-court-next-vs">VS</span>
+          <span class="live-court-next-player" title="${esc(playerName(nm.b.playerId))}">${esc(playerName(nm.b.playerId))}</span>
+        </div>
+      </div>`;
+    }
+    return `<div class="live-court-next">
+      <div class="live-court-next-head"><span class="live-court-next-badge">下一場</span><span class="live-court-next-meta">等待晉級</span></div>
+      <div class="live-court-next-status">等待晉級結果<span class="live-court-next-note">前序賽果確認後將自動顯示對戰選手</span></div>
+    </div>`;
+  }
+  const stationHasFutureWork=state.matches.some(mm=>!mm.isBye&&mm.station===stationNum&&!mm.completed&&mm.id!==(court&&court.currentMatchId));
+  if(stationHasFutureWork){
+    return `<div class="live-court-next">
+      <div class="live-court-next-head"><span class="live-court-next-badge">下一場</span><span class="live-court-next-meta">等待安排</span></div>
+      <div class="live-court-next-status">等待晉級結果<span class="live-court-next-note">前序賽果確認後將自動安排</span></div>
+    </div>`;
+  }
+  return `<div class="live-court-next">
+    <div class="live-court-next-head"><span class="live-court-next-badge">下一場</span><span class="live-court-next-meta">本台完成</span></div>
+    <div class="live-court-next-status">本台賽程已完成<span class="live-court-next-note">目前沒有待執行場次</span></div>
+  </div>`;
+}
+
+function liveNextMatchCompactHtml(court,stationNum){
+  if(court&&court.nextMatchId){
+    const nm=getMatch(court.nextMatchId);
+    if(nm&&nm.a&&nm.b){
       const eta=liveNextEtaState(court,stationNum);
       const etaAttr=eta.deadline?' data-live-eta-deadline="'+String(eta.deadline)+'"':"";
       const title=esc(matchLabel(nm)+"・"+displayMatchLabel(nm));
-      return '<div class="live-court-next" title="'+title+'"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players" title="'+esc(playerName(nm.a.playerId))+' VS '+esc(playerName(nm.b.playerId))+'">'+esc(playerName(nm.a.playerId))+' <span class="live-next-vs">VS</span> '+esc(playerName(nm.b.playerId))+'</span><span class="live-next-eta"'+etaAttr+'>'+esc(eta.text)+'</span></div></div>';
+      return '<div class="live-court-next live-court-next-compact" title="'+title+'"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players" title="'+esc(playerName(nm.a.playerId))+' VS '+esc(playerName(nm.b.playerId))+'">'+esc(playerName(nm.a.playerId))+' <span class="live-next-vs">VS</span> '+esc(playerName(nm.b.playerId))+'</span><span class="live-next-eta"'+etaAttr+'>'+esc(eta.text)+'</span></div></div>';
     }
-    return '<div class="live-court-next"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">等待晉級結果</span><span class="live-next-eta">待前場</span></div></div>';
+    return '<div class="live-court-next live-court-next-compact"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">等待晉級結果</span><span class="live-next-eta">待前場</span></div></div>';
   }
   const stationHasFutureWork=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===Number(stationNum)&&!mm.completed&&mm.id!==(court&&court.currentMatchId));
   if(stationHasFutureWork){
-    return '<div class="live-court-next"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">等待安排</span><span class="live-next-eta">待前場</span></div></div>';
+    return '<div class="live-court-next live-court-next-compact"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">等待安排</span><span class="live-next-eta">待前場</span></div></div>';
   }
-  return '<div class="live-court-next"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">本台目前完成</span><span class="live-next-eta">—</span></div></div>';
+  return '<div class="live-court-next live-court-next-compact"><div class="live-next-line"><span class="live-next-label">下一場</span><span class="live-next-players live-next-muted">本台目前完成</span><span class="live-next-eta">—</span></div></div>';
 }
 
 function currentRefereeIdentity(){
