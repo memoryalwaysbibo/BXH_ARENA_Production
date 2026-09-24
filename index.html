@@ -4263,6 +4263,106 @@ body .celebration-overlay{z-index:3000!important;}
   .smart-call-box .smart-call-stat .v{font-size:10.5px!important;}
 }
 
+/* ==== v14.2.17 BXH CALL single-control UX ==== */
+.smart-call-unified-control{
+  appearance:none;
+  border:0;
+  background:transparent;
+  padding:0;
+  margin:0;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  flex:0 0 auto;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  user-select:none;
+  touch-action:manipulation;
+}
+.smart-call-unified-bell{
+  position:relative;
+  width:29px;
+  height:29px;
+  min-width:29px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:9px;
+  border:1px solid rgba(217,185,92,.30);
+  background:rgba(217,185,92,.055);
+  color:#d7b957;
+  font-size:15px;
+  line-height:1;
+  overflow:hidden;
+}
+.smart-call-unified-control.has-background .smart-call-unified-bell{
+  border-color:rgba(88,230,147,.48);
+  background:rgba(61,196,117,.11);
+  color:#72efaa;
+  box-shadow:0 0 9px rgba(78,235,145,.10);
+}
+.smart-call-unified-bell.is-notify-off::after{
+  content:"";
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:50%;
+  width:35px;
+  height:5px;
+  border-radius:999px;
+  background:linear-gradient(180deg,#ff5a36,#ff2f36);
+  box-shadow:0 0 6px rgba(255,55,55,.34);
+  transform:translate(-50%,-50%) rotate(-45deg);
+  pointer-events:none;
+}
+.smart-call-unified-control.is-blocked .smart-call-unified-bell{
+  opacity:.58;
+  filter:grayscale(.35);
+}
+.smart-call-unified-track{
+  position:relative;
+  width:42px;
+  height:23px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.14);
+  background:#343943;
+  transition:.18s ease;
+}
+.smart-call-unified-knob{
+  position:absolute;
+  width:17px;
+  height:17px;
+  left:2px;
+  top:2px;
+  border-radius:50%;
+  background:#b9bec7;
+  transition:.18s ease;
+}
+.smart-call-unified-control.is-on .smart-call-unified-track{
+  background:rgba(61,196,117,.30);
+  border-color:rgba(88,230,147,.55);
+}
+.smart-call-unified-control.is-on .smart-call-unified-knob{
+  transform:translateX(19px);
+  background:#72efaa;
+  box-shadow:0 0 10px rgba(78,235,145,.45);
+}
+.smart-call-unified-control.is-off{opacity:.78;}
+.smart-call-unified-control:focus-visible{
+  outline:2px solid rgba(240,207,113,.82);
+  outline-offset:3px;
+  border-radius:10px;
+}
+@media(max-width:420px){
+  .smart-call-unified-control{gap:5px;}
+  .smart-call-unified-bell{width:27px;height:27px;min-width:27px;border-radius:8px;font-size:14px;}
+  .smart-call-unified-bell.is-notify-off::after{width:32px;height:5px;}
+  .smart-call-unified-track{width:40px;height:22px;}
+  .smart-call-unified-knob{width:16px;height:16px;}
+  .smart-call-unified-control.is-on .smart-call-unified-knob{transform:translateX(18px);}
+}
+
 /* ==== v14.2.15 BXH CALL compact header / centered station / tighter vertical rhythm ==== */
 .smart-call-head-actions{
   display:flex;
@@ -5032,7 +5132,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.0"></script>
-<script src="court-call-ui.js?v=14.2.16-notify-default-on"></script>
+<script src="court-call-ui.js?v=14.2.17-unified-control"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -17604,10 +17704,9 @@ function smartCallCardHtml(r,info){
   const focusText=model.kind==="playing"?"你的對戰進行中":(model.message||"等待賽事狀態更新");
   return `<div class="smart-call-box">
     <div class="smart-call-head">
-      <div class="smart-call-title">🔔 BXH CALL｜智慧叫號</div>
+      <div class="smart-call-title">BXH CALL｜上場提醒</div>
       <div class="smart-call-head-actions">
-        ${typeof renderCourtCallHeaderControls==='function'?renderCourtCallHeaderControls(r.tournamentCode):''}
-        <input class="smart-call-switch" type="checkbox" data-action="toggle-smart-call" data-code="${esc(r.tournamentCode)}" ${on?'checked':''} aria-label="智慧叫號">
+        ${typeof renderCourtCallHeaderControls==='function'?renderCourtCallHeaderControls(r.tournamentCode,on):''}
       </div>
     </div>
     ${renderCourtCallPlayer(r.tournamentCode)}
@@ -17622,7 +17721,7 @@ function smartCallCardHtml(r,info){
         ${model.opponent?`<span class="smart-call-opponent">VS ${esc(model.opponent)}</span>`:""}
       </div>
       <div class="smart-call-note">ETA 以每場 3 分鐘估算，會依比分動態修正。</div>
-    </div>`:`<details class="smart-call-disabled"><summary>智慧 ETA 已關閉</summary>人工裁判叫號仍會正常運作；重新開啟後會恢復倒數場數與預估上場時間提醒。</details>`}
+    </div>`:`<div class="smart-call-disabled">智慧提醒已關閉｜裁判正式叫號仍保留</div>`}
   </div>`;
 }
 function scheduleSmartCallAutoRefresh(){
@@ -21807,13 +21906,44 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="toggle-smart-call"){
     const code=target.getAttribute("data-code")||"";
-    const on=!!target.checked;
+    const wasOn=target.getAttribute("data-on")==="1";
+    const notifyActive=target.getAttribute("data-notify-active")==="1";
+    const notifyBlocked=target.getAttribute("data-notify-blocked")==="1";
+
+    // Default-on UX: when smart reminders are already on but browser notification
+    // permission is still pending, the first tap completes notification setup
+    // instead of unexpectedly switching BXH CALL off.
+    if(wasOn && !notifyActive && !notifyBlocked){
+      showToast("正在啟用 BXH CALL 背景通知");
+      (async()=>{
+        try{
+          if(typeof courtCallEnableBackgroundNotifications==="function") await courtCallEnableBackgroundNotifications();
+        }catch(e){}
+        renderPreservingScroll();
+      })();
+      return;
+    }
+
+    const on=!wasOn;
     setSmartCallEnabled(code,on);
     if(on){
-      showToast("BXH CALL 智慧叫號已開啟");
-      (async()=>{ try{ const info=await window.cloudSync.getPublicTournamentSummary(code); if(info) myRegistrationsTournamentInfo[code]=info; }catch(e){} renderPreservingScroll(); })();
+      showToast(notifyBlocked?"BXH CALL 已開啟；背景通知目前被瀏覽器封鎖":"BXH CALL 已開啟");
+      (async()=>{
+        try{
+          if(!notifyBlocked && typeof courtCallEnableBackgroundNotifications==="function" &&
+             typeof courtCallPushRegistered==="function" && !courtCallPushRegistered()){
+            await courtCallEnableBackgroundNotifications();
+          }
+        }catch(e){}
+        try{
+          const info=await window.cloudSync.getPublicTournamentSummary(code);
+          if(info) myRegistrationsTournamentInfo[code]=info;
+        }catch(e){}
+        renderPreservingScroll();
+      })();
     }else{
-      showToast("BXH CALL 智慧叫號已關閉"); renderPreservingScroll();
+      showToast("智慧提醒已關閉；裁判正式叫號仍保留");
+      renderPreservingScroll();
     }
     return;
   }
