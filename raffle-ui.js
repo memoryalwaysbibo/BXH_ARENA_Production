@@ -80,11 +80,40 @@ function raffleContext(){
 }
 function raffleIntent(){try{const id=sessionStorage.getItem('bxh.raffle.return')||new URLSearchParams(location.search).get('raffle');return /^[a-f0-9]{64}$/.test(id||'')?id:'';}catch{return '';}}
 function restoreRaffleIntent(){const id=raffleIntent();if(!id||!userProfile?.realName||raffleLinkConsumed)return false;raffleLinkConsumed=true;try{sessionStorage.removeItem('bxh.raffle.return');}catch{}appPhase='player-center';playerActiveTab='raffles';currentRole='player';raffleContext().id=id;return true;}
-function raffleError(e){const msg=String(e?.message||e||'');const messages={'auth-required':'請先登入會員。','creator-required':'此帳號沒有建立抽獎活動的權限。','manager-required':'只有活動主辦或最高管理員可操作。','super-admin-required':'只有最高管理員可以確認或否決中獎資格。','event-not-found':'找不到活動，或此活動尚未公開。','not-eligible':'目前未符合活動條件，請確認帳號年資、賽事或票券資格。','registration-closed':'報名尚未開始、已截止，或名單已鎖定。','invalid-times':'時間須依序為報名開始、截止、開獎及領獎期限。','invalid-text':'請完整填寫內容，並確認字數未超過限制。','invalid-image':'圖片請使用完整 HTTPS 網址。','invalid-prizes':'請設定至少一項獎品，數量須為正整數。','too-many-prizes':'第一版每活動最多 20 種、合計 100 份獎品。','invalid-conditions':'最多 8 個條件；同一道具代碼請勿重複設定。','invalid-ticket':'請確認票券代碼與數量。','invalid-age':'請確認帳號年資條件。','invalid-event':'請輸入有效賽事代碼。','event-locked':'活動狀態已改變，請重新整理。','invalid-publish':'活動無法公布，請確認截止時間仍在未來。','lock-candidates-first':'請先鎖定並確認合格名單。','draw-not-due':'尚未到自動開獎時間。','version-conflict':'另一視窗已修改草稿，請重新讀取後再編輯。','claims-pending':'仍有獎品待領，領獎期限結束或處理完畢後才能封存。','claim-expired-or-resolved':'領獎期限已過或獎品已處理。','redraw-unavailable':'須先記錄棄領，並在領獎期限內補抽。','no-replacement':'沒有可補抽的合格玩家。','review-rejected':'此報名已被主辦拒絕。','award-review-resolved':'這筆中獎資格已完成審核。','invalid-review-reason':'請選擇有效的不符合原因。','review-note-required':'選擇「其他」時，請填寫補充備註。','manual-mode-only':'報到與報名前人工審核只適用現場手動抽獎。','invalid-join-password':'參加密碼至少 4 個字元，最多 64 個字元。','join-password-invalid':'參加密碼不正確，請重新確認。','storage-unavailable':'無法保存操作紀錄，請允許工作階段儲存後再試。'};for(const [k,v]of Object.entries(messages))if(msg.includes(k))return v;return '操作尚未確認，請重試原操作或重新整理查看狀態。';}
+function raffleError(e){const msg=String(e?.message||e||'');const messages={'auth-required':'請先登入會員。','creator-required':'此帳號沒有建立抽獎活動的權限。','manager-required':'只有活動主辦或最高管理員可操作。','super-admin-required':'只有最高管理員可以確認或否決中獎資格。','event-not-found':'找不到活動，或此活動尚未公開。','not-eligible':'目前未符合活動條件，請確認帳號年資、賽事或票券資格。','registration-closed':'報名尚未開始、已截止，或名單已鎖定。','invalid-times':'時間須依序為報名開始、截止、開獎及領獎期限。','invalid-text':'請完整填寫內容，並確認字數未超過限制。','invalid-image':'圖片請使用完整 HTTPS 網址。','invalid-prizes':'請設定至少一項獎品，數量須為正整數。','too-many-prizes':'第一版每活動最多 20 種、合計 100 份獎品。','invalid-conditions':'最多 8 個條件；同一道具代碼請勿重複設定。','invalid-ticket':'請確認票券代碼與數量。','unsupported-ticket-policy':'活動票券規格需要更新，請聯絡主辦或稍後重試。','invalid-age':'請確認帳號年資條件。','invalid-event':'請輸入有效賽事代碼。','event-locked':'活動狀態已改變，請重新整理。','invalid-publish':'活動無法公布，請確認截止時間仍在未來。','lock-candidates-first':'請先鎖定並確認合格名單。','draw-not-due':'尚未到自動開獎時間。','version-conflict':'另一視窗已修改草稿，請重新讀取後再編輯。','claims-pending':'仍有獎品待領，領獎期限結束或處理完畢後才能封存。','claim-expired-or-resolved':'領獎期限已過或獎品已處理。','redraw-unavailable':'須先記錄棄領，並在領獎期限內補抽。','no-replacement':'沒有可補抽的合格玩家。','review-rejected':'此報名已被主辦拒絕。','award-review-resolved':'這筆中獎資格已完成審核。','invalid-review-reason':'請選擇有效的不符合原因。','review-note-required':'選擇「其他」時，請填寫補充備註。','manual-mode-only':'報到與報名前人工審核只適用現場手動抽獎。','invalid-join-password':'參加密碼至少 4 個字元，最多 64 個字元。','join-password-invalid':'參加密碼不正確，請重新確認。','storage-unavailable':'無法保存操作紀錄，請允許工作階段儲存後再試。'};for(const [k,v]of Object.entries(messages))if(msg.includes(k))return v;return '操作尚未確認，請重試原操作或重新整理查看狀態。';}
 async function loadRaffles(more=false){const c=raffleContext();if(c.loading||c.busy)return;c.loading=true;c.error='';render();try{const r=await window.engagementService.raffle(c.id?{action:'get',id:c.id}:{action:c.view==='mine'?'mine':'list',cursor:more?c.nextCursor:null});if(c!==raffleContext())return;if(!r?.ok)throw Error('load-failed');c.canCreate=r.canCreate===true;if(c.id)c.detail=r;else{c.events=more?[...(c.events||[]),...r.events]:r.events;c.nextCursor=r.nextCursor;}}catch(e){if(c===raffleContext())c.error=raffleError(e);}finally{if(c===raffleContext()){c.loading=false;render();}}}
 function raffleRuleLabel(r,mode){if(r.kind==='age')return '帳號滿 '+r.value+(r.unit==='months'?' 個月':' 天');if(r.kind==='ticket')return (r.mode==='consume'?'參加時扣除 ':'持有 ')+r.itemCode+' × '+r.quantity;if(r.kind==='event')return '賽事 '+r.code+'：'+({registered:'已報名',checkedIn:'已報到',completed:'完成參賽'})[r.stage];return (mode==='auto'?'中獎後複核：':'人工審核：')+r.note;}
 function raffleParticipationRules(e){return (e?.conditions||[]).filter(r=>!(e.mode==='auto'&&r.kind==='manual'));}
 function raffleWinnerReviewRules(e){return e?.mode==='auto'?(e.conditions||[]).filter(r=>r.kind==='manual'):[];}
+function raffleTicketAvailabilityText(value){
+ return Number.isSafeInteger(value)&&value>=0?String(value):'已付款／不需重新計算';
+}
+function openRaffleJoinConfirm(preview,event){
+ return new Promise(resolve=>{
+  document.getElementById('raffle-join-confirm-dialog')?.remove();
+  const previous=document.activeElement,dialog=document.createElement('dialog');dialog.id='raffle-join-confirm-dialog';
+  dialog.setAttribute('aria-labelledby','raffle-join-confirm-title');
+  dialog.style.cssText='box-sizing:border-box;width:min(460px,calc(100% - 16px));max-height:90dvh;overflow:auto;background:#111827;color:#fff;border:1px solid #64748b;border-radius:16px;padding:16px';
+  const requirements=Array.isArray(preview?.ticketRequirements)?preview.ticketRequirements:[];
+  const charges=Array.isArray(preview?.ticketCharges)?preview.ticketCharges:[];
+  const rows=requirements.map(r=>'<div class="panel"><b>'+(r.mode==='consume'?'🎟️ 消耗票券':'🎫 持有資格')+'｜'+esc(r.itemCode)+' × '+(Number(r.quantity)||0)+'</b><p class="hint">目前可用：'+esc(raffleTicketAvailabilityText(r.availableQuantity))+(r.mode==='consume'&&r.selected?'｜本次會使用':'')+(r.satisfied?'｜條件符合':'｜條件未符合')+'</p></div>').join('');
+  const immediate=charges.reduce((sum,r)=>sum+(Number(r.quantity)||0),0);
+  const note=preview?.pending
+   ?'本次需要主辦審核；現在不會扣券。審核通過時，系統會重新核對票券並在同一筆交易中扣除。'
+   :immediate>0
+    ?'確認後會立即扣除 '+immediate+' 張／份票券並加入活動；若交易失敗不會扣券。活動由主辦取消時才依原紀錄退還。'
+    :'確認後會加入活動；依目前資格不會立即扣除票券。';
+  const eligible=preview?.eligible===true||preview?.pending===true;
+  dialog.innerHTML='<h2 id="raffle-join-confirm-title">確認參加｜'+esc(event?.title||'會員抽獎')+'</h2>'+(rows||'<p class="hint">本活動沒有票券消耗條件。</p>')+'<p>'+esc(note)+'</p>'+(!eligible?'<p class="auth-error" role="alert">目前資格尚未符合，這次不會送出參加申請，也不會扣券。</p>':'')+'<div class="btn-row">'+(eligible?'<button class="btn btn-primary" data-raffle-join-confirm="yes">確認參加</button>':'')+'<button class="btn btn-ghost" data-raffle-join-confirm="no">'+(eligible?'取消':'關閉')+'</button></div>';
+  document.body.appendChild(dialog);
+  let settled=false;const done=value=>{if(settled)return;settled=true;try{dialog.close();}catch{}dialog.remove();previous?.focus?.();resolve(value);};
+  dialog.querySelector('[data-raffle-join-confirm="yes"]')?.addEventListener('click',()=>done(true));
+  dialog.querySelector('[data-raffle-join-confirm="no"]').addEventListener('click',()=>done(false));
+  dialog.addEventListener('cancel',event=>{event.preventDefault();done(false);});
+  dialog.addEventListener('close',()=>done(false),{once:true});
+  dialog.showModal();
+ });
+}
 function renderRaffleEditor(c){const d=c.draft,disabled=c.busy||!!c.pending;const input=(key,label,type='text',max=120)=>`<div class="field"><label>${label}</label><input data-raffle-field="${key}" type="${type}" maxlength="${max}" value="${esc(d[key]||'')}" ${disabled?'disabled':''}></div>`;
  if(!isRaffleManagementView())return '';
  return `<section class="panel"><div class="panel-title">${c.draftId?'編輯草稿':'建立會員抽獎'}</div><p class="hint">公布後獎品與資格即鎖定。每人最多中獎一次，每份獎品一位得獎者；候選人不足時保留未抽出的獎品。</p><fieldset ${disabled?'disabled':''} style="border:0;padding:0"><div class="grid grid-2 inventory-grid">${input('title','活動名稱','text',80)}<div class="field"><label>開獎模式</label><select data-raffle-field="mode"><option value="manual" ${d.mode==='manual'?'selected':''}>現場手動開獎</option><option value="auto" ${d.mode==='auto'?'selected':''}>線上自動開獎</option></select></div>${input('startAt','報名開始（台灣時間）','datetime-local')}${input('endAt','報名截止（台灣時間）','datetime-local')}${input('drawAt','開獎時間（台灣時間）','datetime-local')}${input('claimUntil','領獎期限（台灣時間）','datetime-local')}<div class="field" style="grid-column:1/-1"><label>活動說明</label><textarea data-raffle-field="description" maxlength="3000">${esc(d.description)}</textarea></div><div class="field" style="grid-column:1/-1"><label>領獎方式</label><textarea data-raffle-field="claimInstructions" maxlength="1000">${esc(d.claimInstructions)}</textarea></div></div>${d.mode==='manual'?`<label><input type="checkbox" data-raffle-field="checkedInOnly" ${d.checkedInOnly?'checked':''}> 現場模式僅限主辦已標記報到者</label>`:'<p class="hint">線上自動模式不使用報到；會員完成參加後會直接進入抽獎候選名單。</p>'}
@@ -210,7 +239,26 @@ async function handleRaffle(action,target){
  if(action==='raffle-participants'||action==='raffle-participants-more'){c.busy=true;render();try{const more=action.endsWith('-more'),r=await window.engagementService.raffle({action:'participants',id:c.id,cursor:more?c.participantCursor:null});if(c!==raffleContext())return;if(!r?.ok)throw Error('load-failed');c.participants=more?[...c.participants,...r.participants]:r.participants;c.participantCursor=r.nextCursor;}catch(e){if(c===raffleContext())c.error=raffleError(e);}finally{if(c===raffleContext()){c.busy=false;render();}}return;}
  const apiAction=action.slice(7);if(!['join','publish','lock','draw','checkin','approve','reject','cancel','retry','claim','forfeit','redraw','archive','winnerApprove','winnerReject'].includes(apiAction))return;
  let joinPassword='';if(apiAction==='join'&&c.detail?.event?.passwordProtected){joinPassword=document.querySelector('[data-raffle-join-password]')?.value||'';if(!joinPassword){c.error='請輸入參加密碼。';render();return;}}
- const text={join:'確認參加？如採用消耗票券條件，報名完成時會扣票；活動取消才退還。',publish:'公布後不能修改獎品、時間及資格，確定公布？',lock:'確定截止報名、鎖定資格與報到名單？',draw:'確定依鎖定合格名單開獎？結果保存後不會重抽。',cancel:'確定取消活動？系統將退回原先扣除的票券。',reject:'確定拒絕此參賽者的資格審核？',forfeit:'確定記錄此獎項棄領？棄領紀錄會保留。',claim:'確定此份獎品已交付？',redraw:'確定補抽此份棄領獎品？原紀錄會保留。',archive:'確定封存活動？結果仍可查閱。',winnerApprove:'確認此暫定得獎者資格符合？確認後才會正式通知得獎者。',winnerReject:'確認此暫定得獎者資格不符？系統會保留紀錄並立即補抽下一位。'};
+ if(apiAction==='join'){
+  c.busy=true;c.error='';render();
+  let preview;
+  try{
+   preview=await window.engagementService.raffle({action:'joinPreview',id:c.id,password:joinPassword||undefined});
+   if(c!==raffleContext())return;
+   if(!preview?.ok)throw Error('preview-failed');
+  }catch(e){
+   if(c===raffleContext())c.error=raffleError(e);
+   return;
+  }finally{
+   if(c===raffleContext()){c.busy=false;render();}
+  }
+  if(preview.alreadyJoined){c.detail=null;await loadRaffles();return;}
+  const approved=await openRaffleJoinConfirm(preview,c.detail?.event);
+  if(!approved)return;
+  await raffleMutate({action:'join',id:c.id,password:joinPassword||undefined,operationId:crypto.randomUUID()});
+  return;
+ }
+ const text={publish:'公布後不能修改獎品、時間及資格，確定公布？',lock:'確定截止報名、鎖定資格與報到名單？',draw:'確定依鎖定合格名單開獎？結果保存後不會重抽。',cancel:'確定取消活動？系統將退回原先扣除的票券。',reject:'確定拒絕此參賽者的資格審核？',forfeit:'確定記錄此獎項棄領？棄領紀錄會保留。',claim:'確定此份獎品已交付？',redraw:'確定補抽此份棄領獎品？原紀錄會保留。',archive:'確定封存活動？結果仍可查閱。',winnerApprove:'確認此暫定得獎者資格符合？確認後才會正式通知得獎者。',winnerReject:'確認此暫定得獎者資格不符？系統會保留紀錄並立即補抽下一位。'};
  if(text[apiAction]&&!confirm(text[apiAction]))return;let reason='';if(['cancel','reject','forfeit'].includes(apiAction)){reason=prompt('請填寫原因（會保存紀錄）')||'';if(!reason.trim())return;}let reasonCode,note;if(apiAction==='winnerReject'){const awardId=target?.getAttribute('data-award')||'';reasonCode=document.querySelector(`[data-raffle-review-reason="${CSS.escape(awardId)}"]`)?.value||'qualification_not_met';note=document.querySelector(`[data-raffle-review-note="${CSS.escape(awardId)}"]`)?.value?.trim()||'';if(reasonCode==='other'&&!note){c.error='選擇「其他」時，請填寫補充備註。';render();return;}}
  await raffleMutate({action:apiAction,id:c.id,targetUid:target?.getAttribute('data-uid')||undefined,awardId:target?.getAttribute('data-award')||undefined,reason,reasonCode,note,password:apiAction==='join'?joinPassword:undefined,operationId:crypto.randomUUID()});
 }
