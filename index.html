@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260925.35">
+<meta name="bxh-build" content="20260925.36">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260925.35";
+  var CURRENT_BUILD="20260925.36";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5045,6 +5045,24 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 #title-management-panel{scroll-margin-top:210px;}
 @media(max-width:640px){.title-management-nav{grid-template-columns:repeat(2,minmax(0,1fr));}.title-management-content .panel-title{flex-wrap:wrap;gap:8px;}}
 
+
+/* P7.12.1: top-layer navigation avoids clipping inside fixed-height cards. */
+.venue-nav-open{flex:0 0 auto;min-height:30px;padding:3px 7px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--panel);color:var(--white);font-size:10px;font-weight:700;white-space:nowrap;cursor:pointer;}
+.venue-nav-open:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+.venue-detail-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.venue-detail-address-row{flex-wrap:nowrap!important;min-width:0;gap:4px;}
+.venue-detail-address{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.venue-navigation-dialog{width:min(420px,calc(100vw - 28px));max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;border:1px solid var(--gold-dim);border-radius:14px;padding:18px;background:var(--panel);color:var(--white);box-shadow:0 18px 60px rgba(0,0,0,.5);}
+.venue-navigation-dialog::backdrop{background:rgba(0,0,0,.66);}
+.venue-navigation-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.venue-navigation-heading h2{margin:0;font-size:18px;}
+.venue-navigation-heading button{min-width:44px;min-height:44px;border:0;background:transparent;color:inherit;font-size:18px;}
+.venue-navigation-name{display:block;margin-top:12px;overflow-wrap:anywhere;}
+.venue-navigation-address{font-size:14px;line-height:1.6;user-select:text;overflow-wrap:anywhere;}
+.venue-navigation-links{display:grid;gap:8px;margin-top:14px;}
+.venue-navigation-links a,.venue-navigation-links button{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--white);font:inherit;text-decoration:none;}
+.venue-navigation-note,.venue-navigation-status{font-size:12px;line-height:1.6;color:var(--metal);}
+.venue-navigation-fallback{position:fixed;inset:10% auto auto 50%;transform:translateX(-50%);z-index:10000;}
 </style>
 <script src="ladder-v1.js?v=20260921.9"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -5522,82 +5540,148 @@ function buildLegacyVenueText(venue){
 }
 
 function normalizeGoogleMapsUrl(value){
-  const raw=String(value||"").trim().replace(/[\]\)}>，。！？、,;；]+$/g,"");
-  if(!raw)return "";
+  if(typeof value!=="string")return "";
+  const raw=value.trim();
+  if(!raw||raw.length>2048||/[\s\u0000-\u001f\u007f\\]/.test(raw)||/%(?:00|0a|0d)/i.test(raw))return "";
   try{
     const u=new URL(raw);
-    if(u.protocol!=="https:")return "";
+    if(u.protocol!=="https:"||u.username||u.password||u.port)return "";
     const host=u.hostname.toLowerCase();
-    if(host==="maps.app.goo.gl")return u.toString();
-    if(host==="maps.google.com")return u.toString();
-    if((host==="www.google.com"||host==="google.com")&&u.pathname.startsWith("/maps"))return u.toString();
+    if(host==="maps.app.goo.gl"&&/^\/[A-Za-z0-9_-]+\/?$/.test(u.pathname))return u.href;
+    if(host==="maps.google.com"&&(u.pathname==="/"||/^\/maps(?:\/|$)/.test(u.pathname)))return u.href;
+    if(["www.google.com","google.com","www.google.com.tw","google.com.tw"].includes(host)&&/^\/maps(?:\/|$)/.test(u.pathname))return u.href;
   }catch(e){}
   return "";
 }
-function extractGoogleMapsUrlFromText(text){
+function extractGoogleMapsUrlsFromText(text){
   const source=String(text||"");
-  const matches=source.match(/https:\/\/(?:maps\.app\.goo\.gl|maps\.google\.com|(?:www\.)?google\.com\/maps)\/[^\s)\]>]+/ig)||[];
-  for(const match of matches){
-    const normalized=normalizeGoogleMapsUrl(match);
-    if(normalized)return normalized;
+  const candidates=source.match(/https:\/\/[^\s<>"']+/ig)||[];
+  const urls=[];
+  for(const candidate of candidates){
+    let raw=candidate.replace(/[\]}>，。！？、,;；]+$/g,"");
+    while(raw.endsWith(")")&&(raw.match(/\)/g)||[]).length>(raw.match(/\(/g)||[]).length)raw=raw.slice(0,-1);
+    const normalized=normalizeGoogleMapsUrl(raw);
+    if(normalized&&!urls.includes(normalized))urls.push(normalized);
   }
-  return "";
+  return urls;
+}
+function extractGoogleMapsUrlFromText(text){
+  const urls=extractGoogleMapsUrlsFromText(text);
+  return urls.length===1?urls[0]:"";
 }
 function googleMapsNavigationUrl(venue){
   const v=venue&&typeof venue==="object"?venue:{};
   const direct=normalizeGoogleMapsUrl(v.googleMapsUrl);
   if(direct)return direct;
-  const target=String(v.address||v.name||"").trim();
-  return target?"https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(target):"";
+  const address=String(v.address||"").trim();
+  if(!address)return ""; // Do not guess a branch from its name alone.
+  const url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(address);
+  return url.length<=2048?url:"";
 }
 function appleMapsNavigationUrl(venue){
-  const v=venue&&typeof venue==="object"?venue:{};
-  const target=String(v.address||v.name||"").trim();
-  return target?"https://maps.apple.com/?daddr="+encodeURIComponent(target):"";
+  const address=String(venue&&venue.address||"").trim();
+  if(!address)return "";
+  const url="https://maps.apple.com/?daddr="+encodeURIComponent(address);
+  return url.length<=2048?url:"";
 }
 function applyVenueDraftToState(d,st=state){
   if(!st||!d)return;
   const info=normalizeEventInfoV2(st.eventInfo);
+  const explicit=Object.prototype.hasOwnProperty.call(d,"venueName")||Object.prototype.hasOwnProperty.call(d,"venueAddress");
+  const legacy=explicit?{name:"",address:""}:splitLegacyVenueText(d.location);
   const venue={
-    name:String(d.venueName||"").trim(),
-    address:String(d.venueAddress||"").trim(),
+    name:String(explicit?(d.venueName||""):legacy.name).trim(),
+    address:String(explicit?(d.venueAddress||""):legacy.address).trim(),
     googleMapsUrl:normalizeGoogleMapsUrl(d.googleMapsUrl),
-    navigationEnabled:!!d.navigationEnabled,
+    navigationEnabled:d.navigationEnabled===true,
     legacyText:""
   };
   venue.legacyText=buildLegacyVenueText(venue);
-  if(!venue.name&&!venue.address&&String(d.location||"").trim()){
-    const legacy=splitLegacyVenueText(d.location);
-    venue.name=legacy.name;venue.address=legacy.address;venue.legacyText=legacy.legacyText;
-  }
-  if(!venue.name&&!venue.address&&!venue.googleMapsUrl)venue.navigationEnabled=false;
-  info.venue=Object.assign({},info.venue,venue);
+  if(!venue.address&&!venue.googleMapsUrl)venue.navigationEnabled=false;
+  info.venue=venue;
   st.eventInfo=info;
   st.meta=st.meta||{};
-  st.meta.location=venue.legacyText||String(d.location||"").trim();
+  st.meta.location=venue.legacyText;
+}
+function venueForEventState(st){
+  const m=st&&st.meta||{};
+  const raw=st&&st.eventInfo&&st.eventInfo.venue||{};
+  const text=String(m.location||"").trim();
+  const structuredText=buildLegacyVenueText({name:raw.name,address:raw.address});
+  const changed=text!==structuredText;
+  const legacy=splitLegacyVenueText(text);
+  const v={
+    name:changed?legacy.name:String(raw.name||"").trim(),
+    address:changed?legacy.address:String(raw.address||"").trim(),
+    googleMapsUrl:changed?"":normalizeGoogleMapsUrl(raw.googleMapsUrl),
+    navigationEnabled:!changed&&raw.navigationEnabled===true,
+    legacyText:text
+  };
+  if(!v.address&&!v.googleMapsUrl)v.navigationEnabled=false;
+  return v;
 }
 function publicVenueFromTournament(t){
-  const raw=t&&t.parsedData&&t.parsedData.eventInfo&&t.parsedData.eventInfo.venue;
+  const pd=t&&t.parsedData||{};
+  const raw=pd.eventInfo&&pd.eventInfo.venue;
+  const legacyText=String(t&&t.location||pd.meta&&pd.meta.location||"");
   if(raw&&typeof raw==="object"){
-    return {
-      name:String(raw.name||"").trim(),
-      address:String(raw.address||"").trim(),
-      googleMapsUrl:normalizeGoogleMapsUrl(raw.googleMapsUrl),
-      navigationEnabled:raw.navigationEnabled===true
-    };
+    const location=Object.prototype.hasOwnProperty.call(t||{},"location")?String(t.location||""):buildLegacyVenueText(raw);
+    return venueForEventState({meta:{location},eventInfo:{venue:raw}});
   }
-  const legacy=splitLegacyVenueText(t&&t.location);
+  const legacy=splitLegacyVenueText(legacyText);
   return {name:legacy.name,address:legacy.address,googleMapsUrl:"",navigationEnabled:false};
 }
 function renderVenueNavigationMenu(venue){
   const v=venue&&typeof venue==="object"?venue:{};
-  if(v.navigationEnabled!==true)return "";
+  if(v.navigationEnabled!==true||(!googleMapsNavigationUrl(v)&&!appleMapsNavigationUrl(v)))return "";
+  return '<button type="button" class="venue-nav-open" data-action="venue-navigation-open" aria-haspopup="dialog" aria-label="開啟場地導航與完整地址">🧭 導航</button>';
+}
+async function copyVenueAddress(address,dialog,status){
+  let ok=false;
+  try{
+    if(!navigator.clipboard||!navigator.clipboard.writeText)throw Error("clipboard-unavailable");
+    await navigator.clipboard.writeText(address);ok=true;
+  }catch(e){
+    const area=document.createElement("textarea");
+    area.value=address;area.setAttribute("aria-label","可手動複製的地址");
+    dialog.appendChild(area);area.select();
+    try{ok=document.execCommand("copy")===true;}catch(ignore){}
+    area.remove();
+  }
+  status.textContent=ok?"地址已複製":"無法自動複製，請長按上方完整地址手動複製。";
+  return ok;
+}
+function openVenueNavigation(venue){
+  const v=venue&&typeof venue==="object"?venue:{};
+  if(v.navigationEnabled!==true)return;
   const google=googleMapsNavigationUrl(v),apple=appleMapsNavigationUrl(v);
-  if(!google&&!apple)return "";
-  return `<details class="venue-nav-menu"><summary>🧭 導航</summary><div class="venue-nav-options">
-    ${google?`<a href="${esc(google)}" target="_blank" rel="noopener noreferrer">Google Maps</a>`:""}
-    ${apple?`<a href="${esc(apple)}" target="_blank" rel="noopener noreferrer">Apple 地圖</a>`:""}
-  </div></details>`;
+  if(!google&&!apple)return;
+  const prior=document.getElementById("bxh-venue-navigation-dialog");
+  if(prior){if(typeof prior.close==="function"&&prior.open)prior.close();else prior.remove();}
+  const opener=document.activeElement;
+  const dialog=document.createElement("dialog");
+  dialog.id="bxh-venue-navigation-dialog";
+  dialog.className="venue-navigation-dialog";
+  dialog.setAttribute("aria-labelledby","venue-navigation-title");
+  const address=String(v.address||"").trim();
+  dialog.innerHTML='<div class="venue-navigation-heading"><h2 id="venue-navigation-title">場地導航</h2><button type="button" data-venue-close aria-label="關閉導航">✕</button></div>'+
+    '<strong class="venue-navigation-name">'+esc(v.name||"活動地點")+'</strong>'+
+    (address?'<p class="venue-navigation-address">'+esc(address)+'</p>':'<p class="venue-navigation-note">未提供地址；僅開啟主辦提供的 Google Maps 連結。</p>')+
+    '<div class="venue-navigation-links">'+
+    (google?'<a href="'+esc(google)+'" target="_blank" rel="noopener noreferrer">Google Maps</a>':'')+
+    (apple?'<a href="'+esc(apple)+'" target="_blank" rel="noopener noreferrer">Apple 地圖</a>':'')+
+    (address?'<button type="button" data-venue-copy>複製地址</button>':'')+'</div>'+
+    '<p class="venue-navigation-note">Google 優先使用主辦提供的地圖連結；Apple 依地址查詢。請在地圖確認目的地後開始導航。</p>'+
+    '<p class="venue-navigation-status" role="status" aria-live="polite"></p>';
+  document.body.appendChild(dialog);
+  const close=()=>{if(typeof dialog.close==="function"&&dialog.open)dialog.close();else{dialog.remove();if(opener&&opener.isConnected)opener.focus();}};
+  dialog.querySelector('[data-venue-close]').addEventListener('click',close);
+  dialog.addEventListener('close',()=>{dialog.remove();if(opener&&opener.isConnected)opener.focus();},{once:true});
+  dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)close();}});
+  dialog.querySelector('[data-venue-copy]')?.addEventListener('click',()=>copyVenueAddress(address,dialog,dialog.querySelector('[role="status"]')));
+  if(typeof dialog.showModal==="function")dialog.showModal();
+  else{dialog.setAttribute('open','');dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.classList.add('venue-navigation-fallback');}
+  dialog.querySelector('[data-venue-close]').focus();
 }
 
 function normalizeEventInfoV2(raw){
@@ -5621,16 +5705,12 @@ function syncEventInfoV2FromLegacy(st){
   if(!st||typeof st!=="object") return emptyEventInfoV2();
   const m=st.meta&&typeof st.meta==="object"?st.meta:{};
   const info=normalizeEventInfoV2(st.eventInfo);
-  const venue=splitLegacyVenueText(m.location);
+  const venue=venueForEventState(st);
   info.basic.name=String(m.name||"");
   info.basic.date=String(m.date||"");
   info.schedule.checkInStart=String(m.checkin||"");
   info.schedule.startAt=String(m.startTime||"");
-  if(String(m.location||"").trim()){
-    info.venue.name=venue.name;
-    info.venue.address=venue.address;
-    info.venue.legacyText=venue.legacyText;
-  }
+  info.venue=venue;
   info.registration.enabled=!!m.registrationEnabled;
   info.registration.openAt=m.registrationOpenAt||null;
   info.registration.closeAt=m.registrationCloseAt||null;
@@ -5823,9 +5903,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.24";
+const APP_VERSION = "v14.2.25";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {"version":"v14.2.25","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.12.1 導航防呆與複製地址","updateLevel":"patch","added":["導航視窗新增完整地址與複製地址","多個地圖連結需房主確認，不自動選擇"],"changed":["Google 保留主辦提供的連結；Apple 僅依地址建立路線","只有店名時不推測目的地；導航視窗獨立於資訊卡，避免手機裁切"],"fixed":["修正清空場地後舊地址回填","修正僅填地址時被存成店名","加強 Maps URL 主機、路徑與安全格式檢查"],"environment":"Production / Event Info V2","deployStatus":"P7.12.1 navigation hardening","firebaseImpact":"沿用 eventInfo.venue；無資料移轉或新增集合","securityRulesImpact":"無","permissionImpact":"無","publicSummary":"場地導航可查看並複製完整地址；清空地址不再恢復舊值，缺地址不會自動導航到同名店家。"},
   {version:"v14.2.24",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.12 結構化場地與雙地圖導航",updateLevel:"minor",added:["賽事設定將活動地點拆分為場地／店家名稱、活動地址、Google Maps 連結與導航開關","玩家賽事詳情的地址旁新增小型「🧭 導航」選單，可開啟 Google Maps 或 Apple 地圖","AI 開房會從原始文案自動辨識 maps.app.goo.gl／Google Maps 連結並帶入場地草稿","即使沒有 Google Maps 連結，只要有地址也能自動產生 Google／Apple 導航"],changed:["舊版 meta.location 仍由場地名稱＋地址自動產生，維持歷史紀錄、搜尋、賽事列表與舊功能相容","公開 eventInfo 僅白名單輸出場地名稱、地址、合法 Google Maps URL 與導航開關"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend venue/navigation layer",firebaseImpact:"沿用 eventInfo.venue；無新增 collection",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事場地改為結構化資料，玩家可直接從地址旁選擇 Google Maps 或 Apple 地圖導航。"},
   {version:"v14.2.23",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11C AI 智慧修正建議",updateLevel:"minor",added:["AI 草稿套用後新增「AI 智慧修正建議」卡片，可逐項勾選並一鍵確認套用","建議明確區分「原文資訊」與「系統建議」，避免把推算值偽裝成原始活動內容","可補開始報到、需要報到、開賽時間、報名開放／截止、正取名額與報名費","原文缺少報到開始時間但已有開賽時間時，可建議開賽前 30 分鐘開始報到；原文缺少開賽時間但有報到結束時間時，可建議以報到結束作為開賽時間"],changed:["所有系統推算值都必須由房主勾選並按「確認並套用」才會進入草稿","套用建議後會重新執行 AI 審核閘門，不直接儲存或發布"],fixed:[],environment:"Production / AI Create Restricted Beta",deployStatus:"Frontend suggestion layer",firebaseImpact:"無新增資料集合或 Rules 變更",securityRulesImpact:"無",permissionImpact:"沿用 AI Create Restricted Beta 權限",publicSummary:"AI 開房現在不只指出缺漏，也能提出可確認的一鍵修正方案；推算值會清楚標示，不會自行修改房間。"},
   {version:"v14.2.22",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11B BXH 賽事公版 CMS",updateLevel:"minor",added:["賽事設定新增「套用 BXH 賽事公版」勾選，官方新房間預設勾選","公版包含比賽規則、注意事項、BXH 賽事／法律定位，並保存每場賽事的版本快照","最高管理員可直接在 ARENA 編輯並發布新版公版；一般管理員只能套用／取消套用","公開賽事詳情新增公版版本與三個可展開內容區塊"],changed:["公版更新不會回寫已發布賽事；歷史房間固定使用當時 snapshot","公開鏡像只輸出 eventInfo.standardTemplate 的安全白名單，不公開 AI source 或其他私人 Event Info V2 欄位"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend + eventTemplateService",firebaseImpact:"新增 server-managed systemSettings/bxhEventTemplate 與 eventTemplateAudit；房間私有 state 保存 standardTemplate snapshot",securityRulesImpact:"無；公版寫入僅透過 Admin SDK Callable",permissionImpact:"super_admin 可修改公版；admin 僅能選擇是否套用",publicSummary:"BXH 賽事可直接套用統一公版；公版本體只有最高管理員能修改，每場活動會保留當時版本。"},
@@ -9305,13 +9386,13 @@ function buildPublicEventInfo(st){
   const info=normalizeEventInfoV2(st&&st.eventInfo);
   const cfg=info.standardTemplate||{};
   const snapshot=cfg.snapshot&&typeof cfg.snapshot==="object"?cfg.snapshot:null;
-  const venue=info.venue||{};
+  const venue=venueForEventState(st);
   const safeGoogleMapsUrl=normalizeGoogleMapsUrl(venue.googleMapsUrl);
   const safeVenue={
     name:String(venue.name||"").trim(),
     address:String(venue.address||"").trim(),
     googleMapsUrl:safeGoogleMapsUrl,
-    navigationEnabled:venue.navigationEnabled===true && !!(safeGoogleMapsUrl||String(venue.address||venue.name||"").trim())
+    navigationEnabled:venue.navigationEnabled===true && !!(safeGoogleMapsUrl||String(venue.address||"").trim())
   };
   return {
     schemaVersion:EVENT_INFO_SCHEMA_VERSION,
@@ -9614,6 +9695,8 @@ function aiCreateDraftMappingModel(){
   if(!result||!event) return null;
   const activity=result.activity||{};
   const warnings=[];
+  const mapLinks=extractGoogleMapsUrlsFromText(aiCreateSourceText);
+  if(mapLinks.length>1)warnings.push("原文包含多個地圖連結，未自動選擇；請房主確認本場場地連結。");
   const checkinCompatible=aiCreateHalfHourCompatible(event.checkInStart);
   const startCompatible=aiCreateHalfHourCompatible(event.startAt);
   const openCompatible=aiCreateHalfHourCompatible(activity.registrationOpenAt);
@@ -9636,8 +9719,8 @@ function aiCreateDraftMappingModel(){
       date:String(event.date||activity.date||"").trim(),
       venueName:String(activity.locationName||"").trim(),
       venueAddress:String(activity.address||"").trim(),
-      googleMapsUrl:extractGoogleMapsUrlFromText(aiCreateSourceText),
-      navigationEnabled:!!(String(activity.address||"").trim()||extractGoogleMapsUrlFromText(aiCreateSourceText)),
+      googleMapsUrl:mapLinks.length===1?mapLinks[0]:"",
+      navigationEnabled:!!(String(activity.address||"").trim()||mapLinks.length===1),
       location:aiCreateLocationText(activity),
       checkin:checkinCompatible?String(event.checkInStart||"").trim():"",
       startTime:startCompatible?String(event.startAt||"").trim():"",
@@ -9973,9 +10056,9 @@ function ensureSettingsFormDraft(){
   const m=state.meta||{};
   const eventInfo=normalizeEventInfoV2(state.eventInfo);
   const legacyVenue=splitLegacyVenueText(m.location);
-  const venue=eventInfo.venue||{};
-  const venueName=String(venue.name||legacyVenue.name||"");
-  const venueAddress=String(venue.address||legacyVenue.address||"");
+  const venue=venueForEventState(state);
+  const venueName=String(venue.name||"");
+  const venueAddress=String(venue.address||"");
   const googleMapsUrl=normalizeGoogleMapsUrl(venue.googleMapsUrl);
   settingsFormDraft={
     name:m.name||"",
@@ -10016,7 +10099,7 @@ function syncSettingsDraftFromDom(){
   settingsFormDraft.googleMapsUrl=val("f-google-maps-url",settingsFormDraft.googleMapsUrl||"");
   const nav=document.getElementById("f-navigation-enabled");
   if(nav)settingsFormDraft.navigationEnabled=!!nav.checked;
-  settingsFormDraft.location=buildLegacyVenueText({name:settingsFormDraft.venueName,address:settingsFormDraft.venueAddress,legacyText:settingsFormDraft.location});
+  settingsFormDraft.location=buildLegacyVenueText({name:settingsFormDraft.venueName,address:settingsFormDraft.venueAddress});
   settingsFormDraft.checkin=val("f-checkin",settingsFormDraft.checkin);
   settingsFormDraft.startTime=val("f-start",settingsFormDraft.startTime);
   settingsFormDraft.formatType=val("f-format",settingsFormDraft.formatType)||"single";
@@ -22753,6 +22836,7 @@ document.addEventListener('input',event=>{const name=event.target.id;if(!['ops-t
 
 /* ==== actions ==== */
 function handleAction(action, target){
+  if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
