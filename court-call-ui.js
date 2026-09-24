@@ -258,6 +258,23 @@ function courtCallPlayerResponseLabel(response){
  return ({unanswered:'未回覆',coming:'✅ 正在前往',pass:'⏸ PASS',ready:'✅ 已準備好'})[response]||response||'未回覆';
 }
 
+function courtCallPassUnavailableText(r,myPlayer){
+ if(myPlayer?.passUsed||r?.passUnavailableReason==='pass-used')return '本賽事 PASS 已使用';
+ switch(String(r?.passUnavailableReason||'')){
+  case 'insufficient-same-round': return '後方沒有同台同輪可承接場次，本場無法使用 PASS';
+  case 'not-current-match': return '目前不是此戰鬥台的執行場次，暫時無法使用 PASS';
+  case 'pass-unavailable': return '此場目前無法遞延';
+  default: return '目前無法使用 PASS';
+ }
+}
+
+function courtCallPassButtonText(r,myPlayer){
+ if(myPlayer?.passUsed||r?.passUnavailableReason==='pass-used')return 'PASS 已使用';
+ if(r?.passUnavailableReason==='insufficient-same-round')return 'PASS｜後方無場次';
+ if(r?.passUnavailableReason==='not-current-match')return 'PASS｜非目前場次';
+ return 'PASS｜目前不可用';
+}
+
 function courtCallRow(c,r,ref){
  const attrs=`data-code="${esc(c.code)}" data-match="${esc(r.matchId)}" data-sequence="${r.sequence}"`;
  const disabled=c.busy||c.pending?'disabled':'';
@@ -267,9 +284,11 @@ function courtCallRow(c,r,ref){
   r.pass?.status==='approved'?'PASS 已接受，同台延後 1 場':
   r.pass?.status==='rejected'?'PASS 未核准':'';
  const playerStatus=r.players.map(p=>`<span class="court-call-person ${p.response==='unanswered'?'is-waiting':'is-replied'}"><b>${esc(p.name)}</b> ${esc(courtCallPlayerResponseLabel(p.response))}</span>`).join('');
+ const passAllowed=!!(myPlayer?.canPass&&r.canPass);
+ const passHint=!passAllowed&&myPlayer?.response==='unanswered'&&!r.pass?.status?courtCallPassUnavailableText(r,myPlayer):'';
  const playerActions=!ref&&myPlayer?(
    myPlayer.response==='unanswered'&&!(r.pass?.status==='approved'&&r.waitingFor.length)
-    ? `<button class="btn btn-primary" data-action="court-call-coming" ${attrs}${participantAttr} ${disabled}>OK｜正在前往</button>${myPlayer.canPass&&r.canPass?`<button class="btn btn-ghost" data-action="court-call-pass" ${attrs}${participantAttr} ${disabled}>PASS｜延後一場</button>`:''}`
+    ? `<button class="btn btn-primary" data-action="court-call-coming" ${attrs}${participantAttr} ${disabled}>OK｜正在前往</button><button class="btn btn-ghost" data-action="court-call-pass" ${attrs}${participantAttr} ${passAllowed?disabled:'disabled'}>${passAllowed?'PASS｜延後一場':esc(courtCallPassButtonText(r,myPlayer))}</button>`
     : (r.pass?.status==='approved'&&r.pass.requester&&!r.waitingFor.length?`<button class="btn btn-ghost" data-action="court-call-ready" ${attrs}${participantAttr} ${disabled}>我已準備好</button>`:'')
   ):'';
  const legacyActions=ref&&r.canApprove?`<button class="btn btn-primary" data-action="court-call-approve" ${attrs} ${disabled}>核准舊版 PASS</button><button class="btn btn-ghost" data-action="court-call-reject" ${attrs} ${disabled}>拒絕</button>`:'';
@@ -279,6 +298,7 @@ function courtCallRow(c,r,ref){
    <div class="court-call-people">${playerStatus}</div>
    ${r.pass?`<p class="hint">${esc(passText)}${r.waitingFor.length?`｜前置場次尚餘 ${r.waitingFor.length} 場`:''}</p>`:''}
    ${legacyActions||playerActions?`<div class="btn-row">${legacyActions}${playerActions}</div>`:''}
+   ${passHint?`<p class="hint" style="margin-top:8px">⚠️ ${esc(passHint)}</p>`:''}
  </div>`;
 }
 
@@ -304,7 +324,7 @@ function renderCourtCallPlayer(code){
   ? `<button class="btn btn-ghost" data-action="court-call-test-push" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`
   : '';
  return `<section>
-   <p class="hint">裁判人工叫號與智慧 ETA 已分離｜人工叫號約每 2–3 秒同步｜PASS：${c.used?'本賽事已使用':'可使用 1 次，直接延後一場'}</p>
+   <p class="hint">裁判人工叫號與智慧 ETA 已分離｜人工叫號約每 2–3 秒同步｜PASS：每人每賽事 1 次，且需有同台同輪下一場可承接${c.used?'｜本賽事已使用':''}</p>
    <div class="btn-row" style="align-items:center">
     ${notifyButton}${testButton}
     <span class="hint">${esc(courtCallNotificationHint())}${courtCallPushTestResult?`｜${esc(courtCallPushTestResult)}`:''}</span>
@@ -363,6 +383,7 @@ function syncCourtCallGlobalOverlay(){
  const a=names[0]||'選手 A',b=names[1]||'選手 B';
  const attrs=`data-code="${esc(x.c.code)}" data-match="${esc(x.r.matchId)}" data-sequence="${x.r.sequence}" data-participant="${esc(x.mePlayer.id||'')}"`;
  const passAllowed=x.mePlayer.canPass&&x.r.canPass&&!x.c.busy&&!x.c.pending;
+ const passUnavailable=!passAllowed?courtCallPassUnavailableText(x.r,x.mePlayer):'';
  const requesterIsMe=!!x.r.pass?.requester;
  const html=x.type==='deferred'
   ? `<div class="bxh-call-modal" role="dialog" aria-modal="true" aria-label="PASS 已生效">
@@ -376,10 +397,10 @@ function syncCourtCallGlobalOverlay(){
       <div class="bxh-call-kicker">🔔 裁判叫號</div>
       <div class="bxh-call-court">Court ${x.r.station}</div>
       <div class="bxh-call-vs"><span>${esc(a)}</span><b>VS</b><span>${esc(b)}</span></div>
-      <div class="bxh-call-message">請前往 <strong>${x.r.station} 號戰鬥台</strong> 準備比賽。<br>請選擇目前狀態。</div>
+      <div class="bxh-call-message">請前往 <strong>${x.r.station} 號戰鬥台</strong> 準備比賽。<br>請選擇目前狀態。${passUnavailable?`<br><span style="display:inline-block;margin-top:8px;font-size:12px;color:#aeb1ba">⚠️ ${esc(passUnavailable)}</span>`:''}</div>
       <div class="bxh-call-actions">
        <button class="btn btn-primary" data-action="court-call-coming" ${attrs} ${x.c.busy||x.c.pending?'disabled':''}>OK｜正在前往</button>
-       <button class="btn btn-ghost" data-action="court-call-pass" ${attrs} ${passAllowed?'':'disabled'}>${passAllowed?'PASS｜延後一場':x.c.used?'PASS 已使用':'PASS 不可用'}</button>
+       <button class="btn btn-ghost" data-action="court-call-pass" ${attrs} ${passAllowed?'':'disabled'}>${passAllowed?'PASS｜延後一場':esc(courtCallPassButtonText(x.r,x.mePlayer))}</button>
       </div>
      </div>`;
  if(old){
