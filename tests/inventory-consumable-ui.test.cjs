@@ -8,13 +8,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(process.env.INVENTORY_UI_SOURCE || path.join(__dirname, '..', 'inventory-ui.js'), 'utf8');
 
-function setup({ admin = true, confirmResult = true, pending = null, failFirst = false } = {}) {
+function setup({ admin = true, auth = true, confirmResult = true, pending = null, failFirst = false } = {}) {
   const storage = new Map();
   if (pending) storage.set('bxh.inventory.pending.v1:admin-uid', JSON.stringify(pending));
   const grants = [], confirmations = [];
+  const listeners = {};
   let operations = 0;
   const sandbox = {
-    currentAuthUid: () => 'admin-uid', engagementSessionEpoch: 1, isSuperAdmin: () => admin,
+    currentAuthUid: () => auth ? 'admin-uid' : '', engagementSessionEpoch: 1, isSuperAdmin: () => admin,
     render() {}, loadMailbox: async () => {}, setTimeout() {}, URL, Date,
     esc: value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
     mailboxDate: value => String(value), titleRecipientLabel: user => user.name,
@@ -24,7 +25,10 @@ function setup({ admin = true, confirmResult = true, pending = null, failFirst =
       getItem: key => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key)
     },
-    document: { addEventListener() {}, querySelector: () => ({}), querySelectorAll: () => [], getElementById: () => null },
+    document: {
+      addEventListener(type, fn, options) { (listeners[type] ||= []).push({ fn, capture: options === true || options?.capture === true }); },
+      querySelector: () => ({}), querySelectorAll: () => [], getElementById: () => null
+    },
     window: { engagementService: { inventory: async payload => {
       if (payload.action === 'grant') {
         grants.push(JSON.parse(JSON.stringify(payload)));
@@ -47,7 +51,21 @@ function setup({ admin = true, confirmResult = true, pending = null, failFirst =
     checked, value: 'on'
   } });
   const checkbox = () => sandbox.renderInventoryPage().match(/<input id="inventory-consumable"[^>]*>/)?.[0];
-  return { sandbox, state, fill, check, checkbox, grants, confirmations, storage };
+  const click = async action => {
+    const target = {
+      getAttribute: key => key === 'data-action' ? action : null,
+      closest: selector => selector === '[data-action^="inventory-"]' ? target : null
+    };
+    const event = {
+      target, prevented: false, stopped: false, immediateStopped: false,
+      preventDefault() { this.prevented = true; },
+      stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.immediateStopped = true; }
+    };
+    await sandbox.inventoryClickCapture(event);
+    return event;
+  };
+  return { sandbox, state, fill, check, checkbox, click, listeners, grants, confirmations, storage };
 }
 
 test('new grants default to non-consumable and explain existing lots are unchanged', () => {
@@ -158,4 +176,36 @@ test('item cards distinguish explicit consumable metadata from legacy or string 
   assert.match(t.sandbox.renderInventoryPage(), /持有中 · 不可消耗/);
   item.consumable = true;
   assert.match(t.sandbox.renderInventoryPage(), /持有中 · 可消耗/);
+});
+
+
+test('captured inventory click owns the action route and submits exactly once', async () => {
+  const t = setup(); t.fill(); t.check(true);
+  const event = await t.click('inventory-grant');
+  assert.equal(event.prevented, true);
+  assert.equal(event.stopped, true);
+  assert.equal(event.immediateStopped, true);
+  assert.equal(t.grants.length, 1);
+  assert.equal(t.grants[0].consumable, true);
+});
+
+test('grant click with missing auth never fails silently', async () => {
+  const t = setup({ auth: false });
+  await t.click('inventory-grant');
+  assert.match(t.state.error, /登入狀態已失效/);
+  assert.equal(t.grants.length, 0);
+});
+
+test('grant click while inventory is loading returns visible feedback', async () => {
+  const t = setup(); t.state.loading = true;
+  await t.click('inventory-grant');
+  assert.match(t.state.error, /仍在載入/);
+  assert.equal(t.grants.length, 0);
+});
+
+test('invalid grant reached through the click router returns visible validation feedback', async () => {
+  const t = setup();
+  await t.click('inventory-grant');
+  assert.match(t.state.error, /請重新搜尋並選擇玩家/);
+  assert.equal(t.grants.length, 0);
 });
