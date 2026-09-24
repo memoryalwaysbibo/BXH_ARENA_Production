@@ -1,0 +1,37 @@
+name: P7.13 isolated integration checks
+on:
+  push:
+    branches: [feature/p7-13-poster-flow-20260925]
+    paths: ['.github/workflows/p7-13-development.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Inspect existing AI draft integration points
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          lines=Path('index.html').read_text().splitlines()
+          pattern=re.compile(r'parseTournament|aiCreate|AI_CREATE|ai-create|aiDraft|AI_DRAFT|aiAssistant|AI_STATE')
+          for n,line in enumerate(lines,1):
+              if pattern.search(line):
+                  print(f'{n}: {line[:420]}')
+          print('TEST FILES:')
+          for p in sorted(Path('tests').glob('*')): print(p)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p7-13-integration-source
+          path: |
+            index.html
+            scripts/
+            tests/
+          retention-days: 1
