@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260925.33">
+<meta name="bxh-build" content="20260925.34">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260925.33";
+  var CURRENT_BUILD="20260925.34";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3745,6 +3745,35 @@ button.ai-create-event-card.is-selected{
 .ai-create-review-item.info{opacity:.86;}
 .ai-create-review-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:11px;flex-wrap:wrap;}
 .ai-create-review-confirmed{color:#b9f0cd;font-size:10.5px;font-weight:800;}
+.ai-create-suggestion-panel{
+  margin:0 0 14px;padding:14px;border:1px solid rgba(102,180,255,.26);
+  border-radius:12px;background:rgba(102,180,255,.035);
+}
+.ai-create-suggestion-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;
+}
+.ai-create-suggestion-head strong{display:block;color:#d9edff;font-size:13px;}
+.ai-create-suggestion-head span{display:block;color:var(--metal-dim);font-size:10px;line-height:1.55;margin-top:3px;}
+.ai-create-suggestion-count{
+  flex:0 0 auto;padding:4px 8px;border:1px solid rgba(102,180,255,.28);
+  border-radius:999px;color:#a9d9ff;font:800 9.5px var(--font-d);
+}
+.ai-create-suggestion-list{display:grid;gap:8px;}
+.ai-create-suggestion-card{
+  display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;align-items:flex-start;
+  padding:10px;border:1px solid rgba(255,255,255,.085);border-radius:9px;background:rgba(0,0,0,.15);
+}
+.ai-create-suggestion-card input{margin-top:2px;width:16px;height:16px;}
+.ai-create-suggestion-title{display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:var(--white);font-size:11px;font-weight:800;}
+.ai-create-suggestion-badge{
+  padding:2px 6px;border-radius:999px;font:800 8.5px var(--font-d);letter-spacing:.25px;
+  border:1px solid rgba(255,255,255,.12);color:var(--metal);
+}
+.ai-create-suggestion-badge.source{border-color:rgba(95,215,147,.30);color:#b9f0cd;background:rgba(95,215,147,.05);}
+.ai-create-suggestion-badge.recommended{border-color:rgba(255,193,85,.34);color:#ffd58a;background:rgba(255,193,85,.055);}
+.ai-create-suggestion-card p{margin:4px 0 0;color:var(--metal);font-size:10px;line-height:1.55;}
+.ai-create-suggestion-value{margin-top:5px;color:#d9edff;font-size:10.5px;font-weight:750;}
+.ai-create-suggestion-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .ai-create-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
 .ai-create-apply-btn{border-color:rgba(95,215,147,.44)!important;}
 .ai-create-apply-btn:not(:disabled){background:rgba(95,215,147,.10)!important;color:#d8f7e4!important;}
@@ -5689,9 +5718,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.22";
+const APP_VERSION = "v14.2.23";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.23",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11C AI 智慧修正建議",updateLevel:"minor",added:["AI 草稿套用後新增「AI 智慧修正建議」卡片，可逐項勾選並一鍵確認套用","建議明確區分「原文資訊」與「系統建議」，避免把推算值偽裝成原始活動內容","可補開始報到、需要報到、開賽時間、報名開放／截止、正取名額與報名費","原文缺少報到開始時間但已有開賽時間時，可建議開賽前 30 分鐘開始報到；原文缺少開賽時間但有報到結束時間時，可建議以報到結束作為開賽時間"],changed:["所有系統推算值都必須由房主勾選並按「確認並套用」才會進入草稿","套用建議後會重新執行 AI 審核閘門，不直接儲存或發布"],fixed:[],environment:"Production / AI Create Restricted Beta",deployStatus:"Frontend suggestion layer",firebaseImpact:"無新增資料集合或 Rules 變更",securityRulesImpact:"無",permissionImpact:"沿用 AI Create Restricted Beta 權限",publicSummary:"AI 開房現在不只指出缺漏，也能提出可確認的一鍵修正方案；推算值會清楚標示，不會自行修改房間。"},
   {version:"v14.2.22",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11B BXH 賽事公版 CMS",updateLevel:"minor",added:["賽事設定新增「套用 BXH 賽事公版」勾選，官方新房間預設勾選","公版包含比賽規則、注意事項、BXH 賽事／法律定位，並保存每場賽事的版本快照","最高管理員可直接在 ARENA 編輯並發布新版公版；一般管理員只能套用／取消套用","公開賽事詳情新增公版版本與三個可展開內容區塊"],changed:["公版更新不會回寫已發布賽事；歷史房間固定使用當時 snapshot","公開鏡像只輸出 eventInfo.standardTemplate 的安全白名單，不公開 AI source 或其他私人 Event Info V2 欄位"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend + eventTemplateService",firebaseImpact:"新增 server-managed systemSettings/bxhEventTemplate 與 eventTemplateAudit；房間私有 state 保存 standardTemplate snapshot",securityRulesImpact:"無；公版寫入僅透過 Admin SDK Callable",permissionImpact:"super_admin 可修改公版；admin 僅能選擇是否套用",publicSummary:"BXH 賽事可直接套用統一公版；公版本體只有最高管理員能修改，每場活動會保留當時版本。"},
   {version:"v14.2.21",date:"2026/09/24",timezone:"Asia/Taipei",title:"P7.11A Event Info V2 底層骨架",updateLevel:"patch",added:["新增 bxh.event-info.v2 結構化賽事資訊影子模型：basic／schedule／venue／registration／prizes／content／standardTemplate／source","新增 Legacy Adapter，可將既有 state.meta 安全同步至 Event Info V2，並預留 V2 回寫既有 meta 的顯式轉接器"],changed:["現階段 legacy state.meta 仍為唯一執行期權威；Event Info V2 僅在儲存快照前同步，不改變既有比賽、報名、裁判、天梯與玩家顯示流程","既有 location 可保守拆分店家與地址；新模型已預留 Google Maps URL、導航開關、公版版本快照、獎品與 AI 來源"],fixed:[],environment:"Production / Compatibility Layer",deployStatus:"P7.11A shadow model only",firebaseImpact:"私有賽事 JSON state 新增 eventInfo；無新增 Firestore collection、無公開欄位變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"ARENA 已建立新的結構化賽事資訊底座；目前畫面與比賽流程維持不變。"},
   {version:"v14.2.20",date:"2026/09/24",timezone:"Asia/Taipei",title:"AI 開房原文案自動帶入活動說明",updateLevel:"patch",added:["AI 套用賽事草稿時，若「活動說明（選填）」原本為空白，自動帶入房主貼給 AI 的完整原始活動文案","AI 套用預覽新增活動說明來源提示與原文案字數"],changed:["保留原始文案的換行、Emoji、規則與補充資訊，避免 AI 結構化後活動說明呈現空白","若房主已手動填寫活動說明，AI 不覆蓋既有內容"],fixed:[],environment:"Production / Restricted Beta",deployStatus:"Frontend AI Create draft mapping patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"AI 開房除了拆解欄位，也會把原始活動文案保留在活動說明；既有手動內容不會被覆蓋。"},
@@ -8997,6 +9027,86 @@ let aiCreateSelectedEventKey = "";
 let aiCreateLastApplied = null;
 let aiCreateReviewAcknowledged = false;
 let aiCreateParseBusy = false;
+let aiCreateSuggestionSelection = {};
+
+function aiCreateTimeMinusMinutes(value,minutes){
+  const m=String(value||"").match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if(!m)return "";
+  let total=Number(m[1])*60+Number(m[2])-Number(minutes||0);
+  while(total<0)total+=24*60;
+  total%=24*60;
+  const hh=String(Math.floor(total/60)).padStart(2,"0");
+  const mm=String(total%60).padStart(2,"0");
+  return hh+":"+mm;
+}
+function aiCreateSuggestionList(){
+  if(!aiCreateLastApplied)return [];
+  ensureSettingsFormDraft();ensureRegistrationFormDraft();
+  const d=settingsFormDraft||{},rd=registrationFormDraft||{};
+  const event=aiCreateSelectedEvent()||{};
+  const activity=(aiCreateStructuredResult&&aiCreateStructuredResult.activity)||{};
+  const list=[];
+  const add=(s)=>{
+    if(list.some(x=>x.id===s.id))return;
+    list.push(Object.assign({origin:"source"},s));
+    if(aiCreateSuggestionSelection[s.id]===undefined)aiCreateSuggestionSelection[s.id]=true;
+  };
+  const compatible=v=>!!v&&aiCreateHalfHourCompatible(v);
+
+  if(!String(d.startTime||"").trim()){
+    if(compatible(event.startAt)){
+      add({id:"start-from-source",title:"補上開賽時間",message:"原始活動資訊已辨識到開賽時間，但目前草稿仍是空白。",value:String(event.startAt),apply:()=>{settingsFormDraft.startTime=String(event.startAt);}});
+    }else if(compatible(event.checkInEnd)){
+      add({id:"start-from-checkin-end",origin:"recommended",title:"以報到結束時間作為開賽時間",message:"原文沒有可安全套用的開賽時間；依報到流程推算，可將報到結束時間作為開賽時間。",value:String(event.checkInEnd),apply:()=>{settingsFormDraft.startTime=String(event.checkInEnd);}});
+    }
+  }
+
+  const effectiveStart=String(d.startTime||event.startAt||event.checkInEnd||"").trim();
+  if(!String(d.checkin||"").trim()){
+    if(compatible(event.checkInStart)){
+      add({id:"checkin-from-source",title:"補上開始報到時間",message:"原始活動資訊已辨識到正取報到開始時間。",value:String(event.checkInStart),apply:()=>{settingsFormDraft.checkin=String(event.checkInStart);settingsFormDraft.checkinRequired=true;}});
+    }else if(effectiveStart && /^([01]\d|2[0-3]):(?:00|30)$/.test(effectiveStart)){
+      const suggested=aiCreateTimeMinusMinutes(effectiveStart,30);
+      add({id:"checkin-default-30",origin:"recommended",title:"開賽前 30 分鐘開始報到",message:"原文沒有報到開始時間；依 BXH 常用活動流程提供建議值，請房主確認。",value:suggested,apply:()=>{settingsFormDraft.checkin=suggested;settingsFormDraft.checkinRequired=true;}});
+    }
+  }
+
+  if(!d.checkinRequired && (String(d.checkin||"").trim() || event.checkInStart)){
+    add({id:"enable-checkin",title:"開啟「需要報到」",message:"目前已有報到時間或原文有報到流程，但房間仍設定為免報到。",value:"需要報到",apply:()=>{settingsFormDraft.checkinRequired=true;}});
+  }
+
+  if(rd.registrationEnabled){
+    if(!rd.registrationOpenAt && activity.registrationOpenAt && aiCreateHalfHourCompatible(activity.registrationOpenAt)){
+      const epoch=aiCreateIsoToEpoch(activity.registrationOpenAt);
+      if(epoch)add({id:"registration-open-from-source",title:"補上報名開放時間",message:"原文已提供報名開放時間。",value:epochToDatetimeLocal(epoch).replace("T"," "),apply:()=>{registrationFormDraft.registrationOpenAt=epoch;}});
+    }
+    if(!rd.registrationCloseAt && activity.registrationCloseAt && aiCreateHalfHourCompatible(activity.registrationCloseAt)){
+      const epoch=aiCreateIsoToEpoch(activity.registrationCloseAt);
+      if(epoch)add({id:"registration-close-from-source",title:"補上報名截止時間",message:"原文已提供報名截止時間。",value:epochToDatetimeLocal(epoch).replace("T"," "),apply:()=>{registrationFormDraft.registrationCloseAt=epoch;}});
+    }
+    if((!rd.registrationCapacity||Number(rd.registrationCapacity)<1) && Number(event.capacity)>0){
+      add({id:"capacity-from-source",title:"補上正取名額",message:"原文已辨識到參賽名額。",value:String(event.capacity)+" 人",apply:()=>{registrationFormDraft.registrationCapacity=Number(event.capacity);}});
+    }
+  }
+  if(rd.registrationFee==null && event.fee!=null && Number(event.fee)>=0){
+    add({id:"fee-from-source",title:"補上報名費",message:"原文已辨識到報名費。",value:"NT$"+String(event.fee),apply:()=>{registrationFormDraft.registrationFee=Number(event.fee);}});
+  }
+
+  return list;
+}
+function applySelectedAiCreateSuggestions(){
+  const list=aiCreateSuggestionList();
+  const selected=list.filter(s=>aiCreateSuggestionSelection[s.id]!==false);
+  if(!selected.length)return {ok:false,count:0};
+  selected.forEach(s=>{try{s.apply();}catch(e){}});
+  settingsFormDraftDirty=true;
+  registrationFormDraftDirty=true;
+  aiCreateReviewAcknowledged=false;
+  selected.forEach(s=>{delete aiCreateSuggestionSelection[s.id];});
+  return {ok:true,count:selected.length};
+}
+
+
 
 /* P7.11B — BXH standard event template UI.
    The canonical template lives behind eventTemplateService. Only super_admin
@@ -9278,6 +9388,7 @@ async function runAiCreateParse(){
   aiCreateStructuredErrors=[];
   aiCreateSelectedEventKey="";
   aiCreateReviewAcknowledged=false;
+  aiCreateSuggestionSelection={};
   aiCreateParseBusy=true;
   aiCreateAssistantNotice=aiCreateRemoteParserEnabled()
     ?"正在透過 Firebase Callable 解析文案；解析結果仍只會進入草稿預覽，不會建立或發布賽事。"
@@ -9580,6 +9691,32 @@ function aiCreateReviewGate(actionLabel="繼續"){
     return false;
   }
   return true;
+}
+
+function renderAiCreateSuggestionPanel(){
+  if(!aiCreateLastApplied || !(settingsFormDraftDirty||registrationFormDraftDirty))return "";
+  const suggestions=aiCreateSuggestionList();
+  if(!suggestions.length)return "";
+  const selectedCount=suggestions.filter(s=>aiCreateSuggestionSelection[s.id]!==false).length;
+  const card=s=>`<label class="ai-create-suggestion-card">
+    <input type="checkbox" data-action="ai-create-suggestion-toggle" data-suggestion-id="${esc(s.id)}" ${aiCreateSuggestionSelection[s.id]!==false?"checked":""}>
+    <span>
+      <span class="ai-create-suggestion-title">${esc(s.title)} <span class="ai-create-suggestion-badge ${s.origin==="recommended"?"recommended":"source"}">${s.origin==="recommended"?"系統建議":"原文資訊"}</span></span>
+      <p>${esc(s.message)}</p>
+      <div class="ai-create-suggestion-value">建議套用｜${esc(s.value||"")}</div>
+    </span>
+  </label>`;
+  return `<div class="ai-create-suggestion-panel" id="ai-create-suggestion-panel">
+    <div class="ai-create-suggestion-head">
+      <div><strong>✨ AI 智慧修正建議</strong><span>系統找到可以直接補上的欄位。請確認勾選內容後再套用；不會自行修改房間。</span></div>
+      <div class="ai-create-suggestion-count">${selectedCount} / ${suggestions.length}</div>
+    </div>
+    <div class="ai-create-suggestion-list">${suggestions.map(card).join("")}</div>
+    <div class="ai-create-suggestion-actions">
+      <button type="button" class="btn btn-ghost btn-sm" data-action="ai-create-suggestion-select-all">全部勾選</button>
+      <button type="button" class="btn btn-primary btn-sm" data-action="ai-create-suggestion-apply" ${selectedCount?"":"disabled"}>確認並套用 ${selectedCount} 項</button>
+    </div>
+  </div>`;
 }
 
 function renderAiCreateReviewPanel(){
@@ -10495,6 +10632,7 @@ const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
   "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack",
+  "ai-create-suggestion-toggle","ai-create-suggestion-select-all","ai-create-suggestion-apply",
   "event-template-toggle","event-template-refresh"
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
@@ -15841,6 +15979,7 @@ function renderSettings(){
     <span>已填入：${aiCreateLastApplied.mappedFields.map(esc).join("、")}。目前只是未儲存草稿，請逐欄審核後再按「儲存賽事設定」。</span>
     ${aiCreateLastApplied.warnings.length?`<div class="ai-create-applied-warnings">⚠️ ${aiCreateLastApplied.warnings.map(esc).join("　")}</div>`:""}
   </div>`:""}
+  ${renderAiCreateSuggestionPanel()}
   ${renderAiCreateReviewPanel()}
 
   <div class="settings-section-head" style="margin-top:0;">
@@ -22617,7 +22756,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="ai-create-close" || action==="ai-create-close-overlay"){
     aiCreateAssistantOpen=false;
     aiCreateAssistantNotice="";
+    aiCreateSuggestionSelection={};
     render();
+    return;
+  }
+  if(action==="ai-create-suggestion-toggle"){
+    const id=target.getAttribute("data-suggestion-id")||"";
+    if(id){aiCreateSuggestionSelection[id]=!!target.checked;render();}
+    return;
+  }
+  if(action==="ai-create-suggestion-select-all"){
+    aiCreateSuggestionList().forEach(s=>{aiCreateSuggestionSelection[s.id]=true;});
+    render();return;
+  }
+  if(action==="ai-create-suggestion-apply"){
+    const result=applySelectedAiCreateSuggestions();
+    if(!result.ok){showToast("目前沒有已勾選的修正建議",true);return;}
+    render();
+    showToast("已套用 "+result.count+" 項 AI 修正建議；請再檢查審核閘門");
+    setTimeout(()=>{try{document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"});}catch(e){}},0);
     return;
   }
   if(action==="ai-create-review-ack"){
@@ -22637,6 +22794,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if((aiCreateStructuredResult.events||[]).some(event=>event&&event.key===key)){
       aiCreateSelectedEventKey=key;
       aiCreateReviewAcknowledged=false;
+      aiCreateSuggestionSelection={};
       render();
     }
     return;
