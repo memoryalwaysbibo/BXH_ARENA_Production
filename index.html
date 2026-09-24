@@ -4573,9 +4573,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.5";
+const APP_VERSION = "v14.2.6";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.6",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳狀態優先順序調整",updateLevel:"patch",added:[],changed:["賽事大廳分類顯示順序調整為：比賽中 → 報名中 → 等待開始 → 結算中 → 已結束／已取消","僅調整分類呈現優先順序，不改變既有賽事狀態判定、資料分類與即時同步機制"],fixed:["讓玩家先看到正在進行與可立即報名的賽事，再看到等待開始與結算中的房間，降低操作優先級錯置"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby status priority",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳排序改為比賽中、報名中、等待開始、結算中、已結束／已取消。"},
   {version:"v14.2.5",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳工具列極簡化",updateLevel:"patch",added:[],changed:["賽事大廳移除常駐大型搜尋框、搜尋按鈕、篩選按鈕與說明副標","頁首改為賽事大廳＋小型搜尋／篩選入口＋小型刷新鍵","搜尋與日期／地區／賽制篩選保留原功能，僅在需要時展開；套用或清除後自動收合","手動刷新改為圖示按鈕並保留即時同步作為主要更新機制"],fixed:["大幅降低賽事大廳首屏工具區高度，讓比賽中／結算中等分類更快進入手機畫面"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby compact toolbar",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳改為極簡工具列；搜尋篩選按需展開，刷新縮成小圖示。"},
   {version:"v14.2.4",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況 Live Dashboard／比分拉霸／智慧倒數",updateLevel:"minor",added:["即時戰況新增充能式全場進度條與單淘汰階段節點","每個戰鬥台的下一場沿用智慧叫號比分估時模型，顯示動態倒數","即時戰況新增單一小型手動刷新鍵，可重新抓取全場最新雲端資料","比分變動時只讓變動側數字做一次短暫拉霸式滾動"],changed:["全場資訊與戰鬥台資訊合併為單一 Live Dashboard；移除重複的即時戰鬥台標題與說明","戰鬥台改顯示 1號台／2號台，責任裁判與台號置於同一資訊列","下一場改為低視覺權重單列，避免搶過目前對戰與比分","複數戰鬥台僅各自顯示該台專屬資訊；全場名稱、參賽人數、階段與進度只顯示一次"],fixed:["避免多 Court 模式重複全場資訊造成手機頁面過長","避免下一場卡片比目前對戰更醒目"],environment:"Production / HTML + Firebase",deployStatus:"Frontend live dashboard refinement",firebaseImpact:"無資料結構變更；沿用既有 match／courtAssignments／eligiblePlayers 與智慧叫號 ETA 模型",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況整合為一張全場進度＋多戰鬥台看板，比分會在變動時短暫滾動，下一場顯示智慧倒數。"},
   {version:"v14.2.3",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況概況卡極簡化",updateLevel:"patch",added:[],changed:["即時戰況原 7 格大型活動資訊 Dashboard 改為單張 Compact Live Summary","移除活動日期與重複的預計總場次／已完成場次獨立卡片；場次改合併為完成／總場次","完成率改為右上角輔助數字，正式參賽人數改為單一核心統計","活動地點與戰鬥台數量降為底部小字，分享按鈕同步縮小"],fixed:["降低即時戰況頁非必要資訊佔用，讓目前 Court 與即時排名更快進入手機首屏"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact live summary experiment",firebaseImpact:"無資料結構變更；沿用既有 eligiblePlayers 與 match 統計來源",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況概況區縮成單張薄卡，保留狀態、賽名、完成進度、正式參賽與完成率。"},
@@ -16412,9 +16413,9 @@ function renderTournamentLobby(opts={}){
     ${lobbyFilterPanelHtml()}
     ${filtered?`<div class="lobby-filter-summary">目前篩選結果 ${total} 場 <button class="link-btn" data-action="clear-find-events-filter">清除篩選</button></div>`:""}
     ${lobbySectionHtml("live","🟡 比賽中",live.length,liveBody,live.length>0)}
-    ${lobbySectionHtml("settling","🟠 結算中",settling.length,settlingBody,false)}
     ${lobbySectionHtml("registration","🟢 報名中",registration.length,registrationBody,false)}
     ${lobbySectionHtml("waiting","⚔️ 等待開始",waiting.length,waitingBody,false)}
+    ${lobbySectionHtml("settling","🟠 結算中",settling.length,settlingBody,false)}
     ${lobbySectionHtml("ended","⚪ 已結束 / 已取消",ended.length,endedBody,false)}
   `;
 }
