@@ -327,9 +327,21 @@ function renderCourtCallHeaderControls(code){
  const active=np==='granted'&&pushReady;
  const action=active?'court-call-notify-status':'court-call-enable-notify';
  const label=active?'背景通知已啟用':(np==='denied'?'背景通知已封鎖':'啟用背景通知');
- return `<button class="court-call-notify-icon ${active?'is-active':''} ${np==='denied'?'is-blocked':''}" type="button"
+
+ // Default-on policy: browsers do not allow notification permission to be
+ // granted silently. Once the user has granted permission, BXH CALL keeps
+ // Web Push registered automatically; no per-event re-enable is required.
+ if(np==='granted'&&!pushReady&&!courtCallPushBusy){
+  setTimeout(async()=>{
+   const ok=await courtCallEnsurePushRegistration(false);
+   if(ok){try{renderPreservingScroll();}catch{}}
+  },0);
+ }
+
+ return `<button class="court-call-notify-icon ${active?'is-active':'is-off'} ${np==='denied'?'is-blocked':''}" type="button"
    data-action="${action}" data-code="${esc(code||'')}" data-court-call-help-hold="1"
-   aria-label="${esc(label)}；長按 1.5 秒查看叫號說明" title="${esc(label)}">🔔</button>`;
+   aria-pressed="${active?'true':'false'}"
+   aria-label="${esc(label)}；長按 1.5 秒查看叫號說明" title="${esc(label)}"><span class="court-call-notify-bell" aria-hidden="true">🔔</span></button>`;
 }
 
 function renderCourtCallPlayer(code){
@@ -362,7 +374,7 @@ function showCourtCallHelpOverlay(code){
      <p>裁判人工叫號與智慧 ETA 分開運作；人工叫號約每 2–3 秒同步。</p>
      <p>PASS 每人每賽事 1 次，且必須有同台同輪下一場可承接。</p>
      <p>智慧 ETA 以每場 3 分鐘為基準，會依進行中比分動態修正；3 分賽點會縮短估時。</p>
-     <p>通知圖示：輕點可啟用背景／鎖屏通知；長按 1.5 秒可再次開啟本說明。</p>
+     <p>通知圖示：背景通知預設維持開啟；首次仍需由瀏覽器取得通知權限。紅色斜槓代表目前未啟用；輕點可開啟，長按 1.5 秒可再次查看本說明。</p>
    </div>
    ${pushReady?`<button class="btn btn-ghost bxh-call-help-test" data-action="court-call-test-push" data-code="${esc(code||'')}" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`:''}
  </div>`;
