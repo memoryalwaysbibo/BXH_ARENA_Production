@@ -3775,6 +3775,176 @@ body .celebration-overlay{z-index:3000!important;}
 .smart-call-disabled{margin-top:8px;font-size:11px;color:var(--metal-dim)}
 @media(max-width:720px){.smart-call-grid{grid-template-columns:1fr 1fr}.smart-call-stat:last-child{grid-column:1/-1}.smart-call-box{padding:11px}.smart-call-head{align-items:center}}
 
+/* ==== v14.2.8 我的賽程／BXH CALL compact hierarchy ==== */
+.my-schedule-card{
+  padding:15px 15px 13px;
+  border-radius:17px;
+  border-color:rgba(217,185,92,.14);
+  background:linear-gradient(145deg,rgba(217,185,92,.045),rgba(255,255,255,.018) 46%,rgba(8,10,13,.92));
+}
+.my-schedule-head{display:grid;gap:5px}
+.my-schedule-card .fe-name{font-size:17px;line-height:1.25;letter-spacing:.01em}
+.my-schedule-meta{font-size:11.5px;line-height:1.55;color:var(--metal)}
+.my-schedule-code{font-size:10.5px;color:var(--metal-dim);letter-spacing:.02em}
+.my-schedule-entry-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:3px}
+.my-schedule-entry-row .fe-status-chip{flex:0 0 auto}
+.my-schedule-participant{font-size:11.5px;color:var(--metal);min-width:0;overflow-wrap:anywhere}
+.my-schedule-card>.hint{margin:6px 0 0;font-size:11px;line-height:1.45}
+
+.smart-call-box{
+  margin-top:11px;
+  padding:12px;
+  border-radius:15px;
+  border-color:rgba(217,185,92,.24);
+  background:linear-gradient(145deg,rgba(217,185,92,.07),rgba(13,15,18,.92) 48%,rgba(8,10,12,.96));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.smart-call-head{min-height:32px}
+.smart-call-title{font-size:14px;letter-spacing:.02em}
+.smart-call-switch{width:42px;height:23px}
+.smart-call-switch:before{width:17px;height:17px}
+.smart-call-switch:checked:before{transform:translateX(19px)}
+
+.court-call-player-section{margin-top:5px}
+.court-call-compact-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-top:4px;
+  color:var(--metal-dim);
+  font-size:10.5px;
+  line-height:1.45;
+}
+.court-call-help{position:relative;flex:0 0 auto}
+.court-call-help summary{
+  cursor:pointer;
+  list-style:none;
+  color:var(--gold);
+  font-weight:800;
+  white-space:nowrap;
+  padding:3px 0 3px 6px;
+}
+.court-call-help summary::-webkit-details-marker{display:none}
+.court-call-help summary::after{content:" ▾";font-size:9px;opacity:.8}
+.court-call-help[open] summary::after{content:" ▴"}
+.court-call-help>div{
+  margin-top:7px;
+  padding:9px 10px;
+  border-radius:9px;
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(0,0,0,.22);
+  color:var(--metal);
+  font-size:10.5px;
+  line-height:1.55;
+}
+
+.court-call-notify-row{
+  margin-top:9px;
+  padding:8px 9px;
+  border-radius:10px;
+  background:rgba(255,255,255,.025);
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+}
+.court-call-notify-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.court-call-notify-actions:empty{display:none}
+.court-call-notify-row:has(.court-call-notify-actions:empty){grid-template-columns:1fr}
+.court-call-notify-row .btn{
+  min-height:34px;
+  height:34px;
+  padding:0 10px;
+  border-radius:9px;
+  font-size:11px;
+}
+.court-call-notify-state{
+  color:var(--metal-dim);
+  font-size:10.5px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+
+.court-call-active-list{margin-top:8px}
+.smart-call-box .court-call-row{
+  margin:0!important;
+  padding:11px 12px!important;
+  border-radius:11px!important;
+  border:1px solid rgba(217,185,92,.16)!important;
+  background:rgba(255,255,255,.028)!important;
+  box-shadow:none!important;
+}
+.court-call-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.court-call-row-head strong{font-size:15px;line-height:1.2;color:var(--ivory)}
+.court-call-time{font-size:10px;color:var(--metal-dim);white-space:nowrap}
+.smart-call-box .court-call-people{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 0}
+.smart-call-box .court-call-person{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  min-height:29px;
+  padding:4px 8px;
+  border-radius:9px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.045);
+  color:var(--metal);
+  font-size:10.5px;
+}
+.smart-call-box .court-call-person b{color:var(--ivory);font-size:11.5px}
+.smart-call-box .court-call-person.is-replied{
+  background:rgba(61,196,117,.08);
+  border-color:rgba(61,196,117,.18);
+  color:#8fe6b5;
+}
+.smart-call-box .court-call-person.is-waiting{color:var(--metal)}
+.court-call-pass-state,.court-call-pass-hint{margin:8px 0 0;font-size:10.5px;line-height:1.45;color:var(--metal-dim)}
+.court-call-actions-inline{margin-top:9px;gap:7px}
+.court-call-actions-inline .btn{min-height:36px;padding:0 11px;font-size:11px}
+.court-call-empty{margin:7px 0 0;color:var(--metal-dim);font-size:10.5px}
+
+.smart-call-body{margin-top:9px;padding-top:9px}
+.smart-call-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.smart-call-stat{padding:8px 8px;border-radius:9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.035)}
+.smart-call-stat .k{font-size:9.5px;margin-bottom:3px}
+.smart-call-stat .v{font-size:12px;line-height:1.3}
+.smart-call-focus{
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:9px;
+  padding-top:8px;
+  border-top:1px solid rgba(255,255,255,.055);
+  font-size:11.5px;
+  color:var(--metal);
+}
+.smart-call-focus strong{color:var(--gold);font-size:12px}
+.smart-call-opponent{color:#dfe3e9}
+.smart-call-note{margin-top:5px;font-size:9.8px;line-height:1.45}
+
+.my-schedule-actions{
+  margin-top:11px;
+  padding-top:11px;
+  border-top:1px solid rgba(255,255,255,.055);
+}
+.my-schedule-actions > .btn,
+.my-schedule-actions > .fe-status-chip{border-radius:10px}
+
+@media(max-width:520px){
+  .my-schedule-card{padding:13px 12px 12px}
+  .my-schedule-meta{font-size:10.8px}
+  .court-call-compact-summary{align-items:flex-start}
+  .court-call-notify-row{grid-template-columns:1fr}
+  .court-call-notify-actions{width:100%}
+  .court-call-notify-actions .btn{flex:1 1 auto}
+  .smart-call-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .smart-call-stat{padding:7px 6px}
+  .smart-call-stat .v{font-size:11px}
+  .smart-call-box{padding:11px 10px}
+  .smart-call-box .court-call-row{padding:10px!important}
+}
+
 /* ==== v13.27.0 lifecycle / post-match / mobile header ==== */
 .tournament-owner-filter{display:flex;gap:6px;margin-top:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
 .tournament-owner-filter button{flex:0 0 auto;border:1px solid var(--border);background:var(--panel-2);color:var(--metal);border-radius:999px;padding:8px 13px;font-weight:700}
@@ -4431,7 +4601,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.0"></script>
-<script src="court-call-ui.js?v=14.2.2-pass-ux"></script>
+<script src="court-call-ui.js?v=14.2.8-compact-layout"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -4610,9 +4780,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.7";
+const APP_VERSION = "v14.2.8";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.8",date:"2026/09/24",timezone:"Asia/Taipei",title:"我的賽程卡片／BXH CALL 資訊層級重整",updateLevel:"minor",added:["BXH CALL 叫號說明改為可展開收合，完整保留人工叫號、智慧 ETA、PASS 與估時規則","叫號主卡新增精簡的 Court／輪次／叫號時間標題列與玩家回覆膠囊"],changed:["我的賽程基本資料改為緊湊資訊頭：賽事名稱、日期時間地點、賽事代碼、正備取與參賽者集中排列","背景通知與鎖屏推播控制改成獨立精簡列，保留通知狀態與測試推播功能","智慧叫號狀態／戰鬥台／預估等待固定三欄扁平資訊卡；對戰提示與 ETA 說明降階處理","底部查看詳情／樹狀圖／報名鎖定操作列維持等寬等高規格"],fixed:["降低我的賽程卡片多層框線與重複文字造成的垂直高度與視覺負擔","改善 BXH CALL 開關、通知列、Court 卡與 ETA 區塊的主次層級"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact schedule / BXH CALL layout",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無；所有既有叫號、PASS、背景通知、推播測試、賽程操作功能完整保留",publicSummary:"我的賽程與 BXH CALL 改成更精簡的資訊層級；功能完整保留，但主畫面更短、更容易看懂現在是否該上場。"},
   {version:"v14.2.7",date:"2026/09/24",timezone:"Asia/Taipei",title:"我的賽程操作列規格統一／智慧叫號預設開啟",updateLevel:"patch",added:[],changed:["我的賽程卡片底部操作列改為等寬、等高、相同圓角規格；查看詳情、查看樹狀圖與報名鎖定狀態維持各自語意配色","BXH CALL 智慧叫號改為每場預設開啟；僅在玩家明確關閉該場叫號時保存關閉偏好"],fixed:["修正我的賽程底部按鈕與狀態標籤尺寸不一致造成的視覺失衡","避免玩家加入進行中賽事後因未手動開啟智慧叫號而漏看 ETA 提醒"],environment:"Production / HTML + Firebase",deployStatus:"Frontend schedule action sizing + smart call default",firebaseImpact:"無資料結構變更；智慧叫號偏好仍使用本機 localStorage",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"我的賽程底部操作列統一尺寸；BXH CALL 智慧叫號預設開啟，玩家仍可自行關閉。"},
   {version:"v14.2.6",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳狀態優先順序調整",updateLevel:"patch",added:[],changed:["賽事大廳分類顯示順序調整為：比賽中 → 報名中 → 等待開始 → 結算中 → 已結束／已取消","僅調整分類呈現優先順序，不改變既有賽事狀態判定、資料分類與即時同步機制"],fixed:["讓玩家先看到正在進行與可立即報名的賽事，再看到等待開始與結算中的房間，降低操作優先級錯置"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby status priority",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳排序改為比賽中、報名中、等待開始、結算中、已結束／已取消。"},
   {version:"v14.2.5",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳工具列極簡化",updateLevel:"patch",added:[],changed:["賽事大廳移除常駐大型搜尋框、搜尋按鈕、篩選按鈕與說明副標","頁首改為賽事大廳＋小型搜尋／篩選入口＋小型刷新鍵","搜尋與日期／地區／賽制篩選保留原功能，僅在需要時展開；套用或清除後自動收合","手動刷新改為圖示按鈕並保留即時同步作為主要更新機制"],fixed:["大幅降低賽事大廳首屏工具區高度，讓比賽中／結算中等分類更快進入手機畫面"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby compact toolbar",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳改為極簡工具列；搜尋篩選按需展開，刷新縮成小圖示。"},
@@ -16987,8 +17158,12 @@ function smartCallMaybeNotify(code,model){
 function smartCallCardHtml(r,info){
   const on=smartCallEnabled(r.tournamentCode); const model=smartCallModel(r,info); if(on) smartCallMaybeNotify(r.tournamentCode,model);
   const statusText = model.kind==="playing" ? "⚔️ 正在上場" : model.kind==="soon" ? "🔴 即將上場" : model.kind==="prepare" ? "🟡 準備" : model.kind==="done" ? "已完成" : "🟢 等待中";
+  const focusText=model.kind==="playing"?"你的對戰進行中":(model.message||"等待賽事狀態更新");
   return `<div class="smart-call-box">
-    <div class="smart-call-head"><div class="smart-call-title">🔔 BXH CALL｜智慧叫號</div><input class="smart-call-switch" type="checkbox" data-action="toggle-smart-call" data-code="${esc(r.tournamentCode)}" ${on?'checked':''} aria-label="智慧叫號"></div>
+    <div class="smart-call-head">
+      <div class="smart-call-title">🔔 BXH CALL｜智慧叫號</div>
+      <input class="smart-call-switch" type="checkbox" data-action="toggle-smart-call" data-code="${esc(r.tournamentCode)}" ${on?'checked':''} aria-label="智慧叫號">
+    </div>
     ${renderCourtCallPlayer(r.tournamentCode)}
     ${on?`<div class="smart-call-body">
       <div class="smart-call-grid">
@@ -16996,9 +17171,12 @@ function smartCallCardHtml(r,info){
         <div class="smart-call-stat"><div class="k">戰鬥台</div><div class="v">${model.station?`Court ${esc(String(model.station))}`:"—"}</div></div>
         <div class="smart-call-stat"><div class="k">預估等待</div><div class="v">${esc(smartCallEtaText(model.etaSec))}</div></div>
       </div>
-      <div class="smart-call-status"><strong>${esc(model.message||"")}</strong>${model.opponent?`　｜　VS ${esc(model.opponent)}`:""}</div>
-      <div class="smart-call-note">ETA 目前以每場 3 分鐘為基準，並依進行中比分動態修正；3 分賽點會縮短估時。此階段為頁面開啟時提醒，背景推播將於後續 PWA 階段導入。</div>
-    </div>`:`<details class="smart-call-disabled"><summary>叫號說明</summary>開啟後顯示倒數場數與預估上場時間，在前方剩 3 場及 1 場提醒；需保持頁面開啟。</details>`}
+      <div class="smart-call-focus">
+        <strong>${esc(focusText)}</strong>
+        ${model.opponent?`<span class="smart-call-opponent">VS ${esc(model.opponent)}</span>`:""}
+      </div>
+      <div class="smart-call-note">ETA 以每場 3 分鐘估算，會依比分動態修正。</div>
+    </div>`:`<details class="smart-call-disabled"><summary>智慧 ETA 已關閉</summary>人工裁判叫號仍會正常運作；重新開啟後會恢復倒數場數與預估上場時間提醒。</details>`}
   </div>`;
 }
 function scheduleSmartCallAutoRefresh(){
@@ -17045,12 +17223,16 @@ function renderPlayerRegisteredTab(){
     ].filter(Boolean);
     const bracketData=info.parsedData||null;
     const bracketReady=!!(bracketData && (Number(bracketData.bracketSize)>0 || (Array.isArray(bracketData.matches)&&bracketData.matches.length>0)));
-    return `<div class="find-event-card">
-      <div class="fe-name">${esc(info.name||r.tournamentCode)}</div>
-      <div class="fe-meta">${esc(metaParts.length ? metaParts.join("　｜　") : "活動資訊待公布")}</div>
-      <div class="fe-meta" style="margin-top:4px;color:var(--metal-dim);">賽事代碼 ${esc(r.tournamentCode)}</div>
-      <div class="fe-status-row"><span class="fe-status-chip status-${r.status}">${esc(statusLabel)}</span></div>
-      <p class="hint">參賽者：${esc(r.displayName||r.realName||"本人")}${r.familyPlayerId?"（孩子，由家長代報名）":""}</p>
+    return `<div class="find-event-card my-schedule-card">
+      <div class="my-schedule-head">
+        <div class="fe-name">${esc(info.name||r.tournamentCode)}</div>
+        <div class="my-schedule-meta">${esc(metaParts.length ? metaParts.join("　｜　") : "活動資訊待公布")}</div>
+        <div class="my-schedule-code">賽事代碼 ${esc(r.tournamentCode)}</div>
+        <div class="my-schedule-entry-row">
+          <span class="fe-status-chip status-${r.status}">${esc(statusLabel)}</span>
+          <span class="my-schedule-participant">參賽者：${esc(r.displayName||r.realName||"本人")}${r.familyPlayerId?"（孩子，由家長代報名）":""}</span>
+        </div>
+      </div>
       ${r.status==='confirmed'&&info.checkInAt?`<p class="hint"><b>現場報到尚待完成：</b>請於 ${esc(info.checkInAt)} 向工作人員繳費並完成報到。</p>`:''}
       ${r.status==='confirmed' && schedulePhase(info)==='live' && smartCallModel(r,info).kind!=='done' ? smartCallCardHtml(r,info) : (schedulePhase(info)==='live'&&smartCallModel(r,info).kind==='done'?'<p class="hint">本次參賽已結束｜賽事進行中，名次待結算</p>':'')}
       <div class="fe-card-action my-schedule-actions">
