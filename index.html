@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.13">
+<meta name="bxh-build" content="20260924.14">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.13";
+  var CURRENT_BUILD="20260924.14";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3394,6 +3394,33 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .ref-station-status.waiting{color:#b9bec6}.ref-station-status.ready{color:#f5d85f;border-color:rgba(245,216,95,.45)}.ref-station-status.live{color:#ff6b79;border-color:rgba(255,85,104,.52);box-shadow:0 0 12px rgba(255,85,104,.18)}.ref-station-status.paused{color:#ffb268;border-color:rgba(255,178,104,.42)}.ref-station-status.done{color:#7cebb8;border-color:rgba(124,235,184,.38)}
 @media(max-width:720px){.ref-workstation-identity{min-width:0}.ref-workstation-identity div{min-width:0}.ref-workstation-identity b{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ref-workstation-meta{flex:0 0 auto}}
 
+/* ==== v14.2.3 compact live summary ==== */
+.live-summary-panel{padding:14px 16px!important;overflow:hidden}
+.live-summary-head{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.live-summary-panel .status-pill{margin:0!important;padding:4px 8px!important;min-height:0!important;font-size:10px!important;line-height:1.15!important}
+.live-summary-progress{flex:0 0 auto;color:var(--neon);font-family:var(--font-d);font-size:22px;font-weight:900;line-height:1;white-space:nowrap}
+.live-summary-title-row{display:flex;align-items:center;gap:8px;min-width:0;margin-top:7px}
+.live-summary-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--white);font-family:var(--font-d);font-size:20px;font-weight:900;line-height:1.2}
+.live-summary-share{flex:0 0 32px!important;width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;border-radius:50%!important}
+.live-summary-share svg{width:15px!important;height:15px!important}
+.live-summary-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
+.live-summary-stat{min-width:0;padding:8px 10px;border:1px solid rgba(255,255,255,.055);border-radius:9px;background:rgba(255,255,255,.025)}
+.live-summary-stat b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--white);font-family:var(--font-d);font-size:16px;font-weight:850;line-height:1.2}
+.live-summary-stat small{display:block;margin-top:2px;color:var(--metal-dim);font-size:9.5px;line-height:1.25}
+.live-summary-meta{margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--metal-dim);font-size:9.5px;line-height:1.3}
+@media(max-width:600px){
+  .live-summary-panel{padding:11px 12px!important}
+  .live-summary-progress{font-size:19px}
+  .live-summary-title-row{margin-top:5px}
+  .live-summary-name{font-size:18px}
+  .live-summary-share{flex-basis:30px!important;width:30px!important;height:30px!important;min-height:30px!important}
+  .live-summary-stats{gap:6px;margin-top:8px}
+  .live-summary-stat{padding:7px 8px}
+  .live-summary-stat b{font-size:15px}
+  .live-summary-stat small{font-size:9px}
+  .live-summary-meta{margin-top:5px;font-size:9px}
+}
+
 /* ==== v13.28.6 court-scoped live view / unclipped referee desktop ==== */
 .live-court-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .live-court-grid-1{grid-template-columns:minmax(0,760px);justify-content:center}
@@ -4435,9 +4462,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.2";
+const APP_VERSION = "v14.2.3";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.3",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況概況卡極簡化",updateLevel:"patch",added:[],changed:["即時戰況原 7 格大型活動資訊 Dashboard 改為單張 Compact Live Summary","移除活動日期與重複的預計總場次／已完成場次獨立卡片；場次改合併為完成／總場次","完成率改為右上角輔助數字，正式參賽人數改為單一核心統計","活動地點與戰鬥台數量降為底部小字，分享按鈕同步縮小"],fixed:["降低即時戰況頁非必要資訊佔用，讓目前 Court 與即時排名更快進入手機首屏"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact live summary experiment",firebaseImpact:"無資料結構變更；沿用既有 eligiblePlayers 與 match 統計來源",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況概況區縮成單張薄卡，保留狀態、賽名、完成進度、正式參賽與完成率。"},
   {version:"v14.2.2",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0｜PASS 可用性提示優化",updateLevel:"patch",added:["叫號資料新增 PASS 可用性判定，玩家在操作前即可知道是否有同台同輪下一場可承接","PASS 不可用時顯示明確原因，不再讓玩家按下後才看到失敗"],changed:["叫號彈窗與我的賽程固定保留 PASS 按鈕；不可用時改為灰階停用並標示「後方無場次／非目前場次／已使用」","PASS 說明補充必須存在同台同輪下一場可承接"],fixed:["修正 2 人單場或同輪最後一場仍看似可按 PASS、造成操作像卡住的體驗"],environment:"Production / HTML + Firebase",deployStatus:"Frontend PASS availability UX + server-authoritative availability",firebaseImpact:"courtCallService list response 新增 passUnavailableReason；無新增集合",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"PASS 現在會在操作前直接判定是否可延後；後方無場次時按鈕會停用並說明原因。"},
   {version:"v14.2.1",date:"2026/09/24",timezone:"Asia/Taipei",title:"公開賽事詳情手機版精簡／報名成功快速返回",updateLevel:"patch",added:["報名成功卡新增「返回賽事列表」快捷鍵，不必再滑回頁面頂端","賽事詳情時間改為 MM/DD HH:mm 精簡格式，移除秒數與重複年份"],changed:["手機版賽事詳情品牌區、資訊面板、欄位卡片與間距全面縮減，提高首屏資訊密度","報名成功區操作改為返回／取消並列，窄螢幕自動改為單欄"],fixed:["避免正取名額與日期資訊因字串過長產生不必要的多行換行與超高卡片"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact tournament detail UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"公開賽事詳情手機版改得更緊湊；報名成功後可直接返回賽事列表。"},
   {version:"v14.2.0",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0 Phase B2｜鎖屏／離開 ARENA Web Push",updateLevel:"minor",added:["新增 Firebase Messaging Service Worker，ARENA 切到 LINE／IG、背景分頁或關閉視窗後仍可接收人工叫號推播","新增裝置 Push 註冊與伺服器 Token Registry；同一裝置換帳號時會轉移 Token 所有權，避免舊帳號持續收到通知","iPhone 會辨識主畫面安裝狀態；未加入主畫面時提示先安裝再啟用鎖屏推播","新增「測試鎖屏推播」：按下後約 4 秒發送本人測試通知，方便直接驗證背景／鎖屏是否正常"],changed:["通知點擊會優先喚醒既有 ARENA 視窗並立即刷新 BXH CALL 狀態","Push 發送改在叫號交易成功後執行；推播失敗不會回滾比賽或 PASS 操作","Service Worker 自訂 notificationclick 於 Firebase Messaging 載入前註冊，避免 SDK 覆蓋點擊行為","Production Web Push 已改用 Firebase 專案專屬公開 VAPID key 取得 FCM Token"],fixed:["修正 Phase B2 callable 串接曾出現字面 \\n 造成 module 語法錯誤的候選版問題","修正 Push Token 可能跨帳號殘留的所有權邊界"],environment:"Production candidate / HTML + Firebase Messaging",deployStatus:"Backend live-verified; Production public VAPID key configured; frontend pending final RC + real-device verification",firebaseImpact:"新增 users/{uid}/courtCallPushTokens、users/{uid}/courtCallPushMeta（server-only）與 courtCallPushTokenOwners 所有權索引；新增 courtCallPushService callable",securityRulesImpact:"無前端直寫權限；Token 註冊與推播皆經 callable / Admin SDK",permissionImpact:"通知僅送給該場雙方選手與對應裁判／賽事負責人",publicSummary:"BXH CALL 進入 Phase B2：裁判叫號可透過 Web Push 送到背景與鎖屏；點通知會回到 ARENA 並同步目前場次。"},
@@ -11714,20 +11742,24 @@ function renderLive(){
   const spectatorNotice=spectatorSettling
     ? '<div class="banner warn"><span>所有對戰已完成，主辦正在處理最終結算；目前排名為暫定資訊，正式名次確認後會出現在「查看最終結果」。</span></div>'
     : "";
+  const liveMetaParts=[];
+  if(state.meta.location && state.meta.location!=="未設定") liveMetaParts.push(esc(state.meta.location));
+  liveMetaParts.push(stationCount+" 台");
   const liveInfoHtml=`
-  <div class="panel">
-    ${eventTitleBar(statusBadge())}
-    <div class="grid grid-4">
-      <div class="stat-box"><div class="label">活動日期</div><div class="value small">${esc(state.meta.date||"未設定")}</div></div>
-      <div class="stat-box"><div class="label">活動地點</div><div class="value small">${esc(state.meta.location||"未設定")}</div></div>
-      <div class="stat-box"><div class="label">${state.meta.checkinRequired ? "已報到／正式參賽人數" : "本場免報到／正式參賽人數"}</div><div class="value">${state.meta.checkinRequired ? officialCount+"／" : ""}${officialCount}</div></div>
-      <div class="stat-box"><div class="label">賽事完成率</div><div class="value">${pct}%</div></div>
+  <div class="panel live-summary-panel">
+    <div class="live-summary-head">
+      <div>${statusBadge()}</div>
+      <div class="live-summary-progress">${pct}%</div>
     </div>
-    <div class="grid grid-3" style="margin-top:12px;">
-      <div class="stat-box"><div class="label">預計總場次</div><div class="value small">${predictedTotal}</div></div>
-      <div class="stat-box"><div class="label">已完成場次</div><div class="value small">${doneCount}</div></div>
-      <div class="stat-box"><div class="label">戰鬥台數量</div><div class="value small">${state.meta.stations}</div></div>
+    <div class="live-summary-title-row">
+      <div class="live-summary-name" title="${esc(state.meta.name||"未命名賽事")}">${esc(state.meta.name||"未命名賽事")}</div>
+      <button class="share-btn live-summary-share" data-action="open-share-modal" title="分享賽事" aria-label="分享賽事">${SHARE_ICON_SVG}</button>
     </div>
+    <div class="live-summary-stats">
+      <div class="live-summary-stat"><b>${doneCount} / ${predictedTotal} 場</b><small>場次進度</small></div>
+      <div class="live-summary-stat"><b>${officialCount} 人</b><small>正式參賽</small></div>
+    </div>
+    <div class="live-summary-meta">${liveMetaParts.join(" · ")}</div>
     ${publicWatchReturnContext?"":renderArchiveControls()}
   </div>`;
   const liveCourtsPanelHtml=`  <div class="panel">
