@@ -54,10 +54,13 @@ function renderInventoryPage(){
  ${c.results.map(u=>`<button class="btn btn-ghost inventory-recipient" data-action="inventory-select" data-uid="${esc(u.uid)}" ${lock?'disabled':''}>${esc(titleRecipientLabel(u))}</button>`).join('')}
  <p role="status" id="inventory-selected">${recipient?'已選擇：'+esc(titleRecipientLabel(recipient)):'尚未選擇玩家'}</p>
  <div class="grid grid-2 inventory-grid">${input('itemCode','道具代碼','maxlength="48" placeholder="例如：member-raffle-ticket"')}${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${input('imageUrl','圖片網址（選填）','type="url" maxlength="2048" placeholder="https://…"')}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
- <button class="btn btn-primary" data-action="inventory-grant" ${c.busy?'disabled':''}>${c.busy?'處理中……':c.pending?'確認原發放結果':'確認發放'}</button></section>`:''}</section>`;
+ <button class="btn btn-primary" data-action="inventory-grant" ${c.busy?'disabled':''}>${c.busy?'處理中……':c.pending?'確認原發放結果':'確認發放'}</button></section>`:''}
+ ${isSuperAdmin()&&typeof window.renderRewardRulesAdmin==='function'?window.renderRewardRulesAdmin():''}</section>`;
 }
 async function handleInventory(action,target){
- const c=inventoryContext();if(!currentAuthUid()||c.busy||c.loading)return;
+ if(!currentAuthUid())return;
+ if(action&&action.startsWith('inventory-rule-')&&typeof window.handleRewardRulesAdmin==='function'){await window.handleRewardRulesAdmin(action,target);return;}
+ const c=inventoryContext();if(c.busy||c.loading)return;
  if(action==='inventory-refresh'){c.selectedId='';await loadInventory();return;}
  if(action==='inventory-more'){if(c.nextCursor)await loadInventory(true);return;}
  if(action==='inventory-history'||action==='inventory-history-more'){
@@ -114,3 +117,13 @@ function inventoryCaptureInput(e){
 }
 document.addEventListener('input',inventoryCaptureInput);
 document.addEventListener('change',inventoryCaptureInput);
+
+(function loadRewardRulesAdminUi(){
+ if(document.querySelector('script[data-reward-rules-ui]'))return;
+ const script=document.createElement('script');
+ script.src='reward-rules-ui.js?v=20260925-p2-4';
+ script.async=true;
+ script.dataset.rewardRulesUi='1';
+ script.onload=()=>{try{render();}catch{}};
+ document.head.appendChild(script);
+})();
