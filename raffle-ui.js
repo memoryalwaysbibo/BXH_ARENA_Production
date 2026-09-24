@@ -75,7 +75,7 @@ function raffleNewDraft(){const now=Date.now();return {title:'',description:'',s
 function raffleContext(){
  const key=currentAuthUid()+':'+engagementSessionEpoch+':'+(isRaffleManagementView()?'manage':'player');
  if(!raffleState||raffleState.key!==key){let pending=null;try{pending=JSON.parse(sessionStorage.getItem(rafflePendingKey())||'null');if(!isRaffleManagementView()&&pending?.action!=='join')pending=null;}catch{}
-  raffleState={key,id:'',events:null,nextCursor:null,detail:null,loading:false,busy:false,error:'',view:'list',canCreate:false,editing:false,draft:raffleNewDraft(),draftId:null,revision:null,pending,participants:[],participantCursor:null,participantsLoaded:false};
+  raffleState={key,id:'',events:null,nextCursor:null,detail:null,loading:false,busy:false,error:'',view:'list',canCreate:false,editing:false,draft:raffleNewDraft(),draftId:null,revision:null,pending,participants:[],participantCursor:null,participantsLoaded:false,publicParticipants:[],publicParticipantCursor:null,publicParticipantsLoaded:false,publicParticipantsOpen:false};
  }return raffleState;
 }
 function raffleIntent(){try{const id=sessionStorage.getItem('bxh.raffle.return')||new URLSearchParams(location.search).get('raffle');return /^[a-f0-9]{64}$/.test(id||'')?id:'';}catch{return '';}}
@@ -149,6 +149,7 @@ function renderRafflePage(){
  return `<section class="panel raffle-page ${management?'raffle-page-management':'raffle-page-public'}">${header}${c.error?`<div class="raffle-status-note is-warning" role="alert"><span>狀態尚未同步</span><p>${esc(c.error)}</p><button class="btn btn-ghost btn-sm" data-action="raffle-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>`:''}${c.pending?`<div class="raffle-status-note"><span>有一筆操作等待確認</span><button class="btn btn-primary btn-sm" data-action="raffle-retry-pending" ${c.busy?'disabled':''}>重試原操作</button></div>`:''}${c.loading?'<div class="raffle-loading-state" role="status"><span class="raffle-loading-dot"></span>正在載入活動…</div>':''}
  ${management&&c.editing?renderRaffleEditor(c):e?`<article>${raffleShareUrl(e)?'<button class="btn btn-ghost" data-action="raffle-share">分享活動／QR</button>':''}<h2>${e.testMode?'（TEST）':''}${esc(e.title)}</h2><p class="hint">${esc(raffleStateLabels[e.state])}${e.delayed?'｜處理延遲，系統正在重試':''}｜${e.mode==='auto'?'線上自動開獎':'現場手動開獎'}</p><div class="mailbox-body">${esc(e.description)}</div><p>報名：${esc(mailboxDate(e.startAt))} ～ ${esc(mailboxDate(e.endAt))}<br>開獎：${esc(mailboxDate(e.drawAt))}（台灣時間）<br>領獎期限：${esc(mailboxDate(e.claimUntil))}</p><p class="hint">${participationRules.length?(e.combination==='all'?'參加條件全部符合：':'參加條件符合任一項：')+participationRules.map(r=>raffleRuleLabel(r,e.mode)).map(esc).join('；'):'有效會員完成參加即可進入抽獎名單'}${e.checkedInOnly?'；只抽主辦已標記報到者':''}${winnerReviewRules.length?'<br>中獎後複核：'+winnerReviewRules.map(r=>esc(r.note)).join('；'):''}${e.passwordProtected?'<br>🔒 本活動需輸入參加密碼':''}</p><div class="grid grid-2 inventory-grid">${e.prizes.map(p=>`<div class="panel inventory-card">${inventoryImage(p.imageUrl)?`<img class="inventory-image" src="${esc(p.imageUrl)}" alt="${esc(p.name)}" referrerpolicy="no-referrer">`:''}<span>${esc(p.name)} × ${p.quantity}</span></div>`).join('')}</div>
  <p>我的狀態：${esc(d.myEntry?({joined:'已參加',pending_review:'待主辦審核',rejected:'審核未通過',cancelled:'已取消'})[d.myEntry.status]||d.myEntry.status:currentAuthUid()?'尚未參加':'尚未登入')}${d.myEntry?.award?'｜'+esc(d.myEntry.award.prizeName)+'：'+esc(({qualification_pending:'待資格確認',pending:'已中獎／待領獎',claimed:'已領獎',forfeited:'已棄領',replaced:'已補抽',ineligible:'資格不符'})[d.myEntry.award.status]||''):''}${d.myEntry?.refundedAt?'｜退票處理完成':''}</p>
+ ${!management?`<section class="panel"><div class="panel-title">🎟️ 參加名單</div><p><b>目前已參加 ${Number(e.entryCount)||0} 人</b></p>${currentAuthUid()?`<button class="btn btn-ghost btn-sm" data-action="raffle-public-participants">${c.publicParticipantsOpen?'收起參加名單':'查看參加名單'}</button>`:'<p class="hint">登入後可查看參加名單。</p>'}${c.publicParticipantsOpen?`<div style="margin-top:12px">${c.publicParticipantsLoaded?(c.publicParticipants.length?c.publicParticipants.map(p=>p.isSelf?`<div class="panel"><b>⭐ ${esc(p.nickname)}（${esc(p.playerId)}）｜你</b></div>`:`<div class="panel">${esc(p.nickname)}（${esc(p.playerId)}）</div>`).join(''):'<p class="hint">目前尚無參加者。</p>'):'<p class="hint">正在載入參加名單…</p>'}${c.publicParticipantCursor?'<button class="btn btn-ghost btn-sm" data-action="raffle-public-participants-more">載入更多</button>':''}</div>`:''}</section>`:''}
  ${d.myEntry?.award?.status==='pending'?'<button class="btn btn-primary" data-action="raffle-claim-code">出示我的領獎碼</button>':''}
  ${d.myEntry?.award?.claimedAt?'<p>核銷時間：'+esc(mailboxDate(d.myEntry.award.claimedAt))+'（台灣時間）</p>':''}
  ${!management&&e.state==='open'&&d.myEntry?.status!=='joined'?(currentAuthUid()?(e.passwordProtected?`<div class="panel"><div class="panel-title">🔒 參加密碼</div><div class="field"><label>輸入活動密碼</label><input type="password" maxlength="64" autocomplete="off" data-raffle-join-password placeholder="請輸入主辦提供的密碼"></div><button class="btn btn-primary" data-action="raffle-join" ${locked?'disabled':''}>解鎖並參加抽獎</button></div>`:`<button class="btn btn-primary" data-action="raffle-join" ${locked?'disabled':''}>參加活動</button>`):`<button class="btn btn-primary" data-action="raffle-login" ${locked?'disabled':''}>登入／註冊後參加</button>`):''}
@@ -157,13 +158,13 @@ function renderRafflePage(){
 }
 async function raffleMutate(payload){
  const c=raffleContext();if(c.busy)return;if((c.pending||payload)?.action!=='join'&&!isRaffleManagementView())return;const storageKey=rafflePendingKey();c.error='';
- try{if(!c.pending){const sensitive=!!(payload?.password||payload?.config?.joinPassword);if(!sensitive){try{sessionStorage.setItem(storageKey,JSON.stringify(payload));}catch{throw Error('storage-unavailable');}}c.pending=payload;}c.busy=true;render();const r=await window.engagementService.raffle(c.pending);if(c!==raffleContext())return;if(!r?.ok)throw Error('operation-failed');const action=c.pending.action;if(r.id)c.id=r.id;c.pending=null;try{sessionStorage.removeItem(storageKey);}catch{}c.busy=false;c.editing=false;c.detail=null;c.events=null;c.participants=[];c.participantCursor=null;await loadRaffles();if(['join','approve','cancel'].includes(action)){inventoryState=null;}if(action==='draw'||action==='retry')await loadMailbox(true);}
+ try{if(!c.pending){const sensitive=!!(payload?.password||payload?.config?.joinPassword);if(!sensitive){try{sessionStorage.setItem(storageKey,JSON.stringify(payload));}catch{throw Error('storage-unavailable');}}c.pending=payload;}c.busy=true;render();const r=await window.engagementService.raffle(c.pending);if(c!==raffleContext())return;if(!r?.ok)throw Error('operation-failed');const action=c.pending.action;if(r.id)c.id=r.id;c.pending=null;try{sessionStorage.removeItem(storageKey);}catch{}c.busy=false;c.editing=false;c.detail=null;c.events=null;c.participants=[];c.participantCursor=null;c.publicParticipants=[];c.publicParticipantCursor=null;c.publicParticipantsLoaded=false;c.publicParticipantsOpen=false;await loadRaffles();if(['join','approve','cancel'].includes(action)){inventoryState=null;}if(action==='draw'||action==='retry')await loadMailbox(true);}
  catch(e){if(c===raffleContext()){c.error=raffleError(e);if(e.code==='functions/failed-precondition'&&!String(e.message).includes('operation-conflict')){c.pending=null;try{sessionStorage.removeItem(storageKey);}catch{}}}}
  finally{if(c===raffleContext()){c.busy=false;render();}}
 }
 async function handleRaffle(action,target){
  const c=raffleContext();if(c.busy)return;
- const memberActions=['raffle-claim-code','raffle-share','raffle-play','raffle-login','raffle-public','raffle-home','raffle-list','raffle-mine','raffle-open','raffle-refresh','raffle-more','raffle-join','raffle-retry-pending'];
+ const memberActions=['raffle-claim-code','raffle-share','raffle-play','raffle-login','raffle-public','raffle-home','raffle-list','raffle-mine','raffle-open','raffle-refresh','raffle-more','raffle-join','raffle-retry-pending','raffle-public-participants','raffle-public-participants-more'];
  if(!isRaffleManagementView()&&!memberActions.includes(action))return;
  if(c.loading&&!['raffle-home','raffle-login','raffle-play'].includes(action))return;
  if(action==='raffle-claim-code'){window.bxhRaffleClaims.showCode(c.detail);return;}
@@ -176,9 +177,26 @@ async function handleRaffle(action,target){
  if(action==='raffle-public'){appPhase='raffle-public';c.id='';render();return;}
  if(action==='raffle-home'){appPhase=currentAuthUid()?'player-center':'landing';if(currentAuthUid())playerActiveTab='home';raffleLinkConsumed=true;render();return;}
  if(action==='raffle-list'||action==='raffle-mine'){c.id='';c.detail=null;c.editing=false;c.view=action==='raffle-mine'?'mine':'list';c.events=null;await loadRaffles();return;}
- if(action==='raffle-open'){c.id=target.getAttribute('data-id');c.detail=null;c.editing=false;c.participants=[];c.participantCursor=null;await loadRaffles();return;}
+ if(action==='raffle-open'){c.id=target.getAttribute('data-id');c.detail=null;c.editing=false;c.participants=[];c.participantCursor=null;c.publicParticipants=[];c.publicParticipantCursor=null;c.publicParticipantsLoaded=false;c.publicParticipantsOpen=false;await loadRaffles();return;}
  if(action==='raffle-refresh'){if(c.id)c.detail=null;else c.events=null;await loadRaffles();return;}
  if(action==='raffle-more'){await loadRaffles(true);return;}
+ if(action==='raffle-public-participants'||action==='raffle-public-participants-more'){
+  if(!currentAuthUid())return;
+  const more=action.endsWith('-more');
+  if(!more&&c.publicParticipantsLoaded&&c.publicParticipantsOpen){c.publicParticipantsOpen=false;render();return;}
+  c.publicParticipantsOpen=true;c.busy=true;render();
+  try{
+   const r=await window.engagementService.raffle({action:'participantList',id:c.id,cursor:more?c.publicParticipantCursor:null});
+   if(c!==raffleContext())return;if(!r?.ok)throw Error('load-failed');
+   const merged=more?[...(c.publicParticipants||[]),...(r.participants||[])]:[...(r.participants||[])],map=new Map();
+   for(const p of merged){const key=String(p.playerId||'')+'|'+String(p.nickname||'');if(!map.has(key)||p.isSelf)map.set(key,p);}
+   c.publicParticipants=[...map.values()].sort((a,b)=>(b.isSelf?1:0)-(a.isSelf?1:0)||String(a.nickname||'').localeCompare(String(b.nickname||''),'zh-Hant'));
+   c.publicParticipantCursor=r.nextCursor||null;c.publicParticipantsLoaded=true;
+   if(c.detail?.event&&Number.isFinite(Number(r.participantCount)))c.detail.event.entryCount=Number(r.participantCount);
+  }catch(e){if(c===raffleContext())c.error=raffleError(e);}
+  finally{if(c===raffleContext()){c.busy=false;render();}}
+  return;
+ }
  if(action==='raffle-new'){if(!c.canCreate)return;c.draft=raffleNewDraft();c.draftId=null;c.revision=null;c.editing=true;render();return;}
  if(action==='raffle-edit'){if(!c.detail?.isManager)return;const e=c.detail.event;c.draft=JSON.parse(JSON.stringify(e));c.draft.joinPassword='';for(const k of ['startAt','endAt','drawAt','claimUntil'])c.draft[k]=raffleDateInput(e[k]);c.draftId=e.id;c.revision=e.revision;c.editing=true;render();return;}
  if(action==='raffle-editor-close'){c.editing=false;render();return;}
