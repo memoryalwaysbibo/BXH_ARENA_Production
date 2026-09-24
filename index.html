@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.32">
+<meta name="bxh-build" content="20260925.33">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.32";
+  var CURRENT_BUILD="20260925.33";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5689,9 +5689,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.21";
+const APP_VERSION = "v14.2.22";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.22",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11B BXH 賽事公版 CMS",updateLevel:"minor",added:["賽事設定新增「套用 BXH 賽事公版」勾選，官方新房間預設勾選","公版包含比賽規則、注意事項、BXH 賽事／法律定位，並保存每場賽事的版本快照","最高管理員可直接在 ARENA 編輯並發布新版公版；一般管理員只能套用／取消套用","公開賽事詳情新增公版版本與三個可展開內容區塊"],changed:["公版更新不會回寫已發布賽事；歷史房間固定使用當時 snapshot","公開鏡像只輸出 eventInfo.standardTemplate 的安全白名單，不公開 AI source 或其他私人 Event Info V2 欄位"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend + eventTemplateService",firebaseImpact:"新增 server-managed systemSettings/bxhEventTemplate 與 eventTemplateAudit；房間私有 state 保存 standardTemplate snapshot",securityRulesImpact:"無；公版寫入僅透過 Admin SDK Callable",permissionImpact:"super_admin 可修改公版；admin 僅能選擇是否套用",publicSummary:"BXH 賽事可直接套用統一公版；公版本體只有最高管理員能修改，每場活動會保留當時版本。"},
   {version:"v14.2.21",date:"2026/09/24",timezone:"Asia/Taipei",title:"P7.11A Event Info V2 底層骨架",updateLevel:"patch",added:["新增 bxh.event-info.v2 結構化賽事資訊影子模型：basic／schedule／venue／registration／prizes／content／standardTemplate／source","新增 Legacy Adapter，可將既有 state.meta 安全同步至 Event Info V2，並預留 V2 回寫既有 meta 的顯式轉接器"],changed:["現階段 legacy state.meta 仍為唯一執行期權威；Event Info V2 僅在儲存快照前同步，不改變既有比賽、報名、裁判、天梯與玩家顯示流程","既有 location 可保守拆分店家與地址；新模型已預留 Google Maps URL、導航開關、公版版本快照、獎品與 AI 來源"],fixed:[],environment:"Production / Compatibility Layer",deployStatus:"P7.11A shadow model only",firebaseImpact:"私有賽事 JSON state 新增 eventInfo；無新增 Firestore collection、無公開欄位變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"ARENA 已建立新的結構化賽事資訊底座；目前畫面與比賽流程維持不變。"},
   {version:"v14.2.20",date:"2026/09/24",timezone:"Asia/Taipei",title:"AI 開房原文案自動帶入活動說明",updateLevel:"patch",added:["AI 套用賽事草稿時，若「活動說明（選填）」原本為空白，自動帶入房主貼給 AI 的完整原始活動文案","AI 套用預覽新增活動說明來源提示與原文案字數"],changed:["保留原始文案的換行、Emoji、規則與補充資訊，避免 AI 結構化後活動說明呈現空白","若房主已手動填寫活動說明，AI 不覆蓋既有內容"],fixed:[],environment:"Production / Restricted Beta",deployStatus:"Frontend AI Create draft mapping patch",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"AI 開房除了拆解欄位，也會把原始活動文案保留在活動說明；既有手動內容不會被覆蓋。"},
   {version:"v14.2.19",date:"2026/09/24",timezone:"Asia/Taipei",title:"AI 智能輔助開房 Restricted Beta",updateLevel:"minor",added:["最高管理員賽事設定頁新增「AI 協助建立 BETA」入口","可貼入 LINE、Threads、Facebook、Instagram 等活動文案，由後端 AI Parser 擷取賽事名稱、日期、地點、報到／開賽時間、名額、費用與組別等欄位","P7.10 Restricted Beta 僅開放 super_admin 與 allowlist admin；AI 僅產生草稿，不可自動建立或發布賽事"],changed:["AI 解析結果先通過後端 Schema Normalizer，再經前端 Schema 驗證後才可套入 settings／registration 草稿","缺少活動名稱或賽事名稱時不再由 AI 猜測；交由 Review Gate 阻擋並要求房主補填","event key 改由 Server 在模型未提供合法識別碼時自動生成"],fixed:["完成 P7.9 Live Shadow 9/9，Hard Failure 0、Quality Mismatch 0","修正 AI Shadow report artifact 路徑、nullable activity/event name、女性限制正規化與 event key fallback"],environment:"Production / Restricted Beta",deployStatus:"Backend Callable 已單函式部署；Frontend Restricted Beta 已上線",firebaseImpact:"新增 parseTournamentAnnouncementV1 Callable；AI 不直接寫 tournaments、publicTournaments 或 registrations",securityRulesImpact:"無",permissionImpact:"super_admin 可使用；admin 需 aiCreateBetaEnabled=true；staff/player/tester 不可使用",publicSummary:"最高管理員可在賽事設定頁使用 AI 協助建立活動草稿；AI 只填草稿，最後仍由房主人工確認與發布。"},
@@ -8997,6 +8998,117 @@ let aiCreateLastApplied = null;
 let aiCreateReviewAcknowledged = false;
 let aiCreateParseBusy = false;
 
+/* P7.11B — BXH standard event template UI.
+   The canonical template lives behind eventTemplateService. Only super_admin
+   can update it; admin may only opt a room in/out. Each opted-in room keeps an
+   immutable snapshot so historical tournaments never change retroactively. */
+let bxhEventTemplateUiState = null;
+
+function bxhEventTemplateContext(){
+  const key=(firebaseUser&&firebaseUser.uid)||"anonymous";
+  if(!bxhEventTemplateUiState || bxhEventTemplateUiState.key!==key){
+    bxhEventTemplateUiState={key,template:null,canEdit:false,loading:false,error:"",editing:false,saving:false};
+  }
+  return bxhEventTemplateUiState;
+}
+function canUseBxhStandardTemplate(){
+  return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
+    (userProfile.role==="super_admin" || userProfile.role==="admin") &&
+    state && state.meta && state.meta.eventAuthority!=="community");
+}
+function roomStandardTemplateConfig(st=state){
+  if(!st.eventInfo) st.eventInfo=emptyEventInfoV2();
+  st.eventInfo=normalizeEventInfoV2(st.eventInfo);
+  return st.eventInfo.standardTemplate;
+}
+function roomStandardTemplateSelected(st=state){
+  const cfg=roomStandardTemplateConfig(st);
+  const explicit=!!(cfg.templateId || cfg.snapshot || cfg.version || cfg.versionLabel);
+  if(explicit) return cfg.enabled===true;
+  return canUseBxhStandardTemplate() && !st.cloudCode && !(st.meta&&st.meta.publishedAt) &&
+    !st.startedAt && !st.bracketSize && !(st.players||[]).length;
+}
+function bxhTemplateSnapshot(template){
+  if(!template) return null;
+  return {
+    id:String(template.id||"bxh-standard"),
+    name:String(template.name||"BXH 標準賽事公版"),
+    version:Math.max(1,Number(template.version)||1),
+    versionLabel:String(template.versionLabel||"v1.0"),
+    rules:String(template.rules||""),
+    notices:String(template.notices||""),
+    legalPositioning:String(template.legalPositioning||"")
+  };
+}
+function applyBxhTemplateSnapshotToRoom(enabled,template){
+  const info=normalizeEventInfoV2(state.eventInfo);
+  if(enabled){
+    const snapshot=bxhTemplateSnapshot(template);
+    if(!snapshot) return false;
+    info.standardTemplate={
+      enabled:true,
+      templateId:snapshot.id,
+      version:snapshot.version,
+      versionLabel:snapshot.versionLabel,
+      snapshot
+    };
+  }else{
+    info.standardTemplate={enabled:false,templateId:null,version:null,versionLabel:null,snapshot:null};
+  }
+  state.eventInfo=info;
+  return true;
+}
+async function loadBxhEventTemplate(force=false){
+  if(!canUseBxhStandardTemplate()) return null;
+  const ui=bxhEventTemplateContext();
+  if(ui.loading) return ui.template;
+  if(ui.template && !force) return ui.template;
+  ui.loading=true; ui.error="";
+  try{
+    if(!window.engagementService || typeof window.engagementService.eventTemplate!=="function") throw new Error("service-unavailable");
+    const result=await window.engagementService.eventTemplate({action:"get"});
+    if(!result || !result.ok || !result.template) throw new Error("template-unavailable");
+    ui.template=result.template;
+    ui.canEdit=result.canEdit===true;
+    const cfg=roomStandardTemplateConfig();
+    if(roomStandardTemplateSelected() && !cfg.snapshot){
+      applyBxhTemplateSnapshotToRoom(true,ui.template);
+      await saveRecord(state);
+    }
+    return ui.template;
+  }catch(e){
+    console.warn("[event template]",e);
+    ui.error="無法讀取 BXH 賽事公版，請稍後重新整理。";
+    return null;
+  }finally{
+    ui.loading=false;
+    if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
+  }
+}
+function buildPublicEventInfo(st){
+  const info=normalizeEventInfoV2(st&&st.eventInfo);
+  const cfg=info.standardTemplate||{};
+  const snapshot=cfg.snapshot&&typeof cfg.snapshot==="object"?cfg.snapshot:null;
+  return {
+    schemaVersion:EVENT_INFO_SCHEMA_VERSION,
+    standardTemplate:(cfg.enabled===true && snapshot)?{
+      enabled:true,
+      templateId:String(cfg.templateId||snapshot.id||"bxh-standard"),
+      version:Math.max(1,Number(cfg.version||snapshot.version)||1),
+      versionLabel:String(cfg.versionLabel||snapshot.versionLabel||"v1.0"),
+      snapshot:{
+        id:String(snapshot.id||"bxh-standard"),
+        name:String(snapshot.name||"BXH 標準賽事公版"),
+        version:Math.max(1,Number(snapshot.version)||1),
+        versionLabel:String(snapshot.versionLabel||"v1.0"),
+        rules:String(snapshot.rules||""),
+        notices:String(snapshot.notices||""),
+        legalPositioning:String(snapshot.legalPositioning||"")
+      }
+    }:{enabled:false}
+  };
+}
+
 const AI_CREATE_SCHEMA_VERSION = "bxh-arena.ai-create.v1";
 const AI_CREATE_CALLABLE_CONTRACT_VERSION = "bxh-arena.ai-create.callable.v1";
 const AI_CREATE_CALLABLE_NAME = "parseTournamentAnnouncementV1";
@@ -10376,12 +10488,14 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
   "account-role-filter","account-search-apply","account-search-clear","account-clear-filters",
   "unarchive-current","unarchive-record","preview-cleanup-public-mirrors","run-cleanup-public-mirrors","ladder-new-season",
   "admin-refresh-engagement","admin-seed-initial-titles","admin-save-engagement-settings","admin-grant-title","admin-revoke-title",
-  "admin-load-engagement-overview","admin-update-title-definition","admin-backfill-preview","admin-backfill-execute","admin-backfill-restart","admin-engagement-diagnose"
+  "admin-load-engagement-overview","admin-update-title-definition","admin-backfill-preview","admin-backfill-execute","admin-backfill-restart","admin-engagement-diagnose",
+  "event-template-edit","event-template-cancel","event-template-save"
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
-  "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack"
+  "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack",
+  "event-template-toggle","event-template-refresh"
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
@@ -15651,6 +15765,50 @@ function renderPeopleManagement(){
   return subnav+(panels[peopleRosterSection]||confirmedPanel);
 }
 
+function renderBxhEventTemplateSettingsSection(readOnly){
+  if(!canUseBxhStandardTemplate()) return "";
+  const ui=bxhEventTemplateContext();
+  if(!ui.template && !ui.loading && !ui.error) setTimeout(()=>loadBxhEventTemplate(false),0);
+  const cfg=roomStandardTemplateConfig();
+  const selected=roomStandardTemplateSelected();
+  const roomSnap=cfg.snapshot&&typeof cfg.snapshot==="object"?cfg.snapshot:null;
+  const latest=ui.template||roomSnap;
+  const roomVersion=roomSnap?String(roomSnap.versionLabel||("v"+roomSnap.version)):"";
+  const latestVersion=ui.template?String(ui.template.versionLabel||("v"+ui.template.version)):"";
+  const outdated=!!(selected&&roomSnap&&ui.template&&Number(roomSnap.version)!==Number(ui.template.version));
+  let body="";
+  body+='<div class="settings-section-head"><span class="settings-section-num">3</span><span class="settings-section-title">BXH 賽事公版</span><span class="settings-section-desc">固定規則、注意事項與賽事定位</span></div>';
+  body+='<div class="panel settings-flow-panel">';
+  body+='<label class="checkbox-row" style="align-items:flex-start;gap:10px;"><input type="checkbox" data-action="event-template-toggle" '+(selected?'checked':'')+' '+((readOnly||ui.loading||!!ui.error)?'disabled':'')+'><span><b>套用 BXH 賽事公版</b><br><span class="hint">勾選後，本場會保存當下公版快照；未來公版更新不會改動這場歷史內容。</span></span></label>';
+  if(ui.loading) body+='<div class="hint" style="margin-top:10px;">正在讀取最新公版……</div>';
+  if(ui.error) body+='<div class="banner warn" style="margin-top:10px;"><span>'+esc(ui.error)+'</span><button class="btn btn-ghost btn-sm" data-action="event-template-refresh">重新整理</button></div>';
+  if(latest){
+    body+='<div class="grid grid-2" style="margin-top:12px;"><div class="stat-box"><div class="label">本場版本</div><div class="value small">'+esc(roomVersion||(selected?'等待建立快照':'未套用'))+'</div></div><div class="stat-box"><div class="label">目前最新公版</div><div class="value small">'+esc(latestVersion||roomVersion||'—')+'</div></div></div>';
+    if(outdated) body+='<div class="banner warn" style="margin-top:10px;"><span>目前公版已有新版；本場仍保留 '+esc(roomVersion)+' 快照，不會自動改寫。</span></div>';
+    body+='<details class="settings-accordion" style="margin-top:12px;"><summary><span>查看公版內容</span><span class="hint">'+esc(latest.versionLabel||'')+'</span></summary><div class="settings-accordion-body">';
+    body+='<div class="field"><label>比賽規則</label><div class="hint" style="white-space:pre-line;color:var(--metal);">'+esc(latest.rules||'—')+'</div></div>';
+    body+='<div class="field" style="margin-top:12px;"><label>注意事項</label><div class="hint" style="white-space:pre-line;color:var(--metal);">'+esc(latest.notices||'—')+'</div></div>';
+    body+='<div class="field" style="margin-top:12px;"><label>BXH 賽事／法律定位</label><div class="hint" style="white-space:pre-line;color:var(--metal);">'+esc(latest.legalPositioning||'—')+'</div></div>';
+    body+='</div></details>';
+  }
+  if(isSuperAdmin() && ui.template && !readOnly){
+    body+='<div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-action="event-template-edit">'+(ui.editing?'正在編輯公版':'編輯公版（最高管理員）')+'</button><button class="btn btn-ghost btn-sm" data-action="event-template-refresh">重新讀取</button></div>';
+    if(ui.editing){
+      body+='<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">';
+      body+='<div class="banner warn"><span>這裡修改的是 BXH 全域公版。儲存後只影響之後新套用／重新套用的賽事；既有房間快照不會被改寫。</span></div>';
+      body+='<div class="field" style="margin-top:12px;"><label>比賽規則</label><textarea id="event-template-rules" rows="8">'+esc(ui.template.rules||'')+'</textarea></div>';
+      body+='<div class="field"><label>注意事項</label><textarea id="event-template-notices" rows="8">'+esc(ui.template.notices||'')+'</textarea></div>';
+      body+='<div class="field"><label>BXH 賽事／法律定位</label><textarea id="event-template-legal" rows="6">'+esc(ui.template.legalPositioning||'')+'</textarea></div>';
+      body+='<div class="btn-row"><button class="btn btn-primary" data-action="event-template-save" '+(ui.saving?'disabled':'')+'>'+(ui.saving?'儲存中…':'儲存並發布新版公版')+'</button><button class="btn btn-ghost" data-action="event-template-cancel" '+(ui.saving?'disabled':'')+'>取消</button></div>';
+      body+='</div>';
+    }
+  }else if(!isSuperAdmin()){
+    body+='<div class="hint" style="margin-top:10px;">公版本體僅最高管理員可修改；一般管理員只能決定本場是否套用。</div>';
+  }
+  body+='</div>';
+  return body;
+}
+
 function renderSettings(){
   const settingsReadOnly=state.archiveStatus==="completed";
   const ladderModeLocked=settingsReadOnly||state.matches.some(m=>!!m.winnerId);
@@ -15778,8 +15936,9 @@ function renderSettings(){
     `}
   </div>
 
+  ${renderBxhEventTemplateSettingsSection(settingsReadOnly)}
   <div class="settings-section-head">
-    <span class="settings-section-num">3</span>
+    <span class="settings-section-num">4</span>
     <span class="settings-section-title">賽制與比賽判定</span>
     <span class="settings-section-desc">決定怎麼打、幾台、如何判定勝負</span>
   </div>
@@ -18511,6 +18670,21 @@ function formatTournamentDetailDateTime(value){
   }
 }
 
+function renderTournamentStandardTemplate(t){
+  const cfg=t&&t.parsedData&&t.parsedData.eventInfo&&t.parsedData.eventInfo.standardTemplate;
+  if(!cfg||cfg.enabled!==true||!cfg.snapshot)return "";
+  const s=cfg.snapshot;
+  let html='<div class="panel tournament-detail-panel tournament-info-panel">';
+  html+='<div class="panel-title">BXH 賽事公版 <span class="badge badge-metal">'+esc(cfg.versionLabel||s.versionLabel||"")+'</span></div>';
+  html+='<p class="hint">本場已保存公版快照；即使日後 BXH 更新公版，本場內容仍維持建立當時版本。</p>';
+  const block=(title,value)=>'<details class="settings-accordion" style="margin-top:8px;"><summary><span>'+esc(title)+'</span><span class="hint">展開</span></summary><div class="settings-accordion-body"><div style="white-space:pre-line;font-size:12px;line-height:1.75;color:var(--metal);">'+esc(value||"—")+'</div></div></details>';
+  html+=block("比賽規則",s.rules);
+  html+=block("注意事項",s.notices);
+  html+=block("BXH 賽事／法律定位",s.legalPositioning);
+  html+='</div>';
+  return html;
+}
+
 function renderTournamentDetailScreen(){
   const code = tournamentDetailCode;
   if(tournamentDetailLoading || !tournamentDetailData){
@@ -18639,6 +18813,7 @@ function renderTournamentDetailScreen(){
       ${t.eventDescription ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">活動說明</div><p class="tournament-info-foot-text">${esc(t.eventDescription)}</p></div>` : ""}
       ${t.registrationNotes ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">報名注意事項</div><p class="tournament-info-foot-text">${esc(t.registrationNotes)}</p></div>` : ""}
     </div>
+    ${renderTournamentStandardTemplate(t)}
     ${!isGuestMode && isLoggedIn && !myReg ? `<div class="panel tournament-detail-panel tournament-info-panel">
       <div class="panel-title">本次報名資料</div>
       <div class="grid grid-2 tournament-detail-grid">
@@ -22356,6 +22531,70 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(ADMIN_TIER_ONLY_ACTIONS.has(action) && !isAdminTierOrAbove() && !(isOwnTestTournament() && TESTER_TIER_ACTIONS.has(action)) && !(isCommunityRoomOwner() && COMMUNITY_OWNER_TIER_ACTIONS.has(action))){
     showToast("目前身分沒有此操作權限。", true);
+    return;
+  }
+  if(action==="event-template-refresh"){
+    loadBxhEventTemplate(true);
+    return;
+  }
+  if(action==="event-template-toggle"){
+    const enabled=!!target.checked;
+    (async()=>{
+      let template=bxhEventTemplateContext().template;
+      if(enabled && !template) template=await loadBxhEventTemplate(false);
+      if(enabled && !template){
+        showToast("公版尚未載入，暫時無法套用。",true);
+        render();
+        return;
+      }
+      applyBxhTemplateSnapshotToRoom(enabled,template);
+      const ok=await saveState();
+      render();
+      showToast(enabled?"已套用 BXH 賽事公版":"本場已取消套用 BXH 賽事公版");
+      if(ok===false) showToast("設定已保存本機，等待雲端同步",true);
+    })();
+    return;
+  }
+  if(action==="event-template-edit"){
+    const ui=bxhEventTemplateContext();
+    if(!ui.template){showToast("請先載入公版",true);return;}
+    ui.editing=true;render();return;
+  }
+  if(action==="event-template-cancel"){
+    const ui=bxhEventTemplateContext();ui.editing=false;render();return;
+  }
+  if(action==="event-template-save"){
+    const ui=bxhEventTemplateContext();
+    if(ui.saving||!ui.template)return;
+    const rules=(document.getElementById("event-template-rules")?.value||"").trim();
+    const notices=(document.getElementById("event-template-notices")?.value||"").trim();
+    const legalPositioning=(document.getElementById("event-template-legal")?.value||"").trim();
+    if(!rules||!notices||!legalPositioning){showToast("公版三個區塊都必須有內容",true);return;}
+    (async()=>{
+      ui.saving=true;render();
+      try{
+        const result=await window.engagementService.eventTemplate({
+          action:"update",
+          name:ui.template.name||"BXH 標準賽事公版",
+          expectedVersion:Number(ui.template.version||1),
+          rules,notices,legalPositioning
+        });
+        if(!result||!result.ok||!result.template)throw new Error("save-failed");
+        const previousRoomVersion=roomStandardTemplateConfig().version;
+        ui.template=result.template;ui.canEdit=result.canEdit===true;ui.editing=false;
+        if(roomStandardTemplateSelected() && !state.cloudCode && !(state.meta&&state.meta.publishedAt)){
+          applyBxhTemplateSnapshotToRoom(true,ui.template);
+          await saveRecord(state);
+          showToast("新版公版已發布，並更新目前尚未發布的房間草稿");
+        }else{
+          showToast("新版 BXH 賽事公版已發布｜"+String(ui.template.versionLabel||""));
+          if(previousRoomVersion) showToast("目前房間仍保留原本公版快照，不會自動改寫");
+        }
+      }catch(e){
+        console.warn("[event template save]",e);
+        showToast(String(e&&e.message||"").includes("version-conflict")?"公版已被其他人更新，請重新讀取後再編輯":"公版儲存失敗，請稍後再試",true);
+      }finally{ui.saving=false;render();}
+    })();
     return;
   }
   if(action==="ai-create-open"){
@@ -26956,6 +27195,7 @@ init();
     async mailbox(payload){return callEngagementFunction("mailboxService",payload,30000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
+    async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
     async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
@@ -27037,6 +27277,7 @@ init();
     return {
       callRevision:Number(state.callRevision||0),
       systemClosure:state.systemClosure?{reason:'idle-24h',label:state.systemClosure.label||'',closedAt:state.systemClosure.closedAt||null,lastActivityAt:state.systemClosure.lastActivityAt||null,restoredAt:state.systemClosure.restoredAt||null}:null,
+      eventInfo:buildPublicEventInfo(state),
       meta: {
         name: (state.meta && state.meta.name) || "",
         location: (state.meta && state.meta.location) || "",
