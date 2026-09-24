@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.12">
+<meta name="bxh-build" content="20260924.13">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.12";
+  var CURRENT_BUILD="20260924.13";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4256,7 +4256,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.0"></script>
-<script src="court-call-ui.js?v=14.2.0-b2.3"></script>
+<script src="court-call-ui.js?v=14.2.2-pass-ux"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -4435,9 +4435,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.1";
+const APP_VERSION = "v14.2.2";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.2",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0｜PASS 可用性提示優化",updateLevel:"patch",added:["叫號資料新增 PASS 可用性判定，玩家在操作前即可知道是否有同台同輪下一場可承接","PASS 不可用時顯示明確原因，不再讓玩家按下後才看到失敗"],changed:["叫號彈窗與我的賽程固定保留 PASS 按鈕；不可用時改為灰階停用並標示「後方無場次／非目前場次／已使用」","PASS 說明補充必須存在同台同輪下一場可承接"],fixed:["修正 2 人單場或同輪最後一場仍看似可按 PASS、造成操作像卡住的體驗"],environment:"Production / HTML + Firebase",deployStatus:"Frontend PASS availability UX + server-authoritative availability",firebaseImpact:"courtCallService list response 新增 passUnavailableReason；無新增集合",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"PASS 現在會在操作前直接判定是否可延後；後方無場次時按鈕會停用並說明原因。"},
   {version:"v14.2.1",date:"2026/09/24",timezone:"Asia/Taipei",title:"公開賽事詳情手機版精簡／報名成功快速返回",updateLevel:"patch",added:["報名成功卡新增「返回賽事列表」快捷鍵，不必再滑回頁面頂端","賽事詳情時間改為 MM/DD HH:mm 精簡格式，移除秒數與重複年份"],changed:["手機版賽事詳情品牌區、資訊面板、欄位卡片與間距全面縮減，提高首屏資訊密度","報名成功區操作改為返回／取消並列，窄螢幕自動改為單欄"],fixed:["避免正取名額與日期資訊因字串過長產生不必要的多行換行與超高卡片"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact tournament detail UX",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"公開賽事詳情手機版改得更緊湊；報名成功後可直接返回賽事列表。"},
   {version:"v14.2.0",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0 Phase B2｜鎖屏／離開 ARENA Web Push",updateLevel:"minor",added:["新增 Firebase Messaging Service Worker，ARENA 切到 LINE／IG、背景分頁或關閉視窗後仍可接收人工叫號推播","新增裝置 Push 註冊與伺服器 Token Registry；同一裝置換帳號時會轉移 Token 所有權，避免舊帳號持續收到通知","iPhone 會辨識主畫面安裝狀態；未加入主畫面時提示先安裝再啟用鎖屏推播","新增「測試鎖屏推播」：按下後約 4 秒發送本人測試通知，方便直接驗證背景／鎖屏是否正常"],changed:["通知點擊會優先喚醒既有 ARENA 視窗並立即刷新 BXH CALL 狀態","Push 發送改在叫號交易成功後執行；推播失敗不會回滾比賽或 PASS 操作","Service Worker 自訂 notificationclick 於 Firebase Messaging 載入前註冊，避免 SDK 覆蓋點擊行為","Production Web Push 已改用 Firebase 專案專屬公開 VAPID key 取得 FCM Token"],fixed:["修正 Phase B2 callable 串接曾出現字面 \\n 造成 module 語法錯誤的候選版問題","修正 Push Token 可能跨帳號殘留的所有權邊界"],environment:"Production candidate / HTML + Firebase Messaging",deployStatus:"Backend live-verified; Production public VAPID key configured; frontend pending final RC + real-device verification",firebaseImpact:"新增 users/{uid}/courtCallPushTokens、users/{uid}/courtCallPushMeta（server-only）與 courtCallPushTokenOwners 所有權索引；新增 courtCallPushService callable",securityRulesImpact:"無前端直寫權限；Token 註冊與推播皆經 callable / Admin SDK",permissionImpact:"通知僅送給該場雙方選手與對應裁判／賽事負責人",publicSummary:"BXH CALL 進入 Phase B2：裁判叫號可透過 Web Push 送到背景與鎖屏；點通知會回到 ARENA 並同步目前場次。"},
   {version:"v14.1.0",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0 Phase A｜前景叫號／一場 PASS／三方同步",updateLevel:"minor",added:["裁判人工叫號改為 ARENA 前景全域彈窗，玩家可直接回覆 OK／PASS","玩家、對手與裁判同步顯示回覆狀態與 PASS 結果","玩家登入 ARENA 後會在各頁持續輪詢本人正取賽事的人工叫號，不再綁定『我的賽程』或智慧 ETA 開關"],changed:["PASS 改為玩家自助立即生效，同台同輪自動延後 1 場，每人每賽事限一次","人工裁判叫號與智慧 ETA 分離；智慧叫號開關不再阻止裁判人工通知","人工叫號同步週期由 5 秒縮短至約 2–3 秒，未變更時不再重繪整個頁面"],fixed:["修正裁判已按『通知雙方選手』但玩家不在『我的賽程』或未開啟智慧叫號時完全看不到通知的問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend Phase A ready; Production courtCallService backend rollout",firebaseImpact:"沿用 courtCalls 集合；PASS 交易會同步更新 tournaments 與 publicTournaments 公開鏡像，不新增集合",securityRulesImpact:"無 Firestore Rules 變更；沿用 callable 權限驗證",permissionImpact:"沿用參賽玩家本人與該 Court 裁判權限",publicSummary:"BXH CALL 人工叫號升級：ARENA 前景任何頁面都能直接收到裁判叫號，玩家可回覆 OK 或使用一次 PASS 延後一場，雙方選手與裁判會同步看到狀態。"},
