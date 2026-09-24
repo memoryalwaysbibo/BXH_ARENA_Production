@@ -7,7 +7,7 @@ function inventoryContext(){
  if(!inventoryState||inventoryState.key!==key){
   let pending=null;
   try{const saved=JSON.parse(sessionStorage.getItem(inventoryStorageKey())||'null');if(saved?.payload?.operationId&&saved.actorUid===currentAuthUid())pending=saved;}catch{}
-  inventoryState={key,items:null,nextCursor:null,loading:false,busy:false,error:'',selectedId:'',events:[],historyCursor:null,historyLoaded:false,query:'',results:[],recipient:null,draft:{itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:''},pending,success:'',serverOffset:0};
+  inventoryState={key,items:null,nextCursor:null,loading:false,busy:false,error:'',selectedId:'',events:[],historyCursor:null,historyLoaded:false,query:'',results:[],recipient:null,draft:{itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false},pending,success:'',serverOffset:0};
  }
  return inventoryState;
 }
@@ -39,12 +39,14 @@ function renderInventoryPage(){
  const c=inventoryContext();
  if(c.items===null&&!c.loading&&!c.error&&!c.busy)setTimeout(()=>loadInventory(),0);
  const lock=c.busy||!!c.pending,d=c.pending?.draft||c.draft,recipient=c.pending?.recipient||c.recipient;
+ // A pending request is immutable; its payload, not the editable draft, owns this flag.
+ const consumable=c.pending?c.pending.payload?.consumable===true:d.consumable===true;
  const selected=(c.items||[]).find(i=>i.id===c.selectedId);
  const input=(key,label,extra='')=>`<div class="field"><label for="inventory-${key}">${label}</label><input id="inventory-${key}" data-inventory-field="${key}" value="${esc(d[key]||'')}" ${extra} ${lock?'disabled':''}></div>`;
  return `<section class="panel"><div class="panel-title"><span>🎒 我的道具</span><button class="btn btn-ghost btn-sm" data-action="inventory-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>
  <p class="hint">道具綁定帳號，不可轉讓。相同道具依發放批次列出，來源與期限各自保存；過期保留紀錄。</p>
  ${c.error?`<p class="auth-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="hint" role="status">${esc(c.success)}</p>`:''}
- <div class="grid grid-2 inventory-grid">${(c.items||[]).map(i=>`<article class="panel inventory-card">${inventoryImage(i.imageUrl)?`<img class="inventory-image" src="${esc(inventoryImage(i.imageUrl))}" alt="${esc(i.name)}" loading="lazy" referrerpolicy="no-referrer">`:'<div class="inventory-image inventory-placeholder" aria-hidden="true">🎟️</div>'}<div><h3>${esc(i.name)}</h3><p><b>數量 ${Number(i.quantity)||0}</b> · ${inventoryStatus(i,c)}${i.consumable?' · 可消耗':''}</p><p class="mailbox-body">${esc(i.purpose)}</p><p class="hint">期限：${i.expiresAt==null?'無期限':esc(mailboxDate(i.expiresAt))+'（台灣時間）'}<br>來源：${esc(i.source)}<br>取得：${esc(mailboxDate(i.createdAt))}<br>道具代碼：${esc(i.itemCode)}</p><button class="btn btn-ghost btn-sm" data-action="inventory-history" data-item-id="${esc(i.id)}" ${c.busy||c.loading?'disabled':''}>發放／使用紀錄</button></div></article>`).join('')}</div>
+ <div class="grid grid-2 inventory-grid">${(c.items||[]).map(i=>`<article class="panel inventory-card">${inventoryImage(i.imageUrl)?`<img class="inventory-image" src="${esc(inventoryImage(i.imageUrl))}" alt="${esc(i.name)}" loading="lazy" referrerpolicy="no-referrer">`:'<div class="inventory-image inventory-placeholder" aria-hidden="true">🎟️</div>'}<div><h3>${esc(i.name)}</h3><p><b>數量 ${Number(i.quantity)||0}</b> · ${inventoryStatus(i,c)}${i.consumable===true?' · 可消耗':' · 不可消耗'}</p><p class="mailbox-body">${esc(i.purpose)}</p><p class="hint">期限：${i.expiresAt==null?'無期限':esc(mailboxDate(i.expiresAt))+'（台灣時間）'}<br>來源：${esc(i.source)}<br>取得：${esc(mailboxDate(i.createdAt))}<br>道具代碼：${esc(i.itemCode)}</p><button class="btn btn-ghost btn-sm" data-action="inventory-history" data-item-id="${esc(i.id)}" ${c.busy||c.loading?'disabled':''}>發放／使用紀錄</button></div></article>`).join('')}</div>
  ${c.loading?'<p role="status">正在載入道具……</p>':c.items&&!c.items.length?'<div class="empty-state">目前沒有道具，收到票券或活動獎勵後會顯示在這裡。</div>':''}
  ${c.nextCursor?`<button class="btn btn-ghost" data-action="inventory-more" ${c.loading||c.busy?'disabled':''}>載入更多道具</button>`:''}
  ${selected?`<section class="panel"><div class="panel-title">${esc(selected.name)}｜發放／使用紀錄</div>${c.events.map(e=>`<p class="mailbox-body">${esc(mailboxDate(e.createdAt))}｜${esc(({grant:'發放',consume:'使用',refund:'退還'})[e.kind]||'異動')} ${e.delta>0?'+':''}${Number(e.delta)}｜剩餘 ${Number(e.balance)}<br>來源：${esc(e.source)}<br><small>紀錄：${esc(e.operationId)}</small></p>`).join('')}${c.historyLoaded&&!c.events.some(e=>e.kind==='consume')?'<p class="hint">目前已載入的紀錄中沒有使用紀錄。</p>':''}${c.historyCursor?`<button class="btn btn-ghost" data-action="inventory-history-more" ${c.busy?'disabled':''}>更多紀錄</button>`:''}</section>`:''}
@@ -54,6 +56,7 @@ function renderInventoryPage(){
  ${c.results.map(u=>`<button class="btn btn-ghost inventory-recipient" data-action="inventory-select" data-uid="${esc(u.uid)}" ${lock?'disabled':''}>${esc(titleRecipientLabel(u))}</button>`).join('')}
  <p role="status" id="inventory-selected">${recipient?'已選擇：'+esc(titleRecipientLabel(recipient)):'尚未選擇玩家'}</p>
  <div class="grid grid-2 inventory-grid">${input('itemCode','道具代碼','maxlength="48" placeholder="例如：member-raffle-ticket"')}${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${input('imageUrl','圖片網址（選填）','type="url" maxlength="2048" placeholder="https://…"')}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
+ <div class="field"><label for="inventory-consumable" style="display:flex;align-items:center;gap:8px"><input id="inventory-consumable" type="checkbox" data-inventory-field="consumable" aria-describedby="inventory-consumable-hint" style="width:auto;min-width:18px;flex:0 0 auto" ${consumable?'checked':''} ${lock?'disabled':''}>可消耗道具（活動使用時可扣除數量）</label><p class="hint" id="inventory-consumable-hint">預設不勾選。抽獎券要用於「消耗票券」活動時才勾選；僅影響本次新發放的批次，不會修改既有道具。</p></div>
  <button class="btn btn-primary" data-action="inventory-grant" ${c.busy?'disabled':''}>${c.busy?'處理中……':c.pending?'確認原發放結果':'確認發放'}</button></section>`:''}
  ${isSuperAdmin()&&typeof window.renderRewardRulesAdmin==='function'?window.renderRewardRulesAdmin():''}</section>`;
 }
@@ -90,8 +93,8 @@ async function handleInventory(action,target){
    for(const [key,max]of [['name',60],['purpose',300],['source',120]])if(!d[key].trim()||[...d[key].trim()].length>max)throw Error('invalid-'+key);
    if(d.imageUrl&&!inventoryImage(d.imageUrl))throw Error('invalid-image');
    if(expiresAt!==null&&expiresAt<=Date.now()+c.serverOffset)throw Error('expired-grant');
-   if(!confirm(`確認發放給 ${titleRecipientLabel(c.recipient)}？\n${d.name} × ${quantity}\n來源：${d.source}\n期限：${expiresAt===null?'無期限':mailboxDate(expiresAt)+'（台灣時間）'}\n將同步寄送站內信。`))return;
-   const pending={actorUid:currentAuthUid(),recipient:c.recipient,draft:{...d},payload:{action:'grant',targetUid:c.recipient.uid,itemCode:d.itemCode.trim(),name:d.name.trim(),quantity,imageUrl:d.imageUrl.trim(),purpose:d.purpose.trim(),source:d.source.trim(),expiresAt,operationId:crypto.randomUUID()}};
+   if(!confirm(`確認發放給 ${titleRecipientLabel(c.recipient)}？\n${d.name} × ${quantity}\n來源：${d.source}\n期限：${expiresAt===null?'無期限':mailboxDate(expiresAt)+'（台灣時間）'}\n使用方式：${d.consumable===true?'可消耗（活動使用時會扣除數量）':'不可消耗（僅持有，不扣除）'}\n將同步寄送站內信。`))return;
+   const pending={actorUid:currentAuthUid(),recipient:c.recipient,draft:{...d},payload:{action:'grant',targetUid:c.recipient.uid,itemCode:d.itemCode.trim(),name:d.name.trim(),quantity,imageUrl:d.imageUrl.trim(),purpose:d.purpose.trim(),source:d.source.trim(),expiresAt,consumable:d.consumable===true,operationId:crypto.randomUUID()}};
    try{sessionStorage.setItem(inventoryStorageKey(),JSON.stringify(pending));if(sessionStorage.getItem(inventoryStorageKey())!==JSON.stringify(pending))throw Error();}catch{throw Error('storage-unavailable');}
    c.pending=pending;
   }
@@ -99,7 +102,7 @@ async function handleInventory(action,target){
   const r=await window.engagementService.inventory(c.pending.payload);if(c!==inventoryContext())return;if(!r?.ok)throw Error('grant-failed');
   c.success=(r.replayed?'已確認先前發放成功':'道具已發放，站內信已建立')+'｜操作：'+c.pending.payload.operationId;
   try{sessionStorage.removeItem(inventoryStorageKey());}catch{}
-  c.pending=null;c.draft={itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:''};c.recipient=null;c.results=[];
+  c.pending=null;c.draft={itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false};c.recipient=null;c.results=[];
   c.busy=false;await loadInventory();await loadMailbox(true);
  }catch(e){
   if(c===inventoryContext()){
@@ -113,6 +116,7 @@ function inventoryCaptureInput(e){
  const field=e.target.getAttribute?.('data-inventory-field');if(!field||!isSuperAdmin())return;
  const c=inventoryContext();if(c.busy||c.pending)return;
  if(field==='query'){c.query=e.target.value;c.recipient=null;c.results=[];const selected=document.getElementById('inventory-selected');if(selected)selected.textContent='尚未選擇玩家';document.querySelectorAll('.inventory-recipient').forEach(el=>el.remove());}
+ else if(field==='consumable')c.draft.consumable=e.target.checked===true;
  else if(Object.hasOwn(c.draft,field))c.draft[field]=e.target.value;
 }
 document.addEventListener('input',inventoryCaptureInput);
