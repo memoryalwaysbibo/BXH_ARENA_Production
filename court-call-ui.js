@@ -283,7 +283,7 @@ function courtCallRow(c,r,ref){
  const passText=r.pass?.status==='pending'?'舊版 PASS 待裁判核准':
   r.pass?.status==='approved'?'PASS 已接受，同台延後 1 場':
   r.pass?.status==='rejected'?'PASS 未核准':'';
- const playerStatus=r.players.map(p=>`<span class="court-call-person ${p.response==='unanswered'?'is-waiting':'is-replied'}"><b>${esc(p.name)}</b> ${esc(courtCallPlayerResponseLabel(p.response))}</span>`).join('');
+ const playerStatus=r.players.map(p=>`<span class="court-call-person ${p.response==='unanswered'?'is-waiting':'is-replied'}"><b>${esc(p.name)}</b><span>${esc(courtCallPlayerResponseLabel(p.response))}</span></span>`).join('');
  const passAllowed=!!(myPlayer?.canPass&&r.canPass);
  const passHint=!passAllowed&&myPlayer?.response==='unanswered'&&!r.pass?.status?courtCallPassUnavailableText(r,myPlayer):'';
  const playerActions=!ref&&myPlayer?(
@@ -292,13 +292,15 @@ function courtCallRow(c,r,ref){
     : (r.pass?.status==='approved'&&r.pass.requester&&!r.waitingFor.length?`<button class="btn btn-ghost" data-action="court-call-ready" ${attrs}${participantAttr} ${disabled}>我已準備好</button>`:'')
   ):'';
  const legacyActions=ref&&r.canApprove?`<button class="btn btn-primary" data-action="court-call-approve" ${attrs} ${disabled}>核准舊版 PASS</button><button class="btn btn-ghost" data-action="court-call-reject" ${attrs} ${disabled}>拒絕</button>`:'';
- return `<div class="panel court-call-row" style="margin-top:8px">
-   <strong>Court ${r.station}｜第 ${Number(r.round)+1} 輪</strong>
-   <p class="hint">叫號：${esc(new Date(r.calledAt).toLocaleTimeString("zh-TW",{hour12:false}))}</p>
+ return `<div class="panel court-call-row">
+   <div class="court-call-row-head">
+     <strong>Court ${r.station}｜第 ${Number(r.round)+1} 輪</strong>
+     <span class="court-call-time">叫號 ${esc(new Date(r.calledAt).toLocaleTimeString("zh-TW",{hour12:false}))}</span>
+   </div>
    <div class="court-call-people">${playerStatus}</div>
-   ${r.pass?`<p class="hint">${esc(passText)}${r.waitingFor.length?`｜前置場次尚餘 ${r.waitingFor.length} 場`:''}</p>`:''}
-   ${legacyActions||playerActions?`<div class="btn-row">${legacyActions}${playerActions}</div>`:''}
-   ${passHint?`<p class="hint" style="margin-top:8px">⚠️ ${esc(passHint)}</p>`:''}
+   ${r.pass?`<p class="court-call-pass-state">${esc(passText)}${r.waitingFor.length?`｜前置場次尚餘 ${r.waitingFor.length} 場`:''}</p>`:''}
+   ${legacyActions||playerActions?`<div class="btn-row court-call-actions-inline">${legacyActions}${playerActions}</div>`:''}
+   ${passHint?`<p class="court-call-pass-hint">⚠️ ${esc(passHint)}</p>`:''}
  </div>`;
 }
 
@@ -318,19 +320,26 @@ function renderCourtCallPlayer(code){
  const c=courtCallContext(code);
  const np=courtCallNotificationPermission(),pushReady=courtCallPushRegistered();
  const notifyButton=np==='default'
-  ? '<button class="btn btn-ghost" data-action="court-call-enable-notify">🔔 啟用背景通知</button>'
-  : (np==='granted'&&!pushReady?'<button class="btn btn-ghost" data-action="court-call-enable-notify">📱 啟用鎖屏推播</button>':'');
+  ? '<button class="btn btn-ghost court-call-notify-btn" data-action="court-call-enable-notify">🔔 啟用背景通知</button>'
+  : (np==='granted'&&!pushReady?'<button class="btn btn-ghost court-call-notify-btn" data-action="court-call-enable-notify">📱 啟用鎖屏推播</button>':'');
  const testButton=pushReady
-  ? `<button class="btn btn-ghost" data-action="court-call-test-push" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`
+  ? `<button class="btn btn-ghost court-call-test-btn" data-action="court-call-test-push" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`
   : '';
- return `<section>
-   <p class="hint">裁判人工叫號與智慧 ETA 已分離｜人工叫號約每 2–3 秒同步｜PASS：每人每賽事 1 次，且需有同台同輪下一場可承接${c.used?'｜本賽事已使用':''}</p>
-   <div class="btn-row" style="align-items:center">
-    ${notifyButton}${testButton}
-    <span class="hint">${esc(courtCallNotificationHint())}${courtCallPushTestResult?`｜${esc(courtCallPushTestResult)}`:''}</span>
+ const myRows=c.rows.filter(r=>r.players.some(p=>p.me));
+ return `<section class="court-call-player-section">
+   <div class="court-call-compact-summary">
+     <span>人工叫號｜智慧 ETA｜PASS 每賽事 1 次${c.used?'（已使用）':''}</span>
+     <details class="court-call-help">
+       <summary>叫號說明</summary>
+       <div>裁判人工叫號與智慧 ETA 已分離。人工叫號約每 2–3 秒同步；PASS 每人每賽事 1 次，且需有同台同輪下一場可承接。智慧 ETA 以每場 3 分鐘為基準，並依進行中比分動態修正；3 分賽點會縮短估時。</div>
+     </details>
+   </div>
+   <div class="court-call-notify-row">
+     <div class="court-call-notify-actions">${notifyButton}${testButton}</div>
+     <span class="court-call-notify-state">${esc(courtCallNotificationHint())}${courtCallPushTestResult?`｜${esc(courtCallPushTestResult)}`:''}</span>
    </div>
    ${courtCallCommon(c)}
-   ${c.rows.filter(r=>r.players.some(p=>p.me)).map(r=>courtCallRow(c,r,false)).join('')||'<p class="hint">等待裁判通知。</p>'}
+   <div class="court-call-active-list">${myRows.map(r=>courtCallRow(c,r,false)).join('')||'<p class="court-call-empty">等待裁判通知。</p>'}</div>
  </section>`;
 }
 
