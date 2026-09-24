@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260924.15">
+<meta name="bxh-build" content="20260924.16">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260924.15";
+  var CURRENT_BUILD="20260924.16";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -3361,6 +3361,68 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .room-status{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;white-space:nowrap}.room-status-dot{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 9px currentColor}.room-status-dot.green{background:#42e69b;color:#42e69b}.room-status-dot.yellow{background:#f5d85f;color:#f5d85f}.room-status-dot.orange{background:#ff9d45;color:#ff9d45}.room-status-dot.gray{background:#a7adb6;color:#a7adb6}.room-status-dot.red{background:#ff5568;color:#ff5568}.room-status-registration{color:#7cebb8}.room-status-live{color:#ffe078}.room-status-settling{color:#ffb268}.room-status-failed{color:#ff6c7c}.room-status-done{color:#c0c5cc}.room-status-prestart{color:#c9cdd4}.room-status-cancelled{color:#ff6c7c}
 .lobby-page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:14px;padding:14px 16px;border:1px solid rgba(217,185,92,.18);border-radius:14px;background:linear-gradient(135deg,rgba(217,185,92,.10),rgba(11,13,16,.88) 45%,rgba(11,13,16,.95));box-shadow:0 10px 24px rgba(0,0,0,.18)}.lobby-search-panel{margin-bottom:14px!important;padding:12px 14px}.lobby-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}.lobby-search-input{position:relative;min-width:0}.lobby-search-input span{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:19px;color:var(--gold);pointer-events:none}.lobby-search-input input{width:100%;height:42px;padding-left:40px;background:rgba(5,7,10,.72);border:1px solid var(--border);border-radius:9px;color:var(--white)}.lobby-filter-expanded .btn-row{margin-top:10px}.lobby-filter-summary{display:flex;align-items:center;justify-content:flex-end;gap:8px;font-size:11px;color:var(--metal-dim);margin:-4px 2px 10px}.lobby-filter-summary .link-btn{font-size:11px}.lobby-section .panel-title{margin-bottom:8px}.lobby-compact-card{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(9,11,15,.72);margin:8px 0;overflow:hidden}.lobby-compact-card[open]{border-color:rgba(217,178,73,.35)}.lobby-compact-card summary{list-style:none;cursor:pointer;padding:12px 14px}.lobby-compact-card summary::-webkit-details-marker{display:none}.lobby-card-main{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.lobby-room-name{font-weight:900;font-size:15px;color:#f3f5f8;line-height:1.25}.lobby-host{font-size:11px;color:var(--metal-dim);margin-top:3px}.lobby-card-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.lobby-authority{font-size:9px;font-weight:900;letter-spacing:.12em;padding:4px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.14)}.lobby-authority.official{color:#f0cf71;border-color:rgba(240,207,113,.38)}.lobby-authority.community{color:#8db7ff;border-color:rgba(141,183,255,.35)}.lobby-time-row{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:8px}.lobby-time{font-size:12px;color:#d7dbe2}.lobby-expand-label{font-size:10px;color:var(--metal-dim)}.lobby-card-detail{padding:0 14px 14px;border-top:1px solid rgba(255,255,255,.07)}.lobby-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 14px;padding-top:12px;font-size:12px;color:#c7ccd4}.lobby-description{margin-top:10px;padding:9px 10px;background:rgba(255,255,255,.025);border-radius:8px;font-size:12px;color:#aeb4bd}.lobby-card-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:12px}
 
+/* ==== v14.2.5 compact lobby toolbar ==== */
+.lobby-page-head-compact{
+  min-height:46px;
+  align-items:center!important;
+  margin-bottom:8px!important;
+  padding:6px 4px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.lobby-page-head-compact .settings-page-title{margin:0!important}
+.lobby-head-tools{display:flex;align-items:center;gap:6px;margin-left:auto}
+.lobby-tool-btn{
+  position:relative;
+  width:32px!important;
+  height:32px!important;
+  min-height:32px!important;
+  padding:0!important;
+  border-radius:9px!important;
+  font-size:17px!important;
+  line-height:1!important;
+  color:#c8cdd3!important;
+}
+.lobby-tool-btn:hover,.lobby-tool-btn:focus-visible{color:#f0cf71!important;border-color:rgba(240,207,113,.38)!important}
+.lobby-tool-btn.is-active::after{
+  content:"";
+  position:absolute;
+  top:4px;
+  right:4px;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#efff6a;
+  box-shadow:0 0 7px rgba(239,255,106,.65);
+}
+.lobby-tool-btn.is-busy{animation:lobby-tool-spin .72s linear infinite}
+@keyframes lobby-tool-spin{to{transform:rotate(360deg)}}
+.lobby-search-panel-compact{
+  margin:0 0 8px!important;
+  padding:10px 11px!important;
+  border-radius:12px!important;
+}
+.lobby-filter-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.lobby-filter-title-row strong{font-size:13px;color:#f1f2ee}
+.lobby-filter-active-chip{padding:3px 7px;border:1px solid rgba(239,255,106,.22);border-radius:999px;background:rgba(239,255,106,.055);color:#efff6a;font-size:9px;font-weight:800}
+.lobby-search-panel-compact .field{margin-bottom:8px}
+.lobby-filter-actions{margin-top:3px!important;justify-content:flex-end}
+.lobby-filter-summary{margin:0 2px 7px!important}
+@media(max-width:640px){
+  .lobby-page-head-compact{min-height:42px;padding:4px 2px!important}
+  .lobby-page-head-compact .settings-page-title{font-size:24px!important}
+  .lobby-tool-btn{width:30px!important;height:30px!important;min-height:30px!important;font-size:16px!important}
+  .lobby-search-panel-compact{padding:9px!important}
+  .lobby-search-panel-compact .grid-2{grid-template-columns:1fr 1fr!important;gap:7px!important}
+  .lobby-search-panel-compact .field label{font-size:10px!important}
+  .lobby-search-panel-compact .field input,.lobby-search-panel-compact .field select{min-height:38px!important;padding:8px 9px!important;font-size:12px!important}
+  .lobby-filter-actions .btn{min-height:36px!important;padding:7px 10px!important;font-size:11px!important}
+}
+@media(max-width:390px){.lobby-search-panel-compact .grid-2{grid-template-columns:1fr!important}}
+@media(prefers-reduced-motion:reduce){.lobby-tool-btn.is-busy{animation:none!important}}
+
 /* ==== 2026-09-22 lobby public roster polish ==== */
 .lobby-roster-block{margin-top:14px;border:1px solid rgba(240,207,113,.18);border-radius:12px;background:linear-gradient(180deg,rgba(8,10,14,.34),rgba(8,10,14,.18));overflow:hidden}
 .lobby-roster-head{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;list-style:none;user-select:none}
@@ -4511,9 +4573,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.4";
+const APP_VERSION = "v14.2.5";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.5",date:"2026/09/24",timezone:"Asia/Taipei",title:"賽事大廳工具列極簡化",updateLevel:"patch",added:[],changed:["賽事大廳移除常駐大型搜尋框、搜尋按鈕、篩選按鈕與說明副標","頁首改為賽事大廳＋小型搜尋／篩選入口＋小型刷新鍵","搜尋與日期／地區／賽制篩選保留原功能，僅在需要時展開；套用或清除後自動收合","手動刷新改為圖示按鈕並保留即時同步作為主要更新機制"],fixed:["大幅降低賽事大廳首屏工具區高度，讓比賽中／結算中等分類更快進入手機畫面"],environment:"Production / HTML + Firebase",deployStatus:"Frontend lobby compact toolbar",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事大廳改為極簡工具列；搜尋篩選按需展開，刷新縮成小圖示。"},
   {version:"v14.2.4",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況 Live Dashboard／比分拉霸／智慧倒數",updateLevel:"minor",added:["即時戰況新增充能式全場進度條與單淘汰階段節點","每個戰鬥台的下一場沿用智慧叫號比分估時模型，顯示動態倒數","即時戰況新增單一小型手動刷新鍵，可重新抓取全場最新雲端資料","比分變動時只讓變動側數字做一次短暫拉霸式滾動"],changed:["全場資訊與戰鬥台資訊合併為單一 Live Dashboard；移除重複的即時戰鬥台標題與說明","戰鬥台改顯示 1號台／2號台，責任裁判與台號置於同一資訊列","下一場改為低視覺權重單列，避免搶過目前對戰與比分","複數戰鬥台僅各自顯示該台專屬資訊；全場名稱、參賽人數、階段與進度只顯示一次"],fixed:["避免多 Court 模式重複全場資訊造成手機頁面過長","避免下一場卡片比目前對戰更醒目"],environment:"Production / HTML + Firebase",deployStatus:"Frontend live dashboard refinement",firebaseImpact:"無資料結構變更；沿用既有 match／courtAssignments／eligiblePlayers 與智慧叫號 ETA 模型",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況整合為一張全場進度＋多戰鬥台看板，比分會在變動時短暫滾動，下一場顯示智慧倒數。"},
   {version:"v14.2.3",date:"2026/09/24",timezone:"Asia/Taipei",title:"即時戰況概況卡極簡化",updateLevel:"patch",added:[],changed:["即時戰況原 7 格大型活動資訊 Dashboard 改為單張 Compact Live Summary","移除活動日期與重複的預計總場次／已完成場次獨立卡片；場次改合併為完成／總場次","完成率改為右上角輔助數字，正式參賽人數改為單一核心統計","活動地點與戰鬥台數量降為底部小字，分享按鈕同步縮小"],fixed:["降低即時戰況頁非必要資訊佔用，讓目前 Court 與即時排名更快進入手機首屏"],environment:"Production / HTML + Firebase",deployStatus:"Frontend compact live summary experiment",firebaseImpact:"無資料結構變更；沿用既有 eligiblePlayers 與 match 統計來源",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"即時戰況概況區縮成單張薄卡，保留狀態、賽名、完成進度、正式參賽與完成率。"},
   {version:"v14.2.2",date:"2026/09/24",timezone:"Asia/Taipei",title:"BXH CALL 2.0｜PASS 可用性提示優化",updateLevel:"patch",added:["叫號資料新增 PASS 可用性判定，玩家在操作前即可知道是否有同台同輪下一場可承接","PASS 不可用時顯示明確原因，不再讓玩家按下後才看到失敗"],changed:["叫號彈窗與我的賽程固定保留 PASS 按鈕；不可用時改為灰階停用並標示「後方無場次／非目前場次／已使用」","PASS 說明補充必須存在同台同輪下一場可承接"],fixed:["修正 2 人單場或同輪最後一場仍看似可按 PASS、造成操作像卡住的體驗"],environment:"Production / HTML + Firebase",deployStatus:"Frontend PASS availability UX + server-authoritative availability",firebaseImpact:"courtCallService list response 新增 passUnavailableReason；無新增集合",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"PASS 現在會在操作前直接判定是否可延後；後方無場次時按鈕會停用並說明原因。"},
@@ -16284,22 +16347,27 @@ function lobbyMatchesActiveFilters(t){
   return true;
 }
 function lobbyFilterPanelHtml(){
+  if(!findEventsFiltersOpen) return "";
   const f=findEventsFilters;
   const active=!!(f.keyword||f.date||f.region||(f.format&&f.format!=="all"));
-  return `<div class="panel lobby-search-panel">
-    ${!findEventsFiltersOpen?`<div class="lobby-search-row">
-      <div class="lobby-search-input"><span>⌕</span><input type="search" id="fe-quick-search" value="${esc(f.keyword)}" placeholder="搜尋賽事、主辦或地點"></div>
-      <button class="btn btn-primary btn-sm" data-action="apply-find-events-quick-search">搜尋</button>
-      <button class="btn btn-ghost btn-sm" data-action="toggle-find-events-filters">篩選${active?" · 已套用":""}</button>
-    </div>`:`<div class="lobby-filter-expanded">
+  return `<div class="panel lobby-search-panel lobby-search-panel-compact">
+    <div class="lobby-filter-expanded">
+      <div class="lobby-filter-title-row">
+        <strong>搜尋／篩選</strong>
+        ${active?'<span class="lobby-filter-active-chip">已套用</span>':""}
+      </div>
       <div class="grid grid-2">
-        <div class="field"><label>關鍵字</label><input type="text" id="fe-keyword" value="${esc(f.keyword)}" placeholder="賽事、主辦或地點"></div>
+        <div class="field"><label>關鍵字</label><input type="search" id="fe-keyword" value="${esc(f.keyword)}" placeholder="賽事、主辦或地點"></div>
         <div class="field"><label>日期</label><input type="date" id="fe-date" value="${esc(f.date)}"></div>
         <div class="field"><label>地區</label><input type="text" id="fe-region" value="${esc(f.region)}" placeholder="例如：台南、仁德"></div>
         <div class="field"><label>賽制</label><select id="fe-format"><option value="all" ${f.format==="all"?"selected":""}>全部賽制</option><option value="single" ${f.format==="single"?"selected":""}>單淘汰賽</option><option value="double" ${f.format==="double"?"selected":""}>雙敗制</option><option value="roundrobin" ${f.format==="roundrobin"?"selected":""}>單循環賽</option></select></div>
       </div>
-      <div class="btn-row"><button class="btn btn-primary btn-sm" data-action="apply-find-events-filter">套用篩選</button><button class="btn btn-ghost btn-sm" data-action="clear-find-events-filter">清除</button><button class="btn btn-ghost btn-sm" data-action="toggle-find-events-filters">收合</button></div>
-    </div>`}
+      <div class="btn-row lobby-filter-actions">
+        <button class="btn btn-primary btn-sm" data-action="apply-find-events-filter">套用</button>
+        ${active?'<button class="btn btn-ghost btn-sm" data-action="clear-find-events-filter">清除</button>':""}
+        <button class="btn btn-ghost btn-sm" data-action="toggle-find-events-filters">關閉</button>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -16334,9 +16402,12 @@ function renderTournamentLobby(opts={}){
   const waitingBody=waiting.length?waiting.map(t=>lobbyCard(t,"waiting",loggedIn)).join(""):`<div class="empty-state fe-empty-line">目前沒有等待開始的房間</div>`;
   const endedBody=ended.length?ended.map(t=>lobbyCard(t,"ended",loggedIn)).join(""):`<div class="empty-state fe-empty-line">目前沒有近期已結束房間</div>`;
   return `
-    <div class="lobby-page-head">
-      <div><div class="settings-page-title">賽事大廳</div><div class="settings-page-sub">即時賽事優先，其餘資訊按需展開。</div></div>
-      <button class="btn btn-ghost btn-sm" data-action="refresh-public-tournaments">重新整理</button>
+    <div class="lobby-page-head lobby-page-head-compact">
+      <div class="settings-page-title">賽事大廳</div>
+      <div class="lobby-head-tools">
+        <button class="btn btn-ghost lobby-tool-btn ${filtered?"is-active":""}" data-action="toggle-find-events-filters" title="搜尋／篩選" aria-label="搜尋或篩選賽事" aria-expanded="${findEventsFiltersOpen?"true":"false"}">⌕</button>
+        <button class="btn btn-ghost lobby-tool-btn ${publicTournamentsLoading?"is-busy":""}" data-action="refresh-public-tournaments" ${publicTournamentsLoading?"disabled":""} title="重新整理" aria-label="重新整理賽事大廳">↻</button>
+      </div>
     </div>
     ${lobbyFilterPanelHtml()}
     ${filtered?`<div class="lobby-filter-summary">目前篩選結果 ${total} 場 <button class="link-btn" data-action="clear-find-events-filter">清除篩選</button></div>`:""}
@@ -21216,6 +21287,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       region: document.getElementById("fe-region")?.value.trim() || "",
       format: document.getElementById("fe-format")?.value || "all"
     };
+    findEventsFiltersOpen = false;
     renderPreservingScroll();
     return;
   }
@@ -21228,6 +21300,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="clear-find-events-filter"){
     findEventsFilters = { keyword:"", date:"", region:"", format:"all" };
+    findEventsFiltersOpen = false;
     renderPreservingScroll();
     return;
   }
