@@ -16,9 +16,11 @@ has("data-raffle-join-confirm=\"yes\"","P5 explicit join confirm button missing"
 has("data-raffle-join-confirm=\"no\"","P5 explicit cancel button missing");
 has("dialog.addEventListener('cancel',event=>{event.preventDefault();done(false);});","P5 ESC/back cancel must resolve false");
 has("if(!approved)return;","P5 cancelled dialog must stop before join");
+has("ticketConfirmation:preview.confirmationToken","P5 confirmed join must bind the exact preview token");
 has("await raffleMutate({action:'join'","P5 confirmed join mutation missing");
 has("const sensitive=!!(payload?.password||payload?.config?.joinPassword);","Join password must remain excluded from session persistence");
 has("'unsupported-ticket-policy':'活動票券規格需要更新","P5 unsupported policy user message missing");
+has("'ticket-confirmation-stale':'票券狀態已變更","P5 stale confirmation user message missing");
 before("preview=await window.engagementService.raffle({action:'joinPreview'","await raffleMutate({action:'join'","P5 preview must occur before the write call");
 if(source.includes("join:'確認參加？如採用消耗票券條件"))throw new Error('Legacy generic ticket confirmation must be removed');
 console.log('PASS HUNTER LOOP P5 frontend join preview / explicit confirmation guards');
