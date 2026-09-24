@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260925.36">
+<meta name="bxh-build" content="20260925.37">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260925.36";
+  var CURRENT_BUILD="20260925.37";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5063,6 +5063,22 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 .venue-navigation-links a,.venue-navigation-links button{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--white);font:inherit;text-decoration:none;}
 .venue-navigation-note,.venue-navigation-status{font-size:12px;line-height:1.6;color:var(--metal);}
 .venue-navigation-fallback{position:fixed;inset:10% auto auto 50%;transform:translateX(-50%);z-index:10000;}
+
+/* P7.13: scoped compact poster controls, never affect competition cards. */
+.ai-poster-input{border:1px solid var(--gold-dim);border-radius:10px;padding:12px;margin-bottom:14px;min-width:0;}
+.ai-poster-input input[hidden]{display:none;}
+.ai-poster-pick{display:block!important;width:100%;min-height:44px;margin:10px 0;white-space:normal;}
+.ai-poster-help{font-size:11px;color:var(--metal);line-height:1.6;}
+.ai-poster-preview{display:grid;grid-template-columns:100px minmax(0,1fr);gap:12px;margin-top:12px;align-items:center;}
+.ai-poster-preview img{width:100%;max-height:145px;object-fit:contain;border-radius:6px;}
+.ai-poster-preview strong{font-size:12px;overflow-wrap:anywhere;}
+.ai-poster-preview p{font-size:11px;color:var(--metal);}
+.ai-poster-preview button{min-height:44px;font-size:12px;white-space:normal;}
+.ai-poster-evidence{margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;}
+.ai-poster-evidence summary{cursor:pointer;min-height:28px;}
+.ai-poster-evidence pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;font:inherit;line-height:1.7;}
+.ai-create-dialog:has(.ai-poster-preview) .ai-create-source{min-height:100px;}
+.ai-create-dialog:has(.ai-poster-preview) .ai-create-fields{display:none;}
 </style>
 <script src="ladder-v1.js?v=20260921.9"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -5482,6 +5498,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
 <script src="family-ui.js?v=14.0.24"></script>
 <script src="raffle-ui.js?v=14.0.12"></script>
+<script src="ai-poster-ui.js?v=14.2.26"></script>
 <script>
 // Standalone browsers do not provide the hosted artifact's window.storage API.
 // Preserve an existing provider; propagate storage failures to existing callers.
@@ -5903,9 +5920,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.25";
+const APP_VERSION = "v14.2.26";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {"version":"v14.2.26","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.13 海報輔助開房","updateLevel":"minor","added":["AI 協助建立可上傳 JPG／PNG 海報並加上補充文案","海報辨識文字、獎品與警告保留於預覽；僅套入草稿"],"changed":["來源更換、取消或切換帳號／房間時捨棄過期回應","保留公版勾選與房主人工審核"],"fixed":["海報來源警告持續出現在審核閘門，不因關閉預覽而遺失"],"environment":"Production / Restricted Beta","deployStatus":"P7.13 frontend integration","firebaseImpact":"沿用獨立海報解析 Callable；無資料遷移","securityRulesImpact":"無","permissionImpact":"沿用 Restricted Beta 白名單","publicSummary":"上傳海報即可擷取活動資訊、套入原有草稿；房主確認後才儲存或發布。"},
   {"version":"v14.2.25","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.12.1 導航防呆與複製地址","updateLevel":"patch","added":["導航視窗新增完整地址與複製地址","多個地圖連結需房主確認，不自動選擇"],"changed":["Google 保留主辦提供的連結；Apple 僅依地址建立路線","只有店名時不推測目的地；導航視窗獨立於資訊卡，避免手機裁切"],"fixed":["修正清空場地後舊地址回填","修正僅填地址時被存成店名","加強 Maps URL 主機、路徑與安全格式檢查"],"environment":"Production / Event Info V2","deployStatus":"P7.12.1 navigation hardening","firebaseImpact":"沿用 eventInfo.venue；無資料移轉或新增集合","securityRulesImpact":"無","permissionImpact":"無","publicSummary":"場地導航可查看並複製完整地址；清空地址不再恢復舊值，缺地址不會自動導航到同名店家。"},
   {version:"v14.2.24",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.12 結構化場地與雙地圖導航",updateLevel:"minor",added:["賽事設定將活動地點拆分為場地／店家名稱、活動地址、Google Maps 連結與導航開關","玩家賽事詳情的地址旁新增小型「🧭 導航」選單，可開啟 Google Maps 或 Apple 地圖","AI 開房會從原始文案自動辨識 maps.app.goo.gl／Google Maps 連結並帶入場地草稿","即使沒有 Google Maps 連結，只要有地址也能自動產生 Google／Apple 導航"],changed:["舊版 meta.location 仍由場地名稱＋地址自動產生，維持歷史紀錄、搜尋、賽事列表與舊功能相容","公開 eventInfo 僅白名單輸出場地名稱、地址、合法 Google Maps URL 與導航開關"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend venue/navigation layer",firebaseImpact:"沿用 eventInfo.venue；無新增 collection",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事場地改為結構化資料，玩家可直接從地址旁選擇 Google Maps 或 Apple 地圖導航。"},
   {version:"v14.2.23",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.11C AI 智慧修正建議",updateLevel:"minor",added:["AI 草稿套用後新增「AI 智慧修正建議」卡片，可逐項勾選並一鍵確認套用","建議明確區分「原文資訊」與「系統建議」，避免把推算值偽裝成原始活動內容","可補開始報到、需要報到、開賽時間、報名開放／截止、正取名額與報名費","原文缺少報到開始時間但已有開賽時間時，可建議開賽前 30 分鐘開始報到；原文缺少開賽時間但有報到結束時間時，可建議以報到結束作為開賽時間"],changed:["所有系統推算值都必須由房主勾選並按「確認並套用」才會進入草稿","套用建議後會重新執行 AI 審核閘門，不直接儲存或發布"],fixed:[],environment:"Production / AI Create Restricted Beta",deployStatus:"Frontend suggestion layer",firebaseImpact:"無新增資料集合或 Rules 變更",securityRulesImpact:"無",permissionImpact:"沿用 AI Create Restricted Beta 權限",publicSummary:"AI 開房現在不只指出缺漏，也能提出可確認的一鍵修正方案；推算值會清楚標示，不會自行修改房間。"},
@@ -9216,6 +9234,90 @@ let aiCreateReviewAcknowledged = false;
 let aiCreateParseBusy = false;
 let aiCreateSuggestionSelection = {};
 
+// P7.13 poster input session. Images stay in memory and never enter room state.
+let aiCreatePosterFile=null;
+let aiCreatePosterPreparing=false;
+let aiCreatePosterGeneration=0;
+let aiCreateInputGeneration=0;
+let aiCreateParsedContext=null;
+let aiCreatePosterOwner=null;
+function aiCreateInvalidateInput(){
+  aiCreateInputGeneration++;
+  aiCreateParseBusy=false;
+  aiCreateParsedContext=null;
+  aiCreateStructuredResult=null;
+  aiCreateStructuredErrors=[];
+  aiCreateSelectedEventKey="";
+  aiCreateAssistantNotice="";
+  aiCreateReviewAcknowledged=false;
+}
+function aiCreateReleasePoster(clearResult=true){
+  aiCreatePosterGeneration++;
+  if(window.BxhPoster)window.BxhPoster.release(aiCreatePosterFile);
+  aiCreatePosterFile=null;
+  aiCreatePosterOwner=null;
+  aiCreatePosterPreparing=false;
+  if(clearResult)aiCreateInvalidateInput();
+  else{aiCreateInputGeneration++;aiCreateParseBusy=false;aiCreateParsedContext=null;}
+}
+function aiCreateCaptureContext(){
+  return {generation:aiCreateInputGeneration,room:state,roomId:state&&state.id,uid:firebaseUser&&firebaseUser.uid,source:String(aiCreateSourceText||"").trim(),poster:aiCreatePosterFile};
+}
+function aiCreateContextValid(context){
+  return !!(context&&aiCreateAssistantOpen&&aiCreateBetaActorAllowed()&&context.uid&&context.uid===(firebaseUser&&firebaseUser.uid)&&context.room===state&&context.roomId===state.id&&context.generation===aiCreateInputGeneration&&context.source===String(aiCreateSourceText||"").trim()&&context.poster===aiCreatePosterFile);
+}
+async function aiCreateLoadPoster(file){
+  if(!file)return;
+  if(!aiCreateBetaActorAllowed()||!aiCreateAssistantOpen)return;
+  aiCreateReleasePoster();
+  if(!window.BxhPoster){aiCreateAssistantNotice="海報模組尚未載入，請重新整理後再試。";render();return;}
+  const generation=aiCreatePosterGeneration,room=state,uid=firebaseUser&&firebaseUser.uid;
+  aiCreatePosterPreparing=true;
+  aiCreatePosterOwner={room,uid};
+  aiCreateAssistantNotice="正在本機處理海報；按下開始解析前不會送出圖片。";
+  render();
+  try{
+    const image=await window.BxhPoster.prepareImage(file);
+    if(generation!==aiCreatePosterGeneration||!aiCreateAssistantOpen||room!==state||uid!==(firebaseUser&&firebaseUser.uid)||!aiCreateBetaActorAllowed()){
+      window.BxhPoster.release(image);return;
+    }
+    aiCreatePosterFile=image;
+    aiCreateAssistantNotice="海報已備妥；可補充文案後開始解析。圖片只用於辨識，不會存成活動封面。";
+  }catch(error){
+    if(generation===aiCreatePosterGeneration)aiCreateAssistantNotice=window.BxhPoster.errorMessage(error);
+  }finally{
+    if(generation===aiCreatePosterGeneration){aiCreatePosterPreparing=false;render();}
+  }
+}
+function aiCreateEvidenceText(){
+  return window.BxhPoster?window.BxhPoster.evidence(aiCreateStructuredResult,aiCreateSourceText):String(aiCreateSourceText||"").trim();
+}
+function renderAiCreatePosterInput(){
+  const image=aiCreatePosterFile;
+  return `<div class="ai-poster-input">
+    <strong>🖼️ 活動海報（選填）</strong>
+    <input id="ai-create-poster-file" type="file" accept="image/jpeg,image/png" aria-describedby="ai-poster-help" hidden>
+    <button id="ai-create-poster-pick" type="button" class="btn btn-ghost ai-poster-pick">${image?"更換海報":"選擇 JPG／PNG 海報"}</button>
+    <div id="ai-poster-help" class="ai-poster-help">JPG／PNG，原圖最多 12 MB。圖片會在本機縮圖；按「開始解析」才送往辨識服務。</div>
+    ${aiCreatePosterPreparing?'<div role="status">正在處理圖片…</div>':""}
+    ${image?`<div class="ai-poster-preview"><img src="${esc(image.previewUrl)}" alt="所選活動海報預覽"><div><strong>${esc(image.name)}</strong><p>${image.width} × ${image.height} · ${Math.ceil(image.byteLength/1024)} KB</p><button id="ai-create-poster-remove" type="button" class="btn btn-ghost">移除海報／改用文字</button></div></div>`:""}
+  </div>`;
+}
+function renderAiCreatePosterEvidence(){
+  const result=aiCreateStructuredResult;
+  if(!result||result.sourceMode!=="poster-callable")return "";
+  return `<details class="ai-poster-evidence"><summary>查看海報辨識文字與獎品（請人工核對）</summary><pre>${esc(result.posterText||"")}</pre></details>`;
+}
+function bindAiCreatePosterInputs(){
+  const input=document.getElementById("ai-create-poster-file");
+  const pick=document.getElementById("ai-create-poster-pick");
+  if(pick&&input)pick.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();input.click();});
+  if(input)input.addEventListener("change",()=>{const file=input.files&&input.files[0];if(file)aiCreateLoadPoster(file);});
+  const remove=document.getElementById("ai-create-poster-remove");
+  if(remove)remove.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();aiCreateReleasePoster();render();});
+}
+
+
 function aiCreateTimeMinusMinutes(value,minutes){
   const m=String(value||"").match(/^([01]\d|2[0-3]):([0-5]\d)$/);
   if(!m)return "";
@@ -9230,8 +9332,9 @@ function aiCreateSuggestionList(){
   if(!aiCreateLastApplied)return [];
   ensureSettingsFormDraft();ensureRegistrationFormDraft();
   const d=settingsFormDraft||{},rd=registrationFormDraft||{};
-  const event=aiCreateSelectedEvent()||{};
-  const activity=(aiCreateStructuredResult&&aiCreateStructuredResult.activity)||{};
+  const applied=aiCreateLastApplied.result||aiCreateStructuredResult||{};
+  const event=(applied.events||[]).find(e=>e.key===aiCreateLastApplied.eventKey)||(applied.events||[])[0]||{};
+  const activity=applied.activity||{};
   const list=[];
   const add=(s)=>{
     if(list.some(x=>x.id===s.id))return;
@@ -9425,7 +9528,7 @@ const AI_CREATE_MAX_SOURCE_CHARS = 12000;
 const AI_CREATE_RESTRICTED_BETA_FRONTEND = true;
 
 function aiCreateBetaActorAllowed(){
-  return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
+  return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.deleted!==true && !["deleted","frozen","disabled"].includes(userProfile.accountStatus) &&
     (userProfile.role==="super_admin" || (userProfile.role==="admin" && userProfile.aiCreateBetaEnabled===true)));
 }
 function aiCreateRemoteParserEnabled(){
@@ -9572,57 +9675,44 @@ async function requestAiCreateStructuredResult(text){
 }
 
 async function runAiCreateParse(){
-  if(aiCreateParseBusy) return;
+  if(aiCreateParseBusy||aiCreatePosterPreparing||!aiCreateBetaActorAllowed()||!aiCreateAssistantOpen)return;
   const input=document.getElementById("ai-create-source-text");
-  if(input) aiCreateSourceText=input.value;
+  if(input)aiCreateSourceText=input.value;
   const source=String(aiCreateSourceText||"").trim();
-  if(!source){
-    showToast("請先貼上活動文案",true);
-    return;
-  }
-  aiCreateStructuredResult=null;
-  aiCreateStructuredErrors=[];
-  aiCreateSelectedEventKey="";
-  aiCreateReviewAcknowledged=false;
-  aiCreateSuggestionSelection={};
+  if(!source&&!aiCreatePosterFile){showToast("請先選擇海報或貼上活動文案",true);return;}
+  if(source.length>AI_CREATE_MAX_SOURCE_CHARS){showToast("補充文案最多 12,000 字",true);return;}
+  aiCreateInvalidateInput();
+  const context=aiCreateCaptureContext();
   aiCreateParseBusy=true;
-  aiCreateAssistantNotice=aiCreateRemoteParserEnabled()
-    ?"正在透過 Firebase Callable 解析文案；解析結果仍只會進入草稿預覽，不會建立或發布賽事。"
-    :"P7.5 安全測試模式：遠端 AI Parser 預設關閉，正在檢查 Golden Test Case。";
+  aiCreateSuggestionSelection={};
+  aiCreateAssistantNotice=context.poster?"正在辨識海報與補充文案；只產生草稿預覽，不會建立或發布賽事。":"正在解析活動文案；只產生草稿預覽，不會建立或發布賽事。";
   render();
   try{
-    const parsed=await requestAiCreateStructuredResult(source);
-    if(!parsed.ok){
-      aiCreateAssistantNotice=parsed.message||"AI Parser 尚未啟用。";
-      return;
+    let candidate;
+    if(context.poster){
+      if(!window.BxhPoster||!window.engagementService||typeof window.engagementService.aiCreatePosterParser!=="function")throw new Error("service-unavailable");
+      const response=await window.engagementService.aiCreatePosterParser(window.BxhPoster.buildRequest(context.poster,source));
+      if(!aiCreateContextValid(context))return;
+      candidate=window.BxhPoster.validateEnvelope(response,validateAiCreateStructuredResult);
+    }else{
+      const parsed=await requestAiCreateStructuredResult(source);
+      if(!aiCreateContextValid(context))return;
+      if(!parsed.ok){aiCreateAssistantNotice=parsed.message||"AI Parser 尚未啟用。";return;}
+      candidate=parsed.result;
+      if(candidate&&parsed.source==="remote-callable"&&!candidate.sourceMode)candidate.sourceMode="remote-callable";
     }
-    const candidate=parsed.result;
-    if(candidate && parsed.source==="remote-callable" && !candidate.sourceMode) candidate.sourceMode="remote-callable";
     const validation=validateAiCreateStructuredResult(candidate);
-    if(!validation.ok){
-      aiCreateStructuredErrors=validation.errors;
-      aiCreateAssistantNotice="P7.5 Parser 回傳結構驗證失敗；資料已停止在預覽層，不會進入賽事草稿。";
-      return;
-    }
+    if(!validation.ok){aiCreateStructuredErrors=validation.errors;aiCreateAssistantNotice="解析結果未通過結構檢查，已停止套用。";return;}
+    if(!aiCreateContextValid(context))return;
     aiCreateStructuredResult=candidate;
-    aiCreateSelectedEventKey=(candidate.events&&candidate.events[0]&&candidate.events[0].key)||"";
-    aiCreateAssistantNotice=(parsed.source==="remote-callable"
-      ?"P7.5 遠端 Parser 已回傳標準結構。"
-      :"P7.5 Golden Test Case 已通過介面層。")
-      +" 請選擇要建立的賽事，再套用至 ARENA 草稿；套用後仍需通過 AI 審核閘門，且不會自動發布。";
-  }catch(e){
-    console.warn("AI create parser failed",e);
-    const raw=String((e&&e.message)||"");
-    aiCreateAssistantNotice=raw.includes("beta-not-allowed")
-      ?"此帳號尚未加入 AI 開房 Beta；ARENA 已安全停止，不會改動賽事草稿。"
-      :raw.includes("beta-disabled")
-        ?"AI 開房 Restricted Beta 後端尚未啟用；ARENA 已安全停止，不會改動賽事草稿。"
-        :raw.includes("feature-disabled")
-          ?"後端 AI Parser 功能目前關閉；ARENA 已安全停止，不會改動賽事草稿。"
-          :"AI Parser 連線失敗；ARENA 已安全停止，不會改動賽事草稿。";
+    aiCreateParsedContext=context;
+    aiCreateSelectedEventKey=candidate.events[0].key;
+    aiCreateAssistantNotice=context.poster?"海報已辨識。請核對預覽與辨識文字；圖文衝突不會自動選邊。套入草稿後，仍可勾選 BXH 公版，並須完成房主審核。":"文案已解析。請選擇賽事並套入草稿；仍須由房主確認，不會自動發布。";
+  }catch(error){
+    if(!aiCreateContextValid(context))return;
+    aiCreateAssistantNotice=context.poster&&window.BxhPoster?window.BxhPoster.errorMessage(error):"AI Parser 連線失敗；未變更賽事草稿，請確認登入與服務狀態後重試。";
   }finally{
-    aiCreateParseBusy=false;
-    render();
+    if(aiCreateContextValid(context)){aiCreateParseBusy=false;render();if(aiCreateStructuredResult)setTimeout(()=>{if(aiCreateParsedContext===context&&aiCreateContextValid(context))document.querySelector(".ai-create-result")?.scrollIntoView({block:"start"});},0);}
   }
 }
 
@@ -9695,7 +9785,7 @@ function aiCreateDraftMappingModel(){
   if(!result||!event) return null;
   const activity=result.activity||{};
   const warnings=[];
-  const mapLinks=extractGoogleMapsUrlsFromText(aiCreateSourceText);
+  const mapLinks=extractGoogleMapsUrlsFromText(aiCreateEvidenceText());
   if(mapLinks.length>1)warnings.push("原文包含多個地圖連結，未自動選擇；請房主確認本場場地連結。");
   const checkinCompatible=aiCreateHalfHourCompatible(event.checkInStart);
   const startCompatible=aiCreateHalfHourCompatible(event.startAt);
@@ -9711,7 +9801,7 @@ function aiCreateDraftMappingModel(){
   if(event.checkInEnd) warnings.push("現行房間欄位只有單一「報到時間」；本次只處理報到開始時間。");
   if(event.endAt) warnings.push("現行房間基本資料沒有活動結束時間欄位；"+event.endAt+" 不會寫入草稿。");
   if(Array.isArray(result.bundleOffers)&&result.bundleOffers.length) warnings.push("雙賽／套票優惠目前沒有對應房間欄位，本次不寫入。");
-  return {
+  const model={
     event,
     activity,
     settings:{
@@ -9734,13 +9824,14 @@ function aiCreateDraftMappingModel(){
       registrationCapacity:event.capacity!=null?event.capacity:null,
       registrationFee:event.fee!=null?event.fee:null,
       targetGroup:(event.targetGroup==="open"||event.targetGroup==="children")?event.targetGroup:null,
-      eventDescription:String(aiCreateSourceText||"").trim()
+      eventDescription:aiCreateEvidenceText()
     },
     warnings
   };
+  return window.BxhPoster?window.BxhPoster.guardMapping(model,result):model;
 }
-
 function applyAiCreateSelectedEventToDraft(){
+  if(aiCreateParseBusy||aiCreatePosterPreparing||!aiCreateContextValid(aiCreateParsedContext))return {ok:false,error:"來源、帳號或房間已變更，請重新解析後再套用。"};
   const model=aiCreateDraftMappingModel();
   if(!model) return {ok:false,error:"請先完成解析並選擇賽事"};
   if(state.archiveStatus==="completed" || state.startedAt || state.bracketSize>0 || (state.matches||[]).some(m=>m&&((m.log&&m.log.length)||m.winnerId||m.completed))){
@@ -9756,6 +9847,13 @@ function applyAiCreateSelectedEventToDraft(){
 
   const mapped=[];
   const s=model.settings,r=model.registration;
+  if(aiCreateStructuredResult.sourceMode==="poster-callable"){
+    // Explicit application: missing poster values must not revive values from an older poster.
+    for(const key of ["name","date","venueName","venueAddress","googleMapsUrl","location","checkin","startTime"])settingsFormDraft[key]=s[key]||"";
+    settingsFormDraft.navigationEnabled=!!s.navigationEnabled;
+    registrationFormDraft.registrationCapacity=r.registrationCapacity;
+    registrationFormDraft.registrationFee=r.registrationFee;
+  }
   if(s.name){settingsFormDraft.name=s.name;mapped.push("賽事名稱");}
   if(s.date){settingsFormDraft.date=s.date;mapped.push("活動日期");}
   if(s.venueName){settingsFormDraft.venueName=s.venueName;mapped.push("場地名稱");}
@@ -9786,6 +9884,8 @@ function applyAiCreateSelectedEventToDraft(){
   registrationFormDraftDirty=true;
   aiCreateLastApplied={
     eventName:model.event.name||"未命名賽事",
+    result:JSON.parse(JSON.stringify(aiCreateStructuredResult)),
+    eventKey:aiCreateSelectedEventKey,
     mappedFields:[...new Set(mapped)],
     warnings:model.warnings.slice(),
     at:Date.now()
@@ -9825,8 +9925,8 @@ function aiCreateReviewReport(){
   ensureSettingsFormDraft();
   ensureRegistrationFormDraft();
   const d=settingsFormDraft||{},rd=registrationFormDraft||{};
-  const event=aiCreateSelectedEvent();
-  const result=aiCreateStructuredResult||{};
+  const result=aiCreateLastApplied.result||aiCreateStructuredResult||{};
+  const event=(result.events||[]).find(e=>e.key===aiCreateLastApplied.eventKey)||(result.events||[])[0]||null;
   const blockers=[],warnings=[],infos=[];
   const seen=new Set();
   const add=(bucket,code,title,message)=>{
@@ -9863,6 +9963,8 @@ function aiCreateReviewReport(){
       // Missing close time is already a blocker above; don't duplicate it.
     } else if(item.code==="multi-event") add(infos,"multi-event","原文包含多場賽事",item.message||"目前只會套用房主選定的單一賽事。");
     else if(item.code==="unsupported-target-group") add(infos,"unsupported-target-group","存在尚未映射的資格條件",item.message||"部分資格條件沒有原生欄位。");
+    else if(result.sourceMode==="poster-callable")add(warnings,"poster:"+item.code+":"+String(item.field||"")+":"+item.message,"海報提醒"+(item.field?"｜"+item.field:""),item.message);
+
   });
 
   if(result.activity?.registrationOpenAt && !aiCreateHalfHourCompatible(result.activity.registrationOpenAt) && !rd.registrationOpenAt){
@@ -9972,8 +10074,8 @@ function renderAiCreateStructuredPreview(){
   const openAt=a.registrationOpenAt?String(a.registrationOpenAt).replace("T"," ").replace(":00+08:00",""):"—";
   return `<div class="ai-create-result">
     <div class="ai-create-result-head">
-      <strong>P7.2｜結構化解析預覽</strong>
-      <span class="ai-create-schema-badge">${esc(result.schemaVersion)}</span>
+      <strong>辨識結果｜請核對後套用</strong>
+      <span class="ai-create-schema-badge">${result.sourceMode==="poster-callable"?"海報辨識":"文案辨識"}</span>
     </div>
     <div class="ai-create-result-body">
       <div class="ai-create-shared-grid">
@@ -10017,13 +10119,14 @@ function renderAiCreateAssistant(){
         <div>
           <div class="ai-create-kicker">ARENA AI · RESTRICTED BETA</div>
           <div class="ai-create-title" id="ai-create-title">✨ AI 協助建立賽事</div>
-          <div class="ai-create-sub">貼上 LINE、Threads、Facebook、Instagram 等活動文案。後續將由 AI 擷取資訊，再套入現有賽事設定草稿供房主審核。</div>
+          <div class="ai-create-sub">上傳活動海報，或貼上 LINE、Threads 等活動文案。AI 擷取資訊後套入原有草稿，最後由房主確認。</div>
         </div>
         <button type="button" class="ai-create-close" data-action="ai-create-close" aria-label="關閉 AI 協助建立">✕</button>
       </div>
       <div class="ai-create-body">
-        <label for="ai-create-source-text" style="display:block;font-weight:800;color:var(--ivory);margin-bottom:8px;">活動文案</label>
-        <textarea id="ai-create-source-text" class="ai-create-source" maxlength="12000" placeholder="請貼上活動文案……">${esc(aiCreateSourceText)}</textarea>
+        ${renderAiCreatePosterInput()}
+        <label for="ai-create-source-text" style="display:block;font-weight:800;color:var(--ivory);margin-bottom:8px;">${aiCreatePosterFile?"補充文案（選填）":"活動文案"}</label>
+        <textarea id="ai-create-source-text" class="ai-create-source" maxlength="12000" placeholder="可補充日期、場地、獎品或其他活動資訊……">${esc(aiCreateSourceText)}</textarea>
         <div class="ai-create-meta">
           <span>${aiCreateRemoteParserEnabled()?"遠端 Parser 已啟用：文案會送往 Firebase Callable，由後端解析。":"安全測試模式：遠端 AI Parser 預設關閉；目前只允許 Golden Test Case。"}</span>
           <span id="ai-create-char-count">${charCount.toLocaleString("zh-TW")} / 12,000</span>
@@ -10038,13 +10141,14 @@ function renderAiCreateAssistant(){
           <span class="ai-create-chip">名額</span>
           <span class="ai-create-chip">費用</span>
         </div>
-        <div class="ai-create-safety">🔒 AI 只負責產生「賽事設定草稿」。正式設計中將維持：AI 不直接建立房間、不直接寫入正式賽事資料，也沒有發布權；最後仍由房主確認。</div>
+        <div class="ai-create-safety">🔒 AI 只產生草稿，不會直接建立或發布房間。套用後仍可勾選 BXH 公版；既有活動說明與公版選擇不覆蓋。海報未辨識欄位留空，請房主核對。</div>
         ${aiCreateAssistantNotice?`<div class="ai-create-notice">${esc(aiCreateAssistantNotice)}</div>`:""}
         ${renderAiCreateStructuredPreview()}
+        ${renderAiCreatePosterEvidence()}
         <div class="ai-create-actions">
           ${aiCreateStructuredResult?'<button type="button" class="btn btn-ghost ai-create-apply-btn" data-action="ai-create-apply">✓ 套用選定賽事至草稿</button>':""}
           <button type="button" class="btn btn-ghost" data-action="ai-create-close">取消</button>
-          <button type="button" class="btn btn-primary" data-action="ai-create-parse" ${aiCreateParseBusy?"disabled":""}>${aiCreateParseBusy?"解析中…":(aiCreateStructuredResult?"重新解析":"✨ 開始解析")}</button>
+          <button type="button" class="btn btn-primary" data-action="ai-create-parse" ${(aiCreateParseBusy||aiCreatePosterPreparing)?"disabled":""}>${aiCreateParseBusy?"解析中…":aiCreatePosterPreparing?"處理圖片中…":(aiCreateStructuredResult?"重新解析":"✨ 開始解析")}</button>
         </div>
       </div>
     </section>
@@ -21462,6 +21566,7 @@ function finishRenderViewport(snapshot){
   setTimeout(restore, 180);
 }
 function render(){
+  if(aiCreatePosterOwner && (aiCreatePosterOwner.room!==state || aiCreatePosterOwner.uid!==(firebaseUser&&firebaseUser.uid) || !aiCreateBetaActorAllowed())){aiCreateReleasePoster();aiCreateAssistantOpen=false;}
   if(releaseGateIsActive() && appPhase==='landing' && !raffleLinkConsumed && raffleIntent()){raffleContext().id=null;}
   if(!releaseGateIsActive() && appPhase==='landing'&&!raffleLinkConsumed&&raffleIntent()){raffleContext().id=raffleIntent();appPhase='raffle-public';}
   if(appPhase==='player-center')restoreRaffleIntent();
@@ -22575,15 +22680,15 @@ function bindDynamicInputs(){
       initHalfHourTimePickers(document);
       initHalfHourDatetimePickers(document);
       freezeArchivedControls();
+      bindAiCreatePosterInputs();
       const aiCreateSource=document.getElementById("ai-create-source-text");
       if(aiCreateSource){
         aiCreateSource.addEventListener("input",()=>{
           aiCreateSourceText=aiCreateSource.value;
-          aiCreateAssistantNotice="";
-          aiCreateStructuredResult=null;
-          aiCreateStructuredErrors=[];
-          aiCreateSelectedEventKey="";
-          aiCreateReviewAcknowledged=false;
+          aiCreateInvalidateInput();
+          document.querySelectorAll(".ai-create-result,.ai-create-schema-errors,.ai-poster-evidence,.ai-create-notice").forEach(el=>el.remove());
+          const apply=document.querySelector('[data-action="ai-create-apply"]');if(apply)apply.disabled=true;
+          const parse=document.querySelector('[data-action="ai-create-parse"]');if(parse){parse.disabled=aiCreatePosterPreparing;parse.textContent=aiCreatePosterPreparing?"處理圖片中…":"✨ 開始解析";}
           const countEl=document.getElementById("ai-create-char-count");
           if(countEl) countEl.textContent=String(aiCreateSourceText.length).replace(/\B(?=(\d{3})+(?!\d))/g,",")+" / 12,000";
         });
@@ -22979,6 +23084,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }
     syncSettingsDraftFromDom();
     syncRegistrationDraftFromDom();
+    aiCreateReleasePoster();
     aiCreateAssistantOpen=true;
     aiCreateAssistantNotice="";
     if(!String(aiCreateSourceText||"").trim()){
@@ -22990,6 +23096,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="ai-create-close" || action==="ai-create-close-overlay"){
+    aiCreateReleasePoster();
     aiCreateAssistantOpen=false;
     aiCreateAssistantNotice="";
     aiCreateSuggestionSelection={};
@@ -23041,6 +23148,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       showToast(applied.error||"無法套用 AI 草稿",true);
       return;
     }
+    aiCreateReleasePoster(false);
     aiCreateAssistantOpen=false;
     aiCreateAssistantNotice="";
     render();
@@ -25244,6 +25352,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       aiCreateStructuredErrors=[];
       aiCreateSelectedEventKey="";
       aiCreateSourceText="";
+      aiCreateReleasePoster();
+      aiCreateAssistantOpen=false;
       aiCreateReviewAcknowledged=false;
       await saveRecord(state);
       await setCurrentId(state.id);
@@ -25338,6 +25448,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       aiCreateStructuredErrors=[];
       aiCreateSelectedEventKey="";
       aiCreateSourceText="";
+      aiCreateReleasePoster();
+      aiCreateAssistantOpen=false;
       aiCreateReviewAcknowledged=false;
       await saveRecord(state);
       await setCurrentId(state.id);
@@ -27593,6 +27705,7 @@ init();
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
     async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
+    async aiCreatePosterParser(payload){return callEngagementFunction("parseTournamentPosterV1",payload,60000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
