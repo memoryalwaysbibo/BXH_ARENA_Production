@@ -241,16 +241,22 @@ async function handleRaffle(action,target){
  let joinPassword='';if(apiAction==='join'&&c.detail?.event?.passwordProtected){joinPassword=document.querySelector('[data-raffle-join-password]')?.value||'';if(!joinPassword){c.error='請輸入參加密碼。';render();return;}}
  if(apiAction==='join'){
   c.busy=true;c.error='';render();
-  let preview;
+  let preview,legacyPreviewUnsupported=false;
   try{
    preview=await window.engagementService.raffle({action:'joinPreview',id:c.id,password:joinPassword||undefined});
    if(c!==raffleContext())return;
    if(!preview?.ok)throw Error('preview-failed');
   }catch(e){
-   if(c===raffleContext())c.error=raffleError(e);
-   return;
+   const msg=String(e?.message||e||'');
+   if(msg.includes('invalid-action'))legacyPreviewUnsupported=true;
+   else{if(c===raffleContext())c.error=raffleError(e);return;}
   }finally{
    if(c===raffleContext()){c.busy=false;render();}
+  }
+  if(legacyPreviewUnsupported){
+   if(!confirm('目前系統正在切換新版票券確認流程。若活動含消耗票券，參加成功會依活動條件扣除；是否繼續參加？'))return;
+   await raffleMutate({action:'join',id:c.id,password:joinPassword||undefined,operationId:crypto.randomUUID()});
+   return;
   }
   if(preview.alreadyJoined){c.detail=null;await loadRaffles();return;}
   const approved=await openRaffleJoinConfirm(preview,c.detail?.event);
