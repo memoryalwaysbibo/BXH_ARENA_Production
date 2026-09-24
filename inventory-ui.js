@@ -1,4 +1,4 @@
-/* v13.31.0 | 我的道具基礎系統 — classic script, shares authenticated app context. */
+/* v13.31.1 | 我的道具基礎系統 — isolated inventory action routing + visible failure feedback. */
 'use strict';
 let inventoryState=null;
 function inventoryStorageKey(){return 'bxh.inventory.pending.v1:'+currentAuthUid();}
@@ -61,9 +61,16 @@ function renderInventoryPage(){
  ${isSuperAdmin()&&typeof window.renderRewardRulesAdmin==='function'?window.renderRewardRulesAdmin():''}</section>`;
 }
 async function handleInventory(action,target){
- if(!currentAuthUid())return;
+ const c=inventoryContext();
+ if(!currentAuthUid()){
+  if(action==='inventory-grant'){c.error='登入狀態已失效，請重新登入後再試。';c.success='';render();}
+  return;
+ }
  if(action&&action.startsWith('inventory-rule-')&&typeof window.handleRewardRulesAdmin==='function'){await window.handleRewardRulesAdmin(action,target);return;}
- const c=inventoryContext();if(c.busy||c.loading)return;
+ if(c.busy||c.loading){
+  if(action==='inventory-grant'){c.error=c.busy?'道具操作仍在處理中，請勿重複送出。':'道具資料仍在載入，請稍候後再試。';c.success='';render();}
+  return;
+ }
  if(action==='inventory-refresh'){c.selectedId='';await loadInventory();return;}
  if(action==='inventory-more'){if(c.nextCursor)await loadInventory(true);return;}
  if(action==='inventory-history'||action==='inventory-history-more'){
@@ -74,7 +81,10 @@ async function handleInventory(action,target){
   try{const r=await window.engagementService.inventory({action:'history',itemId:c.selectedId,cursor:more?c.historyCursor:null});if(c!==inventoryContext())return;if(!r?.ok)throw Error('load-failed');c.events=more?[...c.events,...r.events]:r.events;c.historyCursor=r.nextCursor;c.historyLoaded=true;}
   catch(e){if(c===inventoryContext())c.error=inventoryError(e);}finally{if(c===inventoryContext()){c.busy=false;render();}}return;
  }
- if(!isSuperAdmin())return;
+ if(!isSuperAdmin()){
+  if(action==='inventory-grant'){c.error='最高管理員權限已失效，請重新登入後再試。';c.success='';render();}
+  return;
+ }
  if(action==='inventory-select'&&!c.pending){c.recipient=c.results.find(u=>u.uid===target.getAttribute('data-uid'))||null;c.results=[];render();return;}
  if(action==='inventory-search'&&!c.pending){
   if(!c.query.trim()){c.error='請輸入玩家姓名、編號或 Email。';render();return;}
@@ -83,7 +93,7 @@ async function handleInventory(action,target){
   catch(e){if(c===inventoryContext())c.error='搜尋失敗，請稍後重試。';}finally{if(c===inventoryContext()){c.busy=false;render();}}return;
  }
  if(action!=='inventory-grant')return;
- c.error='';c.success='';
+ c.error='';c.success='已收到發放操作，正在檢查資料…';render();
  try{
   if(!c.pending){
    if(!c.recipient)throw Error('invalid-recipient');
@@ -93,7 +103,7 @@ async function handleInventory(action,target){
    for(const [key,max]of [['name',60],['purpose',300],['source',120]])if(!d[key].trim()||[...d[key].trim()].length>max)throw Error('invalid-'+key);
    if(d.imageUrl&&!inventoryImage(d.imageUrl))throw Error('invalid-image');
    if(expiresAt!==null&&expiresAt<=Date.now()+c.serverOffset)throw Error('expired-grant');
-   if(!confirm(`確認發放給 ${titleRecipientLabel(c.recipient)}？\n${d.name} × ${quantity}\n來源：${d.source}\n期限：${expiresAt===null?'無期限':mailboxDate(expiresAt)+'（台灣時間）'}\n使用方式：${d.consumable===true?'可消耗（活動使用時會扣除數量）':'不可消耗（僅持有，不扣除）'}\n將同步寄送站內信。`))return;
+   if(!confirm(`確認發放給 ${titleRecipientLabel(c.recipient)}？\n${d.name} × ${quantity}\n來源：${d.source}\n期限：${expiresAt===null?'無期限':mailboxDate(expiresAt)+'（台灣時間）'}\n使用方式：${d.consumable===true?'可消耗（活動使用時會扣除數量）':'不可消耗（僅持有，不扣除）'}\n將同步寄送站內信。`)){c.success='已取消發放。';render();return;}
    const pending={actorUid:currentAuthUid(),recipient:c.recipient,draft:{...d},payload:{action:'grant',targetUid:c.recipient.uid,itemCode:d.itemCode.trim(),name:d.name.trim(),quantity,imageUrl:d.imageUrl.trim(),purpose:d.purpose.trim(),source:d.source.trim(),expiresAt,consumable:d.consumable===true,operationId:crypto.randomUUID()}};
    try{sessionStorage.setItem(inventoryStorageKey(),JSON.stringify(pending));if(sessionStorage.getItem(inventoryStorageKey())!==JSON.stringify(pending))throw Error();}catch{throw Error('storage-unavailable');}
    c.pending=pending;
@@ -119,6 +129,22 @@ function inventoryCaptureInput(e){
  else if(field==='consumable')c.draft.consumable=e.target.checked===true;
  else if(Object.hasOwn(c.draft,field))c.draft[field]=e.target.value;
 }
+async function inventoryClickCapture(event){
+ const target=event.target?.closest?.('[data-action^="inventory-"]');
+ if(!target)return;
+ const action=target.getAttribute('data-action');
+ if(!action)return;
+ event.preventDefault?.();
+ event.stopPropagation?.();
+ event.stopImmediatePropagation?.();
+ try{await handleInventory(action,target);}
+ catch(error){
+  const c=inventoryContext();
+  c.busy=false;c.loading=false;c.success='';c.error=inventoryError(error);
+  try{render();}catch{}
+ }
+}
+document.addEventListener('click',inventoryClickCapture,true);
 document.addEventListener('input',inventoryCaptureInput);
 document.addEventListener('change',inventoryCaptureInput);
 
