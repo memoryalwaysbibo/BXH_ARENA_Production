@@ -3536,6 +3536,204 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   display:flex;align-items:flex-end;justify-content:space-between;gap:14px;
   margin:0 0 18px;padding:0 2px;
 }
+
+.ai-create-assist-btn{
+  border-color:rgba(217,185,92,.52)!important;
+  background:linear-gradient(135deg,rgba(217,185,92,.12),rgba(255,255,255,.025))!important;
+  color:var(--ivory)!important;
+}
+.ai-create-assist-btn:hover{border-color:var(--gold)!important;box-shadow:0 0 18px rgba(217,185,92,.10);}
+.ai-create-overlay{
+  position:fixed;inset:0;z-index:4200;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;background:rgba(0,0,0,.72);
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+}
+.ai-create-dialog{
+  width:min(760px,100%);max-height:min(88vh,860px);overflow:auto;
+  border:1px solid rgba(217,185,92,.42);border-radius:16px;
+  background:linear-gradient(180deg,rgba(25,25,27,.99),rgba(12,12,14,.99));
+  box-shadow:0 24px 80px rgba(0,0,0,.62),0 0 32px rgba(217,185,92,.06);
+}
+.ai-create-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08);
+}
+.ai-create-kicker{font:800 11px var(--font-d);letter-spacing:1.4px;color:var(--gold);text-transform:uppercase;}
+.ai-create-title{margin-top:3px;font:800 22px var(--font-d);color:var(--white);}
+.ai-create-sub{margin-top:5px;font-size:12px;line-height:1.6;color:var(--metal-dim);}
+.ai-create-close{
+  flex:0 0 auto;width:38px;height:38px;border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;background:rgba(255,255,255,.03);color:var(--metal);
+  font-size:18px;cursor:pointer;
+}
+.ai-create-body{padding:18px;}
+.ai-create-source{
+  width:100%;min-height:250px;resize:vertical;
+  padding:14px;border:1px solid var(--border);border-radius:12px;
+  background:rgba(0,0,0,.28);color:var(--white);
+  font:500 14px/1.7 "Noto Sans TC",sans-serif;outline:none;
+}
+.ai-create-source:focus{border-color:var(--gold-dim);box-shadow:0 0 0 2px rgba(217,185,92,.07);}
+.ai-create-meta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;color:var(--metal-dim);font-size:10.5px;}
+.ai-create-fields{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;}
+.ai-create-chip{
+  padding:5px 9px;border:1px solid rgba(255,255,255,.1);border-radius:999px;
+  background:rgba(255,255,255,.025);color:var(--metal);font-size:10.5px;
+}
+.ai-create-safety{
+  margin-top:16px;padding:11px 12px;border:1px solid rgba(217,185,92,.18);
+  border-radius:10px;background:rgba(217,185,92,.045);color:var(--metal);
+  font-size:11px;line-height:1.65;
+}
+.ai-create-notice{
+  margin-top:12px;padding:10px 12px;border:1px solid rgba(102,180,255,.28);
+  border-radius:10px;background:rgba(102,180,255,.055);color:#cfe6ff;
+  font-size:11px;line-height:1.6;
+}
+.ai-create-result{
+  margin-top:16px;border:1px solid rgba(255,255,255,.10);border-radius:12px;
+  overflow:hidden;background:rgba(255,255,255,.018);
+}
+.ai-create-result-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 13px;border-bottom:1px solid rgba(255,255,255,.08);
+}
+.ai-create-result-head strong{color:var(--ivory);font-size:13px;}
+.ai-create-schema-badge{
+  flex:0 0 auto;padding:4px 8px;border:1px solid rgba(85,184,255,.34);
+  border-radius:999px;background:rgba(85,184,255,.07);color:#9ed8ff;
+  font:800 9.5px var(--font-d);letter-spacing:.45px;
+}
+.ai-create-result-body{padding:13px;}
+.ai-create-shared-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+}
+.ai-create-data-box{
+  min-width:0;padding:9px 10px;border:1px solid rgba(255,255,255,.075);
+  border-radius:9px;background:rgba(0,0,0,.16);
+}
+.ai-create-data-box span{display:block;color:var(--metal-dim);font-size:9.5px;margin-bottom:3px;}
+.ai-create-data-box strong{
+  display:block;color:var(--white);font-size:12px;line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.ai-create-event-list{display:grid;gap:9px;margin-top:12px;}
+.ai-create-event-card{
+  padding:11px;border:1px solid rgba(217,185,92,.18);border-radius:10px;
+  background:rgba(217,185,92,.025);
+}
+button.ai-create-event-card{
+  width:100%;text-align:left;color:inherit;cursor:pointer;font:inherit;
+  transition:border-color .16s ease,background .16s ease,box-shadow .16s ease,transform .16s ease;
+}
+button.ai-create-event-card:hover{
+  border-color:rgba(217,185,92,.46);background:rgba(217,185,92,.055);transform:translateY(-1px);
+}
+button.ai-create-event-card.is-selected{
+  border-color:var(--gold);background:rgba(217,185,92,.085);
+  box-shadow:0 0 0 1px rgba(217,185,92,.12),0 0 20px rgba(217,185,92,.07);
+}
+.ai-create-selected-mark{
+  display:inline-flex;align-items:center;gap:5px;margin-left:auto;
+  color:var(--gold);font-size:9.5px;font-weight:800;
+}
+.ai-create-event-title{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:8px;color:var(--ivory);font:800 13px var(--font-d);
+}
+.ai-create-event-tag{
+  padding:3px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.10);
+  color:var(--metal-dim);font-size:9px;font-weight:700;
+}
+.ai-create-event-meta{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+}
+.ai-create-event-meta div{
+  padding:7px 8px;border-radius:8px;background:rgba(0,0,0,.14);
+  color:var(--metal);font-size:10.5px;line-height:1.45;
+}
+.ai-create-warning-list{display:grid;gap:7px;margin-top:12px;}
+.ai-create-warning{
+  padding:9px 10px;border-radius:9px;font-size:10.5px;line-height:1.55;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);
+}
+.ai-create-warning.warning{border-color:rgba(255,193,85,.34);color:#ffd58a;background:rgba(255,193,85,.055);}
+.ai-create-warning.info{border-color:rgba(102,180,255,.24);color:#cfe6ff;background:rgba(102,180,255,.045);}
+.ai-create-schema-errors{
+  margin-top:12px;padding:10px 12px;border:1px solid rgba(255,105,105,.35);
+  border-radius:10px;background:rgba(255,80,80,.05);color:#ffb3b3;
+  font-size:10.5px;line-height:1.6;
+}
+.ai-create-draft-lock{
+  margin-top:12px;padding:9px 10px;border:1px dashed rgba(255,255,255,.13);
+  border-radius:9px;color:var(--metal-dim);font-size:10.5px;line-height:1.55;
+}
+.ai-create-map-preview{
+  margin-top:12px;padding:11px;border:1px solid rgba(95,215,147,.22);
+  border-radius:10px;background:rgba(95,215,147,.035);
+}
+.ai-create-map-preview>strong{display:block;color:#b9f0cd;font-size:11.5px;margin-bottom:8px;}
+.ai-create-map-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+.ai-create-map-grid div{
+  min-width:0;padding:7px 8px;border-radius:8px;background:rgba(0,0,0,.14);
+  color:var(--metal);font-size:10px;line-height:1.45;overflow-wrap:anywhere;
+}
+.ai-create-map-grid b{color:var(--white);font-weight:750;}
+.ai-create-unmapped{margin-top:8px;color:#ffd58a;font-size:10px;line-height:1.55;}
+.ai-create-applied-banner{
+  margin:0 0 16px;padding:12px 14px;border:1px solid rgba(95,215,147,.30);
+  border-radius:11px;background:rgba(95,215,147,.05);color:#d8f7e4;
+  font-size:11px;line-height:1.65;
+}
+.ai-create-applied-banner strong{display:block;color:#b9f0cd;font-size:12.5px;margin-bottom:3px;}
+.ai-create-applied-warnings{margin-top:7px;color:#ffd58a;}
+.ai-create-review-panel{
+  margin:0 0 18px;padding:14px;border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;background:rgba(255,255,255,.018);
+}
+.ai-create-review-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;
+}
+.ai-create-review-head strong{display:block;color:var(--ivory);font-size:13px;}
+.ai-create-review-head span{display:block;color:var(--metal-dim);font-size:10px;margin-top:3px;line-height:1.5;}
+.ai-create-review-status{
+  flex:0 0 auto;padding:5px 9px;border-radius:999px;font:800 9.5px var(--font-d);letter-spacing:.35px;
+  border:1px solid rgba(255,255,255,.12);color:var(--metal);
+}
+.ai-create-review-status.blocked{border-color:rgba(255,105,105,.40);background:rgba(255,80,80,.07);color:#ffb3b3;}
+.ai-create-review-status.pending{border-color:rgba(255,193,85,.40);background:rgba(255,193,85,.065);color:#ffd58a;}
+.ai-create-review-status.ready{border-color:rgba(95,215,147,.36);background:rgba(95,215,147,.06);color:#b9f0cd;}
+.ai-create-review-list{display:grid;gap:7px;}
+.ai-create-review-item{
+  display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;
+  padding:9px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.075);background:rgba(0,0,0,.14);
+}
+.ai-create-review-item .icon{font-size:13px;line-height:1.4;}
+.ai-create-review-item b{display:block;color:var(--white);font-size:10.5px;margin-bottom:2px;}
+.ai-create-review-item p{margin:0;color:var(--metal);font-size:10px;line-height:1.55;}
+.ai-create-review-item.blocker{border-color:rgba(255,105,105,.28);background:rgba(255,80,80,.035);}
+.ai-create-review-item.warning{border-color:rgba(255,193,85,.25);background:rgba(255,193,85,.035);}
+.ai-create-review-item.info{opacity:.86;}
+.ai-create-review-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:11px;flex-wrap:wrap;}
+.ai-create-review-confirmed{color:#b9f0cd;font-size:10.5px;font-weight:800;}
+.ai-create-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+.ai-create-apply-btn{border-color:rgba(95,215,147,.44)!important;}
+.ai-create-apply-btn:not(:disabled){background:rgba(95,215,147,.10)!important;color:#d8f7e4!important;}
+@media(max-width:720px){
+  .settings-toolbar .btn-row{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row dense;width:100%;}
+  .settings-toolbar .btn-row .ai-create-assist-btn{grid-column:1/-1;grid-row:2;}
+  .ai-create-overlay{align-items:flex-end;padding:10px;}
+  .ai-create-dialog{width:100%;max-height:92vh;border-radius:16px 16px 12px 12px;}
+  .ai-create-head{padding:16px 14px 12px;}
+  .ai-create-body{padding:14px;}
+  .ai-create-source{min-height:230px;font-size:16px;}
+  .ai-create-meta{flex-direction:column;gap:3px;}
+  .ai-create-actions{display:grid;grid-template-columns:1fr 1fr;}
+  .ai-create-actions .btn{width:100%;}
+  .ai-create-actions .ai-create-apply-btn{grid-column:1/-1;grid-row:1;}
+  .ai-create-shared-grid,.ai-create-event-meta,.ai-create-map-grid{grid-template-columns:1fr;}
+}
 .settings-page-title{font-family:var(--font-d);font-size:24px;font-weight:800;color:var(--white);}
 .settings-page-sub{font-size:12px;color:var(--metal-dim);margin-top:4px;line-height:1.5;}
 .settings-flow-panel{padding:18px;}
@@ -8310,6 +8508,606 @@ let registrationFormDraftDirty = false;
 let settingsFormDraft = null;
 let settingsFormDraftDirty = false;
 
+/* P7.1 — AI-assisted tournament creation shell.
+   Layer 1 is intentionally UI-only: it captures source copy and preserves the
+   existing settings/registration drafts, but performs no AI/network/Firebase
+   writes and can never publish a tournament. */
+let aiCreateAssistantOpen = false;
+let aiCreateSourceText = "";
+let aiCreateAssistantNotice = "";
+let aiCreateStructuredResult = null;
+let aiCreateStructuredErrors = [];
+let aiCreateSelectedEventKey = "";
+let aiCreateLastApplied = null;
+let aiCreateReviewAcknowledged = false;
+let aiCreateParseBusy = false;
+
+const AI_CREATE_SCHEMA_VERSION = "bxh-arena.ai-create.v1";
+const AI_CREATE_CALLABLE_CONTRACT_VERSION = "bxh-arena.ai-create.callable.v1";
+const AI_CREATE_CALLABLE_NAME = "parseTournamentAnnouncementV1";
+const AI_CREATE_TIMEZONE = "Asia/Taipei";
+const AI_CREATE_LOCALE = "zh-Hant-TW";
+const AI_CREATE_MAX_EVENTS = 8;
+const AI_CREATE_MAX_SOURCE_CHARS = 12000;
+
+function aiCreateRemoteParserEnabled(){
+  try{
+    return !!(window.BXH_FEATURE_FLAGS && window.BXH_FEATURE_FLAGS.aiCreateRemoteParser===true);
+  }catch(e){
+    return false;
+  }
+}
+
+function aiCreateLooksLikeGoldenCase(text){
+  const normalized=String(text||"").replace(/\s+/g," ");
+  return normalized.includes("中秋戰鬥陀螺交流賽") &&
+    normalized.includes("女神戰場") &&
+    normalized.includes("中秋大亂鬥");
+}
+
+function buildAiCreateGoldenCaseResult(){
+  return {
+    schemaVersion:AI_CREATE_SCHEMA_VERSION,
+    sourceMode:"mock-golden-case",
+    timezone:AI_CREATE_TIMEZONE,
+    activity:{
+      name:"BXH｜中秋戰鬥陀螺交流賽",
+      date:"2026-09-25",
+      locationName:"Loft 樂飛運動餐酒館",
+      address:"臺南市仁德區文華路三段440號（仁德交流道下方）",
+      registrationChannel:"Threads BXH 粉專",
+      registrationOpenAt:"2026-09-24T22:10:00+08:00",
+      registrationCloseAt:null
+    },
+    events:[
+      {
+        key:"goddess-battlefield",
+        name:"女神戰場",
+        date:"2026-09-25",
+        checkInStart:"17:00",
+        checkInEnd:"18:00",
+        startAt:"18:30",
+        endAt:"20:00",
+        endDate:"2026-09-25",
+        capacity:32,
+        fee:350,
+        registrationEnabled:true,
+        targetGroup:null,
+        participantRestrictions:["female"],
+        formatType:null
+      },
+      {
+        key:"mid-autumn-battle",
+        name:"中秋大亂鬥",
+        date:"2026-09-25",
+        checkInStart:"17:00",
+        checkInEnd:"18:00",
+        startAt:"20:00",
+        endAt:"00:00",
+        endDate:"2026-09-26",
+        capacity:96,
+        fee:350,
+        registrationEnabled:true,
+        targetGroup:"open",
+        participantRestrictions:[],
+        formatType:null
+      }
+    ],
+    bundleOffers:[
+      {
+        eventKeys:["goddess-battlefield","mid-autumn-battle"],
+        price:550,
+        regularPrice:700,
+        discount:150,
+        benefits:["飲品兌換券 2 張"]
+      }
+    ],
+    warnings:[
+      {
+        severity:"warning",
+        code:"weekday-mismatch",
+        field:"activity.registrationOpenAt",
+        message:"原文將 2026/09/24 標示為星期三；實際為星期四，請房主確認。"
+      },
+      {
+        severity:"warning",
+        code:"registration-close-missing",
+        field:"activity.registrationCloseAt",
+        message:"文案未提供報名截止時間。"
+      },
+      {
+        severity:"info",
+        code:"multi-event",
+        field:"events",
+        message:"同一活動包含 2 個賽事；P7.2 只驗證結構，尚未自動建立兩個房間。"
+      },
+      {
+        severity:"info",
+        code:"unsupported-target-group",
+        field:"events[0].participantRestrictions",
+        message:"女神戰場含女性限定條件；現行 ARENA targetGroup 只有公開組／兒童組，先保留為限制資訊，不自動映射。"
+      }
+    ]
+  };
+}
+
+function buildAiCreateCallableRequest(text){
+  return {
+    contractVersion:AI_CREATE_CALLABLE_CONTRACT_VERSION,
+    schemaVersion:AI_CREATE_SCHEMA_VERSION,
+    sourceText:String(text||"").slice(0,AI_CREATE_MAX_SOURCE_CHARS),
+    locale:AI_CREATE_LOCALE,
+    timezone:AI_CREATE_TIMEZONE,
+    limits:{
+      maxEvents:AI_CREATE_MAX_EVENTS,
+      maxSourceChars:AI_CREATE_MAX_SOURCE_CHARS
+    }
+  };
+}
+
+function validateAiCreateCallableEnvelope(raw){
+  const errors=[];
+  if(!raw || typeof raw!=="object" || Array.isArray(raw)) return {ok:false,errors:["Callable 回傳不是物件"]};
+  if(raw.ok!==true) errors.push(String(raw.error||raw.reason||"Callable 回傳 ok=false"));
+  if(raw.contractVersion!==AI_CREATE_CALLABLE_CONTRACT_VERSION) errors.push("Callable contractVersion 不相容");
+  if(raw.schemaVersion!==AI_CREATE_SCHEMA_VERSION) errors.push("Callable schemaVersion 不相容");
+  if(!raw.result || typeof raw.result!=="object" || Array.isArray(raw.result)) errors.push("Callable result 缺失");
+  return {ok:errors.length===0,errors,result:raw.result||null};
+}
+
+async function requestAiCreateStructuredResult(text){
+  if(!aiCreateRemoteParserEnabled()){
+    if(aiCreateLooksLikeGoldenCase(text)){
+      return {ok:true,result:buildAiCreateGoldenCaseResult(),source:"mock-golden-case"};
+    }
+    return {
+      ok:false,
+      reason:"remote-parser-disabled",
+      message:"P7.5 已接好 Firebase Callable 介面契約，但遠端 AI Parser 目前預設關閉。為避免假裝理解，現階段只執行 Golden Test Case。"
+    };
+  }
+  if(!window.engagementService || typeof window.engagementService.aiCreateParser!=="function"){
+    return {ok:false,reason:"service-unavailable",message:"AI Parser 服務尚未載入。"};
+  }
+  const response=await window.engagementService.aiCreateParser(buildAiCreateCallableRequest(text));
+  const envelope=validateAiCreateCallableEnvelope(response);
+  if(!envelope.ok){
+    return {ok:false,reason:"invalid-callable-response",message:envelope.errors.join("｜")};
+  }
+  return {ok:true,result:envelope.result,source:"remote-callable"};
+}
+
+async function runAiCreateParse(){
+  if(aiCreateParseBusy) return;
+  const input=document.getElementById("ai-create-source-text");
+  if(input) aiCreateSourceText=input.value;
+  const source=String(aiCreateSourceText||"").trim();
+  if(!source){
+    showToast("請先貼上活動文案",true);
+    return;
+  }
+  aiCreateStructuredResult=null;
+  aiCreateStructuredErrors=[];
+  aiCreateSelectedEventKey="";
+  aiCreateReviewAcknowledged=false;
+  aiCreateParseBusy=true;
+  aiCreateAssistantNotice=aiCreateRemoteParserEnabled()
+    ?"正在透過 Firebase Callable 解析文案；解析結果仍只會進入草稿預覽，不會建立或發布賽事。"
+    :"P7.5 安全測試模式：遠端 AI Parser 預設關閉，正在檢查 Golden Test Case。";
+  render();
+  try{
+    const parsed=await requestAiCreateStructuredResult(source);
+    if(!parsed.ok){
+      aiCreateAssistantNotice=parsed.message||"AI Parser 尚未啟用。";
+      return;
+    }
+    const candidate=parsed.result;
+    if(candidate && parsed.source==="remote-callable" && !candidate.sourceMode) candidate.sourceMode="remote-callable";
+    const validation=validateAiCreateStructuredResult(candidate);
+    if(!validation.ok){
+      aiCreateStructuredErrors=validation.errors;
+      aiCreateAssistantNotice="P7.5 Parser 回傳結構驗證失敗；資料已停止在預覽層，不會進入賽事草稿。";
+      return;
+    }
+    aiCreateStructuredResult=candidate;
+    aiCreateSelectedEventKey=(candidate.events&&candidate.events[0]&&candidate.events[0].key)||"";
+    aiCreateAssistantNotice=(parsed.source==="remote-callable"
+      ?"P7.5 遠端 Parser 已回傳標準結構。"
+      :"P7.5 Golden Test Case 已通過介面層。")
+      +" 請選擇要建立的賽事，再套用至 ARENA 草稿；套用後仍需通過 AI 審核閘門，且不會自動發布。";
+  }catch(e){
+    console.warn("AI create parser failed",e);
+    const raw=String((e&&e.message)||"");
+    aiCreateAssistantNotice=raw.includes("feature-disabled")
+      ?"後端 AI Parser 功能目前關閉；ARENA 已安全停止，不會改動賽事草稿。"
+      :"AI Parser 連線失敗；ARENA 已安全停止，不會改動賽事草稿。";
+  }finally{
+    aiCreateParseBusy=false;
+    render();
+  }
+}
+
+function validateAiCreateStructuredResult(raw){
+  const errors=[];
+  const isObj=v=>!!v && typeof v==="object" && !Array.isArray(v);
+  const isDate=v=>v==null || /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+  const isTime=v=>v==null || /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(v));
+  if(!isObj(raw)) return {ok:false,errors:["解析結果不是物件"]};
+  if(raw.schemaVersion!==AI_CREATE_SCHEMA_VERSION) errors.push("schemaVersion 不相容");
+  if(raw.timezone!==AI_CREATE_TIMEZONE) errors.push("timezone 必須為 Asia/Taipei");
+  if(!isObj(raw.activity)) errors.push("activity 缺失");
+  else{
+    if(typeof raw.activity.name!=="string" || !raw.activity.name.trim()) errors.push("activity.name 缺失");
+    if(!isDate(raw.activity.date)) errors.push("activity.date 格式錯誤");
+    if(raw.activity.registrationOpenAt!=null && Number.isNaN(Date.parse(raw.activity.registrationOpenAt))) errors.push("activity.registrationOpenAt 格式錯誤");
+    if(raw.activity.registrationCloseAt!=null && Number.isNaN(Date.parse(raw.activity.registrationCloseAt))) errors.push("activity.registrationCloseAt 格式錯誤");
+  }
+  if(!Array.isArray(raw.events) || raw.events.length<1) errors.push("events 至少需要 1 筆");
+  else{
+    if(raw.events.length>AI_CREATE_MAX_EVENTS) errors.push("events 超過 "+AI_CREATE_MAX_EVENTS+" 筆上限");
+    raw.events.forEach((event,index)=>{
+      const p="events["+index+"]";
+      if(!isObj(event)){errors.push(p+" 不是物件");return;}
+      if(typeof event.key!=="string" || !event.key.trim()) errors.push(p+".key 缺失");
+      if(typeof event.name!=="string" || !event.name.trim()) errors.push(p+".name 缺失");
+      if(!isDate(event.date)) errors.push(p+".date 格式錯誤");
+      ["checkInStart","checkInEnd","startAt","endAt"].forEach(field=>{if(!isTime(event[field]))errors.push(p+"."+field+" 格式錯誤");});
+      if(event.capacity!=null && (!Number.isInteger(event.capacity) || event.capacity<=0)) errors.push(p+".capacity 必須為正整數");
+      if(event.fee!=null && (!Number.isFinite(event.fee) || event.fee<0)) errors.push(p+".fee 不合法");
+      if(![null,"open","children"].includes(event.targetGroup??null)) errors.push(p+".targetGroup 不支援");
+      if(![null,"single","double","roundrobin"].includes(event.formatType??null)) errors.push(p+".formatType 不支援");
+      if(typeof event.registrationEnabled!=="boolean") errors.push(p+".registrationEnabled 必須為 boolean");
+      if(!Array.isArray(event.participantRestrictions||[])) errors.push(p+".participantRestrictions 必須為陣列");
+    });
+  }
+  if(raw.warnings!=null && !Array.isArray(raw.warnings)) errors.push("warnings 必須為陣列");
+  if(raw.bundleOffers!=null && !Array.isArray(raw.bundleOffers)) errors.push("bundleOffers 必須為陣列");
+  return {ok:errors.length===0,errors};
+}
+
+function aiCreateSelectedEvent(){
+  const events=Array.isArray(aiCreateStructuredResult&&aiCreateStructuredResult.events)?aiCreateStructuredResult.events:[];
+  return events.find(event=>event&&event.key===aiCreateSelectedEventKey) || events[0] || null;
+}
+
+function aiCreateIsoToEpoch(value){
+  if(!value) return null;
+  const parsed=Date.parse(String(value));
+  return Number.isFinite(parsed)?parsed:null;
+}
+
+function aiCreateHalfHourCompatible(value){
+  if(!value) return true;
+  const m=String(value).match(/(?:T|^)(?:[01]\d|2[0-3]):([0-5]\d)/);
+  if(!m) return false;
+  return m[1]==="00" || m[1]==="30";
+}
+
+function aiCreateLocationText(activity){
+  const venue=String(activity&&activity.locationName||"").trim();
+  const address=String(activity&&activity.address||"").trim();
+  if(venue&&address && !venue.includes(address)) return venue+"｜"+address;
+  return venue||address||"";
+}
+
+function aiCreateDraftMappingModel(){
+  const result=aiCreateStructuredResult;
+  const event=aiCreateSelectedEvent();
+  if(!result||!event) return null;
+  const activity=result.activity||{};
+  const warnings=[];
+  const checkinCompatible=aiCreateHalfHourCompatible(event.checkInStart);
+  const startCompatible=aiCreateHalfHourCompatible(event.startAt);
+  const openCompatible=aiCreateHalfHourCompatible(activity.registrationOpenAt);
+  const closeCompatible=aiCreateHalfHourCompatible(activity.registrationCloseAt);
+  if(!activity.registrationCloseAt) warnings.push("報名截止時間未提供，套用後維持空白。");
+  if(activity.registrationOpenAt && !openCompatible) warnings.push("報名開放 "+String(activity.registrationOpenAt).slice(11,16)+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用，避免被系統靜默四捨五入。");
+  if(activity.registrationCloseAt && !closeCompatible) warnings.push("報名截止 "+String(activity.registrationCloseAt).slice(11,16)+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
+  if(event.checkInStart && !checkinCompatible) warnings.push("報到時間 "+event.checkInStart+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
+  if(event.startAt && !startCompatible) warnings.push("開賽時間 "+event.startAt+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
+  if(event.participantRestrictions?.includes("female")) warnings.push("女性限定目前沒有 ARENA 原生組別欄位，不會自動轉成公開組／兒童組條件。");
+  if(!event.formatType) warnings.push("文案未明確提供賽制，AI 不會覆蓋目前賽制預設值。");
+  if(event.checkInEnd) warnings.push("現行房間欄位只有單一「報到時間」；本次只處理報到開始時間。");
+  if(event.endAt) warnings.push("現行房間基本資料沒有活動結束時間欄位；"+event.endAt+" 不會寫入草稿。");
+  if(Array.isArray(result.bundleOffers)&&result.bundleOffers.length) warnings.push("雙賽／套票優惠目前沒有對應房間欄位，本次不寫入。");
+  return {
+    event,
+    activity,
+    settings:{
+      name:String(event.name||activity.name||"").trim(),
+      date:String(event.date||activity.date||"").trim(),
+      location:aiCreateLocationText(activity),
+      checkin:checkinCompatible?String(event.checkInStart||"").trim():"",
+      startTime:startCompatible?String(event.startAt||"").trim():"",
+      formatType:event.formatType||null,
+      checkinRequired:!!event.checkInStart
+    },
+    registration:{
+      registrationEnabled:!!event.registrationEnabled,
+      registrationOpenAt:openCompatible?aiCreateIsoToEpoch(activity.registrationOpenAt):null,
+      registrationCloseAt:closeCompatible?aiCreateIsoToEpoch(activity.registrationCloseAt):null,
+      registrationCapacity:event.capacity!=null?event.capacity:null,
+      registrationFee:event.fee!=null?event.fee:null,
+      targetGroup:(event.targetGroup==="open"||event.targetGroup==="children")?event.targetGroup:null
+    },
+    warnings
+  };
+}
+
+function applyAiCreateSelectedEventToDraft(){
+  const model=aiCreateDraftMappingModel();
+  if(!model) return {ok:false,error:"請先完成解析並選擇賽事"};
+  if(state.archiveStatus==="completed" || state.startedAt || state.bracketSize>0 || (state.matches||[]).some(m=>m&&((m.log&&m.log.length)||m.winnerId||m.completed))){
+    return {ok:false,error:"此房間已進入對戰流程，AI 建房草稿不可覆蓋。請先建立空白新賽事。"};
+  }
+  if(state.cloudCode || (state.players||[]).length>0){
+    return {ok:false,error:"P7.3 僅允許套用到尚未發布、沒有選手的空白賽事草稿。請先使用「＋ 新增賽事」建立空白房間。"};
+  }
+  ensureSettingsFormDraft();
+  ensureRegistrationFormDraft();
+  syncSettingsDraftFromDom();
+  syncRegistrationDraftFromDom();
+
+  const mapped=[];
+  const s=model.settings,r=model.registration;
+  if(s.name){settingsFormDraft.name=s.name;mapped.push("賽事名稱");}
+  if(s.date){settingsFormDraft.date=s.date;mapped.push("活動日期");}
+  if(s.location){settingsFormDraft.location=s.location;mapped.push("活動地點");}
+  if(s.checkin){settingsFormDraft.checkin=s.checkin;mapped.push("報到時間");}
+  if(s.startTime){settingsFormDraft.startTime=s.startTime;mapped.push("開賽時間");}
+  if(s.formatType && ["single","double","roundrobin"].includes(s.formatType)){settingsFormDraft.formatType=s.formatType;mapped.push("賽制");}
+  if(s.checkinRequired && s.checkin){settingsFormDraft.checkinRequired=true;mapped.push("需要報到");}
+
+  registrationFormDraft.registrationEnabled=r.registrationEnabled;
+  mapped.push("報名方式");
+  registrationFormDraft.registrationOpenAt=r.registrationOpenAt;
+  mapped.push("報名開放");
+  registrationFormDraft.registrationCloseAt=r.registrationCloseAt;
+  mapped.push("報名截止");
+  if(r.registrationCapacity!=null){registrationFormDraft.registrationCapacity=r.registrationCapacity;mapped.push("正取名額");}
+  if(r.registrationFee!=null){registrationFormDraft.registrationFee=r.registrationFee;mapped.push("報名費");}
+  if(r.targetGroup){registrationFormDraft.targetGroup=r.targetGroup;mapped.push("活動組別");}
+
+  settingsFormDraftDirty=true;
+  registrationFormDraftDirty=true;
+  aiCreateLastApplied={
+    eventName:model.event.name||"未命名賽事",
+    mappedFields:[...new Set(mapped)],
+    warnings:model.warnings.slice(),
+    at:Date.now()
+  };
+  aiCreateReviewAcknowledged=false;
+  return {ok:true,model,mappedFields:aiCreateLastApplied.mappedFields,warnings:aiCreateLastApplied.warnings};
+}
+
+function renderAiCreateMappingPreview(){
+  const model=aiCreateDraftMappingModel();
+  if(!model) return "";
+  const s=model.settings,r=model.registration;
+  const epochLabel=value=>value?epochToDatetimeLocal(value).replace("T"," "):"—";
+  return `<div class="ai-create-map-preview">
+    <strong>套用至 ARENA 草稿｜${esc(model.event.name||"未命名賽事")}</strong>
+    <div class="ai-create-map-grid">
+      <div>賽事名稱｜<b>${esc(s.name||"—")}</b></div>
+      <div>日期｜<b>${esc(s.date||"—")}</b></div>
+      <div>地點｜<b>${esc(s.location||"—")}</b></div>
+      <div>報到｜<b>${esc(s.checkin||"—")}</b></div>
+      <div>開賽｜<b>${esc(s.startTime||"—")}</b></div>
+      <div>報名方式｜<b>${r.registrationEnabled?"線上報名":"現場報名"}</b></div>
+      <div>報名開放｜<b>${esc(epochLabel(r.registrationOpenAt))}</b></div>
+      <div>報名截止｜<b>${esc(epochLabel(r.registrationCloseAt))}</b></div>
+      <div>正取名額｜<b>${r.registrationCapacity!=null?esc(String(r.registrationCapacity))+" 人":"—"}</b></div>
+      <div>報名費｜<b>${r.registrationFee!=null?"NT$"+esc(String(r.registrationFee)):"—"}</b></div>
+    </div>
+    ${model.warnings.length?`<div class="ai-create-unmapped">⚠️ ${model.warnings.map(esc).join("　")}</div>`:""}
+  </div>`;
+}
+
+function aiCreateReviewReport(){
+  if(!aiCreateLastApplied) return {blockers:[],warnings:[],infos:[]};
+  ensureSettingsFormDraft();
+  ensureRegistrationFormDraft();
+  const d=settingsFormDraft||{},rd=registrationFormDraft||{};
+  const event=aiCreateSelectedEvent();
+  const result=aiCreateStructuredResult||{};
+  const blockers=[],warnings=[],infos=[];
+  const seen=new Set();
+  const add=(bucket,code,title,message)=>{
+    if(seen.has(code))return;
+    seen.add(code);bucket.push({code,title,message});
+  };
+
+  if(!String(d.name||"").trim()) add(blockers,"name-missing","賽事名稱未完成","請填寫賽事名稱。");
+  if(!String(d.date||"").trim()) add(blockers,"date-missing","活動日期未完成","請填寫活動日期。");
+  if(!String(d.location||"").trim()) add(blockers,"location-missing","活動地點未完成","請確認活動場地或地址。");
+  if(!String(d.startTime||"").trim()) add(blockers,"start-missing","開賽時間未完成","AI 沒有安全套用開賽時間，請由房主確認後填寫。");
+  if(d.checkinRequired && !String(d.checkin||"").trim()) add(blockers,"checkin-missing","報到時間未完成","本場需要報到，但目前沒有可用的報到時間。");
+
+  if(rd.registrationEnabled){
+    if(!rd.registrationOpenAt) add(blockers,"registration-open-missing","報名開放時間未完成","線上報名需要設定開放時間。若原文分鐘刻度不相容，請房主手動選擇時間。");
+    if(!rd.registrationCloseAt) add(blockers,"registration-close-missing","報名截止時間未完成","線上報名需要設定截止時間。");
+    if(!rd.registrationCapacity || Number(rd.registrationCapacity)<1) add(blockers,"capacity-missing","正取名額未完成","請設定至少 1 人的正取名額。");
+    if(rd.registrationOpenAt && rd.registrationCloseAt && Number(rd.registrationCloseAt)<=Number(rd.registrationOpenAt)){
+      add(blockers,"registration-order-invalid","報名時間順序錯誤","報名截止時間必須晚於開放時間。");
+    }
+  }
+
+  if(event && !event.formatType){
+    add(warnings,"format-unconfirmed","賽制需人工確認","文案沒有明確賽制；ARENA 目前保留原本的賽制值，請確認是否正確。");
+  }
+  if(event && event.participantRestrictions?.includes("female")){
+    add(warnings,"female-restriction-unmapped","女性限定條件未建立原生欄位","目前 ARENA 只有公開組／兒童組。女性限定不會被自動轉換，請確認活動說明與現場資格控管。");
+  }
+  const structuredWarnings=Array.isArray(result.warnings)?result.warnings:[];
+  structuredWarnings.forEach(item=>{
+    if(!item||!item.code)return;
+    if(item.code==="weekday-mismatch") add(warnings,"weekday-mismatch","日期與星期不一致",item.message||"原文日期與星期不一致，請確認。");
+    else if(item.code==="registration-close-missing" && !rd.registrationCloseAt) {
+      // Missing close time is already a blocker above; don't duplicate it.
+    } else if(item.code==="multi-event") add(infos,"multi-event","原文包含多場賽事",item.message||"目前只會套用房主選定的單一賽事。");
+    else if(item.code==="unsupported-target-group") add(infos,"unsupported-target-group","存在尚未映射的資格條件",item.message||"部分資格條件沒有原生欄位。");
+  });
+
+  if(result.activity?.registrationOpenAt && !aiCreateHalfHourCompatible(result.activity.registrationOpenAt) && !rd.registrationOpenAt){
+    add(infos,"open-minute-unsupported","原始報名時間未自動套用","原文 "+String(result.activity.registrationOpenAt).slice(11,16)+" 不符合目前 00／30 分鐘刻度，已保留給房主手動決定。");
+  }
+  if(event?.checkInEnd) add(infos,"checkin-end-unmapped","報到結束時間未映射","現行基本資料只有單一報到時間，本次只使用報到開始時間。");
+  if(event?.endAt) add(infos,"event-end-unmapped","活動結束時間未映射","現行基本資料沒有活動結束時間欄位，結束時間只保留在 AI 預覽。");
+  if(Array.isArray(result.bundleOffers)&&result.bundleOffers.length) add(infos,"bundle-unmapped","套票／雙賽優惠未映射","目前房間沒有套票欄位，優惠資訊不會寫入賽事設定。");
+
+  return {blockers,warnings,infos};
+}
+
+function aiCreateReviewGate(actionLabel="繼續"){
+  if(!aiCreateLastApplied) return true;
+  const report=aiCreateReviewReport();
+  if(report.blockers.length){
+    openModal({
+      type:"generic",
+      title:"AI 草稿尚有必填問題",
+      message:"請先處理以下項目，再"+actionLabel+"：\n"+report.blockers.map(x=>"• "+x.title+"｜"+x.message).join("\n"),
+      confirmLabel:"回去檢查",
+      onConfirm:()=>{setTimeout(()=>document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"}),0);}
+    });
+    return false;
+  }
+  if(report.warnings.length && !aiCreateReviewAcknowledged){
+    openModal({
+      type:"generic",
+      title:"AI 草稿仍有需人工確認的事項",
+      message:"請先在「AI 審核閘門」確認以下提醒：\n"+report.warnings.map(x=>"• "+x.title+"｜"+x.message).join("\n"),
+      confirmLabel:"前往確認",
+      onConfirm:()=>{setTimeout(()=>document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"}),0);}
+    });
+    return false;
+  }
+  return true;
+}
+
+function renderAiCreateReviewPanel(){
+  if(!aiCreateLastApplied || !(settingsFormDraftDirty||registrationFormDraftDirty)) return "";
+  const report=aiCreateReviewReport();
+  const blocked=report.blockers.length>0;
+  const pending=!blocked && report.warnings.length>0 && !aiCreateReviewAcknowledged;
+  const ready=!blocked && !pending;
+  const statusText=blocked?report.blockers.length+" 項必須修正":pending?report.warnings.length+" 項待人工確認":"可進入儲存流程";
+  const statusClass=blocked?"blocked":pending?"pending":"ready";
+  const item=(kind,x)=>`<div class="ai-create-review-item ${kind}">
+    <div class="icon">${kind==="blocker"?"⛔":kind==="warning"?"⚠️":"ℹ️"}</div>
+    <div><b>${esc(x.title)}</b><p>${esc(x.message)}</p></div>
+  </div>`;
+  return `<div class="ai-create-review-panel" id="ai-create-review-panel">
+    <div class="ai-create-review-head">
+      <div><strong>AI 審核閘門</strong><span>AI 只負責預填；這裡由 ARENA 檢查是否還有缺漏或需要房主判斷的內容。</span></div>
+      <div class="ai-create-review-status ${statusClass}">${esc(statusText)}</div>
+    </div>
+    <div class="ai-create-review-list">
+      ${report.blockers.map(x=>item("blocker",x)).join("")}
+      ${report.warnings.map(x=>item("warning",x)).join("")}
+      ${report.infos.map(x=>item("info",x)).join("")}
+      ${!report.blockers.length&&!report.warnings.length&&!report.infos.length?'<div class="ai-create-review-item info"><div class="icon">✅</div><div><b>沒有發現額外問題</b><p>仍請房主逐欄確認內容是否符合本場活動。</p></div></div>':""}
+    </div>
+    <div class="ai-create-review-actions">
+      ${report.warnings.length&&!blocked
+        ? (aiCreateReviewAcknowledged
+          ? '<span class="ai-create-review-confirmed">✓ 房主已確認 AI 提醒</span>'
+          : '<button type="button" class="btn btn-ghost btn-sm" data-action="ai-create-review-ack">我已確認以上 AI 提醒</button>')
+        : ""}
+    </div>
+  </div>`;
+}
+
+function renderAiCreateStructuredPreview(){
+  const result=aiCreateStructuredResult;
+  if(!result && !aiCreateStructuredErrors.length) return "";
+  if(!result){
+    return `<div class="ai-create-schema-errors"><strong>結構驗證未通過</strong><br>${aiCreateStructuredErrors.map(esc).join("<br>")}</div>`;
+  }
+  const a=result.activity||{};
+  const events=Array.isArray(result.events)?result.events:[];
+  const warnings=Array.isArray(result.warnings)?result.warnings:[];
+  const openAt=a.registrationOpenAt?String(a.registrationOpenAt).replace("T"," ").replace(":00+08:00",""):"—";
+  return `<div class="ai-create-result">
+    <div class="ai-create-result-head">
+      <strong>P7.2｜結構化解析預覽</strong>
+      <span class="ai-create-schema-badge">${esc(result.schemaVersion)}</span>
+    </div>
+    <div class="ai-create-result-body">
+      <div class="ai-create-shared-grid">
+        <div class="ai-create-data-box"><span>主活動</span><strong>${esc(a.name||"—")}</strong></div>
+        <div class="ai-create-data-box"><span>活動日期</span><strong>${esc(a.date||"—")}</strong></div>
+        <div class="ai-create-data-box"><span>場地</span><strong>${esc(a.locationName||"—")}</strong></div>
+        <div class="ai-create-data-box"><span>報名開放</span><strong>${esc(openAt)}</strong></div>
+      </div>
+      <div class="ai-create-event-list">
+        ${events.map((event,index)=>{
+          const selected=(event.key===aiCreateSelectedEventKey)||(!aiCreateSelectedEventKey&&index===0);
+          return `<button type="button" class="ai-create-event-card ${selected?"is-selected":""}" data-action="ai-create-select-event" data-event-key="${esc(event.key||"")}">
+          <div class="ai-create-event-title">
+            <span>${index+1}. ${esc(event.name||"未命名賽事")}</span>
+            ${selected?`<span class="ai-create-selected-mark">✓ 已選擇</span>`:`<span class="ai-create-event-tag">${esc(event.key||"event")}</span>`}
+          </div>
+          <div class="ai-create-event-meta">
+            <div>日期｜${esc(event.date||"—")}</div>
+            <div>報到｜${esc(event.checkInStart||"—")}–${esc(event.checkInEnd||"—")}</div>
+            <div>開賽｜${esc(event.startAt||"—")}–${esc(event.endAt||"—")}${event.endDate&&event.endDate!==event.date?"（跨日）":""}</div>
+            <div>名額｜${event.capacity!=null?esc(String(event.capacity)):"—"} 人</div>
+            <div>費用｜${event.fee!=null?"NT$"+esc(String(event.fee)):"—"}</div>
+            <div>組別｜${event.targetGroup==="children"?"兒童組":event.targetGroup==="open"?"公開組":event.participantRestrictions?.includes("female")?"女性限定（待映射）":"待確認"}</div>
+          </div>
+        </button>`;
+        }).join("")}
+      </div>
+      ${renderAiCreateMappingPreview()}
+      ${warnings.length?`<div class="ai-create-warning-list">${warnings.map(w=>`<div class="ai-create-warning ${w.severity==="warning"?"warning":"info"}">${w.severity==="warning"?"⚠️":"ℹ️"} ${esc(w.message||"")}</div>`).join("")}</div>`:""}
+      <div class="ai-create-draft-lock">🔒 本層只驗證「文案 → 標準資料結構」。目前尚未寫入 settingsFormDraft / registrationFormDraft，也不會建立或發布賽事。</div>
+    </div>
+  </div>`;
+}
+
+function renderAiCreateAssistant(){
+  if(!aiCreateAssistantOpen) return "";
+  const charCount=String(aiCreateSourceText||"").length;
+  return `<div class="ai-create-overlay" data-action="ai-create-close-overlay" role="presentation">
+    <section class="ai-create-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-create-title">
+      <div class="ai-create-head">
+        <div>
+          <div class="ai-create-kicker">ARENA AI</div>
+          <div class="ai-create-title" id="ai-create-title">✨ AI 協助建立賽事</div>
+          <div class="ai-create-sub">貼上 LINE、Threads、Facebook、Instagram 等活動文案。後續將由 AI 擷取資訊，再套入現有賽事設定草稿供房主審核。</div>
+        </div>
+        <button type="button" class="ai-create-close" data-action="ai-create-close" aria-label="關閉 AI 協助建立">✕</button>
+      </div>
+      <div class="ai-create-body">
+        <label for="ai-create-source-text" style="display:block;font-weight:800;color:var(--ivory);margin-bottom:8px;">活動文案</label>
+        <textarea id="ai-create-source-text" class="ai-create-source" maxlength="12000" placeholder="請貼上活動文案……">${esc(aiCreateSourceText)}</textarea>
+        <div class="ai-create-meta">
+          <span>${aiCreateRemoteParserEnabled()?"遠端 Parser 已啟用：文案會送往 Firebase Callable，由後端解析。":"安全測試模式：遠端 AI Parser 預設關閉；目前只允許 Golden Test Case。"}</span>
+          <span id="ai-create-char-count">${charCount.toLocaleString("zh-TW")} / 12,000</span>
+        </div>
+        <div class="ai-create-fields" aria-label="預計可辨識欄位">
+          <span class="ai-create-chip">賽事名稱</span>
+          <span class="ai-create-chip">活動日期</span>
+          <span class="ai-create-chip">活動地點</span>
+          <span class="ai-create-chip">報到時間</span>
+          <span class="ai-create-chip">開賽時間</span>
+          <span class="ai-create-chip">報名開放／截止</span>
+          <span class="ai-create-chip">名額</span>
+          <span class="ai-create-chip">費用</span>
+        </div>
+        <div class="ai-create-safety">🔒 AI 只負責產生「賽事設定草稿」。正式設計中將維持：AI 不直接建立房間、不直接寫入正式賽事資料，也沒有發布權；最後仍由房主確認。</div>
+        ${aiCreateAssistantNotice?`<div class="ai-create-notice">${esc(aiCreateAssistantNotice)}</div>`:""}
+        ${renderAiCreateStructuredPreview()}
+        <div class="ai-create-actions">
+          ${aiCreateStructuredResult?'<button type="button" class="btn btn-ghost ai-create-apply-btn" data-action="ai-create-apply">✓ 套用選定賽事至草稿</button>':""}
+          <button type="button" class="btn btn-ghost" data-action="ai-create-close">取消</button>
+          <button type="button" class="btn btn-primary" data-action="ai-create-parse" ${aiCreateParseBusy?"disabled":""}>${aiCreateParseBusy?"解析中…":(aiCreateStructuredResult?"重新解析":"✨ 開始解析")}</button>
+        </div>
+      </div>
+    </section>
+  </div>`;
+}
+
 function ensureSettingsFormDraft(){
   if(settingsFormDraft) return;
   const m=state.meta||{};
@@ -9092,7 +9890,8 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle",
-  "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment"
+  "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
+  "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack"
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
@@ -14374,9 +15173,18 @@ function renderSettings(){
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost btn-sm" data-action="cloud-open-admin-list">返回賽事管理</button>
+      <button class="btn btn-ghost btn-sm ai-create-assist-btn" data-action="ai-create-open">✨ AI 協助建立</button>
       <button class="btn btn-primary btn-sm" data-action="new-tournament-blank">＋ 新增賽事</button>
     </div>
   </div>
+
+  ${renderAiCreateAssistant()}
+  ${aiCreateLastApplied && (settingsFormDraftDirty||registrationFormDraftDirty)?`<div class="ai-create-applied-banner">
+    <strong>✨ AI 草稿已套用｜${esc(aiCreateLastApplied.eventName)}</strong>
+    <span>已填入：${aiCreateLastApplied.mappedFields.map(esc).join("、")}。目前只是未儲存草稿，請逐欄審核後再按「儲存賽事設定」。</span>
+    ${aiCreateLastApplied.warnings.length?`<div class="ai-create-applied-warnings">⚠️ ${aiCreateLastApplied.warnings.map(esc).join("　")}</div>`:""}
+  </div>`:""}
+  ${renderAiCreateReviewPanel()}
 
   <div class="settings-section-head" style="margin-top:0;">
     <span class="settings-section-num">1</span>
@@ -20698,6 +21506,19 @@ function bindDynamicInputs(){
       initHalfHourTimePickers(document);
       initHalfHourDatetimePickers(document);
       freezeArchivedControls();
+      const aiCreateSource=document.getElementById("ai-create-source-text");
+      if(aiCreateSource){
+        aiCreateSource.addEventListener("input",()=>{
+          aiCreateSourceText=aiCreateSource.value;
+          aiCreateAssistantNotice="";
+          aiCreateStructuredResult=null;
+          aiCreateStructuredErrors=[];
+          aiCreateSelectedEventKey="";
+          aiCreateReviewAcknowledged=false;
+          const countEl=document.getElementById("ai-create-char-count");
+          if(countEl) countEl.textContent=String(aiCreateSourceText.length).replace(/\B(?=(\d{3})+(?!\d))/g,",")+" / 12,000";
+        });
+      }
       document.querySelectorAll("[data-settings-draft]").forEach(el=>{
         const update=()=>{
           ensureSettingsFormDraft();
@@ -20709,6 +21530,7 @@ function bindDynamicInputs(){
           else value=el.value;
           settingsFormDraft[field]=value;
           settingsFormDraftDirty=true;
+          if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
         };
         el.addEventListener("input",update);
         el.addEventListener("change",update);
@@ -20752,6 +21574,7 @@ function bindDynamicInputs(){
           else { value = el.value; }
           registrationFormDraft[field] = value;
           registrationFormDraftDirty = true;
+          if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
         });
       });
       document.querySelectorAll(".reg-edit-input").forEach(el=>{
@@ -21015,6 +21838,64 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     showToast("目前身分沒有此操作權限。", true);
     return;
   }
+  if(action==="ai-create-open"){
+    syncSettingsDraftFromDom();
+    syncRegistrationDraftFromDom();
+    aiCreateAssistantOpen=true;
+    aiCreateAssistantNotice="";
+    if(!String(aiCreateSourceText||"").trim()){
+      aiCreateStructuredResult=null;
+      aiCreateStructuredErrors=[];
+    }
+    render();
+    setTimeout(()=>{try{document.getElementById("ai-create-source-text")?.focus({preventScroll:true});}catch(e){}},0);
+    return;
+  }
+  if(action==="ai-create-close" || action==="ai-create-close-overlay"){
+    aiCreateAssistantOpen=false;
+    aiCreateAssistantNotice="";
+    render();
+    return;
+  }
+  if(action==="ai-create-review-ack"){
+    const report=aiCreateReviewReport();
+    if(report.blockers.length){
+      showToast("仍有 "+report.blockers.length+" 項必須修正，暫時不能確認",true);
+      return;
+    }
+    aiCreateReviewAcknowledged=true;
+    render();
+    showToast("已確認 AI 提醒；仍請在儲存前逐欄檢查");
+    return;
+  }
+  if(action==="ai-create-select-event"){
+    if(!aiCreateStructuredResult) return;
+    const key=target.getAttribute("data-event-key")||"";
+    if((aiCreateStructuredResult.events||[]).some(event=>event&&event.key===key)){
+      aiCreateSelectedEventKey=key;
+      aiCreateReviewAcknowledged=false;
+      render();
+    }
+    return;
+  }
+  if(action==="ai-create-apply"){
+    const applied=applyAiCreateSelectedEventToDraft();
+    if(!applied.ok){
+      showToast(applied.error||"無法套用 AI 草稿",true);
+      return;
+    }
+    aiCreateAssistantOpen=false;
+    aiCreateAssistantNotice="";
+    render();
+    showToast("已套用「"+(applied.model.event.name||"賽事")+"」至 ARENA 草稿；尚未儲存");
+    setTimeout(()=>{try{document.querySelector(".ai-create-applied-banner")?.scrollIntoView({behavior:"smooth",block:"start"});}catch(e){}},0);
+    return;
+  }
+  if(action==="ai-create-parse"){
+    runAiCreateParse();
+    return;
+  }
+
   // v13.27.0: completed tournament is a true read-only archive.
   if(courtQueueBusy && COMPLETED_TOURNAMENT_MUTATION_ACTIONS.has(action)){
     showToast("正在確認場次安排，請稍候再操作。",true);
@@ -23227,6 +24108,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state = isTester() ? markTesterSandboxState(ns) : ns;
       resetSettingsFormDraft();
       resetRegistrationFormDraft();
+      aiCreateLastApplied=null;
+      aiCreateStructuredResult=null;
+      aiCreateStructuredErrors=[];
+      aiCreateSelectedEventKey="";
+      aiCreateSourceText="";
+      aiCreateReviewAcknowledged=false;
       await saveRecord(state);
       await setCurrentId(state.id);
       recordIndex = await loadIndex();
@@ -23568,6 +24455,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const newVal=target.getAttribute("data-value")==="true";
     settingsFormDraft.checkinRequired=newVal;
     settingsFormDraftDirty=true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23649,6 +24537,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     ensureRegistrationFormDraft();
     const enabled=target.getAttribute("data-value")==="true";
     registrationFormDraft.registrationEnabled=enabled;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
 
     const wasEnabled=!!state.meta.registrationEnabled;
     state.meta.registrationEnabled=enabled;
@@ -23671,6 +24560,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     ensureRegistrationFormDraft();
     registrationFormDraft.registrationVisibility = target.getAttribute("data-value");
     registrationFormDraftDirty = true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23681,6 +24571,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(val!=="realName" && val!=="gameId") return;
     registrationFormDraft.participantNameMode=val;
     registrationFormDraftDirty=true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23691,6 +24582,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     ensureRegistrationFormDraft();
     registrationFormDraft.targetGroup = val;
     registrationFormDraftDirty = true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -23898,6 +24790,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(!aiCreateReviewGate("進入發布預覽")) return;
 
     if(isTester()){
       d.name=ensureTestName(d.name);
@@ -23991,6 +24884,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     settingsFormDraft.ladderMode=mode;
     if(mode==="ranked" && settingsFormDraft.formatType==="single") settingsFormDraft.bronzeMatch=true;
     settingsFormDraftDirty=true;
+    if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
     render();
     return;
   }
@@ -24002,6 +24896,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(!aiCreateReviewGate("儲存賽事設定")) return;
     const requestedStations=Math.max(1,parseInt(d.stations,10)||1);
     const newFormatType=d.formatType||"single";
     const formatChanged=newFormatType!==(state.meta.formatType||"single");
@@ -24056,7 +24951,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state.championId=null; state.runnerUpId=null; state.thirdId=null; state.fourthId=null;
         state.gfMatchId=null; state.gfResetMatchId=null; state.bronzeMatchId=null; state.rrRounds=0;
         state.courtAssignments={};
-        resetSettingsFormDraft(); resetRegistrationFormDraft();
+        resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null; aiCreateReviewAcknowledged=false; aiCreateReviewAcknowledged=false;
         saveState(); render();
         showToast("賽制已更換，請重新產生對戰表");
       }});
@@ -24081,7 +24976,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     });
 
     rebuildCourtAssignments();
-    resetSettingsFormDraft(); resetRegistrationFormDraft();
+    resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null;
     saveState(); render();
     showToast("賽事設定已儲存");
     return;
@@ -24578,6 +25473,7 @@ document.addEventListener("click", (e)=>{
     }
   }
   if(action==="modal-overlay" && e.target!==target){ return; }
+  if(action==="ai-create-close-overlay" && e.target!==target){ return; }
   if(action==="cloud-close-admin-list" && e.target!==target){ return; }
   if(action==="close-share-modal" && e.target!==target){ return; }
   if(action==="cloud-close-join-modal" && e.target!==target){ return; }
@@ -25447,6 +26343,7 @@ init();
     async mood(payload){return callEngagementFunction("moodStation",payload,20000);},
     async mailbox(payload){return callEngagementFunction("mailboxService",payload,30000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
+    async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
