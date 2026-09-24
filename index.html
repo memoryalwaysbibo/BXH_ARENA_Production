@@ -4301,6 +4301,40 @@ body .celebration-overlay{z-index:3000!important;}
   opacity:.48;
   filter:grayscale(.45);
 }
+.court-call-notify-icon{position:relative;overflow:hidden;}
+.court-call-notify-bell{
+  position:relative;
+  z-index:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.court-call-notify-icon.is-off::after{
+  content:"";
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:50%;
+  width:38px;
+  height:6px;
+  border-radius:999px;
+  background:linear-gradient(180deg,#ff5a36,#ff2f36);
+  box-shadow:0 0 7px rgba(255,55,55,.38);
+  transform:translate(-50%,-50%) rotate(-45deg);
+  transform-origin:center;
+  pointer-events:none;
+}
+.court-call-notify-icon.is-off:not(.is-blocked){
+  border-color:rgba(255,82,82,.34);
+  background:rgba(255,55,55,.035);
+}
+.court-call-notify-icon.is-off .court-call-notify-bell{
+  opacity:.72;
+  filter:saturate(.72);
+}
+@media(max-width:420px){
+  .court-call-notify-icon.is-off::after{width:34px;height:5px;}
+}
 .court-call-player-section{margin-top:2px!important;}
 .court-call-active-list{margin-top:5px!important;}
 .smart-call-box .court-call-row{padding:8px 9px!important;}
@@ -4998,7 +5032,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.0"></script>
-<script src="court-call-ui.js?v=14.2.15-compact-header"></script>
+<script src="court-call-ui.js?v=14.2.16-notify-default-on"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
