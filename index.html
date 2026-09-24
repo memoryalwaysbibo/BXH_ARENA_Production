@@ -4233,6 +4233,36 @@ body .celebration-overlay{z-index:3000!important;}
   .smart-call-box .court-call-row{padding:10px!important}
 }
 
+/* ==== v14.2.14 BXH CALL waiting row: force 3-up layout ==== */
+.smart-call-box .smart-call-grid{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:6px!important;
+}
+.smart-call-box .smart-call-grid .smart-call-stat{
+  grid-column:auto!important;
+  min-width:0!important;
+  padding:7px 6px!important;
+  text-align:center;
+}
+.smart-call-box .smart-call-grid .smart-call-stat:last-child{
+  grid-column:auto!important;
+}
+.smart-call-box .smart-call-stat .k{
+  margin-bottom:2px!important;
+  white-space:nowrap;
+}
+.smart-call-box .smart-call-stat .v{
+  line-height:1.2!important;
+  overflow-wrap:anywhere;
+}
+@media(max-width:420px){
+  .smart-call-box .smart-call-grid{gap:5px!important;}
+  .smart-call-box .smart-call-grid .smart-call-stat{padding:6px 4px!important;}
+  .smart-call-box .smart-call-stat .k{font-size:9px!important;}
+  .smart-call-box .smart-call-stat .v{font-size:10.5px!important;}
+}
+
 /* ==== v13.27.0 lifecycle / post-match / mobile header ==== */
 .tournament-owner-filter{display:flex;gap:6px;margin-top:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
 .tournament-owner-filter button{flex:0 0 auto;border:1px solid var(--border);background:var(--panel-2);color:var(--metal);border-radius:999px;padding:8px 13px;font-weight:700}
