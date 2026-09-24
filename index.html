@@ -17634,7 +17634,7 @@ function renderCommunityCreateScreen(){
   </div>`+authShellClose();
 }
 function renderCommunitySettings(){
-  const m=state.meta||{},reg=!!m.registrationEnabled;
+  const m=state.meta||{},reg=!!m.registrationEnabled,accessLocked=!!state.startedAt||!!state.bracketSize||(state.matches||[]).some(x=>!x?.isBye)||state.archiveStatus==="completed";
   return `<div class="panel"><div class="panel-title">一般賽事設定 <span class="badge badge-metal">COMMUNITY</span></div>
     <div class="banner"><span>玩家一般賽事可開放線上報名；固定不計 BXH 官方天梯積分。</span></div>
     <div class="grid grid-2"><div class="field"><label>賽事名稱</label><input id="cset-name" value="${esc(m.name||"")}"></div><div class="field"><label>活動日期</label><input id="cset-date" type="date" value="${esc(m.date||"")}"></div><div class="field"><label>活動地點</label><input id="cset-location" value="${esc(m.location||"")}"></div><div class="field"><label>開賽時間</label><input id="cset-start" type="time" step="1800" value="${esc(m.startTime||"19:00")}"></div></div>
@@ -17648,7 +17648,7 @@ function renderCommunitySettings(){
         <div class="field"><label>報名截止時間</label><input id="cset-reg-close" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationCloseAt))}"></div>
       </div>
     </div>
-    <div class="panel" style="margin-top:14px"><div class="panel-title">🔐 房間存取</div><p><b>${m.roomAccessMode==="password"?"密碼房間":"公開房間"}</b></p><p class="hint">P0-1 先鎖定建立時設定；房主修改／重設密碼會在 P0-2 開放。</p></div>
+    <div class="panel" style="margin-top:14px"><div class="panel-title">🔐 房間存取</div><div class="grid grid-2"><div class="field"><label>房間類型</label><select id="cset-access-mode" ${accessLocked?"disabled":""}><option value="public" ${m.roomAccessMode!=="password"?"selected":""}>公開房間</option><option value="password" ${m.roomAccessMode==="password"?"selected":""}>密碼房間</option></select></div><div class="field"><label>房間密碼</label><input id="cset-access-password" type="password" maxlength="20" autocomplete="new-password" ${accessLocked?"disabled":""} placeholder="${m.roomAccessMode==="password"?"留空保留原密碼；輸入新值可重設":"切換為密碼房時輸入 4～20 字元"}"></div></div><p class="hint">${accessLocked?"比賽已開始或已建立對戰結構，房間存取設定已鎖定。":"切換或重設密碼會撤銷舊的 Access Grant；玩家需以新密碼重新解鎖。密碼不會寫入公開房間資料。"}</p></div>
     <div class="btn-row"><button class="btn btn-primary" data-action="community-save-settings">儲存一般賽事設定</button><button class="btn btn-ghost" data-action="community-copy-code" data-code="${esc(state.cloudCode||"")}">複製房間代碼</button><button class="btn btn-ghost" data-action="open-share-modal">分享賽事／QR</button></div>
   </div>`;
 }
@@ -22874,6 +22874,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const waitlist=Math.max(0,parseInt(document.getElementById("cset-waitlist")?.value||"0",10)||0);
     const openRaw=document.getElementById("cset-reg-open")?.value||"";
     const closeRaw=document.getElementById("cset-reg-close")?.value||"";
+    const nextAccessMode=document.getElementById("cset-access-mode")?.value==="password"?"password":"public";
+    const nextAccessPassword=(document.getElementById("cset-access-password")?.value||"").normalize("NFKC").trim();
+    if(nextAccessMode==="password"&&m.roomAccessMode!=="password"&&(nextAccessPassword.length<4||nextAccessPassword.length>20)){showToast("切換密碼房請設定 4～20 字元房間密碼",true);return;}
+    if(nextAccessPassword&&(nextAccessPassword.length<4||nextAccessPassword.length>20)){showToast("房間密碼需為 4～20 字元",true);return;}
     state.meta.name=name; state.meta.date=date; state.meta.location=location; state.meta.startTime=startTime; state.meta.formatType=formatType; state.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; state.meta.stations=stations;
     state.meta.eventAuthority="community"; state.meta.ladderMode="general"; state.meta.registrationEnabled=registrationEnabled; state.meta.registrationVisibility="public";
     if(registrationEnabled){
@@ -22888,7 +22892,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.registrationOpenAt=null; state.meta.registrationCloseAt=null; state.meta.cancellationDeadline=null;
       state.meta.registrationCapacity=0; state.meta.waitlistCapacity=0; state.meta.registrationStatus="closed";
     }
-    touchCommunityActivity(); saveState(); publicTournamentsCache=null; render(); showToast("一般賽事設定已儲存"); return;
+    (async()=>{try{
+      if(!state.cloudCode)throw new Error("room-not-found");
+      const accessChanged=nextAccessMode!==(m.roomAccessMode==="password"?"password":"public")||!!nextAccessPassword;
+      if(accessChanged){
+        const gate=await window.engagementService.roomAccess({action:"configure",code:state.cloudCode,mode:nextAccessMode,password:nextAccessPassword||undefined,operationId:crypto.randomUUID()});
+        if(!gate?.ok)throw new Error("room-access-config-failed");
+      }
+      state.meta.roomAccessMode=nextAccessMode;
+      touchCommunityActivity();await saveState();publicTournamentsCache=null;render();showToast(accessChanged?"一般賽事設定與房間存取已儲存":"一般賽事設定已儲存");
+    }catch(e){const raw=String(e?.message||e||"");if(raw.includes("room-access-locked"))showToast("比賽已開始，不能再修改房間密碼",true);else if(raw.includes("invalid-room-password"))showToast("房間密碼需為 4～20 字元",true);else showToast("房間存取設定儲存失敗，請稍後再試",true);}})();return;
   }
   if(action==="toggle-lobby-section"){
     const section=target.getAttribute("data-section");
