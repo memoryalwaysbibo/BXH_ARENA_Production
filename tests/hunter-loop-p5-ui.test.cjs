@@ -7,6 +7,9 @@ function has(text,msg){if(!source.includes(text))throw new Error(msg);}
 function before(a,b,msg){const ia=source.indexOf(a),ib=source.indexOf(b);if(ia<0||ib<0||ia>=ib)throw new Error(msg);}
 has("function openRaffleJoinConfirm(preview,event)","P5 join confirmation dialog missing");
 has("action:'joinPreview'","P5 server-side join preview call missing");
+has("legacyPreviewUnsupported","P5 legacy-backend rollout guard missing");
+has("msg.includes('invalid-action')","P5 fallback must be limited to an old backend that does not know joinPreview");
+has("目前系統正在切換新版票券確認流程","P5 legacy fallback disclosure missing");
 has("ticketRequirements","P5 ticket requirement preview missing");
 has("ticketCharges","P5 ticket charge preview missing");
 has("目前可用：","P5 ticket availability display missing");
@@ -24,3 +27,8 @@ has("'ticket-confirmation-stale':'票券狀態已變更","P5 stale confirmation 
 before("preview=await window.engagementService.raffle({action:'joinPreview'","await raffleMutate({action:'join'","P5 preview must occur before the write call");
 if(source.includes("join:'確認參加？如採用消耗票券條件"))throw new Error('Legacy generic ticket confirmation must be removed');
 console.log('PASS HUNTER LOOP P5 frontend join preview / explicit confirmation guards');
+
+const fallbackIndex=source.indexOf("msg.includes('invalid-action')");
+const previewErrorIndex=source.indexOf("else{if(c===raffleContext())c.error=raffleError(e);return;}");
+if(fallbackIndex<0||previewErrorIndex<0||fallbackIndex>previewErrorIndex)throw new Error('only invalid-action may use legacy fallback');
+console.log('PASS HUNTER LOOP P5 staged rollout fallback guard');
