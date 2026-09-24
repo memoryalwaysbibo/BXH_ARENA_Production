@@ -17860,7 +17860,7 @@ function renderPlayerRegisteredTab(){
           : `<button class="btn btn-ghost btn-sm" disabled aria-disabled="true">樹狀圖尚未產生</button>`}
         ${(['confirmed','waitlist','pending_draw'].includes(r.status)) && !publicTournamentRegistrationLocked(info)
           ? `<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(r.tournamentCode)}">取消報名</button>`
-          : ((r.status==='confirmed'||r.status==='waitlist'||r.status==='pending_draw') ? `<span class="fe-status-chip status-closed">賽事已開始｜報名鎖定</span>` : "")}
+          : ""}
       </div>
     </div>`;
   };
