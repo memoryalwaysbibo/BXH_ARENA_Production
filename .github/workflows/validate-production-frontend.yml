@@ -25,6 +25,8 @@ jobs:
 
       - name: Verify venue navigation regressions
         run: node tests/venue-navigation.test.cjs
+      - name: Verify HUNTER LOOP P5 raffle confirmation flow
+        run: node tests/hunter-loop-p5-ui.test.cjs
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
       - name: Verify ladder V1 scoring and inline-script syntax
