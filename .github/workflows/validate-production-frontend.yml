@@ -23,6 +23,11 @@ jobs:
           node --check raffle-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify AI poster contract and draft boundary
+        run: |
+          node --check ai-poster-ui.js
+          node tests/ai-poster-ui.test.cjs
+
       - name: Verify venue navigation regressions
         run: node tests/venue-navigation.test.cjs
       - name: Verify HUNTER LOOP P5 raffle confirmation flow
