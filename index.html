@@ -5242,7 +5242,7 @@ function defaultState(id){
     archiveStatus: "ongoing",
     settlementPhase: "idle",
     settlementAttempt: 0,
-    meta:{ name:"BXH 戰鬥陀螺賽事", date:"", location:"", checkin:"", startTime:"", format:"單淘汰賽", formatType:"single", stations:1, bronzeMatch:false, checkinRequired:false, checkinLeadMinutes:60, checkinClosedEarly:false, checkinClosedAt:null, scoringMode:"standard", roundScoringModes:{}, ladderMode:"general", eventAuthority:"official",
+    meta:{ name:"BXH 戰鬥陀螺賽事", date:"", location:"", checkin:"", startTime:"", format:"單淘汰賽", formatType:"single", stations:1, bronzeMatch:false, checkinRequired:false, checkinLeadMinutes:60, checkinClosedEarly:false, checkinClosedAt:null, scoringMode:"standard", roundScoringModes:{}, ladderMode:"general", eventAuthority:"official", roomAccessMode:"public",
       registrationEnabled:false, registrationOpenAt:null, registrationCloseAt:null, registrationCapacity:null,
       waitlistEnabled:false, waitlistCapacity:0, registrationFee:null, targetGroup:"open", participantNameMode:"realName", cancellationDeadline:null,
       eventDescription:"", registrationNotes:"", registrationVisibility:"public", publishedAt:null, registrationStatus:"scheduled", eventCancelled:false, assignedStaffUids:[], refereeStationAssignments:{}, refereeStationNames:{}, refereeStationRestrictionEnabled:false },
@@ -8195,6 +8195,10 @@ const CODE_ENTRY_ERROR_MESSAGES = {
   "private": "此賽事未開放公開查看",
   "network": "目前無法連線，請稍後再試",
   "same-tournament": "您目前已在此賽事中。",
+  "password-required": "此房間需要密碼才能進入。",
+  "room-password-invalid": "房間密碼不正確。",
+  "room-access-rate-limited": "密碼錯誤次數過多，請稍後再試。",
+  "room-access-not-ready": "房間密碼正在設定中，請稍後再試。",
 };
 
 // Trim, uppercase, and tolerate the code being typed either with or without
@@ -8293,8 +8297,25 @@ async function previewTournamentByCode(rawCode, opts){
 }
 
 
+function openRoomPasswordGate(code,onGranted){
+  if(!currentAuthUid()||currentRole==="guest"){showToast("密碼房需要登入 ARENA 玩家帳號",true);return false;}
+  openModal({type:"room-password",title:"🔒 密碼房間",code,confirmLabel:"解鎖並進入",cancelLabel:"取消",onGranted});
+  return true;
+}
+async function ensureRoomAccessGrant(code){
+  if(!currentAuthUid()||currentRole==="guest")return {ok:true,hasAccess:true,guest:true};
+  try{return await window.engagementService.roomAccess({action:"status",code});}
+  catch(e){return {ok:false,error:String(e?.message||e||"room-access-unavailable")};}
+}
 async function cloudJoinRoomByCode(rawCode){
   cloudJoinBusy = true; cloudJoinError=""; render();
+  const normalized=normalizeRoomCodeInput(rawCode);
+  const gate=await ensureRoomAccessGrant(normalized);
+  if(gate?.locked&&!gate.hasAccess){
+    cloudJoinBusy=false;render();
+    openRoomPasswordGate(normalized,()=>cloudJoinRoomByCode(normalized));
+    return;
+  }
   const wasGuestBefore = currentRole==="guest";
   const result = await resolveAndJoinTournamentByCode(rawCode);
   cloudJoinBusy = false;
@@ -8983,6 +9004,10 @@ const REGISTRATION_ERROR_MESSAGES = {
   "permission-denied": "操作未完成，請重新整理後再試；持續發生請聯絡主辦單位",
   "unavailable": "網路連線異常，請稍後再試",
   "network": "網路連線異常，請稍後再試",
+  "room-password-required": "此房間需要密碼才能參加",
+  "room-password-invalid": "房間密碼不正確",
+  "room-access-rate-limited": "密碼錯誤次數過多，請稍後再試",
+  "room-access-not-ready": "房間密碼正在設定中，請稍後再試",
 };
 function mapRegistrationError(e){
   const code = (e && e.code) || (e && e.message) || "unknown";
@@ -16784,6 +16809,12 @@ function renderCommunityCreateScreen(){
       </div>
       <p class="hint">截止時間留白時，預設為活動開賽時間；取消報名期限同報名截止時間。</p>
     </div>
+    <div class="panel" style="margin-top:14px">
+      <div class="panel-title">🔐 房間存取</div>
+      <div class="field"><label>房間類型</label><select id="community-access-mode"><option value="public">公開房間</option><option value="password">密碼房間</option></select></div>
+      <div class="field"><label>房間密碼（密碼房必填）</label><input id="community-access-password" type="password" maxlength="20" autocomplete="new-password" placeholder="4～20 字元"></div>
+      <p class="hint">密碼房需要 ARENA 會員輸入正確密碼後才能加入或線上報名；密碼不會寫入房間資料或公開鏡像。</p>
+    </div>
     <button class="hoc-btn hoc-btn-primary btn-block" data-action="community-create-submit">建立一般賽事</button>
     <div class="auth-links"><button class="link-btn" data-action="community-create-cancel">返回我的房間</button></div>
   </div>`+authShellClose();
@@ -16803,6 +16834,7 @@ function renderCommunitySettings(){
         <div class="field"><label>報名截止時間</label><input id="cset-reg-close" type="datetime-local" value="${esc(communityDateTimeValue(m.registrationCloseAt))}"></div>
       </div>
     </div>
+    <div class="panel" style="margin-top:14px"><div class="panel-title">🔐 房間存取</div><p><b>${m.roomAccessMode==="password"?"密碼房間":"公開房間"}</b></p><p class="hint">P0-1 先鎖定建立時設定；房主修改／重設密碼會在 P0-2 開放。</p></div>
     <div class="btn-row"><button class="btn btn-primary" data-action="community-save-settings">儲存一般賽事設定</button><button class="btn btn-ghost" data-action="community-copy-code" data-code="${esc(state.cloudCode||"")}">複製房間代碼</button><button class="btn btn-ghost" data-action="open-share-modal">分享賽事／QR</button></div>
   </div>`;
 }
@@ -17010,7 +17042,8 @@ function lobbySummary(raw){
     cancellationDeadline:normalizeDateTime(raw.cancellationDeadline), targetGroup:raw.targetGroup||m.targetGroup||"open",
     eventCancelled:!!raw.eventCancelled, publishedAt:raw.publishedAt, visibility:raw.visibility,
     startMs:lobbyEventStartMs(raw), formatType:raw.formatType||m.formatType||"single",
-    fee:raw.fee, checkInAt:raw.checkInAt||m.checkin||"", eventDescription:raw.eventDescription||""
+    fee:raw.fee, checkInAt:raw.checkInAt||m.checkin||"", eventDescription:raw.eventDescription||"",
+    roomAccessMode:raw.roomAccessMode||m.roomAccessMode||"public"
   };
 }
 function lobbyNewestFirst(a,b){
@@ -17139,6 +17172,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
         </div>
         <div class="lobby-card-right">
           <span class="lobby-authority ${authorityClass}">${authorityLabel}</span>
+          ${t.roomAccessMode==="password"?'<span class="badge badge-metal">🔒 密碼房</span>':""}
           ${t.systemClosure&&!t.systemClosure.restoredAt?'<span class="badge badge-metal">比賽結束（系統關閉）</span>':roomStatusHtml(displayPhase)}
         </div>
       </div>
@@ -19527,6 +19561,13 @@ function renderModal(){
       mm.confirmDisabled = false;
     }
   }
+  if(mm.type==="room-password"){
+    body = `<p>此房間受到密碼保護。請輸入主辦提供的房間密碼。</p>
+    ${mm.error?`<div class="auth-error">${esc(mm.error)}</div>`:""}
+    <div class="field"><label>房間密碼</label><input type="password" id="room-password-input" maxlength="20" autocomplete="off" placeholder="4～20 字元"></div>
+    <p class="hint">驗證成功後會取得此房間的暫時 Access Grant；密碼不會保存在瀏覽器。</p>`;
+    mm.confirmDisabled=false;
+  }
   if(mm.type==="reauth-unarchive"){
     body = `<p>此賽事已封存為歷史紀錄。更正歷史結果需要重新確認您的身分。</p>
     ${mm.error ? `<div class="auth-error">${esc(mm.error)}</div>` : ""}
@@ -20392,7 +20433,7 @@ function renderCloudJoinModal(){
       <div class="hint" style="text-align:center;margin:10px 0;">或手動輸入賽事代碼</div>
       <div class="field"><label>賽事代碼</label><input type="text" id="cloud-join-code-input" maxlength="10" enterkeyhint="go" inputmode="text" style="text-transform:uppercase;letter-spacing:3px;text-align:center;font-size:18px;" placeholder="BXH-XXXXXX" value="${esc(cloudJoinPrefill)}"></div>
       <div class="field"><label>或從目前公開賽事選擇</label>
-        ${publicTournamentsCache===null ? `<div class="hint">正在讀取賽事清單……</div>` : publicTournamentsCache.length ? `<select id="cloud-public-tournament-select"><option value="">請選擇賽事</option>${publicTournamentsCache.filter(t=>!t.eventCancelled && t.tournamentPhase!=="done").map(t=>`<option value="${esc(t.code)}">${esc(t.name||"未命名賽事")}｜${esc(findEventsSummaryLine(t).date||"時間待公布")}｜${esc(t.location||"地點未定")}</option>`).join("")}</select><button class="btn btn-ghost btn-block" style="margin-top:8px;" data-action="cloud-join-selected">進入選擇的賽事</button>` : `<div class="hint">目前沒有可進入的公開賽事</div>`}
+        ${publicTournamentsCache===null ? `<div class="hint">正在讀取賽事清單……</div>` : publicTournamentsCache.length ? `<select id="cloud-public-tournament-select"><option value="">請選擇賽事</option>${publicTournamentsCache.filter(t=>!t.eventCancelled && t.tournamentPhase!=="done").map(t=>`<option value="${esc(t.code)}">${t.roomAccessMode==="password"?"🔒 ":""}${esc(t.name||"未命名賽事")}｜${esc(findEventsSummaryLine(t).date||"時間待公布")}｜${esc(t.location||"地點未定")}</option>`).join("")}</select><button class="btn btn-ghost btn-block" style="margin-top:8px;" data-action="cloud-join-selected">進入選擇的賽事</button>` : `<div class="hint">目前沒有可進入的公開賽事</div>`}
       </div>
       ${recentPublicTournaments.length>0 ? `
         <div class="cloud-recent-list">
@@ -21815,6 +21856,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const registrationEnabled=!!document.getElementById("community-registration-enabled")?.checked;
     const registrationCapacity=Math.max(1,parseInt(document.getElementById("community-capacity")?.value||"16",10)||16);
     const waitlistCapacity=Math.max(0,parseInt(document.getElementById("community-waitlist")?.value||"0",10)||0);
+    const roomAccessMode=document.getElementById("community-access-mode")?.value==="password"?"password":"public";
+    const roomAccessPassword=(document.getElementById("community-access-password")?.value||"").normalize("NFKC").trim();
+    if(roomAccessMode==="password"&&(roomAccessPassword.length<4||roomAccessPassword.length>20)){showToast("密碼房請設定 4～20 字元房間密碼",true);return;}
     const openRaw=document.getElementById("community-reg-open")?.value||"";
     const closeRaw=document.getElementById("community-reg-close")?.value||"";
     if(!name||!date||!location){ showToast("請完整填寫賽事名稱、活動日期與地點",true); return; }
@@ -21825,7 +21869,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const st=defaultState();
         st.meta.name=name; st.meta.date=date; st.meta.location=location; st.meta.startTime=startTime;
         st.meta.formatType=formatType; st.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; st.meta.stations=stations;
-        st.meta.eventAuthority="community"; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.publishedAt=Date.now();
+        st.meta.eventAuthority="community"; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.roomAccessMode=roomAccessMode; st.meta.publishedAt=Date.now();
         if(registrationEnabled){
           const eventStart=Date.parse(date+"T"+startTime+":00");
           const openAt=openRaw?new Date(openRaw).getTime():Date.now();
@@ -21863,6 +21907,15 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         st.expiresAtMs=communityRoomExpiryMs(st);
         const code=await window.cloudSync.createCommunityRoom(st);
         if(!code) throw new Error("create-failed");
+        if(roomAccessMode==="password"){
+          try{
+            const gate=await window.engagementService.roomAccess({action:"configure",code,mode:"password",password:roomAccessPassword,operationId:crypto.randomUUID()});
+            if(!gate?.ok)throw new Error("room-access-config-failed");
+          }catch(gateError){
+            try{await window.cloudSync.deleteCommunityRoom(code);}catch(cleanupError){}
+            throw gateError;
+          }
+        }
         st.cloudCode=code; state=st; await saveRecord(state); await setCurrentId(state.id);
         if(cloudUnsub){ try{cloudUnsub();}catch(e){} }
         cloudUnsub=window.cloudSync.subscribe(code,applyRemoteState); cloudStatus="connected";
@@ -22283,7 +22336,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const result=await window.cloudSync.joinTournamentAsPlayer(code,true);
         showToast(result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
         publicTournamentsCache=null; myRegistrationsCache=null; render();
-      }catch(e){ showToast(mapRegistrationError(e),true); }
+      }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }
     })();
     return;
   }
@@ -22330,6 +22383,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }catch(e){
         tournamentDetailBusy = false;
         console.error("[BXH registration failed]", { code:e&&e.code, message:e&&e.message, raw:e });
+        const raw=String(e?.message||e||"");
+        if(raw.includes("room-password-required")){render();openRoomPasswordGate(code,()=>handleAction("submit-tournament-registration",target));return;}
         showToast(mapRegistrationError(e), true);
         render();
       }
@@ -24762,6 +24817,26 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       })();
       return;
     }
+    if(mm.type==="room-password"){
+      if(mm.confirmBusy)return;
+      const input=document.getElementById("room-password-input"),password=input?input.value:"";
+      if(!password){mm.error="請輸入房間密碼";render();return;}
+      mm.confirmBusy=true;mm.error="";render();
+      (async()=>{
+        try{
+          const result=await window.engagementService.roomAccess({action:"verify",code:mm.code,password});
+          if(!result?.ok)throw Error("room-password-invalid");
+          const next=mm.onGranted;closeModal();if(typeof next==="function")await next();
+        }catch(e){
+          if(pendingModal!==mm)return;
+          const raw=String(e?.message||e||"");
+          mm.confirmBusy=false;
+          mm.error=raw.includes("room-access-rate-limited")?"密碼錯誤次數過多，請稍後再試":raw.includes("room-access-not-ready")?"房間密碼正在設定中，請稍後再試":"房間密碼不正確";
+          render();
+        }
+      })();
+      return;
+    }
     if(mm.type==="reauth-unarchive"){
       if(mm.confirmBusy) return;
       const pwEl = document.getElementById("reauth-password-input");
@@ -25827,6 +25902,7 @@ init();
     async mood(payload){return callEngagementFunction("moodStation",payload,20000);},
     async mailbox(payload){return callEngagementFunction("mailboxService",payload,30000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
+    async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
@@ -25976,13 +26052,16 @@ init();
   // the old "data" field — never breaking guest viewing for older tournament
   // codes that haven't been through the cleanup tool yet.
   function reconstructPublicStateFromDoc(id, d){
+    let out=null;
     if(d.bracketView){
-      try{ return Object.assign({ id }, JSON.parse(d.bracketView)); }catch(e){ /* fall through */ }
+      try{ out=Object.assign({ id }, JSON.parse(d.bracketView)); }catch(e){ /* fall through */ }
     }
-    if(d.data){
-      try{ return JSON.parse(d.data); }catch(e){ /* fall through */ }
+    if(!out&&d.data){
+      try{ out=JSON.parse(d.data); }catch(e){ /* fall through */ }
     }
-    throw new Error("corrupt-public-document");
+    if(!out)throw new Error("corrupt-public-document");
+    out.meta=out.meta||{};out.meta.roomAccessMode=d.roomAccessMode||out.meta.roomAccessMode||"public";
+    return out;
   }
 
 
@@ -26183,6 +26262,10 @@ init();
       if(!uid)throw{code:"auth-required"};
       const selectionDoc=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
       if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
+      if(selectionDoc.exists()&&selectionDoc.data().roomAccessMode==="password"){
+        const access=await window.engagementService.roomAccess({action:"status",code});
+        if(!access?.hasAccess)throw Error("room-password-required");
+      }
       const mode=participantMode==='children'?'children':'self';
       if(selectionDoc.exists()&&selectionDoc.data().registrationSelection){
         if(mode==='children')throw Error('child-registration-unavailable');
@@ -26989,7 +27072,7 @@ init();
         // Player accounts must not perform a preflight read against public mirrors.
         const code=generateRoomCode();
         const now=Date.now();
-        data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.meta.ladderMode="general"; data.meta.registrationEnabled=!!data.meta.registrationEnabled; data.meta.assignedStaffUids=[];
+        data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.meta.ladderMode="general"; data.meta.registrationEnabled=!!data.meta.registrationEnabled; data.meta.assignedStaffUids=[]; data.meta.roomAccessMode=data.meta.roomAccessMode==="password"?"password":"public";
         data.ownerUid=uid; data.createdByRole="player"; data.lastActivityAt=now;
         const hasStructure=(data.players&&data.players.length)||(data.matches&&data.matches.length)||data.bracketSize;
         const expMs=data.expiresAtMs || now+(hasStructure?30:7)*24*60*60*1000; data.expiresAtMs=expMs;
@@ -27009,7 +27092,7 @@ init();
         data.meta.registrationStatus=regEnabled?"open":"closed";
         const base={
           eventAuthority:"community",ownerUid:uid,createdBy:uid,createdByName:currentUserDisplayNameForWrites(),createdByRole:"player",
-          ladderMode:"general",ladderPointsAwarded:false,registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",visibility:"public",
+          ladderMode:"general",ladderPointsAwarded:false,roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",visibility:"public",
           registrationOpenAt:regOpen,registrationCloseAt:regClose,capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,
           confirmedCount:0,waitlistCount:0,registrationVisibility:"public",publishedAt:data.meta.publishedAt||now,
           cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
@@ -27021,7 +27104,7 @@ init();
         const batch=fx.writeBatch(dbHandle);
         batch.set(tournamentRef,Object.assign({},base,{data:JSON.stringify(data)}));
         batch.set(publicRef,{
-          bracketView:JSON.stringify(buildPublicMirrorFields(data)),updatedAt:now,visibility:"public",eventAuthority:"community",ownerUid:uid,ladderMode:"general",
+          bracketView:JSON.stringify(buildPublicMirrorFields(data)),updatedAt:now,visibility:"public",eventAuthority:"community",ownerUid:uid,ladderMode:"general",roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,roomLocked:data.meta.roomAccessMode==="password",
           registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",registrationOpenAt:regOpen,registrationCloseAt:regClose,
           capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,confirmedCount:0,waitlistCount:0,registrationVisibility:"public",
           publishedAt:data.meta.publishedAt||now,cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
