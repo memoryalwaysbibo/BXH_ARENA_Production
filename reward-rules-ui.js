@@ -1,4 +1,4 @@
-/* HUNTER LOOP P2.4 | REWARD RULES 1.0 admin UI */
+/* HUNTER LOOP P4 | 7-DAY REWARD + REWARD RULES admin UI */
 'use strict';
 
 let rewardRulesAdminState=null;
@@ -38,9 +38,10 @@ function defaultRewardRuleDraft(){
     logic:'and',
     deliveryMode:'auto',
     repeatMode:'once',
+    monthlyMax:'',
     enabled:true,
     conditions:[{type:'checkin_streak',value:'7',ref:''}],
-    reward:{itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'REWARD RULES 1.0',expiry:''},
+    reward:{itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'REWARD RULES 1.0',expiry:'',consumable:false},
   };
 }
 function rewardRulesAdminContext(){
@@ -74,6 +75,7 @@ function rewardRulesError(error){
     'invalid-logic':'條件邏輯設定不正確。',
     'invalid-delivery-mode':'發放方式設定不正確。',
     'invalid-repeat-mode':'重複發放設定不正確。',
+    'invalid-monthly-max':'每月上限需為 1～1000；留空或 0 代表不限。',
     'invalid-conditions':'至少需要一個取得條件。',
     'invalid-condition-type':'取得條件類型不正確。',
     'invalid-condition-value':'條件數值需為大於 0 的整數。',
@@ -101,6 +103,7 @@ function storedRuleToDraft(rule){
     logic:rule.logic==='or'?'or':'and',
     deliveryMode:['auto','claim','admin_confirm'].includes(rule.deliveryMode)?rule.deliveryMode:'auto',
     repeatMode:rule.repeatMode==='per_source'?'per_source':'once',
+    monthlyMax:rule.monthlyMax==null?'':String(rule.monthlyMax),
     enabled:rule.enabled===true,
     conditions:Array.isArray(rule.conditions)&&rule.conditions.length
       ?rule.conditions.map(c=>({type:String(c.type||'checkin_streak'),value:c.value==null?'':String(c.value),ref:c.ref==null?'':String(c.ref)}))
@@ -113,6 +116,7 @@ function storedRuleToDraft(rule){
       purpose:String(rule.reward?.purpose||''),
       source:String(rule.reward?.source||'REWARD RULES 1.0'),
       expiry:rewardRuleExpiryLocal(rule.reward?.expiresAt),
+      consumable:rule.reward?.consumable===true,
     },
   };
 }
@@ -159,6 +163,7 @@ function renderRewardRuleEditor(state){
       <div class="field"><label>條件邏輯</label><select data-reward-rule-field="logic" ${locked?'disabled':''}><option value="and" ${d.logic==='and'?'selected':''}>AND｜全部條件成立</option><option value="or" ${d.logic==='or'?'selected':''}>OR｜任一條件成立</option></select></div>
       <div class="field"><label>發放方式</label><select data-reward-rule-field="deliveryMode" ${locked?'disabled':''}>${rewardSelectOptions(REWARD_DELIVERY_LABELS,d.deliveryMode)}</select></div>
       <div class="field"><label>重複規則</label><select data-reward-rule-field="repeatMode" ${locked?'disabled':''}>${rewardSelectOptions(REWARD_REPEAT_LABELS,d.repeatMode)}</select></div>
+      <div class="field"><label>每月發放上限</label><input data-reward-rule-field="monthlyMax" type="number" min="0" max="1000" step="1" value="${esc(d.monthlyMax||'')}" placeholder="0 或留空＝不限" ${locked?'disabled':''}></div>
     </div>
     <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" data-reward-rule-field="enabled" ${d.enabled?'checked':''} ${locked?'disabled':''}>建立後立即啟用</label>
     <div class="panel-title" style="margin-top:10px">取得條件</div>
@@ -175,6 +180,7 @@ function renderRewardRuleEditor(state){
       ${rewardField('source','來源','maxlength="120"')}
       ${rewardField('expiry','到期時間（台灣時間）','type="datetime-local"')}
     </div>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" data-reward-item-field="consumable" ${d.reward.consumable?'checked':''} ${locked?'disabled':''}>此道具可消耗使用（例如抽獎券）</label>
     <div class="btn-row">
       <button class="btn btn-primary" data-action="inventory-rule-save" ${locked?'disabled':''}>${locked?'儲存中……':'儲存取得規則'}</button>
       <button class="btn btn-ghost" data-action="inventory-rule-cancel" ${locked?'disabled':''}>取消</button>
@@ -212,9 +218,9 @@ function renderRewardRulesAdmin(){
     <div class="grid grid-2 inventory-grid">
       ${rules.map(rule=>`<article class="panel">
         <div class="panel-title"><span>${esc(rule.name||rule.ruleCode)}</span><span class="badge badge-metal">${rule.enabled?'啟用':'停用'}</span></div>
-        <p class="hint">代碼：${esc(rule.ruleCode)}<br>觸發：${esc(REWARD_TRIGGER_LABELS[rule.trigger]||rule.trigger)}｜${esc(rule.logic==='or'?'OR':'AND')}｜${esc(REWARD_DELIVERY_LABELS[rule.deliveryMode]||rule.deliveryMode)}<br>重複：${esc(REWARD_REPEAT_LABELS[rule.repeatMode]||rule.repeatMode)}</p>
+        <p class="hint">代碼：${esc(rule.ruleCode)}<br>觸發：${esc(REWARD_TRIGGER_LABELS[rule.trigger]||rule.trigger)}｜${esc(rule.logic==='or'?'OR':'AND')}｜${esc(REWARD_DELIVERY_LABELS[rule.deliveryMode]||rule.deliveryMode)}<br>重複：${esc(REWARD_REPEAT_LABELS[rule.repeatMode]||rule.repeatMode)}｜每月上限：${rule.monthlyMax==null?'不限':Number(rule.monthlyMax)}</p>
         <p class="mailbox-body">${(rule.conditions||[]).map(rewardConditionSummary).map(esc).join('<br>')}</p>
-        <p><b>→ ${esc(rule.reward?.name||'未設定道具')} × ${Number(rule.reward?.quantity||0)}</b></p>
+        <p><b>→ ${esc(rule.reward?.name||'未設定道具')} × ${Number(rule.reward?.quantity||0)}</b>${rule.reward?.consumable?' <span class="badge badge-metal">可消耗</span>':''}</p>
         <div class="btn-row">
           <button class="btn btn-ghost btn-sm" data-action="inventory-rule-edit" data-rule-code="${esc(rule.ruleCode)}" ${s.busy?'disabled':''}>編輯</button>
           <button class="btn btn-ghost btn-sm" data-action="inventory-rule-toggle" data-rule-code="${esc(rule.ruleCode)}" data-enabled="${rule.enabled?'true':'false'}" ${s.busy?'disabled':''}>${rule.enabled?'停用':'啟用'}</button>
@@ -243,6 +249,10 @@ function rewardRuleBuildPayload(draft){
     if(type==='placement_at_most')return {type,value,ref:String(condition.ref||'').trim()||null};
     return {type,value};
   });
+  const monthlyRaw=String(draft.monthlyMax??'').trim();
+  const monthlyValue=monthlyRaw===''?0:Number(monthlyRaw);
+  if(!Number.isInteger(monthlyValue)||monthlyValue<0||monthlyValue>1000)throw Error('invalid-monthly-max');
+  const monthlyMax=monthlyValue===0?null:monthlyValue;
   const quantity=Number(draft.reward.quantity);
   if(!Number.isInteger(quantity)||quantity<1||quantity>10000)throw Error('invalid-quantity');
   const expiresAt=inventoryExpiry(draft.reward.expiry);
@@ -253,6 +263,7 @@ function rewardRuleBuildPayload(draft){
     logic:draft.logic,
     deliveryMode:draft.deliveryMode,
     repeatMode:draft.repeatMode,
+    monthlyMax,
     enabled:draft.enabled===true,
     conditions,
     reward:{
@@ -263,6 +274,7 @@ function rewardRuleBuildPayload(draft){
       purpose:String(draft.reward.purpose||'').trim(),
       source:String(draft.reward.source||'').trim(),
       expiresAt,
+      consumable:draft.reward.consumable===true,
     },
   };
 }
@@ -296,9 +308,9 @@ async function handleRewardRulesAdmin(action,target){
     s.draft={
       ruleCode:'weekly-checkin-ticket',
       name:'每連續 7 天獲得抽獎券',
-      trigger:'daily_checkin',logic:'and',deliveryMode:'auto',repeatMode:'per_source',enabled:true,
+      trigger:'daily_checkin',logic:'and',deliveryMode:'auto',repeatMode:'per_source',monthlyMax:'',enabled:true,
       conditions:[{type:'checkin_streak_multiple',value:'7',ref:''}],
-      reward:{itemCode:'weekly-raffle-ticket',name:'抽獎券',quantity:'1',imageUrl:'',purpose:'會員抽獎使用',source:'每日簽到｜每連續 7 天',expiry:''},
+      reward:{itemCode:'weekly-raffle-ticket',name:'BXH ARENA 抽獎券',quantity:'1',imageUrl:'',purpose:'會員抽獎使用',source:'每日簽到｜每連續 7 天',expiry:'',consumable:true},
     };
     s.error='';render();return;
   }
@@ -312,6 +324,7 @@ async function handleRewardRulesAdmin(action,target){
       purpose:String(source.purpose||''),
       source:String(source.source||'REWARD RULES 1.0'),
       expiry:String(source.expiry||''),
+      consumable:false,
     };
     render();return;
   }
@@ -365,7 +378,7 @@ function rewardRulesCaptureInput(event){
     return;
   }
   if(itemField){
-    s.draft.reward[itemField]=event.target.value;
+    s.draft.reward[itemField]=itemField==='consumable'?!!event.target.checked:event.target.value;
     return;
   }
   if(conditionField){
