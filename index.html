@@ -2363,13 +2363,21 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 
 /* ==== auth / landing screens ==== */
 .auth-shell{
-  position:fixed;inset:0;z-index:400;overflow-y:auto;
+  position:fixed;inset:0;z-index:400;
+  width:100%;height:100vh;height:100dvh;max-height:100dvh;
+  overflow:hidden;
   background:
     radial-gradient(ellipse at 50% -10%, rgba(212,175,55,0.09) 0%, transparent 45%),
     linear-gradient(180deg, #0d0e0a 0%, var(--obsidian) 55%, #020303 100%);
-  display:flex;flex-direction:column;align-items:center;
-  padding:34px 16px 50px;
+  display:block;
+  padding:0;
   animation:hoc-bg-fade 0.7s ease-out both;
+  isolation:isolate;
+}
+.auth-bg-layer{
+  position:absolute;inset:0;z-index:0;
+  pointer-events:none;overflow:hidden;
+  contain:paint;
 }
 .auth-beams{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0.4;
   background:conic-gradient(from 90deg at 50% 0%, transparent 0deg, rgba(212,175,55,0.05) 8deg, transparent 16deg, transparent 40deg, rgba(212,175,55,0.04) 48deg, transparent 56deg);
@@ -2378,6 +2386,17 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .auth-wm img{width:56%;max-width:600px;height:auto;opacity:0.05;filter:saturate(0.6);}
 .auth-particles{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
 .auth-dust{position:absolute;bottom:0;width:3px;height:3px;border-radius:50%;background:var(--champagne-gold);opacity:0;animation:hoc-drift 6s linear infinite;}
+.auth-scroll{
+  position:relative;z-index:1;
+  width:100%;height:100%;
+  overflow-x:hidden;overflow-y:auto;
+  display:flex;flex-direction:column;align-items:center;
+  padding:34px 16px 50px;
+  box-sizing:border-box;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:auto;
+  touch-action:pan-y;
+}
 .auth-content{position:relative;z-index:2;width:100%;max-width:640px;display:flex;flex-direction:column;align-items:center;}
 .auth-brand-header{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:10px;}
 .auth-logo-wrap{position:relative;width:104px;height:104px;margin-bottom:8px;}
@@ -2518,7 +2537,7 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 }
 .landing-version{font-size:10px;letter-spacing:1px;color:rgba(181,177,164,.50);}
 @media (max-width:640px){
-  .auth-shell{
+  .auth-scroll{
     padding-left:max(16px,env(safe-area-inset-left));
     padding-right:max(16px,env(safe-area-inset-right));
     padding-bottom:max(34px,env(safe-area-inset-bottom));
@@ -3617,11 +3636,14 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .community-room-notice{padding:8px 16px;background:rgba(89,140,255,.08);border-bottom:1px solid rgba(89,140,255,.18);font-size:12px;color:var(--metal)}
 .community-create-card{max-width:620px}.community-create-card .banner{margin-bottom:14px}
 .auth-shell.community-create-shell{
-  top:0;right:0;bottom:auto;left:0;
+  top:0;right:0;bottom:0;left:0;
   height:100vh;height:100dvh;max-height:100dvh;
-  box-sizing:border-box;overflow-x:hidden;overflow-y:scroll;
-  -webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior-y:auto;
+  box-sizing:border-box;overflow:hidden;
+}
+.community-create-shell .auth-scroll{
   align-items:stretch;
+  overflow-x:hidden;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior-y:auto;
 }
 .community-create-shell .auth-content.community-create-content{
   display:block;flex:0 0 auto;width:100%;max-width:640px;min-height:max-content;
@@ -14620,12 +14642,15 @@ function renderCelebrationOverlay(){
 /* ==== auth screens ==== */
 function authShellOpen(subtitle, contentClass="", shellClass=""){
   return `<div class="auth-shell ${esc(shellClass||"")}">
-    <div class="auth-beams" aria-hidden="true"></div>
-    <div class="auth-wm" aria-hidden="true"><img src="${LOGO_SRC}" alt=""></div>
-    <div class="auth-particles" aria-hidden="true">${Array.from({length:14}).map((_,i)=>`<span class="auth-dust" style="left:${(i*7+5)%100}%;animation-delay:${(i*0.6).toFixed(1)}s;"></span>`).join("")}</div>
-    <div class="auth-content ${esc(contentClass||"")}">`;
+    <div class="auth-bg-layer" aria-hidden="true">
+      <div class="auth-beams"></div>
+      <div class="auth-wm"><img src="${LOGO_SRC}" alt=""></div>
+      <div class="auth-particles">${Array.from({length:14}).map((_,i)=>`<span class="auth-dust" style="left:${(i*7+5)%100}%;animation-delay:${(i*0.6).toFixed(1)}s;"></span>`).join("")}</div>
+    </div>
+    <div class="auth-scroll">
+      <div class="auth-content ${esc(contentClass||"")}">`;
 }
-function authShellClose(){ return `${renderModal()}${renderCloudJoinModal()}${renderEventEntryModal()}${renderQrScannerModal()}${renderSwitchTournamentModal()}</div></div>`; }
+function authShellClose(){ return `</div></div>${renderModal()}${renderCloudJoinModal()}${renderEventEntryModal()}${renderQrScannerModal()}${renderSwitchTournamentModal()}</div>`; }
 
 function authBrandHeader(){
   return `<div class="auth-brand-header">
