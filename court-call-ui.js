@@ -321,16 +321,14 @@ function renderCourtCallReferee(m){
  </section>`;
 }
 
-function renderCourtCallHeaderControls(code){
+function renderCourtCallHeaderControls(code,on=true){
  ensureCourtCallGlobalStyles();
  const np=courtCallNotificationPermission(),pushReady=courtCallPushRegistered();
- const active=np==='granted'&&pushReady;
- const action=active?'court-call-notify-status':'court-call-enable-notify';
- const label=active?'背景通知已啟用':(np==='denied'?'背景通知已封鎖':'啟用背景通知');
+ const notifyActive=np==='granted'&&pushReady;
+ const notifyBlocked=np==='denied';
 
- // Default-on policy: browsers do not allow notification permission to be
- // granted silently. Once the user has granted permission, BXH CALL keeps
- // Web Push registered automatically; no per-event re-enable is required.
+ // BXH CALL defaults on. Browser permission itself still needs one user gesture.
+ // After permission has been granted once, keep Web Push registered automatically.
  if(np==='granted'&&!pushReady&&!courtCallPushBusy){
   setTimeout(async()=>{
    const ok=await courtCallEnsurePushRegistration(false);
@@ -338,10 +336,19 @@ function renderCourtCallHeaderControls(code){
   },0);
  }
 
- return `<button class="court-call-notify-icon ${active?'is-active':'is-off'} ${np==='denied'?'is-blocked':''}" type="button"
-   data-action="${action}" data-code="${esc(code||'')}" data-court-call-help-hold="1"
-   aria-pressed="${active?'true':'false'}"
-   aria-label="${esc(label)}；長按 1.5 秒查看叫號說明" title="${esc(label)}"><span class="court-call-notify-bell" aria-hidden="true">🔔</span></button>`;
+ const label=!on?'BXH CALL 智慧提醒已關閉；裁判正式叫號仍保留':
+   notifyActive?'BXH CALL 已開啟，包含智慧 ETA 與背景通知':
+   notifyBlocked?'BXH CALL 已開啟；背景通知已被瀏覽器封鎖':
+   'BXH CALL 已開啟；點一下完成背景通知設定';
+
+ return `<button class="smart-call-unified-control ${on?'is-on':'is-off'} ${notifyActive?'has-background':'no-background'} ${notifyBlocked?'is-blocked':''}" type="button"
+   data-action="toggle-smart-call" data-code="${esc(code||'')}" data-on="${on?'1':'0'}"
+   data-notify-active="${notifyActive?'1':'0'}" data-notify-blocked="${notifyBlocked?'1':'0'}"
+   data-court-call-help-hold="1" aria-pressed="${on?'true':'false'}"
+   aria-label="${esc(label)}；長按 1.5 秒查看說明" title="${esc(label)}">
+     <span class="smart-call-unified-bell ${notifyActive?'':'is-notify-off'}" aria-hidden="true">🔔</span>
+     <span class="smart-call-unified-track" aria-hidden="true"><span class="smart-call-unified-knob"></span></span>
+   </button>`;
 }
 
 function renderCourtCallPlayer(code){
@@ -374,7 +381,9 @@ function showCourtCallHelpOverlay(code){
      <p>裁判人工叫號與智慧 ETA 分開運作；人工叫號約每 2–3 秒同步。</p>
      <p>PASS 每人每賽事 1 次，且必須有同台同輪下一場可承接。</p>
      <p>智慧 ETA 以每場 3 分鐘為基準，會依進行中比分動態修正；3 分賽點會縮短估時。</p>
-     <p>通知圖示：背景通知預設維持開啟；首次仍需由瀏覽器取得通知權限。紅色斜槓代表目前未啟用；輕點可開啟，長按 1.5 秒可再次查看本說明。</p>
+     <p>BXH CALL 現在只有一個控制：開啟時提供智慧 ETA／上場提醒，並在裝置允許時自動維持背景與鎖屏通知。</p>
+     <p>首次背景通知仍需要瀏覽器授權；鈴鐺出現紅色斜槓代表背景通知尚未可用。裁判正式人工叫號不受智慧提醒開關影響，仍會保留。</p>
+     <p>長按 BXH CALL 開關 1.5 秒可再次查看本說明。</p>
    </div>
    ${pushReady?`<button class="btn btn-ghost bxh-call-help-test" data-action="court-call-test-push" data-code="${esc(code||'')}" ${courtCallPushTestBusy?'disabled':''}>🧪 ${courtCallPushTestBusy?'測試送出中…':'測試鎖屏推播'}</button>`:''}
  </div>`;
