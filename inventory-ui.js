@@ -44,7 +44,7 @@ function renderInventoryPage(){
  return `<section class="panel"><div class="panel-title"><span>🎒 我的道具</span><button class="btn btn-ghost btn-sm" data-action="inventory-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>
  <p class="hint">道具綁定帳號，不可轉讓。相同道具依發放批次列出，來源與期限各自保存；過期保留紀錄。</p>
  ${c.error?`<p class="auth-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="hint" role="status">${esc(c.success)}</p>`:''}
- <div class="grid grid-2 inventory-grid">${(c.items||[]).map(i=>`<article class="panel inventory-card">${inventoryImage(i.imageUrl)?`<img class="inventory-image" src="${esc(inventoryImage(i.imageUrl))}" alt="${esc(i.name)}" loading="lazy" referrerpolicy="no-referrer">`:'<div class="inventory-image inventory-placeholder" aria-hidden="true">🎟️</div>'}<div><h3>${esc(i.name)}</h3><p><b>數量 ${Number(i.quantity)||0}</b> · ${inventoryStatus(i,c)}</p><p class="mailbox-body">${esc(i.purpose)}</p><p class="hint">期限：${i.expiresAt==null?'無期限':esc(mailboxDate(i.expiresAt))+'（台灣時間）'}<br>來源：${esc(i.source)}<br>取得：${esc(mailboxDate(i.createdAt))}<br>道具代碼：${esc(i.itemCode)}</p><button class="btn btn-ghost btn-sm" data-action="inventory-history" data-item-id="${esc(i.id)}" ${c.busy||c.loading?'disabled':''}>發放／使用紀錄</button></div></article>`).join('')}</div>
+ <div class="grid grid-2 inventory-grid">${(c.items||[]).map(i=>`<article class="panel inventory-card">${inventoryImage(i.imageUrl)?`<img class="inventory-image" src="${esc(inventoryImage(i.imageUrl))}" alt="${esc(i.name)}" loading="lazy" referrerpolicy="no-referrer">`:'<div class="inventory-image inventory-placeholder" aria-hidden="true">🎟️</div>'}<div><h3>${esc(i.name)}</h3><p><b>數量 ${Number(i.quantity)||0}</b> · ${inventoryStatus(i,c)}${i.consumable?' · 可消耗':''}</p><p class="mailbox-body">${esc(i.purpose)}</p><p class="hint">期限：${i.expiresAt==null?'無期限':esc(mailboxDate(i.expiresAt))+'（台灣時間）'}<br>來源：${esc(i.source)}<br>取得：${esc(mailboxDate(i.createdAt))}<br>道具代碼：${esc(i.itemCode)}</p><button class="btn btn-ghost btn-sm" data-action="inventory-history" data-item-id="${esc(i.id)}" ${c.busy||c.loading?'disabled':''}>發放／使用紀錄</button></div></article>`).join('')}</div>
  ${c.loading?'<p role="status">正在載入道具……</p>':c.items&&!c.items.length?'<div class="empty-state">目前沒有道具，收到票券或活動獎勵後會顯示在這裡。</div>':''}
  ${c.nextCursor?`<button class="btn btn-ghost" data-action="inventory-more" ${c.loading||c.busy?'disabled':''}>載入更多道具</button>`:''}
  ${selected?`<section class="panel"><div class="panel-title">${esc(selected.name)}｜發放／使用紀錄</div>${c.events.map(e=>`<p class="mailbox-body">${esc(mailboxDate(e.createdAt))}｜${esc(({grant:'發放',consume:'使用',refund:'退還'})[e.kind]||'異動')} ${e.delta>0?'+':''}${Number(e.delta)}｜剩餘 ${Number(e.balance)}<br>來源：${esc(e.source)}<br><small>紀錄：${esc(e.operationId)}</small></p>`).join('')}${c.historyLoaded&&!c.events.some(e=>e.kind==='consume')?'<p class="hint">目前已載入的紀錄中沒有使用紀錄。</p>':''}${c.historyCursor?`<button class="btn btn-ghost" data-action="inventory-history-more" ${c.busy?'disabled':''}>更多紀錄</button>`:''}</section>`:''}
@@ -121,7 +121,7 @@ document.addEventListener('change',inventoryCaptureInput);
 (function loadRewardRulesAdminUi(){
  if(document.querySelector('script[data-reward-rules-ui]'))return;
  const script=document.createElement('script');
- script.src='reward-rules-ui.js?v=20260925-p2-4';
+ script.src='reward-rules-ui.js?v=20260925-p4';
  script.async=true;
  script.dataset.rewardRulesUi='1';
  script.onload=()=>{try{render();}catch{}};
