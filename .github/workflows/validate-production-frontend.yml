@@ -23,6 +23,8 @@ jobs:
           node --check raffle-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify venue navigation regressions
+        run: node tests/venue-navigation.test.cjs
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
       - name: Verify ladder V1 scoring and inline-script syntax
