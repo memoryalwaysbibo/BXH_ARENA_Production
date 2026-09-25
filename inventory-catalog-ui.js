@@ -101,7 +101,7 @@ async function catalogGift(c){
   const r=await window.engagementService.inventory(c.pending.payload);if(c!==catalogState())return;if(!r?.ok)throw Error('grant-failed');
   c.success='已贈送成功，批次編號：'+String(r.itemCode||'')+'。';
   sessionStorage.removeItem('bxh.catalog.gift:'+currentAuthUid());c.pending=null;c.recipient=null;c.gift={catalogId:'',quantity:'1',source:'',expiry:''};
- }catch(e){if(c===catalogState())c.error=catalogErr(e);}finally{if(c===catalogState()){c.busy=false;render();}}
+ }catch(e){if(c===catalogState()){c.error=catalogErr(e);if(c.pending&&['functions/invalid-argument','functions/failed-precondition'].includes(e.code)&&!String(e.message).includes('operation-conflict')){sessionStorage.removeItem('bxh.catalog.gift:'+currentAuthUid());c.pending=null;}}}finally{if(c===catalogState()){c.busy=false;render();}}
 }
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-action^="catalog-"]');if(!t)return;e.preventDefault();e.stopPropagation();catalogAction(t.dataset.action,t);},true);
 document.addEventListener('input',e=>{const c=catalogState(),t=e.target;if(t.hasAttribute?.('data-catalog-query'))c.query=t.value;const f=t.getAttribute?.('data-catalog-field');if(f&&f!=='consumable'&&Object.hasOwn(c.draft,f))c.draft[f]=t.value;const g=t.getAttribute?.('data-catalog-gift');if(g&&Object.hasOwn(c.gift,g))c.gift[g]=t.value;});
