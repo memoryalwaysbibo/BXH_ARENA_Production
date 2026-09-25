@@ -2802,7 +2802,7 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .mailbox-item-title{font-weight:700;color:var(--ivory);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mailbox-item-meta{margin-top:5px;font-size:11px;color:var(--metal);display:flex;justify-content:space-between;gap:8px;}
 .mailbox-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;color:var(--ivory);}
-.catalog-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}.catalog-tabs .btn{min-width:0;padding:10px 4px}.catalog-list{display:grid;gap:8px;margin:12px 0}.catalog-item{margin:0!important;padding:12px!important}.catalog-item-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.catalog-item-head span{color:var(--metal)}.catalog-item details{margin:8px 0}.catalog-item summary{cursor:pointer;color:var(--gold)}.catalog-item details p{margin:6px 0}.catalog-item .btn{margin-top:6px}
+.catalog-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}.catalog-tabs .btn{min-width:0;padding:10px 4px}.catalog-list{display:grid;gap:8px;margin:12px 0}.catalog-item{margin:0!important;padding:12px!important;min-width:0;overflow-wrap:anywhere}.catalog-item-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.catalog-item-head span{color:var(--metal)}.catalog-item details{margin:8px 0}.catalog-item summary{cursor:pointer;color:var(--gold)}.catalog-item details p{margin:6px 0}.catalog-item .btn{margin-top:6px}
 .inventory-grid{gap:8px}.inventory-grid>.inventory-card{margin-top:0;padding:12px}.inventory-card{display:flex;gap:10px;align-items:flex-start;min-width:0}.inventory-card>div{min-width:0;overflow-wrap:anywhere}.inventory-card h3{margin:0 0 3px;color:var(--ivory)}.inventory-card>div>p{margin:0 0 3px;line-height:1.3}.inventory-card>div>p.mailbox-body{margin-bottom:6px;line-height:1.3}.inventory-card>div>p.hint{margin-bottom:6px;line-height:1.3}.inventory-image{width:76px;height:76px;object-fit:contain;border-radius:12px;flex-shrink:0;background:rgba(217,185,92,.08)}.inventory-placeholder{display:grid;place-items:center;font-size:36px}.inventory-recipient{display:block;width:100%;white-space:normal;text-align:left;margin-top:8px}
 .raffle-replay{position:fixed;inset:0;z-index:100000;background:#111520;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;text-align:center}.raffle-slot{font-size:clamp(28px,7vw,88px);color:var(--gold);overflow-wrap:anywhere}.raffle-replay-progress{font-size:clamp(18px,3vw,32px)}
 .raffle-announcement-window{overflow:hidden;max-width:100%;padding:8px 0;border-bottom:1px solid var(--gold-dim)}
@@ -5509,7 +5509,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <div id="toast-root" class="toast-wrap"></div>
 
 <script src="inventory-ui.js?v=13.31.6"></script>
-<script src="inventory-catalog-ui.js?v=2"></script>
+<script src="inventory-catalog-ui.js?v=3"></script>
 <script src="court-call-ui.js?v=14.2.17-unified-control"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>

@@ -6,7 +6,7 @@ function catalogState(){
  if(!catalogAdminState||catalogAdminState.key!==key){
   let pending=null;
   try{pending=JSON.parse(sessionStorage.getItem('bxh.catalog.gift:'+currentAuthUid())||'null');}catch{}
-  catalogAdminState={key,zone:'items',items:null,loading:false,busy:false,error:'',success:'',draftId:'',draft:{name:'',purpose:'',description:'',imageUrl:'',type:'general',stage:'making',consumable:false},query:'',results:[],recipient:null,gift:{catalogId:'',quantity:'1',source:'',expiry:''},pending};
+  catalogAdminState={key,zone:'items',items:null,legacy:null,legacyCursor:null,legacyLoading:false,loading:false,busy:false,error:'',success:'',draftId:'',draft:{name:'',purpose:'',description:'',imageUrl:'',type:'general',stage:'making',consumable:false},query:'',results:[],recipient:null,gift:{catalogId:'',quantity:'1',source:'',expiry:''},pending};
  }
  return catalogAdminState;
 }
@@ -19,6 +19,13 @@ async function catalogLoad(){
  catch(e){if(c===catalogState())c.error=catalogErr(e);}
  finally{if(c===catalogState()){c.loading=false;render();}}
 }
+async function catalogLoadLegacy(more=false){
+ const c=catalogState();if(c.legacyLoading||!isSuperAdmin())return;
+ c.legacyLoading=true;render();
+ try{const r=await window.engagementService.catalog({action:'catalog-legacy-list',cursor:more?c.legacyCursor:null});if(c!==catalogState())return;if(!r?.ok)throw Error('load-failed');c.legacy=more?[...(c.legacy||[]),...(r.items||[])]:r.items||[];c.legacyCursor=r.nextCursor||null;}
+ catch(e){if(c===catalogState())c.error=catalogErr(e);}
+ finally{if(c===catalogState()){c.legacyLoading=false;render();}}
+}
 function catalogCard(i){
  const status=i.status==='published'?'使用中':i.status==='disabled'?'停用':catalogStages[i.stage]||'製作中';
  return `<article class="panel catalog-item"><div class="catalog-item-head"><b>${esc(i.code||'草稿')}　${esc(i.name||'未命名道具')}</b><span>${esc(i.type==='limited'?'限定':'一般')} · ${esc(status)}</span></div><details><summary>說明展開</summary><p>${esc(i.description||i.purpose||'尚無說明')}</p><p class="hint">用途：${esc(i.purpose||'未填寫')} · ${i.consumable===true?'可消耗':'不可消耗'}</p></details>${i.status==='published'?`<button type="button" class="btn btn-ghost btn-sm" data-action="catalog-disable" data-id="${esc(i.id)}">停用新發放</button>`:i.status==='disabled'?`<button type="button" class="btn btn-ghost btn-sm" data-action="catalog-enable" data-id="${esc(i.id)}">恢復發放</button>`:''}</article>`;
@@ -27,12 +34,13 @@ function catalogDraftCard(i){return `<article class="panel catalog-item"><b>${es
 function renderInventoryCatalogAdmin(){
  if(!isSuperAdmin())return '<section class="panel">目前沒有道具管理權限。</section>';
  const c=catalogState();if(c.items===null&&!c.loading&&!c.error)setTimeout(catalogLoad,0);
+ if(c.zone==='items'&&c.legacy===null&&!c.legacyLoading&&!c.error)setTimeout(()=>catalogLoadLegacy(false),0);
  const formal=(c.items||[]).filter(i=>i.status==='published'||i.status==='disabled'),drafts=(c.items||[]).filter(i=>i.status==='draft'),available=formal.filter(i=>i.status==='published');
  const d=c.draft,g=c.gift,lock=c.busy||!!c.pending;
  return `<section class="panel"><div class="panel-title"><span>道具管理</span><button type="button" class="btn btn-ghost btn-sm" data-action="catalog-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>
  <nav class="catalog-tabs" aria-label="道具管理分區">${[['items','道具區'],['craft','製作區'],['gifts','贈品區']].map(([id,label])=>`<button type="button" class="btn ${c.zone===id?'btn-primary':'btn-ghost'}" data-action="catalog-zone" data-zone="${id}">${label}</button>`).join('')}</nav>
  ${c.error?`<p class="auth-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="hint" role="status">${esc(c.success)}</p>`:''}
- ${c.zone==='items'?`<div class="catalog-list">${formal.length?formal.map(catalogCard).join(''):'<div class="empty-state">目前沒有道具。完成製作並發布後會顯示在這裡。</div>'}</div>`:''}
+ ${c.zone==='items'?`<div class="catalog-list">${formal.length?formal.map(catalogCard).join(''):'<div class="empty-state">目前沒有正式道具。完成製作並發布後會顯示在這裡。</div>'}</div><h3>發放批次紀錄</h3><p class="hint">過去發放的道具保留原始批次；未建目錄的道具可取資料建立草稿，檢查後再發布。</p><div class="catalog-list">${c.legacy?.length?c.legacy.map(i=>`<article class="panel catalog-item"><b>${esc(i.name||'未命名道具')}</b><p class="hint">批次：${esc(i.itemCode)} · 數量 ${Number(i.quantity)||0} · 玩家：${esc(i.ownerUid)}</p><details><summary>說明展開</summary><p>${esc(i.purpose||'尚無說明')}</p><p class="hint">來源：${esc(i.source)}</p></details><button type="button" class="btn btn-ghost btn-sm" data-action="catalog-legacy-copy" data-id="${esc(i.id)}">取資料至製作區</button></article>`).join(''):c.legacyLoading?'載入既有批次中……':'<div class="empty-state">目前沒有發放批次紀錄。</div>'}</div>${c.legacyCursor?`<button type="button" class="btn btn-ghost" data-action="catalog-legacy-more" ${c.legacyLoading?'disabled':''}>載入更多批次</button>`:''}`:''}
  ${c.zone==='craft'?`<h3>Codex 草稿箱</h3><div class="catalog-list">${drafts.filter(i=>i.origin==='codex').length?drafts.filter(i=>i.origin==='codex').map(catalogDraftCard).join(''):'<div class="empty-state">目前沒有 Codex 草稿。聊天確認道具內容後會出現在這裡。</div>'}</div><h3>製作中的道具</h3><div class="catalog-list">${drafts.filter(i=>i.origin!=='codex').length?drafts.filter(i=>i.origin!=='codex').map(catalogDraftCard).join(''):'<div class="empty-state">目前沒有其他製作中的道具。</div>'}</div>
  <section class="panel"><div class="panel-title">${c.draftId?'編輯道具草稿':'新增道具草稿'}</div><p class="hint">草稿不會出現在道具區，也不能贈送給玩家。</p>
  <div class="grid grid-2">
@@ -58,7 +66,9 @@ function renderInventoryCatalogAdmin(){
 async function catalogAction(action,target){
  const c=catalogState();if(!isSuperAdmin())return;
  if(action==='catalog-zone'){c.zone=target.dataset.zone;c.error='';c.success='';render();return;}
- if(action==='catalog-refresh'){await catalogLoad();return;}
+ if(action==='catalog-refresh'){await catalogLoad();if(c.zone==='items')await catalogLoadLegacy(false);return;}
+ if(action==='catalog-legacy-more'){if(c.legacyCursor)await catalogLoadLegacy(true);return;}
+ if(action==='catalog-legacy-copy'){const i=(c.legacy||[]).find(x=>x.id===target.dataset.id);if(!i)return;c.zone='craft';c.draftId='';c.draft={name:i.name||'',purpose:i.purpose||'',description:'',imageUrl:i.imageUrl||'',type:'general',stage:'making',consumable:i.consumable===true};c.success='已帶入舊批次資料，請檢查後儲存草稿。';render();return;}
  if(c.busy)return;
  if(action==='catalog-new'){c.draftId='';c.draft={name:'',purpose:'',description:'',imageUrl:'',type:'general',stage:'making',consumable:false};render();return;}
  if(action==='catalog-edit'){const item=(c.items||[]).find(i=>i.id===target.dataset.id&&i.status==='draft');if(item){c.draftId=item.id;c.draft={name:item.name,purpose:item.purpose,description:item.description,imageUrl:item.imageUrl,type:item.type,stage:item.stage,consumable:item.consumable===true};render();}return;}
