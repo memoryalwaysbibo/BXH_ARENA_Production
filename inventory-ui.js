@@ -7,7 +7,7 @@ function inventoryContext(){
  if(!inventoryState||inventoryState.key!==key){
   let pending=null;
   try{const saved=JSON.parse(sessionStorage.getItem(inventoryStorageKey())||'null');if(saved?.payload?.operationId&&saved.actorUid===currentAuthUid())pending=saved;}catch{}
-  inventoryState={key,items:null,nextCursor:null,loading:false,busy:false,error:'',selectedId:'',events:[],historyCursor:null,historyLoaded:false,query:'',results:[],recipient:null,draft:{name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false},pending,success:'',serverOffset:0};
+  inventoryState={key,items:null,nextCursor:null,loading:false,busy:false,error:'',selectedId:'',events:[],historyCursor:null,historyLoaded:false,query:'',results:[],recipient:null,draft:{name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false},imageFileName:'',pending,success:'',serverOffset:0};
  }
  return inventoryState;
 }
@@ -55,7 +55,7 @@ function renderInventoryPage(){
  <div class="field"><label for="inventory-query">搜尋玩家</label><input id="inventory-query" data-inventory-field="query" value="${esc(c.query)}" placeholder="姓名、玩家編號或 Email" ${lock?'disabled':''}></div><button class="btn btn-ghost" data-action="inventory-search" ${lock?'disabled':''}>搜尋帳號</button>
  ${c.results.map(u=>`<button class="btn btn-ghost inventory-recipient" data-action="inventory-select" data-uid="${esc(u.uid)}" ${lock?'disabled':''}>${esc(titleRecipientLabel(u))}</button>`).join('')}
  <p role="status" id="inventory-selected">${recipient?'已選擇：'+esc(titleRecipientLabel(recipient)):'尚未選擇玩家'}</p>
- <div class="field"><label>道具代碼</label><div class="input-like" aria-readonly="true"><b>系統自動產生</b><br><span class="hint">建立完成後顯示 ITEM-XXXXXX</span></div></div><div class="grid grid-2 inventory-grid">${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${`<div class="field"><label for="inventory-image-file">道具圖片（選填）</label><input id="inventory-image-file" type="file" accept="image/jpeg,image/png,image/webp" data-inventory-image ${lock?'disabled':''}><p class="hint">直接選擇圖片；系統會自動縮放並轉成 WebP 後上傳。</p>${d.imageUrl?`<div class="inventory-upload-preview"><img class="inventory-image" src="${esc(d.imageUrl)}" alt="道具圖片預覽"><button type="button" class="btn btn-ghost btn-sm" data-action="inventory-image-remove" ${lock?'disabled':''}>移除圖片</button></div>`:''}</div>`}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
+ <div class="field"><label>道具代碼</label><div class="input-like" aria-readonly="true"><b>系統自動產生</b><br><span class="hint">建立完成後顯示 ITEM-XXXXXX</span></div></div><div class="grid grid-2 inventory-grid">${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${`<div class="field"><label for="inventory-image-file">道具圖片（選填）</label><input id="inventory-image-file" type="file" accept="image/jpeg,image/png,image/webp" data-inventory-image ${lock?'disabled':''}><p class="hint">${c.imageFileName?'已選擇：'+esc(c.imageFileName)+'｜系統會自動壓縮並上傳。':'尚未選取圖片｜選擇後系統會自動縮放並轉成 WebP。'}</p>${d.imageUrl?`<div class="inventory-upload-preview"><img class="inventory-image" src="${esc(d.imageUrl)}" alt="道具圖片預覽"><button type="button" class="btn btn-ghost btn-sm" data-action="inventory-image-remove" ${lock?'disabled':''}>移除圖片</button></div>`:''}</div>`}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
  <div class="field"><label for="inventory-consumable" style="display:flex;align-items:center;gap:8px"><input id="inventory-consumable" type="checkbox" data-inventory-field="consumable" aria-describedby="inventory-consumable-hint" style="width:auto;min-width:18px;flex:0 0 auto" ${consumable?'checked':''} ${lock?'disabled':''}>可消耗道具（活動使用時可扣除數量）</label><p class="hint" id="inventory-consumable-hint">預設不勾選。抽獎券要用於「消耗票券」活動時才勾選；僅影響本次新發放的批次，不會修改既有道具。</p></div>
  <button class="btn btn-primary" data-action="inventory-grant" ${c.busy?'disabled':''}>${c.busy?'處理中……':c.pending?'確認原發放結果':'確認發放'}</button></section>`:''}
  ${isSuperAdmin()&&typeof window.renderRewardRulesAdmin==='function'?window.renderRewardRulesAdmin():''}</section>`;
@@ -132,11 +132,11 @@ async function inventoryCompressImage(file){
  return blob;
 }
 async function inventoryUploadImage(file){
- const c=inventoryContext();if(c.busy||c.pending)return;c.busy=true;c.error='';c.success='正在壓縮並上傳圖片…';render();
+ const c=inventoryContext();if(c.busy||c.pending)return;c.imageFileName=String(file?.name||'已選擇圖片');c.busy=true;c.error='';c.success='已選擇 '+c.imageFileName+'，正在壓縮並上傳圖片…';render();
  try{
   const blob=await inventoryCompressImage(file),base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('image-read-failed'));reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');reader.readAsDataURL(blob);});
   const r=await callEngagementFunction('inventoryImageUpload',{contentType:'image/webp',base64},60000);if(!r?.ok||!inventoryImage(r.imageUrl))throw Error('image-upload-failed');
-  c.draft.imageUrl=r.imageUrl;c.success='圖片已自動壓縮並上傳完成。';
+  c.draft.imageUrl=r.imageUrl;c.success='圖片已自動壓縮並上傳完成：'+c.imageFileName;
  }catch(error){const msg=String(error?.message||error);c.error=msg.includes('invalid-image-size')?'圖片過大，請選擇 10 MB 以下圖片。':msg.includes('invalid-image-type')?'請選擇 JPG、PNG 或 WebP 圖片。':'圖片上傳失敗，請稍後重試。';c.success='';}
  finally{c.busy=false;render();}
 }
