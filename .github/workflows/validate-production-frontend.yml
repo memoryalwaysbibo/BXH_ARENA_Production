@@ -28,6 +28,8 @@ jobs:
         run: |
           node --check ai-poster-ui.js
           node tests/ai-poster-ui.test.cjs
+          node --check ai-poster-refinements.js
+          node tests/ai-poster-refinements.test.cjs
 
       - name: Verify venue navigation regressions
         run: node tests/venue-navigation.test.cjs
