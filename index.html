@@ -9558,7 +9558,7 @@ const AI_CREATE_RESTRICTED_BETA_FRONTEND = true;
 
 function aiCreateBetaActorAllowed(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.deleted!==true && !["deleted","frozen","disabled"].includes(userProfile.accountStatus) &&
-    (userProfile.role==="super_admin" || (userProfile.role==="admin" && userProfile.aiCreateBetaEnabled===true)));
+    ["super_admin","admin","staff"].includes(userProfile.role));
 }
 function aiCreateRemoteParserEnabled(){
   return AI_CREATE_RESTRICTED_BETA_FRONTEND && aiCreateBetaActorAllowed();
@@ -10177,7 +10177,7 @@ function renderAiCreateAssistant(){
     <section class="ai-create-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-create-title">
       <div class="ai-create-head">
         <div>
-          <div class="ai-create-kicker">ARENA AI · RESTRICTED BETA</div>
+          <div class="ai-create-kicker">ARENA AI · 協助建立</div>
           <div class="ai-create-title" id="ai-create-title">✨ AI 協助建立賽事</div>
           <div class="ai-create-sub">上傳活動海報，或貼上 LINE、Threads 等活動文案。AI 擷取資訊後套入原有草稿，最後由房主確認。</div>
         </div>
@@ -23162,7 +23162,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="ai-create-open"){
     if(!aiCreateBetaActorAllowed()){
-      showToast("AI 智能開房目前僅開放指定管理員測試。",true);
+      showToast("AI 協助建立僅開放管理員與工作人員使用。",true);
       return;
     }
     syncSettingsDraftFromDom();
@@ -23242,7 +23242,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="ai-create-parse"){
     if(!aiCreateBetaActorAllowed()){
-      showToast("此帳號尚未加入 AI 開房 Beta。",true);
+      showToast("此帳號沒有 AI 協助建立權限。",true);
       return;
     }
     runAiCreateParse();
