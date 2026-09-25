@@ -5932,9 +5932,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.28";
+const APP_VERSION = "v14.2.29";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {"version":"v14.2.29","date":"2026/09/25","timezone":"Asia/Taipei","title":"AI 協助建立開放管理員與工作人員","updateLevel":"minor","added":["有效的管理員與工作人員可使用 AI 文案及海報協助建立"],"changed":["房主仍需審核草稿並自行發布"],"fixed":[],"environment":"Production","firebaseImpact":"需先部署 AI 解析與海報封面 Functions 權限更新","securityRulesImpact":"無","permissionImpact":"僅有效 super_admin、admin、staff；玩家及停用帳號不可使用","publicSummary":"管理員與工作人員可使用 AI 協助建立賽事。"},
   {"version":"v14.2.28","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.14 大廳海報縮圖","updateLevel":"minor","added":["海報解析草稿可選擇發布後於大廳卡片顯示縮圖","僅發布成功後透過房主授權上傳壓縮縮圖"],"changed":["大廳卡片有封面時顯示海報小圖，無封面時維持原版"],"fixed":[],"environment":"Production / Restricted Beta","firebaseImpact":"房間私有 coverPath 與公開 coverUrl；Storage room-covers","securityRulesImpact":"無；只由受權限限制的 Callable 寫入","permissionImpact":"僅原房主與 AI 開房 Beta 管理員可上傳","publicSummary":"上傳海報解析後，房主可讓大廳卡片展示海報縮圖。"},
   {"version": "v14.2.27", "date": "2026/09/25", "timezone": "Asia/Taipei", "title": "P7.13.1 海報校對與錯誤定位", "updateLevel": "patch", "added": ["回去檢查直接定位與標示第一個缺漏欄位；每項問題可個別前往修正", "混合文字拆出報名時間與管道，缺日期須房主確認", "北京場地名稱疑似錯字提供未勾選的校正建議"], "changed": ["賽事報到、開賽及報名設定支援每分鐘，不再將 21:10 捨棄或取整"], "fixed": ["空白報到時間不再被選擇器補成午夜 00:00"], "environment": "Production / Restricted Beta", "firebaseImpact": "無資料遷移", "securityRulesImpact": "無", "permissionImpact": "沿用既有權限", "publicSummary": "海報時間可精確到分鐘；缺漏欄位直接定位，報名與報到維持分開。"},
   {"version":"v14.2.26","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.13 海報輔助開房","updateLevel":"minor","added":["AI 協助建立可上傳 JPG／PNG 海報並加上補充文案","海報辨識文字、獎品與警告保留於預覽；僅套入草稿"],"changed":["來源更換、取消或切換帳號／房間時捨棄過期回應","保留公版勾選與房主人工審核"],"fixed":["海報來源警告持續出現在審核閘門，不因關閉預覽而遺失"],"environment":"Production / Restricted Beta","deployStatus":"P7.13 frontend integration","firebaseImpact":"沿用獨立海報解析 Callable；無資料遷移","securityRulesImpact":"無","permissionImpact":"沿用 Restricted Beta 白名單","publicSummary":"上傳海報即可擷取活動資訊、套入原有草稿；房主確認後才儲存或發布。"},
