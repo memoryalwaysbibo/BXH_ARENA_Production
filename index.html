@@ -22352,10 +22352,13 @@ function renderApp(){
   const allTabs = [["management","賽事管理"],["ladder","天梯排行"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
   let tabs = hasAdminAccess() ? allTabs : allTabs.filter(t=>!["management","referee","settings","registrations","people"].includes(t[0]));
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
+  if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"]);
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
+  if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
   let content = "";
   if(activeTab==="management") content = renderTournamentManagementTab();
   else if(activeTab==="member-raffles") content = renderRafflePage();
+  else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
   else if(activeTab==="live") content = wrapBracketWatermark(renderLive());
   else if(activeTab==="bracket") content = renderBracket();
@@ -23393,6 +23396,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="switch-tab"){
     const targetTab = target.getAttribute("data-tab");
     if(targetTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles())){showToast('目前身分沒有此操作權限。',true);return;}
+    if(targetTab==='inventory-admin'&&!isSuperAdmin()){showToast('目前身分沒有道具管理權限。',true);return;}
     if((targetTab==="management" || targetTab==="referee" || targetTab==="settings" || targetTab==="registrations" || targetTab==="people") && !hasAdminAccess()){
       showToast("目前身分沒有此操作權限。", true);
       return;
