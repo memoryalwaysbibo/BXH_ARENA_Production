@@ -4833,8 +4833,13 @@ body .celebration-overlay{z-index:3000!important;}
 /* ==== v13.29.0 稱號與每日簽到（與賽事報到完全獨立） ==== */
 .engagement-panel{position:relative;overflow:hidden;}
 .checkin-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px;text-align:center;font-size:14px}
-.checkin-day{padding:10px 2px;border:1px solid var(--border);border-radius:6px}
+.checkin-day{position:relative;display:grid;place-items:center;padding:10px 2px;border:1px solid var(--border);border-radius:6px;min-height:50px}
 .checkin-day.done{background:rgba(217,185,92,.18);color:var(--gold)}
+.checkin-stamp{position:absolute;right:2px;bottom:2px;display:grid;place-items:center;width:19px;height:19px;border:1px solid var(--gold);border-radius:50%;background:rgba(24,23,19,.9);transform:rotate(-15deg);box-shadow:0 0 5px rgba(217,185,92,.2);pointer-events:none}
+.checkin-stamp img{display:block;width:13px;height:13px;object-fit:contain}
+.checkin-day.stamp-fresh .checkin-stamp{animation:bxhCheckinStamp .6s cubic-bezier(.18,.85,.3,1.3) both}
+@keyframes bxhCheckinStamp{0%{opacity:0;transform:rotate(-15deg) scale(2)}55%{opacity:1;transform:rotate(-15deg) scale(.86)}100%{transform:rotate(-15deg) scale(1)}}
+@media(prefers-reduced-motion:reduce){.checkin-day.stamp-fresh .checkin-stamp{animation:none}}
 .checkin-day[aria-current=date]{outline:2px solid var(--gold);outline-offset:-2px}
 .engagement-panel::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 100% 0,rgba(217,185,92,.11),transparent 42%);}
 .checkin-page-back{margin:0 0 12px;}
@@ -10733,11 +10738,12 @@ let engagementSessionEpoch=0;
 let engagementTitleDraft=null;
 let engagementDiagnostic=null;
 let engagementDayTimer=null;
+let checkinStampAnimationDate="";
 function syncEngagementIdentity(uid){
   const key=uid===undefined ? ((firebaseUser&&firebaseUser.uid)||"") : (uid||"");
   if(key===engagementSessionKey) return;
   engagementSessionKey=key; engagementSessionEpoch++; engagementRequestGeneration++;
-  engagementSnapshot=null; engagementSnapshotUid=""; engagementRequestUid="";
+  engagementSnapshot=null; engagementSnapshotUid=""; engagementRequestUid=""; checkinStampAnimationDate="";
   engagementError=""; engagementLoading=false; engagementActionBusy=false;
   engagementAdminOverview=null; engagementAdminError=""; engagementDiagnostic=null;
   engagementBackfillCursor=""; engagementBackfillResult=null; engagementBackfillDone=false;
@@ -10764,9 +10770,9 @@ function renderCheckInCalendar(ci){
   const cells=Array.from({length:start},()=>'<span aria-hidden="true"></span>');
   for(let n=1;n<=days;n++){
     const key=ci.month+'-'+String(n).padStart(2,'0'),got=checked.has(key);
-    cells.push(`<span class="checkin-day ${got?'done':''}" ${key===ci.today?'aria-current="date"':''} aria-label="${key}${got?' 已簽到':''}">${n}${got?' ✓':''}</span>`);
+    cells.push(`<span class="checkin-day ${got?'done':''} ${got&&key===checkinStampAnimationDate?'stamp-fresh':''}" ${key===ci.today?'aria-current="date"':''} aria-label="${key}${got?' 已簽到':''}">${n}${got?'<span class="checkin-stamp" aria-hidden="true"><img src="assets/icons/bxh-gold-favicon-32.png" alt=""></span>':''}</span>`);
   }
-  return `<div class="hint" style="margin-top:12px">${esc(ci.month)} 簽到日曆｜✓ 已簽到</div><div class="checkin-calendar">${['日','一','二','三','四','五','六'].map(s=>`<b>${s}</b>`).join('')}${cells.join('')}</div>`;
+  return `<div class="hint" style="margin-top:12px">${esc(ci.month)} 簽到日曆｜BXH 印章表示已簽到</div><div class="checkin-calendar">${['日','一','二','三','四','五','六'].map(s=>`<b>${s}</b>`).join('')}${cells.join('')}</div>`;
 }
 function safeEngagementRender(fn){
   try{return fn();}catch(error){
@@ -24315,6 +24321,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         const result=await window.engagementService.dailyCheckIn();
         if(!result || result.ok!==true) throw new Error((result&&result.error)||"checkin-failed");
+        if(!result.alreadyCheckedIn){checkinStampAnimationDate=result.today;setTimeout(()=>{if(actionEpoch===engagementSessionEpoch&&checkinStampAnimationDate===result.today)checkinStampAnimationDate="";},850);}
         if(engagementSnapshot){engagementSnapshot.stats=result.stats||engagementSnapshot.stats;engagementSnapshot.checkIn={...(engagementSnapshot.checkIn||{}),today:result.today,checkedIn:true,month:result.today.slice(0,7),dates:[...new Set([...(engagementSnapshot.checkIn?.dates||[]),result.today])]};}
         showToast(result.alreadyCheckedIn?"今日已經簽到":result.titleEvaluationWarning?"每日簽到成功；稱號將稍後補發":"每日簽到成功");
         requestEngagementSnapshot(true);
