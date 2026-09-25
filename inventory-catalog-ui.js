@@ -34,7 +34,7 @@ function catalogDraftCard(i){return `<article class="panel catalog-item"><b>${es
 function renderInventoryCatalogAdmin(){
  if(!isSuperAdmin())return '<section class="panel">目前沒有道具管理權限。</section>';
  const c=catalogState();if(c.items===null&&!c.loading&&!c.error)setTimeout(catalogLoad,0);
- if(c.zone==='items'&&c.legacy===null&&!c.legacyLoading)setTimeout(()=>catalogLoadLegacy(false),0);
+ if(c.zone==='items'&&c.legacy===null&&!c.legacyLoading&&!c.error)setTimeout(()=>catalogLoadLegacy(false),0);
  const formal=(c.items||[]).filter(i=>i.status==='published'||i.status==='disabled'),drafts=(c.items||[]).filter(i=>i.status==='draft'),available=formal.filter(i=>i.status==='published');
  const d=c.draft,g=c.gift,lock=c.busy||!!c.pending;
  return `<section class="panel"><div class="panel-title"><span>道具管理</span><button type="button" class="btn btn-ghost btn-sm" data-action="catalog-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>
