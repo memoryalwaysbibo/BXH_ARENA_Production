@@ -19254,15 +19254,17 @@ function renderTournamentDetailScreen(){
       const participantName=row.participantName||row.displayName||row.realName||(!row.familyPlayerId?(userProfile?.displayName||userProfile?.realName):'家庭選手')||'參賽者';
       return '<div class="stat-box"><div class="label">'+esc(participantName)+'</div><div class="value small">'+esc(statusLabel)+'</div></div>';
     }).join('');
-    const addSelfButton=additionalRegistrationAvailable&&t.targetGroup!=="children"&&!hasSelfRegistration?`<button class="btn btn-primary" data-action="submit-tournament-registration" data-participant-mode="self" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>本人報名</button>`:'';
-    const addChildButton=additionalRegistrationAvailable&&childRegistrationAllowed?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>兒童報名</button>`:'';
+    const acceptingMore=additionalRegistrationAvailable&&!t.eventCancelled&&effStatus!=="closed"&&effStatus!=="scheduled"&&isLoggedIn&&!profileIncomplete;
+    const addSelfButton=acceptingMore&&t.targetGroup!=="children"&&!hasSelfRegistration?`<button class="btn btn-primary" data-action="submit-tournament-registration" data-participant-mode="self" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>本人報名</button>`:'';
+    const childEntryReason=!childRegistrationAllowed?'此類賽事目前不開放兒童代報名。':t.eventCancelled?'賽事已取消。':effStatus==="closed"?'報名已截止。':effStatus==="scheduled"?'報名尚未開放。':!additionalRegistrationAvailable?'正取與備取名額已滿。':profileIncomplete?'請先完成會員資料。':!isLoggedIn?'請先登入。':'';
+    const addChildButton=childRegistrationAllowed&&acceptingMore?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>替兒童報名</button>`:`<button class="btn btn-ghost" type="button" disabled>替兒童報名｜${esc(childEntryReason||'目前無法報名')}</button>`;
     actionHtml=`
       <div id="registration-result-panel" class="registration-result-panel">
         <div class="registration-result-head"><span class="registration-result-icon">✓</span><div><div class="registration-result-title">我的報名（${activeMyRegs.length}）</div><div class="registration-result-subtitle">同一會員帳號下，每位參賽者各自保留獨立名額與狀態。</div></div></div>
         <div class="registration-result-grid">${participantCards}</div>
         ${requiresCheckin?`<div class="registration-next-step"><b>下一步｜現場繳費與報到</b><br>活動當日請向工作人員完成繳費；每位參賽者都要由工作人員確認報到後，才會正式進入對戰名單。</div>`:''}
         ${t.targetGroup==="children"&&addChildButton?`<label class="checkbox-row"><input type="checkbox" id="child-eligibility-checkbox" ${tournamentDetailChildConfirmed?'checked':''}> 我確認報名兒童符合 6 歲以上、13 歲以下的參加資格</label>`:''}
-        ${addSelfButton||addChildButton?`<div class="btn-row" style="margin-top:12px;">${addSelfButton}${addChildButton}</div>`:''}
+        <div class="btn-row" style="margin-top:12px;">${addSelfButton}${addChildButton}</div>
         <div class="registration-result-actions">${canCancel?`<button class="btn btn-sm registration-cancel-link" data-action="cancel-my-registration" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>${activeMyRegs.length>1?'取消其中一位報名':'取消這場報名'}</button>`:`<span class="hint">${t.cancellationDeadline?"已超過取消期限，無法取消":"目前無法取消報名"}</span>`}</div>
       </div>
     `;
