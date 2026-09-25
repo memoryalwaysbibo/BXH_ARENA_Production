@@ -31,6 +31,10 @@ jobs:
           node --check ai-poster-refinements.js
           node tests/ai-poster-refinements.test.cjs
 
+      - name: Verify family roster check-in preservation
+        run: |
+          node --check family-ui.js
+          node tests/family-roster-checkin.test.cjs
       - name: Verify venue navigation regressions
         run: node tests/venue-navigation.test.cjs
       - name: Verify HUNTER LOOP P5 raffle confirmation flow
