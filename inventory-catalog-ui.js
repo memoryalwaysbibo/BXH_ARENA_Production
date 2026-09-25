@@ -5,7 +5,7 @@ function catalogState(){
  const key=currentAuthUid()+':'+engagementSessionEpoch;
  if(!catalogAdminState||catalogAdminState.key!==key){
   let pending=null;
-  try{pending=JSON.parse(sessionStorage.getItem('bxh.catalog.gift:'+key)||'null');}catch{}
+  try{pending=JSON.parse(sessionStorage.getItem('bxh.catalog.gift:'+currentAuthUid())||'null');}catch{}
   catalogAdminState={key,zone:'items',items:null,loading:false,busy:false,error:'',success:'',draftId:'',draft:{name:'',purpose:'',description:'',imageUrl:'',type:'general',stage:'making',consumable:false},query:'',results:[],recipient:null,gift:{catalogId:'',quantity:'1',source:'',expiry:''},pending};
  }
  return catalogAdminState;
@@ -94,15 +94,15 @@ async function catalogGift(c){
    if(expiresAt!==null&&expiresAt<=Date.now())throw Error('invalid-expiry');
    if(!confirm(`確認贈送給 ${titleRecipientLabel(c.recipient)}？\n${i.code} ${i.name} × ${quantity}\n原因：${source}\n期限：${expiresAt===null?'無期限':mailboxDate(expiresAt)}`))return;
    c.pending={actorUid:currentAuthUid(),payload:{action:'catalog-grant',catalogId:i.id,targetUid:c.recipient.uid,quantity,source,expiresAt,operationId:crypto.randomUUID()}};
-   sessionStorage.setItem('bxh.catalog.gift:'+c.key,JSON.stringify(c.pending));
+   sessionStorage.setItem('bxh.catalog.gift:'+currentAuthUid(),JSON.stringify(c.pending));
   }
   c.busy=true;render();
   const r=await window.engagementService.inventory(c.pending.payload);if(c!==catalogState())return;if(!r?.ok)throw Error('grant-failed');
   c.success='已贈送成功，批次編號：'+String(r.itemCode||'')+'。';
-  sessionStorage.removeItem('bxh.catalog.gift:'+c.key);c.pending=null;c.recipient=null;c.gift={catalogId:'',quantity:'1',source:'',expiry:''};
+  sessionStorage.removeItem('bxh.catalog.gift:'+currentAuthUid());c.pending=null;c.recipient=null;c.gift={catalogId:'',quantity:'1',source:'',expiry:''};
  }catch(e){if(c===catalogState())c.error=catalogErr(e);}finally{if(c===catalogState()){c.busy=false;render();}}
 }
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-action^="catalog-"]');if(!t)return;e.preventDefault();e.stopPropagation();catalogAction(t.dataset.action,t);},true);
 document.addEventListener('input',e=>{const c=catalogState(),t=e.target;if(t.hasAttribute?.('data-catalog-query'))c.query=t.value;const f=t.getAttribute?.('data-catalog-field');if(f&&f!=='consumable'&&Object.hasOwn(c.draft,f))c.draft[f]=t.value;const g=t.getAttribute?.('data-catalog-gift');if(g&&Object.hasOwn(c.gift,g))c.gift[g]=t.value;});
-document.addEventListener('change',async e=>{const c=catalogState(),t=e.target;if(t.getAttribute?.('data-catalog-field')==='consumable')c.draft.consumable=t.checked===true;if(t.matches?.('[data-catalog-image]')&&t.files?.[0]){c.busy=true;c.error='';render();try{const base64=await inventoryCompressImage(t.files[0]);const r=await callEngagementFunction('inventoryImageUpload',{contentType:'image/webp',base64},60000);if(!r?.ok)throw Error('upload-failed');c.draft.imageUrl=r.imageUrl;c.success='道具圖片已上傳。';}catch(err){c.error=catalogErr(err);}finally{c.busy=false;render();}}});
+document.addEventListener('change',async e=>{const c=catalogState(),t=e.target;if(t.getAttribute?.('data-catalog-field')==='consumable')c.draft.consumable=t.checked===true;const g=t.getAttribute?.('data-catalog-gift');if(g&&Object.hasOwn(c.gift,g))c.gift[g]=t.value;if(t.matches?.('[data-catalog-image]')&&t.files?.[0]){const file=t.files[0];c.busy=true;c.error='';render();try{const blob=await inventoryCompressImage(file);const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('image-read-failed'));reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');reader.readAsDataURL(blob);});const r=await callEngagementFunction('inventoryImageUpload',{contentType:'image/webp',base64},60000);if(!r?.ok)throw Error('upload-failed');c.draft.imageUrl=r.imageUrl;c.success='道具圖片已上傳。';}catch(err){c.error=catalogErr(err);}finally{c.busy=false;render();}}});
 window.renderInventoryCatalogAdmin=renderInventoryCatalogAdmin;
