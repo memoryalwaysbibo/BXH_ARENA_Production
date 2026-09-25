@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260925.37">
+<meta name="bxh-build" content="20260925.38">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260925.37";
+  var CURRENT_BUILD="20260925.38";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5079,6 +5079,11 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 .ai-poster-evidence pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;font:inherit;line-height:1.7;}
 .ai-create-dialog:has(.ai-poster-preview) .ai-create-source{min-height:100px;}
 .ai-create-dialog:has(.ai-poster-preview) .ai-create-fields{display:none;}
+/* P7.13.1: visible validation target; no flashing or motion requirement. */
+.ai-review-target{outline:2px solid #e99066;outline-offset:5px;border-radius:6px;scroll-margin-block:170px 100px;}
+.ai-review-field-note{font-size:12px;line-height:1.6;color:#ffbe9e;margin-top:8px;overflow-wrap:anywhere;}
+.ai-clock-hint{font-size:12px;line-height:1.6;overflow-wrap:anywhere;}
+
 </style>
 <script src="ladder-v1.js?v=20260921.9"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -5499,6 +5504,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="family-ui.js?v=14.0.24"></script>
 <script src="raffle-ui.js?v=14.0.12"></script>
 <script src="ai-poster-ui.js?v=14.2.26"></script>
+<script src="ai-poster-refinements.js?v=14.2.27"></script>
 <script>
 // Standalone browsers do not provide the hosted artifact's window.storage API.
 // Preserve an existing provider; propagate storage failures to existing callers.
@@ -5920,9 +5926,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.26";
+const APP_VERSION = "v14.2.27";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {"version": "v14.2.27", "date": "2026/09/25", "timezone": "Asia/Taipei", "title": "P7.13.1 海報校對與錯誤定位", "updateLevel": "patch", "added": ["回去檢查直接定位與標示第一個缺漏欄位；每項問題可個別前往修正", "混合文字拆出報名時間與管道，缺日期須房主確認", "北京場地名稱疑似錯字提供未勾選的校正建議"], "changed": ["賽事報到、開賽及報名設定支援每分鐘，不再將 21:10 捨棄或取整"], "fixed": ["空白報到時間不再被選擇器補成午夜 00:00"], "environment": "Production / Restricted Beta", "firebaseImpact": "無資料遷移", "securityRulesImpact": "無", "permissionImpact": "沿用既有權限", "publicSummary": "海報時間可精確到分鐘；缺漏欄位直接定位，報名與報到維持分開。"},
   {"version":"v14.2.26","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.13 海報輔助開房","updateLevel":"minor","added":["AI 協助建立可上傳 JPG／PNG 海報並加上補充文案","海報辨識文字、獎品與警告保留於預覽；僅套入草稿"],"changed":["來源更換、取消或切換帳號／房間時捨棄過期回應","保留公版勾選與房主人工審核"],"fixed":["海報來源警告持續出現在審核閘門，不因關閉預覽而遺失"],"environment":"Production / Restricted Beta","deployStatus":"P7.13 frontend integration","firebaseImpact":"沿用獨立海報解析 Callable；無資料遷移","securityRulesImpact":"無","permissionImpact":"沿用 Restricted Beta 白名單","publicSummary":"上傳海報即可擷取活動資訊、套入原有草稿；房主確認後才儲存或發布。"},
   {"version":"v14.2.25","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.12.1 導航防呆與複製地址","updateLevel":"patch","added":["導航視窗新增完整地址與複製地址","多個地圖連結需房主確認，不自動選擇"],"changed":["Google 保留主辦提供的連結；Apple 僅依地址建立路線","只有店名時不推測目的地；導航視窗獨立於資訊卡，避免手機裁切"],"fixed":["修正清空場地後舊地址回填","修正僅填地址時被存成店名","加強 Maps URL 主機、路徑與安全格式檢查"],"environment":"Production / Event Info V2","deployStatus":"P7.12.1 navigation hardening","firebaseImpact":"沿用 eventInfo.venue；無資料移轉或新增集合","securityRulesImpact":"無","permissionImpact":"無","publicSummary":"場地導航可查看並複製完整地址；清空地址不再恢復舊值，缺地址不會自動導航到同名店家。"},
   {version:"v14.2.24",date:"2026/09/25",timezone:"Asia/Taipei",title:"P7.12 結構化場地與雙地圖導航",updateLevel:"minor",added:["賽事設定將活動地點拆分為場地／店家名稱、活動地址、Google Maps 連結與導航開關","玩家賽事詳情的地址旁新增小型「🧭 導航」選單，可開啟 Google Maps 或 Apple 地圖","AI 開房會從原始文案自動辨識 maps.app.goo.gl／Google Maps 連結並帶入場地草稿","即使沒有 Google Maps 連結，只要有地址也能自動產生 Google／Apple 導航"],changed:["舊版 meta.location 仍由場地名稱＋地址自動產生，維持歷史紀錄、搜尋、賽事列表與舊功能相容","公開 eventInfo 僅白名單輸出場地名稱、地址、合法 Google Maps URL 與導航開關"],fixed:[],environment:"Production / Event Info V2",deployStatus:"Frontend venue/navigation layer",firebaseImpact:"沿用 eventInfo.venue；無新增 collection",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事場地改為結構化資料，玩家可直接從地址旁選擇 Google Maps 或 Apple 地圖導航。"},
@@ -9306,7 +9313,9 @@ function renderAiCreatePosterInput(){
 function renderAiCreatePosterEvidence(){
   const result=aiCreateStructuredResult;
   if(!result||result.sourceMode!=="poster-callable")return "";
-  return `<details class="ai-poster-evidence"><summary>查看海報辨識文字與獎品（請人工核對）</summary><pre>${esc(result.posterText||"")}</pre></details>`;
+  const hint=window.BxhPosterRefinements?window.BxhPosterRefinements.clockHint(result,"registration-open"):null;
+  const note=hint?`<p class="ai-clock-hint">已讀取報名時刻：<b>${esc(hint.time)}</b>${hint.channel?"｜管道："+esc(hint.channel):""}。${result.activity&&result.activity.registrationOpenAt?"請核對報名日期與時間。":"尚需確認報名日期；不會套入報到欄位。"}</p>`:"";
+  return note+`<details class="ai-poster-evidence"><summary>查看海報辨識文字與獎品（請人工核對）</summary><pre>${esc(result.posterText||"")}</pre></details>`;
 }
 function bindAiCreatePosterInputs(){
   const input=document.getElementById("ai-create-poster-file");
@@ -9355,7 +9364,7 @@ function aiCreateSuggestionList(){
   if(!String(d.checkin||"").trim()){
     if(compatible(event.checkInStart)){
       add({id:"checkin-from-source",title:"補上開始報到時間",message:"原始活動資訊已辨識到正取報到開始時間。",value:String(event.checkInStart),apply:()=>{settingsFormDraft.checkin=String(event.checkInStart);settingsFormDraft.checkinRequired=true;}});
-    }else if(effectiveStart && /^([01]\d|2[0-3]):(?:00|30)$/.test(effectiveStart)){
+    }else if(effectiveStart && /^([01]\d|2[0-3]):[0-5]\d$/.test(effectiveStart) && (Number(effectiveStart.slice(0,2))*60+Number(effectiveStart.slice(3)))>=30){
       const suggested=aiCreateTimeMinusMinutes(effectiveStart,30);
       add({id:"checkin-default-30",origin:"recommended",title:"開賽前 30 分鐘開始報到",message:"原文沒有報到開始時間；依 BXH 常用活動流程提供建議值，請房主確認。",value:suggested,apply:()=>{settingsFormDraft.checkin=suggested;settingsFormDraft.checkinRequired=true;}});
     }
@@ -9382,6 +9391,15 @@ function aiCreateSuggestionList(){
     add({id:"fee-from-source",title:"補上報名費",message:"原文已辨識到報名費。",value:"NT$"+String(event.fee),apply:()=>{registrationFormDraft.registrationFee=Number(event.fee);}});
   }
 
+  if(applied.sourceMode==="poster-callable" && window.BxhPosterRefinements && d.venueName===activity.locationName){
+    const candidate=window.BxhPosterRefinements.venueCandidate(d.venueName);
+    const conflict=(applied.warnings||[]).some(w=>w.code==="source-conflict"&&/locationName|venue/.test(String(w.field||"")));
+    if(candidate&&!conflict){
+      const id="venue-proofread";
+      if(aiCreateSuggestionSelection[id]===undefined)aiCreateSuggestionSelection[id]=false;
+      add({id,origin:"recommended",title:"場地名稱疑似錯字",message:"辨識為「"+d.venueName+"」；常用場地候選是「"+candidate+"」。請對照海報，確定後才勾選。",value:candidate,apply:()=>{settingsFormDraft.venueName=candidate;settingsFormDraft.location=[candidate,settingsFormDraft.venueAddress].filter(Boolean).join("｜");}});
+    }
+  }
   return list;
 }
 function applySelectedAiCreateSuggestions(){
@@ -9694,6 +9712,7 @@ async function runAiCreateParse(){
       const response=await window.engagementService.aiCreatePosterParser(window.BxhPoster.buildRequest(context.poster,source));
       if(!aiCreateContextValid(context))return;
       candidate=window.BxhPoster.validateEnvelope(response,validateAiCreateStructuredResult);
+      candidate.posterSupplementText=source; // Separate source snapshot for label/time hints; never image bytes.
     }else{
       const parsed=await requestAiCreateStructuredResult(source);
       if(!aiCreateContextValid(context))return;
@@ -9766,10 +9785,11 @@ function aiCreateIsoToEpoch(value){
 }
 
 function aiCreateHalfHourCompatible(value){
-  if(!value) return true;
-  const m=String(value).match(/(?:T|^)(?:[01]\d|2[0-3]):([0-5]\d)/);
-  if(!m) return false;
-  return m[1]==="00" || m[1]==="30";
+  // Legacy name retained for callers; draft pickers now preserve every minute.
+  if(!value)return true;
+  if(window.BxhPosterRefinements)return window.BxhPosterRefinements.preciseTime(value);
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(value)) ||
+    /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:00\+08:00$/.test(String(value));
 }
 
 function aiCreateLocationText(activity){
@@ -9792,10 +9812,10 @@ function aiCreateDraftMappingModel(){
   const openCompatible=aiCreateHalfHourCompatible(activity.registrationOpenAt);
   const closeCompatible=aiCreateHalfHourCompatible(activity.registrationCloseAt);
   if(!activity.registrationCloseAt) warnings.push("報名截止時間未提供，套用後維持空白。");
-  if(activity.registrationOpenAt && !openCompatible) warnings.push("報名開放 "+String(activity.registrationOpenAt).slice(11,16)+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用，避免被系統靜默四捨五入。");
-  if(activity.registrationCloseAt && !closeCompatible) warnings.push("報名截止 "+String(activity.registrationCloseAt).slice(11,16)+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
-  if(event.checkInStart && !checkinCompatible) warnings.push("報到時間 "+event.checkInStart+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
-  if(event.startAt && !startCompatible) warnings.push("開賽時間 "+event.startAt+" 不符合現行 ARENA 的 00／30 分鐘刻度，因此不自動套用。");
+  if(activity.registrationOpenAt && !openCompatible) warnings.push("報名開放 "+String(activity.registrationOpenAt).slice(11,16)+" 格式無效，因此不自動套用；不會四捨五入。");
+  if(activity.registrationCloseAt && !closeCompatible) warnings.push("報名截止 "+String(activity.registrationCloseAt).slice(11,16)+" 格式無效，因此不自動套用。");
+  if(event.checkInStart && !checkinCompatible) warnings.push("報到時間 "+event.checkInStart+" 格式無效，因此不自動套用。");
+  if(event.startAt && !startCompatible) warnings.push("開賽時間 "+event.startAt+" 格式無效，因此不自動套用。");
   if(event.participantRestrictions?.includes("female")) warnings.push("女性限定目前沒有 ARENA 原生組別欄位，不會自動轉成公開組／兒童組條件。");
   if(!event.formatType) warnings.push("文案未明確提供賽制，AI 不會覆蓋目前賽制預設值。");
   if(event.checkInEnd) warnings.push("現行房間欄位只有單一「報到時間」；本次只處理報到開始時間。");
@@ -9920,6 +9940,27 @@ function renderAiCreateMappingPreview(){
   </div>`;
 }
 
+function aiCreateRegistrationClockHint(field){
+  const result=aiCreateLastApplied&&aiCreateLastApplied.result;
+  if(!window.BxhPosterRefinements||!result)return null;
+  return window.BxhPosterRefinements.clockHint(result,field==="registrationOpenAt"?"registration-open":"registration-close");
+}
+let aiCreateFocusGeneration=0;
+function aiCreateFocusIssue(code){
+  if(!window.BxhPosterRefinements||!window.BxhPosterRefinements.targetId(code)||!hasAdminAccess())return;
+  syncSettingsDraftFromDom();syncRegistrationDraftFromDom();
+  const room=state,roomId=state&&state.id,uid=firebaseUser&&firebaseUser.uid,generation=++aiCreateFocusGeneration;
+  if(activeTab!=="settings"){activeTab="settings";render();}
+  // closeModal/render restore scroll for up to 180ms; navigate after that, not underneath it.
+  setTimeout(()=>{
+    if(generation!==aiCreateFocusGeneration||room!==state||roomId!==(state&&state.id)||uid!==(firebaseUser&&firebaseUser.uid)||activeTab!=="settings"||!hasAdminAccess())return;
+    const report=aiCreateReviewReport();
+    const issue=report.blockers.find(x=>x.code===code);
+    const target=issue?code:"review";
+    window.BxhPosterRefinements.focusField(target,issue?issue.title+"："+issue.message:"請核對並確認 AI 提醒。",document);
+  },220);
+}
+
 function aiCreateReviewReport(){
   if(!aiCreateLastApplied) return {blockers:[],warnings:[],infos:[]};
   ensureSettingsFormDraft();
@@ -9941,7 +9982,7 @@ function aiCreateReviewReport(){
   if(d.checkinRequired && !String(d.checkin||"").trim()) add(blockers,"checkin-missing","報到時間未完成","本場需要報到，但目前沒有可用的報到時間。");
 
   if(rd.registrationEnabled){
-    if(!rd.registrationOpenAt) add(blockers,"registration-open-missing","報名開放時間未完成","線上報名需要設定開放時間。若原文分鐘刻度不相容，請房主手動選擇時間。");
+    if(!rd.registrationOpenAt) add(blockers,"registration-open-missing","報名開放時間未完成","線上報名需要完整的報名日期與時間；只有時刻時請房主確認日期。");
     if(!rd.registrationCloseAt) add(blockers,"registration-close-missing","報名截止時間未完成","線上報名需要設定截止時間。");
     if(!rd.registrationCapacity || Number(rd.registrationCapacity)<1) add(blockers,"capacity-missing","正取名額未完成","請設定至少 1 人的正取名額。");
     if(rd.registrationOpenAt && rd.registrationCloseAt && Number(rd.registrationCloseAt)<=Number(rd.registrationOpenAt)){
@@ -9968,12 +10009,18 @@ function aiCreateReviewReport(){
   });
 
   if(result.activity?.registrationOpenAt && !aiCreateHalfHourCompatible(result.activity.registrationOpenAt) && !rd.registrationOpenAt){
-    add(infos,"open-minute-unsupported","原始報名時間未自動套用","原文 "+String(result.activity.registrationOpenAt).slice(11,16)+" 不符合目前 00／30 分鐘刻度，已保留給房主手動決定。");
+    add(infos,"open-minute-unsupported","原始報名時間未自動套用","原文 "+String(result.activity.registrationOpenAt).slice(11,16)+" 格式尚待確認，已保留給房主手動決定。");
   }
   if(event?.checkInEnd) add(infos,"checkin-end-unmapped","報到結束時間未映射","現行基本資料只有單一報到時間，本次只使用報到開始時間。");
   if(event?.endAt) add(infos,"event-end-unmapped","活動結束時間未映射","現行基本資料沒有活動結束時間欄位，結束時間只保留在 AI 預覽。");
   if(Array.isArray(result.bundleOffers)&&result.bundleOffers.length) add(infos,"bundle-unmapped","套票／雙賽優惠未映射","目前房間沒有套票欄位，優惠資訊不會寫入賽事設定。");
 
+  if(result.sourceMode==="poster-callable" && window.BxhPosterRefinements){
+    for(const [kind,field,label] of [["registration-open","registrationOpenAt","報名開放"],["registration-close","registrationCloseAt","報名截止"]]){
+      const hint=window.BxhPosterRefinements.clockHint(result,kind);
+      if(hint&&!rd[field])add(infos,"poster-clock:"+field,label+"時刻已讀取",hint.time+(hint.channel?"｜管道："+hint.channel:"")+"。請確認完整報名日期；這不是報到時間，不會套入報到欄位。");
+    }
+  }
   return {blockers,warnings,infos};
 }
 
@@ -9986,7 +10033,7 @@ function aiCreateReviewGate(actionLabel="繼續"){
       title:"AI 草稿尚有必填問題",
       message:"請先處理以下項目，再"+actionLabel+"：\n"+report.blockers.map(x=>"• "+x.title+"｜"+x.message).join("\n"),
       confirmLabel:"回去檢查",
-      onConfirm:()=>{setTimeout(()=>document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"}),0);}
+      onConfirm:()=>aiCreateFocusIssue(report.blockers[0].code)
     });
     return false;
   }
@@ -9996,7 +10043,7 @@ function aiCreateReviewGate(actionLabel="繼續"){
       title:"AI 草稿仍有需人工確認的事項",
       message:"請先在「AI 審核閘門」確認以下提醒：\n"+report.warnings.map(x=>"• "+x.title+"｜"+x.message).join("\n"),
       confirmLabel:"前往確認",
-      onConfirm:()=>{setTimeout(()=>document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"}),0);}
+      onConfirm:()=>aiCreateFocusIssue("review")
     });
     return false;
   }
@@ -10039,7 +10086,7 @@ function renderAiCreateReviewPanel(){
   const statusClass=blocked?"blocked":pending?"pending":"ready";
   const item=(kind,x)=>`<div class="ai-create-review-item ${kind}">
     <div class="icon">${kind==="blocker"?"⛔":kind==="warning"?"⚠️":"ℹ️"}</div>
-    <div><b>${esc(x.title)}</b><p>${esc(x.message)}</p></div>
+    <div><b>${esc(x.title)}</b><p>${esc(x.message)}</p>${kind==="blocker"?`<button type="button" class="btn btn-ghost btn-sm" data-action="ai-create-focus-issue" data-issue-code="${esc(x.code)}">前往修正</button>`:""}</div>
   </div>`;
   return `<div class="ai-create-review-panel" id="ai-create-review-panel">
     <div class="ai-create-review-head">
@@ -15816,7 +15863,8 @@ function renderInlineRegistrationShare(){
 
 function renderHalfHourDatetimeDraft(id, field, epoch){
   const raw = epochToDatetimeLocal(epoch);
-  return `<div class="half-hour-datetime" data-datetime-target="${id}">
+  const hint=!raw?aiCreateRegistrationClockHint(field):null;
+  return `<div class="half-hour-datetime" data-minute-precision="true" data-clock-hint="${esc(hint?hint.time:"")}" data-datetime-target="${id}">
     <input class="half-hour-date" type="date" aria-label="日期" value="${esc(raw ? raw.slice(0,10) : "")}">
     <div class="half-hour-clock">
       <select class="half-hour-hour" aria-label="小時"></select>
@@ -15827,7 +15875,7 @@ function renderHalfHourDatetimeDraft(id, field, epoch){
       </select>
     </div>
     <input id="${id}" type="hidden" data-draft-field="${field}" data-draft-type="datetime" value="${esc(raw)}">
-  </div>`;
+  </div>${hint?`<p class="hint ai-clock-hint">海報時刻：${esc(hint.time)}${hint.channel?"｜"+esc(hint.channel):""}。請選擇並確認報名日期，才會套用此時間；不是報到時間。</p>`:""}`;
 }
 
 function renderRegistrationSettingsPanel(showModeSelector=true){
@@ -16365,7 +16413,7 @@ function renderSettings(){
         <div class="settings-time-index">A</div>
         <div class="field">
           <label>報到時間</label>
-          <div class="half-hour-time" data-time-target="f-checkin">
+          <div class="half-hour-time" data-minute-precision="true" data-time-target="f-checkin">
             <select class="half-hour-hour" aria-label="小時"></select><span class="time-colon">:</span>
             <select class="half-hour-minute" aria-label="分鐘"><option value="00">00</option><option value="30">30</option></select>
             <input id="f-checkin" type="hidden" data-settings-draft="checkin" value="${esc(d.checkin)}">
@@ -16377,7 +16425,7 @@ function renderSettings(){
         <div class="settings-time-index">B</div>
         <div class="field">
           <label>開賽時間</label>
-          <div class="half-hour-time" data-time-target="f-start">
+          <div class="half-hour-time" data-minute-precision="true" data-time-target="f-start">
             <select class="half-hour-hour" aria-label="小時"></select><span class="time-colon">:</span>
             <select class="half-hour-minute" aria-label="分鐘"><option value="00">00</option><option value="30">30</option></select>
             <input id="f-start" type="hidden" data-settings-draft="startTime" value="${esc(d.startTime)}">
@@ -23120,6 +23168,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     setTimeout(()=>{try{document.getElementById("ai-create-review-panel")?.scrollIntoView({behavior:"smooth",block:"center"});}catch(e){}},0);
     return;
   }
+  if(action==="ai-create-focus-issue"){aiCreateFocusIssue(target.getAttribute("data-issue-code"));return;}
   if(action==="ai-create-review-ack"){
     const report=aiCreateReviewReport();
     if(report.blockers.length){
@@ -26675,19 +26724,23 @@ function initHalfHourDatetimePickers(root=document){
       return `<option value="${v}">${v}</option>`;
     }).join("");
 
+    const exact=box.dataset.minutePrecision==="true";
+    if(exact){hour.insertAdjacentHTML("afterbegin",'<option value="">時</option>');minute.innerHTML='<option value="">分</option>'+Array.from({length:60},(_,i)=>{const v=String(i).padStart(2,"0");return `<option value="${v}">${v}</option>`;}).join("");}
     const raw=(hidden.value||"").trim();
     const m=raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
     if(m){
       date.value=m[1];
       hour.value=m[2];
-      minute.value=(parseInt(m[3],10)>=30)?"30":"00";
+      minute.value=exact?m[3]:(parseInt(m[3],10)>=30)?"30":"00";
     }else{
-      hour.value="00";
-      minute.value="00";
+      const hint=exact&&/^([01]\d|2[0-3]):[0-5]\d$/.test(box.dataset.clockHint||"")?box.dataset.clockHint.split(":"):null;
+      hour.value=hint?hint[0]:exact?"":"00";
+      minute.value=hint?hint[1]:exact?"":"00";
     }
 
-    const sync=()=>{
-      hidden.value=date.value ? `${date.value}T${hour.value}:${minute.value}` : "";
+    const sync=(event)=>{
+      if(exact&&event.target===hour&&hour.value&&minute.value==="")minute.value="00";
+      hidden.value=date.value && hour.value!=="" && minute.value!=="" ? `${date.value}T${hour.value}:${minute.value}` : "";
       hidden.dispatchEvent(new Event("input",{bubbles:true}));
     };
     date.addEventListener("change",sync);
@@ -26710,14 +26763,17 @@ function initHalfHourTimePickers(root=document){
       return `<option value="${v}">${v}</option>`;
     }).join("");
 
+    const exact=box.dataset.minutePrecision==="true";
+    if(exact){hour.insertAdjacentHTML("afterbegin",'<option value="">時</option>');minute.innerHTML='<option value="">分</option>'+Array.from({length:60},(_,i)=>{const v=String(i).padStart(2,"0");return `<option value="${v}">${v}</option>`;}).join("");}
     const raw=(hidden.value||"").trim();
     const m=raw.match(/^(\d{2}):(\d{2})/);
-    hour.value=m?m[1]:"00";
-    minute.value=(m && parseInt(m[2],10)>=30)?"30":"00";
-    if(!m) hidden.value="00:00";
+    hour.value=m?m[1]:exact?"":"00";
+    minute.value=exact?(m?m[2]:""):(m && parseInt(m[2],10)>=30)?"30":"00";
+    if(!m&&!exact) hidden.value="00:00";
 
-    const sync=()=>{
-      hidden.value=hour.value+":"+minute.value;
+    const sync=(event)=>{
+      if(exact&&event.target===hour&&hour.value&&minute.value==="")minute.value="00";
+      hidden.value=hour.value!==""&&minute.value!==""?hour.value+":"+minute.value:"";
       hidden.dispatchEvent(new Event("change",{bubbles:true}));
     };
     hour.addEventListener("change",sync);
