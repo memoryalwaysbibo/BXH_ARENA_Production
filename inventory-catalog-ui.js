@@ -11,7 +11,7 @@ function catalogState(){
  return catalogAdminState;
 }
 const catalogStages={making:'製作中',partial:'半成品',ready:'成品待發布',exception:'異常分析'};
-function catalogErr(e){const m=String(e?.message||e);const map={'catalog-not-ready':'請先補齊名稱、用途，並將階段設為成品待發布。','catalog-not-available':'道具未上架或已停用，無法贈送。','catalog-already-published':'已上架道具不能改寫，請停用後另建立新版。','catalog-not-found':'找不到道具，請重新整理。','daily-grant-limit':'今日發放已達 999 筆，請明日再試。','operation-conflict':'發放紀錄不一致，請保留操作編號查核。','auth-required':'請重新登入。','super-admin-required':'只有最高管理員可以管理道具。'};for(const [k,v]of Object.entries(map))if(m.includes(k))return v;return '操作尚未完成，請稍後重試。';}
+function catalogErr(e){const m=String(e?.message||e);const map={'catalog-not-ready':'請先補齊名稱、用途，並將階段設為成品待發布。','catalog-not-available':'道具未上架或已停用，無法贈送。','catalog-already-published':'已上架道具不能改寫，請停用後另建立新版。','catalog-not-found':'找不到道具，請重新整理。','daily-grant-limit':'今日發放已達 999 筆，請明日再試。','operation-conflict':'發放紀錄不一致，請保留操作編號查核。','storage-unavailable':'瀏覽器無法保存重試紀錄，請允許儲存後再贈送。','auth-required':'請重新登入。','super-admin-required':'只有最高管理員可以管理道具。'};for(const [k,v]of Object.entries(map))if(m.includes(k))return v;return '操作尚未完成，請稍後重試。';}
 async function catalogLoad(){
  const c=catalogState();if(c.loading||c.busy||!isSuperAdmin())return;
  c.loading=true;c.error='';render();
@@ -93,8 +93,9 @@ async function catalogGift(c){
    if(!source||[...source].length>120)throw Error('invalid-source');
    if(expiresAt!==null&&expiresAt<=Date.now())throw Error('invalid-expiry');
    if(!confirm(`確認贈送給 ${titleRecipientLabel(c.recipient)}？\n${i.code} ${i.name} × ${quantity}\n原因：${source}\n期限：${expiresAt===null?'無期限':mailboxDate(expiresAt)}`))return;
-   c.pending={actorUid:currentAuthUid(),payload:{action:'catalog-grant',catalogId:i.id,targetUid:c.recipient.uid,quantity,source,expiresAt,operationId:crypto.randomUUID()}};
-   sessionStorage.setItem('bxh.catalog.gift:'+currentAuthUid(),JSON.stringify(c.pending));
+   const pending={actorUid:currentAuthUid(),payload:{action:'catalog-grant',catalogId:i.id,targetUid:c.recipient.uid,quantity,source,expiresAt,operationId:crypto.randomUUID()}};
+   try{sessionStorage.setItem('bxh.catalog.gift:'+currentAuthUid(),JSON.stringify(pending));if(sessionStorage.getItem('bxh.catalog.gift:'+currentAuthUid())!==JSON.stringify(pending))throw Error('storage-unavailable');}catch{throw Error('storage-unavailable');}
+   c.pending=pending;
   }
   c.busy=true;render();
   const r=await window.engagementService.inventory(c.pending.payload);if(c!==catalogState())return;if(!r?.ok)throw Error('grant-failed');
