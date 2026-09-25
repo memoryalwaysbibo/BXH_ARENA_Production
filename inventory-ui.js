@@ -52,7 +52,7 @@ function renderInventoryPage(){
  ${selected?`<section class="panel"><div class="panel-title">${esc(selected.name)}｜發放／使用紀錄</div>${c.events.map(e=>`<p class="mailbox-body">${esc(mailboxDate(e.createdAt))}｜${esc(({grant:'發放',consume:'使用',refund:'退還'})[e.kind]||'異動')} ${e.delta>0?'+':''}${Number(e.delta)}｜剩餘 ${Number(e.balance)}<br>來源：${esc(e.source)}<br><small>紀錄：${esc(e.operationId)}</small></p>`).join('')}${c.historyLoaded&&!c.events.some(e=>e.kind==='consume')?'<p class="hint">目前已載入的紀錄中沒有使用紀錄。</p>':''}${c.historyCursor?`<button class="btn btn-ghost" data-action="inventory-history-more" ${c.busy?'disabled':''}>更多紀錄</button>`:''}</section>`:''}
 </section>`;
 }
-function renderInventoryAdminPage(){
+function renderLegacyInventoryAdminPage(){
  if(!isSuperAdmin())return '<section class="panel"><p class="hint">目前身分沒有道具管理權限。</p></section>';
  const c=inventoryContext();
  const lock=c.busy||!!c.pending,d=c.pending?.draft||c.draft,recipient=c.pending?.recipient||c.recipient;
@@ -66,6 +66,11 @@ function renderInventoryAdminPage(){
  <div class="field"><label>道具代碼</label><div class="input-like" aria-readonly="true"><b>系統自動產生</b><br><span class="hint">建立完成後顯示 ITEM-XXXXXX</span></div></div><div class="grid grid-2 inventory-grid">${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${`<div class="field"><label for="inventory-image-file">道具圖片（選填）</label><input id="inventory-image-file" type="file" accept="image/jpeg,image/png,image/webp" data-inventory-image ${lock?'disabled':''}><p class="hint">${c.imageFileName?'已選擇：'+esc(c.imageFileName)+'｜系統會自動壓縮並上傳。':'尚未選取圖片｜選擇後系統會自動縮放並轉成 WebP。'}</p>${d.imageUrl?`<div class="inventory-upload-preview"><img class="inventory-image" src="${esc(d.imageUrl)}" alt="道具圖片預覽"><button type="button" class="btn btn-ghost btn-sm" data-action="inventory-image-remove" ${lock?'disabled':''}>移除圖片</button></div>`:''}</div>`}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
  <div class="field"><label for="inventory-consumable" style="display:flex;align-items:center;gap:8px"><input id="inventory-consumable" type="checkbox" data-inventory-field="consumable" aria-describedby="inventory-consumable-hint" style="width:auto;min-width:18px;flex:0 0 auto" ${consumable?'checked':''} ${lock?'disabled':''}>可消耗道具（活動使用時可扣除數量）</label><p class="hint" id="inventory-consumable-hint">預設不勾選。抽獎券要用於「消耗票券」活動時才勾選；僅影響本次新發放的批次，不會修改既有道具。</p></div>
  <button class="btn btn-primary" data-action="inventory-grant" ${c.busy?'disabled':''}>${c.busy?'處理中……':c.pending?'確認原發放結果':'確認發放'}</button></section>${typeof window.renderRewardRulesAdmin==='function'?window.renderRewardRulesAdmin():''}</section>`;
+}
+function renderInventoryAdminPage(){
+ const c=inventoryContext();
+ if(c.pending)return renderLegacyInventoryAdminPage();
+ return typeof window.renderInventoryCatalogAdmin==='function'?window.renderInventoryCatalogAdmin():'<section class="panel">道具管理載入中……</section>';
 }
 async function handleInventory(action,target){
  const c=inventoryContext();
