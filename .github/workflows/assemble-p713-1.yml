@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Apply source-guarded edits and remove temporary assembly files
+      - name: Apply source-guarded application edits
         shell: bash
         run: |
           set -euo pipefail
@@ -40,12 +40,7 @@ jobs:
           v=Path('version.json');data=json.loads(v.read_text())
           data.update(version='v14.2.27',build='20260925.38',updatedAt=datetime.now(timezone.utc).isoformat())
           v.write_text(json.dumps(data,indent=2)+'\n')
-          w=Path('.github/workflows/validate-production-frontend.yml');text=w.read_text()
-          needle='          node tests/ai-poster-ui.test.cjs\n'
-          assert text.count(needle)==1
-          w.write_text(text.replace(needle,needle+'          node --check ai-poster-refinements.js\n          node tests/ai-poster-refinements.test.cjs\n'))
           spec.unlink()
-          Path('.github/workflows/assemble-p713-1.yml').unlink()
           PY
       - name: Validate all frontend regressions
         run: |
@@ -63,13 +58,13 @@ jobs:
           node scripts/verify-production-frontend.cjs
           node --experimental-vm-modules tests/ladder-v1.cjs
           node --experimental-vm-modules tests/ladder-settlement.cjs
-      - name: Commit only to isolated feature branch
+      - name: Commit application changes only to isolated feature branch
         run: |
           set -euo pipefail
           git config user.name 'BXH validation bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html version.json .github/workflows/validate-production-frontend.yml .github/workflows/assemble-p713-1.yml scripts/p713-1-index-edits.json
+          git add index.html version.json scripts/p713-1-index-edits.json
+          test -z "$(git diff --cached --name-only -- .github/workflows)"
           git commit -m 'fix(p7.13.1): exact minutes, evidence hints and required-field navigation'
           git push origin HEAD:refs/heads/fix/p7-13-1-review-time-20260925
-          git rev-parse HEAD
-          git diff --stat fb412cb14a1c2c9f8227df0355a0799a2485558e HEAD
+          git show --stat --oneline HEAD
