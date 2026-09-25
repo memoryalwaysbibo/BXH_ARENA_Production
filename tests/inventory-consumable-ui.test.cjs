@@ -50,7 +50,7 @@ function setup({ admin = true, auth = true, confirmResult = true, pending = null
     getAttribute: key => key === 'data-inventory-field' ? 'consumable' : null,
     checked, value: 'on'
   } });
-  const checkbox = () => sandbox.renderInventoryAdminPage().match(/<input id="inventory-consumable"[^>]*>/)?.[0];
+  const checkbox = () => sandbox.renderLegacyInventoryAdminPage().match(/<input id="inventory-consumable"[^>]*>/)?.[0];
   const click = async action => {
     const target = {
       getAttribute: key => key === 'data-action' ? action : null,
@@ -72,15 +72,15 @@ test('new grants default to non-consumable and explain existing lots are unchang
   const t = setup();
   assert.equal(t.state.draft.consumable, false);
   assert.doesNotMatch(t.checkbox(), /\bchecked\b/);
-  assert.match(t.sandbox.renderInventoryAdminPage(), /不會修改既有道具/);
+  assert.match(t.sandbox.renderLegacyInventoryAdminPage(), /不會修改既有道具/);
 });
 
 test('player inventory is identical for administrators and regular players', () => {
   const admin = setup({ admin: true }), player = setup({ admin: false });
   assert.equal(admin.sandbox.renderInventoryPage(), player.sandbox.renderInventoryPage());
   assert.doesNotMatch(admin.sandbox.renderInventoryPage(), /最高管理員｜發放道具|inventory-grant|renderRewardRulesAdmin/);
-  assert.match(admin.sandbox.renderInventoryAdminPage(), /最高管理員｜發放道具/);
-  assert.doesNotMatch(player.sandbox.renderInventoryAdminPage(), /inventory-grant/);
+  assert.match(admin.sandbox.renderLegacyInventoryAdminPage(), /最高管理員｜發放道具/);
+  assert.doesNotMatch(player.sandbox.renderLegacyInventoryAdminPage(), /inventory-grant/);
 });
 
 test('checkbox uses a strict boolean rather than the string input value', () => {
