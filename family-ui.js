@@ -20,12 +20,32 @@ function openFamilyPlayers(){
 
 // v13.38.0: one guardian may register self and multiple children; each keeps its own slot.
 function mergeFamilyOnlineRoster(players,registrations,checkinRequired,newId){
- const confirmed=registrations.filter(r=>r.status==='confirmed'),ids=new Set(confirmed.map(r=>String(r.uid||'')));
- const result=players.filter(p=>p.source!=='online'||!p.registrationUid||ids.has(p.registrationUid));
+ const confirmed=(registrations||[]).filter(r=>r&&r.status==='confirmed');
+ const text=v=>String(v==null?'':v);
+ const familyId=r=>text(r&&r.familyPlayerId);
+ const guardianId=r=>text(r&&(r.guardianUid||r.uid));
+ const registrationId=r=>text(r&&(r.registrationId||r.uid||r.guardianUid));
+ const matchesRegistration=(p,r)=>{
+  if(!p||p.source!=='online'||!r)return false;
+  const childId=familyId(r);
+  if(childId){
+   if(text(p.familyPlayerId||p.participantId)!==childId)return false;
+   const guardian=guardianId(r),existingGuardian=text(p.guardianUid||p.registrationUid);
+   return !guardian||!existingGuardian||guardian===existingGuardian;
+  }
+  const regId=registrationId(r);
+  if(regId&&text(p.registrationId||p.participantId||p.uid)===regId)return true;
+  const guardian=guardianId(r);
+  return !!guardian&&!p.familyPlayerId&&text(p.guardianUid||p.registrationUid)===guardian;
+ };
+ const result=(players||[]).filter(p=>p.source!=='online'||confirmed.some(r=>matchesRegistration(p,r)));
  for(const r of confirmed){
-  const name=String(r.displayName||r.publicName||r.realName||'').trim(),guardian=String(r.guardianUid||r.uid||'');if(!name||!guardian)continue;
-  const participant=r.registrationId||r.uid||guardian,i=result.findIndex(p=>p.registrationUid===guardian&&String(p.registrationId||p.participantId||p.uid||'')===String(participant)),old=i<0?null:result[i],same=(old?.familyPlayerId||null)===(r.familyPlayerId||null);
-  const p={id:r.familyPlayerId?'family_'+r.familyPlayerId:(same&&old?.id||newId()),name,source:'online',registrationUid:guardian,registrationId:participant,checkedIn:same&&old?old.checkedIn:!checkinRequired};
+  const name=text(r.displayName||r.publicName||r.realName).trim(),guardian=guardianId(r);if(!name||!guardian)continue;
+  const participant=registrationId(r)||guardian;
+  const i=result.findIndex(p=>matchesRegistration(p,r)),old=i<0?null:result[i];
+  const priorChecked=old&&typeof old.checkedIn==='boolean'?old.checkedIn:null;
+  const stableId=old&&old.id?old.id:(r.familyPlayerId?'family_'+r.familyPlayerId:newId());
+  const p={id:stableId,name,source:'online',registrationUid:guardian,registrationId:participant,checkedIn:priorChecked===null?!checkinRequired:priorChecked};
   if(r.familyPlayerId)Object.assign(p,{familyPlayerId:r.familyPlayerId,participantId:r.familyPlayerId,guardianUid:guardian});
   if(i<0)result.push(p);else result[i]=p;
  }
