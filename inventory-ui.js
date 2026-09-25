@@ -1,4 +1,4 @@
-/* v13.31.2 | 我的道具基礎系統 — server allocated automatic item codes. */
+/* v13.31.3 | 我的道具基礎系統 — automatic codes + compressed image upload. */
 'use strict';
 let inventoryState=null;
 function inventoryStorageKey(){return 'bxh.inventory.pending.v1:'+currentAuthUid();}
@@ -55,7 +55,7 @@ function renderInventoryPage(){
  <div class="field"><label for="inventory-query">搜尋玩家</label><input id="inventory-query" data-inventory-field="query" value="${esc(c.query)}" placeholder="姓名、玩家編號或 Email" ${lock?'disabled':''}></div><button class="btn btn-ghost" data-action="inventory-search" ${lock?'disabled':''}>搜尋帳號</button>
  ${c.results.map(u=>`<button class="btn btn-ghost inventory-recipient" data-action="inventory-select" data-uid="${esc(u.uid)}" ${lock?'disabled':''}>${esc(titleRecipientLabel(u))}</button>`).join('')}
  <p role="status" id="inventory-selected">${recipient?'已選擇：'+esc(titleRecipientLabel(recipient)):'尚未選擇玩家'}</p>
- <div class="field"><label>道具代碼</label><div class="input-like" aria-readonly="true"><b>系統自動產生</b><br><span class="hint">建立完成後顯示 ITEM-XXXXXX</span></div></div><div class="grid grid-2 inventory-grid">${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${input('imageUrl','圖片網址（選填）','type="url" maxlength="2048" placeholder="https://…"')}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
+ <div class="field"><label>道具代碼</label><div class="input-like" aria-readonly="true"><b>系統自動產生</b><br><span class="hint">建立完成後顯示 ITEM-XXXXXX</span></div></div><div class="grid grid-2 inventory-grid">${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${`<div class="field"><label for="inventory-image-file">道具圖片（選填）</label><input id="inventory-image-file" type="file" accept="image/jpeg,image/png,image/webp" data-inventory-image ${lock?\'disabled\':\'\'}><p class="hint">直接選擇圖片；系統會自動縮放並轉成 WebP 後上傳。</p>${d.imageUrl?`<div class="inventory-upload-preview"><img class="inventory-image" src="${esc(d.imageUrl)}" alt="道具圖片預覽"><button type="button" class="btn btn-ghost btn-sm" data-action="inventory-image-remove" ${lock?\'disabled\':\'\'}>移除圖片</button></div>`:\'\'}</div>`}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
  <div class="field"><label for="inventory-consumable" style="display:flex;align-items:center;gap:8px"><input id="inventory-consumable" type="checkbox" data-inventory-field="consumable" aria-describedby="inventory-consumable-hint" style="width:auto;min-width:18px;flex:0 0 auto" ${consumable?'checked':''} ${lock?'disabled':''}>可消耗道具（活動使用時可扣除數量）</label><p class="hint" id="inventory-consumable-hint">預設不勾選。抽獎券要用於「消耗票券」活動時才勾選；僅影響本次新發放的批次，不會修改既有道具。</p></div>
  <button class="btn btn-primary" data-action="inventory-grant" ${c.busy?'disabled':''}>${c.busy?'處理中……':c.pending?'確認原發放結果':'確認發放'}</button></section>`:''}
  ${isSuperAdmin()&&typeof window.renderRewardRulesAdmin==='function'?window.renderRewardRulesAdmin():''}</section>`;
@@ -85,6 +85,7 @@ async function handleInventory(action,target){
   if(action==='inventory-grant'){c.error='最高管理員權限已失效，請重新登入後再試。';c.success='';render();}
   return;
  }
+ if(action==='inventory-image-remove'&&!c.pending){c.draft.imageUrl='';c.success='已移除目前圖片。';c.error='';render();return;}
  if(action==='inventory-select'&&!c.pending){c.recipient=c.results.find(u=>u.uid===target.getAttribute('data-uid'))||null;c.results=[];render();return;}
  if(action==='inventory-search'&&!c.pending){
   if(!c.query.trim()){c.error='請輸入玩家姓名、編號或 Email。';render();return;}
@@ -121,7 +122,26 @@ async function handleInventory(action,target){
   }
  }finally{if(c===inventoryContext()){c.busy=false;render();}}
 }
+async function inventoryCompressImage(file){
+ if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('invalid-image-type');
+ if(file.size>10*1024*1024)throw Error('invalid-image-size');
+ const bitmap=await createImageBitmap(file),max=1200,scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
+ const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+ const ctx=canvas.getContext('2d');if(!ctx)throw Error('image-compress-failed');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+ const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',0.82));if(!blob||blob.size>1000000)throw Error('image-compress-failed');
+ return blob;
+}
+async function inventoryUploadImage(file){
+ const c=inventoryContext();if(c.busy||c.pending)return;c.busy=true;c.error='';c.success='正在壓縮並上傳圖片…';render();
+ try{
+  const blob=await inventoryCompressImage(file),base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('image-read-failed'));reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');reader.readAsDataURL(blob);});
+  const r=await callEngagementFunction('inventoryImageUpload',{contentType:'image/webp',base64},60000);if(!r?.ok||!inventoryImage(r.imageUrl))throw Error('image-upload-failed');
+  c.draft.imageUrl=r.imageUrl;c.success='圖片已自動壓縮並上傳完成。';
+ }catch(error){const msg=String(error?.message||error);c.error=msg.includes('invalid-image-size')?'圖片過大，請選擇 10 MB 以下圖片。':msg.includes('invalid-image-type')?'請選擇 JPG、PNG 或 WebP 圖片。':'圖片上傳失敗，請稍後重試。';c.success='';}
+ finally{c.busy=false;render();}
+}
 function inventoryCaptureInput(e){
+ if(e.target.matches?.('[data-inventory-image]')){const file=e.target.files?.[0];if(file)inventoryUploadImage(file);return;}
  const field=e.target.getAttribute?.('data-inventory-field');if(!field||!isSuperAdmin())return;
  const c=inventoryContext();if(c.busy||c.pending)return;
  if(field==='query'){c.query=e.target.value;c.recipient=null;c.results=[];const selected=document.getElementById('inventory-selected');if(selected)selected.textContent='尚未選擇玩家';document.querySelectorAll('.inventory-recipient').forEach(el=>el.remove());}
