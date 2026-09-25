@@ -1,4 +1,4 @@
-/* v13.31.1 | 我的道具基礎系統 — isolated inventory action routing + visible failure feedback. */
+/* v13.31.2 | 我的道具基礎系統 — server allocated automatic item codes. */
 'use strict';
 let inventoryState=null;
 function inventoryStorageKey(){return 'bxh.inventory.pending.v1:'+currentAuthUid();}
@@ -7,7 +7,7 @@ function inventoryContext(){
  if(!inventoryState||inventoryState.key!==key){
   let pending=null;
   try{const saved=JSON.parse(sessionStorage.getItem(inventoryStorageKey())||'null');if(saved?.payload?.operationId&&saved.actorUid===currentAuthUid())pending=saved;}catch{}
-  inventoryState={key,items:null,nextCursor:null,loading:false,busy:false,error:'',selectedId:'',events:[],historyCursor:null,historyLoaded:false,query:'',results:[],recipient:null,draft:{itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false},pending,success:'',serverOffset:0};
+  inventoryState={key,items:null,nextCursor:null,loading:false,busy:false,error:'',selectedId:'',events:[],historyCursor:null,historyLoaded:false,query:'',results:[],recipient:null,draft:{name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false},pending,success:'',serverOffset:0};
  }
  return inventoryState;
 }
@@ -55,7 +55,7 @@ function renderInventoryPage(){
  <div class="field"><label for="inventory-query">搜尋玩家</label><input id="inventory-query" data-inventory-field="query" value="${esc(c.query)}" placeholder="姓名、玩家編號或 Email" ${lock?'disabled':''}></div><button class="btn btn-ghost" data-action="inventory-search" ${lock?'disabled':''}>搜尋帳號</button>
  ${c.results.map(u=>`<button class="btn btn-ghost inventory-recipient" data-action="inventory-select" data-uid="${esc(u.uid)}" ${lock?'disabled':''}>${esc(titleRecipientLabel(u))}</button>`).join('')}
  <p role="status" id="inventory-selected">${recipient?'已選擇：'+esc(titleRecipientLabel(recipient)):'尚未選擇玩家'}</p>
- <div class="grid grid-2 inventory-grid">${input('itemCode','道具代碼','maxlength="48" placeholder="例如：member-raffle-ticket"')}${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${input('imageUrl','圖片網址（選填）','type="url" maxlength="2048" placeholder="https://…"')}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
+ <div class="field"><label>道具代碼</label><div class="input-like" aria-readonly="true"><b>系統自動產生</b><br><span class="hint">建立完成後顯示 ITEM-XXXXXX</span></div></div><div class="grid grid-2 inventory-grid">${input('name','道具名稱','maxlength="60"')}${input('quantity','數量','type="number" min="1" max="10000" step="1"')}${input('imageUrl','圖片網址（選填）','type="url" maxlength="2048" placeholder="https://…"')}${input('purpose','用途','maxlength="300"')}${input('source','來源／發放原因','maxlength="120"')}${input('expiry','到期時間（台灣時間；留空為無期限）','type="datetime-local"')}</div>
  <div class="field"><label for="inventory-consumable" style="display:flex;align-items:center;gap:8px"><input id="inventory-consumable" type="checkbox" data-inventory-field="consumable" aria-describedby="inventory-consumable-hint" style="width:auto;min-width:18px;flex:0 0 auto" ${consumable?'checked':''} ${lock?'disabled':''}>可消耗道具（活動使用時可扣除數量）</label><p class="hint" id="inventory-consumable-hint">預設不勾選。抽獎券要用於「消耗票券」活動時才勾選；僅影響本次新發放的批次，不會修改既有道具。</p></div>
  <button class="btn btn-primary" data-action="inventory-grant" ${c.busy?'disabled':''}>${c.busy?'處理中……':c.pending?'確認原發放結果':'確認發放'}</button></section>`:''}
  ${isSuperAdmin()&&typeof window.renderRewardRulesAdmin==='function'?window.renderRewardRulesAdmin():''}</section>`;
@@ -99,20 +99,19 @@ async function handleInventory(action,target){
    if(!c.recipient)throw Error('invalid-recipient');
    const d=c.draft,quantity=Number(d.quantity),expiresAt=inventoryExpiry(d.expiry);
    if(!Number.isInteger(quantity)||quantity<1||quantity>10000)throw Error('invalid-quantity');
-   if(!/^[a-z0-9][a-z0-9_-]{0,47}$/.test(d.itemCode.trim()))throw Error('invalid-item-code');
    for(const [key,max]of [['name',60],['purpose',300],['source',120]])if(!d[key].trim()||[...d[key].trim()].length>max)throw Error('invalid-'+key);
    if(d.imageUrl&&!inventoryImage(d.imageUrl))throw Error('invalid-image');
    if(expiresAt!==null&&expiresAt<=Date.now()+c.serverOffset)throw Error('expired-grant');
    if(!confirm(`確認發放給 ${titleRecipientLabel(c.recipient)}？\n${d.name} × ${quantity}\n來源：${d.source}\n期限：${expiresAt===null?'無期限':mailboxDate(expiresAt)+'（台灣時間）'}\n使用方式：${d.consumable===true?'可消耗（活動使用時會扣除數量）':'不可消耗（僅持有，不扣除）'}\n將同步寄送站內信。`)){c.success='已取消發放。';render();return;}
-   const pending={actorUid:currentAuthUid(),recipient:c.recipient,draft:{...d},payload:{action:'grant',targetUid:c.recipient.uid,itemCode:d.itemCode.trim(),name:d.name.trim(),quantity,imageUrl:d.imageUrl.trim(),purpose:d.purpose.trim(),source:d.source.trim(),expiresAt,consumable:d.consumable===true,operationId:crypto.randomUUID()}};
+   const pending={actorUid:currentAuthUid(),recipient:c.recipient,draft:{...d},payload:{action:'grant',targetUid:c.recipient.uid,itemCode:'auto',name:d.name.trim(),quantity,imageUrl:d.imageUrl.trim(),purpose:d.purpose.trim(),source:d.source.trim(),expiresAt,consumable:d.consumable===true,operationId:crypto.randomUUID()}};
    try{sessionStorage.setItem(inventoryStorageKey(),JSON.stringify(pending));if(sessionStorage.getItem(inventoryStorageKey())!==JSON.stringify(pending))throw Error();}catch{throw Error('storage-unavailable');}
    c.pending=pending;
   }
   c.busy=true;render();
   const r=await window.engagementService.inventory(c.pending.payload);if(c!==inventoryContext())return;if(!r?.ok)throw Error('grant-failed');
-  c.success=(r.replayed?'已確認先前發放成功':'道具已發放，站內信已建立')+'｜操作：'+c.pending.payload.operationId;
+  const allocated=String(r.itemCode||'').toUpperCase();c.success=(r.replayed?'已確認先前發放成功':'道具已發放，站內信已建立')+(allocated?'｜道具代碼：'+allocated:'')+'｜操作：'+c.pending.payload.operationId;
   try{sessionStorage.removeItem(inventoryStorageKey());}catch{}
-  c.pending=null;c.draft={itemCode:'',name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false};c.recipient=null;c.results=[];
+  c.pending=null;c.draft={name:'',quantity:'1',imageUrl:'',purpose:'',source:'',expiry:'',consumable:false};c.recipient=null;c.results=[];
   c.busy=false;await loadInventory();await loadMailbox(true);
  }catch(e){
   if(c===inventoryContext()){
