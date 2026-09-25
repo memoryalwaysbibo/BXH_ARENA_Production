@@ -1,4 +1,4 @@
-/* v14.0.24 Separate self/child registration entry; v13.40.2 community-room diagnostics retained. */
+/* v14.0.25 Allow guardian child registration in ranked events; keep child ladder/activity rewards isolated. */
 function openFamilyPlayers(){
  document.getElementById('bxh-family-dialog')?.close();
  const uid=currentAuthUid(),epoch=engagementSessionEpoch,previous=document.activeElement,dialog=document.createElement('dialog');dialog.id='bxh-family-dialog';dialog.className='raffle-claim-dialog';
@@ -51,7 +51,7 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
  if(!r?.ok)throw Error('unavailable');
  const children=(r.profiles||[]).filter(p=>!p.archived&&!p.accountUid);
- const blocked=!!event.registrationSelection||(event.ladderMode==='ranked'&&!event.testLadderEnabled);
+ const blocked=!!event.registrationSelection;
  const requestedMode=mode==='children'?'children':'self';
  let activeRows=[];
  try{
