@@ -66,7 +66,18 @@
       }
       if(!blob||blob.size>MAX_BYTES||!['image/jpeg','image/png'].includes(blob.type))fail('poster-local-size');
       const base64=await blobBase64(blob);
-      return {name:String(file.name||'活動海報').slice(0,180),mimeType:blob.type,base64,width:canvas.width,height:canvas.height,byteLength:blob.size,previewUrl:URL.createObjectURL(blob)};
+      // Separate small cover from the OCR input. The full image never enters room state.
+      const side=240,cover=document.createElement('canvas');cover.width=side;cover.height=side;
+      const ctx=cover.getContext('2d');if(!ctx)fail('poster-local-decode');
+      ctx.fillStyle='#11151b';ctx.fillRect(0,0,side,side);
+      const ratio=Math.min(side/image.naturalWidth,side/image.naturalHeight);
+      const w=Math.round(image.naturalWidth*ratio),h=Math.round(image.naturalHeight*ratio);
+      ctx.drawImage(image,Math.floor((side-w)/2),Math.floor((side-h)/2),w,h);
+      const coverBlob=await canvasBlob(cover,'image/jpeg',0.75);
+      if(coverBlob.size>120000)fail('poster-local-size');
+      const coverBase64=await blobBase64(coverBlob);
+      cover.width=1;cover.height=1;
+      return {name:String(file.name||'活動海報').slice(0,180),mimeType:blob.type,base64,width:canvas.width,height:canvas.height,byteLength:blob.size,previewUrl:URL.createObjectURL(blob),cover:{mimeType:'image/jpeg',base64:coverBase64,width:side,height:side}};
     }finally{
       URL.revokeObjectURL(original);
       if(image)image.src='';
