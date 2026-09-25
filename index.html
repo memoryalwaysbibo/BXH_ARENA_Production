@@ -14037,6 +14037,32 @@ function sameStringSet(a,b){
   for(const x of a) if(!b.has(x)) return false;
   return true;
 }
+let rosterRegistrationUnsub=null,rosterRegistrationCode="",rosterRefreshTimer=null,rosterRefreshBusy=false,rosterRefreshQueued=false;
+function watchOnlineRoster(){
+  const code=state.cloudCode;
+  if(!code||rosterRegistrationCode===code||!window.cloudSync?.subscribeRegistrationsForAdmin)return;
+  if(rosterRegistrationUnsub)rosterRegistrationUnsub();
+  rosterRegistrationCode=code;
+  rosterRegistrationUnsub=window.cloudSync.subscribeRegistrationsForAdmin(code,()=>{
+    if(appPhase!=="app"||activeTab!=="people"||state.cloudCode!==code||state.startedAt)return;
+    if(rosterRefreshBusy){rosterRefreshQueued=true;return;}
+    clearTimeout(rosterRefreshTimer);
+    rosterRefreshTimer=setTimeout(async()=>{
+      if(rosterRefreshBusy||state.cloudCode!==code||state.startedAt)return;
+      rosterRefreshBusy=true;
+      try{await syncLatestOnlineRosterBeforeLock();if(appPhase==="app"&&activeTab==="people")render();}
+      catch(e){console.warn("[automatic roster sync]",e);}
+      finally{
+        rosterRefreshBusy=false;
+        if(rosterRefreshQueued&&state.cloudCode===code&&!state.startedAt){
+          rosterRefreshQueued=false;
+          if(rosterRegistrationUnsub){rosterRegistrationUnsub();rosterRegistrationUnsub=null;rosterRegistrationCode="";}
+          if(appPhase==="app"&&activeTab==="people")watchOnlineRoster();
+        }
+      }
+    },300);
+  },e=>console.warn("[registration listener]",e));
+}
 function bracketRosterIsCurrent(){
   if(!state.bracketSize || !(state.matches||[]).length) return false;
   return sameStringSet(currentBracketParticipantIds(),eligibleRosterIds());
@@ -14058,7 +14084,7 @@ async function syncLatestOnlineRosterBeforeLock(){
     p.checkedIn===true?"1":"0",String(p.name||"")
   ].join("|")).sort().join("\n");
   const changed=before!==after;
-  if(changed) await saveState();
+  if(changed && await saveState()===false) throw new Error("roster-save-failed");
   publicTournamentsCache=null;
   myRegistrationsCache=null;
   return {ok:true,changed,confirmed:confirmed.length};
@@ -16213,6 +16239,7 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
 
 function renderPeopleManagement(){
   const online=!!(state.meta&&state.meta.registrationEnabled);
+  if(online&&state.cloudCode&&!state.startedAt)setTimeout(watchOnlineRoster,0);
   const needsCheckin=!!(state.meta&&state.meta.checkinRequired);
   const checkinClosed=!!state.meta.checkinClosedEarly;
   const locked=peopleRosterMutationLocked();
@@ -23395,6 +23422,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       resetRegistrationFormDraft();
       refereeAssignmentDraftEnabled = null;
       if(targetTab==="registrations") resetAdminRegistrationsCache(); // always fetch fresh when entering
+      if(activeTab==="people"&&targetTab!=="people"){
+        if(rosterRegistrationUnsub)rosterRegistrationUnsub();
+        rosterRegistrationUnsub=null;rosterRegistrationCode="";
+        clearTimeout(rosterRefreshTimer);
+      }
       if(targetTab==="management" && !adminTournamentListBusy){ adminTournamentListLoaded = false; }
       if(targetTab==="history" && activeTab!=="history" && !historyCloudSyncBusy){ historyCloudSyncLoaded = false; }
       activeTab = targetTab; mainTabNavCenterRequested=true; if(activeTab!=="history"){ viewingRecordId=null; viewingRecordData=null; } render();
@@ -28916,6 +28948,10 @@ init();
       const results = [];
       snap.forEach(docSnap => { results.push(Object.assign({registrationId:docSnap.id},docSnap.data())); });
       return results;
+    },
+    subscribeRegistrationsForAdmin(code,onChange,onError){
+      if(!cloudEnabled||!code)return ()=>{};
+      return fx.onSnapshot(fx.collection(dbHandle,"tournaments",code,"registrations"),onChange,onError);
     },
 
     async queryMyDutyLogs(){
