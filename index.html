@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260925.38">
+<meta name="bxh-build" content="20260925.39">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260925.38";
+  var CURRENT_BUILD="20260925.39";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5074,6 +5074,12 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 .ai-poster-preview strong{font-size:12px;overflow-wrap:anywhere;}
 .ai-poster-preview p{font-size:11px;color:var(--metal);}
 .ai-poster-preview button{min-height:44px;font-size:12px;white-space:normal;}
+.ai-poster-cover-choice{display:flex;align-items:center;gap:9px;margin-top:10px;color:var(--ivory);font-size:12px;line-height:1.5;}
+.ai-poster-cover-choice input{width:18px;height:18px;flex:none;accent-color:var(--gold);}
+.lobby-card-with-cover{display:flex;align-items:flex-start;gap:12px;min-width:0;}
+.lobby-poster-cover{width:68px;height:68px;object-fit:contain;flex:none;background:#11151b;border:1px solid rgba(217,185,92,.3);border-radius:8px;}
+.lobby-card-with-cover .lobby-card-main{flex:1;min-width:0;}
+@media(max-width:400px){.lobby-poster-cover{width:56px;height:56px;}}
 .ai-poster-evidence{margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;}
 .ai-poster-evidence summary{cursor:pointer;min-height:28px;}
 .ai-poster-evidence pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;font:inherit;line-height:1.7;}
@@ -5503,7 +5509,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
 <script src="family-ui.js?v=14.0.24"></script>
 <script src="raffle-ui.js?v=14.0.12"></script>
-<script src="ai-poster-ui.js?v=14.2.26"></script>
+<script src="ai-poster-ui.js?v=14.2.28"></script>
 <script src="ai-poster-refinements.js?v=14.2.27"></script>
 <script>
 // Standalone browsers do not provide the hosted artifact's window.storage API.
@@ -5926,9 +5932,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.27";
+const APP_VERSION = "v14.2.28";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {"version":"v14.2.28","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.14 大廳海報縮圖","updateLevel":"minor","added":["海報解析草稿可選擇發布後於大廳卡片顯示縮圖","僅發布成功後透過房主授權上傳壓縮縮圖"],"changed":["大廳卡片有封面時顯示海報小圖，無封面時維持原版"],"fixed":[],"environment":"Production / Restricted Beta","firebaseImpact":"房間私有 coverPath 與公開 coverUrl；Storage room-covers","securityRulesImpact":"無；只由受權限限制的 Callable 寫入","permissionImpact":"僅原房主與 AI 開房 Beta 管理員可上傳","publicSummary":"上傳海報解析後，房主可讓大廳卡片展示海報縮圖。"},
   {"version": "v14.2.27", "date": "2026/09/25", "timezone": "Asia/Taipei", "title": "P7.13.1 海報校對與錯誤定位", "updateLevel": "patch", "added": ["回去檢查直接定位與標示第一個缺漏欄位；每項問題可個別前往修正", "混合文字拆出報名時間與管道，缺日期須房主確認", "北京場地名稱疑似錯字提供未勾選的校正建議"], "changed": ["賽事報到、開賽及報名設定支援每分鐘，不再將 21:10 捨棄或取整"], "fixed": ["空白報到時間不再被選擇器補成午夜 00:00"], "environment": "Production / Restricted Beta", "firebaseImpact": "無資料遷移", "securityRulesImpact": "無", "permissionImpact": "沿用既有權限", "publicSummary": "海報時間可精確到分鐘；缺漏欄位直接定位，報名與報到維持分開。"},
   {"version":"v14.2.26","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.13 海報輔助開房","updateLevel":"minor","added":["AI 協助建立可上傳 JPG／PNG 海報並加上補充文案","海報辨識文字、獎品與警告保留於預覽；僅套入草稿"],"changed":["來源更換、取消或切換帳號／房間時捨棄過期回應","保留公版勾選與房主人工審核"],"fixed":["海報來源警告持續出現在審核閘門，不因關閉預覽而遺失"],"environment":"Production / Restricted Beta","deployStatus":"P7.13 frontend integration","firebaseImpact":"沿用獨立海報解析 Callable；無資料遷移","securityRulesImpact":"無","permissionImpact":"沿用 Restricted Beta 白名單","publicSummary":"上傳海報即可擷取活動資訊、套入原有草稿；房主確認後才儲存或發布。"},
   {"version":"v14.2.25","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.12.1 導航防呆與複製地址","updateLevel":"patch","added":["導航視窗新增完整地址與複製地址","多個地圖連結需房主確認，不自動選擇"],"changed":["Google 保留主辦提供的連結；Apple 僅依地址建立路線","只有店名時不推測目的地；導航視窗獨立於資訊卡，避免手機裁切"],"fixed":["修正清空場地後舊地址回填","修正僅填地址時被存成店名","加強 Maps URL 主機、路徑與安全格式檢查"],"environment":"Production / Event Info V2","deployStatus":"P7.12.1 navigation hardening","firebaseImpact":"沿用 eventInfo.venue；無資料移轉或新增集合","securityRulesImpact":"無","permissionImpact":"無","publicSummary":"場地導航可查看並複製完整地址；清空地址不再恢復舊值，缺地址不會自動導航到同名店家。"},
@@ -9248,6 +9255,8 @@ let aiCreatePosterGeneration=0;
 let aiCreateInputGeneration=0;
 let aiCreateParsedContext=null;
 let aiCreatePosterOwner=null;
+let aiCreateCoverEnabled=true;
+let aiCreateCoverPending=null;
 function aiCreateInvalidateInput(){
   aiCreateInputGeneration++;
   aiCreateParseBusy=false;
@@ -9289,7 +9298,7 @@ async function aiCreateLoadPoster(file){
       window.BxhPoster.release(image);return;
     }
     aiCreatePosterFile=image;
-    aiCreateAssistantNotice="海報已備妥；可補充文案後開始解析。圖片只用於辨識，不會存成活動封面。";
+    aiCreateAssistantNotice="海報已備妥；可補充文案後開始解析。確認套用後，可選擇將縮圖顯示於大廳。";
   }catch(error){
     if(generation===aiCreatePosterGeneration)aiCreateAssistantNotice=window.BxhPoster.errorMessage(error);
   }finally{
@@ -9307,7 +9316,7 @@ function renderAiCreatePosterInput(){
     <button id="ai-create-poster-pick" type="button" class="btn btn-ghost ai-poster-pick">${image?"更換海報":"選擇 JPG／PNG 海報"}</button>
     <div id="ai-poster-help" class="ai-poster-help">JPG／PNG，原圖最多 12 MB。圖片會在本機縮圖；按「開始解析」才送往辨識服務。</div>
     ${aiCreatePosterPreparing?'<div role="status">正在處理圖片…</div>':""}
-    ${image?`<div class="ai-poster-preview"><img src="${esc(image.previewUrl)}" alt="所選活動海報預覽"><div><strong>${esc(image.name)}</strong><p>${image.width} × ${image.height} · ${Math.ceil(image.byteLength/1024)} KB</p><button id="ai-create-poster-remove" type="button" class="btn btn-ghost">移除海報／改用文字</button></div></div>`:""}
+    ${image?`<div class="ai-poster-preview"><img src="${esc(image.previewUrl)}" alt="所選活動海報預覽"><div><strong>${esc(image.name)}</strong><p>${image.width} × ${image.height} · ${Math.ceil(image.byteLength/1024)} KB</p><button id="ai-create-poster-remove" type="button" class="btn btn-ghost">移除海報／改用文字</button></div></div><label class="ai-poster-cover-choice"><input id="ai-create-cover-enabled" type="checkbox" ${aiCreateCoverEnabled?"checked":""}>發布後在大廳卡片顯示海報縮圖</label>`:""}
   </div>`;
 }
 function renderAiCreatePosterEvidence(){
@@ -9324,6 +9333,8 @@ function bindAiCreatePosterInputs(){
   if(input)input.addEventListener("change",()=>{const file=input.files&&input.files[0];if(file)aiCreateLoadPoster(file);});
   const remove=document.getElementById("ai-create-poster-remove");
   if(remove)remove.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();aiCreateReleasePoster();render();});
+  const cover=document.getElementById("ai-create-cover-enabled");
+  if(cover)cover.addEventListener("change",()=>{aiCreateCoverEnabled=cover.checked;});
 }
 
 
@@ -9910,6 +9921,8 @@ function applyAiCreateSelectedEventToDraft(){
     warnings:model.warnings.slice(),
     at:Date.now()
   };
+  aiCreateCoverPending=aiCreateStructuredResult.sourceMode==="poster-callable"&&aiCreateCoverEnabled&&aiCreatePosterFile?.cover
+    ?{roomId:state.id,uid:firebaseUser?.uid,cover:aiCreatePosterFile.cover}:null;
   aiCreateReviewAcknowledged=false;
   return {ok:true,model,mappedFields:aiCreateLastApplied.mappedFields,warnings:aiCreateLastApplied.warnings};
 }
@@ -13917,6 +13930,19 @@ function renderTournamentPublishAction(readOnly){
   if(!state.cloudCode&&!canCreateOfficialTournament()) return `<button class="btn btn-ghost" disabled>目前帳號不可建立／發布新賽事</button>`;
   return `<button class="btn btn-primary" data-action="open-registration-publish-preview">${state.meta.publishedAt&&state.cloudCode?'更新並重新發布':'完成架構並發布'}</button>`;
 }
+async function publishPendingPosterCover(code){
+  const pending=aiCreateCoverPending;
+  if(!pending||pending.roomId!==state.id||pending.uid!==(firebaseUser&&firebaseUser.uid)||!code)return;
+  try{
+    const result=await window.engagementService.roomPosterCover({code,cover:pending.cover});
+    if(!result||result.ok!==true)throw new Error("cover-upload-failed");
+    if(aiCreateCoverPending===pending)aiCreateCoverPending=null;
+    publicTournamentsCache=null;
+  }catch(error){
+    console.warn("[room cover upload]",error&&error.code||"failed");
+    showToast("賽事已發布，但海報縮圖上傳失敗；請重新按更新並發布重試",true);
+  }
+}
 async function publishRegistrationConfig(){
   state.meta.publishedAt = Date.now();
   state.meta.registrationStatus = computeRegistrationStatus(state.meta);
@@ -13947,6 +13973,7 @@ async function publishRegistrationConfig(){
     if(!postCreateOk){
       queueCloudSyncRetry(state.id, code);
     }
+    await publishPendingPosterCover(code);
 
     if(cloudUnsub){ try{ cloudUnsub(); }catch(e){} }
     cloudUnsub = window.cloudSync.subscribe(code, applyRemoteState);
@@ -13959,6 +13986,7 @@ async function publishRegistrationConfig(){
   }
 
   const syncResult = await saveState();
+  await publishPendingPosterCover(state.cloudCode);
   publicTournamentsCache = null; publicTournamentsError = null;
   render();
   showToast("賽事設定已更新");
@@ -18662,7 +18690,8 @@ function lobbySummary(raw){
     eventCancelled:!!raw.eventCancelled, publishedAt:raw.publishedAt, visibility:raw.visibility,
     startMs:lobbyEventStartMs(raw), formatType:raw.formatType||m.formatType||"single",
     fee:raw.fee, checkInAt:raw.checkInAt||m.checkin||"", eventDescription:raw.eventDescription||"",
-    roomAccessMode:raw.roomAccessMode||m.roomAccessMode||"public"
+    roomAccessMode:raw.roomAccessMode||m.roomAccessMode||"public",
+    coverUrl:typeof raw.coverUrl==="string"?raw.coverUrl:""
   };
 }
 function lobbyNewestFirst(a,b){
@@ -18782,8 +18811,11 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
     t.closeAt?`報名截止｜${esc(new Date(t.closeAt).toLocaleString())}`:"",
     `房間代碼｜${esc(t.code)}`
   ].filter(Boolean);
+  const coverUrl=/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/bxh-arena\.firebasestorage\.app\/o\/room-covers%2F[A-Z0-9-]+%2F[a-f0-9-]+\.jpg\?alt=media&token=[a-f0-9-]+$/.test(t.coverUrl||"")?t.coverUrl:"";
   return `<details class="lobby-compact-card ${authorityClass}" ${expanded?"open":""}>
     <summary>
+      <div class="lobby-card-with-cover">
+      ${coverUrl?`<img class="lobby-poster-cover" src="${esc(coverUrl)}" alt="${esc(t.name)} 海報縮圖" loading="lazy" referrerpolicy="no-referrer">`:""}
       <div class="lobby-card-main">
         <div class="lobby-room">
           <div class="lobby-room-name">${esc(t.name)}</div>
@@ -18794,6 +18826,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
           ${t.roomAccessMode==="password"?'<span class="badge badge-metal">🔒 密碼房</span>':""}
           ${t.systemClosure&&!t.systemClosure.restoredAt?'<span class="badge badge-metal">比賽結束（系統關閉）</span>':roomStatusHtml(displayPhase)}
         </div>
+      </div>
       </div>
       <div class="lobby-time-row">
         <span class="lobby-time">${esc(timeLabel)}</span>
@@ -27764,6 +27797,7 @@ init();
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
     async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
     async aiCreatePosterParser(payload){return callEngagementFunction("parseTournamentPosterV1",payload,60000);},
+    async roomPosterCover(payload){return callEngagementFunction("roomPosterCover",payload,45000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
