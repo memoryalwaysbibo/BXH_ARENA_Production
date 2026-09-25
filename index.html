@@ -8913,6 +8913,7 @@ function commitLeaveTournament(){
   const leftName = state.meta.name || "此賽事";
   // 1. Stop this device's own real-time listener for the tournament being left.
   if(cloudUnsub){ try{ cloudUnsub(); }catch(e){} cloudUnsub=null; }
+  stopAdminRosterWatch();
   // 2. Release any court/referee lock fields this device's local view was
   //    holding (schema-level fields on courtAssignments; safe no-op if unset).
   if(state.courtAssignments){
@@ -14049,11 +14050,11 @@ function bracketRosterIsCurrent(){
   if(!state.bracketSize || !(state.matches||[]).length) return false;
   return sameStringSet(currentBracketParticipantIds(),eligibleRosterIds());
 }
-async function syncLatestOnlineRosterBeforeLock(){
+async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(!state.meta?.registrationEnabled || !state.cloudCode || state.startedAt) return {ok:true,changed:false,confirmed:0};
   if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
-  const regs=await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
+  const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
   adminRegistrationsCache=regs;
   const confirmed=regs.filter(r=>r&&r.status==="confirmed");
   const before=(state.players||[]).map(p=>[
@@ -16226,8 +16227,8 @@ function renderPeopleManagement(){
   const locked=peopleRosterMutationLocked();
   const selectionManaged=peopleRegistrationSelectionManaged();
 
-  if(online&&state.cloudCode&&adminRegistrationsCache===null&&!adminRegistrationsLoading){
-    setTimeout(()=>{ if(activeTab==="people"&&adminRegistrationsCache===null) handleAction("load-admin-registrations",{getAttribute:()=>null}); },0);
+  if(online&&state.cloudCode&&adminRosterCode!==state.cloudCode&&!adminRegistrationsError){
+    setTimeout(startAdminRosterWatch,0);
   }
 
   const confirmed=state.players||[];
@@ -16299,7 +16300,7 @@ function renderPeopleManagement(){
     </div>`;
 
   const toolsPanel=`
-    ${online?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">載入後會以雲端正取／備取狀態為權威來源，並保留本機已完成的報到狀態。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
+    ${online?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
     ${needsCheckin?`<div class="panel"><div class="panel-title">報到管理</div><div class="btn-row"><button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button></div><p class="hint">提前結束後，未報到正取不會進入對戰表。</p>${checkinClosed?`<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>`:''}</div>`:''}
     <div class="panel"><div class="panel-title">現場新增選手</div><div class="field"><label>每行一位</label><textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea><div class="hint">${needsCheckin?'新增後先列為正取／未報到，玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入正取。'}現場玩家不需系統帳號。</div></div><div class="btn-row"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至正取待報到':'新增至正取'}</button></div></div>
     <div class="panel"><div class="panel-title">測試名單</div><div class="hint" style="margin-bottom:10px;">建立指定人數的測試選手；會取代目前正取名單。</div><div class="btn-row"><button class="btn btn-ghost" data-action="random-test-roster" data-count="8" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 8 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="16" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 16 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="32" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 32 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="64" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 64 位</button></div></div>`;
@@ -19162,6 +19163,58 @@ let adminRegistrationsLoading = false;
 let adminRegistrationsError = null;
 let adminRegistrationsBusy = false; // promote/cancel action in-flight guard
 function resetAdminRegistrationsCache(){ adminRegistrationsCache = null; adminRegistrationsError = null; }
+let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;
+let adminRosterSyncChain=Promise.resolve();
+function stopAdminRosterWatch(){
+  ++adminRosterGeneration;
+  if(adminRosterUnsub){ try{ adminRosterUnsub(); }catch(e){} }
+  adminRosterUnsub=null; adminRosterCode="";
+}
+async function startAdminRosterWatch(){
+  const code=state.cloudCode;
+  if(activeTab!=="people" || !hasAdminAccess() || !state.meta?.registrationEnabled || !code) return;
+  if(adminRosterCode===code) return;
+  stopAdminRosterWatch();
+  adminRosterCode=code;
+  const generation=adminRosterGeneration, roomId=state.id;
+  try{
+    if(window.cloudSync?.connect) await window.cloudSync.connect();
+    if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId) return;
+    if(!cloudAvailable() || !window.cloudSync?.subscribeRegistrationsForAdmin) throw new Error("registration listener unavailable");
+    adminRosterUnsub=window.cloudSync.subscribeRegistrationsForAdmin(code, rows=>{
+      if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId || state.cloudCode!==code) return;
+      adminRegistrationsCache=rows;
+      adminRegistrationsError=null;
+      adminRosterSyncChain=adminRosterSyncChain.catch(()=>{}).then(async()=>{
+        if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId || state.cloudCode!==code) return;
+        if(!state.startedAt){
+          const result=await syncLatestOnlineRosterBeforeLock(rows);
+          if(generation!==adminRosterGeneration || state.id!==roomId) return;
+          if(result.changed && state.bracketSize && !bracketRosterIsCurrent())
+            showToast("線上名單已更新；對戰表已過期，請重新產生對戰表",true);
+        }
+        renderPreservingScroll();
+      }).catch(e=>{
+        console.warn("[admin roster auto sync]",e);
+        if(generation===adminRosterGeneration){adminRegistrationsError=mapRegistrationError(e);renderPreservingScroll();}
+      });
+    }, e=>{
+      if(generation!==adminRosterGeneration) return;
+      console.warn("[admin roster watch]",e);
+      adminRegistrationsError=mapRegistrationError(e);
+      adminRegistrationsCache=[];
+      stopAdminRosterWatch();
+      renderPreservingScroll();
+    });
+  }catch(e){
+    if(generation!==adminRosterGeneration) return;
+    console.warn("[admin roster watch]",e);
+    adminRegistrationsError=mapRegistrationError(e);
+    adminRegistrationsCache=[];
+    stopAdminRosterWatch();
+    renderPreservingScroll();
+  }
+}
 let myRegistrationsError = null;
 let myRegistrationsLoading = false;
 let myRegistrationsTournamentInfo = {}; // code -> {name, date, tournamentPhase} for display
@@ -23406,6 +23459,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const doSwitch = ()=>{
       resetRegistrationFormDraft();
       refereeAssignmentDraftEnabled = null;
+      if(targetTab!=="people") stopAdminRosterWatch();
       if(targetTab==="registrations") resetAdminRegistrationsCache(); // always fetch fresh when entering
       if(targetTab==="management" && !adminTournamentListBusy){ adminTournamentListLoaded = false; }
       if(targetTab==="history" && activeTab!=="history" && !historyCloudSyncBusy){ historyCloudSyncLoaded = false; }
@@ -28921,6 +28975,18 @@ init();
         if(!snap.exists()) return null;
         return snap.data();
       }catch(e){ return null; }
+    },
+
+    // 管理端即時監聽正取與備取；只處理伺服器已確認的快照。
+    subscribeRegistrationsForAdmin(code, callback, onError){
+      if(!cloudEnabled || !code) return ()=>{};
+      const ref=fx.collection(dbHandle,"tournaments",String(code).toUpperCase(),"registrations");
+      return fx.onSnapshot(ref,{includeMetadataChanges:true},snap=>{
+        if(snap.metadata.fromCache || snap.metadata.hasPendingWrites) return;
+        const rows=[];
+        snap.forEach(docSnap=>rows.push(Object.assign({registrationId:docSnap.id},docSnap.data())));
+        callback(rows);
+      },onError);
     },
 
     // 管理端讀取整個賽事的報名名單（Rules 限制：未分派 staff 會被拒絕）。
