@@ -53,6 +53,21 @@ function ready(result=fixture().result){ctx.testResult=result;run('aiCreateAssis
  await test('Do not apply into published rooms or rooms with players',()=>{for(const mutation of ['state.cloudCode="BXH-REAL"','state.players=[{id:"p"}]','state.startedAt=1']){ready();run(mutation);assert.equal(api.applyAiCreateSelectedEventToDraft().ok,false);run('delete state.cloudCode;state.players=[];delete state.startedAt');}});
  await test('Transcript and filename are escaped in UI',()=>{ready();const evidence=api.renderAiCreatePosterEvidence();assert(!evidence.includes('<script>'));assert(evidence.includes('&lt;script&gt;'));run('aiCreatePosterFile={...testImage,name:"<img src=x onerror=alert(1)>"}');assert(!api.renderAiCreatePosterInput().includes('<img src=x'));});
  await test('No persistence, direct room write or secret access in image module',()=>{const source=fs.readFileSync(path.join(root,'ai-poster-ui.js'),'utf8');assert(!/localStorage|sessionStorage|indexedDB|setDoc|updateDoc|writeBatch|apiKey|process\.env|console\.log/.test(source));});
+ await test('Cover uploads only for the same room and actor after publication',async()=>{
+   const start=html.indexOf('async function publishPendingPosterCover('),end=html.indexOf('\n}',start)+2;
+   assert(start>0&&end>start);
+   vm.runInContext('let publicTournamentsCache=[];',ctx);
+   vm.runInContext(html.slice(start,end),ctx);
+   let uploads=0;
+   ctx.window.engagementService.roomPosterCover=async()=>{uploads++;return {ok:true};};
+   run('aiCreateCoverPending={roomId:"old-room",uid:"user1",cover:{base64:"only-in-memory"}}');
+   await run('publishPendingPosterCover("BXH-ABC123")');assert.equal(uploads,0);
+   run('aiCreateCoverPending.roomId=state.id;aiCreateCoverPending.uid="other"');
+   await run('publishPendingPosterCover("BXH-ABC123")');assert.equal(uploads,0);
+   run('aiCreateCoverPending.uid="user1"');
+   await run('publishPendingPosterCover("BXH-ABC123")');assert.equal(uploads,1);
+   assert.equal(run('aiCreateCoverPending'),null);
+ });
  await test('Callable bridge keeps original text endpoint and separate poster timeout',()=>{assert(html.includes('async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);}'));assert(html.includes('async aiCreatePosterParser(payload){return callEngagementFunction("parseTournamentPosterV1",payload,60000);}'));assert(html.includes('套用 BXH 賽事公版'));});
  console.log('P7.13 regression cases passed: '+count);
 })().catch(error=>{console.error(error);process.exitCode=1;});
