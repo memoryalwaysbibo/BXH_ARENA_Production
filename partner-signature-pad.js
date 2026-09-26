@@ -12,7 +12,7 @@
     const clear=doc.createElement('button');clear.type='button';clear.textContent='清除重簽';
     const preview=doc.createElement('button');preview.type='button';preview.textContent='預覽簽名';
     const image=doc.createElement('img');image.alt='簽名預覽';image.hidden=true;
-    image.style.cssText='display:block;max-width:100%;margin-top:10px;background:#fff;';
+    image.style.cssText='max-width:100%;margin-top:10px;background:#fff;';
     actions.append(clear,preview);container.append(canvas,actions,image);
     const ctx=canvas.getContext('2d');
     if(!ctx) throw new Error('signature-canvas-unavailable');
