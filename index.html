@@ -738,6 +738,9 @@ input,select,textarea{max-width:100%;min-width:0;}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--neon-dim);}
 .field textarea{min-height:180px;resize:vertical;font-family:var(--font-b);line-height:1.6;}
 .hint{font-size:12px;color:var(--metal-dim);margin-top:2px;}
+.registration-countdown{display:inline-block;font-size:18px;line-height:1.4;font-weight:700;font-variant-numeric:tabular-nums;color:var(--metal-dim)}
+.registration-countdown[data-urgency="soon"]{color:#ff9d35}
+.registration-countdown[data-urgency="urgent"]{color:#ff4d5e}
 .warn-text{font-size:12px;color:var(--danger);margin-top:4px;}
 
 .badge{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;font-family:var(--font-d);}
@@ -18888,14 +18891,18 @@ function registrationCountdownText(openAt,now=Date.now()){
  const days=Math.floor(remaining/86400),hours=Math.floor(remaining%86400/3600),minutes=Math.floor(remaining%3600/60),seconds=remaining%60;
  return '距離開放 '+(days?days+'天 ':'')+[hours,minutes,seconds].map(x=>String(x).padStart(2,'0')).join(':');
 }
+function registrationCountdownUrgency(openAt,now=Date.now()){
+ const remaining=Number(openAt)-now;
+ return remaining>0&&remaining<=60000?'urgent':remaining>0&&remaining<=300000?'soon':'';
+}
 function renderRegistrationCountdown(code,openAt){
  const at=normalizeDateTime(openAt);if(at==null)return '';
- return `<span class="hint" data-registration-countdown="${at}" data-code="${esc(code)}">${esc(registrationCountdownText(at))}</span><span class="hint">台灣時間 ${esc(new Date(at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))} 開放</span>`;
+ return `<span class="registration-countdown" data-registration-countdown="${at}" data-urgency="${registrationCountdownUrgency(at)}" data-code="${esc(code)}">${esc(registrationCountdownText(at))}</span><span class="hint">台灣時間 ${esc(new Date(at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))} 開放</span>`;
 }
 function tickRegistrationCountdowns(){
  if(document.hidden)return;let expired=false;
  document.querySelectorAll('[data-registration-countdown]').forEach(el=>{
-  const at=Number(el.getAttribute('data-registration-countdown'));el.textContent=registrationCountdownText(at);
+  const at=Number(el.getAttribute('data-registration-countdown'));el.textContent=registrationCountdownText(at);el.dataset.urgency=registrationCountdownUrgency(at);
   if(at<=Date.now()&&!el.dataset.expired){el.dataset.expired='true';expired=true;}
  });
  if(!expired)return;
