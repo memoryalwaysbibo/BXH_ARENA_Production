@@ -12878,7 +12878,7 @@ function rebuildPropagationSingle(){
         const curA = bronze.a?bronze.a.playerId:null, curB = bronze.b?bronze.b.playerId:null;
         if(curA!==loserA || curB!==loserB){
           bronze.a={type:"player",playerId:loserA}; bronze.b={type:"player",playerId:loserB};
-          bronze.scoreA=0;bronze.scoreB=0;bronze.log=[];bronze.winnerId=null;bronze.loserId=null;bronze.completed=false;
+          bronze.scoreA=0;bronze.scoreB=0;bronze.log=[];bronze.faultActions=[];bronze.winnerId=null;bronze.loserId=null;bronze.completed=false;
         }
       }
     }
@@ -15647,9 +15647,18 @@ function renderCourtCard(stationNum){
   const scoreLocked=locked || preStartLocked || stationLocked || !!winSide;
 
   const scoreBtn = (side, type) => `<button data-action="score" data-id="${m.id}" data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
+  const faultBtn = (side) => {
+    const count=refereeFaultCount(m,side);
+    return `<button class="fault-btn ${count>0?'has-fault':''}" data-action="fault" data-id="${m.id}" data-side="${side}" data-type="fault" ${scoreLocked?'disabled':''}>失誤 ${count}/2</button>`;
+  };
 
   const lastLog = m.log.length ? m.log[m.log.length-1] : null;
-  const undoLabel = lastLog ? `撤銷上一筆得分（${lastLog.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[lastLog.type]}）` : "撤銷上一筆得分";
+  const pendingFault=refereeFaultLast(m);
+  const pendingFaultName=pendingFault?(pendingFault.side==='A'?aName:bName):"";
+  const undoLabel = pendingFault
+    ? `撤銷上一筆失誤（${esc(pendingFaultName)}）`
+    : (lastLog ? `撤銷上一筆得分（${lastLog.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[lastLog.type]||'得分'}）` : "撤銷上一筆得分");
+  const undoAvailable=!!pendingFault||!!lastLog;
 
   return `
   <div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
@@ -15671,7 +15680,7 @@ function renderCourtCard(stationNum){
         <div class="side-name">${esc(aName)}</div>
         <div class="side-score">${m.scoreA}</div>
         <div class="score-btns">
-          ${scoreBtn('A','spin')}${scoreBtn('A','knockout')}${scoreBtn('A','burst')}${scoreBtn('A','extreme')}
+          ${scoreBtn('A','spin')}${scoreBtn('A','knockout')}${scoreBtn('A','burst')}${scoreBtn('A','extreme')}${faultBtn('A')}
         </div>
       </div>
       ${refereeSwapControl(m)}
@@ -15679,7 +15688,7 @@ function renderCourtCard(stationNum){
         <div class="side-name">${esc(bName)}</div>
         <div class="side-score">${m.scoreB}</div>
         <div class="score-btns">
-          ${scoreBtn('B','spin')}${scoreBtn('B','knockout')}${scoreBtn('B','burst')}${scoreBtn('B','extreme')}
+          ${scoreBtn('B','spin')}${scoreBtn('B','knockout')}${scoreBtn('B','burst')}${scoreBtn('B','extreme')}${faultBtn('B')}
         </div>
       </div>
     </div>
@@ -15687,7 +15696,7 @@ function renderCourtCard(stationNum){
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
-      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${m.log.length===0||locked||stationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${!undoAvailable||locked||stationLocked?'disabled':''}>${undoLabel}</button>
       <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||stationLocked?'disabled':''}>本局重賽</button>
       <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
     </div>
@@ -26077,6 +26086,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!m||!m.completed){showToast("找不到可撤回的上一場",true);return;}
     openModal({type:"generic",title:"撤回上一場比賽",message:"這會撤回上一場的勝負與晉級，並清除該場全部比分／回合紀錄，讓這場重新比賽。\n\n若相關的後續比賽已經有實際得分，系統會自動阻止撤回。",danger:true,confirmLabel:"確認撤回並重打",onConfirm:()=>{reopenCompletedMatchForCorrection(id,"reset");}});
     return;
+  }
+  if(action==="fault"){
+    const side=target.getAttribute("data-side");
+    const m=getMatch(id);
+    if(m&&m.completed){showToast("此場已確認結果，請先使用「修正比分」安全撤回結果。",true);return;}
+    addFault(id,side);return;
   }
   if(action==="score"){
     const side = target.getAttribute("data-side"), type = target.getAttribute("data-type");
