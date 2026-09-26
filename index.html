@@ -17755,9 +17755,9 @@ function renderPartnerContractCard(user){
     <p class="hint">選擇方案後建立合約草稿；玩家於站內信閱讀並簽名，再由最高管理員確認。合作代碼由成立時自動產生。</p>
     ${user.partnerOrganizer?.status==='active'?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:''}
     <div class="grid grid-2">
-      <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.name)}｜${esc(plan.details||'未提供方案內容')}</option>`).join('')}</select></div>
+      <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.planCode)}｜${esc(plan.name)}${Number.isSafeInteger(plan.priceTwd)?'｜NT$ '+plan.priceTwd+'｜'+plan.includedEvents+' 場／每場上限 '+plan.maxParticipants+' 人':''}</option>`).join('')}</select></div>
       <div class="field"><label>合作方名稱</label><input class="partner-contract-name" data-uid="${esc(user.uid)}" maxlength="200" value="${esc(user.partnerOrganizer?.organizationName||'')}"></div>
-      <div class="field"><label>費用 NT$</label><input class="partner-contract-amount" data-uid="${esc(user.uid)}" type="number" min="0" step="1" placeholder="請填寫合約金額"></div>
+      <div class="field"><label>費用 NT$（內建方案依固定價格自動帶入）</label><input class="partner-contract-amount" data-uid="${esc(user.uid)}" type="number" min="0" step="1" placeholder="請填寫合約金額"></div>
       <div class="field"><label>生效日期</label><input class="partner-contract-start" data-uid="${esc(user.uid)}" type="date"></div>
       <div class="field"><label>到期日期</label><input class="partner-contract-end" data-uid="${esc(user.uid)}" type="date"></div>
       <div class="field" style="grid-column:1/-1"><label>完整合作條款</label><textarea class="partner-contract-terms" data-uid="${esc(user.uid)}" rows="8" maxlength="100000" placeholder="填寫積分賽使用範圍、場次、費用、終止與違約條款"></textarea></div>
@@ -25500,16 +25500,18 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const get=selector=>managedAccountControl(selector,uid);
     const planCode=get('.partner-contract-plan')?.value||'';
     const organizationName=(get('.partner-contract-name')?.value||'').trim();
-    const amountRaw=get('.partner-contract-amount')?.value||'';
+    const selectedPlan=(partnerPlansState.plans||[]).find(plan=>plan.planCode===planCode&&plan.active);
+    const amountRaw=Number.isSafeInteger(selectedPlan?.priceTwd)?String(selectedPlan.priceTwd):(get('.partner-contract-amount')?.value||'');
     const starts=get('.partner-contract-start')?.value||'';
     const expires=get('.partner-contract-end')?.value||'';
     const terms=(get('.partner-contract-terms')?.value||'').trim();
     const amountTwd=Number(amountRaw);
-    if(!planCode||!organizationName||amountRaw===''||!Number.isSafeInteger(amountTwd)||amountTwd<0||!starts||!expires||!terms){
+    if(!selectedPlan||!organizationName||amountRaw===''||!Number.isSafeInteger(amountTwd)||amountTwd<0||!starts||!expires||!terms){
       showToast('請選擇方案並填妥合作方、金額、日期及完整條款',true);return;
     }
+    const fixedSummary=Number.isSafeInteger(selectedPlan.priceTwd)?'\n方案 '+selectedPlan.planCode+'：'+selectedPlan.includedEvents+' 場；每場 '+selectedPlan.minParticipants+'–'+selectedPlan.maxParticipants+' 人；總價 NT$ '+selectedPlan.priceTwd+'。':'';
     const data={targetUid:uid,planCode,organizationName,amountTwd,
-      startsAt:starts+'T00:00:00+08:00',expiresAt:expires+'T23:59:59+08:00',terms};
+      startsAt:starts+'T00:00:00+08:00',expiresAt:expires+'T23:59:59+08:00',terms:terms+fixedSummary};
     if(Date.parse(data.expiresAt)<=Date.parse(data.startsAt)){showToast('到期日期必須晚於生效日期',true);return;}
     const key='bxh-partner-draft:'+currentAuthUid()+':'+uid;
     let pending=null;try{pending=JSON.parse(sessionStorage.getItem(key)||'null');}catch(e){}
