@@ -6,6 +6,14 @@ const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'..','court-call-ui.js'),'utf8');
 
 assert(source.includes('class="court-call-next-compact"'), 'compact next-match card missing');
+assert(source.includes("function courtCallNextState(m)"), 'next-match fallback state resolver missing');
+assert(source.includes("kind:'partial'"), 'partial / waiting-for-advancement state missing');
+assert(source.includes("kind:(next.a||next.b)?'partial':'waiting'"), 'future-match waiting state missing');
+assert(source.includes("return {kind:'done',next:null,label:'本台完成'}"), 'court-complete fallback missing');
+assert(source.includes("status='等待晉級'"), 'waiting-for-advancement status missing');
+assert(source.includes("status='等待安排'"), 'waiting-for-assignment status missing');
+assert(source.includes("data-next-kind="), 'next-match state marker missing');
+assert(source.includes("name:'待定'"), 'TBD player fallback missing');
 assert(source.includes('class="court-call-next-compact-badge">下一場'), 'compact next-match badge missing');
 assert(source.includes('court-call-next-compact-player'), 'compact next-match player row missing');
 assert(source.includes('data-bxh-next-prepare="1"'), 'compact prepare marker missing');
