@@ -10,6 +10,7 @@
 <html lang="zh-Hant">
 <head>
 <script src="partner-organizer-ui.js"></script>
+<script src="partner-signature-pad.js"></script>
 <script>
 (function enforceSecureConnection(){
   var isLocalHost=/^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/.test(window.location.hostname);
@@ -9354,7 +9355,7 @@ function partnerOrderFor(uid){
   if(partnerDraftOrders.has(uid))return partnerDraftOrders.get(uid);
   try{
     const value=JSON.parse(sessionStorage.getItem('bxh-partner-order:'+currentAuthUid()+':'+uid)||'null');
-    if(value&&/^BXH-CO-\d{8}-[A-F0-9]{12,}$/.test(value.orderCode)&&['draft','sent'].includes(value.status)){
+    if(value&&/^BXH-CO-\d{8}-[A-F0-9]{12,}$/.test(value.orderCode)&&['draft','sent','signed','active'].includes(value.status)){
       partnerDraftOrders.set(uid,value);return value;
     }
   }catch(error){}
@@ -17763,7 +17764,7 @@ function renderPartnerContractCard(user){
     </div>
     <button class="btn btn-primary btn-sm" data-action="partner-create-contract" data-uid="${esc(user.uid)}" ${activePlans.length?'':'disabled'}>建立合約草稿</button>
     ${activePlans.length?'':'<p class="hint">請先在上方建立合作方案。</p>'}
-    ${draft?`<p class="hint">本次訂單｜${esc(draft.orderCode)}｜${esc(draft.status)}</p>${draft.status==='draft'?`<button class="btn btn-ghost btn-sm" data-action="partner-send-contract" data-uid="${esc(user.uid)}">寄送合約至玩家站內信</button>`:''}`:''}
+    ${draft?`<p class="hint">本次訂單｜${esc(draft.orderCode)}｜${esc(draft.status)}</p>${draft.status==='draft'?`<button class="btn btn-ghost btn-sm" data-action="partner-send-contract" data-uid="${esc(user.uid)}">寄送合約至玩家站內信</button>`:''}<button class="btn btn-ghost btn-sm" data-action="partner-refresh-contract" data-uid="${esc(user.uid)}">更新狀態</button>${draft.status==='signed'?`<div class="field"><label>付款憑據編號</label><input class="partner-payment-reference" data-uid="${esc(user.uid)}" maxlength="120" placeholder="輸入可查核的付款紀錄編號"></div><button class="btn btn-primary btn-sm" data-action="partner-activate-contract" data-uid="${esc(user.uid)}">確認付款並成立</button>`:''}`:''}
   </div>`;
 }
 
@@ -18512,9 +18513,46 @@ function renderMailboxPage(){
   return `<section class="panel"><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
     <p class="hint">未讀 ${c.unreadCount} 封｜系統通知、活動及中獎訊息會集中在這裡。</p>
     ${c.error?`<div class="auth-error" role="alert">${esc(c.error)}</div>`:''}
-    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(selected.body||'')}</div>${Array.isArray(selected.attachments)&&selected.attachments.length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${selected.attachments.map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
+    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(selected.body||'')}</div>${Array.isArray(selected.attachments)&&selected.attachments.length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${selected.attachments.map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
     ${isSuperAdmin()?`<details class="panel" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">最高管理員｜發送測試信</summary><div class="grid grid-2 mailbox-compose-grid" style="margin-top:14px"><div class="field"><label>玩家 UID</label><input id="mailbox-recipient" maxlength="128" placeholder="貼上 Firebase UID"></div><div class="field"><label>信件標題</label><input id="mailbox-subject" maxlength="80" placeholder="例如：站內信測試"></div><div class="field" style="grid-column:1/-1"><label>信件內容</label><textarea id="mailbox-body" maxlength="2000" placeholder="輸入通知內容"></textarea></div></div><button class="btn btn-primary" data-action="mailbox-send-test" ${c.busy?'disabled':''}>發送測試信</button><p class="hint">本階段以 UID 測試寄送；活動中獎通知會在抽獎模組串接。</p>${c.lastSent?`<div class="panel" style="margin-top:14px"><strong>為剛寄出的信件新增附件</strong><p class="hint">收件者 ${esc(c.lastSent.targetUid)}｜信件 ${esc(c.lastSent.messageId)}｜PDF、PNG、JPG、TXT，單檔最多 2 MB</p><input id="mailbox-attachment-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"><button class="btn btn-ghost btn-sm" data-action="mailbox-upload-attachment" ${c.busy?'disabled':''}>上傳附件</button></div>`:''}</details>`:''}
   </section>`;
+}
+async function openMailboxPartnerContract(orderCode){
+  const actor=currentAuthUid(),context=mailboxContext();
+  let order;
+  try{order=await window.engagementService.getPartnerContract({orderCode});}
+  catch(error){context.error=mailboxError(error);render();return;}
+  if(actor!==currentAuthUid()||context!==mailboxContext())return;
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2147483640;background:rgba(0,0,0,.82);display:flex;justify-content:center;align-items:center;padding:12px';
+  overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-label="合作合約" style="background:#1c2029;color:#fff;width:min(680px,100%);max-height:94vh;overflow:auto;padding:18px;border-radius:12px">
+    <div style="display:flex;justify-content:space-between;gap:12px"><strong>合作主辦合約｜${esc(order.orderCode)}</strong><button type="button" class="btn btn-ghost btn-sm" data-close>關閉</button></div>
+    <p>合作方：${esc(order.organizationName)}｜方案：${esc(order.planCode)}｜金額 NT$ ${esc(order.amountTwd)}</p>
+    <p>期間：${esc(order.startsAt)} 至 ${esc(order.expiresAt)}</p>
+    <p class="hint">條款版本 ${esc(order.termsVersion)}｜狀態 ${esc(order.status)}</p>
+    <div style="white-space:pre-wrap;max-height:35vh;overflow:auto;padding:12px;border:1px solid #666;border-radius:8px">${esc(order.terms)}</div>
+    ${order.status==='sent'?`<p>閱讀完整條款後，在下方以手指簽名。</p><div data-signature></div>
+      <label style="display:block;margin:12px 0"><input type="checkbox" data-accept> 我已閱讀並同意上述版本的完整合約條款</label>
+      <p data-error role="alert" style="color:#ff9c9c"></p><button type="button" class="btn btn-primary" data-submit>確認簽署並送出</button>`:'<p class="hint">這份合約目前不能簽署。可向管理員確認目前流程狀態。</p>'}
+  </section>`;
+  document.body.appendChild(overlay);
+  let pad=null;
+  try{if(order.status==='sent')pad=window.BXHPartnerSignaturePad.mount(overlay.querySelector('[data-signature]'));}
+  catch(error){overlay.remove();context.error='手機簽名板無法載入，請重新整理';render();return;}
+  const close=()=>{pad?.destroy();overlay.remove();};
+  overlay.querySelector('[data-close]').addEventListener('click',close);
+  overlay.querySelector('[data-submit]')?.addEventListener('click',async event=>{
+    const errorNode=overlay.querySelector('[data-error]');
+    if(!overlay.querySelector('[data-accept]').checked){errorNode.textContent='請先閱讀並勾選同意條款';return;}
+    if(!pad?.hasInk()){errorNode.textContent='請先在簽名板簽名';return;}
+    const button=event.currentTarget;button.disabled=true;errorNode.textContent='';
+    try{
+      await window.engagementService.signPartnerContract({orderCode:order.orderCode,termsHash:order.termsHash,
+        termsVersion:order.termsVersion,accepted:true,signatureDataUrl:pad.exportPng()});
+      if(actor!==currentAuthUid())return;
+      close();showToast('合約已簽署，等待最高管理員確認');context.messages=null;loadMailbox(true);
+    }catch(error){errorNode.textContent='簽署失敗：'+String(error.message||error);button.disabled=false;}
+  });
 }
 async function handleMailbox(action,target){
   const c=mailboxContext();if(!firebaseUser?.uid||c.busy)return;
@@ -18525,6 +18563,7 @@ async function handleMailbox(action,target){
     c.selectedId=target.getAttribute('data-message-id')||'';const message=(c.messages||[]).find(m=>m.id===c.selectedId);
     render();if(message&&!message.readAt)handleMailbox('mailbox-toggle-read',target);return;
   }
+  if(action==='mailbox-open-contract'){openMailboxPartnerContract(target.getAttribute('data-order-code'));return;}
   if(action==='mailbox-download-attachment'){
     const messageId=target.getAttribute('data-message-id'),attachmentId=target.getAttribute('data-attachment-id');
     c.busy=true;c.error='';render();
@@ -25482,6 +25521,30 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }catch(error){showToast('建立草稿失敗：'+String(error.message||error),true);}
     finally{target.disabled=false;render();}})();return;
   }
+  if(action==='partner-refresh-contract'||action==='partner-activate-contract'){
+    if(!isSuperAdmin())return;
+    const uid=target.getAttribute('data-uid'),draft=partnerOrderFor(uid);
+    if(!draft)return;target.disabled=true;
+    (async()=>{try{
+      let result;
+      if(action==='partner-activate-contract'){
+        if(draft.status!=='signed')throw Error('尚未完成玩家簽署');
+        const paymentReference=(managedAccountControl('.partner-payment-reference',uid)?.value||'').trim();
+        if(!paymentReference)throw Error('請輸入付款憑據編號');
+        if(!confirm('已確認付款與簽名證據，確定成立這筆合作訂單？'))return;
+        result=await window.engagementService.activatePartnerContract({orderCode:draft.orderCode,paymentConfirmed:true,paymentReference});
+        showToast('合作訂單已成立：'+result.organizationCode);
+      }else{
+        result=await window.engagementService.getPartnerContract({orderCode:draft.orderCode});
+        if(result.targetUid!==uid)throw Error('訂單收件者不符');
+        showToast('合約狀態已更新：'+result.status);
+      }
+      const next={orderCode:draft.orderCode,status:result.status};
+      partnerDraftOrders.set(uid,next);
+      sessionStorage.setItem('bxh-partner-order:'+currentAuthUid()+':'+uid,JSON.stringify(next));
+    }catch(error){showToast('合約處理失敗：'+String(error.message||error),true);}
+    finally{target.disabled=false;render();}})();return;
+  }
   if(action==='partner-send-contract'){
     if(!isSuperAdmin())return;
     const uid=target.getAttribute('data-uid'),draft=partnerOrderFor(uid);
@@ -28626,6 +28689,9 @@ init().then(()=>{
     async savePartnerPlan(payload){return callEngagementFunction("savePartnerPlan",payload,30000);},
     async createPartnerContractDraft(payload){return callEngagementFunction("createPartnerContractDraft",payload,30000);},
     async sendPartnerContract(payload){return callEngagementFunction("sendPartnerContract",payload,30000);},
+    async getPartnerContract(payload){return callEngagementFunction("getPartnerContract",payload,30000);},
+    async signPartnerContract(payload){return callEngagementFunction("signPartnerContract",payload,60000);},
+    async activatePartnerContract(payload){return callEngagementFunction("activatePartnerContract",payload,60000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
