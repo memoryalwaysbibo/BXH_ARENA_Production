@@ -14,7 +14,7 @@ def replace_once(before, after):
 
 replace_once(
     "let phase='idle',round=1,index=0,timer=null,drag=null,progress=0;const order=[...cards.keys()].sort(()=>Math.random()-.5);",
-    "let phase='waiting',round=0,index=0,timer=null,drag=null,progress=0,assignedCard=null,session=null;"
+    "let phase='waiting',round=0,index=0,timer=null,drag=null,progress=0,assignedCard=null,session=null,acknowledgedRound=0;"
     "const cardIds=['double_extreme','double_knockout','double_burst','double_spin','boost_extreme','boost_knockout','boost_burst','weaken_extreme','weaken_knockout','weaken_burst','weaken_spin','seal'];"
 )
 replace_once(
@@ -31,7 +31,7 @@ replace_once(
 )
 replace_once(
     "action.addEventListener('click',()=>{if(phase==='idle')finishDraw();else if(phase==='revealed'){phase='waiting';action.textContent='模擬下局抽卡';setCopy('等待裁判開賽','雙方卡片資訊將同步至裁判台。')}else if(phase==='waiting')next()});skip.addEventListener('click',reveal);",
-    """action.addEventListener('click',()=>{if(phase==='idle')finishDraw();else if(phase==='revealed'){phase='waiting';action.disabled=true;setCopy('等待裁判結果','本局卡牌已確認，等待裁判送出比賽結果。')}});
+    """action.addEventListener('click',()=>{if(phase==='idle')finishDraw();else if(phase==='revealed'){acknowledgedRound=round;phase='waiting';action.disabled=true;setCopy('等待裁判結果','本局卡牌已確認，等待裁判送出比賽結果。')}});
 skip.addEventListener('click',()=>{if(assignedCard)reveal()});
 function showDrawError(message){clearTimer();stopClips();phase='waiting';action.disabled=true;skip.hidden=true;setCopy('抽卡暫停',message)}
 function receiveState(data){
@@ -46,6 +46,7 @@ function receiveState(data){
  if(ownCard){
   if(!cardIds.includes(ownCard)){showDrawError('卡牌資料異常。');return;}
   assignedCard=ownCard;
+  if(acknowledgedRound===round)return;
   if(phase==='drawing'||phase==='idle')reveal();
   else if(phase!=='revealed'){phase='drawing';reveal();}
   return;
