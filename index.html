@@ -124,21 +124,8 @@
 <meta name="twitter:image" content="https://memoryalwaysbibo.github.io/index.html/bxh-arena-og-image.png">
 <script>
 (function(){
-  var key="bxh.interface.theme.v1";
-  var accountPrefix="bxh.interface.theme.account.v1.";
-  var entranceUidKey="bxh.interface.theme.entrance.uid.v1";
-  // Restricted skins normally wait for role verification. Once an eligible
-  // account has explicitly chosen Directive on this device, its signed-out
-  // entrance may be restored immediately as well.
-  var allowed={gold:true,blue:true,red:true,green:true};
-  var theme="gold";
-  try{
-    var saved=localStorage.getItem(key);
-    var entranceUid=localStorage.getItem(entranceUidKey);
-    if(allowed[saved])theme=saved;
-    if(entranceUid&&localStorage.getItem(accountPrefix+entranceUid)==="directive")theme="directive";
-  }catch(e){}
-  document.documentElement.setAttribute("data-bxh-theme",theme);
+  // Before account verification, always show the original entrance.
+  document.documentElement.setAttribute("data-bxh-theme","gold");
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5551,7 +5538,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   .people-more-menu>summary{width:30px;height:29px;font-size:18px;}
 }
 </style>
-<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.14">
+<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.15">
 <link rel="stylesheet" href="referee-score-v2.css?v=14.2.38-score-fault">
 </head>
 <body>
@@ -22205,14 +22192,13 @@ function restoreAccountInterfaceTheme(uid,profile){
   syncInterfaceThemeVisibility();
 }
 function canUseDirectiveTheme(){
-  if(userProfile){
+  if(firebaseUser && userProfile){
     return userProfile.active===true && ["super_admin","admin","staff"].includes(userProfile.role);
   }
-  if(firebaseUser || !entranceThemeAccountUid)return false;
-  try{return localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+entranceThemeAccountUid)==="directive";}catch(e){return false;}
+  return false;
 }
 function syncInterfaceThemeVisibility(){
-  const visibleTheme=interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme;
+  const visibleTheme=!firebaseUser?"gold":(interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme);
   if(document.documentElement.getAttribute("data-bxh-theme")!==visibleTheme){
     document.documentElement.setAttribute("data-bxh-theme",visibleTheme);
   }
