@@ -11699,7 +11699,12 @@ async function saveState(){
         return localOk ? true : false;
       }
       const lastCode = (typeof window!=="undefined" && window.__BXH_LAST_CLOUD_ERROR_CODE) || "";
-      if(lastCode==="permission-denied"){
+      if(lastCode==="registration-roster-stale"){
+        cloudAccessLimited = true;
+        cloudAccessMessage = "線上名單已更新；請重新整理頁面，再進行操作。";
+        cloudStatus = "connected";
+        showToast(cloudAccessMessage, true);
+      }else if(lastCode==="permission-denied"){
         cloudAccessLimited = true;
         cloudAccessMessage = "此帳號沒有執行這項雲端寫入的權限。";
         cloudStatus = "connected";
@@ -30166,6 +30171,8 @@ if(testerSession){
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
+              // Server roster revisions make whole-state writes from stale tabs fail atomically.
+              if(Number(remoteState.registrationRosterRevision||0)!==Number(data.registrationRosterRevision||0)) throw new Error("registration-roster-stale");
               // Completed results are irreversible through ordinary whole-state sync.
               // A stale device must never roll a confirmed match (or completed archive)
               // back to "in progress"; corrections must use the explicit correction flow.
@@ -30216,7 +30223,7 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||"unknown";
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.message)==="registration-roster-stale" ? "registration-roster-stale" : (e&&e.code)||"unknown";
         console.warn("雲端同步寫入失敗", e);
         return false;
       }
