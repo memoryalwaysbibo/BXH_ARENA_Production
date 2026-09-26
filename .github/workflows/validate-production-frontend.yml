@@ -39,6 +39,9 @@ jobs:
       - name: Verify compact next-match prepare UI
         run: node tests/court-call-next-prepare-ui.test.cjs
 
+      - name: Verify tournament raffle winner count stepper
+        run: node tests/tournament-operations-count-stepper.test.cjs
+
       - name: Verify ranked registration T-5 preopen UX
         run: |
           node --check ranked-registration-preopen-ui.js
