@@ -2951,6 +2951,8 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   .account-management-panel{padding:14px;}
 }
 
+.account-partner-grant{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.035)}
+.account-partner-grant .field{min-width:0}
 /* ==== v13.28.9 compact account management ==== */
 .account-management-main{width:min(1180px,100%);margin:0 auto;padding:22px 16px 80px;box-sizing:border-box;}
 .account-management-panel{min-width:0;}
@@ -17210,7 +17212,7 @@ function accountActivitySummary(users, now=Date.now()){
 
 const ACCOUNT_ROLE_FILTERS = [
   ["all","全部"],["management","管理層"],["super_admin","最高管理員"],["admin","管理員"],
-  ["staff","工作人員"],["tester","封測管理員"],["player","玩家"],["viewer","觀眾"]
+  ["staff","工作人員"],["tester","封測管理員"],["partner_organizer","合作主辦"],["player","玩家"],["viewer","觀眾"]
 ];
 function accountTimestampValue(value){
   if(value&&typeof value.toMillis==="function") return Number(value.toMillis())||0;
@@ -17234,6 +17236,7 @@ function accountGameId(user){
 function accountRoleMatches(user,filter){
   if(filter==="all") return true;
   if(filter==="management") return user.role==="super_admin"||user.role==="admin";
+  if(filter==="partner_organizer") return user.partnerOrganizer?.status==="active" && (user.partnerOrganizer.expiresAt==null||Number(user.partnerOrganizer.expiresAt)>Date.now());
   if(filter==="tester") return user.role==="tester"||user.isTestAccount===true;
   if(filter==="player") return user.role==="player"&&user.isTestAccount!==true;
   return user.role===filter;
@@ -17732,7 +17735,7 @@ function renderAccountManagementScreen(){
     <main class="account-management-main">
       ${page==="accounts"?`<div class="panel account-management-panel">
         <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
-        <p class="hint">摘要優先顯示姓名、帳號分類與活躍度；點擊個別帳號即可展開角色、狀態及完整資料。</p>
+        <p class="hint">選擇玩家帳號並展開，即可在「合作主辦權限」開通或撤銷；帳號分類維持玩家。</p>
         ${authFormError ? `<div class="auth-error">${esc(authFormError)}</div>` : ""}
         <div class="account-overview-grid">
           <div class="stat-box"><div class="label">全部帳號</div><div class="value">${activity.total}</div></div>
@@ -17759,7 +17762,7 @@ function renderAccountManagementScreen(){
             <summary>
               <label><input class="account-batch-checkbox" type="checkbox" aria-label="選取此帳號" data-uid="${esc(user.uid)}" ${accountBatchContext().selected.has(user.uid)?'checked':''} ${accountBatchContext().busy?'disabled':''}></label><div class="account-user-identity"><div class="account-user-name">${esc(accountPrimaryName(user))}</div><div class="account-user-gameid">${gameId?`遊戲 ID｜${esc(gameId)}`:'尚未設定遊戲 ID'}</div></div>
               <div class="account-user-email">${esc(user.email||"未提供 Email")}</div>
-              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span><span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
+              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${user.partnerOrganizer?.status==="active"&&(user.partnerOrganizer.expiresAt==null||Number(user.partnerOrganizer.expiresAt)>Date.now())?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
             </summary>
             <div class="account-user-detail">
               <div class="account-detail-grid">
@@ -17772,19 +17775,20 @@ function renderAccountManagementScreen(){
               </div>
               <div class="account-user-controls">
                 <div class="field"><label>帳號分類</label><select class="mgmt-role-select" data-uid="${esc(user.uid)}">${["super_admin","admin","staff","tester","player","viewer"].map(role=>`<option value="${role}" ${draft.role===role?'selected':''}>${roleDisplayLabel(role)}</option>`).join("")}</select></div>
+                ${user.role!=="player"?'<div class="field"><label>合作主辦權限</label><div class="hint">請先將帳號分類設為玩家並儲存，再開通合作主辦。</div></div>':""}
                 <label class="account-active-control"><input type="checkbox" class="mgmt-test-box" data-uid="${esc(user.uid)}" ${draft.isTestAccount?'checked':''} style="width:20px;height:20px;">測試身分</label>
                 <label class="account-active-control"><input type="checkbox" class="mgmt-active-box" data-uid="${esc(user.uid)}" ${draft.active?'checked':''} style="width:20px;height:20px;">帳號啟用</label>
                 <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
-                ${user.role==="player"?`<details class="account-partner-grant"><summary>合作主辦授權｜${user.partnerOrganizer?.status==="active"?"已授權":"未授權"}</summary>
+                ${user.role==="player"?`<div class="account-partner-grant"><div class="field"><label>合作主辦權限</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>開通合作主辦</option></select></div>
                   <p class="hint">由最高管理員確認合作後開通；方案代碼只供記錄，賽事與積分權限另行核准。</p>
                   <div class="grid grid-2">
-                    <div class="field"><label>授權狀態</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>開通合作主辦</option></select></div>
+                    
                     <div class="field"><label>主辦名稱</label><input class="partner-name" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.organizationName||"")}" maxlength="80"></div>
                     <div class="field"><label>方案代碼</label><input class="partner-plan" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.plan||"identity_only")}" maxlength="40"></div>
                     <div class="field"><label>有效期限（選填）</label><input type="date" class="partner-expiry" data-uid="${esc(user.uid)}" value="${user.partnerOrganizer?.expiresAt?new Date(user.partnerOrganizer.expiresAt+8*3600000).toISOString().slice(0,10):""}"></div>
                   </div>
                   <button class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}">儲存合作主辦授權</button>
-                </details>`:""}
+                </div>`:""}
               </div>
             </div>
           </details>`;}).join("")}
