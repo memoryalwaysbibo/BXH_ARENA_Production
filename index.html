@@ -124,6 +124,7 @@
 <script>
 (function(){
   var key="bxh.interface.theme.v1";
+  // The staff-only skin is restored after the account role has been verified.
   var allowed={gold:true,blue:true,red:true,green:true};
   var theme="gold";
   try{var saved=localStorage.getItem(key);if(allowed[saved])theme=saved;}catch(e){}
@@ -5535,7 +5536,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   .people-more-menu>summary{width:30px;height:29px;font-size:18px;}
 }
 </style>
-<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
+<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.5">
 <link rel="stylesheet" href="referee-score-v2.css?v=14.2.38-score-fault">
 </head>
 <body>
@@ -22014,6 +22015,7 @@ function finishRenderViewport(snapshot){
   setTimeout(restore, 180);
 }
 function render(){
+  syncInterfaceThemeVisibility();
   if(aiCreatePosterOwner && (aiCreatePosterOwner.room!==state || aiCreatePosterOwner.uid!==(firebaseUser&&firebaseUser.uid) || !aiCreateBetaActorAllowed())){aiCreateReleasePoster();aiCreateAssistantOpen=false;}
   if(releaseGateIsActive() && appPhase==='landing' && !raffleLinkConsumed && raffleIntent()){raffleContext().id=null;}
   if(!releaseGateIsActive() && appPhase==='landing'&&!raffleLinkConsumed&&raffleIntent()){raffleContext().id=raffleIntent();appPhase='raffle-public';}
@@ -22105,20 +22107,37 @@ const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"gold",label:"暗耀金",english:"Dark Gold",color:"#b8922e"},
   {id:"blue",label:"霓虹藍",english:"Neon Blue",color:"#35c9d0"},
   {id:"red",label:"烈焰紅",english:"Crimson Red",color:"#d95778"},
-  {id:"green",label:"螢光綠",english:"Toxic Green",color:"#43cf7c"}
+  {id:"green",label:"螢光綠",english:"Toxic Green",color:"#43cf7c"},
+  {id:"directive",label:"極限指令",english:"BXH Directive",color:"#a05aff"}
 ];
 function normalizeInterfaceTheme(value){
   return BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===value)?value:"gold";
 }
-let interfaceTheme=normalizeInterfaceTheme(document.documentElement.getAttribute("data-bxh-theme"));
+let interfaceTheme=(()=>{
+  try{return normalizeInterfaceTheme(localStorage.getItem(BXH_INTERFACE_THEME_KEY));}catch(e){return "gold";}
+})();
 let accountThemeOpen=false;
+function canUseDirectiveTheme(){
+  return currentRole==="admin" && userProfile?.active===true &&
+    ["super_admin","admin","staff"].includes(userProfile.role);
+}
+function syncInterfaceThemeVisibility(){
+  const visibleTheme=interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme;
+  if(document.documentElement.getAttribute("data-bxh-theme")!==visibleTheme){
+    document.documentElement.setAttribute("data-bxh-theme",visibleTheme);
+  }
+}
 function applyInterfaceTheme(value,persist=true){
-  interfaceTheme=normalizeInterfaceTheme(value);
-  document.documentElement.setAttribute("data-bxh-theme",interfaceTheme);
+  const nextTheme=normalizeInterfaceTheme(value);
+  if(nextTheme==="directive" && !canUseDirectiveTheme())return;
+  interfaceTheme=nextTheme;
+  syncInterfaceThemeVisibility();
   if(persist){try{localStorage.setItem(BXH_INTERFACE_THEME_KEY,interfaceTheme);}catch(e){}}
 }
 function themePickerHtml(){
-  const activeTheme=BXH_INTERFACE_THEME_OPTIONS.find(item=>item.id===interfaceTheme)||BXH_INTERFACE_THEME_OPTIONS[0];
+  const visibleThemes=BXH_INTERFACE_THEME_OPTIONS.filter(item=>item.id!=="directive" || canUseDirectiveTheme());
+  const visibleTheme=interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme;
+  const activeTheme=visibleThemes.find(item=>item.id===visibleTheme)||visibleThemes[0];
   return `<div class="account-theme-entry ${accountThemeOpen?"open":""}">
     <button type="button" class="account-theme-trigger" data-action="toggle-account-theme" aria-expanded="${accountThemeOpen?"true":"false"}">
       <span class="account-theme-trigger-copy">
@@ -22134,7 +22153,7 @@ function themePickerHtml(){
     ${accountThemeOpen?`<div class="account-theme-panel">
       <div class="account-theme-panel-head"><strong>主題風格</strong><span>選擇你偏好的系統配色</span></div>
       <div class="account-theme-grid">
-        ${BXH_INTERFACE_THEME_OPTIONS.map(item=>`<button type="button" class="account-theme-card ${interfaceTheme===item.id?"is-active":""}" data-action="set-interface-theme" data-theme="${item.id}" style="--theme-dot:${item.color}">
+        ${visibleThemes.map(item=>`<button type="button" class="account-theme-card ${visibleTheme===item.id?"is-active":""}" data-action="set-interface-theme" data-theme="${item.id}" style="--theme-dot:${item.color}">
           <span class="account-theme-preview" aria-hidden="true"></span>
           <span class="account-theme-card-copy"><strong>${esc(item.label)}</strong><small>${esc(item.english)}</small></span>
           <span class="account-theme-check" aria-hidden="true">✓</span>
