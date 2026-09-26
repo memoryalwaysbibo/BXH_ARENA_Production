@@ -5551,7 +5551,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   .people-more-menu>summary{width:30px;height:29px;font-size:18px;}
 }
 </style>
-<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.13">
+<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.14">
 <link rel="stylesheet" href="referee-score-v2.css?v=14.2.38-score-fault">
 </head>
 <body>
@@ -17128,6 +17128,7 @@ function renderLandingScreen(){
       <div class="auth-tagline">選擇身分，進入 <span class="landing-tagline-brand">BXH ARENA</span></div>
       <div class="role-cards landing-role-cards">
         <button class="role-card role-card-admin" data-action="select-role-admin">
+          <img class="directive-portrait" src="assets/directive-entrance-admin.png" alt="" aria-hidden="true" loading="eager">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_ADMIN}</span>
             <span class="role-card-cn">管理員</span>
@@ -17137,6 +17138,7 @@ function renderLandingScreen(){
           </span>
         </button>
         <button class="role-card role-card-player" data-action="select-role-player">
+          <img class="directive-portrait" src="assets/directive-entrance-player.png" alt="" aria-hidden="true" loading="eager">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_PLAYER}</span>
             <span class="role-card-cn">玩家</span>
@@ -17147,6 +17149,7 @@ function renderLandingScreen(){
           </span>
         </button>
         <button class="role-card role-card-guest" data-action="select-role-guest">
+          <img class="directive-portrait" src="assets/directive-entrance-guest.png" alt="" aria-hidden="true" loading="eager">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_GUEST}</span>
             <span class="role-card-cn">遊客</span>
