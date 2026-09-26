@@ -5571,6 +5571,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="court-call-ui.js?v=14.2.34-next-fallback"></script>
 <script src="referee-fault-core.js?v=14.2.38-fault-v1"></script>
 <script src="enchantment-score-core.js?v=20260927-1"></script>
+<script src="enchantment-ui.js?v=20260927-1"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -15785,6 +15786,12 @@ function renderCourtCard(stationNum){
 
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
 
+  if(state.meta?.playMode==="enchantment"){
+    return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
+      ${refereeWorkstationHeader(m,stationNum)}${renderCourtCallReferee(m)}
+      ${window.BXHEnchantmentUI?.referee(m,state.cloudCode,!canOperateStation(stationNum))||'<div class="banner warn">附魔裁判台載入中，暫不可計分。</div>'}
+    </div>`;
+  }
   if(m.scoringMode==="quick"){
     return renderQuickDecisionPanel(m, court, stationNum);
   }
@@ -20088,6 +20095,7 @@ function renderPlayerRegisteredTab(){
       </div>
       ${r.status==='confirmed'&&info.checkInAt?`<p class="hint"><b>現場報到尚待完成：</b>請於 ${esc(info.checkInAt)} 向工作人員繳費並完成報到。</p>`:''}
       ${r.status==='confirmed' && schedulePhase(info)==='live' && smartCallModel(r,info).kind!=='done' ? smartCallCardHtml(r,info) : (schedulePhase(info)==='live'&&smartCallModel(r,info).kind==='done'?'<p class="hint">本次參賽已結束｜賽事進行中，名次待結算</p>':'')}
+      ${window.BXHEnchantmentUI?.player(r,info)||''}
       <div class="fe-card-action my-schedule-actions">
         <button class="btn btn-ghost btn-sm" data-action="view-public-tournament" data-code="${esc(r.tournamentCode)}">查看詳情</button>
         ${bracketReady
