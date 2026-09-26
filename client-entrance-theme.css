@@ -3558,8 +3558,25 @@ button.btn-primary,
     linear-gradient(135deg,rgba(255,129,46,.49),rgba(160,90,255,.40) 38%,rgba(255,255,255,.055) 65%,rgba(222,64,79,.29)) border-box!important;
 }
 :root[data-bxh-theme="directive"] header.topbar::after{
-  background:linear-gradient(90deg,#a05aff 0 48%,#ff812e 48% 84%,#de404f 84%)!important;
+  opacity:.95!important;
+  background:
+    linear-gradient(90deg,transparent,rgba(255,245,220,.65) 35%,#fff 50%,rgba(255,129,46,.78) 65%,transparent) -35% 0/28% 100% no-repeat,
+    linear-gradient(90deg,#a05aff 0 48%,#ff812e 48% 84%,#de404f 84%) 0 0/100% 100% no-repeat!important;
   box-shadow:0 0 12px rgba(255,129,46,.25)!important;
+  animation:bxh-directive-rail-sweep 5s ease-in-out infinite;
+}
+@keyframes bxh-directive-rail-sweep{
+  0%,12%{background-position:-35% 0,0 0}
+  58%,100%{background-position:135% 0,0 0}
+}
+:root[data-bxh-theme="directive"] .lobby-page-head .settings-page-title,
+:root[data-bxh-theme="directive"] .lobby-section .panel-title,
+:root[data-bxh-theme="directive"] .account-theme-trigger-title{
+  color:#ff6a75!important;
+  text-shadow:0 0 12px rgba(222,64,79,.22);
+}
+@media(prefers-reduced-motion:reduce){
+  :root[data-bxh-theme="directive"] header.topbar::after{animation:none!important}
 }
 :root[data-bxh-theme="directive"] .lobby-compact-card,
 :root[data-bxh-theme="directive"] .account-theme-card{
