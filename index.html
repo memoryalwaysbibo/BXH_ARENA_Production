@@ -22118,7 +22118,7 @@ let interfaceTheme=(()=>{
 })();
 let accountThemeOpen=false;
 function canUseDirectiveTheme(){
-  return currentRole==="admin" && userProfile?.active===true &&
+  return userProfile?.active===true &&
     ["super_admin","admin","staff"].includes(userProfile.role);
 }
 function syncInterfaceThemeVisibility(){

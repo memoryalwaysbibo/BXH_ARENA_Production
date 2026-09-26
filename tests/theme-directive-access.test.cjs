@@ -40,11 +40,17 @@ assert.equal(player.attributes['data-bxh-theme'], 'gold');
 const staff = createContext('staff', 'admin');
 staff.context.currentRole = 'player';
 staff.context.syncInterfaceThemeVisibility();
-assert.equal(staff.attributes['data-bxh-theme'], 'gold');
-assert.doesNotMatch(staff.context.themePickerHtml(), /極限指令/);
+assert.equal(staff.attributes['data-bxh-theme'], 'directive');
+assert.match(staff.context.themePickerHtml(), /極限指令/);
 assert.equal(staff.stored['bxh.interface.theme.v1'], 'directive');
 staff.context.currentRole = 'admin';
 staff.context.syncInterfaceThemeVisibility();
 assert.equal(staff.attributes['data-bxh-theme'], 'directive');
+
+for (const role of ['super_admin', 'admin']) {
+  const ownPlayer = createContext(role, 'player');
+  assert.equal(ownPlayer.attributes['data-bxh-theme'], 'directive');
+  assert.match(ownPlayer.context.themePickerHtml(), /極限指令/);
+}
 
 console.log('PASS directive theme roles and mode switching');
