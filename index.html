@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.04">
+<meta name="bxh-build" content="20260926.05">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.04";
+  var CURRENT_BUILD="20260926.05";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5544,7 +5544,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 
 <script src="inventory-ui.js?v=13.31.6"></script>
 <script src="inventory-catalog-ui.js?v=3"></script>
-<script src="court-call-ui.js?v=14.2.33-nextbar-v2"></script>
+<script src="court-call-ui.js?v=14.2.34-next-fallback"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -5973,9 +5973,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.33";
+const APP_VERSION = "v14.2.34";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.34",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台下一場 fallback 補完",updateLevel:"patch",added:[],changed:["上方精簡下一場卡補齊雙方已確定、等待晉級、等待安排、本台完成四種狀態","下一場只有一位選手確定時顯示已知選手 VS 待定，通知按鈕維持停用"],fixed:["修正 active scoring 移除底部重複卡後，下一場尚未完全產生時整段資訊消失"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee next-match fallback fix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台下一場資訊不再因等待晉級而消失；未確定時會顯示待定狀態。"},
   {version:"v14.2.33",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台下一場精簡整合",updateLevel:"patch",added:[],changed:["下一場改為裁判叫號區內的精簡雙列資訊，場次、人名、通知狀態與通知準備集中在同一視線區","移除正常計分與簡易判定底部重複的下一場卡片","更新 court-call-ui 資源版本，避免 iPhone／PWA 沿用舊快取"],fixed:["修正新版裁判叫號 UI 已部署但行動裝置仍可能載入舊 court-call-ui.js 的快取問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee compact next-match + cache bust",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台下一場資訊集中到上方叫號區，不再上下重複，並強制更新行動端 JS 資源。"},
   {"version":"v14.2.32","date":"2026/09/26","timezone":"Asia/Taipei","title":"AI 工作人員第二層權限修復","updateLevel":"patch","added":[],"changed":["AI 協助建立相關操作在全域權限分派器中改依 AI 專屬角色 Gate 判斷"],"fixed":["修正工作人員雖看得到 AI 協助建立按鈕，點擊後仍被 ADMIN_TIER_ONLY_ACTIONS 擋下並顯示無權限"],"environment":"Production","firebaseImpact":"無","securityRulesImpact":"無","permissionImpact":"僅 AI 協助建立 action 對有效 staff 放行；其他 admin-tier 操作維持原權限","publicSummary":"工作人員現在可真正開啟並操作 AI 協助建立，不再被第二層前端權限阻擋。"},
   {"version":"v14.2.31","date":"2026/09/26","timezone":"Asia/Taipei","title":"AI 協助建立開放管理員與工作人員","updateLevel":"patch","added":["有效的管理員與工作人員可使用 AI 文案與海報協助建立"],"changed":["移除 Restricted Beta 的 admin 白名單限制；staff 正式納入 AI 開房權限","AI 仍只產生草稿，必須由房主審核後自行儲存／發布"],"fixed":["修正後端已開放 admin／staff、但正式前端仍以舊 Beta Gate 阻擋的權限不一致"],"environment":"Production","firebaseImpact":"後端 Functions PR #38 已合併；前端權限與後端對齊","securityRulesImpact":"無","permissionImpact":"有效 super_admin、admin、staff 可用；player／guest／test／frozen／disabled／deleted 不可用","publicSummary":"管理員與工作人員現在可使用 AI 協助建立賽事。"},
