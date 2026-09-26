@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.10">
+<meta name="bxh-build" content="20260926.11">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.10";
+  var CURRENT_BUILD="20260926.11";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -8778,6 +8778,20 @@ async function ensureCloudRoomForTournament(){
   cloudUnsub = window.cloudSync.subscribe(state.cloudCode, applyRemoteState);
   cloudStatus = "connected";
   cloudLastSyncAt = Date.now();
+
+  // Privacy fail-closed repair for rooms hidden before the visibility hotfix:
+  // local/private state may already say "private" while the old public mirror
+  // still says "public". Repair only the private direction automatically.
+  if(state.meta&&state.meta.publishedAt&&state.meta.registrationVisibility==="private"&&window.cloudSync.syncTournamentVisibility){
+    const visibilityRepair=await window.cloudSync.syncTournamentVisibility(state.cloudCode,"private");
+    if(visibilityRepair&&visibilityRepair.ok){
+      publicTournamentsCache=null;
+      publicTournamentsLastSignature="";
+      publicTournamentsError=null;
+    }else{
+      console.warn("[visibility repair] private mirror repair failed",state.cloudCode,visibilityRepair&&visibilityRepair.reason);
+    }
+  }
   render();
 }
 
@@ -8864,6 +8878,16 @@ async function commitJoinedTournamentData(code, data, usePublic){
     : window.cloudSync.subscribe(code, applyRemoteState);
   cloudStatus = "connected";
   cloudLastSyncAt = Date.now();
+  if(!usePublic && state.meta&&state.meta.publishedAt&&state.meta.registrationVisibility==="private"&&window.cloudSync.syncTournamentVisibility){
+    const visibilityRepair=await window.cloudSync.syncTournamentVisibility(code,"private");
+    if(visibilityRepair&&visibilityRepair.ok){
+      publicTournamentsCache=null;
+      publicTournamentsLastSignature="";
+      publicTournamentsError=null;
+    }else{
+      console.warn("[visibility repair] joined private mirror repair failed",code,visibilityRepair&&visibilityRepair.reason);
+    }
+  }
   if(usePublic){
     const tName = (state.meta && state.meta.name) || "未命名賽事";
     recordRecentPublicTournament(code, tName);
@@ -9295,6 +9319,7 @@ let accountMgmtQuery = "";
    clicked and validation passes. */
 let registrationFormDraft = null;
 let registrationFormDraftDirty = false;
+let registrationVisibilitySaving = false;
 
 /* v13.20.0 — unified tournament settings draft.
    All visible fields in the main "賽事設定" workflow are backed by this
@@ -26324,9 +26349,48 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="set-registration-draft-visibility"){
     syncSettingsDraftFromDom();
     ensureRegistrationFormDraft();
-    registrationFormDraft.registrationVisibility = target.getAttribute("data-value");
-    registrationFormDraftDirty = true;
+    if(registrationVisibilitySaving) return;
+    const nextVisibility=target.getAttribute("data-value")==="private" ? "private" : "public";
+    const previousVisibility=state.meta.registrationVisibility||"public";
+    registrationFormDraft.registrationVisibility=nextVisibility;
+    registrationFormDraftDirty=true;
     if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
+
+    // For an already-published room this is a live privacy control, not just
+    // a draft field. Apply it to the authoritative private/public mirrors now
+    // so "不公開顯示" means the lobby stops showing the room immediately.
+    if(state.cloudCode && state.meta.publishedAt){
+      state.meta.registrationVisibility=nextVisibility;
+      registrationVisibilitySaving=true;
+      render();
+      (async()=>{
+        let result={ok:false,reason:"network"};
+        try{
+          await saveRecord(cloneStateForSave(state));
+          if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
+          if(cloudAvailable()&&window.cloudSync&&window.cloudSync.syncTournamentVisibility){
+            result=await window.cloudSync.syncTournamentVisibility(state.cloudCode,nextVisibility);
+          }
+        }catch(e){
+          result={ok:false,reason:(e&&e.code)||"unknown"};
+        }
+        if(result&&result.ok){
+          publicTournamentsCache=null;
+          publicTournamentsLastSignature="";
+          publicTournamentsError=null;
+          showToast(nextVisibility==="private" ? "已設為不公開，賽事已從公開大廳隱藏" : "已設為公開，賽事會重新顯示於公開大廳");
+        }else{
+          state.meta.registrationVisibility=previousVisibility;
+          registrationFormDraft.registrationVisibility=previousVisibility;
+          try{ await saveRecord(cloneStateForSave(state)); }catch(e){}
+          showToast("公開顯示狀態未同步成功，已還原原設定",true);
+        }
+        registrationVisibilitySaving=false;
+        render();
+      })();
+      return;
+    }
+
     render();
     return;
   }
@@ -26608,8 +26672,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.registrationNotes = "";
     state.meta.registrationVisibility = d.registrationVisibility;
     resetRegistrationFormDraft();
-    saveState(); render();
-    showToast("已儲存線上報名設定");
+    (async()=>{
+      const ok=await saveState();
+      render();
+      if(ok===false) showToast("設定已保存在本機，但雲端尚未同步；公開大廳可能仍顯示舊狀態",true);
+      else showToast("已儲存線上報名設定");
+    })();
     return;
   }
   if(action==="copy-registration-url"){
@@ -29674,6 +29742,44 @@ init().then(()=>{
         console.warn("加入雲端賽事代碼失敗", e);
         if((e&&e.code)==="permission-denied") return { ok:false, reason:"private" };
         return { ok:false, reason:"network" };
+      }
+    },
+
+    async syncTournamentVisibility(code, visibility){
+      if(!cloudEnabled || !code) return { ok:false, reason:"network" };
+      const normalized=String(code).toUpperCase();
+      const next=visibility==="private" ? "private" : "public";
+      try{
+        await fx.runTransaction(dbHandle,async tx=>{
+          const privateRef=fx.doc(dbHandle,"tournaments",normalized);
+          const publicRef=fx.doc(dbHandle,"publicTournaments",normalized);
+          const privateSnap=await tx.get(privateRef);
+          if(!privateSnap.exists()) throw new Error("not-found");
+          const publicSnap=await tx.get(publicRef);
+          const now=Date.now();
+          const privatePatch={visibility:next,registrationVisibility:next,updatedAt:now};
+          const privateDoc=privateSnap.data()||{};
+          if(typeof privateDoc.data==="string"){
+            try{
+              const parsed=JSON.parse(privateDoc.data);
+              parsed.meta=parsed.meta||{};
+              parsed.meta.registrationVisibility=next;
+              parsed.updatedAt=now;
+              privatePatch.data=JSON.stringify(parsed);
+            }catch(e){}
+          }
+          tx.set(privateRef,privatePatch,{merge:true});
+          if(publicSnap.exists()){
+            tx.set(publicRef,{visibility:next,registrationVisibility:next,updatedAt:now},{merge:true});
+          }
+        });
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;
+        return {ok:true,visibility:next};
+      }catch(e){
+        const code=(e&&e.code)||((e&&e.message)==="not-found"?"not-found":"unknown");
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=code;
+        console.warn("[visibility sync]",code,e);
+        return {ok:false,reason:code};
       }
     },
 

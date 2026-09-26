@@ -59,6 +59,13 @@ if((html.match(/visibility: lobbyVisibility/g)||[]).length!==4) throw new Error(
 mustInclude("&& t.registrationVisibility!=='private'",'Lobby must suppress stale public mirrors marked registrationVisibility=private');
 mustInclude('d.deletionStatus===\"deleting\" || d.visibility!==\"public\" || d.registrationVisibility===\"private\" || d.eventCancelled===true','Direct public room join must reject private registration visibility');
 console.log('PASS private tournament lobby visibility guard');
+mustInclude('async syncTournamentVisibility(code, visibility){','Dedicated visibility transaction missing');
+mustInclude('tx.set(privateRef,privatePatch,{merge:true});','Private tournament visibility patch missing');
+mustInclude('tx.set(publicRef,{visibility:next,registrationVisibility:next,updatedAt:now},{merge:true});','Public mirror visibility patch missing');
+mustInclude('已設為不公開，賽事已從公開大廳隱藏','Published private toggle must confirm immediate lobby hide');
+mustInclude('[visibility repair] private mirror repair failed','Legacy private mirror self-heal missing');
+mustInclude('公開大廳可能仍顯示舊狀態','Registration save must disclose cloud-sync failure');
+console.log('PASS immediate/private visibility sync and legacy self-heal');
 must(/subscribePublicTournaments\(callback\)/, 'Realtime public tournament listener missing');
 must(/visibilitychange[\s\S]*?reconcilePublicTournamentsNow\(["']foreground["']\)/, 'Foreground reconciliation missing');
 must(/window\.addEventListener\(["']focus["'][\s\S]*?reconcilePublicTournamentsNow\(["']focus["']\)/, 'Focus reconciliation missing');
