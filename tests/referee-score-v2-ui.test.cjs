@@ -24,9 +24,24 @@ assert(css.includes('.ref-result-actions .ref-undo-score'),'undo full-row visual
 assert(css.includes('.ref-result-actions .ref-confirm-result'),'primary confirm CTA visual missing');
 assert(css.includes('@media(max-width:640px)'),'mobile referee tuning missing');
 
-const controlBlocks=[...css.matchAll(/(?:score-btns button|ref-swap|ref-result-actions \\.btn|msc-btns \\.btn)[^{]*\\{([^}]*)\\}/g)].map(m=>m[1]);
-assert(controlBlocks.length>=6,'expected referee interactive style blocks are missing');
-assert(controlBlocks.every(block=>!block.includes('pointer-events:none')),'V2 must not disable referee controls');
-assert(controlBlocks.every(block=>!block.includes('display:none')),'V2 must not hide referee controls');
+function cssBlock(marker){
+  const start=css.indexOf(marker);
+  assert(start>=0,'missing CSS control marker: '+marker);
+  const open=css.indexOf('{',start),close=css.indexOf('}',open);
+  assert(open>start&&close>open,'malformed CSS control block: '+marker);
+  return css.slice(open+1,close);
+}
+for(const marker of [
+  '.score-btns button{',
+  '.ref-vs-mark .ref-swap{',
+  '.ref-result-actions .ref-undo-score{',
+  '.ref-result-actions .ref-rematch{',
+  '.ref-result-actions .ref-confirm-result{',
+  '.match-status-controls .msc-btns .btn{'
+]){
+  const block=cssBlock(marker);
+  assert(!block.includes('pointer-events:none'),'V2 must not disable referee control: '+marker);
+  assert(!block.includes('display:none'),'V2 must not hide referee control: '+marker);
+}
 
 console.log('PASS referee score panel V2 visual-only guards');
