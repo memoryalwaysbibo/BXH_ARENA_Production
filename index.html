@@ -17087,7 +17087,6 @@ function renderLandingScreen(){
       ${releaseGateLandingBannerHtml()}
       <div class="auth-tagline">選擇身分，進入 <span class="landing-tagline-brand">BXH ARENA</span></div>
       <div class="role-cards landing-role-cards">
-        <button class="role-card role-card-admin" data-action="select-role-partner-organizer"><span class="role-card-inner"><span class="role-card-icon">★</span><span class="role-card-cn">合作主辦</span><span class="role-card-en">PARTNER ORGANIZER</span><span class="role-card-desc">查看 BXH 合作主辦授權</span><span class="role-card-enter">進入 →</span></span></button>
         <button class="role-card role-card-admin" data-action="select-role-admin">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_ADMIN}</span>
@@ -22174,6 +22173,7 @@ function accountMenuItemsHtml(){
   const isPlayerMode=currentRole==="player";
   return isPlayerMode ? `
     <button data-action="player-switch-tab" data-tab="profile">會員資料</button>
+    ${(userProfile && roleAllowsMode(userProfile.role,"partner_organizer",userProfile)) ? `<button data-action="switch-to-partner-organizer">切換至合作主辦</button>` : ""}
     ${(userProfile && roleAllowsMode(userProfile.role,"admin",userProfile)) ? `<button data-action="switch-to-admin-mode">切換至管理模式</button>` : ""}
     <button data-action="account-open-checkin">每日簽到</button>
     ${themePickerHtml()}
@@ -23877,12 +23877,6 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     bxhForceRefresh();
     return;
   }
-  if(action==="select-role-partner-organizer"){
-    if(!firebaseUser){appPhase="player-login";playerLoginError="請先登入現有帳號，再選擇合作主辦身分。";render();return;}
-    if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){showToast("合作主辦身分尚未開通，請聯絡 BXH 確認授權。",true);return;}
-    (async()=>{await saveActiveMode("partner_organizer");currentRole="partner_organizer";appPhase="partner-organizer";render();})();
-    return;
-  }
   if(action==="select-role-admin"){
     guestReadOnlyMode = false;
     loginError=""; authFormError="";
@@ -24889,6 +24883,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       appPhase="landing";
       render();
     })();
+    return;
+  }
+  if(action==="switch-to-partner-organizer"){
+    if(!firebaseUser || !roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)) return;
+    accountMenuOpen=false;
+    (async()=>{await saveActiveMode("partner_organizer");currentRole="partner_organizer";appPhase="partner-organizer";render();})();
     return;
   }
   if(action==="switch-to-player-mode"){
