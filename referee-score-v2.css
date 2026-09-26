@@ -377,3 +377,53 @@
     font-size:9px;
   }
 }
+
+
+/* v14.2.38 referee fault rule */
+.court-grid:not(.court-grid-4fit) .referee-workstation .side-panel .score-btns button[data-type="fault"]::before{
+  content:"!";
+  color:#f0b85a;
+}
+.court-grid:not(.court-grid-4fit) .referee-workstation .side-panel .score-btns .fault-btn{
+  border-color:rgba(240,184,90,.30);
+  background:
+    linear-gradient(180deg,rgba(240,184,90,.075),rgba(255,255,255,.012)),
+    #14171d;
+  color:#e9e2d5;
+}
+.court-grid:not(.court-grid-4fit) .referee-workstation .side-panel .score-btns .fault-btn::after{
+  content:"2次→對手+1";
+  right:8px;
+  color:rgba(240,184,90,.62);
+  font-size:8.5px;
+  font-weight:800;
+}
+.court-grid:not(.court-grid-4fit) .referee-workstation .side-panel .score-btns .fault-btn.has-fault{
+  border-color:rgba(239,145,90,.72);
+  background:
+    linear-gradient(180deg,rgba(239,145,90,.16),rgba(239,145,90,.045)),
+    #17151a;
+  color:#ffd8bd;
+  box-shadow:0 0 14px rgba(239,145,90,.10),inset 0 1px 0 rgba(255,255,255,.035);
+}
+.court-grid:not(.court-grid-4fit) .referee-workstation .side-panel .score-btns .fault-btn.has-fault::before{
+  color:#ff9e67;
+  text-shadow:0 0 10px rgba(255,126,78,.28);
+}
+.court-grid:not(.court-grid-4fit) .referee-workstation .side-panel .score-btns .fault-btn.has-fault::after{
+  content:"再1次→對手+1";
+  color:#ffb487;
+}
+.court-grid-4fit .side-panel .score-btns .fault-btn{
+  grid-column:1/-1;
+  border-color:rgba(240,184,90,.32);
+}
+.court-grid-4fit .side-panel .score-btns .fault-btn.has-fault{
+  border-color:rgba(239,145,90,.68);
+  color:#ffbd93;
+}
+@media(max-width:640px){
+  .court-grid:not(.court-grid-4fit) .referee-workstation .side-panel .score-btns .fault-btn::after{
+    font-size:7.5px;
+  }
+}

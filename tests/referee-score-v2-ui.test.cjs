@@ -7,7 +7,7 @@ const root=path.join(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const css=fs.readFileSync(path.join(root,'referee-score-v2.css'),'utf8');
 
-assert(html.includes('referee-score-v2.css?v=14.2.36-score-v2'),'V2 stylesheet is not cache-busted into Production');
+assert(html.includes('referee-score-v2.css?v=14.2.38-score-fault'),'V2 stylesheet is not cache-busted into Production');
 assert(html.includes('class="btn-row ref-result-actions"'),'result action layout hook missing');
 assert(html.includes('class="btn btn-ghost ref-undo-score" data-action="undo-score"'),'undo action hook or handler changed');
 assert(html.includes('class="btn btn-ghost ref-rematch" data-action="rematch"'),'rematch action hook or handler changed');

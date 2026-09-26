@@ -24,6 +24,12 @@ jobs:
           node --check inventory-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify referee two-fault scoring
+        run: |
+          node --check referee-fault-core.js
+          node tests/referee-fault-core.test.cjs
+          node tests/referee-fault-ui.test.cjs
+
       - name: Verify header logo refresh control
         run: node tests/header-logo-refresh.test.cjs
 
