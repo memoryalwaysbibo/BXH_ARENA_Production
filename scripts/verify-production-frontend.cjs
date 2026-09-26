@@ -1,8 +1,11 @@
 const fs=require('fs');
 const path=require('path');
+const vm=require('vm');
 const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const courtCallUi=fs.readFileSync(path.join(root,'court-call-ui.js'),'utf8');
+const ladderSecondaryUi=fs.readFileSync(path.join(root,'ladder-secondary-ui.js'),'utf8');
+new vm.Script(ladderSecondaryUi,{filename:'ladder-secondary-ui.js'});
 const messagingSw=fs.readFileSync(path.join(root,'firebase-messaging-sw.js'),'utf8');
 const webConfig=JSON.parse(fs.readFileSync(path.join(root,'PRODUCTION_FIREBASE_WEB_CONFIG.json'),'utf8'));
 const cname=fs.readFileSync(path.join(root,'CNAME'),'utf8').trim();
@@ -158,6 +161,15 @@ mustInclude('if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterS
 mustInclude('ladderLocationCity=normalizeTaiwanCityName(ladderCityFilter.value);','ladder city filter must update normalized city');
 mustInclude('ladderLocationRegion="";','ladder city change must reset district');
 console.log('PASS ladder city/district binding');
+if(!ladderSecondaryUi.includes('var ladderScoreMode="season";')) throw new Error('Ladder V2 season mode default missing');
+if(!ladderSecondaryUi.includes('data-ladder-score-mode="season"')||!ladderSecondaryUi.includes('data-ladder-score-mode="career"')) throw new Error('Ladder V2 season/career tabs missing');
+if(!ladderSecondaryUi.includes('function rankCareerRows(players)')) throw new Error('Ladder V2 career ranking missing');
+if(!ladderSecondaryUi.includes('ladderScoreMode==="career"?"careerPoints":"seasonPoints"')) throw new Error('Ladder V2 score source switch missing');
+if(!ladderSecondaryUi.includes('function ladderTierEmblemHtml(p)')) throw new Error('Ladder V2 tier emblem renderer missing');
+if(!ladderSecondaryUi.includes('class="ladder-player-block"')||!ladderSecondaryUi.includes('class="title-chip rarity-')) throw new Error('Ladder V2 player/title hierarchy missing');
+if(!ladderSecondaryUi.includes('grid-template-columns:52px minmax(0,1fr) 96px 78px')||!ladderSecondaryUi.includes('grid-template-columns:44px minmax(0,1fr) 78px 64px')) throw new Error('Ladder V2 responsive four-column grid missing');
+mustInclude('ladder-secondary-ui.js?v=14.2.39','Ladder V2 cache bust missing');
+console.log('PASS ladder ranking V2 season/career responsive UI');
 mustInclude('const REFEREE_RESUME_KEY = "bxh_referee_workstation_resume_v1"','Referee workstation resume key missing');
 mustInclude('function restoreRefereeWorkstationView(uid,intent)','Referee workstation reload restore helper missing');
 mustInclude('const laterReady=available.filter(m=>!isInActiveSingleElimPhase(m,phase));','Independent per-court progression fallback missing');
