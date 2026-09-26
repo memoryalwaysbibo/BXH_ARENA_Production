@@ -160,10 +160,9 @@ mustInclude('data-action="court-swap-start"','Court swap action control missing'
 mustInclude('window.cloudSync.mutateMatchTransaction','Court swap must use authoritative tournament transaction');
 console.log('PASS referee resume / independent court progression / court swap guards');
 mustInclude('function liveNextMatchCardHtml(court,stationNum)','Live next-match structured card renderer missing');
-mustInclude('.referee-workstation .live-court-next-player{font-size:17px','Referee next-match player emphasis missing');
-if((html.match(/\$\{liveNextMatchCardHtml\(court, stationNum\)\}/g)||[]).length<3)throw new Error('Referee standard, quick, and waiting states must use structured next-match cards');
+if((html.match(/\$\{liveNextMatchCardHtml\(court, stationNum\)\}/g)||[]).length!==1)throw new Error('Only unresolved-player referee state may retain the detailed bottom next-match card');
 mustNot(/<div class="ref-next-box"><span>下一場<\/span>\$\{nextMatchPreviewHtml\(court, stationNum\)\}<\/div>/,'Legacy referee next-match row must be removed');
-console.log('PASS emphasized referee next-match card');
+console.log('PASS referee active-score next-match duplication removed');
 mustInclude('class="live-court-next-badge">下一場','Live next-match badge missing');
 mustInclude('.live-court-next-players{display:grid','Live next-match player row missing');
 mustInclude('function liveNextMatchCompactHtml(court,stationNum)','Live compact next-match renderer missing');
