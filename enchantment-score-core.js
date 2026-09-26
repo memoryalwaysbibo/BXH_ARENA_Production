@@ -27,9 +27,10 @@
     const original=BASE[type];
     const buff=winner.kind==='buff'&&winner.type===type&&loser.kind!=='seal';
     const guard=loser.kind==='guard'&&loser.type===type&&winner.kind!=='seal';
-    if(buff&&guard)return {ok:false,reason:'priority-undecided',originalPoints:original,triggered:[winnerCardId,loserCardId]};
-    const applied=buff?winnerCardId:guard?loserCardId:null;
-    const points=buff?winner.points:guard?loser.points:original;
+    // Both effects can match, but the defending card determines the final
+    // score. Do not add the winner's bonus before applying the reduction.
+    const applied=guard?loserCardId:buff?winnerCardId:null;
+    const points=guard?loser.points:buff?winner.points:original;
     return {ok:true,type,originalPoints:original,points,delta:points-original,appliedCardId:applied,
       sealedCardId:winner.kind==='seal'?loserCardId:loser.kind==='seal'?winnerCardId:null};
   }
