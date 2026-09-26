@@ -33,7 +33,7 @@ jobs:
       - name: Verify enchantment rules and connected V3 draw script
         run: |
           node --check enchantment-ui.js
-          node --test tests/enchantment-hunter-ledger.test.cjs tests/enchantment-score-core.test.cjs tests/enchantment-round-core.test.cjs
+          node --test tests/enchantment-hunter-ledger.test.cjs tests/enchantment-score-core.test.cjs tests/enchantment-round-core.test.cjs tests/enchantment-ui-bridge.test.cjs
           node - <<'JS'
           const fs=require('node:fs');
           const html=fs.readFileSync('enchantment-draw-v3.html','utf8');
