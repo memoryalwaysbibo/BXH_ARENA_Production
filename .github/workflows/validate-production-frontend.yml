@@ -24,6 +24,9 @@ jobs:
           node --check inventory-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify referee score panel V2
+        run: node tests/referee-score-v2-ui.test.cjs
+
       - name: Verify compact next-match prepare UI
         run: node tests/court-call-next-prepare-ui.test.cjs
 
