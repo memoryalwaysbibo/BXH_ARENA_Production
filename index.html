@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.09">
+<meta name="bxh-build" content="20260926.10">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.09";
+  var CURRENT_BUILD="20260926.10";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -18847,6 +18847,7 @@ function findEventsSummaryLine(t){
   // never has publishedAt set, so it's naturally excluded here without
   // needing a separate "is this test data" flag.
   const isValid = t.visibility==='public'
+    && t.registrationVisibility!=='private'
     && !!t.publishedAt
     && pd.archiveStatus!=='completed';
   const effectiveStatus = getEffectiveRegistrationStatus(t);
@@ -29523,6 +29524,7 @@ init().then(()=>{
           data.ladderPointsAwarded=false;
         }
         const m = (data && data.meta) || {};
+        const lobbyVisibility = m.registrationVisibility==="private" ? "private" : "public";
         // BUG012: tester sandbox assignment normalization
         // A tester may only create a test tournament assigned to self (or none).
         // Clear stale admin/staff referee assignments carried by the draft before
@@ -29587,7 +29589,7 @@ init().then(()=>{
         const privatePayload=Object.assign({
           data: JSON.stringify(data),
           updatedAt: Date.now(),
-          visibility: "public",
+          visibility: lobbyVisibility,
           createdBy: currentUserUidForWrites(),
           createdByName: currentUserDisplayNameForWrites(),
           // v13.13.2: private runtime mirrors. These are NOT copied to publicTournaments.
@@ -29599,7 +29601,7 @@ init().then(()=>{
         const publicPayload=Object.assign({
           bracketView: JSON.stringify(buildPublicMirrorFields(data)),
           updatedAt: Date.now(),
-          visibility: "public"
+          visibility: lobbyVisibility
         }, publicRegistrationFields, testFields);
         // Both documents must be created in one atomic batch. Beta Rules validate
         // the public mirror with getAfter(), which only sees the paired private
@@ -29665,7 +29667,7 @@ init().then(()=>{
         const snap = await fx.getDoc(fx.doc(dbHandle,"publicTournaments",String(code).toUpperCase()));
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
-        if(d.deletionStatus==="deleting" || d.visibility!=="public" || d.eventCancelled===true) return { ok:false, reason:"not-found" };
+        if(d.deletionStatus==="deleting" || d.visibility!=="public" || d.registrationVisibility==="private" || d.eventCancelled===true) return { ok:false, reason:"not-found" };
         const reconstructed = reconstructPublicStateFromDoc(snap.id, d);
         return { ok:true, data: reconstructed };
       }catch(e){
@@ -29691,6 +29693,7 @@ if(testerSession){
         const testRoom=data.testMode===true && data.meta?.eventAuthority==="test";
         if(testRoom){data.meta.name=ensureTestName(data.meta.name);data.meta.ladderMode="general";data.ladderPointsAwarded=false;}
         const m = (data && data.meta) || {};
+        const lobbyVisibility = m.registrationVisibility==="private" ? "private" : "public";
         const registrationFields = {
           // Top-level fields mirrored from meta so Phase 2+ can query across
           // tournaments (e.g. "find open registration events") without needing
@@ -29752,7 +29755,7 @@ if(testerSession){
           data: JSON.stringify(data),
           entrySelectionWriteRevision:Number(data.entrySelectionRevision||0),
           updatedAt: Date.now(),
-          visibility: "public",
+          visibility: lobbyVisibility,
           // v13.13.2: keep private runtime mirrors current without touching registration counters.
           bracketSize: (data && data.bracketSize) || 0,
           archiveStatus: (data && data.archiveStatus) || "ongoing"
@@ -29760,7 +29763,7 @@ if(testerSession){
         const publicPayload=Object.assign({
           bracketView: JSON.stringify(buildPublicMirrorFields(data)),
           updatedAt: Date.now(),
-          visibility: "public"
+          visibility: lobbyVisibility
         }, publicRegistrationFields, communityPublic, testPublic);
         if(data.entrySelection?.mode==='registration'){
           delete privatePayload.capacity;delete publicPayload.capacity;
