@@ -73,8 +73,8 @@
     return {key:'registration',label:'報名中',dot:'green',phase:base.phase,preopen:true};
   }
 
-  function decorateLifecycle(t,base){
-    if(!base||base.phase!=='waiting'||!isPreopenWindow(t)) return base;
+  function decorateLifecycle(t,base,now=Date.now()){
+    if(!base||base.phase!=='waiting'||!isPreopenWindow(t,now)) return base;
     return registrationDescriptor(base);
   }
 
