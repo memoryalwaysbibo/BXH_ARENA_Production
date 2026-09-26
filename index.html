@@ -5570,6 +5570,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="inventory-catalog-ui.js?v=3"></script>
 <script src="court-call-ui.js?v=14.2.34-next-fallback"></script>
 <script src="referee-fault-core.js?v=14.2.38-fault-v1"></script>
+<script src="enchantment-score-core.js?v=20260927-1"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -13349,6 +13350,24 @@ function createHunterRoundEvent(match,side,type,points,at){
 function normalizeHunterRoundEvent(raw,index,matchId){
   if(!raw || (raw.side!=="A" && raw.side!=="B")) return null;
   const type=String(raw.type||"");
+  if(Number(raw.v)===2){
+    if(raw.enchantment!==true)return null;
+    const api=window.BXHEnchantmentScore;
+    if(!api||!Number.isInteger(raw.round)||raw.round<1) return null;
+    const computed=type==="fault"
+      ? {ok:true,originalPoints:1,points:1,delta:0,appliedCardId:null}
+      : api.resolve({type,winnerCardId:raw.winningCardId,loserCardId:raw.losingCardId});
+    if(!computed.ok||Number(raw.basePoints)!==computed.originalPoints||
+       Number(raw.points)!==computed.points||Number(raw.delta)!==computed.delta||
+       (raw.appliedCardId||null)!==(computed.appliedCardId||null)) return null;
+    if(type==="fault" && (raw.appliedCardId!=null||
+       !api.CARDS[raw.winningCardId]||!api.CARDS[raw.losingCardId])) return null;
+    if(!raw.eventId||Number(raw.seq)!==index+1)return null;
+    return {v:2,eventId:String(raw.eventId),seq:index+1,round:raw.round,
+      side:raw.side,type,basePoints:computed.originalPoints,points:computed.points,
+      delta:computed.delta,appliedCardId:computed.appliedCardId,
+      winningCardId:raw.winningCardId,losingCardId:raw.losingCardId,t:Number(raw.t)||null};
+  }
   if(!HUNTER_VALID_POINT_TYPES.has(type)) return null;
   const expected=Number(POINT_TYPES[type]);
   const points=Number(raw.points);
@@ -13405,8 +13424,8 @@ function buildHunterMatchRecord(st,match){
     ? {ok:true,events:[],roundCount:0,scoreA:null,scoreB:null,errors:[]}
     : validateHunterRoundLedger(match);
   return {
-    schemaVersion:HUNTER_ROUND_SCHEMA_VERSION,
-    scoringVersion:HUNTER_SCORING_VERSION,
+    schemaVersion:st.meta&&st.meta.playMode==="enchantment"?2:HUNTER_ROUND_SCHEMA_VERSION,
+    scoringVersion:st.meta&&st.meta.playMode==="enchantment"?"bxh-enchantment-v2":HUNTER_SCORING_VERSION,
     tournamentId:st.id||null,
     eventCode:st.cloudCode||null,
     eventName:(st.meta&&st.meta.name)||"",
