@@ -17786,7 +17786,11 @@ function renderAccountManagementScreen(){
       ${page==="accounts"?`<div class="panel account-management-panel">
         <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
         <p class="hint">選擇既有玩家，先選合作方案並建立合約；玩家簽名、最高管理員確認付款後才成立。帳號分類維持玩家。</p>
-        <details class="account-tools-card"><summary><span>合作方案設定</span><span class="hint">先建立可用方案⌄</span></summary><div class="account-tools-body"><p class="hint">方案代碼由系統自動產生；合作主辦可用 BXH 積分模式，實際權限須待合約成立。</p><div class="field"><label>方案名稱</label><input id="partner-new-plan-name" maxlength="120" placeholder="例如：合作主辦｜年度積分方案"></div><div class="field"><label>方案內容（寄給合作方確認）</label><textarea id="partner-new-plan-details" maxlength="4000" rows="5" placeholder="填寫積分模式使用範圍、服務項目、場次上限及方案限制"></textarea></div><button class="btn btn-ghost btn-sm" data-action="partner-create-plan">建立合作方案</button><p class="hint">目前可用：${partnerPlansState.loading?'讀取中':(partnerPlansState.plans||[]).filter(p=>p.active&&p.rankedMode).map(p=>esc(p.name)).join('、')||'尚未建立'}</p>${partnerPlansState.error?`<p class="auth-error">${esc(partnerPlansState.error)}</p>`:''}</div></details>
+        <details class="account-tools-card"><summary><span>合作方案設定</span><span class="hint">先建立可用方案⌄</span></summary><div class="account-tools-body"><p class="hint">方案代碼由系統自動產生；合作主辦可用 BXH 積分模式，實際權限須待合約成立。</p><div class="field"><label>方案名稱</label><input id="partner-new-plan-name" maxlength="120" value="BXH 合作主辦｜積分賽基本方案" placeholder="合作方案名稱"></div><div class="field"><label>方案內容（寄給合作方確認）</label><textarea id="partner-new-plan-details" maxlength="4000" rows="8" placeholder="填寫方案內容">適用對象：由 BXH 最高管理員選定的既有玩家帳號。
+使用範圍：於合作期間使用 BXH ARENA 建立合作主辦積分賽，賽事成績依 BXH 公布的積分規則處理。
+授權成立：合作方閱讀方案與合約並手寫簽名後，須由 BXH 最高管理員核對付款並二次確認，才可啟用積分模式。
+方案限制：每筆合作的費用、生效日、到期日、可辦場次與其他限制，由該筆合約單獨載明；未寫入的權利不自動包含。
+合作結束：到期或依合約流程終止後，不得再建立新的合作主辦積分賽；既有賽事資料依系統結算流程處理。</textarea></div><button class="btn btn-ghost btn-sm" data-action="partner-create-plan">建立合作方案</button><p class="hint">目前可用：${partnerPlansState.loading?'讀取中':(partnerPlansState.plans||[]).filter(p=>p.active&&p.rankedMode).map(p=>esc(p.name)).join('、')||'尚未建立'}</p>${partnerPlansState.error?`<p class="auth-error">${esc(partnerPlansState.error)}</p>`:''}</div></details>
         ${authFormError ? `<div class="auth-error">${esc(authFormError)}</div>` : ""}
         <div class="account-overview-grid">
           <div class="stat-box"><div class="label">全部帳號</div><div class="value">${activity.total}</div></div>
