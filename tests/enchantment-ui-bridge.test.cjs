@@ -52,3 +52,18 @@ test('referee action submits the raw outcome; server remains the scoring authori
  assert.equal(calls.find(x=>x.action==='score').type,'burst');
  assert.equal('points' in calls.find(x=>x.action==='score'),false);
 });
+
+test('first fault warning exposes undo before a point is awarded',async()=>{
+ const listeners={},slot={innerHTML:''};
+ const panel={dataset:{code:'BXH-ABCD',matchId:'match1'},querySelector:()=>slot};
+ const root={BXHEnchantmentScore:score,engagementService:{enchantment:async()=>({version:5,state:{
+  round:1,phase:'ready-to-score',scores:{A:0,B:0},faults:{A:1,B:0},drawn:{A:true,B:true},
+  cards:{A:'seal',B:'double_burst'}}})},addEventListener:(event,fn)=>listeners[event]=fn};
+ const document={querySelectorAll:selector=>selector==='[data-enchantment-referee]'?[panel]:[],
+  addEventListener:(event,fn)=>listeners[event]=fn};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../enchantment-ui.js'),'utf8'),
+  {window:root,document,location:{origin:'https://arena.example'},setTimeout:()=>{},setInterval:()=>{},console});
+ await root.BXHEnchantmentUI.refresh('BXH-ABCD','match1');
+ assert.match(slot.innerHTML,/A 失誤 1\/2/);
+ assert.match(slot.innerHTML,/撤回上一筆失誤/);
+});
