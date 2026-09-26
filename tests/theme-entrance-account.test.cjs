@@ -17,6 +17,21 @@ const context={
 vm.createContext(context);
 vm.runInContext(html.slice(start,end),context);
 assert.equal(root.value,'gold');
+const earlyThemeScript=html.match(/<script>\s*(\(function\(\)\{[\s\S]*?data-bxh-theme[\s\S]*?\}\)\(\);)\s*<\/script>/)?.[1];
+assert(earlyThemeScript,'The first paint theme script is present');
+function firstPaintTheme(values){
+  const root={value:null,setAttribute(key,value){this.value=value;}};
+  vm.runInNewContext(earlyThemeScript,{
+    localStorage:{getItem:key=>values[key]||null},
+    document:{documentElement:root}
+  });
+  return root.value;
+}
+assert.equal(firstPaintTheme({}),'gold','A new visitor sees the original entrance');
+assert.equal(firstPaintTheme({
+  'bxh.interface.theme.entrance.uid.v1':'staff-A',
+  'bxh.interface.theme.account.v1.staff-A':'directive'
+}),'directive','A returning opted-in account gets Directive on first paint');
 context.firebaseUser={uid:'staff-A'};
 context.userProfile={role:'staff',active:true};
 vm.runInContext('restoreAccountInterfaceTheme("staff-A",userProfile)',context);
@@ -28,7 +43,7 @@ assert.equal(stored.get('bxh.interface.theme.entrance.uid.v1'),'staff-A');
 context.firebaseUser=null;
 context.userProfile=null;
 vm.runInContext('syncInterfaceThemeVisibility()',context);
-assert.equal(root.value,'gold','Signed-out entrance uses the original skin, even after Directive was selected');
+assert.equal(root.value,'directive','Signed-out entrance keeps the last eligible account theme on this device');
 context.firebaseUser={uid:'staff-B'};
 context.userProfile={role:'staff',active:true};
 vm.runInContext('restoreAccountInterfaceTheme("staff-B",userProfile)',context);
@@ -37,7 +52,7 @@ assert.equal(stored.get('bxh.interface.theme.entrance.uid.v1'),'staff-B');
 context.firebaseUser=null;
 context.userProfile=null;
 vm.runInContext('syncInterfaceThemeVisibility()',context);
-assert.equal(root.value,'gold','Signed-out entrance always uses the original skin');
+assert.equal(root.value,'gold','Signed-out entrance follows the most recently used account');
 context.firebaseUser={uid:'staff-A'};
 context.userProfile={role:'staff',active:true};
 vm.runInContext('restoreAccountInterfaceTheme("staff-A",userProfile)',context);
