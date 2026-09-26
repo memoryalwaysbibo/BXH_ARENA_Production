@@ -18446,7 +18446,7 @@ function mailboxDate(value){
 }
 function mailboxError(error){
   const raw=String(error?.message||error||'');
-  const map={'mail-not-found':'找不到這封信，可能已被移除。','recipient-not-found':'找不到指定玩家帳號。','recipient-inactive':'指定玩家帳號目前不可使用。','super-admin-required':'只有最高管理員可以發送系統信。','invalid-subject':'信件標題請輸入 1～80 字。','invalid-body':'信件內容請輸入 1～2000 字。','operation-conflict':'這次寄送識別碼與先前內容不一致，請重新操作。','auth-required':'請重新登入後再查看站內信。','service-unavailable':'站內信服務尚未部署。'};
+  const map={'mail-not-found':'找不到這封信，可能已被移除。','recipient-not-found':'找不到指定玩家帳號。','recipient-inactive':'指定玩家帳號目前不可使用。','super-admin-required':'只有最高管理員可以發送系統信。','invalid-subject':'信件標題請輸入 1～80 字。','invalid-body':'信件內容請輸入 1～2000 字。','operation-conflict':'這次寄送識別碼與先前內容不一致，請重新操作。','auth-required':'請重新登入後再查看站內信。','service-unavailable':'站內信服務尚未部署。','attachment-not-found':'找不到這個附件。','attachment-integrity-failed':'附件完整性驗證失敗，請聯絡管理員。'};
   for(const [key,value] of Object.entries(map))if(raw.includes(key))return value;
   return '站內信暫時無法連線，請稍後重試。';
 }
@@ -18474,7 +18474,7 @@ function renderMailboxPage(){
   return `<section class="panel"><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
     <p class="hint">未讀 ${c.unreadCount} 封｜系統通知、活動及中獎訊息會集中在這裡。</p>
     ${c.error?`<div class="auth-error" role="alert">${esc(c.error)}</div>`:''}
-    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(selected.body||'')}</div><div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
+    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(selected.body||'')}</div>${Array.isArray(selected.attachments)&&selected.attachments.length?`<div class="mailbox-attachments"><p class="hint">附件</p>${selected.attachments.map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
     ${isSuperAdmin()?`<details class="panel" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">最高管理員｜發送測試信</summary><div class="grid grid-2 mailbox-compose-grid" style="margin-top:14px"><div class="field"><label>玩家 UID</label><input id="mailbox-recipient" maxlength="128" placeholder="貼上 Firebase UID"></div><div class="field"><label>信件標題</label><input id="mailbox-subject" maxlength="80" placeholder="例如：站內信測試"></div><div class="field" style="grid-column:1/-1"><label>信件內容</label><textarea id="mailbox-body" maxlength="2000" placeholder="輸入通知內容"></textarea></div></div><button class="btn btn-primary" data-action="mailbox-send-test" ${c.busy?'disabled':''}>發送測試信</button><p class="hint">本階段以 UID 測試寄送；活動中獎通知會在抽獎模組串接。</p></details>`:''}
   </section>`;
 }
@@ -18486,6 +18486,22 @@ async function handleMailbox(action,target){
   if(action==='mailbox-select'){
     c.selectedId=target.getAttribute('data-message-id')||'';const message=(c.messages||[]).find(m=>m.id===c.selectedId);
     render();if(message&&!message.readAt)handleMailbox('mailbox-toggle-read',target);return;
+  }
+  if(action==='mailbox-download-attachment'){
+    const messageId=target.getAttribute('data-message-id'),attachmentId=target.getAttribute('data-attachment-id');
+    c.busy=true;c.error='';render();
+    try{
+      if(!window.engagementService?.mailboxAttachment)throw Error('service-unavailable');
+      const result=await window.engagementService.mailboxAttachment({action:'download',messageId,attachmentId});
+      if(c!==mailboxContext())return;
+      if(!result?.ok||!result.base64)throw Error('attachment-not-found');
+      const bytes=Uint8Array.from(atob(result.base64),character=>character.charCodeAt(0));
+      const url=URL.createObjectURL(new Blob([bytes],{type:result.mime||'application/octet-stream'}));
+      const link=document.createElement('a');link.href=url;link.download=result.name||'附件';
+      document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(error){if(c===mailboxContext())c.error=mailboxError(error);}
+    finally{if(c===mailboxContext()){c.busy=false;render();}}
+    return;
   }
   let payload;
   if(action==='mailbox-toggle-read')payload={action:target.getAttribute('data-read')==='1'?'markUnread':'markRead',messageId:target.getAttribute('data-message-id'),operationId:crypto.randomUUID()};
@@ -28495,6 +28511,7 @@ init().then(()=>{
     async presence(payload){return callEngagementFunction("onlinePresence",payload,15000);},
     async mood(payload){return callEngagementFunction("moodStation",payload,20000);},
     async mailbox(payload){return callEngagementFunction("mailboxService",payload,30000);},
+    async mailboxAttachment(payload){return callEngagementFunction("mailboxAttachmentService",payload,60000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
