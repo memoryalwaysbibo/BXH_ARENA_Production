@@ -60,7 +60,7 @@ assert.equal(next,open-5*60*1000,'nearest local transition should be the T-5 bou
 const nextAtPreopen=api.nextBoundary([ranked],open-4*60*1000);
 assert.equal(nextAtPreopen,open,'after T-5 the next transition should be T0');
 
-assert(!/getEffectiveRegistrationStatus\s*=/.test(source),'preopen module must never replace registration eligibility');
+assert(!/getEffectiveRegistrationStatus\s*=(?!=)/.test(source),'preopen module must never replace registration eligibility');
 assert(!/registrationStatus\s*=\s*['"]open['"]/.test(source),'preopen module must never force registration open');
 
 console.log('PASS ranked registration T-5 preopen UX');
