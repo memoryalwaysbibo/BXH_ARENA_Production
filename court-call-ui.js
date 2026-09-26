@@ -771,3 +771,16 @@ function courtCallPublicQueue(s,station){
  }
  return all.filter(m=>m.skippedAt&&m.resumeQueuedAt).concat(result);
 }
+
+
+/* Load ranked registration T-5 lobby UX without coupling it to the 2.18 MB inline app bundle. */
+(function loadRankedRegistrationPreopenUx(){
+ try{
+  if(typeof document==='undefined'||document.querySelector('script[data-bxh-ranked-preopen]'))return;
+  const s=document.createElement('script');
+  s.src='ranked-registration-preopen-ui.js?v=14.2.29';
+  s.async=false;
+  s.dataset.bxhRankedPreopen='true';
+  (document.head||document.documentElement).appendChild(s);
+ }catch(e){console.warn('[ranked preopen loader]',e);}
+})();
