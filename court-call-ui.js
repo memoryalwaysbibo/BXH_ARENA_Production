@@ -347,32 +347,39 @@ function renderCourtCallNextPrepare(m,c){
  const disabled=c.busy||c.pending||!linked;
  const status=prepare
    ? '已通知 '+new Date(prepare.notifiedAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})
-   : linked?'尚未通知':'至少一位為現場／未綁定帳號，無法推播';
- return `<div class="court-call-next-ready">
-   <div class="court-call-next-ready-head">
-     <div><span class="court-call-next-kicker">NEXT MATCH</span><b>下一場｜${esc(displayMatchLabel(next)||matchLabel(next))}</b></div>
-     <span class="court-call-next-status">${esc(status)}</span>
-   </div>
-   <div class="court-call-next-people">
-     <div class="court-call-next-person"><span>選手 A</span><strong>${esc(am.name)}</strong><small>${esc(am.sub)}</small></div>
-     <div class="court-call-next-vs">VS</div>
-     <div class="court-call-next-person"><span>選手 B</span><strong>${esc(bm.name)}</strong><small>${esc(bm.sub)}</small></div>
-   </div>
-   <button class="btn btn-ghost court-call-prepare-btn" data-action="court-call-prepare" data-code="${esc(c.code)}" data-match="${esc(next.id)}" ${disabled?'disabled':''}>🔔 提前通知準備</button>
-   <p class="hint">只提醒下一場選手先到戰鬥台附近準備；不會啟動正式叫號、OK 或 PASS。</p>
+   : linked?'尚未通知':'無法推播｜有選手未綁定';
+ const buttonText=prepare?'🔔 再次通知':'🔔 通知準備';
+ return `<div class="court-call-next-inline-actions" data-bxh-next-prepare="1">
+   <span class="court-call-next-inline-status ${prepare?'is-sent':''}">${esc(status)}</span>
+   <button class="btn btn-ghost court-call-prepare-btn" data-action="court-call-prepare" data-code="${esc(c.code)}" data-match="${esc(next.id)}" ${disabled?'disabled':''}>${buttonText}</button>
  </div>`;
+}
+function syncCourtCallNextPrepareInline(m,c){
+ if(typeof document==='undefined'||!m)return;
+ const station=Number(m.station||0);
+ if(!(station>0))return;
+ const host=document.getElementById('court-card-'+station);
+ if(!host)return;
+ host.querySelectorAll('[data-bxh-next-prepare]').forEach(node=>node.remove());
+ const nextCard=host.querySelector('.live-court-next');
+ if(!nextCard)return;
+ const html=renderCourtCallNextPrepare(m,c);
+ if(html)nextCard.insertAdjacentHTML('beforeend',html);
+}
+function queueCourtCallNextPrepareInline(m,c){
+ setTimeout(()=>syncCourtCallNextPrepareInline(m,c),0);
 }
 
 function renderCourtCallReferee(m){
  if(!m||!m.a||!m.b||m.completed||!state.startedAt||!state.cloudCode||!canOperateStation(m.station))return '';
  const c=courtCallContext(state.cloudCode);
+ queueCourtCallNextPrepareInline(m,c);
  return `<section class="panel court-call-referee-panel">
    <div class="panel-title">BXH CALL｜裁判叫號</div>
    <div class="court-call-current-actions">
      <div><b>目前場次｜${esc(displayMatchLabel(m)||matchLabel(m))}</b><p class="hint">正式叫號後，選手可回覆 OK／PASS。</p></div>
      <button class="btn btn-primary" data-action="court-call-notify" data-code="${esc(c.code)}" data-match="${esc(m.id)}" ${c.busy||c.pending?'disabled':''}>通知雙方選手上場</button>
    </div>
-   ${renderCourtCallNextPrepare(m,c)}
    ${courtCallCommon(c)}
    ${c.rows.filter(r=>r.isReferee&&r.station===m.station).map(r=>courtCallRow(c,r,true)).join('')}
  </section>`;
@@ -501,7 +508,7 @@ function ensureCourtCallGlobalStyles(){
  .bxh-call-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.bxh-call-actions.one{grid-template-columns:1fr}
  .bxh-call-actions .btn{min-height:52px;font-size:15px;font-weight:900}
  .court-call-people{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0}.court-call-person{padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.04);font-size:12px}.court-call-person.is-replied{color:#f0cf67}
- .court-call-referee-panel{margin:12px 16px 0!important}.court-call-current-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.court-call-current-actions .hint{margin:3px 0 0}.court-call-next-ready{margin-top:12px;padding:12px;border:1px solid rgba(217,185,92,.20);border-radius:12px;background:rgba(255,255,255,.025)}.court-call-next-ready-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.court-call-next-ready-head>div{display:grid;gap:2px}.court-call-next-kicker{font-size:9px;letter-spacing:.16em;color:var(--gold)}.court-call-next-ready-head b{font-size:13px}.court-call-next-status{font-size:10px;color:var(--metal-dim);text-align:right}.court-call-next-people{display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:7px;align-items:center;margin-top:10px}.court-call-next-person{display:grid;gap:2px;padding:9px;border-radius:10px;background:rgba(255,255,255,.035);min-width:0}.court-call-next-person span,.court-call-next-person small{font-size:9.5px;color:var(--metal-dim)}.court-call-next-person strong{font-size:14px;color:var(--ivory);overflow-wrap:anywhere}.court-call-next-vs{text-align:center;color:var(--gold);font-weight:900;font-size:11px}.court-call-prepare-btn{width:100%;margin-top:10px;min-height:40px}.court-call-next-ready>.hint{margin:7px 0 0;font-size:10px}
+ .court-call-referee-panel{margin:12px 16px 0!important}.court-call-current-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.court-call-current-actions .hint{margin:3px 0 0}.court-call-next-inline-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.10)}.court-call-next-inline-status{flex:1;min-width:0;color:var(--metal-dim);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.court-call-next-inline-status.is-sent{color:#7cebb8;font-weight:800}.court-call-next-inline-actions .court-call-prepare-btn{flex:0 0 auto;width:auto;min-height:34px;margin:0;padding:7px 11px;font-size:11px;white-space:nowrap}
  #bxh-court-call-help-overlay{position:fixed;inset:0;z-index:2147483250;display:flex;align-items:flex-end;justify-content:center;padding:18px;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
  .bxh-call-help-sheet{width:min(100%,430px);border:1px solid rgba(217,185,92,.45);border-radius:18px;background:linear-gradient(165deg,#17181b,#090a0b);box-shadow:0 24px 70px rgba(0,0,0,.65);padding:16px;color:#eef0f3}
  .bxh-call-help-title{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#f0cf71;font-weight:900}
@@ -509,7 +516,7 @@ function ensureCourtCallGlobalStyles(){
  .bxh-call-help-status{margin-top:8px;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.035);color:#bfc4cc;font-size:11px}
  .bxh-call-help-copy{margin-top:10px;color:#cdd1d7;font-size:12px;line-height:1.55}.bxh-call-help-copy p{margin:6px 0}
  .bxh-call-help-test{width:100%;margin-top:10px}
- @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}.bxh-call-help-sheet{padding:14px}.court-call-current-actions{grid-template-columns:1fr}.court-call-current-actions .btn{width:100%}.court-call-next-people{grid-template-columns:1fr}.court-call-next-vs{display:none}.court-call-next-status{text-align:left}}
+ @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}.bxh-call-help-sheet{padding:14px}.court-call-current-actions{grid-template-columns:1fr}.court-call-current-actions .btn{width:100%}.court-call-next-inline-actions{gap:7px}.court-call-next-inline-actions .court-call-prepare-btn{min-height:32px;padding:6px 9px;font-size:10.5px}}
  `;
  document.head.appendChild(style);
 }

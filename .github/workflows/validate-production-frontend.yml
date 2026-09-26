@@ -24,6 +24,9 @@ jobs:
           node --check inventory-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify compact next-match prepare UI
+        run: node tests/court-call-next-prepare-ui.test.cjs
+
       - name: Verify ranked registration T-5 preopen UX
         run: |
           node --check ranked-registration-preopen-ui.js
