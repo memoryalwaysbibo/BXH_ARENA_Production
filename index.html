@@ -9,6 +9,7 @@
 -->
 <html lang="zh-Hant">
 <head>
+<script src="partner-organizer-ui.js"></script>
 <script>
 (function enforceSecureConnection(){
   var isLocalHost=/^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/.test(window.location.hostname);
@@ -10469,7 +10470,7 @@ let pendingExistingAccountProfile = null; // { uid, email } — set when an EXIS
 // Firestore Security Rules and never affects users/{uid}.role. Role stays the
 // account's real permission level; activeMode just decides which UI is shown
 // right now for accounts whose role permits more than one.
-let activeMode = null; // 'admin' | 'player' | null
+let activeMode = null; // 'admin' | 'player' | 'partner_organizer' | null
 const ACTIVE_MODE_KEY = "bxh_active_mode_v1";
 // Set immediately before calling signIn(), so the ONE
 // onAuthStateChanged listener (the sole routing authority) knows WHICH entry
@@ -10593,6 +10594,7 @@ function cancelVerifyingAndRetry(){
 }
 
 function roleAllowsMode(role, mode, profile=null){
+  if(mode==="partner_organizer") return !!(window.BXHPartnerOrganizer && window.BXHPartnerOrganizer.hasGrant(profile));
   if(mode==="admin") return profile?.isTestAccount===true || role==="super_admin" || role==="admin" || role==="staff" || role==="tester";
   if(mode==="player") return true; // every role can use player mode
   return false;
@@ -17085,6 +17087,7 @@ function renderLandingScreen(){
       ${releaseGateLandingBannerHtml()}
       <div class="auth-tagline">選擇身分，進入 <span class="landing-tagline-brand">BXH ARENA</span></div>
       <div class="role-cards landing-role-cards">
+        <button class="role-card role-card-admin" data-action="select-role-partner-organizer"><span class="role-card-inner"><span class="role-card-icon">★</span><span class="role-card-cn">合作主辦</span><span class="role-card-en">PARTNER ORGANIZER</span><span class="role-card-desc">查看 BXH 合作主辦授權</span><span class="role-card-enter">進入 →</span></span></button>
         <button class="role-card role-card-admin" data-action="select-role-admin">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_ADMIN}</span>
@@ -21962,6 +21965,7 @@ function restoreAuthenticatedView(uid,intent){
   appPhase='account-management';superAdminManagementPage=['accounts','checkin','titles'].includes(v.adminPage)?v.adminPage:'accounts';
   accountMgmtUsers=null;window.cloudAuth.listUsers().then(users=>{if(firebaseUser?.uid===uid){accountMgmtUsers=users;render();}}).catch(()=>{});return true;
  }
+ if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){appPhase='partner-organizer';return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
   appPhase='player-center';playerActiveTab=PLAYER_TABS.some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
  }
@@ -22036,6 +22040,7 @@ function render(){
       return;
     }
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
+  if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {app.innerHTML=authShellOpen()+authBrandHeader()+window.BXHPartnerOrganizer.render(userProfile)+authShellClose();return;} }
   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-login"){ app.innerHTML = renderAdminLoginScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-setup"){ app.innerHTML = renderAdminSetupScreen(); bindAuthInputs(); return; }
@@ -23870,6 +23875,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="force-refresh-version"){
     try{ showToast("正在取得最新版本…"); }catch(e){}
     bxhForceRefresh();
+    return;
+  }
+  if(action==="select-role-partner-organizer"){
+    if(!firebaseUser){appPhase="player-login";playerLoginError="請先登入現有帳號，再選擇合作主辦身分。";render();return;}
+    if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){showToast("合作主辦身分尚未開通，請聯絡 BXH 確認授權。",true);return;}
+    (async()=>{await saveActiveMode("partner_organizer");currentRole="partner_organizer";appPhase="partner-organizer";render();})();
     return;
   }
   if(action==="select-role-admin"){
@@ -27688,7 +27699,7 @@ async function init(){
                     Promise.resolve().then(async()=>{ try{ const all=await window.cloudAuth.listUsers(); await window.cloudAuth.syncStaffDirectory(all); }catch(e){} });
                   }
                   await saveActiveMode(intent);
-                  currentRole = (intent==="player") ? "player" : mapRoleToAppRole(profile.role);
+                  currentRole = intent==="partner_organizer" ? "partner_organizer" : (intent==="player" ? "player" : mapRoleToAppRole(profile.role));
                   adminDisplayName = profile.displayName || profile.email;
                   if((profile.role==="tester"||profile.isTestAccount===true) && intent==="admin" && !isOwnTestTournament(state)){
                     state=markTesterSandboxState(defaultState());
@@ -27711,6 +27722,7 @@ async function init(){
                   if(restoringSession && restoreRefereeWorkstationView(fbUser.uid,intent)){render();return;}
                   if(restoringSession && restoreAuthenticatedView(fbUser.uid,intent)){render();return;}
                   if(appPhase==="landing" || appPhase==="admin-login" || appPhase==="admin-setup" || appPhase==="admin-success" || appPhase==="player-login" || appPhase==="player-apply" || currentRole==="guest"){
+                    if(intent==="partner_organizer"){appPhase="partner-organizer";render();return;}
                     if(intent==="admin"){
                       appPhase = "admin-success";
                       render();
@@ -27770,9 +27782,9 @@ async function init(){
                     appPhase = "landing";
                   }
                 }
-                if(currentRole==="player"){
+                if(currentRole==="player" || currentRole==="partner_organizer"){
                   currentRole = null;
-                  if(appPhase==="player-center"){ appPhase = "landing"; }
+                  if(appPhase==="player-center" || appPhase==="partner-organizer"){ appPhase = "landing"; }
                 }
               }
             }catch(e){
