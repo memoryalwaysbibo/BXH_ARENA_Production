@@ -17755,7 +17755,7 @@ function renderPartnerContractCard(user){
     <p class="hint">選擇方案後建立合約草稿；玩家於站內信閱讀並簽名，再由最高管理員確認。合作代碼由成立時自動產生。</p>
     ${user.partnerOrganizer?.status==='active'?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:''}
     <div class="grid grid-2">
-      <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.name)}｜${esc(plan.details||'未提供方案內容')}</option>`).join('')}</select></div>
       <div class="field"><label>合作方名稱</label><input class="partner-contract-name" data-uid="${esc(user.uid)}" maxlength="200" value="${esc(user.partnerOrganizer?.organizationName||'')}"></div>
       <div class="field"><label>費用 NT$</label><input class="partner-contract-amount" data-uid="${esc(user.uid)}" type="number" min="0" step="1" placeholder="請填寫合約金額"></div>
       <div class="field"><label>生效日期</label><input class="partner-contract-start" data-uid="${esc(user.uid)}" type="date"></div>
@@ -17786,7 +17786,7 @@ function renderAccountManagementScreen(){
       ${page==="accounts"?`<div class="panel account-management-panel">
         <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
         <p class="hint">選擇既有玩家，先選合作方案並建立合約；玩家簽名、最高管理員確認付款後才成立。帳號分類維持玩家。</p>
-        <details class="account-tools-card"><summary><span>合作方案設定</span><span class="hint">先建立可用方案⌄</span></summary><div class="account-tools-body"><p class="hint">方案代碼由系統自動產生；合作主辦可用 BXH 積分模式，實際權限須待合約成立。</p><div class="field"><label>方案名稱</label><input id="partner-new-plan-name" maxlength="120" placeholder="例如：合作主辦｜年度積分方案"></div><button class="btn btn-ghost btn-sm" data-action="partner-create-plan">建立合作方案</button><p class="hint">目前可用：${partnerPlansState.loading?'讀取中':(partnerPlansState.plans||[]).filter(p=>p.active&&p.rankedMode).map(p=>esc(p.name)).join('、')||'尚未建立'}</p>${partnerPlansState.error?`<p class="auth-error">${esc(partnerPlansState.error)}</p>`:''}</div></details>
+        <details class="account-tools-card"><summary><span>合作方案設定</span><span class="hint">先建立可用方案⌄</span></summary><div class="account-tools-body"><p class="hint">方案代碼由系統自動產生；合作主辦可用 BXH 積分模式，實際權限須待合約成立。</p><div class="field"><label>方案名稱</label><input id="partner-new-plan-name" maxlength="120" placeholder="例如：合作主辦｜年度積分方案"></div><div class="field"><label>方案內容（寄給合作方確認）</label><textarea id="partner-new-plan-details" maxlength="4000" rows="5" placeholder="填寫積分模式使用範圍、服務項目、場次上限及方案限制"></textarea></div><button class="btn btn-ghost btn-sm" data-action="partner-create-plan">建立合作方案</button><p class="hint">目前可用：${partnerPlansState.loading?'讀取中':(partnerPlansState.plans||[]).filter(p=>p.active&&p.rankedMode).map(p=>esc(p.name)).join('、')||'尚未建立'}</p>${partnerPlansState.error?`<p class="auth-error">${esc(partnerPlansState.error)}</p>`:''}</div></details>
         ${authFormError ? `<div class="auth-error">${esc(authFormError)}</div>` : ""}
         <div class="account-overview-grid">
           <div class="stat-box"><div class="label">全部帳號</div><div class="value">${activity.total}</div></div>
@@ -18527,10 +18527,11 @@ async function openMailboxPartnerContract(orderCode){
   overlay.style.cssText='position:fixed;inset:0;z-index:2147483640;background:rgba(0,0,0,.82);display:flex;justify-content:center;align-items:center;padding:12px';
   overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-label="合作合約" style="background:#1c2029;color:#fff;width:min(680px,100%);max-height:94vh;overflow:auto;padding:18px;border-radius:12px">
     <div style="display:flex;justify-content:space-between;gap:12px"><strong>合作主辦合約｜${esc(order.orderCode)}</strong><button type="button" class="btn btn-ghost btn-sm" data-close>關閉</button></div>
-    <p>合作方：${esc(order.organizationName)}｜方案：${esc(order.planCode)}｜金額 NT$ ${esc(order.amountTwd)}</p>
+    <p>合作方：${esc(order.organizationName)}｜方案：${esc(order.planName||order.planCode)}｜金額 NT$ ${esc(order.amountTwd)}</p>
+    <p>方案內容（版本 ${esc(order.planVersion||1)}）</p><div style="white-space:pre-wrap;padding:12px;border:1px solid #666;border-radius:8px">${esc(order.planDetails||'未提供')}</div>
     <p>期間：${esc(order.startsAt)} 至 ${esc(order.expiresAt)}</p>
     <p class="hint">條款版本 ${esc(order.termsVersion)}｜狀態 ${esc(order.status)}</p>
-    <div style="white-space:pre-wrap;max-height:35vh;overflow:auto;padding:12px;border:1px solid #666;border-radius:8px">${esc(order.terms)}</div>
+    <p>完整合約條款</p><div style="white-space:pre-wrap;max-height:35vh;overflow:auto;padding:12px;border:1px solid #666;border-radius:8px">${esc(order.terms)}</div>
     ${order.status==='sent'?`<p>閱讀完整條款後，在下方以手指簽名。</p><div data-signature></div>
       <label style="display:block;margin:12px 0"><input type="checkbox" data-accept> 我已閱讀並同意上述版本的完整合約條款</label>
       <p data-error role="alert" style="color:#ff9c9c"></p><button type="button" class="btn btn-primary" data-submit>確認簽署並送出</button>`:'<p class="hint">這份合約目前不能簽署。可向管理員確認目前流程狀態。</p>'}
@@ -25470,10 +25471,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==='partner-create-plan'){
     if(!isSuperAdmin())return;
     const name=(document.getElementById('partner-new-plan-name')?.value||'').trim();
-    if(!name){showToast('請先輸入合作方案名稱',true);return;}
+    const details=(document.getElementById('partner-new-plan-details')?.value||'').trim();
+    if(!name||!details){showToast('請完整填寫合作方案名稱與內容',true);return;}
     target.disabled=true;
     (async()=>{try{
-      const result=await window.engagementService.savePartnerPlan({name,active:true,rankedMode:true});
+      const result=await window.engagementService.savePartnerPlan({name,details,active:true,rankedMode:true});
       showToast('方案已建立：'+result.planCode);
       await loadPartnerPlans(true);
     }catch(error){showToast('建立合作方案失敗：'+String(error.message||error),true);}
