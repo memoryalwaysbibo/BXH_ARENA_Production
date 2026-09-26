@@ -8,27 +8,30 @@
 
 ## 伺服器狀態
 
-以比賽作為交易邊界：`tournaments/{eventCode}/enchantmentMatches/{matchId}`（實際路徑由 Functions repo 檢查現有資料模型後定稿）。
+以比賽作為交易邊界：`tournaments/{eventCode}/enchantmentMatches/{matchId}`。目前 Functions 草稿 PR #62 已建立此子集合，尚未部署。
 
 | 欄位 | 意義 |
 | --- | --- |
-| `schemaVersion` | 附魔狀態版本，首次為 `1` |
-| `matchId`, `station`, `playerUids.A/B` | 與現有場次一致的身分與桌次 |
+| `state.matchId`, `state.players.A/B` | 與現有場次一致的比賽 ID 與帳號 UID；桌次每次由賽事主檔重新檢查 |
 | `round`, `phase` | `waiting-referee → drawing → ready-to-score → drawing/awaiting-result → completed` |
 | `cards.A/B` | 伺服器指定的卡牌 ID；指定後不可更換 |
 | `revealed.A/B` | 玩家本人完成拖牌動畫後揭示；重試只能取得同一張 |
-| `scores.A/B`, `events` | 實際得分與完整得分紀錄，均在同一交易內更新 |
-| `revision` | 每次成功轉移加一，拒絕跨局或過期指令 |
+| `state.scores.A/B`, `state.history` | 附魔回合暫存分數與紀錄；尚未寫入正式賽事比分 |
+| `version` | 每次成功轉移加一，拒絕跨局或過期指令 |
 
 **保密邊界：** 卡片指定值不得放在任何兩位選手均可讀的 Firestore 文件。後端使用 private 文件保存指定值；每個玩家 callable 只能取得自己的卡，裁判可取得已揭示卡片。既有公開賽事鏡像不得包含未揭示卡 ID。
 
-## 五項交易入口
+## 目前 Functions 草稿的交易入口
 
-1. `enchantmentStart`：限該桌有權裁判；核對賽事已開始、玩法為附魔、對戰雙方及目前場次，建立第 1 局 `drawing`。`requestId` 重試回傳原狀態。
-2. `enchantmentPrepareDraw`：後端使用安全隨機來源，**在交易內各指定一張** 12 張池中的卡；記錄後才將可抽狀態推送雙方。抽卡動畫不得在前端選卡，也不能重新整理重抽。
-3. `enchantmentReveal`：只允許 A/B 綁定 UID 揭示自己這一局的卡；重複相同請求冪等，回傳同一卡；兩人均完成後才能開啟裁判計分。
-4. `enchantmentScore`：限該桌有權裁判；只接收 `matchId`、`round`、`winnerSide`、**原始勝利方式**、`requestId`、`expectedRevision`。後端讀取雙方卡片，計算原始分、觸發卡、實得分，再原子更新比分與紀錄。用戶端不能提交卡牌 ID 或最終得分。送分後才建立下一局；達 4 分進入待確認。
-5. `enchantmentUndo`／`enchantmentConfirm`：同一裁判權限。Undo 在同一交易中回復上一筆比分、卡片與局數，讓已開始的下一局舊請求失效；Confirm 必須已達勝利條件，沿用現有晉級／結算路徑，不能只改附魔狀態。
+單一 callable `enchantmentService` 以 `action` 分流，請求帶 `code`、`matchId`；變更指令除 `start` 外帶 `version`，局內指令帶 `round`。
+
+1. `start`：限該桌有權裁判；核對賽事已開始、玩法為附魔、對戰雙方及目前場次，建立第 1 局並在同一交易指定兩張卡。重複開始會被拒絕，前端可用 `get` 讀取既有狀態。
+2. `get`：裁判可查看已翻開的雙方卡；選手只能看自己已翻開的卡。未翻開的卡不得透過回應洩露。
+3. `draw`：只允許 A/B 綁定 UID 翻開自己的卡；卡片早已由伺服器指派，拖曳動畫不決定抽到哪張。兩人均翻開後才能計分。
+4. `score`：限裁判提交 `round`、`winner` 與**原始勝利方式** `type`。後端用私有卡片計算得分，跨版或重複送出被拒絕；目前只更新附魔子集合的暫存比分。
+5. `undo`：限裁判依版本撤回上一筆附魔比分與回合狀態。正式賽事比分、晉級與完成場次的撤銷尚未串接。
+
+正式賽事計分交易與 `confirm` 尚未實作；不得將上述暫存比分視為正式賽事比分。完成前需補齊請求冪等鍵及跨裝置中斷重試驗收。
 
 ## 計分紀錄與相容性
 
