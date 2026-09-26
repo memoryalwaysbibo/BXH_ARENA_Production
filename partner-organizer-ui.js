@@ -3,7 +3,7 @@
 (function(root){
   function grant(profile){
     const value=profile&&profile.partnerOrganizer;
-    return profile&&profile.active===true&&value&&typeof value==='object'&&value.status==='active'&&typeof value.organizationId==='string'&&value.organizationId.length>0?value:null;
+    return profile&&profile.active===true&&value&&typeof value==='object'&&value.status==='active'&&typeof value.organizationId==='string'&&value.organizationId.length>0&&(value.expiresAt==null||Number(value.expiresAt)>Date.now())?value:null;
   }
   function safe(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function render(profile){
