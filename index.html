@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.11">
+<meta name="bxh-build" content="20260926.12">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.11";
+  var CURRENT_BUILD="20260926.12";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -8766,8 +8766,40 @@ function applyRemoteState(remote, authoritative=false){
 // Idempotent: if this tournament already has a fixed cloudCode, this is a no-op
 // (the code is permanent for the life of the tournament, per spec). Only ever
 // called for admin-tier sessions; guests/players never create rooms.
+async function maybeRepairLegacyPrivateVisibilityMirrors(){
+  if(legacyPrivateVisibilitySweepStarted) return;
+  if(!userProfile || userProfile.role!=="super_admin") return;
+  if(!(typeof window!=="undefined" && window.cloudSync)) return;
+  legacyPrivateVisibilitySweepStarted=true;
+  try{
+    if(window.cloudSync.connect) await window.cloudSync.connect();
+    if(!cloudAvailable() || !window.cloudSync.repairLegacyPrivateVisibilityMirrors){
+      legacyPrivateVisibilitySweepStarted=false;
+      return;
+    }
+    const result=await window.cloudSync.repairLegacyPrivateVisibilityMirrors();
+    if(result&&result.ok){
+      if(Number(result.repaired||0)>0){
+        publicTournamentsCache=null;
+        publicTournamentsLastSignature="";
+        publicTournamentsError=null;
+        console.info("[visibility sweep] repaired legacy private mirrors:",result.repaired);
+      }
+    }else{
+      legacyPrivateVisibilitySweepStarted=false;
+      console.warn("[visibility sweep] skipped/failed",result&&result.reason);
+    }
+  }catch(e){
+    legacyPrivateVisibilitySweepStarted=false;
+    console.warn("[visibility sweep] failed",e);
+  }
+}
+
 async function ensureCloudRoomForTournament(){
   if(!hasAdminAccess()) return;
+  // One super-admin visit repairs ALL legacy rooms whose private state already
+  // says "private" but whose old public mirror still says "public".
+  maybeRepairLegacyPrivateVisibilityMirrors();
   // v13.19.2: 登入/建立草稿不再產生賽事代碼。只有已發布賽事才有 cloudCode。
   if(!state.cloudCode){ cloudStatus = "local"; render(); return; }
   if(!(typeof window!=="undefined" && window.cloudSync && window.cloudSync.connect)) return;
@@ -11553,6 +11585,7 @@ if(typeof document!=="undefined") document.addEventListener("visibilitychange",(
 
 let cloudSyncPending = false;
 let cloudSyncQueueTimer = null;
+let legacyPrivateVisibilitySweepStarted = false;
 
 // Normal tournament state writes are serialized in invocation order.
 // Each save captures an immutable snapshot immediately, preventing a slow
@@ -29742,6 +29775,72 @@ init().then(()=>{
         console.warn("加入雲端賽事代碼失敗", e);
         if((e&&e.code)==="permission-denied") return { ok:false, reason:"private" };
         return { ok:false, reason:"network" };
+      }
+    },
+
+    async repairLegacyPrivateVisibilityMirrors(){
+      if(!cloudEnabled) return {ok:false,reason:"network",repaired:0};
+      try{
+        const [privateSnap,publicSnap]=await Promise.all([
+          fx.getDocs(fx.collection(dbHandle,"tournaments")),
+          fx.getDocs(fx.collection(dbHandle,"publicTournaments"))
+        ]);
+        const publicById=new Map();
+        publicSnap.forEach(ds=>publicById.set(ds.id,ds.data()||{}));
+        const repairs=[];
+        privateSnap.forEach(ds=>{
+          const d=ds.data()||{};
+          let parsedMeta=null;
+          if(typeof d.data==="string"){
+            try{
+              const parsed=JSON.parse(d.data);
+              parsedMeta=parsed&&parsed.meta||null;
+            }catch(e){}
+          }
+          const explicitlyPrivate=d.registrationVisibility==="private"
+            || (parsedMeta&&parsedMeta.registrationVisibility==="private");
+          if(!explicitlyPrivate) return; // fail-closed: never auto-publish anything.
+          const pub=publicById.get(ds.id);
+          const privateNeeds=d.visibility!=="private" || d.registrationVisibility!=="private"
+            || !(parsedMeta&&parsedMeta.registrationVisibility==="private");
+          const publicNeeds=!!pub && (pub.visibility!=="private" || pub.registrationVisibility!=="private");
+          if(privateNeeds || publicNeeds){
+            repairs.push({id:ds.id,privateDoc:d,parsedMeta,hasPublic:!!pub,privateNeeds,publicNeeds});
+          }
+        });
+        let repaired=0;
+        for(let offset=0;offset<repairs.length;offset+=200){
+          const batch=fx.writeBatch(dbHandle);
+          const chunk=repairs.slice(offset,offset+200);
+          const now=Date.now();
+          chunk.forEach(item=>{
+            if(item.privateNeeds){
+              const patch={visibility:"private",registrationVisibility:"private",updatedAt:now};
+              if(typeof item.privateDoc.data==="string"){
+                try{
+                  const parsed=JSON.parse(item.privateDoc.data);
+                  parsed.meta=parsed.meta||{};
+                  parsed.meta.registrationVisibility="private";
+                  parsed.updatedAt=now;
+                  patch.data=JSON.stringify(parsed);
+                }catch(e){}
+              }
+              batch.set(fx.doc(dbHandle,"tournaments",item.id),patch,{merge:true});
+            }
+            if(item.hasPublic && item.publicNeeds){
+              batch.set(fx.doc(dbHandle,"publicTournaments",item.id),{
+                visibility:"private",registrationVisibility:"private",updatedAt:now
+              },{merge:true});
+            }
+          });
+          await batch.commit();
+          repaired+=chunk.length;
+        }
+        return {ok:true,repaired,scanned:privateSnap.size};
+      }catch(e){
+        const code=(e&&e.code)||"unknown";
+        console.warn("[visibility sweep]",code,e);
+        return {ok:false,reason:code,repaired:0};
       }
     },
 

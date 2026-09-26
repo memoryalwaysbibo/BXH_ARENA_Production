@@ -66,6 +66,11 @@ mustInclude('已設為不公開，賽事已從公開大廳隱藏','Published pri
 mustInclude('[visibility repair] private mirror repair failed','Legacy private mirror self-heal missing');
 mustInclude('公開大廳可能仍顯示舊狀態','Registration save must disclose cloud-sync failure');
 console.log('PASS immediate/private visibility sync and legacy self-heal');
+mustInclude('async repairLegacyPrivateVisibilityMirrors(){','Legacy private visibility sweep missing');
+mustInclude('const explicitlyPrivate=d.registrationVisibility===\"private\"','Legacy sweep must use private state as authority');
+mustInclude('fail-closed: never auto-publish anything.','Legacy sweep must be fail-closed');
+mustInclude('maybeRepairLegacyPrivateVisibilityMirrors();','Super-admin startup must trigger legacy visibility sweep');
+console.log('PASS legacy private visibility global sweep');
 must(/subscribePublicTournaments\(callback\)/, 'Realtime public tournament listener missing');
 must(/visibilitychange[\s\S]*?reconcilePublicTournamentsNow\(["']foreground["']\)/, 'Foreground reconciliation missing');
 must(/window\.addEventListener\(["']focus["'][\s\S]*?reconcilePublicTournamentsNow\(["']focus["']\)/, 'Focus reconciliation missing');
