@@ -11700,7 +11700,12 @@ async function saveState(){
         return localOk ? true : false;
       }
       const lastCode = (typeof window!=="undefined" && window.__BXH_LAST_CLOUD_ERROR_CODE) || "";
-      if(lastCode==="permission-denied"){
+      if(lastCode==="registration-roster-stale"){
+        cloudAccessLimited = true;
+        cloudAccessMessage = "線上名單已更新；請重新整理頁面，再進行操作。";
+        cloudStatus = "connected";
+        showToast(cloudAccessMessage, true);
+      }else if(lastCode==="permission-denied"){
         cloudAccessLimited = true;
         cloudAccessMessage = "此帳號沒有執行這項雲端寫入的權限。";
         cloudStatus = "connected";
@@ -14293,7 +14298,7 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     p.checkedIn===true?"1":"0",String(p.name||"")
   ].join("|")).sort().join("\n");
   const changed=before!==after;
-  if(changed) await saveState();
+  if(changed && !(await saveState())) throw new Error("名單寫入雲端失敗；請重新整理後重試同步");
   publicTournamentsCache=null;
   myRegistrationsCache=null;
   return {ok:true,changed,confirmed:confirmed.length};
@@ -19535,6 +19540,12 @@ async function startAdminRosterWatch(){
       adminRegistrationsError=null;
       adminRosterSyncChain=adminRosterSyncChain.catch(()=>{}).then(async()=>{
         if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId || state.cloudCode!==code) return;
+        const publicRoom=await window.cloudSync.getPublicTournamentFull(code);
+        if(generation!==adminRosterGeneration || state.id!==roomId) return;
+        if(publicRoom?.registrationRosterSyncBackendEnabled===true){
+          renderPreservingScroll();
+          return;
+        }
         if(!state.startedAt){
           const result=await syncLatestOnlineRosterBeforeLock(rows);
           if(generation!==adminRosterGeneration || state.id!==roomId) return;
@@ -27151,6 +27162,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(state.startedAt){ showToast("賽事開始後參賽名單已鎖定", true); return; }
     (async ()=>{
       try{
+        const publicRoom=await window.cloudSync.getPublicTournamentFull(state.cloudCode);
+        if(publicRoom?.registrationRosterSyncBackendEnabled===true){showToast("此房間由伺服器自動同步名單",true);return;}
         const result=await syncLatestOnlineRosterBeforeLock();
         render();
         if(state.bracketSize && !bracketRosterIsCurrent()){
@@ -30183,6 +30196,7 @@ if(testerSession){
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
+              if(Number(remoteState.registrationRosterRevision||0)!==Number(data.registrationRosterRevision||0)) throw new Error("registration-roster-stale");
               if(data.generalClosureReason==="insufficient-eligible-players" &&
                  (remoteDoc.ladderPointsAwarded===true || remoteState.ladderPointsAwarded===true)) throw new Error("ladder-already-awarded");
               // Completed results are irreversible through ordinary whole-state sync.
@@ -30235,7 +30249,7 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||"unknown";
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.message)==="registration-roster-stale" ? "registration-roster-stale" : (e&&e.code)||"unknown";
         console.warn("雲端同步寫入失敗", e);
         return false;
       }
