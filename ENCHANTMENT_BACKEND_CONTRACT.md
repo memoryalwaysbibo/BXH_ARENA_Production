@@ -1,5 +1,13 @@
 # BXH 附魔之戰｜Functions 接入契約（未部署）
 
+## 已選用的選手抽卡畫面
+
+2026-09-27 以黑爸提供的 `BXH_龍爪抽卡_12張卡面_DJ刷盤音效_V3(1).html` 作為選手手機的視覺與音效基準。沿用其中 12 張卡面、BXH 背卡、底部中空龍爪座、手指慢慢往上拖、未達門檻回收時的 DJ 刷盤音效，以及完整抽出後才播放的揭曉音效。保留音效開關及鍵盤／按鈕替代操作。
+
+這份 HTML 是動畫預覽：`order[index%cards.length]` 自行決定卡牌，並有「模擬下局抽卡」按鈕。接入正式選手頁時，**只能**由後端交易預先指派卡牌；動畫完成才以本人帳號送出 `draw`，依回應的 `state.cards[本人側]` 顯示對應的既有卡面。動畫放手回收不呼叫 `draw`、不換牌；重試先 `get` 恢復當局狀態。下一局須等待裁判送分開啟的新 `round`，不得由預覽按鈕自行前進。裁判介面僅讀取雙方揭曉狀態與效果，不在裁判手機抽牌。
+
+V3 預覽中的 12 個中文名稱，依序對應後端 `double_extreme`、`double_knockout`、`double_burst`、`double_spin`、`boost_extreme`、`boost_knockout`、`boost_burst`、`weaken_extreme`、`weaken_knockout`、`weaken_burst`、`weaken_spin`、`seal`。不得讓前端自選卡牌 ID 影響計分。
+
 ## 開放條件
 
 - `meta.playMode` 僅可由有權限的主辦建立為 `enchantment`；目前表單保持 disabled，且儲存時強制標準玩法。後端交易與真機驗收前不能解鎖。
