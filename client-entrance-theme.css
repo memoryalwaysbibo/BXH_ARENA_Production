@@ -3559,16 +3559,15 @@ button.btn-primary,
 }
 :root[data-bxh-theme="directive"] header.topbar::after{
   height:4px;
-  opacity:1!important;
   background:
     linear-gradient(90deg,transparent 0%,rgba(255,129,46,.7) 20%,#fff4ca 42%,#fff 50%,#ff812e 70%,transparent 100%) 0 0/24% 100% no-repeat,
     linear-gradient(90deg,#a05aff 0 48%,#ff812e 48% 84%,#de404f 84%) 0 0/100% 100% no-repeat!important;
   box-shadow:0 0 12px rgba(255,129,46,.5)!important;
-  animation:bxh-directive-rail-sweep 2.8s linear infinite;
+  animation:bxh-directive-rail-breathe 2.4s ease-in-out infinite;
 }
-@keyframes bxh-directive-rail-sweep{
-  0%{background-position:-32% 0,0 0}
-  100%{background-position:132% 0,0 0}
+@keyframes bxh-directive-rail-breathe{
+  0%,100%{opacity:.38;filter:brightness(.75) drop-shadow(0 0 2px rgba(255,129,46,.3))}
+  50%{opacity:1;filter:brightness(1.8) drop-shadow(0 0 9px rgba(255,129,46,.95))}
 }
 :root[data-bxh-theme="directive"] .lobby-page-head .settings-page-title,
 :root[data-bxh-theme="directive"] .lobby-section .panel-title,
@@ -3577,7 +3576,7 @@ button.btn-primary,
   text-shadow:0 0 12px rgba(222,64,79,.22);
 }
 @media(prefers-reduced-motion:reduce){
-  :root[data-bxh-theme="directive"] header.topbar::after{animation:none!important}
+  :root[data-bxh-theme="directive"] header.topbar::after{animation:none!important;opacity:1}
 }
 :root[data-bxh-theme="directive"] .lobby-compact-card,
 :root[data-bxh-theme="directive"] .account-theme-card{
