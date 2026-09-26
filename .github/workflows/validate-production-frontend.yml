@@ -42,6 +42,9 @@ jobs:
       - name: Verify tournament raffle winner count stepper
         run: node tests/tournament-operations-count-stepper.test.cjs
 
+      - name: Verify tournament operations multi-prize UI
+        run: node tests/tournament-operations-multi-prize-ui.test.cjs
+
       - name: Verify ranked registration T-5 preopen UX
         run: |
           node --check ranked-registration-preopen-ui.js
