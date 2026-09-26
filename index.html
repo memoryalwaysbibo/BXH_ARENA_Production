@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.07">
+<meta name="bxh-build" content="20260926.08">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.07";
+  var CURRENT_BUILD="20260926.08";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5991,9 +5991,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.37";
+const APP_VERSION = "v14.2.38";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.38",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台當局失誤判定",updateLevel:"minor",added:["正常計分模式新增每位選手的失誤 0/2 按鈕","同一局第 2 次失誤時自動判給對手 1 分"],changed:["失誤只屬於當前局；任何旋轉／擊飛／爆裂／極限／失誤判分產生局結果後，雙方失誤立即歸零","撤銷會優先撤銷尚未結算的最近失誤；撤銷一個局結果時會還原該結果前的失誤狀態","本局重賽與比賽完成會清除失誤狀態"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee round-fault scoring",firebaseImpact:"match JSON 新增可選 roundFaults 局內狀態；不新增 Firestore collection","securityRulesImpact:"無","permissionImpact:"失誤操作沿用既有 score 權限與戰鬥台限制","publicSummary":"裁判台新增當局失誤判定：同局兩次失誤，對手得 1 分；每局結果後自動重置。"},
   {version:"v14.2.37",date:"2026/09/26",timezone:"Asia/Taipei",title:"Header Logo 快速重新整理",updateLevel:"patch",added:["固定 Header 左上 BXH Logo 改為重新整理按鈕"],changed:["點擊 Logo 會以 cache-bust 重新載入目前頁面並重新建立雲端同步，完成後顯示已讀取最新資訊","所有共用 Header 的 Logo 採相同操作與無障礙標籤"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend header refresh control",firebaseImpact:"無資料結構變更；重新載入後沿用既有 Firebase session 與訂閱流程",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"左上 BXH Logo 現在可以直接重新整理頁面並讀取最新資訊。"},
   {version:"v14.2.36",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台計分介面 V2｜黑金強化版",updateLevel:"minor",added:["裁判台正常計分模式新增黑金主戰卡視覺、得分鍵圖示、主控交換鍵與結果操作分層"],changed:["場次狀態改為精簡控制台","雙方選手卡、姓名與分數重新建立視覺層級","四種得分鍵改為單欄大觸控鍵並保留既有文字與分值","最新得分改膠囊紀錄，撤銷獨立成整列操作","本局重賽降為副操作，確認比賽結果升為金色主 CTA","四台桌面 compact 模式維持既有密度規格"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee score panel V2",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台正常計分介面升級為黑金主控台風格；操作流程與計分邏輯不變。"},
   {version:"v14.2.35",date:"2026/09/26",timezone:"Asia/Taipei",title:"工作人員指派專用雲端同步",updateLevel:"patch",added:["工作人員指派改用專用 Firestore transaction，僅更新 assignedStaffUids 與私人賽事狀態"],changed:["指派操作會等待伺服器讀回驗證成功後才顯示完成","保留既有裁判台必要 UID，避免工作人員名單更新誤移除裁判權限","權限拒絕與真正網路異常分流顯示，不再把單次寫入失敗一律標成 LINK ERROR"],fixed:["修正每次指派工作人員後 BXH LIVE LINK 誤顯示雲端連線異常，但重新整理後資料其實已存在的假斷線現象","修正舊流程未 await saveState()，畫面先顯示成功但雲端仍在背景寫入的時序問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend staff assignment sync hotfix",firebaseImpact:"無新增集合；沿用 tournaments.assignedStaffUids，改為專用 transaction",securityRulesImpact:"無；沿用既有 admin update 規則",permissionImpact:"無擴權；仍限 admin／super_admin 執行工作人員指派",publicSummary:"工作人員指派改成獨立原子同步並等待雲端確認；單次指派不再讓整個 LIVE LINK 誤判斷線。"},
@@ -11050,7 +11051,7 @@ function isLineInAppBrowser(){
 }
 
 const ADMIN_ONLY_ACTIONS = new Set([
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
   "draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster",
   "clear-data","import-data","export-data","goto-settings",
@@ -11066,7 +11067,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
 ]);
 const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "set-registration-draft-name-mode","set-registration-draft-target-group","set-registration-draft-visibility","community-save-settings","save-staff-assignment",
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
@@ -11074,7 +11075,7 @@ const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
 ]);
 
 const COMMUNITY_OWNER_ACTIONS = new Set([
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","update-players","quick-add-players","random-test-roster",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","update-players","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
   "start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","goto-settings"
 ]);
@@ -11097,7 +11098,7 @@ const ADMIN_TIER_ONLY_ACTIONS = new Set([
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
 const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status",
   "skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","archive-complete"
 ]);
@@ -13229,19 +13230,19 @@ function rebuildPropagationRoundRobin(){
 }
 
 /* ==== scoring ==== */
-const POINT_TYPES = { spin:1, knockout:2, burst:2, extreme:3 };
-const POINT_LABELS = { spin:"旋轉勝利＋1分", knockout:"擊飛勝利＋2分", burst:"爆裂勝利＋2分", extreme:"極限勝利＋3分" };
+const POINT_TYPES = { spin:1, knockout:2, burst:2, extreme:3, fault:1 };
+const POINT_LABELS = { spin:"旋轉勝利＋1分", knockout:"擊飛勝利＋2分", burst:"爆裂勝利＋2分", extreme:"極限勝利＋3分", fault:"失誤判分＋1分" };
 
 /* ==== v14.0.33 HUNTER PROFILE P2: canonical round ledger ==== */
 const HUNTER_ROUND_SCHEMA_VERSION = 1;
 const HUNTER_SCORING_VERSION = "bxh-4pt-v1";
 const HUNTER_VALID_POINT_TYPES = new Set(Object.keys(POINT_TYPES));
 
-function createHunterRoundEvent(match,side,type,points,at){
+function createHunterRoundEvent(match,side,type,points,at,meta){
   const log=Array.isArray(match&&match.log)?match.log:[];
   const seq=log.length+1;
   const ts=Number(at)||Date.now();
-  return {
+  return Object.assign({
     v:HUNTER_ROUND_SCHEMA_VERSION,
     eventId:String((match&&match.id)||"match")+":r"+seq+":"+ts,
     seq,
@@ -13249,7 +13250,7 @@ function createHunterRoundEvent(match,side,type,points,at){
     type,
     points,
     t:ts
-  };
+  },meta&&typeof meta==="object"?meta:{});
 }
 function normalizeHunterRoundEvent(raw,index,matchId){
   if(!raw || (raw.side!=="A" && raw.side!=="B")) return null;
@@ -13361,6 +13362,66 @@ function requireTournamentStartedForMatchAction(){
   return false;
 }
 
+function normalizeRoundFaultState(raw){
+  const src=raw&&typeof raw==="object"?raw:{};
+  const next={A:Number(src.A)===1?1:0,B:Number(src.B)===1?1:0,order:[]};
+  const seen=new Set();
+  (Array.isArray(src.order)?src.order:[]).forEach(side=>{
+    if((side==="A"||side==="B")&&next[side]===1&&!seen.has(side)){seen.add(side);next.order.push(side);}
+  });
+  if(next.A===1&&!seen.has("A"))next.order.push("A");
+  if(next.B===1&&!seen.has("B"))next.order.push("B");
+  return next;
+}
+function roundFaultState(match){return normalizeRoundFaultState(match&&match.roundFaults);}
+function setRoundFaultState(match,value){if(match)match.roundFaults=normalizeRoundFaultState(value);}
+function clearRoundFaultState(match){if(match)match.roundFaults={A:0,B:0,order:[]};}
+function roundFaultCount(match,side){const f=roundFaultState(match);return side==="A"?f.A:f.B;}
+function hasPendingRoundFault(match){return roundFaultState(match).order.length>0;}
+function roundFaultLastSide(match){const f=roundFaultState(match);return f.order.length?f.order[f.order.length-1]:null;}
+function applyFaultMutation(match,side,at){
+  if(!match||!["A","B"].includes(side))return {ok:false,reason:"invalid-fault"};
+  if(match.completed||match.status==="completed")return {ok:false,reason:"already-completed"};
+  if(checkWinnerSide(match))return {ok:false,reason:"invalid-score"};
+  const faults=roundFaultState(match);
+  if(faults[side]===0){
+    faults[side]=1;
+    faults.order=faults.order.filter(x=>x!==side);
+    faults.order.push(side);
+    setRoundFaultState(match,faults);
+    match.updatedAt=Number(at)||Date.now();
+    return {ok:true,kind:"warning",faults:roundFaultState(match)};
+  }
+  const recipient=side==="A"?"B":"A";
+  const scoreKey=recipient==="A"?"scoreA":"scoreB";
+  const current=Number(match[scoreKey]||0);
+  if(!Number.isFinite(current)||current+1>6)return {ok:false,reason:"invalid-score"};
+  if(!Array.isArray(match.log))match.log=[];
+  const event=createHunterRoundEvent(match,recipient,"fault",1,at,{faultSide:side,faultsBefore:faults});
+  match[scoreKey]=current+1;
+  match.log.push(event);
+  clearRoundFaultState(match);
+  match.updatedAt=Number(at)||Date.now();
+  return {ok:true,kind:"point",recipient,event};
+}
+function scoreEventText(event,aName,bName){
+  if(!event)return "";
+  if(event.type==="fault"){
+    const faultName=event.faultSide==="A"?aName:event.faultSide==="B"?bName:"選手";
+    const recipient=event.side==="A"?aName:bName;
+    return faultName+" 失誤×2｜"+recipient+"＋1分";
+  }
+  return (event.side==="A"?aName:bName)+" "+(POINT_LABELS[event.type]||"得分");
+}
+function scoreEventUndoLabel(event,aName,bName){
+  if(!event)return "撤銷上一筆得分";
+  if(event.type==="fault"){
+    const faultName=event.faultSide==="A"?aName:event.faultSide==="B"?bName:"選手";
+    return "撤銷失誤判分（"+faultName+" 第2次失誤）";
+  }
+  return "撤銷上一筆得分（"+(event.side==="A"?aName:bName)+" "+(POINT_LABELS[event.type]||"得分")+"）";
+}
+
 function addScore(matchId, side, type){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
@@ -13383,18 +13444,22 @@ function addScore(matchId, side, type){
   }
   const scoreEventAt=Date.now();
   if(!Array.isArray(m.log)) m.log=[];
-  const hunterRoundEvent=createHunterRoundEvent(m,side,type,pts,scoreEventAt);
+  const faultsBefore=roundFaultState(m);
+  const hunterRoundEvent=createHunterRoundEvent(m,side,type,pts,scoreEventAt,{faultsBefore});
   if(side==="A") m.scoreA+=pts; else m.scoreB+=pts;
   m.log.push(hunterRoundEvent);
+  clearRoundFaultState(m);
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch || remoteMatch.completed || remoteMatch.status==="completed") return {ok:false,reason:"already-completed"};
     if(checkWinnerSide(remoteMatch)) return {ok:false,reason:"invalid-score"};
     const remoteCurrent=side==="A"?Number(remoteMatch.scoreA||0):Number(remoteMatch.scoreB||0);
     if(!Number.isFinite(remoteCurrent) || remoteCurrent+pts>6) return {ok:false,reason:"invalid-score"};
+    const remoteFaultsBefore=roundFaultState(remoteMatch);
     if(side==="A") remoteMatch.scoreA=remoteCurrent+pts; else remoteMatch.scoreB=remoteCurrent+pts;
     if(!Array.isArray(remoteMatch.log)) remoteMatch.log=[];
-    const remoteRoundEvent=Object.assign({},hunterRoundEvent,{seq:remoteMatch.log.length+1});
+    const remoteRoundEvent=Object.assign({},hunterRoundEvent,{seq:remoteMatch.log.length+1,faultsBefore:remoteFaultsBefore});
     remoteMatch.log.push(remoteRoundEvent);
+    clearRoundFaultState(remoteMatch);
     remoteMatch.updatedAt=scoreEventAt;
     return {ok:true,state:remoteState};
   });
@@ -13405,19 +13470,70 @@ function addScore(matchId, side, type){
   render();
 }
 
+function addFault(matchId,side){
+  if(!canOperateCurrentTournament()){showToast("目前身分沒有此操作權限。",true);return;}
+  if(!requireTournamentStartedForMatchAction())return;
+  const m=getMatch(matchId);
+  if(!m||!["A","B"].includes(side))return;
+  if(!requireStationPermission(m))return;
+  if(pendingModal&&pendingModal.type==="confirm-result"&&pendingModal.matchId===matchId)return;
+  if(checkWinnerSide(m)){
+    pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
+    showToast("本場已達獲勝條件，請先確認結果。",true);render();return;
+  }
+  const at=Date.now();
+  const outcome=applyFaultMutation(m,side,at);
+  if(!outcome.ok){showToast(stationMutationErrorMessage(outcome.reason||"invalid-score"),true);return;}
+  persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
+    const remoteOutcome=applyFaultMutation(remoteMatch,side,at);
+    if(!remoteOutcome.ok)return {ok:false,reason:remoteOutcome.reason||"invalid-score"};
+    return {ok:true,state:remoteState};
+  });
+  const faultName=playerName(side==="A"?m.a?.playerId:m.b?.playerId);
+  if(outcome.kind==="warning"){
+    showToast(faultName+" 失誤 1/2");
+  }else{
+    const recipientName=playerName(outcome.recipient==="A"?m.a?.playerId:m.b?.playerId);
+    showToast(faultName+" 當局第 2 次失誤｜"+recipientName+" +1 分");
+    if(checkWinnerSide(m))pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
+  }
+  render();
+}
+
 function undoLast(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
-  if(!m || m.log.length===0) return;
+  if(!m) return;
   if(!requireStationPermission(m)) return;
+  const faults=roundFaultState(m);
+  if(faults.order.length){
+    const side=faults.order.pop();
+    faults[side]=0;
+    setRoundFaultState(m,faults);
+    persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
+      const remoteFaults=roundFaultState(remoteMatch);
+      if(!remoteFaults.order.length)return {ok:false,reason:"invalid-score"};
+      const remoteSide=remoteFaults.order.pop();
+      remoteFaults[remoteSide]=0;
+      setRoundFaultState(remoteMatch,remoteFaults);
+      remoteMatch.updatedAt=Date.now();
+      return {ok:true,state:remoteState};
+    });
+    showToast("已撤銷最近一次失誤");
+    render();
+    return;
+  }
+  if(!Array.isArray(m.log)||m.log.length===0) return;
   const last = m.log.pop();
-  if(last.side==="A") m.scoreA-=last.points; else m.scoreB-=last.points;
+  if(last.side==="A") m.scoreA=Math.max(0,Number(m.scoreA||0)-Number(last.points||0)); else m.scoreB=Math.max(0,Number(m.scoreB||0)-Number(last.points||0));
+  setRoundFaultState(m,last.faultsBefore||{A:0,B:0,order:[]});
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch || !Array.isArray(remoteMatch.log) || remoteMatch.log.length===0) return {ok:false,reason:"invalid-score"};
     const remoteLast=remoteMatch.log.pop();
     if(remoteLast.side==="A") remoteMatch.scoreA=Math.max(0,Number(remoteMatch.scoreA||0)-Number(remoteLast.points||0));
     else remoteMatch.scoreB=Math.max(0,Number(remoteMatch.scoreB||0)-Number(remoteLast.points||0));
+    setRoundFaultState(remoteMatch,remoteLast.faultsBefore||{A:0,B:0,order:[]});
     remoteMatch.updatedAt=Date.now();
     return {ok:true,state:remoteState};
   }); render();
@@ -13429,14 +13545,14 @@ function rematch(matchId){
   const m = getMatch(matchId);
   if(!m) return;
   if(!requireStationPermission(m)) return;
-  m.scoreA=0; m.scoreB=0; m.log=[]; m.winnerId=null; m.loserId=null; m.completed=false;
+  m.scoreA=0; m.scoreB=0; m.log=[]; clearRoundFaultState(m); m.winnerId=null; m.loserId=null; m.completed=false;
   m.status = "in_progress";
   m.updatedAt = Date.now();
   m.updatedBy = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   rebuildPropagation();
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch) return {ok:false,reason:"not-found"};
-    remoteMatch.scoreA=0; remoteMatch.scoreB=0; remoteMatch.log=[]; remoteMatch.hunterData=null; remoteMatch.winnerId=null; remoteMatch.loserId=null; remoteMatch.completed=false;
+    remoteMatch.scoreA=0; remoteMatch.scoreB=0; remoteMatch.log=[]; clearRoundFaultState(remoteMatch); remoteMatch.hunterData=null; remoteMatch.winnerId=null; remoteMatch.loserId=null; remoteMatch.completed=false;
     remoteMatch.status="in_progress"; remoteMatch.updatedAt=Date.now(); remoteMatch.updatedBy=adminDisplayName || (userProfile&&userProfile.email) || "admin";
     rebuildPropagationForState(remoteState);
     return {ok:true,state:remoteState};
@@ -13490,6 +13606,7 @@ function applyMatchCompletionFields(m, evalResult, actor){
   m.confirmedTournamentCode = state.cloudCode || null;
   m.confirmedAt = Date.now();
   m.completedAt = Date.now();
+  clearRoundFaultState(m);
   const hunterLedger=validateHunterRoundLedger(m);
   m.hunterData={schemaVersion:HUNTER_ROUND_SCHEMA_VERSION,scoringVersion:HUNTER_SCORING_VERSION,analyzable:hunterLedger.ok,roundCount:hunterLedger.roundCount,scoreA:hunterLedger.scoreA,scoreB:hunterLedger.scoreB,validatedAt:Date.now()};
   m.updatedAt = Date.now();
@@ -15567,9 +15684,16 @@ function renderCourtCard(stationNum){
   const scoreLocked=locked || preStartLocked || stationLocked || !!winSide;
 
   const scoreBtn = (side, type) => `<button data-action="score" data-id="${m.id}" data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
+  const faultBtn = (side) => {
+    const count=roundFaultCount(m,side);
+    return `<button class="fault-btn ${count?'is-active':''}" data-action="fault" data-id="${m.id}" data-side="${side}" ${scoreLocked?'disabled':''}><span class="fault-icon">⚠</span><span>失誤</span><b>${count}/2</b></button>`;
+  };
 
+  const faultLast=roundFaultLastSide(m);
   const lastLog = m.log.length ? m.log[m.log.length-1] : null;
-  const undoLabel = lastLog ? `撤銷上一筆得分（${lastLog.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[lastLog.type]}）` : "撤銷上一筆得分";
+  const undoLabel = faultLast
+    ? `撤銷失誤（${faultLast==='A'?esc(aName):esc(bName)} 1/2）`
+    : scoreEventUndoLabel(lastLog,aName,bName);
 
   return `
   <div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
@@ -15593,6 +15717,7 @@ function renderCourtCard(stationNum){
         <div class="score-btns">
           ${scoreBtn('A','spin')}${scoreBtn('A','knockout')}${scoreBtn('A','burst')}${scoreBtn('A','extreme')}
         </div>
+        ${faultBtn('A')}
       </div>
       ${refereeSwapControl(m)}
       <div class="side-panel ${winSide==='B'?'leading':''}">
@@ -15601,13 +15726,14 @@ function renderCourtCard(stationNum){
         <div class="score-btns">
           ${scoreBtn('B','spin')}${scoreBtn('B','knockout')}${scoreBtn('B','burst')}${scoreBtn('B','extreme')}
         </div>
+        ${faultBtn('B')}
       </div>
     </div>
 
-    <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
+    <div class="score-log">${m.log.map(l=>`<span>${esc(scoreEventText(l,aName,bName))}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
-      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${m.log.length===0||locked||stationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${(!m.log.length&&!hasPendingRoundFault(m))||locked||stationLocked?'disabled':''}>${undoLabel}</button>
       <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||stationLocked?'disabled':''}>本局重賽</button>
       <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
     </div>
@@ -23310,7 +23436,7 @@ function handleAction(action, target){
 
   if(action.startsWith("account-batch-")){handleAccountBatch(action,target);return;}
   const id = target.getAttribute("data-id");
-  if(id&&activeTab==="referee"&&["score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","open-quick-confirm","pause-match-status","resume-match-status","skip-match","court-swap-start"].includes(action)){
+  if(id&&activeTab==="referee"&&["score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","open-quick-confirm","pause-match-status","resume-match-status","skip-match","court-swap-start"].includes(action)){
     state.currentMatchId=id;rememberRefereeWorkstation();
   }
   if(action.startsWith("ops-")){handleTournamentOperationsAction(action,target);return;}
@@ -26003,6 +26129,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const m = getMatch(id);
     if(m&&m.completed){ showToast("此場已確認結果，請先使用「修正比分」安全撤回結果。",true); return; }
     addScore(id, side, type); return;
+  }
+  if(action==="fault"){
+    const side=target.getAttribute("data-side");
+    const m=getMatch(id);
+    if(m&&m.completed){showToast("此場已確認結果，請先使用「修正比分」安全撤回結果。",true);return;}
+    addFault(id,side);return;
   }
   if(action==="undo-score"){
     const m = getMatch(id);
