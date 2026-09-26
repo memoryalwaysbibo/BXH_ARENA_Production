@@ -11849,7 +11849,7 @@ async function performAutoArchive(){
         const reason=String((settled&&settled.reason)||"");
         const rawMessage=String((settled&&settled.message)||"");
         const insufficient=["insufficient-eligible-players","insufficient-valid-players","not-enough-eligible-players"].includes(reason) || /至少.*兩位.*有效/.test(rawMessage);
-        const msg=insufficient ? "有效正式 BXH 帳號不足兩位。本場未計入天梯，可確認後以一般賽事結案。" : reason==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : rawMessage||"天梯積分寫入失敗";
+        const msg=insufficient ? "正式積分賽至少需要兩位有效 BXH 玩家帳號；本場未計入天梯，可確認後以一般賽事結案。" : reason==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : rawMessage||"天梯積分寫入失敗";
         state.settlementError=msg;
         state.settlementErrorCode=insufficient?"insufficient-eligible-players":((settled&&settled.reason)||"ranked-settlement-failed");
         state.settlementPhase="failed";
@@ -11876,7 +11876,7 @@ async function performAutoArchive(){
       const known={"admin-required":"只有管理員／最高管理員可以結算正式積分賽","inactive-account":"目前帳號已停用，無法結算","auth-required":"登入狀態已失效，請重新登入","service-unavailable":"積分結算服務尚未部署"};
       const key=Object.keys(known).find(k=>raw.includes(k));
       const insufficient=/至少.*兩位.*有效/.test(raw)||raw.includes("insufficient-eligible-players")||raw.includes("insufficient-valid-players")||raw.includes("not-enough-eligible-players");
-      state.settlementError=insufficient?"有效正式 BXH 帳號不足兩位。本場未計入天梯，可確認後以一般賽事結案。":key?known[key]:(raw&&raw!=="request-failed"?"天梯結算失敗："+raw:"天梯積分結算失敗；賽事尚未封存");
+      state.settlementError=insufficient?"正式積分賽至少需要兩位有效 BXH 玩家帳號；本場未計入天梯，可確認後以一般賽事結案。":key?known[key]:(raw&&raw!=="request-failed"?"天梯結算失敗："+raw:"天梯積分結算失敗；賽事尚未封存");
       state.settlementErrorCode=insufficient?"insufficient-eligible-players":((e&&e.code)||"ranked-settlement-exception");
       state.settlementPhase="failed";
       await saveRecord(state);
