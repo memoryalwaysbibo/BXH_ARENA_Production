@@ -17747,6 +17747,8 @@ document.addEventListener('change',event=>{
   if(!status)return;
   const config=status.closest('.account-partner-grant')?.querySelector('.partner-config');
   if(config)config.hidden=status.value!=='active';
+  const save=status.closest('.account-partner-grant')?.querySelector('[data-action="save-partner-grant"]');
+  if(save)save.disabled=status.value==='active';
 });
 function renderAccountManagementScreen(){
   const page=["accounts","checkin","titles"].includes(superAdminManagementPage)?superAdminManagementPage:"accounts";
@@ -17810,16 +17812,16 @@ function renderAccountManagementScreen(){
                 <label class="account-active-control"><input type="checkbox" class="mgmt-test-box" data-uid="${esc(user.uid)}" ${draft.isTestAccount?'checked':''} style="width:20px;height:20px;">測試身分</label>
                 <label class="account-active-control"><input type="checkbox" class="mgmt-active-box" data-uid="${esc(user.uid)}" ${draft.active?'checked':''} style="width:20px;height:20px;">帳號啟用</label>
                 <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
-                ${user.role==="player"?`<div class="account-partner-grant"><div class="field"><label>合作主辦權限</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>開通合作主辦</option></select></div>
+                ${user.role==="player"?`<div class="account-partner-grant"><div class="field"><label>合作主辦權限</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>選擇合作主辦方案（待簽約）</option></select></div>
                   <div class="partner-config" ${user.partnerOrganizer?.status==="active"?"":"hidden"}>
-                  <p class="hint">先選合作方案；簽約與積分賽權限另行核准。</p>
+                  <p class="hint">方案可先行查看；需完成合約簽署、付款核對及最高管理員二次確認後才可啟用。</p>
                   <div class="grid grid-2">
                     
                     <div class="field"><label>主辦名稱</label><input class="partner-name" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.organizationName||"")}" maxlength="80"></div>
                     <div class="field"><label>合作方案</label><select class="partner-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option><option value="A1" ${user.partnerOrganizer?.plan==="A1"?"selected":""}>A1｜16–32 人｜1 場｜NT$300</option><option value="A2" ${user.partnerOrganizer?.plan==="A2"?"selected":""}>A2｜16–32 人｜4 場｜NT$1,000</option><option value="A3" ${user.partnerOrganizer?.plan==="A3"?"selected":""}>A3｜16–32 人｜8 場｜NT$1,500</option><option value="A4" ${user.partnerOrganizer?.plan==="A4"?"selected":""}>A4｜16–32 人｜12 場｜NT$2,000</option><option value="B1" ${user.partnerOrganizer?.plan==="B1"?"selected":""}>B1｜33–64 人｜1 場｜NT$600</option><option value="B2" ${user.partnerOrganizer?.plan==="B2"?"selected":""}>B2｜33–64 人｜4 場｜NT$2,000</option><option value="B3" ${user.partnerOrganizer?.plan==="B3"?"selected":""}>B3｜33–64 人｜8 場｜NT$3,200</option><option value="C1" ${user.partnerOrganizer?.plan==="C1"?"selected":""}>C1｜65–128 人｜1 場｜NT$1,000</option><option value="C2" ${user.partnerOrganizer?.plan==="C2"?"selected":""}>C2｜65–128 人｜4 場｜NT$3,400</option><option value="D1" ${user.partnerOrganizer?.plan==="D1"?"selected":""}>D1｜129–256 人｜1 場｜NT$2,000</option>${user.partnerOrganizer?.plan&&!["A1","A2","A3","A4","B1","B2","B3","C1","C2","D1"].includes(user.partnerOrganizer.plan)?`<option value="${esc(user.partnerOrganizer.plan)}" selected>既有方案｜${esc(user.partnerOrganizer.plan)}</option>`:""}</select></div>
                     <div class="field"><label>有效期限（選填）</label><input type="date" class="partner-expiry" data-uid="${esc(user.uid)}" value="${user.partnerOrganizer?.expiresAt?new Date(user.partnerOrganizer.expiresAt+8*3600000).toISOString().slice(0,10):""}"></div>
                   </div>
-                  <button class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}">儲存合作主辦授權</button>
+                  <button class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" ${user.partnerOrganizer?.status==="active"?"disabled":""}>儲存撤銷</button>
                   </div>
                 </div>`:""}
               </div>
@@ -25396,6 +25398,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!user||user.role!=="player"){showToast("僅可授權玩家帳號",true);return;}
     const get=selector=>managedAccountControl(selector,uid);
     const status=get(".partner-status")?.value;
+    if(status==="active"){showToast("請先完成合作合約與付款確認；此處不能直接啟用授權",true);return;}
     const name=(get(".partner-name")?.value||"").trim();
     const plan=(get(".partner-plan")?.value||"").trim();
     const date=get(".partner-expiry")?.value||"";
