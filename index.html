@@ -17848,8 +17848,8 @@ function renderAccountManagementScreen(){
                   </div>
                   <button type="button" class="btn btn-ghost btn-sm" data-action="partner-preview-contract" data-uid="${esc(user.uid)}">預覽合約資料</button>
                   <div class="partner-contract-preview hint" role="status" aria-live="polite" hidden style="white-space:pre-wrap;margin-top:8px;"></div>
-                  <button class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" ${user.partnerOrganizer?.status==="active"?"disabled":""}>儲存撤銷</button>
                   </div>
+                  ${user.partnerOrganizer?.status==="active"?`<button type="button" class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" disabled>確認撤銷舊授權</button>`:""}
                 </div>`:""}
               </div>
             </div>
@@ -25426,15 +25426,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const get=selector=>managedAccountControl(selector,uid);
     const status=get(".partner-status")?.value;
     if(status==="active"){showToast("請先完成合作合約與付款確認；此處不能直接啟用授權",true);return;}
-    const name=(get(".partner-name")?.value||"").trim();
-    const plan=(get(".partner-plan")?.value||"").trim();
-    const date=get(".partner-expiry")?.value||"";
-    if(!name||!/^[-a-zA-Z0-9_]{1,40}$/.test(plan)){showToast("請填寫主辦名稱與有效方案代碼",true);return;}
-    const expiresAt=date?Date.parse(date+"T23:59:59+08:00"):null;
-    if(date&&(!Number.isFinite(expiresAt)||expiresAt<=Date.now())&&status==="active"){showToast("有效期限需在未來",true);return;}
-    const grant={status,organizationId:user.partnerOrganizer?.organizationId||("org-"+uid),organizationName:name,plan,expiresAt};
-    if(JSON.stringify(grant)===JSON.stringify(user.partnerOrganizer)){showToast("授權沒有變更");return;}
-    openModal({type:"generic",title:"確認合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\\n狀態："+(status==="active"?"開通":"撤銷")+"\\n主辦："+name+"\\n方案："+plan+"\\n期限："+(date||"未設定"),confirmLabel:"確認儲存",onConfirm:()=>{(async()=>{await changeSingleManagedAccount(uid,{partnerOrganizer:grant},null);})();}});
+    if(status!=="revoked"||user.partnerOrganizer?.status!=="active"){
+      showToast("目前沒有可撤銷的合作主辦授權",true);return;
+    }
+    const grant={...user.partnerOrganizer,status:"revoked"};
+    openModal({type:"generic",title:"確認撤銷合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\\n撤銷後將停止合作主辦權限。",confirmLabel:"確認撤銷",onConfirm:()=>{(async()=>{await changeSingleManagedAccount(uid,{partnerOrganizer:grant},null);})();}});
     return;
   }
   if(action==="save-managed-account"){
