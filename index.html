@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.05">
+<meta name="bxh-build" content="20260926.06">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.05";
+  var CURRENT_BUILD="20260926.06";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5520,6 +5520,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 }
 </style>
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
+<link rel="stylesheet" href="referee-score-v2.css?v=14.2.36-score-v2">
 </head>
 <body>
 
@@ -5974,9 +5975,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.35";
+const APP_VERSION = "v14.2.36";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.36",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台計分介面 V2｜黑金強化版",updateLevel:"minor",added:["裁判台正常計分模式新增黑金主戰卡視覺、得分鍵圖示、主控交換鍵與結果操作分層"],changed:["場次狀態改為精簡控制台","雙方選手卡、姓名與分數重新建立視覺層級","四種得分鍵改為單欄大觸控鍵並保留既有文字與分值","最新得分改膠囊紀錄，撤銷獨立成整列操作","本局重賽降為副操作，確認比賽結果升為金色主 CTA","四台桌面 compact 模式維持既有密度規格"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee score panel V2",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台正常計分介面升級為黑金主控台風格；操作流程與計分邏輯不變。"},
   {version:"v14.2.35",date:"2026/09/26",timezone:"Asia/Taipei",title:"工作人員指派專用雲端同步",updateLevel:"patch",added:["工作人員指派改用專用 Firestore transaction，僅更新 assignedStaffUids 與私人賽事狀態"],changed:["指派操作會等待伺服器讀回驗證成功後才顯示完成","保留既有裁判台必要 UID，避免工作人員名單更新誤移除裁判權限","權限拒絕與真正網路異常分流顯示，不再把單次寫入失敗一律標成 LINK ERROR"],fixed:["修正每次指派工作人員後 BXH LIVE LINK 誤顯示雲端連線異常，但重新整理後資料其實已存在的假斷線現象","修正舊流程未 await saveState()，畫面先顯示成功但雲端仍在背景寫入的時序問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend staff assignment sync hotfix",firebaseImpact:"無新增集合；沿用 tournaments.assignedStaffUids，改為專用 transaction",securityRulesImpact:"無；沿用既有 admin update 規則",permissionImpact:"無擴權；仍限 admin／super_admin 執行工作人員指派",publicSummary:"工作人員指派改成獨立原子同步並等待雲端確認；單次指派不再讓整個 LIVE LINK 誤判斷線。"},
   {version:"v14.2.34",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台下一場 fallback 補完",updateLevel:"patch",added:[],changed:["上方精簡下一場卡補齊雙方已確定、等待晉級、等待安排、本台完成四種狀態","下一場只有一位選手確定時顯示已知選手 VS 待定，通知按鈕維持停用"],fixed:["修正 active scoring 移除底部重複卡後，下一場尚未完全產生時整段資訊消失"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee next-match fallback fix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台下一場資訊不再因等待晉級而消失；未確定時會顯示待定狀態。"},
   {version:"v14.2.33",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台下一場精簡整合",updateLevel:"patch",added:[],changed:["下一場改為裁判叫號區內的精簡雙列資訊，場次、人名、通知狀態與通知準備集中在同一視線區","移除正常計分與簡易判定底部重複的下一場卡片","更新 court-call-ui 資源版本，避免 iPhone／PWA 沿用舊快取"],fixed:["修正新版裁判叫號 UI 已部署但行動裝置仍可能載入舊 court-call-ui.js 的快取問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee compact next-match + cache bust",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台下一場資訊集中到上方叫號區，不再上下重複，並強制更新行動端 JS 資源。"},
@@ -15587,10 +15589,10 @@ function renderCourtCard(stationNum){
 
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
-    <div class="btn-row" style="margin-top:16px;">
-      <button class="btn btn-ghost" data-action="undo-score" data-id="${m.id}" ${m.log.length===0||locked||stationLocked?'disabled':''}>${undoLabel}</button>
-      <button class="btn btn-ghost" data-action="rematch" data-id="${m.id}" ${locked||stationLocked?'disabled':''}>本局重賽</button>
-      <button class="btn btn-primary" data-action="confirm-result" data-id="${m.id}" ${winSide&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
+    <div class="btn-row ref-result-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${m.log.length===0||locked||stationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||stationLocked?'disabled':''}>本局重賽</button>
+      <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
     </div>
 
   </div>`;
