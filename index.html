@@ -11131,7 +11131,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
   "draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster",
   "clear-data","import-data","export-data","goto-settings",
-  "archive-complete","save-pause","unarchive-current",
+  "archive-complete","archive-general-insufficient","save-pause","unarchive-current",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility",
   "toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "new-tournament-copy","new-tournament-blank","duplicate-record","delete-record","resume-record",
@@ -11144,7 +11144,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
 const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "set-registration-draft-name-mode","set-registration-draft-target-group","set-registration-draft-visibility","community-save-settings","save-staff-assignment",
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
-  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data",
+  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data","archive-general-insufficient",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle","set-ladder-mode"
@@ -11205,6 +11205,7 @@ function isSystemSyntheticTestRoster(st=state){
 }
 function settlementRouteForTournament(st=state){
   const m=st&&st.meta||{};
+  if(st&&st.generalClosureReason==="insufficient-eligible-players" && st.ladderPointsAwarded!==true) return "no-ladder";
   if(st&&st.testLadderEnabled===true && isOwnTestTournament(st)) return "test-ranked";
   if(isTestTournament(st) || isSystemSyntheticTestRoster(st)) return "test-no-ladder";
   if(m.eventAuthority==="official" && m.ladderMode==="ranked") return "official-ranked";
@@ -11755,6 +11756,11 @@ async function performAutoArchive(){
 
   const settlementRoute=settlementRouteForTournament(state);
   state.settlementRoute=settlementRoute;
+  if(state.generalClosureReason==="insufficient-eligible-players" && settlementRoute==="no-ladder"){
+    state.meta.ladderMode="general";
+    state.ladderPointsAwarded=false;
+    state.officialLadderSkippedReason="insufficient-eligible-players";
+  }
   if(settlementRoute==="test-no-ladder"){
     const synthetic=isSystemSyntheticTestRoster(state);
     if(synthetic){
@@ -11843,7 +11849,7 @@ async function performAutoArchive(){
         const reason=String((settled&&settled.reason)||"");
         const rawMessage=String((settled&&settled.message)||"");
         const insufficient=["insufficient-eligible-players","insufficient-valid-players","not-enough-eligible-players"].includes(reason) || /至少.*兩位.*有效/.test(rawMessage);
-        const msg=insufficient ? "正式積分賽至少需要兩位有效 BXH 玩家帳號" : reason==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : rawMessage||"天梯積分寫入失敗";
+        const msg=insufficient ? "有效正式 BXH 帳號不足兩位。本場未計入天梯，可確認後以一般賽事結案。" : reason==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : rawMessage||"天梯積分寫入失敗";
         state.settlementError=msg;
         state.settlementErrorCode=(settled&&settled.reason)||"ranked-settlement-failed";
         state.settlementPhase="failed";
@@ -11870,8 +11876,8 @@ async function performAutoArchive(){
       const known={"admin-required":"只有管理員／最高管理員可以結算正式積分賽","inactive-account":"目前帳號已停用，無法結算","auth-required":"登入狀態已失效，請重新登入","service-unavailable":"積分結算服務尚未部署"};
       const key=Object.keys(known).find(k=>raw.includes(k));
       const insufficient=/至少.*兩位.*有效/.test(raw)||raw.includes("insufficient-eligible-players")||raw.includes("insufficient-valid-players")||raw.includes("not-enough-eligible-players");
-      state.settlementError=insufficient?"正式積分賽至少需要兩位有效 BXH 玩家帳號":key?known[key]:(raw&&raw!=="request-failed"?"天梯結算失敗："+raw:"天梯積分結算失敗；賽事尚未封存");
-      state.settlementErrorCode=(e&&e.code)||"ranked-settlement-exception";
+      state.settlementError=insufficient?"有效正式 BXH 帳號不足兩位。本場未計入天梯，可確認後以一般賽事結案。":key?known[key]:(raw&&raw!=="request-failed"?"天梯結算失敗："+raw:"天梯積分結算失敗；賽事尚未封存");
+      state.settlementErrorCode=insufficient?"insufficient-eligible-players":((e&&e.code)||"ranked-settlement-exception");
       state.settlementPhase="failed";
       await saveRecord(state);
       showToast(state.settlementError,true);
@@ -14424,10 +14430,14 @@ function renderArchiveControls(){
     },0);
   }
   const phaseLabel={processing:"結算處理中",ladder:"天梯結算中",archive:"封存同步中","sync-pending":"等待雲端同步",failed:"封存失敗，可重試",completed:"已完成",idle:"自動封存準備中"}[phase]||"自動封存準備中";
+  const canCloseAsGeneral=canArchive && phase==="failed" && state.ladderPointsAwarded!==true &&
+    settlementRouteForTournament(state)==="official-ranked" &&
+    (["insufficient-eligible-players","insufficient-valid-players","not-enough-eligible-players"].includes(state.settlementErrorCode) || /至少.*兩位.*有效/.test(state.settlementError||""));
   return `<div class="btn-row" style="margin-top:14px;">
     <p class="hint" role="status">對戰已完成｜${esc(phaseLabel)}｜第 ${Number(state.settlementAttempt||0)} 次處理</p>
     ${state.settlementError?`<p role="alert">${esc(state.settlementError)}</p>`:""}
     ${canArchive && phase!=="idle" ? `<button class="btn btn-primary" data-action="archive-complete">${phase==="failed"?"重試封存":"重新嘗試結算"}</button>` : ""}
+    ${canCloseAsGeneral && isAdminTierOrAbove() ? `<button class="btn btn-ghost" data-action="archive-general-insufficient">不計積分，以一般賽事結案</button>` : ""}
     ${canArchive && phase!=="failed" ? `<span class="hint">最終結果確認後由系統自動結算並封存，不需最高管理員再次確認。${phase!=="idle"?" 若狀態長時間未更新，可使用「重新嘗試結算」安全續跑。":""}</span>` : ""}
     <button class="btn btn-ghost" data-action="goto-history">前往賽事紀錄</button>
   </div>`;
@@ -25914,6 +25924,24 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
+  if(action==="archive-general-insufficient"){
+    if(!isAdminTierOrAbove() || state.ladderPointsAwarded===true || state.archiveStatus==="completed" ||
+       settlementRouteForTournament(state)!=="official-ranked" ||
+       !(["insufficient-eligible-players","insufficient-valid-players","not-enough-eligible-players"].includes(state.settlementErrorCode) || /至少.*兩位.*有效/.test(state.settlementError||""))){
+      showToast("目前無法改以一般賽事結案，請重新檢查結算狀態。",true); return;
+    }
+    if(!confirm("後端已回報有效正式 BXH 帳號不足兩位。確認保留賽果、跳過正式天梯積分，並以一般賽事結案？")) return;
+    state.generalClosureReason="insufficient-eligible-players";
+    state.generalClosureAt=Date.now();
+    state.generalClosureBy=currentAuthUid();
+    state.originalLadderMode="ranked";
+    (async()=>{
+      const ok=await performAutoArchive();
+      recordIndex=await loadIndex(); historyCloudSyncLoaded=false; render();
+      if(!ok) showToast("一般賽事結案尚未完成，請依畫面錯誤訊息處理。",true);
+    })();
+    return;
+  }
   if(action==="save-pause"){
     state.archiveStatus="paused";
     (async ()=>{
@@ -30155,6 +30183,8 @@ if(testerSession){
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
+              if(data.generalClosureReason==="insufficient-eligible-players" &&
+                 (remoteDoc.ladderPointsAwarded===true || remoteState.ladderPointsAwarded===true)) throw new Error("ladder-already-awarded");
               // Completed results are irreversible through ordinary whole-state sync.
               // A stale device must never roll a confirmed match (or completed archive)
               // back to "in progress"; corrections must use the explicit correction flow.
