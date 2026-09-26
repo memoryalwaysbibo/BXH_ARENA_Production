@@ -12,6 +12,9 @@ def replace_once(before, after):
         raise RuntimeError(f'Expected one V3 script segment, found {count}: {before[:70]}')
     html = html.replace(before, after, 1)
 
+replace_once('12 張定版卡面隨機展示｜此頁為抽卡動畫預覽，尚未連接賽事與裁判計分。',
+             '12 張 BXH 附魔卡｜抽卡結果由賽事伺服器指定，請等待裁判開始。')
+
 replace_once(
     "let phase='idle',round=1,index=0,timer=null,drag=null,progress=0;const order=[...cards.keys()].sort(()=>Math.random()-.5);",
     "let phase='waiting',round=0,index=0,timer=null,drag=null,progress=0,assignedCard=null,session=null,acknowledgedRound=0;"
