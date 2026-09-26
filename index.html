@@ -17743,6 +17743,19 @@ async function handleTitleEditor(action){
 }
 
 document.addEventListener('click',event=>{
+  const button=event.target?.closest?.('[data-action="partner-open-contract-form"]');
+  if(!button)return;
+  const panel=button.closest('.account-partner-grant');
+  const status=panel?.querySelector('.partner-status');
+  const form=panel?.querySelector('.partner-config');
+  if(!status||!form)return;
+  status.value='active';
+  form.hidden=false;
+  panel.querySelector('[data-action="save-partner-grant"]')?.setAttribute('disabled','');
+  form.scrollIntoView({behavior:'smooth',block:'center'});
+  form.querySelector('.partner-name')?.focus({preventScroll:true});
+});
+document.addEventListener('click',event=>{
   const button=event.target?.closest?.('[data-action="partner-preview-contract"]');
   if(!button)return;
   const card=button.closest('.account-user-card');
@@ -17836,15 +17849,16 @@ function renderAccountManagementScreen(){
                 <label class="account-active-control"><input type="checkbox" class="mgmt-active-box" data-uid="${esc(user.uid)}" ${draft.active?'checked':''} style="width:20px;height:20px;">帳號啟用</label>
                 <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
                 ${user.role==="player"?`<div class="account-partner-grant"><div class="field"><label>合作主辦權限</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>選擇合作主辦方案（待簽約）</option></select></div>
+                  <button type="button" class="btn btn-ghost btn-sm" data-action="partner-open-contract-form" data-uid="${esc(user.uid)}">填寫合作合約</button>
                   <div class="partner-config" ${user.partnerOrganizer?.status==="active"?"":"hidden"}>
-                  <p class="hint">方案可先行查看；需完成合約簽署、付款核對及最高管理員二次確認後才可啟用。</p>
+                  <div class="panel-title">填寫合作合約</div><p class="hint">依序填寫主辦名稱、方案、合約起訖日與完整條款；預覽只供核對，不會建立訂單或寄送。簽署、付款核對與二次確認完成後才可啟用。</p>
                   <div class="grid grid-2">
                     
                     <div class="field"><label>主辦名稱</label><input class="partner-name" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.organizationName||"")}" maxlength="80"></div>
                     <div class="field"><label>合作方案</label><select class="partner-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option><option value="A1" ${user.partnerOrganizer?.plan==="A1"?"selected":""}>A1｜16–32 人｜1 場｜NT$300</option><option value="A2" ${user.partnerOrganizer?.plan==="A2"?"selected":""}>A2｜16–32 人｜4 場｜NT$1,000</option><option value="A3" ${user.partnerOrganizer?.plan==="A3"?"selected":""}>A3｜16–32 人｜8 場｜NT$1,500</option><option value="A4" ${user.partnerOrganizer?.plan==="A4"?"selected":""}>A4｜16–32 人｜12 場｜NT$2,000</option><option value="B1" ${user.partnerOrganizer?.plan==="B1"?"selected":""}>B1｜33–64 人｜1 場｜NT$600</option><option value="B2" ${user.partnerOrganizer?.plan==="B2"?"selected":""}>B2｜33–64 人｜4 場｜NT$2,000</option><option value="B3" ${user.partnerOrganizer?.plan==="B3"?"selected":""}>B3｜33–64 人｜8 場｜NT$3,200</option><option value="C1" ${user.partnerOrganizer?.plan==="C1"?"selected":""}>C1｜65–128 人｜1 場｜NT$1,000</option><option value="C2" ${user.partnerOrganizer?.plan==="C2"?"selected":""}>C2｜65–128 人｜4 場｜NT$3,400</option><option value="D1" ${user.partnerOrganizer?.plan==="D1"?"selected":""}>D1｜129–256 人｜1 場｜NT$2,000</option>${user.partnerOrganizer?.plan&&!["A1","A2","A3","A4","B1","B2","B3","C1","C2","D1"].includes(user.partnerOrganizer.plan)?`<option value="${esc(user.partnerOrganizer.plan)}" selected>既有方案｜${esc(user.partnerOrganizer.plan)}</option>`:""}</select></div>
                     <div class="field"><label>有效期限（選填）</label><input type="date" class="partner-expiry" data-uid="${esc(user.uid)}" value="${user.partnerOrganizer?.expiresAt?new Date(user.partnerOrganizer.expiresAt+8*3600000).toISOString().slice(0,10):""}"></div>
                     <div class="field"><label>合約起始日</label><input type="date" class="partner-contract-start" data-uid="${esc(user.uid)}"></div>
-                    <div class="field"><label>合作條款草稿</label><textarea class="partner-contract-terms" data-uid="${esc(user.uid)}" rows="5" maxlength="100000" placeholder="輸入積分賽使用範圍、付款方式、終止事由及違約金比例"></textarea></div>
+                    <div class="field"><label>合約內容與合作條款</label><textarea class="partner-contract-terms" data-uid="${esc(user.uid)}" rows="5" maxlength="100000" placeholder="輸入積分賽使用範圍、付款方式、終止事由及違約金比例"></textarea></div>
                   </div>
                   <button type="button" class="btn btn-ghost btn-sm" data-action="partner-preview-contract" data-uid="${esc(user.uid)}">預覽合約資料</button>
                   <div class="partner-contract-preview hint" role="status" aria-live="polite" hidden style="white-space:pre-wrap;margin-top:8px;"></div>
