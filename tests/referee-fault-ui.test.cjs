@@ -13,6 +13,7 @@ assert(html.includes('function addFault(matchId, offendingSide)'),'fault action 
 assert(html.includes('data-action="fault"'),'referee fault button missing');
 assert(html.includes('失誤 ${count}/2'),'fault button must expose 0/2 or 1/2');
 assert(html.includes('if(action==="fault")'),'fault click dispatch missing');
+assert.equal((html.match(/"score","fault","undo-score"/g)||[]).length,5,'fault must share score permission and referee routing in all five action lists');
 assert(html.includes('faultApi.attachSnapshotToEvent(m,hunterRoundEvent)'),'normal scoring must snapshot pending faults');
 assert(html.includes('faultApi.clear(m)'),'normal scoring must clear current-round faults');
 assert(html.includes('faultApi.restoreFromEvent(m,last)'),'undo must restore pre-score fault state');

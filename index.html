@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.08">
+<meta name="bxh-build" content="20260926.09">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.08";
+  var CURRENT_BUILD="20260926.09";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5992,9 +5992,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.38";
+const APP_VERSION = "v14.2.39";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.39",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台失誤權限路由補完",updateLevel:"patch",added:[],changed:["失誤操作正式納入與 score 相同的裁判台操作權限、完成賽事鎖定、一般賽事房主權限與 staff live-operator 路由","點擊失誤時同步記住目前裁判台場次，與其他計分操作行為一致"],fixed:["修正失誤按鈕雖已顯示，但 staff／一般賽事房主／tester 等角色可能因 action allowlist 未包含 fault 而無法正確操作"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee fault permission routing fix",firebaseImpact:"無資料結構變更",securityRulesImpact:"無",permissionImpact:"fault 與既有 score 完全同權限層級",publicSummary:"失誤按鈕權限已與一般得分按鈕完全一致。"},
   {version:"v14.2.38",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台當局失誤判定",updateLevel:"minor",added:["正常判定模式左右選手各新增失誤按鈕，顯示當局 0/2、1/2 狀態","同一位選手當局第 2 次失誤時，系統自動讓對手 +1 分並記錄為對手失誤得分"],changed:["任何正常得分成立後自動開始新一局並清除雙方當局失誤","撤銷上一筆可先撤銷尚未形成得分的失誤；若撤銷失誤判分，會恢復判分前的失誤狀態","本局重賽、選手晉級替換與安全比分重設都會清空當局失誤"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee two-fault scoring rule",firebaseImpact:"賽事 match JSON 新增 faultActions 暫存欄位；第二次失誤仍寫入既有 log/score 結構",securityRulesImpact:"無",permissionImpact:"沿用既有裁判台／桌次權限",publicSummary:"裁判台新增失誤判定：同一局失誤兩次，對手自動獲得 1 分。"},
   {version:"v14.2.37",date:"2026/09/26",timezone:"Asia/Taipei",title:"Header Logo 快速重新整理",updateLevel:"patch",added:["固定 Header 左上 BXH Logo 改為重新整理按鈕"],changed:["點擊 Logo 會以 cache-bust 重新載入目前頁面並重新建立雲端同步，完成後顯示已讀取最新資訊","所有共用 Header 的 Logo 採相同操作與無障礙標籤"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend header refresh control",firebaseImpact:"無資料結構變更；重新載入後沿用既有 Firebase session 與訂閱流程",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"左上 BXH Logo 現在可以直接重新整理頁面並讀取最新資訊。"},
   {version:"v14.2.36",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台計分介面 V2｜黑金強化版",updateLevel:"minor",added:["裁判台正常計分模式新增黑金主戰卡視覺、得分鍵圖示、主控交換鍵與結果操作分層"],changed:["場次狀態改為精簡控制台","雙方選手卡、姓名與分數重新建立視覺層級","四種得分鍵改為單欄大觸控鍵並保留既有文字與分值","最新得分改膠囊紀錄，撤銷獨立成整列操作","本局重賽降為副操作，確認比賽結果升為金色主 CTA","四台桌面 compact 模式維持既有密度規格"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee score panel V2",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台正常計分介面升級為黑金主控台風格；操作流程與計分邏輯不變。"},
@@ -11052,7 +11053,7 @@ function isLineInAppBrowser(){
 }
 
 const ADMIN_ONLY_ACTIONS = new Set([
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
   "draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster",
   "clear-data","import-data","export-data","goto-settings",
@@ -11068,7 +11069,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
 ]);
 const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "set-registration-draft-name-mode","set-registration-draft-target-group","set-registration-draft-visibility","community-save-settings","save-staff-assignment",
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
@@ -11076,7 +11077,7 @@ const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
 ]);
 
 const COMMUNITY_OWNER_ACTIONS = new Set([
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","update-players","quick-add-players","random-test-roster",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","update-players","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
   "start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","goto-settings"
 ]);
@@ -11099,7 +11100,7 @@ const ADMIN_TIER_ONLY_ACTIONS = new Set([
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
 const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
-  "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
+  "score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status",
   "skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","archive-complete"
 ]);
@@ -23400,7 +23401,7 @@ function handleAction(action, target){
 
   if(action.startsWith("account-batch-")){handleAccountBatch(action,target);return;}
   const id = target.getAttribute("data-id");
-  if(id&&activeTab==="referee"&&["score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","open-quick-confirm","pause-match-status","resume-match-status","skip-match","court-swap-start"].includes(action)){
+  if(id&&activeTab==="referee"&&["score","fault","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","open-quick-confirm","pause-match-status","resume-match-status","skip-match","court-swap-start"].includes(action)){
     state.currentMatchId=id;rememberRefereeWorkstation();
   }
   if(action.startsWith("ops-")){handleTournamentOperationsAction(action,target);return;}
