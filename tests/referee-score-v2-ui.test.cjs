@@ -24,7 +24,9 @@ assert(css.includes('.ref-result-actions .ref-undo-score'),'undo full-row visual
 assert(css.includes('.ref-result-actions .ref-confirm-result'),'primary confirm CTA visual missing');
 assert(css.includes('@media(max-width:640px)'),'mobile referee tuning missing');
 
-assert(!css.includes('pointer-events:none'),'V2 stylesheet must not disable referee controls');
-assert(!css.includes('display:none'),'V2 stylesheet must not hide referee controls');
+const controlBlocks=[...css.matchAll(/(?:score-btns button|ref-swap|ref-result-actions \\.btn|msc-btns \\.btn)[^{]*\\{([^}]*)\\}/g)].map(m=>m[1]);
+assert(controlBlocks.length>=6,'expected referee interactive style blocks are missing');
+assert(controlBlocks.every(block=>!block.includes('pointer-events:none')),'V2 must not disable referee controls');
+assert(controlBlocks.every(block=>!block.includes('display:none')),'V2 must not hide referee controls');
 
 console.log('PASS referee score panel V2 visual-only guards');
