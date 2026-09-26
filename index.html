@@ -10373,6 +10373,7 @@ function ensureSettingsFormDraft(){
     checkin:m.checkin||"",
     startTime:m.startTime||"",
     formatType:m.formatType||"single",
+    playMode:"standard", // 附魔之戰尚未開放，既有賽事維持標準對戰。
     stations:Math.max(1,parseInt(m.stations,10)||1),
     bronzeMatch:!!m.bronzeMatch,
     ladderMode:(isTester()&&state.testLadderEnabled===true)?"ranked":(m.ladderMode==="ranked"?"ranked":"general"),
@@ -10405,6 +10406,7 @@ function syncSettingsDraftFromDom(){
   settingsFormDraft.checkin=val("f-checkin",settingsFormDraft.checkin);
   settingsFormDraft.startTime=val("f-start",settingsFormDraft.startTime);
   settingsFormDraft.formatType=val("f-format",settingsFormDraft.formatType)||"single";
+  settingsFormDraft.playMode=val("f-play-mode",settingsFormDraft.playMode)||"standard";
 
   const st=document.getElementById("f-stations");
   if(st) settingsFormDraft.stations=Math.max(1,parseInt(st.value,10)||1);
@@ -13472,6 +13474,13 @@ function refereeFaultLast(m){
 function addScore(matchId, side, type){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
+  // The existing round ledger only accepts unmodified BXH points. Until the
+  // server-owned card draws and versioned enchanted ledger are connected,
+  // fail closed for an imported/legacy match marked as enchantment.
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰尚未接入雙方手機抽卡及附魔計分，暫不可送出得分。",true);
+    return;
+  }
   if(!["spin","knockout","burst","extreme"].includes(type)) return;
   const m = getMatch(matchId);
   if(!m) return;
@@ -13522,6 +13531,10 @@ function addScore(matchId, side, type){
 function addFault(matchId, offendingSide){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰尚未接入當局失誤與抽卡狀態，暫不可送出失誤判定。",true);
+    return;
+  }
   const m=getMatch(matchId);
   if(!m||!["A","B"].includes(offendingSide))return;
   if(!requireStationPermission(m)) return;
@@ -13561,6 +13574,10 @@ function addFault(matchId, offendingSide){
 function undoLast(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰的撤銷須經由附魔回合交易，暫不可使用一般賽撤銷。",true);
+    return;
+  }
   const m = getMatch(matchId);
   if(!m) return;
   if(!requireStationPermission(m)) return;
@@ -13596,6 +13613,10 @@ function undoLast(matchId){
 function rematch(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰的重賽須由附魔回合交易處理，暫不可使用一般賽重賽。",true);
+    return;
+  }
   const m = getMatch(matchId);
   if(!m) return;
   if(!requireStationPermission(m)) return;
@@ -13669,6 +13690,10 @@ function applyMatchCompletionFields(m, evalResult, actor){
 function confirmResult(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰尚未串接正式結算，暫不可確認比賽結果。",true);
+    return false;
+  }
   const m = getMatch(matchId);
   if(!requireStationPermission(m)) return false;
   const evalResult = evaluateMatchCompletion(m);
@@ -13703,6 +13728,10 @@ function confirmResult(matchId){
 async function confirmResultWithCloudGuard(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰尚未串接正式結算，暫不可確認比賽結果。",true);
+    return false;
+  }
   const m = getMatch(matchId);
   if(!requireStationPermission(m)) return false;
   const localEval = evaluateMatchCompletion(m);
@@ -13826,6 +13855,10 @@ function applyQuickDecisionFields(m, evalResult, actor){
 function confirmQuickDecision(matchId, selectedWinnerId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰尚未串接正式結算，暫不可使用快速判決。",true);
+    return false;
+  }
   const m = getMatch(matchId);
   if(!requireStationPermission(m)) return false;
   const ev = evaluateQuickDecision(m, selectedWinnerId);
@@ -13855,6 +13888,10 @@ function confirmQuickDecision(matchId, selectedWinnerId){
 async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
+  if(state.meta&&state.meta.playMode==="enchantment"){
+    showToast("附魔之戰尚未串接正式結算，暫不可使用快速判決。",true);
+    return false;
+  }
   const m = getMatch(matchId);
   if(!requireStationPermission(m)) return false;
   const localEval = evaluateQuickDecision(m, selectedWinnerId);
@@ -15738,7 +15775,8 @@ function renderCourtCard(stationNum){
   const locked = !!(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===m.id);
   const preStartLocked=!state.startedAt;
   const stationLocked=!canOperateStation(stationNum);
-  const scoreLocked=locked || preStartLocked || stationLocked || !!winSide;
+  const enchantmentPending=state.meta&&state.meta.playMode==="enchantment";
+  const scoreLocked=locked || preStartLocked || stationLocked || !!winSide || enchantmentPending;
 
   const scoreBtn = (side, type) => `<button data-action="score" data-id="${m.id}" data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
   const faultBtn = (side) => {
@@ -15758,6 +15796,7 @@ function renderCourtCard(stationNum){
   <div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
     ${refereeWorkstationHeader(m,stationNum)}${renderCourtCallReferee(m)}
     ${stationLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>唯讀｜你未被指派 Court ${stationNum}，本台所有比分與判定操作已鎖定。</span></div>`:""}
+    ${enchantmentPending?'<div class="banner warn" style="margin:12px 16px 0;"><span>附魔之戰尚在串接選手手機抽卡與裁判計分，此場暫不可送分。</span></div>':""}
     ${warnBanner}
     ${preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
@@ -16756,6 +16795,11 @@ function renderSettings(){
           <option value="double" ${d.formatType==='double'?'selected':''}>雙敗制</option>
           <option value="roundrobin" ${d.formatType==='roundrobin'?'selected':''}>單循環賽</option>
         </select></div>
+        <div class="field"><label>玩法模式</label><select id="f-play-mode" data-settings-draft="playMode">
+          <option value="standard" selected>標準對戰</option>
+          <option value="enchantment" disabled>附魔之戰（規劃中）</option>
+        </select></div>
+        <p class="hint">附魔之戰將串接智慧叫號、裁判現場判斷雙方到場後啟動抽卡、每回合選手各自手機抽卡及裁判自動計分；完成驗收後開放選用。</p>
         <div class="field"><label>戰鬥台數量</label><input type="number" min="1" max="32" id="f-stations" data-settings-draft="stations" data-settings-type="int" value="${d.stations}"></div>
         <label class="settings-check-row">
           <input type="checkbox" id="f-bronze" data-settings-draft="bronzeMatch" data-settings-type="bool" ${d.bronzeMatch?'checked':''} ${(ladderMode==="ranked"&&d.formatType==="single")?'disabled':''}>
@@ -27104,6 +27148,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.checkin=d.checkin||"";
       state.meta.startTime=d.startTime||"";
       state.meta.formatType=newFormatType;
+      state.meta.playMode="standard";
       state.meta.format=FORMAT_LABELS[newFormatType]||"單淘汰賽";
       state.meta.stations=requestedStations;
       state.testLadderEnabled=isTester()?(d.ladderMode==="ranked"):false;
@@ -28591,6 +28636,7 @@ init().then(()=>{
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async catalog(payload){return callEngagementFunction("inventoryCatalog",payload,30000);},
     async courtCall(payload){return callEngagementFunction("courtCallService",payload,60000);},
+    async enchantment(payload){return callEngagementFunction("enchantmentService",payload,60000);},
     async courtCallPush(payload){return callEngagementFunction("courtCallPushService",payload,60000);},
     async raffle(payload){return callEngagementFunction("memberRaffle",payload,540000,['list','get','announcements'].includes(payload?.action));},
     async getSnapshot(){ return callEngagementFunction("getEngagementSnapshot",{}); },
