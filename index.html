@@ -22445,7 +22445,7 @@ function tournamentViewContextHeaderHtml(){
   // the existing return strip when an admin is temporarily browsing a public view.
   if(hasAdminAccess()){
     if(!publicWatchReturnContext) return "";
-    return `<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">${publicWatchReturnContext==="player-registered"?"← 返回我的賽程":"← 返回賽事大廳"}</button><span>${publicWatchUsesPrivateData?"目前為管理觀賽模式":"目前為公開觀賽模式"}</span></div>`;
+    return `<div class="public-watch-return"><button class="btn btn-ghost" data-action="back-from-public-watch">${publicWatchReturnContext==="player-registered"?"← 返回我的賽程":"← 返回賽事大廳"}</button><span>${publicWatchUsesPrivateData?"目前為管理觀賽模式":"目前為公開觀賽模式"}</span>${publicWatchUsesPrivateData&&state.cloudCode?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(state.cloudCode)}">開啟管理</button>`:""}</div>`;
   }
 
   if(!state.cloudCode){
@@ -25003,6 +25003,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async ()=>{
       await saveActiveMode("admin");
       currentRole = mapRoleToAppRole(userProfile.role);
+      publicWatchReturnContext = null;
+      publicWatchUsesPrivateData = false;
       appPhase = "app"; activeTab = "live";
       ensureCloudRoomForTournament();
       render();
@@ -25660,6 +25662,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
       try{
         await commitJoinedTournamentData(result.code, result.rawData, result.usePublic);
+        publicWatchReturnContext = null;
+        publicWatchUsesPrivateData = false;
         adminTournamentListOpen = false;
         appPhase = "app";
         if(openHistory || state.archiveStatus==="completed"){
