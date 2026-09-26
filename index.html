@@ -11851,7 +11851,7 @@ async function performAutoArchive(){
         const insufficient=["insufficient-eligible-players","insufficient-valid-players","not-enough-eligible-players"].includes(reason) || /至少.*兩位.*有效/.test(rawMessage);
         const msg=insufficient ? "有效正式 BXH 帳號不足兩位。本場未計入天梯，可確認後以一般賽事結案。" : reason==="unlinked-players" ? "以下選手無法連結唯一 BXH 玩家帳號"+missing : rawMessage||"天梯積分寫入失敗";
         state.settlementError=msg;
-        state.settlementErrorCode=(settled&&settled.reason)||"ranked-settlement-failed";
+        state.settlementErrorCode=insufficient?"insufficient-eligible-players":((settled&&settled.reason)||"ranked-settlement-failed");
         state.settlementPhase="failed";
         await saveRecord(state);
         showToast(msg,true);
