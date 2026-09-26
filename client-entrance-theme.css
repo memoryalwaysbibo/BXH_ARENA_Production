@@ -3632,6 +3632,11 @@ button.btn-primary,
   padding:36px 42% 43px 82px!important;align-items:flex-start!important;
   justify-content:center!important;text-align:left!important;gap:3px!important;
 }
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-cn,
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-en,
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-desc{
+  width:100%!important;text-align:left!important;align-self:stretch!important;
+}
 :root[data-bxh-theme="directive"] .landing-role-cards .role-card-desc{
   font-size:9px!important;line-height:1.45!important;max-width:160px!important;
   margin:4px 0 0!important;color:rgba(231,222,236,.85)!important;
