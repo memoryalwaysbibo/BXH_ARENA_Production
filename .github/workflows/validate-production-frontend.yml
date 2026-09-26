@@ -24,6 +24,9 @@ jobs:
           node --check inventory-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify header logo refresh control
+        run: node tests/header-logo-refresh.test.cjs
+
       - name: Verify referee score panel V2
         run: node tests/referee-score-v2-ui.test.cjs
 
