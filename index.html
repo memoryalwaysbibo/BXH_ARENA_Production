@@ -19525,6 +19525,15 @@ async function startAdminRosterWatch(){
       adminRegistrationsError=null;
       adminRosterSyncChain=adminRosterSyncChain.catch(()=>{}).then(async()=>{
         if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId || state.cloudCode!==code) return;
+        // During the guarded backend rollout, the server owns roster writes.
+        // Read the room flag on each registration event so rollback takes effect
+        // without requiring the admin to leave and reopen this tab.
+        const publicRoom=await window.cloudSync.getPublicTournamentFull(code);
+        if(generation!==adminRosterGeneration || state.id!==roomId) return;
+        if(publicRoom?.registrationRosterSyncBackendEnabled===true){
+          renderPreservingScroll();
+          return;
+        }
         if(!state.startedAt){
           const result=await syncLatestOnlineRosterBeforeLock(rows);
           if(generation!==adminRosterGeneration || state.id!==roomId) return;
@@ -27123,6 +27132,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(state.startedAt){ showToast("賽事開始後參賽名單已鎖定", true); return; }
     (async ()=>{
       try{
+        const publicRoom=await window.cloudSync.getPublicTournamentFull(state.cloudCode);
+        if(publicRoom?.registrationRosterSyncBackendEnabled===true){showToast("此房間由伺服器自動同步名單",true);return;}
         const result=await syncLatestOnlineRosterBeforeLock();
         render();
         if(state.bracketSize && !bracketRosterIsCurrent()){
