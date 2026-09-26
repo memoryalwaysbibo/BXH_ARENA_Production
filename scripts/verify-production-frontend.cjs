@@ -54,6 +54,11 @@ mustNot(/getRedirectResult\(authHandle\)/, 'Google redirect result runtime is st
 mustNot(/popupRedirectResolver:\s*authMod\.browserPopupRedirectResolver/, 'Popup/redirect resolver is still active');
 mustNot(/role:\s*["']tester["'],\s*active:\s*true,\s*provider:\s*["'](?:password|google)["']/, 'Public signup/recovery still creates tester role');
 must(/PUBLIC_TOURNAMENTS_RECONCILE_MS\s*=\s*90000/, 'Lobby reconciliation must be 90 seconds');
+if((html.match(/const lobbyVisibility = m\\.registrationVisibility===\"private\" \\? \"private\" : \"public\";/g)||[]).length!==2) throw new Error('createRoom/pushUpdate must derive lobby visibility from registrationVisibility');
+if((html.match(/visibility: lobbyVisibility/g)||[]).length!==4) throw new Error('Private/public tournament mirrors must both use derived lobby visibility');
+mustInclude("&& t.registrationVisibility!=='private'",'Lobby must suppress stale public mirrors marked registrationVisibility=private');
+mustInclude('d.deletionStatus===\"deleting\" || d.visibility!==\"public\" || d.registrationVisibility===\"private\" || d.eventCancelled===true','Direct public room join must reject private registration visibility');
+console.log('PASS private tournament lobby visibility guard');
 must(/subscribePublicTournaments\(callback\)/, 'Realtime public tournament listener missing');
 must(/visibilitychange[\s\S]*?reconcilePublicTournamentsNow\(["']foreground["']\)/, 'Foreground reconciliation missing');
 must(/window\.addEventListener\(["']focus["'][\s\S]*?reconcilePublicTournamentsNow\(["']focus["']\)/, 'Focus reconciliation missing');
