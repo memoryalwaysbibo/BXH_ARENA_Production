@@ -5562,6 +5562,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="inventory-ui.js?v=13.31.6"></script>
 <script src="inventory-catalog-ui.js?v=3"></script>
 <script src="court-call-ui.js?v=14.2.34-next-fallback"></script>
+<script src="referee-fault-core.js?v=14.2.38-fault-v1"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -12061,7 +12062,7 @@ function applyPropagatedSlots(m, newA, newB){
   if(newA!==curA || newB!==curB){
     m.a = newA ? {type:"player", playerId:newA} : null;
     m.b = newB ? {type:"player", playerId:newB} : null;
-    m.scoreA=0; m.scoreB=0; m.log=[]; m.hunterData=null; m.winnerId=null; m.loserId=null; m.completed=false;
+    m.scoreA=0; m.scoreB=0; m.log=[]; m.faultActions=[]; m.hunterData=null; m.winnerId=null; m.loserId=null; m.completed=false;
   }
 }
 
@@ -12128,7 +12129,7 @@ function roundGroupsForScoringConfig(){
   return Object.values(groups).sort((a,b)=> (a.round-b.round) || (a.bracket<b.bracket?-1:1));
 }
 function roundGroupLocked(group){
-  return group.matches.some(m => m.completed || m.status==="completed" || m.status==="in_progress" || (m.log&&m.log.length>0) || m.scoreA>0 || m.scoreB>0);
+  return group.matches.some(m => m.completed || m.status==="completed" || m.status==="in_progress" || (m.log&&m.log.length>0) || (Array.isArray(m.faultActions)&&m.faultActions.length>0) || m.scoreA>0 || m.scoreB>0);
 }
 
 function resolveScoringModeForRound(bracket, round){
@@ -12142,6 +12143,7 @@ function ensureMatchScoringFields(m){
   if(m.resultMethod===undefined) m.resultMethod = m.completed ? "score" : null;
   if(m.confirmedBy===undefined) m.confirmedBy = null;
   if(m.confirmedAt===undefined) m.confirmedAt = null;
+  if(!Array.isArray(m.faultActions)) m.faultActions = [];
 }
 
 function syncMatchStatuses(){
@@ -12383,7 +12385,7 @@ function correctionMatchHasActualPlay(m){
   if(!m) return false;
   const scoreA=Number(m.scoreA||0),scoreB=Number(m.scoreB||0);
   return !!(m.completed || m.status==="completed" || m.confirmedAt || m.resultMethod ||
-    (Array.isArray(m.log)&&m.log.length) || scoreA>0 || scoreB>0);
+    (Array.isArray(m.log)&&m.log.length) || (Array.isArray(m.faultActions)&&m.faultActions.length) || scoreA>0 || scoreB>0);
 }
 function correctionParticipantSignature(m){
   return [m&&m.a&&m.a.playerId||"",m&&m.b&&m.b.playerId||""].join("|");
@@ -12460,6 +12462,7 @@ function applyCompletedMatchCorrection(st,matchId,mode,actor){
   target.startedAt=now;
   if(mode==="reset"){
     target.log=[];
+    target.faultActions=[];
     if(target.scoringMode==="quick"){
       target.scoreA=null;target.scoreB=null;
     }else{
@@ -13229,8 +13232,8 @@ function rebuildPropagationRoundRobin(){
 }
 
 /* ==== scoring ==== */
-const POINT_TYPES = { spin:1, knockout:2, burst:2, extreme:3 };
-const POINT_LABELS = { spin:"旋轉勝利＋1分", knockout:"擊飛勝利＋2分", burst:"爆裂勝利＋2分", extreme:"極限勝利＋3分" };
+const POINT_TYPES = { spin:1, knockout:2, burst:2, extreme:3, fault:1 };
+const POINT_LABELS = { spin:"旋轉勝利＋1分", knockout:"擊飛勝利＋2分", burst:"爆裂勝利＋2分", extreme:"極限勝利＋3分", fault:"對手失誤＋1分" };
 
 /* ==== v14.0.33 HUNTER PROFILE P2: canonical round ledger ==== */
 const HUNTER_ROUND_SCHEMA_VERSION = 1;
@@ -15309,7 +15312,7 @@ function refereeViewKey(m){ return String(state.id)+":"+String(m.id); }
 function refereeViewClass(m){ return refereeSwappedViews.has(refereeViewKey(m))?" swapped":""; }
 function refereeSwapControl(m){ return `<div class="ref-vs-mark"><button class="btn btn-ghost ref-swap" data-action="referee-swap-view" data-id="${esc(m.id)}" aria-label="交換玩家位置" title="交換左右顯示位置">⇄</button></div>`; }
 function matchHasDecisionData(m){
-  return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)>0||Number(m.scoreB||0)>0||(Array.isArray(m.log)&&m.log.length)));
+  return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)>0||Number(m.scoreB||0)>0||(Array.isArray(m.log)&&m.log.length)||(Array.isArray(m.faultActions)&&m.faultActions.length)));
 }
 function canCourtSwapSource(m){
   return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&!matchHasDecisionData(m)&&m.status!=="paused");
