@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260925.40">
+<meta name="bxh-build" content="20260926.01">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260925.40";
+  var CURRENT_BUILD="20260926.01";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5973,9 +5973,11 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.29";
+const APP_VERSION = "v14.2.30";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {"version":"v14.2.30","date":"2026/09/26","timezone":"Asia/Taipei","title":"心情小棧共鳴與單層回覆","updateLevel":"minor","added":["每則心情新增愛心共鳴，可再次點擊取消","新增單層展開回覆與回覆數量"],"changed":["留言與回覆管理操作收進省空間的 ⋯ 選單","回覆跟隨主留言 24 小時生命週期，且不進入上方跑馬燈"],"fixed":[],"environment":"Production / HTML + Firebase","deployStatus":"Frontend ready after moodStation backend","firebaseImpact":"沿用 moodStationMessages；新增 heart/reply 欄位，由 Callable 管理","securityRulesImpact":"無；不新增 client-side Firestore 寫入","permissionImpact":"登入玩家可共鳴／回覆；本人與管理員可移除","publicSummary":"心情小棧加入 ❤️ 共鳴與 💬 單層回覆，手機版維持精簡。"},
+
   {"version":"v14.2.29","date":"2026/09/25","timezone":"Asia/Taipei","title":"家庭代報名報到狀態同步修復","updateLevel":"patch","added":["新增家庭代報名同步回歸測試，涵蓋 registrationId 變更、同家長多名子女與取消其中一名子女"],"changed":["家庭代報名名單同步改以 familyPlayerId 優先辨識同一位子女；一般玩家再以 registrationId／guardian UID 相容比對","線上名單同步只更新報名身分資料，不再因 registrationId 重建而把既有現場報到狀態改回未報到"],"fixed":["修正子女帳號完成報到後，管理端自動同步或產生對戰表前同步時可能重新變成未報到","修正同一家長有多位子女時，已取消的子女可能因共用 guardian UID 而殘留在 roster"],"environment":"Production / HTML + Firebase","deployStatus":"Frontend family roster identity hotfix","firebaseImpact":"無資料結構變更；沿用既有 registrations 與 players.checkedIn","securityRulesImpact":"無","permissionImpact":"無","publicSummary":"家庭代報名改用穩定的子女身分比對；已報到狀態不會再被線上名單同步洗回未報到。"},
 
   {"version":"v14.2.28","date":"2026/09/25","timezone":"Asia/Taipei","title":"P7.14 大廳海報縮圖","updateLevel":"minor","added":["海報解析草稿可選擇發布後於大廳卡片顯示縮圖","僅發布成功後透過房主授權上傳壓縮縮圖"],"changed":["大廳卡片有封面時顯示海報小圖，無封面時維持原版"],"fixed":[],"environment":"Production / Restricted Beta","firebaseImpact":"房間私有 coverPath 與公開 coverUrl；Storage room-covers","securityRulesImpact":"無；只由受權限限制的 Callable 寫入","permissionImpact":"僅原房主與 AI 開房 Beta 管理員可上傳","publicSummary":"上傳海報解析後，房主可讓大廳卡片展示海報縮圖。"},
