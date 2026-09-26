@@ -5,7 +5,7 @@ const path=require('node:path');
 
 const source=fs.readFileSync(path.join(__dirname,'..','court-call-ui.js'),'utf8');
 
-assert(source.includes('class="court-call-next-compact"'), 'compact next-match card missing');
+assert(source.includes('class="court-call-next-compact '), 'compact next-match card missing');
 assert(source.includes("function courtCallNextState(m)"), 'next-match fallback state resolver missing');
 assert(source.includes("kind:'partial'"), 'partial / waiting-for-advancement state missing');
 assert(source.includes("kind:(next.a||next.b)?'partial':'waiting'"), 'future-match waiting state missing');
