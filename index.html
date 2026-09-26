@@ -9348,6 +9348,20 @@ let playerLookupQuery = "";
 let playerCenterContext = null; // { name, records:[...] } — set for the name-search (no-login) flow
 let authFormError = "";
 let accountMgmtUsers = null;
+let partnerPlansState={plans:null,loading:false,error:''};
+const partnerDraftOrders=new Map();
+async function loadPartnerPlans(force=false){
+  if(!isSuperAdmin()||partnerPlansState.loading||(!force&&partnerPlansState.plans!==null))return;
+  partnerPlansState.loading=true;partnerPlansState.error='';
+  const actor=currentAuthUid();
+  try{
+    const result=await window.engagementService.listPartnerPlans({});
+    if(actor!==currentAuthUid())return;
+    partnerPlansState.plans=Array.isArray(result.plans)?result.plans:[];
+  }catch(error){if(actor===currentAuthUid()){partnerPlansState.plans=[];partnerPlansState.error=String(error.message||error);}}
+  finally{partnerPlansState.loading=false;if(actor===currentAuthUid())render();}
+}
+
 let superAdminManagementPage = "accounts"; // accounts | checkin | titles
 let accountMgmtBusy = false;
 let accountMgmtRoleFilter = "all";
@@ -17722,8 +17736,30 @@ async function handleTitleEditor(action){
  finally{if(uid===currentAuthUid()){c.busy=false;render();}}
 }
 
+function renderPartnerContractCard(user){
+  const activePlans=(partnerPlansState.plans||[]).filter(plan=>plan.active&&plan.rankedMode);
+  const draft=partnerDraftOrders.get(user.uid);
+  return `<div class="account-partner-grant">
+    <div class="panel-title">合作主辦｜合作方案與合約</div>
+    <p class="hint">選擇方案後建立合約草稿；玩家於站內信閱讀並簽名，再由最高管理員確認。合作代碼由成立時自動產生。</p>
+    ${user.partnerOrganizer?.status==='active'?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:''}
+    <div class="grid grid-2">
+      <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>合作方名稱</label><input class="partner-contract-name" data-uid="${esc(user.uid)}" maxlength="200" value="${esc(user.partnerOrganizer?.organizationName||'')}"></div>
+      <div class="field"><label>費用 NT$</label><input class="partner-contract-amount" data-uid="${esc(user.uid)}" type="number" min="0" step="1" placeholder="請填寫合約金額"></div>
+      <div class="field"><label>生效日期</label><input class="partner-contract-start" data-uid="${esc(user.uid)}" type="date"></div>
+      <div class="field"><label>到期日期</label><input class="partner-contract-end" data-uid="${esc(user.uid)}" type="date"></div>
+      <div class="field" style="grid-column:1/-1"><label>完整合作條款</label><textarea class="partner-contract-terms" data-uid="${esc(user.uid)}" rows="8" maxlength="100000" placeholder="填寫積分賽使用範圍、場次、費用、終止與違約條款"></textarea></div>
+    </div>
+    <button class="btn btn-primary btn-sm" data-action="partner-create-contract" data-uid="${esc(user.uid)}" ${activePlans.length?'':'disabled'}>建立合約草稿</button>
+    ${activePlans.length?'':'<p class="hint">請先在上方建立合作方案。</p>'}
+    ${draft?`<p class="hint">本次訂單｜${esc(draft.orderCode)}｜${esc(draft.status)}</p>${draft.status==='draft'?`<button class="btn btn-ghost btn-sm" data-action="partner-send-contract" data-uid="${esc(user.uid)}">寄送合約至玩家站內信</button>`:''}`:''}
+  </div>`;
+}
+
 function renderAccountManagementScreen(){
   const page=["accounts","checkin","titles"].includes(superAdminManagementPage)?superAdminManagementPage:"accounts";
+  if(page==='accounts'&&partnerPlansState.plans===null&&!partnerPlansState.loading)setTimeout(()=>loadPartnerPlans(),0);
   const loading=accountMgmtUsers===null;
   const users=accountMgmtUsers||[];
   const activity=accountActivitySummary(users);
@@ -17738,7 +17774,8 @@ function renderAccountManagementScreen(){
     <main class="account-management-main">
       ${page==="accounts"?`<div class="panel account-management-panel">
         <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
-        <p class="hint">選擇玩家帳號並展開，即可在「合作主辦權限」開通或撤銷；帳號分類維持玩家。</p>
+        <p class="hint">選擇既有玩家，先選合作方案並建立合約；玩家簽名、最高管理員確認付款後才成立。帳號分類維持玩家。</p>
+        <details class="account-tools-card"><summary><span>合作方案設定</span><span class="hint">先建立可用方案⌄</span></summary><div class="account-tools-body"><p class="hint">方案代碼由系統自動產生；合作主辦可用 BXH 積分模式，實際權限須待合約成立。</p><div class="field"><label>方案名稱</label><input id="partner-new-plan-name" maxlength="120" placeholder="例如：合作主辦｜年度積分方案"></div><button class="btn btn-ghost btn-sm" data-action="partner-create-plan">建立合作方案</button><p class="hint">目前可用：${partnerPlansState.loading?'讀取中':(partnerPlansState.plans||[]).filter(p=>p.active&&p.rankedMode).map(p=>esc(p.name)).join('、')||'尚未建立'}</p>${partnerPlansState.error?`<p class="auth-error">${esc(partnerPlansState.error)}</p>`:''}</div></details>
         ${authFormError ? `<div class="auth-error">${esc(authFormError)}</div>` : ""}
         <div class="account-overview-grid">
           <div class="stat-box"><div class="label">全部帳號</div><div class="value">${activity.total}</div></div>
@@ -17782,16 +17819,7 @@ function renderAccountManagementScreen(){
                 <label class="account-active-control"><input type="checkbox" class="mgmt-test-box" data-uid="${esc(user.uid)}" ${draft.isTestAccount?'checked':''} style="width:20px;height:20px;">測試身分</label>
                 <label class="account-active-control"><input type="checkbox" class="mgmt-active-box" data-uid="${esc(user.uid)}" ${draft.active?'checked':''} style="width:20px;height:20px;">帳號啟用</label>
                 <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
-                ${user.role==="player"?`<div class="account-partner-grant"><div class="field"><label>合作主辦權限</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>開通合作主辦</option></select></div>
-                  <p class="hint">由最高管理員確認合作後開通；方案代碼只供記錄，賽事與積分權限另行核准。</p>
-                  <div class="grid grid-2">
-                    
-                    <div class="field"><label>主辦名稱</label><input class="partner-name" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.organizationName||"")}" maxlength="80"></div>
-                    <div class="field"><label>方案代碼</label><input class="partner-plan" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.plan||"identity_only")}" maxlength="40"></div>
-                    <div class="field"><label>有效期限（選填）</label><input type="date" class="partner-expiry" data-uid="${esc(user.uid)}" value="${user.partnerOrganizer?.expiresAt?new Date(user.partnerOrganizer.expiresAt+8*3600000).toISOString().slice(0,10):""}"></div>
-                  </div>
-                  <button class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}">儲存合作主辦授權</button>
-                </div>`:""}
+                ${user.role==="player"?renderPartnerContractCard(user):""}
               </div>
             </div>
           </details>`;}).join("")}
@@ -25390,23 +25418,70 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     openModal({ type:"generic", title:"執行公開賽事資料清理", message:"即將檢查並重建 publicTournaments 集合中每份文件的公開安全欄位，移除舊版可能殘留的私人資料。不會刪除任何賽事，不會變更文件 ID 或賽事代碼。是否繼續？", confirmLabel:"確定執行", onConfirm:doCleanup });
     return;
   }
-  if(action==="save-partner-grant"){
-    if(!isSuperAdmin()){showToast("只有最高管理員可設定合作主辦",true);return;}
-    const uid=target.getAttribute("data-uid")||"";
-    const user=(accountMgmtUsers||[]).find(item=>item.uid===uid);
-    if(!user||user.role!=="player"){showToast("僅可授權玩家帳號",true);return;}
+  if(action==='partner-create-plan'){
+    if(!isSuperAdmin())return;
+    const name=(document.getElementById('partner-new-plan-name')?.value||'').trim();
+    if(!name){showToast('請先輸入合作方案名稱',true);return;}
+    target.disabled=true;
+    (async()=>{try{
+      const result=await window.engagementService.savePartnerPlan({name,active:true,rankedMode:true});
+      showToast('方案已建立：'+result.planCode);
+      await loadPartnerPlans(true);
+    }catch(error){showToast('建立合作方案失敗：'+String(error.message||error),true);}
+    finally{target.disabled=false;render();}})();return;
+  }
+  if(action==='partner-revoke-legacy'){
+    if(!isSuperAdmin())return;
+    const uid=target.getAttribute('data-uid'),user=(accountMgmtUsers||[]).find(item=>item.uid===uid);
+    if(!user||user.partnerOrganizer?.status!=='active')return;
+    openModal({type:'generic',title:'撤銷舊版手動授權',message:'確認撤銷 '+accountPrimaryName(user)+' 的舊版合作主辦身分？',confirmLabel:'確認撤銷',onConfirm:()=>{
+      (async()=>{await changeSingleManagedAccount(uid,{partnerOrganizer:{...user.partnerOrganizer,status:'revoked'}},null);})();
+    }});return;
+  }
+  if(action==='partner-create-contract'){
+    if(!isSuperAdmin())return;
+    const uid=target.getAttribute('data-uid'),user=(accountMgmtUsers||[]).find(item=>item.uid===uid);
+    if(!user||user.role!=='player'){showToast('請選擇既有玩家',true);return;}
     const get=selector=>managedAccountControl(selector,uid);
-    const status=get(".partner-status")?.value;
-    const name=(get(".partner-name")?.value||"").trim();
-    const plan=(get(".partner-plan")?.value||"").trim();
-    const date=get(".partner-expiry")?.value||"";
-    if(!name||!/^[-a-zA-Z0-9_]{1,40}$/.test(plan)){showToast("請填寫主辦名稱與有效方案代碼",true);return;}
-    const expiresAt=date?Date.parse(date+"T23:59:59+08:00"):null;
-    if(date&&(!Number.isFinite(expiresAt)||expiresAt<=Date.now())&&status==="active"){showToast("有效期限需在未來",true);return;}
-    const grant={status,organizationId:user.partnerOrganizer?.organizationId||("org-"+uid),organizationName:name,plan,expiresAt};
-    if(JSON.stringify(grant)===JSON.stringify(user.partnerOrganizer)){showToast("授權沒有變更");return;}
-    openModal({type:"generic",title:"確認合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\\n狀態："+(status==="active"?"開通":"撤銷")+"\\n主辦："+name+"\\n方案："+plan+"\\n期限："+(date||"未設定"),confirmLabel:"確認儲存",onConfirm:()=>{(async()=>{await changeSingleManagedAccount(uid,{partnerOrganizer:grant},null);})();}});
-    return;
+    const planCode=get('.partner-contract-plan')?.value||'';
+    const organizationName=(get('.partner-contract-name')?.value||'').trim();
+    const amountRaw=get('.partner-contract-amount')?.value||'';
+    const starts=get('.partner-contract-start')?.value||'';
+    const expires=get('.partner-contract-end')?.value||'';
+    const terms=(get('.partner-contract-terms')?.value||'').trim();
+    const amountTwd=Number(amountRaw);
+    if(!planCode||!organizationName||amountRaw===''||!Number.isSafeInteger(amountTwd)||amountTwd<0||!starts||!expires||!terms){
+      showToast('請選擇方案並填妥合作方、金額、日期及完整條款',true);return;
+    }
+    const data={targetUid:uid,planCode,organizationName,amountTwd,
+      startsAt:starts+'T00:00:00+08:00',expiresAt:expires+'T23:59:59+08:00',terms};
+    if(Date.parse(data.expiresAt)<=Date.parse(data.startsAt)){showToast('到期日期必須晚於生效日期',true);return;}
+    const key='bxh-partner-draft:'+currentAuthUid()+':'+uid;
+    let pending=null;try{pending=JSON.parse(sessionStorage.getItem(key)||'null');}catch(e){}
+    if(pending&&JSON.stringify(pending.data)!==JSON.stringify(data)){
+      showToast('上一次草稿請求尚未確認，請先用原資料重試',true);return;
+    }
+    if(!pending){pending={data,operationId:crypto.randomUUID()};sessionStorage.setItem(key,JSON.stringify(pending));}
+    target.disabled=true;
+    (async()=>{try{
+      const result=await window.engagementService.createPartnerContractDraft({...pending.data,operationId:pending.operationId});
+      partnerDraftOrders.set(uid,{orderCode:result.orderCode,status:'draft'});
+      sessionStorage.removeItem(key);
+      showToast('合約草稿已建立：'+result.orderCode);
+    }catch(error){showToast('建立草稿失敗：'+String(error.message||error),true);}
+    finally{target.disabled=false;render();}})();return;
+  }
+  if(action==='partner-send-contract'){
+    if(!isSuperAdmin())return;
+    const uid=target.getAttribute('data-uid'),draft=partnerDraftOrders.get(uid);
+    if(!draft||draft.status!=='draft')return;
+    target.disabled=true;
+    (async()=>{try{
+      await window.engagementService.sendPartnerContract({orderCode:draft.orderCode});
+      partnerDraftOrders.set(uid,{...draft,status:'sent'});
+      showToast('合約與附件已送達玩家站內信');
+    }catch(error){showToast('站內信寄送未確認：'+String(error.message||error),true);}
+    finally{target.disabled=false;render();}})();return;
   }
   if(action==="save-managed-account"){
     if(!isSuperAdmin()){showToast("只有最高管理員可修改帳號設定",true);return;}
@@ -28535,6 +28610,10 @@ init().then(()=>{
     async mood(payload){return callEngagementFunction("moodStation",payload,20000);},
     async mailbox(payload){return callEngagementFunction("mailboxService",payload,30000);},
     async mailboxAttachment(payload){return callEngagementFunction("mailboxAttachmentService",payload,60000);},
+    async listPartnerPlans(payload){return callEngagementFunction("listPartnerPlans",payload,30000);},
+    async savePartnerPlan(payload){return callEngagementFunction("savePartnerPlan",payload,30000);},
+    async createPartnerContractDraft(payload){return callEngagementFunction("createPartnerContractDraft",payload,30000);},
+    async sendPartnerContract(payload){return callEngagementFunction("sendPartnerContract",payload,30000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
