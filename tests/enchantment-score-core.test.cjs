@@ -19,9 +19,10 @@ test('seal cancels only the opponent card, including two seals',()=>{
   assert.equal(resolve({type:'burst',winnerCardId:'seal',loserCardId:'weaken_burst'}).points,2);
   assert.equal(resolve({type:'burst',winnerCardId:'seal',loserCardId:'seal'}).points,2);
 });
-test('simultaneous attack and defense cannot change the official score before priority is approved',()=>{
+test('defense takes priority when both cards match the winning outcome',()=>{
   const r=resolve({type:'burst',winnerCardId:'double_burst',loserCardId:'weaken_burst'});
-  assert.equal(r.ok,false);assert.equal(r.reason,'priority-undecided');assert.equal(r.points,undefined);
+  assert.equal(r.ok,true);assert.equal(r.points,1);assert.equal(r.delta,-1);
+  assert.equal(r.appliedCardId,'weaken_burst');
 });
 test('invalid or absent draw cannot produce a score',()=>{
   assert.equal(resolve({type:'burst',winnerCardId:'double_burst'}).ok,false);
