@@ -14292,7 +14292,7 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     p.checkedIn===true?"1":"0",String(p.name||"")
   ].join("|")).sort().join("\n");
   const changed=before!==after;
-  if(changed) await saveState();
+  if(changed && !(await saveState())) throw new Error("名單寫入雲端失敗；請重新整理後重試同步");
   publicTournamentsCache=null;
   myRegistrationsCache=null;
   return {ok:true,changed,confirmed:confirmed.length};
