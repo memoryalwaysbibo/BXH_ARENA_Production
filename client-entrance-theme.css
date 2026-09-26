@@ -3558,16 +3558,17 @@ button.btn-primary,
     linear-gradient(135deg,rgba(255,129,46,.49),rgba(160,90,255,.40) 38%,rgba(255,255,255,.055) 65%,rgba(222,64,79,.29)) border-box!important;
 }
 :root[data-bxh-theme="directive"] header.topbar::after{
-  opacity:.95!important;
+  height:4px;
+  opacity:1!important;
   background:
-    linear-gradient(90deg,transparent,rgba(255,245,220,.65) 35%,#fff 50%,rgba(255,129,46,.78) 65%,transparent) -35% 0/28% 100% no-repeat,
+    linear-gradient(90deg,transparent 0%,rgba(255,129,46,.7) 20%,#fff4ca 42%,#fff 50%,#ff812e 70%,transparent 100%) 0 0/24% 100% no-repeat,
     linear-gradient(90deg,#a05aff 0 48%,#ff812e 48% 84%,#de404f 84%) 0 0/100% 100% no-repeat!important;
-  box-shadow:0 0 12px rgba(255,129,46,.25)!important;
-  animation:bxh-directive-rail-sweep 5s ease-in-out infinite;
+  box-shadow:0 0 12px rgba(255,129,46,.5)!important;
+  animation:bxh-directive-rail-sweep 2.8s linear infinite;
 }
 @keyframes bxh-directive-rail-sweep{
-  0%,12%{background-position:-35% 0,0 0}
-  58%,100%{background-position:135% 0,0 0}
+  0%{background-position:-32% 0,0 0}
+  100%{background-position:132% 0,0 0}
 }
 :root[data-bxh-theme="directive"] .lobby-page-head .settings-page-title,
 :root[data-bxh-theme="directive"] .lobby-section .panel-title,
