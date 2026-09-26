@@ -18889,7 +18889,7 @@ function registrationCountdownText(openAt,now=Date.now()){
  const remaining=Math.max(0,Math.ceil((Number(openAt)-now)/1000));if(!Number.isFinite(remaining))return '開放時間待確認';
  if(!remaining)return '時間已到，確認報名狀態中…';
  const days=Math.floor(remaining/86400),hours=Math.floor(remaining%86400/3600),minutes=Math.floor(remaining%3600/60),seconds=remaining%60;
- return '距離開放 '+(days?days+'天 ':'')+[hours,minutes,seconds].map(x=>String(x).padStart(2,'0')).join(':');
+ return (days?days+'天 ':'')+[hours,minutes,seconds].map(x=>String(x).padStart(2,'0')).join(':');
 }
 function registrationCountdownUrgency(openAt,now=Date.now()){
  const remaining=Number(openAt)-now;
@@ -18897,7 +18897,7 @@ function registrationCountdownUrgency(openAt,now=Date.now()){
 }
 function renderRegistrationCountdown(code,openAt){
  const at=normalizeDateTime(openAt);if(at==null)return '';
- return `<span class="registration-countdown" data-registration-countdown="${at}" data-urgency="${registrationCountdownUrgency(at)}" data-code="${esc(code)}">${esc(registrationCountdownText(at))}</span><span class="hint">台灣時間 ${esc(new Date(at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))} 開放</span>`;
+ return `<span class="hint">距離開放時間為台灣時間 ${esc(new Date(at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))} 開放倒數 </span><span class="registration-countdown" data-registration-countdown="${at}" data-urgency="${registrationCountdownUrgency(at)}" data-code="${esc(code)}">${esc(registrationCountdownText(at))}</span>`;
 }
 function tickRegistrationCountdowns(){
  if(document.hidden)return;let expired=false;
