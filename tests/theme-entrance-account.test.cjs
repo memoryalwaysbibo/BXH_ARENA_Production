@@ -8,7 +8,7 @@ assert(start>0 && end>start);
 const stored=new Map();
 const root={value:'gold',getAttribute(){return this.value;},setAttribute(key,value){this.value=value;}};
 const context={
-  localStorage:{getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value)},
+  localStorage:{getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)},
   document:{documentElement:root},
   window:{cloudAuth:{saveInterfaceTheme:async()=>({ok:true})}},
   showToast(){throw Error('unexpected theme save failure');},
@@ -24,10 +24,20 @@ assert.equal(root.value,'gold','A staff account has no directive skin before opt
 vm.runInContext('applyInterfaceTheme("directive",true)',context);
 assert.equal(root.value,'directive');
 assert.equal(stored.get('bxh.interface.theme.account.v1.staff-A'),'directive');
+assert.equal(stored.get('bxh.interface.theme.entrance.uid.v1'),'staff-A');
+context.firebaseUser=null;
+context.userProfile=null;
+vm.runInContext('syncInterfaceThemeVisibility()',context);
+assert.equal(root.value,'directive','Signed-out entrance keeps the last eligible account theme');
 context.firebaseUser={uid:'staff-B'};
 context.userProfile={role:'staff',active:true};
 vm.runInContext('restoreAccountInterfaceTheme("staff-B",userProfile)',context);
 assert.equal(root.value,'gold','Another staff account must not inherit the first account skin');
+assert.equal(stored.get('bxh.interface.theme.entrance.uid.v1'),'staff-B');
+context.firebaseUser=null;
+context.userProfile=null;
+vm.runInContext('syncInterfaceThemeVisibility()',context);
+assert.equal(root.value,'gold','Signed-out entrance follows the most recently used account');
 context.firebaseUser={uid:'staff-A'};
 context.userProfile={role:'staff',active:true};
 vm.runInContext('restoreAccountInterfaceTheme("staff-A",userProfile)',context);
