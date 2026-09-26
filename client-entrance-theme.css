@@ -3587,9 +3587,8 @@ button.btn-primary,
 :root[data-bxh-theme="directive"] .landing-role-cards .role-card-admin::before{content:"零";color:#ffad70}
 :root[data-bxh-theme="directive"] .landing-role-cards .role-card-player::before{content:"初";color:#c29aff}
 :root[data-bxh-theme="directive"] .landing-role-cards .role-card-guest::before{content:"貳";color:#ff8290}
-:root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-icon{
-  color:var(--directive-card-color)!important;filter:drop-shadow(0 0 11px var(--directive-card-color))!important;
-}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-icon{display:none!important}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-cn{color:var(--directive-card-color)!important}
 :root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-enter,
 :root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-en{color:var(--directive-card-color)!important}
 :root[data-bxh-theme="directive"] .landing-role-cards .role-card:hover{
