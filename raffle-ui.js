@@ -332,7 +332,49 @@ function renderRaffleAnnouncements(){const a=raffleAnnouncementsState;if(!a.load
    });
   });
  }
- function run(){queued=false;enhanceLobby();enhanceRaffles();}function schedule(){if(queued)return;queued=true;requestAnimationFrame(run);}
+ function ensureOpsCountStepperStyle(){
+  if(document.getElementById('bxh-ops-count-stepper-style'))return;
+  var style=document.createElement('style');style.id='bxh-ops-count-stepper-style';
+  style.textContent='.bxh-ops-count-stepper{display:grid;grid-template-columns:44px minmax(72px,1fr) 44px;align-items:stretch;gap:8px;width:100%}.bxh-ops-count-stepper .bxh-ops-count-button{min-width:44px;min-height:44px;padding:0;border:1px solid rgba(217,185,92,.42);border-radius:10px;background:rgba(217,185,92,.08);color:var(--gold,#d9b95c);font-size:24px;font-weight:800;line-height:1;touch-action:manipulation}.bxh-ops-count-stepper .bxh-ops-count-button:active{transform:scale(.97);background:rgba(217,185,92,.16)}.bxh-ops-count-stepper .bxh-ops-count-button:disabled{opacity:.35;cursor:not-allowed}.bxh-ops-count-stepper #ops-count{width:100%;min-width:0;min-height:44px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums}.bxh-ops-count-stepper #ops-count::-webkit-inner-spin-button,.bxh-ops-count-stepper #ops-count::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}@media(max-width:420px){.bxh-ops-count-stepper{grid-template-columns:42px minmax(64px,1fr) 42px;gap:6px}}';
+  document.head.appendChild(style);
+ }
+ function enhanceOpsCountStepper(){
+  var input=document.getElementById('ops-count');
+  if(!input||input.dataset.bxhCountStepper==='1')return;
+  ensureOpsCountStepperStyle();
+  input.dataset.bxhCountStepper='1';input.inputMode='numeric';
+  var wrap=document.createElement('div');wrap.className='bxh-ops-count-stepper';
+  var minus=document.createElement('button');minus.type='button';minus.className='bxh-ops-count-button';minus.textContent='−';minus.setAttribute('aria-label','減少中獎人數');
+  var plus=document.createElement('button');plus.type='button';plus.className='bxh-ops-count-button';plus.textContent='＋';plus.setAttribute('aria-label','增加中獎人數');
+  input.parentNode.insertBefore(wrap,input);wrap.appendChild(minus);wrap.appendChild(input);wrap.appendChild(plus);
+  function bounds(){
+   var min=Number(input.min);if(!Number.isFinite(min))min=1;
+   var max=Number(input.max);if(!Number.isFinite(max))max=100;
+   return{min:min,max:max};
+  }
+  function normalized(){
+   var b=bounds(),value=Math.trunc(Number(input.value));
+   if(!Number.isFinite(value))value=b.min;
+   return Math.min(b.max,Math.max(b.min,value));
+  }
+  function sync(){
+   var b=bounds(),value=normalized();
+   if(String(value)!==String(input.value))input.value=String(value);
+   minus.disabled=value<=b.min;plus.disabled=value>=b.max;
+  }
+  function change(delta){
+   var b=bounds(),next=Math.min(b.max,Math.max(b.min,normalized()+delta));
+   if(String(next)===String(input.value)){sync();return;}
+   input.value=String(next);
+   input.dispatchEvent(new Event('input',{bubbles:true}));
+   input.dispatchEvent(new Event('change',{bubbles:true}));
+   sync();
+  }
+  minus.addEventListener('click',function(){change(-1);});
+  plus.addEventListener('click',function(){change(1);});
+  input.addEventListener('input',sync);input.addEventListener('change',sync);sync();
+ }
+ function run(){queued=false;enhanceLobby();enhanceRaffles();enhanceOpsCountStepper();}function schedule(){if(queued)return;queued=true;requestAnimationFrame(run);}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
  new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
 })();
