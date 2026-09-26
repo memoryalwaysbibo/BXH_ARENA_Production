@@ -3541,7 +3541,9 @@ button.btn-primary,
 :root[data-bxh-theme="directive"] body{
   background:
     linear-gradient(135deg,transparent 48.8%,rgba(160,90,255,.042) 49.5%,rgba(160,90,255,.042) 50.5%,transparent 51.2%) 0 0/64px 64px,
-    radial-gradient(circle at 52% 9%,rgba(124,64,197,.19),transparent 39%),
+    radial-gradient(circle at 8% 16%,rgba(255,129,46,.12),transparent 28%),
+    radial-gradient(circle at 93% 76%,rgba(222,64,79,.10),transparent 30%),
+    radial-gradient(circle at 52% 9%,rgba(124,64,197,.16),transparent 39%),
     #080710!important;
 }
 :root[data-bxh-theme="directive"] header.topbar,
@@ -3553,28 +3555,38 @@ button.btn-primary,
 :root[data-bxh-theme="directive"] .referee-workstation{
   background:
     linear-gradient(145deg,rgba(22,16,40,.83),rgba(10,9,20,.82)) padding-box,
-    linear-gradient(135deg,rgba(160,90,255,.43),rgba(255,255,255,.055) 55%,rgba(160,90,255,.18)) border-box!important;
+    linear-gradient(135deg,rgba(255,129,46,.49),rgba(160,90,255,.40) 38%,rgba(255,255,255,.055) 65%,rgba(222,64,79,.29)) border-box!important;
+}
+:root[data-bxh-theme="directive"] header.topbar::after{
+  background:linear-gradient(90deg,#a05aff 0 48%,#ff812e 48% 84%,#de404f 84%)!important;
+  box-shadow:0 0 12px rgba(255,129,46,.25)!important;
 }
 :root[data-bxh-theme="directive"] .lobby-compact-card,
 :root[data-bxh-theme="directive"] .account-theme-card{
-  background:linear-gradient(145deg,rgba(25,17,44,.75),rgba(9,9,20,.86))!important;
-  border-color:rgba(160,90,255,.25)!important;
+  background:
+    linear-gradient(125deg,transparent 0 82%,rgba(222,64,79,.10) 82% 84%,rgba(255,129,46,.12) 84% 87%,transparent 87%),
+    linear-gradient(145deg,rgba(25,17,44,.72),rgba(9,9,20,.86))!important;
+  border-color:rgba(255,129,46,.29)!important;
 }
 :root[data-bxh-theme="directive"] .lobby-compact-card[open],
 :root[data-bxh-theme="directive"] .account-theme-card.is-active{
-  border-color:rgba(160,90,255,.64)!important;
-  box-shadow:inset 3px 0 0 #a05aff,0 8px 20px rgba(0,0,0,.2)!important;
+  border-color:rgba(255,129,46,.62)!important;
+  box-shadow:inset 3px 0 0 #ff812e,0 8px 20px rgba(0,0,0,.2)!important;
 }
 :root[data-bxh-theme="directive"] .lobby-page-head{
-  background:linear-gradient(125deg,rgba(76,38,125,.23),rgba(12,10,25,.93) 60%)!important;
-  border-color:rgba(160,90,255,.28)!important;
+  background:linear-gradient(125deg,rgba(255,129,46,.17),rgba(76,38,125,.22) 35%,rgba(12,10,25,.93) 72%,rgba(222,64,79,.12))!important;
+  border-color:rgba(255,129,46,.31)!important;
 }
 :root[data-bxh-theme="directive"] .account-theme-card[data-theme="directive"] .account-theme-preview{
-  background:linear-gradient(130deg,#120e22 0 40%,#a05aff 40% 58%,#b2ef48 58% 69%,#ff812e 69%)!important;
+  background:linear-gradient(130deg,#120e22 0 30%,#a05aff 30% 49%,#b2ef48 49% 59%,#ff812e 59% 79%,#de404f 79%)!important;
 }
 :root[data-bxh-theme="directive"] .account-theme-card[data-theme="directive"] .account-theme-preview::after{
   background:#b2ef48!important;
   box-shadow:0 0 8px rgba(178,239,72,.56)!important;
+}
+:root[data-bxh-theme="directive"] .player-tab-btn.active::after{
+  background:linear-gradient(90deg,#ff812e 0 72%,#de404f 72%)!important;
+  box-shadow:0 0 8px rgba(255,129,46,.52)!important;
 }
 :root[data-bxh-theme="directive"] .btn-primary,
 :root[data-bxh-theme="directive"] .btn.btn-primary,
