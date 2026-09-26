@@ -51,3 +51,31 @@ test('two triggering cards award defense points and advance the round',()=>{
   assert.equal(r.event.appliedCardId,'weaken_burst');
   assert.equal(r.state.scores.A,1);assert.equal(r.state.round,2);
 });
+test('two faults award a fixed point unaffected by either drawn card',()=>{
+  let s=step(flow.start,flow.create('MF','a','b'),true);
+  s=step(flow.assign,s,1,'A','double_spin');
+  s=step(flow.assign,s,1,'B','weaken_spin');
+  s=step(flow.reveal,s,1,'A','a');s=step(flow.reveal,s,1,'B','b');
+  assert.equal(flow.fault(s,1,'B',false).reason,'referee-required');
+  s=step(flow.fault,s,1,'B',true);
+  assert.equal(s.faults.B,1);assert.equal(s.scores.A,0);
+  const second=flow.fault(s,1,'B',true);
+  assert.equal(second.event.type,'fault');assert.equal(second.event.points,1);
+  assert.equal(second.event.appliedCardId,null);assert.equal(second.state.scores.A,1);
+  assert.equal(second.state.round,2);
+  const restored=step(flow.undo,second.state,true);
+  assert.equal(restored.round,1);assert.equal(restored.scores.A,0);
+  assert.equal(restored.faults.B,1);
+  const erased=flow.undo(restored,true);
+  assert.equal(erased.warningUndone.offender,'B');assert.equal(erased.state.faults.B,0);
+});
+test('a normal scoring event ends the round and restores prior warning on undo',()=>{
+  let s=step(flow.start,flow.create('MW','a','b'),true);
+  s=step(flow.assign,s,1,'A','seal');s=step(flow.assign,s,1,'B','weaken_burst');
+  s=step(flow.reveal,s,1,'A','a');s=step(flow.reveal,s,1,'B','b');
+  s=step(flow.fault,s,1,'A',true);
+  const r=flow.submit(s,1,'A','spin',true);
+  assert.equal(r.state.faults.A,0);assert.equal(r.state.round,2);
+  const restored=step(flow.undo,r.state,true);
+  assert.equal(restored.faults.A,1);assert.equal(restored.round,1);
+});
