@@ -347,39 +347,33 @@ function renderCourtCallNextPrepare(m,c){
  const disabled=c.busy||c.pending||!linked;
  const status=prepare
    ? '已通知 '+new Date(prepare.notifiedAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})
-   : linked?'尚未通知':'無法推播｜有選手未綁定';
+   : linked?'尚未通知':'無法推播';
  const buttonText=prepare?'🔔 再次通知':'🔔 通知準備';
- return `<div class="court-call-next-inline-actions" data-bxh-next-prepare="1">
-   <span class="court-call-next-inline-status ${prepare?'is-sent':''}">${esc(status)}</span>
-   <button class="btn btn-ghost court-call-prepare-btn" data-action="court-call-prepare" data-code="${esc(c.code)}" data-match="${esc(next.id)}" ${disabled?'disabled':''}>${buttonText}</button>
+ return `<div class="court-call-next-compact" data-bxh-next-prepare="1">
+   <div class="court-call-next-compact-head">
+     <span class="court-call-next-compact-badge">下一場</span>
+     <b>${esc(displayMatchLabel(next)||matchLabel(next))}</b>
+     <span class="court-call-next-inline-status ${prepare?'is-sent':''}">${esc(status)}</span>
+   </div>
+   <div class="court-call-next-compact-body">
+     <strong class="court-call-next-compact-player">${esc(am.name)}</strong>
+     <span class="court-call-next-compact-vs">VS</span>
+     <strong class="court-call-next-compact-player is-right">${esc(bm.name)}</strong>
+     <button class="btn btn-ghost court-call-prepare-btn" data-action="court-call-prepare" data-code="${esc(c.code)}" data-match="${esc(next.id)}" ${disabled?'disabled':''}>${buttonText}</button>
+   </div>
  </div>`;
-}
-function syncCourtCallNextPrepareInline(m,c){
- if(typeof document==='undefined'||!m)return;
- const station=Number(m.station||0);
- if(!(station>0))return;
- const host=document.getElementById('court-card-'+station);
- if(!host)return;
- host.querySelectorAll('[data-bxh-next-prepare]').forEach(node=>node.remove());
- const nextCard=host.querySelector('.live-court-next');
- if(!nextCard)return;
- const html=renderCourtCallNextPrepare(m,c);
- if(html)nextCard.insertAdjacentHTML('beforeend',html);
-}
-function queueCourtCallNextPrepareInline(m,c){
- setTimeout(()=>syncCourtCallNextPrepareInline(m,c),0);
 }
 
 function renderCourtCallReferee(m){
  if(!m||!m.a||!m.b||m.completed||!state.startedAt||!state.cloudCode||!canOperateStation(m.station))return '';
  const c=courtCallContext(state.cloudCode);
- queueCourtCallNextPrepareInline(m,c);
  return `<section class="panel court-call-referee-panel">
    <div class="panel-title">BXH CALL｜裁判叫號</div>
    <div class="court-call-current-actions">
      <div><b>目前場次｜${esc(displayMatchLabel(m)||matchLabel(m))}</b><p class="hint">正式叫號後，選手可回覆 OK／PASS。</p></div>
      <button class="btn btn-primary" data-action="court-call-notify" data-code="${esc(c.code)}" data-match="${esc(m.id)}" ${c.busy||c.pending?'disabled':''}>通知雙方選手上場</button>
    </div>
+   ${renderCourtCallNextPrepare(m,c)}
    ${courtCallCommon(c)}
    ${c.rows.filter(r=>r.isReferee&&r.station===m.station).map(r=>courtCallRow(c,r,true)).join('')}
  </section>`;
@@ -508,7 +502,7 @@ function ensureCourtCallGlobalStyles(){
  .bxh-call-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.bxh-call-actions.one{grid-template-columns:1fr}
  .bxh-call-actions .btn{min-height:52px;font-size:15px;font-weight:900}
  .court-call-people{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0}.court-call-person{padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.04);font-size:12px}.court-call-person.is-replied{color:#f0cf67}
- .court-call-referee-panel{margin:12px 16px 0!important}.court-call-current-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.court-call-current-actions .hint{margin:3px 0 0}.court-call-next-inline-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.10)}.court-call-next-inline-status{flex:1;min-width:0;color:var(--metal-dim);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.court-call-next-inline-status.is-sent{color:#7cebb8;font-weight:800}.court-call-next-inline-actions .court-call-prepare-btn{flex:0 0 auto;width:auto;min-height:34px;margin:0;padding:7px 11px;font-size:11px;white-space:nowrap}
+ .court-call-referee-panel{margin:12px 16px 0!important}.court-call-current-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.court-call-current-actions .hint{margin:3px 0 0}.court-call-next-compact{margin-top:10px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--court-accent,var(--gold)) 42%,rgba(255,255,255,.10));border-radius:10px;background:linear-gradient(100deg,color-mix(in srgb,var(--court-accent,var(--gold)) 10%,rgba(8,10,14,.84)),rgba(255,255,255,.02));box-shadow:inset 3px 0 0 var(--court-accent,var(--gold))}.court-call-next-compact-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px}.court-call-next-compact-badge{display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;border-radius:999px;background:var(--court-accent,var(--gold));color:#090a0b;font-size:10px;font-weight:900;line-height:1}.court-call-next-compact-head b{min-width:0;color:#eef0f3;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.court-call-next-inline-status{color:var(--metal-dim);font-size:10px;white-space:nowrap}.court-call-next-inline-status.is-sent{color:#7cebb8;font-weight:800}.court-call-next-compact-body{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;align-items:center;gap:7px;margin-top:8px}.court-call-next-compact-player{min-width:0;color:#fff;font-family:var(--font-d,system-ui);font-size:15px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.court-call-next-compact-player.is-right{text-align:right}.court-call-next-compact-vs{color:var(--court-accent,var(--gold));font-size:10.5px;font-weight:900}.court-call-next-compact .court-call-prepare-btn{width:auto;min-height:32px;margin:0;padding:6px 9px;font-size:10.5px;white-space:nowrap}
  #bxh-court-call-help-overlay{position:fixed;inset:0;z-index:2147483250;display:flex;align-items:flex-end;justify-content:center;padding:18px;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
  .bxh-call-help-sheet{width:min(100%,430px);border:1px solid rgba(217,185,92,.45);border-radius:18px;background:linear-gradient(165deg,#17181b,#090a0b);box-shadow:0 24px 70px rgba(0,0,0,.65);padding:16px;color:#eef0f3}
  .bxh-call-help-title{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#f0cf71;font-weight:900}
@@ -516,7 +510,7 @@ function ensureCourtCallGlobalStyles(){
  .bxh-call-help-status{margin-top:8px;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.035);color:#bfc4cc;font-size:11px}
  .bxh-call-help-copy{margin-top:10px;color:#cdd1d7;font-size:12px;line-height:1.55}.bxh-call-help-copy p{margin:6px 0}
  .bxh-call-help-test{width:100%;margin-top:10px}
- @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}.bxh-call-help-sheet{padding:14px}.court-call-current-actions{grid-template-columns:1fr}.court-call-current-actions .btn{width:100%}.court-call-next-inline-actions{gap:7px}.court-call-next-inline-actions .court-call-prepare-btn{min-height:32px;padding:6px 9px;font-size:10.5px}}
+ @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}.bxh-call-help-sheet{padding:14px}.court-call-current-actions{grid-template-columns:1fr}.court-call-current-actions .btn{width:100%}.court-call-next-compact{padding:8px 9px}.court-call-next-compact-head{gap:6px}.court-call-next-compact-body{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:6px}.court-call-next-compact-player{font-size:14px}.court-call-next-compact .court-call-prepare-btn{padding:6px 8px;font-size:10px}}
  `;
  document.head.appendChild(style);
 }
