@@ -124,7 +124,7 @@
 <script>
 (function(){
   var key="bxh.interface.theme.v1";
-  var allowed={gold:true,blue:true,red:true,green:true};
+  var allowed={gold:true,blue:true,red:true,green:true,directive:true};
   var theme="gold";
   try{var saved=localStorage.getItem(key);if(allowed[saved])theme=saved;}catch(e){}
   document.documentElement.setAttribute("data-bxh-theme",theme);
@@ -5535,7 +5535,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   .people-more-menu>summary{width:30px;height:29px;font-size:18px;}
 }
 </style>
-<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.4">
+<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.5">
 <link rel="stylesheet" href="referee-score-v2.css?v=14.2.38-score-fault">
 </head>
 <body>
@@ -22105,7 +22105,8 @@ const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"gold",label:"暗耀金",english:"Dark Gold",color:"#b8922e"},
   {id:"blue",label:"霓虹藍",english:"Neon Blue",color:"#35c9d0"},
   {id:"red",label:"烈焰紅",english:"Crimson Red",color:"#d95778"},
-  {id:"green",label:"螢光綠",english:"Toxic Green",color:"#43cf7c"}
+  {id:"green",label:"螢光綠",english:"Toxic Green",color:"#43cf7c"},
+  {id:"directive",label:"極限指令",english:"BXH Directive",color:"#a05aff"}
 ];
 function normalizeInterfaceTheme(value){
   return BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===value)?value:"gold";
