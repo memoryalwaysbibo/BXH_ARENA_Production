@@ -22127,7 +22127,7 @@ function restoreAccountInterfaceTheme(uid,profile){
   let saved=null;
   try{saved=localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid);}catch(e){}
   const fromAccount=profile&&typeof profile.interfaceTheme==="string"?profile.interfaceTheme:null;
-  interfaceTheme=normalizeInterfaceTheme(fromAccount||saved||"gold");
+  interfaceTheme=normalizeInterfaceTheme(saved||fromAccount||"gold");
   syncInterfaceThemeVisibility();
 }
 function canUseDirectiveTheme(){
