@@ -24,6 +24,11 @@ jobs:
           node --check inventory-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify ranked registration T-5 preopen UX
+        run: |
+          node --check ranked-registration-preopen-ui.js
+          node tests/ranked-registration-preopen-ui.test.cjs
+
       - name: Verify AI poster contract and draft boundary
         run: |
           node --check ai-poster-ui.js
