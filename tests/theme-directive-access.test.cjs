@@ -11,6 +11,7 @@ function createContext(role, mode, saved = 'directive') {
   const stored = { 'bxh.interface.theme.v1': saved };
   const context = {
     currentRole: mode,
+    firebaseUser: role ? { uid: `theme-test-${role}` } : null,
     userProfile: role ? { role, active: true } : null,
     localStorage: { getItem: key => stored[key], setItem: (key, value) => { stored[key] = value; } },
     document: { documentElement: {
