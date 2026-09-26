@@ -9350,6 +9350,16 @@ let authFormError = "";
 let accountMgmtUsers = null;
 let partnerPlansState={plans:null,loading:false,error:''};
 const partnerDraftOrders=new Map();
+function partnerOrderFor(uid){
+  if(partnerDraftOrders.has(uid))return partnerDraftOrders.get(uid);
+  try{
+    const value=JSON.parse(sessionStorage.getItem('bxh-partner-order:'+currentAuthUid()+':'+uid)||'null');
+    if(value&&/^BXH-CO-\d{8}-[A-F0-9]{12,}$/.test(value.orderCode)&&['draft','sent'].includes(value.status)){
+      partnerDraftOrders.set(uid,value);return value;
+    }
+  }catch(error){}
+  return null;
+}
 async function loadPartnerPlans(force=false){
   if(!isSuperAdmin()||partnerPlansState.loading||(!force&&partnerPlansState.plans!==null))return;
   partnerPlansState.loading=true;partnerPlansState.error='';
@@ -17738,7 +17748,7 @@ async function handleTitleEditor(action){
 
 function renderPartnerContractCard(user){
   const activePlans=(partnerPlansState.plans||[]).filter(plan=>plan.active&&plan.rankedMode);
-  const draft=partnerDraftOrders.get(user.uid);
+  const draft=partnerOrderFor(user.uid);
   return `<div class="account-partner-grant">
     <div class="panel-title">合作主辦｜合作方案與合約</div>
     <p class="hint">選擇方案後建立合約草稿；玩家於站內信閱讀並簽名，再由最高管理員確認。合作代碼由成立時自動產生。</p>
@@ -25466,6 +25476,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async()=>{try{
       const result=await window.engagementService.createPartnerContractDraft({...pending.data,operationId:pending.operationId});
       partnerDraftOrders.set(uid,{orderCode:result.orderCode,status:'draft'});
+      sessionStorage.setItem('bxh-partner-order:'+currentAuthUid()+':'+uid,JSON.stringify({orderCode:result.orderCode,status:'draft'}));
       sessionStorage.removeItem(key);
       showToast('合約草稿已建立：'+result.orderCode);
     }catch(error){showToast('建立草稿失敗：'+String(error.message||error),true);}
@@ -25473,12 +25484,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==='partner-send-contract'){
     if(!isSuperAdmin())return;
-    const uid=target.getAttribute('data-uid'),draft=partnerDraftOrders.get(uid);
+    const uid=target.getAttribute('data-uid'),draft=partnerOrderFor(uid);
     if(!draft||draft.status!=='draft')return;
     target.disabled=true;
     (async()=>{try{
       await window.engagementService.sendPartnerContract({orderCode:draft.orderCode});
       partnerDraftOrders.set(uid,{...draft,status:'sent'});
+      sessionStorage.setItem('bxh-partner-order:'+currentAuthUid()+':'+uid,JSON.stringify({...draft,status:'sent'}));
       showToast('合約與附件已送達玩家站內信');
     }catch(error){showToast('站內信寄送未確認：'+String(error.message||error),true);}
     finally{target.disabled=false;render();}})();return;
