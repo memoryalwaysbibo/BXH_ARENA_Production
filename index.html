@@ -16825,7 +16825,7 @@ function renderSettings(){
           <option value="standard" ${d.playMode!=="enchantment"?"selected":""}>標準對戰</option>
           <option value="enchantment" ${d.playMode==="enchantment"?"selected":""} ${isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&ladderMode!=="ranked"?'':'disabled'}>附魔之戰（正式站限管理者測試）</option>
         </select></div>
-        <p class="hint">附魔之戰將串接智慧叫號、裁判現場判斷雙方到場後啟動抽卡、每回合選手各自手機抽卡及裁判自動計分；完成驗收後開放選用。</p>
+        <p class="hint">附魔試行僅限最高管理員建立一般單淘賽，不開季軍賽、不計積分。這是正式站資料，請先以測試房與測試帳號操作；裁判確認到場後啟動抽卡，選手各自在自己的手機抽牌。</p>
         <div class="field"><label>戰鬥台數量</label><input type="number" min="1" max="32" id="f-stations" data-settings-draft="stations" data-settings-type="int" value="${d.stations}"></div>
         <label class="settings-check-row">
           <input type="checkbox" id="f-bronze" data-settings-draft="bronzeMatch" data-settings-type="bool" ${d.bronzeMatch?'checked':''} ${(ladderMode==="ranked"&&d.formatType==="single")?'disabled':''}>
