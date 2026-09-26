@@ -3522,6 +3522,64 @@ button.btn-primary,
 }
 
 /* BXH Directive skin: visual overrides only; existing controls and behavior remain shared. */
+:root[data-bxh-theme="directive"] .auth-shell{
+  background:
+    radial-gradient(ellipse at 12% 12%,rgba(160,90,255,.14),transparent 45%),
+    radial-gradient(ellipse at 88% 77%,rgba(222,64,79,.12),transparent 43%),
+    linear-gradient(155deg,#0c0916,#080710 54%,#0b0813);
+}
+:root[data-bxh-theme="directive"] .auth-beams{filter:hue-rotate(55deg);opacity:.32}
+:root[data-bxh-theme="directive"] .auth-wm img{filter:hue-rotate(55deg) drop-shadow(0 0 44px rgba(160,90,255,.28))}
+:root[data-bxh-theme="directive"] .auth-brand-header .celeb-brand{
+  color:#f2ecff!important;text-shadow:0 0 28px rgba(160,90,255,.42)!important;
+}
+:root[data-bxh-theme="directive"] .auth-brand-header .hoc-subbrand{color:#ffad75!important}
+:root[data-bxh-theme="directive"] .landing-tagline-brand{color:#ff812e;text-shadow:0 0 12px rgba(255,129,46,.38)}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card{
+  position:relative;overflow:hidden;border-radius:16px;
+  backdrop-filter:blur(20px) saturate(1.16);
+  -webkit-backdrop-filter:blur(20px) saturate(1.16);
+}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card::before{
+  position:absolute;top:8px;left:16px;pointer-events:none;
+  font-size:60px;font-weight:900;line-height:1;opacity:.65;
+}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-admin{
+  --directive-card-color:#ff812e;
+  background:linear-gradient(145deg,rgba(255,129,46,.27),rgba(69,29,20,.68) 56%,rgba(17,10,21,.82))!important;
+  border-color:rgba(255,154,78,.64)!important;
+  box-shadow:inset 0 1px rgba(255,227,197,.24),0 18px 43px rgba(255,129,46,.10);
+}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-player{
+  --directive-card-color:#a05aff;
+  background:linear-gradient(145deg,rgba(160,90,255,.29),rgba(66,30,99,.70) 56%,rgba(17,10,32,.85))!important;
+  border-color:rgba(187,133,255,.63)!important;
+  box-shadow:inset 0 1px rgba(231,205,255,.22),0 18px 43px rgba(160,90,255,.11);
+}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-guest{
+  --directive-card-color:#de404f;
+  background:linear-gradient(145deg,rgba(222,64,79,.28),rgba(87,26,46,.68) 56%,rgba(25,11,24,.85))!important;
+  border-color:rgba(255,111,126,.60)!important;
+  box-shadow:inset 0 1px rgba(255,208,215,.21),0 18px 43px rgba(222,64,79,.10);
+}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-admin::before{content:"零";color:#ffad70}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-player::before{content:"初";color:#c29aff}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card-guest::before{content:"貳";color:#ff8290}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-icon{
+  color:var(--directive-card-color)!important;filter:drop-shadow(0 0 11px var(--directive-card-color))!important;
+}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-enter,
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card .role-card-en{color:var(--directive-card-color)!important}
+:root[data-bxh-theme="directive"] .landing-role-cards .role-card:hover{
+  border-color:var(--directive-card-color)!important;
+  box-shadow:0 0 24px var(--directive-card-color),0 20px 43px rgba(0,0,0,.38)!important;
+}
+:root[data-bxh-theme="directive"] .auth-card{
+  background:linear-gradient(145deg,rgba(31,20,48,.87),rgba(13,10,25,.81)) padding-box,
+    linear-gradient(135deg,rgba(255,129,46,.44),rgba(160,90,255,.37) 55%,rgba(222,64,79,.3)) border-box!important;
+}
+:root[data-bxh-theme="directive"] .auth-card-title{color:#ff7784}
+:root[data-bxh-theme="directive"] .auth-card input:not([type=checkbox]):focus{border-color:#a05aff;box-shadow:0 0 0 2px rgba(160,90,255,.20)}
 :root[data-bxh-theme="directive"]{
   --accent-color:#a05aff;
   --accent-rgb:160,90,255;

@@ -5537,7 +5537,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   .people-more-menu>summary{width:30px;height:29px;font-size:18px;}
 }
 </style>
-<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.10">
+<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.11">
 <link rel="stylesheet" href="referee-score-v2.css?v=14.2.38-score-fault">
 </head>
 <body>
@@ -22108,6 +22108,7 @@ function renderWatchErrorScreen(){
 }
 
 const BXH_INTERFACE_THEME_KEY="bxh.interface.theme.v1";
+const BXH_INTERFACE_THEME_ACCOUNT_PREFIX="bxh.interface.theme.account.v1.";
 const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"gold",label:"暗耀金",english:"Dark Gold",color:"#b8922e"},
   {id:"blue",label:"霓虹藍",english:"Neon Blue",color:"#35c9d0"},
@@ -22122,6 +22123,13 @@ let interfaceTheme=(()=>{
   try{return normalizeInterfaceTheme(localStorage.getItem(BXH_INTERFACE_THEME_KEY));}catch(e){return "gold";}
 })();
 let accountThemeOpen=false;
+function restoreAccountInterfaceTheme(uid,profile){
+  let saved=null;
+  try{saved=localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid);}catch(e){}
+  const fromAccount=profile&&typeof profile.interfaceTheme==="string"?profile.interfaceTheme:null;
+  interfaceTheme=normalizeInterfaceTheme(saved||fromAccount||"gold");
+  syncInterfaceThemeVisibility();
+}
 function canUseDirectiveTheme(){
   return userProfile?.active===true &&
     ["super_admin","admin","staff"].includes(userProfile.role);
@@ -22137,7 +22145,19 @@ function applyInterfaceTheme(value,persist=true){
   if(nextTheme==="directive" && !canUseDirectiveTheme())return;
   interfaceTheme=nextTheme;
   syncInterfaceThemeVisibility();
-  if(persist){try{localStorage.setItem(BXH_INTERFACE_THEME_KEY,interfaceTheme);}catch(e){}}
+  if(persist){
+    try{localStorage.setItem(BXH_INTERFACE_THEME_KEY,interfaceTheme);}catch(e){}
+    const uid=firebaseUser?.uid;
+    if(uid){
+      try{localStorage.setItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid,interfaceTheme);}catch(e){}
+      if(userProfile)userProfile.interfaceTheme=interfaceTheme;
+      if(window.cloudAuth?.saveInterfaceTheme){
+        window.cloudAuth.saveInterfaceTheme(uid,interfaceTheme).then(result=>{
+          if(!result?.ok && firebaseUser?.uid===uid)showToast("主題已套用於此裝置，帳號同步尚未完成",true);
+        }).catch(()=>{if(firebaseUser?.uid===uid)showToast("主題已套用於此裝置，帳號同步尚未完成",true);});
+      }
+    }
+  }
 }
 function themePickerHtml(){
   const visibleThemes=BXH_INTERFACE_THEME_OPTIONS.filter(item=>item.id!=="directive" || canUseDirectiveTheme());
@@ -24014,6 +24034,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       if(!result.ok){ playerApplyError = result.error || "設定失敗，請稍後再試"; render(); return; }
       const profile = await window.cloudAuth.getUserProfile(pending.uid);
       userProfile = profile;
+      restoreAccountInterfaceTheme(pending.uid,profile);
       currentRole = "player"; // player MODE, regardless of the account's underlying role
       firebaseUser = { uid: pending.uid, email: pending.email };
       pendingNewPlayerProfile = null;
@@ -27694,6 +27715,7 @@ async function init(){
                   }
 
                   userProfile = profile;
+                  restoreAccountInterfaceTheme(fbUser.uid,profile);
                   if((profile.role==="staff"||profile.role==="admin"||profile.role==="super_admin"||(profile.role==="tester"||profile.isTestAccount===true)) && window.cloudAuth.ensureMyStaffDirectory){ window.cloudAuth.ensureMyStaffDirectory().catch(()=>{}); }
                   if((profile.role==="admin"||profile.role==="super_admin") && window.cloudAuth.listUsers && window.cloudAuth.syncStaffDirectory){
                     Promise.resolve().then(async()=>{ try{ const all=await window.cloudAuth.listUsers(); await window.cloudAuth.syncStaffDirectory(all); }catch(e){} });
@@ -28046,6 +28068,18 @@ init().then(()=>{
       }catch(e){
         console.warn("讀取使用者資料失敗", e);
         return null;
+      }
+    },
+
+    async saveInterfaceTheme(uid,theme){
+      if(!authReady || !uid || authHandle.currentUser?.uid!==uid) return {ok:false};
+      if(!BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===theme)) return {ok:false};
+      try{
+        await fx.updateDoc(fx.doc(dbHandle,USERS_COLLECTION,uid),{interfaceTheme:theme});
+        return {ok:true};
+      }catch(e){
+        console.warn("儲存帳號介面主題失敗",e);
+        return {ok:false};
       }
     },
 
