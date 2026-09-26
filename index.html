@@ -17766,6 +17766,16 @@ function renderAccountManagementScreen(){
                 <label class="account-active-control"><input type="checkbox" class="mgmt-test-box" data-uid="${esc(user.uid)}" ${draft.isTestAccount?'checked':''} style="width:20px;height:20px;">測試身分</label>
                 <label class="account-active-control"><input type="checkbox" class="mgmt-active-box" data-uid="${esc(user.uid)}" ${draft.active?'checked':''} style="width:20px;height:20px;">帳號啟用</label>
                 <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
+                ${user.role==="player"?`<details class="account-partner-grant"><summary>合作主辦授權｜${user.partnerOrganizer?.status==="active"?"已授權":"未授權"}</summary>
+                  <p class="hint">由最高管理員確認合作後開通；方案代碼只供記錄，賽事與積分權限另行核准。</p>
+                  <div class="grid grid-2">
+                    <div class="field"><label>授權狀態</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>開通合作主辦</option></select></div>
+                    <div class="field"><label>主辦名稱</label><input class="partner-name" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.organizationName||"")}" maxlength="80"></div>
+                    <div class="field"><label>方案代碼</label><input class="partner-plan" data-uid="${esc(user.uid)}" value="${esc(user.partnerOrganizer?.plan||"identity_only")}" maxlength="40"></div>
+                    <div class="field"><label>有效期限（選填）</label><input type="date" class="partner-expiry" data-uid="${esc(user.uid)}" value="${user.partnerOrganizer?.expiresAt?new Date(user.partnerOrganizer.expiresAt+8*3600000).toISOString().slice(0,10):""}"></div>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}">儲存合作主辦授權</button>
+                </details>`:""}
               </div>
             </div>
           </details>`;}).join("")}
@@ -25305,6 +25315,24 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       })();
     };
     openModal({ type:"generic", title:"執行公開賽事資料清理", message:"即將檢查並重建 publicTournaments 集合中每份文件的公開安全欄位，移除舊版可能殘留的私人資料。不會刪除任何賽事，不會變更文件 ID 或賽事代碼。是否繼續？", confirmLabel:"確定執行", onConfirm:doCleanup });
+    return;
+  }
+  if(action==="save-partner-grant"){
+    if(!isSuperAdmin()){showToast("只有最高管理員可設定合作主辦",true);return;}
+    const uid=target.getAttribute("data-uid")||"";
+    const user=(accountMgmtUsers||[]).find(item=>item.uid===uid);
+    if(!user||user.role!=="player"){showToast("僅可授權玩家帳號",true);return;}
+    const get=selector=>managedAccountControl(selector,uid);
+    const status=get(".partner-status")?.value;
+    const name=(get(".partner-name")?.value||"").trim();
+    const plan=(get(".partner-plan")?.value||"").trim();
+    const date=get(".partner-expiry")?.value||"";
+    if(!name||!/^[-a-zA-Z0-9_]{1,40}$/.test(plan)){showToast("請填寫主辦名稱與有效方案代碼",true);return;}
+    const expiresAt=date?Date.parse(date+"T23:59:59+08:00"):null;
+    if(date&&(!Number.isFinite(expiresAt)||expiresAt<=Date.now())&&status==="active"){showToast("有效期限需在未來",true);return;}
+    const grant={status,organizationId:user.partnerOrganizer?.organizationId||("org-"+uid),organizationName:name,plan,expiresAt};
+    if(JSON.stringify(grant)===JSON.stringify(user.partnerOrganizer)){showToast("授權沒有變更");return;}
+    openModal({type:"generic",title:"確認合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\\n狀態："+(status==="active"?"開通":"撤銷")+"\\n主辦："+name+"\\n方案："+plan+"\\n期限："+(date||"未設定"),confirmLabel:"確認儲存",onConfirm:()=>{(async()=>{await changeSingleManagedAccount(uid,{partnerOrganizer:grant},null);})();}});
     return;
   }
   if(action==="save-managed-account"){
