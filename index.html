@@ -10375,7 +10375,7 @@ function ensureSettingsFormDraft(){
     checkin:m.checkin||"",
     startTime:m.startTime||"",
     formatType:m.formatType||"single",
-    playMode:"standard", // 附魔之戰尚未開放，既有賽事維持標準對戰。
+    playMode:m.playMode==="enchantment"?"enchantment":"standard",
     stations:Math.max(1,parseInt(m.stations,10)||1),
     bronzeMatch:!!m.bronzeMatch,
     ladderMode:(isTester()&&state.testLadderEnabled===true)?"ranked":(m.ladderMode==="ranked"?"ranked":"general"),
@@ -16822,8 +16822,8 @@ function renderSettings(){
           <option value="roundrobin" ${d.formatType==='roundrobin'?'selected':''}>單循環賽</option>
         </select></div>
         <div class="field"><label>玩法模式</label><select id="f-play-mode" data-settings-draft="playMode">
-          <option value="standard" selected>標準對戰</option>
-          <option value="enchantment" disabled>附魔之戰（規劃中）</option>
+          <option value="standard" ${d.playMode!=="enchantment"?"selected":""}>標準對戰</option>
+          <option value="enchantment" ${d.playMode==="enchantment"?"selected":""} ${isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&ladderMode!=="ranked"?'':'disabled'}>附魔之戰（正式站限管理者測試）</option>
         </select></div>
         <p class="hint">附魔之戰將串接智慧叫號、裁判現場判斷雙方到場後啟動抽卡、每回合選手各自手機抽卡及裁判自動計分；完成驗收後開放選用。</p>
         <div class="field"><label>戰鬥台數量</label><input type="number" min="1" max="32" id="f-stations" data-settings-draft="stations" data-settings-type="int" value="${d.stations}"></div>
@@ -27056,6 +27056,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       markTesterSandboxState(state);
     }
 
+    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
+      showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
+    }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請確認連結是否來自 Google Maps",true);return;}
     state.meta.name=(d.name||"").trim()||"未命名賽事";
     state.meta.date=d.date||"";
@@ -27063,6 +27066,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.checkin=d.checkin||"";
     state.meta.startTime=d.startTime||"";
     state.meta.formatType=d.formatType||"single";
+    state.meta.playMode=d.playMode==="enchantment"?"enchantment":"standard";
+    state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
     state.meta.format=FORMAT_LABELS[state.meta.formatType]||"單淘汰賽";
     state.meta.stations=Math.max(1,parseInt(d.stations,10)||1);
     state.testLadderEnabled=isTester()?(d.ladderMode==="ranked"):false;
@@ -27155,6 +27160,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
     if(!aiCreateReviewGate("儲存賽事設定")) return;
+    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
+      showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
+    }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請貼上 maps.app.goo.gl 或 Google Maps 網址",true);return;}
     const requestedStations=Math.max(1,parseInt(d.stations,10)||1);
     const newFormatType=d.formatType||"single";
@@ -27175,7 +27183,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.checkin=d.checkin||"";
       state.meta.startTime=d.startTime||"";
       state.meta.formatType=newFormatType;
-      state.meta.playMode="standard";
+      state.meta.playMode=d.playMode==="enchantment"&&isSuperAdmin()&&newFormatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked"?"enchantment":"standard";
+      state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
       state.meta.format=FORMAT_LABELS[newFormatType]||"單淘汰賽";
       state.meta.stations=requestedStations;
       state.testLadderEnabled=isTester()?(d.ladderMode==="ranked"):false;
