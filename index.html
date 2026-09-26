@@ -23379,6 +23379,10 @@ function bindDynamicInputs(){
           else if(type==="bool") value=!!el.checked;
           else value=el.value;
           settingsFormDraft[field]=value;
+          if(field==="formatType"||field==="bronzeMatch"||field==="ladderMode"){
+            const option=document.querySelector('#f-play-mode option[value="enchantment"]');
+            if(option)option.disabled=!(isSuperAdmin()&&settingsFormDraft.formatType==="single"&&settingsFormDraft.bronzeMatch!==true&&settingsFormDraft.ladderMode!=="ranked");
+          }
           settingsFormDraftDirty=true;
           if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
         };
