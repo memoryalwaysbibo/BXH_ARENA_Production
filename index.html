@@ -17755,6 +17755,8 @@ function renderAccountManagementScreen(){
       ${page==="accounts"?`<div class="panel account-management-panel">
         <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
         <p class="hint">選擇玩家帳號並展開，即可在「合作主辦權限」開通或撤銷；帳號分類維持玩家。</p>
+        <details class="account-tools-card"><summary><span>合作方案｜A1–D1</span><span class="hint">查看已定案方案⌄</span></summary><div class="account-tools-body"><p class="hint">先行提供最高管理員查看及選擇方案。合約與積分賽權限仍需正式流程啟用。</p><div class="field"><label for="partner-plan-preview">合作方案</label><select id="partner-plan-preview"><option value="">選擇方案查看人數、場次與價格</option><option value="A1">A1｜16–32 人｜1 場｜NT$300</option><option value="A2">A2｜16–32 人｜4 場｜NT$1,000</option><option value="A3">A3｜16–32 人｜8 場｜NT$1,500</option><option value="A4">A4｜16–32 人｜12 場｜NT$2,000</option><option value="B1">B1｜33–64 人｜1 場｜NT$600</option><option value="B2">B2｜33–64 人｜4 場｜NT$2,000</option><option value="B3">B3｜33–64 人｜8 場｜NT$3,200</option><option value="C1">C1｜65–128 人｜1 場｜NT$1,000</option><option value="C2">C2｜65–128 人｜4 場｜NT$3,400</option><option value="D1">D1｜129–256 人｜1 場｜NT$2,000</option></select></div><p class="hint">目前僅供預覽；選擇方案不會向玩家寄送合約、產生訂單或授予積分賽權限。</p></div></details>
+
         ${authFormError ? `<div class="auth-error">${esc(authFormError)}</div>` : ""}
         <div class="account-overview-grid">
           <div class="stat-box"><div class="label">全部帳號</div><div class="value">${activity.total}</div></div>
