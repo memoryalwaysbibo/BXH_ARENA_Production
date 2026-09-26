@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.02">
+<meta name="bxh-build" content="20260926.03">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.02";
+  var CURRENT_BUILD="20260926.03";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5973,9 +5973,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.31";
+const APP_VERSION = "v14.2.32";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {"version":"v14.2.32","date":"2026/09/26","timezone":"Asia/Taipei","title":"AI 工作人員第二層權限修復","updateLevel":"patch","added":[],"changed":["AI 協助建立相關操作在全域權限分派器中改依 AI 專屬角色 Gate 判斷"],"fixed":["修正工作人員雖看得到 AI 協助建立按鈕，點擊後仍被 ADMIN_TIER_ONLY_ACTIONS 擋下並顯示無權限"],"environment":"Production","firebaseImpact":"無","securityRulesImpact":"無","permissionImpact":"僅 AI 協助建立 action 對有效 staff 放行；其他 admin-tier 操作維持原權限","publicSummary":"工作人員現在可真正開啟並操作 AI 協助建立，不再被第二層前端權限阻擋。"},
   {"version":"v14.2.31","date":"2026/09/26","timezone":"Asia/Taipei","title":"AI 協助建立開放管理員與工作人員","updateLevel":"patch","added":["有效的管理員與工作人員可使用 AI 文案與海報協助建立"],"changed":["移除 Restricted Beta 的 admin 白名單限制；staff 正式納入 AI 開房權限","AI 仍只產生草稿，必須由房主審核後自行儲存／發布"],"fixed":["修正後端已開放 admin／staff、但正式前端仍以舊 Beta Gate 阻擋的權限不一致"],"environment":"Production","firebaseImpact":"後端 Functions PR #38 已合併；前端權限與後端對齊","securityRulesImpact":"無","permissionImpact":"有效 super_admin、admin、staff 可用；player／guest／test／frozen／disabled／deleted 不可用","publicSummary":"管理員與工作人員現在可使用 AI 協助建立賽事。"},
   {"version":"v14.2.30","date":"2026/09/26","timezone":"Asia/Taipei","title":"心情小棧共鳴與單層回覆","updateLevel":"minor","added":["每則心情新增愛心共鳴，可再次點擊取消","新增單層展開回覆與回覆數量"],"changed":["留言與回覆管理操作收進省空間的 ⋯ 選單","回覆跟隨主留言 24 小時生命週期，且不進入上方跑馬燈"],"fixed":[],"environment":"Production / HTML + Firebase","deployStatus":"Frontend ready after moodStation backend","firebaseImpact":"沿用 moodStationMessages；新增 heart/reply 欄位，由 Callable 管理","securityRulesImpact":"無；不新增 client-side Firestore 寫入","permissionImpact":"登入玩家可共鳴／回覆；本人與管理員可移除","publicSummary":"心情小棧加入 ❤️ 共鳴與 💬 單層回覆，手機版維持精簡。"},
 
@@ -23287,7 +23288,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     showToast("只有最高管理員可以管理其他後台帳號。", true);
     return;
   }
-  if(ADMIN_TIER_ONLY_ACTIONS.has(action) && !isAdminTierOrAbove() && !(isOwnTestTournament() && TESTER_TIER_ACTIONS.has(action)) && !(isCommunityRoomOwner() && COMMUNITY_OWNER_TIER_ACTIONS.has(action))){
+  const aiCreateTierAllowed = ADMIN_TIER_ONLY_ACTIONS.has(action) && action.startsWith("ai-create-") && aiCreateBetaActorAllowed();
+  if(ADMIN_TIER_ONLY_ACTIONS.has(action) && !isAdminTierOrAbove() && !aiCreateTierAllowed && !(isOwnTestTournament() && TESTER_TIER_ACTIONS.has(action)) && !(isCommunityRoomOwner() && COMMUNITY_OWNER_TIER_ACTIONS.has(action))){
     showToast("目前身分沒有此操作權限。", true);
     return;
   }
