@@ -49,11 +49,11 @@ assert.equal(api.isPreopenWindow(ranked,open-60*1000),false,'closed registration
 registrationStatus='scheduled';
 
 const base={key:'prestart',label:'等待開始',dot:'gray',phase:'waiting'};
-const decorated=api.decorateLifecycle(ranked,base);
+const decorated=api.decorateLifecycle(ranked,base,open-60*1000);
 assert.equal(decorated.key,'registration');
 assert.equal(decorated.phase,'waiting','canonical tournament phase must remain waiting');
 assert.equal(decorated.preopen,true);
-assert.equal(api.decorateLifecycle(general,base),base);
+assert.equal(api.decorateLifecycle(general,base,open-60*1000),base);
 
 const next=api.nextBoundary([ranked,general],open-10*60*1000);
 assert.equal(next,open-5*60*1000,'nearest local transition should be the T-5 boundary');
