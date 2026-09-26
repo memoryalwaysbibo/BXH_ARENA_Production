@@ -26,10 +26,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.06">
+<meta name="bxh-build" content="20260926.07">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.06";
+  var CURRENT_BUILD="20260926.07";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -229,6 +229,22 @@ header.topbar .logo-glow{
   z-index:0;
 }
 header.topbar img.logo{position:relative;z-index:1;height:84px;width:auto;display:block;flex-shrink:0;}
+header.topbar .logo-refresh-button{
+  appearance:none;-webkit-appearance:none;border:0;padding:0;background:transparent;color:inherit;
+  cursor:pointer;border-radius:14px;outline:none;isolation:isolate;
+  transition:transform .12s ease,filter .16s ease;
+}
+header.topbar .logo-refresh-button:hover{filter:brightness(1.08);}
+header.topbar .logo-refresh-button:active{transform:scale(.96);}
+header.topbar .logo-refresh-button:focus-visible{outline:2px solid rgba(217,185,92,.75);outline-offset:5px;}
+header.topbar .logo-refresh-button.is-refreshing{pointer-events:none;filter:brightness(1.18);}
+header.topbar .logo-refresh-button.is-refreshing .logo{animation:bxhLogoRefreshPulse .55s ease-in-out infinite alternate;}
+header.topbar .logo-refresh-button.is-refreshing .logo-glow{opacity:1;animation:bxhLogoRefreshGlow .7s ease-in-out infinite alternate;}
+@keyframes bxhLogoRefreshPulse{from{transform:scale(.96);filter:brightness(1)}to{transform:scale(1.02);filter:brightness(1.16)}}
+@keyframes bxhLogoRefreshGlow{from{transform:translate(-50%,-50%) scale(.92)}to{transform:translate(-50%,-50%) scale(1.08)}}
+@media(prefers-reduced-motion:reduce){
+  header.topbar .logo-refresh-button,header.topbar .logo-refresh-button .logo,header.topbar .logo-refresh-button .logo-glow{animation:none!important;transition:none!important;}
+}
 header.topbar .brandtext{display:flex;flex-direction:column;line-height:1.15;min-width:0;position:relative;z-index:1;}
 header.topbar .brandtext .t1{
   font-family:var(--font-d);font-weight:700;font-size:25px;letter-spacing:3px;
@@ -5975,9 +5991,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.36";
+const APP_VERSION = "v14.2.37";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.37",date:"2026/09/26",timezone:"Asia/Taipei",title:"Header Logo 快速重新整理",updateLevel:"patch",added:["固定 Header 左上 BXH Logo 改為重新整理按鈕"],changed:["點擊 Logo 會以 cache-bust 重新載入目前頁面並重新建立雲端同步，完成後顯示已讀取最新資訊","所有共用 Header 的 Logo 採相同操作與無障礙標籤"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend header refresh control",firebaseImpact:"無資料結構變更；重新載入後沿用既有 Firebase session 與訂閱流程",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"左上 BXH Logo 現在可以直接重新整理頁面並讀取最新資訊。"},
   {version:"v14.2.36",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台計分介面 V2｜黑金強化版",updateLevel:"minor",added:["裁判台正常計分模式新增黑金主戰卡視覺、得分鍵圖示、主控交換鍵與結果操作分層"],changed:["場次狀態改為精簡控制台","雙方選手卡、姓名與分數重新建立視覺層級","四種得分鍵改為單欄大觸控鍵並保留既有文字與分值","最新得分改膠囊紀錄，撤銷獨立成整列操作","本局重賽降為副操作，確認比賽結果升為金色主 CTA","四台桌面 compact 模式維持既有密度規格"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee score panel V2",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台正常計分介面升級為黑金主控台風格；操作流程與計分邏輯不變。"},
   {version:"v14.2.35",date:"2026/09/26",timezone:"Asia/Taipei",title:"工作人員指派專用雲端同步",updateLevel:"patch",added:["工作人員指派改用專用 Firestore transaction，僅更新 assignedStaffUids 與私人賽事狀態"],changed:["指派操作會等待伺服器讀回驗證成功後才顯示完成","保留既有裁判台必要 UID，避免工作人員名單更新誤移除裁判權限","權限拒絕與真正網路異常分流顯示，不再把單次寫入失敗一律標成 LINK ERROR"],fixed:["修正每次指派工作人員後 BXH LIVE LINK 誤顯示雲端連線異常，但重新整理後資料其實已存在的假斷線現象","修正舊流程未 await saveState()，畫面先顯示成功但雲端仍在背景寫入的時序問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend staff assignment sync hotfix",firebaseImpact:"無新增集合；沿用 tournaments.assignedStaffUids，改為專用 transaction",securityRulesImpact:"無；沿用既有 admin update 規則",permissionImpact:"無擴權；仍限 admin／super_admin 執行工作人員指派",publicSummary:"工作人員指派改成獨立原子同步並等待雲端確認；單次指派不再讓整個 LIVE LINK 誤判斷線。"},
   {version:"v14.2.34",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台下一場 fallback 補完",updateLevel:"patch",added:[],changed:["上方精簡下一場卡補齊雙方已確定、等待晉級、等待安排、本台完成四種狀態","下一場只有一位選手確定時顯示已知選手 VS 待定，通知按鈕維持停用"],fixed:["修正 active scoring 移除底部重複卡後，下一場尚未完全產生時整段資訊消失"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee next-match fallback fix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台下一場資訊不再因等待晉級而消失；未確定時會顯示待定狀態。"},
@@ -17545,7 +17562,7 @@ function renderAccountManagementScreen(){
   const activity=accountActivitySummary(users);
   const visibleUsers=getVisibleAccountUsers(users);
   return `<div class="stickytop account-management-stickytop"><header class="topbar account-management-topbar">
-      <div class="logo-wrap"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></div>
+      <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統 <small style="opacity:.55;font-size:9px;">${APP_VERSION}</small></span>${topbarConnectionRailHtml()}</div>
       <div class="spacer"></div>
       <div class="header-account-controls">${accountMenuHtml()}</div>
@@ -17828,7 +17845,7 @@ function renderPlayerCenterScreen(){
       <td>${r.wins}勝 ${r.losses}敗</td>
     </tr>`).join("");
   return `<div class="stickytop"><header class="topbar">
-      <div class="logo-wrap"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></div>
+      <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
       <div class="spacer"></div>
     </header>
@@ -18329,7 +18346,7 @@ function renderPlayerCenterLoggedIn(){
   else content = renderPlayerHomeTab(p);
 
   return `<div class="stickytop player-shell mode-shell"><header class="topbar">
-      <div class="logo-wrap"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></div>
+      <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
       <div class="spacer"></div>
       <div class="header-account-controls">${mailboxButtonHtml()}${accountMenuHtml()}</div>
@@ -18636,7 +18653,7 @@ function renderCommunityRoomApp(){
   const tabs=[["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["people","人員管理"],["settings","賽事設定"]];
   let content=communityRoomActiveTab==="bracket"?renderBracket():communityRoomActiveTab==="referee"?renderReferee():communityRoomActiveTab==="people"?renderPeopleManagement():communityRoomActiveTab==="settings"?renderCommunitySettings():renderLive();
   const exp=communityRoomExpiryMs(state);
-  return `<div class="stickytop"><header class="topbar"><div class="logo-wrap"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></div><div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">玩家一般賽事</span>${topbarConnectionRailHtml()}</div><div class="spacer"></div><span class="badge badge-metal">一般賽事｜不計積分</span><button class="btn btn-ghost btn-sm" data-action="community-exit-room">返回我的房間</button></header>
+  return `<div class="stickytop"><header class="topbar"><button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button><div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">玩家一般賽事</span>${topbarConnectionRailHtml()}</div><div class="spacer"></div><span class="badge badge-metal">一般賽事｜不計積分</span><button class="btn btn-ghost btn-sm" data-action="community-exit-room">返回我的房間</button></header>
   <div class="community-room-notice">主辦人：${esc((userProfile&& (userProfile.displayName||userProfile.realName))||"玩家")}　｜　代碼 ${esc(state.cloudCode||"—")}　｜　完整房間預計保留至 ${exp?new Date(exp).toLocaleString():"—"}</div>
   <nav class="tabs">${tabs.map(t=>`<button class="${communityRoomActiveTab===t[0]?"active":""}" data-action="community-switch-room-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}</nav></div><main>${content}</main>${renderModal()}${celebrationOpen?renderCelebrationOverlay():""}${shareModalOpen?renderShareModal():""}${renderEventEntryModal()}${renderQrScannerModal()}`;
 }
@@ -22567,7 +22584,7 @@ function renderApp(){
   app.innerHTML = `
     <div class="stickytop mode-shell">
       <header class="topbar">
-        <div class="logo-wrap"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></div>
+        <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
         <div class="brandtext">
           <span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span>
           <span class="t2">戰鬥陀螺賽事系統</span>
@@ -23225,7 +23242,32 @@ async function handleTournamentOperationsAction(action,target){
 document.addEventListener('input',event=>{const name=event.target.id;if(!['ops-title','ops-description','ops-mode','ops-count','ops-exclude'].includes(name))return;const o=operationsContext();const field={ 'ops-title':'title','ops-description':'description','ops-mode':'mode','ops-count':'count','ops-exclude':'excludePrevious'}[name];o.draft[field]=name==='ops-exclude'?event.target.checked:name==='ops-count'?Number(event.target.value):event.target.value;if(name==='ops-mode'||name==='ops-exclude'){o.preview=null;const b=document.querySelector('[data-action="ops-draw"]');if(b)b.disabled=true;}});
 
 /* ==== actions ==== */
+let headerRefreshBusy=false;
+function refreshLatestFromHeaderLogo(target){
+  if(headerRefreshBusy)return;
+  if(typeof registrationFormDraftDirty!=="undefined"&&registrationFormDraftDirty){
+    showToast("目前有尚未儲存的報名設定，請先儲存後再重新整理",true);
+    return;
+  }
+  headerRefreshBusy=true;
+  try{
+    if(target&&target.classList)target.classList.add("is-refreshing");
+    showToast("正在讀取最新資訊…");
+    sessionStorage.setItem("bxh_header_refresh_at",String(Date.now()));
+  }catch(e){}
+  setTimeout(()=>{
+    try{
+      const u=new URL(location.href);
+      u.searchParams.set("bxh_refresh",String(Date.now()));
+      location.replace(u.toString());
+    }catch(e){
+      location.reload();
+    }
+  },180);
+}
+
 function handleAction(action, target){
+  if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
@@ -27508,7 +27550,15 @@ try{
 }catch(e){
   console.warn("BXH ARENA：初始入口繪製失敗",e);
 }
-init();
+init().then(()=>{
+  try{
+    const at=Number(sessionStorage.getItem("bxh_header_refresh_at")||0);
+    if(at&&Date.now()-at<30000){
+      sessionStorage.removeItem("bxh_header_refresh_at");
+      setTimeout(()=>showToast("已讀取最新資訊"),0);
+    }
+  }catch(e){}
+});
 </script>
 
 <!-- ====================================================================
