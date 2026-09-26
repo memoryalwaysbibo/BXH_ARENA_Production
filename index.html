@@ -124,8 +124,12 @@
 <meta name="twitter:image" content="https://memoryalwaysbibo.github.io/index.html/bxh-arena-og-image.png">
 <script>
 (function(){
-  // Before account verification, always show the original entrance.
-  document.documentElement.setAttribute("data-bxh-theme","gold");
+  var theme="gold";
+  try{
+    var uid=localStorage.getItem("bxh.interface.theme.entrance.uid.v1");
+    if(uid&&localStorage.getItem("bxh.interface.theme.account.v1."+uid)==="directive")theme="directive";
+  }catch(e){}
+  document.documentElement.setAttribute("data-bxh-theme",theme);
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22205,10 +22209,11 @@ function canUseDirectiveTheme(){
   if(firebaseUser && userProfile){
     return userProfile.active===true && ["super_admin","admin","staff"].includes(userProfile.role);
   }
-  return false;
+  if(firebaseUser || !entranceThemeAccountUid)return false;
+  try{return localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+entranceThemeAccountUid)==="directive";}catch(e){return false;}
 }
 function syncInterfaceThemeVisibility(){
-  const visibleTheme=!firebaseUser?"gold":(interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme);
+  const visibleTheme=!firebaseUser?(canUseDirectiveTheme()?"directive":"gold"):(interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme);
   if(document.documentElement.getAttribute("data-bxh-theme")!==visibleTheme){
     document.documentElement.setAttribute("data-bxh-theme",visibleTheme);
   }
