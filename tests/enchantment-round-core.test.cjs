@@ -42,10 +42,12 @@ test('round token and assignment prevent rerolls and duplicate scoring',()=>{
   assert.equal(s.round,1);assert.equal(s.phase,'ready-to-score');
   assert.equal(s.scores.A,0);assert.equal(s.cards.A,'double_spin');
 });
-test('two triggering cards keep round unscored pending a rule decision',()=>{
+test('two triggering cards award defense points and advance the round',()=>{
   let s=step(flow.start,flow.create('M3','a','b'),true);
   s=step(flow.assign,s,1,'A','double_burst');s=step(flow.assign,s,1,'B','weaken_burst');
   s=step(flow.reveal,s,1,'A','a');s=step(flow.reveal,s,1,'B','b');
   const r=flow.submit(s,1,'A','burst',true);
-  assert.equal(r.reason,'priority-undecided');assert.equal(s.scores.A,0);assert.equal(s.round,1);
+  assert.equal(r.ok,true);assert.equal(r.event.points,1);
+  assert.equal(r.event.appliedCardId,'weaken_burst');
+  assert.equal(r.state.scores.A,1);assert.equal(r.state.round,2);
 });
