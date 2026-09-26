@@ -223,7 +223,7 @@ function courtCallContext(code){
   try{pending=JSON.parse(sessionStorage.getItem('bxh.call:'+courtCallUserKey()+':'+code)||'null');}catch{}
   courtCallCache.set(code,{
    code,identity:key,storageKey:'bxh.call:'+courtCallUserKey()+':'+code,
-   rows:[],used:false,error:'',pending,busy:false,loading:false,next:0
+   rows:[],prepares:[],used:false,error:'',pending,busy:false,loading:false,next:0
   });
  }
  return courtCallCache.get(code);
@@ -242,6 +242,8 @@ function courtCallError(e){
   'permission-denied':'沒有此賽事的叫號權限。',
   'account-inactive':'帳號目前無法使用。',
   'notify-cooldown':'請稍候 10 秒再叫號。',
+  'prepare-cooldown':'下一場準備提醒剛送出，請稍候 30 秒再通知。',
+  'not-next-match':'只能提前通知本台「下一場」選手。',
   'pass-pending':'已有一筆 PASS 等待處理。',
   'pass-not-pending':'PASS 已處理，請重新整理。',
   'event-not-live':'賽事尚未開始或已結束。'
@@ -309,13 +311,68 @@ function courtCallRow(c,r,ref){
  </div>`;
 }
 
+function courtCallLinkedUid(p){
+ return String(p?.guardianUid||p?.registrationUid||p?.playerUid||'');
+}
+function courtCallParticipantMeta(p){
+ if(!p)return {name:'待定',sub:'等待選手資料',linked:false,checked:false};
+ const linked=!!courtCallLinkedUid(p);
+ const code=String(p.playerId||p.displayCode||'').trim();
+ const source=linked?'BXH 會員':'現場';
+ const check=p.checkedIn===true?'已報到':(state.meta?.checkinRequired?'未報到':'免報到');
+ return {
+  name:String(p.name||'選手'),
+  sub:[code||source,check].filter(Boolean).join(' · '),
+  linked,checked:p.checkedIn===true
+ };
+}
+function courtCallNextMatchFor(m){
+ if(!m)return null;
+ const court=state.courtAssignments?.['court'+Number(m.station||0)];
+ if(!court?.nextMatchId)return null;
+ const next=getMatch(court.nextMatchId);
+ return next&&!next.completed&&next.a&&next.b?next:null;
+}
+function courtCallPrepareRow(c,matchId){
+ return (c?.prepares||[]).find(x=>x.matchId===matchId)||null;
+}
+function renderCourtCallNextPrepare(m,c){
+ const next=courtCallNextMatchFor(m);
+ if(!next)return '';
+ const a=(state.players||[]).find(p=>p.id===next.a?.playerId);
+ const b=(state.players||[]).find(p=>p.id===next.b?.playerId);
+ const am=courtCallParticipantMeta(a),bm=courtCallParticipantMeta(b);
+ const prepare=courtCallPrepareRow(c,next.id);
+ const linked=am.linked&&bm.linked;
+ const disabled=c.busy||c.pending||!linked;
+ const status=prepare
+   ? '已通知 '+new Date(prepare.notifiedAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})
+   : linked?'尚未通知':'至少一位為現場／未綁定帳號，無法推播';
+ return `<div class="court-call-next-ready">
+   <div class="court-call-next-ready-head">
+     <div><span class="court-call-next-kicker">NEXT MATCH</span><b>下一場｜${esc(displayMatchLabel(next)||matchLabel(next))}</b></div>
+     <span class="court-call-next-status">${esc(status)}</span>
+   </div>
+   <div class="court-call-next-people">
+     <div class="court-call-next-person"><span>選手 A</span><strong>${esc(am.name)}</strong><small>${esc(am.sub)}</small></div>
+     <div class="court-call-next-vs">VS</div>
+     <div class="court-call-next-person"><span>選手 B</span><strong>${esc(bm.name)}</strong><small>${esc(bm.sub)}</small></div>
+   </div>
+   <button class="btn btn-ghost court-call-prepare-btn" data-action="court-call-prepare" data-code="${esc(c.code)}" data-match="${esc(next.id)}" ${disabled?'disabled':''}>🔔 提前通知準備</button>
+   <p class="hint">只提醒下一場選手先到戰鬥台附近準備；不會啟動正式叫號、OK 或 PASS。</p>
+ </div>`;
+}
+
 function renderCourtCallReferee(m){
  if(!m||!m.a||!m.b||m.completed||!state.startedAt||!state.cloudCode||!canOperateStation(m.station))return '';
  const c=courtCallContext(state.cloudCode);
- return `<section class="panel">
+ return `<section class="panel court-call-referee-panel">
    <div class="panel-title">BXH CALL｜裁判叫號</div>
-   <button class="btn btn-primary" data-action="court-call-notify" data-code="${esc(c.code)}" data-match="${esc(m.id)}" ${c.busy||c.pending?'disabled':''}>通知雙方選手</button>
-   <p class="hint">選手只要已登入 BXH ARENA，前景任何頁面都可收到叫號彈窗。PASS 會自動同台同輪延後 1 場，每人每賽事限一次；未回覆不自動判棄權。</p>
+   <div class="court-call-current-actions">
+     <div><b>目前場次｜${esc(displayMatchLabel(m)||matchLabel(m))}</b><p class="hint">正式叫號後，選手可回覆 OK／PASS。</p></div>
+     <button class="btn btn-primary" data-action="court-call-notify" data-code="${esc(c.code)}" data-match="${esc(m.id)}" ${c.busy||c.pending?'disabled':''}>通知雙方選手上場</button>
+   </div>
+   ${renderCourtCallNextPrepare(m,c)}
    ${courtCallCommon(c)}
    ${c.rows.filter(r=>r.isReferee&&r.station===m.station).map(r=>courtCallRow(c,r,true)).join('')}
  </section>`;
@@ -444,6 +501,7 @@ function ensureCourtCallGlobalStyles(){
  .bxh-call-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.bxh-call-actions.one{grid-template-columns:1fr}
  .bxh-call-actions .btn{min-height:52px;font-size:15px;font-weight:900}
  .court-call-people{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0}.court-call-person{padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.04);font-size:12px}.court-call-person.is-replied{color:#f0cf67}
+ .court-call-referee-panel{margin:12px 16px 0!important}.court-call-current-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.court-call-current-actions .hint{margin:3px 0 0}.court-call-next-ready{margin-top:12px;padding:12px;border:1px solid rgba(217,185,92,.20);border-radius:12px;background:rgba(255,255,255,.025)}.court-call-next-ready-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.court-call-next-ready-head>div{display:grid;gap:2px}.court-call-next-kicker{font-size:9px;letter-spacing:.16em;color:var(--gold)}.court-call-next-ready-head b{font-size:13px}.court-call-next-status{font-size:10px;color:var(--metal-dim);text-align:right}.court-call-next-people{display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:7px;align-items:center;margin-top:10px}.court-call-next-person{display:grid;gap:2px;padding:9px;border-radius:10px;background:rgba(255,255,255,.035);min-width:0}.court-call-next-person span,.court-call-next-person small{font-size:9.5px;color:var(--metal-dim)}.court-call-next-person strong{font-size:14px;color:var(--ivory);overflow-wrap:anywhere}.court-call-next-vs{text-align:center;color:var(--gold);font-weight:900;font-size:11px}.court-call-prepare-btn{width:100%;margin-top:10px;min-height:40px}.court-call-next-ready>.hint{margin:7px 0 0;font-size:10px}
  #bxh-court-call-help-overlay{position:fixed;inset:0;z-index:2147483250;display:flex;align-items:flex-end;justify-content:center;padding:18px;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
  .bxh-call-help-sheet{width:min(100%,430px);border:1px solid rgba(217,185,92,.45);border-radius:18px;background:linear-gradient(165deg,#17181b,#090a0b);box-shadow:0 24px 70px rgba(0,0,0,.65);padding:16px;color:#eef0f3}
  .bxh-call-help-title{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#f0cf71;font-weight:900}
@@ -451,7 +509,7 @@ function ensureCourtCallGlobalStyles(){
  .bxh-call-help-status{margin-top:8px;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.035);color:#bfc4cc;font-size:11px}
  .bxh-call-help-copy{margin-top:10px;color:#cdd1d7;font-size:12px;line-height:1.55}.bxh-call-help-copy p{margin:6px 0}
  .bxh-call-help-test{width:100%;margin-top:10px}
- @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}.bxh-call-help-sheet{padding:14px}}
+ @media(max-width:420px){.bxh-call-modal{padding:18px 15px}.bxh-call-court{font-size:30px}.bxh-call-vs{font-size:17px}.bxh-call-actions{grid-template-columns:1fr}.bxh-call-help-sheet{padding:14px}.court-call-current-actions{grid-template-columns:1fr}.court-call-current-actions .btn{width:100%}.court-call-next-people{grid-template-columns:1fr}.court-call-next-vs{display:none}.court-call-next-status{text-align:left}}
  `;
  document.head.appendChild(style);
 }
@@ -518,7 +576,20 @@ function courtCallVibrate(pattern=[180,90,180]){
  try{if(typeof navigator!=='undefined'&&navigator.vibrate)navigator.vibrate(pattern);}catch{}
 }
 
-function courtCallNotifyChanges(c,newRows,oldRows){
+function courtCallNotifyChanges(c,newRows,oldRows,newPrepares=[],oldPrepares=[]){
+ const oldPrepareById=new Map((oldPrepares||[]).map(x=>[x.matchId,x]));
+ for(const p of newPrepares||[]){
+  if(!p.me)continue;
+  const before=oldPrepareById.get(p.matchId);
+  if(before&&Number(before.sequence)===Number(p.sequence))continue;
+  showToast(`⏳ BXH CALL｜你是 ${courtCallStationLabel(p.station)} 下一場，請先到附近準備`);
+  courtCallVibrate([90,60,90]);
+  courtCallSystemNotify(
+   `bxh-prepare:${c.code}:${p.matchId}:${p.sequence}`,
+   `⏳ BXH CALL｜下一場準備`,
+   `${p.players?.map(x=>x.name).join(' VS ')||'下一場'}｜請先到 ${p.station} 號戰鬥台附近準備。`
+  );
+ }
  const oldById=new Map((oldRows||[]).map(r=>[r.matchId,r]));
  for(const r of newRows||[]){
   const prev=oldById.get(r.matchId);
@@ -618,27 +689,34 @@ function scheduleCourtCallPoll(){
 
 async function loadCourtCalls(code){
  const c=courtCallContext(code);if(c.loading)return;c.loading=true;
- const oldRows=c.rows||[],oldUsed=!!c.used,oldError=c.error||'';
- const oldSig=JSON.stringify(oldRows.map(r=>({
-  id:r.matchId,seq:r.sequence,calledAt:r.calledAt,
-  pass:r.pass?{status:r.pass.status,requestedAt:r.pass.requestedAt,waitFor:r.pass.waitFor}:null,
-  players:(r.players||[]).map(p=>[p.id,p.response,p.canPass,p.passUsed]),
-  waitingFor:r.waitingFor
- })));
+ const oldRows=c.rows||[],oldPrepares=c.prepares||[],oldUsed=!!c.used,oldError=c.error||'';
+ const oldSig=JSON.stringify({
+  rows:oldRows.map(r=>({
+   id:r.matchId,seq:r.sequence,calledAt:r.calledAt,
+   pass:r.pass?{status:r.pass.status,requestedAt:r.pass.requestedAt,waitFor:r.pass.waitFor}:null,
+   players:(r.players||[]).map(p=>[p.id,p.response,p.canPass,p.passUsed]),
+   waitingFor:r.waitingFor
+  })),
+  prepares:oldPrepares.map(p=>[p.matchId,p.sequence,p.notifiedAt])
+ });
  let changed=false;
  try{
   const result=await window.engagementService.courtCall({action:'list',code});
   if(c!==courtCallContext(code))return;
   if(!result.ok)throw Error('load-failed');
   const newRows=Array.isArray(result.rows)?result.rows:[];
-  courtCallNotifyChanges(c,newRows,oldRows);
-  c.rows=newRows;c.used=!!result.passUsed;c.error='';
-  const newSig=JSON.stringify(newRows.map(r=>({
-   id:r.matchId,seq:r.sequence,calledAt:r.calledAt,
-   pass:r.pass?{status:r.pass.status,requestedAt:r.pass.requestedAt,waitFor:r.pass.waitFor}:null,
-   players:(r.players||[]).map(p=>[p.id,p.response,p.canPass,p.passUsed]),
-   waitingFor:r.waitingFor
-  })));
+  const newPrepares=Array.isArray(result.prepares)?result.prepares:[];
+  courtCallNotifyChanges(c,newRows,oldRows,newPrepares,oldPrepares);
+  c.rows=newRows;c.prepares=newPrepares;c.used=!!result.passUsed;c.error='';
+  const newSig=JSON.stringify({
+   rows:newRows.map(r=>({
+    id:r.matchId,seq:r.sequence,calledAt:r.calledAt,
+    pass:r.pass?{status:r.pass.status,requestedAt:r.pass.requestedAt,waitFor:r.pass.waitFor}:null,
+    players:(r.players||[]).map(p=>[p.id,p.response,p.canPass,p.passUsed]),
+    waitingFor:r.waitingFor
+   })),
+   prepares:newPrepares.map(p=>[p.matchId,p.sequence,p.notifiedAt])
+  });
   changed=oldSig!==newSig||oldUsed!==c.used||oldError!=='';
  }catch(e){
   if(c===courtCallContext(code)){
@@ -712,7 +790,7 @@ async function handleCourtCall(action,target){
   if(['coming','pass','ready'].includes(api)){response=api;requestedResponse=response;api='respond';}
   if(response==='pass')reason='其他';
   if(api==='approve'&&!confirm('這是舊版待審 PASS。核准後將同台同輪延後 1 場，是否繼續？'))return;
-  if(!['notify','respond','approve','reject'].includes(api))return;
+  if(!['notify','prepare','respond','approve','reject'].includes(api))return;
   payload={
    action:api,code,matchId:target.getAttribute('data-match'),
    sequence:Number(target.getAttribute('data-sequence')),
@@ -740,6 +818,7 @@ async function handleCourtCall(action,target){
   c.busy=false;
   await loadCourtCalls(code);
   if(payload.action==='notify')showToast('叫號已送出雙方選手');
+  else if(payload.action==='prepare')showToast('已提前通知下一場雙方選手準備');
   else if(requestedResponse==='pass'||payload.response==='pass')showToast('PASS 已接受，本場自動延後 1 場');
   else if(requestedResponse==='coming'||payload.response==='coming')showToast('已回覆裁判：正在前往');
   else showToast('叫號操作已確認');
