@@ -11837,7 +11837,18 @@ async function performAutoArchive(){
     }
     let payload;
     try{ payload=buildLadderSettlementPayload(state); }
-    catch(e){ showToast(e.message||'V1 積分資料驗證失敗',true); return false; }
+    catch(e){
+      const raw=String((e&&e.message)||'V1 積分資料驗證失敗');
+      const insufficient=/至少.*兩位.*有效/.test(raw);
+      state.settlementError=insufficient
+        ? "正式積分賽至少需要兩位有效 BXH 玩家帳號；本場未計入天梯，可確認後以一般賽事結案。"
+        : raw;
+      state.settlementErrorCode=insufficient?"insufficient-eligible-players":"ranked-payload-invalid";
+      state.settlementPhase="failed";
+      await saveRecord(state);
+      showToast(state.settlementError,true);
+      return false;
+    }
     const requiredTop=Math.min(4,payload.participants.length);
     const topCount=payload.participants.filter(x=>x.placement&&x.placement<=4).length;
     if(topCount<requiredTop){
