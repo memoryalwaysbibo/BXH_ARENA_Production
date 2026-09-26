@@ -13364,9 +13364,25 @@ function requireTournamentStartedForMatchAction(){
   return false;
 }
 
+function refereeFaultApi(){
+  return (typeof window!=="undefined"&&window.BXHRefereeFault)?window.BXHRefereeFault:null;
+}
+function refereeFaultCount(m,side){
+  const api=refereeFaultApi();
+  return api?api.count(m,side):0;
+}
+function refereeFaultPending(m){
+  const api=refereeFaultApi();
+  return api?api.hasPending(m):false;
+}
+function refereeFaultLast(m){
+  const api=refereeFaultApi();
+  return api?api.lastPending(m):null;
+}
 function addScore(matchId, side, type){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
+  if(!["spin","knockout","burst","extreme"].includes(type)) return;
   const m = getMatch(matchId);
   if(!m) return;
   if(!requireStationPermission(m)) return;
@@ -13384,11 +13400,14 @@ function addScore(matchId, side, type){
     showToast("單場比分上限為 6 分；請先確認結果或撤銷得分。", true);
     return;
   }
+  const faultApi=refereeFaultApi();
   const scoreEventAt=Date.now();
   if(!Array.isArray(m.log)) m.log=[];
   const hunterRoundEvent=createHunterRoundEvent(m,side,type,pts,scoreEventAt);
+  if(faultApi)faultApi.attachSnapshotToEvent(m,hunterRoundEvent);
   if(side==="A") m.scoreA+=pts; else m.scoreB+=pts;
   m.log.push(hunterRoundEvent);
+  if(faultApi)faultApi.clear(m);
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch || remoteMatch.completed || remoteMatch.status==="completed") return {ok:false,reason:"already-completed"};
     if(checkWinnerSide(remoteMatch)) return {ok:false,reason:"invalid-score"};
@@ -13397,7 +13416,9 @@ function addScore(matchId, side, type){
     if(side==="A") remoteMatch.scoreA=remoteCurrent+pts; else remoteMatch.scoreB=remoteCurrent+pts;
     if(!Array.isArray(remoteMatch.log)) remoteMatch.log=[];
     const remoteRoundEvent=Object.assign({},hunterRoundEvent,{seq:remoteMatch.log.length+1});
+    if(faultApi)remoteRoundEvent.faultActionsBefore=faultApi.snapshot(remoteMatch);
     remoteMatch.log.push(remoteRoundEvent);
+    if(faultApi)faultApi.clear(remoteMatch);
     remoteMatch.updatedAt=scoreEventAt;
     return {ok:true,state:remoteState};
   });
@@ -13408,19 +13429,75 @@ function addScore(matchId, side, type){
   render();
 }
 
+function addFault(matchId, offendingSide){
+  if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
+  if(!requireTournamentStartedForMatchAction()) return;
+  const m=getMatch(matchId);
+  if(!m||!["A","B"].includes(offendingSide))return;
+  if(!requireStationPermission(m)) return;
+  if(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===matchId) return;
+  const existingWinner=checkWinnerSide(m);
+  if(existingWinner){
+    pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
+    showToast("本場已達獲勝條件，請先確認結果或撤銷。",true);
+    render();
+    return;
+  }
+  const faultApi=refereeFaultApi();
+  if(!faultApi){showToast("失誤計數模組尚未載入，請重新整理",true);return;}
+  const at=Date.now();
+  const localResult=faultApi.applyFault(m,offendingSide,at);
+  if(!localResult.ok){showToast(localResult.reason==="invalid-score"?"目前比分無法再加分，請先確認結果":"失誤紀錄失敗",true);return;}
+  m.updatedAt=at;
+  persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
+    if(!remoteMatch || remoteMatch.completed || remoteMatch.status==="completed") return {ok:false,reason:"already-completed"};
+    if(checkWinnerSide(remoteMatch)) return {ok:false,reason:"invalid-score"};
+    const result=faultApi.applyFault(remoteMatch,offendingSide,at);
+    if(!result.ok)return result;
+    remoteMatch.updatedAt=at;
+    return {ok:true,state:remoteState};
+  });
+  const offenderName=offendingSide==="A"?playerName(m.a&&m.a.playerId):playerName(m.b&&m.b.playerId);
+  const recipientName=offendingSide==="A"?playerName(m.b&&m.b.playerId):playerName(m.a&&m.a.playerId);
+  if(localResult.scored){
+    showToast(offenderName+" 本局第 2 次失誤｜"+recipientName+" +1 分");
+    if(checkWinnerSide(m))pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
+  }else{
+    showToast(offenderName+" 失誤 1/2");
+  }
+  render();
+}
+
 function undoLast(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
-  if(!m || m.log.length===0) return;
+  if(!m) return;
   if(!requireStationPermission(m)) return;
+  const faultApi=refereeFaultApi();
+  if(faultApi&&faultApi.hasPending(m)){
+    const localRemoved=faultApi.popPending(m);
+    persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
+      if(!remoteMatch||!faultApi.hasPending(remoteMatch))return {ok:false,reason:"invalid-score"};
+      faultApi.popPending(remoteMatch);
+      remoteMatch.updatedAt=Date.now();
+      return {ok:true,state:remoteState};
+    });
+    const name=localRemoved&&localRemoved.side==="A"?playerName(m.a&&m.a.playerId):playerName(m.b&&m.b.playerId);
+    showToast("已撤銷 "+name+" 的上一筆失誤");
+    render();
+    return;
+  }
+  if(!Array.isArray(m.log)||m.log.length===0) return;
   const last = m.log.pop();
-  if(last.side==="A") m.scoreA-=last.points; else m.scoreB-=last.points;
+  if(last.side==="A") m.scoreA=Math.max(0,Number(m.scoreA||0)-Number(last.points||0)); else m.scoreB=Math.max(0,Number(m.scoreB||0)-Number(last.points||0));
+  if(faultApi)faultApi.restoreFromEvent(m,last);
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch || !Array.isArray(remoteMatch.log) || remoteMatch.log.length===0) return {ok:false,reason:"invalid-score"};
     const remoteLast=remoteMatch.log.pop();
     if(remoteLast.side==="A") remoteMatch.scoreA=Math.max(0,Number(remoteMatch.scoreA||0)-Number(remoteLast.points||0));
     else remoteMatch.scoreB=Math.max(0,Number(remoteMatch.scoreB||0)-Number(remoteLast.points||0));
+    if(faultApi)faultApi.restoreFromEvent(remoteMatch,remoteLast);
     remoteMatch.updatedAt=Date.now();
     return {ok:true,state:remoteState};
   }); render();
@@ -13432,14 +13509,14 @@ function rematch(matchId){
   const m = getMatch(matchId);
   if(!m) return;
   if(!requireStationPermission(m)) return;
-  m.scoreA=0; m.scoreB=0; m.log=[]; m.winnerId=null; m.loserId=null; m.completed=false;
+  m.scoreA=0; m.scoreB=0; m.log=[]; m.faultActions=[]; m.winnerId=null; m.loserId=null; m.completed=false;
   m.status = "in_progress";
   m.updatedAt = Date.now();
   m.updatedBy = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   rebuildPropagation();
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch) return {ok:false,reason:"not-found"};
-    remoteMatch.scoreA=0; remoteMatch.scoreB=0; remoteMatch.log=[]; remoteMatch.hunterData=null; remoteMatch.winnerId=null; remoteMatch.loserId=null; remoteMatch.completed=false;
+    remoteMatch.scoreA=0; remoteMatch.scoreB=0; remoteMatch.log=[]; remoteMatch.faultActions=[]; remoteMatch.hunterData=null; remoteMatch.winnerId=null; remoteMatch.loserId=null; remoteMatch.completed=false;
     remoteMatch.status="in_progress"; remoteMatch.updatedAt=Date.now(); remoteMatch.updatedBy=adminDisplayName || (userProfile&&userProfile.email) || "admin";
     rebuildPropagationForState(remoteState);
     return {ok:true,state:remoteState};
