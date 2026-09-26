@@ -48,7 +48,8 @@
      return button(`${label} ${result.ok?result.originalPoints+' → '+result.points:''}`,'score',`data-side="${side}" data-type="${type}"`);
     }).join(' ')} ${button(`${side} 失誤 ${s.faults?.[side]||0}/2`,'fault',`data-side="${side}"`)}</div>`).join('');
   }
-  if((s.phase==='drawing'||s.phase==='awaiting-result')&&version>0)controls+=button('撤回上一筆','undo');
+  if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
+   controls+=button(ready?'撤回上一筆失誤':'撤回上一筆','undo');
   if(s.phase==='awaiting-result')controls+=button('確認比賽結果','confirm');
   return `<p><strong>${phase}</strong></p>${points}${cards}${controls}`;
  }
