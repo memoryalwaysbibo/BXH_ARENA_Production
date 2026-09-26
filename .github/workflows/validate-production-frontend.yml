@@ -24,6 +24,9 @@ jobs:
           node --check inventory-ui.js
           node --check firebase-messaging-sw.js
 
+      - name: Verify referee round fault scoring
+        run: node tests/referee-round-faults.test.cjs
+
       - name: Verify header logo refresh control
         run: node tests/header-logo-refresh.test.cjs
 
