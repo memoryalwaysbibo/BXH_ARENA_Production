@@ -15,6 +15,13 @@ mustInclude('<meta name="bxh-build" content="'+String(version.build||'')+'">','i
 mustInclude('CURRENT_BUILD="'+String(version.build||'')+'"','CURRENT_BUILD must match version.json');
 mustInclude('const APP_VERSION = "'+String(version.version||'')+'"','APP_VERSION must match version.json');
 mustInclude('async courtCallPush(payload){return callEngagementFunction("courtCallPushService",payload,60000);}','BXH CALL push callable wrapper missing');
+mustInclude('let staffAssignmentSaving = false;','Staff assignment busy guard missing');
+mustInclude('async saveStaffAssignments(code, requestedUids){','Dedicated staff assignment transaction missing');
+mustInclude('await window.cloudSync.saveStaffAssignments(state.cloudCode, requested);','Staff assignment UI must await dedicated cloud write');
+mustInclude('await flushCloudStateWrites();','Staff assignment must drain older whole-state writes first');
+mustInclude('cloudStatus="connected";','Operation-level staff assignment rejection must not automatically mark LIVE LINK offline');
+mustNot(/if\(action===["']save-staff-assignment["']\)[\s\S]{0,800}?saveState\(\);\s*render\(\);/,'Legacy fire-and-forget staff assignment saveState flow must be removed');
+console.log('PASS dedicated staff assignment cloud sync guard');
 if(!courtCallUi.includes("navigator.serviceWorker.register('/firebase-messaging-sw.js',{scope:'/',updateViaCache:'none'})")) throw new Error('BXH CALL service worker must register at root scope without cache reuse');
 if(!courtCallUi.includes("window.BXH_CALL_VAPID_PUBLIC_KEY||cfg.vapidKey||''")) throw new Error('BXH CALL VAPID config fallback missing');
 if(!courtCallUi.includes("message.type!=='BXH_CALL_PUSH_CLICK'")) throw new Error('BXH CALL client click handoff listener missing');

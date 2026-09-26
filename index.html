@@ -5941,6 +5941,7 @@ let refereeShowAllAccounts = false;
 let refereeDirectoryLoading = false;
 let refereeDirectoryError = "";
 let refereeAssignmentSaving = false;
+let staffAssignmentSaving = false;
 let refereeAssignmentDraftEnabled = null;
 let mainTabNavScrollLeft = 0;
 let mainTabNavCenterRequested = true;
@@ -5973,9 +5974,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.34";
+const APP_VERSION = "v14.2.35";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.2.35",date:"2026/09/26",timezone:"Asia/Taipei",title:"工作人員指派專用雲端同步",updateLevel:"patch",added:["工作人員指派改用專用 Firestore transaction，僅更新 assignedStaffUids 與私人賽事狀態"],changed:["指派操作會等待伺服器讀回驗證成功後才顯示完成","保留既有裁判台必要 UID，避免工作人員名單更新誤移除裁判權限","權限拒絕與真正網路異常分流顯示，不再把單次寫入失敗一律標成 LINK ERROR"],fixed:["修正每次指派工作人員後 BXH LIVE LINK 誤顯示雲端連線異常，但重新整理後資料其實已存在的假斷線現象","修正舊流程未 await saveState()，畫面先顯示成功但雲端仍在背景寫入的時序問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend staff assignment sync hotfix",firebaseImpact:"無新增集合；沿用 tournaments.assignedStaffUids，改為專用 transaction",securityRulesImpact:"無；沿用既有 admin update 規則",permissionImpact:"無擴權；仍限 admin／super_admin 執行工作人員指派",publicSummary:"工作人員指派改成獨立原子同步並等待雲端確認；單次指派不再讓整個 LIVE LINK 誤判斷線。"},
   {version:"v14.2.34",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台下一場 fallback 補完",updateLevel:"patch",added:[],changed:["上方精簡下一場卡補齊雙方已確定、等待晉級、等待安排、本台完成四種狀態","下一場只有一位選手確定時顯示已知選手 VS 待定，通知按鈕維持停用"],fixed:["修正 active scoring 移除底部重複卡後，下一場尚未完全產生時整段資訊消失"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee next-match fallback fix",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台下一場資訊不再因等待晉級而消失；未確定時會顯示待定狀態。"},
   {version:"v14.2.33",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台下一場精簡整合",updateLevel:"patch",added:[],changed:["下一場改為裁判叫號區內的精簡雙列資訊，場次、人名、通知狀態與通知準備集中在同一視線區","移除正常計分與簡易判定底部重複的下一場卡片","更新 court-call-ui 資源版本，避免 iPhone／PWA 沿用舊快取"],fixed:["修正新版裁判叫號 UI 已部署但行動裝置仍可能載入舊 court-call-ui.js 的快取問題"],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee compact next-match + cache bust",firebaseImpact:"無",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"裁判台下一場資訊集中到上方叫號區，不再上下重複，並強制更新行動端 JS 資源。"},
   {"version":"v14.2.32","date":"2026/09/26","timezone":"Asia/Taipei","title":"AI 工作人員第二層權限修復","updateLevel":"patch","added":[],"changed":["AI 協助建立相關操作在全域權限分派器中改依 AI 專屬角色 Gate 判斷"],"fixed":["修正工作人員雖看得到 AI 協助建立按鈕，點擊後仍被 ADMIN_TIER_ONLY_ACTIONS 擋下並顯示無權限"],"environment":"Production","firebaseImpact":"無","securityRulesImpact":"無","permissionImpact":"僅 AI 協助建立 action 對有效 staff 放行；其他 admin-tier 操作維持原權限","publicSummary":"工作人員現在可真正開啟並操作 AI 協助建立，不再被第二層前端權限阻擋。"},
@@ -26347,12 +26349,88 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="save-staff-assignment"){
+    if(staffAssignmentSaving) return;
+    if(!state.cloudCode || !window.cloudSync || typeof window.cloudSync.saveStaffAssignments!=="function"){
+      showToast("工作人員指派暫時無法連上雲端，請稍後再試",true);
+      return;
+    }
     const checkboxes = document.querySelectorAll(".staff-assign-checkbox");
-    const uids = [];
-    checkboxes.forEach(cb=>{ if(cb.checked) uids.push(cb.getAttribute("data-uid")); });
-    state.meta.assignedStaffUids = uids;
-    saveState(); render();
-    showToast(uids.length>0 ? ("已指派 "+uids.length+" 位工作人員") : "已清除指派名單（恢復開放給所有在職工作人員）");
+    const selected = [];
+    checkboxes.forEach(cb=>{ if(cb.checked){ const uid=String(cb.getAttribute("data-uid")||"").trim(); if(uid&&!selected.includes(uid)) selected.push(uid); } });
+    const previous = Array.isArray(state.meta.assignedStaffUids) ? state.meta.assignedStaffUids.slice() : [];
+    const refereeUids = typeof flattenedRefereeStationUids==="function" ? flattenedRefereeStationUids() : [];
+    const requested = [...new Set(selected.concat(refereeUids))];
+    state.meta.assignedStaffUids = requested;
+    staffAssignmentSaving = true;
+    render();
+    (async()=>{
+      try{
+        // Drain older whole-state writes first. Staff assignment then owns one
+        // dedicated transaction so unrelated score/call/registration fields
+        // cannot turn this small permission edit into a global LINK ERROR.
+        await flushCloudStateWrites();
+        const result = await window.cloudSync.saveStaffAssignments(state.cloudCode, requested);
+        if(result&&result.ok){
+          if(result.state){
+            const keepCode=state.cloudCode;
+            state=Object.assign(defaultState(result.state.id),result.state);
+            state.cloudCode=keepCode;
+            if(state.bracketSize>0) rebuildCourtAssignments();
+          }else{
+            state.meta.assignedStaffUids=Array.isArray(result.assignedStaffUids)?result.assignedStaffUids:requested;
+          }
+          cloudSyncPending=false;
+          cloudAccessLimited=false;
+          cloudAccessMessage="";
+          cloudStatus="connected";
+          cloudLastSyncAt=Date.now();
+          await saveRecord(state);
+          const savedCount=Array.isArray(state.meta.assignedStaffUids)?state.meta.assignedStaffUids.length:0;
+          showToast(savedCount>0 ? ("已指派 "+savedCount+" 位工作人員，雲端已確認") : "已清除指派名單（恢復開放給所有在職工作人員）");
+        }else{
+          state.meta.assignedStaffUids=previous;
+          const reason=(result&&result.reason)||"unknown";
+          if(reason==="permission-denied"){
+            cloudAccessLimited=true;
+            cloudAccessMessage="目前帳號沒有變更工作人員指派的權限。";
+            cloudStatus="connected";
+            showToast("工作人員指派未儲存：權限不足",true);
+          }else if(reason==="unauthenticated"){
+            cloudStatus="connected";
+            showToast("工作人員指派未儲存：登入狀態已失效，請重新登入",true);
+          }else if(reason==="already-completed"){
+            cloudStatus="connected";
+            showToast("此賽事已完成並封存，無法變更工作人員",true);
+          }else if(reason==="verify-mismatch"||reason==="verify-not-found"){
+            cloudStatus="connected";
+            showToast("工作人員指派未儲存：雲端讀回資料不一致，已還原原設定",true);
+          }else if(reason==="unavailable"||reason==="deadline-exceeded"||reason==="network-request-failed"){
+            cloudAccessLimited=false;
+            cloudAccessMessage="";
+            cloudStatus="error";
+            showToast("工作人員指派未儲存：雲端目前無法連線",true);
+          }else{
+            // A rejected write is not proof that the Firebase link is down.
+            // Keep LIVE LINK connected and report the operation-level failure.
+            cloudStatus="connected";
+            showToast("工作人員指派未儲存，已還原原設定",true);
+          }
+        }
+      }catch(e){
+        state.meta.assignedStaffUids=previous;
+        const code=String((e&&e.code)||"");
+        if(code==="unavailable"||code==="deadline-exceeded"||code==="network-request-failed"){
+          cloudStatus="error";
+        }else{
+          cloudStatus="connected";
+        }
+        console.warn("[staff assignment]",{code:code||"unknown",message:(e&&e.message)||String(e)});
+        showToast("工作人員指派未儲存，已還原原設定",true);
+      }finally{
+        staffAssignmentSaving=false;
+        render();
+      }
+    })();
     return;
   }
   if(action==="save-registration-settings"){
@@ -29601,6 +29679,76 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||"unknown";
         console.warn("雲端同步寫入失敗", e);
         return false;
+      }
+    },
+
+    async saveStaffAssignments(code, requestedUids){
+      if(!cloudEnabled || !code || !fx.runTransaction) return {ok:false,reason:"cloud-unavailable"};
+      const normalizedCode=String(code).toUpperCase();
+      const ref=fx.doc(dbHandle,"tournaments",normalizedCode);
+      const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
+      if(!actorUid) return {ok:false,reason:"unauthenticated"};
+      const requested=[...new Set((Array.isArray(requestedUids)?requestedUids:[]).map(v=>String(v||"").trim()).filter(Boolean))];
+      try{
+        const outcome=await fx.runTransaction(dbHandle,async tx=>{
+          const snap=await tx.get(ref);
+          if(!snap.exists()) throw new Error("not-found");
+          const actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid));
+          if(!actorSnap.exists()) throw new Error("unauthenticated");
+          const actor=actorSnap.data()||{};
+          const actorIsAdmin=actor.active===true&&actor.isTestAccount!==true&&(actor.role==="admin"||actor.role==="super_admin");
+          if(!actorIsAdmin) throw new Error("permission-denied");
+
+          const docData=snap.data()||{};
+          let remoteState;
+          try{ remoteState=typeof docData.data==="string"?JSON.parse(docData.data):docData.data; }catch(e){ throw new Error("corrupt-data"); }
+          if(!remoteState||!remoteState.meta) throw new Error("corrupt-data");
+          if(remoteState.archiveStatus==="completed") throw new Error("already-completed");
+
+          // Referee station assignees are a stronger operational dependency than
+          // the broad staff list. Never let a staff-list edit silently remove a
+          // referee who is already bound to a Court.
+          const refereeUids=Array.isArray(docData.refereeStationUids)
+            ? docData.refereeStationUids.map(String).filter(Boolean)
+            : (()=>{ const out=[]; Object.values(remoteState.meta.refereeStationAssignments||{}).forEach(list=>{ if(Array.isArray(list)) list.forEach(uid=>{ uid=String(uid||""); if(uid&&!out.includes(uid)) out.push(uid); }); }); return out; })();
+          const assigned=[...new Set(requested.concat(refereeUids))];
+          const now=Date.now();
+          remoteState.meta.assignedStaffUids=assigned;
+          remoteState.updatedAt=now;
+
+          const patch={
+            data:JSON.stringify(remoteState),
+            updatedAt:now,
+            assignedStaffUids:assigned
+          };
+          // Keep registration-selection guard aligned with the newest server
+          // revision when this room uses the lottery/selection subsystem.
+          if(Number(docData.entrySelectionRevision||0)>0){
+            patch.entrySelectionWriteRevision=Number(docData.entrySelectionRevision);
+          }
+          tx.set(ref,patch,{merge:true});
+          return {state:remoteState,assignedStaffUids:assigned};
+        });
+
+        const verify=fx.getDocFromServer?await fx.getDocFromServer(ref):await fx.getDoc(ref);
+        if(!verify.exists()) return {ok:false,reason:"verify-not-found"};
+        const vd=verify.data()||{};
+        let parsed={};
+        try{ parsed=typeof vd.data==="string"?JSON.parse(vd.data):(vd.data||{}); }catch(e){ return {ok:false,reason:"verify-mismatch"}; }
+        const normalize=list=>[...new Set((Array.isArray(list)?list:[]).map(String).filter(Boolean))].sort();
+        const expected=normalize(outcome.assignedStaffUids);
+        const topLevel=normalize(vd.assignedStaffUids);
+        const nested=normalize(parsed&&parsed.meta&&parsed.meta.assignedStaffUids);
+        if(JSON.stringify(topLevel)!==JSON.stringify(expected)||JSON.stringify(nested)!==JSON.stringify(expected)){
+          return {ok:false,reason:"verify-mismatch"};
+        }
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;
+        return {ok:true,verified:true,state:outcome.state,assignedStaffUids:outcome.assignedStaffUids};
+      }catch(e){
+        const reason=String((e&&e.code)||(e&&e.message)||"unknown");
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=reason;
+        console.warn("儲存工作人員指派失敗",{operation:"saveStaffAssignments",code:reason,tournamentCode:normalizedCode});
+        return {ok:false,reason};
       }
     },
 
