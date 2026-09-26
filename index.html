@@ -125,10 +125,19 @@
 <script>
 (function(){
   var key="bxh.interface.theme.v1";
-  // The staff-only skin is restored after the account role has been verified.
+  var accountPrefix="bxh.interface.theme.account.v1.";
+  var entranceUidKey="bxh.interface.theme.entrance.uid.v1";
+  // Restricted skins normally wait for role verification. Once an eligible
+  // account has explicitly chosen Directive on this device, its signed-out
+  // entrance may be restored immediately as well.
   var allowed={gold:true,blue:true,red:true,green:true};
   var theme="gold";
-  try{var saved=localStorage.getItem(key);if(allowed[saved])theme=saved;}catch(e){}
+  try{
+    var saved=localStorage.getItem(key);
+    var entranceUid=localStorage.getItem(entranceUidKey);
+    if(allowed[saved])theme=saved;
+    if(entranceUid&&localStorage.getItem(accountPrefix+entranceUid)==="directive")theme="directive";
+  }catch(e){}
   document.documentElement.setAttribute("data-bxh-theme",theme);
 })();
 </script>
@@ -22119,6 +22128,7 @@ function renderWatchErrorScreen(){
 
 const BXH_INTERFACE_THEME_KEY="bxh.interface.theme.v1";
 const BXH_INTERFACE_THEME_ACCOUNT_PREFIX="bxh.interface.theme.account.v1.";
+const BXH_INTERFACE_THEME_ENTRANCE_UID_KEY="bxh.interface.theme.entrance.uid.v1";
 const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"gold",label:"暗耀金",english:"Dark Gold",color:"#b8922e"},
   {id:"blue",label:"霓虹藍",english:"Neon Blue",color:"#35c9d0"},
@@ -22132,17 +22142,28 @@ function normalizeInterfaceTheme(value){
 let interfaceTheme=(()=>{
   try{return normalizeInterfaceTheme(localStorage.getItem(BXH_INTERFACE_THEME_KEY));}catch(e){return "gold";}
 })();
+let entranceThemeAccountUid=(()=>{
+  try{return localStorage.getItem(BXH_INTERFACE_THEME_ENTRANCE_UID_KEY)||"";}catch(e){return "";}
+})();
 let accountThemeOpen=false;
 function restoreAccountInterfaceTheme(uid,profile){
   let saved=null;
   try{saved=localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid);}catch(e){}
   const fromAccount=profile&&typeof profile.interfaceTheme==="string"?profile.interfaceTheme:null;
   interfaceTheme=normalizeInterfaceTheme(saved||fromAccount||"gold");
+  entranceThemeAccountUid=uid||"";
+  try{
+    if(entranceThemeAccountUid)localStorage.setItem(BXH_INTERFACE_THEME_ENTRANCE_UID_KEY,entranceThemeAccountUid);
+    else localStorage.removeItem(BXH_INTERFACE_THEME_ENTRANCE_UID_KEY);
+  }catch(e){}
   syncInterfaceThemeVisibility();
 }
 function canUseDirectiveTheme(){
-  return userProfile?.active===true &&
-    ["super_admin","admin","staff"].includes(userProfile.role);
+  if(userProfile){
+    return userProfile.active===true && ["super_admin","admin","staff"].includes(userProfile.role);
+  }
+  if(firebaseUser || !entranceThemeAccountUid)return false;
+  try{return localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+entranceThemeAccountUid)==="directive";}catch(e){return false;}
 }
 function syncInterfaceThemeVisibility(){
   const visibleTheme=interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme;
@@ -22160,6 +22181,8 @@ function applyInterfaceTheme(value,persist=true){
     const uid=firebaseUser?.uid;
     if(uid){
       try{localStorage.setItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid,interfaceTheme);}catch(e){}
+      entranceThemeAccountUid=uid;
+      try{localStorage.setItem(BXH_INTERFACE_THEME_ENTRANCE_UID_KEY,uid);}catch(e){}
       if(userProfile)userProfile.interfaceTheme=interfaceTheme;
       if(window.cloudAuth?.saveInterfaceTheme){
         window.cloudAuth.saveInterfaceTheme(uid,interfaceTheme).then(result=>{
