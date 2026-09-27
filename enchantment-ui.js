@@ -15,7 +15,7 @@
   const id=quote(m.id),c=quote(code),locked=stationLocked?'disabled':'';
   setTimeout(()=>refresh(code,m.id),0);
   return `<section class="panel" data-enchantment-referee data-code="${c}" data-match-id="${id}" style="margin:12px 16px;padding:14px">
-   <strong>附魔之戰｜${quote(matchNames.get(key(code,m.id))?.A||'選手 A')} VS ${quote(matchNames.get(key(code,m.id))?.B||'選手 B')}</strong>
+   <strong data-enchantment-title>附魔之戰｜等待裁判開始</strong>
    <div data-enchantment-status>讀取抽卡狀態中…</div>
    <button class="btn btn-ghost btn-sm" data-enchantment-action="refresh" data-code="${c}" data-match-id="${id}">更新附魔狀態</button>
    ${stationLocked?'<p class="hint">本台未指派給你，僅供查看。</p>':''}
@@ -53,8 +53,6 @@
   const button=(label,action,extra='',disabled=false)=>`<button class="btn btn-ghost btn-sm" data-enchantment-action="${action}" ${common} ${extra} ${disabled?'disabled':''}>${label}</button>`;
   if(!s)return `<p>選手到場後，由裁判按「開始抽卡」。</p>${button('開始抽卡','start')}`;
   const ready=s.phase==='ready-to-score';
-  const points=`<p>比分 A ${Number(s.scores?.A)||0}：${Number(s.scores?.B)||0} B　｜　第 ${Number(s.round)||0} 局</p>`;
-  const phase={drawing:'等待雙方抽卡', 'ready-to-score':'等待裁判判定', 'awaiting-result':'已達 4 分，請確認結果',completed:'本場已確認'}[s.phase]||'等待裁判開始';
   const sides=reversedSides.has(key(code,id))?['B','A']:['A','B'];
   const scorePanel=`<div style="position:relative"><div class="ref-vs-arena standard">${sides.map(side=>{
    const name=matchNames.get(key(code,id))?.[side]||'選手 '+side;
@@ -65,18 +63,22 @@
    const card=details(s.cards?.[side]);
    const drawStatus=s.drawn?.[side]?quote(card?.name||'已抽卡'):'尚未抽卡';
    return `<div class="side-panel"><div class="side-name">${quote(name)}</div><div class="hint" style="text-align:center;margin:2px 0 4px;font-size:12px">附魔：${drawStatus}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
-  }).join('')}</div><button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
+  }).join('')}</div><button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
   let controls='';
   if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
    controls+=button(ready?'撤回上一筆失誤':'撤回上一筆','undo');
   if(s.phase==='awaiting-result')controls+=button('確認比賽結果','confirm');
-  return `<p><strong>${phase}</strong>｜第 ${Number(s.round)||0} 局</p><p class="hint">裁判按原本的勝利方式；系統計算附魔後的實得分。</p>${scorePanel}<div class="btn-row ref-result-actions">${controls}</div>`;
+  return `${scorePanel}<div class="btn-row ref-result-actions">${controls}</div>`;
  }
  function paint(code,id){
   const item=cache.get(key(code,id));
   document.querySelectorAll('[data-enchantment-referee]').forEach(el=>{
    if(el.dataset.code!==code||el.dataset.matchId!==id)return;
    const slot=el.querySelector('[data-enchantment-status]');if(!slot)return;
+   const s=item?.state;
+   const phase=s?(s.phase==='completed'?'已完成':s.phase==='awaiting-result'?'等待確認':s.drawn?.A&&s.drawn?.B?'已抽卡':'等待抽卡'):'等待裁判開始';
+   const title=el.querySelector('[data-enchantment-title]');
+   if(title)title.textContent='附魔之戰｜'+(s?'第 '+String(Number(s.round)||0).padStart(2,'0')+' 局｜':'')+phase;
    slot.innerHTML=item?.error?`<p role="alert">${quote(item.error)}</p>`:statusHtml(code,id,item?.version||0,item?.state||null);
   });
  }
