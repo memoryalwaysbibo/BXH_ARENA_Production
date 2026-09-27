@@ -284,8 +284,10 @@
 
     var hero=template.content.querySelector(".ladder-hero");
     if(ladderSecondaryView==="ranking"){
-      if(hero) hero.insertAdjacentHTML("afterend",subnavHtml());
       decorateRankingTemplate(template);
+      var filter=template.content.querySelector(".ladder-location-filter");
+      if(filter) filter.insertAdjacentHTML("afterend",subnavHtml());
+      else if(hero) hero.insertAdjacentHTML("afterend",subnavHtml());
       return template.innerHTML;
     }
 
