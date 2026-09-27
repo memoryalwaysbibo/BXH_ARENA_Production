@@ -253,3 +253,39 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
  script.dataset.bxhRegistrationInvitations='true';
  document.head.appendChild(script);
 })();
+
+
+// Team Battle V1: one registration document represents one whole team.
+// The confirmed team is expanded into fixed player slots for check-in/referee use.
+function mergeTeamOnlineRoster(players,registrations,checkinRequired){
+ const confirmed=(registrations||[]).filter(r=>r&&r.status==='confirmed'&&(r.registrationKind==='team'||(r.teamId&&Array.isArray(r.teamMembers))));
+ const text=v=>String(v==null?'':v);
+ const keyOf=(teamId,slot)=>'team:'+text(teamId)+':'+String(slot);
+ const previous=new Map((players||[]).filter(p=>p&&p.source==='online'&&p.teamId).map(p=>[keyOf(p.teamId,p.teamMemberSlot),p]));
+ const offline=(players||[]).filter(p=>p&&!(p.source==='online'&&p.teamId));
+ const next=[];
+ for(const r of confirmed){
+  const teamId=text(r.teamId||('team_'+text(r.registrationId||r.uid))),teamName=text(r.teamName||r.displayName||'未命名隊伍'),captainUid=text(r.captainUid||r.uid),registrationId=text(r.registrationId||r.uid);
+  (Array.isArray(r.teamMembers)?r.teamMembers:[]).forEach((member,index)=>{
+   const slot=Number(member&&member.slot)||index+1,name=text(member&&member.name).trim();if(!name)return;
+   const identity=keyOf(teamId,slot),old=previous.get(identity),stableId=text(member&&member.playerId)||(teamId+'_m'+slot);
+   next.push({
+    id:old&&old.id?old.id:stableId,name,source:'online',registrationUid:captainUid,registrationId,
+    checkedIn:old&&typeof old.checkedIn==='boolean'?old.checkedIn:!checkinRequired,
+    teamId,teamName,teamMemberSlot:slot,captainUid,participantId:stableId
+   });
+  });
+ }
+ return offline.concat(next);
+}
+function teamRegistrationRowsToTeams(registrations){
+ return (registrations||[]).filter(r=>r&&r.status==='confirmed'&&(r.registrationKind==='team'||(r.teamId&&Array.isArray(r.teamMembers)))).map(r=>{
+  const teamId=String(r.teamId||('team_'+String(r.registrationId||r.uid||''))),teamName=String(r.teamName||r.displayName||'未命名隊伍');
+  const members=(Array.isArray(r.teamMembers)?r.teamMembers:[]).map((member,index)=>({
+   slot:Number(member&&member.slot)||index+1,
+   name:String(member&&member.name||''),
+   playerId:String(member&&member.playerId||teamId+'_m'+String(index+1))
+  }));
+  return {id:teamId,name:teamName,captainUid:String(r.captainUid||r.uid||''),registrationId:String(r.registrationId||r.uid||''),memberPlayerIds:members.map(m=>m.playerId),members};
+ });
+}
