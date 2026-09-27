@@ -155,8 +155,6 @@
     if(!show){if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id)overlay.remove();if(dismissedMatch===key(code,m.id))dismissedMatch='';continue;}
     if(dismissedMatch===key(code,m.id))continue;
     if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id){
-     const heading=overlay.querySelector('[data-enchantment-heading]');
-     if(heading)heading.textContent='附魔之戰｜第 '+Number(s.round)+' 局'+(s.phase==='drawing'?(s.drawn?.[side]?'｜等待對手抽卡':'｜請抽卡'):'｜等待裁判判定');
      syncFrames(code,m.id);continue;
     }
     if(!canDraw)continue;
@@ -165,7 +163,7 @@
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
     overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔之戰抽卡');
     overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080917;display:flex;flex-direction:column';
-    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px"><span data-enchantment-heading>附魔之戰｜第 '+Number(s.round)+' 局</span> <span style="float:right;display:flex;gap:8px;align-items:center"><button type="button" data-enchantment-sound aria-label="切換音效" aria-pressed="'+drawSoundEnabled+'" style="font-size:20px;min-width:38px">'+(drawSoundEnabled?'🔊':'🔇')+'</button><button type="button" data-enchantment-close>離開房間</button></span></div><div data-enchantment-loading style="color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
+    overlay.innerHTML='<div style="position:absolute;right:12px;top:10px;z-index:3;display:flex;gap:6px;align-items:center"><button type="button" data-enchantment-sound aria-label="切換音效" aria-pressed="'+drawSoundEnabled+'" style="font-size:20px;min-width:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white">'+(drawSoundEnabled?'🔊':'🔇')+'</button><button type="button" data-enchantment-close style="background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:7px 10px">離開房間</button></div><div data-enchantment-loading style="position:absolute;left:0;right:0;top:65px;z-index:2;color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
     const frame=document.createElement('iframe');frame.title='附魔之戰選手抽卡';frame.dataset.enchantmentPlayer='';
     frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
     frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917;visibility:hidden';
