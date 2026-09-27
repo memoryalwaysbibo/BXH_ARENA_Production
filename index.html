@@ -19347,7 +19347,7 @@ function renderPlayerCenterLoggedIn(){
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
       <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
-      <div class="header-account-controls">${mailboxButtonHtml()}${accountMenuHtml()}</div>
+      <div class="header-account-controls"><button type="button" id="activity-points-summary" class="activity-points-account-row" data-activity="open" aria-label="查看我的活躍積分"><span>活躍積分</span><strong>… 分</strong></button>${mailboxButtonHtml()}${accountMenuHtml()}</div>
     </header>
     ${renderPlayerNavHtml()}
     </div>
@@ -31881,7 +31881,7 @@ if(testerSession){
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
 </script>
-<script src="activity-points-ui.js?v=20260928-account-row-fix2"></script>
+<script src="activity-points-ui.js?v=20260928-static-header-fix3"></script>
 <script src="ladder-secondary-ui.js?v=14.2.44"></script>
 </body>
 </html>
