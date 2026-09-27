@@ -20,8 +20,10 @@
     [data-enchantment-referee] .enchant-active{border-color:#b889ff!important;box-shadow:0 0 0 1px #b889ff55,0 0 20px #9d62ff38;animation:enchant-glow 2.5s ease-in-out infinite}
     [data-enchantment-referee] .enchant-badge{display:inline-block;margin-left:6px;padding:2px 7px;border:1px solid #c594ff;border-radius:999px;background:#6e35aa88;color:#fff1bc;font-size:11px;font-weight:700;vertical-align:middle}
     [data-enchantment-referee] .enchant-effect-button{border-color:#d5a4ff!important;box-shadow:inset 0 0 13px #ad6bf43d;color:#fff0c7!important}
+    [data-enchantment-referee] .enchant-flame-label{display:inline-block;margin-left:8px;font-size:11px;font-weight:900;letter-spacing:.08em;color:#ffcf63;text-shadow:0 -2px 5px #ff4d1f,0 0 10px #ff8b22,0 0 16px #e63b13;animation:enchant-flame 1.1s ease-in-out infinite alternate;white-space:nowrap}
+    @keyframes enchant-flame{from{transform:translateY(1px);filter:brightness(.9)}to{transform:translateY(-2px);filter:brightness(1.35)}}
     @keyframes enchant-glow{50%{box-shadow:0 0 0 2px #b889ff88,0 0 26px #9d62ff6b}}
-    @media(prefers-reduced-motion:reduce){[data-enchantment-referee] .enchant-active{animation:none}}
+    @media(prefers-reduced-motion:reduce){[data-enchantment-referee] .enchant-active,[data-enchantment-referee] .enchant-flame-label{animation:none}}
    </style>
    <div data-enchantment-status>讀取抽卡狀態中…</div>
    <button class="btn btn-ghost btn-sm" data-enchantment-action="refresh" data-code="${c}" data-match-id="${id}">更新附魔狀態</button>
@@ -66,7 +68,7 @@
    const scoreButtons=Object.entries(outcome).map(([type,label])=>{
     const result=root.BXHEnchantmentScore.resolve({type,winnerCardId:s.cards[side],loserCardId:s.cards[side==='A'?'B':'A']});
     const modified=ready&&result.ok&&result.points!==result.originalPoints;
-    return `<button class="${modified?'enchant-effect-button':''}" data-enchantment-action="score" ${common} data-side="${side}" data-type="${type}" ${ready?'':'disabled'}>${modified?'✦ ':''}${label} ${result.ok?result.originalPoints+' → '+result.points:''}</button>`;
+    return `<button class="${modified?'enchant-effect-button':''}" data-enchantment-action="score" ${common} data-side="${side}" data-type="${type}" ${ready?'':'disabled'}>${modified?'✦ ':''}${label} ${result.ok?result.originalPoints+' → '+result.points:''}${modified?'<span class="enchant-flame-label">附魔中</span>':''}</button>`;
    }).join('');
    const card=details(s.cards?.[side]);
    const drawStatus=s.drawn?.[side]?quote(card?.name||'已抽卡'):'尚未抽卡';
