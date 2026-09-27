@@ -28,10 +28,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260926.13">
+<meta name="bxh-build" content="20260927.2">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260926.13";
+  var CURRENT_BUILD="20260927.2";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -6010,9 +6010,10 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.2.40";
+const APP_VERSION = "v14.3.0";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},
   {version:"v14.2.40",date:"2026/09/26",timezone:"Asia/Taipei",title:"賽事抽獎多品項",updateLevel:"minor",added:["抽獎與維護可新增最多 20 個獎品品項","每個品項可獨立設定中獎人數","多品項抽獎結果依品項分組顯示"],changed:["同一次多品項抽獎不重複得獎","棄領補抽沿用原品項"],fixed:["補足原本只能設定單一獎品的限制"],environment:"Production / HTML + Firebase",deployStatus:"Frontend multi-prize raffle UI",firebaseImpact:"需搭配 Tournament Operations multi-prize backend",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"賽事抽獎可一次建立多個獎品品項，並為每項設定獨立數量。"},
   {version:"v14.2.38",date:"2026/09/26",timezone:"Asia/Taipei",title:"裁判台當局失誤判定",updateLevel:"minor",added:["正常判定模式左右選手各新增失誤按鈕，顯示當局 0/2、1/2 狀態","同一位選手當局第 2 次失誤時，系統自動讓對手 +1 分並記錄為對手失誤得分"],changed:["任何正常得分成立後自動開始新一局並清除雙方當局失誤","撤銷上一筆可先撤銷尚未形成得分的失誤；若撤銷失誤判分，會恢復判分前的失誤狀態","本局重賽、選手晉級替換與安全比分重設都會清空當局失誤"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend referee two-fault scoring rule",firebaseImpact:"賽事 match JSON 新增 faultActions 暫存欄位；第二次失誤仍寫入既有 log/score 結構",securityRulesImpact:"無",permissionImpact:"沿用既有裁判台／桌次權限",publicSummary:"裁判台新增失誤判定：同一局失誤兩次，對手自動獲得 1 分。"},
   {version:"v14.2.37",date:"2026/09/26",timezone:"Asia/Taipei",title:"Header Logo 快速重新整理",updateLevel:"patch",added:["固定 Header 左上 BXH Logo 改為重新整理按鈕"],changed:["點擊 Logo 會以 cache-bust 重新載入目前頁面並重新建立雲端同步，完成後顯示已讀取最新資訊","所有共用 Header 的 Logo 採相同操作與無障礙標籤"],fixed:[],environment:"Production / HTML + Firebase",deployStatus:"Frontend header refresh control",firebaseImpact:"無資料結構變更；重新載入後沿用既有 Firebase session 與訂閱流程",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"左上 BXH Logo 現在可以直接重新整理頁面並讀取最新資訊。"},
@@ -10512,13 +10513,13 @@ let pendingExistingAccountProfile = null; // { uid, email } — set when an EXIS
 // Firestore Security Rules and never affects users/{uid}.role. Role stays the
 // account's real permission level; activeMode just decides which UI is shown
 // right now for accounts whose role permits more than one.
-let activeMode = null; // 'admin' | 'player' | 'partner_organizer' | null
+let activeMode = null; // 'admin' | 'player' | 'partner_organizer' | 'event_staff' | null
 const ACTIVE_MODE_KEY = "bxh_active_mode_v1";
 // Set immediately before calling signIn(), so the ONE
 // onAuthStateChanged listener (the sole routing authority) knows WHICH entry
 // point this specific sign-in attempt came through, without needing a second
 // competing routing path. Cleared as soon as it's been consumed.
-let pendingLoginIntent = null; // 'admin' | 'player' | null
+let pendingLoginIntent = null; // 'admin' | 'player' | 'partner_organizer' | 'event_staff' | null
 
 // Races a promise against a timeout; resolves to {ok:false, error:"..."} on
 // timeout instead of leaving the caller's await hanging forever. Used to
@@ -10637,6 +10638,7 @@ function cancelVerifyingAndRetry(){
 
 function roleAllowsMode(role, mode, profile=null){
   if(mode==="partner_organizer") return !!(window.BXHPartnerOrganizer && window.BXHPartnerOrganizer.hasGrant(profile));
+  if(mode==="event_staff") return Object.values(profile?.eventStaffMemberships||{}).some(item=>item&&item.status==="accepted");
   if(mode==="admin") return profile?.isTestAccount===true || role==="super_admin" || role==="admin" || role==="staff" || role==="tester";
   if(mode==="player") return true; // every role can use player mode
   return false;
@@ -11211,10 +11213,16 @@ function partnerOrganizerGrant(){
   return activeMode==="partner_organizer" && window.BXHPartnerOrganizer ? window.BXHPartnerOrganizer.grant(userProfile) : null;
 }
 function isPartnerOrganizerMode(){ return !!partnerOrganizerGrant(); }
+function eventStaffMemberships(){ return userProfile&&userProfile.eventStaffMemberships&&typeof userProfile.eventStaffMemberships==="object"?userProfile.eventStaffMemberships:{}; }
+function isEventStaffMode(){ return activeMode==="event_staff"; }
+function currentEventStaffMembership(st=state){
+  const code=String(st&&st.cloudCode||"").toUpperCase();
+  return code?(eventStaffMemberships()[code]||null):null;
+}
 function hasAdminAccess(){ return currentRole === "admin" || currentRole === "tester"; }
 function hasPrivilegedTournamentProfile(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
-    (["super_admin","admin","staff"].includes(userProfile.role) || isPartnerOrganizerMode()));
+    (["super_admin","admin","staff"].includes(userProfile.role) || isPartnerOrganizerMode() || isEventStaffMode()));
 }
 function isCommunityRoom(){ return !!(state && state.meta && state.meta.eventAuthority==="community"); }
 function isOwnTesterSandboxRoom(st=state){
@@ -11281,7 +11289,7 @@ function canConfigureCurrentTournament(){ return isAdminTierOrAbove() || isOwnTe
 function canJoinCloudRoom(){ return currentRole === "admin" || currentRole === "guest" || currentRole === "player"; }
 function isSuperAdmin(){ return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin"); }
 function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin")); }
-function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode())); }
+function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode() || isEventStaffMode())); }
 function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff" || isPartnerOrganizerMode())); }
 function currentAuthUid(){ return (firebaseUser&&firebaseUser.uid)||null; }
 function isCurrentOfficialTournamentCreator(){
@@ -11319,6 +11327,7 @@ function canOperateStation(stationNum, st=state){
   if(isOwnTestTournament(st)) return true;
   if(isTester()) return false;
   if(isAdminTierOrAbove()) return true;
+  if(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator()) return true;
   if(!isStaffTier()) return hasAdminAccess();
   if(!refereeStationRestrictionEnabled(st)) return true;
   const uid=currentAuthUid();
@@ -16040,7 +16049,39 @@ function datetimeLocalToEpoch(str){
 
 const REGISTRATION_STATUS_LABELS = { draft:"草稿", scheduled:"即將開放", open:"開放報名", full:"已額滿", closed:"已截止", cancelled:"已取消", started:"已截止" };
 
+let eventStaffPanelState={eventCode:"",loading:false,busy:false,assignments:null,results:[],error:""};
+function eventStaffDutyLabel(value){return ({event_assistant:"活動協助",checkin:"報到",referee:"裁判",head_referee:"主裁"})[value]||value;}
+async function loadEventStaffPanel(force=false){
+  const code=String(state.cloudCode||"").toUpperCase();
+  if(!code||!isPartnerOrganizerMode()||!window.engagementService?.eventStaff)return;
+  if(!force&&eventStaffPanelState.eventCode===code&&eventStaffPanelState.assignments)return;
+  eventStaffPanelState={eventCode:code,loading:true,busy:false,assignments:null,results:[],error:""};render();
+  try{const result=await window.engagementService.eventStaff({action:"listForEvent",eventCode:code});eventStaffPanelState.assignments=result.assignments||[];}
+  catch(error){eventStaffPanelState.error=String(error?.message||"讀取活動工作人員失敗");}
+  finally{eventStaffPanelState.loading=false;render();}
+}
+function renderEventStaffAssignmentPanel(){
+  const code=String(state.cloudCode||"").toUpperCase(),c=eventStaffPanelState;
+  if(!code)return `<div class="panel"><div class="panel-title">工作人員（活動）</div><p class="hint">活動同步至雲端後即可邀請工作人員。</p></div>`;
+  if(c.eventCode!==code||(!c.assignments&&!c.loading)){setTimeout(()=>loadEventStaffPanel(),0);return `<div class="panel"><div class="panel-title">工作人員（活動）</div><p class="hint">正在載入活動工作人員……</p></div>`;}
+  const rows=c.assignments||[];
+  return `<div class="panel"><div class="panel-title"><span>工作人員（活動）</span><button class="btn btn-ghost btn-sm" data-action="event-staff-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button></div>
+    <p class="hint">此權限只綁定本活動，不會成為 BXH 正規工作人員。受邀者接受後才生效；您的活動主辦權限失效時，所有活動工作人員會立即停止操作。活動與房間資料不會刪除。</p>
+    <div class="grid grid-2" style="margin-top:12px"><div class="field"><label>搜尋玩家名稱或遊戲名稱</label><input id="event-staff-search-query" maxlength="60" placeholder="至少輸入 2 個字"></div><div class="field"><label>預定職務</label><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">${[['event_assistant','活動協助'],['checkin','報到'],['referee','裁判'],['head_referee','主裁']].map(([v,l])=>`<label><input type="checkbox" class="event-staff-duty" value="${v}" ${v==='event_assistant'?'checked':''}> ${l}</label>`).join('')}</div></div></div>
+    <button class="btn btn-ghost" data-action="event-staff-search" ${c.busy?'disabled':''}>搜尋玩家</button>
+    ${c.error?`<div class="auth-error" style="margin-top:10px">${esc(c.error)}</div>`:""}
+    ${c.results.length?`<div style="display:grid;gap:8px;margin-top:12px">${c.results.map(player=>`<div class="account-detail-item" style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span><b>${esc(player.displayName)}</b>${player.gameId?`<span class="hint">｜${esc(player.gameId)}</span>`:""}</span><button class="btn btn-primary btn-sm" data-action="event-staff-invite" data-uid="${esc(player.uid)}" ${c.busy?'disabled':''}>寄送邀請</button></div>`).join('')}</div>`:""}
+    <div class="panel-title" style="font-size:14px;margin-top:18px">本活動人員</div>
+    ${c.loading?'<p class="hint">載入中……</p>':rows.length?`<div style="display:grid;gap:8px">${rows.map(item=>`<div class="account-detail-item"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${esc(item.displayName||item.targetUid)}</b><span class="badge ${item.status==='accepted'?'badge-neon':item.status==='invited'?'badge-metal':'badge-danger'}">${esc(({invited:'待確認',accepted:'已接受',rejected:'已拒絕',revoked:'已撤銷'})[item.status]||item.status)}</span></div><div class="hint">${(item.duties||[]).map(eventStaffDutyLabel).map(esc).join('、')||'未設定職務'}</div>${['invited','accepted'].includes(item.status)?`<button class="btn btn-ghost btn-sm" data-action="event-staff-revoke" data-uid="${esc(item.targetUid)}" ${c.busy?'disabled':''}>撤銷活動權限</button>`:""}</div>`).join('')}</div>`:'<p class="hint">尚未邀請工作人員（活動）。</p>'}
+  </div>`;
+}
+
 function renderStaffAssignmentPanel(){
+  if(isPartnerOrganizerMode())return renderEventStaffAssignmentPanel();
+  if(isEventStaffMode()){
+    const membership=currentEventStaffMembership(),duties=(membership?.duties||[]).map(eventStaffDutyLabel).join('、');
+    return `<div class="panel"><div class="panel-title">工作人員（活動）</div><p class="hint">您只能操作本活動被授予的工作範圍；無法新增人員、刪除房間或刪除已保存資料。</p><div class="stat-box"><div class="label">目前職務</div><div class="value small">${esc(duties||"活動工作人員")}</div></div></div>`;
+  }
   const assigned = state.meta.assignedStaffUids || [];
   if(!isAdminTierOrAbove()){
     return ""; // staff themselves don't manage assignment
@@ -16086,7 +16127,7 @@ function renderRefereeStationAssignmentPanel(){
   if(refereeDirectoryUsers===null){
     return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">指定每位裁判負責的戰鬥台。啟用限制後，staff 只能操作本人被指派的 Court；admin／super_admin 保留全桌操作權。</p><button class="btn btn-ghost" data-action="load-referee-directory">載入裁判清單</button></div>`;
   }
-  const eligible=refereeDirectoryUsers.filter(u=>u&&u.active!==false&&(isOwnTestTournament()?((u.role==="tester"||u.isTestAccount===true)&&u.uid===currentAuthUid()):(u.role==="staff"||u.role==="admin"||u.role==="super_admin")));
+  const eligible=refereeDirectoryUsers.filter(u=>u&&u.active!==false&&(isOwnTestTournament()?((u.role==="tester"||u.isTestAccount===true)&&u.uid===currentAuthUid()):(u.role==="staff"||u.role==="admin"||u.role==="super_admin"||(isPartnerOrganizerMode()&&u.role==="event_staff"))));
   const eventStaff=Array.isArray(state.meta.assignedStaffUids)?state.meta.assignedStaffUids:[];
   const alreadyAssigned=Object.values(map).flat();
   const candidates=eventStaff.length&&!refereeShowAllAccounts
@@ -16096,7 +16137,7 @@ function renderRefereeStationAssignmentPanel(){
     : '<p class="hint">本賽事尚未建立工作人員分派名單，以下為所有具權限帳號，並非 BXH 正式人事名冊。請先在「工作人員分派」指定本場人員。</p>';
   const rows=Array.from({length:n},(_,i)=>i+1).map(station=>{
     const assigned=Array.isArray(map[String(station)])?map[String(station)]:[];
-    return `<div class="panel" style="margin:0;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>Court ${station}</b><span class="badge ${assigned.length?'badge-neon':'badge-metal'}">${assigned.length?assigned.length+' 位裁判':'未指派'}</span></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${candidates.length?candidates.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" class="referee-station-checkbox" data-station="${station}" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} ${refereeAssignmentSaving?'disabled':''} style="width:18px;height:18px;"><span>${esc(u.displayName||u.realName||u.uid)}</span><span class="hint" style="margin:0;">${u.uid===creatorUid?'建立者｜':''}${u.role==='super_admin'?'最高管理員':u.role==='admin'?'管理員':u.role==='tester'?'封測管理員（測試）':'工作人員'}</span></label>`).join(''):'<span class="hint">目前沒有可用的裁判帳號。</span>'}</div></div>`;
+    return `<div class="panel" style="margin:0;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>Court ${station}</b><span class="badge ${assigned.length?'badge-neon':'badge-metal'}">${assigned.length?assigned.length+' 位裁判':'未指派'}</span></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${candidates.length?candidates.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" class="referee-station-checkbox" data-station="${station}" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} ${refereeAssignmentSaving?'disabled':''} style="width:18px;height:18px;"><span>${esc(u.displayName||u.realName||u.uid)}</span><span class="hint" style="margin:0;">${u.uid===creatorUid?'建立者｜':''}${u.role==='super_admin'?'最高管理員':u.role==='admin'?'管理員':u.role==='tester'?'封測管理員（測試）':u.role==='event_staff'?'工作人員（活動）':'工作人員'}</span></label>`).join(''):'<span class="hint">目前沒有可用的裁判帳號。</span>'}</div></div>`;
   }).join('');
   const draftHint=typeof refereeAssignmentDraftEnabled==="boolean"&&refereeAssignmentDraftEnabled!==refereeStationRestrictionEnabled()?'<div class="hint" style="margin-top:8px;color:var(--gold);">桌次限制尚未儲存，請按「儲存裁判台分配」。</div>':'';
   return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">建議賽前完成分配。啟用後，未被指定的 staff 在其他 Court 只可查看，不能計分、確認結果、簡易判定、暫停、跳過或重賽。玩家端只會看到裁判顯示名稱，不公開 UID。</p>${directoryHint}${refereeDirectoryError?`<div class="auth-error">${esc(refereeDirectoryError)}</div>`:""}<div class="toggle-row" style="margin:12px 0;"><span><b>啟用桌次限制</b><small>未啟用時沿用既有賽事權限；啟用後依 Court 指派限制。</small></span><button class="toggle ${enabled?'on':''}" data-action="toggle-referee-station-restriction" data-value="${enabled?'false':'true'}" ${refereeAssignmentSaving?'disabled':''}><span></span></button></div>${draftHint}<div style="display:flex;flex-direction:column;gap:10px;">${rows}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="save-referee-station-assignment" ${refereeAssignmentSaving?'disabled':''}>${refereeAssignmentSaving?'雲端交易確認中…':'儲存裁判台分配'}</button><button class="btn btn-ghost" data-action="load-referee-directory" ${refereeAssignmentSaving?'disabled':''}>重新載入名單</button></div></div>`;
@@ -18663,7 +18704,7 @@ function renderMailboxPage(){
   return `<section class="panel"><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
     <p class="hint">未讀 ${c.unreadCount} 封｜系統通知、活動及中獎訊息會集中在這裡。</p>
     ${c.error?`<div class="auth-error" role="alert">${esc(c.error)}</div>`:''}
-    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(selected.body||'')}</div>${Array.isArray(selected.attachments)&&selected.attachments.length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${selected.attachments.map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
+    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(selected.body||'')}</div>${Array.isArray(selected.attachments)&&selected.attachments.length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${selected.attachments.map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}${selected.eventCode&&selected.invitationStatus==='invited'?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="accept">接受工作人員（活動）邀請</button><button class="btn btn-ghost" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="reject">拒絕</button></div>`:selected.eventCode&&selected.invitationStatus?`<div class="banner" style="margin-top:12px"><span>邀請狀態：${esc(({accepted:'已接受',rejected:'已拒絕',revoked:'已撤銷'})[selected.invitationStatus]||selected.invitationStatus)}</span></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
     ${isSuperAdmin()?`<details class="panel" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">最高管理員｜發送測試信</summary><div class="grid grid-2 mailbox-compose-grid" style="margin-top:14px"><div class="field"><label>玩家 UID</label><input id="mailbox-recipient" maxlength="128" placeholder="貼上 Firebase UID"></div><div class="field"><label>信件標題</label><input id="mailbox-subject" maxlength="80" placeholder="例如：站內信測試"></div><div class="field" style="grid-column:1/-1"><label>信件內容</label><textarea id="mailbox-body" maxlength="2000" placeholder="輸入通知內容"></textarea></div></div><button class="btn btn-primary" data-action="mailbox-send-test" ${c.busy?'disabled':''}>發送測試信</button><p class="hint">本階段以 UID 測試寄送；活動中獎通知會在抽獎模組串接。</p>${c.lastSent?`<div class="panel" style="margin-top:14px"><strong>為剛寄出的信件新增附件</strong><p class="hint">收件者 ${esc(c.lastSent.targetUid)}｜信件 ${esc(c.lastSent.messageId)}｜PDF、PNG、JPG、TXT，單檔最多 2 MB</p><input id="mailbox-attachment-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"><button class="btn btn-ghost btn-sm" data-action="mailbox-upload-attachment" ${c.busy?'disabled':''}>上傳附件</button></div>`:''}</details>`:''}
   </section>`;
 }
@@ -18715,6 +18756,18 @@ async function handleMailbox(action,target){
     render();if(message&&!message.readAt)handleMailbox('mailbox-toggle-read',target);return;
   }
   if(action==='mailbox-open-contract'){openMailboxPartnerContract(target.getAttribute('data-order-code'));return;}
+  if(action==='mailbox-event-staff-respond'){
+    const eventCode=target.getAttribute('data-event-code'),response=target.getAttribute('data-response');
+    c.busy=true;c.error='';render();
+    try{
+      await window.engagementService.eventStaff({action:'respond',eventCode,response});
+      const fresh=await window.cloudAuth.getUserProfile(firebaseUser.uid);if(fresh)userProfile=fresh;
+      c.messages=null;c.selectedId='';c.busy=false;showToast(response==='accept'?'已接受工作人員（活動）邀請':'已拒絕邀請');
+      await loadMailbox(true);
+    }catch(error){c.error=mailboxError(error);}
+    finally{c.busy=false;render();}
+    return;
+  }
   if(action==='mailbox-download-attachment'){
     const messageId=target.getAttribute('data-message-id'),attachmentId=target.getAttribute('data-attachment-id');
     c.busy=true;c.error='';render();
@@ -22292,7 +22345,7 @@ function restoreAuthenticatedView(uid,intent){
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
   appPhase='player-center';playerActiveTab=PLAYER_TABS.some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
  }
- if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer')){
+ if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer'||intent==='event_staff')){
   appPhase='app';
   activeTab=v.cloudCode===(state.cloudCode||'')&&['management','ladder','live','bracket','referee','duty','registrations','settings','people','operations','history','version'].includes(v.tab)?v.tab:'management';
   adminTournamentListLoaded=false;return true;
@@ -22532,6 +22585,7 @@ function accountMenuItemsHtml(){
   return isPlayerMode ? `
     <button data-action="player-switch-tab" data-tab="profile">會員資料</button>
     ${(userProfile && roleAllowsMode(userProfile.role,"partner_organizer",userProfile)) ? `<button data-action="switch-to-partner-organizer">切換至合作主辦</button>` : ""}
+    ${(userProfile && roleAllowsMode(userProfile.role,"event_staff",userProfile)) ? `<button data-action="switch-to-event-staff">切換至工作人員（活動）</button>` : ""}
     ${(userProfile && roleAllowsMode(userProfile.role,"admin",userProfile)) ? `<button data-action="switch-to-admin-mode">切換至管理模式</button>` : ""}
     <button data-action="account-open-checkin">每日簽到</button>
     ${themePickerHtml()}
@@ -22551,13 +22605,15 @@ function accountMenuItemsHtml(){
 function accountMenuHtml(){
   if(currentRole!=="admin" && currentRole!=="player") return "";
   const isPlayerMode=currentRole==="player";
-  const partnerGrant=partnerOrganizerGrant();
+  const partnerGrant=partnerOrganizerGrant(),eventWorker=isEventStaffMode();
   const displayName=partnerGrant
     ? (partnerGrant.organizationName||"合作主辦")
+    : eventWorker
+    ? ((userProfile&&userProfile.displayName)||(userProfile&&userProfile.gameId)||"活動工作人員")
     : isPlayerMode
     ? ((userProfile&&userProfile.displayName)||(userProfile&&userProfile.nickname)||(userProfile&&userProfile.realName)||(firebaseUser&&firebaseUser.email)||"玩家")
     : (adminDisplayName||"管理員");
-  const roleLabel=partnerGrant?"合作主辦":roleDisplayLabel((userProfile&&userProfile.role)||(isPlayerMode?"player":"admin"));
+  const roleLabel=partnerGrant?"活動主辦":eventWorker?"工作人員（活動）":roleDisplayLabel((userProfile&&userProfile.role)||(isPlayerMode?"player":"admin"));
   return `<div class="account-menu-wrap">
     <button class="account-badge" data-action="toggle-account-menu" aria-expanded="${accountMenuOpen?"true":"false"}">
       <span class="account-role-dot"></span>
@@ -22977,7 +23033,7 @@ function renderTournamentManagementTab(){
         <div class="btn-row" style="margin-top:12px;">
           ${done?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}" data-open-history="true">查看紀錄</button>`:(isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`)}
           <button class="btn btn-ghost btn-sm" data-action="cloud-admin-copy-code" data-code="${esc(t.code)}">複製代碼</button>
-          <button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}">刪除賽事</button>
+          ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}">刪除賽事</button>`:""}
         </div>
       </div>`;
     }).join("")}</div>`;
@@ -23024,7 +23080,7 @@ function renderAdminTournamentListModal(){
         <div class="btn-row" style="margin-top:12px;">
           ${isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`}
           <button class="btn btn-ghost btn-sm" data-action="cloud-admin-copy-code" data-code="${esc(t.code)}">複製代碼</button>
-          <button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}">刪除賽事</button>
+          ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}">刪除賽事</button>`:""}
         </div>
       </div>`;
     }).join("")}${canCreateOfficialTournament()?`<div class="panel" style="padding:18px;margin:0;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><div class="hint" style="margin-bottom:12px;">直接建立空白賽事並進入賽事設定。</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}</div>`;
@@ -23134,7 +23190,7 @@ function renderApp(){
       </nav>
     </div>
     ${accountMenuOverlayHtml()}
-    <main>${isPartnerOrganizerMode()?`<div class="banner warn"><span><b>合作主辦模式</b>｜${esc(partnerOrganizerGrant().organizationName||partnerOrganizerGrant().organizationId)}｜方案 ${esc(partnerOrganizerGrant().planCode||partnerOrganizerGrant().plan||"—")}；僅能管理本合作帳號建立的賽事。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
+    <main>${isPartnerOrganizerMode()?`<div class="banner warn"><span><b>活動主辦模式</b>｜${esc(partnerOrganizerGrant().organizationName||partnerOrganizerGrant().organizationId)}｜方案 ${esc(partnerOrganizerGrant().planCode||partnerOrganizerGrant().plan||"—")}；僅能管理本合作帳號建立的賽事。</span></div>`:""}${isEventStaffMode()?`<div class="banner warn"><span><b>工作人員（活動）模式</b>｜權限僅限受邀且仍有效的活動；活動主辦失去授權時會立即停止操作，既有資料不會刪除。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
     <div id="print-bracket" style="display:none;">${renderPrintBracket()}</div>
     ${renderModal()}
     ${celebrationOpen ? renderCelebrationOverlay() : ""}
@@ -25260,6 +25316,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async()=>{await saveActiveMode("partner_organizer");currentRole="admin";appPhase="app";activeTab="management";adminTournamentListLoaded=false;publicWatchReturnContext=null;publicWatchUsesPrivateData=false;render();})();
     return;
   }
+  if(action==="switch-to-event-staff"){
+    if(!firebaseUser || !roleAllowsMode(userProfile?.role,"event_staff",userProfile)) return;
+    accountMenuOpen=false;
+    (async()=>{await saveActiveMode("event_staff");currentRole="admin";appPhase="app";activeTab="management";adminTournamentListLoaded=false;publicWatchReturnContext=null;publicWatchUsesPrivateData=false;render();})();
+    return;
+  }
   if(action==="switch-to-player-mode"){
     if(!userProfile || !roleAllowsMode(userProfile.role, "player")) return;
     accountMenuOpen=false;
@@ -25979,7 +26041,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="cloud-admin-delete-tournament"){
-    if(!hasAdminAccess()){ showToast("目前身分沒有此操作權限。", true); return; }
+    if(!isAdminTierOrAbove()){ showToast("活動主辦及工作人員（活動）不可刪除已保存的活動與房間。", true); return; }
     const code = target.getAttribute("data-code") || "";
     const name = target.getAttribute("data-name") || code;
     if(!code) return;
@@ -27028,6 +27090,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           if(window.cloudAuth.syncStaffDirectory) await window.cloudAuth.syncStaffDirectory(refereeDirectoryUsers);
         }else{
           refereeDirectoryUsers=window.cloudAuth.listStaffDirectory?await window.cloudAuth.listStaffDirectory():[];
+          if(isPartnerOrganizerMode()&&window.engagementService?.eventStaff&&state.cloudCode){
+            const result=await window.engagementService.eventStaff({action:"listForEvent",eventCode:state.cloudCode});
+            (result.assignments||[]).filter(item=>item.status==="accepted"&&(item.duties||[]).some(duty=>duty==="referee"||duty==="head_referee")).forEach(item=>{
+              if(!refereeDirectoryUsers.some(user=>user.uid===item.targetUid))refereeDirectoryUsers.push({uid:item.targetUid,displayName:item.displayName||item.targetUid,role:"event_staff",active:true});
+            });
+          }
           const uid=currentAuthUid();
           if(uid && !refereeDirectoryUsers.some(u=>u.uid===uid)) refereeDirectoryUsers.push({uid,displayName:userProfile&&userProfile.displayName||adminDisplayName||uid,role:userProfile&&userProfile.role||"staff",active:true});
         }
@@ -27140,6 +27208,28 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       render();
     })();
     return;
+  }
+  if(action==="event-staff-refresh"){loadEventStaffPanel(true);return;}
+  if(action==="event-staff-search"){
+    if(!isPartnerOrganizerMode()||eventStaffPanelState.busy)return;
+    const query=(document.getElementById("event-staff-search-query")?.value||"").trim();
+    if(query.length<2){showToast("請至少輸入 2 個字搜尋玩家",true);return;}
+    eventStaffPanelState.busy=true;eventStaffPanelState.error="";render();
+    (async()=>{try{const result=await window.engagementService.eventStaff({action:"searchPlayers",eventCode:state.cloudCode,query});eventStaffPanelState.results=result.players||[];if(!eventStaffPanelState.results.length)showToast("找不到符合的玩家");}
+      catch(error){eventStaffPanelState.error=String(error?.message||"搜尋玩家失敗");}finally{eventStaffPanelState.busy=false;render();}})();return;
+  }
+  if(action==="event-staff-invite"){
+    if(!isPartnerOrganizerMode()||eventStaffPanelState.busy)return;
+    const targetUid=target.getAttribute("data-uid")||"",duties=[];document.querySelectorAll(".event-staff-duty:checked").forEach(input=>duties.push(input.value));
+    if(!duties.length){showToast("請至少選擇一項職務",true);return;}
+    eventStaffPanelState.busy=true;eventStaffPanelState.error="";render();
+    (async()=>{try{await window.engagementService.eventStaff({action:"invite",eventCode:state.cloudCode,targetUid,duties});showToast("工作人員（活動）邀請已寄到對方站內信");await loadEventStaffPanel(true);}
+      catch(error){eventStaffPanelState.error=String(error?.message||"邀請失敗");}finally{eventStaffPanelState.busy=false;render();}})();return;
+  }
+  if(action==="event-staff-revoke"){
+    if(!isPartnerOrganizerMode()||eventStaffPanelState.busy)return;
+    const targetUid=target.getAttribute("data-uid")||"";
+    openModal({type:"generic",title:"撤銷工作人員（活動）",message:"撤銷後對方會立即失去本活動操作權限，但活動、房間與歷史資料全部保留。",danger:true,confirmLabel:"確認撤銷",onConfirm:()=>{(async()=>{eventStaffPanelState.busy=true;render();try{await window.engagementService.eventStaff({action:"revoke",eventCode:state.cloudCode,targetUid});showToast("已撤銷活動工作人員權限");await loadEventStaffPanel(true);}catch(error){eventStaffPanelState.error=String(error?.message||"撤銷失敗");}finally{eventStaffPanelState.busy=false;render();}})();}});return;
   }
   if(action==="save-staff-assignment"){
     if(staffAssignmentSaving) return;
@@ -28191,7 +28281,7 @@ async function init(){
                     Promise.resolve().then(async()=>{ try{ const all=await window.cloudAuth.listUsers(); await window.cloudAuth.syncStaffDirectory(all); }catch(e){} });
                   }
                   await saveActiveMode(intent);
-                  currentRole = intent==="partner_organizer" ? "admin" : (intent==="player" ? "player" : mapRoleToAppRole(profile.role));
+                  currentRole = intent==="partner_organizer" ? "admin" : (intent==="event_staff" ? "admin" : (intent==="player" ? "player" : mapRoleToAppRole(profile.role)));
                   adminDisplayName = profile.displayName || profile.email;
                   if((profile.role==="tester"||profile.isTestAccount===true) && intent==="admin" && !isOwnTestTournament(state)){
                     state=markTesterSandboxState(defaultState());
@@ -28215,6 +28305,7 @@ async function init(){
                   if(restoringSession && restoreAuthenticatedView(fbUser.uid,intent)){render();return;}
                   if(appPhase==="landing" || appPhase==="admin-login" || appPhase==="admin-setup" || appPhase==="admin-success" || appPhase==="player-login" || appPhase==="player-apply" || currentRole==="guest"){
                     if(intent==="partner_organizer"){appPhase="app";activeTab="management";adminTournamentListLoaded=false;render();return;}
+                    if(intent==="event_staff"){appPhase="app";activeTab="management";adminTournamentListLoaded=false;render();return;}
                     if(intent==="admin"){
                       appPhase = "admin-success";
                       render();
@@ -28903,6 +28994,7 @@ init().then(()=>{
     async presence(payload){return callEngagementFunction("onlinePresence",payload,15000);},
     async mood(payload){return callEngagementFunction("moodStation",payload,20000);},
     async mailbox(payload){return callEngagementFunction("mailboxService",payload,30000);},
+    async eventStaff(payload){return callEngagementFunction("eventStaffService",payload,30000);},
     async mailboxAttachment(payload){return callEngagementFunction("mailboxAttachmentService",payload,60000);},
     async listPartnerPlans(payload){return callEngagementFunction("listPartnerPlans",payload,30000);},
     async savePartnerPlan(payload){return callEngagementFunction("savePartnerPlan",payload,30000);},
@@ -29780,18 +29872,27 @@ init().then(()=>{
       const actorUid=currentUserUidForWrites();
       const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&actorUid);
       const partnerSession=isPartnerOrganizerMode()&&actorUid;
-      const source=testerSession
-        ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("eventAuthority","==","test"))
-        : partnerSession
-          ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("partnerOrganizationCode","==",partnerOrganizerGrant().organizationId))
-          : fx.collection(dbHandle,"tournaments");
-      const snap = await fx.getDocs(source);
+      const eventStaffSession=isEventStaffMode()&&actorUid;
+      let docs=[];
+      if(eventStaffSession){
+        const access=await window.engagementService.eventStaff({action:"listMine"});
+        const codes=(access?.assignments||[]).filter(item=>item.status==="accepted"&&item.effective===true).map(item=>item.eventCode);
+        docs=(await Promise.all(codes.map(code=>fx.getDoc(fx.doc(dbHandle,"tournaments",code))))).filter(snap=>snap.exists());
+      }else{
+        const source=testerSession
+          ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("eventAuthority","==","test"))
+          : partnerSession
+            ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("partnerOrganizationCode","==",partnerOrganizerGrant().organizationId))
+            : fx.collection(dbHandle,"tournaments");
+        docs=(await fx.getDocs(source)).docs;
+      }
       const items = [];
-      snap.forEach(docSnap=>{
+      docs.forEach(docSnap=>{
         const d = docSnap.data() || {};
         let savedState=null;
         try{savedState=typeof d.data==="string"?JSON.parse(d.data):d.data;}catch(e){}
         if(partnerSession&&(d.eventAuthority!=="official"||d.partnerOrganizationCode!==partnerOrganizerGrant().organizationId))return;
+        if(eventStaffSession&&!((d.eventStaffAssignments||{})[actorUid]?.status==="accepted"))return;
         items.push({
           code: docSnap.id,
           name: d.name || "",
@@ -30782,8 +30883,17 @@ if(testerSession){
           const actorIsAdmin=actor.active===true&&actor.isTestAccount!==true&&(actor.role==="admin"||actor.role==="super_admin");
           const eventAuthority=docData.eventAuthority||(remoteState.meta&&remoteState.meta.eventAuthority)||"official";
           const actorIsCreator=actor.active===true&&actor.isTestAccount!==true&&actor.role==="staff"&&creator===actorUid&&eventAuthority==="official";
+          const partnerGrant=actor.partnerOrganizer||{};
+          const partnerExpiryRaw=partnerGrant.expiresAtMs||partnerGrant.expiresAt||0;
+          const partnerExpiry=Number(partnerExpiryRaw)||Date.parse(String(partnerExpiryRaw))||0;
+          const partnerStartRaw=partnerGrant.startsAtMs||partnerGrant.startsAt||0;
+          const partnerStart=Number(partnerStartRaw)||Date.parse(String(partnerStartRaw))||0;
+          const partnerOrder=String(partnerGrant.orderCode||actor.partnerContractOrderCode||"");
+          const actorIsPartnerCreator=actor.active===true&&actor.isTestAccount!==true&&actor.role==="player"&&partnerGrant.status==="active"&&(!partnerStart||partnerStart<=Date.now())&&partnerExpiry>Date.now()
+            &&creator===actorUid&&eventAuthority==="official"&&docData.createdByRole==="partner_organizer"&&docData.partnerOrganizationCode===partnerGrant.organizationId
+            &&(partnerOrder?docData.partnerContractOrderCode===partnerOrder:!docData.partnerContractOrderCode);
           const actorIsTesterOwner=actor.active===true&&(actor.role==="tester"||actor.isTestAccount===true)&&creator===actorUid&&docData.ownerUid===actorUid&&docData.testMode===true&&eventAuthority==="test";
-          if(!actorIsAdmin&&!actorIsCreator&&!actorIsTesterOwner) throw new Error("permission-denied");
+          if(!actorIsAdmin&&!actorIsCreator&&!actorIsPartnerCreator&&!actorIsTesterOwner) throw new Error("permission-denied");
 
           const stationCount=Math.max(1,Number(remoteState.meta.stations)||1);
           const requestedKeys=Object.keys(requestedRaw);
@@ -30806,6 +30916,11 @@ if(testerSession){
           const directory={};
           for(const uid of allUids){
             if(uid===actorUid){ directory[uid]=actor; continue; }
+            const eventAssignment=(docData.eventStaffAssignments||{})[uid];
+            if(actorIsPartnerCreator&&eventAssignment&&eventAssignment.status==="accepted"&&eventAssignment.organizerUid===actorUid
+              &&Array.isArray(eventAssignment.duties)&&eventAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee")){
+              directory[uid]={uid,displayName:eventAssignment.displayName,role:"event_staff",active:true};continue;
+            }
             const directorySnap=await tx.get(fx.doc(dbHandle,"staffDirectory",uid));
             if(!directorySnap.exists()) throw new Error("invalid-referee");
             directory[uid]=directorySnap.data()||{};
@@ -30814,7 +30929,7 @@ if(testerSession){
           for(let station=1;station<=stationCount;station++){
             names[String(station)]=map[String(station)].map(uid=>{
               const profile=directory[uid]||{};
-              const validRole=actorIsTesterOwner?(uid===actorUid&&(profile.role==="tester"||profile.isTestAccount===true)):["staff","admin","super_admin"].includes(profile.role);
+              const validRole=actorIsTesterOwner?(uid===actorUid&&(profile.role==="tester"||profile.isTestAccount===true)):["staff","admin","super_admin","event_staff"].includes(profile.role);
               if(profile.active!==true||!validRole) throw new Error("invalid-referee");
               const displayName=String(profile.displayName||profile.realName||"").trim();
               if(!displayName) throw new Error("invalid-referee");
@@ -30889,7 +31004,11 @@ if(testerSession){
           if(!actorUid || (expectedActorUid && expectedActorUid!==actorUid)) throw new Error("auth-mismatch");
           const actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid));
           const actor=actorSnap.exists()?actorSnap.data():{};
-          if(actor.role==="staff" && docData.refereeStationRestrictionEnabled===true){
+          const eventStaffAssignment=(docData.eventStaffAssignments&&docData.eventStaffAssignments[actorUid])||null;
+          const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
+            &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
+            &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
+          if((actor.role==="staff"||actorIsEventReferee) && docData.refereeStationRestrictionEnabled===true){
             const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
             const list=Array.isArray(map[String(Number(queueOptions.targetStation||station))])?map[String(Number(queueOptions.targetStation||station))]:[];
             if(!list.includes(actorUid)) throw new Error("station-not-assigned");
@@ -30902,7 +31021,7 @@ if(testerSession){
           if(queueOptions.expectedRevision!=null && (remoteMatch.dispatchRevision||0)!==queueOptions.expectedRevision) throw new Error("dispatch-stale");
           if(queueOptions.targetStation!=null){
             if(actor.active===false) throw new Error("permission-denied");
-            const privileged=["super_admin","admin","staff"].includes(actor.role);
+            const privileged=["super_admin","admin","staff"].includes(actor.role)||actorIsEventReferee;
             const ownTest=(actor.role==="tester"||actor.isTestAccount===true) && remoteState.testMode===true && remoteState.meta&&remoteState.meta.eventAuthority==="test" && remoteState.ownerUid===actorUid && remoteState.createdBy===actorUid;
             const ownCommunity=remoteState.meta&&remoteState.meta.eventAuthority==="community" && remoteState.ownerUid===actorUid;
             if(!privileged&&!ownTest&&!ownCommunity) throw new Error("permission-denied");
@@ -30946,7 +31065,11 @@ if(testerSession){
             if(actorUid){
               const actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid));
               const actor=actorSnap.exists()?actorSnap.data():{};
-              if(actor.role==="staff" && docData.refereeStationRestrictionEnabled===true){
+              const eventStaffAssignment=(docData.eventStaffAssignments&&docData.eventStaffAssignments[actorUid])||null;
+              const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
+                &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
+                &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
+              if((actor.role==="staff"||actorIsEventReferee) && docData.refereeStationRestrictionEnabled===true){
                 const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
                 const list=Array.isArray(map[String(Number(auditMeta.station))])?map[String(Number(auditMeta.station))]:[];
                 if(!list.includes(actorUid)) throw new Error("station-not-assigned");
