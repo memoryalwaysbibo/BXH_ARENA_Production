@@ -167,7 +167,9 @@
     const start=()=>{observer.observe(document.body,{childList:true,subtree:true});decorateMailboxContractButtons();decorateQuota();};
     if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
   }
-  const api={hasGrant:profile=>!!grant(profile),grant,render};
+  const api={hasGrant:profile=>!!grant(profile),grant,render,
+    remainingRooms:orderCode=>quotaState.orderCode===orderCode&&quotaState.actor===actorUid()&&quotaState.total!==null
+      ?Math.max(0,quotaState.total-quotaState.used):null};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   root.BXHPartnerOrganizer=api;
 })(typeof window!=='undefined'?window:globalThis);
