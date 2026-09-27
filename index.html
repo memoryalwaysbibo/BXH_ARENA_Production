@@ -9615,7 +9615,7 @@ function bxhEventTemplateContext(){
 }
 function canUseBxhStandardTemplate(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
-    (userProfile.role==="super_admin" || userProfile.role==="admin") &&
+    ["super_admin","admin","staff"].includes(userProfile.role) &&
     state && state.meta && state.meta.eventAuthority!=="community");
 }
 function roomStandardTemplateConfig(st=state){
@@ -11190,14 +11190,14 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
   "unarchive-current","unarchive-record","preview-cleanup-public-mirrors","run-cleanup-public-mirrors","ladder-new-season",
   "admin-refresh-engagement","admin-seed-initial-titles","admin-save-engagement-settings","admin-grant-title","admin-revoke-title",
   "admin-load-engagement-overview","admin-update-title-definition","admin-backfill-preview","admin-backfill-execute","admin-backfill-restart","admin-engagement-diagnose",
-  "event-template-edit","event-template-cancel","event-template-save"
+
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
   "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack",
   "ai-create-suggestion-toggle","ai-create-suggestion-select-all","ai-create-suggestion-apply",
-  "event-template-toggle","event-template-refresh"
+  "event-template-toggle","event-template-refresh","event-template-edit","event-template-cancel","event-template-save"
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
@@ -16685,8 +16685,8 @@ function renderBxhEventTemplateSettingsSection(readOnly){
     body+='<div class="field" style="margin-top:12px;"><label>BXH 賽事／法律定位</label><div class="hint" style="white-space:pre-line;color:var(--metal);">'+esc(latest.legalPositioning||'—')+'</div></div>';
     body+='</div></details>';
   }
-  if(isSuperAdmin() && ui.template && !readOnly){
-    body+='<div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-action="event-template-edit">'+(ui.editing?'正在編輯公版':'編輯公版（最高管理員）')+'</button><button class="btn btn-ghost btn-sm" data-action="event-template-refresh">重新讀取</button></div>';
+  if(isAdminTierOrAbove() && ui.canEdit && ui.template && !readOnly){
+    body+='<div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-action="event-template-edit">'+(ui.editing?'正在編輯公版':'編輯公版（管理員）')+'</button><button class="btn btn-ghost btn-sm" data-action="event-template-refresh">重新讀取</button></div>';
     if(ui.editing){
       body+='<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">';
       body+='<div class="banner warn"><span>這裡修改的是 BXH 全域公版。儲存後只影響之後新套用／重新套用的賽事；既有房間快照不會被改寫。</span></div>';
@@ -16696,8 +16696,8 @@ function renderBxhEventTemplateSettingsSection(readOnly){
       body+='<div class="btn-row"><button class="btn btn-primary" data-action="event-template-save" '+(ui.saving?'disabled':'')+'>'+(ui.saving?'儲存中…':'儲存並發布新版公版')+'</button><button class="btn btn-ghost" data-action="event-template-cancel" '+(ui.saving?'disabled':'')+'>取消</button></div>';
       body+='</div>';
     }
-  }else if(!isSuperAdmin()){
-    body+='<div class="hint" style="margin-top:10px;">公版本體僅最高管理員可修改；一般管理員只能決定本場是否套用。</div>';
+  }else if(isStaffTier()){
+    body+='<div class="hint" style="margin-top:10px;">工作人員可為本場套用公版；公版本體由管理員維護。</div>';
   }
   body+='</div>';
   return body;
@@ -23914,7 +23914,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   const aiCreateTierAllowed = ADMIN_TIER_ONLY_ACTIONS.has(action) && action.startsWith("ai-create-") && aiCreateBetaActorAllowed();
-  if(ADMIN_TIER_ONLY_ACTIONS.has(action) && !isAdminTierOrAbove() && !aiCreateTierAllowed && !(isOwnTestTournament() && TESTER_TIER_ACTIONS.has(action)) && !(isCommunityRoomOwner() && COMMUNITY_OWNER_TIER_ACTIONS.has(action))){
+  const staffTemplateAllowed = (action==="event-template-toggle" || action==="event-template-refresh") && canUseBxhStandardTemplate();
+  if(ADMIN_TIER_ONLY_ACTIONS.has(action) && !isAdminTierOrAbove() && !aiCreateTierAllowed && !staffTemplateAllowed && !(isOwnTestTournament() && TESTER_TIER_ACTIONS.has(action)) && !(isCommunityRoomOwner() && COMMUNITY_OWNER_TIER_ACTIONS.has(action))){
     showToast("目前身分沒有此操作權限。", true);
     return;
   }
@@ -23942,6 +23943,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="event-template-edit"){
     const ui=bxhEventTemplateContext();
+    if(!isAdminTierOrAbove() || !ui.canEdit)return;
     if(!ui.template){showToast("請先載入公版",true);return;}
     ui.editing=true;render();return;
   }
@@ -23950,6 +23952,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="event-template-save"){
     const ui=bxhEventTemplateContext();
+    if(!isAdminTierOrAbove() || !ui.canEdit)return;
     if(ui.saving||!ui.template)return;
     const rules=(document.getElementById("event-template-rules")?.value||"").trim();
     const notices=(document.getElementById("event-template-notices")?.value||"").trim();
