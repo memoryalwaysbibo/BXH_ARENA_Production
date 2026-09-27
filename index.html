@@ -18998,7 +18998,7 @@ function renderLadderLeaderboardPage(adminMode=false){
     ${ladderPublicError?`<div class="auth-error">${esc(ladderPublicError)}</div>`:""}
     ${ladderLocationFilterHtml()}
     ${ladderRulesHtml()}
-    <div class="panel">
+    <div class="panel ladder-ranking-panel">
       <div class="panel-title">${esc((control&&control.currentSeason)||"S1")}｜${esc(ladderLocationLabel())}</div>
       ${ladderPublicLoading?'<div class="empty-state">正在讀取天梯資料…</div>':ladderLeaderboardTable(rows,adminMode)}
     </div>
@@ -31888,6 +31888,6 @@ if(testerSession){
   });
 </script>
 <script src="activity-points-ui.js?v=20260928-static-header-fix3"></script>
-<script src="ladder-secondary-ui.js?v=14.2.46"></script>
+<script src="ladder-secondary-ui.js?v=14.2.47"></script>
 </body>
 </html>
