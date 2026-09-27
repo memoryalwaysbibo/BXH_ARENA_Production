@@ -21,6 +21,7 @@ assert(source.includes('grid-template-columns:52px minmax(0,1fr) 96px 78px'), 'd
 assert(source.includes('grid-template-columns:44px minmax(0,1fr) 78px 64px'), 'narrow iPhone four-column grid missing');
 assert(source.includes('title.textContent=(ladderScoreMode==="career"?"生涯":season+" 季賽")+"｜"+location;'), 'board title must reflect season/career mode');
 assert(source.includes('grid-column:1/-1'), 'admin actions must be preserved without adding a fifth data column');
-assert(html.includes('ladder-secondary-ui.js?v=14.2.39'), 'ladder asset cache-bust version must match release');
+assert(source.includes('.ladder-rank-scroll-v2{max-height:none;overflow:visible;}'), 'ranking must grow beyond the shared 420px list limit');
+assert(html.includes('ladder-secondary-ui.js?v=14.2.40'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
