@@ -16350,6 +16350,8 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
   ensureRegistrationFormDraft();
   const d = registrationFormDraft;
   const m = state.meta;
+  const teamRegistrationMode=(settingsFormDraft&&settingsFormDraft.battleMode==="team")||(!settingsFormDraft&&m.battleMode==="team");
+  const teamRegistrationSize=Math.max(3,Number((settingsFormDraft&&settingsFormDraft.teamSize)||m.teamSize)||3);
   const status = (!m || !m.registrationEnabled) ? null : (m.eventCancelled ? "cancelled" : (state.bracketSize>0 ? "closed" : getEffectiveRegistrationStatus({
     registrationCloseAt: m.registrationCloseAt, registrationOpenAt: m.registrationOpenAt,
     capacity: m.registrationCapacity, confirmedCount: 0,
@@ -16371,7 +16373,7 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     </div>
     ${locked ? `<p class="hint" style="margin-top:10px;">已產生對戰表，無法變更是否啟用線上報名。</p>` : ""}` : ""}
     ${d.registrationEnabled ? `
-    <div class="field" style="margin-top:14px;">
+    ${teamRegistrationMode?`<div class="banner" style="margin-top:14px;"><span><b>${teamRegistrationSize}V${teamRegistrationSize} 團體戰</b>｜報名與正備取名額都以「隊伍」計算；玩家端先填隊名，再完整填入 ${teamRegistrationSize} 位隊員。</span></div>`:`<div class="field" style="margin-top:14px;">
       <label>參賽名稱顯示</label>
       <div class="btn-row">
         <button class="btn ${d.participantNameMode==='realName'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-name-mode" data-value="realName">使用本名</button>
@@ -16386,18 +16388,18 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
         <button class="btn ${d.targetGroup==='children'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-target-group" data-value="children">兒童組</button>
       </div>
       <p class="hint" style="margin-top:6px;">${d.targetGroup==='children' ? "限 6 歲以上、13 歲以下參加。" : "不限年齡，符合活動規則者皆可參加。"}</p>
-    </div>
+    </div>`}
     <div class="grid grid-2" style="margin-top:14px;">
       <div class="field"><label>報名開放時間</label>${renderHalfHourDatetimeDraft("reg-open-at","registrationOpenAt",d.registrationOpenAt)}</div>
       <div class="field"><label>報名截止時間</label>${renderHalfHourDatetimeDraft("reg-close-at","registrationCloseAt",d.registrationCloseAt)}</div>
-      <div class="field"><label>正取人數上限</label><input type="number" id="reg-capacity" data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
+      <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
       <div class="field"><label>報名費（元，選填）</label><input type="number" id="reg-fee" data-draft-field="registrationFee" data-draft-type="int-or-null" min="0" value="${d.registrationFee!=null?d.registrationFee:""}"></div>
     </div>
     ${state.entrySelection?.mode==='registration'?'<p class="hint">本場已啟用報名抽籤：報名不限額、備取不限額，正取人數請至「參賽名額抽籤」調整。下列舊制上限不套用於本場。</p>':''}
     <div class="field" style="margin-top:8px;">
-      <label>備取人數上限（選填）</label>
+      <label>${teamRegistrationMode?"備取隊伍上限（選填）":"備取人數上限（選填）"}</label>
       <input type="number" id="reg-waitlist-capacity" data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
-      <p class="hint" style="margin-top:6px;">有需要備取就填人數；留空即代表 0 人、不開放備取。</p>
+      <p class="hint" style="margin-top:6px;">有需要備取就填${teamRegistrationMode?"隊伍數":"人數"}；留空即代表 0、不開放備取。</p>
     </div>
     <div class="field" style="margin-top:8px;"><label>活動說明（選填）</label><textarea id="reg-event-desc" data-draft-field="eventDescription" data-draft-type="string" rows="3">${esc(d.eventDescription)}</textarea></div>
     <div class="btn-row" style="margin-top:6px;">
@@ -20248,6 +20250,7 @@ function smartCallRemainingSeconds(m){
 }
 function smartCallModel(r,info){
   const st=info&&info.parsedData;
+  if((info&&info.battleMode)==="team" || (st&&st.meta&&st.meta.battleMode)==="team") return {kind:"pending",message:"團體戰上場提醒將於團體裁判台完成後啟用"};
   if(!st || !Array.isArray(st.matches) || !Array.isArray(st.players)) return {kind:"pending",message:"等待賽事對戰資料同步"};
   if(r.status!=="confirmed") return {kind:"waitlist",message:"目前為備取，遞補為正取後才會啟用叫號"};
   const pid=smartCallFindPlayerId(st,r);
@@ -27469,7 +27472,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     d.waitlistEnabled = d.waitlistCapacity > 0;
     if(d.registrationEnabled){
       if(d.registrationOpenAt && d.registrationCloseAt && d.registrationCloseAt<=d.registrationOpenAt){ showToast("報名截止時間必須晚於開放時間", true); return; }
-      if(!d.registrationCapacity || d.registrationCapacity<1){ showToast("請輸入正確的正取人數上限", true); return; }
+      if(!d.registrationCapacity || d.registrationCapacity<1){ showToast(state.meta.battleMode==="team"||settingsFormDraft?.battleMode==="team"?"請輸入正確的正取隊伍上限":"請輸入正確的正取人數上限", true); return; }
 
       if(d.targetGroup!=="open" && d.targetGroup!=="children"){ showToast("活動組別設定有誤，請重新選擇", true); return; }
     }
@@ -27596,8 +27599,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       ["報名開放", new Date(sm.registrationOpenAt).toLocaleString()],
       ["報名截止", new Date(sm.registrationCloseAt).toLocaleString()],
       ["取消期限", new Date(sm.registrationCloseAt+3*60*60*1000).toLocaleString()+"（截止後 3 小時）"],
-      ["正取上限", sm.registrationCapacity+" 人"],
-      ["備取上限", (Number(sm.waitlistCapacity)||0)+" 人"],
+      ["正取上限", sm.registrationCapacity+(sm.battleMode==="team"?" 隊":" 人")],
+      ["備取上限", (Number(sm.waitlistCapacity)||0)+(sm.battleMode==="team"?" 隊":" 人")],
       ["報名費", sm.registrationFee!=null?(sm.registrationFee+" 元"):"未設定"],
       ["參賽名稱", sm.participantNameMode==="gameId"?"使用遊戲 ID（未設定時使用本名）":"使用本名"],
       ["公開狀態", sm.registrationVisibility==="public"?"公開顯示":"不公開顯示"]
@@ -27652,7 +27655,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     rd.waitlistEnabled=rd.waitlistCapacity>0;
     if(rd.registrationEnabled){
       if(rd.registrationOpenAt && rd.registrationCloseAt && rd.registrationCloseAt<=rd.registrationOpenAt){ showToast("報名截止時間必須晚於開放時間",true); return; }
-      if(!rd.registrationCapacity || rd.registrationCapacity<1){ showToast("請輸入正確的正取人數上限",true); return; }
+      if(!rd.registrationCapacity || rd.registrationCapacity<1){ showToast(d.battleMode==="team"?"請輸入正確的正取隊伍上限":"請輸入正確的正取人數上限",true); return; }
       if(rd.targetGroup!=="open" && rd.targetGroup!=="children"){ showToast("活動組別設定有誤，請重新選擇",true); return; }
     }
 
@@ -30060,6 +30063,8 @@ init().then(()=>{
           eventDate: d.eventDate || "",
           startAt: d.startAt || "",
           location: d.location || "",
+          battleMode:(d.battleMode||(savedState&&savedState.meta&&savedState.meta.battleMode))==="team"?"team":"individual",
+          teamSize:Math.max(3,Number(d.teamSize||(savedState&&savedState.meta&&savedState.meta.teamSize))||3),
           formatType: d.formatType || "",
           ladderMode: d.ladderMode === "ranked" ? "ranked" : "general",
           testLadderEnabled: d.testLadderEnabled===true || savedState?.testLadderEnabled===true,
@@ -30261,7 +30266,9 @@ init().then(()=>{
         return {
           systemClosed:d.systemClosed===true, eventCancelled:d.eventCancelled===true, registrationSelection:d.registrationSelection||null,
           name: d.name||"", date: d.eventDate||"", startAt: d.startAt||"",
-          location: d.location||"", formatType: d.formatType||"", fee: d.fee,
+          location: d.location||"", battleMode:(d.battleMode||(parsedData&&parsedData.meta&&parsedData.meta.battleMode))==="team"?"team":"individual",
+          teamSize:Math.max(3,Number(d.teamSize||(parsedData&&parsedData.meta&&parsedData.meta.teamSize))||3),
+          formatType: d.formatType||"", fee: d.fee,
           tournamentPhase: canonicalPublicTournamentPhase(view),
           registrationStatus: publicTournamentRegistrationLocked(view) ? "started" : (d.registrationStatus||""),
           archiveStatus: (parsedData&&parsedData.archiveStatus)||d.archiveStatus||"ongoing",
