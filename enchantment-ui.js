@@ -78,6 +78,54 @@
    frame.contentWindow?.postMessage({kind:first?'bxh-enchantment-init':'bxh-enchantment-state',code,matchId:id,side:frame.dataset.side,state:playerState(item.state,frame.dataset.side)},location.origin);
   });
  }
+
+ // Public brackets created before this fix can omit playMode. Use the signed-in
+ // player's confirmed registration to find the active match; the callable
+ // verifies the UID and only returns an enchantment round to its participants.
+ let discoveryBusy=false,lastRegistrations=0,registrations=[];
+ async function discoverPlayerDraw(){
+  if(discoveryBusy||!root.cloudSync?.queryMyRegistrations||!root.engagementService?.enchantment)return;
+  discoveryBusy=true;
+  try{
+   if(Date.now()-lastRegistrations>30000){registrations=await root.cloudSync.queryMyRegistrations();lastRegistrations=Date.now();}
+   for(const r of registrations.filter(x=>x.status==='confirmed')){
+    const code=r.tournamentCode;
+    const info=await root.cloudSync.getPublicTournamentSummary(code);
+    const data=info?.parsedData;
+    if(!data?.startedAt||!Array.isArray(data.matches))continue;
+    const pid=typeof smartCallFindPlayerId==='function'?smartCallFindPlayerId(data,r):null;
+    const m=data.matches.find(x=>!x.completed&&!x.isBye&&x.a?.playerId&&x.b?.playerId&&
+     (x.a.playerId===pid||x.b.playerId===pid)&&
+     (x.status==='in_progress'||Object.values(data.courtAssignments||{}).some(c=>c?.currentMatchId===x.id)));
+    if(!m)continue;
+    const side=m.a.playerId===pid?'A':'B';
+    let result;
+    try{result=await call({action:'get',code,matchId:m.id});}catch(e){continue;}
+    cache.set(key(code,m.id),{version:result.version,state:result.state});
+    const s=result.state;
+    const show=s?.phase==='drawing'&&!s.drawn?.[side];
+    let overlay=document.querySelector('[data-enchantment-draw-overlay]');
+    if(!show){if(overlay)overlay.remove();continue;}
+    if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id){syncFrames(code,m.id);continue;}
+    if(overlay)overlay.remove();
+    overlay=document.createElement('section');
+    overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
+    overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔之戰抽卡');
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080917;display:flex;flex-direction:column';
+    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px">附魔之戰｜第 '+Number(s.round)+' 局抽卡 <button type="button" data-enchantment-close style="float:right">稍後抽卡</button></div>';
+    const frame=document.createElement('iframe');frame.title='附魔之戰選手抽卡';frame.dataset.enchantmentPlayer='';
+    frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
+    frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0';
+    overlay.append(frame);document.body.append(overlay);
+    frame.addEventListener('load',()=>syncFrames(code,m.id),{once:true});
+    break;
+   }
+  }catch(e){/* Registration and public bracket may be temporarily unavailable. */}
+  finally{discoveryBusy=false;}
+ }
+ document.addEventListener('click',e=>{if(e.target.closest('[data-enchantment-close]'))document.querySelector('[data-enchantment-draw-overlay]')?.remove();});
+ setInterval(discoverPlayerDraw,7000);
+ setTimeout(discoverPlayerDraw,1500);
  async function operate(d){
   const {code,matchId:id,action}=d,k=key(code,id),item=cache.get(k);
   if(busy.has(k))return;
