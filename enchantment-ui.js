@@ -19,7 +19,7 @@
    <style>
     [data-enchantment-referee] .enchant-active{border-color:#b889ff!important;box-shadow:0 0 0 1px #b889ff55,0 0 20px #9d62ff38;animation:enchant-glow 2.5s ease-in-out infinite}
     [data-enchantment-referee] .enchant-badge{display:inline-block;margin-left:6px;padding:2px 7px;border:1px solid #c594ff;border-radius:999px;background:#6e35aa88;color:#fff1bc;font-size:11px;font-weight:700;vertical-align:middle}
-    [data-enchantment-referee] .enchant-effect-button{border-color:#d5a4ff!important;box-shadow:inset 0 0 13px #ad6bf43d;color:#fff0c7!important}
+    [data-enchantment-referee] .enchant-effect-button{border-color:#e6b5ff!important;box-shadow:inset 0 0 13px #ad6bf43d,0 0 0 1px #d991ff88,0 0 9px #a64cf455;color:#fff0c7!important}
     [data-enchantment-referee] .enchant-flame-label{display:inline-block;margin-left:8px;font-size:11px;font-weight:900;letter-spacing:.08em;color:#ffcf63;text-shadow:0 -2px 5px #ff4d1f,0 0 10px #ff8b22,0 0 16px #e63b13;animation:enchant-flame 1.1s ease-in-out infinite alternate;white-space:nowrap}
     @keyframes enchant-flame{from{transform:translateY(1px);filter:brightness(.9)}to{transform:translateY(-2px);filter:brightness(1.35)}}
     @keyframes enchant-glow{50%{box-shadow:0 0 0 2px #b889ff88,0 0 26px #9d62ff6b}}
