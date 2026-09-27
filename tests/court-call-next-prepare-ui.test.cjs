@@ -14,7 +14,7 @@ assert(source.includes("status='等待晉級'"), 'waiting-for-advancement status
 assert(source.includes("status='等待安排'"), 'waiting-for-assignment status missing');
 assert(source.includes("data-next-kind="), 'next-match state marker missing');
 assert(source.includes("name:'待定'"), 'TBD player fallback missing');
-assert(source.includes('class="court-call-next-compact-badge">下一場'), 'compact next-match badge missing');
+assert(source.includes('class="court-call-next-compact-badge">下一組選手'), 'compact next-match badge missing');
 assert(source.includes('court-call-next-compact-player'), 'compact next-match player row missing');
 assert(source.includes('data-bxh-next-prepare="1"'), 'compact prepare marker missing');
 assert(source.includes("linked?'尚未通知':'無法推播'"), 'compact prepare status missing');
