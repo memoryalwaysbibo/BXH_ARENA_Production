@@ -82,7 +82,7 @@
 
   function ladderScoreSwitchHtml(){
     return '<div class="ladder-score-switch" role="tablist" aria-label="天梯積分類型">'+
-      '<button type="button" role="tab" data-ladder-score-mode="season" class="'+(ladderScoreMode==="season"?"active":"")+'" aria-selected="'+(ladderScoreMode==="season"?"true":"false")+'">季賽</button>'+
+      '<button type="button" role="tab" data-ladder-score-mode="season" class="'+(ladderScoreMode==="season"?"active":"")+'" aria-selected="'+(ladderScoreMode==="season"?"true":"false")+'">賽季</button>'+
       '<button type="button" role="tab" data-ladder-score-mode="career" class="'+(ladderScoreMode==="career"?"active":"")+'" aria-selected="'+(ladderScoreMode==="career"?"true":"false")+'">生涯</button>'+
     '</div>';
   }
@@ -117,7 +117,7 @@
       '</article>';
     }).join("");
     return '<div class="rank-scroll ladder-rank-scroll-v2"><div class="ladder-rank-board-v2">'+
-      '<div class="ladder-rank-grid ladder-rank-head-v2"><div>排名</div><div>玩家</div><div>位階</div><div title="'+(ladderScoreMode==="career"?"生涯積分":"季賽積分")+'">積分</div></div>'+
+      '<div class="ladder-rank-grid ladder-rank-head-v2"><div>排名</div><div>玩家</div><div title="位階依目前賽季積分決定">本季位階</div><div title="'+(ladderScoreMode==="career"?"生涯積分":"賽季積分")+'">積分</div></div>'+
       body+
       (rows.length>10?'<div class="ladder-rank-more">'+
         (ladderVisibleCount<rows.length?'<button type="button" class="btn btn-ghost" data-ladder-more="next">再顯示 '+Math.min(20,rows.length-ladderVisibleCount)+' 位（剩餘 '+(rows.length-ladderVisibleCount)+' 位）</button>':'')+
@@ -253,10 +253,6 @@
   }
 
   function decorateRankingTemplate(template){
-    var filter=template.content.querySelector(".ladder-location-filter");
-    if(filter&&!template.content.querySelector(".ladder-score-switch")){
-      filter.insertAdjacentHTML("afterend",ladderScoreSwitchHtml());
-    }
     var board=template.content.querySelector(".ladder-rank-board-v2");
     if(board){
       var panel=board.closest(".panel");
@@ -264,7 +260,8 @@
       if(title){
         var location=typeof ladderLocationLabel==="function"?ladderLocationLabel():"全區總榜";
         var season=(typeof ladderPublicData!=="undefined"&&ladderPublicData&&ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1";
-        title.textContent=(ladderScoreMode==="career"?"生涯":season+" 季賽")+"｜"+location;
+        title.classList.add("ladder-board-title-v2");
+        title.innerHTML='<span class="ladder-board-heading">'+escLocal((ladderScoreMode==="career"?"生涯積分":season+" 賽季")+"｜"+location)+'</span>'+ladderScoreSwitchHtml();
       }
     }
   }
@@ -368,9 +365,11 @@
 
   var rankingStyle=document.createElement("style");
   rankingStyle.textContent=
-    ".ladder-score-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin:10px 0 14px;padding:4px;border:1px solid rgba(217,185,92,.2);border-radius:10px;background:rgba(10,11,13,.72);}"+
-    ".ladder-score-switch button{min-height:40px;border:0;border-radius:7px;background:transparent;color:var(--metal);font:700 13px/1 var(--font-d);letter-spacing:.5px;}"+
+    ".ladder-board-title-v2{width:100%;margin-bottom:12px}.ladder-board-heading{min-width:0;flex:1 1 auto;}"+
+    ".ladder-score-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;flex:0 0 auto;margin:0;padding:3px;border:1px solid rgba(217,185,92,.2);border-radius:10px;background:rgba(10,11,13,.72);}"+
+    ".ladder-score-switch button{min-height:34px;min-width:58px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--metal);font:700 12px/1 var(--font-d);letter-spacing:.5px;}"+
     ".ladder-score-switch button.active{background:linear-gradient(145deg,rgba(217,185,92,.2),rgba(217,185,92,.07));color:var(--gold);box-shadow:inset 0 0 0 1px rgba(217,185,92,.28);}"+
+    "@media(max-width:520px){.ladder-board-title-v2 .ladder-board-heading,.ladder-board-title-v2 .ladder-score-switch{flex-basis:100%}.ladder-board-title-v2 .ladder-score-switch{width:100%}}"+
     ".ladder-rank-scroll-v2{max-height:none;overflow:visible;}"+
     ".ladder-rank-more{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:14px 8px;border-top:1px solid rgba(217,185,92,.2)}"+
     ".ladder-rank-board-v2{width:100%;min-width:0;}"+
