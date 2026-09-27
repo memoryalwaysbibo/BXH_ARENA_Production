@@ -20,7 +20,7 @@
     catch(error){return false;}
   }
   function reviewCard(uid){
-    return [...document.querySelectorAll('.account-user-card')].find(card=>card.textContent.includes(uid))||null;
+    return [...document.querySelectorAll('.account-user-card')].find(card=>card.querySelector('.account-batch-checkbox')?.getAttribute('data-uid')===uid)||null;
   }
   function revealReviewControls(){
     for(const contract of reviewState.contracts||[]){
@@ -57,7 +57,7 @@
   function reviewPanelMarkup(){
     const labels={draft:'草稿待寄送',sent:'等待玩家簽署',signed:'待最高管理員確認付款'};
     const rows=reviewState.contracts||[];
-    const body=reviewState.loading&&reviewState.contracts===null?'<p class="hint">正在讀取待審合約……</p>':reviewState.error?`<div class="auth-error">讀取失敗：${safe(reviewState.error)}</div>`:rows.length?`<div style="display:grid;gap:8px">${rows.map(contract=>`<div class="account-detail-item" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><strong>${safe(contract.organizationName||contract.targetUid)}</strong><div class="hint">${safe(contract.orderCode)}｜${safe(contract.planCode||'')}｜${safe(labels[contract.status]||contract.status)}</div></div><button class="btn ${contract.status==='signed'?'btn-primary':'btn-ghost'} btn-sm" data-partner-review-open="${safe(contract.targetUid)}">${contract.status==='signed'?'前往確認':'查看合約'}</button></div>`).join('')}</div>`:'<div class="empty-state">目前沒有待審合作合約</div>';
+    const body=reviewState.loading&&reviewState.contracts===null?'<p class="hint">正在讀取待審合約……</p>':reviewState.error?`<div class="auth-error">讀取失敗：${safe(reviewState.error)}</div>`:rows.length?`<div style="display:grid;gap:8px">${rows.map(contract=>`<div class="account-detail-item" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><strong>${safe(contract.organizationName||contract.targetUid)}</strong><div class="hint">${safe(contract.orderCode)}｜${safe(contract.planCode||'')}｜${safe(labels[contract.status]||contract.status)}</div></div><button type="button" class="btn ${contract.status==='signed'?'btn-primary':'btn-ghost'} btn-sm" data-partner-review-open="${safe(contract.targetUid)}" data-partner-review-order="${safe(contract.orderCode)}">${contract.status==='signed'?'前往確認':'查看合約'}</button></div>`).join('')}</div>`:'<div class="empty-state">目前沒有待審合作合約</div>';
     return `<div class="panel-title">待審合作合約 <span class="badge badge-gold">${rows.length}</span><button class="btn btn-ghost btn-sm" data-partner-review-refresh ${reviewState.loading?'disabled':''}>重新整理</button></div><p class="hint">合約由系統保存；重整或換裝置後仍可找回。玩家簽名後，按「前往確認」即可處理付款與成立授權。</p>${body}`;
   }
   function decorateReviewPanel(){
@@ -70,14 +70,48 @@
     revealReviewControls();
     loadPendingContracts();
   }
-  function openReviewContract(uid){
-    document.querySelector('[data-action="account-clear-filters"]')?.click();
-    setTimeout(()=>{
-      decorateReviewPanel();const card=reviewCard(uid);
-      if(!card){root.showToast?.('找不到合約對應的玩家帳號',true);return;}
-      card.open=true;revealReviewControls();card.scrollIntoView({behavior:'smooth',block:'start'});
-      setTimeout(()=>card.querySelector('[data-action="partner-refresh-contract"]')?.focus({preventScroll:true}),350);
-    },50);
+  async function openReviewContract(uid,orderCode){
+    const listed=(reviewState.contracts||[]).find(contract=>contract.targetUid===uid&&contract.orderCode===orderCode);
+    if(!listed){root.showToast?.('找不到這筆合作合約，請重新整理清單',true);return;}
+    if(typeof root.engagementService?.getPartnerContract!=='function'){
+      root.showToast?.('目前無法開啟合約，請重新整理頁面',true);return;
+    }
+    document.querySelector('[data-partner-review-dialog]')?._bxhClose?.();
+    const actor=actorUid(),overlay=document.createElement('div');
+    overlay.setAttribute('data-partner-review-dialog','');
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483640;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.82)';
+    overlay.innerHTML='<section role="dialog" aria-modal="true" aria-label="合作合約確認" style="width:min(100%,620px);max-height:90vh;overflow:auto;padding:24px;border:1px solid #bd953d;border-radius:16px;background:#1e2029;color:#fff"><p>正在讀取合約……</p><button type="button" class="btn btn-ghost" data-partner-review-close>關閉</button></section>';
+    document.body.appendChild(overlay);
+    const onKeydown=event=>{if(event.key==='Escape')close();};
+    function close(){overlay.remove();document.removeEventListener('keydown',onKeydown);}
+    overlay._bxhClose=close;
+    document.addEventListener('keydown',onKeydown);
+    overlay.addEventListener('click',event=>{if(event.target===overlay||event.target.closest?.('[data-partner-review-close]'))close();});
+    try{
+      const contract=await root.engagementService.getPartnerContract({orderCode});
+      if(!overlay.isConnected||actor!==actorUid())return;
+      if(contract?.orderCode!==orderCode||contract?.targetUid!==uid)throw new Error('讀取的合約與所選訂單不符');
+      const signed=contract.status==='signed';
+      overlay.querySelector('[role="dialog"]').innerHTML=`<h2 style="margin-top:0">${signed?'確認合作合約與付款':'查看合作合約'}</h2><p>合作訂單：${safe(orderCode)}<br>合作方：${safe(contract.organizationName||uid)}<br>方案：${safe(contract.planCode||'')}｜金額 NT$ ${safe(contract.amountTwd??'')}<br>合作期間：${safe(contract.startsAt||'')} 至 ${safe(contract.expiresAt||'')}<br>條款版本：${safe(contract.termsVersion||'')}｜狀態：${safe(contract.status||'')}</p><h3>完整合約條款</h3><div style="white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;border:1px solid #68626b;border-radius:8px">${safe(contract.terms||'此合約未提供條款')}</div>${signed?`<p>合作方已於 ${safe(contract.signedAt||'系統記錄時間')} 簽署。請核對合約及收款紀錄後，再確認授權。</p><label for="partner-payment-reference">付款紀錄或備註</label><input id="partner-payment-reference" type="text" maxlength="120" autocomplete="off" placeholder="請填寫付款紀錄編號" style="display:block;width:100%;box-sizing:border-box;margin:8px 0 16px;padding:12px"><button type="button" class="btn btn-primary" data-partner-review-activate>確認已收款並成立合作</button>`:''}<button type="button" class="btn btn-ghost" data-partner-review-close style="margin:8px">關閉</button><p role="alert" data-partner-review-error style="color:#ff9999"></p>`;
+      overlay.querySelector('[data-partner-review-close]')?.focus();
+      const activate=overlay.querySelector('[data-partner-review-activate]');
+      activate?.addEventListener('click',async()=>{
+        const reference=overlay.querySelector('#partner-payment-reference')?.value.trim()||'';
+        const error=overlay.querySelector('[data-partner-review-error]');
+        if(!reference){error.textContent='請先填寫付款紀錄或備註';return;}
+        if(!root.confirm('確認這筆合作訂單已收款，並正式授權合作主辦？'))return;
+        activate.disabled=true;error.textContent='正在確認付款與授權……';
+        try{
+          const result=await root.engagementService.activatePartnerContract({orderCode,paymentConfirmed:true,paymentReference:reference});
+          if(!overlay.isConnected||actor!==actorUid())return;
+          if(result?.status!=='active')throw new Error('授權結果未確認，請重新整理清單');
+          close();root.showToast?.('合作合約已成立並授權');await loadPendingContracts(true);
+        }catch(failure){if(overlay.isConnected)error.textContent=`確認失敗：${String(failure?.message||failure)}`;}
+        finally{if(activate.isConnected)activate.disabled=false;}
+      });
+    }catch(error){
+      if(overlay.isConnected)overlay.querySelector('[role="dialog"]').innerHTML=`<h2>無法開啟合約</h2><p role="alert" style="color:#ff9999">${safe(String(error?.message||error))}</p><button type="button" class="btn btn-ghost" data-partner-review-close>關閉</button>`;
+    }
   }
   const completedMailboxContracts=new Map(),mailboxContractChecks=new Set();
   function applyMailboxContractStatus(button,status){
@@ -107,7 +141,7 @@
   if(typeof document!=='undefined'){
     document.addEventListener('click',event=>{
       const refresh=event.target.closest?.('[data-partner-review-refresh]');if(refresh){loadPendingContracts(true);return;}
-      const open=event.target.closest?.('[data-partner-review-open]');if(open)openReviewContract(open.getAttribute('data-partner-review-open')||'');
+      const open=event.target.closest?.('[data-partner-review-open]');if(open){event.preventDefault();openReviewContract(open.getAttribute('data-partner-review-open')||'',open.getAttribute('data-partner-review-order')||'');}
     });
     const observer=new MutationObserver(()=>{if(reviewState.scheduled)return;reviewState.scheduled=true;queueMicrotask(()=>{reviewState.scheduled=false;decorateReviewPanel();decorateMailboxContractButtons();});});
     const start=()=>{observer.observe(document.body,{childList:true,subtree:true});decorateMailboxContractButtons();};
