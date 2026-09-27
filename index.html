@@ -3468,6 +3468,12 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .test-roster-box .btn-row{gap:8px;flex-wrap:wrap;}
 
 .ladder-hero{border-color:var(--gold-dim);background:linear-gradient(150deg,rgba(217,185,92,.09),var(--panel));}
+.ladder-season-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;color:var(--gold);font:800 18px/1.35 var(--font-d);list-style:none;}
+.ladder-season-summary::-webkit-details-marker{display:none;}
+.ladder-season-summary:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:4px;}
+.ladder-season-summary .chev{font-size:13px;transition:transform .2s;}
+.ladder-hero[open] .ladder-season-summary .chev{transform:rotate(180deg);}
+.ladder-season-content{padding-top:16px;}
 .ladder-season-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px;}
 .ladder-season-grid .stat-box{min-height:116px;display:flex;flex-direction:column;justify-content:center;}
 .ladder-season-grid .label{font-size:13px;line-height:1.35;}
@@ -18957,21 +18963,23 @@ function renderLadderLeaderboardPage(adminMode=false){
   const ended=control&&control.endAt&&now>=control.endAt;
   const isTrialSeason=String(control&&control.currentSeason||"").toUpperCase()==="S0"||control&&control.isTrialSeason===true;
   const seasonDash=ladderSeasonDashboard(control);
+  const seasonInfoOpen=!!document.querySelector("details.ladder-hero[open]");
   return `
     ${adminMode?renderTestLadderPanel():""}
     ${playerSearchPanel()}
-    <div class="panel ladder-hero">
-      <div class="panel-title"><span>BXH 天梯排行</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="ladder-refresh">重新整理</button>${adminMode&&isSuperAdmin()?((ladderPublicData.control&&ladderPublicData.control.currentSeason)==="S0"?`<button class="btn btn-ghost btn-sm" disabled>S1 將於 10/1 00:00 自動啟用</button>`:`<button class="btn btn-primary btn-sm" data-action="ladder-new-season">開啟新賽季</button>`):""}</div></div>
-      ${ladderPublicError?`<div class="auth-error">${esc(ladderPublicError)}</div>`:""}
+    <details class="panel ladder-hero" ${seasonInfoOpen?"open":""}>
+      <summary class="ladder-season-summary"><span>賽季資訊</span><span class="chev" aria-hidden="true">⌄</span></summary>
+      <div class="ladder-season-content">
+      <div class="btn-row" style="justify-content:flex-end;"><button class="btn btn-ghost btn-sm" data-action="ladder-refresh">重新整理</button>${adminMode&&isSuperAdmin()?((ladderPublicData.control&&ladderPublicData.control.currentSeason)==="S0"?`<button class="btn btn-ghost btn-sm" disabled>S1 將於 10/1 00:00 自動啟用</button>`:`<button class="btn btn-primary btn-sm" data-action="ladder-new-season">開啟新賽季</button>`):""}</div>
       <div class="ladder-season-grid">
         <div class="stat-box"><div class="label">目前賽季</div><div class="value">${esc((control&&control.currentSeason)||"S1")}</div></div>
-        <div class="stat-box"><div class="label">賽季開始</div><div class="value">${formatLadderDate(control&&control.startAt)}</div></div>
-        <div class="stat-box"><div class="label">預計結束</div><div class="value">${formatLadderDate(control&&control.endAt)}</div></div>
         <div class="stat-box season-status-card ladder-season-state-${seasonDash.state}">
-          <div class="label">${esc(seasonDash.label)}</div>
+          <div class="label">賽季倒數</div>
           <div class="value">${esc(seasonDash.value)}</div>
           <div class="ladder-season-status-note">${esc(seasonDash.note)}</div>
         </div>
+        <div class="stat-box"><div class="label">賽季開始</div><div class="value">${formatLadderDate(control&&control.startAt)}</div></div>
+        <div class="stat-box"><div class="label">賽季結束</div><div class="value">${formatLadderDate(control&&control.endAt)}</div></div>
       </div>
       <div class="ladder-season-progress">
         <div class="ladder-season-progress-head"><span>${esc((control&&control.currentSeason)||"S1")} 賽季進度</span><strong>${esc(seasonDash.progressText)}</strong></div>
@@ -18979,7 +18987,9 @@ function renderLadderLeaderboardPage(adminMode=false){
         <div class="ladder-season-progress-foot"><span>${formatLadderDate(control&&control.startAt)}</span><span>${formatLadderDate(control&&control.endAt)}</span></div>
       </div>
       <div class="hint" style="margin-top:10px;">${isTrialSeason?"S0 為積分體驗版：賽季分與牌位照常計算，但不計入正式生涯積分、最高牌位與永久成就；10/1 00:00 將保存體驗紀錄並由 S1 重新從 0 分開始。":"每 4 個月為一個正式賽季。S1：2026/10/01～2027/01/31。"}<br>同分依序比較：冠軍次數 → 亞軍 → 季軍 → 殿軍 → 生涯積分；仍相同則並列。</div>
-    </div>
+      </div>
+    </details>
+    ${ladderPublicError?`<div class="auth-error">${esc(ladderPublicError)}</div>`:""}
     ${ladderLocationFilterHtml()}
     ${ladderRulesHtml()}
     <div class="panel">
