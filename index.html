@@ -14961,6 +14961,86 @@ function bracketRefreshButtonHtml(){
   return `<button class="btn btn-ghost btn-sm bracket-refresh-btn" data-action="bracket-refresh" ${bracketRefreshBusy?'disabled':''} aria-label="重新讀取最新對戰表">${bracketRefreshBusy?'更新中…':'↻ 刷新'}</button>`;
 }
 
+const teamMatchUi=new Map();
+const teamMatchLoading=new Set();
+const teamMatchActionsBusy=new Set();
+function teamMatchNames(m){
+  const teams=new Map((state.teams||[]).map(t=>[String(t.id),t]));
+  return (m.teamIds||[]).map(id=>teams.get(String(id))?.name||"待晉級");
+}
+function teamMatchPlayerName(id){
+  return (state.players||[]).find(p=>String(p.id)===String(id))?.name||"未知隊員";
+}
+function renderTeamLineupPanel(m){
+  if(!m.teamIds?.[0]||!m.teamIds?.[1]||!state.cloudCode)return '';
+  const view=teamMatchUi.get(m.id);
+  if(!view&&!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
+  const teams=(state.teams||[]).filter(t=>m.teamIds.includes(t.id));
+  const mine=teams.find(t=>t.captainUid===currentAuthUid());
+  const canRef=view?.isReferee===true;
+  let out='<div class="panel"><div class="panel-title">隊長排陣與人員到齊</div>';
+  out+='<div class="hint">'+teams.map(t=>esc(t.name)+'：'+(view?.submitted?.[t.id]?'已提交':'待提交')).join(' ／ ')+'</div>';
+  if(view?.revealed){
+    out+='<div class="hint">雙方出場順序已公開並鎖定</div>';
+    for(const t of teams)out+='<p>'+esc(t.name)+'：'+(view.lineups?.[t.id]||[]).map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
+  }else{
+    if(mine){
+      const order=view?.ownOrder||mine.memberPlayerIds||[];
+      out+='<div class="hint">僅隊長與裁判可查看本隊順序；拖曳不支援，請以選單調整順位。</div>';
+      for(let i=0;i<order.length;i++){
+        out+='<label>第 '+(i+1)+' 位 <select class="team-lineup-slot" data-match-id="'+esc(m.id)+'" data-slot="'+i+'">';
+        for(const pid of mine.memberPlayerIds)out+='<option value="'+esc(pid)+'" '+(order[i]===pid?'selected':'')+'>'+esc(teamMatchPlayerName(pid))+'</option>';
+        out+='</select></label>';
+      }
+      out+='<button class="btn btn-primary btn-sm" data-action="team-lineup-submit" data-match-id="'+esc(m.id)+'">提交本隊出場順序</button>';
+    }
+    if(canRef){
+      for(const t of teams)if(view?.lineups?.[t.id])out+='<p>裁判檢視｜'+esc(t.name)+'：'+view.lineups[t.id].map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
+      if(view?.submitted?.[teams[0]?.id]&&view?.submitted?.[teams[1]?.id])
+        out+='<button class="btn btn-primary btn-sm" data-action="team-lineup-reveal" data-match-id="'+esc(m.id)+'">人員到齊・同時公開並鎖定</button>';
+      else if(view?.submitted?.[teams[0]?.id]||view?.submitted?.[teams[1]?.id])
+        out+='<button class="btn btn-ghost btn-sm" data-action="team-lineup-reset" data-match-id="'+esc(m.id)+'">退回雙方重排</button>';
+    }
+  }
+  out+='<button class="btn btn-ghost btn-sm" data-action="team-lineup-refresh" data-match-id="'+esc(m.id)+'">更新排陣狀態</button></div>';
+  return out;
+}
+function renderTeamScorePanel(m){
+  const view=teamMatchUi.get(m.id);
+  if(!state.startedAt||!view?.revealed)return '';
+  const game=view.game, names=teamMatchNames(m);
+  let out='<div class="panel"><div class="panel-title">雙命守擂｜'+names.map(esc).join(' vs ')+'</div>';
+  if(game){
+    for(let side=0;side<2;side++){
+      const idx=game.current[side], id=game.lineups[side][idx];
+      out+='<p>'+esc(names[side])+'：'+(id?esc(teamMatchPlayerName(id))+'（'+game.life[side][idx]+' 命）':'全員淘汰')+'</p>';
+    }
+    out+='<div class="hint">已完成 '+game.rounds.length+' 次判定</div>';
+    if(game.winner!==null){out+='<b>本場勝隊：'+esc(names[game.winner])+'</b></div>';return out;}
+  }
+  if(view.isReferee===true){
+    out+='<label>勝方 <select id="team-score-winner-'+esc(m.id)+'"><option value="0">'+esc(names[0])+'</option><option value="1">'+esc(names[1])+'</option></select></label>';
+    out+='<label>判定 <select id="team-score-finish-'+esc(m.id)+'"><option value="spin">轉停</option><option value="burst">爆裂</option><option value="over">擊飛</option><option value="extreme">極限</option></select></label>';
+    out+='<button class="btn btn-primary btn-sm" data-action="team-score-submit" data-match-id="'+esc(m.id)+'">確認本次判定</button>';
+  }
+  return out+'</div>';
+}
+async function loadTeamMatchUi(matchId){
+  if(!state.cloudCode||!window.engagementService?.teamLineup)return;
+  const code=state.cloudCode;
+  try{
+    const view=await window.engagementService.teamLineup({action:'view',code,matchId});
+    if(code!==state.cloudCode)return;
+    const prior=teamMatchUi.get(matchId)||{};
+    teamMatchUi.set(matchId,{...prior,...view});
+    if(view.revealed&&state.startedAt&&view.isReferee===true){
+      try{const scored=await window.engagementService.teamScoring({action:'view',code,matchId});teamMatchUi.set(matchId,{...teamMatchUi.get(matchId),game:scored.game});}
+      catch(e){console.warn('[team score view]',e);}
+    }
+    render();
+  }catch(e){console.warn('[team lineup view]',e);teamMatchUi.set(matchId,{error:true});}
+  finally{teamMatchLoading.delete(matchId);}
+}
 function renderTeamBracket(){
   const teams=new Map((state.teams||[]).map(t=>[String(t.id),t]));
   const name=id=>id?esc(teams.get(String(id))?.name||"隊伍已移除"):"待晉級";
@@ -14971,7 +15051,7 @@ function renderTeamBracket(){
   for(const round of [...new Set(state.matches.map(m=>m.round))]){
     const matches=state.matches.filter(m=>m.round===round&&!m.isBye);
     html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">第 '+(round+1)+' 輪</span><span class="compact-round-count">'+matches.length+' 場</span></div><div class="compact-round-matches">';
-    for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>';
+    for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m)+renderTeamScorePanel(m);
     html+='</div></section>';
   }
   return html+'</div>';
@@ -16006,6 +16086,7 @@ function renderSkippedMatches(){
   return `<section class="panel"><div class="panel-title">待承接場次（${skipped.length}）</div><div class="hint">保留原比分。閒置台立即承接；忙碌台安排在目前比賽之後。未承接的場次依原台佇列接續；跳過時沒有其他可執行場次，則保留待承接。</div>${skipped.map(m=>`<div class="panel" style="margin-top:12px"><strong>${esc(matchLabel(m))}｜${esc(playerName(m.a.playerId))} vs ${esc(playerName(m.b.playerId))}</strong><div class="hint">台${Number(m.station)} · ${m.callPass?'PASS：同台兩場後回補':m.resumeQueuedAt?'已安排承接':'已跳過'}</div>${!m.resumeQueuedAt&&!m.callPass&&canOperateCurrentTournament()&&state.archiveStatus!=="completed"?`<div class="btn-row">${targets.map(i=>`<button class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${i}" ${courtQueueBusy?'disabled':''}>${isAdminTierOrAbove()?'指派':'承接'}至台${i}</button>`).join("")}</div>`:""}</div>`).join("")}</section>`;
 }
 function renderReferee(){
+  if(state.meta?.battleMode==="team")return renderTeamBracket();
   const quickNav = refereeBracketRoundtripNav("bracket");
   if(!state.bracketSize){
     return quickNav+`<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請先至「賽事設定」產生對戰表</div></div></div>`;
@@ -16796,7 +16877,7 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const bracketPanel=`
-    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt&&state.meta.battleMode!=="team"?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
@@ -24055,7 +24136,45 @@ function refreshLatestFromHeaderLogo(target){
   },180);
 }
 
+async function handleTeamMatchAction(action,target){
+  const matchId=target.dataset.matchId,match=(state.matches||[]).find(m=>m.id===matchId);
+  if(!match||!state.cloudCode)return;
+  const code=state.cloudCode,teams=(state.teams||[]).filter(t=>match.teamIds?.includes(t.id));
+  const busyKey=matchId+':'+action;
+  if(teamMatchActionsBusy.has(busyKey))return;
+  teamMatchActionsBusy.add(busyKey);
+  try{
+    if(action==='team-lineup-refresh'){teamMatchUi.delete(matchId);await loadTeamMatchUi(matchId);return;}
+    if(action==='team-lineup-submit'){
+      const mine=teams.find(t=>t.captainUid===currentAuthUid());
+      if(!mine)return showToast('僅隊長可提交本隊出場順序',true);
+      const selectors=[...document.querySelectorAll('.team-lineup-slot')].filter(el=>el.dataset.matchId===matchId);
+      const order=selectors.sort((a,b)=>Number(a.dataset.slot)-Number(b.dataset.slot)).map(el=>el.value);
+      if(order.length!==mine.memberPlayerIds.length||new Set(order).size!==order.length)return showToast('每位隊員需出場一次，不能重複',true);
+      await window.engagementService.teamLineup({action:'submit',code,matchId,teamId:mine.id,order});
+      showToast('本隊順序已秘密提交');
+    }else if(action==='team-lineup-reveal'){
+      if(!confirm('確認雙方人員都已到齊？公開後出場順序將永久鎖定。'))return;
+      await window.engagementService.teamLineup({action:'reveal',code,matchId,peoplePresent:true});
+      showToast('雙方順序已同時公開並鎖定');
+    }else if(action==='team-lineup-reset'){
+      if(!confirm('將清除雙方尚未公開的順序，請兩隊重新提交。'))return;
+      await window.engagementService.teamLineup({action:'reset',code,matchId});
+      showToast('已退回雙方重排');
+    }else if(action==='team-score-submit'){
+      const winnerSide=Number(document.getElementById('team-score-winner-'+matchId)?.value);
+      const finish=document.getElementById('team-score-finish-'+matchId)?.value;
+      if(![0,1].includes(winnerSide)||!['spin','burst','over','extreme'].includes(finish))return;
+      if(!confirm('確認本次判定？提交後立即更新雙方生命與守擂順位。'))return;
+      await window.engagementService.teamScoring({action:'score',code,matchId,winnerSide,finish,operationId:crypto.randomUUID()});
+      showToast('判定已記錄');
+    }
+    await loadTeamMatchUi(matchId);
+  }catch(e){console.warn('[team match action]',e);showToast('操作失敗：'+String(e?.message||e),true);}
+  finally{teamMatchActionsBusy.delete(busyKey);}
+}
 function handleAction(action, target){
+  if(action.startsWith("team-lineup-")||action==="team-score-submit"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
@@ -27856,7 +27975,33 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="start-tournament"){
-    if(state.meta.battleMode==="team"){showToast("團體戰開賽將於下一階段開放",true);return;}
+    if(state.meta.battleMode==="team"){
+      (async()=>{
+        if(state.startedAt||!state.bracketSize)return;
+        try{
+          await syncLatestOnlineRosterBeforeLock();
+          if(!bracketRosterIsCurrent()){render();showToast("名單已有異動，請重新產生團體對戰表",true);return;}
+          openModal({type:"generic",title:"確認團體戰開賽",message:"將鎖定 "+eligibleBracketTeams().length+" 支隊伍與對戰表，並停止報名。請確認雙方人員與報到狀態。",danger:true,confirmLabel:"正式開始",onConfirm:async()=>{
+            try{
+              await syncLatestOnlineRosterBeforeLock();
+              if(!bracketRosterIsCurrent()){render();showToast("名單已變更，請重新抽籤",true);return;}
+              const prior={startedAt:state.startedAt,rosterLocked:state.rosterLocked,status:state.meta.registrationStatus,
+                checkinClosedEarly:state.meta.checkinClosedEarly,checkinClosedAt:state.meta.checkinClosedAt};
+              state.startedAt=Date.now();state.rosterLocked=true;state.meta.registrationStatus="started";
+              if(state.meta.checkinRequired){state.meta.checkinClosedEarly=true;state.meta.checkinClosedAt=Date.now();}
+              rebuildCourtAssignments();
+              if(await saveState()===false){
+                state.startedAt=prior.startedAt;state.rosterLocked=prior.rosterLocked;state.meta.registrationStatus=prior.status;
+                state.meta.checkinClosedEarly=prior.checkinClosedEarly;state.meta.checkinClosedAt=prior.checkinClosedAt;
+                render();showToast("雲端未確認開賽，請稍後重試",true);return;
+              }
+              activeTab="bracket";render();showToast("團體戰已開始，裁判可進行雙命守擂判定");
+            }catch(e){console.warn('[team start]',e);showToast("無法確認最新名單，本次未開賽",true);}
+          }});
+        }catch(e){console.warn('[team start preflight]',e);showToast("無法同步最新報名名單，本次未開賽",true);}
+      })();
+      return;
+    }
     if(state.startedAt){ showToast("賽事已經開始", true); return; }
     if(!state.bracketSize || state.matches.length===0){ showToast("請先產生對戰表", true); return; }
 
@@ -29218,6 +29363,8 @@ init().then(()=>{
     async activatePartnerContract(payload){return callEngagementFunction("activatePartnerContract",payload,60000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
     async teamRegistration(payload){return callEngagementFunction("teamRegistration",payload,60000);},
+    async teamLineup(payload){return callEngagementFunction("teamLineup",payload,60000);},
+    async teamScoring(payload){return callEngagementFunction("teamScoring",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
     async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
