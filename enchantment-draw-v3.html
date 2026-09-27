@@ -30,6 +30,12 @@ body[data-draw-skin="gods-arena"] .halo:after{border-color:#f6d28e73}
 body[data-draw-skin="gods-arena"] .beam{background:linear-gradient(90deg,transparent,#f5c976a1,transparent)}
 body[data-draw-skin="gods-arena"] .drag-guide{color:#ffe7b2;text-shadow:0 0 12px #eabc5c}
 body[data-draw-skin="gods-arena"] .skin-picker select{background:#20170f;border-color:#be995b;color:#ffeac2}
+/* Keep the reveal light inside a soft ellipse; a full-stage flash exposes a rectangular edge. */
+.flash{background:radial-gradient(ellipse 42% 36% at 50% 50%,#fff9 0%,#f7d69b70 38%,transparent 100%);filter:blur(12px)}
+.flash.on{animation:flashSoft .65s ease-out}
+@keyframes flashSoft{0%{opacity:0;transform:scale(.75)}18%{opacity:.75}100%{opacity:0;transform:scale(1.12)}}
+body[data-draw-skin="gods-arena"] .back{border:0;box-shadow:0 16px 30px #0009}
+body[data-draw-skin="gods-arena"] .card.flipped{box-shadow:none}
 /* Player-selected draw SKIN. */
 body[data-draw-skin="classic"]{background-image:radial-gradient(ellipse at 50% 28%,#30245f 0,#10152c 40%,#070915 78%);background-size:100% 100%}
 .skin-picker{align-self:center;display:inline-flex;align-items:center;gap:7px;margin:8px auto 0;color:#d5c9ec;font-size:11px;z-index:5}
