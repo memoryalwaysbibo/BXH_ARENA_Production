@@ -17993,7 +17993,7 @@ function renderAccountManagementScreen(){
   return `<div class="stickytop account-management-stickytop"><header class="topbar account-management-topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統 <small style="opacity:.55;font-size:9px;">${APP_VERSION}</small></span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div>
+      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
       <div class="header-account-controls">${accountMenuHtml()}</div>
     </header>${renderSuperAdminManagementTabs(page)}</div>
     ${accountMenuOverlayHtml()}
@@ -18283,7 +18283,7 @@ function renderPlayerCenterScreen(){
   return `<div class="stickytop"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div>
+      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
     </header>
     <div class="role-indicator">玩家模式｜${esc(ctx.name)}　<button class="btn btn-ghost btn-sm" data-action="account-back-to-role">返回身分選擇</button></div>
     </div>
@@ -18983,7 +18983,7 @@ function renderPlayerCenterLoggedIn(){
   return `<div class="stickytop player-shell mode-shell"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div>
+      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
       <div class="header-account-controls">${mailboxButtonHtml()}${accountMenuHtml()}</div>
     </header>
     ${renderPlayerNavHtml()}
@@ -19288,7 +19288,7 @@ function renderCommunityRoomApp(){
   const tabs=[["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["people","人員管理"],["settings","賽事設定"]];
   let content=communityRoomActiveTab==="bracket"?renderBracket():communityRoomActiveTab==="referee"?renderReferee():communityRoomActiveTab==="people"?renderPeopleManagement():communityRoomActiveTab==="settings"?renderCommunitySettings():renderLive();
   const exp=communityRoomExpiryMs(state);
-  return `<div class="stickytop"><header class="topbar"><button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button><div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">玩家一般賽事</span>${topbarConnectionRailHtml()}</div><div class="spacer"></div><span class="badge badge-metal">一般賽事｜不計積分</span><button class="btn btn-ghost btn-sm" data-action="community-exit-room">返回我的房間</button></header>
+  return `<div class="stickytop"><header class="topbar"><button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button><div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">玩家一般賽事</span>${topbarConnectionRailHtml()}</div><div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true"><span class="badge badge-metal">一般賽事｜不計積分</span><button class="btn btn-ghost btn-sm" data-action="community-exit-room">返回我的房間</button></header>
   <div class="community-room-notice">主辦人：${esc((userProfile&& (userProfile.displayName||userProfile.realName))||"玩家")}　｜　代碼 ${esc(state.cloudCode||"—")}　｜　完整房間預計保留至 ${exp?new Date(exp).toLocaleString():"—"}</div>
   <nav class="tabs">${tabs.map(t=>`<button class="${communityRoomActiveTab===t[0]?"active":""}" data-action="community-switch-room-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}</nav></div><main>${content}</main>${renderModal()}${celebrationOpen?renderCelebrationOverlay():""}${shareModalOpen?renderShareModal():""}${renderEventEntryModal()}${renderQrScannerModal()}`;
 }
@@ -23321,7 +23321,7 @@ function renderApp(){
           <span class="t2">戰鬥陀螺賽事系統</span>
           ${topbarConnectionRailHtml()}
         </div>
-        <div class="spacer"></div>
+        <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
       ${tournamentViewContextHeaderHtml()}
