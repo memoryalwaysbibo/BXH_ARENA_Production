@@ -5866,12 +5866,13 @@ function defaultState(id){
     archiveStatus: "ongoing",
     settlementPhase: "idle",
     settlementAttempt: 0,
-    meta:{ name:"BXH 戰鬥陀螺賽事", date:"", location:"", checkin:"", startTime:"", format:"單淘汰賽", formatType:"single", stations:1, bronzeMatch:false, checkinRequired:false, checkinLeadMinutes:60, checkinClosedEarly:false, checkinClosedAt:null, scoringMode:"standard", roundScoringModes:{}, ladderMode:"general", eventAuthority:"official", roomAccessMode:"public",
+    meta:{ name:"BXH 戰鬥陀螺賽事", date:"", location:"", checkin:"", startTime:"", format:"單淘汰賽", formatType:"single", battleMode:"individual", teamSize:3, playMode:"standard", stations:1, bronzeMatch:false, checkinRequired:false, checkinLeadMinutes:60, checkinClosedEarly:false, checkinClosedAt:null, scoringMode:"standard", roundScoringModes:{}, ladderMode:"general", eventAuthority:"official", roomAccessMode:"public",
       registrationEnabled:false, registrationOpenAt:null, registrationCloseAt:null, registrationCapacity:null,
       waitlistEnabled:false, waitlistCapacity:0, registrationFee:null, targetGroup:"open", participantNameMode:"realName", cancellationDeadline:null,
       eventDescription:"", registrationNotes:"", registrationVisibility:"public", publishedAt:null, registrationStatus:"scheduled", eventCancelled:false, assignedStaffUids:[], refereeStationAssignments:{}, refereeStationNames:{}, refereeStationRestrictionEnabled:false },
     eventInfo:emptyEventInfoV2(),
     players:[],
+    teams:[],
     registrations:[],
     rosterLocked:false,
     bracketSize:0,
@@ -5909,6 +5910,8 @@ function defaultState(id){
 }
 
 const FORMAT_LABELS = { single:"單淘汰賽", double:"雙敗制", roundrobin:"單循環賽" };
+const BATTLE_MODE_LABELS = { individual:"個人戰", team:"團體戰" };
+const PLAY_MODE_LABELS = { standard:"標準規則", enchantment:"附魔之戰" };
 const ARCHIVE_LABELS = { ongoing:"進行中", paused:"已暫停", completed:"已完成" };
 
 let state = defaultState();
@@ -10408,6 +10411,8 @@ function ensureSettingsFormDraft(){
     navigationEnabled:venue.navigationEnabled===true || (!String(m.location||"").trim() && !state.cloudCode && !m.publishedAt),
     checkin:m.checkin||"",
     startTime:m.startTime||"",
+    battleMode:m.battleMode==="team"?"team":"individual",
+    teamSize:Math.max(3,parseInt(m.teamSize,10)||3),
     formatType:m.formatType||"single",
     playMode:m.playMode==="enchantment"?"enchantment":"standard",
     stations:Math.max(1,parseInt(m.stations,10)||1),
@@ -10441,6 +10446,9 @@ function syncSettingsDraftFromDom(){
   settingsFormDraft.location=buildLegacyVenueText({name:settingsFormDraft.venueName,address:settingsFormDraft.venueAddress});
   settingsFormDraft.checkin=val("f-checkin",settingsFormDraft.checkin);
   settingsFormDraft.startTime=val("f-start",settingsFormDraft.startTime);
+  settingsFormDraft.battleMode=val("f-battle-mode",settingsFormDraft.battleMode)==="team"?"team":"individual";
+  const teamSizeEl=document.getElementById("f-team-size");
+  if(teamSizeEl) settingsFormDraft.teamSize=Math.max(3,parseInt(teamSizeEl.value,10)||3);
   settingsFormDraft.formatType=val("f-format",settingsFormDraft.formatType)||"single";
   settingsFormDraft.playMode=val("f-play-mode",settingsFormDraft.playMode)||"standard";
 
@@ -11505,6 +11513,7 @@ function summarizeRecord(st){
   const champ = st.championId ? (st.players.find(p=>p.id===st.championId)||{}).name : null;
   return {
     id: st.id, name: st.meta.name, date: st.meta.date, location: st.meta.location,
+    battleMode: st.meta.battleMode==="team"?"team":"individual", teamSize:Math.max(3,Number(st.meta.teamSize)||3), playMode:st.meta.playMode==="enchantment"?"enchantment":"standard",
     formatType: st.meta.formatType, format: st.meta.format,
     playerCount: st.players.length, championName: champ || null,
     systemClosure: st.systemClosure||null,
@@ -16697,7 +16706,7 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const bracketPanel=`
-    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">可編排選手</div><div class="value small">${eligiblePlayers().length}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||!entryRosterValid()?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||!entryRosterValid()?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
@@ -16893,17 +16902,22 @@ function renderSettings(){
   <div class="panel settings-flow-panel">
     <div class="settings-match-grid settings-match-grid-single">
       <div>
-        <div class="settings-mini-title">賽制設定</div>
-        <div class="field"><label>賽制</label><select id="f-format" data-settings-draft="formatType">
+        <div class="settings-mini-title">對戰架構</div>
+        <div class="field"><label>對戰形式</label><select id="f-battle-mode" data-settings-draft="battleMode">
+          <option value="individual" ${d.battleMode!=="team"?"selected":""}>個人戰</option>
+          <option value="team" ${d.battleMode==="team"?"selected":""}>團體戰</option>
+        </select></div>
+        ${d.battleMode==="team"?`<div class="field"><label>每隊人數</label><input type="number" min="3" step="1" id="f-team-size" data-settings-draft="teamSize" data-settings-type="int" value="${Math.max(3,parseInt(d.teamSize,10)||3)}"><p class="hint">本場固定為 ${Math.max(3,parseInt(d.teamSize,10)||3)}V${Math.max(3,parseInt(d.teamSize,10)||3)}；所有隊伍必須相同人數。</p></div>`:""}
+        <div class="field"><label>賽事制度</label><select id="f-format" data-settings-draft="formatType">
           <option value="single" ${d.formatType==='single'?'selected':''}>單淘汰賽</option>
           <option value="double" ${d.formatType==='double'?'selected':''}>雙敗制</option>
           <option value="roundrobin" ${d.formatType==='roundrobin'?'selected':''}>單循環賽</option>
         </select></div>
-        <div class="field"><label>玩法模式</label><select id="f-play-mode" data-settings-draft="playMode">
-          <option value="standard" ${d.playMode!=="enchantment"?"selected":""}>標準對戰</option>
+        <div class="field"><label>戰鬥規則</label><select id="f-play-mode" data-settings-draft="playMode">
+          <option value="standard" ${d.playMode!=="enchantment"?"selected":""}>標準規則</option>
           <option value="enchantment" ${d.playMode==="enchantment"?"selected":""} ${isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&ladderMode!=="ranked"?'':'disabled'}>附魔之戰（正式站限管理者測試）</option>
         </select></div>
-        <p class="hint">附魔試行僅限最高管理員建立一般單淘賽，不開季軍賽、不計積分。這是正式站資料，請先以測試房與測試帳號操作；裁判確認到場後啟動抽卡，選手各自在自己的手機抽牌。</p>
+        <p class="hint">對戰形式、賽事制度、戰鬥規則彼此獨立。團體戰可搭配單淘／雙敗／單循環；資料結構已預留未來「團體附魔戰」。附魔試行仍維持目前正式站限制。</p>
         <div class="field"><label>戰鬥台數量</label><input type="number" min="1" max="32" id="f-stations" data-settings-draft="stations" data-settings-type="int" value="${d.stations}"></div>
         <label class="settings-check-row">
           <input type="checkbox" id="f-bronze" data-settings-draft="bronzeMatch" data-settings-type="bool" ${d.bronzeMatch?'checked':''} ${(ladderMode==="ranked"&&d.formatType==="single")?'disabled':''}>
@@ -27396,6 +27410,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     applyVenueDraftToState(d,state);
     state.meta.checkin=d.checkin||"";
     state.meta.startTime=d.startTime||"";
+    state.meta.battleMode=d.battleMode==="team"?"team":"individual";
+    state.meta.teamSize=state.meta.battleMode==="team"?Math.max(3,parseInt(d.teamSize,10)||3):3;
     state.meta.formatType=d.formatType||"single";
     state.meta.playMode=d.playMode==="enchantment"?"enchantment":"standard";
     state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
@@ -27443,6 +27459,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     saveRecord(state);
     const previewRows=[
       ["賽事名稱", sm.name],
+      ["對戰形式", (BATTLE_MODE_LABELS[sm.battleMode]||"個人戰")+(sm.battleMode==="team"?"｜"+sm.teamSize+"V"+sm.teamSize:"")],
+      ["賽事制度", FORMAT_LABELS[sm.formatType]||sm.format||"單淘汰賽"],
+      ["戰鬥規則", PLAY_MODE_LABELS[sm.playMode]||"標準規則"],
       ["活動日期", sm.date],
       ["活動地點", sm.location],
       ["報到時間", sm.checkin||"未設定"],
@@ -27496,8 +27515,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請貼上 maps.app.goo.gl 或 Google Maps 網址",true);return;}
     const requestedStations=Math.max(1,parseInt(d.stations,10)||1);
+    const newBattleMode=d.battleMode==="team"?"team":"individual";
+    const newTeamSize=newBattleMode==="team"?Math.max(3,parseInt(d.teamSize,10)||3):3;
     const newFormatType=d.formatType||"single";
     const formatChanged=newFormatType!==(state.meta.formatType||"single");
+    const battleModeChanged=newBattleMode!==(state.meta.battleMode==="team"?"team":"individual") || (newBattleMode==="team"&&newTeamSize!==Math.max(3,parseInt(state.meta.teamSize,10)||3));
 
     rd.waitlistCapacity=Math.max(0,parseInt(rd.waitlistCapacity,10)||0);
     rd.waitlistEnabled=rd.waitlistCapacity>0;
@@ -27513,6 +27535,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       applyVenueDraftToState(d,state);
       state.meta.checkin=d.checkin||"";
       state.meta.startTime=d.startTime||"";
+      state.meta.battleMode=newBattleMode;
+      state.meta.teamSize=newTeamSize;
       state.meta.formatType=newFormatType;
       state.meta.playMode=d.playMode==="enchantment"&&isSuperAdmin()&&newFormatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked"?"enchantment":"standard";
       state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
@@ -27544,8 +27568,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.registrationVisibility=rd.registrationVisibility;
     };
 
-    if(formatChanged && state.matches.length>0){
-      openModal({ type:"generic", title:"更換賽制", message:"已經產生對戰表，更換賽制將清除目前對戰表、比分及比賽結果，此動作無法復原，請確認是否繼續。", danger:true, confirmLabel:"確定更換賽制", onConfirm:()=>{
+    if((formatChanged||battleModeChanged) && state.matches.length>0){
+      openModal({ type:"generic", title:"更換對戰架構", message:"已經產生對戰表，更換對戰形式、隊伍人數或賽事制度將清除目前對戰表、比分及比賽結果，此動作無法復原，請確認是否繼續。", danger:true, confirmLabel:"確定更換對戰架構", onConfirm:()=>{
         applyMeta();
         state.matches=[]; state.bracketSize=0; state.drawnAt=null; state.currentMatchId=null;
         state.championId=null; state.runnerUpId=null; state.thirdId=null; state.fourthId=null;
@@ -27740,8 +27764,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           type:"generic",
           title:"確認開始賽事",
           message:"請再次確認：\n\n參賽人數："+eligible+" 人"+
+            "\n對戰形式："+(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")+(state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):"")+
             "\n戰鬥台："+state.meta.stations+" 台"+
-            "\n賽制："+(FORMAT_LABELS[state.meta.formatType]||state.meta.format)+
+            "\n賽事制度："+(FORMAT_LABELS[state.meta.formatType]||state.meta.format)+
+            "\n戰鬥規則："+(PLAY_MODE_LABELS[state.meta.playMode]||"標準規則")+
             (pending?"\n未報到："+pending+" 人（不列入本次對戰）":"")+
             "\n\n開始後，報名、取消、備取與遞補功能將全部鎖定。",
           danger:true,
@@ -29096,6 +29122,9 @@ init().then(()=>{
         name: (state.meta && state.meta.name) || "",
         location: (state.meta && state.meta.location) || "",
         date: (state.meta && state.meta.date) || "",
+        battleMode: (state.meta && state.meta.battleMode)==="team" ? "team" : "individual",
+        teamSize: Math.max(3,Number(state.meta && state.meta.teamSize)||3),
+        playMode: (state.meta && state.meta.playMode)==="enchantment" ? "enchantment" : "standard",
         formatType: (state.meta && state.meta.formatType) || "single",
         format: (state.meta && state.meta.format) || "",
         ladderMode: (state.meta && state.meta.ladderMode) === "ranked" ? "ranked" : "general",
@@ -30232,7 +30261,7 @@ init().then(()=>{
           registrationOpenAt:regOpen,registrationCloseAt:regClose,capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,
           confirmedCount:0,waitlistCount:0,registrationVisibility:"public",publishedAt:data.meta.publishedAt||now,
           cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
-          tournamentPhase:computeTournamentPhase(data),archiveStatus:data.archiveStatus||"ongoing",name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",formatType:data.meta.formatType||"single",bracketSize:data.bracketSize||0,
+          tournamentPhase:computeTournamentPhase(data),archiveStatus:data.archiveStatus||"ongoing",name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",bracketSize:data.bracketSize||0,
           updatedAt:now,lastActivityAt:now,expiresAt:new Date(expMs)
         };
         const tournamentRef=fx.doc(dbHandle,"tournaments",code);
@@ -30244,7 +30273,7 @@ init().then(()=>{
           registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",registrationOpenAt:regOpen,registrationCloseAt:regClose,
           capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,confirmedCount:0,waitlistCount:0,registrationVisibility:"public",
           publishedAt:data.meta.publishedAt||now,cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
-          tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
+          tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
         });
         await batch.commit();
         return code;
@@ -30370,6 +30399,9 @@ init().then(()=>{
           refereeStationRestrictionEnabled: !!m.refereeStationRestrictionEnabled,
           tournamentPhase: computeTournamentPhase(data),
           location: data.meta && data.meta.location || "",
+          battleMode: data.meta && data.meta.battleMode==="team" ? "team" : "individual",
+          teamSize: Math.max(3,Number(data.meta && data.meta.teamSize)||3),
+          playMode: data.meta && data.meta.playMode==="enchantment" ? "enchantment" : "standard",
           formatType: data.meta && data.meta.formatType || "single",
           name: data.meta && data.meta.name || "",
           ladderMode: testerSession ? "general" : ((data.meta && data.meta.ladderMode==="ranked") ? "ranked" : "general"),
@@ -30652,6 +30684,9 @@ if(testerSession){
           refereeStationRestrictionEnabled: !!m.refereeStationRestrictionEnabled,
           tournamentPhase: computeTournamentPhase(data),
           location: data.meta && data.meta.location || "",
+          battleMode: data.meta && data.meta.battleMode==="team" ? "team" : "individual",
+          teamSize: Math.max(3,Number(data.meta && data.meta.teamSize)||3),
+          playMode: data.meta && data.meta.playMode==="enchantment" ? "enchantment" : "standard",
           formatType: data.meta && data.meta.formatType || "single",
           name: data.meta && data.meta.name || "",
           ladderMode: testRoom ? "general" : ((data.meta && data.meta.ladderMode==="ranked") ? "ranked" : "general"),
