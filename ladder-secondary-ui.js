@@ -380,6 +380,13 @@
     ".ladder-points-cell strong{font-family:var(--font-d);font-size:13px;color:var(--gold);}"+
     ".ladder-points-cell span{font-size:9px;color:var(--metal);}"+
     ".ladder-rank-admin-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:6px;padding-top:7px;margin-top:1px;border-top:1px dashed rgba(255,255,255,.055);}"+
-    "@media(max-width:430px){.ladder-rank-grid{grid-template-columns:44px minmax(0,1fr) 78px 64px;gap:6px}.ladder-rank-head-v2{padding-left:3px;padding-right:3px;font-size:10px}.ladder-rank-row-v2{padding:9px 3px;min-height:54px}.ladder-rank-position{font-size:11px}.ladder-player-link{font-size:12px}.ladder-tier-display{gap:4px}.ladder-tier-emblem{width:28px;height:32px;flex-basis:28px}.ladder-tier-emblem span{font-size:10px}.ladder-tier-name{font-size:10px}.ladder-points-cell strong{font-size:12px}.ladder-points-cell span{font-size:8px}.ladder-rank-admin-actions{justify-content:stretch}.ladder-rank-admin-actions .btn{flex:1;min-width:0;}}";
+    "@media(max-width:430px){.ladder-rank-grid{grid-template-columns:44px minmax(0,1fr) 78px 64px;gap:6px}.ladder-rank-head-v2{padding-left:3px;padding-right:3px;font-size:10px}.ladder-rank-row-v2{padding:9px 3px;min-height:54px}.ladder-rank-position{font-size:11px}.ladder-player-link{font-size:12px}.ladder-tier-display{gap:4px}.ladder-tier-emblem{width:28px;height:32px;flex-basis:28px}.ladder-tier-emblem span{font-size:10px}.ladder-tier-name{font-size:10px}.ladder-points-cell strong{font-size:12px}.ladder-points-cell span{font-size:8px}.ladder-rank-admin-actions{justify-content:stretch}.ladder-rank-admin-actions .btn{flex:1;min-width:0;}}"+
+    ".ladder-tier-display{flex-direction:column;gap:2px}.ladder-rank-row-v2{min-height:90px}"+
+    ".ladder-tier-emblem{width:72px;height:66px;flex:0 0 66px;clip-path:none;background-image:url('assets/ladder-gods-trial.png');background-size:300% 300%;background-repeat:no-repeat;filter:none}"+
+    ".ladder-tier-emblem:before,.ladder-tier-emblem span{display:none}"+
+    ".ladder-tier-emblem-0{background-position:0% 0%}.ladder-tier-emblem-1{background-position:50% 0%}.ladder-tier-emblem-2{background-position:100% 0%}"+
+    ".ladder-tier-emblem-3{background-position:0% 50%}.ladder-tier-emblem-4{background-position:50% 50%}.ladder-tier-emblem-5{background-position:100% 50%}"+
+    ".ladder-tier-emblem-6{background-position:0% 100%}.ladder-tier-emblem-7{background-position:50% 100%}.ladder-tier-emblem.is-legend{background-position:100% 100%;filter:none}"+
+    "@media(max-width:430px){.ladder-rank-row-v2{min-height:78px}.ladder-tier-emblem{width:60px;height:55px;flex-basis:55px}.ladder-tier-name{font-size:10px}}";
   document.head.appendChild(rankingStyle);
 })();

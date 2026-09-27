@@ -22,6 +22,8 @@ assert(source.includes('grid-template-columns:44px minmax(0,1fr) 78px 64px'), 'n
 assert(source.includes('title.textContent=(ladderScoreMode==="career"?"生涯":season+" 季賽")+"｜"+location;'), 'board title must reflect season/career mode');
 assert(source.includes('grid-column:1/-1'), 'admin actions must be preserved without adding a fifth data column');
 assert(source.includes('.ladder-rank-scroll-v2{max-height:none;overflow:visible;}'), 'ranking must grow beyond the shared 420px list limit');
-assert(html.includes('ladder-secondary-ui.js?v=14.2.40'), 'ladder asset cache-bust version must match release');
+assert(source.includes('assets/ladder-gods-trial.png'), 'approved Gods trial badges must be used');
+assert(source.includes('.ladder-tier-emblem.is-legend{background-position:100% 100%'), 'legend must use the ninth badge');
+assert(html.includes('ladder-secondary-ui.js?v=14.2.41'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
