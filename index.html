@@ -16915,9 +16915,9 @@ function renderSettings(){
         </select></div>
         <div class="field"><label>戰鬥規則</label><select id="f-play-mode" data-settings-draft="playMode">
           <option value="standard" ${d.playMode!=="enchantment"?"selected":""}>標準規則</option>
-          <option value="enchantment" ${d.playMode==="enchantment"?"selected":""} ${isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&ladderMode!=="ranked"?'':'disabled'}>附魔之戰（正式站限管理者測試）</option>
+          <option value="enchantment" ${d.playMode==="enchantment"?"selected":""} ${isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&ladderMode!=="ranked"?'':'disabled'}>附魔之戰（正式站限管理者測試）</option>
         </select></div>
-        <p class="hint">對戰形式、賽事制度、戰鬥規則彼此獨立。團體戰可搭配單淘／雙敗／單循環；資料結構已預留未來「團體附魔戰」。附魔試行仍維持目前正式站限制。</p>
+        <p class="hint">對戰形式、賽事制度、戰鬥規則彼此獨立。團體戰可搭配單淘／雙敗／單循環；資料結構已預留未來「團體附魔戰」。目前附魔試行仍限定個人戰，待團體附魔裁判流程完成後再開放組合。</p>
         <div class="field"><label>戰鬥台數量</label><input type="number" min="1" max="32" id="f-stations" data-settings-draft="stations" data-settings-type="int" value="${d.stations}"></div>
         <label class="settings-check-row">
           <input type="checkbox" id="f-bronze" data-settings-draft="bronzeMatch" data-settings-type="bool" ${d.bronzeMatch?'checked':''} ${(ladderMode==="ranked"&&d.formatType==="single")?'disabled':''}>
@@ -23606,16 +23606,17 @@ function bindDynamicInputs(){
           const field=el.getAttribute("data-settings-draft");
           const type=el.getAttribute("data-settings-type");
           let value;
-          if(type==="int") value=Math.max(1,parseInt(el.value,10)||1);
+          if(type==="int") value=field==="teamSize"?Math.max(3,parseInt(el.value,10)||3):Math.max(1,parseInt(el.value,10)||1);
           else if(type==="bool") value=!!el.checked;
           else value=el.value;
           settingsFormDraft[field]=value;
-          if(field==="formatType"||field==="bronzeMatch"||field==="ladderMode"){
+          if(field==="formatType"||field==="bronzeMatch"||field==="ladderMode"||field==="battleMode"){
             const option=document.querySelector('#f-play-mode option[value="enchantment"]');
-            if(option)option.disabled=!(isSuperAdmin()&&settingsFormDraft.formatType==="single"&&settingsFormDraft.bronzeMatch!==true&&settingsFormDraft.ladderMode!=="ranked");
+            if(option)option.disabled=!(isSuperAdmin()&&settingsFormDraft.battleMode!=="team"&&settingsFormDraft.formatType==="single"&&settingsFormDraft.bronzeMatch!==true&&settingsFormDraft.ladderMode!=="ranked");
           }
           settingsFormDraftDirty=true;
           if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
+          if(field==="battleMode") render();
         };
         el.addEventListener("input",update);
         el.addEventListener("change",update);
@@ -27401,7 +27402,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       markTesterSandboxState(state);
     }
 
-    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
+    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
       showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
     }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請確認連結是否來自 Google Maps",true);return;}
@@ -27510,7 +27511,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
     if(!aiCreateReviewGate("儲存賽事設定")) return;
-    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
+    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
       showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
     }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請貼上 maps.app.goo.gl 或 Google Maps 網址",true);return;}
@@ -27538,7 +27539,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.battleMode=newBattleMode;
       state.meta.teamSize=newTeamSize;
       state.meta.formatType=newFormatType;
-      state.meta.playMode=d.playMode==="enchantment"&&isSuperAdmin()&&newFormatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked"?"enchantment":"standard";
+      state.meta.playMode=d.playMode==="enchantment"&&isSuperAdmin()&&newBattleMode!=="team"&&newFormatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked"?"enchantment":"standard";
       state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
       state.meta.format=FORMAT_LABELS[newFormatType]||"單淘汰賽";
       state.meta.stations=requestedStations;
