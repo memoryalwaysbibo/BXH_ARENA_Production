@@ -2,6 +2,7 @@
 (function(root){
  'use strict';
  const cache=new Map(),busy=new Set(),frames=new WeakMap(),matchNames=new Map(),reversedSides=new Set();
+ let drawSoundEnabled=true;
  const quote=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const key=(code,id)=>code+':'+id;
  const call=payload=>root.engagementService.enchantment(payload);
@@ -79,7 +80,7 @@
   document.querySelectorAll('iframe[data-enchantment-player]').forEach(frame=>{
    if(frame.dataset.code!==code||frame.dataset.matchId!==id)return;
    const first=!frames.get(frame);frames.set(frame,true);
-   frame.contentWindow?.postMessage({kind:first?'bxh-enchantment-init':'bxh-enchantment-state',code,matchId:id,side:frame.dataset.side,state:playerState(item.state,frame.dataset.side)},location.origin);
+   frame.contentWindow?.postMessage({kind:first?'bxh-enchantment-init':'bxh-enchantment-state',code,matchId:id,side:frame.dataset.side,state:playerState(item.state,frame.dataset.side),names:matchNames.get(key(code,id))||null,soundEnabled:drawSoundEnabled},location.origin);
   });
  }
 
@@ -108,6 +109,7 @@
      continue;
     }
     const side=m.a.playerId===pid?'A':'B';
+    matchNames.set(key(code,m.id),{A:typeof playerName==='function'?playerName(m.a.playerId):'選手 A',B:typeof playerName==='function'?playerName(m.b.playerId):'選手 B'});
     let result;
     try{result=await call({action:'get',code,matchId:m.id});}catch(e){continue;}
     cache.set(key(code,m.id),{version:result.version,state:result.state});
@@ -136,7 +138,7 @@
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
     overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔之戰抽卡');
     overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080917;display:flex;flex-direction:column';
-    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px"><span data-enchantment-heading>附魔之戰｜第 '+Number(s.round)+' 局</span> <button type="button" data-enchantment-close style="float:right">離開抽卡畫面</button></div><div data-enchantment-loading style="color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
+    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px"><span data-enchantment-heading>附魔之戰｜第 '+Number(s.round)+' 局</span> <span style="float:right;display:flex;gap:8px;align-items:center"><button type="button" data-enchantment-sound aria-label="切換音效" aria-pressed="'+drawSoundEnabled+'" style="font-size:20px;min-width:38px">'+(drawSoundEnabled?'🔊':'🔇')+'</button><button type="button" data-enchantment-close>離開房間</button></span></div><div data-enchantment-loading style="color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
     const frame=document.createElement('iframe');frame.title='附魔之戰選手抽卡';frame.dataset.enchantmentPlayer='';
     frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
     frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917;visibility:hidden';
@@ -161,6 +163,11 @@
    if(overlay)dismissedMatch=key(overlay.dataset.code,overlay.dataset.matchId);
    overlay?.remove();
    const reopen=document.querySelector('[data-enchantment-open]');if(reopen)reopen.style.display='';
+  }
+  if(e.target.closest('[data-enchantment-sound]')){
+   drawSoundEnabled=!drawSoundEnabled;
+   const btn=e.target.closest('[data-enchantment-sound]');btn.textContent=drawSoundEnabled?'🔊':'🔇';btn.setAttribute('aria-pressed',String(drawSoundEnabled));
+   document.querySelector('[data-enchantment-draw-overlay] iframe[data-enchantment-player]')?.contentWindow?.postMessage({kind:'bxh-enchantment-sound',enabled:drawSoundEnabled},location.origin);
   }
   if(e.target.closest('[data-enchantment-open]')){dismissedMatch='';discoverPlayerDraw();}
  });
