@@ -12246,6 +12246,7 @@ function resetBracketBeforeStart(){
 
 /* ==== dispatcher: generate bracket ==== */
 function generateBracket(){
+  if(state.meta&&state.meta.battleMode==="team"){showToast("團體戰對戰表需使用團體戰編排引擎；目前不會套用個人戰抽籤。",true);return false;}
   if(!entryRosterValid()){showToast("請先完成名額抽籤，並保持抽中的正式名單",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   const fmt = state.meta.formatType || "single";
@@ -14402,15 +14403,21 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
   adminRegistrationsCache=regs;
   const confirmed=regs.filter(r=>r&&r.status==="confirmed");
-  const before=(state.players||[]).map(p=>[
+  const before=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
-    p.checkedIn===true?"1":"0",String(p.name||"")
-  ].join("|")).sort().join("\n");
-  state.players=mergeFamilyOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired,()=>uid("p"));
-  const after=(state.players||[]).map(p=>[
+    p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
+  ]).sort(),teams:state.teams||[]});
+  if(state.meta.battleMode==="team"){
+    state.players=mergeTeamOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired);
+    state.teams=teamRegistrationRowsToTeams(confirmed);
+  }else{
+    state.players=mergeFamilyOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired,()=>uid("p"));
+    state.teams=[];
+  }
+  const after=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
-    p.checkedIn===true?"1":"0",String(p.name||"")
-  ].join("|")).sort().join("\n");
+    p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
+  ]).sort(),teams:state.teams||[]});
   const changed=before!==after;
   if(changed && !(await saveState())) throw new Error("名單寫入雲端失敗；請重新整理後重試同步");
   publicTournamentsCache=null;
@@ -19331,7 +19338,7 @@ function findEventsCardHtml(t){
     : (t.capacity ? `<span class="hint" style="margin:0;">剩餘名額 ${Math.max(0,t.capacity-t.confirmedCount)}／${t.capacity}</span>` : "");
   return `<div class="find-event-card">
     <div class="fe-name">${esc(t.name)}</div>
-    <div class="fe-meta">${esc(t.date||"時間待公布")}　${esc(t.location||"地點待公布")}　${esc(FORMAT_LABELS[t.formatType]||"")}</div>
+    <div class="fe-meta">${esc(t.date||"時間待公布")}　${esc(t.location||"地點待公布")}　${t.battleMode==="team"?esc(t.teamSize+"V"+t.teamSize+" 團體戰　"):""}${esc(FORMAT_LABELS[t.formatType]||"")}</div>
     <div class="fe-status-row">
       ${t.regStatusLabel && t.phase!=="live" ? `<span class="fe-status-chip status-${t.regStatus}">${esc(t.regStatusLabel)}</span>` : ""}
       ${t.phase==="live" ? `<span class="fe-status-chip status-live">進行中</span>` : ""}
@@ -19370,6 +19377,7 @@ function lobbySummary(raw){
     cancellationDeadline:normalizeDateTime(raw.cancellationDeadline), targetGroup:raw.targetGroup||m.targetGroup||"open",
     eventCancelled:!!raw.eventCancelled, publishedAt:raw.publishedAt, visibility:raw.visibility,
     startMs:lobbyEventStartMs(raw), formatType:raw.formatType||m.formatType||"single",
+    battleMode:(raw.battleMode||m.battleMode)==="team"?"team":"individual", teamSize:Math.max(3,Number(raw.teamSize||m.teamSize)||3),
     fee:raw.fee, checkInAt:raw.checkInAt||m.checkin||"", eventDescription:raw.eventDescription||"",
     roomAccessMode:raw.roomAccessMode||m.roomAccessMode||"public",
     coverUrl:typeof raw.coverUrl==="string"?raw.coverUrl:""
@@ -19922,16 +19930,24 @@ async function loadTournamentDetail(code){
     tournamentDetailMyRegs=[];
     tournamentDetailMyReg=null;
     if(uid){
-      let familyLoaded=false;
-      if(window.engagementService?.familyRegistration){
+      const detailBattleMode=(data.battleMode||(data.parsedData&&data.parsedData.meta&&data.parsedData.meta.battleMode))==="team"?"team":"individual";
+      let registrationLoaded=false;
+      if(detailBattleMode==="team"&&window.engagementService?.teamRegistration){
+        try{
+          const mine=await window.engagementService.teamRegistration({action:'mine',code});
+          tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist'].includes(row.status));
+          tournamentDetailMyReg=tournamentDetailMyRegs[0]||null;
+          registrationLoaded=true;
+        }catch(e){console.warn('[BXH team registration mine failed; fallback to registration read]',e)}
+      }else if(window.engagementService?.familyRegistration){
         try{
           const mine=await window.engagementService.familyRegistration({action:'mine',code});
           tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist','pending_draw'].includes(row.status));
           tournamentDetailMyReg=tournamentDetailMyRegs.find(row=>!row.familyPlayerId)||tournamentDetailMyRegs[0]||null;
-          familyLoaded=true;
+          registrationLoaded=true;
         }catch(e){console.warn('[BXH family registration mine failed; fallback to legacy registration read]',e)}
       }
-      if(!familyLoaded&&window.cloudSync.getMyRegistrationForTournament){
+      if(!registrationLoaded&&window.cloudSync.getMyRegistrationForTournament){
         tournamentDetailMyReg=await window.cloudSync.getMyRegistrationForTournament(code);
         tournamentDetailMyRegs=tournamentDetailMyReg?[tournamentDetailMyReg]:[];
       }
@@ -29031,6 +29047,7 @@ init().then(()=>{
     async signPartnerContract(payload){return callEngagementFunction("signPartnerContract",payload,60000);},
     async activatePartnerContract(payload){return callEngagementFunction("activatePartnerContract",payload,60000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
+    async teamRegistration(payload){return callEngagementFunction("teamRegistration",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
     async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
@@ -29143,6 +29160,10 @@ init().then(()=>{
       // Only id/name/checkedIn — no phone, no email, no internal player
       // fields of any kind.
       players: (state.players||[]).map(p=>({ id:p.id, name:p.name, checkedIn:!!p.checkedIn })),
+      teams: (state.teams||[]).map(team=>({
+        id:team.id, name:team.name,
+        memberPlayerIds:Array.isArray(team.memberPlayerIds)?team.memberPlayerIds.slice():[]
+      })),
       // Only structural/scoring fields needed to render a public bracket or
       // live scoreboard — no referee uid, no lock info, no internal notes.
       matches: (state.matches||[]).map(m=>({
