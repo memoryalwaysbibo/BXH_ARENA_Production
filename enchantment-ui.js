@@ -35,7 +35,7 @@
    apply();
   });
   observer.observe(face,{attributes:true,attributeFilter:['src']});
-  selector.addEventListener('change',()=>{selected=selector.value==='gods'?'gods':'basic';saveCardSkin(selected);applyBack();apply();});
+  selector.addEventListener('change',()=>{selected=selector.value==='gods'?'gods':'basic';saveCardSkin(selected);applyBack();apply();showSharedCards(overlay,cache.get(key(frame.dataset.code,frame.dataset.matchId))?.state,frame.dataset.side);});
   applyBack();
   if(face.getAttribute('src')&&!face.src.includes(GODS_CARD_PATH)){baseSrc=face.src;apply();}
   const cleanup=new MutationObserver(()=>{if(!overlay.isConnected){observer.disconnect();cleanup.disconnect();}});
@@ -140,11 +140,34 @@
   catch(e){cache.set(k,{error:message(e)});}
   finally{busy.delete(k);paint(code,id);syncFrames(code,id);}
  }
- function playerState(s,side){return {...s,cards:{A:side==='A'?s.cards?.A:null,B:side==='B'?s.cards?.B:null}};}
+ function playerState(s,side){
+  const both=!!(s.drawn?.A&&s.drawn?.B);
+  return {...s,cards:{A:(side==='A'||both)?s.cards?.A:null,B:(side==='B'||both)?s.cards?.B:null}};
+ }
+ function showSharedCards(overlay,s,side){
+  if(!overlay)return;
+  let panel=overlay.querySelector('[data-enchantment-shared-cards]');
+  const both=!!(s?.drawn?.A&&s?.drawn?.B&&s.cards?.A&&s.cards?.B);
+  if(!both){panel?.remove();return;}
+  if(!panel){
+   panel=document.createElement('div');panel.dataset.enchantmentSharedCards='';
+   panel.style.cssText='position:absolute;right:10px;bottom:12px;z-index:4;width:min(244px,60vw);padding:9px;border:1px solid #e4bd87;border-radius:14px;background:#171329ee;color:#fff;box-shadow:0 8px 24px #000b;backdrop-filter:blur(10px)';
+   overlay.append(panel);
+  }
+  const gods=cardSkin()==='gods';
+  const label=who=>quote(matchNames.get(key(overlay.dataset.code,overlay.dataset.matchId))?.[who]||'選手 '+who);
+  panel.innerHTML='<div style="text-align:center;color:#f9d69a;font-weight:800;font-size:12px;margin-bottom:6px">雙方附魔已公開</div><div style="display:flex;gap:6px;justify-content:center">'+
+   ['A','B'].map(who=>{
+    const id=s.cards[who],card=details(id),name=quote(card?.name||'附魔卡'),self=side===who;
+    const art=gods&&GODS_CARD_IDS.has(id)?'<img src="'+quote(new URL(GODS_CARD_PATH+id+'.webp',location.href).href)+'" alt="'+name+'卡面" style="width:62px;height:93px;object-fit:cover;border-radius:6px">':'<div style="width:62px;height:93px;border-radius:6px;border:1px solid #bd9bca;background:linear-gradient(145deg,#614384,#29213e);display:grid;place-items:center;text-align:center;padding:4px">'+name+'</div>';
+    return '<div style="flex:1;min-width:0;text-align:center;font-size:11px"><div style="color:#d7c7eb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(self?'你 · ':'')+label(who)+'</div>'+art+'<div style="color:#f9d69a;font-weight:700">'+name+'</div></div>';
+   }).join('')+'</div><div style="text-align:center;color:#cdbfe0;font-size:10px;margin-top:5px">本局卡牌保留至下一局抽卡</div>';
+ }
  function syncFrames(code,id){
   const item=cache.get(key(code,id));if(!item?.state)return;
   document.querySelectorAll('iframe[data-enchantment-player]').forEach(frame=>{
    if(frame.dataset.code!==code||frame.dataset.matchId!==id)return;
+   showSharedCards(frame.closest('[data-enchantment-draw-overlay]'),item.state,frame.dataset.side);
    const first=!frames.get(frame);frames.set(frame,true);
    frame.contentWindow?.postMessage({kind:first?'bxh-enchantment-init':'bxh-enchantment-state',code,matchId:id,side:frame.dataset.side,state:playerState(item.state,frame.dataset.side),names:matchNames.get(key(code,id))||null,soundEnabled:drawSoundEnabled},location.origin);
   });
