@@ -3473,6 +3473,9 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .ladder-season-summary:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:4px;}
 .ladder-season-summary .chev{font-size:13px;transition:transform .2s;}
 .ladder-hero[open] .ladder-season-summary .chev{transform:rotate(180deg);}
+.ladder-location-filter[open] .ladder-season-summary .chev{transform:rotate(180deg);}
+.ladder-location-summary-status{display:flex;align-items:center;gap:8px;min-width:0;}
+.ladder-location-summary-status small{font:700 11px/1.3 var(--font-d);color:var(--metal);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ladder-season-content{padding-top:16px;}
 .ladder-season-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px;}
 .ladder-season-grid .stat-box{min-height:116px;display:flex;flex-direction:column;justify-content:center;}
@@ -18749,14 +18752,17 @@ function ladderLocationLabel(){
 }
 function ladderLocationFilterHtml(){
   const city=normalizeTaiwanCityName(ladderLocationCity);
-  return `<div class="panel ladder-location-filter">
-    <div class="panel-title">地區分類</div>
+  const locationOpen=!!document.querySelector("details.ladder-location-filter[open]");
+  return `<details class="panel ladder-location-filter" ${locationOpen?"open":""}>
+    <summary class="ladder-season-summary"><span>地區分類</span><span class="ladder-location-summary-status"><small>${esc(ladderLocationLabel())}</small><span class="chev" aria-hidden="true">⌄</span></span></summary>
+    <div class="ladder-season-content">
     <div class="grid grid-2">
       <div class="field"><label>所在都市</label><select id="ladder-city-filter">${profileCityOptionsHtml(city,"全部都市")}</select></div>
       <div class="field"><label>所在地區</label><select id="ladder-region-filter" ${city?'':'disabled'}>${profileDistrictOptionsHtml(city,ladderLocationRegion,city?"全部地區":"請先選擇都市")}</select></div>
     </div>
     <div class="hint">選擇都市／地區即可查看地方榜；未完整設定所在地的玩家仍保留在全區總榜。</div>
-  </div>`;
+    </div>
+  </details>`;
 }
 let ladderAdminLogs=[];
 let ladderAdminLogsLoaded=false;
@@ -31882,6 +31888,6 @@ if(testerSession){
   });
 </script>
 <script src="activity-points-ui.js?v=20260928-static-header-fix3"></script>
-<script src="ladder-secondary-ui.js?v=14.2.44"></script>
+<script src="ladder-secondary-ui.js?v=14.2.45"></script>
 </body>
 </html>
