@@ -30,6 +30,6 @@ assert(html.includes('function ladderBadgeHtml(p)'), 'shared tier badge renderer
 assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'guest leaderboard must show tier badges');
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
-assert(html.includes('ladder-secondary-ui.js?v=14.2.49'), 'ladder asset cache-bust version must match release');
+assert(html.includes('ladder-secondary-ui.js?v=14.2.50'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
