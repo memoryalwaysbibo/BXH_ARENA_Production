@@ -14924,11 +14924,11 @@ function bracketRefreshUsesPublicMirror(){
 }
 
 async function refreshBracketFromCloud(){
-  if(bracketRefreshBusy) return;
+  if(bracketRefreshBusy) return false;
   const code=String(state.cloudCode||"").trim().toUpperCase();
   if(!code || !window.cloudSync){
     showToast("目前沒有可更新的雲端賽事", true);
-    return;
+    return false;
   }
   bracketRefreshBusy=true;
   renderPreservingScroll();
@@ -14942,17 +14942,19 @@ async function refreshBracketFromCloud(){
       bracketRefreshBusy=false;
       renderPreservingScroll();
       showToast(CODE_ENTRY_ERROR_MESSAGES[(result&&result.reason)||"network"] || "更新失敗，請稍後再試", true);
-      return;
+      return false;
     }
     bracketRefreshBusy=false;
     cloudStatus="connected";
     cloudLastSyncAt=Date.now();
     applyRemoteState(result.data, true);
     showToast("對戰表已更新");
+    return true;
   }catch(e){
     bracketRefreshBusy=false;
     renderPreservingScroll();
     showToast("更新失敗，請稍後再試", true);
+    return false;
   }
 }
 
@@ -24170,7 +24172,7 @@ async function handleTeamMatchAction(action,target){
       if(![0,1].includes(winnerSide)||!['spin','burst','over','extreme'].includes(finish))return;
       if(!confirm('確認本次判定？提交後立即更新雙方生命與守擂順位。'))return;
       const outcome=await window.engagementService.teamScoring({action:'score',code,matchId,winnerSide,finish,operationId:crypto.randomUUID()});
-      if(outcome.matchCompleted){teamMatchUi.delete(matchId);await refreshBracketFromCloud();showToast('勝隊已晉級，對戰表已更新');return;}
+      if(outcome.matchCompleted){teamMatchUi.delete(matchId);const refreshed=await refreshBracketFromCloud();if(refreshed)showToast('勝隊已晉級，對戰表已更新');return;}
       showToast('判定已記錄');
     }
     await loadTeamMatchUi(matchId);
