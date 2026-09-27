@@ -399,17 +399,17 @@
     ".ladder-my-rank-content{display:flex;align-items:center;flex:1;min-width:0;gap:9px}.ladder-my-rank-content>strong{font:900 13px var(--font-d);color:var(--gold);white-space:nowrap}.ladder-my-rank-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;font-size:12px}.ladder-my-rank-content .ladder-tier-display{flex-direction:row;gap:3px}.ladder-my-rank-content .ladder-tier-emblem{width:34px;height:34px;flex-basis:34px}.ladder-my-rank-content .ladder-tier-name{font-size:10px}.ladder-my-rank-points{white-space:nowrap;color:var(--gold);font-weight:900;font-size:12px}.ladder-my-rank-empty{flex:1;font-size:12px;color:var(--metal)}"+
     "#ladder-my-row{background:rgba(217,185,92,.08);box-shadow:inset 3px 0 var(--gold)}"+
     "@media(max-width:520px){.ladder-my-rank-content{flex-wrap:wrap;gap:6px}.ladder-my-rank .btn{margin-left:auto}.ladder-my-rank-content .ladder-tier-name{display:none}}"+
-    ".ladder-rank-grid{display:grid;grid-template-columns:52px minmax(0,1fr) 96px 78px;gap:8px;align-items:center;min-width:0;}"+
+    ".ladder-rank-grid{display:grid;grid-template-columns:64px minmax(0,1fr) 96px 78px;gap:8px;align-items:center;min-width:0;}"+
     ".ladder-rank-head-v2{padding:0 8px 9px;color:var(--metal);font-size:11px;font-weight:800;border-bottom:1px solid rgba(255,255,255,.08);text-align:center;}"+
     ".ladder-rank-head-v2>div:nth-child(2){text-align:left;}"+
     ".ladder-rank-row-v2{position:relative;padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.065);min-height:58px;}"+
     ".ladder-rank-row-v2:last-child{border-bottom:0;}"+
-    ".ladder-rank-position{font-family:var(--font-d);font-size:12px;font-weight:900;color:var(--gold);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;}"+
+    ".ladder-rank-position{font-family:var(--font-d);font-size:16px;font-weight:900;color:var(--gold);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;}"+
     ".ladder-rank-top-1 .ladder-rank-position{color:#f4cf67;text-shadow:0 0 10px rgba(244,207,103,.18);}"+
     ".ladder-rank-top-2 .ladder-rank-position{color:#d8dde5;}"+
     ".ladder-rank-top-3 .ladder-rank-position{color:#d9a574;}"+
     ".ladder-player-block{min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;}"+
-    ".ladder-player-link{display:block;max-width:100%;padding:0;border:0;background:transparent;color:var(--ivory);font:800 13px/1.25 var(--font-d);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}"+
+    ".ladder-player-link{display:block;max-width:100%;padding:0;border:0;background:transparent;color:var(--ivory);font:800 17px/1.25 var(--font-d);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}"+
     ".ladder-player-link:focus-visible{outline:1px solid var(--gold);outline-offset:3px;border-radius:3px;}"+
     ".ladder-player-block .title-chip{display:block;max-width:100%;margin:0;padding:2px 7px;font-size:9px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}"+
     ".ladder-tier-cell{min-width:0;display:flex;justify-content:center;}"+
@@ -423,7 +423,7 @@
     ".ladder-points-cell strong{font-family:var(--font-d);font-size:13px;color:var(--gold);}"+
     ".ladder-points-cell span{font-size:9px;color:var(--metal);}"+
     ".ladder-rank-admin-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:6px;padding-top:7px;margin-top:1px;border-top:1px dashed rgba(255,255,255,.055);}"+
-    "@media(max-width:430px){.ladder-rank-grid{grid-template-columns:44px minmax(0,1fr) 78px 64px;gap:6px}.ladder-rank-head-v2{padding-left:3px;padding-right:3px;font-size:10px}.ladder-rank-row-v2{padding:9px 3px;min-height:54px}.ladder-rank-position{font-size:11px}.ladder-player-link{font-size:12px}.ladder-tier-display{gap:4px}.ladder-tier-emblem{width:28px;height:32px;flex-basis:28px}.ladder-tier-emblem span{font-size:10px}.ladder-tier-name{font-size:10px}.ladder-points-cell strong{font-size:12px}.ladder-points-cell span{font-size:8px}.ladder-rank-admin-actions{justify-content:stretch}.ladder-rank-admin-actions .btn{flex:1;min-width:0;}}"+
+    "@media(max-width:430px){.ladder-rank-grid{grid-template-columns:54px minmax(0,1fr) 78px 64px;gap:6px}.ladder-rank-head-v2{padding-left:3px;padding-right:3px;font-size:10px}.ladder-rank-row-v2{padding:9px 3px;min-height:54px}.ladder-rank-position{font-size:14px}.ladder-player-link{font-size:15px}.ladder-tier-display{gap:4px}.ladder-tier-emblem{width:28px;height:32px;flex-basis:28px}.ladder-tier-emblem span{font-size:10px}.ladder-tier-name{font-size:10px}.ladder-points-cell strong{font-size:12px}.ladder-points-cell span{font-size:8px}.ladder-rank-admin-actions{justify-content:stretch}.ladder-rank-admin-actions .btn{flex:1;min-width:0;}}"+
     ".ladder-tier-display{flex-direction:column;gap:2px}.ladder-rank-row-v2{min-height:98px}"+
     ".ladder-tier-emblem{width:72px;height:72px;flex:0 0 72px;clip-path:none;background-image:url('assets/ladder-gods-trial-transparent.png');background-size:300% 300%;background-repeat:no-repeat;filter:none}"+
     ".ladder-tier-emblem:before,.ladder-tier-emblem span{display:none}"+
