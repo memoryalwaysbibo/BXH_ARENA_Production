@@ -9615,7 +9615,7 @@ function bxhEventTemplateContext(){
 }
 function canUseBxhStandardTemplate(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
-    ["super_admin","admin","staff"].includes(userProfile.role) &&
+    (["super_admin","admin","staff"].includes(userProfile.role) || (typeof isPartnerOrganizerMode==="function"&&isPartnerOrganizerMode())) &&
     state && state.meta && state.meta.eventAuthority!=="community");
 }
 function roomStandardTemplateConfig(st=state){
@@ -9731,7 +9731,7 @@ const AI_CREATE_RESTRICTED_BETA_FRONTEND = true;
 
 function aiCreateBetaActorAllowed(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.deleted!==true && !["deleted","frozen","disabled"].includes(userProfile.accountStatus) &&
-    ["super_admin","admin","staff"].includes(userProfile.role));
+    (["super_admin","admin","staff"].includes(userProfile.role) || (typeof isPartnerOrganizerMode==="function"&&isPartnerOrganizerMode())));
 }
 function aiCreateRemoteParserEnabled(){
   return AI_CREATE_RESTRICTED_BETA_FRONTEND && aiCreateBetaActorAllowed();
@@ -11207,10 +11207,14 @@ const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
   "skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","archive-complete"
 ]);
 
+function partnerOrganizerGrant(){
+  return activeMode==="partner_organizer" && window.BXHPartnerOrganizer ? window.BXHPartnerOrganizer.grant(userProfile) : null;
+}
+function isPartnerOrganizerMode(){ return !!partnerOrganizerGrant(); }
 function hasAdminAccess(){ return currentRole === "admin" || currentRole === "tester"; }
 function hasPrivilegedTournamentProfile(){
   return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true &&
-    ["super_admin","admin","staff"].includes(userProfile.role));
+    (["super_admin","admin","staff"].includes(userProfile.role) || isPartnerOrganizerMode()));
 }
 function isCommunityRoom(){ return !!(state && state.meta && state.meta.eventAuthority==="community"); }
 function isOwnTesterSandboxRoom(st=state){
@@ -11277,8 +11281,8 @@ function canConfigureCurrentTournament(){ return isAdminTierOrAbove() || isOwnTe
 function canJoinCloudRoom(){ return currentRole === "admin" || currentRole === "guest" || currentRole === "player"; }
 function isSuperAdmin(){ return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin"); }
 function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin")); }
-function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && userProfile.role==="staff"); }
-function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff")); }
+function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode())); }
+function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff" || isPartnerOrganizerMode())); }
 function currentAuthUid(){ return (firebaseUser&&firebaseUser.uid)||null; }
 function isCurrentOfficialTournamentCreator(){
   const uid=currentAuthUid();
@@ -22284,11 +22288,11 @@ function restoreAuthenticatedView(uid,intent){
   appPhase='account-management';superAdminManagementPage=['accounts','checkin','titles'].includes(v.adminPage)?v.adminPage:'accounts';
   accountMgmtUsers=null;window.cloudAuth.listUsers().then(users=>{if(firebaseUser?.uid===uid){accountMgmtUsers=users;render();}}).catch(()=>{});return true;
  }
- if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){appPhase='partner-organizer';return true;}
+ if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
   appPhase='player-center';playerActiveTab=PLAYER_TABS.some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
  }
- if(v.phase==='app'&&intent==='admin'){
+ if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer')){
   appPhase='app';
   activeTab=v.cloudCode===(state.cloudCode||'')&&['management','ladder','live','bracket','referee','duty','registrations','settings','people','operations','history','version'].includes(v.tab)?v.tab:'management';
   adminTournamentListLoaded=false;return true;
@@ -22359,7 +22363,7 @@ function render(){
       return;
     }
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
-  if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {app.innerHTML=authShellOpen()+authBrandHeader()+window.BXHPartnerOrganizer.render(userProfile)+authShellClose();return;} }
+  if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {currentRole="admin";appPhase="app";activeTab="management";} }
   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-login"){ app.innerHTML = renderAdminLoginScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-setup"){ app.innerHTML = renderAdminSetupScreen(); bindAuthInputs(); return; }
@@ -22547,10 +22551,13 @@ function accountMenuItemsHtml(){
 function accountMenuHtml(){
   if(currentRole!=="admin" && currentRole!=="player") return "";
   const isPlayerMode=currentRole==="player";
-  const displayName=isPlayerMode
+  const partnerGrant=partnerOrganizerGrant();
+  const displayName=partnerGrant
+    ? (partnerGrant.organizationName||"合作主辦")
+    : isPlayerMode
     ? ((userProfile&&userProfile.displayName)||(userProfile&&userProfile.nickname)||(userProfile&&userProfile.realName)||(firebaseUser&&firebaseUser.email)||"玩家")
     : (adminDisplayName||"管理員");
-  const roleLabel=roleDisplayLabel((userProfile&&userProfile.role)||(isPlayerMode?"player":"admin"));
+  const roleLabel=partnerGrant?"合作主辦":roleDisplayLabel((userProfile&&userProfile.role)||(isPlayerMode?"player":"admin"));
   return `<div class="account-menu-wrap">
     <button class="account-badge" data-action="toggle-account-menu" aria-expanded="${accountMenuOpen?"true":"false"}">
       <span class="account-role-dot"></span>
@@ -23127,7 +23134,7 @@ function renderApp(){
       </nav>
     </div>
     ${accountMenuOverlayHtml()}
-    <main>${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
+    <main>${isPartnerOrganizerMode()?`<div class="banner warn"><span><b>合作主辦模式</b>｜${esc(partnerOrganizerGrant().organizationName||partnerOrganizerGrant().organizationId)}｜方案 ${esc(partnerOrganizerGrant().planCode||partnerOrganizerGrant().plan||"—")}；僅能管理本合作帳號建立的賽事。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
     <div id="print-bracket" style="display:none;">${renderPrintBracket()}</div>
     ${renderModal()}
     ${celebrationOpen ? renderCelebrationOverlay() : ""}
@@ -25250,7 +25257,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="switch-to-partner-organizer"){
     if(!firebaseUser || !roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)) return;
     accountMenuOpen=false;
-    (async()=>{await saveActiveMode("partner_organizer");currentRole="partner_organizer";appPhase="partner-organizer";render();})();
+    (async()=>{await saveActiveMode("partner_organizer");currentRole="admin";appPhase="app";activeTab="management";adminTournamentListLoaded=false;publicWatchReturnContext=null;publicWatchUsesPrivateData=false;render();})();
     return;
   }
   if(action==="switch-to-player-mode"){
@@ -28184,7 +28191,7 @@ async function init(){
                     Promise.resolve().then(async()=>{ try{ const all=await window.cloudAuth.listUsers(); await window.cloudAuth.syncStaffDirectory(all); }catch(e){} });
                   }
                   await saveActiveMode(intent);
-                  currentRole = intent==="partner_organizer" ? "partner_organizer" : (intent==="player" ? "player" : mapRoleToAppRole(profile.role));
+                  currentRole = intent==="partner_organizer" ? "admin" : (intent==="player" ? "player" : mapRoleToAppRole(profile.role));
                   adminDisplayName = profile.displayName || profile.email;
                   if((profile.role==="tester"||profile.isTestAccount===true) && intent==="admin" && !isOwnTestTournament(state)){
                     state=markTesterSandboxState(defaultState());
@@ -28207,7 +28214,7 @@ async function init(){
                   if(restoringSession && restoreRefereeWorkstationView(fbUser.uid,intent)){render();return;}
                   if(restoringSession && restoreAuthenticatedView(fbUser.uid,intent)){render();return;}
                   if(appPhase==="landing" || appPhase==="admin-login" || appPhase==="admin-setup" || appPhase==="admin-success" || appPhase==="player-login" || appPhase==="player-apply" || currentRole==="guest"){
-                    if(intent==="partner_organizer"){appPhase="partner-organizer";render();return;}
+                    if(intent==="partner_organizer"){appPhase="app";activeTab="management";adminTournamentListLoaded=false;render();return;}
                     if(intent==="admin"){
                       appPhase = "admin-success";
                       render();
@@ -29772,15 +29779,19 @@ init().then(()=>{
       if(!cloudEnabled) return [];
       const actorUid=currentUserUidForWrites();
       const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&actorUid);
+      const partnerSession=isPartnerOrganizerMode()&&actorUid;
       const source=testerSession
         ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("eventAuthority","==","test"))
-        : fx.collection(dbHandle,"tournaments");
+        : partnerSession
+          ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("partnerOrganizationCode","==",partnerOrganizerGrant().organizationId))
+          : fx.collection(dbHandle,"tournaments");
       const snap = await fx.getDocs(source);
       const items = [];
       snap.forEach(docSnap=>{
         const d = docSnap.data() || {};
         let savedState=null;
         try{savedState=typeof d.data==="string"?JSON.parse(d.data):d.data;}catch(e){}
+        if(partnerSession&&(d.eventAuthority!=="official"||d.partnerOrganizationCode!==partnerOrganizerGrant().organizationId))return;
         items.push({
           code: docSnap.id,
           name: d.name || "",
@@ -29811,6 +29822,8 @@ init().then(()=>{
           createdByName: d.createdByName || "",
           eventAuthority: d.eventAuthority || "official",
           ownerUid: d.ownerUid || null,
+          partnerOrganizationCode:d.partnerOrganizationCode||null,
+          partnerContractOrderCode:d.partnerContractOrderCode||null,
           expiresAt: d.expiresAt || null,
           testMode: d.testMode===true,
           testLabel: d.testLabel||null,
@@ -30191,6 +30204,8 @@ init().then(()=>{
         // before they own one. The atomic create batch below prevents overwrites.
         const code = generateRoomCode();
         const creatorUid=currentUserUidForWrites();
+        const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
+        const partnerSession=!!(partnerGrant&&creatorUid);
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&creatorUid);
         if(testerSession){
           const created=Number(data.testCreatedAt||data.createdAt||Date.now());
@@ -30206,6 +30221,15 @@ init().then(()=>{
           data.ownerUid=creatorUid;
           data.createdByRole="tester";
           data.ladderPointsAwarded=false;
+        }
+        if(partnerSession){
+          data.meta=data.meta||{};
+          data.meta.eventAuthority="official";
+          data.meta.assignedStaffUids=[creatorUid];
+          data.createdBy=creatorUid;
+          data.createdByRole="partner_organizer";
+          data.partnerOrganizationCode=partnerGrant.organizationId;
+          data.partnerContractOrderCode=partnerGrant.orderCode||partnerGrant.contractOrderCode||userProfile.partnerContractOrderCode||null;
         }
         const m = (data && data.meta) || {};
         const lobbyVisibility = m.registrationVisibility==="private" ? "private" : "public";
@@ -30270,6 +30294,11 @@ init().then(()=>{
         delete publicRegistrationFields.refereeStationNames;
         delete publicRegistrationFields.refereeStationUids;
         delete publicRegistrationFields.refereeStationRestrictionEnabled;
+        const partnerPrivate=partnerSession?{
+          createdByRole:"partner_organizer",
+          partnerOrganizationCode:partnerGrant.organizationId,
+          partnerContractOrderCode:data.partnerContractOrderCode
+        }:{};
         const privatePayload=Object.assign({
           data: JSON.stringify(data),
           updatedAt: Date.now(),
@@ -30281,7 +30310,7 @@ init().then(()=>{
           archiveStatus: (data && data.archiveStatus) || "ongoing",
           ladderPointsAwarded: data && data.ladderPointsAwarded===true,
           ladderSeasonId: (data && data.ladderSeasonId) || null
-        }, registrationFields, testFields);
+        }, registrationFields, testFields, partnerPrivate);
         const publicPayload=Object.assign({
           bracketView: JSON.stringify(buildPublicMirrorFields(data)),
           updatedAt: Date.now(),
@@ -30327,6 +30356,9 @@ init().then(()=>{
         if(Array.isArray(d.ladderSkippedPlayers)) parsed.ladderSkippedPlayers=d.ladderSkippedPlayers;
         if(d.createdBy) parsed.createdBy=d.createdBy;
         if(d.ownerUid) parsed.ownerUid=d.ownerUid;
+        if(d.createdByRole) parsed.createdByRole=d.createdByRole;
+        if(d.partnerOrganizationCode) parsed.partnerOrganizationCode=d.partnerOrganizationCode;
+        if(d.partnerContractOrderCode) parsed.partnerContractOrderCode=d.partnerContractOrderCode;
         if(d.testMode===true) parsed.testMode=true;
         if(d.testCreatedAt) parsed.testCreatedAt=d.testCreatedAt;
         if(d.testExpiresAt&&typeof d.testExpiresAt.toMillis==="function") parsed.testExpiresAtMs=d.testExpiresAt.toMillis();
@@ -30469,6 +30501,8 @@ init().then(()=>{
       if(!cloudEnabled || !code) return false;
       try{
         const actorUid=currentUserUidForWrites();
+        const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
+        const partnerSession=!!(partnerGrant&&actorUid);
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&actorUid);
 const legacyTesterSandbox=!!(testerSession&&data&&data.createdBy===actorUid&&data.ownerUid===actorUid&&data.createdByRole==="tester"&&data.meta&&data.meta.ladderMode!=="ranked");
 if(testerSession){
@@ -30477,6 +30511,14 @@ if(testerSession){
           data.meta.name=ensureTestName(data.meta.name);
           data.meta.ladderMode="general";
           data.ladderPointsAwarded=false;
+        }
+        if(partnerSession){
+          data.meta=data.meta||{};
+          data.meta.eventAuthority="official";
+          data.createdBy=data.createdBy||actorUid;
+          data.createdByRole="partner_organizer";
+          data.partnerOrganizationCode=partnerGrant.organizationId;
+          data.partnerContractOrderCode=partnerGrant.orderCode||partnerGrant.contractOrderCode||userProfile.partnerContractOrderCode||data.partnerContractOrderCode||null;
         }
         const testRoom=data.testMode===true && data.meta?.eventAuthority==="test";
         if(testRoom){data.meta.name=ensureTestName(data.meta.name);data.meta.ladderMode="general";data.ladderPointsAwarded=false;}
@@ -30539,6 +30581,7 @@ if(testerSession){
         const testExpiry=testRoom?new Date(Number(data.testExpiresAtMs||data.expiresAtMs)):null;
         const testPrivate=testRoom?{testMode:true,testLabel:"（測試）",eventAuthority:"test",ownerUid:data.ownerUid,createdBy:data.createdBy,createdByRole:"tester",ladderMode:"general",ladderPointsAwarded:false,testCreatedAt:Number(data.testCreatedAt||data.createdAt),testExpiresAt:testExpiry,expiresAt:testExpiry}:{};
         const testPublic=testRoom?{testMode:true,testLabel:"（測試）",eventAuthority:"test",ownerUid:data.ownerUid,createdByRole:"tester",ladderMode:"general",testCreatedAt:Number(data.testCreatedAt||data.createdAt),testExpiresAt:testExpiry,expiresAt:testExpiry}:{};
+        const partnerPrivate=partnerSession?{eventAuthority:"official",createdBy:actorUid,createdByRole:"partner_organizer",partnerOrganizationCode:partnerGrant.organizationId,partnerContractOrderCode:data.partnerContractOrderCode}:{};
         const privatePayload=Object.assign({
           data: JSON.stringify(data),
           entrySelectionWriteRevision:Number(data.entrySelectionRevision||0),
@@ -30547,7 +30590,7 @@ if(testerSession){
           // v13.13.2: keep private runtime mirrors current without touching registration counters.
           bracketSize: (data && data.bracketSize) || 0,
           archiveStatus: (data && data.archiveStatus) || "ongoing"
-        }, registrationFields, communityPrivate, testPrivate);
+        }, registrationFields, communityPrivate, testPrivate, partnerPrivate);
         const publicPayload=Object.assign({
           bracketView: JSON.stringify(buildPublicMirrorFields(data)),
           updatedAt: Date.now(),
