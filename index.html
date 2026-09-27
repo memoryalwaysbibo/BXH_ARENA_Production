@@ -8849,6 +8849,7 @@ async function ensureCloudRoomForTournament(){
 
 function cloudCreateRoomErrorMessage(prefix="建立失敗"){
   const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
+  if(code==="partner-room-quota-exhausted" || (code==="permission-denied"&&isPartnerOrganizerMode()&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerOrganizerGrant()?.orderCode)===0))return prefix+"：合作方案開房次數已用完";
   if(code==="permission-denied") return prefix+"：Firestore 權限被拒絕，請重新整理後再試";
   if(code==="unauthenticated") return prefix+"：登入狀態已失效，請重新登入";
   if(code==="already-exists") return prefix+"：房間代碼重複，請再試一次";
@@ -30307,6 +30308,9 @@ init().then(()=>{
         const creatorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
         const partnerSession=!!(partnerGrant&&creatorUid);
+        if(partnerSession&&partnerGrant.scope==="contract"&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerGrant.orderCode)===0){
+          throw Object.assign(new Error("partner-room-quota-exhausted"),{code:"partner-room-quota-exhausted"});
+        }
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&creatorUid);
         if(testerSession){
           const created=Number(data.testCreatedAt||data.createdAt||Date.now());
