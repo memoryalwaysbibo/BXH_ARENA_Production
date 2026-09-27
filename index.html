@@ -11102,6 +11102,7 @@ function titleConditionMeta(t){
     pioneer_registration:{category:'special',label:'封測限定',scope:'以 Firebase 帳號建立時間判定：台灣時間 2026/9/21 23:59 前註冊，不限人數。',task:'於 2026/9/21 23:59 前建立帳號；自動授予，逾期仍可補領'},
     pioneer_quota:{category:'special',label:'限定任務',scope:'依 BXH ARENA 開拓者資格與限定名額規則判定。',task:'完成開拓者限定資格'},
     profile_completion:{category:'activity',label:'玩家資料',scope:'依會員資料的八項完整度計算；首次達到 100% 自動授予。',task:'個人資料完成度達到 100%'},
+    card_set_completion:{category:'activity',label:'套卡蒐集',scope:'我的卡冊中同一套卡的 12 種卡牌各持有至少一張。',task:'集滿一套 12 張卡牌'},
     manual:{category:'special',label:'特殊榮譽',scope:'由 BXH 官方依指定資格人工授予，不依一般賽事進度自動取得。',task:'符合 BXH 官方指定授予資格'}
   };
   return map[type]||{category:'special',label:'特殊任務',scope:'依此稱號公告的指定條件判定。',task:(t&&t.description)||'完成指定條件'};
@@ -18893,7 +18894,7 @@ function renderCardAlbumPage(){
       return owned?`<button type="button" class="card-album-slot owned" data-action="card-album-preview" data-set="${set.id}" data-card="${card.id}" aria-label="檢視 ${esc(label)}，持有 ${quantity} 張"><img loading="lazy" decoding="async" src="${src}" alt="${esc(label)}卡面"><span class="card-album-count">×${quantity}</span></button>`:
         `<div class="card-album-slot" aria-label="${esc(label)}，${state.data?"尚未擁有":"讀取中"}"><img loading="lazy" decoding="async" src="${src}" alt="${esc(label)}卡面"><div class="card-album-lock"><strong>${esc(card.name)}</strong>${state.data?"尚未擁有":"收藏狀態待確認"}</div></div>`;
     }).join("")}</div>
-    <p class="hint">集滿 12 張可解鎖稱號「${esc(set.title)}」；稱號發放尚未開放。</p>
+    <p class="hint">集滿 12 張自動解鎖稱號「${esc(set.title)}」。</p>
   </section>`;
  }).join("");
  const selected=cardAlbumPreview&&CARD_ALBUM_SETS.find(s=>s.id===cardAlbumPreview.set);
