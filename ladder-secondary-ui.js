@@ -253,16 +253,13 @@
   }
 
   function decorateRankingTemplate(template){
-    var board=template.content.querySelector(".ladder-rank-board-v2");
-    if(board){
-      var panel=board.closest(".panel");
-      var title=panel&&panel.querySelector(".panel-title");
-      if(title){
-        var location=typeof ladderLocationLabel==="function"?ladderLocationLabel():"全區總榜";
-        var season=(typeof ladderPublicData!=="undefined"&&ladderPublicData&&ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1";
-        title.classList.add("ladder-board-title-v2");
-        title.innerHTML='<span class="ladder-board-heading">'+escLocal((ladderScoreMode==="career"?"生涯積分":season+" 賽季")+"｜"+location)+'</span>'+ladderScoreSwitchHtml();
-      }
+    var panel=template.content.querySelector(".ladder-ranking-panel");
+    var title=panel&&panel.querySelector(".panel-title");
+    if(title){
+      var location=typeof ladderLocationLabel==="function"?ladderLocationLabel():"全區總榜";
+      var season=(typeof ladderPublicData!=="undefined"&&ladderPublicData&&ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1";
+      title.classList.add("ladder-board-title-v2");
+      title.innerHTML='<span class="ladder-board-heading">'+escLocal((ladderScoreMode==="career"?"生涯積分":season+" 賽季")+"｜"+location)+'</span>'+ladderScoreSwitchHtml();
     }
   }
 
