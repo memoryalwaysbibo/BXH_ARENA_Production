@@ -5551,7 +5551,62 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
   .people-more-menu>summary{width:30px;height:29px;font-size:18px;}
 }
 </style>
-<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.16">
+<link rel="stylesheet" href="client-entrance-theme.css?v=2.0.17-directive-warning">
+<style id="directive-warning-critical-v1">
+.directive-warning-layer{display:none!important}
+:root[data-bxh-theme="directive"] header.topbar{position:relative!important;isolation:isolate!important;overflow:hidden!important}
+:root[data-bxh-theme="directive"] header.topbar .directive-warning-layer{
+  display:block!important;
+  position:absolute!important;
+  top:6px!important;
+  right:-2vw!important;
+  bottom:6px!important;
+  left:auto!important;
+  width:min(64vw,760px)!important;
+  height:calc(100% - 12px)!important;
+  max-width:none!important;
+  object-fit:contain!important;
+  object-position:right center!important;
+  pointer-events:none!important;
+  z-index:1!important;
+  opacity:.075!important;
+  mix-blend-mode:screen!important;
+  filter:saturate(1.2) brightness(.86) contrast(1.1)!important;
+  transform:translateZ(0) scale(1.002);
+  transform-origin:80% 50%;
+  animation:bxhDirectiveWarningCritical 3.2s linear infinite!important;
+}
+:root[data-bxh-theme="directive"] header.topbar .logo-wrap,
+:root[data-bxh-theme="directive"] header.topbar .brandtext,
+:root[data-bxh-theme="directive"] header.topbar .header-account-controls{
+  position:relative!important;
+  z-index:3!important;
+}
+@keyframes bxhDirectiveWarningCritical{
+  0%,64%{opacity:.075;filter:saturate(1.18) brightness(.84) contrast(1.1);transform:translateZ(0) scale(1.002)}
+  72%{opacity:.16;filter:saturate(1.25) brightness(1.02) contrast(1.1);transform:translateZ(0) scale(1.004)}
+  79%{opacity:.42;filter:saturate(1.38) brightness(1.38) contrast(1.12);transform:translateZ(0) scale(1.010)}
+  84%{opacity:.18;filter:saturate(1.25) brightness(1.06) contrast(1.1);transform:translateZ(0) scale(1.005)}
+  90%{opacity:.62;filter:saturate(1.5) brightness(1.62) contrast(1.15);transform:translateZ(0) scale(1.016)}
+  96%{opacity:.14;filter:saturate(1.22) brightness(.98) contrast(1.1);transform:translateZ(0) scale(1.004)}
+  100%{opacity:.075;filter:saturate(1.18) brightness(.84) contrast(1.1);transform:translateZ(0) scale(1.002)}
+}
+@media(max-width:640px){
+  :root[data-bxh-theme="directive"] header.topbar .directive-warning-layer{
+    width:78vw!important;
+    right:-10vw!important;
+    top:4px!important;
+    bottom:4px!important;
+    height:calc(100% - 8px)!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  :root[data-bxh-theme="directive"] header.topbar .directive-warning-layer{
+    animation:none!important;
+    opacity:.18!important;
+  }
+}
+</style>
 <link rel="stylesheet" href="referee-score-v2.css?v=14.2.38-score-fault">
 <style>
 .card-album-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -17993,7 +18048,7 @@ function renderAccountManagementScreen(){
   return `<div class="stickytop account-management-stickytop"><header class="topbar account-management-topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統 <small style="opacity:.55;font-size:9px;">${APP_VERSION}</small></span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
+      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
       <div class="header-account-controls">${accountMenuHtml()}</div>
     </header>${renderSuperAdminManagementTabs(page)}</div>
     ${accountMenuOverlayHtml()}
@@ -18283,7 +18338,7 @@ function renderPlayerCenterScreen(){
   return `<div class="stickytop"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
+      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
     </header>
     <div class="role-indicator">玩家模式｜${esc(ctx.name)}　<button class="btn btn-ghost btn-sm" data-action="account-back-to-role">返回身分選擇</button></div>
     </div>
@@ -18983,7 +19038,7 @@ function renderPlayerCenterLoggedIn(){
   return `<div class="stickytop player-shell mode-shell"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
+      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
       <div class="header-account-controls">${mailboxButtonHtml()}${accountMenuHtml()}</div>
     </header>
     ${renderPlayerNavHtml()}
@@ -19288,7 +19343,7 @@ function renderCommunityRoomApp(){
   const tabs=[["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["people","人員管理"],["settings","賽事設定"]];
   let content=communityRoomActiveTab==="bracket"?renderBracket():communityRoomActiveTab==="referee"?renderReferee():communityRoomActiveTab==="people"?renderPeopleManagement():communityRoomActiveTab==="settings"?renderCommunitySettings():renderLive();
   const exp=communityRoomExpiryMs(state);
-  return `<div class="stickytop"><header class="topbar"><button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button><div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">玩家一般賽事</span>${topbarConnectionRailHtml()}</div><div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true"><span class="badge badge-metal">一般賽事｜不計積分</span><button class="btn btn-ghost btn-sm" data-action="community-exit-room">返回我的房間</button></header>
+  return `<div class="stickytop"><header class="topbar"><button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button><div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">玩家一般賽事</span>${topbarConnectionRailHtml()}</div><div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true"><span class="badge badge-metal">一般賽事｜不計積分</span><button class="btn btn-ghost btn-sm" data-action="community-exit-room">返回我的房間</button></header>
   <div class="community-room-notice">主辦人：${esc((userProfile&& (userProfile.displayName||userProfile.realName))||"玩家")}　｜　代碼 ${esc(state.cloudCode||"—")}　｜　完整房間預計保留至 ${exp?new Date(exp).toLocaleString():"—"}</div>
   <nav class="tabs">${tabs.map(t=>`<button class="${communityRoomActiveTab===t[0]?"active":""}" data-action="community-switch-room-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}</nav></div><main>${content}</main>${renderModal()}${celebrationOpen?renderCelebrationOverlay():""}${shareModalOpen?renderShareModal():""}${renderEventEntryModal()}${renderQrScannerModal()}`;
 }
@@ -23321,7 +23376,7 @@ function renderApp(){
           <span class="t2">戰鬥陀螺賽事系統</span>
           ${topbarConnectionRailHtml()}
         </div>
-        <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp" alt="" aria-hidden="true">
+        <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
       ${tournamentViewContextHeaderHtml()}
