@@ -354,7 +354,7 @@
     ".ladder-score-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin:10px 0 14px;padding:4px;border:1px solid rgba(217,185,92,.2);border-radius:10px;background:rgba(10,11,13,.72);}"+
     ".ladder-score-switch button{min-height:40px;border:0;border-radius:7px;background:transparent;color:var(--metal);font:700 13px/1 var(--font-d);letter-spacing:.5px;}"+
     ".ladder-score-switch button.active{background:linear-gradient(145deg,rgba(217,185,92,.2),rgba(217,185,92,.07));color:var(--gold);box-shadow:inset 0 0 0 1px rgba(217,185,92,.28);}"+
-    ".ladder-rank-scroll-v2{overflow:visible;}"+
+    ".ladder-rank-scroll-v2{max-height:none;overflow:visible;}"+
     ".ladder-rank-board-v2{width:100%;min-width:0;}"+
     ".ladder-rank-grid{display:grid;grid-template-columns:52px minmax(0,1fr) 96px 78px;gap:8px;align-items:center;min-width:0;}"+
     ".ladder-rank-head-v2{padding:0 8px 9px;color:var(--metal);font-size:11px;font-weight:800;border-bottom:1px solid rgba(255,255,255,.08);text-align:center;}"+
