@@ -3563,6 +3563,12 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .guest-rank{font-family:var(--font-d);font-weight:800;color:var(--gold);font-size:15px;}
 .guest-player-name{font-weight:700;color:var(--white);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .guest-player-mobile-meta{display:none;}
+.guest-tier .ladder-tier-display{gap:2px;}
+.guest-tier .ladder-tier-emblem{width:54px;height:50px;flex-basis:50px;}
+.guest-ladder-row{min-height:76px;}
+.guest-player-mobile-badge{display:none;}
+.profile-tier-badge .ladder-tier-display{gap:3px;}
+.profile-tier-badge .ladder-tier-emblem{width:66px;height:60px;flex-basis:60px;}
 .guest-pts strong{font-family:var(--font-d);color:var(--neon);font-size:17px;margin-right:3px;}
 .guest-pts span,.guest-career,.guest-events,.guest-champs{font-size:12px;color:var(--metal);}
 .guest-ladder-more{padding:12px;text-align:center;border-top:1px solid var(--border);}
@@ -3587,6 +3593,10 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   }
   .guest-tier,.guest-career,.guest-events,.guest-champs{display:none;}
   .guest-player-mobile-meta{display:block;font-size:10px;color:var(--metal-dim);margin-top:2px;}
+  .guest-player-mobile-badge{display:block;float:left;margin-right:8px;}
+  .guest-player-mobile-badge .ladder-tier-emblem{width:48px;height:44px;flex-basis:44px;}
+  .guest-player-mobile-badge .ladder-tier-name{display:none;}
+  .guest-ladder-row{min-height:66px;}
   .guest-pts{text-align:right;}
   .guest-player-name{font-size:13px;}
   .guest-rank{font-size:13px;}
@@ -18659,6 +18669,12 @@ function ladderDisplayTier(p){
   return Number(p.seasonPoints||0)>=2800 && globalRank && globalRank<=10
     ? 'BXH 傳說' : ladderTierFromPoints(p.seasonPoints);
 }
+function ladderBadgeHtml(p){
+  const base=ladderTierFromPoints(p.seasonPoints);
+  const display=ladderDisplayTier(p);
+  const tierIndex=LADDER_TIER_INDEX[base]||0;
+  return `<span class="ladder-tier-display" title="${esc(display)}"><span class="ladder-tier-emblem ladder-tier-emblem-${tierIndex}${display==='BXH 傳說'?' is-legend':''}" aria-hidden="true"></span><span class="ladder-tier-name">${esc(display)}</span></span>`;
+}
 function ladderRulesHtml(){
   return `<details class="panel"><summary style="cursor:pointer;color:var(--gold);font-weight:700">天梯積分 V1｜計分方式與牌位 ▾</summary>
     <p>本場積分＝10 分＋四捨五入（名次加分 × 人數倍率）。只計最終名次，不逐輪累加。</p>
@@ -20082,9 +20098,9 @@ function guestLadderRowsHtml(rows){
       <div class="guest-rank">NO.${p.__rank}</div>
       <div class="guest-player">
         <div class="guest-player-name">${esc(p.playerName||p.publicName||"—")}${p.equippedBadge?` <span class="badge badge-metal">${esc(p.equippedBadge.name)}</span>`:""}</div>
-        <div class="guest-player-mobile-meta">${esc(ladderDisplayTier(p))} · ${Number(p.seasonPoints||0)} PT</div>
+        <div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div><div class="guest-player-mobile-meta">${esc(ladderDisplayTier(p))} · ${Number(p.seasonPoints||0)} PT</div>
       </div>
-      <div class="guest-tier"><span class="badge badge-metal ladder-tier-${LADDER_TIER_INDEX[ladderTierFromPoints(p.seasonPoints)]||0}">${esc(ladderDisplayTier(p))}</span></div>
+      <div class="guest-tier">${ladderBadgeHtml(p)}</div>
       <div class="guest-pts"><strong>${Number(p.seasonPoints||0)}</strong><span>PT</span></div>
       <div class="guest-career">${Number(p.careerPoints||0)}</div>
       <div class="guest-events">${Number(p.totalEvents||0)}</div>
@@ -22216,7 +22232,7 @@ function renderPlayerProfileTab(p){
       return `<div class="panel"><div class="panel-title">BXH 天梯</div>
         ${myLadderProfileLoading?'<div class="empty-state">正在讀取天梯資料…</div>':`<div class="grid grid-2">
           <div class="stat-box"><div class="label">目前賽季</div><div class="value small">${esc(l.currentSeason||"S1")}</div></div>
-          <div class="stat-box"><div class="label">目前階級</div><div class="value small">${esc(ladderDisplayTier(l))}</div></div>
+          <div class="stat-box"><div class="label">目前階級</div><div class="value small profile-tier-badge">${ladderBadgeHtml(l)}</div></div>
           <div class="stat-box"><div class="label">賽季積分</div><div class="value small">${Number(l.seasonPoints||0)} PT</div></div>
           <div class="stat-box"><div class="label">生涯積分</div><div class="value small">${Number(l.careerPoints||0)} PT</div></div>
           <div class="stat-box"><div class="label">最高歷史階級</div><div class="value small">${esc(l.highestRankTier||"黑鐵")}</div></div>
@@ -31846,6 +31862,6 @@ if(testerSession){
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
 </script>
-<script src="ladder-secondary-ui.js?v=14.2.41"></script>
+<script src="ladder-secondary-ui.js?v=14.2.42"></script>
 </body>
 </html>
