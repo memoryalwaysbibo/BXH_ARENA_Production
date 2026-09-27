@@ -145,7 +145,7 @@
   }
   if(e.target.closest('[data-enchantment-open]')){dismissedRound='';discoverPlayerDraw();}
  });
- setInterval(discoverPlayerDraw,7000);
+ setInterval(discoverPlayerDraw,4000);
  setTimeout(discoverPlayerDraw,1500);
  async function operate(d){
   const {code,matchId:id,action}=d,k=key(code,id),item=cache.get(k);
