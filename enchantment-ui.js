@@ -147,6 +147,7 @@
      if(heading)heading.textContent='附魔之戰｜第 '+Number(s.round)+' 局'+(s.phase==='drawing'?(s.drawn?.[side]?'｜等待對手抽卡':'｜請抽卡'):'｜等待裁判判定');
      syncFrames(code,m.id);continue;
     }
+    if(!canDraw)continue;
     if(overlay)overlay.remove();
     overlay=document.createElement('section');
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
