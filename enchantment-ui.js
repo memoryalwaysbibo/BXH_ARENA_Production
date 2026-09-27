@@ -43,14 +43,14 @@
   const points=`<p>比分 A ${Number(s.scores?.A)||0}：${Number(s.scores?.B)||0} B　｜　第 ${Number(s.round)||0} 局</p>`;
   const phase={drawing:'等待雙方抽卡', 'ready-to-score':'等待裁判判定', 'awaiting-result':'已達 4 分，請確認結果',completed:'本場已確認'}[s.phase]||'等待裁判開始';
   const sides=reversedSides.has(key(code,id))?['B','A']:['A','B'];
-  const scorePanel=`<div class="ref-vs-arena standard" style="position:relative">${sides.map(side=>{
+  const scorePanel=`<div style="position:relative"><div class="ref-vs-arena standard">${sides.map(side=>{
    const name=matchNames.get(key(code,id))?.[side]||'選手 '+side;
    const scoreButtons=Object.entries(outcome).map(([type,label])=>{
     const result=root.BXHEnchantmentScore.resolve({type,winnerCardId:s.cards[side],loserCardId:s.cards[side==='A'?'B':'A']});
     return `<button data-enchantment-action="score" ${common} data-side="${side}" data-type="${type}" ${ready?'':'disabled'}>${label} ${result.ok?result.originalPoints+' → '+result.points:''}</button>`;
    }).join('');
    return `<div class="side-panel"><div class="side-name">${quote(name)}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
-  }).join('')}<button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
+  }).join('')}</div><button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
   let controls='';
   if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
    controls+=button(ready?'撤回上一筆失誤':'撤回上一筆','undo');
