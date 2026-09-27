@@ -3,7 +3,8 @@
 (function(root){
   function grant(profile){
     const value=profile&&profile.partnerOrganizer;
-    return profile&&profile.active===true&&value&&typeof value==='object'&&value.status==='active'&&typeof value.organizationId==='string'&&value.organizationId.length>0&&(value.expiresAt==null||Number(value.expiresAt)>Date.now())?value:null;
+    const rawExpiry=value&&(value.expiresAtMs??value.expiresAt),expiry=rawExpiry==null?0:(Number(rawExpiry)||Date.parse(rawExpiry)||0);
+    return profile&&profile.active===true&&value&&typeof value==='object'&&value.status==='active'&&typeof value.organizationId==='string'&&value.organizationId.length>0&&(!expiry||expiry>Date.now())?value:null;
   }
   function safe(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function render(profile){
@@ -112,7 +113,7 @@
     const start=()=>{observer.observe(document.body,{childList:true,subtree:true});decorateMailboxContractButtons();};
     if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
   }
-  const api={hasGrant:profile=>!!grant(profile),render};
+  const api={hasGrant:profile=>!!grant(profile),grant,render};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   root.BXHPartnerOrganizer=api;
 })(typeof window!=='undefined'?window:globalThis);
