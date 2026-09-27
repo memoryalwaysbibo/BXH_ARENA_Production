@@ -42,6 +42,7 @@ const skinSelect=$('skinSelect'),skinStorageKey='bxh-enchantment-draw-skin';
 function applyDrawSkin(value){const skin=['classic','gods-arena'].includes(value)?value:'night-sky';document.body.dataset.drawSkin=skin;skinSelect.value=skin;try{localStorage.setItem(skinStorageKey,skin)}catch(e){/* Private browsing may disable storage. */}}
 try{applyDrawSkin(localStorage.getItem(skinStorageKey))}catch(e){applyDrawSkin('night-sky')}
 skinSelect.addEventListener('change',()=>applyDrawSkin(skinSelect.value));
+const previewMode=window.parent===window;
 let phase='waiting',round=0,index=0,timer=null,drag=null,progress=0,assignedCard=null,session=null,acknowledgedRound=0;const cardIds=['double_extreme','double_knockout','double_burst','double_spin','boost_extreme','boost_knockout','boost_burst','weaken_extreme','weaken_knockout','weaken_burst','weaken_spin','seal'];
 function setCopy(h,d){$('heading').textContent=h;$('description').textContent=d}
 function clearTimer(){if(timer){clearTimeout(timer);timer=null}}
@@ -70,14 +71,16 @@ function scrubSound(value){
  src.connect(gain).connect(audioCtx.destination);src.start(0,offset,.085);src.stop(audioCtx.currentTime+.085);
 }
 $('soundToggle').addEventListener('click',()=>{sfxEnabled=!sfxEnabled;$('soundToggle').textContent=sfxEnabled?'音效 🔊':'音效 🔇';$('soundToggle').setAttribute('aria-pressed',String(sfxEnabled));if(!sfxEnabled)stopClips()});
-function reveal(){if(phase!=='drawing')return;clearTimer();releaseAudio.pause();playClip(roarAudio);const cardIndex=cardIds.indexOf(assignedCard);if(cardIndex<0){showDrawError('無法取得本局卡牌，請重新整理。');return;}const c=cards[cardIndex];$('cardFaceImage').src=c.src;$('cardFaceImage').alt=c.title+'附魔卡';card.classList.add('flipped');$('flash').classList.remove('on');void $('flash').offsetWidth;$('flash').classList.add('on');phase='revealed';app.classList.add('revealed');skip.hidden=true;action.disabled=false;action.textContent='確認附魔';setCopy('抽卡完成｜'+c.title,'效果已揭曉，確認後等待裁判宣布開戰。')}
-function finishDraw(){if(phase!=='idle')return;loadScrub();if(!soundStarted){playClip(clawAudio);soundStarted=true;playClip(releaseAudio)}else{clawAudio.pause();playClip(releaseAudio)}phase='drawing';app.classList.add('draw');card.classList.remove('dragging');card.style.removeProperty('--lift');card.classList.add('extracted');card.setAttribute('aria-valuenow','100');action.disabled=true;action.textContent='附魔召喚中…';skip.hidden=false;setCopy('抽取附魔中','卡片已到舞台中央，準備揭曉…');timer=setTimeout(()=>{if(session)window.parent.postMessage({kind:'bxh-enchantment-draw',code:session.code,matchId:session.matchId,round},location.origin);else showDrawError('尚未連接賽事');},750)}
+function reveal(){if(phase!=='drawing')return;clearTimer();releaseAudio.pause();playClip(roarAudio);const cardIndex=cardIds.indexOf(assignedCard);if(cardIndex<0){showDrawError('無法取得本局卡牌，請重新整理。');return;}const c=cards[cardIndex];$('cardFaceImage').src=c.src;$('cardFaceImage').alt=c.title+'附魔卡';card.classList.add('flipped');$('flash').classList.remove('on');void $('flash').offsetWidth;$('flash').classList.add('on');phase='revealed';app.classList.add('revealed');skip.hidden=true;action.disabled=false;action.textContent='確認附魔';setCopy(previewMode?'預覽結果｜'+c.title:'抽卡完成｜'+c.title,previewMode?'點一下卡牌可再抽一次；預覽結果不會送出賽事。':'效果已揭曉，確認後等待裁判宣布開戰。')}
+function finishDraw(){if(phase!=='idle')return;loadScrub();if(!soundStarted){playClip(clawAudio);soundStarted=true;playClip(releaseAudio)}else{clawAudio.pause();playClip(releaseAudio)}phase='drawing';app.classList.add('draw');card.classList.remove('dragging');card.style.removeProperty('--lift');card.classList.add('extracted');card.setAttribute('aria-valuenow','100');action.disabled=true;action.textContent='附魔召喚中…';skip.hidden=false;setCopy('抽取附魔中','卡片已到舞台中央，準備揭曉…');timer=setTimeout(()=>{if(previewMode){assignedCard=cardIds[index++%cardIds.length];reveal();}else if(session)window.parent.postMessage({kind:'bxh-enchantment-draw',code:session.code,matchId:session.matchId,round},location.origin);else showDrawError('尚未連接賽事');},750)}
 function next(){stopClips();soundStarted=false;assignedCard=null;clearTimer();$('round').textContent='ROUND '+String(round).padStart(2,'0')+' · 抽卡階段';phase='idle';drag=null;app.classList.remove('draw','dragging','revealed');card.classList.remove('flipped','extracted','dragging');card.style.removeProperty('--lift');card.setAttribute('aria-valuenow','0');progress=0;action.disabled=false;action.textContent='按鈕抽卡 ↑';skip.hidden=true;setCopy('下一局附魔待命','按住底部露出的卡片，穿過龍爪往上抽。放手太早會返回卡牌座。')}
 function dragStart(e){if(phase!=='idle'||drag||!e.isPrimary)return;e.preventDefault();loadScrub();rewindAudio.pause();playClip(clawAudio);soundStarted=true;drag={id:e.pointerId,y:e.clientY,start:progress};card.classList.add('dragging');app.classList.add('dragging');e.currentTarget.setPointerCapture(e.pointerId)}
 function dragMove(e){if(!drag||drag.id!==e.pointerId)return;e.preventDefault();setProgress(drag.start+(drag.y-e.clientY)/295);if(scrubBuffer){clawAudio.pause();scrubSound(progress)}if(progress>.02)setCopy('拖出附魔卡片','繼續向上拉，放開後揭曉附魔。')}
 function dragEnd(e){if(!drag||drag.id!==e.pointerId)return;const completed=progress>=.68;drag=null;card.classList.remove('dragging');app.classList.remove('dragging');if(completed){finishDraw()}else{clawAudio.pause();playClip(rewindAudio,Math.max(0,(1-progress)*.56));soundStarted=false;setProgress(0);setCopy('本局附魔待命','再往上拉一些，讓卡片穿過底部龍爪。')}}
 for(const el of [card]){el.addEventListener('pointerdown',dragStart);el.addEventListener('pointermove',dragMove);el.addEventListener('pointerup',dragEnd);el.addEventListener('pointercancel',dragEnd)}
-card.addEventListener('keydown',e=>{if(phase!=='idle')return;if(e.key==='ArrowUp'){e.preventDefault();setProgress(progress+.2);if(progress>=.68)finishDraw()}else if(e.key==='Enter'||e.key===' '){e.preventDefault();finishDraw()}});
+function restartPreview(){if(!previewMode||phase!=='revealed')return;round++;next();setCopy('預覽模式｜抽卡待命','按住卡牌往上拉；結果不會寫入賽事。')}
+card.addEventListener('click',restartPreview);
+card.addEventListener('keydown',e=>{if(previewMode&&phase==='revealed'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();restartPreview();return;}if(phase!=='idle')return;if(e.key==='ArrowUp'){e.preventDefault();setProgress(progress+.2);if(progress>=.68)finishDraw()}else if(e.key==='Enter'||e.key===' '){e.preventDefault();finishDraw()}});
 action.addEventListener('click',()=>{if(phase==='idle')finishDraw();else if(phase==='revealed'){acknowledgedRound=round;phase='waiting';action.disabled=true;setCopy('等待裁判結果','本局卡牌已確認，等待裁判送出比賽結果。')}});
 skip.addEventListener('click',()=>{if(assignedCard)reveal()});
 function showDrawError(message){clearTimer();stopClips();phase='waiting';action.disabled=true;skip.hidden=true;setCopy('抽卡暫停',message)}
@@ -118,6 +121,7 @@ window.addEventListener('message',event=>{
  else if(d.kind==='bxh-enchantment-sound'){sfxEnabled=!!d.enabled;if(!sfxEnabled)stopClips();}
  else if(d.kind==='bxh-enchantment-error'&&session&&d.code===session.code&&d.matchId===session.matchId)showDrawError('連線中斷，請重新整理頁面再試。');
 });
-action.disabled=true;skip.hidden=true;setCopy('等待裁判開始抽卡','請留在此畫面，裁判啟動後即可拖出卡片。');
-window.parent.postMessage({kind:'bxh-enchantment-ready'},location.origin);
+action.disabled=true;skip.hidden=true;
+if(previewMode){round=1;next();setCopy('預覽模式｜抽卡待命','按住卡牌往上拉，直接試玩抽卡動畫。');document.querySelector('.note').textContent='預覽模式｜不會寫入賽事紀錄；點一下揭曉的卡牌可再次抽卡。';}
+else{setCopy('等待裁判開始抽卡','請留在此畫面，裁判啟動後即可拖出卡片。');window.parent.postMessage({kind:'bxh-enchantment-ready'},location.origin);}
 </script></body></html>
