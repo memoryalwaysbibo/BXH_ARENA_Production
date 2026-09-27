@@ -64,6 +64,7 @@ test('first fault warning exposes undo before a point is awarded',async()=>{
  vm.runInNewContext(fs.readFileSync(require.resolve('../enchantment-ui.js'),'utf8'),
   {window:root,document,location:{origin:'https://arena.example'},setTimeout:()=>{},setInterval:()=>{},console});
  await root.BXHEnchantmentUI.refresh('BXH-ABCD','match1');
- assert.match(slot.innerHTML,/A 失誤 1\/2/);
+ assert.match(slot.innerHTML,/class="ref-vs-arena standard"/);
+ assert.match(slot.innerHTML,/data-side="A"[^>]*>失誤 1\/2/);
  assert.match(slot.innerHTML,/撤回上一筆失誤/);
 });
