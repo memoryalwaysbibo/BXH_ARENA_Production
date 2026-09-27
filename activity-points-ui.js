@@ -1,5 +1,7 @@
 "use strict";
 (function installActivityPointsUI(){
+ if(window.__BXH_ACTIVITY_POINTS_UI_INSTALLED__)return;
+ window.__BXH_ACTIVITY_POINTS_UI_INSTALLED__=true;
  const state={snapshot:null,rows:[],mode:"records",loading:false,error:"",open:false,nextSnapshotAt:0,snapshotFailures:0};
  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const labels={daily_checkin:"每日簽到",match_completed:"完成真實對戰",host_completed:"房主完賽",mood_message:"心情小棧留言",ladder_points:"天梯積分",ladder_migration:"既有天梯積分補發",inactivity_penalty:"未簽到扣分",redemption:"商品兌換"};
