@@ -21,7 +21,7 @@
   const godsSrc=id=>new URL(GODS_CARD_PATH+id+'.webp',location.href).href;
   const applyBack=()=>{
    if(!back)return;
-   if(selected==='gods'&&Object.values(godsOwned).some(Number))back.style.backgroundImage=`url("${new URL(GODS_CARD_PATH+'back.webp',location.href).href}")`;
+   if(selected==='gods'&&Object.values(godsOwned).some(Number))back.style.backgroundImage=`url("${new URL(GODS_CARD_PATH+'back.webp?v=20260928-c-grand',location.href).href}")`;
    else back.style.removeProperty('background-image');
   };
   const apply=()=>{
