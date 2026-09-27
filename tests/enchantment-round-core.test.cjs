@@ -16,11 +16,17 @@ test('referee begins; each player reveals only their own assigned card; scoring 
   s=step(flow.reveal,s,1,'B','user-b');
   assert.equal(flow.view(s,'referee').cards.B,'weaken_spin');
   const r=flow.submit(s,1,'A','burst',true);assert.equal(r.event.points,4);
-  assert.equal(r.state.phase,'awaiting-result');assert.equal(r.state.scores.A,4);
-  assert.equal(flow.confirm(r.state,false).reason,'referee-required');
-  assert.equal(step(flow.confirm,r.state,true).phase,'completed');
-  const undone=step(flow.undo,r.state,true);
-  assert.equal(undone.phase,'ready-to-score');assert.equal(undone.scores.A,0);
+  assert.equal(r.state.phase,'drawing');assert.equal(r.state.scores.A,4);
+  let next=step(flow.assign,r.state,2,'A','double_burst');
+  next=step(flow.assign,next,2,'B','weaken_spin');
+  next=step(flow.reveal,next,2,'A','user-a');
+  next=step(flow.reveal,next,2,'B','user-b');
+  const finish=flow.submit(next,2,'A','burst',true);
+  assert.equal(finish.state.phase,'awaiting-result');assert.equal(finish.state.scores.A,8);
+  assert.equal(flow.confirm(finish.state,false).reason,'referee-required');
+  assert.equal(step(flow.confirm,finish.state,true).phase,'completed');
+  const undone=step(flow.undo,finish.state,true);
+  assert.equal(undone.phase,'ready-to-score');assert.equal(undone.scores.A,4);
   assert.deepEqual(undone.cards,{A:'double_burst',B:'weaken_spin'});
 });
 test('round token and assignment prevent rerolls and duplicate scoring',()=>{
