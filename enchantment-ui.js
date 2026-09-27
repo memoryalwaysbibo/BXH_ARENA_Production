@@ -86,7 +86,7 @@
  // Public brackets created before this fix can omit playMode. Use the signed-in
  // player's confirmed registration to find the active match; the callable
  // verifies the UID and only returns an enchantment round to its participants.
- let discoveryBusy=false,lastRegistrations=0,registrations=[],dismissedRound='';
+ let discoveryBusy=false,lastRegistrations=0,registrations=[],dismissedMatch='';
  async function discoverPlayerDraw(){
   if(discoveryBusy||!root.cloudSync?.queryMyRegistrations||!root.engagementService?.enchantment)return;
   discoveryBusy=true;
@@ -101,31 +101,42 @@
     const m=data.matches.find(x=>!x.completed&&!x.isBye&&x.a?.playerId&&x.b?.playerId&&
      (x.a.playerId===pid||x.b.playerId===pid)&&
      (x.status==='in_progress'||Object.values(data.courtAssignments||{}).some(c=>c?.currentMatchId===x.id)));
-    if(!m)continue;
+    if(!m){
+     const overlay=document.querySelector('[data-enchantment-draw-overlay]');
+     const active=overlay&&overlay.dataset.code===code&&data.matches.some(x=>x.id===overlay.dataset.matchId&&x.completed);
+     if(active){overlay.remove();document.querySelector('[data-enchantment-open]')?.remove();dismissedMatch='';}
+     continue;
+    }
     const side=m.a.playerId===pid?'A':'B';
     let result;
     try{result=await call({action:'get',code,matchId:m.id});}catch(e){continue;}
     cache.set(key(code,m.id),{version:result.version,state:result.state});
     const s=result.state;
-    const show=s?.phase==='drawing'&&!s.drawn?.[side];
+    const show=!!s&&s.phase!=='completed';
     let overlay=document.querySelector('[data-enchantment-draw-overlay]');
     let reopen=document.querySelector('[data-enchantment-open]');
-    if(!show){if(overlay)overlay.remove();if(reopen)reopen.remove();continue;}
+    if(!show){if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id)overlay.remove();if(reopen?.dataset.code===code&&reopen.dataset.matchId===m.id)reopen.remove();if(dismissedMatch===key(code,m.id))dismissedMatch='';continue;}
     if(!reopen){
      reopen=document.createElement('button');reopen.type='button';reopen.dataset.enchantmentOpen='';
-     reopen.textContent='進入抽卡｜第 '+Number(s.round)+' 局';
+     reopen.dataset.code=code;reopen.dataset.matchId=m.id;
      reopen.style.cssText='position:fixed;right:16px;bottom:20px;z-index:2147483001;padding:13px 18px;border:1px solid #e9be69;border-radius:12px;background:#21182b;color:#fff;font-size:16px;box-shadow:0 6px 24px #0009';
      document.body.append(reopen);
     }
-    reopen.textContent='進入抽卡｜第 '+Number(s.round)+' 局';
-    if(dismissedRound===key(code,m.id)+':'+s.round)continue;
-    if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id){reopen.style.display='none';syncFrames(code,m.id);continue;}
+    reopen.dataset.code=code;reopen.dataset.matchId=m.id;
+    reopen.textContent='進入附魔對戰｜第 '+Number(s.round)+' 局';
+    if(dismissedMatch===key(code,m.id))continue;
+    if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id){
+     reopen.style.display='none';
+     const heading=overlay.querySelector('[data-enchantment-heading]');
+     if(heading)heading.textContent='附魔之戰｜第 '+Number(s.round)+' 局'+(s.phase==='drawing'?(s.drawn?.[side]?'｜等待對手抽卡':'｜請抽卡'):'｜等待裁判判定');
+     syncFrames(code,m.id);continue;
+    }
     if(overlay)overlay.remove();
     overlay=document.createElement('section');
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
     overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔之戰抽卡');
     overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080917;display:flex;flex-direction:column';
-    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px">附魔之戰｜第 '+Number(s.round)+' 局抽卡 <button type="button" data-enchantment-close style="float:right">稍後抽卡</button></div><div data-enchantment-loading style="color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
+    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px"><span data-enchantment-heading>附魔之戰｜第 '+Number(s.round)+' 局</span> <button type="button" data-enchantment-close style="float:right">離開抽卡畫面</button></div><div data-enchantment-loading style="color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
     const frame=document.createElement('iframe');frame.title='附魔之戰選手抽卡';frame.dataset.enchantmentPlayer='';
     frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
     frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917;visibility:hidden';
@@ -136,7 +147,7 @@
      let valid=true;
      try{valid=!!frame.contentDocument?.querySelector('main.app');}catch(e){/* Keep cross-origin fallback visible. */}
      const loading=overlay.querySelector('[data-enchantment-loading]');
-     if(!valid){if(loading)loading.innerHTML='抽卡畫面載入失敗。請按「稍後抽卡」，再點「進入抽卡」重試。';return;}
+     if(!valid){if(loading)loading.innerHTML='抽卡畫面載入失敗。請按「離開抽卡畫面」，再點「進入附魔對戰」重試。';return;}
      if(loading)loading.remove();frame.style.visibility='visible';syncFrames(code,m.id);
     },{once:true});
     break;
@@ -147,12 +158,11 @@
  document.addEventListener('click',e=>{
   if(e.target.closest('[data-enchantment-close]')){
    const overlay=document.querySelector('[data-enchantment-draw-overlay]');
-   const s=overlay&&cache.get(key(overlay.dataset.code,overlay.dataset.matchId))?.state;
-   if(s)dismissedRound=key(overlay.dataset.code,overlay.dataset.matchId)+':'+s.round;
+   if(overlay)dismissedMatch=key(overlay.dataset.code,overlay.dataset.matchId);
    overlay?.remove();
    const reopen=document.querySelector('[data-enchantment-open]');if(reopen)reopen.style.display='';
   }
-  if(e.target.closest('[data-enchantment-open]')){dismissedRound='';discoverPlayerDraw();}
+  if(e.target.closest('[data-enchantment-open]')){dismissedMatch='';discoverPlayerDraw();}
  });
  setInterval(discoverPlayerDraw,4000);
  setTimeout(discoverPlayerDraw,1500);
