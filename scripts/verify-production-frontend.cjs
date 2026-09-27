@@ -185,7 +185,7 @@ if(!ladderSecondaryUi.includes('ladderScoreMode==="career"?"careerPoints":"seaso
 if(!ladderSecondaryUi.includes('function ladderTierEmblemHtml(p)')) throw new Error('Ladder V2 tier emblem renderer missing');
 if(!ladderSecondaryUi.includes('class="ladder-player-block"')||!ladderSecondaryUi.includes('class="title-chip rarity-')) throw new Error('Ladder V2 player/title hierarchy missing');
 if(!ladderSecondaryUi.includes('grid-template-columns:52px minmax(0,1fr) 96px 78px')||!ladderSecondaryUi.includes('grid-template-columns:44px minmax(0,1fr) 78px 64px')) throw new Error('Ladder V2 responsive four-column grid missing');
-mustInclude('ladder-secondary-ui.js?v=14.2.47','Ladder V2 cache bust missing');
+mustInclude('ladder-secondary-ui.js?v=14.2.48','Ladder V2 cache bust missing');
 console.log('PASS ladder ranking V2 season/career responsive UI');
 mustInclude('const REFEREE_RESUME_KEY = "bxh_referee_workstation_resume_v1"','Referee workstation resume key missing');
 mustInclude('function restoreRefereeWorkstationView(uid,intent)','Referee workstation reload restore helper missing');

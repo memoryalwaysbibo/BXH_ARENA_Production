@@ -89,10 +89,19 @@
 
   function ladderRankingTableHtml(adminMode){
     var rows=ladderActiveRankingRows();
-    if(!rows.length){
-      return '<div class="empty-state"><strong>排行尚未產生</strong><br>'+(ladderScoreMode==="career"?'目前尚無玩家取得生涯積分。':'目前尚無玩家取得賽季積分。完成第一場積分賽後，排名將自動顯示。')+'</div>';
-    }
+    var myUid=typeof firebaseUser!=="undefined"&&firebaseUser&&firebaseUser.uid;
+    var myIndex=myUid?rows.findIndex(function(p){return p.uid===myUid;}):-1;
+    var mine=myIndex>=0?rows[myIndex]:null;
     var scoreKey=ladderScoreMode==="career"?"careerPoints":"seasonPoints";
+    var myCard=myUid?'<div class="ladder-my-rank" aria-label="我的排名">'+
+      '<div class="ladder-my-rank-label">我的排名 <span>'+escLocal(ladderScoreMode==="career"?"生涯":"賽季")+'</span></div>'+
+      (mine?'<div class="ladder-my-rank-content"><strong>NO.'+Number(mine.__rank||0)+'</strong><span class="ladder-my-rank-name">'+escLocal(mine.playerName||mine.publicName||"—")+'</span>'+ladderTierEmblemHtml(mine)+'<span class="ladder-my-rank-points">'+Number(mine[scoreKey]||0)+' PT</span></div>'+
+        '<button type="button" class="btn btn-ghost btn-sm" data-ladder-find-me>查看榜上位置</button>':
+        '<div class="ladder-my-rank-empty">尚未上榜'+(typeof ladderLocationLabel==="function"?'（'+escLocal(ladderLocationLabel())+'）':'')+'</div>')+
+    '</div>':"";
+    if(!rows.length){
+      return myCard+'<div class="empty-state"><strong>排行尚未產生</strong><br>'+(ladderScoreMode==="career"?'目前尚無玩家取得生涯積分。':'目前尚無玩家取得賽季積分。完成第一場積分賽後，排名將自動顯示。')+'</div>';
+    }
     var body=rows.slice(0,ladderVisibleCount).map(function(p){
       var rank=Number(p.__rank||0);
       var topClass=rank>=1&&rank<=3?" ladder-rank-top-"+rank:"";
@@ -105,7 +114,7 @@
           ((typeof isAdminTierOrAbove==="function"&&isAdminTierOrAbove())?'<button class="btn btn-ghost btn-sm" data-action="ladder-adjust-select" data-uid="'+escLocal(p.uid||"")+'">更正積分</button>':"")+
         '</div>'
         :"";
-      return '<article class="ladder-rank-grid ladder-rank-row-v2'+topClass+'">'+
+      return '<article class="ladder-rank-grid ladder-rank-row-v2'+topClass+'"'+(p.uid===myUid?' id="ladder-my-row"':'')+'>'+
         '<div class="ladder-rank-position">NO.'+rank+'</div>'+
         '<div class="ladder-player-block">'+
           '<button class="ladder-player-link" data-action="card-open" data-uid="'+escLocal(p.uid||"")+'" title="'+escLocal(p.playerName||p.publicName||"—")+'">'+escLocal(p.playerName||p.publicName||"—")+'</button>'+
@@ -116,7 +125,7 @@
         adminActions+
       '</article>';
     }).join("");
-    return '<div class="rank-scroll ladder-rank-scroll-v2"><div class="ladder-rank-board-v2">'+
+    return myCard+'<div class="rank-scroll ladder-rank-scroll-v2"><div class="ladder-rank-board-v2">'+
       '<div class="ladder-rank-grid ladder-rank-head-v2"><div>排名</div><div>玩家</div><div title="位階依目前賽季積分決定">本季位階</div><div title="'+(ladderScoreMode==="career"?"生涯積分":"賽季積分")+'">積分</div></div>'+
       body+
       (rows.length>10?'<div class="ladder-rank-more">'+
@@ -296,6 +305,21 @@
   };
 
   document.addEventListener("click",function(event){
+    var findMe=event.target&&event.target.closest?event.target.closest("[data-ladder-find-me]"):null;
+    if(findMe){
+      event.preventDefault();
+      event.stopPropagation();
+      var uid=typeof firebaseUser!=="undefined"&&firebaseUser&&firebaseUser.uid;
+      var index=uid?ladderActiveRankingRows().findIndex(function(p){return p.uid===uid;}):-1;
+      if(index<0) return;
+      ladderVisibleCount=Math.max(ladderVisibleCount,10+20*Math.ceil(Math.max(0,index-9)/20));
+      rerender();
+      requestAnimationFrame(function(){
+        var row=document.getElementById("ladder-my-row");
+        if(row) row.scrollIntoView({behavior:"smooth",block:"center"});
+      });
+      return;
+    }
     var more=event.target&&event.target.closest?event.target.closest("[data-ladder-more]"):null;
     if(more){
       event.preventDefault();
@@ -370,6 +394,11 @@
     ".ladder-rank-scroll-v2{max-height:none;overflow:visible;}"+
     ".ladder-rank-more{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:14px 8px;border-top:1px solid rgba(217,185,92,.2)}"+
     ".ladder-rank-board-v2{width:100%;min-width:0;}"+
+    ".ladder-my-rank{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:11px 13px;margin:0 0 13px;border:1px solid rgba(217,185,92,.4);border-radius:12px;background:linear-gradient(120deg,rgba(217,185,92,.12),rgba(11,12,16,.72));}"+
+    ".ladder-my-rank-label{font-size:12px;font-weight:900;color:var(--gold);white-space:nowrap}.ladder-my-rank-label span{margin-left:4px;color:var(--metal);font-size:10px}"+
+    ".ladder-my-rank-content{display:flex;align-items:center;flex:1;min-width:0;gap:9px}.ladder-my-rank-content>strong{font:900 13px var(--font-d);color:var(--gold);white-space:nowrap}.ladder-my-rank-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;font-size:12px}.ladder-my-rank-content .ladder-tier-display{flex-direction:row;gap:3px}.ladder-my-rank-content .ladder-tier-emblem{width:34px;height:34px;flex-basis:34px}.ladder-my-rank-content .ladder-tier-name{font-size:10px}.ladder-my-rank-points{white-space:nowrap;color:var(--gold);font-weight:900;font-size:12px}.ladder-my-rank-empty{flex:1;font-size:12px;color:var(--metal)}"+
+    "#ladder-my-row{background:rgba(217,185,92,.08);box-shadow:inset 3px 0 var(--gold)}"+
+    "@media(max-width:520px){.ladder-my-rank-content{flex-wrap:wrap;gap:6px}.ladder-my-rank .btn{margin-left:auto}.ladder-my-rank-content .ladder-tier-name{display:none}}"+
     ".ladder-rank-grid{display:grid;grid-template-columns:52px minmax(0,1fr) 96px 78px;gap:8px;align-items:center;min-width:0;}"+
     ".ladder-rank-head-v2{padding:0 8px 9px;color:var(--metal);font-size:11px;font-weight:800;border-bottom:1px solid rgba(255,255,255,.08);text-align:center;}"+
     ".ladder-rank-head-v2>div:nth-child(2){text-align:left;}"+
