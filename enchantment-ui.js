@@ -23,24 +23,36 @@
  }
  function player(registration,info){
   const data=info?.parsedData,code=registration?.tournamentCode;
-  if(!data||data.meta?.playMode!=='enchantment'||!code||registration.status!=='confirmed')return '';
+  if(!data||!code||registration.status!=='confirmed')return '';
+  if(data.meta?.playMode!=='enchantment'&&![...cache.keys()].some(k=>k.startsWith(code+':')))return '';
   const pid=typeof smartCallFindPlayerId==='function'?smartCallFindPlayerId(data,registration):null;
   const m=(data.matches||[]).find(x=>!x.completed&&!x.isBye&&x.a?.playerId&&x.b?.playerId&&
-   (x.a.playerId===pid||x.b.playerId===pid)&&Object.values(data.courtAssignments||{}).some(c=>c?.currentMatchId===x.id));
-  if(!m)return '';
-  const side=m.a.playerId===pid?'A':'B';
-  return `<section class="panel" style="margin:12px 0;padding:12px"><strong>附魔之戰｜你的抽卡畫面</strong>
-   <p class="hint">裁判開始後，在自己的手機將卡片穿過龍爪向上抽。</p>
-   <iframe title="附魔之戰選手抽卡" data-enchantment-player data-code="${quote(code)}" data-match-id="${quote(m.id)}" data-side="${side}" src="enchantment-draw-v3.html" style="width:100%;height:min(760px,85dvh);border:0;border-radius:12px;background:#080917" loading="eager"></iframe>
-   </section>`;
+   (x.a.playerId===pid||x.b.playerId===pid)&&
+   (x.status==='in_progress'||Object.values(data.courtAssignments||{}).some(c=>c?.currentMatchId===x.id)));
+  const side=m?(m.a.playerId===pid?'A':'B'):null;
+  const state=m&&cache.get(key(code,m.id))?.state;
+  const enabled=!!state&&state.phase==='drawing'&&!state.drawn?.[side];
+  return `<div class="fe-card-action" style="margin-top:10px">
+   <button type="button" class="btn btn-sm ${enabled?'btn-primary':'btn-ghost'}" data-enchantment-open data-code="${quote(code)}" ${m?`data-match-id="${quote(m.id)}"`:''} ${enabled?'':'disabled aria-disabled="true"'} style="width:100%;min-height:44px;${enabled?'':'opacity:.55;filter:grayscale(1)'}">${enabled?'進入抽卡｜第 '+Number(state.round)+' 局':'抽卡入口｜尚未輪到你'}</button>
+   </div>`;
+ }
+ function ensureScheduleEntry(code){
+  let entry=[...document.querySelectorAll('[data-enchantment-open]')].find(el=>el.dataset.code===code);
+  if(entry)return entry;
+  const detail=[...document.querySelectorAll('[data-action="view-public-tournament"]')].find(el=>el.dataset.code===code);
+  const row=detail?.closest('.my-schedule-card')?.querySelector('.my-schedule-actions');
+  if(!row)return null;
+  const wrap=document.createElement('div');wrap.className='fe-card-action';wrap.style.marginTop='10px';
+  entry=document.createElement('button');entry.type='button';entry.className='btn btn-ghost btn-sm';
+  entry.dataset.enchantmentOpen='';entry.dataset.code=code;entry.disabled=true;entry.setAttribute('aria-disabled','true');
+  entry.textContent='抽卡入口｜尚未輪到你';entry.style.cssText='width:100%;min-height:44px;opacity:.55;filter:grayscale(1)';
+  wrap.append(entry);row.before(wrap);return entry;
  }
  function statusHtml(code,id,version,s){
   const common=`data-code="${quote(code)}" data-match-id="${quote(id)}"`;
   const button=(label,action,extra='',disabled=false)=>`<button class="btn btn-ghost btn-sm" data-enchantment-action="${action}" ${common} ${extra} ${disabled?'disabled':''}>${label}</button>`;
   if(!s)return `<p>選手到場後，由裁判按「開始抽卡」。</p>${button('開始抽卡','start')}`;
-  const A=details(s.cards?.A),B=details(s.cards?.B),ready=s.phase==='ready-to-score';
-  const names=matchNames.get(key(code,id))||{};
-  const cards=`<p>${quote(names.A||'選手 A')}：${s.drawn?.A?quote(A?.name||'已抽卡'):'尚未抽卡'}　｜　${quote(names.B||'選手 B')}：${s.drawn?.B?quote(B?.name||'已抽卡'):'尚未抽卡'}</p>`;
+  const ready=s.phase==='ready-to-score';
   const points=`<p>比分 A ${Number(s.scores?.A)||0}：${Number(s.scores?.B)||0} B　｜　第 ${Number(s.round)||0} 局</p>`;
   const phase={drawing:'等待雙方抽卡', 'ready-to-score':'等待裁判判定', 'awaiting-result':'已達 4 分，請確認結果',completed:'本場已確認'}[s.phase]||'等待裁判開始';
   const sides=reversedSides.has(key(code,id))?['B','A']:['A','B'];
@@ -50,13 +62,15 @@
     const result=root.BXHEnchantmentScore.resolve({type,winnerCardId:s.cards[side],loserCardId:s.cards[side==='A'?'B':'A']});
     return `<button data-enchantment-action="score" ${common} data-side="${side}" data-type="${type}" ${ready?'':'disabled'}>${label} ${result.ok?result.originalPoints+' → '+result.points:''}</button>`;
    }).join('');
-   return `<div class="side-panel"><div class="side-name">${quote(name)}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
+   const card=details(s.cards?.[side]);
+   const drawStatus=s.drawn?.[side]?quote(card?.name||'已抽卡'):'尚未抽卡';
+   return `<div class="side-panel"><div class="side-name">${quote(name)}</div><div class="hint" style="text-align:center;margin:2px 0 4px;font-size:12px">附魔：${drawStatus}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
   }).join('')}</div><button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
   let controls='';
   if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
    controls+=button(ready?'撤回上一筆失誤':'撤回上一筆','undo');
   if(s.phase==='awaiting-result')controls+=button('確認比賽結果','confirm');
-  return `<p><strong>${phase}</strong>｜第 ${Number(s.round)||0} 局</p>${cards}<p class="hint">裁判按原本的勝利方式；系統計算附魔後的實得分。</p>${scorePanel}<div class="btn-row ref-result-actions">${controls}</div>`;
+  return `<p><strong>${phase}</strong>｜第 ${Number(s.round)||0} 局</p><p class="hint">裁判按原本的勝利方式；系統計算附魔後的實得分。</p>${scorePanel}<div class="btn-row ref-result-actions">${controls}</div>`;
  }
  function paint(code,id){
   const item=cache.get(key(code,id));
@@ -105,7 +119,9 @@
     if(!m){
      const overlay=document.querySelector('[data-enchantment-draw-overlay]');
      const active=overlay&&overlay.dataset.code===code&&data.matches.some(x=>x.id===overlay.dataset.matchId&&x.completed);
-     if(active){overlay.remove();document.querySelector('[data-enchantment-open]')?.remove();dismissedMatch='';}
+     if(active){overlay.remove();dismissedMatch='';}
+     const entry=[...document.querySelectorAll('[data-enchantment-open]')].find(el=>el.dataset.code===code);
+     if(entry){entry.disabled=true;entry.setAttribute('aria-disabled','true');entry.textContent='抽卡入口｜尚未輪到你';entry.style.opacity='.55';entry.style.filter='grayscale(1)';}
      continue;
     }
     const side=m.a.playerId===pid?'A':'B';
@@ -116,23 +132,22 @@
     const s=result.state;
     const show=!!s&&s.phase!=='completed';
     let overlay=document.querySelector('[data-enchantment-draw-overlay]');
-    let reopen=document.querySelector('[data-enchantment-open]');
-    if(!show){if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id)overlay.remove();if(reopen?.dataset.code===code&&reopen.dataset.matchId===m.id)reopen.remove();if(dismissedMatch===key(code,m.id))dismissedMatch='';continue;}
-    if(!reopen){
-     reopen=document.createElement('button');reopen.type='button';reopen.dataset.enchantmentOpen='';
-     reopen.dataset.code=code;reopen.dataset.matchId=m.id;
-     reopen.style.cssText='position:fixed;right:16px;bottom:20px;z-index:2147483001;padding:13px 18px;border:1px solid #e9be69;border-radius:12px;background:#21182b;color:#fff;font-size:16px;box-shadow:0 6px 24px #0009';
-     document.body.append(reopen);
+    const reopen=ensureScheduleEntry(code);
+    const canDraw=show&&s.phase==='drawing'&&!s.drawn?.[side];
+    if(reopen){
+     reopen.dataset.matchId=m.id;
+     reopen.disabled=!canDraw;reopen.setAttribute('aria-disabled',String(!canDraw));
+     reopen.textContent=canDraw?'進入抽卡｜第 '+Number(s.round)+' 局':'抽卡入口｜尚未輪到你';
+     reopen.style.opacity=canDraw?'1':'.55';reopen.style.filter=canDraw?'':'grayscale(1)';
     }
-    reopen.dataset.code=code;reopen.dataset.matchId=m.id;
-    reopen.textContent='進入附魔對戰｜第 '+Number(s.round)+' 局';
+    if(!show){if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id)overlay.remove();if(dismissedMatch===key(code,m.id))dismissedMatch='';continue;}
     if(dismissedMatch===key(code,m.id))continue;
     if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id){
-     reopen.style.display='none';
      const heading=overlay.querySelector('[data-enchantment-heading]');
      if(heading)heading.textContent='附魔之戰｜第 '+Number(s.round)+' 局'+(s.phase==='drawing'?(s.drawn?.[side]?'｜等待對手抽卡':'｜請抽卡'):'｜等待裁判判定');
      syncFrames(code,m.id);continue;
     }
+    if(!canDraw)continue;
     if(overlay)overlay.remove();
     overlay=document.createElement('section');
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
@@ -143,7 +158,6 @@
     frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
     frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917;visibility:hidden';
     overlay.append(frame);document.body.append(overlay);
-    reopen.style.display='none';
     frame.addEventListener('load',()=>{
      if(!overlay.isConnected)return;
      let valid=true;
@@ -162,14 +176,14 @@
    const overlay=document.querySelector('[data-enchantment-draw-overlay]');
    if(overlay)dismissedMatch=key(overlay.dataset.code,overlay.dataset.matchId);
    overlay?.remove();
-   const reopen=document.querySelector('[data-enchantment-open]');if(reopen)reopen.style.display='';
+
   }
   if(e.target.closest('[data-enchantment-sound]')){
    drawSoundEnabled=!drawSoundEnabled;
    const btn=e.target.closest('[data-enchantment-sound]');btn.textContent=drawSoundEnabled?'🔊':'🔇';btn.setAttribute('aria-pressed',String(drawSoundEnabled));
    document.querySelector('[data-enchantment-draw-overlay] iframe[data-enchantment-player]')?.contentWindow?.postMessage({kind:'bxh-enchantment-sound',enabled:drawSoundEnabled},location.origin);
   }
-  if(e.target.closest('[data-enchantment-open]')){dismissedMatch='';discoverPlayerDraw();}
+  if(e.target.closest('[data-enchantment-open]:not([disabled])')){dismissedMatch='';discoverPlayerDraw();}
  });
  setInterval(discoverPlayerDraw,4000);
  setTimeout(discoverPlayerDraw,1500);
