@@ -12263,12 +12263,84 @@ function eligibleBracketTeams(){
   }
   return teams.filter(t=>!state.meta.checkinRequired||t.memberPlayerIds.every(id=>players.get(String(id))?.checkedIn===true));
 }
+function teamMatchTemplate(bracket,round,index,seq,station,extra={}){
+  return {id:uid("tm"),seq,bracket,round,indexInRound:index,station,teamIds:[null,null],
+    a:null,b:null,isBye:false,status:"pending",completed:false,scoreA:0,scoreB:0,log:[],
+    winnerId:null,loserId:null,...extra};
+}
+function generateTeamRoundRobin(teams){
+  const shuffled=shuffle(teams).map(t=>String(t.id));
+  if(shuffled.length%2)shuffled.push(null);
+  let rotation=shuffled.slice(),matches=[],seq=0,stations=Math.max(1,Number(state.meta.stations)||1);
+  for(let round=0;round<rotation.length-1;round++){
+    let index=0;
+    for(let i=0;i<rotation.length/2;i++){
+      const a=rotation[i],b=rotation[rotation.length-1-i];
+      if(a&&b)matches.push(teamMatchTemplate("RR",round,index++,seq,seq++%stations+1,{teamIds:[a,b],status:"ready"}));
+    }
+    rotation=[rotation[0],rotation.at(-1),...rotation.slice(1,-1)];
+  }
+  state.bracketSize=rotation.length;state.matches=matches;state.drawnAt=Date.now();
+  state.rrRounds=rotation.length-1;state.teamStandings=null;state.championId=null;state.runnerUpId=null;
+  state.currentMatchId=matches[0]?.id||null;state.rosterLocked=false;
+  syncMatchStatuses();rebuildCourtAssignments();
+  return true;
+}
+function generateTeamDouble(teams){
+  const shuffled=shuffle(teams),size=nextPow2(shuffled.length),order=seedOrder(size),slots=new Array(size).fill(null);
+  order.forEach((seed,pos)=>{if(seed<=shuffled.length)slots[pos]=String(shuffled[seed-1].id);});
+  const k=Math.log2(size),matches=[],wbRounds=[],lbRounds=[],stations=Math.max(1,Number(state.meta.stations)||1);
+  let seq=0;
+  const make=(bracket,round,index,extra={})=>{
+    const m=teamMatchTemplate(bracket,round,index,seq,seq%stations+1,extra);seq++;matches.push(m);return m;
+  };
+  for(let r=0;r<k;r++){
+    const arr=[];
+    for(let i=0;i<size/2**(r+1);i++){
+      const a=r?null:slots[2*i],b=r?null:slots[2*i+1];
+      const bye=r===0&&(!a||!b);
+      arr.push(make("WB",r,i,{teamIds:[a,b],isBye:bye,completed:bye,
+        winnerId:bye?(a||b):null,status:bye?"completed":r===0?"ready":"pending"}));
+    }
+    wbRounds.push(arr);
+  }
+  for(let r=1;r<k;r++)wbRounds[r].forEach((m,i)=>{
+    for(const side of [0,1])m.teamIds[side]=wbRounds[r-1][2*i+side]?.winnerId||null;
+    if(m.teamIds.every(Boolean))m.status="ready";
+  });
+  let survivors=null;
+  for(let r=0;r<k;r++){
+    if(r===0){
+      const arr=[];
+      for(let i=0;i<wbRounds[0].length;i+=2)
+        arr.push(make("LB",lbRounds.length,arr.length,{lbSrc:{type:"first",srcAId:wbRounds[0][i].id,srcBId:wbRounds[0][i+1]?.id||null}}));
+      lbRounds.push(arr);survivors=arr;
+    }else{
+      const merged=survivors.map((m,i)=>make("LB",lbRounds.length,i,{lbSrc:{type:"merge",survivorMatchId:m.id,dropperMatchId:wbRounds[r][i]?.id||null}}));
+      lbRounds.push(merged);survivors=merged;
+      if(r<k-1&&survivors.length>1){
+        const combined=[];
+        for(let i=0;i<survivors.length;i+=2)
+          combined.push(make("LB",lbRounds.length,combined.length,{lbSrc:{type:"combine",srcAMatchId:survivors[i].id,srcBMatchId:survivors[i+1]?.id||null}}));
+        lbRounds.push(combined);survivors=combined;
+      }
+    }
+  }
+  const gf=make("GF",0,0,{gfSrc:{wbFinalId:wbRounds[k-1][0].id,lbFinalId:survivors?.[0]?.id||null}});
+  state.bracketSize=size;state.matches=matches;state.drawnAt=Date.now();
+  state.gfMatchId=gf.id;state.gfResetMatchId=null;state.championId=null;state.runnerUpId=null;
+  state.currentMatchId=matches.find(m=>!m.isBye&&m.teamIds.every(Boolean))?.id||null;
+  state.rosterLocked=false;syncMatchStatuses();rebuildCourtAssignments();
+  return true;
+}
 function generateTeamBracket(){
   if(!canOperateCurrentTournament()||state.startedAt) return false;
-  if(state.meta.formatType!=="single"){showToast("團體戰目前僅支援單淘汰對戰表",true);return false;}
   const teams=eligibleBracketTeams();
   if(!teams){showToast("隊伍名單不完整或有重複隊員",true);return false;}
   if(teams.length<2){showToast("至少需要兩支全員完成報到的隊伍",true);return false;}
+  if(state.meta.formatType==="double")return generateTeamDouble(teams);
+  if(state.meta.formatType==="roundrobin")return generateTeamRoundRobin(teams);
+  if(state.meta.formatType!=="single"){showToast("尚未支援的團體賽制",true);return false;}
   const shuffled=shuffle(teams),size=nextPow2(shuffled.length),order=seedOrder(size),slots=new Array(size).fill(null);
   order.forEach((seed,pos)=>{if(seed<=shuffled.length) slots[pos]=String(shuffled[seed-1].id);});
   const matches=[],rounds=Math.log2(size),stations=Math.max(1,Number(state.meta.stations)||1);
@@ -15047,15 +15119,31 @@ async function loadTeamMatchUi(matchId){
 function renderTeamBracket(){
   const teams=new Map((state.teams||[]).map(t=>[String(t.id),t]));
   const name=id=>id?esc(teams.get(String(id))?.name||"隊伍已移除"):"待晉級";
-  const byes=state.matches.filter(m=>m.isBye&&m.winnerId);
+  const opening=state.meta.formatType==="double"?"WB":"SE";
+  const byes=state.matches.filter(m=>m.bracket===opening&&m.round===0&&m.isBye&&m.winnerId);
+  const fmt=state.meta.formatType||"single";
+  const label={SE:"單淘",WB:"勝部",LB:"敗部",GF:"總決賽",GFR:"重置戰",RR:"積分賽"};
   let html='<div class="panel"><div class="panel-title">團體戰對戰表</div>';
   html+='<p class="hint">'+esc(state.meta.teamSize)+'V'+esc(state.meta.teamSize)+'・'+teams.size+' 支隊伍・'+byes.length+' 支首輪輪空</p>';
   if(byes.length)html+='<p class="hint">首輪輪空：'+byes.map(m=>name(m.winnerId)).join('、')+'</p>';
-  for(const round of [...new Set(state.matches.map(m=>m.round))]){
-    const matches=state.matches.filter(m=>m.round===round&&!m.isBye);
-    html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">第 '+(round+1)+' 輪</span><span class="compact-round-count">'+matches.length+' 場</span></div><div class="compact-round-matches">';
+  const groups=new Map();
+  for(const m of state.matches.filter(m=>!m.isBye)){
+    const key=m.bracket+':'+m.round;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(m);
+  }
+  for(const [key,matches] of groups){
+    const [bracket,round]=key.split(':');
+    const title=(label[bracket]||bracket)+(bracket==="GF"||bracket==="GFR"?"":"・第 "+(Number(round)+1)+" 輪");
+    html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">'+title+'</span><span class="compact-round-count">'+matches.length+' 場</span></div><div class="compact-round-matches">';
     for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m)+renderTeamScorePanel(m);
     html+='</div></section>';
+  }
+  if(fmt==="roundrobin"){
+    const rows=Array.isArray(state.teamStandings)?state.teamStandings:[];
+    html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">隊伍排名</span></div>';
+    if(rows.length)html+='<div class="table-scroll"><table class="rank-table"><thead><tr><th>名次</th><th>隊伍</th><th>勝</th><th>敗</th><th>得失分差</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(r.rank)+(r.tied?'（同名次，需加賽）':'')+'</td><td>'+name(r.id)+'</td><td>'+esc(r.wins)+'</td><td>'+esc(r.losses)+'</td><td>'+esc(r.diff)+'</td></tr>').join('')+'</tbody></table></div>';
+    html+='</section>';
   }
   if(state.championId)html+='<div class="panel"><b>冠軍：'+name(state.championId)+'</b><div>亞軍：'+name(state.runnerUpId)+'</div></div>';
   return html+'</div>';
@@ -29510,7 +29598,9 @@ init().then(()=>{
       championId: state.championId||null, runnerUpId: state.runnerUpId||null,
       thirdId: state.thirdId||null, fourthId: state.fourthId||null,
       gfMatchId: state.gfMatchId||null, gfResetMatchId: state.gfResetMatchId||null,
-      bronzeMatchId: state.bronzeMatchId||null, rrRounds: state.rrRounds||0
+      bronzeMatchId: state.bronzeMatchId||null, rrRounds: state.rrRounds||0,
+      teamResultRevision: Number(state.teamResultRevision)||0,
+      teamStandings: Array.isArray(state.teamStandings)?state.teamStandings.map(r=>({id:r.id,name:r.name,rank:r.rank,tied:!!r.tied,played:r.played,wins:r.wins,losses:r.losses,scoreFor:r.scoreFor,scoreAgainst:r.scoreAgainst,diff:r.diff})):null
     };
   }
 
