@@ -11196,7 +11196,7 @@ const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
   "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack",
   "ai-create-suggestion-toggle","ai-create-suggestion-select-all","ai-create-suggestion-apply",
-  "event-template-edit","event-template-cancel","event-template-save"
+  "event-template-toggle","event-template-refresh","event-template-edit","event-template-cancel","event-template-save"
 ]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
@@ -16685,7 +16685,7 @@ function renderBxhEventTemplateSettingsSection(readOnly){
     body+='</div></details>';
   }
   if(isAdminTierOrAbove() && ui.canEdit && ui.template && !readOnly){
-    body+='<div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-action="event-template-edit">'+(ui.editing?'正在編輯公版':'編輯公版（最高管理員）')+'</button><button class="btn btn-ghost btn-sm" data-action="event-template-refresh">重新讀取</button></div>';
+    body+='<div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost btn-sm" data-action="event-template-edit">'+(ui.editing?'正在編輯公版':'編輯公版（管理員）')+'</button><button class="btn btn-ghost btn-sm" data-action="event-template-refresh">重新讀取</button></div>';
     if(ui.editing){
       body+='<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">';
       body+='<div class="banner warn"><span>這裡修改的是 BXH 全域公版。儲存後只影響之後新套用／重新套用的賽事；既有房間快照不會被改寫。</span></div>';
