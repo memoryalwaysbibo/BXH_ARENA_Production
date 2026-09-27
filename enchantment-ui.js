@@ -13,18 +13,20 @@
   const face=frame.contentDocument?.getElementById('cardFaceImage');
   const back=frame.contentDocument?.querySelector('#card .face.back');
   if(!selector||!face)return;
-  let selected=cardSkin(),baseSrc='',changing=false;
+  let selected='basic',baseSrc='',changing=false,godsOwned={};
+  const godsOption=selector.querySelector('option[value="gods"]');
+  if(godsOption)godsOption.disabled=true;
   selector.value=selected;
   const currentId=()=>cache.get(key(frame.dataset.code,frame.dataset.matchId))?.state?.cards?.[frame.dataset.side];
   const godsSrc=id=>new URL(GODS_CARD_PATH+id+'.webp',location.href).href;
   const applyBack=()=>{
    if(!back)return;
-   if(selected==='gods')back.style.backgroundImage=`url("${new URL(GODS_CARD_PATH+'back.webp',location.href).href}")`;
+   if(selected==='gods'&&Object.values(godsOwned).some(Number))back.style.backgroundImage=`url("${new URL(GODS_CARD_PATH+'back.webp',location.href).href}")`;
    else back.style.removeProperty('background-image');
   };
   const apply=()=>{
    const id=currentId();if(!GODS_CARD_IDS.has(id))return;
-   const target=selected==='gods'?godsSrc(id):baseSrc;
+   const target=selected==='gods'&&Number(godsOwned[id])>0?godsSrc(id):baseSrc;
    if(target&&face.src!==target){changing=true;face.src=target;changing=false;}
   };
   const observer=new MutationObserver(()=>{
@@ -35,7 +37,17 @@
    apply();
   });
   observer.observe(face,{attributes:true,attributeFilter:['src']});
-  selector.addEventListener('change',()=>{selected=selector.value==='gods'?'gods':'basic';saveCardSkin(selected);applyBack();apply();showSharedCards(overlay,cache.get(key(frame.dataset.code,frame.dataset.matchId))?.state,frame.dataset.side);});
+  selector.addEventListener('change',()=>{selected=selector.value==='gods'&&Object.values(godsOwned).some(Number)?'gods':'basic';selector.value=selected;saveCardSkin(selected);overlay.dataset.cardSkinUnlocked=selected;applyBack();apply();showSharedCards(overlay,cache.get(key(frame.dataset.code,frame.dataset.matchId))?.state,frame.dataset.side);});
+  const ownershipCall=root.engagementService?.cardAlbum?.({action:'get'});
+  if(ownershipCall)ownershipCall.then(result=>{
+   if(!overlay.isConnected)return;
+   godsOwned=result?.sets?.gods||{};
+   const hasGods=Object.values(godsOwned).some(value=>Number(value)>0);
+   if(godsOption)godsOption.disabled=!hasGods;
+   selected=hasGods&&cardSkin()==='gods'?'gods':'basic';
+   selector.value=selected;overlay.dataset.cardSkinUnlocked=selected;
+   applyBack();apply();showSharedCards(overlay,cache.get(key(frame.dataset.code,frame.dataset.matchId))?.state,frame.dataset.side);
+  }).catch(()=>{if(godsOption)godsOption.disabled=true;});
   applyBack();
   if(face.getAttribute('src')&&!face.src.includes(GODS_CARD_PATH)){baseSrc=face.src;apply();}
   const cleanup=new MutationObserver(()=>{if(!overlay.isConnected){observer.disconnect();cleanup.disconnect();}});
@@ -154,7 +166,7 @@
    panel.style.cssText='position:absolute;right:10px;bottom:12px;z-index:4;width:min(244px,60vw);padding:9px;border:1px solid #e4bd87;border-radius:14px;background:#171329ee;color:#fff;box-shadow:0 8px 24px #000b;backdrop-filter:blur(10px)';
    overlay.append(panel);
   }
-  const gods=cardSkin()==='gods';
+  const gods=overlay.dataset.cardSkinUnlocked==='gods';
   const label=who=>quote(matchNames.get(key(overlay.dataset.code,overlay.dataset.matchId))?.[who]||'選手 '+who);
   panel.innerHTML='<div style="text-align:center;color:#f9d69a;font-weight:800;font-size:12px;margin-bottom:6px">雙方附魔已公開</div><div style="display:flex;gap:6px;justify-content:center">'+
    ['A','B'].map(who=>{
