@@ -16,3 +16,10 @@ test('pending contracts reveal the account contract controls without legacy gran
   assert.match(ui,/if\\(form\\)form\\.hidden=false/);
   assert.match(ui,/data-action="partner-refresh-contract"/);
 });
+
+test('signed mailbox contracts are disabled after checking backend state',()=>{
+  assert.match(ui,/decorateMailboxContractButtons/);
+  assert.match(ui,/getPartnerContract\\?\\.\\(\\{orderCode:code\\}\\)/);
+  assert.match(ui,/button\\.disabled=true/);
+  assert.match(ui,/已完成簽署/);
+});
