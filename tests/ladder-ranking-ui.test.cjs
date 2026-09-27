@@ -22,12 +22,14 @@ assert(source.includes('grid-template-columns:44px minmax(0,1fr) 78px 64px'), 'n
 assert(source.includes('title.textContent=(ladderScoreMode==="career"?"生涯":season+" 季賽")+"｜"+location;'), 'board title must reflect season/career mode');
 assert(source.includes('grid-column:1/-1'), 'admin actions must be preserved without adding a fifth data column');
 assert(source.includes('.ladder-rank-scroll-v2{max-height:none;overflow:visible;}'), 'ranking must grow beyond the shared 420px list limit');
-assert(source.includes('assets/ladder-gods-trial.png'), 'approved Gods trial badges must be used');
+assert(source.includes('assets/ladder-gods-trial-transparent.png'), 'transparent Gods trial badges must be used');
+assert(source.includes('width:72px;height:72px;flex:0 0 72px'), 'desktop emblems must retain square proportions');
+assert(source.includes('width:60px;height:60px;flex-basis:60px'), 'mobile emblems must retain square proportions');
 assert(source.includes('.ladder-tier-emblem.is-legend{background-position:100% 100%'), 'legend must use the ninth badge');
 assert(html.includes('function ladderBadgeHtml(p)'), 'shared tier badge renderer missing');
 assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'guest leaderboard must show tier badges');
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
-assert(html.includes('ladder-secondary-ui.js?v=14.2.42'), 'ladder asset cache-bust version must match release');
+assert(html.includes('ladder-secondary-ui.js?v=14.2.43'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
