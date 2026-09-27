@@ -14976,7 +14976,7 @@ function renderTeamLineupPanel(m){
   const view=teamMatchUi.get(m.id);
   if(!view&&!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
   const teams=(state.teams||[]).filter(t=>m.teamIds.includes(t.id));
-  const mine=teams.find(t=>t.captainUid===currentAuthUid());
+  const mine=teams.find(t=>t.id===view?.ownTeamId);
   const canRef=view?.isReferee===true;
   let out='<div class="panel"><div class="panel-title">隊長排陣與人員到齊</div>';
   out+='<div class="hint">'+teams.map(t=>esc(t.name)+'：'+(view?.submitted?.[t.id]?'已提交':'待提交')).join(' ／ ')+'</div>';
@@ -24140,13 +24140,14 @@ async function handleTeamMatchAction(action,target){
   const matchId=target.dataset.matchId,match=(state.matches||[]).find(m=>m.id===matchId);
   if(!match||!state.cloudCode)return;
   const code=state.cloudCode,teams=(state.teams||[]).filter(t=>match.teamIds?.includes(t.id));
+  const view=teamMatchUi.get(matchId);
   const busyKey=matchId+':'+action;
   if(teamMatchActionsBusy.has(busyKey))return;
   teamMatchActionsBusy.add(busyKey);
   try{
     if(action==='team-lineup-refresh'){teamMatchUi.delete(matchId);await loadTeamMatchUi(matchId);return;}
     if(action==='team-lineup-submit'){
-      const mine=teams.find(t=>t.captainUid===currentAuthUid());
+      const mine=teams.find(t=>t.id===view?.ownTeamId);
       if(!mine)return showToast('僅隊長可提交本隊出場順序',true);
       const selectors=[...document.querySelectorAll('.team-lineup-slot')].filter(el=>el.dataset.matchId===matchId);
       const order=selectors.sort((a,b)=>Number(a.dataset.slot)-Number(b.dataset.slot)).map(el=>el.value);
