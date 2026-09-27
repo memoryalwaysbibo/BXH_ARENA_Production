@@ -3,6 +3,37 @@
  'use strict';
  const cache=new Map(),busy=new Set(),frames=new WeakMap(),matchNames=new Map(),reversedSides=new Set();
  let drawSoundEnabled=true;
+ const CARD_SKIN_KEY='bxh-enchantment-card-skin';
+ const GODS_CARD_IDS=new Set(['double_extreme','double_knockout','double_burst','double_spin','boost_extreme','boost_knockout','boost_burst','weaken_extreme','weaken_knockout','weaken_burst','weaken_spin','seal']);
+ const GODS_CARD_PATH='assets/enchantment-gods/';
+ function cardSkin(){try{return localStorage.getItem(CARD_SKIN_KEY)==='gods'?'gods':'basic';}catch(e){return 'basic';}}
+ function saveCardSkin(value){try{localStorage.setItem(CARD_SKIN_KEY,value);}catch(e){/* A private session can still switch cards. */}}
+ function attachCardSkin(overlay,frame){
+  const selector=overlay.querySelector('[data-enchantment-card-skin]');
+  const face=frame.contentDocument?.getElementById('cardFaceImage');
+  if(!selector||!face)return;
+  let selected=cardSkin(),baseSrc='',changing=false;
+  selector.value=selected;
+  const currentId=()=>cache.get(key(frame.dataset.code,frame.dataset.matchId))?.state?.cards?.[frame.dataset.side];
+  const godsSrc=id=>new URL(GODS_CARD_PATH+id+'.webp',location.href).href;
+  const apply=()=>{
+   const id=currentId();if(!GODS_CARD_IDS.has(id))return;
+   const target=selected==='gods'?godsSrc(id):baseSrc;
+   if(target&&face.src!==target){changing=true;face.src=target;changing=false;}
+  };
+  const observer=new MutationObserver(()=>{
+   if(changing)return;
+   const src=face.getAttribute('src')||'';
+   if(!src||src.includes(GODS_CARD_PATH))return;
+   baseSrc=face.src;
+   apply();
+  });
+  observer.observe(face,{attributes:true,attributeFilter:['src']});
+  selector.addEventListener('change',()=>{selected=selector.value==='gods'?'gods':'basic';saveCardSkin(selected);apply();});
+  if(face.getAttribute('src')&&!face.src.includes(GODS_CARD_PATH)){baseSrc=face.src;apply();}
+  const cleanup=new MutationObserver(()=>{if(!overlay.isConnected){observer.disconnect();cleanup.disconnect();}});
+  cleanup.observe(document.body,{childList:true});
+ }
  const quote=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const key=(code,id)=>code+':'+id;
  const call=payload=>root.engagementService.enchantment(payload);
@@ -170,7 +201,7 @@
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
     overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔之戰抽卡');
     overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080917;display:flex;flex-direction:column';
-    overlay.innerHTML='<div style="position:absolute;right:12px;top:10px;z-index:3;display:flex;gap:6px;align-items:center"><button type="button" data-enchantment-sound aria-label="切換音效" aria-pressed="'+drawSoundEnabled+'" style="font-size:20px;min-width:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white">'+(drawSoundEnabled?'🔊':'🔇')+'</button><button type="button" data-enchantment-close style="background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:7px 10px">離開房間</button></div><div data-enchantment-loading style="position:absolute;left:0;right:0;top:65px;z-index:2;color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
+    overlay.innerHTML='<label style="position:absolute;left:12px;top:10px;z-index:3;color:#f5e2ab;font-size:12px">卡牌外觀 <select data-enchantment-card-skin aria-label="卡牌外觀" style="min-height:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:6px"><option value="basic">基礎卡牌</option><option value="gods">諸神戰場</option></select></label><div style="position:absolute;right:12px;top:10px;z-index:3;display:flex;gap:6px;align-items:center"><button type="button" data-enchantment-sound aria-label="切換音效" aria-pressed="'+drawSoundEnabled+'" style="font-size:20px;min-width:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white">'+(drawSoundEnabled?'🔊':'🔇')+'</button><button type="button" data-enchantment-close style="background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:7px 10px">離開房間</button></div><div data-enchantment-loading style="position:absolute;left:0;right:0;top:65px;z-index:2;color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
     const frame=document.createElement('iframe');frame.title='附魔之戰選手抽卡';frame.dataset.enchantmentPlayer='';
     frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
     frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917;visibility:hidden';
@@ -181,7 +212,7 @@
      try{valid=!!frame.contentDocument?.querySelector('main.app');}catch(e){/* Keep cross-origin fallback visible. */}
      const loading=overlay.querySelector('[data-enchantment-loading]');
      if(!valid){if(loading)loading.innerHTML='抽卡畫面載入失敗。請按「離開抽卡畫面」，再點「進入附魔對戰」重試。';return;}
-     if(loading)loading.remove();frame.style.visibility='visible';syncFrames(code,m.id);
+     if(loading)loading.remove();attachCardSkin(overlay,frame);frame.style.visibility='visible';syncFrames(code,m.id);
     },{once:true});
     break;
    }
