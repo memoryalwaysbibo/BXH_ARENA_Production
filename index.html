@@ -5553,6 +5553,19 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 </style>
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.16">
 <link rel="stylesheet" href="referee-score-v2.css?v=14.2.38-score-fault">
+<style>
+.card-album-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.card-album-head select{min-width:160px;max-width:100%;padding:9px 12px;border-radius:9px;background:#151c2a;color:#fff;border:1px solid #8c7855}
+.card-album-note{margin:10px 0 18px;line-height:1.7}
+.card-album-set{margin-bottom:20px}
+.card-album-set-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.card-album-set-head h3{margin:0}
+.card-album-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.card-album-slot{position:relative;min-width:0;aspect-ratio:2/3;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;border:1px solid #696b73;border-radius:10px;background:linear-gradient(145deg,#30343d,#161a22);color:#adb2bc;text-align:center;filter:grayscale(1);cursor:default}
+.card-album-slot span{font-size:clamp(18px,2.3vw,28px);font-weight:700}
+.card-album-slot small{font-size:12px}
+@media(max-width:700px){.card-album-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}}
+</style>
 </head>
 <body>
 
@@ -18826,6 +18839,37 @@ async function handleMailbox(action,target){
   finally{if(c===mailboxContext()){c.busy=false;render();}}
 }
 
+
+// 卡冊展示架構：未接入可信任的收藏紀錄前，不推測持有數量或開放卡面。
+const CARD_ALBUM_SETS=[
+  {id:"basic",name:"基礎套卡",title:"初代藏卡者"},
+  {id:"gods",name:"諸神戰場",title:"諸神典藏者"}
+];
+let cardAlbumSetFilter="all";
+function renderCardAlbumPage(){
+  const sets=cardAlbumSetFilter==="all"?CARD_ALBUM_SETS:CARD_ALBUM_SETS.filter(set=>set.id===cardAlbumSetFilter);
+  return `<section class="panel">
+    <div class="card-album-head"><h2 class="panel-title">我的卡冊</h2>
+      <label>選擇套卡 <select id="card-album-set-filter" aria-label="選擇套卡">
+        <option value="all" ${cardAlbumSetFilter==="all"?"selected":""}>全部</option>
+        ${CARD_ALBUM_SETS.map(set=>`<option value="${set.id}" ${cardAlbumSetFilter===set.id?"selected":""}>${esc(set.name)}</option>`).join("")}
+      </select></label>
+    </div>
+    <p class="hint card-album-note">每套 12 張卡牌造型，卡背另計。收藏資料與卡面尚未開放；取得方式預計包含活動、玩家交換與購買。遊戲對局抽到卡牌不代表永久擁有。</p>
+  </section>
+  ${sets.map(set=>`<section class="panel card-album-set" aria-label="${esc(set.name)}">
+    <div class="card-album-set-head"><h3>${esc(set.name)}</h3><span class="badge badge-metal">收藏進度：尚未開放</span></div>
+    <div class="card-album-grid">${Array.from({length:12},(_,i)=>`<div class="card-album-slot" aria-label="${esc(set.name)}第 ${i+1} 張，尚未開放"><span>✦</span><small>第 ${String(i+1).padStart(2,"0")} 張 · 未開放</small></div>`).join("")}</div>
+    <p class="hint">集滿 12 張可解鎖稱號「${esc(set.title)}」；稱號發放功能尚未開放。</p>
+  </section>`).join("")}`;
+}
+document.addEventListener("change",event=>{
+  if(event.target?.id!=="card-album-set-filter")return;
+  const value=event.target.value;
+  cardAlbumSetFilter=value==="all"||CARD_ALBUM_SETS.some(set=>set.id===value)?value:"all";
+  renderPreservingScroll();
+});
+
 function renderPlayerCenterLoggedIn(){
   const p = userProfile;
   const mail=mailboxContext();
@@ -18835,6 +18879,7 @@ function renderPlayerCenterLoggedIn(){
   let content;
   if(mailboxContext().open) content = renderMailboxPage();
   else if(playerActiveTab==="items") content = renderInventoryPage();
+  else if(playerActiveTab==="cards") content = renderCardAlbumPage();
   else if(playerActiveTab==="raffles") content = renderRafflePage();
   else if(playerActiveTab==="registered") content = renderPlayerRegisteredTab();
   else if(playerActiveTab==="checkin") content = renderDailyCheckInPage();
@@ -22586,6 +22631,7 @@ function accountMenuItemsHtml(){
   return isPlayerMode ? `
     <button data-action="player-switch-tab" data-tab="raffles">我的抽獎</button>
     <button data-action="player-switch-tab" data-tab="items">我的道具</button>
+    <button data-action="player-switch-tab" data-tab="cards">我的卡冊</button>
     <button data-action="player-switch-tab" data-tab="profile">我的資料</button>
     ${(userProfile && roleAllowsMode(userProfile.role,"partner_organizer",userProfile)) ? `<button data-action="switch-to-partner-organizer">切換至合作主辦</button>` : ""}
     ${(userProfile && roleAllowsMode(userProfile.role,"event_staff",userProfile)) ? `<button data-action="switch-to-event-staff">切換至工作人員（活動）</button>` : ""}
