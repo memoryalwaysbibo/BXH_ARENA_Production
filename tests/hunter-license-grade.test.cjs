@@ -24,7 +24,13 @@ assert.equal(grade({eligible:true,overall:49,matches:100,validRounds:300},99).la
 assert.equal(grade({eligible:true,overall:55,matches:9,validRounds:50},99).label,'C 級獵人');
 assert.equal(grade({eligible:true,overall:65,matches:20,validRounds:60},99).label,'S 級獵人');
 assert.equal(grade({eligible:true,overall:65,matches:20,validRounds:60},99).tier,'s');
-assert.equal(grade({eligible:true,overall:100,matches:100,validRounds:300},99).label,'S 級獵人');
+assert.equal(grade({eligible:true,overall:75,matches:40,validRounds:120},99).label,'國家級獵人');
+assert.equal(grade({eligible:true,overall:75,matches:40,validRounds:120},99).tier,'national');
+assert.equal(grade({eligible:true,overall:74.9,matches:40,validRounds:120},99).label,'S 級獵人');
+assert.equal(grade({eligible:true,overall:75,matches:39,validRounds:120},99).label,'S 級獵人');
+assert.equal(grade({eligible:true,overall:75,matches:40,validRounds:119},99).label,'S 級獵人');
+assert.equal(grade({eligible:true,overall:75,matches:40,validRounds:120},1).label,'S 級獵人');
+assert.equal(grade({eligible:true,overall:100,matches:100,validRounds:300},99).label,'國家級獵人');
 assert.equal(grade({eligible:true,overall:100,matches:100,validRounds:300},99).score,100);
 for(const tier of ['e','d','c','a','s','national'])assert(source.includes('.hunter-grade-badge.grade-'+tier+'{'),tier+' badge style missing');
 assert(source.includes('hunter-grade-badge grade-\'+licenseGrade.tier'), 'badge must use calculated tier');

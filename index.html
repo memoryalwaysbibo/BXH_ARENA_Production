@@ -20825,8 +20825,8 @@ function hunterLicenseGrade(analysis,level){
   let label=score>=50?"C 級獵人":score>=40?"D 級獵人":"E 級獵人";
   if(score>=60&&analysis.overall>=55&&matches>=10&&rounds>=30)label="A 級獵人";
   if(score>=70&&analysis.overall>=65&&matches>=20&&rounds>=60)label="S 級獵人";
-  // National status requires a separate verified tournament result and official approval.
-  return {tier:label[0].toLowerCase(),label,bonus,score,eligible:true};
+  if(score>=80&&analysis.overall>=75&&matches>=40&&rounds>=120)label="國家級獵人";
+  return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 function hunterPeriodSummary(period){
   const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));
@@ -21361,7 +21361,7 @@ function renderPlayerStatsTab(p){
       '<div class="hunter-license-main"><div class="hunter-license-avatar">'+avatar+'</div><div class="hunter-license-copy"><div class="hunter-license-name-line"><div class="hunter-license-name">'+esc(playerName)+'</div><span class="hunter-grade-badge grade-'+licenseGrade.tier+'"><span class="hunter-grade-ornament" aria-hidden="true">'+(licenseGrade.tier==="pending"?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span><span class="hunter-grade-label">'+esc(licenseGrade.label)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+(licenseGrade.tier==="pending"?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span></span></div>'+
       '<div class="hunter-license-meta">'+(gameId?('遊戲 ID '+esc(gameId)+'　｜　'):'')+'玩家編號 '+esc(playerId)+'</div>'+
       '<div class="hunter-license-rank-row"><div><span>獵人等級</span><strong>LV.'+growth.level+'</strong></div><div><span>綜合評分</span><strong>'+(careerAnalysis.eligible?careerAnalysis.overall:'—')+'</strong></div><div><span>有效回合</span><strong>'+statValue(career.validRounds)+'</strong></div></div></div></div>'+
-      '<div class="hunter-grade-detail"><b class="hunter-grade-detail-label">階級判定</b><strong>'+(licenseGrade.eligible?licenseGrade.score.toFixed(1):'—')+'</strong><span>＝ 實力 '+(licenseGrade.eligible?careerAnalysis.overall:'—')+' ＋ 資歷 '+(dataReady?licenseGrade.bonus.toFixed(1):'—')+'</span><small>資歷依 LV.1～99 逐級加分，最高 +15；樣本不足時不評級。A／S 級另需實力與場次門檻，國家級需官方核定。</small></div>'+
+      '<div class="hunter-grade-detail"><b class="hunter-grade-detail-label">階級判定</b><strong>'+(licenseGrade.eligible?licenseGrade.score.toFixed(1):'—')+'</strong><span>＝ 實力 '+(licenseGrade.eligible?careerAnalysis.overall:'—')+' ＋ 資歷 '+(dataReady?licenseGrade.bonus.toFixed(1):'—')+'</span><small>資歷依 LV.1～99 逐級加分，最高 +15；樣本不足時不評級。A／S 級另需實力與場次門檻；國家級達 80 分、實力 75 分、40 場與 120 有效回合時自動授予。</small></div>'+
       '<div class="hunter-growth"><div class="hunter-growth-head"><strong>'+growth.xp+' XP</strong><span>'+(growth.level>=99?'MAX':('距離 LV.'+(growth.level+1)+' 還有 '+growthRemaining+' XP'))+'</span></div>'+
       '<div class="hunter-growth-track"><div class="hunter-growth-fill" style="width:'+growth.progress+'%"></div></div>'+
       '<div class="hunter-growth-breakdown"><div><span>完成對戰</span><b>'+growth.rows.length+' 場｜+'+growth.xpFromMatches+' XP</b></div><div><span>有效回合</span><b>'+growth.validRounds+' 回｜+'+growth.xpFromRounds+' XP</b></div><div><span>完成賽事</span><b>'+growth.eventCount+' 場｜+'+growth.xpFromEvents+' XP</b></div></div></div>'+
