@@ -123,13 +123,20 @@
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
     overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔之戰抽卡');
     overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080917;display:flex;flex-direction:column';
-    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px">附魔之戰｜第 '+Number(s.round)+' 局抽卡 <button type="button" data-enchantment-close style="float:right">稍後抽卡</button></div>';
+    overlay.innerHTML='<div style="color:white;padding:10px 16px;font-size:16px">附魔之戰｜第 '+Number(s.round)+' 局抽卡 <button type="button" data-enchantment-close style="float:right">稍後抽卡</button></div><div data-enchantment-loading style="color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
     const frame=document.createElement('iframe');frame.title='附魔之戰選手抽卡';frame.dataset.enchantmentPlayer='';
     frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
-    frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0';
+    frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917;visibility:hidden';
     overlay.append(frame);document.body.append(overlay);
     reopen.style.display='none';
-    frame.addEventListener('load',()=>syncFrames(code,m.id),{once:true});
+    frame.addEventListener('load',()=>{
+     if(!overlay.isConnected)return;
+     let valid=true;
+     try{valid=!!frame.contentDocument?.querySelector('main.app');}catch(e){/* Keep cross-origin fallback visible. */}
+     const loading=overlay.querySelector('[data-enchantment-loading]');
+     if(!valid){if(loading)loading.innerHTML='抽卡畫面載入失敗。請按「稍後抽卡」，再點「進入抽卡」重試。';return;}
+     if(loading)loading.remove();frame.style.visibility='visible';syncFrames(code,m.id);
+    },{once:true});
     break;
    }
   }catch(e){/* Registration and public bracket may be temporarily unavailable. */}
