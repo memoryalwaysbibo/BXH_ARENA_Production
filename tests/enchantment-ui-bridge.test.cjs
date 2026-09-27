@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const score=require('../enchantment-score-core.js');
 
-test('player phone receives only its card and sends draw for its own assigned round',async()=>{
+test('player phone hides the opponent card until both players draw',async()=>{
  const calls=[],sent=[],listeners={};
  const frame={dataset:{code:'BXH-ABCD',matchId:'match1',side:'A'},contentWindow:{postMessage:x=>sent.push(x)}};
  const state={round:1,phase:'drawing',scores:{A:0,B:0},faults:{A:0,B:0},drawn:{A:false,B:true},
@@ -28,7 +28,7 @@ test('player phone receives only its card and sends draw for its own assigned ro
  assert.equal(calls.at(-1).version,2);
  assert.equal(calls.at(-1).round,1);
  assert.equal(sent.at(-1).state.cards.A,'double_spin');
- assert.equal(sent.at(-1).state.cards.B,null);
+ assert.equal(sent.at(-1).state.cards.B,'double_burst');
 });
 
 test('referee action submits the raw outcome; server remains the scoring authority',async()=>{
