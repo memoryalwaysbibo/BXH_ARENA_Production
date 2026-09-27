@@ -21361,7 +21361,7 @@ function renderPlayerStatsTab(p){
       '<div class="hunter-growth"><div class="hunter-growth-head"><strong>'+growth.xp+' XP</strong><span>'+(growth.level>=99?'MAX':('距離 LV.'+(growth.level+1)+' 還有 '+growthRemaining+' XP'))+'</span></div>'+
       '<div class="hunter-growth-track"><div class="hunter-growth-fill" style="width:'+growth.progress+'%"></div></div>'+
       '<div class="hunter-growth-breakdown"><div><span>完成對戰</span><b>'+growth.rows.length+' 場｜+'+growth.xpFromMatches+' XP</b></div><div><span>有效回合</span><b>'+growth.validRounds+' 回｜+'+growth.xpFromRounds+' XP</b></div><div><span>完成賽事</span><b>'+growth.eventCount+' 場｜+'+growth.xpFromEvents+' XP</b></div></div></div>'+
-      '<div class="hunter-framework-note">獵人等級由累積經驗決定：Match +10 XP、有效回合 +2 XP、每個有完成對戰的賽事 +20 XP。綜合評分由 P4 能力引擎獨立計算；等級只對獵人階級提供資歷加分，不改變 P4 評分或天梯積分。</div></section>'+
+      '<div class="hunter-framework-note">獵人等級只代表累積經驗：Match +10 XP、有效回合 +2 XP、每個有完成對戰的賽事 +20 XP。綜合評分由 P4 能力引擎獨立計算；等級只對獵人階級提供資歷加分，不改變 P4 評分或天梯積分。</div></section>'+
       (hunterProfileError?'<div class="hunter-profile-error">'+esc(hunterProfileError)+'</div>':'')+
       '<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HUNTER STATS</div><div class="panel-title">期間統計</div></div><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">'+(hunterProfileLoading?"讀取中…":"重新整理")+'</button></div>'+
       '<div class="hunter-overview-period-tabs">'+overviewPeriods+'</div><div class="hunter-stat-grid">'+
