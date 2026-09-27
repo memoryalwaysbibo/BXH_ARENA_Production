@@ -1,7 +1,7 @@
 /* BXH 附魔之戰｜裁判與選手手機的 callable bridge。入口啟用前保持唯讀。 */
 (function(root){
  'use strict';
- const cache=new Map(),busy=new Set(),frames=new WeakMap(),matchNames=new Map();
+ const cache=new Map(),busy=new Set(),frames=new WeakMap(),matchNames=new Map(),reversedSides=new Set();
  const quote=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const key=(code,id)=>code+':'+id;
  const call=payload=>root.engagementService.enchantment(payload);
@@ -14,7 +14,7 @@
   const id=quote(m.id),c=quote(code),locked=stationLocked?'disabled':'';
   setTimeout(()=>refresh(code,m.id),0);
   return `<section class="panel" data-enchantment-referee data-code="${c}" data-match-id="${id}" style="margin:12px 16px;padding:14px">
-   <strong>附魔之戰｜${quote(m.a?.playerId)} VS ${quote(m.b?.playerId)}</strong>
+   <strong>附魔之戰｜${quote(matchNames.get(key(code,m.id))?.A||'選手 A')} VS ${quote(matchNames.get(key(code,m.id))?.B||'選手 B')}</strong>
    <div data-enchantment-status>讀取抽卡狀態中…</div>
    <button class="btn btn-ghost btn-sm" data-enchantment-action="refresh" data-code="${c}" data-match-id="${id}">更新附魔狀態</button>
    ${stationLocked?'<p class="hint">本台未指派給你，僅供查看。</p>':''}
@@ -38,17 +38,19 @@
   const button=(label,action,extra='',disabled=false)=>`<button class="btn btn-ghost btn-sm" data-enchantment-action="${action}" ${common} ${extra} ${disabled?'disabled':''}>${label}</button>`;
   if(!s)return `<p>選手到場後，由裁判按「開始抽卡」。</p>${button('開始抽卡','start')}`;
   const A=details(s.cards?.A),B=details(s.cards?.B),ready=s.phase==='ready-to-score';
-  const cards=`<p>選手 A：${s.drawn?.A?quote(A?.name||'已抽卡'):'尚未抽卡'}　｜　選手 B：${s.drawn?.B?quote(B?.name||'已抽卡'):'尚未抽卡'}</p>`;
+  const names=matchNames.get(key(code,id))||{};
+  const cards=`<p>${quote(names.A||'選手 A')}：${s.drawn?.A?quote(A?.name||'已抽卡'):'尚未抽卡'}　｜　${quote(names.B||'選手 B')}：${s.drawn?.B?quote(B?.name||'已抽卡'):'尚未抽卡'}</p>`;
   const points=`<p>比分 A ${Number(s.scores?.A)||0}：${Number(s.scores?.B)||0} B　｜　第 ${Number(s.round)||0} 局</p>`;
   const phase={drawing:'等待雙方抽卡', 'ready-to-score':'等待裁判判定', 'awaiting-result':'已達 4 分，請確認結果',completed:'本場已確認'}[s.phase]||'等待裁判開始';
-  const scorePanel=`<div class="ref-vs-arena standard">${['A','B'].map(side=>{
+  const sides=reversedSides.has(key(code,id))?['B','A']:['A','B'];
+  const scorePanel=`<div class="ref-vs-arena standard" style="position:relative">${sides.map(side=>{
    const name=matchNames.get(key(code,id))?.[side]||'選手 '+side;
    const scoreButtons=Object.entries(outcome).map(([type,label])=>{
     const result=root.BXHEnchantmentScore.resolve({type,winnerCardId:s.cards[side],loserCardId:s.cards[side==='A'?'B':'A']});
     return `<button data-enchantment-action="score" ${common} data-side="${side}" data-type="${type}" ${ready?'':'disabled'}>${label} ${result.ok?result.originalPoints+' → '+result.points:''}</button>`;
    }).join('');
    return `<div class="side-panel"><div class="side-name">${quote(name)}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
-  }).join('')}</div>`;
+  }).join('')}<button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
   let controls='';
   if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
    controls+=button(ready?'撤回上一筆失誤':'撤回上一筆','undo');
@@ -174,7 +176,7 @@
  document.addEventListener('click',e=>{
   const el=e.target.closest('[data-enchantment-action]');if(!el)return;
   e.preventDefault();e.stopPropagation();
-  const d=el.dataset;if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type});
+  const d=el.dataset;if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);else if(d.enchantmentAction==='swap'){const k=key(d.code,d.matchId);if(reversedSides.has(k))reversedSides.delete(k);else reversedSides.add(k);paint(d.code,d.matchId);}else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type});
  },true);
  root.addEventListener('message',async e=>{
   if(e.origin!==location.origin)return;
