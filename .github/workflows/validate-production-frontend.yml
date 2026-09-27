@@ -83,6 +83,8 @@ jobs:
         run: node tests/team-battle-foundation.test.cjs
       - name: Verify team registration UI
         run: node tests/team-registration-ui.test.cjs
+      - name: Verify team bracket formats
+        run: node tests/team-bracket-formats.test.cjs
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
       - name: Verify ladder V1 scoring and inline-script syntax
