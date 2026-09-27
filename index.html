@@ -5947,12 +5947,13 @@ function defaultState(id){
     archiveStatus: "ongoing",
     settlementPhase: "idle",
     settlementAttempt: 0,
-    meta:{ name:"BXH 戰鬥陀螺賽事", date:"", location:"", checkin:"", startTime:"", format:"單淘汰賽", formatType:"single", stations:1, bronzeMatch:false, checkinRequired:false, checkinLeadMinutes:60, checkinClosedEarly:false, checkinClosedAt:null, scoringMode:"standard", roundScoringModes:{}, ladderMode:"general", eventAuthority:"official", roomAccessMode:"public",
+    meta:{ name:"BXH 戰鬥陀螺賽事", date:"", location:"", checkin:"", startTime:"", format:"單淘汰賽", formatType:"single", battleMode:"individual", teamSize:3, playMode:"standard", stations:1, bronzeMatch:false, checkinRequired:false, checkinLeadMinutes:60, checkinClosedEarly:false, checkinClosedAt:null, scoringMode:"standard", roundScoringModes:{}, ladderMode:"general", eventAuthority:"official", roomAccessMode:"public",
       registrationEnabled:false, registrationOpenAt:null, registrationCloseAt:null, registrationCapacity:null,
       waitlistEnabled:false, waitlistCapacity:0, registrationFee:null, targetGroup:"open", participantNameMode:"realName", cancellationDeadline:null,
       eventDescription:"", registrationNotes:"", registrationVisibility:"public", publishedAt:null, registrationStatus:"scheduled", eventCancelled:false, assignedStaffUids:[], refereeStationAssignments:{}, refereeStationNames:{}, refereeStationRestrictionEnabled:false },
     eventInfo:emptyEventInfoV2(),
     players:[],
+    teams:[],
     registrations:[],
     rosterLocked:false,
     bracketSize:0,
@@ -5990,6 +5991,8 @@ function defaultState(id){
 }
 
 const FORMAT_LABELS = { single:"單淘汰賽", double:"雙敗制", roundrobin:"單循環賽" };
+const BATTLE_MODE_LABELS = { individual:"個人戰", team:"團體戰" };
+const PLAY_MODE_LABELS = { standard:"標準規則", enchantment:"附魔之戰" };
 const ARCHIVE_LABELS = { ongoing:"進行中", paused:"已暫停", completed:"已完成" };
 
 let state = defaultState();
@@ -10490,6 +10493,8 @@ function ensureSettingsFormDraft(){
     navigationEnabled:venue.navigationEnabled===true || (!String(m.location||"").trim() && !state.cloudCode && !m.publishedAt),
     checkin:m.checkin||"",
     startTime:m.startTime||"",
+    battleMode:m.battleMode==="team"?"team":"individual",
+    teamSize:Math.max(3,parseInt(m.teamSize,10)||3),
     formatType:m.formatType||"single",
     playMode:m.playMode==="enchantment"?"enchantment":"standard",
     stations:Math.max(1,parseInt(m.stations,10)||1),
@@ -10523,6 +10528,9 @@ function syncSettingsDraftFromDom(){
   settingsFormDraft.location=buildLegacyVenueText({name:settingsFormDraft.venueName,address:settingsFormDraft.venueAddress});
   settingsFormDraft.checkin=val("f-checkin",settingsFormDraft.checkin);
   settingsFormDraft.startTime=val("f-start",settingsFormDraft.startTime);
+  settingsFormDraft.battleMode=val("f-battle-mode",settingsFormDraft.battleMode)==="team"?"team":"individual";
+  const teamSizeEl=document.getElementById("f-team-size");
+  if(teamSizeEl) settingsFormDraft.teamSize=Math.max(3,parseInt(teamSizeEl.value,10)||3);
   settingsFormDraft.formatType=val("f-format",settingsFormDraft.formatType)||"single";
   settingsFormDraft.playMode=val("f-play-mode",settingsFormDraft.playMode)||"standard";
 
@@ -10823,6 +10831,10 @@ const REGISTRATION_ERROR_MESSAGES = {
   "room-password-invalid": "房間密碼不正確",
   "room-access-rate-limited": "密碼錯誤次數過多，請稍後再試",
   "room-access-not-ready": "房間密碼正在設定中，請稍後再試",
+  "team-mode-required": "此賽事不是團體戰",
+  "team-size-mismatch": "隊伍人數與本場設定不一致",
+  "invalid-team-data": "請確認隊名與所有隊員名稱皆已完整填寫",
+  "team-lottery-unavailable": "團體戰目前尚未開放超額抽籤報名",
 };
 function mapRegistrationError(e){
   const code = (e && e.code) || (e && e.message) || "unknown";
@@ -11588,6 +11600,7 @@ function summarizeRecord(st){
   const champ = st.championId ? (st.players.find(p=>p.id===st.championId)||{}).name : null;
   return {
     id: st.id, name: st.meta.name, date: st.meta.date, location: st.meta.location,
+    battleMode: st.meta.battleMode==="team"?"team":"individual", teamSize:Math.max(3,Number(st.meta.teamSize)||3), playMode:st.meta.playMode==="enchantment"?"enchantment":"standard",
     formatType: st.meta.formatType, format: st.meta.format,
     playerCount: st.players.length, championName: champ || null,
     systemClosure: st.systemClosure||null,
@@ -11824,7 +11837,7 @@ async function saveState(){
         return localOk ? true : false;
       }
       const lastCode = (typeof window!=="undefined" && window.__BXH_LAST_CLOUD_ERROR_CODE) || "";
-      if(lastCode==="registration-roster-stale"){
+      if(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"){
         cloudAccessLimited = true;
         cloudAccessMessage = "線上名單已更新；請重新整理頁面，再進行操作。";
         cloudStatus = "connected";
@@ -12318,8 +12331,119 @@ function resetBracketBeforeStart(){
   return true;
 }
 
+function eligibleBracketTeams(){
+  const size=Number(state.meta.teamSize), teams=Array.isArray(state.teams)?state.teams:[];
+  if(!Number.isInteger(size)||size<3) return null;
+  const players=new Map((state.players||[]).map(p=>[String(p.id),p]));
+  const ids=new Set(), members=new Set();
+  for(const t of teams){
+    if(!t?.id||ids.has(String(t.id))||!Array.isArray(t.memberPlayerIds)||t.memberPlayerIds.length!==size) return null;
+    ids.add(String(t.id));
+    for(const id of t.memberPlayerIds){
+      if(!id||members.has(String(id))||!players.has(String(id))) return null;
+      members.add(String(id));
+    }
+  }
+  return teams.filter(t=>!state.meta.checkinRequired||t.memberPlayerIds.every(id=>players.get(String(id))?.checkedIn===true));
+}
+function teamMatchTemplate(bracket,round,index,seq,station,extra={}){
+  return {id:uid("tm"),seq,bracket,round,indexInRound:index,station,teamIds:[null,null],
+    a:null,b:null,isBye:false,status:"pending",completed:false,scoreA:0,scoreB:0,log:[],
+    winnerId:null,loserId:null,...extra};
+}
+function generateTeamRoundRobin(teams){
+  const shuffled=shuffle(teams).map(t=>String(t.id));
+  if(shuffled.length%2)shuffled.push(null);
+  let rotation=shuffled.slice(),matches=[],seq=0,stations=Math.max(1,Number(state.meta.stations)||1);
+  for(let round=0;round<rotation.length-1;round++){
+    let index=0;
+    for(let i=0;i<rotation.length/2;i++){
+      const a=rotation[i],b=rotation[rotation.length-1-i];
+      if(a&&b)matches.push(teamMatchTemplate("RR",round,index++,seq,seq++%stations+1,{teamIds:[a,b],status:"ready"}));
+    }
+    rotation=[rotation[0],rotation.at(-1),...rotation.slice(1,-1)];
+  }
+  state.bracketSize=rotation.length;state.matches=matches;state.drawnAt=Date.now();
+  state.rrRounds=rotation.length-1;state.teamStandings=null;state.championId=null;state.runnerUpId=null;
+  state.currentMatchId=matches[0]?.id||null;state.rosterLocked=false;
+  syncMatchStatuses();rebuildCourtAssignments();
+  return true;
+}
+function generateTeamDouble(teams){
+  const shuffled=shuffle(teams),size=nextPow2(shuffled.length),order=seedOrder(size),slots=new Array(size).fill(null);
+  order.forEach((seed,pos)=>{if(seed<=shuffled.length)slots[pos]=String(shuffled[seed-1].id);});
+  const k=Math.log2(size),matches=[],wbRounds=[],lbRounds=[],stations=Math.max(1,Number(state.meta.stations)||1);
+  let seq=0;
+  const make=(bracket,round,index,extra={})=>{
+    const m=teamMatchTemplate(bracket,round,index,seq,seq%stations+1,extra);seq++;matches.push(m);return m;
+  };
+  for(let r=0;r<k;r++){
+    const arr=[];
+    for(let i=0;i<size/2**(r+1);i++){
+      const a=r?null:slots[2*i],b=r?null:slots[2*i+1];
+      const bye=r===0&&(!a||!b);
+      arr.push(make("WB",r,i,{teamIds:[a,b],isBye:bye,completed:bye,
+        winnerId:bye?(a||b):null,status:bye?"completed":r===0?"ready":"pending"}));
+    }
+    wbRounds.push(arr);
+  }
+  for(let r=1;r<k;r++)wbRounds[r].forEach((m,i)=>{
+    for(const side of [0,1])m.teamIds[side]=wbRounds[r-1][2*i+side]?.winnerId||null;
+    if(m.teamIds.every(Boolean))m.status="ready";
+  });
+  let survivors=null;
+  for(let r=0;r<k;r++){
+    if(r===0){
+      const arr=[];
+      for(let i=0;i<wbRounds[0].length;i+=2)
+        arr.push(make("LB",lbRounds.length,arr.length,{lbSrc:{type:"first",srcAId:wbRounds[0][i].id,srcBId:wbRounds[0][i+1]?.id||null}}));
+      lbRounds.push(arr);survivors=arr;
+    }else{
+      const merged=survivors.map((m,i)=>make("LB",lbRounds.length,i,{lbSrc:{type:"merge",survivorMatchId:m.id,dropperMatchId:wbRounds[r][i]?.id||null}}));
+      lbRounds.push(merged);survivors=merged;
+      if(r<k-1&&survivors.length>1){
+        const combined=[];
+        for(let i=0;i<survivors.length;i+=2)
+          combined.push(make("LB",lbRounds.length,combined.length,{lbSrc:{type:"combine",srcAMatchId:survivors[i].id,srcBMatchId:survivors[i+1]?.id||null}}));
+        lbRounds.push(combined);survivors=combined;
+      }
+    }
+  }
+  const gf=make("GF",0,0,{gfSrc:{wbFinalId:wbRounds[k-1][0].id,lbFinalId:survivors?.[0]?.id||null}});
+  state.bracketSize=size;state.matches=matches;state.drawnAt=Date.now();
+  state.gfMatchId=gf.id;state.gfResetMatchId=null;state.championId=null;state.runnerUpId=null;
+  state.currentMatchId=matches.find(m=>!m.isBye&&m.teamIds.every(Boolean))?.id||null;
+  state.rosterLocked=false;syncMatchStatuses();rebuildCourtAssignments();
+  return true;
+}
+function generateTeamBracket(){
+  if(!canOperateCurrentTournament()||state.startedAt) return false;
+  const teams=eligibleBracketTeams();
+  if(!teams){showToast("隊伍名單不完整或有重複隊員",true);return false;}
+  if(teams.length<2){showToast("至少需要兩支全員完成報到的隊伍",true);return false;}
+  if(state.meta.formatType==="double")return generateTeamDouble(teams);
+  if(state.meta.formatType==="roundrobin")return generateTeamRoundRobin(teams);
+  if(state.meta.formatType!=="single"){showToast("尚未支援的團體賽制",true);return false;}
+  const shuffled=shuffle(teams),size=nextPow2(shuffled.length),order=seedOrder(size),slots=new Array(size).fill(null);
+  order.forEach((seed,pos)=>{if(seed<=shuffled.length) slots[pos]=String(shuffled[seed-1].id);});
+  const matches=[],rounds=Math.log2(size),stations=Math.max(1,Number(state.meta.stations)||1);
+  for(let round=0;round<rounds;round++)for(let i=0;i<size/Math.pow(2,round+1);i++){
+    const lower=round?matches.filter(m=>m.round===round-1):[];
+    const a=round===0?slots[2*i]:(lower[2*i]?.winnerId||null),b=round===0?slots[2*i+1]:(lower[2*i+1]?.winnerId||null),bye=round===0&&(!a||!b);
+    matches.push({id:uid("tm"),seq:matches.length,bracket:"SE",round,indexInRound:i,teamIds:[a,b],
+      a:null,b:null,isBye:bye,station:matches.length%stations+1,status:bye?"completed":"pending",
+      completed:bye,scoreA:0,scoreB:0,log:[],winnerId:bye?(a||b):null,loserId:null});
+  }
+  state.bracketSize=size;state.matches=matches;state.drawnAt=Date.now();
+  state.currentMatchId=matches.find(m=>!m.isBye)?.id||null;
+  state.championId=null;state.runnerUpId=null;state.thirdId=null;state.fourthId=null;
+  state.rosterLocked=false;syncMatchStatuses();rebuildCourtAssignments();
+  return true;
+}
+
 /* ==== dispatcher: generate bracket ==== */
 function generateBracket(){
+  if(state.meta&&state.meta.battleMode==="team") return generateTeamBracket();
   if(!entryRosterValid()){showToast("請先完成名額抽籤，並保持抽中的正式名單",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   const fmt = state.meta.formatType || "single";
@@ -14467,6 +14591,7 @@ function sameStringSet(a,b){
 }
 function bracketRosterIsCurrent(){
   if(!state.bracketSize || !(state.matches||[]).length) return false;
+  if(state.meta?.battleMode==="team"){const teams=eligibleBracketTeams();if(!teams)return false;return sameStringSet(new Set(state.matches.flatMap(m=>m.teamIds||[]).filter(Boolean).map(String)),new Set(teams.map(t=>String(t.id))));}
   return sameStringSet(currentBracketParticipantIds(),eligibleRosterIds());
 }
 async function syncLatestOnlineRosterBeforeLock(registrationRows){
@@ -14476,15 +14601,21 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
   adminRegistrationsCache=regs;
   const confirmed=regs.filter(r=>r&&r.status==="confirmed");
-  const before=(state.players||[]).map(p=>[
+  const before=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
-    p.checkedIn===true?"1":"0",String(p.name||"")
-  ].join("|")).sort().join("\n");
-  state.players=mergeFamilyOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired,()=>uid("p"));
-  const after=(state.players||[]).map(p=>[
+    p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
+  ]).sort(),teams:state.teams||[]});
+  if(state.meta.battleMode==="team"){
+    state.players=mergeTeamOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired);
+    state.teams=teamRegistrationRowsToTeams(confirmed);
+  }else{
+    state.players=mergeFamilyOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired,()=>uid("p"));
+    state.teams=[];
+  }
+  const after=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
-    p.checkedIn===true?"1":"0",String(p.name||"")
-  ].join("|")).sort().join("\n");
+    p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
+  ]).sort(),teams:state.teams||[]});
   const changed=before!==after;
   if(changed && !(await saveState())) throw new Error("名單寫入雲端失敗；請重新整理後重試同步");
   publicTournamentsCache=null;
@@ -14948,11 +15079,11 @@ function bracketRefreshUsesPublicMirror(){
 }
 
 async function refreshBracketFromCloud(){
-  if(bracketRefreshBusy) return;
+  if(bracketRefreshBusy) return false;
   const code=String(state.cloudCode||"").trim().toUpperCase();
   if(!code || !window.cloudSync){
     showToast("目前沒有可更新的雲端賽事", true);
-    return;
+    return false;
   }
   bracketRefreshBusy=true;
   renderPreservingScroll();
@@ -14966,17 +15097,19 @@ async function refreshBracketFromCloud(){
       bracketRefreshBusy=false;
       renderPreservingScroll();
       showToast(CODE_ENTRY_ERROR_MESSAGES[(result&&result.reason)||"network"] || "更新失敗，請稍後再試", true);
-      return;
+      return false;
     }
     bracketRefreshBusy=false;
     cloudStatus="connected";
     cloudLastSyncAt=Date.now();
     applyRemoteState(result.data, true);
     showToast("對戰表已更新");
+    return true;
   }catch(e){
     bracketRefreshBusy=false;
     renderPreservingScroll();
     showToast("更新失敗，請稍後再試", true);
+    return false;
   }
 }
 
@@ -14985,7 +15118,121 @@ function bracketRefreshButtonHtml(){
   return `<button class="btn btn-ghost btn-sm bracket-refresh-btn" data-action="bracket-refresh" ${bracketRefreshBusy?'disabled':''} aria-label="重新讀取最新對戰表">${bracketRefreshBusy?'更新中…':'↻ 刷新'}</button>`;
 }
 
+const teamMatchUi=new Map();
+const teamMatchLoading=new Set();
+const teamMatchActionsBusy=new Set();
+function teamMatchNames(m){
+  const teams=new Map((state.teams||[]).map(t=>[String(t.id),t]));
+  return (m.teamIds||[]).map(id=>teams.get(String(id))?.name||"待晉級");
+}
+function teamMatchPlayerName(id){
+  return (state.players||[]).find(p=>String(p.id)===String(id))?.name||"未知隊員";
+}
+function renderTeamLineupPanel(m){
+  if(m.completed||!m.teamIds?.[0]||!m.teamIds?.[1]||!state.cloudCode)return '';
+  const view=teamMatchUi.get(m.id);
+  if(!view&&!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
+  const teams=(state.teams||[]).filter(t=>m.teamIds.includes(t.id));
+  const mine=teams.find(t=>t.id===view?.ownTeamId);
+  const canRef=view?.isReferee===true;
+  let out='<div class="panel"><div class="panel-title">隊長排陣與人員到齊</div>';
+  out+='<div class="hint">'+teams.map(t=>esc(t.name)+'：'+(view?.submitted?.[t.id]?'已提交':'待提交')).join(' ／ ')+'</div>';
+  if(view?.revealed){
+    out+='<div class="hint">雙方出場順序已公開並鎖定</div>';
+    for(const t of teams)out+='<p>'+esc(t.name)+'：'+(view.lineups?.[t.id]||[]).map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
+  }else{
+    if(mine){
+      const order=view?.ownOrder||mine.memberPlayerIds||[];
+      out+='<div class="hint">僅隊長與裁判可查看本隊順序；拖曳不支援，請以選單調整順位。</div>';
+      for(let i=0;i<order.length;i++){
+        out+='<label>第 '+(i+1)+' 位 <select class="team-lineup-slot" data-match-id="'+esc(m.id)+'" data-slot="'+i+'">';
+        for(const pid of mine.memberPlayerIds)out+='<option value="'+esc(pid)+'" '+(order[i]===pid?'selected':'')+'>'+esc(teamMatchPlayerName(pid))+'</option>';
+        out+='</select></label>';
+      }
+      out+='<button class="btn btn-primary btn-sm" data-action="team-lineup-submit" data-match-id="'+esc(m.id)+'">提交本隊出場順序</button>';
+    }
+    if(canRef){
+      for(const t of teams)if(view?.lineups?.[t.id])out+='<p>裁判檢視｜'+esc(t.name)+'：'+view.lineups[t.id].map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
+      if(view?.submitted?.[teams[0]?.id]&&view?.submitted?.[teams[1]?.id])
+        out+='<button class="btn btn-primary btn-sm" data-action="team-lineup-reveal" data-match-id="'+esc(m.id)+'">人員到齊・同時公開並鎖定</button>';
+      else if(view?.submitted?.[teams[0]?.id]||view?.submitted?.[teams[1]?.id])
+        out+='<button class="btn btn-ghost btn-sm" data-action="team-lineup-reset" data-match-id="'+esc(m.id)+'">退回雙方重排</button>';
+    }
+  }
+  out+='<button class="btn btn-ghost btn-sm" data-action="team-lineup-refresh" data-match-id="'+esc(m.id)+'">更新排陣狀態</button></div>';
+  return out;
+}
+function renderTeamScorePanel(m){
+  if(m.completed)return '<div class="hint">本場勝隊：'+esc((state.teams||[]).find(t=>t.id===m.winnerId)?.name||'未知隊伍')+'</div>';
+  const view=teamMatchUi.get(m.id);
+  if(!state.startedAt||!view?.revealed)return '';
+  const game=view.game, names=teamMatchNames(m);
+  let out='<div class="panel"><div class="panel-title">雙命守擂｜'+names.map(esc).join(' vs ')+'</div>';
+  if(game){
+    for(let side=0;side<2;side++){
+      const idx=game.current[side], id=game.lineups[side][idx];
+      out+='<p>'+esc(names[side])+'：'+(id?esc(teamMatchPlayerName(id))+'（'+game.life[side][idx]+' 命）':'全員淘汰')+'</p>';
+    }
+    out+='<div class="hint">已完成 '+game.rounds.length+' 次判定</div>';
+    if(game.winner!==null){out+='<b>本場勝隊：'+esc(names[game.winner])+'</b></div>';return out;}
+  }
+  if(view.isReferee===true){
+    out+='<label>勝方 <select id="team-score-winner-'+esc(m.id)+'"><option value="0">'+esc(names[0])+'</option><option value="1">'+esc(names[1])+'</option></select></label>';
+    out+='<label>判定 <select id="team-score-finish-'+esc(m.id)+'"><option value="spin">轉停</option><option value="burst">爆裂</option><option value="over">擊飛</option><option value="extreme">極限</option></select></label>';
+    out+='<button class="btn btn-primary btn-sm" data-action="team-score-submit" data-match-id="'+esc(m.id)+'">確認本次判定</button>';
+  }
+  return out+'</div>';
+}
+async function loadTeamMatchUi(matchId){
+  if(!state.cloudCode||!window.engagementService?.teamLineup)return;
+  const code=state.cloudCode;
+  try{
+    const view=await window.engagementService.teamLineup({action:'view',code,matchId});
+    if(code!==state.cloudCode)return;
+    const prior=teamMatchUi.get(matchId)||{};
+    teamMatchUi.set(matchId,{...prior,...view});
+    if(view.revealed&&state.startedAt&&view.isReferee===true){
+      try{const scored=await window.engagementService.teamScoring({action:'view',code,matchId});teamMatchUi.set(matchId,{...teamMatchUi.get(matchId),game:scored.game});}
+      catch(e){console.warn('[team score view]',e);}
+    }
+    render();
+  }catch(e){console.warn('[team lineup view]',e);teamMatchUi.set(matchId,{error:true});}
+  finally{teamMatchLoading.delete(matchId);}
+}
+function renderTeamBracket(){
+  const teams=new Map((state.teams||[]).map(t=>[String(t.id),t]));
+  const name=id=>id?esc(teams.get(String(id))?.name||"隊伍已移除"):"待晉級";
+  const opening=state.meta.formatType==="double"?"WB":"SE";
+  const byes=state.matches.filter(m=>m.bracket===opening&&m.round===0&&m.isBye&&m.winnerId);
+  const fmt=state.meta.formatType||"single";
+  const label={SE:"單淘",WB:"勝部",LB:"敗部",GF:"總決賽",GFR:"重置戰",RR:"積分賽"};
+  let html='<div class="panel"><div class="panel-title">團體戰對戰表</div>';
+  html+='<p class="hint">'+esc(state.meta.teamSize)+'V'+esc(state.meta.teamSize)+'・'+teams.size+' 支隊伍・'+byes.length+' 支首輪輪空</p>';
+  if(byes.length)html+='<p class="hint">首輪輪空：'+byes.map(m=>name(m.winnerId)).join('、')+'</p>';
+  const groups=new Map();
+  for(const m of state.matches.filter(m=>!m.isBye)){
+    const key=m.bracket+':'+m.round;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(m);
+  }
+  for(const [key,matches] of groups){
+    const [bracket,round]=key.split(':');
+    const title=(label[bracket]||bracket)+(bracket==="GF"||bracket==="GFR"?"":"・第 "+(Number(round)+1)+" 輪");
+    html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">'+title+'</span><span class="compact-round-count">'+matches.length+' 場</span></div><div class="compact-round-matches">';
+    for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m)+renderTeamScorePanel(m);
+    html+='</div></section>';
+  }
+  if(fmt==="roundrobin"){
+    const rows=Array.isArray(state.teamStandings)?state.teamStandings:[];
+    html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">隊伍排名</span></div>';
+    if(rows.length)html+='<div class="table-scroll"><table class="rank-table"><thead><tr><th>名次</th><th>隊伍</th><th>勝</th><th>敗</th><th>得失分差</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(r.rank)+(r.tied?'（同名次，需加賽）':'')+'</td><td>'+name(r.id)+'</td><td>'+esc(r.wins)+'</td><td>'+esc(r.losses)+'</td><td>'+esc(r.diff)+'</td></tr>').join('')+'</tbody></table></div>';
+    html+='</section>';
+  }
+  if(state.championId)html+='<div class="panel"><b>冠軍：'+name(state.championId)+'</b><div>亞軍：'+name(state.runnerUpId)+'</div></div>';
+  return html+'</div>';
+}
 function renderBracket(){
+  if(state.meta?.battleMode==="team"&&state.bracketSize)return renderTeamBracket();
   const refreshBtn=bracketRefreshButtonHtml();
   if(!state.bracketSize){
     const refreshOnly=refreshBtn ? `<div class="bracket-top-controls bracket-top-controls-refresh-only">${refreshBtn}</div>` : "";
@@ -16014,6 +16261,7 @@ function renderSkippedMatches(){
   return `<section class="panel"><div class="panel-title">待承接場次（${skipped.length}）</div><div class="hint">保留原比分。閒置台立即承接；忙碌台安排在目前比賽之後。未承接的場次依原台佇列接續；跳過時沒有其他可執行場次，則保留待承接。</div>${skipped.map(m=>`<div class="panel" style="margin-top:12px"><strong>${esc(matchLabel(m))}｜${esc(playerName(m.a.playerId))} vs ${esc(playerName(m.b.playerId))}</strong><div class="hint">台${Number(m.station)} · ${m.callPass?'PASS：同台兩場後回補':m.resumeQueuedAt?'已安排承接':'已跳過'}</div>${!m.resumeQueuedAt&&!m.callPass&&canOperateCurrentTournament()&&state.archiveStatus!=="completed"?`<div class="btn-row">${targets.map(i=>`<button class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${i}" ${courtQueueBusy?'disabled':''}>${isAdminTierOrAbove()?'指派':'承接'}至台${i}</button>`).join("")}</div>`:""}</div>`).join("")}</section>`;
 }
 function renderReferee(){
+  if(state.meta?.battleMode==="team")return renderTeamBracket();
   const quickNav = refereeBracketRoundtripNav("bracket");
   if(!state.bracketSize){
     return quickNav+`<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請先至「賽事設定」產生對戰表</div></div></div>`;
@@ -16226,6 +16474,27 @@ function renderRefereeStationAssignmentPanel(){
   return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">建議賽前完成分配。啟用後，未被指定的 staff 在其他 Court 只可查看，不能計分、確認結果、簡易判定、暫停、跳過或重賽。玩家端只會看到裁判顯示名稱，不公開 UID。</p>${directoryHint}${refereeDirectoryError?`<div class="auth-error">${esc(refereeDirectoryError)}</div>`:""}<div class="toggle-row" style="margin:12px 0;"><span><b>啟用桌次限制</b><small>未啟用時沿用既有賽事權限；啟用後依 Court 指派限制。</small></span><button class="toggle ${enabled?'on':''}" data-action="toggle-referee-station-restriction" data-value="${enabled?'false':'true'}" ${refereeAssignmentSaving?'disabled':''}><span></span></button></div>${draftHint}<div style="display:flex;flex-direction:column;gap:10px;">${rows}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="save-referee-station-assignment" ${refereeAssignmentSaving?'disabled':''}>${refereeAssignmentSaving?'雲端交易確認中…':'儲存裁判台分配'}</button><button class="btn btn-ghost" data-action="load-referee-directory" ${refereeAssignmentSaving?'disabled':''}>重新載入名單</button></div></div>`;
 }
 
+
+function renderTeamAdminRegistrations(list,registrationLocked){
+  const rows=(Array.isArray(list)?list:[]).filter(r=>r&&(r.registrationKind==="team"||r.teamId));
+  const confirmed=rows.filter(r=>r.status==="confirmed").sort((a,b)=>normalizeDateTime(a.createdAt)-normalizeDateTime(b.createdAt));
+  const waitlist=rows.filter(r=>r.status==="waitlist").sort((a,b)=>normalizeDateTime(a.createdAt)-normalizeDateTime(b.createdAt));
+  const cancelled=rows.filter(r=>r.status==="cancelled").sort((a,b)=>normalizeDateTime(b.cancelledAt)-normalizeDateTime(a.cancelledAt));
+  const size=Math.max(3,Number(state.meta&&state.meta.teamSize)||3);
+  const card=(r,showCancel)=>{
+    const members=(Array.isArray(r.teamMembers)?r.teamMembers:[]).map((m,i)=>'<li><span>第 '+(Number(m.slot)||i+1)+' 位</span><b>'+esc(m.name||"未命名玩家")+'</b></li>').join('');
+    const created=normalizeDateTime(r.createdAt)?new Date(normalizeDateTime(r.createdAt)).toLocaleString():"—";
+    return '<details class="registration-mobile-card team-registration-admin-card"><summary><span class="registration-mobile-main"><strong>'+esc(r.teamName||r.displayName||"未命名隊伍")+'</strong><small>'+size+' 人｜隊長 '+esc(r.captainDisplayName||r.captainName||"—")+'</small></span><span class="registration-mobile-more">展開隊員</span></summary><div class="registration-mobile-details"><div><span>隊伍人數</span><b>'+size+' 人</b></div><div><span>隊長</span><b>'+esc(r.captainName||r.captainDisplayName||"—")+'</b></div><div><span>電話</span><b>'+esc(r.phone||"—")+'</b></div><div><span>報名時間</span><b>'+esc(created)+'</b></div><div style="display:block;"><span>隊員名單</span><ol class="team-registration-members">'+members+'</ol></div>'+(showCancel?'<div class="registration-mobile-actions"><button class="btn btn-danger btn-sm" data-action="admin-cancel-registration" data-uid="'+esc(r.registrationId||r.uid)+'" '+(adminRegistrationsBusy||registrationLocked?'disabled':'')+'>取消整隊報名</button></div>':'')+'</div></details>';
+  };
+  const section=(title,items,showCancel,extra,empty)=>'<div class="panel registration-list-panel"><div class="panel-title">'+title+'（'+items.length+' 隊）</div>'+(extra||'')+'<div class="registration-mobile-list">'+(items.length?items.map(r=>card(r,showCancel)).join(''):'<div class="registration-mobile-empty">'+empty+'</div>')+'</div></div>';
+  const lockBanner=registrationLocked?'<div class="banner warn"><span>賽事已開始，隊伍報名管理已鎖定。</span></div>':'';
+  const promote=waitlist.length?'<div class="btn-row registration-promote-row"><button class="btn btn-primary" data-action="admin-promote-waitlist" '+(adminRegistrationsBusy||registrationLocked?'disabled':'')+'>遞補下一隊（依報名時間）</button></div>':'';
+  return lockBanner+
+    section('正取隊伍',confirmed,true,'','目前沒有正取隊伍')+
+    section('備取隊伍',waitlist,true,promote,'目前沒有備取隊伍')+
+    section('已取消隊伍',cancelled,false,'','目前沒有取消紀錄');
+}
+
 function renderAdminRegistrationsTab(){
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
@@ -16254,6 +16523,7 @@ function renderAdminRegistrationsTab(){
     </div>`;
   }
   const list = adminRegistrationsCache;
+  if(state.meta.battleMode==="team") return renderTeamAdminRegistrations(list,registrationLocked);
   if(state.entrySelection?.mode==='registration'){
     const drawn=state.entrySelection.status==='drawn';
     const records=list.slice().sort((a,b)=>(normalizeDateTime(a.createdAt)||0)-(normalizeDateTime(b.createdAt)||0)||String(a.uid).localeCompare(String(b.uid)));
@@ -16391,6 +16661,8 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
   ensureRegistrationFormDraft();
   const d = registrationFormDraft;
   const m = state.meta;
+  const teamRegistrationMode=(settingsFormDraft&&settingsFormDraft.battleMode==="team")||(!settingsFormDraft&&m.battleMode==="team");
+  const teamRegistrationSize=Math.max(3,Number((settingsFormDraft&&settingsFormDraft.teamSize)||m.teamSize)||3);
   const status = (!m || !m.registrationEnabled) ? null : (m.eventCancelled ? "cancelled" : (state.bracketSize>0 ? "closed" : getEffectiveRegistrationStatus({
     registrationCloseAt: m.registrationCloseAt, registrationOpenAt: m.registrationOpenAt,
     capacity: m.registrationCapacity, confirmedCount: 0,
@@ -16412,7 +16684,7 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     </div>
     ${locked ? `<p class="hint" style="margin-top:10px;">已產生對戰表，無法變更是否啟用線上報名。</p>` : ""}` : ""}
     ${d.registrationEnabled ? `
-    <div class="field" style="margin-top:14px;">
+    ${teamRegistrationMode?`<div class="banner" style="margin-top:14px;"><span><b>${teamRegistrationSize}V${teamRegistrationSize} 團體戰</b>｜報名與正備取名額都以「隊伍」計算；玩家端先填隊名，再完整填入 ${teamRegistrationSize} 位隊員。</span></div>`:`<div class="field" style="margin-top:14px;">
       <label>參賽名稱顯示</label>
       <div class="btn-row">
         <button class="btn ${d.participantNameMode==='realName'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-name-mode" data-value="realName">使用本名</button>
@@ -16427,18 +16699,18 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
         <button class="btn ${d.targetGroup==='children'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-target-group" data-value="children">兒童組</button>
       </div>
       <p class="hint" style="margin-top:6px;">${d.targetGroup==='children' ? "限 6 歲以上、13 歲以下參加。" : "不限年齡，符合活動規則者皆可參加。"}</p>
-    </div>
+    </div>`}
     <div class="grid grid-2" style="margin-top:14px;">
       <div class="field"><label>報名開放時間</label>${renderHalfHourDatetimeDraft("reg-open-at","registrationOpenAt",d.registrationOpenAt)}</div>
       <div class="field"><label>報名截止時間</label>${renderHalfHourDatetimeDraft("reg-close-at","registrationCloseAt",d.registrationCloseAt)}</div>
-      <div class="field"><label>正取人數上限</label><input type="number" id="reg-capacity" data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
+      <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
       <div class="field"><label>報名費（元，選填）</label><input type="number" id="reg-fee" data-draft-field="registrationFee" data-draft-type="int-or-null" min="0" value="${d.registrationFee!=null?d.registrationFee:""}"></div>
     </div>
     ${state.entrySelection?.mode==='registration'?'<p class="hint">本場已啟用報名抽籤：報名不限額、備取不限額，正取人數請至「參賽名額抽籤」調整。下列舊制上限不套用於本場。</p>':''}
     <div class="field" style="margin-top:8px;">
-      <label>備取人數上限（選填）</label>
+      <label>${teamRegistrationMode?"備取隊伍上限（選填）":"備取人數上限（選填）"}</label>
       <input type="number" id="reg-waitlist-capacity" data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
-      <p class="hint" style="margin-top:6px;">有需要備取就填人數；留空即代表 0 人、不開放備取。</p>
+      <p class="hint" style="margin-top:6px;">有需要備取就填${teamRegistrationMode?"隊伍數":"人數"}；留空即代表 0、不開放備取。</p>
     </div>
     <div class="field" style="margin-top:8px;"><label>活動說明（選填）</label><textarea id="reg-event-desc" data-draft-field="eventDescription" data-draft-type="string" rows="3">${esc(d.eventDescription)}</textarea></div>
     <div class="btn-row" style="margin-top:6px;">
@@ -16780,7 +17052,7 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const bracketPanel=`
-    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">可編排選手</div><div class="value small">${eligiblePlayers().length}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||!entryRosterValid()?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
@@ -16976,17 +17248,22 @@ function renderSettings(){
   <div class="panel settings-flow-panel">
     <div class="settings-match-grid settings-match-grid-single">
       <div>
-        <div class="settings-mini-title">賽制設定</div>
-        <div class="field"><label>賽制</label><select id="f-format" data-settings-draft="formatType">
+        <div class="settings-mini-title">對戰架構</div>
+        <div class="field"><label>對戰形式</label><select id="f-battle-mode" data-settings-draft="battleMode">
+          <option value="individual" ${d.battleMode!=="team"?"selected":""}>個人戰</option>
+          <option value="team" ${d.battleMode==="team"?"selected":""}>團體戰</option>
+        </select></div>
+        ${d.battleMode==="team"?`<div class="field"><label>每隊人數</label><input type="number" min="3" step="1" id="f-team-size" data-settings-draft="teamSize" data-settings-type="int" value="${Math.max(3,parseInt(d.teamSize,10)||3)}"><p class="hint">本場固定為 ${Math.max(3,parseInt(d.teamSize,10)||3)}V${Math.max(3,parseInt(d.teamSize,10)||3)}；所有隊伍必須相同人數。</p></div>`:""}
+        <div class="field"><label>賽事制度</label><select id="f-format" data-settings-draft="formatType">
           <option value="single" ${d.formatType==='single'?'selected':''}>單淘汰賽</option>
           <option value="double" ${d.formatType==='double'?'selected':''}>雙敗制</option>
           <option value="roundrobin" ${d.formatType==='roundrobin'?'selected':''}>單循環賽</option>
         </select></div>
-        <div class="field"><label>玩法模式</label><select id="f-play-mode" data-settings-draft="playMode">
-          <option value="standard" ${d.playMode!=="enchantment"?"selected":""}>標準對戰</option>
-          <option value="enchantment" ${d.playMode==="enchantment"?"selected":""} ${isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&ladderMode!=="ranked"?'':'disabled'}>附魔之戰（正式站限管理者測試）</option>
+        <div class="field"><label>戰鬥規則</label><select id="f-play-mode" data-settings-draft="playMode">
+          <option value="standard" ${d.playMode!=="enchantment"?"selected":""}>標準規則</option>
+          <option value="enchantment" ${d.playMode==="enchantment"?"selected":""} ${isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&ladderMode!=="ranked"?'':'disabled'}>附魔之戰（正式站限管理者測試）</option>
         </select></div>
-        <p class="hint">附魔試行僅限最高管理員建立一般單淘賽，不開季軍賽、不計積分。這是正式站資料，請先以測試房與測試帳號操作；裁判確認到場後啟動抽卡，選手各自在自己的手機抽牌。</p>
+        <p class="hint">對戰形式、賽事制度、戰鬥規則彼此獨立。團體戰可搭配單淘／雙敗／單循環；資料結構已預留未來「團體附魔戰」。目前附魔試行仍限定個人戰，待團體附魔裁判流程完成後再開放組合。</p>
         <div class="field"><label>戰鬥台數量</label><input type="number" min="1" max="32" id="f-stations" data-settings-draft="stations" data-settings-type="int" value="${d.stations}"></div>
         <label class="settings-check-row">
           <input type="checkbox" id="f-bronze" data-settings-draft="bronzeMatch" data-settings-type="bool" ${d.bronzeMatch?'checked':''} ${(ladderMode==="ranked"&&d.formatType==="single")?'disabled':''}>
@@ -19509,7 +19786,7 @@ function findEventsCardHtml(t){
     : (t.capacity ? `<span class="hint" style="margin:0;">剩餘名額 ${Math.max(0,t.capacity-t.confirmedCount)}／${t.capacity}</span>` : "");
   return `<div class="find-event-card">
     <div class="fe-name">${esc(t.name)}</div>
-    <div class="fe-meta">${esc(t.date||"時間待公布")}　${esc(t.location||"地點待公布")}　${esc(FORMAT_LABELS[t.formatType]||"")}</div>
+    <div class="fe-meta">${esc(t.date||"時間待公布")}　${esc(t.location||"地點待公布")}　${t.battleMode==="team"?esc(t.teamSize+"V"+t.teamSize+" 團體戰　"):""}${esc(FORMAT_LABELS[t.formatType]||"")}</div>
     <div class="fe-status-row">
       ${t.regStatusLabel && t.phase!=="live" ? `<span class="fe-status-chip status-${t.regStatus}">${esc(t.regStatusLabel)}</span>` : ""}
       ${t.phase==="live" ? `<span class="fe-status-chip status-live">進行中</span>` : ""}
@@ -19548,6 +19825,7 @@ function lobbySummary(raw){
     cancellationDeadline:normalizeDateTime(raw.cancellationDeadline), targetGroup:raw.targetGroup||m.targetGroup||"open",
     eventCancelled:!!raw.eventCancelled, publishedAt:raw.publishedAt, visibility:raw.visibility,
     startMs:lobbyEventStartMs(raw), formatType:raw.formatType||m.formatType||"single",
+    battleMode:(raw.battleMode||m.battleMode)==="team"?"team":"individual", teamSize:Math.max(3,Number(raw.teamSize||m.teamSize)||3),
     fee:raw.fee, checkInAt:raw.checkInAt||m.checkin||"", eventDescription:raw.eventDescription||"",
     roomAccessMode:raw.roomAccessMode||m.roomAccessMode||"public",
     coverUrl:typeof raw.coverUrl==="string"?raw.coverUrl:""
@@ -20100,16 +20378,24 @@ async function loadTournamentDetail(code){
     tournamentDetailMyRegs=[];
     tournamentDetailMyReg=null;
     if(uid){
-      let familyLoaded=false;
-      if(window.engagementService?.familyRegistration){
+      const detailBattleMode=(data.battleMode||(data.parsedData&&data.parsedData.meta&&data.parsedData.meta.battleMode))==="team"?"team":"individual";
+      let registrationLoaded=false;
+      if(detailBattleMode==="team"&&window.engagementService?.teamRegistration){
+        try{
+          const mine=await window.engagementService.teamRegistration({action:'mine',code});
+          tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist'].includes(row.status));
+          tournamentDetailMyReg=tournamentDetailMyRegs[0]||null;
+          registrationLoaded=true;
+        }catch(e){console.warn('[BXH team registration mine failed; fallback to registration read]',e)}
+      }else if(window.engagementService?.familyRegistration){
         try{
           const mine=await window.engagementService.familyRegistration({action:'mine',code});
           tournamentDetailMyRegs=(mine?.rows||[]).filter(row=>row&&['confirmed','waitlist','pending_draw'].includes(row.status));
           tournamentDetailMyReg=tournamentDetailMyRegs.find(row=>!row.familyPlayerId)||tournamentDetailMyRegs[0]||null;
-          familyLoaded=true;
+          registrationLoaded=true;
         }catch(e){console.warn('[BXH family registration mine failed; fallback to legacy registration read]',e)}
       }
-      if(!familyLoaded&&window.cloudSync.getMyRegistrationForTournament){
+      if(!registrationLoaded&&window.cloudSync.getMyRegistrationForTournament){
         tournamentDetailMyReg=await window.cloudSync.getMyRegistrationForTournament(code);
         tournamentDetailMyRegs=tournamentDetailMyReg?[tournamentDetailMyReg]:[];
       }
@@ -20157,6 +20443,34 @@ function renderTournamentStandardTemplate(t){
   return html;
 }
 
+
+function tournamentBattleMode(t){
+  return (t&&((t.battleMode)||(t.parsedData&&t.parsedData.meta&&t.parsedData.meta.battleMode)))==="team"?"team":"individual";
+}
+function tournamentTeamSize(t){
+  return Math.max(3,Number(t&&((t.teamSize)||(t.parsedData&&t.parsedData.meta&&t.parsedData.meta.teamSize)))||3);
+}
+function renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining){
+  const size=tournamentTeamSize(t),myTeam=activeMyRegs.find(row=>row&&row.registrationKind==="team")||activeMyRegs[0]||null;
+  if(publicTournamentRegistrationLocked(t)) return '<div class="banner warn"><span>賽事已開始，隊伍報名與取消功能均已鎖定。</span></div><div class="tournament-detail-bottom-actions"><button class="btn btn-ghost" data-action="back-to-find-events">← 返回賽事列表</button><button class="btn btn-primary" data-action="switch-to-player-watch" data-code="'+esc(code)+'">'+(t.tournamentPhase==="done"?"查看比賽結果":"查看即時賽事")+'</button></div>';
+  if(isGuestMode) return '<div class="hint">遊客模式僅供瀏覽，請切換至玩家模式後由隊長建立隊伍報名。</div><button class="btn btn-primary" data-action="select-role-player">切換至玩家模式</button>';
+  if(myTeam){
+    const status=myTeam.status==="confirmed"?"正取":myTeam.status==="waitlist"?"備取"+(myTeam.waitRank?"第 "+myTeam.waitRank+" 位":""):myTeam.status;
+    const members=(Array.isArray(myTeam.teamMembers)?myTeam.teamMembers:[]).map((m,i)=>'<li><span>第 '+(Number(m.slot)||i+1)+' 位</span><b>'+esc(m.name||"未命名玩家")+'</b></li>').join('');
+    const canCancel=t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
+    return '<div id="registration-result-panel" class="registration-result-panel"><div class="registration-result-head"><span class="registration-result-icon">✓</span><div><div class="registration-result-title">'+esc(myTeam.teamName||myTeam.displayName||"我的隊伍")+'</div><div class="registration-result-subtitle">'+size+'V'+size+' 團體戰｜隊長：'+esc(myTeam.captainDisplayName||myTeam.captainName||userProfile?.displayName||userProfile?.realName||"—")+'</div></div></div><div class="stat-box"><div class="label">報名狀態</div><div class="value small">'+esc(status)+'</div></div><details class="settings-accordion" open><summary><span>隊伍成員（'+size+' 人）</span><span class="hint">展開／收合</span></summary><div class="settings-accordion-body"><ol class="team-registration-members">'+members+'</ol></div></details><div class="registration-next-step"><b>出場順序不是現在提交</b><br>每一場團體對戰開始前，隊長會另外提交該場出場順序；提交後僅裁判可見，直到裁判按下「人員到齊」才公開。</div><div class="registration-result-actions">'+(canCancel?'<button class="btn btn-sm registration-cancel-link" data-action="cancel-team-registration" data-code="'+esc(code)+'" '+(tournamentDetailBusy?'disabled':'')+'>取消整隊報名</button>':'<span class="hint">'+(t.cancellationDeadline?"已超過取消期限，無法取消":"目前無法取消報名")+'</span>')+'</div></div>';
+  }
+  if(effStatus==="cancelled"||t.eventCancelled)return '<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>';
+  if(effStatus==="closed")return '<div class="hint">團體報名已截止。</div><button class="btn btn-ghost" disabled>不可報名</button>';
+  if(effStatus==="scheduled")return '<div>'+renderRegistrationCountdown(code,t.registrationOpenAt)+'</div><button class="btn btn-ghost" disabled>尚未開放</button>';
+  if(!isLoggedIn)return '<div class="hint">請先登入，由隊長帳號建立隊伍報名。</div><button class="btn btn-primary" data-action="switch-to-player-mode">登入後報名</button>';
+  if(profileIncomplete)return '<div class="hint">隊長需先完成會員資料才能建立隊伍。</div><button class="btn btn-primary" data-action="player-edit-profile">前往完成資料</button>';
+  if(effStatus==="full"&&!(t.waitlistEnabled&&waitlistRemaining>0))return '<div class="hint">正取與備取隊伍皆已額滿。</div><button class="btn btn-ghost" disabled>已額滿</button>';
+  const willWait=confirmedRemaining<=0;
+  const memberFields=Array.from({length:size},(_,i)=>'<div class="field"><label>隊員 '+(i+1)+'</label><input class="team-registration-member" type="text" maxlength="40" autocomplete="off" placeholder="輸入玩家名稱"></div>').join('');
+  return '<div class="team-registration-form"><div class="banner"><span><b>'+size+'V'+size+' 團體戰</b>｜本場每隊必須剛好 '+size+' 人，不接受不同人數隊伍。</span></div><div class="field"><label>隊名</label><input id="team-registration-name" type="text" maxlength="40" autocomplete="off" placeholder="輸入隊伍名稱"></div><div class="settings-mini-title">隊伍成員</div><div class="grid grid-2">'+memberFields+'</div><p class="hint">目前登入帳號會成為本隊「隊長」並負責每場提交出場順序；隊長是否同時出賽，取決於是否有填在上方 '+size+' 名隊員內。</p><button class="btn btn-primary" data-action="submit-team-registration" data-code="'+esc(code)+'" '+(tournamentDetailBusy?'disabled':'')+'>'+(willWait?'整隊加入備取':'送出整隊報名')+'</button></div>';
+}
+
 function renderTournamentDetailScreen(){
   const code = tournamentDetailCode;
   if(tournamentDetailLoading || !tournamentDetailData){
@@ -20171,6 +20485,8 @@ function renderTournamentDetailScreen(){
   const t = tournamentDetailData;
   const publicVenue=publicVenueFromTournament(t);
   const now = Date.now();
+  const isTeamBattle=tournamentBattleMode(t)==="team";
+  const teamSize=tournamentTeamSize(t);
   const effStatus = getEffectiveRegistrationStatus(Object.assign({}, t, {
     registrationStatus: t.eventCancelled ? "cancelled" : t.registrationStatus
   }), now);
@@ -20254,6 +20570,9 @@ function renderTournamentDetailScreen(){
       </div>`;
     }
   }
+  if(isTeamBattle){
+    actionHtml=renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining);
+  }
 
   return authShellOpen() + `
     <div class="tournament-detail-brand">${authBrandHeader()}</div>
@@ -20270,7 +20589,8 @@ function renderTournamentDetailScreen(){
         </div></div>
         <div class="stat-box"><div class="label">報到時間</div><div class="value small">${esc(t.checkInAt||"—")}</div></div>
         <div class="stat-box"><div class="label">開賽時間</div><div class="value small">${esc(t.startAt||"—")}</div></div>
-        <div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(t.formatType==='single'?'單淘汰賽':(t.formatType||"—"))}</div></div>
+        <div class="stat-box"><div class="label">對戰形式</div><div class="value small">${isTeamBattle?esc(teamSize+"V"+teamSize+" 團體戰"):"個人戰"}</div></div>
+        <div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[t.formatType]||(t.formatType||"—"))}</div></div>
         <div class="stat-box"><div class="label">報名費</div><div class="value small">${t.fee!=null?esc(String(t.fee))+" 元":"免費"}</div></div>
       </div>
       <div class="tournament-info-foot">
@@ -20285,14 +20605,14 @@ function renderTournamentDetailScreen(){
         <div class="stat-box"><div class="label">報名截止時間</div><div class="value small">${esc(formatTournamentDetailDateTime(t.registrationCloseAt))}</div></div>
         <div class="stat-box"><div class="label">取消報名期限</div><div class="value small">${esc(formatTournamentDetailDateTime(t.cancellationDeadline))}</div></div>
         <div class="stat-box"><div class="label">報名狀態</div><div class="value small">${esc(REGISTRATION_STATUS_LABELS[effStatus]||effStatus)}</div></div>
-        <div class="stat-box"><div class="label">${t.registrationSelection?'報名／參賽名額':'正取名額'}</div><div class="value small">${t.registrationSelection?`${t.registeredCount||0} 人報名（不限額）／正取 ${t.registrationSelection.capacity} 人`:`${t.confirmedCount||0} / ${t.capacity||0}（剩餘 ${confirmedRemaining}）`}</div></div>
-        <div class="stat-box"><div class="label">備取名額</div><div class="value small">${t.waitlistEnabled ? `${t.waitlistCount||0} / ${t.waitlistCapacity||0}（剩餘 ${waitlistRemaining}）` : "未開放備取"}</div></div>
+        <div class="stat-box"><div class="label">${t.registrationSelection?'報名／參賽名額':(isTeamBattle?'正取隊伍':'正取名額')}</div><div class="value small">${t.registrationSelection?`${t.registeredCount||0} 人報名（不限額）／正取 ${t.registrationSelection.capacity} 人`:`${t.confirmedCount||0} / ${t.capacity||0}（剩餘 ${confirmedRemaining}${isTeamBattle?" 隊":" 人"}）`}</div></div>
+        <div class="stat-box"><div class="label">${isTeamBattle?"備取隊伍":"備取名額"}</div><div class="value small">${t.waitlistEnabled ? `${t.waitlistCount||0} / ${t.waitlistCapacity||0}（剩餘 ${waitlistRemaining}${isTeamBattle?" 隊":" 人"}）` : "未開放備取"}</div></div>
       </div>
       ${t.eventDescription ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">活動說明</div><p class="tournament-info-foot-text">${esc(t.eventDescription)}</p></div>` : ""}
       ${t.registrationNotes ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">報名注意事項</div><p class="tournament-info-foot-text">${esc(t.registrationNotes)}</p></div>` : ""}
     </div>
     ${renderTournamentStandardTemplate(t)}
-    ${!isGuestMode && isLoggedIn && !myReg ? `<div class="panel tournament-detail-panel tournament-info-panel">
+    ${!isTeamBattle && !isGuestMode && isLoggedIn && !myReg ? `<div class="panel tournament-detail-panel tournament-info-panel">
       <div class="panel-title">本次報名資料</div>
       <div class="grid grid-2 tournament-detail-grid">
         <div class="stat-box"><div class="label">姓名</div><div class="value small">${esc(userProfile.realName||"—")}</div></div>
@@ -20350,6 +20670,7 @@ function smartCallRemainingSeconds(m){
 }
 function smartCallModel(r,info){
   const st=info&&info.parsedData;
+  if((info&&info.battleMode)==="team" || (st&&st.meta&&st.meta.battleMode)==="team") return {kind:"pending",message:"團體戰上場提醒將於團體裁判台完成後啟用"};
   if(!st || !Array.isArray(st.matches) || !Array.isArray(st.players)) return {kind:"pending",message:"等待賽事對戰資料同步"};
   if(r.status!=="confirmed") return {kind:"waitlist",message:"目前為備取，遞補為正取後才會啟用叫號"};
   const pid=smartCallFindPlayerId(st,r);
@@ -23787,16 +24108,17 @@ function bindDynamicInputs(){
           const field=el.getAttribute("data-settings-draft");
           const type=el.getAttribute("data-settings-type");
           let value;
-          if(type==="int") value=Math.max(1,parseInt(el.value,10)||1);
+          if(type==="int") value=field==="teamSize"?Math.max(3,parseInt(el.value,10)||3):Math.max(1,parseInt(el.value,10)||1);
           else if(type==="bool") value=!!el.checked;
           else value=el.value;
           settingsFormDraft[field]=value;
-          if(field==="formatType"||field==="bronzeMatch"||field==="ladderMode"){
+          if(field==="formatType"||field==="bronzeMatch"||field==="ladderMode"||field==="battleMode"){
             const option=document.querySelector('#f-play-mode option[value="enchantment"]');
-            if(option)option.disabled=!(isSuperAdmin()&&settingsFormDraft.formatType==="single"&&settingsFormDraft.bronzeMatch!==true&&settingsFormDraft.ladderMode!=="ranked");
+            if(option)option.disabled=!(isSuperAdmin()&&settingsFormDraft.battleMode!=="team"&&settingsFormDraft.formatType==="single"&&settingsFormDraft.bronzeMatch!==true&&settingsFormDraft.ladderMode!=="ranked");
           }
           settingsFormDraftDirty=true;
           if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
+          if(field==="battleMode") render();
         };
         el.addEventListener("input",update);
         el.addEventListener("change",update);
@@ -24101,7 +24423,47 @@ function refreshLatestFromHeaderLogo(target){
   },180);
 }
 
+async function handleTeamMatchAction(action,target){
+  const matchId=target.dataset.matchId,match=(state.matches||[]).find(m=>m.id===matchId);
+  if(!match||!state.cloudCode)return;
+  const code=state.cloudCode,teams=(state.teams||[]).filter(t=>match.teamIds?.includes(t.id));
+  const view=teamMatchUi.get(matchId);
+  const busyKey=matchId+':'+action;
+  if(teamMatchActionsBusy.has(busyKey))return;
+  teamMatchActionsBusy.add(busyKey);
+  try{
+    if(action==='team-lineup-refresh'){teamMatchUi.delete(matchId);await loadTeamMatchUi(matchId);return;}
+    if(action==='team-lineup-submit'){
+      const mine=teams.find(t=>t.id===view?.ownTeamId);
+      if(!mine)return showToast('僅隊長可提交本隊出場順序',true);
+      const selectors=[...document.querySelectorAll('.team-lineup-slot')].filter(el=>el.dataset.matchId===matchId);
+      const order=selectors.sort((a,b)=>Number(a.dataset.slot)-Number(b.dataset.slot)).map(el=>el.value);
+      if(order.length!==mine.memberPlayerIds.length||new Set(order).size!==order.length)return showToast('每位隊員需出場一次，不能重複',true);
+      await window.engagementService.teamLineup({action:'submit',code,matchId,teamId:mine.id,order});
+      showToast('本隊順序已秘密提交');
+    }else if(action==='team-lineup-reveal'){
+      if(!confirm('確認雙方人員都已到齊？公開後出場順序將永久鎖定。'))return;
+      await window.engagementService.teamLineup({action:'reveal',code,matchId,peoplePresent:true});
+      showToast('雙方順序已同時公開並鎖定');
+    }else if(action==='team-lineup-reset'){
+      if(!confirm('將清除雙方尚未公開的順序，請兩隊重新提交。'))return;
+      await window.engagementService.teamLineup({action:'reset',code,matchId});
+      showToast('已退回雙方重排');
+    }else if(action==='team-score-submit'){
+      const winnerSide=Number(document.getElementById('team-score-winner-'+matchId)?.value);
+      const finish=document.getElementById('team-score-finish-'+matchId)?.value;
+      if(![0,1].includes(winnerSide)||!['spin','burst','over','extreme'].includes(finish))return;
+      if(!confirm('確認本次判定？提交後立即更新雙方生命與守擂順位。'))return;
+      const outcome=await window.engagementService.teamScoring({action:'score',code,matchId,winnerSide,finish,operationId:crypto.randomUUID()});
+      if(outcome.matchCompleted){teamMatchUi.delete(matchId);const refreshed=await refreshBracketFromCloud();if(refreshed)showToast('勝隊已晉級，對戰表已更新');return;}
+      showToast('判定已記錄');
+    }
+    await loadTeamMatchUi(matchId);
+  }catch(e){console.warn('[team match action]',e);showToast('操作失敗：'+String(e?.message||e),true);}
+  finally{teamMatchActionsBusy.delete(busyKey);}
+}
 function handleAction(action, target){
+  if(action.startsWith("team-lineup-")||action==="team-score-submit"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
@@ -24429,7 +24791,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         if(!window.cloudSync || !window.cloudSync.promoteEarliestWaitlist) throw { code:"network" };
         const result = await window.cloudSync.promoteEarliestWaitlist(code);
-        showToast("已遞補一位候選人為正取");
+        showToast(state.meta.battleMode==="team"?"已遞補一支隊伍為正取":"已遞補一位候選人為正取");
         publicTournamentsCache = null;
         adminRegistrationsBusy = false;
         resetAdminRegistrationsCache();
@@ -24446,7 +24808,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(currentTournamentRegistrationLocked()){ showToast("賽事已開始，報名管理已鎖定",true); return; }
     const targetUid = target.getAttribute("data-uid");
     const code = state.cloudCode;
-    openModal({ type:"generic", title:"手動取消報名？", message:"確定要取消這位選手的報名嗎？名額會釋出，紀錄會保留，不會自動遞補其他人。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
+    openModal({ type:"generic", title:state.meta.battleMode==="team"?"取消整隊報名？":"手動取消報名？", message:state.meta.battleMode==="team"?"確定要取消這支隊伍嗎？會釋出 1 個隊伍名額，隊內所有玩家一起退出；不會自動遞補其他隊伍。":"確定要取消這位選手的報名嗎？名額會釋出，紀錄會保留，不會自動遞補其他人。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
       if(adminRegistrationsBusy) return;
       adminRegistrationsBusy = true; render();
       (async ()=>{
@@ -25270,7 +25632,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const code=target.getAttribute("data-code");
     const targetGroup=target.getAttribute("data-target-group")||"open";
     if(!code) return;
-    if(targetGroup==="children"){
+    if(targetGroup==="children" || (lobbyTarget&&lobbyTarget.battleMode==="team")){
       resetTournamentDetailState(); tournamentDetailCode=code; tournamentDetailLoading=true; appPhase="tournament-detail"; render(); loadTournamentDetail(code); return;
     }
     (async ()=>{
@@ -25292,6 +25654,56 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       localStorage.setItem(key,JSON.stringify(arr));
       showToast("已加入開賽提醒（目前為此裝置記錄）");
     }catch(e){ showToast("無法儲存提醒",true); }
+    return;
+  }
+  if(action==="submit-team-registration"){
+    if(isGuestReadOnlyContext()){showToast("遊客模式不可報名，請切換至玩家模式",true);return;}
+    if(tournamentDetailBusy)return;
+    const code=target.getAttribute("data-code")||tournamentDetailCode,t=tournamentDetailData;
+    if(!code||!t||tournamentBattleMode(t)!=="team"){showToast("此賽事不是團體戰",true);return;}
+    if(publicTournamentRegistrationLocked(t)){showToast("賽事已開始，報名系統已鎖定",true);return;}
+    const teamName=(document.getElementById("team-registration-name")?.value||"").trim();
+    const memberEls=[...document.querySelectorAll(".team-registration-member")];
+    const members=memberEls.map(el=>(el.value||"").trim());
+    const size=tournamentTeamSize(t);
+    if(!teamName){showToast("請輸入隊名",true);return;}
+    if(memberEls.length!==size||members.some(name=>!name)){showToast("請完整填寫 "+size+" 位隊員名稱",true);return;}
+    tournamentDetailBusy=true;target.disabled=true;
+    (async()=>{
+      try{
+        if(!window.engagementService?.teamRegistration)throw {code:"network"};
+        const preview=await window.engagementService.teamRegistration({action:"preview",code,teamName,members});
+        const statusText=preview.status==="confirmed"?"正取":"備取";
+        if(!confirm("確認送出「"+teamName+"」？\n\n本場："+size+"V"+size+"\n隊員："+members.join("、")+"\n預計狀態："+statusText+"\n\n送出後，本場出場順序仍會在每次對戰前另外提交。")){tournamentDetailBusy=false;target.disabled=false;return;}
+        const result=await window.engagementService.teamRegistration({action:"join",code,teamName,members,operationId:crypto.randomUUID()});
+        showToast(result.status==="confirmed"?"隊伍報名成功（正取）":"隊伍報名成功（備取）");
+        publicTournamentsCache=null;myRegistrationsCache=null;tournamentDetailBusy=false;
+        await loadTournamentDetail(code);
+      }catch(e){
+        tournamentDetailBusy=false;target.disabled=false;
+        const raw=String(e?.message||e||"");
+        if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("submit-team-registration",target));return;}
+        showToast(mapRegistrationError(e),true);
+      }
+    })();
+    return;
+  }
+  if(action==="cancel-team-registration"){
+    if(isGuestReadOnlyContext()){showToast("遊客模式不可取消報名",true);return;}
+    const code=target.getAttribute("data-code")||tournamentDetailCode;
+    if(!code||tournamentDetailBusy)return;
+    openModal({type:"generic",title:"取消整隊報名？",message:"這會取消整支隊伍的報名並釋出 1 個隊伍名額；所有隊員會一起退出本場。",danger:true,confirmLabel:"確認取消整隊",onConfirm:()=>{
+      tournamentDetailBusy=true;render();
+      (async()=>{
+        try{
+          if(!window.engagementService?.teamRegistration)throw {code:"network"};
+          await window.engagementService.teamRegistration({action:"cancel",code,operationId:crypto.randomUUID()});
+          showToast("已取消整隊報名");
+          publicTournamentsCache=null;myRegistrationsCache=null;tournamentDetailBusy=false;
+          await loadTournamentDetail(code);
+        }catch(e){tournamentDetailBusy=false;showToast(mapRegistrationError(e),true);render();}
+      })();
+    }});
     return;
   }
   if(action==="submit-tournament-registration"){
@@ -27523,7 +27935,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     d.waitlistEnabled = d.waitlistCapacity > 0;
     if(d.registrationEnabled){
       if(d.registrationOpenAt && d.registrationCloseAt && d.registrationCloseAt<=d.registrationOpenAt){ showToast("報名截止時間必須晚於開放時間", true); return; }
-      if(!d.registrationCapacity || d.registrationCapacity<1){ showToast("請輸入正確的正取人數上限", true); return; }
+      if(!d.registrationCapacity || d.registrationCapacity<1){ showToast(state.meta.battleMode==="team"||settingsFormDraft?.battleMode==="team"?"請輸入正確的正取隊伍上限":"請輸入正確的正取人數上限", true); return; }
 
       if(d.targetGroup!=="open" && d.targetGroup!=="children"){ showToast("活動組別設定有誤，請重新選擇", true); return; }
     }
@@ -27582,7 +27994,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       markTesterSandboxState(state);
     }
 
-    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
+    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
       showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
     }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請確認連結是否來自 Google Maps",true);return;}
@@ -27591,6 +28003,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     applyVenueDraftToState(d,state);
     state.meta.checkin=d.checkin||"";
     state.meta.startTime=d.startTime||"";
+    state.meta.battleMode=d.battleMode==="team"?"team":"individual";
+    state.meta.teamSize=state.meta.battleMode==="team"?Math.max(3,parseInt(d.teamSize,10)||3):3;
     state.meta.formatType=d.formatType||"single";
     state.meta.playMode=d.playMode==="enchantment"?"enchantment":"standard";
     state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
@@ -27638,6 +28052,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     saveRecord(state);
     const previewRows=[
       ["賽事名稱", sm.name],
+      ["對戰形式", (BATTLE_MODE_LABELS[sm.battleMode]||"個人戰")+(sm.battleMode==="team"?"｜"+sm.teamSize+"V"+sm.teamSize:"")],
+      ["賽事制度", FORMAT_LABELS[sm.formatType]||sm.format||"單淘汰賽"],
+      ["戰鬥規則", PLAY_MODE_LABELS[sm.playMode]||"標準規則"],
       ["活動日期", sm.date],
       ["活動地點", sm.location],
       ["報到時間", sm.checkin||"未設定"],
@@ -27645,8 +28062,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       ["報名開放", new Date(sm.registrationOpenAt).toLocaleString()],
       ["報名截止", new Date(sm.registrationCloseAt).toLocaleString()],
       ["取消期限", new Date(sm.registrationCloseAt+3*60*60*1000).toLocaleString()+"（截止後 3 小時）"],
-      ["正取上限", sm.registrationCapacity+" 人"],
-      ["備取上限", (Number(sm.waitlistCapacity)||0)+" 人"],
+      ["正取上限", sm.registrationCapacity+(sm.battleMode==="team"?" 隊":" 人")],
+      ["備取上限", (Number(sm.waitlistCapacity)||0)+(sm.battleMode==="team"?" 隊":" 人")],
       ["報名費", sm.registrationFee!=null?(sm.registrationFee+" 元"):"未設定"],
       ["參賽名稱", sm.participantNameMode==="gameId"?"使用遊戲 ID（未設定時使用本名）":"使用本名"],
       ["公開狀態", sm.registrationVisibility==="public"?"公開顯示":"不公開顯示"]
@@ -27686,19 +28103,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
     if(!aiCreateReviewGate("儲存賽事設定")) return;
-    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
+    if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
       showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
     }
     if(d.googleMapsUrl && !normalizeGoogleMapsUrl(d.googleMapsUrl)){showToast("Google Maps 連結格式不支援，請貼上 maps.app.goo.gl 或 Google Maps 網址",true);return;}
     const requestedStations=Math.max(1,parseInt(d.stations,10)||1);
+    const newBattleMode=d.battleMode==="team"?"team":"individual";
+    const newTeamSize=newBattleMode==="team"?Math.max(3,parseInt(d.teamSize,10)||3):3;
     const newFormatType=d.formatType||"single";
     const formatChanged=newFormatType!==(state.meta.formatType||"single");
+    const battleModeChanged=newBattleMode!==(state.meta.battleMode==="team"?"team":"individual") || (newBattleMode==="team"&&newTeamSize!==Math.max(3,parseInt(state.meta.teamSize,10)||3));
 
     rd.waitlistCapacity=Math.max(0,parseInt(rd.waitlistCapacity,10)||0);
     rd.waitlistEnabled=rd.waitlistCapacity>0;
     if(rd.registrationEnabled){
       if(rd.registrationOpenAt && rd.registrationCloseAt && rd.registrationCloseAt<=rd.registrationOpenAt){ showToast("報名截止時間必須晚於開放時間",true); return; }
-      if(!rd.registrationCapacity || rd.registrationCapacity<1){ showToast("請輸入正確的正取人數上限",true); return; }
+      if(!rd.registrationCapacity || rd.registrationCapacity<1){ showToast(d.battleMode==="team"?"請輸入正確的正取隊伍上限":"請輸入正確的正取人數上限",true); return; }
       if(rd.targetGroup!=="open" && rd.targetGroup!=="children"){ showToast("活動組別設定有誤，請重新選擇",true); return; }
     }
 
@@ -27708,8 +28128,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       applyVenueDraftToState(d,state);
       state.meta.checkin=d.checkin||"";
       state.meta.startTime=d.startTime||"";
+      state.meta.battleMode=newBattleMode;
+      state.meta.teamSize=newTeamSize;
       state.meta.formatType=newFormatType;
-      state.meta.playMode=d.playMode==="enchantment"&&isSuperAdmin()&&newFormatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked"?"enchantment":"standard";
+      state.meta.playMode=d.playMode==="enchantment"&&isSuperAdmin()&&newBattleMode!=="team"&&newFormatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked"?"enchantment":"standard";
       state.meta.enchantmentPilot=state.meta.playMode==="enchantment";
       state.meta.format=FORMAT_LABELS[newFormatType]||"單淘汰賽";
       state.meta.stations=requestedStations;
@@ -27739,8 +28161,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.registrationVisibility=rd.registrationVisibility;
     };
 
-    if(formatChanged && state.matches.length>0){
-      openModal({ type:"generic", title:"更換賽制", message:"已經產生對戰表，更換賽制將清除目前對戰表、比分及比賽結果，此動作無法復原，請確認是否繼續。", danger:true, confirmLabel:"確定更換賽制", onConfirm:()=>{
+    if((formatChanged||battleModeChanged) && state.matches.length>0){
+      openModal({ type:"generic", title:"更換對戰架構", message:"已經產生對戰表，更換對戰形式、隊伍人數或賽事制度將清除目前對戰表、比分及比賽結果，此動作無法復原，請確認是否繼續。", danger:true, confirmLabel:"確定更換對戰架構", onConfirm:()=>{
         applyMeta();
         state.matches=[]; state.bracketSize=0; state.drawnAt=null; state.currentMatchId=null;
         state.championId=null; state.runnerUpId=null; state.thirdId=null; state.fourthId=null;
@@ -27842,6 +28264,33 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="start-tournament"){
+    if(state.meta.battleMode==="team"){
+      (async()=>{
+        if(state.startedAt||!state.bracketSize)return;
+        try{
+          await syncLatestOnlineRosterBeforeLock();
+          if(!bracketRosterIsCurrent()){render();showToast("名單已有異動，請重新產生團體對戰表",true);return;}
+          openModal({type:"generic",title:"確認團體戰開賽",message:"將鎖定 "+eligibleBracketTeams().length+" 支隊伍與對戰表，並停止報名。請確認雙方人員與報到狀態。",danger:true,confirmLabel:"正式開始",onConfirm:async()=>{
+            try{
+              await syncLatestOnlineRosterBeforeLock();
+              if(!bracketRosterIsCurrent()){render();showToast("名單已變更，請重新抽籤",true);return;}
+              const prior={startedAt:state.startedAt,rosterLocked:state.rosterLocked,status:state.meta.registrationStatus,
+                checkinClosedEarly:state.meta.checkinClosedEarly,checkinClosedAt:state.meta.checkinClosedAt};
+              state.startedAt=Date.now();state.rosterLocked=true;state.meta.registrationStatus="started";
+              if(state.meta.checkinRequired){state.meta.checkinClosedEarly=true;state.meta.checkinClosedAt=Date.now();}
+              rebuildCourtAssignments();
+              if(await saveState()===false){
+                state.startedAt=prior.startedAt;state.rosterLocked=prior.rosterLocked;state.meta.registrationStatus=prior.status;
+                state.meta.checkinClosedEarly=prior.checkinClosedEarly;state.meta.checkinClosedAt=prior.checkinClosedAt;
+                render();showToast("雲端未確認開賽，請稍後重試",true);return;
+              }
+              activeTab="bracket";render();showToast("團體戰已開始，裁判可進行雙命守擂判定");
+            }catch(e){console.warn('[team start]',e);showToast("無法確認最新名單，本次未開賽",true);}
+          }});
+        }catch(e){console.warn('[team start preflight]',e);showToast("無法同步最新報名名單，本次未開賽",true);}
+      })();
+      return;
+    }
     if(state.startedAt){ showToast("賽事已經開始", true); return; }
     if(!state.bracketSize || state.matches.length===0){ showToast("請先產生對戰表", true); return; }
 
@@ -27935,8 +28384,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           type:"generic",
           title:"確認開始賽事",
           message:"請再次確認：\n\n參賽人數："+eligible+" 人"+
+            "\n對戰形式："+(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")+(state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):"")+
             "\n戰鬥台："+state.meta.stations+" 台"+
-            "\n賽制："+(FORMAT_LABELS[state.meta.formatType]||state.meta.format)+
+            "\n賽事制度："+(FORMAT_LABELS[state.meta.formatType]||state.meta.format)+
+            "\n戰鬥規則："+(PLAY_MODE_LABELS[state.meta.playMode]||"標準規則")+
             (pending?"\n未報到："+pending+" 人（不列入本次對戰）":"")+
             "\n\n開始後，報名、取消、備取與遞補功能將全部鎖定。",
           danger:true,
@@ -27979,6 +28430,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
     };
     const doCheckThenDraw = ()=>{
+      if(state.meta.battleMode==="team"){doDraw();return;}
       const total = state.players.length;
       const checkedCount = eligiblePlayers().length;
       const notCheckedCount = state.meta.checkinRequired ? (total - checkedCount) : 0;
@@ -29199,6 +29651,9 @@ init().then(()=>{
     async signPartnerContract(payload){return callEngagementFunction("signPartnerContract",payload,60000);},
     async activatePartnerContract(payload){return callEngagementFunction("activatePartnerContract",payload,60000);},
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
+    async teamRegistration(payload){return callEngagementFunction("teamRegistration",payload,60000);},
+    async teamLineup(payload){return callEngagementFunction("teamLineup",payload,60000);},
+    async teamScoring(payload){return callEngagementFunction("teamScoring",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},
     async aiCreateParser(payload){return callEngagementFunction("parseTournamentAnnouncementV1",payload,45000);},
@@ -29292,6 +29747,9 @@ init().then(()=>{
         name: (state.meta && state.meta.name) || "",
         location: (state.meta && state.meta.location) || "",
         date: (state.meta && state.meta.date) || "",
+        battleMode: (state.meta && state.meta.battleMode)==="team" ? "team" : "individual",
+        teamSize: Math.max(3,Number(state.meta && state.meta.teamSize)||3),
+        playMode: (state.meta && state.meta.playMode)==="enchantment" ? "enchantment" : "standard",
         formatType: (state.meta && state.meta.formatType) || "single",
         format: (state.meta && state.meta.format) || "",
         ladderMode: (state.meta && state.meta.ladderMode) === "ranked" ? "ranked" : "general",
@@ -29309,10 +29767,15 @@ init().then(()=>{
       // Only id/name/checkedIn — no phone, no email, no internal player
       // fields of any kind.
       players: (state.players||[]).map(p=>({ id:p.id, name:p.name, checkedIn:!!p.checkedIn })),
+      teams: (state.teams||[]).map(team=>({
+        id:team.id, name:team.name,
+        memberPlayerIds:Array.isArray(team.memberPlayerIds)?team.memberPlayerIds.slice():[]
+      })),
       // Only structural/scoring fields needed to render a public bracket or
       // live scoreboard — no referee uid, no lock info, no internal notes.
       matches: (state.matches||[]).map(m=>({
         id:m.id, seq:m.seq, bracket:m.bracket, round:m.round, indexInRound:m.indexInRound, station:m.station,
+        teamIds:Array.isArray(m.teamIds)?m.teamIds.slice(0,2):null,
         a: m.a ? { playerId:m.a.playerId } : null, b: m.b ? { playerId:m.b.playerId } : null,
         isBye:!!m.isBye,
         scoreA:m.scoreA==null?null:Number(m.scoreA), scoreB:m.scoreB==null?null:Number(m.scoreB), log:m.log||[],
@@ -29331,7 +29794,9 @@ init().then(()=>{
       championId: state.championId||null, runnerUpId: state.runnerUpId||null,
       thirdId: state.thirdId||null, fourthId: state.fourthId||null,
       gfMatchId: state.gfMatchId||null, gfResetMatchId: state.gfResetMatchId||null,
-      bronzeMatchId: state.bronzeMatchId||null, rrRounds: state.rrRounds||0
+      bronzeMatchId: state.bronzeMatchId||null, rrRounds: state.rrRounds||0,
+      teamResultRevision: Number(state.teamResultRevision)||0,
+      teamStandings: Array.isArray(state.teamStandings)?state.teamStandings.map(r=>({id:r.id,name:r.name,rank:r.rank,tied:!!r.tied,played:r.played,wins:r.wins,losses:r.losses,scoreFor:r.scoreFor,scoreAgainst:r.scoreAgainst,diff:r.diff})):null
     };
   }
 
@@ -30095,6 +30560,8 @@ init().then(()=>{
           eventDate: d.eventDate || "",
           startAt: d.startAt || "",
           location: d.location || "",
+          battleMode:(d.battleMode||(savedState&&savedState.meta&&savedState.meta.battleMode))==="team"?"team":"individual",
+          teamSize:Math.max(3,Number(d.teamSize||(savedState&&savedState.meta&&savedState.meta.teamSize))||3),
           formatType: d.formatType || "",
           ladderMode: d.ladderMode === "ranked" ? "ranked" : "general",
           testLadderEnabled: d.testLadderEnabled===true || savedState?.testLadderEnabled===true,
@@ -30296,7 +30763,9 @@ init().then(()=>{
         return {
           systemClosed:d.systemClosed===true, eventCancelled:d.eventCancelled===true, registrationSelection:d.registrationSelection||null,
           name: d.name||"", date: d.eventDate||"", startAt: d.startAt||"",
-          location: d.location||"", formatType: d.formatType||"", fee: d.fee,
+          location: d.location||"", battleMode:(d.battleMode||(parsedData&&parsedData.meta&&parsedData.meta.battleMode))==="team"?"team":"individual",
+          teamSize:Math.max(3,Number(d.teamSize||(parsedData&&parsedData.meta&&parsedData.meta.teamSize))||3),
+          formatType: d.formatType||"", fee: d.fee,
           tournamentPhase: canonicalPublicTournamentPhase(view),
           registrationStatus: publicTournamentRegistrationLocked(view) ? "started" : (d.registrationStatus||""),
           archiveStatus: (parsedData&&parsedData.archiveStatus)||d.archiveStatus||"ongoing",
@@ -30428,7 +30897,7 @@ init().then(()=>{
           registrationOpenAt:regOpen,registrationCloseAt:regClose,capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,
           confirmedCount:0,waitlistCount:0,registrationVisibility:"public",publishedAt:data.meta.publishedAt||now,
           cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
-          tournamentPhase:computeTournamentPhase(data),archiveStatus:data.archiveStatus||"ongoing",name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",formatType:data.meta.formatType||"single",bracketSize:data.bracketSize||0,
+          tournamentPhase:computeTournamentPhase(data),archiveStatus:data.archiveStatus||"ongoing",name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",bracketSize:data.bracketSize||0,
           updatedAt:now,lastActivityAt:now,expiresAt:new Date(expMs)
         };
         const tournamentRef=fx.doc(dbHandle,"tournaments",code);
@@ -30440,7 +30909,7 @@ init().then(()=>{
           registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",registrationOpenAt:regOpen,registrationCloseAt:regClose,
           capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,confirmedCount:0,waitlistCount:0,registrationVisibility:"public",
           publishedAt:data.meta.publishedAt||now,cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
-          tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
+          tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
         });
         await batch.commit();
         return code;
@@ -30569,6 +31038,9 @@ init().then(()=>{
           refereeStationRestrictionEnabled: !!m.refereeStationRestrictionEnabled,
           tournamentPhase: computeTournamentPhase(data),
           location: data.meta && data.meta.location || "",
+          battleMode: data.meta && data.meta.battleMode==="team" ? "team" : "individual",
+          teamSize: Math.max(3,Number(data.meta && data.meta.teamSize)||3),
+          playMode: data.meta && data.meta.playMode==="enchantment" ? "enchantment" : "standard",
           formatType: data.meta && data.meta.formatType || "single",
           name: data.meta && data.meta.name || "",
           ladderMode: testerSession ? "general" : ((data.meta && data.meta.ladderMode==="ranked") ? "ranked" : "general"),
@@ -30857,6 +31329,9 @@ if(testerSession){
           refereeStationRestrictionEnabled: !!m.refereeStationRestrictionEnabled,
           tournamentPhase: computeTournamentPhase(data),
           location: data.meta && data.meta.location || "",
+          battleMode: data.meta && data.meta.battleMode==="team" ? "team" : "individual",
+          teamSize: Math.max(3,Number(data.meta && data.meta.teamSize)||3),
+          playMode: data.meta && data.meta.playMode==="enchantment" ? "enchantment" : "standard",
           formatType: data.meta && data.meta.formatType || "single",
           name: data.meta && data.meta.name || "",
           ladderMode: testRoom ? "general" : ((data.meta && data.meta.ladderMode==="ranked") ? "ranked" : "general"),
@@ -30915,6 +31390,7 @@ if(testerSession){
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
               if(Number(remoteState.registrationRosterRevision||0)!==Number(data.registrationRosterRevision||0)) throw new Error("registration-roster-stale");
+              if(Number(remoteState.teamResultRevision||0)!==Number(data.teamResultRevision||0)) throw new Error("team-result-stale");
               if(data.generalClosureReason==="insufficient-eligible-players" &&
                  (remoteDoc.ladderPointsAwarded===true || remoteState.ladderPointsAwarded===true)) throw new Error("ladder-already-awarded");
               // Completed results are irreversible through ordinary whole-state sync.
