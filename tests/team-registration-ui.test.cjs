@@ -39,7 +39,9 @@ test('team roster projection expands fixed member slots',()=>{
 });
 
 test('team mode never falls through to individual bracket generator',()=>{
-  assert(html.includes('團體戰對戰表需使用團體戰編排引擎；目前不會套用個人戰抽籤。'));
+  assert(html.includes('if(state.meta&&state.meta.battleMode==="team") return generateTeamBracket();'));
+  assert(html.includes('function generateTeamBracket(){'));
+  assert(html.includes('teamIds:[a,b]'));
 });
 
 test('team capacities use team units',()=>{
