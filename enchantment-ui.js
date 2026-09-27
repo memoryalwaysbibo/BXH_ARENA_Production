@@ -167,7 +167,7 @@
   const item=cache.get(key(code,id));if(!item?.state)return;
   document.querySelectorAll('iframe[data-enchantment-player]').forEach(frame=>{
    if(frame.dataset.code!==code||frame.dataset.matchId!==id)return;
-   showSharedCards(frame.closest('[data-enchantment-draw-overlay]'),item.state,frame.dataset.side);
+   showSharedCards(frame.closest?.('[data-enchantment-draw-overlay]'),item.state,frame.dataset.side);
    const first=!frames.get(frame);frames.set(frame,true);
    frame.contentWindow?.postMessage({kind:first?'bxh-enchantment-init':'bxh-enchantment-state',code,matchId:id,side:frame.dataset.side,state:playerState(item.state,frame.dataset.side),names:matchNames.get(key(code,id))||null,soundEnabled:drawSoundEnabled},location.origin);
   });
