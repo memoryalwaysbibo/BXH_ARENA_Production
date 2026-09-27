@@ -78,13 +78,38 @@
       setTimeout(()=>card.querySelector('[data-action="partner-refresh-contract"]')?.focus({preventScroll:true}),350);
     },50);
   }
+  const completedMailboxContracts=new Map(),mailboxContractChecks=new Set();
+  function applyMailboxContractStatus(button,status){
+    if(status==='sent'){
+      button.disabled=false;button.removeAttribute('aria-disabled');button.textContent='閱讀合約與簽名';return;
+    }
+    button.disabled=true;button.setAttribute('aria-disabled','true');
+    button.textContent=status==='active'?'✓ 合約已成立':'✓ 已完成簽署';
+    button.title=status==='active'?'合作合約已成立':'已完成簽署，等待最高管理員確認';
+  }
+  function decorateMailboxContractButtons(){
+    if(typeof document==='undefined')return;
+    for(const button of document.querySelectorAll('[data-action="mailbox-open-contract"][data-order-code]')){
+      const code=button.getAttribute('data-order-code')||'',key=actorUid()+'|'+code;
+      if(!code)continue;
+      if(completedMailboxContracts.has(key)){applyMailboxContractStatus(button,completedMailboxContracts.get(key));continue;}
+      if(mailboxContractChecks.has(key))continue;
+      mailboxContractChecks.add(key);button.disabled=true;button.textContent='確認簽署狀態中……';
+      Promise.resolve(root.engagementService?.getPartnerContract?.({orderCode:code})).then(order=>{
+        const status=String(order?.status||'');
+        if(status&&status!=='sent')completedMailboxContracts.set(key,status);
+        if(button.isConnected)applyMailboxContractStatus(button,status||'sent');
+      }).catch(()=>{if(button.isConnected)applyMailboxContractStatus(button,'sent');})
+        .finally(()=>mailboxContractChecks.delete(key));
+    }
+  }
   if(typeof document!=='undefined'){
     document.addEventListener('click',event=>{
       const refresh=event.target.closest?.('[data-partner-review-refresh]');if(refresh){loadPendingContracts(true);return;}
       const open=event.target.closest?.('[data-partner-review-open]');if(open)openReviewContract(open.getAttribute('data-partner-review-open')||'');
     });
-    const observer=new MutationObserver(()=>{if(reviewState.scheduled)return;reviewState.scheduled=true;queueMicrotask(()=>{reviewState.scheduled=false;decorateReviewPanel();});});
-    const start=()=>observer.observe(document.body,{childList:true,subtree:true});
+    const observer=new MutationObserver(()=>{if(reviewState.scheduled)return;reviewState.scheduled=true;queueMicrotask(()=>{reviewState.scheduled=false;decorateReviewPanel();decorateMailboxContractButtons();});});
+    const start=()=>{observer.observe(document.body,{childList:true,subtree:true});decorateMailboxContractButtons();};
     if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
   }
   const api={hasGrant:profile=>!!grant(profile),render};
