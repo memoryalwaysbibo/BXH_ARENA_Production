@@ -11,11 +11,17 @@
  function attachCardSkin(overlay,frame){
   const selector=overlay.querySelector('[data-enchantment-card-skin]');
   const face=frame.contentDocument?.getElementById('cardFaceImage');
+  const back=frame.contentDocument?.querySelector('#card .face.back');
   if(!selector||!face)return;
   let selected=cardSkin(),baseSrc='',changing=false;
   selector.value=selected;
   const currentId=()=>cache.get(key(frame.dataset.code,frame.dataset.matchId))?.state?.cards?.[frame.dataset.side];
   const godsSrc=id=>new URL(GODS_CARD_PATH+id+'.webp',location.href).href;
+  const applyBack=()=>{
+   if(!back)return;
+   if(selected==='gods')back.style.backgroundImage=`url("${new URL(GODS_CARD_PATH+'back.webp',location.href).href}")`;
+   else back.style.removeProperty('background-image');
+  };
   const apply=()=>{
    const id=currentId();if(!GODS_CARD_IDS.has(id))return;
    const target=selected==='gods'?godsSrc(id):baseSrc;
@@ -29,7 +35,8 @@
    apply();
   });
   observer.observe(face,{attributes:true,attributeFilter:['src']});
-  selector.addEventListener('change',()=>{selected=selector.value==='gods'?'gods':'basic';saveCardSkin(selected);apply();});
+  selector.addEventListener('change',()=>{selected=selector.value==='gods'?'gods':'basic';saveCardSkin(selected);applyBack();apply();});
+  applyBack();
   if(face.getAttribute('src')&&!face.src.includes(GODS_CARD_PATH)){baseSrc=face.src;apply();}
   const cleanup=new MutationObserver(()=>{if(!overlay.isConnected){observer.disconnect();cleanup.disconnect();}});
   cleanup.observe(document.body,{childList:true});
