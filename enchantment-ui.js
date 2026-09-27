@@ -137,7 +137,12 @@
      continue;
     }
     const side=m.a.playerId===pid?'A':'B';
-    matchNames.set(key(code,m.id),{A:typeof playerName==='function'?playerName(m.a.playerId):'選手 A',B:typeof playerName==='function'?playerName(m.b.playerId):'選手 B'});
+    const matchPlayerName=side=>{
+     const pid=m[side.toLowerCase()]?.playerId;
+     const record=data.players?.find(p=>p.id===pid);
+     return String(record?.name||record?.displayName||'').trim()||'選手 '+side;
+    };
+    matchNames.set(key(code,m.id),{A:matchPlayerName('A'),B:matchPlayerName('B')});
     let result;
     try{result=await call({action:'get',code,matchId:m.id});}catch(e){continue;}
     cache.set(key(code,m.id),{version:result.version,state:result.state});
