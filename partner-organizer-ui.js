@@ -11,7 +11,26 @@
     const value=grant(profile);
     if(!value)return '';
     const name=safe(value.organizationName||'合作主辦');
-    return `<div class="partner-workspace"><div class="role-indicator">合作主辦｜${name} <button class="btn btn-ghost btn-sm" data-action="switch-to-player-mode">切換回玩家模式</button></div><section class="auth-card"><h2>合作主辦工作台</h2><p>此身分已開通。方案與賽事權限將由 BXH 後台設定並於此顯示。</p><p class="hint">正式開賽與積分資格需通過後端授權檢查。</p></section></div>`;
+    const orderCode=value.orderCode||profile.partnerContractOrderCode||'';
+    const quota=orderCode?`<p class="hint" data-partner-room-quota="${safe(orderCode)}" role="status">開房次數｜讀取中……</p>`:'<p class="hint">目前為手動授權；尚無合約場次紀錄。</p>';
+    return `<div class="partner-workspace"><div class="role-indicator">合作主辦｜${name} <button class="btn btn-ghost btn-sm" data-action="switch-to-player-mode">切換回玩家模式</button></div><section class="auth-card"><h2>合作主辦工作台</h2>${quota}<p>此身分已開通。方案與賽事權限將由 BXH 後台設定並於此顯示。</p><p class="hint">正式開賽與積分資格需通過後端授權檢查。</p></section></div>`;
+  }
+  const quotaState={orderCode:'',actor:'',loading:false,used:null,total:null,error:'',generation:0};
+  function decorateQuota(){
+    const label=document.querySelector('[data-partner-room-quota]');if(!label)return;
+    const orderCode=label.getAttribute('data-partner-room-quota')||'',actor=actorUid();
+    if(!orderCode||!actor)return;
+    if(quotaState.orderCode!==orderCode||quotaState.actor!==actor){Object.assign(quotaState,{orderCode,actor,loading:false,used:null,total:null,error:'',generation:quotaState.generation+1});}
+    const display=quotaState.error?`開房次數｜讀取失敗：${quotaState.error}`:quotaState.total===null?'開房次數｜讀取中……':`開房次數｜剩餘 ${Math.max(0,quotaState.total-quotaState.used)} / ${quotaState.total} 場（已使用 ${quotaState.used} 場）`;
+    if(label.textContent!==display)label.textContent=display;
+    if(quotaState.loading||quotaState.total!==null||quotaState.error)return;
+    quotaState.loading=true;const generation=quotaState.generation;
+    Promise.resolve(root.engagementService?.getPartnerContract?.({orderCode})).then(contract=>{
+      if(quotaState.orderCode!==orderCode||quotaState.actor!==actor||quotaState.generation!==generation)return;
+      if(contract?.orderCode!==orderCode||contract.status!=='active'||!Number.isSafeInteger(contract.includedEvents)||!Number.isSafeInteger(contract.usedEvents))throw Error('合約場次尚未設定');
+      quotaState.total=contract.includedEvents;quotaState.used=contract.usedEvents;
+    }).catch(error=>{if(quotaState.orderCode===orderCode&&quotaState.actor===actor&&quotaState.generation===generation)quotaState.error=String(error?.message||error);})
+      .finally(()=>{if(quotaState.orderCode===orderCode&&quotaState.actor===actor&&quotaState.generation===generation){quotaState.loading=false;decorateQuota();}});
   }
   const reviewState={actor:'',contracts:null,loading:false,error:'',scheduled:false};
   function actorUid(){try{return String(root.currentAuthUid?.()||'');}catch(error){return '';}}
@@ -143,11 +162,14 @@
       const refresh=event.target.closest?.('[data-partner-review-refresh]');if(refresh){loadPendingContracts(true);return;}
       const open=event.target.closest?.('[data-partner-review-open]');if(open){event.preventDefault();openReviewContract(open.getAttribute('data-partner-review-open')||'',open.getAttribute('data-partner-review-order')||'');}
     });
-    const observer=new MutationObserver(()=>{if(reviewState.scheduled)return;reviewState.scheduled=true;queueMicrotask(()=>{reviewState.scheduled=false;decorateReviewPanel();decorateMailboxContractButtons();});});
-    const start=()=>{observer.observe(document.body,{childList:true,subtree:true});decorateMailboxContractButtons();};
+    root.addEventListener('bxh-partner-room-created',()=>{quotaState.total=null;quotaState.used=null;quotaState.error='';quotaState.loading=false;quotaState.generation++;decorateQuota();});
+    const observer=new MutationObserver(()=>{if(reviewState.scheduled)return;reviewState.scheduled=true;queueMicrotask(()=>{reviewState.scheduled=false;decorateReviewPanel();decorateMailboxContractButtons();decorateQuota();});});
+    const start=()=>{observer.observe(document.body,{childList:true,subtree:true});decorateMailboxContractButtons();decorateQuota();};
     if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
   }
-  const api={hasGrant:profile=>!!grant(profile),grant,render};
+  const api={hasGrant:profile=>!!grant(profile),grant,render,
+    remainingRooms:orderCode=>quotaState.orderCode===orderCode&&quotaState.actor===actorUid()&&quotaState.total!==null
+      ?Math.max(0,quotaState.total-quotaState.used):null};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   root.BXHPartnerOrganizer=api;
 })(typeof window!=='undefined'?window:globalThis);
