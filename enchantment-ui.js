@@ -16,6 +16,13 @@
   setTimeout(()=>refresh(code,m.id),0);
   return `<section class="panel" data-enchantment-referee data-code="${c}" data-match-id="${id}" style="margin:12px 16px;padding:14px">
    <strong data-enchantment-title>附魔之戰｜等待裁判開始</strong>
+   <style>
+    [data-enchantment-referee] .enchant-active{border-color:#b889ff!important;box-shadow:0 0 0 1px #b889ff55,0 0 20px #9d62ff38;animation:enchant-glow 2.5s ease-in-out infinite}
+    [data-enchantment-referee] .enchant-badge{display:inline-block;margin-left:6px;padding:2px 7px;border:1px solid #c594ff;border-radius:999px;background:#6e35aa88;color:#fff1bc;font-size:11px;font-weight:700;vertical-align:middle}
+    [data-enchantment-referee] .enchant-effect-button{border-color:#d5a4ff!important;box-shadow:inset 0 0 13px #ad6bf43d;color:#fff0c7!important}
+    @keyframes enchant-glow{50%{box-shadow:0 0 0 2px #b889ff88,0 0 26px #9d62ff6b}}
+    @media(prefers-reduced-motion:reduce){[data-enchantment-referee] .enchant-active{animation:none}}
+   </style>
    <div data-enchantment-status>讀取抽卡狀態中…</div>
    <button class="btn btn-ghost btn-sm" data-enchantment-action="refresh" data-code="${c}" data-match-id="${id}">更新附魔狀態</button>
    ${stationLocked?'<p class="hint">本台未指派給你，僅供查看。</p>':''}
@@ -58,11 +65,14 @@
    const name=matchNames.get(key(code,id))?.[side]||'選手 '+side;
    const scoreButtons=Object.entries(outcome).map(([type,label])=>{
     const result=root.BXHEnchantmentScore.resolve({type,winnerCardId:s.cards[side],loserCardId:s.cards[side==='A'?'B':'A']});
-    return `<button data-enchantment-action="score" ${common} data-side="${side}" data-type="${type}" ${ready?'':'disabled'}>${label} ${result.ok?result.originalPoints+' → '+result.points:''}</button>`;
+    const modified=ready&&result.ok&&result.points!==result.originalPoints;
+    return `<button class="${modified?'enchant-effect-button':''}" data-enchantment-action="score" ${common} data-side="${side}" data-type="${type}" ${ready?'':'disabled'}>${modified?'✦ ':''}${label} ${result.ok?result.originalPoints+' → '+result.points:''}</button>`;
    }).join('');
    const card=details(s.cards?.[side]);
    const drawStatus=s.drawn?.[side]?quote(card?.name||'已抽卡'):'尚未抽卡';
-   return `<div class="side-panel"><div class="side-name">${quote(name)}</div><div class="hint" style="text-align:center;margin:2px 0 4px;font-size:12px">附魔：${drawStatus}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
+   const active=ready&&s.drawn?.[side];
+   const badge=active?`<span class="enchant-badge">${s.cards?.[side]==='seal'?'✦ 封印中':'✦ 附魔中'}</span>`:'';
+   return `<div class="side-panel ${active?'enchant-active':''}"><div class="side-name">${quote(name)}</div><div class="hint" style="text-align:center;margin:2px 0 4px;font-size:12px">附魔：${drawStatus}${badge}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
   }).join('')}</div><button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
   let controls='';
   if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
