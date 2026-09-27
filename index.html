@@ -5564,6 +5564,9 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 .card-album-slot{position:relative;min-width:0;aspect-ratio:2/3;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;border:1px solid #696b73;border-radius:10px;background:linear-gradient(145deg,#30343d,#161a22);color:#adb2bc;text-align:center;filter:grayscale(1);cursor:default}
 .card-album-slot span{font-size:clamp(18px,2.3vw,28px);font-weight:700}
 .card-album-slot small{font-size:12px}
+.card-album-slot img{display:block;width:100%;height:100%;object-fit:cover;border-radius:9px;opacity:.62}
+.card-album-slot .card-album-lock{position:absolute;left:0;right:0;bottom:0;padding:7px 3px;background:#111b;color:#fff;font-size:11px;line-height:1.4}
+.card-album-slot .card-album-lock strong{display:block;font-size:12px}
 @media(max-width:700px){.card-album-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}}
 </style>
 </head>
@@ -18840,10 +18843,11 @@ async function handleMailbox(action,target){
 }
 
 
-// 卡冊展示架構：未接入可信任的收藏紀錄前，不推測持有數量或開放卡面。
+// 卡冊共用遊戲中的 12 種功能卡 ID；收藏權限須由可信任的帳號資料提供。
+const CARD_ALBUM_CARDS=[{"id":"double_extreme","name":"雙重極限"},{"id":"double_knockout","name":"雙重擊飛"},{"id":"double_burst","name":"雙重爆裂"},{"id":"double_spin","name":"雙重轉停"},{"id":"boost_extreme","name":"強化極限"},{"id":"boost_knockout","name":"強化擊飛"},{"id":"boost_burst","name":"強化爆裂"},{"id":"weaken_extreme","name":"極限弱化"},{"id":"weaken_knockout","name":"擊飛弱化"},{"id":"weaken_burst","name":"爆裂弱化"},{"id":"weaken_spin","name":"轉停弱化"},{"id":"seal","name":"附魔封印"}];
 const CARD_ALBUM_SETS=[
-  {id:"basic",name:"基礎套卡",title:"初代藏卡者"},
-  {id:"gods",name:"諸神戰場",title:"諸神典藏者"}
+  {id:"basic",name:"基礎套卡",title:"初代藏卡者",assetRoot:"assets/enchantment-basic/",extension:".svg"},
+  {id:"gods",name:"諸神戰場",title:"諸神典藏者",assetRoot:"assets/enchantment-gods/",extension:".webp"}
 ];
 let cardAlbumSetFilter="all";
 function renderCardAlbumPage(){
@@ -18855,11 +18859,11 @@ function renderCardAlbumPage(){
         ${CARD_ALBUM_SETS.map(set=>`<option value="${set.id}" ${cardAlbumSetFilter===set.id?"selected":""}>${esc(set.name)}</option>`).join("")}
       </select></label>
     </div>
-    <p class="hint card-album-note">每套 12 張卡牌造型，卡背另計。收藏資料與卡面尚未開放；取得方式預計包含活動、玩家交換與購買。遊戲對局抽到卡牌不代表永久擁有。</p>
+    <p class="hint card-album-note">兩套各 12 張卡牌造型，卡背另計。卡面已收錄；收藏紀錄尚未接入，因此暫時全部灰化且不能放大。遊戲對局抽到卡牌不代表永久擁有。</p>
   </section>
   ${sets.map(set=>`<section class="panel card-album-set" aria-label="${esc(set.name)}">
     <div class="card-album-set-head"><h3>${esc(set.name)}</h3><span class="badge badge-metal">收藏進度：尚未開放</span></div>
-    <div class="card-album-grid">${Array.from({length:12},(_,i)=>`<div class="card-album-slot" aria-label="${esc(set.name)}第 ${i+1} 張，尚未開放"><span>✦</span><small>第 ${String(i+1).padStart(2,"0")} 張 · 未開放</small></div>`).join("")}</div>
+    <div class="card-album-grid">${CARD_ALBUM_CARDS.map(card=>`<div class="card-album-slot" aria-label="${esc(set.name)}：${esc(card.name)}，收藏狀態尚未開放"><img loading="lazy" decoding="async" src="${set.assetRoot+card.id+set.extension}" alt="${esc(set.name)} ${esc(card.name)}卡面"><div class="card-album-lock"><strong>${esc(card.name)}</strong>收藏狀態待開放</div></div>`).join("")}</div>
     <p class="hint">集滿 12 張可解鎖稱號「${esc(set.title)}」；稱號發放功能尚未開放。</p>
   </section>`).join("")}`;
 }
