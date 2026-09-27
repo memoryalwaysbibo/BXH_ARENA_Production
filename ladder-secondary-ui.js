@@ -11,6 +11,7 @@
   var ladderHistoryLoading=false;
   var ladderHistoryError="";
   var ladderScoreMode="season";
+  var ladderVisibleCount=10;
 
   function ladderScoreLabel(){
     return ladderScoreMode==="career"?"生涯":"季賽";
@@ -92,7 +93,7 @@
       return '<div class="empty-state"><strong>排行尚未產生</strong><br>'+(ladderScoreMode==="career"?'目前尚無玩家取得生涯積分。':'目前尚無玩家取得賽季積分。完成第一場積分賽後，排名將自動顯示。')+'</div>';
     }
     var scoreKey=ladderScoreMode==="career"?"careerPoints":"seasonPoints";
-    var body=rows.map(function(p){
+    var body=rows.slice(0,ladderVisibleCount).map(function(p){
       var rank=Number(p.__rank||0);
       var topClass=rank>=1&&rank<=3?" ladder-rank-top-"+rank:"";
       var title=p&&p.equippedBadge
@@ -118,6 +119,10 @@
     return '<div class="rank-scroll ladder-rank-scroll-v2"><div class="ladder-rank-board-v2">'+
       '<div class="ladder-rank-grid ladder-rank-head-v2"><div>排名</div><div>玩家</div><div>位階</div><div title="'+(ladderScoreMode==="career"?"生涯積分":"季賽積分")+'">積分</div></div>'+
       body+
+      (rows.length>10?'<div class="ladder-rank-more">'+
+        (ladderVisibleCount<rows.length?'<button type="button" class="btn btn-ghost" data-ladder-more="next">再顯示 '+Math.min(20,rows.length-ladderVisibleCount)+' 位（剩餘 '+(rows.length-ladderVisibleCount)+' 位）</button>':'')+
+        (ladderVisibleCount>10?'<button type="button" class="btn btn-ghost" data-ladder-more="collapse">收合至前 10 名</button>':'')+
+      '</div>':'')+
     '</div></div>';
   }
 
@@ -295,6 +300,14 @@
   };
 
   document.addEventListener("click",function(event){
+    var more=event.target&&event.target.closest?event.target.closest("[data-ladder-more]"):null;
+    if(more){
+      event.preventDefault();
+      event.stopPropagation();
+      ladderVisibleCount=more.getAttribute("data-ladder-more")==="collapse"?10:ladderVisibleCount+20;
+      rerender();
+      return;
+    }
     var scoreTab=event.target&&event.target.closest?event.target.closest("[data-ladder-score-mode]"):null;
     if(scoreTab){
       event.preventDefault();
@@ -303,6 +316,7 @@
       if(scoreMode!=="season"&&scoreMode!=="career") return;
       if(ladderScoreMode!==scoreMode){
         ladderScoreMode=scoreMode;
+        ladderVisibleCount=10;
         rerender();
       }
       return;
@@ -328,6 +342,7 @@
   },true);
 
   document.addEventListener("change",function(event){
+    if(event.target&&event.target.matches&&event.target.matches("#ladder-city-filter,#ladder-region-filter")) ladderVisibleCount=10;
     var select=event.target&&event.target.matches&&event.target.matches("[data-ladder-history-sort]")?event.target:null;
     if(!select) return;
     ladderHistorySort=select.value||"date-desc";
@@ -355,6 +370,7 @@
     ".ladder-score-switch button{min-height:40px;border:0;border-radius:7px;background:transparent;color:var(--metal);font:700 13px/1 var(--font-d);letter-spacing:.5px;}"+
     ".ladder-score-switch button.active{background:linear-gradient(145deg,rgba(217,185,92,.2),rgba(217,185,92,.07));color:var(--gold);box-shadow:inset 0 0 0 1px rgba(217,185,92,.28);}"+
     ".ladder-rank-scroll-v2{max-height:none;overflow:visible;}"+
+    ".ladder-rank-more{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:14px 8px;border-top:1px solid rgba(217,185,92,.2)}"+
     ".ladder-rank-board-v2{width:100%;min-width:0;}"+
     ".ladder-rank-grid{display:grid;grid-template-columns:52px minmax(0,1fr) 96px 78px;gap:8px;align-items:center;min-width:0;}"+
     ".ladder-rank-head-v2{padding:0 8px 9px;color:var(--metal);font-size:11px;font-weight:800;border-bottom:1px solid rgba(255,255,255,.08);text-align:center;}"+

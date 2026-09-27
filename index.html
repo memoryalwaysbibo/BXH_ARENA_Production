@@ -3558,6 +3558,7 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
   transition:background .15s ease;
 }
 .guest-ladder-row:last-child{border-bottom:none;}
+.guest-ladder-row.guest-ladder-collapsed{display:none;}
 .guest-ladder-row:hover{background:rgba(217,185,92,.045);}
 .guest-ladder-row:nth-child(-n+3){background:linear-gradient(90deg,rgba(217,185,92,.055),transparent 48%);}
 .guest-rank{font-family:var(--font-d);font-weight:800;color:var(--gold);font-size:15px;}
@@ -20083,7 +20084,7 @@ function renderTournamentLobby(opts={}){
 }
 
 let guestActiveTab = "events";
-let guestLadderExpanded = false;
+let guestLadderVisibleCount = 10;
 let guestLadderSearch = "";
 let guestReadOnlyMode = false;
 
@@ -20094,7 +20095,7 @@ function isGuestReadOnlyContext(){
 function guestLadderRowsHtml(rows){
   if(!rows.length) return `<div class="empty-state">目前尚無天梯玩家資料</div>`;
   return `<div class="guest-ladder-list" id="guest-ladder-list">
-    ${rows.map((p,i)=>`<div class="guest-ladder-row ${i>=10&&!guestLadderExpanded?'guest-ladder-collapsed':''}" data-guest-ladder-index="${i}" data-search-name="${esc(String(p.playerName||p.publicName||"").toLowerCase())}">
+    ${rows.map((p,i)=>`<div class="guest-ladder-row ${i>=guestLadderVisibleCount?'guest-ladder-collapsed':''}" data-guest-ladder-index="${i}" data-search-name="${esc(String(p.playerName||p.publicName||"").toLowerCase())}">
       <div class="guest-rank">NO.${p.__rank}</div>
       <div class="guest-player">
         <div class="guest-player-name">${esc(p.playerName||p.publicName||"—")}${p.equippedBadge?` <span class="badge badge-metal">${esc(p.equippedBadge.name)}</span>`:""}</div>
@@ -20141,7 +20142,8 @@ function renderGuestLadder(){
           ${guestLadderRowsHtml(rows)}
           <div id="guest-ladder-no-result" class="empty-state" style="display:none;">找不到符合的玩家</div>
           ${total>10?`<div class="guest-ladder-more">
-            <button class="btn btn-ghost" data-action="guest-ladder-toggle">${guestLadderExpanded?`收合至前 10 名 ▲`:`展開完整排行（${total} 人） ▼`}</button>
+            ${guestLadderVisibleCount<total?`<button class="btn btn-ghost" data-action="guest-ladder-toggle">再顯示 ${Math.min(20,total-guestLadderVisibleCount)} 位（剩餘 ${total-guestLadderVisibleCount} 位）</button>`:""}
+            ${guestLadderVisibleCount>10?`<button class="btn btn-ghost" data-action="guest-ladder-collapse">收合至前 10 名</button>`:""}
           </div>`:""}
         </div>`}
     <div class="guest-ladder-note">同分依序比較冠軍、亞軍、季軍、殿軍次數與生涯積分；條件完全相同則並列。</div>
@@ -20158,12 +20160,14 @@ function applyGuestLadderFilter(){
   list.querySelectorAll(".guest-ladder-row").forEach(row=>{
     const idx=parseInt(row.getAttribute("data-guest-ladder-index")||"0",10);
     const name=(row.getAttribute("data-search-name")||"").toLowerCase();
-    const show=q ? name.includes(q) : (guestLadderExpanded || idx<10);
+    const show=q ? name.includes(q) : idx<guestLadderVisibleCount;
     row.style.display=show?"grid":"none";
     if(show) visible++;
   });
   const empty=document.getElementById("guest-ladder-no-result");
   if(empty) empty.style.display=(q&&visible===0)?"block":"none";
+  const more=list.closest(".guest-ladder-board")?.querySelector(".guest-ladder-more");
+  if(more) more.style.display=q?"none":"";
 }
 
 function renderGuestLobbyScreen(){
@@ -24149,7 +24153,7 @@ function bindDynamicInputs(){
         ladderCityFilter.addEventListener("change",()=>{
           ladderLocationCity=normalizeTaiwanCityName(ladderCityFilter.value);
           ladderLocationRegion="";
-          guestLadderExpanded=false;
+          guestLadderVisibleCount=10;
           render();
         });
       }
@@ -24157,7 +24161,7 @@ function bindDynamicInputs(){
       if(ladderRegionFilter){
         ladderRegionFilter.addEventListener("change",()=>{
           ladderLocationRegion=String(ladderRegionFilter.value||"").trim();
-          guestLadderExpanded=false;
+          guestLadderVisibleCount=10;
           render();
         });
       }
@@ -25999,7 +26003,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     currentRole = "guest";
     publicTournamentsCache = null; publicTournamentsError = null;
     guestActiveTab = "events";
-    guestLadderExpanded = false;
+    guestLadderVisibleCount = 10;
     guestLadderSearch = "";
     appPhase="guest-lobby";
     render();
@@ -26008,12 +26012,17 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="guest-switch-tab"){
     guestActiveTab=target.getAttribute("data-tab")==="ladder"?"ladder":"events";
     guestLadderSearch="";
-    guestLadderExpanded=false;
+    guestLadderVisibleCount=10;
     render();
     return;
   }
   if(action==="guest-ladder-toggle"){
-    guestLadderExpanded=!guestLadderExpanded;
+    guestLadderVisibleCount+=20;
+    render();
+    return;
+  }
+  if(action==="guest-ladder-collapse"){
+    guestLadderVisibleCount=10;
     render();
     return;
   }
@@ -31863,6 +31872,6 @@ if(testerSession){
   });
 </script>
 <script src="activity-points-ui.js?v=20260928-directive-brandfix"></script>
-<script src="ladder-secondary-ui.js?v=14.2.43"></script>
+<script src="ladder-secondary-ui.js?v=14.2.44"></script>
 </body>
 </html>
