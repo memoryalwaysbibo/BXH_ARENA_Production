@@ -19995,6 +19995,34 @@ function renderTournamentStandardTemplate(t){
   return html;
 }
 
+
+function tournamentBattleMode(t){
+  return (t&&((t.battleMode)||(t.parsedData&&t.parsedData.meta&&t.parsedData.meta.battleMode)))==="team"?"team":"individual";
+}
+function tournamentTeamSize(t){
+  return Math.max(3,Number(t&&((t.teamSize)||(t.parsedData&&t.parsedData.meta&&t.parsedData.meta.teamSize)))||3);
+}
+function renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining){
+  const size=tournamentTeamSize(t),myTeam=activeMyRegs.find(row=>row&&row.registrationKind==="team")||activeMyRegs[0]||null;
+  if(publicTournamentRegistrationLocked(t)) return '<div class="banner warn"><span>賽事已開始，隊伍報名與取消功能均已鎖定。</span></div><div class="tournament-detail-bottom-actions"><button class="btn btn-ghost" data-action="back-to-find-events">← 返回賽事列表</button><button class="btn btn-primary" data-action="switch-to-player-watch" data-code="'+esc(code)+'">'+(t.tournamentPhase==="done"?"查看比賽結果":"查看即時賽事")+'</button></div>';
+  if(isGuestMode) return '<div class="hint">遊客模式僅供瀏覽，請切換至玩家模式後由隊長建立隊伍報名。</div><button class="btn btn-primary" data-action="select-role-player">切換至玩家模式</button>';
+  if(myTeam){
+    const status=myTeam.status==="confirmed"?"正取":myTeam.status==="waitlist"?"備取"+(myTeam.waitRank?"第 "+myTeam.waitRank+" 位":""):myTeam.status;
+    const members=(Array.isArray(myTeam.teamMembers)?myTeam.teamMembers:[]).map((m,i)=>'<li><span>第 '+(Number(m.slot)||i+1)+' 位</span><b>'+esc(m.name||"未命名玩家")+'</b></li>').join('');
+    const canCancel=t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
+    return '<div id="registration-result-panel" class="registration-result-panel"><div class="registration-result-head"><span class="registration-result-icon">✓</span><div><div class="registration-result-title">'+esc(myTeam.teamName||myTeam.displayName||"我的隊伍")+'</div><div class="registration-result-subtitle">'+size+'V'+size+' 團體戰｜隊長：'+esc(myTeam.captainDisplayName||myTeam.captainName||userProfile?.displayName||userProfile?.realName||"—")+'</div></div></div><div class="stat-box"><div class="label">報名狀態</div><div class="value small">'+esc(status)+'</div></div><details class="settings-accordion" open><summary><span>隊伍成員（'+size+' 人）</span><span class="hint">展開／收合</span></summary><div class="settings-accordion-body"><ol class="team-registration-members">'+members+'</ol></div></details><div class="registration-next-step"><b>出場順序不是現在提交</b><br>每一場團體對戰開始前，隊長會另外提交該場出場順序；提交後僅裁判可見，直到裁判按下「人員到齊」才公開。</div><div class="registration-result-actions">'+(canCancel?'<button class="btn btn-sm registration-cancel-link" data-action="cancel-team-registration" data-code="'+esc(code)+'" '+(tournamentDetailBusy?'disabled':'')+'>取消整隊報名</button>':'<span class="hint">'+(t.cancellationDeadline?"已超過取消期限，無法取消":"目前無法取消報名")+'</span>')+'</div></div>';
+  }
+  if(effStatus==="cancelled"||t.eventCancelled)return '<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>';
+  if(effStatus==="closed")return '<div class="hint">團體報名已截止。</div><button class="btn btn-ghost" disabled>不可報名</button>';
+  if(effStatus==="scheduled")return '<div>'+renderRegistrationCountdown(code,t.registrationOpenAt)+'</div><button class="btn btn-ghost" disabled>尚未開放</button>';
+  if(!isLoggedIn)return '<div class="hint">請先登入，由隊長帳號建立隊伍報名。</div><button class="btn btn-primary" data-action="switch-to-player-mode">登入後報名</button>';
+  if(profileIncomplete)return '<div class="hint">隊長需先完成會員資料才能建立隊伍。</div><button class="btn btn-primary" data-action="player-edit-profile">前往完成資料</button>';
+  if(effStatus==="full"&&!(t.waitlistEnabled&&waitlistRemaining>0))return '<div class="hint">正取與備取隊伍皆已額滿。</div><button class="btn btn-ghost" disabled>已額滿</button>';
+  const willWait=confirmedRemaining<=0;
+  const memberFields=Array.from({length:size},(_,i)=>'<div class="field"><label>隊員 '+(i+1)+'</label><input class="team-registration-member" type="text" maxlength="40" autocomplete="off" placeholder="輸入玩家名稱"></div>').join('');
+  return '<div class="team-registration-form"><div class="banner"><span><b>'+size+'V'+size+' 團體戰</b>｜本場每隊必須剛好 '+size+' 人，不接受不同人數隊伍。</span></div><div class="field"><label>隊名</label><input id="team-registration-name" type="text" maxlength="40" autocomplete="off" placeholder="輸入隊伍名稱"></div><div class="settings-mini-title">隊伍成員</div><div class="grid grid-2">'+memberFields+'</div><p class="hint">目前登入帳號會成為本隊「隊長」並負責每場提交出場順序；隊長是否同時出賽，取決於是否有填在上方 '+size+' 名隊員內。</p><button class="btn btn-primary" data-action="submit-team-registration" data-code="'+esc(code)+'" '+(tournamentDetailBusy?'disabled':'')+'>'+(willWait?'整隊加入備取':'送出整隊報名')+'</button></div>';
+}
+
 function renderTournamentDetailScreen(){
   const code = tournamentDetailCode;
   if(tournamentDetailLoading || !tournamentDetailData){
@@ -20009,6 +20037,8 @@ function renderTournamentDetailScreen(){
   const t = tournamentDetailData;
   const publicVenue=publicVenueFromTournament(t);
   const now = Date.now();
+  const isTeamBattle=tournamentBattleMode(t)==="team";
+  const teamSize=tournamentTeamSize(t);
   const effStatus = getEffectiveRegistrationStatus(Object.assign({}, t, {
     registrationStatus: t.eventCancelled ? "cancelled" : t.registrationStatus
   }), now);
@@ -20092,6 +20122,9 @@ function renderTournamentDetailScreen(){
       </div>`;
     }
   }
+  if(isTeamBattle){
+    actionHtml=renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining);
+  }
 
   return authShellOpen() + `
     <div class="tournament-detail-brand">${authBrandHeader()}</div>
@@ -20108,7 +20141,8 @@ function renderTournamentDetailScreen(){
         </div></div>
         <div class="stat-box"><div class="label">報到時間</div><div class="value small">${esc(t.checkInAt||"—")}</div></div>
         <div class="stat-box"><div class="label">開賽時間</div><div class="value small">${esc(t.startAt||"—")}</div></div>
-        <div class="stat-box"><div class="label">賽制</div><div class="value small">${esc(t.formatType==='single'?'單淘汰賽':(t.formatType||"—"))}</div></div>
+        <div class="stat-box"><div class="label">對戰形式</div><div class="value small">${isTeamBattle?esc(teamSize+"V"+teamSize+" 團體戰"):"個人戰"}</div></div>
+        <div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[t.formatType]||(t.formatType||"—"))}</div></div>
         <div class="stat-box"><div class="label">報名費</div><div class="value small">${t.fee!=null?esc(String(t.fee))+" 元":"免費"}</div></div>
       </div>
       <div class="tournament-info-foot">
@@ -20123,14 +20157,14 @@ function renderTournamentDetailScreen(){
         <div class="stat-box"><div class="label">報名截止時間</div><div class="value small">${esc(formatTournamentDetailDateTime(t.registrationCloseAt))}</div></div>
         <div class="stat-box"><div class="label">取消報名期限</div><div class="value small">${esc(formatTournamentDetailDateTime(t.cancellationDeadline))}</div></div>
         <div class="stat-box"><div class="label">報名狀態</div><div class="value small">${esc(REGISTRATION_STATUS_LABELS[effStatus]||effStatus)}</div></div>
-        <div class="stat-box"><div class="label">${t.registrationSelection?'報名／參賽名額':'正取名額'}</div><div class="value small">${t.registrationSelection?`${t.registeredCount||0} 人報名（不限額）／正取 ${t.registrationSelection.capacity} 人`:`${t.confirmedCount||0} / ${t.capacity||0}（剩餘 ${confirmedRemaining}）`}</div></div>
-        <div class="stat-box"><div class="label">備取名額</div><div class="value small">${t.waitlistEnabled ? `${t.waitlistCount||0} / ${t.waitlistCapacity||0}（剩餘 ${waitlistRemaining}）` : "未開放備取"}</div></div>
+        <div class="stat-box"><div class="label">${t.registrationSelection?'報名／參賽名額':(isTeamBattle?'正取隊伍':'正取名額')}</div><div class="value small">${t.registrationSelection?`${t.registeredCount||0} 人報名（不限額）／正取 ${t.registrationSelection.capacity} 人`:`${t.confirmedCount||0} / ${t.capacity||0}（剩餘 ${confirmedRemaining}${isTeamBattle?" 隊":" 人"}）`}</div></div>
+        <div class="stat-box"><div class="label">${isTeamBattle?"備取隊伍":"備取名額"}</div><div class="value small">${t.waitlistEnabled ? `${t.waitlistCount||0} / ${t.waitlistCapacity||0}（剩餘 ${waitlistRemaining}${isTeamBattle?" 隊":" 人"}）` : "未開放備取"}</div></div>
       </div>
       ${t.eventDescription ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">活動說明</div><p class="tournament-info-foot-text">${esc(t.eventDescription)}</p></div>` : ""}
       ${t.registrationNotes ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">報名注意事項</div><p class="tournament-info-foot-text">${esc(t.registrationNotes)}</p></div>` : ""}
     </div>
     ${renderTournamentStandardTemplate(t)}
-    ${!isGuestMode && isLoggedIn && !myReg ? `<div class="panel tournament-detail-panel tournament-info-panel">
+    ${!isTeamBattle && !isGuestMode && isLoggedIn && !myReg ? `<div class="panel tournament-detail-panel tournament-info-panel">
       <div class="panel-title">本次報名資料</div>
       <div class="grid grid-2 tournament-detail-grid">
         <div class="stat-box"><div class="label">姓名</div><div class="value small">${esc(userProfile.realName||"—")}</div></div>
@@ -25106,7 +25140,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const code=target.getAttribute("data-code");
     const targetGroup=target.getAttribute("data-target-group")||"open";
     if(!code) return;
-    if(targetGroup==="children"){
+    if(targetGroup==="children" || (lobbyTarget&&lobbyTarget.battleMode==="team")){
       resetTournamentDetailState(); tournamentDetailCode=code; tournamentDetailLoading=true; appPhase="tournament-detail"; render(); loadTournamentDetail(code); return;
     }
     (async ()=>{
