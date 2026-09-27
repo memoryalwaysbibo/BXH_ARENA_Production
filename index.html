@@ -10749,6 +10749,10 @@ const REGISTRATION_ERROR_MESSAGES = {
   "room-password-invalid": "房間密碼不正確",
   "room-access-rate-limited": "密碼錯誤次數過多，請稍後再試",
   "room-access-not-ready": "房間密碼正在設定中，請稍後再試",
+  "team-mode-required": "此賽事不是團體戰",
+  "team-size-mismatch": "隊伍人數與本場設定不一致",
+  "invalid-team-data": "請確認隊名與所有隊員名稱皆已完整填寫",
+  "team-lottery-unavailable": "團體戰目前尚未開放超額抽籤報名",
 };
 function mapRegistrationError(e){
   const code = (e && e.code) || (e && e.message) || "unknown";
@@ -16159,6 +16163,27 @@ function renderRefereeStationAssignmentPanel(){
   return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">建議賽前完成分配。啟用後，未被指定的 staff 在其他 Court 只可查看，不能計分、確認結果、簡易判定、暫停、跳過或重賽。玩家端只會看到裁判顯示名稱，不公開 UID。</p>${directoryHint}${refereeDirectoryError?`<div class="auth-error">${esc(refereeDirectoryError)}</div>`:""}<div class="toggle-row" style="margin:12px 0;"><span><b>啟用桌次限制</b><small>未啟用時沿用既有賽事權限；啟用後依 Court 指派限制。</small></span><button class="toggle ${enabled?'on':''}" data-action="toggle-referee-station-restriction" data-value="${enabled?'false':'true'}" ${refereeAssignmentSaving?'disabled':''}><span></span></button></div>${draftHint}<div style="display:flex;flex-direction:column;gap:10px;">${rows}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="save-referee-station-assignment" ${refereeAssignmentSaving?'disabled':''}>${refereeAssignmentSaving?'雲端交易確認中…':'儲存裁判台分配'}</button><button class="btn btn-ghost" data-action="load-referee-directory" ${refereeAssignmentSaving?'disabled':''}>重新載入名單</button></div></div>`;
 }
 
+
+function renderTeamAdminRegistrations(list,registrationLocked){
+  const rows=(Array.isArray(list)?list:[]).filter(r=>r&&(r.registrationKind==="team"||r.teamId));
+  const confirmed=rows.filter(r=>r.status==="confirmed").sort((a,b)=>normalizeDateTime(a.createdAt)-normalizeDateTime(b.createdAt));
+  const waitlist=rows.filter(r=>r.status==="waitlist").sort((a,b)=>normalizeDateTime(a.createdAt)-normalizeDateTime(b.createdAt));
+  const cancelled=rows.filter(r=>r.status==="cancelled").sort((a,b)=>normalizeDateTime(b.cancelledAt)-normalizeDateTime(a.cancelledAt));
+  const size=Math.max(3,Number(state.meta&&state.meta.teamSize)||3);
+  const card=(r,showCancel)=>{
+    const members=(Array.isArray(r.teamMembers)?r.teamMembers:[]).map((m,i)=>'<li><span>第 '+(Number(m.slot)||i+1)+' 位</span><b>'+esc(m.name||"未命名玩家")+'</b></li>').join('');
+    const created=normalizeDateTime(r.createdAt)?new Date(normalizeDateTime(r.createdAt)).toLocaleString():"—";
+    return '<details class="registration-mobile-card team-registration-admin-card"><summary><span class="registration-mobile-main"><strong>'+esc(r.teamName||r.displayName||"未命名隊伍")+'</strong><small>'+size+' 人｜隊長 '+esc(r.captainDisplayName||r.captainName||"—")+'</small></span><span class="registration-mobile-more">展開隊員</span></summary><div class="registration-mobile-details"><div><span>隊伍人數</span><b>'+size+' 人</b></div><div><span>隊長</span><b>'+esc(r.captainName||r.captainDisplayName||"—")+'</b></div><div><span>電話</span><b>'+esc(r.phone||"—")+'</b></div><div><span>報名時間</span><b>'+esc(created)+'</b></div><div style="display:block;"><span>隊員名單</span><ol class="team-registration-members">'+members+'</ol></div>'+(showCancel?'<div class="registration-mobile-actions"><button class="btn btn-danger btn-sm" data-action="admin-cancel-registration" data-uid="'+esc(r.registrationId||r.uid)+'" '+(adminRegistrationsBusy||registrationLocked?'disabled':'')+'>取消整隊報名</button></div>':'')+'</div></details>';
+  };
+  const section=(title,items,showCancel,extra,empty)=>'<div class="panel registration-list-panel"><div class="panel-title">'+title+'（'+items.length+' 隊）</div>'+(extra||'')+'<div class="registration-mobile-list">'+(items.length?items.map(r=>card(r,showCancel)).join(''):'<div class="registration-mobile-empty">'+empty+'</div>')+'</div></div>';
+  const lockBanner=registrationLocked?'<div class="banner warn"><span>賽事已開始，隊伍報名管理已鎖定。</span></div>':'';
+  const promote=waitlist.length?'<div class="btn-row registration-promote-row"><button class="btn btn-primary" data-action="admin-promote-waitlist" '+(adminRegistrationsBusy||registrationLocked?'disabled':'')+'>遞補下一隊（依報名時間）</button></div>':'';
+  return lockBanner+
+    section('正取隊伍',confirmed,true,'','目前沒有正取隊伍')+
+    section('備取隊伍',waitlist,true,promote,'目前沒有備取隊伍')+
+    section('已取消隊伍',cancelled,false,'','目前沒有取消紀錄');
+}
+
 function renderAdminRegistrationsTab(){
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
@@ -16187,6 +16212,7 @@ function renderAdminRegistrationsTab(){
     </div>`;
   }
   const list = adminRegistrationsCache;
+  if(state.meta.battleMode==="team") return renderTeamAdminRegistrations(list,registrationLocked);
   if(state.entrySelection?.mode==='registration'){
     const drawn=state.entrySelection.status==='drawn';
     const records=list.slice().sort((a,b)=>(normalizeDateTime(a.createdAt)||0)-(normalizeDateTime(b.createdAt)||0)||String(a.uid).localeCompare(String(b.uid)));
@@ -24299,7 +24325,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         if(!window.cloudSync || !window.cloudSync.promoteEarliestWaitlist) throw { code:"network" };
         const result = await window.cloudSync.promoteEarliestWaitlist(code);
-        showToast("已遞補一位候選人為正取");
+        showToast(state.meta.battleMode==="team"?"已遞補一支隊伍為正取":"已遞補一位候選人為正取");
         publicTournamentsCache = null;
         adminRegistrationsBusy = false;
         resetAdminRegistrationsCache();
@@ -24316,7 +24342,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(currentTournamentRegistrationLocked()){ showToast("賽事已開始，報名管理已鎖定",true); return; }
     const targetUid = target.getAttribute("data-uid");
     const code = state.cloudCode;
-    openModal({ type:"generic", title:"手動取消報名？", message:"確定要取消這位選手的報名嗎？名額會釋出，紀錄會保留，不會自動遞補其他人。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
+    openModal({ type:"generic", title:state.meta.battleMode==="team"?"取消整隊報名？":"手動取消報名？", message:state.meta.battleMode==="team"?"確定要取消這支隊伍嗎？會釋出 1 個隊伍名額，隊內所有玩家一起退出；不會自動遞補其他隊伍。":"確定要取消這位選手的報名嗎？名額會釋出，紀錄會保留，不會自動遞補其他人。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
       if(adminRegistrationsBusy) return;
       adminRegistrationsBusy = true; render();
       (async ()=>{
@@ -25162,6 +25188,56 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       localStorage.setItem(key,JSON.stringify(arr));
       showToast("已加入開賽提醒（目前為此裝置記錄）");
     }catch(e){ showToast("無法儲存提醒",true); }
+    return;
+  }
+  if(action==="submit-team-registration"){
+    if(isGuestReadOnlyContext()){showToast("遊客模式不可報名，請切換至玩家模式",true);return;}
+    if(tournamentDetailBusy)return;
+    const code=target.getAttribute("data-code")||tournamentDetailCode,t=tournamentDetailData;
+    if(!code||!t||tournamentBattleMode(t)!=="team"){showToast("此賽事不是團體戰",true);return;}
+    if(publicTournamentRegistrationLocked(t)){showToast("賽事已開始，報名系統已鎖定",true);return;}
+    const teamName=(document.getElementById("team-registration-name")?.value||"").trim();
+    const memberEls=[...document.querySelectorAll(".team-registration-member")];
+    const members=memberEls.map(el=>(el.value||"").trim());
+    const size=tournamentTeamSize(t);
+    if(!teamName){showToast("請輸入隊名",true);return;}
+    if(memberEls.length!==size||members.some(name=>!name)){showToast("請完整填寫 "+size+" 位隊員名稱",true);return;}
+    tournamentDetailBusy=true;target.disabled=true;
+    (async()=>{
+      try{
+        if(!window.engagementService?.teamRegistration)throw {code:"network"};
+        const preview=await window.engagementService.teamRegistration({action:"preview",code,teamName,members});
+        const statusText=preview.status==="confirmed"?"正取":"備取";
+        if(!confirm("確認送出「"+teamName+"」？\n\n本場："+size+"V"+size+"\n隊員："+members.join("、")+"\n預計狀態："+statusText+"\n\n送出後，本場出場順序仍會在每次對戰前另外提交。")){tournamentDetailBusy=false;target.disabled=false;return;}
+        const result=await window.engagementService.teamRegistration({action:"join",code,teamName,members,operationId:crypto.randomUUID()});
+        showToast(result.status==="confirmed"?"隊伍報名成功（正取）":"隊伍報名成功（備取）");
+        publicTournamentsCache=null;myRegistrationsCache=null;tournamentDetailBusy=false;
+        await loadTournamentDetail(code);
+      }catch(e){
+        tournamentDetailBusy=false;target.disabled=false;
+        const raw=String(e?.message||e||"");
+        if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("submit-team-registration",target));return;}
+        showToast(mapRegistrationError(e),true);
+      }
+    })();
+    return;
+  }
+  if(action==="cancel-team-registration"){
+    if(isGuestReadOnlyContext()){showToast("遊客模式不可取消報名",true);return;}
+    const code=target.getAttribute("data-code")||tournamentDetailCode;
+    if(!code||tournamentDetailBusy)return;
+    openModal({type:"generic",title:"取消整隊報名？",message:"這會取消整支隊伍的報名並釋出 1 個隊伍名額；所有隊員會一起退出本場。",danger:true,confirmLabel:"確認取消整隊",onConfirm:()=>{
+      tournamentDetailBusy=true;render();
+      (async()=>{
+        try{
+          if(!window.engagementService?.teamRegistration)throw {code:"network"};
+          await window.engagementService.teamRegistration({action:"cancel",code,operationId:crypto.randomUUID()});
+          showToast("已取消整隊報名");
+          publicTournamentsCache=null;myRegistrationsCache=null;tournamentDetailBusy=false;
+          await loadTournamentDetail(code);
+        }catch(e){tournamentDetailBusy=false;showToast(mapRegistrationError(e),true);render();}
+      })();
+    }});
     return;
   }
   if(action==="submit-tournament-registration"){
