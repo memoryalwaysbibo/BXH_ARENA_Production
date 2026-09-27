@@ -11754,7 +11754,7 @@ async function saveState(){
         return localOk ? true : false;
       }
       const lastCode = (typeof window!=="undefined" && window.__BXH_LAST_CLOUD_ERROR_CODE) || "";
-      if(lastCode==="registration-roster-stale"){
+      if(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"){
         cloudAccessLimited = true;
         cloudAccessMessage = "線上名單已更新；請重新整理頁面，再進行操作。";
         cloudStatus = "connected";
@@ -14972,7 +14972,7 @@ function teamMatchPlayerName(id){
   return (state.players||[]).find(p=>String(p.id)===String(id))?.name||"未知隊員";
 }
 function renderTeamLineupPanel(m){
-  if(!m.teamIds?.[0]||!m.teamIds?.[1]||!state.cloudCode)return '';
+  if(m.completed||!m.teamIds?.[0]||!m.teamIds?.[1]||!state.cloudCode)return '';
   const view=teamMatchUi.get(m.id);
   if(!view&&!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
   const teams=(state.teams||[]).filter(t=>m.teamIds.includes(t.id));
@@ -15006,6 +15006,7 @@ function renderTeamLineupPanel(m){
   return out;
 }
 function renderTeamScorePanel(m){
+  if(m.completed)return '<div class="hint">本場勝隊：'+esc((state.teams||[]).find(t=>t.id===m.winnerId)?.name||'未知隊伍')+'</div>';
   const view=teamMatchUi.get(m.id);
   if(!state.startedAt||!view?.revealed)return '';
   const game=view.game, names=teamMatchNames(m);
@@ -15054,6 +15055,7 @@ function renderTeamBracket(){
     for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m)+renderTeamScorePanel(m);
     html+='</div></section>';
   }
+  if(state.championId)html+='<div class="panel"><b>冠軍：'+name(state.championId)+'</b><div>亞軍：'+name(state.runnerUpId)+'</div></div>';
   return html+'</div>';
 }
 function renderBracket(){
@@ -24167,7 +24169,8 @@ async function handleTeamMatchAction(action,target){
       const finish=document.getElementById('team-score-finish-'+matchId)?.value;
       if(![0,1].includes(winnerSide)||!['spin','burst','over','extreme'].includes(finish))return;
       if(!confirm('確認本次判定？提交後立即更新雙方生命與守擂順位。'))return;
-      await window.engagementService.teamScoring({action:'score',code,matchId,winnerSide,finish,operationId:crypto.randomUUID()});
+      const outcome=await window.engagementService.teamScoring({action:'score',code,matchId,winnerSide,finish,operationId:crypto.randomUUID()});
+      if(outcome.matchCompleted){teamMatchUi.delete(matchId);await refreshBracketFromCloud();showToast('勝隊已晉級，對戰表已更新');return;}
       showToast('判定已記錄');
     }
     await loadTeamMatchUi(matchId);
@@ -31090,6 +31093,7 @@ if(testerSession){
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
               if(Number(remoteState.registrationRosterRevision||0)!==Number(data.registrationRosterRevision||0)) throw new Error("registration-roster-stale");
+              if(Number(remoteState.teamResultRevision||0)!==Number(data.teamResultRevision||0)) throw new Error("team-result-stale");
               if(data.generalClosureReason==="insufficient-eligible-players" &&
                  (remoteDoc.ladderPointsAwarded===true || remoteState.ladderPointsAwarded===true)) throw new Error("ladder-already-awarded");
               // Completed results are irreversible through ordinary whole-state sync.
