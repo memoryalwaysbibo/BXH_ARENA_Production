@@ -19624,33 +19624,13 @@ function communityDateTimeValue(ms){
   return local.toISOString().slice(0,16);
 }
 function renderCommunityCreateScreen(){
-  const nowValue=communityDateTimeValue(Date.now());
+  const hostName=String(userProfile?.gameId||userProfile?.displayName||userProfile?.nickname||userProfile?.realName||firebaseUser?.email||"玩家").trim();
   return authShellOpen("","community-create-content","community-create-shell")+`<div class="community-create-topbar"><button class="btn btn-ghost" type="button" data-action="community-create-cancel">← 返回我的房間</button></div>${authBrandHeader()}<div class="auth-card community-create-card">
-    <div class="auth-card-title">建立一般賽事</div>
+    <div class="auth-card-title">快速開房</div>
     <div class="banner"><span>玩家主辦｜一般賽事｜不計 BXH 天梯積分</span></div>
-    <div class="field"><label>賽事名稱</label><input id="community-name" type="text" placeholder="例如：好友交流賽"></div>
-    <div class="field"><label>活動日期</label><input id="community-date" type="date"></div>
-    <div class="field"><label>活動地點</label><input id="community-location" type="text" placeholder="例如：XX 桌遊店"></div>
-    <div class="field"><label>開賽時間</label><div class="half-hour-time" data-time-target="community-start"><select class="half-hour-hour"></select><span class="time-colon">:</span><select class="half-hour-minute"><option value="00">00</option><option value="30">30</option></select><input id="community-start" type="hidden" value="19:00"></div></div>
-    <div class="field"><label>賽制</label><select id="community-format"><option value="single">單淘汰賽</option><option value="double">雙敗制</option><option value="roundrobin">單循環賽</option></select></div>
-    <div class="field"><label>戰鬥台數</label><input id="community-stations" type="number" min="1" max="16" value="1"></div>
-    <div class="panel" style="margin-top:14px">
-      <label class="settings-check-row"><input id="community-registration-enabled" type="checkbox" checked><span><b>開放線上報名</b><small style="display:block;color:var(--metal-dim)">玩家可從賽事大廳或分享連結直接報名。</small></span></label>
-      <div class="grid grid-2" style="margin-top:12px">
-        <div class="field"><label>正取名額</label><input id="community-capacity" type="number" min="1" max="256" value="16"></div>
-        <div class="field"><label>備取名額</label><input id="community-waitlist" type="number" min="0" max="256" value="8"></div>
-        <div class="field"><label>報名開放時間</label><input id="community-reg-open" type="datetime-local" value="${esc(nowValue)}"></div>
-        <div class="field"><label>報名截止時間</label><input id="community-reg-close" type="datetime-local"></div>
-      </div>
-      <p class="hint">截止時間留白時，預設為活動開賽時間；取消報名期限同報名截止時間。</p>
-    </div>
-    <div class="panel" style="margin-top:14px">
-      <div class="panel-title">🔐 房間存取</div>
-      <div class="field"><label>房間類型</label><select id="community-access-mode"><option value="public">公開房間</option><option value="password">密碼房間</option></select></div>
-      <div class="field"><label>房間密碼（密碼房必填）</label><input id="community-access-password" type="password" maxlength="20" autocomplete="new-password" placeholder="4～20 字元"></div>
-      <p class="hint">密碼房需要 ARENA 會員輸入正確密碼後才能加入或線上報名；密碼不會寫入房間資料或公開鏡像。</p>
-    </div>
-    <button class="hoc-btn hoc-btn-primary btn-block" data-action="community-create-submit">建立一般賽事</button>
+    <p class="hint">房間名稱：${esc(hostName)}的房間｜日期與時間以建立當下的台灣時間為準。</p>
+    <div class="field"><label>開房模式</label><select id="community-format"><option value="single">單淘汰賽</option><option value="double">雙敗制</option><option value="roundrobin">單循環賽</option></select></div>
+    <button class="hoc-btn hoc-btn-primary btn-block" data-action="community-create-submit">建立房間</button>
     <div class="auth-links"><button class="link-btn" data-action="community-create-cancel">返回我的房間</button></div>
   </div>`+authShellClose();
 }
@@ -25199,21 +25179,17 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="community-create-open"){ appPhase="community-create"; render(); return; }
   if(action==="community-create-cancel"){ appPhase="player-center"; playerActiveTab="host"; render(); return; }
   if(action==="community-create-submit"){
-    const name=(document.getElementById("community-name")?.value||"").trim();
-    const date=document.getElementById("community-date")?.value||"";
-    const location=(document.getElementById("community-location")?.value||"").trim();
-    const startTime=document.getElementById("community-start")?.value||"19:00";
+    const hostProfile=userProfile||{};
+    const hostName=String(hostProfile.gameId||hostProfile.displayName||hostProfile.nickname||hostProfile.realName||firebaseUser?.email||"玩家").trim();
+    const name=hostName+"的房間";
+    const taipeiParts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).map(part=>[part.type,part.value]));
+    const date=`${taipeiParts.year}-${taipeiParts.month}-${taipeiParts.day}`;
+    const startTime=`${taipeiParts.hour}:${taipeiParts.minute}`;
+    const location="玩家即時對戰";
     const formatType=document.getElementById("community-format")?.value||"single";
-    const stations=Math.max(1,parseInt(document.getElementById("community-stations")?.value||"1",10)||1);
-    const registrationEnabled=!!document.getElementById("community-registration-enabled")?.checked;
-    const registrationCapacity=Math.max(1,parseInt(document.getElementById("community-capacity")?.value||"16",10)||16);
-    const waitlistCapacity=Math.max(0,parseInt(document.getElementById("community-waitlist")?.value||"0",10)||0);
-    const roomAccessMode=document.getElementById("community-access-mode")?.value==="password"?"password":"public";
-    const roomAccessPassword=(document.getElementById("community-access-password")?.value||"").normalize("NFKC").trim();
-    if(roomAccessMode==="password"&&(roomAccessPassword.length<4||roomAccessPassword.length>20)){showToast("密碼房請設定 4～20 字元房間密碼",true);return;}
-    const openRaw=document.getElementById("community-reg-open")?.value||"";
-    const closeRaw=document.getElementById("community-reg-close")?.value||"";
-    if(!name||!date||!location){ showToast("請完整填寫賽事名稱、活動日期與地點",true); return; }
+    const stations=1;
+    const registrationEnabled=false;
+    const roomAccessMode="public";
     (async()=>{
       try{
         if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
@@ -25222,25 +25198,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         st.meta.name=name; st.meta.date=date; st.meta.location=location; st.meta.startTime=startTime;
         st.meta.formatType=formatType; st.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; st.meta.stations=stations;
         st.meta.eventAuthority="community"; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.roomAccessMode=roomAccessMode; st.meta.publishedAt=Date.now();
-        if(registrationEnabled){
-          const eventStart=Date.parse(date+"T"+startTime+":00");
-          const openAt=openRaw?new Date(openRaw).getTime():Date.now();
-          const closeAt=closeRaw?new Date(closeRaw).getTime():eventStart;
-          if(!Number.isFinite(closeAt)||closeAt<=openAt){ showToast("報名截止時間必須晚於開放時間",true); return; }
-          st.meta.registrationOpenAt=openAt; st.meta.registrationCloseAt=closeAt; st.meta.cancellationDeadline=closeAt;
-          st.meta.registrationCapacity=registrationCapacity; st.meta.waitlistCapacity=waitlistCapacity;
-          st.meta.registrationVisibility="public"; st.meta.registrationStatus=Date.now()<openAt?"scheduled":"open";
-        }else{
-          st.meta.registrationOpenAt=null; st.meta.registrationCloseAt=null; st.meta.cancellationDeadline=null;
-          st.meta.registrationCapacity=0; st.meta.waitlistCapacity=0; st.meta.registrationVisibility="public"; st.meta.registrationStatus="closed";
-        }
+        st.meta.registrationOpenAt=null; st.meta.registrationCloseAt=null; st.meta.cancellationDeadline=null;
+        st.meta.registrationCapacity=0; st.meta.waitlistCapacity=0; st.meta.registrationVisibility="public"; st.meta.registrationStatus="closed";
         st.ownerUid=firebaseUser.uid; st.createdByRole="player"; st.lastActivityAt=Date.now();
 
         // COMMUNITY host joins their own room by default. Host ownership and
         // participant membership are independent: removing this player later
         // must NOT remove room ownership or management permission.
-        const hostProfile=userProfile||{};
-        const hostName=String(hostProfile.gameId||hostProfile.displayName||hostProfile.nickname||hostProfile.realName||firebaseUser.email||"房主").trim();
         st.players=[{
           id:uid("player"),
           name:hostName,
@@ -25259,15 +25223,6 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         st.expiresAtMs=communityRoomExpiryMs(st);
         const code=await window.cloudSync.createCommunityRoom(st);
         if(!code) throw new Error("create-failed");
-        if(roomAccessMode==="password"){
-          try{
-            const gate=await window.engagementService.roomAccess({action:"configure",code,mode:"password",password:roomAccessPassword,operationId:crypto.randomUUID()});
-            if(!gate?.ok)throw new Error("room-access-config-failed");
-          }catch(gateError){
-            try{await window.cloudSync.deleteCommunityRoom(code);}catch(cleanupError){}
-            throw gateError;
-          }
-        }
         st.cloudCode=code; state=st; await saveRecord(state); await setCurrentId(state.id);
         if(cloudUnsub){ try{cloudUnsub();}catch(e){} }
         cloudUnsub=window.cloudSync.subscribe(code,applyRemoteState); cloudStatus="connected";
