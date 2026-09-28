@@ -3952,3 +3952,87 @@ button.btn-primary,
     filter:saturate(1.18) brightness(1.02) contrast(1.08)!important;
   }
 }
+
+
+/* Directive warning pulse recovery v2 - 2026-09-28 */
+/* Use the spacer pseudo-layer as the single animated warning artwork.
+   This avoids the DOM warning image being frozen by later !important opacity/filter rules. */
+:root[data-bxh-theme="directive"] header.topbar .directive-warning-layer{
+  display:none!important;
+}
+:root[data-bxh-theme="directive"] header.topbar .spacer::before{
+  display:block!important;
+  content:""!important;
+  position:absolute!important;
+  top:-18px!important;
+  bottom:-18px!important;
+  right:-8vw!important;
+  width:min(58vw,720px)!important;
+  height:auto!important;
+  pointer-events:none!important;
+  z-index:1!important;
+  background:
+    radial-gradient(circle at 72% 50%,rgba(255,52,52,.30) 0%,rgba(255,52,52,.14) 24%,rgba(255,52,52,0) 60%),
+    url("./assets/ui/bxh-directive-warning.webp?v=20260928-pulse2") center/contain no-repeat!important;
+  background-repeat:no-repeat!important;
+  opacity:.055;
+  mix-blend-mode:screen!important;
+  filter:saturate(1.18) brightness(.82) contrast(1.08);
+  transform:translateZ(0) scale(1.002);
+  transform-origin:72% 50%;
+  will-change:opacity,filter,transform;
+  animation:bxh-directive-warning-recover 3.2s linear infinite!important;
+}
+@keyframes bxh-directive-warning-recover{
+  0%,62%{
+    opacity:.055;
+    filter:saturate(1.15) brightness(.80) contrast(1.08);
+    transform:translateZ(0) scale(1.002);
+  }
+  70%{
+    opacity:.14;
+    filter:saturate(1.24) brightness(1.04) contrast(1.09);
+    transform:translateZ(0) scale(1.004);
+  }
+  78%{
+    opacity:.38;
+    filter:saturate(1.36) brightness(1.38) contrast(1.12);
+    transform:translateZ(0) scale(1.010);
+  }
+  84%{
+    opacity:.18;
+    filter:saturate(1.24) brightness(1.06) contrast(1.10);
+    transform:translateZ(0) scale(1.005);
+  }
+  90%{
+    opacity:.62;
+    filter:saturate(1.50) brightness(1.62) contrast(1.15);
+    transform:translateZ(0) scale(1.016);
+  }
+  96%{
+    opacity:.14;
+    filter:saturate(1.22) brightness(.98) contrast(1.09);
+    transform:translateZ(0) scale(1.004);
+  }
+  100%{
+    opacity:.055;
+    filter:saturate(1.15) brightness(.80) contrast(1.08);
+    transform:translateZ(0) scale(1.002);
+  }
+}
+@media(max-width:640px){
+  :root[data-bxh-theme="directive"] header.topbar .spacer::before{
+    top:-14px!important;
+    bottom:-14px!important;
+    right:-10vw!important;
+    width:min(74vw,720px)!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  :root[data-bxh-theme="directive"] header.topbar .spacer::before{
+    animation:none!important;
+    opacity:.18!important;
+    filter:saturate(1.22) brightness(1.02) contrast(1.09)!important;
+    transform:translateZ(0) scale(1.004)!important;
+  }
+}
