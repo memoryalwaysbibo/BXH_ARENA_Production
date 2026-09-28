@@ -4036,3 +4036,76 @@ button.btn-primary,
     transform:translateZ(0) scale(1.004)!important;
   }
 }
+
+
+/* Directive warning pulse recovery v3 - spacer::after */
+/* The inline critical warning style owns .directive-warning-layer and .spacer::before.
+   Use the untouched ::after channel so the pulse cannot be frozen by that later rule. */
+:root[data-bxh-theme="directive"] header.topbar .spacer::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  top:-16px!important;
+  right:-9vw!important;
+  bottom:-16px!important;
+  left:auto!important;
+  width:min(66vw,760px)!important;
+  pointer-events:none!important;
+  z-index:0!important;
+  background:
+    radial-gradient(circle at 74% 50%,rgba(255,44,44,.34) 0%,rgba(255,44,44,.16) 24%,rgba(255,44,44,0) 61%),
+    url("./assets/ui/bxh-directive-warning.webp?v=20260928-pulse3") center/contain no-repeat!important;
+  background-repeat:no-repeat!important;
+  opacity:.025;
+  mix-blend-mode:screen!important;
+  filter:saturate(1.20) brightness(.78) contrast(1.10);
+  transform:translateZ(0) scale(1.002);
+  transform-origin:76% 50%;
+  will-change:opacity,filter,transform;
+  animation:bxh-directive-warning-pulse-v3 3.2s linear infinite!important;
+}
+@keyframes bxh-directive-warning-pulse-v3{
+  0%,62%{
+    opacity:.025;
+    filter:saturate(1.16) brightness(.76) contrast(1.10);
+    transform:translateZ(0) scale(1.002);
+  }
+  70%{
+    opacity:.16;
+    filter:saturate(1.28) brightness(1.08) contrast(1.11);
+    transform:translateZ(0) scale(1.004);
+  }
+  78%{
+    opacity:.48;
+    filter:saturate(1.42) brightness(1.48) contrast(1.14);
+    transform:translateZ(0) scale(1.010);
+  }
+  84%{
+    opacity:.22;
+    filter:saturate(1.30) brightness(1.12) contrast(1.12);
+    transform:translateZ(0) scale(1.005);
+  }
+  90%{
+    opacity:.76;
+    filter:saturate(1.62) brightness(1.90) contrast(1.18);
+    transform:translateZ(0) scale(1.018);
+  }
+  96%{
+    opacity:.18;
+    filter:saturate(1.28) brightness(1.04) contrast(1.11);
+    transform:translateZ(0) scale(1.004);
+  }
+  100%{
+    opacity:.025;
+    filter:saturate(1.16) brightness(.76) contrast(1.10);
+    transform:translateZ(0) scale(1.002);
+  }
+}
+@media(max-width:640px){
+  :root[data-bxh-theme="directive"] header.topbar .spacer::after{
+    top:-12px!important;
+    right:-12vw!important;
+    bottom:-12px!important;
+    width:min(82vw,760px)!important;
+  }
+}
