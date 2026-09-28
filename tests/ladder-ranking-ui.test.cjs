@@ -17,6 +17,7 @@ assert(source.includes('ladder-tier-emblem is-legend')===false, 'legend class sh
 assert(source.includes("tier.legend?' is-legend':''"), 'BXH legend emblem state missing');
 assert(source.includes('class="ladder-player-block"'), 'player info block missing');
 assert(source.includes('class="title-chip rarity-'), 'equipped title must remain under player name');
+assert(source.includes('assets/title-limited-gods-collector.webp'), 'Gods Collector artwork must render in the ladder');
 assert(source.includes('grid-template-columns:64px minmax(0,1fr) 96px 78px'), 'desktop/mobile-safe four-column grid missing');
 assert(source.includes('grid-template-columns:54px minmax(0,1fr) 78px 64px'), 'narrow iPhone four-column grid missing');
 assert(source.includes('ladder-board-heading'), 'board title must display the active score mode and location');
@@ -30,6 +31,7 @@ assert(html.includes('function ladderBadgeHtml(p)'), 'shared tier badge renderer
 assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'guest leaderboard must show tier badges');
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
-assert(html.includes('ladder-secondary-ui.js?v=14.2.50'), 'ladder asset cache-bust version must match release');
+assert(html.includes("name==='諸神典藏者')return 'assets/title-limited-gods-collector.webp'"), 'Gods Collector artwork must render across title surfaces');
+assert(html.includes('ladder-secondary-ui.js?v=14.2.51'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
