@@ -1,4 +1,4 @@
-/* v14.3.1 Family profile cards add a data-transfer entry beside archive; transfer backend remains safely disabled. */
+/* v14.3.2 Family transfer form connects to guarded Production familyTransfer prepare flow. */
 function openFamilyPlayers(){
  document.getElementById('bxh-family-dialog')?.close();
  const uid=currentAuthUid(),epoch=engagementSessionEpoch,previous=document.activeElement,dialog=document.createElement('dialog');dialog.id='bxh-family-dialog';dialog.className='raffle-claim-dialog';
@@ -9,7 +9,47 @@ function openFamilyPlayers(){
  const close=()=>{if(closed)return;closed=true;clearInterval(timer);dialog.close();dialog.remove();previous?.focus?.();};const timer=setInterval(()=>{if(document.hidden)return;if(!valid())close();},1000);
  function lock(v){busy=v;dialog.querySelectorAll('button,input').forEach(x=>{if(x!==q('close'))x.disabled=v;});}
  function list(){q('list').innerHTML=profiles.map(p=>`<article class="claim-history-row"><strong>${esc(p.name)}${p.nickname?'（'+esc(p.nickname)+'）':''}</strong><p>選手編號：${esc(p.playerId)}</p><p>生日：${esc(p.birthDate)}${p.archived?'｜已封存':''}</p><button class="btn btn-ghost" data-history="${esc(p.id)}">賽事紀錄</button> <button class="btn btn-ghost" data-edit="${esc(p.id)}">編輯</button> <button class="btn btn-ghost" data-state="${esc(p.id)}">${p.archived?'恢復使用':'封存'}</button> <button class="btn btn-ghost" data-transfer="${esc(p.id)}">資料移轉</button></article>`).join('')||'<p>尚未建立孩子的選手資料。</p>';q('list').querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>history(b.dataset.history));q('list').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>edit(profiles.find(p=>p.id===b.dataset.edit)));q('list').querySelectorAll('[data-state]').forEach(b=>b.onclick=()=>{const p=profiles.find(x=>x.id===b.dataset.state);if(confirm((p.archived?'恢復':'封存')+'「'+p.name+'」？選手編號與紀錄會保留。'))mutate({action:p.archived?'restore':'archive',id:p.id});});q('list').querySelectorAll('[data-transfer]').forEach(b=>b.onclick=()=>transfer(profiles.find(p=>p.id===b.dataset.transfer)));}
- function transfer(p){if(busy||pending||!p)return;const focus=document.activeElement,modal=document.createElement('dialog');modal.className='raffle-claim-dialog';modal.innerHTML='<header><h2>資料移轉</h2><button class="btn btn-ghost" data-close>關閉</button></header><p><strong>'+esc(p.name)+(p.nickname?'（'+esc(p.nickname)+'）':'')+'</strong></p><p>此功能將把目前由家長代管的家庭選手，移交成獨立 BXH ARENA 帳號。原有選手編號、賽事紀錄與後續生涯資料會保留。</p><p class="hint">目前先建立資料移轉入口；帳號建立與「首次登入後自動解除家庭關係」的後端流程尚未啟用，因此這個畫面不會更動任何資料。</p>';const close=()=>{modal.close();modal.remove();focus?.focus?.();};modal.querySelector('[data-close]').onclick=close;modal.oncancel=e=>{e.preventDefault();close();};modal.onclose=()=>{if(modal.isConnected)modal.remove();};document.body.appendChild(modal);modal.showModal();}
+ function transfer(p){
+  if(busy||pending||!p)return;
+  const focus=document.activeElement,modal=document.createElement('dialog');modal.className='raffle-claim-dialog';
+  const waiting=p.transferStatus==='pending';
+  modal.innerHTML='<header><h2>資料移轉</h2><button class="btn btn-ghost" data-close>關閉</button></header>'
+   +'<p><strong>'+esc(p.name)+(p.nickname?'（'+esc(p.nickname)+'）':'')+'</strong></p>'
+   +'<p>此功能會建立孩子自己的 BXH ARENA 登入帳號。原有選手編號與賽事紀錄會保留；孩子第一次成功登入前，家庭選手位置不會解除。</p>'
+   +(waiting
+     ?'<div class="claim-history-row"><strong>等待首次登入</strong><p>新帳號：'+esc(p.pendingEmail||'已建立')+'</p><p class="hint">請在孩子的新手機使用這組 Email 與初始密碼登入。首次登入成功後，系統才會完成移交並清空目前家庭選手位置。</p></div>'
+     :'<form data-transfer-form><label>新帳號 Email<input name="email" type="email" maxlength="254" autocomplete="off" required></label><label>初始密碼<input name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label><label>再次確認密碼<input name="confirmPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label><p class="hint">密碼至少 8 碼。建立後不會立即解除家庭關係；只有新帳號首次登入成功才會完成移交。</p><button class="btn btn-primary" type="submit">建立獨立帳號</button></form>')
+   +'<p data-transfer-status role="status" aria-live="polite"></p>';
+  const transferStatus=modal.querySelector('[data-transfer-status]');
+  let transferBusy=false;
+  const close=()=>{if(transferBusy)return;modal.close();modal.remove();focus?.focus?.();};
+  modal.querySelector('[data-close]').onclick=close;
+  modal.oncancel=e=>{e.preventDefault();close();};
+  modal.onclose=()=>{if(modal.isConnected)modal.remove();};
+  const tf=modal.querySelector('[data-transfer-form]');
+  if(tf)tf.onsubmit=async e=>{
+   e.preventDefault();if(transferBusy)return;
+   const email=String(tf.elements.email.value||'').trim(),password=String(tf.elements.password.value||''),confirmPassword=String(tf.elements.confirmPassword.value||'');
+   if(password!==confirmPassword){transferStatus.textContent='兩次輸入的密碼不一致。';return;}
+   if(password.length<8){transferStatus.textContent='初始密碼至少需要 8 碼。';return;}
+   if(!confirm('確定為「'+p.name+'」建立獨立帳號？建立後會等待孩子首次登入，現在不會解除家庭關係。'))return;
+   transferBusy=true;tf.querySelectorAll('input,button').forEach(x=>x.disabled=true);modal.querySelector('[data-close]').disabled=true;transferStatus.textContent='正在建立獨立帳號…';
+   try{
+    if(!window.engagementService?.familyTransfer)throw Error('service-unavailable');
+    const result=await window.engagementService.familyTransfer({action:'prepare',childId:p.id,email,password});
+    if(!result?.ok||result.status!=='pending')throw Error('prepare-failed');
+    transferStatus.textContent='獨立帳號已建立，等待孩子首次登入。';
+    await load();
+    setTimeout(()=>{if(modal.open){modal.close();modal.remove();}},500);
+   }catch(error){
+    const raw=String(error?.details?.message||error?.message||error?.code||error);
+    const known={'invalid-email':'Email 格式不正確。','invalid-password':'密碼至少需要 8 碼。','email-already-in-use':'這個 Email 已經有 BXH ARENA 帳號。','transfer-already-pending':'這位家庭選手已在等待首次登入。','profile-transferred':'這位選手已完成移交。','child-not-found':'找不到這位家庭選手。','auth-required':'登入狀態已失效，請重新登入。','service-unavailable':'資料移轉服務尚未連線。'};
+    transferStatus.textContent=Object.entries(known).find(([k])=>raw.includes(k))?.[1]||'建立失敗，沒有解除任何家庭資料，請稍後再試。';
+    transferBusy=false;tf.querySelectorAll('input,button').forEach(x=>x.disabled=false);modal.querySelector('[data-close]').disabled=false;
+   }
+  };
+  document.body.appendChild(modal);modal.showModal();
+ }
  async function history(childId){if(busy)return;lock(true);status.textContent='讀取賽事紀錄…';try{const r=await window.engagementService.familyRegistration({action:'history',childId});if(!valid())return;if(!r?.ok)throw Error('unavailable');status.innerHTML='<strong>孩子的賽事紀錄</strong>'+((r.rows||[]).map(x=>'<p>'+esc(x.title)+'｜'+esc(({confirmed:'正取',waitlist:'備取',cancelled:'已取消'})[x.status]||x.status)+'｜'+(x.completed?'已結束':x.checkedIn?'已報到':'未報到')+'｜'+Number(x.wins||0)+' 勝 '+Number(x.losses||0)+' 敗</p>').join('')||'<p>尚無代報名紀錄。</p>');}catch(e){if(valid())status.textContent='讀取失敗，請稍後再試。'}finally{if(valid())lock(false);}}
  async function request(data){const r=await window.engagementService.family(data);if(!valid())throw Error('auth-required');if(!r?.ok)throw Error('unavailable');return r;}
  function message(e){const s=String(e?.message||e);return Object.entries(errors).find(([k])=>s.includes(k))?.[1]||'連線結果尚未確認，請按「重試原操作」。';}
