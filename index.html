@@ -28,10 +28,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260929.1">
+<meta name="bxh-build" content="20260929.2">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260929.1";
+  var CURRENT_BUILD="20260929.2";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -30372,7 +30372,7 @@ init().then(()=>{
         tx.update(regRef,regPatch);
         tx.update(tourRef,Object.assign({},common,{data:JSON.stringify(runtime)}));
         tx.update(pubRef,Object.assign({},common,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime))}));
-        return {capacity:newCapacity,confirmedCount:nextConfirmed,waitlistCount:nextWaiting,status:action==="cancel"?"cancelled":action==="demote"?"waitlist":"confirmed"};
+        return {capacity:newCapacity,confirmedCount:nextConfirmed,waitlistCount:nextWaiting,status:action==="cancel"?"cancelled":action==="demote"?"waitlist":"confirmed",participantRegistrationId:participant};
       });
 
       // Server round-trip verification: do not announce success until all authoritative
@@ -30388,9 +30388,16 @@ init().then(()=>{
       const statusOk=String(reg.status||"")===String(expectedStatus);
       let publicRuntime={};try{publicRuntime=pub.bracketView?JSON.parse(pub.bracketView):{};}catch(e){}
       const pubPlayerIds=new Set((publicRuntime.players||[]).map(p=>String(p.id||"")));
-      const privateCandidate=(remoteState.players||[]).find(p=>String(p.registrationId||"")===regId)||null;
-      const rosterOk=action==="promote"?!!privateCandidate&&(pubPlayerIds.has(String(privateCandidate.id||""))):!(remoteState.players||[]).some(p=>String(p.registrationId||"")===regId);
-      if(!countsOk||!capOk||!statusOk||!rosterOk)throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+      const verifyRegistrationId=String(txResult.participantRegistrationId||regId);
+      const privateCandidate=(remoteState.players||[]).find(p=>String(p.registrationId||"")===verifyRegistrationId)||null;
+      const rosterOk=action==="promote"
+        ? !!privateCandidate&&pubPlayerIds.has(String(privateCandidate.id||""))
+        : !privateCandidate&&!(publicRuntime.players||[]).some(p=>String(p.id||"")&&pubPlayerIds.has(String(p.id||""))&&
+            (remoteState.waitlistPlayers||[]).some(w=>String(w.registrationId||"")===verifyRegistrationId&&String(w.id||"")===String(p.id||"")));
+      if(!countsOk||!capOk||!statusOk||!rosterOk){
+        console.warn("[roster verify mismatch]",{action,regId,verifyRegistrationId,countsOk,capOk,statusOk,rosterOk,txResult});
+        throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+      }
       return Object.assign({ok:true,verified:true,state:remoteState,registrationId:regId},txResult);
     },
 
