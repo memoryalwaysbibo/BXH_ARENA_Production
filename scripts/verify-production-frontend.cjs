@@ -47,13 +47,14 @@ must(/authDomain:\s*["']bxh-arena\.firebaseapp\.com["']/, 'Production authDomain
 must(/async\s+applyPlayerAccount\([\s\S]*?role:\s*["']player["'][\s\S]*?provider:\s*["']password["']/, 'Self-service signup must create role=player with password provider');
 must(/async\s+completeNewPlayerProfile\([\s\S]*?role:\s*["']player["'][\s\S]*?provider:\s*["']password["']/, 'Missing-profile recovery must create role=player with password provider');
 must(/function\s+canCreateOfficialTournament\(\)\{[^\n]*!isTester\(\)/, 'Tester must be excluded from official tournament creation');
-mustNot(/if\(action===["']player-google-signin["']\)/, 'Google sign-in action is still active');
-mustNot(/async\s+signInWithGoogle\s*\(/, 'Google sign-in runtime method is still active');
+must(/if\(action==="player-google-signin"\)[\s\S]*?window\.cloudAuth\.signInWithLinkedGoogle\(\)/, 'Linked Google sign-in action missing');
+must(/async\s+signInWithLinkedGoogle\s*\(\)[\s\S]*?ax\.signInWithPopup\(authHandle,provider,ax\.browserPopupRedirectResolver\)/, 'Linked Google popup sign-in missing');
+must(/if\(fbUser\.providerData\?\.some\(p=>p\.providerId==="google\.com"\)\)[\s\S]*?await window\.cloudAuth\.signOutUser\(\)/, 'Missing Google profile must fail closed');
 must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linking pilot must import the provider');
 must(/async\s+linkMyGoogleAccount\s*\(\)\s*\{[\s\S]*?profile\?\.role!=="super_admin"[\s\S]*?ax\.linkWithPopup\(user,provider,[\s\S]*?linked\.uid!==uid[\s\S]*?googleEmail!==oldEmail[\s\S]*?ax\.unlink\(linked,"google.com"\)/, 'Google link pilot must be super-admin only, keep UID, and reject mismatched email');
 must(/if\(action==="player-link-google"\)\{\s*if\(!isSuperAdmin\(\)\)return;/, 'Google link action must be super-admin only');
 mustNot(/getRedirectResult\(authHandle\)/, 'Google redirect result runtime is still active');
-mustNot(/signInWithPopup:\s*authMod\.signInWithPopup/, 'Public Google popup sign-in must remain disabled');
+must(/signInWithPopup:\s*authMod\.signInWithPopup/, 'Google popup sign-in SDK mapping missing');
 mustNot(/role:\s*["']tester["'],\s*active:\s*true,\s*provider:\s*["'](?:password|google)["']/, 'Public signup/recovery still creates tester role');
 must(/PUBLIC_TOURNAMENTS_RECONCILE_MS\s*=\s*90000/, 'Lobby reconciliation must be 90 seconds');
 if((html.split('const lobbyVisibility = m.registrationVisibility==="private" ? "private" : "public";').length-1)!==2) throw new Error('createRoom/pushUpdate must derive lobby visibility from registrationVisibility');

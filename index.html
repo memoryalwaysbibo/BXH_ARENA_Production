@@ -18619,6 +18619,8 @@ function renderPlayerLoginScreen(){
         </div>
       </div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-email-signin" ${verifying?'disabled':''}>${verifying?'正在驗證帳號權限……':'登入'}</button>
+      <button class="hoc-btn btn-block" style="width:100%;margin-top:10px;" data-action="player-google-signin" ${verifying?'disabled':''}>使用已綁定的 Google 帳號登入</button>
+      <div class="hint" style="margin-top:6px;">僅限先前已在 ARENA 綁定的 Google 帳號；未綁定者請先以原帳密登入。</div>
       <div class="auth-links">
         <button class="link-btn" data-action="player-forgot-password">忘記密碼</button>
         <button class="link-btn" data-action="player-goto-apply">還沒有帳號？申請帳號</button>
@@ -25019,6 +25021,26 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="player-goto-login"){ playerLoginError=""; appPhase="player-login"; render(); return; }
   if(action==="player-goto-apply"){ playerApplyError=""; appPhase="player-apply"; render(); return; }
   if(action==="player-goto-lookup"){ playerLookupQuery=""; playerLookupResult=null; appPhase="player-lookup"; render(); return; }
+  if(action==="player-google-signin"){
+    if(playerLoginBusy||authVerifying)return;
+    if(!(window.cloudAuth&&window.cloudAuth.isReady())){playerLoginError="雲端服務尚未連線，請稍後再試";render();return;}
+    playerLoginBusy=true;playerLoginError="";pendingLoginIntent="player";render();
+    const attempt=++loginAttemptGeneration;
+    window.cloudAuth.signInWithLinkedGoogle().then(result=>{
+      if(attempt!==loginAttemptGeneration)return;
+      if(!result.ok){
+        playerLoginBusy=false;pendingLoginIntent=null;
+        playerLoginError=result.error||"Google 登入失敗";render();return;
+      }
+      if(appPhase==="player-login"){
+        authVerifying=true;startVerifyingTimeout();startFastAuthRecovery();render();
+      }
+    }).catch(()=>{
+      if(attempt!==loginAttemptGeneration)return;
+      playerLoginBusy=false;pendingLoginIntent=null;playerLoginError="Google 登入失敗，請稍後再試";render();
+    });
+    return;
+  }
   if(action==="player-email-signin"){
     if(playerLoginBusy) return;
     if(!(window.cloudAuth && window.cloudAuth.isReady())){ playerLoginError="雲端服務尚未連線，請確認網路連線或稍後再試"; render(); return; }
@@ -29114,6 +29136,13 @@ async function init(){
                     try{ playerLookupResult = await searchPlayerNames(profile.realName||""); }catch(e){ playerLookupResult=null; }
                   }
                 } else if(!profile){
+                  if(fbUser.providerData?.some(p=>p.providerId==="google.com")){
+                    userProfile=null;currentRole=null;firebaseUser=null;pendingLoginIntent=null;
+                    await window.cloudAuth.signOutUser();
+                    playerLoginError="找不到這個 Google 帳號原有的 ARENA 玩家資料，請聯絡管理員。";
+                    appPhase="player-login";
+                    return;
+                  }
                   // No users/{uid} document yet — for example, a prior Email/Password sign-up
                   // whose Firestore profile write failed. Never re-create the Auth
                   // account here; let the user complete the profile on the SAME session.
@@ -29291,6 +29320,7 @@ init().then(()=>{
           EmailAuthProvider: authMod.EmailAuthProvider,
           GoogleAuthProvider: authMod.GoogleAuthProvider,
           linkWithPopup: authMod.linkWithPopup,
+          signInWithPopup: authMod.signInWithPopup,
           unlink: authMod.unlink,
           browserPopupRedirectResolver: authMod.browserPopupRedirectResolver
         };
@@ -29362,6 +29392,22 @@ init().then(()=>{
         if(e?.code==="auth/credential-already-in-use"||e?.code==="auth/email-already-in-use")return {ok:false,error:"這個 Google 帳號已連到其他 ARENA 帳號，請聯絡管理員。"};
         if(e?.code==="auth/requires-recent-login")return {ok:false,error:"請登出後用原帳密重新登入，再連結 Google。"};
         return {ok:false,error:"Google 連結失敗："+String(e?.code||e?.message||"請稍後重試")};
+      }
+    },
+
+    async signInWithLinkedGoogle(){
+      if(!authReady)return {ok:false,error:"雲端服務尚未連線。"};
+      try{
+        const provider=new ax.GoogleAuthProvider();
+        provider.setCustomParameters({prompt:"select_account"});
+        const result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
+        if(!result.user.providerData.some(p=>p.providerId==="google.com"))throw Error("google-provider-missing");
+        return {ok:true,uid:result.user.uid};
+      }catch(e){
+        if(e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request")return {ok:false,error:"已取消 Google 登入。"};
+        if(e?.code==="auth/permission-denied"||e?.code==="auth/internal-error")return {ok:false,error:"此 Google 帳號尚未綁定 ARENA；請先用原帳密登入並完成綁定。"};
+        if(e?.code==="auth/account-exists-with-different-credential")return {ok:false,error:"請先以原帳密登入，並在我的資料綁定 Google 帳號。"};
+        return {ok:false,error:"Google 登入失敗："+String(e?.code||"請稍後再試")};
       }
     },
 
