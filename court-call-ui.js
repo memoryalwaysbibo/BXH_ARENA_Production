@@ -340,6 +340,11 @@ function courtCallNextState(m){
  const future=(state.matches||[]).filter(mm=>!mm.isBye&&Number(mm.station)===station&&!mm.completed&&mm.id!==(court&&court.currentMatchId))
   .sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
  if(future.length){
+  // A station may finish earlier than another station in the same knockout round.
+  // Do not let an earlier unresolved placeholder block a later match whose two
+  // participants are already known: that ready match can be judged in parallel.
+  const ready=future.find(mm=>mm.a&&mm.b&&mm.status!=='paused');
+  if(ready)return {kind:'ready',next:ready,label:displayMatchLabel(ready)||matchLabel(ready)};
   const next=future[0];
   return {kind:(next.a||next.b)?'partial':'waiting',next,label:displayMatchLabel(next)||matchLabel(next)||'等待安排'};
  }
