@@ -1,5 +1,5 @@
 (()=>{'use strict';
-let callable=null,busy=false,lastMine=0,nextMineAt=0,mineFailures=0,lastMineUid='',lastCode='',lastSentHtml='',lastSentAt=0,mineRows=[];
+let callable=null,busy=false,attachmentBusy=false,lastMine=0,nextMineAt=0,mineFailures=0,lastMineUid='',lastCode='',lastSentHtml='',lastSentAt=0,mineRows=[];
 const mailboxDraft={initialized:false,open:false,targetUid:'',subject:'',body:'',lastMessageId:''};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function runtime(){try{return Function('return {user:firebaseUser,profile:userProfile,state:state,phase:appPhase,mailbox:(typeof mailboxContext==="function"?mailboxContext:null),entryUrl:(typeof buildTournamentEntryUrl==="function"?buildTournamentEntryUrl:null),render:(typeof render==="function"?render:null)}')()}catch{return {}}}
@@ -66,6 +66,28 @@ async function sendSingle(button){
  }catch(e){alert('測試信寄送失敗：'+String(e?.message||e?.code||'unknown'))}
  finally{busy=false;button.disabled=false;button.textContent=old;broadcastComposer()}
 }
+function stableAttachmentPanel(){
+ const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null,sent=ctx?.lastSent;
+ let panel=document.getElementById('mailbox-stable-attachment');
+ if(!sent?.targetUid||!sent?.messageId){panel?.remove();return}
+ if(panel?.dataset.messageId===String(sent.messageId))return;
+ panel?.remove();panel=document.createElement('section');panel.id='mailbox-stable-attachment';panel.dataset.messageId=String(sent.messageId);panel.className='panel';
+ panel.style.cssText='position:fixed;right:18px;bottom:18px;z-index:2600;width:min(420px,calc(100vw - 36px));box-shadow:0 18px 60px #000a';
+ panel.innerHTML='<strong>為剛寄出的信件新增附件</strong><p class="hint">PDF、PNG、JPG、TXT，單檔最多 2 MB</p><input id="mailbox-stable-attachment-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"><div class="btn-row" style="margin-top:10px"><button class="btn btn-primary btn-sm" data-mailbox-stable-upload>上傳附件</button><button class="btn btn-ghost btn-sm" data-mailbox-stable-close>稍後處理</button></div>';
+ document.body.appendChild(panel);
+ panel.querySelector('[data-mailbox-stable-close]').addEventListener('click',()=>panel.remove());
+ panel.querySelector('[data-mailbox-stable-upload]').addEventListener('click',async()=>{
+  if(attachmentBusy)return;const file=panel.querySelector('input[type="file"]')?.files?.[0];if(!file){alert('請先選擇附件');return}
+  const mime=({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',txt:'text/plain'})[file.name.split('.').pop().toLowerCase()]||file.type;
+  if(file.size<1||file.size>2*1024*1024||!['application/pdf','image/png','image/jpeg','text/plain'].includes(mime)){alert('僅支援 PDF、PNG、JPG、TXT，單檔最多 2 MB');return}
+  attachmentBusy=true;const button=panel.querySelector('[data-mailbox-stable-upload]');button.disabled=true;button.textContent='上傳中…';
+  try{
+   const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('file-read-failed'));reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');reader.readAsDataURL(file)});
+   const result=await window.engagementService.mailboxAttachment({action:'upload',targetUid:sent.targetUid,messageId:sent.messageId,operationId:crypto.randomUUID(),name:file.name,mime,base64});
+   if(!result?.ok)throw Error('attachment-upload-failed');panel.remove();alert('附件已加到該封站內信');
+  }catch(e){alert('附件上傳失敗：'+String(e?.message||e?.code||'unknown'));button.disabled=false;button.textContent='上傳附件'}finally{attachmentBusy=false}
+ });
+}
 document.addEventListener('click',e=>{const button=e.target.closest?.('[data-action="mailbox-send-test"]');if(!button)return;e.preventDefault();e.stopImmediatePropagation();if(document.getElementById('mailbox-broadcast-mode')?.checked)sendBroadcast(button);else sendSingle(button)},true);
 function mailboxInvitationPanel(){
  const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null,selected=(ctx?.messages||[]).find(x=>x.id===ctx.selectedId);
@@ -84,8 +106,8 @@ async function mine(force=false){if(document.hidden&&!force)return;const r=runti
 async function respond(c,decision){if(busy)return;busy=true;try{const r=await api({action:'respond',code:c,decision});const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null,selected=(ctx?.messages||[]).find(x=>x.id===ctx.selectedId);if(selected&&String(selected.eventCode).toUpperCase()===String(c).toUpperCase())selected.invitationStatus=decision==='accept'?(r.status||'accepted'):'declined';alert(decision==='accept'?'已接受邀請，報名狀態：'+(r.status==='confirmed'?'正取':r.status==='waitlist'?'備取':'已確認'):'已拒絕邀請');lastMine=0;nextMineAt=0;mineRows=mineRows.filter(x=>String(x.code).toUpperCase()!==String(c).toUpperCase());mailboxInvitationPanel();await mine(true)}catch(e){alert('處理邀請失敗：'+String(e?.message||e?.code||'unknown'))}finally{busy=false}}
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-invite]');if(!t)return;const a=t.dataset.invite;if(a==='search')search();if(a==='send')send(t.dataset.uid);if(a==='accept'||a==='decline')respond(t.dataset.code,a);if(a==='open-event'){const rt=runtime(),url=rt.entryUrl?rt.entryUrl(t.dataset.code,'register'):('?code='+encodeURIComponent(t.dataset.code)+'&entry=register');window.location.assign(url)}});
 const style=document.createElement('style');style.textContent='#registration-invitation-overlay{position:fixed;inset:0;z-index:2700;background:#000d;padding:18px;display:flex;align-items:center;justify-content:center}#registration-invitation-overlay>section{width:min(560px,100%);max-height:85dvh;overflow:auto}#registration-invite-panel input{min-width:0;flex:1}#registration-invite-panel [data-invite-results] .ap-task{display:flex;align-items:center;gap:10px;margin-top:10px}#registration-invite-panel [data-invite-results] small{color:#999;flex:1}';document.head.appendChild(style);
-function tick(){if(document.hidden)return;const r=runtime(),c=code();if((r.phase==='tournament'||document.getElementById('quick-add-textarea'))&&c){if(c!==lastCode){lastCode=c;lastSentHtml='';lastSentAt=0}managerPanel();loadSent()}broadcastComposer();mailboxInvitationPanel();mine()}
+function tick(){if(document.hidden)return;const r=runtime(),c=code();if((r.phase==='tournament'||document.getElementById('quick-add-textarea'))&&c){if(c!==lastCode){lastCode=c;lastSentHtml='';lastSentAt=0}managerPanel();loadSent()}broadcastComposer();stableAttachmentPanel();mailboxInvitationPanel();mine()}
 setInterval(tick,3000);setTimeout(tick,0);
-new MutationObserver(()=>broadcastComposer()).observe(document.body,{childList:true,subtree:true});
+new MutationObserver(()=>{broadcastComposer();stableAttachmentPanel()}).observe(document.body,{childList:true,subtree:true});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){nextMineAt=0;tick()}});
 })();
