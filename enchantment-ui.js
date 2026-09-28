@@ -93,6 +93,7 @@
   const enabled=!!state&&state.phase!=='completed';
   return `<div class="fe-card-action" style="margin-top:10px">
    <button type="button" class="btn btn-sm ${enabled?'btn-primary':'btn-ghost'}" data-enchantment-open data-code="${quote(code)}" ${m?`data-match-id="${quote(m.id)}"`:''} ${enabled?'':'disabled aria-disabled="true"'} style="width:100%;min-height:44px;${enabled?'':'opacity:.55;filter:grayscale(1)'}">${enabled?(state.drawn?.[side]?'查看本局卡片':'進入抽卡｜第 '+Number(state.round)+' 局'):'抽卡入口｜尚未輪到你'}</button>
+   <button type="button" class="btn btn-ghost btn-sm" data-enchantment-preview style="width:100%;min-height:44px;margin-top:6px">體驗抽牌場景</button>
    </div>`;
  }
  function ensureScheduleEntry(code){
@@ -105,7 +106,11 @@
   entry=document.createElement('button');entry.type='button';entry.className='btn btn-ghost btn-sm';
   entry.dataset.enchantmentOpen='';entry.dataset.code=code;entry.disabled=true;entry.setAttribute('aria-disabled','true');
   entry.textContent='抽卡入口｜尚未輪到你';entry.style.cssText='width:100%;min-height:44px;opacity:.55;filter:grayscale(1)';
-  wrap.append(entry);row.before(wrap);return entry;
+  wrap.append(entry);
+  const preview=document.createElement('button');preview.type='button';preview.className='btn btn-ghost btn-sm';
+  preview.dataset.enchantmentPreview='';preview.textContent='體驗抽牌場景';
+  preview.style.cssText='width:100%;min-height:44px;margin-top:6px';
+  wrap.append(preview);row.before(wrap);return entry;
  }
  function statusHtml(code,id,version,s){
   const common=`data-code="${quote(code)}" data-match-id="${quote(id)}"`;
@@ -262,6 +267,18 @@
   }catch(e){/* Registration and public bracket may be temporarily unavailable. */}
   finally{discoveryBusy=false;}
  }
+ function openEnchantmentPreview(){
+  if(document.querySelector('[data-enchantment-preview-overlay]'))return;
+  const overlay=document.createElement('section');overlay.dataset.enchantmentPreviewOverlay='';
+  overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔抽牌體驗');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2147483100;background:#080917;display:flex;flex-direction:column';
+  overlay.innerHTML='<div style="position:absolute;left:12px;top:10px;z-index:3;padding:9px;color:#f5e2ab;background:#171326dd;border-radius:9px;font-size:12px">抽牌體驗｜不計入賽事</div><button type="button" data-enchantment-preview-close style="position:absolute;right:12px;top:10px;z-index:3;background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:7px 10px">離開體驗</button><div data-enchantment-preview-loading style="position:absolute;left:0;right:0;top:70px;color:#f5e2ab;text-align:center">正在載入抽牌場景…</div>';
+  const frame=document.createElement('iframe');frame.title='附魔之戰抽牌體驗';
+  frame.src='docs/enchantment/approved-draw-v3.html';
+  frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917';
+  frame.addEventListener('load',()=>overlay.querySelector('[data-enchantment-preview-loading]')?.remove(),{once:true});
+  overlay.append(frame);document.body.append(overlay);
+ }
  async function recoverPlayerDraw(button){
   const overlay=button.closest('[data-enchantment-draw-overlay]');
   const frame=overlay?.querySelector('iframe[data-enchantment-player]');
@@ -292,6 +309,8 @@
   }finally{button.disabled=false;}
  }
  document.addEventListener('click',e=>{
+  if(e.target.closest('[data-enchantment-preview-close]')){document.querySelector('[data-enchantment-preview-overlay]')?.remove();return;}
+  if(e.target.closest('[data-enchantment-preview]')){openEnchantmentPreview();return;}
   const recover=e.target.closest('[data-enchantment-recover]');
   if(recover){recoverPlayerDraw(recover);return;}
   if(e.target.closest('[data-enchantment-close]')){
