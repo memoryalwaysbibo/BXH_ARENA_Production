@@ -108,9 +108,11 @@
       var titleName=p.equippedBadge&&p.equippedBadge.name==="審判者"?"裁決者":p.equippedBadge&&p.equippedBadge.name||"";
       var art=p.equippedBadge&&p.equippedBadge.rarity==="eternal"
         ?(titleName==="創世者"?"assets/title-eternal-creator.webp":titleName==="裁決者"?"assets/title-eternal-adjudicator.webp":"")
-        :p.equippedBadge&&p.equippedBadge.rarity==="limited"
-          ?(titleName==="開拓者"?"assets/title-limited-pioneer.webp":titleName==="諸神典藏者"?"assets/title-limited-gods-collector.webp":"")
-          :"";
+        :p.equippedBadge&&p.equippedBadge.rarity==="limited"&&titleName==="開拓者"
+          ?"assets/title-limited-pioneer.webp"
+          :p.equippedBadge&&(p.equippedBadge.rarity==="rare"||p.equippedBadge.rarity==="limited")&&titleName==="諸神典藏者"
+            ?"assets/title-limited-gods-collector.webp"
+            :"";
       var title=p&&p.equippedBadge
         ?'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+(art?' title-art-chip':'')+'" title="'+escLocal(titleName)+'">'+(art?'<img src="'+art+'" alt="'+escLocal(titleName)+'" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">':escLocal(titleName))+'</span>'
         :"";

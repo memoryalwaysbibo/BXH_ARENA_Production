@@ -31,7 +31,7 @@ assert(html.includes('function ladderBadgeHtml(p)'), 'shared tier badge renderer
 assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'guest leaderboard must show tier badges');
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
-assert(html.includes("name==='諸神典藏者')return 'assets/title-limited-gods-collector.webp'"), 'Gods Collector artwork must render across title surfaces');
-assert(html.includes('ladder-secondary-ui.js?v=14.2.51'), 'ladder asset cache-bust version must match release');
+assert(html.includes("(rarity==='rare'||rarity==='limited')&&name==='諸神典藏者'"), 'Gods Collector artwork must support its production Rare rarity');
+assert(html.includes('ladder-secondary-ui.js?v=14.2.52'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
