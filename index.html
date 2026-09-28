@@ -1041,7 +1041,8 @@ table.rank-table tr:last-child td{border-bottom:none;}
 }
 .board-canvas{
   transform-origin:0 0;padding:24px;width:max-content;min-width:100%;
-  transition:transform .05s linear;
+  /* Direct manipulation must track the finger without interpolation lag. */
+  will-change:transform;
 }
 .board-champion-area{
   margin-top:26px;padding:22px;border-radius:12px;text-align:center;
@@ -24023,6 +24024,10 @@ function setBoardZoom(newZoom){
   boardZoom = Math.round(Math.max(0.5, Math.min(1.5, newZoom)) * 10) / 10;
   applyBoardTransform();
 }
+function setBoardPinchZoom(newZoom){
+  boardZoom = Math.max(0.5, Math.min(1.5, newZoom));
+  applyBoardTransform();
+}
 function applyBoardTransform(){
   try{
     const canvas = document.getElementById("board-canvas");
@@ -24161,13 +24166,23 @@ function bindBoardModeInteractions(){
       if(e.touches.length===2){
         e.preventDefault();
         const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
-        if(touchStartDist>0) setBoardZoom(touchStartZoom * (dist/touchStartDist));
+        if(touchStartDist>0) setBoardPinchZoom(touchStartZoom * (dist/touchStartDist));
       } else if(e.touches.length===1){
+        e.preventDefault();
         boardPanX = touchStartPanX + (e.touches[0].clientX-touchStartX);
         boardPanY = touchStartPanY + (e.touches[0].clientY-touchStartY);
         applyBoardTransform();
       }
     }, { passive:false });
+    viewport.addEventListener("touchend", (e)=>{
+      if(e.touches.length===1){
+        touchStartX=e.touches[0].clientX; touchStartY=e.touches[0].clientY;
+        touchStartPanX=boardPanX; touchStartPanY=boardPanY;
+        touchStartDist=0;
+      } else if(!e.touches.length){
+        touchStartDist=0;
+      }
+    }, { passive:true });
 
     const themeSelect = document.getElementById("board-theme-select");
     if(themeSelect){
