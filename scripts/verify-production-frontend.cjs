@@ -49,9 +49,11 @@ must(/async\s+completeNewPlayerProfile\([\s\S]*?role:\s*["']player["'][\s\S]*?pr
 must(/function\s+canCreateOfficialTournament\(\)\{[^\n]*!isTester\(\)/, 'Tester must be excluded from official tournament creation');
 mustNot(/if\(action===["']player-google-signin["']\)/, 'Google sign-in action is still active');
 mustNot(/async\s+signInWithGoogle\s*\(/, 'Google sign-in runtime method is still active');
-mustNot(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'GoogleAuthProvider is still wired into runtime');
+must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linking pilot must import the provider');
+must(/async\s+linkMyGoogleAccount\s*\(\)\s*\{[\s\S]*?profile\?\.role!=="super_admin"[\s\S]*?ax\.linkWithPopup\(user,provider,[\s\S]*?linked\.uid!==uid[\s\S]*?googleEmail!==oldEmail[\s\S]*?ax\.unlink\(linked,"google.com"\)/, 'Google link pilot must be super-admin only, keep UID, and reject mismatched email');
+must(/if\(action==="player-link-google"\)\{\s*if\(!isSuperAdmin\(\)\)return;/, 'Google link action must be super-admin only');
 mustNot(/getRedirectResult\(authHandle\)/, 'Google redirect result runtime is still active');
-mustNot(/popupRedirectResolver:\s*authMod\.browserPopupRedirectResolver/, 'Popup/redirect resolver is still active');
+mustNot(/signInWithPopup:\s*authMod\.signInWithPopup/, 'Public Google popup sign-in must remain disabled');
 mustNot(/role:\s*["']tester["'],\s*active:\s*true,\s*provider:\s*["'](?:password|google)["']/, 'Public signup/recovery still creates tester role');
 must(/PUBLIC_TOURNAMENTS_RECONCILE_MS\s*=\s*90000/, 'Lobby reconciliation must be 90 seconds');
 if((html.split('const lobbyVisibility = m.registrationVisibility==="private" ? "private" : "public";').length-1)!==2) throw new Error('createRoom/pushUpdate must derive lobby visibility from registrationVisibility');
