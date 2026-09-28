@@ -105,8 +105,10 @@
     var body=rows.slice(0,ladderVisibleCount).map(function(p){
       var rank=Number(p.__rank||0);
       var topClass=rank>=1&&rank<=3?" ladder-rank-top-"+rank:"";
+      var art=p.equippedBadge&&p.equippedBadge.rarity==="eternal"
+        ?(p.equippedBadge.name==="創世者"?"assets/title-eternal-creator.png":p.equippedBadge.name==="審判者"?"assets/title-eternal-judge.png":""):"";
       var title=p&&p.equippedBadge
-        ?'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+'" title="'+escLocal(p.equippedBadge.name||"")+'">'+escLocal(p.equippedBadge.name||"")+'</span>'
+        ?'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+(art?' title-art-chip':'')+'" title="'+escLocal(p.equippedBadge.name||"")+'">'+(art?'<img src="'+art+'" alt="'+escLocal(p.equippedBadge.name)+'" loading="lazy">':escLocal(p.equippedBadge.name||""))+'</span>'
         :"";
       var adminActions=adminMode
         ?'<div class="ladder-rank-admin-actions">'+
@@ -413,6 +415,7 @@
     ".ladder-player-link{display:block;max-width:100%;padding:0;border:0;background:transparent;color:var(--ivory);font:800 17px/1.25 var(--font-d);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}"+
     ".ladder-player-link:focus-visible{outline:1px solid var(--gold);outline-offset:3px;border-radius:3px;}"+
     ".ladder-player-block .title-chip{display:block;max-width:100%;margin:0;padding:2px 7px;font-size:9px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}"+
+    ".ladder-player-block .title-chip.title-art-chip{width:155px;max-width:100%;padding:0;border:0;aspect-ratio:3/1;overflow:visible;line-height:0;}"+
     ".ladder-tier-cell{min-width:0;display:flex;justify-content:center;}"+
     ".ladder-tier-display{min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;}"+
     ".ladder-tier-emblem{--tier-color:#a9adb5;--tier-edge:#545861;position:relative;display:grid;place-items:center;width:32px;height:36px;flex:0 0 32px;clip-path:polygon(50% 0,92% 15%,86% 72%,50% 100%,14% 72%,8% 15%);background:linear-gradient(155deg,var(--tier-color),#111 72%);filter:drop-shadow(0 3px 5px rgba(0,0,0,.34));}"+
