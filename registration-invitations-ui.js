@@ -67,7 +67,8 @@ async function sendSingle(button){
  finally{busy=false;button.disabled=false;button.textContent=old;broadcastComposer()}
 }
 function stableAttachmentPanel(){
- const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null,sent=ctx?.lastSent;
+ const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null,selected=(ctx?.messages||[]).find(x=>x.id===ctx.selectedId);
+ const sent=ctx?.lastSent||(selected?.type==='test'&&rt.user?.uid?{targetUid:rt.user.uid,messageId:selected.id}:null);
  let panel=document.getElementById('mailbox-stable-attachment');
  if(!sent?.targetUid||!sent?.messageId){panel?.remove();return}
  if(panel?.dataset.messageId===String(sent.messageId))return;
