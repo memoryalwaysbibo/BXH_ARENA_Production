@@ -22143,8 +22143,6 @@ function profileCompletionPercent(p){
 let playerProfileEditOpen=false;
 let playerProfileEditBusy=false;
 let playerProfileEditError="";
-let googleLinkBusy=false;
-let googleLinkError="";
 
 // v13.23.1：玩家資料編輯視窗支援 Esc 關閉。
 // 不在儲存中時可直接退出；儲存中則避免中斷狀態。
@@ -22239,12 +22237,11 @@ function renderPlayerProfileTab(p){
             <div class="profile-info-row"><div class="profile-info-label">所在都市</div><div class="profile-info-value">${esc(profileLocationParts(p).city||"尚未設定")}</div></div>
             <div class="profile-info-row"><div class="profile-info-label">所在地區</div><div class="profile-info-value">${esc(profileLocationParts(p).region||"尚未設定")}</div></div>
             <div class="profile-info-row"><div class="profile-info-label">資料完整度</div><div class="profile-info-value">${profileCompletionPercent(p)}%</div></div>
-            <div class="profile-info-row"><div class="profile-info-label">登入方式</div><div class="profile-info-value">${window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?"Email／密碼、Google":"Email／密碼"}</div></div>
+            <div class="profile-info-row"><div class="profile-info-label">登入方式</div><div class="profile-info-value">${p.provider==="google"?"Google 帳號":"Email／密碼"}</div></div>
           </div>
         </section>
       </div>
       <div class="profile-account-actions">
-        ${isSuperAdmin()?`<div class="panel" style="width:100%"><strong>Google 帳號綁定（內部測試）</strong><p class="hint">${window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?"已綁定 Google 帳號。":"先以原本的 ARENA 帳密登入，再連結相同信箱的 Google 帳號。"}</p>${googleLinkError?`<div class="auth-error">${esc(googleLinkError)}</div>`:""}${window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?"":`<button class="btn btn-ghost" data-action="player-link-google" ${googleLinkBusy?'disabled':''}>${googleLinkBusy?'連結中…':'連結 Google 帳號'}</button>`}</div>`:""}
         <button class="btn btn-ghost" data-action="player-change-password">修改密碼</button>
         <button class="btn btn-danger-solid" data-action="player-logout">登出</button>
       </div>
@@ -25924,18 +25921,6 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     showToast("修改密碼功能開發中");
     return;
   }
-  if(action==="player-link-google"){
-    if(!isSuperAdmin())return;
-    if(googleLinkBusy)return;
-    const before=window.cloudAuth?.getCurrentUser?.();
-    if(!before?.uid){googleLinkError="請先使用原本的 ARENA 帳密登入。";render();return;}
-    googleLinkBusy=true;googleLinkError="";render();
-    window.cloudAuth.linkMyGoogleAccount().then(result=>{
-      if(result?.ok){showToast("Google 帳號已連結，玩家資料與權限維持不變");}
-      else googleLinkError=result?.error||"連結失敗，請稍後重試。";
-    }).catch(()=>{googleLinkError="連結失敗，請稍後重試。";}).finally(()=>{googleLinkBusy=false;render();});
-    return;
-  }
   if(action==="player-logout"){
     (async ()=>{
       if(window.cloudAuth && window.cloudAuth.isReady()){ await window.cloudAuth.signOutUser(); }
@@ -29198,11 +29183,7 @@ init().then(()=>{
           sendPasswordResetEmail: authMod.sendPasswordResetEmail,
           updatePassword: authMod.updatePassword,
           reauthenticateWithCredential: authMod.reauthenticateWithCredential,
-          EmailAuthProvider: authMod.EmailAuthProvider,
-          GoogleAuthProvider: authMod.GoogleAuthProvider,
-          linkWithPopup: authMod.linkWithPopup,
-          unlink: authMod.unlink,
-          browserPopupRedirectResolver: authMod.browserPopupRedirectResolver
+          EmailAuthProvider: authMod.EmailAuthProvider
         };
         authReady = true;
         cloudEnabled = true;
@@ -29240,39 +29221,8 @@ init().then(()=>{
     getCurrentUser(){
       try{
         const u = authHandle && authHandle.currentUser;
-        return u ? { uid: u.uid, email: u.email, providers:(u.providerData||[]).map(p=>p.providerId) } : null;
+        return u ? { uid: u.uid, email: u.email } : null;
       }catch(e){ return null; }
-    },
-
-    async linkMyGoogleAccount(){
-      if(!authReady || !authHandle?.currentUser) return {ok:false,error:"請先使用原本的 ARENA 帳密登入。"};
-      const user=authHandle.currentUser,uid=user.uid,oldEmail=String(user.email||"").trim().toLowerCase();
-      if(!oldEmail) return {ok:false,error:"原帳號缺少登入信箱，請聯絡管理員。"};
-      const profile=await this.getUserProfile(uid);
-      if(profile?.role!=="super_admin"||profile?.active!==true)return {ok:false,error:"Google 綁定目前僅開放最高管理員測試。"};
-      if(String(profile.email||"").trim().toLowerCase()!==oldEmail)return {ok:false,error:"登入信箱與會員資料不一致，請先核對。"};
-      if(user.providerData.some(p=>p.providerId==="google.com"))return {ok:true,uid};
-      try{
-        const provider=new ax.GoogleAuthProvider();
-        provider.setCustomParameters({login_hint:oldEmail,prompt:"select_account"});
-        const result=await ax.linkWithPopup(user,provider,ax.browserPopupRedirectResolver);
-        const linked=result.user;
-        if(linked.uid!==uid)throw Error("uid-changed");
-        const googleEmail=String(linked.providerData.find(p=>p.providerId==="google.com")?.email||"").trim().toLowerCase();
-        if(googleEmail!==oldEmail){
-          // A chosen Google account can differ from login_hint. Keep the original
-          // password account intact; email correction is a separate verified flow.
-          try{await ax.unlink(linked,"google.com");}
-          catch(unlinkError){return {ok:false,error:"選取的 Google 帳號不同，解除連結失敗。請停止操作並由管理員檢查帳號。"};}
-          return {ok:false,error:"選取的 Google 信箱與 ARENA 登入信箱不同，已取消連結。誤填信箱需另行核對修正。"};
-        }
-        return {ok:true,uid};
-      }catch(e){
-        if(e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request")return {ok:false,error:"已取消 Google 帳號選擇。"};
-        if(e?.code==="auth/credential-already-in-use"||e?.code==="auth/email-already-in-use")return {ok:false,error:"這個 Google 帳號已連到其他 ARENA 帳號，請聯絡管理員。"};
-        if(e?.code==="auth/requires-recent-login")return {ok:false,error:"請登出後用原帳密重新登入，再連結 Google。"};
-        return {ok:false,error:"Google 連結失敗："+String(e?.code||e?.message||"請稍後重試")};
-      }
     },
 
     async hasSuperAdmin(){
