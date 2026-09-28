@@ -11308,7 +11308,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
   "import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
   "cloud-retry-connect","cloud-test-connection",
-  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start",
+  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim",
   "open-quick-confirm"
 ]);
 const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
@@ -11317,13 +11317,13 @@ const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data","archive-general-insufficient",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
-  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle","set-ladder-mode"
+  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle","set-ladder-mode"
 ]);
 
 const COMMUNITY_OWNER_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","update-players","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
-  "start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","goto-settings"
+  "start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","goto-settings"
 ]);
 const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
@@ -11346,7 +11346,7 @@ const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
 const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status",
-  "skip-match","claim-skipped-match","court-swap-start","open-quick-confirm","archive-complete"
+  "skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","archive-complete"
 ]);
 
 function partnerOrganizerGrant(){
@@ -12767,6 +12767,19 @@ function rebuildPropagationForState(targetState){
   try{
     state=targetState;
     rebuildPropagation();
+    // Only the authoritative transaction may rebalance queued matches. Never
+    // move a match currently displayed on another court or one with play data.
+    if(state.startedAt&&state.archiveStatus!=="completed"){
+      let moved=false;
+      for(let n=1;n<=Math.max(1,Number(state.meta.stations)||1);n++){
+        const court=state.courtAssignments[courtKey(n)];
+        if(court&&!court.currentMatchId){
+          const candidate=idleCourtCandidates(state,n)[0];
+          if(candidate&&applyIdleCourtClaim(state,candidate.id,n).ok)moved=true;
+        }
+      }
+      if(moved)rebuildPropagation();
+    }
     return targetState;
   }finally{
     state=previousState;
@@ -15971,6 +15984,51 @@ function canCourtSwapTarget(m,sourceMatch){
   if(m.status==="in_progress"||m.status==="paused"||m.skippedAt||m.callPass||matchHasDecisionData(m)) return false;
   return true;
 }
+// A court may take only a queued match. A match already shown as another
+// court's current match can be underway before its first score is entered.
+function idleCourtCandidates(st,stationNum){
+  const courts=st.courtAssignments||{};
+  const busy=new Set(Object.values(courts).map(c=>c&&c.currentMatchId).filter(Boolean));
+  const phase=(st.meta.formatType||"single")==="single"?activeSingleElimSchedulePhase(st.matches):null;
+  return (st.matches||[]).filter(m=>m&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
+    !m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&
+    !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&
+    (!phase||isInActiveSingleElimPhase(m,phase,st.matches)))
+    .sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
+}
+function applyIdleCourtClaim(st,matchId,stationNum){
+  const court=st.courtAssignments&&st.courtAssignments[courtKey(stationNum)];
+  if(!court||court.currentMatchId) return {ok:false,reason:"court-no-longer-idle"};
+  const match=idleCourtCandidates(st,stationNum).find(m=>m.id===matchId);
+  if(!match) return {ok:false,reason:"match-no-longer-available"};
+  const now=Date.now();
+  clearCourtAssignmentRefs(st,[match.id]);
+  match.station=stationNum;match.status="ready";match.startedAt=null;
+  match.dispatchPriorityAt=now;match.dispatchRevision=Number(match.dispatchRevision||0)+1;
+  match.updatedAt=now;
+  st.currentMatchId=match.id;
+  return {ok:true,state:st};
+}
+async function claimIdleCourt(matchId,stationNum){
+  if(!canOperateStation(stationNum)){showToast("你未被指派此戰鬥台",true);return;}
+  const match=getMatch(matchId);
+  if(!match||!idleCourtCandidates(state,stationNum).some(m=>m.id===matchId)){
+    showToast("場次狀態已改變，請重新整理",true);return;
+  }
+  let result;
+  if(state.cloudCode){
+    if(!cloudAvailable()||!window.cloudSync?.mutateMatchTransaction){showToast("雲端未連線，無法接手場次",true);return;}
+    result=await window.cloudSync.mutateMatchTransaction(state.cloudCode,match.id,Number(match.station),
+      remote=>applyIdleCourtClaim(remote,match.id,stationNum),currentAuthUid(),
+      {targetStation:stationNum,expectedRevision:Number(match.dispatchRevision||0)});
+  }else{
+    result=applyIdleCourtClaim(state,match.id,stationNum);
+    if(result.ok){rebuildPropagation();if(!await saveState()) result={ok:false,reason:"save-failed"};}
+  }
+  if(!result?.ok){showToast("接手失敗："+String(result?.reason||"請重試"),true);return;}
+  if(result.state)applyRemoteState(result.state,true);
+  rememberRefereeWorkstation();render();showToast("場次已送至第 "+stationNum+" 台");
+}
 function courtSwapMatchClass(m){
   if(!courtSwapDraft) return "";
   const source=getMatch(courtSwapDraft.sourceMatchId);
@@ -16191,9 +16249,12 @@ function renderCourtCard(stationNum){
   if(!m){
     const stationHasFutureWork = state.matches.some(mm=>!mm.isBye && mm.station===stationNum && !mm.completed);
     const canReceiveSkipped = state.matches.some(mm=>!mm.isBye&&!mm.completed&&mm.skippedAt&&!mm.resumeQueuedAt&&mm.a&&mm.b);
+    const available=state.startedAt&&canOperateStation(stationNum)?idleCourtCandidates(state,stationNum):[];
+    const claimButtons=available.slice(0,5).map(candidate=>`<button class="btn btn-ghost btn-sm" data-action="idle-court-claim" data-id="${esc(candidate.id)}" data-station="${stationNum}">接手｜${esc(displayMatchLabel(candidate))} ${esc(playerName(candidate.a.playerId))} vs ${esc(playerName(candidate.b.playerId))}</button>`).join("");
     return `<div class="panel court-card court-card-idle referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
       ${refereeWorkstationHeader(null,stationNum)}
       <div class="empty-state"><div class="big">${canReceiveSkipped ? "本台閒置，可承接跳過場次" : stationHasFutureWork ? "等待晉級結果" : "本台賽程已完成"}</div>${canReceiveSkipped?'<div>請至上方「待承接場次」選擇安排。</div>':''}</div>
+      ${claimButtons?`<div class="msc-btns" style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:8px">${claimButtons}</div>`:""}
     </div>`;
   }
 
@@ -27454,6 +27515,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     rememberRefereeWorkstation();
     const el = document.getElementById("court-card-"+n);
     if(el && el.scrollIntoView){ el.scrollIntoView({ behavior:"smooth", block:"start" }); }
+    return;
+  }
+  if(action==="idle-court-claim"){
+    const station=Number(target.getAttribute("data-station")||0);
+    if(!station||!id)return;
+    claimIdleCourt(id,station);
     return;
   }
   if(action==="court-swap-start"){
