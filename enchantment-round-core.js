@@ -42,7 +42,7 @@ function submit(s,round,side,type,refereeAuthorized){
   const n=copy(s);n.scores[side]+=computed.points;
   n.history.push({round,side,type,winningCardId:s.cards[side],losingCardId:s.cards[other],
     scoreBefore:{...s.scores},faultsBefore:{...s.faults},pendingFaultsBefore:(s.pendingFaults||[]).slice(),...computed});
-  if(n.scores[side]>=8){n.phase='awaiting-result';n.faults={A:0,B:0};n.pendingFaults=[];return {ok:true,state:n,event:n.history.at(-1)};}
+  if(n.scores[side]>=6){n.phase='awaiting-result';n.faults={A:0,B:0};n.pendingFaults=[];return {ok:true,state:n,event:n.history.at(-1)};}
   n.round++;n.phase='drawing';n.cards={A:null,B:null};n.revealed={A:false,B:false};
   n.faults={A:0,B:0};n.pendingFaults=[];
   return {ok:true,state:n,event:n.history.at(-1)};
@@ -63,7 +63,7 @@ function fault(s,round,offender,refereeAuthorized){
     appliedCardId:null,winningCardId:s.cards[side],losingCardId:s.cards[offender],
     scoreBefore:{...s.scores},faultsBefore:{...s.faults},pendingFaultsBefore:(s.pendingFaults||[]).slice()};
   n.history.push(event);n.faults={A:0,B:0};n.pendingFaults=[];
-  if(n.scores[side]>=8){n.phase='awaiting-result';return {ok:true,state:n,event};}
+  if(n.scores[side]>=6){n.phase='awaiting-result';return {ok:true,state:n,event};}
   n.round++;n.phase='drawing';n.cards={A:null,B:null};n.revealed={A:false,B:false};
   return {ok:true,state:n,event};
 }
@@ -88,7 +88,7 @@ function confirm(s,refereeAuthorized){
   if(!refereeAuthorized)return failure('referee-required');
   if(s.phase!=='awaiting-result')return failure('not-ready');
   const n=copy(s);n.phase='completed';
-  n.winner=n.scores.A>=8?'A':'B';return {ok:true,state:n};
+  n.winner=n.scores.A>=6?'A':'B';return {ok:true,state:n};
 }
 function view(s,side){
   // The referee sees both after players reveal. A player never receives the
