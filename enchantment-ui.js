@@ -243,7 +243,7 @@
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
     overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','附魔之戰抽卡');
     overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#080917;display:flex;flex-direction:column';
-    overlay.innerHTML='<label style="position:absolute;left:12px;top:10px;z-index:3;color:#f5e2ab;font-size:12px">卡牌外觀 <select data-enchantment-card-skin aria-label="卡牌外觀" style="min-height:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:6px"><option value="basic">基礎卡牌</option><option value="gods">諸神戰場</option></select></label><div style="position:absolute;right:12px;top:10px;z-index:3;display:flex;gap:6px;align-items:center"><button type="button" data-enchantment-sound aria-label="切換音效" aria-pressed="'+drawSoundEnabled+'" style="font-size:20px;min-width:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white">'+(drawSoundEnabled?'🔊':'🔇')+'</button><button type="button" data-enchantment-close style="background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:7px 10px">離開房間</button></div><div data-enchantment-loading style="position:absolute;left:0;right:0;top:65px;z-index:2;color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
+    overlay.innerHTML='<label style="position:absolute;left:12px;top:58px;z-index:3;color:#f5e2ab;font-size:12px">卡牌外觀 <select data-enchantment-card-skin aria-label="卡牌外觀" style="min-height:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:6px"><option value="basic">基礎卡牌</option><option value="gods">諸神戰場</option></select></label><div style="position:absolute;right:12px;top:10px;z-index:3;display:flex;gap:6px;align-items:center"><button type="button" data-enchantment-sound aria-label="切換音效" aria-pressed="'+drawSoundEnabled+'" style="font-size:20px;min-width:38px;background:#171326;border:1px solid #766391;border-radius:9px;color:white">'+(drawSoundEnabled?'🔊':'🔇')+'</button><button type="button" data-enchantment-recover style="background:#171326;border:1px solid #b994e8;border-radius:9px;color:#f5e2ab;padding:7px 10px">恢復本局抽卡</button><button type="button" data-enchantment-close style="background:#171326;border:1px solid #766391;border-radius:9px;color:white;padding:7px 10px">離開房間</button></div><div data-enchantment-loading style="position:absolute;left:0;right:0;top:103px;z-index:2;color:#f5e2ab;text-align:center;padding:24px 16px">正在載入 BXH 卡牌與龍爪動畫…<br><small>首次載入可能需要一些時間，請留在此畫面。</small></div>';
     const frame=document.createElement('iframe');frame.title='附魔之戰選手抽卡';frame.dataset.enchantmentPlayer='';
     frame.dataset.code=code;frame.dataset.matchId=m.id;frame.dataset.side=side;
     frame.src='enchantment-draw-v3.html';frame.style.cssText='border:0;width:100%;flex:1;min-height:0;background:#080917;visibility:hidden';
@@ -261,7 +261,38 @@
   }catch(e){/* Registration and public bracket may be temporarily unavailable. */}
   finally{discoveryBusy=false;}
  }
+ async function recoverPlayerDraw(button){
+  const overlay=button.closest('[data-enchantment-draw-overlay]');
+  const frame=overlay?.querySelector('iframe[data-enchantment-player]');
+  if(!frame||button.disabled)return;
+  const {code,matchId:id}=frame.dataset;
+  button.disabled=true;button.textContent='正在恢復…';
+  try{
+   const result=await Promise.race([
+    call({action:'get',code,matchId:id}),
+    new Promise((_,reject)=>setTimeout(()=>reject(Error('連線逾時，請再試一次')),12000))
+   ]);
+   if(!overlay.isConnected||!result?.state)throw Error('本局狀態尚未建立');
+   cache.set(key(code,id),{version:result.version,state:result.state});
+   // Reload only the animation. The server retains the assigned card.
+   frame.style.visibility='hidden';
+   frame.addEventListener('load',()=>{
+    if(!overlay.isConnected)return;
+    const valid=!!frame.contentDocument?.querySelector('main.app');
+    if(!valid){button.textContent='載入失敗，請再試一次';return;}
+    frames.delete(frame);attachCardSkin(overlay,frame);
+    frame.style.visibility='visible';syncFrames(code,id);
+    button.textContent='恢復本局抽卡';
+   },{once:true});
+   frame.src='enchantment-draw-v3.html?recover='+Date.now();
+  }catch(error){
+   if(overlay?.isConnected){button.textContent='恢復失敗，請重試';
+    if(typeof showToast==='function')showToast('抽卡恢復失敗：'+message(error),true);}
+  }finally{button.disabled=false;}
+ }
  document.addEventListener('click',e=>{
+  const recover=e.target.closest('[data-enchantment-recover]');
+  if(recover){recoverPlayerDraw(recover);return;}
   if(e.target.closest('[data-enchantment-close]')){
    const overlay=document.querySelector('[data-enchantment-draw-overlay]');
    if(overlay)dismissedMatch=key(overlay.dataset.code,overlay.dataset.matchId);
