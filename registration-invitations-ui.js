@@ -1,5 +1,6 @@
 (()=>{'use strict';
 let callable=null,busy=false,lastMine=0,nextMineAt=0,mineFailures=0,lastMineUid='',lastCode='',lastSentHtml='',lastSentAt=0,mineRows=[];
+const mailboxDraft={initialized:false,open:false,targetUid:'',subject:'',body:'',lastMessageId:''};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function runtime(){try{return Function('return {user:firebaseUser,profile:userProfile,state:state,phase:appPhase,mailbox:(typeof mailboxContext==="function"?mailboxContext:null),entryUrl:(typeof buildTournamentEntryUrl==="function"?buildTournamentEntryUrl:null),render:(typeof render==="function"?render:null)}')()}catch{return {}}}
 async function api(data){if(!callable){const [a,f]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js')]);callable=f.httpsCallable(f.getFunctions(a.getApp(),'asia-east1'),'registrationInvitations',{timeout:25000});}return (await callable(data)).data}
@@ -24,12 +25,22 @@ function broadcastComposer(){
  const rt=runtime(),profile=rt.profile,subject=document.getElementById('mailbox-subject');
  let box=document.getElementById('mailbox-broadcast-controls');
  if(profile?.role!=='super_admin'||!subject){box?.remove();return}
+ const details=subject.closest('details'),recipient=document.getElementById('mailbox-recipient'),body=document.getElementById('mailbox-body');
+ const sent=rt.mailbox?rt.mailbox()?.lastSent:null,messageId=String(sent?.messageId||'');
+ if(messageId&&messageId!==mailboxDraft.lastMessageId){mailboxDraft.initialized=true;mailboxDraft.open=true;mailboxDraft.targetUid='';mailboxDraft.subject='';mailboxDraft.body='';mailboxDraft.lastMessageId=messageId}
+ if(!mailboxDraft.initialized){mailboxDraft.initialized=true;mailboxDraft.open=!!details?.open;mailboxDraft.targetUid=recipient?.value||'';mailboxDraft.subject=subject.value||'';mailboxDraft.body=body?.value||''}
+ if(details&&details.open!==mailboxDraft.open)details.open=mailboxDraft.open;
+ if(recipient&&recipient.value!==mailboxDraft.targetUid)recipient.value=mailboxDraft.targetUid;
+ if(subject.value!==mailboxDraft.subject)subject.value=mailboxDraft.subject;
+ if(body&&body.value!==mailboxDraft.body)body.value=mailboxDraft.body;
  if(box?.isConnected)return;
  box=document.createElement('div');box.id='mailbox-broadcast-controls';box.style.margin='12px 0';
  box.innerHTML='<label style="display:flex;align-items:center;gap:10px"><input id="mailbox-broadcast-mode" type="checkbox" style="width:auto"> 公告模式（寄送給全部有效會員）</label><div id="mailbox-broadcast-warning" class="auth-error" hidden style="margin-top:10px">目前為全站公告模式。送出後，每位有效會員都會收到站內信，請再次確認標題與內容。</div>';
- const details=subject.closest('details');const button=details?.querySelector('[data-action="mailbox-send-test"]');button?.before(box);
+ const button=details?.querySelector('[data-action="mailbox-send-test"]');button?.before(box);
  box.querySelector('input').addEventListener('change',updateBroadcastMode);updateBroadcastMode();
 }
+document.addEventListener('input',e=>{if(e.target?.id==='mailbox-recipient')mailboxDraft.targetUid=e.target.value;else if(e.target?.id==='mailbox-subject')mailboxDraft.subject=e.target.value;else if(e.target?.id==='mailbox-body')mailboxDraft.body=e.target.value});
+document.addEventListener('toggle',e=>{if(e.target?.querySelector?.('#mailbox-recipient'))mailboxDraft.open=e.target.open},true);
 async function sendBroadcast(button){
  if(busy)return;const subject=document.getElementById('mailbox-subject')?.value.trim(),body=document.getElementById('mailbox-body')?.value.trim();
  if(!subject||!body){alert('請完整填寫公告標題與內容。');return}
@@ -60,5 +71,6 @@ document.addEventListener('click',e=>{const t=e.target.closest?.('[data-invite]'
 const style=document.createElement('style');style.textContent='#registration-invitation-overlay{position:fixed;inset:0;z-index:2700;background:#000d;padding:18px;display:flex;align-items:center;justify-content:center}#registration-invitation-overlay>section{width:min(560px,100%);max-height:85dvh;overflow:auto}#registration-invite-panel input{min-width:0;flex:1}#registration-invite-panel [data-invite-results] .ap-task{display:flex;align-items:center;gap:10px;margin-top:10px}#registration-invite-panel [data-invite-results] small{color:#999;flex:1}';document.head.appendChild(style);
 function tick(){if(document.hidden)return;const r=runtime(),c=code();if((r.phase==='tournament'||document.getElementById('quick-add-textarea'))&&c){if(c!==lastCode){lastCode=c;lastSentHtml='';lastSentAt=0}managerPanel();loadSent()}broadcastComposer();mailboxInvitationPanel();mine()}
 setInterval(tick,3000);setTimeout(tick,0);
+new MutationObserver(()=>broadcastComposer()).observe(document.body,{childList:true,subtree:true});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){nextMineAt=0;tick()}});
 })();
