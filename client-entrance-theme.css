@@ -4109,3 +4109,54 @@ button.btn-primary,
     width:min(82vw,760px)!important;
   }
 }
+
+
+/* Directive warning responsive anchor v4 - 2026-09-28 */
+/* At compact widths the flexible spacer collapses when account controls move to a full-width row.
+   Anchor the warning layer to the whole header instead of the spacer's flex box. */
+@media(max-width:899px){
+  :root[data-bxh-theme="directive"] header.topbar{
+    position:relative!important;
+    isolation:isolate!important;
+    overflow:hidden!important;
+  }
+  :root[data-bxh-theme="directive"] header.topbar .spacer{
+    display:block!important;
+    position:absolute!important;
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    min-width:100%!important;
+    min-height:100%!important;
+    margin:0!important;
+    padding:0!important;
+    align-self:auto!important;
+    flex:none!important;
+    pointer-events:none!important;
+    overflow:visible!important;
+    z-index:0!important;
+  }
+  :root[data-bxh-theme="directive"] header.topbar .spacer::after{
+    top:0!important;
+    right:-7vw!important;
+    bottom:0!important;
+    left:auto!important;
+    width:min(78vw,760px)!important;
+    height:100%!important;
+    animation:bxh-directive-warning-pulse-v3 3.2s linear infinite!important;
+    animation-play-state:running!important;
+    transform-origin:76% 50%!important;
+  }
+}
+@media(max-width:640px){
+  :root[data-bxh-theme="directive"] header.topbar .spacer::after{
+    right:-10vw!important;
+    width:min(86vw,760px)!important;
+  }
+}
+@media(max-width:430px){
+  :root[data-bxh-theme="directive"] header.topbar .spacer::after{
+    right:-13vw!important;
+    width:92vw!important;
+  }
+}
