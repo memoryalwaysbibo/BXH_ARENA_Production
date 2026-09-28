@@ -85,3 +85,15 @@ test('a normal scoring event ends the round and restores prior warning on undo',
   const restored=step(flow.undo,r.state,true);
   assert.equal(restored.faults.A,1);assert.equal(restored.round,1);
 });
+
+test('six points ends enchantment match; five points continue',()=>{
+  let s=step(flow.start,flow.create('M6','a','b'),true);
+  for(let round=1;round<=6;round++){
+    s=step(flow.assign,s,round,'A','seal');s=step(flow.assign,s,round,'B','seal');
+    s=step(flow.reveal,s,round,'A','a');s=step(flow.reveal,s,round,'B','b');
+    s=step(flow.submit,s,round,'A','spin',true);
+    assert.equal(s.scores.A,round);
+    assert.equal(s.phase,round===6?'awaiting-result':'drawing');
+  }
+  assert.equal(step(flow.confirm,s,true).winner,'A');
+});
