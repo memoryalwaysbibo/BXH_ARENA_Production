@@ -1091,7 +1091,9 @@ table.rank-table tr:last-child td{border-bottom:none;}
 .board-canvas .se-finals-champion-card .board-trophy{width:36px;height:36px;}
 .board-canvas .se-finals-champion-card .board-champion-label{font-size:11px;letter-spacing:3px;margin-top:3px;}
 .board-canvas .se-finals-champion-card .board-champion-name{font-size:18px;margin-top:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.board-canvas .se-bracket-two-player .se-final-stage-col{min-width:190px;}
 @media(max-width:640px){
+  .board-canvas .se-bracket-two-player .se-final-stage-col{min-width:170px;}
   .board-canvas .se-finals-champion-card{width:170px;min-height:102px;padding:12px 14px;}
   .board-canvas .se-finals-champion-card .board-trophy{width:32px;height:32px;}
   .board-canvas .se-finals-champion-card .board-champion-name{font-size:17px;max-width:142px;}
@@ -15532,7 +15534,7 @@ function renderSingleElimBracket(forceTree=false){
       <div class="board-champion-label">冠軍</div>
       <div class="board-champion-name">${esc(playerName(state.championId))}</div>
     </div>` : "";
-  const treeHtml = `<div class="se-bracket-outer" id="se-bracket-outer">
+  const treeHtml = `<div class="se-bracket-outer ${total===1?'se-bracket-two-player':''}" id="se-bracket-outer">
     <svg class="se-bracket-svg" id="se-bracket-svg"></svg>
     ${finalsChampionHtml}
     <div class="se-bracket-cols" id="se-bracket-cols">${cols}${bronzeCol}</div>
@@ -15616,6 +15618,12 @@ function layoutSingleElimBracket(suffix){
     const anchorCol=outer.querySelector('.se-col[data-round="'+anchorRound+'"]');
     const anchorBoxes=realBoxesByRound.get(anchorRound)||[];
     let cursor=titleBase(anchorCol);
+    // A two-player bracket has only the final match, so reserve a separate
+    // vertical slot for the champion card and the "冠亞" label above it.
+    if(maxRound===0 && anchorBoxes.length===1){
+      const champion=outer.querySelector('.se-finals-champion-card');
+      if(champion) cursor=Math.max(cursor,34+champion.offsetHeight+38);
+    }
     anchorBoxes.forEach(box=>{
       box.style.top=cursor+"px";
       centers.set(box.getAttribute("data-id"),cursor+box.offsetHeight/2);
