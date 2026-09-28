@@ -51,7 +51,22 @@ async function sendBroadcast(button){
  catch(e){alert('公告發送失敗：'+String(e?.message||e?.code||'unknown'))}
  finally{busy=false;button.disabled=false;button.textContent=old;updateBroadcastMode()}
 }
-document.addEventListener('click',e=>{const button=e.target.closest?.('[data-action="mailbox-send-test"]');if(!button||!document.getElementById('mailbox-broadcast-mode')?.checked)return;e.preventDefault();e.stopImmediatePropagation();sendBroadcast(button)},true);
+async function sendSingle(button){
+ if(busy)return;const targetUid=mailboxDraft.targetUid.trim(),subject=mailboxDraft.subject.trim(),body=mailboxDraft.body.trim();
+ if(!targetUid||!subject||!body){alert('請完整填寫玩家 UID、標題與內容。');return}
+ if(!confirm('確認發送「'+subject+'」給指定玩家？'))return;
+ busy=true;button.disabled=true;const old=button.textContent;button.textContent='寄送中…';
+ try{
+  const result=await window.engagementService.mailbox({action:'send',targetUid,subject,body,type:'test',operationId:crypto.randomUUID()});
+  if(!result?.ok)throw Error('operation-failed');
+  const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null;
+  if(ctx){ctx.lastSent={targetUid,messageId:result.messageId};ctx.messages=null}
+  mailboxDraft.open=true;mailboxDraft.targetUid='';mailboxDraft.subject='';mailboxDraft.body='';mailboxDraft.lastMessageId=String(result.messageId||'');
+  if(rt.render)rt.render();alert(result.replayed?'這封測試信先前已送出':'測試信已送出');
+ }catch(e){alert('測試信寄送失敗：'+String(e?.message||e?.code||'unknown'))}
+ finally{busy=false;button.disabled=false;button.textContent=old;broadcastComposer()}
+}
+document.addEventListener('click',e=>{const button=e.target.closest?.('[data-action="mailbox-send-test"]');if(!button)return;e.preventDefault();e.stopImmediatePropagation();if(document.getElementById('mailbox-broadcast-mode')?.checked)sendBroadcast(button);else sendSingle(button)},true);
 function mailboxInvitationPanel(){
  const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null,selected=(ctx?.messages||[]).find(x=>x.id===ctx.selectedId);
  let panel=document.getElementById('mailbox-invitation-actions');
