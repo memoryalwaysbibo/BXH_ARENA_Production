@@ -404,17 +404,17 @@
     "@media(max-width:350px){.ladder-my-rank{grid-template-columns:1fr}.ladder-my-rank .btn{justify-self:end}}"+
     ".ladder-rank-grid{display:grid;grid-template-columns:64px minmax(0,1fr) 96px 78px;gap:8px;align-items:center;min-width:0;}"+
     ".ladder-rank-head-v2{padding:0 8px 9px;color:var(--metal);font-size:16px;font-weight:800;border-bottom:1px solid rgba(255,255,255,.08);text-align:center;}"+
-    ".ladder-rank-head-v2>div:nth-child(2){text-align:left;}"+
+    ".ladder-rank-head-v2>div:nth-child(2){text-align:center;}"+
     ".ladder-rank-row-v2{position:relative;padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.065);min-height:58px;}"+
     ".ladder-rank-row-v2:last-child{border-bottom:0;}"+
     ".ladder-rank-position{font-family:var(--font-d);font-size:16px;font-weight:900;color:var(--gold);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;}"+
     ".ladder-rank-top-1 .ladder-rank-position{color:#f4cf67;text-shadow:0 0 10px rgba(244,207,103,.18);}"+
     ".ladder-rank-top-2 .ladder-rank-position{color:#d8dde5;}"+
     ".ladder-rank-top-3 .ladder-rank-position{color:#d9a574;}"+
-    ".ladder-player-block{min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;}"+
-    ".ladder-player-link{display:block;max-width:100%;padding:0;border:0;background:transparent;color:var(--ivory);font:800 17px/1.25 var(--font-d);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}"+
+    ".ladder-player-block{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;}"+
+    ".ladder-player-link{display:block;width:100%;max-width:100%;padding:0;border:0;background:transparent;color:var(--ivory);font:800 17px/1.25 var(--font-d);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}"+
     ".ladder-player-link:focus-visible{outline:1px solid var(--gold);outline-offset:3px;border-radius:3px;}"+
-    ".ladder-player-block .title-chip{display:block;max-width:100%;margin:0;padding:2px 7px;font-size:9px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}"+
+    ".ladder-player-block .title-chip{display:block;max-width:100%;margin:0 auto;padding:2px 7px;font-size:9px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}"+
     ".ladder-player-block .title-chip.title-art-chip{width:155px;max-width:100%;padding:0;border:0;aspect-ratio:3/1;overflow:visible;line-height:0;}"+
     ".ladder-tier-cell{min-width:0;display:flex;justify-content:center;}"+
     ".ladder-tier-display{min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;}"+
