@@ -90,9 +90,9 @@
    (x.status==='in_progress'||Object.values(data.courtAssignments||{}).some(c=>c?.currentMatchId===x.id)));
   const side=m?(m.a.playerId===pid?'A':'B'):null;
   const state=m&&cache.get(key(code,m.id))?.state;
-  const enabled=!!state&&state.phase==='drawing'&&!state.drawn?.[side];
+  const enabled=!!state&&state.phase!=='completed';
   return `<div class="fe-card-action" style="margin-top:10px">
-   <button type="button" class="btn btn-sm ${enabled?'btn-primary':'btn-ghost'}" data-enchantment-open data-code="${quote(code)}" ${m?`data-match-id="${quote(m.id)}"`:''} ${enabled?'':'disabled aria-disabled="true"'} style="width:100%;min-height:44px;${enabled?'':'opacity:.55;filter:grayscale(1)'}">${enabled?'進入抽卡｜第 '+Number(state.round)+' 局':'抽卡入口｜尚未輪到你'}</button>
+   <button type="button" class="btn btn-sm ${enabled?'btn-primary':'btn-ghost'}" data-enchantment-open data-code="${quote(code)}" ${m?`data-match-id="${quote(m.id)}"`:''} ${enabled?'':'disabled aria-disabled="true"'} style="width:100%;min-height:44px;${enabled?'':'opacity:.55;filter:grayscale(1)'}">${enabled?(state.drawn?.[side]?'查看本局卡片':'進入抽卡｜第 '+Number(state.round)+' 局'):'抽卡入口｜尚未輪到你'}</button>
    </div>`;
  }
  function ensureScheduleEntry(code){
@@ -226,18 +226,19 @@
     let overlay=document.querySelector('[data-enchantment-draw-overlay]');
     const reopen=ensureScheduleEntry(code);
     const canDraw=show&&s.phase==='drawing'&&!s.drawn?.[side];
+    const canEnter=show&&['drawing','ready-to-score','awaiting-result'].includes(s.phase);
     if(reopen){
      reopen.dataset.matchId=m.id;
-     reopen.disabled=!canDraw;reopen.setAttribute('aria-disabled',String(!canDraw));
-     reopen.textContent=canDraw?'進入抽卡｜第 '+Number(s.round)+' 局':'抽卡入口｜尚未輪到你';
-     reopen.style.opacity=canDraw?'1':'.55';reopen.style.filter=canDraw?'':'grayscale(1)';
+     reopen.disabled=!canEnter;reopen.setAttribute('aria-disabled',String(!canEnter));
+     reopen.textContent=canDraw?'進入抽卡｜第 '+Number(s.round)+' 局':canEnter?'查看本局卡片':'抽卡入口｜尚未輪到你';
+     reopen.style.opacity=canEnter?'1':'.55';reopen.style.filter=canEnter?'':'grayscale(1)';
     }
     if(!show){if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id)overlay.remove();if(dismissedMatch===key(code,m.id))dismissedMatch='';continue;}
     if(dismissedMatch===key(code,m.id))continue;
     if(overlay?.dataset.code===code&&overlay.dataset.matchId===m.id){
      syncFrames(code,m.id);continue;
     }
-    if(!canDraw)continue;
+    if(!canEnter)continue;
     if(overlay)overlay.remove();
     overlay=document.createElement('section');
     overlay.dataset.enchantmentDrawOverlay='';overlay.dataset.code=code;overlay.dataset.matchId=m.id;
