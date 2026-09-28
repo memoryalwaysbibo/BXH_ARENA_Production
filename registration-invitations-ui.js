@@ -68,7 +68,8 @@ async function sendSingle(button){
 }
 function stableAttachmentPanel(){
  const rt=runtime(),ctx=rt.mailbox?rt.mailbox():null,selected=(ctx?.messages||[]).find(x=>x.id===ctx.selectedId);
- const sent=ctx?.lastSent||(selected?.type==='test'&&rt.user?.uid?{targetUid:rt.user.uid,messageId:selected.id}:null);
+ const selectedTest=selected&&rt.profile?.role==='super_admin'&&String(selected.subject||'').startsWith('【測試】');
+ const sent=ctx?.lastSent||(selectedTest&&rt.user?.uid?{targetUid:rt.user.uid,messageId:selected.id}:null);
  let panel=document.getElementById('mailbox-stable-attachment');
  if(!sent?.targetUid||!sent?.messageId){panel?.remove();return}
  if(panel?.dataset.messageId===String(sent.messageId))return;
