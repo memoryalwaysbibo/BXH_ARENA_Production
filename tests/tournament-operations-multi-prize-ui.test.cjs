@@ -15,7 +15,7 @@ must(/合計最多 100 位得獎者/,'100 winner cap copy');
 must(/renderTournamentRaffleRecord\(r,modes,statuses,locked\)/,'grouped prize history renderer');
 must(/prizeIndex/,'prize-index aware history');
 must(/v14\.3\.0/,'release version');
-must(/20260927\.2/,'release build');
+must(new RegExp(require('../version.json').build.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),'release build');
 mustNot(/id="ops-title"/,'legacy single prize title field');
 mustNot(/id="ops-count"/,'legacy single winner-count field');
 console.log('PASS tournament operations multi-prize frontend');
