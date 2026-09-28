@@ -105,10 +105,12 @@
     var body=rows.slice(0,ladderVisibleCount).map(function(p){
       var rank=Number(p.__rank||0);
       var topClass=rank>=1&&rank<=3?" ladder-rank-top-"+rank:"";
+      var titleName=p.equippedBadge&&p.equippedBadge.name==="審判者"?"裁決者":p.equippedBadge&&p.equippedBadge.name||"";
       var art=p.equippedBadge&&p.equippedBadge.rarity==="eternal"
-        ?(p.equippedBadge.name==="創世者"?"assets/title-eternal-creator.webp":p.equippedBadge.name==="審判者"?"assets/title-eternal-judge.webp":""):"";
+        ?(titleName==="創世者"?"assets/title-eternal-creator.webp":titleName==="裁決者"?"assets/title-eternal-adjudicator.webp":"")
+        :p.equippedBadge&&p.equippedBadge.rarity==="limited"&&titleName==="開拓者"?"assets/title-limited-pioneer.webp":"";
       var title=p&&p.equippedBadge
-        ?'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+(art?' title-art-chip':'')+'" title="'+escLocal(p.equippedBadge.name||"")+'">'+(art?'<img src="'+art+'" alt="'+escLocal(p.equippedBadge.name)+'" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">':escLocal(p.equippedBadge.name||""))+'</span>'
+        ?'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+(art?' title-art-chip':'')+'" title="'+escLocal(titleName)+'">'+(art?'<img src="'+art+'" alt="'+escLocal(titleName)+'" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">':escLocal(titleName))+'</span>'
         :"";
       var adminActions=adminMode
         ?'<div class="ladder-rank-admin-actions">'+
