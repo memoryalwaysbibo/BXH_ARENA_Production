@@ -118,6 +118,8 @@
   if(!s)return `<p>選手到場後，由裁判按「開始抽卡」。</p>${button('開始抽卡','start')}`;
   const ready=s.phase==='ready-to-score';
   const sides=reversedSides.has(key(code,id))?['B','A']:['A','B'];
+  const remaining=s.revealDeadline?Math.max(0,Math.ceil((s.revealDeadline-Date.now())/1000)):null;
+  const revealControl=s.phase==='drawing'?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:9px 0;padding:9px;border:1px solid #805f9d;border-radius:9px"><button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="setAutoReveal" ${common} data-enabled="${s.autoReveal===false?'true':'false'}" aria-pressed="${s.autoReveal!==false}">8 秒自動揭牌：${s.autoReveal===false?'關':'開'}</button><span class="hint">${remaining!==null?`等待另一位揭牌 · ${remaining} 秒`:s.drawn?.A||s.drawn?.B?'等待另一位揭牌':'等待選手揭牌'}</span></div>`:'';
   const scorePanel=`<div style="position:relative"><div class="ref-vs-arena standard">${sides.map(side=>{
    const name=matchNames.get(key(code,id))?.[side]||'選手 '+side;
    const scoreButtons=Object.entries(outcome).map(([type,label])=>{
@@ -129,13 +131,14 @@
    const drawStatus=s.drawn?.[side]?quote(card?.name||'已抽卡'):'尚未抽卡';
    const active=ready&&s.drawn?.[side];
    const badge=active?`<span class="enchant-badge">${s.cards?.[side]==='seal'?'✦ 封印中':'✦ 附魔中'}</span>`:'';
-   return `<div class="side-panel ${active?'enchant-active':''}"><div class="side-name">${quote(name)}</div><div class="hint" style="text-align:center;margin:2px 0 4px;font-size:12px">附魔：${drawStatus}${badge}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div></div>`;
+   const assist=s.phase==='drawing'&&!s.drawn?.[side]?button(`協助${quote(name)}揭牌`,'assistReveal',`data-side="${side}"`):'';
+   return `<div class="side-panel ${active?'enchant-active':''}"><div class="side-name">${quote(name)}</div><div class="hint" style="text-align:center;margin:2px 0 4px;font-size:12px">附魔：${drawStatus}${badge}</div><div class="side-score">${Number(s.scores?.[side])||0}</div><div class="score-btns">${scoreButtons}<button class="fault-btn ${(s.faults?.[side]||0)>0?'has-fault':''}" data-enchantment-action="fault" ${common} data-side="${side}" ${ready?'':'disabled'}>失誤 ${s.faults?.[side]||0}/2</button></div>${assist}</div>`;
   }).join('')}</div><button type="button" class="btn btn-ghost btn-sm" data-enchantment-action="swap" ${common} aria-label="交換選手站位" title="交換選手站位" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;min-width:40px;padding:6px">⇄</button></div>`;
   let controls='';
   if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
    controls+=button(ready?'撤回上一筆失誤':'撤回上一筆','undo');
   if(s.phase==='awaiting-result')controls+=button('確認比賽結果','confirm');
-  return `${scorePanel}<div class="btn-row ref-result-actions">${controls}</div>`;
+  return `${revealControl}${scorePanel}<div class="btn-row ref-result-actions">${controls}</div>`;
  }
  function paint(code,id){
   const item=cache.get(key(code,id));
@@ -338,17 +341,19 @@
    if(action!=='start')payload.version=item.version;
    if(action==='score'){payload.round=item.state.round;payload.winner=d.side;payload.type=d.type;}
    if(action==='fault'){payload.round=item.state.round;payload.offender=d.side;}
+   if(action==='assistReveal'){payload.round=item.state.round;payload.target=d.side;}
+   if(action==='setAutoReveal')payload.enabled=d.enabled==='true';
    if(action==='confirm'&&!window.confirm('確認附魔比分與獲勝選手，並推進下一輪？'))return;
    const result=await call(payload);
    cache.set(k,{version:result.version,state:result.state});paint(code,id);syncFrames(code,id);
    if(result.event||result.completion){if(typeof showToast==='function')showToast(result.completion?'已確認比賽結果':'已記錄本局判定');}
-  }catch(e){if(typeof showToast==='function')showToast('附魔操作失敗：'+message(e),true);}
+  }catch(e){if(message(e).includes('stale-version'))await refresh(code,id);else if(typeof showToast==='function')showToast('附魔操作失敗：'+message(e),true);}
   finally{busy.delete(k);await refresh(code,id);}
  }
  document.addEventListener('click',e=>{
   const el=e.target.closest('[data-enchantment-action]');if(!el)return;
   e.preventDefault();e.stopPropagation();
-  const d=el.dataset;if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);else if(d.enchantmentAction==='swap'){const k=key(d.code,d.matchId);if(reversedSides.has(k))reversedSides.delete(k);else reversedSides.add(k);paint(d.code,d.matchId);}else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type});
+  const d=el.dataset;if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);else if(d.enchantmentAction==='swap'){const k=key(d.code,d.matchId);if(reversedSides.has(k))reversedSides.delete(k);else reversedSides.add(k);paint(d.code,d.matchId);}else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type,enabled:d.enabled});
  },true);
  root.addEventListener('message',async e=>{
   if(e.origin!==location.origin)return;
@@ -372,5 +377,11 @@
   const pairs=new Set([...refs,...players].map(el=>key(el.dataset.code,el.dataset.matchId)));
   pairs.forEach(pair=>{const i=pair.indexOf(':');if(i>0)refresh(pair.slice(0,i),pair.slice(i+1));});
  },4000);
+ setInterval(()=>{for(const el of document.querySelectorAll('[data-enchantment-referee]')){
+  const s=cache.get(key(el.dataset.code,el.dataset.matchId))?.state;
+  if(!s?.revealDeadline)continue;
+  paint(el.dataset.code,el.dataset.matchId);
+  if(s.phase==='drawing'&&s.revealDeadline<=Date.now())refresh(el.dataset.code,el.dataset.matchId);
+ }},1000);
  root.BXHEnchantmentUI={referee,player,refresh};
 })(window);
