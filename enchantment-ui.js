@@ -146,7 +146,7 @@
    if(el.dataset.code!==code||el.dataset.matchId!==id)return;
    const slot=el.querySelector('[data-enchantment-status]');if(!slot)return;
    const s=item?.state;
-   const localModal=document.querySelector('[data-enchantment-confirm-modal]');
+   const localModal=[...document.querySelectorAll('[data-enchantment-confirm-modal]')][0];
    if(localModal&&localModal.dataset.code===code&&localModal.dataset.matchId===id&&s?.phase!=='awaiting-result')localModal.remove();
    const phase=s?(s.phase==='completed'?'已完成':s.phase==='awaiting-result'?'等待確認':s.drawn?.A&&s.drawn?.B?'已抽卡':'等待抽卡'):'等待裁判開始';
    const title=el.querySelector('[data-enchantment-title]');
