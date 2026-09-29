@@ -28,10 +28,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260930.1">
+<meta name="bxh-build" content="20260930.2">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260930.1";
+  var CURRENT_BUILD="20260930.2";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -4922,6 +4922,7 @@ body .celebration-overlay{z-index:3000!important;}
 .engagement-head .title-art-chip{width:clamp(140px,27vw,240px);}
 .title-card .title-gallery-art{max-width:340px;}
 .rarity-badge{display:inline-flex;align-items:center;padding:2px 7px;border:1px solid rgba(190,198,208,.55);border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap;}
+.title-limit-badge{border-color:rgba(255,103,151,.58);color:#ffb0c8;background:rgba(255,65,125,.10);box-shadow:0 0 12px rgba(255,65,125,.06);}
 .title-card.rarity-common{border-color:rgba(154,166,178,.24)}
 .title-card.rarity-rare{border-color:rgba(85,184,255,.36);background:linear-gradient(135deg,rgba(42,148,223,.08),rgba(255,255,255,.018))}
 .title-card.rarity-epic{border-color:rgba(181,108,255,.38);background:linear-gradient(135deg,rgba(155,72,230,.09),rgba(255,255,255,.018))}
@@ -6128,7 +6129,7 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.10";
+const APP_VERSION = "v14.3.11";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},
@@ -11181,8 +11182,29 @@ function titleById(id){
 function earnedTitleIds(){
   return new Set(((engagementSnapshot&&engagementSnapshot.earned)||[]).map(x=>x.titleId));
 }
-function titleRarityLabel(r){
-  return ({common:"一般",rare:"稀有",epic:"史詩",legendary:"傳說",limited:"限定",eternal:"永恆"})[r]||"一般";
+const TITLE_TIER_LABELS=Object.freeze({common:"一般",rare:"稀有",epic:"史詩",legendary:"傳說",eternal:"永恆",unrated:"待分級"});
+const TITLE_LIMITED_LABELS=Object.freeze({none:"",event:"活動限定",season:"賽季限定",identity:"身分限定",unique:"唯一限定",launch:"開服限定",beta:"封測限定",legacy:"限定（舊制）"});
+function titleRarityLabel(r){return r==="limited"?"待分級":TITLE_TIER_LABELS[r]||"一般";}
+function titleTierValue(t){
+  if(typeof t==="string")return t==="limited"?"unrated":(TITLE_TIER_LABELS[t]?t:"common");
+  const explicit=String(t&&t.rarityTier||"");
+  if(TITLE_TIER_LABELS[explicit])return explicit;
+  const legacy=String(t&&t.rarity||"common");
+  return legacy==="limited"?"unrated":(TITLE_TIER_LABELS[legacy]?legacy:"common");
+}
+function titleTierClass(t){const v=titleTierValue(t);return v==="unrated"?"limited":v;}
+function titleTierLabel(t){return TITLE_TIER_LABELS[titleTierValue(t)]||"一般";}
+function titleLimitedTypeValue(t){
+  const explicit=String(t&&t.limitedType||"");
+  if(Object.prototype.hasOwnProperty.call(TITLE_LIMITED_LABELS,explicit))return explicit;
+  return t&&(t.isLimited===true||String(t.rarity||"")==="limited")?"legacy":"none";
+}
+function titleLimitedLabel(t){return TITLE_LIMITED_LABELS[titleLimitedTypeValue(t)]||"";}
+function titlePermanentLabel(t){return t&&t.isPermanent===false?"期間制":"永久持有";}
+function titleClassificationText(t){const tag=titleLimitedLabel(t);return titleTierLabel(t)+(tag?"｜"+tag:"")+"｜"+titlePermanentLabel(t);}
+function titleClassificationHtml(t){
+  const tier=titleTierValue(t),tag=titleLimitedLabel(t);
+  return '<span class="rarity-badge rarity-'+esc(titleTierClass(t))+'">'+esc(titleTierLabel(t))+'</span>'+(tag?' <span class="rarity-badge title-limit-badge">'+esc(tag)+'</span>':'');
 }
 function formatTitleDisplay(realName,gameId,titleName,format,enabled=true){
   const real=String(realName||"").trim()||"玩家";
@@ -11261,9 +11283,9 @@ function renderPlayerTitleCenter(p){
   const preview=formatTitleDisplay(p.realName,effectiveGameId(p),equippedDef&&equippedDef.name,format,displayEnabled);
   // A title being inactive/archived only stops future awards. Players who
   // already earned it must keep the right to equip and display it.
-  const options=earned.map(x=>{const def=titleById(x.titleId); return def?`<option value="${esc(x.titleId)}" ${equipped===x.titleId?'selected':''}>${esc(def.name)}｜${esc(titleRarityLabel(def.rarity))}${def.isActive===false?'｜已停止發放':''}</option>`:"";}).join("");
+  const options=earned.map(x=>{const def=titleById(x.titleId); return def?`<option value="${esc(x.titleId)}" ${equipped===x.titleId?'selected':''}>${esc(def.name)}｜${esc(titleClassificationText(def))}${def.isActive===false?'｜已停止發放':''}</option>`:"";}).join("");
   return `<section class="panel engagement-panel">
-    <div class="engagement-head"><div><div class="engagement-kicker">BXH TITLES</div><div class="engagement-title">我的稱號</div><div class="hint">已取得 ${earned.length} 個；一次只能裝備一個，也可以完全不顯示。</div></div>${equippedDef?`${titleChipHtml(equippedDef.name,equippedDef.rarity)}`:""}</div>
+    <div class="engagement-head"><div><div class="engagement-kicker">BXH TITLES</div><div class="engagement-title">我的稱號</div><div class="hint">已取得 ${earned.length} 個；一次只能裝備一個，也可以完全不顯示。</div></div>${equippedDef?`${titleChipHtml(equippedDef.name,titleTierClass(equippedDef))}`:""}</div>
     <div class="title-setting-grid">
       <div class="field"><label>裝備稱號</label><select id="profile-equipped-title"><option value="">不裝備稱號</option>${options}</select></div>
       <div class="field"><label>名稱呈現方式</label><select id="profile-title-format">
@@ -11278,7 +11300,7 @@ function renderPlayerTitleCenter(p){
     <div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="player-save-title-settings" ${engagementActionBusy?'disabled':''}>${engagementActionBusy?'儲存中…':'儲存稱號設定'}</button></div>
     ${engagementError?`<div class="hint">${esc(engagementError)}；已確認儲存的設定不受影響。<button class="btn btn-ghost btn-sm" data-action="player-refresh-engagement">重新連線</button></div>`:''}
     <div class="panel-title" style="margin-top:20px;">稱號圖鑑</div>
-    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(t.rarity||'common')} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,t.rarity)?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,t.rarity)}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span class="rarity-badge rarity-${esc(t.rarity||'common')}">${esc(titleRarityLabel(t.rarity))}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${got?'✓ 已取得':`${current}／${target}`}${t.isActive===false?'・籌備中':''}${t.isLimited?'・限定':''}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
+    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,titleTierClass(t))?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,titleTierClass(t))}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span>${titleClassificationHtml(t)}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${got?'✓ 已取得':`${current}／${target}`}${t.isActive===false?'・籌備中':''}${titleLimitedTypeValue(t)!=='none'?'・'+titleLimitedLabel(t):''}${t.isPermanent===false?'・期間制':'・永久'}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
   </section>`;
 }
 let communityEventsCache = null;
@@ -18139,7 +18161,7 @@ function renderTitleManagementPanel(){
   else if(ui.tab==='grant')content=`    <details id="title-recipient-panel" open class="account-tools-card" style="margin-top:12px;"><summary><span>冊封／撤銷</span><span class="hint">所有操作留下紀錄⌄</span></summary><div class="account-tools-body">
       <div class="grid grid-2 account-management-form-grid">
         ${renderTitleRecipientPicker()}
-        <div class="field"><label>稱號</label><select id="engagement-title-id"><option value="">請選擇</option>${grantCatalog.map(t=>`<option value="${esc(t.id)}" ${titleRecipientContext().titleId===t.id?"selected":""}>${esc(t.name)}｜${esc(titleRarityLabel(t.rarity))}｜${esc(t.id)}</option>`).join("")}</select></div>
+        <div class="field"><label>稱號</label><select id="engagement-title-id"><option value="">請選擇</option>${grantCatalog.map(t=>`<option value="${esc(t.id)}" ${titleRecipientContext().titleId===t.id?"selected":""}>${esc(t.name)}｜${esc(titleClassificationText(t))}｜${esc(t.id)}</option>`).join("")}</select></div>
         <div class="field" style="grid-column:1/-1"><label>操作原因</label><input id="engagement-title-reason" value="${esc(titleRecipientContext().reason)}" maxlength="120" placeholder="必填，例如：封測人工授予"></div>
       </div>
       <div class="btn-row"><button class="btn btn-primary" data-action="admin-grant-title" ${engagementActionBusy?'disabled':''}>冊封稱號</button><button class="btn btn-danger-solid" data-action="admin-revoke-title" ${engagementActionBusy?'disabled':''}>撤銷稱號</button></div>
@@ -18325,12 +18347,12 @@ function titleIssueDate(t){
  return Number.isFinite(ms)&&ms>0?ms:0;
 }
 function visibleAdminTitles(defs,c){
- const rank={common:0,rare:1,epic:2,legendary:3,limited:4,eternal:5};
+ const rank={unrated:-1,common:0,rare:1,epic:2,legendary:3,eternal:4};
  const collator=new Intl.Collator('zh-Hant-u-co-stroke',{numeric:true,sensitivity:'base'});
  const byName=(a,b)=>collator.compare(a.name||a.id,b.name||b.id)||String(a.id).localeCompare(String(b.id));
  return defs.filter(t=>!c.query||[t.name,t.id,t.description].some(v=>String(v||'').toLocaleLowerCase().includes(c.query.toLocaleLowerCase()))).filter(t=>c.filter==='issued'?titleIssuedCount(t)>0:c.filter==='disabled'?t.isActive!==true: true).slice().sort((a,b)=>{
   if(c.sort==='name')return byName(a,b);
-  if(c.sort.startsWith('rarity'))return ((rank[a.rarity]??-1)-(rank[b.rarity]??-1))*(c.sort==='rarity-desc'?-1:1)||byName(a,b);
+  if(c.sort.startsWith('rarity'))return ((rank[titleTierValue(a)]??-1)-(rank[titleTierValue(b)]??-1))*(c.sort==='rarity-desc'?-1:1)||byName(a,b);
   const ad=titleIssueDate(a),bd=titleIssueDate(b);
   if(!ad||!bd)return ad?-1:bd?1:byName(a,b);
   return (ad-bd)*(c.sort==='date-asc'?1:-1)||byName(a,b);
@@ -18361,8 +18383,8 @@ function renderAdminTitleList(){
  <div class="btn-row"><button class="btn btn-ghost" data-action="title-list-refresh" ${c.busy?'disabled':''}>${c.busy?'載入中…':'重新整理清單'}</button></div>
  <p class="hint">發行日期優先使用發布時間，未記錄時使用建立時間。已發放包含曾授予後撤銷的紀錄；測試發放另行標示。</p>
  ${c.error?`<p role="alert">${esc(c.error)}</p>`:''}
- ${items.map(t=>`<div class="community-event-card"><b>${esc(t.name||t.id)}</b> <span class="rarity-badge rarity-${esc(t.rarity||'common')}">${esc(titleRarityLabel(t.rarity))}</span>
- <div class="hint">${t.isActive?'啟用中':'停用'}｜${t.isHidden?'隱藏':'公開'}${t.isArchived?'｜已絕版':''}｜發行：${titleIssueDate(t)?new Date(titleIssueDate(t)).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'}):'未記錄'}</div>
+ ${items.map(t=>`<div class="community-event-card"><b>${esc(t.name||t.id)}</b> ${titleClassificationHtml(t)}
+ <div class="hint">${t.isActive?'啟用中':'停用'}｜${t.isHidden?'隱藏':'公開'}${t.isArchived?'｜已絕版':''}｜${titlePermanentLabel(t)}｜發行：${titleIssueDate(t)?new Date(titleIssueDate(t)).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'}):'未記錄'}</div>
  <div class="hint">累計授予：${titleIssuedCount(t)??'尚未取得'}${Number(t.testIssuedCount)>0?'（含測試 '+Number(t.testIssuedCount)+'）':''}</div>
  <details><summary>查看說明與條件</summary><p>${esc(t.description||'尚無說明')}</p>${titleConditionBadge(t)}</details>
  <button class="btn btn-primary" data-action="title-list-grant" data-title-id="${esc(t.id)}" ${engagementActionBusy||titleEditorContext().busy||!t.isActive||t.isArchived?'disabled':''}>冊封</button> <button class="btn btn-ghost" data-action="title-list-edit" data-title-id="${esc(t.id)}" ${titleEditorContext().busy?'disabled':''}>${titleEditorContext().inlineId===t.id?'編輯中':'編輯'}</button>${titleEditorContext().inlineId===t.id?renderTitleEditor(true):''}</div>`).join('')}
@@ -18378,10 +18400,12 @@ function renderTitleEditor(inline=false){
  if(!isSuperAdmin())return '';const c=titleEditorContext(),d=c.draft,defs=engagementAdminOverview?.definitions||[];
  if(!inline&&c.inlineId)return '<div class="btn-row"><button class="btn btn-ghost" data-action="title-editor-new">＋ 新增其他稱號</button></div>';
  const html=`<details id="title-editor-panel" class="account-tools-card" ${c.busy||c.message?'open':''}><summary><span>稱號建立／編輯中心</span></summary><div class="account-tools-body">
- <div class="hint">直接建立或編輯稱號；一般條件、門檻與稀有度都可在這裡設定，不需要修改程式。只有新增全新的判定條件類型時才需要更新後端。</div>
+ <div class="hint">直接建立或編輯稱號；榮譽等級、取得限定與持有規則分開設定。限定不再代表品質等級；只有新增全新的判定條件類型時才需要更新後端。</div>
  <div class="btn-row"><button class="btn btn-primary" data-action="title-editor-new" ${c.busy?'disabled':''}>＋ 新增稱號</button><button class="btn btn-ghost" data-action="title-editor-load" ${c.busy?'disabled':''}>重新載入</button></div><label>選擇既有稱號<select id="title-editor-select"><option value="">— 新稱號草稿 —</option>${defs.map(t=>`<option value="${esc(t.id)}" ${d.titleId===t.id?'selected':''}>${esc(t.name||t.id)}</option>`).join('')}</select></label>
  <div class="field"><label>稱號名稱</label><input id="title-editor-name" maxlength="60" value="${esc(d.name)}"></div>
- <div class="field"><label>稀有度／視覺等級</label><select id="title-editor-rarity">${Object.entries({common:'一般',rare:'稀有',epic:'史詩',legendary:'傳說',limited:'限定',eternal:'永恆'}).map(([k,v])=>`<option value="${k}" ${(d.rarity||'common')===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">稀有度會同步決定玩家端稱號顏色、徽章與圖鑑卡片樣式。</div></div>
+ <div class="field"><label>榮譽等級</label><select id="title-editor-rarity-tier">${Object.entries({common:'一般',rare:'稀有',epic:'史詩',legendary:'傳說',eternal:'永恆',...(titleTierValue(d)==='unrated'?{unrated:'待分級（舊制）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleTierValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">決定稱號本身的榮譽層級與視覺規格：一般 → 稀有 → 史詩 → 傳說 → 永恆。</div></div>
+ <div class="field"><label>取得標籤</label><select id="title-editor-limited-type">${Object.entries({none:'常態取得',event:'活動限定',season:'賽季限定',identity:'身分限定',unique:'唯一限定',launch:'開服限定',beta:'封測限定',...(titleLimitedTypeValue(d)==='legacy'?{legacy:'限定（舊制待整理）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleLimitedTypeValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">描述「為什麼難以取得」，不影響榮譽等級；唯一限定會自動限制正式持有人數為 1。</div></div>
+ <label><input id="title-editor-permanent" type="checkbox" ${d.isPermanent!==false?'checked':''}> 永久持有（取消則標記為期間制）</label>
  <div class="field"><label>達成條件</label><select id="title-editor-condition">${Object.entries({manual:'指定 UID 人工授予',profile_completion:'個人資料完成度達100%',hosted_tournaments:'成功完成主辦場數',completed_tournaments:'正式賽事完成場數',championships:'正式賽事冠軍次數',best_placement:'正式賽事名次不大於',total_checkins:'正式累積簽到天數',checkin_streak:'正式連續簽到天數',...(d.titleId==='pioneer'?{pioneer_registration:'開拓者：9/21 23:59 前註冊自動授予'}:{})}).map(([k,v])=>`<option value="${k}" ${d.conditionType===k?'selected':''}>${v}</option>`).join('')}</select></div>
  <div class="field"><label>門檻數值（人工授予填1，資料完成度填100）</label><input id="title-editor-target" type="number" min="1" max="100000" value="${Number(d.targetValue)||1}"></div>
  <div class="field"><label>說明</label><textarea id="title-editor-description" maxlength="500">${esc(d.description||'')}</textarea></div>
@@ -18405,7 +18429,7 @@ function bindTitleEditor(){
   if(c.busy)return;const t=(engagementAdminOverview?.definitions||[]).find(t=>t.id===e.target.value);
   c.draft=t?{...t,titleId:t.id,create:false,expectedVersion:t.version||1}:null;render();
  });
- for(const [id,key,type] of [['name','name','text'],['rarity','rarity','text'],['description','description','text'],['condition','conditionType','text'],['target','targetValue','number'],['active','isActive','boolean'],['hidden','isHidden','boolean'],['archived','isArchived','boolean']]){
+ for(const [id,key,type] of [['name','name','text'],['rarity-tier','rarityTier','text'],['limited-type','limitedType','text'],['permanent','isPermanent','boolean'],['description','description','text'],['condition','conditionType','text'],['target','targetValue','number'],['active','isActive','boolean'],['hidden','isHidden','boolean'],['archived','isArchived','boolean']]){
   document.getElementById('title-editor-'+id)?.addEventListener('input',e=>{c.draft[key]=type==='boolean'?e.target.checked:type==='number'?Number(e.target.value):e.target.value;if(key==='conditionType'&&e.target.value==='profile_completion'){c.draft.targetValue=100;render();}});
  }
 }
@@ -18415,16 +18439,16 @@ async function handleTitleEditor(action){
  if(action==='title-editor-new'){
   titleManagementContext().tab='list';titleManagementContext().creating=true;
   c.inlineId=null;
-  c.draft={titleId:'custom_'+crypto.randomUUID(),create:true,name:'',description:'',conditionType:'manual',targetValue:1,rarity:'common',isActive:true,isHidden:false,isArchived:false};
-  c.preview=null;c.message='已建立新稱號草稿。設定名稱、稀有度、條件與門檻後，直接儲存並發布即可。';render();return;
+  c.draft={titleId:'custom_'+crypto.randomUUID(),create:true,name:'',description:'',conditionType:'manual',targetValue:1,rarity:'common',rarityTier:'common',limitedType:'none',isPermanent:true,isActive:true,isHidden:false,isArchived:false};
+  c.preview=null;c.message='已建立新稱號草稿。設定名稱、榮譽等級、取得標籤、條件與門檻後，直接儲存並發布即可。';render();return;
  }
  if(action==='title-editor-preset-creator'){
   const existing=(engagementAdminOverview?.definitions||[]).find(t=>t.id==='creator');
-  c.draft={...(existing||{}),titleId:'creator',create:!existing,expectedVersion:existing?(existing.version||1):undefined,name:'創世者',description:'BXH ARENA 創建者榮譽稱號。',conditionType:'manual',targetValue:1,rarity:'eternal',isActive:true,isHidden:false,isArchived:false};
+  c.draft={...(existing||{}),titleId:'creator',create:!existing,expectedVersion:existing?(existing.version||1):undefined,name:'創世者',description:'BXH ARENA 創建者榮譽稱號。',conditionType:'manual',targetValue:1,rarity:'eternal',rarityTier:'eternal',limitedType:'identity',isPermanent:true,isActive:true,isHidden:false,isArchived:false};
   c.preview=null;c.message=existing?'已載入既有「創世者」並套用「永恆」等級。確認後按「儲存並發布」即可更新。':'已載入「創世者｜永恆」範本。確認內容後按「儲存並發布」，再到下方人工授予給指定玩家 UID。';render();return;
  }
  if(action==='title-editor-save'){
-  for(const [id,key,type] of [['name','name','text'],['rarity','rarity','text'],['description','description','text'],['condition','conditionType','text'],['target','targetValue','number'],['active','isActive','boolean'],['hidden','isHidden','boolean'],['archived','isArchived','boolean']]){
+  for(const [id,key,type] of [['name','name','text'],['rarity-tier','rarityTier','text'],['limited-type','limitedType','text'],['permanent','isPermanent','boolean'],['description','description','text'],['condition','conditionType','text'],['target','targetValue','number'],['active','isActive','boolean'],['hidden','isHidden','boolean'],['archived','isArchived','boolean']]){
    const el=document.getElementById('title-editor-'+id);if(el)c.draft[key]=type==='boolean'?el.checked:type==='number'?Number(el.value):el.value;
   }
  }
