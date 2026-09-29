@@ -31,7 +31,12 @@ assert(html.includes('function ladderBadgeHtml(p)'), 'shared tier badge renderer
 assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'guest leaderboard must show tier badges');
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
-assert(html.includes("(rarity==='rare'||rarity==='limited')&&name==='諸神典藏者'"), 'Gods Collector artwork must support its production Rare rarity');
-assert(html.includes('ladder-secondary-ui.js?v=14.2.52'), 'ladder asset cache-bust version must match release');
+assert(html.includes("'諸神典藏者':'assets/title-limited-gods-collector.webp'"), 'Gods Collector artwork must support its production Rare rarity');
+for(const [name,file] of [['整裝待發','title-common-ready.svg'],['初次上陣','title-common-debut.svg'],['初次開局','title-rare-first-match.svg']]){
+  assert(html.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
+  assert(source.includes("\""+name+"\":\"assets/"+file+"\""), name+' artwork missing from ladder');
+  assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
+}
+assert(html.includes('ladder-secondary-ui.js?v=14.2.54-three-titles'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
