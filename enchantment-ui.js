@@ -137,7 +137,7 @@
   let controls='';
   if((s.phase==='drawing'||s.phase==='awaiting-result'||ready&&(Number(s.faults?.A)||Number(s.faults?.B)))&&version>0)
    controls+=button(ready?'撤回上一筆失誤':'撤回上一筆','undo');
-  if(s.phase==='awaiting-result')controls+=button('確認比賽結果','confirm');
+  if(s.phase==='awaiting-result')controls+=button('確認勝負','confirm');
   return `${revealControl}${scorePanel}<div class="btn-row ref-result-actions">${controls}</div>`;
  }
  function paint(code,id){
@@ -146,6 +146,8 @@
    if(el.dataset.code!==code||el.dataset.matchId!==id)return;
    const slot=el.querySelector('[data-enchantment-status]');if(!slot)return;
    const s=item?.state;
+   const localModal=[...document.querySelectorAll('[data-enchantment-confirm-modal]')][0];
+   if(localModal&&localModal.dataset.code===code&&localModal.dataset.matchId===id&&s?.phase!=='awaiting-result')localModal.remove();
    const phase=s?(s.phase==='completed'?'已完成':s.phase==='awaiting-result'?'等待確認':s.drawn?.A&&s.drawn?.B?'已抽卡':'等待抽卡'):'等待裁判開始';
    const title=el.querySelector('[data-enchantment-title]');
    if(title)title.textContent='附魔之戰｜5 分制｜'+(s?'第 '+String(Number(s.round)||0).padStart(2,'0')+' 局｜':'')+phase;
@@ -331,6 +333,40 @@
  });
  setInterval(discoverPlayerDraw,4000);
  setTimeout(discoverPlayerDraw,1500);
+ function closeConfirmModal(){
+  [...document.querySelectorAll('[data-enchantment-confirm-modal]')][0]?.remove();
+ }
+ function openConfirmModal(code,id){
+  const item=cache.get(key(code,id)),s=item?.state;
+  if(!s||s.phase!=='awaiting-result')return;
+  const scoreA=Number(s.scores?.A)||0,scoreB=Number(s.scores?.B)||0;
+  const winner=scoreA>=5&&scoreA>scoreB?'A':scoreB>=5&&scoreB>scoreA?'B':null;
+  if(!winner){
+   if(typeof showToast==='function')showToast('目前比分尚未產生可確認的獲勝者',true);
+   return;
+  }
+  closeConfirmModal();
+  const names=matchNames.get(key(code,id))||{};
+  const winnerName=names[winner]||'選手 '+winner;
+  const overlay=document.createElement('section');
+  overlay.dataset.enchantmentConfirmModal='';
+  overlay.dataset.code=code;overlay.dataset.matchId=id;overlay.dataset.version=String(item.version);
+  overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','附魔之戰勝負確認');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2147483600;background:#05040acc;display:grid;place-items:center;padding:20px;backdrop-filter:blur(8px)';
+  overlay.innerHTML=`<div style="width:min(430px,100%);border:1px solid #d9b86c;border-radius:18px;background:linear-gradient(160deg,#171326,#0b0912);box-shadow:0 24px 80px #000c,0 0 28px #b889ff33;padding:22px;color:#fff;text-align:center">
+   <div style="font-size:12px;letter-spacing:.16em;color:#cbb9df">附魔之戰｜5 分制</div>
+   <h3 style="margin:8px 0 4px;font-size:22px">🏆 比賽結果確認</h3>
+   <div style="margin-top:16px;color:#cdbfe0;font-size:13px">獲勝者</div>
+   <div data-enchantment-confirm-winner style="margin:5px 0 12px;font-size:30px;font-weight:900;color:#f4d27a;word-break:break-word">${quote(winnerName)}</div>
+   <div style="font-size:14px;color:#e7dfef">${quote(names.A||'選手 A')} <strong style="font-size:22px;color:#fff">${scoreA}</strong> ： <strong style="font-size:22px;color:#fff">${scoreB}</strong> ${quote(names.B||'選手 B')}</div>
+   <p style="margin:14px 0 18px;color:#aaa0b7;font-size:12px">確認後將完成本場比賽並推進賽程。</p>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button type="button" class="btn btn-ghost" data-enchantment-confirm-cancel style="min-height:46px">取消</button>
+    <button type="button" class="btn btn-primary" data-enchantment-confirm-submit style="min-height:46px">確認結果</button>
+   </div>
+  </div>`;
+  document.body.append(overlay);
+ }
  async function operate(d){
   const {code,matchId:id,action}=d,k=key(code,id),item=cache.get(k);
   if(busy.has(k))return;
@@ -343,17 +379,37 @@
    if(action==='fault'){payload.round=item.state.round;payload.offender=d.side;}
    if(action==='assistReveal'){payload.round=item.state.round;payload.target=d.side;}
    if(action==='setAutoReveal')payload.enabled=d.enabled==='true';
-   if(action==='confirm'&&!window.confirm('確認附魔比分與獲勝選手，並推進下一輪？'))return;
+   if(action==='confirm'&&Number(d.expectedVersion)!==Number(item.version)){
+    closeConfirmModal();
+    if(typeof showToast==='function')showToast('比分狀態已更新，請重新確認勝負',true);
+    await refresh(code,id);return;
+   }
    const result=await call(payload);
+   if(action==='confirm')closeConfirmModal();
    cache.set(k,{version:result.version,state:result.state});paint(code,id);syncFrames(code,id);
    if(result.event||result.completion){if(typeof showToast==='function')showToast(result.completion?'已確認比賽結果':'已記錄本局判定');}
-  }catch(e){if(message(e).includes('stale-version'))await refresh(code,id);else if(typeof showToast==='function')showToast('附魔操作失敗：'+message(e),true);}
+  }catch(e){if(message(e).includes('stale-version')){if(action==='confirm')closeConfirmModal();await refresh(code,id);if(typeof showToast==='function')showToast('比分狀態已更新，請重新確認勝負',true);}else if(typeof showToast==='function')showToast('附魔操作失敗：'+message(e),true);}
   finally{busy.delete(k);await refresh(code,id);}
  }
  document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-enchantment-action]');if(!el)return;
-  e.preventDefault();e.stopPropagation();
-  const d=el.dataset;if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);else if(d.enchantmentAction==='swap'){const k=key(d.code,d.matchId);if(reversedSides.has(k))reversedSides.delete(k);else reversedSides.add(k);paint(d.code,d.matchId);}else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type,enabled:d.enabled});
+  const el=e.target.closest('[data-enchantment-action]');
+  if(el){
+   e.preventDefault();e.stopPropagation();
+   const d=el.dataset;
+   if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);
+   else if(d.enchantmentAction==='swap'){const k=key(d.code,d.matchId);if(reversedSides.has(k))reversedSides.delete(k);else reversedSides.add(k);paint(d.code,d.matchId);}
+   else if(d.enchantmentAction==='confirm')openConfirmModal(d.code,d.matchId);
+   else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type,enabled:d.enabled});
+   return;
+  }
+  const cancel=e.target.closest('[data-enchantment-confirm-cancel]');
+  if(cancel){e.preventDefault();e.stopPropagation();closeConfirmModal();return;}
+  const submit=e.target.closest('[data-enchantment-confirm-submit]');
+  if(submit){
+   e.preventDefault();e.stopPropagation();
+   const modal=submit.closest('[data-enchantment-confirm-modal]');if(!modal)return;
+   operate({code:modal.dataset.code,matchId:modal.dataset.matchId,action:'confirm',expectedVersion:Number(modal.dataset.version)});
+  }
  },true);
  root.addEventListener('message',async e=>{
   if(e.origin!==location.origin)return;
