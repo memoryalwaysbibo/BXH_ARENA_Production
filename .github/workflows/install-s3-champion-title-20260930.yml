@@ -1,0 +1,96 @@
+name: Install S3 Champion Title 20260930
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/install-s3-champion-title-20260930.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bxh-arena-s3-champion-title-install
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct S3 champion artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            .tmp-s3-champion-small/u00 \
+            .tmp-s3-champion-small/u01 \
+            .tmp-s3-champion-small/u02_03 \
+            .tmp-s3-champion-small/u04 \
+            .tmp-s3-champion-small/u05 \
+            .tmp-s3-champion-small/u06 \
+            | base64 -d > assets/title-limited-s3-champion.webp
+          echo "ab042ac1d61ddf1b7eef418bedeec48ebc7c3d4dd1a0362d2da453b05e95fb81  assets/title-limited-s3-champion.webp" | sha256sum -c -
+          file assets/title-limited-s3-champion.webp
+
+      - name: Wire S3 champion title artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import json
+
+          index_path=Path("index.html")
+          s=index_path.read_text(encoding="utf-8")
+          anchor="    '諸神收藏家':'assets/title-limited-gods-collector.webp',"
+          addition="    'S3總冠軍':'assets/title-limited-s3-champion.webp',"
+          if addition not in s:
+              if anchor not in s:
+                  raise SystemExit("index title artwork anchor not found")
+              s=s.replace(anchor,anchor+"\n"+addition,1)
+          index_path.write_text(s,encoding="utf-8")
+
+          ladder_path=Path("ladder-secondary-ui.js")
+          l=ladder_path.read_text(encoding="utf-8")
+          anchor_l='        "諸神收藏家":"assets/title-limited-gods-collector.webp",'
+          addition_l='        "S3總冠軍":"assets/title-limited-s3-champion.webp",'
+          if addition_l not in l:
+              if anchor_l not in l:
+                  raise SystemExit("ladder title artwork anchor not found")
+              l=l.replace(anchor_l,anchor_l+"\n"+addition_l,1)
+          ladder_path.write_text(l,encoding="utf-8")
+
+          version_path=Path("version.json")
+          v=json.loads(version_path.read_text(encoding="utf-8"))
+          v["build"]="20260930.1"
+          v["version"]="v14.3.10"
+          v["updatedAt"]="2026-09-30T00:05:00+08:00"
+          version_path.write_text(json.dumps(v,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          PY
+
+      - name: Validate S3 champion title
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s assets/title-limited-s3-champion.webp
+          grep -Fq "'S3總冠軍':'assets/title-limited-s3-champion.webp'" index.html
+          grep -Fq '"S3總冠軍":"assets/title-limited-s3-champion.webp"' ladder-secondary-ui.js
+          grep -Fq '"build": "20260930.1"' version.json
+          node scripts/verify-production-frontend.cjs
+
+      - name: Commit S3 champion title
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .tmp-s3-champion-small .tmp-s3-champion
+          rm -f .github/workflows/install-s3-champion-title-20260930.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Install S3 champion title artwork"
+          git push origin HEAD:main
