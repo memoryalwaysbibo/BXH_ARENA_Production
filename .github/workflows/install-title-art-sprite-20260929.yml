@@ -1,0 +1,197 @@
+name: Install Title Art Sprite 20260929
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/install-title-art-sprite-20260929.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bxh-arena-title-art-install
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct transparent title sprite
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .tmp-title-sprite/u180_* | base64 -d > assets/title-sprite-v1.webp
+          echo "fe8f522c6debbb807d765a4b125c98e23699c6f5b3788af494e802bf7394900d  assets/title-sprite-v1.webp" | sha256sum -c -
+          file assets/title-sprite-v1.webp
+
+      - name: Wire title artwork into Production UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import json
+
+          index_path=Path("index.html")
+          s=index_path.read_text(encoding="utf-8")
+
+          old_css='''.title-chip.title-art-chip{flex:0 1 auto;width:220px;max-width:100%;aspect-ratio:3/1;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;vertical-align:middle;line-height:0;}
+.title-art-chip img,.title-gallery-art{display:block;width:100%;height:100%;object-fit:contain;}
+.title-gallery-art{height:auto;aspect-ratio:3/1;margin:-5px auto 7px;}
+.engagement-head .title-art-chip{width:clamp(140px,27vw,240px);}
+.title-card .title-gallery-art{max-width:340px;}'''
+          new_css='''.title-chip.title-art-chip{flex:0 1 auto;width:220px;max-width:100%;aspect-ratio:3/1;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;vertical-align:middle;line-height:0;}
+.title-art-chip img,.title-gallery-art{display:block;width:100%;height:100%;object-fit:contain;}
+.title-gallery-art{height:auto;aspect-ratio:3/1;margin:-5px auto 7px;}
+.title-sprite-art{display:block;background-image:url("assets/title-sprite-v1.webp?v=20260929.3");background-size:100% 1400%;background-repeat:no-repeat;background-position:center var(--title-sprite-y,0%);}
+.title-art-chip.title-sprite-chip{width:180px;}
+.title-art-chip .title-sprite-art{width:100%;height:100%;}
+.engagement-head .title-art-chip{width:clamp(140px,27vw,240px);}
+.engagement-head .title-art-chip.title-sprite-chip{width:clamp(140px,22vw,180px);}
+.title-card .title-gallery-art{max-width:340px;}
+.title-card .title-gallery-art.title-sprite-art{max-width:180px;}'''
+          if old_css not in s:
+              raise SystemExit("title CSS anchor not found")
+          s=s.replace(old_css,new_css,1)
+
+          old_fn='''function titleArtworkPath(name,rarity){
+  if(rarity==='eternal'&&name==='創世者')return 'assets/title-eternal-creator.webp';
+  if(rarity==='eternal'&&(name==='裁決者'||name==='審判者'))return 'assets/title-eternal-adjudicator.webp';
+  if(rarity==='limited'&&name==='開拓者')return 'assets/title-limited-pioneer.webp';
+  if((rarity==='rare'||rarity==='limited')&&name==='諸神典藏者')return 'assets/title-limited-gods-collector.webp';
+  return '';
+}
+function titleDisplayName(name){return name==='審判者'?'裁決者':name;}
+function titleChipHtml(name,rarity,extra=''){
+  const art=titleArtworkPath(name,rarity);
+  const displayName=titleDisplayName(name||'');
+  return `<span class="title-chip rarity-${esc(rarity||'common')}${art?' title-art-chip':''}" title="${esc(displayName)}" ${extra}>${art?`<img src="${art}" alt="${esc(displayName)}" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:esc(displayName)}</span>`;
+}'''
+          new_fn='''function titleArtworkPath(name,rarity){
+  if(rarity==='eternal'&&name==='創世者')return 'assets/title-eternal-creator.webp';
+  if(rarity==='eternal'&&(name==='裁決者'||name==='審判者'))return 'assets/title-eternal-adjudicator.webp';
+  if(rarity==='limited'&&name==='開拓者')return 'assets/title-limited-pioneer.webp';
+  if((rarity==='rare'||rarity==='limited')&&(name==='諸神典藏者'||name==='諸神收藏家'))return 'assets/title-limited-gods-collector.webp';
+  return '';
+}
+function titleDisplayName(name){return name==='審判者'?'裁決者':name;}
+function titleSpriteIndex(name,rarity){
+  const key=String(rarity||'')+'|'+String(name||'');
+  const map={
+    'legendary|三冠王':0,
+    'limited|二當家':1,
+    'limited|BXH 工作人員':2,
+    'limited|三當家':3,
+    'limited|封測先鋒':4,
+    'epic|百戰磨練':5,
+    'epic|四強霸主':6,
+    'epic|冠軍獵人':7,
+    'epic|百日戰士':8,
+    'rare|初次開局':9,
+    'rare|資深主辦':10,
+    'rare|對戰召集人':11,
+    'rare|賽事推手':12,
+    'rare|競技場主':13
+  };
+  return Object.prototype.hasOwnProperty.call(map,key)?map[key]:-1;
+}
+function titleSpriteStyle(index){
+  const y=index<=0?0:(index/13*100);
+  return `--title-sprite-y:${y.toFixed(6)}%`;
+}
+function titleGalleryArtworkHtml(name,rarity){
+  const art=titleArtworkPath(name,rarity);
+  const displayName=titleDisplayName(name||'');
+  if(art)return `<img class="title-gallery-art" src="${art}" alt="${esc(displayName)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`;
+  const spriteIndex=titleSpriteIndex(name,rarity);
+  if(spriteIndex>=0)return `<span class="title-gallery-art title-sprite-art" style="${titleSpriteStyle(spriteIndex)}" role="img" aria-label="${esc(displayName)}"></span>`;
+  return '';
+}
+function titleChipHtml(name,rarity,extra=''){
+  const art=titleArtworkPath(name,rarity);
+  const spriteIndex=titleSpriteIndex(name,rarity);
+  const hasArt=!!art||spriteIndex>=0;
+  const displayName=titleDisplayName(name||'');
+  const body=art
+    ?`<img src="${art}" alt="${esc(displayName)}" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`
+    :spriteIndex>=0
+      ?`<span class="title-sprite-art" style="${titleSpriteStyle(spriteIndex)}" role="img" aria-label="${esc(displayName)}"></span>`
+      :esc(displayName);
+  return `<span class="title-chip rarity-${esc(rarity||'common')}${hasArt?' title-art-chip':''}${spriteIndex>=0?' title-sprite-chip':''}" title="${esc(displayName)}" ${extra}>${body}</span>`;
+}'''
+          if old_fn not in s:
+              raise SystemExit("titleArtworkPath block not found")
+          s=s.replace(old_fn,new_fn,1)
+
+          old_gallery='''${!hidden&&titleArtworkPath(t.name,t.rarity)?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,t.rarity)}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}'''
+          new_gallery='''${!hidden?titleGalleryArtworkHtml(t.name,t.rarity):''}'''
+          if old_gallery not in s:
+              raise SystemExit("title gallery artwork anchor not found")
+          s=s.replace(old_gallery,new_gallery,1)
+
+          s=s.replace('20260929.2','20260929.3')
+          s=s.replace('ladder-secondary-ui.js?v=14.2.52','ladder-secondary-ui.js?v=14.3.2-title-art')
+          index_path.write_text(s,encoding="utf-8")
+
+          ladder_path=Path("ladder-secondary-ui.js")
+          l=ladder_path.read_text(encoding="utf-8")
+          old_ladder='''      var titleName=p.equippedBadge&&p.equippedBadge.name==="審判者"?"裁決者":p.equippedBadge&&p.equippedBadge.name||"";
+      var art=p.equippedBadge&&p.equippedBadge.rarity==="eternal"
+        ?(titleName==="創世者"?"assets/title-eternal-creator.webp":titleName==="裁決者"?"assets/title-eternal-adjudicator.webp":"")
+        :p.equippedBadge&&p.equippedBadge.rarity==="limited"&&titleName==="開拓者"
+          ?"assets/title-limited-pioneer.webp"
+          :p.equippedBadge&&(p.equippedBadge.rarity==="rare"||p.equippedBadge.rarity==="limited")&&titleName==="諸神典藏者"
+            ?"assets/title-limited-gods-collector.webp"
+            :"";
+      var title=p&&p.equippedBadge
+        ?'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+(art?' title-art-chip':'')+'" title="'+escLocal(titleName)+'">'+(art?'<img src="'+art+'" alt="'+escLocal(titleName)+'" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">':escLocal(titleName))+'</span>'
+        :'';'''
+          new_ladder='''      var titleName=p.equippedBadge&&p.equippedBadge.name==="審判者"?"裁決者":p.equippedBadge&&p.equippedBadge.name||"";
+      var title=p&&p.equippedBadge
+        ?(typeof window.titleChipHtml==="function"
+          ?window.titleChipHtml(titleName,p.equippedBadge.rarity||"common")
+          :'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+'" title="'+escLocal(titleName)+'">'+escLocal(titleName)+'</span>')
+        :'';'''
+          if old_ladder not in l:
+              raise SystemExit("ladder title-art block not found")
+          l=l.replace(old_ladder,new_ladder,1)
+          ladder_path.write_text(l,encoding="utf-8")
+
+          version_path=Path("version.json")
+          v=json.loads(version_path.read_text(encoding="utf-8"))
+          v["build"]="20260929.3"
+          v["version"]="v14.3.2"
+          v["updatedAt"]="2026-09-29T09:12:00+08:00"
+          version_path.write_text(json.dumps(v,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          PY
+
+      - name: Validate title-art wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'title-sprite-v1.webp?v=20260929.3' index.html
+          grep -Fq "'legendary|三冠王':0" index.html
+          grep -Fq "'limited|BXH 工作人員':2" index.html
+          grep -Fq "'epic|百戰磨練':5" index.html
+          grep -Fq "'rare|競技場主':13" index.html
+          grep -Fq 'window.titleChipHtml' ladder-secondary-ui.js
+          grep -Fq '"build": "20260929.3"' version.json
+          node scripts/verify-production-frontend.cjs
+
+      - name: Commit Production title art
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .tmp-title-sprite
+          rm -f .github/workflows/install-title-art-sprite-20260929.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Install first and second batch title artwork"
+          git push origin HEAD:main
