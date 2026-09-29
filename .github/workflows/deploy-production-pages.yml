@@ -35,7 +35,24 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
+      - name: Verify validated commit is still current main HEAD
+        id: freshness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          latest="$(git rev-parse origin/main)"
+          validated="${{ github.event.workflow_run.head_sha }}"
+          if [ "$latest" != "$validated" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Stale validated commit; skip deploy. validated=$validated latest=$latest"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Validated commit is current main HEAD: $validated"
+          fi
+
       - name: Re-verify production entrypoint before deploy
+        if: steps.freshness.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -54,13 +71,16 @@ jobs:
           echo "Deploy guard OK: bytes=$bytes lines=$lines"
 
       - name: Configure GitHub Pages
+        if: steps.freshness.outputs.deploy == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload exact validated site artifact
+        if: steps.freshness.outputs.deploy == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
           path: '.'
 
       - name: Deploy to GitHub Pages
+        if: steps.freshness.outputs.deploy == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
