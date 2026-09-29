@@ -4160,3 +4160,15 @@ button.btn-primary,
     width:92vw!important;
   }
 }
+
+
+/* Directive warning single-layer consolidation v5 - 2026-09-30
+   Keep the DOM image as the only warning artwork. Legacy spacer pseudo-layers
+   from pulse recovery v2/v3 are disabled to prevent double-image ghosting. */
+:root[data-bxh-theme="directive"] header.topbar .spacer::before,
+:root[data-bxh-theme="directive"] header.topbar .spacer::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  animation:none!important;
+}
