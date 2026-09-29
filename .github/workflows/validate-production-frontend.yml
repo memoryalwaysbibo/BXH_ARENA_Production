@@ -151,3 +151,35 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  emulator_e2e:
+    name: Critical E2E - Player Signup / Community Room
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Java for Firestore Emulator
+        shell: bash
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-21-jre-headless
+          java -version
+
+      - name: Install E2E dependencies
+        run: npm install --no-package-lock --ignore-scripts
+
+      - name: Run critical Firebase Emulator E2E
+        shell: bash
+        run: |
+          npx firebase emulators:exec             --only auth,firestore             --project demo-bxh-arena-e2e             --config tests/e2e/firebase.json             "npm run test:ui-e2e"
+
+      - name: Upload E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-critical-e2e-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
