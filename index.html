@@ -31845,11 +31845,23 @@ if(testerSession){
             const incomingAssigned=Array.isArray(data.meta.assignedStaffUids)?data.meta.assignedStaffUids.map(String).filter(Boolean):[];
             data.meta.assignedStaffUids=[...new Set(incomingAssigned.concat(canonicalUids))];
             privatePayload.data=JSON.stringify(data);
-            privatePayload.assignedStaffUids=data.meta.assignedStaffUids;
-            privatePayload.refereeStationAssignments=canonicalAssignments;
-            privatePayload.refereeStationNames=canonicalNames;
-            privatePayload.refereeStationUids=canonicalUids;
-            privatePayload.refereeStationRestrictionEnabled=canonicalRestriction;
+            // Community rooms are owned by a player and deliberately have no
+            // top-level staff/referee assignment contract. Re-adding these
+            // admin-only fields here makes an otherwise-valid community sync
+            // fail Production Rules, leaving Firestore behind the local UI.
+            if(!community){
+              privatePayload.assignedStaffUids=data.meta.assignedStaffUids;
+              privatePayload.refereeStationAssignments=canonicalAssignments;
+              privatePayload.refereeStationNames=canonicalNames;
+              privatePayload.refereeStationUids=canonicalUids;
+              privatePayload.refereeStationRestrictionEnabled=canonicalRestriction;
+            }else{
+              delete privatePayload.assignedStaffUids;
+              delete privatePayload.refereeStationAssignments;
+              delete privatePayload.refereeStationNames;
+              delete privatePayload.refereeStationUids;
+              delete privatePayload.refereeStationRestrictionEnabled;
+            }
             publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
           }
           tx.set(ref,privatePayload,{merge:true});
