@@ -80,7 +80,7 @@ test('winner confirmation opens only as a local modal and submits its bound matc
   body:{append(el){modal=el;}},
   createElement:tag=>makeOverlay(),
   querySelector:sel=>sel==='[data-enchantment-confirm-modal]'?modal:null,
-  querySelectorAll:selector=>selector==='[data-enchantment-referee]'?[panel]:[],
+  querySelectorAll:selector=>selector==='[data-enchantment-referee]'?[panel]:selector==='[data-enchantment-confirm-modal]'&&modal?[modal]:[],
   addEventListener:(event,fn)=>listeners[event]=fn
  };
  const root={BXHEnchantmentScore:score,engagementService:{enchantment:async payload=>{
