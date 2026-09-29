@@ -1,0 +1,207 @@
+name: Upgrade Title Classification 20260930
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/upgrade-title-classification-20260930.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bxh-arena-title-classification-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply title classification upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          import json
+
+          p=Path("index.html")
+          s=p.read_text(encoding="utf-8")
+
+          def rep(old,new,label):
+              global s
+              if old not in s:
+                  raise SystemExit(f"{label}: anchor missing")
+              s=s.replace(old,new,1)
+
+          rep(
+          '''function titleRarityLabel(r){
+            return ({common:"一般",rare:"稀有",epic:"史詩",legendary:"傳說",limited:"限定",eternal:"永恆"})[r]||"一般";
+          }''',
+          '''const TITLE_TIER_LABELS=Object.freeze({common:"一般",rare:"稀有",epic:"史詩",legendary:"傳說",eternal:"永恆",unrated:"待分級"});
+          const TITLE_LIMITED_LABELS=Object.freeze({none:"",event:"活動限定",season:"賽季限定",identity:"身分限定",unique:"唯一限定",launch:"開服限定",beta:"封測限定",legacy:"限定（舊制）"});
+          function titleRarityLabel(r){return r==="limited"?"待分級":TITLE_TIER_LABELS[r]||"一般";}
+          function titleTierValue(t){
+            if(typeof t==="string")return t==="limited"?"unrated":(TITLE_TIER_LABELS[t]?t:"common");
+            const explicit=String(t&&t.rarityTier||"");
+            if(TITLE_TIER_LABELS[explicit])return explicit;
+            const legacy=String(t&&t.rarity||"common");
+            return legacy==="limited"?"unrated":(TITLE_TIER_LABELS[legacy]?legacy:"common");
+          }
+          function titleTierClass(t){const v=titleTierValue(t);return v==="unrated"?"limited":v;}
+          function titleTierLabel(t){return TITLE_TIER_LABELS[titleTierValue(t)]||"一般";}
+          function titleLimitedTypeValue(t){
+            const explicit=String(t&&t.limitedType||"");
+            if(Object.prototype.hasOwnProperty.call(TITLE_LIMITED_LABELS,explicit))return explicit;
+            return t&&(t.isLimited===true||String(t.rarity||"")==="limited")?"legacy":"none";
+          }
+          function titleLimitedLabel(t){return TITLE_LIMITED_LABELS[titleLimitedTypeValue(t)]||"";}
+          function titlePermanentLabel(t){return t&&t.isPermanent===false?"期間制":"永久持有";}
+          function titleClassificationText(t){const tag=titleLimitedLabel(t);return titleTierLabel(t)+(tag?"｜"+tag:"")+"｜"+titlePermanentLabel(t);}
+          function titleClassificationHtml(t){
+            const tier=titleTierValue(t),tag=titleLimitedLabel(t);
+            return '<span class="rarity-badge rarity-'+esc(titleTierClass(t))+'">'+esc(titleTierLabel(t))+'</span>'+(tag?' <span class="rarity-badge title-limit-badge">'+esc(tag)+'</span>':'');
+          }''',
+          "title classification helpers")
+
+          rep(
+          '''.rarity-badge{display:inline-flex;align-items:center;padding:2px 7px;border:1px solid rgba(190,198,208,.55);border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap;}''',
+          '''.rarity-badge{display:inline-flex;align-items:center;padding:2px 7px;border:1px solid rgba(190,198,208,.55);border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap;}
+          .title-limit-badge{border-color:rgba(255,103,151,.58);color:#ffb0c8;background:rgba(255,65,125,.10);box-shadow:0 0 12px rgba(255,65,125,.06);}''',
+          "limited badge css")
+
+          rep(
+          ''' <div class="hint">直接建立或編輯稱號；一般條件、門檻與稀有度都可在這裡設定，不需要修改程式。只有新增全新的判定條件類型時才需要更新後端。</div>''',
+          ''' <div class="hint">直接建立或編輯稱號；榮譽等級、取得限定與持有規則分開設定。限定不再代表品質等級；只有新增全新的判定條件類型時才需要更新後端。</div>''',
+          "editor intro")
+
+          old_field=''' <div class="field"><label>稀有度／視覺等級</label><select id="title-editor-rarity">${Object.entries({common:'一般',rare:'稀有',epic:'史詩',legendary:'傳說',limited:'限定',eternal:'永恆'}).map(([k,v])=>`<option value="${k}" ${(d.rarity||'common')===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">稀有度會同步決定玩家端稱號顏色、徽章與圖鑑卡片樣式。</div></div>'''
+          new_field=''' <div class="field"><label>榮譽等級</label><select id="title-editor-rarity-tier">${Object.entries({common:'一般',rare:'稀有',epic:'史詩',legendary:'傳說',eternal:'永恆',...(titleTierValue(d)==='unrated'?{unrated:'待分級（舊制）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleTierValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">決定稱號本身的榮譽層級與視覺規格：一般 → 稀有 → 史詩 → 傳說 → 永恆。</div></div>
+           <div class="field"><label>取得標籤</label><select id="title-editor-limited-type">${Object.entries({none:'常態取得',event:'活動限定',season:'賽季限定',identity:'身分限定',unique:'唯一限定',launch:'開服限定',beta:'封測限定',...(titleLimitedTypeValue(d)==='legacy'?{legacy:'限定（舊制待整理）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleLimitedTypeValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">描述「為什麼難以取得」，不影響榮譽等級；唯一限定會自動限制正式持有人數為 1。</div></div>
+           <label><input id="title-editor-permanent" type="checkbox" ${d.isPermanent!==false?'checked':''}> 永久持有（取消則標記為期間制）</label>'''
+          rep(old_field,new_field,"editor classification fields")
+
+          old_loop="for(const [id,key,type] of [['name','name','text'],['rarity','rarity','text'],['description','description','text'],['condition','conditionType','text'],['target','targetValue','number'],['active','isActive','boolean'],['hidden','isHidden','boolean'],['archived','isArchived','boolean']]){"
+          new_loop="for(const [id,key,type] of [['name','name','text'],['rarity-tier','rarityTier','text'],['limited-type','limitedType','text'],['permanent','isPermanent','boolean'],['description','description','text'],['condition','conditionType','text'],['target','targetValue','number'],['active','isActive','boolean'],['hidden','isHidden','boolean'],['archived','isArchived','boolean']]){"
+          if s.count(old_loop)!=2:
+              raise SystemExit(f"editor field loops: expected 2, found {s.count(old_loop)}")
+          s=s.replace(old_loop,new_loop,2)
+
+          rep(
+          "c.draft={titleId:'custom_'+crypto.randomUUID(),create:true,name:'',description:'',conditionType:'manual',targetValue:1,rarity:'common',isActive:true,isHidden:false,isArchived:false};",
+          "c.draft={titleId:'custom_'+crypto.randomUUID(),create:true,name:'',description:'',conditionType:'manual',targetValue:1,rarity:'common',rarityTier:'common',limitedType:'none',isPermanent:true,isActive:true,isHidden:false,isArchived:false};",
+          "new title draft")
+
+          rep(
+          "name:'創世者',description:'BXH ARENA 創建者榮譽稱號。',conditionType:'manual',targetValue:1,rarity:'eternal',isActive:true,isHidden:false,isArchived:false",
+          "name:'創世者',description:'BXH ARENA 創建者榮譽稱號。',conditionType:'manual',targetValue:1,rarity:'eternal',rarityTier:'eternal',limitedType:'identity',isPermanent:true,isActive:true,isHidden:false,isArchived:false",
+          "creator preset")
+
+          rep(
+          "c.preview=null;c.message='已建立新稱號草稿。設定名稱、稀有度、條件與門檻後，直接儲存並發布即可。';",
+          "c.preview=null;c.message='已建立新稱號草稿。設定名稱、榮譽等級、取得標籤、條件與門檻後，直接儲存並發布即可。';",
+          "new draft message")
+
+          rep(
+          "const rank={common:0,rare:1,epic:2,legendary:3,limited:4,eternal:5};",
+          "const rank={unrated:-1,common:0,rare:1,epic:2,legendary:3,eternal:4};",
+          "admin rank map")
+          rep(
+          "if(c.sort.startsWith('rarity'))return ((rank[a.rarity]??-1)-(rank[b.rarity]??-1))*(c.sort==='rarity-desc'?-1:1)||byName(a,b);",
+          "if(c.sort.startsWith('rarity'))return ((rank[titleTierValue(a)]??-1)-(rank[titleTierValue(b)]??-1))*(c.sort==='rarity-desc'?-1:1)||byName(a,b);",
+          "admin tier sort")
+
+          rep(
+          '''${items.map(t=>`<div class="community-event-card"><b>${esc(t.name||t.id)}</b> <span class="rarity-badge rarity-${esc(t.rarity||'common')}">${esc(titleRarityLabel(t.rarity))}</span>''',
+          '''${items.map(t=>`<div class="community-event-card"><b>${esc(t.name||t.id)}</b> ${titleClassificationHtml(t)}''',
+          "admin card badges")
+
+          rep(
+          ''' <div class="hint">${t.isActive?'啟用中':'停用'}｜${t.isHidden?'隱藏':'公開'}${t.isArchived?'｜已絕版':''}｜發行：''',
+          ''' <div class="hint">${t.isActive?'啟用中':'停用'}｜${t.isHidden?'隱藏':'公開'}${t.isArchived?'｜已絕版':''}｜${titlePermanentLabel(t)}｜發行：''',
+          "admin permanent label")
+
+          rep(
+          '''${grantCatalog.map(t=>`<option value="${esc(t.id)}" ${titleRecipientContext().titleId===t.id?"selected":""}>${esc(t.name)}｜${esc(titleRarityLabel(t.rarity))}｜${esc(t.id)}</option>`).join("")}''',
+          '''${grantCatalog.map(t=>`<option value="${esc(t.id)}" ${titleRecipientContext().titleId===t.id?"selected":""}>${esc(t.name)}｜${esc(titleClassificationText(t))}｜${esc(t.id)}</option>`).join("")}''',
+          "grant select classification")
+
+          rep(
+          '''const options=earned.map(x=>{const def=titleById(x.titleId); return def?`<option value="${esc(x.titleId)}" ${equipped===x.titleId?'selected':''}>${esc(def.name)}｜${esc(titleRarityLabel(def.rarity))}${def.isActive===false?'｜已停止發放':''}</option>`:"";}).join("");''',
+          '''const options=earned.map(x=>{const def=titleById(x.titleId); return def?`<option value="${esc(x.titleId)}" ${equipped===x.titleId?'selected':''}>${esc(def.name)}｜${esc(titleClassificationText(def))}${def.isActive===false?'｜已停止發放':''}</option>`:"";}).join("");''',
+          "player equipped options")
+
+          rep(
+          '''${equippedDef?`${titleChipHtml(equippedDef.name,equippedDef.rarity)}`:""}''',
+          '''${equippedDef?`${titleChipHtml(equippedDef.name,titleTierClass(equippedDef))}`:""}''',
+          "equipped title tier class")
+
+          rep(
+          '''<article class="title-card rarity-${esc(t.rarity||'common')} ${got?'':'locked'}">''',
+          '''<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">''',
+          "gallery card tier class")
+
+          s=s.replaceAll("titleArtworkPath(t.name,t.rarity)","titleArtworkPath(t.name,titleTierClass(t))")
+
+          rep(
+          '''<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span class="rarity-badge rarity-${esc(t.rarity||'common')}">${esc(titleRarityLabel(t.rarity))}</span></div>''',
+          '''<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span>${titleClassificationHtml(t)}</span></div>''',
+          "gallery classification badges")
+
+          rep(
+          '''${t.isLimited?'・限定':''}${t.isArchived?'・已絕版':''}''',
+          '''${titleLimitedTypeValue(t)!=='none'?'・'+titleLimitedLabel(t):''}${t.isPermanent===false?'・期間制':'・永久'}${t.isArchived?'・已絕版':''}''',
+          "gallery status tags")
+
+          # Build/version metadata
+          old_build="20260930.1"
+          new_build="20260930.2"
+          old_version="v14.3.10"
+          new_version="v14.3.11"
+          for old,new in [
+              (f'<meta name="bxh-build" content="{old_build}">',f'<meta name="bxh-build" content="{new_build}">'),
+              (f'CURRENT_BUILD="{old_build}"',f'CURRENT_BUILD="{new_build}"'),
+              (f'const APP_VERSION = "{old_version}";',f'const APP_VERSION = "{new_version}";')
+          ]:
+              if old not in s:
+                  raise SystemExit(f"version anchor missing: {old}")
+              s=s.replace(old,new,1)
+
+          p.write_text(s,encoding="utf-8")
+          vp=Path("version.json")
+          v=json.loads(vp.read_text(encoding="utf-8"))
+          v["build"]=new_build
+          v["version"]=new_version
+          v["updatedAt"]="2026-09-30T01:10:00+08:00"
+          vp.write_text(json.dumps(v,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          PY
+
+      - name: Validate title classification upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const TITLE_TIER_LABELS=' index.html
+          grep -Fq 'title-editor-rarity-tier' index.html
+          grep -Fq 'title-editor-limited-type' index.html
+          grep -Fq 'title-editor-permanent' index.html
+          grep -Fq '唯一限定' index.html
+          grep -Fq 'titleClassificationHtml(t)' index.html
+          grep -Fq '<meta name="bxh-build" content="20260930.2">' index.html
+          grep -Fq '"build": "20260930.2"' version.json
+          node scripts/verify-production-frontend.cjs
+
+      - name: Commit upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/upgrade-title-classification-20260930.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Upgrade title tier and limited-tag model"
+          git push origin HEAD:main
