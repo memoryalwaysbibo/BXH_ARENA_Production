@@ -31,7 +31,7 @@
 <meta name="bxh-build" content="20260929.4">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260929.4";
+  var CURRENT_BUILD="20260929.5";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -11143,17 +11143,36 @@ function requestEngagementSnapshot(force=false){
   });
 }
 function titleArtworkPath(name,rarity){
-  if(rarity==='eternal'&&name==='創世者')return 'assets/title-eternal-creator.webp';
-  if(rarity==='eternal'&&(name==='裁決者'||name==='審判者'))return 'assets/title-eternal-adjudicator.webp';
-  if(rarity==='limited'&&name==='開拓者')return 'assets/title-limited-pioneer.webp';
-  if((rarity==='rare'||rarity==='limited')&&name==='諸神典藏者')return 'assets/title-limited-gods-collector.webp';
-  return '';
+  const key=String(name||'');
+  const map={
+    '創世者':'assets/title-eternal-creator.webp',
+    '裁決者':'assets/title-eternal-adjudicator.webp',
+    '審判者':'assets/title-eternal-adjudicator.webp',
+    '開拓者':'assets/title-limited-pioneer.webp',
+    '諸神典藏者':'assets/title-limited-gods-collector.webp',
+    '諸神收藏家':'assets/title-limited-gods-collector.webp',
+    '三冠王':'assets/title-legendary-triple-crown.webp',
+    '二當家':'assets/title-limited-co-leader.webp',
+    '三當家':'assets/title-limited-third-leader.webp',
+    'BXH 工作人員':'assets/title-limited-bxh-staff.webp',
+    '封測先鋒':'assets/title-limited-closed-beta.webp',
+    '百戰磨練':'assets/title-epic-hundred-battles.webp',
+    '四強霸主':'assets/title-epic-top4-overlord.webp',
+    '冠軍獵人':'assets/title-epic-champion-hunter.webp',
+    '百日戰士':'assets/title-epic-hundred-day-warrior.webp',
+    '初次開局':'assets/title-rare-host-1.webp',
+    '對戰召集人':'assets/title-rare-host-3.webp',
+    '賽事推手':'assets/title-rare-host-10.webp',
+    '資深主辦':'assets/title-rare-host-20.webp',
+    '競技場主':'assets/title-rare-host-30.webp'
+  };
+  return map[key]||'';
 }
 function titleDisplayName(name){return name==='審判者'?'裁決者':name;}
 function titleChipHtml(name,rarity,extra=''){
   const art=titleArtworkPath(name,rarity);
   const displayName=titleDisplayName(name||'');
-  return `<span class="title-chip rarity-${esc(rarity||'common')}${art?' title-art-chip':''}" title="${esc(displayName)}" ${extra}>${art?`<img src="${art}" alt="${esc(displayName)}" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:esc(displayName)}</span>`;
+  return `<span class="title-chip rarity-${esc(rarity||'common')}${art?' title-art-chip':''}" title="${esc(displayName)}" ${extra}>${art?`<img src="${art}" alt="${esc(displayName)}" decoding="async" onerror="if(this.dataset.fallback==='png'){const p=this.parentElement;p&&p.classList.remove('title-art-chip');this.replaceWith(document.createTextNode(this.alt));return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:esc(displayName)}</span>`;
 }
 function titleById(id){
   const all=(engagementSnapshot&&engagementSnapshot.catalog)||[];
@@ -11260,7 +11279,7 @@ function renderPlayerTitleCenter(p){
     <div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="player-save-title-settings" ${engagementActionBusy?'disabled':''}>${engagementActionBusy?'儲存中…':'儲存稱號設定'}</button></div>
     ${engagementError?`<div class="hint">${esc(engagementError)}；已確認儲存的設定不受影響。<button class="btn btn-ghost btn-sm" data-action="player-refresh-engagement">重新連線</button></div>`:''}
     <div class="panel-title" style="margin-top:20px;">稱號圖鑑</div>
-    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(t.rarity||'common')} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,t.rarity)?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,t.rarity)}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span class="rarity-badge rarity-${esc(t.rarity||'common')}">${esc(titleRarityLabel(t.rarity))}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${got?'✓ 已取得':`${current}／${target}`}${t.isActive===false?'・籌備中':''}${t.isLimited?'・限定':''}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
+    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(t.rarity||'common')} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,t.rarity)?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,t.rarity)}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span class="rarity-badge rarity-${esc(t.rarity||'common')}">${esc(titleRarityLabel(t.rarity))}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${got?'✓ 已取得':`${current}／${target}`}${t.isActive===false?'・籌備中':''}${t.isLimited?'・限定':''}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
   </section>`;
 }
 let communityEventsCache = null;
@@ -32076,6 +32095,6 @@ if(testerSession){
   });
 </script>
 <script src="activity-points-ui.js?v=20260928-account-frame-fix5"></script>
-<script src="ladder-secondary-ui.js?v=14.2.52"></script>
+<script src="ladder-secondary-ui.js?v=14.2.53-title-skins"></script>
 </body>
 </html>
