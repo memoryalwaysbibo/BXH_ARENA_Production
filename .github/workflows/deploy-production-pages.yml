@@ -1,0 +1,66 @@
+name: Deploy Production Pages - Validated Only
+
+on:
+  workflow_run:
+    workflows:
+      - Validate Production Frontend RC1
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: production-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy validated production build
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout exact validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Re-verify production entrypoint before deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f index.html
+          bytes="$(wc -c < index.html | tr -d ' ')"
+          lines="$(wc -l < index.html | tr -d ' ')"
+          if [ "$bytes" -lt 100000 ] || [ "$lines" -lt 1000 ]; then
+            echo "DEPLOY BLOCKED: index.html looks empty or truncated: bytes=$bytes lines=$lines" >&2
+            exit 1
+          fi
+          grep -qi '<!doctype html' index.html
+          grep -qi '<html' index.html
+          grep -q 'BXH ARENA' index.html
+          grep -q 'bxh-environment" content="production' index.html
+          grep -qi '</html>' index.html
+          echo "Deploy guard OK: bytes=$bytes lines=$lines"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload exact validated site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
