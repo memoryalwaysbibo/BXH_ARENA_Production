@@ -14,6 +14,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Guard production entrypoint integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f index.html
+          bytes="$(wc -c < index.html | tr -d ' ')"
+          lines="$(wc -l < index.html | tr -d ' ')"
+          if [ "$bytes" -lt 100000 ] || [ "$lines" -lt 1000 ]; then
+            echo "Production index.html looks empty or truncated: bytes=$bytes lines=$lines" >&2
+            exit 1
+          fi
+          grep -qi '<!doctype html' index.html
+          grep -qi '<html' index.html
+          grep -q 'BXH ARENA' index.html
+          grep -q 'bxh-environment" content="production' index.html
+          grep -qi '</html>' index.html
+          echo "Production entrypoint integrity OK: bytes=$bytes lines=$lines"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
