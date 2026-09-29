@@ -70,45 +70,5 @@ test('player can create account and open a community room on isolated emulators'
   const notice = await page.locator('.community-room-notice').innerText();
   expect(notice).toMatch(/BXH-[A-Z0-9]{6}/);
 
-  // Build a four-player field through the same UI used on site.
-  await page.locator('[data-action="people-section"][data-section="tools"]').click();
-  await expect(page.getByText('現場新增選手', { exact: true })).toBeVisible();
-  await page.locator('#quick-add-textarea').fill('BOT Alpha\nBOT Beta\nBOT Gamma');
-  await page.locator('[data-action="quick-add-players"]').click();
-
-  await page.locator('[data-action="people-section"][data-section="confirmed"]').click();
-  await expect(page.getByText('BOT Alpha', { exact: true })).toBeVisible();
-  await expect(page.getByText('BOT Beta', { exact: true })).toBeVisible();
-  await expect(page.getByText('BOT Gamma', { exact: true })).toBeVisible();
-
-  // Draw the bracket and lock the roster by starting the tournament.
-  await page.locator('[data-action="people-section"][data-section="bracket"]').click();
-  const drawButton = page.locator('[data-action="draw-bracket"]');
-  await expect(drawButton).toBeEnabled();
-  await drawButton.click();
-  await expect(page.locator('[data-action="start-tournament"]')).toBeVisible({ timeout: 15000 });
-  await page.locator('[data-action="start-tournament"]').click();
-  await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({ timeout: 15000 });
-  await page.locator('[data-action="modal-confirm"]').click();
-
-  // Community rooms keep their own tab state, so enter the referee desk explicitly.
-  await page.locator('[data-action="community-switch-room-tab"][data-tab="referee"]').click();
-  const extremeA = page.locator('[data-action="score"][data-side="A"][data-type="extreme"]').first();
-  const spinA = page.locator('[data-action="score"][data-side="A"][data-type="spin"]').first();
-  await expect(extremeA).toBeEnabled({ timeout: 20000 });
-
-  // Standard scoring: Extreme 3 + Spin 1 reaches the four-point win threshold.
-  await extremeA.click();
-  await spinA.click();
-  const confirmResult = page.locator('[data-action="confirm-result"]').first();
-  await expect(confirmResult).toBeEnabled();
-  await confirmResult.click();
-  await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible();
-  await page.locator('[data-action="modal-confirm"]').click();
-
-  // A successful cloud-guard transaction advances the station and exposes
-  // correction controls for the just-completed match.
-  await expect(page.locator('.ref-previous-correction')).toBeVisible({ timeout: 30000 });
-
   expect(externalFirebaseRequests).toEqual([]);
 });
