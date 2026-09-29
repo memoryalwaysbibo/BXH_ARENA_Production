@@ -24219,7 +24219,8 @@ function bindBoardModeInteractions(){
     const canvas = document.getElementById("board-canvas");
     if(!viewport || !canvas) return;
 
-    bindCompletedMatchCorrectionLongPress(viewport);\n    bindManualCourtAssignLongPress(viewport);
+    bindCompletedMatchCorrectionLongPress(viewport);
+    bindManualCourtAssignLongPress(viewport);
 
     viewport.addEventListener("wheel", (e)=>{
       if(!e.ctrlKey) return;
@@ -27666,6 +27667,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();return;
   }
   if(action==="open-match"){
+    if(bracketManualAssignSuppressClickId===id&&Date.now()<bracketManualAssignSuppressClickUntil){bracketManualAssignSuppressClickId="";return;}
     const m = getMatch(id);
     if(!m||m.isBye) return;
     if(courtSwapDraft){
