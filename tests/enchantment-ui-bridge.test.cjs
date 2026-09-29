@@ -113,3 +113,37 @@ test('enchantment result confirmation no longer uses browser-global confirm',()=
  assert.match(source,/data-enchantment-confirm-winner/);
  assert.match(source,/確認勝負/);
 });
+
+
+test('player AUTO draw preference is local, off by default, and automatically draws only own side',async()=>{
+ const calls=[],sent=[],listeners={};let stored='1';
+ const state={round:4,phase:'drawing',scores:{A:2,B:1},faults:{A:0,B:0},drawn:{A:false,B:false},cards:{A:null,B:null}};
+ const frame={dataset:{code:'BXH-ABCD',matchId:'match1',side:'A'},contentWindow:{postMessage:x=>sent.push(x)},closest:()=>null};
+ const root={BXHEnchantmentScore:score,engagementService:{enchantment:async payload=>{
+  calls.push(payload);
+  if(payload.action==='draw')return {version:8,state:{...state,phase:'drawing',drawn:{A:true,B:false},cards:{A:'double_spin',B:null}}};
+  return {version:7,state};
+ }},addEventListener:(event,fn)=>listeners[event]=fn};
+ const document={querySelectorAll:selector=>selector==='iframe[data-enchantment-player]'?[frame]:[],
+  addEventListener:(event,fn)=>listeners[event]=fn};
+ const localStorage={getItem:key=>key==='bxh-enchantment-player-auto-draw'?stored:null,setItem:(key,value)=>{if(key==='bxh-enchantment-player-auto-draw')stored=value;}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../enchantment-ui.js'),'utf8'),
+  {window:root,document,localStorage,location:{origin:'https://arena.example'},setTimeout:(fn)=>fn(),setInterval:()=>{},console});
+ await root.BXHEnchantmentUI.refresh('BXH-ABCD','match1');
+ await new Promise(resolve=>setImmediate(resolve));
+ const draw=calls.find(x=>x.action==='draw');
+ assert.ok(draw,'AUTO ON should submit a draw when the own side is eligible');
+ assert.equal(draw.round,4);assert.equal(draw.version,7);
+ assert.equal('target' in draw,false);assert.equal('side' in draw,false);
+ assert.equal(sent.at(-1).state.drawn.A,true);assert.equal(sent.at(-1).state.drawn.B,false);
+});
+
+test('player AUTO draw toggle is present and persisted independently from referee auto reveal',()=>{
+ const source=fs.readFileSync(require.resolve('../enchantment-ui.js'),'utf8');
+ assert.match(source,/AUTO_DRAW_KEY='bxh-enchantment-player-auto-draw'/);
+ assert.match(source,/data-enchantment-auto-draw/);
+ assert.match(source,/AUTO 抽卡/);
+ assert.match(source,/saveAutoDraw\(enabled\)/);
+ assert.match(source,/action:'draw',code,matchId:id,version:item\.version,round:state\.round/);
+ assert.match(source,/setAutoReveal/);
+});
