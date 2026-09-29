@@ -1,0 +1,50 @@
+name: Finalize enchantment release metadata
+on:
+  push:
+    branches: [fix/enchantment-five-points-20260929]
+    paths: [.github/workflows/enchantment-release-metadata-20260929.yml]
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.repository == 'memoryalwaysbibo/BXH_ARENA_Production' && github.ref == 'refs/heads/fix/enchantment-five-points-20260929'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/enchantment-five-points-20260929
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Preserve increasing app version
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('index.html');text=p.read_text()
+          assert text.count('const APP_VERSION = "v14.3.5"')==1
+          assert text.count('CURRENT_BUILD="20260929.6"')==1
+          p.write_text(text.replace('const APP_VERSION = "v14.3.5"','const APP_VERSION = "v14.3.7"'))
+          p=Path('version.json');v=json.loads(p.read_text())
+          assert v['version']=='v14.3.5' and v['build']=='20260929.6'
+          v['version']='v14.3.7'
+          p.write_text(json.dumps(v,indent=2)+'\n')
+          PY
+      - name: Validate complete scoped changes
+        run: |
+          node --test tests/enchantment-hunter-ledger.test.cjs tests/enchantment-score-core.test.cjs tests/enchantment-round-core.test.cjs tests/enchantment-ui-bridge.test.cjs
+          node scripts/verify-production-frontend.cjs
+      - name: Commit release metadata only
+        run: |
+          set -euo pipefail
+          git diff --check
+          python3 - <<'PY'
+          import subprocess
+          assert set(subprocess.check_output(['git','diff','--name-only'],text=True).splitlines())=={'index.html','version.json'}
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html version.json
+          git commit -m 'fix(release): publish enchantment five points as v14.3.7'
+          git push origin HEAD:refs/heads/fix/enchantment-five-points-20260929
