@@ -146,7 +146,7 @@ jobs:
           '''<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">''',
           "gallery card tier class")
 
-          s=s.replaceAll("titleArtworkPath(t.name,t.rarity)","titleArtworkPath(t.name,titleTierClass(t))")
+          s=s.replace("titleArtworkPath(t.name,t.rarity)","titleArtworkPath(t.name,titleTierClass(t))")
 
           rep(
           '''<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span class="rarity-badge rarity-${esc(t.rarity||'common')}">${esc(titleRarityLabel(t.rarity))}</span></div>''',
