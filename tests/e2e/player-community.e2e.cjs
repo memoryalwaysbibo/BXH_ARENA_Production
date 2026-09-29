@@ -73,7 +73,7 @@ test('player can create account and open a community room on isolated emulators'
   // Build a four-player field through the same UI used on site.
   await page.locator('[data-action="people-section"][data-section="tools"]').click();
   await expect(page.getByText('現場新增選手', { exact: true })).toBeVisible();
-  await page.locator('#quick-add-textarea').fill('BOT Alpha\\nBOT Beta\\nBOT Gamma');
+  await page.locator('#quick-add-textarea').fill('BOT Alpha\nBOT Beta\nBOT Gamma');
   await page.locator('[data-action="quick-add-players"]').click();
 
   await page.locator('[data-action="people-section"][data-section="confirmed"]').click();
