@@ -37,7 +37,7 @@ for(const [name,file] of [['整裝待發','title-common-ready.svg'],['初次上�
   assert(source.includes("\""+name+"\":\"assets/"+file+"\""), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
 }
-for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp'],['百日戰士','title-epic-hundred-day-warrior.webp'],['初次開局','title-rare-first-match.webp'],['資深主辦','title-rare-host-20.webp']]){
+for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp'],['百日戰士','title-epic-hundred-day-warrior.webp'],['初次開局','title-rare-first-match.webp'],['資深主辦','title-rare-host-20.webp'],['賽事推手','title-rare-host-10.webp'],['競技場主','title-rare-host-30.webp'],['封測先鋒','title-limited-closed-beta.webp']]){
   assert(html.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
   assert(source.includes('"'+name+'":"assets/'+file+'"'), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
