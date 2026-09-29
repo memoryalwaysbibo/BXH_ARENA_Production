@@ -113,6 +113,7 @@
         "開拓者":"assets/title-limited-pioneer.webp",
         "諸神典藏者":"assets/title-limited-gods-collector.webp",
         "諸神收藏家":"assets/title-limited-gods-collector.webp",
+        "S3總冠軍":"assets/title-limited-s3-champion.webp",
         "三冠王":"assets/title-legendary-triple-crown.webp",
         "二當家":"assets/title-limited-co-leader.webp",
         "三當家":"assets/title-limited-third-leader.webp",
