@@ -1,5 +1,6 @@
 name: Validate enchantment local confirm modal
 # retry after DOM bridge compatibility fix
+# retry 2 after legacy closest stub compatibility
 on:
   push:
     branches: [fix/enchantment-confirm-modal-20260929]
