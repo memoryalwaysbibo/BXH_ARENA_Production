@@ -1,5 +1,31 @@
 const { test, expect } = require('@playwright/test');
 
+const blockedBackendHosts = [
+  'firestore.googleapis.com',
+  'identitytoolkit.googleapis.com',
+  'securetoken.googleapis.com',
+  'firebaseinstallations.googleapis.com',
+  'fcmregistrations.googleapis.com',
+  'firebaseremoteconfig.googleapis.com',
+];
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    const host = url.hostname;
+    const blocked =
+      blockedBackendHosts.includes(host) ||
+      host.endsWith('.firebaseio.com') ||
+      host.endsWith('.googleapis.com');
+
+    if (blocked) {
+      await route.abort('blockedbyclient');
+      return;
+    }
+    await route.continue();
+  });
+});
+
 test('ARENA shell renders and stays inside viewport', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
@@ -30,12 +56,10 @@ test('production identity markers are present in rendered document', async ({ pa
   expect(build).toBeTruthy();
 });
 
-test('main entrance cards exist in source layout', async ({ page }) => {
+test('main entrance cards exist in isolated rendered layout', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  const cards = page.locator('.landing-role-cards');
-  await expect(cards).toHaveCount(1);
-
+  await expect(page.locator('.landing-role-cards')).toHaveCount(1);
   await expect(page.locator('.role-card-admin')).toHaveCount(1);
   await expect(page.locator('.role-card-player')).toHaveCount(1);
   await expect(page.locator('.role-card-guest')).toHaveCount(1);
