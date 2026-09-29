@@ -131,3 +131,23 @@ jobs:
             echo 'This candidate is validation-only; deployment action found.' >&2
             exit 1
           fi
+
+  ui_smoke:
+    name: UI Smoke - Desktop / iPhone / Android
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install UI test runner
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Run isolated browser smoke tests
+        run: npm run test:ui-smoke
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-ui-smoke-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
