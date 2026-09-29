@@ -2,8 +2,6 @@ name: BXH ARENA Emulator E2E
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 permissions:
   contents: read
