@@ -2,9 +2,11 @@
   "name": "bxh-arena-production-tests",
   "private": true,
   "devDependencies": {
-    "@playwright/test": "1.55.0"
+    "@playwright/test": "1.55.0",
+    "firebase-tools": "^14.0.0"
   },
   "scripts": {
-    "test:ui-smoke": "playwright test --config=playwright.config.cjs"
+    "test:ui-smoke": "playwright test --config=playwright.config.cjs",
+    "test:ui-e2e": "playwright test --config=playwright.e2e.config.cjs"
   }
 }
