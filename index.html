@@ -28,7 +28,7 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260929.4">
+<meta name="bxh-build" content="20260929.5">
 <script>
 (function bxhFreshVersionGuard(){
   var CURRENT_BUILD="20260929.5";
@@ -6128,7 +6128,7 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.3";
+const APP_VERSION = "v14.3.4";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},
@@ -17068,10 +17068,31 @@ async function peopleDemoteOnline(player){
 }
 async function peopleCancelOnline(registrationId,name){
   if(peopleRosterBusy)return;
+  const beforeRow=(Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[]).find(r=>peopleRegistrationIdOf(r)===String(registrationId))||null;
+  const wasConfirmed=beforeRow&&beforeRow.status==="confirmed";
   peopleRosterBusy=true;render();
   try{
     if(!window.cloudSync||!window.cloudSync.mutateRegistrationRoster)throw Object.assign(new Error("network"),{code:"network"});
     const result=await window.cloudSync.mutateRegistrationRoster(state.cloudCode,registrationId,"cancel",{});
+    if(wasConfirmed&&Number(result.waitlistCount||0)>0&&window.cloudSync.promoteEarliestWaitlist){
+      let promoted=null,lastError=null;
+      for(let attempt=0;attempt<2&&!promoted;attempt++){
+        try{promoted=await window.cloudSync.promoteEarliestWaitlist(state.cloudCode);}catch(err){lastError=err;}
+      }
+      if(promoted&&promoted.ok){
+        if(window.cloudSync.listRegistrationsForAdmin){
+          const rows=await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
+          adminRegistrationsCache=rows;
+          await syncLatestOnlineRosterBeforeLock(rows);
+        }
+        peopleRosterBusy=false;render();
+        showToast("已取消「"+name+"」；備取第 1 位已自動遞補正取");
+        return;
+      }
+      console.warn("[auto waitlist promotion after admin cancel] failed",lastError);
+      await peopleApplyCloudRosterResult(result,"已取消「"+name+"」，但備取自動遞補失敗，請手動確認");
+      return;
+    }
     await peopleApplyCloudRosterResult(result,"已取消「"+name+"」的參賽名額");
   }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
 }
