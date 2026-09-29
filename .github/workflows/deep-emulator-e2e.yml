@@ -1,0 +1,60 @@
+name: BXH ARENA Deep Emulator E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/deep-emulator-e2e.yml'
+      - 'tests/e2e/player-tournament-deep.e2e.cjs'
+      - 'playwright.deep-e2e.config.cjs'
+      - 'tests/e2e/static-server.cjs'
+      - 'tests/e2e/firebase.json'
+      - 'tests/e2e/firestore.rules'
+  schedule:
+    - cron: '30 19 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bxh-arena-deep-emulator-e2e
+  cancel-in-progress: true
+
+jobs:
+  four-player-referee-flow:
+    name: Four-player tournament through first referee result
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Java for Firestore Emulator
+        shell: bash
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-21-jre-headless
+          java -version
+
+      - name: Install test dependencies
+        run: npm install --no-package-lock --ignore-scripts
+
+      - name: Run deep Firebase Emulator E2E
+        shell: bash
+        run: |
+          npx firebase emulators:exec \
+            --only auth,firestore \
+            --project demo-bxh-arena-e2e \
+            --config tests/e2e/firebase.json \
+            "npx playwright test --config=playwright.deep-e2e.config.cjs"
+
+      - name: Upload deep E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-deep-e2e-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
