@@ -11561,7 +11561,8 @@ function stationMutationErrorMessage(reason){
     "already-completed":"本場已由其他裁判完成判定。",
     "invalid-score":"雲端比分已變更，請重新整理後再操作。",
     "cloud-unavailable":"目前無法連線雲端，請稍後再試。",
-    "corrupt-data":"雲端賽事資料異常，已停止寫入。"
+    "corrupt-data":"雲端賽事資料異常，已停止寫入。",
+    "bronze-before-final":"季殿尚未完成，冠亞必須等待季殿結束後才能開始。"
   };
   return map[reason] || ("雲端場次更新失敗（"+reason+"），請重新整理後再試。");
 }
@@ -12343,14 +12344,37 @@ function applyChallongeSingleElimOrder(matches, stationCount){
   return matches;
 }
 
+function singleElimBronzeGatePhase(matches=state.matches, meta=state.meta){
+  if((meta&&meta.formatType||"single")!=="single" || !(meta&&meta.bronzeMatch)) return null;
+  const se=matches.filter(m=>m&&m.bracket==="SE"&&!m.isBye);
+  if(!se.length) return null;
+  const finalRound=Math.max(...se.map(m=>Number(m.round)||0));
+  if(finalRound<1) return null;
+  const semis=se.filter(m=>Number(m.round||0)===finalRound-1);
+  const losersReady=semis.length===2&&semis.every(m=>m.completed&&m.loserId);
+  if(!losersReady) return null;
+  const bronze=matches.find(m=>m&&m.bracket==="BZ"&&!m.isBye);
+  if(bronze&&bronze.completed) return null;
+  if(bronze&&bronze.a&&bronze.b) return {kind:"bronze",matchId:bronze.id,finalRound};
+  // Defensive hold: semifinal losers are already known but the BZ node has not
+  // been materialized yet. Never let the championship final slip through this
+  // transient propagation window.
+  return {kind:"bronze-pending",matchId:bronze&&bronze.id||null,finalRound};
+}
+
+function singleElimBronzeBeforeFinalBlocked(match,matches=state.matches,meta=state.meta){
+  if(!match||match.bracket!=="SE") return false;
+  const gate=singleElimBronzeGatePhase(matches,meta);
+  if(!gate) return false;
+  return Number(match.round||0)===Number(gate.finalRound);
+}
+
 function activeSingleElimSchedulePhase(matches=state.matches, meta=state.meta){
-  // Global finals gate: when a single-elimination event has an enabled bronze
-  // match and both semifinal losers are known, 季殿 must be completed BEFORE
-  // 冠亞 can be dispatched on any court.  BZ lives outside the SE tree, so it
-  // has to be promoted to an explicit scheduling phase here.
-  const bronzeEnabled=!!(meta&&meta.bronzeMatch);
-  const bronze=bronzeEnabled?matches.find(m=>m&&m.bracket==="BZ"&&!m.isBye&&!m.completed&&m.a&&m.b):null;
-  if(bronze) return {kind:"bronze",matchId:bronze.id};
+  // Placement gate is stronger than normal per-court progression: once both
+  // semifinal losers are known, 季殿 must finish before 冠亞 can become ready,
+  // current, manually assigned, swapped in, or started.
+  const placementGate=singleElimBronzeGatePhase(matches,meta);
+  if(placementGate) return placementGate;
 
   const unfinished=matches.filter(m=>m.bracket==="SE" && !m.isBye && !m.completed);
   if(!unfinished.length) return null;
@@ -12363,6 +12387,7 @@ function activeSingleElimSchedulePhase(matches=state.matches, meta=state.meta){
 function isInActiveSingleElimPhase(match, phase, matches=state.matches){
   if(!phase) return true;
   if(phase.kind==="bronze") return match.bracket==="BZ" && match.id===phase.matchId;
+  if(phase.kind==="bronze-pending") return false;
   return match.bracket==="SE" && Number(match.round||0)===phase.round && singleElimScheduleTier(match,matches)===phase.tier;
 }
 
@@ -12611,6 +12636,15 @@ function syncMatchStatuses(){
 }
 
 function autoAdvanceReadyMatches(){
+  // Heal stale/legacy rooms first: a championship final that was preassigned
+  // before the bronze gate existed must be released as long as no real play
+  // data has been entered yet.
+  const blockedFinals=state.matches.filter(m=>singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta)&&!matchHasDecisionData(m));
+  blockedFinals.forEach(m=>{
+    if(m.status==="ready"||m.status==="in_progress"){m.status="pending";m.startedAt=null;m.updatedAt=Date.now();}
+  });
+  if(blockedFinals.length) clearCourtAssignmentRefs(state,blockedFinals.map(m=>m.id));
+
   const readyStations = new Set();
   state.matches.forEach(m=>{ if(!m.isBye && m.status==="ready" && m.station!=null) readyStations.add(m.station); });
 
@@ -12620,7 +12654,8 @@ function autoAdvanceReadyMatches(){
     !m.completed &&
     m.a && m.b &&
     m.station!=null &&
-    !readyStations.has(m.station)
+    !readyStations.has(m.station) &&
+    !singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta)
   );
 
   candidates.sort((a,b)=>{
@@ -12642,6 +12677,7 @@ function setMatchInProgress(matchId, force){
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
   if(!m || m.isBye) return;
+  if(singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta)){showToast("季殿尚未完成，冠亞必須等待季殿結束後才能開始。",true);return;}
   if(!requireStationPermission(m)) return;
   if(!m.a || !m.b){ showToast("此場次尚未確定兩位選手，無法設為進行中", true); return; }
   const conflict = state.matches.find(x=> x.id!==m.id && !x.isBye && x.station===m.station && x.status==="in_progress");
@@ -12659,6 +12695,7 @@ function setMatchInProgress(matchId, force){
   m.updatedBy = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch) return {ok:false,reason:"not-found"};
+    if(singleElimBronzeBeforeFinalBlocked(remoteMatch,remoteState.matches,remoteState.meta)) return {ok:false,reason:"bronze-before-final"};
     const conflict=(remoteState.matches||[]).find(x=>x.id!==remoteMatch.id && !x.isBye && x.station===remoteMatch.station && x.status==="in_progress");
     if(conflict){ conflict.status="ready"; conflict.updatedAt=Date.now(); }
     remoteMatch.status="in_progress"; remoteMatch.startedAt=remoteMatch.startedAt||Date.now(); remoteMatch.updatedAt=Date.now();
@@ -12671,6 +12708,7 @@ function setMatchReady(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   const m = getMatch(matchId);
   if(!m || m.isBye) return;
+  if(singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta)){showToast("季殿尚未完成，冠亞不能進入預備或開賽狀態。",true);return;}
   if(!requireStationPermission(m)) return;
   if(m.completed || m.status==="completed"){ showToast("此場次已完成，無法設為預備中", true); return; }
   if(!m.a || !m.b){ showToast("此場次尚未確定兩位選手，無法設為預備中", true); return; }
@@ -12686,6 +12724,7 @@ function setMatchReady(matchId){
   m.updatedBy = adminDisplayName || (userProfile&&userProfile.email) || "admin";
   persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
     if(!remoteMatch) return {ok:false,reason:"not-found"};
+    if(singleElimBronzeBeforeFinalBlocked(remoteMatch,remoteState.matches,remoteState.meta)) return {ok:false,reason:"bronze-before-final"};
     (remoteState.matches||[]).forEach(x=>{ if(x.id!==remoteMatch.id && !x.isBye && x.station===remoteMatch.station && x.status==="ready"){ x.status="pending"; x.updatedAt=Date.now(); } });
     remoteMatch.status="ready"; remoteMatch.updatedAt=Date.now();
     rebuildPropagationForState(remoteState); return {ok:true,state:remoteState};
@@ -13092,10 +13131,11 @@ function stationExecutionQueue(stationNum){
   if((state.meta.formatType||"single")==="single"){
     const phase=activeSingleElimSchedulePhase();
     if(phase){
-      // Hard global phase gate. Do not merely sort later rounds behind the active
-      // phase: on multi-court events another court could otherwise start 冠亞
-      // while 季殿 is still pending.
-      available=available.filter(m=>isInActiveSingleElimPhase(m,phase));
+      // Preserve normal independent per-court progression, but never permit the
+      // championship final to bypass a pending 季殿 placement match.
+      const samePhase=available.filter(m=>isInActiveSingleElimPhase(m,phase));
+      const laterReady=available.filter(m=>!isInActiveSingleElimPhase(m,phase));
+      available=samePhase.concat(laterReady.filter(m=>!singleElimBronzeBeforeFinalBlocked(m)));
     }
   }
   const normal=available.filter(m=>!m.skippedAt).sort((a,b)=>{
@@ -13132,7 +13172,7 @@ function reconcileCourtAssignments(){
     const key=courtKey(i),court=incoming[key];
     if(!court)continue;
     const current=court.currentMatchId?getMatch(court.currentMatchId):null;
-    const validCurrent=!!(current&&!current.completed&&Number(current.station)===i&&current.a&&current.b&&current.status!=="paused");
+    const validCurrent=!!(current&&!current.completed&&Number(current.station)===i&&current.a&&current.b&&current.status!=="paused"&&!singleElimBronzeBeforeFinalBlocked(current,state.matches,state.meta));
     preserved[key]=validCurrent?current.id:null;
   }
   rebuildCourtAssignments();
@@ -13170,6 +13210,9 @@ function rebuildCourtAssignments(){
     // Drop the current assignment if it completed, or (due to a station
     // redistribution) no longer actually belongs to this court.
     if(current && (current.completed || current.station!==i)) current = null;
+    if(current && singleElimBronzeBeforeFinalBlocked(current,state.matches,state.meta) && !matchHasDecisionData(current)){
+      current.status="pending";current.startedAt=null;court.currentMatchId=null;current=null;
+    }
     // A paused match STAYS as the court's current match (paused ≠ vacated).
     if(!current){
       current = queue.find(m=>true) || null;
@@ -13356,12 +13399,17 @@ function rebuildPropagationSingle(){
     if(semis.length===2 && semis[0].completed && semis[1].completed){
       const loserA = semis[0].loserId, loserB = semis[1].loserId;
       if(loserA && loserB){
+        const finalMatch=matchesInRound(total-1)[0]||null;
+        const finalSeq=Number(finalMatch&&finalMatch.seq);
+        const semiMaxSeq=Math.max(...semis.map(m=>Number(m.seq)||0));
+        const bronzeSeq=Number.isFinite(finalSeq)?finalSeq-0.5:semiMaxSeq+0.5;
         let bronze = state.bronzeMatchId ? getMatch(state.bronzeMatchId) : null;
         if(!bronze){
-          bronze = { id: uid("bz"), seq: (state.matches.reduce((mx,x)=>Math.max(mx,x.seq||0),0))+0.5, bracket:"BZ", round:total-2, indexInRound:0, isBye:false, scoreA:0,scoreB:0, log:[], winnerId:null, loserId:null, completed:false, station: semis[0].station };
+          bronze = { id: uid("bz"), seq:bronzeSeq, bracket:"BZ", round:total-2, indexInRound:0, isBye:false, scoreA:0,scoreB:0, log:[], winnerId:null, loserId:null, completed:false, station: semis[0].station };
           state.matches.push(bronze);
           state.bronzeMatchId = bronze.id;
         }
+        bronze.seq=bronzeSeq;
         const curA = bronze.a?bronze.a.playerId:null, curB = bronze.b?bronze.b.playerId:null;
         if(curA!==loserA || curB!==loserB){
           bronze.a={type:"player",playerId:loserA}; bronze.b={type:"player",playerId:loserB};
@@ -16067,8 +16115,9 @@ function matchHasDecisionData(m){
 function canCourtSwapSource(m){
   return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&!matchHasDecisionData(m)&&m.status!=="paused");
 }
-function canCourtSwapTarget(m,sourceMatch){
+function canCourtSwapTarget(m,sourceMatch,st=state){
   if(!m||!sourceMatch||m.id===sourceMatch.id||m.isBye||m.completed||!m.a||!m.b) return false;
+  if(singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{})) return false;
   if(m.status==="in_progress"||m.status==="paused"||m.skippedAt||m.callPass||matchHasDecisionData(m)) return false;
   return true;
 }
@@ -16081,7 +16130,7 @@ function idleCourtCandidates(st,stationNum){
   return (st.matches||[]).filter(m=>m&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
     !m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&
     !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&
-    (!phase||isInActiveSingleElimPhase(m,phase,st.matches)))
+    (!phase||isInActiveSingleElimPhase(m,phase,st.matches)||!singleElimBronzeBeforeFinalBlocked(m,st.matches,st.meta)))
     .sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
 }
 function applyIdleCourtClaim(st,matchId,stationNum){
@@ -16149,7 +16198,7 @@ function applyCourtSwapMutation(remoteState,sourceId,targetId){
   const source=(remoteState.matches||[]).find(m=>m.id===sourceId);
   const target=(remoteState.matches||[]).find(m=>m.id===targetId);
   if(!canCourtSwapSource(source)) return {ok:false,reason:"source-no-longer-swappable"};
-  if(!canCourtSwapTarget(target,source)) return {ok:false,reason:"target-no-longer-swappable"};
+  if(!canCourtSwapTarget(target,source,remoteState)) return {ok:false,reason:"target-no-longer-swappable"};
   const sourceStation=Number(source.station||0),targetStation=Number(target.station||sourceStation||0);
   if(!sourceStation||!targetStation) return {ok:false,reason:"station-mismatch"};
   const now=Date.now();
@@ -16186,9 +16235,9 @@ async function executeCourtSwap(targetId){
 }
 let bracketManualAssignSuppressClickId="";
 let bracketManualAssignSuppressClickUntil=0;
-function canManualAssignMatch(m){return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!matchHasDecisionData(m)&&m.status!=="paused"&&!m.skippedAt&&!m.callPass);}
+function canManualAssignMatch(m,st=state){return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!matchHasDecisionData(m)&&m.status!=="paused"&&!m.skippedAt&&!m.callPass&&!singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{}));}
 function applyManualCourtAssign(st,matchId,targetStation){
- const m=(st.matches||[]).find(x=>x.id===matchId);if(!canManualAssignMatch(m))return {ok:false,reason:"match-no-longer-available"};
+ const m=(st.matches||[]).find(x=>x.id===matchId);if(!canManualAssignMatch(m,st))return {ok:false,reason:"match-no-longer-available"};
  const n=Math.max(1,Number(st.meta?.stations||1));if(targetStation<1||targetStation>n)return {ok:false,reason:"station-not-assigned"};
  const now=Date.now();clearCourtAssignmentRefs(st,[m.id]);const target=st.courtAssignments&&st.courtAssignments[courtKey(targetStation)];
  if(target&&target.currentMatchId&&target.currentMatchId!==m.id){const d=(st.matches||[]).find(x=>x.id===target.currentMatchId);if(d&&!d.completed&&!matchHasDecisionData(d)){d.status="pending";d.startedAt=null;d.dispatchPriorityAt=null;d.dispatchRevision=Number(d.dispatchRevision||0)+1;d.updatedAt=now;}target.currentMatchId=null;}
