@@ -31,8 +31,8 @@ test('ARENA shell renders and stays inside viewport', async ({ page }) => {
 
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('#app')).toBeVisible();
-  await expect(page.locator('header.topbar')).toBeVisible();
-  await expect(page.getByText('BXH ARENA', { exact: false }).first()).toBeVisible();
+  await expect(page.locator('.landing-role-cards')).toBeVisible();
+  await expect(page.locator('.role-card-player')).toBeVisible();
 
   const metrics = await page.evaluate(() => ({
     bodyScrollWidth: document.body.scrollWidth,
