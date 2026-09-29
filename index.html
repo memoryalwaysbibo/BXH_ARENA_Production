@@ -10644,6 +10644,7 @@ const ACTIVE_MODE_KEY = "bxh_active_mode_v1";
 // point this specific sign-in attempt came through, without needing a second
 // competing routing path. Cleared as soon as it's been consumed.
 let pendingLoginIntent = null; // 'admin' | 'player' | 'partner_organizer' | 'event_staff' | null
+let googlePopupPending = false; // Google account choice / device verification is still in progress
 
 // Races a promise against a timeout; resolves to {ok:false, error:"..."} on
 // timeout instead of leaving the caller's await hanging forever. Used to
@@ -10750,6 +10751,7 @@ function clearVerifyingTimeout(){
 // and returns control to the login form immediately.
 function cancelVerifyingAndRetry(){
   loginAttemptGeneration++; // orphan any in-flight attempt's eventual callback
+  googlePopupPending = false;
   clearVerifyingTimeout();
   authVerifying = false;
   loginBusy = false; playerLoginBusy = false;
@@ -18600,12 +18602,15 @@ document.addEventListener("change",(e)=>{
 
 function renderPlayerLoginScreen(){
   const verifying=playerLoginBusy||authVerifying;
+  const verifyingMessage=googlePopupPending
+    ? "請在 Google 視窗完成帳號選擇與身分驗證，完成後返回 ARENA。"
+    : "正在驗證帳號權限……";
   return authShellOpen()+`
     ${authBrandHeader()}
     <div class="auth-card">
       <div class="auth-card-title">玩家登入</div>
       ${playerLoginError ? `<div class="auth-error">${esc(playerLoginError)}${(!verifying)?`<div class="hint" style="margin-top:6px;">請重新點擊下方按鈕再試一次。</div>`:""}</div>`:""}
-      ${verifying ? `<div class="auth-verifying">正在驗證帳號權限……<button class="link-btn" data-action="cancel-verifying" style="margin-left:8px;">取消並重試</button></div>`:""}
+      ${verifying ? `<div class="auth-verifying">${verifyingMessage}<button class="link-btn" data-action="cancel-verifying" style="margin-left:8px;">取消並重試</button></div>`:""}
       <div class="field"><label>Gmail 帳號或完整 Email</label><input type="text" inputmode="email" id="player-login-email" value="${esc(bxhPlayerLoginIdentifierDraft)}" placeholder="例如：bxhplayer" ${verifying?'disabled':''} autocomplete="username" autocapitalize="none" spellcheck="false"><div class="hint" style="margin-top:5px;">只輸入 @ 前的帳號即可；完整 Email 也能登入</div></div>
       <label class="player-remember-row" for="player-remember-account">
         <input type="checkbox" id="player-remember-account" ${bxhRememberPlayerAccount?'checked':''} ${verifying?'disabled':''}>
@@ -18618,7 +18623,7 @@ function renderPlayerLoginScreen(){
           <button type="button" class="pw-eye-btn" data-action="toggle-login-password" aria-label="${showLoginPassword?'隱藏密碼':'顯示密碼'}" title="${showLoginPassword?'隱藏密碼':'顯示密碼'}">${showLoginPassword?EYE_OFF_SVG:EYE_TOGGLE_SVG}</button>
         </div>
       </div>
-      <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-email-signin" ${verifying?'disabled':''}>${verifying?'正在驗證帳號權限……':'登入'}</button>
+      <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-email-signin" ${verifying?(googlePopupPending?'請先完成 Google 驗證':'正在驗證帳號權限……'):'登入'}</button>
       <button class="hoc-btn btn-block" style="width:100%;margin-top:10px;" data-action="player-google-signin" ${verifying?'disabled':''}>使用已綁定的 Google 帳號登入</button>
       <div class="hint" style="margin-top:6px;">僅限先前已在 ARENA 綁定的 Google 帳號；未綁定者請先以原帳密登入。</div>
       <div class="auth-links">
@@ -25024,10 +25029,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="player-google-signin"){
     if(playerLoginBusy||authVerifying)return;
     if(!(window.cloudAuth&&window.cloudAuth.isReady())){playerLoginError="雲端服務尚未連線，請稍後再試";render();return;}
-    playerLoginBusy=true;playerLoginError="";pendingLoginIntent="player";render();
+    playerLoginBusy=true;googlePopupPending=true;playerLoginError="";pendingLoginIntent="player";render();
     const attempt=++loginAttemptGeneration;
     window.cloudAuth.signInWithLinkedGoogle().then(result=>{
       if(attempt!==loginAttemptGeneration)return;
+      googlePopupPending=false;
       if(!result.ok){
         playerLoginBusy=false;pendingLoginIntent=null;
         playerLoginError=result.error||"Google 登入失敗";render();return;
@@ -25037,6 +25043,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
     }).catch(()=>{
       if(attempt!==loginAttemptGeneration)return;
+      googlePopupPending=false;
       playerLoginBusy=false;pendingLoginIntent=null;playerLoginError="Google 登入失敗，請稍後再試";render();
     });
     return;
