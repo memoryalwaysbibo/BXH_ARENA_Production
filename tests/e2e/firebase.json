@@ -1,6 +1,6 @@
 {
   "firestore": {
-    "rules": "tests/e2e/firestore.rules"
+    "rules": "firestore.rules"
   },
   "emulators": {
     "auth": {
