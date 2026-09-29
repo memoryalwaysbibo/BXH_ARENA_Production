@@ -334,7 +334,7 @@
  setInterval(discoverPlayerDraw,4000);
  setTimeout(discoverPlayerDraw,1500);
  function closeConfirmModal(){
-  document.querySelector('[data-enchantment-confirm-modal]')?.remove();
+  [...document.querySelectorAll('[data-enchantment-confirm-modal]')][0]?.remove();
  }
  function openConfirmModal(code,id){
   const item=cache.get(key(code,id)),s=item?.state;
@@ -392,6 +392,16 @@
   finally{busy.delete(k);await refresh(code,id);}
  }
  document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-enchantment-action]');
+  if(el){
+   e.preventDefault();e.stopPropagation();
+   const d=el.dataset;
+   if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);
+   else if(d.enchantmentAction==='swap'){const k=key(d.code,d.matchId);if(reversedSides.has(k))reversedSides.delete(k);else reversedSides.add(k);paint(d.code,d.matchId);}
+   else if(d.enchantmentAction==='confirm')openConfirmModal(d.code,d.matchId);
+   else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type,enabled:d.enabled});
+   return;
+  }
   const cancel=e.target.closest('[data-enchantment-confirm-cancel]');
   if(cancel){e.preventDefault();e.stopPropagation();closeConfirmModal();return;}
   const submit=e.target.closest('[data-enchantment-confirm-submit]');
@@ -399,15 +409,7 @@
    e.preventDefault();e.stopPropagation();
    const modal=submit.closest('[data-enchantment-confirm-modal]');if(!modal)return;
    operate({code:modal.dataset.code,matchId:modal.dataset.matchId,action:'confirm',expectedVersion:Number(modal.dataset.version)});
-   return;
   }
-  const el=e.target.closest('[data-enchantment-action]');if(!el)return;
-  e.preventDefault();e.stopPropagation();
-  const d=el.dataset;
-  if(d.enchantmentAction==='refresh')refresh(d.code,d.matchId);
-  else if(d.enchantmentAction==='swap'){const k=key(d.code,d.matchId);if(reversedSides.has(k))reversedSides.delete(k);else reversedSides.add(k);paint(d.code,d.matchId);}
-  else if(d.enchantmentAction==='confirm')openConfirmModal(d.code,d.matchId);
-  else operate({code:d.code,matchId:d.matchId,action:d.enchantmentAction,side:d.side,type:d.type,enabled:d.enabled});
  },true);
  root.addEventListener('message',async e=>{
   if(e.origin!==location.origin)return;
