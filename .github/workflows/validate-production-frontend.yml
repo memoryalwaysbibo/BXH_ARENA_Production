@@ -108,6 +108,12 @@ jobs:
         run: node --experimental-vm-modules tests/ladder-v1.cjs
       - name: Verify ladder V1 settlement trust boundary
         run: node --experimental-vm-modules tests/ladder-settlement.cjs
+      - name: BXH ARENA Regression Core - Critical
+        run: node scripts/run-regression-core.cjs critical
+
+      - name: BXH ARENA Regression Core - Warning
+        continue-on-error: true
+        run: node scripts/run-regression-core.cjs warning
       - name: Verify no Beta runtime target
         shell: bash
         run: |
