@@ -84,9 +84,20 @@ test('four-player community event reaches first confirmed referee result', async
   await expect(extremeA).toBeVisible({ timeout: 30000 });
   await extremeA.click();
 
+  // Scoring is authoritative through a Firestore transaction. The remote
+  // snapshot intentionally re-renders the referee desk, so wait for that
+  // transaction to settle before locating the next scoring control.
+  await page.waitForFunction(() => {
+    const scores = [...document.querySelectorAll('.side-score')].map(x => x.textContent.trim());
+    return scores.includes('3');
+  }, null, { timeout: 20000 });
+  await page.evaluate(async () => {
+    if (typeof flushStationMatchMutations === 'function') await flushStationMatchMutations();
+  });
+
   const spinA = page.locator('[data-action="score"][data-side="A"][data-type="spin"]:not([disabled])').first();
   await expect(spinA).toBeVisible({ timeout: 20000 });
-  await spinA.click();
+  await spinA.click({ force: true });
 
   await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({ timeout: 15000 });
   await page.locator('[data-action="modal-confirm"]').click();
