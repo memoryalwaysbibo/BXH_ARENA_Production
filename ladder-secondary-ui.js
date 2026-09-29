@@ -106,13 +106,29 @@
       var rank=Number(p.__rank||0);
       var topClass=rank>=1&&rank<=3?" ladder-rank-top-"+rank:"";
       var titleName=p.equippedBadge&&p.equippedBadge.name==="審判者"?"裁決者":p.equippedBadge&&p.equippedBadge.name||"";
-      var art=p.equippedBadge&&p.equippedBadge.rarity==="eternal"
-        ?(titleName==="創世者"?"assets/title-eternal-creator.webp":titleName==="裁決者"?"assets/title-eternal-adjudicator.webp":"")
-        :p.equippedBadge&&p.equippedBadge.rarity==="limited"&&titleName==="開拓者"
-          ?"assets/title-limited-pioneer.webp"
-          :p.equippedBadge&&(p.equippedBadge.rarity==="rare"||p.equippedBadge.rarity==="limited")&&titleName==="諸神典藏者"
-            ?"assets/title-limited-gods-collector.webp"
-            :"";
+      var titleArtMap={
+        "創世者":"assets/title-eternal-creator.webp",
+        "裁決者":"assets/title-eternal-adjudicator.webp",
+        "審判者":"assets/title-eternal-adjudicator.webp",
+        "開拓者":"assets/title-limited-pioneer.webp",
+        "諸神典藏者":"assets/title-limited-gods-collector.webp",
+        "諸神收藏家":"assets/title-limited-gods-collector.webp",
+        "三冠王":"assets/title-legendary-triple-crown.webp",
+        "二當家":"assets/title-limited-co-leader.webp",
+        "三當家":"assets/title-limited-third-leader.webp",
+        "BXH 工作人員":"assets/title-limited-bxh-staff.webp",
+        "封測先鋒":"assets/title-limited-closed-beta.webp",
+        "百戰磨練":"assets/title-epic-hundred-battles.webp",
+        "四強霸主":"assets/title-epic-top4-overlord.webp",
+        "冠軍獵人":"assets/title-epic-champion-hunter.webp",
+        "百日戰士":"assets/title-epic-hundred-day-warrior.webp",
+        "初次開局":"assets/title-rare-host-1.webp",
+        "對戰召集人":"assets/title-rare-host-3.webp",
+        "賽事推手":"assets/title-rare-host-10.webp",
+        "資深主辦":"assets/title-rare-host-20.webp",
+        "競技場主":"assets/title-rare-host-30.webp"
+      };
+      var art=p.equippedBadge?titleArtMap[titleName]||"":"";
       var title=p&&p.equippedBadge
         ?'<span class="title-chip rarity-'+escLocal(p.equippedBadge.rarity||"common")+(art?' title-art-chip':'')+'" title="'+escLocal(titleName)+'">'+(art?'<img src="'+art+'" alt="'+escLocal(titleName)+'" decoding="async" onerror="this.onerror=null;this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">':escLocal(titleName))+'</span>'
         :"";
