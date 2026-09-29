@@ -102,6 +102,11 @@ test('four-player community event reaches first confirmed referee result', async
   await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({ timeout: 15000 });
   await page.locator('[data-action="modal-confirm"]').click();
 
-  await expect(page.locator('.ref-previous-correction')).toBeVisible({ timeout: 30000 });
+  // Confirmation must advance the authoritative room, not just mutate the
+  // local score card. The next referee workstation is the durable outcome.
+  await expect(page.getByText(/已完成 1 場/).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText('目前場次｜第2場', { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-action="score"]:not([disabled])').first()).toBeVisible();
+
   expect(externalFirebaseRequests).toEqual([]);
 });
