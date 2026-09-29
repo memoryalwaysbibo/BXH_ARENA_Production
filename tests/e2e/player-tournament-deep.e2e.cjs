@@ -80,33 +80,85 @@ test('four-player community event reaches first confirmed referee result', async
 
   await page.locator('[data-action="community-switch-room-tab"][data-tab="referee"]').click();
 
-  const extremeA = page.locator('[data-action="score"][data-side="A"][data-type="extreme"]:not([disabled])').first();
-  await expect(extremeA).toBeVisible({ timeout: 30000 });
-  await extremeA.click();
+  async function winCurrentMatchForA(expectedCompleted) {
+    const extreme = page.locator('[data-action="score"][data-side="A"][data-type="extreme"]:not([disabled])').first();
+    await expect(extreme).toBeVisible({ timeout: 30000 });
+    await extreme.click();
 
-  // Scoring is authoritative through a Firestore transaction. The remote
-  // snapshot intentionally re-renders the referee desk, so wait for that
-  // transaction to settle before locating the next scoring control.
-  await page.waitForFunction(() => {
-    const scores = [...document.querySelectorAll('.side-score')].map(x => x.textContent.trim());
-    return scores.includes('3');
-  }, null, { timeout: 20000 });
-  await page.evaluate(async () => {
-    if (typeof flushStationMatchMutations === 'function') await flushStationMatchMutations();
-  });
+    await page.waitForFunction(() => {
+      const active = [...document.querySelectorAll('.court-card.referee-workstation')]
+        .find(card => card.querySelector('[data-action="score"]:not([disabled])'));
+      if(!active) return false;
+      const scores=[...active.querySelectorAll('.side-score')].map(x=>x.textContent.trim());
+      return scores.includes('3');
+    }, null, { timeout: 20000 });
 
-  const spinA = page.locator('[data-action="score"][data-side="A"][data-type="spin"]:not([disabled])').first();
-  await expect(spinA).toBeVisible({ timeout: 20000 });
-  await spinA.click({ force: true });
+    await page.evaluate(async () => {
+      if (typeof flushStationMatchMutations === 'function') await flushStationMatchMutations();
+    });
 
-  await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({ timeout: 15000 });
-  await page.locator('[data-action="modal-confirm"]').click();
+    const spin = page.locator('[data-action="score"][data-side="A"][data-type="spin"]:not([disabled])').first();
+    await expect(spin).toBeVisible({ timeout: 20000 });
+    await spin.click({ force: true });
 
-  // Confirmation must advance the authoritative room, not just mutate the
-  // local score card. The next referee workstation is the durable outcome.
+    await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({ timeout: 15000 });
+    await page.locator('[data-action="modal-confirm"]').click();
+
+    await page.waitForFunction((count) => {
+      try {
+        return state.matches.filter(m => m && !m.isBye && m.completed).length >= count;
+      } catch (_) {
+        return false;
+      }
+    }, expectedCompleted, { timeout: 30000 });
+
+    await page.evaluate(async () => {
+      if (typeof flushStationMatchMutations === 'function') await flushStationMatchMutations();
+      if (typeof flushCloudStateWrites === 'function') await flushCloudStateWrites();
+    });
+  }
+
+  // Semi-final 1.
+  await winCurrentMatchForA(1);
   await expect(page.getByText(/已完成 1 場/).first()).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('目前場次｜第2場', { exact: true })).toBeVisible({ timeout: 30000 });
-  await expect(page.locator('[data-action="score"]:not([disabled])').first()).toBeVisible();
+
+  // Semi-final 2.
+  await winCurrentMatchForA(2);
+  await page.waitForFunction(() => {
+    try {
+      const final = state.matches.find(m => m && m.bracket === 'SE' && Number(m.round) === 1);
+      return !!(final && final.a && final.b && !final.completed);
+    } catch (_) {
+      return false;
+    }
+  }, null, { timeout: 30000 });
+
+  // Championship final.
+  await winCurrentMatchForA(3);
+
+  await page.waitForFunction(() => {
+    try {
+      return !!state.championId && state.archiveStatus === 'completed';
+    } catch (_) {
+      return false;
+    }
+  }, null, { timeout: 45000 });
+
+  const finalState = await page.evaluate(() => ({
+    championId: state.championId,
+    runnerUpId: state.runnerUpId,
+    archiveStatus: state.archiveStatus,
+    completedRealMatches: state.matches.filter(m => m && !m.isBye && m.completed).length,
+    totalRealMatches: state.matches.filter(m => m && !m.isBye).length,
+    settlementPhase: state.settlementPhase
+  }));
+
+  expect(finalState.championId).toBeTruthy();
+  expect(finalState.runnerUpId).toBeTruthy();
+  expect(finalState.completedRealMatches).toBe(finalState.totalRealMatches);
+  expect(finalState.completedRealMatches).toBe(3);
+  expect(finalState.archiveStatus).toBe('completed');
 
   expect(externalFirebaseRequests).toEqual([]);
 });
