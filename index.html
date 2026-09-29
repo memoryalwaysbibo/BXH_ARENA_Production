@@ -6128,7 +6128,7 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.5";
+const APP_VERSION = "v14.3.6";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},
@@ -8877,15 +8877,11 @@ function applyRemoteState(remote, authoritative=false){
     state.cloudCode = keepCode;
     refereeAssignmentDraftEnabled = null;
     if(courtSwapDraft){const swapSource=getMatch(courtSwapDraft.sourceMatchId);if(!swapSource||!canCourtSwapSource(swapSource))courtSwapDraft=null;}
-    // Court assignments are a PURE, deterministic function of state.matches +
-    // state.meta.stations — never trust whatever courtAssignments value
-    // happened to be included in the transmitted blob (the device that wrote
-    // this update may not have pushed its own freshly-rebuilt assignments as
-    // part of the SAME write, e.g. confirmMatchTransaction only commits match
-    // fields). Recomputing locally here means every device always converges
-    // on the same correct court state from the same underlying match data,
-    // regardless of transmission timing.
-    if(state.bracketSize>0){ rebuildCourtAssignments(); }
+    // Court assignments are normally derived from matches, but dispatchRevision
+    // now makes explicit manual/transactional dispatch authoritative. Preserve
+    // valid remote current assignments so a listener refresh cannot immediately
+    // undo a manual claim/swap or leave a court pointing at a stale placeholder.
+    if(state.bracketSize>0){ reconcileCourtAssignments(); }
     cloudLastSyncAt = Date.now();
     saveRecord(state);
     // Firebase-driven updates should never yank the viewport back to the top —
@@ -13095,6 +13091,33 @@ function stationExecutionQueue(stationNum){
 // the next executable match per court — this is what removes the old manual
 // "設為進行中" step: a match assigned as a court's current match is
 // immediately marked in_progress.
+function reconcileCourtAssignments(){
+  const n=Math.max(1,Number(state.meta?.stations||1));
+  const incoming=state.courtAssignments||{};
+  const preserved={};
+  for(let i=1;i<=n;i++){
+    const key=courtKey(i),court=incoming[key];
+    if(!court)continue;
+    const current=court.currentMatchId?getMatch(court.currentMatchId):null;
+    const validCurrent=!!(current&&!current.completed&&Number(current.station)===i&&current.a&&current.b&&current.status!=="paused");
+    preserved[key]=validCurrent?current.id:null;
+  }
+  rebuildCourtAssignments();
+  for(let i=1;i<=n;i++){
+    const key=courtKey(i),wanted=preserved[key];
+    if(!wanted)continue;
+    const court=state.courtAssignments[key],m=getMatch(wanted);
+    if(!court||!m||m.completed||Number(m.station)!==i||!m.a||!m.b)continue;
+    const autoCurrent=court.currentMatchId?getMatch(court.currentMatchId):null;
+    const explicit=Number(m.dispatchRevision||0)>0||Number(m.dispatchPriorityAt||0)>0;
+    if(explicit&&(autoCurrent?.id!==m.id)){
+      court.currentMatchId=m.id;
+      if(state.startedAt&&["pending","ready"].includes(m.status)){m.status="in_progress";m.startedAt=m.startedAt||Date.now();}
+      const queue=stationExecutionQueue(i).filter(x=>x.id!==m.id);
+      court.nextMatchId=queue[0]?.id||null;court.status=m.status||"in_progress";court.updatedAt=Date.now();
+    }
+  }
+}
 function rebuildCourtAssignments(){
   const n = Math.max(1, state.meta.stations||1);
   const existing = state.courtAssignments || {};
