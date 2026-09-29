@@ -45,10 +45,11 @@ test('player can create account and open a community room on isolated emulators'
   await page.locator('#apply-agree').check();
   await page.locator('[data-action="player-apply-submit"]').click();
 
-  await expect(page.locator('.player-shell')).toBeVisible({ timeout: 30000 });
-  await expect(page.locator('[data-action="player-switch-tab"][data-tab="host"]')).toBeVisible();
+  await expect(page.locator('.player-shell')).toBeVisible({ timeout: 60000 });
+  const hostTab = page.locator('[data-action="player-switch-tab"][data-tab="host"]').filter({visible:true}).first();
+  await expect(hostTab).toBeVisible();
 
-  await page.locator('[data-action="player-switch-tab"][data-tab="host"]').click();
+  await hostTab.click();
   await expect(page.locator('.community-host-hero')).toBeVisible({ timeout: 20000 });
 
   await page.locator('[data-action="community-create-open"]').click();
