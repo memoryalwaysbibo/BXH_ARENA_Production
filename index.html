@@ -28,10 +28,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260929.5">
+<meta name="bxh-build" content="20260929.6">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260929.5";
+  var CURRENT_BUILD="20260929.6";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -5695,7 +5695,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 <script src="court-call-ui.js?v=14.2.34-next-fallback"></script>
 <script src="referee-fault-core.js?v=14.2.38-fault-v1"></script>
 <script src="enchantment-score-core.js?v=20260927-1"></script>
-<script src="enchantment-ui.js?v=20260927-1"></script>
+<script src="enchantment-ui.js?v=20260929-five-points"></script>
 <script src="raffle-replay.js?v=13.34.0"></script>
 <script src="raffle-claims-ui.js?v=13.35.0"></script>
 <script src="registration-invitations-ui.js?v=13.42.3" data-bxh-registration-invitations="true"></script>
@@ -6128,7 +6128,7 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.6";
+const APP_VERSION = "v14.3.5";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},

@@ -65,7 +65,7 @@
   const id=quote(m.id),c=quote(code),locked=stationLocked?'disabled':'';
   setTimeout(()=>refresh(code,m.id),0);
   return `<section class="panel" data-enchantment-referee data-code="${c}" data-match-id="${id}" style="margin:12px 16px;padding:14px">
-   <strong data-enchantment-title>附魔之戰｜等待裁判開始</strong>
+   <strong data-enchantment-title>附魔之戰｜5 分制｜等待裁判開始</strong>
    <style>
     [data-enchantment-referee] .enchant-active{border-color:#b889ff!important;box-shadow:0 0 0 1px #b889ff55,0 0 20px #9d62ff38;animation:enchant-glow 2.5s ease-in-out infinite}
     [data-enchantment-referee] .enchant-badge{display:inline-block;margin-left:6px;padding:2px 7px;border:1px solid #c594ff;border-radius:999px;background:#6e35aa88;color:#fff1bc;font-size:11px;font-weight:700;vertical-align:middle}
@@ -148,7 +148,7 @@
    const s=item?.state;
    const phase=s?(s.phase==='completed'?'已完成':s.phase==='awaiting-result'?'等待確認':s.drawn?.A&&s.drawn?.B?'已抽卡':'等待抽卡'):'等待裁判開始';
    const title=el.querySelector('[data-enchantment-title]');
-   if(title)title.textContent='附魔之戰｜'+(s?'第 '+String(Number(s.round)||0).padStart(2,'0')+' 局｜':'')+phase;
+   if(title)title.textContent='附魔之戰｜5 分制｜'+(s?'第 '+String(Number(s.round)||0).padStart(2,'0')+' 局｜':'')+phase;
    slot.innerHTML=item?.error?`<p role="alert">${quote(item.error)}</p>`:statusHtml(code,id,item?.version||0,item?.state||null);
   });
  }
