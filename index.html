@@ -6128,7 +6128,7 @@ let cloudTestBusy = false;
 let cloudTestResult = null;
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.4";
+const APP_VERSION = "v14.3.5";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},
@@ -16128,6 +16128,37 @@ async function executeCourtSwap(targetId){
   setTimeout(()=>{const moved=getMatch(target.id);const courtNo=moved?Number(moved.station||0):Number(draft.sourceStation||0);const el=document.getElementById("court-card-"+courtNo);if(el&&el.scrollIntoView)try{el.scrollIntoView({behavior:"smooth",block:"start"});}catch(e){}},80);
   showToast("換場完成｜新場次已送至 Court "+Number(draft.sourceStation||source.station||0));
 }
+let bracketManualAssignSuppressClickId="";
+let bracketManualAssignSuppressClickUntil=0;
+function canManualAssignMatch(m){return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!matchHasDecisionData(m)&&m.status!=="paused"&&!m.skippedAt&&!m.callPass);}
+function applyManualCourtAssign(st,matchId,targetStation){
+ const m=(st.matches||[]).find(x=>x.id===matchId);if(!canManualAssignMatch(m))return {ok:false,reason:"match-no-longer-available"};
+ const n=Math.max(1,Number(st.meta?.stations||1));if(targetStation<1||targetStation>n)return {ok:false,reason:"station-not-assigned"};
+ const now=Date.now();clearCourtAssignmentRefs(st,[m.id]);const target=st.courtAssignments&&st.courtAssignments[courtKey(targetStation)];
+ if(target&&target.currentMatchId&&target.currentMatchId!==m.id){const d=(st.matches||[]).find(x=>x.id===target.currentMatchId);if(d&&!d.completed&&!matchHasDecisionData(d)){d.status="pending";d.startedAt=null;d.dispatchPriorityAt=null;d.dispatchRevision=Number(d.dispatchRevision||0)+1;d.updatedAt=now;}target.currentMatchId=null;}
+ m.station=targetStation;m.status="ready";m.startedAt=null;m.updatedAt=now;m.dispatchPriorityAt=now;m.dispatchRevision=Number(m.dispatchRevision||0)+1;
+ if(target){target.currentMatchId=m.id;target.nextMatchId=null;target.status="ready";target.updatedAt=now;}st.currentMatchId=m.id;return {ok:true,state:st};
+}
+async function executeManualCourtAssign(matchId,targetStation){
+ const m=getMatch(matchId);if(!m||!canManualAssignMatch(m)){showToast("此場目前無法指定",true);return;}let result;
+ if(state.cloudCode){if(!cloudAvailable()||!window.cloudSync?.mutateMatchTransaction){showToast("雲端未連線，無法人工指定",true);return;}result=await window.cloudSync.mutateMatchTransaction(state.cloudCode,m.id,Number(m.station||0),remote=>applyManualCourtAssign(remote,m.id,targetStation),currentAuthUid(),{targetStation,expectedRevision:Number(m.dispatchRevision||0)});}
+ else{result=applyManualCourtAssign(state,m.id,targetStation);if(result.ok){rebuildPropagation();if(!await saveState())result={ok:false,reason:"save-failed"};}}
+ if(!result?.ok){showToast("指定失敗："+String(result?.reason||"請重試"),true);return;}if(result.state)applyRemoteState(result.state,true);state.currentMatchId=m.id;rememberRefereeWorkstation();render();showToast("人工調度完成｜已指定至 Court "+targetStation);
+}
+function openManualCourtAssignMenu(matchId){
+ const m=getMatch(matchId);if(!m||!canManualAssignMatch(m))return;if(!canOperateCurrentTournament()){showToast("目前身分沒有人工調度權限",true);return;}
+ const max=Math.max(1,Number(state.meta?.stations||1));const raw=window.prompt("人工指定場次｜"+displayMatchLabel(m)+"\n"+playerName(m.a.playerId)+" VS "+playerName(m.b.playerId)+"\n\n請輸入戰鬥台編號（1～"+max+"）：",String(Number(m.station||1)));if(raw===null)return;
+ const station=Number(raw);if(!Number.isInteger(station)||station<1||station>max){showToast("請輸入 1～"+max+" 的戰鬥台編號",true);return;}
+ openModal({type:"generic",title:"確認人工指定",message:displayMatchLabel(m)+"｜"+playerName(m.a.playerId)+" VS "+playerName(m.b.playerId)+"\n\n指定至 Court "+station+"？\n若該台存在尚未計分的舊排程，系統會解除舊排程並改派此場。",confirmLabel:"是｜確認指定",cancelLabel:"否",onConfirm:()=>executeManualCourtAssign(m.id,station)});
+}
+function bindManualCourtAssignLongPress(viewport){
+ if(!viewport||typeof viewport.querySelectorAll!=="function")return;const HOLD_MS=1500,MOVE_CANCEL_PX=14;
+ viewport.querySelectorAll('.match-box[data-action="open-match"][data-id]:not(.done)').forEach(box=>{const id=box.getAttribute("data-id")||"",m=getMatch(id);if(!m||!canManualAssignMatch(m)||!canOperateCurrentTournament())return;
+ let timer=null,startX=0,startY=0,pointerId=null,triggered=false;const clear=()=>{if(timer){clearTimeout(timer);timer=null;}box.classList.remove("long-press-armed");};
+ box.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&e.button!==0)return;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;triggered=false;clear();box.classList.add("long-press-armed");timer=setTimeout(()=>{timer=null;triggered=true;box.classList.remove("long-press-armed");bracketManualAssignSuppressClickId=id;bracketManualAssignSuppressClickUntil=Date.now()+1200;try{navigator.vibrate?.(25);}catch(_){}openManualCourtAssignMenu(id);},HOLD_MS);});
+ box.addEventListener("pointermove",e=>{if(pointerId===e.pointerId&&timer&&Math.hypot(e.clientX-startX,e.clientY-startY)>MOVE_CANCEL_PX)clear();});box.addEventListener("pointerup",e=>{if(pointerId===e.pointerId&&!triggered)clear();});box.addEventListener("pointercancel",clear);box.addEventListener("contextmenu",e=>e.preventDefault());});
+}
+
 const QD_PLAYER_ICON_SVG = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="20" r="10"/><path d="M12 54 C12 40 20 34 32 34 C44 34 52 40 52 54"/></svg>';
 
 function nextMatchPreviewHtml(court, stationNum){
@@ -24188,7 +24219,7 @@ function bindBoardModeInteractions(){
     const canvas = document.getElementById("board-canvas");
     if(!viewport || !canvas) return;
 
-    bindCompletedMatchCorrectionLongPress(viewport);
+    bindCompletedMatchCorrectionLongPress(viewport);\n    bindManualCourtAssignLongPress(viewport);
 
     viewport.addEventListener("wheel", (e)=>{
       if(!e.ctrlKey) return;
