@@ -1,0 +1,43 @@
+name: Verify Live Host 3 Artwork 20260929
+on:
+  push:
+    branches: ['assets/host-3-title-20260929']
+    paths: ['.github/workflows/verify-host-3-live-20260929.yml']
+permissions:
+  contents: read
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verify public production PNG and WebP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, time
+          from urllib.request import Request, urlopen
+          expected = {
+              'png': ('f25be44b04c7b99851e22a824154b380221c6652868a34d1e16201030536247b', 2081601),
+              'webp': ('fccc8342ebae72931d00c02c40d343335101124b6d6f53e5ee1c9877dc95513c', 470870),
+          }
+          for ext, (digest, size) in expected.items():
+              url = 'https://arena.bxh.com.tw/assets/title-rare-host-3.' + ext
+              for attempt in range(8):
+                  try:
+                      request = Request(url, headers={'User-Agent':'BXH-Artwork-Verification/1.0', 'Cache-Control':'no-cache'})
+                      with urlopen(request, timeout=15) as response:
+                          data = response.read(5_000_001)
+                          status = response.status
+                          mime = response.headers.get('Content-Type', '')
+                      actual = hashlib.sha256(data).hexdigest()
+                      assert status == 200 and len(data) == size and actual == digest, 'Production asset differs from approved build'
+                      print(json.dumps({'url':url, 'status':status, 'contentType':mime, 'bytes':len(data), 'sha256':actual, 'verified':True}, ensure_ascii=False), flush=True)
+                      break
+                  except Exception as error:
+                      print('Attempt', attempt + 1, type(error).__name__, str(error), flush=True)
+                      if attempt == 7:
+                          raise
+                      time.sleep(10)
+          print('PASS both publicly served production images exactly match the approved PNG/WebP build', flush=True)
+          PY
