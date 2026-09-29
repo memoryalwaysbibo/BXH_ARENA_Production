@@ -1,0 +1,135 @@
+name: Prepare Host 3 Artwork 20260929
+
+on:
+  push:
+    branches: ['assets/host-3-title-20260929']
+    paths: ['.github/workflows/prepare-host-3-art-20260929.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bxh-host-3-art-20260929
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: assets/host-3-title-20260929
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image encoder
+        run: python -m pip install 'Pillow==11.3.0'
+      - name: Verify original and prepare transparent image pair
+        env:
+          ART_SOURCE: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/ba145748-0717-43ee-a00a-cca28970c971.png?_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlIYXNoIjoiZWJjY2FiNmUzY2I0NTYzNyIsImJ1Y2tldCI6InJ1bndheS1kYXRhc2V0cyIsInN0YWdlIjoicHJvZCIsImV4cCI6MTc5MDc4ODU5MH0.xjB8BcdBIZg84M5o1nyaSDoiKEK9olf1aSOkwb1z7Ek'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+          from PIL import Image, ImageChops
+          import hashlib, io, json, os
+          html = Path('index.html').read_text(encoding='utf-8')
+          ladder = Path('ladder-secondary-ui.js').read_text(encoding='utf-8')
+          assert "'對戰召集人':'assets/title-rare-host-3.webp'" in html, 'Existing catalog mapping differs; stop without editing logic'
+          assert '"對戰召集人":"assets/title-rare-host-3.webp"' in ladder, 'Existing ladder mapping differs; stop'
+          url = os.environ['ART_SOURCE']
+          print('::add-mask::' + url)
+          with urlopen(Request(url, headers={'User-Agent': 'BXH-Title-Art-Install/1.0'}), timeout=60) as response:
+              data = response.read(10_000_001)
+          assert len(data) == 2081601, 'Original byte size mismatch'
+          digest = hashlib.sha256(data).hexdigest()
+          assert digest == 'f25be44b04c7b99851e22a824154b380221c6652868a34d1e16201030536247b', 'Original SHA256 mismatch'
+          image = Image.open(io.BytesIO(data))
+          assert image.format == 'PNG' and image.mode == 'RGBA' and image.size == (2172, 724)
+          assert image.getchannel('A').getextrema() == (0, 255), 'Transparency missing'
+          png = Path('assets/title-rare-host-3.png')
+          webp = Path('assets/title-rare-host-3.webp')
+          assert not png.exists() and not webp.exists(), 'Asset appeared concurrently; review instead of overwriting'
+          png.write_bytes(data)
+          image.save(webp, 'WEBP', quality=90, method=6, exact=True)
+          decoded = Image.open(webp).convert('RGBA')
+          assert decoded.size == image.size
+          assert ImageChops.difference(image.getchannel('A'), decoded.getchannel('A')).getbbox() is None, 'Alpha channel changed'
+          assert webp.stat().st_size < 1_000_000, 'WebP size budget exceeded'
+          report = {'title':'對戰召集人', 'size':list(image.size), 'alphaPreserved':True, 'pngSHA256':digest, 'webpSHA256':hashlib.sha256(webp.read_bytes()).hexdigest(), 'pngBytes':len(data), 'webpBytes':webp.stat().st_size, 'scope':'artwork only; existing catalog and entitlement logic unchanged'}
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          Path('/tmp/host-3-art-report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+          for needle in ['function titleArtworkPath', 'function titleChipHtml', 'function titleGalleryArtworkHtml']:
+              offset = html.find(needle)
+              if offset >= 0:
+                  end = html.find('\nfunction ', offset + len(needle))
+                  print('\nSOURCE CHECK: ' + html[offset:end if end >= 0 else offset+3500][:6000])
+          PY
+      - name: Add targeted regression test
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e tests/title-host-3-art.test.cjs
+          cat > tests/title-host-3-art.test.cjs <<'JS'
+          'use strict';
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          const root = path.join(__dirname, '..');
+          const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+          const ladder = fs.readFileSync(path.join(root, 'ladder-secondary-ui.js'), 'utf8');
+          assert(html.includes("'對戰召集人':'assets/title-rare-host-3.webp'"), 'Host-3 catalog artwork mapping missing');
+          assert(ladder.includes('"對戰召集人":"assets/title-rare-host-3.webp"'), 'Host-3 ladder artwork mapping missing');
+          const png = fs.readFileSync(path.join(root, 'assets/title-rare-host-3.png'));
+          assert.equal(crypto.createHash('sha256').update(png).digest('hex'), 'f25be44b04c7b99851e22a824154b380221c6652868a34d1e16201030536247b', 'PNG must be the exact user-approved original');
+          assert.equal(png.subarray(1, 4).toString(), 'PNG');
+          assert.equal(png.readUInt32BE(16), 2172);
+          assert.equal(png.readUInt32BE(20), 724);
+          assert.equal(png[25], 6, 'PNG must retain RGBA transparency');
+          const webp = fs.readFileSync(path.join(root, 'assets/title-rare-host-3.webp'));
+          assert.equal(webp.subarray(0, 4).toString(), 'RIFF');
+          assert.equal(webp.subarray(8, 12).toString(), 'WEBP');
+          assert.equal(webp.readUInt32LE(4) + 8, webp.length, 'WebP container is truncated');
+          assert(webp.length > 1000 && webp.length < 1000000, 'WebP image size outside expected budget');
+          console.log('PASS host-3 original artwork, transparency metadata, catalog and ladder mapping');
+          JS
+      - name: Validate artwork and existing frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/title-host-3-art.test.cjs
+          node tests/ladder-ranking-ui.test.cjs
+          node scripts/verify-production-frontend.cjs
+          node --experimental-vm-modules tests/ladder-v1.cjs
+          node --experimental-vm-modules tests/ladder-settlement.cjs
+          git diff --exit-code -- index.html ladder-secondary-ui.js version.json CNAME PRODUCTION_FIREBASE_WEB_CONFIG.json
+      - name: Save verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-3-art-verification
+          path: |
+            /tmp/host-3-art-report.json
+            assets/title-rare-host-3.png
+            assets/title-rare-host-3.webp
+          retention-days: 3
+      - name: Commit assets on isolated branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -- .github/workflows/prepare-host-3-art-20260929.yml
+          git add -- assets/title-rare-host-3.png assets/title-rare-host-3.webp tests/title-host-3-art.test.cjs
+          git diff --cached --stat
+          git commit -m 'feat(titles): install approved 對戰召集人 artwork'
+          git push origin HEAD:assets/host-3-title-20260929
+          echo "Prepared commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/host-3-art-report.json >> "$GITHUB_STEP_SUMMARY"
