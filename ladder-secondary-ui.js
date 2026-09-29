@@ -122,7 +122,7 @@
         "四強霸主":"assets/title-epic-top4-overlord.webp",
         "冠軍獵人":"assets/title-epic-champion-hunter.webp",
         "百日戰士":"assets/title-epic-hundred-day-warrior.webp",
-        "初次開局":"assets/title-rare-first-match.svg",
+        "初次開局":"assets/title-rare-first-match.webp",
         "整裝待發":"assets/title-common-ready.svg",
         "初次上陣":"assets/title-common-debut.svg",
         "對戰召集人":"assets/title-rare-host-3.webp",

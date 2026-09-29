@@ -32,17 +32,17 @@ assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'gu
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
 assert(html.includes("'諸神典藏者':'assets/title-limited-gods-collector.webp'"), 'Gods Collector artwork must support its production Rare rarity');
-for(const [name,file] of [['整裝待發','title-common-ready.svg'],['初次上陣','title-common-debut.svg'],['初次開局','title-rare-first-match.svg']]){
+for(const [name,file] of [['整裝待發','title-common-ready.svg'],['初次上陣','title-common-debut.svg']]){
   assert(html.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
   assert(source.includes("\""+name+"\":\"assets/"+file+"\""), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
 }
-for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp']]){
+for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp'],['百日戰士','title-epic-hundred-day-warrior.webp'],['初次開局','title-rare-first-match.webp'],['資深主辦','title-rare-host-20.webp']]){
   assert(html.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
   assert(source.includes('"'+name+'":"assets/'+file+'"'), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file.replace(/\.webp$/,'.png'))), name+' PNG fallback missing');
 }
-assert(html.includes('ladder-secondary-ui.js?v=14.2.54-three-titles'), 'ladder asset cache-bust version must match release');
+assert(html.includes('ladder-secondary-ui.js?v=14.2.55-badge-batch2'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
