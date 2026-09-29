@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const s=fs.readFileSync('activity-points-ui.js','utf8');
+assert.match(s,/installMakeupCheckInV2/);
+assert.match(s,/getEngagementSnapshot/);
+assert.match(s,/makeupCheckIn/);
+assert.match(s,/補簽不補發當日活躍積分/);
+assert.match(s,/eligibleDates/);
+console.log('PASS makeup check-in v2 UI contract');

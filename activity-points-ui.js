@@ -123,3 +123,66 @@
  window.addEventListener("resize",()=>{if(signedIn())summary();},{passive:true});
 })();
 
+
+
+/* BXH ARENA Makeup Check-in V2 — progressive enhancement for the existing check-in calendar. */
+(function installMakeupCheckInV2(){
+  const state={snapshot:null,loading:false,busy:false};
+  let snapshotCall=null,makeupCall=null;
+  async function callable(name){
+    const [apps,functions]=await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.13.0/firebase-functions.js")
+    ]);
+    const app=apps.getApps()[0]; if(!app)throw Error("firebase-app-not-ready");
+    return functions.httpsCallable(functions.getFunctions(app,"asia-east1"),name,{timeout:25000});
+  }
+  async function load(){
+    if(state.loading)return; state.loading=true;
+    try{
+      snapshotCall=snapshotCall||await callable("getEngagementSnapshot");
+      const res=await snapshotCall({});
+      state.snapshot=res?.data||null; paint();
+    }catch(e){console.warn("[makeup-checkin snapshot]",e)}
+    finally{state.loading=false}
+  }
+  function calendar(){return document.querySelector(".checkin-calendar")}
+  function paint(){
+    const cal=calendar(),ci=state.snapshot?.checkIn,makeup=ci?.makeup;
+    if(!cal||!makeup?.enabled)return;
+    let info=document.getElementById("checkin-makeup-v2-info");
+    if(!info){info=document.createElement("div");info.id="checkin-makeup-v2-info";info.className="hint checkin-makeup-v2-info";cal.parentElement?.insertBefore(info,cal);}
+    info.textContent=`本月免費補簽：已使用 ${Number(makeup.used||0)}/${Number(makeup.limit||2)}｜剩餘 ${Number(makeup.remaining||0)} 次｜僅限最近 ${Number(makeup.windowDays||7)} 天`;
+    const eligible=new Set(makeup.eligibleDates||[]);
+    cal.querySelectorAll(".checkin-day").forEach(cell=>{
+      cell.querySelector(".checkin-makeup-v2-btn")?.remove();
+      const n=parseInt(cell.childNodes[0]?.textContent||cell.textContent,10); if(!n)return;
+      const key=`${ci.month}-${String(n).padStart(2,"0")}`;
+      if(!eligible.has(key)||Number(makeup.remaining||0)<=0)return;
+      const b=document.createElement("button");b.type="button";b.className="checkin-makeup-v2-btn";b.dataset.makeupDate=key;b.textContent="補";b.setAttribute("aria-label",`補簽 ${key}`);cell.appendChild(b);
+    });
+  }
+  async function submit(date){
+    if(state.busy)return;
+    const m=state.snapshot?.checkIn?.makeup;if(!m||Number(m.remaining||0)<=0)return;
+    if(!confirm(`確定補簽 ${date}？\n本月剩餘 ${m.remaining}/${m.limit} 次，補簽不補發當日活躍積分。`))return;
+    state.busy=true;
+    try{
+      makeupCall=makeupCall||await callable("makeupCheckIn");
+      const res=await makeupCall({date}),data=res?.data;
+      if(!data?.ok)throw Error("makeup-failed");
+      try{const refresh=Function('try{return requestEngagementSnapshot}catch(e){return null}')();if(typeof refresh==="function")refresh(true);}catch(e){}
+      await load();
+      if(typeof window.showToast==="function")window.showToast(`已補簽 ${date}`);
+      else alert(`補簽成功：${date}`);
+    }catch(e){
+      const code=String(e?.code||e?.message||"").replace(/^functions\//,"");
+      const labels={"resource-exhausted":"本月補簽次數已用完","already-exists":"該日期已簽到","failed-precondition":"此日期目前不能補簽"};
+      alert(labels[code]||"補簽失敗，請重新整理後再試。");
+    }finally{state.busy=false}
+  }
+  document.addEventListener("click",e=>{const b=e.target.closest?.(".checkin-makeup-v2-btn");if(b){e.preventDefault();e.stopPropagation();submit(b.dataset.makeupDate)}});
+  const style=document.createElement("style");style.textContent=`.checkin-makeup-v2-info{margin-top:8px;padding:8px 10px;border:1px solid rgba(217,185,92,.28);border-radius:8px;background:rgba(217,185,92,.06)}.checkin-day .checkin-makeup-v2-btn{position:absolute;right:3px;bottom:3px;min-width:24px;height:24px;padding:0 6px;border:1px solid var(--gold,#d9b95c);border-radius:7px;background:#181713;color:var(--gold,#d9b95c);font-weight:800;font-size:12px;line-height:22px;cursor:pointer}.checkin-day .checkin-makeup-v2-btn:active{transform:scale(.94)}`;document.head.appendChild(style);
+  setInterval(()=>{if(document.hidden||!calendar())return;if(!state.snapshot&&!state.loading)load();else paint()},3000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&calendar())load()});
+})();
