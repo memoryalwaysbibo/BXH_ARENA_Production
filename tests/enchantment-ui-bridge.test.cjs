@@ -68,3 +68,48 @@ test('first fault warning exposes undo before a point is awarded',async()=>{
  assert.match(slot.innerHTML,/data-side="A"[^>]*>失誤 1\/2/);
  assert.match(slot.innerHTML,/撤回上一筆失誤/);
 });
+
+
+test('winner confirmation opens only as a local modal and submits its bound match version',async()=>{
+ const calls=[],listeners={};let modal=null;
+ const state={round:3,phase:'awaiting-result',scores:{A:5,B:3},faults:{A:0,B:0},drawn:{A:true,B:true},cards:{A:'seal',B:'seal'}};
+ const slot={innerHTML:''},title={textContent:''};
+ const panel={dataset:{code:'BXH-ABCD',matchId:'match1'},querySelector:sel=>sel==='[data-enchantment-status]'?slot:title};
+ const makeOverlay=()=>({dataset:{},style:{},innerHTML:'',isConnected:true,setAttribute(){},remove(){if(modal===this)modal=null;}});
+ const document={
+  body:{append(el){modal=el;}},
+  createElement:tag=>makeOverlay(),
+  querySelector:sel=>sel==='[data-enchantment-confirm-modal]'?modal:null,
+  querySelectorAll:selector=>selector==='[data-enchantment-referee]'?[panel]:[],
+  addEventListener:(event,fn)=>listeners[event]=fn
+ };
+ const root={BXHEnchantmentScore:score,engagementService:{enchantment:async payload=>{
+  calls.push(payload);
+  if(payload.action==='confirm')return {version:10,state:{...state,phase:'completed'},completion:{winnerId:'a'}};
+  return {version:9,state};
+ }},addEventListener:(event,fn)=>listeners[event]=fn};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../enchantment-ui.js'),'utf8'),
+  {window:root,document,location:{origin:'https://arena.example'},playerName:id=>id==='a'?'黑爸':'小宇',setTimeout:()=>{},setInterval:()=>{},console});
+ root.BXHEnchantmentUI.referee({id:'match1',a:{playerId:'a'},b:{playerId:'b'}},'BXH-ABCD',false);
+ await root.BXHEnchantmentUI.refresh('BXH-ABCD','match1');
+ const confirmButton={dataset:{enchantmentAction:'confirm',code:'BXH-ABCD',matchId:'match1'}};
+ listeners.click({target:{closest:sel=>sel==='[data-enchantment-action]'?confirmButton:null},preventDefault(){},stopPropagation(){}});
+ assert.ok(modal,'local modal should be created only after this device clicks confirm');
+ assert.match(modal.innerHTML,/黑爸/);assert.match(modal.innerHTML,/5/);assert.match(modal.innerHTML,/3/);
+ assert.equal(calls.filter(x=>x.action==='confirm').length,0,'opening modal must not confirm on the server');
+ const submit={closest:sel=>sel==='[data-enchantment-confirm-modal]'?modal:null};
+ listeners.click({target:{closest:sel=>sel==='[data-enchantment-confirm-submit]'?submit:null},preventDefault(){},stopPropagation(){}});
+ await new Promise(resolve=>setImmediate(resolve));
+ const confirmCall=calls.find(x=>x.action==='confirm');
+ assert.equal(confirmCall.version,9);
+ assert.equal(confirmCall.code,'BXH-ABCD');assert.equal(confirmCall.matchId,'match1');
+ assert.equal(modal,null,'successful confirmation closes the local modal');
+});
+
+test('enchantment result confirmation no longer uses browser-global confirm',()=>{
+ const source=fs.readFileSync(require.resolve('../enchantment-ui.js'),'utf8');
+ assert.equal(source.includes('window.confirm('),false);
+ assert.match(source,/data-enchantment-confirm-modal/);
+ assert.match(source,/data-enchantment-confirm-winner/);
+ assert.match(source,/確認勝負/);
+});
