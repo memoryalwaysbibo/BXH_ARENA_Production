@@ -1,6 +1,9 @@
 name: Apply finals order fix
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: [ '.github/workflows/apply-finals-order-fix.yml' ]
 permissions:
   contents: write
 jobs:
