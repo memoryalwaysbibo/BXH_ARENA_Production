@@ -25801,6 +25801,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           publicTournamentsLastSignature=publicTournamentListSignature(cached.items);
           publicTournamentsLastRefreshAt=cached.savedAt||Date.now();
           publicTournamentsError=null;
+          if(typeof renderPreservingScroll==="function") renderPreservingScroll();
+          else render();
         }
       }catch(e){}
     }
