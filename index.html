@@ -10882,7 +10882,10 @@ let publicTournamentsRealtimeStarting = false;
 let publicTournamentsReconcilePromise = null;
 let publicTournamentsReconcileTimer = null;
 let publicTournamentsLastSignature = "";
+let publicTournamentsRealtimeLastServerAt = 0;
+let publicTournamentsRealtimeHealthy = false;
 const PUBLIC_TOURNAMENTS_RECONCILE_MS = 90000;
+const PUBLIC_TOURNAMENTS_REALTIME_STALE_MS = 180000;
 
 function isTournamentLobbyVisible(){
   return (appPhase==="player-center" && playerActiveTab==="home")
@@ -10931,17 +10934,27 @@ function stopPublicTournamentsRealtime(){
     publicTournamentsRealtimeUnsub=null;
   }
   publicTournamentsRealtimeStarting=false;
+  publicTournamentsRealtimeHealthy=false;
+  publicTournamentsRealtimeLastServerAt=0;
   if(publicTournamentsReconcileTimer){
     clearTimeout(publicTournamentsReconcileTimer);
     publicTournamentsReconcileTimer=null;
   }
 }
+function publicTournamentsRealtimeIsFresh(){
+  return !!publicTournamentsRealtimeUnsub && publicTournamentsRealtimeHealthy
+    && publicTournamentsRealtimeLastServerAt>0
+    && Date.now()-publicTournamentsRealtimeLastServerAt<PUBLIC_TOURNAMENTS_REALTIME_STALE_MS;
+}
 function schedulePublicTournamentsReconcile(delay=PUBLIC_TOURNAMENTS_RECONCILE_MS){
   if(publicTournamentsReconcileTimer || !isTournamentLobbyVisible()) return;
+  const requested=Math.max(1000,Number(delay)||PUBLIC_TOURNAMENTS_RECONCILE_MS);
+  const wait=publicTournamentsRealtimeIsFresh()?Math.max(requested,PUBLIC_TOURNAMENTS_REALTIME_STALE_MS):requested;
   publicTournamentsReconcileTimer=setTimeout(()=>{
     publicTournamentsReconcileTimer=null;
+    if(publicTournamentsRealtimeIsFresh()){ schedulePublicTournamentsReconcile(); return; }
     reconcilePublicTournamentsNow("timer");
-  },Math.max(1000,Number(delay)||PUBLIC_TOURNAMENTS_RECONCILE_MS));
+  },wait);
 }
 async function reconcilePublicTournamentsNow(reason="manual"){
   if(publicTournamentsReconcilePromise) return publicTournamentsReconcilePromise;
@@ -10982,11 +10995,19 @@ function startPublicTournamentsRealtime(){
     publicTournamentsRealtimeUnsub=window.cloudSync.subscribePublicTournaments((result)=>{
       if(!isTournamentLobbyVisible()) return;
       if(result&&result.ok){
+        if(!result.fromCache){
+          publicTournamentsRealtimeHealthy=true;
+          publicTournamentsRealtimeLastServerAt=Date.now();
+        }
         applyPublicTournamentItems(result.items,{renderIfChanged:true});
-      }else if(publicTournamentsCache===null){
-        publicTournamentsCache=[];
-        publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
-        render();
+      }else{
+        publicTournamentsRealtimeHealthy=false;
+        schedulePublicTournamentsReconcile(5000);
+        if(publicTournamentsCache===null){
+          publicTournamentsCache=[];
+          publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+          render();
+        }
       }
     });
   }catch(e){
