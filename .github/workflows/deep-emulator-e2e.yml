@@ -8,6 +8,8 @@ on:
       - 'index.html'
       - '.github/workflows/deep-emulator-e2e.yml'
       - 'tests/e2e/player-tournament-deep.e2e.cjs'
+      - 'tests/e2e/admin-finals-order-deep.e2e.cjs'
+      - 'tests/e2e/multi-court-dispatch-deep.e2e.cjs'
       - 'playwright.deep-e2e.config.cjs'
       - 'tests/e2e/static-server.cjs'
       - 'tests/e2e/firebase.json'
@@ -24,7 +26,7 @@ concurrency:
 
 jobs:
   four-player-referee-flow:
-    name: Four-player tournament through first referee result
+    name: Full tournament / finals / multi-court deep E2E
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
