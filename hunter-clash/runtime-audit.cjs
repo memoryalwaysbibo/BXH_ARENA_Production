@@ -33,7 +33,7 @@ function rulesetRecord(value, expected) {
     if (!object(file) || !scalar(file.name, /^[A-Za-z0-9_.\/-]+$/) || typeof file.content !== 'string' || names.has(file.name)) fail('invalid-ruleset-file');
     names.add(file.name);
     return { name: file.name, bytes: Buffer.byteLength(file.content), sha256: hash(file.content) };
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   return { name: expected, createTime: timestamp(value.createTime), files, manifestSha256: hash(JSON.stringify(files)) };
 }
 async function collectRuntimeAudit({ projectId, token, fetchImpl = fetch, now = () => new Date() }) {
@@ -63,7 +63,7 @@ async function collectRuntimeAudit({ projectId, token, fetchImpl = fetch, now = 
         if (resources.has(record.name)) fail('duplicate-resource');
         resources.add(record.name); records.push(record);
       }
-      if (body.nextPageToken === undefined || body.nextPageToken === '') return records.sort((a, b) => a.name.localeCompare(b.name));
+      if (body.nextPageToken === undefined || body.nextPageToken === '') return records.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
       if (typeof body.nextPageToken !== 'string' || body.nextPageToken.length > 4096 || seen.has(body.nextPageToken)) fail('invalid-pagination');
       pageToken = body.nextPageToken; seen.add(pageToken);
     }
