@@ -36,6 +36,18 @@ test('PASS labels cannot bypass backend provenance or entry integration', () => 
     assert.equal(checkFile(file).allowed, false);
     checkpoint.entryWired = true;
     fs.writeFileSync(file, JSON.stringify(checkpoint));
+    assert.equal(checkFile(file).allowed, false);
+    const sha = 'a'.repeat(40);
+    checkpoint.backendDeploymentEvidence = {
+      schemaVersion: 1, repository: 'memoryalwaysbibo/BXH_ARENA_Functions_Production',
+      projectId: 'bxh-arena', sourceCommit: sha, runtimeReconciled: true,
+      run: { id: 1, head_sha: sha, status: 'completed', conclusion: 'success' },
+      jobs: [{ run_id: 1, status: 'completed', conclusion: 'success', steps: [
+        { name: 'Deploy Production Firestore Rules', status: 'completed', conclusion: 'success' },
+        { name: 'Deploy Production Functions', status: 'completed', conclusion: 'success' }
+      ] }]
+    };
+    fs.writeFileSync(file, JSON.stringify(checkpoint));
     assert.equal(checkFile(file).allowed, true);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

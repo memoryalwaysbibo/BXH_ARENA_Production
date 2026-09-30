@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { releaseDecision } = require('./contracts.cjs');
+const { backendProvenanceDecision } = require('./backend-provenance.cjs');
 function checkFile(file) {
   try {
     const checkpoint = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -9,6 +10,8 @@ function checkFile(file) {
     const result = releaseDecision(checkpoint.evidence);
     if (checkpoint.backendReferenceIsLiveVerified !== true)
       result.blockers.push('backend-provenance-unverified');
+    const backend = backendProvenanceDecision(checkpoint.backendDeploymentEvidence);
+    result.blockers.push(...backend.blockers);
     if (checkpoint.entryWired !== true)
       result.blockers.push('entry-not-wired');
     result.allowed = result.blockers.length === 0;

@@ -21,5 +21,18 @@
     "Implement isolated HC-01 service with server-owned writes",
     "Verify denied access, concurrency and settlement in emulator",
     "Connect internal-only frontend adapter after service validation"
-  ]
+  ],
+  "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
+  "backendCandidateValidation": {
+    "runId": 36668868791,
+    "conclusion": "success",
+    "rulesDeployment": "skipped",
+    "functionsDeployment": "skipped",
+    "provesDeployment": false
+  },
+  "lastLocalVerification": {
+    "tests": 16,
+    "result": "PASS",
+    "scope": "pure contracts, provenance and release gate; no database/emulator or production writes"
+  }
 }

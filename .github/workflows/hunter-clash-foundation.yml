@@ -18,5 +18,6 @@ jobs:
       - run: node --check hunter-clash/contracts.cjs
       - run: node tests/hunter-clash-contracts.test.cjs
       - run: node tests/hunter-clash-release.test.cjs
+      - run: node tests/hunter-clash-provenance.test.cjs
       - name: Existing Hunter regressions
         run: node --test tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
