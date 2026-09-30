@@ -10,5 +10,14 @@ ok("staff event group hidden",!M.visibleGroups(staff).some(g=>g.id==="event"));
 ok("staff activity group hidden",!M.visibleGroups(staff).some(g=>g.id==="activity"));
 ok("referee resolves field",M.resolveActiveGroup("referee",admin).id==="field");
 ok("inventory resolves activity",M.resolveActiveGroup("inventory-admin",admin).id==="activity");
+const host=document.createElement("div");document.body.appendChild(host);
+let chosen="";
+ok("mount succeeds",M.mount({host,activeTab:"referee",visibleTabs:admin,onTab:t=>chosen=t,onGroup:t=>chosen=t})===true);
+ok("mount renders five groups",host.querySelectorAll("[data-management-v2-group]").length===5);
+ok("mount renders field children",host.querySelectorAll("[data-management-v2-tab]").length===4);
+host.querySelector('[data-management-v2-tab="bracket"]').click();
+ok("mount child callback",chosen==="bracket");
+chosen="";host.querySelector('[data-management-v2-group="system"]').click();
+ok("mount group callback resolves first visible",chosen==="operations");
 document.getElementById("out").textContent=out.join("\n");
 </script>
