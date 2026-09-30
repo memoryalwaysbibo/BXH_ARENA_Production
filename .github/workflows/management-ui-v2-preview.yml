@@ -1,0 +1,31 @@
+name: Management UI V2 Preview Artifact
+on:
+  push:
+    branches:
+      - preview/management-ui-v2
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate preview files
+        run: |
+          set -euo pipefail
+          test -f management-ui-v2-preview.html
+          test -f management-ui-v2.js
+          test -f management-ui-v2.css
+          grep -q "BXH ARENA Management UI V2 Preview" management-ui-v2-preview.html
+      - name: Build isolated preview artifact
+        run: |
+          mkdir -p preview-artifact
+          cp management-ui-v2-preview.html preview-artifact/index.html
+          cp management-ui-v2.js preview-artifact/
+          cp management-ui-v2.css preview-artifact/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: management-ui-v2-preview
+          path: preview-artifact
+          retention-days: 7
