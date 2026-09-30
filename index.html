@@ -28,10 +28,10 @@
 <meta name="description" content="BXH ARENA｜查看 BXH 賽事、即時對戰、天梯排行與最終排名。">
 <meta name="theme-color" content="#000000">
 <meta name="bxh-environment" content="production">
-<meta name="bxh-build" content="20260930.3">
+<meta name="bxh-build" content="20260930.4">
 <script>
 (function bxhFreshVersionGuard(){
-  var CURRENT_BUILD="20260930.3";
+  var CURRENT_BUILD="20260930.4";
   var CHECK_EVERY_MS=60000;
   var lastCheck=0;
   var checking=false;
@@ -6127,9 +6127,10 @@ async function recordRecentPublicTournament(code, name){
 let cloudLastSyncAt = null;
 let cloudTestBusy = false;
 let cloudTestResult = null;
+let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.12";
+const APP_VERSION = "v14.3.13";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},
@@ -14187,6 +14188,15 @@ function confirmResult(matchId){
 // win condition against THAT (not the local screen), so a stale/already-changed score
 // on another device cannot be confirmed here. Falls back to the plain local path
 // (confirmResult) when no cloud room is active or the transaction API is unavailable.
+async function queueOfflineMatchConfirmation(matchId,mode,selectedWinnerId){
+  const m=getMatch(matchId);if(!m||!state.cloudCode||!window.BXHOfflineQueue)return false;
+  const ref=currentRefereeIdentity(),actor=ref.name||adminDisplayName||(userProfile&&userProfile.email)||"admin";
+  const ev=mode==="quick_decision"?evaluateQuickDecision(m,selectedWinnerId):evaluateMatchCompletion(m);if(!ev.ok)return false;
+  await window.BXHOfflineQueue.enqueue({tournamentCode:String(state.cloudCode).toUpperCase(),matchId:m.id,station:Number(m.station||0),dispatchRevision:m.dispatchRevision||0,mode:mode||"score",selectedWinnerId:ev.winnerId,playerAId:m.a&&m.a.playerId||null,playerBId:m.b&&m.b.playerId||null,scoreA:m.scoreA,scoreB:m.scoreB,log:Array.isArray(m.log)?JSON.parse(JSON.stringify(m.log)):[],faultActions:Array.isArray(m.faultActions)?JSON.parse(JSON.stringify(m.faultActions)):[],actorUid:ref.uid||null,actorName:actor,auditMeta:{recordDuty:ref.isStaff,uid:ref.uid,matchId:m.id,tournamentName:(state.meta&&state.meta.name)||"",station:Number(m.station||0),dispatchRevision:m.dispatchRevision||0,roundLabel:refereeStageLabel(m),playerA:m.a?playerName(m.a.playerId):"",playerB:m.b?playerName(m.b.playerId):"",winnerName:playerName(ev.winnerId),resultMethod:mode==="quick_decision"?"quick_decision":"score",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"}});
+  if(mode==="quick_decision")applyQuickDecisionFields(m,ev,actor);else applyMatchCompletionFields(m,ev,actor);
+  m.offlinePendingSync=true;m.offlineOperationQueuedAt=Date.now();rebuildPropagation();await saveRecord(cloneStateForSave(state));render();showToast("目前離線：比賽結果已安全暫存，恢復網路後會自動驗證並同步雲端。",true);return true;
+}
+
 async function confirmResultWithCloudGuard(matchId){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
@@ -14200,6 +14210,9 @@ async function confirmResultWithCloudGuard(matchId){
   if(!localEval.ok){
     showToast(completionFailureMessage(localEval.reason), true);
     return false;
+  }
+  if(state.cloudCode && typeof navigator!=="undefined" && navigator.onLine===false){
+    return await queueOfflineMatchConfirmation(matchId,"score",localEval.winnerId);
   }
   if(!(state.cloudCode && cloudAvailable() && window.cloudSync.confirmMatchTransaction)){
     return confirmResult(matchId);
@@ -14360,6 +14373,9 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(!localEval.ok){
     showToast(quickDecisionFailureMessage(localEval.reason), true);
     return false;
+  }
+  if(state.cloudCode && typeof navigator!=="undefined" && navigator.onLine===false){
+    return await queueOfflineMatchConfirmation(matchId,"quick_decision",selectedWinnerId);
   }
   if(!(state.cloudCode && cloudAvailable() && window.cloudSync.confirmMatchTransaction)){
     return confirmQuickDecision(matchId, selectedWinnerId);
@@ -32266,10 +32282,28 @@ if(testerSession){
     }
   };
 
+  window.BXHCommitOfflineMatch=async function(op){
+  if(!op||!op.tournamentCode||!window.cloudSync||!window.cloudSync.confirmMatchTransaction)return {ok:false,reason:"cloud-unavailable"};
+  if(currentAuthUid()!==op.actorUid)return {ok:false,reason:"permission-denied"};
+  return await window.cloudSync.confirmMatchTransaction(op.tournamentCode,(remoteState)=>{
+    rebuildPropagationForState(remoteState);const m=(remoteState.matches||[]).find(x=>x.id===op.matchId);if(!m)return{ok:false,reason:"not-found"};
+    if(m.completed||m.winnerId)return{ok:false,reason:"already-completed"};if(Number(m.station||0)!==Number(op.station||0))return{ok:false,reason:"station-mismatch"};
+    if((m.dispatchRevision||0)!==(op.dispatchRevision||0))return{ok:false,reason:"dispatch-stale"};if(!m.a||!m.b||m.a.playerId!==op.playerAId||m.b.playerId!==op.playerBId)return{ok:false,reason:"player-mismatch"};
+    let ev;if(op.mode==="quick_decision")ev=evaluateQuickDecision(m,op.selectedWinnerId);else{m.scoreA=op.scoreA;m.scoreB=op.scoreB;m.log=Array.isArray(op.log)?op.log:[];m.faultActions=Array.isArray(op.faultActions)?op.faultActions:[];ev=evaluateMatchCompletion(m);}
+    if(!ev.ok||ev.winnerId!==op.selectedWinnerId)return{ok:false,reason:(ev&&ev.reason)||"validation-failed"};if(op.mode==="quick_decision")applyQuickDecisionFields(m,ev,op.actorName);else applyMatchCompletionFields(m,ev,op.actorName);
+    delete m.offlinePendingSync;delete m.offlineOperationQueuedAt;rebuildPropagationForState(remoteState);return{ok:true,state:remoteState};
+  },op.auditMeta||{});
+};
+window.addEventListener("bxh-offline-operation-synced",(e)=>{try{const d=e.detail||{},op=d.op||{},r=d.result||{};if(state.cloudCode&&String(state.cloudCode).toUpperCase()===String(op.tournamentCode||"").toUpperCase()&&r.state){const keep=state.cloudCode;state=Object.assign(defaultState(r.state.id),r.state);state.cloudCode=keep;rebuildPropagation();saveRecord(state);cloudStatus="connected";cloudLastSyncAt=Date.now();render();}showToast("離線賽事資料已完成雲端同步");}catch(err){}});
+window.addEventListener("bxh-offline-operation-conflict",()=>{cloudStatus="error";render();showToast("離線資料與雲端賽事發生衝突，系統已停止自動覆寫，請由管理員確認。",true);});
+window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";render();showToast("離線資料多次同步失敗，已停止自動重試並保留紀錄，請確認網路後再處理。",true);});
+window.addEventListener("bxh-offline-queue-change",(e)=>{offlineQueueStatus=Object.assign({pending:0,conflict:0,failed:0,total:0},(e&&e.detail)||{});render();});
+
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
 </script>
+<script src="offline-resilience.js?v=20260930-offline-v2"></script>
 <script src="activity-points-ui.js?v=20260928-account-frame-fix5"></script>
 <script src="ladder-secondary-ui.js?v=14.2.55-badge-batch2"></script>
 </body>
