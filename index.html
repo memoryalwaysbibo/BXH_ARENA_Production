@@ -29651,6 +29651,7 @@ let staffDirectoryRequest=null;
 const STAFF_DIRECTORY_CACHE_TTL_MS=30000;
 function invalidateStaffDirectoryCache(){ staffDirectoryCache=null; staffDirectoryCacheAt=0; }
 
+let ladderSnapshotRequest=null;
 window.cloudAuth = {
     isReady(){ return authReady; },
     // Direct, synchronous read of Firebase's own current-user state — used as
@@ -30829,23 +30830,26 @@ window.cloudAuth = {
     async getPlayerBadges(uids){const call=fnx.httpsCallable(functionsHandle,'playerCardService',{timeout:15000});const r=await call({action:'badges',uids});return r.data;},
     async getLadderSnapshot(){
       if(!cloudEnabled) return {control:null,season:null,players:[]};
-
-      // Control and player collection are independent: fetch them in parallel.
-      // Previously these were serial, followed by another season read, causing
-      // avoidable latency on mobile even with only one ladder player.
-      const [controlSnap,ps]=await Promise.all([
-        fx.getDoc(fx.doc(dbHandle,"ladderSystem","current")),
-        fx.getDocs(fx.collection(dbHandle,"ladderPlayers"))
-      ]);
-      const control=controlSnap.exists()?controlSnap.data():null;
-      const players=[]; ps.forEach(d=>players.push(Object.assign({uid:d.id},d.data())));
-
-      let season=null;
-      if(control&&control.currentSeason){
-        const ss=await fx.getDoc(fx.doc(dbHandle,"ladderSeasons",control.currentSeason));
-        if(ss.exists()) season=ss.data();
-      }
-      return {control,season,players};
+      if(ladderSnapshotRequest) return await ladderSnapshotRequest;
+      ladderSnapshotRequest=(async()=>{
+        try{
+          const [controlSnap,ps]=await Promise.all([
+            fx.getDoc(fx.doc(dbHandle,"ladderSystem","current")),
+            fx.getDocs(fx.collection(dbHandle,"ladderPlayers"))
+          ]);
+          const control=controlSnap.exists()?controlSnap.data():null;
+          const players=[]; ps.forEach(d=>players.push(Object.assign({uid:d.id},d.data())));
+          let season=null;
+          if(control&&control.currentSeason){
+            const ss=await fx.getDoc(fx.doc(dbHandle,"ladderSeasons",control.currentSeason));
+            if(ss.exists()) season=ss.data();
+          }
+          return {control,season,players};
+        }finally{
+          ladderSnapshotRequest=null;
+        }
+      })();
+      return await ladderSnapshotRequest;
     },
 
     async getLadderPlayer(uid){
