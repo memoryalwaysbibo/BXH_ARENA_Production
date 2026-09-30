@@ -17170,7 +17170,7 @@ async function handleEntrySelection(action){
    if(payload.action!=='preview')sessionStorage.setItem(storageKey,JSON.stringify(payload));
   }
   c.busy=true;c.message='';render();
-  if(!pending){await flushCloudStateWrites();if(entryContext().key!==key)return;const synced=await window.cloudSync.pushUpdate(state.cloudCode,state);if(!synced)throw Error('名單尚未同步，請重新載入賽事後再試');if(entryContext().key!==key)return;}
+  if(!pending){await flushCloudStateWrites();if(entryContext().key!==key)return;const synced=await enqueueCloudStateWrite(state.cloudCode,cloneStateForSave(state));if(!synced)throw Error('名單尚未同步，請重新載入賽事後再試');if(entryContext().key!==key)return;}
   contacted=true;const legacy=state.entrySelection&&!state.entrySelection.mode;const result=await (legacy?window.engagementService.manageEntrySelection(payload):window.engagementService.manageRegistrationSelection(payload));if(entryContext().key!==key)return;
   if(payload.action==='preview'){c.preview=result;c.message=(result.resuming?'先前抽籤尚未結束，再次執行會接續原結果。 ':'')+`有效報名 ${result.count} 人（最多顯示100位）：${result.candidates.map(x=>x.name).join('、')}`;}
   else{sessionStorage.removeItem(storageKey);state={...result.state,cloudCode:payload.code};c.preview=null;c.message='名額設定／名單已同步';adminRegistrationsCache=null;saveState();}
@@ -27278,7 +27278,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       openModal({ type:"generic", title:"尚有資料同步中", message:"目前賽事仍有變更尚未同步至雲端，請稍候再離開，或立即重試同步。直接離開可能導致這些變更遺失。", confirmLabel:"重試同步", onConfirm:()=>{
         (async ()=>{
           if(!state.cloudCode || !cloudAvailable()){ showToast("目前無法連線，請稍後再試", true); return; }
-          const ok = await window.cloudSync.pushUpdate(state.cloudCode, state);
+          const ok = await enqueueCloudStateWrite(state.cloudCode, cloneStateForSave(state));
           if(ok){ cloudSyncPending=false; showToast("已完成同步，請重新點擊「離開目前賽事」"); render(); }
           else { showToast("同步仍未成功，請檢查網路連線", true); }
         })();
