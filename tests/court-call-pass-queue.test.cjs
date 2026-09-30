@@ -1,0 +1,57 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+
+const ui=fs.readFileSync(path.join(__dirname,'..','court-call-ui.js'),'utf8');
+
+function extract(name,next){
+  const start=ui.indexOf('function '+name+'(');
+  assert(start>=0,'missing '+name);
+  const end=next?ui.indexOf('\n'+next,start):ui.length;
+  assert(end>start,'missing end for '+name);
+  return ui.slice(start,end);
+}
+
+const sandbox={String,Number,Array,Object,Set,Map,Date,Math};
+vm.createContext(sandbox);
+vm.runInContext(
+  extract('callPassProtected','function courtCallUserKey')+'\n'+
+  extract('courtCallPublicQueue','/* Load ranked registration'),
+  sandbox
+);
+
+const base=()=>({
+  matches:[
+    {id:'pass',station:1,seq:0,isBye:false,completed:false,status:'pending',a:{},b:{},skippedAt:100,resumeQueuedAt:null,skipManualOnly:false,callPass:{waitFor:['m1']}},
+    {id:'m1',station:1,seq:1,isBye:false,completed:false,status:'ready',a:{},b:{}},
+    {id:'m2',station:1,seq:2,isBye:false,completed:false,status:'ready',a:{},b:{}},
+    {id:'other',station:2,seq:1,isBye:false,completed:false,status:'ready',a:{},b:{}}
+  ]
+});
+
+{
+  const st=base();
+  assert.equal(sandbox.callPassProtected(st,st.matches[0]),true,'PASS match itself must be protected');
+  assert.equal(sandbox.callPassProtected(st,st.matches[1]),true,'PASS predecessor must be protected');
+  assert.equal(sandbox.callPassProtected(st,st.matches[2]),false,'unrelated match must remain operable');
+
+  const order=Array.from(sandbox.courtCallPublicQueue(st,1),m=>m.id);
+  assert.deepEqual(order,['m1','pass','m2'],'PASS must sit immediately after its required predecessor');
+}
+
+{
+  const st=base();
+  st.matches.find(m=>m.id==='m1').completed=true;
+  const order=Array.from(sandbox.courtCallPublicQueue(st,1),m=>m.id);
+  assert.deepEqual(order,['pass','m2'],'PASS must return to the front once required predecessor completes');
+}
+
+{
+  const st=base();
+  const pass=st.matches.find(m=>m.id==='pass');
+  pass.completed=true;
+  assert.equal(sandbox.callPassProtected(st,st.matches.find(m=>m.id==='m1')),false,'completed PASS must release predecessor protection');
+}
+
+console.log('PASS court-call PASS defer / protection / requeue contract');
