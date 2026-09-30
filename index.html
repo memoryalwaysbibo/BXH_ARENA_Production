@@ -23359,7 +23359,7 @@ let interfaceTheme=(()=>{
 let entranceThemeAccountUid=(()=>{
   try{return localStorage.getItem(BXH_INTERFACE_THEME_ENTRANCE_UID_KEY)||"";}catch(e){return "";}
 })();
-let accountThemeOpen=false;
+let accountThemeOpen=false;\nlet accountInterfaceOpen=false;\nconst BXH_MANAGEMENT_UI_PREF_KEY="bxh.management.ui.version.v1";\nfunction managementUiPreference(){try{return localStorage.getItem(BXH_MANAGEMENT_UI_PREF_KEY)==="v2"?"v2":"v1";}catch(e){return "v1";}}
 function restoreAccountInterfaceTheme(uid,profile){
   let saved=null;
   try{saved=localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid);}catch(e){}
@@ -23432,6 +23432,20 @@ function themePickerHtml(){
         </button>`).join("")}
       </div>
     </div>`:""}
+  </div>`;
+}
+
+function interfacePickerHtml(){
+  const current=managementUiPreference();
+  return `<div class="account-theme-entry ${accountInterfaceOpen?"open":""}">
+    <button type="button" class="account-theme-trigger" data-action="toggle-account-interface" aria-expanded="${accountInterfaceOpen?"true":"false"}">
+      <span class="account-theme-trigger-copy"><span class="account-theme-trigger-title">我的介面</span><span class="account-theme-trigger-sub">MANAGEMENT UI</span></span>
+      <span class="account-theme-current"><span class="account-theme-current-name">${current==="v2"?"V2 新版":"V1 經典版"}</span><span class="account-theme-chevron">›</span></span>
+    </button>
+    ${accountInterfaceOpen?`<div class="account-theme-panel"><div class="account-theme-grid">
+      <button type="button" class="account-theme-card ${current==="v1"?"is-active":""}" data-action="set-management-interface" data-version="v1"><span class="account-theme-card-copy"><strong>V1 經典版</strong><small>目前正式管理介面</small></span><span class="account-theme-check">✓</span></button>
+      <button type="button" class="account-theme-card" disabled aria-disabled="true" title="V2 尚在驗收"><span class="account-theme-card-copy"><strong>V2 新版</strong><small>驗收完成後開放</small></span><span class="account-theme-check">—</span></button>
+    </div></div>`:""}
   </div>`;
 }
 
@@ -26549,7 +26563,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
-  if(action==="toggle-account-theme"){
+  if(action==="toggle-account-interface"){ accountInterfaceOpen=!accountInterfaceOpen; accountThemeOpen=false; render(); return; }\n  if(action==="set-management-interface"){ const v=target.getAttribute("data-version"); if(v==="v1"){try{localStorage.setItem(BXH_MANAGEMENT_UI_PREF_KEY,"v1");}catch(e){} accountInterfaceOpen=false; showToast("已使用 V1 經典管理介面"); render();} return; }\n  if(action==="toggle-account-theme"){
     accountThemeOpen=!accountThemeOpen;
     render();
     return;
@@ -26560,7 +26574,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     return;
   }
-  if(action==="toggle-account-menu"){ accountMenuOpen=!accountMenuOpen; if(!accountMenuOpen) accountThemeOpen=false; render(); return; }
+  if(action==="toggle-account-menu"){ accountMenuOpen=!accountMenuOpen; if(!accountMenuOpen){accountThemeOpen=false;accountInterfaceOpen=false;} render(); return; }
   if(action==="super-admin-page"){ const page=target.getAttribute("data-page"); if(["accounts","checkin","titles"].includes(page)){ if(page==="titles"&&!engagementActionBusy){resetTitleRecipientForm();engagementAdminOverview=null;requestEngagementSnapshot(true);} superAdminManagementPage=page; accountMenuOpen=false; render(); } return; }
   if(action==="account-goto-home"){ accountMenuOpen=false; appPhase="app"; activeTab="live"; render(); return; }
   if(action==="account-change-password"){ accountMenuOpen=false; authFormError=""; appPhase="admin-change-password"; render(); return; }
