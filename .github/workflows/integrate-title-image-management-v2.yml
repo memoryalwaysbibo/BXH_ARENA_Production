@@ -1,0 +1,83 @@
+name: Integrate Title Image Management V2
+on:
+  push:
+    branches: [feat/title-image-management-v2]
+    paths: [.github/workflows/integrate-title-image-management-v2.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Patch production title editor
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("index.html"); s=p.read_text()
+          s=s.replace("  let functionsHandle = null;\n  let fnx = null;","  let functionsHandle = null;\n  let fnx = null;\n  let storageHandle = null;\n  let sx = null; // firebase-storage references",1)
+          old='''        const authMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`);
+        const app = appMod.initializeApp(FIREBASE_CONFIG);
+        dbHandle = fsMod.getFirestore(app);'''
+          new='''        const authMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`);
+        const storageMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-storage.js`);
+        const app = appMod.initializeApp(FIREBASE_CONFIG);
+        dbHandle = fsMod.getFirestore(app);
+        storageHandle = storageMod.getStorage(app);
+        sx = { ref:storageMod.ref, uploadBytes:storageMod.uploadBytes, getDownloadURL:storageMod.getDownloadURL };'''
+          if old not in s: raise SystemExit("firebase init anchor missing")
+          s=s.replace(old,new,1)
+          marker="  window.cloudAuth = {\n    isReady(){ return authReady; },"
+          storage='''  window.cloudStorage = {
+    isReady(){ return !!(cloudEnabled && authReady && storageHandle && sx); },
+    async uploadTitleImage({titleId,file}){
+      if(!this.isReady()) return {ok:false,error:"圖片儲存服務尚未就緒。"};
+      const user=authHandle&&authHandle.currentUser;
+      if(!user?.uid) return {ok:false,error:"請先登入最高管理員帳號。"};
+      const profile=await window.cloudAuth.getUserProfile(user.uid);
+      if(profile?.role!=="super_admin"||profile?.active!==true) return {ok:false,error:"只有最高管理員可以上傳稱號圖片。"};
+      const id=String(titleId||"").trim().toLowerCase().replace(/[^a-z0-9_-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,100);
+      if(!id) return {ok:false,error:"稱號 ID 無效。"};
+      if(!file||!String(file.type||"").startsWith("image/")) return {ok:false,error:"請選擇圖片檔案。"};
+      if(Number(file.size||0)>8*1024*1024) return {ok:false,error:"稱號圖片不可超過 8MB。"};
+      const mime=String(file.type||"image/webp").toLowerCase();
+      const ext=mime==="image/png"?"png":mime==="image/jpeg"?"jpg":mime==="image/svg+xml"?"svg":"webp";
+      const path="managed/titles/"+id+"/icon."+ext;
+      try{
+        const objectRef=sx.ref(storageHandle,path);
+        await sx.uploadBytes(objectRef,file,{contentType:mime,customMetadata:{module:"titles",titleId:id,uploadedBy:user.uid}});
+        const url=await sx.getDownloadURL(objectRef);
+        return {ok:true,imagePath:path,imageUrl:url};
+      }catch(e){ console.warn("稱號圖片上傳失敗",e); return {ok:false,error:String(e?.code||e?.message||"圖片上傳失敗")}; }
+    }
+  };
+
+'''
+          if marker not in s: raise SystemExit("cloudAuth anchor missing")
+          s=s.replace(marker,storage+marker,1)
+          art=''' <div class="field"><label>說明</label><textarea id="title-editor-description" maxlength="500">${esc(d.description||'')}</textarea></div>'''
+          artnew=art+'''\n <div class="field"><label>稱號圖片</label><input id="title-editor-image" type="file" accept="image/*"><div class="hint">上傳後由系統自動管理 Storage Path 與 URL，不需要手動貼網址。</div>${d.imageUrl?`<img src="${esc(d.imageUrl)}" alt="${esc(d.name||'稱號圖片')}" style="display:block;max-width:260px;max-height:140px;object-fit:contain;margin-top:8px">`:''}${d.imagePath?`<div class="hint">${esc(d.imagePath)}</div>`:''}</div>'''
+          if art not in s: raise SystemExit("editor art anchor missing")
+          s=s.replace(art,artnew,1)
+          bind=''' for(const [id,key,type] of [['name','name','text'],['rarity-tier','rarityTier','text'],['limited-type','limitedType','text'],['permanent','isPermanent','boolean'],['description','description','text'],['condition','conditionType','text'],['target','targetValue','number'],['active','isActive','boolean'],['hidden','isHidden','boolean'],['archived','isArchived','boolean']]){'''
+          bindnew=''' document.getElementById('title-editor-image')?.addEventListener('change',async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;c.busy=true;c.message='稱號圖片上傳中…';render();const result=await window.cloudStorage?.uploadTitleImage?.({titleId:c.draft.titleId,file});c.busy=false;if(result?.ok){c.draft.imagePath=result.imagePath;c.draft.imageUrl=result.imageUrl;c.message='圖片已上傳；按「儲存稱號」後會與稱號資料一起發布。';}else c.message=result?.error||'圖片上傳失敗';render();});
+ '''+bind
+          if bind not in s: raise SystemExit("editor bind anchor missing")
+          s=s.replace(bind,bindnew,1)
+          p.write_text(s)
+      - name: Verify integration
+        run: |
+          grep -Fq 'firebase-storage.js' index.html
+          grep -Fq 'window.cloudStorage' index.html
+          grep -Fq 'title-editor-image' index.html
+          grep -Fq 'managed/titles/' index.html
+          node scripts/verify-production-frontend.cjs
+      - name: Commit integration
+        run: |
+          rm .github/workflows/integrate-title-image-management-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Integrate title image management into existing admin editor"
+          git push origin HEAD:feat/title-image-management-v2
