@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "stage": "HC-00",
+  "status": "IN_PROGRESS",
+  "frontendBaseCommit": "2974f7461e64db5e4a188cff635fa6c9e21f3906",
+  "backendHistoricalReference": "7c7d110ba3d57647db7b6037e1ed8616caa1c5e0",
+  "backendReferenceIsLiveVerified": false,
+  "entryWired": false,
+  "deployed": false,
+  "evidence": {
+    "sourcePinned": "PASS",
+    "backendAuthorization": "NOT RUN",
+    "sandboxIsolation": "NOT RUN",
+    "idempotentSettlement": "NOT RUN",
+    "concurrentSubmission": "NOT RUN",
+    "legacyRegression": "PASS",
+    "internalBeta": "NOT RUN"
+  },
+  "next": [
+    "Establish deployed backend and Rules provenance",
+    "Implement isolated HC-01 service with server-owned writes",
+    "Verify denied access, concurrency and settlement in emulator",
+    "Connect internal-only frontend adapter after service validation"
+  ]
+}

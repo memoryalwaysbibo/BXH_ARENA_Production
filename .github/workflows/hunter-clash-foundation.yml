@@ -1,0 +1,21 @@
+name: Hunter Clash Foundation
+on:
+  pull_request:
+    paths: ['hunter-clash/**', 'tests/hunter-clash-*.test.cjs', '.github/workflows/hunter-clash-foundation.yml']
+  push:
+    branches: ['feature/hc00-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check hunter-clash/contracts.cjs
+      - run: node --test tests/hunter-clash-contracts.test.cjs
+      - name: Existing Hunter regressions
+        run: node --test tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
