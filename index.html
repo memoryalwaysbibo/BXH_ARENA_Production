@@ -29645,7 +29645,13 @@ init().then(()=>{
   const USERS_COLLECTION = "users";
   const BOOTSTRAP_DOC_PATH = ["system","bootstrap"];
 
-  window.cloudAuth = {
+  let staffDirectoryCache=null;
+let staffDirectoryCacheAt=0;
+let staffDirectoryRequest=null;
+const STAFF_DIRECTORY_CACHE_TTL_MS=30000;
+function invalidateStaffDirectoryCache(){ staffDirectoryCache=null; staffDirectoryCacheAt=0; }
+
+window.cloudAuth = {
     isReady(){ return authReady; },
     // Direct, synchronous read of Firebase's own current-user state — used as
     // a manual recovery check if onAuthStateChanged's event itself never
@@ -30031,11 +30037,20 @@ init().then(()=>{
 
     async listStaffDirectory(){
       if(!authReady) return [];
-      try{
-        const snap=await fx.getDocs(fx.collection(dbHandle,"staffDirectory"));
-        const out=[]; snap.forEach(d=>out.push(Object.assign({uid:d.id},d.data())));
-        return out.filter(u=>u.active!==false&&["staff","admin","super_admin","tester"].includes(u.role)).sort((a,b)=>String(a.displayName||"").localeCompare(String(b.displayName||""),"zh-Hant"));
-      }catch(e){ console.warn("讀取裁判安全目錄失敗",e); return []; }
+      const now=Date.now();
+      if(staffDirectoryCache && now-staffDirectoryCacheAt<STAFF_DIRECTORY_CACHE_TTL_MS) return staffDirectoryCache.slice();
+      if(staffDirectoryRequest) return (await staffDirectoryRequest).slice();
+      staffDirectoryRequest=(async()=>{
+        try{
+          const snap=await fx.getDocs(fx.collection(dbHandle,"staffDirectory"));
+          const out=[]; snap.forEach(d=>out.push(Object.assign({uid:d.id},d.data())));
+          staffDirectoryCache=out.filter(u=>u.active!==false&&["staff","admin","super_admin","tester"].includes(u.role)).sort((a,b)=>String(a.displayName||"").localeCompare(String(b.displayName||""),"zh-Hant"));
+          staffDirectoryCacheAt=Date.now();
+          return staffDirectoryCache;
+        }catch(e){ console.warn("讀取裁判安全目錄失敗",e); return []; }
+        finally{ staffDirectoryRequest=null; }
+      })();
+      return (await staffDirectoryRequest).slice();
     },
 
     async syncStaffDirectory(users){
@@ -30046,6 +30061,7 @@ init().then(()=>{
           batch.set(fx.doc(dbHandle,"staffDirectory",u.uid),{uid:u.uid,displayName:u.displayName||u.realName||u.email||u.uid,role:u.role,active:true,updatedAt:Date.now()},{merge:true}); count++;
         });
         if(count) await batch.commit();
+        invalidateStaffDirectoryCache();
         return true;
       }catch(e){ console.warn("同步裁判安全目錄失敗",e); return false; }
     },
