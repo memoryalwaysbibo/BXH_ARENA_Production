@@ -15,17 +15,24 @@
 | 現行雲端基線與可信來源核對 | BLOCKED | 取得真實 runtime 報告；Rules 名稱／內容雜湊一致；Functions build／revision 與可信部署來源一致 |
 | 獨立雲端測試環境與正式授權邊界 | BLOCKED | 提供獨立 Firebase project；完成部署隔離、正式簽章／撤銷、IAM 與 App Check 驗證 |
 
-最後兩項完成後才能宣告 HC-00 完整驗收。目前缺少可用的 GCP 採集環境與独立測試專案，不能用本機測試通過補成雲端驗收。
+最後兩項完成後才能宣告 HC-00 完整驗收。目前缺少完整 Functions 來源核對與獨立測試專案，不能用本機測試通過補成雲端驗收。
 
 ## 與其他階段的關係
 
 本機提交、認證、人工風險放行與結算串接，是為了驗證架構，涵蓋 HC-01～04 的部分準備工作。QR／近距離配對、獵人執照完整 adapter、一般／認證雙軌及完整防刷引擎不因此宣告完成。
 HC-05 工作人員實戰及 HC-06 正式發布另行驗收。發布清單目前 2/7 PASS（約 29%），這是必驗項目比例，不能當成 HC-00 施工完成度。
 
-玩家正式入口保持關閉，PR 保持草稿，未合併或部署。例行工具與文件完善不替代上述雲端完成條件。
+玩家正式入口保持關閉，HC 功能 PR 保持草稿，未合併或部署。例行工具與文件完善不替代上述雲端完成條件。
 
 
 ## 雲端採集執行路徑
 
-後端獨立草稿 [PR #88](https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/pull/88) 已準備唯讀 runtime workflow，固定官方 GET 與版本 SHA，使用既有 OIDC。18 項本機工具／防護測試及 Push／PR CI 通過；兩次 CI 的雲端 job 均為 skipped，沒有取得線上證據。
-工作流程須先經審查進入後端 main，才可選 main 手動執行。現有 GitHub 連線沒有 workflow_dispatch 能力，因此尚未啟動。既有部署 workflow、Functions、Rules 與 IAM 都未修改。此採集工具的啟用和 HC 功能發布分開，玩家入口與原發布 gate 保持關閉。
+後端唯讀工具 [PR #88](https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/pull/88) 已準備唯讀 runtime workflow，固定官方 GET 與版本 SHA，使用既有 OIDC。18 項本機工具／防護測試及 Push／PR CI 通過；兩次開發 CI 的雲端 job 均為 skipped；後續授權的手動核對結果見下節。
+工作流程已經使用者授權合併至後端 main，並透過網頁執行一次手動稽核。現有 GitHub 連線沒有 workflow_dispatch 能力，後續手動啟動仍需網頁。既有部署 workflow、Functions、Rules 與 IAM 都未修改。此採集工具的啟用和 HC 功能發布分開，玩家入口與原發布 gate 保持關閉。
+
+
+## 2026-09-30 真實雲端核對結果
+
+使用者授權後，PR #88 已合併；run 36696307510 由 main 手動執行。既有 OIDC、Functions v1/v2 與 Rules releases/rulesets 讀取均成功。觀測快照有 0 個第一代、96 個第二代 Functions，分屬 36 個 build，未見 hcSandboxCommand。採集沒有部署或更改 IAM／資料。
+原候選 Rules 比對為 MISMATCH，流程正確退出失敗。另從來源 commit ed1fc0d2befd6b9becae3a1e759e887f2645342b 取得相同的現行 Rules 內容，Git blob、SHA-256 與 78,887 位元組均核對一致。該來源的 PR CI 部署 job 為 skipped，不能以此宣告唯一部署來源或完整後端基線。原候選清單與失敗報告保留，不以換掉清單消除差異。
+線上證據保存於 [audit/20260930-36696307510](audit/20260930-36696307510)。下一步是 Functions build 與可信部署來源對照、獨立測試專案及正式授權驗收；backendReferenceIsLiveVerified、deployed、entryWired 均維持 false。

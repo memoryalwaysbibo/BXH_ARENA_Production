@@ -104,10 +104,15 @@ getChallenge 在伺服器交易中檢查有效內部角色、入口與當場指�
 
 ## 唯讀 runtime 採集器
 
-`runtime-audit.cjs` 已完成七項注入回應測試，涵蓋 GET 與 Token 保護、分頁、跨專案參照拒絕、不完整區域、API 錯誤及 Rules 雜湊。採集器不更動 checkpoint／發布 gate；完整操作與人工核對標準見 [RUNTIME_AUDIT.md](RUNTIME_AUDIT.md)。目前執行環境沒有 gcloud，尚未取得實際雲端資料；正式 runtime 證據仍待取得。
+`runtime-audit.cjs` 已完成七項注入回應測試，涵蓋 GET 與 Token 保護、分頁、跨專案參照拒絕、不完整區域、API 錯誤及 Rules 雜湊。採集器不更動 checkpoint／發布 gate；完整操作與人工核對標準見 [RUNTIME_AUDIT.md](RUNTIME_AUDIT.md)。本機沒有 gcloud；已經使用者授權透過後端 GitHub workflow 取得真實雲端 metadata。原候選 Rules 比對失敗，完整 Functions 來源核對仍待完成。
 
 
 ## 架構驗收與 Rules 來源比對
 
 架構工項與剩餘完成條件見 [ARCHITECTURE_STATUS.md](ARCHITECTURE_STATUS.md)。約 80% 為工程施工估算，2/7 為發布必驗項比例，兩者不得混用。
 `rules-source-reference.json` 已固定並交叉核對候選來源的 Git blob 與 SHA-256；`compare-runtime-rules.cjs` 可核對實際採集報告中的 Firestore release、ruleset 與完整檔案雜湊。七項比對測試通過，涵蓋缺少／多出／變更來源、重複與跨專案參照。候選雜湊與比對工具通過不表示已取得現行雲端證據，發布仍維持阻擋。
+
+
+## 首次真實雲端核對
+
+唯讀工具 PR #88 已經使用者授權合併並執行 run 36696307510。完整採集到 96 個第二代 Functions、36 個 build 與現行 Rules release；原候選 Rules 不符，因此 job 正確失敗。現行 Rules 已找到相同來源內容；完整 Functions 來源、獨立專案與正式 HC 授權仍待驗收。詳見 [ARCHITECTURE_STATUS.md](ARCHITECTURE_STATUS.md) 與保存的 audit 報告。HC 功能未合併或部署，正式入口關閉。

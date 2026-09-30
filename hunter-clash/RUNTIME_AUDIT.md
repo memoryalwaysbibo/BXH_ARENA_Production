@@ -24,7 +24,7 @@ node hunter-clash/runtime-audit.cjs --project bxh-arena --out /tmp/hc00-runtime-
 4. 清單與 Rules 讀取是分次請求，並非原子快照。核對期間如有部署或 release 更動，重新採集並確認穩定。
 5. 經獨立專案部署、正式 Token／撤銷、IAM／App Check 與工作人員內部實戰驗證後，才處理相應驗收項目。不可直接把採集結果當成 PASS。
 
-目前此工作環境未安裝 gcloud，尚未取得實際遠端報告。單元測試使用注入的 API 回應，證明工具行為，並非線上版本證據。
+本機仍未安裝 gcloud；2026-09-30 經授權的後端 GitHub workflow 已取得真實報告，見 audit/20260930-36696307510。單元測試使用注入的 API 回應，證明工具行為，並非線上版本證據。
 
 ## 官方 API 參考
 
@@ -46,3 +46,6 @@ node hunter-clash/compare-runtime-rules.cjs --inventory /tmp/hc00-runtime-audit.
 工具只讀報告與版本固定的來源清單，輸出 MATCH／MISMATCH／BLOCKED；退出碼為 0／1／1。檢查 project、採集完整性、觀測時間、預設 Firestore release、唯一 ruleset、完整檔案清單、位元組數及 SHA-256。接受 cloud.firestore 與 cloud.firestore/(default) 名稱；兩者同時存在時必須指向同一 ruleset。重複／跨專案參照、缺少／多出檔案、錯誤雜湊均會拒絕或列出差異。
 
 MATCH 只表示這次快照的 Rules 內容符合候選來源。清單雜湊可驗證內部一致性，不能驗證報告取得者的身分或原始 API 回應真實性；報告仍需可信採集與稽核保存。工具不認證 Functions 來源，也不判斷快照是否仍為現行版本，部署有變動時必須重新採集。runtimeReconciled／hcDeploymentVerified 始終為 false，不更新發布 gate。
+
+
+首次真實採集由 main commit 036369e2430f60ea7cab55bcfb514f9df7f5734b 的 run 36696307510 完成。採集為 COLLECTED，原候選 Rules 比對 MISMATCH，整體 job 失敗。另取得相同現行 Rules 的來源內容，尚未建立完整 Functions 部署對照；發布 gate 保持阻擋。
