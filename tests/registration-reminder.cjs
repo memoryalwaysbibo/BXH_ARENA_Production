@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+const {decision}=require('../scripts/registration-reminder-core.cjs');
+const event={visibility:'public',registrationEnabled:true,registrationOpenAt:10000000};
+const pref={enabled:true,minutesBefore:60};
+assert.equal(decision(event,pref,null,6400000).action,'send');
+assert.equal(decision(event,pref,null,6399999).action,'wait');
+assert.equal(decision(event,pref,null,6700000).action,'expired');
+assert.equal(decision(event,{...pref,sentKey:'10000000:60'},null,6400000).action,'skip');
+assert.equal(decision(event,pref,{status:'confirmed'},6400000).action,'cancel');
+assert.equal(decision({...event,eventCancelled:true},pref,null,6400000).action,'cancel');
+assert.equal(decision({...event,registrationOpenAt:20000000},pref,null,6400000).action,'wait');
+assert.equal(decision(event,{...pref,enabled:false},null,6400000).action,'skip');
+assert.equal(decision({...event,visibility:'private'},pref,null,6400000).action,'cancel');
+assert.equal(decision(event,{enabled:true,minutesBefore:0},null,10000000).action,'send');
+console.log('10 registration reminder cases passed');
