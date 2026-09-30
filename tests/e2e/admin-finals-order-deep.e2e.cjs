@@ -204,7 +204,7 @@ test('official single elimination enforces bronze before championship final', as
   expect(completed.archiveStatus).toBe('completed');
 
   // Data and rendered bracket must agree on all four placements.
-  await page.locator('[data-action="switch-tab"][data-tab="bracket"]').click();
+  await page.locator('[data-action="switch-tab"][data-tab="bracket"]').first().click();
   const finalBox=page.locator(`.match-box[data-id="${completed.finalId}"]`);
   const bronzeBox=page.locator(`.match-box[data-id="${completed.bronzeId}"]`);
   await expect(finalBox).toBeVisible({timeout:20000});
