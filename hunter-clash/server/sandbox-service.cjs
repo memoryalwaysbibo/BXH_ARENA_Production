@@ -76,6 +76,80 @@ function createSandboxService({ db, auth, serverTimestamp }, env = process.env) 
       return {challengeId:data.challengeId,revision,status:'submitted'};
     });
   }
+  function reviewRequest(input, extra = []) {
+    request(input,['challengeId','requestId','expectedRevision','resultRevision',...extra]);
+    if (!Number.isSafeInteger(input.resultRevision) || input.resultRevision < 1) throw Error('invalid-revision');
+    return {challengeId:input.challengeId,requestId:input.requestId,
+      expectedRevision:input.expectedRevision,resultRevision:input.resultRevision};
+  }
+  async function reviewRecords(tx, data, uid, assignment) {
+    const challengeRef=ref('hcChallenges',data.challengeId), resultRef=ref('hcResults',data.challengeId);
+    const [cs,rs]=await tx.getAll(challengeRef,resultRef);
+    const c=cs.data(),r=rs.data();
+    if (!c || !r || c.environment !== 'sandbox' || r.environment !== 'sandbox' ||
+        c.challengeId !== data.challengeId || r.challengeId !== data.challengeId ||
+        !Array.isArray(c.participants) || c.participants.length !== 2 || new Set(c.participants).size !== 2 ||
+        c.participants.includes(uid) || c[assignment] !== uid ||
+        JSON.stringify(c.participants) !== JSON.stringify(r.participants) ||
+        c.resultRevision !== data.resultRevision || r.resultRevision !== data.resultRevision ||
+        c.status !== r.status || !validScore(r.score) ||
+        r.winnerUid !== c.participants[r.score.a > r.score.b ? 0 : 1]) throw Error('review-forbidden');
+    return {c,r,challengeRef,resultRef};
+  }
+  function auditReview(tx,data,uid,operation,revision) {
+    tx.create(ref('hcAuditEvents',hash([uid,operation,data.requestId])),{
+      environment:'sandbox',operation,challengeId:data.challengeId,actorUid:uid,
+      resultRevision:data.resultRevision,revision,...(data.decision ? {decision:data.decision}:{}),
+      ...(data.reason ? {reason:data.reason}:{}),createdAt:serverTimestamp()});
+  }
+  async function beginVerification(token,input) {
+    const data=reviewRequest(input);
+    return transact(token,data,'beginVerification',async(tx,uid)=>{
+      const {c,challengeRef,resultRef}=await reviewRecords(tx,data,uid,'verificationActorUid');
+      const revision=assertTransition(c.status,'pending_verification',c.revision,data.expectedRevision);
+      if(c.status !== 'submitted') throw Error('verification-not-ready');
+      tx.update(challengeRef,{status:'pending_verification',revision});
+      tx.update(resultRef,{status:'pending_verification'});
+      auditReview(tx,data,uid,'beginVerification',revision);
+      return {challengeId:data.challengeId,revision,status:'pending_verification'};
+    });
+  }
+  async function verifyResult(token,input) {
+    const data={...reviewRequest(input,['decision']),decision:input.decision};
+    if(!['approve','dispute'].includes(data.decision)) throw Error('invalid-decision');
+    return transact(token,data,'verifyResult',async(tx,uid)=>{
+      const {c,challengeRef,resultRef}=await reviewRecords(tx,data,uid,'verificationActorUid');
+      if(c.status !== 'pending_verification') throw Error('verification-not-ready');
+      const status=data.decision === 'approve' ? 'verified':'disputed';
+      const revision=assertTransition(c.status,status,c.revision,data.expectedRevision);
+      tx.update(challengeRef,{status,revision});
+      tx.update(resultRef,{status,verificationStatus:status,verificationRevision:data.resultRevision,
+        verifiedBy:uid,riskStatus:'hold',verifiedAt:serverTimestamp()});
+      auditReview(tx,data,uid,'verifyResult',revision);
+      return {challengeId:data.challengeId,revision,status};
+    });
+  }
+  async function reviewRisk(token,input) {
+    const data={...reviewRequest(input,['decision','reason']),decision:input.decision,
+      reason:typeof input.reason === 'string' ? input.reason.trim():''};
+    if(!['clear','hold'].includes(data.decision) || !data.reason || data.reason.length>500) throw Error('invalid-risk-review');
+    return transact(token,data,'reviewRisk',async(tx,uid,actor)=>{
+      if(!['admin','super_admin'].includes(actor.role)) throw Error('risk-review-forbidden');
+      const {c,r,challengeRef,resultRef}=await reviewRecords(tx,data,uid,'riskReviewerUid');
+      if(c.status !== 'verified' || r.verificationStatus !== 'verified' ||
+          r.verificationRevision !== data.resultRevision || r.verifiedBy !== c.verificationActorUid ||
+          c.participants.includes(r.verifiedBy)) throw Error('verification-not-ready');
+      if(!active((await tx.get(ref('hcActors',r.verifiedBy))).data())) throw Error('witness-unavailable');
+      if(c.revision !== data.expectedRevision) throw Error('revision-conflict');
+      if(!Number.isSafeInteger(c.revision) || c.revision>=Number.MAX_SAFE_INTEGER) throw Error('invalid-revision');
+      const revision=c.revision+1;
+      tx.update(challengeRef,{revision});
+      tx.update(resultRef,{riskStatus:data.decision,riskRevision:data.resultRevision,
+        riskReviewedBy:uid,riskReason:data.reason,riskReviewedAt:serverTimestamp()});
+      auditReview(tx,data,uid,'reviewRisk',revision);
+      return {challengeId:data.challengeId,revision,status:'verified',riskStatus:data.decision};
+    });
+  }
   async function settle(token,input) {
     request(input,['challengeId','requestId','expectedRevision','resultRevision']);
     if (!Number.isSafeInteger(input.resultRevision) || input.resultRevision < 0) throw Error('invalid-revision');
@@ -95,7 +169,7 @@ function createSandboxService({ db, auth, serverTimestamp }, env = process.env) 
           r.resultRevision !== data.resultRevision ||
           c.resultRevision !== data.resultRevision) throw Error('result-unavailable');
       const resultHash=hash([data.challengeId,r.resultRevision,r.participants,r.winnerUid,r.score,
-        r.verifiedBy,r.verificationRevision,r.riskRevision]);
+        r.verifiedBy,r.verificationRevision,r.riskRevision,r.riskReviewedBy,r.riskReason]);
       if (ledgerSnap.exists) {
         const ledger=ledgerSnap.data();
         if (ledger.resultHash !== resultHash || ledger.fromRevision !== data.expectedRevision ||
@@ -106,6 +180,11 @@ function createSandboxService({ db, auth, serverTimestamp }, env = process.env) 
       if (r.verificationRevision !== r.resultRevision || r.riskRevision !== r.resultRevision ||
           typeof r.verifiedBy !== 'string' || c.verificationActorUid !== r.verifiedBy ||
           c.participants.includes(r.verifiedBy)) throw Error('invalid-verification');
+      if (typeof r.riskReviewedBy !== 'string' || r.riskReviewedBy !== c.riskReviewerUid ||
+          c.participants.includes(r.riskReviewedBy) || typeof r.riskReason !== 'string' ||
+          !r.riskReason.trim()) throw Error('invalid-risk-review');
+      const reviewer=(await tx.get(ref('hcActors',r.riskReviewedBy))).data();
+      if (!active(reviewer) || !['admin','super_admin'].includes(reviewer.role)) throw Error('risk-reviewer-unavailable');
       const witness=(await tx.get(ref('hcActors',r.verifiedBy))).data();
       if (!active(witness)) throw Error('witness-unavailable');
       const revision=assertTransition(c.status,'settled',c.revision,data.expectedRevision);
@@ -128,6 +207,6 @@ function createSandboxService({ db, auth, serverTimestamp }, env = process.env) 
       return outcome;
     });
   }
-  return Object.freeze({submit,settle});
+  return Object.freeze({submit,beginVerification,verifyResult,reviewRisk,settle});
 }
 module.exports={createSandboxService};

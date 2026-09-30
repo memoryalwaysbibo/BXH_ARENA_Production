@@ -35,7 +35,7 @@ beforeEach(async()=>{
   await db.doc('hcConfig/runtime').set({enabled:true,environment:'sandbox'});
   for(const [uid,role]of Object.entries(actors))await db.doc('hcActors/'+uid).set({active:true,role});
   await db.doc('hcChallenges/c1').set({challengeId:'c1',environment:'sandbox',participants:['p1','p2'],
-    status:'in_progress',revision:0,settlementActorUid:'admin',verificationActorUid:'witness'});
+    status:'in_progress',revision:0,settlementActorUid:'admin',verificationActorUid:'witness',riskReviewerUid:'admin'});
   await db.doc('users/p1').set({lifetime:444});
   await db.doc('ladder/p1').set({points:123});
   await db.doc('mailboxes/p1').set({count:7});
@@ -45,11 +45,11 @@ const submission=(patch={})=>({challengeId:'c1',requestId:'submit-1',expectedRev
   winnerUid:'p1',score:{a:4,b:2},...patch});
 const settlement=(patch={})=>({challengeId:'c1',requestId:'settle-1',expectedRevision:3,resultRevision:1,...patch});
 async function verified(patch={}){
-  // Fixture-only certification: no claim that the real verification workflow is implemented.
+  // Fixture for settlement fault injection; full workflow tests below use actual service methods.
   await db.doc('hcChallenges/c1').update({status:'verified',revision:3,resultRevision:1});
   await db.doc('hcResults/c1').set({challengeId:'c1',environment:'sandbox',participants:['p1','p2'],winnerUid:'p1',
     score:{a:4,b:2},status:'verified',resultRevision:1,verificationRevision:1,
-    verificationStatus:'verified',riskStatus:'clear',riskRevision:1,verifiedBy:'witness',...patch});
+    verificationStatus:'verified',riskStatus:'clear',riskRevision:1,verifiedBy:'witness',riskReviewedBy:'admin',riskReason:'Fixture review',...patch});
 }
 test('Auth identity and trusted actor record reject spoofed, unrelated and disabled callers',async()=>{
   await assert.rejects(service.submit('',submission()),/unauthenticated/);
@@ -149,4 +149,90 @@ test('corrupt sandbox stats are rejected instead of overwritten or carried into 
   await assert.rejects(service.settle(tokens.admin,settlement()),/invalid-sandbox-stats/);
   assert.equal((await db.collection('hcSettlementLedger').get()).size,0);
   assert.equal((await db.doc('hcResults/c1').get()).data().status,'verified');
+});
+
+const review=(revision,requestId,patch={})=>({challengeId:'c1',requestId,expectedRevision:revision,resultRevision:1,...patch});
+async function certify(){
+  await service.submit(tokens.p1,submission());
+  await service.beginVerification(tokens.witness,review(1,'begin'));
+  await service.verifyResult(tokens.witness,review(2,'verify',{decision:'approve'}));
+}
+test('actual submit, witness certification, risk clearance and settlement are version-bound',async()=>{
+  await certify();
+  await assert.rejects(service.settle(tokens.admin,settlement()),/result-not-cleared/);
+  const request=review(3,'risk',{decision:'clear',reason:'Witness and score checked'});
+  const approved=await service.reviewRisk(tokens.admin,request);
+  assert.deepEqual(await service.reviewRisk(tokens.admin,request),approved);
+  const outcome=await service.settle(tokens.admin,settlement({expectedRevision:4}));
+  assert.equal(outcome.revision,5);
+  assert.equal((await db.collection('hcSettlementLedger').get()).size,1);
+  assert.equal((await db.collection('hcAuditEvents').get()).size,4);
+  assert.deepEqual((await db.doc('users/p1').get()).data(),{lifetime:444});
+});
+test('certification rejects unassigned, participant, spoofed and stale result identities',async()=>{
+  await service.submit(tokens.p1,submission());
+  for(const uid of ['p1','outsider','admin'])
+    await assert.rejects(service.beginVerification(tokens[uid],review(1,'bad-'+uid)),/review-forbidden/);
+  await assert.rejects(service.beginVerification(tokens.witness,review(1,'stale-result',{resultRevision:2})),/review-forbidden/);
+  await assert.rejects(service.beginVerification(tokens.witness,review(1,'spoof',{uid:'admin'})),/invalid-request/);
+  await assert.rejects(service.beginVerification(tokens.witness,review(0,'stale-version')),/revision-conflict/);
+  await db.doc('hcChallenges/c1').update({verificationActorUid:'p1'});
+  await assert.rejects(service.beginVerification(tokens.p1,review(1,'self')),/review-forbidden/);
+  assert.equal((await db.collection('hcAuditEvents').get()).size,0);
+});
+test('concurrent witness decisions accept exactly one certification',async()=>{
+  await service.submit(tokens.p1,submission());
+  const begin=review(1,'begin');
+  await service.beginVerification(tokens.witness,begin);
+  await service.beginVerification(tokens.witness,begin);
+  const outcomes=await Promise.allSettled(['approve','dispute'].map(decision=>
+    service.verifyResult(tokens.witness,review(2,decision,{decision}))));
+  assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal((await db.doc('hcChallenges/c1').get()).data().revision,3);
+  assert.equal((await db.collection('hcAuditEvents').get()).size,2);
+});
+test('disputed result cannot clear risk or settle',async()=>{
+  await service.submit(tokens.p1,submission());
+  await service.beginVerification(tokens.witness,review(1,'begin'));
+  await service.verifyResult(tokens.witness,review(2,'dispute',{decision:'dispute'}));
+  await assert.rejects(service.reviewRisk(tokens.admin,review(3,'risk',{decision:'clear',reason:'Checked'})),/verification-not-ready/);
+  await assert.rejects(service.settle(tokens.admin,settlement()));
+  assert.equal((await db.collection('hcSettlementLedger').get()).size,0);
+});
+test('risk review requires assigned administrator, reason, current version and active witness',async()=>{
+  await certify();
+  const request=review(3,'risk',{decision:'clear',reason:'Checked'});
+  await assert.rejects(service.reviewRisk(tokens.witness,request),/risk-review-forbidden/);
+  await db.doc('hcActors/outsider').update({role:'admin'});
+  await assert.rejects(service.reviewRisk(tokens.outsider,request),/review-forbidden/);
+  await assert.rejects(service.reviewRisk(tokens.admin,{...request,reason:' '}),/invalid-risk-review/);
+  await assert.rejects(service.reviewRisk(tokens.admin,{...request,expectedRevision:2}),/revision-conflict/);
+  await db.doc('hcActors/witness').update({active:false});
+  await assert.rejects(service.reviewRisk(tokens.admin,request),/witness-unavailable/);
+  assert.equal((await db.doc('hcResults/c1').get()).data().riskStatus,'hold');
+});
+test('risk hold records reason and blocks settlement; concurrent reviews accept one version',async()=>{
+  await certify();
+  const outcomes=await Promise.allSettled(['clear','hold'].map(decision=>
+    service.reviewRisk(tokens.admin,review(3,decision,{decision,reason:'Manual review '+decision}))));
+  assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);
+  await service.reviewRisk(tokens.admin,review(4,'force-hold',{decision:'hold',reason:'Need evidence'}));
+  await assert.rejects(service.settle(tokens.admin,settlement({expectedRevision:5})),/result-not-cleared/);
+  const result=(await db.doc('hcResults/c1').get()).data();
+  assert.equal(result.riskReason,'Need evidence');assert.equal(result.riskRevision,1);
+  assert.equal((await db.collection('hcSettlementLedger').get()).size,0);
+});
+
+test('settlement rechecks risk reviewer and settled records reject further reviews',async()=>{
+  await certify();
+  await service.reviewRisk(tokens.admin,review(3,'clear',{decision:'clear',reason:'Checked'}));
+  await db.doc('hcActors/admin').update({role:'staff'});
+  await db.doc('hcActors/outsider').update({role:'admin'});
+  await db.doc('hcChallenges/c1').update({settlementActorUid:'outsider'});
+  await assert.rejects(service.settle(tokens.outsider,settlement({expectedRevision:4})),/risk-reviewer-unavailable/);
+  await db.doc('hcActors/admin').update({role:'admin'});
+  await db.doc('hcChallenges/c1').update({settlementActorUid:'admin'});
+  await service.settle(tokens.admin,settlement({expectedRevision:4}));
+  await assert.rejects(service.reviewRisk(tokens.admin,review(5,'late',{decision:'hold',reason:'Late change'})),/verification-not-ready/);
+  assert.equal((await db.doc('hcResults/c1').get()).data().status,'settled');
 });

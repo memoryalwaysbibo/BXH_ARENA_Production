@@ -61,7 +61,10 @@ Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派
 提交與結算以 requestId／內容指紋、revision 及 Firestore 交易處理。結算帳本、稽核、兩名玩家的 hcSandboxStats 與狀態同時提交；失敗時全部回滾。
 只記錄 sandbox 比賽次數與勝場，不寫入既有 Hunter 生涯、XP、天梯、信箱或獎勵。
 認證及風險放行必須綁定同一結果版本，認證者必須有效、受指派且非參賽者。
-目前認證完畢的結果由測試 fixture 建立；實際認證／風險流程、HTTP/callable、正式 IAM 與玩家介面尚未實裝。
-本機測試：21 項契約及既有回歸 + 17 項真正 Auth／Firestore 模擬器測試，共 38 項通過。
+已實裝 sandbox beginVerification、verifyResult 與 reviewRisk。完整流程測試從提交開始，透過實際服務認證與放行，再結算；個別結算故障測試仍使用 fixture。
+認證限指定且非參賽的有效內部見證者；風險審查限指定且非參賽的有效管理者，必須填理由並綁定結果版本。此角色配置是 sandbox 測試契約，尚未定為正式營運政策。
+認證通過仍維持 risk hold，人工放行才可結算；爭議結果不得放行，已結算結果不得再改審查。重送共用交易收據，並發審查只接受一個預期版本。
+HTTP/callable、正式 IAM 與玩家介面尚未實裝。
+本機測試：21 項契約及既有回歸 + 24 項真正 Auth／Firestore 模擬器測試，共 45 項通過。
 包含兩端同時提交只接受一個版本、8 路不同 requestId 結算只入帳一次、重送一致性及失敗回滾。
 這些是 demo 範圍證據，不能把 checkpoint 的正式／端到端驗收欄位改成完整 PASS。

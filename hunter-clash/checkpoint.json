@@ -18,7 +18,6 @@
   },
   "next": [
     "Reconcile actually deployed Functions and Rules; candidate validation run skipped deployment",
-    "Build actual challenge certification/risk workflow; current verified records are test fixtures",
     "Wrap sandbox service in callable interface and verify transport/auth boundary",
     "Connect internal-only frontend after end-to-end service validation"
   ],
@@ -31,9 +30,9 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 38,
+    "tests": 45,
     "result": "PASS",
-    "scope": "21 contracts/legacy regressions plus 17 real demo Auth/Firestore Rules and transaction tests; no production deployment"
+    "scope": "21 contracts/legacy regressions plus 24 real demo Auth/Firestore Rules, transaction and complete certification/risk workflow tests; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
@@ -44,7 +43,10 @@
     "sandboxRequestReplay": "PASS",
     "sandboxConcurrentSubmission": "PASS",
     "sandboxIdempotentSettlement": "PASS",
-    "sandboxAtomicRollback": "PASS"
+    "sandboxAtomicRollback": "PASS",
+    "sandboxCertificationWorkflow": "PASS",
+    "sandboxManualRiskReview": "PASS",
+    "sandboxSubmitThroughSettlement": "PASS"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
