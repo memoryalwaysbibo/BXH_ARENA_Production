@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const s=fs.readFileSync(path.join(__dirname,'..','registration-reminder-ui.js'),'utf8');
+assert.match(s,/ALLOWED=\[60,30,10,0\]/);
+assert.match(s,/courtCallEnableBackgroundNotifications/,'must reuse BXH CALL notification permission');
+assert.match(s,/engagementService\.registrationReminder/,'backend bridge missing');
+assert.match(s,/pendingSync:true/,'offline/backend-missing intent must be retained');
+assert.doesNotMatch(s,/getEffectiveRegistrationStatus\s*=/,'must not override registration eligibility');
+console.log('registration reminder UI bridge: PASS');
