@@ -64,8 +64,8 @@ Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派
 已實裝 sandbox beginVerification、verifyResult 與 reviewRisk。完整流程測試從提交開始，透過實際服務認證與放行，再結算；個別結算故障測試仍使用 fixture。
 認證限指定且非參賽的有效內部見證者；風險審查限指定且非參賽的有效管理者，必須填理由並綁定結果版本。此角色配置是 sandbox 測試契約，尚未定為正式營運政策。
 認證通過仍維持 risk hold，人工放行才可結算；爭議結果不得放行，已結算結果不得再改審查。重送共用交易收據，並發審查只接受一個預期版本。
-已完成模擬器 HTTP/callable 與客戶端 SDK 驗證；正式 IAM 與玩家介面尚未實裝。
-本機測試：25 項契約、傳輸防護與既有回歸 + 29 項真正 Functions／Auth／Firestore 模擬器測試，共 54 項通過。
+已完成模擬器 HTTP/callable 與客戶端 SDK 驗證；正式 IAM 與玩家正式入口尚未完成；內部本機介面已通過瀏覽器測試。
+本機測試：25 項契約、傳輸防護與既有回歸 + 34 項真正 Functions／Auth／Firestore 與瀏覽器測試，共 59 項通過。
 包含兩端同時提交只接受一個版本、8 路不同 requestId 結算只入帳一次、重送一致性及失敗回滾。
 這些是 demo 範圍證據，不能把 checkpoint 的正式／端到端驗收欄位改成完整 PASS。
 
@@ -73,8 +73,22 @@ Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派
 ## Callable 傳輸邊界
 
 emulator/functions.cjs 使用官方 firebase-functions 7.4.0 onCall，僅提供 hcSandboxCommand，固定 demo project 與本機 5003 / 9098 / 8180。
-請求格式為 `{operation, input}`，operation 僅允許 submit、beginVerification、verifyResult、reviewRisk、settle；input 使用既有服務的 challengeId、requestId 與版本契約。
+請求格式為 `{operation, input}`，operation 僅允許 getChallenge、submit、beginVerification、verifyResult、reviewRisk、settle；input 使用既有服務的 challengeId、requestId 與版本契約。
 SDK 傳入的 Auth 身分不能替代服務的 verifyIdToken(token, true) 與資料庫角色檢查；客戶端 uid／role 不接受。未知內部錯誤只回傳通用 internal，不暴露 Token、stack 或資料。
 已用 Firebase 客戶端 SDK 經 Functions 模擬器完成實際提交、認證、風險放行與四路並發結算，帳本仍只有一筆。另驗證無效／缺少 Token、停用帳號、未指派角色、舊版本、重用 requestId 與 malformed callable protocol。
 run-tests.cjs 在啟動 CLI 前阻擋正式專案／憑證，並停用 metadata credential discovery；firebase.json predeploy 無條件拒絕部署，bootstrap 在非模擬器或非 demo 環境拒絕載入。
 模擬器 Auth 的 unsigned Token、Functions debug 行為不代表正式簽章、安全 IAM、App Check、撤銷傳播或負載測試已驗收。入口、發布 gate 與完整端到端欄位仍關閉；此階段未改正式 Functions repository。
+
+
+## 內部本機介面
+
+frontend/index.html / app.mjs / style.css 是獨立的測試操作頁，未接入 ARENA 首頁、選單、正式登入或 Service Worker。
+frontend/serve.cjs 只綁定 127.0.0.1:5199 並只提供三個白名單資產；頁面固定使用 demo Auth 與 callable 本機端點，離開指定 origin 即禁止登入。
+getChallenge 在伺服器交易中檢查有效內部角色、入口與當場指派，僅回傳顯示需要的欄位；不開放廣泛查詢、不暴露 privateNote 或直接放寬 Firestore 客戶端讀寫。
+畫面依伺服器身分／指派與最新狀態控制操作。所有變更先確認；舊版本拒絕後要求重新讀取。Token 僅保留記憶體，不写入 localStorage／sessionStorage，登入後立即清空密碼欄。
+未知網路錯誤保留原 operation / requestId / input，重送同一筆；已確認操作但刷新失敗則僅要求重新讀取，避免把確認結果誤當成尚未完成。
+
+`npm ci --ignore-scripts`、`npx playwright install --with-deps chromium`、`npm test`（在 emulator 目錄）可重跑全部後端及瀏覽器檢查；Playwright 固定 1.58.2。
+自動測試會啟動本機操作頁、建立測試身分與挑戰、跑完後清理及關閉頁面伺服器。手動啟動頁面可用 `node hunter-clash/frontend/serve.cjs`，需另啟 demo Auth／Functions／Firestore，並事先準備受指派的 sandbox 帳號與挑戰。
+已執行五項真實 Chromium 390px 手機視窗測試：參賽／見證／管理者完整流程、结算回應遺失後原請求重送、取消與撤權、舊畫面競爭提交與讀取欄位白名單、已確認結算但刷新失敗。已查看中文字型完整的手機截圖並確認無橫向溢出。
+這是自動化本機證據，尚未等同工作人員現場實戰、正式 IAM、部署核對或公開入口驗收；internalBeta 與正式 entryWired 維持 NOT RUN / false。

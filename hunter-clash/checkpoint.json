@@ -18,8 +18,8 @@
   },
   "next": [
     "Reconcile actually deployed Functions and Rules; candidate validation run skipped deployment",
-    "Connect internal-only frontend after end-to-end service validation",
-    "Verify production signature/revocation, IAM and App Check when isolated deployed runtime is available"
+    "Verify production signature/revocation, IAM and App Check when isolated deployed runtime is available",
+    "Run supervised staff internal beta on an isolated deployed environment; browser automation is partial evidence only"
   ],
   "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
   "backendCandidateValidation": {
@@ -30,9 +30,9 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 54,
+    "tests": 59,
     "result": "PASS",
-    "scope": "25 contracts/transport guards/legacy regressions plus 29 real demo Functions/Auth/Firestore tests including client SDK submit-through-settlement; no production deployment"
+    "scope": "25 contracts/transport guards/legacy regressions plus 34 demo Functions/Auth/Firestore and Chromium browser tests; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
@@ -49,7 +49,12 @@
     "sandboxSubmitThroughSettlement": "PASS",
     "sandboxCallableTransport": "PASS",
     "sandboxClientSDKFlow": "PASS",
-    "sandboxFunctionsDeploymentGuard": "PASS"
+    "sandboxFunctionsDeploymentGuard": "PASS",
+    "sandboxInternalUi": "PASS",
+    "sandboxBrowserWorkflow": "PASS",
+    "sandboxLostResponseReplay": "PASS",
+    "sandboxMobileLayout": "PASS",
+    "supervisedStaffInternalBeta": "NOT RUN"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
@@ -58,5 +63,6 @@
     "javaVersion": 21,
     "authHost": "127.0.0.1:9098",
     "functionsHost": "127.0.0.1:5003"
-  }
+  },
+  "sandboxUiWired": true
 }

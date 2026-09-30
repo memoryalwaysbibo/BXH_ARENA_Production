@@ -39,6 +39,8 @@ jobs:
           java-version: 21
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: hunter-clash/emulator
-      - name: Isolated Auth and Firestore backend tests
+      - run: npx playwright install --with-deps chromium
+        working-directory: hunter-clash/emulator
+      - name: Isolated Functions, Auth, Firestore and browser tests
         run: npm test
         working-directory: hunter-clash/emulator

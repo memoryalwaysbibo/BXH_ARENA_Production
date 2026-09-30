@@ -30,6 +30,33 @@ function createSandboxService({ db, auth, serverTimestamp }, env = process.env) 
       db.projectId !== PROJECT || auth.app.options.projectId !== PROJECT)
     throw Error('sandbox-service-only');
   const ref = (name, value) => db.collection(name).doc(value);
+  async function getChallenge(token,input) {
+    if(!input || typeof input !== 'object' || Array.isArray(input) ||
+        Object.keys(input).some(key=>key!=='challengeId')) throw Error('invalid-request');
+    id(input.challengeId);
+    if(typeof token !== 'string' || !token) throw Error('unauthenticated');
+    const {uid}=await auth.verifyIdToken(token,true);
+    return db.runTransaction(async tx=>{
+      const [actorSnap,configSnap,challengeSnap,resultSnap]=await tx.getAll(
+        ref('hcActors',uid),ref('hcConfig','runtime'),ref('hcChallenges',input.challengeId),ref('hcResults',input.challengeId));
+      const actor=actorSnap.data(),config=configSnap.data(),c=challengeSnap.data(),r=resultSnap.data();
+      if(!active(actor)) throw Error('account-unavailable');
+      if(config?.enabled!==true || config.environment!=='sandbox') throw Error('closed');
+      if(!c || c.environment!=='sandbox' || c.challengeId!==input.challengeId ||
+          !Array.isArray(c.participants) || c.participants.length!==2 || new Set(c.participants).size!==2 ||
+          ![...c.participants,c.verificationActorUid,c.riskReviewerUid,c.settlementActorUid].includes(uid))
+        throw Error('challenge-unavailable');
+      if(r && (r.environment!=='sandbox' || r.challengeId!==c.challengeId ||
+          r.resultRevision!==c.resultRevision || JSON.stringify(r.participants)!==JSON.stringify(c.participants)))
+        throw Error('result-unavailable');
+      return {actor:{uid,role:actor.role},challenge:{challengeId:c.challengeId,status:c.status,revision:c.revision,
+        resultRevision:c.resultRevision ?? null,participants:c.participants,
+        verificationActorUid:c.verificationActorUid ?? null,riskReviewerUid:c.riskReviewerUid ?? null,
+        settlementActorUid:c.settlementActorUid ?? null},
+        result:r ? {winnerUid:r.winnerUid,score:r.score,status:r.status,verificationStatus:r.verificationStatus,
+          riskStatus:r.riskStatus,resultRevision:r.resultRevision}:null};
+    });
+  }
   async function transact(token, input, operation, execute) {
     if (typeof token !== 'string' || !token) throw Error('unauthenticated');
     const verified = await auth.verifyIdToken(token, true);
@@ -207,6 +234,6 @@ function createSandboxService({ db, auth, serverTimestamp }, env = process.env) 
       return outcome;
     });
   }
-  return Object.freeze({submit,beginVerification,verifyResult,reviewRisk,settle});
+  return Object.freeze({getChallenge,submit,beginVerification,verifyResult,reviewRisk,settle});
 }
 module.exports={createSandboxService};

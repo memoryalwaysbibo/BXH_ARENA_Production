@@ -1,6 +1,6 @@
 'use strict';
 // Transport adapter only. The service independently verifies bearer tokens and DB roles.
-const OPERATIONS=Object.freeze(['submit','beginVerification','verifyResult','reviewRisk','settle']);
+const OPERATIONS=Object.freeze(['getChallenge','submit','beginVerification','verifyResult','reviewRisk','settle']);
 const ERRORS=Object.freeze({
   'invalid-request':'invalid-argument','invalid-id':'invalid-argument','invalid-revision':'invalid-argument',
   'invalid-score':'invalid-argument','winner-mismatch':'invalid-argument',
