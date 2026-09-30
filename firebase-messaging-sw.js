@@ -48,19 +48,27 @@ const messaging=firebase.messaging();
 
 messaging.onBackgroundMessage(payload=>{
   const data=payload?.data||{};
-  const title=safe(data.title||'BXH CALL',120);
-  const body=safe(data.body||'裁判已發出叫號通知。',300);
-  const tag=['bxh-call',data.kind,data.code,data.matchId,data.sequence].filter(Boolean).join(':').slice(0,220);
+  const kind=safe(data.kind||'court-call',40);
+  const registrationReminder=kind==='registration-reminder';
+  const title=safe(data.title||(registrationReminder?'BXH 報名提醒':'BXH CALL'),120);
+  const body=safe(data.body||(registrationReminder?'你預約提醒的賽事即將開放報名。':'裁判已發出叫號通知。'),300);
+  const tag=(registrationReminder
+    ? ['bxh-registration',data.eventId,data.openAt,data.reminderMinutes]
+    : ['bxh-call',kind,data.code,data.matchId,data.sequence]
+  ).filter(Boolean).join(':').slice(0,220);
   return self.registration.showNotification(title,{
     body,
     icon:'/assets/icons/bxh-gold-icon-192.png?v=20260918',
     badge:'/assets/icons/bxh-gold-icon-192.png?v=20260918',
-    tag:tag||'bxh-call',
+    tag:tag||(registrationReminder?'bxh-registration':'bxh-call'),
     renotify:false,
     vibrate:[180,90,180],
     data:{
       url:pushUrl(data),
-      kind:safe(data.kind,40),
+      kind,
+      eventId:safe(data.eventId,120),
+      openAt:safe(data.openAt,40),
+      reminderMinutes:safe(data.reminderMinutes,8),
       code:safe(data.code,32),
       matchId:safe(data.matchId,120),
       station:safe(data.station,16),
