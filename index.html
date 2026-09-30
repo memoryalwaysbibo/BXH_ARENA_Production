@@ -10917,6 +10917,7 @@ function applyPublicTournamentItems(items,{renderIfChanged=true}={}){
   publicTournamentsLastSignature=signature;
   publicTournamentsError=null;
   publicTournamentsLastRefreshAt=Date.now();
+  try{ if(window.BXHLobbyFastCache) window.BXHLobbyFastCache.write(next); }catch(e){}
   if(changed && renderIfChanged && isTournamentLobbyVisible()){
     if(typeof renderPreservingScroll==="function") renderPreservingScroll();
     else render();
@@ -25792,6 +25793,17 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="load-public-tournaments" || action==="refresh-public-tournaments"){
     if(publicTournamentsLoading) return;
+    if(action==="load-public-tournaments" && publicTournamentsCache===null && window.BXHLobbyFastCache){
+      try{
+        const cached=window.BXHLobbyFastCache.read();
+        if(cached&&Array.isArray(cached.items)){
+          publicTournamentsCache=cached.items;
+          publicTournamentsLastSignature=publicTournamentListSignature(cached.items);
+          publicTournamentsLastRefreshAt=cached.savedAt||Date.now();
+          publicTournamentsError=null;
+        }
+      }catch(e){}
+    }
     const initialLoad=publicTournamentsCache===null;
     publicTournamentsLastRefreshAt=Date.now();
     publicTournamentsLoading=true;
@@ -32303,6 +32315,7 @@ window.addEventListener("bxh-offline-queue-change",(e)=>{offlineQueueStatus=Obje
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
 </script>
+<script src="lobby-fast-cache.js?v=20260930-lobby-v1"></script>
 <script src="offline-resilience.js?v=20260930-offline-v2"></script>
 <script src="activity-points-ui.js?v=20260928-account-frame-fix5"></script>
 <script src="ladder-secondary-ui.js?v=14.2.55-badge-batch2"></script>
