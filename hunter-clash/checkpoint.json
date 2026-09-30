@@ -30,9 +30,9 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 71,
+    "tests": 78,
     "result": "PASS",
-    "scope": "33 contracts/transport/isolation/runtime-audit/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; runtime audit tests use synthetic responses; no production deployment"
+    "scope": "40 contracts/transport/isolation/runtime-audit/rules-comparison/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; audit/comparison tests use synthetic responses; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
@@ -58,7 +58,9 @@
     "sandboxManualLabSeed": "PASS",
     "sandboxSeedRollback": "PASS",
     "sandboxManualLabStartup": "PASS",
-    "readOnlyRuntimeAuditCollector": "PASS (7 synthetic-response tests only; live collection unavailable)"
+    "readOnlyRuntimeAuditCollector": "PASS (7 synthetic-response tests only; live collection unavailable)",
+    "pinnedRulesSourceHash": "PASS (candidate source blob and repository SHA-256 manifest agree; not deployment evidence)",
+    "runtimeRulesComparisonTool": "PASS (7 synthetic-report tests only; live comparison not run)"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
@@ -80,6 +82,14 @@
     "instructions": "RUNTIME_AUDIT.md",
     "liveCollection": "NOT RUN",
     "blocker": "gcloud is unavailable in the current execution environment; no live runtime report collected",
+    "updatesReleaseGate": false
+  },
+  "architectureStatusFile": "ARCHITECTURE_STATUS.md",
+  "rulesSourceReferenceFile": "rules-source-reference.json",
+  "runtimeRulesComparison": {
+    "file": "compare-runtime-rules.cjs",
+    "liveComparison": "NOT RUN",
+    "provesFunctionsDeployment": false,
     "updatesReleaseGate": false
   }
 }

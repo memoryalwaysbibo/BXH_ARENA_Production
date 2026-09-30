@@ -65,7 +65,7 @@ Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派
 認證限指定且非參賽的有效內部見證者；風險審查限指定且非參賽的有效管理者，必須填理由並綁定結果版本。此角色配置是 sandbox 測試契約，尚未定為正式營運政策。
 認證通過仍維持 risk hold，人工放行才可結算；爭議結果不得放行，已結算結果不得再改審查。重送共用交易收據，並發審查只接受一個預期版本。
 已完成模擬器 HTTP/callable 與客戶端 SDK 驗證；正式 IAM 與玩家正式入口尚未完成；內部本機介面已通過瀏覽器測試。
-本機測試：33 項契約、傳輸／隔離防護、唯讀採集器與既有回歸 + 38 項真正 Functions／Auth／Firestore、瀏覽器與 lab 測試，共 71 項通過。
+本機測試：40 項契約、傳輸／隔離防護、唯讀採集／Rules 比對與既有回歸 + 38 項真正 Functions／Auth／Firestore、瀏覽器與 lab 測試，共 78 項通過。
 包含兩端同時提交只接受一個版本、8 路不同 requestId 結算只入帳一次、重送一致性及失敗回滾。
 這些是 demo 範圍證據，不能把 checkpoint 的正式／端到端驗收欄位改成完整 PASS。
 
@@ -105,3 +105,9 @@ getChallenge 在伺服器交易中檢查有效內部角色、入口與當場指�
 ## 唯讀 runtime 採集器
 
 `runtime-audit.cjs` 已完成七項注入回應測試，涵蓋 GET 與 Token 保護、分頁、跨專案參照拒絕、不完整區域、API 錯誤及 Rules 雜湊。採集器不更動 checkpoint／發布 gate；完整操作與人工核對標準見 [RUNTIME_AUDIT.md](RUNTIME_AUDIT.md)。目前執行環境沒有 gcloud，尚未取得實際雲端資料；正式 runtime 證據仍待取得。
+
+
+## 架構驗收與 Rules 來源比對
+
+架構工項與剩餘完成條件見 [ARCHITECTURE_STATUS.md](ARCHITECTURE_STATUS.md)。約 80% 為工程施工估算，2/7 為發布必驗項比例，兩者不得混用。
+`rules-source-reference.json` 已固定並交叉核對候選來源的 Git blob 與 SHA-256；`compare-runtime-rules.cjs` 可核對實際採集報告中的 Firestore release、ruleset 與完整檔案雜湊。七項比對測試通過，涵蓋缺少／多出／變更來源、重複與跨專案參照。候選雜湊與比對工具通過不表示已取得現行雲端證據，發布仍維持阻擋。

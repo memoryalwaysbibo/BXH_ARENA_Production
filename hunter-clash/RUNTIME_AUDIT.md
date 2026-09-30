@@ -32,3 +32,17 @@ node hunter-clash/runtime-audit.cjs --project bxh-arena --out /tmp/hc00-runtime-
 - [Functions v2 list](https://docs.cloud.google.com/functions/docs/reference/rest/v2/projects.locations.functions/list)
 - [Rules releases list](https://firebase.google.com/docs/reference/rules/rest/v1/projects.releases/list)
 - [Rules rulesets get](https://firebase.google.com/docs/reference/rules/rest/v1/projects.rulesets/get)
+
+## 固定來源比對
+
+`rules-source-reference.json` 固定候選來源 commit `462287fdb86f6df6b71a0966c25405ca925fcdc7`。已從該 commit 讀取 firestore.rules，驗證其 Git blob 與 FIRESTORE_RULES_SOURCE.sha256 一致；沒有把這份來源部署至正式站。
+
+取得實際報告後執行：
+
+```sh
+node hunter-clash/compare-runtime-rules.cjs --inventory /tmp/hc00-runtime-audit.json
+```
+
+工具只讀報告與版本固定的來源清單，輸出 MATCH／MISMATCH／BLOCKED；退出碼為 0／1／1。檢查 project、採集完整性、觀測時間、預設 Firestore release、唯一 ruleset、完整檔案清單、位元組數及 SHA-256。接受 cloud.firestore 與 cloud.firestore/(default) 名稱；兩者同時存在時必須指向同一 ruleset。重複／跨專案參照、缺少／多出檔案、錯誤雜湊均會拒絕或列出差異。
+
+MATCH 只表示這次快照的 Rules 內容符合候選來源。清單雜湊可驗證內部一致性，不能驗證報告取得者的身分或原始 API 回應真實性；報告仍需可信採集與稽核保存。工具不認證 Functions 來源，也不判斷快照是否仍為現行版本，部署有變動時必須重新採集。runtimeReconciled／hcDeploymentVerified 始終為 false，不更新發布 gate。
