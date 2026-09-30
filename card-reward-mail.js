@@ -20,12 +20,12 @@ window.BXHCardRewardUI={
     const r=rewardOf(message);if(!r||r.kind!=='card')return '';
     const claimed=isClaimed(r),art=cardArt(r);
     return '<section class="card-reward-mail-card" data-card-reward-message="'+escHtml(message.id||'')+'">'
-      +'<div class="card-reward-mail-kicker">OCTOBER EVENT · CARD REWARD</div>'
+      +'<div class="card-reward-mail-kicker">📎 獎勵附件（1）</div>'
       +'<div class="card-reward-mail-art"><img src="'+escHtml(art)+'" alt="'+escHtml(claimed?(r.cardName||'活動卡牌'):'未揭曉卡牌')+'"></div>'
       +'<div class="card-reward-mail-meta"><strong>'+(claimed?escHtml(r.cardName||'活動卡牌'):'完成賽事獎勵')+'</strong>'
-      +'<span>'+(claimed?'已領取並收入我的卡冊':'附件：卡牌 × 1')+'</span></div>'
+      +'<span>'+(claimed?'已領取並收入我的卡冊':'🎴 活動卡牌 × 1')+'</span></div>'
       +'<button class="btn btn-primary" data-action="mailbox-card-reward" data-message-id="'+escHtml(message.id||'')+'" '+(busy||claimed?'disabled':'')+'>'
-      +(claimed?'已領取':'領取卡牌')+'</button></section>';
+      +(claimed?'已領取 ✓':'領取附件')+'</button></section>';
   },
   async claim(messageId){
     if(!messageId)throw Error('card-reward-message-required');
