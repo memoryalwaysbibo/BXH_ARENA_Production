@@ -31,7 +31,7 @@
 
 ## 隔離部署前仍缺少的證據
 
-1. 指定獨立 Firebase／GCP 測試專案及可核對的部署身分，禁止沿用 bxh-arena 或 bxh-arena-beta 作 HC 的測試資料庫。
+1. 指定獨立 Firebase／GCP 測試專案及可核對的部署身分，禁止沿用正式站或既有 Beta 專案作 HC 的測試資料庫。
 2. 準備獨立可部署的 HC adapter；目前 emulator bootstrap 的部署禁止必須保留，不能直接移除來上線。
 3. 取得正式後端的實際 Functions 清單／各模組版本、Rules 發布版本及 IAM，與固定來源對照。個別模組部署成功不代表整包一致。
 4. 在獨立部署驗證簽章、Token 撤銷、IAM、App Check、手機傳輸、實際人員操作及資料隔離，留下證據後再判定 internalBeta。
