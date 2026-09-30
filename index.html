@@ -23448,6 +23448,8 @@ function accountMenuItemsHtml(){
     ${(userProfile && roleAllowsMode(userProfile.role,"admin",userProfile)) ? `<button data-action="switch-to-admin-mode">切換至管理模式</button>` : ""}
     <button data-action="account-open-checkin">每日簽到</button>
     ${themePickerHtml()}
+    <button data-action="account-open-interface">我的介面</button>
+    <button data-action="account-open-interface">我的介面</button>
     <button data-action="account-back-to-role">返回身分選擇</button>
     <button data-action="account-logout" class="danger">登出系統</button>
   ` : `
@@ -24825,6 +24827,7 @@ function handleAction(action, target){
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
+  if(action==='account-open-interface'){accountMenuOpen=false;window.openMyInterface?.();return;}
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
@@ -32337,5 +32340,14 @@ window.addEventListener("bxh-offline-queue-change",(e)=>{offlineQueueStatus=Obje
 <script src="activity-points-ui.js?v=20260928-account-frame-fix5"></script>
 <script src="ladder-secondary-ui.js?v=14.2.55-badge-batch2"></script>
 <link rel="stylesheet" href="card-reward-mail.css?v=20260930-1">\n<script src="title-reward-mail.js?v=20260930-1"></script>\n<script src="card-reward-mail.js?v=20260930-1"></script>
+<link rel="stylesheet" href="management-ui-v2.css?v=20260930-ui-v2">
+<link rel="stylesheet" href="interface-preference.css?v=20260930-ui-v2">
+<link rel="stylesheet" href="player-identity-ui.css?v=20260930-ui-v2">
+<script src="management-ui-v2.js?v=20260930-ui-v2"></script>
+<script src="management-ui-v2-adapter.js?v=20260930-ui-v2"></script>
+<script src="interface-preference.js?v=20260930-ui-v2"></script>
+<script src="my-interface-ui.js?v=20260930-ui-v2"></script>
+<script src="player-identity-ui.js?v=20260930-ui-v2"></script>
+<script src="management-ui-v2-bootstrap.js?v=20260930-ui-v2"></script>
 </body>
 </html>
