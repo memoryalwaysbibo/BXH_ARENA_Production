@@ -11953,9 +11953,11 @@ async function saveState(){
         return localOk ? true : false;
       }
       const lastCode = (typeof window!=="undefined" && window.__BXH_LAST_CLOUD_ERROR_CODE) || "";
-      if(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"){
+      if(["call-state-stale","registration-roster-stale","team-result-stale","archive-state-stale","match-state-stale"].includes(lastCode)){
         cloudAccessLimited = true;
-        cloudAccessMessage = "線上名單已更新；請重新整理頁面，再進行操作。";
+        cloudAccessMessage = (lastCode==="registration-roster-stale"||lastCode==="team-result-stale")
+            ? "線上名單或團體結果已更新；請重新整理頁面，再進行操作。"
+            : "賽事資料已由其他裝置更新；為避免覆蓋最新結果，已停止自動重試，請重新整理後再操作。";
         cloudStatus = "connected";
         showToast(cloudAccessMessage, true);
       }else if(lastCode==="permission-denied"){
@@ -31986,7 +31988,11 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.message)==="registration-roster-stale" ? "registration-roster-stale" : (e&&e.code)||"unknown";
+        if(typeof window!=="undefined"){
+          const message=(e&&e.message)||"";
+          const staleCodes=["call-state-stale","registration-roster-stale","team-result-stale","archive-state-stale","match-state-stale"];
+          window.__BXH_LAST_CLOUD_ERROR_CODE=staleCodes.includes(message)?message:((e&&e.code)||message||"unknown");
+        }
         console.warn("雲端同步寫入失敗", e);
         return false;
       }
