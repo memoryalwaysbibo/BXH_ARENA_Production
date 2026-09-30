@@ -39,7 +39,7 @@
     if(el){el.click();return true;}
     const proxy=document.createElement("button");
     proxy.type="button";proxy.hidden=true;proxy.dataset.action="switch-tab";proxy.dataset.tab=key;
-    document.body.appendChild(proxy);proxy.click();proxy.remove();return true;
+    document.body.appendChild(proxy);proxy.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}));proxy.remove();return true;
   }
 
   function mount(options){
