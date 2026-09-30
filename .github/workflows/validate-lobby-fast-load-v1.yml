@@ -1,0 +1,28 @@
+name: Validate Lobby Fast Load V1
+on:
+  push:
+    branches: [performance-lobby-fast-load-v1]
+    paths: ['.github/workflows/validate-lobby-fast-load-v1.yml']
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: performance-lobby-fast-load-v1, fetch-depth: 0}
+      - name: Lobby cache unit tests
+        run: node scripts/test-lobby-fast-cache.cjs
+      - name: Hard integration gates
+        run: |
+          test -s lobby-fast-cache.js
+          grep -Fq 'lobby-fast-cache.js?v=20260930-lobby-v1' index.html
+          grep -Fq 'const cached=window.BXHLobbyFastCache.read()' index.html
+          grep -Fq 'window.BXHLobbyFastCache.write(next)' index.html
+          grep -Fq 'background repaired stale public mirror' index.html
+          grep -Fq 'offline-resilience.js?v=20260930-offline-v2' index.html
+          grep -Fq 'queueOfflineMatchConfirmation(matchId,"score",localEval.winnerId)' index.html
+          grep -Fq 'queueOfflineMatchConfirmation(matchId,"quick_decision",selectedWinnerId)' index.html
+      - name: Production frontend guard
+        run: node scripts/verify-production-frontend.cjs
