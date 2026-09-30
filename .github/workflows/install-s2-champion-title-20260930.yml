@@ -1,0 +1,139 @@
+name: Install S2 Champion Title Artwork
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-s2-champion-title-20260930.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bxh-arena-s2-champion-title
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout latest production
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase onto latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --rebase origin main
+
+      - name: Reconstruct and verify S2 champion artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .s2-title/chunk_00
+          test -f .s2-title/chunk_01
+          test -f .s2-title/chunk_02
+          test -f .s2-title/chunk_03
+          test -f .s2-title/chunk_04
+          cat .s2-title/chunk_00 .s2-title/chunk_01 .s2-title/chunk_02 .s2-title/chunk_03 .s2-title/chunk_04 > /tmp/s2-champion.b64
+          test "$(wc -c < /tmp/s2-champion.b64 | tr -d ' ')" = "54464"
+          base64 -d /tmp/s2-champion.b64 > assets/title-limited-s2-champion.webp
+          test "$(wc -c < assets/title-limited-s2-champion.webp | tr -d ' ')" = "40846"
+          echo "c5dbe46eed361e14b64fc019ed690fa7f2295c833f7904db0283f4b11cbc97c0  assets/title-limited-s2-champion.webp" | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("assets/title-limited-s2-champion.webp").read_bytes()
+          if p[:4] != b"RIFF" or p[8:12] != b"WEBP":
+              raise SystemExit("invalid WebP header")
+          PY
+
+      - name: Register title artwork and bump frontend version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import json, re
+
+          index_path=Path("index.html")
+          ladder_path=Path("ladder-secondary-ui.js")
+          version_path=Path("version.json")
+
+          s=index_path.read_text(encoding="utf-8")
+          l=ladder_path.read_text(encoding="utf-8")
+          v=json.loads(version_path.read_text(encoding="utf-8"))
+
+          old_build=str(v.get("build") or "")
+          old_version=str(v.get("version") or "")
+          if not old_build or not old_version:
+              raise SystemExit("version metadata missing")
+
+          index_anchor="    'S3總冠軍':'assets/title-limited-s3-champion.webp',"
+          index_add="    'S2總冠軍':'assets/title-limited-s2-champion.webp',"
+          if index_add not in s:
+              if index_anchor not in s:
+                  raise SystemExit("index S3 title artwork anchor not found")
+              s=s.replace(index_anchor,index_add+"\n"+index_anchor,1)
+
+          ladder_anchor='        "S3總冠軍":"assets/title-limited-s3-champion.webp",'
+          ladder_add='        "S2總冠軍":"assets/title-limited-s2-champion.webp",'
+          if ladder_add not in l:
+              if ladder_anchor not in l:
+                  raise SystemExit("ladder S3 title artwork anchor not found")
+              l=l.replace(ladder_anchor,ladder_add+"\n"+ladder_anchor,1)
+
+          m=re.fullmatch(r"(\d{8})\.(\d+)",old_build)
+          if not m:
+              raise SystemExit(f"unexpected build format: {old_build}")
+          new_build=f"{m.group(1)}.{int(m.group(2))+1}"
+
+          vm=re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)",old_version)
+          if not vm:
+              raise SystemExit(f"unexpected version format: {old_version}")
+          new_version=f"v{vm.group(1)}.{vm.group(2)}.{int(vm.group(3))+1}"
+
+          replacements=[
+              (f'<meta name="bxh-build" content="{old_build}">',f'<meta name="bxh-build" content="{new_build}">'),
+              (f'CURRENT_BUILD="{old_build}"',f'CURRENT_BUILD="{new_build}"'),
+              (f'const APP_VERSION = "{old_version}";',f'const APP_VERSION = "{new_version}";')
+          ]
+          for old,new in replacements:
+              if old not in s:
+                  raise SystemExit(f"version anchor missing: {old}")
+              s=s.replace(old,new,1)
+
+          v["build"]=new_build
+          v["version"]=new_version
+          v["updatedAt"]=datetime.now(ZoneInfo("Asia/Taipei")).isoformat(timespec="seconds")
+
+          index_path.write_text(s,encoding="utf-8")
+          ladder_path.write_text(l,encoding="utf-8")
+          version_path.write_text(json.dumps(v,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(f"frontend version: {old_version}/{old_build} -> {new_version}/{new_build}")
+          PY
+
+      - name: Validate production frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s assets/title-limited-s2-champion.webp
+          grep -Fq "'S2總冠軍':'assets/title-limited-s2-champion.webp'" index.html
+          grep -Fq '"S2總冠軍":"assets/title-limited-s2-champion.webp"' ladder-secondary-ui.js
+          node scripts/verify-production-frontend.cjs
+
+      - name: Commit production update and clean installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -r .s2-title
+          git rm .github/workflows/install-s2-champion-title-20260930.yml
+          git add assets/title-limited-s2-champion.webp index.html ladder-secondary-ui.js version.json
+          git commit -m "Install S2 champion title artwork"
+          git push origin HEAD:main
