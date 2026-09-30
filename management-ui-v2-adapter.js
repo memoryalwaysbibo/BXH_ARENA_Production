@@ -36,9 +36,10 @@
 
   function activate(tabMap,key){
     const el=tabMap.get(key);
-    if(!el)return false;
-    el.click();
-    return true;
+    if(el){el.click();return true;}
+    const proxy=document.createElement("button");
+    proxy.type="button";proxy.hidden=true;proxy.dataset.action="switch-tab";proxy.dataset.tab=key;
+    document.body.appendChild(proxy);proxy.click();proxy.remove();return true;
   }
 
   function mount(options){
@@ -49,12 +50,13 @@
     if(!model||!host)return {ok:false,reason:"missing-model-or-host"};
 
     let tabs=discoverTabs(root,options.tabSelectors);
-    let visible=[...tabs.keys()].filter(k=>model.LABELS[k]);
+    const manifest=String(host.dataset.visibleTabs||"").split(",").map(x=>x.trim()).filter(Boolean);
+    let visible=(manifest.length?manifest:[...tabs.keys()]).filter(k=>model.LABELS[k]);
     if(!visible.length)return {ok:false,reason:"no-compatible-tabs"};
 
     function draw(){
       tabs=discoverTabs(root,options.tabSelectors);
-      visible=[...tabs.keys()].filter(k=>model.LABELS[k]);
+      visible=(manifest.length?manifest:[...tabs.keys()]).filter(k=>model.LABELS[k]);
       const active=activeKey(tabs);
       model.mount({
         host,

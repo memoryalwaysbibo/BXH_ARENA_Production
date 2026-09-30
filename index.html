@@ -24047,7 +24047,7 @@ function renderApp(){
       </header>
       ${tournamentViewContextHeaderHtml()}
       ${(typeof window!=="undefined" && window.BXH_INTERFACE_PREFERENCE?.get?.()==="v2")
-        ? '<div id="bxh-management-v2-nav" data-active-tab="'+esc(activeTab)+'"></div>'
+        ? '<div id="bxh-management-v2-nav" data-active-tab="'+esc(activeTab)+'" data-visible-tabs="'+esc(tabs.map(t=>t[0]).join(","))+'"></div>'
         : '<nav class="tabs">'+tabs.map(t=>'<button class="'+(activeTab===t[0]?'active':'')+'" data-action="switch-tab" data-tab="'+t[0]+'">'+t[1]+'</button>').join("")+'</nav>'}
     </div>
     ${accountMenuOverlayHtml()}
