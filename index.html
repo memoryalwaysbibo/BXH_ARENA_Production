@@ -11896,26 +11896,43 @@ async function flushCloudStateWrites(){
 function queueCloudSyncRetry(tournamentId, code){
   cloudSyncPending = true;
   if(cloudSyncQueueTimer) return;
+  const stopRetry=(message)=>{
+    cloudSyncPending=false;
+    if(cloudSyncQueueTimer){ clearInterval(cloudSyncQueueTimer); cloudSyncQueueTimer=null; }
+    cloudStatus="connected";
+    if(message){ cloudAccessLimited=true; cloudAccessMessage=message; showToast(message,true); }
+    render();
+  };
   cloudSyncQueueTimer = setInterval(async ()=>{
     if(!cloudSyncPending || state.id!==tournamentId || state.cloudCode!==code || !cloudAvailable()){
       clearInterval(cloudSyncQueueTimer); cloudSyncQueueTimer=null; return;
     }
     try{
       cloudStatus = "connecting";
-      const ok = await window.cloudSync.pushUpdate(code, state);
+      const ok = await window.cloudSync.pushUpdate(code, cloneStateForSave(state));
       if(ok){
-        cloudSyncPending=false;
-        cloudStatus = "connected";
-        cloudLastSyncAt = Date.now();
+        cloudSyncPending=false; cloudStatus="connected"; cloudLastSyncAt=Date.now();
         clearInterval(cloudSyncQueueTimer); cloudSyncQueueTimer=null;
-        showToast("已同步雲端");
-        render();
-      }else{
-        cloudStatus = "error";
-        render();
+        showToast("已同步雲端"); render(); return;
       }
-    }catch(e){ /* keep retrying on the interval */ }
-  }, 15000);
+      const lastCode=(typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"";
+      const staleCodes=["call-state-stale","registration-roster-stale","team-result-stale","archive-state-stale","match-state-stale"];
+      if(staleCodes.includes(lastCode)){
+        stopRetry(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"
+          ?"線上名單或團體結果已更新；已停止舊資料重試，請重新整理後再操作。"
+          :"賽事資料已由其他裝置更新；已停止舊資料重試，請重新整理後再操作。");
+        return;
+      }
+      if(lastCode==="permission-denied"){
+        stopRetry("此帳號沒有執行這項雲端寫入的權限。");
+        return;
+      }
+      cloudStatus="error"; render();
+    }catch(e){
+      const code=(e&&e.code)||"";
+      if(code==="permission-denied"){ stopRetry("此帳號沒有執行這項雲端寫入的權限。"); }
+    }
+  },15000);
 }
 
 // Builds a copy of the tournament state safe to expose to unauthenticated
