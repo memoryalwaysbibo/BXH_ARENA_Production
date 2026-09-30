@@ -19447,7 +19447,16 @@ async function handleMailbox(action,target){
   if(action==='mailbox-refresh'){c.messages=null;c.selectedId='';loadMailbox(true);return;}
   if(action==='mailbox-select'){
     c.selectedId=target.getAttribute('data-message-id')||'';const message=(c.messages||[]).find(m=>m.id===c.selectedId);
-    render();if(message&&!message.readAt)handleMailbox('mailbox-toggle-read',target);return;
+    render();
+    if(message&&message.type==='card_reward'&&!message.reward&&window.engagementService?.getCardRewardMessage){
+      const selectedId=c.selectedId;
+      window.engagementService.getCardRewardMessage({messageId:selectedId}).then(result=>{
+        if(c!==mailboxContext()||c.selectedId!==selectedId||!result?.ok||!result.message?.reward)return;
+        const current=(c.messages||[]).find(m=>m.id===selectedId);if(current)current.reward=result.message.reward;
+        render();
+      }).catch(()=>{});
+    }
+    if(message&&!message.readAt)handleMailbox('mailbox-toggle-read',target);return;
   }
   if(action==='mailbox-card-reward'){
     const messageId=target.getAttribute('data-message-id')||'';
@@ -30147,6 +30156,7 @@ init().then(()=>{
     async grantTitle(payload){ return callEngagementFunction("grantTitle",payload); },
     async claimTitleReward(payload){ return callEngagementFunction("claimTitleReward",payload,30000); },
     async claimCardReward(payload){ return callEngagementFunction("claimCardReward",payload,30000); },
+    async getCardRewardMessage(payload){ return callEngagementFunction("getCardRewardMessage",payload,30000); },
     async revokeTitle(payload){ return callEngagementFunction("revokeTitle",payload); },
     async getAdminOverview(){ return callEngagementFunction("getEngagementAdminOverview",{}); },
     async runBackfill(payload){ return callEngagementFunction("runTitleBackfill",payload,ENGAGEMENT_BACKFILL_TIMEOUT_MS); },
