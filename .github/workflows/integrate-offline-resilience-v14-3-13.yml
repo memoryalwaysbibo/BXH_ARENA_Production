@@ -1,5 +1,6 @@
 name: Integrate Offline Resilience v14.3.13
 on:
+  workflow_dispatch:
   push:
     branches: [offline-resilience-v14-3-13]
     paths: ['.github/workflows/integrate-offline-resilience-v14-3-13.yml']
