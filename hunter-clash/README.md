@@ -41,3 +41,15 @@ node --test tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.
 
 契約測試 PASS 只代表本地契約成立。資料庫隔離、可信授權、重送、並發、實戰仍待後續驗證。
 此分支可作為後續工作檢查點；不表示 HC-00 完整驗收或下一聊天已自動喚醒。
+
+## 獨立 Firestore 模擬器
+
+`hunter-clash/emulator` 固定使用 `demo-hunter-clash`、127.0.0.1:8180 及 Java 21。
+先執行 `npm ci --ignore-scripts`，再執行 `npm test`。正式專案、憑證或遠端模擬器位址會被拒絕。
+Rules 僅允許有效且被指派的內部角色讀取 sandbox 挑戰，所有客戶端寫入與既有生涯、天梯、信箱路徑皆拒絕。
+此 Rules 是新模組的測試檔，禁止整份覆蓋 ARENA 正式 Rules。
+
+已執行 6 項真正 Firestore 模擬器測試，加上 21 項契約及既有 Hunter 回歸測試。
+這不證明正式 IAM、Functions 授權、伺服器交易、重送、並發結算或內部實戰已完成。
+後端候選 commit `462287fdb86f6df6b71a0966c25405ca925fcdc7` 的 run `36668868791` 僅驗證成功，部署步驟均 skipped。
+發布檢查繼續拒絕缺少部署／線上核對證據的發布。

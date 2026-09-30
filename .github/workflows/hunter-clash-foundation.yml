@@ -19,5 +19,25 @@ jobs:
       - run: node tests/hunter-clash-contracts.test.cjs
       - run: node tests/hunter-clash-release.test.cjs
       - run: node tests/hunter-clash-provenance.test.cjs
+      - run: node tests/hunter-clash-isolation.test.cjs
       - name: Existing Hunter regressions
         run: node --test tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
+  emulator-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: hunter-clash/emulator/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: hunter-clash/emulator
+      - name: Isolated Firestore Rules tests
+        run: npm test
+        working-directory: hunter-clash/emulator

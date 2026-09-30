@@ -17,10 +17,10 @@
     "internalBeta": "NOT RUN"
   },
   "next": [
-    "Establish deployed backend and Rules provenance",
-    "Implement isolated HC-01 service with server-owned writes",
-    "Verify denied access, concurrency and settlement in emulator",
-    "Connect internal-only frontend adapter after service validation"
+    "Reconcile actually deployed Functions and Rules; candidate validation run skipped deployment",
+    "Implement isolated server service and trusted identity checks",
+    "Verify request replay and concurrent settlement in emulator",
+    "Connect internal-only frontend after service validation"
   ],
   "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
   "backendCandidateValidation": {
@@ -31,8 +31,20 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 16,
+    "tests": 27,
     "result": "PASS",
-    "scope": "pure contracts, provenance and release gate; no database/emulator or production writes"
+    "scope": "21 contracts/legacy regressions plus 6 isolated Firestore Rules tests; no production writes or server settlement"
+  },
+  "partialEvidence": {
+    "isolatedFirestoreRules": "PASS",
+    "trustedFunctionsAuthorization": "NOT RUN",
+    "serverTransactionConcurrency": "NOT RUN",
+    "runtimeProvenance": "BLOCKED"
+  },
+  "emulator": {
+    "projectId": "demo-hunter-clash",
+    "host": "127.0.0.1:8180",
+    "rulesAreProduction": false,
+    "javaVersion": 21
   }
 }
