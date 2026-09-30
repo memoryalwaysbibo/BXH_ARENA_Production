@@ -56,7 +56,7 @@ Rules 僅允許有效且被指派的內部角色讀取 sandbox 挑戰，所有�
 
 ## Sandbox 交易服務
 
-`server/sandbox-service.cjs` 僅能在 demo-hunter-clash 的 Auth／Firestore 模擬器使用，沒有 Functions 匯出或正式寫入 adapter。
+`server/sandbox-service.cjs` 僅能在 demo-hunter-clash 的 Auth／Firestore 模擬器使用，沒有正式寫入 adapter；callable 匯出另放在 emulator/functions.cjs，只允許模擬器。
 Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派從資料庫讀取，忽略客戶端角色宣稱。
 提交與結算以 requestId／內容指紋、revision 及 Firestore 交易處理。結算帳本、稽核、兩名玩家的 hcSandboxStats 與狀態同時提交；失敗時全部回滾。
 只記錄 sandbox 比賽次數與勝場，不寫入既有 Hunter 生涯、XP、天梯、信箱或獎勵。
@@ -64,7 +64,17 @@ Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派
 已實裝 sandbox beginVerification、verifyResult 與 reviewRisk。完整流程測試從提交開始，透過實際服務認證與放行，再結算；個別結算故障測試仍使用 fixture。
 認證限指定且非參賽的有效內部見證者；風險審查限指定且非參賽的有效管理者，必須填理由並綁定結果版本。此角色配置是 sandbox 測試契約，尚未定為正式營運政策。
 認證通過仍維持 risk hold，人工放行才可結算；爭議結果不得放行，已結算結果不得再改審查。重送共用交易收據，並發審查只接受一個預期版本。
-HTTP/callable、正式 IAM 與玩家介面尚未實裝。
-本機測試：21 項契約及既有回歸 + 24 項真正 Auth／Firestore 模擬器測試，共 45 項通過。
+已完成模擬器 HTTP/callable 與客戶端 SDK 驗證；正式 IAM 與玩家介面尚未實裝。
+本機測試：25 項契約、傳輸防護與既有回歸 + 29 項真正 Functions／Auth／Firestore 模擬器測試，共 54 項通過。
 包含兩端同時提交只接受一個版本、8 路不同 requestId 結算只入帳一次、重送一致性及失敗回滾。
 這些是 demo 範圍證據，不能把 checkpoint 的正式／端到端驗收欄位改成完整 PASS。
+
+
+## Callable 傳輸邊界
+
+emulator/functions.cjs 使用官方 firebase-functions 7.4.0 onCall，僅提供 hcSandboxCommand，固定 demo project 與本機 5003 / 9098 / 8180。
+請求格式為 `{operation, input}`，operation 僅允許 submit、beginVerification、verifyResult、reviewRisk、settle；input 使用既有服務的 challengeId、requestId 與版本契約。
+SDK 傳入的 Auth 身分不能替代服務的 verifyIdToken(token, true) 與資料庫角色檢查；客戶端 uid／role 不接受。未知內部錯誤只回傳通用 internal，不暴露 Token、stack 或資料。
+已用 Firebase 客戶端 SDK 經 Functions 模擬器完成實際提交、認證、風險放行與四路並發結算，帳本仍只有一筆。另驗證無效／缺少 Token、停用帳號、未指派角色、舊版本、重用 requestId 與 malformed callable protocol。
+run-tests.cjs 在啟動 CLI 前阻擋正式專案／憑證，並停用 metadata credential discovery；firebase.json predeploy 無條件拒絕部署，bootstrap 在非模擬器或非 demo 環境拒絕載入。
+模擬器 Auth 的 unsigned Token、Functions debug 行為不代表正式簽章、安全 IAM、App Check、撤銷傳播或負載測試已驗收。入口、發布 gate 與完整端到端欄位仍關閉；此階段未改正式 Functions repository。

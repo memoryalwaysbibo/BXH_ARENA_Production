@@ -20,6 +20,7 @@ jobs:
       - run: node tests/hunter-clash-release.test.cjs
       - run: node tests/hunter-clash-provenance.test.cjs
       - run: node tests/hunter-clash-isolation.test.cjs
+      - run: node tests/hunter-clash-callable.test.cjs
       - name: Existing Hunter regressions
         run: node --test tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
   emulator-backend:

@@ -18,8 +18,8 @@
   },
   "next": [
     "Reconcile actually deployed Functions and Rules; candidate validation run skipped deployment",
-    "Wrap sandbox service in callable interface and verify transport/auth boundary",
-    "Connect internal-only frontend after end-to-end service validation"
+    "Connect internal-only frontend after end-to-end service validation",
+    "Verify production signature/revocation, IAM and App Check when isolated deployed runtime is available"
   ],
   "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
   "backendCandidateValidation": {
@@ -30,13 +30,13 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 45,
+    "tests": 54,
     "result": "PASS",
-    "scope": "21 contracts/legacy regressions plus 24 real demo Auth/Firestore Rules, transaction and complete certification/risk workflow tests; no production deployment"
+    "scope": "25 contracts/transport guards/legacy regressions plus 29 real demo Functions/Auth/Firestore tests including client SDK submit-through-settlement; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
-    "trustedFunctionsAuthorization": "NOT RUN",
+    "trustedFunctionsAuthorization": "PASS (demo Functions only)",
     "serverTransactionConcurrency": "PASS (demo only)",
     "runtimeProvenance": "BLOCKED",
     "sandboxTokenAuthorization": "PASS",
@@ -46,13 +46,17 @@
     "sandboxAtomicRollback": "PASS",
     "sandboxCertificationWorkflow": "PASS",
     "sandboxManualRiskReview": "PASS",
-    "sandboxSubmitThroughSettlement": "PASS"
+    "sandboxSubmitThroughSettlement": "PASS",
+    "sandboxCallableTransport": "PASS",
+    "sandboxClientSDKFlow": "PASS",
+    "sandboxFunctionsDeploymentGuard": "PASS"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
     "host": "127.0.0.1:8180",
     "rulesAreProduction": false,
     "javaVersion": 21,
-    "authHost": "127.0.0.1:9098"
+    "authHost": "127.0.0.1:9098",
+    "functionsHost": "127.0.0.1:5003"
   }
 }

@@ -14,6 +14,7 @@ function assertIsolated(env) {
   return PROJECT;
 }
 if (require.main === module) {
+  if (process.argv.includes('--deny-deploy')) throw Error('sandbox-functions-cannot-deploy');
   assertIsolated(process.env);
   process.stdout.write('PASS isolated demo project preflight\n');
 }

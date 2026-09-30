@@ -11,3 +11,19 @@ test('emulator guard rejects production projects, credentials and remote hosts',
     {FIREBASE_AUTH_EMULATOR_HOST:'example.com:9098'}])
     assert.throws(() => assertIsolated(env));
 });
+
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+test('sandbox Functions bootstrap refuses non-emulator and production environments',()=>{
+  const file=path.resolve(__dirname,'../hunter-clash/emulator/functions.cjs');
+  for(const env of [{GCLOUD_PROJECT:PROJECT},{GCLOUD_PROJECT:'bxh-arena',FUNCTIONS_EMULATOR:'true'}]){
+    const result=spawnSync(process.execPath,[file],{env,encoding:'utf8'});
+    assert.equal(result.status,1);assert.match(result.stderr,/sandbox-functions-only|unsafe-emulator-project/);
+  }
+});
+test('Firebase predeploy hook unconditionally refuses publishing sandbox Functions',()=>{
+  const config=require('../hunter-clash/emulator/firebase.json');
+  assert.deepEqual(config.functions.predeploy,['node "$RESOURCE_DIR/preflight.cjs" --deny-deploy']);
+  const result=spawnSync(process.execPath,[path.resolve(__dirname,'../hunter-clash/emulator/preflight.cjs'),'--deny-deploy'],{env:{},encoding:'utf8'});
+  assert.equal(result.status,1);assert.match(result.stderr,/sandbox-functions-cannot-deploy/);
+});
