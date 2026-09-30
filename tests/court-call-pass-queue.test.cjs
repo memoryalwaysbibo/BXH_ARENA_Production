@@ -4,6 +4,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 
 const ui=fs.readFileSync(path.join(__dirname,'..','court-call-ui.js'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 
 function extract(name,next){
   const start=ui.indexOf('function '+name+'(');
@@ -54,4 +55,18 @@ const base=()=>({
   assert.equal(sandbox.callPassProtected(st,st.matches.find(m=>m.id==='m1')),false,'completed PASS must release predecessor protection');
 }
 
-console.log('PASS court-call PASS defer / protection / requeue contract');
+assert.match(ui,/\['coming','pass','ready'\]\.includes\(api\).*response=api;requestedResponse=response;api='respond'/s,
+  'PASS button must map to respond/pass callable contract');
+assert.match(ui,/if\(response==='pass'\)reason='其他'/,
+  'PASS response reason contract missing');
+assert.match(ui,/if\(r\.state&&typeof state!=='undefined'&&state\.cloudCode===code\)applyRemoteState\(r\.state,true\)/,
+  'PASS authoritative state must be applied after callable response');
+
+assert.match(html,/if\(callPassProtected\(state,m\)\)\{showToast\("PASS 回補及其前置場次不可再次跳過或移台"/,
+  'PASS protected matches must reject ordinary skip/move');
+assert.match(html,/state\.matches\.some\(m=>m\.callPass&&!m\.completed&&m\.skippedAt\)/,
+  'station-count changes must be blocked while PASS is pending');
+assert.match(html,/!m\.resumeQueuedAt&&!m\.callPass&&canOperateCurrentTournament\(\)/,
+  'PASS rows must not expose manual claim controls');
+
+console.log('PASS court-call PASS defer / protection / requeue / callable contract');
