@@ -91,5 +91,18 @@
     "liveComparison": "NOT RUN",
     "provesFunctionsDeployment": false,
     "updatesReleaseGate": false
+  },
+  "readOnlyCloudAuditWorkflow": {
+    "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+    "draftPR": 88,
+    "url": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/pull/88",
+    "branch": "feature/hc00-readonly-runtime-audit-20260930",
+    "sourceCommit": "e7fdde4fb843e93fb152b944e31f78288e9e72fa",
+    "status": "DRAFT_READY",
+    "localToolAndWorkflowTests": 18,
+    "pullRequestValidationRun": 36694116617,
+    "pushValidationRun": 36694113335,
+    "cloudInventoryExecuted": false,
+    "note": "Push/PR validated tools only; OIDC inventory job skipped. Requires default-main workflow activation and manual dispatch; connector has no dispatch capability."
   }
 }

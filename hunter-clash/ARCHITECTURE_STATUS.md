@@ -23,3 +23,9 @@
 HC-05 工作人員實戰及 HC-06 正式發布另行驗收。發布清單目前 2/7 PASS（約 29%），這是必驗項目比例，不能當成 HC-00 施工完成度。
 
 玩家正式入口保持關閉，PR 保持草稿，未合併或部署。例行工具與文件完善不替代上述雲端完成條件。
+
+
+## 雲端採集執行路徑
+
+後端獨立草稿 [PR #88](https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/pull/88) 已準備唯讀 runtime workflow，固定官方 GET 與版本 SHA，使用既有 OIDC。18 項本機工具／防護測試及 Push／PR CI 通過；兩次 CI 的雲端 job 均為 skipped，沒有取得線上證據。
+工作流程須先經審查進入後端 main，才可選 main 手動執行。現有 GitHub 連線沒有 workflow_dispatch 能力，因此尚未啟動。既有部署 workflow、Functions、Rules 與 IAM 都未修改。此採集工具的啟用和 HC 功能發布分開，玩家入口與原發布 gate 保持關閉。
