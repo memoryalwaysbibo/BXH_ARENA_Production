@@ -11031,10 +11031,10 @@ function queuePublicTournamentsBackgroundRefresh(){
 }
 document.addEventListener("visibilitychange",()=>{
   syncPublicTournamentsRealtimeState();
-  if(!document.hidden && isTournamentLobbyVisible()) reconcilePublicTournamentsNow("foreground");
+  if(!document.hidden && isTournamentLobbyVisible() && !publicTournamentsRealtimeIsFresh()) reconcilePublicTournamentsNow("foreground");
 });
 window.addEventListener("focus",()=>{
-  if(isTournamentLobbyVisible()) reconcilePublicTournamentsNow("focus");
+  if(isTournamentLobbyVisible() && !publicTournamentsRealtimeIsFresh()) reconcilePublicTournamentsNow("focus");
 });
 let findEventsFilters = { keyword:"", date:"", region:"", format:"all" };
 // Pure front-end display state for the "賽事資訊" tab — deliberately never
@@ -20654,6 +20654,16 @@ let adminRegistrationsBusy = false; // promote/cancel action in-flight guard
 function resetAdminRegistrationsCache(){ adminRegistrationsCache = null; adminRegistrationsError = null; }
 let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;
 let adminRosterSyncChain=Promise.resolve();
+let adminRosterCapabilityCode="";
+let adminRosterBackendSyncEnabled=null;
+async function adminRosterUsesBackendSync(code){
+  const normalized=String(code||"").toUpperCase();
+  if(adminRosterCapabilityCode===normalized && adminRosterBackendSyncEnabled!==null) return adminRosterBackendSyncEnabled;
+  const publicRoom=await window.cloudSync.getPublicTournamentFull(normalized);
+  adminRosterCapabilityCode=normalized;
+  adminRosterBackendSyncEnabled=publicRoom?.registrationRosterSyncBackendEnabled===true;
+  return adminRosterBackendSyncEnabled;
+}
 function stopAdminRosterWatch(){
   ++adminRosterGeneration;
   if(adminRosterUnsub){ try{ adminRosterUnsub(); }catch(e){} }
@@ -20676,9 +20686,9 @@ async function startAdminRosterWatch(){
       adminRegistrationsError=null;
       adminRosterSyncChain=adminRosterSyncChain.catch(()=>{}).then(async()=>{
         if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId || state.cloudCode!==code) return;
-        const publicRoom=await window.cloudSync.getPublicTournamentFull(code);
+        const backendRosterSync=await adminRosterUsesBackendSync(code);
         if(generation!==adminRosterGeneration || state.id!==roomId) return;
-        if(publicRoom?.registrationRosterSyncBackendEnabled===true){
+        if(backendRosterSync){
           renderPreservingScroll();
           return;
         }
