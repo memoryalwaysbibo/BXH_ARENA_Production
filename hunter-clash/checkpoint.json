@@ -17,7 +17,7 @@
     "internalBeta": "NOT RUN"
   },
   "next": [
-    "Map the 36 observed Functions builds to trusted deployment source; live Rules content already matched a different source from the original candidate",
+    "Obtain trusted deployed source package or immutable source manifest for the 35 currently observed Functions builds; Cloud Build sourceProvenance supplied no resolved commits or source hashes",
     "Verify production signature/revocation, IAM and App Check when isolated deployed runtime is available",
     "Run supervised staff internal beta on an isolated deployed environment; browser automation is partial evidence only"
   ],
@@ -38,7 +38,7 @@
     "isolatedFirestoreRules": "PASS",
     "trustedFunctionsAuthorization": "PASS (demo Functions only)",
     "serverTransactionConcurrency": "PASS (demo only)",
-    "runtimeProvenance": "PARTIAL (live inventory and exact Rules source content; Functions source mapping pending)",
+    "runtimeProvenance": "PARTIAL (latest live inventory, unchanged matched Rules content and Cloud Build metadata; deployed Functions source identity unverified)",
     "sandboxTokenAuthorization": "PASS",
     "sandboxRequestReplay": "PASS",
     "sandboxConcurrentSubmission": "PASS",
@@ -58,11 +58,12 @@
     "sandboxManualLabSeed": "PASS",
     "sandboxSeedRollback": "PASS",
     "sandboxManualLabStartup": "PASS",
-    "readOnlyRuntimeAuditCollector": "PASS (7 synthetic-response tests only; live collection unavailable)",
+    "readOnlyRuntimeAuditCollector": "PASS (7 synthetic-response tests; real inventory collected in runs 36696307510 and 36756766360)",
     "pinnedRulesSourceHash": "PASS (candidate source blob and repository SHA-256 manifest agree; not deployment evidence)",
-    "runtimeRulesComparisonTool": "PASS (7 synthetic-report tests only; live comparison not run)",
+    "runtimeRulesComparisonTool": "PASS (7 synthetic-report tests; original candidate live comparison MISMATCH)",
     "cloudMetadataReadAuthorization": "PASS (existing OIDC, Functions list and Rules get only)",
-    "liveRulesSourceContent": "PASS (snapshot content matches repository blob; not complete deployment provenance)"
+    "liveRulesSourceContent": "PASS (snapshot content matches repository blob; not complete deployment provenance)",
+    "cloudBuildMetadataReadAuthorization": "PASS (35 fixed-project Cloud Build GETs; no IAM change)"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
@@ -83,7 +84,7 @@
     "file": "runtime-audit.cjs",
     "instructions": "RUNTIME_AUDIT.md",
     "liveCollection": "COLLECTED",
-    "blocker": "Complete Functions build-to-source reconciliation remains pending",
+    "blocker": "Cloud Build GETs completed, but resolved source commit/hash fields absent; trusted deployment source evidence still needed",
     "updatesReleaseGate": false
   },
   "architectureStatusFile": "ARCHITECTURE_STATUS.md",
@@ -113,5 +114,23 @@
     "collectionStatus": "COLLECTED",
     "candidateRulesComparison": "MISMATCH"
   },
-  "liveAuditDirectory": "audit/20260930-36696307510"
+  "liveAuditDirectory": "audit/20260930-36696307510",
+  "readOnlyBuildSourceAudit": {
+    "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+    "url": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/pull/89",
+    "status": "MERGED_AND_EXECUTED",
+    "mergeCommit": "e20fa91c661f28bb6cc303a748e85c2b2337c7cc",
+    "liveRunId": 36756766360,
+    "liveRunConclusion": "failure",
+    "localAndCIToolTests": 27,
+    "collectionStatus": "COLLECTED",
+    "functions": 98,
+    "builds": 35,
+    "resolvedCommits": 0,
+    "sourceHashes": 0,
+    "sourceReconciled": false,
+    "candidateRulesComparison": "MISMATCH",
+    "updatesReleaseGate": false
+  },
+  "latestLiveAuditDirectory": "audit/20260930-36756766360"
 }

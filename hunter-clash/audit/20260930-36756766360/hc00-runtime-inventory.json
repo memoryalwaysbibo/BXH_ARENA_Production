@@ -1,0 +1,1027 @@
+{
+  "schemaVersion": 1,
+  "projectId": "bxh-arena",
+  "startedAt": "2026-09-30T18:12:00.880Z",
+  "completedAt": "2026-09-30T18:12:02.322Z",
+  "readOnly": true,
+  "collectionStatus": "COLLECTED",
+  "runtimeReconciled": false,
+  "hcDeploymentVerified": false,
+  "functionsV1": {
+    "status": "COLLECTED",
+    "records": []
+  },
+  "functionsV2": {
+    "status": "COLLECTED",
+    "records": [
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/activateLadderS1",
+        "updateTime": "2026-09-30T18:05:27.589397491Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "activateladders1-00022-biy"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/activatePartnerContract",
+        "updateTime": "2026-09-29T17:51:01.920701722Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "activatepartnercontract-00041-yaj"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/activityCompletedTournamentBackfill",
+        "updateTime": "2026-09-27T18:37:00.508530064Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/43847d12-d980-4293-86db-fa3166e5bd10",
+        "revision": "activitycompletedtournamentbackfill-00002-puh"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/activityInactivityPenalty",
+        "updateTime": "2026-09-22T06:56:06.484002676Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/431b46a2-7010-49e6-a26f-1b868085d98c",
+        "revision": "activityinactivitypenalty-00003-siw"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/activityOnlinePresenceWritten",
+        "updateTime": "2026-09-27T18:37:11.735299992Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/43847d12-d980-4293-86db-fa3166e5bd10",
+        "revision": "activityonlinepresencewritten-00001-luc"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/activityPoints",
+        "updateTime": "2026-09-27T18:37:01.724475235Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/43847d12-d980-4293-86db-fa3166e5bd10",
+        "revision": "activitypoints-00003-xah"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/activityTournamentCompleted",
+        "updateTime": "2026-09-27T18:36:58.345377291Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/43847d12-d980-4293-86db-fa3166e5bd10",
+        "revision": "activitytournamentcompleted-00002-zas"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/autoAwardStaffTitle",
+        "updateTime": "2026-09-30T18:05:46.822614968Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "autoawardstafftitle-00028-nax"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/awardHostingTitles",
+        "updateTime": "2026-09-27T19:27:39.573305238Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+        "revision": "awardhostingtitles-00004-fus"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/backfillOctoberCardReward",
+        "updateTime": "2026-09-30T18:05:27.762141159Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "backfilloctobercardreward-00015-fec"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/backfillRegistrationRoster",
+        "updateTime": "2026-09-27T15:51:59.075715235Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/7ee9a7ee-af86-4949-8275-6019dce2bdf6",
+        "revision": "backfillregistrationroster-00002-kop"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/beforeGoogleAuthUserCreated",
+        "updateTime": "2026-09-29T17:49:50.388176337Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/b504acac-946b-42f1-a7f2-9dc144dc089e",
+        "revision": "beforegoogleauthusercreated-00006-cay"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/cardAlbumBackfill",
+        "updateTime": "2026-09-30T01:15:14.871921702Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5a852d76-7fbd-4952-b654-2ffe43327677",
+        "revision": "cardalbumbackfill-00004-giv"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/cardAlbumEventAward",
+        "updateTime": "2026-09-30T01:15:18.241473959Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5a852d76-7fbd-4952-b654-2ffe43327677",
+        "revision": "cardalbumeventaward-00005-kex"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/cardAlbumService",
+        "updateTime": "2026-09-30T01:15:14.892051184Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5a852d76-7fbd-4952-b654-2ffe43327677",
+        "revision": "cardalbumservice-00005-yef"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/cardAlbumStaffAward",
+        "updateTime": "2026-09-30T01:15:17.780987130Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5a852d76-7fbd-4952-b654-2ffe43327677",
+        "revision": "cardalbumstaffaward-00005-beb"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/changeManagedAccounts",
+        "updateTime": "2026-09-27T15:52:12.079560118Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/9084fc1e-663e-4dde-b14a-d5530bdb522b",
+        "revision": "changemanagedaccounts-00010-jad"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/claimCardReward",
+        "updateTime": "2026-09-30T18:05:25.212618546Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "claimcardreward-00017-kiz"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/claimTitleReward",
+        "updateTime": "2026-09-30T18:05:29.472614358Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "claimtitlereward-00017-fur"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/closeIdleTournaments",
+        "updateTime": "2026-09-27T05:58:59.973014295Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "closeidletournaments-00008-roz"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/courtCallPushService",
+        "updateTime": "2026-09-26T05:30:21.871536248Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/c86cac87-f07b-4437-b1a1-0c18e7bb8e8b",
+        "revision": "courtcallpushservice-00004-fiy"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/courtCallService",
+        "updateTime": "2026-09-26T05:30:31.334961865Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/c86cac87-f07b-4437-b1a1-0c18e7bb8e8b",
+        "revision": "courtcallservice-00006-zok"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/createPartnerContractDraft",
+        "updateTime": "2026-09-29T17:51:02.816134462Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "createpartnercontractdraft-00025-qil"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/dailyCheckIn",
+        "updateTime": "2026-09-29T17:50:35.700506391Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a99b5e26-3e11-4f93-b7ac-bd3690542d36",
+        "revision": "dailycheckin-00039-ged"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/deleteTitleDefinition",
+        "updateTime": "2026-09-19T14:24:28.540371481Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "deletetitledefinition-00002-zil"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/deleteTournamentSafely",
+        "updateTime": "2026-09-30T18:05:29.845250522Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "deletetournamentsafely-00027-sor"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/drawTournamentRaffle",
+        "updateTime": "2026-09-27T05:58:52.273718986Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "drawtournamentraffle-00007-xiq"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/enchantmentService",
+        "updateTime": "2026-09-29T14:29:42.109031694Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/3ac354eb-f1d5-49c5-a1d5-83e2c3de5058",
+        "revision": "enchantmentservice-00005-miv"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/eventStaffService",
+        "updateTime": "2026-09-29T17:50:37.378874408Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/710881b1-7661-4a5e-ab61-c77efc42ba40",
+        "revision": "eventstaffservice-00016-peb"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/eventTemplateService",
+        "updateTime": "2026-09-29T17:50:34.953730176Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d7b1f351-6187-4b4f-ae50-9c6e9a68feea",
+        "revision": "eventtemplateservice-00027-lab"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/familyPlayers",
+        "updateTime": "2026-09-19T14:24:12.717632044Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "familyplayers-00001-xoh"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/familyRegistration",
+        "updateTime": "2026-09-29T17:50:45.283943904Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5674dba5-7f49-4dbf-8534-7ed4aa2b0853",
+        "revision": "familyregistration-00032-jam"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/familyTransfer",
+        "updateTime": "2026-09-28T07:31:42.766971997Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5079caa6-c65c-4034-92c3-562ed9f93d53",
+        "revision": "familytransfer-00001-vap"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/getEngagementAdminOverview",
+        "updateTime": "2026-09-29T17:12:31.020606438Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/f94872ee-af0d-487b-9632-f6c52155e4d3",
+        "revision": "getengagementadminoverview-00004-row"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/getEngagementHealth",
+        "updateTime": "2026-09-19T14:24:20.420792921Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "getengagementhealth-00002-dux"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/getEngagementSnapshot",
+        "updateTime": "2026-09-30T18:04:56.010028302Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "getengagementsnapshot-00037-vop"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/getPartnerContract",
+        "updateTime": "2026-09-29T17:51:02.176412140Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "getpartnercontract-00025-loc"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/getTournamentOperations",
+        "updateTime": "2026-09-27T05:58:52.796144213Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "gettournamentoperations-00007-nom"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/grantTitle",
+        "updateTime": "2026-09-30T18:05:26.131641445Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "granttitle-00020-fav"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/inventoryCatalog",
+        "updateTime": "2026-09-27T15:08:33.457764389Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/1b476204-3770-41de-bfca-2ad7848f6697",
+        "revision": "inventorycatalog-00004-daz"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/inventoryImageUpload",
+        "updateTime": "2026-09-29T17:50:35.366786686Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ded60ca9-d7c9-48db-a6bc-0cba65007e33",
+        "revision": "inventoryimageupload-00027-pup"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/inventoryService",
+        "updateTime": "2026-09-29T17:50:46.032179045Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a99b5e26-3e11-4f93-b7ac-bd3690542d36",
+        "revision": "inventoryservice-00035-ges"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/listPartnerContracts",
+        "updateTime": "2026-09-29T17:51:02.279734383Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "listpartnercontracts-00015-yun"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/listPartnerPlans",
+        "updateTime": "2026-09-29T17:51:02.473319690Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "listpartnerplans-00025-sit"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/lotteryRegistration",
+        "updateTime": "2026-09-29T17:50:37.104559305Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5674dba5-7f49-4dbf-8534-7ed4aa2b0853",
+        "revision": "lotteryregistration-00032-hod"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/mailboxAttachmentService",
+        "updateTime": "2026-09-29T17:50:51.893581461Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/2a11b4d2-69f3-4988-b71f-ae1ee92ee7e0",
+        "revision": "mailboxattachmentservice-00025-zuy"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/mailboxService",
+        "updateTime": "2026-09-29T17:50:50.487652182Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "mailboxservice-00025-yuv"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/makeupCheckIn",
+        "updateTime": "2026-09-29T01:04:06.740948657Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/8f29cf41-fbc9-4a80-92bc-09f083336d9f",
+        "revision": "makeupcheckin-00001-nuv"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/manageEntrySelection",
+        "updateTime": "2026-09-19T14:24:23.172050897Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "manageentryselection-00002-xil"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/manageRegistrationSelection",
+        "updateTime": "2026-09-19T14:24:31.443922328Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "manageregistrationselection-00002-dip"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/memberRaffle",
+        "updateTime": "2026-09-25T06:47:58.052513143Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/0dc1082b-7c00-43ae-aaaa-d08088b24892",
+        "revision": "memberraffle-00007-zeh"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/moodStation",
+        "updateTime": "2026-09-29T17:50:23.458563784Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/4bf03ee3-7311-4dd9-8fc4-eda66c5af65e",
+        "revision": "moodstation-00020-nil"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/onLadderTransactionCreated",
+        "updateTime": "2026-09-30T18:05:26.403023284Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "onladdertransactioncreated-00024-voq"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/onPioneerRegistrationWritten",
+        "updateTime": "2026-09-27T19:09:51.902506119Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/080923c1-d2fa-4e0c-ab5d-62fd7b15667f",
+        "revision": "onpioneerregistrationwritten-00002-pev"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/onProfileCompletionWritten",
+        "updateTime": "2026-09-29T17:50:35.568021182Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/baf6954f-91f1-4dd3-bd68-e1de802e2a4c",
+        "revision": "onprofilecompletionwritten-00004-fop"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/onlinePresence",
+        "updateTime": "2026-09-19T14:24:09.678131590Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "onlinepresence-00001-zal"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/parseTournamentAnnouncementV1",
+        "updateTime": "2026-09-30T18:05:28.208456160Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "parsetournamentannouncementv1-00024-maz"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/parseTournamentPosterV1",
+        "updateTime": "2026-09-27T06:54:19.719761489Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/0be7a6c8-628c-41f9-a8db-052eb5f9c9ab",
+        "revision": "parsetournamentposterv1-00007-tov"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/pioneerDefinitionMaintenance",
+        "updateTime": "2026-09-29T17:50:34.183912167Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/baf6954f-91f1-4dd3-bd68-e1de802e2a4c",
+        "revision": "pioneerdefinitionmaintenance-00002-cer"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/playerCardService",
+        "updateTime": "2026-09-30T04:38:19.269840913Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/f8cfe6bc-65de-468d-be38-e8739e9095ae",
+        "revision": "playercardservice-00005-kop"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/prepareLadderS1Cutover",
+        "updateTime": "2026-09-30T18:05:25.969731503Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "prepareladders1cutover-00022-bet"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/preserveCompletedRoomAndCountHost",
+        "updateTime": "2026-09-27T19:27:35.383402181Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+        "revision": "preservecompletedroomandcounthost-00004-teh"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/preserveExistingCompletedRooms",
+        "updateTime": "2026-09-27T19:27:37.559848396Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+        "revision": "preserveexistingcompletedrooms-00005-ref"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/previewTournamentRaffle",
+        "updateTime": "2026-09-27T05:58:52.135995329Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "previewtournamentraffle-00007-zuw"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/reconcileOctoberCardRewards",
+        "updateTime": "2026-09-30T18:05:26.272605083Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "reconcileoctobercardrewards-00013-vum"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/registrationInvitations",
+        "updateTime": "2026-09-19T14:24:34.540863170Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "registrationinvitations-00001-mok"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/resetHunterPrelaunchData",
+        "updateTime": "2026-09-30T18:05:31.267429697Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "resethunterprelaunchdata-00024-voy"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/restoreIdleTournament",
+        "updateTime": "2026-09-27T05:58:51.921038904Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "restoreidletournament-00007-xak"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/revokeTitle",
+        "updateTime": "2026-09-19T14:24:36.431052051Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "revoketitle-00002-hix"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/rewardRulesService",
+        "updateTime": "2026-09-29T17:50:45.102708894Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a99b5e26-3e11-4f93-b7ac-bd3690542d36",
+        "revision": "rewardrulesservice-00034-pef"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/rolloverLadderSeasonAtCutover",
+        "updateTime": "2026-09-21T12:09:50.191260982Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/7effa893-0c92-43b6-9372-c5d881236188",
+        "revision": "rolloverladderseasonatcutover-00001-sum"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/roomAccess",
+        "updateTime": "2026-09-29T17:50:45.839665897Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/5674dba5-7f49-4dbf-8534-7ed4aa2b0853",
+        "revision": "roomaccess-00030-jip"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/roomPosterCover",
+        "updateTime": "2026-09-29T17:50:20.624057173Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/caf55454-3f42-42cb-bcce-365a97df8b92",
+        "revision": "roompostercover-00023-yiw"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/roomPosterCoverCleanup",
+        "updateTime": "2026-09-29T17:50:15.758719951Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/c8535a26-baea-4c6b-b149-6dad786e0ac0",
+        "revision": "roompostercovercleanup-00020-son"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/runMemberRaffles",
+        "updateTime": "2026-09-25T06:48:05.641857341Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/0dc1082b-7c00-43ae-aaaa-d08088b24892",
+        "revision": "runmemberraffles-00008-koh"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/runTitleBackfill",
+        "updateTime": "2026-09-27T19:27:36.669314281Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+        "revision": "runtitlebackfill-00004-daf"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/saveEngagementSettings",
+        "updateTime": "2026-09-19T14:24:50.046158780Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "saveengagementsettings-00002-ziq"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/savePartnerPlan",
+        "updateTime": "2026-09-29T17:51:04.157698106Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "savepartnerplan-00025-muc"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/seedInitialTitles",
+        "updateTime": "2026-09-29T17:50:34.118053634Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/baf6954f-91f1-4dd3-bd68-e1de802e2a4c",
+        "revision": "seedinitialtitles-00004-leq"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/sendPartnerContract",
+        "updateTime": "2026-09-29T17:51:01.327668598Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "sendpartnercontract-00025-mon"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/setTitlePreferences",
+        "updateTime": "2026-09-30T18:05:26.693889063Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "settitlepreferences-00031-ban"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/setTournamentOperations",
+        "updateTime": "2026-09-27T05:58:53.084189604Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "settournamentoperations-00007-miw"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/settleLadderTournament",
+        "updateTime": "2026-09-21T14:13:28.975848286Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/db4992ce-eb2f-4d32-b3e6-06cd7b723014",
+        "revision": "settleladdertournament-00001-yol"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/signPartnerContract",
+        "updateTime": "2026-09-29T17:51:01.805251626Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+        "revision": "signpartnercontract-00025-fed"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/syncHunterAchievements",
+        "updateTime": "2026-09-30T18:05:25.666141141Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+        "revision": "synchunterachievements-00026-ray"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/syncMyHostingProgress",
+        "updateTime": "2026-09-27T19:27:35.640449641Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+        "revision": "syncmyhostingprogress-00004-cuv"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/syncPlayerDirectory",
+        "updateTime": "2026-09-19T14:24:35.010424836Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+        "revision": "syncplayerdirectory-00002-ses"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/syncRegistrationRoster",
+        "updateTime": "2026-09-27T15:51:55.772142578Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/7ee9a7ee-af86-4949-8275-6019dce2bdf6",
+        "revision": "syncregistrationroster-00002-nav"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/teamLineup",
+        "updateTime": "2026-09-29T17:49:53.509717375Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/dd0a88ff-1416-49ad-8567-1e3f21bf4368",
+        "revision": "teamlineup-00013-pox"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/teamRegistration",
+        "updateTime": "2026-09-29T17:49:51.012877641Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/dd0a88ff-1416-49ad-8567-1e3f21bf4368",
+        "revision": "teamregistration-00013-nos"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/teamScoring",
+        "updateTime": "2026-09-29T17:49:50.636977807Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/dd0a88ff-1416-49ad-8567-1e3f21bf4368",
+        "revision": "teamscoring-00013-yom"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/titleClassificationV2Maintenance",
+        "updateTime": "2026-09-29T17:50:32.763251368Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/baf6954f-91f1-4dd3-bd68-e1de802e2a4c",
+        "revision": "titleclassificationv2maintenance-00001-zev"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/titleParticipationBackfill",
+        "updateTime": "2026-09-27T19:27:32.668098726Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+        "revision": "titleparticipationbackfill-00003-yul"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/titleProgressMaintenance",
+        "updateTime": "2026-09-27T19:27:36.189382059Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+        "revision": "titleprogressmaintenance-00002-cec"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/trackTournamentActivity",
+        "updateTime": "2026-09-27T05:58:42.702772183Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "tracktournamentactivity-00007-faf"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/trackTournamentRegistrationActivity",
+        "updateTime": "2026-09-27T05:58:53.209476372Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "tracktournamentregistrationactivity-00007-zoj"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/updateTitleDefinition",
+        "updateTime": "2026-09-29T17:06:25.497766794Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/46db043e-4af9-40c5-87cd-e0041b54703d",
+        "revision": "updatetitledefinition-00006-coj"
+      },
+      {
+        "name": "projects/bxh-arena/locations/asia-east1/functions/updateTournamentRaffleWinner",
+        "updateTime": "2026-09-27T05:58:51.914414449Z",
+        "state": "ACTIVE",
+        "environment": "GEN_2",
+        "versionId": null,
+        "runtime": "nodejs22",
+        "build": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+        "revision": "updatetournamentrafflewinner-00007-keb"
+      }
+    ]
+  },
+  "releases": {
+    "status": "COLLECTED",
+    "records": [
+      {
+        "name": "projects/bxh-arena/releases/cloud.firestore",
+        "rulesetName": "projects/bxh-arena/rulesets/e9014a09-8c33-4859-8e3a-a4b3b6e0ea1a",
+        "createTime": "2026-09-03T16:15:58.185088Z",
+        "updateTime": "2026-09-29T17:50:04.736879Z"
+      }
+    ]
+  },
+  "rulesets": {
+    "status": "COLLECTED",
+    "records": [
+      {
+        "name": "projects/bxh-arena/rulesets/e9014a09-8c33-4859-8e3a-a4b3b6e0ea1a",
+        "createTime": "2026-09-29T17:03:01.643055Z",
+        "files": [
+          {
+            "name": "firestore.rules",
+            "bytes": 78887,
+            "sha256": "df10098a1fd880871fbecfd93c066ab4e87ab6b31109c3dcf0b6c337cd2c46c7"
+          }
+        ],
+        "manifestSha256": "811f45f0330e111f6125401f5a48ee2640fc59fe32b7a9c8baefded33119a4aa"
+      }
+    ]
+  }
+}

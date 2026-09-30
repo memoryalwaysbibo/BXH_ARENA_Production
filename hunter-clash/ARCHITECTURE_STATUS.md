@@ -36,3 +36,14 @@ HC-05 工作人員實戰及 HC-06 正式發布另行驗收。發布清單目前 
 使用者授權後，PR #88 已合併；run 36696307510 由 main 手動執行。既有 OIDC、Functions v1/v2 與 Rules releases/rulesets 讀取均成功。觀測快照有 0 個第一代、96 個第二代 Functions，分屬 36 個 build，未見 hcSandboxCommand。採集沒有部署或更改 IAM／資料。
 原候選 Rules 比對為 MISMATCH，流程正確退出失敗。另從來源 commit ed1fc0d2befd6b9becae3a1e759e887f2645342b 取得相同的現行 Rules 內容，Git blob、SHA-256 與 78,887 位元組均核對一致。該來源的 PR CI 部署 job 為 skipped，不能以此宣告唯一部署來源或完整後端基線。原候選清單與失敗報告保留，不以換掉清單消除差異。
 線上證據保存於 [audit/20260930-36696307510](audit/20260930-36696307510)。下一步是 Functions build 與可信部署來源對照、獨立測試專案及正式授權驗收；backendReferenceIsLiveVerified、deployed、entryWired 均維持 false。
+
+
+## 2026-10-01 02:12（台北）Cloud Build 查詢结果
+
+唯讀擴充 PR #89 已合併至後端 main，commit e20fa91c661f28bb6cc303a748e85c2b2337c7cc；Push／PR CI 皆通過，27 項工具與防護測試（18 舊有＋9 新增）。run 36756766360 手動執行：現有 OIDC、Functions／Rules 採集及 35 個 Cloud Build GET 均成功，未部署 HC 或更動 IAM／資料。
+
+此快照有 98 個第二代 Functions、35 個 build，較前次新增 2 個十月卡牌補發 Functions，另有 13 個既有 Functions 的 build 改變；這是兩個時間點的觀測差異，不代表本次唯讀工作流程部署了它們。仍未見 hcSandboxCommand。Rules ruleset 與內容雜湊與前次一致，但原候選比較仍 MISMATCH；流程在保存 artifact 後正確失敗。
+
+Cloud Build 報告的 sourceProvenance 沒有已解析 commit、儲存來源或來源雜湊，35 筆 COLLECTED 不代表任何一筆來源已驗收。下一步需要可信的已部署來源包或不可變部署來源清單；不能以 build SUCCESS、更新時間或合成測試補成來源證據。另仍缺專用 Firebase 測試專案與正式授權／工作人員驗收。
+
+完整證據見 [audit/20260930-36756766360](audit/20260930-36756766360)，ZIP digest、報告連結 SHA-256 與四檔白名單已核對。HC-00 工程估算仍約 80%；正式發布 gate 與 backendReferenceIsLiveVerified／deployed／entryWired 均未放行。
