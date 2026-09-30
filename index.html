@@ -30146,6 +30146,7 @@ init().then(()=>{
     async saveSettings(payload){ return callEngagementFunction("saveEngagementSettings",payload); },
     async grantTitle(payload){ return callEngagementFunction("grantTitle",payload); },
     async claimTitleReward(payload){ return callEngagementFunction("claimTitleReward",payload,30000); },
+    async claimCardReward(payload){ return callEngagementFunction("claimCardReward",payload,30000); },
     async revokeTitle(payload){ return callEngagementFunction("revokeTitle",payload); },
     async getAdminOverview(){ return callEngagementFunction("getEngagementAdminOverview",{}); },
     async runBackfill(payload){ return callEngagementFunction("runTitleBackfill",payload,ENGAGEMENT_BACKFILL_TIMEOUT_MS); },
