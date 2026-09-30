@@ -6,7 +6,13 @@ function checkFile(file) {
   try {
     const checkpoint = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (checkpoint.schemaVersion !== 1) throw Error('unsupported-checkpoint');
-    return releaseDecision(checkpoint.evidence);
+    const result = releaseDecision(checkpoint.evidence);
+    if (checkpoint.backendReferenceIsLiveVerified !== true)
+      result.blockers.push('backend-provenance-unverified');
+    if (checkpoint.entryWired !== true)
+      result.blockers.push('entry-not-wired');
+    result.allowed = result.blockers.length === 0;
+    return result;
   } catch (error) {
     return { allowed: false, blockers: ['invalid-checkpoint'], reason: error.message };
   }
