@@ -207,8 +207,12 @@ test('official single elimination enforces bronze before championship final', as
   const celebrationBracket=page.locator('[data-action="celeb-view-bracket"]').first();
   if(await celebrationBracket.isVisible().catch(()=>false)) await celebrationBracket.click();
   else await page.locator('[data-action="switch-tab"][data-tab="bracket"]').first().click();
-  const finalBox=page.locator(`.match-box[data-id="${completed.finalId}"]`);
-  const bronzeBox=page.locator(`.match-box[data-id="${completed.bronzeId}"]`);
+  // Scope to the live bracket only. The hidden print bracket intentionally
+  // mirrors the same match ids and must not make the locator ambiguous.
+  const liveBracket=page.locator('#se-bracket-cols');
+  await expect(liveBracket).toBeVisible({timeout:20000});
+  const finalBox=liveBracket.locator(`.match-box[data-id="${completed.finalId}"]`);
+  const bronzeBox=liveBracket.locator(`.match-box[data-id="${completed.bronzeId}"]`);
   await expect(finalBox).toBeVisible({timeout:20000});
   await expect(bronzeBox).toBeVisible({timeout:20000});
   await expect(finalBox.locator('.mb-row.winner')).toContainText(completed.championName);
