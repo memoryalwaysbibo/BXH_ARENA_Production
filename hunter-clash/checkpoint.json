@@ -30,9 +30,9 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 64,
+    "tests": 71,
     "result": "PASS",
-    "scope": "26 contracts/transport/isolation/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; no production deployment"
+    "scope": "33 contracts/transport/isolation/runtime-audit/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; runtime audit tests use synthetic responses; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
@@ -57,7 +57,8 @@
     "supervisedStaffInternalBeta": "NOT RUN",
     "sandboxManualLabSeed": "PASS",
     "sandboxSeedRollback": "PASS",
-    "sandboxManualLabStartup": "PASS"
+    "sandboxManualLabStartup": "PASS",
+    "readOnlyRuntimeAuditCollector": "PASS (7 synthetic-response tests only; live collection unavailable)"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
@@ -73,5 +74,12 @@
     "Direct GCP runtime/version and Rules release reconciliation unavailable",
     "Dedicated isolated Firebase test project not configured",
     "Supervised staff internal beta not executed"
-  ]
+  ],
+  "runtimeAuditCollector": {
+    "file": "runtime-audit.cjs",
+    "instructions": "RUNTIME_AUDIT.md",
+    "liveCollection": "NOT RUN",
+    "blocker": "gcloud is unavailable in the current execution environment; no live runtime report collected",
+    "updatesReleaseGate": false
+  }
 }
