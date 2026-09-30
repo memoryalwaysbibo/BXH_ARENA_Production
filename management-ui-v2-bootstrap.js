@@ -54,6 +54,24 @@
     applyPreference();
   }
 
+  let lastV2Host=null,refreshQueued=false;
+  function refreshDynamicMounts(){
+    refreshQueued=false;
+    mountInterfaceEntry();
+    mountIdentity();
+    const host=byId("bxh-management-v2-nav");
+    if(host!==lastV2Host){
+      lastV2Host=host;
+      applyPreference();
+    }
+  }
+  const observer=new MutationObserver(()=>{
+    if(refreshQueued)return;
+    refreshQueued=true;
+    queueMicrotask(refreshDynamicMounts);
+  });
+  observer.observe(document.documentElement,{childList:true,subtree:true});
+
   global.addEventListener("bxh:interface-change",applyPreference);
   global.addEventListener("bxh:profile-updated",mountIdentity);
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else queueMicrotask(boot);
