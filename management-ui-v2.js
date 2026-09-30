@@ -18,7 +18,17 @@
     operations:"抽獎與維護",history:"賽事紀錄",version:"版本更新"
   };
   function groupForTab(tab){return GROUPS.find(g=>g.tabs.includes(tab))||GROUPS[0];}
-  function resolveActiveGroup(activeTab,visibleTabKeys){\n    const groups=visibleGroups(visibleTabKeys);\n    const direct=groups.find(g=>g.tabs.includes(activeTab));\n    return direct||groups[0]||null;\n  }\n  function firstVisibleTab(groupId,visibleTabKeys){\n    const allowed=new Set(visibleTabKeys||[]);\n    const group=GROUPS.find(g=>g.id===groupId);\n    return group ? (group.tabs.find(t=>allowed.has(t))||null) : null;\n  }\n  function visibleGroups(visibleTabKeys){
+  function resolveActiveGroup(activeTab,visibleTabKeys){
+    const groups=visibleGroups(visibleTabKeys);
+    const direct=groups.find(g=>g.tabs.includes(activeTab));
+    return direct||groups[0]||null;
+  }
+  function firstVisibleTab(groupId,visibleTabKeys){
+    const allowed=new Set(visibleTabKeys||[]);
+    const group=GROUPS.find(g=>g.id===groupId);
+    return group ? (group.tabs.find(t=>allowed.has(t))||null) : null;
+  }
+  function visibleGroups(visibleTabKeys){
     const allowed=new Set(visibleTabKeys||[]);
     return GROUPS.map(g=>({...g,tabs:g.tabs.filter(t=>allowed.has(t))})).filter(g=>g.tabs.length);
   }
