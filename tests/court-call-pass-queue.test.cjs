@@ -23,7 +23,7 @@ vm.runInContext(
 
 const base=()=>({
   matches:[
-    {id:'pass',station:1,seq:0,isBye:false,completed:false,status:'pending',a:{},b:{},skippedAt:100,resumeQueuedAt:null,skipManualOnly:false,callPass:{waitFor:['m1']}},
+    {id:'pass',station:1,seq:0,isBye:false,completed:false,status:'pending',a:{},b:{},skippedAt:100,resumeQueuedAt:null,skipManualOnly:false,skipWaitFor:['m1'],callPass:{waitFor:['m1']}},
     {id:'m1',station:1,seq:1,isBye:false,completed:false,status:'ready',a:{},b:{}},
     {id:'m2',station:1,seq:2,isBye:false,completed:false,status:'ready',a:{},b:{}},
     {id:'other',station:2,seq:1,isBye:false,completed:false,status:'ready',a:{},b:{}}
