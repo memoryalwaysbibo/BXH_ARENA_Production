@@ -2,8 +2,8 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
-  testMatch: /player-tournament-deep\.e2e\.cjs/,
-  timeout: 120000,
+  testMatch: /(?:player-tournament-deep|admin-finals-order-deep|multi-court-dispatch-deep)\.e2e\.cjs/,
+  timeout: 150000,
   expect: { timeout: 20000 },
   fullyParallel: false,
   workers: 1,
