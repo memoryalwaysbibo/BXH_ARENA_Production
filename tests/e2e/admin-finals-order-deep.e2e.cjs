@@ -136,7 +136,7 @@ test('official single elimination enforces bronze before championship final', as
   expect(gated.finalStatus).toBe('pending');
   expect(gated.finalStartedAt).toBeFalsy();
   expect(Number(gated.bronzeSeq)).toBeLessThan(Number(gated.finalSeq));
-  await expect(page.getByText(/季殿 · 第3場/).first()).toBeVisible({timeout:20000});
+  await expect(page.locator('.ref-workstation-meta small').first()).toContainText('季殿',{timeout:20000});
 
   // Bronze / fourth-place match must finish before final is released.
   await winCurrentA(3);
@@ -162,7 +162,7 @@ test('official single elimination enforces bronze before championship final', as
   expect(released.fourthId).toBeTruthy();
   expect(released.currentMatchId).toBe(released.finalId);
   expect(['ready','in_progress']).toContain(released.finalStatus);
-  await expect(page.getByText(/冠亞 · 第4場/).first()).toBeVisible({timeout:20000});
+  await expect(page.locator('.ref-workstation-meta small').first()).toContainText('冠亞',{timeout:20000});
 
   // Championship final.
   await winCurrentA(4);
@@ -172,15 +172,28 @@ test('official single elimination enforces bronze before championship final', as
       state.archiveStatus==='completed';
   },null,{timeout:45000});
 
-  const completed=await page.evaluate(()=>({
-    championId:state.championId,
-    runnerUpId:state.runnerUpId,
-    thirdId:state.thirdId,
-    fourthId:state.fourthId,
-    archiveStatus:state.archiveStatus,
-    completedMatches:state.matches.filter(m=>m&&!m.isBye&&m.completed).length,
-    totalMatches:state.matches.filter(m=>m&&!m.isBye).length
-  }));
+  const completed=await page.evaluate(()=>{
+    const se=state.matches.filter(m=>m&&m.bracket==='SE'&&!m.isBye);
+    const finalRound=Math.max(...se.map(m=>Number(m.round)||0));
+    const final=se.find(m=>Number(m.round||0)===finalRound);
+    const bronze=state.matches.find(m=>m&&m.bracket==='BZ');
+    const name=id=>(state.players||[]).find(p=>p.id===id)?.name||'';
+    return {
+      championId:state.championId,
+      runnerUpId:state.runnerUpId,
+      thirdId:state.thirdId,
+      fourthId:state.fourthId,
+      championName:name(state.championId),
+      runnerUpName:name(state.runnerUpId),
+      thirdName:name(state.thirdId),
+      fourthName:name(state.fourthId),
+      finalId:final?.id||null,
+      bronzeId:bronze?.id||null,
+      archiveStatus:state.archiveStatus,
+      completedMatches:state.matches.filter(m=>m&&!m.isBye&&m.completed).length,
+      totalMatches:state.matches.filter(m=>m&&!m.isBye).length
+    };
+  });
 
   expect(completed.championId).toBeTruthy();
   expect(completed.runnerUpId).toBeTruthy();
@@ -189,5 +202,17 @@ test('official single elimination enforces bronze before championship final', as
   expect(completed.completedMatches).toBe(4);
   expect(completed.totalMatches).toBe(4);
   expect(completed.archiveStatus).toBe('completed');
+
+  // Data and rendered bracket must agree on all four placements.
+  await page.locator('[data-action="switch-tab"][data-tab="bracket"]').click();
+  const finalBox=page.locator(`.match-box[data-id="${completed.finalId}"]`);
+  const bronzeBox=page.locator(`.match-box[data-id="${completed.bronzeId}"]`);
+  await expect(finalBox).toBeVisible({timeout:20000});
+  await expect(bronzeBox).toBeVisible({timeout:20000});
+  await expect(finalBox.locator('.mb-row.winner')).toContainText(completed.championName);
+  await expect(finalBox).toContainText(completed.runnerUpName);
+  await expect(bronzeBox.locator('.mb-row.winner')).toContainText(completed.thirdName);
+  await expect(bronzeBox).toContainText(completed.fourthName);
+
   expect(externalFirebaseRequests).toEqual([]);
 });
