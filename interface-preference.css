@@ -1,0 +1,11 @@
+/* BXH ARENA — My Interface picker */
+.bxh-interface-picker{display:grid;gap:12px;padding:14px;border:1px solid var(--border,#2c2e33);border-radius:12px;background:var(--panel,#17181b)}
+.bxh-interface-picker__title{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.bxh-interface-picker__title small{color:var(--metal,#9a9ea6)}
+.bxh-interface-picker__options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bxh-interface-picker__options button{appearance:none;display:grid;gap:3px;text-align:left;padding:12px;border:1px solid var(--border,#2c2e33);border-radius:10px;background:var(--panel-2,#1e2023);color:var(--white,#f4f5f2)}
+.bxh-interface-picker__options button b{font-size:15px}
+.bxh-interface-picker__options button span{font-size:12px;color:var(--metal,#9a9ea6)}
+.bxh-interface-picker__options button[aria-checked="true"]{border-color:var(--neon,#e9ff2e);box-shadow:inset 0 0 0 1px var(--neon,#e9ff2e)}
+.bxh-interface-picker__options button[aria-checked="true"] b{color:var(--neon,#e9ff2e)}
+@media(max-width:430px){.bxh-interface-picker__options{grid-template-columns:1fr}}
