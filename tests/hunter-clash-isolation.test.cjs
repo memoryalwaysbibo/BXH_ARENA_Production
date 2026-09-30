@@ -27,3 +27,13 @@ test('Firebase predeploy hook unconditionally refuses publishing sandbox Functio
   const result=spawnSync(process.execPath,[path.resolve(__dirname,'../hunter-clash/emulator/preflight.cjs'),'--deny-deploy'],{env:{},encoding:'utf8'});
   assert.equal(result.status,1);assert.match(result.stderr,/sandbox-functions-cannot-deploy/);
 });
+const {assertSessionTarget}=require('../hunter-clash/emulator/seed-session.cjs');
+test('manual lab refuses production, credentials and absent emulator connections',()=>{
+  const db={projectId:PROJECT},auth={app:{options:{projectId:PROJECT}}};
+  const env={FIRESTORE_EMULATOR_HOST:'127.0.0.1:8180',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9098'};
+  assert.doesNotThrow(()=>assertSessionTarget(db,auth,env));
+  for(const patch of [{GCLOUD_PROJECT:'bxh-arena'},{GOOGLE_APPLICATION_CREDENTIALS:'credential.json'},
+    {FIRESTORE_EMULATOR_HOST:undefined},{FIREBASE_AUTH_EMULATOR_HOST:'remote:9098'}])
+    assert.throws(()=>assertSessionTarget(db,auth,{...env,...patch}));
+  assert.throws(()=>assertSessionTarget({projectId:'bxh-arena'},auth,env));
+});

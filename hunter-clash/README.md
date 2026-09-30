@@ -65,7 +65,7 @@ Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派
 認證限指定且非參賽的有效內部見證者；風險審查限指定且非參賽的有效管理者，必須填理由並綁定結果版本。此角色配置是 sandbox 測試契約，尚未定為正式營運政策。
 認證通過仍維持 risk hold，人工放行才可結算；爭議結果不得放行，已結算結果不得再改審查。重送共用交易收據，並發審查只接受一個預期版本。
 已完成模擬器 HTTP/callable 與客戶端 SDK 驗證；正式 IAM 與玩家正式入口尚未完成；內部本機介面已通過瀏覽器測試。
-本機測試：25 項契約、傳輸防護與既有回歸 + 34 項真正 Functions／Auth／Firestore 與瀏覽器測試，共 59 項通過。
+本機測試：26 項契約、傳輸／隔離防護與既有回歸 + 38 項真正 Functions／Auth／Firestore、瀏覽器與 lab 測試，共 64 項通過。
 包含兩端同時提交只接受一個版本、8 路不同 requestId 結算只入帳一次、重送一致性及失敗回滾。
 這些是 demo 範圍證據，不能把 checkpoint 的正式／端到端驗收欄位改成完整 PASS。
 
@@ -92,3 +92,11 @@ getChallenge 在伺服器交易中檢查有效內部角色、入口與當場指�
 自動測試會啟動本機操作頁、建立測試身分與挑戰、跑完後清理及關閉頁面伺服器。手動啟動頁面可用 `node hunter-clash/frontend/serve.cjs`，需另啟 demo Auth／Functions／Firestore，並事先準備受指派的 sandbox 帳號與挑戰。
 已執行五項真實 Chromium 390px 手機視窗測試：參賽／見證／管理者完整流程、结算回應遺失後原請求重送、取消與撤權、舊畫面競爭提交與讀取欄位白名單、已確認結算但刷新失敗。已查看中文字型完整的手機截圖並確認無橫向溢出。
 這是自動化本機證據，尚未等同工作人員現場實戰、正式 IAM、部署核對或公開入口驗收；internalBeta 與正式 entryWired 維持 NOT RUN / false。
+
+
+## 可重現的臨時實驗室與部署核對
+
+在 emulator 目錄執行 `npm run lab`，可同時啟動三種 demo 模擬器、本機操作頁、四個臨時測試身分與全新挑戰。每次產生獨立 ID，拒絕改開已關閉的 runtime；Firestore 初始化批次失敗時只清理此次 Auth 使用者。已實際啟動並讀取操作頁，另通過建立、登入、指派讀取、不覆寫既有資料及失敗回滾測試。
+完整手動操作與待測標準見 INTERNAL_BETA.md。這仍是本機準備，不表示已取得遠端人員實戰或獨立專案的部署證據。
+部署核對快照見 deployment-audit.json：目前候選 run 的 Functions／Rules 仍 skipped，沒有找到該工作流的 workflow_dispatch 執行；個別 playerCardService、HUNTER LOOP 等部署步驟成功只代表各自 scope，不證明 HC 的整包來源與現行 Rules 一致。
+尚缺直接 GCP runtime／Rules release 核對、獨立測試專案與人員現場驗收。此快照不得當成 backendReferenceIsLiveVerified 或完整內部實戰 PASS。

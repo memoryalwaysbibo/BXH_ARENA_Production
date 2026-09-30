@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "test": "node run-tests.cjs"
+    "test": "node run-tests.cjs",
+    "lab": "node run-lab.cjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

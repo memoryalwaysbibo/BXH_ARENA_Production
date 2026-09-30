@@ -30,9 +30,9 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 59,
+    "tests": 64,
     "result": "PASS",
-    "scope": "25 contracts/transport guards/legacy regressions plus 34 demo Functions/Auth/Firestore and Chromium browser tests; no production deployment"
+    "scope": "26 contracts/transport/isolation/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
@@ -54,7 +54,10 @@
     "sandboxBrowserWorkflow": "PASS",
     "sandboxLostResponseReplay": "PASS",
     "sandboxMobileLayout": "PASS",
-    "supervisedStaffInternalBeta": "NOT RUN"
+    "supervisedStaffInternalBeta": "NOT RUN",
+    "sandboxManualLabSeed": "PASS",
+    "sandboxSeedRollback": "PASS",
+    "sandboxManualLabStartup": "PASS"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
@@ -64,5 +67,11 @@
     "authHost": "127.0.0.1:9098",
     "functionsHost": "127.0.0.1:5003"
   },
-  "sandboxUiWired": true
+  "sandboxUiWired": true,
+  "deploymentAuditFile": "deployment-audit.json",
+  "blockingDependencies": [
+    "Direct GCP runtime/version and Rules release reconciliation unavailable",
+    "Dedicated isolated Firebase test project not configured",
+    "Supervised staff internal beta not executed"
+  ]
 }
