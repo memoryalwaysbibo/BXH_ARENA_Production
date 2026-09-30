@@ -9,6 +9,8 @@ function assertIsolated(env) {
   }
   if (env.FIRESTORE_EMULATOR_HOST && env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8180')
     throw Error('unsafe-emulator-host');
+  if (env.FIREBASE_AUTH_EMULATOR_HOST && env.FIREBASE_AUTH_EMULATOR_HOST !== '127.0.0.1:9098')
+    throw Error('unsafe-auth-emulator-host');
   return PROJECT;
 }
 if (require.main === module) {

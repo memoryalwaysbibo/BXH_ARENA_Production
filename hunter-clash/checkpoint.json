@@ -18,9 +18,9 @@
   },
   "next": [
     "Reconcile actually deployed Functions and Rules; candidate validation run skipped deployment",
-    "Implement isolated server service and trusted identity checks",
-    "Verify request replay and concurrent settlement in emulator",
-    "Connect internal-only frontend after service validation"
+    "Build actual challenge certification/risk workflow; current verified records are test fixtures",
+    "Wrap sandbox service in callable interface and verify transport/auth boundary",
+    "Connect internal-only frontend after end-to-end service validation"
   ],
   "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
   "backendCandidateValidation": {
@@ -31,20 +31,26 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 27,
+    "tests": 38,
     "result": "PASS",
-    "scope": "21 contracts/legacy regressions plus 6 isolated Firestore Rules tests; no production writes or server settlement"
+    "scope": "21 contracts/legacy regressions plus 17 real demo Auth/Firestore Rules and transaction tests; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
     "trustedFunctionsAuthorization": "NOT RUN",
-    "serverTransactionConcurrency": "NOT RUN",
-    "runtimeProvenance": "BLOCKED"
+    "serverTransactionConcurrency": "PASS (demo only)",
+    "runtimeProvenance": "BLOCKED",
+    "sandboxTokenAuthorization": "PASS",
+    "sandboxRequestReplay": "PASS",
+    "sandboxConcurrentSubmission": "PASS",
+    "sandboxIdempotentSettlement": "PASS",
+    "sandboxAtomicRollback": "PASS"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
     "host": "127.0.0.1:8180",
     "rulesAreProduction": false,
-    "javaVersion": 21
+    "javaVersion": 21,
+    "authHost": "127.0.0.1:9098"
   }
 }

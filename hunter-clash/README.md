@@ -53,3 +53,15 @@ Rules 僅允許有效且被指派的內部角色讀取 sandbox 挑戰，所有�
 這不證明正式 IAM、Functions 授權、伺服器交易、重送、並發結算或內部實戰已完成。
 後端候選 commit `462287fdb86f6df6b71a0966c25405ca925fcdc7` 的 run `36668868791` 僅驗證成功，部署步驟均 skipped。
 發布檢查繼續拒絕缺少部署／線上核對證據的發布。
+
+## Sandbox 交易服務
+
+`server/sandbox-service.cjs` 僅能在 demo-hunter-clash 的 Auth／Firestore 模擬器使用，沒有 Functions 匯出或正式寫入 adapter。
+Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派從資料庫讀取，忽略客戶端角色宣稱。
+提交與結算以 requestId／內容指紋、revision 及 Firestore 交易處理。結算帳本、稽核、兩名玩家的 hcSandboxStats 與狀態同時提交；失敗時全部回滾。
+只記錄 sandbox 比賽次數與勝場，不寫入既有 Hunter 生涯、XP、天梯、信箱或獎勵。
+認證及風險放行必須綁定同一結果版本，認證者必須有效、受指派且非參賽者。
+目前認證完畢的結果由測試 fixture 建立；實際認證／風險流程、HTTP/callable、正式 IAM 與玩家介面尚未實裝。
+本機測試：21 項契約及既有回歸 + 17 項真正 Auth／Firestore 模擬器測試，共 38 項通過。
+包含兩端同時提交只接受一個版本、8 路不同 requestId 結算只入帳一次、重送一致性及失敗回滾。
+這些是 demo 範圍證據，不能把 checkpoint 的正式／端到端驗收欄位改成完整 PASS。
