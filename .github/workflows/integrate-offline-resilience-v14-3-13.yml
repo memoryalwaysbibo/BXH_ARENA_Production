@@ -1,0 +1,93 @@
+name: Integrate Offline Resilience v14.3.13
+on:
+  push:
+    branches: [offline-resilience-v14-3-13]
+    paths: ['.github/workflows/integrate-offline-resilience-v14-3-13.yml']
+permissions: { contents: write }
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: offline-resilience-v14-3-13, fetch-depth: 0 }
+      - name: Apply validated offline patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+          p=Path("index.html"); s=p.read_text()
+          if 'offline-resilience.js?v=20260930-offline-v2' in s:
+              raise SystemExit("already integrated")
+          # Version anchors
+          s=s.replace('<meta name="bxh-build" content="20260930.3">','<meta name="bxh-build" content="20260930.4">',1)
+          s=s.replace('var CURRENT_BUILD="20260930.3";','var CURRENT_BUILD="20260930.4";',1)
+          s=s.replace('const APP_VERSION = "v14.3.12";','const APP_VERSION = "v14.3.13";',1)
+          # Queue status state
+          anchor='let cloudTestResult = null;'
+          if anchor not in s: raise SystemExit("cloud status anchor missing")
+          s=s.replace(anchor,anchor+'\nlet offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};',1)
+          # Insert queue helper before guarded confirmation.
+          anchor='async function confirmResultWithCloudGuard(matchId){'
+          if anchor not in s: raise SystemExit("confirm guard anchor missing")
+          helper=r'''async function queueOfflineMatchConfirmation(matchId,mode,selectedWinnerId){
+            const m=getMatch(matchId);if(!m||!state.cloudCode||!window.BXHOfflineQueue)return false;
+            const ref=currentRefereeIdentity(),actor=ref.name||adminDisplayName||(userProfile&&userProfile.email)||"admin";
+            const ev=mode==="quick_decision"?evaluateQuickDecision(m,selectedWinnerId):evaluateMatchCompletion(m);if(!ev.ok)return false;
+            await window.BXHOfflineQueue.enqueue({tournamentCode:String(state.cloudCode).toUpperCase(),matchId:m.id,station:Number(m.station||0),dispatchRevision:m.dispatchRevision||0,mode:mode||"score",selectedWinnerId:ev.winnerId,playerAId:m.a&&m.a.playerId||null,playerBId:m.b&&m.b.playerId||null,scoreA:m.scoreA,scoreB:m.scoreB,log:Array.isArray(m.log)?JSON.parse(JSON.stringify(m.log)):[],faultActions:Array.isArray(m.faultActions)?JSON.parse(JSON.stringify(m.faultActions)):[],actorUid:ref.uid||null,actorName:actor,auditMeta:{recordDuty:ref.isStaff,uid:ref.uid,matchId:m.id,tournamentName:(state.meta&&state.meta.name)||"",station:Number(m.station||0),roundLabel:refereeStageLabel(m),playerA:m.a?playerName(m.a.playerId):"",playerB:m.b?playerName(m.b.playerId):"",winnerName:playerName(ev.winnerId),resultMethod:mode==="quick_decision"?"quick_decision":"score",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"}});
+            if(mode==="quick_decision")applyQuickDecisionFields(m,ev,actor);else applyMatchCompletionFields(m,ev,actor);
+            m.offlinePendingSync=true;m.offlineOperationQueuedAt=Date.now();rebuildPropagation();saveRecord(cloneStateForSave(state)).catch(()=>false);render();showToast("目前離線：比賽結果已安全暫存，恢復網路後會自動驗證並同步雲端。",true);return true;
+          }
+
+          '''
+          s=s.replace(anchor,helper+anchor,1)
+          # Standard score offline branch
+          needle='if(!(state.cloudCode && cloudAvailable() && window.cloudSync.confirmMatchTransaction)){ return confirmResult(matchId); }'
+          if needle not in s: raise SystemExit("standard tx anchor missing")
+          s=s.replace(needle,'if(state.cloudCode && typeof navigator!=="undefined" && navigator.onLine===false) return await queueOfflineMatchConfirmation(matchId,"score",localEval.winnerId);\n  '+needle,1)
+          # Replay adapter near Firebase init tail.
+          anchor='  tryInitFirebase().then((ok)=>{'
+          if anchor not in s: raise SystemExit("firebase ready anchor missing")
+          adapter=r'''  window.BXHCommitOfflineMatch=async function(op){
+            if(!op||!op.tournamentCode||!window.cloudSync||!window.cloudSync.confirmMatchTransaction)return {ok:false,reason:"cloud-unavailable"};
+            if(currentAuthUid()!==op.actorUid)return {ok:false,reason:"permission-denied"};
+            return await window.cloudSync.confirmMatchTransaction(op.tournamentCode,(remoteState)=>{
+              rebuildPropagationForState(remoteState);
+              const m=(remoteState.matches||[]).find(x=>x.id===op.matchId);if(!m)return{ok:false,reason:"not-found"};
+              if(m.completed||m.winnerId)return{ok:false,reason:"already-completed"};
+              if(Number(m.station||0)!==Number(op.station||0))return{ok:false,reason:"station-mismatch"};
+              if((m.dispatchRevision||0)!==(op.dispatchRevision||0))return{ok:false,reason:"dispatch-stale"};
+              if(!m.a||!m.b||m.a.playerId!==op.playerAId||m.b.playerId!==op.playerBId)return{ok:false,reason:"player-mismatch"};
+              let ev;
+              if(op.mode==="quick_decision")ev=evaluateQuickDecision(m,op.selectedWinnerId);
+              else{m.scoreA=op.scoreA;m.scoreB=op.scoreB;m.log=Array.isArray(op.log)?op.log:[];m.faultActions=Array.isArray(op.faultActions)?op.faultActions:[];ev=evaluateMatchCompletion(m);}
+              if(!ev.ok||ev.winnerId!==op.selectedWinnerId)return{ok:false,reason:(ev&&ev.reason)||"validation-failed"};
+              if(op.mode==="quick_decision")applyQuickDecisionFields(m,ev,op.actorName);else applyMatchCompletionFields(m,ev,op.actorName);
+              delete m.offlinePendingSync;delete m.offlineOperationQueuedAt;rebuildPropagationForState(remoteState);return{ok:true,state:remoteState};
+            },op.auditMeta||{});
+          };
+          window.addEventListener("bxh-offline-operation-synced",(e)=>{try{const d=e.detail||{},op=d.op||{},r=d.result||{};if(state.cloudCode&&String(state.cloudCode).toUpperCase()===String(op.tournamentCode||"").toUpperCase()&&r.state){const keep=state.cloudCode;state=Object.assign(defaultState(r.state.id),r.state);state.cloudCode=keep;rebuildPropagation();saveRecord(state);cloudStatus="connected";cloudLastSyncAt=Date.now();render();}showToast("離線賽事資料已完成雲端同步");}catch(err){}});
+          window.addEventListener("bxh-offline-operation-conflict",()=>{cloudStatus="error";render();showToast("離線資料與雲端賽事發生衝突，系統已停止自動覆寫，請由管理員確認。",true);});
+          window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";render();showToast("離線資料多次同步失敗，已停止自動重試並保留紀錄，請確認網路後再處理。",true);});
+          window.addEventListener("bxh-offline-queue-change",(e)=>{offlineQueueStatus=Object.assign({pending:0,conflict:0,failed:0,total:0},(e&&e.detail)||{});render();});
+
+          '''
+          s=s.replace(anchor,adapter+anchor,1)
+          # Load module before other tail modules.
+          anchor='<script src="activity-points-ui.js'
+          if anchor not in s: raise SystemExit("tail script anchor missing")
+          s=s.replace(anchor,'<script src="offline-resilience.js?v=20260930-offline-v2"></script>\n'+anchor,1)
+          p.write_text(s)
+          v=Path("version.json"); d=json.loads(v.read_text()); d["build"]="20260930.4"; d["version"]="v14.3.13"; d["updatedAt"]="2026-09-30T10:00:00+08:00"; v.write_text(json.dumps(d,ensure_ascii=False,indent=2)+"\n")
+      - name: Verify production frontend
+        run: |
+          grep -Fq 'offline-resilience.js?v=20260930-offline-v2' index.html
+          grep -Fq 'window.BXHCommitOfflineMatch' index.html
+          grep -Fq 'queueOfflineMatchConfirmation' index.html
+          node scripts/verify-production-frontend.cjs
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html version.json offline-resilience.js
+          git commit -m "feat: integrate offline resilience v14.3.13"
+          git push origin HEAD:offline-resilience-v14-3-13
