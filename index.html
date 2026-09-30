@@ -30051,6 +30051,7 @@ window.cloudAuth = {
         const u=us.data()||{};
         if(!["staff","admin","super_admin","tester"].includes(u.role)||u.active===false) return {ok:false};
         await fx.setDoc(fx.doc(dbHandle,"staffDirectory",uid),{uid,displayName:u.displayName||u.realName||u.email||uid,role:u.role,active:u.active!==false,updatedAt:Date.now()},{merge:true});
+        invalidateStaffDirectoryCache();
         return {ok:true};
       }catch(e){ return {ok:false}; }
     },
