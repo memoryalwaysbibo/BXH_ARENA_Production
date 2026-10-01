@@ -30,9 +30,9 @@
     "provesDeployment": false
   },
   "lastLocalVerification": {
-    "tests": 78,
+    "tests": 81,
     "result": "PASS",
-    "scope": "40 contracts/transport/isolation/runtime-audit/rules-comparison/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; audit/comparison tests use synthetic responses; no production deployment"
+    "scope": "43 contracts/transport/isolation/cloud-test-bundle/runtime-audit/rules-comparison/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; no production deployment"
   },
   "partialEvidence": {
     "isolatedFirestoreRules": "PASS",
@@ -145,6 +145,9 @@
     "productionDataAllowed": false,
     "publicEntryEnabled": false,
     "deploymentAuthorized": false,
-    "status": "READY_FOR_PROJECT_CONFIGURATION"
+    "status": "READY_FOR_PROJECT_CONFIGURATION",
+    "validationCommit": "7e1850879eb846f61226300f4c5f8cf07eea833f",
+    "foundationPullRequestRun": 36906438694,
+    "productionFrontendRun": 36906438766
   }
 }
