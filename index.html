@@ -23373,7 +23373,7 @@ let entranceThemeAccountUid=(()=>{
 let accountThemeOpen=false;
 let accountInterfaceOpen=false;
 const BXH_MANAGEMENT_UI_PREF_KEY="bxh.management.ui.version.v1";
-function managementUiPreference(){try{return localStorage.getItem(BXH_MANAGEMENT_UI_PREF_KEY)==="v2"?"v2":"v1";}catch(e){return "v1";}}
+function managementUiPreference(){try{return window.BXH_INTERFACE_PREFERENCE?.get?.()||(localStorage.getItem(BXH_MANAGEMENT_UI_PREF_KEY)==="v2"?"v2":"v1");}catch(e){return "v1";}}
 function restoreAccountInterfaceTheme(uid,profile){
   let saved=null;
   try{saved=localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid);}catch(e){}
@@ -26580,7 +26580,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="toggle-account-interface"){ accountInterfaceOpen=!accountInterfaceOpen; accountThemeOpen=false; render(); return; }
-  if(action==="set-management-interface"){ const v=target.getAttribute("data-version"); if(v==="v1"||v==="v2"){try{localStorage.setItem(BXH_MANAGEMENT_UI_PREF_KEY,v);}catch(e){} accountInterfaceOpen=false; showToast(v==="v2"?"已切換 V2 新版管理介面":"已使用 V1 經典管理介面"); render();} return; }
+  if(action==="set-management-interface"){ const v=target.getAttribute("data-version"); if(v==="v1"||v==="v2"){try{localStorage.setItem(BXH_MANAGEMENT_UI_PREF_KEY,v);window.BXH_INTERFACE_PREFERENCE?.set?.(v);}catch(e){} accountInterfaceOpen=false; showToast(v==="v2"?"已切換 V2 新版管理介面":"已使用 V1 經典管理介面"); render();} return; }
   if(action==="toggle-account-theme"){
     accountThemeOpen=!accountThemeOpen;
     render();
