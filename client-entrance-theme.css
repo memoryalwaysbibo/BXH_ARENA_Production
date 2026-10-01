@@ -4239,3 +4239,25 @@ button.btn-primary,
   .celebration-overlay .hoc-rank-name{font-size:clamp(20px,6.2vw,27px)!important;padding-left:14px!important}
 }
 /* ==== /HOC settlement layout v1 ==== */
+
+
+/* ==== DEPLOY-05A mobile bracket visual hotfix ====
+   Reserve a presentation-only lane for the champion card so compact / 3-player
+   brackets never let the absolute champion card cover the live final node. */
+#board-canvas .se-bracket-outer:has(.se-finals-champion-card){
+  padding-right:208px;
+  box-sizing:content-box;
+}
+#board-canvas .se-finals-champion-card{
+  left:auto !important;
+  right:8px !important;
+}
+@media(max-width:640px){
+  #board-canvas .se-bracket-outer:has(.se-finals-champion-card){
+    padding-right:188px;
+  }
+  #board-canvas .se-finals-champion-card{
+    right:4px !important;
+  }
+}
+/* ==== /DEPLOY-05A mobile bracket visual hotfix ==== */
