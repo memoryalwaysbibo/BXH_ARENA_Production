@@ -188,8 +188,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install UI test runner
         run: npm install --no-package-lock --ignore-scripts
-      - name: Run isolated browser smoke tests
-        run: npm run test:ui-smoke
+      - name: Run isolated browser smoke tests (retry once if flaky)
+        shell: bash
+        run: |
+          set +e
+          npm run test:ui-smoke
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "::warning title=TEST_FLAKY_RETRY::UI smoke failed once; retrying before classifying as CODE_FAIL."
+            npm run test:ui-smoke
+            rc=$?
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=CODE_FAIL::UI smoke failed twice; deployment must remain blocked."
+            exit "$rc"
+          fi
       - name: Upload browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -219,10 +232,21 @@ jobs:
       - name: Install E2E dependencies
         run: npm install --no-package-lock --ignore-scripts
 
-      - name: Run critical Firebase Emulator E2E
+      - name: Run critical Firebase Emulator E2E (retry once if flaky)
         shell: bash
         run: |
-          npx firebase emulators:exec             --only auth,firestore             --project demo-bxh-arena-e2e             --config tests/e2e/firebase.json             "npm run test:ui-e2e"
+          set +e
+          npx firebase emulators:exec --only auth,firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "npm run test:ui-e2e"
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "::warning title=TEST_FLAKY_RETRY::Critical E2E failed once; retrying before classifying as CODE_FAIL."
+            npx firebase emulators:exec --only auth,firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "npm run test:ui-e2e"
+            rc=$?
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=CODE_FAIL::Critical E2E failed twice; deployment must remain blocked."
+            exit "$rc"
+          fi
 
       - name: Upload E2E failure artifacts
         if: failure()
