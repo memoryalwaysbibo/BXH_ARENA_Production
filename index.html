@@ -19419,7 +19419,7 @@ function mailboxButtonHtml(){
 }
 function renderMailboxPage(){
   const c=mailboxContext(),messages=c.messages||[],selected=messages.find(m=>m.id===c.selectedId)||null;
-  return `<section class="panel"><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
+  return `<section class="panel"><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row">${isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="mailbox-self-card-test" ${c.busy?"disabled":""}>發送測試卡給我</button>`:""}<button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
     <p class="hint">未讀 ${c.unreadCount} 封｜系統通知、活動及中獎訊息會集中在這裡。</p>
     ${c.error?`<div class="auth-error" role="alert">${esc(c.error)}</div>`:''}
     ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(selected.body||'')}</div>${window.BXHTitleRewardUI?.card(selected,c.busy)||''}${window.BXHCardRewardUI?.card(selected,c.busy)||''}${Array.isArray(selected.attachments)&&selected.attachments.length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${selected.attachments.map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}${selected.eventCode&&selected.invitationStatus==='invited'?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="accept">接受工作人員（活動）邀請</button><button class="btn btn-ghost" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="reject">拒絕</button></div>`:selected.eventCode&&selected.invitationStatus?`<div class="banner" style="margin-top:12px"><span>邀請狀態：${esc(({accepted:'已接受',rejected:'已拒絕',revoked:'已撤銷'})[selected.invitationStatus]||selected.invitationStatus)}</span></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
@@ -19481,6 +19481,17 @@ async function handleMailbox(action,target){
       }).catch(()=>{});
     }
     if(message&&!message.readAt)handleMailbox('mailbox-toggle-read',target);return;
+  }
+  if(action==='mailbox-self-card-test'){
+    c.busy=true;c.error='';render();
+    try{
+      const result=await window.engagementService.issueSelfCardRewardE2ETest();
+      if(!result?.ok)throw Error('test-card-failed');
+      c.messages=null;c.selectedId='';c.busy=false;
+      await loadMailbox(true);showToast(result.replayed?'測試卡已存在':'測試卡已送達站內信');
+    }catch(error){c.error=mailboxError(error);}
+    finally{c.busy=false;render();}
+    return;
   }
   if(action==='mailbox-card-reward'){
     const messageId=target.getAttribute('data-message-id')||'';
@@ -30187,6 +30198,7 @@ init().then(()=>{
     async claimTitleReward(payload){ return callEngagementFunction("claimTitleReward",payload,30000); },
     async claimCardReward(payload){ return callEngagementFunction("claimCardReward",payload,30000); },
     async getCardRewardMessage(payload){ return callEngagementFunction("getCardRewardMessage",payload,30000); },
+    async issueSelfCardRewardE2ETest(){ return callEngagementFunction("issueSelfCardRewardE2ETest",{},30000); },
     async revokeTitle(payload){ return callEngagementFunction("revokeTitle",payload); },
     async getAdminOverview(){ return callEngagementFunction("getEngagementAdminOverview",{}); },
     async runBackfill(payload){ return callEngagementFunction("runTitleBackfill",payload,ENGAGEMENT_BACKFILL_TIMEOUT_MS); },
