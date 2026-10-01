@@ -13448,6 +13448,20 @@ function rebuildPropagationSingle(){
     }
     state.thirdId = null; state.fourthId = null;
   }
+
+  // Three-player single elimination is a special, valid BYE bracket:
+  // one player receives the BYE, the other two play the semifinal/play-in,
+  // and that first real match loser is the sole third-place finisher.
+  // Do this in the authoritative propagation layer so archive, history,
+  // celebration and cloud snapshots all receive the same placement.
+  const eligibleThree=tournamentEligiblePlayers(state.players,state.meta,state.matches);
+  if(!state.meta.bronzeMatch && eligibleThree.length===3 && state.championId && state.runnerUpId){
+    const remaining=eligibleThree.filter(p=>p&&p.id!==state.championId&&p.id!==state.runnerUpId);
+    if(remaining.length===1){
+      state.thirdId=remaining[0].id;
+      state.fourthId=null;
+    }
+  }
 }
 
 
