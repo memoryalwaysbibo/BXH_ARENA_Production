@@ -19,7 +19,7 @@
   "next": [
     "Obtain trusted deployed source package or immutable source manifest for the 35 currently observed Functions builds; Cloud Build sourceProvenance supplied no resolved commits or source hashes",
     "Verify production signature/revocation, IAM and App Check when isolated deployed runtime is available",
-    "Run supervised staff internal beta on an isolated deployed environment; browser automation is partial evidence only"
+    "Provide a dedicated bxh-hc-test-* Firebase project ID, then configure minimum-permission deployment and run supervised staff internal beta"
   ],
   "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
   "backendCandidateValidation": {
@@ -64,6 +64,7 @@
     "cloudMetadataReadAuthorization": "PASS (existing OIDC, Functions list and Rules get only)",
     "liveRulesSourceContent": "PASS (snapshot content matches repository blob; not complete deployment provenance)",
     "cloudBuildMetadataReadAuthorization": "PASS (35 fixed-project Cloud Build GETs; no IAM change)"
+    ,"cloudTestCandidateBundle": "PASS (deterministic candidate bundle only; no project, IAM or deployment)"
   },
   "emulator": {
     "projectId": "demo-hunter-clash",
@@ -133,4 +134,17 @@
     "updatesReleaseGate": false
   },
   "latestLiveAuditDirectory": "audit/20260930-36756766360"
+  ,"cloudTestBundle": {
+    "builder": "prepare-cloud-test-bundle.cjs",
+    "projectPattern": "bxh-hc-test-*",
+    "region": "asia-east1",
+    "codebase": "hc-isolated-test",
+    "functionTarget": "hcSandboxCommand",
+    "appCheckEnforced": true,
+    "privateInvoker": true,
+    "productionDataAllowed": false,
+    "publicEntryEnabled": false,
+    "deploymentAuthorized": false,
+    "status": "READY_FOR_PROJECT_CONFIGURATION"
+  }
 }

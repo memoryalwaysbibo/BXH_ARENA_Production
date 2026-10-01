@@ -116,3 +116,11 @@ getChallenge 在伺服器交易中檢查有效內部角色、入口與當場指�
 ## 首次真實雲端核對
 
 唯讀工具 PR #88 已經使用者授權合併並執行 run 36696307510。完整採集到 96 個第二代 Functions、36 個 build 與現行 Rules release；原候選 Rules 不符，因此 job 正確失敗。現行 Rules 已找到相同來源內容；完整 Functions 來源、獨立專案與正式 HC 授權仍待驗收。詳見 [ARCHITECTURE_STATUS.md](ARCHITECTURE_STATUS.md) 與保存的 audit 報告。HC 功能未合併或部署，正式入口關閉。
+
+## 獨立雲端測試候選包
+
+`prepare-cloud-test-bundle.cjs` 把 HC callable、服務、契約、Rules 與固定依賴整理成可重現候選包。只接受 `bxh-hc-test-*` 專案和完整 40 字元來源 commit；正式站、Beta、demo 或任意其他專案都會在產包前拒絕。輸出目錄必須是新建的 `hc-cloud-test-*`，失敗時清除該次未完成輸出。
+
+產物固定 `asia-east1`、codebase `hc-isolated-test`、函式 `hcSandboxCommand`，App Check 強制啟用，invoker 保持 private；服務啟動時再次比對實際 Admin SDK project 與候選包內固定 project。manifest 記錄所有檔案的 bytes／SHA-256、來源 repository／commit 與整體 tree SHA-256，並固定 `publicEntryEnabled: false`、`productionDataAllowed: false`、`deploymentAuthorized: false`。
+
+這是可部署性準備，不會建立 Firebase 專案、不會取得 IAM、不會執行 deploy，也不改正式入口。取得專用 project ID 後，仍須另外建立最小權限 OIDC／App Check 測試設定並經明確部署授權，才可進入真實雲端驗收。

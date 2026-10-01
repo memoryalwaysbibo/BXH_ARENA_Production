@@ -1,6 +1,6 @@
 # HC-00 架構施工與驗收
 
-施工狀態：IN_PROGRESS。2026-09-30 對使用者回報的約 80% 是工程估算，沒有完整工時權重；不由測試數或發布 gate 自動換算，也不代表雲端已驗收。
+施工狀態：IN_PROGRESS。2026-10-02 工程估算約 82%；增加的 2% 來自獨立雲端測試候選包與雙重專案邊界，不由測試數或發布 gate 自動換算，也不代表雲端已驗收。
 
 ## 本階段工項
 
@@ -47,3 +47,11 @@ HC-05 工作人員實戰及 HC-06 正式發布另行驗收。發布清單目前 
 Cloud Build 報告的 sourceProvenance 沒有已解析 commit、儲存來源或來源雜湊，35 筆 COLLECTED 不代表任何一筆來源已驗收。下一步需要可信的已部署來源包或不可變部署來源清單；不能以 build SUCCESS、更新時間或合成測試補成來源證據。另仍缺專用 Firebase 測試專案與正式授權／工作人員驗收。
 
 完整證據見 [audit/20260930-36756766360](audit/20260930-36756766360)，ZIP digest、報告連結 SHA-256 與四檔白名單已核對。HC-00 工程估算仍約 80%；正式發布 gate 與 backendReferenceIsLiveVerified／deployed／entryWired 均未放行。
+
+## 2026-10-02 獨立雲端測試包準備
+
+新增 `server/runtime-boundary.cjs` 與 `prepare-cloud-test-bundle.cjs`。既有 demo emulator 行為保持不變；遠端模式只接受候選包內固定且符合 `bxh-hc-test-*` 的實際專案。正式站、Beta、demo、任意專案、專案不一致、模擬器環境混用、可變來源 ref 與既有輸出目錄皆拒絕。
+
+候選包固定 App Check、private invoker、asia-east1、獨立 codebase，並產生逐檔 SHA-256 與來源 commit manifest；manifest 明確維持未授權部署、不可使用正式資料、不可公開入口。三項新增邊界／產包測試通過，另以實際 bundle 執行 `npm ci` 與 Functions 語法檢查通過。
+
+此工項把下一個外部依賴收斂為「提供符合命名規則的專用 Firebase project ID」。尚未建立專案、設定 IAM、部署或執行遠端測試；工程估算調整為約 82%，發布 gate 不變。

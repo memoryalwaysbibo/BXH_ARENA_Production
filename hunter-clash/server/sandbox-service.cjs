@@ -1,7 +1,7 @@
 'use strict';
 // Sandbox-only transaction foundation. No Functions export or production adapter.
 const { createHash } = require('node:crypto');
-const { assertIsolated, PROJECT } = require('../emulator/preflight.cjs');
+const { assertSandboxRuntime } = require('./runtime-boundary.cjs');
 const { assertTransition, assertSettlement } = require('../contracts.cjs');
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function id(value) {
@@ -23,12 +23,8 @@ function validScore(score) {
   return score && Object.keys(score).every(key=>['a','b'].includes(key)) &&
     [score.a,score.b].every(v=>Number.isSafeInteger(v)&&v>=0&&v<=100) && score.a!==score.b;
 }
-function createSandboxService({ db, auth, serverTimestamp }, env = process.env) {
-  assertIsolated(env);
-  if (env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8180' ||
-      env.FIREBASE_AUTH_EMULATOR_HOST !== '127.0.0.1:9098' ||
-      db.projectId !== PROJECT || auth.app.options.projectId !== PROJECT)
-    throw Error('sandbox-service-only');
+function createSandboxService({ db, auth, serverTimestamp }, env = process.env, options = {}) {
+  assertSandboxRuntime(db, auth, env, options.expectedCloudProject);
   const ref = (name, value) => db.collection(name).doc(value);
   async function getChallenge(token,input) {
     if(!input || typeof input !== 'object' || Array.isArray(input) ||
