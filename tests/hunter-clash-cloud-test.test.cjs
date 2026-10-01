@@ -6,14 +6,14 @@ const os = require('node:os');
 const path = require('node:path');
 const { assertSandboxRuntime } = require('../hunter-clash/server/runtime-boundary.cjs');
 const { buildBundle } = require('../hunter-clash/prepare-cloud-test-bundle.cjs');
-const project = 'bxh-hc-test-acceptance';
+const project = 'bxh-hc-test';
 const handles = id => ({ db: { projectId: id }, auth: { app: { options: { projectId: id } } } });
 test('runtime boundary accepts only exact demo emulator or dedicated cloud test projects', () => {
   const demo = handles('demo-hunter-clash');
   assert.equal(assertSandboxRuntime(demo.db,demo.auth,{FUNCTIONS_EMULATOR:'true',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8180',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9098'}).mode,'emulator');
   const cloud = handles(project);
   assert.equal(assertSandboxRuntime(cloud.db,cloud.auth,{HC_RUNTIME_MODE:'isolated-cloud-test'},project).mode,'isolated-cloud-test');
-  for (const id of ['bxh-arena','bxh-arena-beta','demo-hunter-clash','random-project']) {
+  for (const id of ['bxh-arena','bxh-arena-beta','demo-hunter-clash','random-project','bxh-hc-test-other']) {
     const h=handles(id); assert.throws(()=>assertSandboxRuntime(h.db,h.auth,{HC_RUNTIME_MODE:'isolated-cloud-test'},id));
   }
   assert.throws(()=>assertSandboxRuntime(cloud.db,cloud.auth,{HC_RUNTIME_MODE:'isolated-cloud-test',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8180'},project));
@@ -35,7 +35,7 @@ test('bundle is deterministic, immutable-source identified, App Check enforced a
   } finally { fs.rmSync(parent,{recursive:true,force:true}); }
 });
 test('bundle builder rejects Production, Beta, demo, arbitrary projects and mutable source refs', () => {
-  for(const id of ['bxh-arena','bxh-arena-beta','demo-hunter-clash','random-project'])
+  for(const id of ['bxh-arena','bxh-arena-beta','demo-hunter-clash','random-project','bxh-hc-test-other'])
     assert.throws(()=>buildBundle({projectId:id,sourceCommit:'a'.repeat(40),output:'/tmp/hc-cloud-test-invalid'}),/invalid-cloud-test-project/);
   assert.throws(()=>buildBundle({projectId:project,sourceCommit:'main',output:'/tmp/hc-cloud-test-invalid'}),/invalid-source-commit/);
 });
