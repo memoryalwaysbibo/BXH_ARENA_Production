@@ -43,7 +43,14 @@
     const visible=Array.isArray(options.visibleTabs)?options.visibleTabs:[];host.innerHTML=renderRails(options.activeTab,visible);
     host.onclick=function(e){
       const group=e.target.closest('[data-management-v2-group]'),tab=e.target.closest('[data-management-v2-tab]');
-      if(group&&typeof options.onGroup==='function'){const t=firstVisibleTab(group.dataset.managementV2Group,visible);if(t)options.onGroup(t,group.dataset.managementV2Group);}
+      if(group&&typeof options.onGroup==='function'){
+        const groupId=group.dataset.managementV2Group;
+        const currentGroup=resolveActiveGroup(options.activeTab,visible);
+        // A one-item group (e.g. 排行) is already its destination when active.
+        // Re-clicking it must be a no-op instead of dispatching the same tab again.
+        if(currentGroup&&currentGroup.id===groupId)return;
+        const t=firstVisibleTab(groupId,visible);if(t)options.onGroup(t,groupId);
+      }
       else if(tab&&typeof options.onTab==='function')options.onTab(tab.dataset.managementV2Tab);
     };return true;
   }
