@@ -17,7 +17,7 @@ must(/renderTournamentRaffleRecord\(r,modes,statuses,locked\)/,'grouped prize hi
 must(/prizeIndex/,'prize-index aware history');
 const release=require('../version.json');
 mustContain(release.version,'release version');
-must(new RegExp(require('../version.json').build.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),'release build');
+mustContain(release.build,'release build');
 mustNot(/id="ops-title"/,'legacy single prize title field');
 mustNot(/id="ops-count"/,'legacy single winner-count field');
 console.log('PASS tournament operations multi-prize frontend');
