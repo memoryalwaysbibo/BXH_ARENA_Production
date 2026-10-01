@@ -179,7 +179,7 @@ jobs:
 
   ui_smoke:
     needs: classify
-    if: needs.classify.outputs.run_ui == 'true'
+    if: ${{ needs.classify.outputs.run_ui == 'true' }}
     name: UI Smoke - Desktop / iPhone / Android
     runs-on: ubuntu-latest
     container:
@@ -201,7 +201,7 @@ jobs:
 
   emulator_e2e:
     needs: classify
-    if: needs.classify.outputs.run_e2e == 'true'
+    if: ${{ needs.classify.outputs.run_e2e == 'true' }}
     name: Critical E2E - Player Signup / Community Room
     runs-on: ubuntu-latest
     container:
