@@ -1,19 +1,7 @@
-name: BXH ARENA Deep Emulator E2E
+name: BXH ARENA Nightly Full Regression
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'index.html'
-      - '.github/workflows/deep-emulator-e2e.yml'
-      - 'tests/e2e/player-tournament-deep.e2e.cjs'
-      - 'tests/e2e/admin-finals-order-deep.e2e.cjs'
-      - 'tests/e2e/multi-court-dispatch-deep.e2e.cjs'
-      - 'playwright.deep-e2e.config.cjs'
-      - 'tests/e2e/static-server.cjs'
-      - 'tests/e2e/firebase.json'
-      - 'tests/e2e/firestore.rules'
   schedule:
     - cron: '30 19 * * *'
 
@@ -21,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: bxh-arena-deep-emulator-e2e
+  group: bxh-arena-nightly-full-regression
   cancel-in-progress: true
 
 jobs:
