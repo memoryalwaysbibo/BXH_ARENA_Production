@@ -498,8 +498,9 @@ console.log('PASS Hunter Profile P6.7 permanent achievement awards');
 mustInclude('const HUNTER_OFFICIAL_LAUNCH_AT=Date.parse("2026-10-01T00:00:00+08:00");','Hunter official launch cutoff missing');
 mustInclude('const HUNTER_PRELAUNCH_RESET_AT=Date.parse("2026-09-30T23:58:00+08:00");','Hunter prelaunch reset boundary missing');
 mustInclude('return Date.now()<HUNTER_PRELAUNCH_RESET_AT||hunterRecordTimestamp(record)>=HUNTER_OFFICIAL_LAUNCH_AT;','Hunter test data must remain visible until the reset boundary');
-mustInclude('const sourceRecords=allSourceRecords.filter(hunterRecordIsOfficial);','Hunter official record filter missing');
-console.log('PASS Hunter 10/1 official launch boundary');
+mustInclude('const sourceRecords=allSourceRecords;','Hunter profile must preserve historical records');
+mustNot(/const sourceRecords=allSourceRecords\.filter\(hunterRecordIsOfficial\);/,'Hunter profile must not hide historical records');
+console.log('PASS Hunter historical profile preservation');
 
 must(/canArchive && phase!==["']idle["'][\s\S]*?data-action=["']archive-complete["'][\s\S]*?重新嘗試結算/, 'Stuck settlement phases must expose a manual retry action');
 mustInclude('若狀態長時間未更新，可使用「重新嘗試結算」安全續跑。','Settlement recovery guidance missing');
