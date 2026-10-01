@@ -13455,7 +13455,7 @@ function rebuildPropagationSingle(){
   // Do this in the authoritative propagation layer so archive, history,
   // celebration and cloud snapshots all receive the same placement.
   const eligibleThree=tournamentEligiblePlayers(state.players,state.meta,state.matches);
-  if(!state.meta.bronzeMatch && eligibleThree.length===3 && state.championId && state.runnerUpId){
+  if(eligibleThree.length===3 && state.championId && state.runnerUpId){
     const remaining=eligibleThree.filter(p=>p&&p.id!==state.championId&&p.id!==state.runnerUpId);
     if(remaining.length===1){
       state.thirdId=remaining[0].id;
