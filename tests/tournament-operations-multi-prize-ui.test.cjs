@@ -2,6 +2,7 @@
 const fs=require('node:fs');
 const src=fs.readFileSync('index.html','utf8');
 function must(pattern,label){if(!pattern.test(src))throw new Error('Missing '+label);}
+function mustContain(value,label){if(!src.includes(String(value)))throw new Error('Missing '+label);}
 function mustNot(pattern,label){if(pattern.test(src))throw new Error('Unexpected '+label);}
 must(/function tournamentOpsDefaultPrize\(\)/,'default prize helper');
 must(/function operationsDraftPrizes\(d\)/,'prize draft normalizer');
@@ -15,7 +16,7 @@ must(/合計最多 100 位得獎者/,'100 winner cap copy');
 must(/renderTournamentRaffleRecord\(r,modes,statuses,locked\)/,'grouped prize history renderer');
 must(/prizeIndex/,'prize-index aware history');
 const release=require('../version.json');
-must(new RegExp(release.version.replace(/[.*+?^${}()|[\]\\]/g,'\\must(src.includes(release.version),'release version');')),'release version');
+mustContain(release.version,'release version');
 must(new RegExp(require('../version.json').build.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),'release build');
 mustNot(/id="ops-title"/,'legacy single prize title field');
 mustNot(/id="ops-count"/,'legacy single winner-count field');
