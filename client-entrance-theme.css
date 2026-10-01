@@ -4290,3 +4290,13 @@ button.btn-primary,
   }
 }
 /* ==== /DEPLOY-05A pass 2 ==== */
+
+
+/* ==== DEPLOY-05A pass 3: keep finals stage label out of player rows ==== */
+#board-canvas .se-final-stage-col > .se-stage-tag-final{
+  top:2px !important;
+}
+#board-canvas .se-bronze-col > .se-stage-tag-bronze{
+  top:2px !important;
+}
+/* ==== /DEPLOY-05A pass 3 ==== */
