@@ -188,7 +188,9 @@ if(!ladderSecondaryUi.includes('ladderScoreMode==="career"?"careerPoints":"seaso
 if(!ladderSecondaryUi.includes('function ladderTierEmblemHtml(p)')) throw new Error('Ladder V2 tier emblem renderer missing');
 if(!ladderSecondaryUi.includes('class="ladder-player-block"')||!ladderSecondaryUi.includes('class="title-chip rarity-')) throw new Error('Ladder V2 player/title hierarchy missing');
 if(!ladderSecondaryUi.includes('grid-template-columns:64px minmax(0,1fr) 96px 78px')||!ladderSecondaryUi.includes('grid-template-columns:54px minmax(0,1fr) 78px 64px')) throw new Error('Ladder V2 responsive four-column grid missing');
-mustInclude('ladder-secondary-ui.js?v=14.2.55-badge-batch2','Ladder V2 cache bust missing');
+mustInclude('ladder-secondary-ui.js?v=14.3.15','Ladder V2 cache bust missing');
+mustInclude('fx.orderBy("createdAt","desc")','Ladder history must use server-side newest-first query');
+mustInclude('fx.limit(200)','Ladder history query must be bounded on mobile');
 console.log('PASS ladder ranking V2 season/career responsive UI');
 mustInclude('const REFEREE_RESUME_KEY = "bxh_referee_workstation_resume_v1"','Referee workstation resume key missing');
 mustInclude('function restoreRefereeWorkstationView(uid,intent)','Referee workstation reload restore helper missing');

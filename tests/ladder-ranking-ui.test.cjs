@@ -43,6 +43,10 @@ for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['�
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file.replace(/\.webp$/,'.png'))), name+' PNG fallback missing');
 }
-assert(html.includes('ladder-secondary-ui.js?v=14.2.55-badge-batch2'), 'ladder asset cache-bust version must match release');
+assert(source.includes('String(row&&row.seasonId||"")===String(currentSeason)'), 'recent history must be isolated to the current season');
+assert(source.includes('舊賽季已封存，不會載入玩家手機'), 'history archive boundary disclosure missing');
+assert(html.includes('fx.orderBy("createdAt","desc")'), 'history query must be ordered on the server');
+assert(html.includes('fx.limit(200)'), 'history query must be bounded before download');
+assert(html.includes('ladder-secondary-ui.js?v=14.3.15'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');

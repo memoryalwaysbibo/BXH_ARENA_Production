@@ -188,7 +188,10 @@
   }
 
   function sortedLogs(logs){
-    var rows=Array.isArray(logs)?logs.slice():[];
+    var currentSeason=(typeof ladderPublicData!=="undefined"&&ladderPublicData&&ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1";
+    var rows=(Array.isArray(logs)?logs:[]).filter(function(row){
+      return String(row&&row.seasonId||"")===String(currentSeason);
+    }).slice(0,100);
     rows.sort(function(a,b){
       if(ladderHistorySort==="points-asc") return deltaOf(a)-deltaOf(b);
       if(ladderHistorySort==="points-desc") return deltaOf(b)-deltaOf(a);
@@ -242,7 +245,8 @@
 
   function historyTableHtml(adminMode){
     var logs=typeof ladderAdminLogs!=="undefined"&&Array.isArray(ladderAdminLogs)?ladderAdminLogs:[];
-    var rows=sortedLogs(logs).slice(0,100);
+    var rows=sortedLogs(logs);
+    var currentSeason=(typeof ladderPublicData!=="undefined"&&ladderPublicData&&ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1";
     var actorHead=adminMode?"<th>操作人</th>":"";
     var actorCell=function(row){return adminMode?"<td>"+escLocal(row.actorName||row.actorUid||"—")+"</td>":"";};
     var body=rows.map(function(row){
@@ -267,7 +271,7 @@
     else if(!rows.length) body='<tr><td colspan="'+(adminMode?7:6)+'">目前沒有積分紀錄</td></tr>';
 
     return '<section class="panel ladder-history-panel">'+
-      '<div class="panel-title"><span>近期積分紀錄</span><button type="button" class="btn btn-ghost btn-sm" data-ladder-history-refresh '+(ladderHistoryLoading?"disabled":"")+'>'+(ladderHistoryLoading?"讀取中…":"重新整理")+'</button></div>'+
+      '<div class="panel-title"><span>'+escLocal(currentSeason)+'｜近期積分紀錄</span><button type="button" class="btn btn-ghost btn-sm" data-ladder-history-refresh '+(ladderHistoryLoading?"disabled":"")+'>'+(ladderHistoryLoading?"讀取中…":"重新整理")+'</button></div>'+
       '<div class="ladder-history-toolbar"><label><span>排序方式</span><select data-ladder-history-sort aria-label="近期積分紀錄排序">'+
         option("date-desc","日期｜晚 → 早")+
         option("date-asc","日期｜早 → 晚")+
@@ -278,7 +282,7 @@
       '</select></label></div>'+
       (ladderHistoryError?'<div class="auth-error">'+escLocal(ladderHistoryError)+'</div>':"")+
       '<div class="rank-scroll"><table class="rank-table ladder-history-table"><thead><tr><th>時間</th><th>玩家</th><th>類型</th><th>異動</th><th>賽季</th><th>原因／賽事</th>'+actorHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+
-      '<div class="hint ladder-history-note">最多顯示最近 100 筆；切換排序不會修改任何積分資料。</div>'+
+      '<div class="hint ladder-history-note">僅顯示 '+escLocal(currentSeason)+' 最近 100 筆；舊賽季已封存，不會載入玩家手機。</div>'+
     '</section>';
   }
 
