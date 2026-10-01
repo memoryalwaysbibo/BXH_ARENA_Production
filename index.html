@@ -19735,7 +19735,12 @@ document.addEventListener("click",async event=>{
  if(!payload)return;
  state.busy=true;
  try{await window.engagementService.cardAlbum(payload);showToast("卡牌交換狀態已更新");await loadCardAlbum(true);}
- catch(e){showToast(String(e.message||e),true);}
+ catch(e){
+  const message=String(e?.message||e||"");
+  if(message.includes("insufficient-duplicate")){
+    openModal({type:"generic",title:"交換失敗",message:"您的卡片數量不足。\n\n卡牌交換需至少持有 2 張，交換後系統會保留 1 張於卡冊中。",confirmLabel:"我知道了",onConfirm:()=>{}});
+  }else showToast(message,true);
+ }
  finally{state.busy=false;renderPreservingScroll();}
 });
 
