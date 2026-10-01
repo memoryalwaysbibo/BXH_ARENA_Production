@@ -1,0 +1,71 @@
+name: M2 Directive CSS isolated extraction
+on:
+  push:
+    branches: [refactor/index-css-m2-directive-20261002]
+permissions:
+  contents: read
+concurrency:
+  group: m2-directive-css-isolated
+  cancel-in-progress: false
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: ${{ github.sha }}, fetch-depth: 1}
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Verify fixed M2-1 parent and current head
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/refactor/index-css-m2-card-album-20261002|cut -f1)" = 1f78c090fa6e444d158f3896d724860260b7b0bb
+          test "$(git ls-remote origin refs/heads/refactor/index-css-m2-directive-20261002|cut -f1)" = "$GITHUB_SHA"
+      - name: Stage or verify candidate
+        id: stage
+        run: |
+          set -euo pipefail
+          b="$(git hash-object index.html)"
+          if [ "$b" = 52a33590b3ca5a9d118aaeae70cd9d16f78baceb ]; then
+            python3 tools/stage-m2-directive-css.py --source . --output "$RUNNER_TEMP/m22"
+            echo "root=$RUNNER_TEMP/m22" >> "$GITHUB_OUTPUT"; echo "apply=true" >> "$GITHUB_OUTPUT"
+          else
+            test "$b" = 4a3a7e900ac9e9aaa6c706e65bb170e832c1bc20
+            test -f modules/theme-directive/styles.css
+            echo "root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"; echo "apply=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Contracts and critical regression
+        env: {BXH_M22_ROOT: ${{ steps.stage.outputs.root }}}
+        run: |
+          set -euo pipefail
+          node --test tools/verify-m2-directive-css.cjs
+          (cd "$BXH_M22_ROOT" && node scripts/verify-production-frontend.cjs)
+          (cd "$BXH_M22_ROOT" && node scripts/run-regression-core.cjs critical)
+          (cd "$BXH_M22_ROOT" && node --test tests/theme-directive-access.test.cjs)
+      - run: npm install --prefix "$RUNNER_TEMP/pw" --no-package-lock --ignore-scripts @playwright/test@1.55.0
+      - name: Browser computed style
+        env: {BXH_M22_ROOT: ${{ steps.stage.outputs.root }}}
+        run: |
+          export NODE_PATH="$RUNNER_TEMP/pw/node_modules"
+          node "$RUNNER_TEMP/pw/node_modules/@playwright/test/cli.js" test --config=tools/m2-directive-css.config.cjs
+      - name: Commit verified extraction only
+        if: steps.stage.outputs.apply == 'true'
+        env: {BXH_M22_ROOT: ${{ steps.stage.outputs.root }}}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/refactor/index-css-m2-card-album-20261002|cut -f1)" = 1f78c090fa6e444d158f3896d724860260b7b0bb
+          test "$(git ls-remote origin "$GITHUB_REF"|cut -f1)" = "$GITHUB_SHA"
+          mkdir -p modules/theme-directive
+          cp "$BXH_M22_ROOT/index.html" index.html
+          cp "$BXH_M22_ROOT/modules/theme-directive/styles.css" modules/theme-directive/styles.css
+          cp "$BXH_M22_ROOT/m2-directive-css-manifest.json" m2-directive-css-manifest.json
+          git add -- index.html modules/theme-directive/styles.css m2-directive-css-manifest.json
+          git diff --cached --check
+          test "$(git diff --cached --name-only|sort|tr '\n' ' ')" = "index.html m2-directive-css-manifest.json modules/theme-directive/styles.css "
+          git config user.name github-actions[bot];git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'refactor(css): extract Directive critical styles from index'
+          git push origin HEAD:refs/heads/refactor/index-css-m2-directive-20261002
