@@ -14499,6 +14499,14 @@ function buildCelebrationData(rec){
       }).filter(Boolean);
       const names = [...new Set(semiLoserIds)].map(id=>recName(rec,id)).filter(Boolean);
       if(names.length) thirdLabel = names.join("、");
+      // A 3-player single-elimination bracket has exactly one player outside
+      // champion/runner-up. Legacy 4-slot/BYE records may not expose that player
+      // through the stored semifinal loser fields, so recover it directly from
+      // the official participant roster as the authoritative final fallback.
+      if(!thirdLabel && (rec.players||[]).length===3 && rec.championId && rec.runnerUpId){
+        const remaining=(rec.players||[]).filter(p=>p&&p.id!==rec.championId&&p.id!==rec.runnerUpId);
+        if(remaining.length===1) thirdLabel=recName(rec,remaining[0].id);
+      }
     } else if(fmt==="roundrobin" && !rec.thirdId){
       const standings = computeRoundRobinStandings();
       const tied3 = standings.filter(s=>s.rank===3);
