@@ -9,6 +9,227 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: safety-gate-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  classify:
+    name: Classify change risk
+    runs-on: ubuntu-latest
+    outputs:
+      level: ${{ steps.risk.outputs.level }}
+      run_ui: ${{ steps.risk.outputs.run_ui }}
+      run_e2e: ${{ steps.risk.outputs.run_e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: risk
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            files="$(git diff --name-only HEAD^ HEAD)"
+          else
+            files="$(git ls-files)"
+          fi
+          printf '%s\n' "$files"
+          level=low
+          run_ui=false
+          run_e2e=false
+          if echo "$files" | grep -Eq '^(index\.html|firebase|firestore|functions/|tests/e2e/|playwright|package(-lock)?\.json|scripts/run-regression-core\.cjs|\.github/workflows/)'; then
+            level=high; run_ui=true; run_e2e=true
+          elif echo "$files" | grep -Eq '\.(js|cjs|mjs|html)
+  validate:
+    needs: classify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard production entrypoint integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f index.html
+          bytes="$(wc -c < index.html | tr -d ' ')"
+          lines="$(wc -l < index.html | tr -d ' ')"
+          if [ "$bytes" -lt 100000 ] || [ "$lines" -lt 1000 ]; then
+            echo "Production index.html looks empty or truncated: bytes=$bytes lines=$lines" >&2
+            exit 1
+          fi
+          grep -qi '<!doctype html' index.html
+          grep -qi '<html' index.html
+          grep -q 'BXH ARENA' index.html
+          grep -q 'bxh-environment" content="production' index.html
+          grep -qi '</html>' index.html
+          echo "Production entrypoint integrity OK: bytes=$bytes lines=$lines"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify BXH CALL Web Push scripts syntax
+        run: |
+          node --check court-call-ui.js
+          node --check raffle-ui.js
+          node --check inventory-ui.js
+          node --check firebase-messaging-sw.js
+
+      - name: Verify referee two-fault scoring
+        run: |
+          node --check referee-fault-core.js
+          node tests/referee-fault-core.test.cjs
+          node tests/referee-fault-ui.test.cjs
+
+      - name: Verify enchantment rules and connected V3 draw script
+        run: |
+          node --check enchantment-ui.js
+          node --test tests/enchantment-hunter-ledger.test.cjs tests/enchantment-score-core.test.cjs tests/enchantment-round-core.test.cjs tests/enchantment-ui-bridge.test.cjs
+          node - <<'JS'
+          const fs=require('node:fs');
+          const html=fs.readFileSync('enchantment-draw-v3.html','utf8');
+          const match=html.match(/<script>([\s\S]*?)<\/script>/);
+          if(!match || html.includes('模擬下局抽卡') || html.includes('尚未連接賽事與裁判計分'))throw Error('connected-draw-missing');
+          new Function(match[1]);
+          JS
+
+      - name: Verify header logo refresh control
+        run: node tests/header-logo-refresh.test.cjs
+
+      - name: Verify referee score panel V2
+        run: node tests/referee-score-v2-ui.test.cjs
+
+      - name: Verify compact next-match prepare UI
+        run: node tests/court-call-next-prepare-ui.test.cjs
+
+      - name: Verify tournament raffle winner count stepper
+        run: node tests/tournament-operations-count-stepper.test.cjs
+
+      - name: Verify tournament operations multi-prize UI
+        run: node tests/tournament-operations-multi-prize-ui.test.cjs
+
+      - name: Verify ranked registration T-5 preopen UX
+        run: |
+          node --check ranked-registration-preopen-ui.js
+          node tests/ranked-registration-preopen-ui.test.cjs
+
+      - name: Verify AI poster contract and draft boundary
+        run: |
+          node --check ai-poster-ui.js
+          node tests/ai-poster-ui.test.cjs
+          node --check ai-poster-refinements.js
+          node tests/ai-poster-refinements.test.cjs
+
+      - name: Verify family roster check-in preservation
+        run: |
+          node --check family-ui.js
+          node tests/family-roster-checkin.test.cjs
+      - name: Verify venue navigation regressions
+        run: node tests/venue-navigation.test.cjs
+      - name: Verify HUNTER LOOP P5 raffle confirmation flow
+        run: node tests/hunter-loop-p5-ui.test.cjs
+      - name: Verify inventory consumable grant and replay safety
+        run: node tests/inventory-consumable-ui.test.cjs
+      - name: Verify team battle foundation
+        run: node tests/team-battle-foundation.test.cjs
+      - name: Verify team registration UI
+        run: node tests/team-registration-ui.test.cjs
+      - name: Verify team bracket formats
+        run: node tests/team-bracket-formats.test.cjs
+      - name: Verify Production frontend invariants
+        run: node scripts/verify-production-frontend.cjs
+      - name: Verify ladder V1 scoring and inline-script syntax
+        run: node --experimental-vm-modules tests/ladder-v1.cjs
+      - name: Verify ladder V1 settlement trust boundary
+        run: node --experimental-vm-modules tests/ladder-settlement.cjs
+      - name: BXH ARENA Regression Core - Critical
+        run: node scripts/run-regression-core.cjs critical
+
+      - name: BXH ARENA Regression Core - Warning
+        continue-on-error: true
+        run: node scripts/run-regression-core.cjs warning
+      - name: Verify no Beta runtime target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn --exclude-dir=.git --exclude-dir=.github --exclude-dir=tests --exclude='RELEASE_*.md' \
+            -E 'bxh-arena-beta|beta\.bxh\.com\.tw|BETA 測試站｜非正式環境' .; then
+            echo 'Forbidden Beta runtime marker detected.' >&2
+            exit 1
+          fi
+      - name: Verify no deployment workflows are bundled
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn --exclude='validate-production-frontend.yml' -E 'firebase deploy|gcloud functions deploy|FirebaseExtended/action-hosting-deploy' .github/workflows; then
+            echo 'This candidate is validation-only; deployment action found.' >&2
+            exit 1
+          fi
+
+  ui_smoke:
+    needs: classify
+    if: needs.classify.outputs.run_ui == 'true'
+    name: UI Smoke - Desktop / iPhone / Android
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install UI test runner
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Run isolated browser smoke tests
+        run: npm run test:ui-smoke
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-ui-smoke-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  emulator_e2e:
+    needs: classify
+    if: needs.classify.outputs.run_e2e == 'true'
+    name: Critical E2E - Player Signup / Community Room
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Java for Firestore Emulator
+        shell: bash
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-21-jre-headless
+          java -version
+
+      - name: Install E2E dependencies
+        run: npm install --no-package-lock --ignore-scripts
+
+      - name: Run critical Firebase Emulator E2E
+        shell: bash
+        run: |
+          npx firebase emulators:exec             --only auth,firestore             --project demo-bxh-arena-e2e             --config tests/e2e/firebase.json             "npm run test:ui-e2e"
+
+      - name: Upload E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-critical-e2e-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+; then
+            level=medium; run_ui=true
+          fi
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+          echo "run_ui=$run_ui" >> "$GITHUB_OUTPUT"
+          echo "run_e2e=$run_e2e" >> "$GITHUB_OUTPUT"
+          echo "Safety Gate risk=$level ui=$run_ui e2e=$run_e2e"
+
 jobs:
   validate:
     runs-on: ubuntu-latest
