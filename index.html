@@ -15894,15 +15894,27 @@ function positionSingleElimFinalDecorations(outer){
 
     const champion=outer.querySelector('.se-finals-champion-card');
     if(champion&&finalCol&&finalBox){
-      const rightCol=bronzeCol||finalCol;
-      const zoneLeft=finalCol.offsetLeft;
-      const zoneRight=rightCol.offsetLeft+rightCol.offsetWidth;
-      const available=Math.max(0,zoneRight-zoneLeft);
+      // Keep the champion card OUTSIDE the live match geometry. The previous
+      // absolute overlay could cover the final match on compact/mobile boards.
+      const colsWrap=outer.querySelector('.se-bracket-cols');
+      const boardWidth=Math.max(outer.scrollWidth,colsWrap?colsWrap.scrollWidth:0);
       const cardW=champion.offsetWidth||190;
-      const matchTop=Math.min(finalBox.offsetTop,bronzeBox?bronzeBox.offsetTop:finalBox.offsetTop);
       const cardH=champion.offsetHeight||112;
-      champion.style.left=Math.round(zoneLeft+Math.max(0,(available-cardW)/2))+"px";
-      champion.style.top=Math.round(Math.max(34,matchTop-cardH-52))+"px";
+      const finalRight=finalCol.offsetLeft+finalCol.offsetWidth;
+      const bronzeRight=bronzeCol?(bronzeCol.offsetLeft+bronzeCol.offsetWidth):finalRight;
+      const rightEdge=Math.max(finalRight,bronzeRight);
+      const desiredLeft=rightEdge+18;
+      const canPlaceRight=(boardWidth-desiredLeft)>=cardW;
+      if(canPlaceRight){
+        champion.style.left=Math.round(desiredLeft)+"px";
+        champion.style.top=Math.round(Math.max(34,finalBox.offsetTop+(finalBox.offsetHeight-cardH)/2))+"px";
+      }else{
+        // If there is no horizontal room, reserve a dedicated top lane. Never
+        // overlap the final/bronze match cards.
+        const matchTop=Math.min(finalBox.offsetTop,bronzeBox?bronzeBox.offsetTop:finalBox.offsetTop);
+        champion.style.left=Math.round(Math.max(0,finalCol.offsetLeft+(finalCol.offsetWidth-cardW)/2))+"px";
+        champion.style.top=Math.round(Math.max(4,matchTop-cardH-42))+"px";
+      }
     }
   }catch(e){ console.warn("[final decorations]",e); }
 }
