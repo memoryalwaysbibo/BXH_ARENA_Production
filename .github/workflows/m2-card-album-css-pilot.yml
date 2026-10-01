@@ -18,83 +18,55 @@ jobs:
     timeout-minutes: 15
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
+          persist-credentials: false
       - name: Trust only the checked-out workspace
         shell: bash
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - name: Verify stacked M1 parent and current M2 head
+      - name: Verify fixed M1 parent, current M2 head and committed extraction
         shell: bash
         run: |
           set -euo pipefail
           test "$(git ls-remote origin refs/heads/refactor/management-v2-migration-m1-20261002 | cut -f1)" = f5a890b831d3bb736df0022829c08a89987f6c1f
           test "$(git ls-remote origin refs/heads/refactor/index-css-m2-card-album-20261002 | cut -f1)" = "$GITHUB_SHA"
-      - name: Stage candidate or verify committed candidate
-        id: stage
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="$(git hash-object index.html)"
-          if [ "$base" = f5c5d2205d26aeedd340c8a822b4f3fecefa377b ]; then
-            python3 tools/stage-m2-card-album-css.py --source . --output "$RUNNER_TEMP/m2-card-album" | tee "$RUNNER_TEMP/m2-stage.json"
-            echo "root=$RUNNER_TEMP/m2-card-album" >> "$GITHUB_OUTPUT"
-            echo "apply=true" >> "$GITHUB_OUTPUT"
-          else
-            test "$base" = 52a33590b3ca5a9d118aaeae70cd9d16f78baceb
-            test -f modules/card-album/styles.css
-            test -f m2-card-album-css-manifest.json
-            echo "root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
-            echo "apply=false" >> "$GITHUB_OUTPUT"
-          fi
+          test "$(git hash-object index.html)" = 52a33590b3ca5a9d118aaeae70cd9d16f78baceb
+          test -f modules/card-album/styles.css
+          test -f m2-card-album-css-manifest.json
+          printf '%s  %s\n' 034f6ce6fe55540c7a495d23480ad9723795df374a9e5bf1cde91afdde5f2789 modules/card-album/styles.css | sha256sum -c -
       - name: Verify extraction contracts and existing critical checks
         shell: bash
         env:
-          BXH_M2_ROOT: ${{ steps.stage.outputs.root }}
+          BXH_M2_ROOT: ${{ github.workspace }}
         run: |
           set -euo pipefail
           node --test tools/verify-m2-card-album-css.cjs
-          (cd "$BXH_M2_ROOT" && node scripts/verify-production-frontend.cjs)
-          (cd "$BXH_M2_ROOT" && node scripts/run-regression-core.cjs critical)
+          node scripts/verify-production-frontend.cjs
+          node scripts/run-regression-core.cjs critical
       - name: Install pinned browser runner
         shell: bash
         run: npm install --prefix "$RUNNER_TEMP/m2-runner" --no-package-lock --ignore-scripts @playwright/test@1.55.0
       - name: Browser-computed Card Album style checks
         shell: bash
         env:
-          BXH_M2_ROOT: ${{ steps.stage.outputs.root }}
+          BXH_M2_ROOT: ${{ github.workspace }}
         run: |
           set -euo pipefail
           export NODE_PATH="$RUNNER_TEMP/m2-runner/node_modules"
           node "$RUNNER_TEMP/m2-runner/node_modules/@playwright/test/cli.js" test --config=tools/m2-card-album-css.config.cjs
-      - name: Commit only verified extraction to isolated M2 branch
-        if: steps.stage.outputs.apply == 'true'
+      - name: Record immutable read-only evidence
+        if: always()
         shell: bash
-        env:
-          BXH_M2_ROOT: ${{ steps.stage.outputs.root }}
         run: |
-          set -euo pipefail
-          test "$GITHUB_REF" = refs/heads/refactor/index-css-m2-card-album-20261002
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git ls-remote origin refs/heads/refactor/management-v2-migration-m1-20261002 | cut -f1)" = f5a890b831d3bb736df0022829c08a89987f6c1f
-          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
-          mkdir -p modules/card-album
-          cp "$BXH_M2_ROOT/index.html" index.html
-          cp "$BXH_M2_ROOT/modules/card-album/styles.css" modules/card-album/styles.css
-          cp "$BXH_M2_ROOT/m2-card-album-css-manifest.json" m2-card-album-css-manifest.json
-          git add -- index.html modules/card-album/styles.css m2-card-album-css-manifest.json
-          git diff --cached --check
-          python3 - <<'PY'
-          import subprocess
-          actual=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
-          expected={'index.html','modules/card-album/styles.css','m2-card-album-css-manifest.json'}
-          if actual != expected: raise SystemExit('Unexpected staged paths: '+repr(actual))
-          PY
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'refactor(css): extract Card Album styles from index'
-          git push origin HEAD:refs/heads/refactor/index-css-m2-card-album-20261002
+          mkdir -p "$RUNNER_TEMP/m2-evidence"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/m2-evidence/tested-commit.txt"
+          printf 'READ-ONLY M2 VALIDATION. No branch write, merge or deployment.\n' > "$RUNNER_TEMP/m2-evidence/scope.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m2-card-album-css-${{ github.run_id }}
+          path: ${{ runner.temp }}/m2-evidence
+          retention-days: 7
