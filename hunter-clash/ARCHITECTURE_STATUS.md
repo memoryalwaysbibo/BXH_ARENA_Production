@@ -50,8 +50,8 @@ Cloud Build 報告的 sourceProvenance 沒有已解析 commit、儲存來源或�
 
 ## 2026-10-02 獨立雲端測試包準備
 
-新增 `server/runtime-boundary.cjs` 與 `prepare-cloud-test-bundle.cjs`。既有 demo emulator 行為保持不變；遠端模式只接受候選包內固定且符合 `bxh-hc-test-*` 的實際專案。正式站、Beta、demo、任意專案、專案不一致、模擬器環境混用、可變來源 ref 與既有輸出目錄皆拒絕。
+新增 `server/runtime-boundary.cjs` 與 `prepare-cloud-test-bundle.cjs`。既有 demo emulator 行為保持不變；遠端模式現在只接受候選包內固定的實際專案 `bxh-hc-test`。正式站、Beta、demo、名稱相近但非精確相符的專案、專案不一致、模擬器環境混用、可變來源 ref 與既有輸出目錄皆拒絕。
 
 候選包固定 App Check、private invoker、asia-east1、獨立 codebase，並產生逐檔 SHA-256 與來源 commit manifest；manifest 明確維持未授權部署、不可使用正式資料、不可公開入口。三項新增邊界／產包測試通過，另以實際 bundle 執行 `npm ci` 與 Functions 語法檢查通過。
 
-此工項把下一個外部依賴收斂為「提供符合命名規則的專用 Firebase project ID」。尚未建立專案、設定 IAM、部署或執行遠端測試；工程估算調整為約 82%，發布 gate 不變。
+專用 Firebase project ID `bxh-hc-test` 已由 Owner 建立，Firestore 建立完成由 Owner 回報；程式邊界已收斂為精確 ID。尚待獨立驗證專案設定、設定最小權限、部署與執行遠端測試；工程估算維持約 82%，發布 gate 不變。
