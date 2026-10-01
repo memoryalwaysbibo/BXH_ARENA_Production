@@ -65,7 +65,7 @@ Token 經 Admin SDK 驗證並檢查停用狀態；角色、入口設定及指派
 認證限指定且非參賽的有效內部見證者；風險審查限指定且非參賽的有效管理者，必須填理由並綁定結果版本。此角色配置是 sandbox 測試契約，尚未定為正式營運政策。
 認證通過仍維持 risk hold，人工放行才可結算；爭議結果不得放行，已結算結果不得再改審查。重送共用交易收據，並發審查只接受一個預期版本。
 已完成模擬器 HTTP/callable 與客戶端 SDK 驗證；正式 IAM 與玩家正式入口尚未完成；內部本機介面已通過瀏覽器測試。
-本機測試：40 項契約、傳輸／隔離防護、唯讀採集／Rules 比對與既有回歸 + 38 項真正 Functions／Auth／Firestore、瀏覽器與 lab 測試，共 78 項通過。
+本機測試：43 項契約、傳輸／隔離防護、雲端候選包、唯讀採集／Rules 比對與既有回歸 + 38 項真正 Functions／Auth／Firestore、瀏覽器與 lab 測試，共 81 項通過。
 包含兩端同時提交只接受一個版本、8 路不同 requestId 結算只入帳一次、重送一致性及失敗回滾。
 這些是 demo 範圍證據，不能把 checkpoint 的正式／端到端驗收欄位改成完整 PASS。
 
@@ -119,7 +119,7 @@ getChallenge 在伺服器交易中檢查有效內部角色、入口與當場指�
 
 ## 獨立雲端測試候選包
 
-`prepare-cloud-test-bundle.cjs` 把 HC callable、服務、契約、Rules 與固定依賴整理成可重現候選包。只接受 `bxh-hc-test-*` 專案和完整 40 字元來源 commit；正式站、Beta、demo 或任意其他專案都會在產包前拒絕。輸出目錄必須是新建的 `hc-cloud-test-*`，失敗時清除該次未完成輸出。
+`prepare-cloud-test-bundle.cjs` 把 HC callable、服務、契約、Rules 與固定依賴整理成可重現候選包。只接受已建立的專用專案 `bxh-hc-test` 和完整 40 字元來源 commit；即使是名稱相近的其他專案也會與正式站、Beta、demo 一樣在產包前拒絕。輸出目錄必須是新建的 `hc-cloud-test-*`，失敗時清除該次未完成輸出。
 
 產物固定 `asia-east1`、codebase `hc-isolated-test`、函式 `hcSandboxCommand`，App Check 強制啟用，invoker 保持 private；服務啟動時再次比對實際 Admin SDK project 與候選包內固定 project。manifest 記錄所有檔案的 bytes／SHA-256、來源 repository／commit 與整體 tree SHA-256，並固定 `publicEntryEnabled: false`、`productionDataAllowed: false`、`deploymentAuthorized: false`。
 
