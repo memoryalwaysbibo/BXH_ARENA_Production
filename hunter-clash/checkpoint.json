@@ -19,7 +19,7 @@
   "next": [
     "Obtain trusted deployed source package or immutable source manifest for the 35 currently observed Functions builds; Cloud Build sourceProvenance supplied no resolved commits or source hashes",
     "Verify production signature/revocation, IAM and App Check when isolated deployed runtime is available",
-    "Provide a dedicated bxh-hc-test-* Firebase project ID, then configure minimum-permission deployment and run supervised staff internal beta"
+    "Verify the dedicated bxh-hc-test Firebase project, then configure minimum-permission deployment and run supervised staff internal beta"
   ],
   "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
   "backendCandidateValidation": {
@@ -136,7 +136,7 @@
   "latestLiveAuditDirectory": "audit/20260930-36756766360"
   ,"cloudTestBundle": {
     "builder": "prepare-cloud-test-bundle.cjs",
-    "projectPattern": "bxh-hc-test-*",
+    "projectId": "bxh-hc-test",
     "region": "asia-east1",
     "codebase": "hc-isolated-test",
     "functionTarget": "hcSandboxCommand",
@@ -145,7 +145,7 @@
     "productionDataAllowed": false,
     "publicEntryEnabled": false,
     "deploymentAuthorized": false,
-    "status": "READY_FOR_PROJECT_CONFIGURATION",
+    "status": "PROJECT_CREATED_AWAITING_ACCESS_CONFIGURATION",
     "validationCommit": "7e1850879eb846f61226300f4c5f8cf07eea833f",
     "foundationPullRequestRun": 36906438694,
     "productionFrontendRun": 36906438766
