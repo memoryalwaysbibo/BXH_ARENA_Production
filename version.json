@@ -1,6 +1,6 @@
 {
-  "build": "20261001.2",
+  "build": "20261001.4",
   "version": "v14.3.15",
-  "updatedAt": "2026-10-01T08:58:00+08:00",
-  "releaseTrigger": "management-ui-v2-production"
+  "updatedAt": "2026-10-01T20:20:00+08:00",
+  "releaseTrigger": "hoc-ranking-bracket-runtime-fixes"
 }
