@@ -14501,7 +14501,7 @@ function buildCelebrationData(rec){
     // placement fix may still have thirdId=null. Heal the in-memory historical
     // snapshot at read/render time without requiring the archived record to be
     // reopened or rewritten.
-    if(fmt==="single" && !rec.meta.bronzeMatch && !rec.thirdId && rec.championId && rec.runnerUpId){
+    if(fmt==="single" && !rec.thirdId && rec.championId && rec.runnerUpId){
       const eligible=tournamentEligiblePlayers(rec.players,rec.meta,rec.matches);
       if(eligible.length===3){
         const remaining=eligible.filter(p=>p&&p.id!==rec.championId&&p.id!==rec.runnerUpId);
