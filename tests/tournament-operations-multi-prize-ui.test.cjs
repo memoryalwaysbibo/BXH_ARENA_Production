@@ -15,7 +15,7 @@ must(/合計最多 100 位得獎者/,'100 winner cap copy');
 must(/renderTournamentRaffleRecord\(r,modes,statuses,locked\)/,'grouped prize history renderer');
 must(/prizeIndex/,'prize-index aware history');
 const release=require('../version.json');
-must(src.includes(release.version),'release version');
+must(new RegExp(release.version.replace(/[.*+?^${}()|[\]\\]/g,'\\must(src.includes(release.version),'release version');')),'release version');
 must(new RegExp(require('../version.json').build.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),'release build');
 mustNot(/id="ops-title"/,'legacy single prize title field');
 mustNot(/id="ops-count"/,'legacy single winner-count field');
