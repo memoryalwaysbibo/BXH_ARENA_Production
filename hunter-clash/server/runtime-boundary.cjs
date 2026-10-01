@@ -7,7 +7,10 @@ function assertSandboxRuntime(db, auth, env = process.env, expectedCloudProject)
   const dbProject = db?.projectId;
   const authProject = auth?.app?.options?.projectId;
   if (dbProject !== authProject || typeof dbProject !== 'string') throw Error('sandbox-service-only');
-  if (env.FUNCTIONS_EMULATOR === 'true') {
+  const localEmulator = dbProject === EMULATOR_PROJECT &&
+    env.FIRESTORE_EMULATOR_HOST === '127.0.0.1:8180' &&
+    env.FIREBASE_AUTH_EMULATOR_HOST === '127.0.0.1:9098';
+  if (localEmulator) {
     assertIsolated(env);
     if (dbProject !== EMULATOR_PROJECT || env.FIRESTORE_EMULATOR_HOST !== '127.0.0.1:8180' ||
         env.FIREBASE_AUTH_EMULATOR_HOST !== '127.0.0.1:9098') throw Error('sandbox-service-only');
