@@ -1,6 +1,6 @@
 'use strict';
 const { assertIsolated, PROJECT: EMULATOR_PROJECT } = require('../emulator/preflight.cjs');
-const CLOUD_TEST_PROJECT = /^bxh-hc-test-[a-z0-9](?:[a-z0-9-]{1,27}[a-z0-9])$/;
+const CLOUD_TEST_PROJECT_ID = 'bxh-hc-test';
 const PRODUCTION_PROJECT = 'bxh-arena';
 const LEGACY_BETA_PROJECT = [PRODUCTION_PROJECT, 'beta'].join('-');
 function assertSandboxRuntime(db, auth, env = process.env, expectedCloudProject) {
@@ -18,9 +18,9 @@ function assertSandboxRuntime(db, auth, env = process.env, expectedCloudProject)
   }
   if (env.HC_RUNTIME_MODE !== 'isolated-cloud-test' || env.FIRESTORE_EMULATOR_HOST ||
       env.FIREBASE_AUTH_EMULATOR_HOST || typeof expectedCloudProject !== 'string' ||
-      expectedCloudProject !== dbProject || !CLOUD_TEST_PROJECT.test(dbProject) ||
+      expectedCloudProject !== dbProject || dbProject !== CLOUD_TEST_PROJECT_ID ||
       [PRODUCTION_PROJECT, LEGACY_BETA_PROJECT, EMULATOR_PROJECT].includes(dbProject))
     throw Error('sandbox-service-only');
   return { mode: 'isolated-cloud-test', projectId: dbProject };
 }
-module.exports = { assertSandboxRuntime, CLOUD_TEST_PROJECT };
+module.exports = { assertSandboxRuntime, CLOUD_TEST_PROJECT_ID };
