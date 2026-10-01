@@ -19270,7 +19270,7 @@ function renderLadderLeaderboardPage(adminMode=false){
   const seasonDash=ladderSeasonDashboard(control);
   const seasonInfoOpen=!!document.querySelector("details.ladder-hero[open]");
   return `
-    ${adminMode?renderTestLadderPanel():""}
+    ${false&&adminMode?renderTestLadderPanel():""}
     ${playerSearchPanel()}
     <details class="panel ladder-hero" ${seasonInfoOpen?"open":""}>
       <summary class="ladder-season-summary"><span>賽季資訊</span><span class="chev" aria-hidden="true">⌄</span></summary>
