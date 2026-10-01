@@ -69,17 +69,8 @@ jobs:
           )
           html = replace_once(html, "const VERSION_HISTORY = [\n", "const VERSION_HISTORY = [\n" + history_entry, "version history")
 
-          old_query = '''      const s=await fx.getDocs(fx.collection(dbHandle,"ladderTransactions"));
-          const out=[]; s.forEach(d=>{const x=Object.assign({id:d.id},d.data()); x.createdAtMs=cloudSafeTimestampMs(x.createdAt); out.push(x);});
-          return out.sort((a,b)=>(b.createdAtMs||0)-(a.createdAtMs||0)).slice(0,200);'''
-          new_query = '''      const q=fx.query(
-            fx.collection(dbHandle,"ladderTransactions"),
-            fx.orderBy("createdAt","desc"),
-            fx.limit(200)
-          );
-          const s=await fx.getDocs(q);
-          const out=[]; s.forEach(d=>{const x=Object.assign({id:d.id},d.data()); x.createdAtMs=cloudSafeTimestampMs(x.createdAt); out.push(x);});
-          return out;'''
+          old_query = '      const s=await fx.getDocs(fx.collection(dbHandle,"ladderTransactions"));\n      const out=[]; s.forEach(d=>{const x=Object.assign({id:d.id},d.data()); x.createdAtMs=cloudSafeTimestampMs(x.createdAt); out.push(x);});\n      return out.sort((a,b)=>(b.createdAtMs||0)-(a.createdAtMs||0)).slice(0,200);'
+          new_query = '      const q=fx.query(\n        fx.collection(dbHandle,"ladderTransactions"),\n        fx.orderBy("createdAt","desc"),\n        fx.limit(200)\n      );\n      const s=await fx.getDocs(q);\n      const out=[]; s.forEach(d=>{const x=Object.assign({id:d.id},d.data()); x.createdAtMs=cloudSafeTimestampMs(x.createdAt); out.push(x);});\n      return out;'
           html = replace_once(html, old_query, new_query, "bounded ladder history query")
           html = replace_once(html, 'ladder-secondary-ui.js?v=14.2.55-badge-batch2', 'ladder-secondary-ui.js?v=14.3.15', "ladder cache bust")
 
