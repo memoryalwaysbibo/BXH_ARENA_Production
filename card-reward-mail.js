@@ -36,4 +36,54 @@ window.BXHCardRewardUI={
     return result;
   }
 };
+// This classic script is loaded after the main inline application. Keep the
+// reward/album integration here so the existing mailbox and card-tab dispatchers
+// use these session-safe handlers without a second UI or optimistic inventory.
+if(typeof cardAlbumContext==='function'&&typeof loadCardAlbum==='function'&&typeof handleMailbox==='function'){
+  cardAlbumState=null;
+  cardAlbumContext=function(){
+    const uid=firebaseUser?.uid||'',key=uid+':'+engagementSessionEpoch;
+    if(!cardAlbumState||cardAlbumState.key!==key){
+      cardAlbumState={key,uid,revision:0,data:null,loading:false,error:'',trades:null,targets:null,query:'',targetUid:'',busy:false};
+      cardAlbumPreview=null;
+    }
+    return cardAlbumState;
+  };
+  loadCardAlbum=async function(refresh=false){
+    const state=cardAlbumContext();
+    if(!state.uid||(!refresh&&(state.loading||state.data)))return;
+    // Forced reads supersede even an in-flight pre-claim request.
+    const revision=++state.revision;
+    const isCurrent=()=>state===cardAlbumContext()&&state.revision===revision;
+    if(refresh){state.data=null;state.trades=null;}
+    state.loading=true;state.error='';renderPreservingScroll();
+    try{
+      if(!window.engagementService?.cardAlbum)throw Error('卡冊服務尚未連線');
+      const [data,trades]=await Promise.all([window.engagementService.cardAlbum({action:'get'}),window.engagementService.cardAlbum({action:'list'})]);
+      if(!isCurrent())return;
+      if(!data?.ok||!data.sets||!trades?.ok)throw Error('卡冊暫時無法讀取');
+      state.data=data;state.trades=trades;state.error='';
+    }catch(error){if(isCurrent())state.error=String(error?.message||'卡冊暫時無法讀取').slice(0,130);}
+    finally{if(isCurrent()){state.loading=false;renderPreservingScroll();}}
+  };
+  const originalMailboxHandler=handleMailbox;
+  handleMailbox=async function(action,target){
+    if(action!=='mailbox-card-reward')return originalMailboxHandler(action,target);
+    const context=mailboxContext();
+    if(!firebaseUser?.uid||context.busy)return;
+    const messageId=target.getAttribute('data-message-id')||'';
+    context.busy=true;context.error='';render();
+    try{
+      await window.BXHCardRewardUI.claim(messageId);
+      if(context!==mailboxContext())return;
+      // Includes already-claimed replays. The server alone supplies quantities.
+      // Do not keep the claim handler pending on the background album read.
+      void loadCardAlbum(true);
+      context.messages=null;context.busy=false;await loadMailbox(true);
+      if(context!==mailboxContext())return;
+      showToast('卡牌已領取並收入我的卡冊');
+    }catch(error){if(context===mailboxContext())context.error=mailboxError(error);}
+    finally{if(context===mailboxContext()){context.busy=false;render();}}
+  };
+}
 })();
