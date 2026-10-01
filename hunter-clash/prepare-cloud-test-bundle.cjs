@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { CLOUD_TEST_PROJECT } = require('./server/runtime-boundary.cjs');
+const BLOCKED_PROJECTS = ['bxh-arena', ['bxh-arena','beta'].join('-'), 'demo-hunter-clash'];
 const SOURCE_FILES = Object.freeze([
   'contracts.cjs', 'server/callable-handler.cjs', 'server/runtime-boundary.cjs',
   'server/sandbox-service.cjs', 'emulator/firestore.rules', 'emulator/preflight.cjs',
@@ -16,7 +17,7 @@ function safeOut(root, output) {
   return resolved;
 }
 function buildBundle({ projectId, sourceCommit, output, root = __dirname }) {
-  if (!CLOUD_TEST_PROJECT.test(projectId) || ['bxh-arena','bxh-arena-beta','demo-hunter-clash'].includes(projectId))
+  if (!CLOUD_TEST_PROJECT.test(projectId) || BLOCKED_PROJECTS.includes(projectId))
     throw Error('invalid-cloud-test-project');
   if (!/^[a-f0-9]{40}$/.test(sourceCommit)) throw Error('invalid-source-commit');
   const destination = safeOut(path.resolve(root), output);
