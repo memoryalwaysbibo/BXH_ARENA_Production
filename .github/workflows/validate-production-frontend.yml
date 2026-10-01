@@ -65,6 +65,9 @@ jobs:
       - name: Verify referee score panel V2
         run: node tests/referee-score-v2-ui.test.cjs
 
+      - name: Verify Offline Resilience V2 wiring
+        run: node tests/offline-resilience-v2-wiring.test.cjs
+
       - name: Verify compact next-match prepare UI
         run: node tests/court-call-next-prepare-ui.test.cjs
 
