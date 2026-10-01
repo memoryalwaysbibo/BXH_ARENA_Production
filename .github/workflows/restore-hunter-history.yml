@@ -1,0 +1,143 @@
+name: Restore Hunter Historical Profile Data
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/workflows/restore-hunter-history.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: restore-hunter-history
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore historical Hunter records to profile calculations
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+
+          html_path = Path("index.html")
+          verify_path = Path("scripts/verify-production-frontend.cjs")
+          version_path = Path("version.json")
+
+          html = html_path.read_text(encoding="utf-8")
+          verify = verify_path.read_text(encoding="utf-8")
+          version = json.loads(version_path.read_text(encoding="utf-8"))
+
+          old_build = str(version["build"])
+          old_version = str(version["version"])
+          new_build = "20261001.1"
+          new_version = "v14.3.14"
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, got {count}")
+              return text.replace(old, new, 1)
+
+          html = replace_once(
+              html,
+              f'<meta name="bxh-build" content="{old_build}">',
+              f'<meta name="bxh-build" content="{new_build}">',
+              "build meta",
+          )
+          html = replace_once(
+              html,
+              f'CURRENT_BUILD="{old_build}"',
+              f'CURRENT_BUILD="{new_build}"',
+              "fresh-version build",
+          )
+          html = replace_once(
+              html,
+              f'const APP_VERSION = "{old_version}";',
+              f'const APP_VERSION = "{new_version}";',
+              "app version",
+          )
+          html = replace_once(
+              html,
+              "const sourceRecords=allSourceRecords.filter(hunterRecordIsOfficial);",
+              "const sourceRecords=allSourceRecords;",
+              "Hunter historical record filter",
+          )
+
+          history_entry = (
+              '  {version:"v14.3.14",date:"2026/10/01",timezone:"Asia/Taipei",'
+              'title:"復原獵人檔案歷史生涯資料",updateLevel:"patch",'
+              'added:[],changed:["獵人執照、生涯統計、能力分析與對戰紀錄重新納入既有可信歷史對戰"],'
+              'fixed:["修復正式啟動截止條件將歷史獵人資料隱藏後顯示 LV.1、0 XP、0 場的問題"],'
+              'environment:"Production",deployStatus:"Historical Hunter profile restored",'
+              'firebaseImpact:"無刪除、無重建；沿用既有可信賽事與報名來源",'
+              'securityRulesImpact:"無",permissionImpact:"無",'
+              'publicSummary:"獵人檔案保留既有生涯資料，正式上線後的新對戰會繼續累加。"},\n'
+          )
+          html = replace_once(
+              html,
+              "const VERSION_HISTORY = [\n",
+              "const VERSION_HISTORY = [\n" + history_entry,
+              "version history",
+          )
+
+          old_assert = (
+              "mustInclude('const sourceRecords=allSourceRecords.filter(hunterRecordIsOfficial);',"
+              "'Hunter official record filter missing');"
+          )
+          new_assert = (
+              "mustInclude('const sourceRecords=allSourceRecords;',"
+              "'Hunter profile must preserve historical records');\n"
+              "mustNot(/const sourceRecords=allSourceRecords\\.filter\\(hunterRecordIsOfficial\\);/,"
+              "'Hunter profile must not hide historical records');"
+          )
+          verify = replace_once(
+              verify,
+              old_assert,
+              new_assert,
+              "Hunter frontend invariant",
+          )
+          verify = replace_once(
+              verify,
+              "console.log('PASS Hunter 10/1 official launch boundary');",
+              "console.log('PASS Hunter historical profile preservation');",
+              "Hunter invariant label",
+          )
+
+          version["build"] = new_build
+          version["version"] = new_version
+          version["updatedAt"] = "2026-10-01T08:10:00+08:00"
+
+          html_path.write_text(html, encoding="utf-8")
+          verify_path.write_text(verify, encoding="utf-8")
+          version_path.write_text(
+              json.dumps(version, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Verify Hunter preservation and production invariants
+        run: |
+          node scripts/verify-production-frontend.cjs
+          node --experimental-vm-modules tests/ladder-v1.cjs
+          node --experimental-vm-modules tests/ladder-settlement.cjs
+
+      - name: Commit verified restoration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "bxh-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html scripts/verify-production-frontend.cjs version.json
+          git commit -m "fix(hunter): restore historical profile data"
+          git push origin HEAD:main
