@@ -14486,7 +14486,18 @@ function buildCelebrationData(rec){
     if(fmt==="single" && !rec.meta.bronzeMatch){
       const total = numRoundsTotal();
       const semis = matchesInRound(total-2).filter(m=>!m.isBye);
-      const names = semis.map(m=>m.loserId).filter(Boolean).map(id=>recName(rec,id));
+      // Some completed/legacy cloud records have winnerId but no persisted loserId.
+      // Recover the loser from the two player slots so 3-player single elimination
+      // still renders its sole third-place finisher correctly.
+      const semiLoserIds = semis.map(m=>{
+        if(m.loserId) return m.loserId;
+        if(!m.winnerId) return null;
+        const aId=m.a&&m.a.playerId, bId=m.b&&m.b.playerId;
+        if(m.winnerId===aId) return bId||null;
+        if(m.winnerId===bId) return aId||null;
+        return null;
+      }).filter(Boolean);
+      const names = [...new Set(semiLoserIds)].map(id=>recName(rec,id)).filter(Boolean);
       if(names.length) thirdLabel = names.join("、");
     } else if(fmt==="roundrobin" && !rec.thirdId){
       const standings = computeRoundRobinStandings();
@@ -23057,7 +23068,11 @@ function renderHistoryDetail(rec){
     return `<tr><td>${i+1}</td><td>Court ${Number(m.confirmedStation||m.station||0)||"—"}</td><td>${esc(a)} <b>${Number(m.scoreA||0)} : ${Number(m.scoreB||0)}</b> ${esc(b)}</td><td>${esc(winner)}</td><td>${esc(judge)}</td><td>${m.confirmedAt?esc(new Date(Number(m.confirmedAt)).toLocaleString()):"—"}</td></tr>`;
   }).join("");
 
-  const championHtml = rec.championId ? `<div class="panel postmatch-ranking"><div class="panel-title">最終名次</div><div class="postmatch-podium"><div><span>冠軍</span><b>${esc(recName(rec,rec.championId))}</b></div><div><span>亞軍</span><b>${rec.runnerUpId?esc(recName(rec,rec.runnerUpId)):"—"}</b></div><div><span>季軍</span><b>${rec.thirdId?esc(recName(rec,rec.thirdId)):"—"}</b></div><div><span>殿軍</span><b>${rec.fourthId?esc(recName(rec,rec.fourthId)):"—"}</b></div></div><div class="btn-row" style="margin-top:14px;"><button class="btn btn-primary btn-sm" data-action="view-celebration" data-id="${rec.id}">查看最終排名慶祝畫面</button></div></div>` : "";
+  const postmatchCelebration = rec.championId ? buildCelebrationData(rec) : null;
+  const postmatchThird = postmatchCelebration
+    ? (postmatchCelebration.thirdName || postmatchCelebration.thirdLabel || "—")
+    : "—";
+  const championHtml = rec.championId ? `<div class="panel postmatch-ranking"><div class="panel-title">最終名次</div><div class="postmatch-podium"><div><span>冠軍</span><b>${esc(recName(rec,rec.championId))}</b></div><div><span>亞軍</span><b>${rec.runnerUpId?esc(recName(rec,rec.runnerUpId)):"—"}</b></div><div><span>季軍</span><b>${esc(postmatchThird)}</b></div><div><span>殿軍</span><b>${rec.fourthId?esc(recName(rec,rec.fourthId)):"—"}</b></div></div><div class="btn-row" style="margin-top:14px;"><button class="btn btn-primary btn-sm" data-action="view-celebration" data-id="${rec.id}">查看最終排名慶祝畫面</button></div></div>` : "";
 
   return `<div class="postmatch-center">
   <div class="panel postmatch-hero">
