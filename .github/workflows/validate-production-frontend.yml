@@ -2,6 +2,17 @@ name: Validate Production Frontend RC1
 
 on:
   workflow_dispatch:
+    inputs:
+      risk_override:
+        description: 'Acceptance-test override only (auto/low/medium/high)'
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - low
+          - medium
+          - high
   pull_request:
   push:
     branches: [ main ]
@@ -41,6 +52,17 @@ jobs:
           level=low
           run_ui=false
           run_e2e=false
+          override="${{ github.event.inputs.risk_override || 'auto' }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$override" != "auto" ]; then
+            level="$override"
+            [ "$override" = "medium" ] && run_ui=true
+            if [ "$override" = "high" ]; then run_ui=true; run_e2e=true; fi
+            echo "level=$level" >> "$GITHUB_OUTPUT"
+            echo "run_ui=$run_ui" >> "$GITHUB_OUTPUT"
+            echo "run_e2e=$run_e2e" >> "$GITHUB_OUTPUT"
+            echo "Safety Gate acceptance override risk=$level ui=$run_ui e2e=$run_e2e"
+            exit 0
+          fi
           if echo "$files" | grep -Eq '^(index[.]html|firebase|firestore|functions/|tests/e2e/|playwright|package(-lock)?[.]json|scripts/run-regression-core[.]cjs|[.]github/workflows/)'; then
             level=high
             run_ui=true
