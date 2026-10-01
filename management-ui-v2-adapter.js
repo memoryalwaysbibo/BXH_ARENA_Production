@@ -46,51 +46,41 @@
     options=options||{};
     const model=global.BXH_MANAGEMENT_UI_V2;
     const host=options.host;
-    const root=options.root||document;
     if(!model||!host)return {ok:false,reason:"missing-model-or-host"};
 
-    let tabs=discoverTabs(root,options.tabSelectors);
+    // The canonical app already supplies the permitted tab manifest and active
+    // tab on every render. V2 must only render navigation; it must never scan
+    // or observe the whole application DOM.
     const manifest=String(host.dataset.visibleTabs||"").split(",").map(x=>x.trim()).filter(Boolean);
-    let visible=(manifest.length?manifest:[...tabs.keys()]).filter(k=>model.LABELS[k]);
+    const visible=manifest.filter(k=>model.LABELS[k]);
     if(!visible.length)return {ok:false,reason:"no-compatible-tabs"};
+    const active=String(host.dataset.activeTab||visible[0]||"");
 
-    function draw(){
-      tabs=discoverTabs(root,options.tabSelectors);
-      visible=(manifest.length?manifest:[...tabs.keys()]).filter(k=>model.LABELS[k]);
-      const active=activeKey(tabs);
-      model.mount({
-        host,
-        activeTab:active,
-        visibleTabs:visible,
-        onTab:key=>{ if(activate(tabs,key)) scheduleDraw(); },
-        onGroup:key=>{ if(activate(tabs,key)) scheduleDraw(); }
-      });
+    function activate(key){
+      if(!key)return false;
+      const proxy=document.createElement("button");
+      proxy.type="button";
+      proxy.hidden=true;
+      proxy.dataset.action="switch-tab";
+      proxy.dataset.tab=key;
+      host.appendChild(proxy);
+      proxy.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}));
+      proxy.remove();
+      return true;
     }
 
-    draw();
-    let drawQueued=false,drawing=false;
-    function scheduleDraw(){
-      if(drawQueued||drawing)return;
-      drawQueued=true;
-      requestAnimationFrame(()=>{
-        drawQueued=false;
-        if(!host.isConnected)return;
-        drawing=true;
-        try{draw();}finally{drawing=false;}
-      });
-    }
-    const observer=new MutationObserver(mutations=>{
-      // Ignore mutations inside the V2 host itself. model.mount() replaces host
-      // contents, which otherwise creates a self-triggering redraw loop.
-      const external=mutations.some(m=>m.target!==host&&!host.contains(m.target));
-      if(external)scheduleDraw();
+    model.mount({
+      host,
+      activeTab:active,
+      visibleTabs:visible,
+      onTab:key=>activate(key),
+      onGroup:key=>activate(key)
     });
-    if(options.observe!==false)observer.observe(root,{subtree:true,attributes:true,attributeFilter:["class","aria-selected","aria-current"]});
 
     return {
       ok:true,
-      refresh:draw,
-      destroy(){observer.disconnect();host.replaceChildren();},
+      refresh(){return true;},
+      destroy(){host.replaceChildren();},
       get visibleTabs(){return visible.slice();}
     };
   }
