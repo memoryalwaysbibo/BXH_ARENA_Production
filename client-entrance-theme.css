@@ -4261,3 +4261,32 @@ button.btn-primary,
   }
 }
 /* ==== /DEPLOY-05A mobile bracket visual hotfix ==== */
+
+
+/* ==== DEPLOY-05A pass 2: compact bracket spacing / final label clearance ==== */
+#board-canvas .se-bracket-outer:has(.se-finals-champion-card){
+  padding-right:228px;
+}
+#board-canvas .se-finals-champion-card{
+  right:4px !important;
+  transform:translateX(18px);
+}
+#board-canvas .se-final-match,
+#board-canvas [data-se-round="final"]{
+  margin-right:28px;
+}
+@media(max-width:640px){
+  #board-canvas .se-bracket-outer:has(.se-finals-champion-card){
+    padding-right:216px;
+    margin-top:-28px;
+  }
+  #board-canvas .se-finals-champion-card{
+    right:0 !important;
+    transform:translateX(26px);
+  }
+  #board-canvas .se-final-match,
+  #board-canvas [data-se-round="final"]{
+    margin-right:36px;
+  }
+}
+/* ==== /DEPLOY-05A pass 2 ==== */
