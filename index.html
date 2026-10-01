@@ -2402,9 +2402,20 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   .hoc-laurel{width:26px;height:60px;}
   .hoc-trophy-wrap{width:80px;height:80px;}
   .hoc-trophy-svg{width:68px;height:68px;}
-  .hoc-ranks-row{flex-direction:column;align-items:center;gap:12px;margin-top:26px;}
-  .hoc-rank-card{width:100%;max-width:260px;flex-direction:row;text-align:left;gap:12px;padding:12px 16px;}
-  .hoc-rank-medal{margin-bottom:0;}
+  .hoc-ranks-row{flex-direction:column;align-items:stretch;gap:10px;margin-top:26px;padding:0 8px;}
+  .hoc-rank-card{
+    width:100%;max-width:none;min-height:78px;
+    display:grid;grid-template-columns:48px 96px minmax(0,1fr);grid-template-rows:auto auto;
+    align-items:center;text-align:left;column-gap:12px;row-gap:2px;padding:10px 14px;
+  }
+  .hoc-rank-medal{grid-column:1;grid-row:1 / span 2;width:40px;height:56px;margin:0;justify-self:center;}
+  .hoc-rank-cn{grid-column:2;grid-row:1;font-size:15px;line-height:1.15;letter-spacing:1.5px;white-space:nowrap;align-self:end;}
+  .hoc-rank-en{grid-column:2;grid-row:2;font-size:8px;line-height:1.15;letter-spacing:1.3px;white-space:nowrap;margin:0;align-self:start;}
+  .hoc-rank-name{
+    grid-column:3;grid-row:1 / span 2;align-self:center;margin:0;padding-left:14px;
+    border-left:1px solid rgba(255,255,255,0.16);font-size:clamp(19px,5.7vw,25px);line-height:1.12;
+    white-space:nowrap;word-break:keep-all;overflow:hidden;text-overflow:ellipsis;
+  }
   .hoc-actions{max-width:100%;}
   .hoc-btn{flex:1 1 45%;max-width:none;}
 }
