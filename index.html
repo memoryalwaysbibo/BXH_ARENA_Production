@@ -23373,7 +23373,7 @@ let entranceThemeAccountUid=(()=>{
 let accountThemeOpen=false;
 let accountInterfaceOpen=false;
 const BXH_MANAGEMENT_UI_PREF_KEY="bxh.management.ui.version.v1";
-function managementUiPreference(){try{return localStorage.getItem(BXH_MANAGEMENT_UI_PREF_KEY)==="v2"?"v2":"v1";}catch(e){return "v1";}}
+function managementUiPreference(){try{return window.BXH_INTERFACE_PREFERENCE?.get?.()||(localStorage.getItem(BXH_MANAGEMENT_UI_PREF_KEY)==="v2"?"v2":"v1");}catch(e){return "v1";}}
 function restoreAccountInterfaceTheme(uid,profile){
   let saved=null;
   try{saved=localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+uid);}catch(e){}
@@ -23458,7 +23458,7 @@ function interfacePickerHtml(){
     </button>
     ${accountInterfaceOpen?`<div class="account-theme-panel"><div class="account-theme-grid">
       <button type="button" class="account-theme-card ${current==="v1"?"is-active":""}" data-action="set-management-interface" data-version="v1"><span class="account-theme-card-copy"><strong>V1 經典版</strong><small>目前正式管理介面</small></span><span class="account-theme-check">✓</span></button>
-      <button type="button" class="account-theme-card" disabled aria-disabled="true" title="V2 尚在驗收"><span class="account-theme-card-copy"><strong>V2 新版</strong><small>驗收完成後開放</small></span><span class="account-theme-check">—</span></button>
+      <button type="button" class="account-theme-card ${current==="v2"?"is-active":""}" data-action="set-management-interface" data-version="v2"><span class="account-theme-card-copy"><strong>V2 新版</strong><small>新版管理介面</small></span><span class="account-theme-check">✓</span></button>
     </div></div>`:""}
   </div>`;
 }
@@ -23476,6 +23476,7 @@ function accountMenuItemsHtml(){
     ${(userProfile && roleAllowsMode(userProfile.role,"admin",userProfile)) ? `<button data-action="switch-to-admin-mode">切換至管理模式</button>` : ""}
     <button data-action="account-open-checkin">每日簽到</button>
     ${themePickerHtml()}
+    ${interfacePickerHtml()}
     <button data-action="account-back-to-role">返回身分選擇</button>
     <button data-action="account-logout" class="danger">登出系統</button>
   ` : `
@@ -23483,6 +23484,7 @@ function accountMenuItemsHtml(){
     ${isSuperAdmin() ? `<button data-action="open-account-management">帳號管理</button>` : ""}
     ${(userProfile && roleAllowsMode(userProfile.role,"player")) ? `<button data-action="switch-to-player-mode">切換至玩家模式</button><button data-action="account-open-checkin">每日簽到</button>` : ""}
     ${themePickerHtml()}
+    ${interfacePickerHtml()}
     <button data-action="account-change-password">變更密碼</button>
     <button data-action="account-back-to-role">返回身分選擇</button>
     <button data-action="account-logout" class="danger">登出系統</button>
@@ -24072,9 +24074,9 @@ function renderApp(){
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
       ${tournamentViewContextHeaderHtml()}
-      <nav class="tabs">
-        ${tabs.map(t=>`<button class="${activeTab===t[0]?'active':''}" data-action="switch-tab" data-tab="${t[0]}">${t[1]}</button>`).join("")}
-      </nav>
+      ${(typeof window!=="undefined" && window.BXH_INTERFACE_PREFERENCE?.get?.()==="v2")
+        ? '<div id="bxh-management-v2-nav" data-active-tab="'+esc(activeTab)+'" data-visible-tabs="'+esc(tabs.map(t=>t[0]).join(","))+'"></div>'
+        : '<nav class="tabs">'+tabs.map(t=>'<button class="'+(activeTab===t[0]?'active':'')+'" data-action="switch-tab" data-tab="'+t[0]+'">'+t[1]+'</button>').join("")+'</nav>'}
     </div>
     ${accountMenuOverlayHtml()}
     <main>${isPartnerOrganizerMode()?`<div class="banner warn"><span><b>活動主辦模式</b>｜${esc(partnerOrganizerGrant().organizationName||partnerOrganizerGrant().organizationId)}｜方案 ${esc(partnerOrganizerGrant().planCode||partnerOrganizerGrant().plan||"—")}；僅能管理本合作帳號建立的賽事。</span></div>`:""}${isEventStaffMode()?`<div class="banner warn"><span><b>工作人員（活動）模式</b>｜權限僅限受邀且仍有效的活動；活動主辦失去授權時會立即停止操作，既有資料不會刪除。</span></div>`:""}${renderSystemClosureNotice(state)}<div class="mode-management-context">${adminManagementContextHtml()}</div>${testSandboxBannerHtml()}${content}</main>
@@ -26578,7 +26580,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="toggle-account-interface"){ accountInterfaceOpen=!accountInterfaceOpen; accountThemeOpen=false; render(); return; }
-  if(action==="set-management-interface"){ const v=target.getAttribute("data-version"); if(v==="v1"){try{localStorage.setItem(BXH_MANAGEMENT_UI_PREF_KEY,"v1");}catch(e){} accountInterfaceOpen=false; showToast("已使用 V1 經典管理介面"); render();} return; }
+  if(action==="set-management-interface"){ const v=target.getAttribute("data-version"); if(v==="v1"||v==="v2"){try{localStorage.setItem(BXH_MANAGEMENT_UI_PREF_KEY,v);window.BXH_INTERFACE_PREFERENCE?.set?.(v);}catch(e){} accountInterfaceOpen=false; showToast(v==="v2"?"已切換 V2 新版管理介面":"已使用 V1 經典管理介面"); render();} return; }
   if(action==="toggle-account-theme"){
     accountThemeOpen=!accountThemeOpen;
     render();
@@ -32376,5 +32378,14 @@ window.addEventListener("bxh-offline-queue-change",(e)=>{offlineQueueStatus=Obje
 <link rel="stylesheet" href="card-reward-mail.css?v=20261001-1">
 <script src="title-reward-mail.js?v=20260930-1"></script>
 <script src="card-reward-mail.js?v=20261001-1"></script>
+<link rel="stylesheet" href="management-ui-v2.css?v=20261001-ui-v2">
+<link rel="stylesheet" href="interface-preference.css?v=20261001-ui-v2">
+<link rel="stylesheet" href="player-identity-ui.css?v=20261001-ui-v2">
+<script src="management-ui-v2.js?v=20261001-ui-v2"></script>
+<script src="management-ui-v2-adapter.js?v=20261001-ui-v2"></script>
+<script src="interface-preference.js?v=20261001-ui-v2"></script>
+<script src="my-interface-ui.js?v=20261001-ui-v2"></script>
+<script src="player-identity-ui.js?v=20261001-ui-v2"></script>
+<script src="management-ui-v2-bootstrap.js?v=20261001-ui-v2"></script>
 </body>
 </html>

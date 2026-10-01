@@ -1,0 +1,9 @@
+/* BXH ARENA — player identity */
+.bxh-player-identity{display:flex;min-width:0;color:var(--white,#f4f5f2)}
+.bxh-player-identity--stacked{flex-direction:column;align-items:flex-start;gap:3px}
+.bxh-player-identity--inline{flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap}
+.bxh-player-identity__name{font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.bxh-player-identity__title{display:inline-flex;align-items:center;gap:5px;min-width:0;color:var(--gold,#d9b95c);font-size:.82em;font-weight:700;line-height:1.1}
+.bxh-player-identity__title-icon{width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;object-fit:contain;flex:0 0 28px}
+.bxh-player-identity__title span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:430px){.bxh-player-identity__title-icon{width:26px;height:26px;min-width:26px;min-height:26px;max-width:26px;max-height:26px;flex-basis:26px}}

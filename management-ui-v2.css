@@ -1,0 +1,49 @@
+/* BXH ARENA Management UI V2 — isolated two-level top navigation */
+nav.management-v2-groups,
+nav.management-v2-children{
+  display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x;
+}
+nav.management-v2-groups::-webkit-scrollbar,
+nav.management-v2-children::-webkit-scrollbar{display:none}
+nav.management-v2-groups{
+  gap:6px;padding:8px 12px 6px;background:var(--bg-soft);border-bottom:0;
+}
+nav.management-v2-children{
+  gap:4px;padding:0 12px 8px;background:var(--bg-soft);border-bottom:1px solid var(--border);
+}
+nav.management-v2-groups button,
+nav.management-v2-children button{
+  appearance:none;border:1px solid transparent;background:transparent;color:var(--metal);
+  font-family:var(--font-d);font-weight:700;white-space:nowrap;flex:0 0 auto;min-width:max-content;
+}
+nav.management-v2-groups button{
+  min-height:38px;padding:7px 15px;border-radius:999px;font-size:14px;letter-spacing:.6px;
+}
+nav.management-v2-groups button.active{
+  color:#0a0a0a;background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 1px rgba(217,185,92,.12);
+}
+nav.management-v2-children button{
+  min-height:36px;padding:7px 13px;border-radius:8px;font-size:13px;letter-spacing:.25px;
+}
+nav.management-v2-children button.active{
+  color:var(--neon);border-color:var(--neon-dim);background:rgba(233,255,46,.06);
+}
+nav.management-v2-children button:not(.active):hover{color:var(--white);background:var(--panel-2)}
+@media(max-width:640px){
+  nav.management-v2-groups{padding:7px 10px 5px;gap:5px}
+  nav.management-v2-children{padding:0 10px 7px}
+  nav.management-v2-groups button{min-height:34px;padding:6px 13px;font-size:13px}
+  nav.management-v2-children button{min-height:34px;padding:6px 11px;font-size:12px}
+}
+
+/* Mobile field mode: keep the two rails compact and reachable on narrow iPhones. */
+@media(max-width:430px){
+  nav.management-v2-groups{scroll-snap-type:x proximity}
+  nav.management-v2-groups button{scroll-snap-align:center}
+  nav.management-v2-children{scroll-snap-type:x proximity}
+  nav.management-v2-children button{scroll-snap-align:center}
+}
+@media(prefers-reduced-motion:reduce){
+  nav.management-v2-groups,nav.management-v2-children{scroll-behavior:auto!important}
+}
