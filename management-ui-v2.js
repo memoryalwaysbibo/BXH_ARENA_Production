@@ -8,6 +8,7 @@
     {id:"event",label:"賽事",tabs:["management","registrations","settings","people"]},
     {id:"field",label:"現場",tabs:["live","bracket","referee","duty"]},
     {id:"ranking",label:"排行",tabs:["ladder"]},
+    {id:"hunter",label:"獵人",tabs:[],placeholder:true},
     {id:"activity",label:"活動",tabs:["member-raffles","inventory-admin"]},
     {id:"system",label:"系統",tabs:["operations","history","version"]}
   ];
@@ -30,12 +31,12 @@
   }
   function visibleGroups(visibleTabKeys){
     const allowed=new Set(visibleTabKeys||[]);
-    return GROUPS.map(g=>({...g,tabs:g.tabs.filter(t=>allowed.has(t))})).filter(g=>g.tabs.length);
+    return GROUPS.map(g=>({...g,tabs:g.tabs.filter(t=>allowed.has(t))})).filter(g=>g.tabs.length||g.placeholder);
   }
   function renderRails(activeTab,visibleTabs){
     const groups=visibleGroups(visibleTabs),selected=resolveActiveGroup(activeTab,visibleTabs);
     if(!selected)return "";
-    return '<nav class="management-v2-groups" aria-label="管理功能群組">'+groups.map(g=>'<button type="button" data-management-v2-group="'+g.id+'" class="'+(g.id===selected.id?'active':'')+'">'+g.label+'</button>').join('')+'</nav>'
+    return '<nav class="management-v2-groups" aria-label="管理功能群組">'+groups.map(g=>'<button type="button" data-management-v2-group="'+g.id+'" class="'+(g.id===selected.id?'active':'')+(g.placeholder?' is-placeholder':'')+'" '+(g.placeholder?'aria-disabled="true" title="獵人系統建置中"':'')+'>'+g.label+(g.placeholder?'<small>COMING</small>':'')+'</button>').join('')+'</nav>'
       +'<nav class="management-v2-children" aria-label="'+selected.label+'子選單">'+selected.tabs.map(t=>'<button type="button" data-management-v2-tab="'+t+'" class="'+(t===activeTab?'active':'')+'">'+(LABELS[t]||t)+'</button>').join('')+'</nav>';
   }
   function mount(options){
@@ -45,6 +46,7 @@
       const group=e.target.closest('[data-management-v2-group]'),tab=e.target.closest('[data-management-v2-tab]');
       if(group&&typeof options.onGroup==='function'){
         const groupId=group.dataset.managementV2Group;
+        const groupModel=GROUPS.find(g=>g.id===groupId);if(groupModel&&groupModel.placeholder)return;
         const currentGroup=resolveActiveGroup(options.activeTab,visible);
         // A one-item group (e.g. 排行) is already its destination when active.
         // Re-clicking it must be a no-op instead of dispatching the same tab again.
