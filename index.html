@@ -14497,6 +14497,17 @@ function buildCelebrationData(rec){
   let thirdLabel = null;
   try{
     const fmt = rec.meta.formatType || "single";
+    // Completed 3-player single-elimination records created before the core
+    // placement fix may still have thirdId=null. Heal the in-memory historical
+    // snapshot at read/render time without requiring the archived record to be
+    // reopened or rewritten.
+    if(fmt==="single" && !rec.meta.bronzeMatch && !rec.thirdId && rec.championId && rec.runnerUpId){
+      const eligible=tournamentEligiblePlayers(rec.players,rec.meta,rec.matches);
+      if(eligible.length===3){
+        const remaining=eligible.filter(p=>p&&p.id!==rec.championId&&p.id!==rec.runnerUpId);
+        if(remaining.length===1) rec.thirdId=remaining[0].id;
+      }
+    }
     if(fmt==="single" && !rec.meta.bronzeMatch){
       const total = numRoundsTotal();
       const semis = matchesInRound(total-2).filter(m=>!m.isBye);
