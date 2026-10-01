@@ -62,13 +62,29 @@
         host,
         activeTab:active,
         visibleTabs:visible,
-        onTab:key=>{ if(activate(tabs,key)) queueMicrotask(draw); },
-        onGroup:key=>{ if(activate(tabs,key)) queueMicrotask(draw); }
+        onTab:key=>{ if(activate(tabs,key)) scheduleDraw(); },
+        onGroup:key=>{ if(activate(tabs,key)) scheduleDraw(); }
       });
     }
 
     draw();
-    const observer=new MutationObserver(()=>draw());
+    let drawQueued=false,drawing=false;
+    function scheduleDraw(){
+      if(drawQueued||drawing)return;
+      drawQueued=true;
+      requestAnimationFrame(()=>{
+        drawQueued=false;
+        if(!host.isConnected)return;
+        drawing=true;
+        try{draw();}finally{drawing=false;}
+      });
+    }
+    const observer=new MutationObserver(mutations=>{
+      // Ignore mutations inside the V2 host itself. model.mount() replaces host
+      // contents, which otherwise creates a self-triggering redraw loop.
+      const external=mutations.some(m=>m.target!==host&&!host.contains(m.target));
+      if(external)scheduleDraw();
+    });
     if(options.observe!==false)observer.observe(root,{subtree:true,attributes:true,attributeFilter:["class","aria-selected","aria-current"]});
 
     return {
