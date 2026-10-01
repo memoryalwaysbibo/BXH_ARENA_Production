@@ -1,0 +1,24 @@
+.card-album-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.card-album-head select{min-width:160px;max-width:100%;padding:9px 12px;border-radius:9px;background:#151c2a;color:#fff;border:1px solid #8c7855}
+.card-album-note{margin:10px 0 18px;line-height:1.7}
+.card-album-set{margin-bottom:20px}
+.card-album-set-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.card-album-set-head h3{margin:0}
+.card-album-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.card-album-slot{position:relative;min-width:0;aspect-ratio:2/3;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;border:1px solid #696b73;border-radius:10px;background:linear-gradient(145deg,#30343d,#161a22);color:#adb2bc;text-align:center;filter:grayscale(1);cursor:default}
+.card-album-slot span{font-size:clamp(18px,2.3vw,28px);font-weight:700}
+.card-album-slot small{font-size:12px}
+.card-album-slot img{display:block;width:100%;height:100%;object-fit:cover;border-radius:9px;opacity:.62}
+.card-album-slot .card-album-lock{position:absolute;left:0;right:0;bottom:0;padding:7px 3px;background:#111b;color:#fff;font-size:11px;line-height:1.4}
+.card-album-slot .card-album-lock strong{display:block;font-size:12px}
+.card-album-slot.owned{filter:none;cursor:pointer;padding:0;overflow:hidden;border-color:#c9a34f;box-shadow:0 0 14px #e6bb3c28}
+.card-album-slot.owned img{opacity:1}
+.card-album-count{position:absolute;right:6px;top:6px;font-size:13px!important;padding:1px 6px;border-radius:6px;color:#fff;background:#111b}
+.card-album-preview-overlay{position:fixed;inset:0;background:#02040adb;z-index:10000;display:grid;place-items:center;padding:16px}
+.card-album-preview{max-width:min(440px,95vw);max-height:94dvh;overflow:auto;text-align:center}
+.card-album-preview img{width:min(300px,75vw);max-height:65dvh;object-fit:contain;display:block;margin:12px auto}
+.card-album-trades label{display:inline-flex;flex-direction:column;gap:5px;margin:6px 8px 6px 0}
+.card-album-trades input,.card-album-trades select{min-height:40px;background:#151c2a;color:#fff;border:1px solid #8c7855;border-radius:8px;padding:6px 9px}
+.card-album-trade-row{padding:8px 0;border-bottom:1px solid #fff2}
+.card-album-targets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+@media(max-width:700px){.card-album-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}}

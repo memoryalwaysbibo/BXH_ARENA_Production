@@ -1,0 +1,12 @@
+{
+  "status": "STAGED_ONLY_NOT_DEPLOYED",
+  "parent_m1_commit": "f5a890b831d3bb736df0022829c08a89987f6c1f",
+  "source_index_blob": "f5c5d2205d26aeedd340c8a822b4f3fecefa377b",
+  "candidate_index_blob": "52a33590b3ca5a9d118aaeae70cd9d16f78baceb",
+  "css_sha256": "034f6ce6fe55540c7a495d23480ad9723795df374a9e5bf1cde91afdde5f2789",
+  "source_index_bytes": 2396206,
+  "candidate_index_bytes": 2393788,
+  "extracted_css_bytes": 2478,
+  "stylesheet": "modules/card-album/styles.css",
+  "relative_urls": 0
+}
