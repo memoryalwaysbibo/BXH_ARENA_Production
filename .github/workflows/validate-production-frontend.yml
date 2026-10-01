@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - id: risk
         shell: bash
         run: |
@@ -42,9 +42,10 @@ jobs:
           run_ui=false
           run_e2e=false
           if echo "$files" | grep -Eq '^(index\.html|firebase|firestore|functions/|tests/e2e/|playwright|package(-lock)?\.json|scripts/run-regression-core\.cjs|\.github/workflows/)'; then
-            level=high; run_ui=true; run_e2e=true
-          elif echo "$files" | grep -Eq '\.(js|cjs|mjs|html)
-  validate:
+            level=high
+            run_ui=true
+            run_e2e=true
+          elif echo "$files" | grep -Eq '\.(js|cjs|mjs|html)  validate:
     needs: classify
     runs-on: ubuntu-latest
     steps:
@@ -223,14 +224,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 ; then
-            level=medium; run_ui=true
+            level=medium
+            run_ui=true
           fi
           echo "level=$level" >> "$GITHUB_OUTPUT"
           echo "run_ui=$run_ui" >> "$GITHUB_OUTPUT"
           echo "run_e2e=$run_e2e" >> "$GITHUB_OUTPUT"
           echo "Safety Gate risk=$level ui=$run_ui e2e=$run_e2e"
 
-jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
