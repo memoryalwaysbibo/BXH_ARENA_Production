@@ -38,8 +38,8 @@ function replaceOnce(source, needle, replacement, label) {
   return source.slice(0, at) + replacement + source.slice(at + needle.length);
 }
 
-function injectFirebaseEmulators(html) {
-  let out = html;
+function injectFirebaseEmulators(source) {
+  let out = source;
 
   out = replaceOnce(
     out,
@@ -98,14 +98,13 @@ const server = http.createServer((req,res)=>{
       return;
     }
 
-    if (emulatorMode && file === path.join(root, 'index.html')) {
+    if (emulatorMode && file === path.join(root, 'modules', 'cloud', 'cloud-runtime.js')) {
       try {
         const original = fs.readFileSync(file, 'utf8');
         const transformed = injectFirebaseEmulators(original);
         res.writeHead(200, {
-          'content-type':'text/html; charset=utf-8',
-          'cache-control':'no-store',
-          'x-bxh-e2e-emulator':'1'
+          'content-type':'text/javascript; charset=utf-8',
+          'cache-control':'no-store'
         });
         res.end(transformed);
       } catch (error) {
@@ -114,6 +113,10 @@ const server = http.createServer((req,res)=>{
         res.end('E2E emulator injection failed');
       }
       return;
+    }
+
+    if (emulatorMode && file === path.join(root, 'index.html')) {
+      res.setHeader('x-bxh-e2e-emulator','1');
     }
 
     res.writeHead(200,{
