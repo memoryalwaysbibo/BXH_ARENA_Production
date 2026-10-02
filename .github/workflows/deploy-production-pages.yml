@@ -59,10 +59,15 @@ jobs:
           test -f index.html
           bytes="$(wc -c < index.html | tr -d ' ')"
           lines="$(wc -l < index.html | tr -d ' ')"
-          if [ "$bytes" -lt 100000 ] || [ "$lines" -lt 1000 ]; then
+          # Core modularization intentionally shrank index.html. Guard the shell
+          # entrypoint itself, then verify the modular runtime assets it delegates to.
+          if [ "$bytes" -lt 50000 ] || [ "$lines" -lt 150 ]; then
             echo "DEPLOY BLOCKED: index.html looks empty or truncated: bytes=$bytes lines=$lines" >&2
             exit 1
           fi
+          test -s modules/main-app/core.js
+          test -s modules/cloud/cloud-runtime.js
+          test -s modules/main-app/domain-utils.js
           grep -qi '<!doctype html' index.html
           grep -qi '<html' index.html
           grep -q 'BXH ARENA' index.html
