@@ -69,6 +69,10 @@ function hunterRecordHasTrustedScore(record){
   const scoreFor=Number(record.scoreFor),scoreAgainst=Number(record.scoreAgainst);
   return Number.isFinite(scoreFor)&&Number.isFinite(scoreAgainst)&&scoreFor>=0&&scoreAgainst>=0;
 }
+function hunterRecordScoreText(record){
+  return hunterRecordHasTrustedScore(record)?String(Number(record.scoreFor))+" / "+String(Number(record.scoreAgainst)):"比分未驗證";
+}
+
 function hunterCareerSummary(records){
   const rows=Array.isArray(records)?records:[];
   let wins=0,losses=0,totalFor=0,totalAgainst=0,validRounds=0,scoredMatches=0;
@@ -134,6 +138,6 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();
