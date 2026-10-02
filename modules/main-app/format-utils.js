@@ -37,4 +37,8 @@ function smartCallEtaText(sec){
   const min=Math.max(1,Math.round(sec/60)); const lo=Math.max(1,min-1), hi=min+1; return lo===hi?`約 ${min} 分鐘`:`約 ${lo}～${hi} 分鐘`;
 }
 
-Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText});
+function registrationStatusLabel(v){
+  return ({open:"開放報名",scheduled:"即將開放",full:"已額滿",closed:"已截止",started:"已開賽",cancelled:"已取消"})[v] || (v||"未設定");
+}
+
+Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel});
