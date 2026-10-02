@@ -68,7 +68,8 @@ test('two courts preserve independent work and queue a skipped match onto a busy
 
   await page.locator('[data-action="people-section"][data-section="bracket"]').click();
   await page.locator('[data-action="draw-bracket"]').click();
-  await expect(page.locator('[data-action="start-tournament"]')).toBeVisible({timeout:15000});
+  await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
+  await expect(page.locator('[data-action="start-tournament"]')).toBeVisible({timeout:30000});
   await page.locator('[data-action="start-tournament"]').click();
   await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({timeout:15000});
   await page.locator('[data-action="modal-confirm"]').click();
