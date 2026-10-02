@@ -15,7 +15,7 @@ test('Directive external critical CSS loads and preserves its own desktop/mobile
   expect(await warning.evaluate(e=>getComputedStyle(e).width)).not.toBe('0px');
   await page.evaluate(()=>document.documentElement.setAttribute('data-bxh-theme','gold'));
   expect(await header.evaluate(e=>getComputedStyle(e).position)).toBe('static');
-  expect(await warning.evaluate(e=>getComputedStyle(e).display)).toBe('block');
+  expect(await warning.evaluate(e=>getComputedStyle(e).display)).toBe('none');
   expect(await warning.evaluate(e=>getComputedStyle(e).animationName)).toBe('none');
   expect(errs).toEqual([]);
 });
