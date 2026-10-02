@@ -1,0 +1,36 @@
+name: Staff assignment real-name verification
+on:
+  push:
+    branches: [fix/staff-assignment-realname-20261002]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Inspect staff assignment source (code only)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          needles = [r'被分派的工作人員', r'staffDirectory', r'function\s+\w*[Ss]taff\w*', r'儲存分派名單']
+          files = [Path('modules/main-app/core.js')] + list(Path('modules').glob('*.js'))
+          for path in files:
+              lines = path.read_text().splitlines()
+              selected = set()
+              for i, line in enumerate(lines):
+                  if any(re.search(n, line) for n in needles):
+                      selected.update(range(max(0, i-8), min(len(lines), i+48)))
+              if selected:
+                  print('\nSOURCE', path)
+                  previous = -2
+                  for i in sorted(selected):
+                      if i != previous + 1: print('...')
+                      print(f'{i+1}: {lines[i]}')
+                      previous = i
+          PY
