@@ -56,8 +56,8 @@ function setup({ installBridge = true } = {}) {
   const target = { getAttribute: name => name === 'data-message-id' ? 'mail-1' : null };
   return {
     sandbox, calls, toasts, listeners, scheduled, install,
-    state: () => sandbox.cardAlbumContext(), mail: () => sandbox.mailboxContext(),
-    load: refresh => sandbox.loadCardAlbum(refresh),
+    state: () => sandbox.window.BXHCardAlbumFeature.cardAlbumContext(), mail: () => sandbox.mailboxContext(),
+    load: refresh => sandbox.window.BXHCardAlbumFeature.loadCardAlbum(refresh),
     claim: () => sandbox.handleMailbox('mailbox-card-reward', target),
     view: () => sandbox.window.BXHCardAlbumFeature.renderCardAlbumPage(),
     get: fn => { get = fn; }, list: fn => { list = fn; }, onClaim: fn => { claim = fn; },
