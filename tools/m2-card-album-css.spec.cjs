@@ -1,0 +1,25 @@
+'use strict';
+const {test,expect}=require('@playwright/test');
+const fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(process.env.BXH_M2_ROOT||process.cwd());
+test('Card Album external CSS loads exact bytes and preserves desktop/mobile rules',async({page})=>{
+  const responses=[];const errors=[];
+  page.on('response',r=>responses.push(r));page.on('pageerror',e=>errors.push(e.message));
+  await page.setViewportSize({width:1280,height:900});
+  const r=await page.goto('/tools/m2-card-album-css-fixture.html');expect(r.status()).toBe(200);
+  const cssResp=responses.find(x=>new URL(x.url()).pathname==='/modules/card-album/styles.css');
+  expect(cssResp).toBeTruthy();expect(cssResp.status()).toBe(200);
+  expect(await cssResp.body()).toEqual(fs.readFileSync(path.join(root,'modules/card-album/styles.css')));
+  const grid=page.locator('.card-album-grid');
+  expect((await grid.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length))).toBe(6);
+  const owned=page.locator('.card-album-slot.owned');
+  expect(await owned.evaluate(el=>getComputedStyle(el).cursor)).toBe('pointer');
+  expect(await owned.evaluate(el=>getComputedStyle(el).filter)).toBe('none');
+  const overlay=page.locator('.card-album-preview-overlay');
+  expect(await overlay.evaluate(el=>getComputedStyle(el).position)).toBe('fixed');
+  expect(await overlay.evaluate(el=>getComputedStyle(el).zIndex)).toBe('10000');
+  expect(await page.locator('.card-album-trades input').evaluate(el=>getComputedStyle(el).minHeight)).toBe('40px');
+  await page.setViewportSize({width:390,height:844});
+  expect((await grid.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length))).toBe(3);
+  expect(errors).toEqual([]);
+});

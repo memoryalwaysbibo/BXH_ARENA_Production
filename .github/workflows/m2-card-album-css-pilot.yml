@@ -1,0 +1,72 @@
+name: M2 Card Album CSS isolated extraction
+
+on:
+  push:
+    branches: [refactor/index-css-m2-card-album-20261002]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m2-card-album-css-isolated
+  cancel-in-progress: false
+
+jobs:
+  pilot:
+    if: github.ref == 'refs/heads/refactor/index-css-m2-card-album-20261002'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Trust only the checked-out workspace
+        shell: bash
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Verify fixed M1 parent, current M2 head and committed extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/refactor/management-v2-migration-m1-20261002 | cut -f1)" = f5a890b831d3bb736df0022829c08a89987f6c1f
+          test "$(git ls-remote origin refs/heads/refactor/index-css-m2-card-album-20261002 | cut -f1)" = "$GITHUB_SHA"
+          test "$(git hash-object index.html)" = 52a33590b3ca5a9d118aaeae70cd9d16f78baceb
+          test -f modules/card-album/styles.css
+          test -f m2-card-album-css-manifest.json
+          printf '%s  %s\n' 034f6ce6fe55540c7a495d23480ad9723795df374a9e5bf1cde91afdde5f2789 modules/card-album/styles.css | sha256sum -c -
+      - name: Verify extraction contracts and existing critical checks
+        shell: bash
+        env:
+          BXH_M2_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          node --test tools/verify-m2-card-album-css.cjs
+          node scripts/verify-production-frontend.cjs
+          node scripts/run-regression-core.cjs critical
+      - name: Install pinned browser runner
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/m2-runner" --no-package-lock --ignore-scripts @playwright/test@1.55.0
+      - name: Browser-computed Card Album style checks
+        shell: bash
+        env:
+          BXH_M2_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          export NODE_PATH="$RUNNER_TEMP/m2-runner/node_modules"
+          node "$RUNNER_TEMP/m2-runner/node_modules/@playwright/test/cli.js" test --config=tools/m2-card-album-css.config.cjs
+      - name: Record immutable read-only evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2-evidence"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/m2-evidence/tested-commit.txt"
+          printf 'READ-ONLY M2 VALIDATION. No branch write, merge or deployment.\n' > "$RUNNER_TEMP/m2-evidence/scope.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m2-card-album-css-${{ github.run_id }}
+          path: ${{ runner.temp }}/m2-evidence
+          retention-days: 7
