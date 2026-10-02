@@ -90,5 +90,8 @@ if(albumFeature&&typeof albumFeature.cardAlbumContext==='function'&&typeof album
     }catch(error){if(context===mailboxContext())context.error=mailboxError(error);}
     finally{if(context===mailboxContext()){context.busy=false;render();}}
   };
+  albumFeature.cardAlbumContext=cardAlbumContext;
+  albumFeature.loadCardAlbum=loadCardAlbum;
+  mailboxFeature.handleMailbox=handleMailbox;
 }
 })();
