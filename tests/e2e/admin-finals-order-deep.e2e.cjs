@@ -50,14 +50,16 @@ test('official single elimination enforces bronze before championship final', as
   }
 
   await page.waitForFunction(()=>{
-    const button=document.querySelector('[data-action="cloud-admin-new-tournament"]');
-    const login=document.querySelector('#auth-username');
-    return !!button || !!login;
+    return !!document.querySelector('[data-action="cloud-admin-new-tournament"]') ||
+      !!document.querySelector('[data-action="select-role-admin"]');
   },null,{timeout:60000});
-  if(await page.locator('#auth-username').isVisible().catch(()=>false)){
-    await page.locator('#auth-username').fill(email);
-    await page.locator('#auth-password').fill(secret);
-    await page.locator('[data-action="admin-login-submit"]').click();
+  if(await page.locator('[data-action="select-role-admin"]').isVisible().catch(()=>false)){
+    await page.locator('[data-action="select-role-admin"]').click();
+    if(await page.locator('#auth-username').isVisible().catch(()=>false)){
+      await page.locator('#auth-username').fill(email);
+      await page.locator('#auth-password').fill(secret);
+      await page.locator('[data-action="admin-login-submit"]').click();
+    }
   }
   await expect(page.locator('[data-action="cloud-admin-new-tournament"]').first()).toBeVisible({timeout:60000});
   await page.locator('[data-action="cloud-admin-new-tournament"]').first().click();
