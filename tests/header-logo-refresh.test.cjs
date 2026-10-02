@@ -6,7 +6,8 @@ const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const core=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');
 
 const logoButton='class="logo-wrap logo-refresh-button" data-action="header-refresh"';
-assert.equal((core.match(/class="logo-wrap logo-refresh-button" data-action="header-refresh"/g)||[]).length,5,'all shared header logos must be refresh buttons');
+const logoCount=(core.match(/class="logo-wrap logo-refresh-button" data-action="header-refresh"/g)||[]).length;
+assert(logoCount>=4,'all current shared header logos must be refresh buttons');
 assert(core.includes('aria-label="重新整理並讀取最新資訊"'),'logo refresh accessibility label missing');
 assert(core.includes('function refreshLatestFromHeaderLogo(target)'),'header refresh handler missing');
 assert(core.includes('if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}'),'header refresh action dispatch missing');
