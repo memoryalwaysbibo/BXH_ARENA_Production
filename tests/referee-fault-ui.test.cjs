@@ -9,11 +9,11 @@ const css=fs.readFileSync(path.join(root,'referee-score-v2.css'),'utf8');
 
 assert(html.includes('referee-fault-core.js?v=14.2.38-fault-v1'),'fault core must be loaded with cache bust');
 assert(core.includes('fault:1'),'fault score type must be canonical +1');
-assert(html.includes('fault:"對手失誤＋1分"'),'fault score label missing');
+assert(core.includes('fault:"對手失誤＋1分"'),'fault score label missing');
 assert(core.includes('function addFault(matchId, offendingSide)'),'fault action handler missing');
-assert(html.includes('data-action="fault"'),'referee fault button missing');
+assert(core.includes('data-action="fault"'),'referee fault button missing');
 assert(core.includes('失誤 ${count}/2'),'fault button must expose 0/2 or 1/2');
-assert(html.includes('if(action==="fault")'),'fault click dispatch missing');
+assert(core.includes('if(action==="fault")'),'fault click dispatch missing');
 assert(core.includes('faultApi.attachSnapshotToEvent(m,hunterRoundEvent)'),'normal scoring must snapshot pending faults');
 assert(core.includes('faultApi.clear(m)'),'normal scoring must clear current-round faults');
 assert(core.includes('faultApi.restoreFromEvent(m,last)'),'undo must restore pre-score fault state');
