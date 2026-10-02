@@ -4,8 +4,8 @@ const crypto = require('node:crypto');
 test('two courts preserve independent work and queue a skipped match onto a busy court', async ({ page }) => {
 
   async function dumpBracketDiagnostics(label){
-    const diag=await page.evaluate(()=>({
-      label,
+    const diag=await page.evaluate((diagnosticLabel)=>({
+      label:diagnosticLabel,
       bracketSize:state?.bracketSize,
       playersLength:state?.players?.length,
       registrationEnabled:state?.meta?.registrationEnabled,
@@ -21,7 +21,7 @@ test('two courts preserve independent work and queue a skipped match onto a busy
       modalTitle:document.querySelector('.modal-title')?.textContent?.trim()||null,
       modalMessage:document.querySelector('.modal-message')?.textContent?.trim()||null,
       visibleText:[...document.querySelectorAll('.toast,.error,.alert')].filter(x=>x.offsetParent!==null).map(x=>x.textContent?.trim()).filter(Boolean).slice(0,10)
-    }));
+    }),label);
     console.log('[P2P bracket diagnostics]',JSON.stringify(diag));
     return diag;
   }
