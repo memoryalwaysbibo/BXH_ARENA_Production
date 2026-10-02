@@ -14659,9 +14659,6 @@ function hunterAchievementRoundEvidenceRef(record,event){
   };
 }
 
-function hunterAchievementHasExactMatchTime(record){
-  return Number(record&&record.completedAt||0)>0||Number(record&&record.confirmedAt||0)>0;
-}
 function hunterAchievementOrderedRecords(records){
   return hunterUniqueRecords(records).slice().sort((a,b)=>{
     const ta=hunterRecordTimestamp(a),tb=hunterRecordTimestamp(b);
