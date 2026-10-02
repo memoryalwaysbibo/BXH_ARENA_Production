@@ -1,0 +1,31 @@
+{
+  "status": "STAGED_ONLY_NOT_DEPLOYED",
+  "base_commit": "fdd1c73c7e61e97deb0c15c325057b6301bbec37",
+  "source_index_blob": "ff61e00a1ed2ca15eff7af9a8de83aeff9141b92",
+  "entrypoint_path_replacements": 4,
+  "source_index_bytes": 2396168,
+  "candidate_index_bytes": 2396206,
+  "legacy_urls_retained": true,
+  "modules": [
+    {
+      "from": "management-ui-v2.js",
+      "to": "modules/management-v2/navigation.js",
+      "sha256": "a354606869ed0bf39a79ea5b1a40f950c10e50bc3a9e30f3422d41b6bc6b3071"
+    },
+    {
+      "from": "management-ui-v2-adapter.js",
+      "to": "modules/management-v2/adapter.js",
+      "sha256": "2a6e0e323e947c6f98fdac602876a099c2b7d995efaa2aeffbc4c33b1e6d7af7"
+    },
+    {
+      "from": "management-ui-v2-bootstrap.js",
+      "to": "modules/management-v2/bootstrap.js",
+      "sha256": "6e4eba2b62a1109a2ddcecc71b3958d57902dfc2c128e48bd11a9ff7c59c6021"
+    },
+    {
+      "from": "management-ui-v2.css",
+      "to": "modules/management-v2/styles.css",
+      "sha256": "89eee2f4817cc1b73ddf51519a09cafaff0cac662c7c58f75055b8bc12f72c9d"
+    }
+  ]
+}

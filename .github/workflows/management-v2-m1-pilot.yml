@@ -1,0 +1,70 @@
+name: V2 M1 isolated migration validation
+
+on:
+  push:
+    branches: [refactor/management-v2-migration-m1-20261002]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: management-v2-m1-isolated
+  cancel-in-progress: false
+
+jobs:
+  pilot:
+    if: github.ref == 'refs/heads/refactor/management-v2-migration-m1-20261002'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Trust only the checked-out workspace in this container
+        shell: bash
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Verify current pilot head, main baseline, and wired entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = fdd1c73c7e61e97deb0c15c325057b6301bbec37
+          test "$(git ls-remote origin refs/heads/refactor/management-v2-migration-m1-20261002 | cut -f1)" = "$GITHUB_SHA"
+          test "$(git hash-object index.html)" = f5c5d2205d26aeedd340c8a822b4f3fecefa377b
+          test -f management-v2-migration-manifest.json
+      - name: Exact-byte migration contracts and existing critical checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/v2-evidence"
+          node --test tools/verify-management-v2-migration.cjs | tee "$RUNNER_TEMP/v2-evidence/contracts.log"
+          node --test tools/verify-management-v2-update-contract.cjs | tee "$RUNNER_TEMP/v2-evidence/update-contract.log"
+          node scripts/verify-production-frontend.cjs | tee "$RUNNER_TEMP/v2-evidence/verifier.log"
+          node scripts/run-regression-core.cjs critical | tee "$RUNNER_TEMP/v2-evidence/critical.log"
+      - name: Install pinned isolated browser test runner
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/v2-runner" --no-package-lock --ignore-scripts @playwright/test@1.55.0
+      - name: HTTP resource loading and actual browser storage checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          export BXH_PILOT_ROOT="$GITHUB_WORKSPACE"
+          export BXH_PILOT_RESULTS="$RUNNER_TEMP/v2-evidence/browser"
+          export NODE_PATH="$RUNNER_TEMP/v2-runner/node_modules"
+          node "$RUNNER_TEMP/v2-runner/node_modules/@playwright/test/cli.js" test --config=tools/management-v2-http.config.cjs | tee "$RUNNER_TEMP/v2-evidence/http.log"
+      - name: Record exact tested commit and read-only scope
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/v2-evidence"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/v2-evidence/tested-commit.txt"
+          printf 'READ-ONLY VALIDATION. No branch write, merge, deployment, Firebase access, PWA or real-device acceptance.\n' > "$RUNNER_TEMP/v2-evidence/scope.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: management-v2-m1-${{ github.run_id }}
+          path: ${{ runner.temp }}/v2-evidence
+          retention-days: 7
