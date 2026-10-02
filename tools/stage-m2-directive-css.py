@@ -21,7 +21,7 @@ def main(src,out):
  if hashlib.sha256(css.encode()).hexdigest()!=CSS_SHA256: raise ValueError("Directive CSS changed")
  if "url(" in css.lower(): raise ValueError("relative URL requires review")
  cand=(t[:a]+LINK+t[b:]).encode()
- if blob(cand)!=CANDIDATE_INDEX_BLOB: raise ValueError("candidate digest mismatch")
+ actual=blob(cand)\n if actual!=CANDIDATE_INDEX_BLOB: raise ValueError("candidate digest mismatch: "+actual+" bytes="+str(len(cand)))
  shutil.copytree(src,out,ignore=shutil.ignore_patterns(".git","node_modules","__pycache__"))
  p=out/"modules/theme-directive/styles.css";p.parent.mkdir(parents=True,exist_ok=True);p.write_text(css,encoding="utf-8")
  (out/"index.html").write_bytes(cand)
