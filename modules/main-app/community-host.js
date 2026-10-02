@@ -1,3 +1,4 @@
+(function(){
 // Core Phase 2D — Community Host / player room feature module.
 // Keeps community-room labels, host rendering, create/settings and room shell together.
 function communityPhaseLabel(t){
@@ -71,3 +72,5 @@ function renderCommunityRoomApp(){
 }
 
 Object.assign(window.BXHCommunityHostFeature||(window.BXHCommunityHostFeature={}),{communityPhaseLabel,communityExpiryLabel,renderPlayerCommunityHostTab,renderCommunityCreateScreen,renderCommunitySettings,renderCommunityRoomApp});
+
+})();
