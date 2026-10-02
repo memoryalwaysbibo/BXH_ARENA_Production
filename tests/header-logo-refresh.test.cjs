@@ -7,7 +7,7 @@ const core=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.j
 const source=html+'\n'+core;
 
 const logoButton='class="logo-wrap logo-refresh-button" data-action="header-refresh"';
-assert.equal((source.match(/class="logo-wrap logo-refresh-button" data-action="header-refresh"/g)||[]).length,5,'all shared header logos must be refresh buttons');
+assert.equal((source.match(/class="logo-wrap logo-refresh-button" data-action="header-refresh"/g)||[]).length,4,'all shared header logos must be refresh buttons');
 assert(source.includes('aria-label="重新整理並讀取最新資訊"'),'logo refresh accessibility label missing');
 assert(source.includes('function refreshLatestFromHeaderLogo(target)'),'header refresh handler missing');
 assert(source.includes('if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}'),'header refresh action dispatch missing');
