@@ -68,7 +68,9 @@ test('two courts preserve independent work and queue a skipped match onto a busy
 
   await page.locator('[data-action="people-section"][data-section="bracket"]').click();
   await page.locator('[data-action="draw-bracket"]').click();
-  const confirmDraw=page.locator('[data-action="modal-confirm"]');\n  if(await confirmDraw.isVisible().catch(()=>false)) await confirmDraw.click();\n  await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
+  const confirmDraw=page.locator('[data-action="modal-confirm"]');
+  if(await confirmDraw.isVisible().catch(()=>false)) await confirmDraw.click();
+  await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
   await expect(page.locator('[data-action="start-tournament"]')).toBeVisible({timeout:30000});
   await page.locator('[data-action="start-tournament"]').click();
   await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({timeout:15000});
