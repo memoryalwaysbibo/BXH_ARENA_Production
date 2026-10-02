@@ -15211,12 +15211,7 @@ function renderPlayerRegisteredTab(){
   return `<div class="panel-title">我的賽程<button class="btn btn-ghost btn-sm" data-action="load-my-registrations">重新整理</button></div>`+scheduleGroups('registered',myRegistrationsCache,renderCard,r=>r.status==='cancelled'?'cancelled':schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}));
 }
 
-function hunterRecordTimestamp(record){
-  const completed=Number(record&&record.completedAt||0),confirmed=Number(record&&record.confirmedAt||0);
-  if(completed||confirmed) return completed||confirmed;
-  const parsed=Date.parse(String(record&&record.eventDate||""));
-  return Number.isFinite(parsed)?parsed:0;
-}
+const {hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef}=window.BXHHunterUtils;
 const HUNTER_OFFICIAL_LAUNCH_AT=Date.parse("2026-10-01T00:00:00+08:00");
 const HUNTER_PRELAUNCH_RESET_AT=Date.parse("2026-09-30T23:58:00+08:00");
 function hunterRecordIsOfficial(record){
@@ -15574,14 +15569,7 @@ function hunterResolveAchievementEvidenceRef(ref,records){
   })||null;
   return round?{record,round}:null;
 }
-function hunterAchievementDateText(ts){
-  const value=Number(ts)||0;
-  if(!value) return "日期未記錄";
-  const d=new Date(value);
-  if(Number.isNaN(d.getTime())) return "日期未記錄";
-  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
-  return y+"/"+m+"/"+day;
-}
+
 function hunterAchievementEvidenceRowHtml(ref,records,index){
   const resolved=hunterResolveAchievementEvidenceRef(ref,records);
   if(!resolved){
@@ -15734,9 +15722,7 @@ function hunterStreakSpecialAchievementsHtml(core,records){
     '<div class="hunter-achievement-meta hunter-round-achievement-total">連勝窗口與完封來源都可逐筆展開；本區不產生「剋星、無敵」等主觀標籤。</div>'+
     '</section>';
 }
-function hunterAchievementIntegrityStatusLabel(value){
-  return {loaded_history_complete:"已載入歷史無身分排除",partial_identity_exclusions:"部分歷史資料已排除",partial_read_failures:"部分賽事讀取失敗，請重試",exact:"精確完成時間",stable_fallback_used:"部分舊資料使用穩定 fallback 排序",all_matches_analyzable:"全部 Match 具可信 Round",trusted_rounds_only:"僅可信 Round 納入 Round 成就",no_matches:"目前沒有 Match",resolved:"Evidence 全部可解析",needs_review:"存在無法解析 Evidence"}[value]||String(value||"—");
-}
+
 function hunterAchievementIntegrityAuditHtml(audit){
   if(!audit)return "";
   const evidenceOk=audit.evidenceResolution==="resolved",identityOk=audit.countCoverage==="loaded_history_complete",timeOk=audit.streakChronology==="exact";
@@ -15862,24 +15848,9 @@ function hunterBuildAnalysis(records){
   }
   return {rows,analyzable,matches,wins,winRate,pointEfficiency,totalFor,totalAgainst,validRounds,eligible,overall,attack,defense,offense,weakness,primary,secondary,mainWeakness,style};
 }
-function hunterRadarVisualValue(share){
-  // 50% actual distribution = full visual radius. Labels always show the true percentage.
-  return Math.max(0,Math.min(100,Number(share||0)*2));
-}
-function hunterRadarPolygonPoints(values,radius=105,cx=160,cy=160){
-  return values.map((value,index)=>{
-    const angle=(-90+index*45)*Math.PI/180;
-    const r=radius*Math.max(0,Math.min(100,Number(value||0)))/100;
-    return (cx+Math.cos(angle)*r).toFixed(1)+","+(cy+Math.sin(angle)*r).toFixed(1);
-  }).join(" ");
-}
-function hunterRadarGridPoints(scale,radius=105,cx=160,cy=160){
-  return Array.from({length:8},(_,index)=>{
-    const angle=(-90+index*45)*Math.PI/180;
-    const r=radius*scale;
-    return (cx+Math.cos(angle)*r).toFixed(1)+","+(cy+Math.sin(angle)*r).toFixed(1);
-  }).join(" ");
-}
+
+
+
 function hunterRadarSvg(analysis){
   const shares=[
     analysis.attack.extreme.share,analysis.attack.knockout.share,analysis.attack.burst.share,analysis.attack.spin.share,
@@ -15896,12 +15867,8 @@ function hunterRadarSvg(analysis){
     axes+'<polygon class="hunter-radar-shape" points="'+hunterRadarPolygonPoints(visual)+'"></polygon>'+nodes+
     '<text class="hunter-radar-center-label" x="160" y="164">50% 分布＝滿格</text></svg>';
 }
-function hunterTrustLabel(value){
-  return { "complete-round":"完整回合","legacy-identity":"舊資料身分相容","quick-decision":"Quick Decision","round-incomplete":"Round 資料不完整" }[value]||"資料狀態未知";
-}
-function hunterEvidenceMatchKey(ev){
-  return String(ev.eventCode||"event")+"|"+String(ev.matchId||"match");
-}
+
+
 function hunterEvidenceGroups(evidence){
   const map=new Map();
   (Array.isArray(evidence)?evidence:[]).forEach(ev=>{
@@ -15944,16 +15911,8 @@ function hunterAnalysisStatHtml(bucket,type,perspective="for"){
   return '<details><summary><div class="hunter-stat-click"><span>'+esc(title)+'</span><b>'+Number(row.points||0)+' 分<small>'+Number(row.events||0)+' 回｜'+Number(row.share||0)+'%</small></b></div></summary>'+hunterEvidenceHtml(bucket,type,perspective)+'</details>';
 }
 
-function hunterPointLabel(type,perspective){
-  const names={extreme:"極限",knockout:"擊飛",burst:"爆裂",spin:"轉停"};
-  const n=names[type]||type||"得分";
-  return perspective==="against"?"被"+n:n;
-}
-function hunterOpponentIdentityRef(record){
-  const code=String(record&&record.eventCode||"").toUpperCase();
-  const localId=String(record&&record.opponent&&record.opponent.localPlayerId||"");
-  return code&&localId?(code+"|"+localId):"";
-}
+
+
 function hunterOpponentIdentityValue(record){
   if(record&&record.opponentIdentity&&record.opponentIdentity.scope) return record.opponentIdentity;
   const direct=String(record&&record.opponent&&record.opponent.playerId||"").trim();
