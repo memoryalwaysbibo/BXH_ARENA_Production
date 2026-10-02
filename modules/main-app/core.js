@@ -8804,19 +8804,7 @@ function computeRegistrationStatus(m){
   return "open";
 }
 
-function publicationValidationErrors(m){
-  const errs=[];
-  if(!m.name || !m.name.trim() || m.name==="未命名賽事") errs.push("賽事名稱未填寫");
-  if(!m.date) errs.push("活動日期未填寫");
-  if(!m.location || !m.location.trim()) errs.push("活動地點未填寫");
-  if(m.registrationEnabled){
-    if(!m.registrationOpenAt) errs.push("報名開放時間未設定");
-    if(!m.registrationCloseAt) errs.push("報名截止時間未設定");
-    if(m.registrationOpenAt && m.registrationCloseAt && m.registrationCloseAt<=m.registrationOpenAt) errs.push("報名截止時間必須晚於開放時間");
-    if(!m.registrationCapacity || m.registrationCapacity<1) errs.push("正取人數上限未設定");
-  }
-  return errs;
-}
+function publicationValidationErrors(m){return window.BXHDomainUtils.publicationValidationErrors(m);}
 function renderTournamentPublishAction(readOnly){
   if(readOnly) return "";
   if(!state.cloudCode&&!canCreateOfficialTournament()) return `<button class="btn btn-ghost" disabled>目前帳號不可建立／發布新賽事</button>`;
