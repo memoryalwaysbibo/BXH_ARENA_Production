@@ -4,8 +4,8 @@ const crypto = require('node:crypto');
 test('official single elimination enforces bronze before championship final', async ({ page }) => {
 
   async function dumpAdminDiagnostics(label){
-    const diag=await page.evaluate(()=>({
-      label,
+    const diag=await page.evaluate((diagnosticLabel)=>({
+      label:diagnosticLabel,
       appPhase:typeof appPhase!=='undefined'?appPhase:null,
       currentRole:typeof currentRole!=='undefined'?currentRole:null,
       activeMode:typeof activeMode!=='undefined'?activeMode:null,
@@ -19,7 +19,7 @@ test('official single elimination enforces bronze before championship final', as
       modalTitle:document.querySelector('.modal-title')?.textContent?.trim()||null,
       modalMessage:document.querySelector('.modal-message')?.textContent?.trim()||null,
       visibleText:[...document.querySelectorAll('.toast,.error,.alert')].filter(x=>x.offsetParent!==null).map(x=>x.textContent?.trim()).filter(Boolean).slice(0,10)
-    }));
+    }),label);
     console.log('[P2P admin diagnostics]',JSON.stringify(diag));
     return diag;
   }
