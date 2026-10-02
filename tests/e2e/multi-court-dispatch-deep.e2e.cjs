@@ -91,12 +91,22 @@ test('two courts preserve independent work and queue a skipped match onto a busy
   await expect(page.locator('.people-roster-table .people-col-name')).toHaveCount(4);
 
   await page.locator('[data-action="people-section"][data-section="bracket"]').click();
+  await page.evaluate(()=>{
+    window.__p2pActionProbe=[];
+    document.addEventListener('click',e=>{
+      const t=e.target&&e.target.closest?e.target.closest('[data-action]'):null;
+      if(t) window.__p2pActionProbe.push({action:t.getAttribute('data-action'),time:Date.now(),defaultPrevented:e.defaultPrevented});
+    },true);
+  });
+
   await page.locator('[data-action="draw-bracket"]').click();
   const confirmDraw=page.locator('[data-action="modal-confirm"]');
   if(await confirmDraw.isVisible().catch(()=>false)) await confirmDraw.click();
   try {
     await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
   } catch (error) {
+    const actionProbe=await page.evaluate(()=>window.__p2pActionProbe||[]);
+    console.log('[P2P action probe]',JSON.stringify(actionProbe));
     await dumpBracketDiagnostics('bracket-size-timeout');
     throw error;
   }
