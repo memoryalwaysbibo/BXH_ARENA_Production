@@ -2,11 +2,13 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const source=fs.readFileSync(require('node:path').join(__dirname,'..','index.html'),'utf8');
+const root=require('node:path').join(__dirname,'..');
+const source=fs.readFileSync(require('node:path').join(root,'modules','main-app','hunter-utils.js'),'utf8');
+const html=fs.readFileSync(require('node:path').join(root,'index.html'),'utf8');
 const start=source.indexOf('function hunterSeniorityBonus(level){');
-const end=source.indexOf('function hunterPeriodSummary(period){',start);
-assert(start>=0&&end>start,'license grade calculation exists');
-const context=vm.createContext({});
+const end=source.indexOf('Object.assign(window.BXHHunterUtils',start);
+assert(start>=0&&end>start,'license grade calculation exists in hunter-utils');
+const context=vm.createContext({window:{}});
 vm.runInContext(source.slice(start,end),context);
 const bonus=level=>vm.runInContext(`hunterSeniorityBonus(${level})`,context);
 const grade=(analysis,level)=>{context.analysis=analysis;context.level=level;return vm.runInContext('hunterLicenseGrade(analysis,level)',context)};
@@ -32,6 +34,6 @@ assert.equal(grade({eligible:true,overall:75,matches:40,validRounds:119},99).lab
 assert.equal(grade({eligible:true,overall:75,matches:40,validRounds:120},1).label,'S 級獵人');
 assert.equal(grade({eligible:true,overall:100,matches:100,validRounds:300},99).label,'國家級獵人');
 assert.equal(grade({eligible:true,overall:100,matches:100,validRounds:300},99).score,100);
-for(const tier of ['e','d','c','a','s','national'])assert(source.includes('.hunter-grade-badge.grade-'+tier+'{'),tier+' badge style missing');
-assert(source.includes('hunter-grade-badge grade-\'+licenseGrade.tier'), 'badge must use calculated tier');
+for(const tier of ['e','d','c','a','s','national'])assert(html.includes('.hunter-grade-badge.grade-'+tier+'{'),tier+' badge style missing');
+assert(html.includes('hunter-grade-badge grade-\'+licenseGrade.tier'), 'badge must use calculated tier');
 console.log('PASS hunter license grade, bonus progression and high-rank gates');
