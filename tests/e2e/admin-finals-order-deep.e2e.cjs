@@ -2,6 +2,28 @@ const { test, expect } = require('@playwright/test');
 const crypto = require('node:crypto');
 
 test('official single elimination enforces bronze before championship final', async ({ page }) => {
+
+  async function dumpAdminDiagnostics(label){
+    const diag=await page.evaluate(()=>({
+      label,
+      appPhase:typeof appPhase!=='undefined'?appPhase:null,
+      currentRole:typeof currentRole!=='undefined'?currentRole:null,
+      activeMode:typeof activeMode!=='undefined'?activeMode:null,
+      firebaseUid:typeof firebaseUser!=='undefined'?firebaseUser?.uid:null,
+      userRole:typeof userProfile!=='undefined'?userProfile?.role:null,
+      userActive:typeof userProfile!=='undefined'?userProfile?.active:null,
+      isTestAccount:typeof userProfile!=='undefined'?userProfile?.isTestAccount:null,
+      canCreateOfficialTournament:typeof canCreateOfficialTournament==='function'?canCreateOfficialTournament():null,
+      roleButtons:[...document.querySelectorAll('[data-action^="select-role-"]')].filter(x=>x.offsetParent!==null).map(x=>x.getAttribute('data-action')),
+      authUsernameVisible:!!document.querySelector('#auth-username')&&document.querySelector('#auth-username').offsetParent!==null,
+      modalTitle:document.querySelector('.modal-title')?.textContent?.trim()||null,
+      modalMessage:document.querySelector('.modal-message')?.textContent?.trim()||null,
+      visibleText:[...document.querySelectorAll('.toast,.error,.alert')].filter(x=>x.offsetParent!==null).map(x=>x.textContent?.trim()).filter(Boolean).slice(0,10)
+    }));
+    console.log('[P2P admin diagnostics]',JSON.stringify(diag));
+    return diag;
+  }
+
   const externalFirebaseRequests=[];
 
   await page.route('**/*', async route=>{
@@ -49,10 +71,15 @@ test('official single elimination enforces bronze before championship final', as
     await page.locator('[data-action="admin-login-submit"]').click();
   }
 
-  await page.waitForFunction(()=>{
-    return !!document.querySelector('[data-action="cloud-admin-new-tournament"]') ||
-      !!document.querySelector('[data-action="select-role-admin"]');
-  },null,{timeout:60000});
+  try {
+    await page.waitForFunction(()=>{
+      return !!document.querySelector('[data-action="cloud-admin-new-tournament"]') ||
+        !!document.querySelector('[data-action="select-role-admin"]');
+    },null,{timeout:60000});
+  } catch (error) {
+    await dumpAdminDiagnostics('admin-routing-timeout');
+    throw error;
+  }
   if(await page.locator('[data-action="select-role-admin"]').isVisible().catch(()=>false)){
     await page.locator('[data-action="select-role-admin"]').click();
     if(await page.locator('#auth-username').isVisible().catch(()=>false)){
