@@ -1,0 +1,1 @@
+'use strict';const path=require('path');module.exports={testDir:__dirname,testMatch:'m3-mobile-overrides.spec.cjs',timeout:30000,use:{baseURL:'http://127.0.0.1:4176'},webServer:{command:'python3 -m http.server 4176 --directory '+JSON.stringify(path.resolve(process.env.BXH_M31_ROOT||process.cwd())),port:4176,reuseExistingServer:false}};
