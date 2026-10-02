@@ -71,11 +71,17 @@ test('official single elimination enforces bronze before championship final', as
     await page.locator('[data-action="admin-login-submit"]').click();
   }
 
+  // Auth success renders a short welcome transition before the admin shell.
+  // Wait for that transition to settle instead of treating its intermediate DOM
+  // as an auth-routing failure.
   try {
     await page.waitForFunction(()=>{
-      return !!document.querySelector('[data-action="cloud-admin-new-tournament"]') ||
-        !!document.querySelector('[data-action="select-role-admin"]');
-    },null,{timeout:60000});
+      const newTournament=document.querySelector('[data-action="cloud-admin-new-tournament"]');
+      const roleAdmin=document.querySelector('[data-action="select-role-admin"]');
+      const bodyText=document.body?.innerText||'';
+      const welcome=/登入成功|歡迎回來/.test(bodyText);
+      return !!newTournament || (!!roleAdmin && !welcome);
+    },null,{timeout:90000});
   } catch (error) {
     await dumpAdminDiagnostics('admin-routing-timeout');
     throw error;
