@@ -179,7 +179,7 @@ mustInclude('title:"是否要取消報到？"','Checked-in second tap must ask b
 mustInclude('confirmLabel:"是"','Cancel check-in confirmation yes label missing');
 mustInclude('cancelLabel:"否"','Cancel check-in confirmation no label missing');
 must(/@media\(max-width:760px\)[\s\S]*?grid-template-columns:30px minmax\(0,1fr\) auto 34px[\s\S]*?grid-template-areas:["']idx name status actions["']/, 'Mobile people rows must be a single horizontal line',htmlAndLocalCss);
-must(/\.people-col-source\{display:none!important;\}/, 'Mobile source badge must leave the primary row');
+must(/\.people-col-source\{display:none!important;\}/, 'Mobile source badge must leave the primary row',htmlAndLocalCss);
 console.log('PASS compact single-line attendance roster');
 mustInclude('if(appPhase==="guest-lobby"){ app.innerHTML = renderGuestLobbyScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','guest ladder must bind city/district filters');
 mustInclude('if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','player ladder must bind city/district filters');
