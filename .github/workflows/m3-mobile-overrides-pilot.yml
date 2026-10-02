@@ -1,0 +1,44 @@
+name: M3 Mobile Override CSS extraction
+on:
+  push:
+    branches: [refactor/index-css-m3-mobile-overrides-20261002]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: "${{ github.sha }}", fetch-depth: 1, persist-credentials: false}
+      - name: Stage candidate
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$(git hash-object index.html)" = ac4ae95673e4d96546f1fa9683fb3557de93164f ]; then
+            python3 tools/stage-m3-mobile-overrides.py --source . --output "$RUNNER_TEMP/m31"
+            echo "root=$RUNNER_TEMP/m31" >> "$GITHUB_OUTPUT"
+          else
+            test "$(git hash-object index.html)" = 99ab90be16347904f050c11ee7086cf11d367620
+            echo "root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Exact contracts and regression
+        env: {BXH_M31_ROOT: "${{ steps.stage.outputs.root }}"}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/verify-m3-mobile-overrides.cjs
+          (cd "$BXH_M31_ROOT" && node scripts/verify-production-frontend.cjs)
+          (cd "$BXH_M31_ROOT" && node scripts/run-regression-core.cjs critical)
+      - name: Install browser runner
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/pw" --no-package-lock --ignore-scripts @playwright/test@1.55.0
+      - name: Chromium three-size smoke
+        env: {BXH_M31_ROOT: "${{ steps.stage.outputs.root }}"}
+        shell: bash
+        run: |
+          export NODE_PATH="$RUNNER_TEMP/pw/node_modules"
+          node "$RUNNER_TEMP/pw/node_modules/@playwright/test/cli.js" test --config=tools/m3-mobile-overrides.config.cjs
