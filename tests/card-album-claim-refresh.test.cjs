@@ -11,15 +11,16 @@ const core = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8'
 const mailbox = fs.readFileSync(path.join(root, 'modules/main-app/mailbox.js'), 'utf8');
 const albumFeature = fs.readFileSync(path.join(root, 'modules/main-app/card-album.js'), 'utf8');
 const html = core;
-function section(start, end) {
-  const at = html.indexOf(start), until = html.indexOf(end, at);
-  assert.ok(at >= 0 && until > at, `missing source section: ${start}`);
-  return html.slice(at, until);
+function sectionFrom(sourceText,start,end) {
+  const at=sourceText.indexOf(start),until=sourceText.indexOf(end,at);
+  assert.ok(at>=0&&until>at,`missing source section: ${start}`);
+  return sourceText.slice(at,until);
 }
-const source = [
-  section('let mailboxState=null;', 'function mailboxButtonHtml()'),
-  section('async function handleMailbox(action,target)', '// 卡冊的畫面只相信'),
-  section('const CARD_ALBUM_CARDS=', 'function renderPlayerCenterLoggedIn()')
+const source=[
+  sectionFrom(mailbox,'let mailboxState=null;','function mailboxButtonHtml()'),
+  sectionFrom(mailbox,'async function handleMailbox(action,target)','Object.assign(window.BXHMailbox'),
+  sectionFrom(core,'const CARD_ALBUM_CARDS=','function renderPlayerCenterLoggedIn()'),
+  albumFeature
 ].join('\n');
 const rewardSource = fs.readFileSync(path.join(root, 'card-reward-mail.js'), 'utf8');
 const album = quantity => ({ ok: true, sets: { basic: { seal: 1 }, gods: { seal: quantity } }, octoberCompleted: 2 });
