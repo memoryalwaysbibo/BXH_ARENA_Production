@@ -7004,15 +7004,8 @@ function rebuildPropagationForState(targetState){
   }
 }
 
-function correctionMatchHasActualPlay(m){
-  if(!m) return false;
-  const scoreA=Number(m.scoreA||0),scoreB=Number(m.scoreB||0);
-  return !!(m.completed || m.status==="completed" || m.confirmedAt || m.resultMethod ||
-    (Array.isArray(m.log)&&m.log.length) || (Array.isArray(m.faultActions)&&m.faultActions.length) || scoreA>0 || scoreB>0);
-}
-function correctionParticipantSignature(m){
-  return [m&&m.a&&m.a.playerId||"",m&&m.b&&m.b.playerId||""].join("|");
-}
+
+
 function correctionProbe(st,matchId){
   const matches=st&&Array.isArray(st.matches)?st.matches:[];
   const target=matches.find(x=>x&&x.id===matchId);
@@ -8433,6 +8426,8 @@ function evaluateQuickDecision(m, selectedWinnerId){
 }
 
 const {quickDecisionFailureMessage}=window.BXHFormatUtils||{};
+const {correctionMatchHasActualPlay,correctionParticipantSignature,matchHasDecisionData}=window.BXHMatchUtils||{};
+
 
 function applyQuickDecisionFields(m, evalResult, actor){
   const ref=currentRefereeIdentity();
@@ -10255,9 +10250,7 @@ const refereeSwappedViews = new Set();
 function refereeViewKey(m){ return String(state.id)+":"+String(m.id); }
 function refereeViewClass(m){ return refereeSwappedViews.has(refereeViewKey(m))?" swapped":""; }
 function refereeSwapControl(m){ return `<div class="ref-vs-mark"><button class="btn btn-ghost ref-swap" data-action="referee-swap-view" data-id="${esc(m.id)}" aria-label="交換玩家位置" title="交換左右顯示位置">⇄</button></div>`; }
-function matchHasDecisionData(m){
-  return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)>0||Number(m.scoreB||0)>0||(Array.isArray(m.log)&&m.log.length)||(Array.isArray(m.faultActions)&&m.faultActions.length)));
-}
+
 function canCourtSwapSource(m){
   return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&!matchHasDecisionData(m)&&m.status!=="paused");
 }

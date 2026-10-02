@@ -28,4 +28,12 @@ function matchStatusClass(m){
   return "ms-card-"+s;
 }
 
+function correctionMatchHasActualPlay(m){
+  if(!m) return false;
+  const scoreA=Number(m.scoreA||0),scoreB=Number(m.scoreB||0);
+  return !!(m.completed || m.status==="completed" || m.confirmedAt || m.resultMethod || (Array.isArray(m.log)&&m.log.length) || (Array.isArray(m.faultActions)&&m.faultActions.length) || scoreA>0 || scoreB>0);
+}
+function correctionParticipantSignature(m){return [m&&m.a&&m.a.playerId||"",m&&m.b&&m.b.playerId||""].join("|");}
+function matchHasDecisionData(m){return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)>0||Number(m.scoreB||0)>0||(Array.isArray(m.log)&&m.log.length)||(Array.isArray(m.faultActions)&&m.faultActions.length)));}
+
 Object.assign(window.BXHMatchUtils||(window.BXHMatchUtils={}),{courtKey,matchLabel,liveEtaCountdownText,matchStatusClass});
