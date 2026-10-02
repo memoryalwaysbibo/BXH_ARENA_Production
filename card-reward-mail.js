@@ -74,21 +74,21 @@ if(albumFeature&&typeof albumFeature.cardAlbumContext==='function'&&typeof album
   const originalMailboxHandler=mailboxFeature.handleMailbox;
   handleMailbox=async function(action,target){
     if(action!=='mailbox-card-reward')return originalMailboxHandler(action,target);
-    const context=mailboxContext();
+    const context=mailboxFeature.mailboxContext();
     if(!firebaseUser?.uid||context.busy)return;
     const messageId=target.getAttribute('data-message-id')||'';
     context.busy=true;context.error='';render();
     try{
       await window.BXHCardRewardUI.claim(messageId);
-      if(context!==mailboxContext())return;
+      if(context!==mailboxFeature.mailboxContext())return;
       // Includes already-claimed replays. The server alone supplies quantities.
       // Do not keep the claim handler pending on the background album read.
       void loadCardAlbum(true);
-      context.messages=null;context.busy=false;await loadMailbox(true);
-      if(context!==mailboxContext())return;
+      context.messages=null;context.busy=false;await mailboxFeature.loadMailbox(true);
+      if(context!==mailboxFeature.mailboxContext())return;
       showToast('卡牌已領取並收入我的卡冊');
-    }catch(error){if(context===mailboxContext())context.error=mailboxError(error);}
-    finally{if(context===mailboxContext()){context.busy=false;render();}}
+    }catch(error){if(context===mailboxFeature.mailboxContext())context.error=mailboxFeature.mailboxError(error);}
+    finally{if(context===mailboxFeature.mailboxContext()){context.busy=false;render();}}
   };
   albumFeature.cardAlbumContext=cardAlbumContext;
   albumFeature.loadCardAlbum=loadCardAlbum;
