@@ -229,11 +229,11 @@ test('slow album refresh cannot clear a newer claim busy state', async () => {
   assert.equal(t.mail().busy, false);
 });
 
-test('reward bridge loads as a classic script after the inline application', () => {
-  const handlerAt=html.indexOf('async function handleMailbox(action,target)');
-  const bridgeAt=html.indexOf('<script src="card-reward-mail.js?');
-  assert.ok(handlerAt>0 && bridgeAt>handlerAt);
-  assert.ok(html.lastIndexOf('</script>', bridgeAt)>handlerAt);
+test('reward bridge loads after the modular mailbox feature', () => {
+  const indexHtml=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const mailboxAt=indexHtml.indexOf('modules/main-app/mailbox.js');
+  const bridgeAt=indexHtml.indexOf('<script src="card-reward-mail.js?');
+  assert.ok(mailboxAt>0 && bridgeAt>mailboxAt);
 });
 
 test('the bridge preserves unrelated mailbox actions', async () => {
