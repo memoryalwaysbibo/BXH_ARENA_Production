@@ -1,2 +1,21 @@
-'use strict';const {test,expect}=require('@playwright/test'),fs=require('node:fs'),path=require('node:path');const root=path.resolve(process.env.BXH_M22_ROOT||process.cwd());
-test('Directive external CSS loads and applies only under directive root',async({page})=>{let rs=[],errs=[];page.on('response',r=>rs.push(r));page.on('pageerror',e=>errs.push(e.message));await page.setViewportSize({width:1280,height:800});let r=await page.goto('/tools/m2-directive-css-fixture.html');expect(r.status()).toBe(200);let cr=rs.find(x=>new URL(x.url()).pathname==='/modules/theme-directive/styles.css');expect(cr).toBeTruthy();expect(await cr.body()).toEqual(fs.readFileSync(path.join(root,'modules/theme-directive/styles.css')));let header=page.locator('header.topbar');expect(await header.evaluate(e=>getComputedStyle(e).position)).toBe('relative');expect(await page.locator('.directive-warning-layer').evaluate(e=>getComputedStyle(e).display)).toBe('none');let nav=page.locator('nav.tabs');expect(await nav.evaluate(e=>getComputedStyle(e).position)).toBe('relative');await page.setViewportSize({width:390,height:844});expect(await header.evaluate(e=>getComputedStyle(e).borderRadius)).toBe('0px');await page.evaluate(()=>document.documentElement.setAttribute('data-bxh-theme','gold'));expect(await header.evaluate(e=>getComputedStyle(e).position)).toBe('static');expect(errs).toEqual([])});
+'use strict';
+const {test,expect}=require('@playwright/test'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(process.env.BXH_M22_ROOT||process.cwd());
+test('Directive external critical CSS loads and preserves its own desktop/mobile behavior',async({page})=>{
+  const rs=[],errs=[];page.on('response',r=>rs.push(r));page.on('pageerror',e=>errs.push(e.message));
+  await page.setViewportSize({width:1280,height:800});
+  const r=await page.goto('/tools/m2-directive-css-fixture.html');expect(r.status()).toBe(200);
+  const cr=rs.find(x=>new URL(x.url()).pathname==='/modules/theme-directive/styles.css');
+  expect(cr).toBeTruthy();expect(await cr.body()).toEqual(fs.readFileSync(path.join(root,'modules/theme-directive/styles.css')));
+  const header=page.locator('header.topbar'),warning=page.locator('header.topbar .directive-warning-layer');
+  expect(await header.evaluate(e=>getComputedStyle(e).position)).toBe('relative');
+  expect(await warning.evaluate(e=>getComputedStyle(e).display)).toBe('block');
+  expect(await warning.evaluate(e=>getComputedStyle(e).animationName)).toBe('bxhDirectiveWarningCritical');
+  await page.setViewportSize({width:390,height:844});
+  expect(await warning.evaluate(e=>getComputedStyle(e).width)).not.toBe('0px');
+  await page.evaluate(()=>document.documentElement.setAttribute('data-bxh-theme','gold'));
+  expect(await header.evaluate(e=>getComputedStyle(e).position)).toBe('static');
+  expect(await warning.evaluate(e=>getComputedStyle(e).display)).toBe('block');
+  expect(await warning.evaluate(e=>getComputedStyle(e).animationName)).toBe('none');
+  expect(errs).toEqual([]);
+});
