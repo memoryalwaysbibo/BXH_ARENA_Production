@@ -58,7 +58,7 @@ function setup({ installBridge = true } = {}) {
     sandbox, calls, toasts, listeners, scheduled, install,
     state: () => sandbox.window.BXHCardAlbumFeature.cardAlbumContext(), mail: () => sandbox.mailboxContext(),
     load: refresh => sandbox.window.BXHCardAlbumFeature.loadCardAlbum(refresh),
-    claim: () => sandbox.handleMailbox('mailbox-card-reward', target),
+    claim: () => sandbox.window.BXHMailbox.handleMailbox('mailbox-card-reward', target),
     view: () => sandbox.window.BXHCardAlbumFeature.renderCardAlbumPage(),
     get: fn => { get = fn; }, list: fn => { list = fn; }, onClaim: fn => { claim = fn; },
     switchUser(uid) { sandbox.firebaseUser = uid ? { uid } : null; sandbox.engagementSessionEpoch++; }
@@ -238,7 +238,7 @@ test('reward bridge loads as a classic script after the inline application', () 
 
 test('the bridge preserves unrelated mailbox actions', async () => {
   const t=setup(); t.mail().open=true;
-  await t.sandbox.handleMailbox('mailbox-close', {});
+  await t.sandbox.window.BXHMailbox.handleMailbox('mailbox-close', {});
   assert.equal(t.mail().open, false);
   assert.deepEqual(t.calls, []);
 });
