@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const src=fs.readFileSync(require('node:path').join(__dirname,'..','index.html'),'utf8');
+const src=fs.readFileSync(require('node:path').join(__dirname,'..','modules','main-app','core.js'),'utf8');
 function fn(name,next){const start=src.indexOf('function '+name+'(');assert(start>=0,name);const end=src.indexOf('\n'+next,start);assert(end>start,name);return src.slice(start,end);}
 const sandbox={Date,Number,Object,Set,Array,String,Math,
  courtKey:n=>'court'+n,
