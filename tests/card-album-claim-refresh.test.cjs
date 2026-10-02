@@ -7,7 +7,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const root = path.join(__dirname, '..');
-const core = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8');\nconst mailbox = fs.readFileSync(path.join(root, 'modules/main-app/mailbox.js'), 'utf8');\nconst albumFeature = fs.readFileSync(path.join(root, 'modules/main-app/card-album.js'), 'utf8');\nconst html = core;
+const core = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8');
+const mailbox = fs.readFileSync(path.join(root, 'modules/main-app/mailbox.js'), 'utf8');
+const albumFeature = fs.readFileSync(path.join(root, 'modules/main-app/card-album.js'), 'utf8');
+const html = core;
 function section(start, end) {
   const at = html.indexOf(start), until = html.indexOf(end, at);
   assert.ok(at >= 0 && until > at, `missing source section: ${start}`);
