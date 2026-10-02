@@ -7666,29 +7666,20 @@ function generateDoubleElim(){
 }
 
 function dblSideWillNeverArrive(src, side){
-  // A source can be skipped only after it is structurally absent or has
-  // completed without the result required by this LB slot. Never treat an
-  // unfinished "待定" source as a bye.
-  const winnerWillNeverArrive=id=>{
-    const sm=id?getMatch(id):null;
-    return !sm || (sm.completed && !sm.winnerId);
-  };
-  const loserWillNeverArrive=id=>{
-    const sm=id?getMatch(id):null;
-    return !sm || (sm.completed && !sm.loserId);
-  };
   if(src.type==="first"){
-    const id=side==="A"?src.srcAId:src.srcBId;
-    return loserWillNeverArrive(id);
+    const id = side==="A" ? src.srcAId : src.srcBId;
+    const sm = id?getMatch(id):null;
+    return !sm || (sm.completed && sm.isBye);
   }
   if(src.type==="merge"){
-    return side==="A"
-      ? winnerWillNeverArrive(src.survivorMatchId)
-      : loserWillNeverArrive(src.dropperMatchId);
+    if(side==="A"){ const sm=getMatch(src.survivorMatchId); return !sm; }
+    const sm = src.dropperMatchId?getMatch(src.dropperMatchId):null;
+    return !sm || (sm.completed && sm.isBye);
   }
   if(src.type==="combine"){
-    const id=side==="A"?src.srcAMatchId:src.srcBMatchId;
-    return winnerWillNeverArrive(id);
+    const id = side==="A"?src.srcAMatchId:src.srcBMatchId;
+    const sm = id?getMatch(id):null;
+    return !sm;
   }
   return false;
 }
