@@ -1,0 +1,33 @@
+name: M4 Main CSS tail extraction
+on:
+  push:
+    branches: [refactor/index-css-m4-tail-modules-20261002]
+permissions: {contents: read}
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: {image: mcr.microsoft.com/playwright:v1.55.0-noble}
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: "${{ github.sha }}", fetch-depth: 1, persist-credentials: false}
+      - name: Stage candidate
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$(git hash-object index.html)" = 99ab90be16347904f050c11ee7086cf11d367620 ]; then python3 tools/stage-m4-main-tail.py --source . --output "$RUNNER_TEMP/m41"; echo "root=$RUNNER_TEMP/m41" >> "$GITHUB_OUTPUT"; else test "$(git hash-object index.html)" = 32635b55c812f03bbd2f804bdec0b7114679042c; echo "root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"; fi
+      - name: Exact contracts and regression
+        env: {BXH_M41_ROOT: "${{ steps.stage.outputs.root }}"}
+        shell: bash
+        run: |
+          node tools/verify-m4-main-tail.cjs
+          (cd "$BXH_M41_ROOT" && node scripts/verify-production-frontend.cjs)
+          (cd "$BXH_M41_ROOT" && node scripts/run-regression-core.cjs critical)
+      - name: Install browser runner
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/pw" --no-package-lock --ignore-scripts @playwright/test@1.55.0
+      - name: Chromium three-size smoke
+        env: {BXH_M41_ROOT: "${{ steps.stage.outputs.root }}"}
+        shell: bash
+        run: export NODE_PATH="$RUNNER_TEMP/pw/node_modules"; node "$RUNNER_TEMP/pw/node_modules/@playwright/test/cli.js" test --config=tools/m4-main-tail.config.cjs
