@@ -3,6 +3,11 @@ const path=require('path');
 const vm=require('vm');
 const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const localStyles=[...html.matchAll(/<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["']([^"'?#]+)[^"']*["'][^>]*>/gi)]
+  .map(m=>m[1]).filter(h=>!/^https?:\/\//i.test(h)&&!h.startsWith('//'))
+  .map(h=>path.resolve(root,h.replace(/^\//,''))).filter(p=>p.startsWith(root+path.sep)&&fs.existsSync(p))
+  .map(p=>fs.readFileSync(p,'utf8')).join('\n');
+const htmlAndLocalCss=html+'\n'+localStyles;
 const courtCallUi=fs.readFileSync(path.join(root,'court-call-ui.js'),'utf8');
 const ladderSecondaryUi=fs.readFileSync(path.join(root,'ladder-secondary-ui.js'),'utf8');
 new vm.Script(ladderSecondaryUi,{filename:'ladder-secondary-ui.js'});
