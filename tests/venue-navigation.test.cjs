@@ -2,7 +2,7 @@
 // Pure regressions against production inline functions; no network/Firebase writes.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const root=process.argv[2]||path.resolve(__dirname,'..');
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','main-app','core.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','main-app','venue-utils.js'),'utf8');
 const ctx=vm.createContext({URL,console});
 vm.runInContext('const EVENT_INFO_SCHEMA_VERSION="bxh.event-info.v2"; let state={};',ctx);
 const names=['emptyEventInfoV2','splitLegacyVenueText','buildLegacyVenueText','normalizeGoogleMapsUrl','extractGoogleMapsUrlsFromText','extractGoogleMapsUrlFromText','googleMapsNavigationUrl','appleMapsNavigationUrl','normalizeEventInfoV2','venueForEventState','syncEventInfoV2FromLegacy','applyVenueDraftToState','publicVenueFromTournament','buildPublicEventInfo','renderVenueNavigationMenu'];
