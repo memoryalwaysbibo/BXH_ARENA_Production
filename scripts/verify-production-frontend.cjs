@@ -162,9 +162,9 @@ console.log('PASS account-management staged save confirmation');
 mustInclude('data-action="account-search-clear"','Account search clear control missing');
 mustInclude('if(action==="account-search-clear"){','Account search clear action missing');
 must(/if\(action===["']account-search-clear["']\)\{[\s\S]*?accountMgmtQuery=["']{2}[\s\S]*?render\(\); return;/,'Account search clear must only clear the keyword and rerender');
-mustInclude('.account-user-list{display:grid;gap:6px;}','Compact account list gap missing');
-mustInclude('.account-filter-search{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;}','Account search must provide input, search, and clear controls');
-mustInclude('.account-user-card>summary{grid-template-columns:28px minmax(0,1fr) auto;grid-template-rows:auto auto;gap:2px 8px;padding:8px 10px;}','Mobile compact account card layout missing');
+must(/\.account-user-list\s*\{[^}]*display\s*:\s*grid\s*;[^}]*gap\s*:\s*6px\s*;/,'Compact account list gap missing',htmlAndLocalCss);
+must(/\.account-filter-search\s*\{[^}]*display\s*:\s*grid\s*;[^}]*grid-template-columns\s*:\s*minmax\(0,1fr\)\s+auto\s+auto\s*;[^}]*gap\s*:\s*7px\s*;/,'Account search must provide input, search, and clear controls',htmlAndLocalCss);
+must(/\.account-user-card>summary\s*\{[^}]*grid-template-columns\s*:\s*28px\s+minmax\(0,1fr\)\s+auto\s*;[^}]*grid-template-rows\s*:\s*auto\s+auto\s*;[^}]*gap\s*:\s*2px\s+8px\s*;[^}]*padding\s*:\s*8px\s+10px\s*;/,'Mobile compact account card layout missing',htmlAndLocalCss);
 console.log('PASS compact account list / search clear');
 
 
