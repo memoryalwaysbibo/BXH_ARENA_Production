@@ -5,32 +5,89 @@ on:
 permissions:
   contents: read
 jobs:
-  inspect:
+  apply-isolated-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Inspect private account loader (source code only)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          specs = [('modules/main-app/core.js', r'accountMgmtUsers\s*=|action===\"load-staff-assignment-list\"'), ('modules/cloud/cloud-runtime.js', r'listUsers\s*\(')]
+          for name, pattern in specs:
+              lines = Path(name).read_text().splitlines()
+              selected = set()
+              for i, line in enumerate(lines):
+                  if re.search(pattern, line):
+                      selected.update(range(max(0, i-3), min(len(lines), i+42)))
+              print('\nSOURCE', name)
+              for i in sorted(selected):
+                  print(f'{i+1}: {lines[i]}')
+          PY
+      - name: Apply only the reviewed renderer expression and its cache key
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('modules/main-app/core.js')
+          source = p.read_text()
+          start = source.index('function renderStaffAssignmentPanel(){')
+          end = source.index('\nfunction renderRefereeStationAssignmentPanel(){', start)
+          panel = source[start:end]
+          old = '${esc(u.displayName||u.email)}'
+          new = '${esc((typeof u.realName==="string" && u.realName.trim()) || "未填寫本名")}'
+          if old in panel:
+              assert panel.count(old) == 1, 'ambiguous renderer expression'
+              changed = source[:start] + panel.replace(old, new) + source[end:]
+              assert changed.replace(new, old, 1) == source, 'unexpected changes outside name expression'
+              p.write_text(changed)
+          else:
+              assert panel.count(new) == 1, 'renderer changed; review required'
+          index = Path('index.html')
+          html = index.read_text()
+          old_src = 'src="modules/main-app/core.js?v=20261002-m7-1"'
+          new_src = 'src="modules/main-app/core.js?v=20261002-staff-realname-1"'
+          if old_src in html:
+              assert html.count(old_src) == 1, 'ambiguous core script'
+              index.write_text(html.replace(old_src, new_src))
+          else:
+              assert html.count(new_src) == 1, 'core script changed; review required'
+          PY
+      - name: Verify syntax and staff-name regressions before branch commit
+        run: |
+          git diff --check
+          node --check modules/main-app/core.js
+          node --test tests/staff-assignment-realname.test.cjs
+          git diff --stat
+          git diff -- modules/main-app/core.js index.html
+      - name: Commit the verified two-line change to this fix branch only
+        run: |
+          test "$GITHUB_REF_NAME" = 'fix/staff-assignment-realname-20261002'
+          git add modules/main-app/core.js index.html
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'fix: show real names in staff assignment without changing UID bindings'
+            git push origin HEAD:refs/heads/fix/staff-assignment-realname-20261002
+          fi
+  existing-production-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Inspect staff assignment source (code only)
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          needles = [r'被分派的工作人員', r'staffDirectory', r'function\s+\w*[Ss]taff\w*', r'儲存分派名單']
-          files = [Path('modules/main-app/core.js')] + list(Path('modules').glob('*.js'))
-          for path in files:
-              lines = path.read_text().splitlines()
-              selected = set()
-              for i, line in enumerate(lines):
-                  if any(re.search(n, line) for n in needles):
-                      selected.update(range(max(0, i-8), min(len(lines), i+48)))
-              if selected:
-                  print('\nSOURCE', path)
-                  previous = -2
-                  for i in sorted(selected):
-                      if i != previous + 1: print('...')
-                      print(f'{i+1}: {lines[i]}')
-                      previous = i
-          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Existing production invariant checks (no bypass)
+        run: node scripts/verify-production-frontend.cjs
+      - name: Existing critical regression suite (no bypass)
+        if: always()
+        run: node scripts/run-regression-core.cjs critical
