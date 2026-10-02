@@ -4,7 +4,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const core=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');
-const source=html+'\n'+core;
+const css=fs.readFileSync(path.join(__dirname,'..','modules','main-css','core-competition.css'),'utf8');
+const source=html+'\n'+core+'\n'+css;
 
 const logoButton='class="logo-wrap logo-refresh-button" data-action="header-refresh"';
 assert.equal((source.match(/class="logo-wrap logo-refresh-button" data-action="header-refresh"/g)||[]).length,4,'all shared header logos must be refresh buttons');
