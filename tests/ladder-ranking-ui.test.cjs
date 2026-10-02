@@ -47,7 +47,7 @@ for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['�
 assert(source.includes('String(row&&row.seasonId||"")===String(currentSeason)'), 'recent history must be isolated to the current season');
 assert(source.includes('舊賽季已封存，不會載入玩家手機'), 'history archive boundary disclosure missing');
 assert(html.includes('fx.orderBy("createdAt","desc")'), 'history query must be ordered on the server');
-assert(html.includes('fx.limit(200)'), 'history query must be bounded before download');
+assert(cloud.includes('fx.limit(200)'), 'history query must be bounded before download');
 assert(html.includes('ladder-secondary-ui.js?v=14.3.15'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
