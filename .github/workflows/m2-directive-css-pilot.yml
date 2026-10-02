@@ -18,78 +18,56 @@ jobs:
     timeout-minutes: 15
     container:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
+          persist-credentials: false
       - name: Trust workspace
         shell: bash
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - name: Verify fixed M2-1 parent and current head
+      - name: Verify fixed M2-1 parent, current head and committed extraction
         shell: bash
         run: |
           set -euo pipefail
           test "$(git ls-remote origin refs/heads/refactor/index-css-m2-card-album-20261002 | cut -f1)" = 1f78c090fa6e444d158f3896d724860260b7b0bb
           test "$(git ls-remote origin refs/heads/refactor/index-css-m2-directive-20261002 | cut -f1)" = "$GITHUB_SHA"
-      - name: Stage or verify candidate
-        id: stage
-        shell: bash
-        run: |
-          set -euo pipefail
-          b="$(git hash-object index.html)"
-          if [ "$b" = 52a33590b3ca5a9d118aaeae70cd9d16f78baceb ]; then
-            python3 tools/stage-m2-directive-css.py --source . --output "$RUNNER_TEMP/m22"
-            echo "root=$RUNNER_TEMP/m22" >> "$GITHUB_OUTPUT"
-            echo "apply=true" >> "$GITHUB_OUTPUT"
-          else
-            test "$b" = 4a3a7e900ac9e9aaa6c706e65bb170e832c1bc20
-            test -f modules/theme-directive/styles.css
-            test -f m2-directive-css-manifest.json
-            echo "root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
-            echo "apply=false" >> "$GITHUB_OUTPUT"
-          fi
+          test "$(git hash-object index.html)" = ac4ae95673e4d96546f1fa9683fb3557de93164f
+          test -f modules/theme-directive/styles.css
+          test -f m2-directive-css-manifest.json
+          printf '%s  %s\n' 94bb93aabec246e2adb097f3303b20dd6f7d930821621d5bd7f0251d44ad3eb6 modules/theme-directive/styles.css | sha256sum -c -
       - name: Contracts and critical regression
         shell: bash
         env:
-          BXH_M22_ROOT: ${{ steps.stage.outputs.root }}
+          BXH_M22_ROOT: ${{ github.workspace }}
         run: |
           set -euo pipefail
           node --test tools/verify-m2-directive-css.cjs
-          (cd "$BXH_M22_ROOT" && node scripts/verify-production-frontend.cjs)
-          (cd "$BXH_M22_ROOT" && node scripts/run-regression-core.cjs critical)
-          (cd "$BXH_M22_ROOT" && node --test tests/theme-directive-access.test.cjs)
+          node scripts/verify-production-frontend.cjs
+          node scripts/run-regression-core.cjs critical
+          node --test tests/theme-directive-access.test.cjs
       - name: Install pinned browser runner
         shell: bash
         run: npm install --prefix "$RUNNER_TEMP/pw" --no-package-lock --ignore-scripts @playwright/test@1.55.0
       - name: Browser computed style
         shell: bash
         env:
-          BXH_M22_ROOT: ${{ steps.stage.outputs.root }}
+          BXH_M22_ROOT: ${{ github.workspace }}
         run: |
           set -euo pipefail
           export NODE_PATH="$RUNNER_TEMP/pw/node_modules"
           node "$RUNNER_TEMP/pw/node_modules/@playwright/test/cli.js" test --config=tools/m2-directive-css.config.cjs
-      - name: Commit verified extraction only
-        if: steps.stage.outputs.apply == 'true'
+      - name: Record immutable read-only evidence
+        if: always()
         shell: bash
-        env:
-          BXH_M22_ROOT: ${{ steps.stage.outputs.root }}
         run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git ls-remote origin refs/heads/refactor/index-css-m2-card-album-20261002 | cut -f1)" = 1f78c090fa6e444d158f3896d724860260b7b0bb
-          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
-          mkdir -p modules/theme-directive
-          cp "$BXH_M22_ROOT/index.html" index.html
-          cp "$BXH_M22_ROOT/modules/theme-directive/styles.css" modules/theme-directive/styles.css
-          cp "$BXH_M22_ROOT/m2-directive-css-manifest.json" m2-directive-css-manifest.json
-          git add -- index.html modules/theme-directive/styles.css m2-directive-css-manifest.json
-          git diff --cached --check
-          test "$(git diff --cached --name-only | sort | tr '\n' ' ')" = "index.html m2-directive-css-manifest.json modules/theme-directive/styles.css "
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'refactor(css): extract Directive critical styles from index'
-          git push origin HEAD:refs/heads/refactor/index-css-m2-directive-20261002
+          mkdir -p "$RUNNER_TEMP/m22-evidence"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/m22-evidence/tested-commit.txt"
+          printf 'READ-ONLY M2-2 VALIDATION. No branch write, merge or deployment.\n' > "$RUNNER_TEMP/m22-evidence/scope.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m2-directive-css-${{ github.run_id }}
+          path: ${{ runner.temp }}/m22-evidence
+          retention-days: 7
