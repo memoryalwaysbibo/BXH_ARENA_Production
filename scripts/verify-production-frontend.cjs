@@ -15,7 +15,7 @@ const messagingSw=fs.readFileSync(path.join(root,'firebase-messaging-sw.js'),'ut
 const webConfig=JSON.parse(fs.readFileSync(path.join(root,'PRODUCTION_FIREBASE_WEB_CONFIG.json'),'utf8'));
 const cname=fs.readFileSync(path.join(root,'CNAME'),'utf8').trim();
 const version=JSON.parse(fs.readFileSync(path.join(root,'version.json'),'utf8'));
-function must(re,msg){if(!re.test(html))throw new Error(msg)}
+function must(re,msg,corpus=html){if(!re.test(corpus))throw new Error(msg)}
 function mustNot(re,msg){if(re.test(html))throw new Error(msg)}
 function mustInclude(text,msg){if(!html.includes(text))throw new Error(msg)}
 if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
@@ -168,7 +168,7 @@ console.log('PASS compact account list / search clear');
 mustInclude('class="rank-table people-roster-table"','People roster table mobile scope missing');
 mustInclude('class="people-col-actions"','People roster action semantic cell missing');
 mustInclude('>移至備取</button>','Roster overflow menu must retain the move-to-waitlist action label');
-must(/@media\(max-width:760px\)[\s\S]*?\.people-roster-table tr\{[\s\S]*?grid-template-columns:30px minmax\(0,1fr\) auto 34px[\s\S]*?grid-template-areas:["']idx name status actions["']/, 'Mobile roster must use the compact single-line grid');
+must(/@media\(max-width:760px\)[\s\S]*?\.people-roster-table tr\{[\s\S]*?grid-template-columns:30px minmax\(0,1fr\) auto 34px[\s\S]*?grid-template-areas:["']idx name status actions["']/, 'Mobile roster must use the compact single-line grid',htmlAndLocalCss);
 mustInclude('class="people-more-menu"','Mobile roster low-frequency actions must live in the overflow menu');
 console.log('PASS mobile people roster single-line overflow layout');
 mustInclude('class="people-checkin-toggle','Attendance state must be a clickable compact control');
