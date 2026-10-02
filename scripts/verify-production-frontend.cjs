@@ -2,7 +2,10 @@ const fs=require('fs');
 const path=require('path');
 const vm=require('vm');
 const root=path.resolve(__dirname,'..');
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const indexHtml=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const core=fs.readFileSync(path.join(root,'modules','main-app','core.js'),'utf8');
+const cloudRuntime=fs.readFileSync(path.join(root,'modules','cloud','cloud-runtime.js'),'utf8');
+const html=indexHtml+'\n'+core+'\n'+cloudRuntime;
 const localStyles=[...html.matchAll(/<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["']([^"'?#]+)[^"']*["'][^>]*>/gi)]
   .map(m=>m[1]).filter(h=>!/^https?:\/\//i.test(h)&&!h.startsWith('//'))
   .map(h=>path.resolve(root,h.replace(/^\//,''))).filter(p=>p.startsWith(root+path.sep)&&fs.existsSync(p))
