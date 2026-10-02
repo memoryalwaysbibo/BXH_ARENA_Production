@@ -39,7 +39,12 @@ window.BXHCardRewardUI={
 // This classic script is loaded after the main inline application. Keep the
 // reward/album integration here so the existing mailbox and card-tab dispatchers
 // use these session-safe handlers without a second UI or optimistic inventory.
-const albumFeature=window.BXHCardAlbumFeature;\nconst mailboxFeature=window.BXHMailbox;\nif(albumFeature&&typeof albumFeature.cardAlbumContext==='function'&&typeof albumFeature.loadCardAlbum==='function'&&mailboxFeature&&typeof mailboxFeature.handleMailbox==='function'){\n  let cardAlbumContext=albumFeature.cardAlbumContext;\n  let loadCardAlbum=albumFeature.loadCardAlbum;\n  let handleMailbox=mailboxFeature.handleMailbox;
+const albumFeature=window.BXHCardAlbumFeature;
+const mailboxFeature=window.BXHMailbox;
+if(albumFeature&&typeof albumFeature.cardAlbumContext==='function'&&typeof albumFeature.loadCardAlbum==='function'&&mailboxFeature&&typeof mailboxFeature.handleMailbox==='function'){
+  let cardAlbumContext=albumFeature.cardAlbumContext;
+  let loadCardAlbum=albumFeature.loadCardAlbum;
+  let handleMailbox=mailboxFeature.handleMailbox;
   cardAlbumState=null;
   cardAlbumContext=function(){
     const uid=firebaseUser?.uid||'',key=uid+':'+engagementSessionEpoch;
