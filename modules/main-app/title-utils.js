@@ -36,6 +36,6 @@ function formatTitleDisplay(realName,gameId,titleName,format,enabled=true){
   return `${real}${game!==real?`（${game}）`:""}・${titleName}`;
 }
 
-Object.assign(window.BXHTitleUtils||(window.BXHTitleUtils={}),{titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay});
+Object.assign(window.BXHTitleUtils||(window.BXHTitleUtils={}),{titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml});
 
 })();
