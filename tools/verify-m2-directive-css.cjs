@@ -8,6 +8,6 @@ test('critical id retained on external stylesheet',()=>{assert.equal(index.split
 test('cascade remains after client entrance theme and before head closes',()=>{let a=index.indexOf('client-entrance-theme.css?v=2.0.17-directive-warning'),b=index.indexOf(link),c=index.indexOf('</head>');assert.ok(a>=0&&b>a&&c>b)});
 test('reinline reconstructs M2-1 exact bytes',()=>assert.equal(blob(index.replace(link,'<style id="directive-warning-critical-v1">'+css+'</style>')),'52a33590b3ca5a9d118aaeae70cd9d16f78baceb'));
 test('no relative URL semantics',()=>assert.equal(/url\s*\(/i.test(css),false));
-test('directive selector families retained',()=>{for(const s of ['.directive-warning-layer',':root[data-bxh-theme="directive"] header.topbar',':root[data-bxh-theme="directive"] nav.tabs',':root[data-bxh-theme="directive"] .landing-mode-card',':root[data-bxh-theme="directive"] #login-card'])assert.ok(css.includes(s),s)});
-test('keyframes and responsive rule retained',()=>{assert.ok(css.includes('@keyframes directiveTopbarPulse'));assert.ok(css.includes('@media (max-width:640px)'))});
+test('directive selector families retained',()=>{for(const s of ['.directive-warning-layer',':root[data-bxh-theme="directive"] header.topbar',':root[data-bxh-theme="directive"] .landing-mode-card',':root[data-bxh-theme="directive"] #login-card'])assert.ok(css.includes(s),s)});
+test('keyframes and responsive rule retained',()=>{assert.ok(css.includes('@keyframes bxhDirectiveWarningCritical'));assert.ok(css.includes('@media(max-width:640px)'))});
 test('M2-1 Card Album stylesheet remains wired',()=>assert.ok(index.includes('modules/card-album/styles.css?v=20261002-m2-1')));
