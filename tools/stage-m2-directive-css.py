@@ -2,7 +2,7 @@
 import argparse,hashlib,json,shutil
 from pathlib import Path
 BASE_INDEX_BLOB="52a33590b3ca5a9d118aaeae70cd9d16f78baceb"
-CANDIDATE_INDEX_BLOB="4a3a7e900ac9e9aaa6c706e65bb170e832c1bc20"
+CANDIDATE_INDEX_BLOB="ac4ae95673e4d96546f1fa9683fb3557de93164f"
 CSS_SHA256="94bb93aabec246e2adb097f3303b20dd6f7d930821621d5bd7f0251d44ad3eb6"
 OPEN='<style id="directive-warning-critical-v1">'
 CLOSE='</style>'

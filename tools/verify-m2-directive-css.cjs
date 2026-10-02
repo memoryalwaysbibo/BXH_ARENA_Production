@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const root=path.resolve(process.env.BXH_M22_ROOT||process.cwd()),index=fs.readFileSync(path.join(root,'index.html'),'utf8'),css=fs.readFileSync(path.join(root,'modules/theme-directive/styles.css'),'utf8');
 const link='<link id="directive-warning-critical-v1" rel="stylesheet" href="modules/theme-directive/styles.css?v=20261002-m2-2">';
 const sha=x=>crypto.createHash('sha256').update(x).digest('hex');const blob=x=>{let b=Buffer.from(x);return crypto.createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex')};
-test('digests fixed',()=>{assert.equal(blob(index),'4a3a7e900ac9e9aaa6c706e65bb170e832c1bc20');assert.equal(sha(css),'94bb93aabec246e2adb097f3303b20dd6f7d930821621d5bd7f0251d44ad3eb6')});
+test('digests fixed',()=>{assert.equal(blob(index),'ac4ae95673e4d96546f1fa9683fb3557de93164f');assert.equal(sha(css),'94bb93aabec246e2adb097f3303b20dd6f7d930821621d5bd7f0251d44ad3eb6')});
 test('critical id retained on external stylesheet',()=>{assert.equal(index.split('id="directive-warning-critical-v1"').length-1,1);assert.equal(index.split(link).length-1,1);assert.equal(index.includes('<style id="directive-warning-critical-v1">'),false)});
 test('cascade remains after client entrance theme and before head closes',()=>{let a=index.indexOf('client-entrance-theme.css?v=2.0.17-directive-warning'),b=index.indexOf(link),c=index.indexOf('</head>');assert.ok(a>=0&&b>a&&c>b)});
 test('reinline reconstructs M2-1 exact bytes',()=>assert.equal(blob(index.replace(link,'<style id="directive-warning-critical-v1">'+css+'</style>')),'52a33590b3ca5a9d118aaeae70cd9d16f78baceb'));
