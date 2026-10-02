@@ -1,3 +1,4 @@
+(function(){
 function isValidRoomCode(code){
   return typeof code==="string" && /^BXH-[A-Z0-9]{6}$/.test(code);
 }
@@ -8,7 +9,7 @@ function normalizeTournamentEntryType(raw){
 }
 function buildTournamentEntryUrl(code, entry="event"){
   try{
-    const normalized=normalizeRoomCodeInput(code);
+    const normalized=window.BXHInputUtils.normalizeRoomCodeInput(code);
     if(!isValidRoomCode(normalized)) return "";
     const url = new URL(window.location.href);
     url.search = "";
@@ -21,11 +22,11 @@ function buildTournamentEntryUrl(code, entry="event"){
 function getTournamentEntryFromUrl(){
   try{
     const params=new URLSearchParams(window.location.search);
-    const canonicalCode=normalizeRoomCodeInput(params.get("code")||"");
+    const canonicalCode=window.BXHInputUtils.normalizeRoomCodeInput(params.get("code")||"");
     if(canonicalCode) return {code:canonicalCode,entry:normalizeTournamentEntryType(params.get("entry"))};
-    const legacyRegistration=normalizeRoomCodeInput(params.get("register")||"");
+    const legacyRegistration=window.BXHInputUtils.normalizeRoomCodeInput(params.get("register")||"");
     if(legacyRegistration) return {code:legacyRegistration,entry:"register",legacy:true};
-    const legacyWatch=normalizeRoomCodeInput(params.get("watch")||"");
+    const legacyWatch=window.BXHInputUtils.normalizeRoomCodeInput(params.get("watch")||"");
     if(legacyWatch) return {code:legacyWatch,entry:"watch",legacy:true};
   }catch(e){}
   return null;
@@ -57,3 +58,5 @@ function clearWatchParamFromUrl(){
 }
 
 Object.assign(window.BXHTournamentEntryUtils||(window.BXHTournamentEntryUtils={}),{isValidRoomCode,normalizeTournamentEntryType,buildTournamentEntryUrl,getTournamentEntryFromUrl,clearTournamentEntryFromUrl,replaceTournamentEntryInUrl,buildWatchUrl,getWatchParamFromUrl,clearWatchParamFromUrl});
+
+})();

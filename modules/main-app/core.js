@@ -8804,19 +8804,7 @@ function computeRegistrationStatus(m){
   return "open";
 }
 
-function publicationValidationErrors(m){
-  const errs=[];
-  if(!m.name || !m.name.trim() || m.name==="未命名賽事") errs.push("賽事名稱未填寫");
-  if(!m.date) errs.push("活動日期未填寫");
-  if(!m.location || !m.location.trim()) errs.push("活動地點未填寫");
-  if(m.registrationEnabled){
-    if(!m.registrationOpenAt) errs.push("報名開放時間未設定");
-    if(!m.registrationCloseAt) errs.push("報名截止時間未設定");
-    if(m.registrationOpenAt && m.registrationCloseAt && m.registrationCloseAt<=m.registrationOpenAt) errs.push("報名截止時間必須晚於開放時間");
-    if(!m.registrationCapacity || m.registrationCapacity<1) errs.push("正取人數上限未設定");
-  }
-  return errs;
-}
+function publicationValidationErrors(m){return window.BXHDomainUtils.publicationValidationErrors(m);}
 function renderTournamentPublishAction(readOnly){
   if(readOnly) return "";
   if(!state.cloudCode&&!canCreateOfficialTournament()) return `<button class="btn btn-ghost" disabled>目前帳號不可建立／發布新賽事</button>`;
@@ -14603,7 +14591,7 @@ function hunterFilteredRecords(){
     return true;
   });
 }
-const {hunterRecordHasTrustedScore,hunterCareerSummary}=window.BXHHunterUtils||{};
+const {hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
 const {hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth}=window.BXHHunterUtils||{};
 
 /* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
@@ -22340,6 +22328,23 @@ async function init(){
     }catch(e){}
     render();
   }
+
+  window.BXHCommitOfflineMatch=async function(op){
+    if(!op||!op.tournamentCode||!window.cloudSync||!window.cloudSync.confirmMatchTransaction)return {ok:false,reason:"cloud-unavailable"};
+    if(currentAuthUid()!==op.actorUid)return {ok:false,reason:"permission-denied"};
+    return await window.cloudSync.confirmMatchTransaction(op.tournamentCode,(remoteState)=>{
+      rebuildPropagationForState(remoteState);const m=(remoteState.matches||[]).find(x=>x.id===op.matchId);if(!m)return{ok:false,reason:"not-found"};
+      if(m.completed||m.winnerId)return{ok:false,reason:"already-completed"};if(Number(m.station||0)!==Number(op.station||0))return{ok:false,reason:"station-mismatch"};
+      if((m.dispatchRevision||0)!==(op.dispatchRevision||0))return{ok:false,reason:"dispatch-stale"};if(!m.a||!m.b||m.a.playerId!==op.playerAId||m.b.playerId!==op.playerBId)return{ok:false,reason:"player-mismatch"};
+      let ev;if(op.mode==="quick_decision")ev=evaluateQuickDecision(m,op.selectedWinnerId);else{m.scoreA=op.scoreA;m.scoreB=op.scoreB;m.log=Array.isArray(op.log)?op.log:[];m.faultActions=Array.isArray(op.faultActions)?op.faultActions:[];ev=evaluateMatchCompletion(m);}
+      if(!ev.ok||ev.winnerId!==op.selectedWinnerId)return{ok:false,reason:(ev&&ev.reason)||"validation-failed"};if(op.mode==="quick_decision")applyQuickDecisionFields(m,ev,op.actorName);else applyMatchCompletionFields(m,ev,op.actorName);
+      delete m.offlinePendingSync;delete m.offlineOperationQueuedAt;rebuildPropagationForState(remoteState);return{ok:true,state:remoteState};
+    },op.auditMeta||{});
+  };
+  window.addEventListener("bxh-offline-operation-synced",(e)=>{try{const d=e.detail||{},op=d.op||{},r=d.result||{};if(state.cloudCode&&String(state.cloudCode).toUpperCase()===String(op.tournamentCode||"").toUpperCase()&&r.state){const keep=state.cloudCode;state=Object.assign(defaultState(r.state.id),r.state);state.cloudCode=keep;rebuildPropagation();saveRecord(state);cloudStatus="connected";cloudLastSyncAt=Date.now();render();}showToast("離線賽事資料已完成雲端同步");}catch(err){}});
+  window.addEventListener("bxh-offline-operation-conflict",()=>{cloudStatus="error";render();showToast("離線資料與雲端賽事發生衝突，系統已停止自動覆寫，請由管理員確認。",true);});
+  window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";render();showToast("離線資料多次同步失敗，已停止自動重試並保留紀錄，請確認網路後再處理。",true);});
+  window.addEventListener("bxh-offline-queue-change",(e)=>{offlineQueueStatus=Object.assign({pending:0,conflict:0,failed:0,total:0},(e&&e.detail)||{});render();});
 
   // Cloud sync + Firebase Authentication: wire up without ever blocking the local-only startup path above.
   try{

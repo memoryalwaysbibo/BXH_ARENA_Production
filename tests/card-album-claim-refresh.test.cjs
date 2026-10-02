@@ -7,16 +7,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-function section(start, end) {
-  const at = html.indexOf(start), until = html.indexOf(end, at);
-  assert.ok(at >= 0 && until > at, `missing source section: ${start}`);
-  return html.slice(at, until);
+const core = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8');
+const mailbox = fs.readFileSync(path.join(root, 'modules/main-app/mailbox.js'), 'utf8');
+const albumFeature = fs.readFileSync(path.join(root, 'modules/main-app/card-album.js'), 'utf8');
+const html = core;
+function sectionFrom(sourceText,start,end) {
+  const at=sourceText.indexOf(start),until=sourceText.indexOf(end,at);
+  assert.ok(at>=0&&until>at,`missing source section: ${start}`);
+  return sourceText.slice(at,until);
 }
-const source = [
-  section('let mailboxState=null;', 'function mailboxButtonHtml()'),
-  section('async function handleMailbox(action,target)', '// 卡冊的畫面只相信'),
-  section('const CARD_ALBUM_CARDS=', 'function renderPlayerCenterLoggedIn()')
+const source=[
+  sectionFrom(mailbox,'let mailboxState=null;','function mailboxButtonHtml()'),
+  sectionFrom(mailbox,'async function handleMailbox(action,target)','Object.assign(window.BXHMailbox'),
+  sectionFrom(core,'const CARD_ALBUM_CARDS=','const {cardAlbumContext,loadCardAlbum,cardAlbumImage,renderCardAlbumPage,renderCardAlbumTrade}=window.BXHCardAlbumFeature;'),
+  albumFeature
 ].join('\n');
 const rewardSource = fs.readFileSync(path.join(root, 'card-reward-mail.js'), 'utf8');
 const album = quantity => ({ ok: true, sets: { basic: { seal: 1 }, gods: { seal: quantity } }, octoberCompleted: 2 });
@@ -45,16 +49,18 @@ function setup({ installBridge = true } = {}) {
     } }
   };
   vm.createContext(sandbox);
-  vm.runInContext(source, sandbox, { filename: 'card-album-inline.js' });
+  vm.runInContext(mailbox, sandbox, { filename: 'mailbox-feature.js' });
+  vm.runInContext(albumFeature, sandbox, { filename: 'card-album-feature.js' });
+  vm.runInContext(source.replace(albumFeature,''), sandbox, { filename: 'card-album-inline.js' });
   const install = () => vm.runInContext(rewardSource, sandbox, { filename: 'card-reward-mail.js' });
   if (installBridge) install();
   const target = { getAttribute: name => name === 'data-message-id' ? 'mail-1' : null };
   return {
     sandbox, calls, toasts, listeners, scheduled, install,
-    state: () => sandbox.cardAlbumContext(), mail: () => sandbox.mailboxContext(),
-    load: refresh => sandbox.loadCardAlbum(refresh),
-    claim: () => sandbox.handleMailbox('mailbox-card-reward', target),
-    view: () => sandbox.renderCardAlbumPage(),
+    state: () => sandbox.window.BXHCardAlbumFeature.cardAlbumContext(), mail: () => sandbox.window.BXHMailbox.mailboxContext(),
+    load: refresh => sandbox.window.BXHCardAlbumFeature.loadCardAlbum(refresh),
+    claim: () => sandbox.window.BXHMailbox.handleMailbox('mailbox-card-reward', target),
+    view: () => sandbox.window.BXHCardAlbumFeature.renderCardAlbumPage(),
     get: fn => { get = fn; }, list: fn => { list = fn; }, onClaim: fn => { claim = fn; },
     switchUser(uid) { sandbox.firebaseUser = uid ? { uid } : null; sandbox.engagementSessionEpoch++; }
   };
@@ -224,16 +230,16 @@ test('slow album refresh cannot clear a newer claim busy state', async () => {
   assert.equal(t.mail().busy, false);
 });
 
-test('reward bridge loads as a classic script after the inline application', () => {
-  const handlerAt=html.indexOf('async function handleMailbox(action,target)');
-  const bridgeAt=html.indexOf('<script src="card-reward-mail.js?');
-  assert.ok(handlerAt>0 && bridgeAt>handlerAt);
-  assert.ok(html.lastIndexOf('</script>', bridgeAt)>handlerAt);
+test('reward bridge loads after the modular mailbox feature', () => {
+  const indexHtml=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const mailboxAt=indexHtml.indexOf('modules/main-app/mailbox.js');
+  const bridgeAt=indexHtml.indexOf('<script src="card-reward-mail.js?');
+  assert.ok(mailboxAt>0 && bridgeAt>mailboxAt);
 });
 
 test('the bridge preserves unrelated mailbox actions', async () => {
   const t=setup(); t.mail().open=true;
-  await t.sandbox.handleMailbox('mailbox-close', {});
+  await t.sandbox.window.BXHMailbox.handleMailbox('mailbox-close', {});
   assert.equal(t.mail().open, false);
   assert.deepEqual(t.calls, []);
 });

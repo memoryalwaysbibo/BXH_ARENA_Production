@@ -1,3 +1,4 @@
+(function(){
 // Core P1K — pure domain/value utilities.
 // No DOM, Firebase, storage, cache, or mutable app-state access.
 
@@ -46,7 +47,7 @@ function hunterAchievementMatchKey(record){
     String(record&&record.round!=null?record.round:""),
     String(record&&record.indexInRound!=null?record.indexInRound:""),
     String(record&&record.station!=null?record.station:""),
-    String(hunterRecordTimestamp(record)||0)
+    String(window.BXHHunterUtils.hunterRecordTimestamp(record)||0)
   ].join(":");
   return eventKey+"|legacy:"+legacy;
 }
@@ -113,4 +114,7 @@ function fastLobbyHash(value){
   return (h>>>0).toString(36);
 }
 
-Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash});
+function publicationValidationErrors(m){const e=[];if(!m.name||!m.name.trim()||m.name==="未命名賽事")e.push("賽事名稱未填寫");if(!m.date)e.push("活動日期未填寫");if(!m.location||!m.location.trim())e.push("活動地點未填寫");if(m.registrationEnabled){if(!m.registrationOpenAt)e.push("報名開放時間未設定");if(!m.registrationCloseAt)e.push("報名截止時間未設定");if(m.registrationOpenAt&&m.registrationCloseAt&&m.registrationCloseAt<=m.registrationOpenAt)e.push("報名截止時間必須晚於開放時間");if(!m.registrationCapacity||m.registrationCapacity<1)e.push("正取人數上限未設定");}return e;}
+Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,publicationValidationErrors});
+
+})();

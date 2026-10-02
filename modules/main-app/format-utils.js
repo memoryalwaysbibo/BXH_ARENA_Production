@@ -1,3 +1,4 @@
+(function(){
 // Core P1G — low-coupling labels/date/time formatting helpers.
 // Pure formatting only: no DOM, Firebase, storage, or mutable app state.
 
@@ -47,3 +48,5 @@ function quickDecisionFailureMessage(reason){
 }
 
 Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel,quickDecisionFailureMessage});
+
+})();

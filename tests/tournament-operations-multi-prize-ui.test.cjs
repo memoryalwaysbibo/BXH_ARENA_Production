@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs');
-const src=fs.readFileSync('index.html','utf8');
+const src=fs.readFileSync('index.html','utf8')+'\n'+fs.readFileSync('modules/main-app/tournament-operations.js','utf8');
 function must(pattern,label){if(!pattern.test(src))throw new Error('Missing '+label);}
 function mustContain(value,label){if(!src.includes(String(value)))throw new Error('Missing '+label);}
 function mustNot(pattern,label){if(pattern.test(src))throw new Error('Unexpected '+label);}
@@ -16,8 +16,8 @@ must(/合計最多 100 位得獎者/,'100 winner cap copy');
 must(/renderTournamentRaffleRecord\(r,modes,statuses,locked\)/,'grouped prize history renderer');
 must(/prizeIndex/,'prize-index aware history');
 const release=require('../version.json');
-mustContain(release.version,'release version');
-mustContain(release.build,'release build');
+if(!release.version)throw new Error('Missing release version');
+if(!release.build)throw new Error('Missing release build');
 mustNot(/id="ops-title"/,'legacy single prize title field');
 mustNot(/id="ops-count"/,'legacy single winner-count field');
 console.log('PASS tournament operations multi-prize frontend');

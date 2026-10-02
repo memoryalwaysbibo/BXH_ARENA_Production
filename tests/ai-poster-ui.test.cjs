@@ -1,7 +1,7 @@
 'use strict';
 // No network or production writes: real helpers + extracted draft functions, mocked callable only.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','main-app','core.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','main-app','venue-utils.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','cloud','cloud-runtime.js'),'utf8');
 const P=require(path.join(root,'ai-poster-ui.js'));
 let count=0;
 async function test(name,fn){await fn();count++;console.log('PASS '+name);}

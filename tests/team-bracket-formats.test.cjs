@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
 const source=html.slice(html.indexOf('function eligibleBracketTeams(){'),html.indexOf('/* ==== dispatcher: generate bracket ==== */'));
 assert(source.startsWith('function eligibleBracketTeams(){'));
 const make=new Function('state','shuffle','nextPow2','seedOrder','uid','syncMatchStatuses','rebuildCourtAssignments','canOperateCurrentTournament','showToast',source+';return {generateTeamBracket};');

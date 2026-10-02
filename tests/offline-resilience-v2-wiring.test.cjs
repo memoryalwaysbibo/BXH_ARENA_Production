@@ -3,6 +3,8 @@
 const fs = require('node:fs');
 
 const html = fs.readFileSync('index.html', 'utf8');
+const core = fs.readFileSync('modules/main-app/core.js', 'utf8');
+const source = html + '\n' + core;
 const offline = fs.readFileSync('offline-resilience.js', 'utf8');
 
 const requiredHtml = [
@@ -19,7 +21,7 @@ const requiredHtml = [
 ];
 
 for (const needle of requiredHtml) {
-  if (!html.includes(needle)) {
+  if (!source.includes(needle)) {
     throw new Error(`Offline Resilience V2 wiring missing: ${needle}`);
   }
 }

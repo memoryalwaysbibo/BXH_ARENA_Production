@@ -1,3 +1,4 @@
+(function(){
 // ==== Unified registration status enum (spec section 4.1) ====
 // The ENTIRE system uses only these six values as the canonical registration
 // status. Nothing else is ever written or compared against going forward.
@@ -59,3 +60,5 @@ function registrationCountdownUrgency(openAt,now=Date.now()){
 }
 
 Object.assign(window.BXHRegistrationUtils||(window.BXHRegistrationUtils={}),{REGISTRATION_STATUS_VALUES,REGISTRATION_STATUS_COMPAT,normalizeRegistrationStatusValue,normalizeDateTime,registrationCountdownText,registrationCountdownUrgency});
+
+})();

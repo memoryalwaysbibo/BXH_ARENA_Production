@@ -1,3 +1,4 @@
+(function(){
 // Core P1H — pure input normalization and date/tournament value helpers.
 // No DOM, Firebase, storage, or mutable app-state access.
 
@@ -66,3 +67,5 @@ function tournamentTeamSize(t){
 }
 
 Object.assign(window.BXHInputUtils||(window.BXHInputUtils={}),{normalizeRoomCodeInput,normalizeLoginEmail,loginIdentifierDisplayValue,normalizeAuthEmailForMatch,epochToDatetimeLocal,datetimeLocalToEpoch,communityDateTimeValue,formatTournamentDetailDateTime,tournamentBattleMode,tournamentTeamSize});
+
+})();

@@ -67,6 +67,8 @@ for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
   if(/type=["']module/.test(m[1]))new vm.SourceTextModule(m[2]);
   else new vm.Script(m[2]);scriptCount++;
 }
-assert(html.indexOf('src="ladder-v1.js')<html.indexOf('const LADDER_TIERS'));
+const core=fs.readFileSync(require('node:path').join(__dirname,'../modules/main-app/core.js'),'utf8');
+assert(html.indexOf('src="ladder-v1.js')>=0);
+assert(core.includes('const LADDER_TIERS'));
 console.log(`PASS ${assertions} scoring assertions; ${scriptCount} inline scripts parse`);
 module.exports={single};

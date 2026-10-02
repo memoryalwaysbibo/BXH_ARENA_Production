@@ -1,3 +1,4 @@
+(function(){
 // Core P1J — pure match/court display utilities.
 // State-dependent referee scheduling/stage logic intentionally remains in core.
 
@@ -45,3 +46,5 @@ function seedOrder(size){
 function sameStringSet(a,b){if(a.size!==b.size)return false;for(const x of a)if(!b.has(x))return false;return true;}
 
 Object.assign(window.BXHMatchUtils||(window.BXHMatchUtils={}),{courtKey,matchLabel,liveEtaCountdownText,matchStatusClass});
+
+})();

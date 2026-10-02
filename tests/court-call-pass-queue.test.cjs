@@ -4,7 +4,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 
 const ui=fs.readFileSync(path.join(__dirname,'..','court-call-ui.js'),'utf8');
-const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');
 
 function extract(name,next){
   const start=ui.indexOf('function '+name+'(');

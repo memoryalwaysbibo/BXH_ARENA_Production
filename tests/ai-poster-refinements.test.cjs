@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const R=require('../ai-poster-refinements'),P=require('../ai-poster-ui');
-const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'..','modules','main-app','venue-utils.js'),'utf8');
 let passed=0;function test(name,fn){fn();passed++;console.log('PASS '+name);}
 const result=(text,supplement='')=>({sourceMode:'poster-callable',posterText:text,posterSupplementText:supplement,warnings:[]});
 test('Mixed registration label retains exact minute and BXH channel',()=>assert.deepEqual(R.clockHint(result('報名時間:21:10 BXH粉專'),'registration-open'),{time:'21:10',channel:'BXH粉專',evidence:'報名時間:21:10 BXH粉專'}));

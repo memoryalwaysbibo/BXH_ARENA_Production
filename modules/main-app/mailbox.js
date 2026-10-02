@@ -1,3 +1,4 @@
+(function(){
 // Core Phase 2A — Mailbox feature module.
 // Feature-level extraction: state, rendering and service actions stay together.
 let mailboxState=null;
@@ -202,3 +203,5 @@ async function handleMailbox(action,target){
 }
 
 Object.assign(window.BXHMailbox||(window.BXHMailbox={}),{mailboxContext,mailboxError,loadMailbox,mailboxButtonHtml,renderMailboxPage,openMailboxPartnerContract,handleMailbox});
+
+})();

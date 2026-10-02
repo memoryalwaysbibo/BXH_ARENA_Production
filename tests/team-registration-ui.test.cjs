@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=process.argv[2]||path.resolve(__dirname,'..');
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','main-app','core.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','cloud','cloud-runtime.js'),'utf8');
 const family=fs.readFileSync(path.join(root,'family-ui.js'),'utf8');
 let count=0;
 const test=(name,fn)=>{fn();count++;console.log('PASS '+name);};

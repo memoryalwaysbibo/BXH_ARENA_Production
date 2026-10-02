@@ -1,3 +1,4 @@
+(function(){
 // Core P1F — pure account presentation/filter utilities.
 // No DOM, Firebase, storage, or mutable app-state access.
 
@@ -76,3 +77,5 @@ function accountMatchesActivity(user,filter,now=Date.now()){
 }
 
 Object.assign(window.BXHAccountUtils||(window.BXHAccountUtils={}),{passwordStrengthLabel,accountActivityStatus,accountActivitySummary,accountTimestampValue,formatAccountTimestamp,accountPrimaryName,accountGameId,accountRoleMatches,accountRoleCount,accountMatchesActivity});
+
+})();

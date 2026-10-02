@@ -3,8 +3,11 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 
-const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
-const method=html.slice(html.indexOf('    async settleLadderTournament('),html.indexOf('    async adjustLadderPoints('));
+const runtime=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
+const start=runtime.indexOf('    async settleLadderTournament(');
+const end=runtime.indexOf('    async adjustLadderPoints(',start);
+assert.ok(start>=0&&end>start,'settleLadderTournament must exist in modular cloud runtime');
+const method=runtime.slice(start,end);
 let received=null;
 const context=vm.createContext({
   window:{engagementService:{settleLadder:async payload=>{received=payload;return {ok:true,seasonId:'S0',results:[]};}}},

@@ -1,3 +1,4 @@
+(function(){
 // Core Phase 2C — Card Album feature module.
 // Album context, loading, rendering and trade workflow stay together.
 function cardAlbumContext(){
@@ -111,3 +112,5 @@ document.addEventListener("click",async event=>{
 });
 
 Object.assign(window.BXHCardAlbumFeature||(window.BXHCardAlbumFeature={}),{cardAlbumContext,loadCardAlbum,cardAlbumImage,renderCardAlbumPage,renderCardAlbumTrade});
+
+})();

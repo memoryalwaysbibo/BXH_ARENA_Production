@@ -1,3 +1,4 @@
+(function(){
 // Core P1E — pure title display/classification utilities.
 // Keep this module side-effect free: no DOM, Firebase, storage, or app-state access.
 function titleDisplayName(name){return name==='審判者'?'裁決者':name;}
@@ -36,3 +37,5 @@ function formatTitleDisplay(realName,gameId,titleName,format,enabled=true){
 }
 
 Object.assign(window.BXHTitleUtils||(window.BXHTitleUtils={}),{titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay});
+
+})();

@@ -1,3 +1,4 @@
+(function(){
 // Core Phase 2A — Share / QR feature module.
 // Cohesive feature extraction: share targets, URL/text composition, QR scheduling and modal rendering.
 // Runtime dependencies (state, shareTarget, tournamentStatus, QR renderer, esc, LOGO_SRC) remain owned by main app.
@@ -72,3 +73,5 @@ function renderShareModal(){
 }
 
 Object.assign(window.BXHShareFeature||(window.BXHShareFeature={}),{SHARE_TARGET_CONFIG,shareTargetEnabled,currentShareUrl,currentShareText,renderCurrentShareQr,renderShareModal});
+
+})();

@@ -39,7 +39,12 @@ window.BXHCardRewardUI={
 // This classic script is loaded after the main inline application. Keep the
 // reward/album integration here so the existing mailbox and card-tab dispatchers
 // use these session-safe handlers without a second UI or optimistic inventory.
-if(typeof cardAlbumContext==='function'&&typeof loadCardAlbum==='function'&&typeof handleMailbox==='function'){
+const albumFeature=window.BXHCardAlbumFeature;
+const mailboxFeature=window.BXHMailbox;
+if(albumFeature&&typeof albumFeature.cardAlbumContext==='function'&&typeof albumFeature.loadCardAlbum==='function'&&mailboxFeature&&typeof mailboxFeature.handleMailbox==='function'){
+  let cardAlbumContext=albumFeature.cardAlbumContext;
+  let loadCardAlbum=albumFeature.loadCardAlbum;
+  let handleMailbox=mailboxFeature.handleMailbox;
   cardAlbumState=null;
   cardAlbumContext=function(){
     const uid=firebaseUser?.uid||'',key=uid+':'+engagementSessionEpoch;
@@ -66,24 +71,27 @@ if(typeof cardAlbumContext==='function'&&typeof loadCardAlbum==='function'&&type
     }catch(error){if(isCurrent())state.error=String(error?.message||'卡冊暫時無法讀取').slice(0,130);}
     finally{if(isCurrent()){state.loading=false;renderPreservingScroll();}}
   };
-  const originalMailboxHandler=handleMailbox;
+  const originalMailboxHandler=mailboxFeature.handleMailbox;
   handleMailbox=async function(action,target){
     if(action!=='mailbox-card-reward')return originalMailboxHandler(action,target);
-    const context=mailboxContext();
+    const context=mailboxFeature.mailboxContext();
     if(!firebaseUser?.uid||context.busy)return;
     const messageId=target.getAttribute('data-message-id')||'';
     context.busy=true;context.error='';render();
     try{
       await window.BXHCardRewardUI.claim(messageId);
-      if(context!==mailboxContext())return;
+      if(context!==mailboxFeature.mailboxContext())return;
       // Includes already-claimed replays. The server alone supplies quantities.
       // Do not keep the claim handler pending on the background album read.
       void loadCardAlbum(true);
-      context.messages=null;context.busy=false;await loadMailbox(true);
-      if(context!==mailboxContext())return;
+      context.messages=null;context.busy=false;await mailboxFeature.loadMailbox(true);
+      if(context!==mailboxFeature.mailboxContext())return;
       showToast('卡牌已領取並收入我的卡冊');
-    }catch(error){if(context===mailboxContext())context.error=mailboxError(error);}
-    finally{if(context===mailboxContext()){context.busy=false;render();}}
+    }catch(error){if(context===mailboxFeature.mailboxContext())context.error=mailboxFeature.mailboxError(error);}
+    finally{if(context===mailboxFeature.mailboxContext()){context.busy=false;render();}}
   };
+  albumFeature.cardAlbumContext=cardAlbumContext;
+  albumFeature.loadCardAlbum=loadCardAlbum;
+  mailboxFeature.handleMailbox=handleMailbox;
 }
 })();
