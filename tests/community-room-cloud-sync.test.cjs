@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('node:fs');
-const html = fs.readFileSync('modules/main-app/core.js','utf8');
+const html = fs.readFileSync('modules/cloud/cloud-runtime.js','utf8');
 
 function mustInclude(text, message){
   if(!html.includes(text)) throw new Error(message);
