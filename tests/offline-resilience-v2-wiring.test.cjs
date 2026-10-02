@@ -36,3 +36,4 @@ for (const needle of requiredModule) {
 }
 
 console.log('Offline Resilience V2 regression gate: PASS');
+
