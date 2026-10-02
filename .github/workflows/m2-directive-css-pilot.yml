@@ -1,0 +1,73 @@
+name: M2 Directive CSS isolated extraction
+
+on:
+  push:
+    branches:
+      - refactor/index-css-m2-directive-20261002
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m2-directive-css-isolated
+  cancel-in-progress: false
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Trust workspace
+        shell: bash
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Verify fixed M2-1 parent, current head and committed extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/refactor/index-css-m2-card-album-20261002 | cut -f1)" = 1f78c090fa6e444d158f3896d724860260b7b0bb
+          test "$(git ls-remote origin refs/heads/refactor/index-css-m2-directive-20261002 | cut -f1)" = "$GITHUB_SHA"
+          test "$(git hash-object index.html)" = ac4ae95673e4d96546f1fa9683fb3557de93164f
+          test -f modules/theme-directive/styles.css
+          test -f m2-directive-css-manifest.json
+          printf '%s  %s\n' 94bb93aabec246e2adb097f3303b20dd6f7d930821621d5bd7f0251d44ad3eb6 modules/theme-directive/styles.css | sha256sum -c -
+      - name: Contracts and critical regression
+        shell: bash
+        env:
+          BXH_M22_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          node --test tools/verify-m2-directive-css.cjs
+          node scripts/verify-production-frontend.cjs
+          node scripts/run-regression-core.cjs critical
+          node --test tests/theme-directive-access.test.cjs
+      - name: Install pinned browser runner
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/pw" --no-package-lock --ignore-scripts @playwright/test@1.55.0
+      - name: Browser computed style
+        shell: bash
+        env:
+          BXH_M22_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          export NODE_PATH="$RUNNER_TEMP/pw/node_modules"
+          node "$RUNNER_TEMP/pw/node_modules/@playwright/test/cli.js" test --config=tools/m2-directive-css.config.cjs
+      - name: Record immutable read-only evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/m22-evidence"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/m22-evidence/tested-commit.txt"
+          printf 'READ-ONLY M2-2 VALIDATION. No branch write, merge or deployment.\n' > "$RUNNER_TEMP/m22-evidence/scope.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m2-directive-css-${{ github.run_id }}
+          path: ${{ runner.temp }}/m22-evidence
+          retention-days: 7
