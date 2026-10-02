@@ -14680,23 +14680,7 @@ function hunterCareerSummary(records){
     totalFor,totalAgainst,net:totalFor-totalAgainst,validRounds,scoredMatches
   };
 }
-const HUNTER_GROWTH_VERSION="hunter-xp-v1";
-const HUNTER_XP_PER_MATCH=10;
-const HUNTER_XP_PER_VALID_ROUND=2;
-const HUNTER_XP_PER_EVENT=20;
-
-
-function hunterUniqueRecords(records){
-  const seen=new Set(),out=[];
-  (Array.isArray(records)?records:[]).forEach((r,index)=>{
-    const eventKey=hunterRecordEventKey(r);
-    const matchKey=String((r&&r.matchId)||(((r&&r.opponent&&r.opponent.name)||"opponent")+"|"+String((r&&r.round)||"")+"|"+String(hunterRecordTimestamp(r)||index)));
-    const key=eventKey+"|"+matchKey;
-    if(seen.has(key)) return;
-    seen.add(key); out.push(r);
-  });
-  return out;
-}
+const {hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth}=window.BXHHunterUtils||{};
 
 /* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
 const HUNTER_ACHIEVEMENT_SCHEMA_VERSION=1;
@@ -15128,26 +15112,6 @@ function hunterPermanentAwardSummaryHtml(core){
 function hunterAchievementsHtml(core,records,audit){
   return hunterPermanentAwardSummaryHtml(core)+hunterAchievementIntegrityAuditHtml(audit)+hunterMatchAchievementsHtml(core,records)+hunterRoundAchievementsHtml(core,records)+hunterStreakSpecialAchievementsHtml(core,records);
 }
-function hunterLevelThreshold(level){
-  const lv=Math.max(1,Math.floor(Number(level)||1));
-  return lv<=1?0:25*(lv-1)*lv;
-}
-function hunterBuildGrowth(records){
-  const rows=hunterUniqueRecords(records);
-  const eventCount=new Set(rows.map(hunterRecordEventKey)).size;
-  const validRounds=rows.reduce((sum,r)=>sum+(r&&r.analyzable&&Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0),0);
-  const xpFromMatches=rows.length*HUNTER_XP_PER_MATCH;
-  const xpFromRounds=validRounds*HUNTER_XP_PER_VALID_ROUND;
-  const xpFromEvents=eventCount*HUNTER_XP_PER_EVENT;
-  const xp=xpFromMatches+xpFromRounds+xpFromEvents;
-  let level=1;
-  while(level<99 && xp>=hunterLevelThreshold(level+1)) level++;
-  const floor=hunterLevelThreshold(level);
-  const next=hunterLevelThreshold(level+1);
-  const progress=next>floor?Math.max(0,Math.min(100,Math.round((xp-floor)/(next-floor)*100))):100;
-  return {version:HUNTER_GROWTH_VERSION,rows,eventCount,validRounds,xp,xpFromMatches,xpFromRounds,xpFromEvents,level,floor,next,progress};
-}
-// Career experience is a bounded contribution to the license grade, never to P4 ability.
 const {hunterSeniorityBonus,hunterLicenseGrade}=window.BXHHunterUtils||{};
 function hunterPeriodSummary(period){
   const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));
