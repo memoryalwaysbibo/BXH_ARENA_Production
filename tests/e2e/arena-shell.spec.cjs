@@ -10,6 +10,8 @@ const blockedBackendHosts = [
 ];
 
 test.beforeEach(async ({ page }) => {
+  page.on('pageerror', error => console.error('PAGEERROR:', error.stack || error.message));
+  page.on('console', msg => { if (msg.type()==='error') console.error('BROWSER:', msg.text()); });
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     const host = url.hostname;
