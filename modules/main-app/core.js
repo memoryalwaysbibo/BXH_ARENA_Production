@@ -22486,9 +22486,15 @@ async function init(){
                     if(intent==="partner_organizer"){appPhase="app";activeTab="management";adminTournamentListLoaded=false;render();return;}
                     if(intent==="event_staff"){appPhase="app";activeTab="management";adminTournamentListLoaded=false;render();return;}
                     if(intent==="admin"){
-                      appPhase = "admin-success";
+                      // P0: route authenticated admins directly into the management app.
+                      // The previous admin-success interstitial depended on a 600ms timer;
+                      // any auth-state/render re-entry could leave Production stranded on
+                      // that transient phase even though role/profile validation succeeded.
+                      appPhase = "app";
+                      activeTab = "management";
+                      adminTournamentListLoaded = false;
                       render();
-                      setTimeout(()=>{ if(appPhase==="admin-success"){ appPhase = "app"; activeTab="management"; adminTournamentListLoaded=false; render(); } }, 600);
+                      showToast("登入成功");
                       return;
                     }
                     // intent === "player": any role (including existing
