@@ -18345,23 +18345,46 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     appPhase="admin-login";
     render();
     (async ()=>{
+      // P0: Admin bootstrap must never leave the UI waiting forever when a
+      // storage/Firebase promise stalls. Player mode does not depend on this path.
+      const adminBootstrapTimeout=(promise,ms=4500)=>Promise.race([
+        Promise.resolve(promise),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error("admin-bootstrap-timeout")),ms))
+      ]);
       try{
-        const res = await window.storage.get(REMEMBER_EMAIL_KEY);
-        rememberedUsername = (res && res.value) ? res.value : "";
-        rememberUsername = !!rememberedUsername;
-      }catch(e){ rememberedUsername=""; }
-      if(!authAvailable()){
-        // give the module a brief moment to finish connecting if it hasn't yet
-        if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
-      }
-      if(!authAvailable()){
-        appPhase="admin-login"; // shows the "雲端服務尚未連線" banner rather than blocking entirely
+        try{
+          const res = await adminBootstrapTimeout(window.storage.get(REMEMBER_EMAIL_KEY),2500);
+          rememberedUsername = (res && res.value) ? res.value : "";
+          rememberUsername = !!rememberedUsername;
+        }catch(e){ rememberedUsername=""; rememberUsername=false; }
+        if(!authAvailable()){
+          // Give cloud runtime a short chance to connect, but never block Admin UI.
+          if(window.cloudSync && window.cloudSync.connect){
+            try{ await adminBootstrapTimeout(window.cloudSync.connect(),4500); }catch(e){}
+          }
+        }
+        if(!authAvailable()){
+          appPhase="admin-login";
+          loginError="雲端服務連線逾時，請稍後重試。";
+          render();
+          return;
+        }
+        try{
+          superAdminExists = await adminBootstrapTimeout(window.cloudAuth.hasSuperAdmin(),4500);
+          appPhase = (superAdminExists===false) ? "admin-setup" : "admin-login";
+        }catch(e){
+          // Existing admins must still be able to reach the login screen when
+          // the setup probe is slow/unavailable. Permission is verified at login.
+          superAdminExists = null;
+          appPhase = "admin-login";
+          loginError = "管理權限服務回應較慢，請直接登入重試。";
+        }
         render();
-        return;
+      }catch(e){
+        appPhase="admin-login";
+        loginError="管理模式初始化失敗，請重新登入。";
+        render();
       }
-      superAdminExists = await window.cloudAuth.hasSuperAdmin();
-      appPhase = (superAdminExists===false) ? "admin-setup" : "admin-login";
-      render();
     })();
     return;
   }
