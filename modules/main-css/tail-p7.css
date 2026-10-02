@@ -1,0 +1,44 @@
+/* P7.12.1: top-layer navigation avoids clipping inside fixed-height cards. */
+.venue-nav-open{flex:0 0 auto;min-height:30px;padding:3px 7px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--panel);color:var(--white);font-size:10px;font-weight:700;white-space:nowrap;cursor:pointer;}
+.venue-nav-open:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+.venue-detail-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.venue-detail-address-row{flex-wrap:nowrap!important;min-width:0;gap:4px;}
+.venue-detail-address{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.venue-navigation-dialog{width:min(420px,calc(100vw - 28px));max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;border:1px solid var(--gold-dim);border-radius:14px;padding:18px;background:var(--panel);color:var(--white);box-shadow:0 18px 60px rgba(0,0,0,.5);}
+.venue-navigation-dialog::backdrop{background:rgba(0,0,0,.66);}
+.venue-navigation-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.venue-navigation-heading h2{margin:0;font-size:18px;}
+.venue-navigation-heading button{min-width:44px;min-height:44px;border:0;background:transparent;color:inherit;font-size:18px;}
+.venue-navigation-name{display:block;margin-top:12px;overflow-wrap:anywhere;}
+.venue-navigation-address{font-size:14px;line-height:1.6;user-select:text;overflow-wrap:anywhere;}
+.venue-navigation-links{display:grid;gap:8px;margin-top:14px;}
+.venue-navigation-links a,.venue-navigation-links button{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--white);font:inherit;text-decoration:none;}
+.venue-navigation-note,.venue-navigation-status{font-size:12px;line-height:1.6;color:var(--metal);}
+.venue-navigation-fallback{position:fixed;inset:10% auto auto 50%;transform:translateX(-50%);z-index:10000;}
+
+/* P7.13: scoped compact poster controls, never affect competition cards. */
+.ai-poster-input{border:1px solid var(--gold-dim);border-radius:10px;padding:12px;margin-bottom:14px;min-width:0;}
+.ai-poster-input input[hidden]{display:none;}
+.ai-poster-pick{display:block!important;width:100%;min-height:44px;margin:10px 0;white-space:normal;}
+.ai-poster-help{font-size:11px;color:var(--metal);line-height:1.6;}
+.ai-poster-preview{display:grid;grid-template-columns:100px minmax(0,1fr);gap:12px;margin-top:12px;align-items:center;}
+.ai-poster-preview img{width:100%;max-height:145px;object-fit:contain;border-radius:6px;}
+.ai-poster-preview strong{font-size:12px;overflow-wrap:anywhere;}
+.ai-poster-preview p{font-size:11px;color:var(--metal);}
+.ai-poster-preview button{min-height:44px;font-size:12px;white-space:normal;}
+.ai-poster-cover-choice{display:flex;align-items:center;gap:9px;margin-top:10px;color:var(--ivory);font-size:12px;line-height:1.5;}
+.ai-poster-cover-choice input{width:18px;height:18px;flex:none;accent-color:var(--gold);}
+.lobby-card-with-cover{display:flex;align-items:flex-start;gap:12px;min-width:0;}
+.lobby-poster-cover{width:68px;height:68px;object-fit:contain;flex:none;background:#11151b;border:1px solid rgba(217,185,92,.3);border-radius:8px;}
+.lobby-card-with-cover .lobby-card-main{flex:1;min-width:0;}
+@media(max-width:400px){.lobby-poster-cover{width:56px;height:56px;}}
+.ai-poster-evidence{margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;}
+.ai-poster-evidence summary{cursor:pointer;min-height:28px;}
+.ai-poster-evidence pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;font:inherit;line-height:1.7;}
+.ai-create-dialog:has(.ai-poster-preview) .ai-create-source{min-height:100px;}
+.ai-create-dialog:has(.ai-poster-preview) .ai-create-fields{display:none;}
+/* P7.13.1: visible validation target; no flashing or motion requirement. */
+.ai-review-target{outline:2px solid #e99066;outline-offset:5px;border-radius:6px;scroll-margin-block:170px 100px;}
+.ai-review-field-note{font-size:12px;line-height:1.6;color:#ffbe9e;margin-top:8px;overflow-wrap:anywhere;}
+.ai-clock-hint{font-size:12px;line-height:1.6;overflow-wrap:anywhere;}
+

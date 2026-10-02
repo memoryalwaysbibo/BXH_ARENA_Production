@@ -1,0 +1,11 @@
+{
+  "status": "CANDIDATE_NOT_DEPLOYED",
+  "source_index_blob": "99ab90be16347904f050c11ee7086cf11d367620",
+  "candidate_index_blob": "32635b55c812f03bbd2f804bdec0b7114679042c",
+  "source_index_bytes": 2381048,
+  "candidate_index_bytes": 2376908,
+  "css_bytes": 4239,
+  "css_sha256": "6aececae863ebe5869b4658647ac6d19b3f344ca9992e791e39e21a98964bed6",
+  "stylesheet": "modules/main-css/tail-p7.css",
+  "relative_urls": 0
+}

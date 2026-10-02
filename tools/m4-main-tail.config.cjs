@@ -1,0 +1,1 @@
+'use strict';const path=require('path');module.exports={testDir:__dirname,testMatch:'m4-main-tail.spec.cjs',timeout:30000,use:{baseURL:'http://127.0.0.1:4177'},webServer:{command:'python3 -m http.server 4177 --directory '+JSON.stringify(path.resolve(process.env.BXH_M41_ROOT||process.cwd())),port:4177,reuseExistingServer:false}};
