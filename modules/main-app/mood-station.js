@@ -1,3 +1,4 @@
+(function(){
 // Core Phase 2B — Mood Station feature module.
 // Context, rendering, service actions, input listeners and refresh lifecycle stay together.
 function moodContext(){
@@ -169,3 +170,5 @@ document.addEventListener('input',e=>{
 setInterval(()=>{if(appPhase==='player-center'&&playerActiveTab==='home'&&firebaseUser?.uid&&!guestReadOnlyMode){const c=moodContext();if(!c.loading&&!c.busy)loadMood();}},60000);
 
 Object.assign(window.BXHMoodFeature||(window.BXHMoodFeature={}),{moodContext,moodLength,moodError,moodReplyDraft,moodMenuHtml,renderMoodReplies,renderMoodMessage,loadMood,renderMoodStation,handleMood,setMoodHeld,releaseMoodHold});
+
+})();
