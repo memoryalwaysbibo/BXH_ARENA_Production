@@ -123,8 +123,8 @@ mustInclude('["pending","待報到",pending.length]','People management must exp
 mustInclude('id="registration-result-panel"','Registration success result panel missing');
 mustInclude('下一步｜現場繳費與報到','On-site payment/check-in guidance missing');
 mustNot(/state\.meta\.registrationEnabled\s*&&\s*state\.meta\.checkinRequired/, 'Check-in must not depend on online registration being enabled');
-must(/WIP Phase 3: final Challonge-density cascade/, 'Final bracket-density cascade missing');
-if(html.indexOf('WIP Phase 3: final Challonge-density cascade') < html.indexOf('v14.0.6 compact bracket / mobile board density')) throw new Error('Final density cascade must override the legacy compact layer');
+must(/WIP Phase 3: final Challonge-density cascade/, 'Final bracket-density cascade missing',htmlAndLocalCss);
+if(htmlAndLocalCss.indexOf('WIP Phase 3: final Challonge-density cascade') < htmlAndLocalCss.indexOf('v14.0.6 compact bracket / mobile board density')) throw new Error('Final density cascade must override the legacy compact layer');
 const densityCases={8:4,16:8,32:16,34:2,47:15,64:32};
 function pow2(n){let p=2;while(p<n)p*=2;return p}
 function seeds(size){let order=[1];while(order.length<size){const total=order.length*2+1;const next=[];for(const x of order)next.push(x,total-x);order=next}return order}
