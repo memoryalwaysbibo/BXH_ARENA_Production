@@ -6599,6 +6599,14 @@ function generateTeamRoundRobin(teams){
   syncMatchStatuses();rebuildCourtAssignments();
   return true;
 }
+// Double-elimination cross-feed: winners-bracket droppers must enter the opposite
+// losers-bracket lane whenever another lane exists. This prevents an avoidable
+// immediate rematch with the opponent they just faced in the winners bracket.
+function doubleElimCrossFeedIndex(index,count){
+  const n=Math.max(1,Number(count)||1),i=Math.max(0,Number(index)||0);
+  if(n<=1)return 0;
+  return (i%2===0)?Math.min(i+1,n-1):i-1;
+}
 function generateTeamDouble(teams){
   const shuffled=shuffle(teams),size=nextPow2(shuffled.length),order=seedOrder(size),slots=new Array(size).fill(null);
   order.forEach((seed,pos)=>{if(seed<=shuffled.length)slots[pos]=String(shuffled[seed-1].id);});
@@ -6629,7 +6637,7 @@ function generateTeamDouble(teams){
         arr.push(make("LB",lbRounds.length,arr.length,{lbSrc:{type:"first",srcAId:wbRounds[0][i].id,srcBId:wbRounds[0][i+1]?.id||null}}));
       lbRounds.push(arr);survivors=arr;
     }else{
-      const merged=survivors.map((m,i)=>make("LB",lbRounds.length,i,{lbSrc:{type:"merge",survivorMatchId:m.id,dropperMatchId:wbRounds[r][i]?.id||null}}));
+      const merged=survivors.map((m,i)=>{const di=doubleElimCrossFeedIndex(i,wbRounds[r].length);return make("LB",lbRounds.length,i,{lbSrc:{type:"merge",survivorMatchId:m.id,dropperMatchId:wbRounds[r][di]?.id||null}});});
       lbRounds.push(merged);survivors=merged;
       if(r<k-1&&survivors.length>1){
         const combined=[];
@@ -7617,7 +7625,7 @@ function generateDoubleElim(){
       for(let i=0;i<currentSurvivors.length;i++){
         mergeArr.push({ id:uid("m"), seq:seq++, bracket:"LB", round: lbRounds.length, indexInRound:i,
           a:null,b:null, isBye:false, scoreA:0,scoreB:0, log:[], winnerId:null, loserId:null, completed:false, station: nextStation(),
-          lbSrc:{ type:"merge", survivorMatchId: currentSurvivors[i].id, dropperMatchId: droppers[i] ? droppers[i].id : null } });
+          lbSrc:{ type:"merge", survivorMatchId: currentSurvivors[i].id, dropperMatchId: droppers[doubleElimCrossFeedIndex(i,droppers.length)] ? droppers[doubleElimCrossFeedIndex(i,droppers.length)].id : null } });
       }
       matches.push(...mergeArr);
       lbRounds.push(mergeArr);
