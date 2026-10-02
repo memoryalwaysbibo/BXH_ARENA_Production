@@ -1,3 +1,4 @@
+(function(){
 // Core Phase 2E — Player Cards feature module.
 // Player search, privacy settings, public card overlay and card actions stay together.
 function cardContext(){const uid=currentAuthUid();if(playerCardsUI.uid!==uid)playerCardsUI={uid,query:'',results:null,settings:null,savedSettings:null,editing:false,busy:false,error:'',card:null,opened:false,hasMore:false};return playerCardsUI;}
@@ -9,3 +10,5 @@ async function handlePlayerCard(action,button){const c=cardContext();if(c.busy&&
 function bindPlayerCardInputs(){document.querySelectorAll('[data-card-privacy]').forEach(el=>{el.onchange=()=>{const c=cardContext();if(c.settings){c.settings[el.dataset.cardPrivacy]=el.checked;if(el.dataset.cardPrivacy==='cardPublic'&&!el.checked){c.settings.searchable=false;const b=document.querySelector('[data-card-privacy="searchable"]');if(b)b.checked=false;}}};});const q=document.getElementById('player-card-query');if(q){q.oninput=()=>cardContext().query=q.value;q.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();handlePlayerCard('card-search');}};}}
 
 Object.assign(window.BXHPlayerCardsFeature||(window.BXHPlayerCardsFeature={}),{cardContext,playerSearchPanel,playerPrivacyPanel,renderPlayerCardOverlay,handlePlayerCard,bindPlayerCardInputs});
+
+})();
