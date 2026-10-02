@@ -48,6 +48,6 @@ assert(source.includes('String(row&&row.seasonId||"")===String(currentSeason)'),
 assert(source.includes('舊賽季已封存，不會載入玩家手機'), 'history archive boundary disclosure missing');
 assert(cloud.includes('fx.orderBy("createdAt","desc")'), 'history query must be ordered on the server');
 assert(cloud.includes('fx.limit(200)'), 'history query must be bounded before download');
-assert(html.includes('ladder-secondary-ui.js?v=14.3.15'), 'ladder asset cache-bust version must match release');
+assert(fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8').includes('ladder-secondary-ui.js?v=14.3.15'), 'ladder asset cache-bust version must match release');
 
 console.log('PASS ladder ranking v2 layout / season-career modes');
