@@ -62,6 +62,42 @@ function hunterOpponentIdentityRef(record){
   return code&&localId?(code+"|"+localId):"";
 }
 
+const HUNTER_GROWTH_VERSION="hunter-xp-v1";
+const HUNTER_XP_PER_MATCH=10;
+const HUNTER_XP_PER_VALID_ROUND=2;
+const HUNTER_XP_PER_EVENT=20;
+
+function hunterUniqueRecords(records){
+  const seen=new Set(),out=[];
+  (Array.isArray(records)?records:[]).forEach((r,index)=>{
+    const eventKey=window.BXHDomainUtils.hunterRecordEventKey(r);
+    const matchKey=String((r&&r.matchId)||(((r&&r.opponent&&r.opponent.name)||"opponent")+"|"+String((r&&r.round)||"")+"|"+String(hunterRecordTimestamp(r)||index)));
+    const key=eventKey+"|"+matchKey;
+    if(seen.has(key)) return;
+    seen.add(key); out.push(r);
+  });
+  return out;
+}
+function hunterLevelThreshold(level){
+  const lv=Math.max(1,Math.floor(Number(level)||1));
+  return lv<=1?0:25*(lv-1)*lv;
+}
+function hunterBuildGrowth(records){
+  const rows=hunterUniqueRecords(records);
+  const eventCount=new Set(rows.map(window.BXHDomainUtils.hunterRecordEventKey)).size;
+  const validRounds=rows.reduce((sum,r)=>sum+(r&&r.analyzable&&Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0),0);
+  const xpFromMatches=rows.length*HUNTER_XP_PER_MATCH;
+  const xpFromRounds=validRounds*HUNTER_XP_PER_VALID_ROUND;
+  const xpFromEvents=eventCount*HUNTER_XP_PER_EVENT;
+  const xp=xpFromMatches+xpFromRounds+xpFromEvents;
+  let level=1;
+  while(level<99 && xp>=hunterLevelThreshold(level+1)) level++;
+  const floor=hunterLevelThreshold(level);
+  const next=hunterLevelThreshold(level+1);
+  const progress=next>floor?Math.max(0,Math.min(100,Math.round((xp-floor)/(next-floor)*100))):100;
+  return {version:HUNTER_GROWTH_VERSION,rows,eventCount,validRounds,xp,xpFromMatches,xpFromRounds,xpFromEvents,level,floor,next,progress};
+}
+
 function hunterSeniorityBonus(level){
   const lv=Math.max(1,Math.min(99,Math.floor(Number(level)||1)));
   return 15*Math.pow((lv-1)/98,0.75);
@@ -80,4 +116,4 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth});
