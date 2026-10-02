@@ -97,4 +97,20 @@ function snapToHalfHourValue(raw, type){
   return raw;
 }
 
-Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue});
+function buildPublicTournamentSnapshot(st){return Object.assign({},st,{registrations:[]});}
+function roomStatusDescriptor(phase){
+  const p=phase||"waiting";
+  if(p==="cancelled")return {key:"cancelled",label:"已取消",dot:"red"};
+  if(p==="done")return {key:"done",label:"已結束",dot:"gray"};
+  if(p==="settling")return {key:"settling",label:"結算中",dot:"orange"};
+  if(p==="live")return {key:"live",label:"比賽中",dot:"yellow"};
+  if(p==="prestart")return {key:"prestart",label:"等待開始",dot:"gray"};
+  return {key:"registration",label:"報名中",dot:"green"};
+}
+function fastLobbyHash(value){
+  const str=String(value==null?"":value);let h=2166136261;
+  for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}
+  return (h>>>0).toString(36);
+}
+
+Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash});
