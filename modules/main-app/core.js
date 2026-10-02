@@ -6422,18 +6422,9 @@ function showToast(msg, isErr){
 }
 
 /* ==== shared bracket utilities ==== */
-function nextPow2(n){ let p=2; while(p<n) p*=2; return p; }
 
-function seedOrder(size){
-  let order=[1];
-  while(order.length<size){
-    const total = order.length*2+1;
-    const next=[];
-    order.forEach(s=>{ next.push(s); next.push(total-s); });
-    order=next;
-  }
-  return order;
-}
+
+
 
 // Challonge-style single-elimination order for brackets with opening-round
 // byes.  Within the same round, matches whose two players advanced directly
@@ -8427,6 +8418,7 @@ function evaluateQuickDecision(m, selectedWinnerId){
 
 const {quickDecisionFailureMessage}=window.BXHFormatUtils||{};
 const {correctionMatchHasActualPlay,correctionParticipantSignature,matchHasDecisionData}=window.BXHMatchUtils||{};
+const {nextPow2,seedOrder,sameStringSet}=window.BXHMatchUtils||{};
 
 
 function applyQuickDecisionFields(m, evalResult, actor){
@@ -8936,11 +8928,7 @@ function currentBracketParticipantIds(){
 function eligibleRosterIds(){
   return new Set(eligiblePlayers().map(p=>String(p.id)));
 }
-function sameStringSet(a,b){
-  if(a.size!==b.size) return false;
-  for(const x of a) if(!b.has(x)) return false;
-  return true;
-}
+
 function bracketRosterIsCurrent(){
   if(!state.bracketSize || !(state.matches||[]).length) return false;
   if(state.meta?.battleMode==="team"){const teams=eligibleBracketTeams();if(!teams)return false;return sameStringSet(new Set(state.matches.flatMap(m=>m.teamIds||[]).filter(Boolean).map(String)),new Set(teams.map(t=>String(t.id))));}
