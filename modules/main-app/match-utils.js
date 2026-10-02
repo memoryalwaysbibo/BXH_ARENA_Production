@@ -36,4 +36,12 @@ function correctionMatchHasActualPlay(m){
 function correctionParticipantSignature(m){return [m&&m.a&&m.a.playerId||"",m&&m.b&&m.b.playerId||""].join("|");}
 function matchHasDecisionData(m){return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)>0||Number(m.scoreB||0)>0||(Array.isArray(m.log)&&m.log.length)||(Array.isArray(m.faultActions)&&m.faultActions.length)));}
 
+function nextPow2(n){let p=2;while(p<n)p*=2;return p;}
+function seedOrder(size){
+  let order=[1];
+  while(order.length<size){const total=order.length*2+1,next=[];order.forEach(s=>{next.push(s);next.push(total-s);});order=next;}
+  return order;
+}
+function sameStringSet(a,b){if(a.size!==b.size)return false;for(const x of a)if(!b.has(x))return false;return true;}
+
 Object.assign(window.BXHMatchUtils||(window.BXHMatchUtils={}),{courtKey,matchLabel,liveEtaCountdownText,matchStatusClass});
