@@ -1,0 +1,1 @@
+'use strict';const path=require('path');module.exports={testDir:__dirname,testMatch:'m5-referee-tail.spec.cjs',timeout:30000,use:{baseURL:'http://127.0.0.1:4178'},webServer:{command:'python3 -m http.server 4178 --directory '+JSON.stringify(path.resolve(process.env.BXH_M51_ROOT||process.cwd())),port:4178,reuseExistingServer:false}};
