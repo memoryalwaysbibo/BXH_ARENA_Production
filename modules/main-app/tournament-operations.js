@@ -1,3 +1,4 @@
+(function(){
 // Core Phase 2A — Tournament Operations feature module.
 // Owns raffle/maintenance feature state, rendering, backend actions, and its input bindings.
 // External app services/state are intentionally consumed through the existing global runtime contract.
@@ -99,3 +100,5 @@ document.addEventListener('input',event=>{
  o.draft[name==='ops-mode'?'mode':'excludePrevious']=name==='ops-exclude'?event.target.checked:event.target.value;
  o.preview=null;const b=document.querySelector('[data-action="ops-draw"]');if(b)b.disabled=true;
 });
+
+})();
