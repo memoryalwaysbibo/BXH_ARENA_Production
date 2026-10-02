@@ -4,7 +4,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 
 const source=fs.readFileSync(path.join(__dirname,'..','ladder-secondary-ui.js'),'utf8');
-const html=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');\nconst cloud=fs.readFileSync(path.join(__dirname,'..','modules','cloud','cloud-runtime.js'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');
+const cloud=fs.readFileSync(path.join(__dirname,'..','modules','cloud','cloud-runtime.js'),'utf8');
 
 assert(source.includes('var ladderScoreMode="season";'), 'season mode must be the default');
 assert(source.includes('data-ladder-score-mode="season"'), 'season score tab missing');
