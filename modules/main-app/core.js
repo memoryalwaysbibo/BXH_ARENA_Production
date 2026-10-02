@@ -15148,23 +15148,7 @@ function hunterBuildGrowth(records){
   return {version:HUNTER_GROWTH_VERSION,rows,eventCount,validRounds,xp,xpFromMatches,xpFromRounds,xpFromEvents,level,floor,next,progress};
 }
 // Career experience is a bounded contribution to the license grade, never to P4 ability.
-function hunterSeniorityBonus(level){
-  const lv=Math.max(1,Math.min(99,Math.floor(Number(level)||1)));
-  return 15*Math.pow((lv-1)/98,0.75);
-}
-function hunterLicenseGrade(analysis,level){
-  const bonus=hunterSeniorityBonus(level);
-  if(!analysis||!analysis.eligible||!Number.isFinite(analysis.overall)){
-    return {tier:"pending",label:"評級中",bonus,score:null,eligible:false};
-  }
-  const score=Math.min(100,analysis.overall+bonus);
-  const matches=analysis.matches||0,rounds=analysis.validRounds||0;
-  let label=score>=50?"C 級獵人":score>=40?"D 級獵人":"E 級獵人";
-  if(score>=60&&analysis.overall>=55&&matches>=10&&rounds>=30)label="A 級獵人";
-  if(score>=70&&analysis.overall>=65&&matches>=20&&rounds>=60)label="S 級獵人";
-  if(score>=80&&analysis.overall>=75&&matches>=40&&rounds>=120)label="國家級獵人";
-  return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
-}
+const {hunterSeniorityBonus,hunterLicenseGrade}=window.BXHHunterUtils||{};
 function hunterPeriodSummary(period){
   const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));
   const base=hunterCareerSummary(rows);
