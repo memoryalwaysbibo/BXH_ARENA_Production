@@ -1,3 +1,4 @@
+(function(){
 // Core P1I — pure Hunter data/visual calculation utilities.
 // No DOM, Firebase, storage, cache, or mutable app-state access.
 
@@ -134,3 +135,5 @@ function hunterLicenseGrade(analysis,level){
 }
 
 Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterCareerSummary});
+
+})();
