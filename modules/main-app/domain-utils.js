@@ -47,7 +47,7 @@ function hunterAchievementMatchKey(record){
     String(record&&record.round!=null?record.round:""),
     String(record&&record.indexInRound!=null?record.indexInRound:""),
     String(record&&record.station!=null?record.station:""),
-    String(hunterRecordTimestamp(record)||0)
+    String(window.BXHHunterUtils.hunterRecordTimestamp(record)||0)
   ].join(":");
   return eventKey+"|legacy:"+legacy;
 }
