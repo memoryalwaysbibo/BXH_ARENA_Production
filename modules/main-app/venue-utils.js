@@ -1,3 +1,4 @@
+(function(){
 function splitLegacyVenueText(value){
   const text=String(value||"").trim();
   if(!text) return {name:"",address:"",legacyText:""};
@@ -61,3 +62,5 @@ function appleMapsNavigationUrl(venue){
 }
 
 Object.assign(window.BXHVenueUtils||(window.BXHVenueUtils={}),{splitLegacyVenueText,buildLegacyVenueText,normalizeGoogleMapsUrl,extractGoogleMapsUrlsFromText,extractGoogleMapsUrlFromText,googleMapsNavigationUrl,appleMapsNavigationUrl});
+
+})();
