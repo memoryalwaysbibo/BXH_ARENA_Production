@@ -3254,11 +3254,7 @@ const CODE_ENTRY_ERROR_MESSAGES = {
 // its "BXH-" prefix — used identically for both URL-driven and manually
 // entered codes (see resolveAndJoinTournamentByCode below), so there is only
 // ever one normalization rule in the whole app, not two that could drift.
-function normalizeRoomCodeInput(raw){
-  let code = String(raw||"").trim().toUpperCase();
-  if(code && !code.startsWith("BXH-") && /^[A-Z0-9]{6}$/.test(code)) code = "BXH-"+code;
-  return code;
-}
+const {normalizeRoomCodeInput,normalizeLoginEmail,loginIdentifierDisplayValue,normalizeAuthEmailForMatch,epochToDatetimeLocal,datetimeLocalToEpoch,communityDateTimeValue,formatTournamentDetailDateTime,tournamentBattleMode,tournamentTeamSize}=window.BXHInputUtils;
 
 // THE single shared function that resolves a room code (from either the
 // share-link URL or the manual "輸入賽事代碼" dialog) and joins it. Every
@@ -4947,18 +4943,9 @@ function roleAllowsMode(role, mode, profile=null){
   if(mode==="player") return true; // every role can use player mode
   return false;
 }
-function normalizeLoginEmail(value){
-  const raw=String(value||"").trim().toLowerCase();
-  if(!raw) return "";
-  return raw.includes("@")?raw:raw+"@gmail.com";
-}
-function loginIdentifierDisplayValue(value){
-  const normalized=normalizeLoginEmail(value);
-  return normalized.endsWith("@gmail.com")?normalized.slice(0,-10):normalized;
-}
-function normalizeAuthEmailForMatch(value){
-  return normalizeLoginEmail(value);
-}
+
+
+
 async function reconcileExistingAuthSession(expectedEmail, intent){
   if(!window.cloudAuth||!window.cloudAuth.getCurrentUser) return {status:"none"};
   const current=window.cloudAuth.getCurrentUser();
@@ -10852,17 +10839,8 @@ function renderVersionPage(){
   </div>`;
 }
 
-function epochToDatetimeLocal(ts){
-  if(!ts) return "";
-  const d = new Date(ts);
-  const pad = n=>String(n).padStart(2,"0");
-  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
-}
-function datetimeLocalToEpoch(str){
-  if(!str) return null;
-  const t = new Date(str).getTime();
-  return isNaN(t) ? null : t;
-}
+
+
 
 const REGISTRATION_STATUS_LABELS = { draft:"草稿", scheduled:"即將開放", open:"開放報名", full:"已額滿", closed:"已截止", cancelled:"已取消", started:"已截止" };
 
@@ -14077,13 +14055,7 @@ function renderPlayerCommunityHostTab(){
   ${foldSection('host-history','我的主辦紀錄',history.length,`<p class="hint">完成主辦場數（一般＋正式）：${hostAchievementCount===null?'同步中':hostAchievementCount<0?'暫時無法同步，請重新整理':hostAchievementCount}（經伺服器驗證；測試與系統關閉不計入）</p>`+history.map(h=>`<div class="community-history-card"><b>${esc(h.name||'未命名賽事')}</b><div class="hint">${esc(h.eventDate||'')}｜${Number(h.playerCount||0)} 人｜${esc(h.format||'')}</div><div class="hint">冠軍：${esc(h.championName||'—')}　亞軍：${esc(h.runnerUpName||'—')}</div></div>`).join(''),false)}`;
 }
 
-function communityDateTimeValue(ms){
-  if(!ms) return "";
-  const d=new Date(Number(ms));
-  if(isNaN(d.getTime())) return "";
-  const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
-  return local.toISOString().slice(0,16);
-}
+
 function renderCommunityCreateScreen(){
   const hostName=String(userProfile?.gameId||userProfile?.displayName||userProfile?.nickname||userProfile?.realName||firebaseUser?.email||"玩家").trim();
   return authShellOpen("","community-create-content","community-create-shell")+`<div class="community-create-topbar"><button class="btn btn-ghost" type="button" data-action="community-create-cancel">← 返回我的房間</button></div>${authBrandHeader()}<div class="auth-card community-create-card">
@@ -14857,19 +14829,7 @@ function resetTournamentDetailState(){
   tournamentDetailChildConfirmed = false; tournamentDetailBusy = false;
 }
 
-function formatTournamentDetailDateTime(value){
-  if(!value) return "—";
-  const d=new Date(value);
-  if(!Number.isFinite(d.getTime())) return "—";
-  try{
-    const parts=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(d);
-    const get=type=>(parts.find(p=>p.type===type)||{}).value||"";
-    return get("month")+"/"+get("day")+" "+get("hour")+":"+get("minute");
-  }catch(e){
-    const pad=n=>String(n).padStart(2,"0");
-    return pad(d.getMonth()+1)+"/"+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes());
-  }
-}
+
 
 function renderTournamentStandardTemplate(t){
   const cfg=t&&t.parsedData&&t.parsedData.eventInfo&&t.parsedData.eventInfo.standardTemplate;
@@ -14887,12 +14847,8 @@ function renderTournamentStandardTemplate(t){
 }
 
 
-function tournamentBattleMode(t){
-  return (t&&((t.battleMode)||(t.parsedData&&t.parsedData.meta&&t.parsedData.meta.battleMode)))==="team"?"team":"individual";
-}
-function tournamentTeamSize(t){
-  return Math.max(3,Number(t&&((t.teamSize)||(t.parsedData&&t.parsedData.meta&&t.parsedData.meta.teamSize)))||3);
-}
+
+
 function renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining){
   const size=tournamentTeamSize(t),myTeam=activeMyRegs.find(row=>row&&row.registrationKind==="team")||activeMyRegs[0]||null;
   if(publicTournamentRegistrationLocked(t)) return '<div class="banner warn"><span>賽事已開始，隊伍報名與取消功能均已鎖定。</span></div><div class="tournament-detail-bottom-actions"><button class="btn btn-ghost" data-action="back-to-find-events">← 返回賽事列表</button><button class="btn btn-primary" data-action="switch-to-player-watch" data-code="'+esc(code)+'">'+(t.tournamentPhase==="done"?"查看比賽結果":"查看即時賽事")+'</button></div>';
