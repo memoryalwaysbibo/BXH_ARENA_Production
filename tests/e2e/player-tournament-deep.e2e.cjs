@@ -69,7 +69,9 @@ test('four-player community event reaches first confirmed referee result', async
   const draw = page.locator('[data-action="draw-bracket"]');
   await expect(draw).toBeEnabled();
   await draw.click();
-  const confirmDraw=page.locator('[data-action="modal-confirm"]');\n  if(await confirmDraw.isVisible().catch(()=>false)) await confirmDraw.click();\n  await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
+  const confirmDraw=page.locator('[data-action="modal-confirm"]');
+  if(await confirmDraw.isVisible().catch(()=>false)) await confirmDraw.click();
+  await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
 
   const start = page.locator('[data-action="start-tournament"]');
   await expect(start).toBeVisible({ timeout: 30000 });
