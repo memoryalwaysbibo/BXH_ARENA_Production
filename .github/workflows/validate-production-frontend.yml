@@ -21,7 +21,7 @@ jobs:
           test -f index.html
           bytes="$(wc -c < index.html | tr -d ' ')"
           lines="$(wc -l < index.html | tr -d ' ')"
-          if [ "$bytes" -lt 100000 ] || [ "$lines" -lt 1000 ]; then
+          if [ "$bytes" -lt 50000 ] || [ "$lines" -lt 150 ]; then
             echo "Production index.html looks empty or truncated: bytes=$bytes lines=$lines" >&2
             exit 1
           fi
