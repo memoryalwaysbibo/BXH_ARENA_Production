@@ -41,4 +41,9 @@ function registrationStatusLabel(v){
   return ({open:"開放報名",scheduled:"即將開放",full:"已額滿",closed:"已截止",started:"已開賽",cancelled:"已取消"})[v] || (v||"未設定");
 }
 
-Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel});
+function quickDecisionFailureMessage(reason){
+  const map={"already-completed":"本場比賽已完成判定。","missing-players":"選手資料不存在，無法確認結果。","no-selection":"尚未選擇獲勝方。","invalid-selection":"選擇的選手不屬於本場比賽。","not-found":"找不到此場比賽。"};
+  return map[reason] || "賽事資料已變更或不符合判定條件，請重新確認。";
+}
+
+Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel,quickDecisionFailureMessage});
