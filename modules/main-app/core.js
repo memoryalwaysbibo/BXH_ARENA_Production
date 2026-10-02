@@ -17107,9 +17107,7 @@ function renderSwitchTournamentModal(){
   </div>`;
 }
 
-function registrationStatusLabel(v){
-  return ({open:"開放報名",scheduled:"即將開放",full:"已額滿",closed:"已截止",started:"已開賽",cancelled:"已取消"})[v] || (v||"未設定");
-}
+const {registrationStatusLabel}=window.BXHFormatUtils||{};
 
 function renderTournamentManagementTab(){
   if(!hasAdminAccess()){
