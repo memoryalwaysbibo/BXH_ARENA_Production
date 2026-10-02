@@ -2,7 +2,9 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const core=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');\nconst mailbox=fs.readFileSync(path.join(__dirname,'..','modules','main-app','mailbox.js'),'utf8');\nconst html=core+'\\n'+mailbox;
+const core=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');
+const mailbox=fs.readFileSync(path.join(__dirname,'..','modules','main-app','mailbox.js'),'utf8');
+const html=core+'\n'+mailbox;
 
 test('event staff is a separate activity-scoped mode',()=>{
   assert.match(html,/mode==="event_staff"/);
