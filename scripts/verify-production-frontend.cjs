@@ -333,7 +333,7 @@ mustInclude('data-action="hunter-h2h-sort"','Hunter P5.6 sort action missing');
 mustInclude('搜尋只比對公開名稱與穩定 playerId','Hunter P5.6 identity safety disclosure missing');
 console.log('PASS Hunter Profile P5.6 opponent directory');
 mustInclude('function hunterRecordHasTrustedScore(record)','Hunter trusted-score helper missing');
-mustInclude('function hunterRecordScoreText(record)','Hunter centralized score display helper missing');
+must(/(?:function\s+hunterRecordScoreText\(record\)|const\s+hunterRecordScoreText\s*=)/,'Hunter centralized score display helper missing');
 mustInclude('scoreA:quickDecision?null:','Canonical Quick Decision scoreA must be null');
 mustInclude('scoreB:quickDecision?null:','Canonical Quick Decision scoreB must be null');
 mustInclude('if(hunterRecordHasTrustedScore(r)){','Career totals must use trusted-score guard');
