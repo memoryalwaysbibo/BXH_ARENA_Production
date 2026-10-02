@@ -5055,15 +5055,7 @@ function isTournamentLobbyVisible(){
     || (appPhase==="guest-lobby" && guestActiveTab==="events");
 }
 
-function fastLobbyHash(value){
-  const str=String(value==null?"":value);
-  let h=2166136261;
-  for(let i=0;i<str.length;i++){
-    h^=str.charCodeAt(i);
-    h=Math.imul(h,16777619);
-  }
-  return (h>>>0).toString(36);
-}
+
 function publicTournamentListSignature(items){
   return (Array.isArray(items)?items:[]).map(t=>[
     String(t&&t.code||""),
@@ -5577,7 +5569,7 @@ function isOwnTestTournament(st=state){
   const uid=currentAuthUid();
   return !!(isOwnTesterSandboxRoom(st) && uid && (st.createdBy===uid||st.ownerUid===uid));
 }
-const {ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue}=window.BXHDomainUtils;
+const {ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash}=window.BXHDomainUtils;
 function markTesterSandboxState(st){
   if(!isTester() || !st) return st;
   const uid=currentAuthUid(), created=Number(st.testCreatedAt||st.createdAt||Date.now());
@@ -6026,9 +6018,7 @@ function queueCloudSyncRetry(tournamentId, code){
 // This is what gets written to the separate `publicTournaments/{code}`
 // document; the full `state` (including registrations) only ever goes to the
 // admin/staff-only `tournaments/{code}` document.
-function buildPublicTournamentSnapshot(st){
-  return Object.assign({}, st, { registrations: [] });
-}
+
 
 async function saveState(){
   state.updatedAt = Date.now();
@@ -8978,15 +8968,7 @@ function esc(s){
   return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
-function roomStatusDescriptor(phase){
-  const p=phase||"waiting";
-  if(p==="cancelled") return {key:"cancelled",label:"已取消",dot:"red"};
-  if(p==="done") return {key:"done",label:"已結束",dot:"gray"};
-  if(p==="settling") return {key:"settling",label:"結算中",dot:"orange"};
-  if(p==="live") return {key:"live",label:"比賽中",dot:"yellow"};
-  if(p==="prestart") return {key:"prestart",label:"等待開始",dot:"gray"};
-  return {key:"registration",label:"報名中",dot:"green"};
-}
+
 function roomStatusHtml(phase, cls=""){
   const d=roomStatusDescriptor(phase);
   return `<span class="room-status ${esc(cls)} room-status-${d.key}"><i class="room-status-dot ${d.dot}"></i>${d.label}</span>`;
