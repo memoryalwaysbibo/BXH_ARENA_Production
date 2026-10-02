@@ -5594,61 +5594,7 @@ header.topbar .brandtext .t-conn-heading .online-presence strong{font-size:10px;
 }
 </style>
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.17-directive-warning">
-<style id="directive-warning-critical-v1">
-.directive-warning-layer{display:none!important}
-:root[data-bxh-theme="directive"] header.topbar{position:relative!important;isolation:isolate!important;overflow:hidden!important}
-:root[data-bxh-theme="directive"] header.topbar .directive-warning-layer{
-  display:block!important;
-  position:absolute!important;
-  top:6px!important;
-  right:-2vw!important;
-  bottom:6px!important;
-  left:auto!important;
-  width:min(64vw,760px)!important;
-  height:calc(100% - 12px)!important;
-  max-width:none!important;
-  object-fit:contain!important;
-  object-position:right center!important;
-  pointer-events:none!important;
-  z-index:1!important;
-  opacity:.075!important;
-  mix-blend-mode:screen!important;
-  filter:saturate(1.2) brightness(.86) contrast(1.1)!important;
-  transform:translateZ(0) scale(1.002);
-  transform-origin:80% 50%;
-  animation:bxhDirectiveWarningCritical 3.2s linear infinite!important;
-}
-:root[data-bxh-theme="directive"] header.topbar .logo-wrap,
-:root[data-bxh-theme="directive"] header.topbar .brandtext,
-:root[data-bxh-theme="directive"] header.topbar .header-account-controls{
-  position:relative!important;
-  z-index:3!important;
-}
-@keyframes bxhDirectiveWarningCritical{
-  0%,64%{opacity:.075;filter:saturate(1.18) brightness(.84) contrast(1.1);transform:translateZ(0) scale(1.002)}
-  72%{opacity:.16;filter:saturate(1.25) brightness(1.02) contrast(1.1);transform:translateZ(0) scale(1.004)}
-  79%{opacity:.42;filter:saturate(1.38) brightness(1.38) contrast(1.12);transform:translateZ(0) scale(1.010)}
-  84%{opacity:.18;filter:saturate(1.25) brightness(1.06) contrast(1.1);transform:translateZ(0) scale(1.005)}
-  90%{opacity:.62;filter:saturate(1.5) brightness(1.62) contrast(1.15);transform:translateZ(0) scale(1.016)}
-  96%{opacity:.14;filter:saturate(1.22) brightness(.98) contrast(1.1);transform:translateZ(0) scale(1.004)}
-  100%{opacity:.075;filter:saturate(1.18) brightness(.84) contrast(1.1);transform:translateZ(0) scale(1.002)}
-}
-@media(max-width:640px){
-  :root[data-bxh-theme="directive"] header.topbar .directive-warning-layer{
-    width:78vw!important;
-    right:-10vw!important;
-    top:4px!important;
-    bottom:4px!important;
-    height:calc(100% - 8px)!important;
-  }
-}
-@media(prefers-reduced-motion:reduce){
-  :root[data-bxh-theme="directive"] header.topbar .directive-warning-layer{
-    animation:none!important;
-    opacity:.18!important;
-  }
-}
-</style>
+<link id="directive-warning-critical-v1" rel="stylesheet" href="modules/theme-directive/styles.css?v=20261002-m2-2">
 
 
 

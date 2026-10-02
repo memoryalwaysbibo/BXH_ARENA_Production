@@ -1,0 +1,11 @@
+{
+  "status": "STAGED_ONLY_NOT_DEPLOYED",
+  "source_index_blob": "52a33590b3ca5a9d118aaeae70cd9d16f78baceb",
+  "candidate_index_blob": "ac4ae95673e4d96546f1fa9683fb3557de93164f",
+  "css_sha256": "94bb93aabec246e2adb097f3303b20dd6f7d930821621d5bd7f0251d44ad3eb6",
+  "source_index_bytes": 2393788,
+  "candidate_index_bytes": 2391466,
+  "css_bytes": 2388,
+  "stylesheet": "modules/theme-directive/styles.css",
+  "relative_urls": 0
+}
