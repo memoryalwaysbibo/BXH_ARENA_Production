@@ -1,0 +1,673 @@
+/* ==== v13.26.0 BXH CALL smart queue ==== */
+.smart-call-box{margin-top:12px;border:1px solid rgba(217,185,92,.28);border-radius:12px;background:linear-gradient(135deg,rgba(217,185,92,.08),rgba(7,9,12,.88));padding:12px 13px;overflow:hidden}
+.smart-call-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.smart-call-title{display:flex;align-items:center;gap:8px;font-weight:900;font-size:13px;color:#f0cf71;letter-spacing:.03em}
+.smart-call-switch{appearance:none;width:44px;height:24px;border-radius:999px;background:#343943;border:1px solid rgba(255,255,255,.14);position:relative;cursor:pointer;flex:0 0 auto;transition:.2s}
+.smart-call-switch:before{content:"";position:absolute;width:18px;height:18px;border-radius:50%;left:2px;top:2px;background:#b9bec7;transition:.2s}
+.smart-call-switch:checked{background:rgba(61,196,117,.30);border-color:rgba(88,230,147,.55)}
+.smart-call-switch:checked:before{transform:translateX(20px);background:#72efaa;box-shadow:0 0 12px rgba(78,235,145,.55)}
+.smart-call-body{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+.smart-call-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.smart-call-stat{padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.035);min-width:0}
+.smart-call-stat .k{font-size:10px;color:var(--metal-dim);margin-bottom:4px}.smart-call-stat .v{font-size:13px;font-weight:850;color:#f2f4f7;overflow-wrap:anywhere}
+.smart-call-status{margin-top:9px;font-size:12px;line-height:1.55;color:#cfd4dc}.smart-call-status strong{color:#f0cf71}
+.smart-call-note{margin-top:7px;font-size:10px;color:var(--metal-dim);line-height:1.5}
+.smart-call-disabled{margin-top:8px;font-size:11px;color:var(--metal-dim)}
+@media(max-width:720px){.smart-call-grid{grid-template-columns:1fr 1fr}.smart-call-stat:last-child{grid-column:1/-1}.smart-call-box{padding:11px}.smart-call-head{align-items:center}}
+
+/* ==== v14.2.8 我的賽程／BXH CALL compact hierarchy ==== */
+.my-schedule-card{
+  padding:15px 15px 13px;
+  border-radius:17px;
+  border-color:rgba(217,185,92,.14);
+  background:linear-gradient(145deg,rgba(217,185,92,.045),rgba(255,255,255,.018) 46%,rgba(8,10,13,.92));
+}
+.my-schedule-head{display:grid;gap:5px}
+.my-schedule-card .fe-name{font-size:17px;line-height:1.25;letter-spacing:.01em}
+.my-schedule-meta{font-size:11.5px;line-height:1.55;color:var(--metal)}
+.my-schedule-code{font-size:10.5px;color:var(--metal-dim);letter-spacing:.02em}
+.my-schedule-entry-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:3px}
+.my-schedule-entry-row .fe-status-chip{flex:0 0 auto}
+.my-schedule-participant{font-size:11.5px;color:var(--metal);min-width:0;overflow-wrap:anywhere}
+.my-schedule-card>.hint{margin:6px 0 0;font-size:11px;line-height:1.45}
+
+.smart-call-box{
+  margin-top:11px;
+  padding:12px;
+  border-radius:15px;
+  border-color:rgba(217,185,92,.24);
+  background:linear-gradient(145deg,rgba(217,185,92,.07),rgba(13,15,18,.92) 48%,rgba(8,10,12,.96));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.smart-call-head{min-height:32px}
+.smart-call-title{font-size:14px;letter-spacing:.02em}
+.smart-call-switch{width:42px;height:23px}
+.smart-call-switch:before{width:17px;height:17px}
+.smart-call-switch:checked:before{transform:translateX(19px)}
+
+.court-call-player-section{margin-top:5px}
+.court-call-compact-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-top:4px;
+  color:var(--metal-dim);
+  font-size:10.5px;
+  line-height:1.45;
+}
+.court-call-help{position:relative;flex:0 0 auto}
+.court-call-help summary{
+  cursor:pointer;
+  list-style:none;
+  color:var(--gold);
+  font-weight:800;
+  white-space:nowrap;
+  padding:3px 0 3px 6px;
+}
+.court-call-help summary::-webkit-details-marker{display:none}
+.court-call-help summary::after{content:" ▾";font-size:9px;opacity:.8}
+.court-call-help[open] summary::after{content:" ▴"}
+.court-call-help>div{
+  margin-top:7px;
+  padding:9px 10px;
+  border-radius:9px;
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(0,0,0,.22);
+  color:var(--metal);
+  font-size:10.5px;
+  line-height:1.55;
+}
+
+.court-call-notify-row{
+  margin-top:9px;
+  padding:8px 9px;
+  border-radius:10px;
+  background:rgba(255,255,255,.025);
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+}
+.court-call-notify-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.court-call-notify-actions:empty{display:none}
+.court-call-notify-row:has(.court-call-notify-actions:empty){grid-template-columns:1fr}
+.court-call-notify-row .btn{
+  min-height:34px;
+  height:34px;
+  padding:0 10px;
+  border-radius:9px;
+  font-size:11px;
+}
+.court-call-notify-state{
+  color:var(--metal-dim);
+  font-size:10.5px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+
+.court-call-active-list{margin-top:8px}
+.smart-call-box .court-call-row{
+  margin:0!important;
+  padding:11px 12px!important;
+  border-radius:11px!important;
+  border:1px solid rgba(217,185,92,.16)!important;
+  background:rgba(255,255,255,.028)!important;
+  box-shadow:none!important;
+}
+.court-call-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.court-call-row-head strong{font-size:15px;line-height:1.2;color:var(--ivory)}
+.court-call-time{font-size:10px;color:var(--metal-dim);white-space:nowrap}
+.smart-call-box .court-call-people{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 0}
+.smart-call-box .court-call-person{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  min-height:29px;
+  padding:4px 8px;
+  border-radius:9px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.045);
+  color:var(--metal);
+  font-size:10.5px;
+}
+.smart-call-box .court-call-person b{color:var(--ivory);font-size:11.5px}
+.smart-call-box .court-call-person.is-replied{
+  background:rgba(61,196,117,.08);
+  border-color:rgba(61,196,117,.18);
+  color:#8fe6b5;
+}
+.smart-call-box .court-call-person.is-waiting{color:var(--metal)}
+.court-call-pass-state,.court-call-pass-hint{margin:8px 0 0;font-size:10.5px;line-height:1.45;color:var(--metal-dim)}
+.court-call-actions-inline{margin-top:9px;gap:7px}
+.court-call-actions-inline .btn{min-height:36px;padding:0 11px;font-size:11px}
+.court-call-empty{margin:7px 0 0;color:var(--metal-dim);font-size:10.5px}
+
+.smart-call-body{margin-top:9px;padding-top:9px}
+.smart-call-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.smart-call-stat{padding:8px 8px;border-radius:9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.035)}
+.smart-call-stat .k{font-size:9.5px;margin-bottom:3px}
+.smart-call-stat .v{font-size:12px;line-height:1.3}
+.smart-call-focus{
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:9px;
+  padding-top:8px;
+  border-top:1px solid rgba(255,255,255,.055);
+  font-size:11.5px;
+  color:var(--metal);
+}
+.smart-call-focus strong{color:var(--gold);font-size:12px}
+.smart-call-opponent{color:#dfe3e9}
+.smart-call-note{margin-top:5px;font-size:9.8px;line-height:1.45}
+
+.my-schedule-actions{
+  margin-top:11px;
+  padding-top:11px;
+  border-top:1px solid rgba(255,255,255,.055);
+}
+.my-schedule-actions > .btn,
+.my-schedule-actions > .fe-status-chip{border-radius:10px}
+
+@media(max-width:520px){
+  .my-schedule-card{padding:13px 12px 12px}
+  .my-schedule-meta{font-size:10.8px}
+  .court-call-compact-summary{align-items:flex-start}
+  .court-call-notify-row{grid-template-columns:1fr}
+  .court-call-notify-actions{width:100%}
+  .court-call-notify-actions .btn{flex:1 1 auto}
+  .smart-call-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .smart-call-stat{padding:7px 6px}
+  .smart-call-stat .v{font-size:11px}
+  .smart-call-box{padding:11px 10px}
+  .smart-call-box .court-call-row{padding:10px!important}
+}
+
+/* ==== v14.2.14 BXH CALL waiting row: force 3-up layout ==== */
+.smart-call-box .smart-call-grid{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:6px!important;
+}
+.smart-call-box .smart-call-grid .smart-call-stat{
+  grid-column:auto!important;
+  min-width:0!important;
+  padding:7px 6px!important;
+  text-align:center;
+}
+.smart-call-box .smart-call-grid .smart-call-stat:last-child{
+  grid-column:auto!important;
+}
+.smart-call-box .smart-call-stat .k{
+  margin-bottom:2px!important;
+  white-space:nowrap;
+}
+.smart-call-box .smart-call-stat .v{
+  line-height:1.2!important;
+  overflow-wrap:anywhere;
+}
+@media(max-width:420px){
+  .smart-call-box .smart-call-grid{gap:5px!important;}
+  .smart-call-box .smart-call-grid .smart-call-stat{padding:6px 4px!important;}
+  .smart-call-box .smart-call-stat .k{font-size:9px!important;}
+  .smart-call-box .smart-call-stat .v{font-size:10.5px!important;}
+}
+
+/* ==== v14.2.17 BXH CALL single-control UX ==== */
+.smart-call-unified-control{
+  appearance:none;
+  border:0;
+  background:transparent;
+  padding:0;
+  margin:0;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  flex:0 0 auto;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  user-select:none;
+  touch-action:manipulation;
+}
+.smart-call-unified-bell{
+  position:relative;
+  width:29px;
+  height:29px;
+  min-width:29px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:9px;
+  border:1px solid rgba(217,185,92,.30);
+  background:rgba(217,185,92,.055);
+  color:#d7b957;
+  font-size:15px;
+  line-height:1;
+  overflow:hidden;
+}
+.smart-call-unified-control.has-background .smart-call-unified-bell{
+  border-color:rgba(88,230,147,.48);
+  background:rgba(61,196,117,.11);
+  color:#72efaa;
+  box-shadow:0 0 9px rgba(78,235,145,.10);
+}
+.smart-call-unified-bell.is-notify-off::after{
+  content:"";
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:50%;
+  width:35px;
+  height:5px;
+  border-radius:999px;
+  background:linear-gradient(180deg,#ff5a36,#ff2f36);
+  box-shadow:0 0 6px rgba(255,55,55,.34);
+  transform:translate(-50%,-50%) rotate(-45deg);
+  pointer-events:none;
+}
+.smart-call-unified-control.is-blocked .smart-call-unified-bell{
+  opacity:.58;
+  filter:grayscale(.35);
+}
+.smart-call-unified-track{
+  position:relative;
+  width:42px;
+  height:23px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.14);
+  background:#343943;
+  transition:.18s ease;
+}
+.smart-call-unified-knob{
+  position:absolute;
+  width:17px;
+  height:17px;
+  left:2px;
+  top:2px;
+  border-radius:50%;
+  background:#b9bec7;
+  transition:.18s ease;
+}
+.smart-call-unified-control.is-on .smart-call-unified-track{
+  background:rgba(61,196,117,.30);
+  border-color:rgba(88,230,147,.55);
+}
+.smart-call-unified-control.is-on .smart-call-unified-knob{
+  transform:translateX(19px);
+  background:#72efaa;
+  box-shadow:0 0 10px rgba(78,235,145,.45);
+}
+.smart-call-unified-control.is-off{opacity:.78;}
+.smart-call-unified-control:focus-visible{
+  outline:2px solid rgba(240,207,113,.82);
+  outline-offset:3px;
+  border-radius:10px;
+}
+@media(max-width:420px){
+  .smart-call-unified-control{gap:5px;}
+  .smart-call-unified-bell{width:27px;height:27px;min-width:27px;border-radius:8px;font-size:14px;}
+  .smart-call-unified-bell.is-notify-off::after{width:32px;height:5px;}
+  .smart-call-unified-track{width:40px;height:22px;}
+  .smart-call-unified-knob{width:16px;height:16px;}
+  .smart-call-unified-control.is-on .smart-call-unified-knob{transform:translateX(18px);}
+}
+
+/* ==== v14.2.15 BXH CALL compact header / centered station / tighter vertical rhythm ==== */
+.smart-call-head-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex:0 0 auto;
+}
+.court-call-notify-icon{
+  appearance:none;
+  width:30px;
+  height:30px;
+  min-width:30px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:9px;
+  border:1px solid rgba(217,185,92,.30);
+  background:rgba(217,185,92,.055);
+  color:#d7b957;
+  font-size:15px;
+  line-height:1;
+  cursor:pointer;
+  -webkit-touch-callout:none;
+  user-select:none;
+  touch-action:manipulation;
+}
+.court-call-notify-icon.is-active{
+  border-color:rgba(88,230,147,.52);
+  background:rgba(61,196,117,.13);
+  color:#72efaa;
+  box-shadow:0 0 10px rgba(78,235,145,.12);
+}
+.court-call-notify-icon.is-blocked{
+  opacity:.48;
+  filter:grayscale(.45);
+}
+.court-call-notify-icon{position:relative;overflow:hidden;}
+.court-call-notify-bell{
+  position:relative;
+  z-index:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.court-call-notify-icon.is-off::after{
+  content:"";
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:50%;
+  width:38px;
+  height:6px;
+  border-radius:999px;
+  background:linear-gradient(180deg,#ff5a36,#ff2f36);
+  box-shadow:0 0 7px rgba(255,55,55,.38);
+  transform:translate(-50%,-50%) rotate(-45deg);
+  transform-origin:center;
+  pointer-events:none;
+}
+.court-call-notify-icon.is-off:not(.is-blocked){
+  border-color:rgba(255,82,82,.34);
+  background:rgba(255,55,55,.035);
+}
+.court-call-notify-icon.is-off .court-call-notify-bell{
+  opacity:.72;
+  filter:saturate(.72);
+}
+@media(max-width:420px){
+  .court-call-notify-icon.is-off::after{width:34px;height:5px;}
+}
+.court-call-player-section{margin-top:2px!important;}
+.court-call-active-list{margin-top:5px!important;}
+.smart-call-box .court-call-row{padding:8px 9px!important;}
+.court-call-row-head{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;
+  align-items:center!important;
+  gap:6px!important;
+  min-height:24px;
+}
+.court-call-row-head strong{
+  grid-column:2;
+  justify-self:center;
+  text-align:center;
+  font-size:13px!important;
+  line-height:1.15!important;
+  white-space:nowrap;
+}
+.court-call-time{
+  grid-column:3;
+  justify-self:end;
+  font-size:9px!important;
+}
+.smart-call-box .court-call-people{margin:6px 0 0!important;gap:5px!important;}
+.smart-call-box .court-call-person{min-height:26px!important;padding:3px 6px!important;}
+.smart-call-body{margin-top:6px!important;padding-top:6px!important;}
+.smart-call-box .smart-call-grid{gap:5px!important;}
+.smart-call-box .smart-call-grid .smart-call-stat{padding:6px 4px!important;}
+.smart-call-focus{margin-top:6px!important;padding-top:6px!important;}
+.smart-call-note{margin-top:3px!important;}
+@media(max-width:420px){
+  .smart-call-head{gap:7px!important;}
+  .smart-call-head-actions{gap:6px;}
+  .court-call-notify-icon{width:28px;height:28px;min-width:28px;border-radius:8px;font-size:14px;}
+  .smart-call-switch{width:40px!important;height:22px!important;}
+  .court-call-row-head{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;}
+  .court-call-row-head strong{font-size:12px!important;}
+  .court-call-time{font-size:8.5px!important;}
+  .smart-call-box .court-call-row{padding:7px 8px!important;}
+}
+
+/* ==== v14.2.18 BXH CALL centered status / opponent hierarchy ==== */
+.smart-call-box .court-call-people{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex-wrap:wrap!important;
+  gap:7px!important;
+  margin:7px 0 1px!important;
+  width:100%;
+  text-align:left;
+}
+.smart-call-box .court-call-person{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:5px!important;
+  min-height:28px!important;
+  padding:4px 9px!important;
+  border-radius:999px!important;
+  text-align:left!important;
+  white-space:nowrap;
+}
+.smart-call-box .court-call-person b{
+  font-size:11.5px!important;
+  line-height:1.15!important;
+}
+.smart-call-focus{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:3px!important;
+  width:100%;
+  margin-top:6px!important;
+  padding-top:6px!important;
+  text-align:center!important;
+  border-top:1px solid rgba(255,255,255,.055);
+}
+.smart-call-focus-title{
+  display:block;
+  color:var(--gold)!important;
+  font-size:12.5px!important;
+  font-weight:900!important;
+  line-height:1.2!important;
+}
+.smart-call-opponent{
+  display:block!important;
+  color:#f0f2f6!important;
+  font-size:14px!important;
+  font-weight:850!important;
+  line-height:1.2!important;
+  letter-spacing:.01em;
+}
+.smart-call-focus .smart-call-note{
+  margin:1px 0 0!important;
+  max-width:100%;
+  color:var(--metal-dim)!important;
+  font-size:9.5px!important;
+  line-height:1.35!important;
+  text-align:center!important;
+}
+@media(max-width:420px){
+  .smart-call-box .court-call-people{gap:5px!important;margin-top:6px!important;}
+  .smart-call-box .court-call-person{
+    min-height:26px!important;
+    padding:3px 7px!important;
+    font-size:10px!important;
+  }
+  .smart-call-focus-title{font-size:12px!important;}
+  .smart-call-opponent{font-size:13px!important;}
+  .smart-call-focus .smart-call-note{font-size:9px!important;}
+}
+
+/* ==== v13.27.0 lifecycle / post-match / mobile header ==== */
+.tournament-owner-filter{display:flex;gap:6px;margin-top:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.tournament-owner-filter button{flex:0 0 auto;border:1px solid var(--border);background:var(--panel-2);color:var(--metal);border-radius:999px;padding:8px 13px;font-weight:700}
+.tournament-owner-filter button.active{border-color:var(--gold);color:var(--gold);background:rgba(217,185,92,.10)}
+.tournament-owner-filter b{font-size:10px;margin-left:4px;opacity:.8}
+.settings-readonly input,.settings-readonly select,.settings-readonly textarea,.settings-readonly .settings-choice-row button,.settings-readonly .settings-check-row input{pointer-events:none!important;opacity:.58!important}
+.settings-readonly .settings-save-bar .btn{pointer-events:none}
+.settings-readonly-banner{margin-bottom:14px}
+.postmatch-podium{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.postmatch-podium>div{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px;min-width:0}
+.postmatch-podium span{display:block;color:var(--metal);font-size:11px;margin-bottom:5px}.postmatch-podium b{display:block;color:var(--gold);font-size:17px;overflow-wrap:anywhere}
+.postmatch-match-table td{vertical-align:middle}
+@media(max-width:640px){
+  /* 所有登入角色共用一致的手機 Header：品牌區一列、身份區獨立右對齊，不互相擠壓。 */
+  .stickytop>header.topbar,.player-shell>header.topbar,.account-management-stickytop>header.topbar{display:grid!important;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"logo brand" "account account";column-gap:10px!important;row-gap:8px!important;padding:10px 12px!important;align-items:center!important}
+  header.topbar .logo-wrap{grid-area:logo!important;margin-left:0!important;align-self:start}
+  header.topbar img.logo{height:62px!important;max-width:92px!important;object-fit:contain}
+  header.topbar .brandtext{grid-area:brand!important;min-width:0!important;width:100%!important;display:flex!important;overflow:visible!important}
+  header.topbar .brandtext .t1{font-size:20px!important;letter-spacing:2px!important}
+  header.topbar .brandtext .t2{font-size:10.5px!important;letter-spacing:1.2px!important;white-space:normal!important}
+  header.topbar .brandtext .top-connection-state{max-width:165px!important;width:100%!important;margin-top:6px!important;padding-left:8px!important}
+  header.topbar .brandtext .t-rule{width:min(132px,100%)!important}
+  header.topbar .spacer,header.topbar .status-pill{display:none!important}
+  header.topbar .account-menu-wrap{grid-area:account!important;order:initial!important;width:100%!important;flex:none!important;justify-content:flex-end!important;margin-top:0!important}
+  header.topbar .account-name{max-width:52vw!important}
+  .postmatch-podium{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:380px){.postmatch-podium{grid-template-columns:1fr}header.topbar img.logo{height:56px!important}}
+/* ==== v13.29.0 稱號與每日簽到（與賽事報到完全獨立） ==== */
+.engagement-panel{position:relative;overflow:hidden;}
+.checkin-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px;text-align:center;font-size:14px}
+.checkin-day{position:relative;display:grid;place-items:center;padding:10px 2px;border:1px solid var(--border);border-radius:6px;min-height:50px}
+.checkin-day.done{background:rgba(217,185,92,.18);color:var(--gold)}
+.checkin-stamp{position:absolute;right:2px;bottom:2px;display:grid;place-items:center;width:19px;height:19px;border:1px solid var(--gold);border-radius:50%;background:rgba(24,23,19,.9);transform:rotate(-15deg);box-shadow:0 0 5px rgba(217,185,92,.2);pointer-events:none}
+.checkin-stamp img{display:block;width:13px;height:13px;object-fit:contain}
+.checkin-day.stamp-fresh .checkin-stamp{animation:bxhCheckinStamp .6s cubic-bezier(.18,.85,.3,1.3) both}
+@keyframes bxhCheckinStamp{0%{opacity:0;transform:rotate(-15deg) scale(2)}55%{opacity:1;transform:rotate(-15deg) scale(.86)}100%{transform:rotate(-15deg) scale(1)}}
+@media(prefers-reduced-motion:reduce){.checkin-day.stamp-fresh .checkin-stamp{animation:none}}
+.checkin-day[aria-current=date]{outline:2px solid var(--gold);outline-offset:-2px}
+.engagement-panel::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 100% 0,rgba(217,185,92,.11),transparent 42%);}
+.checkin-page-back{margin:0 0 12px;}
+.checkin-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.checkin-status{flex:0 0 auto;white-space:nowrap;}
+.checkin-description{margin-top:10px;}
+.engagement-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:relative;}
+.engagement-kicker{font-size:11px;letter-spacing:1.2px;color:var(--gold);font-weight:700;}
+.engagement-title{font-family:var(--font-d);font-size:18px;font-weight:800;margin-top:3px;}
+.checkin-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0;position:relative;}
+.checkin-stat{padding:11px 8px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(0,0,0,.18);text-align:center;min-width:0;}
+.checkin-stat strong{display:block;color:var(--white);font:700 20px var(--font-d);}
+.checkin-stat span{display:block;color:var(--metal);font-size:10px;margin-top:3px;}
+.title-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 9px;border:1px solid rgba(190,198,208,.58);border-radius:999px;color:#dce3ea;background:rgba(183,193,204,.09);font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;}
+.title-chip.rarity-common,.rarity-badge.rarity-common{border-color:#9aa6b2;color:#d7dee5;background:rgba(154,166,178,.10);}
+.title-chip.rarity-rare,.rarity-badge.rarity-rare{border-color:#55b8ff;color:#8fd2ff;background:rgba(42,148,223,.12);box-shadow:0 0 12px rgba(42,148,223,.06);}
+.title-chip.rarity-epic,.rarity-badge.rarity-epic{border-color:#b56cff;color:#d5a7ff;background:rgba(155,72,230,.13);box-shadow:0 0 13px rgba(155,72,230,.08);}
+.title-chip.rarity-legendary,.rarity-badge.rarity-legendary{border-color:#ffbf3c;color:#ffe18a;background:rgba(255,175,26,.13);box-shadow:0 0 14px rgba(255,175,26,.10);}
+.title-chip.rarity-limited,.rarity-badge.rarity-limited{border-color:#ff5d91;color:#ff9fbd;background:rgba(255,65,125,.12);box-shadow:0 0 14px rgba(255,65,125,.09);}
+.title-chip.rarity-eternal,.rarity-badge.rarity-eternal{border-color:#fff0a6;color:#fff7d2;background:linear-gradient(120deg,rgba(255,190,52,.18),rgba(255,255,255,.10),rgba(142,96,255,.14));box-shadow:0 0 9px rgba(255,225,138,.22),0 0 22px rgba(153,101,255,.10);text-shadow:0 0 8px rgba(255,244,194,.34);}
+.title-chip.title-art-chip{flex:0 1 auto;width:220px;max-width:100%;aspect-ratio:3/1;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible;vertical-align:middle;line-height:0;}
+.title-art-chip img,.title-gallery-art{display:block;width:100%;height:100%;object-fit:contain;}
+.title-gallery-art{height:auto;aspect-ratio:3/1;margin:-5px auto 7px;}
+.engagement-head .title-art-chip{width:clamp(140px,27vw,240px);}
+.title-card .title-gallery-art{max-width:340px;}
+.rarity-badge{display:inline-flex;align-items:center;padding:2px 7px;border:1px solid rgba(190,198,208,.55);border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap;}
+.title-limit-badge{border-color:rgba(255,103,151,.58);color:#ffb0c8;background:rgba(255,65,125,.10);box-shadow:0 0 12px rgba(255,65,125,.06);}
+.title-card.rarity-common{border-color:rgba(154,166,178,.24)}
+.title-card.rarity-rare{border-color:rgba(85,184,255,.36);background:linear-gradient(135deg,rgba(42,148,223,.08),rgba(255,255,255,.018))}
+.title-card.rarity-epic{border-color:rgba(181,108,255,.38);background:linear-gradient(135deg,rgba(155,72,230,.09),rgba(255,255,255,.018))}
+.title-card.rarity-legendary{border-color:rgba(255,191,60,.40);background:linear-gradient(135deg,rgba(255,175,26,.10),rgba(255,255,255,.02))}
+.title-card.rarity-limited{border-color:rgba(255,93,145,.40);background:linear-gradient(135deg,rgba(255,65,125,.09),rgba(255,255,255,.02))}
+.title-card.rarity-eternal{border-color:rgba(255,240,166,.52);background:linear-gradient(135deg,rgba(255,190,52,.12),rgba(255,255,255,.045),rgba(142,96,255,.10));box-shadow:inset 0 0 18px rgba(255,244,194,.035),0 0 18px rgba(153,101,255,.05)}
+.title-setting-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:12px;}
+.title-preview{margin-top:12px;padding:14px;border:1px dashed rgba(217,185,92,.45);border-radius:10px;background:rgba(0,0,0,.18);text-align:center;min-width:0;overflow:hidden;}
+.title-preview-name{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.title-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px;}
+.title-card{padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025);min-width:0;}
+.title-card.locked{opacity:.58;filter:saturate(.55);}
+.title-card-name{font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.title-card-desc{font-size:11px;color:var(--metal);line-height:1.55;margin-top:7px;}
+.title-progress{height:5px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:9px;}
+.title-progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#ffe995);}
+.engagement-disabled{padding:12px;border:1px dashed rgba(255,255,255,.12);border-radius:10px;color:var(--metal);font-size:12px;line-height:1.6;}
+@media(max-width:600px){.title-setting-grid,.title-gallery{grid-template-columns:1fr}.checkin-stats{gap:6px}.checkin-stat strong{font-size:17px}.title-chip{font-size:10px;max-width:42vw}}
+.title-chip.title-art-chip{max-width:min(220px,100%)}
+.engagement-head .title-chip.title-art-chip{max-width:min(44vw,240px)}
+
+/* v13.29.7 R3: shared player/admin header and navigation geometry. */
+.mode-shell>nav.tabs,.mode-shell>nav.player-tabs{
+  display:flex;flex-wrap:nowrap;align-items:center;gap:4px;padding:8px 12px;
+  background:var(--bg-soft);border-bottom:1px solid var(--border);box-sizing:border-box;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;touch-action:pan-x;
+}
+.mode-shell>nav.tabs>button,.mode-shell>nav.player-tabs>button{
+  flex:0 0 auto;min-width:max-content;min-height:44px;box-sizing:border-box;
+  padding:10px 14px;border:1px solid transparent;border-radius:8px;
+  font-family:var(--font-d);font-size:14px;font-weight:600;line-height:22px;
+  letter-spacing:.5px;white-space:nowrap;color:var(--metal);background:transparent;
+}
+.mode-shell>nav.tabs>button.active,.mode-shell>nav.player-tabs>button.active{
+  color:var(--neon);border-color:var(--neon-dim);background:rgba(233,255,46,.06);
+}
+.mode-shell>header.topbar{gap:24px;padding:16px 28px;flex-wrap:nowrap;}
+.mode-shell>header.topbar .account-badge{min-height:44px;max-width:100%;box-sizing:border-box;}
+.mode-shell>header.topbar .account-name{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mode-management-context{margin-bottom:12px;}
+.mode-management-context>.status-pill{margin-bottom:8px;}
+@media(max-width:899px){
+  .stickytop.mode-shell>header.topbar{
+    display:grid!important;grid-template-columns:auto minmax(0,1fr);
+    grid-template-areas:"logo brand" "account account";column-gap:10px!important;
+    row-gap:8px!important;padding:10px 12px!important;align-items:center!important;
+  }
+  .mode-shell>header.topbar .logo-wrap{grid-area:logo;margin-left:0;align-self:start;}
+  .mode-shell>header.topbar img.logo{height:62px;max-width:92px;object-fit:contain;}
+  .mode-shell>header.topbar .brandtext{grid-area:brand;min-width:0;width:100%;}
+  .mode-shell>header.topbar .brandtext .t1{font-size:20px;letter-spacing:2px;}
+  .mode-shell>header.topbar .brandtext .t2{font-size:10.5px;letter-spacing:1.2px;white-space:normal;}
+  .mode-shell>header.topbar .brandtext .top-connection-state{max-width:165px;width:100%;margin-top:6px;padding-left:8px;}
+  .mode-shell>header.topbar .brandtext .t-rule{width:min(132px,100%);}
+  .mode-shell>header.topbar .spacer{display:none;}
+  .mode-shell>header.topbar .account-menu-wrap{grid-area:account;width:100%;min-width:0;display:flex;justify-content:flex-end;margin:0;}
+  .mode-shell>header.topbar .account-badge{max-width:100%;padding:7px 12px;}
+  .mode-shell>header.topbar .account-name{max-width:52vw;}
+}
+
+
+.ops-winner{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.archive-disabled:disabled{background:#292b2e!important;color:#92959a!important;border-color:#45474b!important;opacity:.7!important;cursor:not-allowed!important;box-shadow:none!important}
+/* Cloud tournament list: preserve refresh label on narrow screens. */
+.cloud-list-heading{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;}
+.cloud-list-heading-copy{flex:1 1 240px;min-width:0;}
+.cloud-list-heading > [data-action="cloud-refresh-admin-list"]{flex:0 0 auto;white-space:nowrap;word-break:normal;overflow-wrap:normal;min-width:max-content;}
+/* Confirmation dialogs must sit above the list that opened them. */
+body .modal-overlay.confirmation-overlay{z-index:2100!important;}
+/* Compact personal schedules and rooms */
+.room-create-action{display:flex;justify-content:center;margin:16px 0;}
+.room-policy{font-size:12px;line-height:1.7;color:var(--metal-dim);margin:8px 0 0;}
+.schedule-fold>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;font-weight:700;}
+.schedule-fold>summary::-webkit-details-marker{display:none;}
+.fold-arrow{margin-left:auto;font-size:11px;color:var(--metal-dim);white-space:nowrap;}
+.schedule-fold-body{margin-top:14px;}.schedule-fold:not([open]){padding-top:16px;padding-bottom:16px;}
+.schedule-light{display:inline-block;flex:0 0 9px;width:9px;height:9px;border-radius:50%;background:#858990;}.schedule-light.live{background:#32d583;box-shadow:0 0 8px #32d58366;}.schedule-light.waiting{background:#f5a623;}
+
+/* ==== super admin management pages: accounts / check-in / titles ==== */
+.super-admin-management-tabs{
+  display:flex;gap:6px;padding:8px 12px;background:rgba(10,11,13,.97);
+  border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+}
+.super-admin-management-tabs::-webkit-scrollbar{display:none;}
+.super-admin-management-tabs .super-admin-tab{
+  flex:0 0 auto;min-height:40px;padding:8px 15px;border-radius:9px;
+  border:1px solid transparent;background:transparent;color:var(--metal);
+  font-family:var(--font-d);font-size:13px;font-weight:800;letter-spacing:.4px;white-space:nowrap;
+}
+.super-admin-management-tabs .super-admin-tab.active{
+  color:var(--gold);border-color:var(--gold-dim);background:rgba(217,185,92,.10);
+  box-shadow:inset 0 0 0 1px rgba(217,185,92,.05);
+}
+.super-admin-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.super-admin-page-title{font-family:var(--font-d);font-size:20px;font-weight:800;color:var(--ivory);}
+.super-admin-page-sub{font-size:12px;color:var(--metal);margin-top:4px;line-height:1.55;}
+.super-admin-section{margin-top:14px;}
+@media(max-width:640px){
+  .super-admin-management-tabs{padding:7px 10px;}
+  .super-admin-management-tabs .super-admin-tab{min-height:38px;padding:7px 12px;font-size:12px;}
+  .super-admin-page-head .btn{width:100%;}
+}
+
+
