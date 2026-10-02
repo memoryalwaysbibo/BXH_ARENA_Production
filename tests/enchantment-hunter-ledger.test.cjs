@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
-const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
 const start=html.indexOf('function normalizeHunterRoundEvent(');
 const end=html.indexOf('function validateHunterRoundLedger(',start);
 assert(start>0&&end>start);
