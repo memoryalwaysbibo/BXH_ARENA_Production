@@ -71,7 +71,7 @@ if(albumFeature&&typeof albumFeature.cardAlbumContext==='function'&&typeof album
     }catch(error){if(isCurrent())state.error=String(error?.message||'卡冊暫時無法讀取').slice(0,130);}
     finally{if(isCurrent()){state.loading=false;renderPreservingScroll();}}
   };
-  const originalMailboxHandler=handleMailbox;
+  const originalMailboxHandler=mailboxFeature.handleMailbox;
   handleMailbox=async function(action,target){
     if(action!=='mailbox-card-reward')return originalMailboxHandler(action,target);
     const context=mailboxContext();
