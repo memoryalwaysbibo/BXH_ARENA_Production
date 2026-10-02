@@ -14591,7 +14591,7 @@ function hunterFilteredRecords(){
     return true;
   });
 }
-const {hunterRecordHasTrustedScore,hunterCareerSummary}=window.BXHHunterUtils||{};
+const {hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
 const {hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth}=window.BXHHunterUtils||{};
 
 /* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
