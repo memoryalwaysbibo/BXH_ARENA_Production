@@ -49,6 +49,7 @@ function setup({ installBridge = true } = {}) {
     } }
   };
   vm.createContext(sandbox);
+  vm.runInContext(mailbox, sandbox, { filename: 'mailbox-feature.js' });
   vm.runInContext(albumFeature, sandbox, { filename: 'card-album-feature.js' });
   vm.runInContext(source.replace(albumFeature,''), sandbox, { filename: 'card-album-inline.js' });
   const install = () => vm.runInContext(rewardSource, sandbox, { filename: 'card-reward-mail.js' });
