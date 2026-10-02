@@ -5795,9 +5795,7 @@ function mapRoleToAppRole(role){
   if(role==="viewer") return "guest";
   return "guest";
 }
-function roleDisplayLabel(role){
-  return { super_admin:"最高管理員", admin:"管理員", staff:"工作人員", tester:"封測管理員", player:"玩家", viewer:"觀眾" }[role] || role;
-}
+const {roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText}=window.BXHFormatUtils;
 function authAvailable(){
   return (typeof window!=="undefined" && window.cloudAuth && typeof window.cloudAuth.isReady==="function" && window.cloudAuth.isReady());
 }
@@ -5823,19 +5821,12 @@ async function saveIndexArr(arr){
 }
 // Converts an epoch-ms timestamp to a YYYY-MM-DD calendar date as seen in
 // Asia/Taipei (UTC+8, no DST), used as a normalized, comparable date string.
-function taipeiDateFromTimestamp(ts){
-  if(!ts) return "";
-  const d = new Date(ts + 8*3600*1000);
-  return d.toISOString().slice(0,10);
-}
+
 // The date a record should be filtered/sorted by: the manually-entered event
 // date if the admin filled it in, otherwise falls back to when the tournament
 // was actually completed/archived — never leaves a blank meta.date silently
 // unmatched against a real completion date.
-function recordFilterDate(r){
-  if(r.date) return r.date;
-  return taipeiDateFromTimestamp(r.completedAt || r.archivedAt) || "";
-}
+
 
 function summarizeRecord(st){
   const champ = st.championId ? (st.players.find(p=>p.id===st.championId)||{}).name : null;
@@ -10876,7 +10867,7 @@ function datetimeLocalToEpoch(str){
 const REGISTRATION_STATUS_LABELS = { draft:"草稿", scheduled:"即將開放", open:"開放報名", full:"已額滿", closed:"已截止", cancelled:"已取消", started:"已截止" };
 
 let eventStaffPanelState={eventCode:"",loading:false,busy:false,assignments:null,results:[],error:""};
-function eventStaffDutyLabel(value){return ({event_assistant:"活動協助",checkin:"報到",referee:"裁判",head_referee:"主裁"})[value]||value;}
+
 async function loadEventStaffPanel(force=false){
   const code=String(state.cloudCode||"").toUpperCase();
   if(!code||!isPartnerOrganizerMode()||!window.engagementService?.eventStaff)return;
@@ -13164,10 +13155,7 @@ function rankLadderRows(players){
   });
   return rows;
 }
-function formatLadderDate(ts){
-  if(!ts) return "—";
-  try{ return new Date(ts).toLocaleDateString("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit"}); }catch(e){ return "—"; }
-}
+
 function defaultLadderProfile(uid,name,seasonId){
   return { uid:uid||"", playerName:name||"", seasonPoints:0, careerPoints:0, rankTier:"未定級", currentSeason:seasonId||"S1", highestRankTier:"未定級", totalEvents:0, championCount:0, runnerUpCount:0, thirdPlaceCount:0, fourthPlaceCount:0, rankedWins:0, rankedLosses:0, lastPointsUpdatedAt:null, seasonHistory:{} };
 }
@@ -13512,10 +13500,7 @@ function mailboxContext(){
   if(!mailboxState||mailboxState.key!==key)mailboxState={key,open:false,loading:false,busy:false,messages:null,unreadCount:0,selectedId:'',error:'',lastSent:null};
   return mailboxState;
 }
-function mailboxDate(value){
-  if(!value)return '—';
-  try{return new Date(value).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return '—';}
-}
+
 function mailboxError(error){
   const raw=String(error?.message||error||'');
   const map={'mail-not-found':'找不到這封信，可能已被移除。','recipient-not-found':'找不到指定玩家帳號。','recipient-inactive':'指定玩家帳號目前不可使用。','super-admin-required':'只有最高管理員可以發送系統信。','invalid-subject':'信件標題請輸入 1～80 字。','invalid-body':'信件內容請輸入 1～2000 字。','operation-conflict':'這次寄送識別碼與先前內容不一致，請重新操作。','auth-required':'請重新登入後再查看站內信。','service-unavailable':'站內信服務尚未部署。'};
@@ -13899,9 +13884,7 @@ function moodError(e){
  for(const[key,value]of Object.entries(errors))if(message.includes(key))return value;
  return '心情小棧暫時無法連線，請稍後重試。';
 }
-function moodTime(ms){
- try{return new Date(Number(ms)).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}
-}
+
 function moodReplyDraft(c,id){return String(c.replyDrafts?.[id]||'');}
 function moodMenuHtml(c,key,action,id,replyId,label){
  if(c.menuKey!==key)return '';
@@ -15160,10 +15143,7 @@ function smartCallModel(r,info){
   const kind=idx<=1?"soon":idx<=3?"prepare":"waiting";
   return {kind,ahead:idx,station,opponent:smartCallPlayerName(st,opp),etaSec:eta,message:idx===0?"下一場就是你":"前方還有 "+idx+" 場"};
 }
-function smartCallEtaText(sec){
-  if(sec==null) return "—"; if(sec<=30) return "即將上場";
-  const min=Math.max(1,Math.round(sec/60)); const lo=Math.max(1,min-1), hi=min+1; return lo===hi?`約 ${min} 分鐘`:`約 ${lo}～${hi} 分鐘`;
-}
+
 function smartCallMaybeNotify(code,model){
   if(!smartCallEnabled(code) || !model || typeof model.ahead!=="number") return;
   const all=smartCallStorageRead(SMART_CALL_LAST_KEY), uk=smartCallUserKey(); all[uk]=all[uk]||{}; const prev=all[uk][code]||{};
