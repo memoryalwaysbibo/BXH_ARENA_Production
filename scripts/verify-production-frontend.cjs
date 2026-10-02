@@ -213,7 +213,7 @@ if((html.match(/\$\{liveNextMatchCardHtml\(court, stationNum\)\}/g)||[]).length!
 mustNot(/<div class="ref-next-box"><span>下一場<\/span>\$\{nextMatchPreviewHtml\(court, stationNum\)\}<\/div>/,'Legacy referee next-match row must be removed');
 console.log('PASS referee active-score next-match duplication removed');
 mustInclude('class="live-court-next-badge">下一場','Live next-match badge missing');
-mustInclude('.live-court-next-players{display:grid','Live next-match player row missing');
+must(/\.live-court-next-players\s*\{[^}]*display\s*:\s*grid/,'Live next-match player row missing',htmlAndLocalCss);
 mustInclude('function liveNextMatchCompactHtml(court,stationNum)','Live compact next-match renderer missing');
 mustInclude('const nextPreview=liveNextMatchCompactHtml(safeCourt,stationNum);','Live court must use compact next-match row');
 mustInclude('class="live-court-next live-court-next-compact"','Live compact next-match row class missing');
