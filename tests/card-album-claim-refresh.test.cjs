@@ -59,7 +59,7 @@ function setup({ installBridge = true } = {}) {
     state: () => sandbox.cardAlbumContext(), mail: () => sandbox.mailboxContext(),
     load: refresh => sandbox.loadCardAlbum(refresh),
     claim: () => sandbox.handleMailbox('mailbox-card-reward', target),
-    view: () => sandbox.renderCardAlbumPage(),
+    view: () => sandbox.window.BXHCardAlbumFeature.renderCardAlbumPage(),
     get: fn => { get = fn; }, list: fn => { list = fn; }, onClaim: fn => { claim = fn; },
     switchUser(uid) { sandbox.firebaseUser = uid ? { uid } : null; sandbox.engagementSessionEpoch++; }
   };
