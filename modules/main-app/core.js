@@ -14649,37 +14649,7 @@ function hunterFilteredRecords(){
     return true;
   });
 }
-function hunterRecordHasTrustedScore(record){
-  if(!record||record.resultMethod==="quick_decision"||record.analyzable!==true) return false;
-  if(record.scoreFor==null||record.scoreAgainst==null) return false;
-  const scoreFor=Number(record.scoreFor),scoreAgainst=Number(record.scoreAgainst);
-  return Number.isFinite(scoreFor)&&Number.isFinite(scoreAgainst)&&scoreFor>=0&&scoreAgainst>=0;
-}
-function hunterRecordScoreText(record){
-  if(record&&record.resultMethod==="quick_decision") return "判定";
-  if(hunterRecordHasTrustedScore(record)) return Number(record.scoreFor)+" : "+Number(record.scoreAgainst);
-  if(record&&record.scoreFor!=null&&record.scoreAgainst!=null) return "比分未驗證";
-  return "—";
-}
-
-function hunterCareerSummary(records){
-  const rows=Array.isArray(records)?records:[];
-  let wins=0,losses=0,totalFor=0,totalAgainst=0,validRounds=0,scoredMatches=0;
-  rows.forEach(r=>{
-    if(r.isWin) wins++; else losses++;
-    if(hunterRecordHasTrustedScore(r)){
-      scoredMatches++;
-      totalFor+=Number(r.scoreFor);
-      totalAgainst+=Number(r.scoreAgainst);
-    }
-    if(r.analyzable) validRounds+=Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0;
-  });
-  return {
-    matches:rows.length,wins,losses,
-    winRate:rows.length?Math.round(wins/rows.length*100):0,
-    totalFor,totalAgainst,net:totalFor-totalAgainst,validRounds,scoredMatches
-  };
-}
+const {hunterRecordHasTrustedScore,hunterCareerSummary}=window.BXHHunterUtils||{};
 const {hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth}=window.BXHHunterUtils||{};
 
 /* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */

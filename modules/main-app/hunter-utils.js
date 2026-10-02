@@ -62,6 +62,23 @@ function hunterOpponentIdentityRef(record){
   return code&&localId?(code+"|"+localId):"";
 }
 
+function hunterRecordHasTrustedScore(record){
+  if(!record||record.resultMethod==="quick_decision"||record.analyzable!==true) return false;
+  if(record.scoreFor==null||record.scoreAgainst==null) return false;
+  const scoreFor=Number(record.scoreFor),scoreAgainst=Number(record.scoreAgainst);
+  return Number.isFinite(scoreFor)&&Number.isFinite(scoreAgainst)&&scoreFor>=0&&scoreAgainst>=0;
+}
+function hunterCareerSummary(records){
+  const rows=Array.isArray(records)?records:[];
+  let wins=0,losses=0,totalFor=0,totalAgainst=0,validRounds=0,scoredMatches=0;
+  rows.forEach(r=>{
+    if(r.isWin) wins++; else losses++;
+    if(hunterRecordHasTrustedScore(r)){scoredMatches++;totalFor+=Number(r.scoreFor);totalAgainst+=Number(r.scoreAgainst);}
+    if(r.analyzable) validRounds+=Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0;
+  });
+  return {matches:rows.length,wins,losses,winRate:rows.length?Math.round(wins/rows.length*100):0,totalFor,totalAgainst,net:totalFor-totalAgainst,validRounds,scoredMatches};
+}
+
 const HUNTER_GROWTH_VERSION="hunter-xp-v1";
 const HUNTER_XP_PER_MATCH=10;
 const HUNTER_XP_PER_VALID_ROUND=2;
@@ -116,4 +133,4 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterCareerSummary});
