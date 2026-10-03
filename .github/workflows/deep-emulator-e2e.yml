@@ -2,6 +2,11 @@ name: BXH ARENA Deep Emulator E2E
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'modules/main-app/core.js'
+      - 'tests/e2e/admin-finals-order-deep.e2e.cjs'
+      - '.github/workflows/deep-emulator-e2e.yml'
   push:
     branches: [ main ]
     paths:

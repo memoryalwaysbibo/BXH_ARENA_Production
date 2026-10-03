@@ -3,6 +3,8 @@ const crypto = require('node:crypto');
 
 test('official single elimination enforces bronze before championship final', async ({ page }) => {
   const externalFirebaseRequests=[];
+  page.on('pageerror',error=>console.log('[P0 admin pageerror]',String(error&&error.stack||error)));
+  page.on('console',msg=>{if(['error','warning'].includes(msg.type()))console.log('[P0 admin console]',msg.type(),msg.text());});
 
   await page.route('**/*', async route=>{
     const url=new URL(route.request().url());
@@ -61,13 +63,21 @@ test('official single elimination enforces bronze before championship final', as
       await page.locator('[data-action="admin-login-submit"]').click();
     }
   }
-  await expect(page.locator('[data-action="cloud-admin-new-tournament"]').first()).toBeVisible({timeout:60000});
-  await page.locator('[data-action="cloud-admin-new-tournament"]').first().click();
+  await page.waitForFunction(()=>firebaseUser?.uid && userProfile?.active===true && currentRole==="admin" && appPhase==="app" && activeTab==="management",null,{timeout:60000});
+  const newTournament=page.locator('[data-action="cloud-admin-new-tournament"]').first();
+  await expect(newTournament).toBeVisible({timeout:60000});
+  await newTournament.click({force:true});
 
   const genericConfirm=page.locator('[data-action="modal-confirm"]');
   if(await genericConfirm.isVisible().catch(()=>false)) await genericConfirm.click();
 
-  await expect(page.locator('#f-bronze')).toBeVisible({timeout:20000});
+  try {
+    await expect(page.locator('#f-bronze')).toBeVisible({timeout:20000});
+  } catch(error) {
+    const diag=await page.evaluate(()=>({appPhase,activeTab,stateId:state?.id,cloudCode:state?.cloudCode,role:currentRole,profileRole:userProfile?.role,body:document.body.innerText.slice(0,2000)}));
+    console.log('[P0 admin settings diagnostics]',JSON.stringify(diag));
+    throw error;
+  }
   await page.locator('#f-name').fill('E2E 季殿順序驗證');
   await page.locator('#f-bronze').check();
   await page.locator('[data-action="save-meta"]').click();

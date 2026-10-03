@@ -43,6 +43,7 @@ test('two courts preserve independent work and queue a skipped match onto a busy
     null,{timeout:90000}
   );
   await page.locator('[data-action="player-apply-submit"]').click();
+  await page.waitForFunction(()=>currentRole==='player' && appPhase==='player-center',null,{timeout:60000});
   await expect(page.locator('.player-shell')).toBeVisible({timeout:30000});
 
   await page.locator('[data-action="player-switch-tab"][data-tab="host"]').first().click();
