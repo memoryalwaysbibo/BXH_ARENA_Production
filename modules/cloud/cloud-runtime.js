@@ -2737,6 +2737,61 @@ if(testerSession){
     // callback throws, the entire transaction is aborted with nothing written.
     // Also mirrors the result to publicTournaments/{code} (minus registrations) in the
     // SAME transaction, so guests watching live see the confirmed result immediately.
+    // One-room structural rescue. This deliberately avoids rebuildPropagationForState:
+    // it only fills the reviewed LB target slots and persists the override marker.
+    async rescueC6bataTransaction(expectedFingerprint, expectedActorUid){
+      const code="BXH-C6BATA";
+      if(!cloudEnabled || !fx.runTransaction) return {ok:false,reason:"cloud-unavailable"};
+      const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
+      if(!actorUid || !expectedActorUid || actorUid!==expectedActorUid) return {ok:false,reason:"auth-mismatch"};
+      const ref=fx.doc(dbHandle,"tournaments",code);
+      const publicRef=fx.doc(dbHandle,"publicTournaments",code);
+      try{
+        const outcome=await fx.runTransaction(dbHandle,async tx=>{
+          const snap=await tx.get(ref);
+          if(!snap.exists()) throw new Error("not-found");
+          const actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid));
+          if(!actorSnap.exists()) throw new Error("unauthenticated");
+          const actor=actorSnap.data()||{};
+          if(actor.active!==true || actor.isTestAccount===true || actor.role!=="super_admin") throw new Error("permission-denied");
+          const docData=snap.data()||{};
+          let remoteState;
+          try{ remoteState=typeof docData.data==="string"?JSON.parse(docData.data):docData.data; }catch(e){ throw new Error("corrupt-data"); }
+          if(!remoteState || remoteState.cloudCode!==code || !remoteState.meta || remoteState.meta.formatType!=="double") throw new Error("room-or-format-mismatch");
+          if(remoteState.c6bataRescueV1) throw new Error("rescue-already-committed");
+          const rescue=window.BXHC6BataRescue;
+          if(!rescue || typeof rescue.computePlan!=="function") throw new Error("rescue-module-unavailable");
+          const plan=rescue.computePlan(remoteState);
+          if(!plan.ok) throw new Error("dry-run-invalid:"+plan.errors.join(","));
+          if(plan.fingerprint!==expectedFingerprint) throw new Error("dry-run-stale");
+          if(!plan.operations.length || plan.operations.some(op=>!op.stopForManualScore || !op.otherPlayerId)) throw new Error("manual-match-stop-required");
+          const matches=Array.isArray(remoteState.matches)?remoteState.matches:[];
+          const protectedBefore=JSON.stringify(matches.map(m=>({id:m.id,completed:m.completed,scoreA:m.scoreA,scoreB:m.scoreB,winnerId:m.winnerId,loserId:m.loserId})));
+          for(const op of plan.operations){
+            const source=matches.find(m=>m&&m.id===op.sourceMatchId);
+            const target=matches.find(m=>m&&m.id===op.targetMatchId);
+            if(!source || source.bracket!=="LB" || source.completed===true || !target || target.bracket!=="LB" || target.completed===true) throw new Error("match-state-changed");
+            if(target[op.targetSlot]) throw new Error("target-slot-not-empty:"+target.id+":"+op.targetSlot);
+            const other=op.targetSlot==="a"?target.b:target.a;
+            if(!other || other.type!=="player" || String(other.playerId)!==String(op.otherPlayerId)) throw new Error("target-opponent-changed:"+target.id);
+            if(target.winnerId||target.loserId||Number(target.scoreA||0)!==0||Number(target.scoreB||0)!==0||target.completed===true) throw new Error("target-has-result-data:"+target.id);
+            target[op.targetSlot]={type:"player",playerId:op.playerId};
+          }
+          if(JSON.stringify(matches.map(m=>({id:m.id,completed:m.completed,scoreA:m.scoreA,scoreB:m.scoreB,winnerId:m.winnerId,loserId:m.loserId})))!==protectedBefore) throw new Error("protected-result-data-changed");
+          const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1,Number(remoteState.updatedAt||0)+1);
+          remoteState.updatedAt=now;
+          remoteState.c6bataRescueV1={
+            version:1,roomCode:code,committedAt:now,committedBy:actorUid,fingerprint:plan.fingerprint,
+            operations:plan.operations.map(op=>({sourceMatchId:op.sourceMatchId,targetMatchId:op.targetMatchId,targetSlot:op.targetSlot,playerId:op.playerId,otherPlayerId:op.otherPlayerId,deadSourceMatchIds:op.deadSourceMatchIds}))
+          };
+          tx.set(ref,{data:JSON.stringify(remoteState),updatedAt:now},{merge:true});
+          tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
+          return {state:remoteState,operationCount:plan.operations.length,protected:plan.protected};
+        });
+        return {ok:true,state:outcome.state,operationCount:outcome.operationCount,protected:outcome.protected};
+      }catch(e){ return {ok:false,reason:(e&&e.message)||String(e)}; }
+    },
+
     async confirmMatchTransaction(code, validateAndApplyFn, auditMeta){
       if(!cloudEnabled || !code || !fx.runTransaction){
         return { ok:false, reason:"cloud-unavailable" };
