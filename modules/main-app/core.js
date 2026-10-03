@@ -6545,8 +6545,7 @@ function displayMatchNumber(m){
   return idx<0 ? null : idx+1;
 }
 function displayMatchLabel(m){
-  const n=displayMatchNumber(m);
-  return n==null ? "" : "第"+n+"場";
+  return window.BXHFormatUtils.matchSequenceLabel(displayMatchNumber(m));
 }
 function matchesInRound(r){ return state.matches.filter(m=>m.round===r && (m.bracket==null || m.bracket==="SE")).sort((a,b)=>a.indexInRound-b.indexInRound); }
 function matchesInRoundBracket(bracket, r){ return state.matches.filter(m=>m.bracket===bracket && m.round===r).sort((a,b)=>a.indexInRound-b.indexInRound); }
