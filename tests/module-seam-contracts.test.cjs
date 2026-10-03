@@ -105,7 +105,7 @@ test('module exports and script order satisfy Core bindings', () => {
   ]) vm.runInContext(read(file), context, { filename: file });
 
   for (const [namespace, names] of [
-    ['BXHFormatUtils', ['matchSequenceLabel']],
+    ['BXHFormatUtils', ['matchSequenceLabel', 'refereeNamesLabel']],
     ['BXHInputUtils', ['smartCallNorm']],
     ['BXHAccountUtils', ['legacyGameIdFromProfile', 'effectiveGameId', 'effectivePlayerNameForMode']],
     ['BXHTitleUtils', ['titleClassificationHtml']],
@@ -136,6 +136,25 @@ test('match sequence labels are exported and delegated without changing match nu
     [null, ''],
     [undefined, ''],
   ]) assert.equal(context.window.BXHFormatUtils.matchSequenceLabel(value), expected);
+});
+
+test('referee station labels are exported and delegated without changing station lookup', () => {
+  const context = moduleContext({
+    refereeNamesForStation: stationNum => stationNum === 1 ? ['小宇', '黑爸'] : [],
+  });
+  vm.runInContext(read('modules/main-app/format-utils.js'), context, { filename: 'format-utils.js' });
+  const start = core.indexOf('function refereeDisplayForStation(');
+  const end = core.indexOf('\nfunction canOperateStation(', start);
+  assert(start >= 0 && end > start, 'Core referee label binding exists');
+  const binding = core.slice(start, end);
+  assert.match(binding, /window\.BXHFormatUtils\.refereeNamesLabel\(refereeNamesForStation\(stationNum,st\)\)/);
+  vm.runInContext(binding + '\nglobalThis.__refereeDisplayForStation=refereeDisplayForStation;', context, { filename: 'Core referee label binding' });
+
+  assert.equal(context.window.BXHFormatUtils.refereeNamesLabel([]), '未指定');
+  assert.equal(context.window.BXHFormatUtils.refereeNamesLabel(['小宇']), '小宇');
+  assert.equal(context.window.BXHFormatUtils.refereeNamesLabel(['小宇', '黑爸']), '小宇、黑爸');
+  assert.equal(context.__refereeDisplayForStation(1, {}), '小宇、黑爸');
+  assert.equal(context.__refereeDisplayForStation(2, {}), '未指定');
 });
 
 test('Smart Call identity normalization is exported and delegated through Core', () => {
