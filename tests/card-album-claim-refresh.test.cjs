@@ -450,3 +450,6 @@ test('claimed legacy pack reveals its card and stays non-downloadable', () => {
   assert.match(html,/assets\/enchantment-gods\/seal\.webp/);
   assert.equal(t.sandbox.window.BXHCardRewardUI.isVirtualAttachment(message,message.attachments[0]),true);
 });
+
+// Include projected mailbox payload regressions in the existing critical gate.
+require('./card-pack-projection.test.cjs');

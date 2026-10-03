@@ -1,6 +1,6 @@
 {
-  "build": "20261003.2",
+  "build": "20261003.3",
   "version": "v14.3.17",
-  "updatedAt": "2026-10-03T15:50:00+08:00",
-  "releaseTrigger": "double-elimination-source-graph-v1"
+  "updatedAt": "2026-10-03T17:04:03+08:00",
+  "releaseTrigger": "card-pack-mailbox-projection-hotfix"
 }
