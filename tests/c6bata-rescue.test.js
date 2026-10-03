@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 global.window = {};
 global.document = undefined;
-const { computePlan } = require("../modules/main-app/c6bata-rescue.js");
+const { computePlan, applyPropagationOverride } = require("../modules/main-app/c6bata-rescue.js");
 
 function completed(id, bracket, winnerId, loserId, isBye = false) {
   return { id, bracket, round: 0, indexInRound: 0, a: null, b: null, isBye, completed: true, winnerId, loserId, scoreA: 4, scoreB: 0, log: [], faultActions: [] };
@@ -36,6 +36,17 @@ assert.ok(plan.operations.every(x => x.stopForManualScore && x.otherPlayerId));
 assert.deepEqual(plan.operations.map(x => x.targetSlot), ["a", "a", "a"]);
 assert.deepEqual(plan.protected, { completedMatchesModified: 0, scoresModified: 0, winnerLoserModified: 0 });
 assert.equal(JSON.stringify(state), before, "Dry Run must not mutate source state");
+
+state.c6bataRescueV1 = { roomCode: "BXH-C6BATA", operations: plan.operations };
+const target = state.matches.find(m => m.id === plan.operations[0].targetMatchId);
+const guarded = applyPropagationOverride(state, target, null, "r1");
+assert.equal(guarded.ok, true);
+assert.equal(guarded.a, "p1", "propagation must retain the rescued participant slot");
+target.completed = true;
+target.scoreA = 4;
+target.winnerId = "p1";
+const protectedResult = applyPropagationOverride(state, target, "different-player", "r1");
+assert.equal(protectedResult.skip, true, "later propagation must not overwrite a scored rescue match");
 
 assert.equal(computePlan({ ...fixture(), cloudCode: "OTHER-ROOM" }).ok, false);
 assert.equal(computePlan({ ...fixture(), meta: { formatType: "single" } }).ok, false);
