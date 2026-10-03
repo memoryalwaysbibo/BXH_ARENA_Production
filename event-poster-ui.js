@@ -60,9 +60,10 @@ function makeManager(){
   return manager;
 }
 function closeManager(){
-  if(!manager)return;
+  if(!manager||manager._saving)return;
   if(manager._objectUrl)URL.revokeObjectURL(manager._objectUrl);
-  manager.hidden=true;manager._file=null;manager._dimensions=null;manager._code="";manager._card=null;
+  manager.querySelector("[data-poster-preview-image]").removeAttribute("src");
+  manager.hidden=true;manager._file=null;manager._dimensions=null;manager._code="";manager._card=null;manager._objectUrl="";
   document.body.classList.remove("lobby-poster-modal-open");
 }
 async function selectPoster(event){
@@ -81,32 +82,33 @@ async function selectPoster(event){
   }catch(errorValue){error.textContent=errorValue.message||"無法讀取圖片，請重新選擇。";preview.hidden=true;}
 }
 function openManager(button){
-  const modal=makeManager();
+  const modal=makeManager();if(modal._saving)return;
   modal._code=button.dataset.code;modal._card=button.closest(".lobby-compact-card");
   modal.querySelector("[data-poster-file]").value="";
   modal.querySelector("[data-poster-preview]").hidden=true;
   modal.querySelector("[data-poster-error]").textContent="";
   modal.querySelector("[data-poster-save]").disabled=true;
+  modal.querySelector("[data-poster-save]").textContent="確認儲存";
   modal.hidden=false;document.body.classList.add("lobby-poster-modal-open");
   modal.querySelector("[data-poster-file]").focus();
 }
 async function saveSelectedPoster(){
   const modal=makeManager(),file=modal._file,dimensions=modal._dimensions,call=getService();
+  const code=modal._code,card=modal._card;
   const save=modal.querySelector("[data-poster-save]"),error=modal.querySelector("[data-poster-error]");
-  if(!file||!dimensions||!call)return;
-  save.disabled=true;save.textContent="儲存中…";error.textContent="";
+  if(!file||!dimensions||!call||modal._saving)return;
+  modal._saving=true;save.disabled=true;save.textContent="儲存中…";error.textContent="";
   try{
     const values=await Promise.all([asBase64(file),thumbnailBase64(file)]);
-    const result=await call({action:"savePoster",code:modal._code,
+    const result=await call({action:"savePoster",code,
       photo:{mimeType:file.type,width:dimensions.width,height:dimensions.height,base64:values[0]},
       cover:{mimeType:"image/jpeg",width:240,height:240,base64:values[1]}});
     if(!result||result.ok!==true||!safePosterUrl(result.posterUrl))throw new Error("伺服器未確認新照片，舊照片仍保留。請檢查網路後重試。");
-    const card=modal._card,code=modal._code;
-    closeManager();
-    if(card)applyPhoto(card,result.posterUrl,result.coverUrl,code);
+    modal._saving=false;closeManager();
+    if(card&&card.isConnected)applyPhoto(card,result.posterUrl,result.coverUrl,code);
   }catch(errorValue){
     error.textContent=errorValue&&errorValue.message&&errorValue.message!=="internal"?"上傳失敗，舊照片仍保留。"+errorValue.message:"上傳失敗，舊照片仍保留。請檢查網路後再按「確認儲存」重試。";
-  }finally{if(manager&&!manager.hidden){save.disabled=!manager._file;save.textContent="確認儲存";}}
+  }finally{modal._saving=false;if(manager&&!manager.hidden&&manager._code===code){save.disabled=!manager._file;save.textContent="確認儲存";}}
 }
 function applyPhoto(card,url,coverUrl,code){
   const safe=safePosterUrl(url);if(!safe)return;
@@ -134,15 +136,16 @@ function openViewer(trigger){
   function paint(){viewerImage.style.transform="translate("+x+"px,"+y+"px) scale("+scale+")";}
   function reset(){scale=1;x=0;y=0;paint();}
   function close(){
-    if(!viewer)return;
-    viewer.remove();viewer=null;
+    if(!viewer||viewer!==overlay)return;
+    document.removeEventListener("keydown",keydown);
+    overlay.remove();viewer=null;
     document.body.style.position=oldStyle.position;document.body.style.top=oldStyle.top;document.body.style.width=oldStyle.width;document.body.style.overflow=oldStyle.overflow;
     window.scrollTo(0,savedY);trigger.focus();
   }
   overlay.querySelector("[data-viewer-close]").addEventListener("click",close);
   overlay.querySelector("[data-viewer-reset]").addEventListener("click",reset);
   overlay.addEventListener("click",event=>{if(event.target===overlay||event.target.classList.contains("lobby-poster-viewer-stage"))close();});
-  const keydown=event=>{if(event.key==="Escape"){document.removeEventListener("keydown",keydown);close();}};
+  const keydown=event=>{if(event.key==="Escape")close();};
   document.addEventListener("keydown",keydown);
   viewerImage.addEventListener("pointerdown",event=>{
     event.preventDefault();viewerImage.setPointerCapture(event.pointerId);pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
