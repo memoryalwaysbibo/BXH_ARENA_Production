@@ -134,7 +134,6 @@ jobs:
             echo ""
             echo "| Field | Value |"
             echo "| --- | --- |"
-            echo "| --- | --- |"
             printf '| Build | `%s` |\n' "$build"
             printf '| Version | `%s` |\n' "$version"
             printf '| Source commit | `%s` |\n' "$EXPECTED_COMMIT"
