@@ -5360,7 +5360,7 @@ function titleArtworkPath(name,rarity){
   };
   return map[key]||'';
 }
-const {titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay}=window.BXHTitleUtils;
+const {titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml}=window.BXHTitleUtils;
 function titleChipHtml(name,rarity,extra=''){
   const art=titleArtworkPath(name,rarity);
   const displayName=titleDisplayName(name||'');
