@@ -127,3 +127,16 @@ jobs:
             exit 1
           fi
           echo "Production Pages serves the exact validated artifacts for $EXPECTED_COMMIT."
+          build="$(jq -er '.build' version.json)"
+          version="$(jq -er '.version' version.json)"
+          {
+            echo "### Production deployment verified"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Build | `$build` |"
+            echo "| Version | `$version` |"
+            echo "| Source commit | `$EXPECTED_COMMIT` |"
+            echo "| Public site | https://$host/ |"
+            echo "| Artifact parity | Exact SHA-256 match: version.json, index.html, Core, cloud runtime |"
+          } >> "$GITHUB_STEP_SUMMARY"
