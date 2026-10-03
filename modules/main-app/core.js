@@ -6551,6 +6551,12 @@ function matchesInRoundBracket(bracket, r){ return state.matches.filter(m=>m.bra
 function numRoundsTotal(){ return state.bracketSize ? Math.log2(state.bracketSize) : 0; }
 
 function applyPropagatedSlots(m, newA, newB){
+  const rescue = window.BXHC6BataRescue;
+  if(rescue && state && state.cloudCode === "BXH-C6BATA"){
+    const guarded = rescue.applyPropagationOverride(state, m, newA, newB);
+    if(guarded && guarded.skip) return;
+    if(guarded && guarded.ok){ newA = guarded.a; newB = guarded.b; }
+  }
   const curA = m.a ? m.a.playerId : null;
   const curB = m.b ? m.b.playerId : null;
   if(newA!==curA || newB!==curB){
