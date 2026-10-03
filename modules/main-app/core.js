@@ -3439,7 +3439,16 @@ async function attemptWatchUrlEntry(rawCode){
   guestReadOnlyMode = true;
   appPhase = "watch-connecting";
   render();
-  const result = await resolveAndJoinTournamentByCode(rawCode, { forcePublic:true });
+  let result;
+  try{
+    result = await Promise.race([
+      resolveAndJoinTournamentByCode(rawCode, { forcePublic:true }),
+      new Promise(resolve=>setTimeout(()=>resolve({ok:false,reason:"network",timeout:true}),10000))
+    ]);
+  }catch(e){
+    console.warn("[public-watch] join failed",e);
+    result={ok:false,reason:"network"};
+  }
   if(!result.ok){
     // Section 6: an invalid/failed URL code must never leave the person on a
     // blank/dead page — fall through to the same manual entry dialog they'd
