@@ -2,8 +2,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const html = fs.readFileSync('index.html', 'utf8');
-const source = html.slice(html.indexOf('const BXH_INTERFACE_THEME_KEY='), html.indexOf('function accountMenuItemsHtml()'));
+const core = fs.readFileSync('modules/main-app/core.js', 'utf8');
+const start = core.indexOf('const BXH_INTERFACE_THEME_KEY=');
+const end = core.indexOf('function accountMenuItemsHtml()', start);
+const source = core.slice(start, end);
 assert.ok(source.startsWith('const BXH_INTERFACE_THEME_KEY='));
 
 function createContext(role, mode, saved = 'directive') {
