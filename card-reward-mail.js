@@ -6,6 +6,9 @@ function escHtml(value){
 }
 function rewardOf(message){return message&&message.type===OCT_CARD_REWARD_TYPE?message.reward:null;}
 function isClaimed(reward){return reward?.claimedAt!=null||reward?.status==='claimed';}
+function isGodsPack(reward){return reward?.kind==='gods_card_pack';}
+const CARD_NAMES=Object.freeze({double_extreme:'雙重極限',double_knockout:'雙重擊飛',double_burst:'雙重爆裂',double_spin:'雙重轉停',boost_extreme:'強化極限',boost_knockout:'強化擊飛',boost_burst:'強化爆裂',weaken_extreme:'極限弱化',weaken_knockout:'擊飛弱化',weaken_burst:'爆裂弱化',weaken_spin:'轉停弱化',seal:'附魔封印'});
+function cardName(id){return CARD_NAMES[String(id||'')]||'諸神戰場卡牌';}
 function cardArt(reward){
   const direct=String(reward?.artwork||reward?.imageUrl||'').trim();
   if(direct)return direct;
@@ -16,20 +19,31 @@ function cardArt(reward){
   return 'assets/enchantment-gods/'+encodeURIComponent(id)+'.webp';
 }
 window.BXHCardRewardUI={
-  card(message,busy){
-    const r=rewardOf(message);if(!r||r.kind!=='card')return '';
-    const claimed=isClaimed(r),art=cardArt(r);
-    return '<section class="card-reward-mail-card" data-card-reward-message="'+escHtml(message.id||'')+'">'
-      +'<div class="card-reward-mail-kicker">📎 獎勵附件（1）</div>'
-      +'<div class="card-reward-mail-art"><img src="'+escHtml(art)+'" alt="'+escHtml(claimed?(r.cardName||'活動卡牌'):'未揭曉卡牌')+'"></div>'
-      +'<div class="card-reward-mail-meta"><strong>'+(claimed?escHtml(r.cardName||'活動卡牌'):'完成賽事獎勵')+'</strong>'
-      +'<span>'+(claimed?'已領取並收入我的卡冊':'🎴 活動卡牌 × 1')+'</span></div>'
-      +'<button class="btn btn-primary" data-action="mailbox-card-reward" data-message-id="'+escHtml(message.id||'')+'" '+(busy||claimed?'disabled':'')+'>'
-      +(claimed?'已領取 ✓':'領取附件')+'</button></section>';
+  isVirtualAttachment(message,item){
+    const r=rewardOf(message);
+    return !!(isGodsPack(r)&&item?.kind==='gods_card_pack'&&item?.mime==='application/x-bxh-card-pack');
   },
-  async claim(messageId){
+  card(message,busy){
+    const r=rewardOf(message);if(!r||!['card','gods_card_pack'].includes(r.kind))return '';
+    const claimed=isClaimed(r),pack=isGodsPack(r),art=cardArt(r),name=cardName(r.cardId);
+    const bonus=claimed&&Array.isArray(r.bonus)&&r.bonus.length?'<span>第 12 場補齊缺卡：'+r.bonus.map(cardName).map(escHtml).join('、')+'</span>':'';
+    return '<section class="card-reward-mail-card" data-card-reward-message="'+escHtml(message.id||'')+'">'
+      +'<div class="card-reward-mail-kicker">🎴 賽事卡牌獎勵</div>'
+      +'<div class="card-reward-mail-art"><img src="'+escHtml(art)+'" alt="'+escHtml(claimed?name:'未揭曉卡牌')+'"></div>'
+      +'<div class="card-reward-mail-meta"><strong>'+(claimed?escHtml(name):(pack?'諸神戰場卡包 ×1':'完成賽事獎勵'))+'</strong>'
+      +'<span>'+(claimed?'已領取並收入我的卡冊':'🎴 點擊領取後揭曉卡牌')+'</span>'+bonus+'</div>'
+      +'<button class="btn btn-primary" data-action="mailbox-card-reward" data-message-id="'+escHtml(message.id||'')+'" '+(busy||claimed?'disabled':'')+'>'
+      +(claimed?'已領取 ✓':'領取卡牌')+'</button></section>';
+  },
+  async claim(messageId,message){
     if(!messageId)throw Error('card-reward-message-required');
-    const svc=window.engagementService;
+    const svc=window.engagementService,r=rewardOf(message);
+    if(isGodsPack(r)){
+      if(!svc||typeof svc.cardAlbum!=='function')throw Error('card-reward-service-unavailable');
+      const result=await svc.cardAlbum({action:'claimPack',messageId});
+      if(!result?.ok||!result.cardId)throw Error('card-pack-claim-failed');
+      return {ok:true,card:{id:result.cardId,setId:'gods',name:cardName(result.cardId)},bonus:Array.isArray(result.bonus)?result.bonus:[]};
+    }
     if(!svc||typeof svc.claimCardReward!=='function')throw Error('card-reward-service-unavailable');
     const result=await svc.claimCardReward({messageId,action:'claim'});
     if(!result?.ok||!result.card)throw Error('card-reward-claim-failed');
@@ -77,9 +91,10 @@ if(albumFeature&&typeof albumFeature.cardAlbumContext==='function'&&typeof album
     const context=mailboxFeature.mailboxContext();
     if(!firebaseUser?.uid||context.busy)return;
     const messageId=target.getAttribute('data-message-id')||'';
+    const message=(context.messages||[]).find(item=>item.id===messageId)||null;
     context.busy=true;context.error='';render();
     try{
-      await window.BXHCardRewardUI.claim(messageId);
+      await window.BXHCardRewardUI.claim(messageId,message);
       if(context!==mailboxFeature.mailboxContext())return;
       // Includes already-claimed replays. The server alone supplies quantities.
       // Do not keep the claim handler pending on the background album read.
