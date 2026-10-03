@@ -1,6 +1,6 @@
 {
-  "build": "20261003.1",
-  "version": "v14.3.16",
-  "updatedAt": "2026-10-03T15:12:51+09:00",
-  "releaseTrigger": "c6bata-room-rescue"
+  "build": "20261003.2",
+  "version": "v14.3.17",
+  "updatedAt": "2026-10-03T15:50:00+08:00",
+  "releaseTrigger": "double-elimination-source-graph-v1"
 }
