@@ -7,6 +7,7 @@ const ui=require('../event-poster-ui.js');
 const root=path.join(__dirname,'..');
 const core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'modules/main-css/lobby-community.css'),'utf8');
+const uiSource=fs.readFileSync(path.join(root,'event-poster-ui.js'),'utf8');
 test('poster links accept only versioned BXH Storage poster objects',()=>{
   const url='https://firebasestorage.googleapis.com/v0/b/bxh-arena.firebasestorage.app/o/room-posters%2FBXH-ABC123%2F12345678-1234-1234-1234-123456789abc.jpg?alt=media&token=12345678-1234-1234-1234-123456789abc';
   assert.equal(ui.safePosterUrl(url),url);
@@ -31,4 +32,10 @@ test('expanded event detail order is intro, copy, photo, roster, then registrati
 test('poster viewer uses contain sizing and an empty slot collapses',()=>{
   assert.ok(css.includes('object-fit:contain'));
   assert.ok(css.includes('.lobby-poster-slot:empty{display:none}'));
+});
+test('upload target remains fixed and viewer listeners are released on every close',()=>{
+  assert.ok(uiSource.includes('const code=modal._code,card=modal._card;'));
+  assert.ok(uiSource.includes('if(!manager||manager._saving)return;'));
+  assert.ok(uiSource.includes('if(!viewer||viewer!==overlay)return;'));
+  assert.ok(uiSource.includes('document.removeEventListener("keydown",keydown);'));
 });
