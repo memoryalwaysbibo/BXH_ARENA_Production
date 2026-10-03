@@ -2,8 +2,9 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
-const start=html.indexOf('const BXH_INTERFACE_THEME_KEY=');
-const end=html.indexOf('function themePickerHtml()',start);
+const core=fs.readFileSync('modules/main-app/core.js','utf8');
+const start=core.indexOf('const BXH_INTERFACE_THEME_KEY=');
+const end=core.indexOf('function themePickerHtml()',start);
 assert(start>0 && end>start);
 const stored=new Map();
 const root={value:'gold',getAttribute(){return this.value;},setAttribute(key,value){this.value=value;}};
@@ -15,7 +16,7 @@ const context={
   userProfile:null,firebaseUser:null
 };
 vm.createContext(context);
-vm.runInContext(html.slice(start,end),context);
+vm.runInContext(core.slice(start,end),context);
 assert.equal(root.value,'gold');
 const earlyThemeScript=html.match(/<script>\s*(\(function\(\)\{[\s\S]*?data-bxh-theme[\s\S]*?\}\)\(\);)\s*<\/script>/)?.[1];
 assert(earlyThemeScript,'The first paint theme script is present');
