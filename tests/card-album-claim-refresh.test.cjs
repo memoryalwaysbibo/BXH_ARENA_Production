@@ -253,3 +253,136 @@ test('a pre-install inline request cannot overwrite the bridge cache', async () 
   assert.equal(t.state().data.sets.gods.seal, 2);
   assert.equal(t.state().loading, false);
 });
+
+// The original harness uses namespace handlers after initializing context. Real
+// first-open rendering instead uses core's pre-bridge const bindings. Keep the
+// shipped feature -> core binding -> reward bridge load order for this contract.
+function setupProductionAlbumEntry({ installBridge = true } = {}) {
+  const calls = [], listeners = {}, scheduled = [];
+  let get = async () => album(2), list = async () => trades(), lastHtml = '';
+  const sandbox = {
+    firebaseUser: { uid: 'entry-player' }, engagementSessionEpoch: 1,
+    currentAuthUid: () => sandbox.firebaseUser?.uid || '', playerActiveTab: 'cards',
+    setTimeout: fn => { scheduled.push(fn); }, esc: value => String(value ?? ''),
+    showToast() {},
+    document: {
+      addEventListener: (name, fn) => { (listeners[name] ||= []).push(fn); },
+      getElementById: () => null,
+    },
+    window: { engagementService: {
+      cardAlbum: payload => { calls.push(payload.action); return payload.action === 'get' ? get() : list(); },
+    } },
+  };
+  vm.createContext(sandbox);
+  const run = expression => vm.runInContext(expression, sandbox);
+  sandbox.render = sandbox.renderPreservingScroll = () => { lastHtml = run('renderCardAlbumPage()'); };
+  vm.runInContext(mailbox, sandbox, { filename: 'modules/main-app/mailbox.js' });
+  vm.runInContext(albumFeature, sandbox, { filename: 'modules/main-app/card-album.js' });
+  vm.runInContext(sectionFrom(core, 'const CARD_ALBUM_CARDS=', 'function renderPlayerCenterLoggedIn()'), sandbox, { filename: 'production-core-album-bindings.js' });
+  const install = () => vm.runInContext(rewardSource, sandbox, { filename: 'card-reward-mail.js' });
+  if (installBridge) install();
+  return {
+    calls, scheduled, run, sandbox, install,
+    view: () => run('renderCardAlbumPage()'), html: () => lastHtml,
+    state: () => run('cardAlbumState'), load: force => run(`loadCardAlbum(${force === true})`),
+    get: fn => { get = fn; }, list: fn => { list = fn; },
+    async click(action, data = {}) {
+      const target = { dataset: { action, ...data }, classList: { contains: () => false } };
+      target.closest = () => target;
+      for (const fn of listeners.click || []) await fn({ target });
+    },
+    change(value) {
+      for (const fn of listeners.change || []) fn({ target: { id: 'card-album-set-filter', value } });
+    },
+  };
+}
+
+test('production entry: first render after reward bridge reset opens without preloading context', () => {
+  const t = setupProductionAlbumEntry();
+  assert.equal(t.state(), null, 'fixture must start at the real bridge reset');
+  assert.doesNotThrow(() => t.view());
+  assert.match(t.view(), /我的卡冊/);
+  assert.equal(t.state().key, 'entry-player:1');
+  assert.deepEqual(t.calls, [], 'opening the shell must not require a completed server request');
+});
+
+test('production entry: scheduled first load uses the current session-aware handler', async () => {
+  const t = setupProductionAlbumEntry(); t.view();
+  await t.scheduled.shift()();
+  assert.deepEqual(t.calls, ['get', 'list']);
+  assert.equal(t.state().revision, 1);
+  assert.equal(t.state().loading, false);
+  assert.match(t.html(), /諸神戰場 附魔封印，持有 2 張/);
+  assert.strictEqual(t.run('cardAlbumContext()'), t.sandbox.window.BXHCardAlbumFeature.cardAlbumContext());
+});
+
+test('production entry: refresh button uses authoritative quantities through its original closure', async () => {
+  const t = setupProductionAlbumEntry(); await t.load();
+  t.get(async () => album(4));
+  await t.click('card-album-refresh');
+  assert.equal(t.state().data.sets.gods.seal, 4);
+  assert.equal(t.state().revision, 2);
+  assert.deepEqual(t.calls, ['get', 'list', 'get', 'list']);
+  assert.match(t.html(), /持有 4 張/);
+});
+
+test('production entry: set filter and owned preview work without changing card counts', async () => {
+  const t = setupProductionAlbumEntry(); await t.load();
+  const before = JSON.stringify(t.state().data.sets);
+  t.change('gods');
+  assert.equal(t.run('cardAlbumSetFilter'), 'gods');
+  assert.equal((t.html().match(/class="panel card-album-set"/g) || []).length, 1);
+  await t.click('card-album-preview', { set: 'gods', card: 'seal' });
+  assert.match(t.html(), /role="dialog"/);
+  await t.click('card-album-close');
+  assert.doesNotMatch(t.html(), /role="dialog"/);
+  await t.click('card-album-preview', { set: 'gods', card: 'double_extreme' });
+  assert.doesNotMatch(t.html(), /role="dialog"/, 'unowned cards stay locked');
+  assert.equal(JSON.stringify(t.state().data.sets), before);
+});
+
+test('production entry: stale core load binding still rejects out-of-order forced refreshes', async () => {
+  const t = setupProductionAlbumEntry(), old = deferred(), next = deferred();
+  t.get(() => old.promise); const first = t.load(true);
+  t.get(() => next.promise); const second = t.load(true);
+  next.resolve(album(5)); await second;
+  old.resolve(album(1)); await first;
+  assert.equal(t.state().data.sets.gods.seal, 5);
+  assert.equal(t.state().loading, false);
+  assert.equal(t.state().revision, 2);
+});
+
+test('production entry: same-UID new session cannot retain old quantities or preview', async () => {
+  const t = setupProductionAlbumEntry(); await t.load();
+  await t.click('card-album-preview', { set: 'gods', card: 'seal' });
+  t.sandbox.engagementSessionEpoch++;
+  t.view();
+  assert.equal(t.state().key, 'entry-player:2');
+  assert.equal(t.state().data, null);
+  assert.equal(t.run('cardAlbumPreview'), null);
+  t.sandbox.firebaseUser = null; t.sandbox.engagementSessionEpoch++;
+  const before = t.calls.length; t.view(); await t.load();
+  assert.equal(t.state().uid, '');
+  assert.equal(t.calls.length, before);
+});
+
+test('production entry: failed or malformed reads release loading and an explicit retry recovers', async () => {
+  const t = setupProductionAlbumEntry();
+  t.get(async () => ({ ok: false, sets: { gods: { seal: 999 } } }));
+  await t.load();
+  assert.equal(t.state().data, null);
+  assert.equal(t.state().loading, false);
+  assert.match(t.html(), /卡冊讀取失敗/);
+  t.get(async () => album(2)); await t.click('card-album-refresh');
+  assert.equal(t.state().error, '');
+  assert.equal(t.state().data.sets.gods.seal, 2);
+});
+
+test('production entry: base module also tolerates a reset when the optional bridge is absent', async () => {
+  const t = setupProductionAlbumEntry({ installBridge: false });
+  t.run('cardAlbumState=null');
+  assert.doesNotThrow(() => t.view());
+  await t.load();
+  assert.equal(t.state().data.sets.gods.seal, 2);
+  assert.equal(t.state().loading, false);
+});
