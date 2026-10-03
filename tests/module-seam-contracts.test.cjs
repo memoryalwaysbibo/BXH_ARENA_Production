@@ -81,6 +81,7 @@ test('module exports and script order satisfy Core bindings', () => {
   const coreIndex = scriptSources.findIndex(src => src.startsWith('modules/main-app/core.js'));
   assert(coreIndex >= 0, 'Core script is present');
   for (const file of [
+    'modules/main-app/account-utils.js',
     'modules/main-app/title-utils.js',
     'modules/main-app/hunter-utils.js',
     'modules/main-app/match-utils.js',
@@ -92,6 +93,7 @@ test('module exports and script order satisfy Core bindings', () => {
 
   const context = moduleContext();
   for (const file of [
+    'modules/main-app/account-utils.js',
     'modules/main-app/title-utils.js',
     'modules/main-app/hunter-utils.js',
     'modules/main-app/match-utils.js',
@@ -99,6 +101,7 @@ test('module exports and script order satisfy Core bindings', () => {
   ]) vm.runInContext(read(file), context, { filename: file });
 
   for (const [namespace, names] of [
+    ['BXHAccountUtils', ['legacyGameIdFromProfile', 'effectiveGameId', 'effectivePlayerNameForMode']],
     ['BXHTitleUtils', ['titleClassificationHtml']],
     ['BXHHunterUtils', ['hunterLicenseGrade', 'hunterSeniorityBonus']],
     ['BXHMatchUtils', ['nextPow2', 'seedOrder', 'sameStringSet', 'matchHasDecisionData', 'correctionMatchHasActualPlay', 'correctionParticipantSignature']],
@@ -109,6 +112,28 @@ test('module exports and script order satisfy Core bindings', () => {
   assert(titleBinding, 'Core title utility binding exists');
   vm.runInContext(titleBinding, context);
   assert.equal(vm.runInContext('typeof titleClassificationHtml', context), 'function', 'Core binds the exported title classification helper');
+});
+
+test('account display helpers preserve legacy player-name fallbacks through Core bindings', () => {
+  const context = moduleContext();
+  vm.runInContext(read('modules/main-app/account-utils.js'), context, { filename: 'account-utils.js' });
+  const start = core.indexOf('function legacyGameIdFromProfile(');
+  const end = core.indexOf('const TAIWAN_CITY_DISTRICTS=', start);
+  assert(start >= 0 && end > start, 'Core account helper compatibility bindings exist');
+  vm.runInContext(core.slice(start, end), context, { filename: 'Core account bindings' });
+
+  const profiles = [
+    [{ gameId: '  BXH-PLAYER  ', nickname: 'Fallback', realName: 'Real' }, 'gameId', 'BXH-PLAYER'],
+    [{ nickname: '  Nickname  ', realName: 'Real' }, 'gameId', 'Nickname'],
+    [{ displayName: 'Player Alias', realName: 'Real Name' }, 'gameId', 'Player Alias'],
+    [{ displayName: 'Same Name', realName: 'Same Name' }, 'gameId', 'Same Name'],
+    [{ gameId: 'BXH-PLAYER', realName: 'Real Name' }, 'realName', 'Real Name'],
+  ];
+  for (const [profile, mode, expected] of profiles) {
+    assert.equal(context.effectivePlayerNameForMode(profile, mode), expected);
+  }
+  assert.equal(context.legacyGameIdFromProfile({ displayName: 'Same Name', realName: 'Same Name' }), '');
+  assert.equal(context.effectiveGameId({ nickname: ' Nick ' }), 'Nick');
 });
 
 test('feature modules read the shared Core room state', () => {

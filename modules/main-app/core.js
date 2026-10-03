@@ -15629,22 +15629,9 @@ function renderPlayerStatsTab(p){
     '<div class="player-stats-subtabs hunter-profile-tabs">'+tabs.map(([key,label])=>'<button class="player-stats-subtab '+(playerStatsSubTab===key?'active':'')+'" data-action="player-stats-subtab" data-tab="'+key+'">'+label+'</button>').join('')+'</div>'+body+'</section>';
 }
 
-function legacyGameIdFromProfile(p){
-  if(!p) return "";
-  if(typeof p.gameId==="string" && p.gameId.trim()) return p.gameId.trim();
-  if(typeof p.nickname==="string" && p.nickname.trim()) return p.nickname.trim();
-  const dn=(p.displayName||"").trim();
-  const rn=(p.realName||"").trim();
-  return dn && dn!==rn ? dn : "";
-}
-function effectiveGameId(p){
-  return legacyGameIdFromProfile(p);
-}
-function effectivePlayerNameForMode(p,mode){
-  const real=(p&&p.realName||"").trim();
-  const game=effectiveGameId(p);
-  return mode==="gameId" ? (game||real) : real;
-}
+function legacyGameIdFromProfile(p){ return window.BXHAccountUtils.legacyGameIdFromProfile(p); }
+function effectiveGameId(p){ return window.BXHAccountUtils.effectiveGameId(p); }
+function effectivePlayerNameForMode(p,mode){ return window.BXHAccountUtils.effectivePlayerNameForMode(p,mode); }
 const TAIWAN_CITY_DISTRICTS={
   "台北市":["中正區","大同區","中山區","松山區","大安區","萬華區","信義區","士林區","北投區","內湖區","南港區","文山區"],
   "新北市":["萬里區","金山區","板橋區","汐止區","深坑區","石碇區","瑞芳區","平溪區","雙溪區","貢寮區","新店區","坪林區","烏來區","永和區","中和區","土城區","三峽區","樹林區","鶯歌區","三重區","新莊區","泰山區","林口區","蘆洲區","五股區","八里區","淡水區","三芝區","石門區"],
