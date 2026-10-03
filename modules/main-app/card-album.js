@@ -2,11 +2,17 @@
 // Core Phase 2C — Card Album feature module.
 // Album context, loading, rendering and trade workflow stay together.
 function cardAlbumContext(){
+ // Core bindings and render/event closures may predate the reward bridge.
+ // Resolve its current session-safe handler instead of using a stale snapshot.
+ const current=window.BXHCardAlbumFeature?.cardAlbumContext;
+ if(typeof current==="function"&&current!==cardAlbumContext)return current();
  const uid=firebaseUser?.uid||"";
- if(cardAlbumState.uid!==uid)cardAlbumState={uid,data:null,loading:false,error:"",trades:null,targets:null,query:"",targetUid:"",busy:false};
+ if(!cardAlbumState||cardAlbumState.uid!==uid)cardAlbumState={uid,data:null,loading:false,error:"",trades:null,targets:null,query:"",targetUid:"",busy:false};
  return cardAlbumState;
 }
 async function loadCardAlbum(refresh=false){
+ const current=window.BXHCardAlbumFeature?.loadCardAlbum;
+ if(typeof current==="function"&&current!==loadCardAlbum)return current(refresh);
  const state=cardAlbumContext(),uid=state.uid;
  if(!uid||state.loading||(!refresh&&state.data))return;
  state.loading=true;state.error="";renderPreservingScroll();
