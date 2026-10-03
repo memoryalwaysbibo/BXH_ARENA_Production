@@ -1,0 +1,62 @@
+name: Verify live projected-pack fix without account access
+on:
+  push:
+    branches: [hotfix/card-pack-projection-20261003]
+    paths: [.github/workflows/card-pack-public-probe.yml]
+permissions:
+  contents: read
+jobs:
+  verify_live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 5cf477eb68c8f5a9c775d870217721ba2b0c39cc
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify normal public URL and exact published runtime bytes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import urllib.request,urllib.parse,json,re,time,hashlib
+          root='https://arena.bxh.com.tw/'
+          sha256=lambda data:hashlib.sha256(data).hexdigest()
+          def read(url):
+              req=urllib.request.Request(url,headers={'Cache-Control':'no-cache','User-Agent':'BXH-ReadOnly-Deployment-Verification'})
+              with urllib.request.urlopen(req,timeout=25) as r:
+                  assert r.status==200,(url,r.status)
+                  return r.read()
+          assets=['card-reward-mail.js','modules/main-app/mailbox.js','modules/main-app/card-album.js','modules/main-app/core.js']
+          expected={name:sha256(Path(name).read_bytes()) for name in ['index.html','version.json']+assets}
+          for attempt in range(16):
+              body=read(root)
+              fresh=read(root+'?bxh_probe='+str(int(time.time())))
+              version=read(root+'version.json?bxh_probe='+str(int(time.time())))
+              if sha256(body)==expected['index.html'] and sha256(fresh)==expected['index.html'] and sha256(version)==expected['version.json']:
+                  break
+              print('WAITING_FOR_VALIDATED_DEPLOYMENT',attempt+1,flush=True)
+              time.sleep(12)
+          else:
+              raise SystemExit('Public endpoint did not expose the exact validated build within the bounded verification window')
+          assert json.loads(version)['build']=='20261003.3'
+          print('PUBLIC_BUILD '+json.dumps(json.loads(version),ensure_ascii=False),flush=True)
+          print('NORMAL_ROOT_AND_FRESH_ROOT_MATCH_VALIDATED_COMMIT',flush=True)
+          html=body.decode('utf-8')
+          for name in assets:
+              matches=[src for src in re.findall(r'<script[^>]+src="([^"]+)"',html) if src.split('?')[0]==name]
+              assert len(matches)==1,(name,matches)
+              data=read(urllib.parse.urljoin(root,matches[0]))
+              actual=sha256(data)
+              assert actual==expected[name],('published-asset-mismatch',name,actual,expected[name])
+              Path(name).write_bytes(data)
+              print('PUBLIC_ASSET '+json.dumps({'src':matches[0],'bytes':len(data),'sha256':actual,'matchesValidatedCommit':True}),flush=True)
+          print('PASS exact public runtime verification; no account or Firebase requests made',flush=True)
+          PY
+      - name: Exercise actual published bytes with isolated projected mailbox replies
+        run: |
+          node --check card-reward-mail.js
+          node --check modules/main-app/mailbox.js
+          node --test tests/card-album-claim-refresh.test.cjs
