@@ -76,6 +76,23 @@ function accountMatchesActivity(user,filter,now=Date.now()){
   return true;
 }
 
-Object.assign(window.BXHAccountUtils||(window.BXHAccountUtils={}),{passwordStrengthLabel,accountActivityStatus,accountActivitySummary,accountTimestampValue,formatAccountTimestamp,accountPrimaryName,accountGameId,accountRoleMatches,accountRoleCount,accountMatchesActivity});
+function legacyGameIdFromProfile(p){
+  if(!p) return "";
+  if(typeof p.gameId==="string" && p.gameId.trim()) return p.gameId.trim();
+  if(typeof p.nickname==="string" && p.nickname.trim()) return p.nickname.trim();
+  const dn=(p.displayName||"").trim();
+  const rn=(p.realName||"").trim();
+  return dn && dn!==rn ? dn : "";
+}
+function effectiveGameId(p){
+  return legacyGameIdFromProfile(p);
+}
+function effectivePlayerNameForMode(p,mode){
+  const real=(p&&p.realName||"").trim();
+  const game=effectiveGameId(p);
+  return mode==="gameId" ? (game||real) : real;
+}
+
+Object.assign(window.BXHAccountUtils||(window.BXHAccountUtils={}),{passwordStrengthLabel,accountActivityStatus,accountActivitySummary,accountTimestampValue,formatAccountTimestamp,accountPrimaryName,accountGameId,accountRoleMatches,accountRoleCount,accountMatchesActivity,legacyGameIdFromProfile,effectiveGameId,effectivePlayerNameForMode});
 
 })();
