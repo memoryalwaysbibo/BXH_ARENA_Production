@@ -81,6 +81,7 @@ test('module exports and script order satisfy Core bindings', () => {
   const coreIndex = scriptSources.findIndex(src => src.startsWith('modules/main-app/core.js'));
   assert(coreIndex >= 0, 'Core script is present');
   for (const file of [
+    'modules/main-app/input-utils.js',
     'modules/main-app/account-utils.js',
     'modules/main-app/title-utils.js',
     'modules/main-app/hunter-utils.js',
@@ -93,6 +94,7 @@ test('module exports and script order satisfy Core bindings', () => {
 
   const context = moduleContext();
   for (const file of [
+    'modules/main-app/input-utils.js',
     'modules/main-app/account-utils.js',
     'modules/main-app/title-utils.js',
     'modules/main-app/hunter-utils.js',
@@ -101,6 +103,7 @@ test('module exports and script order satisfy Core bindings', () => {
   ]) vm.runInContext(read(file), context, { filename: file });
 
   for (const [namespace, names] of [
+    ['BXHInputUtils', ['smartCallNorm']],
     ['BXHAccountUtils', ['legacyGameIdFromProfile', 'effectiveGameId', 'effectivePlayerNameForMode']],
     ['BXHTitleUtils', ['titleClassificationHtml']],
     ['BXHHunterUtils', ['hunterLicenseGrade', 'hunterSeniorityBonus']],
@@ -112,6 +115,24 @@ test('module exports and script order satisfy Core bindings', () => {
   assert(titleBinding, 'Core title utility binding exists');
   vm.runInContext(titleBinding, context);
   assert.equal(vm.runInContext('typeof titleClassificationHtml', context), 'function', 'Core binds the exported title classification helper');
+});
+
+test('Smart Call identity normalization is exported and delegated through Core', () => {
+  const context = moduleContext();
+  vm.runInContext(read('modules/main-app/input-utils.js'), context, { filename: 'input-utils.js' });
+  const start = core.indexOf('function smartCallNorm(');
+  const end = core.indexOf('\nfunction smartCallFindPlayerId(', start);
+  assert(start >= 0 && end > start, 'Core Smart Call normalization binding exists');
+  const binding = core.slice(start, end);
+  assert.match(binding, /window\.BXHInputUtils\.smartCallNorm/);
+  vm.runInContext(binding, context, { filename: 'Core Smart Call binding' });
+
+  for (const [value, expected] of [
+    ['  Player Name  ', 'playername'],
+    ['ＢＸＨ Test ID', 'ｂｘｈtestid'],
+    ['Mixed\n Case\tID', 'mixedcaseid'],
+    [null, ''],
+  ]) assert.equal(context.smartCallNorm(value), expected);
 });
 
 test('account display helpers preserve legacy player-name fallbacks through Core bindings', () => {
