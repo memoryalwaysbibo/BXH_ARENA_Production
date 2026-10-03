@@ -115,6 +115,12 @@ function fastLobbyHash(value){
 }
 
 function publicationValidationErrors(m){const e=[];if(!m.name||!m.name.trim()||m.name==="未命名賽事")e.push("賽事名稱未填寫");if(!m.date)e.push("活動日期未填寫");if(!m.location||!m.location.trim())e.push("活動地點未填寫");if(m.registrationEnabled){if(!m.registrationOpenAt)e.push("報名開放時間未設定");if(!m.registrationCloseAt)e.push("報名截止時間未設定");if(m.registrationOpenAt&&m.registrationCloseAt&&m.registrationCloseAt<=m.registrationOpenAt)e.push("報名截止時間必須晚於開放時間");if(!m.registrationCapacity||m.registrationCapacity<1)e.push("正取人數上限未設定");}return e;}
-Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,publicationValidationErrors});
+function lobbyNewestFirst(a,b){
+  const aKnown=Number.isFinite(a&&a.startMs), bKnown=Number.isFinite(b&&b.startMs);
+  if(aKnown!==bKnown) return aKnown ? -1 : 1;
+  if(aKnown && bKnown && a.startMs!==b.startMs) return b.startMs-a.startMs;
+  return String(a&&a.code||"").localeCompare(String(b&&b.code||""));
+}
+Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,publicationValidationErrors,lobbyNewestFirst});
 
 })();

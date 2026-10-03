@@ -13625,10 +13625,7 @@ function lobbySummary(raw){
   };
 }
 function lobbyNewestFirst(a,b){
-  const aKnown=Number.isFinite(a&&a.startMs), bKnown=Number.isFinite(b&&b.startMs);
-  if(aKnown!==bKnown) return aKnown ? -1 : 1;
-  if(aKnown && bKnown && a.startMs!==b.startMs) return b.startMs-a.startMs;
-  return String(a&&a.code||"").localeCompare(String(b&&b.code||""));
+  return window.BXHDomainUtils.lobbyNewestFirst(a,b);
 }
 function lobbyLists(rawList){
   const unique = new Map();

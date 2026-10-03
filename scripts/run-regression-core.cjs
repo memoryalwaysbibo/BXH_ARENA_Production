@@ -6,6 +6,7 @@ const suites = {
   critical: [
     { name: 'claimed-card album refresh and session isolation', args: ['--test', 'tests/card-album-claim-refresh.test.cjs'] },
     { name: 'Core module exports, shared state, and stale callback guards', args: ['--test', 'tests/module-seam-contracts.test.cjs'] },
+    { name: 'public lobby ordering utility and Core seam', args: ['--test', 'tests/lobby-ordering.test.cjs'] },
     { name: 'idle court dispatch', args: ['tests/idle-court-dispatch.test.cjs'] },
     { name: 'event staff permission boundary', args: ['--test', 'tests/event-staff-permission.test.cjs'] },
     { name: 'makeup check-in contract', args: ['tests/checkin-makeup-v2-ui.test.cjs'] },
