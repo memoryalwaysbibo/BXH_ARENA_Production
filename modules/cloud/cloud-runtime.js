@@ -2766,7 +2766,7 @@ if(testerSession){
           if(plan.fingerprint!==expectedFingerprint) throw new Error("dry-run-stale");
           if(!plan.operations.length || plan.operations.some(op=>!op.stopForManualScore || !op.otherPlayerId)) throw new Error("manual-match-stop-required");
           const matches=Array.isArray(remoteState.matches)?remoteState.matches:[];
-          const protectedBefore=JSON.stringify(matches.map(m=>({id:m.id,completed:m.completed,scoreA:m.scoreA,scoreB:m.scoreB,winnerId:m.winnerId,loserId:m.loserId})));
+          const protectedBefore=JSON.stringify(matches.map(m=>({id:m.id,completed:m.completed,scoreA:m.scoreA,scoreB:m.scoreB,winnerId:m.winnerId,loserId:m.loserId,log:m.log,faultActions:m.faultActions,hunterData:m.hunterData,confirmedBy:m.confirmedBy,confirmedAt:m.confirmedAt,resultMethod:m.resultMethod})));
           for(const op of plan.operations){
             const source=matches.find(m=>m&&m.id===op.sourceMatchId);
             const target=matches.find(m=>m&&m.id===op.targetMatchId);
@@ -2774,10 +2774,10 @@ if(testerSession){
             if(target[op.targetSlot]) throw new Error("target-slot-not-empty:"+target.id+":"+op.targetSlot);
             const other=op.targetSlot==="a"?target.b:target.a;
             if(!other || other.type!=="player" || String(other.playerId)!==String(op.otherPlayerId)) throw new Error("target-opponent-changed:"+target.id);
-            if(target.winnerId||target.loserId||Number(target.scoreA||0)!==0||Number(target.scoreB||0)!==0||target.completed===true) throw new Error("target-has-result-data:"+target.id);
+            if(target.winnerId||target.loserId||Number(target.scoreA||0)!==0||Number(target.scoreB||0)!==0||target.completed===true||target.confirmedAt||target.confirmedBy||target.resultMethod||target.hunterData||(Array.isArray(target.log)&&target.log.length)||(Array.isArray(target.faultActions)&&target.faultActions.length)) throw new Error("target-has-result-data:"+target.id);
             target[op.targetSlot]={type:"player",playerId:op.playerId};
           }
-          if(JSON.stringify(matches.map(m=>({id:m.id,completed:m.completed,scoreA:m.scoreA,scoreB:m.scoreB,winnerId:m.winnerId,loserId:m.loserId})))!==protectedBefore) throw new Error("protected-result-data-changed");
+          if(JSON.stringify(matches.map(m=>({id:m.id,completed:m.completed,scoreA:m.scoreA,scoreB:m.scoreB,winnerId:m.winnerId,loserId:m.loserId,log:m.log,faultActions:m.faultActions,hunterData:m.hunterData,confirmedBy:m.confirmedBy,confirmedAt:m.confirmedAt,resultMethod:m.resultMethod})))!==protectedBefore) throw new Error("protected-result-data-changed");
           const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1,Number(remoteState.updatedAt||0)+1);
           remoteState.updatedAt=now;
           remoteState.c6bataRescueV1={
