@@ -16,11 +16,11 @@
   function dead(reason,ids=[]){return {status:"dead",reason,deadSourceMatchIds:[...new Set(ids.filter(Boolean))]};}
   function player(pid,reason){return {status:"player",playerId:pid,reason,deadSourceMatchIds:[]};}
   function invalid(reason){return {status:"invalid",reason,deadSourceMatchIds:[]};}
-  function hasDecisionData(m){return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)!==0||Number(m.scoreB||0)!==0||m.confirmedAt||m.resultMethod||(Array.isArray(m.log)&&m.log.length)||(Array.isArray(m.faultActions)&&m.faultActions.length)));}
+  function hasDecisionData(m){return !!(m&&(m.completed||m.winnerId||m.loserId||Number(m.scoreA||0)!==0||Number(m.scoreB||0)!==0||m.confirmedAt||m.confirmedBy||m.resultMethod||m.hunterData||(Array.isArray(m.log)&&m.log.length)||(Array.isArray(m.faultActions)&&m.faultActions.length)));}
   function sourceFingerprint(st){
     return JSON.stringify({
       id:st&&st.id,cloudCode:st&&st.cloudCode,formatType:st&&st.meta&&st.meta.formatType,
-      matches:(st&&Array.isArray(st.matches)?st.matches:[]).map(m=>({id:m.id,bracket:m.bracket,round:m.round,indexInRound:m.indexInRound,a:m.a,b:m.b,lbSrc:m.lbSrc,gfSrc:m.gfSrc,isBye:m.isBye,completed:m.completed,status:m.status,scoreA:m.scoreA,scoreB:m.scoreB,log:m.log,faultActions:m.faultActions,winnerId:m.winnerId,loserId:m.loserId,confirmedAt:m.confirmedAt,resultMethod:m.resultMethod}))
+      matches:(st&&Array.isArray(st.matches)?st.matches:[]).map(m=>({id:m.id,bracket:m.bracket,round:m.round,indexInRound:m.indexInRound,a:m.a,b:m.b,lbSrc:m.lbSrc,gfSrc:m.gfSrc,isBye:m.isBye,completed:m.completed,status:m.status,scoreA:m.scoreA,scoreB:m.scoreB,log:m.log,faultActions:m.faultActions,hunterData:m.hunterData,winnerId:m.winnerId,loserId:m.loserId,confirmedBy:m.confirmedBy,confirmedAt:m.confirmedAt,resultMethod:m.resultMethod}))
     });
   }
   function computePlan(st){
@@ -126,7 +126,7 @@
   }
   function escapeText(v){return String(v||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
   function displayPlan(plan){
-    const lines=["房間：BXH-C6BATA｜21 位選手｜只檢查敗部 source graph","", "永久空缺（兩側來源均不會再產生敗者）："];
+      const lines=[`房間：BXH-C6BATA｜${plan.playerCount} 位選手｜只檢查敗部 source graph`, "", "永久空缺（兩側來源均不會再產生敗者）："];
     for(const d of plan.deadMatches)lines.push(`• 敗部第 ${d.round} 輪第 ${d.index} 場：空缺繼續傳遞，不判勝、不記比分`);
     lines.push("","準備旁路：");
     for(const o of plan.operations){
