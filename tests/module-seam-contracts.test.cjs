@@ -81,6 +81,7 @@ test('module exports and script order satisfy Core bindings', () => {
   const coreIndex = scriptSources.findIndex(src => src.startsWith('modules/main-app/core.js'));
   assert(coreIndex >= 0, 'Core script is present');
   for (const file of [
+    'modules/main-app/format-utils.js',
     'modules/main-app/input-utils.js',
     'modules/main-app/account-utils.js',
     'modules/main-app/title-utils.js',
@@ -94,6 +95,7 @@ test('module exports and script order satisfy Core bindings', () => {
 
   const context = moduleContext();
   for (const file of [
+    'modules/main-app/format-utils.js',
     'modules/main-app/input-utils.js',
     'modules/main-app/account-utils.js',
     'modules/main-app/title-utils.js',
@@ -103,6 +105,7 @@ test('module exports and script order satisfy Core bindings', () => {
   ]) vm.runInContext(read(file), context, { filename: file });
 
   for (const [namespace, names] of [
+    ['BXHFormatUtils', ['matchSequenceLabel']],
     ['BXHInputUtils', ['smartCallNorm']],
     ['BXHAccountUtils', ['legacyGameIdFromProfile', 'effectiveGameId', 'effectivePlayerNameForMode']],
     ['BXHTitleUtils', ['titleClassificationHtml']],
@@ -115,6 +118,24 @@ test('module exports and script order satisfy Core bindings', () => {
   assert(titleBinding, 'Core title utility binding exists');
   vm.runInContext(titleBinding, context);
   assert.equal(vm.runInContext('typeof titleClassificationHtml', context), 'function', 'Core binds the exported title classification helper');
+});
+
+test('match sequence labels are exported and delegated without changing match numbering', () => {
+  const context = moduleContext();
+  vm.runInContext(read('modules/main-app/format-utils.js'), context, { filename: 'format-utils.js' });
+  const start = core.indexOf('function displayMatchLabel(');
+  const end = core.indexOf('\nfunction matchesInRound(', start);
+  assert(start >= 0 && end > start, 'Core match label binding exists');
+  const binding = core.slice(start, end);
+  assert.match(binding, /window\.BXHFormatUtils\.matchSequenceLabel\(displayMatchNumber\(m\)\)/);
+
+  for (const [value, expected] of [
+    [12, '第12場'],
+    [0, '第0場'],
+    ['A', '第A場'],
+    [null, ''],
+    [undefined, ''],
+  ]) assert.equal(context.window.BXHFormatUtils.matchSequenceLabel(value), expected);
 });
 
 test('Smart Call identity normalization is exported and delegated through Core', () => {
