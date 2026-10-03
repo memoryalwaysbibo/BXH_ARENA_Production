@@ -6793,6 +6793,12 @@ function autoAdvanceReadyMatches(){
   });
   if(blockedFinals.length) clearCourtAssignmentRefs(state,blockedFinals.map(m=>m.id));
 
+  const blockedDouble=(state.meta&&state.meta.formatType==="double"&&window.BXHDoubleElim)
+    ? state.matches.filter(m=>!m.completed&&!m.isBye&&m.status==="ready"&&!matchHasDecisionData(m)&&!window.BXHDoubleElim.isPhaseOpen(state.matches,m))
+    : [];
+  blockedDouble.forEach(m=>{m.status="pending";m.startedAt=null;m.updatedAt=Date.now();});
+  if(blockedDouble.length) clearCourtAssignmentRefs(state,blockedDouble.map(m=>m.id));
+
   const readyStations = new Set();
   state.matches.forEach(m=>{ if(!m.isBye && m.status==="ready" && m.station!=null) readyStations.add(m.station); });
 
@@ -6803,7 +6809,8 @@ function autoAdvanceReadyMatches(){
     m.a && m.b &&
     m.station!=null &&
     !readyStations.has(m.station) &&
-    !singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta)
+    !singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta) &&
+    (!(state.meta&&state.meta.formatType==="double") || !window.BXHDoubleElim || window.BXHDoubleElim.isPhaseOpen(state.matches,m))
   );
 
   candidates.sort((a,b)=>{
@@ -7685,6 +7692,7 @@ function generateDoubleElim(){
     scoreA:0,scoreB:0, log:[], winnerId:null, loserId:null, completed:false, station: nextStation(),
     gfSrc:{ wbFinalId: wbFinal.id, lbFinalId: lbFinalMatch ? lbFinalMatch.id : null } };
   matches.push(gf);
+  if(window.BXHDoubleElim) window.BXHDoubleElim.resequence(matches);
 
   state.bracketSize = size;
   state.matches = matches;
@@ -7700,29 +7708,11 @@ function generateDoubleElim(){
   return true;
 }
 
-function dblSideWillNeverArrive(src, side){
-  if(src.type==="first"){
-    const id = side==="A" ? src.srcAId : src.srcBId;
-    const sm = id?getMatch(id):null;
-    return !sm || (sm.completed && sm.isBye);
-  }
-  if(src.type==="merge"){
-    if(side==="A"){ const sm=getMatch(src.survivorMatchId); return !sm; }
-    const sm = src.dropperMatchId?getMatch(src.dropperMatchId):null;
-    return !sm || (sm.completed && sm.isBye);
-  }
-  if(src.type==="combine"){
-    const id = side==="A"?src.srcAMatchId:src.srcBMatchId;
-    const sm = id?getMatch(id):null;
-    return !sm;
-  }
-  return false;
-}
-
 function rebuildPropagationDouble(){
   const k = numRoundsTotal();
   for(let r=1;r<k;r++){
     matchesInRoundBracket("WB", r).forEach(m=>{
+      if(m.completed) return;
       const lower = matchesInRoundBracket("WB", r-1);
       const srcA = lower[m.indexInRound*2];
       const srcB = lower[m.indexInRound*2+1];
@@ -7732,35 +7722,24 @@ function rebuildPropagationDouble(){
     });
   }
 
+  const de=window.BXHDoubleElim;
   const lbMatches = state.matches.filter(m=>m.bracket==="LB").sort((a,b)=> a.round-b.round || a.indexInRound-b.indexInRound);
   lbMatches.forEach(m=>{
-    const src = m.lbSrc;
-    if(!src) return;
-    let newA=null, newB=null;
-    if(src.type==="first"){
-      const srcA = getMatch(src.srcAId), srcB = src.srcBId?getMatch(src.srcBId):null;
-      newA = srcA && srcA.completed && srcA.loserId ? srcA.loserId : null;
-      newB = srcB && srcB.completed && srcB.loserId ? srcB.loserId : null;
-    } else if(src.type==="merge"){
-      const surv = getMatch(src.survivorMatchId);
-      const drop = src.dropperMatchId ? getMatch(src.dropperMatchId) : null;
-      newA = surv && surv.completed && surv.winnerId ? surv.winnerId : null;
-      newB = drop && drop.completed && drop.loserId ? drop.loserId : null;
-    } else if(src.type==="combine"){
-      const sA = getMatch(src.srcAMatchId), sB = src.srcBMatchId?getMatch(src.srcBMatchId):null;
-      newA = sA && sA.completed && sA.winnerId ? sA.winnerId : null;
-      newB = sB && sB.completed && sB.winnerId ? sB.winnerId : null;
-    }
-    applyPropagatedSlots(m, newA, newB);
-    if(!m.completed){
-      const aReady = m.a!=null, bReady = m.b!=null;
-      if(aReady && !bReady && dblSideWillNeverArrive(src,"B")){
-        m.isBye=true; m.completed=true; m.winnerId=m.a.playerId; m.loserId=null;
-      } else if(bReady && !aReady && dblSideWillNeverArrive(src,"A")){
-        m.isBye=true; m.completed=true; m.winnerId=m.b.playerId; m.loserId=null;
-      } else {
-        m.isBye=false;
-      }
+    if(m.completed) return;
+    const inputs=de ? de.sourceInputs(state.matches,m) : [{status:"pending"},{status:"pending"}];
+    const newA=inputs[0]&&inputs[0].status==="player"?inputs[0].playerId:null;
+    const newB=inputs[1]&&inputs[1].status==="player"?inputs[1].playerId:null;
+    applyPropagatedSlots(m,newA,newB);
+    const action=de ? de.classifyInputs(inputs) : "waiting";
+    if(action==="void"){
+      m.a=null;m.b=null;m.isBye=true;m.structuralVoid=true;m.completed=true;
+      m.winnerId=null;m.loserId=null;
+    }else if(action==="bye"){
+      const winnerId=newA||newB;
+      m.isBye=true;m.structuralVoid=false;m.completed=true;
+      m.winnerId=winnerId;m.loserId=null;
+    }else{
+      m.isBye=false;m.structuralVoid=false;
     }
   });
 
@@ -7770,7 +7749,7 @@ function rebuildPropagationDouble(){
     const lbFinal = gf.gfSrc.lbFinalId ? getMatch(gf.gfSrc.lbFinalId) : null;
     const newA = wbFinal && wbFinal.completed && wbFinal.winnerId ? wbFinal.winnerId : null;
     const newB = lbFinal && lbFinal.completed && lbFinal.winnerId ? lbFinal.winnerId : null;
-    applyPropagatedSlots(gf, newA, newB);
+    if(!gf.completed) applyPropagatedSlots(gf, newA, newB);
   }
 
   if(gf && gf.completed && gf.winnerId){
@@ -7813,6 +7792,10 @@ function rebuildPropagationDouble(){
       state.gfResetMatchId=null;
     }
   }
+
+  const placement=de?de.placements(state.matches,state.gfMatchId):{thirdId:null,fourthId:null};
+  state.thirdId=placement.thirdId;
+  state.fourthId=placement.fourthId;
 }
 
 /* ======================================================================
@@ -8600,6 +8583,11 @@ function isTournamentFullyDecided(){
   if(!state.championId || !state.runnerUpId) return false;
   if(fmt==="single" && state.meta.bronzeMatch){
     if(!state.thirdId || !state.fourthId) return false;
+  }
+  if(fmt==="double"){
+    const n=tournamentEligiblePlayers(state.players,state.meta,state.matches).length;
+    if(n>=3 && !state.thirdId) return false;
+    if(n>=4 && !state.fourthId) return false;
   }
   if(fmt==="roundrobin"){
     const n = state.players.length;
@@ -10115,6 +10103,7 @@ function renderDoubleElimBracket(){
     <div class="cap">冠　軍</div>
     <div class="name">${esc(playerName(state.championId))}</div>
     ${state.runnerUpId ? `<div class="hint" style="margin-top:10px;">亞軍：${esc(playerName(state.runnerUpId))}</div>`:""}
+    ${state.thirdId ? `<div class="hint">季軍：${esc(playerName(state.thirdId))}${state.fourthId?`　殿軍：${esc(playerName(state.fourthId))}`:""}</div>`:""}
   </div>` : "";
 
   return `
