@@ -89,3 +89,41 @@ jobs:
         if: steps.freshness.outputs.deploy == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
+
+
+      - name: Verify deployed production build matches validated artifact
+        if: steps.freshness.outputs.deploy == 'true'
+        env:
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          host="$(tr -d '\r\n' < CNAME)"
+          if [[ ! "$host" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "Invalid production CNAME; refusing public health check." >&2
+            exit 1
+          fi
+          base="https://$host"
+          scratch="$(mktemp -d)"
+          trap 'rm -rf "$scratch"' EXIT
+          verified=false
+          for attempt in {1..12}; do
+            verified=true
+            for path in version.json index.html modules/main-app/core.js modules/cloud/cloud-runtime.js; do
+              expected="$(sha256sum "$path" | cut -d ' ' -f 1)"
+              status="$(curl --silent --show-error --location --compressed --max-time 12 --output "$scratch/served" --write-out '%{http_code}' "$base/$path?deployment_check=$EXPECTED_COMMIT" 2>/dev/null || true)"
+              actual="$(sha256sum "$scratch/served" 2>/dev/null | cut -d ' ' -f 1 || true)"
+              if [[ "$status" != "200" || "$actual" != "$expected" ]]; then
+                verified=false
+                echo "Waiting for deployed artifact: path=$path http=$status attempt=$attempt"
+                break
+              fi
+            done
+            if [[ "$verified" == "true" ]]; then break; fi
+            sleep 5
+          done
+          if [[ "$verified" != "true" ]]; then
+            echo "Production Pages is not serving the exact validated build $EXPECTED_COMMIT." >&2
+            exit 1
+          fi
+          echo "Production Pages serves the exact validated artifacts for $EXPECTED_COMMIT."
