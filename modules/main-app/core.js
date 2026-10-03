@@ -366,9 +366,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.15";
+const APP_VERSION = "v14.3.16";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.16",date:"2026/10/03",timezone:"Asia/Taipei",title:"C6BATA 敗部單房救援",updateLevel:"patch",added:["BXH-C6BATA 專用 source graph Dry Run 與救援交易"],changed:["敗部結構性空缺可安全旁路到下一場","形成真人對戰後停止，保留人工輸入比分"],fixed:["修復 C6BATA 敗部因永久空缺來源而卡死"],environment:"Production",deployStatus:"C6BATA room rescue",firebaseImpact:"單房交易只填參賽槽位；不修改比分、winnerId、loserId 或已完成場次",securityRulesImpact:"無",permissionImpact:"僅 Super Admin",publicSummary:"C6BATA 的結構性空缺可旁路；真人對戰仍由管理員依紀錄輸入比分。"},
   {version:"v14.3.15",date:"2026/10/01",timezone:"Asia/Taipei",title:"天梯歷史紀錄防當機與賽季隔離",updateLevel:"patch",added:[],changed:["近期積分紀錄只顯示目前 S1 並限制最新 100 筆","Firestore 直接依時間索引只下載最新 200 筆，不再把完整歷史集合載入手機"],fixed:["修復玩家點進歷史資料時因全量下載造成手機凍結或頁面被關閉","S0 歷史保持封存，不再混入 S1 近期紀錄"],environment:"Production",deployStatus:"Ladder history stability hotfix",firebaseImpact:"唯讀查詢最佳化；無刪除、無資料結構變更",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"天梯歷史頁改為輕量化讀取目前賽季，避免手機當機。"},
   {version:"v14.3.14",date:"2026/10/01",timezone:"Asia/Taipei",title:"復原獵人檔案歷史生涯資料",updateLevel:"patch",added:[],changed:["獵人執照、生涯統計、能力分析與對戰紀錄重新納入既有可信歷史對戰"],fixed:["修復正式啟動截止條件將歷史獵人資料隱藏後顯示 LV.1、0 XP、0 場的問題"],environment:"Production",deployStatus:"Historical Hunter profile restored",firebaseImpact:"無刪除、無重建；沿用既有可信賽事與報名來源",securityRulesImpact:"無",permissionImpact:"無",publicSummary:"獵人檔案保留既有生涯資料，正式上線後的新對戰會繼續累加。"},
   {version:"v14.3.0",date:"2026/09/27",timezone:"Asia/Taipei",title:"工作人員（活動）權限",updateLevel:"major",added:["活動主辦可依單一活動邀請工作人員（活動）","站內信接受或拒絕邀請","活動協助、報到、裁判與主裁職務","活動裁判可納入 Court 分配"],changed:["活動主辦與活動工作人員均不可刪除已保存的活動或房間","活動主辦授權失效時，其活動工作人員同步失去操作權限"],fixed:["活動工作人員與 BXH 正規工作人員權限來源完全分離","撤銷權限只停用操作，不刪除活動、房間或歷史資料"],environment:"Production / HTML + Firebase",deployStatus:"Frontend event staff workspace",firebaseImpact:"需搭配 eventStaffService 與 Firestore Rules v13.40.4",securityRulesImpact:"新增活動範圍授權與父權限連動驗證",permissionImpact:"新增工作人員（活動）",publicSummary:"活動主辦現在可為個別活動邀請工作人員，受邀者確認後才取得該活動權限。"},
