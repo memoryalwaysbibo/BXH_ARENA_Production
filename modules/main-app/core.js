@@ -18346,6 +18346,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     loginError=""; authFormError="";
     appPhase="admin-login";
     render();
+    const adminBootstrapPhase="admin-login";
     (async ()=>{
       // P0: Admin bootstrap must never leave the UI waiting forever when a
       // storage/Firebase promise stalls. Player mode does not depend on this path.
@@ -18365,6 +18366,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             try{ await adminBootstrapTimeout(window.cloudSync.connect(),4500); }catch(e){}
           }
         }
+        if(appPhase!==adminBootstrapPhase || currentRole==="admin") return;
         if(!authAvailable()){
           appPhase="admin-login";
           loginError="雲端服務連線逾時，請稍後重試。";
@@ -18373,10 +18375,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }
         try{
           superAdminExists = await adminBootstrapTimeout(window.cloudAuth.hasSuperAdmin(),4500);
+          if(appPhase!==adminBootstrapPhase || currentRole==="admin") return;
           appPhase = (superAdminExists===false) ? "admin-setup" : "admin-login";
         }catch(e){
           // Existing admins must still be able to reach the login screen when
           // the setup probe is slow/unavailable. Permission is verified at login.
+          if(appPhase!==adminBootstrapPhase || currentRole==="admin") return;
           superAdminExists = null;
           appPhase = "admin-login";
           loginError = "管理權限服務回應較慢，請直接登入重試。";
