@@ -26,7 +26,7 @@ test('expanded event detail order is intro, copy, photo, roster, then registrati
   const head=card.indexOf('lobby-event-intro-head'),copy=card.indexOf('lobby-description'),photo=card.indexOf('data-poster-slot'),players=card.indexOf('lobbyPlayerRosterHtml(t)'),registration=card.indexOf('lobbyRegistrationButtons(t,loggedIn)');
   assert.ok(head>=0&&head<copy&&copy<photo&&photo<players&&players<registration);
   assert.doesNotMatch(summary,/data-poster-manage/);
-  assert.match(card,/放大＋/);
+  assert.ok(card.includes('放大＋'));
 });
 test('poster viewer uses contain sizing and an empty slot collapses',()=>{
   assert.match(css,/lobby-poster-image[^}]*object-fit:\\s*contain/s);
