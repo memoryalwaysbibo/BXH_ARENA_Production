@@ -22407,7 +22407,10 @@ async function init(){
           // happens (success, an unexpected thrown error, a hung sub-call that
           // eventually settles) the finally block guarantees verifying/busy
           // states are never left stuck.
+          let authStateGeneration=0;
           async function processAuthStateChangeImpl(fbUser){
+            const authGeneration=++authStateGeneration;
+            const authStateIsCurrent=()=>authGeneration===authStateGeneration;
             syncEngagementIdentity(fbUser&&fbUser.uid);
             try{
               if(fbUser){
@@ -22430,6 +22433,7 @@ async function init(){
                   if(profileRead.timeout) throw new Error("profile-read-timeout");
                   throw (profileRead.error || new Error("profile-read-failed"));
                 }
+                if(!authStateIsCurrent()) return;
                 const profile = profileRead.value;
                 if(profile && profile.active===true){
                   // Determine which mode this specific sign-in should land in.
@@ -22439,6 +22443,7 @@ async function init(){
                   // default sensibly by role so existing behavior is preserved
                   // for accounts that have never touched activeMode before.
                   const storedMode = await loadActiveMode();
+                  if(!authStateIsCurrent()) return;
                   const restoringSession = !pendingLoginIntent;
                   const intent = pendingLoginIntent || (roleAllowsMode(profile.role,storedMode,profile)?storedMode:null) || (mapRoleToAppRole(profile.role)==="player" ? "player" : "admin");
                   pendingLoginIntent = null;
@@ -22579,6 +22584,7 @@ async function init(){
               // Guaranteed cleanup regardless of which branch above ran, an
               // exception was thrown, or nothing matched — verifying/busy
               // states can NEVER be left stuck after this function returns.
+              if(!authStateIsCurrent()) return;
               clearVerifyingTimeout();
               authVerifying = false;
               loginBusy = false; playerLoginBusy = false;
