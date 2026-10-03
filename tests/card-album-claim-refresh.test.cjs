@@ -411,7 +411,7 @@ test('legacy gods pack claim routes to cardAlbum claimPack and returns the revea
     calls.push(payload);return {ok:true,cardId:'seal',bonus:[]};
   };
   const result=await t.sandbox.window.BXHCardRewardUI.claim(pack.id,pack);
-  assert.deepEqual(calls,[{action:'claimPack',messageId:'gods_pack_BXH-ABC123'}]);
+  assert.equal(JSON.stringify(calls),JSON.stringify([{action:'claimPack',messageId:'gods_pack_BXH-ABC123'}]));
   assert.equal(result.card.id,'seal');assert.equal(result.card.name,'附魔封印');
   assert.equal(result.card.setId,'gods');
 });
@@ -437,7 +437,7 @@ test('direct October card reward keeps claimCardReward and uses the same 領取�
   const html=t.sandbox.window.BXHCardRewardUI.card(message,false);
   assert.match(html,/領取卡牌/);assert.doesNotMatch(html,/領取附件/);
   await t.sandbox.window.BXHCardRewardUI.claim(message.id,message);
-  assert.deepEqual(calls,[{messageId:message.id,action:'claim'}]);
+  assert.equal(JSON.stringify(calls),JSON.stringify([{messageId:message.id,action:'claim'}]));
 });
 
 test('claimed legacy pack reveals its card and stays non-downloadable', () => {
