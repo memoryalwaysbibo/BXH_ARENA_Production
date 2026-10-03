@@ -45,6 +45,6 @@ function seedOrder(size){
 }
 function sameStringSet(a,b){if(a.size!==b.size)return false;for(const x of a)if(!b.has(x))return false;return true;}
 
-Object.assign(window.BXHMatchUtils||(window.BXHMatchUtils={}),{courtKey,matchLabel,liveEtaCountdownText,matchStatusClass});
+Object.assign(window.BXHMatchUtils||(window.BXHMatchUtils={}),{courtKey,matchLabel,liveEtaCountdownText,matchStatusClass,correctionMatchHasActualPlay,correctionParticipantSignature,matchHasDecisionData,nextPow2,seedOrder,sameStringSet});
 
 })();

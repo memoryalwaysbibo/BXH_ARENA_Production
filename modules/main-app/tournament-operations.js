@@ -101,4 +101,10 @@ document.addEventListener('input',event=>{
  o.preview=null;const b=document.querySelector('[data-action="ops-draw"]');if(b)b.disabled=true;
 });
 
+Object.assign(window.BXHTournamentOperations||(window.BXHTournamentOperations={}),{
+  renderSystemClosureNotice,
+  renderTournamentOperationsPage,
+  handleTournamentOperationsAction
+});
+
 })();
