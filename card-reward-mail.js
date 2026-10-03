@@ -4,7 +4,27 @@ const OCT_CARD_REWARD_TYPE='card_reward';
 function escHtml(value){
   return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-function rewardOf(message){return message&&message.type===OCT_CARD_REWARD_TYPE?message.reward:null;}
+// mailboxService intentionally projects attachments to id/name/mime/size and
+// omits reward. Recognize only its reserved pack identity, never a title/name.
+const packReceipts=new WeakMap();
+function packReceiptContext(){return window.BXHMailbox?.mailboxContext?.()||null;}
+function packAttachment(item){
+  return item?.id==='gods_pack'&&item?.mime==='application/x-bxh-card-pack'&&
+    (item.kind==null||item.kind==='gods_card_pack');
+}
+function projectedPack(message){
+  if(message?.type!==OCT_CARD_REWARD_TYPE||message.reward!=null)return null;
+  const match=/^gods_pack_(BXH-[A-Z0-9]{6})$/.exec(String(message.id||''));
+  if(!match||message.eventCode!==match[1]||!Array.isArray(message.attachments)||
+    !message.attachments.some(packAttachment))return null;
+  // Unknown is not an unclaimed assertion. Only claimPack may decide/grant.
+  return {kind:'gods_card_pack',status:'unknown',eventCode:match[1]};
+}
+function rewardOf(message){
+  if(message?.type!==OCT_CARD_REWARD_TYPE)return null;
+  const context=packReceiptContext();
+  return (context&&packReceipts.get(context)?.get(message.id))||message.reward||projectedPack(message);
+}
 function isClaimed(reward){return reward?.claimedAt!=null||reward?.status==='claimed';}
 function isGodsPack(reward){return reward?.kind==='gods_card_pack';}
 const CARD_NAMES=Object.freeze({double_extreme:'雙重極限',double_knockout:'雙重擊飛',double_burst:'雙重爆裂',double_spin:'雙重轉停',boost_extreme:'強化極限',boost_knockout:'強化擊飛',boost_burst:'強化爆裂',weaken_extreme:'極限弱化',weaken_knockout:'擊飛弱化',weaken_burst:'爆裂弱化',weaken_spin:'轉停弱化',seal:'附魔封印'});
@@ -19,13 +39,17 @@ function cardArt(reward){
   return 'assets/enchantment-gods/'+encodeURIComponent(id)+'.webp';
 }
 window.BXHCardRewardUI={
+  bodyText(message){
+    const body=String(message?.body||'');
+    return isGodsPack(rewardOf(message))?body.replace(/\\r\\n|\\n|\\r/g,'\n'):body;
+  },
   isVirtualAttachment(message,item){
     const r=rewardOf(message);
-    return !!(isGodsPack(r)&&item?.kind==='gods_card_pack'&&item?.mime==='application/x-bxh-card-pack');
+    return !!(isGodsPack(r)&&packAttachment(item));
   },
   card(message,busy){
     const r=rewardOf(message);if(!r||!['card','gods_card_pack'].includes(r.kind))return '';
-    const claimed=isClaimed(r),pack=isGodsPack(r),art=cardArt(r),name=cardName(r.cardId);
+    const claimed=isClaimed(r),pack=isGodsPack(r),art=cardArt(r),name=r.cardName||cardName(r.cardId);
     const bonus=claimed&&Array.isArray(r.bonus)&&r.bonus.length?'<span>第 12 場補齊缺卡：'+r.bonus.map(cardName).map(escHtml).join('、')+'</span>':'';
     return '<section class="card-reward-mail-card" data-card-reward-message="'+escHtml(message.id||'')+'">'
       +'<div class="card-reward-mail-kicker">🎴 賽事卡牌獎勵</div>'
@@ -40,9 +64,20 @@ window.BXHCardRewardUI={
     const svc=window.engagementService,r=rewardOf(message);
     if(isGodsPack(r)){
       if(!svc||typeof svc.cardAlbum!=='function')throw Error('card-reward-service-unavailable');
+      if(message?.id!==messageId)throw Error('card-pack-message-mismatch');
+      const context=packReceiptContext();
       const result=await svc.cardAlbum({action:'claimPack',messageId});
-      if(!result?.ok||!result.cardId)throw Error('card-pack-claim-failed');
-      return {ok:true,card:{id:result.cardId,setId:'gods',name:cardName(result.cardId)},bonus:Array.isArray(result.bonus)?result.bonus:[]};
+      if(!result?.ok||!Object.prototype.hasOwnProperty.call(CARD_NAMES,result.cardId)||
+        (result.bonus!=null&&(!Array.isArray(result.bonus)||result.bonus.some(id=>!Object.prototype.hasOwnProperty.call(CARD_NAMES,id)))))throw Error('card-pack-claim-failed');
+      const bonus=Array.isArray(result.bonus)?result.bonus.slice():[];
+      // Retain only this session's successful server receipt across projected
+      // mailbox reloads. Never persist or increment any inventory in the client.
+      if(context&&context===packReceiptContext()){
+        if(!packReceipts.has(context))packReceipts.set(context,new Map());
+        packReceipts.get(context).set(messageId,{kind:'gods_card_pack',status:'claimed',
+          eventCode:message.eventCode,cardId:result.cardId,bonus});
+      }
+      return {ok:true,replayed:result.replayed===true,card:{id:result.cardId,setId:'gods',name:cardName(result.cardId)},bonus};
     }
     if(!svc||typeof svc.claimCardReward!=='function')throw Error('card-reward-service-unavailable');
     const result=await svc.claimCardReward({messageId,action:'claim'});
