@@ -13198,7 +13198,7 @@ async function loadLadderAdminLogs(force=false){
 
 async function loadPlayerBadges(snapshot){if(!window.cloudSync?.getPlayerBadges)return;try{for(let i=0;i<snapshot.players.length;i+=50){const chunk=snapshot.players.slice(i,i+50);const r=await window.cloudSync.getPlayerBadges(chunk.map(p=>p.uid));if(ladderPublicData!==snapshot)return;for(const p of chunk)p.equippedBadge=r.badges?.[p.uid]||null;render();}}catch(e){console.warn('[player badges]',e.code);}}
 let playerCardsUI={uid:'',query:'',results:null,settings:null,savedSettings:null,editing:false,busy:false,error:'',card:null,opened:false,hasMore:false};
-const {cardContext,playerSearchPanel,playerPrivacyPanel,renderPlayerCardOverlay,handlePlayerCard,bindPlayerCardInputs}=window.BXHPlayerCardsFeature;
+const {playerSearchPanel,playerPrivacyPanel,renderPlayerCardOverlay,handlePlayerCard,bindPlayerCardInputs}=window.BXHPlayerCardsFeature;
 
 function ladderLeaderboardTable(rows, adminMode=false){
   if(!rows.length) return '<div class="empty-state"><strong>排行尚未產生</strong><br>目前尚無玩家取得賽季積分。完成第一場積分賽後，排名將自動顯示。</div>';
@@ -13394,7 +13394,7 @@ function renderPlayerNavHtml(){
   </nav>`;
 }
 
-const {mailboxContext,mailboxError,loadMailbox,mailboxButtonHtml,renderMailboxPage,openMailboxPartnerContract,handleMailbox}=window.BXHMailbox;
+const {mailboxContext,mailboxError,loadMailbox,mailboxButtonHtml,renderMailboxPage,handleMailbox}=window.BXHMailbox;
 
 // 卡冊的畫面只相信登入帳號取得的伺服器持有資料。
 const CARD_ALBUM_CARDS=[{"id":"double_extreme","name":"雙重極限"},{"id":"double_knockout","name":"雙重擊飛"},{"id":"double_burst","name":"雙重爆裂"},{"id":"double_spin","name":"雙重轉停"},{"id":"boost_extreme","name":"強化極限"},{"id":"boost_knockout","name":"強化擊飛"},{"id":"boost_burst","name":"強化爆裂"},{"id":"weaken_extreme","name":"極限弱化"},{"id":"weaken_knockout","name":"擊飛弱化"},{"id":"weaken_burst","name":"爆裂弱化"},{"id":"weaken_spin","name":"轉停弱化"},{"id":"seal","name":"附魔封印"}];
@@ -13403,7 +13403,7 @@ const CARD_ALBUM_SETS=[
   {id:"gods",name:"諸神戰場",title:"諸神典藏者",assetRoot:"assets/enchantment-gods/",extension:".webp"}
 ];
 let cardAlbumSetFilter="all",cardAlbumPreview=null,cardAlbumState={uid:"",data:null,loading:false,error:"",trades:null,targets:null,query:"",targetUid:"",busy:false};
-const {cardAlbumContext,loadCardAlbum,cardAlbumImage,renderCardAlbumPage,renderCardAlbumTrade}=window.BXHCardAlbumFeature;
+const {cardAlbumContext,loadCardAlbum,renderCardAlbumPage}=window.BXHCardAlbumFeature;
 function renderPlayerCenterLoggedIn(){
   const p = userProfile;
   const mail=mailboxContext();
@@ -13449,7 +13449,7 @@ function renderPlayerCenterLoggedIn(){
 }
 
 let moodState=null;
-const {moodContext,moodLength,moodError,moodReplyDraft,moodMenuHtml,renderMoodReplies,renderMoodMessage,loadMood,renderMoodStation,handleMood,setMoodHeld,releaseMoodHold}=window.BXHMoodFeature;
+const {renderMoodStation,handleMood}=window.BXHMoodFeature;
 
 function renderPlayerHomeTab(p){
   return `${renderMoodStation()}${renderTournamentLobby({ loggedIn:true, profile:p })}`;
@@ -13472,7 +13472,7 @@ function scheduleGroups(key,items,card,phaseOf=schedulePhase){
  return [['live','<span class="schedule-light live" aria-hidden="true"></span> 比賽中',true],['waiting','<span class="schedule-light waiting" aria-hidden="true"></span> 等待中',false],['done','<span class="schedule-light done" aria-hidden="true"></span> 已完成',false],['closed','<span class="schedule-light done" aria-hidden="true"></span> 系統關閉',false],['cancelled','已取消',false]].map(([phase,label,open])=>{const group=items.filter(x=>phaseOf(x)===phase);if(!group.length&&['closed','cancelled'].includes(phase))return '';return foldSection(key+'-'+phase,label,group.length,group.map(card).join(''),open);}).join('');
 }
 document.addEventListener('toggle',e=>{const key=e.target?.dataset?.foldKey;if(key){try{sessionStorage.setItem('bxh-fold:'+currentAuthUid()+':'+key,e.target.open?'1':'0');}catch(err){}}},true);
-const {communityPhaseLabel,communityExpiryLabel,renderPlayerCommunityHostTab,renderCommunityCreateScreen,renderCommunitySettings,renderCommunityRoomApp}=window.BXHCommunityHostFeature;
+const {renderPlayerCommunityHostTab,renderCommunityCreateScreen,renderCommunityRoomApp}=window.BXHCommunityHostFeature;
 
 const {REGISTRATION_STATUS_VALUES,REGISTRATION_STATUS_COMPAT,normalizeRegistrationStatusValue,normalizeDateTime,registrationCountdownText,registrationCountdownUrgency}=window.BXHRegistrationUtils;
 function renderRegistrationCountdown(code,openAt){
@@ -15911,7 +15911,7 @@ function matchResultSummaryText(m){
   return winName + " " + winScore + "：" + loseScore + " " + loserName;
 }
 
-const {SHARE_TARGET_CONFIG,shareTargetEnabled,currentShareUrl,currentShareText,renderCurrentShareQr,renderShareModal}=window.BXHShareFeature;
+const {SHARE_TARGET_CONFIG,shareTargetEnabled,currentShareUrl,currentShareText,renderShareModal}=window.BXHShareFeature;
 
 function clearFireworks(){
   try{
