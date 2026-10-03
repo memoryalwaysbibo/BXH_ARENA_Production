@@ -386,3 +386,67 @@ test('production entry: base module also tolerates a reset when the optional bri
   assert.equal(t.state().data.sets.gods.seal, 2);
   assert.equal(t.state().loading, false);
 });
+
+
+test('legacy gods pack is rendered as a claimable card reward and not a downloadable file', () => {
+  const t=setup();
+  t.sandbox.isSuperAdmin=()=>false;t.sandbox.mailboxDate=()=> '2026/10/03 14:49';
+  const pack={
+    id:'gods_pack_BXH-ABC123',type:'card_reward',senderName:'BXH ARENA 系統',createdAt:1,
+    reward:{kind:'gods_card_pack',status:'unclaimed',eventCode:'BXH-ABC123'},
+    attachments:[{id:'gods_pack',kind:'gods_card_pack',name:'諸神戰場卡包 ×1',mime:'application/x-bxh-card-pack',size:1,eventCode:'BXH-ABC123'}]
+  };
+  const mail=t.mail();mail.messages=[pack];mail.selectedId=pack.id;mail.open=true;
+  const html=t.sandbox.window.BXHMailbox.renderMailboxPage();
+  assert.match(html,/諸神戰場卡包 ×1/);
+  assert.match(html,/領取卡牌/);
+  assert.doesNotMatch(html,/mailbox-download-attachment/);
+  assert.doesNotMatch(html,/⬇/);
+});
+
+test('legacy gods pack claim routes to cardAlbum claimPack and returns the revealed card', async () => {
+  const t=setup(),calls=[];
+  const pack={id:'gods_pack_BXH-ABC123',type:'card_reward',reward:{kind:'gods_card_pack',status:'unclaimed',eventCode:'BXH-ABC123'}};
+  t.sandbox.window.engagementService.cardAlbum=async payload=>{
+    calls.push(payload);return {ok:true,cardId:'seal',bonus:[]};
+  };
+  const result=await t.sandbox.window.BXHCardRewardUI.claim(pack.id,pack);
+  assert.equal(JSON.stringify(calls),JSON.stringify([{action:'claimPack',messageId:'gods_pack_BXH-ABC123'}]));
+  assert.equal(result.card.id,'seal');assert.equal(result.card.name,'附魔封印');
+  assert.equal(result.card.setId,'gods');
+});
+
+test('normal mailbox attachments remain downloadable', () => {
+  const t=setup();
+  t.sandbox.isSuperAdmin=()=>false;t.sandbox.mailboxDate=()=> '2026/10/03';
+  const message={id:'normal-mail',type:'notice',senderName:'BXH ARENA',createdAt:1,
+    attachments:[{id:'pdf-1',name:'規章.pdf',mime:'application/pdf',size:1024}]};
+  const mail=t.mail();mail.messages=[message];mail.selectedId=message.id;mail.open=true;
+  const html=t.sandbox.window.BXHMailbox.renderMailboxPage();
+  assert.match(html,/mailbox-download-attachment/);
+  assert.match(html,/規章\.pdf/);
+});
+
+test('direct October card reward keeps claimCardReward and uses the same 領取卡牌 wording', async () => {
+  const t=setup(),calls=[];
+  const message={id:'oct26_BXH-ABC123_player-a',type:'card_reward',
+    reward:{kind:'card',status:'unclaimed',setId:'gods',cardId:'seal'}};
+  t.sandbox.window.engagementService.claimCardReward=async payload=>{
+    calls.push(payload);return {ok:true,card:{id:'seal',setId:'gods'}};
+  };
+  const html=t.sandbox.window.BXHCardRewardUI.card(message,false);
+  assert.match(html,/領取卡牌/);assert.doesNotMatch(html,/領取附件/);
+  await t.sandbox.window.BXHCardRewardUI.claim(message.id,message);
+  assert.equal(JSON.stringify(calls),JSON.stringify([{messageId:message.id,action:'claim'}]));
+});
+
+test('claimed legacy pack reveals its card and stays non-downloadable', () => {
+  const t=setup();
+  const message={id:'gods_pack_BXH-ABC123',type:'card_reward',
+    reward:{kind:'gods_card_pack',status:'claimed',claimedAt:1,eventCode:'BXH-ABC123',cardId:'seal',bonus:[]},
+    attachments:[{id:'gods_pack',kind:'gods_card_pack',name:'諸神戰場卡包 ×1',mime:'application/x-bxh-card-pack',size:1}]};
+  const html=t.sandbox.window.BXHCardRewardUI.card(message,false);
+  assert.match(html,/附魔封印/);assert.match(html,/已領取 ✓/);
+  assert.match(html,/assets\/enchantment-gods\/seal\.webp/);
+  assert.equal(t.sandbox.window.BXHCardRewardUI.isVirtualAttachment(message,message.attachments[0]),true);
+});
