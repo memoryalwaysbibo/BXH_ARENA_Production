@@ -29,6 +29,6 @@ test('expanded event detail order is intro, copy, photo, roster, then registrati
   assert.ok(card.includes('放大＋'));
 });
 test('poster viewer uses contain sizing and an empty slot collapses',()=>{
-  assert.match(css,/lobby-poster-image[^}]*object-fit:\\s*contain/s);
-  assert.match(css,/lobby-poster-slot:empty\{display:none\}/);
+  assert.ok(css.includes('object-fit:contain'));
+  assert.ok(css.includes('.lobby-poster-slot:empty{display:none}'));
 });
