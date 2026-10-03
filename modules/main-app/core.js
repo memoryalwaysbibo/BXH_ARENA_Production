@@ -6545,8 +6545,7 @@ function displayMatchNumber(m){
   return idx<0 ? null : idx+1;
 }
 function displayMatchLabel(m){
-  const n=displayMatchNumber(m);
-  return n==null ? "" : "第"+n+"場";
+  return window.BXHFormatUtils.matchSequenceLabel(displayMatchNumber(m));
 }
 function matchesInRound(r){ return state.matches.filter(m=>m.round===r && (m.bracket==null || m.bracket==="SE")).sort((a,b)=>a.indexInRound-b.indexInRound); }
 function matchesInRoundBracket(bracket, r){ return state.matches.filter(m=>m.bracket===bracket && m.round===r).sort((a,b)=>a.indexInRound-b.indexInRound); }
@@ -14429,7 +14428,7 @@ function setSmartCallEnabled(code,on){
   const all=smartCallStorageRead(SMART_CALL_PREF_KEY); const uk=smartCallUserKey(); all[uk]=all[uk]||{}; all[uk][code]=!!on; smartCallStorageWrite(SMART_CALL_PREF_KEY,all);
   if(!on){ const ls=smartCallStorageRead(SMART_CALL_LAST_KEY); if(ls[uk]) delete ls[uk][code]; smartCallStorageWrite(SMART_CALL_LAST_KEY,ls); }
 }
-function smartCallNorm(v){ return String(v||"").trim().toLowerCase().replace(/\s+/g,""); }
+function smartCallNorm(v){ return window.BXHInputUtils.smartCallNorm(v); }
 function smartCallFindPlayerId(st,r){
   if(!st||!Array.isArray(st.players)) return null;
   if(r?.familyPlayerId)return st.players.find(p=>p.id==="family_"+r.familyPlayerId||p.familyPlayerId===r.familyPlayerId)?.id||null;

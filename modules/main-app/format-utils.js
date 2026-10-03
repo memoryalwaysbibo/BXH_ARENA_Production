@@ -47,6 +47,10 @@ function quickDecisionFailureMessage(reason){
   return map[reason] || "賽事資料已變更或不符合判定條件，請重新確認。";
 }
 
-Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel,quickDecisionFailureMessage});
+function matchSequenceLabel(number){
+  return number==null ? "" : "第"+number+"場";
+}
+
+Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel,quickDecisionFailureMessage,matchSequenceLabel});
 
 })();

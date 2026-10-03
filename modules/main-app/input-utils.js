@@ -66,6 +66,8 @@ function tournamentTeamSize(t){
   return Math.max(3,Number(t&&((t.teamSize)||(t.parsedData&&t.parsedData.meta&&t.parsedData.meta.teamSize)))||3);
 }
 
-Object.assign(window.BXHInputUtils||(window.BXHInputUtils={}),{normalizeRoomCodeInput,normalizeLoginEmail,loginIdentifierDisplayValue,normalizeAuthEmailForMatch,epochToDatetimeLocal,datetimeLocalToEpoch,communityDateTimeValue,formatTournamentDetailDateTime,tournamentBattleMode,tournamentTeamSize});
+function smartCallNorm(v){ return String(v||"").trim().toLowerCase().replace(/\s+/g,""); }
+
+Object.assign(window.BXHInputUtils||(window.BXHInputUtils={}),{normalizeRoomCodeInput,normalizeLoginEmail,loginIdentifierDisplayValue,normalizeAuthEmailForMatch,epochToDatetimeLocal,datetimeLocalToEpoch,communityDateTimeValue,formatTournamentDetailDateTime,tournamentBattleMode,tournamentTeamSize,smartCallNorm});
 
 })();
