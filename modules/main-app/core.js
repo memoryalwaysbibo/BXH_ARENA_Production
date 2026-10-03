@@ -13621,7 +13621,7 @@ function lobbySummary(raw){
     battleMode:(raw.battleMode||m.battleMode)==="team"?"team":"individual", teamSize:Math.max(3,Number(raw.teamSize||m.teamSize)||3),
     fee:raw.fee, checkInAt:raw.checkInAt||m.checkin||"", eventDescription:raw.eventDescription||"",
     roomAccessMode:raw.roomAccessMode||m.roomAccessMode||"public",
-    coverUrl:typeof raw.coverUrl==="string"?raw.coverUrl:""
+    coverUrl:typeof raw.coverUrl==="string"?raw.coverUrl:"",posterUrl:typeof raw.posterUrl==="string"?raw.posterUrl:""
   };
 }
 function lobbyNewestFirst(a,b){
@@ -13739,6 +13739,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
     `房間代碼｜${esc(t.code)}`
   ].filter(Boolean);
   const coverUrl=/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/bxh-arena\.firebasestorage\.app\/o\/room-covers%2F[A-Z0-9-]+%2F[a-f0-9-]+\.jpg\?alt=media&token=[a-f0-9-]+$/.test(t.coverUrl||"")?t.coverUrl:"";
+  const posterFullUrl=/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/bxh-arena\.firebasestorage\.app\/o\/room-posters%2FBXH-[A-Z0-9-]{4,24}%2F[a-f0-9-]{36}\.(?:jpg|png)\?alt=media&token=[a-f0-9-]{36}$/.test(t.posterUrl||"")?t.posterUrl:"";
   return `<details class="lobby-compact-card ${authorityClass}" ${expanded?"open":""}>
     <summary>
       <div class="lobby-card-with-cover">
@@ -13762,7 +13763,9 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
     </summary>
     <div class="lobby-card-detail">
       <div class="lobby-detail-grid">${details.map(x=>`<div>${x}</div>`).join("")}</div>
+      ${`<div class="lobby-event-intro-head"><h3>活動介紹</h3><button type="button" class="btn btn-ghost btn-sm lobby-poster-manage" data-poster-manage data-code="${esc(t.code)}" data-poster-has-photo="${posterFullUrl||coverUrl?"1":"0"}" hidden>＋新增照片</button></div>`}
       ${t.eventDescription?`<div class="lobby-description">${esc(t.eventDescription)}</div>`:""}
+      <div class="lobby-poster-slot" data-poster-slot>${posterFullUrl?`<figure class="lobby-poster-figure"><button type="button" class="lobby-poster-open" data-poster-open aria-label="放大檢視 ${esc(t.name)} 海報"><img class="lobby-poster-image" src="${esc(posterFullUrl)}" alt="${esc(t.name)} 活動海報" loading="lazy" referrerpolicy="no-referrer"></button><button type="button" class="lobby-poster-zoom" data-poster-open aria-label="放大檢視海報">放大＋</button></figure>`:(coverUrl?`<figure class="lobby-poster-legacy"><img src="${esc(coverUrl)}" alt="${esc(t.name)} 舊版海報縮圖" loading="lazy" referrerpolicy="no-referrer"><figcaption>目前保存的是舊版縮圖；更換為原圖後可清晰放大檢視。</figcaption></figure>`:"")}</div>
       ${lobbyPlayerRosterHtml(t)}
       <div class="lobby-card-actions">${lobbyRegistrationButtons(t,loggedIn)}</div>
     </div>

@@ -837,3 +837,40 @@ body .celebration-overlay{z-index:3000!important;}
   .player-shell header.topbar .account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;}
 }
 
+
+
+/* Activity poster management and full-size A4 viewing */
+.lobby-event-intro-head{display:flex;align-items:center;justify-content:space-between;gap:.65rem;margin:1rem 0 .5rem}
+.lobby-event-intro-head h3{font-size:1rem;margin:0;color:#f5e9cf}
+.lobby-poster-manage{flex:0 0 auto;color:#e7d5b2;border-color:rgba(231,213,178,.35);background:rgba(255,255,255,.045)}
+.lobby-poster-manage:hover{background:rgba(255,255,255,.1)}
+.lobby-poster-slot:empty{display:none}
+.lobby-poster-figure{position:relative;width:min(100%,560px);margin:.75rem auto 1rem;text-align:center}
+.lobby-poster-open{display:block;width:100%;padding:0;border:0;background:transparent;cursor:zoom-in}
+.lobby-poster-image{display:block;width:auto;height:auto;max-width:100%;max-height:80vh;object-fit:contain;margin:auto;border-radius:10px;box-shadow:0 8px 28px #0008}
+.lobby-poster-zoom{position:absolute;right:.65rem;bottom:.65rem;padding:.45rem .8rem;border:1px solid #ffffff55;border-radius:999px;background:#171717dd;color:#fff;font-weight:700;cursor:pointer}
+.lobby-poster-legacy{width:min(100%,260px);margin:.75rem auto 1rem;text-align:center}
+.lobby-poster-legacy img{display:block;width:auto;height:auto;max-width:240px;max-height:240px;object-fit:contain;margin:auto}
+.lobby-poster-legacy figcaption{margin-top:.4rem;color:#b8b2a5;font-size:.78rem}
+.lobby-poster-manager{position:fixed;inset:0;z-index:10030;display:grid;place-items:center;padding:1rem}
+.lobby-poster-manager[hidden]{display:none}
+.lobby-poster-manager-backdrop{position:absolute;inset:0;background:#000c}
+.lobby-poster-manager-panel{position:relative;z-index:1;width:min(100%,560px);max-height:92vh;overflow:auto;padding:1.1rem;border:1px solid #b78d45;border-radius:18px;background:#171717;color:#f8f2e7;box-shadow:0 18px 70px #000b}
+.lobby-poster-manager-panel h2{margin:.15rem 2.5rem .5rem 0}
+.lobby-poster-modal-close{position:absolute;right:.7rem;top:.6rem;width:2.5rem;height:2.5rem;border:0;border-radius:50%;background:#ffffff18;color:#fff;font-size:1.5rem}
+.lobby-poster-manager-help{color:#c7beae;font-size:.9rem}
+.lobby-poster-file-label{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:1rem 0;padding:.8rem;border:1px dashed #b78d45;border-radius:12px}
+.lobby-poster-file-label input{max-width:100%}
+.lobby-poster-preview{max-height:52vh;overflow:auto;text-align:center;background:#080808;border-radius:12px}
+.lobby-poster-preview img{max-width:100%;max-height:52vh;object-fit:contain}
+.lobby-poster-error{min-height:1.4em;margin:.5rem 0;color:#ffaaa1;font-size:.9rem}
+.lobby-poster-manager-actions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.8rem}
+.lobby-poster-viewer{position:fixed;inset:0;z-index:10040;display:grid;grid-template-rows:auto 1fr auto;background:#050505f5;color:#fff}
+.lobby-poster-viewer-toolbar{display:flex;justify-content:space-between;align-items:center;padding:max(.6rem,env(safe-area-inset-top)) .8rem .4rem}
+.lobby-poster-viewer-toolbar button{min-width:2.7rem;min-height:2.7rem;border:1px solid #ffffff50;border-radius:999px;background:#171717;color:#fff;font-size:1rem}
+.lobby-poster-viewer-toolbar [data-viewer-close]{font-size:1.5rem}
+.lobby-poster-viewer-stage{position:relative;display:grid;place-items:center;overflow:hidden;touch-action:none}
+.lobby-poster-viewer-image{max-width:100vw;max-height:calc(100vh - 7rem);width:auto;height:auto;object-fit:contain;transform-origin:center center;touch-action:none;user-select:none;-webkit-user-drag:none}
+.lobby-poster-viewer-hint{text-align:center;padding:.35rem .6rem max(.55rem,env(safe-area-inset-bottom));color:#d6d0c5;font-size:.82rem}
+.lobby-poster-modal-open{overscroll-behavior:none}
+@media(max-width:600px){.lobby-event-intro-head{align-items:center}.lobby-poster-figure{width:100%}.lobby-poster-image{max-height:70vh}.lobby-poster-manager-panel{padding:1rem}}
