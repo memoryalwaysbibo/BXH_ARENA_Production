@@ -3308,16 +3308,33 @@ async function resolveAndJoinTournamentByCode(rawCode, opts){
       setTimeout(resolve, 8000);
     });
   }
-  if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
+  if(window.cloudSync && window.cloudSync.connect){
+    try{
+      await Promise.race([
+        window.cloudSync.connect(),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error("public-watch-connect-timeout")),6000))
+      ]);
+    }catch(e){
+      console.warn("[public-watch] cloud connect failed",e);
+      return {ok:false,reason:"network",code};
+    }
+  }
   if(!cloudAvailable()) return { ok:false, reason:"network", code };
   // Guests and players only ever get the safe, filtered public mirror.
   // Admin-tier gets the full document by default, unless the caller
   // explicitly asks to browse read-only (opts.forcePublic).
   const forcePrivate = opts.forcePrivate===true && hasPrivilegedTournamentProfile();
   const usePublic = forcePrivate ? false : (opts.forcePublic || currentRole==="guest" || currentRole==="player" || !hasAdminAccess());
-  const result = usePublic
-    ? await window.cloudSync.joinRoomPublic(code)
-    : await window.cloudSync.joinRoom(code);
+  let result;
+  try{
+    result = await Promise.race([
+      usePublic ? window.cloudSync.joinRoomPublic(code) : window.cloudSync.joinRoom(code),
+      new Promise(resolve=>setTimeout(()=>resolve({ok:false,reason:"network",timeout:true}),8000))
+    ]);
+  }catch(e){
+    console.warn("[public-watch] tournament read failed",e);
+    return {ok:false,reason:"network",code};
+  }
   if(!result.ok) return { ok:false, reason: result.reason, code };
   await commitJoinedTournamentData(code, result.data, usePublic);
   return { ok:true, code, usePublic };
@@ -3439,7 +3456,16 @@ async function attemptWatchUrlEntry(rawCode){
   guestReadOnlyMode = true;
   appPhase = "watch-connecting";
   render();
-  const result = await resolveAndJoinTournamentByCode(rawCode, { forcePublic:true });
+  let result;
+  try{
+    result = await Promise.race([
+      resolveAndJoinTournamentByCode(rawCode, { forcePublic:true }),
+      new Promise(resolve=>setTimeout(()=>resolve({ok:false,reason:"network",timeout:true}),10000))
+    ]);
+  }catch(e){
+    console.warn("[public-watch] join failed",e);
+    result={ok:false,reason:"network"};
+  }
   if(!result.ok){
     // Section 6: an invalid/failed URL code must never leave the person on a
     // blank/dead page — fall through to the same manual entry dialog they'd
