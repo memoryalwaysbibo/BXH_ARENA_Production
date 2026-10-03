@@ -120,6 +120,17 @@ test('module exports and script order satisfy Core bindings', () => {
   assert.equal(vm.runInContext('typeof titleClassificationHtml', context), 'function', 'Core binds the exported title classification helper');
 });
 
+test('Core feature bridges do not retain unused legacy aliases', () => {
+  for (const name of [
+    'cardAlbumImage', 'renderCardAlbumTrade',
+    'communityPhaseLabel', 'communityExpiryLabel', 'renderCommunitySettings',
+    'openMailboxPartnerContract',
+    'moodContext', 'moodLength', 'moodError', 'moodReplyDraft', 'moodMenuHtml',
+    'renderMoodReplies', 'renderMoodMessage', 'loadMood', 'setMoodHeld', 'releaseMoodHold',
+    'cardContext', 'renderCurrentShareQr',
+  ]) assert.doesNotMatch(core, new RegExp('\\b' + name + '\\b'), `${name} remains module-internal`);
+});
+
 test('match sequence labels are exported and delegated without changing match numbering', () => {
   const context = moduleContext();
   vm.runInContext(read('modules/main-app/format-utils.js'), context, { filename: 'format-utils.js' });

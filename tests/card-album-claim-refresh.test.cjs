@@ -19,7 +19,7 @@ function sectionFrom(sourceText,start,end) {
 const source=[
   sectionFrom(mailbox,'let mailboxState=null;','function mailboxButtonHtml()'),
   sectionFrom(mailbox,'async function handleMailbox(action,target)','Object.assign(window.BXHMailbox'),
-  sectionFrom(core,'const CARD_ALBUM_CARDS=','const {cardAlbumContext,loadCardAlbum,cardAlbumImage,renderCardAlbumPage,renderCardAlbumTrade}=window.BXHCardAlbumFeature;'),
+  sectionFrom(core,'const CARD_ALBUM_CARDS=','function renderPlayerCenterLoggedIn()'),
   albumFeature
 ].join('\n');
 const rewardSource = fs.readFileSync(path.join(root, 'card-reward-mail.js'), 'utf8');
