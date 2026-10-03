@@ -19690,7 +19690,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       const result = await window.cloudAuth.createSuperAdmin({ email, password:p1, displayName });
       if(result.ok){
         authFormError="";
-        appPhase="admin-login";
+        // createSuperAdmin signs the new account in. The auth observer may
+        // already have routed that authenticated super-admin into the app
+        // before this setup promise resolves. Never overwrite that newer route
+        // with the legacy admin-login screen.
+        if(!(currentRole==="admin" && userProfile?.active===true)){
+          appPhase="admin-login";
+        }
         loginError="";
         showToast("最高管理員建立完成，請妥善保存登入資料。");
         render();
