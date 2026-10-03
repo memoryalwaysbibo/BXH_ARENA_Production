@@ -144,6 +144,7 @@ if (emulatorMode) {
     req.on('data',chunk=>{ body += chunk; });
     req.on('end',()=>{
       const name=String(req.url||'').split('/').filter(Boolean).pop()||'unknown';
+      console.log('[P2P function stub]', name, body.slice(0,500));
       const okNames=new Set(['getEngagementHealth','onlinePresence']);
       const payload=okNames.has(name)
         ? {data:{ok:true,serverTime:Date.now(),messages:[]}}

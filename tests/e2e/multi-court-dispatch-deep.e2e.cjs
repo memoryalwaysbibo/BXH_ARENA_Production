@@ -2,6 +2,30 @@ const { test, expect } = require('@playwright/test');
 const crypto = require('node:crypto');
 
 test('two courts preserve independent work and queue a skipped match onto a busy court', async ({ page }) => {
+
+  async function dumpBracketDiagnostics(label){
+    const diag=await page.evaluate((diagnosticLabel)=>({
+      label:diagnosticLabel,
+      bracketSize:state?.bracketSize,
+      playersLength:state?.players?.length,
+      registrationEnabled:state?.meta?.registrationEnabled,
+      checkinRequired:state?.meta?.checkinRequired,
+      entrySelection:state?.entrySelection,
+      eligiblePlayersLength:typeof eligiblePlayers==='function'?eligiblePlayers().length:null,
+      entryRosterValid:typeof entryRosterValid==='function'?entryRosterValid():null,
+      cloudCode:state?.cloudCode,
+      currentRole:typeof currentRole!=='undefined'?currentRole:null,
+      userRole:typeof userProfile!=='undefined'?userProfile?.role:null,
+      isTestAccount:typeof userProfile!=='undefined'?userProfile?.isTestAccount:null,
+      activeMode:typeof activeMode!=='undefined'?activeMode:null,
+      modalTitle:document.querySelector('.modal-title')?.textContent?.trim()||null,
+      modalMessage:document.querySelector('.modal-message')?.textContent?.trim()||null,
+      visibleText:[...document.querySelectorAll('.toast,.error,.alert')].filter(x=>x.offsetParent!==null).map(x=>x.textContent?.trim()).filter(Boolean).slice(0,10)
+    }),label);
+    console.log('[P2P bracket diagnostics]',JSON.stringify(diag));
+    return diag;
+  }
+
   const externalFirebaseRequests=[];
 
   await page.route('**/*', async route=>{
@@ -67,10 +91,25 @@ test('two courts preserve independent work and queue a skipped match onto a busy
   await expect(page.locator('.people-roster-table .people-col-name')).toHaveCount(4);
 
   await page.locator('[data-action="people-section"][data-section="bracket"]').click();
+  await page.evaluate(()=>{
+    window.__p2pActionProbe=[];
+    document.addEventListener('click',e=>{
+      const t=e.target&&e.target.closest?e.target.closest('[data-action]'):null;
+      if(t) window.__p2pActionProbe.push({action:t.getAttribute('data-action'),time:Date.now(),defaultPrevented:e.defaultPrevented});
+    },true);
+  });
+
   await page.locator('[data-action="draw-bracket"]').click();
   const confirmDraw=page.locator('[data-action="modal-confirm"]');
   if(await confirmDraw.isVisible().catch(()=>false)) await confirmDraw.click();
-  await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
+  try {
+    await page.waitForFunction(()=>Number(state.bracketSize)>0,null,{timeout:30000});
+  } catch (error) {
+    const actionProbe=await page.evaluate(()=>window.__p2pActionProbe||[]);
+    console.log('[P2P action probe]',JSON.stringify(actionProbe));
+    await dumpBracketDiagnostics('bracket-size-timeout');
+    throw error;
+  }
   await expect(page.locator('[data-action="start-tournament"]')).toBeVisible({timeout:30000});
   await page.locator('[data-action="start-tournament"]').click();
   await expect(page.locator('[data-action="modal-confirm"]')).toBeVisible({timeout:15000});
