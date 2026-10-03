@@ -63,8 +63,10 @@ test('official single elimination enforces bronze before championship final', as
       await page.locator('[data-action="admin-login-submit"]').click();
     }
   }
-  await expect(page.locator('[data-action="cloud-admin-new-tournament"]').first()).toBeVisible({timeout:60000});
-  await page.locator('[data-action="cloud-admin-new-tournament"]').first().click();
+  await page.waitForFunction(()=>firebaseUser?.uid && userProfile?.active===true && currentRole==="admin" && appPhase==="app" && activeTab==="management",null,{timeout:60000});
+  const newTournament=page.locator('[data-action="cloud-admin-new-tournament"]').first();
+  await expect(newTournament).toBeVisible({timeout:60000});
+  await newTournament.click({force:true});
 
   const genericConfirm=page.locator('[data-action="modal-confirm"]');
   if(await genericConfirm.isVisible().catch(()=>false)) await genericConfirm.click();
