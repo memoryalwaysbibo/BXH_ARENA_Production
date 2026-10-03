@@ -5660,8 +5660,7 @@ function refereeNamesForStation(stationNum, st=state){
   return Array.isArray(raw)?raw.filter(Boolean):[];
 }
 function refereeDisplayForStation(stationNum, st=state){
-  const names=refereeNamesForStation(stationNum,st);
-  return names.length?names.join("、"):"未指定";
+  return window.BXHFormatUtils.refereeNamesLabel(refereeNamesForStation(stationNum,st));
 }
 function canOperateStation(stationNum, st=state){
   if(isCommunityRoomOwner()) return true;

@@ -51,6 +51,10 @@ function matchSequenceLabel(number){
   return number==null ? "" : "第"+number+"場";
 }
 
-Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel,quickDecisionFailureMessage,matchSequenceLabel});
+function refereeNamesLabel(names){
+  return names.length ? names.join("、") : "未指定";
+}
+
+Object.assign(window.BXHFormatUtils||(window.BXHFormatUtils={}),{roleDisplayLabel,taipeiDateFromTimestamp,recordFilterDate,eventStaffDutyLabel,formatLadderDate,mailboxDate,moodTime,smartCallEtaText,registrationStatusLabel,quickDecisionFailureMessage,matchSequenceLabel,refereeNamesLabel});
 
 })();
