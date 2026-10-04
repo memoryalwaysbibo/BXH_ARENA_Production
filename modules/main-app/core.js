@@ -9476,6 +9476,9 @@ function renderTeamLineupPanel(m,mode="player"){
     }
     if(canRef){
       for(const t of teams)if(view?.lineups?.[t.id])out+='<p>裁判檢視｜'+esc(t.name)+'：'+view.lineups[t.id].map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
+      for(const t of teams)if(!view?.submitted?.[t.id])
+        out+='<button class="btn btn-ghost btn-sm" data-action="team-lineup-default" data-match-id="'+esc(m.id)+'" data-team-id="'+esc(t.id)+'">套用名單順序｜'+esc(t.name)+'</button>';
+      if(teams.some(t=>view?.defaulted?.[t.id]))out+='<div class="hint">裁判預設順序依報名名單；隊長仍可在公開前提交調整。</div>';
       if(view?.submitted?.[teams[0]?.id]&&view?.submitted?.[teams[1]?.id])
         out+='<button class="btn btn-primary btn-sm" data-action="team-lineup-reveal" data-match-id="'+esc(m.id)+'">人員到齊・同時公開並鎖定</button>';
       else if(view?.submitted?.[teams[0]?.id]||view?.submitted?.[teams[1]?.id])
@@ -18038,6 +18041,14 @@ async function handleTeamMatchAction(action,target){
       if(order.length!==mine.memberPlayerIds.length||new Set(order).size!==order.length)return showToast('每位隊員需出場一次，不能重複',true);
       await window.engagementService.teamLineup({action:'submit',code,matchId,teamId:mine.id,order});
       showToast('本隊順序已秘密提交');
+    }else if(action==='team-lineup-default'){
+      const team=teams.find(t=>t.id===target.dataset.teamId);
+      if(view?.isReferee!==true)return showToast('目前帳號不是本場裁判，無法套用預設順序。',true);
+      if(!team)return showToast('找不到本場隊伍，請更新排陣狀態。',true);
+      if(view?.submitted?.[team.id])return showToast('該隊已提交；為避免覆蓋，不套用裁判預設。',true);
+      if(!confirm('以「'+team.name+'」目前報名名單順序作為本場預設？隊長仍可在裁判公開前提交修改。'))return;
+      await window.engagementService.teamLineup({action:'default',code,matchId,teamId:team.id});
+      showToast(team.name+'已套用名單順序預設；公開前仍可由隊長調整。');
     }else if(action==='team-lineup-reveal'){
       if(!confirm('確認雙方人員都已到齊？公開後出場順序將永久鎖定。'))return;
       await window.engagementService.teamLineup({action:'reveal',code,matchId,peoplePresent:true});
@@ -18067,6 +18078,7 @@ async function handleTeamMatchAction(action,target){
       'referee-required':'目前帳號不是此戰鬥台裁判，無法送出判定。',
       'event-not-live':'賽事尚未開始或已結束，暫時不能計分。',
       'lineup-locked':'本場已開始計分，出場順序不能再變更。',
+      'lineup-already-submitted':'該隊已提交排陣，系統不會用裁判預設覆蓋。',
       'stale-match':'本場資料已更新，請重新整理後再操作。',
       'public-mirror-stale':'公開對戰表尚未同步，請更新排陣狀態後再試。',
       'permission-denied':'目前帳號沒有這項團體賽操作權限。'
