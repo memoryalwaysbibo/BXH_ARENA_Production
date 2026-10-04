@@ -112,8 +112,9 @@ test('four-player community event reaches first confirmed referee result', async
     await route.continue();
   });
 
+  const watchOrigin = new URL(page.url()).origin;
   const watchResponse = await watchPage.goto(
-    `/?bxh_e2e=1&code=${encodeURIComponent(watchCode)}&entry=watch`,
+    `${watchOrigin}/?bxh_e2e=1&code=${encodeURIComponent(watchCode)}&entry=watch`,
     { waitUntil: 'domcontentloaded' }
   );
   expect(watchResponse?.headers()['x-bxh-e2e-emulator']).toBe('1');
