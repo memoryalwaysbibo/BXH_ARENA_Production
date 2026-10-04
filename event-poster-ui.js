@@ -88,7 +88,7 @@ function filterAdminRosterRows(rows,kind){
 function addInlineRosterStyles(){
   if(document.getElementById("bxh-admin-inline-roster-style"))return;
   const style=document.createElement("style");style.id="bxh-admin-inline-roster-style";
-  style.textContent=".tournament-roster-toggle{cursor:pointer;touch-action:manipulation}.tournament-roster-toggle:focus-visible{outline:2px solid #d9b95c;outline-offset:2px}.tournament-inline-roster{margin:10px 0 0;padding:10px 12px;border:1px solid rgba(170,112,255,.34);border-radius:10px;background:rgba(20,13,32,.9)}.tournament-inline-roster[hidden]{display:none!important}.tournament-inline-roster-title{margin:0 0 8px;font-size:14px;font-weight:800}.tournament-inline-roster-list{max-height:220px;overflow:auto;margin:0;padding:0 4px 0 24px;overscroll-behavior:contain}.tournament-inline-roster-list li{padding:3px 0;overflow-wrap:anywhere}.tournament-inline-roster-message{margin:0;color:#b8b2c4;font-size:13px}";
+  style.textContent=".tournament-roster-toggle{cursor:pointer;touch-action:manipulation}.tournament-roster-toggle:focus-visible{outline:2px solid #d9b95c;outline-offset:2px}.tournament-inline-roster{margin:10px 0 0;padding:10px 12px;border:1px solid rgba(170,112,255,.34);border-radius:10px;background:rgba(20,13,32,.9)}.tournament-inline-roster[hidden]{display:none!important}.tournament-inline-roster-title{margin:0 0 8px;font-size:14px;font-weight:800}.tournament-inline-roster-list{max-height:220px;overflow:auto;margin:0;padding:0 4px;list-style:none;overscroll-behavior:contain}.tournament-inline-roster-list li{display:grid;grid-template-columns:2.8em minmax(0,1fr);gap:4px;padding:3px 0}.tournament-inline-roster-index{display:block;text-align:right;padding-right:4px;white-space:nowrap;font-variant-numeric:tabular-nums}.tournament-inline-roster-name{min-width:0;overflow-wrap:anywhere}.tournament-inline-roster-message{margin:0;color:#b8b2c4;font-size:13px}";
   document.head.appendChild(style);
 }
 function ensureInlineRosterPanel(card){
@@ -131,7 +131,7 @@ function renderInlineRoster(panel,kind,rows){
   const title=document.createElement("h4");title.className="tournament-inline-roster-title";
   title.textContent=(kind==="waitlist"?"備取":"正取")+"名單（"+rows.length+" 人）";
   const list=document.createElement("ol");list.className="tournament-inline-roster-list";
-  rows.forEach(row=>{const item=document.createElement("li");item.textContent=row.name;list.appendChild(item);});
+  rows.forEach((row,index)=>{const item=document.createElement("li");const number=document.createElement("span");number.className="tournament-inline-roster-index";number.textContent=String(index+1)+".";const name=document.createElement("span");name.className="tournament-inline-roster-name";name.textContent=row.name;item.append(number,name);list.appendChild(item);});
   panel.replaceChildren(title,list);
 }
 async function toggleInlineRoster(button){
