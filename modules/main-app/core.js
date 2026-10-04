@@ -326,7 +326,7 @@ let adminTournamentListBusy = false;
 let adminTournamentListError = "";
 let adminTournamentListItems = [];
 let adminTournamentListLoaded = false;
-let adminTournamentListFilter = "all"; // v13.27.0: all | mine | others
+let adminTournamentListFilter = "all"; // all | mine | others | community
 let refereeDirectoryUsers = null;
 let refereeShowAllAccounts = false;
 let refereeDirectoryLoading = false;
@@ -5483,7 +5483,7 @@ function communityReadWithTimeout(promise, ms=6500, label="community-read"){
 }
 
 let communityRoomActiveTab = "live";
-const COMMUNITY_DRAFT_IDLE_MS = 7*24*60*60*1000;
+const COMMUNITY_DRAFT_IDLE_MS = 6*60*60*1000;
 const COMMUNITY_ACTIVE_IDLE_MS = 30*24*60*60*1000;
 const COMMUNITY_COMPLETED_FULL_MS = 90*24*60*60*1000;
 const TEST_DATA_TTL_MS = 7*24*60*60*1000;
@@ -5774,7 +5774,9 @@ function communityRoomExpiryMs(st){
   if(st.archiveStatus==="completed") return null;
   if(st.startedAt) return Number(st.lastActivityAt||st.updatedAt||now)+COMMUNITY_ACTIVE_IDLE_MS;
   const base=Number(st.lastActivityAt||st.updatedAt||st.createdAt||now);
-  const hasStructure=(st.players&&st.players.length>0)||(st.matches&&st.matches.length>0)||!!st.bracketSize;
+  // A newly-created room contains the host as a synthetic participant. That
+  // alone must not turn an otherwise empty room into a 30-day active room.
+  const hasStructure=(st.players||[]).some(p=>p&&p.isRoomOwner!==true)||(st.matches&&st.matches.length>0)||!!st.bracketSize;
   let expiry=base+(hasStructure?COMMUNITY_ACTIVE_IDLE_MS:COMMUNITY_DRAFT_IDLE_MS);
   if(st.meta&&st.meta.date){
     const eventEnd=Date.parse(st.meta.date+"T23:59:59+08:00");
@@ -17077,15 +17079,19 @@ function renderTournamentManagementTab(){
   }
 
   const myUid=(firebaseUser&&firebaseUser.uid)||"";
-  const allItems=adminTournamentListItems.slice();
+  const allItems=adminTournamentListItems.filter(t=>t.eventAuthority!=="community");
+  const communityItems=adminTournamentListItems.filter(t=>t.eventAuthority==="community");
   const isMine=t=>!!(myUid && t.createdBy===myUid);
   const mineCount=allItems.filter(isMine).length;
   const otherCount=allItems.length-mineCount;
-  const visibleItems=allItems.filter(t=>adminTournamentListFilter==="mine"?isMine(t):adminTournamentListFilter==="others"?!isMine(t):true);
+  const visibleItems=adminTournamentListFilter==="community"
+    ? communityItems
+    : allItems.filter(t=>adminTournamentListFilter==="mine"?isMine(t):adminTournamentListFilter==="others"?!isMine(t):true);
   const filterBar=`<div class="tournament-owner-filter" role="tablist" aria-label="賽事建立者篩選">
     <button class="${adminTournamentListFilter==='all'?'active':''}" data-action="admin-tournament-filter" data-filter="all">全部賽事 <b>${allItems.length}</b></button>
     <button class="${adminTournamentListFilter==='mine'?'active':''}" data-action="admin-tournament-filter" data-filter="mine">我的賽事 <b>${mineCount}</b></button>
     <button class="${adminTournamentListFilter==='others'?'active':''}" data-action="admin-tournament-filter" data-filter="others">其他賽事 <b>${otherCount}</b></button>
+    ${isAdminTierOrAbove()?`<button class="${adminTournamentListFilter==='community'?'active':''}" data-action="admin-tournament-filter" data-filter="community">一般房間 <b>${communityItems.length}</b></button>`:""}
   </div>`;
 
   let body = "";
@@ -17094,7 +17100,7 @@ function renderTournamentManagementTab(){
   }else if(adminTournamentListError){
     body = `<div class="panel"><div class="auth-error">${esc(adminTournamentListError)}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost" data-action="cloud-refresh-admin-list">重新整理</button></div></div>`;
   }else if(!visibleItems.length){
-    const emptyLabel=adminTournamentListFilter==="mine"?"目前沒有自己建立的賽事":adminTournamentListFilter==="others"?"目前沒有其他人建立的可管理賽事":"目前沒有可管理的賽事";
+    const emptyLabel=adminTournamentListFilter==="community"?"目前沒有玩家一般房間":adminTournamentListFilter==="mine"?"目前沒有自己建立的賽事":adminTournamentListFilter==="others"?"目前沒有其他人建立的可管理賽事":"目前沒有可管理的賽事";
     body = `<div class="panel"><div class="empty-state"><div class="big">${emptyLabel}</div><div class="hint">切換上方分類即可查看其他賽事。</div></div></div>`;
   }else{
     body = `<div style="display:flex;flex-direction:column;gap:10px;">${visibleItems.map(t=>{
@@ -17102,12 +17108,13 @@ function renderTournamentManagementTab(){
       const isCurrent = state.cloudCode && t.code===state.cloudCode;
       const mine=isMine(t);
       const isTest=t.testMode===true||t.eventAuthority==="test";
+      const isCommunity=t.eventAuthority==="community";
       const done=(t.archiveStatus==="completed"||t.tournamentPhase==="done");
       const phaseLabel=({waiting:"尚未開始",live:"進行中",settling:"結算中",done:"已結束",cancelled:"已取消"})[t.tournamentPhase]||t.tournamentPhase||"—";
       return `<div class="panel tournament-management-card" style="margin:0;">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
           <div style="min-width:0;flex:1;">
-            <div style="font-family:var(--font-d);font-weight:700;font-size:17px;">${esc(t.name||"未命名賽事")} ${isCurrent?'<span class="badge badge-neon">目前賽事</span>':''} ${isTest?'<span class="badge badge-danger">測試｜7天</span>':''} <span class="badge ${t.ladderMode==='ranked'?'badge-neon':'badge-metal'}">${t.testLadderEnabled?'🧪 測試積分賽事':t.ladderMode==='ranked'?'積分賽事':'一般賽事'}</span> <span class="badge badge-metal">${mine?'我建立':'他人建立'}</span>${t.ladderMode==='ranked'&&t.ladderPointsAwarded?'<span class="badge badge-ok">天梯已結算</span>':''}</div>
+            <div style="font-family:var(--font-d);font-weight:700;font-size:17px;">${esc(t.name||"未命名賽事")} ${isCurrent?'<span class="badge badge-neon">目前賽事</span>':''} ${isTest?'<span class="badge badge-danger">測試｜7天</span>':''} <span class="badge ${isCommunity?'badge-metal':t.ladderMode==='ranked'?'badge-neon':'badge-metal'}">${isCommunity?'玩家一般房間':t.testLadderEnabled?'🧪 測試積分賽事':t.ladderMode==='ranked'?'積分賽事':'一般賽事'}</span> <span class="badge badge-metal">${mine?'我建立':'他人建立'}</span>${t.ladderMode==='ranked'&&t.ladderPointsAwarded?'<span class="badge badge-ok">天梯已結算</span>':''}</div>
             <div class="hint" style="margin-top:5px;">${esc(t.eventDate||"日期未設定")}　${esc(t.location||"")}　代碼 ${esc(t.code)}</div>
             <div class="hint" style="margin-top:4px;">建立者：${esc(t.createdByName || t.createdBy || "舊版未記錄")}</div>
           </div>
@@ -17119,9 +17126,9 @@ function renderTournamentManagementTab(){
           <div class="stat-box"><div class="label">賽事狀態</div><div class="value small">${esc(phaseLabel)}</div></div>
         </div>
         <div class="btn-row" style="margin-top:12px;">
-          ${done?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}" data-open-history="true">查看紀錄</button>`:(isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`)}
+          ${isCommunity?"":done?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}" data-open-history="true">查看紀錄</button>`:(isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`)}
           <button class="btn btn-ghost btn-sm" data-action="cloud-admin-copy-code" data-code="${esc(t.code)}">複製代碼</button>
-          ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}">刪除賽事</button>`:""}
+          ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}" data-community="${isCommunity?'true':'false'}">${isCommunity?'刪除房間':'刪除賽事'}</button>`:""}
         </div>
       </div>`;
     }).join("")}</div>`;
@@ -17129,7 +17136,7 @@ function renderTournamentManagementTab(){
 
   return `<div class="panel">
     <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
-    <div class="hint">賽事切換集中於此：直接選擇其他賽事的「開啟管理」。依建立者快速分流；已完成賽事改由「查看紀錄」進入唯讀賽後中心。</div>
+    <div class="hint">正式賽事可依建立者快速分流；最高管理員與管理員可在「一般房間」整理玩家房間。工作人員無法查看或刪除一般房間。</div>
     ${filterBar}
   </div>
   ${body}
@@ -17143,10 +17150,10 @@ function renderAdminTournamentListModal(){
     body = `<div class="empty-state"><div class="big">正在讀取雲端賽事…</div></div>`;
   } else if(adminTournamentListError){
     body = `<div class="auth-error">${esc(adminTournamentListError)}</div>`;
-  } else if(!adminTournamentListItems.length){
+  } else if(!adminTournamentListItems.filter(t=>t.eventAuthority!=="community").length){
     body = `<div class="empty-state"><div class="big">目前沒有可管理的賽事</div><div class="hint">空白／未完成設定的雲端賽事已自動隱藏。</div><div class="btn-row" style="justify-content:center;margin-top:14px;">${canCreateOfficialTournament()?`<button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:`<span class="hint">目前帳號沒有可建立或管理的賽事。</span>`}</div></div>`;
   } else {
-    body = `<div style="display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto;padding-right:2px;">${adminTournamentListItems.map(t=>{
+    body = `<div style="display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto;padding-right:2px;">${adminTournamentListItems.filter(t=>t.eventAuthority!=="community").map(t=>{
       const confirmed = Number(t.confirmedCount||0);
       const waiting = Number(t.waitlistCount||0);
       const cap = Number(t.capacity||0);
@@ -17209,7 +17216,7 @@ async function loadAdminTournamentList(){
 
     // v13.14.1：隱藏「剛建立但尚未填任何活動資料」的空白雲端賽事，避免管理清單被占滿。
     adminTournamentListItems = rawItems.filter(t=>{
-      if(t.eventAuthority==="community") return false;
+      if(t.eventAuthority==="community") return isAdminTierOrAbove();
       const hasIdentity = !!String(t.name||"").trim() || !!String(t.eventDate||"").trim() || !!String(t.location||"").trim();
       const hasRegistration = !!t.registrationEnabled || Number(t.confirmedCount||0)>0 || Number(t.waitlistCount||0)>0;
       const hasProgress = (t.tournamentPhase && t.tournamentPhase!=="waiting");
@@ -18196,7 +18203,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="admin-tournament-filter"){
     const f=target.getAttribute("data-filter");
-    if(["all","mine","others"].includes(f)){ adminTournamentListFilter=f; render(); }
+    if(["all","mine","others"].includes(f)||(f==="community"&&isAdminTierOrAbove())){ adminTournamentListFilter=f; render(); }
     return;
   }
   if(action==="load-duty-logs"){
@@ -20204,8 +20211,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!isAdminTierOrAbove()){ showToast("活動主辦及工作人員（活動）不可刪除已保存的活動與房間。", true); return; }
     const code = target.getAttribute("data-code") || "";
     const name = target.getAttribute("data-name") || code;
+    const isCommunity = target.getAttribute("data-community")==="true";
     if(!code) return;
-    openModal({ type:"generic", title:"刪除雲端賽事", message:"確定刪除「"+name+"」？\n\n會刪除這場賽事的雲端資料、公開觀賽資料，以及正取／備取報名資料。此動作無法復原。", danger:true, confirmLabel:"確定刪除", onConfirm:()=>{
+    openModal({ type:"generic", title:isCommunity?"刪除一般房間":"刪除雲端賽事", message:"確定刪除「"+name+"」？\n\n"+(isCommunity?"會刪除完整房間、公開大廳資料及房間內報名資料；已完成的主辦摘要仍保留。":"會刪除這場賽事的雲端資料、公開觀賽資料，以及正取／備取報名資料。")+"此動作無法復原。", danger:true, confirmLabel:"確定刪除", onConfirm:()=>{
       (async ()=>{
         try{
           if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
@@ -20214,7 +20222,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             state.cloudCode = null;
             await saveRecord(state);
           }
-          showToast("已刪除賽事："+name);
+          showToast((isCommunity?"已刪除一般房間：":"已刪除賽事：")+name);
           adminTournamentListOpen = true;
           await loadAdminTournamentList();
         }catch(e){
