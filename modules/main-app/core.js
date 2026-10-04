@@ -10830,7 +10830,7 @@ function renderStaffAssignmentPanel(){
       ${candidates.map(u=>`
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
           <input type="checkbox" class="staff-assign-checkbox" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} style="width:18px;height:18px;">
-          ${esc(u.displayName||u.email)}　<span class="hint" style="margin:0;">(${u.role==="admin"?"管理員":"工作人員"})</span>
+          ${esc((typeof u.realName==="string" && u.realName.trim()) || "未填寫本名")}　<span class="hint" style="margin:0;">(${u.role==="admin"?"管理員":"工作人員"})</span>
         </label>`).join("")}
     </div>
     <div class="btn-row" style="margin-top:12px;">
