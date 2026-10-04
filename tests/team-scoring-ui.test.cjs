@@ -49,14 +49,15 @@ function watchIsolationCase(search,watchContext,activeTab){
     },
     querySelector(selector){return selector==='#bxh-management-v2-nav'?navRoot:null;}
   };
+  let originalRendered=false,originalPrimeCount=0;
   const sandbox={
     URLSearchParams,location:{search},publicWatchReturnContext:watchContext,activeTab,
-    renderTeamLineupPanel:()=> 'lineup',primeTeamMatchViews(){this.primed=(this.primed||0)+1;},
-    renderApp(){this.rendered=true;},document:{getElementById:()=>app}
+    renderTeamLineupPanel:()=> 'lineup',primeTeamMatchViews(){originalPrimeCount++;},
+    renderApp(){originalRendered=true;},document:{getElementById:()=>app}
   };
   vm.runInNewContext(publicWatchPatch,sandbox);
   sandbox.renderApp();
-  return {sandbox,nav,account,modeContext,navRoot};
+  return {sandbox,nav,account,modeContext,navRoot,originalRendered:()=>originalRendered,originalPrimeCount:()=>originalPrimeCount};
 }
 const directWatch=watchIsolationCase('?code=BXH-QATEST&entry=watch',false,'duty');
 assert.equal(directWatch.sandbox.activeTab,'live');
@@ -64,6 +65,7 @@ assert.deepEqual(directWatch.nav.filter(x=>!x.removed).map(x=>x.dataset.tab),['l
 assert.deepEqual(directWatch.account.filter(x=>!x.removed).map(x=>x.dataset.action),['back-from-public-watch','account-logout']);
 assert.equal(directWatch.navRoot.dataset.visibleTabs,'ladder,live,bracket');
 assert.equal(directWatch.modeContext.cleared,true);
+assert.equal(directWatch.originalRendered(),true);
 assert.equal(directWatch.sandbox.renderTeamLineupPanel({},'player'),'');
 const normalEvent=watchIsolationCase('?code=BXH-QATEST&entry=event',false,'duty');
 assert.equal(normalEvent.sandbox.activeTab,'duty');
