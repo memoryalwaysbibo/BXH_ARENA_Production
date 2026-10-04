@@ -65,7 +65,7 @@ must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linkin
 must(/linkWithRedirect:\s*authMod\.linkWithRedirect/, 'Google account linking fallback must import linkWithRedirect');
 must(/getRedirectResult:\s*authMod\.getRedirectResult/, 'Google account linking fallback must import getRedirectResult');
 mustInclude('const GOOGLE_LINK_PILOT_EMAILS=new Set(["memoryalwaysbobi@gmail.com"]);','Google link pilot allowlist missing');
-must(/function\s+canUseGoogleLinkPilot\(\)[\s\S]*?isSuperAdmin\(\)[\s\S]*?userProfile\.active===true[\s\S]*?GOOGLE_LINK_PILOT_EMAILS\.has\(email\)/, 'Google link UI must allow only super-admin or the active pilot account');
+must(/function\s+canUseGoogleLinkPilot\(\)[\s\S]*?userProfile\.active===true[\s\S]*?userProfile\.isTestAccount!==true[\s\S]*?GOOGLE_LINK_PILOT_EMAILS\.has\(email\)/, 'Google link UI must allow only the active allowlisted pilot account');
 must(/async\s+getUserProfile\(uid\)[\s\S]*?googleLinkProfileCache\.set\(uid,\{profile,loadedAt:Date\.now\(\)\}\)/, 'Google link profile must be cached before the button is tapped');
 const googleLinkMethod=cloudRuntime.slice(cloudRuntime.indexOf('async linkMyGoogleAccount()'),cloudRuntime.indexOf('async signInWithLinkedGoogle()'));
 const executableGoogleLinkMethod=googleLinkMethod.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,'');
