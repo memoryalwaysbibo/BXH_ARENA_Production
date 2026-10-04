@@ -195,7 +195,7 @@
       const pilotEmails=new Set(["memoryalwaysbobi@gmail.com"]);
       const profileEmail=String(profile?.email||"").trim().toLowerCase();
       const approvedPilot=profile?.active===true&&pilotEmails.has(profileEmail);
-      if(profile?.active!==true||(profile?.role!=="super_admin"&&!approvedPilot))return {ok:false,error:"此帳號尚未開放 Google 綁定測試。"};
+      if(!approvedPilot)return {ok:false,error:"此帳號尚未開放 Google 綁定測試。"};
       if(profileEmail!==oldEmail)return {ok:false,error:"登入信箱與會員資料不一致，請先核對。"};
       if(user.providerData.some(p=>p.providerId==="google.com"))return {ok:true,uid};
       try{
