@@ -20,8 +20,11 @@ test('admin inline roster filters by seat type and exposes names only',()=>{
   assert.match(uiSource,/!canManageInCurrentInterface\(\)\)return/);
   assert.match(uiSource,/aria-expanded/);
   assert.match(uiSource,/名單載入中/);
-  assert.match(uiSource,/max-height:220px;overflow:auto/);
-  assert.ok(uiSource.includes("grid-template-columns:2.8em minmax(0,1fr)"));
+  assert.match(uiSource,/tournament-inline-roster-columns/);
+  assert.match(uiSource,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(uiSource,/const midpoint=Math\.ceil\(rows\.length\/2\)/);
+  assert.match(uiSource,/rows\.slice\(0,midpoint\),rows\.slice\(midpoint\)/);
+  assert.ok(uiSource.includes("grid-template-columns:2.4em minmax(0,1fr)"));
   assert.match(uiSource,/tournament-inline-roster-index/);
   assert.match(uiSource,/white-space:nowrap;font-variant-numeric:tabular-nums/);
   assert.ok(uiSource.includes("查看名單⌄"));
@@ -46,9 +49,10 @@ test('management poster preview uses only a full-resolution poster URL',()=>{
   assert.match(uiSource,/trigger\.closest\("\.lobby-poster-figure, \.tournament-poster-stats-preview"\)/);
   assert.match(uiSource,/if\(!poster\)return false/);
   assert.match(uiSource,/preview\.parentElement!==layout\|\|stats\.parentElement!==layout/);
-  assert.match(uiSource,/grid-template-rows:repeat\(3,minmax\(72px,1fr\)\)!important/);
-  assert.match(uiSource,/min-height:252px;display:flex;align-items:center;justify-content:center/);
-  assert.match(uiSource,/min-height:72px!important;height:100%/);
+  assert.match(uiSource,/grid-template-rows:repeat\(3,minmax\(64px,1fr\)\)!important/);
+  assert.match(uiSource,/min-height:204px;display:flex;align-items:center;justify-content:center/);
+  assert.match(uiSource,/min-height:64px!important;height:100%/);
+  assert.match(uiSource,/target=Math\.min\(height,216\)/);
   assert.match(uiSource,/syncAdminPosterStatHeight\(image,stats,preview\)/);
   assert.match(uiSource,/heightSource\.getBoundingClientRect\(\)\.height/);
   
