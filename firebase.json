@@ -1,0 +1,31 @@
+{
+  "hosting": [
+    {
+      "target": "pwa-auth-test",
+      "public": ".",
+      "ignore": [
+        "firebase.json",
+        ".firebaserc",
+        ".firebaseignore",
+        "**/.*",
+        "**/node_modules/**",
+        "**/tests/**",
+        "**/scripts/**",
+        "**/tools/**",
+        "docs/**",
+        "cloudflare/**",
+        ".github/**",
+        "package.json",
+        "playwright*.cjs"
+      ],
+      "headers": [
+        {
+          "source": "/**",
+          "headers": [
+            { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+          ]
+        }
+      ]
+    }
+  ]
+}
