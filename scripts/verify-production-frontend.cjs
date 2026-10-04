@@ -61,8 +61,10 @@ must(/if\(action==="player-google-signin"\)[\s\S]*?window\.cloudAuth\.signInWith
 must(/async\s+signInWithLinkedGoogle\s*\(\)[\s\S]*?ax\.signInWithPopup\(authHandle,provider,ax\.browserPopupRedirectResolver\)/, 'Linked Google popup sign-in missing');
 must(/if\(fbUser\.providerData\?\.some\(p=>p\.providerId==="google\.com"\)\)[\s\S]*?await window\.cloudAuth\.signOutUser\(\)/, 'Missing Google profile must fail closed');
 must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linking pilot must import the provider');
-must(/async\s+linkMyGoogleAccount\s*\(\)\s*\{[\s\S]*?profile\?\.role!=="super_admin"[\s\S]*?ax\.linkWithPopup\(user,provider,[\s\S]*?linked\.uid!==uid[\s\S]*?googleEmail!==oldEmail[\s\S]*?ax\.unlink\(linked,"google.com"\)/, 'Google link pilot must be super-admin only, keep UID, and reject mismatched email');
-must(/if\(action==="player-link-google"\)\{\s*if\(!isSuperAdmin\(\)\)return;/, 'Google link action must be super-admin only');
+mustInclude('const GOOGLE_LINK_PILOT_EMAILS=new Set(["memoryalwaysbobi@gmail.com"]);','Google link pilot allowlist missing');
+must(/function\s+canUseGoogleLinkPilot\(\)[\s\S]*?isSuperAdmin\(\)[\s\S]*?userProfile\.active===true[\s\S]*?GOOGLE_LINK_PILOT_EMAILS\.has\(email\)/, 'Google link UI must allow only super-admin or the active pilot account');
+must(/async\s+linkMyGoogleAccount\s*\(\)\s*\{[\s\S]*?pilotEmails\.has\(profileEmail\)[\s\S]*?profile\?\.role!=="super_admin"&&!approvedPilot[\s\S]*?profileEmail!==oldEmail[\s\S]*?ax\.linkWithPopup\(user,provider,[\s\S]*?linked\.uid!==uid[\s\S]*?googleEmail!==oldEmail[\s\S]*?ax\.unlink\(linked,"google.com"\)/, 'Google link pilot must keep UID and reject unapproved or mismatched accounts');
+must(/if\(action==="player-link-google"\)\{\s*if\(!canUseGoogleLinkPilot\(\)\)return;/, 'Google link action must enforce the pilot allowlist');
 mustNot(/getRedirectResult\(authHandle\)/, 'Google redirect result runtime is still active');
 must(/signInWithPopup:\s*authMod\.signInWithPopup/, 'Google popup sign-in SDK mapping missing');
 mustNot(/role:\s*["']tester["'],\s*active:\s*true,\s*provider:\s*["'](?:password|google)["']/, 'Public signup/recovery still creates tester role');

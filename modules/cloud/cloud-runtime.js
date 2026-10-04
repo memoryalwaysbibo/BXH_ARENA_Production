@@ -139,8 +139,11 @@
       const user=authHandle.currentUser,uid=user.uid,oldEmail=String(user.email||"").trim().toLowerCase();
       if(!oldEmail) return {ok:false,error:"原帳號缺少登入信箱，請聯絡管理員。"};
       const profile=await this.getUserProfile(uid);
-      if(profile?.role!=="super_admin"||profile?.active!==true)return {ok:false,error:"Google 綁定目前僅開放最高管理員測試。"};
-      if(String(profile.email||"").trim().toLowerCase()!==oldEmail)return {ok:false,error:"登入信箱與會員資料不一致，請先核對。"};
+      const pilotEmails=new Set(["memoryalwaysbobi@gmail.com"]);
+      const profileEmail=String(profile?.email||"").trim().toLowerCase();
+      const approvedPilot=profile?.active===true&&pilotEmails.has(profileEmail);
+      if(profile?.active!==true||(profile?.role!=="super_admin"&&!approvedPilot))return {ok:false,error:"此帳號尚未開放 Google 綁定測試。"};
+      if(profileEmail!==oldEmail)return {ok:false,error:"登入信箱與會員資料不一致，請先核對。"};
       if(user.providerData.some(p=>p.providerId==="google.com"))return {ok:true,uid};
       try{
         const provider=new ax.GoogleAuthProvider();
