@@ -1,0 +1,11 @@
+name = "bxh-arena-firebase-auth-proxy"
+main = "src/index.mjs"
+compatibility_date = "2026-10-04"
+
+[[routes]]
+pattern = "arena.bxh.com.tw/__/auth/*"
+zone_name = "bxh.com.tw"
+
+[[routes]]
+pattern = "arena.bxh.com.tw/__/firebase/init.json"
+zone_name = "bxh.com.tw"
