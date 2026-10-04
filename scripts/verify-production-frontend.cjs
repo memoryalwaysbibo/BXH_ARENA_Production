@@ -60,6 +60,13 @@ must(/async\s+completeNewPlayerProfile\([\s\S]*?role:\s*["']player["'][\s\S]*?pr
 must(/function\s+canCreateOfficialTournament\(\)\{[^\n]*!isTester\(\)/, 'Tester must be excluded from official tournament creation');
 must(/if\(action==="player-google-signin"\)[\s\S]*?window\.cloudAuth\.signInWithLinkedGoogle\(\)/, 'Linked Google sign-in action missing');
 must(/async\s+signInWithLinkedGoogle\s*\(\)[\s\S]*?ax\.signInWithPopup\(authHandle,provider,ax\.browserPopupRedirectResolver\)/, 'Linked Google popup sign-in missing');
+must(/function\s+shouldUseRedirectGoogleAuth\(\)[\s\S]*?navigator\.standalone===true[\s\S]*?display-mode:\s*standalone/, 'Standalone PWA must use full-page Google auth redirect');
+must(/location\.hostname===["']bxh-arena-pwa-auth-test\.web\.app["'][\s\S]*?FIREBASE_CONFIG\.authDomain=location\.hostname/, 'Only the dedicated PWA auth test host may use same-origin authDomain');
+must(/const useRedirect=shouldUseRedirectGoogleAuth\(\)[\s\S]*?if\(useRedirect\)return await startRedirect\(\)/, 'Standalone Google sign-in must start redirect before attempting a popup');
+must(/auth\/popup-blocked[\s\S]*?return await startRedirect\(\)/, 'Blocked Google sign-in popup must fall back to full-page redirect');
+must(/sessionStorage\.setItem\(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY,"1"\)[\s\S]*?ax\.signInWithRedirect\(authHandle,provider,ax\.browserPopupRedirectResolver\)/, 'Google sign-in redirect must persist its pending result marker');
+must(/sessionStorage\.getItem\(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY\)[\s\S]*?ax\.getRedirectResult\(authHandle,ax\.browserPopupRedirectResolver\)/, 'Google sign-in redirect result must be consumed after returning');
+
 must(/if\(fbUser\.providerData\?\.some\(p=>p\.providerId==="google\.com"\)\)[\s\S]*?await window\.cloudAuth\.signOutUser\(\)/, 'Missing Google profile must fail closed');
 must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linking must import the provider');
 must(/linkWithRedirect:\s*authMod\.linkWithRedirect/, 'Google account linking fallback must import linkWithRedirect');
