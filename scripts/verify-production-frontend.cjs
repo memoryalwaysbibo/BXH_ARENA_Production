@@ -65,8 +65,8 @@ mustInclude('const GOOGLE_LINK_PILOT_EMAILS=new Set(["memoryalwaysbobi@gmail.com
 must(/function\s+canUseGoogleLinkPilot\(\)[\s\S]*?isSuperAdmin\(\)[\s\S]*?userProfile\.active===true[\s\S]*?GOOGLE_LINK_PILOT_EMAILS\.has\(email\)/, 'Google link UI must allow only super-admin or the active pilot account');
 must(/async\s+getUserProfile\(uid\)[\s\S]*?googleLinkProfileCache\.set\(uid,\{profile,loadedAt:Date\.now\(\)\}\)/, 'Google link profile must be cached before the button is tapped');
 const googleLinkMethod=cloudRuntime.slice(cloudRuntime.indexOf('async linkMyGoogleAccount()'),cloudRuntime.indexOf('async signInWithLinkedGoogle()'));
-const googlePopupCall=googleLinkMethod.indexOf('ax.linkWithPopup(');
 const executableGoogleLinkMethod=googleLinkMethod.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,'');
+const googlePopupCall=executableGoogleLinkMethod.indexOf('ax.linkWithPopup(');
 const googleFirstAwait=executableGoogleLinkMethod.indexOf('await ');
 if(googlePopupCall<0 || (googleFirstAwait>=0 && googlePopupCall>googleFirstAwait)) throw new Error('Google link popup must start before any await in the click handler');
 must(/async\s+linkMyGoogleAccount\s*\(\)[\s\S]*?googleLinkProfileCache\.get\(uid\)[\s\S]*?pilotEmails\.has\(profileEmail\)[\s\S]*?profile\?\.role!=="super_admin"&&!approvedPilot[\s\S]*?ax\.linkWithPopup\(user,provider,[\s\S]*?const freshProfile=await this\.getUserProfile\(uid\)[\s\S]*?linked\.uid!==uid[\s\S]*?googleEmail!==oldEmail[\s\S]*?ax\.unlink\(linked,"google.com"\)/, 'Google link must start popup synchronously, revalidate eligibility, keep UID, and reject mismatched email');
