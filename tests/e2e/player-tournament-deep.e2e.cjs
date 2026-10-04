@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('node:crypto');
 
-test('four-player community event reaches first confirmed referee result', async ({ page }) => {
+test('four-player community event reaches first confirmed referee result', async ({ page, browser }) => {
   const externalFirebaseRequests = [];
 
   await page.route('**/*', async route => {
@@ -80,6 +80,68 @@ test('four-player community event reaches first confirmed referee result', async
   const modalConfirm = page.locator('[data-action="modal-confirm"]');
   await expect(modalConfirm).toBeVisible({ timeout: 20000 });
   await modalConfirm.click();
+
+  await page.evaluate(async () => {
+    if (typeof flushCloudStateWrites === 'function') await flushCloudStateWrites();
+  });
+
+  // Open the live tournament through the public URL used by "觀看比賽".
+  // The fresh browser context proves the entry does not depend on the host
+  // account session and cannot remain stuck at watch-connecting.
+  const watchCode = await page.evaluate(() => state.cloudCode);
+  expect(watchCode).toMatch(/^BXH-[A-Z0-9]{6}$/);
+
+  const watchContext = await browser.newContext();
+  const watchPage = await watchContext.newPage();
+  const watchExternalFirebaseRequests = [];
+
+  await watchPage.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    const host = url.hostname;
+    const blocked =
+      host === 'firestore.googleapis.com' ||
+      host === 'identitytoolkit.googleapis.com' ||
+      host === 'securetoken.googleapis.com' ||
+      host.endsWith('.firebaseio.com') ||
+      host.endsWith('.cloudfunctions.net');
+    if (blocked) {
+      watchExternalFirebaseRequests.push(url.toString());
+      await route.abort('blockedbyclient');
+      return;
+    }
+    await route.continue();
+  });
+
+  const watchOrigin = new URL(page.url()).origin;
+  const watchResponse = await watchPage.goto(
+    `${watchOrigin}/?bxh_e2e=1&code=${encodeURIComponent(watchCode)}&entry=watch`,
+    { waitUntil: 'domcontentloaded' }
+  );
+  expect(watchResponse?.headers()['x-bxh-e2e-emulator']).toBe('1');
+
+  await watchPage.waitForFunction(
+    () => typeof appPhase !== 'undefined' && appPhase !== 'watch-connecting',
+    null,
+    { timeout: 30000 }
+  );
+  await expect(watchPage.locator('.live-dashboard-panel')).toBeVisible({ timeout: 30000 });
+
+  const publicWatchState = await watchPage.evaluate(() => ({
+    appPhase,
+    activeTab,
+    currentRole,
+    guestReadOnlyMode,
+    cloudCode: state.cloudCode
+  }));
+  expect(publicWatchState).toEqual({
+    appPhase: 'app',
+    activeTab: 'live',
+    currentRole: 'guest',
+    guestReadOnlyMode: true,
+    cloudCode: watchCode
+  });
+  expect(watchExternalFirebaseRequests).toEqual([]);
+  await watchContext.close();
 
   await page.locator('[data-action="community-switch-room-tab"][data-tab="referee"]').click();
 
