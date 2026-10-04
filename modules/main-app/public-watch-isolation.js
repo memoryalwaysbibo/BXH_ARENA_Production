@@ -8,7 +8,8 @@
 
   // Public/live pages must never render captain or referee controls.
   renderTeamLineupPanel=function(m,mode='player'){
-    return mode==='referee'?originalLineupPanel(m,mode):'';
+    if(publicWatchReturnContext&&mode!=='referee')return '';
+    return originalLineupPanel(m,mode);
   };
 
   // Private lineup reads are reserved for the referee workstation.

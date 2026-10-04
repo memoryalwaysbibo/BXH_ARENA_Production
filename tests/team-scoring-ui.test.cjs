@@ -15,7 +15,8 @@ assert(source.includes("[['spin','轉停'],['burst','爆裂'],['over','擊飛'],
 assert(!source.includes('id="team-score-winner-'));
 assert(source.includes('function renderTeamReferee()'));
 assert(source.includes('if(mine&&!refereeMode){'));
-assert(publicWatchPatch.includes("return mode==='referee'?originalLineupPanel(m,mode):''"));
+assert(publicWatchPatch.includes("if(publicWatchReturnContext&&mode!=='referee')return '';"));
+assert(publicWatchPatch.includes('return originalLineupPanel(m,mode);'));
 assert(publicWatchPatch.includes("activeTab==='referee'&&!publicWatchReturnContext"));
 assert(publicWatchPatch.includes("const allowedTabs=new Set(['ladder','live','bracket'])"));
 assert(publicWatchPatch.includes("v2.dataset.visibleTabs='ladder,live,bracket'"));
