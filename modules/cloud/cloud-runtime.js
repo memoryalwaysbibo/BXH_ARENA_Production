@@ -119,10 +119,8 @@
               const profile = snap?.exists() ? snap.data() : null;
               const oldEmail = String(redirectContext.email||"").trim().toLowerCase();
               const profileEmail = String(profile?.email||"").trim().toLowerCase();
-              const pilotEmails = new Set(["memoryalwaysbobi@gmail.com"]);
-              const approvedPilot = profile?.active===true && pilotEmails.has(profileEmail);
               const googleEmail = String(linked.providerData.find(p=>p.providerId==="google.com")?.email||"").trim().toLowerCase();
-              const eligible = profile?.active===true && (profile?.role==="super_admin" || approvedPilot);
+              const eligible = profile?.active===true && profile?.isTestAccount!==true;
               if(!eligible || profileEmail!==oldEmail || googleEmail!==oldEmail){
                 try{
                   if(linked.providerData.some(p=>p.providerId==="google.com")) await ax.unlink(linked,"google.com");
@@ -192,10 +190,8 @@
       const profileEntry=googleLinkProfileCache.get(uid);
       if(!profileEntry || Date.now()-profileEntry.loadedAt>GOOGLE_LINK_PROFILE_CACHE_TTL_MS)return {ok:false,error:"帳號資料已逾時，請重新開啟「我的資料」後再試。"};
       const profile=profileEntry.profile;
-      const pilotEmails=new Set(["memoryalwaysbobi@gmail.com"]);
       const profileEmail=String(profile?.email||"").trim().toLowerCase();
-      const approvedPilot=profile?.active===true&&pilotEmails.has(profileEmail);
-      if(!approvedPilot)return {ok:false,error:"此帳號尚未開放 Google 綁定測試。"};
+      if(profile?.active!==true||profile?.isTestAccount===true)return {ok:false,error:"此帳號目前不符合 Google 綁定資格。"};
       if(profileEmail!==oldEmail)return {ok:false,error:"登入信箱與會員資料不一致，請先核對。"};
       if(user.providerData.some(p=>p.providerId==="google.com"))return {ok:true,uid};
       try{
@@ -221,8 +217,7 @@
         if(linked.uid!==uid)throw Error("uid-changed");
         const freshProfile=await this.getUserProfile(uid);
         const freshEmail=String(freshProfile?.email||"").trim().toLowerCase();
-        const freshApprovedPilot=freshProfile?.active===true&&pilotEmails.has(freshEmail);
-        if(freshProfile?.active!==true||(freshProfile?.role!=="super_admin"&&!freshApprovedPilot)||freshEmail!==oldEmail){
+        if(freshProfile?.active!==true||freshProfile?.isTestAccount===true||freshEmail!==oldEmail){
           try{await ax.unlink(linked,"google.com");}
           catch(unlinkError){return {ok:false,error:"帳號資格重新核對失敗，解除連結也失敗。請停止操作並由管理員檢查帳號。"};}
           return {ok:false,error:"帳號資格已變更或無法確認，已取消 Google 連結。"};
