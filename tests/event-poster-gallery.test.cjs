@@ -21,6 +21,7 @@ test('management poster preview uses only a full-resolution poster URL',()=>{
   assert.match(uiSource,/grid-template-columns:minmax\(88px,30%\)/);
   assert.match(uiSource,/object-fit:contain/);
   assert.match(uiSource,/data-poster-stats-layout/);
+  assert.match(uiSource,/trigger\.closest\("\.lobby-poster-figure, \.tournament-poster-stats-preview"\)/);
   assert.match(uiSource,/if\(!poster\)return false/);
   assert.match(uiSource,/preview\.parentElement!==layout\|\|stats\.parentElement!==layout/);
   assert.match(uiSource,/grid-template-rows:repeat\(3,minmax\(0,1fr\)\)!important/);
