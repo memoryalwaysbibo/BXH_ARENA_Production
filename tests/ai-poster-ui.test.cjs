@@ -62,6 +62,10 @@ function ready(result=fixture().result){ctx.testResult=result;run('aiCreateAssis
    ctx.window.localStorage={getItem:key=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
    vm.runInContext('let publicTournamentsCache=[];',ctx);
    vm.runInContext(html.slice(start,end),ctx);
+   image.cover={mimeType:"image/jpeg",base64:"AAAA",width:240,height:240};
+   ready();assert(api.applyAiCreateSelectedEventToDraft().ok);
+   assert(Number.isFinite(run('aiCreateCoverPending.createdAt')),'applied cover has retry timestamp');
+   run('aiCreateCoverPending=null');
    let uploads=0,failUpload=true;
    ctx.window.engagementService.roomPosterCover=async()=>{uploads++;if(failUpload)throw Object.assign(new Error('poster-upload-failed'),{code:'poster-upload-failed'});return {ok:true};};
    run('aiCreateCoverPending={roomId:"old-room",uid:"user1",createdAt:Date.now(),cover:{mimeType:"image/jpeg",base64:"AAAA",width:240,height:240}}');
