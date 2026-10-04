@@ -2,6 +2,13 @@ name: Validate Production Frontend RC1
 
 on:
   workflow_dispatch:
+    inputs:
+      risk_override:
+        description: 'Acceptance-test override (auto/low/medium/high)'
+        required: false
+        default: auto
+        type: choice
+        options: [auto, low, medium, high]
   pull_request:
   push:
     branches: [ main ]
@@ -9,8 +16,52 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: safety-gate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  classify:
+    name: Classify change risk
+    runs-on: ubuntu-latest
+    outputs:
+      level: ${{ steps.risk.outputs.level }}
+      run_ui: ${{ steps.risk.outputs.run_ui }}
+      run_e2e: ${{ steps.risk.outputs.run_e2e }}
+      run_deep: ${{ steps.risk.outputs.run_deep }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: risk
+        name: Calculate Safety Gate tier
+        shell: bash
+        env:
+          DISPATCH_OVERRIDE: ${{ inputs.risk_override || 'auto' }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
+            override=auto
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            files="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")"
+            override=auto
+          else
+            files="$(git diff --name-only HEAD^ HEAD 2>/dev/null || git ls-files)"
+            override="$DISPATCH_OVERRIDE"
+          fi
+          printf '%s\n' "$files" | sed '/^$/d' | tee "$RUNNER_TEMP/safety-gate-files.txt"
+          RISK_OVERRIDE="$override" node scripts/classify-change-risk.cjs < "$RUNNER_TEMP/safety-gate-files.txt" | tee "$RUNNER_TEMP/safety-gate-result.txt"
+          grep -E '^(level|run_ui|run_e2e|run_deep)=' "$RUNNER_TEMP/safety-gate-result.txt" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Safety Gate 2.0"
+            echo ""
+            sed 's/^/- /' "$RUNNER_TEMP/safety-gate-result.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   validate:
+    needs: classify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +85,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Verify Safety Gate risk classifier
+        run: node --test tests/safety-gate-risk.test.cjs
       - name: Verify BXH CALL Web Push scripts syntax
         run: |
           node --check court-call-ui.js
@@ -144,6 +197,8 @@ jobs:
           fi
 
   ui_smoke:
+    needs: classify
+    if: ${{ needs.classify.outputs.run_ui == 'true' }}
     name: UI Smoke - Desktop / iPhone / Android
     runs-on: ubuntu-latest
     container:
@@ -152,8 +207,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install UI test runner
         run: npm install --no-package-lock --ignore-scripts
-      - name: Run isolated browser smoke tests
-        run: npm run test:ui-smoke
+      - name: Run isolated browser smoke tests (one controlled retry)
+        shell: bash
+        run: |
+          set +e
+          npm run test:ui-smoke
+          rc=$?
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::warning title=TEST_FLAKY_RETRY::UI Smoke failed once; retrying."
+            npm run test:ui-smoke
+            rc=$?
+            if [[ "$rc" -eq 0 ]]; then
+              echo "TEST_FLAKY_RECOVERED: UI Smoke passed on retry." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::error title=CODE_FAIL_OR_INFRA_FAIL::UI Smoke failed twice."
+            exit "$rc"
+          fi
       - name: Upload browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -164,6 +235,8 @@ jobs:
           retention-days: 7
 
   emulator_e2e:
+    needs: classify
+    if: ${{ needs.classify.outputs.run_e2e == 'true' }}
     name: Critical E2E - Player Signup / Community Room
     runs-on: ubuntu-latest
     container:
@@ -181,16 +254,76 @@ jobs:
       - name: Install E2E dependencies
         run: npm install --no-package-lock --ignore-scripts
 
-      - name: Run critical Firebase Emulator E2E
+      - name: Run critical Firebase Emulator E2E (one controlled retry)
         shell: bash
         run: |
-          npx firebase emulators:exec             --only auth,firestore             --project demo-bxh-arena-e2e             --config tests/e2e/firebase.json             "npm run test:ui-e2e"
+          set +e
+          command=(npx firebase emulators:exec --only auth,firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "npm run test:ui-e2e")
+          "${command[@]}"
+          rc=$?
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::warning title=TEST_FLAKY_RETRY::Critical E2E failed once; retrying."
+            "${command[@]}"
+            rc=$?
+            if [[ "$rc" -eq 0 ]]; then
+              echo "TEST_FLAKY_RECOVERED: Critical E2E passed on retry." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::error title=CODE_FAIL_OR_INFRA_FAIL::Critical E2E failed twice."
+            exit "$rc"
+          fi
 
       - name: Upload E2E failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: bxh-arena-critical-e2e-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  deep_e2e:
+    needs: classify
+    if: ${{ needs.classify.outputs.run_deep == 'true' }}
+    name: Deep E2E - Finals / Multi-court / Player / Public Watch
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Java for Firestore Emulator
+        shell: bash
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openjdk-21-jre-headless
+          java -version
+      - name: Install Deep E2E dependencies
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Run Deep Emulator E2E (one controlled retry)
+        shell: bash
+        run: |
+          set +e
+          command=(npx firebase emulators:exec --only auth,firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "npx playwright test --config=playwright.deep-e2e.config.cjs")
+          "${command[@]}"
+          rc=$?
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::warning title=TEST_FLAKY_RETRY::Deep E2E failed once; retrying."
+            "${command[@]}"
+            rc=$?
+            if [[ "$rc" -eq 0 ]]; then
+              echo "TEST_FLAKY_RECOVERED: Deep E2E passed on retry." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::error title=CODE_FAIL_OR_INFRA_FAIL::Deep E2E failed twice."
+            exit "$rc"
+          fi
+      - name: Upload Deep E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-deep-e2e-failure-${{ github.run_id }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7

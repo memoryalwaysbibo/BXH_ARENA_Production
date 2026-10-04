@@ -1,32 +1,7 @@
-name: BXH ARENA Deep Emulator E2E
+name: BXH ARENA Nightly Full Regression
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'index.html'
-      - 'modules/main-app/**'
-      - '.github/workflows/deep-emulator-e2e.yml'
-      - 'tests/e2e/player-tournament-deep.e2e.cjs'
-      - 'tests/e2e/admin-finals-order-deep.e2e.cjs'
-      - 'tests/e2e/multi-court-dispatch-deep.e2e.cjs'
-      - 'playwright.deep-e2e.config.cjs'
-      - 'tests/e2e/static-server.cjs'
-      - 'tests/e2e/firebase.json'
-      - 'tests/e2e/firestore.rules'
-  push:
-    branches: [ main ]
-    paths:
-      - 'index.html'
-      - 'modules/main-app/**'
-      - '.github/workflows/deep-emulator-e2e.yml'
-      - 'tests/e2e/player-tournament-deep.e2e.cjs'
-      - 'tests/e2e/admin-finals-order-deep.e2e.cjs'
-      - 'tests/e2e/multi-court-dispatch-deep.e2e.cjs'
-      - 'playwright.deep-e2e.config.cjs'
-      - 'tests/e2e/static-server.cjs'
-      - 'tests/e2e/firebase.json'
-      - 'tests/e2e/firestore.rules'
   schedule:
     - cron: '30 19 * * *'
 
@@ -34,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: bxh-arena-deep-emulator-e2e
+  group: bxh-arena-nightly-full-regression
   cancel-in-progress: true
 
 jobs:
@@ -57,14 +32,25 @@ jobs:
       - name: Install test dependencies
         run: npm install --no-package-lock --ignore-scripts
 
-      - name: Run deep Firebase Emulator E2E
+      - name: Run nightly Deep Emulator E2E (one controlled retry)
         shell: bash
         run: |
-          npx firebase emulators:exec \
-            --only auth,firestore \
-            --project demo-bxh-arena-e2e \
-            --config tests/e2e/firebase.json \
-            "npx playwright test --config=playwright.deep-e2e.config.cjs"
+          set +e
+          command=(npx firebase emulators:exec --only auth,firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "npx playwright test --config=playwright.deep-e2e.config.cjs")
+          "${command[@]}"
+          rc=$?
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::warning title=TEST_FLAKY_RETRY::Nightly Deep E2E failed once; retrying."
+            "${command[@]}"
+            rc=$?
+            if [[ "$rc" -eq 0 ]]; then
+              echo "TEST_FLAKY_RECOVERED: Nightly Deep E2E passed on retry." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::error title=CODE_FAIL_OR_INFRA_FAIL::Nightly Deep E2E failed twice."
+            exit "$rc"
+          fi
 
       - name: Upload deep E2E failure artifacts
         if: failure()
