@@ -22,6 +22,7 @@ test('management poster preview uses only a full-resolution poster URL',()=>{
   assert.match(uiSource,/object-fit:contain/);
   assert.match(uiSource,/data-poster-stats-layout/);
   assert.match(uiSource,/if\(!poster\)return false/);
+  assert.match(uiSource,/preview\.parentElement!==layout\|\|stats\.parentElement!==layout/);
 });
 test('admin tournament query exposes the original poster URL for preview',()=>{
   const cloud=fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8');
