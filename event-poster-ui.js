@@ -200,7 +200,7 @@ function applyPhoto(card,url,coverUrl,code){
   card.dataset.posterUpdatedCode=code;
 }
 function openViewer(trigger){
-  const figure=trigger.closest(".lobby-poster-figure"),image=figure&&figure.querySelector(".lobby-poster-image");
+  const figure=trigger.closest(".lobby-poster-figure, .tournament-poster-stats-preview"),image=figure&&figure.querySelector(".lobby-poster-image");
   const url=image&&safePosterUrl(image.src);if(!url)return;
   const overlay=document.createElement("div");overlay.className="lobby-poster-viewer";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");overlay.setAttribute("aria-label","海報全螢幕檢視");
   overlay.innerHTML='<div class="lobby-poster-viewer-toolbar"><button type="button" data-viewer-reset>重設</button><button type="button" data-viewer-close aria-label="關閉全螢幕檢視">×</button></div><div class="lobby-poster-viewer-stage"><img class="lobby-poster-viewer-image" draggable="false"></div><div class="lobby-poster-viewer-hint">雙指縮放／拖曳查看細節</div>';
