@@ -14,7 +14,12 @@ assert(source.includes("[['spin','轉停'],['burst','爆裂'],['over','擊飛'],
 assert(!source.includes('id="team-score-winner-'));
 assert(source.includes('function renderTeamReferee()'));
 assert(source.includes('if(mine&&!refereeMode){'));
-assert(source.includes("renderTeamLineupPanel(m,refereeMode?'referee':'player')"));
+assert(source.includes("refereeMode?renderTeamLineupPanel(m,'referee'):''"));
+assert(!source.includes("renderTeamLineupPanel(m,refereeMode?'referee':'player')"));
+assert(source.includes('const publicViewing=!!publicWatchReturnContext;'));
+assert(source.includes('hasAdminAccess()&&!publicViewing ? allTabs'));
+assert(source.includes('if(publicWatchReturnContext) return "";'));
+assert(!source.includes('primeTeamMatchViews();\n  const toggle='));
 assert(source.includes("if(state.meta?.battleMode===\"team\")return renderTeamReferee();"));
 assert(source.includes('data-action="set-team-bracket-view"'));
 assert(source.includes("teamBracketViewMode==='live'?renderTeamMatchList(false):renderTeamTree()"));
