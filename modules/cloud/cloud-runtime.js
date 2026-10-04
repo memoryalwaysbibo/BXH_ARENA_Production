@@ -2915,7 +2915,7 @@ if(testerSession){
 window.addEventListener("bxh-offline-operation-synced",(e)=>{try{const d=e.detail||{},op=d.op||{},r=d.result||{};if(state.cloudCode&&String(state.cloudCode).toUpperCase()===String(op.tournamentCode||"").toUpperCase()&&r.state){const keep=state.cloudCode;state=Object.assign(defaultState(r.state.id),r.state);state.cloudCode=keep;rebuildPropagation();saveRecord(state);cloudStatus="connected";cloudLastSyncAt=Date.now();render();}showToast("離線賽事資料已完成雲端同步");}catch(err){}});
 window.addEventListener("bxh-offline-operation-conflict",()=>{cloudStatus="error";render();showToast("離線資料與雲端賽事發生衝突，系統已停止自動覆寫，請由管理員確認。",true);});
 window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";render();showToast("離線資料多次同步失敗，已停止自動重試並保留紀錄，請確認網路後再處理。",true);});
-window.addEventListener("bxh-offline-queue-change",(e)=>{offlineQueueStatus=Object.assign({pending:0,conflict:0,failed:0,total:0},(e&&e.detail)||{});render();});
+
 
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
