@@ -366,9 +366,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.22";
+const APP_VERSION = "v14.3.23";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
   {version:"v14.3.22",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體賽模式分流與即時戰況",updateLevel:"minor",added:["團體賽新增隊伍樹狀總覽與即時戰況切換","公開觀賽訂閱團體生命、目前出場者與判定紀錄"],changed:["玩家模式只顯示觀賽資訊與隊長本隊排陣；裁判模式集中排陣公開與計分操作","團體裁判台不再與玩家對戰表共用同一畫面"],fixed:["修正團體賽缺少樹狀圖","修正其他裝置必須手動刷新才能看到最新生命與判定"],security:["公開即時資料只包含已公開排陣與比賽狀態，不開放寫入"]},
   {version:"v14.3.21",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體戰按鍵式判定",updateLevel:"patch",added:["左右隊伍各自提供轉停、爆裂、擊飛、極限四種直接判定按鈕","團體賽操作失敗時保留後端原因代碼供現場排錯"],changed:["移除勝方與判定下拉選單，改為單次按鍵操作"],fixed:["修正 Callable 錯誤細節在前端封裝時遺失，導致所有異常只顯示泛用訊息"],security:[]},
   {version:"v14.3.20",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體戰雙命計分板補完",updateLevel:"patch",added:["排陣公開後立即顯示雙方上場選手、剩餘生命與最近判定"],changed:["團體戰計分控制改為手機友善雙欄計分板","已公開的團體比分可供觀賽者同步查看"],fixed:["修正第一筆判定前計分狀態為空而只顯示勝方與判定選單","團體賽後端錯誤改顯示裁判可理解的中文訊息"],security:[]},
@@ -9446,20 +9447,21 @@ function teamMatchNames(m){
 function teamMatchPlayerName(id){
   return (state.players||[]).find(p=>String(p.id)===String(id))?.name||"未知隊員";
 }
-function renderTeamLineupPanel(m,allowReferee=true){
+function renderTeamLineupPanel(m,mode="player"){
   if(m.completed||!m.teamIds?.[0]||!m.teamIds?.[1]||!state.cloudCode)return '';
   const view=teamMatchUi.get(m.id);
   if(!view&&!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
   const teams=(state.teams||[]).filter(t=>m.teamIds.includes(t.id));
   const mine=teams.find(t=>t.id===view?.ownTeamId);
-  const canRef=allowReferee&&view?.isReferee===true;
+  const refereeMode=mode==="referee";
+  const canRef=refereeMode&&view?.isReferee===true;
   let out='<div class="panel"><div class="panel-title">隊長排陣與人員到齊</div>';
   out+='<div class="hint">'+teams.map(t=>esc(t.name)+'：'+(view?.submitted?.[t.id]?'已提交':'待提交')).join(' ／ ')+'</div>';
   if(view?.revealed){
     out+='<div class="hint">雙方出場順序已公開並鎖定</div>';
     for(const t of teams)out+='<p>'+esc(t.name)+'：'+(view.lineups?.[t.id]||[]).map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
   }else{
-    if(mine){
+    if(mine&&!refereeMode){
       const order=view?.ownOrder||mine.memberPlayerIds||[];
       out+='<div class="hint">僅隊長與裁判可查看本隊順序；拖曳不支援，請以選單調整順位。</div>';
       for(let i=0;i<order.length;i++){
@@ -9468,6 +9470,9 @@ function renderTeamLineupPanel(m,allowReferee=true){
         out+='</select></label>';
       }
       out+='<button class="btn btn-primary btn-sm" data-action="team-lineup-submit" data-match-id="'+esc(m.id)+'">提交本隊出場順序</button>';
+    }
+    if(refereeMode&&!canRef){
+      out+='<div class="banner warn"><span>本場尚未取得裁判操作權限，僅能查看提交狀態。</span></div>';
     }
     if(canRef){
       for(const t of teams)if(view?.lineups?.[t.id])out+='<p>裁判檢視｜'+esc(t.name)+'：'+view.lineups[t.id].map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
@@ -9603,7 +9608,7 @@ function renderTeamMatchList(refereeMode){
     const [bracket,round]=key.split(':');
     const title=(label[bracket]||bracket)+(bracket==="GF"||bracket==="GFR"?"":"・第 "+(Number(round)+1)+" 輪");
     html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">'+title+'</span><span class="compact-round-count">'+matches.length+' 場</span></div><div class="compact-round-matches">';
-    for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m,refereeMode)+renderTeamScorePanel(m,refereeMode);
+    for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m,refereeMode?'referee':'player')+renderTeamScorePanel(m,refereeMode);
     html+='</div></section>';
   }
   if(fmt==="roundrobin"){
