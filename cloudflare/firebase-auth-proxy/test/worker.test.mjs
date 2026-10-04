@@ -13,13 +13,14 @@ test("forwards Firebase Auth helper requests to the fixed upstream", async () =>
   try {
     const response = await worker.fetch(new Request(
       "https://arena.bxh.com.tw/__/auth/handler?apiKey=test&mode=select",
-      { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "credential=sample" },
+      { method: "POST", headers: { host: "arena.bxh.com.tw", "content-type": "application/x-www-form-urlencoded" }, body: "credential=sample" },
     ));
 
     assert.equal(captured.request.url, "https://bxh-arena.firebaseapp.com/__/auth/handler?apiKey=test&mode=select");
     assert.equal(captured.request.method, "POST");
     assert.equal(await captured.request.text(), "credential=sample");
-    assert.deepEqual(captured.options, { redirect: "manual" });
+    assert.equal(captured.request.headers.has("host"), false);
+    assert.equal(captured.request.redirect, "manual");
     assert.equal(response.status, 200);
     assert.equal(await response.text(), "firebase-helper");
   } finally {
