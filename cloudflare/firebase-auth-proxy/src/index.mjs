@@ -30,9 +30,21 @@ export default {
       });
     }
 
-    const upstreamUrl = new URL(`${incoming.pathname}${incoming.search}`, FIREBASE_AUTH_ORIGIN);
-    const upstreamRequest = new Request(upstreamUrl, request);
-    const upstreamResponse = await fetch(upstreamRequest, { redirect: "manual" });
+    const upstreamUrl = new URL(incoming.pathname + incoming.search, FIREBASE_AUTH_ORIGIN);
+    const headers = new Headers(request.headers);
+    // Let fetch derive Host from the fixed upstream URL, never from the app URL.
+    headers.delete("host");
+    const requestInit = {
+      method: request.method,
+      headers,
+      redirect: "manual",
+    };
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      requestInit.body = request.body;
+      requestInit.duplex = "half";
+    }
+    const upstreamRequest = new Request(upstreamUrl, requestInit);
+    const upstreamResponse = await fetch(upstreamRequest);
 
     // Preserve Firebase's status, redirect and headers exactly. The browser
     // sees the ARENA origin because Cloudflare serves this response on-route.
