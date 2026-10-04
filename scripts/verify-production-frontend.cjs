@@ -24,7 +24,7 @@ function must(re,msg,corpus=html){if(!re.test(corpus))throw new Error(msg)}
 function mustNot(re,msg){if(re.test(html))throw new Error(msg)}
 function mustInclude(text,msg){if(!html.includes(text))throw new Error(msg)}
 if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
-mustInclude('modules/cloud/cloud-runtime.js?v=20261004-google-link-popup-fix-1','Google-link fix must use a fresh cloud runtime cache key');
+mustInclude('modules/cloud/cloud-runtime.js?v=20261004-google-link-redirect-fallback-1','Google-link fix must use a fresh cloud runtime cache key');
 mustInclude('<meta name="bxh-build" content="'+String(version.build||'')+'">','index.html bxh-build must match version.json');
 mustInclude('CURRENT_BUILD="'+String(version.build||'')+'"','CURRENT_BUILD must match version.json');
 mustInclude('const APP_VERSION = "'+String(version.version||'')+'"','APP_VERSION must match version.json');
@@ -62,6 +62,8 @@ must(/if\(action==="player-google-signin"\)[\s\S]*?window\.cloudAuth\.signInWith
 must(/async\s+signInWithLinkedGoogle\s*\(\)[\s\S]*?ax\.signInWithPopup\(authHandle,provider,ax\.browserPopupRedirectResolver\)/, 'Linked Google popup sign-in missing');
 must(/if\(fbUser\.providerData\?\.some\(p=>p\.providerId==="google\.com"\)\)[\s\S]*?await window\.cloudAuth\.signOutUser\(\)/, 'Missing Google profile must fail closed');
 must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linking pilot must import the provider');
+must(/linkWithRedirect:\s*authMod\.linkWithRedirect/, 'Google account linking fallback must import linkWithRedirect');
+must(/getRedirectResult:\s*authMod\.getRedirectResult/, 'Google account linking fallback must import getRedirectResult');
 mustInclude('const GOOGLE_LINK_PILOT_EMAILS=new Set(["memoryalwaysbobi@gmail.com"]);','Google link pilot allowlist missing');
 must(/function\s+canUseGoogleLinkPilot\(\)[\s\S]*?isSuperAdmin\(\)[\s\S]*?userProfile\.active===true[\s\S]*?GOOGLE_LINK_PILOT_EMAILS\.has\(email\)/, 'Google link UI must allow only super-admin or the active pilot account');
 must(/async\s+getUserProfile\(uid\)[\s\S]*?googleLinkProfileCache\.set\(uid,\{profile,loadedAt:Date\.now\(\)\}\)/, 'Google link profile must be cached before the button is tapped');
@@ -77,7 +79,12 @@ const googleLinkBusy=googleLinkAction.indexOf('googleLinkBusy=true;googleLinkErr
 const googleLinkInvocation=googleLinkAction.indexOf('window.cloudAuth.linkMyGoogleAccount()');
 const googleLinkRender=googleLinkAction.indexOf('render();',googleLinkBusy);
 if(googleLinkBusy<0 || googleLinkInvocation<googleLinkBusy || googleLinkRender<googleLinkInvocation) throw new Error('Google link popup must start before rerendering the click target');
-mustNot(/getRedirectResult\(authHandle\)/, 'Google redirect result runtime is still active');
+must(/auth\/popup-blocked[\s\S]*?ax\.linkWithRedirect\(user,provider,ax\.browserPopupRedirectResolver\)/, 'Blocked Google link popup must fall back to full-page redirect');
+must(/sessionStorage\.setItem\(GOOGLE_LINK_REDIRECT_SESSION_KEY,JSON\.stringify\(\{uid,email:oldEmail\}\)\)[\s\S]*?ax\.linkWithRedirect\(user,provider,ax\.browserPopupRedirectResolver\)/, 'Google link redirect must retain its pending UID/email context');
+must(/sessionStorage\.getItem\(GOOGLE_LINK_REDIRECT_SESSION_KEY\)[\s\S]*?ax\.getRedirectResult\(authHandle,\s*ax\.browserPopupRedirectResolver\)/, 'Google link redirect must consume its pending result');
+must(/const redirectOutcome=pendingGoogleLinkRedirectOutcome[\s\S]*?callback\(user,redirectOutcome\)/, 'Google link redirect result must reach the auth UI once');
+must(/async function processAuthStateChangeImpl\(fbUser,googleLinkRedirectOutcome\)/, 'Auth UI must consume Google link redirect outcome');
+must(/if\(result\?\.redirecting\)return;/, 'Google link UI must not announce success before redirect returns');
 must(/signInWithPopup:\s*authMod\.signInWithPopup/, 'Google popup sign-in SDK mapping missing');
 mustNot(/role:\s*["']tester["'],\s*active:\s*true,\s*provider:\s*["'](?:password|google)["']/, 'Public signup/recovery still creates tester role');
 must(/PUBLIC_TOURNAMENTS_RECONCILE_MS\s*=\s*90000/, 'Lobby reconciliation must be 90 seconds');
