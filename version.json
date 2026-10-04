@@ -1,6 +1,6 @@
 {
-  "build": "20261004.1",
-  "version": "v14.3.18",
-  "updatedAt": "2026-10-04T16:45:00+08:00",
-  "releaseTrigger": "player-login-button-label-fix"
+  "build": "20261004.2",
+  "version": "v14.3.19",
+  "updatedAt": "2026-10-04T17:26:00+08:00",
+  "releaseTrigger": "google-link-popup-blocked-redirect-fallback"
 }
