@@ -56,6 +56,19 @@ test('four-player community event reaches first confirmed referee result', async
   // If account creation succeeded before the observer completed routing, use
   // the normal player login UI to resume the new account deterministically.
   if (!(await page.locator('.player-shell').isVisible().catch(() => false))) {
+    // Re-enter Auth from a clean state. Signing in an already-authenticated
+    // account does not guarantee another observer event.
+    await page.evaluate(async () => {
+      if (window.cloudAuth && typeof window.cloudAuth.signOutUser === 'function') {
+        await window.cloudAuth.signOutUser();
+      }
+    });
+    await page.waitForFunction(() =>
+      !!document.querySelector('[data-action="player-goto-login"]') ||
+      !!document.querySelector('[data-action="select-role-player"]'),
+      null,
+      { timeout: 30000 }
+    );
     if (await page.locator('[data-action="select-role-player"]').isVisible().catch(() => false)) {
       await page.locator('[data-action="select-role-player"]').click();
     }
