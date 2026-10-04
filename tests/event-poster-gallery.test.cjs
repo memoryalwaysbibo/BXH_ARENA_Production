@@ -8,6 +8,20 @@ const root=path.join(__dirname,'..');
 const core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'modules/main-css/lobby-community.css'),'utf8');
 const uiSource=fs.readFileSync(path.join(root,'event-poster-ui.js'),'utf8');
+test('admin inline roster filters by seat type and exposes names only',()=>{
+  const confirmed=ui.filterAdminRosterRows([
+    {status:'confirmed',publicName:'阿明',email:'private@example.com'},
+    {status:'waitlist',publicName:'小花'},
+    {status:'confirmed',displayName:'',participantName:'小林',phone:'0912345678'}
+  ],'confirmed');
+  assert.deepEqual(confirmed,[{name:'阿明'},{name:'小林'}]);
+  assert.deepEqual(ui.filterAdminRosterRows([{status:'confirmed',publicName:'阿明'}],'waitlist'),[]);
+  assert.match(uiSource,/listRegistrationsForAdmin\(code\)/);
+  assert.match(uiSource,/if\(!canManageInCurrentInterface\(\)\)return/);
+  assert.match(uiSource,/aria-expanded/);
+  assert.match(uiSource,/名單載入中/);
+  assert.match(uiSource,/max-height:220px;overflow:auto/);
+});
 test('poster links accept only versioned BXH Storage poster objects',()=>{
   const url='https://firebasestorage.googleapis.com/v0/b/bxh-arena.firebasestorage.app/o/room-posters%2FBXH-ABC123%2F12345678-1234-1234-1234-123456789abc.jpg?alt=media&token=12345678-1234-1234-1234-123456789abc';
   assert.equal(ui.safePosterUrl(url),url);
