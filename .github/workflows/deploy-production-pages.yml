@@ -12,8 +12,10 @@ permissions:
   pages: write
   id-token: write
 
+# Safety Gate 2.0: Production is a single-writer resource.
+# Never cancel an in-flight deployment; later validated commits wait their turn.
 concurrency:
-  group: production-pages
+  group: production-pages-single-writer
   cancel-in-progress: false
 
 jobs:
@@ -35,7 +37,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
-      - name: Verify validated commit is still current main HEAD
+      - name: Queue acquired - verify validated commit is still current main HEAD
         id: freshness
         shell: bash
         run: |
