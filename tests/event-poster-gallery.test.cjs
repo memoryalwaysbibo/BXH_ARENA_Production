@@ -21,11 +21,16 @@ test('image upload accepts only JPEG/PNG files within the callable transport lim
   assert.equal(ui.validatePosterFile({type:'image/png',size:6*1024*1024+1}).reason,'size');
 });
 test('poster management controls appear only in management interface modes',()=>{
-  for(const mode of ['admin','event_staff','partner_organizer'])assert.equal(ui.isManagementMode(mode),true);
-  for(const mode of ['player','guest','',null,undefined])assert.equal(ui.isManagementMode(mode),false);
-  assert.match(uiSource,/if\(!isManagementMode\(currentInterfaceMode\(\)\)\)\{button\.hidden=true;return;\}/);
-  assert.match(uiSource,/button\.hidden=!isManagementMode\(currentInterfaceMode\(\)\)\|\|!result\|\|result\.allowed!==true/);
-  assert.match(uiSource,/if\(!isManagementMode\(currentInterfaceMode\(\)\)\)\{manageButton\.hidden=true;return;\}/);
+  for(const mode of ['admin','event_staff','partner_organizer'])assert.equal(ui.isManagementMode(mode,'admin'),true);
+  for(const mode of ['player','guest','',null,undefined])assert.equal(ui.isManagementMode(mode,'admin'),false);
+  assert.equal(ui.isManagementMode('admin','player'),false);
+  assert.equal(ui.isManagementMode('event_staff','guest'),false);
+  assert.match(uiSource,/if\(!canManageInCurrentInterface\(\)\)\{button\.hidden=true;return;\}/);
+  assert.match(uiSource,/button\.hidden=!canManageInCurrentInterface\(\)\|\|!result\|\|result\.allowed!==true/);
+  assert.match(uiSource,/if\(!canManageInCurrentInterface\(\)\)\{manageButton\.hidden=true;return;\}/);
+  assert.match(uiSource,/querySelectorAll\("\.tournament-management-card"\)/);
+  assert.match(uiSource,/actions\.insertBefore\(button,copy\|\|null\)/);
+  assert.match(uiSource,/button\.closest\("\.lobby-compact-card, \.tournament-management-card"\)/);
 });
 test('expanded event detail order is intro, copy, photo, roster, then registration',()=>{
   const start=core.indexOf('function lobbyCard(t, kind, loggedIn, expanded=false){');
