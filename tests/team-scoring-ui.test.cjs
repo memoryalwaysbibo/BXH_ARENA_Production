@@ -2,6 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const source=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
 const cloud=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
+const publicWatchPatch=fs.readFileSync(path.join(__dirname,'../modules/main-app/public-watch-isolation.js'),'utf8');
 
 assert(source.includes('雙命守擂計分板｜'));
 assert(source.includes("'●'.repeat(life)+'○'.repeat(Math.max(0,2-life))"));
@@ -14,12 +15,11 @@ assert(source.includes("[['spin','轉停'],['burst','爆裂'],['over','擊飛'],
 assert(!source.includes('id="team-score-winner-'));
 assert(source.includes('function renderTeamReferee()'));
 assert(source.includes('if(mine&&!refereeMode){'));
-assert(source.includes("refereeMode?renderTeamLineupPanel(m,'referee'):''"));
-assert(!source.includes("renderTeamLineupPanel(m,refereeMode?'referee':'player')"));
-assert(source.includes('const publicViewing=!!publicWatchReturnContext;'));
-assert(source.includes('hasAdminAccess()&&!publicViewing ? allTabs'));
-assert(source.includes('if(publicWatchReturnContext) return "";'));
-assert(!source.includes('primeTeamMatchViews();\n  const toggle='));
+assert(publicWatchPatch.includes("return mode==='referee'?originalLineupPanel(m,mode):''"));
+assert(publicWatchPatch.includes("activeTab==='referee'&&!publicWatchReturnContext"));
+assert(publicWatchPatch.includes("const allowedTabs=new Set(['ladder','live','bracket'])"));
+assert(publicWatchPatch.includes("v2.dataset.visibleTabs='ladder,live,bracket'"));
+assert(publicWatchPatch.includes("node.textContent='目前為公開觀賽模式'"));
 assert(source.includes("if(state.meta?.battleMode===\"team\")return renderTeamReferee();"));
 assert(source.includes('data-action="set-team-bracket-view"'));
 assert(source.includes("teamBracketViewMode==='live'?renderTeamMatchList(false):renderTeamTree()"));
