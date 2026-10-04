@@ -14,6 +14,19 @@ test('poster links accept only versioned BXH Storage poster objects',()=>{
   assert.equal(ui.safePosterUrl('javascript:alert(1)'),'');
   assert.equal(ui.safePosterUrl(url.replace('room-posters%2F','room-covers%2F')),'');
 });
+test('management poster preview uses only a full-resolution poster URL',()=>{
+  const poster='https://firebasestorage.googleapis.com/v0/b/bxh-arena.firebasestorage.app/o/room-posters%2FBXH-ABC123%2F12345678-1234-1234-1234-123456789abc.jpg?alt=media&token=12345678-1234-1234-1234-123456789abc';
+  assert.equal(ui.managementPosterUrl(poster),poster);
+  assert.equal(ui.managementPosterUrl('https://firebasestorage.googleapis.com/v0/b/bxh-arena.firebasestorage.app/o/room-covers%2FBXH-ABC123%2F12345678-1234-1234-1234-123456789abc.jpg?alt=media&token=12345678-1234-1234-1234-123456789abc'),'');
+  assert.match(uiSource,/grid-template-columns:minmax\(88px,30%\)/);
+  assert.match(uiSource,/object-fit:contain/);
+  assert.match(uiSource,/data-poster-stats-layout/);
+  assert.match(uiSource,/if\(!poster\)return false/);
+});
+test('admin tournament query exposes the original poster URL for preview',()=>{
+  const cloud=fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8');
+  assert.match(cloud,/posterUrl: typeof d\.posterUrl==="string" \? d\.posterUrl : ""/);
+});
 test('image upload accepts only JPEG/PNG files within the callable transport limit',()=>{
   assert.equal(ui.MAX_FILE_BYTES,6*1024*1024);
   assert.equal(ui.validatePosterFile({type:'image/jpeg',size:1024}).ok,true);
