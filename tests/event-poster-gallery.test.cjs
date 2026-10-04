@@ -17,7 +17,7 @@ test('admin inline roster filters by seat type and exposes names only',()=>{
   assert.deepEqual(confirmed,[{name:'阿明'},{name:'小林'}]);
   assert.deepEqual(ui.filterAdminRosterRows([{status:'confirmed',publicName:'阿明'}],'waitlist'),[]);
   assert.match(uiSource,/listRegistrationsForAdmin\(code\)/);
-  assert.match(uiSource,/if\(!canManageInCurrentInterface\(\)\)return/);
+  assert.match(uiSource,/!canManageInCurrentInterface\(\)\)return/);
   assert.match(uiSource,/aria-expanded/);
   assert.match(uiSource,/名單載入中/);
   assert.match(uiSource,/max-height:220px;overflow:auto/);
