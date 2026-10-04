@@ -23,8 +23,9 @@ function thumbnailBase64(file){
   });
 }
 function getService(){return root.engagementService&&typeof root.engagementService.roomPosterCover==="function"?root.engagementService.roomPosterCover:null;}
-function isManagementMode(mode){return ["admin","event_staff","partner_organizer"].includes(mode);}
-function currentInterfaceMode(){try{return typeof activeMode==="string"?activeMode:"";}catch(_){return "";}}
+function isManagementMode(mode,role){return ["admin","event_staff","partner_organizer"].includes(mode)&&role==="admin";}
+function currentInterfaceMode(){try{return {mode:typeof activeMode==="string"?activeMode:"",role:typeof currentRole==="string"?currentRole:""};}catch(_){return {mode:"",role:""};}}
+function canManageInCurrentInterface(){const mode=currentInterfaceMode();return isManagementMode(mode.mode,mode.role);}
 let manager=null,viewer=null;
 function scanCards(){
   document.querySelectorAll(".lobby-compact-card").forEach(card=>{
@@ -33,18 +34,32 @@ function scanCards(){
     card.addEventListener("toggle",()=>{if(card.open)refreshPermission(card);});
     if(card.open)refreshPermission(card);
   });
+  document.querySelectorAll(".tournament-management-card").forEach(card=>{
+    if(card.dataset.posterAccessHook==="1")return;
+    const actions=card.querySelector(".btn-row");
+    const codeButton=card.querySelector('[data-action="cloud-admin-copy-code"][data-code]');
+    const code=codeButton&&codeButton.dataset.code;
+    if(!actions||!code)return;
+    card.dataset.posterAccessHook="1";
+    const button=document.createElement("button");
+    button.type="button";button.className="btn btn-ghost btn-sm";
+    button.dataset.posterManage="";button.dataset.code=code;button.hidden=true;button.textContent="＋新增照片";
+    const copy=card.querySelector('[data-action="cloud-admin-copy-code"]');
+    actions.insertBefore(button,copy||null);
+    refreshPermission(card);
+  });
 }
 async function refreshPermission(card){
   const button=card.querySelector("[data-poster-manage]");
   if(!button)return;
-  if(!isManagementMode(currentInterfaceMode())){button.hidden=true;return;}
+  if(!canManageInCurrentInterface()){button.hidden=true;return;}
   const call=getService();
   if(!call||card.dataset.posterPermissionBusy==="1")return;
   card.dataset.posterPermissionBusy="1";
   try{
     const result=await call({action:"canManage",code:button.dataset.code});
     if(!button.isConnected)return;
-    button.hidden=!isManagementMode(currentInterfaceMode())||!result||result.allowed!==true;
+    button.hidden=!canManageInCurrentInterface()||!result||result.allowed!==true;
     button.textContent=result&&result.hasPoster?"更換照片":"＋新增照片";
     button.dataset.posterHasPhoto=result&&result.hasPoster?"1":"0";
   }catch(_){button.hidden=true;}
@@ -88,7 +103,7 @@ async function selectPoster(event){
 }
 function openManager(button){
   const modal=makeManager();if(modal._saving)return;
-  modal._code=button.dataset.code;modal._card=button.closest(".lobby-compact-card");
+  modal._code=button.dataset.code;modal._card=button.closest(".lobby-compact-card, .tournament-management-card");
   modal.querySelector("[data-poster-file]").value="";
   modal.querySelector("[data-poster-preview]").hidden=true;
   modal.querySelector("[data-poster-error]").textContent="";
@@ -117,13 +132,15 @@ async function saveSelectedPoster(){
 }
 function applyPhoto(card,url,coverUrl,code){
   const safe=safePosterUrl(url);if(!safe)return;
-  const slot=card.querySelector("[data-poster-slot]");if(!slot)return;
-  const name=card.querySelector(".lobby-room-name")?.textContent||"活動";
-  const figure=document.createElement("figure");figure.className="lobby-poster-figure";
-  const open=document.createElement("button");open.type="button";open.className="lobby-poster-open";open.dataset.posterOpen="";open.setAttribute("aria-label","放大檢視 "+name+" 海報");
-  const image=document.createElement("img");image.className="lobby-poster-image";image.src=safe;image.alt=name+" 活動海報";image.loading="lazy";image.referrerPolicy="no-referrer";open.appendChild(image);
-  const zoom=document.createElement("button");zoom.type="button";zoom.className="lobby-poster-zoom";zoom.dataset.posterOpen="";zoom.textContent="放大＋";zoom.setAttribute("aria-label","放大檢視海報");
-  figure.append(open,zoom);slot.replaceChildren(figure);
+  const slot=card.querySelector("[data-poster-slot]");
+  if(slot){
+    const name=card.querySelector(".lobby-room-name")?.textContent||"活動";
+    const figure=document.createElement("figure");figure.className="lobby-poster-figure";
+    const open=document.createElement("button");open.type="button";open.className="lobby-poster-open";open.dataset.posterOpen="";open.setAttribute("aria-label","放大檢視 "+name+" 海報");
+    const image=document.createElement("img");image.className="lobby-poster-image";image.src=safe;image.alt=name+" 活動海報";image.loading="lazy";image.referrerPolicy="no-referrer";open.appendChild(image);
+    const zoom=document.createElement("button");zoom.type="button";zoom.className="lobby-poster-zoom";zoom.dataset.posterOpen="";zoom.textContent="放大＋";zoom.setAttribute("aria-label","放大檢視海報");
+    figure.append(open,zoom);slot.replaceChildren(figure);
+  }
   const manage=card.querySelector("[data-poster-manage]");if(manage){manage.textContent="更換照片";manage.dataset.posterHasPhoto="1";}
   const summary=card.querySelector(".lobby-poster-cover");if(summary&&typeof coverUrl==="string")summary.src=coverUrl;
   card.dataset.posterUpdatedCode=code;
@@ -171,7 +188,7 @@ function openViewer(trigger){
 function onClick(event){
   const manageButton=event.target.closest&&event.target.closest("[data-poster-manage]");
   if(manageButton&&!manageButton.hidden){
-    if(!isManagementMode(currentInterfaceMode())){manageButton.hidden=true;return;}
+    if(!canManageInCurrentInterface()){manageButton.hidden=true;return;}
     event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();openManager(manageButton);return;
   }
   const openButton=event.target.closest&&event.target.closest("[data-poster-open]");
