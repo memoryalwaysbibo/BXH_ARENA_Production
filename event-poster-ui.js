@@ -23,6 +23,40 @@ function thumbnailBase64(file){
   });
 }
 function getService(){return root.engagementService&&typeof root.engagementService.roomPosterCover==="function"?root.engagementService.roomPosterCover:null;}
+function managementPosterUrl(value){return safePosterUrl(value);}
+function adminTournamentFor(code){
+  try{return (typeof adminTournamentListItems!=="undefined"?adminTournamentListItems:[]).find(item=>item&&String(item.code||"")===String(code||""))||null;}catch(_){return null;}
+}
+function addAdminPosterLayoutStyles(){
+  if(document.getElementById("bxh-admin-poster-stats-style"))return;
+  const style=document.createElement("style");style.id="bxh-admin-poster-stats-style";
+  style.textContent=".tournament-poster-stats-layout{display:grid;grid-template-columns:minmax(88px,30%) minmax(0,1fr);gap:12px;align-items:start;margin-top:12px}.tournament-poster-stats-preview{margin:0;position:relative;min-width:0;max-width:220px}.tournament-poster-stats-preview .lobby-poster-open{display:block;width:100%;padding:0;border:0;background:transparent;cursor:zoom-in}.tournament-poster-stats-preview .lobby-poster-image{display:block;width:100%;height:auto;max-height:300px;object-fit:contain;object-position:top;border-radius:8px}.tournament-poster-stats-preview .lobby-poster-zoom{position:absolute;right:6px;bottom:6px;padding:5px 8px;border:1px solid rgba(255,255,255,.4);border-radius:7px;background:rgba(12,8,20,.82);color:#fff;font-size:12px}.tournament-poster-stats-layout>.grid.grid-3{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:8px!important;margin-top:0!important}.tournament-poster-stats-layout>.grid.grid-3>.stat-box{min-width:0;margin:0!important}.tournament-poster-stats-layout>.grid.grid-3 .stat-box{min-width:0}@media(max-width:600px){.tournament-poster-stats-layout{grid-template-columns:minmax(84px,32%) minmax(0,1fr);gap:9px}.tournament-poster-stats-preview .lobby-poster-image{max-height:260px}.tournament-poster-stats-layout>.grid.grid-3{gap:7px!important}}";
+  document.head.appendChild(style);
+}
+function applyAdminPosterStatsLayout(card,posterOverride){
+  if(!card||!card.matches(".tournament-management-card"))return false;
+  const stats=card.querySelector(".grid.grid-3");if(!stats)return false;
+  const codeButton=card.querySelector('[data-action="cloud-admin-copy-code"][data-code]');
+  const item=adminTournamentFor(codeButton&&codeButton.dataset.code);
+  const poster=managementPosterUrl(posterOverride||item&&item.posterUrl);
+  if(!poster)return false;
+  addAdminPosterLayoutStyles();
+  let layout=card.querySelector(":scope > .tournament-poster-stats-layout");
+  let preview=layout&&layout.querySelector(".tournament-poster-stats-preview");
+  if(!layout){layout=document.createElement("div");layout.className="tournament-poster-stats-layout";layout.setAttribute("data-poster-stats-layout","");}
+  if(!preview){
+    preview=document.createElement("figure");preview.className="tournament-poster-stats-preview";
+    const open=document.createElement("button");open.type="button";open.className="lobby-poster-open";open.dataset.posterOpen="";open.setAttribute("aria-label","放大檢視活動海報");
+    const image=document.createElement("img");image.className="lobby-poster-image";image.alt=(item&&item.name?item.name:"活動")+" 海報";image.loading="lazy";image.referrerPolicy="no-referrer";open.appendChild(image);
+    const zoom=document.createElement("button");zoom.type="button";zoom.className="lobby-poster-zoom";zoom.dataset.posterOpen="";zoom.textContent="放大＋";zoom.setAttribute("aria-label","放大檢視活動海報");
+    preview.append(open,zoom);
+  }
+  const image=preview.querySelector(".lobby-poster-image");
+  if(image.src!==poster)image.src=poster;
+  layout.replaceChildren(preview,stats);
+  if(!layout.isConnected)card.insertBefore(layout,card.querySelector(".btn-row")||null);
+  return true;
+}
 function isManagementMode(mode,role){return ["admin","event_staff","partner_organizer"].includes(mode)&&role==="admin";}
 function currentInterfaceMode(){try{return {mode:typeof activeMode==="string"?activeMode:"",role:typeof currentRole==="string"?currentRole:""};}catch(_){return {mode:"",role:""};}}
 function canManageInCurrentInterface(){const mode=currentInterfaceMode();return isManagementMode(mode.mode,mode.role);}
@@ -35,6 +69,7 @@ function scanCards(){
     if(card.open)refreshPermission(card);
   });
   document.querySelectorAll(".tournament-management-card").forEach(card=>{
+    applyAdminPosterStatsLayout(card);
     if(card.dataset.posterAccessHook==="1")return;
     const actions=card.querySelector(".btn-row");
     const codeButton=card.querySelector('[data-action="cloud-admin-copy-code"][data-code]');
@@ -142,6 +177,7 @@ function applyPhoto(card,url,coverUrl,code){
     figure.append(open,zoom);slot.replaceChildren(figure);
   }
   const manage=card.querySelector("[data-poster-manage]");if(manage){manage.textContent="更換照片";manage.dataset.posterHasPhoto="1";}
+  if(card.matches(".tournament-management-card"))applyAdminPosterStatsLayout(card,safe);
   const summary=card.querySelector(".lobby-poster-cover");if(summary&&typeof coverUrl==="string")summary.src=coverUrl;
   card.dataset.posterUpdatedCode=code;
 }
@@ -200,7 +236,7 @@ function init(){
   const observer=new MutationObserver(scanCards);observer.observe(document.body,{childList:true,subtree:true});
   scanCards();
 }
-const api={safePosterUrl,validatePosterFile,isManagementMode,MAX_FILE_BYTES};
+const api={safePosterUrl,managementPosterUrl,validatePosterFile,isManagementMode,MAX_FILE_BYTES};
 root.BXHEventPosterUI=api;
 if(typeof module==="object"&&module.exports)module.exports=api;
 if(root.document){if(root.document.readyState==="loading")root.document.addEventListener("DOMContentLoaded",init,{once:true});else init();}
