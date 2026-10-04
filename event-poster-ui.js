@@ -53,7 +53,7 @@ function applyAdminPosterStatsLayout(card,posterOverride){
   }
   const image=preview.querySelector(".lobby-poster-image");
   if(image.src!==poster)image.src=poster;
-  layout.replaceChildren(preview,stats);
+  if(preview.parentElement!==layout||stats.parentElement!==layout||layout.firstElementChild!==preview||layout.lastElementChild!==stats)layout.replaceChildren(preview,stats);
   if(!layout.isConnected)card.insertBefore(layout,card.querySelector(".btn-row")||null);
   return true;
 }
