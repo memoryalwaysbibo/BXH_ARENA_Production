@@ -16,6 +16,7 @@ const suites = {
     { name: 'community room cloud sync contract', args: ['tests/community-room-cloud-sync.test.cjs'] },
     { name: 'bronze-before-final ordering', args: ['tests/finals-order-core.test.cjs'] },
     { name: 'court-call PASS defer contract', args: ['tests/court-call-pass-queue.test.cjs'] },
+    { name: 'team scoring board initial state', args: ['tests/team-scoring-ui.test.cjs'] },
   ],
   warning: [
     { name: 'hunter license grade', args: ['tests/hunter-license-grade.test.cjs'] },
