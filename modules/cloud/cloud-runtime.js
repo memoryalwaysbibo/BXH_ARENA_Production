@@ -1639,6 +1639,7 @@
           eventDate: d.eventDate || "",
           startAt: d.startAt || "",
           location: d.location || "",
+          posterUrl: typeof d.posterUrl==="string" ? d.posterUrl : "",
           battleMode:(d.battleMode||(savedState&&savedState.meta&&savedState.meta.battleMode))==="team"?"team":"individual",
           teamSize:Math.max(3,Number(d.teamSize||(savedState&&savedState.meta&&savedState.meta.teamSize))||3),
           formatType: d.formatType || "",
