@@ -24,6 +24,11 @@ test('admin inline roster filters by seat type and exposes names only',()=>{
   assert.ok(uiSource.includes("grid-template-columns:2.8em minmax(0,1fr)"));
   assert.match(uiSource,/tournament-inline-roster-index/);
   assert.match(uiSource,/white-space:nowrap;font-variant-numeric:tabular-nums/);
+  assert.ok(uiSource.includes("查看名單⌄"));
+  assert.ok(uiSource.includes("收合名單⌃"));
+  assert.ok(uiSource.includes("輕點查看"));
+  assert.match(uiSource,/data-roster-kind=confirmed/);
+  assert.match(uiSource,/data-roster-kind=waitlist/);
 });
 test('poster links accept only versioned BXH Storage poster objects',()=>{
   const url='https://firebasestorage.googleapis.com/v0/b/bxh-arena.firebasestorage.app/o/room-posters%2FBXH-ABC123%2F12345678-1234-1234-1234-123456789abc.jpg?alt=media&token=12345678-1234-1234-1234-123456789abc';
