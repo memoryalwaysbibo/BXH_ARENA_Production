@@ -88,7 +88,7 @@ function filterAdminRosterRows(rows,kind){
 function addInlineRosterStyles(){
   if(document.getElementById("bxh-admin-inline-roster-style"))return;
   const style=document.createElement("style");style.id="bxh-admin-inline-roster-style";
-  style.textContent=".tournament-roster-toggle{cursor:pointer;touch-action:manipulation}.tournament-roster-toggle:focus-visible{outline:2px solid #d9b95c;outline-offset:2px}.tournament-inline-roster{margin:10px 0 0;padding:10px 12px;border:1px solid rgba(170,112,255,.34);border-radius:10px;background:rgba(20,13,32,.9)}.tournament-inline-roster[hidden]{display:none!important}.tournament-inline-roster-title{margin:0 0 8px;font-size:14px;font-weight:800}.tournament-inline-roster-list{max-height:220px;overflow:auto;margin:0;padding:0 4px;list-style:none;overscroll-behavior:contain}.tournament-inline-roster-list li{display:grid;grid-template-columns:2.8em minmax(0,1fr);gap:4px;padding:3px 0}.tournament-inline-roster-index{display:block;text-align:right;padding-right:4px;white-space:nowrap;font-variant-numeric:tabular-nums}.tournament-inline-roster-name{min-width:0;overflow-wrap:anywhere}.tournament-inline-roster-message{margin:0;color:#b8b2c4;font-size:13px}";
+  style.textContent=".tournament-roster-toggle{cursor:pointer;touch-action:manipulation;transition:border-color .16s ease,background-color .16s ease,transform .12s ease}.tournament-roster-toggle .label{display:flex;align-items:center;justify-content:space-between;gap:6px}.tournament-roster-toggle .label:after{content:\"查看名單⌄\";flex:0 0 auto;padding:3px 6px;border:1px solid rgba(189,165,255,.38);border-radius:999px;background:rgba(137,91,219,.12);color:#cdb7ff;font-size:11px;font-weight:700;white-space:nowrap}.tournament-roster-toggle[aria-expanded=true] .label:after{content:\"收合名單⌃\";border-color:rgba(240,212,123,.42);background:rgba(240,212,123,.1);color:#f0d47b}.tournament-roster-toggle[data-roster-kind=confirmed]{border-color:rgba(93,213,222,.42)}.tournament-roster-toggle[data-roster-kind=waitlist]{border-color:rgba(255,190,95,.42)}.tournament-roster-toggle:active{transform:scale(.99);filter:brightness(1.12)}.tournament-roster-toggle:focus-visible{outline:2px solid #d9b95c;outline-offset:2px}.tournament-inline-roster{margin:10px 0 0;padding:10px 12px;border:1px solid rgba(170,112,255,.34);border-radius:10px;background:rgba(20,13,32,.9)}.tournament-inline-roster[hidden]{display:none!important}.tournament-inline-roster-title{margin:0 0 8px;font-size:14px;font-weight:800}.tournament-inline-roster-list{max-height:220px;overflow:auto;margin:0;padding:0 4px;list-style:none;overscroll-behavior:contain}.tournament-inline-roster-list li{display:grid;grid-template-columns:2.8em minmax(0,1fr);gap:4px;padding:3px 0}.tournament-inline-roster-index{display:block;text-align:right;padding-right:4px;white-space:nowrap;font-variant-numeric:tabular-nums}.tournament-inline-roster-name{min-width:0;overflow-wrap:anywhere}.tournament-inline-roster-message{margin:0;color:#b8b2c4;font-size:13px}";
   document.head.appendChild(style);
 }
 function ensureInlineRosterPanel(card){
@@ -113,7 +113,7 @@ function setupInlineRosterToggles(card){
     if(!kind)return;
     box.classList.add("tournament-roster-toggle");box.dataset.rosterKind=kind;
     box.setAttribute("role","button");box.setAttribute("tabindex","0");
-    box.setAttribute("aria-label","查看"+title+"人員名單");
+    box.setAttribute("aria-label","輕點查看"+title+"名單");
     box.setAttribute("aria-expanded","false");
   });
 }
@@ -121,6 +121,7 @@ let activeInlineRoster=null,inlineRosterRequest=0;
 function closeInlineRoster(){
   if(!activeInlineRoster)return;
   activeInlineRoster.button.setAttribute("aria-expanded","false");
+  activeInlineRoster.button.setAttribute("aria-label","輕點查看"+(activeInlineRoster.kind==="waitlist"?"備取":"正取")+"名單");
   activeInlineRoster.panel.hidden=true;activeInlineRoster=null;
 }
 function setInlineRosterMessage(panel,message){
@@ -143,7 +144,7 @@ async function toggleInlineRoster(button){
   if(activeInlineRoster&&activeInlineRoster.button===button){inlineRosterRequest++;closeInlineRoster();return;}
   closeInlineRoster();
   const current={card,kind,button,panel,code};activeInlineRoster=current;
-  button.setAttribute("aria-expanded","true");panel.hidden=false;
+  button.setAttribute("aria-expanded","true");button.setAttribute("aria-label","收合"+(kind==="waitlist"?"備取":"正取")+"名單");panel.hidden=false;
   setInlineRosterMessage(panel,"名單載入中…");
   const request=++inlineRosterRequest;
   try{
