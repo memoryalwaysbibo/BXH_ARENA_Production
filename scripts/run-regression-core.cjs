@@ -10,6 +10,7 @@ const suites = {
     { name: 'idle court dispatch', args: ['tests/idle-court-dispatch.test.cjs'] },
     { name: 'event staff permission boundary', args: ['--test', 'tests/event-staff-permission.test.cjs'] },
     { name: 'staff assignment real-name display', args: ['--test', 'tests/staff-assignment-realname.test.cjs'] },
+    { name: 'offline queue render dedupe', args: ['tests/offline-queue-render-dedupe.test.cjs'] },
     { name: 'makeup check-in contract', args: ['tests/checkin-makeup-v2-ui.test.cjs'] },
     { name: 'ladder ranking UI contract', args: ['tests/ladder-ranking-ui.test.cjs'] },
     { name: 'community room cloud sync contract', args: ['tests/community-room-cloud-sync.test.cjs'] },
