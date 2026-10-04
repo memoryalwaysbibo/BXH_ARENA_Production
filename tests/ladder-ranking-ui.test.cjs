@@ -5,6 +5,7 @@ const path=require('node:path');
 
 const source=fs.readFileSync(path.join(__dirname,'..','ladder-secondary-ui.js'),'utf8');
 const html=fs.readFileSync(path.join(__dirname,'..','modules','main-app','core.js'),'utf8');
+const titleUtils=fs.readFileSync(path.join(__dirname,'..','modules','main-app','title-utils.js'),'utf8');
 const cloud=fs.readFileSync(path.join(__dirname,'..','modules','cloud','cloud-runtime.js'),'utf8');
 
 assert(source.includes('var ladderScoreMode="season";'), 'season mode must be the default');
@@ -32,14 +33,14 @@ assert(html.includes('function ladderBadgeHtml(p)'), 'shared tier badge renderer
 assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'guest leaderboard must show tier badges');
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
-assert(html.includes("'諸神典藏者':'assets/title-limited-gods-collector.webp'"), 'Gods Collector artwork must support its production Rare rarity');
+assert(titleUtils.includes("'諸神典藏者':'assets/title-limited-gods-collector.webp'"), 'Gods Collector artwork must support its production Rare rarity');
 for(const [name,file] of [['整裝待發','title-common-ready.svg'],['初次上陣','title-common-debut.svg']]){
-  assert(html.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
+  assert(titleUtils.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
   assert(source.includes("\""+name+"\":\"assets/"+file+"\""), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
 }
 for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp'],['百日戰士','title-epic-hundred-day-warrior.webp'],['初次開局','title-rare-first-match.webp'],['資深主辦','title-rare-host-20.webp'],['賽事推手','title-rare-host-10.webp'],['競技場主','title-rare-host-30.webp'],['封測先鋒','title-limited-closed-beta.webp']]){
-  assert(html.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
+  assert(titleUtils.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
   assert(source.includes('"'+name+'":"assets/'+file+'"'), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file.replace(/\.webp$/,'.png'))), name+' PNG fallback missing');

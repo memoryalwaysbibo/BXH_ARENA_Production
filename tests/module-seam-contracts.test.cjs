@@ -108,15 +108,16 @@ test('module exports and script order satisfy Core bindings', () => {
     ['BXHFormatUtils', ['matchSequenceLabel', 'refereeNamesLabel']],
     ['BXHInputUtils', ['smartCallNorm']],
     ['BXHAccountUtils', ['legacyGameIdFromProfile', 'effectiveGameId', 'effectivePlayerNameForMode']],
-    ['BXHTitleUtils', ['titleClassificationHtml']],
+    ['BXHTitleUtils', ['titleArtworkPath', 'titleClassificationHtml']],
     ['BXHHunterUtils', ['hunterLicenseGrade', 'hunterSeniorityBonus']],
     ['BXHMatchUtils', ['nextPow2', 'seedOrder', 'sameStringSet', 'matchHasDecisionData', 'correctionMatchHasActualPlay', 'correctionParticipantSignature']],
     ['BXHTournamentOperations', ['renderTournamentOperationsPage', 'handleTournamentOperationsAction']],
   ]) for (const name of names) assert.equal(typeof context.window[namespace]?.[name], 'function', `${namespace}.${name} is exported`);
 
-  const titleBinding = core.match(/const \{titleDisplayName[^;]+\}=window\.BXHTitleUtils;/)?.[0];
-  assert(titleBinding, 'Core title utility binding exists');
+  const titleBinding = core.match(/const \{[^}]*titleArtworkPath[^}]*\}=window\.BXHTitleUtils;/)?.[0];
+  assert(titleBinding, 'Core title utility bindings include artwork path and classification helpers');
   vm.runInContext(titleBinding, context);
+  assert.equal(vm.runInContext('typeof titleArtworkPath', context), 'function', 'Core binds the exported title artwork path helper');
   assert.equal(vm.runInContext('typeof titleClassificationHtml', context), 'function', 'Core binds the exported title classification helper');
 });
 
