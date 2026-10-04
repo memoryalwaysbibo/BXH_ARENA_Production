@@ -13,6 +13,8 @@ assert(source.includes('data-winner-side="'));
 assert(source.includes("[['spin','轉停'],['burst','爆裂'],['over','擊飛'],['extreme','極限']]"));
 assert(!source.includes('id="team-score-winner-'));
 assert(source.includes('function renderTeamReferee()'));
+assert(source.includes('if(mine&&!refereeMode){'));
+assert(source.includes("renderTeamLineupPanel(m,refereeMode?'referee':'player')"));
 assert(source.includes("if(state.meta?.battleMode===\"team\")return renderTeamReferee();"));
 assert(source.includes('data-action="set-team-bracket-view"'));
 assert(source.includes("teamBracketViewMode==='live'?renderTeamMatchList(false):renderTeamTree()"));

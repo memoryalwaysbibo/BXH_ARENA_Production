@@ -1,6 +1,6 @@
 {
-  "build": "20261004.6",
-  "version": "v14.3.22",
-  "updatedAt": "2026-10-04T21:04:00+08:00",
-  "releaseTrigger": "team-mode-split-tree-and-live-scoring"
+  "build": "20261004.7",
+  "version": "v14.3.23",
+  "updatedAt": "2026-10-04T21:53:00+08:00",
+  "releaseTrigger": "team-referee-captain-ui-separation"
 }
