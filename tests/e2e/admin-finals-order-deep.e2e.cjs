@@ -28,6 +28,13 @@ test('official single elimination enforces bronze before championship final', as
   const response=await page.goto('/?bxh_e2e=1',{waitUntil:'domcontentloaded'});
   expect(response?.headers()['x-bxh-e2e-emulator']).toBe('1');
 
+  // Admin bootstrap queries the Auth/Firestore emulators immediately after the
+  // role click, so wait for the injected cloud runtime before starting it.
+  await page.waitForFunction(
+    () => window.cloudAuth && typeof window.cloudAuth.isReady === 'function' && window.cloudAuth.isReady(),
+    null,
+    { timeout: 90000 }
+  );
   await page.locator('[data-action="select-role-admin"]').click();
   await expect(page.locator('#setup-displayname')).toBeVisible({timeout:30000});
   await page.locator('#setup-displayname').fill('BOT SUPER ADMIN');

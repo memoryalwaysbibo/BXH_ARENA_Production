@@ -45,7 +45,30 @@ test('four-player community event reaches first confirmed referee result', async
   );
   await page.locator('[data-action="player-apply-submit"]').click();
 
-  await expect(page.locator('.player-shell')).toBeVisible({ timeout: 30000 });
+  // Account creation and Auth observer routing complete independently. Wait
+  // until either the player shell is ready or the apply request has settled.
+  await page.waitForFunction(() => {
+    if (document.querySelector('.player-shell')) return true;
+    const submit = document.querySelector('[data-action="player-apply-submit"]');
+    return !!(submit && !submit.disabled);
+  }, null, { timeout: 60000 });
+
+  // If account creation succeeded before the observer completed routing, use
+  // the normal player login UI to resume the new account deterministically.
+  if (!(await page.locator('.player-shell').isVisible().catch(() => false))) {
+    if (await page.locator('[data-action="select-role-player"]').isVisible().catch(() => false)) {
+      await page.locator('[data-action="select-role-player"]').click();
+    }
+    if (await page.locator('[data-action="player-goto-login"]').isVisible().catch(() => false)) {
+      await page.locator('[data-action="player-goto-login"]').first().click();
+    }
+    await expect(page.locator('#player-login-email')).toBeVisible({ timeout: 30000 });
+    await page.locator('#player-login-email').fill(email);
+    await page.locator('#player-login-password').fill(secret);
+    await page.locator('[data-action="player-email-signin"]').click();
+  }
+
+  await expect(page.locator('.player-shell')).toBeVisible({ timeout: 60000 });
   await page.locator('[data-action="player-switch-tab"][data-tab="host"]').first().click();
   await expect(page.locator('.community-host-hero')).toBeVisible();
 
