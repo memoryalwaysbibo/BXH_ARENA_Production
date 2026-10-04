@@ -17984,7 +17984,7 @@ async function handleTeamMatchAction(action,target){
       'permission-denied':'目前帳號沒有這項團體賽操作權限。'
     };
     const key=Object.keys(known).find(code=>raw.includes(code));
-    const diagnostic=String(e?.details?.reason||e?.code||'unknown').replace(/^functions\\//,'');
+    const diagnostic=String(e?.details?.reason||e?.code||'unknown').replace(/^functions\//,'');
     showToast(key?known[key]:'團體賽操作失敗（'+diagnostic+'），請更新排陣狀態後再試。',true);
   }
   finally{teamMatchActionsBusy.delete(busyKey);}
