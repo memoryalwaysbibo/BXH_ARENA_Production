@@ -5607,10 +5607,10 @@ function canOperateCurrentTournament(){ return (hasAdminAccess() && (!isTester()
 function canConfigureCurrentTournament(){ return isAdminTierOrAbove() || isOwnTestTournament() || isCommunityRoomOwner(); }
 function canJoinCloudRoom(){ return currentRole === "admin" || currentRole === "guest" || currentRole === "player"; }
 function isSuperAdmin(){ return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin"); }
-const GOOGLE_LINK_PILOT_EMAILS=new Set(["memoryalwaysbobi@gmail.com"]);
-function canUseGoogleLinkPilot(){
+function canLinkGoogleAccount(){
   const email=String(userProfile&&userProfile.email||"").trim().toLowerCase();
-  return !!(userProfile && userProfile.active===true && userProfile.isTestAccount!==true && GOOGLE_LINK_PILOT_EMAILS.has(email));
+  const authEmail=String(firebaseUser&&firebaseUser.email||"").trim().toLowerCase();
+  return !!(userProfile && userProfile.active===true && userProfile.isTestAccount!==true && email && email===authEmail);
 }
 function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin")); }
 function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode() || isEventStaffMode())); }
@@ -15808,7 +15808,7 @@ function renderPlayerProfileTab(p){
         </section>
       </div>
       <div class="profile-account-actions">
-        ${canUseGoogleLinkPilot()?`<div class="panel" style="width:100%"><strong>Google 帳號綁定（限定測試）</strong><p class="hint">${window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?"已綁定 Google 帳號。":"先以原本的 ARENA 帳密登入，再連結相同信箱的 Google 帳號。"}</p>${googleLinkError?`<div class="auth-error">${esc(googleLinkError)}</div>`:""}${window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?"":`<button class="btn btn-ghost" data-action="player-link-google" ${googleLinkBusy?'disabled':''}>${googleLinkBusy?'連結中…':'連結 Google 帳號'}</button>`}</div>`:""}
+        ${canLinkGoogleAccount()?`<div class="panel" style="width:100%"><strong>Google 帳號綁定</strong><p class="hint">${window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?"已綁定 Google 帳號。":"先以原本的 ARENA 帳密登入，再連結相同信箱的 Google 帳號。"}</p>${googleLinkError?`<div class="auth-error">${esc(googleLinkError)}</div>`:""}${window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?"":`<button class="btn btn-ghost" data-action="player-link-google" ${googleLinkBusy?'disabled':''}>${googleLinkBusy?'連結中…':'連結 Google 帳號'}</button>`}</div>`:""}
         <button class="btn btn-ghost" data-action="player-change-password">修改密碼</button>
         <button class="btn btn-danger-solid" data-action="player-logout">登出</button>
       </div>
@@ -19429,7 +19429,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="player-link-google"){
-    if(!canUseGoogleLinkPilot())return;
+    if(!canLinkGoogleAccount())return;
     if(googleLinkBusy)return;
     const before=window.cloudAuth?.getCurrentUser?.();
     if(!before?.uid){googleLinkError="請先使用原本的 ARENA 帳密登入。";render();return;}
