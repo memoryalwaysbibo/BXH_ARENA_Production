@@ -1,6 +1,6 @@
 {
-  "build": "20261004.7",
+  "build": "20261004.8",
   "version": "v14.3.23",
-  "updatedAt": "2026-10-04T21:53:00+08:00",
-  "releaseTrigger": "team-referee-captain-ui-separation"
+  "updatedAt": "2026-10-04T22:36:00+08:00",
+  "releaseTrigger": "public-watch-admin-ui-isolation"
 }
