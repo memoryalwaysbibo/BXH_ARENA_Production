@@ -3754,6 +3754,12 @@ let aiCreateParsedContext=null;
 let aiCreatePosterOwner=null;
 let aiCreateCoverEnabled=true;
 let aiCreateCoverPending=null;
+const AI_CREATE_COVER_RETRY_TTL_MS=30*24*60*60*1000;
+function aiCreateCoverRetryKey(uid,roomId){if(!uid||!roomId)return null;return "bxh.aiCreatePosterCoverRetry.v1:"+encodeURIComponent(uid)+":"+encodeURIComponent(roomId);}
+function aiCreateCoverRetryValid(pending,roomId,uid){const cover=pending&&pending.cover;return !!(pending&&pending.uid===uid&&pending.roomId===roomId&&Number.isFinite(pending.createdAt)&&pending.createdAt<=Date.now()&&Date.now()-pending.createdAt<=AI_CREATE_COVER_RETRY_TTL_MS&&cover&&cover.mimeType==="image/jpeg"&&cover.width===240&&cover.height===240&&typeof cover.base64==="string"&&cover.base64.length>0&&cover.base64.length<=160000&&/^[A-Za-z0-9+/]*={0,2}$/.test(cover.base64));}
+function aiCreatePersistCoverRetry(pending){if(!pending||!aiCreateCoverRetryValid(pending,pending.roomId,pending.uid))return false;const key=aiCreateCoverRetryKey(pending.uid,pending.roomId);try{if(!key||!window.localStorage)return false;window.localStorage.setItem(key,JSON.stringify(pending));return true;}catch(error){return false;}}
+function aiCreateLoadCoverRetry(roomId,uid){const key=aiCreateCoverRetryKey(uid,roomId);if(!key)return null;try{const raw=window.localStorage&&window.localStorage.getItem(key);if(!raw)return null;const pending=JSON.parse(raw);if(!aiCreateCoverRetryValid(pending,roomId,uid)){window.localStorage.removeItem(key);return null;}return pending;}catch(error){return null;}}
+function aiCreateClearCoverRetry(pending){const key=pending&&aiCreateCoverRetryKey(pending.uid,pending.roomId);if(!key)return;try{if(window.localStorage)window.localStorage.removeItem(key);}catch(error){}}
 function aiCreateInvalidateInput(){
   aiCreateInputGeneration++;
   aiCreateParseBusy=false;
@@ -8817,16 +8823,21 @@ function renderTournamentPublishAction(readOnly){
   return `<button class="btn btn-primary" data-action="open-registration-publish-preview">${state.meta.publishedAt&&state.cloudCode?'更新並重新發布':'完成架構並發布'}</button>`;
 }
 async function publishPendingPosterCover(code){
-  const pending=aiCreateCoverPending;
-  if(!pending||pending.roomId!==state.id||pending.uid!==(firebaseUser&&firebaseUser.uid)||!code)return;
+  const uid=firebaseUser&&firebaseUser.uid,roomId=state&&state.id;
+  let pending=aiCreateCoverPending;
+  if(!aiCreateCoverRetryValid(pending,roomId,uid))pending=aiCreateLoadCoverRetry(roomId,uid);
+  if(!pending||!code)return;
+  aiCreateCoverPending=pending;
+  const retrySaved=aiCreatePersistCoverRetry(pending);
   try{
     const result=await window.engagementService.roomPosterCover({code,cover:pending.cover});
     if(!result||result.ok!==true)throw new Error("cover-upload-failed");
+    aiCreateClearCoverRetry(pending);
     if(aiCreateCoverPending===pending)aiCreateCoverPending=null;
     publicTournamentsCache=null;
   }catch(error){
     console.warn("[room cover upload]",error&&error.code||"failed");
-    showToast("賽事已發布，但海報縮圖上傳失敗；請重新按更新並發布重試",true);
+    showToast(retrySaved?"賽事已發布，海報縮圖上傳失敗；舊圖保留，請按「更新並重新發布」重試":"賽事已發布，海報縮圖上傳失敗；舊圖保留。本機無法保存重試資料，請留在此頁按「更新並重新發布」重試",true);
   }
 }
 async function publishRegistrationConfig(){
