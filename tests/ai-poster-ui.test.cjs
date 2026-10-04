@@ -56,13 +56,11 @@ function ready(result=fixture().result){ctx.testResult=result;run('aiCreateAssis
  await test('Transcript and filename are escaped in UI',()=>{ready();const evidence=api.renderAiCreatePosterEvidence();assert(!evidence.includes('<script>'));assert(evidence.includes('&lt;script&gt;'));run('aiCreatePosterFile={...testImage,name:"<img src=x onerror=alert(1)>"}');assert(!api.renderAiCreatePosterInput().includes('<img src=x'));});
  await test('No persistence, direct room write or secret access in image module',()=>{const source=fs.readFileSync(path.join(root,'ai-poster-ui.js'),'utf8');assert(!/localStorage|sessionStorage|indexedDB|setDoc|updateDoc|writeBatch|apiKey|process\.env|console\.log/.test(source));});
  await test('Cover retry survives refresh, stays room and actor scoped, and clears on success',async()=>{
-   const helperStart=html.indexOf('const AI_CREATE_COVER_RETRY_TTL_MS='),helperEnd=html.indexOf('\nfunction aiCreateInvalidateInput(',helperStart);
    const start=html.indexOf('async function publishPendingPosterCover('),end=html.indexOf('\n}',start)+2;
-   assert(helperStart>0&&helperEnd>helperStart&&start>0&&end>start);
+   assert(start>0&&end>start);
    const values=new Map();
    ctx.window.localStorage={getItem:key=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
    vm.runInContext('let publicTournamentsCache=[];',ctx);
-   vm.runInContext(html.slice(helperStart,helperEnd),ctx);
    vm.runInContext(html.slice(start,end),ctx);
    let uploads=0,failUpload=true;
    ctx.window.engagementService.roomPosterCover=async()=>{uploads++;if(failUpload)throw Object.assign(new Error('poster-upload-failed'),{code:'poster-upload-failed'});return {ok:true};};
