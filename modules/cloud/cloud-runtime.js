@@ -120,6 +120,8 @@
 
   const USERS_COLLECTION = "users";
   const BOOTSTRAP_DOC_PATH = ["system","bootstrap"];
+  const GOOGLE_LINK_PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
+  const googleLinkProfileCache = new Map();
 
   window.cloudAuth = {
     isReady(){ return authReady; },
@@ -138,7 +140,12 @@
       if(!authReady || !authHandle?.currentUser) return {ok:false,error:"請先使用原本的 ARENA 帳密登入。"};
       const user=authHandle.currentUser,uid=user.uid,oldEmail=String(user.email||"").trim().toLowerCase();
       if(!oldEmail) return {ok:false,error:"原帳號缺少登入信箱，請聯絡管理員。"};
-      const profile=await this.getUserProfile(uid);
+      // The profile is fetched while the signed-in profile is loaded, before
+      // the user taps this button. Do not wait on Firestore here: mobile browsers
+      // can block Firebase's popup after transient user activation expires.
+      const profileEntry=googleLinkProfileCache.get(uid);
+      if(!profileEntry || Date.now()-profileEntry.loadedAt>GOOGLE_LINK_PROFILE_CACHE_TTL_MS)return {ok:false,error:"帳號資料已逾時，請重新開啟「我的資料」後再試。"};
+      const profile=profileEntry.profile;
       const pilotEmails=new Set(["memoryalwaysbobi@gmail.com"]);
       const profileEmail=String(profile?.email||"").trim().toLowerCase();
       const approvedPilot=profile?.active===true&&pilotEmails.has(profileEmail);
@@ -148,9 +155,19 @@
       try{
         const provider=new ax.GoogleAuthProvider();
         provider.setCustomParameters({login_hint:oldEmail,prompt:"select_account"});
-        const result=await ax.linkWithPopup(user,provider,ax.browserPopupRedirectResolver);
+        // Start the popup synchronously in the original button-click stack.
+        const popupPromise=ax.linkWithPopup(user,provider,ax.browserPopupRedirectResolver);
+        const result=await popupPromise;
         const linked=result.user;
         if(linked.uid!==uid)throw Error("uid-changed");
+        const freshProfile=await this.getUserProfile(uid);
+        const freshEmail=String(freshProfile?.email||"").trim().toLowerCase();
+        const freshApprovedPilot=freshProfile?.active===true&&pilotEmails.has(freshEmail);
+        if(freshProfile?.active!==true||(freshProfile?.role!=="super_admin"&&!freshApprovedPilot)||freshEmail!==oldEmail){
+          try{await ax.unlink(linked,"google.com");}
+          catch(unlinkError){return {ok:false,error:"帳號資格重新核對失敗，解除連結也失敗。請停止操作並由管理員檢查帳號。"};}
+          return {ok:false,error:"帳號資格已變更或無法確認，已取消 Google 連結。"};
+        }
         const googleEmail=String(linked.providerData.find(p=>p.providerId==="google.com")?.email||"").trim().toLowerCase();
         if(googleEmail!==oldEmail){
           // A chosen Google account can differ from login_hint. Keep the original
@@ -241,6 +258,7 @@
         try{localStorage.removeItem(pushKey);}catch(e){}
       }
       try{ await ax.signOut(authHandle); }catch(e){}
+      googleLinkProfileCache.clear();
     },
 
     onAuthChange(callback){
@@ -252,8 +270,12 @@
       if(!authReady || !uid) return null;
       try{
         const snap = await fx.getDoc(fx.doc(dbHandle, USERS_COLLECTION, uid));
-        return snap.exists() ? snap.data() : null;
+        const profile=snap.exists() ? snap.data() : null;
+        if(profile)googleLinkProfileCache.set(uid,{profile,loadedAt:Date.now()});
+        else googleLinkProfileCache.delete(uid);
+        return profile;
       }catch(e){
+        googleLinkProfileCache.delete(uid);
         console.warn("讀取使用者資料失敗", e);
         return null;
       }
