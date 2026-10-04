@@ -366,9 +366,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.21";
+const APP_VERSION = "v14.3.22";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.22",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體賽模式分流與即時戰況",updateLevel:"minor",added:["團體賽新增隊伍樹狀總覽與即時戰況切換","公開觀賽訂閱團體生命、目前出場者與判定紀錄"],changed:["玩家模式只顯示觀賽資訊與隊長本隊排陣；裁判模式集中排陣公開與計分操作","團體裁判台不再與玩家對戰表共用同一畫面"],fixed:["修正團體賽缺少樹狀圖","修正其他裝置必須手動刷新才能看到最新生命與判定"],security:["公開即時資料只包含已公開排陣與比賽狀態，不開放寫入"]},
   {version:"v14.3.21",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體戰按鍵式判定",updateLevel:"patch",added:["左右隊伍各自提供轉停、爆裂、擊飛、極限四種直接判定按鈕","團體賽操作失敗時保留後端原因代碼供現場排錯"],changed:["移除勝方與判定下拉選單，改為單次按鍵操作"],fixed:["修正 Callable 錯誤細節在前端封裝時遺失，導致所有異常只顯示泛用訊息"],security:[]},
   {version:"v14.3.20",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體戰雙命計分板補完",updateLevel:"patch",added:["排陣公開後立即顯示雙方上場選手、剩餘生命與最近判定"],changed:["團體戰計分控制改為手機友善雙欄計分板","已公開的團體比分可供觀賽者同步查看"],fixed:["修正第一筆判定前計分狀態為空而只顯示勝方與判定選單","團體賽後端錯誤改顯示裁判可理解的中文訊息"],security:[]},
   {version:"v14.3.19",date:"2026/10/04",timezone:"Asia/Taipei",title:"iPhone Google 綁定 redirect 備援",updateLevel:"patch",added:["iPhone／PWA 封鎖彈出視窗時改用整頁 Google redirect"],changed:["redirect 返回後重新核對原帳號 UID、資格與 Google 信箱"],fixed:["修復 auth/popup-blocked 讓 Google 帳號無法綁定"],security:[]},
@@ -9417,6 +9418,27 @@ function bracketRefreshButtonHtml(){
 const teamMatchUi=new Map();
 const teamMatchLoading=new Set();
 const teamMatchActionsBusy=new Set();
+let teamLiveUnsub=null;
+let teamLiveCode="";
+let teamLiveSignature="";
+let teamBracketViewMode="tree";
+function ensureTeamLiveSubscription(){
+  const code=String(state.cloudCode||"").toUpperCase();
+  if(!code||!window.cloudSync?.subscribeTeamLive)return;
+  if(teamLiveUnsub&&teamLiveCode===code)return;
+  try{if(teamLiveUnsub)teamLiveUnsub();}catch(e){}
+  teamLiveUnsub=null;teamLiveCode=code;teamLiveSignature="";
+  teamLiveUnsub=window.cloudSync.subscribeTeamLive(code,games=>{
+    if(code!==String(state.cloudCode||"").toUpperCase())return;
+    const signature=JSON.stringify(games||{});
+    if(signature===teamLiveSignature)return;
+    teamLiveSignature=signature;
+    for(const [matchId,game] of Object.entries(games||{})){
+      teamMatchUi.set(matchId,{...(teamMatchUi.get(matchId)||{}),game});
+    }
+    renderPreservingScroll();
+  });
+}
 function teamMatchNames(m){
   const teams=new Map((state.teams||[]).map(t=>[String(t.id),t]));
   return (m.teamIds||[]).map(id=>teams.get(String(id))?.name||"待晉級");
@@ -9424,13 +9446,13 @@ function teamMatchNames(m){
 function teamMatchPlayerName(id){
   return (state.players||[]).find(p=>String(p.id)===String(id))?.name||"未知隊員";
 }
-function renderTeamLineupPanel(m){
+function renderTeamLineupPanel(m,allowReferee=true){
   if(m.completed||!m.teamIds?.[0]||!m.teamIds?.[1]||!state.cloudCode)return '';
   const view=teamMatchUi.get(m.id);
   if(!view&&!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
   const teams=(state.teams||[]).filter(t=>m.teamIds.includes(t.id));
   const mine=teams.find(t=>t.id===view?.ownTeamId);
-  const canRef=view?.isReferee===true;
+  const canRef=allowReferee&&view?.isReferee===true;
   let out='<div class="panel"><div class="panel-title">隊長排陣與人員到齊</div>';
   out+='<div class="hint">'+teams.map(t=>esc(t.name)+'：'+(view?.submitted?.[t.id]?'已提交':'待提交')).join(' ／ ')+'</div>';
   if(view?.revealed){
@@ -9458,10 +9480,10 @@ function renderTeamLineupPanel(m){
   out+='<button class="btn btn-ghost btn-sm" data-action="team-lineup-refresh" data-match-id="'+esc(m.id)+'">更新排陣狀態</button></div>';
   return out;
 }
-function renderTeamScorePanel(m){
+function renderTeamScorePanel(m,allowActions=true){
   if(m.completed)return '<div class="hint">本場勝隊：'+esc((state.teams||[]).find(t=>t.id===m.winnerId)?.name||'未知隊伍')+'</div>';
   const view=teamMatchUi.get(m.id);
-  if(!state.startedAt||!view?.revealed)return '';
+  if(!state.startedAt||(!view?.revealed&&!view?.game))return '';
   const game=view.game, names=teamMatchNames(m);
   const finishLabel={spin:'轉停',burst:'爆裂',over:'擊飛',extreme:'極限'};
   let out='<div class="panel"><div class="panel-title">雙命守擂計分板｜'+names.map(esc).join(' vs ')+'</div>';
@@ -9488,7 +9510,7 @@ function renderTeamScorePanel(m){
   }else{
     out+='<div class="hint">計分板初始化中，請按「更新排陣狀態」重新載入。</div>';
   }
-  if(view.isReferee===true){
+  if(allowActions&&view.isReferee===true){
     const scoreButtons=side=>'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px;">'
       +[['spin','轉停'],['burst','爆裂'],['over','擊飛'],['extreme','極限']].map(([finish,label])=>
         '<button class="btn btn-primary btn-sm" style="min-height:46px;padding:8px 4px;" data-action="team-score-direct" data-match-id="'+esc(m.id)+'" data-winner-side="'+side+'" data-finish="'+finish+'" '+(!game?'disabled':'')+'>'+label+'</button>'
@@ -9516,7 +9538,52 @@ async function loadTeamMatchUi(matchId){
   }catch(e){console.warn('[team lineup view]',e);teamMatchUi.set(matchId,{error:true});}
   finally{teamMatchLoading.delete(matchId);}
 }
-function renderTeamBracket(){
+function teamNameById(id){
+  return id?((state.teams||[]).find(t=>String(t.id)===String(id))?.name||"隊伍已移除"):"待晉級";
+}
+function teamMatchBoxHtml(m,round,index){
+  const ids=m.teamIds||[];
+  const game=teamMatchUi.get(m.id)?.game;
+  const lifeText=side=>{
+    if(m.completed)return m.winnerId&&String(m.winnerId)===String(ids[side])?'勝':'';
+    if(!game)return '';
+    const i=game.current?.[side],remaining=game.life?.[side]?.[i];
+    return Number.isFinite(Number(remaining))?String(remaining)+'命':'';
+  };
+  const aWin=m.completed&&m.winnerId&&String(m.winnerId)===String(ids[0]);
+  const bWin=m.completed&&m.winnerId&&String(m.winnerId)===String(ids[1]);
+  return `<div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}" data-round="${round}" data-index="${index}" data-id="${esc(m.id)}">
+    <div class="mb-head"><span>第 ${Number(m.indexInRound||0)+1} 場</span><span>台${esc(m.station)}</span></div>
+    <div class="mb-row ${aWin?'winner':''}"><span class="pname">${esc(teamNameById(ids[0]))}</span><span class="sc">${esc(lifeText(0))}</span></div>
+    <div class="mb-row ${bWin?'winner':''}"><span class="pname">${esc(teamNameById(ids[1]))}</span><span class="sc">${esc(lifeText(1))}</span></div>
+    ${matchStatusBarHtml(m)}
+  </div>`;
+}
+function renderTeamTreeSection(bracket,title,suffix){
+  const rounds=Array.from(new Set(state.matches.filter(m=>m.bracket===bracket).map(m=>Number(m.round)||0))).sort((a,b)=>a-b);
+  if(!rounds.length)return '';
+  const cols=rounds.map((round,roundIndex)=>{
+    const matches=state.matches.filter(m=>m.bracket===bracket&&Number(m.round||0)===round).sort((a,b)=>a.indexInRound-b.indexInRound);
+    const boxes=matches.map((m,index)=>teamMatchBoxHtml(m,roundIndex,index)).join('');
+    return `<div class="se-col" data-round="${roundIndex}"><div class="se-col-title">${bracket==='SE'&&roundIndex===rounds.length-1?'冠亞':title+'・第 '+(round+1)+' 輪'}</div>${boxes}</div>`;
+  }).join('');
+  return `<div class="panel"><div class="panel-title">${esc(title)}</div><div class="bracket-wrap">${wrapBracketWatermark(`<div class="se-bracket-outer" id="se-bracket-outer-${suffix}"><svg class="se-bracket-svg" id="se-bracket-svg-${suffix}"></svg><div class="se-bracket-cols" id="se-bracket-cols-${suffix}">${cols}</div></div>`)}</div></div>`;
+}
+function renderTeamTree(){
+  const fmt=state.meta.formatType||'single';
+  if(fmt==='roundrobin')return renderTeamMatchList(false);
+  let out='';
+  if(fmt==='double'){
+    out+=renderTeamTreeSection('WB','勝部','team-wb');
+    out+=renderTeamTreeSection('LB','敗部','team-lb');
+    out+=renderTeamTreeSection('GF','總決賽','team-gf');
+    out+=renderTeamTreeSection('GFR','重置戰','team-gfr');
+  }else out+=renderTeamTreeSection('SE','團體單淘汰','team');
+  if(state.championId)out='<div class="champion-box"><div class="cap">冠　軍</div><div class="name">'+esc(teamNameById(state.championId))+'</div></div>'+out;
+  setTimeout(()=>{['team','team-wb','team-lb','team-gf','team-gfr'].forEach(s=>layoutSingleElimBracket('-'+s));},0);
+  return out;
+}
+function renderTeamMatchList(refereeMode){
   const teams=new Map((state.teams||[]).map(t=>[String(t.id),t]));
   const name=id=>id?esc(teams.get(String(id))?.name||"隊伍已移除"):"待晉級";
   const opening=state.meta.formatType==="double"?"WB":"SE";
@@ -9536,7 +9603,7 @@ function renderTeamBracket(){
     const [bracket,round]=key.split(':');
     const title=(label[bracket]||bracket)+(bracket==="GF"||bracket==="GFR"?"":"・第 "+(Number(round)+1)+" 輪");
     html+='<section class="compact-round"><div class="compact-round-head"><span class="compact-round-title">'+title+'</span><span class="compact-round-count">'+matches.length+' 場</span></div><div class="compact-round-matches">';
-    for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m)+renderTeamScorePanel(m);
+    for(const m of matches)html+='<div class="panel"><b>'+name(m.teamIds?.[0])+'　vs　'+name(m.teamIds?.[1])+'</b><div class="hint">第 '+(m.indexInRound+1)+' 場・戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m,refereeMode)+renderTeamScorePanel(m,refereeMode);
     html+='</div></section>';
   }
   if(fmt==="roundrobin"){
@@ -9547,6 +9614,22 @@ function renderTeamBracket(){
   }
   if(state.championId)html+='<div class="panel"><b>冠軍：'+name(state.championId)+'</b><div>亞軍：'+name(state.runnerUpId)+'</div></div>';
   return html+'</div>';
+}
+function primeTeamMatchViews(){
+  for(const m of (state.matches||[]).filter(m=>!m.isBye&&!m.completed&&m.teamIds?.[0]&&m.teamIds?.[1])){
+    if(!teamMatchUi.has(m.id)&&!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
+  }
+}
+function renderTeamBracket(){
+  ensureTeamLiveSubscription();
+  primeTeamMatchViews();
+  const toggle=`<div class="bracket-view-toggle" role="group" aria-label="團體賽檢視模式"><button class="bvt-btn ${teamBracketViewMode==='tree'?'active':''}" data-action="set-team-bracket-view" data-mode="tree">樹狀總覽</button><button class="bvt-btn ${teamBracketViewMode==='live'?'active':''}" data-action="set-team-bracket-view" data-mode="live">即時戰況</button></div>`;
+  return `<div class="bracket-top-controls">${toggle}${bracketRefreshButtonHtml()}</div>`+(teamBracketViewMode==='live'?renderTeamMatchList(false):renderTeamTree());
+}
+function renderTeamReferee(){
+  ensureTeamLiveSubscription();
+  primeTeamMatchViews();
+  return refereeBracketRoundtripNav('bracket')+'<div class="banner"><span>團體裁判模式｜排陣確認、公開與即時計分僅在此操作。</span></div>'+renderTeamMatchList(true);
 }
 function renderBracket(){
   if(state.meta?.battleMode==="team"&&state.bracketSize)return renderTeamBracket();
@@ -10675,7 +10758,7 @@ function renderSkippedMatches(){
   return `<section class="panel"><div class="panel-title">待承接場次（${skipped.length}）</div><div class="hint">保留原比分。閒置台立即承接；忙碌台安排在目前比賽之後。未承接的場次依原台佇列接續；跳過時沒有其他可執行場次，則保留待承接。</div>${skipped.map(m=>`<div class="panel" style="margin-top:12px"><strong>${esc(matchLabel(m))}｜${esc(playerName(m.a.playerId))} vs ${esc(playerName(m.b.playerId))}</strong><div class="hint">台${Number(m.station)} · ${m.callPass?'PASS：同台兩場後回補':m.resumeQueuedAt?'已安排承接':'已跳過'}</div>${!m.resumeQueuedAt&&!m.callPass&&canOperateCurrentTournament()&&state.archiveStatus!=="completed"?`<div class="btn-row">${targets.map(i=>`<button class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${i}" ${courtQueueBusy?'disabled':''}>${isAdminTierOrAbove()?'指派':'承接'}至台${i}</button>`).join("")}</div>`:""}</div>`).join("")}</section>`;
 }
 function renderReferee(){
-  if(state.meta?.battleMode==="team")return renderTeamBracket();
+  if(state.meta?.battleMode==="team")return renderTeamReferee();
   const quickNav = refereeBracketRoundtripNav("bracket");
   if(!state.bracketSize){
     return quickNav+`<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請先至「賽事設定」產生對戰表</div></div></div>`;
@@ -20435,6 +20518,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     boardZoom = 1; boardPanX = 0; boardPanY = 0;
     render();
     if(mode==="board") scheduleSeRelayout();
+    return;
+  }
+  if(action==="set-team-bracket-view"){
+    const mode=target.getAttribute("data-mode");
+    if(mode!=="tree"&&mode!=="live")return;
+    teamBracketViewMode=mode;
+    render();
     return;
   }
   if(action==="set-single-bracket-layout"){

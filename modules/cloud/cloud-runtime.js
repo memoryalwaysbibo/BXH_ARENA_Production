@@ -2981,6 +2981,29 @@ if(testerSession){
         console.warn("建立雲端監聽失敗", e);
         return ()=>{};
       }
+    },
+
+    // Public, read-only live state for team battles. The callable scorer writes
+    // JSON strings because Firestore does not support nested arrays.
+    subscribeTeamLive(code, callback){
+      if(!cloudEnabled || !code || typeof callback!=="function") return ()=>{};
+      try{
+        const ref = fx.doc(dbHandle,"publicTournaments",String(code).toUpperCase());
+        return fx.onSnapshot(ref,{includeMetadataChanges:true},snap=>{
+          if(!snap.exists() || snap.metadata.hasPendingWrites) return;
+          const raw=snap.data()?.teamLiveGames;
+          const games={};
+          if(raw&&typeof raw==="object"){
+            for(const [matchId,value] of Object.entries(raw)){
+              try{games[matchId]=typeof value==="string"?JSON.parse(value):value;}catch(e){}
+            }
+          }
+          callback(games,snap.data()?.updatedAt);
+        },err=>console.warn("團體賽即時比分監聽發生錯誤",err));
+      }catch(e){
+        console.warn("建立團體賽即時比分監聽失敗",e);
+        return ()=>{};
+      }
     }
   };
 

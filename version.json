@@ -1,6 +1,6 @@
 {
-  "build": "20261004.5",
-  "version": "v14.3.21",
-  "updatedAt": "2026-10-04T20:22:00+08:00",
-  "releaseTrigger": "team-score-direct-buttons-and-error-details"
+  "build": "20261004.6",
+  "version": "v14.3.22",
+  "updatedAt": "2026-10-04T21:04:00+08:00",
+  "releaseTrigger": "team-mode-split-tree-and-live-scoring"
 }
