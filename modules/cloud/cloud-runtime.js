@@ -1870,8 +1870,8 @@
         const now=Date.now();
         data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.meta.ladderMode="general"; data.meta.registrationEnabled=!!data.meta.registrationEnabled; data.meta.assignedStaffUids=[]; data.meta.roomAccessMode=data.meta.roomAccessMode==="password"?"password":"public";
         data.ownerUid=uid; data.createdByRole="player"; data.lastActivityAt=now;
-        const hasStructure=(data.players&&data.players.length)||(data.matches&&data.matches.length)||data.bracketSize;
-        const expMs=data.expiresAtMs || now+(hasStructure?30:7)*24*60*60*1000; data.expiresAtMs=expMs;
+        const hasStructure=(data.players||[]).some(p=>p&&p.isRoomOwner!==true)||(data.matches&&data.matches.length)||data.bracketSize;
+        const expMs=data.expiresAtMs || now+(hasStructure?30*24*60*60*1000:6*60*60*1000); data.expiresAtMs=expMs;
         const regEnabled=!!data.meta.registrationEnabled;
         const regOpen=regEnabled?(data.meta.registrationOpenAt||now):null;
         const eventStartMs=Date.parse(String(data.meta.date||"")+"T"+String(data.meta.startTime||"23:59")+":00");
