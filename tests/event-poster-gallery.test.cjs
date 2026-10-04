@@ -20,7 +20,10 @@ test('admin inline roster filters by seat type and exposes names only',()=>{
   assert.match(uiSource,/!canManageInCurrentInterface\(\)\)return/);
   assert.match(uiSource,/aria-expanded/);
   assert.match(uiSource,/名單載入中/);
-  assert.match(uiSource,/max-height:220px;overflow:auto/);\n  assert.ok(uiSource.includes("grid-template-columns:2.8em minmax(0,1fr)"));\n  assert.match(uiSource,/tournament-inline-roster-index/);\n  assert.match(uiSource,/white-space:nowrap;font-variant-numeric:tabular-nums/);
+  assert.match(uiSource,/max-height:220px;overflow:auto/);
+  assert.ok(uiSource.includes("grid-template-columns:2.8em minmax(0,1fr)"));
+  assert.match(uiSource,/tournament-inline-roster-index/);
+  assert.match(uiSource,/white-space:nowrap;font-variant-numeric:tabular-nums/);
 });
 test('poster links accept only versioned BXH Storage poster objects',()=>{
   const url='https://firebasestorage.googleapis.com/v0/b/bxh-arena.firebasestorage.app/o/room-posters%2FBXH-ABC123%2F12345678-1234-1234-1234-123456789abc.jpg?alt=media&token=12345678-1234-1234-1234-123456789abc';
