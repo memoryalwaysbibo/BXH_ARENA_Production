@@ -19432,8 +19432,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(googleLinkBusy)return;
     const before=window.cloudAuth?.getCurrentUser?.();
     if(!before?.uid){googleLinkError="請先使用原本的 ARENA 帳密登入。";render();return;}
-    googleLinkBusy=true;googleLinkError="";render();
-    window.cloudAuth.linkMyGoogleAccount().then(result=>{
+    googleLinkBusy=true;googleLinkError="";
+    const linkPromise=window.cloudAuth.linkMyGoogleAccount();
+    render();
+    linkPromise.then(result=>{
       if(result?.ok){showToast("Google 帳號已連結，玩家資料與權限維持不變");}
       else googleLinkError=result?.error||"連結失敗，請稍後重試。";
     }).catch(()=>{googleLinkError="連結失敗，請稍後重試。";}).finally(()=>{googleLinkBusy=false;render();});
