@@ -30,13 +30,14 @@ function adminTournamentFor(code){
 function addAdminPosterLayoutStyles(){
   if(document.getElementById("bxh-admin-poster-stats-style"))return;
   const style=document.createElement("style");style.id="bxh-admin-poster-stats-style";
-  style.textContent=".tournament-poster-stats-layout{display:grid;grid-template-columns:minmax(88px,30%) minmax(0,1fr);gap:12px;align-items:start;margin-top:12px}.tournament-poster-stats-preview{margin:0;position:relative;min-width:0;max-width:220px}.tournament-poster-stats-preview .lobby-poster-open{display:block;width:100%;padding:0;border:0;background:transparent;cursor:zoom-in}.tournament-poster-stats-preview .lobby-poster-image{display:block;width:100%;height:auto;max-height:300px;object-fit:contain;object-position:top;border-radius:8px}.tournament-poster-stats-preview .lobby-poster-zoom{position:absolute;right:6px;bottom:6px;padding:5px 8px;border:1px solid rgba(255,255,255,.4);border-radius:7px;background:rgba(12,8,20,.82);color:#fff;font-size:12px}.tournament-poster-stats-layout>.grid.grid-3{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:repeat(3,minmax(0,1fr))!important;gap:8px!important;margin-top:0!important}.tournament-poster-stats-layout>.grid.grid-3>.stat-box{min-width:0;min-height:0!important;height:100%;box-sizing:border-box;padding:6px 8px!important;margin:0!important}.tournament-poster-stats-layout>.grid.grid-3 .stat-box{min-width:0}@media(max-width:600px){.tournament-poster-stats-layout{grid-template-columns:minmax(84px,32%) minmax(0,1fr);gap:9px}.tournament-poster-stats-preview .lobby-poster-image{max-height:260px}.tournament-poster-stats-layout>.grid.grid-3{gap:7px!important}}";
+  style.textContent=".tournament-poster-stats-layout{display:grid;grid-template-columns:minmax(88px,30%) minmax(0,1fr);gap:12px;align-items:start;margin-top:12px}.tournament-poster-stats-preview{margin:0;position:relative;min-width:0;max-width:220px;min-height:204px;display:flex;align-items:center;justify-content:center}.tournament-poster-stats-preview .lobby-poster-open{display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:0;border:0;background:transparent;cursor:zoom-in}.tournament-poster-stats-preview .lobby-poster-image{display:block;width:100%;height:auto;max-height:300px;object-fit:contain;object-position:top;border-radius:8px}.tournament-poster-stats-preview .lobby-poster-zoom{position:absolute;right:6px;bottom:6px;padding:5px 8px;border:1px solid rgba(255,255,255,.4);border-radius:7px;background:rgba(12,8,20,.82);color:#fff;font-size:12px}.tournament-poster-stats-layout>.grid.grid-3{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:repeat(3,minmax(0,1fr))!important;gap:8px!important;margin-top:0!important}.tournament-poster-stats-layout>.grid.grid-3>.stat-box{min-width:0;min-height:0!important;height:100%;box-sizing:border-box;padding:4px 8px!important;margin:0!important;display:flex!important;flex-direction:column;justify-content:center;gap:1px}.tournament-poster-stats-layout>.grid.grid-3>.stat-box .label{margin:0 0 1px!important;line-height:1.2!important}.tournament-poster-stats-layout>.grid.grid-3>.stat-box .value{line-height:1.1!important}.tournament-poster-stats-layout>.grid.grid-3 .stat-box{min-width:0}@media(max-width:600px){.tournament-poster-stats-layout{grid-template-columns:minmax(84px,32%) minmax(0,1fr);gap:9px}.tournament-poster-stats-preview .lobby-poster-image{max-height:260px}.tournament-poster-stats-layout>.grid.grid-3{gap:7px!important}}";
   document.head.appendChild(style);
 }
-function syncAdminPosterStatHeight(image,stats){
+function syncAdminPosterStatHeight(image,stats,preview){
   if(!image||!stats)return;
+  const heightSource=preview||image;
   const sync=()=>{
-    const height=Math.round(image.getBoundingClientRect().height);
+    const height=Math.round(heightSource.getBoundingClientRect().height);
     if(height>0&&stats.style.height!==height+"px"){stats.style.height=height+"px";stats.style.boxSizing="border-box";}
   };
   if(!image._bxhPosterStatsSync){
@@ -44,7 +45,7 @@ function syncAdminPosterStatHeight(image,stats){
     image.addEventListener("load",sync);
     if(typeof root.ResizeObserver==="function"){
       image._bxhPosterStatsObserver=new root.ResizeObserver(sync);
-      image._bxhPosterStatsObserver.observe(image);
+      image._bxhPosterStatsObserver.observe(heightSource);
     }
   }
   sync();
@@ -71,7 +72,7 @@ function applyAdminPosterStatsLayout(card,posterOverride){
   if(image.src!==poster)image.src=poster;
   if(preview.parentElement!==layout||stats.parentElement!==layout||layout.firstElementChild!==preview||layout.lastElementChild!==stats)layout.replaceChildren(preview,stats);
   if(!layout.isConnected)card.insertBefore(layout,card.querySelector(".btn-row")||null);
-  syncAdminPosterStatHeight(image,stats);
+  syncAdminPosterStatHeight(image,stats,preview);
   return true;
 }
 function isManagementMode(mode,role){return ["admin","event_staff","partner_organizer"].includes(mode)&&role==="admin";}
