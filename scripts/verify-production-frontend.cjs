@@ -24,6 +24,7 @@ function must(re,msg,corpus=html){if(!re.test(corpus))throw new Error(msg)}
 function mustNot(re,msg){if(re.test(html))throw new Error(msg)}
 function mustInclude(text,msg){if(!html.includes(text))throw new Error(msg)}
 if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
+mustInclude('modules/cloud/cloud-runtime.js?v=20261004-google-link-popup-fix-1','Google-link fix must use a fresh cloud runtime cache key');
 mustInclude('<meta name="bxh-build" content="'+String(version.build||'')+'">','index.html bxh-build must match version.json');
 mustInclude('CURRENT_BUILD="'+String(version.build||'')+'"','CURRENT_BUILD must match version.json');
 mustInclude('const APP_VERSION = "'+String(version.version||'')+'"','APP_VERSION must match version.json');
