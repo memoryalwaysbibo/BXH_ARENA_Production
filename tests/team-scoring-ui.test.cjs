@@ -1,5 +1,5 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
 const cloud=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
 const publicWatchPatch=fs.readFileSync(path.join(__dirname,'../modules/main-app/public-watch-isolation.js'),'utf8');
@@ -19,9 +19,10 @@ assert(source.includes("[['spin','轉停'],['burst','爆裂'],['over','擊飛'],
 assert(!source.includes('id="team-score-winner-'));
 assert(source.includes('function renderTeamReferee()'));
 assert(source.includes('if(mine&&!refereeMode){'));
-assert(publicWatchPatch.includes("if(publicWatchReturnContext&&mode!=='referee')return '';"));
+assert(publicWatchPatch.includes("const directWatchEntry=new URLSearchParams(location.search).get('entry')==='watch';"));
+assert(publicWatchPatch.includes("if(inPublicWatch()&&mode!=='referee')return '';"));
 assert(publicWatchPatch.includes('return originalLineupPanel(m,mode);'));
-assert(publicWatchPatch.includes("activeTab==='referee'&&!publicWatchReturnContext"));
+assert(publicWatchPatch.includes("activeTab==='referee'&&!inPublicWatch()"));
 assert(publicWatchPatch.includes("const allowedTabs=new Set(['ladder','live','bracket'])"));
 assert(publicWatchPatch.includes("v2.dataset.visibleTabs='ladder,live,bracket'"));
 assert(publicWatchPatch.includes("node.textContent='目前為公開觀賽模式'"));
@@ -30,4 +31,42 @@ assert(source.includes('data-action="set-team-bracket-view"'));
 assert(source.includes("teamBracketViewMode==='live'?renderTeamMatchList(false):renderTeamTree()"));
 assert(source.includes('function renderTeamTree()'));
 assert(cloud.includes('subscribeTeamLive(code, callback)'));
-console.log('PASS team scoring board initial-state and error-message UI contracts');
+
+function watchIsolationCase(search,watchContext,activeTab){
+  const makeNode=(data={})=>({dataset:data,removed:false,cleared:false,remove(){this.removed=true;},replaceChildren(){this.cleared=true;}});
+  const nav=['ladder','live','bracket','duty','operations','history','version'].map(tab=>makeNode({tab}));
+  const account=['back-from-public-watch','account-logout','admin-open'].map(action=>makeNode({action}));
+  const modeContext=makeNode();
+  const navRoot={dataset:{}};
+  const app={
+    querySelectorAll(selector){
+      if(selector==='[data-action="switch-tab"][data-tab]')return nav;
+      if(selector==='.mode-management-context')return [modeContext];
+      if(selector==='.public-watch-return [data-action="cloud-admin-open-tournament"]')return [];
+      if(selector==='.public-watch-return span'||selector==='.account-role-label')return [];
+      if(selector==='.account-menu button')return account;
+      return [];
+    },
+    querySelector(selector){return selector==='#bxh-management-v2-nav'?navRoot:null;}
+  };
+  const sandbox={
+    URLSearchParams,location:{search},publicWatchReturnContext:watchContext,activeTab,
+    renderTeamLineupPanel:()=> 'lineup',primeTeamMatchViews(){this.primed=(this.primed||0)+1;},
+    renderApp(){this.rendered=true;},document:{getElementById:()=>app}
+  };
+  vm.runInNewContext(publicWatchPatch,sandbox);
+  sandbox.renderApp();
+  return {sandbox,nav,account,modeContext,navRoot};
+}
+const directWatch=watchIsolationCase('?code=BXH-QATEST&entry=watch',false,'duty');
+assert.equal(directWatch.sandbox.activeTab,'live');
+assert.deepEqual(directWatch.nav.filter(x=>!x.removed).map(x=>x.dataset.tab),['ladder','live','bracket']);
+assert.deepEqual(directWatch.account.filter(x=>!x.removed).map(x=>x.dataset.action),['back-from-public-watch','account-logout']);
+assert.equal(directWatch.navRoot.dataset.visibleTabs,'ladder,live,bracket');
+assert.equal(directWatch.modeContext.cleared,true);
+assert.equal(directWatch.sandbox.renderTeamLineupPanel({},'player'),'');
+const normalEvent=watchIsolationCase('?code=BXH-QATEST&entry=event',false,'duty');
+assert.equal(normalEvent.sandbox.activeTab,'duty');
+assert.equal(normalEvent.nav.some(x=>x.removed),false);
+
+console.log('PASS team scoring board and direct public-watch role isolation contracts');
