@@ -23,6 +23,8 @@ function thumbnailBase64(file){
   });
 }
 function getService(){return root.engagementService&&typeof root.engagementService.roomPosterCover==="function"?root.engagementService.roomPosterCover:null;}
+function isManagementMode(mode){return ["admin","event_staff","partner_organizer"].includes(mode);}
+function currentInterfaceMode(){try{return typeof activeMode==="string"?activeMode:"";}catch(_){return "";}}
 let manager=null,viewer=null;
 function scanCards(){
   document.querySelectorAll(".lobby-compact-card").forEach(card=>{
@@ -33,13 +35,16 @@ function scanCards(){
   });
 }
 async function refreshPermission(card){
-  const button=card.querySelector("[data-poster-manage]"),call=getService();
-  if(!button||!call||card.dataset.posterPermissionBusy==="1")return;
+  const button=card.querySelector("[data-poster-manage]");
+  if(!button)return;
+  if(!isManagementMode(currentInterfaceMode())){button.hidden=true;return;}
+  const call=getService();
+  if(!call||card.dataset.posterPermissionBusy==="1")return;
   card.dataset.posterPermissionBusy="1";
   try{
     const result=await call({action:"canManage",code:button.dataset.code});
     if(!button.isConnected)return;
-    button.hidden=!result||result.allowed!==true;
+    button.hidden=!isManagementMode(currentInterfaceMode())||!result||result.allowed!==true;
     button.textContent=result&&result.hasPoster?"更換照片":"＋新增照片";
     button.dataset.posterHasPhoto=result&&result.hasPoster?"1":"0";
   }catch(_){button.hidden=true;}
@@ -165,7 +170,10 @@ function openViewer(trigger){
 }
 function onClick(event){
   const manageButton=event.target.closest&&event.target.closest("[data-poster-manage]");
-  if(manageButton&&!manageButton.hidden){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();openManager(manageButton);return;}
+  if(manageButton&&!manageButton.hidden){
+    if(!isManagementMode(currentInterfaceMode())){manageButton.hidden=true;return;}
+    event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();openManager(manageButton);return;
+  }
   const openButton=event.target.closest&&event.target.closest("[data-poster-open]");
   if(openButton){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();openViewer(openButton);}
 }
@@ -175,7 +183,7 @@ function init(){
   const observer=new MutationObserver(scanCards);observer.observe(document.body,{childList:true,subtree:true});
   scanCards();
 }
-const api={safePosterUrl,validatePosterFile,MAX_FILE_BYTES};
+const api={safePosterUrl,validatePosterFile,isManagementMode,MAX_FILE_BYTES};
 root.BXHEventPosterUI=api;
 if(typeof module==="object"&&module.exports)module.exports=api;
 if(root.document){if(root.document.readyState==="loading")root.document.addEventListener("DOMContentLoaded",init,{once:true});else init();}
