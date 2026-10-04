@@ -17,7 +17,7 @@ const requiredHtml = [
   'bxh-offline-operation-conflict',
   'bxh-offline-operation-failed',
   'bxh-offline-queue-change',
-  '<script src="offline-resilience.js?v=20260930-offline-v2"></script>',
+  '<script src="offline-resilience.js?v=20261004-render-dedupe-1"></script>',
 ];
 
 for (const needle of requiredHtml) {
