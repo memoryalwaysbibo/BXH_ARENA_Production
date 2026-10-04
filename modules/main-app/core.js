@@ -366,9 +366,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.18";
+const APP_VERSION = "v14.3.19";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.19",date:"2026/10/04",timezone:"Asia/Taipei",title:"iPhone Google 綁定 redirect 備援",updateLevel:"patch",added:["iPhone／PWA 封鎖彈出視窗時改用整頁 Google redirect"],changed:["redirect 返回後重新核對原帳號 UID、資格與 Google 信箱"],fixed:["修復 auth/popup-blocked 讓 Google 帳號無法綁定"],security:[]},
   {version:"v14.3.18",date:"2026/10/04",timezone:"Asia/Taipei",title:"玩家登入按鈕文案修復",updateLevel:"patch",added:[],changed:["登入驗證期間明確顯示狀態並停用登入按鈕"],fixed:["修復玩家登入畫面的登入按鈕文字因 HTML 屬性插值錯位而消失"],security:[]},
   {version:"v14.3.17",date:"2026/10/03",timezone:"Asia/Taipei",title:"雙敗來源圖與名次修正",updateLevel:"patch",added:["通用敗部 dead-source 傳遞與勝敗部交錯場序","雙敗季軍、殿軍自動結算"],changed:["真人對戰一律保留人工輸入比分","勝部冠軍一勝奪冠、敗部冠軍需連勝兩場"],fixed:["修復非滿編雙敗賽事的敗部永久空缺卡死","修復雙敗制無法產生季軍與殿軍"],security:[]},
   {version:"v14.3.16",date:"2026/10/03",timezone:"Asia/Taipei",title:"C6BATA 敗部單房救援",updateLevel:"patch",added:["BXH-C6BATA 專用 source graph Dry Run 與救援交易"],changed:["敗部結構性空缺可安全旁路到下一場","形成真人對戰後停止，保留人工輸入比分"],fixed:["修復 C6BATA 敗部因永久空缺來源而卡死"],environment:"Production",deployStatus:"C6BATA room rescue",firebaseImpact:"單房交易只填參賽槽位；不修改比分、winnerId、loserId 或已完成場次",securityRulesImpact:"無",permissionImpact:"僅 Super Admin",publicSummary:"C6BATA 的結構性空缺可旁路；真人對戰仍由管理員依紀錄輸入比分。"},
@@ -19436,6 +19437,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const linkPromise=window.cloudAuth.linkMyGoogleAccount();
     render();
     linkPromise.then(result=>{
+      if(result?.redirecting)return;
       if(result?.ok){showToast("Google 帳號已連結，玩家資料與權限維持不變");}
       else googleLinkError=result?.error||"連結失敗，請稍後重試。";
     }).catch(()=>{googleLinkError="連結失敗，請稍後重試。";}).finally(()=>{googleLinkBusy=false;render();});
@@ -22423,7 +22425,9 @@ async function init(){
           // eventually settles) the finally block guarantees verifying/busy
           // states are never left stuck.
           let authStateGeneration=0;
-          async function processAuthStateChangeImpl(fbUser){
+          let googleLinkRedirectOutcomePending=null;
+          async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
+            if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
             const authStateIsCurrent=()=>authGeneration===authStateGeneration;
             syncEngagementIdentity(fbUser&&fbUser.uid);
@@ -22604,6 +22608,11 @@ async function init(){
               authVerifying = false;
               loginBusy = false; playerLoginBusy = false;
               render();
+              if(googleLinkRedirectOutcomePending){
+                const result=googleLinkRedirectOutcomePending;
+                googleLinkRedirectOutcomePending=null;
+                showToast(result.ok?"Google 帳號已連結，玩家資料與權限維持不變":(result.error||"Google 綁定失敗，請稍後重試"),!result.ok);
+              }
             }
           }
 

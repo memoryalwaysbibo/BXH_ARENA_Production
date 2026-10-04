@@ -90,12 +90,56 @@
           EmailAuthProvider: authMod.EmailAuthProvider,
           GoogleAuthProvider: authMod.GoogleAuthProvider,
           linkWithPopup: authMod.linkWithPopup,
+          linkWithRedirect: authMod.linkWithRedirect,
+          getRedirectResult: authMod.getRedirectResult,
           signInWithPopup: authMod.signInWithPopup,
           unlink: authMod.unlink,
           browserPopupRedirectResolver: authMod.browserPopupRedirectResolver
         };
         authReady = true;
         cloudEnabled = true;
+        // A redirect fallback returns here in a fresh page load. Consume and
+        // validate its credential before the app's auth-state listener routes
+        // the user, then pass a one-shot result to the UI for feedback.
+        let redirectContext = null;
+        try{
+          const raw = sessionStorage.getItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);
+          if(raw) redirectContext = JSON.parse(raw);
+        }catch(e){}
+        if(redirectContext){
+          try{
+            const result = await ax.getRedirectResult(authHandle, ax.browserPopupRedirectResolver);
+            const linked = result?.user;
+            if(!linked){
+              pendingGoogleLinkRedirectOutcome = {ok:false,error:"沒有取得 Google 綁定結果，請重新嘗試。"};
+            }else if(linked.uid !== redirectContext.uid){
+              pendingGoogleLinkRedirectOutcome = {ok:false,error:"登入帳號已變更，未完成 Google 綁定。"};
+            }else{
+              const snap = await withTimeout(fx.getDoc(fx.doc(dbHandle, USERS_COLLECTION, linked.uid)),7000,null);
+              const profile = snap?.exists() ? snap.data() : null;
+              const oldEmail = String(redirectContext.email||"").trim().toLowerCase();
+              const profileEmail = String(profile?.email||"").trim().toLowerCase();
+              const pilotEmails = new Set(["memoryalwaysbobi@gmail.com"]);
+              const approvedPilot = profile?.active===true && pilotEmails.has(profileEmail);
+              const googleEmail = String(linked.providerData.find(p=>p.providerId==="google.com")?.email||"").trim().toLowerCase();
+              const eligible = profile?.active===true && (profile?.role==="super_admin" || approvedPilot);
+              if(!eligible || profileEmail!==oldEmail || googleEmail!==oldEmail){
+                try{
+                  if(linked.providerData.some(p=>p.providerId==="google.com")) await ax.unlink(linked,"google.com");
+                  pendingGoogleLinkRedirectOutcome = {ok:false,error:"帳號資格或 Google 信箱未通過核對，已取消連結。"};
+                }catch(unlinkError){
+                  pendingGoogleLinkRedirectOutcome = {ok:false,error:"綁定核對失敗且無法解除連結，請聯絡管理員檢查帳號。"};
+                }
+              }else{
+                pendingGoogleLinkRedirectOutcome = {ok:true};
+              }
+            }
+          }catch(e){
+            pendingGoogleLinkRedirectOutcome = {ok:false,error:"Google 綁定失敗："+String(e?.code||"請稍後重試")};
+          }finally{
+            try{sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);}catch(e){}
+          }
+        }
         return true;
       }catch(e){
         console.warn("BXH ARENA 雲端同步：Firebase 初始化失敗，自動退回僅本機模式。", e);
@@ -122,6 +166,8 @@
   const BOOTSTRAP_DOC_PATH = ["system","bootstrap"];
   const GOOGLE_LINK_PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
   const googleLinkProfileCache = new Map();
+  const GOOGLE_LINK_REDIRECT_SESSION_KEY = "bxh_google_link_redirect_v1";
+  let pendingGoogleLinkRedirectOutcome = null;
 
   window.cloudAuth = {
     isReady(){ return authReady; },
@@ -157,7 +203,20 @@
         provider.setCustomParameters({login_hint:oldEmail,prompt:"select_account"});
         // Start the popup synchronously in the original button-click stack.
         const popupPromise=ax.linkWithPopup(user,provider,ax.browserPopupRedirectResolver);
-        const result=await popupPromise;
+        let result;
+        try{
+          result=await popupPromise;
+        }catch(popupError){
+          if(popupError?.code!=="auth/popup-blocked" && popupError?.code!=="auth/operation-not-supported-in-this-environment") throw popupError;
+          try{
+            sessionStorage.setItem(GOOGLE_LINK_REDIRECT_SESSION_KEY,JSON.stringify({uid,email:oldEmail}));
+            await ax.linkWithRedirect(user,provider,ax.browserPopupRedirectResolver);
+            return {ok:true,redirecting:true};
+          }catch(redirectError){
+            try{sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);}catch(e){}
+            return {ok:false,error:"此瀏覽器無法開啟 Google 綁定，請改用 Safari 或 Chrome 重試。"};
+          }
+        }
         const linked=result.user;
         if(linked.uid!==uid)throw Error("uid-changed");
         const freshProfile=await this.getUserProfile(uid);
@@ -263,7 +322,11 @@
 
     onAuthChange(callback){
       if(!authReady) return ()=>{};
-      return ax.onAuthStateChanged(authHandle, callback);
+      return ax.onAuthStateChanged(authHandle, user=>{
+        const redirectOutcome=pendingGoogleLinkRedirectOutcome;
+        pendingGoogleLinkRedirectOutcome=null;
+        callback(user,redirectOutcome);
+      });
     },
 
     async getUserProfile(uid){
