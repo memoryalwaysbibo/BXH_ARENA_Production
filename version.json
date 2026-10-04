@@ -1,6 +1,6 @@
 {
-  "build": "20261003.3",
-  "version": "v14.3.17",
-  "updatedAt": "2026-10-03T17:04:03+08:00",
-  "releaseTrigger": "card-pack-mailbox-projection-hotfix"
+  "build": "20261004.1",
+  "version": "v14.3.18",
+  "updatedAt": "2026-10-04T16:45:00+08:00",
+  "releaseTrigger": "player-login-button-label-fix"
 }
