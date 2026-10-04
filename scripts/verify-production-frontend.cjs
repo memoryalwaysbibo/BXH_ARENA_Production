@@ -65,14 +65,14 @@ must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linkin
 must(/linkWithRedirect:\s*authMod\.linkWithRedirect/, 'Google account linking fallback must import linkWithRedirect');
 must(/getRedirectResult:\s*authMod\.getRedirectResult/, 'Google account linking fallback must import getRedirectResult');
 mustInclude('const GOOGLE_LINK_PILOT_EMAILS=new Set(["memoryalwaysbobi@gmail.com"]);','Google link pilot allowlist missing');
-must(/function\s+canUseGoogleLinkPilot\(\)[\s\S]*?isSuperAdmin\(\)[\s\S]*?userProfile\.active===true[\s\S]*?GOOGLE_LINK_PILOT_EMAILS\.has\(email\)/, 'Google link UI must allow only super-admin or the active pilot account');
+must(/function\s+canUseGoogleLinkPilot\(\)[\s\S]*?userProfile\.active===true[\s\S]*?userProfile\.isTestAccount!==true[\s\S]*?GOOGLE_LINK_PILOT_EMAILS\.has\(email\)/, 'Google link UI must allow only the active allowlisted pilot account');
 must(/async\s+getUserProfile\(uid\)[\s\S]*?googleLinkProfileCache\.set\(uid,\{profile,loadedAt:Date\.now\(\)\}\)/, 'Google link profile must be cached before the button is tapped');
 const googleLinkMethod=cloudRuntime.slice(cloudRuntime.indexOf('async linkMyGoogleAccount()'),cloudRuntime.indexOf('async signInWithLinkedGoogle()'));
 const executableGoogleLinkMethod=googleLinkMethod.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,'');
 const googlePopupCall=executableGoogleLinkMethod.indexOf('ax.linkWithPopup(');
 const googleFirstAwait=executableGoogleLinkMethod.indexOf('await ');
 if(googlePopupCall<0 || (googleFirstAwait>=0 && googlePopupCall>googleFirstAwait)) throw new Error('Google link popup must start before any await in the click handler');
-must(/async\s+linkMyGoogleAccount\s*\(\)\s*\{[\s\S]*?googleLinkProfileCache\.get\(uid\)[\s\S]*?pilotEmails\.has\(profileEmail\)[\s\S]*?profile\?\.role!=="super_admin"&&!approvedPilot[\s\S]*?ax\.linkWithPopup\(user,provider,[\s\S]*?linked\.uid!==uid[\s\S]*?const freshProfile=await this\.getUserProfile\(uid\)[\s\S]*?freshEmail!==oldEmail[\s\S]*?googleEmail!==oldEmail[\s\S]*?ax\.unlink\(linked,"google.com"\)/, 'Google link must start popup synchronously, revalidate eligibility, keep UID, and reject mismatched email');
+must(/async\s+linkMyGoogleAccount\s*\(\)\s*\{[\s\S]*?googleLinkProfileCache\.get\(uid\)[\s\S]*?pilotEmails\.has\(profileEmail\)[\s\S]*?if\(!approvedPilot\)[\s\S]*?ax\.linkWithPopup\(user,provider,[\s\S]*?linked\.uid!==uid[\s\S]*?const freshProfile=await this\.getUserProfile\(uid\)[\s\S]*?freshEmail!==oldEmail[\s\S]*?googleEmail!==oldEmail[\s\S]*?ax\.unlink\(linked,"google.com"\)/, 'Google link must start popup synchronously, revalidate eligibility, keep UID, and reject mismatched email');
 must(/if\(action==="player-link-google"\)\{\s*if\(!canUseGoogleLinkPilot\(\)\)return;/, 'Google link action must enforce the pilot allowlist');
 const googleLinkAction=core.slice(core.indexOf('if(action==="player-link-google"){'),core.indexOf('if(action==="player-logout"){'));
 const googleLinkBusy=googleLinkAction.indexOf('googleLinkBusy=true;googleLinkError=""');

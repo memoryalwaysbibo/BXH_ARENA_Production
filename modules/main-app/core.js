@@ -5610,7 +5610,7 @@ function isSuperAdmin(){ return !!(userProfile && userProfile.active!==false && 
 const GOOGLE_LINK_PILOT_EMAILS=new Set(["memoryalwaysbobi@gmail.com"]);
 function canUseGoogleLinkPilot(){
   const email=String(userProfile&&userProfile.email||"").trim().toLowerCase();
-  return isSuperAdmin() || !!(userProfile && userProfile.active===true && userProfile.isTestAccount!==true && GOOGLE_LINK_PILOT_EMAILS.has(email));
+  return !!(userProfile && userProfile.active===true && userProfile.isTestAccount!==true && GOOGLE_LINK_PILOT_EMAILS.has(email));
 }
 function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin")); }
 function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode() || isEventStaffMode())); }
