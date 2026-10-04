@@ -687,9 +687,10 @@
       if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
       return response&&response.data ? response.data : {ok:false,error:"empty-response"};
     }catch(e){
-      const raw=String((e&&e.message)||"");
+      const detailReason=e&&e.details&&typeof e.details==="object"?e.details.reason:e&&e.details;
+      const raw=[e&&e.message,detailReason,e&&e.code].filter(Boolean).map(String).join(" ");
       const normalized=raw.includes("feature-disabled")?"feature-disabled":raw.includes("title-not-earned")?"title-not-earned":raw||"request-failed";
-      const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); throw err;
+      const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
   }
   window.engagementService={
