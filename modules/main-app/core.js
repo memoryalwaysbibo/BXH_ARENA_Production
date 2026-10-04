@@ -4425,7 +4425,7 @@ function applyAiCreateSelectedEventToDraft(){
     at:Date.now()
   };
   aiCreateCoverPending=aiCreateStructuredResult.sourceMode==="poster-callable"&&aiCreateCoverEnabled&&aiCreatePosterFile?.cover
-    ?{roomId:state.id,uid:firebaseUser?.uid,cover:aiCreatePosterFile.cover}:null;
+    ?{roomId:state.id,uid:firebaseUser?.uid,cover:aiCreatePosterFile.cover,createdAt:Date.now()}:null;
   aiCreateReviewAcknowledged=false;
   return {ok:true,model,mappedFields:aiCreateLastApplied.mappedFields,warnings:aiCreateLastApplied.warnings};
 }
