@@ -79,6 +79,86 @@ function isManagementMode(mode,role){return ["admin","event_staff","partner_orga
 function currentInterfaceMode(){try{return {mode:typeof activeMode==="string"?activeMode:"",role:typeof currentRole==="string"?currentRole:""};}catch(_){return {mode:"",role:""};}}
 function canManageInCurrentInterface(){const mode=currentInterfaceMode();return isManagementMode(mode.mode,mode.role);}
 let manager=null,viewer=null;
+function filterAdminRosterRows(rows,kind){
+  const status=kind==="waitlist"?"waitlist":"confirmed";
+  return (Array.isArray(rows)?rows:[])
+    .filter(row=>row&&row.status===status)
+    .map(row=>({name:String(row.publicName||row.displayName||row.participantName||row.realName||row.name||"未命名選手").trim()||"未命名選手"}));
+}
+function addInlineRosterStyles(){
+  if(document.getElementById("bxh-admin-inline-roster-style"))return;
+  const style=document.createElement("style");style.id="bxh-admin-inline-roster-style";
+  style.textContent=".tournament-roster-toggle{cursor:pointer;touch-action:manipulation}.tournament-roster-toggle:focus-visible{outline:2px solid #d9b95c;outline-offset:2px}.tournament-inline-roster{margin:10px 0 0;padding:10px 12px;border:1px solid rgba(170,112,255,.34);border-radius:10px;background:rgba(20,13,32,.9)}.tournament-inline-roster[hidden]{display:none!important}.tournament-inline-roster-title{margin:0 0 8px;font-size:14px;font-weight:800}.tournament-inline-roster-list{max-height:220px;overflow:auto;margin:0;padding:0 4px 0 24px;overscroll-behavior:contain}.tournament-inline-roster-list li{padding:3px 0;overflow-wrap:anywhere}.tournament-inline-roster-message{margin:0;color:#b8b2c4;font-size:13px}";
+  document.head.appendChild(style);
+}
+function ensureInlineRosterPanel(card){
+  if(!card||!card.matches(".tournament-management-card"))return null;
+  let panel=card.querySelector(":scope > .tournament-inline-roster");
+  if(!panel){
+    panel=document.createElement("section");panel.className="tournament-inline-roster";panel.hidden=true;
+    panel.setAttribute("aria-live","polite");
+  }
+  const anchor=card.querySelector(":scope > .tournament-poster-stats-layout")||card.querySelector(":scope > .grid.grid-3");
+  if(anchor&&panel.previousElementSibling!==anchor)anchor.after(panel);
+  return panel;
+}
+function setupInlineRosterToggles(card){
+  if(!card||!card.matches(".tournament-management-card"))return;
+  const stats=card.querySelector(".grid.grid-3");if(!stats)return;
+  addInlineRosterStyles();ensureInlineRosterPanel(card);
+  stats.querySelectorAll(":scope > .stat-box").forEach(box=>{
+    const label=box.querySelector(".label");
+    const title=String(label&&label.textContent||"").trim();
+    const kind=title==="正取"?"confirmed":title==="備取"?"waitlist":"";
+    if(!kind)return;
+    box.classList.add("tournament-roster-toggle");box.dataset.rosterKind=kind;
+    box.setAttribute("role","button");box.setAttribute("tabindex","0");
+    box.setAttribute("aria-label","查看"+title+"人員名單");
+    box.setAttribute("aria-expanded","false");
+  });
+}
+let activeInlineRoster=null,inlineRosterRequest=0;
+function closeInlineRoster(){
+  if(!activeInlineRoster)return;
+  activeInlineRoster.button.setAttribute("aria-expanded","false");
+  activeInlineRoster.panel.hidden=true;activeInlineRoster=null;
+}
+function setInlineRosterMessage(panel,message){
+  const node=document.createElement("p");node.className="tournament-inline-roster-message";node.textContent=message;
+  panel.replaceChildren(node);
+}
+function renderInlineRoster(panel,kind,rows){
+  const title=document.createElement("h4");title.className="tournament-inline-roster-title";
+  title.textContent=(kind==="waitlist"?"備取":"正取")+"名單（"+rows.length+" 人）";
+  const list=document.createElement("ol");list.className="tournament-inline-roster-list";
+  rows.forEach(row=>{const item=document.createElement("li");item.textContent=row.name;list.appendChild(item);});
+  panel.replaceChildren(title,list);
+}
+async function toggleInlineRoster(button){
+  const card=button.closest(".tournament-management-card"),kind=button.dataset.rosterKind;
+  const codeButton=card&&card.querySelector('[data-action="cloud-admin-copy-code"][data-code]');
+  const code=codeButton&&codeButton.dataset.code;
+  if(!card||!kind||!code||!canManageInCurrentInterface())return;
+  const panel=ensureInlineRosterPanel(card);if(!panel)return;
+  if(activeInlineRoster&&activeInlineRoster.button===button){inlineRosterRequest++;closeInlineRoster();return;}
+  closeInlineRoster();
+  const current={card,kind,button,panel,code};activeInlineRoster=current;
+  button.setAttribute("aria-expanded","true");panel.hidden=false;
+  setInlineRosterMessage(panel,"名單載入中…");
+  const request=++inlineRosterRequest;
+  try{
+    const cloud=root.cloudSync;
+    if(!cloud||typeof cloud.listRegistrationsForAdmin!=="function")throw new Error("cloud-unavailable");
+    if(typeof cloud.connect==="function")await cloud.connect();
+    const records=await cloud.listRegistrationsForAdmin(code);
+    if(activeInlineRoster!==current||request!==inlineRosterRequest)return;
+    const rows=filterAdminRosterRows(records,kind);
+    if(!rows.length){setInlineRosterMessage(panel,"目前沒有"+(kind==="waitlist"?"備取":"正取")+"人員。");return;}
+    renderInlineRoster(panel,kind,rows);
+  }catch(_){
+    if(activeInlineRoster===current&&request===inlineRosterRequest)setInlineRosterMessage(panel,"名單讀取失敗，請確認管理權限或網路後重試。");
+  }
+}
 function scanCards(){
   document.querySelectorAll(".lobby-compact-card").forEach(card=>{
     if(card.dataset.posterAccessHook==="1")return;
@@ -88,6 +168,7 @@ function scanCards(){
   });
   document.querySelectorAll(".tournament-management-card").forEach(card=>{
     applyAdminPosterStatsLayout(card);
+    setupInlineRosterToggles(card);
     if(card.dataset.posterAccessHook==="1")return;
     const actions=card.querySelector(".btn-row");
     const codeButton=card.querySelector('[data-action="cloud-admin-copy-code"][data-code]');
@@ -195,7 +276,7 @@ function applyPhoto(card,url,coverUrl,code){
     figure.append(open,zoom);slot.replaceChildren(figure);
   }
   const manage=card.querySelector("[data-poster-manage]");if(manage){manage.textContent="更換照片";manage.dataset.posterHasPhoto="1";}
-  if(card.matches(".tournament-management-card"))applyAdminPosterStatsLayout(card,safe);
+  if(card.matches(".tournament-management-card")){applyAdminPosterStatsLayout(card,safe);setupInlineRosterToggles(card);}
   const summary=card.querySelector(".lobby-poster-cover");if(summary&&typeof coverUrl==="string")summary.src=coverUrl;
   card.dataset.posterUpdatedCode=code;
 }
@@ -240,6 +321,8 @@ function openViewer(trigger){
   viewerImage.addEventListener("wheel",event=>{event.preventDefault();scale=Math.max(1,Math.min(6,scale*(event.deltaY<0?1.15:0.87)));paint();},{passive:false});
 }
 function onClick(event){
+  const rosterButton=event.target.closest&&event.target.closest("[data-roster-kind]");
+  if(rosterButton){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();toggleInlineRoster(rosterButton);return;}
   const manageButton=event.target.closest&&event.target.closest("[data-poster-manage]");
   if(manageButton&&!manageButton.hidden){
     if(!canManageInCurrentInterface()){manageButton.hidden=true;return;}
@@ -251,10 +334,11 @@ function onClick(event){
 function init(){
   if(!document.body)return;
   document.addEventListener("click",onClick,true);
+  document.addEventListener("keydown",event=>{const button=event.target&&event.target.closest&&event.target.closest("[data-roster-kind]");if(button&&(event.key==="Enter"||event.key===" ")){event.preventDefault();event.stopPropagation();toggleInlineRoster(button);}},true);
   const observer=new MutationObserver(scanCards);observer.observe(document.body,{childList:true,subtree:true});
   scanCards();
 }
-const api={safePosterUrl,managementPosterUrl,validatePosterFile,isManagementMode,MAX_FILE_BYTES};
+const api={safePosterUrl,managementPosterUrl,validatePosterFile,isManagementMode,filterAdminRosterRows,MAX_FILE_BYTES};
 root.BXHEventPosterUI=api;
 if(typeof module==="object"&&module.exports)module.exports=api;
 if(root.document){if(root.document.readyState==="loading")root.document.addEventListener("DOMContentLoaded",init,{once:true});else init();}
