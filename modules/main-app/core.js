@@ -366,9 +366,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.20";
+const APP_VERSION = "v14.3.21";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.21",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體戰按鍵式判定",updateLevel:"patch",added:["左右隊伍各自提供轉停、爆裂、擊飛、極限四種直接判定按鈕","團體賽操作失敗時保留後端原因代碼供現場排錯"],changed:["移除勝方與判定下拉選單，改為單次按鍵操作"],fixed:["修正 Callable 錯誤細節在前端封裝時遺失，導致所有異常只顯示泛用訊息"],security:[]},
   {version:"v14.3.20",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體戰雙命計分板補完",updateLevel:"patch",added:["排陣公開後立即顯示雙方上場選手、剩餘生命與最近判定"],changed:["團體戰計分控制改為手機友善雙欄計分板","已公開的團體比分可供觀賽者同步查看"],fixed:["修正第一筆判定前計分狀態為空而只顯示勝方與判定選單","團體賽後端錯誤改顯示裁判可理解的中文訊息"],security:[]},
   {version:"v14.3.19",date:"2026/10/04",timezone:"Asia/Taipei",title:"iPhone Google 綁定 redirect 備援",updateLevel:"patch",added:["iPhone／PWA 封鎖彈出視窗時改用整頁 Google redirect"],changed:["redirect 返回後重新核對原帳號 UID、資格與 Google 信箱"],fixed:["修復 auth/popup-blocked 讓 Google 帳號無法綁定"],security:[]},
   {version:"v14.3.18",date:"2026/10/04",timezone:"Asia/Taipei",title:"玩家登入按鈕文案修復",updateLevel:"patch",added:[],changed:["登入驗證期間明確顯示狀態並停用登入按鈕"],fixed:["修復玩家登入畫面的登入按鈕文字因 HTML 屬性插值錯位而消失"],security:[]},
@@ -9488,10 +9489,14 @@ function renderTeamScorePanel(m){
     out+='<div class="hint">計分板初始化中，請按「更新排陣狀態」重新載入。</div>';
   }
   if(view.isReferee===true){
-    out+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:end;margin-top:12px;">'
-      +'<label>勝方<select id="team-score-winner-'+esc(m.id)+'"><option value="0">'+esc(names[0])+'</option><option value="1">'+esc(names[1])+'</option></select></label>'
-      +'<label>判定<select id="team-score-finish-'+esc(m.id)+'"><option value="spin">轉停</option><option value="burst">爆裂</option><option value="over">擊飛</option><option value="extreme">極限</option></select></label></div>';
-    out+='<button class="btn btn-primary" style="width:100%;margin-top:10px;" data-action="team-score-submit" data-match-id="'+esc(m.id)+'" '+(!game?'disabled':'')+'>確認本次判定</button>';
+    const scoreButtons=side=>'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px;">'
+      +[['spin','轉停'],['burst','爆裂'],['over','擊飛'],['extreme','極限']].map(([finish,label])=>
+        '<button class="btn btn-primary btn-sm" style="min-height:46px;padding:8px 4px;" data-action="team-score-direct" data-match-id="'+esc(m.id)+'" data-winner-side="'+side+'" data-finish="'+finish+'" '+(!game?'disabled':'')+'>'+label+'</button>'
+      ).join('')+'</div>';
+    out+='<div class="hint" style="margin-top:12px;">直接按下獲勝隊伍的判定方式</div>'
+      +'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:8px;">'
+      +'<div class="stat-box" style="padding:10px 8px;text-align:center;"><b>'+esc(names[0])+'</b>'+scoreButtons(0)+'</div>'
+      +'<div class="stat-box" style="padding:10px 8px;text-align:center;"><b>'+esc(names[1])+'</b>'+scoreButtons(1)+'</div></div>';
   }
   return out+'</div>';
 }
@@ -17953,11 +17958,13 @@ async function handleTeamMatchAction(action,target){
       if(!confirm('將清除雙方尚未公開的順序，請兩隊重新提交。'))return;
       await window.engagementService.teamLineup({action:'reset',code,matchId});
       showToast('已退回雙方重排');
-    }else if(action==='team-score-submit'){
-      const winnerSide=Number(document.getElementById('team-score-winner-'+matchId)?.value);
-      const finish=document.getElementById('team-score-finish-'+matchId)?.value;
+    }else if(action==='team-score-direct'){
+      const winnerSide=Number(target.dataset.winnerSide);
+      const finish=target.dataset.finish;
       if(![0,1].includes(winnerSide)||!['spin','burst','over','extreme'].includes(finish))return;
-      if(!confirm('確認本次判定？提交後立即更新雙方生命與守擂順位。'))return;
+      const finishLabel={spin:'轉停',burst:'爆裂',over:'擊飛',extreme:'極限'};
+      const winnerName=teamMatchNames(match)[winnerSide]||'未知隊伍';
+      if(!confirm('確認判定：'+winnerName+'｜'+finishLabel[finish]+'？'))return;
       const outcome=await window.engagementService.teamScoring({action:'score',code,matchId,winnerSide,finish,operationId:crypto.randomUUID()});
       if(outcome.matchCompleted){teamMatchUi.delete(matchId);const refreshed=await refreshBracketFromCloud();if(refreshed)showToast('勝隊已晉級，對戰表已更新');return;}
       showToast('判定已記錄');
@@ -17965,7 +17972,7 @@ async function handleTeamMatchAction(action,target){
     await loadTeamMatchUi(matchId);
   }catch(e){
     console.warn('[team match action]',e);
-    const raw=String(e?.message||e||'').toLowerCase();
+    const raw=[e?.message,e?.details?.reason,e?.details,e?.code].filter(Boolean).map(String).join(' ').toLowerCase();
     const known={
       'lineups-incomplete':'雙方尚未完成排陣，請先提交並由裁判公開。',
       'invalid-team-roster':'隊伍名單與本場對戰資料不一致，請重新整理賽事資料。',
@@ -17977,12 +17984,13 @@ async function handleTeamMatchAction(action,target){
       'permission-denied':'目前帳號沒有這項團體賽操作權限。'
     };
     const key=Object.keys(known).find(code=>raw.includes(code));
-    showToast(key?known[key]:'團體賽操作失敗，請更新排陣狀態後再試。',true);
+    const diagnostic=String(e?.details?.reason||e?.code||'unknown').replace(/^functions\//,'');
+    showToast(key?known[key]:'團體賽操作失敗（'+diagnostic+'），請更新排陣狀態後再試。',true);
   }
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
-  if(action.startsWith("team-lineup-")||action==="team-score-submit"){handleTeamMatchAction(action,target);return;}
+  if(action.startsWith("team-lineup-")||action==="team-score-direct"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}

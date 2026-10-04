@@ -1,6 +1,6 @@
 {
-  "build": "20261004.4",
-  "version": "v14.3.20",
-  "updatedAt": "2026-10-04T20:10:00+08:00",
-  "releaseTrigger": "team-scoreboard-initial-state-fix"
+  "build": "20261004.5",
+  "version": "v14.3.21",
+  "updatedAt": "2026-10-04T20:22:00+08:00",
+  "releaseTrigger": "team-score-direct-buttons-and-error-details"
 }
