@@ -10,6 +10,10 @@
   var ladderHistorySort="date-desc";
   var ladderHistoryLoading=false;
   var ladderHistoryError="";
+  var ladderHistoryScope="";
+  var ladderHistoryAttempted=false;
+  var ladderHistoryRows=[];
+  var ladderHistoryRequest=0;
   var ladderScoreMode="season";
   var ladderVisibleCount=10;
 
@@ -88,6 +92,9 @@
   }
 
   function ladderRankingTableHtml(adminMode){
+    if(typeof ladderPublicLoaded!=="undefined"&&!ladderPublicLoaded){
+      return '<div class="empty-state" role="status">'+escLocal((typeof ladderPublicError!=="undefined"&&ladderPublicError)||"正在讀取天梯資料…")+'</div>';
+    }
     var rows=ladderActiveRankingRows();
     var myUid=typeof firebaseUser!=="undefined"&&firebaseUser&&firebaseUser.uid;
     var myIndex=myUid?rows.findIndex(function(p){return p.uid===myUid;}):-1;
@@ -203,24 +210,54 @@
     return rows;
   }
 
+  function historyScope(){
+    var uid=typeof firebaseUser!=="undefined"&&firebaseUser&&firebaseUser.uid||"";
+    var admin=typeof isAdminTierOrAbove==="function"&&isAdminTierOrAbove();
+    var season=(typeof ladderPublicData!=="undefined"&&ladderPublicData&&ladderPublicData.control&&ladderPublicData.control.currentSeason)||"";
+    var epoch=typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0;
+    return {uid:uid,admin:admin,season:season,key:[uid,admin?"admin":"player",season,epoch].join("|")};
+  }
+
   function ensureHistory(force){
+    var scope=historyScope();
+    if(ladderHistoryScope!==scope.key){
+      ladderHistoryScope=scope.key;
+      ladderHistoryRequest++;
+      ladderHistoryLoading=false;
+      ladderHistoryAttempted=false;
+      ladderHistoryError="";
+      ladderHistoryRows=[];
+      if(typeof ladderAdminLogs!=="undefined") ladderAdminLogs=[];
+      if(typeof ladderAdminLogsLoaded!=="undefined") ladderAdminLogsLoaded=false;
+    }
+    if(!scope.uid||!scope.season) return;
     if(ladderHistoryLoading) return;
-    if(typeof ladderAdminLogsLoaded!=="undefined"&&ladderAdminLogsLoaded&&!force) return;
+    if(ladderHistoryAttempted&&!force) return;
+    ladderHistoryAttempted=true;
     if(!window.cloudSync||typeof window.cloudSync.getLadderTransactions!=="function"){
       ladderHistoryError="近期積分紀錄服務尚未就緒。";
-      rerender();
       return;
     }
     ladderHistoryLoading=true;
     ladderHistoryError="";
-    Promise.resolve(window.cloudSync.getLadderTransactions()).then(function(rows){
-      if(typeof ladderAdminLogs!=="undefined") ladderAdminLogs=Array.isArray(rows)?rows:[];
+    var request=++ladderHistoryRequest;
+    var read=Promise.resolve().then(function(){return window.cloudSync.getLadderTransactions({seasonId:scope.season});});
+    if(typeof ladderReadWithTimeout==="function") read=ladderReadWithTimeout(read,10000,"ladder-history");
+    read.then(function(rows){
+      if(request!==ladderHistoryRequest||scope.key!==historyScope().key) return;
+      ladderHistoryRows=Array.isArray(rows)?rows:[];
+      if(scope.admin&&typeof ladderAdminLogs!=="undefined") ladderAdminLogs=ladderHistoryRows;
       if(typeof ladderAdminLogsLoaded!=="undefined") ladderAdminLogsLoaded=true;
     }).catch(function(error){
+      if(request!==ladderHistoryRequest||scope.key!==historyScope().key) return;
       console.warn("[ladder-secondary] history load failed",error);
-      ladderHistoryError="近期積分紀錄讀取失敗，請稍後再試。";
-      if(typeof ladderAdminLogsLoaded!=="undefined") ladderAdminLogsLoaded=false;
+      ladderHistoryError=String(error&&error.code||"").includes("permission-denied")
+        ?"目前無法讀取積分紀錄，請重新登入；若仍失敗，請聯絡管理員。"
+        :String(error&&error.message||"").includes("history-limit-reached")
+          ?"本季紀錄超過單次查詢上限，請聯絡管理員核對。"
+          :"近期積分紀錄讀取失敗，請點『重新整理』再試一次。";
     }).finally(function(){
+      if(request!==ladderHistoryRequest||scope.key!==historyScope().key) return;
       ladderHistoryLoading=false;
       rerender();
     });
@@ -244,7 +281,9 @@
   }
 
   function historyTableHtml(adminMode){
-    var logs=typeof ladderAdminLogs!=="undefined"&&Array.isArray(ladderAdminLogs)?ladderAdminLogs:[];
+    var scope=historyScope();
+    adminMode=!!adminMode&&scope.admin;
+    var logs=ladderHistoryRows;
     var rows=sortedLogs(logs);
     var currentSeason=(typeof ladderPublicData!=="undefined"&&ladderPublicData&&ladderPublicData.control&&ladderPublicData.control.currentSeason)||"S1";
     var actorHead=adminMode?"<th>操作人</th>":"";
@@ -267,7 +306,10 @@
       "</tr>";
     }).join("");
 
-    if(ladderHistoryLoading&&!rows.length) body='<tr><td colspan="'+(adminMode?7:6)+'">正在讀取近期積分紀錄…</td></tr>';
+    if(!scope.uid) body='<tr><td colspan="6">登入玩家帳號後，可查看自己的積分紀錄。</td></tr>';
+    else if(!scope.season) body='<tr><td colspan="'+(adminMode?7:6)+'">'+escLocal((typeof ladderPublicError!=="undefined"&&ladderPublicError)||"正在讀取賽季資訊…")+'</td></tr>';
+    else if(ladderHistoryError&&!rows.length) body='<tr><td colspan="'+(adminMode?7:6)+'">紀錄尚未讀取成功，請重新整理。</td></tr>';
+    else if(ladderHistoryLoading&&!rows.length) body='<tr><td colspan="'+(adminMode?7:6)+'">正在讀取近期積分紀錄…</td></tr>';
     else if(!rows.length) body='<tr><td colspan="'+(adminMode?7:6)+'">目前沒有積分紀錄</td></tr>';
 
     return '<section class="panel ladder-history-panel">'+
@@ -282,7 +324,7 @@
       '</select></label></div>'+
       (ladderHistoryError?'<div class="auth-error">'+escLocal(ladderHistoryError)+'</div>':"")+
       '<div class="rank-scroll"><table class="rank-table ladder-history-table"><thead><tr><th>時間</th><th>玩家</th><th>類型</th><th>異動</th><th>賽季</th><th>原因／賽事</th>'+actorHead+'</tr></thead><tbody>'+body+'</tbody></table></div>'+
-      '<div class="hint ladder-history-note">僅顯示 '+escLocal(currentSeason)+' 最近 100 筆；舊賽季已封存，不會載入玩家手機。</div>'+
+      '<div class="hint ladder-history-note">'+(scope.admin?'管理員可查看全體紀錄。':'登入後僅顯示自己的紀錄。')+' 僅顯示 '+escLocal(currentSeason)+' 最近 100 筆；舊賽季已封存，不會載入玩家手機。</div>'+
     '</section>';
   }
 

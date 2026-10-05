@@ -13,6 +13,7 @@ const suites = {
     { name: 'offline queue render dedupe', args: ['tests/offline-queue-render-dedupe.test.cjs'] },
     { name: 'makeup check-in contract', args: ['tests/checkin-makeup-v2-ui.test.cjs'] },
     { name: 'ladder ranking UI contract', args: ['tests/ladder-ranking-ui.test.cjs'] },
+    { name: 'ladder history access and loading state', args: ['--test', 'tests/ladder-history-access.test.cjs'] },
     { name: 'community room cloud sync contract', args: ['tests/community-room-cloud-sync.test.cjs'] },
     { name: 'bronze-before-final ordering', args: ['tests/finals-order-core.test.cjs'] },
     { name: 'court-call PASS defer contract', args: ['tests/court-call-pass-queue.test.cjs'] },

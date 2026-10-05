@@ -1401,16 +1401,29 @@
       return s.exists()?Object.assign({uid:s.id},s.data()):null;
     },
 
-    async getLadderTransactions(){
+    async getLadderTransactions(options={}){
       if(!cloudEnabled) return [];
-      const q=fx.query(
-        fx.collection(dbHandle,"ladderTransactions"),
-        fx.orderBy("createdAt","desc"),
-        fx.limit(200)
-      );
+      const uid=authHandle&&authHandle.currentUser&&authHandle.currentUser.uid;
+      if(!uid) throw new Error("auth-required");
+      const epoch=typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0;
+      const admin=!!(userProfile&&userProfile.active!==false&&userProfile.isTestAccount!==true&&["admin","super_admin"].includes(userProfile.role));
+      let q;
+      if(admin){
+        q=fx.query(fx.collection(dbHandle,"ladderTransactions"),fx.orderBy("createdAt","desc"),fx.limit(200));
+      }else{
+        const seasonId=String(options.seasonId||"");
+        if(!seasonId) throw new Error("season-required");
+        // Equality filters use Firestore's merged single-field indexes. Do not
+        // require a new composite index or query other players' audit records.
+        q=fx.query(fx.collection(dbHandle,"ladderTransactions"),fx.where("playerUid","==",uid),fx.where("seasonId","==",seasonId),fx.limit(200));
+      }
       const s=await fx.getDocs(q);
+      if(uid!==(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)) throw new Error("stale-session");
+      if(epoch!==(typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0)) throw new Error("stale-session");
       const out=[]; s.forEach(d=>{const x=Object.assign({id:d.id},d.data()); x.createdAtMs=cloudSafeTimestampMs(x.createdAt); out.push(x);});
-      return out;
+      // A capped unordered result cannot honestly be labelled "most recent".
+      if(!admin&&out.length>=200) throw new Error("history-limit-reached");
+      return out.sort((a,b)=>Number(b.createdAtMs||0)-Number(a.createdAtMs||0));
     },
 
     async getTestLadderRanking(){
