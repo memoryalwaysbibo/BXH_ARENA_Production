@@ -134,3 +134,18 @@ test('unrecognized server card ID is rejected without a claimed receipt',async()
   const t=setup();t.onClaim(async()=>({ok:true,cardId:'unknown',bonus:[]}));await t.claim();
   assert.notEqual(t.mail().error,'');assert.doesNotMatch(t.view(),/已領取 ✓/);assert.equal(t.toasts.length,0);
 });
+
+test('attachment upload prompt accepts manual test mail and excludes projected card pack test mail',()=>{
+ const source=read('registration-invitations-ui.js');
+ const body=source.slice(source.indexOf('function stableAttachmentPanel(){'),source.indexOf("document.addEventListener('click',e=>{const button="));
+ function prompt(message){
+  let created=0;const ctx={messages:[message],selectedId:message.id,lastSent:null};
+  const panel={dataset:{},style:{},querySelector:()=>({addEventListener(){}})};
+  const document={getElementById:()=>null,createElement:()=>{created++;return panel;},body:{appendChild(){}}};
+  vm.runInNewContext(body+';stableAttachmentPanel();',{document,runtime:()=>({profile:{role:'super_admin'},user:{uid:'admin'},mailbox:()=>ctx})});
+  return created;
+ }
+ assert.equal(prompt(projected({id:'gods_pack_TEST-20261006',subject:'【測試】諸神戰場卡包已送達',eventCode:'TEST-20261006'})),0);
+ assert.equal(prompt({id:'manual-test',type:'test',subject:'測試通知'}),1);
+ assert.equal(prompt({id:'other',type:'announcement',subject:'【測試】活動通知'}),0);
+});
