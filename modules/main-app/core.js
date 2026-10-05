@@ -12302,6 +12302,7 @@ function renderAdminLoginScreen(){
         <button class="link-btn" data-action="admin-forgot-password">忘記密碼</button>
         <button class="link-btn" data-action="account-back-to-role">返回身分選擇</button>
       </div>
+      ${window.BXHInstallEntry?.renderEntry() || ""}
       <div class="auth-fineprint">
         僅限 BXH 授權工作人員使用。<br>
         帳號使用 Firebase Authentication 驗證，登入狀態由雲端判斷，非本機資料。
@@ -12995,6 +12996,7 @@ function renderPlayerHomeScreen(){
         <span class="role-card-enter">進入 →</span>
       </button>
     </div>
+    ${window.BXHInstallEntry?.renderEntry() || ""}
     <div class="auth-links" style="margin-top:20px;">
       <button class="link-btn" data-action="account-back-to-role">返回身分選擇</button>
     </div>
@@ -13056,6 +13058,7 @@ function renderPlayerLoginScreen(){
         <button class="link-btn" data-action="player-forgot-password">忘記密碼</button>
         <button class="link-btn" data-action="player-goto-apply">還沒有帳號？申請帳號</button>
       </div>
+      ${window.BXHInstallEntry?.renderEntry() || ""}
       <div class="auth-links">
         <button class="link-btn" data-action="account-back-to-role">返回身分選擇</button>
       </div>
@@ -13090,6 +13093,7 @@ function renderPlayerApplyScreen(){
       <div class="auth-links">
         <button class="link-btn" data-action="player-goto-login">已經有帳號？前往登入</button>
       </div>
+      ${window.BXHInstallEntry?.renderEntry() || ""}
       <div class="auth-links">
         <button class="link-btn" data-action="account-back-to-role">返回身分選擇</button>
       </div>
