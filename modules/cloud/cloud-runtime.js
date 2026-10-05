@@ -1134,7 +1134,7 @@
         catch(e){throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});}
         if(!runtime||typeof runtime!=="object"||!runtime.meta)throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});
         if(tour.registrationSelection||pub.registrationSelection||runtime.entrySelection?.mode==="registration")throw Object.assign(new Error("selection-managed"),{code:"selection-managed"});
-        if(tour.tournamentPhase!=="waiting"||runtime.startedAt||runtime.bracketSize||runtime.archiveStatus==="completed"||["live","settling","done","cancelled"].includes(String(pub.tournamentPhase||"")))throw Object.assign(new Error("bracket-locked"),{code:"bracket-locked"});
+        if(runtime.startedAt||runtime.bracketSize||runtime.archiveStatus==="completed"||["live","settling","done","cancelled"].includes(String(tour.tournamentPhase||""))||["live","settling","done","cancelled"].includes(String(pub.tournamentPhase||"")))throw Object.assign(new Error("bracket-locked"),{code:"bracket-locked"});
         if(Number(tour.callRevision||0)!==Number(runtime.callRevision||0))throw Object.assign(new Error("call-state-stale"),{code:"call-state-stale"});
         if(Number(tour.entrySelectionRevision||0)!==Number(runtime.entrySelectionRevision||0))throw Object.assign(new Error("entry-selection-stale"),{code:"entry-selection-stale"});
         const players=Array.isArray(runtime.players)?runtime.players.slice():[];
