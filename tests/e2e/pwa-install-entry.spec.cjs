@@ -19,6 +19,27 @@ const ua = {
   desktop: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36'
 };
 
+// A small host for the real install module. Auth/navigation integration is still
+// tested against the full app below; synthetic platform/race cases need no Firebase
+// or animated entrance. This page exists only in Playwright route.fulfill().
+const installFixture = `<!doctype html><html lang="zh-Hant"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/pwa-install-entry.css">
+<style>body{margin:0;padding:24px;background:#111;color:#eee;font:16px system-ui}#app{max-width:420px;margin:auto}input{display:block;box-sizing:border-box;width:100%;margin:8px 0;padding:10px}button{min-height:44px}input[type=checkbox]{width:auto}</style>
+<script src="/pwa-install-entry.js"></script></head><body><div id="app"></div>
+<script>
+function showFixtureScreen(apply) {
+  document.getElementById('app').innerHTML = '<h1>Install module test fixture</h1>' + (apply
+    ? '<input id="apply-realname" aria-label="Name"><input id="apply-email" aria-label="Email"><input id="apply-password" type="password" aria-label="Password"><input id="apply-agree" type="checkbox" aria-label="Agree">'
+    : '<input id="player-login-email" aria-label="Email"><input id="player-login-password" type="password" aria-label="Password"><button type="button" data-action="player-email-signin">登入</button><button type="button" data-action="player-goto-apply">申請帳號</button>')
+    + window.BXHInstallEntry.renderEntry();
+}
+document.addEventListener('click', event => {
+  if (event.target.closest('[data-action="player-goto-apply"]')) showFixtureScreen(true);
+});
+showFixtureScreen(false);
+</script></body></html>`;
+
 async function activate(page, locator) {
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
   if (touch) await locator.tap();
@@ -41,6 +62,9 @@ async function openLogin(page, userAgent = ua.android, setup = {}) {
   await page.route('**/*', route => {
     const url = new URL(route.request().url());
     if (url.hostname !== '127.0.0.1') return route.abort();
+    if (url.pathname === '/' && url.searchParams.has('install_fixture')) {
+      return route.fulfill({ status: 200, contentType: 'text/html', body: installFixture });
+    }
     if (setup.baseline && url.pathname === '/modules/main-app/core.js') {
       return route.fulfill({ status: 200, contentType: 'text/javascript', body: baselineCore });
     }
@@ -60,10 +84,13 @@ async function openLogin(page, userAgent = ua.android, setup = {}) {
     }
     if (setup.noDialog) HTMLDialogElement.prototype.showModal = undefined;
   }, { userAgent, setup });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await activate(page, page.locator('[data-action="select-role-player"]'));
-  await expect(page.locator('[data-action="player-goto-login"]')).toBeVisible();
-  await activate(page, page.locator('[data-action="player-goto-login"]'));
+  const fullApp = setup.integration || setup.baseline;
+  await page.goto(fullApp ? '/' : '/?install_fixture=1', { waitUntil: 'domcontentloaded' });
+  if (fullApp) {
+    await activate(page, page.locator('[data-action="select-role-player"]'));
+    await expect(page.locator('[data-action="player-goto-login"]')).toBeVisible();
+    await activate(page, page.locator('[data-action="player-goto-login"]'));
+  }
   await expect(page.locator('#player-login-email')).toBeVisible();
 }
 
@@ -92,8 +119,9 @@ test('unchanged-main entrance control reaches the login form without install ass
   await expect(page.locator('#player-login-password')).toBeVisible();
 });
 
-test('optional entry is below login/signup, preserves input, focus and history on dismiss/reopen', async ({ page }) => {
-  await openLogin(page);
+for (const integration of [true, false]) {
+test(`${integration ? 'ARENA integration' : 'isolated module'} preserves input, focus and history on dismiss/reopen`, async ({ page }) => {
+  await openLogin(page, ua.android, { integration });
   await expect(entry(page)).toHaveCount(1);
   await expect(entry(page)).toHaveText('📲 加入手機主畫面');
   await expect(guide(page)).toHaveCount(0);
@@ -133,6 +161,8 @@ test('optional entry is below login/signup, preserves input, focus and history o
   await expect(page.locator('#apply-password')).toHaveValue('draft-password');
   await expect(page.locator('#apply-agree')).toBeChecked();
 });
+
+}
 
 test('native prompt occurs only on click, cancellation consumes once and repeated clicks stay safe', async ({ page }) => {
   await openLogin(page);
@@ -214,7 +244,7 @@ test('older embedded browser has a dismissible inline guide; navigation removes 
 });
 
 test('player entrance and administrator login each expose one optional entry', async ({ page }) => {
-  await openLogin(page);
+  await openLogin(page, ua.android, { integration: true });
   await page.locator('[data-action="account-back-to-role"]').click();
   await activate(page, page.locator('[data-action="select-role-player"]'));
   await expect(entry(page)).toHaveCount(1);
