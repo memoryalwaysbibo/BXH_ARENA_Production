@@ -14,6 +14,14 @@ const viewportStart = core.indexOf('function captureRenderViewport()');
 const viewportEnd = core.indexOf('function render(){', viewportStart);
 if (viewportStart < 0 || viewportEnd <= viewportStart) throw Error('Core viewport integration functions are missing');
 const viewportSource = core.slice(viewportStart, viewportEnd);
+// Observe completion of core's final scheduled restore without changing its
+// timing or scroll behavior. Tokens keep older renders from reporting readiness.
+const lastRestore = '  setTimeout(restore, 180);';
+if (viewportSource.split(lastRestore).length !== 2) throw Error('Core final viewport restore changed');
+const observedViewportSource = viewportSource.replace(lastRestore, `  setTimeout(() => {
+    restore();
+    if (token === __viewportRestoreToken) fixture.settledViewportToken = token;
+  }, 180);`);
 const invitations = fs.readFileSync(path.join(root, 'registration-invitations-ui.js'), 'utf8');
 const invitationStart = invitations.indexOf('function mailboxInvitationPanel(){');
 const invitationEnd = invitations.indexOf('async function mine(', invitationStart);
@@ -77,7 +85,7 @@ let __lastRenderedViewportKey = null, __viewportRestoreToken = 0;
 const currentRenderViewportKey = () => 'mailbox-fixture';
 const captureHorizontalNavPositions = () => ({});
 const restoreHorizontalNavPositions = () => {};
-${viewportSource}
+${observedViewportSource}
 const runtime = () => ({ mailbox: () => window.BXHMailbox.mailboxContext() });
 const mineRows = [];
 ${invitationSource}
@@ -118,9 +126,10 @@ async function openMailbox(page, seed = messages()) {
 }
 const header = (page, id) => page.locator('.mailbox-item[data-message-id="' + id + '"]');
 const expanded = page => page.locator('.mailbox-detail:not([hidden])');
-// Core intentionally runs viewport restorations at 0, 80 and 180 ms. Observe
-// the settled result so a later core restoration cannot silently undo the UX.
-const settleViewport = page => page.waitForTimeout(230);
+// Wait for the latest render's actual final restore callback, not a fixed sleep.
+const settleViewport = async page => {
+  await expect.poll(() => page.evaluate(() => fixture.settledViewportToken === __viewportRestoreToken)).toBe(true);
+};
 async function activate(page, locator) {
   if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) await locator.tap();
   else await locator.click();
@@ -295,6 +304,7 @@ test('registration invitation extension appears in the selected visible row and 
   await expect(invitation).toHaveCount(1);
   await activate(page, header(page, 'mail-17'));
   await expect(invitation).toHaveCount(0); await expect(expanded(page)).toHaveCount(0);
+  await settleViewport(page);
   await activate(page, header(page, 'mail-0'));
   await expect(invitation).toHaveCount(0); await assertInline(page, 'mail-0');
 });
