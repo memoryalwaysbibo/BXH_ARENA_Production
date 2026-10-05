@@ -97,6 +97,7 @@ const captainMatch={id:'m1',teamIds:['a','b'],station:1};
 const captainView={ownTeamId:'a',ownOrder:['p2','p1'],submitted:{a:true,b:false},isReferee:true};
 const captainSandbox={
   state:{cloudCode:'BXH-QATEST',teams:[{id:'a',name:'A',memberPlayerIds:['p1','p2']},{id:'b',name:'B',memberPlayerIds:['p3','p4']}],matches:[captainMatch]},
+  tournamentDetailMyRegs:[{status:'confirmed',teamId:'a'}],tournamentDetailMyReg:null,
   teamMatchUi:new Map([['m1',captainView]]),teamMatchLoading:new Set(),
   firebaseUser:{uid:'captain'},currentRole:'player',appPhase:'team-lineup',
   esc:String,teamMatchPlayerName:String,teamMatchNames:()=>['A','B'],
@@ -109,6 +110,9 @@ assert(captainHtml.includes('value="p2" selected'));
 assert(!captainHtml.includes('team-lineup-default'));
 assert(!captainHtml.includes('team-lineup-reveal'));
 assert(!captainHtml.includes('team-score-direct'));
+captainSandbox.teamMatchUi.set('m1',{...captainView,ownOrder:undefined,lineups:{a:['p2','p1'],b:['p4','p3']}});
+assert(captainSandbox.renderTeamCaptainScreen().includes('value="p2" selected'));
+assert(!captainSandbox.renderTeamCaptainScreen().includes('p4'));
 captainSandbox.teamMatchUi.set('m1',{submitted:{},isReferee:false});
 assert(!captainSandbox.renderTeamCaptainScreen().includes('team-lineup-submit'));
 captainSandbox.teamMatchUi.set('m1',{...captainView,revealed:true,lineups:{a:['p2','p1'],b:['p3','p4']}});
