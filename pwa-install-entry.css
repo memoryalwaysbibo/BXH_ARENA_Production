@@ -1,0 +1,24 @@
+/* Scoped optional install UI: never restyles login fields or primary actions. */
+.bxh-install-entry { box-sizing: border-box; width: min(100%, 440px); margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(217,185,92,.2); text-align: center; }
+.bxh-install-entry[hidden] { display: none !important; }
+.bxh-install-button, .bxh-install-close { font: inherit; color: #eee5cb; border: 1px solid #746743; border-radius: 10px; background: #202019; cursor: pointer; min-height: 44px; }
+.bxh-install-button { width: 100%; padding: 10px 14px; font-size: 14px; line-height: 1.5; }
+.bxh-install-button:hover, .bxh-install-close:hover { background: #302b1d; }
+.bxh-install-button:focus-visible, .bxh-install-close:focus-visible, .bxh-install-url:focus-visible { outline: 3px solid #dfc776; outline-offset: 3px; }
+.bxh-install-button:disabled { cursor: wait; opacity: .65; }
+.bxh-install-hint, .bxh-install-status { font-size: 12px; line-height: 1.6; margin: 7px 0 0; color: #c1bbac; }
+.bxh-install-status:empty, .bxh-install-copy-status:empty { display: none; }
+.bxh-install-guide { box-sizing: border-box; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); max-height: min(720px, calc(100dvh - 32px)); margin: auto; padding: 0; border: 1px solid #746743; border-radius: 16px; background: #171816; color: #eeeae0; box-shadow: 0 20px 80px #0009; overflow-y: auto; overscroll-behavior: contain; font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.7; }
+.bxh-install-guide::backdrop { background: #000b; }
+.bxh-install-guide-content { padding: 22px; }
+.bxh-install-guide-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bxh-install-guide h2 { margin: 0; font-size: 19px; line-height: 1.4; color: #eee5cb; }
+.bxh-install-close { flex: 0 0 44px; width: 44px; padding: 0; }
+.bxh-install-guide ol { padding-left: 22px; }
+.bxh-install-guide li { margin: 10px 0; }
+.bxh-install-url-label { display: block; margin-top: 16px; font-size: 12px; color: #c1bbac; }
+.bxh-install-guide .bxh-install-url { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px; margin: 5px 0 10px; border: 1px solid #746743; border-radius: 8px; background: #0f100f; color: #eeeae0; font-size: 16px; }
+.bxh-install-note, .bxh-install-copy-status { font-size: 12px; color: #c1bbac; line-height: 1.7; }
+.bxh-install-guide-inline { position: static; width: 100%; max-height: none; margin-top: 12px; text-align: left; }
+@media (display-mode: standalone) { .bxh-install-entry { box-sizing: border-box; width: min(100%, 440px); display: none !important; } }
+@media (max-width: 380px) { .bxh-install-guide-content { padding: 16px; } .bxh-install-guide h2 { font-size: 17px; } }
