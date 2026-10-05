@@ -7,11 +7,11 @@ const publicWatchPatch=fs.readFileSync(path.join(__dirname,'../modules/main-app/
 
 const releaseIndex=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const releaseVersion=JSON.parse(fs.readFileSync(path.join(__dirname,'../version.json'),'utf8'));
-assert.equal(releaseVersion.build,'20261005.1');
+assert.equal(releaseVersion.build,'20261005.2');
 assert.equal(releaseVersion.version,'v14.3.24');
 assert(releaseIndex.includes('const APP_VERSION = "v14.3.24"'));
-assert(releaseIndex.includes('<meta name="bxh-build" content="20261005.1">'));
-assert(releaseIndex.includes('var CURRENT_BUILD="20261005.1";'));
+assert(releaseIndex.includes('<meta name="bxh-build" content="20261005.2">'));
+assert(releaseIndex.includes('var CURRENT_BUILD="20261005.2";'));
 assert(releaseIndex.includes('public-watch-isolation.js?v=20261005-watch-spa-1'));
 assert(releaseIndex.includes('modules/main-app/core.js?v=20261005-version-sync-1'));
 assert(source.includes('const APP_VERSION = "v14.3.24";'));
