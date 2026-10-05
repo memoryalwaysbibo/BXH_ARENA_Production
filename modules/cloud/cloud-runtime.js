@@ -1401,16 +1401,29 @@
       return s.exists()?Object.assign({uid:s.id},s.data()):null;
     },
 
-    async getLadderTransactions(){
+    async getLadderTransactions(options={}){
       if(!cloudEnabled) return [];
-      const q=fx.query(
-        fx.collection(dbHandle,"ladderTransactions"),
-        fx.orderBy("createdAt","desc"),
-        fx.limit(200)
-      );
+      const uid=authHandle&&authHandle.currentUser&&authHandle.currentUser.uid;
+      if(!uid) throw new Error("auth-required");
+      const epoch=typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0;
+      const admin=!!(userProfile&&userProfile.active!==false&&userProfile.isTestAccount!==true&&["admin","super_admin"].includes(userProfile.role));
+      let q;
+      if(admin){
+        q=fx.query(fx.collection(dbHandle,"ladderTransactions"),fx.orderBy("createdAt","desc"),fx.limit(200));
+      }else{
+        const seasonId=String(options.seasonId||"");
+        if(!seasonId) throw new Error("season-required");
+        // Equality filters use Firestore's merged single-field indexes. Do not
+        // require a new composite index or query other players' audit records.
+        q=fx.query(fx.collection(dbHandle,"ladderTransactions"),fx.where("playerUid","==",uid),fx.where("seasonId","==",seasonId),fx.limit(200));
+      }
       const s=await fx.getDocs(q);
+      if(uid!==(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)) throw new Error("stale-session");
+      if(epoch!==(typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0)) throw new Error("stale-session");
       const out=[]; s.forEach(d=>{const x=Object.assign({id:d.id},d.data()); x.createdAtMs=cloudSafeTimestampMs(x.createdAt); out.push(x);});
-      return out;
+      // A capped unordered result cannot honestly be labelled "most recent".
+      if(!admin&&out.length>=200) throw new Error("history-limit-reached");
+      return out.sort((a,b)=>Number(b.createdAtMs||0)-Number(a.createdAtMs||0));
     },
 
     async getTestLadderRanking(){
@@ -1904,9 +1917,10 @@
       return results;
     },
 
-    // 隱私最小化名單：正式 staff/admin 可依既有 tournaments read Rules 跨賽事查看，
-    // 回傳內容只含姓名與正取/備取狀態，不讀 registrations 子集合，因此不帶 phone/email。
-    // 被正式指派的 event staff / 合作主辦也沿用其既有 tournament read 權限。
+    // Only return names and statuses to the caller. The tournament runtime also
+    // contains onsite players; registration counters can advance before its
+    // roster arrays are populated. Existing Rules decide who can read registration
+    // documents; a denied read retains the runtime-only view.
     async listRegistrationNamesForStaff(code){
       const eventCode=String(code||"").trim().toUpperCase();
       if(!eventCode) return [];
@@ -1916,17 +1930,39 @@
       let runtime={};
       try{ runtime=typeof docData.data==="string"?JSON.parse(docData.data):(docData.data||{}); }
       catch(e){ throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"}); }
-      const rows=[];
+      const expected={confirmed:Math.max(0,Number(docData.confirmedCount)||0),waitlist:Math.max(0,Number(docData.waitlistCount)||0)};
+      const runtimeRows=[];
       const append=(items,status)=>{
         (Array.isArray(items)?items:[]).forEach(player=>{
           if(!player)return;
           const publicName=String(player.name||player.displayName||player.publicName||"").trim();
-          if(publicName)rows.push({status,publicName});
+          if(publicName)runtimeRows.push({status,publicName,registrationId:String(player.registrationId||""),source:String(player.source||"")});
         });
       };
       append(runtime.players,"confirmed");
       append(runtime.waitlistPlayers,"waitlist");
-      return rows;
+      let rows=runtimeRows;
+      const needsRegistrations=["confirmed","waitlist"].some(status=>expected[status]>runtimeRows.filter(row=>row.status===status).length);
+      if(needsRegistrations){
+        try{
+          const regSnap=await fx.getDocs(fx.collection(dbHandle,"tournaments",eventCode,"registrations"));
+          const registered=[];
+          regSnap.forEach(docSnap=>{
+            const reg=docSnap.data()||{};
+            if(!["confirmed","waitlist"].includes(reg.status))return;
+            const publicName=String(reg.publicName||reg.displayName||reg.participantName||reg.realName||"").trim();
+            if(publicName)registered.push({status:reg.status,publicName,registrationId:docSnap.id,waitRank:Number(reg.waitRank||0)});
+          });
+          registered.sort((a,b)=>a.status===b.status?(a.status==="waitlist"?a.waitRank-b.waitRank:0):(a.status==="confirmed"?-1:1));
+          const registeredIds=new Set(registered.map(row=>row.registrationId));
+          rows=registered.concat(runtimeRows.filter(row=>row.source!=="online"&&(!row.registrationId||!registeredIds.has(row.registrationId))));
+        }catch(error){
+          if(!String(error&&error.code||"").includes("permission-denied"))throw error;
+        }
+      }
+      const result=rows.map(row=>({status:row.status,publicName:row.publicName}));
+      result.expectedCounts=expected;
+      return result;
     },
 
     async queryMyDutyLogs(){

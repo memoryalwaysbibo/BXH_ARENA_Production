@@ -27,7 +27,7 @@ async function activate(page, locator) {
 
 async function openLogin(page, userAgent = ua.android, setup = {}) {
   page.on('crash', () => console.error('INSTALL DIAGNOSTIC: page crashed'));
-  // Core was unchanged between original main 04be6a42 and current base 7a41d63.
+  // Core was unchanged between original main 04be6a42 and current base ea4df24.
   // Reconstruct it byte-for-byte for a feature-free control, rather than guessing
   // that an entrance failure comes from the optional install module.
   let baselineCore;
