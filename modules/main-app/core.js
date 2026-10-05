@@ -11503,15 +11503,35 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
     });
     return;
   }
-  if(cap>0&&state.players.length>=cap&&expandCapacity)state.meta.registrationCapacity=cap+8;
-  list.splice(idx,1);
-  const restored=Object.assign({},p);
-  delete restored.waitRank;delete restored.waitlistedAt;
-  state.players.push(restored);
-  const synced=await saveState();
-  resetRegistrationFormDraft();publicTournamentsCache=null;
-  render();
-  showToast((expandCapacity?"已加開至 "+state.meta.registrationCapacity+" 人；":"")+name+" 已升為正取",synced===false);
+  if(peopleRosterBusy)return;
+  peopleRosterBusy=true;
+  const previousPlayers=state.players.slice();
+  const previousWaitlist=list.slice();
+  const previousCapacity=state.meta.registrationCapacity;
+  try{
+    if(cap>0&&state.players.length>=cap&&expandCapacity)state.meta.registrationCapacity=cap+8;
+    list.splice(idx,1);
+    const restored=Object.assign({},p);
+    delete restored.waitRank;delete restored.waitlistedAt;
+    state.players.push(restored);
+    const synced=await saveState();
+    const cloudError=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
+    if(synced===false&&["permission-denied","registration-roster-stale","team-result-stale"].includes(cloudError)){
+      state.players=previousPlayers;
+      state.waitlistPlayers=previousWaitlist;
+      state.meta.registrationCapacity=previousCapacity;
+      await saveRecord(cloneStateForSave(state));
+      showToast(cloudError==="permission-denied"
+        ?"雲端拒絕加開名額，名單已還原；請檢查此房的寫入規則。"
+        :"雲端名單已有更新，名單已還原；請重新整理後再試。",true);
+      return;
+    }
+    resetRegistrationFormDraft();publicTournamentsCache=null;
+    showToast((expandCapacity?"已加開至 "+state.meta.registrationCapacity+" 人；":"")+name+" 已升為正取",synced===false);
+  }finally{
+    peopleRosterBusy=false;
+    render();
+  }
 }
 
 function renderPeopleManagement(){
