@@ -1894,13 +1894,39 @@
       },onError);
     },
 
-    // 管理端讀取整個賽事的報名名單（Rules 限制：未分派 staff 會被拒絕）。
+    // 管理端讀取完整 registration 文件；僅限 Rules 已授權的賽事管理者，
+    // 因文件含聯絡資料，不可拿來實作「全體正式工作人員只看姓名」。
     async listRegistrationsForAdmin(code){
       const q = fx.collection(dbHandle, "tournaments", code, "registrations");
       const snap = await fx.getDocs(q);
       const results = [];
       snap.forEach(docSnap => { results.push(Object.assign({registrationId:docSnap.id},docSnap.data())); });
       return results;
+    },
+
+    // 隱私最小化名單：正式 staff/admin 可依既有 tournaments read Rules 跨賽事查看，
+    // 回傳內容只含姓名與正取/備取狀態，不讀 registrations 子集合，因此不帶 phone/email。
+    // 被正式指派的 event staff / 合作主辦也沿用其既有 tournament read 權限。
+    async listRegistrationNamesForStaff(code){
+      const eventCode=String(code||"").trim().toUpperCase();
+      if(!eventCode) return [];
+      const snap=await fx.getDoc(fx.doc(dbHandle,"tournaments",eventCode));
+      if(!snap.exists()) throw Object.assign(new Error("not-found"),{code:"not-found"});
+      const docData=snap.data()||{};
+      let runtime={};
+      try{ runtime=typeof docData.data==="string"?JSON.parse(docData.data):(docData.data||{}); }
+      catch(e){ throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"}); }
+      const rows=[];
+      const append=(items,status)=>{
+        (Array.isArray(items)?items:[]).forEach(player=>{
+          if(!player)return;
+          const publicName=String(player.name||player.displayName||player.publicName||"").trim();
+          if(publicName)rows.push({status,publicName});
+        });
+      };
+      append(runtime.players,"confirmed");
+      append(runtime.waitlistPlayers,"waitlist");
+      return rows;
     },
 
     async queryMyDutyLogs(){
