@@ -128,6 +128,14 @@ function setInlineRosterMessage(panel,message){
   const node=document.createElement("p");node.className="tournament-inline-roster-message";node.textContent=message;
   panel.replaceChildren(node);
 }
+function inlineRosterErrorMessage(error){
+  const code=String(error&&error.code||error&&error.message||"").toLowerCase();
+  if(code.includes("permission-denied"))return "你目前沒有查看這場賽事名單的權限。";
+  if(code.includes("unauthenticated")||code.includes("auth-required"))return "登入狀態已失效，請重新登入後再試。";
+  if(code.includes("unavailable")||code.includes("network")||code.includes("timeout"))return "網路連線失敗，請稍後重試。";
+  if(code.includes("not-found"))return "找不到這場賽事資料，請重新整理後再試。";
+  return "名單讀取失敗，請重新整理後再試。";
+}
 function renderInlineRoster(panel,kind,rows){
   const title=document.createElement("h4");title.className="tournament-inline-roster-title";
   title.textContent=(kind==="waitlist"?"備取":"正取")+"名單（"+rows.length+" 人）";
@@ -154,15 +162,15 @@ async function toggleInlineRoster(button){
   const request=++inlineRosterRequest;
   try{
     const cloud=root.cloudSync;
-    if(!cloud||typeof cloud.listRegistrationsForAdmin!=="function")throw new Error("cloud-unavailable");
+    if(!cloud||typeof cloud.listRegistrationNamesForStaff!=="function")throw new Error("cloud-unavailable");
     if(typeof cloud.connect==="function")await cloud.connect();
-    const records=await cloud.listRegistrationsForAdmin(code);
+    const records=await cloud.listRegistrationNamesForStaff(code);
     if(activeInlineRoster!==current||request!==inlineRosterRequest)return;
     const rows=filterAdminRosterRows(records,kind);
     if(!rows.length){setInlineRosterMessage(panel,"目前沒有"+(kind==="waitlist"?"備取":"正取")+"人員。");return;}
     renderInlineRoster(panel,kind,rows);
-  }catch(_){
-    if(activeInlineRoster===current&&request===inlineRosterRequest)setInlineRosterMessage(panel,"名單讀取失敗，請確認管理權限或網路後重試。");
+  }catch(error){
+    if(activeInlineRoster===current&&request===inlineRosterRequest)setInlineRosterMessage(panel,inlineRosterErrorMessage(error));
   }
 }
 function scanCards(){
@@ -344,7 +352,7 @@ function init(){
   const observer=new MutationObserver(scanCards);observer.observe(document.body,{childList:true,subtree:true});
   scanCards();
 }
-const api={safePosterUrl,managementPosterUrl,validatePosterFile,isManagementMode,filterAdminRosterRows,MAX_FILE_BYTES};
+const api={safePosterUrl,managementPosterUrl,validatePosterFile,isManagementMode,filterAdminRosterRows,inlineRosterErrorMessage,MAX_FILE_BYTES};
 root.BXHEventPosterUI=api;
 if(typeof module==="object"&&module.exports)module.exports=api;
 if(root.document){if(root.document.readyState==="loading")root.document.addEventListener("DOMContentLoaded",init,{once:true});else init();}
