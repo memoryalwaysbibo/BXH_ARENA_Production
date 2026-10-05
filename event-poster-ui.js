@@ -167,8 +167,19 @@ async function toggleInlineRoster(button){
     const records=await cloud.listRegistrationNamesForStaff(code);
     if(activeInlineRoster!==current||request!==inlineRosterRequest)return;
     const rows=filterAdminRosterRows(records,kind);
-    if(!rows.length){setInlineRosterMessage(panel,"目前沒有"+(kind==="waitlist"?"備取":"正取")+"人員。");return;}
+    const expected=Number(records&&records.expectedCounts&&records.expectedCounts[kind]||0);
+    if(!rows.length){
+      setInlineRosterMessage(panel,expected>0
+        ?"報名紀錄已有 "+expected+" 位"+(kind==="waitlist"?"備取":"正取")+"；姓名名單尚未同步，請由管理員進入報名管理查看。"
+        :"目前沒有"+(kind==="waitlist"?"備取":"正取")+"人員。");
+      return;
+    }
     renderInlineRoster(panel,kind,rows);
+    if(expected>rows.length){
+      const note=document.createElement("p");note.className="tournament-inline-roster-message";
+      note.textContent="已顯示 "+rows.length+" 位；報名紀錄共 "+expected+" 位，請由管理員進入報名管理核對其餘名單。";
+      panel.appendChild(note);
+    }
   }catch(error){
     if(activeInlineRoster===current&&request===inlineRosterRequest)setInlineRosterMessage(panel,inlineRosterErrorMessage(error));
   }

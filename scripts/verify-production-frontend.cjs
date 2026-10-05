@@ -175,7 +175,7 @@ mustInclude('newCapacity=capacity+8','Roster full expansion must add exactly 8 s
 mustInclude('roster-sync-mismatch','Roster mutation must verify server round-trip');
 mustInclude('results.push(Object.assign({registrationId:docSnap.id},docSnap.data()))','Admin registration rows must retain Firestore document id');
 mustInclude('async listRegistrationNamesForStaff(code){','Privacy-safe cross-event staff roster projection missing');
-mustInclude('rows.push({status,publicName})','Staff roster projection must expose only name/status rows');
+mustInclude('rows.map(row=>({status:row.status,publicName:row.publicName}))','Staff roster projection must expose only name/status rows');
 must(/if\(action===["']delete-player["']\)[\s\S]*?p\.source===["']online["'][\s\S]*?peopleCancelOnline/, 'Online player delete must cancel authoritative registration');
 console.log('PASS people roster second-level / atomic waitlist linkage');
 mustInclude('data-action="save-managed-account"','Per-account save button missing');
