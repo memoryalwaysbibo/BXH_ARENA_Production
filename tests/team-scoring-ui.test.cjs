@@ -13,6 +13,8 @@ assert(releaseIndex.includes('const APP_VERSION = "v14.3.24"'));
 assert(releaseIndex.includes('<meta name="bxh-build" content="20261005.1">'));
 assert(releaseIndex.includes('var CURRENT_BUILD="20261005.1";'));
 assert(releaseIndex.includes('public-watch-isolation.js?v=20261005-watch-spa-1'));
+assert(releaseIndex.includes('modules/main-app/core.js?v=20261005-version-sync-1'));
+assert(source.includes('const APP_VERSION = "v14.3.24";'));
 assert(source.includes('雙命守擂計分板｜'));
 assert(source.includes("'●'.repeat(life)+'○'.repeat(Math.max(0,2-life))"));
 assert(source.includes("if(view.revealed&&state.startedAt){"));
