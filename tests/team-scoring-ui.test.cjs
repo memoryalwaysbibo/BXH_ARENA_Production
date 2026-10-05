@@ -4,6 +4,14 @@ const source=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),
 const cloud=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
 const publicWatchPatch=fs.readFileSync(path.join(__dirname,'../modules/main-app/public-watch-isolation.js'),'utf8');
 
+
+const releaseIndex=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const releaseVersion=JSON.parse(fs.readFileSync(path.join(__dirname,'../version.json'),'utf8'));
+assert.equal(releaseVersion.build,'20261005.1');
+assert.equal(releaseVersion.version,'v14.3.24');
+assert(releaseIndex.includes('<meta name="bxh-build" content="20261005.1">'));
+assert(releaseIndex.includes('var CURRENT_BUILD="20261005.1";'));
+assert(releaseIndex.includes('public-watch-isolation.js?v=20261005-watch-spa-1'));
 assert(source.includes('雙命守擂計分板｜'));
 assert(source.includes("'●'.repeat(life)+'○'.repeat(Math.max(0,2-life))"));
 assert(source.includes("if(view.revealed&&state.startedAt){"));
