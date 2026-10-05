@@ -1116,6 +1116,68 @@
       return result;
     },
 
+    async promoteLocalWaitlistRoster(code,waitId,options={}){
+      const eventCode=String(code||"").trim().toUpperCase(),candidateId=String(waitId||"");
+      if(!eventCode||!candidateId)throw Object.assign(new Error("not-found"),{code:"not-found"});
+      if(!authReady||!authHandle?.currentUser)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
+      const expandBy=Number(options.expandBy||0);
+      if(expandBy!==0&&expandBy!==8)throw Object.assign(new Error("invalid-capacity-step"),{code:"invalid-capacity-step"});
+      const tourRef=fx.doc(dbHandle,"tournaments",eventCode);
+      const pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
+      const result=await fx.runTransaction(dbHandle,async tx=>{
+        const tourSnap=await tx.get(tourRef);
+        const pubSnap=await tx.get(pubRef);
+        if(!tourSnap.exists()||!pubSnap.exists())throw Object.assign(new Error("not-found"),{code:"not-found"});
+        const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+        let runtime;
+        try{runtime=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});}
+        catch(e){throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});}
+        if(!runtime||typeof runtime!=="object"||!runtime.meta)throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});
+        if(tour.registrationSelection||pub.registrationSelection||runtime.entrySelection?.mode==="registration")throw Object.assign(new Error("selection-managed"),{code:"selection-managed"});
+        if(tour.tournamentPhase!=="waiting"||runtime.startedAt||runtime.bracketSize||runtime.archiveStatus==="completed"||["live","settling","done","cancelled"].includes(String(pub.tournamentPhase||"")))throw Object.assign(new Error("bracket-locked"),{code:"bracket-locked"});
+        if(Number(tour.callRevision||0)!==Number(runtime.callRevision||0))throw Object.assign(new Error("call-state-stale"),{code:"call-state-stale"});
+        if(Number(tour.entrySelectionRevision||0)!==Number(runtime.entrySelectionRevision||0))throw Object.assign(new Error("entry-selection-stale"),{code:"entry-selection-stale"});
+        const players=Array.isArray(runtime.players)?runtime.players.slice():[];
+        const waitlist=Array.isArray(runtime.waitlistPlayers)?runtime.waitlistPlayers.slice():[];
+        const matches=waitlist.filter(p=>p&&String(p.id)===candidateId);
+        if(matches.length!==1||players.some(p=>p&&String(p.id)===candidateId))throw Object.assign(new Error("not-waitlist"),{code:"not-waitlist"});
+        const candidate=matches[0];
+        if(candidate.registrationId||candidate.source==="online")throw Object.assign(new Error("online-registration-required"),{code:"online-registration-required"});
+        const capacity=Number(tour.capacity??runtime.meta.registrationCapacity??0);
+        if(!Number.isSafeInteger(capacity)||capacity<0)throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});
+        const full=capacity>0&&players.length>=capacity;
+        if(full&&expandBy!==8)throw Object.assign(new Error("capacity-full"),{code:"capacity-full",capacity});
+        const nextCapacity=full?capacity+8:capacity;
+        const promoted=Object.assign({},candidate);
+        delete promoted.waitRank;delete promoted.waitlistedAt;
+        runtime.players=players.concat(promoted);
+        runtime.waitlistPlayers=waitlist.filter(p=>p!==candidate);
+        runtime.meta.registrationCapacity=nextCapacity;
+        let nextStatus=String(tour.registrationStatus||pub.registrationStatus||runtime.meta.registrationStatus||"open");
+        if(nextStatus==="full"&&(!nextCapacity||runtime.players.length<nextCapacity))nextStatus="open";
+        runtime.meta.registrationStatus=nextStatus;
+        const now=Date.now();
+        const privatePatch={data:JSON.stringify(runtime),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now};
+        if(Number(tour.entrySelectionRevision||0)>0)privatePatch.entrySelectionWriteRevision=Number(tour.entrySelectionRevision);
+        tx.update(tourRef,privatePatch);
+        tx.update(pubRef,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime)),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now});
+        return {state:runtime,capacity:nextCapacity,expanded:nextCapacity!==capacity,candidateId};
+      });
+      // The transaction committed both mirrors. Read back from the server before showing success.
+      const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
+      if(!tourSnap.exists()||!pubSnap.exists())throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+      const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+      let remoteState={},publicState={};
+      try{
+        remoteState=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});
+        publicState=typeof pub.bracketView==="string"?JSON.parse(pub.bracketView):(pub.bracketView||{});
+      }catch(e){throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});}
+      const inPrivate=(remoteState.players||[]).some(p=>p&&String(p.id)===candidateId);
+      const inPublic=(publicState.players||[]).some(p=>p&&String(p.id)===candidateId);
+      if(!inPrivate||!inPublic||Number(tour.capacity)!==result.capacity||Number(pub.capacity)!==result.capacity)throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+      return Object.assign({},result,{state:remoteState,verified:true});
+    },
+
     async mutateRegistrationRoster(code,registrationId,action,options={}){
       const staffUid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
       if(!staffUid)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
