@@ -1,6 +1,6 @@
 {
-  "build": "20261005.2",
-  "version": "v14.3.24",
-  "updatedAt": "2026-10-05T08:57:00+08:00",
-  "releaseTrigger": "runtime-version-label-cache-refresh"
+  "build": "20261005.3",
+  "version": "v14.3.25",
+  "updatedAt": "2026-10-05T18:00:00+08:00",
+  "releaseTrigger": "team-captain-lineup-entry"
 }
