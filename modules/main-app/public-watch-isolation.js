@@ -2,23 +2,25 @@
   'use strict';
 
   const allowedTabs=new Set(['ladder','live','bracket']);
+  const directWatchEntry=new URLSearchParams(location.search).get('entry')==='watch';
+  const inPublicWatch=()=>publicWatchReturnContext||directWatchEntry;
   const originalLineupPanel=renderTeamLineupPanel;
   const originalPrimeTeamMatchViews=primeTeamMatchViews;
   const originalRenderApp=renderApp;
 
   // Public/live pages must never render captain or referee controls.
   renderTeamLineupPanel=function(m,mode='player'){
-    if(publicWatchReturnContext&&mode!=='referee')return '';
+    if(inPublicWatch()&&mode!=='referee')return '';
     return originalLineupPanel(m,mode);
   };
 
   // Private lineup reads are reserved for the referee workstation.
   primeTeamMatchViews=function(){
-    if(activeTab==='referee'&&!publicWatchReturnContext)originalPrimeTeamMatchViews();
+    if(activeTab==='referee'&&!inPublicWatch())originalPrimeTeamMatchViews();
   };
 
   function sanitizePublicWatchUi(){
-    if(!publicWatchReturnContext)return;
+    if(!inPublicWatch())return;
     const app=document.getElementById('app');
     if(!app)return;
 
@@ -38,7 +40,7 @@
   }
 
   renderApp=function(){
-    if(publicWatchReturnContext&&!allowedTabs.has(activeTab))activeTab='live';
+    if(inPublicWatch()&&!allowedTabs.has(activeTab))activeTab='live';
     originalRenderApp();
     sanitizePublicWatchUi();
   };
