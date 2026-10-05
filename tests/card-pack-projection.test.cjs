@@ -60,7 +60,7 @@ test('projected pack without reward or attachment kind renders claim, not downlo
   assert.match(html,/back\.webp/);
 });
 test('failed narrow reward-detail endpoint does not remove the projected pack claim button',async()=>{
-  const t=setup();await t.select();await tick();
+  const t=setup();t.mail().selectedId='';await t.select();await tick();
   assert.match(t.view(),/領取卡牌/);assert.doesNotMatch(t.view(),/mailbox-download-attachment/);
   assert.equal(t.calls.filter(x=>x.action==='claimPack').length,0);
 });

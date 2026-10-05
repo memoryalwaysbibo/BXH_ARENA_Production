@@ -16,19 +16,35 @@ function mailboxError(error){
 }
 async function loadMailbox(force=false){
   const c=mailboxContext();
-  if(!firebaseUser?.uid||c.loading||c.busy||(!force&&Array.isArray(c.messages)))return;
+  if(!firebaseUser?.uid||c.busy||(!force&&Array.isArray(c.messages)))return;
+  // A read-state change may finish while an older list is still in flight.
+  // Coalesce its refresh and never paint that obsolete list over the new state.
+  if(c.loading){if(force)c.reloadRequested=true;return c.loadPromise;}
   c.loading=true;c.error='';render();
-  try{
-    if(!window.engagementService?.mailbox)throw Error('service-unavailable');
-    const result=await window.engagementService.mailbox({action:'list'});
-    if(c!==mailboxContext())return;
-    if(!result?.ok)throw Error('load-failed');
-    c.messages=Array.isArray(result.messages)?result.messages:[];
-    c.unreadCount=Math.max(0,Number(result.unreadCount)||0);
-    if(c.selectedId&&!c.messages.some(m=>m.id===c.selectedId))c.selectedId='';
-  }catch(error){if(c===mailboxContext())c.error=mailboxError(error);}
-  finally{if(c===mailboxContext()){c.loading=false;render();}}
+  c.loadPromise=(async()=>{
+    try{
+      do{
+        c.reloadRequested=false;
+        try{
+          if(!window.engagementService?.mailbox)throw Error('service-unavailable');
+          const result=await window.engagementService.mailbox({action:'list'});
+          if(c!==mailboxContext())return;
+          if(c.reloadRequested)continue;
+          if(!result?.ok)throw Error('load-failed');
+          c.messages=Array.isArray(result.messages)?result.messages:[];
+          c.unreadCount=Math.max(0,Number(result.unreadCount)||0);
+          if(c.selectedId&&!c.messages.some(m=>m.id===c.selectedId))c.selectedId='';
+        }catch(error){if(c===mailboxContext()&&!c.reloadRequested)c.error=mailboxError(error);}
+      }while(c===mailboxContext()&&c.reloadRequested);
+    }finally{
+      // Clear loading before this promise settles, so a simultaneous mutation
+      // cannot queue its refresh against an already-completed request.
+      if(c===mailboxContext()){c.loading=false;render();}
+    }
+  })();
+  return c.loadPromise;
 }
+
 function mailboxVisibleAttachments(message){
   const items=Array.isArray(message?.attachments)?message.attachments:[];
   return items.filter(item=>!window.BXHCardRewardUI?.isVirtualAttachment?.(message,item));
@@ -37,12 +53,52 @@ function mailboxButtonHtml(){
   const c=mailboxContext();
   return `<button class="mailbox-trigger ${c.open?'active':''}" data-action="mailbox-open" aria-label="站內信${c.unreadCount?'，'+c.unreadCount+'封未讀':''}"><span aria-hidden="true">✉️</span><span class="mailbox-label">站內信</span>${c.unreadCount?`<span class="mailbox-unread">${c.unreadCount>99?'99+':c.unreadCount}</span>`:''}</button>`;
 }
+function mailboxDomId(messageId){
+  return 'mailbox-message-'+Array.from(String(messageId)).map(char=>char.codePointAt(0).toString(16)).join('-');
+}
+function renderMailboxDetail(selected,c){
+  return `<div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(window.BXHCardRewardUI?.bodyText?.(selected)??selected.body??'')}</div>${window.BXHTitleRewardUI?.card(selected,c.busy)||''}${window.BXHCardRewardUI?.card(selected,c.busy)||''}${mailboxVisibleAttachments(selected).length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${mailboxVisibleAttachments(selected).map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}${selected.eventCode&&selected.invitationStatus==='invited'?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="accept">接受工作人員（活動）邀請</button><button class="btn btn-ghost" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="reject">拒絕</button></div>`:selected.eventCode&&selected.invitationStatus?`<div class="banner" style="margin-top:12px"><span>邀請狀態：${esc(({accepted:'已接受',rejected:'已拒絕',revoked:'已撤銷'})[selected.invitationStatus]||selected.invitationStatus)}</span></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div>`;
+}
+// Keep .panel on the expanded article only: invitation controls mount there.
+function renderMailboxEntry(message,c){
+  const expanded=message.id===c.selectedId,id=mailboxDomId(message.id);
+  return `<div class="mailbox-entry"><button type="button" id="${id}" class="mailbox-item ${message.readAt?'':'unread'} ${expanded?'active':''}" data-action="mailbox-select" data-message-id="${esc(message.id)}" aria-expanded="${expanded}" aria-controls="${id}-detail"><span class="mailbox-item-heading"><span class="mailbox-item-title">${message.readAt?'':'● '}${esc(message.subject||'系統通知')}</span><span class="mailbox-item-toggle" aria-hidden="true">${expanded?'收合 ▴':'展開 ▾'}</span></span><span class="mailbox-item-meta"><span>${esc(message.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(message.createdAt))}</span></span></button><article id="${id}-detail" class="${expanded?'panel ':''}mailbox-detail" aria-labelledby="${id}" ${expanded?'':'hidden'}>${expanded?renderMailboxDetail(message,c):''}</article></div>`;
+}
+// Core replaces the entire screen on each render. Keep the selected row and
+// keyboard focus in place, including when a previous expanded row collapses.
+function captureViewport(){
+  const c=mailboxContext();
+  if(!c.open||typeof document==='undefined')return null;
+  const id=c.viewportAnchorId||c.selectedId;delete c.viewportAnchorId;
+  const anchor=id?document.getElementById(mailboxDomId(id)):null;
+  const active=document.activeElement;
+  const focus=active?.closest?.('[data-mailbox-page]')&&active.matches('[data-action]')
+    ?['data-action','data-message-id','data-attachment-id','data-response'].map(name=>[name,active.getAttribute(name)]):null;
+  return {context:c,id,top:anchor?.getBoundingClientRect().top,focus};
+}
+function restoreViewport(snapshot){
+  if(!snapshot||snapshot.context!==mailboxContext()||!snapshot.context.open||typeof document==='undefined')return false;
+  if(snapshot.focus){
+    const focus=snapshot.focus;snapshot.focus=null;
+    // Do not steal focus if the user has already moved to another control.
+    if(!document.activeElement||document.activeElement===document.body){
+      const control=Array.from(document.querySelectorAll('[data-mailbox-page] [data-action]'))
+        .find(node=>focus.every(([name,value])=>node.getAttribute(name)===value));
+      control?.focus({preventScroll:true});
+    }
+  }
+  const anchor=snapshot.id?document.getElementById(mailboxDomId(snapshot.id)):null;
+  if(!anchor||!Number.isFinite(snapshot.top))return false;
+  const delta=anchor.getBoundingClientRect().top-snapshot.top;
+  if(Math.abs(delta)>.5)window.scrollTo({left:window.scrollX||0,top:(window.scrollY||0)+delta,behavior:'instant'});
+  return true;
+}
 function renderMailboxPage(){
-  const c=mailboxContext(),messages=c.messages||[],selected=messages.find(m=>m.id===c.selectedId)||null;
-  return `<section class="panel"><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row">${isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="mailbox-self-card-test" ${c.busy?"disabled":""}>🎴 發送測試卡給我</button>`:""}<button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
+  const c=mailboxContext(),messages=c.messages||[];
+  return `<section class="panel" data-mailbox-page><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row">${isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="mailbox-self-card-test" ${c.busy?"disabled":""}>🎴 發送測試卡給我</button>`:""}<button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
     <p class="hint">未讀 ${c.unreadCount} 封｜系統通知、活動及中獎訊息會集中在這裡。</p>
     ${c.error?`<div class="auth-error" role="alert">${esc(c.error)}</div>`:''}
-    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list">${messages.length?messages.map(m=>`<button class="mailbox-item ${m.readAt?'':'unread'} ${selected?.id===m.id?'active':''}" data-action="mailbox-select" data-message-id="${esc(m.id)}"><div class="mailbox-item-title">${m.readAt?'':'● '}${esc(m.subject||'系統通知')}</div><div class="mailbox-item-meta"><span>${esc(m.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(m.createdAt))}</span></div></button>`).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div><div>${selected?`<article class="panel"><div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(window.BXHCardRewardUI?.bodyText?.(selected)??selected.body??'')}</div>${window.BXHTitleRewardUI?.card(selected,c.busy)||''}${window.BXHCardRewardUI?.card(selected,c.busy)||''}${mailboxVisibleAttachments(selected).length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${mailboxVisibleAttachments(selected).map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}${selected.eventCode&&selected.invitationStatus==='invited'?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="accept">接受工作人員（活動）邀請</button><button class="btn btn-ghost" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="reject">拒絕</button></div>`:selected.eventCode&&selected.invitationStatus?`<div class="banner" style="margin-top:12px"><span>邀請狀態：${esc(({accepted:'已接受',rejected:'已拒絕',revoked:'已撤銷'})[selected.invitationStatus]||selected.invitationStatus)}</span></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div></article>`:'<div class="panel empty-state">請選擇一封信件查看內容。</div>'}</div></div>`}
+    ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list" aria-busy="${c.loading}">${messages.length?messages.map(message=>renderMailboxEntry(message,c)).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div></div>`}
     ${isSuperAdmin()?`<details class="panel" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">最高管理員｜發送測試信</summary><div class="grid grid-2 mailbox-compose-grid" style="margin-top:14px"><div class="field"><label>玩家 UID</label><input id="mailbox-recipient" maxlength="128" placeholder="貼上 Firebase UID"></div><div class="field"><label>信件標題</label><input id="mailbox-subject" maxlength="80" placeholder="例如：站內信測試"></div><div class="field" style="grid-column:1/-1"><label>信件內容</label><textarea id="mailbox-body" maxlength="2000" placeholder="輸入通知內容"></textarea></div></div><button class="btn btn-primary" data-action="mailbox-send-test" ${c.busy?'disabled':''}>發送測試信</button><p class="hint">本階段以 UID 測試寄送；活動中獎通知會在抽獎模組串接。</p>${c.lastSent?`<div class="panel" style="margin-top:14px"><strong>為剛寄出的信件新增附件</strong><p class="hint">收件者 ${esc(c.lastSent.targetUid)}｜信件 ${esc(c.lastSent.messageId)}｜PDF、PNG、JPG、TXT，單檔最多 2 MB</p><input id="mailbox-attachment-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"><button class="btn btn-ghost btn-sm" data-action="mailbox-upload-attachment" ${c.busy?'disabled':''}>上傳附件</button></div>`:''}</details>`:''}
   </section>`;
 }
@@ -88,10 +144,13 @@ async function handleMailbox(action,target){
   const c=mailboxContext();if(!firebaseUser?.uid||c.busy)return;
   if(action==='mailbox-open'){c.open=true;accountMenuOpen=false;render();loadMailbox(true);return;}
   if(action==='mailbox-close'){c.open=false;c.selectedId='';render();return;}
-  if(action==='mailbox-refresh'){c.messages=null;c.selectedId='';loadMailbox(true);return;}
+  if(action==='mailbox-refresh'){loadMailbox(true);return;}
   if(action==='mailbox-select'){
-    c.selectedId=target.getAttribute('data-message-id')||'';const message=(c.messages||[]).find(m=>m.id===c.selectedId);
-    render();
+    const selectedId=target.getAttribute('data-message-id')||'';
+    const message=(c.messages||[]).find(m=>m.id===selectedId);if(!message)return;
+    c.viewportAnchorId=selectedId;
+    if(c.selectedId===selectedId){c.selectedId='';render();return;}
+    c.selectedId=selectedId;render();
     if(message&&message.type==='card_reward'&&!message.reward&&window.engagementService?.getCardRewardMessage){
       const selectedId=c.selectedId;
       window.engagementService.getCardRewardMessage({messageId:selectedId}).then(result=>{
@@ -206,11 +265,12 @@ async function handleMailbox(action,target){
     if(!window.engagementService?.mailbox)throw Error('service-unavailable');
     const result=await window.engagementService.mailbox(payload);if(c!==mailboxContext())return;if(!result?.ok)throw Error('operation-failed');
     if(action==='mailbox-send-test'){c.lastSent={targetUid:payload.targetUid,messageId:result.messageId};showToast(result.replayed?'這封測試信先前已送出':'測試信已送出');}
-    c.busy=false;c.messages=null;await loadMailbox(true);
+    c.busy=false;const refresh=loadMailbox(true);c.busy=true;
+    await refresh;
   }catch(error){if(c===mailboxContext())c.error=mailboxError(error);}
   finally{if(c===mailboxContext()){c.busy=false;render();}}
 }
 
-Object.assign(window.BXHMailbox||(window.BXHMailbox={}),{mailboxContext,mailboxError,loadMailbox,mailboxVisibleAttachments,mailboxButtonHtml,renderMailboxPage,openMailboxPartnerContract,handleMailbox});
+Object.assign(window.BXHMailbox||(window.BXHMailbox={}),{mailboxContext,mailboxError,loadMailbox,mailboxVisibleAttachments,mailboxButtonHtml,renderMailboxPage,captureViewport,restoreViewport,openMailboxPartnerContract,handleMailbox});
 
 })();
