@@ -1,4 +1,7 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
 
 // Exercise behavior with the app's supported reduced-motion preference. Keep ordinary
 // actionability checks, while avoiding concurrent WebKit entrance-animation workloads.
@@ -16,9 +19,36 @@ const ua = {
   desktop: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36'
 };
 
+async function activate(page, locator) {
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  if (touch) await locator.tap();
+  else await locator.click();
+}
+
 async function openLogin(page, userAgent = ua.android, setup = {}) {
+  page.on('crash', () => console.error('INSTALL DIAGNOSTIC: page crashed'));
+  // Core was unchanged between original main 04be6a42 and current base 7a41d63.
+  // Reconstruct it byte-for-byte for a feature-free control, rather than guessing
+  // that an entrance failure comes from the optional install module.
+  let baselineCore;
+  if (setup.baseline) {
+    baselineCore = fs.readFileSync(path.join(__dirname, '../../modules/main-app/core.js'), 'utf8')
+      .replace(/^[ \t]*\$\{window\.BXHInstallEntry\?\.renderEntry\(\) \|\| ""\}\r?\n/gm, '');
+    expect(crypto.createHash('sha256').update(baselineCore).digest('hex'))
+      .toBe('490613293ae6942dd1571302a88c0a06c5d77406f9b34f7d8a4f78d32cc99673');
+  }
   // These tests exercise the real local UI with every remote request blocked.
-  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.hostname !== '127.0.0.1') return route.abort();
+    if (setup.baseline && url.pathname === '/modules/main-app/core.js') {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: baselineCore });
+    }
+    if (setup.baseline && /^\/pwa-install-entry\.(js|css)$/.test(url.pathname)) {
+      return route.fulfill({ status: 200, contentType: url.pathname.endsWith('.css') ? 'text/css' : 'text/javascript', body: '' });
+    }
+    return route.continue();
+  });
   await page.addInitScript(({ userAgent, setup }) => {
     Object.defineProperty(navigator, 'userAgent', { get: () => userAgent });
     Object.defineProperty(navigator, 'platform', { get: () => setup.ipad ? 'MacIntel' : 'test' });
@@ -31,9 +61,9 @@ async function openLogin(page, userAgent = ua.android, setup = {}) {
     if (setup.noDialog) HTMLDialogElement.prototype.showModal = undefined;
   }, { userAgent, setup });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.locator('[data-action="select-role-player"]').click();
+  await activate(page, page.locator('[data-action="select-role-player"]'));
   await expect(page.locator('[data-action="player-goto-login"]')).toBeVisible();
-  await page.locator('[data-action="player-goto-login"]').click();
+  await activate(page, page.locator('[data-action="player-goto-login"]'));
   await expect(page.locator('#player-login-email')).toBeVisible();
 }
 
@@ -54,6 +84,13 @@ async function installEvent(page, mode = 'dismissed') {
 
 const entry = page => page.locator('[data-bxh-install]');
 const guide = page => page.locator('.bxh-install-guide');
+
+test('unchanged-main entrance control reaches the login form without install assets', async ({ page }) => {
+  await openLogin(page, ua.android, { baseline: true });
+  await expect(entry(page)).toHaveCount(0);
+  await expect(page.locator('#player-login-email')).toBeVisible();
+  await expect(page.locator('#player-login-password')).toBeVisible();
+});
 
 test('optional entry is below login/signup, preserves input, focus and history on dismiss/reopen', async ({ page }) => {
   await openLogin(page);
@@ -179,10 +216,10 @@ test('older embedded browser has a dismissible inline guide; navigation removes 
 test('player entrance and administrator login each expose one optional entry', async ({ page }) => {
   await openLogin(page);
   await page.locator('[data-action="account-back-to-role"]').click();
-  await page.locator('[data-action="select-role-player"]').click();
+  await activate(page, page.locator('[data-action="select-role-player"]'));
   await expect(entry(page)).toHaveCount(1);
   await page.locator('[data-action="account-back-to-role"]').click();
-  await page.locator('[data-action="select-role-admin"]').click();
+  await activate(page, page.locator('[data-action="select-role-admin"]'));
   await expect(entry(page)).toHaveCount(1);
   await expect(page.locator('#auth-username')).toBeVisible();
 });
