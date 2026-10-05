@@ -11394,6 +11394,8 @@ function peopleMutationErrorMessage(e){
   const code=String((e&&e.code)||(e&&e.message)||"");
   if(code.includes("selection-managed")) return "本場使用抽籤名額模式，請先在「參賽名額抽籤」完成名額調整。";
   if(code.includes("bracket-locked")) return "已產生對戰表或賽事已開始；請先重設對戰表後再調整正備取。";
+  if(code.includes("online-registration-required")) return "這筆是線上報名資料，請先同步最新報名名單再操作。";
+  if(code.includes("call-state-stale")||code.includes("entry-selection-stale")) return "雲端賽事狀態已更新，請重新整理後再試。";
   if(code.includes("not-waitlist")) return "這位玩家目前已不是備取，名單可能已被其他裝置更新。";
   if(code.includes("not-confirmed")) return "這位玩家目前已不是正取，名單可能已被其他裝置更新。";
   if(code.includes("roster-sync-mismatch")) return "雲端已收到操作，但讀回資料尚未完全一致；請重新整理名單確認。";
@@ -11491,6 +11493,29 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
   }
   if(state.cloudCode&&p.source==="online"){
     showToast("線上報名識別資料不足，請先同步最新正備取名單",true);
+    return;
+  }
+  if(state.cloudCode){
+    if(peopleRosterBusy)return;
+    peopleRosterBusy=true;render();
+    try{
+      if(!window.cloudSync?.promoteLocalWaitlistRoster)throw Object.assign(new Error("network"),{code:"network"});
+      const result=await window.cloudSync.promoteLocalWaitlistRoster(state.cloudCode,waitId,{expandBy:expandCapacity?8:0});
+      await peopleApplyCloudRosterResult(result,(result.expanded?"已加開至 "+result.capacity+" 人；":"")+name+" 已升為正取");
+    }catch(e){
+      peopleRosterBusy=false;
+      if(String(e?.code||e?.message||"").includes("capacity-full")&&!expandCapacity){
+        const cap=Number(e.capacity||state.meta.registrationCapacity||0);
+        openModal({
+          type:"generic",title:"正取名額已滿",
+          message:"目前正取上限為 "+cap+" 人。\n\n是否增加 8 個名額，並將「"+name+"」升為正取？\n調整後上限："+(cap+8)+" 人。\n\n每次固定增加 8 人，可重複加開。",
+          confirmLabel:"增加 8 名並升正取",
+          onConfirm:()=>peoplePromoteLocal(waitId,name,true)
+        });
+        render();return;
+      }
+      showToast(peopleMutationErrorMessage(e),true);render();
+    }
     return;
   }
   const cap=Number(state.meta.registrationCapacity||0);
