@@ -105,10 +105,10 @@ async function handleMailbox(action,target){
   if(action==='mailbox-self-card-test'){
     c.busy=true;c.error='';render();
     try{
-      const result=await window.engagementService.issueSelfCardRewardE2ETest();
+      const result=await window.engagementService.cardAlbum({action:'issueSelfTestPack'});
       if(!result?.ok)throw Error('test-card-failed');
       c.messages=null;c.selectedId='';c.busy=false;
-      await loadMailbox(true);showToast(result.replayed?'今天的測試卡已存在':'測試卡已送達站內信');
+      await loadMailbox(true);showToast(result.replayed?'今天的測試卡包已存在':'諸神戰場測試卡包已送達站內信');
     }catch(error){c.error=mailboxError(error);}
     finally{c.busy=false;render();}
     return;

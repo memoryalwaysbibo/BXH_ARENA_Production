@@ -14,6 +14,19 @@ function projected(overrides={}){
     attachments:[{id:'gods_pack',name:'諸神戰場卡包 ×1',mime:'application/x-bxh-card-pack',size:1}],...overrides};
 }
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
+test('projected self-test pack uses the same claimPack endpoint',async()=>{
+ const t=setup(),id='gods_pack_TEST-20261006',message=projected({id,eventCode:'TEST-20261006'});
+ assert.match(t.ui.card(message,false),/領取卡牌/);
+ await t.ui.claim(id,message);
+ assert.equal(t.calls.filter(x=>x.action==='claimPack'&&x.messageId===id).length,1);
+});
+test('self-test button sends through cardAlbum and never the archived direct-card endpoint',async()=>{
+ const t=setup();t.s.window.engagementService.cardAlbum=async payload=>{t.calls.push(copy(payload));return {ok:true,messageId:'gods_pack_TEST-20261006'};};
+ t.s.window.engagementService.issueSelfCardRewardE2ETest=async()=>{throw Error('archived route');};
+ await t.s.window.BXHMailbox.handleMailbox('mailbox-self-card-test',null);
+ assert.equal(t.calls.filter(x=>x.action==='issueSelfTestPack').length,1);
+ assert(t.toasts.includes('諸神戰場測試卡包已送達站內信'));
+});
 const tick=()=>new Promise(r=>setImmediate(r));
 function setup(){
   const calls=[],toasts=[];let quantity=0,claimed=false,claimImpl=null;
