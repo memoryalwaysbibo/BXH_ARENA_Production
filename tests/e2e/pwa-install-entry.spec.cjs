@@ -48,15 +48,16 @@ async function activate(page, locator) {
 
 async function openLogin(page, userAgent = ua.android, setup = {}) {
   page.on('crash', () => console.error('INSTALL DIAGNOSTIC: page crashed'));
-  // Baseline is main d04fcaf; preserve its independent roster fixes.
-  // Reconstruct it byte-for-byte for a feature-free control, rather than guessing
-  // that an entrance failure comes from the optional install module.
+  // Feature-disabled control retains all other current core behavior. Its SHA was
+  // verified against main d04fcaf when introduced; log the hash rather than pinning
+  // all future, unrelated core edits to that old version.
   let baselineCore;
   if (setup.baseline) {
-    baselineCore = fs.readFileSync(path.join(__dirname, '../../modules/main-app/core.js'), 'utf8')
-      .replace(/^[ \t]*\$\{window\.BXHInstallEntry\?\.renderEntry\(\) \|\| ""\}\r?\n/gm, '');
-    expect(crypto.createHash('sha256').update(baselineCore).digest('hex'))
-      .toBe('9da27c523588cda7a06d7abcfd30e35444810514b9b846cb3125486042e57af3');
+    const core = fs.readFileSync(path.join(__dirname, '../../modules/main-app/core.js'), 'utf8');
+    const hooks = /^[ \t]*\$\{window\.BXHInstallEntry\?\.renderEntry\(\) \|\| ""\}\r?\n/gm;
+    expect(core.match(hooks)).toHaveLength(4);
+    baselineCore = core.replace(hooks, '');
+    console.log('Feature-disabled control SHA-256:', crypto.createHash('sha256').update(baselineCore).digest('hex'));
   }
   // These tests exercise the real local UI with every remote request blocked.
   await page.route('**/*', route => {
@@ -112,7 +113,7 @@ async function installEvent(page, mode = 'dismissed') {
 const entry = page => page.locator('[data-bxh-install]');
 const guide = page => page.locator('.bxh-install-guide');
 
-test('unchanged-main entrance control reaches the login form without install assets', async ({ page }) => {
+test('feature-disabled entrance control reaches the login form without install assets', async ({ page }) => {
   await openLogin(page, ua.android, { baseline: true });
   await expect(entry(page)).toHaveCount(0);
   await expect(page.locator('#player-login-email')).toBeVisible();
