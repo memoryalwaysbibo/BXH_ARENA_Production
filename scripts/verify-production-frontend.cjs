@@ -24,7 +24,7 @@ function must(re,msg,corpus=html){if(!re.test(corpus))throw new Error(msg)}
 function mustNot(re,msg){if(re.test(html))throw new Error(msg)}
 function mustInclude(text,msg){if(!html.includes(text))throw new Error(msg)}
 if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
-mustInclude('modules/cloud/cloud-runtime.js?v=20261004-google-link-redirect-fallback-1','Google-link fix must use a fresh cloud runtime cache key');
+mustInclude('modules/cloud/cloud-runtime.js?v=20261005-staff-roster-safe-1','Staff roster privacy fix must use a fresh cloud runtime cache key');
 mustInclude('<meta name="bxh-build" content="'+String(version.build||'')+'">','index.html bxh-build must match version.json');
 mustInclude('CURRENT_BUILD="'+String(version.build||'')+'"','CURRENT_BUILD must match version.json');
 mustInclude('const APP_VERSION = "'+String(version.version||'')+'"','APP_VERSION must match version.json');
@@ -174,6 +174,8 @@ mustInclude('async mutateRegistrationRoster(code,registrationId,action,options={
 mustInclude('newCapacity=capacity+8','Roster full expansion must add exactly 8 slots');
 mustInclude('roster-sync-mismatch','Roster mutation must verify server round-trip');
 mustInclude('results.push(Object.assign({registrationId:docSnap.id},docSnap.data()))','Admin registration rows must retain Firestore document id');
+mustInclude('async listRegistrationNamesForStaff(code){','Privacy-safe cross-event staff roster projection missing');
+mustInclude('rows.push({status,publicName})','Staff roster projection must expose only name/status rows');
 must(/if\(action===["']delete-player["']\)[\s\S]*?p\.source===["']online["'][\s\S]*?peopleCancelOnline/, 'Online player delete must cancel authoritative registration');
 console.log('PASS people roster second-level / atomic waitlist linkage');
 mustInclude('data-action="save-managed-account"','Per-account save button missing');
