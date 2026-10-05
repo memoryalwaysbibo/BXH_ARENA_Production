@@ -1142,9 +1142,11 @@
         if(tour.registrationSelection||pub.registrationSelection||(runtime.entrySelection&&runtime.entrySelection.mode==="registration"))throw Object.assign(new Error("selection-managed"),{code:"selection-managed"});
         if(runtime.startedAt||runtime.bracketSize||["live","settling","done","cancelled"].includes(String(pub.tournamentPhase||"")))throw Object.assign(new Error("bracket-locked"),{code:"bracket-locked"});
 
-        let capacity=Math.max(0,Number(pub.capacity||tour.capacity||runtime.meta.registrationCapacity||0));
-        let confirmed=Math.max(0,Number(pub.confirmedCount??tour.confirmedCount??0));
-        let waiting=Math.max(0,Number(pub.waitlistCount??tour.waitlistCount??0));
+        // Firestore Rules validate deltas against tournaments, not the public mirror.
+        // Use the same source here and repair any lagging public counters in this transaction.
+        let capacity=Math.max(0,Number(tour.capacity??pub.capacity??runtime.meta.registrationCapacity??0));
+        let confirmed=Math.max(0,Number(tour.confirmedCount??pub.confirmedCount??0));
+        let waiting=Math.max(0,Number(tour.waitlistCount??pub.waitlistCount??0));
         const oldStatus=String(reg.status||"");
         const players=Array.isArray(runtime.players)?runtime.players.slice():[];
         const waitlist=Array.isArray(runtime.waitlistPlayers)?runtime.waitlistPlayers.slice():[];
