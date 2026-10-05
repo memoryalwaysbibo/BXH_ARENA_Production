@@ -42,8 +42,11 @@ showFixtureScreen(false);
 
 async function activate(page, locator) {
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
-  if (touch) await locator.tap();
-  else await locator.click();
+  await expect(locator).toBeVisible();
+  // Entrance cards animate independently of the install feature. Once visible,
+  // force the setup action so WebKit motion cannot consume this test's timeout.
+  if (touch) await locator.tap({ force: true });
+  else await locator.click({ force: true });
 }
 
 async function openLogin(page, userAgent = ua.android, setup = {}) {
@@ -129,7 +132,7 @@ test(`${integration ? 'ARENA integration' : 'isolated module'} preserves input, 
   await page.locator('#player-login-email').fill('draft-player');
   await page.locator('#player-login-password').fill('draft-password');
   const before = await page.evaluate(() => ({ href: location.href, history: history.length }));
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await expect(guide(page)).toBeVisible();
   await expect(guide(page)).toContainText('安裝應用程式');
   await expect(page.getByRole('button', { name: '關閉安裝說明' })).toBeFocused();
@@ -143,11 +146,11 @@ test(`${integration ? 'ARENA integration' : 'isolated module'} preserves input, 
   await expect(page.locator('#player-login-password')).toHaveValue('draft-password');
   await expect(page.locator('#player-login-email')).toHaveValue('draft-player');
   expect(await page.evaluate(() => ({ href: location.href, history: history.length }))).toEqual(before);
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await page.evaluate(() => document.querySelector('[data-bxh-install]').click());
   await expect(guide(page)).toHaveCount(1);
   await page.getByRole('button', { name: '稍後再說' }).click();
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await page.mouse.click(2, 2);
   await expect(guide(page)).toHaveCount(0);
   await page.locator('[data-action="player-goto-apply"]').click();
@@ -155,7 +158,7 @@ test(`${integration ? 'ARENA integration' : 'isolated module'} preserves input, 
   await page.locator('#apply-email').fill('draft@example.test');
   await page.locator('#apply-password').fill('draft-password');
   await page.locator('#apply-agree').check();
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await page.getByRole('button', { name: '關閉安裝說明' }).click();
   await expect(page.locator('#apply-realname')).toHaveValue('測試草稿');
   await expect(page.locator('#apply-email')).toHaveValue('draft@example.test');
@@ -170,7 +173,7 @@ test('native prompt occurs only on click, cancellation consumes once and repeate
   await installEvent(page, 'pending');
   expect(await page.evaluate(() => installDefaultPrevented)).toBe(true);
   expect(await page.evaluate(() => installCalls)).toBe(0);
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await expect(entry(page)).toBeDisabled();
   await page.evaluate(() => document.querySelector('[data-bxh-install]').click());
   expect(await page.evaluate(() => installCalls)).toBe(1);
@@ -178,12 +181,12 @@ test('native prompt occurs only on click, cancellation consumes once and repeate
   await expect(entry(page)).toBeEnabled();
   await expect(page.locator('.bxh-install-status')).toContainText('已取消安裝');
   await expect(guide(page)).toHaveCount(0);
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await expect(guide(page)).toBeVisible();
   expect(await page.evaluate(() => installCalls)).toBe(1);
   await page.keyboard.press('Escape');
   await installEvent(page, 'accepted');
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await expect(page.locator('.bxh-install-status')).toContainText('已送出安裝確認');
   await expect(entry(page)).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')));
@@ -193,7 +196,7 @@ test('native prompt occurs only on click, cancellation consumes once and repeate
 test('native prompt rejection falls back to guide and never blocks login', async ({ page }) => {
   await openLogin(page);
   await installEvent(page, 'reject');
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await expect(guide(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(entry(page)).toBeEnabled();
@@ -204,7 +207,7 @@ for (const browser of ['ios', 'ipad', 'line', 'instagram', 'desktop']) {
   test(`${browser} gets accurate instructions, canonical URL and safe clipboard fallback`, async ({ page }) => {
     const userAgent = browser === 'ios' ? ua.ios : browser === 'line' ? ua.ios + ' Line/15.0' : browser === 'instagram' ? ua.android + ' Instagram 300' : ua.desktop;
     await openLogin(page, userAgent, { ipad: browser === 'ipad' });
-    await entry(page).click();
+    await entry(page).click({ force: true });
     await expect(guide(page)).toBeVisible();
     if (['ios', 'ipad'].includes(browser)) await expect(guide(page)).toContainText('分享');
     else if (['line', 'instagram'].includes(browser)) await expect(guide(page)).toContainText('無法替你自動切換 App');
@@ -234,11 +237,11 @@ for (const flag of ['standalone', 'displayStandalone']) {
 
 test('older embedded browser has a dismissible inline guide; navigation removes stale guide', async ({ page }) => {
   await openLogin(page, ua.android + ' Instagram 300', { noDialog: true });
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await expect(page.locator('.bxh-install-guide-inline')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(guide(page)).toHaveCount(0);
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await page.locator('[data-action="player-goto-apply"]').click();
   await expect(guide(page)).toHaveCount(0);
   await expect(entry(page)).toHaveCount(1);
@@ -246,10 +249,10 @@ test('older embedded browser has a dismissible inline guide; navigation removes 
 
 test('player entrance and administrator login each expose one optional entry', async ({ page }) => {
   await openLogin(page, ua.android, { integration: true });
-  await page.locator('[data-action="account-back-to-role"]').click();
+  await page.locator('[data-action="account-back-to-role"]').click({ force: true });
   await activate(page, page.locator('[data-action="select-role-player"]'));
   await expect(entry(page)).toHaveCount(1);
-  await page.locator('[data-action="account-back-to-role"]').click();
+  await page.locator('[data-action="account-back-to-role"]').click({ force: true });
   await activate(page, page.locator('[data-action="select-role-admin"]'));
   await expect(entry(page)).toHaveCount(1);
   await expect(page.locator('#auth-username')).toBeVisible();
@@ -263,14 +266,14 @@ test('legacy userChoice cancellation and delayed failure after navigation are sa
     event.userChoice = Promise.resolve({ outcome: 'dismissed' });
     window.dispatchEvent(event);
   });
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await expect(page.locator('.bxh-install-status')).toContainText('已取消安裝');
   await page.evaluate(() => {
     const event = new Event('beforeinstallprompt', { cancelable: true });
     event.prompt = () => new Promise((resolve, reject) => { window.rejectInstall = reject; });
     window.dispatchEvent(event);
   });
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await page.locator('[data-action="player-goto-apply"]').click();
   await page.evaluate(() => rejectInstall(Error('late rejection')));
   await expect(guide(page)).toHaveCount(0);
@@ -279,11 +282,11 @@ test('legacy userChoice cancellation and delayed failure after navigation are sa
 
 test('late clipboard completion does not update a reopened guide; appinstalled closes it', async ({ page }) => {
   await openLogin(page);
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => new Promise(resolve => { window.finishCopy = resolve; }) } }));
   await page.getByRole('button', { name: '複製 ARENA 網址' }).click();
   await page.keyboard.press('Escape');
-  await entry(page).click();
+  await entry(page).click({ force: true });
   await page.evaluate(() => finishCopy());
   await expect(page.locator('.bxh-install-copy-status')).toBeEmpty();
   await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')));
