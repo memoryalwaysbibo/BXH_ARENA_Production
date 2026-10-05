@@ -104,6 +104,20 @@
     </div>`;
     document.body.appendChild(dialog);
     dialog.addEventListener('cancel', event => { event.preventDefault(); closeGuide(); });
+    dialog.addEventListener('keydown', event => {
+      if (event.key !== 'Tab' || dialog.classList.contains('bxh-install-guide-inline')) return;
+      // Native dialogs can tab into browser chrome. Keep keyboard navigation in this modal.
+      const controls = [...dialog.querySelectorAll('button:not(:disabled), input:not(:disabled)')];
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
     dialog.addEventListener('click', event => {
       if (event.target !== dialog) return;
       const rect = dialog.getBoundingClientRect();

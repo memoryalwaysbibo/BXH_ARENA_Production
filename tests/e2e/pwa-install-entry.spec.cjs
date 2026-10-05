@@ -1,5 +1,15 @@
 const { test, expect } = require('@playwright/test');
 
+// Exercise behavior with the app's supported reduced-motion preference. Keep ordinary
+// actionability checks, while avoiding concurrent WebKit entrance-animation workloads.
+test.use({ reducedMotion: 'reduce' });
+test.describe.configure({ mode: 'default', timeout: 90000 });
+test.afterEach(async ({}, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    for (const error of testInfo.errors) console.error('INSTALL TEST FAILURE:', error.message);
+  }
+});
+
 const ua = {
   ios: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
   android: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36',
@@ -59,6 +69,8 @@ test('optional entry is below login/signup, preserves input, focus and history o
   await expect(page.getByRole('button', { name: '關閉安裝說明' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(page.getByRole('button', { name: '稍後再說' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: '關閉安裝說明' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(guide(page)).toHaveCount(0);
   await expect(entry(page)).toBeFocused();
