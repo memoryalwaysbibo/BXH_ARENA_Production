@@ -2,8 +2,7 @@
   'use strict';
 
   const allowedTabs=new Set(['ladder','live','bracket']);
-  const directWatchEntry=new URLSearchParams(location.search).get('entry')==='watch';
-  const inPublicWatch=()=>publicWatchReturnContext||directWatchEntry;
+  const inPublicWatch=()=>publicWatchReturnContext||new URLSearchParams(location.search).get('entry')==='watch';
   const originalLineupPanel=renderTeamLineupPanel;
   const originalPrimeTeamMatchViews=primeTeamMatchViews;
   const originalRenderApp=renderApp;
