@@ -9462,7 +9462,7 @@ function renderTeamLineupPanel(m,mode="player"){
     for(const t of teams)out+='<p>'+esc(t.name)+'：'+(view.lineups?.[t.id]||[]).map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
   }else{
     if(mine&&!refereeMode){
-      const order=view?.ownOrder||mine.memberPlayerIds||[];
+      const order=view?.ownOrder||view?.lineups?.[mine.id]||mine.memberPlayerIds||[];
       out+='<div class="hint">僅隊長與裁判可查看本隊順序；拖曳不支援，請以選單調整順位。</div>';
       for(let i=0;i<order.length;i++){
         out+='<label>第 '+(i+1)+' 位 <select class="team-lineup-slot" data-match-id="'+esc(m.id)+'" data-slot="'+i+'">';
@@ -9638,7 +9638,9 @@ function renderTeamCaptainScreen(){
   const back='<button class="btn btn-ghost" data-action="back-from-team-lineup">← 返回賽事詳情</button>';
   if(!firebaseUser||currentRole!=="player")return authShellOpen()+back+'<div class="hint">請先登入玩家帳號。</div>'+authShellClose();
   let html=authShellOpen()+authBrandHeader()+back+'<div class="panel"><div class="panel-title">本隊出場順序</div><div class="hint">僅報名隊長可提交；公開前可調整，公開後鎖定。</div></div>';
-  const matches=(state.matches||[]).filter(m=>!m.isBye&&!m.completed&&m.teamIds?.[0]&&m.teamIds?.[1]);
+  const registrations=Array.isArray(tournamentDetailMyRegs)&&tournamentDetailMyRegs.length?tournamentDetailMyRegs:(tournamentDetailMyReg?[tournamentDetailMyReg]:[]);
+  const myTeamIds=new Set(registrations.filter(r=>r.status==='confirmed'&&r.teamId).map(r=>r.teamId));
+  const matches=(state.matches||[]).filter(m=>!m.isBye&&!m.completed&&m.teamIds?.[0]&&m.teamIds?.[1]&&m.teamIds.some(id=>myTeamIds.has(id)));
   let pending=false,ownCount=0,failed=false;
   for(const m of matches){
     const view=teamMatchUi.get(m.id);
