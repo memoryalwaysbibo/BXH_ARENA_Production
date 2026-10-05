@@ -14,7 +14,7 @@ function packAttachment(item){
 }
 function projectedPack(message){
   if(message?.type!==OCT_CARD_REWARD_TYPE||message.reward!=null)return null;
-  const match=/^gods_pack_(BXH-[A-Z0-9]{6})$/.exec(String(message.id||''));
+  const match=/^gods_pack_(BXH-[A-Z0-9]{6}|TEST-[0-9]{8})$/.exec(String(message.id||''));
   if(!match||message.eventCode!==match[1]||!Array.isArray(message.attachments)||
     !message.attachments.some(packAttachment))return null;
   // Unknown is not an unclaimed assertion. Only claimPack may decide/grant.

@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 
 // Exercise behavior with the app's supported reduced-motion preference. Keep ordinary
 // actionability checks, while avoiding concurrent WebKit entrance-animation workloads.
-test.use({ reducedMotion: 'reduce' });
+test.use({ contextOptions: { reducedMotion: 'reduce' } });
 test.describe.configure({ mode: 'default', timeout: 90000 });
 test.afterEach(async ({}, testInfo) => {
   if (testInfo.status !== testInfo.expectedStatus) {
@@ -43,10 +43,9 @@ showFixtureScreen(false);
 async function activate(page, locator) {
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
   await expect(locator).toBeVisible();
-  // Entrance cards animate independently of the install feature. Once visible,
-  // force the setup action so WebKit motion cannot consume this test's timeout.
-  if (touch) await locator.tap({ force: true });
-  else await locator.click({ force: true });
+  // Keep normal actionability checks while using the app's reduced-motion mode.
+  if (touch) await locator.tap();
+  else await locator.click();
 }
 
 async function openLogin(page, userAgent = ua.android, setup = {}) {
@@ -90,6 +89,7 @@ async function openLogin(page, userAgent = ua.android, setup = {}) {
   }, { userAgent, setup });
   const fullApp = setup.integration || setup.baseline;
   await page.goto(fullApp ? '/' : '/?install_fixture=1', { waitUntil: 'domcontentloaded' });
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
   if (fullApp) {
     await activate(page, page.locator('[data-action="select-role-player"]'));
     await expect(page.locator('[data-action="player-goto-login"]')).toBeVisible();

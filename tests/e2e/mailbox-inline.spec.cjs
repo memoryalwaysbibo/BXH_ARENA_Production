@@ -7,7 +7,7 @@ const path = require('node:path');
 // and Android. It never loads Firebase or makes requests to a live service.
 // Use the real mailbox module, production CSS and core viewport functions, with
 // a minimal full-innerHTML host and deterministic, in-memory service responses.
-test.use({ reducedMotion: 'reduce', serviceWorkers: 'block' });
+test.use({ contextOptions: { reducedMotion: 'reduce' }, serviceWorkers: 'block' });
 const root = path.join(__dirname, '../..');
 const core = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8');
 const viewportStart = core.indexOf('function captureRenderViewport()');
@@ -121,6 +121,7 @@ async function openMailbox(page, seed = messages()) {
     return route.abort('blockedbyclient');
   });
   await page.goto('/?mailbox_fixture=1', { waitUntil: 'load' });
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
   await expect(page.locator('.mailbox-entry')).toHaveCount(seed.length);
   await settleViewport(page);
 }

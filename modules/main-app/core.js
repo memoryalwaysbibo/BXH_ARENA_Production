@@ -366,7 +366,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.26";
+const APP_VERSION = "v14.3.27";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
