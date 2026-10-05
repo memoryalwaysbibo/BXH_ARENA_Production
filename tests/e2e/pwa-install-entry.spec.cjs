@@ -42,8 +42,11 @@ showFixtureScreen(false);
 
 async function activate(page, locator) {
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
-  if (touch) await locator.tap();
-  else await locator.click();
+  await expect(locator).toBeVisible();
+  // Entrance cards animate independently of the install feature. Once visible,
+  // force the setup action so WebKit motion cannot consume this test's timeout.
+  if (touch) await locator.tap({ force: true });
+  else await locator.click({ force: true });
 }
 
 async function openLogin(page, userAgent = ua.android, setup = {}) {

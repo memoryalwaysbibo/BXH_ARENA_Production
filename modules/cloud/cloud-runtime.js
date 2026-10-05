@@ -1116,6 +1116,42 @@
       return result;
     },
 
+    async diagnoseRosterPermission(code,registrationId=""){
+      const eventCode=String(code||"").trim().toUpperCase();
+      const read=async ref=>{
+        try{const snap=await fx.getDoc(ref);return snap.exists()?snap.data():null;}
+        catch(e){return {readError:String(e?.code||e?.message||"unknown")};}
+      };
+      const [tour,pub,reg]=await Promise.all([
+        read(fx.doc(dbHandle,"tournaments",eventCode)),
+        read(fx.doc(dbHandle,"publicTournaments",eventCode)),
+        registrationId?read(fx.doc(dbHandle,"tournaments",eventCode,"registrations",String(registrationId))):Promise.resolve(null)
+      ]);
+      let runtime={};
+      try{runtime=typeof tour?.data==="string"?JSON.parse(tour.data):(tour?.data||{});}catch(e){}
+      return {
+        source:registrationId?"online":"onsite",
+        authPresent:!!authHandle?.currentUser,profileRole:String(userProfile?.role||""),profileActive:userProfile?.active===true,
+        privateReadError:tour?.readError||"",publicReadError:pub?.readError||"",
+        registrationReadError:reg?.readError||"",
+        registrationExists:!!reg&&!reg.readError,
+        registrationStatus:reg?.status||"",
+        privateConfirmed:tour?.confirmedCount??null,privateWaitlist:tour?.waitlistCount??null,
+        publicConfirmed:pub?.confirmedCount??null,publicWaitlist:pub?.waitlistCount??null,
+        privateCapacity:tour?.capacity??null,publicCapacity:pub?.capacity??null,
+        players:Array.isArray(runtime.players)?runtime.players.length:null,
+        waitlistPlayers:Array.isArray(runtime.waitlistPlayers)?runtime.waitlistPlayers.length:null,
+        privatePhase:tour?.tournamentPhase||"",publicPhase:pub?.tournamentPhase||"",
+        privateSelectionPresent:!!tour&&Object.prototype.hasOwnProperty.call(tour,"registrationSelection"),
+        publicSelectionPresent:!!pub&&Object.prototype.hasOwnProperty.call(pub,"registrationSelection"),
+        publicSchemaValid:!!pub&&["general","ranked"].includes(pub.ladderMode||"general")&&
+          ["open","children"].includes(pub.targetGroup||"open")&&
+          ["realName","gameId"].includes(pub.participantNameMode||"realName")&&
+          ["individual","team"].includes(pub.battleMode||"individual")&&
+          ["standard","enchantment"].includes(pub.playMode||"standard")
+      };
+    },
+
     async promoteLocalWaitlistRoster(code,waitId,options={}){
       const eventCode=String(code||"").trim().toUpperCase(),candidateId=String(waitId||"");
       if(!eventCode||!candidateId)throw Object.assign(new Error("not-found"),{code:"not-found"});

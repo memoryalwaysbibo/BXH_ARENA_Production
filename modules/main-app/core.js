@@ -366,7 +366,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.25";
+const APP_VERSION = "v14.3.26";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
@@ -11402,6 +11402,21 @@ function peopleMutationErrorMessage(e){
   if(code.includes("permission-denied")) return "目前帳號沒有異動這場賽事名單的權限。";
   return mapRegistrationError(e)||"名單更新失敗，請重新整理後再試。";
 }
+async function peopleReportRosterPermission(registrationId=""){
+  let d=null;
+  try{d=await window.cloudSync?.diagnoseRosterPermission?.(state.cloudCode,registrationId);}catch(e){}
+  if(!d){showToast("雲端拒絕名單異動；請提供房號與操作畫面。",true);return;}
+  const pair=(a,b)=>String(a??"?")+" / "+String(b??"?");
+  const message=[
+    "操作："+(d.source==="online"?"線上報名":"現場備取")+"；登入："+(d.authPresent?"是":"否")+"；角色："+(d.profileRole||"?")+"；啟用："+(d.profileActive?"是":"否"),
+    "私有計數 正／備："+pair(d.privateConfirmed,d.privateWaitlist)+"；名單 正／備："+pair(d.players,d.waitlistPlayers)+"；上限："+String(d.privateCapacity??"?"),
+    "公開計數 正／備："+pair(d.publicConfirmed,d.publicWaitlist)+"；上限："+String(d.publicCapacity??"?"),
+    "階段 私有／公開："+(d.privatePhase||"?")+" / "+(d.publicPhase||"?")+"；選拔欄位 私有／公開："+(d.privateSelectionPresent?"有":"無")+" / "+(d.publicSelectionPresent?"有":"無"),
+    d.source==="online"?"報名文件："+(d.registrationReadError||(!d.registrationExists?"不存在":d.registrationStatus||"狀態未知")):"",
+    "讀取錯誤："+[d.privateReadError,d.publicReadError].filter(Boolean).join(" / ")+"；公開欄位格式："+(d.publicSchemaValid?"正常":"需檢查")
+  ].filter(Boolean).join("\n");
+  openModal({type:"generic",title:"名單異動遭雲端拒絕",message,confirmLabel:"關閉"});
+}
 async function peopleApplyCloudRosterResult(result,successMessage){
   if(result&&result.state){
     const code=state.cloudCode;
@@ -11440,6 +11455,7 @@ async function peoplePromoteOnline(registrationId,name,expandBy=0){
       render();
       return;
     }
+    if(String(e?.code||e?.message||"").includes("permission-denied")){render();await peopleReportRosterPermission(registrationId);return;}
     showToast(peopleMutationErrorMessage(e),true);render();
   }
 }
@@ -11514,6 +11530,7 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
         });
         render();return;
       }
+      if(String(e?.code||e?.message||"").includes("permission-denied")){render();await peopleReportRosterPermission();return;}
       showToast(peopleMutationErrorMessage(e),true);render();
     }
     return;

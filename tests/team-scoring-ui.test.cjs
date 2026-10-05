@@ -8,13 +8,13 @@ const publicWatchPatch=fs.readFileSync(path.join(__dirname,'../modules/main-app/
 const releaseIndex=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const releaseVersion=JSON.parse(fs.readFileSync(path.join(__dirname,'../version.json'),'utf8'));
 assert.match(releaseVersion.build,/^\d{8}\.\d+$/);
-assert.equal(releaseVersion.version,'v14.3.25');
-assert(releaseIndex.includes('const APP_VERSION = "v14.3.25"'));
+assert.match(releaseVersion.version,/^v\d+\.\d+\.\d+$/);
+assert(releaseIndex.includes('const APP_VERSION = "'+releaseVersion.version+'"'));
 assert(releaseIndex.includes('<meta name="bxh-build" content="'+releaseVersion.build+'">'));
 assert(releaseIndex.includes('var CURRENT_BUILD="'+releaseVersion.build+'";'));
 assert(releaseIndex.includes('public-watch-isolation.js?v=20261005-captain-isolation-1'));
-assert(releaseIndex.includes('modules/main-app/core.js?v=20261005-captain-entry-1'));
-assert(source.includes('const APP_VERSION = "v14.3.25";'));
+assert(releaseIndex.includes('modules/main-app/core.js?v=20261006-roster-promotion-1'));
+assert(source.includes('const APP_VERSION = "'+releaseVersion.version+'";'));
 assert(source.includes('雙命守擂計分板｜'));
 assert(source.includes("'●'.repeat(life)+'○'.repeat(Math.max(0,2-life))"));
 assert(source.includes("if(view.revealed&&state.startedAt){"));

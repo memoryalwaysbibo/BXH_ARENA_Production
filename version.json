@@ -1,6 +1,6 @@
 {
-  "build": "20261005.4",
-  "version": "v14.3.25",
-  "updatedAt": "2026-10-05T23:48:32+08:00",
-  "releaseTrigger": "ladder-loading-history-access"
+  "build": "20261006.1",
+  "version": "v14.3.26",
+  "updatedAt": "2026-10-06T01:17:26+08:00",
+  "releaseTrigger": "roster-promotion-cache-and-diagnostic"
 }
