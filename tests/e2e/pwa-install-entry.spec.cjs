@@ -48,7 +48,7 @@ async function activate(page, locator) {
 
 async function openLogin(page, userAgent = ua.android, setup = {}) {
   page.on('crash', () => console.error('INSTALL DIAGNOSTIC: page crashed'));
-  // Core was unchanged between original main 04be6a42 and current base ea4df24.
+  // Baseline is main d04fcaf; preserve its independent roster fixes.
   // Reconstruct it byte-for-byte for a feature-free control, rather than guessing
   // that an entrance failure comes from the optional install module.
   let baselineCore;
@@ -56,7 +56,7 @@ async function openLogin(page, userAgent = ua.android, setup = {}) {
     baselineCore = fs.readFileSync(path.join(__dirname, '../../modules/main-app/core.js'), 'utf8')
       .replace(/^[ \t]*\$\{window\.BXHInstallEntry\?\.renderEntry\(\) \|\| ""\}\r?\n/gm, '');
     expect(crypto.createHash('sha256').update(baselineCore).digest('hex'))
-      .toBe('490613293ae6942dd1571302a88c0a06c5d77406f9b34f7d8a4f78d32cc99673');
+      .toBe('9da27c523588cda7a06d7abcfd30e35444810514b9b846cb3125486042e57af3');
   }
   // These tests exercise the real local UI with every remote request blocked.
   await page.route('**/*', route => {
