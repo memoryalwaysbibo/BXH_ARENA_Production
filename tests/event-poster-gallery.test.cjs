@@ -20,7 +20,9 @@ test('admin inline roster filters by seat type and exposes names only',()=>{
   assert.match(uiSource,/listRegistrationNamesForStaff\(code\)/);
   assert.doesNotMatch(uiSource,/listRegistrationsForAdmin\(code\)/);
   assert.match(cloudSource,/async listRegistrationNamesForStaff\(code\)/);
-  assert.match(cloudSource,/rows\.push\(\{status,publicName\}\)/);
+  assert.match(cloudSource,/rows\.map\(row=>\(\{status:row\.status,publicName:row\.publicName\}\)\)/);
+  assert.match(cloudSource,/result\.expectedCounts=expected/);
+  assert.match(uiSource,/姓名名單尚未同步/);
   assert.match(uiSource,/!canManageInCurrentInterface\(\)\)return/);
   assert.match(uiSource,/aria-expanded/);
   assert.match(uiSource,/名單載入中/);
