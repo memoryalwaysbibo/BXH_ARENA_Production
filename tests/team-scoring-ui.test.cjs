@@ -19,7 +19,7 @@ assert(source.includes("[['spin','轉停'],['burst','爆裂'],['over','擊飛'],
 assert(!source.includes('id="team-score-winner-'));
 assert(source.includes('function renderTeamReferee()'));
 assert(source.includes('if(mine&&!refereeMode){'));
-assert(publicWatchPatch.includes("const directWatchEntry=new URLSearchParams(location.search).get('entry')==='watch';"));
+assert(publicWatchPatch.includes("new URLSearchParams(location.search).get('entry')==='watch'"));
 assert(publicWatchPatch.includes("if(inPublicWatch()&&mode!=='referee')return '';"));
 assert(publicWatchPatch.includes('return originalLineupPanel(m,mode);'));
 assert(publicWatchPatch.includes("activeTab==='referee'&&!inPublicWatch()"));
@@ -50,14 +50,15 @@ function watchIsolationCase(search,watchContext,activeTab){
     querySelector(selector){return selector==='#bxh-management-v2-nav'?navRoot:null;}
   };
   let originalRendered=false,originalPrimeCount=0;
+  const currentLocation={search};
   const sandbox={
-    URLSearchParams,location:{search},publicWatchReturnContext:watchContext,activeTab,
+    URLSearchParams,location:currentLocation,publicWatchReturnContext:watchContext,activeTab,
     renderTeamLineupPanel:()=> 'lineup',primeTeamMatchViews(){originalPrimeCount++;},
     renderApp(){originalRendered=true;},document:{getElementById:()=>app}
   };
   vm.runInNewContext(publicWatchPatch,sandbox);
   sandbox.renderApp();
-  return {sandbox,nav,account,modeContext,navRoot,originalRendered:()=>originalRendered,originalPrimeCount:()=>originalPrimeCount};
+  return {sandbox,nav,account,modeContext,navRoot,originalRendered:()=>originalRendered,originalPrimeCount:()=>originalPrimeCount,setSearch:(value)=>{currentLocation.search=value;}};
 }
 const directWatch=watchIsolationCase('?code=BXH-QATEST&entry=watch',false,'duty');
 assert.equal(directWatch.sandbox.activeTab,'live');
@@ -70,5 +71,11 @@ assert.equal(directWatch.sandbox.renderTeamLineupPanel({},'player'),'');
 const normalEvent=watchIsolationCase('?code=BXH-QATEST&entry=event',false,'duty');
 assert.equal(normalEvent.sandbox.activeTab,'duty');
 assert.equal(normalEvent.nav.some(x=>x.removed),false);
+const transitionedWatch=watchIsolationCase('?code=BXH-QATEST&entry=event',false,'duty');
+transitionedWatch.setSearch('?code=BXH-QATEST&entry=watch');
+transitionedWatch.sandbox.renderApp();
+assert.equal(transitionedWatch.sandbox.activeTab,'live');
+assert.deepEqual(transitionedWatch.nav.filter(x=>!x.removed).map(x=>x.dataset.tab),['ladder','live','bracket']);
+assert.equal(transitionedWatch.sandbox.renderTeamLineupPanel({},'player'),'');
 
 console.log('PASS team scoring board and direct public-watch role isolation contracts');
