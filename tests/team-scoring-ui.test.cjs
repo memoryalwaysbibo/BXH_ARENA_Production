@@ -7,14 +7,14 @@ const publicWatchPatch=fs.readFileSync(path.join(__dirname,'../modules/main-app/
 
 const releaseIndex=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const releaseVersion=JSON.parse(fs.readFileSync(path.join(__dirname,'../version.json'),'utf8'));
-assert.equal(releaseVersion.build,'20261005.2');
-assert.equal(releaseVersion.version,'v14.3.24');
-assert(releaseIndex.includes('const APP_VERSION = "v14.3.24"'));
-assert(releaseIndex.includes('<meta name="bxh-build" content="20261005.2">'));
-assert(releaseIndex.includes('var CURRENT_BUILD="20261005.2";'));
-assert(releaseIndex.includes('public-watch-isolation.js?v=20261005-watch-spa-1'));
-assert(releaseIndex.includes('modules/main-app/core.js?v=20261005-version-sync-1'));
-assert(source.includes('const APP_VERSION = "v14.3.24";'));
+assert.equal(releaseVersion.build,'20261005.3');
+assert.equal(releaseVersion.version,'v14.3.25');
+assert(releaseIndex.includes('const APP_VERSION = "v14.3.25"'));
+assert(releaseIndex.includes('<meta name="bxh-build" content="20261005.3">'));
+assert(releaseIndex.includes('var CURRENT_BUILD="20261005.3";'));
+assert(releaseIndex.includes('public-watch-isolation.js?v=20261005-captain-isolation-1'));
+assert(releaseIndex.includes('modules/main-app/core.js?v=20261005-captain-entry-1'));
+assert(source.includes('const APP_VERSION = "v14.3.25";'));
 assert(source.includes('雙命守擂計分板｜'));
 assert(source.includes("'●'.repeat(life)+'○'.repeat(Math.max(0,2-life))"));
 assert(source.includes("if(view.revealed&&state.startedAt){"));
@@ -90,3 +90,38 @@ assert.deepEqual(transitionedWatch.nav.filter(x=>!x.removed).map(x=>x.dataset.ta
 assert.equal(transitionedWatch.sandbox.renderTeamLineupPanel({},'player'),'');
 
 console.log('PASS team scoring board and direct public-watch role isolation contracts');
+
+const lineupSource=source.slice(source.indexOf('function renderTeamLineupPanel('),source.indexOf('function renderTeamScorePanel('));
+const captainSource=source.slice(source.indexOf('function renderTeamCaptainScreen('),source.indexOf('function renderTeamReferee('));
+const captainMatch={id:'m1',teamIds:['a','b'],station:1};
+const captainView={ownTeamId:'a',ownOrder:['p2','p1'],submitted:{a:true,b:false},isReferee:true};
+const captainSandbox={
+  state:{cloudCode:'BXH-QATEST',teams:[{id:'a',name:'A',memberPlayerIds:['p1','p2']},{id:'b',name:'B',memberPlayerIds:['p3','p4']}],matches:[captainMatch]},
+  teamMatchUi:new Map([['m1',captainView]]),teamMatchLoading:new Set(),
+  firebaseUser:{uid:'captain'},currentRole:'player',appPhase:'team-lineup',
+  esc:String,teamMatchPlayerName:String,teamMatchNames:()=>['A','B'],
+  authShellOpen:()=>'',authShellClose:()=>'',authBrandHeader:()=>'',setTimeout:()=>{}
+};
+vm.runInNewContext(lineupSource+captainSource,captainSandbox);
+let captainHtml=captainSandbox.renderTeamCaptainScreen();
+assert(captainHtml.includes('team-lineup-submit'));
+assert(captainHtml.includes('value="p2" selected'));
+assert(!captainHtml.includes('team-lineup-default'));
+assert(!captainHtml.includes('team-lineup-reveal'));
+assert(!captainHtml.includes('team-score-direct'));
+captainSandbox.teamMatchUi.set('m1',{submitted:{},isReferee:false});
+assert(!captainSandbox.renderTeamCaptainScreen().includes('team-lineup-submit'));
+captainSandbox.teamMatchUi.set('m1',{...captainView,revealed:true,lineups:{a:['p2','p1'],b:['p3','p4']}});
+assert(!captainSandbox.renderTeamCaptainScreen().includes('team-lineup-submit'));
+captainSandbox.firebaseUser=null;
+assert(!captainSandbox.renderTeamCaptainScreen().includes('team-lineup-submit'));
+const explicitCaptain=watchIsolationCase('?entry=watch',true,'bracket');
+Object.assign(explicitCaptain.sandbox,{appPhase:'team-lineup',firebaseUser:{uid:'captain'},currentRole:'player'});
+assert.equal(explicitCaptain.sandbox.renderTeamLineupPanel({},'captain'),'lineup');
+assert.equal(explicitCaptain.sandbox.renderTeamLineupPanel({},'player'),'');
+explicitCaptain.sandbox.appPhase='app';
+assert.equal(explicitCaptain.sandbox.renderTeamLineupPanel({},'captain'),'');
+explicitCaptain.sandbox.appPhase='team-lineup';explicitCaptain.sandbox.currentRole='guest';
+assert.equal(explicitCaptain.sandbox.renderTeamLineupPanel({},'captain'),'');
+assert(source.includes('data-action="switch-to-team-lineup"'));
+console.log('PASS authenticated captain entry, own lineup, revealed lock and spectator isolation');
