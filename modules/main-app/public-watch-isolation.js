@@ -9,6 +9,7 @@
 
   // Public/live pages must never render captain or referee controls.
   renderTeamLineupPanel=function(m,mode='player'){
+    if(mode==='captain')return appPhase==='team-lineup'&&firebaseUser&&currentRole==='player'?originalLineupPanel(m,mode):'';
     if(inPublicWatch()&&mode!=='referee')return '';
     return originalLineupPanel(m,mode);
   };
