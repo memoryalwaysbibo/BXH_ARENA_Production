@@ -366,7 +366,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.24";
+const APP_VERSION = "v14.3.25";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
@@ -9455,14 +9455,14 @@ function renderTeamLineupPanel(m,mode="player"){
   const mine=teams.find(t=>t.id===view?.ownTeamId);
   const refereeMode=mode==="referee";
   const canRef=refereeMode&&view?.isReferee===true;
-  let out='<div class="panel"><div class="panel-title">隊長排陣與人員到齊</div>';
+  let out='<div class="panel"><div class="panel-title">'+(refereeMode?'隊長排陣與人員到齊':'本隊出場順序')+'</div>';
   out+='<div class="hint">'+teams.map(t=>esc(t.name)+'：'+(view?.submitted?.[t.id]?'已提交':'待提交')).join(' ／ ')+'</div>';
   if(view?.revealed){
     out+='<div class="hint">雙方出場順序已公開並鎖定</div>';
     for(const t of teams)out+='<p>'+esc(t.name)+'：'+(view.lineups?.[t.id]||[]).map(id=>esc(teamMatchPlayerName(id))).join(' → ')+'</p>';
   }else{
     if(mine&&!refereeMode){
-      const order=view?.ownOrder||mine.memberPlayerIds||[];
+      const order=view?.ownOrder||view?.lineups?.[mine.id]||mine.memberPlayerIds||[];
       out+='<div class="hint">僅隊長與裁判可查看本隊順序；拖曳不支援，請以選單調整順位。</div>';
       for(let i=0;i<order.length;i++){
         out+='<label>第 '+(i+1)+' 位 <select class="team-lineup-slot" data-match-id="'+esc(m.id)+'" data-slot="'+i+'">';
@@ -9543,7 +9543,7 @@ async function loadTeamMatchUi(matchId){
       catch(e){console.warn('[team score view]',e);}
     }
     render();
-  }catch(e){console.warn('[team lineup view]',e);teamMatchUi.set(matchId,{error:true});}
+  }catch(e){console.warn('[team lineup view]',e);teamMatchUi.set(matchId,{error:true});render();}
   finally{teamMatchLoading.delete(matchId);}
 }
 function teamNameById(id){
@@ -9633,6 +9633,30 @@ function renderTeamBracket(){
   primeTeamMatchViews();
   const toggle=`<div class="bracket-view-toggle" role="group" aria-label="團體賽檢視模式"><button class="bvt-btn ${teamBracketViewMode==='tree'?'active':''}" data-action="set-team-bracket-view" data-mode="tree">樹狀總覽</button><button class="bvt-btn ${teamBracketViewMode==='live'?'active':''}" data-action="set-team-bracket-view" data-mode="live">即時戰況</button></div>`;
   return `<div class="bracket-top-controls">${toggle}${bracketRefreshButtonHtml()}</div>`+(teamBracketViewMode==='live'?renderTeamMatchList(false):renderTeamTree());
+}
+function renderTeamCaptainScreen(){
+  const back='<button class="btn btn-ghost" data-action="back-from-team-lineup">← 返回賽事詳情</button>';
+  if(!firebaseUser||currentRole!=="player")return authShellOpen()+back+'<div class="hint">請先登入玩家帳號。</div>'+authShellClose();
+  let html=authShellOpen()+authBrandHeader()+back+'<div class="panel"><div class="panel-title">本隊出場順序</div><div class="hint">僅報名隊長可提交；公開前可調整，公開後鎖定。</div></div>';
+  const registrations=Array.isArray(tournamentDetailMyRegs)&&tournamentDetailMyRegs.length?tournamentDetailMyRegs:(tournamentDetailMyReg?[tournamentDetailMyReg]:[]);
+  const myTeamIds=new Set(registrations.filter(r=>r.status==='confirmed'&&r.teamId).map(r=>r.teamId));
+  const matches=(state.matches||[]).filter(m=>!m.isBye&&!m.completed&&m.teamIds?.[0]&&m.teamIds?.[1]&&m.teamIds.some(id=>myTeamIds.has(id)));
+  let pending=false,ownCount=0,failed=false;
+  for(const m of matches){
+    const view=teamMatchUi.get(m.id);
+    if(!view){
+      pending=true;
+      if(!teamMatchLoading.has(m.id)){teamMatchLoading.add(m.id);setTimeout(()=>loadTeamMatchUi(m.id),0);}
+    }else if(view.error){failed=true;}
+    else if(view.ownTeamId&&m.teamIds.includes(view.ownTeamId)){
+      ownCount++;
+      html+='<div class="panel"><b>'+teamMatchNames(m).map(esc).join(' vs ')+'</b><div class="hint">戰鬥台 '+esc(m.station)+'</div></div>'+renderTeamLineupPanel(m,'captain');
+    }
+  }
+  if(pending)html+='<div class="hint" role="status">正在確認本隊對戰與隊長身分…</div>';
+  if(failed)html+='<div class="banner warn"><span>排陣讀取失敗，請返回賽事詳情後重試。</span></div>';
+  if(!pending&&!failed&&!ownCount)html+='<div class="hint">目前沒有可排陣的本隊對戰。請確認使用報名時的隊長帳號；輪空或等待對手晉級時暫不提供排陣。</div>';
+  return html+authShellClose();
 }
 function renderTeamReferee(){
   ensureTeamLiveSubscription();
@@ -14454,6 +14478,7 @@ function renderTournamentDetailScreen(){
   }
   if(isTeamBattle){
     actionHtml=renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedIn,profileIncomplete,activeMyRegs,confirmedRemaining,waitlistRemaining);
+    if(isLoggedIn&&!isGuestMode&&activeMyRegs.some(r=>r.status==="confirmed"))actionHtml+='<div class="tournament-detail-bottom-actions"><button class="btn btn-primary" data-action="switch-to-team-lineup" data-code="'+esc(code)+'">本隊出場順序｜隊長排陣</button></div>';
   }
 
   return authShellOpen() + `
@@ -16606,6 +16631,7 @@ function render(){
   if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }
   if(appPhase==="community-create"){ app.innerHTML = renderCommunityCreateScreen(); bindAuthInputs(); initHalfHourTimePickers(); return; }
   if(appPhase==="community-room"){ app.innerHTML = renderCommunityRoomApp(); bindDynamicInputs(); return; }
+  if(appPhase==="team-lineup"){ app.innerHTML = renderTeamCaptainScreen(); return; }
   if(appPhase==="tournament-detail"){ app.innerHTML = renderTournamentDetailScreen(); return; }
   if(appPhase==="admin-no-tournament"){ renderAdminNoTournamentScreen(); return; }
     renderApp();
@@ -19231,6 +19257,21 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(currentRole==="guest") appPhase="guest-lobby";
     else { appPhase = "player-center"; playerActiveTab = "home"; }
     render();
+    return;
+  }
+  if(action==="back-from-team-lineup"){
+    appPhase="tournament-detail";render();return;
+  }
+  if(action==="switch-to-team-lineup"){
+    if(!firebaseUser||currentRole!=="player"){showToast("請先登入玩家帳號",true);return;}
+    const code=target.getAttribute("data-code");
+    if(!code)return;
+    (async()=>{
+      const result=await resolveAndJoinTournamentByCode(code,{forcePublic:true});
+      if(!result.ok){showToast(CODE_ENTRY_ERROR_MESSAGES[result.reason]||"無法開啟賽事",true);return;}
+      teamMatchUi.clear();teamMatchLoading.clear();
+      appPhase="team-lineup";render();
+    })();
     return;
   }
   if(action==="switch-to-player-watch"){
