@@ -807,6 +807,7 @@
     });
     return {
       callRevision:Number(state.callRevision||0),
+      registrationRosterRevision:Number(state.registrationRosterRevision||0),
       systemClosure:state.systemClosure?{reason:'idle-24h',label:state.systemClosure.label||'',closedAt:state.systemClosure.closedAt||null,lastActivityAt:state.systemClosure.lastActivityAt||null,restoredAt:state.systemClosure.restoredAt||null}:null,
       eventInfo:buildPublicEventInfo(state),
       meta: {
@@ -1186,6 +1187,8 @@
         const nextCapacity=full?capacity+8:capacity;
         const promoted=Object.assign({},candidate);
         delete promoted.waitRank;delete promoted.waitlistedAt;
+        runtime.registrationRosterRevision=Number(runtime.registrationRosterRevision||0)+1;
+        runtime.updatedAt=Date.now();
         runtime.players=players.concat(promoted);
         runtime.waitlistPlayers=waitlist.filter(p=>p!==candidate);
         runtime.meta.registrationCapacity=nextCapacity;
@@ -1299,6 +1302,8 @@
           regPatch=Object.assign(regPatch,{status:"cancelled",cancelledAt:fx.serverTimestamp(),cancelledBy:staffUid});
         }
 
+        runtime.registrationRosterRevision=Number(runtime.registrationRosterRevision||0)+1;
+        runtime.updatedAt=Date.now();
         runtime.players=nextPlayers;
         runtime.waitlistPlayers=nextWait;
         runtime.meta.registrationCapacity=newCapacity;
