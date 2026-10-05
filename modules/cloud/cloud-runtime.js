@@ -1906,8 +1906,8 @@
 
     // Only return names and statuses to the caller. The tournament runtime also
     // contains onsite players; registration counters can advance before its
-    // roster arrays are populated. Admins may read registration documents under
-    // existing Rules, while staff without that access retain the runtime view.
+    // roster arrays are populated. Existing Rules decide who can read registration
+    // documents; a denied read retains the runtime-only view.
     async listRegistrationNamesForStaff(code){
       const eventCode=String(code||"").trim().toUpperCase();
       if(!eventCode) return [];
@@ -1930,8 +1930,7 @@
       append(runtime.waitlistPlayers,"waitlist");
       let rows=runtimeRows;
       const needsRegistrations=["confirmed","waitlist"].some(status=>expected[status]>runtimeRows.filter(row=>row.status===status).length);
-      const admin=!!(userProfile&&userProfile.active===true&&userProfile.isTestAccount!==true&&["admin","super_admin"].includes(userProfile.role));
-      if(admin&&needsRegistrations){
+      if(needsRegistrations){
         try{
           const regSnap=await fx.getDocs(fx.collection(dbHandle,"tournaments",eventCode,"registrations"));
           const registered=[];
