@@ -11484,6 +11484,15 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
   const list=peopleLocalWaitlist(),idx=list.findIndex(p=>String(p.id)===String(waitId));
   if(idx<0)return;
   const p=list[idx];
+  // Online registrations can appear as runtime shadows before the registration
+  // listener catches up. Never persist them through the local roster save path.
+  if(state.cloudCode&&p.registrationId){
+    return peoplePromoteOnline(String(p.registrationId),name,expandCapacity?8:0);
+  }
+  if(state.cloudCode&&p.source==="online"){
+    showToast("線上報名識別資料不足，請先同步最新正備取名單",true);
+    return;
+  }
   const cap=Number(state.meta.registrationCapacity||0);
   if(cap>0&&state.players.length>=cap&&!expandCapacity){
     openModal({
