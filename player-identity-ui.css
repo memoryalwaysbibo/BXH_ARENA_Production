@@ -16,9 +16,13 @@
 .header-account-controls .account-equipped-title .title-chip:not(.title-art-chip){max-width:100%;line-height:1.35;white-space:normal}
 @media(max-width:430px){.header-account-controls .account-equipped-title .title-chip.title-art-chip{width:min(190px,55vw)}}
 
-/* Keep mail and account name on their original row; artwork hangs below the name. */
-header.topbar .header-account-controls:has(.account-equipped-title){align-items:flex-start;padding-bottom:66px}
-header.topbar .header-account-controls .account-menu-wrap:has(.account-equipped-title){position:relative}
-header.topbar .header-account-controls .account-menu-wrap .account-equipped-title{position:absolute;top:100%;right:0;width:min(210px,55vw);max-width:none;margin-top:2px}
-header.topbar .header-account-controls .account-menu-wrap .account-equipped-title .title-chip.title-art-chip{width:100%}
-@media(max-width:430px){header.topbar .header-account-controls .account-menu-wrap .account-equipped-title{width:min(190px,55vw)}}
+/* The player header reads left to right: title, mail, account. */
+header.topbar .header-account-controls > .account-equipped-title{flex:0 1 190px;width:min(190px,35vw);min-width:0;max-width:100%;margin:0;justify-content:center}
+header.topbar .header-account-controls > .account-equipped-title .title-chip.title-art-chip{width:100%;max-width:100%}
+@media(max-width:899px){
+  header.topbar .header-account-controls:has(> .account-equipped-title){display:grid;grid-template-columns:minmax(0,1fr) 44px auto;grid-template-areas:"score score score" "title mail account";align-items:center;gap:7px;padding-bottom:0}
+  header.topbar .header-account-controls > .activity-points-account-row{grid-area:score;justify-self:start}
+  header.topbar .header-account-controls > .account-equipped-title{grid-area:title;width:100%;justify-self:stretch}
+  header.topbar .header-account-controls > .mailbox-trigger{grid-area:mail;justify-self:center}
+  header.topbar .header-account-controls > .account-menu-wrap{grid-area:account;justify-self:end}
+}
