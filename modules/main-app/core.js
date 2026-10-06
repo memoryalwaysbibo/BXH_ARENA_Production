@@ -16930,6 +16930,14 @@ function accountMenuItemsHtml(){
   `;
 }
 
+function accountEquippedTitleHtml(){
+  const p=userProfile;
+  if(!p || p.titleDisplayEnabled===false || !p.equippedTitleId) return "";
+  const title=titleById(p.equippedTitleId);
+  if(!title || !earnedTitleIds().has(title.id)) return "";
+  return `<span class="account-equipped-title" aria-label="目前佩戴稱號：${esc(title.name)}">${titleChipHtml(title.name,titleTierClass(title))}</span>`;
+}
+
 function accountMenuHtml(){
   if(currentRole!=="admin" && currentRole!=="player") return "";
   const isPlayerMode=currentRole==="player";
@@ -16942,6 +16950,7 @@ function accountMenuHtml(){
     ? ((userProfile&&userProfile.displayName)||(userProfile&&userProfile.nickname)||(userProfile&&userProfile.realName)||(firebaseUser&&firebaseUser.email)||"玩家")
     : (adminDisplayName||"管理員");
   const roleLabel=partnerGrant?"活動主辦":eventWorker?"工作人員（活動）":roleDisplayLabel((userProfile&&userProfile.role)||(isPlayerMode?"player":"admin"));
+  if(firebaseUser?.uid && userProfile && !engagementSnapshot && !engagementLoading && !engagementError) setTimeout(()=>requestEngagementSnapshot(false),0);
   return `<div class="account-menu-wrap">
     <button class="account-badge" data-action="toggle-account-menu" aria-expanded="${accountMenuOpen?"true":"false"}">
       <span class="account-role-dot"></span>
@@ -16949,6 +16958,7 @@ function accountMenuHtml(){
       <span class="account-role-label">${esc(roleLabel)}</span>
       <span class="account-menu-caret" aria-hidden="true">▾</span>
     </button>
+    ${accountEquippedTitleHtml()}
   </div>`;
 }
 
