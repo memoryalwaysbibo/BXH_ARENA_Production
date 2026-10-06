@@ -15,3 +15,10 @@
 .header-account-controls .account-equipped-title .title-art-chip img{width:100%;height:100%;object-fit:contain}
 .header-account-controls .account-equipped-title .title-chip:not(.title-art-chip){max-width:100%;line-height:1.35;white-space:normal}
 @media(max-width:430px){.header-account-controls .account-equipped-title .title-chip.title-art-chip{width:min(190px,55vw)}}
+
+/* Keep mail and account name on their original row; artwork hangs below the name. */
+header.topbar .header-account-controls:has(.account-equipped-title){align-items:flex-start;padding-bottom:66px}
+header.topbar .header-account-controls .account-menu-wrap:has(.account-equipped-title){position:relative}
+header.topbar .header-account-controls .account-menu-wrap .account-equipped-title{position:absolute;top:100%;right:0;width:min(210px,55vw);max-width:none;margin-top:2px}
+header.topbar .header-account-controls .account-menu-wrap .account-equipped-title .title-chip.title-art-chip{width:100%}
+@media(max-width:430px){header.topbar .header-account-controls .account-menu-wrap .account-equipped-title{width:min(190px,55vw)}}
