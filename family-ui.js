@@ -134,43 +134,67 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
        return '<label><input type="checkbox" name="participant" value="'+esc(p.id)+'"> '+esc(p.name)+(p.nickname?'（'+esc(p.nickname)+'）':'')+' <span class="hint">'+esc(childCode)+'</span></label>';
       }).join('')
      :'<p class="hint">目前沒有可報名的兒童資料。若尚未建立，請先到會員資料 → 家庭選手／孩子資料新增。</p>')
-   :'<label><input type="checkbox" name="participant" value="" checked> 本人參賽</label>';
+   :'<p>本人：'+esc(userProfile?.displayName||userProfile?.realName||'目前登入會員')+'</p>';
   dialog.innerHTML='<header><h2>'+(requestedMode==='children'?'兒童報名':'本人報名')+'</h2><button class="btn btn-ghost" data-close>取消</button></header>'
    +'<p>'+(requestedMode==='children'?'請選擇要參加這場賽事的孩子；每位孩子各占一個名額。':'確認由目前登入會員本人參加這場賽事。')+'</p>'
+   +'<p><b>'+esc(event.name||code)+'</b>｜報名費：'+(event.fee!=null?esc(String(event.fee))+' 元':'免費')+'</p>'
    +'<form><fieldset><legend>參賽者</legend>'+participantFields+'</fieldset>'
    +'<p class="hint">'+(requestedMode==='children'?(availableChildren.length?'已報名的孩子不會重複出現在可選清單。':'可先建立孩子資料後再回到本場報名。'):'本人與兒童報名分開處理；之後仍可再使用「兒童報名」新增孩子。')+'</p>'
-   +'<p data-family="allocation" role="status"></p>'
-   +'<button class="btn btn-primary" type="submit" '+(requestedMode==='children'&&!availableChildren.length?'disabled':'')+'>預覽名額並確認</button></form>';
+   +'<p data-family="allocation" role="status" aria-live="polite"></p>'
+   +'<p class="hint">名額以送出時為準；若正取已滿，可能轉為備取。</p>'
+   +'<button class="btn btn-primary" type="submit" disabled>確認報名</button></form>';
   let done=false;
   const finish=(error,value)=>{if(done)return;done=true;clearInterval(timer);dialog.close();dialog.remove();focus?.focus?.();if(error)reject(Error(error));else resolve(value)};
   const timer=setInterval(()=>{if(document.hidden)return;if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)finish('auth-required')},1000);
   dialog.querySelector('[data-close]').onclick=()=>finish('registration-aborted');
   dialog.oncancel=e=>{e.preventDefault();finish('registration-aborted')};
   dialog.onclose=()=>finish('registration-aborted');
-  dialog.querySelector('form').onsubmit=async e=>{
-   e.preventDefault();
+  const form=dialog.querySelector('form');
+  const submit=form.querySelector('[type="submit"]');
+  const allocation=dialog.querySelector('[data-family="allocation"]');
+  const selectedIds=()=>requestedMode==='self'?[null]:[...form.querySelectorAll('input[name="participant"]:checked')].map(x=>x.value).filter(Boolean);
+  let previewGeneration=0,readySelection=null;
+  // Preview when the dialog opens or selection changes. Only the latest
+  // selection can enable the single confirmation button; preview never joins.
+  const refreshPreview=async()=>{
+   const generation=++previewGeneration;
+   readySelection=null;submit.disabled=true;
    if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch){finish('auth-required');return}
-   const ids=requestedMode==='self'?[null]:[...e.target.querySelectorAll('input[name="participant"]:checked')].map(x=>x.value).filter(Boolean);
-   const allocation=dialog.querySelector('[data-family="allocation"]');
-   if(requestedMode==='children'&&!ids.length){allocation.textContent='請至少選擇一位孩子。';return}
+   const ids=selectedIds();
+   if(requestedMode==='children'&&!ids.length){allocation.textContent=availableChildren.length?'請至少選擇一位孩子。':'尚無可報名的兒童資料。';return}
    if(ids.some(id=>id!==null&&!availableChildren.some(p=>p.id===id))){allocation.textContent='參賽者資料已變更，請重新開啟報名。';return}
    allocation.textContent='正在檢查名額…';
    try{
     const preview=await window.engagementService.familyRegistration({action:'preview',code,childIds:ids,childEligibilityConfirmed:childEligibilityConfirmed===true});
-    if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
+    if(done||generation!==previewGeneration)return;
+    if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch){finish('auth-required');return}
     if(!preview?.ok)throw Error('preview-failed');
     allocation.textContent=(preview.rows||[]).map(x=>String(x.participantName||'參賽者')+'：'+(x.status==='confirmed'?'正取':'備取')).join('、');
-    if(!confirm('名額配置：'+allocation.textContent+'。確定送出報名？'))return;
-    finish(null,{childIds:ids,allocation:preview.allocation||[]});
+    readySelection={childIds:ids,allocation:preview.allocation||[]};
+    submit.disabled=false;
    }catch(err){
+    if(done||generation!==previewGeneration)return;
     const raw=String(err?.details?.message||err?.message||err?.code||'unknown').replace(/^functions\//,'');
     const known={'auth-required':'請重新登入後再試。','not-found':'找不到這場賽事。','not-enabled':'此賽事尚未開放線上報名。','not-open-yet':'報名尚未開放。','closed':'報名已截止。','full':'正取與備取皆已額滿。','profile-incomplete':'請先完成會員資料。','already-registered':'這位參賽者已完成報名。','registration-state-conflict':'報名人數尚未同步，請聯絡主辦重新發布賽事。','tournament-started':'賽事已開始，報名系統已鎖定。','test-event-required':'封測身分限制尚未更新，請重新整理後再試。'};
     allocation.textContent=known[raw]||Object.entries(known).find(([key])=>raw.includes(key))?.[1]||('名額檢查失敗（'+raw+'）');
+    const retry=document.createElement('button');
+    retry.type='button';retry.className='btn btn-ghost';retry.textContent='重新檢查名額';retry.onclick=refreshPreview;
+    allocation.appendChild(retry);
     console.error('[BXH family registration preview failed]',err);
    }
   };
+  form.onchange=refreshPreview;
+  form.onsubmit=e=>{
+   e.preventDefault();
+   if(done||!readySelection)return;
+   if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch){finish('auth-required');return}
+   if(JSON.stringify(selectedIds())!==JSON.stringify(readySelection.childIds)){refreshPreview();return}
+   submit.disabled=true;
+   finish(null,readySelection);
+  };
   document.body.appendChild(dialog);
   dialog.showModal();
+  refreshPreview();
  });
 }
 

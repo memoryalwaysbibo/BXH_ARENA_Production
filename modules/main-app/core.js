@@ -14577,6 +14577,12 @@ function renderTournamentDetailScreen(){
 
   return authShellOpen() + `
     <div class="tournament-detail-brand">${authBrandHeader()}</div>
+    <div class="panel tournament-detail-panel tournament-action-panel tournament-info-panel">
+      <div class="panel-title">報名</div>
+      <p class="hint">${esc(t.name||code)}</p>
+      ${actionHtml}
+      ${publicTournamentRegistrationLocked(t)?"":`<div class="tournament-detail-bottom-actions is-single"><button class="btn btn-ghost" data-action="back-to-find-events">← 返回賽事列表</button></div>`}
+    </div>
     <div class="panel tournament-detail-panel tournament-summary-panel tournament-info-panel">
       <div class="panel-title">${esc(t.name||code)}</div>
       <div class="grid tournament-detail-grid tournament-summary-grid tournament-info-grid">
@@ -14623,11 +14629,6 @@ function renderTournamentDetailScreen(){
       </div>
       <p class="hint" style="margin-top:8px;">以上資料已由您的 BXH 會員帳號自動帶入，不需要重新填寫。</p>
     </div>` : ""}
-    <div class="panel tournament-detail-panel tournament-action-panel tournament-info-panel">
-      <div class="panel-title">報名</div>
-      ${actionHtml}
-      ${publicTournamentRegistrationLocked(t)?"":`<div class="tournament-detail-bottom-actions is-single"><button class="btn btn-ghost" data-action="back-to-find-events">← 返回賽事列表</button></div>`}
-    </div>
     ${renderModal()}
   </div>`;
 }
