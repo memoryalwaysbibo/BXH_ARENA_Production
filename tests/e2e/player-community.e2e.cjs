@@ -36,6 +36,13 @@ test('player can create account and open a community room on isolated emulators'
   await page.locator('[data-action="player-goto-apply"]').click();
 
   await expect(page.getByText('申請玩家帳號', { exact: true })).toBeVisible();
+  // Complete cold cloud initialization before entering data; its render can
+  // replace the signup form. Preserve all signup and emulator assertions.
+  await page.waitForFunction(
+    () => window.cloudAuth && typeof window.cloudAuth.isReady === 'function' && window.cloudAuth.isReady(),
+    null,
+    { timeout: 90000 }
+  );
   await page.locator('#apply-realname').fill('BOT 測試玩家');
   await page.locator('#apply-email').fill(email);
   await page.locator('#apply-password').fill(secret);
@@ -44,14 +51,7 @@ test('player can create account and open a community room on isolated emulators'
   await page.locator('#apply-phone').fill('0900000000');
   await page.locator('#apply-agree').check();
 
-  // Cold CI starts must wait for the Firebase SDK and emulator connections.
-  // A real user naturally spends time filling the form; the bot can otherwise
-  // reach submit before cloudAuth is ready and correctly receive "尚未連線".
-  await page.waitForFunction(
-    () => window.cloudAuth && typeof window.cloudAuth.isReady === 'function' && window.cloudAuth.isReady(),
-    null,
-    { timeout: 90000 }
-  );
+
   await page.locator('[data-action="player-apply-submit"]').click();
 
   await expect(page.locator('.player-shell')).toBeVisible({ timeout: 30000 });

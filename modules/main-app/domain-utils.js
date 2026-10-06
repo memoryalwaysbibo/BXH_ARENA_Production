@@ -35,6 +35,69 @@ function publicTournamentRegistrationLocked(t){
   return phase==="live" || phase==="settling" || phase==="done" || phase==="cancelled";
 }
 
+// Only explicitly opted-in COMMUNITY rooms use the unscheduled/unlimited contract.
+// Legacy zero/null capacity and official events keep their existing semantics.
+function communityRegistrationSource(t){ return (t&&t.raw)||t||{}; }
+function communityRegistrationMeta(t){ const source=communityRegistrationSource(t); return source.meta||source.parsedData?.meta||{}; }
+function isCommunityQuickRegistration(t){
+  const source=communityRegistrationSource(t),m=communityRegistrationMeta(source);
+  return (source.eventAuthority||source.authority||m.eventAuthority)==="community"
+    && (source.battleMode||m.battleMode)!=="team"
+    && (Object.prototype.hasOwnProperty.call(source,"communityQuickRegistration")?source.communityQuickRegistration===true:m.communityQuickRegistration===true);
+}
+function communityRegistrationCapacity(t){
+  const source=communityRegistrationSource(t),m=communityRegistrationMeta(source);
+  return Object.prototype.hasOwnProperty.call(source,"capacity")?source.capacity
+    :Object.prototype.hasOwnProperty.call(source,"registrationCapacity")?source.registrationCapacity:m.registrationCapacity;
+}
+function isUnlimitedCommunityRegistration(t){
+  return isCommunityQuickRegistration(t)&&communityRegistrationCapacity(t)===null;
+}
+function communityLocalParticipantCount(st){
+  const players=(Array.isArray(st?.players)?st.players:[]).filter(p=>p&&p.source!=="online"&&!p.registrationId);
+  const parent=new Map();
+  const find=key=>{if(!parent.has(key))parent.set(key,key);if(parent.get(key)!==key)parent.set(key,find(parent.get(key)));return parent.get(key);};
+  const entities=players.map((p,index)=>{
+    if(p.familyPlayerId)return ["family:"+p.familyPlayerId];
+    const aliases=[...new Set([p.accountUid,p.playerUid,p.uid,p.registrationUid].filter(Boolean).map(uid=>"account:"+uid))];
+    if(p.id)aliases.push("player:"+p.id);
+    return aliases.length?aliases:["unlinked:"+index];
+  });
+  for(const aliases of entities){const root=find(aliases[0]);for(const alias of aliases.slice(1))parent.set(find(alias),root);}
+  return new Set(entities.map(aliases=>find(aliases[0]))).size;
+}
+function communityRegistrationParticipantCount(t){
+  const source=communityRegistrationSource(t);
+  const confirmed=Math.max(0,Number(source.confirmedCount)||0);
+  if(!isCommunityQuickRegistration(source))return confirmed;
+  if(Number.isSafeInteger(source.communityParticipantCount)&&source.communityParticipantCount>=0)return source.communityParticipantCount;
+  const players=source.players||source.parsedData?.players||[];
+  // Legacy public mirrors have only public player IDs. Their overlap with online
+  // registrations is unknown, so do not add two potentially overlapping counts.
+  const ids=new Set(players.filter(Boolean).map((p,i)=>String(p.id||("row:"+i))));
+  return Math.max(confirmed,ids.size);
+}
+function parseCommunityRegistrationCapacity(raw){
+  const value=String(raw==null?"":raw).trim();
+  if(!value)return null;
+  const capacity=Number(value);
+  if(!Number.isSafeInteger(capacity)||capacity<1)throw new Error("invalid-registration-capacity");
+  return capacity;
+}
+function communityRegistrationLocked(t){
+  const source=communityRegistrationSource(t);
+  return publicTournamentRegistrationLocked(source)||!!source.startedAt||!!source.parsedData?.startedAt;
+}
+function canCancelCommunityRegistration(t,now=Date.now()){
+  if(!isCommunityQuickRegistration(t)||communityRegistrationLocked(t))return false;
+  const source=communityRegistrationSource(t),m=communityRegistrationMeta(source);
+  const status=source.registrationStatus??m.registrationStatus;
+  if(status==="cancelled"||source.eventCancelled||m.eventCancelled)return false;
+  const normalize=window.BXHRegistrationUtils.normalizeDateTime;
+  const deadline=normalize(source.cancellationDeadline??m.cancellationDeadline);
+  return deadline==null||now<deadline;
+}
+
 function hunterRecordEventKey(record){
   return String((record&&record.eventCode)||(record&&record.tournamentId)||(((record&&record.eventName)||"event")+"|"+((record&&record.eventDate)||"")));
 }
@@ -121,6 +184,6 @@ function lobbyNewestFirst(a,b){
   if(aKnown && bKnown && a.startMs!==b.startMs) return b.startMs-a.startMs;
   return String(a&&a.code||"").localeCompare(String(b&&b.code||""));
 }
-Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,publicationValidationErrors,lobbyNewestFirst});
+Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,publicationValidationErrors,lobbyNewestFirst,isCommunityQuickRegistration,isUnlimitedCommunityRegistration,parseCommunityRegistrationCapacity,communityRegistrationCapacity,communityRegistrationParticipantCount,communityLocalParticipantCount,communityRegistrationLocked,canCancelCommunityRegistration});
 
 })();

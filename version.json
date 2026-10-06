@@ -1,6 +1,6 @@
 {
-  "build": "20261006.5",
-  "version": "v14.3.30",
-  "updatedAt": "2026-10-06T12:21:13+08:00",
-  "releaseTrigger": "management-room-staged-loading"
+  "build": "20261006.6",
+  "version": "v14.3.31",
+  "updatedAt": "2026-10-06T14:10:01+08:00",
+  "releaseTrigger": "community-quick-registration"
 }
