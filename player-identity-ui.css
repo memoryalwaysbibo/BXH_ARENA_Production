@@ -20,9 +20,12 @@
 header.topbar .header-account-controls > .account-equipped-title{flex:0 1 190px;width:min(190px,35vw);min-width:0;max-width:100%;margin:0;justify-content:center}
 header.topbar .header-account-controls > .account-equipped-title .title-chip.title-art-chip{width:100%;max-width:100%}
 @media(max-width:899px){
-  header.topbar .header-account-controls:has(> .account-equipped-title){display:grid;grid-template-columns:minmax(0,1fr) 44px auto;grid-template-areas:"score score score" "title mail account";align-items:center;gap:7px;padding-bottom:0}
+  header.topbar .header-account-controls:has(> .account-equipped-title){display:grid!important;grid-template-columns:minmax(0,1fr) 44px minmax(78px,max-content);grid-template-areas:"score score score" "title mail account";align-items:center;gap:7px;padding-bottom:0}
   header.topbar .header-account-controls > .activity-points-account-row{grid-area:score;justify-self:start}
   header.topbar .header-account-controls > .account-equipped-title{grid-area:title;width:100%;justify-self:stretch}
   header.topbar .header-account-controls > .mailbox-trigger{grid-area:mail;justify-self:center}
   header.topbar .header-account-controls > .account-menu-wrap{grid-area:account;justify-self:end}
+  header.topbar .header-account-controls:has(> .account-equipped-title) .account-badge{min-width:78px;max-width:100%;gap:5px;padding:7px 8px}
+  header.topbar .header-account-controls:has(> .account-equipped-title) .account-name{display:inline!important;min-width:2em;max-width:25vw;flex:0 1 auto;color:var(--ivory);font-weight:800}
+  header.topbar .header-account-controls:has(> .account-equipped-title) .account-role-label{display:none!important}
 }
