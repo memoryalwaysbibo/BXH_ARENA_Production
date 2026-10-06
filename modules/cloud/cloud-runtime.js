@@ -1809,28 +1809,32 @@
           testExpiresAt: d.testExpiresAt||d.expiresAt||null
         });
       });
-      // v13.14.2：補齊賽事建立者名稱。新版賽事會直接保存 createdByName；
-      // 舊版賽事若只有 createdBy UID，admin / super_admin 會嘗試從 users/{uid}
-      // 補查顯示名稱。staff 若無 users 讀取權限則安全退回顯示 UID，不影響清單載入。
-      const creatorIds = [...new Set(items.map(x=>x.createdBy).filter(Boolean))];
-      const creatorNameMap = {};
-      await Promise.all(creatorIds.map(async uid=>{
-        try{
-          const userSnap = await fx.getDoc(fx.doc(dbHandle, "users", uid));
-          if(userSnap.exists()){
-            const u = userSnap.data() || {};
-            creatorNameMap[uid] = u.displayName || u.realName || u.nickname || "";
-          }
-        }catch(e){ /* staff 可能無 users 讀取權限；保留 UID 即可 */ }
-      }));
-      items.forEach(x=>{
-        if(!x.createdByName && x.createdBy && creatorNameMap[x.createdBy]) x.createdByName = creatorNameMap[x.createdBy];
-      });
       return items.sort((a,b)=>{
         const ad = String(a.eventDate||""), bd = String(b.eventDate||"");
         if(ad!==bd) return ad<bd ? 1 : -1;
         return Number(b.updatedAt||0)-Number(a.updatedAt||0);
       });
+    },
+
+    // Names are optional display enrichment, never a prerequisite for rooms.
+    // Read only missing labels, with a short bound for slow/unavailable users.
+    async enrichAdminTournamentCreatorNames(items){
+      const rows=Array.isArray(items)?items:[];
+      if(!cloudEnabled) return rows;
+      const creatorIds=[...new Set(rows.filter(item=>!String(item.createdByName||"").trim()).map(item=>item.createdBy).filter(Boolean))];
+      if(!creatorIds.length) return rows;
+      const names={};
+      await Promise.all(creatorIds.map(async uid=>{
+        try{
+          const snap=await withTimeout(fx.getDoc(fx.doc(dbHandle,"users",uid)),3000,null);
+          if(snap&&snap.exists()){
+            const user=snap.data()||{};
+            names[uid]=user.displayName||user.realName||user.nickname||"";
+          }
+        }catch(e){ /* Existing users permission rules remain authoritative. */ }
+      }));
+      return rows.map(item=>!String(item.createdByName||"").trim()&&names[item.createdBy]
+        ? {...item,createdByName:names[item.createdBy]} : item);
     },
 
     // v13.13.4：玩家「已報名」改為「先列出公開賽事，再逐場 get 自己的 registration」。

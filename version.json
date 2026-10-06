@@ -1,6 +1,6 @@
 {
-  "build": "20261006.4",
-  "version": "v14.3.29",
-  "updatedAt": "2026-10-06T10:15:00+08:00",
-  "releaseTrigger": "per-room-automatic-waitlist-fill"
+  "build": "20261006.5",
+  "version": "v14.3.30",
+  "updatedAt": "2026-10-06T12:21:13+08:00",
+  "releaseTrigger": "management-room-staged-loading"
 }

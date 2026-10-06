@@ -146,6 +146,8 @@ jobs:
           node --check ai-poster-refinements.js
           node tests/ai-poster-refinements.test.cjs
 
+      - name: Verify management list loading and stale responses
+        run: node --test tests/management-loading.test.cjs
       - name: Verify roster mutation and snapshot races
         run: node --test tests/roster-sync-race.test.cjs
       - name: Verify family roster check-in preservation
