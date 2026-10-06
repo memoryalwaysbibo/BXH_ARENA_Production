@@ -1112,7 +1112,9 @@
       if(!mine?.ok)throw Error('unavailable');
       const registrationId=await chooseFamilyRegistrationToCancel(mine.rows||[]);
       if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
-      const result=await this.cancelRoster(code,registrationId,'','player');
+      const result=selectionDoc.exists()&&selectionDoc.data().battleMode==='team'
+        ?await window.engagementService.familyRegistration({action:'cancel',code,registrationId})
+        :await this.cancelRoster(code,registrationId,'','player');
       if(!result?.ok)throw Error('cancel-failed');
       return result;
     },
