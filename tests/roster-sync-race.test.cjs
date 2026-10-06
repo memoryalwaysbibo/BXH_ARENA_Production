@@ -15,7 +15,7 @@ function rosterHarness(status){
  vm.runInContext('api={'+block(cloud,'async mutateRegistrationRoster(','    async promoteEarliestWaitlist(')+'}',sandbox);
  return {api:sandbox.api,docs};
 }
-for(const [action,status,confirmed,waiting] of [['promote','waitlist',1,0],['demote','confirmed',0,1],['cancel','waitlist',0,0]]){
+for(const [action,status,confirmed,waiting] of [['promote','waitlist',1,0],['demote','confirmed',0,1]]){
  test(action+' commits a newer roster revision to both mirrors',async()=>{
   const {api,docs}=rosterHarness(status),result=await api.mutateRegistrationRoster('BXH-X','r',action);
   assert.equal(result.verified,true);
@@ -48,4 +48,38 @@ test('queued registration snapshot cannot reconcile after cache advances',async(
  vm.runInContext(block(core,'async function syncLatestOnlineRosterBeforeLock(','/* ==== render helpers ===='),sandbox);
  const result=await sandbox.syncLatestOnlineRosterBeforeLock([{status:'confirmed'}]);
  assert.equal(result.changed,false);
+});
+
+test('cancel mutation delegates to the unified server transaction',async()=>{
+ const {api}=rosterHarness('confirmed');let called=0;
+ api.cancelRoster=async(code,registrationId,localId,intent)=>{called++;assert.equal(code,'BXH-X');assert.equal(registrationId,'r');assert.equal(localId,'');assert.equal(intent,'admin');return {ok:true,autoPromoted:true};};
+ const result=await api.mutateRegistrationRoster('BXH-X','r','cancel');
+ assert.equal(called,1);assert.equal(result.autoPromoted,true);
+});
+test('atomic cancel and fill patches both registration statuses without clearing others',async()=>{
+ const sandbox={state:{id:'room',cloudCode:'BXH-X'},adminRegistrationsCache:[{registrationId:'c',status:'confirmed'},{registrationId:'w',status:'waitlist'},{registrationId:'other',status:'waitlist'}],peopleRegistrationIdOf:r=>r.registrationId,saveRecord:async()=>true,resetRegistrationFormDraft(){},render(){},showToast(){},Date};
+ vm.createContext(sandbox);
+ vm.runInContext(block(core,'async function peopleApplyCloudRosterResult(','async function peoplePromoteOnline('),sandbox);
+ await sandbox.peopleApplyCloudRosterResult({state:{id:'room'},registrationChanges:[{registrationId:'c',status:'cancelled'},{registrationId:'w',status:'confirmed'}]},'done');
+ assert.deepEqual(Array.from(sandbox.adminRegistrationsCache,row=>row.status),['cancelled','confirmed','waitlist']);
+});
+test('per-room switch sends a boolean and waits for committed state',async()=>{
+ let sent,applied;
+ const sandbox={state:{cloudCode:'BXH-X',meta:{}},peopleRosterBusy:false,render(){},showToast(){},
+ window:{cloudSync:{configureAutoFill:async(code,enabled)=>{sent={code,enabled};return {ok:true,enabled,state:{meta:{registrationAutoFillEnabled:enabled}}};}}},
+ peopleApplyCloudRosterResult:async(result)=>{applied=result;sandbox.state=result.state;sandbox.peopleRosterBusy=false;},peopleMutationErrorMessage:e=>e.message};
+ vm.createContext(sandbox);
+ vm.runInContext(block(core,'async function peopleToggleAutoFill(','async function peoplePromoteLocal('),sandbox);
+ await sandbox.peopleToggleAutoFill();assert.equal(sent.enabled,true);assert.equal(applied.enabled,true);
+ sandbox.state.cloudCode='BXH-X';await sandbox.peopleToggleAutoFill();assert.equal(sent.enabled,false);
+});
+test('both online and onsite cancellation use one server call without client promotion',async()=>{
+ const calls=[];
+ const sandbox={state:{cloudCode:'BXH-X',meta:{}},peopleRosterBusy:false,render(){},showToast(){},peopleCancellationMessage:()=>'',peopleMutationErrorMessage:e=>e.message,
+ window:{cloudSync:{cancelRoster:async(...args)=>{calls.push(args);return {ok:true,autoPromoted:true};},promoteEarliestWaitlist:()=>{throw Error('must not double-promote');}}},
+ peopleApplyCloudRosterResult:async()=>{sandbox.peopleRosterBusy=false;}};
+ vm.createContext(sandbox);
+ vm.runInContext(block(core,'async function peopleCancelOnline(','async function peopleToggleAutoFill('),sandbox);
+ await sandbox.peopleCancelOnline('r','Name');await sandbox.peopleCancelLocal('onsite','Local');
+ assert.deepEqual(Array.from(calls[0]),['BXH-X','r','','admin']);assert.deepEqual(Array.from(calls[1]),['BXH-X','','onsite','admin']);
 });
