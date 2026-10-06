@@ -30,6 +30,13 @@ test('four-player community event reaches first confirmed referee result', async
 
   await page.locator('[data-action="select-role-player"]').click();
   await page.locator('[data-action="player-goto-apply"]').click();
+  // Auth initialization may render the form again. Wait before entering data
+  // so startup rendering cannot erase a partly completed signup form.
+  await page.waitForFunction(
+    () => window.cloudAuth && typeof window.cloudAuth.isReady === 'function' && window.cloudAuth.isReady(),
+    null,
+    { timeout: 90000 }
+  );
   await page.locator('#apply-realname').fill('BOT 深度測試');
   await page.locator('#apply-email').fill(email);
   await page.locator('#apply-password').fill(secret);
@@ -38,11 +45,8 @@ test('four-player community event reaches first confirmed referee result', async
   await page.locator('#apply-phone').fill('0900000000');
   await page.locator('#apply-agree').check();
 
-  await page.waitForFunction(
-    () => window.cloudAuth && typeof window.cloudAuth.isReady === 'function' && window.cloudAuth.isReady(),
-    null,
-    { timeout: 90000 }
-  );
+  await expect(page.locator('#apply-realname')).toHaveValue('BOT 深度測試');
+  await expect(page.locator('#apply-email')).toHaveValue(email);
   await page.locator('[data-action="player-apply-submit"]').click();
 
   // Account creation and Auth observer routing complete independently. Wait

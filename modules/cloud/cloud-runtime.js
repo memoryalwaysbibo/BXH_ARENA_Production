@@ -1112,9 +1112,18 @@
       if(!mine?.ok)throw Error('unavailable');
       const registrationId=await chooseFamilyRegistrationToCancel(mine.rows||[]);
       if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
-      const result=await window.engagementService.familyRegistration({action:'cancel',code,registrationId,operationId:crypto.randomUUID()});
+      const result=selectionDoc.exists()&&selectionDoc.data().battleMode==='team'
+        ?await window.engagementService.familyRegistration({action:'cancel',code,registrationId})
+        :await this.cancelRoster(code,registrationId,'','player');
       if(!result?.ok)throw Error('cancel-failed');
       return result;
+    },
+
+    async cancelRoster(code,registrationId="",localId="",intent="admin"){
+      return callEngagementFunction("registrationRosterService",{action:"cancel",code,registrationId,localId,intent,operationId:crypto.randomUUID()},60000);
+    },
+    async configureAutoFill(code,enabled){
+      return callEngagementFunction("registrationRosterService",{action:"configure",code,enabled,intent:"admin",operationId:crypto.randomUUID()},60000);
     },
 
     async diagnoseRosterPermission(code,registrationId=""){
@@ -1221,6 +1230,7 @@
       const staffUid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
       if(!staffUid)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
       if(!["promote","demote","cancel"].includes(action))throw Object.assign(new Error("invalid-action"),{code:"invalid-action"});
+      if(action==="cancel")return this.cancelRoster(code,registrationId,"","admin");
       const eventCode=String(code||"").toUpperCase(),regId=String(registrationId||"");
       if(!eventCode||!regId)throw Object.assign(new Error("not-found"),{code:"not-found"});
       const expandBy=Number(options.expandBy||0);
@@ -1405,6 +1415,11 @@
     },
 
     async staffCancelRegistration(code, targetUid){
+      const current=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
+      if(!current.exists())throw {code:"not-found"};
+      const room=current.data()||{};
+      if(room.battleMode!=="team"&&!room.registrationSelection)
+        return this.cancelRoster(code,targetUid,"","admin");
       const staffUid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
       if(!staffUid) throw { code: "auth-required" };
       const tourRef = fx.doc(dbHandle, "tournaments", code);

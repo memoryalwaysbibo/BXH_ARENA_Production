@@ -366,7 +366,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.28";
+const APP_VERSION = "v14.3.29";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
@@ -11388,9 +11388,8 @@ function peopleRegistrationIdOf(row){
 function peopleOnlineWaitlistRows(){
   const rows=Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[];
   return rows.filter(r=>r&&r.status==="waitlist").sort((a,b)=>{
-    const ar=Number(a.waitRank||0),br=Number(b.waitRank||0);
-    if(ar&&br&&ar!==br)return ar-br;
-    return (normalizeDateTime(a.createdAt)||0)-(normalizeDateTime(b.createdAt)||0);
+    return (normalizeDateTime(a.createdAt)||0)-(normalizeDateTime(b.createdAt)||0)||
+      peopleRegistrationIdOf(a).localeCompare(peopleRegistrationIdOf(b));
   });
 }
 function peopleWaitlistShadow(registrationId){
@@ -11398,6 +11397,7 @@ function peopleWaitlistShadow(registrationId){
 }
 function peopleMutationErrorMessage(e){
   const code=String((e&&e.code)||(e&&e.message)||"");
+  if(code.includes("team-roster-managed")) return "團體賽請使用整隊報名管理；此開關適用一般個人賽。";
   if(code.includes("selection-managed")) return "本場使用抽籤名額模式，請先在「參賽名額抽籤」完成名額調整。";
   if(code.includes("bracket-locked")) return "已產生對戰表或賽事已開始；請先重設對戰表後再調整正備取。";
   if(code.includes("online-registration-required")) return "這筆是線上報名資料，請先同步最新報名名單再操作。";
@@ -11434,10 +11434,12 @@ async function peopleApplyCloudRosterResult(result,successMessage){
   myRegistrationsCache=null;
   // Keep the complete listener cache and patch the committed participant.
   // Clearing it while the listener stays attached hides all other online rows.
-  if(result?.registrationId && Array.isArray(adminRegistrationsCache)){
+  if(Array.isArray(adminRegistrationsCache)){
+    const changes=Array.isArray(result?.registrationChanges)?result.registrationChanges:
+      result?.registrationId?[{registrationId:result.registrationId,status:result.status}]:[];
+    const byId=new Map(changes.map(row=>[String(row.registrationId),row.status]));
     adminRegistrationsCache=adminRegistrationsCache.map(row=>
-      peopleRegistrationIdOf(row)===String(result.registrationId)
-        ? Object.assign({},row,{status:result.status}) : row);
+      byId.has(peopleRegistrationIdOf(row))?Object.assign({},row,{status:byId.get(peopleRegistrationIdOf(row))}):row);
   }
   cloudStatus="connected";
   cloudLastSyncAt=Date.now();
@@ -11480,34 +11482,34 @@ async function peopleDemoteOnline(player){
     await peopleApplyCloudRosterResult(result,"「"+player.name+"」已移至備取區");
   }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
 }
+function peopleCancellationMessage(result,name){
+  return "已取消「"+name+"」"+(result?.autoPromoted?"；「"+result.promotedName+"」已自動遞補正取":"");
+}
 async function peopleCancelOnline(registrationId,name){
   if(peopleRosterBusy)return;
-  const beforeRow=(Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[]).find(r=>peopleRegistrationIdOf(r)===String(registrationId))||null;
-  const wasConfirmed=beforeRow&&beforeRow.status==="confirmed";
   peopleRosterBusy=true;render();
   try{
-    if(!window.cloudSync||!window.cloudSync.mutateRegistrationRoster)throw Object.assign(new Error("network"),{code:"network"});
-    const result=await window.cloudSync.mutateRegistrationRoster(state.cloudCode,registrationId,"cancel",{});
-    if(wasConfirmed&&Number(result.waitlistCount||0)>0&&window.cloudSync.promoteEarliestWaitlist){
-      let promoted=null,lastError=null;
-      for(let attempt=0;attempt<2&&!promoted;attempt++){
-        try{promoted=await window.cloudSync.promoteEarliestWaitlist(state.cloudCode);}catch(err){lastError=err;}
-      }
-      if(promoted&&promoted.ok){
-        if(window.cloudSync.listRegistrationsForAdmin){
-          const rows=await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
-          adminRegistrationsCache=rows;
-          await syncLatestOnlineRosterBeforeLock(rows);
-        }
-        peopleRosterBusy=false;render();
-        showToast("已取消「"+name+"」；備取第 1 位已自動遞補正取");
-        return;
-      }
-      console.warn("[auto waitlist promotion after admin cancel] failed",lastError);
-      await peopleApplyCloudRosterResult(result,"已取消「"+name+"」，但備取自動遞補失敗，請手動確認");
-      return;
-    }
-    await peopleApplyCloudRosterResult(result,"已取消「"+name+"」的參賽名額");
+    const result=state.meta.battleMode==="team"
+      ? await window.cloudSync.staffCancelRegistration(state.cloudCode,registrationId)
+      : await window.cloudSync.cancelRoster(state.cloudCode,registrationId,"","admin");
+    await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
+  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+}
+async function peopleCancelLocal(localId,name){
+  if(peopleRosterBusy)return;
+  peopleRosterBusy=true;render();
+  try{
+    const result=await window.cloudSync.cancelRoster(state.cloudCode,"",localId,"admin");
+    await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
+  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+}
+async function peopleToggleAutoFill(){
+  if(peopleRosterBusy)return;
+  peopleRosterBusy=true;render();
+  try{
+    const enabled=state.meta.registrationAutoFillEnabled!==true;
+    const result=await window.cloudSync.configureAutoFill(state.cloudCode,enabled);
+    await peopleApplyCloudRosterResult(result,"自動補位已"+(result.enabled?"開啟":"關閉"));
   }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 async function peoplePromoteLocal(waitId,name,expandCapacity){
@@ -11668,6 +11670,10 @@ function renderPeopleManagement(){
   const waitlistPanel=`
     <div class="panel">
       <div class="people-capacity-banner"><div><div class="panel-title">備取區（${waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
+      <div class="btn-row" style="margin:12px 0;">
+        <button class="btn ${state.meta.registrationAutoFillEnabled===true?'btn-primary':'btn-ghost'}" role="switch" aria-checked="${state.meta.registrationAutoFillEnabled===true}" data-action="people-toggle-auto-fill" ${!state.cloudCode||locked||selectionManaged||state.meta.battleMode==='team'||peopleRosterBusy?'disabled':''}>自動補位：${state.meta.registrationAutoFillEnabled===true?'開啟':'關閉'}</button>
+        <span class="hint">${selectionManaged||state.meta.battleMode==='team'?'此開關適用一般個人賽；本場依專用名額規則處理。':'開啟後取消正取時，依備取順序補一位；不會增加名額。'}</span>
+      </div>
       ${selectionManaged?'<div class="banner warn"><span>本場為抽籤名額模式，請由「參賽名額抽籤」異動正備取。</span></div>':''}
       ${adminRegistrationsLoading?'<div class="empty-state">正在同步線上備取名單……</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th><th>升正取</th><th>更多</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
     </div>`;
@@ -18558,17 +18564,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(currentTournamentRegistrationLocked()){ showToast("賽事已開始，報名管理已鎖定",true); return; }
     const targetUid = target.getAttribute("data-uid");
     const code = state.cloudCode;
-    openModal({ type:"generic", title:state.meta.battleMode==="team"?"取消整隊報名？":"手動取消報名？", message:state.meta.battleMode==="team"?"確定要取消這支隊伍嗎？會釋出 1 個隊伍名額，隊內所有玩家一起退出；不會自動遞補其他隊伍。":"確定要取消這位選手的報名嗎？名額會釋出，紀錄會保留，不會自動遞補其他人。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
+    openModal({ type:"generic", title:state.meta.battleMode==="team"?"取消整隊報名？":"手動取消報名？", message:state.meta.battleMode==="team"?"確定要取消這支隊伍嗎？會釋出 1 個隊伍名額，隊內所有玩家一起退出；不會自動遞補其他隊伍。":"確定要取消這位選手的報名嗎？紀錄會保留；若本場開啟自動補位，會依備取順序遞補一位。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
       if(adminRegistrationsBusy) return;
       adminRegistrationsBusy = true; render();
       (async ()=>{
         try{
           if(!window.cloudSync || !window.cloudSync.staffCancelRegistration) throw { code:"network" };
-          await window.cloudSync.staffCancelRegistration(code, targetUid);
-          showToast("已取消該報名");
+          const result=await window.cloudSync.staffCancelRegistration(code, targetUid);
+          await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,"該報名"));
           publicTournamentsCache = null;
           adminRegistrationsBusy = false;
-          resetAdminRegistrationsCache();
           render();
         }catch(e){
           adminRegistrationsBusy = false;
@@ -19554,14 +19559,14 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const detailLock=(tournamentDetailCode===code && tournamentDetailData && publicTournamentRegistrationLocked(tournamentDetailData));
     const summaryLock=myRegistrationsTournamentInfo[code] && publicTournamentRegistrationLocked(myRegistrationsTournamentInfo[code]);
     if(detailLock || summaryLock){ showToast("賽事已開始，取消報名功能已鎖定",true); return; }
-    openModal({ type:"generic", title:"取消報名？", message:"確定要取消這場賽事的報名嗎？取消後名額會釋出，紀錄會保留但不會自動遞補其他人。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
+    openModal({ type:"generic", title:"取消報名？", message:"確定要取消這場賽事的報名嗎？取消後紀錄會保留；若本場開啟自動補位，會依備取順序遞補一位。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
       if(tournamentDetailBusy) return;
       tournamentDetailBusy = true; render();
       (async ()=>{
         try{
           if(!window.cloudSync || !window.cloudSync.cancelRegistrationAsPlayer) throw { code:"network" };
-          await window.cloudSync.cancelRegistrationAsPlayer(code);
-          showToast("已取消報名");
+          const result=await window.cloudSync.cancelRegistrationAsPlayer(code);
+          showToast(result?.autoPromoted?"已取消報名；備取已自動遞補":"已取消報名");
           publicTournamentsCache = null;
           myRegistrationsCache = null;
           tournamentDetailBusy = false;
@@ -21177,6 +21182,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     });
     return;
   }
+  if(action==="people-toggle-auto-fill"){ peopleToggleAutoFill(); return; }
   if(action==="delete-player"){
     if(state.startedAt){ showToast("賽事開始後無法刪除選手", true); return; }
     const pid = target.getAttribute("data-id");
@@ -21192,6 +21198,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         peopleCancelOnline(p.registrationId,p.name);
         return;
       }
+      if(state.cloudCode&&state.meta.battleMode!=="team"){peopleCancelLocal(pid,p.name);return;}
       state.players = state.players.filter(x=>x.id!==pid);
       saveState(); render();
       showToast("已刪除選手「"+p.name+"」");
