@@ -146,6 +146,8 @@ jobs:
           node --check ai-poster-refinements.js
           node tests/ai-poster-refinements.test.cjs
 
+      - name: Verify roster mutation and snapshot races
+        run: node --test tests/roster-sync-race.test.cjs
       - name: Verify family roster check-in preservation
         run: |
           node --check family-ui.js

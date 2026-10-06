@@ -366,7 +366,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.27";
+const APP_VERSION = "v14.3.28";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
@@ -3115,10 +3115,14 @@ function applyRemoteState(remote, authoritative=false){
     if(!remote || !remote.id) return;
     if(remote.id !== state.id) return; // safety: only accept updates for the room we're actually in
     if(remoteAppliedRoomId!==remote.id){remoteAppliedRoomId=remote.id;remoteAppliedAt=0;}
-    if((remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0)) return;
+    if((remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
+    const localRosterRevision=Number(state.registrationRosterRevision||0);
+    const remoteRosterRevision=Number(remote.registrationRosterRevision||0);
+    if(remoteRosterRevision<localRosterRevision) return;
+    const newerRoster=remoteRosterRevision>localRosterRevision;
     const localUpdated = state.updatedAt || 0;
     const remoteUpdated = remote.updatedAt || 0;
-    if(!authoritative && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0) && remoteUpdated <= localUpdated) return; // ignore stale/older data (avoid clobbering newer local edits)
+    if(!authoritative && !newerRoster && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0) && remoteUpdated <= localUpdated) return; // ignore stale/older data (avoid clobbering newer local edits)
     remoteAppliedAt=remoteUpdated;
     const keepCode = state.cloudCode;
     state = Object.assign(defaultState(remote.id), remote);
@@ -8940,6 +8944,8 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
+  if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
+    return {ok:true,changed:false,confirmed:0};
   adminRegistrationsCache=regs;
   const confirmed=regs.filter(r=>r&&r.status==="confirmed");
   const before=JSON.stringify({players:(state.players||[]).map(p=>[
@@ -11418,7 +11424,7 @@ async function peopleReportRosterPermission(registrationId=""){
   openModal({type:"generic",title:"名單異動遭雲端拒絕",message,confirmLabel:"關閉"});
 }
 async function peopleApplyCloudRosterResult(result,successMessage){
-  if(result&&result.state){
+  if(result&&result.state && Number(result.state.registrationRosterRevision||0)>=Number(state.registrationRosterRevision||0)){
     const code=state.cloudCode;
     state=Object.assign({},result.state,{cloudCode:code});
     await saveRecord(state);
@@ -11426,7 +11432,13 @@ async function peopleApplyCloudRosterResult(result,successMessage){
   resetRegistrationFormDraft();
   publicTournamentsCache=null;
   myRegistrationsCache=null;
-  resetAdminRegistrationsCache();
+  // Keep the complete listener cache and patch the committed participant.
+  // Clearing it while the listener stays attached hides all other online rows.
+  if(result?.registrationId && Array.isArray(adminRegistrationsCache)){
+    adminRegistrationsCache=adminRegistrationsCache.map(row=>
+      peopleRegistrationIdOf(row)===String(result.registrationId)
+        ? Object.assign({},row,{status:result.status}) : row);
+  }
   cloudStatus="connected";
   cloudLastSyncAt=Date.now();
   peopleRosterBusy=false;
@@ -11591,7 +11603,12 @@ function renderPeopleManagement(){
   const pending=needsCheckin?confirmed.filter(p=>p&&p.checkedIn!==true):[];
   const onlineWait=peopleOnlineWaitlistRows();
   const onlineIds=new Set(onlineWait.map(peopleRegistrationIdOf).filter(Boolean));
-  const localWait=peopleLocalWaitlist().filter(p=>!p.registrationId||!onlineIds.has(String(p.registrationId)));
+  const localWait=peopleLocalWaitlist().filter(p=>{
+    if(!online) return true;
+    // Once registrations are loaded they own every online participant's status.
+    if(Array.isArray(adminRegistrationsCache) && (p.registrationId||p.source==="online")) return false;
+    return !p.registrationId||!onlineIds.has(String(p.registrationId));
+  });
   const waitCount=onlineWait.length+localWait.length;
   const capacity=Number((selectionManaged&&state.entrySelection&&state.entrySelection.capacity)||state.meta.registrationCapacity||0);
 
@@ -11639,12 +11656,12 @@ function renderPeopleManagement(){
   const waitOnlineRows=onlineWait.map((r,i)=>{
     const regId=peopleRegistrationIdOf(r),shadow=peopleWaitlistShadow(regId);
     const name=r.displayName||r.publicName||r.participantName||r.realName||"未命名選手";
-    const rank=Number(r.waitRank||0)||(i+1);
+    const rank=i+1;
     const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">線上報名</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消備取</button></div></details>`;
     return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(name)}</td><td class="people-col-source"><span class="badge badge-neon">線上報名</span></td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const waitLocalRows=localWait.map((p,i)=>{
-    const rank=Number(p.waitRank||0)||(onlineWait.length+i+1);
+    const rank=onlineWait.length+i+1;
     const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
     return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
@@ -14318,6 +14335,8 @@ async function startAdminRosterWatch(){
           renderPreservingScroll();
           return;
         }
+        // A queued snapshot must not reconcile an older roster over a mutation.
+        if(rows!==adminRegistrationsCache || peopleRosterBusy) return;
         if(!state.startedAt){
           const result=await syncLatestOnlineRosterBeforeLock(rows);
           if(generation!==adminRosterGeneration || state.id!==roomId) return;
