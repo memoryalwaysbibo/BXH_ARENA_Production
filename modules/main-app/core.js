@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.30";
+const APP_VERSION = "v14.3.31";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.31",date:"2026/10/06",timezone:"Asia/Taipei",title:"玩家房間快速報名",updateLevel:"patch",added:["玩家一般房間可勾選立即開放報名，人數上限留空即不限人數"],changed:["報名時間與備取移至進階選填設定；已填人數上限包含參賽中的房主與現場選手","本人與兒童代報名共用快速報名規則，未填取消期限時可於開賽前取消"],fixed:["設定儲存等待雲端確認，失敗不套用報名變更，完成後可再次儲存"],security:[]},
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
   {version:"v14.3.22",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體賽模式分流與即時戰況",updateLevel:"minor",added:["團體賽新增隊伍樹狀總覽與即時戰況切換","公開觀賽訂閱團體生命、目前出場者與判定紀錄"],changed:["玩家模式只顯示觀賽資訊與隊長本隊排陣；裁判模式集中排陣公開與計分操作","團體裁判台不再與玩家對戰表共用同一畫面"],fixed:["修正團體賽缺少樹狀圖","修正其他裝置必須手動刷新才能看到最新生命與判定"],security:["公開即時資料只包含已公開排陣與比賽狀態，不開放寫入"]},
   {version:"v14.3.21",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體戰按鍵式判定",updateLevel:"patch",added:["左右隊伍各自提供轉停、爆裂、擊飛、極限四種直接判定按鈕","團體賽操作失敗時保留後端原因代碼供現場排錯"],changed:["移除勝方與判定下拉選單，改為單次按鍵操作"],fixed:["修正 Callable 錯誤細節在前端封裝時遺失，導致所有異常只顯示泛用訊息"],security:[]},
@@ -2263,6 +2264,10 @@ const VERSION_HISTORY = [
 const CHANGELOG_TEXT = "" +
 "# BXH ARENA CHANGELOG\n\n" +
 "本檔案為 BXH ARENA 的正式版本紀錄，只能追加，不得覆蓋或刪除舊紀錄。最新版本置於最上方。\n\n" +
+"## v14.3.31｜玩家房間快速報名（2026/10/06）\n\n" +
+"- 玩家一般房間可勾選立即開放報名，人數上限留空即不限人數；填寫上限時包含參賽中的房主與現場選手。\n" +
+"- 報名時間與備取為進階選填；本人與兒童代報名共用規則，未填取消期限時可於開賽前取消。\n" +
+"- 設定等待雲端確認後生效，失敗保留原設定，儲存完成後可再次操作。\n\n" +
 "---\n\n" +
 "## v13.13.1（Phase 3：賽事詳細頁與管理端報名管理介面，仍未完成，不建議部署）\n\n" +
 "- **更新等級**：功能（PATCH，延續 v13.13.0 的 Phase 3 開發）\n" +
@@ -3095,6 +3100,9 @@ const BOARD_THEMES = {
   ice:   { label:"冰藍",     accent:"#5fc4ff" }
 };
 let boardReshuffleBusy = false;
+let communitySettingsSaving = false;
+let communitySettingsWriteGate = null;
+let communityCreateSaving = false;
 let watchErrorMessage = "";
 
 function cloudAvailable(){
@@ -3126,6 +3134,9 @@ function applyRemoteState(remote, authoritative=false){
     const newerRoster=remoteRosterRevision>localRosterRevision;
     const localUpdated = state.updatedAt || 0;
     const remoteUpdated = remote.updatedAt || 0;
+    if(!authoritative&&!newerRoster&&remoteUpdated<=localUpdated&&Number(remote.callRevision||0)<=Number(state.callRevision||0)&&Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0)&&isCommunityQuickRegistration(remote)&&Number.isSafeInteger(remote.communityParticipantCount)&&remote.communityParticipantCount>=0&&remote.communityParticipantCount!==state.communityParticipantCount){
+      state.communityParticipantCount=remote.communityParticipantCount;saveRecord(state);renderPreservingScroll();return;
+    }
     if(!authoritative && !newerRoster && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0) && remoteUpdated <= localUpdated) return; // ignore stale/older data (avoid clobbering newer local edits)
     remoteAppliedAt=remoteUpdated;
     const keepCode = state.cloudCode;
@@ -5049,7 +5060,10 @@ const PUBLIC_TOURNAMENTS_ERROR_MESSAGES = {
 // 無法歸類的 permission-denied 才顯示「操作未完成，請重新整理後再試」，
 // 不再籠統翻譯成單一句話。
 const REGISTRATION_ERROR_MESSAGES = {
-  "registration-state-conflict": "報名人數尚未同步，請聯絡主辦重新發布賽事。",
+  "registration-state-conflict": "報名設定或人數尚未同步，請聯絡主辦重新儲存設定。",
+  "invalid-registration-capacity": "報名人數上限設定無效，請聯絡主辦修正。",
+  "community-quick-individual-only": "快速報名適用個人賽；團體賽請使用既有排程報名設定。",
+  "invalid-registration-schedule": "報名時間設定無效，請聯絡主辦修正或清空選填時間。",
   "registration-aborted": "已取消這次報名操作",
   "family-ranked-unavailable": "積分賽尚未開放孩子代報名，請選本人參賽。",
   "family-lottery-unavailable": "超額抽籤賽事尚未開放孩子代報名。",
@@ -5114,7 +5128,9 @@ function publicTournamentListSignature(items){
     String(t&&t.registrationStatus||""),
     Number(t&&t.confirmedCount||0),
     Number(t&&t.waitlistCount||0),
-    Number(t&&t.capacity||0),
+    communityRegistrationParticipantCount(t),
+    isUnlimitedCommunityRegistration(t)?"unlimited":Number(t&&t.capacity||0),
+    t?.communityQuickRegistration===true?"quick":"",
     fastLobbyHash(t&&t.bracketView||"")
   ].join(":")).sort().join("|");
 }
@@ -5589,7 +5605,7 @@ function isOwnTestTournament(st=state){
   const uid=currentAuthUid();
   return !!(isOwnTesterSandboxRoom(st) && uid && (st.createdBy===uid||st.ownerUid===uid));
 }
-const {ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash}=window.BXHDomainUtils;
+const {ensureTestName,scheduledTournamentStartMs,canonicalPublicTournamentPhase,publicTournamentRegistrationLocked,hunterRecordEventKey,hunterAchievementMatchKey,hunterAchievementHasExactMatchTime,hunterAchievementAwardLabel,hunterAchievementAwardMeta,operationsDate,snapToHalfHourValue,buildPublicTournamentSnapshot,roomStatusDescriptor,fastLobbyHash,isCommunityQuickRegistration,isUnlimitedCommunityRegistration,parseCommunityRegistrationCapacity,communityRegistrationCapacity,communityRegistrationParticipantCount,communityLocalParticipantCount,communityRegistrationLocked,canCancelCommunityRegistration}=window.BXHDomainUtils;
 function markTesterSandboxState(st){
   if(!isTester() || !st) return st;
   const uid=currentAuthUid(), created=Number(st.testCreatedAt||st.createdAt||Date.now());
@@ -5992,13 +6008,13 @@ function cloneStateForSave(st){
     return st;
   }
 }
-function enqueueCloudStateWrite(code, snapshot){
+function enqueueCloudStateWrite(code, snapshot, options={}){
   const normalizedCode = code;
   cloudWriteChain = cloudWriteChain
     .catch(()=>false)
     .then(async ()=>{
       if(!normalizedCode || !cloudAvailable() || !window.cloudSync || !window.cloudSync.pushUpdate) return false;
-      return await window.cloudSync.pushUpdate(normalizedCode, snapshot);
+      return await window.cloudSync.pushUpdate(normalizedCode, snapshot, options);
     });
   return cloudWriteChain;
 }
@@ -6015,6 +6031,7 @@ function queueCloudSyncRetry(tournamentId, code){
   cloudSyncPending = true;
   if(cloudSyncQueueTimer) return;
   cloudSyncQueueTimer = setInterval(async ()=>{
+    if(communitySettingsWriteGate&&communitySettingsWriteGate.roomId===tournamentId&&communitySettingsWriteGate.roomCode===code)return;
     if(!cloudSyncPending || state.id!==tournamentId || state.cloudCode!==code || !cloudAvailable()){
       clearInterval(cloudSyncQueueTimer); cloudSyncQueueTimer=null; return;
     }
@@ -6046,15 +6063,33 @@ function queueCloudSyncRetry(tournamentId, code){
 // admin/staff-only `tournaments/{code}` document.
 
 
-async function saveState(){
-  state.updatedAt = Date.now();
-  if(state.meta && state.meta.registrationEnabled){
-    state.meta.registrationStatus = computeRegistrationStatus(state.meta);
+async function saveState(options={}){
+  const requestedState=state;
+  const settingsGate=communitySettingsWriteGate;
+  if(settingsGate&&settingsGate.roomId===requestedState.id&&settingsGate.roomCode===requestedState.cloudCode&&options.settingsToken!==settingsGate){
+    // Other edits may continue in memory, but must not snapshot uncommitted
+    // settings or overwrite a just-committed settings result from an old snapshot.
+    await settingsGate.promise;
   }
-  touchCommunityActivity(state);
+  const saveTarget=options.snapshot||(state.id===requestedState.id&&state.cloudCode===requestedState.cloudCode?state:requestedState);
+  saveTarget.updatedAt = Date.now();
+  if(saveTarget.meta && saveTarget.meta.registrationEnabled){
+    saveTarget.meta.registrationStatus = computeRegistrationStatus(saveTarget.meta,saveTarget);
+  }
+  touchCommunityActivity(saveTarget);
 
   // Snapshot NOW. Later UI mutations must not change the payload of this save.
-  const snapshot = cloneStateForSave(state);
+  const snapshot = cloneStateForSave(saveTarget);
+  if(options.settingsToken){
+    // Explicit settings saves stay detached until the cloud accepts them. They
+    // never become an optimistic local snapshot or an automatic retry payload.
+    if(!snapshot.cloudCode||!cloudAvailable()||currentRole==="guest")return false;
+    const ok=await enqueueCloudStateWrite(snapshot.cloudCode,snapshot,{syncCommunitySummary:true});
+    if(ok!==true)return false;
+    options.cloudSaved=true;
+    cloudStatus="connected";cloudLastSyncAt=Date.now();
+    try{return await saveRecord(snapshot)===true;}catch(e){console.warn("[community settings local cache]",e);return false;}
+  }
   const localSavePromise = saveRecord(snapshot);
 
   if(snapshot.cloudCode && cloudAvailable() && currentRole!=="guest"){
@@ -8814,17 +8849,18 @@ function playerBracketRowHtml(playerId,name){
 // Registration status priority (per spec): cancelled > started > closed (past
 // deadline) > full (capacity reached) > scheduled (not yet open) > open.
 // Returns null when online registration isn't enabled for this tournament at all.
-function computeRegistrationStatus(m){
+function computeRegistrationStatus(m,st=state){
   if(!m || !m.registrationEnabled) return null;
   if(m.eventCancelled) return "cancelled";
-  if(state.startedAt) return "started";
+  if(st.startedAt || (isCommunityQuickRegistration(m)&&communityRegistrationLocked(st))) return "started";
   const now = Date.now();
-  if(m.registrationCloseAt && now > m.registrationCloseAt) return "closed";
+  if(m.registrationCloseAt && (isCommunityQuickRegistration(m)?now>=m.registrationCloseAt:now>m.registrationCloseAt)) return "closed";
   const capacity = m.registrationCapacity;
+  if(isCommunityQuickRegistration(m)&&m.registrationOpenAt&&now<m.registrationOpenAt)return "scheduled";
   // Phase 1 note: no real registrations exist yet (that's Phase 3), so the
   // confirmed count is always 0 here — this branch is correctly unreachable
   // until Phase 3 wires it up to the real registrations subcollection.
-  const confirmedCount = 0;
+  const confirmedCount = isCommunityQuickRegistration(m)?communityRegistrationParticipantCount(st):0;
   if(capacity && confirmedCount >= capacity) return "full";
   if(m.registrationOpenAt && now < m.registrationOpenAt) return "scheduled";
   return "open";
@@ -13726,14 +13762,21 @@ function getEffectiveRegistrationStatus(t, now){
   if(t.registrationSelection&&t.registrationSelection.status!=="open")return "closed";
   now = (now==null) ? Date.now() : now;
   if(t.registrationStatus==="cancelled" || t.eventCancelled) return "cancelled";
-  if(publicTournamentRegistrationLocked(t)) return "started";
+  if(publicTournamentRegistrationLocked(t) || (isCommunityQuickRegistration(t)&&communityRegistrationLocked(t))) return "started";
+  if(isCommunityQuickRegistration(t)){
+    const m=t.meta||t.parsedData?.meta||{};
+    const capacity=communityRegistrationCapacity(t);
+    if((t.registrationEnabled??m.registrationEnabled)!==true || (t.registrationStatus??m.registrationStatus)==="closed")return "closed";
+    if(capacity!==null&&(!Number.isSafeInteger(capacity)||capacity<1))return "closed";
+  }
   const closeAt = normalizeDateTime(t.registrationCloseAt);
   if(closeAt!=null && now>=closeAt) return "closed";
   const openAt = normalizeDateTime(t.registrationOpenAt);
   if(openAt!=null && now<openAt) return "scheduled";
   const capacity = t.capacity;
-  const confirmedCount = t.confirmedCount||0;
+  const confirmedCount = communityRegistrationParticipantCount(t);
   if(!t.registrationSelection && capacity!=null && capacity>0 && confirmedCount>=capacity) return "full";
+  if(isCommunityQuickRegistration(t))return "open"; // summary updates can release a previously full quick room
   if(openAt!=null && (closeAt==null || now<closeAt)) return "open";
   return normalizeRegistrationStatusValue(t.registrationStatus) || "open";
 }
@@ -13753,10 +13796,10 @@ function findEventsSummaryLine(t){
     && !!t.publishedAt
     && pd.archiveStatus!=='completed';
   const effectiveStatus = getEffectiveRegistrationStatus(t);
-  return { code: t.code, isValid,
+  return { code: t.code, isValid, eventAuthority:t.eventAuthority||m.eventAuthority,communityQuickRegistration:isCommunityQuickRegistration(t),
     name: m.name||t.name||"未命名賽事", location: m.location||t.location||"", date: m.date||t.eventDate||"",
     regStatus: effectiveStatus, regStatusLabel: REGISTRATION_STATUS_LABELS[effectiveStatus]||"", phase: t.tournamentPhase, phaseLabel: phaseLabels[t.tournamentPhase]||"",
-    openAt: normalizeDateTime(t.registrationOpenAt), closeAt: normalizeDateTime(t.registrationCloseAt), capacity: t.capacity||null, confirmedCount: t.confirmedCount||0,
+    openAt: normalizeDateTime(t.registrationOpenAt), closeAt: normalizeDateTime(t.registrationCloseAt), capacity: t.capacity||null, confirmedCount: communityRegistrationParticipantCount(t),
     formatType: m.formatType||t.formatType||"single", drawnAt: normalizeDateTime(pd.drawnAt), updatedAt: normalizeDateTime(t.updatedAt)||0 };
 }
 
@@ -13804,6 +13847,7 @@ function findEventsCardActionHtml(t){
 
 function findEventsCardHtml(t){
   const capacityLine = t.regStatus==="full" ? `<span class="fe-status-chip status-full">已額滿</span>`
+    : isUnlimitedCommunityRegistration(t)?`<span class="hint" style="margin:0;">${Number(t.confirmedCount||0)} 人已報名／不限人數</span>`
     : (t.capacity ? `<span class="hint" style="margin:0;">剩餘名額 ${Math.max(0,t.capacity-t.confirmedCount)}／${t.capacity}</span>` : "");
   return `<div class="find-event-card">
     <div class="fe-name">${esc(t.name)}</div>
@@ -13837,10 +13881,10 @@ function lobbySummary(raw){
   const authority=raw.eventAuthority||m.eventAuthority||"official";
   const hostName=raw.hostName||raw.createdByName||raw.ownerName||m.hostName||(authority==="official"?"BXH":"玩家主辦");
   return {
-    raw, code:raw.code, name:m.name||raw.name||"未命名賽事", date:m.date||raw.eventDate||"", startAt:m.startTime||raw.startAt||"",
+    raw, communityQuickRegistration:isCommunityQuickRegistration(raw), registrationEnabled:raw.registrationEnabled, registrationStatus:raw.registrationStatus, code:raw.code, name:m.name||raw.name||"未命名賽事", date:m.date||raw.eventDate||"", startAt:m.startTime||raw.startAt||"",
     location:m.location||raw.location||"", phase:canonicalPublicTournamentPhase(raw), regStatus,
     authority, hostName, systemClosure:raw.systemClosure||pd.systemClosure||null,
-    registrationSelection:raw.registrationSelection||null,registeredCount:Number(raw.registeredCount||0),capacity:raw.capacity||0, confirmedCount:raw.confirmedCount||0, waitlistEnabled:!!raw.waitlistEnabled,
+    registrationSelection:raw.registrationSelection||null,registeredCount:Number(raw.registeredCount||0),capacity:raw.capacity??null, confirmedCount:communityRegistrationParticipantCount(raw), waitlistEnabled:!!raw.waitlistEnabled,
     waitlistCapacity:raw.waitlistCapacity||0, waitlistCount:raw.waitlistCount||0,
     closeAt:normalizeDateTime(raw.registrationCloseAt), openAt:normalizeDateTime(raw.registrationOpenAt),
     cancellationDeadline:normalizeDateTime(raw.cancellationDeadline), targetGroup:raw.targetGroup||m.targetGroup||"open",
@@ -13884,7 +13928,8 @@ function lobbyRegistrationButtons(t, loggedIn){
     return infoButton("查看取消資訊");
   }
   if(t.authority==="community"){
-    return infoButton("查看賽事資訊");
+    const quickOpen=isCommunityQuickRegistration(t)&&(t.regStatus==="open"||t.regStatus==="full");
+    return infoButton(quickOpen?(t.regStatus==="full"?"查看報名名額":"查看與報名"):"查看賽事資訊");
   }
 
   // Official registration events: the lobby is a preview surface. Registration
@@ -13917,6 +13962,7 @@ function lobbyRegistrationButtons(t, loggedIn){
   return `<button class="btn btn-primary btn-sm" data-action="view-public-tournament" data-code="${esc(t.code)}">${confirmedFull&&waitlistAvailable?"查看與加入備取":"查看與報名"}</button>`;
 }
 function publicEventLifecycleStatus(t){
+  t=t.raw||t;
   const phase=canonicalPublicTournamentPhase(t);
   if(phase==="waiting"){
     const reg=getEffectiveRegistrationStatus(t);
@@ -13953,14 +13999,14 @@ function lobbyPlayerRosterHtml(t){
 
 function lobbyCard(t, kind, loggedIn, expanded=false){
   const life=publicEventLifecycleStatus(t);
-  const displayPhase=(t.phase==="waiting" && (t.authority==="community" || !(t.regStatus==="open" || t.regStatus==="full"))) ? "prestart" : life.phase;
+  const displayPhase=t.phase==="waiting" ? ((t.regStatus==="open"||t.regStatus==="full")&& (t.authority!=="community"||isCommunityQuickRegistration(t)) ? "registration" : "prestart") : life.phase;
   const authorityLabel=t.authority==="community"?"COMMUNITY":"BXH OFFICIAL";
   const authorityClass=t.authority==="community"?"community":"official";
   const timeLabel=[t.date,t.startAt].filter(Boolean).join(" ") || "時間待公布";
   const details=[
     t.location?`地點｜${esc(t.location)}`:"",
     `賽制｜${esc(FORMAT_LABELS[t.formatType]||t.formatType||"—")}`,
-    t.capacity?`名額｜${Number(t.confirmedCount||0)} / ${Number(t.capacity||0)}`:"",
+    isUnlimitedCommunityRegistration(t)?`名額｜${Number(t.confirmedCount||0)} 人已報名／不限人數`:t.capacity?`名額｜${Number(t.confirmedCount||0)} / ${Number(t.capacity||0)}`:"",
     t.fee!=null?`報名費｜${esc(String(t.fee))} 元`:"",
     t.checkInAt?`報到｜${esc(t.checkInAt)}`:"",
     t.closeAt?`報名截止｜${esc(new Date(t.closeAt).toLocaleString())}`:"",
@@ -14467,7 +14513,7 @@ function renderTeamRegistrationAction(t,code,effStatus,now,isGuestMode,isLoggedI
   if(myTeam){
     const status=myTeam.status==="confirmed"?"正取":myTeam.status==="waitlist"?"備取"+(myTeam.waitRank?"第 "+myTeam.waitRank+" 位":""):myTeam.status;
     const members=(Array.isArray(myTeam.teamMembers)?myTeam.teamMembers:[]).map((m,i)=>'<li><span>第 '+(Number(m.slot)||i+1)+' 位</span><b>'+esc(m.name||"未命名玩家")+'</b></li>').join('');
-    const canCancel=t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
+    const canCancel=isCommunityQuickRegistration(t)?canCancelCommunityRegistration(t,now):t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
     return '<div id="registration-result-panel" class="registration-result-panel"><div class="registration-result-head"><span class="registration-result-icon">✓</span><div><div class="registration-result-title">'+esc(myTeam.teamName||myTeam.displayName||"我的隊伍")+'</div><div class="registration-result-subtitle">'+size+'V'+size+' 團體戰｜隊長：'+esc(myTeam.captainDisplayName||myTeam.captainName||userProfile?.displayName||userProfile?.realName||"—")+'</div></div></div><div class="stat-box"><div class="label">報名狀態</div><div class="value small">'+esc(status)+'</div></div><details class="settings-accordion" open><summary><span>隊伍成員（'+size+' 人）</span><span class="hint">展開／收合</span></summary><div class="settings-accordion-body"><ol class="team-registration-members">'+members+'</ol></div></details><div class="registration-next-step"><b>出場順序不是現在提交</b><br>每一場團體對戰開始前，隊長會另外提交該場出場順序；提交後僅裁判可見，直到裁判按下「人員到齊」才公開。</div><div class="registration-result-actions">'+(canCancel?'<button class="btn btn-sm registration-cancel-link" data-action="cancel-team-registration" data-code="'+esc(code)+'" '+(tournamentDetailBusy?'disabled':'')+'>取消整隊報名</button>':'<span class="hint">'+(t.cancellationDeadline?"已超過取消期限，無法取消":"目前無法取消報名")+'</span>')+'</div></div>';
   }
   if(effStatus==="cancelled"||t.eventCancelled)return '<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>';
@@ -14500,7 +14546,9 @@ function renderTournamentDetailScreen(){
   const effStatus = getEffectiveRegistrationStatus(Object.assign({}, t, {
     registrationStatus: t.eventCancelled ? "cancelled" : t.registrationStatus
   }), now);
-  const confirmedRemaining = t.registrationSelection ? Math.max(0,t.registrationSelection.capacity-(t.confirmedCount||0)) : Math.max(0, (t.capacity||0) - (t.confirmedCount||0));
+  const unlimitedCapacity=isUnlimitedCommunityRegistration(t);
+  const participantCount=communityRegistrationParticipantCount(t);
+  const confirmedRemaining = unlimitedCapacity ? Infinity : t.registrationSelection ? Math.max(0,t.registrationSelection.capacity-(t.confirmedCount||0)) : Math.max(0, (t.capacity||0) - participantCount);
   const waitlistRemaining = Math.max(0, (t.waitlistCapacity||0) - (t.waitlistCount||0));
   const isGuestMode=isGuestReadOnlyContext();
   const activeMyRegs=isGuestMode?[]:(Array.isArray(tournamentDetailMyRegs)&&tournamentDetailMyRegs.length?tournamentDetailMyRegs:(tournamentDetailMyReg?[tournamentDetailMyReg]:[])).filter(row=>row&&['confirmed','waitlist','pending_draw'].includes(row.status));
@@ -14513,7 +14561,7 @@ function renderTournamentDetailScreen(){
   const additionalRegistrationAvailable=confirmedRemaining>0||(t.waitlistEnabled&&waitlistRemaining>0);
 
   let actionHtml;
-  if(publicTournamentRegistrationLocked(t)){
+  if(publicTournamentRegistrationLocked(t)||(isCommunityQuickRegistration(t)&&communityRegistrationLocked(t))){
     actionHtml = `<div class="banner warn"><span>賽事已開始，報名、備取與取消報名功能均已鎖定。</span></div>
       <div class="tournament-detail-bottom-actions">
         <button class="btn btn-ghost" data-action="back-to-find-events">← 返回賽事列表</button>
@@ -14523,16 +14571,16 @@ function renderTournamentDetailScreen(){
     actionHtml = `<div class="hint">遊客模式僅供瀏覽公開賽事資訊，不提供報名／取消報名操作。</div>
       <button class="btn btn-primary" data-action="select-role-player">切換至玩家模式</button>`;
   } else if(activeMyRegs.length){
-    const canCancel=t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
+    const canCancel=isCommunityQuickRegistration(t)?canCancelCommunityRegistration(t,now):t.cancellationDeadline&&now<t.cancellationDeadline&&t.tournamentPhase==="waiting";
     const requiresCheckin=t.checkinRequired===true||t.parsedData?.meta?.checkinRequired===true;
     const participantCards=activeMyRegs.map(row=>{
       const statusLabel=t.registrationSelection?.status==='drawing'?'抽籤處理中':t.registrationSelection?.status==='open'||row.status==='pending_draw'?'待抽籤':row.status==='confirmed'?'正取':'備取'+(row.waitRank?'第 '+row.waitRank+' 位（原始順位）':'');
       const participantName=row.participantName||row.displayName||row.realName||(!row.familyPlayerId?(userProfile?.displayName||userProfile?.realName):'家庭選手')||'參賽者';
       return '<div class="stat-box"><div class="label">'+esc(participantName)+'</div><div class="value small">'+esc(statusLabel)+'</div></div>';
     }).join('');
-    const acceptingMore=additionalRegistrationAvailable&&!t.eventCancelled&&effStatus!=="closed"&&effStatus!=="scheduled"&&isLoggedIn&&!profileIncomplete;
+    const acceptingMore=additionalRegistrationAvailable&&!t.eventCancelled&&(effStatus==="open"||effStatus==="full")&&isLoggedIn&&!profileIncomplete;
     const addSelfButton=acceptingMore&&t.targetGroup!=="children"&&!hasSelfRegistration?`<button class="btn btn-primary" data-action="submit-tournament-registration" data-participant-mode="self" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>本人報名</button>`:'';
-    const childEntryReason=!childRegistrationAllowed?'此類賽事目前不開放兒童代報名。':t.eventCancelled?'賽事已取消。':effStatus==="closed"?'報名已截止。':effStatus==="scheduled"?'報名尚未開放。':!additionalRegistrationAvailable?'正取與備取名額已滿。':profileIncomplete?'請先完成會員資料。':!isLoggedIn?'請先登入。':'';
+    const childEntryReason=!childRegistrationAllowed?'此類賽事目前不開放兒童代報名。':t.eventCancelled||effStatus==="cancelled"?'賽事已取消。':effStatus==="closed"?'報名已截止。':effStatus==="scheduled"?'報名尚未開放。':!additionalRegistrationAvailable?'正取與備取名額已滿。':profileIncomplete?'請先完成會員資料。':!isLoggedIn?'請先登入。':'';
     const addChildButton=childRegistrationAllowed&&acceptingMore?`<button class="btn btn-ghost" data-action="submit-tournament-registration" data-participant-mode="children" data-code="${esc(code)}" ${tournamentDetailBusy?'disabled':''}>替兒童報名</button>`:`<button class="btn btn-ghost" type="button" disabled>替兒童報名｜${esc(childEntryReason||'目前無法報名')}</button>`;
     actionHtml=`
       <div id="registration-result-panel" class="registration-result-panel">
@@ -14547,7 +14595,7 @@ function renderTournamentDetailScreen(){
   } else if(effStatus==="cancelled" || t.eventCancelled){
     actionHtml = `<div class="hint">此賽事已取消。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
   } else if(effStatus==="closed"){
-    const noOnlineRegistration=!t.registrationSelection || Number(t.capacity||0)<=0 || !normalizeDateTime(t.registrationOpenAt) || !normalizeDateTime(t.registrationCloseAt);
+    const noOnlineRegistration=isCommunityQuickRegistration(t)?t.registrationEnabled!==true:!t.registrationSelection || Number(t.capacity||0)<=0 || !normalizeDateTime(t.registrationOpenAt) || !normalizeDateTime(t.registrationCloseAt);
     actionHtml = noOnlineRegistration
       ? `<div class="hint">本場目前未開放線上報名，請依主辦公告參加。</div><button class="btn btn-ghost" disabled>未開放線上報名</button>`
       : `<div class="hint">報名已截止。</div><button class="btn btn-ghost" disabled>不可報名</button>`;
@@ -14618,11 +14666,11 @@ function renderTournamentDetailScreen(){
     <div class="panel tournament-detail-panel tournament-registration-info tournament-info-panel">
       <div class="panel-title">報名資訊</div>
       <div class="grid tournament-detail-grid tournament-registration-grid tournament-info-grid">
-        <div class="stat-box"><div class="label">報名開放時間</div><div class="value small">${esc(formatTournamentDetailDateTime(t.registrationOpenAt))}</div></div>
-        <div class="stat-box"><div class="label">報名截止時間</div><div class="value small">${esc(formatTournamentDetailDateTime(t.registrationCloseAt))}</div></div>
-        <div class="stat-box"><div class="label">取消報名期限</div><div class="value small">${esc(formatTournamentDetailDateTime(t.cancellationDeadline))}</div></div>
+        <div class="stat-box"><div class="label">報名開放時間</div><div class="value small">${esc(isCommunityQuickRegistration(t)&&t.registrationOpenAt==null?"儲存後立即開放":formatTournamentDetailDateTime(t.registrationOpenAt))}</div></div>
+        <div class="stat-box"><div class="label">報名截止時間</div><div class="value small">${esc(isCommunityQuickRegistration(t)&&t.registrationCloseAt==null?"房主關閉報名或開賽前":formatTournamentDetailDateTime(t.registrationCloseAt))}</div></div>
+        <div class="stat-box"><div class="label">取消報名期限</div><div class="value small">${esc(isCommunityQuickRegistration(t)&&t.cancellationDeadline==null?"開賽前皆可取消":formatTournamentDetailDateTime(t.cancellationDeadline))}</div></div>
         <div class="stat-box"><div class="label">報名狀態</div><div class="value small">${esc(REGISTRATION_STATUS_LABELS[effStatus]||effStatus)}</div></div>
-        <div class="stat-box"><div class="label">${t.registrationSelection?'報名／參賽名額':(isTeamBattle?'正取隊伍':'正取名額')}</div><div class="value small">${t.registrationSelection?`${t.registeredCount||0} 人報名（不限額）／正取 ${t.registrationSelection.capacity} 人`:`${t.confirmedCount||0} / ${t.capacity||0}（剩餘 ${confirmedRemaining}${isTeamBattle?" 隊":" 人"}）`}</div></div>
+        <div class="stat-box"><div class="label">${t.registrationSelection?'報名／參賽名額':(isTeamBattle?'正取隊伍':'正取名額')}</div><div class="value small">${unlimitedCapacity?`${participantCount} 人已報名／不限人數`:t.registrationSelection?`${t.registeredCount||0} 人報名（不限額）／正取 ${t.registrationSelection.capacity} 人`:`${participantCount} / ${t.capacity||0}（剩餘 ${confirmedRemaining}${isTeamBattle?" 隊":" 人"}）`}</div></div>
         <div class="stat-box"><div class="label">${isTeamBattle?"備取隊伍":"備取名額"}</div><div class="value small">${t.waitlistEnabled ? `${t.waitlistCount||0} / ${t.waitlistCapacity||0}（剩餘 ${waitlistRemaining}${isTeamBattle?" 隊":" 人"}）` : "未開放備取"}</div></div>
       </div>
       ${t.eventDescription ? `<div class="tournament-info-foot"><div class="tournament-info-foot-label">活動說明</div><p class="tournament-info-foot-text">${esc(t.eventDescription)}</p></div>` : ""}
@@ -14814,7 +14862,7 @@ function renderPlayerRegisteredTab(){
         ${bracketReady
           ? `<button class="btn btn-primary btn-sm" data-action="switch-to-player-watch" data-view="bracket" data-return="registered" data-code="${esc(r.tournamentCode)}">查看樹狀圖</button>`
           : `<button class="btn btn-ghost btn-sm" disabled aria-disabled="true">樹狀圖尚未產生</button>`}
-        ${(['confirmed','waitlist','pending_draw'].includes(r.status)) && !publicTournamentRegistrationLocked(info)
+        ${(['confirmed','waitlist','pending_draw'].includes(r.status)) && (isCommunityQuickRegistration(info)?canCancelCommunityRegistration(info):!publicTournamentRegistrationLocked(info))
           ? `<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(r.tournamentCode)}">取消報名</button>`
           : ""}
       </div>
@@ -19042,6 +19090,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="community-create-open"){ appPhase="community-create"; render(); return; }
   if(action==="community-create-cancel"){ appPhase="player-center"; playerActiveTab="host"; render(); return; }
   if(action==="community-create-submit"){
+    if(communityCreateSaving)return;
+    const actorUid=currentAuthUid();
+    if(!actorUid){showToast("請先登入後再建立房間",true);return;}
     const hostProfile=userProfile||{};
     const hostName=String(hostProfile.gameId||hostProfile.displayName||hostProfile.nickname||hostProfile.realName||firebaseUser?.email||"玩家").trim();
     const name=hostName+"的房間";
@@ -19051,19 +19102,23 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const location="玩家即時對戰";
     const formatType=document.getElementById("community-format")?.value||"single";
     const stations=1;
-    const registrationEnabled=false;
+    const registrationEnabled=!!document.getElementById("community-registration-enabled")?.checked;
+    let capacity;
+    try{const input=document.getElementById("community-capacity");if(input?.validity?.badInput)throw new Error("invalid-registration-capacity");capacity=parseCommunityRegistrationCapacity(input?.value);}catch(e){showToast("人數上限請留空，或填寫大於 0 的整數",true);return;}
     const roomAccessMode="public";
+    communityCreateSaving=true;target.disabled=true;
     (async()=>{
       try{
         if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
+        if(currentAuthUid()!==actorUid||appPhase!=="community-create")throw new Error("create-context-changed");
         if(!cloudAvailable()) throw new Error("network");
         const st=defaultState();
         st.meta.name=name; st.meta.date=date; st.meta.location=location; st.meta.startTime=startTime;
         st.meta.formatType=formatType; st.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; st.meta.stations=stations;
-        st.meta.eventAuthority="community"; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.roomAccessMode=roomAccessMode; st.meta.publishedAt=Date.now();
+        st.meta.eventAuthority="community"; st.communityQuickRegistration=true; st.meta.communityQuickRegistration=true; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.roomAccessMode=roomAccessMode; st.meta.publishedAt=Date.now();
         st.meta.registrationOpenAt=null; st.meta.registrationCloseAt=null; st.meta.cancellationDeadline=null;
-        st.meta.registrationCapacity=0; st.meta.waitlistCapacity=0; st.meta.registrationVisibility="public"; st.meta.registrationStatus="closed";
-        st.ownerUid=firebaseUser.uid; st.createdByRole="player"; st.lastActivityAt=Date.now();
+        st.meta.registrationCapacity=capacity; st.meta.waitlistCapacity=0; st.meta.registrationVisibility="public"; st.meta.registrationStatus=registrationEnabled?"open":"closed";
+        st.ownerUid=actorUid; st.createdByRole="player"; st.lastActivityAt=Date.now();
 
         // COMMUNITY host joins their own room by default. Host ownership and
         // participant membership are independent: removing this player later
@@ -19075,23 +19130,32 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           source:"host",
           participantType:"account",
           accountLinked:true,
-          playerUid:firebaseUser.uid,
-          accountUid:firebaseUser.uid,
-          uid:firebaseUser.uid,
+          playerUid:actorUid,
+          accountUid:actorUid,
+          uid:actorUid,
           playerId:hostProfile.playerId||null,
           ladderEligible:false,
           activityEligible:true,
           isRoomOwner:true
         }];
+        st.communityParticipantCount=communityLocalParticipantCount(st);
+        if(registrationEnabled&&capacity!==null&&st.communityParticipantCount>=capacity)st.meta.registrationStatus="full";
         st.expiresAtMs=communityRoomExpiryMs(st);
+        if(currentAuthUid()!==actorUid||appPhase!=="community-create")throw new Error("create-context-changed");
         const code=await window.cloudSync.createCommunityRoom(st);
+        if(currentAuthUid()!==actorUid||appPhase!=="community-create")return;
         if(!code) throw new Error("create-failed");
-        st.cloudCode=code; state=st; await saveRecord(state); await setCurrentId(state.id);
+        st.cloudCode=code;await saveRecord(st);
+        if(currentAuthUid()!==actorUid||appPhase!=="community-create")return;
+        await setCurrentId(st.id);
+        if(currentAuthUid()!==actorUid||appPhase!=="community-create")return;
+        state=st;
         if(cloudUnsub){ try{cloudUnsub();}catch(e){} }
         cloudUnsub=window.cloudSync.subscribe(code,applyRemoteState); cloudStatus="connected";
         communityRoomActiveTab="people"; appPhase="community-room"; communityEventsCache=null; publicTournamentsCache=null; publicTournamentsError=null; render();
         showToast("一般賽事已建立｜代碼 "+code);
       }catch(e){
+        if(currentAuthUid()!==actorUid||appPhase!=="community-create")return;
         console.warn("[community create]",e);
         const code=(e&&e.code)?String(e.code):"";
         const msg=(e&&e.message)?String(e.message):"";
@@ -19104,7 +19168,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }else{
           showToast("建立一般賽事失敗｜"+(code||msg||"未知錯誤"),true);
         }
-      }
+      }finally{communityCreateSaving=false;target.disabled=false;}
     })();
     return;
   }
@@ -19138,45 +19202,116 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const code=target.getAttribute("data-code")||""; const name=target.getAttribute("data-name")||code;
     openModal({type:"generic",title:"刪除一般賽事",message:"確定刪除「"+name+"」？完整房間與對戰詳細資料刪除後無法復原；已完成的主辦摘要及驗證場數仍保留。",danger:true,confirmLabel:"確定刪除",onConfirm:()=>{(async()=>{try{await window.cloudSync.deleteCommunityRoom(code); communityEventsCache=null; showToast("已刪除一般賽事"); handleAction("community-load-events",target);}catch(e){showToast("刪除失敗",true);}})();}}); return;
   }
+  if(action==="community-sync-summary"){
+    if(!isCommunityRoomOwner()||!isCommunityQuickRegistration(state)||communitySettingsSaving)return;
+    const code=state.cloudCode,roomId=state.id;target.disabled=true;
+    (async()=>{try{
+      const result=await window.cloudSync.syncCommunityRegistrationSummary(code);
+      if(state.id===roomId&&state.cloudCode===code){state.communityParticipantCount=result.communityParticipantCount;await saveRecord(state);publicTournamentsCache=null;render();showToast("參賽人數已重新同步");}
+    }catch(e){if(state.id===roomId){render();showToast("參賽人數摘要尚未同步，請稍後重試；已儲存的設定仍保留",true);}}finally{target.disabled=false;}})();return;
+  }
   if(action==="community-save-settings"){
-    if(!isCommunityRoomOwner()) return;
+    if(!isCommunityRoomOwner()||communitySettingsSaving) return;
+    const m=state.meta||{},quickRegistration=m.battleMode!=="team";
     const name=(document.getElementById("cset-name")?.value||"").trim(); const date=document.getElementById("cset-date")?.value||""; const location=(document.getElementById("cset-location")?.value||"").trim();
-    const startTime=document.getElementById("cset-start")?.value||"19:00"; const formatType=document.getElementById("cset-format")?.value||"single"; const stations=Math.max(1,parseInt(document.getElementById("cset-stations")?.value||"1",10)||1);
+    const startTime=document.getElementById("cset-start")?.value||""; const formatType=document.getElementById("cset-format")?.value||"single"; const stations=Math.max(1,parseInt(document.getElementById("cset-stations")?.value||"1",10)||1);
     if(!name||!date||!location){showToast("請完整填寫名稱、日期與地點",true);return;}
-    if(state.matches.length && formatType!==state.meta.formatType){showToast("已產生對戰表後不能直接更換賽制，請先清除／重建房間",true);return;}
+    if(state.matches.length && formatType!==m.formatType){showToast("已產生對戰表後不能直接更換賽制，請先清除／重建房間",true);return;}
     const registrationEnabled=!!document.getElementById("cset-registration-enabled")?.checked;
-    const capacity=Math.max(1,parseInt(document.getElementById("cset-capacity")?.value||"16",10)||16);
-    const waitlist=Math.max(0,parseInt(document.getElementById("cset-waitlist")?.value||"0",10)||0);
-    const openRaw=document.getElementById("cset-reg-open")?.value||"";
-    const closeRaw=document.getElementById("cset-reg-close")?.value||"";
+    let capacity;
+    try{const input=document.getElementById("cset-capacity");if(input?.validity?.badInput)throw new Error("invalid-registration-capacity");capacity=parseCommunityRegistrationCapacity(input?.value);}catch(e){showToast("人數上限請留空，或填寫大於 0 的整數",true);return;}
+    if(!quickRegistration&&registrationEnabled&&capacity===null){showToast("團體賽請設定正取隊伍上限",true);return;}
+    const waitlistInput=document.getElementById("cset-waitlist");
+    if(waitlistInput?.validity?.badInput){showToast("備取名額請填寫 0 或正整數",true);return;}
+    const waitlistRaw=String(waitlistInput?.value??m.waitlistCapacity??0).trim();
+    const waitlist=waitlistRaw===""?0:Number(waitlistRaw);
+    if(!Number.isSafeInteger(waitlist)||waitlist<0){showToast("備取名額請填寫 0 或正整數",true);return;}
+    const openInput=document.getElementById("cset-reg-open"),closeInput=document.getElementById("cset-reg-close");
+    if(openInput?.validity?.badInput||closeInput?.validity?.badInput){showToast("請輸入有效的報名時間，或留空使用快速報名",true);return;}
+    const openRaw=openInput?.value||"";
+    const closeRaw=closeInput?.value||"";
+    const openAt=openRaw?new Date(openRaw).getTime():null;
+    const closeAt=closeRaw?new Date(closeRaw).getTime():null;
+    const cancelInput=document.getElementById("cset-reg-cancel");
+    const cancelRaw=cancelInput?.value||"";
+    const cancellationDeadline=cancelInput?(cancelRaw?new Date(cancelRaw).getTime():null):(m.cancellationDeadline??null);
+    if(cancelInput?.validity?.badInput||(cancellationDeadline!==null&&(!Number.isSafeInteger(cancellationDeadline)||cancellationDeadline<=0))){showToast("請輸入有效的取消報名期限，或留空",true);return;}
+    if((openAt!==null&&(!Number.isSafeInteger(openAt)||openAt<=0))||(closeAt!==null&&(!Number.isSafeInteger(closeAt)||closeAt<=0))){showToast("請輸入有效的報名時間，或留空使用快速報名",true);return;}
+    if(openAt!==null&&closeAt!==null&&closeAt<=openAt){showToast("報名截止時間必須晚於開放時間",true);return;}
+    if(!quickRegistration&&registrationEnabled&&(openAt===null||closeAt===null)){showToast("團體賽請設定報名開放與截止時間",true);return;}
+    const currentAccessMode=m.roomAccessMode==="password"?"password":"public";
     const nextAccessMode=document.getElementById("cset-access-mode")?.value==="password"?"password":"public";
     const nextAccessPassword=(document.getElementById("cset-access-password")?.value||"").normalize("NFKC").trim();
-    if(nextAccessMode==="password"&&m.roomAccessMode!=="password"&&(nextAccessPassword.length<4||nextAccessPassword.length>20)){showToast("切換密碼房請設定 4～20 字元房間密碼",true);return;}
+    if(nextAccessMode==="password"&&currentAccessMode!=="password"&&(nextAccessPassword.length<4||nextAccessPassword.length>20)){showToast("切換密碼房請設定 4～20 字元房間密碼",true);return;}
     if(nextAccessPassword&&(nextAccessPassword.length<4||nextAccessPassword.length>20)){showToast("房間密碼需為 4～20 字元",true);return;}
-    state.meta.name=name; state.meta.date=date; state.meta.location=location; state.meta.startTime=startTime; state.meta.formatType=formatType; state.meta.format=FORMAT_LABELS[formatType]||"單淘汰賽"; state.meta.stations=stations;
-    state.meta.eventAuthority="community"; state.meta.ladderMode="general"; state.meta.registrationEnabled=registrationEnabled; state.meta.registrationVisibility="public";
-    if(registrationEnabled){
-      const openAt=openRaw?new Date(openRaw).getTime():Date.now();
-      const eventStart=Date.parse(date+"T"+startTime+":00");
-      const closeAt=closeRaw?new Date(closeRaw).getTime():eventStart;
-      if(!Number.isFinite(closeAt)||closeAt<=openAt){showToast("報名截止時間必須晚於開放時間",true);return;}
-      state.meta.registrationOpenAt=openAt; state.meta.registrationCloseAt=closeAt; state.meta.cancellationDeadline=closeAt;
-      state.meta.registrationCapacity=capacity; state.meta.waitlistCapacity=waitlist;
-      state.meta.registrationStatus=Date.now()<openAt?"scheduled":"open";
-    }else{
-      state.meta.registrationOpenAt=null; state.meta.registrationCloseAt=null; state.meta.cancellationDeadline=null;
-      state.meta.registrationCapacity=0; state.meta.waitlistCapacity=0; state.meta.registrationStatus="closed";
-    }
-    (async()=>{try{
-      if(!state.cloudCode)throw new Error("room-not-found");
-      const accessChanged=nextAccessMode!==(m.roomAccessMode==="password"?"password":"public")||!!nextAccessPassword;
-      if(accessChanged){
-        const gate=await window.engagementService.roomAccess({action:"configure",code:state.cloudCode,mode:nextAccessMode,password:nextAccessPassword||undefined,operationId:crypto.randomUUID()});
-        if(!gate?.ok)throw new Error("room-access-config-failed");
+    const accessChanged=nextAccessMode!==currentAccessMode||!!nextAccessPassword;
+    const accessLocked=!!state.startedAt||!!state.bracketSize||(state.matches||[]).some(x=>!x?.isBye)||state.archiveStatus==="completed";
+    if(accessChanged&&accessLocked){showToast("比賽已開始或已建立對戰結構，不能再修改房間存取設定",true);return;}
+    // Validate every input before touching the active state or security settings.
+    const nextMeta={name,date,location,startTime,formatType,format:FORMAT_LABELS[formatType]||"單淘汰賽",stations,
+      eventAuthority:"community",...(quickRegistration?{communityQuickRegistration:true}:{}),ladderMode:"general",registrationEnabled,
+      registrationVisibility:m.registrationVisibility||"public",registrationOpenAt:openAt,registrationCloseAt:closeAt,
+      cancellationDeadline:quickRegistration?cancellationDeadline:(cancellationDeadline??closeAt),registrationCapacity:quickRegistration?capacity:(capacity??m.registrationCapacity??0),waitlistCapacity:waitlist,
+      registrationStatus:registrationEnabled?(openAt!==null&&Date.now()<openAt?"scheduled":"open"):"closed"};
+    const roomId=state.id,roomCode=state.cloudCode,actorUid=currentAuthUid(),roomState=state;
+    const writeGate={roomId,roomCode};writeGate.promise=new Promise(resolve=>{writeGate.resolve=resolve;});
+    communitySettingsWriteGate=writeGate;
+    communitySettingsSaving=true;target.disabled=true;
+    (async()=>{
+      let accessSaved=false;
+      try{
+        if(!roomCode)throw new Error("room-not-found");
+        if(window.cloudSync?.connect)await window.cloudSync.connect();
+        if(!cloudAvailable())throw new Error("cloud-unavailable");
+        await flushCloudStateWrites();
+        if(state.id!==roomId||state.cloudCode!==roomCode||currentAuthUid()!==actorUid||!isCommunityRoomOwner())throw new Error("room-context-changed");
+        if(accessChanged){
+          const gate=await window.engagementService.roomAccess({action:"configure",code:roomCode,mode:nextAccessMode,password:nextAccessPassword||undefined,operationId:crypto.randomUUID()});
+          if(!gate?.ok)throw new Error("room-access-config-failed");
+          accessSaved=true;
+        }
+        if(state.id!==roomId||state.cloudCode!==roomCode||currentAuthUid()!==actorUid)throw new Error("room-context-changed");
+        const pending=JSON.parse(JSON.stringify(state));
+        pending.meta=Object.assign({},pending.meta,nextMeta,{roomAccessMode:nextAccessMode});if(quickRegistration)pending.communityQuickRegistration=true;
+        const saveOptions={snapshot:pending,settingsToken:writeGate};
+        const saved=await saveState(saveOptions);
+        if(saved===false&&!saveOptions.cloudSaved)throw new Error("community-settings-save-failed");
+        // Commit settings only, preserving roster or other edits made while saving.
+        const summary=quickRegistration?window.__BXH_COMMUNITY_SUMMARY_STATUS?.[roomCode]:null;
+        const applySettings=st=>{st.meta=Object.assign({},st.meta,nextMeta,{registrationStatus:pending.meta.registrationStatus,roomAccessMode:nextAccessMode});if(quickRegistration)st.communityQuickRegistration=true;st.updatedAt=Math.max(st.updatedAt||0,pending.updatedAt||0);if(summary?.ok)st.communityParticipantCount=summary.communityParticipantCount;};
+        applySettings(roomState);
+        if(state.id===roomId&&state.cloudCode===roomCode&&currentAuthUid()===actorUid){
+          if(state!==roomState)applySettings(state);
+          let cached=false;try{cached=await saveRecord(state);}catch(cacheError){console.warn("[community settings local cache]",cacheError);}
+          render();
+          if(summary?.ok===false)showToast("一般賽事設定已儲存；參賽人數摘要尚未同步，請點重新同步人數",true);
+          else if(saved===false||cached===false)showToast("一般賽事設定已儲存到雲端，但本機快取未完成，請重新整理確認",true);
+          else showToast(accessChanged?"一般賽事設定與房間存取已儲存":"一般賽事設定已儲存");
+        }
+        publicTournamentsCache=null;communityEventsCache=null;
+      }catch(e){
+        const sameRoom=state.id===roomId&&state.cloudCode===roomCode&&currentAuthUid()===actorUid;
+        // Access is an independent, already-confirmed security operation. Retain
+        // that result without publishing any failed registration-setting edits.
+        if(accessSaved){roomState.meta.roomAccessMode=nextAccessMode;if(sameRoom)state.meta.roomAccessMode=nextAccessMode;}
+        const raw=String(e?.message||e||"");
+        if(sameRoom){
+          try{await saveRecord(state);}catch(cacheError){console.warn("[community settings local cache]",cacheError);}
+          render();
+          if(raw.includes("room-access-locked"))showToast("比賽已開始，不能再修改房間密碼",true);
+          else if(raw.includes("invalid-room-password"))showToast("房間密碼需為 4～20 字元",true);
+          else showToast(accessSaved?"房間存取已更新，但一般賽事設定未確認儲存，請重新整理後再試":"一般賽事設定未儲存，請確認連線後再試",true);
+        }
+      }finally{
+        if(communitySettingsWriteGate===writeGate)communitySettingsWriteGate=null;
+        writeGate.resolve();
+        communitySettingsSaving=false;target.disabled=false;
+        if(state.id===roomId&&state.cloudCode===roomCode&&currentAuthUid()===actorUid){
+          const saveButton=document.querySelector?.('[data-action="community-save-settings"]');
+          if(saveButton){saveButton.disabled=false;saveButton.textContent="儲存一般賽事設定";}
+        }
       }
-      state.meta.roomAccessMode=nextAccessMode;
-      touchCommunityActivity();await saveState();publicTournamentsCache=null;render();showToast(accessChanged?"一般賽事設定與房間存取已儲存":"一般賽事設定已儲存");
-    }catch(e){const raw=String(e?.message||e||"");if(raw.includes("room-access-locked"))showToast("比賽已開始，不能再修改房間密碼",true);else if(raw.includes("invalid-room-password"))showToast("房間密碼需為 4～20 字元",true);else showToast("房間存取設定儲存失敗，請稍後再試",true);}})();return;
+    })();return;
   }
   if(action==="toggle-lobby-section"){
     const section=target.getAttribute("data-section");
@@ -19614,7 +19749,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="submit-tournament-registration"){
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可報名，請切換至玩家模式", true); return; }
-    if(tournamentDetailData && publicTournamentRegistrationLocked(tournamentDetailData)){ showToast("賽事已開始，報名系統已鎖定",true); return; }
+    if(tournamentDetailData && (publicTournamentRegistrationLocked(tournamentDetailData)||(isCommunityQuickRegistration(tournamentDetailData)&&communityRegistrationLocked(tournamentDetailData)))){ showToast("賽事已開始，報名系統已鎖定",true); return; }
     if(tournamentDetailBusy) return;
     const code=target.getAttribute("data-code");
     const participantMode=target.getAttribute("data-participant-mode")==="children"?"children":"self";
@@ -19655,8 +19790,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="cancel-my-registration"){
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可取消報名，請切換至玩家模式", true); return; }
     const code = target.getAttribute("data-code");
-    const detailLock=(tournamentDetailCode===code && tournamentDetailData && publicTournamentRegistrationLocked(tournamentDetailData));
-    const summaryLock=myRegistrationsTournamentInfo[code] && publicTournamentRegistrationLocked(myRegistrationsTournamentInfo[code]);
+    const detailLock=(tournamentDetailCode===code && tournamentDetailData && (publicTournamentRegistrationLocked(tournamentDetailData)||(isCommunityQuickRegistration(tournamentDetailData)&&communityRegistrationLocked(tournamentDetailData))));
+    const summaryLock=myRegistrationsTournamentInfo[code] && (publicTournamentRegistrationLocked(myRegistrationsTournamentInfo[code])||(isCommunityQuickRegistration(myRegistrationsTournamentInfo[code])&&communityRegistrationLocked(myRegistrationsTournamentInfo[code])));
     if(detailLock || summaryLock){ showToast("賽事已開始，取消報名功能已鎖定",true); return; }
     openModal({ type:"generic", title:"取消報名？", message:"確定要取消這場賽事的報名嗎？取消後紀錄會保留；若本場開啟自動補位，會依備取順序遞補一位。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
       if(tournamentDetailBusy) return;

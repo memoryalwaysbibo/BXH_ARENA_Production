@@ -26,6 +26,10 @@ function mustInclude(text,msg){if(!html.includes(text))throw new Error(msg)}
 if(cname!=='arena.bxh.com.tw')throw new Error('Unexpected CNAME: '+cname);
 mustInclude('modules/cloud/cloud-runtime.js?v=20261006-roster-promotion-1','Roster promotion fix must use a fresh cloud runtime cache key');
 mustInclude('modules/main-app/core.js?v=20261006-roster-promotion-1','Roster promotion UI must use a fresh core cache key');
+for(const file of ['family-ui.js','modules/main-app/domain-utils.js','modules/main-app/community-host.js','modules/main-app/core.js','modules/cloud/cloud-runtime.js']){
+  const source=[...indexHtml.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map(match=>match[1]).find(src=>src.startsWith(file+'?'));
+  if(!source || !source.includes('&quick-registration=20261006.6'))throw new Error('Community quick registration must use a fresh cache key: '+file);
+}
 mustInclude('<meta name="bxh-build" content="'+String(version.build||'')+'">','index.html bxh-build must match version.json');
 mustInclude('CURRENT_BUILD="'+String(version.build||'')+'"','CURRENT_BUILD must match version.json');
 mustInclude('const APP_VERSION = "'+String(version.version||'')+'"','APP_VERSION must match version.json');

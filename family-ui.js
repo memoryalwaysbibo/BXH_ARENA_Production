@@ -113,6 +113,7 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
  if(!r?.ok)throw Error('unavailable');
  const children=(r.profiles||[]).filter(p=>!p.archived&&!p.accountUid);
  const blocked=!!event.registrationSelection;
+ const unlimitedCapacity=window.BXHDomainUtils?.isUnlimitedCommunityRegistration(event)===true;
  const requestedMode=mode==='children'?'children':'self';
  let activeRows=[];
  try{
@@ -138,10 +139,11 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
   dialog.innerHTML='<header><h2>'+(requestedMode==='children'?'兒童報名':'本人報名')+'</h2><button class="btn btn-ghost" data-close>取消</button></header>'
    +'<p>'+(requestedMode==='children'?'請選擇要參加這場賽事的孩子；每位孩子各占一個名額。':'確認由目前登入會員本人參加這場賽事。')+'</p>'
    +'<p><b>'+esc(event.name||code)+'</b>｜報名費：'+(event.fee!=null?esc(String(event.fee))+' 元':'免費')+'</p>'
+   +(unlimitedCapacity?'<p>名額：不限人數｜已有 '+Number(window.BXHDomainUtils?.communityRegistrationParticipantCount(event)??event.confirmedCount??0)+' 人報名</p>':'')
    +'<form><fieldset><legend>參賽者</legend>'+participantFields+'</fieldset>'
    +'<p class="hint">'+(requestedMode==='children'?(availableChildren.length?'已報名的孩子不會重複出現在可選清單。':'可先建立孩子資料後再回到本場報名。'):'本人與兒童報名分開處理；之後仍可再使用「兒童報名」新增孩子。')+'</p>'
    +'<p data-family="allocation" role="status" aria-live="polite"></p>'
-   +'<p class="hint">名額以送出時為準；若正取已滿，可能轉為備取。</p>'
+   +'<p class="hint">'+(unlimitedCapacity?'本場目前不限人數；實際報名狀態以送出時為準。':'名額以送出時為準；若正取已滿，可能轉為備取。')+'</p>'
    +'<button class="btn btn-primary" type="submit" disabled>確認報名</button></form>';
   let done=false;
   const finish=(error,value)=>{if(done)return;done=true;clearInterval(timer);dialog.close();dialog.remove();focus?.focus?.();if(error)reject(Error(error));else resolve(value)};
@@ -175,7 +177,7 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
    }catch(err){
     if(done||generation!==previewGeneration)return;
     const raw=String(err?.details?.message||err?.message||err?.code||'unknown').replace(/^functions\//,'');
-    const known={'auth-required':'請重新登入後再試。','not-found':'找不到這場賽事。','not-enabled':'此賽事尚未開放線上報名。','not-open-yet':'報名尚未開放。','closed':'報名已截止。','full':'正取與備取皆已額滿。','profile-incomplete':'請先完成會員資料。','already-registered':'這位參賽者已完成報名。','registration-state-conflict':'報名人數尚未同步，請聯絡主辦重新發布賽事。','tournament-started':'賽事已開始，報名系統已鎖定。','test-event-required':'封測身分限制尚未更新，請重新整理後再試。'};
+    const known={'auth-required':'請重新登入後再試。','not-found':'找不到這場賽事。','not-enabled':'此賽事尚未開放線上報名。','not-open-yet':'報名尚未開放。','closed':'報名已截止。','full':'正取與備取皆已額滿。','profile-incomplete':'請先完成會員資料。','already-registered':'這位參賽者已完成報名。','registration-state-conflict':'報名設定或人數尚未同步，請聯絡主辦重新儲存設定。','invalid-registration-capacity':'報名人數上限設定無效，請聯絡主辦修正。','invalid-registration-schedule':'報名時間設定無效，請聯絡主辦修正或清空選填時間。','tournament-started':'賽事已開始，報名系統已鎖定。','test-event-required':'封測身分限制尚未更新，請重新整理後再試。'};
     allocation.textContent=known[raw]||Object.entries(known).find(([key])=>raw.includes(key))?.[1]||('名額檢查失敗（'+raw+'）');
     const retry=document.createElement('button');
     retry.type='button';retry.className='btn btn-ghost';retry.textContent='重新檢查名額';retry.onclick=refreshPreview;
@@ -225,7 +227,7 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
     api.__testerGeneralRoomHotfix=true;
     if(typeof api.pushUpdate==='function'){
       const push=api.pushUpdate.bind(api);
-      api.pushUpdate=async(code,data)=>{if(!ownCommunity(data))return push(code,data);const result=await asCommunityOwner(()=>push(code,data));if(result===false)await communityDiagnostic(code,'雲端同步');return result};
+      api.pushUpdate=async(code,data,options)=>{if(!ownCommunity(data))return push(code,data,options);const result=await asCommunityOwner(()=>push(code,data,options));if(result===false)await communityDiagnostic(code,'雲端同步');return result};
     }
     if(typeof api.deleteCommunityRoom==='function'){
       api.deleteCommunityRoom=async code=>asCommunityOwner(async()=>{

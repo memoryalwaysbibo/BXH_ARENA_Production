@@ -150,6 +150,8 @@ jobs:
         run: node --test tests/management-loading.test.cjs
       - name: Verify roster mutation and snapshot races
         run: node --test tests/roster-sync-race.test.cjs
+      - name: Verify community quick registration and cloud contract
+        run: node --test tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs
       - name: Verify family roster check-in preservation
         run: |
           node --check family-ui.js
@@ -210,6 +212,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install UI test runner
+        id: install_ui
         run: npm install --no-package-lock --ignore-scripts
       - name: Run isolated browser smoke tests (one controlled retry)
         shell: bash
@@ -229,6 +232,17 @@ jobs:
             echo "::error title=CODE_FAIL_OR_INFRA_FAIL::UI Smoke failed twice."
             exit "$rc"
           fi
+      - name: Verify isolated community quick registration in Chromium
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/e2e/community-quick-registration-browser.cjs
+      - name: Upload community quick registration screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-community-quick-registration-${{ github.run_id }}
+          path: test-results/community-quick-registration/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

@@ -826,7 +826,8 @@
         stations: (state.meta && state.meta.stations) || 1,
         refereeStationRestrictionEnabled: !!(state.meta && state.meta.refereeStationRestrictionEnabled),
         refereeStationNames: (state.meta && state.meta.refereeStationNames && typeof state.meta.refereeStationNames==="object") ? state.meta.refereeStationNames : {},
-        eventAuthority: (state.meta && state.meta.eventAuthority) || "official"
+        eventAuthority: (state.meta && state.meta.eventAuthority) || "official",
+        ...(state.meta?.eventAuthority==="community"&&state.meta.communityQuickRegistration===true?{communityQuickRegistration:true}:{})
       },
       testMode: state.testMode===true,
       testCreatedAt: state.testCreatedAt||null,
@@ -898,6 +899,14 @@
     }
     if(!out)throw new Error("corrupt-public-document");
     out.meta=out.meta||{};out.meta.roomAccessMode=d.roomAccessMode||out.meta.roomAccessMode||"public";
+    if(d.eventAuthority==="community"&&d.communityQuickRegistration===true){
+      out.communityQuickRegistration=true;out.meta.communityQuickRegistration=true;out.meta.eventAuthority="community";
+      if(Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)out.communityParticipantCount=d.communityParticipantCount;
+      out.meta.registrationEnabled=d.registrationEnabled===true;
+      out.meta.registrationCapacity=d.capacity;
+      out.meta.registrationOpenAt=d.registrationOpenAt??null;out.meta.registrationCloseAt=d.registrationCloseAt??null;
+      out.meta.cancellationDeadline=d.cancellationDeadline??null;out.meta.registrationStatus=d.registrationStatus||"closed";
+    }
     return out;
   }
 
@@ -1189,8 +1198,9 @@
         if(matches.length!==1||players.some(p=>p&&String(p.id)===candidateId))throw Object.assign(new Error("not-waitlist"),{code:"not-waitlist"});
         const candidate=matches[0];
         if(candidate.registrationId||candidate.source==="online")throw Object.assign(new Error("online-registration-required"),{code:"online-registration-required"});
-        const capacity=Number(tour.capacity??runtime.meta.registrationCapacity??0);
-        if(!Number.isSafeInteger(capacity)||capacity<0)throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});
+        const unlimited=tour.eventAuthority==="community"&&tour.communityQuickRegistration===true&&tour.capacity===null&&pub.eventAuthority==="community"&&pub.communityQuickRegistration===true&&pub.capacity===null;
+        const capacity=unlimited?null:Number(tour.capacity??runtime.meta.registrationCapacity??0);
+        if(capacity!==null&&(!Number.isSafeInteger(capacity)||capacity<0))throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});
         const full=capacity>0&&players.length>=capacity;
         if(full&&expandBy!==8)throw Object.assign(new Error("capacity-full"),{code:"capacity-full",capacity});
         const nextCapacity=full?capacity+8:capacity;
@@ -1222,7 +1232,7 @@
       }catch(e){throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});}
       const inPrivate=(remoteState.players||[]).some(p=>p&&String(p.id)===candidateId);
       const inPublic=(publicState.players||[]).some(p=>p&&String(p.id)===candidateId);
-      if(!inPrivate||!inPublic||Number(tour.capacity)!==result.capacity||Number(pub.capacity)!==result.capacity)throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+      if(!inPrivate||!inPublic||(result.capacity===null?tour.capacity!==null||pub.capacity!==null:Number(tour.capacity)!==result.capacity||Number(pub.capacity)!==result.capacity))throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
       return Object.assign({},result,{state:remoteState,verified:true});
     },
 
@@ -1240,7 +1250,20 @@
       const pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
       const regRef=fx.doc(dbHandle,"tournaments",eventCode,"registrations",regId);
 
-      const txResult=await fx.runTransaction(dbHandle,async tx=>{
+      let unlimitedPromotion=false;
+      if(action==="promote"){
+        const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
+        if(tourSnap.exists()&&pubSnap.exists()){
+          const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+          unlimitedPromotion=tour.eventAuthority==="community"&&tour.communityQuickRegistration===true&&tour.capacity===null&&pub.eventAuthority==="community"&&pub.communityQuickRegistration===true&&pub.capacity===null;
+        }
+        if(unlimitedPromotion&&expandBy!==0)throw Object.assign(new Error("invalid-capacity-step"),{code:"invalid-capacity-step"});
+      }
+      // Unlimited promotions use the existing staff/admin-only trusted service.
+      // The common server read-back below still verifies roster + both mirrors.
+      const txResult=unlimitedPromotion
+        ?await callEngagementFunction("registrationRosterService",{action:"promote",code:eventCode,registrationId:regId,intent:"admin",operationId:crypto.randomUUID()},60000)
+        :await fx.runTransaction(dbHandle,async tx=>{
         const tourSnap=await tx.get(tourRef);
         const pubSnap=await tx.get(pubRef);
         const regSnap=await tx.get(regRef);
@@ -1255,7 +1278,8 @@
 
         // Firestore Rules validate deltas against tournaments, not the public mirror.
         // Use the same source here and repair any lagging public counters in this transaction.
-        let capacity=Math.max(0,Number(tour.capacity??pub.capacity??runtime.meta.registrationCapacity??0));
+        const unlimited=tour.eventAuthority==="community"&&tour.communityQuickRegistration===true&&tour.capacity===null&&pub.eventAuthority==="community"&&pub.communityQuickRegistration===true&&pub.capacity===null;
+        let capacity=unlimited?null:Math.max(0,Number(tour.capacity??pub.capacity??runtime.meta.registrationCapacity??0));
         let confirmed=Math.max(0,Number(tour.confirmedCount??pub.confirmedCount??0));
         let waiting=Math.max(0,Number(tour.waitlistCount??pub.waitlistCount??0));
         const oldStatus=String(reg.status||"");
@@ -1354,7 +1378,7 @@
       const expectedStatus=txResult.status;
       const stateCap=Number(remoteState&&remoteState.meta&&remoteState.meta.registrationCapacity||0);
       const countsOk=Number(tour.confirmedCount||0)===Number(txResult.confirmedCount)&&Number(pub.confirmedCount||0)===Number(txResult.confirmedCount)&&Number(tour.waitlistCount||0)===Number(txResult.waitlistCount)&&Number(pub.waitlistCount||0)===Number(txResult.waitlistCount);
-      const capOk=Number(tour.capacity||0)===Number(txResult.capacity)&&Number(pub.capacity||0)===Number(txResult.capacity)&&stateCap===Number(txResult.capacity);
+      const capOk=txResult.capacity===null?tour.capacity===null&&pub.capacity===null&&remoteState?.meta?.registrationCapacity===null:Number(tour.capacity||0)===Number(txResult.capacity)&&Number(pub.capacity||0)===Number(txResult.capacity)&&stateCap===Number(txResult.capacity);
       const statusOk=!regExists||String(reg.status||"")===String(expectedStatus);
       let publicRuntime={};try{publicRuntime=pub.bracketView?JSON.parse(pub.bracketView):{};}catch(e){}
       const pubPlayerIds=new Set((publicRuntime.players||[]).map(p=>String(p.id||"")));
@@ -1788,7 +1812,9 @@
           registrationSelection:d.registrationSelection||null,registeredCount:Number(d.registeredCount||0),
           registrationEnabled: !!d.registrationEnabled,
           registrationStatus: d.registrationStatus || "",
-          capacity: d.capacity || 0,
+          communityQuickRegistration:d.eventAuthority==="community"&&d.communityQuickRegistration===true,
+          communityParticipantCount:d.communityParticipantCount,
+          capacity: d.eventAuthority==="community"&&d.communityQuickRegistration===true?d.capacity:(d.capacity||0),
           confirmedCount: d.confirmedCount || 0,
           waitlistEnabled: !!d.waitlistEnabled,
           waitlistCapacity: d.waitlistCapacity || 0,
@@ -2132,6 +2158,7 @@
 
     async createCommunityRoom(data){
       if(!cloudEnabled || !data) throw Object.assign(new Error("cloud-disabled"),{code:"cloud-disabled"});
+      if(data.meta?.battleMode==="team")throw new Error("community-quick-individual-only");
       const uid=currentUserUidForWrites();
       if(!uid) throw Object.assign(new Error("auth-not-ready"),{code:"auth-not-ready"});
       try{
@@ -2139,29 +2166,35 @@
         // Player accounts must not perform a preflight read against public mirrors.
         const code=generateRoomCode();
         const now=Date.now();
-        data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.meta.ladderMode="general"; data.meta.registrationEnabled=!!data.meta.registrationEnabled; data.meta.assignedStaffUids=[]; data.meta.roomAccessMode=data.meta.roomAccessMode==="password"?"password":"public";
+        data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.communityQuickRegistration=true; data.meta.communityQuickRegistration=true; data.meta.ladderMode="general"; data.meta.registrationEnabled=!!data.meta.registrationEnabled; data.meta.assignedStaffUids=[]; data.meta.roomAccessMode=data.meta.roomAccessMode==="password"?"password":"public";
         data.ownerUid=uid; data.createdByRole="player"; data.lastActivityAt=now;
         const hasStructure=(data.players||[]).some(p=>p&&p.isRoomOwner!==true)||(data.matches&&data.matches.length)||data.bracketSize;
         const expMs=data.expiresAtMs || now+(hasStructure?30*24*60*60*1000:6*60*60*1000); data.expiresAtMs=expMs;
         const regEnabled=!!data.meta.registrationEnabled;
-        const regOpen=regEnabled?(data.meta.registrationOpenAt||now):null;
-        const eventStartMs=Date.parse(String(data.meta.date||"")+"T"+String(data.meta.startTime||"23:59")+":00");
-        const regClose=regEnabled?(data.meta.registrationCloseAt||(!isNaN(eventStartMs)?eventStartMs:now+7*24*60*60*1000)):null;
-        const capacity=regEnabled?Math.max(1,Number(data.meta.registrationCapacity)||16):0;
-        const waitlistCapacity=regEnabled?Math.max(0,Number(data.meta.waitlistCapacity)||0):0;
-        const cancellationDeadline=regEnabled?(data.meta.cancellationDeadline||regClose):null;
+        const regOpen=data.meta.registrationOpenAt??null;
+        const regClose=data.meta.registrationCloseAt??null;
+        const capacity=data.meta.registrationCapacity==null?null:Number(data.meta.registrationCapacity);
+        if(capacity!==null&&(!Number.isSafeInteger(capacity)||capacity<1))throw new Error("invalid-registration-capacity");
+        const waitlistCapacity=Number(data.meta.waitlistCapacity??0);
+        if(!Number.isSafeInteger(waitlistCapacity)||waitlistCapacity<0)throw new Error("invalid-waitlist-capacity");
+        const cancellationDeadline=data.meta.cancellationDeadline??null;
+        if([regOpen,regClose,cancellationDeadline].some(value=>value!==null&&(!Number.isSafeInteger(value)||value<=0)))throw new Error("invalid-registration-schedule");
+        if(regOpen!==null&&regClose!==null&&regClose<=regOpen)throw new Error("invalid-registration-schedule");
+        const communityParticipantCount=window.BXHDomainUtils.communityLocalParticipantCount(data);
+        data.communityParticipantCount=communityParticipantCount;
+        const registrationStatus=!regEnabled?"closed":regClose!==null&&now>=regClose?"closed":regOpen!==null&&now<regOpen?"scheduled":capacity!==null&&communityParticipantCount>=capacity?"full":"open";
         data.meta.registrationOpenAt=regOpen;
         data.meta.registrationCloseAt=regClose;
         data.meta.registrationCapacity=capacity;
         data.meta.waitlistCapacity=waitlistCapacity;
         data.meta.cancellationDeadline=cancellationDeadline;
         data.meta.registrationVisibility="public";
-        data.meta.registrationStatus=regEnabled?"open":"closed";
+        data.meta.registrationStatus=registrationStatus;
         const base={
-          eventAuthority:"community",ownerUid:uid,createdBy:uid,createdByName:currentUserDisplayNameForWrites(),createdByRole:"player",
-          ladderMode:"general",ladderPointsAwarded:false,roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",visibility:"public",
+          eventAuthority:"community",communityQuickRegistration:true,ownerUid:uid,createdBy:uid,createdByName:currentUserDisplayNameForWrites(),createdByRole:"player",
+          ladderMode:"general",ladderPointsAwarded:false,roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,registrationEnabled:regEnabled,registrationStatus,visibility:"public",
           registrationOpenAt:regOpen,registrationCloseAt:regClose,capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,
-          confirmedCount:0,waitlistCount:0,registrationVisibility:"public",publishedAt:data.meta.publishedAt||now,
+          confirmedCount:0,waitlistCount:0,communityParticipantCount,registrationVisibility:"public",publishedAt:data.meta.publishedAt||now,
           cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
           tournamentPhase:computeTournamentPhase(data),archiveStatus:data.archiveStatus||"ongoing",name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",bracketSize:data.bracketSize||0,
           updatedAt:now,lastActivityAt:now,expiresAt:new Date(expMs)
@@ -2171,9 +2204,9 @@
         const batch=fx.writeBatch(dbHandle);
         batch.set(tournamentRef,Object.assign({},base,{data:JSON.stringify(data)}));
         batch.set(publicRef,{
-          bracketView:JSON.stringify(buildPublicMirrorFields(data)),updatedAt:now,visibility:"public",eventAuthority:"community",ownerUid:uid,ladderMode:"general",roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,roomLocked:data.meta.roomAccessMode==="password",
-          registrationEnabled:regEnabled,registrationStatus:regEnabled?"open":"closed",registrationOpenAt:regOpen,registrationCloseAt:regClose,
-          capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,confirmedCount:0,waitlistCount:0,registrationVisibility:"public",
+          bracketView:JSON.stringify(buildPublicMirrorFields(data)),updatedAt:now,visibility:"public",eventAuthority:"community",communityQuickRegistration:true,ownerUid:uid,ladderMode:"general",roomAccessMode:data.meta.roomAccessMode,roomAccessVersion:0,roomLocked:data.meta.roomAccessMode==="password",
+          registrationEnabled:regEnabled,registrationStatus,registrationOpenAt:regOpen,registrationCloseAt:regClose,
+          capacity,waitlistEnabled:waitlistCapacity>0,waitlistCapacity,confirmedCount:0,waitlistCount:0,communityParticipantCount,registrationVisibility:"public",
           publishedAt:data.meta.publishedAt||now,cancellationDeadline,targetGroup:"open",participantNameMode:(data.meta.participantNameMode==="gameId"?"gameId":"realName"),
           tournamentPhase:computeTournamentPhase(data),name:data.meta.name||"",eventDate:data.meta.date||"",location:data.meta.location||"",startAt:data.meta.startTime||"",battleMode:data.meta.battleMode==="team"?"team":"individual",teamSize:Math.max(3,Number(data.meta.teamSize)||3),playMode:data.meta.playMode==="enchantment"?"enchantment":"standard",formatType:data.meta.formatType||"single",lastActivityAt:now,expiresAt:new Date(expMs)
         });
@@ -2267,6 +2300,13 @@
           data.partnerContractOrderCode=partnerGrant.orderCode||partnerGrant.contractOrderCode||userProfile.partnerContractOrderCode||null;
         }
         const m = (data && data.meta) || {};
+        if(m.eventAuthority==="community"&&m.communityQuickRegistration===true){
+          if(m.battleMode==="team")throw new Error("community-quick-individual-only");
+          if(m.registrationCapacity!==null&&(!Number.isSafeInteger(m.registrationCapacity)||m.registrationCapacity<1))throw new Error("invalid-registration-capacity");
+          if([m.registrationOpenAt,m.registrationCloseAt,m.cancellationDeadline].some(value=>value!=null&&(!Number.isSafeInteger(value)||value<=0)))throw new Error("invalid-registration-schedule");
+          if(m.registrationOpenAt!=null&&m.registrationCloseAt!=null&&m.registrationCloseAt<=m.registrationOpenAt)throw new Error("invalid-registration-schedule");
+          data.communityQuickRegistration=true;
+        }
         const lobbyVisibility = m.registrationVisibility==="private" ? "private" : "public";
         // BUG012: tester sandbox assignment normalization
         // A tester may only create a test tournament assigned to self (or none).
@@ -2281,11 +2321,12 @@
         if(data && !data.createdBy) data.createdBy=creatorUid;
         if(data && data.meta && data.meta.eventAuthority==="community" && !data.ownerUid) data.ownerUid=creatorUid;
         const registrationFields = {
+          ...(m.eventAuthority==="community"&&m.communityQuickRegistration===true?{communityQuickRegistration:true}:{}),
           registrationEnabled: !!m.registrationEnabled,
           registrationOpenAt: m.registrationOpenAt || null,
           registrationCloseAt: m.registrationCloseAt || null,
           registrationStatus: m.registrationStatus || null,
-          capacity: m.registrationCapacity || null,
+          capacity: m.eventAuthority==="community"&&m.communityQuickRegistration===true?m.registrationCapacity:(m.registrationCapacity||null),
           waitlistEnabled: (Number(m.waitlistCapacity)||0) > 0,
           waitlistCapacity: m.waitlistCapacity || null,
           confirmedCount: 0,
@@ -2394,6 +2435,7 @@
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
         const parsed = JSON.parse(d.data);
+        if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
         if(d.ladderPointsAwarded===true) parsed.ladderPointsAwarded=true;
         if(d.ladderSeasonId) parsed.ladderSeasonId=d.ladderSeasonId;
         if(d.ladderAwardedAt) parsed.ladderAwardedAt=d.ladderAwardedAt;
@@ -2541,7 +2583,19 @@
       }
     },
 
-    async pushUpdate(code, data){
+    async syncCommunityRegistrationSummary(code){
+      const normalized=String(code||"").toUpperCase();
+      window.__BXH_COMMUNITY_SUMMARY_STATUS=window.__BXH_COMMUNITY_SUMMARY_STATUS||{};
+      try{
+        if(!window.engagementService?.familyRegistration)throw new Error("summary-service-unavailable");
+        const result=await window.engagementService.familyRegistration({action:"syncSummary",code:normalized,operationId:crypto.randomUUID()});
+        if(result?.ok!==true||!Number.isSafeInteger(result.communityParticipantCount)||result.communityParticipantCount<0)throw new Error("invalid-summary-result");
+        window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:true,communityParticipantCount:result.communityParticipantCount};
+        return window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized];
+      }catch(e){window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:false};throw e;}
+    },
+
+    async pushUpdate(code, data, options={}){
       if(!cloudEnabled || !code) return false;
       try{
         const actorUid=currentUserUidForWrites();
@@ -2567,16 +2621,24 @@ if(testerSession){
         const testRoom=data.testMode===true && data.meta?.eventAuthority==="test";
         if(testRoom){data.meta.name=ensureTestName(data.meta.name);data.meta.ladderMode="general";data.ladderPointsAwarded=false;}
         const m = (data && data.meta) || {};
+        if(m.eventAuthority==="community"&&m.communityQuickRegistration===true){
+          if(m.battleMode==="team")throw new Error("community-quick-individual-only");
+          if(m.registrationCapacity!==null&&(!Number.isSafeInteger(m.registrationCapacity)||m.registrationCapacity<1))throw new Error("invalid-registration-capacity");
+          if([m.registrationOpenAt,m.registrationCloseAt,m.cancellationDeadline].some(value=>value!=null&&(!Number.isSafeInteger(value)||value<=0)))throw new Error("invalid-registration-schedule");
+          if(m.registrationOpenAt!=null&&m.registrationCloseAt!=null&&m.registrationCloseAt<=m.registrationOpenAt)throw new Error("invalid-registration-schedule");
+          data.communityQuickRegistration=true;
+        }
         const lobbyVisibility = m.registrationVisibility==="private" ? "private" : "public";
         const registrationFields = {
           // Top-level fields mirrored from meta so Phase 2+ can query across
           // tournaments (e.g. "find open registration events") without needing
           // to parse the full JSON blob. Kept in sync on every push.
+          ...(m.eventAuthority==="community"&&m.communityQuickRegistration===true?{communityQuickRegistration:true}:{}),
           registrationEnabled: !!m.registrationEnabled,
           registrationOpenAt: m.registrationOpenAt || null,
           registrationCloseAt: m.registrationCloseAt || null,
           registrationStatus: m.registrationStatus || null,
-          capacity: m.registrationCapacity || null,
+          capacity: m.eventAuthority==="community"&&m.communityQuickRegistration===true?m.registrationCapacity:(m.registrationCapacity||null),
           waitlistEnabled: (Number(m.waitlistCapacity)||0) > 0,
           waitlistCapacity: m.waitlistCapacity || null,
           // v13.13.2: confirmedCount / waitlistCount are deliberately omitted here.
@@ -2647,6 +2709,8 @@ if(testerSession){
           delete privatePayload.capacity;delete publicPayload.capacity;
         }
         const normalized=String(code).toUpperCase();
+        const quickWaiting=community&&m.communityQuickRegistration===true&&!data.startedAt&&computeTournamentPhase(data)==="waiting";
+        let syncSummary=community&&m.communityQuickRegistration===true&&options.syncCommunitySummary===true;
         await fx.runTransaction(dbHandle,async tx=>{
           const ref=fx.doc(dbHandle,"tournaments",normalized),snap=await tx.get(ref);
           if(snap.exists()){
@@ -2677,6 +2741,7 @@ if(testerSession){
             // local copy, so always rebase those fields from the newest remote document
             // before writing the JSON blob or public mirror.
             const remoteMeta=(remoteState&&remoteState.meta)||{};
+            if(quickWaiting&&(remoteDoc.communityQuickRegistration!==true||JSON.stringify(remoteState?.players||[])!==JSON.stringify(data.players||[])))syncSummary=true;
             const canonicalAssignments=(remoteDoc.refereeStationAssignments&&typeof remoteDoc.refereeStationAssignments==="object"&&!Array.isArray(remoteDoc.refereeStationAssignments))
               ? remoteDoc.refereeStationAssignments
               : ((remoteMeta.refereeStationAssignments&&typeof remoteMeta.refereeStationAssignments==="object"&&!Array.isArray(remoteMeta.refereeStationAssignments))?remoteMeta.refereeStationAssignments:{});
@@ -2718,6 +2783,10 @@ if(testerSession){
           tx.set(ref,privatePayload,{merge:true});
           tx.set(fx.doc(dbHandle,"publicTournaments",normalized),publicPayload,{merge:true});
         });
+        if(syncSummary){
+          try{const summary=await this.syncCommunityRegistrationSummary(normalized);data.communityParticipantCount=summary.communityParticipantCount;}
+          catch(e){console.warn("[community participant summary pending]",e);}
+        }
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
@@ -3131,6 +3200,7 @@ if(testerSession){
           const d = snap.data();
           try{
             const parsed = JSON.parse(d.data);
+            if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
             callback(parsed, d.updatedAt);
           }catch(e){}
         }, (err)=>{
@@ -3155,7 +3225,7 @@ if(testerSession){
           try{
             const source = d.bracketView || d.data;
             if(!source) return;
-            const parsed = JSON.parse(source);
+            const parsed = reconstructPublicStateFromDoc(snap.id,d);
             callback(parsed, d.updatedAt);
           }catch(e){
             console.warn("公開賽事即時資料解析失敗", e);
