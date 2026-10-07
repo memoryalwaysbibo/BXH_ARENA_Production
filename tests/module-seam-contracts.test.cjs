@@ -58,6 +58,8 @@ function authHarness(getUserProfile) {
     pendingExistingAccountProfile: null,
     pendingNewPlayerProfile: null,
     syncEngagementIdentity() {},
+    captureCommunityRoomStateContext: () => null,
+    resumeCommunityRoomStateSubscription() {},
     clearVerifyingTimeout() {},
     render() {},
     showToast() {},

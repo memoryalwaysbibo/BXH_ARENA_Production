@@ -20,6 +20,7 @@ function harness(overrides={}){
  ...overrides});
  ctx.window.cloudSync={connect:async()=>true,subscribeRegistrationsForAdmin:(code,next,error)=>{calls.subscribe.push({code,next,error});return ()=>{calls.unsub++;};},syncCommunityRegistrationSummary:async()=>{calls.catchup++;return {ok:true,communityParticipantCount:2};},joinRoom:async()=>{calls.read++;return {ok:true,data:clone(ctx.remote)};},getPublicTournamentFull:async()=>{calls.publicRead++;return {};},listRegistrationsForAdmin:async()=>{calls.list++;return [];}};
  vm.runInContext(domain,ctx);Object.assign(ctx,ctx.window.BXHDomainUtils);
+ vm.runInContext(block('let communityRoomSnapshotGeneration=0;','let remoteAppliedRoomId=null'),ctx);
  for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','applyRemoteState'])vm.runInContext(fn(name),ctx);
  vm.runInContext(block('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;','let myRegistrationsError = null;'),ctx);
  vm.runInContext(fn('syncLatestOnlineRosterBeforeLock'),ctx);
@@ -154,6 +155,129 @@ function startHarness(){
  vm.runInContext('function startTournament(){const action="start-tournament";'+block('  if(action==="start-tournament"){','  if(action==="reset-bracket"){')+'}',ctx);
  return h;
 }
+
+test('actual create action preserves creator identity through first owner roster sync and draw',async()=>{
+ const {ctx,calls}=harness();let createdPayload;
+ Object.assign(ctx,{appPhase:'community-create',communityCreateSaving:false,cloudUnsub:null,cloudStatus:'connected',
+  document:{getElementById:id=>id==='community-capacity'?{value:'',validity:{badInput:false}}:id==='community-registration-enabled'?{checked:false}:null},
+  emptyEventInfoV2:()=>({}),uid:prefix=>prefix+'-created',FORMAT_LABELS:{single:'single'},communityRoomExpiryMs:()=>Date.now()+10000,
+  setCurrentId:async()=>{},eligiblePlayers:()=>ctx.state.players,openModal:modal=>{throw Error('unexpected modal '+modal.title);},
+  generateBracket:()=>{ctx.state.bracketSize=ctx.state.players.length;return true;}});
+ vm.runInContext(fn('defaultState'),ctx);
+ ctx.window.cloudSync.createCommunityRoom=async st=>{createdPayload=clone(st);return 'ROOM-NEW';};
+ ctx.window.cloudSync.subscribe=()=>()=>{};
+ vm.runInContext('function createRoom(){const action="community-create-submit",target={};'+block('  if(action==="community-create-submit"){','  if(action==="community-open-room"){')+'}',ctx);
+ vm.runInContext('function drawRoom(){const action="draw-bracket",target={};'+block('  if(action==="draw-bracket"){','  if(action==="view-changelog"){')+'}',ctx);
+ ctx.createRoom();await tick();
+ assert.equal(ctx.appPhase,'community-room');assert.equal(createdPayload.createdBy,'host','serialized runtime must preserve the authenticated creator');
+ assert.equal(ctx.state.createdBy,'host');assert.equal(ctx.canManageRegistrationRoster(),true);
+ ctx.state.players.push({id:'onsite',name:'Guest',source:'onsite',checkedIn:true});ctx.remote=clone(ctx.state);
+ ctx.drawRoom();await tick();
+ assert.equal(ctx.state.bracketSize,2);assert.equal(calls.catchup,1);assert.equal(calls.read,1);assert.equal(calls.save,1);
+ assert(!calls.toasts.some(row=>row.error));
+});
+
+for(const missing of [null,undefined])test('legacy raw snapshot preserves the same owner creator previously hydrated by joinRoom: '+missing,async()=>{
+ const {ctx,calls}=harness();
+ const cloud=fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8');
+ const begin=cloud.indexOf('    async joinRoom(code){'),end=cloud.indexOf('\n    // Guest/public use',begin);
+ assert(begin>=0&&end>begin);
+ const raw={...clone(ctx.state),createdBy:missing,updatedAt:10,registrationRosterRevision:1};
+ const doc={eventAuthority:'community',communityQuickRegistration:true,createdBy:'host',ownerUid:'host',createdByRole:'player',data:JSON.stringify(raw)};
+ Object.assign(ctx,{cloudEnabled:true,dbHandle:{},fx:{doc:()=>({}),getDoc:async()=>({exists:()=>true,data:()=>clone(doc)})}});
+ vm.runInContext('globalThis.actualCloud={'+cloud.slice(begin,end).trim().replace(/,$/,'')+'}',ctx);
+ const joined=await ctx.actualCloud.joinRoom('ROOM-A');assert.equal(joined.ok,true);assert.equal(joined.data.createdBy,'host');
+ ctx.state=joined.data;ctx.reconcileRegistrationRosterContext();await ctx.startAdminRosterWatch();assert.equal(calls.subscribe.length,1);
+ const next={...raw,updatedAt:20,registrationRosterRevision:2,players:[...raw.players,{id:'new-online',source:'online',registrationId:'r'}]};
+ ctx.applyRemoteState(next);
+ assert.equal(ctx.state.createdBy,'host');assert.equal(ctx.state.players.length,2);assert.equal(ctx.canManageRegistrationRoster(),true);
+ assert.equal(ctx.rosterCode(),'ROOM-A');assert.equal(calls.unsub,0);assert.equal(next.createdBy,missing,'preservation must not mutate incoming snapshots');
+});
+
+for(const [label,change] of [
+ ['conflicting creator',c=>{c.remote.createdBy='other';}],
+ ['changed owner',c=>{c.remote.ownerUid='other';}],
+ ['different room code',c=>{c.remote.cloudCode='ROOM-B';}],
+ ['missing room code',c=>{delete c.remote.cloudCode;}],
+ ['unverified previous creator',c=>{c.state.createdBy=null;}],
+ ['different signed-in user',c=>{c.firebaseUser.uid='other';}],
+ ['non-owner role',c=>{c.currentRole='guest';}],
+ ['official incoming room',c=>{c.remote.meta.eventAuthority='official';}],
+ ['legacy unmarked incoming room',c=>{delete c.remote.communityQuickRegistration;delete c.remote.meta.communityQuickRegistration;}]
+])test('legacy creator preservation cannot grant owner access for '+label,()=>{
+ const {ctx}=harness();ctx.remote.createdBy=null;change(ctx);ctx.applyRemoteState(ctx.remote);
+ assert.notEqual(ctx.state.createdBy,'host');assert.equal(ctx.canManageRegistrationRoster(),false);
+});
+
+test('a different room snapshot cannot change the current creator or roster',()=>{
+ const {ctx}=harness(),before=clone(ctx.state);ctx.remote.id='another-room';ctx.remote.createdBy=null;
+ ctx.applyRemoteState(ctx.remote);assert.deepEqual(clone(ctx.state),before);
+});
+
+async function legacySubscriptionHarness(){
+ const h=harness(),{ctx}=h,cloud=fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8'),docs=new Map(),callbacks=[];
+ const methods=['createCommunityRoom','joinRoom'].map(name=>{const start=cloud.indexOf('    async '+name+'('),end=cloud.indexOf('\n    },',start);assert(start>=0&&end>start);return cloud.slice(start,end+6);});
+ Object.assign(ctx,{cloudEnabled:true,dbHandle:{},emptyEventInfoV2:()=>({}),uid:prefix=>prefix+'-legacy',
+  currentUserUidForWrites:()=>ctx.firebaseUser?.uid,currentUserDisplayNameForWrites:()=> 'Host',generateRoomCode:()=> 'ROOM-A',
+  computeTournamentPhase:()=> 'waiting',buildPublicMirrorFields:st=>({id:st.id,players:st.players.map(({id,name,checkedIn})=>({id,name,checkedIn}))}),
+  fx:{doc:(_db,...parts)=>parts.join('/'),getDoc:async key=>({exists:()=>docs.has(key),data:()=>clone(docs.get(key))}),
+   writeBatch:()=>{const writes=[];return {set:(key,value)=>writes.push([key,clone(value)]),commit:async()=>writes.forEach(([key,value])=>docs.set(key,value))};}}});
+ vm.runInContext(fn('defaultState'),ctx);vm.runInContext('globalThis.actualCloud={'+methods.join(',\n')+'}',ctx);
+ const legacy=ctx.defaultState('legacy-room');legacy.players=[{id:'host-player',name:'Host',source:'host',checkedIn:true}];
+ const code=await ctx.actualCloud.createCommunityRoom(legacy),raw=JSON.parse(docs.get('tournaments/'+code).data);
+ assert.equal(raw.createdBy,null);assert.equal(raw.cloudCode,null,'actual cloud create serializes before the caller receives its code');
+ const joined=await ctx.actualCloud.joinRoom(code);assert.equal(joined.data.createdBy,'host');
+ ctx.state=joined.data;ctx.state.cloudCode=code;ctx.reconcileRegistrationRosterContext();
+ ctx.window.cloudSync.subscribe=(_code,callback)=>{callbacks.push(callback);return ()=>{};};
+ const unsubscribe=ctx.subscribeCommunityRoomState(code);
+ const next={...raw,updatedAt:Date.now()+1000,registrationRosterRevision:1,players:[...raw.players,{id:'online',source:'online',registrationId:'r'}]};
+ return {...h,raw,next,callbacks,unsubscribe};
+}
+
+test('actual legacy creation, authoritative join and private listener handle both missing identity fields',async()=>{
+ const {ctx,next,callbacks}=await legacySubscriptionHarness();callbacks[0](next,Date.now());
+ assert.equal(ctx.state.createdBy,'host');assert.equal(ctx.state.cloudCode,'ROOM-A');assert.equal(ctx.state.players.length,2);
+ assert.equal(ctx.canManageRegistrationRoster(),true);assert.equal(next.createdBy,null);assert.equal(next.cloudCode,null);
+});
+
+for(const [label,change] of [
+ ['switched room',h=>{h.ctx.state={...h.ctx.state,id:'room-b',cloudCode:'ROOM-B'};}],
+ ['changed current owner',h=>{h.ctx.state.ownerUid='other';}],
+ ['signed out',h=>{h.ctx.firebaseUser=null;}],
+ ['switched user',h=>{h.ctx.firebaseUser={uid:'other'};}],
+ ['new session for same user',h=>{h.ctx.invalidateCommunityRoomSnapshotContext();h.ctx.firebaseUser={uid:'host'};}],
+ ['left community room',h=>{h.ctx.appPhase='player-center';}],
+ ['guest role',h=>{h.ctx.currentRole='guest';}],
+ ['inactive profile',h=>{h.ctx.userProfile.active=false;}],
+ ['unsubscribed listener',h=>h.unsubscribe()],
+ ['replaced subscription',h=>h.ctx.subscribeCommunityRoomState('ROOM-A')],
+ ['conflicting snapshot room',h=>{h.next.id='room-b';}],
+ ['conflicting snapshot code',h=>{h.next.cloudCode='ROOM-B';}]
+])test('captured community listener ignores stale or mismatched context: '+label,async()=>{
+ const h=await legacySubscriptionHarness();change(h);const before=clone(h.ctx.state);h.callbacks[0](h.next,Date.now());assert.deepEqual(clone(h.ctx.state),before);
+});
+
+for(const [label,field]of [['creator','createdBy'],['owner','ownerUid']])test('a conflicting '+label+' in the captured room cannot retain owner access',async()=>{
+ const {ctx,next,callbacks}=await legacySubscriptionHarness();next[field]='other';callbacks[0](next,Date.now());
+ assert.equal(ctx.canManageRegistrationRoster(),false);assert.notEqual(ctx.state.createdBy,'host');
+});
+
+test('auth observer invalidates community private snapshots before asynchronous profile work',()=>{
+ const start=core.indexOf('async function processAuthStateChangeImpl('),end=core.indexOf('const authStateIsCurrent=',start);
+ assert(start>=0&&end>start);assert.match(core.slice(start,end),/invalidateCommunityRoomSnapshotContext\(\)/);
+ assert.match(core.slice(start,core.indexOf('} else if(!profile){',end)),/if\(authStateIsCurrent\(\)\)resumeCommunityRoomStateSubscription\(communityRoomAuthContext\)/);
+});
+
+test('successful same-user revalidation resumes with a new listener while its old callback stays invalid',async()=>{
+ const h=await legacySubscriptionHarness(),{ctx,next,callbacks}=h;ctx.cloudUnsub=h.unsubscribe;
+ ctx.invalidateCommunityRoomSnapshotContext();const context=ctx.captureCommunityRoomStateContext('host');ctx.firebaseUser={uid:'host'};ctx.resumeCommunityRoomStateSubscription(context);
+ assert.equal(callbacks.length,2);const before=clone(ctx.state);callbacks[0](next);assert.deepEqual(clone(ctx.state),before);
+ callbacks[1](next);assert.equal(ctx.state.players.length,2);assert.equal(ctx.state.createdBy,'host');
+});
+
+for(const [label,change]of [['other account',c=>{c.firebaseUser={uid:'other'};}],['signed out',c=>{c.firebaseUser=null;}],['inactive account',c=>{c.userProfile.active=false;}],['unverified creator',c=>{c.state.createdBy=null;}],['wrong creator',c=>{c.state.createdBy='other';}],['nonowner',c=>{c.state.ownerUid='other';}],['left room',c=>{c.appPhase='player-center';}],['missing room code',c=>{c.state.cloudCode=null;}],['switched room',c=>{c.state={...c.state,id:'new-room',cloudCode:'ROOM-B'};}],['newer subscription',c=>{c.subscribeCommunityRoomState('ROOM-A');}]])test('auth resume cannot subscribe for '+label,async()=>{
+ const h=await legacySubscriptionHarness();h.ctx.cloudUnsub=h.unsubscribe;h.ctx.invalidateCommunityRoomSnapshotContext();const context=h.ctx.captureCommunityRoomStateContext('host');change(h.ctx);const count=h.callbacks.length;h.ctx.resumeCommunityRoomStateSubscription(context);assert.equal(h.callbacks.length,count);
+});
 
 test('current pending draw starts from the COMMUNITY bracket tab after both authoritative checks',async()=>{
  const {ctx,calls}=startHarness(),matches=JSON.stringify(ctx.state.matches);

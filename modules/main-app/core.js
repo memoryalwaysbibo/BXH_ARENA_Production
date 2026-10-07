@@ -3125,6 +3125,33 @@ function renderPreservingScroll(){
   }
 }
 
+let communityRoomSnapshotGeneration=0;
+function invalidateCommunityRoomSnapshotContext(){ ++communityRoomSnapshotGeneration; }
+function subscribeCommunityRoomState(code){
+  const context={generation:++communityRoomSnapshotGeneration,code,roomId:state.id,uid:currentAuthUid(),ownerUid:state.ownerUid};
+  let active=true;
+  const unsubscribe=window.cloudSync.subscribe(code,remote=>{
+    if(!active || context.generation!==communityRoomSnapshotGeneration || appPhase!=="community-room" ||
+      currentAuthUid()!==context.uid || state.id!==context.roomId || state.cloudCode!==context.code ||
+      state.ownerUid!==context.ownerUid || !isCommunityRoomOwner() || !canManageRegistrationRoster())return;
+    if(!remote || remote.id!==context.roomId || remote.cloudCode!=null&&remote.cloudCode!==context.code)return;
+    // Old create payloads predate receipt of their generated code. Only this
+    // current private subscription can supply the missing code; never infer it
+    // from an arbitrary remote state passed to applyRemoteState.
+    applyRemoteState(remote.cloudCode==null?{...remote,cloudCode:context.code}:remote);
+  });
+  return ()=>{active=false;if(context.generation===communityRoomSnapshotGeneration)invalidateCommunityRoomSnapshotContext();if(unsubscribe)unsubscribe();};
+}
+function captureCommunityRoomStateContext(uid=currentAuthUid()){
+  return appPhase==="community-room"?{generation:communityRoomSnapshotGeneration,roomId:state.id,code:state.cloudCode,uid}:null;
+}
+function resumeCommunityRoomStateSubscription(context){
+  if(!context || context.generation!==communityRoomSnapshotGeneration || context.roomId!==state.id || context.code!==state.cloudCode || context.uid!==currentAuthUid() ||
+    appPhase!=="community-room" || !state.cloudCode || !cloudAvailable() || !isCommunityRoomOwner() || !canManageRegistrationRoster())return;
+  if(cloudUnsub){try{cloudUnsub();}catch(e){}}
+  cloudUnsub=subscribeCommunityRoomState(state.cloudCode);
+}
+
 let remoteAppliedRoomId=null, remoteAppliedAt=0;
 function applyRemoteState(remote, authoritative=false){
   try{
@@ -3144,8 +3171,16 @@ function applyRemoteState(remote, authoritative=false){
     if(!authoritative && !newerRoster && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0) && remoteUpdated <= localUpdated) return; // ignore stale/older data (avoid clobbering newer local edits)
     remoteAppliedAt=remoteUpdated;
     const keepCode = state.cloudCode;
+    // joinRoom hydrates the verified top-level creator, while older room JSON
+    // can still omit it. Preserve that identity only for this same quick room
+    // and current owner; a conflicting creator or owner must remain rejected.
+    const keepCreator = remote.createdBy==null && keepCode && remote.cloudCode===keepCode &&
+      isCommunityQuickRegistration(state) && isCommunityQuickRegistration(remote) &&
+      state.createdBy===state.ownerUid && remote.ownerUid===state.ownerUid &&
+      isCommunityRoomOwner() ? state.createdBy : null;
     state = Object.assign(defaultState(remote.id), remote);
     state.cloudCode = keepCode;
+    if(keepCreator)state.createdBy=keepCreator;
     refereeAssignmentDraftEnabled = null;
     if(courtSwapDraft){const swapSource=getMatch(courtSwapDraft.sourceMatchId);if(!swapSource||!canCourtSwapSource(swapSource))courtSwapDraft=null;}
     // Court assignments are normally derived from matches, but dispatchRevision
@@ -19202,7 +19237,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         st.meta.eventAuthority="community"; st.communityQuickRegistration=true; st.meta.communityQuickRegistration=true; st.meta.ladderMode="general"; st.meta.registrationEnabled=registrationEnabled; st.meta.roomAccessMode=roomAccessMode; st.meta.publishedAt=Date.now();
         st.meta.registrationOpenAt=null; st.meta.registrationCloseAt=null; st.meta.cancellationDeadline=null;
         st.meta.registrationCapacity=capacity; st.meta.waitlistCapacity=0; st.meta.registrationVisibility="public"; st.meta.registrationStatus=registrationEnabled?"open":"closed";
-        st.ownerUid=actorUid; st.createdByRole="player"; st.lastActivityAt=Date.now();
+        st.ownerUid=actorUid; st.createdBy=actorUid; st.createdByRole="player"; st.lastActivityAt=Date.now();
 
         // COMMUNITY host joins their own room by default. Host ownership and
         // participant membership are independent: removing this player later
@@ -19235,7 +19270,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(currentAuthUid()!==actorUid||appPhase!=="community-create")return;
         state=st;
         if(cloudUnsub){ try{cloudUnsub();}catch(e){} }
-        cloudUnsub=window.cloudSync.subscribe(code,applyRemoteState); cloudStatus="connected";
+        cloudUnsub=subscribeCommunityRoomState(code); cloudStatus="connected";
         communityRoomActiveTab="people"; appPhase="community-room"; communityEventsCache=null; publicTournamentsCache=null; publicTournamentsError=null; render();
         showToast("一般賽事已建立｜代碼 "+code);
       }catch(e){
@@ -19267,7 +19302,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!(st.meta&&st.meta.eventAuthority==="community") || st.ownerUid!==firebaseUser.uid) throw new Error("not-owner");
         state=st; await saveRecord(state); await setCurrentId(state.id);
         if(cloudUnsub){try{cloudUnsub();}catch(e){}}
-        cloudUnsub=window.cloudSync.subscribe(code,applyRemoteState); cloudStatus="connected";
+        cloudUnsub=subscribeCommunityRoomState(code); cloudStatus="connected";
         communityRoomActiveTab="live"; appPhase="community-room"; render();
       }catch(e){ console.warn("[community open]",e); showToast("無法開啟此一般賽事房間",true); }
     })();
@@ -23053,6 +23088,8 @@ async function init(){
           async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
             if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
+            if(typeof invalidateCommunityRoomSnapshotContext==="function")invalidateCommunityRoomSnapshotContext();
+            const communityRoomAuthContext=captureCommunityRoomStateContext(fbUser&&fbUser.uid);
             if(typeof stopAdminRosterWatch==="function") stopAdminRosterWatch();
             if(typeof resetAdminRegistrationsCache==="function") resetAdminRegistrationsCache();
             if(typeof resetAdminTournamentListContext==="function") resetAdminTournamentListContext();
@@ -23178,6 +23215,7 @@ async function init(){
                   if(currentRole==="player"){
                     try{ playerLookupResult = await searchPlayerNames(profile.realName||""); }catch(e){ playerLookupResult=null; }
                   }
+                  if(authStateIsCurrent())resumeCommunityRoomStateSubscription(communityRoomAuthContext);
                 } else if(!profile){
                   if(fbUser.providerData?.some(p=>p.providerId==="google.com")){
                     userProfile=null;currentRole=null;firebaseUser=null;pendingLoginIntent=null;

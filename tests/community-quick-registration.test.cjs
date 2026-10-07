@@ -498,6 +498,7 @@ function createHarness({ enabled = false, capacity = '', fields = {} } = {}) {
     applyRemoteState: () => {}, render: () => {}, showToast: (message, error) => toasts.push({ message, error: !!error }),
   });
   ctx.currentAuthUid = () => ctx.firebaseUser?.uid || '';
+  vm.runInContext('let communityRoomSnapshotGeneration=0;\n'+extractFunction(core,'invalidateCommunityRoomSnapshotContext')+'\n'+extractFunction(core,'subscribeCommunityRoomState'),ctx);
   ctx.window.cloudSync = { connect: async () => {}, subscribe: () => () => {},
     createCommunityRoom: async state => { creates.push(clone(state)); return 'LOCAL-CREATED'; } };
   const start = core.indexOf('  if(action==="community-create-submit"){');
