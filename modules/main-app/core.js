@@ -3200,24 +3200,27 @@ function applyRemoteState(remote, authoritative=false){
   try{
     if(!remote || !remote.id) return;
     if(remote.id !== state.id) return; // safety: only accept updates for the room we're actually in
+    const localExits=state.forcedCourtExits||{},remoteExits=remote.forcedCourtExits||{};
+    if(Object.entries(localExits).some(([n,c])=>Number(remoteExits[n]?.revision||0)<Number(c.revision||0)))return;
+    const newerExit=Object.entries(remoteExits).some(([n,c])=>Number(c.revision||0)>Number(localExits[n]?.revision||0));
     if(remoteAppliedRoomId!==remote.id){remoteAppliedRoomId=remote.id;remoteAppliedAt=0;}
-    if((remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
+    if(!newerExit&&(remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
     const localRosterRevision=Number(state.registrationRosterRevision||0);
     const remoteRosterRevision=Number(remote.registrationRosterRevision||0);
     if(remoteRosterRevision<localRosterRevision) return;
     const newerRoster=remoteRosterRevision>localRosterRevision;
     const localUpdated = state.updatedAt || 0;
     const remoteUpdated = remote.updatedAt || 0;
-    if(!authoritative&&!newerRoster&&remoteUpdated<=localUpdated&&Number(remote.callRevision||0)<=Number(state.callRevision||0)&&Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0)&&isCommunityQuickRegistration(remote)&&Number.isSafeInteger(remote.communityParticipantCount)&&remote.communityParticipantCount>=0&&remote.communityParticipantCount!==state.communityParticipantCount){
+    if(!authoritative&&!newerExit&&!newerRoster&&remoteUpdated<=localUpdated&&Number(remote.callRevision||0)<=Number(state.callRevision||0)&&Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0)&&isCommunityQuickRegistration(remote)&&Number.isSafeInteger(remote.communityParticipantCount)&&remote.communityParticipantCount>=0&&remote.communityParticipantCount!==state.communityParticipantCount){
       state.communityParticipantCount=remote.communityParticipantCount;saveRecord(state);renderPreservingScroll();return;
     }
-    if(!authoritative && !newerRoster && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0) && remoteUpdated <= localUpdated) return; // ignore stale/older data (avoid clobbering newer local edits)
+    if(!authoritative && !newerExit && !newerRoster && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0) && remoteUpdated <= localUpdated) return; // ignore stale/older data (avoid clobbering newer local edits)
     const settingsGate=typeof communitySettingsWriteGate!=="undefined"?communitySettingsWriteGate:null;
     if(settingsGate&&settingsGate.hasPendingWrites&&settingsGate.isCurrent()&&settingsGate.roomId===state.id&&settingsGate.roomCode===state.cloudCode){
       // Keep listener projections detached while local edits await this save.
       const previous=settingsGate.remote;
       const revision=Number(remote.registrationRosterRevision||0),previousRevision=Number(previous?.registrationRosterRevision||0);
-      if(!previous||revision>previousRevision||revision===previousRevision&&(Number(remote.updatedAt||0)>=Number(previous.updatedAt||0)||Number(remote.callRevision||0)>Number(previous.callRevision||0)||Number(remote.teamResultRevision||0)>Number(previous.teamResultRevision||0)))settingsGate.remote=JSON.parse(JSON.stringify(remote));
+      if(!previous||revision>previousRevision||revision===previousRevision&&(Number(remote.updatedAt||0)>=Number(previous.updatedAt||0)||Number(remote.callRevision||0)>Number(previous.callRevision||0)||Number(remote.teamResultRevision||0)>Number(previous.teamResultRevision||0)||Object.entries(remoteExits).some(([n,c])=>Number(c.revision||0)>Number(previous.forcedCourtExits?.[n]?.revision||0))))settingsGate.remote=JSON.parse(JSON.stringify(remote));
       return;
     }
     remoteAppliedAt=remoteUpdated;
@@ -4856,7 +4859,7 @@ function ensureSettingsFormDraft(){
     teamSize:Math.max(3,parseInt(m.teamSize,10)||3),
     formatType:m.formatType||"single",
     playMode:m.playMode==="enchantment"?"enchantment":"standard",
-    stations:Math.max(1,parseInt(m.stations,10)||1),
+    stations:window.BXHCourtRetirement?window.BXHCourtRetirement.target(state):Math.max(1,parseInt(m.stations,10)||1),
     bronzeMatch:!!m.bronzeMatch,
     ladderMode:(isTester()&&state.testLadderEnabled===true)?"ranked":(m.ladderMode==="ranked"?"ranked":"general"),
     scoringMode:m.scoringMode==="quick"?"quick":"standard",
@@ -5764,6 +5767,7 @@ function refereeDisplayForStation(stationNum, st=state){
   return window.BXHFormatUtils.refereeNamesLabel(refereeNamesForStation(stationNum,st));
 }
 function canOperateStation(stationNum, st=state){
+  if(Number(stationNum)<1||st.forcedCourtExits?.[stationNum]?.closed)return false;
   if(isCommunityRoomOwner()) return true;
   if(isOwnTestTournament(st)) return true;
   if(isTester()) return false;
@@ -7084,7 +7088,8 @@ async function runCourtQueueAction(matchId,station,options,mutateFn,message){
 function applySkippedDispatch(remote,m,target,expectedRevision){
   if(callPassProtected(remote,m))return {ok:false,reason:"dispatch-stale"};
   if(!m || m.completed || !m.skippedAt || m.resumeQueuedAt || !m.a || !m.b || (m.dispatchRevision||0)!==expectedRevision) return {ok:false,reason:"dispatch-stale"};
-  if(!Number.isInteger(target)||target<1||target>Number(remote.meta.stations||1)) return {ok:false,reason:"station-mismatch"};
+  if(!Number.isInteger(target)||target<1||target>(window.BXHCourtRetirement?window.BXHCourtRetirement.target(remote):Number(remote.meta.stations||1))) return {ok:false,reason:"station-mismatch"};
+  if(window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(remote,target))return {ok:false,reason:"court-retired"};
   if(Object.values(remote.courtAssignments||{}).some(c=>c.currentMatchId===m.id)) return {ok:false,reason:"dispatch-stale"};
   m.lastDispatch={from:Number(m.station),to:target,at:Date.now()};
   m.station=target; m.skipWaitFor=[]; m.resumeQueuedAt=Date.now(); m.dispatchRevision=expectedRevision+1;
@@ -7399,6 +7404,9 @@ const {courtKey,matchLabel,liveEtaCountdownText,matchStatusClass}=window.BXHMatc
 
 // Stable skip dependencies survive reloads and completed predecessors naturally disappear.
 function stationExecutionQueue(stationNum){
+  if(state.forcedCourtExits?.[stationNum]?.closed)return [];
+  const retirement=state.courtRetirementPlan?.courts?.[stationNum];
+  if(retirement&&Number(stationNum)>window.BXHCourtRetirement.target(state))return refereeMatches().filter(m=>Number(m.station)===Number(stationNum)&&!m.completed&&retirement.holdIds.includes(m.id)&&m.a&&m.b&&!m.skippedAt);
   let available=refereeMatches().filter(m=>m.station===stationNum&&!m.completed&&m.a&&m.b&&m.status!=="paused");
   if((state.meta.formatType||"single")==="single"){
     const phase=activeSingleElimSchedulePhase();
@@ -7442,6 +7450,7 @@ function reconcileCourtAssignments(){
   const preserved={};
   for(let i=1;i<=n;i++){
     const key=courtKey(i),court=incoming[key];
+    if(state.forcedCourtExits?.[i]?.closed)continue;
     if(!court)continue;
     const current=court.currentMatchId?getMatch(court.currentMatchId):null;
     const validCurrent=!!(current&&!current.completed&&Number(current.station)===i&&current.a&&current.b&&current.status!=="paused"&&!singleElimBronzeBeforeFinalBlocked(current,state.matches,state.meta));
@@ -7464,6 +7473,7 @@ function reconcileCourtAssignments(){
   }
 }
 function rebuildCourtAssignments(){
+  window.BXHCourtRetirement?.reconcile(state);
   const n = Math.max(1, state.meta.stations||1);
   const existing = state.courtAssignments || {};
   const next = {};
@@ -7476,6 +7486,7 @@ function rebuildCourtAssignments(){
   for(let i=1;i<=n;i++){
     const key = courtKey(i);
     const court = state.courtAssignments[key];
+    if(state.forcedCourtExits?.[i]?.closed){Object.assign(court,{currentMatchId:null,nextMatchId:null,status:"retired",lockedBy:null,lockedAt:null});continue;}
     const queue = stationExecutionQueue(i);
 
     let current = court.currentMatchId ? getMatch(court.currentMatchId) : null;
@@ -10521,6 +10532,7 @@ function canCourtSwapSource(m){
   return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&!matchHasDecisionData(m)&&m.status!=="paused");
 }
 function canCourtSwapTarget(m,sourceMatch,st=state){
+  if(window.BXHCourtRetirement&&(!window.BXHCourtRetirement.accepts(st,m?.station)||!window.BXHCourtRetirement.accepts(st,sourceMatch?.station)))return false;
   if(!m||!sourceMatch||m.id===sourceMatch.id||m.isBye||m.completed||!m.a||!m.b) return false;
   if(singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{})) return false;
   if(m.status==="in_progress"||m.status==="paused"||m.skippedAt||m.callPass||matchHasDecisionData(m)) return false;
@@ -10529,6 +10541,7 @@ function canCourtSwapTarget(m,sourceMatch,st=state){
 // A court may take only a queued match. A match already shown as another
 // court's current match can be underway before its first score is entered.
 function idleCourtCandidates(st,stationNum){
+  if(window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,stationNum))return [];
   const courts=st.courtAssignments||{};
   const busy=new Set(Object.values(courts).map(c=>c&&c.currentMatchId).filter(Boolean));
   const phase=(st.meta.formatType||"single")==="single"?activeSingleElimSchedulePhase(st.matches,st.meta):null;
@@ -10643,7 +10656,7 @@ let bracketManualAssignSuppressClickUntil=0;
 function canManualAssignMatch(m,st=state){return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!matchHasDecisionData(m)&&m.status!=="paused"&&!m.skippedAt&&!m.callPass&&!singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{}));}
 function applyManualCourtAssign(st,matchId,targetStation){
  const m=(st.matches||[]).find(x=>x.id===matchId);if(!canManualAssignMatch(m,st))return {ok:false,reason:"match-no-longer-available"};
- const n=Math.max(1,Number(st.meta?.stations||1));if(targetStation<1||targetStation>n)return {ok:false,reason:"station-not-assigned"};
+ const n=window.BXHCourtRetirement?window.BXHCourtRetirement.target(st):Math.max(1,Number(st.meta?.stations||1));if(targetStation<1||targetStation>n||window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,targetStation))return {ok:false,reason:"station-not-assigned"};
  const now=Date.now();clearCourtAssignmentRefs(st,[m.id]);const target=st.courtAssignments&&st.courtAssignments[courtKey(targetStation)];
  if(target&&target.currentMatchId&&target.currentMatchId!==m.id){const d=(st.matches||[]).find(x=>x.id===target.currentMatchId);if(d&&!d.completed&&!matchHasDecisionData(d)){d.status="pending";d.startedAt=null;d.dispatchPriorityAt=null;d.dispatchRevision=Number(d.dispatchRevision||0)+1;d.updatedAt=now;}target.currentMatchId=null;}
  m.station=targetStation;m.status="ready";m.startedAt=null;m.updatedAt=now;m.dispatchPriorityAt=now;m.dispatchRevision=Number(m.dispatchRevision||0)+1;
@@ -10781,10 +10794,12 @@ function previousMatchCorrectionHtml(stationNum,currentId){
   </div>`;
 }
 function refereeWorkstationHeader(m, stationNum){
+  const closed=state.forcedCourtExits?.[stationNum]?.closed;
+  const exitButton=(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<button class="btn btn-ghost btn-sm" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'強制退場'}</button>`:"";
   const assigned=refereeDisplayForStation(stationNum);
   const status=refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
-  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small></div></div>`;
+  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
@@ -10817,8 +10832,12 @@ function renderCourtCard(stationNum){
   if(!court){
     return `<div class="panel court-card court-card-idle referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">${refereeWorkstationHeader(null,stationNum)}<div class="empty-state">尚未初始化</div></div>`;
   }
+  if(state.forcedCourtExits?.[stationNum]?.closed)return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}">${refereeWorkstationHeader(null,stationNum)}<div class="empty-state">本台已強制退場，停止接新場。未完成場次保留於待接管清單。</div></div>`;
   const m = court.currentMatchId ? getMatch(court.currentMatchId) : null;
 
+  if(!m&&state.courtRetirementPlan?.courts?.[stationNum]&&Number(stationNum)>window.BXHCourtRetirement.target(state)){
+    return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}">${refereeWorkstationHeader(null,stationNum)}<div class="empty-state">本台已退場，不再接新場</div></div>`;
+  }
   if(!m){
     const stationHasFutureWork = state.matches.some(mm=>!mm.isBye && mm.station===stationNum && !mm.completed);
     const canReceiveSkipped = state.matches.some(mm=>!mm.isBye&&!mm.completed&&mm.skippedAt&&!mm.resumeQueuedAt&&mm.a&&mm.b);
@@ -10936,8 +10955,86 @@ function renderRefereeScoringControls(){
 function renderSkippedMatches(){
   const skipped=refereeMatches().filter(m=>!m.completed&&m.skippedAt&&m.a&&m.b);
   if(!skipped.length) return "";
-  const targets=Array.from({length:Math.max(1,state.meta.stations||1)},(_,i)=>i+1).filter(i=>canOperateStation(i));
+  const targets=Array.from({length:window.BXHCourtRetirement?window.BXHCourtRetirement.target(state):Math.max(1,state.meta.stations||1)},(_,i)=>i+1).filter(i=>canOperateStation(i));
   return `<section class="panel"><div class="panel-title">待承接場次（${skipped.length}）</div><div class="hint">保留原比分。閒置台立即承接；忙碌台安排在目前比賽之後。未承接的場次依原台佇列接續；跳過時沒有其他可執行場次，則保留待承接。</div>${skipped.map(m=>`<div class="panel" style="margin-top:12px"><strong>${esc(matchLabel(m))}｜${esc(playerName(m.a.playerId))} vs ${esc(playerName(m.b.playerId))}</strong><div class="hint">台${Number(m.station)} · ${m.callPass?'PASS：同台兩場後回補':m.resumeQueuedAt?'已安排承接':'已跳過'}</div>${!m.resumeQueuedAt&&!m.callPass&&canOperateCurrentTournament()&&state.archiveStatus!=="completed"?`<div class="btn-row">${targets.map(i=>`<button class="btn btn-ghost btn-sm" data-action="claim-skipped-match" data-id="${esc(m.id)}" data-station="${i}" ${courtQueueBusy?'disabled':''}>${isAdminTierOrAbove()?'指派':'承接'}至台${i}</button>`).join("")}</div>`:""}</div>`).join("")}</section>`;
+}
+let courtRetirementBusy=false;
+function canForceExitCourt(n){return canManageCourtRetirement()||(canOperateCurrentTournament()&&canOperateStation(n));}
+function canManageCourtRetirement(){return canManageRefereeStationAssignments()||isCommunityRoomOwner()||(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator());}
+async function resizeCourtsSafely(n,expected,nextMeta){
+  if(courtRetirementBusy)return;courtRetirementBusy=true;const roomId=state.id;
+  try{
+    let result;
+    if(state.cloudCode){
+      if(!cloudAvailable()||!window.cloudSync?.courtRetirementTransaction)throw new Error("cloud-unavailable");
+      if(!await flushStationMatchMutations()||!await flushCloudStateWrites())throw new Error("sync-pending");
+      result=await window.cloudSync.courtRetirementTransaction(state.cloudCode,{kind:"resize",count:n,expectedTarget:expected,meta:nextMeta},currentAuthUid());
+    }else{
+      result=window.BXHCourtRetirement.request(state,n,expected);
+      if(result.ok){const physical=state.meta.stations;Object.assign(state.meta,nextMeta,{stations:physical});rebuildPropagation();await saveState();}
+    }
+    if(!result?.ok)throw new Error(result?.reason||"resize-failed");
+    if(state.id!==roomId)return;
+    if(result.state)applyRemoteState(result.state,true);
+    resetSettingsFormDraft();resetRegistrationFormDraft();await saveRecord(state);
+    showToast(state.courtRetirementPlan?.status==="draining"?"已設定保留 "+n+" 台；退場台完成目前場次後退出，不再接新場。":"已安全調整為 "+n+" 台");
+  }catch(e){showToast("調整未完成："+e.message+"。原場次與比分保留，請確認連線後重試。",true);}
+  finally{courtRetirementBusy=false;renderPreservingScroll();}
+}
+async function transferRetiringCourtMatch(id,to){
+  if(!canManageCourtRetirement()||courtRetirementBusy)return;
+  const m=getMatch(id);if(!m)return;
+  courtRetirementBusy=true;const revision=Number(m.dispatchRevision||0),roomId=state.id;
+  try{
+    let result;
+    if(state.cloudCode){
+      if(!cloudAvailable()||!window.cloudSync?.courtRetirementTransaction)throw new Error("cloud-unavailable");
+      if(!await flushStationMatchMutations()||!await flushCloudStateWrites())throw new Error("sync-pending");
+      result=await window.cloudSync.courtRetirementTransaction(state.cloudCode,{kind:"transfer",matchId:id,to,revision},currentAuthUid());
+    }else{result=window.BXHCourtRetirement.transfer(state,id,to,revision);if(result.ok){rebuildPropagation();await saveState();}}
+    if(!result?.ok)throw new Error(result?.reason||"transfer-failed");
+    if(state.id!==roomId)return;
+    if(result.state)applyRemoteState(result.state,true);await saveRecord(state);showToast("場次已移交台"+to+"，比分與紀錄已保留");
+  }catch(e){showToast("接管未完成："+e.message+"。請保留原裝置待同步資料。",true);}
+  finally{courtRetirementBusy=false;renderPreservingScroll();}
+}
+async function executeCourtForceAction(change){
+  if(!(change.kind==="force-exit"?canForceExitCourt(change.station):canManageCourtRetirement())||courtRetirementBusy)return;
+  courtRetirementBusy=true;const roomId=state.id;
+  try{
+    let result;
+    // Emergency release must not wait on the normal whole-state sync queue.
+    await saveRecord(state);
+    if(state.cloudCode){
+      if(!cloudAvailable()||!window.cloudSync?.courtRetirementTransaction||navigator.onLine===false)throw new Error("cloud-unavailable");
+      let timeout;
+      try{result=await Promise.race([window.cloudSync.courtRetirementTransaction(state.cloudCode,change,currentAuthUid()),new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error("雲端回應逾時，操作可能已送達，請重新讀取確認")),15000);})]);}
+      finally{clearTimeout(timeout);}
+    }else{
+      const api=window.BXHCourtRetirement;
+      result=change.kind==="force-exit"?api.forceExit(state,change.station,change.matchId,change.revision,change.exitRevision):change.kind==="reopen"?api.reopen(state,change.station,change.exitRevision):api.claimDetached(state,change.matchId,change.to,change.revision);
+      if(result.ok){rebuildPropagation();await saveState();}
+    }
+    if(!result?.ok)throw new Error(result?.reason||"force-exit-failed");
+    if(state.id!==roomId)return;
+    if(result.state)applyRemoteState(result.state,true);await saveRecord(state);
+    showToast(change.kind==="force-exit"?"本台已強制退場；未完成場次與雲端比分保留，等待接管。":change.kind==="reopen"?"本台已重新啟用；待接管場次需另外指定。":"場次已接管，比分保留。");
+  }catch(e){showToast("操作未完成："+e.message+"。請重新讀取狀態；保留原裝置未同步紀錄。",true);}
+  finally{courtRetirementBusy=false;renderPreservingScroll();}
+}
+function renderForcedCourtExitPanel(){
+  const work=state.matches.filter(m=>!m.completed&&!m.isBye&&m.forceDetached&&Number(m.station)===0);
+  if(!work.length)return "";
+  const targets=Array.from({length:window.BXHCourtRetirement.target(state)},(_,i)=>i+1).filter(i=>window.BXHCourtRetirement.accepts(state,i));
+  return `<section class="panel"><div class="panel-title">強制退場｜待接管場次</div><div class="hint">場次、比分及紀錄保留。原台的過期送分會被拒絕；接管前請確認原裝置未同步資料。</div>${work.map(m=>`<div class="panel"><strong>${esc(matchLabel(m))}｜原台${m.forceDetached.from}｜${Number(m.scoreA)||0}：${Number(m.scoreB)||0}</strong>${canManageCourtRetirement()?`<div class="btn-row">${targets.map(i=>`<button class="btn btn-ghost btn-sm" data-action="court-force-claim" data-id="${esc(m.id)}" data-station="${i}" ${courtRetirementBusy||m.offlinePendingSync?'disabled':''}>接管至台${i}</button>`).join('')}</div>`:''}${!targets.length?'<div class="hint">目前沒有可接管台，請先重新啟用一台。</div>':''}</div>`).join('')}</section>`;
+}
+function renderCourtRetirementPanel(){
+  const p=state.courtRetirementPlan;if(!p||p.status!=="draining")return "";
+  const rows=Object.entries(p.courts||{}).filter(([,c])=>c.status==="draining").map(([n,c])=>{
+    const work=(c.holdIds||[]).map(getMatch).filter(Boolean);
+    return `<div class="panel"><strong>台${Number(n)}｜退場中・停止接新場</strong><div class="hint">${Date.now()-c.requestedAt>300000?'已等待超過 5 分鐘，請確認裁判連線或接管。':'完成目前場次並同步後自動退場。'}</div>${work.map(m=>`<div>${esc(matchLabel(m))}｜${Number(m.scoreA)||0}：${Number(m.scoreB)||0}${m.offlinePendingSync?'｜離線資料待同步':''}</div>${canManageCourtRetirement()?`<div class="btn-row">${Array.from({length:p.targetCount},(_,i)=>`<button class="btn btn-ghost btn-sm" data-action="court-retirement-transfer" data-id="${esc(m.id)}" data-station="${i+1}" ${courtRetirementBusy||m.offlinePendingSync?'disabled':''}>接管至台${i+1}</button>`).join('')}</div>`:''}`).join('')}</div>`;
+  }).join('');
+  return `<section class="panel"><div class="panel-title">安全退場｜目標保留 ${p.targetCount} 台</div><div class="hint">保留台照常運作。退場狀態與場次保存在賽事資料中，重新開啟可接續。</div>${rows}</section>`;
 }
 function renderReferee(){
   if(state.meta?.battleMode==="team")return renderTeamReferee();
@@ -10965,7 +11062,7 @@ function renderReferee(){
     : (n===2
       ? "court-grid court-grid-2"
       : (n===4 ? "court-grid court-grid-many court-grid-4fit" : "court-grid court-grid-many"));
-  return `${quickNav}${renderRefereeScoringControls()}${renderSkippedMatches()}${jumpNav}<div class="${gridClass}">${cards}</div>`;
+  return `${quickNav}${renderForcedCourtExitPanel()}${renderCourtRetirementPanel()}${renderRefereeScoringControls()}${renderSkippedMatches()}${jumpNav}<div class="${gridClass}">${cards}</div>`;
 }
 
 /* ==== tab: settings ==== */
@@ -22419,7 +22516,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     return;
   }
+  if(["court-force-exit","court-force-reopen","court-force-claim"].includes(action)){
+    const station=Number(target.getAttribute("data-station"));
+    if(!(action==="court-force-exit"?canForceExitCourt(station):canManageCourtRetirement())||courtRetirementBusy)return;
+    const current=state.courtAssignments?.[courtKey(station)]?.currentMatchId||null;
+    const m=getMatch(action==="court-force-claim"?id:current);
+    const change=action==="court-force-exit"?{kind:"force-exit",station,matchId:current,revision:Number(m?.dispatchRevision||0),exitRevision:Number(state.forcedCourtExits?.[station]?.revision||0)}:action==="court-force-reopen"?{kind:"reopen",station,exitRevision:Number(state.forcedCourtExits?.[station]?.revision||0)}:{kind:"claim-detached",matchId:id,to:station,revision:Number(m?.dispatchRevision||0)};
+    openModal({type:"generic",title:action==="court-force-exit"?"強制退場｜台"+station:action==="court-force-reopen"?"重新啟用裁判台":"接管退場場次",message:action==="court-force-exit"?"立即解除本台目前場次、下一場與派場鎖，停止接新場。未完成場次保留雲端比分，移至待接管清單；已完成結果保留。原裝置尚未上傳的資料請保留。":"保留比分與紀錄。重新啟用不會自動綁回待接管場次。",confirmLabel:"確認",onConfirm:()=>executeCourtForceAction(change)});return;
+  }
+  if(action==="court-retirement-transfer"){
+    openModal({type:"generic",title:"接管退場台場次",message:"保留雲端比分與紀錄，將場次移至保留台；原台後續送分將因派場版本變更而停止。請先確認原裁判已停止操作。",confirmLabel:"確認接管",onConfirm:()=>transferRetiringCourtMatch(id,Number(target.getAttribute("data-station")))});return;
+  }
   if(action==="save-meta"){
+    if(courtRetirementBusy)return;
     ensureSettingsFormDraft();
     ensureRegistrationFormDraft();
     syncSettingsDraftFromDom();
@@ -22500,14 +22609,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       return;
     }
 
-    if(state.bracketSize>0 && requestedStations!==state.meta.stations){
-      const check=checkCanChangeStationCount(requestedStations);
+    const previousCourtTarget=window.BXHCourtRetirement?window.BXHCourtRetirement.target(state):state.meta.stations;
+    if(state.bracketSize>0 && requestedStations!==previousCourtTarget){
+      const check=window.BXHCourtRetirement?{ok:true}:checkCanChangeStationCount(requestedStations);
       if(!check.ok){ showToast(check.message,true); return; }
     }
 
-    const stationsChanged=requestedStations!==state.meta.stations;
+    const stationsChanged=requestedStations!==previousCourtTarget;
+    const physicalCourtCount=state.meta.stations;
+    if(stationsChanged&&state.bracketSize>0){
+      if(!canManageCourtRetirement()){showToast("目前身分無法調整退場台",true);return;}
+      // Apply other draft fields only after the cloud retirement transaction succeeds.
+      const draftBefore=cloneStateForSave(state);applyMeta();const nextMeta=JSON.parse(JSON.stringify(state.meta));state=draftBefore;state.meta.stations=physicalCourtCount;
+      resizeCourtsSafely(requestedStations,previousCourtTarget,nextMeta);return;
+    }
     applyMeta();
-    if(stationsChanged && state.bracketSize>0) redistributeStationsForCourtCount(requestedStations);
+    if(state.courtRetirementPlan)state.meta.stations=physicalCourtCount;
 
     state.matches.forEach(mt=>{
       if(mt.isBye) return;

@@ -782,6 +782,20 @@
   // player id/name/checked-in status is ever included. Stored under
   // "bracketView", never "data" — the field name itself is part of the
   // fix, so nothing can accidentally keep reading the old private blob.
+  function courtLifecycleWritePatch(doc, state, activate=false){
+    const epoch=Number(doc?.courtLifecycleEpoch||0);
+    const current=Number(doc?.courtLifecycleWriteSeq||0);
+    if(activate && epoch===0){
+      state.courtLifecycleEpoch=1;
+      return {courtLifecycleEpoch:1,courtLifecycleWriteSeq:1};
+    }
+    if(epoch===0) return {};
+    if(epoch!==1 || !Number.isSafeInteger(current) || current<1 || Number(state?.courtLifecycleEpoch||0)!==1){
+      throw new Error('court-lifecycle-stale');
+    }
+    return {courtLifecycleWriteSeq:current+1};
+  }
+
   function buildPublicMirrorFields(state){
     // Explicit, hand-picked whitelist — NEVER a spread of the full private
     // state. This is the content that ends up INSIDE the "bracketView" JSON
@@ -806,6 +820,7 @@
       };
     });
     return {
+      courtLifecycleEpoch:Number(state.courtLifecycleEpoch||0),
       callRevision:Number(state.callRevision||0),
       registrationRosterRevision:Number(state.registrationRosterRevision||0),
       systemClosure:state.systemClosure?{reason:'idle-24h',label:state.systemClosure.label||'',closedAt:state.systemClosure.closedAt||null,lastActivityAt:state.systemClosure.lastActivityAt||null,restoredAt:state.systemClosure.restoredAt||null}:null,
@@ -1215,7 +1230,7 @@
         if(nextStatus==="full"&&(!nextCapacity||runtime.players.length<nextCapacity))nextStatus="open";
         runtime.meta.registrationStatus=nextStatus;
         const now=Date.now();
-        const privatePatch={data:JSON.stringify(runtime),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now};
+        const privatePatch=Object.assign({data:JSON.stringify(runtime),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now},courtLifecycleWritePatch(tour,runtime));
         if(Number(tour.entrySelectionRevision||0)>0)privatePatch.entrySelectionWriteRevision=Number(tour.entrySelectionRevision);
         tx.update(tourRef,privatePatch);
         tx.update(pubRef,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime)),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now});
@@ -1357,7 +1372,7 @@
           lastRegistrationMutationBy:staffUid
         };
         tx.update(regRef,regPatch);
-        tx.update(tourRef,Object.assign({},common,{data:JSON.stringify(runtime)}));
+        tx.update(tourRef,Object.assign({},common,{data:JSON.stringify(runtime)},courtLifecycleWritePatch(tour,runtime)));
         tx.update(pubRef,Object.assign({},common,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime))}));
         return {capacity:newCapacity,confirmedCount:nextConfirmed,waitlistCount:nextWaiting,status:action==="cancel"?"cancelled":action==="demote"?"waitlist":"confirmed",participantRegistrationId:participant};
       });
@@ -2566,6 +2581,7 @@
               parsed.meta=parsed.meta||{};
               parsed.meta.registrationVisibility=next;
               parsed.updatedAt=now;
+              Object.assign(privatePatch,courtLifecycleWritePatch(privateDoc,parsed));
               privatePatch.data=JSON.stringify(parsed);
             }catch(e){}
           }
@@ -2720,6 +2736,15 @@ if(testerSession){
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
+              if(JSON.stringify(remoteState.forcedCourtExits||{})!==JSON.stringify(data.forcedCourtExits||{}))throw new Error("court-exit-stale");
+              const dispatchById=new Map((data.matches||[]).map(m=>[m.id,m]));
+              for(const m of remoteState.matches||[]){if(m.forceDetached||m.dispatchRevision){const incoming=dispatchById.get(m.id);if(!incoming||Number(incoming.dispatchRevision||0)!==Number(m.dispatchRevision||0)||Number(incoming.station)!==Number(m.station))throw new Error("court-dispatch-stale");}}
+              if(remoteState.courtRetirementPlan){
+                if(Number(remoteState.courtRetirementPlan.revision)!==Number(data.courtRetirementPlan?.revision))throw new Error("court-lifecycle-stale");
+                const byId=new Map((data.matches||[]).map(m=>[m.id,m]));
+                for(const m of remoteState.matches||[]){const incoming=byId.get(m.id);if(!m.isBye&&(!incoming||Number(incoming.dispatchRevision||0)!==Number(m.dispatchRevision||0)||Number(incoming.station)!==Number(m.station)))throw new Error("court-dispatch-stale");}
+                data.courtRetirementPlan=remoteState.courtRetirementPlan;data.meta.stations=remoteState.meta.stations;
+              }
               if(Number(remoteState.registrationRosterRevision||0)!==Number(data.registrationRosterRevision||0)) throw new Error("registration-roster-stale");
               if(Number(remoteState.teamResultRevision||0)!==Number(data.teamResultRevision||0)) throw new Error("team-result-stale");
               if(data.generalClosureReason==="insufficient-eligible-players" &&
@@ -2781,6 +2806,9 @@ if(testerSession){
             }
             publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
           }
+          Object.assign(privatePayload,courtLifecycleWritePatch(snap.exists()?snap.data():{},data));
+          privatePayload.data=JSON.stringify(data);
+          publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
           tx.set(ref,privatePayload,{merge:true});
           tx.set(fx.doc(dbHandle,"publicTournaments",normalized),publicPayload,{merge:true});
         });
@@ -2836,6 +2864,7 @@ if(testerSession){
             updatedAt:now,
             assignedStaffUids:assigned
           };
+          Object.assign(patch,courtLifecycleWritePatch(docData,remoteState));
           // Keep registration-selection guard aligned with the newest server
           // revision when this room uses the lottery/selection subsystem.
           if(Number(docData.entrySelectionRevision||0)>0){
@@ -2976,7 +3005,7 @@ if(testerSession){
           remoteState.meta.assignedStaffUids=assigned;
           const now=Date.now();
           remoteState.updatedAt=now;
-          tx.set(ref,{data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,refereeStationRestrictionEnabled:requestedRestriction},{merge:true});
+          tx.set(ref,Object.assign({data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,refereeStationRestrictionEnabled:requestedRestriction},courtLifecycleWritePatch(docData,remoteState)),{merge:true});
           tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
           return {state:remoteState,map,names,restriction:requestedRestriction};
         });
@@ -3020,6 +3049,52 @@ if(testerSession){
     },
 
     // Court-scoped mutation: restricted staff always merge from newest cloud state.
+    async courtRetirementTransaction(code,change,expectedActorUid){
+      if(!cloudEnabled||!code||!fx.runTransaction||!window.BXHCourtRetirement)return {ok:false,reason:"cloud-unavailable"};
+      const uid=authHandle?.currentUser?.uid;
+      if(!uid||uid!==expectedActorUid)return {ok:false,reason:"auth-mismatch"};
+      const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase()),pub=fx.doc(dbHandle,"publicTournaments",String(code).toUpperCase());
+      try{
+        const result=await fx.runTransaction(dbHandle,async tx=>{
+          const snap=await tx.get(ref),actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,uid));
+          if(!snap.exists()||!actorSnap.exists())throw new Error("not-found");
+          const docData=snap.data(),actor=actorSnap.data(),st=JSON.parse(docData.data);
+          if(actor.active!==true)throw new Error("permission-denied");
+          const creator=docData.createdBy||st.createdBy;
+          const admin=actor.isTestAccount!==true&&["super_admin","admin"].includes(actor.role);
+          const owner=st.meta?.eventAuthority==="community"&&st.ownerUid===uid;
+          const staff=actor.isTestAccount!==true&&actor.role==="staff"&&creator===uid&&st.meta?.eventAuthority==="official";
+          const tester=(actor.role==="tester"||actor.isTestAccount===true)&&st.testMode===true&&creator===uid&&st.ownerUid===uid;
+          const grant=actor.partnerOrganizer||{};
+          const partner=actor.role==="player"&&actor.isTestAccount!==true&&creator===uid&&docData.createdByRole==="partner_organizer"&&grant.status==="active"&&Number(grant.expiresAtMs)>Date.now()&&docData.partnerOrganizationCode===grant.organizationId;
+          const assignment=docData.eventStaffAssignments?.[uid];
+          const eventReferee=assignment?.status==="accepted"&&assignment.targetUid===uid&&Array.isArray(assignment.duties)&&assignment.duties.some(d=>d==="referee"||d==="head_referee");
+          const assignedUids=docData.refereeStationAssignments?.[String(change.station)]||[];
+          const ownCourtExit=change.kind==="force-exit"&&actor.isTestAccount!==true&&(actor.role==="staff"||eventReferee)&&(docData.refereeStationRestrictionEnabled!==true||Array.isArray(assignedUids)&&assignedUids.includes(uid));
+          if(!admin&&!owner&&!staff&&!tester&&!partner&&!ownCourtExit)throw new Error("permission-denied");
+          if(st.archiveStatus==="completed")throw new Error("already-completed");
+          let applied;
+          if(change.kind==="resize"){
+            applied=window.BXHCourtRetirement.request(st,change.count,change.expectedTarget);
+            if(applied.ok&&change.meta){
+              const physical=st.meta.stations,oldMeta=st.meta;
+              st.meta=Object.assign({},oldMeta,change.meta,{stations:physical,refereeStationAssignments:oldMeta.refereeStationAssignments,refereeStationNames:oldMeta.refereeStationNames,refereeStationRestrictionEnabled:oldMeta.refereeStationRestrictionEnabled});
+            }
+          }else if(change.kind==="force-exit")applied=window.BXHCourtRetirement.forceExit(st,change.station,change.matchId,change.revision,change.exitRevision);
+          else if(change.kind==="reopen")applied=window.BXHCourtRetirement.reopen(st,change.station,change.exitRevision);
+          else if(change.kind==="claim-detached")applied=window.BXHCourtRetirement.claimDetached(st,change.matchId,change.to,change.revision);
+          else if(change.kind==="transfer")applied=window.BXHCourtRetirement.transfer(st,change.matchId,change.to,change.revision);
+          if(!applied?.ok)throw new Error(applied?.reason||"invalid-change");
+          rebuildPropagationForState(st);
+          const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1);st.updatedAt=now;
+          const lifecyclePatch=courtLifecycleWritePatch(docData,st,true);
+          tx.set(ref,Object.assign({data:JSON.stringify(st),updatedAt:now},lifecyclePatch),{merge:true});
+          tx.set(pub,{bracketView:JSON.stringify(buildPublicMirrorFields(st)),updatedAt:now,tournamentPhase:computeTournamentPhase(st)},{merge:true});
+          return {ok:true,state:st};
+        });return result;
+      }catch(e){return {ok:false,reason:e.message||String(e)};}
+    },
+
     async mutateMatchTransaction(code, matchId, station, mutateFn, expectedActorUid, queueOptions={}){
       if(!cloudEnabled || !code || !fx.runTransaction) return {ok:false,reason:"cloud-unavailable"};
       const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
@@ -3044,6 +3119,7 @@ if(testerSession){
           }
           let remoteState; try{ remoteState=JSON.parse(docData.data); }catch(e){ throw new Error("corrupt-data"); }
           if(remoteState.archiveStatus==="completed") throw new Error("already-completed");
+          if(Number(station)<1||remoteState.forcedCourtExits?.[station]?.closed||queueOptions.targetStation!=null&&remoteState.forcedCourtExits?.[queueOptions.targetStation]?.closed)throw new Error("court-retired");
           const remoteMatch=(remoteState.matches||[]).find(x=>x.id===matchId);
           if(!remoteMatch) throw new Error("not-found");
           if(Number(remoteMatch.station||0)!==Number(station||0)) throw new Error("station-mismatch");
@@ -3059,7 +3135,7 @@ if(testerSession){
           if(!result || !result.ok) throw new Error((result&&result.reason)||"validation-failed");
           const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1,Number(remoteState.updatedAt||0)+1);
           result.state.updatedAt=now; rebuildPropagationForState(result.state);
-          tx.set(ref,{data:JSON.stringify(result.state),updatedAt:now},{merge:true});
+          tx.set(ref,Object.assign({data:JSON.stringify(result.state),updatedAt:now},courtLifecycleWritePatch(docData,result.state)),{merge:true});
           tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(result.state)),updatedAt:now,tournamentPhase:computeTournamentPhase(result.state)},{merge:true});
           return result;
         });
@@ -3125,7 +3201,7 @@ if(testerSession){
             version:1,roomCode:code,committedAt:now,committedBy:actorUid,fingerprint:plan.fingerprint,
             operations:plan.operations.map(op=>({sourceMatchId:op.sourceMatchId,targetMatchId:op.targetMatchId,targetSlot:op.targetSlot,playerId:op.playerId,otherPlayerId:op.otherPlayerId,deadSourceMatchIds:op.deadSourceMatchIds}))
           };
-          tx.set(ref,{data:JSON.stringify(remoteState),updatedAt:now},{merge:true});
+          tx.set(ref,Object.assign({data:JSON.stringify(remoteState),updatedAt:now},courtLifecycleWritePatch(docData,remoteState)),{merge:true});
           tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
           return {state:remoteState,operationCount:plan.operations.length,protected:plan.protected};
         });
@@ -3163,6 +3239,7 @@ if(testerSession){
           let remoteState;
           try{ remoteState = JSON.parse(docData.data); }catch(e){ throw new Error("corrupt-data"); }
           if(auditMeta&&auditMeta.matchId){
+            if(Number(auditMeta.station)<1||remoteState.forcedCourtExits?.[auditMeta.station]?.closed)throw new Error("court-retired");
             const match=(remoteState.matches||[]).find(m=>m.id===auditMeta.matchId);
             if(!match || Number(match.station)!==Number(auditMeta.station)) throw new Error("station-mismatch");
             if(match.skippedAt || (auditMeta.dispatchRevision!=null && (match.dispatchRevision||0)!==auditMeta.dispatchRevision)) throw new Error("dispatch-stale");
@@ -3173,7 +3250,7 @@ if(testerSession){
           const community=(result.state.meta&&result.state.meta.eventAuthority)==="community";
           if(community){ result.state.lastActivityAt=now; result.state.expiresAtMs=communityRoomExpiryMs(result.state); }
           const extra=community?{lastActivityAt:now,expiresAt:result.state.expiresAtMs==null?null:new Date(result.state.expiresAtMs),eventAuthority:"community",ownerUid:result.state.ownerUid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed"}:{};
-          tx.set(ref, Object.assign({ data: JSON.stringify(result.state), updatedAt: now },extra), { merge:true });
+          tx.set(ref, Object.assign({ data: JSON.stringify(result.state), updatedAt: now },extra,courtLifecycleWritePatch(docData,result.state)), { merge:true });
           tx.set(publicRef, Object.assign({ bracketView: JSON.stringify(buildPublicMirrorFields(result.state)), updatedAt: now, tournamentPhase: computeTournamentPhase(result.state) },extra), { merge:true });
           const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
           if(auditMeta && auditMeta.recordDuty===true && actorUid && auditMeta.uid===actorUid && !(userProfile&&(userProfile.role==="tester"||userProfile.isTestAccount===true))){
@@ -3270,6 +3347,7 @@ if(testerSession){
   if(currentAuthUid()!==op.actorUid)return {ok:false,reason:"permission-denied"};
   return await window.cloudSync.confirmMatchTransaction(op.tournamentCode,(remoteState)=>{
     rebuildPropagationForState(remoteState);const m=(remoteState.matches||[]).find(x=>x.id===op.matchId);if(!m)return{ok:false,reason:"not-found"};
+    if(Number(op.station)<1||remoteState.forcedCourtExits?.[op.station]?.closed)return {ok:false,reason:"court-retired"};
     if(m.completed||m.winnerId)return{ok:false,reason:"already-completed"};if(Number(m.station||0)!==Number(op.station||0))return{ok:false,reason:"station-mismatch"};
     if((m.dispatchRevision||0)!==(op.dispatchRevision||0))return{ok:false,reason:"dispatch-stale"};if(!m.a||!m.b||m.a.playerId!==op.playerAId||m.b.playerId!==op.playerBId)return{ok:false,reason:"player-mismatch"};
     let ev;if(op.mode==="quick_decision")ev=evaluateQuickDecision(m,op.selectedWinnerId);else{m.scoreA=op.scoreA;m.scoreB=op.scoreB;m.log=Array.isArray(op.log)?op.log:[];m.faultActions=Array.isArray(op.faultActions)?op.faultActions:[];ev=evaluateMatchCompletion(m);}

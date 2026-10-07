@@ -53,6 +53,22 @@ test('referee action submits the raw outcome; server remains the scoring authori
  assert.equal('points' in calls.find(x=>x.action==='score'),false);
 });
 
+test('a referee restart after takeover carries the current dispatch revision',async()=>{
+ const calls=[],listeners={},slot={innerHTML:''};
+ const panel={dataset:{code:'BXH-ABCD',matchId:'match1',dispatchRevision:'2'},querySelector:()=>slot};
+ const root={BXHEnchantmentScore:score,engagementService:{enchantment:async payload=>{
+  calls.push(payload);return {version:8,state:{round:1,phase:'drawing',scores:{A:2,B:0},drawn:{A:false,B:false},cards:{A:null,B:null}}};
+ }},addEventListener:(event,fn)=>listeners[event]=fn};
+ const document={querySelectorAll:selector=>selector==='[data-enchantment-referee]'?[panel]:[],
+  addEventListener:(event,fn)=>listeners[event]=fn};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../enchantment-ui.js'),'utf8'),
+  {window:root,document,location:{origin:'https://arena.example'},setTimeout:()=>{},setInterval:()=>{},console});
+ const button={dataset:{enchantmentAction:'start',code:'BXH-ABCD',matchId:'match1'}};
+ listeners.click({target:{closest:()=>button},preventDefault(){},stopPropagation(){}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(calls.find(x=>x.action==='start').dispatchRevision,2);
+});
+
 test('first fault warning exposes undo before a point is awarded',async()=>{
  const listeners={},slot={innerHTML:''};
  const panel={dataset:{code:'BXH-ABCD',matchId:'match1'},querySelector:()=>slot};
