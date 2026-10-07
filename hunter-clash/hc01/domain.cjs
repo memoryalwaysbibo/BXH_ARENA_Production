@@ -1,7 +1,7 @@
 'use strict';
 // HC-01 domain only. Completion is an unrated record, never an award/settlement.
 const POINTS = Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
-const OPERATIONS = Object.freeze(['accept','reject','start','proposeRound','recordRound','confirmRound','confirmFinish','dispute','cancel']);
+const OPERATIONS = Object.freeze(['accept','reject','start','proposeRound','recordRound','undoRound','resumeReview','confirmRound','confirmFinish','dispute','cancel']);
 const fail = reason => { throw Error(reason); };
 function identifier(value){if(typeof value!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(value))fail('invalid-id');return value;}
 function keys(input,allowed){if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('invalid-input');}
@@ -45,12 +45,27 @@ function transition(original,uid,operation,input,now){
         points:POINTS[input.finish],roundRevision:c.revision+1,confirmedBy:[uid],proposedAt:now};
       c.status='round_pending';
     }else if(operation==='recordRound'){
-      if(c.status!=='in_progress'||uid!==c.participants[0]||!c.participants.includes(input.winnerUid)||!Object.hasOwn(POINTS,input.finish))fail('invalid-round');
+      if(!['in_progress','score_review'].includes(c.status)||c.pendingRound||Math.max(c.score.a,c.score.b)>=c.rules.targetScore||uid!==c.participants[0]||!c.participants.includes(input.winnerUid)||!Object.hasOwn(POINTS,input.finish))fail('invalid-round');
       const r={number:c.rounds.length+1,winnerUid:input.winnerUid,finish:input.finish,
         points:POINTS[input.finish],roundRevision:c.revision+1,recordedBy:uid,recordedAt:now};
       c.rounds.push(r);c.score[r.winnerUid===c.participants[0]?'a':'b']+=r.points;
-      c.status=Math.max(c.score.a,c.score.b)>=c.rules.targetScore?'final_pending':'in_progress';
+      c.status=c.status==='score_review'?'score_review':Math.max(c.score.a,c.score.b)>=c.rules.targetScore?'final_pending':'in_progress';
       if(c.status==='final_pending'){c.resultRevision=c.revision+1;c.winnerUid=r.winnerUid;}
+    }else if(operation==='undoRound'){
+      if(uid!==c.participants[0]||!['in_progress','round_pending','final_pending','score_review'].includes(c.status)||(!c.pendingRound&&!c.rounds.length))fail('undo-unavailable');
+      const wasReview=c.status==='score_review',pending=!!c.pendingRound;
+      const removed=pending?c.pendingRound:c.rounds.pop();
+      if(!pending)c.score[removed.winnerUid===c.participants[0]?'a':'b']-=removed.points;
+      c.pendingRound=null;c.finishConfirmedBy=[];c.resultRevision=null;delete c.winnerUid;
+      c.corrections=(c.corrections||[]).concat([{round:removed,pending,undoneBy:uid,at:now,revision:c.revision+1}]);
+      c.status=wasReview?'score_review':'in_progress';
+    }else if(operation==='resumeReview'){
+      if(uid!==c.participants[0]||c.status!=='score_review')fail('review-unavailable');
+      c.finishConfirmedBy=[];
+      c.status=c.pendingRound?'round_pending':Math.max(c.score.a,c.score.b)>=c.rules.targetScore?'final_pending':'in_progress';
+      c.resultRevision=c.status==='final_pending'?c.revision+1:null;
+      if(c.status==='final_pending')c.winnerUid=c.participants[c.score.a>=c.rules.targetScore?0:1];
+      else delete c.winnerUid;
     }else if(operation==='confirmRound'){
       const r=c.pendingRound;
       if(c.status!=='round_pending'||!r||input.roundRevision!==r.roundRevision||r.confirmedBy.includes(uid))fail('round-confirmation-invalid');
@@ -65,7 +80,7 @@ function transition(original,uid,operation,input,now){
       if(c.finishConfirmedBy.length===2){c.status='completed';c.completedAt=now;c.certificationSource='SELF';c.ratingStatus='not_awarded';}
     }else if(operation==='dispute'){
       if(!['in_progress','round_pending','final_pending'].includes(c.status))fail('invalid-state');
-      c.status='disputed';c.disputedBy=uid;c.disputedAt=now;
+      c.status='score_review';c.disputedBy=uid;c.disputedAt=now;c.finishConfirmedBy=[];c.resultRevision=null;delete c.winnerUid;
     }
   }
   if(c.revision>=Number.MAX_SAFE_INTEGER)fail('revision-overflow');c.revision++;return c;

@@ -110,7 +110,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
   return Object.freeze({run});
 }
 function view(c){
-  const allowed=['schemaVersion','environment','challengeId','participants','rules','status','revision','createdAt','expiresAt','ready','rounds','pendingRound','score','finishConfirmedBy','resultRevision','winnerUid','completedAt','certificationSource','ratingStatus','disputedBy','disputedAt'];
+  const allowed=['schemaVersion','environment','challengeId','participants','rules','status','revision','createdAt','expiresAt','ready','rounds','pendingRound','score','finishConfirmedBy','resultRevision','winnerUid','completedAt','certificationSource','ratingStatus','disputedBy','disputedAt','corrections'];
   return Object.fromEntries(allowed.filter(k=>Object.hasOwn(c,k)).map(k=>[k,structuredClone(c[k])]));
 }
 module.exports={createLifecycleService,view};

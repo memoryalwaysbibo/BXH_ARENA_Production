@@ -96,3 +96,18 @@ test('manual code and QR use the same atomic Firestore pairing and private code 
   const url='http://127.0.0.1:8180/v1/projects/'+PROJECT+'/databases/(default)/documents/'+index.ref.path;
   assert.equal((await fetch(url,{headers:{Authorization:'Bearer '+tokens.A}})).status,403);
 });
+
+test('actual Callable dispute preserves room, undo corrects score and fresh final confirmations complete',async()=>{
+  const made=await create();let c=await command('B','accept',made.challenge,{pairingToken:made.pairingToken});
+  c=await command('A','start',c);c=await command('B','start',c);
+  for(const finish of ['extreme','spin'])c=await command('A','recordRound',c,{winnerUid:'A',finish});
+  c=await command('A','confirmFinish',c,{resultRevision:c.resultRevision});
+  c=await command('B','dispute',c);assert.equal(c.status,'score_review');assert.deepEqual(c.finishConfirmedBy,[]);
+  c=await command('A','undoRound',c);assert.deepEqual(c.score,{a:3,b:0});assert.equal(c.corrections.length,1);
+  c=await command('A','recordRound',c,{winnerUid:'A',finish:'spin'});
+  c=await command('A','resumeReview',c);assert.equal(c.status,'final_pending');
+  c=await command('B','confirmFinish',c,{resultRevision:c.resultRevision});
+  c=await command('A','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'completed');
+  const stored=(await db.doc('hc01Challenges/'+c.challengeId).get()).data();
+  assert.equal(stored.corrections[0].round.finish,'spin');assert.deepEqual(stored.score,{a:4,b:0});
+});

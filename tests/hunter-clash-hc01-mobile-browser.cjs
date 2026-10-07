@@ -33,6 +33,15 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     assert.equal(await A.locator('.join-panel').isVisible(),false);assert.equal(await A.locator('[data-op="start"]').textContent(),'確認開賽');const ready=await command(A,'start');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),ready.challenge.revision);await command(B,'start');await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('對戰中'));
     await A.screenshot({path:'test-results/hc01/mobile-scoring.png',fullPage:true});
     for(const finish of ['extreme','spin']){const result=await command(A,'recordRound','[data-op="recordRound"][data-player="0"][data-finish="'+finish+'"]');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),result.challenge.revision);assert.equal(await B.locator('[data-op="confirmRound"]').isVisible(),false);}
+    const firstConfirm=await command(A,'confirmFinish');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),firstConfirm.challenge.revision);
+    await command(B,'dispute');await A.waitForFunction(()=>document.querySelector('.state').textContent==='請核對比分');
+    assert.equal(await A.locator('.home-actions').isVisible(),false);
+    assert.equal(await A.locator('[data-op="confirmFinish"]').isVisible(),false);
+    assert.equal(await B.locator('[data-op="undoRound"]').isVisible(),false);
+    await command(A,'undoRound');assert.equal(await A.locator('.points').first().textContent(),'3');
+    await command(A,'recordRound','[data-op="recordRound"][data-player="0"][data-finish="spin"]');
+    await A.screenshot({path:'test-results/hc01/mobile-score-review.png',fullPage:true});
+    const reviewed=await command(A,'resumeReview');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),reviewed.challenge.revision);
     const final=await command(A,'confirmFinish');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),final.challenge.revision);await command(B,'confirmFinish');await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('完賽紀錄已保存'));
     // Session reload restores only challenge ID, then reads current service state after login.
     await A.reload();assert.equal(await A.locator('[name="email"]').inputValue(),'A@fixture.invalid');assert.equal(await A.locator('[name="remember"]').isChecked(),true);assert.equal(await A.locator('[name="password"]').inputValue(),'');await A.locator('[name="password"]').fill('fixture');await A.locator('#login button').click();await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('完賽紀錄已保存'));

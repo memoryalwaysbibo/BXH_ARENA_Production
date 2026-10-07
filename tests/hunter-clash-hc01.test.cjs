@@ -76,10 +76,10 @@ test('role revocation blocks replay, opponent revocation blocks confirmation; ca
   c=await f.mutate('B','cancel',c);assert.equal(c.status,'cancelled');
   await assert.rejects(f.service.run('A','createChallenge',{requestId:'create'}),/account-unavailable/);
 });
-test('disputed round/final locks progress and preserves evidence; terminal cancellation is immutable',async()=>{
+test('dispute returns pending round to review and preserves evidence; terminal cancellation is immutable',async()=>{
   const f=fixture();let c=await f.start();c=await f.mutate('B','proposeRound',c,{winnerUid:'A',finish:'spin'});c=await f.mutate('A','dispute',c);
-  assert.equal(c.status,'disputed');assert.equal(c.pendingRound.winnerUid,'A');
-  await assert.rejects(f.mutate('B','confirmRound',c,{roundRevision:c.pendingRound.roundRevision}),/terminal-state/);
+  assert.equal(c.status,'score_review');assert.equal(c.pendingRound.winnerUid,'A');
+  await assert.rejects(f.mutate('B','confirmRound',c,{roundRevision:c.pendingRound.roundRevision}),/round-confirmation-invalid/);
   const g=fixture(),cancelled=await g.mutate('A','cancel',await g.start());await assert.rejects(g.mutate('B','start',cancelled),/terminal-state/);
 });
 test('production projects and closed/invalid sandbox policy fail before mutation',async()=>{
@@ -175,6 +175,63 @@ test('creator records both scores immediately, replay is idempotent and both con
 });
 test('opponent can dispute an immediately recorded score during play',async()=>{
   const f=fixture();let c=await f.start();c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'spin'});
-  c=await f.mutate('B','dispute',c);assert.equal(c.status,'disputed');assert.equal(c.rounds.length,1);
-  await assert.rejects(f.mutate('A','recordRound',c,{winnerUid:'A',finish:'extreme'}),/terminal-state/);
+  c=await f.mutate('B','dispute',c);assert.equal(c.status,'score_review');assert.equal(c.rounds.length,1);
+  await assert.rejects(f.mutate('B','recordRound',c,{winnerUid:'A',finish:'extreme'}),/invalid-round/);
+  c=await f.mutate('A','resumeReview',c);assert.equal(c.status,'in_progress');
+});
+
+
+test('undo is creator-only, replay-safe and preserves the removed scoring evidence',async()=>{
+  const f=fixture();let c=await f.start();
+  await assert.rejects(f.mutate('A','undoRound',c),/undo-unavailable/);
+  c=await f.mutate('A','recordRound',c,{winnerUid:'B',finish:'extreme'});
+  await assert.rejects(f.mutate('B','undoRound',c),/undo-unavailable/);
+  const input={challengeId:c.challengeId,requestId:'undo',expectedRevision:c.revision};
+  const result=await f.service.run('A','undoRound',input);
+  assert.deepEqual(await f.service.run('A','undoRound',input),result);
+  c=result.challenge;assert.deepEqual(c.score,{a:0,b:0});assert.equal(c.rounds.length,0);
+  assert.equal(c.corrections.length,1);assert.equal(c.corrections[0].round.finish,'extreme');
+  await assert.rejects(f.mutate('A','undoRound',{...c,revision:c.revision-1}),/revision-conflict/);
+  c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'spin'});
+  assert.equal(c.rounds[0].number,1);assert.deepEqual(c.score,{a:1,b:0});
+});
+
+test('disputed final can be corrected and requires fresh confirmations of the new result',async()=>{
+  const f=fixture();let c=await f.start();
+  for(const finish of ['extreme','spin'])c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish});
+  const oldResult=c.resultRevision;
+  c=await f.mutate('A','confirmFinish',c,{resultRevision:oldResult});
+  c=await f.mutate('B','dispute',c);
+  assert.equal(c.status,'score_review');assert.deepEqual(c.finishConfirmedBy,[]);assert.equal(c.resultRevision,null);
+  await assert.rejects(f.mutate('B','resumeReview',c),/review-unavailable/);
+  await assert.rejects(f.mutate('A','confirmFinish',c,{resultRevision:oldResult}),/finish-confirmation-invalid/);
+  c=await f.mutate('A','undoRound',c);assert.equal(c.status,'score_review');assert.deepEqual(c.score,{a:3,b:0});
+  c=await f.mutate('A','recordRound',c,{winnerUid:'B',finish:'knockout'});
+  c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'spin'});
+  assert.equal(c.status,'score_review');
+  c=await f.mutate('A','resumeReview',c);assert.equal(c.status,'final_pending');
+  assert.notEqual(c.resultRevision,oldResult);
+  await assert.rejects(f.mutate('B','confirmFinish',c,{resultRevision:oldResult}),/finish-confirmation-invalid/);
+  c=await f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision});
+  c=await f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'completed');
+  await assert.rejects(f.mutate('A','undoRound',c),/terminal-state/);
+});
+
+test('undo pending legacy round never subtracts unconfirmed points',async()=>{
+  const f=fixture();let c=await f.start();
+  c=await f.mutate('B','proposeRound',c,{winnerUid:'B',finish:'burst'});
+  c=await f.mutate('A','dispute',c);
+  c=await f.mutate('A','undoRound',c);
+  assert.equal(c.pendingRound,null);assert.deepEqual(c.score,{a:0,b:0});
+  assert.equal(c.corrections[0].pending,true);
+  c=await f.mutate('A','resumeReview',c);assert.equal(c.status,'in_progress');
+});
+
+test('undo final score clears an existing confirmation and reopens scoring',async()=>{
+  const f=fixture();let c=await f.start();
+  for(const finish of ['extreme','spin'])c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish});
+  c=await f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision});
+  c=await f.mutate('A','undoRound',c);
+  assert.equal(c.status,'in_progress');assert.deepEqual(c.finishConfirmedBy,[]);
+  assert.equal(c.resultRevision,null);assert.equal(c.winnerUid,undefined);assert.deepEqual(c.score,{a:3,b:0});
 });

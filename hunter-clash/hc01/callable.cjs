@@ -9,6 +9,7 @@ const codes={
   'closed':'failed-precondition','request-id-reused':'already-exists','challenge-already-exists':'already-exists',
   'pairing-rate-limited':'resource-exhausted','pairing-unavailable':'failed-precondition','revision-conflict':'aborted','terminal-state':'failed-precondition',
   'invalid-state':'failed-precondition','invalid-round':'invalid-argument','round-confirmation-invalid':'failed-precondition',
+  'undo-unavailable':'failed-precondition','review-unavailable':'failed-precondition',
   'finish-confirmation-invalid':'failed-precondition','environment-mismatch':'failed-precondition','revision-overflow':'failed-precondition'
 };
 // The runtime decodes request.auth; the service independently verifies the same bearer token.
