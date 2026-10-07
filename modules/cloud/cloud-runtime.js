@@ -2256,9 +2256,10 @@
       await fx.deleteDoc(fx.doc(dbHandle,"publicTournaments",String(code).toUpperCase())); await fx.deleteDoc(ref); return true;
     },
     async cleanupMyExpiredCommunityRooms(){
-      const items=await this.queryMyCommunityEvents(); const now=Date.now();
-      for(const t of items){if(schedulePhase(t)==="done")continue;let ms=0;try{ms=t.expiresAt&&typeof t.expiresAt.toMillis==="function"?t.expiresAt.toMillis():0;}catch(e){} if(ms&&ms<=now){try{await this.deleteCommunityRoom(t.code);}catch(e){}}}
-      return true;
+      // Retained for older callers. Stored expiresAt can predate registrations
+      // and must never authorize a browser-side delete. Scheduled cleanup is
+      // currently audit-only; deletion requires fresh server-side checks.
+      return {processed:0,disabled:true};
     },
 
     async createRoom(data){

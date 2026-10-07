@@ -1,6 +1,6 @@
 {
-  "build": "20261007.1",
+  "build": "20261007.2",
   "version": "v14.3.32",
-  "updatedAt": "2026-10-07T08:53:00+08:00",
-  "releaseTrigger": "community-host-roster-sync"
+  "updatedAt": "2026-10-07T07:59:23.450Z",
+  "releaseTrigger": "disable-legacy-community-cleanup"
 }
