@@ -22091,6 +22091,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           cloudStatus="connected"; cloudAccessLimited=false; cloudAccessMessage=""; cloudLastSyncAt=Date.now();
           await saveRecord(state);
           showToast("裁判台分配已完成原子同步與雲端確認");
+        }else if(result&&result.committed){
+          cloudStatus="connected";
+          showToast("裁判台分配已送出，雲端讀回核對尚未完成；請重新整理頁面確認",true);
         }else{
           state.meta.refereeStationAssignments=previous.assignments;
           state.meta.refereeStationNames=previous.names;
@@ -22203,6 +22206,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           await saveRecord(state);
           const savedCount=Array.isArray(state.meta.assignedStaffUids)?state.meta.assignedStaffUids.length:0;
           showToast(savedCount>0 ? ("已指派 "+savedCount+" 位工作人員，雲端已確認") : "已清除指派名單（恢復開放給所有在職工作人員）");
+        }else if(result&&result.committed){
+          cloudStatus="connected";
+          showToast("工作人員指派已送出，雲端讀回核對尚未完成；請重新整理頁面確認",true);
         }else{
           state.meta.assignedStaffUids=previous;
           const reason=(result&&result.reason)||"unknown";
