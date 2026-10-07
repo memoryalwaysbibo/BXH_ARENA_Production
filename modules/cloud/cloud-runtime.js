@@ -2169,7 +2169,7 @@
         data.meta=data.meta||{}; data.meta.eventAuthority="community"; data.communityQuickRegistration=true; data.meta.communityQuickRegistration=true; data.meta.ladderMode="general"; data.meta.registrationEnabled=!!data.meta.registrationEnabled; data.meta.assignedStaffUids=[]; data.meta.roomAccessMode=data.meta.roomAccessMode==="password"?"password":"public";
         data.ownerUid=uid; data.createdByRole="player"; data.lastActivityAt=now;
         const hasStructure=(data.players||[]).some(p=>p&&p.isRoomOwner!==true)||(data.matches&&data.matches.length)||data.bracketSize;
-        const expMs=data.expiresAtMs || now+(hasStructure?30*24*60*60*1000:6*60*60*1000); data.expiresAtMs=expMs;
+        const expMs=data.expiresAtMs || now+(hasStructure?24*60*60*1000:6*60*60*1000); data.expiresAtMs=expMs;
         const regEnabled=!!data.meta.registrationEnabled;
         const regOpen=data.meta.registrationOpenAt??null;
         const regClose=data.meta.registrationCloseAt??null;
@@ -3170,7 +3170,7 @@ if(testerSession){
           if(!result || !result.ok) throw new Error((result && result.reason) || "validation-failed");
           const now=Date.now();
           const community=(result.state.meta&&result.state.meta.eventAuthority)==="community";
-          if(community){ result.state.lastActivityAt=now; result.state.expiresAtMs=now+30*24*60*60*1000; }
+          if(community){ result.state.lastActivityAt=now; result.state.expiresAtMs=communityRoomExpiryMs(result.state); }
           const extra=community?{lastActivityAt:now,expiresAt:new Date(result.state.expiresAtMs),eventAuthority:"community",ownerUid:result.state.ownerUid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed"}:{};
           tx.set(ref, Object.assign({ data: JSON.stringify(result.state), updatedAt: now },extra), { merge:true });
           tx.set(publicRef, Object.assign({ bracketView: JSON.stringify(buildPublicMirrorFields(result.state)), updatedAt: now, tournamentPhase: computeTournamentPhase(result.state) },extra), { merge:true });
