@@ -54,11 +54,11 @@ test('preserves administrator role and checked assignment', () => {
   assert.ok(html.includes('data-action="save-staff-assignment"'));
 });
 
-test('missing, blank, or malformed real name uses an explicit placeholder', () => {
+test('missing, blank, or malformed real name uses game ID and a missing-name label', () => {
   for (const realName of [undefined, null, '', ' \t\n ', 123, false, {}, []]) {
-    const html = render([staff({realName})], ['uid-staff-a']);
+    const html = render([staff({realName, gameId: '  GAME_ID_ONLY  '})], ['uid-staff-a']);
     const text = visible(html);
-    assert.ok(text.includes('未填寫本名'), 'placeholder for ' + JSON.stringify(realName));
+    assert.ok(text.includes('GAME_ID_ONLY（缺少本名）'), 'placeholder for ' + JSON.stringify(realName));
     for (const value of ['NICKNAME_ONLY', 'staff@example.invalid', 'uid-staff-a']) assert.ok(!text.includes(value));
     assert.match(html, /data-uid="uid-staff-a" checked/);
   }
