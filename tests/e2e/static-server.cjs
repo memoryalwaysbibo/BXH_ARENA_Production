@@ -3,6 +3,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const {CALLABLE_PATH,syncOnsiteCommunitySummary} = require('./community-summary-fixture.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const port = Number(process.env.PORT || 4173);
@@ -142,12 +143,19 @@ if (emulatorMode) {
     }
     let body='';
     req.on('data',chunk=>{ body += chunk; });
-    req.on('end',()=>{
+    req.on('end',async()=>{
       const name=String(req.url||'').split('/').filter(Boolean).pop()||'unknown';
       const okNames=new Set(['getEngagementHealth','onlinePresence']);
-      const payload=okNames.has(name)
+      let payload=req.method==='POST'&&okNames.has(name)
         ? {data:{ok:true,serverTime:Date.now(),messages:[]}}
         : {data:{ok:false,error:'e2e-function-stub',function:name}};
+      if(req.url===CALLABLE_PATH){
+        try{
+          payload={data:await syncOnsiteCommunitySummary({method:req.method,url:req.url,authorization:req.headers.authorization,body:JSON.parse(body)})};
+        }catch(error){
+          payload={error:{status:'FAILED_PRECONDITION',message:String(error.message||'e2e-function-stub')}};
+        }
+      }
       res.writeHead(200,{'content-type':'application/json; charset=utf-8'});
       res.end(JSON.stringify(payload));
     });
