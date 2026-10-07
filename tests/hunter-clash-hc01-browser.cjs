@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs');
 const {spawn}=require('node:child_process');
-const {chromium}=require(require.resolve('playwright',{paths:[process.cwd(),process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES].filter(Boolean)}));
+const {chromium}=require(require.resolve('playwright',{paths:[process.cwd(),process.env.HC01_PLAYWRIGHT_MODULES,process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES].filter(Boolean)}));
 const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:path.join(__dirname,'..'),stdio:['ignore','pipe','pipe']});
 (async()=>{
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('lab-start-timeout')),10000);server.stdout.once('data',()=>{clearTimeout(timer);resolve();});server.once('exit',code=>{clearTimeout(timer);reject(Error('lab-exit-'+code));});});

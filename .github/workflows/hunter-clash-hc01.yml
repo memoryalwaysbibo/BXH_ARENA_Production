@@ -24,9 +24,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
+      - run: npm install --prefix /tmp/hc01-browser --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
+      - run: node /tmp/hc01-browser/node_modules/playwright/cli.js install --with-deps chromium
       - run: node tests/hunter-clash-hc01-browser.cjs
+        env:
+          HC01_PLAYWRIGHT_MODULES: /tmp/hc01-browser/node_modules
       - uses: actions/upload-artifact@v4
         if: always()
         with:
