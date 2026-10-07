@@ -92,6 +92,7 @@ function saveHarness({ capacity = '', enabled = true, saveResult = true, meta = 
     'cset-waitlist': { value: '3' }, 'cset-reg-open': { value: '' }, 'cset-reg-close': { value: '' }, 'cset-reg-cancel': { value: '' }, 'cset-access-mode': { value: 'public' },
     'cset-access-password': { value: '' }, ...fields,
   };
+  for(const [id,input]of Object.entries(elements)){input.id=id;input.dataset={};input.type=id==='cset-registration-enabled'?'checkbox':id==='cset-access-password'?'password':'text';input.disabled=false;}
   const original = {
     id: 'local-room', cloudCode: 'COMMUNITY-QUICK', startedAt: null, matches: [], players: [],
     meta: { name: 'Original room', date: '2026-10-05', location: 'Original venue',
@@ -103,7 +104,8 @@ function saveHarness({ capacity = '', enabled = true, saveResult = true, meta = 
   const saves = [], toasts = [], accessCalls = [];
   let renderCount = 0;
   const ctx = context({
-    state: clone(original), document: { getElementById: id => elements[id] || null },
+    state: clone(original), document: { getElementById: id => elements[id] || null, querySelectorAll: () => Object.values(elements) },
+    appPhase:'community-room',communityRoomActiveTab:'settings',communityRoomSnapshotGeneration:0,communitySettingsRenderedContext:null,canManageRegistrationRoster:()=>true,
     FORMAT_LABELS: { single: '單淘汰賽' }, crypto: { randomUUID: () => 'local-operation' },
     publicTournamentsCache: [{ code: 'stale' }], communityEventsCache: [{ code: 'stale' }],
     isCommunityRoomOwner: () => true, touchCommunityActivity: () => {},
@@ -112,6 +114,7 @@ function saveHarness({ capacity = '', enabled = true, saveResult = true, meta = 
     cloneStateForSave: clone,
     render: () => { renderCount++; }, showToast: (message, error) => toasts.push({ message, error: !!error }),
   });
+  for(const name of ['communitySettingsDraftContext','communitySettingsInputs','communitySettingBadInput','setCommunitySettingsInputsSaving','captureCommunitySettingsInputs','restoreCommunitySettingsInputs','renderCommunityRoomPreservingSettings'])vm.runInContext(extractFunction(core,name),ctx);
   ctx.saveState = async (options = {}) => {
     const snapshot = options.snapshot || ctx.state;
     if (snapshot.meta.registrationEnabled) snapshot.meta.registrationStatus = ctx.computeRegistrationStatus(snapshot.meta, snapshot);
@@ -498,6 +501,7 @@ function createHarness({ enabled = false, capacity = '', fields = {} } = {}) {
     applyRemoteState: () => {}, render: () => {}, showToast: (message, error) => toasts.push({ message, error: !!error }),
   });
   ctx.currentAuthUid = () => ctx.firebaseUser?.uid || '';
+  vm.runInContext('let communityRoomSnapshotGeneration=0;\n'+extractFunction(core,'invalidateCommunityRoomSnapshotContext')+'\n'+extractFunction(core,'subscribeCommunityRoomState'),ctx);
   ctx.window.cloudSync = { connect: async () => {}, subscribe: () => () => {},
     createCommunityRoom: async state => { creates.push(clone(state)); return 'LOCAL-CREATED'; } };
   const start = core.indexOf('  if(action==="community-create-submit"){');
@@ -1139,4 +1143,255 @@ test('waitlist browser badInput is rejected before any settings or access mutati
   assert.equal(h.accessCalls.length, 0);
   assert.deepEqual(clone(h.ctx.state), h.original);
   assert(h.toasts.some(t => t.error));
+});
+
+
+function settingsRaceHarness(options = {}) {
+  const h = saveHarness({ meta: { communityQuickRegistration: true }, ...options });
+  Object.assign(h.ctx.state, { ownerUid: 'local-test-user', createdBy: 'local-test-user', registrationRosterRevision: 1 });
+  h.cloudWrites = []; h.localWrites = []; h.retries = []; h.reads = 0;
+  h.fresh = clone(h.ctx.state);
+  Object.assign(h.fresh, { registrationRosterRevision: 2, players: [{ id: 'server-player', registrationId: 'server-registration', checkedIn: true }], waitlistPlayers: [{ id: 'server-waiting' }] });
+  Object.assign(h.ctx, { currentRole: 'player', cloudWriteChain: Promise.resolve(),
+    syncEventInfoV2FromLegacy() {}, defaultState: id => ({ id }), remoteAppliedRoomId: h.ctx.state.id, remoteAppliedAt: 0,
+    courtSwapDraft: null, getMatch: () => null, renderPreservingScroll() {},
+    saveRecord: async snapshot => { h.localWrites.push(clone(snapshot)); return true; },
+    queueCloudSyncRetry: (...args) => h.retries.push(args),
+  });
+  h.ctx.window.cloudSync.joinRoom = async () => { h.reads++; return { ok: true, data: clone(h.fresh) }; };
+  h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+    h.cloudWrites.push(clone(snapshot));
+    // Enforce the production roster revision guard, not just a stubbed save result.
+    if (snapshot.registrationRosterRevision !== h.fresh.registrationRosterRevision) {
+      h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = 'registration-roster-stale'; return false;
+    }
+    h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = ''; return true;
+  };
+  for (const name of ['cloneStateForSave', 'enqueueCloudStateWrite', 'flushCloudStateWrites', 'saveState', 'applyRemoteState']) vm.runInContext(extractFunction(core, name), h.ctx);
+  return h;
+}
+const nextTurn = () => new Promise(resolve => setImmediate(resolve));
+
+test('roster-stale settings rebase commits fresh roster, waitlist, results and revision to cloud, active state and cache', async () => {
+  const h = settingsRaceHarness();
+  const matches = [{ id: 'finished', completed: true, winnerId: 'winner', scoreA: 3, scoreB: 1 }];
+  h.ctx.state.matches = clone(matches); h.fresh.matches = clone(matches);
+  await h.run();
+  assert.equal(h.reads, 1); assert.equal(h.cloudWrites.length, 2);
+  for (const saved of [h.cloudWrites[1], h.ctx.state, h.localWrites.at(-1)]) {
+    assert.equal(saved.meta.stations, 2); assert.equal(saved.registrationRosterRevision, 2);
+    assert.deepEqual(clone(saved.players), h.fresh.players); assert.deepEqual(clone(saved.waitlistPlayers), h.fresh.waitlistPlayers);
+    assert.deepEqual(clone(saved.matches), matches);
+  }
+  assert(h.toasts.some(t => !t.error && /已儲存/.test(t.message))); assert.equal(h.retries.length, 0);
+});
+
+test('a second stale rejection stops after one rebase and never queues automatic settings retries', async () => {
+  const h = settingsRaceHarness();
+  h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+    h.cloudWrites.push(clone(snapshot)); h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = 'registration-roster-stale'; return false;
+  };
+  await h.run();
+  assert.equal(h.reads, 1); assert.equal(h.cloudWrites.length, 2); assert.equal(h.retries.length, 0);
+  assert.equal(h.ctx.state.meta.stations, 1); assert.equal(h.elements['cset-stations'].value, '2');
+  assert(!h.toasts.some(t => !t.error));
+});
+
+for (const change of ['code', 'owner', 'creator', 'revision', 'team', 'started', 'bracket', 'roster-lock', 'result', 'result-revision', 'format', 'access', 'settings']) {
+  test('settings rebase fails closed on fresh ' + change + ' changes', async () => {
+    const h = settingsRaceHarness();
+    if (change === 'code') h.fresh.cloudCode = 'OTHER';
+    if (change === 'owner') h.fresh.ownerUid = 'other';
+    if (change === 'creator') h.fresh.createdBy = 'other';
+    if (change === 'revision') h.fresh.registrationRosterRevision = 1;
+    if (change === 'team') h.fresh.meta.battleMode = 'team';
+    if (change === 'started') h.fresh.startedAt = NOW;
+    if (change === 'bracket') h.fresh.bracketSize = 8;
+    if (change === 'roster-lock') h.fresh.rosterLocked = true;
+    if (change === 'result') h.fresh.matches = [{ id: 'new-match', completed: true, winnerId: 'server-player' }];
+    if (change === 'result-revision') h.fresh.teamResultRevision = 2;
+    if (change === 'format') h.fresh.meta.formatType = 'double';
+    if (change === 'access') h.fresh.meta.roomAccessMode = 'password';
+    if (change === 'settings') h.fresh.meta.name = 'Changed on other device';
+    h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+      h.cloudWrites.push(clone(snapshot)); h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = 'registration-roster-stale'; return false;
+    };
+    await h.run();
+    assert.equal(h.reads, 1); assert.equal(h.cloudWrites.length, 1); assert.equal(h.ctx.state.meta.stations, 1);
+    assert(!h.toasts.some(t => !t.error));
+  });
+}
+
+for (const interruption of ['exit', 'reopen', 'identity', 'permission']) {
+  for (const succeeds of [false, true]) test('pending settings ignore ' + (succeeds ? 'success' : 'stale failure') + ' after ' + interruption, async () => {
+    const h = settingsRaceHarness(); let finish;
+    h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+      h.cloudWrites.push(clone(snapshot)); return new Promise(resolve => { finish = resolve; });
+    };
+    await h.run();
+    if (interruption === 'exit') h.ctx.appPhase = 'player-center';
+    if (interruption === 'reopen') h.ctx.communityRoomSnapshotGeneration++;
+    if (interruption === 'identity') h.ctx.currentAuthUid = () => 'different-user';
+    if (interruption === 'permission') h.ctx.canManageRegistrationRoster = () => false;
+    h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = 'registration-roster-stale';
+    finish(succeeds); await nextTurn();
+    assert.equal(h.reads, 0); assert.equal(h.cloudWrites.length, 1); assert.equal(h.localWrites.length, 0);
+    assert.equal(h.ctx.state.meta.stations, 1); assert.equal(h.toasts.length, 0); assert.equal(h.ctx.communitySettingsWriteGate, null);
+  });
+}
+
+test('draw creation while draining earlier saves prevents stale format or access changes before first push', async () => {
+  const h = settingsRaceHarness({ fields: { 'cset-format': { value: 'double' } } }); let finish;
+  h.ctx.flushCloudStateWrites = () => new Promise(resolve => { finish = resolve; });
+  await h.run(); h.ctx.state.bracketSize = 8; h.ctx.state.rosterLocked = true;
+  h.ctx.state.matches = [{ id: 'newly-drawn', completed: false }];
+  finish(true); await nextTurn();
+  assert.equal(h.cloudWrites.length, 0); assert.equal(h.accessCalls.length, 0); assert.equal(h.ctx.state.meta.formatType, 'single');
+});
+
+for (const duringRetry of [false, true]) {
+  test('local roster edits and a private projection remain safe ' + (duringRetry ? 'during retry' : 'before retry'), async () => {
+    const h = settingsRaceHarness(); let finish;
+    h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+      h.cloudWrites.push(clone(snapshot));
+      if (duringRetry && h.cloudWrites.length === 1) { h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = 'registration-roster-stale'; return false; }
+      return new Promise(resolve => { finish = resolve; });
+    };
+    await h.run(); assert.equal(h.cloudWrites.length, duringRetry ? 2 : 1);
+    h.ctx.state.players.push({ id: 'pending-onsite', name: 'Pending onsite' });
+    const localSave = h.ctx.saveState();
+    h.ctx.applyRemoteState({ ...clone(h.fresh), updatedAt: NOW + 1 });
+    assert.equal(h.ctx.state.players[0].id, 'pending-onsite', 'Listener cannot erase the queued local mutation');
+    h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = duringRetry ? '' : 'registration-roster-stale'; finish(duringRetry);
+    assert.equal(await localSave, false); await nextTurn();
+    assert.equal(h.cloudWrites.length, duringRetry ? 2 : 1, 'Conflicted old roster cannot be sent after the gate');
+    assert.equal(h.ctx.state.players[0].id, 'pending-onsite');
+    assert.equal(h.ctx.state.registrationRosterRevision, 1, 'Never bless old local players with a newer server revision');
+    assert.equal(h.ctx.state.meta.stations, duringRetry ? 2 : 1);
+    assert(h.toasts.some(t => t.error && /尚未儲存/.test(t.message)));
+    if (duringRetry) { assert.deepEqual(h.localWrites.at(-1).players, h.fresh.players); assert.equal(h.localWrites.at(-1).meta.stations, 2); }
+    assert.equal(h.retries.length, 0);
+  });
+}
+
+test('a newer same-revision private result survives the settings retry acknowledgement and cache write', async () => {
+  const h = settingsRaceHarness(); let finish;
+  h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+    h.cloudWrites.push(clone(snapshot));
+    if (h.cloudWrites.length === 1) { h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = 'registration-roster-stale'; return false; }
+    return new Promise(resolve => { finish = resolve; });
+  };
+  await h.run(); assert.equal(h.cloudWrites.length, 2);
+  const newer = { ...clone(h.fresh), startedAt: NOW, updatedAt: NOW + 1000,
+    matches: [{ id: 'fresh-result', completed: true, winnerId: 'server-player' }] };
+  h.ctx.applyRemoteState(newer); finish(true); await nextTurn();
+  for (const st of [h.ctx.state, h.localWrites.at(-1)]) {
+    assert.equal(st.startedAt, NOW); assert.deepEqual(clone(st.matches), newer.matches);
+    assert.equal(st.registrationRosterRevision, 2); assert.equal(st.meta.stations, 2);
+  }
+});
+
+for (const conflict of [false, true]) test('room access config is single-shot and fresh access mode is checked: ' + conflict, async () => {
+  const secret = 'ephemeral-secret';
+  const h = settingsRaceHarness({ fields: { 'cset-access-mode': { value: 'password' }, 'cset-access-password': { value: secret } } });
+  h.ctx.window.engagementService.roomAccess = async payload => {
+    h.accessCalls.push(payload); h.fresh.meta.roomAccessMode = conflict ? 'public' : payload.mode; return { ok: true };
+  };
+  await h.run();
+  assert.equal(h.accessCalls.length, 1); assert.equal(h.reads, 1); assert.equal(h.cloudWrites.length, conflict ? 1 : 2);
+  assert.equal(h.accessCalls[0].password, secret);
+  for (const saved of [...h.cloudWrites, ...h.localWrites, h.ctx.state]) assert(!JSON.stringify(saved).includes(secret));
+  if (conflict) assert(h.toasts.some(t => t.error));
+  else assert.equal(h.ctx.state.meta.roomAccessMode, 'password');
+});
+
+test('an interval retry already running is drained before explicit settings are written', async () => {
+  const h = settingsRaceHarness(); h.fresh.registrationRosterRevision = 1;
+  let tick, finishOld;
+  h.ctx.setInterval = fn => { tick = fn; return 123; };
+  vm.runInContext(extractFunction(core, 'queueCloudSyncRetry'), h.ctx);
+  h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+    h.cloudWrites.push(clone(snapshot));
+    if (h.cloudWrites.length === 1) return new Promise(resolve => { finishOld = resolve; }); return true;
+  };
+  h.ctx.queueCloudSyncRetry(h.ctx.state.id, h.ctx.state.cloudCode);
+  const oldSave = tick(); await nextTurn(); await h.run();
+  assert.equal(h.cloudWrites.length, 1, 'Settings waits for the timer write');
+  finishOld(true); await oldSave; await nextTurn();
+  assert.equal(h.cloudWrites.length, 2); assert.equal(h.cloudWrites[0].meta.stations, 1);
+  assert.equal(h.cloudWrites[1].meta.stations, 2); assert.equal(h.ctx.state.meta.stations, 2);
+});
+
+
+test('completing an old settings save unlocks a replacement room without restoring the old draft', async () => {
+  const h = settingsRaceHarness(); let finish;
+  h.ctx.window.cloudSync.pushUpdate = async () => new Promise(resolve => { finish = resolve; });
+  await h.run();
+  h.ctx.state = { id: 'other-room', cloudCode: 'OTHER', meta: { name: 'Other room' }, matches: [] };
+  h.ctx.communityRoomSnapshotGeneration++;
+  const button = { disabled: true, textContent: '儲存中…' };
+  h.ctx.document.querySelector = () => button;
+  for (const input of Object.values(h.elements)) { input.value = 'New room draft'; input.disabled = false; input.dataset = {}; }
+  h.ctx.setCommunitySettingsInputsSaving(true);
+  finish(true); await nextTurn();
+  assert.equal(button.disabled, false);
+  assert.equal(h.elements['cset-name'].disabled, false);
+  assert.equal(h.elements['cset-name'].value, 'New room draft');
+  assert.equal(h.ctx.state.meta.name, 'Other room');
+  assert.equal(h.localWrites.length, 0);
+  assert.equal(h.toasts.length, 0);
+});
+
+test('an expired settings gate does not swallow the reopened room subscription', () => {
+  const h = settingsRaceHarness();
+  h.ctx.communitySettingsWriteGate = { roomId: h.ctx.state.id, roomCode: h.ctx.state.cloudCode, hasPendingWrites: true, isCurrent: () => false };
+  h.ctx.applyRemoteState({ ...clone(h.fresh), updatedAt: NOW + 1 });
+  assert.equal(h.ctx.state.registrationRosterRevision, 2);
+  assert.deepEqual(clone(h.ctx.state.players), h.fresh.players);
+  assert.equal(h.ctx.communitySettingsWriteGate.remote, undefined);
+});
+
+for (const lateRemote of [false, true]) test('local edits during final cache save are sent or explicitly rejected against a newer projection: ' + lateRemote, async () => {
+  const h = settingsRaceHarness(); let finishCache;
+  h.ctx.saveRecord = async snapshot => {
+    h.localWrites.push(clone(snapshot));
+    if (h.localWrites.length === 2) return new Promise(resolve => { finishCache = resolve; });
+    return true;
+  };
+  await h.run();
+  assert.equal(h.ctx.state.registrationRosterRevision, 2);
+  h.ctx.state.players.push({ id: 'late-onsite' });
+  const localSave = h.ctx.saveState();
+  if (lateRemote) h.ctx.applyRemoteState({ ...clone(h.fresh), registrationRosterRevision: 3, updatedAt: NOW + 1, players: [{ id: 'even-newer-server' }] });
+  finishCache(true);
+  assert.equal(await localSave, !lateRemote); await nextTurn();
+  assert.equal(h.cloudWrites.length, lateRemote ? 2 : 3);
+  assert(h.ctx.state.players.some(p => p.id === 'late-onsite'));
+  if (lateRemote) assert(h.toasts.some(t => t.error && /尚未儲存/.test(t.message)));
+  else {
+    assert.deepEqual(h.cloudWrites.at(-1).players.map(p => p.id), ['server-player', 'late-onsite']);
+    assert.equal(h.cloudWrites.at(-1).registrationRosterRevision, 2);
+  }
+});
+
+for (const shape of ['old-revision', 'missing-creator', 'out-of-order']) test('detached cache preserves accepted authority for ' + shape + ' projections', async () => {
+  const h = settingsRaceHarness(); let finish;
+  h.ctx.window.cloudSync.pushUpdate = async (code, snapshot) => {
+    h.cloudWrites.push(clone(snapshot));
+    if (h.cloudWrites.length === 1) { h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE = 'registration-roster-stale'; return false; }
+    return new Promise(resolve => { finish = resolve; });
+  };
+  await h.run();
+  h.ctx.state.players.push({ id: 'local-pending' });
+  const queued = h.ctx.saveState();
+  const remote = { ...clone(h.fresh), updatedAt: NOW + 1 };
+  if (shape === 'old-revision') { remote.registrationRosterRevision = 1; remote.players = []; }
+  if (shape === 'missing-creator') remote.createdBy = null;
+  h.ctx.applyRemoteState(remote);
+  if (shape === 'out-of-order') h.ctx.applyRemoteState({ ...remote, registrationRosterRevision: 1, updatedAt: NOW + 100000, players: [] });
+  finish(true); assert.equal(await queued, false); await nextTurn();
+  const cached = h.localWrites.at(-1);
+  assert.equal(cached.registrationRosterRevision, 2); assert.deepEqual(cached.players, h.fresh.players);
+  assert.equal(cached.meta.stations, 2); assert.equal(cached.createdBy, 'local-test-user');
+  assert.equal(h.ctx.state.registrationRosterRevision, 1); assert.equal(h.ctx.state.players[0].id, 'local-pending');
 });
