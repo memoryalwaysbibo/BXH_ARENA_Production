@@ -15,6 +15,8 @@ npm run build:web
 
 可附第三個參數傳入已填好的 client config JSON；輸入只允許指定測試專案。未提供設定時，產生 `enabled:false`、空 API key／appId／App Check site key 的設定，頁面保持關閉。不能把模板當成已可登入的入口。
 
+2026-10-07已收到主持者提供的實際Web App設定，保存在 `client-config.pending.json`，App ID為 `1:615734931487:web:e69565d13bebeaa14a652a`。專案／authDomain及API key／App ID格式已核對；這不是雲端連線驗證。App Check Enterprise site key仍缺，因此保持 `enabled:false`；此檔刻意不能直接通過build-bundle設定檢查。取得並註冊實際site key後，另存完整client config，再依部署前條件核對後設定enabled並產生候選包。不可使用假site key使檢查通過。
+
 CI會驗證本機單玩家 UI 的雙 session 完賽、登入後恢復場次、登出清理及390px版面，並真正安裝固定Firebase SDK後打包。前者使用明確標示的假登入／記憶體fixture，不冒充雲端Auth、App Check或實機。
 
 ## 部署前需具備的設定
