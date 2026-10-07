@@ -1,7 +1,7 @@
 name: Hunter Clash HC01 isolated lifecycle
 on:
   pull_request:
-    paths: ['hunter-clash/hc01/**', 'hunter-clash/server/runtime-boundary.cjs', 'hunter-clash/emulator/preflight.cjs', 'tests/hunter-clash-hc01.test.cjs', 'tests/hunter-clash-hc01-client.test.cjs', 'tests/hunter-clash-hc01-callable.test.cjs', 'tests/hunter-clash-hc01-browser.cjs', 'tests/helpers/hc01-memory.cjs', '.github/workflows/hunter-clash-hc01.yml']
+    paths: ['hunter-clash/hc01/**', 'hunter-clash/server/runtime-boundary.cjs', 'hunter-clash/emulator/preflight.cjs', 'tests/hunter-clash-hc01.test.cjs', 'tests/hunter-clash-hc01-client.test.cjs', 'tests/hunter-clash-hc01-callable.test.cjs', 'tests/hunter-clash-hc01-browser.cjs', 'tests/hunter-clash-hc01-cloud.test.cjs', 'tests/hunter-clash-hc01-mobile-browser.cjs', 'tests/helpers/hc01-memory.cjs', '.github/workflows/hunter-clash-hc01.yml']
   push:
     branches: ['feature/hc01-*']
 permissions:
@@ -14,9 +14,35 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test tests/hunter-clash-hc01.test.cjs tests/hunter-clash-hc01-client.test.cjs tests/hunter-clash-hc01-callable.test.cjs
+      - run: node --test tests/hunter-clash-hc01.test.cjs tests/hunter-clash-hc01-client.test.cjs tests/hunter-clash-hc01-callable.test.cjs tests/hunter-clash-hc01-cloud.test.cjs
       - run: node --test tests/module-seam-contracts.test.cjs tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
       - run: node scripts/verify-production-frontend.cjs
+  cloud-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node hunter-clash/hc01/cloud/build-bundle.cjs /tmp/hc01-cloud-test-ci "$GITHUB_SHA"
+      - run: npm install --no-audit --no-fund
+        working-directory: /tmp/hc01-cloud-test-ci
+      - run: npm run build:web
+        working-directory: /tmp/hc01-cloud-test-ci
+      - run: node -e "const fs=require('node:fs'),m=require('./manifest.json');if(!m.sdkBundleBuilt||!fs.statSync('public/cloud/firebase-sdk.mjs').size)throw Error('sdk-build-missing')"
+        working-directory: /tmp/hc01-cloud-test-ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hunter-clash-hc01-cloud-candidate-not-deployed
+          path: |
+            /tmp/hc01-cloud-test-ci/public/
+            /tmp/hc01-cloud-test-ci/functions/
+            /tmp/hc01-cloud-test-ci/firebase.json
+            /tmp/hc01-cloud-test-ci/manifest.json
+            /tmp/hc01-cloud-test-ci/package.json
+            /tmp/hc01-cloud-test-ci/package-lock.json
+            /tmp/hc01-cloud-test-ci/build-web.cjs
   firebase-emulator:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -49,6 +75,9 @@ jobs:
       - run: npm install --prefix /tmp/hc01-browser --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.0
       - run: node /tmp/hc01-browser/node_modules/playwright/cli.js install --with-deps chromium
       - run: node tests/hunter-clash-hc01-browser.cjs
+        env:
+          HC01_PLAYWRIGHT_MODULES: /tmp/hc01-browser/node_modules
+      - run: node tests/hunter-clash-hc01-mobile-browser.cjs
         env:
           HC01_PLAYWRIGHT_MODULES: /tmp/hc01-browser/node_modules
       - uses: actions/upload-artifact@v4
