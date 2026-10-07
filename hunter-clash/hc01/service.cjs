@@ -7,6 +7,7 @@ const newCode=()=>Array.from({length:4},()=>CODE_ALPHABET[randomInt(CODE_ALPHABE
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const hash=value=>digest(JSON.stringify(value));
 const denied=reason=>{throw Error(reason);};
+const displayName=(actor,input)=>[actor.realName,actor.displayName,actor.gameId,input.playerName].find(v=>typeof v==='string'&&v.trim()&&v.trim().length<=40&&!/[\u0000-\u001f\u007f]/.test(v))?.trim()||'未設定名稱';
 // No deployment export. A trusted adapter must supply Auth, Firestore and clock.
 function createLifecycleService({db,auth,clock=Date.now},env=process.env,options={}){
   assertSandboxRuntime(db,auth,env,options.expectedCloudProject);
@@ -18,8 +19,9 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
     if(![...domain.OPERATIONS,'createChallenge','getChallenge','acceptCode'].includes(operation))denied('invalid-operation');
     if(typeof token!=='string'||!token)denied('unauthenticated');
     const {uid}=await auth.verifyIdToken(token,true);domain.identifier(uid);
-    domain.keys(input,createOp?['requestId']:readOp?['challengeId']:codeOp?['pairingCode','requestId','expectedRevision']:
-      ['challengeId','requestId','expectedRevision',...(operation==='accept'?['pairingToken']:['proposeRound','recordRound'].includes(operation)?['winnerUid','finish']:operation==='confirmRound'?['roundRevision']:operation==='confirmFinish'?['resultRevision']:[])]);
+    domain.keys(input,createOp?['requestId','playerName']:readOp?['challengeId']:codeOp?['pairingCode','requestId','expectedRevision','playerName']:
+      ['challengeId','requestId','expectedRevision',...(operation==='accept'?['pairingToken','playerName']:['proposeRound','recordRound'].includes(operation)?['winnerUid','finish']:operation==='confirmRound'?['roundRevision']:operation==='confirmFinish'?['resultRevision']:[])]);
+    if(Object.hasOwn(input,'playerName')&&(typeof input.playerName!=='string'||!input.playerName.trim()||input.playerName.trim().length>40||/[\u0000-\u001f\u007f]/.test(input.playerName)))denied('invalid-input');
     if(!readOp)domain.identifier(input.requestId);
     if(!createOp&&!codeOp)domain.identifier(input.challengeId);
     const suppliedCode=codeOp&&typeof input.pairingCode==='string'&&input.pairingCode.length<=40?input.pairingCode.replace(/[\s-]/g,'').toUpperCase():null;
@@ -79,6 +81,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
         const ttl=config.hc01PairingTtlMs;
         if(!Number.isSafeInteger(ttl)||ttl<1000||ttl>300000)denied('invalid-pairing-policy');
         next=domain.create({challengeId,creatorUid:uid,rules,now,expiresAt:now+ttl});
+        next.participantNames={[uid]:displayName(actor,input)};
         next.pairingTokenHash=digest(pairingToken);next.pairingCodeHash=digest(pairingCode);
         outcome={challenge:view(next),pairingToken,pairingCode};
       }else{
@@ -94,9 +97,9 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
           const others=current.participants.filter(v=>v!==uid);
           if(others.length){const peers=await tx.getAll(...others.map(v=>doc('hcActors',v)));if(peers.some(s=>!eligible(s.data())))denied('opponent-unavailable');}
         }
-        const command={...input};delete command.challengeId;delete command.requestId;delete command.pairingToken;delete command.pairingCode;
+        const command={...input};delete command.challengeId;delete command.requestId;delete command.pairingToken;delete command.pairingCode;delete command.playerName;
         next=domain.transition(current,uid,codeOp?'accept':operation,command,now);
-        if(operation==='accept'||codeOp){delete next.pairingTokenHash;delete next.pairingCodeHash;}
+        if(operation==='accept'||codeOp){next.participantNames={...(next.participantNames||{}),[uid]:displayName(actor,input)};delete next.pairingTokenHash;delete next.pairingCodeHash;}
         outcome={challenge:view(next)};
       }
       if(createOp)tx.set(codeRef,{environment:'sandbox',challengeId,expiresAt:next.expiresAt,used:false});
@@ -110,7 +113,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
   return Object.freeze({run});
 }
 function view(c){
-  const allowed=['schemaVersion','environment','challengeId','participants','rules','status','revision','createdAt','expiresAt','ready','rounds','pendingRound','score','finishConfirmedBy','resultRevision','winnerUid','completedAt','certificationSource','ratingStatus','disputedBy','disputedAt','corrections'];
+  const allowed=['schemaVersion','environment','challengeId','participants','participantNames','rules','status','revision','createdAt','expiresAt','ready','rounds','pendingRound','score','finishConfirmedBy','resultRevision','winnerUid','completedAt','certificationSource','ratingStatus','disputedBy','disputedAt','corrections'];
   return Object.fromEntries(allowed.filter(k=>Object.hasOwn(c,k)).map(k=>[k,structuredClone(c[k])]));
 }
 module.exports={createLifecycleService,view};

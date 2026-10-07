@@ -235,3 +235,13 @@ test('undo final score clears an existing confirmation and reopens scoring',asyn
   assert.equal(c.status,'in_progress');assert.deepEqual(c.finishConfirmedBy,[]);
   assert.equal(c.resultRevision,null);assert.equal(c.winnerUid,undefined);assert.deepEqual(c.score,{a:3,b:0});
 });
+
+test('participant names persist for both phones and only the joining actor supplies their own name',async()=>{
+  const f=fixture();f.data.get('hcActors/A').realName=' 黑爸 ';
+  const created=await f.service.run('A','createChallenge',{requestId:'named',playerName:'其他名稱'});
+  const joined=await f.mutate('B','accept',created.challenge,{pairingToken:created.pairingToken,playerName:' 小宇 '});
+  assert.deepEqual(joined.participantNames,{A:'黑爸',B:'小宇'});
+  for(const uid of ['A','B'])assert.deepEqual((await f.service.run(uid,'getChallenge',{challengeId:joined.challengeId})).challenge.participantNames,joined.participantNames);
+  await assert.rejects(f.service.run('C','createChallenge',{requestId:'inject',participantNames:{A:'冒名'}}),/invalid-input/);
+  await assert.rejects(f.service.run('C','createChallenge',{requestId:'long',playerName:'字'.repeat(41)}),/invalid-input/);
+});
