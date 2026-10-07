@@ -931,9 +931,11 @@ table.rank-table tr:last-child td{border-bottom:none;}
 .board-canvas .se-final-stage-col,
 .board-canvas .se-bronze-col{position:relative;}
 .board-canvas .se-final-stage-col>.se-col-title,
-.board-canvas .se-bronze-col>.bracket-col-title{visibility:hidden;}
+.board-canvas .se-bronze-col>.bracket-col-title{visibility:visible;}
 .board-canvas .se-stage-tag{
-  display:block;position:absolute;left:0;right:0;z-index:6;
+  /* The column title already reserves a measured lane above the match.
+     An absolute duplicate can cover player names in two/three-player trees. */
+  display:none;
   text-align:center;pointer-events:none;
   font-family:var(--font-d);font-weight:900;font-size:13px;letter-spacing:2px;
   color:#f0cf67;text-shadow:0 0 10px rgba(217,185,92,.3);
