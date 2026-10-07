@@ -22052,7 +22052,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const n=Math.max(1,Number(state.meta.stations)||1), map={}, nameMap={};
     for(let station=1;station<=n;station++){
       const list=[], names=[];
-      document.querySelectorAll(`.referee-station-checkbox[data-station="${station}"]`).forEach(cb=>{ if(cb.checked){ const uid=cb.getAttribute("data-uid"); if(uid&&!list.includes(uid)){ list.push(uid); const u=(refereeDirectoryUsers||[]).find(x=>x.uid===uid); names.push((u&&(u.displayName||u.realName))||uid); } } });
+      document.querySelectorAll(`.referee-station-checkbox[data-station="${station}"]`).forEach(cb=>{ if(cb.checked){ const uid=cb.getAttribute("data-uid"); if(uid&&!list.includes(uid)){ list.push(uid); const u=(refereeDirectoryUsers||[]).find(x=>x.uid===uid); names.push((u&&typeof u.realName==="string"&&u.realName.trim())||(([u&&u.gameId,u&&u.displayName,u&&u.nickname].find(value=>typeof value==="string"&&value.trim())||uid).trim()+"（缺少本名）")); } } });
       map[String(station)]=list; nameMap[String(station)]=names;
     }
     const previous={
@@ -22186,8 +22186,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const selected = [];
     checkboxes.forEach(cb=>{ if(cb.checked){ const uid=String(cb.getAttribute("data-uid")||"").trim(); if(uid&&!selected.includes(uid)) selected.push(uid); } });
     const previous = Array.isArray(state.meta.assignedStaffUids) ? state.meta.assignedStaffUids.slice() : [];
-    const refereeUids = typeof flattenedRefereeStationUids==="function" ? flattenedRefereeStationUids() : [];
-    const requested = [...new Set(selected.concat(refereeUids))];
+    const requested = selected.slice();
     state.meta.assignedStaffUids = requested;
     staffAssignmentSaving = true;
     render();

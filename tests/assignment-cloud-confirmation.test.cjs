@@ -14,6 +14,7 @@ function harness(){
  docs.set('publicTournaments/ROOM',{bracketView:JSON.stringify({meta:clone(initial.meta)})});
  docs.set('users/admin',{active:true,role:'admin',displayName:'Admin'});
  docs.set('staffDirectory/ref',{active:true,role:'staff',displayName:'Referee'});
+ docs.set('users/ref',{active:true,role:'staff',displayName:'Referee',realName:'王裁判'});
  const snap=value=>({exists:()=>value!=null,data:()=>clone(value),metadata:{hasPendingWrites:false}});
  const fx={doc:(_db,...parts)=>parts.join('/'),getDoc:async key=>snap(docs.get(key)),getDocFromServer:async key=>{reads.push(key);const queue=stale.get(key)||[];return snap(queue.length?queue.shift():docs.get(key));},
  runTransaction:async(_db,fn)=>{const pending=[];const result=await fn({get:async key=>snap(docs.get(key)),set:(key,patch,options)=>pending.push({key,patch,deep:!!options?.merge}),update:(key,patch)=>pending.push({key,patch,deep:false})});for(const {key,patch,deep} of pending)docs.set(key,deep?merge(docs.get(key),patch):{...clone(docs.get(key)||{}),...clone(patch)});if(afterCommit){const f=afterCommit;afterCommit=null;await f();}return result;}};
@@ -106,3 +107,55 @@ for(const reason of ['already-completed','corrupt-data','unavailable','deadline-
   let finish;const done=new Promise(resolve=>finish=resolve);const context={state:room(),previous:{assignments:{},names:{},assignedStaffUids:[],restrictionEnabled:false},refereeAssignmentDraftEnabled:true,cloudStatus:'connected',flushCloudStateWrites:async()=>true,window:{cloudSync:{saveRefereeStationAssignments:async()=>({ok:false,reason})}},showToast:()=>{},render:()=>finish(),console:{warn:()=>{}}};context.state.cloudCode='ROOM';vm.createContext(context);vm.runInContext(core.slice(a,b+5),context);await done;assert.equal(context.cloudStatus,['unavailable','deadline-exceeded'].includes(reason)?'error':'connected');
  });
 }
+
+function bindReferee(h){
+ const doc=h.docs.get('tournaments/ROOM'),st=JSON.parse(doc.data);
+ Object.assign(st.meta,{assignedStaffUids:['ref'],refereeStationAssignments:{'1':['ref']},refereeStationNames:{'1':['Referee']},refereeStationRestrictionEnabled:true});
+ Object.assign(doc,{data:JSON.stringify(st),assignedStaffUids:['ref'],refereeStationAssignments:{'1':['ref']},refereeStationNames:{'1':['Referee']},refereeStationUids:['ref']});
+ return st;
+}
+test('unchecking bound staff removes Court permissions and public labels atomically, even after stale sync',async()=>{
+ const h=harness(),old=bindReferee(h);
+ assert.equal((await h.api.saveStaffAssignments('ROOM',[])).ok,true);
+ const doc=h.docs.get('tournaments/ROOM');
+ assert.deepEqual(doc.assignedStaffUids,[]);assert.deepEqual(doc.refereeStationUids,[]);
+ assert.deepEqual(doc.refereeStationAssignments,{'1':[]});assert.deepEqual(doc.refereeStationNames,{'1':[]});
+ assert.deepEqual(JSON.parse(h.docs.get('publicTournaments/ROOM').bracketView).meta.refereeStationNames,{'1':[]});
+ assert.equal(await h.api.pushUpdate('ROOM',old),true);
+ assert.deepEqual(h.docs.get('tournaments/ROOM').refereeStationAssignments,{'1':[]});
+});
+test('staff save refreshes retained Court names from real profiles in private and public views',async()=>{
+ const h=harness();bindReferee(h);
+ assert.equal((await h.api.saveStaffAssignments('ROOM',['ref'])).ok,true);
+ assert.deepEqual(h.docs.get('tournaments/ROOM').refereeStationNames,{'1':['王裁判']});
+ assert.deepEqual(JSON.parse(h.docs.get('publicTournaments/ROOM').bracketView).meta.refereeStationNames,{'1':['王裁判']});
+});
+for(const realName of ['陳裁判','',null,42])test('Court save resolves real name or ID with missing-name annotation: '+realName,async()=>{
+ const h=harness();h.docs.set('users/ref',{active:true,role:'staff',realName,gameId:'REF-ID',displayName:'Nickname'});
+ const st=room();st.meta.refereeStationAssignments={'1':['ref']};
+ const result=await h.api.saveRefereeStationAssignments('ROOM',st);assert.equal(result.ok,true);
+ const expected=realName==='陳裁判'?'陳裁判':'REF-ID（缺少本名）';
+ assert.deepEqual(h.docs.get('tournaments/ROOM').refereeStationNames,{'1':[expected]});
+ assert.deepEqual(JSON.parse(h.docs.get('publicTournaments/ROOM').bracketView).meta.refereeStationNames,{'1':[expected]});
+});
+test('staff UI submits exactly the checked list without restoring bound referees',()=>{
+ const a=core.indexOf('  if(action==="save-staff-assignment")'),b=core.indexOf('    (async()=>{',a);
+ let requested;
+ const context={action:'save-staff-assignment',staffAssignmentSaving:false,state:{cloudCode:'ROOM',meta:{assignedStaffUids:['ref','keep']}},window:{cloudSync:{saveStaffAssignments(){}}},document:{querySelectorAll:()=>[{checked:false,getAttribute:()=> 'ref'},{checked:true,getAttribute:()=> 'keep'}]},flattenedRefereeStationUids:()=>['ref'],render:()=>{},showToast:()=>{}};
+ vm.createContext(context);vm.runInContext('(function(){'+core.slice(a,b)+'globalThis.submitted=requested;}})()',context);
+ assert.deepEqual(Array.from(context.submitted),['keep']);
+});
+
+test('admin directory sync includes real name and game ID for creator-operated Court saves',async()=>{
+ const writes=[];
+ const context={authReady:true,fx:{doc:(_db,...parts)=>parts.join('/'),writeBatch:()=>({set:(ref,data)=>writes.push({ref,data}),commit:async()=>{}})},dbHandle:{},console};
+ vm.createContext(context);vm.runInContext('api={'+method('syncStaffDirectory')+'}',context);
+ assert.equal(await context.api.syncStaffDirectory([{uid:'ref',role:'staff',active:true,realName:' 王裁判 ',gameId:'REF-ID',displayName:'Nickname'}]),true);
+ assert.equal(writes[0].data.realName,'王裁判');assert.equal(writes[0].data.gameId,'REF-ID');
+});
+test('legacy self-directory writes preserve admin-enriched names without a rule-rejected write',async()=>{
+ let writes=0;
+ const context={authReady:true,authHandle:{currentUser:{uid:'ref'}},USERS_COLLECTION:'users',dbHandle:{},fx:{doc:(_db,...parts)=>parts.join('/'),getDoc:async key=>({exists:()=>true,data:()=>key==='users/ref'?{role:'staff',active:true,realName:'王裁判'}:{realName:'王裁判',gameId:'REF-ID'}}),setDoc:async()=>writes++},console};
+ vm.createContext(context);vm.runInContext('api={'+method('ensureMyStaffDirectory')+'}',context);
+ assert.equal((await context.api.ensureMyStaffDirectory()).ok,true);assert.equal(writes,0);
+});
