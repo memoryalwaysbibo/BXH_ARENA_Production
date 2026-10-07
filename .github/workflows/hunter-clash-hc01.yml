@@ -1,0 +1,35 @@
+name: Hunter Clash HC01 isolated lifecycle
+on:
+  pull_request:
+    paths: ['hunter-clash/hc01/**', 'hunter-clash/server/runtime-boundary.cjs', 'hunter-clash/emulator/preflight.cjs', 'tests/hunter-clash-hc01.test.cjs', 'tests/hunter-clash-hc01-browser.cjs', 'tests/helpers/hc01-memory.cjs', '.github/workflows/hunter-clash-hc01.yml']
+  push:
+    branches: ['feature/hc01-*']
+permissions:
+  contents: read
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/hunter-clash-hc01.test.cjs
+      - run: node --test tests/module-seam-contracts.test.cjs tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
+      - run: node scripts/verify-production-frontend.cjs
+  local-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/hunter-clash-hc01-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hunter-clash-hc01-local-browser
+          path: test-results/hc01/
+          if-no-files-found: ignore
