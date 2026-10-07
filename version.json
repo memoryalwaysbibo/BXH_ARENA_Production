@@ -1,6 +1,6 @@
 {
-  "build": "20261006.6",
-  "version": "v14.3.31",
-  "updatedAt": "2026-10-06T14:10:01+08:00",
-  "releaseTrigger": "community-quick-registration"
+  "build": "20261007.1",
+  "version": "v14.3.32",
+  "updatedAt": "2026-10-07T08:53:00+08:00",
+  "releaseTrigger": "community-host-roster-sync"
 }

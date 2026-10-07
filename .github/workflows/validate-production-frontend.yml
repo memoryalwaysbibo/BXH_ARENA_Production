@@ -151,7 +151,7 @@ jobs:
       - name: Verify roster mutation and snapshot races
         run: node --test tests/roster-sync-race.test.cjs
       - name: Verify community quick registration and cloud contract
-        run: node --test tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs
+        run: node --test tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/community-host-roster-sync.test.cjs
       - name: Verify family roster check-in preservation
         run: |
           node --check family-ui.js

@@ -269,7 +269,11 @@ test('an old Admin room read cannot update state after switching rooms', async (
   const source = core.slice(start, end) + '\nglobalThis.__startAdminWatch=startAdminRosterWatch;globalThis.__stopAdminWatch=stopAdminRosterWatch;globalThis.__adminChain=()=>adminRosterSyncChain;';
   const context = moduleContext({
     state: { id: 'room-a', cloudCode: 'ROOM-A', meta: { registrationEnabled: true } },
-    activeTab: 'people',
+    activeTab: 'people', appPhase: 'app', currentRole: 'admin',
+    firebaseUser: { uid: 'admin' }, userProfile: { role: 'admin', active: true },
+    currentAuthUid: () => 'admin', isTester: () => false, isCommunityRoom: () => false, isCommunityRoomOwner: () => false,
+    isCommunityQuickRegistration: () => false, peopleRosterBusy: false,
+    resetAdminRegistrationsCache() {},
     hasAdminAccess: () => true,
     cloudAvailable: () => true,
     renderPreservingScroll: () => { renders++; },

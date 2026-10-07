@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.31";
+const APP_VERSION = "v14.3.32";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.32",date:"2026/10/07",timezone:"Asia/Taipei",title:"玩家房間名單同步修復",updateLevel:"patch",added:[],changed:["快速報名名單由伺服器同步並保留報到資料"],fixed:["一般玩家房主可即時收到正備取名單，並可手動重試同步","離開房間或切換帳號時停止舊名單讀取，避免舊結果覆蓋目前畫面"],security:[]},
   {version:"v14.3.31",date:"2026/10/06",timezone:"Asia/Taipei",title:"玩家房間快速報名",updateLevel:"patch",added:["玩家一般房間可勾選立即開放報名，人數上限留空即不限人數"],changed:["報名時間與備取移至進階選填設定；已填人數上限包含參賽中的房主與現場選手","本人與兒童代報名共用快速報名規則，未填取消期限時可於開賽前取消"],fixed:["設定儲存等待雲端確認，失敗不套用報名變更，完成後可再次儲存"],security:[]},
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
   {version:"v14.3.22",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體賽模式分流與即時戰況",updateLevel:"minor",added:["團體賽新增隊伍樹狀總覽與即時戰況切換","公開觀賽訂閱團體生命、目前出場者與判定紀錄"],changed:["玩家模式只顯示觀賽資訊與隊長本隊排陣；裁判模式集中排陣公開與計分操作","團體裁判台不再與玩家對戰表共用同一畫面"],fixed:["修正團體賽缺少樹狀圖","修正其他裝置必須手動刷新才能看到最新生命與判定"],security:["公開即時資料只包含已公開排陣與比賽狀態，不開放寫入"]},
@@ -2264,6 +2265,9 @@ const VERSION_HISTORY = [
 const CHANGELOG_TEXT = "" +
 "# BXH ARENA CHANGELOG\n\n" +
 "本檔案為 BXH ARENA 的正式版本紀錄，只能追加，不得覆蓋或刪除舊紀錄。最新版本置於最上方。\n\n" +
+"## v14.3.32｜玩家房間名單同步修復（2026/10/07）\n\n" +
+"- 一般玩家房主可即時收到正備取名單，並可手動重試同步；快速報名名單由伺服器同步並保留報到資料。\n" +
+"- 離開房間或切換帳號時停止舊名單讀取，避免舊結果覆蓋目前畫面。\n\n" +
 "## v14.3.31｜玩家房間快速報名（2026/10/06）\n\n" +
 "- 玩家一般房間可勾選立即開放報名，人數上限留空即不限人數；填寫上限時包含參賽中的房主與現場選手。\n" +
 "- 報名時間與備取為進階選填；本人與兒童代報名共用規則，未填取消期限時可於開賽前取消。\n" +
@@ -5533,7 +5537,7 @@ const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
 const COMMUNITY_OWNER_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","update-players","quick-add-players","random-test-roster",
   "toggle-checkin-btn","delete-player","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
-  "start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","goto-settings"
+  "load-online-roster","start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","goto-settings"
 ]);
 const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
@@ -8980,10 +8984,20 @@ function bracketRosterIsCurrent(){
   return sameStringSet(currentBracketParticipantIds(),eligibleRosterIds());
 }
 async function syncLatestOnlineRosterBeforeLock(registrationRows){
-  if(!state.meta?.registrationEnabled || !state.cloudCode || state.startedAt) return {ok:true,changed:false,confirmed:0};
+  if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
+    return {ok:true,changed:false,confirmed:0};
+  if((!state.meta?.registrationEnabled&&!isCommunityQuickRegistration(state)) || !state.cloudCode || state.startedAt) return {ok:true,changed:false,confirmed:0};
+  const context=captureRegistrationRosterContext();
+  requireRegistrationRosterContext(context);
   if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
+  requireRegistrationRosterContext(context);
+  if(isCommunityQuickRegistration(state)) return refreshBackendRegistrationRoster(context,canCatchUpCommunityRegistrationRoster());
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
-  const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(state.cloudCode);
+  const publicRoom=await window.cloudSync.getPublicTournamentFull(context.code);
+  requireRegistrationRosterContext(context);
+  if(publicRoom?.registrationRosterSyncBackendEnabled===true) return refreshBackendRegistrationRoster(context);
+  const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(context.code);
+  requireRegistrationRosterContext(context);
   if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
     return {ok:true,changed:false,confirmed:0};
   adminRegistrationsCache=regs;
@@ -9005,6 +9019,7 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   ]).sort(),teams:state.teams||[]});
   const changed=before!==after;
   if(changed && !(await saveState())) throw new Error("名單寫入雲端失敗；請重新整理後重試同步");
+  requireRegistrationRosterContext(context);
   publicTournamentsCache=null;
   myRegistrationsCache=null;
   return {ok:true,changed,confirmed:confirmed.length};
@@ -11637,7 +11652,7 @@ function renderPeopleManagement(){
   const locked=peopleRosterMutationLocked();
   const selectionManaged=peopleRegistrationSelectionManaged();
 
-  if(online&&state.cloudCode&&adminRosterCode!==state.cloudCode&&!adminRegistrationsError){
+  if(canManageRegistrationRoster()&&(online||isCommunityQuickRegistration(state))&&state.cloudCode&&adminRosterCode!==state.cloudCode&&!adminRegistrationsError){
     setTimeout(startAdminRosterWatch,0);
   }
 
@@ -11646,7 +11661,7 @@ function renderPeopleManagement(){
   const onlineWait=peopleOnlineWaitlistRows();
   const onlineIds=new Set(onlineWait.map(peopleRegistrationIdOf).filter(Boolean));
   const localWait=peopleLocalWaitlist().filter(p=>{
-    if(!online) return true;
+    if(!online&&!isCommunityQuickRegistration(state)) return true;
     // Once registrations are loaded they own every online participant's status.
     if(Array.isArray(adminRegistrationsCache) && (p.registrationId||p.source==="online")) return false;
     return !p.registrationId||!onlineIds.has(String(p.registrationId));
@@ -11719,7 +11734,7 @@ function renderPeopleManagement(){
     </div>`;
 
   const toolsPanel=`
-    ${online?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
+    ${online||isCommunityQuickRegistration(state)?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt||peopleRosterBusy?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
     ${needsCheckin?`<div class="panel"><div class="panel-title">報到管理</div><div class="btn-row"><button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button></div><p class="hint">提前結束後，未報到正取不會進入對戰表。</p>${checkinClosed?`<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>`:''}</div>`:''}
     <div class="panel"><div class="panel-title">現場新增選手</div><div class="field"><label>每行一位</label><textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea><div class="hint">${needsCheckin?'新增後先列為正取／未報到，玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入正取。'}現場玩家不需系統帳號。</div></div><div class="btn-row"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至正取待報到':'新增至正取'}</button></div></div>
     <div class="panel"><div class="panel-title">測試名單</div><div class="hint" style="margin-bottom:10px;">建立指定人數的測試選手；會取代目前正取名單。</div><div class="btn-row"><button class="btn btn-ghost" data-action="random-test-roster" data-count="8" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 8 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="16" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 16 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="32" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 32 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="64" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 64 位</button></div></div>`;
@@ -11731,7 +11746,8 @@ function renderPeopleManagement(){
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
-  return subnav+(panels[peopleRosterSection]||confirmedPanel);
+  const syncError=adminRegistrationsError?`<div class="banner warn" role="alert"><span>線上名單尚未同步：${esc(adminRegistrationsError)}</span><button class="btn btn-ghost btn-sm" data-action="${state.startedAt?"load-admin-registrations":"load-online-roster"}" ${peopleRosterBusy?"disabled":""}>重新同步名單</button></div>`:"";
+  return syncError+subnav+(panels[peopleRosterSection]||confirmedPanel);
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -14363,60 +14379,145 @@ let adminRegistrationsBusy = false; // promote/cancel action in-flight guard
 function resetAdminRegistrationsCache(){ adminRegistrationsCache = null; adminRegistrationsError = null; }
 let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;
 let adminRosterSyncChain=Promise.resolve();
+let adminRosterContextKey="";
+let adminRosterManualContext=null;
+function canManageRegistrationRoster(){
+  if(!firebaseUser || userProfile?.active===false) return false;
+  if(isCommunityRoomOwner() && state.createdBy===firebaseUser.uid) return true;
+  return hasAdminAccess() && (!isTester() || isOwnTestTournament());
+}
+function canCatchUpCommunityRegistrationRoster(){
+  // The server preserves pending draws and rejects played/locked results.
+  // A fresh projection is required before the existing bracket-roster check.
+  return isCommunityQuickRegistration(state)&&isCommunityRoomOwner()&&state.createdBy===firebaseUser.uid&&!communityRegistrationLocked(state);
+}
+function registrationRosterViewTab(){ return appPhase==="community-room"?communityRoomActiveTab:activeTab; }
+function registrationRosterContextKey(){
+  return JSON.stringify([state.id,state.cloudCode,currentAuthUid(),currentRole,appPhase,registrationRosterViewTab()]);
+}
+function registrationRosterPeopleView(){
+  return (appPhase==="community-room"||appPhase==="app") && registrationRosterViewTab()==="people";
+}
 function stopAdminRosterWatch(){
   ++adminRosterGeneration;
   if(adminRosterUnsub){ try{ adminRosterUnsub(); }catch(e){} }
   adminRosterUnsub=null; adminRosterCode="";
+  // A slow old room must not hold the next room behind its pending read.
+  adminRosterSyncChain=Promise.resolve();
 }
-async function startAdminRosterWatch(){
-  const code=state.cloudCode;
-  if(activeTab!=="people" || !hasAdminAccess() || !state.meta?.registrationEnabled || !code) return;
-  if(adminRosterCode===code) return;
-  stopAdminRosterWatch();
-  adminRosterCode=code;
-  const generation=adminRosterGeneration, roomId=state.id;
+function reconcileRegistrationRosterContext(){
+  const key=registrationRosterContextKey();
+  if(key!==adminRosterContextKey){
+    stopAdminRosterWatch();
+    resetAdminRegistrationsCache();
+    adminRegistrationsLoading=false;
+    if(adminRosterManualContext){peopleRosterBusy=false;adminRosterManualContext=null;}
+    adminRosterContextKey=key;
+  }else if(adminRosterCode && (!canManageRegistrationRoster() || !registrationRosterPeopleView() || (!state.meta?.registrationEnabled&&!isCommunityQuickRegistration(state)))){
+    stopAdminRosterWatch();
+  }
+}
+function captureRegistrationRosterContext(){
+  reconcileRegistrationRosterContext();
+  return {key:adminRosterContextKey,generation:adminRosterGeneration,code:state.cloudCode,roomId:state.id};
+}
+function registrationRosterContextIsCurrent(context){
+  return context.key===registrationRosterContextKey() && context.generation===adminRosterGeneration && canManageRegistrationRoster();
+}
+function requireRegistrationRosterContext(context){
+  if(!registrationRosterContextIsCurrent(context)) throw new Error("room-context-changed");
+}
+async function refreshBackendRegistrationRoster(context,catchup=false){
+  requireRegistrationRosterContext(context);
+  if(catchup){
+    // Quick COMMUNITY rosters are projected by the owner-only callable. Never
+    // rebuild them from a client snapshot, including legacy rooms without a marker.
+    if(!isCommunityQuickRegistration(state)||!isCommunityRoomOwner()) throw new Error("permission-denied");
+    await window.cloudSync.syncCommunityRegistrationSummary(context.code);
+    requireRegistrationRosterContext(context);
+  }
+  const result=await window.cloudSync.joinRoom(context.code);
+  requireRegistrationRosterContext(context);
+  if(result?.ok!==true||result.data?.id!==context.roomId) throw new Error(result?.reason||"roster-readback-failed");
+  if(isCommunityRoomOwner() && (result.data.ownerUid!==firebaseUser.uid||result.data.createdBy!==firebaseUser.uid)) throw new Error("permission-denied");
+  const before=JSON.stringify(state.players||[]);
+  applyRemoteState(result.data);
+  requireRegistrationRosterContext(context);
+  publicTournamentsCache=null;
+  myRegistrationsCache=null;
+  return {ok:true,changed:before!==JSON.stringify(state.players||[]),confirmed:(state.players||[]).filter(p=>p.source==="online").length};
+}
+async function loadAdminRegistrationRows(){
+  if(adminRegistrationsLoading||!state.cloudCode||!canManageRegistrationRoster()) return;
+  const context=captureRegistrationRosterContext();
+  adminRegistrationsLoading=true;
+  adminRegistrationsError=null;
+  const previousRows=adminRegistrationsCache;
+  render();
   try{
     if(window.cloudSync?.connect) await window.cloudSync.connect();
-    if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId) return;
+    requireRegistrationRosterContext(context);
+    if(!cloudAvailable()||!window.cloudSync?.listRegistrationsForAdmin) throw new Error("network");
+    const rows=await window.cloudSync.listRegistrationsForAdmin(context.code);
+    requireRegistrationRosterContext(context);
+    if(adminRegistrationsCache===previousRows)adminRegistrationsCache=rows;
+    adminRegistrationsError=null;
+  }catch(e){
+    if(!registrationRosterContextIsCurrent(context)) return;
+    if(!Array.isArray(adminRegistrationsCache))adminRegistrationsCache=[];
+    adminRegistrationsError=mapRegistrationError(e);
+  }finally{
+    if(registrationRosterContextIsCurrent(context)){adminRegistrationsLoading=false;render();}
+  }
+}
+async function startAdminRosterWatch(){
+  reconcileRegistrationRosterContext();
+  const code=state.cloudCode;
+  if(!registrationRosterPeopleView() || !canManageRegistrationRoster() || (!state.meta?.registrationEnabled&&!isCommunityQuickRegistration(state)) || !code) return;
+  if(adminRosterCode===code) return;
+  if(adminRosterUnsub||adminRosterCode)stopAdminRosterWatch();
+  adminRosterCode=code;
+  const context=captureRegistrationRosterContext();
+  let catchupPending=canCatchUpCommunityRegistrationRoster();
+  try{
+    if(window.cloudSync?.connect) await window.cloudSync.connect();
+    if(!registrationRosterContextIsCurrent(context)) return;
     if(!cloudAvailable() || !window.cloudSync?.subscribeRegistrationsForAdmin) throw new Error("registration listener unavailable");
     adminRosterUnsub=window.cloudSync.subscribeRegistrationsForAdmin(code, rows=>{
-      if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId || state.cloudCode!==code) return;
+      if(!registrationRosterContextIsCurrent(context)) return;
       adminRegistrationsCache=rows;
       adminRegistrationsError=null;
       adminRosterSyncChain=adminRosterSyncChain.catch(()=>{}).then(async()=>{
-        if(generation!==adminRosterGeneration || activeTab!=="people" || state.id!==roomId || state.cloudCode!==code) return;
-        const publicRoom=await window.cloudSync.getPublicTournamentFull(code);
-        if(generation!==adminRosterGeneration || state.id!==roomId) return;
-        if(publicRoom?.registrationRosterSyncBackendEnabled===true){
-          renderPreservingScroll();
-          return;
+        if(!registrationRosterContextIsCurrent(context) || rows!==adminRegistrationsCache || peopleRosterBusy) return;
+        let result;
+        if(isCommunityQuickRegistration(state)){
+          const catchup=catchupPending&&canCatchUpCommunityRegistrationRoster();
+          catchupPending=false;
+          result=await refreshBackendRegistrationRoster(context,catchup);
+        }else{
+          const publicRoom=await window.cloudSync.getPublicTournamentFull(code);
+          if(!registrationRosterContextIsCurrent(context) || rows!==adminRegistrationsCache || peopleRosterBusy) return;
+          if(publicRoom?.registrationRosterSyncBackendEnabled===true) result=await refreshBackendRegistrationRoster(context);
+          else if(!state.startedAt) result=await syncLatestOnlineRosterBeforeLock(rows);
         }
-        // A queued snapshot must not reconcile an older roster over a mutation.
-        if(rows!==adminRegistrationsCache || peopleRosterBusy) return;
-        if(!state.startedAt){
-          const result=await syncLatestOnlineRosterBeforeLock(rows);
-          if(generation!==adminRosterGeneration || state.id!==roomId) return;
-          if(result.changed && state.bracketSize && !bracketRosterIsCurrent())
-            showToast("線上名單已更新；對戰表已過期，請重新產生對戰表",true);
-        }
+        if(!registrationRosterContextIsCurrent(context)) return;
+        if(result?.changed && state.bracketSize && !bracketRosterIsCurrent()) showToast("線上名單已更新；對戰表已過期，請重新產生對戰表",true);
         renderPreservingScroll();
       }).catch(e=>{
         console.warn("[admin roster auto sync]",e);
-        if(generation===adminRosterGeneration){adminRegistrationsError=mapRegistrationError(e);renderPreservingScroll();}
+        if(registrationRosterContextIsCurrent(context)){adminRegistrationsError=mapRegistrationError(e);renderPreservingScroll();}
       });
     }, e=>{
-      if(generation!==adminRosterGeneration) return;
+      if(!registrationRosterContextIsCurrent(context)) return;
       console.warn("[admin roster watch]",e);
       adminRegistrationsError=mapRegistrationError(e);
-      adminRegistrationsCache=[];
       stopAdminRosterWatch();
       renderPreservingScroll();
     });
   }catch(e){
-    if(generation!==adminRosterGeneration) return;
+    if(!registrationRosterContextIsCurrent(context)) return;
     console.warn("[admin roster watch]",e);
     adminRegistrationsError=mapRegistrationError(e);
-    adminRegistrationsCache=[];
     stopAdminRosterWatch();
     renderPreservingScroll();
   }
@@ -16748,6 +16849,7 @@ function finishRenderViewport(snapshot){
   setTimeout(restore, 180);
 }
 function render(){
+  reconcileRegistrationRosterContext();
   reconcileAdminTournamentListContext();
   syncInterfaceThemeVisibility();
   if(aiCreatePosterOwner && (aiCreatePosterOwner.room!==state || aiCreatePosterOwner.uid!==(firebaseUser&&firebaseUser.uid) || !aiCreateBetaActorAllowed())){aiCreateReleasePoster();aiCreateAssistantOpen=false;}
@@ -18618,25 +18720,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="load-admin-registrations"){
-    if(adminRegistrationsLoading) return;
-    const code = state.cloudCode;
-    if(!code) return;
-    adminRegistrationsLoading = true;
-    adminRegistrationsError = null;
-    render();
-    (async ()=>{
-      try{
-        if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
-        if(!cloudAvailable() || !window.cloudSync.listRegistrationsForAdmin) throw { code:"network" };
-        adminRegistrationsCache = await window.cloudSync.listRegistrationsForAdmin(code);
-        adminRegistrationsError = null;
-      }catch(e){
-        adminRegistrationsCache = [];
-        adminRegistrationsError = mapRegistrationError(e);
-      }
-      adminRegistrationsLoading = false;
-      render();
-    })();
+    loadAdminRegistrationRows();
     return;
   }
   if(action==="people-section"){
@@ -19189,8 +19273,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
-  if(action==="community-switch-room-tab"){ communityRoomActiveTab=target.getAttribute("data-tab")||"live"; render(); return; }
+  if(action==="community-switch-room-tab"){ communityRoomActiveTab=target.getAttribute("data-tab")||"live"; if(communityRoomActiveTab!=="people")stopAdminRosterWatch(); render(); return; }
   if(action==="community-exit-room"){
+    stopAdminRosterWatch();
     if(cloudUnsub){try{cloudUnsub();}catch(e){} cloudUnsub=null;}
     appPhase="player-center"; playerActiveTab="host";
     communityEventsCache=null; communityHistoryCache=null;
@@ -22318,14 +22403,18 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="load-online-roster"){
-    if(!state.meta.registrationEnabled){ showToast("此賽事未啟用線上報名", true); return; }
+    if(!canManageRegistrationRoster()){showToast("目前身分沒有此操作權限。",true);return;}
+    if(!state.meta.registrationEnabled&&!isCommunityQuickRegistration(state)){ showToast("此賽事未啟用線上報名", true); return; }
     if(!state.cloudCode){ showToast("此賽事尚未發布到雲端", true); return; }
     if(state.startedAt){ showToast("賽事開始後參賽名單已鎖定", true); return; }
+    if(peopleRosterBusy)return;
+    const context=captureRegistrationRosterContext();
+    peopleRosterBusy=true;adminRosterManualContext=context;target.disabled=true;
     (async ()=>{
       try{
-        const publicRoom=await window.cloudSync.getPublicTournamentFull(state.cloudCode);
-        if(publicRoom?.registrationRosterSyncBackendEnabled===true){showToast("此房間由伺服器自動同步名單",true);return;}
         const result=await syncLatestOnlineRosterBeforeLock();
+        if(!registrationRosterContextIsCurrent(context))return;
+        adminRegistrationsError=null;
         render();
         if(state.bracketSize && !bracketRosterIsCurrent()){
           showToast("線上名單已更新；對戰表已過期，請重新產生對戰表", true);
@@ -22334,7 +22423,14 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }
       }catch(e){
         console.warn("[load-online-roster]",e);
-        showToast("載入線上報名名單失敗，請稍後再試", true);
+        if(registrationRosterContextIsCurrent(context)){
+          adminRegistrationsError=mapRegistrationError(e);
+          render();showToast("載入線上報名名單失敗，請稍後再試", true);
+        }
+      }finally{
+        if(adminRosterManualContext===context){peopleRosterBusy=false;adminRosterManualContext=null;}
+        target.disabled=false;
+        if(registrationRosterContextIsCurrent(context))render();
       }
     })();
     return;
@@ -22957,6 +23053,8 @@ async function init(){
           async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
             if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
+            if(typeof stopAdminRosterWatch==="function") stopAdminRosterWatch();
+            if(typeof resetAdminRegistrationsCache==="function") resetAdminRegistrationsCache();
             if(typeof resetAdminTournamentListContext==="function") resetAdminTournamentListContext();
             const authStateIsCurrent=()=>authGeneration===authStateGeneration;
             syncEngagementIdentity(fbUser&&fbUser.uid);
