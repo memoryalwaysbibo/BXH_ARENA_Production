@@ -11105,9 +11105,10 @@ function renderStaffAssignmentPanel(){
     <div class="panel-title">被分派的工作人員</div>
     <p class="hint">未勾選任何人時，所有在職 staff／admin 皆可操作此賽事（過渡期預設）；勾選後，只有勾選的人可以操作此賽事的資料。</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
-      ${candidates.map(u=>`
+      ${candidates.map((u,index)=>`
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
           <input type="checkbox" class="staff-assign-checkbox" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} style="width:18px;height:18px;">
+          <span style="min-width:3ch;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums;">${index+1}.</span>
           ${esc((typeof u.realName==="string" && u.realName.trim()) || "未填寫本名")}　<span class="hint" style="margin:0;">(${u.role==="admin"?"管理員":"工作人員"})</span>
         </label>`).join("")}
     </div>
@@ -11138,7 +11139,7 @@ function renderRefereeStationAssignmentPanel(){
     : '<p class="hint">本賽事尚未建立工作人員分派名單，以下為所有具權限帳號，並非 BXH 正式人事名冊。請先在「工作人員分派」指定本場人員。</p>';
   const rows=Array.from({length:n},(_,i)=>i+1).map(station=>{
     const assigned=Array.isArray(map[String(station)])?map[String(station)]:[];
-    return `<div class="panel" style="margin:0;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>Court ${station}</b><span class="badge ${assigned.length?'badge-neon':'badge-metal'}">${assigned.length?assigned.length+' 位裁判':'未指派'}</span></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${candidates.length?candidates.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" class="referee-station-checkbox" data-station="${station}" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} ${refereeAssignmentSaving?'disabled':''} style="width:18px;height:18px;"><span>${esc(u.displayName||u.realName||u.uid)}</span><span class="hint" style="margin:0;">${u.uid===creatorUid?'建立者｜':''}${u.role==='super_admin'?'最高管理員':u.role==='admin'?'管理員':u.role==='tester'?'封測管理員（測試）':u.role==='event_staff'?'工作人員（活動）':'工作人員'}</span></label>`).join(''):'<span class="hint">目前沒有可用的裁判帳號。</span>'}</div></div>`;
+    return `<div class="panel" style="margin:0;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>Court ${station}</b><span class="badge ${assigned.length?'badge-neon':'badge-metal'}">${assigned.length?assigned.length+' 位裁判':'未指派'}</span></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${candidates.length?candidates.map((u,index)=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" class="referee-station-checkbox" data-station="${station}" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} ${refereeAssignmentSaving?'disabled':''} style="width:18px;height:18px;"><span style="min-width:3ch;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums;">${index+1}.</span><span>${esc((typeof u.realName==="string" && u.realName.trim()) || "未填寫本名")}</span><span class="hint" style="margin:0;">${u.uid===creatorUid?'建立者｜':''}${u.role==='super_admin'?'最高管理員':u.role==='admin'?'管理員':u.role==='tester'?'封測管理員（測試）':u.role==='event_staff'?'工作人員（活動）':'工作人員'}</span></label>`).join(''):'<span class="hint">目前沒有可用的裁判帳號。</span>'}</div></div>`;
   }).join('');
   const draftHint=typeof refereeAssignmentDraftEnabled==="boolean"&&refereeAssignmentDraftEnabled!==refereeStationRestrictionEnabled()?'<div class="hint" style="margin-top:8px;color:var(--gold);">桌次限制尚未儲存，請按「儲存裁判台分配」。</div>':'';
   return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">建議賽前完成分配。啟用後，未被指定的 staff 在其他 Court 只可查看，不能計分、確認結果、簡易判定、暫停、跳過或重賽。玩家端只會看到裁判顯示名稱，不公開 UID。</p>${directoryHint}${refereeDirectoryError?`<div class="auth-error">${esc(refereeDirectoryError)}</div>`:""}<div class="toggle-row" style="margin:12px 0;"><span><b>啟用桌次限制</b><small>未啟用時沿用既有賽事權限；啟用後依 Court 指派限制。</small></span><button class="toggle ${enabled?'on':''}" data-action="toggle-referee-station-restriction" data-value="${enabled?'false':'true'}" ${refereeAssignmentSaving?'disabled':''}><span></span></button></div>${draftHint}<div style="display:flex;flex-direction:column;gap:10px;">${rows}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="save-referee-station-assignment" ${refereeAssignmentSaving?'disabled':''}>${refereeAssignmentSaving?'雲端交易確認中…':'儲存裁判台分配'}</button><button class="btn btn-ghost" data-action="load-referee-directory" ${refereeAssignmentSaving?'disabled':''}>重新載入名單</button></div></div>`;
@@ -22029,7 +22030,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             });
           }
           const uid=currentAuthUid();
-          if(uid && !refereeDirectoryUsers.some(u=>u.uid===uid)) refereeDirectoryUsers.push({uid,displayName:userProfile&&userProfile.displayName||adminDisplayName||uid,role:userProfile&&userProfile.role||"staff",active:true});
+          if(uid && !refereeDirectoryUsers.some(u=>u.uid===uid)) refereeDirectoryUsers.push({uid,realName:userProfile&&userProfile.realName||"",displayName:userProfile&&userProfile.displayName||adminDisplayName||uid,role:userProfile&&userProfile.role||"staff",active:true});
         }
       }catch(e){ refereeDirectoryError="讀取裁判清單失敗，請重新整理後再試"; }
       finally{ refereeDirectoryLoading=false; render(); }
