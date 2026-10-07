@@ -5580,7 +5580,7 @@ function communityReadWithTimeout(promise, ms=6500, label="community-read"){
 
 let communityRoomActiveTab = "live";
 const COMMUNITY_DRAFT_IDLE_MS = 6*60*60*1000;
-const COMMUNITY_ACTIVE_IDLE_MS = 30*24*60*60*1000;
+const COMMUNITY_ACTIVE_IDLE_MS = 24*60*60*1000;
 const COMMUNITY_COMPLETED_FULL_MS = 90*24*60*60*1000;
 const TEST_DATA_TTL_MS = 7*24*60*60*1000;
 let authVerifying = false; // true while waiting for onAuthStateChanged to resolve role/appPhase after a sign-in call
@@ -5876,7 +5876,7 @@ function communityRoomExpiryMs(st){
   if(st.startedAt) return Number(st.lastActivityAt||st.updatedAt||now)+COMMUNITY_ACTIVE_IDLE_MS;
   const base=Number(st.lastActivityAt||st.updatedAt||st.createdAt||now);
   // A newly-created room contains the host as a synthetic participant. That
-  // alone must not turn an otherwise empty room into a 30-day active room.
+  // alone must not turn an otherwise empty room into a 24-hour active room.
   const hasStructure=(st.players||[]).some(p=>p&&p.isRoomOwner!==true)||(st.matches&&st.matches.length>0)||!!st.bracketSize;
   let expiry=base+(hasStructure?COMMUNITY_ACTIVE_IDLE_MS:COMMUNITY_DRAFT_IDLE_MS);
   if(st.meta&&st.meta.date){
