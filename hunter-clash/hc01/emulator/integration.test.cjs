@@ -87,7 +87,7 @@ test('closed setup uses actual Auth and Firestore, preserves shared fields and r
   await assert.rejects(setup.provisionClosed(input,plan.planHash),/setup-plan-changed/);await assert.rejects(create(),/closed/);
 });
 test('manual code and QR use the same atomic Firestore pairing and private code index',async()=>{
-  const made=await create();assert.match(made.pairingCode,/^(?:[A-F0-9]{4}-){3}[A-F0-9]{4}$/);
+  const made=await create();assert.match(made.pairingCode,/^[2-9A-HJ-NP-Z]{4}$/);
   const input={requestId:'manual-code',expectedRevision:0,pairingCode:made.pairingCode.toLowerCase()};
   const accepted=await call('B','acceptCode',input);assert.equal(accepted.challenge.status,'accepted');
   assert.deepEqual(await call('B','acceptCode',input),accepted);

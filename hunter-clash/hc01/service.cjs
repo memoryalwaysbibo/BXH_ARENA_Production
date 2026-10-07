@@ -1,7 +1,9 @@
 'use strict';
-const {createHash,randomBytes}=require('node:crypto');
+const {createHash,randomBytes,randomInt}=require('node:crypto');
 const domain=require('./domain.cjs');
 const {assertSandboxRuntime}=require('../server/runtime-boundary.cjs');
+const CODE_ALPHABET='23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const newCode=()=>Array.from({length:4},()=>CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const hash=value=>digest(JSON.stringify(value));
 const denied=reason=>{throw Error(reason);};
@@ -21,31 +23,55 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
     if(!readOp)domain.identifier(input.requestId);
     if(!createOp&&!codeOp)domain.identifier(input.challengeId);
     const suppliedCode=codeOp&&typeof input.pairingCode==='string'&&input.pairingCode.length<=40?input.pairingCode.replace(/[\s-]/g,'').toUpperCase():null;
-    if(codeOp&&!/^[A-F0-9]{16}$/.test(suppliedCode||''))denied('pairing-unavailable');
+    if(codeOp&&!/^(?:[2-9A-HJ-NP-Z]{4}|[A-F0-9]{16})$/.test(suppliedCode||''))denied('pairing-unavailable');
     let challengeId=codeOp?null:createOp?'hc01_'+hash([uid,input.requestId]).slice(0,40):input.challengeId;
     let challengeRef=challengeId?doc('hc01Challenges',challengeId):null;
     const receiptRef=readOp?null:doc('hc01Receipts',hash([uid,operation,input.requestId]));
     const fingerprint=hash(input);
     // Generated once outside transaction retries; plaintext is never in challenge/public view.
     const pairingToken=createOp?randomBytes(32).toString('base64url'):null;
-    const pairingCode=createOp?randomBytes(8).toString('hex').toUpperCase():suppliedCode;
-    const codeRef=pairingCode?doc('hc01PairingCodes',digest(pairingCode)):null;
+    const candidates=createOp?Array.from({length:8},()=> (options.pairingCodeGenerator||newCode)()):[];
+    if(candidates.some(c=>!/^[2-9A-HJ-NP-Z]{4}$/.test(c)))denied('invalid-pairing-code-generator');
+    let pairingCode=suppliedCode,codeRef=codeOp?doc('hc01PairingCodes',digest(suppliedCode)):null;
+    // Short codes are authenticated, allowlisted and limited to ten attempts per minute.
+    if(codeOp)await db.runTransaction(async tx=>{
+      const limitRef=doc('hc01PairingAttempts',uid);
+      const [actor,config,receipt,limit]=(await tx.getAll(doc('hcActors',uid),doc('hcConfig','runtime'),receiptRef,limitRef)).map(s=>s.data());
+      if(!eligible(actor))denied('account-unavailable');
+      if(config?.enabled!==true||config.environment!=='sandbox'||config.hc01Enabled!==true)denied('closed');
+      if(receipt)return;
+      const now=clock(),sameWindow=limit&&now>=limit.windowStart&&now-limit.windowStart<60000;
+      if(sameWindow&&limit.count>=10)denied('pairing-rate-limited');
+      tx.set(limitRef,{environment:'sandbox',windowStart:sameWindow?limit.windowStart:now,count:sameWindow?limit.count+1:1});
+    });
     return db.runTransaction(async tx=>{
       const refs=[doc('hcActors',uid),doc('hcConfig','runtime')];if(receiptRef)refs.push(receiptRef);
       const [actor,config,receipt]=(await tx.getAll(...refs)).map(s=>s.data());
       if(!eligible(actor))denied('account-unavailable');
       if(config?.enabled!==true||config.environment!=='sandbox'||config.hc01Enabled!==true)denied('closed');
       if(receipt){if(receipt.fingerprint!==fingerprint)denied('request-id-reused');return receipt.outcome;}
-      if(codeRef){
+      const now=clock();
+      if(createOp){
+        const candidateRefs=candidates.map(c=>doc('hc01PairingCodes',digest(c)));
+        const entries=(await tx.getAll(...candidateRefs)).map(s=>s.data());
+        const index=entries.findIndex(e=>!e||(e.environment==='sandbox'&&Number.isSafeInteger(e.expiresAt)&&e.expiresAt<=now));
+        if(index<0)denied('pairing-unavailable');
+        pairingCode=candidates[index];codeRef=candidateRefs[index];
+      }
+      if(codeOp){
         const [codeSnap]=await tx.getAll(codeRef);const entry=codeSnap.data();
-        if(createOp&&entry)denied('pairing-unavailable');
         if(codeOp){
           if(!entry||entry.environment!=='sandbox'||entry.used!==false)denied('pairing-unavailable');
           domain.identifier(entry.challengeId);challengeId=entry.challengeId;challengeRef=doc('hc01Challenges',challengeId);
         }
       }
       const [challengeSnap]=await tx.getAll(challengeRef);const current=challengeSnap.data();
-      const now=clock();let next,outcome;
+      let next,outcome,consumeCodeRef=null;
+      if(!createOp&&(operation==='accept'||codeOp)&&current?.pairingCodeHash){
+        const ref=doc('hc01PairingCodes',current.pairingCodeHash);
+        const [snapshot]=await tx.getAll(ref);
+        if(snapshot.data()?.challengeId===challengeId)consumeCodeRef=ref;
+      }
       if(createOp){
         if(current)denied('challenge-already-exists');
         // Sandbox policy is configured explicitly, not a claimed final product rule.
@@ -54,7 +80,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
         if(!Number.isSafeInteger(ttl)||ttl<1000||ttl>300000)denied('invalid-pairing-policy');
         next=domain.create({challengeId,creatorUid:uid,rules,now,expiresAt:now+ttl});
         next.pairingTokenHash=digest(pairingToken);next.pairingCodeHash=digest(pairingCode);
-        outcome={challenge:view(next),pairingToken,pairingCode:pairingCode.match(/.{4}/g).join('-')};
+        outcome={challenge:view(next),pairingToken,pairingCode};
       }else{
         if(!current||current.environment!=='sandbox'||current.challengeId!==challengeId)denied('challenge-unavailable');
         if(codeOp&&now>=current.expiresAt)denied('pairing-unavailable');
@@ -73,8 +99,8 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
         if(operation==='accept'||codeOp){delete next.pairingTokenHash;delete next.pairingCodeHash;}
         outcome={challenge:view(next)};
       }
-      if(createOp)tx.create(codeRef,{environment:'sandbox',challengeId,expiresAt:next.expiresAt,used:false});
-      else if((operation==='accept'||codeOp)&&current.pairingCodeHash)tx.set(doc('hc01PairingCodes',current.pairingCodeHash),{environment:'sandbox',challengeId,expiresAt:current.expiresAt,used:true});
+      if(createOp)tx.set(codeRef,{environment:'sandbox',challengeId,expiresAt:next.expiresAt,used:false});
+      else if(consumeCodeRef)tx.set(consumeCodeRef,{environment:'sandbox',challengeId,expiresAt:current.expiresAt,used:true});
       if(createOp)tx.create(challengeRef,next);else tx.set(challengeRef,next);
       tx.create(receiptRef,{schemaVersion:1,environment:'sandbox',actorUid:uid,operation,fingerprint,outcome,createdAt:now});
       tx.create(doc('hc01Audit',hash([uid,operation,input.requestId])),{environment:'sandbox',challengeId,operation,actorUid:uid,revision:next.revision,status:next.status,at:now});

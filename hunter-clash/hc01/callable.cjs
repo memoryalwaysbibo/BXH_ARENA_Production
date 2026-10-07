@@ -7,7 +7,7 @@ const codes={
   'unauthenticated':'unauthenticated','account-unavailable':'permission-denied','opponent-unavailable':'permission-denied',
   'challenge-unavailable':'permission-denied','participant-required':'permission-denied',
   'closed':'failed-precondition','request-id-reused':'already-exists','challenge-already-exists':'already-exists',
-  'pairing-unavailable':'failed-precondition','revision-conflict':'aborted','terminal-state':'failed-precondition',
+  'pairing-rate-limited':'resource-exhausted','pairing-unavailable':'failed-precondition','revision-conflict':'aborted','terminal-state':'failed-precondition',
   'invalid-state':'failed-precondition','invalid-round':'invalid-argument','round-confirmation-invalid':'failed-precondition',
   'finish-confirmation-invalid':'failed-precondition','environment-mismatch':'failed-precondition','revision-overflow':'failed-precondition'
 };

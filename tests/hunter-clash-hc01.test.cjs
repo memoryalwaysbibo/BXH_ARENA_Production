@@ -4,12 +4,12 @@ const {createLifecycleService}=require('../hunter-clash/hc01/service.cjs');
 const domain=require('../hunter-clash/hc01/domain.cjs');
 const {memory}=require('./helpers/hc01-memory.cjs');
 const env={FIRESTORE_EMULATOR_HOST:'127.0.0.1:8180',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9098',GCLOUD_PROJECT:'demo-hunter-clash'};
-function fixture(){
+function fixture(options={}){
   const {db,data}=memory();let now=10000;
   for(const uid of ['A','B','C'])data.set('hcActors/'+uid,{active:true,hc01Allowed:true,role:'player'});
   data.set('hcConfig/runtime',{enabled:true,environment:'sandbox',hc01Enabled:true,hc01Rules:{version:'sandbox-4-v1',targetScore:4},hc01PairingTtlMs:120000});
   const auth={app:{options:{projectId:'demo-hunter-clash'}},async verifyIdToken(token,checkRevoked){assert.equal(checkRevoked,true);if(!['A','B','C'].includes(token))throw Error('unauthenticated');return {uid:token};}};
-  const service=createLifecycleService({db,auth,clock:()=>now},env);
+  const service=createLifecycleService({db,auth,clock:()=>now},env,options);
   let seq=0;
   async function mutate(uid,operation,c,extra={}){return (await service.run(uid,operation,{challengeId:c.challengeId,requestId:'req_'+(++seq),expectedRevision:c.revision,...extra})).challenge;}
   async function pair(){const created=await service.run('A','createChallenge',{requestId:'create'});let c=await mutate('B','accept',created.challenge,{pairingToken:created.pairingToken});return c;}
@@ -106,7 +106,7 @@ test('QR payload round-trips only one-time pairing material and rejects malforme
 });
 test('manual serial accepts normalized input, replays safely and never appears in read projection',async()=>{
   const f=fixture(),made=await f.service.run('A','createChallenge',{requestId:'serial'});
-  assert.match(made.pairingCode,/^(?:[A-F0-9]{4}-){3}[A-F0-9]{4}$/);
+  assert.match(made.pairingCode,/^[2-9A-HJ-NP-Z]{4}$/);
   const input={requestId:'manual',expectedRevision:0,pairingCode:made.pairingCode.toLowerCase().replaceAll('-',' ')};
   const accepted=await f.service.run('B','acceptCode',input);assert.equal(accepted.challenge.status,'accepted');
   assert.deepEqual(await f.service.run('B','acceptCode',input),accepted);
@@ -131,4 +131,32 @@ test('manual serial rejects malformed, unknown, self-pairing and expired challen
   for(const pairingCode of ['123456','0'.repeat(16),{},'x'.repeat(100)])await assert.rejects(f.service.run('B','acceptCode',{...input,pairingCode}),/pairing-unavailable/);
   f.setNow(made.challenge.expiresAt);await assert.rejects(f.service.run('B','acceptCode',input),/pairing-unavailable/);
   assert.deepEqual(f.data.get('hc01Challenges/'+made.challenge.challengeId).participants,['A']);
+});
+
+test('four-character codes skip active collisions and reuse expired entries without old QR consuming the new invite',async()=>{
+  let sequence=0;
+  const f=fixture({pairingCodeGenerator:()=>sequence++<8?'ABCD':sequence<=16?'ABCD':'EFGH'});
+  const first=await f.service.run('A','createChallenge',{requestId:'first'});
+  assert.equal(first.pairingCode,'ABCD');
+  await assert.rejects(f.service.run('A','createChallenge',{requestId:'collision'}),/pairing-unavailable/);
+  f.setNow(first.challenge.expiresAt);
+  // A service with the same backing store exercises deterministic expired-code reuse.
+  sequence=0;f.setNow(first.challenge.expiresAt);
+  const second=await f.service.run('A','createChallenge',{requestId:'second'});
+  assert.equal(second.pairingCode,'ABCD');
+  await f.service.run('B','accept',{requestId:'oldqr',expectedRevision:0,challengeId:first.challenge.challengeId,pairingToken:first.pairingToken});
+  const accepted=await f.service.run('B','acceptCode',{requestId:'newcode',expectedRevision:0,pairingCode:second.pairingCode});
+  assert.equal(accepted.challenge.challengeId,second.challenge.challengeId);
+});
+test('short-code guesses are limited and receipt replay does not spend another attempt',async()=>{
+  const f=fixture();
+  for(let i=0;i<10;i++)await assert.rejects(f.service.run('B','acceptCode',{requestId:'guess'+i,expectedRevision:0,pairingCode:'ZZZZ'}),/pairing-unavailable/);
+  await assert.rejects(f.service.run('B','acceptCode',{requestId:'blocked',expectedRevision:0,pairingCode:'ZZZZ'}),/pairing-rate-limited/);
+  f.setNow(70000);
+  const made=await f.service.run('A','createChallenge',{requestId:'new'});
+  const input={requestId:'valid',expectedRevision:0,pairingCode:made.pairingCode};
+  const accepted=await f.service.run('B','acceptCode',input);
+  const count=f.data.get('hc01PairingAttempts/B').count;
+  assert.deepEqual(await f.service.run('B','acceptCode',input),accepted);
+  assert.equal(f.data.get('hc01PairingAttempts/B').count,count);
 });
