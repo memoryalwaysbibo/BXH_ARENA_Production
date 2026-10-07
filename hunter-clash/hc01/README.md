@@ -18,7 +18,7 @@ node --test tests/hunter-clash-hc01.test.cjs
 node --test tests/module-seam-contracts.test.cjs tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
 node scripts/verify-production-frontend.cjs
 node hunter-clash/hc01/local-lab.cjs
-# 開啟 http://127.0.0.1:5198
+# 開啟 http://127.0.0.1:5198；同機雙玩家示範，非手机遠端網址
 # 需 Playwright + Chromium：
 node tests/hunter-clash-hc01-browser.cjs
 ```
@@ -36,3 +36,13 @@ node tests/hunter-clash-hc01-browser.cjs
 4. HC-03見證與認證來源分流、HC-04防刷/Rating、HC-02獵人檔案adapter、HC-05人員內測與HC-06發布。
 
 正式入口沒有掛載至index；config、IAM、既有正式Rules與部署workflow均未變更。本PR保持draft；FAIL/BLOCKED/NOT RUN不可改成PASS。
+
+## 2026-10-07 第二批：掃碼與未知回應恢復
+
+新增 controller.mjs、scanner.mjs 與独立lab.mjs。建立挑戰后顯示真實QR，camera可使用BarcodeDetector或本地jsQR pixel fallback；掃到有效載荷僅填入配對資料，由使用者再接受。拒絕不相關QR。stop／pagehide／背景化與取消權限等待後都釋放camera tracks。
+
+未知網路回應保留同一requestId/input，阻止新mutation並提供「重送原操作」。sessionStorage僅保留同帳號待送操作（最多10分鐘），不保存Bearer Token；跨帳號／登出清除pending，舊session回應不再顯示。未收到結果不會假稱成功；刷新是讀取狀態，不會消除待確認請求。
+
+QR依賴及license保存在vendor，單機驗收不依赖外部CDN。新增6項控制器/掃碼測試，合計20項HC-01測試；浏览器脚本新增實際QR像素解碼及「伺服器已建立但回應遺失→刷新頁面→重送同請求」情境。真实手机相机权限/iOS/Android实机、远端Auth/Firestore仍待验收，不能以local假身分测试代替。
+
+前一批最新head a438969 的HC-01 CI与完整前端RC1 CI皆SUCCESS。第二批需以新head的CI結果為準。

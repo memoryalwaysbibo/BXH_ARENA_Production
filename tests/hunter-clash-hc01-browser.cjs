@@ -10,8 +10,17 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     await page.goto('http://127.0.0.1:5198');
     const panel=uid=>page.locator('#'+uid);
     // Wait for each network result independently, rather than a stale success label.
-    async function command(uid,op){const response=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().operation===op);await panel(uid).locator('[data-op="'+op+'"]').click();const r=await response;assert.equal(r.status(),200);const result=await r.json();await page.waitForFunction(({uid,revision})=>document.querySelector('#'+uid+' .state').textContent.endsWith('版本 '+revision),{uid,revision:result.challenge.revision});}
-    await command('A','createChallenge');const payload=await panel('A').locator('textarea').inputValue();assert.match(payload,/^bxh-hc01:/);
+    async function command(uid,op,buttonOp=op){const response=page.waitForResponse(r=>r.url().endsWith('/command')&&r.request().postDataJSON().operation===op);await panel(uid).locator('[data-op="'+buttonOp+'"]').click();const r=await response;assert.equal(r.status(),200);const result=await r.json();await page.waitForFunction(({uid,revision})=>document.querySelector('#'+uid+' .state').textContent.endsWith('版本 '+revision),{uid,revision:result.challenge.revision});}
+    let dropped=false,original=null,replayed=null;
+    await page.route('**/command',async route=>{const body=route.request().postDataJSON();
+      if(body.operation==='createChallenge'&&!dropped){dropped=true;original=body;await route.fetch();await route.abort('failed');}
+      else{if(body.operation==='createChallenge')replayed=body;await route.continue();}
+    });
+    await panel('A').locator('[data-op="createChallenge"]').click();await panel('A').locator('[data-op="retry"]').waitFor({state:'visible'});
+    assert.equal(await panel('A').locator('[data-op="createChallenge"]').isDisabled(),true);
+    await page.reload();await panel('A').locator('[data-op="retry"]').waitFor({state:'visible'});await command('A','createChallenge','retry');assert.deepEqual(original,replayed);
+    const payload=await panel('A').locator('textarea').inputValue();assert.match(payload,/^bxh-hc01:/);
+    const decoded=await page.evaluate(()=>{const canvas=document.querySelector('#A .qr canvas'),pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);return window.jsQR(pixels.data,pixels.width,pixels.height)?.data;});assert.equal(decoded,payload);
     await panel('B').locator('textarea').fill(payload);await command('B','accept');await command('A','getChallenge');
     await command('A','start');await command('B','getChallenge');await command('B','start');await command('A','getChallenge');
     for(const finish of ['extreme','spin']){await panel('A').locator('.finish').selectOption(finish);await command('A','proposeRound');await command('B','getChallenge');await command('B','confirmRound');await command('A','getChallenge');}
@@ -21,6 +30,6 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     await page.screenshot({path:path.join(__dirname,'../test-results/hc01/completed.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});await page.reload();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.screenshot({path:path.join(__dirname,'../test-results/hc01/mobile.png'),fullPage:true});
-    console.log('PASS HC01 local browser pairing, dual starts, two rounds, final confirmations, mobile width and no JS errors. Local memory fixture only.');
+    console.log('PASS HC01 QR pixels decode, lost-response/reload exact-request replay, pairing, dual starts, rounds, final confirmations, mobile width and no JS errors. Local memory fixture only.');
   }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>server.kill('SIGTERM'));

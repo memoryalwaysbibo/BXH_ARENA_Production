@@ -13,8 +13,9 @@ const port=5198,origin='http://127.0.0.1:'+port;
 const server=http.createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
   if(req.headers.host!=='127.0.0.1:'+port){res.writeHead(403);res.end();return;}
-  if(req.method==='GET'&&['/','/pairing.mjs'].includes(req.url)){
-    const file=req.url==='/'?'lab.html':'pairing.mjs';res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':'text/javascript; charset=utf-8');res.end(fs.readFileSync(path.join(__dirname,file)));return;
+  const staticFiles=['/','/pairing.mjs','/controller.mjs','/scanner.mjs','/lab.mjs','/vendor/qrcode.min.js','/vendor/jsQR.js'];
+  if(req.method==='GET'&&staticFiles.includes(req.url)){
+    const file=req.url==='/'?'lab.html':req.url.slice(1);res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':'text/javascript; charset=utf-8');res.end(fs.readFileSync(path.join(__dirname,file)));return;
   }
   if(req.method!=='POST'||req.url!=='/command'||req.headers.origin!==origin){res.writeHead(403);res.end();return;}
   let raw='';try{
