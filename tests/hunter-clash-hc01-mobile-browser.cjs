@@ -36,7 +36,7 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     assert.deepEqual(await A.locator('.player-score h3').allTextContents(),['小宇','黑爸']);
     assert.deepEqual(await B.locator('.player-score h3').allTextContents(),['黑爸','小宇']);
     const exchanged=await command(A,'recordRound','[data-op="recordRound"][data-player="0"][data-finish="spin"]');
-    assert.equal(exchanged.challenge.score.A,1);assert.equal(exchanged.challenge.score.B,0);
+    assert.equal(exchanged.challenge.score.a,1);assert.equal(exchanged.challenge.score.b,0);
     assert.deepEqual(await A.locator('.points').allTextContents(),['0','1']);
     await command(A,'undoRound');await A.locator('[data-op="exchange"]').click();
     for(const width of [320,390,430]){await A.setViewportSize({width,height:844});assert.equal(await A.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
