@@ -89,3 +89,20 @@ for(const kind of ['staff','referee'])for(const committed of [true,false]){
   else assert(messages[0].includes('權限不足'));
  });
 }
+
+for(const kind of ['staff','referee']){
+ test(kind+' local-cache failure after verified cloud commit cannot mark LINK ERROR or revert assignment',async()=>{
+  const start=core.indexOf('  if(action==="save-'+(kind==='staff'?'staff-assignment':'referee-station-assignment')+'")');const a=core.indexOf('(async()=>{',start),b=core.indexOf('})();',a);
+  let finish;const done=new Promise(resolve=>finish=resolve),messages=[];const saved=room();saved.meta.assignedStaffUids=['ref'];saved.cloudCode='ROOM';saved.meta.refereeStationAssignments={'1':['ref']};saved.meta.refereeStationRestrictionEnabled=true;
+  const previous=kind==='staff'?['old']:{assignments:{},names:{},assignedStaffUids:['old'],restrictionEnabled:false};
+  const context={state:clone(saved),previous,requested:['ref'],refereeAssignmentDraftEnabled:true,cloudStatus:'connected',flushCloudStateWrites:async()=>true,window:{cloudSync:{saveStaffAssignments:async()=>({ok:true,committed:true,state:clone(saved)}),saveRefereeStationAssignments:async()=>({ok:true,committed:true,state:clone(saved)})}},defaultState:()=>({}),saveRecord:async()=>{throw new Error('IndexedDB local cache unavailable');},showToast:msg=>messages.push(msg),render:()=>finish(),console:{warn:()=>{}}};
+  vm.createContext(context);vm.runInContext(core.slice(a,b+5),context);await done;assert.equal(context.cloudStatus,'connected');assert.deepEqual(Array.from(context.state.meta.assignedStaffUids),['ref']);assert(messages[0].includes('本機暫存'));assert(!messages[0].includes('未儲存'));assert(!messages[0].includes('還原'));
+ });
+}
+
+for(const reason of ['already-completed','corrupt-data','unavailable','deadline-exceeded']){
+ test('referee LINK ERROR is limited to transport failures: '+reason,async()=>{
+  const start=core.indexOf('  if(action==="save-referee-station-assignment")'),a=core.indexOf('(async()=>{',start),b=core.indexOf('})();',a);
+  let finish;const done=new Promise(resolve=>finish=resolve);const context={state:room(),previous:{assignments:{},names:{},assignedStaffUids:[],restrictionEnabled:false},refereeAssignmentDraftEnabled:true,cloudStatus:'connected',flushCloudStateWrites:async()=>true,window:{cloudSync:{saveRefereeStationAssignments:async()=>({ok:false,reason})}},showToast:()=>{},render:()=>finish(),console:{warn:()=>{}}};context.state.cloudCode='ROOM';vm.createContext(context);vm.runInContext(core.slice(a,b+5),context);await done;assert.equal(context.cloudStatus,['unavailable','deadline-exceeded'].includes(reason)?'error':'connected');
+ });
+}

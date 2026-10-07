@@ -22073,6 +22073,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     refereeAssignmentSaving=true;
     render();
     (async()=>{
+      let assignmentCommitted=false;
       try{
         // Referee assignment owns its own Firestore transaction. Drain older whole-state
         // writes first so an earlier snapshot cannot land immediately before/after it.
@@ -22080,6 +22081,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const result = window.cloudSync&&window.cloudSync.saveRefereeStationAssignments&&state.cloudCode
           ? await window.cloudSync.saveRefereeStationAssignments(state.cloudCode,state,{assignments:previous.assignments,restrictionEnabled:previous.restrictionEnabled})
           : {ok:false,reason:"cloud-unavailable"};
+        assignmentCommitted=!!(result&&(result.ok||result.committed));
         if(result&&result.ok){
           if(result.state){
             const keepCode=state.cloudCode;
@@ -22118,19 +22120,26 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               showToast("裁判分配未儲存：已載入雲端最新分配，請確認後再儲存",true);
             }else showToast("裁判分配未儲存：資料已更新，請重新進入賽事後再試",true);
           }else if(reason==="verify-mismatch"||reason==="verify-not-found"){
-            cloudStatus="error"; showToast("裁判分配未儲存：雲端讀回資料不一致，已還原畫面",true);
+            cloudStatus="connected"; showToast("裁判分配讀回核對未完成，請重新整理頁面確認",true);
           }else{
-            cloudStatus="error"; showToast("裁判分配未儲存：雲端連線失敗，已還原原設定",true);
+            const networkError=["unavailable","deadline-exceeded","network-request-failed","auth/network-request-failed"].includes(reason);
+            cloudStatus=networkError?"error":"connected";
+            showToast(networkError?"裁判分配未儲存：雲端目前無法連線，已還原原設定":"裁判分配未儲存，請確認賽事狀態後再試",true);
           }
         }
       }catch(e){
-        state.meta.refereeStationAssignments=previous.assignments;
-        state.meta.refereeStationNames=previous.names;
-        state.meta.assignedStaffUids=previous.assignedStaffUids;
-        state.meta.refereeStationRestrictionEnabled=previous.restrictionEnabled;
-        cloudStatus="error";
+        if(assignmentCommitted){
+          cloudStatus="connected";
+          showToast("裁判分配已送出，本機暫存未完成；請重新整理頁面確認",true);
+        }else{
+          state.meta.refereeStationAssignments=previous.assignments;
+          state.meta.refereeStationNames=previous.names;
+          state.meta.assignedStaffUids=previous.assignedStaffUids;
+          state.meta.refereeStationRestrictionEnabled=previous.restrictionEnabled;
+          cloudStatus=["unavailable","deadline-exceeded","network-request-failed","auth/network-request-failed"].includes(String(e?.code||""))?"error":"connected";
+          showToast("裁判分配未儲存，已還原原設定",true);
+        }
         console.warn("[referee assignment]",{code:(e&&e.code)||"unknown",message:(e&&e.message)||String(e)});
-        showToast("裁判分配未儲存，已還原原設定",true);
       }finally{
         refereeAssignmentSaving=false;
         render();
@@ -22183,12 +22192,14 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     staffAssignmentSaving = true;
     render();
     (async()=>{
+      let assignmentCommitted=false;
       try{
         // Drain older whole-state writes first. Staff assignment then owns one
         // dedicated transaction so unrelated score/call/registration fields
         // cannot turn this small permission edit into a global LINK ERROR.
         await flushCloudStateWrites();
         const result = await window.cloudSync.saveStaffAssignments(state.cloudCode, requested);
+        assignmentCommitted=!!(result&&(result.ok||result.committed));
         if(result&&result.ok){
           if(result.state){
             const keepCode=state.cloudCode;
@@ -22239,15 +22250,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           }
         }
       }catch(e){
-        state.meta.assignedStaffUids=previous;
         const code=String((e&&e.code)||"");
-        if(code==="unavailable"||code==="deadline-exceeded"||code==="network-request-failed"){
-          cloudStatus="error";
-        }else{
+        if(assignmentCommitted){
           cloudStatus="connected";
+          showToast("工作人員指派已送出，本機暫存未完成；請重新整理頁面確認",true);
+        }else{
+          state.meta.assignedStaffUids=previous;
+          cloudStatus=["unavailable","deadline-exceeded","network-request-failed","auth/network-request-failed"].includes(code)?"error":"connected";
+          showToast("工作人員指派未儲存，已還原原設定",true);
         }
         console.warn("[staff assignment]",{code:code||"unknown",message:(e&&e.message)||String(e)});
-        showToast("工作人員指派未儲存，已還原原設定",true);
       }finally{
         staffAssignmentSaving=false;
         render();
