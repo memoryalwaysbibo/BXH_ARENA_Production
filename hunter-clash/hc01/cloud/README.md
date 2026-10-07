@@ -46,6 +46,8 @@ Function為 `asia-east1/hc01Command`，codebase為 `hc01-isolated-test`。Callab
 
 在測試專案先建立兩個測試Auth帳號，將UID填入 `setup-input.example.json`，另存為 `setup-input.json`。這份檔案不包含密碼、Token或私鑰；規則／TTL須由測試主持者明確選定，範例4分／120秒只屬內測政策。安裝後端依賴後執行：
 
+2026-10-07主持者回報已儲存電子郵件／密碼登入設定，並提供兩個內測帳號UID；已填入repository的 `setup-input.internal-test.json`，使用既有內測候選的4分／120秒政策。這是待套用名單，不代表已讀取Auth確認帳號存在、已寫入hcActors或已開通。操作者可將此檔複製為候選包根目錄的 `setup-input.json`，再執行下列inspect／apply-closed；工具會向實際Auth再次核對UID與停用狀態。密碼由主持者保管。
+
 ```sh
 npm install --prefix functions --no-audit --no-fund
 GCLOUD_PROJECT=bxh-hc-test node functions/hc01/cloud/setup.cjs inspect setup-input.json
