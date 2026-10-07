@@ -14,7 +14,7 @@
 ## 驗證與操作
 
 ```sh
-node --test tests/hunter-clash-hc01.test.cjs
+node --test tests/hunter-clash-hc01.test.cjs tests/hunter-clash-hc01-client.test.cjs tests/hunter-clash-hc01-callable.test.cjs
 node --test tests/module-seam-contracts.test.cjs tests/enchantment-hunter-ledger.test.cjs tests/hunter-license-grade.test.cjs tests/hunter-loop-p5-ui.test.cjs
 node scripts/verify-production-frontend.cjs
 node hunter-clash/hc01/local-lab.cjs
@@ -23,15 +23,28 @@ node hunter-clash/hc01/local-lab.cjs
 node tests/hunter-clash-hc01-browser.cjs
 ```
 
-本輪14項HC-01單元測試、14項既有回歸与前端檢查PASS（Node 24.19.0）。單元測試的 memory adapter 序列化原子交易，用來驗證服務邏輯，不冒充實際 Firestore 並發驗收。CI 固定 Node 22，再跑相同測試。
-本輪瀏覽器驗收因環境缺少 Chromium executable 未執行成功；新增 CI 瀏覽器 job，通過後仍只證明 local lab，不是 Firebase／雙手機實戰。
+目前23項HC-01單元測試（服務／控制器／相機／Callable transport）、14項既有回歸與前端檢查已在本機通過。CI固定Node 22。前一批提交b323426的HC01瀏覽器CI與整站RC1 CI已通過；本批新增Emulator驗證，以最新提交的CI結果為準。
 
-本機lab使用固定A/B假身分與記憶體資料；只bind127.0.0.1，Host/Origin檢查拒絕外站操作，關閉後資料消失。介面使用配對資料貼上，QR渲染與攝影機掃碼尚待接入已授權的內測手機入口。示範4分勝/120秒只屬sandbox fixture，不是最終政策核准。
+本機lab使用固定A/B假身分與記憶體資料；只bind127.0.0.1，Host/Origin檢查拒絕外站操作，關閉後資料消失。介面已支援QR顯示、相機掃碼及原請求重送。示範4分勝/120秒只屬sandbox fixture，不是最終政策核准。
+
+## 真正Firebase Emulator驗證
+
+`emulator/`為獨立Auth／Firestore／Functions測試入口；只允許demo-hunter-clash及127.0.0.1固定埠。Functions初始化guard和predeploy拒絕部署，不能用這份firebase.json部署雲端。
+
+```sh
+cd hunter-clash/hc01/emulator
+npm install --no-package-lock --no-audit --no-fund
+node run-tests.cjs
+```
+
+需Node 22與Java 21；使用HC00已採用的固定Firebase套件版本。CI自動啟動Emulator並測試真實ID Token、Callable、交易搶碼、同請求並發重送、停用帳號／allowlist撤銷、關閉開關、私人收據／設定／挑戰的client讀寫拒絕，以及完整雙人完賽且不影響生涯／天梯／郵件。`callable.cjs`只負責驗證transport並對已知錯誤分類，未知SDK錯誤不公開內部資料。
+
+這不是bxh-hc-test雲端部署或實機手機驗收。雲端Function需另行提供只允許bxh-hc-test的部署包與存取設定，不能取消Emulator入口guard改作部署。
 
 ## 待做與發布狀態
 
-1. 真正 Auth/Functions/Firestore emulator 與遠端 `bxh-hc-test` adapter/授權驗證。現有服務未匯出部署Function，沒有部署入口。
-2. QR掃描相機、手機HTTPS內測與QR renderer實機驗收；斷線未知結果重送的客戶端controller。
+1. 完成新增Auth/Functions/Firestore Emulator CI驗證，再串接遠端 `bxh-hc-test` adapter／授權；測試專案已由擁有者建立，仍待存取設定。
+2. 手機HTTPS內測與QR／相機／斷線恢復實機驗收；controller与本機掃碼已實作。
 3. 爭議重審／更正流程，目前 disputed 鎖定並保留證據，不支持直接覆寫。
 4. HC-03見證與認證來源分流、HC-04防刷/Rating、HC-02獵人檔案adapter、HC-05人員內測與HC-06發布。
 
