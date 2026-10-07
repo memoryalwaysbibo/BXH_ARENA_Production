@@ -19,7 +19,7 @@ test('account change or abort while retrieving credentials never sends a command
   const g=await fixture(async()=>{sent++;});const controller=new AbortController();controller.abort();await assert.rejects(g.run('createChallenge',{}, {uid:'A',signal:controller.signal}),e=>e.name==='AbortError');assert.equal(sent,0);
 });
 test('known server rejection is definitive; internal, malformed and cross-environment responses retain pending',async()=>{
-  for(const [body,status,definitive]of [[{error:{status:'ABORTED',details:{reason:'revision-conflict'}}},409,true],[{error:{status:'INTERNAL',details:{reason:'revision-conflict'}}},500,false],[{error:{status:'UNAUTHENTICATED'}},401,false],[{result:{challenge:{...challenge,environment:'production'}}},200,false],[{result:{challenge:{...challenge,participants:['B']}}},200,false]]){
+  for(const [body,status,definitive]of [[{error:{status:'RESOURCE_EXHAUSTED',details:{reason:'pairing-rate-limited'}}},429,true],[{error:{status:'ABORTED',details:{reason:'revision-conflict'}}},409,true],[{error:{status:'INTERNAL',details:{reason:'revision-conflict'}}},500,false],[{error:{status:'UNAUTHENTICATED'}},401,false],[{result:{challenge:{...challenge,environment:'production'}}},200,false],[{result:{challenge:{...challenge,participants:['B']}}},200,false]]){
     const {run}=await fixture(async()=>({ok:status===200,status,json:async()=>body}));await assert.rejects(run('createChallenge',{}, {uid:'A'}),e=>!!e.definitive===definitive);
   }
 });

@@ -1,5 +1,5 @@
 import{ENDPOINT,validateConfig}from'./config.mjs';
-const reasons=new Set(['invalid-operation','invalid-id','invalid-input','invalid-rules','invalid-pairing-policy','invalid-time','unauthenticated','account-unavailable','opponent-unavailable','challenge-unavailable','participant-required','closed','request-id-reused','challenge-already-exists','pairing-unavailable','revision-conflict','terminal-state','invalid-state','invalid-round','round-confirmation-invalid','finish-confirmation-invalid','environment-mismatch','revision-overflow']);
+const reasons=new Set(['invalid-operation','invalid-id','invalid-input','invalid-rules','invalid-pairing-policy','invalid-time','unauthenticated','account-unavailable','opponent-unavailable','challenge-unavailable','participant-required','closed','request-id-reused','challenge-already-exists','pairing-rate-limited','pairing-unavailable','revision-conflict','terminal-state','invalid-state','invalid-round','round-confirmation-invalid','finish-confirmation-invalid','environment-mismatch','revision-overflow']);
 export function createCloudTransport({config,origin,auth,getAppCheckToken,fetcher=fetch}){
   validateConfig(config,origin);
   return async(operation,input,{uid,signal})=>{
