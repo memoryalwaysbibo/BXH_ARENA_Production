@@ -235,6 +235,9 @@ jobs:
       - name: Verify isolated community quick registration in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/community-quick-registration-browser.cjs
+      - name: Verify compact bracket finals labels
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/e2e/bracket-final-label-layout.cjs
       - name: Upload community quick registration screenshots and results
         if: always()
         uses: actions/upload-artifact@v4
