@@ -35,3 +35,24 @@ Function為 `asia-east1/hc01Command`，codebase為 `hc01-isolated-test`。Callab
 部署只針對此獨立Function與Hosting site，不能使用本機Emulator的firebase.json部署。Functions與Hosting predeploy都要求GCLOUD_PROJECT精確為bxh-hc-test；runtime另核對SDK專案與環境。套件／建置可先完成，部署需在可核對的專案存取設定下執行，不能因CI通過就將雲端驗收改成PASS。
 
 部署後再提供 `https://bxh-hc-test-hc01.web.app` 作手機內測；目前這只是預定地址，未驗證可用。需記錄部署commit、Auth／App Check／Rules／IAM、真實雙手機流程、斷線重送與撤銷授權結果。關閉 `hc01Enabled` 可停止新操作；保留測試資料供核對。
+
+## 檢查候選包與開通指定帳號
+
+產出的包含有 `tools/check-candidate.cjs` 與 `setup-input.example.json`。SDK打包後執行 `npm run check:candidate`，列出候選程式與Web App設定缺項。輸出中的 `cloudVerified:false` 與 `notVerified` 永遠保留：此工具沒有查詢IAM、Auth provider、App Check registration或雲端部署，不能憑本機檔案宣告雲端PASS。
+
+目前沒有Firebase／Google Cloud操作連接可供此對話直接讀取專案；下列命令需由可存取該專案的操作者在已登入的環境執行。不要把正式站帳號或資料匯入此測試專案。
+
+在測試專案先建立兩個測試Auth帳號，將UID填入 `setup-input.example.json`，另存為 `setup-input.json`。這份檔案不包含密碼、Token或私鑰；規則／TTL須由測試主持者明確選定，範例4分／120秒只屬內測政策。安裝後端依賴後執行：
+
+```sh
+npm install --prefix functions --no-audit --no-fund
+GCLOUD_PROJECT=bxh-hc-test node functions/hc01/cloud/setup.cjs inspect setup-input.json
+# 核對輸出的指定UID、角色與planHash後，使用該次PLAN_HASH：
+GCLOUD_PROJECT=bxh-hc-test node functions/hc01/cloud/setup.cjs apply-closed setup-input.json PLAN_HASH
+```
+
+`inspect`只讀，不建立帳號或寫入資料。`apply-closed`再次核對Auth及資料庫快照：若角色／設定已變動、帳號停用或凍結，拒絕套用。它只準備指定UID的hc01Allowed與HC01規則，保存現有角色／HC00設定及其他欄位，設定 `hc01Enabled:false`，不啟用全域enabled、不部署、不修改Rules/IAM、不建立挑戰或獎勵。新建runtime預設 `enabled:false`；既有全域enabled保持原值。
+
+取得Web App設定的第一步：[bxh-hc-test專案設定](https://console.firebase.google.com/project/bxh-hc-test/settings/general/)。在「你的應用程式」選Web App，取得 `projectId`、`authDomain`、`apiKey`、`appId`；App Check的Enterprise site key另在該App註冊後取得。只有實際資料齊備並核對上述雲端缺項後，才可設定前端enabled並進行隔離部署／手機驗收。
+
+填妥client config後，以build-bundle的第三個參數重新產生候選包，再打包SDK／檢查；不要直接修改已產出檔案而使manifest校驗失效。

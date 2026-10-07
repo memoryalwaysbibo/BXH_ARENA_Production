@@ -76,3 +76,13 @@ test('authenticated client cannot read private receipt or directly mutate any se
   }
   assert.equal((await service.run(tokens.A,'getChallenge',{challengeId:made.challenge.challengeId})).challenge.revision,0);
 });
+
+test('closed setup uses actual Auth and Firestore, preserves shared fields and refuses stale plans',async()=>{
+  const {createSetupService}=require('../cloud/setup-service.cjs');const setup=createSetupService({db,auth});
+  await db.doc('hcConfig/runtime').update({hc00Policy:{keep:1}});await db.doc('hcActors/A').update({role:'staff',hc00Allowed:true});
+  const input={uids:['A','B'],rules:{version:'hc01-internal-test-v1',targetScore:4},pairingTtlMs:120000};
+  const plan=await setup.inspect(input);assert.equal(plan.applied,false);assert.equal((await db.doc('hcConfig/runtime').get()).data().hc01Enabled,true);
+  await setup.provisionClosed(input,plan.planHash);const config=(await db.doc('hcConfig/runtime').get()).data();assert.equal(config.enabled,true);assert.equal(config.hc01Enabled,false);assert.deepEqual(config.hc00Policy,{keep:1});
+  const actor=(await db.doc('hcActors/A').get()).data();assert.equal(actor.role,'staff');assert.equal(actor.hc00Allowed,true);
+  await assert.rejects(setup.provisionClosed(input,plan.planHash),/setup-plan-changed/);await assert.rejects(create(),/closed/);
+});
