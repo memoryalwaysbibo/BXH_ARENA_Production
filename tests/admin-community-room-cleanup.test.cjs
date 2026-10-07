@@ -45,6 +45,7 @@ test('structured and running community rooms expire 24 hours after their last ac
   }
   assert.match(cloud,/result\.state\.expiresAtMs=communityRoomExpiryMs\(result\.state\)/);
   assert.match(host,/連續 24 小時無操作後清理/);
+  assert.match(cloud,/expiresAt:result\.state\.expiresAtMs==null\?null:new Date\(result\.state\.expiresAtMs\)/);
 });
 test('empty, completed, official and scheduled room exemptions are preserved',()=>{
   const ctx=expiryContext(),base=Date.parse('2026-10-07T03:00:00Z');

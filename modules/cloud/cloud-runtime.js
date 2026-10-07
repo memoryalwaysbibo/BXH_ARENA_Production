@@ -3171,7 +3171,7 @@ if(testerSession){
           const now=Date.now();
           const community=(result.state.meta&&result.state.meta.eventAuthority)==="community";
           if(community){ result.state.lastActivityAt=now; result.state.expiresAtMs=communityRoomExpiryMs(result.state); }
-          const extra=community?{lastActivityAt:now,expiresAt:new Date(result.state.expiresAtMs),eventAuthority:"community",ownerUid:result.state.ownerUid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed"}:{};
+          const extra=community?{lastActivityAt:now,expiresAt:result.state.expiresAtMs==null?null:new Date(result.state.expiresAtMs),eventAuthority:"community",ownerUid:result.state.ownerUid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed"}:{};
           tx.set(ref, Object.assign({ data: JSON.stringify(result.state), updatedAt: now },extra), { merge:true });
           tx.set(publicRef, Object.assign({ bracketView: JSON.stringify(buildPublicMirrorFields(result.state)), updatedAt: now, tournamentPhase: computeTournamentPhase(result.state) },extra), { merge:true });
           const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
