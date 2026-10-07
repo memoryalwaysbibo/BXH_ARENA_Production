@@ -86,3 +86,13 @@ test('closed setup uses actual Auth and Firestore, preserves shared fields and r
   const actor=(await db.doc('hcActors/A').get()).data();assert.equal(actor.role,'staff');assert.equal(actor.hc00Allowed,true);
   await assert.rejects(setup.provisionClosed(input,plan.planHash),/setup-plan-changed/);await assert.rejects(create(),/closed/);
 });
+test('manual code and QR use the same atomic Firestore pairing and private code index',async()=>{
+  const made=await create();assert.match(made.pairingCode,/^(?:[A-F0-9]{4}-){3}[A-F0-9]{4}$/);
+  const input={requestId:'manual-code',expectedRevision:0,pairingCode:made.pairingCode.toLowerCase()};
+  const accepted=await call('B','acceptCode',input);assert.equal(accepted.challenge.status,'accepted');
+  assert.deepEqual(await call('B','acceptCode',input),accepted);
+  await assert.rejects(command('C','accept',made.challenge,{pairingToken:made.pairingToken}),/pairing-unavailable/);
+  const index=(await db.collection('hc01PairingCodes').get()).docs[0];assert.equal(index.data().used,true);
+  const url='http://127.0.0.1:8180/v1/projects/'+PROJECT+'/databases/(default)/documents/'+index.ref.path;
+  assert.equal((await fetch(url,{headers:{Authorization:'Bearer '+tokens.A}})).status,403);
+});

@@ -1,6 +1,6 @@
 'use strict';
 const {OPERATIONS}=require('./domain.cjs');
-const allowed=new Set(['createChallenge','getChallenge',...OPERATIONS]);
+const allowed=new Set(['createChallenge','getChallenge','acceptCode',...OPERATIONS]);
 const codes={
   'invalid-operation':'invalid-argument','invalid-id':'invalid-argument','invalid-input':'invalid-argument',
   'invalid-rules':'failed-precondition','invalid-pairing-policy':'failed-precondition','invalid-time':'failed-precondition',
