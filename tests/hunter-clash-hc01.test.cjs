@@ -160,3 +160,21 @@ test('short-code guesses are limited and receipt replay does not spend another a
   assert.deepEqual(await f.service.run('B','acceptCode',input),accepted);
   assert.equal(f.data.get('hc01PairingAttempts/B').count,count);
 });
+
+test('creator records both scores immediately, replay is idempotent and both confirm only the final result',async()=>{
+  const f=fixture();let c=await f.start();
+  await assert.rejects(f.mutate('B','recordRound',c,{winnerUid:'B',finish:'spin'}),/invalid-round/);
+  const input={challengeId:c.challengeId,requestId:'direct-round',expectedRevision:c.revision,winnerUid:'B',finish:'knockout'};
+  const result=await f.service.run('A','recordRound',input);assert.deepEqual(await f.service.run('A','recordRound',input),result);
+  c=result.challenge;assert.equal(c.status,'in_progress');assert.equal(c.pendingRound,null);assert.equal(c.score.b,2);
+  await assert.rejects(f.mutate('A','recordRound',{...c,revision:c.revision-1},{winnerUid:'B',finish:'spin'}),/revision-conflict/);
+  c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'extreme'});
+  c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'spin'});assert.deepEqual(c.score,{a:4,b:2});assert.equal(c.status,'final_pending');
+  c=await f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'final_pending');
+  c=await f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'completed');assert.equal(c.ratingStatus,'not_awarded');
+});
+test('opponent can dispute an immediately recorded score during play',async()=>{
+  const f=fixture();let c=await f.start();c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'spin'});
+  c=await f.mutate('B','dispute',c);assert.equal(c.status,'disputed');assert.equal(c.rounds.length,1);
+  await assert.rejects(f.mutate('A','recordRound',c,{winnerUid:'A',finish:'extreme'}),/terminal-state/);
+});

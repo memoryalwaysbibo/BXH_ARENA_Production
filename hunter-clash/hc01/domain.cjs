@@ -1,7 +1,7 @@
 'use strict';
 // HC-01 domain only. Completion is an unrated record, never an award/settlement.
 const POINTS = Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
-const OPERATIONS = Object.freeze(['accept','reject','start','proposeRound','confirmRound','confirmFinish','dispute','cancel']);
+const OPERATIONS = Object.freeze(['accept','reject','start','proposeRound','recordRound','confirmRound','confirmFinish','dispute','cancel']);
 const fail = reason => { throw Error(reason); };
 function identifier(value){if(typeof value!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(value))fail('invalid-id');return value;}
 function keys(input,allowed){if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))fail('invalid-input');}
@@ -19,7 +19,7 @@ function create({challengeId,creatorUid,rules,now,expiresAt}){
 }
 function transition(original,uid,operation,input,now){
   identifier(uid);if(!OPERATIONS.includes(operation))fail('invalid-operation');
-  const extra=operation==='proposeRound'?['winnerUid','finish']:operation==='confirmRound'?['roundRevision']:operation==='confirmFinish'?['resultRevision']:[];
+  const extra=['proposeRound','recordRound'].includes(operation)?['winnerUid','finish']:operation==='confirmRound'?['roundRevision']:operation==='confirmFinish'?['resultRevision']:[];
   keys(input,['expectedRevision',...extra]);
   if(!Number.isSafeInteger(input.expectedRevision)||input.expectedRevision!==original.revision)fail('revision-conflict');
   if(!Number.isSafeInteger(now)||now<original.createdAt)fail('invalid-time');
@@ -44,6 +44,13 @@ function transition(original,uid,operation,input,now){
       c.pendingRound={number:c.rounds.length+1,winnerUid:input.winnerUid,finish:input.finish,
         points:POINTS[input.finish],roundRevision:c.revision+1,confirmedBy:[uid],proposedAt:now};
       c.status='round_pending';
+    }else if(operation==='recordRound'){
+      if(c.status!=='in_progress'||uid!==c.participants[0]||!c.participants.includes(input.winnerUid)||!Object.hasOwn(POINTS,input.finish))fail('invalid-round');
+      const r={number:c.rounds.length+1,winnerUid:input.winnerUid,finish:input.finish,
+        points:POINTS[input.finish],roundRevision:c.revision+1,recordedBy:uid,recordedAt:now};
+      c.rounds.push(r);c.score[r.winnerUid===c.participants[0]?'a':'b']+=r.points;
+      c.status=Math.max(c.score.a,c.score.b)>=c.rules.targetScore?'final_pending':'in_progress';
+      if(c.status==='final_pending'){c.resultRevision=c.revision+1;c.winnerUid=r.winnerUid;}
     }else if(operation==='confirmRound'){
       const r=c.pendingRound;
       if(c.status!=='round_pending'||!r||input.roundRevision!==r.roundRevision||r.confirmedBy.includes(uid))fail('round-confirmation-invalid');
@@ -57,7 +64,7 @@ function transition(original,uid,operation,input,now){
       c.finishConfirmedBy.push(uid);
       if(c.finishConfirmedBy.length===2){c.status='completed';c.completedAt=now;c.certificationSource='SELF';c.ratingStatus='not_awarded';}
     }else if(operation==='dispute'){
-      if(!['round_pending','final_pending'].includes(c.status))fail('invalid-state');
+      if(!['in_progress','round_pending','final_pending'].includes(c.status))fail('invalid-state');
       c.status='disputed';c.disputedBy=uid;c.disputedAt=now;
     }
   }

@@ -4,7 +4,7 @@ import{createScanner}from'../scanner.mjs';
 const labels={proposed:'等待對手配對',accepted:'配對成功，等待確認開賽',in_progress:'對戰中',round_pending:'等待本局確認',final_pending:'等待完賽確認',completed:'完賽紀錄已保存',disputed:'有爭議，保留紀錄',cancelled:'已取消',expired:'配對已過期',rejected:'已拒絕'};
 export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=globalThis.localStorage}={}){
   const app=root.querySelector('#app'),message=text=>root.querySelector('#message').textContent=text;
-  app.innerHTML=`<form id="login"><section><h2>內測帳號登入</h2><label>電子郵件<input name="email" type="email" autocomplete="username" required></label><label>密碼<input name="password" type="password" autocomplete="current-password" required></label><label class="remember"><input name="remember" type="checkbox">記憶帳號</label><button type="submit">登入</button><p>帳號由測試主持者提供。</p></section></form><section id="identity" hidden><span id="who"></span><button type="button" data-op="logout">登出</button></section><section id="match" hidden><div class="state"></div><div class="score">0 : 0</div><p class="round"></p><small class="policy"></small><div class="pairing-share" hidden><h3>請對手掃描 QR 或輸入配對序號</h3><div class="qr"></div><strong class="pairing-code"></strong><p class="pairing-expiry"></p></div><div class="home-actions row"><button data-op="createChallenge">建立挑戰</button><button data-op="join">加入挑戰</button></div><div class="join-panel" hidden><h3>加入挑戰</h3><button data-op="scan">掃描 QR</button><div class="camera" hidden><video playsinline muted></video><button data-op="stopScan">關閉相機</button></div><canvas hidden></canvas><p>或輸入 4 碼</p><label>配對序號<input name="pairingCode" placeholder="例如 A7K3" autocomplete="off" autocapitalize="characters" maxlength="4"></label><button data-op="acceptCode">確認加入</button><div class="scan-confirm" hidden><p>已辨識挑戰 QR，確認加入此挑戰？</p><button data-op="accept">確認加入</button></div><textarea hidden></textarea><button data-op="back">返回</button></div><div class="pairing-actions row"><button data-op="start">確認開賽</button><button data-op="reject">拒絕配對</button><button data-op="cancel">取消挑戰</button></div><p class="ready-help" hidden></p><div class="row"><button data-op="getChallenge">刷新狀態</button><button data-op="retry" hidden>重送原操作</button></div><div class="scoreboards"></div><p class="score-help">點選得分方式後，需由另一方確認本局才會加分。</p><div class="row"><button data-op="confirmRound">確認本局</button><button data-op="confirmFinish">確認完賽</button><button data-op="dispute">有爭議</button></div></section>`;
+  app.innerHTML=`<form id="login"><section><h2>內測帳號登入</h2><label>電子郵件<input name="email" type="email" autocomplete="username" required></label><label>密碼<input name="password" type="password" autocomplete="current-password" required></label><label class="remember"><input name="remember" type="checkbox">記憶帳號</label><button type="submit">登入</button><p>帳號由測試主持者提供。</p></section></form><section id="identity" hidden><span id="who"></span><button type="button" data-op="logout">登出</button></section><section id="match" hidden><div class="state"></div><div class="score">0 : 0</div><p class="round"></p><small class="policy"></small><div class="pairing-share" hidden><h3>請對手掃描 QR 或輸入配對序號</h3><div class="qr"></div><strong class="pairing-code"></strong><p class="pairing-expiry"></p></div><div class="home-actions row"><button data-op="createChallenge">建立挑戰</button><button data-op="join">加入挑戰</button></div><div class="join-panel" hidden><h3>加入挑戰</h3><button data-op="scan">掃描 QR</button><div class="camera" hidden><video playsinline muted></video><button data-op="stopScan">關閉相機</button></div><canvas hidden></canvas><p>或輸入 4 碼</p><label>配對序號<input name="pairingCode" placeholder="例如 A7K3" autocomplete="off" autocapitalize="characters" maxlength="4"></label><button data-op="acceptCode">確認加入</button><div class="scan-confirm" hidden><p>已辨識挑戰 QR，確認加入此挑戰？</p><button data-op="accept">確認加入</button></div><textarea hidden></textarea><button data-op="back">返回</button></div><div class="pairing-actions row"><button data-op="start">確認開賽</button><button data-op="reject">拒絕配對</button><button data-op="cancel">取消挑戰</button></div><p class="ready-help" hidden></p><div class="row"><button data-op="getChallenge">刷新狀態</button><button data-op="retry" hidden>重送原操作</button></div><div class="scoreboards"></div><p class="score-help">建立挑戰者替雙方記分，比分自動同步；整場結束後雙方確認結果。</p><div class="row"><button data-op="confirmRound">確認本局</button><button data-op="confirmFinish">確認完賽</button><button data-op="dispute">有爭議</button></div></section>`;
   const select=s=>app.querySelector(s),video=select('video');let view={},previousUid=null,loginBusy=false,joining=false,scanning=false,scanFound=false;
   const accountKey='hc01:remembered-email';
   try{const email=accountStorage?.getItem(accountKey);if(email){select('[name="email"]').value=email;select('[name="remember"]').checked=true;}}catch{}
@@ -40,7 +40,7 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
     select('.score-help').hidden=c?.status!=='in_progress';
     select('[data-op="confirmRound"]').hidden=c?.status!=='round_pending'||c.pendingRound.confirmedBy.includes(uid);
     select('[data-op="confirmFinish"]').hidden=c?.status!=='final_pending'||c.finishConfirmedBy.includes(uid);
-    select('[data-op="dispute"]').hidden=!['round_pending','final_pending'].includes(c?.status);
+    select('[data-op="dispute"]').hidden=!['in_progress','round_pending','final_pending'].includes(c?.status);
     select('[data-op="getChallenge"]').hidden=!c&&!view.pending&&!savedId(uid);
     const boards=select('.scoreboards');boards.replaceChildren();boards.hidden=!['in_progress','round_pending','final_pending','completed','disputed'].includes(c?.status);
     for(const [index,player] of (c?.participants||[]).entries()){
@@ -48,7 +48,7 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
       const name=document.createElement('h3');name.textContent=player===uid?'我方':'對方';panel.append(name);
       const score=document.createElement('div');score.className='points';score.textContent=String(c.score[index===0?'a':'b']);panel.append(score);
       for(const [finish,label] of [['spin','旋轉勝利 +1分'],['knockout','擊飛勝利 +2分'],['burst','爆裂勝利 +2分'],['extreme','極限勝利 +3分']]){
-        const button=document.createElement('button');button.type='button';button.dataset.op='proposeRound';button.dataset.player=String(index);button.dataset.finish=finish;button.textContent=label;button.hidden=c.status!=='in_progress';panel.append(button);
+        const button=document.createElement('button');button.type='button';button.dataset.op='recordRound';button.dataset.player=String(index);button.dataset.finish=finish;button.textContent=label;button.hidden=c.status!=='in_progress'||c.participants[0]!==uid;panel.append(button);
       }
       boards.append(panel);
     }
@@ -59,9 +59,9 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
       button.disabled=!uid||!!view.busy||(!!view.pending&&!['retry','getChallenge','stopScan'].includes(op))||
         (op==='retry'&&!view.pending)||(op==='getChallenge'&&!c&&!view.pending?.input.challengeId&&!savedId(uid))||
         (op==='createChallenge'&&active)||(['accept','acceptCode'].includes(op)&&active)||(op==='start'&&(c?.status!=='accepted'||c.ready.includes(uid)))||
-        (op==='proposeRound'&&c?.status!=='in_progress')||(op==='confirmRound'&&(c?.status!=='round_pending'||c.pendingRound.confirmedBy.includes(uid)))||
+        (['proposeRound','recordRound'].includes(op)&&c?.status!=='in_progress')||(op==='confirmRound'&&(c?.status!=='round_pending'||c.pendingRound.confirmedBy.includes(uid)))||
         (op==='confirmFinish'&&(c?.status!=='final_pending'||c.finishConfirmedBy.includes(uid)))||
-        (op==='dispute'&&!['round_pending','final_pending'].includes(c?.status))||(op==='reject'&&(c?.status!=='accepted'||c.participants[0]===uid))||(op==='cancel'&&!active);
+        (op==='dispute'&&!['in_progress','round_pending','final_pending'].includes(c?.status))||(op==='reject'&&(c?.status!=='accepted'||c.participants[0]===uid))||(op==='cancel'&&!active);
     }
   }
   const unsubscribe=runtime.watch(user=>{
@@ -85,15 +85,17 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
       else if(op==='getChallenge')result=await client.read(view.snapshot?.challengeId||view.pending?.input.challengeId||savedId(uid));
       else{const c=view.snapshot;let input;if(op==='createChallenge')input={};else if(op==='acceptCode')input={pairingCode:select('[name="pairingCode"]').value,expectedRevision:0};else if(op==='accept')input={...parsePairingPayload(select('textarea').value),expectedRevision:0};
         else{if(!c)throw Error('challenge-required');input={challengeId:c.challengeId,expectedRevision:c.revision};
-          if(op==='proposeRound'){input.winnerUid=c.participants[Number(action.dataset.player)];input.finish=action.dataset.finish;}
+          if(['proposeRound','recordRound'].includes(op)){input.winnerUid=c.participants[Number(action.dataset.player)];input.finish=action.dataset.finish;}
           if(op==='confirmRound')input.roundRevision=c.pendingRound?.roundRevision;if(op==='confirmFinish')input.resultRevision=c.resultRevision;}
         result=await client.mutate(op,input);}
       if(view.uid!==uid||!result)return;
       if(['accept','acceptCode'].includes(op)){clearPairing();render();}
       if(result.pairingToken){const payload=pairingPayload(result.challenge.challengeId,result.pairingToken);select('textarea').value=payload;select('.pairing-share').hidden=false;select('.pairing-code').textContent=result.pairingCode||'';select('.pairing-expiry').textContent='配對期限：'+new Date(result.challenge.expiresAt).toLocaleTimeString()+'，成功配對後失效。';renderPairingQr(select('.qr'),payload,globalThis.QRCode);}
-      message(result.pairingToken?'挑戰已建立，請對手掃描 QR 或輸入配對序號。':'操作已確認。另一方可按刷新查看最新狀態。');
+      message(result.pairingToken?'挑戰已建立，請對手掃描 QR 或輸入配對序號。':'操作已確認，雙方畫面會自動更新。');
     }catch(error){if(view.uid!==uid)return;message(view.pending?'操作結果尚未確認，請重送原操作。':error.message==='revision-conflict'?'狀態已更新，請先刷新。':error.message==='pairing-rate-limited'?'輸入序號次數過多，請稍候一分鐘再試。':error.message==='closed'?'測試站對戰功能尚未開啟，暫時無法建立或接受挑戰。':error.message==='pairing-unavailable'?'配對資料無效、已使用或已失效，請對手重新建立挑戰。':error.message==='account-unavailable'?'此帳號沒有內測授權，請聯絡測試主持者。':'操作未完成，請刷新並確認配對資料或目前狀態。');}
   });
-  const stop=()=>{scanner.stop();scanning=false;render();};const background=()=>{if(document.hidden)stop();};addEventListener('pagehide',stop);document.addEventListener('visibilitychange',background);
-  render();return{dispose(){unsubscribe();stop();client.dispose();app.replaceChildren();removeEventListener('pagehide',stop);document.removeEventListener('visibilitychange',background);}};
+  const stop=()=>{scanner.stop();scanning=false;render();};const synchronize=()=>{const c=view.snapshot;if(!document.hidden&&view.uid&&c&&!view.busy&&!view.pending&&!['completed','disputed','cancelled','expired','rejected'].includes(c.status))client.sync(c.challengeId).catch(()=>{});};
+  const syncTimer=setInterval(synchronize,1500);
+  const background=()=>{if(document.hidden)stop();else synchronize();};addEventListener('pagehide',stop);document.addEventListener('visibilitychange',background);
+  render();return{dispose(){unsubscribe();clearInterval(syncTimer);stop();client.dispose();app.replaceChildren();removeEventListener('pagehide',stop);document.removeEventListener('visibilitychange',background);}};
 }

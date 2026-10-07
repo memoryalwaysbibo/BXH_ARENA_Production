@@ -39,3 +39,12 @@ test('native failure falls back to pixel decoder; malformed QR cannot become a p
   const scanner=createScanner({...opts,decoder:()=>({data:'https://unrelated.example'})});await scanner.start();assert.equal(found,undefined);assert.equal(warning,1);assert.equal(typeof scheduled,'function');scanner.stop();
   assert.throws(()=>decodePairingPixels({data:[],width:1,height:1},()=>({data:'bad'})),/invalid-pairing/);
 });
+
+test('background sync does not block scoring or overwrite newer state and releases late old-account reads',async()=>{
+  const {createController}=await import('../hunter-clash/hc01/controller.mjs');let resolveRead;
+  const c=createController({transport:async op=>op==='getChallenge'?new Promise(resolve=>{resolveRead=resolve;}):{challenge:{challengeId:'c',revision:3}},requestId:()=> 'sync-race'});
+  c.setSession('A');const sync=c.sync('c');assert.equal(c.state().busy,false);
+  await c.mutate('recordRound',{challengeId:'c',expectedRevision:1,winnerUid:'A',finish:'spin'});
+  resolveRead({challenge:{challengeId:'c',revision:2}});await sync;assert.equal(c.state().snapshot.revision,3);
+  const late=c.sync('c');c.setSession('B');resolveRead({challenge:{challengeId:'c',revision:4}});await late;assert.equal(c.state().snapshot,null);
+});

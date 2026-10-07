@@ -19,7 +19,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
     if(typeof token!=='string'||!token)denied('unauthenticated');
     const {uid}=await auth.verifyIdToken(token,true);domain.identifier(uid);
     domain.keys(input,createOp?['requestId']:readOp?['challengeId']:codeOp?['pairingCode','requestId','expectedRevision']:
-      ['challengeId','requestId','expectedRevision',...(operation==='accept'?['pairingToken']:operation==='proposeRound'?['winnerUid','finish']:operation==='confirmRound'?['roundRevision']:operation==='confirmFinish'?['resultRevision']:[])]);
+      ['challengeId','requestId','expectedRevision',...(operation==='accept'?['pairingToken']:['proposeRound','recordRound'].includes(operation)?['winnerUid','finish']:operation==='confirmRound'?['roundRevision']:operation==='confirmFinish'?['resultRevision']:[])]);
     if(!readOp)domain.identifier(input.requestId);
     if(!createOp&&!codeOp)domain.identifier(input.challengeId);
     const suppliedCode=codeOp&&typeof input.pairingCode==='string'&&input.pairingCode.length<=40?input.pairingCode.replace(/[\s-]/g,'').toUpperCase():null;
