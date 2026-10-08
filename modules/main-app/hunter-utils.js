@@ -69,6 +69,62 @@ function hunterRecordHasTrustedScore(record){
   const scoreFor=Number(record.scoreFor),scoreAgainst=Number(record.scoreAgainst);
   return Number.isFinite(scoreFor)&&Number.isFinite(scoreAgainst)&&scoreFor>=0&&scoreAgainst>=0&&hunterRoundIntegrity(record).ok;
 }
+function hunterRecordMode(record){
+  if(record&&record.sourceType==="hunter-clash")return "pk";
+  const version=String(record&&record.scoringVersion||"");
+  if(version==="bxh-enchantment-v2")return "enchantment";
+  if(version&&version!=="bxh-4pt-v1")return "unknown";
+  if(record&&record.playMode==="enchantment")return version?"unknown":"enchantment";
+  if(!version&&(record&&record.roundsPerspective||[]).some(ev=>ev.v===2))return "unknown";
+  return "standard";
+}
+function hunterFilterByMode(records,mode="all"){
+  const rows=hunterUniqueRecords(records);
+  return mode==="all"?rows:rows.filter(r=>hunterRecordMode(r)===mode);
+}
+function hunterScoringBreakdown(record){
+  const check=hunterRoundIntegrity(record);
+  if(!check.ok)return {available:false,reason:check.reason};
+  const mode=hunterRecordMode(record);
+  if(mode==="unknown")return {available:false,reason:"unknown-scoring-version"};
+  const result={available:true,baseFor:0,baseAgainst:0,gainFor:0,gainAgainst:0,reductionFor:0,reductionAgainst:0,faultFor:0,faultAgainst:0,actualFor:0,actualAgainst:0};
+  const basePoints={spin:1,knockout:2,burst:2,extreme:3,fault:1};
+  for(const ev of record.roundsPerspective){
+    const side=ev.perspective==="for"?"For":"Against";
+    let base=ev.points,delta=0;
+    if(mode==="enchantment"){
+      if(ev.v!==2||!Number.isInteger(ev.basePoints)||ev.basePoints!==basePoints[ev.type]||
+         !Number.isInteger(ev.delta)||ev.basePoints+ev.delta!==ev.points||
+         (ev.type==="fault"&&(ev.points!==1||ev.delta!==0)))return {available:false,reason:"enchantment-breakdown-missing"};
+      base=ev.basePoints;delta=ev.delta;
+    }
+    if(ev.type==="fault")result["fault"+side]+=ev.points;
+    else{
+      result["base"+side]+=base;
+      result["gain"+side]+=Math.max(0,delta);
+      result["reduction"+side]+=Math.max(0,-delta);
+    }
+    result["actual"+side]+=ev.points;
+  }
+  return result;
+}
+function hunterAnalysisPoints(record,event){
+  return hunterRecordMode(record)==="enchantment"?event.basePoints:event.points;
+}
+function hunterModeSummary(records){
+  const rows=hunterUniqueRecords(records),counts={standard:0,pk:0,enchantment:0,unknown:0};
+  const totals={baseFor:0,baseAgainst:0,gainFor:0,gainAgainst:0,reductionFor:0,reductionAgainst:0,faultFor:0,faultAgainst:0,actualFor:0,actualAgainst:0};
+  let enchantmentVerified=0,enchantmentExcluded=0;
+  rows.forEach(r=>{
+    const mode=hunterRecordMode(r);counts[mode]++;
+    if(mode!=="enchantment")return;
+    const split=hunterScoringBreakdown(r);
+    if(!split.available){enchantmentExcluded++;return;}
+    enchantmentVerified++;
+    Object.keys(totals).forEach(key=>totals[key]+=split[key]);
+  });
+  return {counts,totals,enchantmentVerified,enchantmentExcluded};
+}
 // Fault awards reconcile the score, but are not physical finish rounds.
 function hunterRoundIntegrity(record){
   const fail=reason=>({ok:false,reason,rounds:[],validRounds:0});
@@ -99,8 +155,8 @@ function hunterDataStatus(cache,loading,error){
 
 function hunterCoverage(records,skipped){
   const rows=hunterUniqueRecords(records),reasons={};let matches=0,validRounds=0;
-  rows.forEach(r=>{const check=hunterRoundIntegrity(r);if(check.ok&&check.validRounds){matches++;validRounds+=check.validRounds;}
-    else {const reason=check.reason||"no-finish-rounds";reasons[reason]=(reasons[reason]||0)+1;}});
+  rows.forEach(r=>{const check=hunterRoundIntegrity(r),split=hunterScoringBreakdown(r);if(check.ok&&check.validRounds&&split.available){matches++;validRounds+=check.validRounds;}
+    else {const reason=check.reason||(!split.available?split.reason:"no-finish-rounds");reasons[reason]=(reasons[reason]||0)+1;}});
   const skippedReasons={};
   (Array.isArray(skipped)?skipped:[]).forEach(r=>{const reason=r&&r.reason||"unknown";skippedReasons[reason]=(skippedReasons[reason]||0)+1;});
   return {totalMatches:rows.length,analyzableMatches:matches,validRounds,reasons,skippedReasons};
@@ -179,6 +235,6 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();

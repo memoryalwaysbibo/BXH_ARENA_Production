@@ -498,3 +498,10 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .ladder-tier-6{color:#d69cff;border-color:#8254a3;}
 .ladder-tier-7{color:#ff6d77;border-color:#ad3038;box-shadow:0 0 10px rgba(255,109,119,.2);}
 
+
+/* Hunter 2.0 B2: source selection and auditable enchantment scoring */
+.hunter-battle-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.hunter-battle-tabs .btn{flex:1 1 120px;white-space:normal}
+.hunter-enchantment-summary{margin:12px 0;padding:12px;border:1px solid var(--border, #444);border-radius:12px}
+.hunter-enchantment-summary .hunter-stat-grid{margin:10px 0}
+.hunter-battle-filter .hint,.hunter-enchantment-summary .hint{overflow-wrap:anywhere}
