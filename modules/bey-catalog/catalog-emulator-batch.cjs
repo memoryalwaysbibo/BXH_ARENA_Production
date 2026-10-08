@@ -2,7 +2,8 @@
 /** Emulator-only resumable import; individual records are transactional, entire batch is not. */
 const crypto=require('node:crypto');
 const {doc,runTransaction}=require('firebase/firestore');
-const {verifyEmulator,createTransactionAdapter,applyTransactionalStaging}=require('./catalog-emulator-transactions.cjs');
+const {verifyEmulator,createTransactionAdapter}=require('./catalog-emulator-transactions.cjs');
+const {allowedCollections}=require('./safety-gate.cjs');
 const RUNS='beyCatalogImportRuns';
 function manifestDigest(plan){
  const hashes=plan.records.map(r=>[r.collection,r.id,r.sha256]);
@@ -40,7 +41,17 @@ async function resumeEmulatorBatch(db,target,plan,options={}){
  const {manifest,ref}=await prepareRun(db,target,plan);
  const adapter=createTransactionAdapter(db,target);
  // No optimistic counters: every retry inspects actual document hashes.
- const stats=await applyTransactionalStaging(plan,adapter,target);
+ const stats={inserted:0,unchanged:0,conflicts:0,deleted:0,published:0};
+ for(let index=0;index<plan.records.length;index++){
+  const r=plan.records[index];
+  if(!allowedCollections.includes(r.collection))throw Error('COLLECTION_NOT_ALLOWED');
+  const outcome=await adapter.createOrCompare(r.collection,r.id,{sha256:r.sha256,origin:'research_staging',batchId:plan.batchId,payload:r.data,publicationStatus:'unpublished'});
+  if(outcome==='inserted')stats.inserted++;
+  else if(outcome==='unchanged')stats.unchanged++;
+  else if(outcome==='conflict')stats.conflicts++;
+  else throw Error('UNKNOWN_TRANSACTION_RESULT');
+  if(options.afterRecord)await options.afterRecord(index,r,outcome);
+ }
  if(options.beforeComplete)await options.beforeComplete(stats);
  const status=await finishRun(db,target,plan,ref,manifest,stats);
  return {...stats,batchId:plan.batchId,manifestDigest:manifest,status};
