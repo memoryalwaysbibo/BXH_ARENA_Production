@@ -15,3 +15,5 @@
 .entrance-join img{left:-120.4893%}
 .home-actions strong,.home-actions small{padding:0 10px}.home-actions strong{color:var(--gold);font-size:17px;line-height:1.5}.home-actions small{color:var(--muted);opacity:1;font-size:10px}.home-actions strong:after{content:' ›';float:right;color:var(--gold)}
 @media(max-width:350px){.home-actions button{padding:0 0 12px}.home-actions strong{font-size:15px}.home-actions small{font-size:9px}}
+
+.confirmation-wait{padding:16px;border:1px solid #8a754c;border-radius:12px;background:#30263b;color:var(--gold);font-size:14px;line-height:1.7}

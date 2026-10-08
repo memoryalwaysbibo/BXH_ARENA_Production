@@ -52,7 +52,7 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     await command(A,'recordRound','[data-op="recordRound"][data-player="0"][data-finish="spin"]');
     await A.screenshot({path:'test-results/hc01/mobile-score-review.png',fullPage:true});
     const reviewed=await command(A,'resumeReview');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),reviewed.challenge.revision);
-    const final=await command(A,'confirmFinish');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),final.challenge.revision);await command(B,'confirmFinish');await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('完賽紀錄已保存'));
+    const final=await command(A,'confirmFinish');assert.equal(await A.locator('.state').textContent(),'等待對方確認中');assert.equal(await A.locator('.confirmation-wait').isVisible(),true);assert.equal(await A.locator('[data-op="dispute"]').isVisible(),false);assert.equal(await A.locator('[data-op="undoRound"]').isVisible(),false);assert.equal(await A.locator('[data-op="cancel"]').isVisible(),false);await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),final.challenge.revision);await command(B,'confirmFinish');await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('完賽紀錄已保存'));
     await A.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('1 勝 0 敗'));
     await B.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('0 勝 1 敗'));
     for(const page of pages)await page.locator('#history summary').click();
