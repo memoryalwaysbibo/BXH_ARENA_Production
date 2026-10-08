@@ -5,7 +5,7 @@ const labels={proposed:'等待對手配對',accepted:'配對成功，等待確�
 export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=globalThis.localStorage}={}){
   const app=root.querySelector('#app'),message=text=>root.querySelector('#message').textContent=text;
   app.innerHTML=`<form id="login"><section><h2>內測帳號登入</h2><label>玩家名稱<input name="playerName" autocomplete="nickname" maxlength="40" placeholder="對戰時顯示的名稱" required></label><label>電子郵件<input name="email" type="email" autocomplete="username" required></label><label>密碼<input name="password" type="password" autocomplete="current-password" required></label><label class="remember"><input name="remember" type="checkbox">記憶帳號</label><button type="submit">登入</button><p>帳號由測試主持者提供。</p></section></form><section id="identity" hidden><span class="account-dot" aria-hidden="true"></span><span id="who"></span><button type="button" data-op="logout">登出</button></section><section id="match" hidden><div class="match-heading"><div class="state"></div><span class="sync-label">自動同步</span></div><div class="welcome"><h2>下一場，換你上場。</h2><p>建立挑戰，或加入對手的挑戰。</p></div><div class="score">0 : 0</div><p class="round"></p><small class="policy"></small><div class="pairing-share" hidden><h3>邀請對手加入</h3><p>請對手掃描 QR，或輸入下方 4 碼。</p><div class="qr"></div><strong class="pairing-code"></strong><p class="pairing-expiry"></p></div><div class="room-options"><label>對練場次<input name="matchCount" type="number" min="1" max="100" placeholder="未填預設 1 場"></label><label class="remember"><input name="practice" type="checkbox">循環練習（每房最多 100 場）</label></div><div class="home-actions row"><button data-op="createChallenge"><span class="entrance-art entrance-create" aria-hidden="true"><img src="./cloud/entrance-cards-v2.png" alt=""></span><strong>建立挑戰</strong><small>出示 QR 與 4 碼</small></button><button data-op="join"><span class="entrance-art entrance-join" aria-hidden="true"><img src="./cloud/entrance-cards-v2.png" alt=""></span><strong>加入挑戰</strong><small>掃碼或輸入序號</small></button></div><div class="join-panel" hidden><h3>加入挑戰</h3><div class="camera" hidden><video playsinline muted></video><p>將對手的 QR 放入畫面即可掃描</p></div><button data-op="scan" hidden>重新啟動掃描</button><canvas hidden></canvas><p class="divider">或輸入 4 碼</p><label>配對序號<input name="pairingCode" placeholder="例如 A7K3" autocomplete="off" autocapitalize="characters" maxlength="4"></label><button data-op="acceptCode">確認加入</button><div class="scan-confirm" hidden><p>已辨識挑戰 QR，確認加入此挑戰？</p><button data-op="accept">確認加入</button></div><textarea hidden></textarea><button data-op="back">返回</button></div><div class="pairing-actions row"><button data-op="start">確認開賽</button><button data-op="reject">拒絕配對</button></div><p class="ready-help" hidden></p><button class="flow-back" data-op="cancel">返回</button><details class="more-actions"><summary>更多操作</summary><div class="row"><button data-op="getChallenge">重新同步</button></div></details><button data-op="retry" hidden>重送原操作</button><div class="scoreboards"></div><p class="confirmation-wait" role="status" aria-live="polite" hidden></p><p class="review-help" hidden></p><button data-op="undoRound">撤銷上一筆得分</button><button data-op="resumeReview">比分已核對，繼續</button><div class="series-actions row"><button data-op="nextGame">下一場</button><button data-op="endSession">結束對練</button></div><details class="room-analysis" hidden><summary>本輪評價</summary><p class="analysis-description">本房已完成場次的即時分析；八角圖不代表正式執照能力值。</p><div class="room-stats" aria-label="本輪戰績"></div><h3 class="radar-title">即時八角圖</h3><div class="room-radar"></div></details><div class="session-results"></div><p class="score-help">建立挑戰者替雙方記分，比分自動同步；整場結束後雙方確認結果。</p><div class="row"><button data-op="confirmRound">確認本局</button><button data-op="confirmFinish">確認完賽</button><button data-op="dispute">有爭議</button></div></section><section id="history" hidden><details><summary>我的 PK 戰績</summary><p class="history-status" role="status"></p><div class="history-stats"></div><p class="history-note">僅計入雙方確認完賽的 PK；明細顯示最近 50 場。</p><div class="history-list"></div><button data-op="history">更新戰績</button></details></section>`;
-  const select=s=>app.querySelector(s),video=select('video');let view={},previousUid=null,loginBusy=false,joining=false,scanning=false,scanFound=false,swapped=false,historyEpoch=0,historyRequest=null,historyCompletion=null;
+  const select=s=>app.querySelector(s),video=select('video');let view={},previousUid=null,loginBusy=false,joining=false,scanning=false,scanFound=false,swapped=false,radarPlayer=0,radarChallengeId=null,historyEpoch=0,historyRequest=null,historyCompletion=null;
   const accountKey='hc01:remembered-email',nameKey='hc01:remembered-name';
   const playerName=()=>select('[name="playerName"]').value.trim()||runtime.auth?.currentUser?.displayName||'未設定名稱';
   try{const email=accountStorage?.getItem(accountKey);if(email){select('[name="email"]').value=email;select('[name="remember"]').checked=true;select('[name="playerName"]').value=accountStorage?.getItem(nameKey)||'';}}catch{}
@@ -20,6 +20,7 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
   const goHome=()=>{saveId(view.uid,null);clearPairing();client.setSession(view.uid);message('');};
   function render(){
     const c=view.snapshot,uid=view.uid;
+    if(c?.challengeId!==radarChallengeId){radarChallengeId=c?.challengeId||null;radarPlayer=0;}
     const waiting=c?.status==='final_pending'&&c.finishConfirmedBy.includes(uid);
     select('#history').hidden=!uid;select('#login').hidden=!!uid;select('#identity').hidden=!uid;select('#match').hidden=!uid;select('#who').textContent=uid?(c?.participantNames?.[uid]||playerName()):'';
     select('.state').textContent=waiting?'等待對方確認中':c?(labels[c.status]||c.status):view.pending?'操作待確認':'準備對戰';
@@ -89,7 +90,7 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
       const panel=document.createElement('div');panel.className='player-score';
       const name=document.createElement('h3');name.textContent=c.participantNames?.[player]||(player===uid?playerName():'未設定名稱');panel.append(name);
       const score=document.createElement('div');score.className='points';score.textContent=String(c.score[index===0?'a':'b']);panel.append(score);
-      for(const [finish,label] of [['spin','旋轉 +1'],['knockout','擊飛 +2'],['burst','爆裂 +2'],['extreme','極限 +3']]){
+      for(const [finish,label] of [['spin','轉停 +1'],['knockout','擊飛 +2'],['burst','爆裂 +2'],['extreme','極限 +3']]){
         const button=document.createElement('button');button.type='button';button.dataset.op='recordRound';button.dataset.player=String(index);button.dataset.finish=finish;button.textContent=label;button.hidden=!['in_progress','score_review'].includes(c.status)||!!c.pendingRound||Math.max(c.score.a,c.score.b)>=c.rules.targetScore||c.participants[0]!==uid;panel.append(button);
       }
       boards.append(panel);
@@ -110,29 +111,35 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
     }
   }
   function renderRoomRadar(container,c,games){
-    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
-    svg.setAttribute('viewBox','0 0 380 390');svg.setAttribute('role','img');svg.setAttribute('aria-label','雙方本輪八角圖：旋轉、擊飛、爆裂、極限、勝率、場均得分、得分局、得分場');
-    const labels=['旋轉','擊飛','爆裂','極限','勝率','場均得分','得分局','得分場'];
-    const point=(index,radius)=>{const angle=-Math.PI/2+index*Math.PI/4;return [190+Math.cos(angle)*radius,178+Math.sin(angle)*radius]};
-    const polygon=(values,className)=>{const el=document.createElementNS(ns,'polygon');el.setAttribute('points',values.map((value,index)=>point(index,value).join(',')).join(' '));el.setAttribute('class',className);svg.append(el);};
-    for(const radius of [30,60,90,120])polygon(labels.map(()=>radius),'radar-grid');
-    for(let i=0;i<8;i++){
-      const axis=document.createElementNS(ns,'line'),[x,y]=point(i,120);axis.setAttribute('x1','190');axis.setAttribute('y1','178');axis.setAttribute('x2',String(x));axis.setAttribute('y2',String(y));axis.setAttribute('class','radar-axis');svg.append(axis);
-      const label=document.createElementNS(ns,'text'),[lx,ly]=point(i,146);label.setAttribute('x',String(lx));label.setAttribute('y',String(ly));label.setAttribute('text-anchor','middle');label.setAttribute('dominant-baseline','middle');label.textContent=labels[i];svg.append(label);
-    }
+    const ns='http://www.w3.org/2000/svg',types=['extreme','knockout','burst','spin'];
+    const tabs=document.createElement('div');tabs.className='radar-tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','選擇查看的玩家');
     for(const [index,player] of c.participants.entries()){
-      const rounds=games.flatMap(game=>game.rounds||[]).filter(round=>round.winnerUid===player);
-      const scores=games.map(game=>game.score[index===0?'a':'b']);
-      const total=games.length,score=scores.reduce((sum,value)=>sum+value,0),wins=games.filter(game=>game.winnerUid===player).length;
-      const percent=value=>total?Math.min(100,Math.round(value/total*100)):0;
-      const values=['spin','knockout','burst','extreme'].map(finish=>percent(rounds.filter(round=>round.finish===finish).length));
-      values.push(percent(wins),Math.min(100,Math.round(score/Math.max(total*4,1)*100)),Math.min(100,Math.round(rounds.length/Math.max(total*4,1)*100)),percent(scores.filter(value=>value>0).length));
-      polygon(values.map(value=>value*1.2),'radar-player radar-player-'+index);
+      const tab=document.createElement('button');tab.type='button';tab.textContent=c.participantNames?.[player]||'未設定名稱';tab.setAttribute('aria-pressed',String(radarPlayer===index));
+      tab.addEventListener('click',()=>{radarPlayer=index;container.replaceChildren();renderRoomRadar(container,c,games);});tabs.append(tab);
     }
-    const legend=document.createElement('p');legend.className='radar-legend';
-    for(const [index,player] of c.participants.entries()){const item=document.createElement('span');item.className='radar-legend-'+index;item.textContent=c.participantNames?.[player]||'未設定名稱';legend.append(item);}
-    container.append(svg,legend);
-    const note=document.createElement('p');note.className='radar-note';note.textContent='依本房已完成場次換算：勝率、得分場為比例，其餘以每場表現顯示（最高 100）。';container.append(note);
+    const player=c.participants[radarPlayer]||c.participants[0],opponent=c.participants.find(uid=>uid!==player);
+    const totals={for:Object.fromEntries(types.map(type=>[type,0])),against:Object.fromEntries(types.map(type=>[type,0]))};
+    for(const game of games)for(const round of game.rounds||[]){
+      if(!types.includes(round.finish)||!Number.isFinite(round.points))continue;
+      if(round.winnerUid===player)totals.for[round.finish]+=round.points;
+      else if(round.winnerUid===opponent)totals.against[round.finish]+=round.points;
+    }
+    const totalFor=types.reduce((sum,type)=>sum+totals.for[type],0),totalAgainst=types.reduce((sum,type)=>sum+totals.against[type],0);
+    const axes=[['極限','for','extreme'],['擊飛','for','knockout'],['爆裂','for','burst'],['轉停','for','spin'],['被極限','against','extreme'],['被擊飛','against','knockout'],['被爆裂','against','burst'],['被轉停','against','spin']];
+    const shares=axes.map(([,side,type])=>{const total=side==='for'?totalFor:totalAgainst;return total?Math.round(totals[side][type]/total*100):0;});
+    const shell=document.createElement('div');shell.className='license-radar';
+    const svg=document.createElementNS(ns,'svg');svg.classList.add('license-radar-svg');svg.setAttribute('viewBox','0 0 320 320');svg.setAttribute('role','img');svg.setAttribute('aria-label',(c.participantNames?.[player]||'玩家')+' 本輪得分及失分分布八角圖');
+    const point=(index,radius)=>{const angle=(-90+index*45)*Math.PI/180;return [(160+Math.cos(angle)*radius).toFixed(1),(160+Math.sin(angle)*radius).toFixed(1)]};
+    const polygon=(radii,className)=>{const el=document.createElementNS(ns,'polygon');el.setAttribute('points',radii.map((radius,index)=>point(index,radius).join(',')).join(' '));el.setAttribute('class',className);svg.append(el);return el;};
+    for(const scale of [.25,.5,.75,1])polygon(axes.map(()=>105*scale),'radar-grid');
+    for(let i=0;i<8;i++){const axis=document.createElementNS(ns,'line'),[x,y]=point(i,105);axis.setAttribute('x1','160');axis.setAttribute('y1','160');axis.setAttribute('x2',x);axis.setAttribute('y2',y);axis.setAttribute('class','radar-axis');svg.append(axis);}
+    const radii=shares.map(share=>105*Math.min(100,share*2)/100);polygon(radii,'radar-player');
+    for(let i=0;i<8;i++){const node=document.createElementNS(ns,'circle'),[x,y]=point(i,radii[i]);node.setAttribute('cx',x);node.setAttribute('cy',y);node.setAttribute('r','2.8');node.setAttribute('class','radar-node');svg.append(node);}
+    const center=document.createElementNS(ns,'text');center.setAttribute('x','160');center.setAttribute('y','164');center.setAttribute('class','radar-center');center.textContent='50% 分布＝滿格';svg.append(center);
+    shell.append(svg);
+    axes.forEach(([label,side],index)=>{const axis=document.createElement('span');axis.className='radar-label radar-label-'+index+(side==='against'?' loss':'');axis.textContent=label;const value=document.createElement('b');value.textContent=shares[index]+'%';axis.append(value);shell.append(axis);});
+    const note=document.createElement('p');note.className='radar-note';note.textContent='進攻四軸為本人各種得分占總得分的比例；防守四軸為對手各種得分占本人總失分的比例。數字是真實百分比，圖形以 50% 占比為滿格。僅分析本房已完成場次。';
+    container.append(tabs,shell,note);
   }
   function clearHistory(){historyEpoch++;historyRequest?.abort();historyRequest=null;historyCompletion=null;select('.history-list').replaceChildren();select('.history-stats').replaceChildren();select('.history-status').textContent='';}
   async function refreshHistory(){
