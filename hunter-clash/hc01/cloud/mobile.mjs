@@ -22,9 +22,8 @@ export function roomPlayerStats(c,games,player){
   const summary=wins===games.length?'本輪全勝，已將得分轉成勝場。':wins===0?(totalFor?'尚未拿下勝場，但已有得分；可回看比分接近的場次。':'本輪尚未取得得分，先以建立有效得分回合為目標。'):wins>losses?(efficiency<50?'勝場領先，但總得分落後；可回看失分較多的敗局。':'勝場領先，得分占比也達到一半以上。'):wins===losses?'本輪勝敗相當，可比較勝局與敗局的得失分方式。':efficiency>=50?'勝場較少，但總得分不低於對手；可回看未能拿下的場次。':'本輪勝場與總得分較少，先找出最常見的失分方式。';
   const maxLoss=Math.max(...Object.values(defense)),lossTypes=types.filter(type=>defense[type]===maxLoss);
   const advice=totalAgainst?'下一輪可優先回看「被'+lossTypes.map(type=>finishLabels[type]).join('／被')+'」的回合，記下當時配置與情境，再比較調整後的失分次數。':'本輪沒有失分；可更換對手或配置，觀察得分方式是否仍能維持。';
-  const finishComments={extreme:'單次取得 3 分，是本輪拉開比分的得分來源。',knockout:'透過擊飛取得 2 分，是本輪累積比分的主要方式。',burst:'透過爆裂取得 2 分，是本輪累積比分的主要方式。',spin:'透過轉停逐次取得 1 分，累積本輪比分。'};
   const maxAttack=Math.max(...Object.values(attack)),mainTypes=types.filter(type=>attack[type]===maxAttack);
-  const scoreComment=!totalFor?'本輪尚無得分。':mainTypes.length>1?'本輪'+mainTypes.map(type=>finishLabels[type]).join('與')+'取得分數並列，得分來源較多元。':'本輪主要得分來自'+finishLabels[mainTypes[0]]+'；'+finishComments[mainTypes[0]];
+  const scoreComment=!totalFor?'本輪尚無得分。':mainTypes.length>1?'本輪'+mainTypes.map(type=>finishLabels[type]).join('與')+'取得分數並列，得分來源較多元。':'本輪主要得分來自'+finishLabels[mainTypes[0]]+'。';
   const countMax=Math.max(...Object.values(attackCount)),frequentTypes=types.filter(type=>attackCount[type]===countMax);
   const frequentText=totalFor?frequentTypes.map(type=>finishLabels[type]+' '+countMax+' 次').join('、'):'本輪尚無得分';
   const breakdown=types.map(type=>finishLabels[type]+' '+attackCount[type]+' 次／'+attack[type]+' 分／'+(totalFor?Math.round(attack[type]/totalFor*100):0)+'%').join('；');
@@ -134,7 +133,13 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
           for(const [label,value] of [['主要得分',stats.attackText],['主要失分',stats.defenseText],['得分效率',stats.efficiency+'%（'+stats.totalFor+' 得分／'+stats.totalAgainst+' 失分）']]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;metrics.append(term,detail);}card.append(metrics);
           const scoring=document.createElement('p');scoring.className='room-feedback-summary';scoring.textContent=stats.scoreComment;card.append(scoring);
           const details=document.createElement('dl');details.className='room-feedback-metrics';
-          for(const [label,value] of [['最常得分方式',stats.frequentText],['四種得分明細',stats.breakdown],['首回合表現',stats.firstText],['失分集中回合',stats.positionText],['領先後落敗',stats.leadText],['落後後逆轉',stats.comebackText]]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;details.append(term,detail);}card.append(details);
+          for(const [label,value] of [['最常得分方式',stats.frequentText],['首回合表現',stats.firstText],['失分集中回合',stats.positionText],['領先後落敗',stats.leadText],['落後後逆轉',stats.comebackText]]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;details.append(term,detail);}card.append(details);
+          const table=document.createElement('table');table.className='finish-breakdown';
+          const caption=document.createElement('caption');caption.textContent='四種得分明細';table.append(caption);
+          const head=document.createElement('thead'),heading=document.createElement('tr');
+          for(const label of ['方式','次數','累計得分','占比']){const cell=document.createElement('th');cell.scope='col';cell.textContent=label;heading.append(cell);}head.append(heading);table.append(head);
+          const body=document.createElement('tbody');
+          for(const type of Object.keys(finishLabels)){const row=document.createElement('tr');for(const [index,value] of [finishLabels[type],stats.attackCount[type]+' 次',stats.attack[type]+' 分',(stats.totalFor?Math.round(stats.attack[type]/stats.totalFor*100):0)+'%'].entries()){const cell=document.createElement(index===0?'th':'td');if(index===0)cell.scope='row';cell.textContent=value;row.append(cell);}body.append(row);}table.append(body);card.append(table);
           const advice=document.createElement('p');advice.className='room-feedback-advice';advice.textContent='對練建議：'+stats.advice;card.append(advice);
         }
       }
