@@ -3,6 +3,25 @@ const assert=require('node:assert/strict'),path=require('node:path'),fs=require(
 const {chromium}=require(require.resolve('playwright',{paths:[process.cwd(),process.env.HC01_PLAYWRIGHT_MODULES,process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES].filter(Boolean)}));
 const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:path.join(__dirname,'..'),stdio:['ignore','pipe','pipe']});
 (async()=>{
+  const {roomPlayerStats}=await import('../hunter-clash/hc01/cloud/mobile.mjs');
+  const fixture={participants:['A','B']};
+  const round=(winnerUid,finish,points)=>({winnerUid,finish,points});
+  const comeback={winnerUid:'A',rounds:[round('B','extreme',3),round('A','knockout',2),round('A','burst',2)]};
+  const stats=roomPlayerStats(fixture,Array(5).fill(comeback),'A');
+  assert.equal(stats.leadText,'曾領先 0 場，其中 0 場最後落敗。');
+  assert.equal(stats.comebackText,'曾落後 5 場，其中 5 場逆轉獲勝。');
+  assert.match(stats.firstText,/0／5 場（0%）/);
+  assert.match(stats.positionText,/第 1 回合失分 5／5 場（100%）/);
+  assert.match(stats.scoreComment,/擊飛與爆裂取得分數並列/);
+  const other=roomPlayerStats(fixture,Array(5).fill(comeback),'B');
+  assert.equal(other.leadText,'曾領先 5 場，其中 5 場最後落敗。');
+  const sparse=roomPlayerStats(fixture,[comeback],'A');assert.match(sparse.positionText,/資料不足/);
+  const mixed=roomPlayerStats(fixture,[{winnerUid:'A',rounds:[...Array(5).fill(round('A','spin',1)),...Array(2).fill(round('A','extreme',3))]}],'A');
+  assert.equal(mixed.frequentText,'轉停 5 次');assert.match(mixed.attackText,/極限/);
+  for(const [finish,points] of [['extreme',3],['knockout',2],['burst',2],['spin',1]]){
+    const sample=roomPlayerStats(fixture,[{winnerUid:'A',rounds:[round('A',finish,points)]}],'A');
+    assert.match(sample.scoreComment,/本輪主要得分來自/);assert.equal(sample.attackCount[finish],1);
+  }
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('lab-start-timeout')),10000);server.stdout.once('data',()=>{clearTimeout(timer);resolve();});server.once('exit',code=>{clearTimeout(timer);reject(Error('lab-exit-'+code));});});
   const browser=await chromium.launch({headless:true});try{
     const pages=[];const errors=[];
@@ -82,8 +101,8 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     assert.equal(await A.locator('.room-radar .radar-player').count(),1);
     assert.deepEqual(await A.locator('.radar-label').allTextContents(),['極限75%','擊飛0%','爆裂0%','轉停25%','被極限75%','被擊飛0%','被爆裂0%','被轉停25%']);
     assert.match(await A.locator('.room-stat').first().textContent(),/3 勝 2 敗.*評價：初步・極限突擊型/);
-    assert.match(await A.locator('.room-feedback-metrics').first().textContent(),/主要得分極限 75%（9 分）主要失分被極限 75%（6 分）得分效率60%（12 得分／8 失分）/);
-    assert.match(await A.locator('.room-feedback-metrics').last().textContent(),/得分效率40%（8 得分／12 失分）/);
+    assert.match(await A.locator('.room-stat').first().locator('.room-feedback-metrics').first().textContent(),/主要得分極限 75%（9 分）主要失分被極限 75%（6 分）得分效率60%（12 得分／8 失分）/);
+    assert.match(await A.locator('.room-stat').last().locator('.room-feedback-metrics').first().textContent(),/得分效率40%（8 得分／12 失分）/);
     assert.match(await A.locator('.room-feedback-advice').first().textContent(),/回看「被極限」/);
     for(const width of [320,390,430]){await A.setViewportSize({width,height:844});assert.equal(await A.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}await A.setViewportSize({width:390,height:844});
     await A.locator('.radar-tabs button').last().click();assert.equal(await A.locator('.radar-tabs button').last().getAttribute('aria-pressed'),'true');

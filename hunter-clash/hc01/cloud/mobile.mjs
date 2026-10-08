@@ -3,13 +3,14 @@ import{pairingPayload,parsePairingPayload,renderPairingQr}from'../pairing.mjs';
 import{createScanner}from'../scanner.mjs';
 const labels={proposed:'等待對手配對',accepted:'配對成功，等待確認開賽',in_progress:'對戰中',round_pending:'等待本局確認',game_pending:'本場結束，可繼續下一場',final_pending:'等待完賽確認',completed:'完賽紀錄已保存',disputed:'有爭議，保留紀錄',score_review:'請核對比分',cancelled:'已取消',expired:'配對已過期',rejected:'已拒絕'};
 const finishLabels={extreme:'極限',knockout:'擊飛',burst:'爆裂',spin:'轉停'};
-function roomPlayerStats(c,games,player){
+export function roomPlayerStats(c,games,player){
   const types=Object.keys(finishLabels),opponent=c.participants.find(uid=>uid!==player);
   const attack=Object.fromEntries(types.map(type=>[type,0])),defense=Object.fromEntries(types.map(type=>[type,0]));
+  const attackCount=Object.fromEntries(types.map(type=>[type,0])),defenseCount=Object.fromEntries(types.map(type=>[type,0]));
   for(const game of games)for(const round of game.rounds||[]){
     if(!types.includes(round.finish)||!Number.isFinite(round.points))continue;
-    if(round.winnerUid===player)attack[round.finish]+=round.points;
-    else if(round.winnerUid===opponent)defense[round.finish]+=round.points;
+    if(round.winnerUid===player){attack[round.finish]+=round.points;attackCount[round.finish]++;}
+    else if(round.winnerUid===opponent){defense[round.finish]+=round.points;defenseCount[round.finish]++;}
   }
   const totalFor=types.reduce((sum,type)=>sum+attack[type],0),totalAgainst=types.reduce((sum,type)=>sum+defense[type],0);
   const ranked=types.map(type=>({type,points:attack[type],share:totalFor?Math.round(attack[type]/totalFor*100):0})).sort((a,b)=>b.points-a.points);
@@ -21,7 +22,36 @@ function roomPlayerStats(c,games,player){
   const summary=wins===games.length?'本輪全勝，已將得分轉成勝場。':wins===0?(totalFor?'尚未拿下勝場，但已有得分；可回看比分接近的場次。':'本輪尚未取得得分，先以建立有效得分回合為目標。'):wins>losses?(efficiency<50?'勝場領先，但總得分落後；可回看失分較多的敗局。':'勝場領先，得分占比也達到一半以上。'):wins===losses?'本輪勝敗相當，可比較勝局與敗局的得失分方式。':efficiency>=50?'勝場較少，但總得分不低於對手；可回看未能拿下的場次。':'本輪勝場與總得分較少，先找出最常見的失分方式。';
   const maxLoss=Math.max(...Object.values(defense)),lossTypes=types.filter(type=>defense[type]===maxLoss);
   const advice=totalAgainst?'下一輪可優先回看「被'+lossTypes.map(type=>finishLabels[type]).join('／被')+'」的回合，記下當時配置與情境，再比較調整後的失分次數。':'本輪沒有失分；可更換對手或配置，觀察得分方式是否仍能維持。';
-  return {attack,defense,totalFor,totalAgainst,style,efficiency,summary,advice,attackText:leading(attack,totalFor),defenseText:leading(defense,totalAgainst,'被')};
+  const finishComments={extreme:'單次取得 3 分，是本輪拉開比分的得分來源。',knockout:'透過擊飛取得 2 分，是本輪累積比分的主要方式。',burst:'透過爆裂取得 2 分，是本輪累積比分的主要方式。',spin:'透過轉停逐次取得 1 分，累積本輪比分。'};
+  const maxAttack=Math.max(...Object.values(attack)),mainTypes=types.filter(type=>attack[type]===maxAttack);
+  const scoreComment=!totalFor?'本輪尚無得分。':mainTypes.length>1?'本輪'+mainTypes.map(type=>finishLabels[type]).join('與')+'取得分數並列，得分來源較多元。':'本輪主要得分來自'+finishLabels[mainTypes[0]]+'；'+finishComments[mainTypes[0]];
+  const countMax=Math.max(...Object.values(attackCount)),frequentTypes=types.filter(type=>attackCount[type]===countMax);
+  const frequentText=totalFor?frequentTypes.map(type=>finishLabels[type]+' '+countMax+' 次').join('、'):'本輪尚無得分';
+  const breakdown=types.map(type=>finishLabels[type]+' '+attackCount[type]+' 次／'+attack[type]+' 分／'+(totalFor?Math.round(attack[type]/totalFor*100):0)+'%').join('；');
+  let firstTotal=0,firstWins=0,ledGames=0,lostLead=0,trailedGames=0,comebacks=0;
+  const positions=[];
+  for(const game of games){
+    let own=0,other=0,led=false,trailed=false;
+    for(const [index,round] of (game.rounds||[]).entries()){
+      if(!types.includes(round.finish)||!Number.isFinite(round.points)||![player,opponent].includes(round.winnerUid))continue;
+      const won=round.winnerUid===player;
+      if(index===0){firstTotal++;if(won)firstWins++;}
+      positions[index]??={number:index+1,total:0,losses:0};positions[index].total++;if(!won)positions[index].losses++;
+      if(won)own+=round.points;else other+=round.points;
+      // Only a lead/deficit before the deciding score describes a comeback opportunity.
+      if(index<(game.rounds||[]).length-1){if(own>other)led=true;if(own<other)trailed=true;}
+    }
+    if(led){ledGames++;if(game.winnerUid===opponent)lostLead++;}
+    if(trailed){trailedGames++;if(game.winnerUid===player)comebacks++;}
+  }
+  const eligible=positions.filter(position=>position&&position.total>=5);
+  const highest=eligible.length?Math.max(...eligible.map(position=>position.losses/position.total)):0;
+  const concentrated=eligible.filter(position=>position.losses>0&&Math.abs(position.losses/position.total-highest)<1e-9);
+  const positionText=concentrated.length?concentrated.map(position=>'第 '+position.number+' 回合失分 '+position.losses+'／'+position.total+' 場（'+Math.round(position.losses/position.total*100)+'%）').join('；')+(concentrated.length>1?'，失分率並列。':'，為本輪失分率最高的回合。'):eligible.length?'符合樣本門檻的回合沒有失分。':'資料不足：各回合至少需有 5 場到達，才比較失分率。';
+  const firstText=firstTotal>=5?'首回合得分 '+firstWins+'／'+firstTotal+' 場（'+Math.round(firstWins/firstTotal*100)+'%）。':'首回合樣本不足（'+firstTotal+'／5 場）。';
+  const leadText='曾領先 '+ledGames+' 場，其中 '+lostLead+' 場最後落敗。';
+  const comebackText='曾落後 '+trailedGames+' 場，其中 '+comebacks+' 場逆轉獲勝。';
+  return {attackCount,defenseCount,scoreComment,frequentText,breakdown,firstText,positionText,leadText,comebackText,attack,defense,totalFor,totalAgainst,style,efficiency,summary,advice,attackText:leading(attack,totalFor),defenseText:leading(defense,totalAgainst,'被')};
 }
 export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=globalThis.localStorage}={}){
   const app=root.querySelector('#app'),message=text=>root.querySelector('#message').textContent=text;
@@ -102,6 +132,9 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
           const summary=document.createElement('p');summary.className='room-feedback-summary';summary.textContent=stats.summary;card.append(summary);
           const metrics=document.createElement('dl');metrics.className='room-feedback-metrics';
           for(const [label,value] of [['主要得分',stats.attackText],['主要失分',stats.defenseText],['得分效率',stats.efficiency+'%（'+stats.totalFor+' 得分／'+stats.totalAgainst+' 失分）']]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;metrics.append(term,detail);}card.append(metrics);
+          const scoring=document.createElement('p');scoring.className='room-feedback-summary';scoring.textContent=stats.scoreComment;card.append(scoring);
+          const details=document.createElement('dl');details.className='room-feedback-metrics';
+          for(const [label,value] of [['最常得分方式',stats.frequentText],['四種得分明細',stats.breakdown],['首回合表現',stats.firstText],['失分集中回合',stats.positionText],['領先後落敗',stats.leadText],['落後後逆轉',stats.comebackText]]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;details.append(term,detail);}card.append(details);
           const advice=document.createElement('p');advice.className='room-feedback-advice';advice.textContent='對練建議：'+stats.advice;card.append(advice);
         }
       }
@@ -160,7 +193,7 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
     const center=document.createElementNS(ns,'text');center.setAttribute('x','160');center.setAttribute('y','164');center.setAttribute('class','radar-center');center.textContent='50% 分布＝滿格';svg.append(center);
     shell.append(svg);
     axes.forEach(([label,side],index)=>{const axis=document.createElement('span');axis.className='radar-label radar-label-'+index+(side==='against'?' loss':'');axis.textContent=label;const value=document.createElement('b');value.textContent=shares[index]+'%';axis.append(value);shell.append(axis);});
-    const note=document.createElement('p');note.className='radar-note';note.textContent='戰型與攻防分布依本房得失分明細計算；得分效率＝本人得分÷雙方總得分。進攻四軸各占本人總得分，防守四軸各占本人總失分。圖形以 50% 占比為滿格。評價與建議只反映本輪對練，無法判定發射技術、陀螺配置優劣或整體實力。';
+    const note=document.createElement('p');note.className='radar-note';note.textContent='戰型與攻防分布依本房得失分明細計算；得分效率＝本人得分÷雙方總得分。進攻四軸各占本人總得分，防守四軸各占本人總失分。圖形以 50% 占比為滿格。回合序號依有效記分順序計算，不含未記錄的平手或重賽；失分不等於失誤。集中失分以到達該回合的場次為分母，至少 5 場才比較；領先與逆轉以已完成場次的比分走勢統計。評價與建議只反映本輪對練，無法判定發射技術、陀螺配置優劣或整體實力。';
     container.append(tabs,shell,note);
   }
   function clearHistory(){historyEpoch++;historyRequest?.abort();historyRequest=null;historyCompletion=null;select('.history-list').replaceChildren();select('.history-stats').replaceChildren();select('.history-status').textContent='';}
