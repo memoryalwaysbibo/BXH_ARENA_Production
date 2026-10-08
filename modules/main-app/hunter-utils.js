@@ -27,6 +27,27 @@ function hunterRadarVisualValue(share){
   return Math.max(0,Math.min(100,Number(share||0)));
 }
 
+function hunterSampleMaturity(analysis,partial=false){
+  if(partial)return {state:"partial",label:"部分資料缺失"};
+  if(analysis.matches<3||analysis.validRounds<8)return {state:"accumulating",label:"資料累積中"};
+  // Stable-analysis thresholds require historical backtesting; not an accuracy claim.
+  return {state:"preliminary",label:"初步分析"};
+}
+function hunterTrendWindows(records){
+  const rows=hunterUniqueRecords(records);
+  const undated=rows.filter(r=>hunterRecordTimestamp(r)<=0).length;
+  const dated=rows.filter(r=>hunterRecordTimestamp(r)>0).sort((a,b)=>hunterRecordTimestamp(b)-hunterRecordTimestamp(a)||hunterEvidenceMatchKey(a).localeCompare(hunterEvidenceMatchKey(b)));
+  const recent=dated.slice(0,20),previous=dated.slice(20,40);
+  const versions=new Set([...recent,...previous].map(r=>String(r.scoringVersion|| (hunterRecordMode(r)==="standard"?"bxh-4pt-v1":"unknown"))));
+  const modes=new Set([...recent,...previous].map(hunterRecordMode));
+  let reason=null;
+  if(undated)reason="undated";
+  else if(recent.length!==20||previous.length!==20)reason="insufficient-windows";
+  else if(versions.size!==1||modes.size!==1||modes.has("unknown"))reason="mixed-versions";
+  else if([...recent,...previous].some(r=>!hunterScoringBreakdown(r).available||!hunterRoundIntegrity(r).validRounds))reason="incomplete-ledger";
+  return {recent,previous,undated,versions:[...versions],comparable:!reason,reason};
+}
+
 function hunterDistributionRows(bucket,metric="points"){
   const types=["extreme","knockout","burst","spin"];
   const totalEvents=types.reduce((sum,type)=>sum+Number(bucket[type].events||0),0);
@@ -247,6 +268,6 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();

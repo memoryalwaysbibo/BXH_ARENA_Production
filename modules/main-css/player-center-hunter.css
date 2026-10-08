@@ -522,3 +522,12 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .hunter-distribution-denominator{padding:10px 0}
 .hunter-radar-placeholder .axis-burst{right:0}
 .hunter-radar-placeholder .axis-taken-burst{left:0}
+
+/* Hunter 2.0 B4 sample context and comparable recent windows */
+.hunter-main-loss{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;color:#ff8888}
+.hunter-analysis-meta{font-size:10px;line-height:1.7;color:var(--metal,#aaa);overflow-wrap:anywhere}
+.hunter-trend-table-wrap{overflow-x:auto;margin:12px 0}
+.hunter-trend-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.hunter-trend-table th,.hunter-trend-table td{padding:8px 5px;text-align:left;border-bottom:1px solid rgba(153,167,188,.18);overflow-wrap:anywhere}
+.hunter-trend-status{font-size:11px;line-height:1.6;margin-bottom:10px;color:var(--metal,#aaa)}
+@media(max-width:640px){.hunter-period-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
