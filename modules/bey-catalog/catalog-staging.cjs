@@ -1,5 +1,6 @@
 'use strict';
 const crypto=require('node:crypto');
+const {assertIsolatedTarget,allowedCollections}=require('./safety-gate.cjs');
 const SECTIONS=Object.freeze({sources:['beySources','sourceId'],products:['beyProducts','productId'],parts:['beyParts','partId'],variants:['beyPartVariants','variantId'],colors:['beyColors','colorId'],options:['beyProductOptions','optionId'],assemblyClaims:['beyAssemblyClaims','groupId'],contentClaims:['beyPackageContents','contentClaimId'],issues:['beyCatalogIssues','issueId']});
 function stable(v){if(Array.isArray(v))return '['+v.map(stable).join(',')+']';if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';return JSON.stringify(v);}
 function digest(v){return crypto.createHash('sha256').update(stable(v)).digest('hex');}
@@ -24,11 +25,11 @@ function planStaging(batch){
 }
 /** Adapter has get(collection,id) and put(collection,id,document); no Firebase SDK or network calls. */
 async function applyEmulatorStaging(plan,adapter,target){
- assert(target?.mode==='emulator'&&target?.readOnlyProduction===true&&/^demo-/.test(target.projectId),'TARGET_NOT_ISOLATED');
+ assertIsolatedTarget(target);
  assert(plan?.mode==='DRY_RUN'&&plan.productionWritable===false&&plan.autoPublish===false,'PLAN_NOT_SAFE');
  assert(adapter&&typeof adapter.get==='function'&&typeof adapter.put==='function','ADAPTER_REQUIRED');
  let inserted=0,unchanged=0,conflicts=0;
- for(const r of plan.records){const old=await adapter.get(r.collection,r.id);if(old){if(old.sha256===r.sha256)unchanged++;else conflicts++;continue;}
+ for(const r of plan.records){assert(allowedCollections.includes(r.collection),'COLLECTION_NOT_ALLOWED');const old=await adapter.get(r.collection,r.id);if(old){if(old.sha256===r.sha256)unchanged++;else conflicts++;continue;}
  await adapter.put(r.collection,r.id,{sha256:r.sha256,origin:'research_staging',batchId:plan.batchId,payload:r.data,publicationStatus:'unpublished'});inserted++;}
  return {inserted,unchanged,conflicts,deleted:0,published:0};
 }
