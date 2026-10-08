@@ -531,3 +531,8 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .hunter-trend-table th,.hunter-trend-table td{padding:8px 5px;text-align:left;border-bottom:1px solid rgba(153,167,188,.18);overflow-wrap:anywhere}
 .hunter-trend-status{font-size:11px;line-height:1.6;margin-bottom:10px;color:var(--metal,#aaa)}
 @media(max-width:640px){.hunter-period-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Hunter 2.0 B5 diagnostics remain separate from official scoring. */
+.hunter-strength-research>summary{cursor:pointer;line-height:1.6}
+.hunter-strength-research-body{margin-top:12px}
+.hunter-research-metrics{font-size:12px;line-height:1.7;margin:12px 0;overflow-wrap:anywhere}

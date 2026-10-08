@@ -12,7 +12,7 @@ function setup(){
  ctx.HUNTER_ANALYSIS_LABELS={extreme:'極限',knockout:'擊飛',burst:'爆裂',spin:'轉停'};
  ctx.HUNTER_ANALYSIS_MIN_MATCHES=3;ctx.HUNTER_ANALYSIS_MIN_ROUNDS=8;
  ctx.HUNTER_H2H_ANALYSIS_MIN_MATCHES=3;ctx.HUNTER_H2H_ANALYSIS_MIN_ROUNDS=8;
- for(const name of ['hunterAnalysisContextHtml','hunterTrendHtml','hunterRadarHtml','hunterModeLabel','hunterBattleFiltersHtml','hunterEnchantmentSummaryHtml','hunterBuildAnalysis','hunterBuildOpponentAnalysis','hunterAnalysisStatHtml','renderPlayerStatsTab']){
+ for(const name of ['hunterStrengthDiagnosticsHtml','hunterAnalysisContextHtml','hunterTrendHtml','hunterRadarHtml','hunterModeLabel','hunterBattleFiltersHtml','hunterEnchantmentSummaryHtml','hunterBuildAnalysis','hunterBuildOpponentAnalysis','hunterAnalysisStatHtml','renderPlayerStatsTab']){
   const start=core.indexOf('function '+name+'(');const end=core.indexOf('\nfunction ',start+1);
   vm.runInContext(core.slice(start,end),ctx);
  }

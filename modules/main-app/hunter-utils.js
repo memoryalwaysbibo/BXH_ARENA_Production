@@ -27,6 +27,66 @@ function hunterRadarVisualValue(share){
   return Math.max(0,Math.min(100,Number(share||0)));
 }
 
+function hunterWinRateInterval(wins,matches){
+  if(!Number.isInteger(matches)||matches<=0||!Number.isInteger(wins)||wins<0||wins>matches)return null;
+  const z=1.959963984540054,p=wins/matches,z2=z*z,denominator=1+z2/matches;
+  const center=(p+z2/(2*matches))/denominator;
+  const margin=z*Math.sqrt(p*(1-p)/matches+z2/(4*matches*matches))/denominator;
+  return {low:Math.max(0,center-margin)*100,high:Math.min(100,center+margin)*100,method:"wilson-95-independent"};
+}
+function hunterPreMatchRating(record){
+  // An offline backtest input contract. Current production loader supplies none.
+  const snapshot=record&&record.ratingSnapshot,started=record&&record.matchStartedAt;
+  if(!snapshot||snapshot.source!=="server"||snapshot.verified!==true||typeof snapshot.version!=="string"||!snapshot.version.trim()||
+    typeof started!=="number"||!Number.isFinite(started)||started<=0||
+    typeof snapshot.capturedAt!=="number"||!Number.isFinite(snapshot.capturedAt)||snapshot.capturedAt<=0||snapshot.capturedAt>=started||
+    typeof snapshot.selfBefore!=="number"||!Number.isFinite(snapshot.selfBefore)||
+    typeof snapshot.opponentBefore!=="number"||!Number.isFinite(snapshot.opponentBefore))return null;
+  return {self:snapshot.selfBefore,opponent:snapshot.opponentBefore,version:snapshot.version,capturedAt:snapshot.capturedAt};
+}
+function hunterStrengthDiagnostics(records){
+  const standard=hunterFilterByMode(records,"standard"),rows=standard.filter(r=>hunterScoringBreakdown(r).available&&hunterRoundIntegrity(r).validRounds>0);
+  const opponents=new Map();let unresolved=0,rated=0;
+  rows.forEach(r=>{
+    const id=String(r.opponentIdentity&&r.opponentIdentity.scope==="cross-event"&&r.opponentIdentity.playerId||r.opponent&&r.opponent.playerId||"").trim();
+    if(!id)unresolved++;else{const group=opponents.get(id)||{matches:0,wins:0};group.matches++;group.wins+=r.isWin?1:0;opponents.set(id,group);}
+    if(hunterPreMatchRating(r))rated++;
+  });
+  const known=rows.length-unresolved,knownWins=[...opponents.values()].reduce((sum,g)=>sum+g.wins,0);
+  const largest=opponents.size?Math.max(...[...opponents.values()].map(g=>g.matches)):0;
+  const wins=rows.filter(r=>r.isWin).length;
+  return {version:"hunter-strength-diagnostics-v1",rows,standardMatches:standard.length,matches:rows.length,wins,excluded:standard.length-rows.length,
+    interval:hunterWinRateInterval(wins,rows.length),known,unresolved,uniqueOpponents:opponents.size,repeated:known-opponents.size,
+    repeatShare:known?Math.round((known-opponents.size)/known*100):null,largestShare:known?Math.round(largest/known*100):null,
+    knownWinRate:known?knownWins/known*100:null,
+    opponentBalancedWinRate:opponents.size?[...opponents.values()].reduce((sum,g)=>sum+g.wins/g.matches,0)/opponents.size*100:null,
+    rated,missingRatings:rows.length-rated,candidateScore:null,candidateStatus:"pending-calibration"};
+}
+function hunterBacktestStrength(records,analyze,candidate=null){
+  const diagnostic=hunterStrengthDiagnostics(records),undated=diagnostic.rows.filter(r=>hunterRecordTimestamp(r)<=0).length;
+  const rows=diagnostic.rows.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)||hunterEvidenceMatchKey(a).localeCompare(hunterEvidenceMatchKey(b)));
+  const versions=new Set(rows.map(r=>hunterPreMatchRating(r)?.version).filter(Boolean));
+  let candidateReason=!candidate?"no-calibrated-formula":undated?"undated":diagnostic.missingRatings?"missing-pre-match-ratings":versions.size!==1?"mixed-rating-versions":null;
+  if(candidate&&(typeof candidate.evaluate!=="function"||typeof candidate.version!=="string"||!candidate.version))throw new Error("Invalid backtest candidate contract");
+  const history=[];let lastBaseline=null,lastCandidate=null,maxBaselineJump=0,maxCandidateJump=0;
+  rows.forEach((row,index)=>{
+    const prefix=rows.slice(0,index+1),baseline=analyze(prefix),baselineScore=baseline.eligible?baseline.overall:null;
+    let candidateScore=null;
+    if(!candidateReason&&baseline.eligible){
+      candidateScore=candidate.evaluate(prefix.map(r=>({record:JSON.parse(JSON.stringify(r)),rating:hunterPreMatchRating(r)})));
+      if(typeof candidateScore!=="number"||!Number.isFinite(candidateScore)||candidateScore<0||candidateScore>100)throw new Error("Candidate score must be finite and within 0–100");
+    }
+    const baselineJump=!undated&&lastBaseline!=null&&baselineScore!=null?baselineScore-lastBaseline:null;
+    const candidateJump=lastCandidate!=null&&candidateScore!=null?candidateScore-lastCandidate:null;
+    if(baselineJump!=null)maxBaselineJump=Math.max(maxBaselineJump,Math.abs(baselineJump));
+    if(candidateJump!=null)maxCandidateJump=Math.max(maxCandidateJump,Math.abs(candidateJump));
+    history.push({matchKey:hunterEvidenceMatchKey(row),matches:index+1,baselineVersion:baseline.version,baselineScore,candidateScore,baselineJump,candidateJump});
+    lastBaseline=baselineScore;lastCandidate=candidateScore;
+  });
+  return {version:"hunter-strength-backtest-v1",diagnostic,candidateVersion:candidate&&candidate.version||null,candidateReason,
+    history,maxBaselineJump:undated?null:maxBaselineJump,maxCandidateJump:candidateReason?null:maxCandidateJump,undated};
+}
+
 function hunterSampleMaturity(analysis,partial=false){
   if(partial)return {state:"partial",label:"部分資料缺失"};
   if(analysis.matches<3||analysis.validRounds<8)return {state:"accumulating",label:"資料累積中"};
@@ -268,6 +328,6 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterWinRateInterval,hunterPreMatchRating,hunterStrengthDiagnostics,hunterBacktestStrength,hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();

@@ -15238,7 +15238,7 @@ function hunterFilteredRecords(){
     return true;
   });
 }
-const {hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
+const {hunterStrengthDiagnostics,hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
 const {hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth}=window.BXHHunterUtils||{};
 
 /* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
@@ -15757,6 +15757,23 @@ function hunterBuildAnalysis(records){
 }
 
 
+
+function hunterStrengthDiagnosticsHtml(records,partial=false){
+  const d=hunterStrengthDiagnostics(records),baseline=hunterBuildAnalysis(d.rows);
+  const percent=value=>value==null?'—':value.toFixed(1)+'%';
+  const interval=!partial&&d.interval?d.interval.low.toFixed(1)+'%～'+d.interval.high.toFixed(1)+'%':'—';
+  return '<details class="panel hunter-strength-research"><summary><strong>實力評分回測資料</strong> <span class="badge badge-metal">校準中</span></summary>'+
+    '<div class="hunter-strength-research-body"><div class="hunter-stat-grid">'+
+    '<div class="stat-box"><div class="label">現行實力分（正規賽）</div><div class="value small">'+(!partial&&baseline.eligible?baseline.overall:'—')+'</div></div>'+
+    '<div class="stat-box"><div class="label">候選實力分</div><div class="value small">—</div></div>'+
+    '<div class="stat-box"><div class="label">已識別不同對手</div><div class="value small">'+d.uniqueOpponents+'</div></div>'+
+    '<div class="stat-box"><div class="label">最大單一對手占比</div><div class="value small">'+(d.largestShare==null?'—':d.largestShare+'%')+'</div></div></div>'+
+    '<div class="hunter-analysis-meta">本期間正規可分析 '+d.matches+' / '+d.standardMatches+' 場｜身分確認 '+d.known+' 場、未確認 '+d.unresolved+' 場｜重複交手 '+d.repeated+' / '+d.known+'（'+(d.repeatShare==null?'—':d.repeatShare+'%')+'）。對手統計只使用穩定玩家編號。</div>'+
+    '<div class="hunter-research-metrics">勝率參考區間：'+interval+'<br>已識別對手子集勝率：'+(!partial?percent(d.knownWinRate):'—')+'｜每位對手等權診斷：'+(!partial?percent(d.opponentBalancedWinRate):'—')+'</div>'+
+    '<div class="hint">勝率區間採 Wilson 95% 並假設每場獨立；重複交手可能不符合假設，因此不代表實力分的信賴區間。每位對手等權僅用於觀察交手集中影響，不是新的實力公式。</div>'+
+    '<div class="hunter-trend-status">'+(partial?'部分資料缺失，暫停回測結論。':'候選公式與權重尚待歷史回測，暫不提供新實力分。')+'開賽前評等完整 '+d.rated+' / '+d.matches+' 場；缺少 '+d.missingRatings+' 場，不能以目前評等回填或判定強弱對手。</div>'+
+    '<div class="hunter-analysis-meta">'+esc(d.version)+'｜現行 '+esc(baseline.version)+'｜沿用現行評分與執照規則。此面板依目前分類及期間診斷；附魔不進入實力回測。</div></div></details>';
+}
 
 function hunterAnalysisContextHtml(analysis,partial=false){
   const maturity=hunterSampleMaturity(analysis,partial);
@@ -16292,6 +16309,7 @@ function renderPlayerStatsTab(p){
       '<section class="panel hunter-loss-panel"><div class="panel-title">防守失分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.defense,type,"against",hunterRadarMetric)).join('')+'</div></section></div>'+
       '<section class="panel"><div class="panel-title">分析結論</div><div class="hunter-analysis-grid"><div><span>主要優勢</span><strong>'+esc(analysis.primary)+'</strong></div><div><span>次要優勢</span><strong>'+esc(analysis.secondary)+'</strong></div><div><span>主要弱點</span><strong>'+esc(analysis.mainWeakness)+'</strong></div><div><span>戰型判定</span><strong>'+esc(analysis.style)+'</strong></div></div>'+
       '<div class="hunter-framework-note">綜合評分只採正規賽資料。附魔攻防採卡牌調整前基礎分；卡牌加分與減分另列，失誤判罰獨立核對。評分公式：60% 對戰勝率＋40% 得分占比。勝率＝可分析勝場／可分析場數；得分占比＝四種方式得分／雙方四種方式總得分。有效回合為比分核對通過的極限、擊飛、爆裂與轉停事件；失誤判罰用於核對比分，不計入四種方式或有效回合。Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析。點擊任一進攻／防守項目，可追溯到對手、Match 與原始 Round Timeline。</div></section>';
+    body+=hunterStrengthDiagnosticsHtml(analysisRows,!completeHistory);
     body+=hunterTrendHtml(hunterFilterByMode(allRecords,hunterBattleFilter),!completeHistory);
   }else if(playerStatsSubTab==="achievements"){
     const achievementCore=hunterProfileCache&&hunterProfileCache.achievementCore
