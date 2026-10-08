@@ -1,0 +1,38 @@
+/* 獵人 Hunter skin, scoped to the account theme. */
+.hunter-portrait,.hunter-license-layer{display:none}
+:root[data-bxh-theme="hunter"]{
+  --accent-color:#71d995;--accent-rgb:113,217,149;
+  --accent-glow:rgba(113,217,149,.28);--accent-soft:rgba(113,217,149,.11);
+  --accent-border:rgba(113,217,149,.42);--accent-contrast:#07150e;
+  --glass-surface:rgba(8,24,19,.65);--glass-surface-strong:rgba(8,24,19,.87);
+}
+:root[data-bxh-theme="hunter"] .auth-shell{background:radial-gradient(ellipse at top,rgba(38,133,88,.22),transparent 68%),#05130f}
+:root[data-bxh-theme="hunter"] .landing-tagline-brand{color:#9cefaf;text-shadow:0 0 16px #67d78f77}
+:root[data-bxh-theme="hunter"] .auth-brand-header::after{content:"獵人 HUNTER";display:block;color:#b9eab9;letter-spacing:.27em;margin-top:12px;font-size:15px}
+:root[data-bxh-theme="hunter"] .landing-role-cards{grid-template-columns:1fr;gap:13px;max-width:540px;margin:24px auto 0}
+:root[data-bxh-theme="hunter"] .role-card{--hunter-tone:#84e59d;position:relative;isolation:isolate;overflow:hidden;min-height:180px!important;border:1px solid var(--hunter-tone)!important;border-radius:18px!important;background:#071b13!important;box-shadow:0 0 22px color-mix(in srgb,var(--hunter-tone) 17%,transparent)}
+:root[data-bxh-theme="hunter"] .role-card-player{--hunter-tone:#8dc6ff}
+:root[data-bxh-theme="hunter"] .role-card-guest{--hunter-tone:#ffc09b}
+:root[data-bxh-theme="hunter"] .directive-portrait{display:none!important}
+:root[data-bxh-theme="hunter"] .hunter-portrait{display:block;position:absolute;inset:0 0 0 auto;width:72%;max-width:280px;z-index:-1;background-image:linear-gradient(90deg,#07130fbf,transparent 76%),url('../../assets/hunter/entrance-atlas.webp');background-size:100% 100%,300% auto;background-position:center,left top;background-repeat:no-repeat}
+:root[data-bxh-theme="hunter"] .role-card-player .hunter-portrait{background-position:center,center top}
+:root[data-bxh-theme="hunter"] .role-card-guest .hunter-portrait{background-position:center,right top}
+:root[data-bxh-theme="hunter"] .role-card::before{content:"小傑";position:absolute;left:17px;top:47px;font-size:37px;font-weight:900;line-height:1.1;color:var(--hunter-tone);text-shadow:0 0 18px var(--hunter-tone);pointer-events:none}
+:root[data-bxh-theme="hunter"] .role-card-player::before{content:"奇犽"}
+:root[data-bxh-theme="hunter"] .role-card-guest::before{content:"酷拉皮卡";font-size:24px;top:54px}
+:root[data-bxh-theme="hunter"] .role-card-inner{position:relative;display:flex!important;align-items:flex-start;flex-direction:column;min-height:180px!important;padding:28px 16px 46px 110px!important;gap:5px}
+:root[data-bxh-theme="hunter"] .role-card-icon{display:none!important}
+:root[data-bxh-theme="hunter"] .role-card-cn{color:var(--hunter-tone)!important;font-size:20px}
+:root[data-bxh-theme="hunter"] .landing-role-cards .role-card-cn,:root[data-bxh-theme="hunter"] .landing-role-cards .role-card-en{align-self:flex-start!important;text-shadow:0 1px 5px #00110c}
+:root[data-bxh-theme="hunter"] .role-card-en{color:#ecf2e8!important;font-size:10px}
+:root[data-bxh-theme="hunter"] .role-card-desc{color:#f2f7ef!important;font-size:11px;max-width:174px;line-height:1.5;text-shadow:0 1px 4px #000}
+:root[data-bxh-theme="hunter"] .role-card-assist{display:none}
+:root[data-bxh-theme="hunter"] .role-card-enter{position:absolute;bottom:0;left:0;width:100%;height:34px;display:grid;place-items:center;margin:0!important;opacity:1;color:var(--hunter-tone)!important;background:#06130ddc;border-top:1px solid color-mix(in srgb,var(--hunter-tone) 42%,transparent)}
+:root[data-bxh-theme="hunter"] .role-card:focus-visible{outline:2px solid var(--hunter-tone);outline-offset:4px}
+:root[data-bxh-theme="hunter"] header.topbar{position:relative;isolation:isolate;overflow:hidden;background:#071812!important}
+:root[data-bxh-theme="hunter"] header.topbar .hunter-license-layer{display:block;position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('../../assets/hunter/hunter-license.webp') right center/auto 100% no-repeat;opacity:.52;animation:hunter-license-glow 3.6s ease-in-out infinite}
+:root[data-bxh-theme="hunter"] header.topbar::before{content:"";position:absolute;left:-58%;bottom:0;width:58%;height:3px;pointer-events:none;background:linear-gradient(90deg,transparent,#25744c,#bafbd0,transparent);box-shadow:0 0 12px #61dd8b91;animation:hunter-license-rail 3.6s linear infinite}
+@keyframes hunter-license-rail{to{transform:translateX(275%)}}
+@keyframes hunter-license-glow{0%,100%{opacity:.42}50%{opacity:.72}}
+@media(max-width:400px){:root[data-bxh-theme="hunter"] .role-card-inner{padding-left:98px!important}:root[data-bxh-theme="hunter"] .role-card::before{left:10px;font-size:32px}:root[data-bxh-theme="hunter"] .role-card-guest::before{font-size:20px}:root[data-bxh-theme="hunter"] .role-card-desc{max-width:145px;font-size:10px}}
+@media(prefers-reduced-motion:reduce){:root[data-bxh-theme="hunter"] header.topbar::before,:root[data-bxh-theme="hunter"] .hunter-license-layer{animation:none!important}}
