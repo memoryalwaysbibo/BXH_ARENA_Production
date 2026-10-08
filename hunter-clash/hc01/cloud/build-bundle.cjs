@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node
 const ROOT=path.resolve(__dirname,'..');
 const digest=data=>createHash('sha256').update(data).digest('hex');
 const backend=['domain.cjs','service.cjs','callable.cjs','cloud/server-entry.cjs','cloud/deploy-preflight.cjs','cloud/setup-service.cjs','cloud/setup.cjs'];
-const frontend=['controller.mjs','pairing.mjs','scanner.mjs','cloud/config.mjs','cloud/transport.mjs','cloud/boot.mjs','cloud/mobile.mjs','cloud/mobile.css','cloud/index.html','cloud/firebase-sdk-entry.mjs','vendor/qrcode.min.js','vendor/jsQR.js','vendor/jsQR-LICENSE.txt','vendor/qrcode-LICENSE.txt','vendor/README.md'];
+const frontend=['controller.mjs','pairing.mjs','scanner.mjs','cloud/config.mjs','cloud/transport.mjs','cloud/boot.mjs','cloud/mobile.mjs','cloud/mobile.css','cloud/entrance-cards-v2.png','cloud/index.html','cloud/firebase-sdk-entry.mjs','vendor/qrcode.min.js','vendor/jsQR.js','vendor/jsQR-LICENSE.txt','vendor/qrcode-LICENSE.txt','vendor/README.md'];
 async function buildBundle({output,sourceCommit,clientConfig=null}){
   const destination=path.resolve(output);
   if(!/^[a-f0-9]{40}$/.test(sourceCommit))throw Error('invalid-source-commit');

@@ -7,3 +7,11 @@
 #history summary{font-size:16px;font-weight:700;color:var(--gold)}.history-stats{font-size:16px;font-weight:700;line-height:1.6}.history-note,.history-status{font-size:12px;color:var(--muted)}.history-match{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:14px 0;border-bottom:1px solid var(--line)}.history-match strong{font-size:14px;overflow-wrap:anywhere}.history-match small{grid-column:1/-1;color:var(--muted);font-size:11px}.history-win{color:var(--gold)}.history-loss{color:#c7badb}#history button{margin-top:14px;font-size:13px}
 
 .room-options{margin:14px 0}.room-options label{font-size:13px}.room-options .remember{font-size:12px}.series-actions:has(button:not([hidden])){margin:14px 0}.series-actions button{flex:1;font-size:14px}.series-actions [data-op=nextGame]{background:var(--gold);color:#241b12;border-color:var(--gold)}.session-results{margin-top:12px;border-top:1px solid var(--line)}.session-results p{font-size:12px;overflow-wrap:anywhere;margin:10px 0}
+
+/* Artwork stays decorative; labels and actions remain native accessible controls. */
+.home-actions button,.home-actions button:first-child{position:relative;overflow:hidden;padding:0 0 14px;gap:5px;background:#13101e;color:var(--text);border:1px solid #b49a65;box-shadow:0 6px 22px #0004;align-items:stretch}
+.entrance-art{position:relative;display:block;overflow:hidden;width:100%;aspect-ratio:654/695;margin-bottom:9px;background:#21152f;pointer-events:none}
+.entrance-art img{position:absolute;max-width:none;width:234.8624%;height:auto;top:-11.7986%;left:-14.6789%}
+.entrance-join img{left:-120.4893%}
+.home-actions strong,.home-actions small{padding:0 10px}.home-actions strong{color:var(--gold);font-size:17px;line-height:1.5}.home-actions small{color:var(--muted);opacity:1;font-size:10px}.home-actions strong:after{content:' ›';float:right;color:var(--gold)}
+@media(max-width:350px){.home-actions button{padding:0 0 12px}.home-actions strong{font-size:15px}.home-actions small{font-size:9px}}
