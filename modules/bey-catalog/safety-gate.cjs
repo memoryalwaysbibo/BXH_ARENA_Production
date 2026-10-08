@@ -1,7 +1,7 @@
 'use strict';
 /** DB-01: pure target and dataset gate; no Firebase SDK or network calls. */
 const PROD = new Set(['bxh-arena']);
-const allowedCollections = Object.freeze(['beyProducts','beyProductOptions','beyPackageContents','beyParts','beyPartVariants','beyColors','beySources','beyCatalogAudit']);
+const allowedCollections = Object.freeze(['beyProducts','beyProductOptions','beyPackageContents','beyParts','beyPartVariants','beyColors','beySources','beyAssemblyClaims','beyCatalogIssues','beyCatalogAudit']);
 function assertIsolatedTarget({projectId, emulatorHost, mode} = {}) {
   if (typeof projectId !== 'string' || !projectId.trim()) throw Error('PROJECT_ID_REQUIRED');
   if (PROD.has(projectId) || /(^|[-_])prod(uction)?($|[-_])/i.test(projectId)) throw Error('PRODUCTION_TARGET_FORBIDDEN');
