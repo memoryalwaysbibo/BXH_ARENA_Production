@@ -17176,7 +17176,7 @@ const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"directive",label:"極限指令",english:"BXH Directive",color:"#a05aff"},
   {id:"three-gods",label:"三幻神",english:"Egyptian Gods",color:"#e8bd62"},
   {id:"hunter",label:"獵人Hunter",english:"Hunter License",color:"#67d78f"},
-  {id:"akatsuki",label:"火影忍者－曉組織",english:"Akatsuki",color:"#ed5369"}
+  {id:"akatsuki",label:"曉組織",english:"Akatsuki",color:"#ed5369"}
 ];
 function normalizeInterfaceTheme(value){
   return BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===value)?value:"gold";
