@@ -49,3 +49,8 @@
 :root[data-bxh-theme="akatsuki"] .landing-home>.btn-row .btn-primary{background:linear-gradient(135deg,#851d36,#d74b65)!important;border:1px solid #ffa8ba!important;color:#fff4f6!important;box-shadow:0 0 15px #c8355755}
 :root[data-bxh-theme="akatsuki"] .landing-home>.btn-row .btn-ghost{background:#0a0b13c9!important;border:1px solid #9593a266!important;color:#eae4ee!important}
 @media(min-width:700px){:root[data-bxh-theme="akatsuki"] .auth-shell{background-size:cover;background-position:center 28%}:root[data-bxh-theme="akatsuki"] .auth-brand-header{padding-top:24px}}
+/* Crimson floor seal and its soft water reflection. */
+:root[data-bxh-theme="akatsuki"] .landing-footnote{position:relative;padding-bottom:142px}
+:root[data-bxh-theme="akatsuki"] .landing-footnote::after,:root[data-bxh-theme="akatsuki"] .landing-footnote::before{content:"曉";position:absolute;left:50%;width:130px;text-align:center;font-family:"Noto Sans TC",serif;font-weight:900;font-size:100px;line-height:1;pointer-events:none;color:#ff3d59;letter-spacing:0;text-shadow:0 0 8px #ff2c4eaa,0 0 30px #ff1b4277}
+:root[data-bxh-theme="akatsuki"] .landing-footnote::after{bottom:46px;transform:translateX(-50%) perspective(260px) rotateX(38deg);opacity:.9}
+:root[data-bxh-theme="akatsuki"] .landing-footnote::before{bottom:-5px;transform:translateX(-50%) scaleY(-.45);opacity:.35;filter:blur(2px);mask-image:linear-gradient(to bottom,transparent 12%,#000 90%);-webkit-mask-image:linear-gradient(to bottom,transparent 12%,#000 90%)}
