@@ -505,3 +505,20 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .hunter-enchantment-summary{margin:12px 0;padding:12px;border:1px solid var(--border, #444);border-radius:12px}
 .hunter-enchantment-summary .hunter-stat-grid{margin:10px 0}
 .hunter-battle-filter .hint,.hunter-enchantment-summary .hint{overflow-wrap:anywhere}
+
+/* Hunter 2.0 B3: actual 0–100% distributions, separate gain/loss colors. */
+.hunter-radar-controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.hunter-radar-controls .btn{flex:1}
+.hunter-radar-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;font-size:11px}
+.hunter-radar-legend .attack{color:var(--gold,#d9b95c)}
+.hunter-radar-legend .loss{color:#ff6868}
+.hunter-radar-placeholder button.axis{border:0;background:transparent;padding:3px;cursor:pointer;color:var(--ivory,#eee)}
+.hunter-radar-placeholder button.axis.loss{color:#ff6868}
+.hunter-radar-placeholder button.axis:focus-visible{outline:2px solid currentColor;border-radius:6px}
+.hunter-radar-shape.loss{stroke:#ff6868;fill:rgba(255,104,104,.12)}
+.hunter-radar-node.loss{fill:#ff6868}
+.hunter-radar-scale{font:700 9px sans-serif;fill:var(--metal,#aaa);paint-order:stroke;stroke:var(--bg,#101114);stroke-width:2px}
+.hunter-radar-note,.hunter-distribution-denominator{font-size:11px;line-height:1.6;color:var(--metal,#aaa);overflow-wrap:anywhere}
+.hunter-distribution-denominator{padding:10px 0}
+.hunter-radar-placeholder .axis-burst{right:0}
+.hunter-radar-placeholder .axis-taken-burst{left:0}

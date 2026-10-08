@@ -23,8 +23,20 @@ function hunterAchievementIntegrityStatusLabel(value){
 }
 
 function hunterRadarVisualValue(share){
-  // 50% actual distribution = full visual radius. Labels always show the true percentage.
-  return Math.max(0,Math.min(100,Number(share||0)*2));
+  // The full radius is 100%; missing denominators are handled before plotting.
+  return Math.max(0,Math.min(100,Number(share||0)));
+}
+
+function hunterDistributionRows(bucket,metric="points"){
+  const types=["extreme","knockout","burst","spin"];
+  const totalEvents=types.reduce((sum,type)=>sum+Number(bucket[type].events||0),0);
+  const totalPoints=types.reduce((sum,type)=>sum+Number(bucket[type].points||0),0);
+  const denominator=metric==="events"?totalEvents:totalPoints;
+  return types.map(type=>{
+    const row=bucket[type],numerator=Number(row[metric==="events"?"events":"points"]||0);
+    return {type,events:Number(row.events||0),points:Number(row.points||0),totalEvents,totalPoints,numerator,denominator,
+      share:denominator>0?Math.round(numerator/denominator*100):null};
+  });
 }
 
 function hunterRadarPolygonPoints(values,radius=105,cx=160,cy=160){
@@ -235,6 +247,6 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();
