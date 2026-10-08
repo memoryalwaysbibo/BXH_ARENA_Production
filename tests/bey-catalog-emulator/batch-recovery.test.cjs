@@ -55,3 +55,19 @@ test('conflict status persists without changing manually corrected document',asy
   assert.equal((await getDoc(doc(db,'beyParts','part-conflict'))).data().sha256,'manual-edit');
  });
 });
+
+test('197-record synthetic workload survives interruption and replay',async()=>{
+ const e=await setup();
+ const b=fixture('volume197');
+ b.parts=Array.from({length:195},(_,i)=>({partId:'vol-'+String(i).padStart(3,'0')}));
+ const plan=planStaging(b);
+ assert.equal(plan.recordCount,197);
+ await e.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();
+  await assert.rejects(()=>resumeEmulatorBatch(db,target,plan,{afterRecord:async index=>{if(index===72)throw Error('STOP_AT_73')}}),/STOP_AT_73/);
+  const result=await resumeEmulatorBatch(db,target,plan);
+  assert.equal(result.inserted,124);assert.equal(result.unchanged,73);assert.equal(result.conflicts,0);
+  const again=await resumeEmulatorBatch(db,target,plan);
+  assert.equal(again.inserted,0);assert.equal(again.unchanged,197);
+ });
+});
