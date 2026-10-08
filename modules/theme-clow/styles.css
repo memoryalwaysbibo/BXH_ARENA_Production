@@ -6,9 +6,9 @@
   --accent-border:rgba(239,167,203,.42);--accent-contrast:#200d29;
   --glass-surface:rgba(22,12,35,.65);--glass-surface-strong:rgba(22,12,35,.87);
 }
-:root[data-bxh-theme="clow"] .auth-shell{background:linear-gradient(180deg,rgba(6,8,14,.10),rgba(12,4,10,.26) 55%,rgba(6,8,14,.15)),url('../../assets/clow/tomoeda-night.webp') center top/cover no-repeat,#120b23}
-:root[data-bxh-theme="clow"] .landing-tagline-brand{color:#ffd7e8;text-shadow:0 0 16px #efa7cb77}
-:root[data-bxh-theme="clow"] .auth-brand-header::after{content:"庫洛魔法使";display:block;color:#ffe1ee;letter-spacing:.27em;margin-top:12px;font-size:15px}
+:root[data-bxh-theme="clow"] .auth-shell{background:linear-gradient(180deg,rgba(6,8,14,.10),rgba(4,10,25,.26) 55%,rgba(6,8,14,.15)),url('../../assets/clow/tomoeda-night.webp') center top/cover no-repeat,#120b23}
+:root[data-bxh-theme="clow"] .landing-tagline-brand{color:#ffe49c;text-shadow:0 0 16px #f0c56377}
+:root[data-bxh-theme="clow"] .auth-brand-header::after{content:"庫洛魔法使";display:block;color:#ffe3a0;letter-spacing:.27em;margin-top:12px;font-size:15px}
 :root[data-bxh-theme="clow"] .landing-role-cards{grid-template-columns:1fr;gap:13px;max-width:540px;margin:24px auto 0}
 :root[data-bxh-theme="clow"] .role-card{--clow-tone:#ffc3df;position:relative;isolation:isolate;overflow:hidden;min-height:180px!important;border:1px solid var(--clow-tone)!important;border-radius:18px!important;background:#1b102b!important;box-shadow:0 0 22px color-mix(in srgb,var(--clow-tone) 17%,transparent)}
 :root[data-bxh-theme="clow"] .role-card-player{--clow-tone:#9fe3c3}
@@ -42,10 +42,10 @@
 :root[data-bxh-theme="clow"] .auth-wm,:root[data-bxh-theme="clow"] .auth-beams,:root[data-bxh-theme="clow"] .auth-particles{display:none}
 :root[data-bxh-theme="clow"] .auth-shell::after{position:absolute;background:linear-gradient(90deg,rgba(3,4,10,.18),transparent 35%,transparent 65%,rgba(3,4,10,.18));animation:none}
 :root[data-bxh-theme="clow"] .auth-brand-header{padding-top:60px;margin-bottom:18px}
-:root[data-bxh-theme="clow"] .auth-brand-header .celeb-brand{color:#fff2ff;text-shadow:0 2px 8px #08030b,0 0 26px #e690c888}
-:root[data-bxh-theme="clow"] .auth-brand-header::after{color:#ffdaeb;text-shadow:0 2px 7px #05050b;letter-spacing:.45em}
-:root[data-bxh-theme="clow"] .auth-tagline,:root[data-bxh-theme="clow"] .auth-footnote{color:#f2dfed;text-shadow:0 1px 5px #000}
+:root[data-bxh-theme="clow"] .auth-brand-header .celeb-brand{color:#fff2ce;text-shadow:0 2px 8px #040917,0 0 26px #e7bf6388}
+:root[data-bxh-theme="clow"] .auth-brand-header::after{color:#ffe3a0;text-shadow:0 2px 7px #05050b;letter-spacing:.45em}
+:root[data-bxh-theme="clow"] .auth-tagline,:root[data-bxh-theme="clow"] .auth-footnote{color:#e9e3d2;text-shadow:0 1px 5px #000}
 :root[data-bxh-theme="clow"] .role-card{box-shadow:0 0 6px color-mix(in srgb,var(--clow-tone) 50%,transparent),0 0 22px color-mix(in srgb,var(--clow-tone) 23%,transparent),0 12px 26px #0008}
-:root[data-bxh-theme="clow"] .landing-home>.btn-row .btn-primary{background:linear-gradient(135deg,#77527f,#cc8bb6)!important;border:1px solid #ffe0b2!important;color:#fff2e3!important;box-shadow:0 0 15px #dc91be55}
+:root[data-bxh-theme="clow"] .landing-home>.btn-row .btn-primary{background:linear-gradient(135deg,#c99638,#f0d18a)!important;border:1px solid #ffe0b2!important;color:#182035!important;box-shadow:0 0 15px #e4b75955}
 :root[data-bxh-theme="clow"] .landing-home>.btn-row .btn-ghost{background:#0a0b13c9!important;border:1px solid #9593a266!important;color:#eae4ee!important}
 @media(min-width:700px){:root[data-bxh-theme="clow"] .auth-shell{background-size:cover;background-position:center 28%}:root[data-bxh-theme="clow"] .auth-brand-header{padding-top:24px}}
