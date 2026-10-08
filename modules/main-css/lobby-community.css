@@ -649,6 +649,9 @@ button.ai-create-event-card.is-selected{
 .live-next-eta{color:#c7caa2;font-size:10px;font-weight:800;white-space:nowrap}
 .live-next-muted{color:#858c95}
 .live-dashboard-panel .live-court-empty{padding:16px 12px}
+.ref-workstation-meta .ref-court-exit-btn{align-self:flex-end;margin-top:7px;padding:8px 14px;border:1px solid #ff8282;border-radius:9px;background:#6f202b;color:#fff;font-size:13px;font-weight:900;box-shadow:0 0 0 1px rgba(255,100,100,.16)}
+.ref-workstation-meta .ref-court-exit-btn:hover:not(:disabled),.ref-workstation-meta .ref-court-exit-btn:focus-visible{background:#9c2835;border-color:#ffb2b2;outline:2px solid #ffd0d0;outline-offset:2px}
+.ref-workstation-meta .ref-court-exit-btn:disabled{opacity:.5;cursor:wait}
 .live-court-switch{display:none}
 @media(max-width:640px){
   .live-court-switch{display:block;margin:0 0 10px;overflow:hidden}
@@ -656,6 +659,8 @@ button.ai-create-event-card.is-selected{
   .live-court-switch-btn{flex:0 0 76px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid color-mix(in srgb,var(--court-accent,var(--gold)) 50%,rgba(255,255,255,.12));border-radius:10px;background:rgba(255,255,255,.04);color:#f4f5f7;scroll-snap-align:center;cursor:pointer}
   .live-court-switch-btn strong{font-size:13px;line-height:1.1}.live-court-switch-btn span{font-size:10px;color:#bfc5cd;white-space:nowrap}
   .live-court-switch-btn.is-selected{border-color:var(--court-accent,var(--gold));background:color-mix(in srgb,var(--court-accent,var(--gold)) 18%,#101019);box-shadow:0 0 0 2px color-mix(in srgb,var(--court-accent,var(--gold)) 25%,transparent)}
+  .live-court-switch-all{border-color:#d6b268;background:rgba(214,178,104,.1)}
+  .live-court-switch-all.is-selected{border-color:#f5d982;background:rgba(214,178,104,.25);box-shadow:0 0 0 2px rgba(245,217,130,.22)}
   .live-court-switch-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
   .live-dashboard-panel .live-court-grid[data-mobile-switcher="true"] .live-court-card:not([data-selected="true"]){display:none}
 }
