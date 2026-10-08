@@ -241,6 +241,9 @@ jobs:
             echo "::error title=CODE_FAIL_OR_INFRA_FAIL::UI Smoke failed twice."
             exit "$rc"
           fi
+      - name: Verify Hunter Clash A1 entry in Chromium
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/hunter-clash-a1-browser.cjs
       - name: Verify isolated community quick registration in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/community-quick-registration-browser.cjs

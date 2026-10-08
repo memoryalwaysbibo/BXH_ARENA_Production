@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    { name: "Hunter Clash A1 identity gate and camera lifecycle", args: ["--test", "tests/hunter-clash-a1-entry.test.cjs"] },
     { name: 'hunter B6 grade transparency and career replay', args: ['--test', 'tests/hunter-b6-license.test.cjs'] },
     { name: 'hunter B5 offline replay and strength diagnostics', args: ['--test', 'tests/hunter-b5-strength.test.cjs'] },
     { name: 'hunter B4 sample maturity and comparable recent windows', args: ['--test', 'tests/hunter-b4-trends.test.cjs'] },

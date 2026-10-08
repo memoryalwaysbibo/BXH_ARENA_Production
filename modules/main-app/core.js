@@ -5341,6 +5341,9 @@ let findEventsExpanded = { ongoing:false, open:false, upcoming:false };
 let findEventsFiltersOpen = false;
 let lobbySectionExpanded = { live:null, settling:false, registration:false, waiting:false, ended:false };
 const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","天梯排行"]];
+const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>renderPreservingScroll(),escape:esc});
+function playerVisibleTabs(){return hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:PLAYER_TABS;}
+
 let engagementSnapshot=null;
 let engagementSnapshotUid="";
 let engagementLoading=false;
@@ -13904,7 +13907,7 @@ function playerDerivedId(p){
 
 function renderPlayerNavHtml(){
   return `<nav class="player-tabs">
-    ${PLAYER_TABS.map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
+    ${playerVisibleTabs().map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
   </nav>`;
 }
 
@@ -13924,6 +13927,7 @@ function renderPlayerCenterLoggedIn(){
   if(mail.messages===null&&!mail.loading&&!mail.busy&&!mail.error)setTimeout(()=>loadMailbox(false),0);
   // v13.24.0: legacy cached "find" tab now resolves into the unified lobby.
   if(playerActiveTab==="find") playerActiveTab="home";
+  if(playerActiveTab==="clash"&&!hunterClashEntry?.visible())playerActiveTab="home";
   let content;
   if(mailboxContext().open) content = renderMailboxPage();
   else if(playerActiveTab==="items") content = renderInventoryPage();
@@ -13932,6 +13936,7 @@ function renderPlayerCenterLoggedIn(){
   else if(playerActiveTab==="registered") content = renderPlayerRegisteredTab();
   else if(playerActiveTab==="checkin") content = renderDailyCheckInPage();
   else if(playerActiveTab==="host") content = renderPlayerCommunityHostTab();
+  else if(playerActiveTab==="clash") content = hunterClashEntry.render();
   else if(playerActiveTab==="stats") content = renderPlayerStatsTab(p);
   else if(playerActiveTab==="ladder") content = renderLadderLeaderboardPage(false);
   else if(playerActiveTab==="profile") content = renderPlayerProfileTab(p);
@@ -13950,7 +13955,7 @@ function renderPlayerCenterLoggedIn(){
       ${content}
     </main>
     <nav class="player-tabs player-tabs-bottom">
-      ${PLAYER_TABS.map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
+      ${playerVisibleTabs().map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
     </nav>
     ${renderModal()}
     ${renderCloudJoinModal()}
@@ -17151,7 +17156,7 @@ function restoreAuthenticatedView(uid,intent){
  }
  if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
-  appPhase='player-center';playerActiveTab=PLAYER_TABS.some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
+  appPhase='player-center';playerActiveTab=playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
  }
  if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer'||intent==='event_staff')){
   appPhase='app';
@@ -17206,6 +17211,7 @@ function finishRenderViewport(snapshot){
   setTimeout(restore, 180);
 }
 function render(){
+  hunterClashEntry?.session(firebaseUser,userProfile);
   if(!communitySettingsDraftContext())communitySettingsRenderedContext=null;
   reconcileRegistrationRosterContext();
   reconcileAdminTournamentListContext();
@@ -17253,6 +17259,7 @@ function render(){
     renderApp();
     bindAuthInputs();
   } finally {
+    hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]")&&!document.hidden);
     syncBoardFullscreen();
     scheduleCourtCallPoll();
     syncPublicTournamentsRealtimeState();
@@ -19906,10 +19913,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
+  if(hunterClashEntry?.handle(action))return;
   if(action==="player-switch-tab"){
     accountMenuOpen=false;
     mailboxContext().open=false;
     let newTab = target.getAttribute("data-tab");
+    if(newTab==="clash"&&!hunterClashEntry?.visible())return;
     if(newTab==="find") newTab="home"; // legacy v13.23.x cached/action compatibility
     if(newTab==="stats" && playerActiveTab!=="stats") playerStatsSubTab="overview";
     if(playerActiveTab==="home" && newTab!=="home") findEventsFiltersOpen=false;
@@ -23828,3 +23837,7 @@ init().then(()=>{
     }
   }catch(e){}
 });
+
+// Release the A1 camera on backgrounding and navigation; no PK polling exists in A1.
+window.addEventListener("pagehide",()=>hunterClashEntry?.suspend());
+document.addEventListener("visibilitychange",()=>{if(document.hidden)hunterClashEntry?.suspend();else hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]"));});
