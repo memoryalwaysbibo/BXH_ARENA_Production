@@ -9340,7 +9340,21 @@ async function refreshLiveFromCloud(){
   }
 }
 
-function liveCourtCardHtml(stationNum){
+let liveSelectedCourt=0;
+let liveSelectedRoom="";
+let liveCourtSwitchScrollLeft=0;
+let liveCourtSwitchCenterRequested=false;
+function liveCourtSelection(stationCount){
+  const room=String(state.cloudCode||state.id||"");
+  if(room!==liveSelectedRoom){liveSelectedRoom=room;liveSelectedCourt=0;liveCourtSwitchScrollLeft=0;}
+  if(liveSelectedCourt<1||liveSelectedCourt>stationCount){
+    liveSelectedCourt=Array.from({length:stationCount},(_,i)=>i+1)
+      .find(i=>liveCurrentMatchForStation(i).m&&!liveCurrentMatchForStation(i).m.completed)||1;
+    liveCourtSwitchCenterRequested=true;
+  }
+  return liveSelectedCourt;
+}
+function liveCourtCardHtml(stationNum,selectedCourt){
   const current=liveCurrentMatchForStation(stationNum);
   const court=current.court,m=current.m;
   const assigned=refereeDisplayForStation(stationNum);
@@ -9360,7 +9374,7 @@ function liveCourtCardHtml(stationNum){
   }else{
     body='<div class="live-court-empty"><b>'+(future?"等待晉級結果":"本台賽程已完成")+'</b><span>'+(future?"前序賽果確認後將自動安排":"目前沒有待執行場次")+'</span></div>'+(future?nextPreview:"");
   }
-  return '<section class="live-court-card" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
+  return '<section class="live-court-card" data-live-court="'+stationNum+'" data-selected="'+(stationNum===selectedCourt)+'" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
 }
 function renderLive(){
   const fmt = state.meta.formatType || "single";
@@ -9373,7 +9387,14 @@ function renderLive(){
   const officialCount=officialPlayers.length;
 
   const stationCount=Math.max(1,Number(state.meta.stations)||1);
-  const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1)).join("");
+  const selectedCourt=liveCourtSelection(stationCount);
+  const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1,selectedCourt)).join("");
+  const liveCourtSwitchHtml=stationCount>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track">${Array.from({length:stationCount},(_,i)=>{
+    const n=i+1,current=liveCurrentMatchForStation(n),m=current.m;
+    const hasFuture=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===n&&!mm.completed);
+    const status=m?refereeStationStatus(m).label:(hasFuture?"等待中":"已完成");
+    return `<button type="button" class="live-court-switch-btn ${n===selectedCourt?"is-selected":""}" data-action="live-select-court" data-court="${n}" aria-pressed="${n===selectedCourt}" style="${courtAtmosphereStyle(n)}"><strong>${n}號台</strong><span>${esc(status)}</span></button>`;
+  }).join("")}</div></div>`:"";
   const rankingOpen=typeof window==="undefined"||Number(window.innerWidth||0)>640;
 
   let rankRows = "";
@@ -9430,7 +9451,8 @@ function renderLive(){
       ${liveStageNodesHtml(liveStage)}
     </div>
     <div class="live-dashboard-courts">
-      <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}">${liveCourtsHtml}</div>
+      ${liveCourtSwitchHtml}
+      <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}" data-mobile-switcher="${stationCount>1}">${liveCourtsHtml}</div>
     </div>
     ${publicWatchReturnContext?"":renderArchiveControls()}
   </div>`;
@@ -11202,10 +11224,11 @@ function renderStaffAssignmentPanel(){
     <div class="panel-title">被分派的工作人員</div>
     <p class="hint">未勾選任何人時，所有在職 staff／admin 皆可操作此賽事（過渡期預設）；勾選後，只有勾選的人可以操作此賽事的資料。</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
-      ${candidates.map(u=>`
+      ${candidates.map((u,index)=>`
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
           <input type="checkbox" class="staff-assign-checkbox" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} style="width:18px;height:18px;">
-          ${esc((typeof u.realName==="string" && u.realName.trim()) || "未填寫本名")}　<span class="hint" style="margin:0;">(${u.role==="admin"?"管理員":"工作人員"})</span>
+          <span style="min-width:3ch;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums;">${index+1}.</span>
+          ${esc((typeof u.realName==="string" && u.realName.trim()) || (([u.gameId,u.displayName,u.nickname].find(value=>typeof value==="string" && value.trim()) || "未設定ID").trim()+"（缺少本名）"))}　<span class="hint" style="margin:0;">(${u.role==="admin"?"管理員":"工作人員"})</span>
         </label>`).join("")}
     </div>
     <div class="btn-row" style="margin-top:12px;">
@@ -11235,7 +11258,7 @@ function renderRefereeStationAssignmentPanel(){
     : '<p class="hint">本賽事尚未建立工作人員分派名單，以下為所有具權限帳號，並非 BXH 正式人事名冊。請先在「工作人員分派」指定本場人員。</p>';
   const rows=Array.from({length:n},(_,i)=>i+1).map(station=>{
     const assigned=Array.isArray(map[String(station)])?map[String(station)]:[];
-    return `<div class="panel" style="margin:0;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>Court ${station}</b><span class="badge ${assigned.length?'badge-neon':'badge-metal'}">${assigned.length?assigned.length+' 位裁判':'未指派'}</span></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${candidates.length?candidates.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" class="referee-station-checkbox" data-station="${station}" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} ${refereeAssignmentSaving?'disabled':''} style="width:18px;height:18px;"><span>${esc(u.displayName||u.realName||u.uid)}</span><span class="hint" style="margin:0;">${u.uid===creatorUid?'建立者｜':''}${u.role==='super_admin'?'最高管理員':u.role==='admin'?'管理員':u.role==='tester'?'封測管理員（測試）':u.role==='event_staff'?'工作人員（活動）':'工作人員'}</span></label>`).join(''):'<span class="hint">目前沒有可用的裁判帳號。</span>'}</div></div>`;
+    return `<div class="panel" style="margin:0;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>Court ${station}</b><span class="badge ${assigned.length?'badge-neon':'badge-metal'}">${assigned.length?assigned.length+' 位裁判':'未指派'}</span></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${candidates.length?candidates.map((u,index)=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" class="referee-station-checkbox" data-station="${station}" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} ${refereeAssignmentSaving?'disabled':''} style="width:18px;height:18px;"><span style="min-width:3ch;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums;">${index+1}.</span><span>${esc((typeof u.realName==="string" && u.realName.trim()) || (([u.gameId,u.displayName,u.nickname].find(value=>typeof value==="string" && value.trim()) || "未設定ID").trim()+"（缺少本名）"))}</span><span class="hint" style="margin:0;">${u.uid===creatorUid?'建立者｜':''}${u.role==='super_admin'?'最高管理員':u.role==='admin'?'管理員':u.role==='tester'?'封測管理員（測試）':u.role==='event_staff'?'工作人員（活動）':'工作人員'}</span></label>`).join(''):'<span class="hint">目前沒有可用的裁判帳號。</span>'}</div></div>`;
   }).join('');
   const draftHint=typeof refereeAssignmentDraftEnabled==="boolean"&&refereeAssignmentDraftEnabled!==refereeStationRestrictionEnabled()?'<div class="hint" style="margin-top:8px;color:var(--gold);">桌次限制尚未儲存，請按「儲存裁判台分配」。</div>':'';
   return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">建議賽前完成分配。啟用後，未被指定的 staff 在其他 Court 只可查看，不能計分、確認結果、簡易判定、暫停、跳過或重賽。玩家端只會看到裁判顯示名稱，不公開 UID。</p>${directoryHint}${refereeDirectoryError?`<div class="auth-error">${esc(refereeDirectoryError)}</div>`:""}<div class="toggle-row" style="margin:12px 0;"><span><b>啟用桌次限制</b><small>未啟用時沿用既有賽事權限；啟用後依 Court 指派限制。</small></span><button class="toggle ${enabled?'on':''}" data-action="toggle-referee-station-restriction" data-value="${enabled?'false':'true'}" ${refereeAssignmentSaving?'disabled':''}><span></span></button></div>${draftHint}<div style="display:flex;flex-direction:column;gap:10px;">${rows}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="save-referee-station-assignment" ${refereeAssignmentSaving?'disabled':''}>${refereeAssignmentSaving?'雲端交易確認中…':'儲存裁判台分配'}</button><button class="btn btn-ghost" data-action="load-referee-directory" ${refereeAssignmentSaving?'disabled':''}>重新載入名單</button></div></div>`;
@@ -17983,6 +18006,17 @@ function renderApp(){
       mainTabNavCenterRequested=false;
       nav.addEventListener("scroll",()=>{ mainTabNavScrollLeft=nav.scrollLeft; },{passive:true});
     }
+    const courtTrack=app.querySelector(".live-court-switch-track");
+    if(courtTrack){
+      const maxLeft=Math.max(0,courtTrack.scrollWidth-courtTrack.clientWidth);
+      if(liveCourtSwitchCenterRequested){
+        const selected=courtTrack.querySelector(".is-selected");
+        liveCourtSwitchScrollLeft=selected?Math.min(maxLeft,Math.max(0,selected.offsetLeft-(courtTrack.clientWidth-selected.offsetWidth)/2)):0;
+      }
+      courtTrack.scrollLeft=Math.min(maxLeft,Math.max(0,liveCourtSwitchScrollLeft));
+      liveCourtSwitchCenterRequested=false;
+      courtTrack.addEventListener("scroll",()=>{liveCourtSwitchScrollLeft=courtTrack.scrollLeft;},{passive:true});
+    }
   });
 
   if(activeTab==="bracket" && (state.meta.formatType||"single")==="single" && state.bracketSize){
@@ -21282,6 +21316,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     refreshLiveFromCloud();
     return;
   }
+  if(action==="live-select-court"){
+    const n=Number(target.getAttribute("data-court"));
+    const count=Math.max(1,Number(state.meta.stations)||1);
+    if(!Number.isInteger(n)||n<1||n>count)return;
+    liveSelectedCourt=n;
+    document.querySelectorAll(".live-court-switch-btn").forEach(button=>{
+      const selected=Number(button.getAttribute("data-court"))===n;
+      button.classList.toggle("is-selected",selected);
+      button.setAttribute("aria-pressed",String(selected));
+    });
+    document.querySelectorAll(".live-dashboard-courts .live-court-card").forEach(card=>{
+      card.setAttribute("data-selected",String(Number(card.getAttribute("data-live-court"))===n));
+    });
+    target.scrollIntoView?.({behavior:"smooth",block:"nearest",inline:"center"});
+    return;
+  }
   if(action==="bracket-refresh"){
     refreshBracketFromCloud();
     return;
@@ -22126,7 +22176,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             });
           }
           const uid=currentAuthUid();
-          if(uid && !refereeDirectoryUsers.some(u=>u.uid===uid)) refereeDirectoryUsers.push({uid,displayName:userProfile&&userProfile.displayName||adminDisplayName||uid,role:userProfile&&userProfile.role||"staff",active:true});
+          if(uid && !refereeDirectoryUsers.some(u=>u.uid===uid)) refereeDirectoryUsers.push({uid,realName:userProfile&&userProfile.realName||"",displayName:userProfile&&userProfile.displayName||adminDisplayName||uid,role:userProfile&&userProfile.role||"staff",active:true});
         }
       }catch(e){ refereeDirectoryError="讀取裁判清單失敗，請重新整理後再試"; }
       finally{ refereeDirectoryLoading=false; render(); }
@@ -22148,7 +22198,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const n=Math.max(1,Number(state.meta.stations)||1), map={}, nameMap={};
     for(let station=1;station<=n;station++){
       const list=[], names=[];
-      document.querySelectorAll(`.referee-station-checkbox[data-station="${station}"]`).forEach(cb=>{ if(cb.checked){ const uid=cb.getAttribute("data-uid"); if(uid&&!list.includes(uid)){ list.push(uid); const u=(refereeDirectoryUsers||[]).find(x=>x.uid===uid); names.push((u&&(u.displayName||u.realName))||uid); } } });
+      document.querySelectorAll(`.referee-station-checkbox[data-station="${station}"]`).forEach(cb=>{ if(cb.checked){ const uid=cb.getAttribute("data-uid"); if(uid&&!list.includes(uid)){ list.push(uid); const u=(refereeDirectoryUsers||[]).find(x=>x.uid===uid); names.push((u&&typeof u.realName==="string"&&u.realName.trim())||(([u&&u.gameId,u&&u.displayName,u&&u.nickname].find(value=>typeof value==="string"&&value.trim())||uid).trim()+"（缺少本名）")); } } });
       map[String(station)]=list; nameMap[String(station)]=names;
     }
     const previous={
@@ -22169,6 +22219,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     refereeAssignmentSaving=true;
     render();
     (async()=>{
+      let assignmentCommitted=false;
       try{
         // Referee assignment owns its own Firestore transaction. Drain older whole-state
         // writes first so an earlier snapshot cannot land immediately before/after it.
@@ -22176,6 +22227,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const result = window.cloudSync&&window.cloudSync.saveRefereeStationAssignments&&state.cloudCode
           ? await window.cloudSync.saveRefereeStationAssignments(state.cloudCode,state,{assignments:previous.assignments,restrictionEnabled:previous.restrictionEnabled})
           : {ok:false,reason:"cloud-unavailable"};
+        assignmentCommitted=!!(result&&(result.ok||result.committed));
         if(result&&result.ok){
           if(result.state){
             const keepCode=state.cloudCode;
@@ -22187,6 +22239,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           cloudStatus="connected"; cloudAccessLimited=false; cloudAccessMessage=""; cloudLastSyncAt=Date.now();
           await saveRecord(state);
           showToast("裁判台分配已完成原子同步與雲端確認");
+        }else if(result&&result.committed){
+          cloudStatus="connected";
+          showToast("裁判台分配已送出，雲端讀回核對尚未完成；請重新整理頁面確認",true);
         }else{
           state.meta.refereeStationAssignments=previous.assignments;
           state.meta.refereeStationNames=previous.names;
@@ -22211,19 +22266,26 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               showToast("裁判分配未儲存：已載入雲端最新分配，請確認後再儲存",true);
             }else showToast("裁判分配未儲存：資料已更新，請重新進入賽事後再試",true);
           }else if(reason==="verify-mismatch"||reason==="verify-not-found"){
-            cloudStatus="error"; showToast("裁判分配未儲存：雲端讀回資料不一致，已還原畫面",true);
+            cloudStatus="connected"; showToast("裁判分配讀回核對未完成，請重新整理頁面確認",true);
           }else{
-            cloudStatus="error"; showToast("裁判分配未儲存：雲端連線失敗，已還原原設定",true);
+            const networkError=["unavailable","deadline-exceeded","network-request-failed","auth/network-request-failed"].includes(reason);
+            cloudStatus=networkError?"error":"connected";
+            showToast(networkError?"裁判分配未儲存：雲端目前無法連線，已還原原設定":"裁判分配未儲存，請確認賽事狀態後再試",true);
           }
         }
       }catch(e){
-        state.meta.refereeStationAssignments=previous.assignments;
-        state.meta.refereeStationNames=previous.names;
-        state.meta.assignedStaffUids=previous.assignedStaffUids;
-        state.meta.refereeStationRestrictionEnabled=previous.restrictionEnabled;
-        cloudStatus="error";
+        if(assignmentCommitted){
+          cloudStatus="connected";
+          showToast("裁判分配已送出，本機暫存未完成；請重新整理頁面確認",true);
+        }else{
+          state.meta.refereeStationAssignments=previous.assignments;
+          state.meta.refereeStationNames=previous.names;
+          state.meta.assignedStaffUids=previous.assignedStaffUids;
+          state.meta.refereeStationRestrictionEnabled=previous.restrictionEnabled;
+          cloudStatus=["unavailable","deadline-exceeded","network-request-failed","auth/network-request-failed"].includes(String(e?.code||""))?"error":"connected";
+          showToast("裁判分配未儲存，已還原原設定",true);
+        }
         console.warn("[referee assignment]",{code:(e&&e.code)||"unknown",message:(e&&e.message)||String(e)});
-        showToast("裁判分配未儲存，已還原原設定",true);
       }finally{
         refereeAssignmentSaving=false;
         render();
@@ -22270,18 +22332,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const selected = [];
     checkboxes.forEach(cb=>{ if(cb.checked){ const uid=String(cb.getAttribute("data-uid")||"").trim(); if(uid&&!selected.includes(uid)) selected.push(uid); } });
     const previous = Array.isArray(state.meta.assignedStaffUids) ? state.meta.assignedStaffUids.slice() : [];
-    const refereeUids = typeof flattenedRefereeStationUids==="function" ? flattenedRefereeStationUids() : [];
-    const requested = [...new Set(selected.concat(refereeUids))];
+    const requested = selected.slice();
     state.meta.assignedStaffUids = requested;
     staffAssignmentSaving = true;
     render();
     (async()=>{
+      let assignmentCommitted=false;
       try{
         // Drain older whole-state writes first. Staff assignment then owns one
         // dedicated transaction so unrelated score/call/registration fields
         // cannot turn this small permission edit into a global LINK ERROR.
         await flushCloudStateWrites();
         const result = await window.cloudSync.saveStaffAssignments(state.cloudCode, requested);
+        assignmentCommitted=!!(result&&(result.ok||result.committed));
         if(result&&result.ok){
           if(result.state){
             const keepCode=state.cloudCode;
@@ -22299,6 +22362,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           await saveRecord(state);
           const savedCount=Array.isArray(state.meta.assignedStaffUids)?state.meta.assignedStaffUids.length:0;
           showToast(savedCount>0 ? ("已指派 "+savedCount+" 位工作人員，雲端已確認") : "已清除指派名單（恢復開放給所有在職工作人員）");
+        }else if(result&&result.committed){
+          cloudStatus="connected";
+          showToast("工作人員指派已送出，雲端讀回核對尚未完成；請重新整理頁面確認",true);
         }else{
           state.meta.assignedStaffUids=previous;
           const reason=(result&&result.reason)||"unknown";
@@ -22329,15 +22395,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           }
         }
       }catch(e){
-        state.meta.assignedStaffUids=previous;
         const code=String((e&&e.code)||"");
-        if(code==="unavailable"||code==="deadline-exceeded"||code==="network-request-failed"){
-          cloudStatus="error";
-        }else{
+        if(assignmentCommitted){
           cloudStatus="connected";
+          showToast("工作人員指派已送出，本機暫存未完成；請重新整理頁面確認",true);
+        }else{
+          state.meta.assignedStaffUids=previous;
+          cloudStatus=["unavailable","deadline-exceeded","network-request-failed","auth/network-request-failed"].includes(code)?"error":"connected";
+          showToast("工作人員指派未儲存，已還原原設定",true);
         }
         console.warn("[staff assignment]",{code:code||"unknown",message:(e&&e.message)||String(e)});
-        showToast("工作人員指派未儲存，已還原原設定",true);
       }finally{
         staffAssignmentSaving=false;
         render();

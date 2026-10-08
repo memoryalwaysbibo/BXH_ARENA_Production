@@ -583,7 +583,15 @@
         if(!us.exists()) return {ok:false};
         const u=us.data()||{};
         if(!["staff","admin","super_admin","tester"].includes(u.role)||u.active===false) return {ok:false};
-        await fx.setDoc(fx.doc(dbHandle,"staffDirectory",uid),{uid,displayName:u.displayName||u.realName||u.email||uid,role:u.role,active:u.active!==false,updatedAt:Date.now()},{merge:true});
+        const directoryRef=fx.doc(dbHandle,"staffDirectory",uid);
+        // Enriched names are maintained by admin sync. The legacy self-write
+        // rule only accepts the original directory fields; preserve enrichment.
+        if(!["admin","super_admin"].includes(u.role)){
+          const existing=await fx.getDoc(directoryRef);
+          if(existing.exists()&&(Object.prototype.hasOwnProperty.call(existing.data(),"realName")
+            ||Object.prototype.hasOwnProperty.call(existing.data(),"gameId"))) return {ok:true};
+        }
+        await fx.setDoc(directoryRef,{uid,displayName:u.displayName||u.realName||u.email||uid,role:u.role,active:u.active!==false,updatedAt:Date.now()},{merge:true});
         return {ok:true};
       }catch(e){ return {ok:false}; }
     },
@@ -602,7 +610,7 @@
       try{
         const batch=fx.writeBatch(dbHandle); let count=0;
         users.filter(u=>u&&u.uid&&u.active!==false&&["staff","admin","super_admin"].includes(u.role)).forEach(u=>{
-          batch.set(fx.doc(dbHandle,"staffDirectory",u.uid),{uid:u.uid,displayName:u.displayName||u.realName||u.email||u.uid,role:u.role,active:true,updatedAt:Date.now()},{merge:true}); count++;
+          batch.set(fx.doc(dbHandle,"staffDirectory",u.uid),{uid:u.uid,realName:typeof u.realName==="string"?u.realName.trim():"",gameId:typeof u.gameId==="string"?u.gameId.trim():"",displayName:u.displayName||u.realName||u.uid,role:u.role,active:true,updatedAt:Date.now()},{merge:true}); count++;
         });
         if(count) await batch.commit();
         return true;
@@ -2784,8 +2792,11 @@ if(testerSession){
             data.meta.refereeStationAssignments=canonicalAssignments;
             data.meta.refereeStationNames=canonicalNames;
             data.meta.refereeStationRestrictionEnabled=canonicalRestriction;
-            const incomingAssigned=Array.isArray(data.meta.assignedStaffUids)?data.meta.assignedStaffUids.map(String).filter(Boolean):[];
-            data.meta.assignedStaffUids=[...new Set(incomingAssigned.concat(canonicalUids))];
+            // Staff assignment is also transaction-owned. A stale score/settings
+            // snapshot must not remove new staff or resurrect removed staff.
+            const canonicalStaff=Array.isArray(remoteDoc.assignedStaffUids)
+              ?remoteDoc.assignedStaffUids:(Array.isArray(remoteMeta.assignedStaffUids)?remoteMeta.assignedStaffUids:[]);
+            data.meta.assignedStaffUids=[...new Set(canonicalStaff.map(String).filter(Boolean).concat(canonicalUids))];
             privatePayload.data=JSON.stringify(data);
             // Community rooms are owned by a player and deliberately have no
             // top-level staff/referee assignment contract. Re-adding these
@@ -2832,6 +2843,7 @@ if(testerSession){
       const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
       if(!actorUid) return {ok:false,reason:"unauthenticated"};
       const requested=[...new Set((Array.isArray(requestedUids)?requestedUids:[]).map(v=>String(v||"").trim()).filter(Boolean))];
+      let committed=false;
       try{
         const outcome=await fx.runTransaction(dbHandle,async tx=>{
           const snap=await tx.get(ref);
@@ -2848,21 +2860,38 @@ if(testerSession){
           if(!remoteState||!remoteState.meta) throw new Error("corrupt-data");
           if(remoteState.archiveStatus==="completed") throw new Error("already-completed");
 
-          // Referee station assignees are a stronger operational dependency than
-          // the broad staff list. Never let a staff-list edit silently remove a
-          // referee who is already bound to a Court.
-          const refereeUids=Array.isArray(docData.refereeStationUids)
-            ? docData.refereeStationUids.map(String).filter(Boolean)
-            : (()=>{ const out=[]; Object.values(remoteState.meta.refereeStationAssignments||{}).forEach(list=>{ if(Array.isArray(list)) list.forEach(uid=>{ uid=String(uid||""); if(uid&&!out.includes(uid)) out.push(uid); }); }); return out; })();
-          const assigned=[...new Set(requested.concat(refereeUids))];
+          // A staff edit is an exact replacement. Remove deselected people from
+          // Court bindings in the same transaction so their permissions and labels
+          // cannot survive the cancellation or silently repopulate the staff list.
+          const assigned=requested.slice();
+          const source=docData.refereeStationAssignments||remoteState.meta.refereeStationAssignments||{};
+          const map={}, names={}, allUids=[];
+          for(const [station,list] of Object.entries(source)){
+            map[station]=[...new Set((Array.isArray(list)?list:[]).map(String).filter(uid=>assigned.includes(uid)))];
+            map[station].forEach(uid=>{if(!allUids.includes(uid)) allUids.push(uid);});
+          }
+          const profiles={};
+          for(const uid of allUids){
+            const profileSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,uid));
+            profiles[uid]=profileSnap.exists()?profileSnap.data():{};
+          }
+          for(const [station,list] of Object.entries(map)) names[station]=list.map(uid=>{
+            const profile=profiles[uid]||{};
+            return (typeof profile.realName==="string"&&profile.realName.trim())
+              || (([profile.gameId,profile.displayName,profile.nickname].find(value=>typeof value==="string"&&value.trim())||uid).trim()+"（缺少本名）");
+          });
           const now=Date.now();
           remoteState.meta.assignedStaffUids=assigned;
+          remoteState.meta.refereeStationAssignments=map;
+          remoteState.meta.refereeStationNames=names;
+          remoteState.meta.refereeStationRestrictionEnabled=docData.refereeStationRestrictionEnabled===undefined
+            ?!!remoteState.meta.refereeStationRestrictionEnabled:!!docData.refereeStationRestrictionEnabled;
           remoteState.updatedAt=now;
 
           const patch={
-            data:JSON.stringify(remoteState),
-            updatedAt:now,
-            assignedStaffUids:assigned
+            data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,
+            refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,
+            refereeStationRestrictionEnabled:remoteState.meta.refereeStationRestrictionEnabled
           };
           Object.assign(patch,courtLifecycleWritePatch(docData,remoteState));
           // Keep registration-selection guard aligned with the newest server
@@ -2870,34 +2899,54 @@ if(testerSession){
           if(Number(docData.entrySelectionRevision||0)>0){
             patch.entrySelectionWriteRevision=Number(docData.entrySelectionRevision);
           }
-          tx.set(ref,patch,{merge:true});
+          tx.update(ref,patch);
+          tx.set(fx.doc(dbHandle,"publicTournaments",normalizedCode),{
+            bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,
+            tournamentPhase:computeTournamentPhase(remoteState)
+          },{merge:true});
           return {state:remoteState,assignedStaffUids:assigned};
         });
 
-        const verify=fx.getDocFromServer?await fx.getDocFromServer(ref):await fx.getDoc(ref);
-        if(!verify.exists()) return {ok:false,reason:"verify-not-found"};
-        const vd=verify.data()||{};
-        let parsed={};
-        try{ parsed=typeof vd.data==="string"?JSON.parse(vd.data):(vd.data||{}); }catch(e){ return {ok:false,reason:"verify-mismatch"}; }
+        committed=true;
         const normalize=list=>[...new Set((Array.isArray(list)?list:[]).map(String).filter(Boolean))].sort();
-        const expected=normalize(outcome.assignedStaffUids);
-        const topLevel=normalize(vd.assignedStaffUids);
-        const nested=normalize(parsed&&parsed.meta&&parsed.meta.assignedStaffUids);
-        if(JSON.stringify(topLevel)!==JSON.stringify(expected)||JSON.stringify(nested)!==JSON.stringify(expected)){
-          return {ok:false,reason:"verify-mismatch"};
+        const expected=JSON.stringify(normalize(outcome.assignedStaffUids));
+        let reason="verify-mismatch";
+        // A committed transaction and readback confirmation are separate states.
+        // Briefly retry readback; never describe a committed write as rejected.
+        for(let attempt=0;attempt<3;attempt++){
+          if(attempt) await new Promise(resolve=>setTimeout(resolve,200*attempt));
+          try{
+            const verify=fx.getDocFromServer?await fx.getDocFromServer(ref):await fx.getDoc(ref);
+            if(!verify.exists()){reason="verify-not-found";continue;}
+            const vd=verify.data()||{};
+            const parsed=typeof vd.data==="string"?JSON.parse(vd.data):(vd.data||{});
+            if(JSON.stringify(normalize(vd.assignedStaffUids))!==expected
+              ||JSON.stringify(normalize(parsed?.meta?.assignedStaffUids))!==expected){reason="verify-mismatch";continue;}
+            const courtFields=["refereeStationAssignments","refereeStationNames"];
+            if(courtFields.some(key=>JSON.stringify(vd[key]||{})!==JSON.stringify(outcome.state.meta[key]||{})
+              ||JSON.stringify(parsed?.meta?.[key]||{})!==JSON.stringify(outcome.state.meta[key]||{}))){reason="verify-mismatch";continue;}
+            const publicRef=fx.doc(dbHandle,"publicTournaments",normalizedCode);
+            const publicSnap=fx.getDocFromServer?await fx.getDocFromServer(publicRef):await fx.getDoc(publicRef);
+            if(!publicSnap.exists()){reason="verify-not-found";continue;}
+            const publicDoc=publicSnap.data()||{};
+            const publicState=typeof publicDoc.bracketView==="string"?JSON.parse(publicDoc.bracketView):(publicDoc.bracketView||{});
+            if(JSON.stringify(publicState?.meta?.refereeStationNames||{})!==JSON.stringify(outcome.state.meta.refereeStationNames||{})){reason="verify-mismatch";continue;}
+            if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;
+            return {ok:true,committed:true,verified:true,state:parsed,assignedStaffUids:outcome.assignedStaffUids};
+          }catch(e){reason=String(e?.code||"verify-mismatch");}
         }
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;
-        return {ok:true,verified:true,state:outcome.state,assignedStaffUids:outcome.assignedStaffUids};
+        return {ok:false,committed:true,reason};
       }catch(e){
         const reason=String((e&&e.code)||(e&&e.message)||"unknown");
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=reason;
         console.warn("儲存工作人員指派失敗",{operation:"saveStaffAssignments",code:reason,tournamentCode:normalizedCode});
-        return {ok:false,reason};
+        return {ok:false,committed,reason};
       }
     },
 
     async saveRefereeStationAssignments(code, data, expectedConfig){
       if(!cloudEnabled || !code || !data || !fx.runTransaction) return {ok:false,reason:"cloud-unavailable"};
+      let committed=false;
       try{
         const requestedMeta=data.meta||{};
         const requestedRaw=(requestedMeta.refereeStationAssignments&&typeof requestedMeta.refereeStationAssignments==="object"&&!Array.isArray(requestedMeta.refereeStationAssignments))?requestedMeta.refereeStationAssignments:{};
@@ -2979,7 +3028,7 @@ if(testerSession){
               &&Array.isArray(eventAssignment.duties)&&eventAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee")){
               directory[uid]={uid,displayName:eventAssignment.displayName,role:"event_staff",active:true};continue;
             }
-            const directorySnap=await tx.get(fx.doc(dbHandle,"staffDirectory",uid));
+            const directorySnap=await tx.get(fx.doc(dbHandle,actorIsAdmin?USERS_COLLECTION:"staffDirectory",uid));
             if(!directorySnap.exists()) throw new Error("invalid-referee");
             directory[uid]=directorySnap.data()||{};
           }
@@ -2989,8 +3038,8 @@ if(testerSession){
               const profile=directory[uid]||{};
               const validRole=actorIsTesterOwner?(uid===actorUid&&(profile.role==="tester"||profile.isTestAccount===true)):["staff","admin","super_admin","event_staff"].includes(profile.role);
               if(profile.active!==true||!validRole) throw new Error("invalid-referee");
-              const displayName=String(profile.displayName||profile.realName||"").trim();
-              if(!displayName) throw new Error("invalid-referee");
+              const displayName=(typeof profile.realName==="string"&&profile.realName.trim())
+                || (([profile.gameId,profile.displayName,profile.nickname].find(value=>typeof value==="string"&&value.trim())||uid).trim()+"（缺少本名）");
               return displayName;
             });
           }
@@ -3005,27 +3054,37 @@ if(testerSession){
           remoteState.meta.assignedStaffUids=assigned;
           const now=Date.now();
           remoteState.updatedAt=now;
-          tx.set(ref,Object.assign({data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,refereeStationRestrictionEnabled:requestedRestriction},courtLifecycleWritePatch(docData,remoteState)),{merge:true});
+          // Replace each map field completely; recursive merge retains obsolete Courts.
+          tx.update(ref,Object.assign({data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,refereeStationRestrictionEnabled:requestedRestriction},courtLifecycleWritePatch(docData,remoteState)));
           tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
           return {state:remoteState,map,names,restriction:requestedRestriction};
         });
 
-        // Confirm both halves from the server. The UI reports success only when
-        // the private source and public mirror expose the same saved config.
-        const verifyPrivate=fx.getDocFromServer?await fx.getDocFromServer(ref):await fx.getDoc(ref);
-        const verifyPublic=fx.getDocFromServer?await fx.getDocFromServer(publicRef):await fx.getDoc(publicRef);
-        if(!verifyPrivate.exists()||!verifyPublic.exists()) return {ok:false,reason:"verify-not-found"};
-        const vd=verifyPrivate.data()||{};
-        let publicState={};
-        try{ publicState=JSON.parse((verifyPublic.data()||{}).bracketView||"{}"); }catch(e){ return {ok:false,reason:"verify-mismatch"}; }
-        const sameMap=JSON.stringify(vd.refereeStationAssignments||{})===JSON.stringify(outcome.map);
-        const sameNames=JSON.stringify(vd.refereeStationNames||{})===JSON.stringify(outcome.names);
-        const sameRestriction=!!vd.refereeStationRestrictionEnabled===outcome.restriction;
-        const publicNames=publicState&&publicState.meta&&publicState.meta.refereeStationNames||{};
-        const publicRestriction=!!(publicState&&publicState.meta&&publicState.meta.refereeStationRestrictionEnabled);
-        if(!sameMap||!sameNames||!sameRestriction||JSON.stringify(publicNames)!==JSON.stringify(outcome.names)||publicRestriction!==outcome.restriction) return {ok:false,reason:"verify-mismatch"};
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;
-        return {ok:true,verified:true,state:outcome.state};
+        committed=true;
+        let reason="verify-mismatch";
+        for(let attempt=0;attempt<3;attempt++){
+          if(attempt) await new Promise(resolve=>setTimeout(resolve,200*attempt));
+          try{
+            const verifyPrivate=fx.getDocFromServer?await fx.getDocFromServer(ref):await fx.getDoc(ref);
+            const verifyPublic=fx.getDocFromServer?await fx.getDocFromServer(publicRef):await fx.getDoc(publicRef);
+            if(!verifyPrivate.exists()||!verifyPublic.exists()){reason="verify-not-found";continue;}
+            const vd=verifyPrivate.data()||{};
+            const privateState=typeof vd.data==="string"?JSON.parse(vd.data):(vd.data||{});
+            const publicState=JSON.parse((verifyPublic.data()||{}).bracketView||"{}");
+            const sameMap=JSON.stringify(vd.refereeStationAssignments||{})===JSON.stringify(outcome.map)
+              &&JSON.stringify(privateState?.meta?.refereeStationAssignments||{})===JSON.stringify(outcome.map);
+            const sameNames=JSON.stringify(vd.refereeStationNames||{})===JSON.stringify(outcome.names)
+              &&JSON.stringify(privateState?.meta?.refereeStationNames||{})===JSON.stringify(outcome.names);
+            const sameRestriction=!!vd.refereeStationRestrictionEnabled===outcome.restriction
+              &&!!privateState?.meta?.refereeStationRestrictionEnabled===outcome.restriction;
+            const publicNames=publicState?.meta?.refereeStationNames||{};
+            const publicRestriction=!!publicState?.meta?.refereeStationRestrictionEnabled;
+            if(!sameMap||!sameNames||!sameRestriction||JSON.stringify(publicNames)!==JSON.stringify(outcome.names)||publicRestriction!==outcome.restriction){reason="verify-mismatch";continue;}
+            if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;
+            return {ok:true,committed:true,verified:true,state:privateState};
+          }catch(e){reason=String(e?.code||"verify-mismatch");}
+        }
+        return {ok:false,committed:true,reason};
       }catch(e){
         const errorCode=(e&&e.code)||(e&&e.message)||"unknown";
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=errorCode;
@@ -3044,7 +3103,7 @@ if(testerSession){
             }
           }catch(readError){ console.warn("讀取最新裁判分配失敗",readError); }
         }
-        return {ok:false,reason:errorCode};
+        return {ok:false,committed,reason:errorCode};
       }
     },
 

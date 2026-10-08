@@ -649,6 +649,16 @@ button.ai-create-event-card.is-selected{
 .live-next-eta{color:#c7caa2;font-size:10px;font-weight:800;white-space:nowrap}
 .live-next-muted{color:#858c95}
 .live-dashboard-panel .live-court-empty{padding:16px 12px}
+.live-court-switch{display:none}
+@media(max-width:640px){
+  .live-court-switch{display:block;margin:0 0 10px;overflow:hidden}
+  .live-court-switch-track{display:flex;gap:7px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;padding:2px 2px 8px;scrollbar-width:thin}
+  .live-court-switch-btn{flex:0 0 76px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid color-mix(in srgb,var(--court-accent,var(--gold)) 50%,rgba(255,255,255,.12));border-radius:10px;background:rgba(255,255,255,.04);color:#f4f5f7;scroll-snap-align:center;cursor:pointer}
+  .live-court-switch-btn strong{font-size:13px;line-height:1.1}.live-court-switch-btn span{font-size:10px;color:#bfc5cd;white-space:nowrap}
+  .live-court-switch-btn.is-selected{border-color:var(--court-accent,var(--gold));background:color-mix(in srgb,var(--court-accent,var(--gold)) 18%,#101019);box-shadow:0 0 0 2px color-mix(in srgb,var(--court-accent,var(--gold)) 25%,transparent)}
+  .live-court-switch-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .live-dashboard-panel .live-court-grid[data-mobile-switcher="true"] .live-court-card:not([data-selected="true"]){display:none}
+}
 @media(max-width:640px){
   .live-dashboard-panel .live-court-match{padding:13px 9px 7px;gap:5px}
   .live-dashboard-panel .live-court-player{font-size:16.5px}
