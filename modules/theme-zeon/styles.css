@@ -6,6 +6,9 @@
   --accent-border:rgba(216,180,106,.42);--accent-contrast:#101b30;
   --glass-surface:rgba(10,20,39,.65);--glass-surface-strong:rgba(10,20,39,.87);
 }
+:root[data-bxh-theme="zeon"] body{background:radial-gradient(ellipse at 74% -10%,#6e273629,transparent 48%),radial-gradient(ellipse at 18% 60%,#b58a2814,transparent 44%),repeating-linear-gradient(90deg,transparent 0 103px,#d0ad5a09 104px,transparent 105px 208px),#090d14!important}
+:root[data-bxh-theme="zeon"] nav.tabs{background:linear-gradient(180deg,#101720,#0b1017)!important;border-bottom:1px solid #a948594d!important}
+:root[data-bxh-theme="zeon"] nav.tabs button.active{color:#f7d994!important;border-color:#a94b5c!important;background:#a7405220!important}
 :root[data-bxh-theme="zeon"] .auth-shell{background:linear-gradient(180deg,rgba(6,8,14,.10),rgba(4,10,25,.26) 55%,rgba(6,8,14,.15)),url('../../assets/zeon/orbital-hangar.webp') center top/cover no-repeat,#080d16}
 :root[data-bxh-theme="zeon"] .landing-tagline-brand{color:#ffe49c;text-shadow:0 0 16px #f0c56377}
 :root[data-bxh-theme="zeon"] .auth-brand-header::after{content:"吉翁";display:block;color:#ffe3a0;letter-spacing:.27em;margin-top:12px;font-size:15px}
@@ -30,9 +33,12 @@
 :root[data-bxh-theme="zeon"] .role-card-assist{display:none}
 :root[data-bxh-theme="zeon"] .role-card-enter{position:absolute;bottom:0;left:0;width:100%;height:34px;display:grid;place-items:center;margin:0!important;opacity:1;color:var(--zeon-tone)!important;background:#090e16e8;border-top:1px solid color-mix(in srgb,var(--zeon-tone) 42%,transparent)}
 :root[data-bxh-theme="zeon"] .role-card:focus-visible{outline:2px solid var(--zeon-tone);outline-offset:4px}
-:root[data-bxh-theme="zeon"] header.topbar{position:relative;isolation:isolate;overflow:hidden;background:#10141c!important}
-:root[data-bxh-theme="zeon"] header.topbar .zeon-emblem-layer{display:block;position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('../../assets/zeon/zeon-emblem.svg') right center/auto 100% no-repeat;opacity:.92;animation:zeon-license-glow 3.6s ease-in-out infinite}
-:root[data-bxh-theme="zeon"] header.topbar::before{content:"";position:absolute;left:-58%;bottom:0;width:58%;height:3px;pointer-events:none;background:linear-gradient(90deg,transparent,#b98931,#ffe5ba,transparent);box-shadow:0 0 12px #d8b46a91;animation:zeon-license-rail 3.6s linear infinite}
+:root[data-bxh-theme="zeon"] header.topbar{position:relative;isolation:isolate;overflow:hidden;background:radial-gradient(ellipse at 77% 49%,#8e263844,transparent 39%),repeating-linear-gradient(90deg,transparent 0 37px,#e1bc6610 38px,#e1bc6610 39px,transparent 40px 78px),linear-gradient(145deg,#121a24,#080c13 72%)!important;border-bottom:1px solid #aa804955!important}
+:root[data-bxh-theme="zeon"] header.topbar .zeon-emblem-layer{display:block;position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('../../assets/zeon/zeon-emblem.svg') right center/auto 100% no-repeat;opacity:.94;animation:zeon-license-glow 3.6s ease-in-out infinite}
+:root[data-bxh-theme="zeon"] header.topbar::before{content:"";position:absolute;left:-58%;bottom:0;width:58%;height:3px;pointer-events:none;background:linear-gradient(90deg,transparent,#963344,#ff6377,transparent);box-shadow:0 0 12px #ef465d99;animation:zeon-license-rail 3.6s linear infinite}
+:root[data-bxh-theme="zeon"] header.topbar::after{background:linear-gradient(90deg,#ab3449,#e1b86c 60%,#a43a4c)!important;box-shadow:0 0 12px #d8465c66!important}
+:root[data-bxh-theme="zeon"] header.topbar .brandtext .t1{color:#fff2d2!important;text-shadow:0 0 14px #f2cf8a4f}
+:root[data-bxh-theme="zeon"] header.topbar .brandtext .t-rule{background:linear-gradient(90deg,#b83e50,#d8b46a,transparent)!important}
 @keyframes zeon-license-rail{to{transform:translateX(275%)}}
 @keyframes zeon-license-glow{0%,100%{opacity:.82}50%{opacity:1}}
 @media(max-width:400px){:root[data-bxh-theme="zeon"] .role-card-inner{padding-left:98px!important}:root[data-bxh-theme="zeon"] .role-card::before{left:20px;font-size:54px}:root[data-bxh-theme="zeon"] .role-card-desc{max-width:145px;font-size:10px}}
