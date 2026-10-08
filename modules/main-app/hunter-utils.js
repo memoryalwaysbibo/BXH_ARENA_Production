@@ -314,20 +314,56 @@ function hunterSeniorityBonus(level){
   const lv=Math.max(1,Math.min(99,Math.floor(Number(level)||1)));
   return 15*Math.pow((lv-1)/98,0.75);
 }
+function hunterLicenseRules(){
+  // Existing automatic grade rules; B6 adds traceability, not new thresholds.
+  return [
+    {tier:"e",label:"E 級獵人",score:0,ability:0,matches:3,rounds:8},
+    {tier:"d",label:"D 級獵人",score:40,ability:0,matches:3,rounds:8},
+    {tier:"c",label:"C 級獵人",score:50,ability:0,matches:3,rounds:8},
+    {tier:"a",label:"A 級獵人",score:60,ability:55,matches:10,rounds:30},
+    {tier:"s",label:"S 級獵人",score:70,ability:65,matches:20,rounds:60},
+    {tier:"national",label:"國家級獵人",score:80,ability:75,matches:40,rounds:120}
+  ];
+}
 function hunterLicenseGrade(analysis,level){
-  const bonus=hunterSeniorityBonus(level);
+  const bonus=hunterSeniorityBonus(level),version="hunter-grade-v1";
   if(!analysis||!analysis.eligible||!Number.isFinite(analysis.overall)){
-    return {tier:"pending",label:"評級中",bonus,score:null,eligible:false};
+    return {version,tier:"pending",label:"評級中",bonus,score:null,eligible:false};
   }
   const score=Math.min(100,analysis.overall+bonus);
   const matches=analysis.matches||0,rounds=analysis.validRounds||0;
-  let label=score>=50?"C 級獵人":score>=40?"D 級獵人":"E 級獵人";
-  if(score>=60&&analysis.overall>=55&&matches>=10&&rounds>=30)label="A 級獵人";
-  if(score>=70&&analysis.overall>=65&&matches>=20&&rounds>=60)label="S 級獵人";
-  if(score>=80&&analysis.overall>=75&&matches>=40&&rounds>=120)label="國家級獵人";
-  return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
+  // Eligibility already supplies the 3-match / 8-round entry gate.
+  const rules=hunterLicenseRules();let rule=rules[0];
+  rules.slice(1).forEach(r=>{
+    if(score>=r.score&&(!r.ability||(analysis.overall>=r.ability&&matches>=r.matches&&rounds>=r.rounds)))rule=r;
+  });
+  return {version,tier:rule.tier,label:rule.label,bonus,score,eligible:true};
+}
+function hunterLicenseOverview(records,analyze,complete=true){
+  const rows=hunterUniqueRecords(records),growth=hunterBuildGrowth(rows),analysis=analyze(hunterFilterByMode(rows,"standard"));
+  const grade=hunterLicenseGrade(complete?analysis:{...analysis,eligible:false},growth.level);
+  const rules=hunterLicenseRules(),index=rules.findIndex(r=>r.tier===grade.tier);
+  const next=grade.eligible?rules[index+1]||null:rules[0];
+  const gates=next?[
+    {key:"score",label:"階級分",current:grade.score,target:next.score},
+    {key:"ability",label:"實力分",current:grade.eligible?analysis.overall:null,target:next.ability},
+    {key:"matches",label:"正規可分析對戰",current:analysis.matches,target:next.matches},
+    {key:"rounds",label:"正規有效回合",current:analysis.validRounds,target:next.rounds}
+  ].filter(g=>g.target>0).map(g=>({...g,current:complete?g.current:null,remaining:complete&&g.current!=null?Math.max(0,g.target-g.current):null,met:complete&&g.current!=null&&g.current>=g.target})):[];
+  return {version:"hunter-license-overview-v1",growth,analysis,grade,next,gates,complete,
+    versions:{xp:growth.version,strength:analysis.version,grade:grade.version},
+    candidate:{status:"pending-calibration",strength:null,grade:null,connected:false}};
+}
+function hunterReplayLicense(records,analyze){
+  const rows=hunterUniqueRecords(records),undated=rows.filter(r=>hunterRecordTimestamp(r)<=0).length;
+  const ordered=rows.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)||hunterEvidenceMatchKey(a).localeCompare(hunterEvidenceMatchKey(b)));
+  const summary=overview=>({versions:overview.versions,matches:overview.analysis.matches,validRounds:overview.analysis.validRounds,
+    xp:overview.growth.xp,level:overview.growth.level,strength:overview.grade.eligible?overview.analysis.overall:null,
+    bonus:overview.grade.bonus,score:overview.grade.score,tier:overview.grade.tier,candidate:overview.candidate});
+  return {version:"hunter-license-replay-v1",undated,history:undated?[]:ordered.map((r,i)=>({matchesLoaded:i+1,...summary(hunterLicenseOverview(ordered.slice(0,i+1),analyze))})),
+    current:summary(hunterLicenseOverview(rows,analyze)),historyReason:undated?"undated":null,officialRulesChanged:false};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterWinRateInterval,hunterPreMatchRating,hunterStrengthDiagnostics,hunterBacktestStrength,hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterLicenseRules,hunterLicenseOverview,hunterReplayLicense,hunterWinRateInterval,hunterPreMatchRating,hunterStrengthDiagnostics,hunterBacktestStrength,hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();

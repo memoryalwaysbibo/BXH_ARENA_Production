@@ -15672,7 +15672,7 @@ function hunterPermanentAwardSummaryHtml(core){
 function hunterAchievementsHtml(core,records,audit){
   return hunterPermanentAwardSummaryHtml(core)+hunterAchievementIntegrityAuditHtml(audit)+hunterMatchAchievementsHtml(core,records)+hunterRoundAchievementsHtml(core,records)+hunterStreakSpecialAchievementsHtml(core,records);
 }
-const {hunterSeniorityBonus,hunterLicenseGrade}=window.BXHHunterUtils||{};
+const {hunterLicenseRules,hunterLicenseOverview,hunterSeniorityBonus,hunterLicenseGrade}=window.BXHHunterUtils||{};
 function hunterPeriodSummary(period){
   const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));
   const base=hunterCareerSummary(rows);
@@ -15757,6 +15757,23 @@ function hunterBuildAnalysis(records){
 }
 
 
+
+function hunterLicenseOverviewHtml(overview){
+  const {grade,growth,analysis,next,gates,complete,versions}=overview;
+  const value=n=>n==null?'—':Number.isInteger(n)?String(n):n.toFixed(1);
+  const rows=hunterLicenseRules().map(r=>'<div>'+esc(r.label.replace('獵人',''))+'</div><div>'+r.score+' 起</div><div>'+(r.ability?'實力 ≥'+r.ability+'、':'')+r.matches+' 場、'+r.rounds+' 回合</div>').join('');
+  const progress=!complete?'<div class="hunter-grade-next">部分資料缺失，暫停階級判定與升級差距。</div>':
+    !next?'<div class="hunter-grade-next">目前已達最高階級。</div>':
+    '<div class="hunter-grade-next"><b>'+(grade.eligible?'下一階級：':'取得初次評級：')+esc(next.label)+'</b><ul>'+gates.map(g=>'<li><span>'+g.label+'</span><strong>'+value(g.current)+' / '+g.target+'</strong><small>'+(g.met?'已達標':g.remaining==null?'尚未出分':'還差 '+value(g.remaining))+'</small></li>').join('')+'</ul></div>';
+  return '<details class="hunter-grade-detail"><summary><b class="hunter-grade-detail-label">階級判定</b><strong>'+value(grade.score)+'</strong></summary><div class="hunter-grade-detail-content">'+
+    '<span>實力 '+value(grade.eligible?analysis.overall:null)+' ＋ 資歷 '+value(growth&&grade.bonus)+' → 階級分 '+value(grade.score)+'</span>'+
+    '<small>實力分＝勝率 ×60%＋得分占比 ×40%，只採生涯正規賽可信回合；至少 3 場、8 回合才出分。階級分＝實力分＋資歷加分，最高 100；資歷依 LV.1～99 累加，最高 +15。</small>'+progress+
+    '<div class="hunter-grade-thresholds" aria-label="獵人階級門檻"><div class="hunter-grade-threshold-head">階級</div><div class="hunter-grade-threshold-head">階級分數</div><div class="hunter-grade-threshold-head">其他條件</div>'+rows+'</div>'+
+    '<small>各項條件需同時達標，系統自動判定最高符合階級。分數達標但場次、回合或實力不足時，維持較低階級；不採人工審核或未實作的大型賽條件。</small>'+
+    '<small>獵人等級只代表累積經驗，沿用全部已接入生涯戰績：完成對戰 +10 XP、每筆回合經驗事件 +2 XP、每個完成賽事 +20 XP。回合經驗含既有失誤判罰事件；實力的有效回合只計極限、擊飛、爆裂、轉停。期間統計不改變生涯階級，天梯積分另行計算。</small>'+
+    '<div class="hunter-grade-comparison"><b>評分版本比較</b><div>現行實力 '+value(grade.eligible?analysis.overall:null)+'｜現行階級 '+esc(grade.label)+'</div><div>候選實力 —｜候選階級 —</div><small>B5 尚待可信歷史開賽前評等與校準，新公式未接入階級。既有生涯、XP 與已取得成就保留。</small></div>'+
+    '<div class="hunter-analysis-meta">經驗 '+esc(versions.xp)+'｜實力 '+esc(versions.strength)+'｜階級 '+esc(versions.grade)+'。以本次已載入生涯紀錄回算；資料更正或撤銷可能改變回算結果，非永久授予紀錄。</div></div></details>';
+}
 
 function hunterStrengthDiagnosticsHtml(records,partial=false){
   const d=hunterStrengthDiagnostics(records),baseline=hunterBuildAnalysis(d.rows);
@@ -16238,13 +16255,12 @@ function renderPlayerStatsTab(p){
   const avatar=p&&p.avatarUrl?'<img src="'+esc(p.avatarUrl)+'" alt="'+esc(playerName)+'">':'<span>'+esc(playerName.slice(0,1)||"獵")+'</span>';
   if(hunterProfileCache===null&&!hunterProfileLoading&&!hunterProfileError) setTimeout(()=>loadHunterProfile(false),0);
   const allRecords=hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[];
-  const careerAnalysis=hunterBuildAnalysis(hunterFilterByMode(allRecords,"standard"));
-  const growth=hunterBuildGrowth(allRecords);
-  const licenseGrade=hunterLicenseGrade(careerAnalysis,growth.level);
   const dataStatus=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
   const dataReady=dataStatus==="ready"||dataStatus==="empty"||dataStatus==="partial";
   const completeHistory=dataStatus==="ready"||dataStatus==="empty";
-  if(!completeHistory){careerAnalysis.eligible=false;careerAnalysis.overall=null;licenseGrade.eligible=false;licenseGrade.tier="pending";licenseGrade.label="評級中";}
+  const licenseOverview=hunterLicenseOverview(allRecords,hunterBuildAnalysis,completeHistory);
+  const {analysis:careerAnalysis,growth,grade:licenseGrade}=licenseOverview;
+  if(!completeHistory){careerAnalysis.eligible=false;careerAnalysis.overall=null;}
   const statValue=(value,suffix="")=>dataReady?String(value)+suffix:"—";
   let body="";
 
@@ -16265,8 +16281,8 @@ function renderPlayerStatsTab(p){
       '<div class="hunter-license-head"><div><div class="hunter-kicker">BXH HUNTER LICENSE</div><div class="panel-title">獵人執照</div></div><span class="badge badge-metal">P5</span></div>'+
       '<div class="hunter-license-main"><div class="hunter-license-avatar">'+avatar+'</div><div class="hunter-license-copy"><div class="hunter-license-name-line"><div class="hunter-license-name">'+esc(playerName)+'</div><span class="hunter-grade-badge grade-'+licenseGrade.tier+'"><span class="hunter-grade-ornament" aria-hidden="true">'+(licenseGrade.tier==="pending"?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span><span class="hunter-grade-label">'+esc(licenseGrade.label)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+(licenseGrade.tier==="pending"?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span></span></div>'+
       '<div class="hunter-license-meta">'+(gameId?('遊戲 ID '+esc(gameId)+'　｜　'):'')+'玩家編號 '+esc(playerId)+'</div>'+
-      '<div class="hunter-license-rank-row"><div><span>獵人等級</span><strong>LV.'+growth.level+'</strong></div><div><span>綜合評分</span><strong>'+(careerAnalysis.eligible?careerAnalysis.overall:'—')+'</strong></div><div><span>正規有效回合</span><strong>'+statValue(careerAnalysis.validRounds)+'</strong></div></div></div></div>'+
-      '<details class="hunter-grade-detail"><summary><b class="hunter-grade-detail-label">階級判定</b><strong>'+(licenseGrade.eligible?licenseGrade.score.toFixed(1):'—')+'</strong></summary><div class="hunter-grade-detail-content"><span>實力 '+(licenseGrade.eligible?careerAnalysis.overall:'—')+' ＋ 資歷 '+(dataReady?licenseGrade.bonus.toFixed(1):'—')+'</span><small>實力、樣本與綜合評分只採正規賽；累積經驗與資歷沿用全部已接入戰績。資歷依 LV.1～99 逐級加分，最高 +15；樣本不足時不評級。階級分數＝實力分＋資歷加分，達標後系統自動授予。</small><div class="hunter-grade-thresholds" aria-label="獵人階級門檻"><div class="hunter-grade-threshold-head">階級</div><div class="hunter-grade-threshold-head">階級分數</div><div class="hunter-grade-threshold-head">其他條件</div><div>E 級</div><div>0–39</div><div>取得可分析評分</div><div>D 級</div><div>40–49</div><div>取得可分析評分</div><div>C 級</div><div>50–59</div><div>取得可分析評分</div><div>A 級</div><div>60 起</div><div>實力 ≥55、10 場、30 回合</div><div>S 級</div><div>70 起</div><div>實力 ≥65、20 場、60 回合</div><div>國家級</div><div>80 起</div><div>實力 ≥75、40 場、120 回合</div></div><small>獵人等級只代表累積經驗：完成對戰 +10 XP、每筆回合經驗事件 +2 XP、每個有完成對戰的賽事 +20 XP。回合經驗沿用既有紀錄計算，含失誤判罰事件；能力分析的有效回合只計四種結束方式。綜合評分由 P4 能力引擎計算；等級只提供階級資歷加分，不改變 P4 評分或天梯積分。</small></div></details>'+
+      '<div class="hunter-license-rank-row"><div><span>獵人等級</span><strong>LV.'+growth.level+'</strong></div><div><span>實力分（正規賽）</span><strong>'+(careerAnalysis.eligible?careerAnalysis.overall:'—')+'</strong></div><div><span>正規有效回合</span><strong>'+statValue(careerAnalysis.validRounds)+'</strong></div></div></div></div>'+
+      hunterLicenseOverviewHtml(licenseOverview)+
       '<div class="hunter-growth"><div class="hunter-growth-head"><strong>'+growth.xp+' XP</strong><span>'+(growth.level>=99?'MAX':('距離 LV.'+(growth.level+1)+' 還有 '+growthRemaining+' XP'))+'</span></div>'+
       '<div class="hunter-growth-track"><div class="hunter-growth-fill" style="width:'+growth.progress+'%"></div></div>'+
       '<div class="hunter-growth-breakdown"><div><span>完成對戰</span><b>'+growth.rows.length+' 場｜+'+growth.xpFromMatches+' XP</b></div><div><span>回合經驗事件</span><b>'+growth.experienceEvents+' 筆｜+'+growth.xpFromRounds+' XP</b></div><div><span>完成賽事</span><b>'+growth.eventCount+' 場｜+'+growth.xpFromEvents+' XP</b></div></div></div>'+
