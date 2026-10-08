@@ -17,6 +17,29 @@
   const FIREBASE_SDK_VERSION = "10.13.0";
   const ENGAGEMENT_CALL_TIMEOUT_MS = 30000;
   const ENGAGEMENT_BACKFILL_TIMEOUT_MS = 120000;
+  // Public Enterprise site key registered for arena.bxh.com.tw in Firebase App Check.
+  const ARENA_APP_CHECK_SITE_KEY = "6Lc24uUtAAAAAMkkB66ePeZku9ax2-TvTHmRPduR";
+  let firebaseAppHandle = null;
+  let appCheckHandle = null;
+  let appCheckModule = null;
+  let appCheckInitPromise = null;
+
+  // Load only when PK is used. Failure must not block existing Auth/Firestore services.
+  async function ensureHunterClashAppCheck(){
+    if(!appCheckInitPromise){
+      appCheckInitPromise = (async()=>{
+        const mod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app-check.js`);
+        appCheckHandle = mod.initializeAppCheck(firebaseAppHandle, {
+          provider: new mod.ReCaptchaEnterpriseProvider(ARENA_APP_CHECK_SITE_KEY),
+          isTokenAutoRefreshEnabled: true
+        });
+        appCheckModule = mod;
+      })().catch(error=>{ appCheckInitPromise=null; throw error; });
+    }
+    await appCheckInitPromise;
+    const result = await appCheckModule.getToken(appCheckHandle, false);
+    if(!result || !result.token) throw new Error('app-check-token-unavailable');
+  }
 
   let cloudEnabled = false;
   let dbHandle = null;
@@ -58,6 +81,7 @@
         const fsMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`);
         const authMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`);
         const app = appMod.initializeApp(FIREBASE_CONFIG);
+        firebaseAppHandle = app;
         dbHandle = fsMod.getFirestore(app);
         // Functions 是附加服務；載入失敗時不可拖垮既有 Auth／Firestore。
         try{
@@ -690,6 +714,11 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
+      if(name === 'hunterClashCommand'){
+        const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
+        if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
+        if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
+      }
       const call=fnx.httpsCallable(functionsHandle,name,{timeout:timeoutMs});
       const response=await call(payload||{});
       if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
