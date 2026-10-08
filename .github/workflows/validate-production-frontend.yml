@@ -93,6 +93,7 @@ jobs:
           node tests/theme-directive-access.test.cjs
           node tests/theme-three-gods.test.cjs
           node tests/theme-hunter.test.cjs
+          node tests/theme-akatsuki.test.cjs
       - name: Verify BXH CALL Web Push scripts syntax
         run: |
           node --check court-call-ui.js
