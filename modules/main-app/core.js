@@ -17169,7 +17169,7 @@ const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"green",label:"螢光綠",english:"Toxic Green",color:"#43cf7c"},
   {id:"directive",label:"極限指令",english:"BXH Directive",color:"#a05aff"},
   {id:"three-gods",label:"三幻神",english:"Egyptian Gods",color:"#e8bd62"},
-  {id:"hunter",label:"獵人 Hunter",english:"Hunter License",color:"#67d78f"}
+  {id:"hunter",label:"獵人Hunter",english:"Hunter License",color:"#67d78f"}
 ];
 function normalizeInterfaceTheme(value){
   return BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===value)?value:"gold";

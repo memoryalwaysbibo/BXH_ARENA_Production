@@ -1,4 +1,4 @@
-/* 獵人 Hunter skin, scoped to the account theme. */
+/* 獵人Hunter skin, scoped to the account theme. */
 .hunter-portrait,.hunter-license-layer,.hunter-character-name{display:none}
 :root[data-bxh-theme="hunter"]{
   --accent-color:#71d995;--accent-rgb:113,217,149;
@@ -8,7 +8,7 @@
 }
 :root[data-bxh-theme="hunter"] .auth-shell{background:radial-gradient(ellipse at top,rgba(38,133,88,.22),transparent 68%),#05130f}
 :root[data-bxh-theme="hunter"] .landing-tagline-brand{color:#9cefaf;text-shadow:0 0 16px #67d78f77}
-:root[data-bxh-theme="hunter"] .auth-brand-header::after{content:"獵人 HUNTER";display:block;color:#b9eab9;letter-spacing:.27em;margin-top:12px;font-size:15px}
+:root[data-bxh-theme="hunter"] .auth-brand-header::after{content:"獵人Hunter";display:block;color:#b9eab9;letter-spacing:.27em;margin-top:12px;font-size:15px}
 :root[data-bxh-theme="hunter"] .landing-role-cards{grid-template-columns:1fr;gap:13px;max-width:540px;margin:24px auto 0}
 :root[data-bxh-theme="hunter"] .role-card{--hunter-tone:#84e59d;position:relative;isolation:isolate;overflow:hidden;min-height:180px!important;border:1px solid var(--hunter-tone)!important;border-radius:18px!important;background:#071b13!important;box-shadow:0 0 22px color-mix(in srgb,var(--hunter-tone) 17%,transparent)}
 :root[data-bxh-theme="hunter"] .role-card-player{--hunter-tone:#8dc6ff}
