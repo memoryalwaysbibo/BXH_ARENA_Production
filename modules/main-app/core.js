@@ -9329,7 +9329,21 @@ async function refreshLiveFromCloud(){
   }
 }
 
-function liveCourtCardHtml(stationNum){
+let liveSelectedCourt=0;
+let liveSelectedRoom="";
+let liveCourtSwitchScrollLeft=0;
+let liveCourtSwitchCenterRequested=false;
+function liveCourtSelection(stationCount){
+  const room=String(state.cloudCode||state.id||"");
+  if(room!==liveSelectedRoom){liveSelectedRoom=room;liveSelectedCourt=0;liveCourtSwitchScrollLeft=0;}
+  if(liveSelectedCourt<1||liveSelectedCourt>stationCount){
+    liveSelectedCourt=Array.from({length:stationCount},(_,i)=>i+1)
+      .find(i=>liveCurrentMatchForStation(i).m&&!liveCurrentMatchForStation(i).m.completed)||1;
+    liveCourtSwitchCenterRequested=true;
+  }
+  return liveSelectedCourt;
+}
+function liveCourtCardHtml(stationNum,selectedCourt){
   const current=liveCurrentMatchForStation(stationNum);
   const court=current.court,m=current.m;
   const assigned=refereeDisplayForStation(stationNum);
@@ -9349,7 +9363,7 @@ function liveCourtCardHtml(stationNum){
   }else{
     body='<div class="live-court-empty"><b>'+(future?"等待晉級結果":"本台賽程已完成")+'</b><span>'+(future?"前序賽果確認後將自動安排":"目前沒有待執行場次")+'</span></div>'+(future?nextPreview:"");
   }
-  return '<section class="live-court-card" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
+  return '<section class="live-court-card" data-live-court="'+stationNum+'" data-selected="'+(stationNum===selectedCourt)+'" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
 }
 function renderLive(){
   const fmt = state.meta.formatType || "single";
@@ -9362,7 +9376,14 @@ function renderLive(){
   const officialCount=officialPlayers.length;
 
   const stationCount=Math.max(1,Number(state.meta.stations)||1);
-  const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1)).join("");
+  const selectedCourt=liveCourtSelection(stationCount);
+  const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1,selectedCourt)).join("");
+  const liveCourtSwitchHtml=stationCount>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track">${Array.from({length:stationCount},(_,i)=>{
+    const n=i+1,current=liveCurrentMatchForStation(n),m=current.m;
+    const hasFuture=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===n&&!mm.completed);
+    const status=m?refereeStationStatus(m).label:(hasFuture?"等待中":"已完成");
+    return `<button type="button" class="live-court-switch-btn ${n===selectedCourt?"is-selected":""}" data-action="live-select-court" data-court="${n}" aria-pressed="${n===selectedCourt}" style="${courtAtmosphereStyle(n)}"><strong>${n}號台</strong><span>${esc(status)}</span></button>`;
+  }).join("")}</div></div>`:"";
   const rankingOpen=typeof window==="undefined"||Number(window.innerWidth||0)>640;
 
   let rankRows = "";
@@ -9419,7 +9440,8 @@ function renderLive(){
       ${liveStageNodesHtml(liveStage)}
     </div>
     <div class="live-dashboard-courts">
-      <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}">${liveCourtsHtml}</div>
+      ${liveCourtSwitchHtml}
+      <div class="live-court-grid ${stationCount===1?"live-court-grid-1":""}" data-mobile-switcher="${stationCount>1}">${liveCourtsHtml}</div>
     </div>
     ${publicWatchReturnContext?"":renderArchiveControls()}
   </div>`;
@@ -17887,6 +17909,17 @@ function renderApp(){
       mainTabNavCenterRequested=false;
       nav.addEventListener("scroll",()=>{ mainTabNavScrollLeft=nav.scrollLeft; },{passive:true});
     }
+    const courtTrack=app.querySelector(".live-court-switch-track");
+    if(courtTrack){
+      const maxLeft=Math.max(0,courtTrack.scrollWidth-courtTrack.clientWidth);
+      if(liveCourtSwitchCenterRequested){
+        const selected=courtTrack.querySelector(".is-selected");
+        liveCourtSwitchScrollLeft=selected?Math.min(maxLeft,Math.max(0,selected.offsetLeft-(courtTrack.clientWidth-selected.offsetWidth)/2)):0;
+      }
+      courtTrack.scrollLeft=Math.min(maxLeft,Math.max(0,liveCourtSwitchScrollLeft));
+      liveCourtSwitchCenterRequested=false;
+      courtTrack.addEventListener("scroll",()=>{liveCourtSwitchScrollLeft=courtTrack.scrollLeft;},{passive:true});
+    }
   });
 
   if(activeTab==="bracket" && (state.meta.formatType||"single")==="single" && state.bracketSize){
@@ -21184,6 +21217,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="live-refresh"){
     refreshLiveFromCloud();
+    return;
+  }
+  if(action==="live-select-court"){
+    const n=Number(target.getAttribute("data-court"));
+    const count=Math.max(1,Number(state.meta.stations)||1);
+    if(!Number.isInteger(n)||n<1||n>count)return;
+    liveSelectedCourt=n;
+    document.querySelectorAll(".live-court-switch-btn").forEach(button=>{
+      const selected=Number(button.getAttribute("data-court"))===n;
+      button.classList.toggle("is-selected",selected);
+      button.setAttribute("aria-pressed",String(selected));
+    });
+    document.querySelectorAll(".live-dashboard-courts .live-court-card").forEach(card=>{
+      card.setAttribute("data-selected",String(Number(card.getAttribute("data-live-court"))===n));
+    });
+    target.scrollIntoView?.({behavior:"smooth",block:"nearest",inline:"center"});
     return;
   }
   if(action==="bracket-refresh"){
