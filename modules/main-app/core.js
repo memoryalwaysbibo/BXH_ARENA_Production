@@ -12527,6 +12527,7 @@ function renderLandingScreen(){
       <div class="auth-tagline">選擇身分，進入 <span class="landing-tagline-brand">BXH ARENA</span></div>
       <div class="role-cards landing-role-cards">
         <button class="role-card role-card-admin" data-action="select-role-admin">
+          <span class="three-gods-portrait" aria-hidden="true"></span>
           <img class="directive-portrait" src="assets/directive-entrance-admin.png" alt="" aria-hidden="true" loading="eager">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_ADMIN}</span>
@@ -12537,6 +12538,7 @@ function renderLandingScreen(){
           </span>
         </button>
         <button class="role-card role-card-player" data-action="select-role-player">
+          <span class="three-gods-portrait" aria-hidden="true"></span>
           <img class="directive-portrait" src="assets/directive-entrance-player.png" alt="" aria-hidden="true" loading="eager">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_PLAYER}</span>
@@ -12548,6 +12550,7 @@ function renderLandingScreen(){
           </span>
         </button>
         <button class="role-card role-card-guest" data-action="select-role-guest">
+          <span class="three-gods-portrait" aria-hidden="true"></span>
           <img class="directive-portrait" src="assets/directive-entrance-guest.png" alt="" aria-hidden="true" loading="eager">
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_GUEST}</span>
@@ -13174,7 +13177,7 @@ function renderAccountManagementScreen(){
   return `<div class="stickytop account-management-stickytop"><header class="topbar account-management-topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統 <small style="opacity:.55;font-size:9px;">${APP_VERSION}</small></span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
       <div class="header-account-controls">${accountMenuHtml()}</div>
     </header>${renderSuperAdminManagementTabs(page)}</div>
     ${accountMenuOverlayHtml()}
@@ -13472,7 +13475,7 @@ function renderPlayerCenterScreen(){
   return `<div class="stickytop"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
     </header>
     <div class="role-indicator">玩家模式｜${esc(ctx.name)}　<button class="btn btn-ghost btn-sm" data-action="account-back-to-role">返回身分選擇</button></div>
     </div>
@@ -13917,7 +13920,7 @@ function renderPlayerCenterLoggedIn(){
   return `<div class="stickytop player-shell mode-shell"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
       <div class="header-account-controls"><button type="button" id="activity-points-summary" class="activity-points-account-row" data-activity="open" aria-label="查看我的活躍積分" style="border:1px solid rgba(var(--accent-rgb),.34)!important;border-radius:8px!important;background:rgba(15,17,23,.40)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important;backdrop-filter:blur(12px) saturate(1.08)!important;-webkit-backdrop-filter:blur(12px) saturate(1.08)!important;"><span>活躍積分</span><strong>… 分</strong></button>${accountEquippedTitleHtml()}${mailboxButtonHtml()}${accountMenuHtml()}</div>
     </header>
     ${renderPlayerNavHtml()}
@@ -17158,7 +17161,8 @@ const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"blue",label:"霓虹藍",english:"Neon Blue",color:"#35c9d0"},
   {id:"red",label:"烈焰紅",english:"Crimson Red",color:"#d95778"},
   {id:"green",label:"螢光綠",english:"Toxic Green",color:"#43cf7c"},
-  {id:"directive",label:"極限指令",english:"BXH Directive",color:"#a05aff"}
+  {id:"directive",label:"極限指令",english:"BXH Directive",color:"#a05aff"},
+  {id:"three-gods",label:"三幻神",english:"Egyptian Gods",color:"#e8bd62"}
 ];
 function normalizeInterfaceTheme(value){
   return BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===value)?value:"gold";
@@ -17192,8 +17196,15 @@ function canUseDirectiveTheme(){
   if(firebaseUser || !entranceThemeAccountUid)return false;
   try{return localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+entranceThemeAccountUid)==="directive";}catch(e){return false;}
 }
+function canUseThreeGodsTheme(){
+  if(firebaseUser && userProfile){
+    return userProfile.active===true && ["super_admin","admin","staff"].includes(userProfile.role);
+  }
+  if(firebaseUser || !entranceThemeAccountUid)return false;
+  try{return localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+entranceThemeAccountUid)==="three-gods";}catch(e){return false;}
+}
 function syncInterfaceThemeVisibility(){
-  const visibleTheme=!firebaseUser?(canUseDirectiveTheme()?"directive":"gold"):(interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme);
+  const visibleTheme=!firebaseUser?(canUseThreeGodsTheme()?"three-gods":canUseDirectiveTheme()?"directive":"gold"):((interfaceTheme==="directive" && !canUseDirectiveTheme()) || (interfaceTheme==="three-gods" && !canUseThreeGodsTheme())?"gold":interfaceTheme);
   if(document.documentElement.getAttribute("data-bxh-theme")!==visibleTheme){
     document.documentElement.setAttribute("data-bxh-theme",visibleTheme);
   }
@@ -17201,6 +17212,7 @@ function syncInterfaceThemeVisibility(){
 function applyInterfaceTheme(value,persist=true){
   const nextTheme=normalizeInterfaceTheme(value);
   if(nextTheme==="directive" && !canUseDirectiveTheme())return;
+  if(nextTheme==="three-gods" && !canUseThreeGodsTheme())return;
   interfaceTheme=nextTheme;
   syncInterfaceThemeVisibility();
   if(persist){
@@ -17220,8 +17232,8 @@ function applyInterfaceTheme(value,persist=true){
   }
 }
 function themePickerHtml(){
-  const visibleThemes=BXH_INTERFACE_THEME_OPTIONS.filter(item=>item.id!=="directive" || canUseDirectiveTheme());
-  const visibleTheme=interfaceTheme==="directive" && !canUseDirectiveTheme()?"gold":interfaceTheme;
+  const visibleThemes=BXH_INTERFACE_THEME_OPTIONS.filter(item=>(item.id!=="directive" || canUseDirectiveTheme()) && (item.id!=="three-gods" || canUseThreeGodsTheme()));
+  const visibleTheme=(interfaceTheme==="directive" && !canUseDirectiveTheme()) || (interfaceTheme==="three-gods" && !canUseThreeGodsTheme())?"gold":interfaceTheme;
   const activeTheme=visibleThemes.find(item=>item.id===visibleTheme)||visibleThemes[0];
   return `<div class="account-theme-entry ${accountThemeOpen?"open":""}">
     <button type="button" class="account-theme-trigger" data-action="toggle-account-theme" aria-expanded="${accountThemeOpen?"true":"false"}">
@@ -17966,7 +17978,7 @@ function renderApp(){
           <span class="t2">戰鬥陀螺賽事系統</span>
           ${topbarConnectionRailHtml()}
         </div>
-        <div class="spacer"></div><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+        <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
       ${tournamentViewContextHeaderHtml()}

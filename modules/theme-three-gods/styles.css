@@ -1,0 +1,49 @@
+/* 三幻神 skin. Existing navigation, permissions and event handlers stay authoritative. */
+.three-gods-portrait,.three-gods-puzzle-layer{display:none}
+:root[data-bxh-theme="three-gods"]{
+  --accent-color:#e8bd62;--accent-rgb:232,189,98;
+  --accent-glow:rgba(232,189,98,.26);--accent-soft:rgba(232,189,98,.10);
+  --accent-border:rgba(232,189,98,.44);--accent-contrast:#100d08;
+  --glass-surface:rgba(18,16,12,.64);--glass-surface-strong:rgba(18,16,12,.86);
+}
+:root[data-bxh-theme="three-gods"] .auth-shell{
+  background:radial-gradient(ellipse at top,rgba(232,189,98,.12),transparent 65%),#080807;
+}
+:root[data-bxh-theme="three-gods"] .landing-tagline-brand{color:#e8bd62;text-shadow:0 0 14px #e8bd6240}
+:root[data-bxh-theme="three-gods"] .auth-brand-header::after{
+  content:"三幻神";display:block;color:#e8bd62;letter-spacing:.45em;margin-top:12px;font-size:16px;
+}
+:root[data-bxh-theme="three-gods"] .landing-role-cards{grid-template-columns:1fr;gap:14px;max-width:540px;margin:24px auto 0}
+:root[data-bxh-theme="three-gods"] .role-card{--god-tone:#e8bd62;position:relative;isolation:isolate;overflow:hidden;min-height:180px!important;border:1px solid var(--god-tone)!important;border-radius:18px!important;background:#100d08!important;box-shadow:0 0 20px color-mix(in srgb,var(--god-tone) 15%,transparent)}
+:root[data-bxh-theme="three-gods"] .role-card-player{--god-tone:#f46a64}
+:root[data-bxh-theme="three-gods"] .role-card-guest{--god-tone:#58b7ff}
+:root[data-bxh-theme="three-gods"] .directive-portrait{display:none!important}
+:root[data-bxh-theme="three-gods"] .three-gods-portrait{display:block;position:absolute;inset:0 0 0 auto;width:72%;max-width:280px;z-index:-1;background-image:linear-gradient(90deg,#080807cc,transparent 68%),url('../../assets/three-gods/entrance-atlas.png');background-size:100% 100%,300% auto;background-position:center,left top;background-repeat:no-repeat}
+:root[data-bxh-theme="three-gods"] .role-card-player .three-gods-portrait{background-position:center,center top}
+:root[data-bxh-theme="three-gods"] .role-card-guest .three-gods-portrait{background-position:center,right top}
+:root[data-bxh-theme="three-gods"] .role-card::before{content:"翼";position:absolute;left:18px;top:44px;font-size:64px;font-weight:900;line-height:1;color:var(--god-tone);text-shadow:0 0 18px var(--god-tone);pointer-events:none}
+:root[data-bxh-theme="three-gods"] .role-card-player::before{content:"天"}
+:root[data-bxh-theme="three-gods"] .role-card-guest::before{content:"巨"}
+:root[data-bxh-theme="three-gods"] .role-card-inner{position:relative;display:flex!important;align-items:flex-start;flex-direction:column;min-height:180px!important;padding:30px 16px 46px 104px!important;gap:5px}
+:root[data-bxh-theme="three-gods"] .role-card-icon{display:none!important}
+:root[data-bxh-theme="three-gods"] .role-card-cn{color:var(--god-tone)!important;font-size:21px}
+:root[data-bxh-theme="three-gods"] .role-card-en{color:#efe3ce!important;font-size:10px}
+:root[data-bxh-theme="three-gods"] .role-card-desc{color:#eee2d2!important;font-size:11px;max-width:180px;line-height:1.5;text-shadow:0 1px 4px #000}
+:root[data-bxh-theme="three-gods"] .role-card-assist{display:none}
+:root[data-bxh-theme="three-gods"] .role-card-enter{position:absolute;bottom:0;left:0;width:100%;height:34px;display:grid;place-items:center;margin:0!important;opacity:1;color:var(--god-tone)!important;background:#090807bb;border-top:1px solid color-mix(in srgb,var(--god-tone) 40%,transparent)}
+:root[data-bxh-theme="three-gods"] .role-card:focus-visible{outline:2px solid var(--god-tone);outline-offset:4px}
+:root[data-bxh-theme="three-gods"] header.topbar{position:relative;isolation:isolate;overflow:hidden;background:#0c0b08!important}
+:root[data-bxh-theme="three-gods"] header.topbar .three-gods-puzzle-layer{display:block;position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('../../assets/three-gods/millennium-puzzle.png') right center/auto 100% no-repeat;opacity:.52;animation:three-gods-awaken 3.2s linear infinite}
+:root[data-bxh-theme="three-gods"] header.topbar::before{content:"";position:absolute;left:-58%;bottom:0;width:58%;height:3px;pointer-events:none;background:linear-gradient(90deg,transparent,#a57b31,#ffe4a3,transparent);box-shadow:0 0 12px #e8bd6270;animation:three-gods-rail 3.2s linear infinite}
+@keyframes three-gods-rail{from{transform:translateX(0)}to{transform:translateX(275%)}}
+@keyframes three-gods-awaken{0%,64%,100%{opacity:.40;filter:brightness(.9)}79%{opacity:.68;filter:brightness(1.35)}90%{opacity:.76;filter:brightness(1.5)}}
+@media(max-width:400px){
+  :root[data-bxh-theme="three-gods"] .role-card-inner{padding-left:84px!important}
+  :root[data-bxh-theme="three-gods"] .role-card::before{left:12px;font-size:56px}
+  :root[data-bxh-theme="three-gods"] .role-card-desc{max-width:142px;font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  :root[data-bxh-theme="three-gods"] header.topbar::before,:root[data-bxh-theme="three-gods"] .three-gods-puzzle-layer{animation:none!important}
+}
+
+:root[data-bxh-theme="three-gods"] .landing-role-cards .role-card-cn,:root[data-bxh-theme="three-gods"] .landing-role-cards .role-card-en{align-self:flex-start!important}

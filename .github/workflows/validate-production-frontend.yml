@@ -87,6 +87,11 @@ jobs:
           node-version: 22
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
+      - name: Verify interface theme account isolation
+        run: |
+          node tests/theme-entrance-account.test.cjs
+          node tests/theme-directive-access.test.cjs
+          node tests/theme-three-gods.test.cjs
       - name: Verify BXH CALL Web Push scripts syntax
         run: |
           node --check court-call-ui.js
