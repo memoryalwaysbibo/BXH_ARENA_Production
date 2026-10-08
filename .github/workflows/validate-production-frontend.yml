@@ -95,6 +95,7 @@ jobs:
           node tests/theme-hunter.test.cjs
           node tests/theme-akatsuki.test.cjs
           node tests/theme-clow.test.cjs
+          node tests/theme-zeon.test.cjs
       - name: Verify BXH CALL Web Push scripts syntax
         run: |
           node --check court-call-ui.js
