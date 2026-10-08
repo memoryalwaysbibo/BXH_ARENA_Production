@@ -22,7 +22,8 @@ context.userProfile={role:'staff',active:false};context.applyInterfaceTheme('hun
 const early=fs.readFileSync('index.html','utf8').match(/<script>\s*(\(function\(\)\{[\s\S]*?data-bxh-theme[\s\S]*?\}\)\(\);)\s*<\/script>/)[1];
 vm.runInNewContext(early,{document:{documentElement:root},localStorage:{getItem:k=>({'bxh.interface.theme.entrance.uid.v1':'A','bxh.interface.theme.account.v1.A':'hunter'})[k]}});assert.equal(root.value,'hunter');
 const css=fs.readFileSync('modules/theme-hunter/styles.css','utf8');
-assert.match(css,/小傑/);assert.match(css,/奇犽/);assert.match(css,/酷拉皮卡/);
+assert.match(css,/content:"傑"/);assert.match(css,/content:"犽"/);assert.match(css,/content:"酷"/);
+for(const name of ['小傑','奇犽','酷拉皮卡'])assert.match(core,RegExp('<span class="hunter-character-name">'+name+'</span>'));
 assert.match(css,/entrance-battle-atlas\.webp/);
 assert.ok(fs.statSync('assets/hunter/entrance-battle-atlas.webp').size>100000);
 assert.match(css,/prefers-reduced-motion/);

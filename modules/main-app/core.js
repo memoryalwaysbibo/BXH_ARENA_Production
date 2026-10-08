@@ -12533,6 +12533,7 @@ function renderLandingScreen(){
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_ADMIN}</span>
             <span class="role-card-cn">管理員</span>
+            <span class="hunter-character-name">小傑</span>
             <span class="role-card-en">ADMINISTRATOR</span>
             <span class="role-card-desc">賽事建立、選手報到、對戰編排與賽事管理</span>
             <span class="role-card-enter">進入 →</span>
@@ -12545,6 +12546,7 @@ function renderLandingScreen(){
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_PLAYER}</span>
             <span class="role-card-cn">玩家</span>
+            <span class="hunter-character-name">奇犽</span>
             <span class="role-card-en">PLAYER</span>
             <span class="role-card-desc">查看個人賽事、天梯排名與 BXH 生涯戰績</span>
             <span class="role-card-assist">登入後查看天梯排名與生涯戰績</span>
@@ -12558,6 +12560,7 @@ function renderLandingScreen(){
           <span class="role-card-inner">
             <span class="role-card-icon">${ROLE_ICON_GUEST}</span>
             <span class="role-card-cn">遊客</span>
+            <span class="hunter-character-name">酷拉皮卡</span>
             <span class="role-card-en">GUEST</span>
             <span class="role-card-desc">免登入查看公開賽況、即時對戰與最終排名</span>
             <span class="role-card-enter">進入 →</span>
