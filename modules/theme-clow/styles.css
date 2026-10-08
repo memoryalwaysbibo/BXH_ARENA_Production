@@ -1,10 +1,10 @@
 /* 庫洛魔法使 skin, scoped to the account theme. */
 .clow-portrait,.clow-seal-layer,.clow-character-name{display:none}
 :root[data-bxh-theme="clow"]{
-  --accent-color:#efa7cb;--accent-rgb:239,167,203;
-  --accent-glow:rgba(239,167,203,.28);--accent-soft:rgba(239,167,203,.11);
-  --accent-border:rgba(239,167,203,.42);--accent-contrast:#200d29;
-  --glass-surface:rgba(22,12,35,.65);--glass-surface-strong:rgba(22,12,35,.87);
+  --accent-color:#e6be68;--accent-rgb:230,190,104;
+  --accent-glow:rgba(230,190,104,.28);--accent-soft:rgba(230,190,104,.11);
+  --accent-border:rgba(230,190,104,.42);--accent-contrast:#101b30;
+  --glass-surface:rgba(10,20,39,.65);--glass-surface-strong:rgba(10,20,39,.87);
 }
 :root[data-bxh-theme="clow"] .auth-shell{background:linear-gradient(180deg,rgba(6,8,14,.10),rgba(4,10,25,.26) 55%,rgba(6,8,14,.15)),url('../../assets/clow/tomoeda-night.webp') center top/cover no-repeat,#120b23}
 :root[data-bxh-theme="clow"] .landing-tagline-brand{color:#ffe49c;text-shadow:0 0 16px #f0c56377}
@@ -30,11 +30,11 @@
 :root[data-bxh-theme="clow"] .role-card-assist{display:none}
 :root[data-bxh-theme="clow"] .role-card-enter{position:absolute;bottom:0;left:0;width:100%;height:34px;display:grid;place-items:center;margin:0!important;opacity:1;color:var(--clow-tone)!important;background:#140b22dc;border-top:1px solid color-mix(in srgb,var(--clow-tone) 42%,transparent)}
 :root[data-bxh-theme="clow"] .role-card:focus-visible{outline:2px solid var(--clow-tone);outline-offset:4px}
-:root[data-bxh-theme="clow"] header.topbar{position:relative;isolation:isolate;overflow:hidden;background:#1d112e!important}
-:root[data-bxh-theme="clow"] header.topbar .clow-seal-layer{display:block;position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('../../assets/clow/clow-seal.svg') right center/auto 100% no-repeat;opacity:.52;animation:clow-license-glow 3.6s ease-in-out infinite}
-:root[data-bxh-theme="clow"] header.topbar::before{content:"";position:absolute;left:-58%;bottom:0;width:58%;height:3px;pointer-events:none;background:linear-gradient(90deg,transparent,#87517e,#ffe5ba,transparent);box-shadow:0 0 12px #efa7cb91;animation:clow-license-rail 3.6s linear infinite}
+:root[data-bxh-theme="clow"] header.topbar{position:relative;isolation:isolate;overflow:hidden;background:#0a1427!important}
+:root[data-bxh-theme="clow"] header.topbar .clow-seal-layer{display:block;position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('../../assets/clow/kero-guardian.webp') right center/auto 100% no-repeat;opacity:.92;animation:clow-license-glow 3.6s ease-in-out infinite}
+:root[data-bxh-theme="clow"] header.topbar::before{content:"";position:absolute;left:-58%;bottom:0;width:58%;height:3px;pointer-events:none;background:linear-gradient(90deg,transparent,#b98931,#ffe5ba,transparent);box-shadow:0 0 12px #e6be6891;animation:clow-license-rail 3.6s linear infinite}
 @keyframes clow-license-rail{to{transform:translateX(275%)}}
-@keyframes clow-license-glow{0%,100%{opacity:.42}50%{opacity:.72}}
+@keyframes clow-license-glow{0%,100%{opacity:.82}50%{opacity:1}}
 @media(max-width:400px){:root[data-bxh-theme="clow"] .role-card-inner{padding-left:98px!important}:root[data-bxh-theme="clow"] .role-card::before{left:20px;font-size:54px}:root[data-bxh-theme="clow"] .role-card-desc{max-width:145px;font-size:10px}}
 @media(prefers-reduced-motion:reduce){:root[data-bxh-theme="clow"] header.topbar::before,:root[data-bxh-theme="clow"] .clow-seal-layer{animation:none!important}}
 
