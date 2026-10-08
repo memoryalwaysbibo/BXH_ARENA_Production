@@ -1,5 +1,7 @@
 # A1：ARENA 獵人交鋒入口與身分整合
 
+此為 A1 階段存檔；A2/A3 接線、完整帳本與後端 codebase 現況見 [hunter-clash-a2-a3-arena.md](hunter-clash-a2-a3-arena.md)。以下狀態描述僅對 A1 時點。
+
 基準 main 72d6f4e；依接軌規劃 PR #455。此候選只完成入口與身分預覽，不代表可在 ARENA 建立實際 PK 對戰。
 
 ## 完成範圍

@@ -243,7 +243,9 @@ jobs:
           fi
       - name: Verify Hunter Clash A1 entry in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
-        run: node tests/hunter-clash-a1-browser.cjs
+        run: |
+          node tests/hunter-clash-a1-browser.cjs
+          node tests/hunter-clash-a23-browser.cjs
       - name: Verify isolated community quick registration in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/community-quick-registration-browser.cjs
@@ -306,6 +308,12 @@ jobs:
             echo "::error title=CODE_FAIL_OR_INFRA_FAIL::Critical E2E failed twice."
             exit "$rc"
           fi
+
+      - name: Install ARENA PK server SDK for integration tests
+        working-directory: hunter-clash/arena
+        run: npm ci --ignore-scripts
+      - name: Verify ARENA PK with real Auth and Firestore Emulators
+        run: npx firebase emulators:exec --only auth,firestore --project demo-arena-pk --config tests/helpers/arena-pk-emulator.json "node tests/hunter-clash-a23-emulator.cjs"
 
       - name: Upload E2E failure artifacts
         if: failure()
