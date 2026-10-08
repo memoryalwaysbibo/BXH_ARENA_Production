@@ -1,6 +1,6 @@
 {
-  "build": "20261008.2",
+  "build": "20261008.3",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-08T11:43:38.767206+00:00",
-  "releaseTrigger": "gundam-approved-entrance-haro-header"
+  "updatedAt": "2026-10-08T12:23:34.304202+00:00",
+  "releaseTrigger": "gundam-entrance-blur-fade-fix"
 }

@@ -8,7 +8,7 @@
 :root[data-bxh-theme="gundam"] .landing-home{max-width:540px;width:100%;margin:auto!important;padding:0!important}
 :root[data-bxh-theme="gundam"] .auth-content{width:100%;padding:12px!important}
 :root[data-bxh-theme="gundam"] .landing-role-cards{position:relative;display:block!important;width:100%;max-width:540px;aspect-ratio:2/3;margin:0 auto!important;background:url('../../assets/gundam/entrance.webp') center/100% 100% no-repeat}
-:root[data-bxh-theme="gundam"] .landing-role-cards .role-card{position:absolute!important;left:3.2%;width:93.6%;height:23.5%;min-height:0!important;padding:0!important;border:0!important;border-radius:10px!important;background:transparent!important;box-shadow:none!important;transform:none!important}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card{position:absolute!important;left:3.2%;width:93.6%;height:23.5%;min-height:0!important;padding:0!important;border:0!important;border-radius:10px!important;background:transparent!important;box-shadow:none!important;transform:none!important;-webkit-transform:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;animation:none!important;opacity:1!important;transition:none!important}
 :root[data-bxh-theme="gundam"] .landing-role-cards .role-card-player{top:17%}
 :root[data-bxh-theme="gundam"] .landing-role-cards .role-card-admin{top:41.5%}
 :root[data-bxh-theme="gundam"] .landing-role-cards .role-card-guest{top:66.3%}
@@ -27,3 +27,6 @@
 :root[data-bxh-theme="gundam"] nav.tabs{background:#0b111be8!important;border-bottom:1px solid #49647d!important}
 :root[data-bxh-theme="gundam"] nav.tabs button.active{color:#efd79a!important;border-color:#796740!important;background:#213349!important}
 @media(max-width:640px){:root[data-bxh-theme="gundam"] header.topbar .gundam-haro-layer{right:8px;width:42%;max-width:210px;height:110px;top:10px}}
+
+/* The approved landing is static: rerenders must not restart a shell fade. */
+:root[data-bxh-theme="gundam"] .auth-shell:has(.landing-home){animation:none!important;opacity:1!important}
