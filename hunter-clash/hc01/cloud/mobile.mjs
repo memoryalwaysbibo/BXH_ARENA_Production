@@ -73,11 +73,14 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
         const card=document.createElement('div');card.className='room-stat';
         const name=document.createElement('strong');name.textContent=c.participantNames?.[player]||'未設定名稱';
         const rate=document.createElement('p');rate.textContent='本輪勝率：'+(games.length?Math.round(wins/games.length*100)+'%':'—')+'（'+wins+' 勝 '+losses+' 敗）';
-        const evaluation=document.createElement('p');evaluation.textContent='評價：'+(!games.length?'尚未產生':wins===games.length?'全勝':wins===0?'待突破':wins>losses?'優勢':wins===losses?'勢均力敵':'持續挑戰');
+        const evaluation=document.createElement('p');evaluation.textContent='評價：'+(games.length<5?'資料不足（滿 5 場後顯示）':(games.length<10?'初步・':'')+(wins===games.length?'全勝':wins===0?'待突破':wins>losses?'優勢':wins===losses?'勢均力敵':'持續挑戰'));
         card.append(name,rate,evaluation);roomStats.append(card);
       }
-      if(c.status!=='completed'){const note=document.createElement('p');note.className='room-stats-note';note.textContent='本輪暫計；雙方確認整組結果後才計入 PK 戰績。';roomStats.append(note);}
-      if(c.participants.length===2)renderRoomRadar(radar,c,games);
+      const note=document.createElement('p');note.className='room-stats-note';note.textContent=c.status==='completed'?'雙方已確認，本房對戰明細已保存；評價與八角圖由明細即時計算，沒有另存固定報告。':'本輪資料為暫計；雙方確認整組結果後，才保存對戰明細並計入 PK 戰績。';roomStats.append(note);
+      const radarTitle=select('.radar-title');radarTitle.hidden=games.length<5;
+      if(c.participants.length===2&&games.length>=5)renderRoomRadar(radar,c,games);
+      else if(games.length<5){const threshold=document.createElement('p');threshold.className='radar-note';threshold.textContent='已完成 '+games.length+' 場；滿 5 場才顯示初步八角圖，滿 10 場後資料較充分。';radar.append(threshold);}
+      if(games.length>=5){const threshold=document.createElement('p');threshold.className='radar-note';threshold.textContent=games.length<10?'目前 '+games.length+' 場，屬初步分析；滿 10 場後資料較充分。':'目前 '+games.length+' 場，已達 10 場分析門檻；僅供本輪參考。';radar.append(threshold);}
     }
     const boards=select('.scoreboards');boards.replaceChildren();boards.hidden=!['in_progress','round_pending','game_pending','final_pending','score_review','completed','disputed'].includes(c?.status);
     const players=Array.from((c?.participants||[]).entries());if(swapped)players.reverse();
