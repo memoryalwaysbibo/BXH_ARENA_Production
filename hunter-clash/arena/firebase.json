@@ -1,0 +1,1 @@
+{"functions":[{"source":".","codebase":"arena-internal-pk","runtime":"nodejs22","ignore":["node_modules","*.log","firebase.json","vendor","entrance-cards-v2.png","mobile.mjs","mobile.css","controller.mjs","scanner.mjs","pairing.mjs","history.js","runtime.js"]}]}

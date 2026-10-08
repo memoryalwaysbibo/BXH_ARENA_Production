@@ -722,6 +722,7 @@
     async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
     async teamRegistration(payload){return callEngagementFunction("teamRegistration",payload,60000);},
     async teamLineup(payload){return callEngagementFunction("teamLineup",payload,60000);},
+    async hunterClash(payload){return callEngagementFunction("hunterClashCommand",payload,30000);},
     async teamScoring(payload){return callEngagementFunction("teamScoring",payload,60000);},
     async roomAccess(payload){return callEngagementFunction("roomAccess",payload,60000);},
     async eventTemplate(payload){return callEngagementFunction("eventTemplateService",payload,30000);},

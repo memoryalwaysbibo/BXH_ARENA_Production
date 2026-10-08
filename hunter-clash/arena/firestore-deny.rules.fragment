@@ -1,0 +1,10 @@
+// Insert inside the existing /databases/{database}/documents block; do NOT replace ARENA rules.
+match /arenaPKChallenges/{id} { allow read, write: if false; }
+match /arenaPKCodes/{id} { allow read, write: if false; }
+match /arenaPKReceipts/{id} { allow read, write: if false; }
+match /arenaPKAttempts/{uid} { allow read, write: if false; }
+match /arenaPKAudit/{id} { allow read, write: if false; }
+match /arenaPKPlayers/{uid} { allow read, write: if false;
+  match /matches/{id} { allow read, write: if false; }
+}
+match /systemSettings/hunterClash { allow read, write: if false; }

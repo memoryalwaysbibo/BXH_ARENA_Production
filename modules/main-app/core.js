@@ -5341,6 +5341,9 @@ let findEventsExpanded = { ongoing:false, open:false, upcoming:false };
 let findEventsFiltersOpen = false;
 let lobbySectionExpanded = { live:null, settling:false, registration:false, waiting:false, ended:false };
 const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","天梯排行"]];
+const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>renderPreservingScroll(),escape:esc});
+function playerVisibleTabs(){return hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:PLAYER_TABS;}
+
 let engagementSnapshot=null;
 let engagementSnapshotUid="";
 let engagementLoading=false;
@@ -13904,7 +13907,7 @@ function playerDerivedId(p){
 
 function renderPlayerNavHtml(){
   return `<nav class="player-tabs">
-    ${PLAYER_TABS.map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
+    ${playerVisibleTabs().map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
   </nav>`;
 }
 
@@ -13924,6 +13927,7 @@ function renderPlayerCenterLoggedIn(){
   if(mail.messages===null&&!mail.loading&&!mail.busy&&!mail.error)setTimeout(()=>loadMailbox(false),0);
   // v13.24.0: legacy cached "find" tab now resolves into the unified lobby.
   if(playerActiveTab==="find") playerActiveTab="home";
+  if(playerActiveTab==="clash"&&!hunterClashEntry?.visible())playerActiveTab="home";
   let content;
   if(mailboxContext().open) content = renderMailboxPage();
   else if(playerActiveTab==="items") content = renderInventoryPage();
@@ -13932,6 +13936,7 @@ function renderPlayerCenterLoggedIn(){
   else if(playerActiveTab==="registered") content = renderPlayerRegisteredTab();
   else if(playerActiveTab==="checkin") content = renderDailyCheckInPage();
   else if(playerActiveTab==="host") content = renderPlayerCommunityHostTab();
+  else if(playerActiveTab==="clash") content = hunterClashEntry.render();
   else if(playerActiveTab==="stats") content = renderPlayerStatsTab(p);
   else if(playerActiveTab==="ladder") content = renderLadderLeaderboardPage(false);
   else if(playerActiveTab==="profile") content = renderPlayerProfileTab(p);
@@ -13950,7 +13955,7 @@ function renderPlayerCenterLoggedIn(){
       ${content}
     </main>
     <nav class="player-tabs player-tabs-bottom">
-      ${PLAYER_TABS.map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
+      ${playerVisibleTabs().map(([key,label])=>`<button class="player-tab-btn ${playerActiveTab===key?'active':''}" data-action="player-switch-tab" data-tab="${key}">${esc(label)}</button>`).join("")}
     </nav>
     ${renderModal()}
     ${renderCloudJoinModal()}
@@ -15230,7 +15235,7 @@ function hunterPeriodStartMs(period){
   return 0;
 }
 function hunterFilteredRecords(){
-  const rows=hunterFilterByMode(hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[],hunterBattleFilter);
+  const rows=hunterFilterByMode(window.BXHArenaPK?.displayRecords(hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[])||(hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[]),hunterBattleFilter);
   const periodStart=hunterPeriodStartMs(hunterRecordPeriodFilter);
   return rows.filter(r=>{
     if(hunterRecordTypeFilter!=="all" && r.ladderMode!==hunterRecordTypeFilter) return false;
@@ -15688,8 +15693,9 @@ const HUNTER_ANALYSIS_LABELS={extreme:"極限",knockout:"擊飛",burst:"爆裂",
 
 function hunterModeLabel(mode){return {standard:"正規賽",enchantment:"附魔",pk:"PK",unknown:"未識別來源"}[mode]||"全部";}
 function hunterBattleFiltersHtml(){
-  const buttons=[["standard","正規賽"],["pk","PK（尚未串接）"],["enchantment","附魔"],["all","全部"]].map(([key,label])=>'<button class="btn '+(hunterBattleFilter===key?'btn-primary':'btn-ghost')+' btn-sm" '+(key==="pk"?'disabled':'data-action="hunter-battle-filter" data-value="'+key+'" aria-pressed="'+(hunterBattleFilter===key)+'"')+'>'+label+'</button>').join('');
-  return '<section class="panel hunter-battle-filter"><div class="hunter-battle-tabs" role="group" aria-label="戰績來源">'+buttons+'</div><div class="hint">目前查看：'+esc(hunterModeLabel(hunterBattleFilter))+'。分類共用於期間統計、能力分析與對戰紀錄；執照實力只採正規賽。PK 尚無正式戰績來源，未納入全部。</div></section>';
+  const pkAvailable=window.BXHArenaPK&&hunterClashEntry?.visible();
+  const buttons=[["standard","正規賽"],["pk",pkAvailable?"PK":"PK（尚未串接）"],["enchantment","附魔"],["all","全部"]].map(([key,label])=>'<button class="btn '+(hunterBattleFilter===key?'btn-primary':'btn-ghost')+' btn-sm" '+(key==="pk"&&!pkAvailable?'disabled':'data-action="hunter-battle-filter" data-value="'+key+'" aria-pressed="'+(hunterBattleFilter===key)+'"')+'>'+label+'</button>').join('');
+  return '<section class="panel hunter-battle-filter"><div class="hunter-battle-tabs" role="group" aria-label="戰績來源">'+buttons+'</div><div class="hint">目前查看：'+esc(hunterModeLabel(hunterBattleFilter))+'。分類共用於期間統計、能力分析與對戰紀錄；執照實力只採正規賽。'+(pkAvailable?'PK 為 SELF 雙方確認，僅供統計與分布；不計 XP、成就與階級。':'PK 尚無正式戰績來源，未納入全部。')+'</div></section>';
 }
 function hunterEnchantmentSummaryHtml(records){
   const summary=hunterModeSummary(records);
@@ -15699,7 +15705,7 @@ function hunterEnchantmentSummaryHtml(records){
   return '<div class="hunter-enchantment-summary"><strong>附魔得分拆分</strong><div class="hunter-stat-grid">'+cell('基礎分','base')+cell('卡牌加分','gain')+cell('卡牌減分','reduction')+cell('失誤判罰','fault')+cell('實際比分','actual')+'</div><div class="hint">'+summary.enchantmentVerified+' / '+summary.counts.enchantment+' 場通過核對。實際分＝基礎分＋卡牌加分－卡牌減分＋失誤判罰。'+(summary.enchantmentExcluded?'另有 '+summary.enchantmentExcluded+' 場缺少完整拆分，未猜測基礎分。':'')+'</div></div>';
 }
 function hunterRecordsForPeriod(period){
-  const rows=hunterFilterByMode(hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[],hunterBattleFilter);
+  const rows=hunterFilterByMode(window.BXHArenaPK?.displayRecords(hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[])||(hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[]),hunterBattleFilter);
   if(period==="recent20")return hunterTrendWindows(rows).recent;
   const start=hunterPeriodStartMs(period);
   return rows.filter(r=>period==="career"||start<=0||hunterRecordTimestamp(r)>=start);
@@ -16248,7 +16254,14 @@ async function loadHunterProfile(force=false){
 }
 
 function renderPlayerStatsTab(p){
+
   const tabs=[["overview","獵人總覽"],["analysis","能力分析"],["records","對戰紀錄"],["achievements","成就"]];
+  if(hunterBattleFilter==="pk"&&playerStatsSubTab!=="achievements"&&window.BXHArenaPK&&hunterClashEntry?.visible()){
+    const selectedPeriod=playerStatsSubTab==="analysis"?hunterAnalysisPeriod:playerStatsSubTab==="records"?hunterRecordPeriodFilter:hunterOverviewPeriod;
+    const periodAction=playerStatsSubTab==="analysis"?"hunter-analysis-period":playerStatsSubTab==="records"?"hunter-period-filter":"hunter-overview-period";
+    const periodTabs=[["career","生涯"],["month","本月"],["week","本週"],["today","今日"]].map(([key,label])=>'<button class="btn '+(selectedPeriod===key?'btn-primary':'btn-ghost')+' btn-sm" data-action="'+periodAction+'" data-value="'+key+'">'+label+'</button>').join('');
+    return '<section class="hunter-profile-shell"><h2>獵人檔案</h2><div class="player-stats-subtabs hunter-profile-tabs">'+tabs.map(([key,label])=>'<button class="player-stats-subtab '+(playerStatsSubTab===key?'active':'')+'" data-action="player-stats-subtab" data-tab="'+key+'">'+label+'</button>').join('')+'</div>'+hunterBattleFiltersHtml()+'<div class="hunter-period-tabs">'+periodTabs+'</div>'+window.BXHArenaPK.renderLicense({tab:playerStatsSubTab,analyze:hunterBuildAnalysis,radar:a=>hunterRadarHtml(a,hunterRadarMetric),card:hunterRecordCardHtml,records:hunterRecordsForPeriod(selectedPeriod)})+'</section>';
+  }
   const playerName=(p&&((p.displayName||"").trim()||(p.realName||"").trim()))||"玩家";
   const playerId=(typeof playerDerivedId==="function")?playerDerivedId(p):"—";
   const gameId=(typeof effectiveGameId==="function")?effectiveGameId(p):"";
@@ -16309,24 +16322,26 @@ function renderPlayerStatsTab(p){
       '<div class="hint">目前天梯階級：'+esc(ladderDisplayTier(l))+'　｜　生涯積分：'+Number(l.careerPoints||0)+' PT　｜　天梯、獵人等級、綜合評分三者用途不同。</div></section>';
   }else if(playerStatsSubTab==="analysis"){
     const analysisRows=hunterRecordsForPeriod(hunterAnalysisPeriod);
+    const displayCompleteHistory=completeHistory&&(hunterBattleFilter!=="all"||!window.BXHArenaPK||!hunterClashEntry?.visible()||["ready","empty"].includes(window.BXHArenaPK.state().status));
     const analysis=hunterBuildAnalysis(analysisRows);
-    if(!completeHistory){analysis.eligible=false;analysis.overall=null;analysis.primary=analysis.secondary=analysis.mainWeakness=analysis.style="資料尚未完整";}
+    if(hunterBattleFilter==="all"&&window.BXHArenaPK&&hunterClashEntry?.visible()){analysis.scoreAllowed=false;analysis.eligible=false;analysis.overall=null;}
+    if(!displayCompleteHistory){analysis.eligible=false;analysis.overall=null;analysis.primary=analysis.secondary=analysis.mainWeakness=analysis.style="資料尚未完整";}
     const seasonAvailable=hunterSeasonStartMs()>0;
     const periods=[["career","生涯",true],["season","本季",seasonAvailable],["month","本月",true],["week","本週",true],["today","今日",true],["recent20","最近20場",true]].map(([key,label,enabled])=>'<button class="btn '+(hunterAnalysisPeriod===key?'btn-primary':'btn-ghost')+' btn-sm" '+(enabled?'data-action="hunter-analysis-period" data-value="'+key+'"':'disabled title="賽季起始時間尚未載入"')+'>'+label+'</button>').join('');
     const scoreText=analysis.eligible?String(analysis.overall):"—";
     const percentText=(value,hasSamples)=>hasSamples?value+"%":"—";
     const sampleText=analysis.matches+' 場可分析對戰｜'+analysis.validRounds+' 個有效回合';
-    body=hunterAnalysisContextHtml(analysis,!completeHistory)+'<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HUNTER ANALYSIS</div><div class="panel-title">能力分析</div></div><span class="badge badge-metal">P4 LIVE</span></div>'+
+    body=hunterAnalysisContextHtml(analysis,!displayCompleteHistory)+'<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HUNTER ANALYSIS</div><div class="panel-title">能力分析</div></div><span class="badge badge-metal">P4 LIVE</span></div>'+
       '<div class="hunter-period-tabs">'+periods+'</div>'+hunterEnchantmentSummaryHtml(analysisRows)+
       '<div class="hunter-analysis-scoreline"><div><span>綜合評分</span><b class="'+(analysis.eligible?'':'muted')+'">'+scoreText+'</b></div><div><span>對戰勝率</span><b>'+percentText(analysis.winRate,analysis.matches>0)+'</b></div><div><span>得分占比</span><b>'+percentText(analysis.pointEfficiency,analysis.totalFor+analysis.totalAgainst>0)+'</b></div><div><span>有效回合</span><b>'+analysis.validRounds+'</b></div></div>'+
       hunterRadarHtml(analysis,hunterRadarMetric)+
-      '<div class="hunter-sample-note '+(analysis.eligible?'ready':'')+'">'+(!completeHistory?'資料尚未完整｜暫停綜合評分與戰型結論；以下僅顯示已成功讀取的原始統計。':!analysis.scoreAllowed?'此分類不產生綜合能力分；附魔攻防使用基礎分，混合來源不判定戰型。'+sampleText:analysis.eligible?'樣本達標｜'+sampleText+'。雷達圖數字依所選口徑呈現得失分方式分布；視覺半徑以 100% 分布為滿格，次數／分數口徑依上方切換。':'樣本不足｜'+sampleText+'；至少需要 '+HUNTER_ANALYSIS_MIN_MATCHES+' 場＋'+HUNTER_ANALYSIS_MIN_ROUNDS+' 回合才產生綜合評分與戰型結論。')+'</div></section>'+
+      '<div class="hunter-sample-note '+(analysis.eligible?'ready':'')+'">'+(!displayCompleteHistory?'資料尚未完整｜暫停綜合評分與戰型結論；以下僅顯示已成功讀取的原始統計。':!analysis.scoreAllowed?'此分類不產生綜合能力分；附魔攻防使用基礎分，混合來源不判定戰型。'+sampleText:analysis.eligible?'樣本達標｜'+sampleText+'。雷達圖數字依所選口徑呈現得失分方式分布；視覺半徑以 100% 分布為滿格，次數／分數口徑依上方切換。':'樣本不足｜'+sampleText+'；至少需要 '+HUNTER_ANALYSIS_MIN_MATCHES+' 場＋'+HUNTER_ANALYSIS_MIN_ROUNDS+' 回合才產生綜合評分與戰型結論。')+'</div></section>'+
       '<div class="hunter-score-panels"><section class="panel"><div class="panel-title">進攻得分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.attack,type,"for",hunterRadarMetric)).join('')+'</div></section>'+
       '<section class="panel hunter-loss-panel"><div class="panel-title">防守失分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.defense,type,"against",hunterRadarMetric)).join('')+'</div></section></div>'+
       '<section class="panel"><div class="panel-title">分析結論</div><div class="hunter-analysis-grid"><div><span>主要優勢</span><strong>'+esc(analysis.primary)+'</strong></div><div><span>次要優勢</span><strong>'+esc(analysis.secondary)+'</strong></div><div><span>主要弱點</span><strong>'+esc(analysis.mainWeakness)+'</strong></div><div><span>戰型判定</span><strong>'+esc(analysis.style)+'</strong></div></div>'+
       '<div class="hunter-framework-note">綜合評分只採正規賽資料。附魔攻防採卡牌調整前基礎分；卡牌加分與減分另列，失誤判罰獨立核對。評分公式：60% 對戰勝率＋40% 得分占比。勝率＝可分析勝場／可分析場數；得分占比＝四種方式得分／雙方四種方式總得分。有效回合為比分核對通過的極限、擊飛、爆裂與轉停事件；失誤判罰用於核對比分，不計入四種方式或有效回合。Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析。點擊任一進攻／防守項目，可追溯到對手、Match 與原始 Round Timeline。</div></section>';
-    body+=hunterStrengthDiagnosticsHtml(analysisRows,!completeHistory);
-    body+=hunterTrendHtml(hunterFilterByMode(allRecords,hunterBattleFilter),!completeHistory);
+    body+=hunterStrengthDiagnosticsHtml(analysisRows,!displayCompleteHistory);
+    body+=hunterTrendHtml(hunterFilterByMode(window.BXHArenaPK?.displayRecords(allRecords)||allRecords,hunterBattleFilter),!displayCompleteHistory);
   }else if(playerStatsSubTab==="achievements"){
     const achievementCore=hunterProfileCache&&hunterProfileCache.achievementCore
       ? hunterProfileCache.achievementCore
@@ -16341,7 +16356,7 @@ function renderPlayerStatsTab(p){
     const periods=[["career","生涯",true],["season","本季",seasonAvailable],["month","本月",true],["week","本週",true],["today","今日",true]].map(([key,label,enabled])=>'<button class="btn '+(hunterRecordPeriodFilter===key?'btn-primary':'btn-ghost')+' btn-sm" '+(enabled?'data-action="hunter-period-filter" data-value="'+key+'"':'disabled title="賽季起始時間尚未載入"')+'>'+label+'</button>').join('');
     body='<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">MATCH RECORDS</div><div class="panel-title">對戰紀錄</div></div><span class="badge badge-metal">P3 LIVE</span></div>'+
       '<div class="hunter-record-filters"><div class="hunter-filter-group"><span>類型</span>'+typeButtons+'</div><div class="hunter-filter-group"><span>期間</span>'+periods+'</div></div>'+
-      '<div class="hunter-record-toolbar"><div class="hint">顯示 '+rows.length+' / '+allRecords.length+' 場已完成對戰</div><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">'+(hunterProfileLoading?"讀取中…":"重新整理")+'</button></div>'+
+      '<div class="hunter-record-toolbar"><div class="hint">顯示 '+rows.length+' / '+(window.BXHArenaPK?.displayRecords(allRecords)||allRecords).length+' 場已完成對戰</div><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">'+(hunterProfileLoading?"讀取中…":"重新整理")+'</button></div>'+
       (hunterProfileError?'<div class="hunter-profile-error">'+esc(hunterProfileError)+'</div>':'')+
       (hunterProfileCache!==null?hunterH2HPanelHtml(rows):'')+
       (hunterProfileLoading&&hunterProfileCache===null?'<div class="hunter-record-empty"><strong>正在讀取對戰紀錄</strong><p>正在交叉比對本人報名與公開對戰資料。</p></div>':
@@ -16349,6 +16364,7 @@ function renderPlayerStatsTab(p){
         '<div class="hunter-record-empty"><strong>目前沒有符合條件的對戰紀錄</strong><p>'+(allRecords.length?'可調整類型或期間篩選。':'已完成的賽事 Match 將自動出現在這裡。')+'</p><small>無法安全辨識的舊資料不會用名字強制併入。</small></div>')+
       '</section>';
   }
+  if(hunterBattleFilter==="all"&&window.BXHArenaPK&&hunterClashEntry?.visible())body=window.BXHArenaPK.statusHtml()+body;
   if(dataStatus==="loading"||dataStatus==="error"){
     body='<section class="panel" role="status"><div class="hunter-record-empty"><strong>'+
       (dataStatus==="loading"?'正在讀取獵人資料':esc(hunterProfileError))+
@@ -17151,7 +17167,7 @@ function restoreAuthenticatedView(uid,intent){
  }
  if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
-  appPhase='player-center';playerActiveTab=PLAYER_TABS.some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
+  appPhase='player-center';playerActiveTab=playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
  }
  if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer'||intent==='event_staff')){
   appPhase='app';
@@ -17206,6 +17222,7 @@ function finishRenderViewport(snapshot){
   setTimeout(restore, 180);
 }
 function render(){
+  hunterClashEntry?.session(firebaseUser,userProfile);
   if(!communitySettingsDraftContext())communitySettingsRenderedContext=null;
   reconcileRegistrationRosterContext();
   reconcileAdminTournamentListContext();
@@ -17253,6 +17270,7 @@ function render(){
     renderApp();
     bindAuthInputs();
   } finally {
+    hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]")&&!document.hidden);
     syncBoardFullscreen();
     scheduleCourtCallPoll();
     syncPublicTournamentsRealtimeState();
@@ -19906,10 +19924,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
+  if(hunterClashEntry?.handle(action))return;
   if(action==="player-switch-tab"){
     accountMenuOpen=false;
     mailboxContext().open=false;
     let newTab = target.getAttribute("data-tab");
+    if(newTab==="clash"&&!hunterClashEntry?.visible())return;
     if(newTab==="find") newTab="home"; // legacy v13.23.x cached/action compatibility
     if(newTab==="stats" && playerActiveTab!=="stats") playerStatsSubTab="overview";
     if(playerActiveTab==="home" && newTab!=="home") findEventsFiltersOpen=false;
@@ -19963,6 +19983,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="hunter-refresh"){
+    if(hunterBattleFilter==="all")void window.BXHArenaPK?.load(true);
     hunterProfileCache=null; hunterProfileError=null;
     hunterOpponentIdentityGeneration++;
     hunterOpponentIdentityLoading=false;
@@ -20004,9 +20025,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }
     return;
   }
+  if(action==="hunter-pk-refresh"){void window.BXHArenaPK?.load(true);return;}
   if(action==="hunter-battle-filter"){
     const value=target.getAttribute("data-value");
-    if(["standard","enchantment","all"].includes(value)){hunterBattleFilter=value;renderPreservingScroll();}
+    if(["standard","enchantment","all"].includes(value)||value==="pk"&&window.BXHArenaPK&&hunterClashEntry?.visible()){hunterBattleFilter=value;if(["pk","all"].includes(value))void window.BXHArenaPK?.load(false);renderPreservingScroll();}
     return;
   }
   if(action==="hunter-overview-period"){
@@ -23828,3 +23850,7 @@ init().then(()=>{
     }
   }catch(e){}
 });
+
+// Release the A1 camera on backgrounding and navigation; no PK polling exists in A1.
+window.addEventListener("pagehide",()=>hunterClashEntry?.suspend());
+document.addEventListener("visibilitychange",()=>{if(document.hidden)hunterClashEntry?.suspend();else hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]"));});

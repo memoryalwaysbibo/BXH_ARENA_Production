@@ -1,0 +1,1 @@
+{"firestore":{"rules":"arena-pk-emulator.rules"},"emulators":{"auth":{"port":9299},"firestore":{"port":8288},"ui":{"enabled":false},"singleProjectMode":true}}

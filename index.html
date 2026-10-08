@@ -142,6 +142,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link id="bxh-main-css-m6-core" rel="stylesheet" href="modules/main-css/core-competition.css?v=20261002-m6-1&final-label=20261007.3">
 <link id="bxh-main-css-m6-auth" rel="stylesheet" href="modules/main-css/auth-player.css?v=20261005-inline-mail-1">
+<link rel="stylesheet" href="modules/main-css/hunter-clash-entry.css?v=20261009-a1-1">
 <link id="bxh-main-css-m6-player" rel="stylesheet" href="modules/main-css/player-center-hunter.css?v=20261009-b6-1">
 <link id="bxh-main-css-m6-lobby" rel="stylesheet" href="modules/main-css/lobby-community.css?v=20261002-m6-1&live-court-switch=20261008.2">
 <link id="bxh-main-css-m6-tail" rel="stylesheet" href="modules/main-css/call-admin-tail.css?v=20261002-m6-1"><link id="bxh-referee-tail-m5-1" rel="stylesheet" href="modules/main-css/referee-tail.css?v=20261002-m5-1"><link id="bxh-main-tail-m4-1" rel="stylesheet" href="modules/main-css/tail-p7.css?v=20261002-m4-1">
@@ -219,7 +220,11 @@
 <script id="bxh-player-cards-p2e" src="modules/main-app/player-cards.js?v=20261002-p2e-1"></script>
 <script id="bxh-double-elim-core-v1" src="double-elimination-core.js?v=20261003-de1"></script>
 <script src="modules/main-app/court-retirement.js?v=20261007-2"></script>
-<script id="bxh-main-app-m7" src="modules/main-app/core.js?v=20261006-roster-promotion-1&roster-sync=2&auto-fill=1&registration=20261006-1&install-entry=20261005-1&inline-mail=20261005-1&management-load=20261006.5&header-title=row-3&quick-registration=20261006.6&community-roster=20261007.3&room-retention=20261007-24h&staff-names=20261008-5&live-court-switch=20261008.2&court-retirement=20261007-2&three-gods=20261008.1&hunter=20261008.1&akatsuki=20261008.1&clow=20261008.1&zeon=20261008.1&gundam=20261008.1&hunter-b1=20261008.1&hunter-b2=20261009.1&hunter-b3=20261009.1&hunter-b4=20261009.1&hunter-b5=20261009.1&hunter-b6=20261009.1"></script>
+<script src="hunter-clash/arena/adapter.js?v=20261009-a23"></script>
+<script src="hunter-clash/arena/history.js?v=20261009-a23"></script>
+<script src="hunter-clash/arena/runtime.js?v=20261009-a23"></script>
+<script src="modules/main-app/hunter-clash-entry.js?v=20261009-a1-1"></script>
+<script id="bxh-main-app-m7" src="modules/main-app/core.js?v=20261006-roster-promotion-1&roster-sync=2&auto-fill=1&registration=20261006-1&install-entry=20261005-1&inline-mail=20261005-1&management-load=20261006.5&header-title=row-3&quick-registration=20261006.6&community-roster=20261007.3&room-retention=20261007-24h&staff-names=20261008-5&live-court-switch=20261008.2&court-retirement=20261007-2&three-gods=20261008.1&hunter=20261008.1&akatsuki=20261008.1&clow=20261008.1&zeon=20261008.1&gundam=20261008.1&hunter-b1=20261008.1&hunter-b2=20261009.1&hunter-b3=20261009.1&hunter-b4=20261009.1&hunter-b5=20261009.1&hunter-b6=20261009.1&hunter-clash-a1=20261009.2&hunter-clash-a23=20261009.1"></script>
 <script id="bxh-public-watch-isolation" src="modules/main-app/public-watch-isolation.js?v=20261005-captain-isolation-1"></script>
 <script id="bxh-c6bata-rescue-v1" src="modules/main-app/c6bata-rescue.js?v=20261003-c6bata-rescue1"></script>
 
@@ -230,7 +235,7 @@
      介面互動；沒設定 FIREBASE_CONFIG 或連線失敗時，window.cloudSync 仍然
      存在，但所有方法會安全地回傳「未啟用」，系統自動維持純本機模式。
      ==================================================================== -->
-<script id="bxh-cloud-runtime-m8" src="modules/cloud/cloud-runtime.js?v=20261006-roster-promotion-1&assignment-confirm=20261008-2&roster-sync=2&auto-fill=1&team-live=1&admin-poster-layout=1&ladder-history=20261006.1&management-load=20261006.5&quick-registration=20261006.6&room-retention=20261007-24h&court-retirement=20261007-2&hunter-b1=20261008.1"></script>
+<script id="bxh-cloud-runtime-m8" src="modules/cloud/cloud-runtime.js?v=20261006-roster-promotion-1&assignment-confirm=20261008-2&roster-sync=2&auto-fill=1&team-live=1&admin-poster-layout=1&ladder-history=20261006.1&management-load=20261006.5&quick-registration=20261006.6&room-retention=20261007-24h&court-retirement=20261007-2&hunter-b1=20261008.1&hunter-clash-a23=20261009.1"></script>
 <script id="bxh-event-poster-ui" src="event-poster-ui.js?v=20261005-staff-roster-safe-1"></script>
 <script src="lobby-fast-cache.js?v=20260930-lobby-v1"></script>
 <script src="offline-resilience.js?v=20261004-render-dedupe-1"></script>
