@@ -380,11 +380,11 @@ mustInclude('重新整理可重試','Hunter identity retry guidance missing');
 mustInclude('let excluded=0,loading=0,unresolved=0;','H2H unresolved counter missing');
 mustInclude("statusParts.push(h2h.unresolved+' 場辨識失敗')",'H2H must disclose unresolved identity count');
 console.log('PASS Hunter P5 identity-resolution consistency');
-mustInclude('if(!record||record.analyzable!==true){','Hunter P5.2 breakdown must reject untrusted round data');
+mustInclude('if(!record||record.analyzable!==true||!hunterRoundIntegrity(record).ok){','Hunter P5.2 breakdown must reject untrusted round data');
 mustInclude('Round 資料未通過完整性驗證｜不顯示部分攻防拆解。','Hunter P5.2 partial breakdown warning missing');
-mustInclude('if(record.analyzable!==true) return','Hunter P5.2 timeline must reject untrusted round data');
+mustInclude('if(record.analyzable!==true||!hunterRoundIntegrity(record).ok) return','Hunter P5.2 timeline must reject untrusted round data');
 mustInclude('不顯示部分 Timeline','Hunter P5.2 partial timeline warning missing');
-mustInclude('const rounds=r.analyzable===true?','Hunter record chips must require analyzable=true');
+mustInclude('const rounds=r.analyzable===true&&hunterRoundIntegrity(r).ok?','Hunter record chips must require analyzable=true');
 mustInclude('Round 資料未通過完整性驗證｜不納入能力分析','Hunter record integrity warning missing');
 console.log('PASS Hunter P5 round-integrity display boundary');
 
@@ -392,10 +392,10 @@ mustInclude('const allSourceRecords=Array.isArray(result&&result.records)?result
 mustInclude('const canonicalRecords=hunterUniqueRecords(sourceRecords);','Hunter P5 seal must canonicalize Match records at load boundary');
 mustInclude('const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));','Hunter period summary must preserve canonical Match dedupe');
 mustInclude('const rows=hunterUniqueRecords(records);','Hunter H2H/growth must preserve canonical Match dedupe');
-mustInclude('const analyzable=rows.filter(r=>r&&r.analyzable&&Array.isArray(r.roundsPerspective)&&r.roundsPerspective.length>0);','Hunter P4 analysis must use analyzable canonical rounds only');
+mustInclude('const analyzable=rows.filter(r=>{const check=hunterRoundIntegrity(r);return check.ok&&check.validRounds>0;});','Hunter P4 analysis must use analyzable canonical rounds only');
 mustInclude('if(!HUNTER_ANALYSIS_TYPES.includes(ev.type)) return;','Hunter analysis must reject non-canonical point types');
 mustInclude('else if(scoreA!==expectedA||scoreB!==expectedB)','Hunter ledger totals must match final Match score');
-mustInclude('if(!record||record.analyzable!==true){','Hunter single-match analysis must share analyzable trust boundary');
+mustInclude('if(!record||record.analyzable!==true||!hunterRoundIntegrity(record).ok){','Hunter single-match analysis must share analyzable trust boundary');
 mustInclude('function hunterBuildH2H(records)','Hunter H2H canonical aggregation missing');
 console.log('PASS Hunter P5 statistical-caliber seal');
 
@@ -504,7 +504,7 @@ console.log('PASS Hunter Profile P6.5 achievement evidence chain UI');
 mustInclude('const HUNTER_ACHIEVEMENT_AUDIT_VERSION="hunter-achievement-audit-v1";','Hunter P6.6 audit version missing');
 mustInclude('function hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skipped,core)','Hunter P6.6 integrity audit engine missing');
 mustInclude('duplicatesRemoved:Math.max(0,source.length-canonical.length)','Hunter P6.6 duplicate audit missing');
-mustInclude('skippedIdentity:skippedRows.length','Hunter P6.6 identity exclusion audit missing');
+mustInclude('skippedIdentity:skippedRows.filter(row=>row&&row.reason==="identity-unresolved").length','Hunter P6.6 identity exclusion audit missing');
 mustInclude('legacyMatchKey','Hunter P6.6 legacy Match key audit missing');
 mustInclude('missingExactTime','Hunter P6.6 timestamp fallback audit missing');
 mustInclude('quickDecision','Hunter P6.6 Quick Decision audit missing');

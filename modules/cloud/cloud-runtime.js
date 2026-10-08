@@ -1892,7 +1892,7 @@
     // 或 permission-denied，導致玩家明明已成功報名，這個分頁卻只顯示未知錯誤。
     // 現在不需要 collection-group index；每筆 registration 仍只 get 自己 uid 的文件，
     // 因此沿用既有 Security Rules 的本人讀取限制，不會讀到其他玩家資料。
-    async queryMyRegistrations(){
+    async queryMyRegistrations(options={}){
       const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
       if(!uid) return [];
 
@@ -1913,6 +1913,7 @@
         }catch(e){
           // 一場讀取失敗不應讓整個「已報名」頁崩潰；但權限/連線類錯誤仍保留診斷資訊。
           console.warn("[queryMyRegistrations] registration read failed", code, e);
+          if(typeof options.onReadFailure==="function")options.onReadFailure(code);
           return null;
         }
       }));
@@ -1928,16 +1929,19 @@
     // registration documents. No new collection and no access to other players' private data.
     async queryMyHunterMatches(){
       const uid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
-      if(!uid) return {ok:true,records:[],skipped:[]};
-      const regs=await this.queryMyRegistrations();
-      const selfRegs=(regs||[]).filter(r=>r&&r.status!=="cancelled"&&!r.familyPlayerId);
+      if(!uid) throw new Error("hunter-auth-required");
       const records=[],skipped=[];
+      const regs=await this.queryMyRegistrations({onReadFailure:code=>skipped.push({code,reason:"registration-read-failed"})});
+      // Cancellation must not erase a completed historical match.
+      const selfRegs=(regs||[]).filter(r=>r&&!r.familyPlayerId);
+      const seenCodes=new Set();
       const idToken=v=>String(v||"").replace(/[^A-Za-z0-9_-]/g,"_");
       const cleanName=v=>String(v||"").trim().replace(/\s+/g," ").toLocaleLowerCase("zh-Hant");
 
       for(const reg of selfRegs){
         const code=String(reg.tournamentCode||"").toUpperCase();
-        if(!code) continue;
+        if(!code||seenCodes.has(code)) continue;
+        seenCodes.add(code);
         try{
           const snap=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
           if(!snap.exists()){ skipped.push({code,reason:"public-missing"}); continue; }

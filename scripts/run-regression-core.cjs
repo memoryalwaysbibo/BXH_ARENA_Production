@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    { name: 'hunter B1 statistics and partial-read states', args: ['--test', 'tests/hunter-b1-statistics.test.cjs', 'tests/hunter-b1-cloud.test.cjs'] },
     { name: 'inline mailbox reading and stable refresh', args: ['--test', 'tests/mailbox-inline.test.cjs'] },
     { name: 'claimed-card album refresh and session isolation', args: ['--test', 'tests/card-album-claim-refresh.test.cjs'] },
     { name: 'Core module exports, shared state, and stale callback guards', args: ['--test', 'tests/module-seam-contracts.test.cjs'] },
