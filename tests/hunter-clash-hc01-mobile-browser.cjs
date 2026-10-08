@@ -70,13 +70,15 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('配對成功'));const seriesReady=await command(A,'start');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),seriesReady.challenge.revision);await command(B,'start');await A.waitForFunction(()=>document.querySelector('.state').textContent==='對戰中');
     for(const finish of ['extreme','spin'])await command(A,'recordRound','[data-op="recordRound"][data-player="0"][data-finish="'+finish+'"]');
     await B.waitForFunction(()=>document.querySelector('.state').textContent.includes('本場結束'));assert.equal(await B.locator('[data-op="nextGame"]').isVisible(),false);assert.equal(await A.locator('[data-op="confirmFinish"]').isVisible(),false);
+    await A.locator('.room-analysis summary').click();assert.equal(await A.locator('.room-stat').count(),2);assert.match(await A.locator('.room-stat').first().textContent(),/本輪勝率：100%（1 勝 0 敗）.*評價：全勝/);assert.match(await A.locator('.room-stat').last().textContent(),/本輪勝率：0%（0 勝 1 敗）.*評價：待突破/);assert.equal(await A.locator('.room-radar .radar-player').count(),2);assert.equal(await A.locator('.room-stats-note').isVisible(),true);
     await command(A,'nextGame');await B.waitForFunction(()=>document.querySelector('.policy').textContent.includes('第 2 / 2 場'));assert.deepEqual(await A.locator('.points').allTextContents(),['0','0']);
     assert.equal(await A.locator('.session-results p').textContent(),'第 1 場：黑爸 4 : 0 小宇');
     for(const finish of ['extreme','spin'])await command(A,'recordRound','[data-op="recordRound"][data-player="1"][data-finish="'+finish+'"]');
+    assert.match(await A.locator('.room-stat').first().textContent(),/本輪勝率：50%（1 勝 1 敗）.*評價：勢均力敵/);
     const seriesFinal=await command(A,'confirmFinish');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),seriesFinal.challenge.revision);await command(B,'confirmFinish');
     await A.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('3 場 · 2 勝 1 敗'));
     await B.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('3 場 · 1 勝 2 敗'));
-    await A.screenshot({path:'test-results/hc01/mobile-series.png',fullPage:true});
+    assert.equal(await A.locator('.room-stats-note').count(),0);await A.screenshot({path:'test-results/hc01/mobile-series.png',fullPage:true});
     await A.locator('[data-op="logout"]').click();await A.locator('#login').waitFor({state:'visible'});assert.equal(await A.locator('.history-list').textContent(),'');assert.equal(await A.locator('.qr').textContent(),'');assert.equal(await A.locator('textarea').inputValue(),'');assert.equal(await A.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('hc01:')).length),0);assert.equal(await A.evaluate(()=>localStorage.getItem('hc01:remembered-email')),'A@fixture.invalid');await A.locator('[name="remember"]').uncheck();await A.reload();assert.equal(await A.locator('[name="email"]').inputValue(),'');assert.deepEqual(errors,[]);
     console.log('PASS single-player mobile fixture UI: two sessions, complete match, reload/read recovery, logout cleanup, 390px and no JS errors. Not cloud login or real camera evidence.');
   }finally{await browser.close();}
