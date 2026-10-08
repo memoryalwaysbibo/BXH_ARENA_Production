@@ -3,3 +3,5 @@
 .review-help{font-size:13px;color:var(--gold)}[data-op=undoRound]{width:100%;margin:4px 0 12px;background:transparent;color:var(--gold);border-color:#635b49}[data-op=resumeReview]{width:100%;margin-bottom:12px;background:var(--gold);color:#241b12;border-color:var(--gold)}
 
 .scoreboards{grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:6px;align-items:start}.exchange{align-self:center;padding:0;width:34px;min-height:44px;font-size:25px;color:var(--gold);border-color:#8b7547;background:#272236}.player-score h3{overflow-wrap:anywhere;line-height:1.4}
+
+#history summary{font-size:16px;font-weight:700;color:var(--gold)}.history-stats{font-size:16px;font-weight:700;line-height:1.6}.history-note,.history-status{font-size:12px;color:var(--muted)}.history-match{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:14px 0;border-bottom:1px solid var(--line)}.history-match strong{font-size:14px;overflow-wrap:anywhere}.history-match small{grid-column:1/-1;color:var(--muted);font-size:11px}.history-win{color:var(--gold)}.history-loss{color:#c7badb}#history button{margin-top:14px;font-size:13px}

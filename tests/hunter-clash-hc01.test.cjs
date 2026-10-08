@@ -245,3 +245,26 @@ test('participant names persist for both phones and only the joining actor suppl
   await assert.rejects(f.service.run('C','createChallenge',{requestId:'inject',participantNames:{A:'冒名'}}),/invalid-input/);
   await assert.rejects(f.service.run('C','createChallenge',{requestId:'long',playerName:'字'.repeat(41)}),/invalid-input/);
 });
+
+test('PK history records both perspectives only on final agreement and is idempotent',async()=>{
+  const f=fixture();assert.equal((await f.service.run('A','getMyHistory',{})).history.total,0);
+  let c=await f.start();c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'extreme'});c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'spin'});
+  c=await f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision});
+  assert.equal((await f.service.run('A','getMyHistory',{})).history.total,0);
+  const input={challengeId:c.challengeId,requestId:'finish-history',expectedRevision:c.revision,resultRevision:c.resultRevision};
+  await f.service.run('B','confirmFinish',input);await f.service.run('B','confirmFinish',input);
+  const a=(await f.service.run('A','getMyHistory',{})).history,b=(await f.service.run('B','getMyHistory',{})).history;
+  assert.deepEqual([a.total,a.wins,a.losses,b.total,b.wins,b.losses],[1,1,0,1,0,1]);
+  assert.deepEqual([a.matches[0].score,a.matches[0].opponentScore,a.matches[0].opponentUid,b.matches[0].score,b.matches[0].opponentScore,b.matches[0].opponentUid],[4,0,'B',0,4,'A']);
+  assert.equal((await f.service.run('C','getMyHistory',{})).history.total,0);
+  await assert.rejects(f.service.run('C','getMyHistory',{uid:'A'}),/invalid-input/);
+});
+test('history keeps 50 recent matches while lifetime totals continue, and corrupt peer record rolls back all writes',async()=>{
+  const f=fixture();let c=await f.start();c=await f.mutate('A','recordRound',c,{winnerUid:'B',finish:'extreme'});c=await f.mutate('A','recordRound',c,{winnerUid:'B',finish:'spin'});c=await f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision});
+  f.data.set('hc01PlayerRecords/A',{environment:'sandbox',uid:'A',total:50,wins:50,losses:0,matches:Array.from({length:50},(_,i)=>({challengeId:'old_'+i}))});
+  f.data.set('hc01PlayerRecords/B',{environment:'production',uid:'B'});
+  await assert.rejects(f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision}),/history-unavailable/);
+  assert.equal(f.data.get('hc01PlayerRecords/A').total,50);assert.equal(f.data.get('hc01Challenges/'+c.challengeId).status,'final_pending');
+  f.data.delete('hc01PlayerRecords/B');await f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision});
+  const a=(await f.service.run('A','getMyHistory',{})).history;assert.deepEqual([a.total,a.wins,a.losses,a.matches.length],[51,50,1,50]);assert.equal(a.matches[0].challengeId,c.challengeId);assert.equal(a.matches.at(-1).challengeId,'old_48');
+});

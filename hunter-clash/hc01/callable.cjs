@@ -1,12 +1,12 @@
 'use strict';
 const {OPERATIONS}=require('./domain.cjs');
-const allowed=new Set(['createChallenge','getChallenge','acceptCode',...OPERATIONS]);
+const allowed=new Set(['createChallenge','getChallenge','getMyHistory','acceptCode',...OPERATIONS]);
 const codes={
   'invalid-operation':'invalid-argument','invalid-id':'invalid-argument','invalid-input':'invalid-argument',
   'invalid-rules':'failed-precondition','invalid-pairing-policy':'failed-precondition','invalid-time':'failed-precondition',
   'unauthenticated':'unauthenticated','account-unavailable':'permission-denied','opponent-unavailable':'permission-denied',
   'challenge-unavailable':'permission-denied','participant-required':'permission-denied',
-  'closed':'failed-precondition','request-id-reused':'already-exists','challenge-already-exists':'already-exists',
+  'history-unavailable':'failed-precondition','closed':'failed-precondition','request-id-reused':'already-exists','challenge-already-exists':'already-exists',
   'pairing-rate-limited':'resource-exhausted','pairing-unavailable':'failed-precondition','revision-conflict':'aborted','terminal-state':'failed-precondition',
   'invalid-state':'failed-precondition','invalid-round':'invalid-argument','round-confirmation-invalid':'failed-precondition',
   'undo-unavailable':'failed-precondition','review-unavailable':'failed-precondition',

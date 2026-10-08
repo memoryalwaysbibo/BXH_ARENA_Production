@@ -43,3 +43,11 @@ test('deployment and runtime fail closed for production and emulator environment
   for(const env of [{},{GCLOUD_PROJECT:'bxh-arena'},{GCLOUD_PROJECT:'bxh-hc-test',GOOGLE_CLOUD_PROJECT:'bxh-arena'},{GCLOUD_PROJECT:'bxh-hc-test',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8180'}])assert.throws(()=>assertDeployment(env));
   const result=spawnSync(process.execPath,['hunter-clash/hc01/cloud/server-entry.cjs'],{cwd:path.join(__dirname,'..'),env:{...process.env,GCLOUD_PROJECT:'bxh-arena',GOOGLE_CLOUD_PROJECT:'bxh-arena'},encoding:'utf8'});assert.notEqual(result.status,0);assert.match(result.stderr,/cloud-test-project-mismatch/);assert.doesNotMatch(result.stderr,/Cannot find module/);
 });
+
+test('history response is restricted to the captured authenticated account',async()=>{
+  const history={environment:'sandbox',uid:'A',total:1,wins:1,losses:0,matches:[]};
+  const f=await fixture(async()=>({ok:true,status:200,json:async()=>({result:{history}})}));assert.deepEqual(await f.run('getMyHistory',{}, {uid:'A'}),{history});
+  for(const invalid of [{...history,uid:'B'},{...history,environment:'production'},{...history,wins:2}]){
+    const g=await fixture(async()=>({ok:true,status:200,json:async()=>({result:{history:invalid}})}));await assert.rejects(g.run('getMyHistory',{}, {uid:'A'}),/unknown-response/);
+  }
+});

@@ -53,11 +53,17 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     await A.screenshot({path:'test-results/hc01/mobile-score-review.png',fullPage:true});
     const reviewed=await command(A,'resumeReview');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),reviewed.challenge.revision);
     const final=await command(A,'confirmFinish');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),final.challenge.revision);await command(B,'confirmFinish');await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('完賽紀錄已保存'));
+    await A.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('1 勝 0 敗'));
+    await B.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('0 勝 1 敗'));
+    for(const page of pages)await page.locator('#history summary').click();
+    assert.equal(await A.locator('.history-match strong').textContent(),'黑爸 vs 小宇');assert.equal(await B.locator('.history-match strong').textContent(),'小宇 vs 黑爸');
+    assert.equal(await A.locator('.history-match span').textContent(),'勝 4 : 0');assert.equal(await B.locator('.history-match span').textContent(),'敗 0 : 4');
+    await A.screenshot({path:'test-results/hc01/mobile-history.png',fullPage:true});
     // Session reload restores only challenge ID, then reads current service state after login.
     await A.reload();assert.equal(await A.locator('[name="playerName"]').inputValue(),'黑爸');assert.equal(await A.locator('[name="email"]').inputValue(),'A@fixture.invalid');assert.equal(await A.locator('[name="remember"]').isChecked(),true);assert.equal(await A.locator('[name="password"]').inputValue(),'');await A.locator('[name="password"]').fill('fixture');await A.locator('#login button').click();await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('完賽紀錄已保存'));
     for(const page of pages)assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     fs.mkdirSync('test-results/hc01',{recursive:true});await A.screenshot({path:'test-results/hc01/mobile-internal-test.png',fullPage:true});
-    await A.locator('[data-op="logout"]').click();await A.locator('#login').waitFor({state:'visible'});assert.equal(await A.locator('.qr').textContent(),'');assert.equal(await A.locator('textarea').inputValue(),'');assert.equal(await A.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('hc01:')).length),0);assert.equal(await A.evaluate(()=>localStorage.getItem('hc01:remembered-email')),'A@fixture.invalid');await A.locator('[name="remember"]').uncheck();await A.reload();assert.equal(await A.locator('[name="email"]').inputValue(),'');assert.deepEqual(errors,[]);
+    await A.locator('[data-op="logout"]').click();await A.locator('#login').waitFor({state:'visible'});assert.equal(await A.locator('.history-list').textContent(),'');assert.equal(await A.locator('.qr').textContent(),'');assert.equal(await A.locator('textarea').inputValue(),'');assert.equal(await A.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('hc01:')).length),0);assert.equal(await A.evaluate(()=>localStorage.getItem('hc01:remembered-email')),'A@fixture.invalid');await A.locator('[name="remember"]').uncheck();await A.reload();assert.equal(await A.locator('[name="email"]').inputValue(),'');assert.deepEqual(errors,[]);
     console.log('PASS single-player mobile fixture UI: two sessions, complete match, reload/read recovery, logout cleanup, 390px and no JS errors. Not cloud login or real camera evidence.');
   }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>server.kill('SIGTERM'));

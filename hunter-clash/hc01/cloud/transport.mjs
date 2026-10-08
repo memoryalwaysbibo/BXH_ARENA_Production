@@ -1,5 +1,5 @@
 import{ENDPOINT,validateConfig}from'./config.mjs';
-const reasons=new Set(['invalid-operation','invalid-id','invalid-input','invalid-rules','invalid-pairing-policy','invalid-time','unauthenticated','account-unavailable','opponent-unavailable','challenge-unavailable','participant-required','closed','request-id-reused','challenge-already-exists','pairing-rate-limited','pairing-unavailable','revision-conflict','terminal-state','invalid-state','invalid-round','round-confirmation-invalid','finish-confirmation-invalid','environment-mismatch','revision-overflow']);
+const reasons=new Set(['invalid-operation','history-unavailable','undo-unavailable','review-unavailable','invalid-id','invalid-input','invalid-rules','invalid-pairing-policy','invalid-time','unauthenticated','account-unavailable','opponent-unavailable','challenge-unavailable','participant-required','closed','request-id-reused','challenge-already-exists','pairing-rate-limited','pairing-unavailable','revision-conflict','terminal-state','invalid-state','invalid-round','round-confirmation-invalid','finish-confirmation-invalid','environment-mismatch','revision-overflow']);
 export function createCloudTransport({config,origin,auth,getAppCheckToken,fetcher=fetch}){
   validateConfig(config,origin);
   return async(operation,input,{uid,signal})=>{
@@ -19,6 +19,11 @@ export function createCloudTransport({config,origin,auth,getAppCheckToken,fetche
         // An INTERNAL/unknown transport error may follow a committed transaction. Keep the pending command.
         error.definitive=response.status>=400&&response.status<500&&reasons.has(reason);throw error;}
       const result=body.result;
+      if(operation==='getMyHistory'){
+        const h=result?.history;
+        if(!response.ok||h?.environment!=='sandbox'||h.uid!==uid||!Number.isSafeInteger(h.total)||h.total<0||!Number.isSafeInteger(h.wins)||!Number.isSafeInteger(h.losses)||h.wins<0||h.losses<0||h.wins+h.losses!==h.total||!Array.isArray(h.matches)||h.matches.length>50)throw Error('unknown-response');
+        return result;
+      }
       if(!response.ok||result?.challenge?.environment!=='sandbox'||typeof result.challenge.challengeId!=='string'||!result.challenge.participants.includes(uid))throw Error('unknown-response');
       return result;
     }finally{clearTimeout(timeout);signal?.removeEventListener('abort',cancel);}

@@ -38,6 +38,9 @@ test('actual Auth and Callable complete pairing, two starts, rounds and two fina
   for(const finish of ['extreme','spin']){c=await command('A','proposeRound',c,{winnerUid:'A',finish});c=await command('B','confirmRound',c,{roundRevision:c.pendingRound.roundRevision});}
   c=await command('A','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'final_pending');
   c=await command('B','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'completed');assert.deepEqual(c.score,{a:4,b:0});
+  const a=await call('A','getMyHistory',{}),b=await call('B','getMyHistory',{});
+  assert.deepEqual([a.history.total,a.history.wins,b.history.total,b.history.losses],[1,1,1,1]);
+  assert.deepEqual([a.history.matches[0].score,a.history.matches[0].opponentScore,b.history.matches[0].score,b.history.matches[0].opponentScore],[4,0,0,4]);
   assert.equal(c.certificationSource,'SELF');assert.equal(c.ratingStatus,'not_awarded');
   assert.equal((await db.doc('hc01Challenges/'+c.challengeId).get()).data().status,'completed');
   assert.deepEqual((await db.doc('users/A').get()).data(),{lifetime:444});assert.deepEqual((await db.doc('ladder/A').get()).data(),{points:123});assert.deepEqual((await db.doc('mailboxes/A').get()).data(),{count:7});
@@ -68,7 +71,7 @@ test('participant and global close gates block calls; rejection leaves stored st
 });
 test('authenticated client cannot read private receipt or directly mutate any service collection',async()=>{
   const made=await create();const receipt=(await db.collection('hc01Receipts').get()).docs[0];
-  for(const path of ['hc01Challenges/'+made.challenge.challengeId,receipt.ref.path,'hcActors/A','hcConfig/runtime']){
+  for(const path of ['hc01Challenges/'+made.challenge.challengeId,receipt.ref.path,'hc01PlayerRecords/A','hcActors/A','hcConfig/runtime']){
     const url='http://127.0.0.1:8180/v1/projects/'+PROJECT+'/databases/(default)/documents/'+path;
     const headers={Authorization:'Bearer '+tokens.A,'Content-Type':'application/json'};
     assert.equal((await fetch(url,{headers})).status,403);
