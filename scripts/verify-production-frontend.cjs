@@ -380,7 +380,7 @@ mustInclude('重新整理可重試','Hunter identity retry guidance missing');
 mustInclude('let excluded=0,loading=0,unresolved=0;','H2H unresolved counter missing');
 mustInclude("statusParts.push(h2h.unresolved+' 場辨識失敗')",'H2H must disclose unresolved identity count');
 console.log('PASS Hunter P5 identity-resolution consistency');
-mustInclude('if(!record||record.analyzable!==true||!hunterRoundIntegrity(record).ok){','Hunter P5.2 breakdown must reject untrusted round data');
+mustInclude('if(!record||record.analyzable!==true||!hunterScoringBreakdown(record).available){','Hunter P5.2 breakdown must reject untrusted round data');
 mustInclude('Round 資料未通過完整性驗證｜不顯示部分攻防拆解。','Hunter P5.2 partial breakdown warning missing');
 mustInclude('if(record.analyzable!==true||!hunterRoundIntegrity(record).ok) return','Hunter P5.2 timeline must reject untrusted round data');
 mustInclude('不顯示部分 Timeline','Hunter P5.2 partial timeline warning missing');
@@ -392,10 +392,10 @@ mustInclude('const allSourceRecords=Array.isArray(result&&result.records)?result
 mustInclude('const canonicalRecords=hunterUniqueRecords(sourceRecords);','Hunter P5 seal must canonicalize Match records at load boundary');
 mustInclude('const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));','Hunter period summary must preserve canonical Match dedupe');
 mustInclude('const rows=hunterUniqueRecords(records);','Hunter H2H/growth must preserve canonical Match dedupe');
-mustInclude('const analyzable=rows.filter(r=>{const check=hunterRoundIntegrity(r);return check.ok&&check.validRounds>0;});','Hunter P4 analysis must use analyzable canonical rounds only');
+mustInclude('const analyzable=rows.filter(r=>{const check=hunterRoundIntegrity(r);return check.ok&&check.validRounds>0&&hunterScoringBreakdown(r).available;});','Hunter P4 analysis must use analyzable canonical rounds only');
 mustInclude('if(!HUNTER_ANALYSIS_TYPES.includes(ev.type)) return;','Hunter analysis must reject non-canonical point types');
 mustInclude('else if(scoreA!==expectedA||scoreB!==expectedB)','Hunter ledger totals must match final Match score');
-mustInclude('if(!record||record.analyzable!==true||!hunterRoundIntegrity(record).ok){','Hunter single-match analysis must share analyzable trust boundary');
+mustInclude('if(!record||record.analyzable!==true||!hunterScoringBreakdown(record).available){','Hunter single-match analysis must share analyzable trust boundary');
 mustInclude('function hunterBuildH2H(records)','Hunter H2H canonical aggregation missing');
 console.log('PASS Hunter P5 statistical-caliber seal');
 
