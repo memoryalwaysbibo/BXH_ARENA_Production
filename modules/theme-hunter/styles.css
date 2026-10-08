@@ -14,9 +14,9 @@
 :root[data-bxh-theme="hunter"] .role-card-player{--hunter-tone:#8dc6ff}
 :root[data-bxh-theme="hunter"] .role-card-guest{--hunter-tone:#ffc09b}
 :root[data-bxh-theme="hunter"] .directive-portrait{display:none!important}
-:root[data-bxh-theme="hunter"] .hunter-portrait{display:block;position:absolute;inset:0 0 0 auto;width:72%;max-width:280px;z-index:-1;background-image:linear-gradient(90deg,#07130fbf,transparent 76%),url('../../assets/hunter/entrance-atlas.webp');background-size:100% 100%,300% auto;background-position:center,left top;background-repeat:no-repeat}
-:root[data-bxh-theme="hunter"] .role-card-player .hunter-portrait{background-position:center,center top}
-:root[data-bxh-theme="hunter"] .role-card-guest .hunter-portrait{background-position:center,right top}
+:root[data-bxh-theme="hunter"] .hunter-portrait{display:block;position:absolute;inset:0 0 0 auto;width:72%;max-width:280px;z-index:-1;background-image:linear-gradient(90deg,#07130fbf,transparent 76%),url('../../assets/hunter/entrance-battle-atlas.webp');background-size:100% 100%,300% auto;background-position:center,left center;background-repeat:no-repeat}
+:root[data-bxh-theme="hunter"] .role-card-player .hunter-portrait{background-position:center,center center}
+:root[data-bxh-theme="hunter"] .role-card-guest .hunter-portrait{background-position:center,right center}
 :root[data-bxh-theme="hunter"] .role-card::before{content:"小傑";position:absolute;left:17px;top:47px;font-size:37px;font-weight:900;line-height:1.1;color:var(--hunter-tone);text-shadow:0 0 18px var(--hunter-tone);pointer-events:none}
 :root[data-bxh-theme="hunter"] .role-card-player::before{content:"奇犽"}
 :root[data-bxh-theme="hunter"] .role-card-guest::before{content:"酷拉皮卡";font-size:24px;top:54px}

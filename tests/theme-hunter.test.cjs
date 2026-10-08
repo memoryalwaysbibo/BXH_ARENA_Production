@@ -23,6 +23,8 @@ const early=fs.readFileSync('index.html','utf8').match(/<script>\s*(\(function\(
 vm.runInNewContext(early,{document:{documentElement:root},localStorage:{getItem:k=>({'bxh.interface.theme.entrance.uid.v1':'A','bxh.interface.theme.account.v1.A':'hunter'})[k]}});assert.equal(root.value,'hunter');
 const css=fs.readFileSync('modules/theme-hunter/styles.css','utf8');
 assert.match(css,/小傑/);assert.match(css,/奇犽/);assert.match(css,/酷拉皮卡/);
+assert.match(css,/entrance-battle-atlas\.webp/);
+assert.ok(fs.statSync('assets/hunter/entrance-battle-atlas.webp').size>100000);
 assert.match(css,/prefers-reduced-motion/);
 for(const path of ['modules/main-app/core.js','modules/main-app/community-host.js'])assert.match(fs.readFileSync(path,'utf8'),/hunter-license-layer/);
 console.log('PASS Hunter account isolation, first paint, role eligibility, art and header');
