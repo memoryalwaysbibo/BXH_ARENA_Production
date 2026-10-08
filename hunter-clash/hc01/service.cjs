@@ -19,7 +19,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
     if(![...domain.OPERATIONS,'createChallenge','getChallenge','getMyHistory','acceptCode'].includes(operation))denied('invalid-operation');
     if(typeof token!=='string'||!token)denied('unauthenticated');
     const {uid}=await auth.verifyIdToken(token,true);domain.identifier(uid);
-    domain.keys(input,createOp?['requestId','playerName']:historyOp?[]:readOp?['challengeId']:codeOp?['pairingCode','requestId','expectedRevision','playerName']:
+    domain.keys(input,createOp?['requestId','playerName','matchCount']:historyOp?[]:readOp?['challengeId']:codeOp?['pairingCode','requestId','expectedRevision','playerName']:
       ['challengeId','requestId','expectedRevision',...(operation==='accept'?['pairingToken','playerName']:['proposeRound','recordRound'].includes(operation)?['winnerUid','finish']:operation==='confirmRound'?['roundRevision']:operation==='confirmFinish'?['resultRevision']:[])]);
     if(Object.hasOwn(input,'playerName')&&(typeof input.playerName!=='string'||!input.playerName.trim()||input.playerName.trim().length>40||/[\u0000-\u001f\u007f]/.test(input.playerName)))denied('invalid-input');
     if(!readOp)domain.identifier(input.requestId);
@@ -86,7 +86,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
         const rules=domain.policy(config.hc01Rules);
         const ttl=config.hc01PairingTtlMs;
         if(!Number.isSafeInteger(ttl)||ttl<1000||ttl>300000)denied('invalid-pairing-policy');
-        next=domain.create({challengeId,creatorUid:uid,rules,now,expiresAt:now+ttl});
+        next=domain.create({challengeId,creatorUid:uid,rules,now,expiresAt:now+ttl,matchCount:input.matchCount});
         next.participantNames={[uid]:displayName(actor,input)};
         next.pairingTokenHash=digest(pairingToken);next.pairingCodeHash=digest(pairingCode);
         outcome={challenge:view(next),pairingToken,pairingCode};
@@ -115,9 +115,12 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
         for(const [index,player]of next.participants.entries()){
           const prior=records[index].data()||{environment:'sandbox',uid:player,total:0,wins:0,losses:0,matches:[]};
           if(prior.environment!=='sandbox'||prior.uid!==player||!Number.isSafeInteger(prior.total)||prior.total<0||!Number.isSafeInteger(prior.wins)||!Number.isSafeInteger(prior.losses)||prior.wins<0||prior.losses<0||prior.wins+prior.losses!==prior.total||!Array.isArray(prior.matches)||prior.total>=Number.MAX_SAFE_INTEGER)denied('history-unavailable');
-          const opponentUid=next.participants[1-index],won=next.winnerUid===player;
-          const match={challengeId:next.challengeId,playerName:next.participantNames?.[player]||'未設定名稱',opponentName:next.participantNames?.[opponentUid]||'未設定名稱',opponentUid,score:next.score[index===0?'a':'b'],opponentScore:next.score[index===0?'b':'a'],won,completedAt:next.completedAt};
-          tx.set(doc('hc01PlayerRecords',player),{environment:'sandbox',uid:player,total:prior.total+1,wins:prior.wins+(won?1:0),losses:prior.losses+(won?0:1),updatedAt:next.completedAt,matches:[match,...prior.matches].slice(0,50)});
+          const opponentUid=next.participants[1-index],games=[...(next.games||[]),domain.gameRecord(next,next.completedAt)];
+          if(prior.total>Number.MAX_SAFE_INTEGER-games.length)denied('history-unavailable');
+          const wins=games.filter(game=>game.winnerUid===player).length;
+          const matches=games.map(game=>{const won=game.winnerUid===player;
+          const match={challengeId:next.challengeId,gameNumber:game.number,playerName:next.participantNames?.[player]||'未設定名稱',opponentName:next.participantNames?.[opponentUid]||'未設定名稱',opponentUid,score:game.score[index===0?'a':'b'],opponentScore:game.score[index===0?'b':'a'],won,completedAt:game.endedAt};return match;});
+          tx.set(doc('hc01PlayerRecords',player),{environment:'sandbox',uid:player,total:prior.total+games.length,wins:prior.wins+wins,losses:prior.losses+games.length-wins,updatedAt:next.completedAt,matches:[...matches.reverse(),...prior.matches].slice(0,50)});
         }
       }
       if(createOp)tx.set(codeRef,{environment:'sandbox',challengeId,expiresAt:next.expiresAt,used:false});
@@ -131,7 +134,7 @@ function createLifecycleService({db,auth,clock=Date.now},env=process.env,options
   return Object.freeze({run});
 }
 function view(c){
-  const allowed=['schemaVersion','environment','challengeId','participants','participantNames','rules','status','revision','createdAt','expiresAt','ready','rounds','pendingRound','score','finishConfirmedBy','resultRevision','winnerUid','completedAt','certificationSource','ratingStatus','disputedBy','disputedAt','corrections'];
+  const allowed=['schemaVersion','environment','challengeId','participants','participantNames','matchCount','gameNumber','games','sessionClosing','rules','status','revision','createdAt','expiresAt','ready','rounds','pendingRound','score','finishConfirmedBy','resultRevision','winnerUid','completedAt','certificationSource','ratingStatus','disputedBy','disputedAt','corrections'];
   return Object.fromEntries(allowed.filter(k=>Object.hasOwn(c,k)).map(k=>[k,structuredClone(c[k])]));
 }
 module.exports={createLifecycleService,view};

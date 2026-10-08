@@ -114,3 +114,12 @@ test('actual Callable dispute preserves room, undo corrects score and fresh fina
   const stored=(await db.doc('hc01Challenges/'+c.challengeId).get()).data();
   assert.equal(stored.corrections[0].round.finish,'spin');assert.deepEqual(stored.score,{a:4,b:0});
 });
+
+
+test('actual Callable completes two-game series with one pairing and records both games atomically',async()=>{
+  const made=await call('A','createChallenge',{requestId:'two-games',matchCount:2,playerName:'黑爸'});let c=await command('B','accept',made.challenge,{pairingToken:made.pairingToken,playerName:'小宇'});c=await command('A','start',c);c=await command('B','start',c);
+  for(const finish of ['extreme','spin'])c=await command('A','recordRound',c,{winnerUid:'A',finish});assert.equal(c.status,'game_pending');
+  assert.equal((await call('A','getMyHistory',{})).history.total,0);c=await command('A','nextGame',c);assert.equal(c.gameNumber,2);assert.equal(c.games.length,1);assert.deepEqual(c.score,{a:0,b:0});
+  for(const finish of ['extreme','spin'])c=await command('A','recordRound',c,{winnerUid:'B',finish});assert.equal(c.status,'final_pending');c=await command('A','confirmFinish',c,{resultRevision:c.resultRevision});c=await command('B','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'completed');
+  for(const uid of ['A','B']){const h=(await call(uid,'getMyHistory',{})).history;assert.deepEqual([h.total,h.wins,h.losses],[2,1,1]);assert.deepEqual(h.matches.map(m=>m.gameNumber),[2,1]);}
+});

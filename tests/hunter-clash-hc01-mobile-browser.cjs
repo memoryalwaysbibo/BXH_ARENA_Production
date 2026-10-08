@@ -63,6 +63,19 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     await A.reload();assert.equal(await A.locator('[name="playerName"]').inputValue(),'黑爸');assert.equal(await A.locator('[name="email"]').inputValue(),'A@fixture.invalid');assert.equal(await A.locator('[name="remember"]').isChecked(),true);assert.equal(await A.locator('[name="password"]').inputValue(),'');await A.locator('[name="password"]').fill('fixture');await A.locator('#login button').click();await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('完賽紀錄已保存'));
     for(const page of pages)assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     fs.mkdirSync('test-results/hc01',{recursive:true});await A.screenshot({path:'test-results/hc01/mobile-internal-test.png',fullPage:true});
+    // A two-game series reuses one pairing and starts once, then confirms only at the end.
+    await A.locator('[name="matchCount"]').fill('2');await command(A,'createChallenge');
+    const seriesCode=await A.locator('.pairing-code').textContent();await B.locator('[data-op="join"]').click();await B.locator('[name="pairingCode"]').fill(seriesCode);await command(B,'acceptCode');
+    await A.waitForFunction(()=>document.querySelector('.state').textContent.includes('配對成功'));const seriesReady=await command(A,'start');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),seriesReady.challenge.revision);await command(B,'start');await A.waitForFunction(()=>document.querySelector('.state').textContent==='對戰中');
+    for(const finish of ['extreme','spin'])await command(A,'recordRound','[data-op="recordRound"][data-player="0"][data-finish="'+finish+'"]');
+    await B.waitForFunction(()=>document.querySelector('.state').textContent.includes('本場結束'));assert.equal(await B.locator('[data-op="nextGame"]').isVisible(),false);assert.equal(await A.locator('[data-op="confirmFinish"]').isVisible(),false);
+    await command(A,'nextGame');await B.waitForFunction(()=>document.querySelector('.policy').textContent.includes('第 2 / 2 場'));assert.deepEqual(await A.locator('.points').allTextContents(),['0','0']);
+    assert.equal(await A.locator('.session-results p').textContent(),'第 1 場：黑爸 4 : 0 小宇');
+    for(const finish of ['extreme','spin'])await command(A,'recordRound','[data-op="recordRound"][data-player="1"][data-finish="'+finish+'"]');
+    const seriesFinal=await command(A,'confirmFinish');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),seriesFinal.challenge.revision);await command(B,'confirmFinish');
+    await A.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('3 場 · 2 勝 1 敗'));
+    await B.waitForFunction(()=>document.querySelector('.history-stats').textContent.includes('3 場 · 1 勝 2 敗'));
+    await A.screenshot({path:'test-results/hc01/mobile-series.png',fullPage:true});
     await A.locator('[data-op="logout"]').click();await A.locator('#login').waitFor({state:'visible'});assert.equal(await A.locator('.history-list').textContent(),'');assert.equal(await A.locator('.qr').textContent(),'');assert.equal(await A.locator('textarea').inputValue(),'');assert.equal(await A.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('hc01:')).length),0);assert.equal(await A.evaluate(()=>localStorage.getItem('hc01:remembered-email')),'A@fixture.invalid');await A.locator('[name="remember"]').uncheck();await A.reload();assert.equal(await A.locator('[name="email"]').inputValue(),'');assert.deepEqual(errors,[]);
     console.log('PASS single-player mobile fixture UI: two sessions, complete match, reload/read recovery, logout cleanup, 390px and no JS errors. Not cloud login or real camera evidence.');
   }finally{await browser.close();}

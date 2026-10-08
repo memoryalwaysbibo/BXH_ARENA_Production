@@ -268,3 +268,31 @@ test('history keeps 50 recent matches while lifetime totals continue, and corrup
   f.data.delete('hc01PlayerRecords/B');await f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision});
   const a=(await f.service.run('A','getMyHistory',{})).history;assert.deepEqual([a.total,a.wins,a.losses,a.matches.length],[51,50,1,50]);assert.equal(a.matches[0].challengeId,c.challengeId);assert.equal(a.matches.at(-1).challengeId,'old_48');
 });
+
+async function seriesFixture(matchCount){
+  const f=fixture(),made=await f.service.run('A','createChallenge',{requestId:'series',matchCount,playerName:'黑爸'});
+  let c=await f.mutate('B','accept',made.challenge,{pairingToken:made.pairingToken,playerName:'小宇'});c=await f.mutate('A','start',c);c=await f.mutate('B','start',c);
+  return {f,c,async score(c,winnerUid){c=await f.mutate('A','recordRound',c,{winnerUid,finish:'extreme'});return f.mutate('A','recordRound',c,{winnerUid,finish:'spin'});}};
+}
+test('three-game room needs pairing/start once and records each game once after whole-series agreement',async()=>{
+  const {f,score,c:initial}=await seriesFixture(3);let c=await score(initial,'A');assert.equal(c.status,'game_pending');
+  await assert.rejects(f.mutate('B','nextGame',c),/invalid-state/);await assert.rejects(f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision}),/finish-confirmation-invalid/);
+  const input={challengeId:c.challengeId,requestId:'next-once',expectedRevision:c.revision};c=(await f.service.run('A','nextGame',input)).challenge;
+  assert.deepEqual((await f.service.run('A','nextGame',input)).challenge,c);assert.deepEqual(c.score,{a:0,b:0});assert.equal(c.games.length,1);assert.equal(c.gameNumber,2);assert.deepEqual(c.participants,['A','B']);
+  c=await score(c,'B');c=await f.mutate('A','nextGame',c);c=await score(c,'A');assert.equal(c.status,'final_pending');
+  assert.equal((await f.service.run('A','getMyHistory',{})).history.total,0);
+  c=await f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision});c=await f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'completed');
+  const a=(await f.service.run('A','getMyHistory',{})).history,b=(await f.service.run('B','getMyHistory',{})).history;
+  assert.deepEqual([a.total,a.wins,a.losses,b.total,b.wins,b.losses],[3,2,1,3,1,2]);assert.deepEqual(a.matches.map(m=>m.gameNumber),[3,2,1]);assert.deepEqual(a.matches.map(m=>m.score),[4,0,4]);
+});
+test('practice ends on demand, review preserves previous games and clears final confirmation',async()=>{
+  const {f,score,c:initial}=await seriesFixture(0);let c=await score(initial,'B');c=await f.mutate('A','nextGame',c);
+  await assert.rejects(f.mutate('A','endSession',c),/invalid-state/);c=await score(c,'A');c=await f.mutate('A','endSession',c);c=await f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision});
+  c=await f.mutate('B','dispute',c);assert.equal(c.games.length,1);c=await f.mutate('A','undoRound',c);assert.equal(c.score.a,3);c=await f.mutate('A','recordRound',c,{winnerUid:'A',finish:'knockout'});c=await f.mutate('A','resumeReview',c);assert.equal(c.status,'final_pending');assert.deepEqual(c.finishConfirmedBy,[]);
+  c=await f.mutate('B','confirmFinish',c,{resultRevision:c.resultRevision});c=await f.mutate('A','confirmFinish',c,{resultRevision:c.resultRevision});assert.equal(c.status,'completed');const a=(await f.service.run('A','getMyHistory',{})).history;assert.deepEqual([a.total,a.wins,a.losses],[2,1,1]);assert.equal(a.matches[0].score,5);
+});
+test('room counts are bounded, default one remains compatible and practice caps at 100 games',async()=>{
+  const f=fixture();for(const matchCount of [-1,101,1.5,'2',null])await assert.rejects(f.service.run('A','createChallenge',{requestId:'invalid_'+String(matchCount).replace(/[^a-z0-9]/gi,'_'),matchCount}),/invalid-input/);
+  const made=await f.service.run('A','createChallenge',{requestId:'default-one'});assert.equal(made.challenge.matchCount,1);
+  const {c:initial}=await seriesFixture(0);initial.gameNumber=100;let c=domain.transition(initial,'A','recordRound',{expectedRevision:initial.revision,winnerUid:'A',finish:'extreme'},10000);c=domain.transition(c,'A','recordRound',{expectedRevision:c.revision,winnerUid:'A',finish:'spin'},10000);assert.equal(c.status,'final_pending');assert.throws(()=>domain.transition(c,'A','nextGame',{expectedRevision:c.revision},10000),/invalid-state/);
+});
