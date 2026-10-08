@@ -67,19 +67,55 @@ function hunterRecordHasTrustedScore(record){
   if(!record||record.resultMethod==="quick_decision"||record.analyzable!==true) return false;
   if(record.scoreFor==null||record.scoreAgainst==null) return false;
   const scoreFor=Number(record.scoreFor),scoreAgainst=Number(record.scoreAgainst);
-  return Number.isFinite(scoreFor)&&Number.isFinite(scoreAgainst)&&scoreFor>=0&&scoreAgainst>=0;
+  return Number.isFinite(scoreFor)&&Number.isFinite(scoreAgainst)&&scoreFor>=0&&scoreAgainst>=0&&hunterRoundIntegrity(record).ok;
+}
+// Fault awards reconcile the score, but are not physical finish rounds.
+function hunterRoundIntegrity(record){
+  const fail=reason=>({ok:false,reason,rounds:[],validRounds:0});
+  if(!record||record.resultMethod==="quick_decision") return fail("quick-decision");
+  if(record.analyzable!==true) return fail("round-incomplete");
+  const events=record.roundsPerspective;
+  if(!Array.isArray(events)||!events.length) return fail("round-incomplete");
+  const seen=new Set();let scoreFor=0,scoreAgainst=0;
+  for(const ev of events){
+    if(!ev||!["extreme","knockout","burst","spin","fault"].includes(ev.type)||
+       !["for","against"].includes(ev.perspective)||typeof ev.points!=="number"||
+       !Number.isInteger(ev.points)||ev.points<0) return fail("invalid-round-event");
+    if(ev.eventId){if(seen.has(ev.eventId))return fail("duplicate-round-event");seen.add(ev.eventId);}
+    if(ev.perspective==="for")scoreFor+=ev.points;else scoreAgainst+=ev.points;
+  }
+  if(record.scoreFor==null||record.scoreAgainst==null||
+     scoreFor!==Number(record.scoreFor)||scoreAgainst!==Number(record.scoreAgainst))return fail("score-ledger-mismatch");
+  const rounds=events.filter(ev=>ev.type!=="fault");
+  return {ok:true,reason:null,rounds,validRounds:rounds.length};
+}
+
+function hunterDataStatus(cache,loading,error){
+  if(loading||(!cache&&!error))return "loading";
+  if(error)return "error";
+  if(Array.isArray(cache&&cache.skipped)&&cache.skipped.length)return "partial";
+  return cache&&Array.isArray(cache.records)&&cache.records.length?"ready":"empty";
+}
+
+function hunterCoverage(records,skipped){
+  const rows=hunterUniqueRecords(records),reasons={};let matches=0,validRounds=0;
+  rows.forEach(r=>{const check=hunterRoundIntegrity(r);if(check.ok&&check.validRounds){matches++;validRounds+=check.validRounds;}
+    else {const reason=check.reason||"no-finish-rounds";reasons[reason]=(reasons[reason]||0)+1;}});
+  const skippedReasons={};
+  (Array.isArray(skipped)?skipped:[]).forEach(r=>{const reason=r&&r.reason||"unknown";skippedReasons[reason]=(skippedReasons[reason]||0)+1;});
+  return {totalMatches:rows.length,analyzableMatches:matches,validRounds,reasons,skippedReasons};
 }
 function hunterRecordScoreText(record){
   return hunterRecordHasTrustedScore(record)?String(Number(record.scoreFor))+" / "+String(Number(record.scoreAgainst)):"比分未驗證";
 }
 
 function hunterCareerSummary(records){
-  const rows=Array.isArray(records)?records:[];
+  const rows=hunterUniqueRecords(records);
   let wins=0,losses=0,totalFor=0,totalAgainst=0,validRounds=0,scoredMatches=0;
   rows.forEach(r=>{
     if(r.isWin) wins++; else losses++;
     if(hunterRecordHasTrustedScore(r)){scoredMatches++;totalFor+=Number(r.scoreFor);totalAgainst+=Number(r.scoreAgainst);}
-    if(r.analyzable) validRounds+=Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0;
+    validRounds+=hunterRoundIntegrity(r).validRounds;
   });
   return {matches:rows.length,wins,losses,winRate:rows.length?Math.round(wins/rows.length*100):0,totalFor,totalAgainst,net:totalFor-totalAgainst,validRounds,scoredMatches};
 }
@@ -90,15 +126,18 @@ const HUNTER_XP_PER_VALID_ROUND=2;
 const HUNTER_XP_PER_EVENT=20;
 
 function hunterUniqueRecords(records){
-  const seen=new Set(),out=[];
+  const latest=new Map();
   (Array.isArray(records)?records:[]).forEach((r,index)=>{
+    if(!r) return;
     const eventKey=window.BXHDomainUtils.hunterRecordEventKey(r);
     const matchKey=String((r&&r.matchId)||(((r&&r.opponent&&r.opponent.name)||"opponent")+"|"+String((r&&r.round)||"")+"|"+String(hunterRecordTimestamp(r)||index)));
     const key=eventKey+"|"+matchKey;
-    if(seen.has(key)) return;
-    seen.add(key); out.push(r);
+    const previous=latest.get(key);
+    const revisionTime=row=>Math.max(Number(row.updatedAt)||0,Number(row.confirmedAt)||0,Number(row.completedAt)||0);
+    if(!previous||revisionTime(r)>=revisionTime(previous))latest.set(key,r);
   });
-  return out;
+  // A newer incomplete result must not resurrect its older completed win.
+  return [...latest.values()].filter(r=>r.completed!==false&&r.isBye!==true);
 }
 function hunterLevelThreshold(level){
   const lv=Math.max(1,Math.floor(Number(level)||1));
@@ -107,9 +146,11 @@ function hunterLevelThreshold(level){
 function hunterBuildGrowth(records){
   const rows=hunterUniqueRecords(records);
   const eventCount=new Set(rows.map(window.BXHDomainUtils.hunterRecordEventKey)).size;
-  const validRounds=rows.reduce((sum,r)=>sum+(r&&r.analyzable&&Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0),0);
+  const validRounds=rows.reduce((sum,r)=>sum+hunterRoundIntegrity(r).validRounds,0);
   const xpFromMatches=rows.length*HUNTER_XP_PER_MATCH;
-  const xpFromRounds=validRounds*HUNTER_XP_PER_VALID_ROUND;
+  // Preserve existing XP credits; ability rounds exclude fault awards.
+  const experienceEvents=rows.reduce((sum,r)=>sum+(r&&r.analyzable&&Array.isArray(r.roundsPerspective)?r.roundsPerspective.length:0),0);
+  const xpFromRounds=experienceEvents*HUNTER_XP_PER_VALID_ROUND;
   const xpFromEvents=eventCount*HUNTER_XP_PER_EVENT;
   const xp=xpFromMatches+xpFromRounds+xpFromEvents;
   let level=1;
@@ -117,7 +158,7 @@ function hunterBuildGrowth(records){
   const floor=hunterLevelThreshold(level);
   const next=hunterLevelThreshold(level+1);
   const progress=next>floor?Math.max(0,Math.min(100,Math.round((xp-floor)/(next-floor)*100))):100;
-  return {version:HUNTER_GROWTH_VERSION,rows,eventCount,validRounds,xp,xpFromMatches,xpFromRounds,xpFromEvents,level,floor,next,progress};
+  return {version:HUNTER_GROWTH_VERSION,rows,eventCount,validRounds,experienceEvents,xp,xpFromMatches,xpFromRounds,xpFromEvents,level,floor,next,progress};
 }
 
 function hunterSeniorityBonus(level){
@@ -138,6 +179,6 @@ function hunterLicenseGrade(analysis,level){
   return {tier:label==="國家級獵人"?"national":label[0].toLowerCase(),label,bonus,score,eligible:true};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();
