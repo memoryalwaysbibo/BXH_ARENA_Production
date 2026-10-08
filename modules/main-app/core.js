@@ -14585,6 +14585,7 @@ let myRegistrationsCache = null; // null = not yet fetched this session
 let hunterProfileCache = null; // {records, skipped}
 let hunterProfileLoading = false;
 let hunterProfileError = null;
+let hunterRadarMetric = "points"; // points | events; display only
 let hunterBattleFilter = "standard"; // standard | enchantment | all; PK awaits production source
 let hunterRecordTypeFilter = "all"; // all | general | ranked
 let hunterRecordPeriodFilter = "career"; // career | season | month | week | today
@@ -15237,7 +15238,7 @@ function hunterFilteredRecords(){
     return true;
   });
 }
-const {hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
+const {hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
 const {hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth}=window.BXHHunterUtils||{};
 
 /* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
@@ -15756,21 +15757,41 @@ function hunterBuildAnalysis(records){
 
 
 
-function hunterRadarSvg(analysis){
-  const shares=[
-    analysis.attack.extreme.share,analysis.attack.knockout.share,analysis.attack.burst.share,analysis.attack.spin.share,
-    analysis.defense.extreme.share,analysis.defense.knockout.share,analysis.defense.burst.share,analysis.defense.spin.share
-  ];
-  const visual=shares.map(hunterRadarVisualValue);
-  const nodes=hunterRadarPolygonPoints(visual).split(" ").map(pt=>{const [x,y]=pt.split(",");return '<circle class="hunter-radar-node" cx="'+x+'" cy="'+y+'" r="2.8"></circle>';}).join("");
-  const axes=Array.from({length:8},(_,index)=>{
+function hunterRadarSvg(analysis,metric="points"){
+  const attack=hunterDistributionRows(analysis.attack,metric),defense=hunterDistributionRows(analysis.defense,metric);
+  const rows=[...attack,...defense];
+  const axes=rows.map((row,index)=>{
     const angle=(-90+index*45)*Math.PI/180;
     return '<line class="hunter-radar-axis-line" x1="160" y1="160" x2="'+(160+Math.cos(angle)*105).toFixed(1)+'" y2="'+(160+Math.sin(angle)*105).toFixed(1)+'"></line>';
   }).join("");
-  return '<svg class="hunter-radar-svg" viewBox="0 0 320 320" role="img" aria-label="獵人八角能力分布圖">'+
-    [0.25,0.5,0.75,1].map(s=>'<polygon class="hunter-radar-grid" points="'+hunterRadarGridPoints(s)+'"></polygon>').join("")+
-    axes+'<polygon class="hunter-radar-shape" points="'+hunterRadarPolygonPoints(visual)+'"></polygon>'+nodes+
-    '<text class="hunter-radar-center-label" x="160" y="164">50% 分布＝滿格</text></svg>';
+  const shape=(side,from)=>{
+    if(rows[from].denominator<=0)return '';
+    const values=rows.map((row,index)=>index>=from&&index<from+4?hunterRadarVisualValue(row.share):0);
+    const coordinates=hunterRadarPolygonPoints(values).split(" ");
+    const nodes=coordinates.slice(from,from+4).map((pt,i)=>{
+      const [x,y]=pt.split(","),row=rows[from+i];
+      return '<circle class="hunter-radar-node '+side+'" cx="'+x+'" cy="'+y+'" r="2.8"><title>'+esc(hunterPointLabel(row.type,side==="loss"?"against":"for")+' '+row.share+'%（'+row.numerator+' / '+row.denominator+'）')+'</title></circle>';
+    }).join('');
+    return '<polygon class="hunter-radar-shape '+side+'" points="'+coordinates.join(' ')+'"></polygon>'+nodes;
+  };
+  const description=rows.map((row,i)=>hunterPointLabel(row.type,i>=4?"against":"for")+' '+(row.share==null?'無資料':row.share+'%')+'（'+row.numerator+' / '+row.denominator+'）').join('；');
+  return '<svg class="hunter-radar-svg" viewBox="0 0 320 320" role="img" aria-label="'+esc('獵人八軸得失分方式分布，'+(metric==="events"?'次數占比':'分數占比')+'，0–100%。'+description)+'">'+
+    [0.25,0.5,0.75,1].map(scale=>'<polygon class="hunter-radar-grid" points="'+hunterRadarGridPoints(scale)+'"></polygon>').join('')+
+    axes+shape("attack",0)+shape("loss",4)+
+    [25,50,75,100].map(value=>'<text class="hunter-radar-scale" x="164" y="'+(160-105*value/100+9).toFixed(1)+'">'+value+'%</text>').join('')+'</svg>';
+}
+function hunterRadarHtml(analysis,metric="points"){
+  const attack=hunterDistributionRows(analysis.attack,metric),defense=hunterDistributionRows(analysis.defense,metric);
+  const classes=["axis-xtreme","axis-knockout","axis-burst","axis-spin","axis-taken-xtreme","axis-taken-knockout","axis-taken-burst","axis-taken-spin"];
+  const buttons=[...attack,...defense].map((row,index)=>{
+    const perspective=index>=4?"against":"for",label=hunterPointLabel(row.type,perspective),share=row.share==null?'—':row.share+'%';
+    return '<button class="axis '+classes[index]+(index>=4?' loss':'')+'" data-action="hunter-radar-axis" data-type="'+row.type+'" data-perspective="'+perspective+'" aria-controls="hunter-analysis-'+perspective+'-'+row.type+'" aria-label="'+esc(label+' '+share+'，查看次數、分數、分母與來源')+'">'+esc(label)+'<br><b>'+share+'</b></button>';
+  }).join('');
+  const controls=[["points","分數占比"],["events","次數占比"]].map(([key,label])=>'<button class="btn '+(metric===key?'btn-primary':'btn-ghost')+' btn-sm" data-action="hunter-radar-metric" data-value="'+key+'" aria-pressed="'+(metric===key)+'">'+label+'</button>').join('');
+  const unit=metric==="events"?'回':'分';
+  return '<div class="hunter-radar-controls" role="group" aria-label="八軸占比口徑">'+controls+'</div><div class="hunter-radar-legend"><span class="attack">得分方式｜分母 '+attack[0].denominator+' '+unit+'</span><span class="loss">失分方式｜分母 '+defense[0].denominator+' '+unit+'</span></div>'+
+    '<div class="hunter-radar-shell"><div class="hunter-radar-placeholder">'+buttons+hunterRadarSvg(analysis,metric)+'</div></div>'+
+    '<div class="hunter-radar-note">0–100% 刻度；呈現得失分方式分布，數值較大代表該方式占比較多。失分占比不代表防守能力較強。'+(metric==="points"?'附魔採基礎分，卡牌調整另列。':'以有效結束事件次數計算，每次事件等權。')+'失誤判罰不計入兩種占比。— 表示分母為 0；有分母但未發生顯示 0%。點擊八軸項目可展開來源。</div>';
 }
 
 
@@ -15810,13 +15831,13 @@ function hunterEvidenceHtml(bucket,type,perspective){
   }).join('')+'</div>';
 }
 
-function hunterAnalysisStatHtml(bucket,type,perspective="for"){
-  const row=bucket[type];
-  const title=perspective==="against"?"被"+HUNTER_ANALYSIS_LABELS[type]:HUNTER_ANALYSIS_LABELS[type];
-  const shareText=Object.values(bucket).some(item=>Number(item.points)>0)?Number(row.share||0)+"%":"—";
-  return '<details><summary><div class="hunter-stat-click"><span>'+esc(title)+'</span><b>'+Number(row.points||0)+' 分<small>'+Number(row.events||0)+' 回｜'+shareText+'</small></b></div></summary>'+hunterEvidenceHtml(bucket,type,perspective)+'</details>';
+function hunterAnalysisStatHtml(bucket,type,perspective="for",metric="points"){
+  const row=hunterDistributionRows(bucket,metric).find(item=>item.type===type);
+  const title=hunterPointLabel(type,perspective),shareText=row.share==null?'—':row.share+'%';
+  const unit=metric==="events"?'回':'分';
+  return '<details id="hunter-analysis-'+perspective+'-'+type+'"><summary><div class="hunter-stat-click"><span>'+esc(title)+'</span><b>'+row.points+' 分<small>'+row.events+' 回｜'+shareText+'</small></b></div></summary>'+
+    '<div class="hunter-distribution-denominator">'+(metric==="events"?'次數占比':'分數占比')+'＝'+row.numerator+' / '+row.denominator+' '+unit+'（'+shareText+'）<br>次數：'+row.events+' / '+row.totalEvents+' 回；分數：'+row.points+' / '+row.totalPoints+' 分。'+(row.denominator===0?'此方向沒有可計算的分母。':'')+'</div>'+hunterEvidenceHtml(bucket,type,perspective)+'</details>';
 }
-
 
 
 function hunterOpponentIdentityValue(record){
@@ -16233,12 +16254,10 @@ function renderPlayerStatsTab(p){
     body='<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HUNTER ANALYSIS</div><div class="panel-title">能力分析</div></div><span class="badge badge-metal">P4 LIVE</span></div>'+
       '<div class="hunter-period-tabs">'+periods+'</div>'+hunterEnchantmentSummaryHtml(analysisRows)+
       '<div class="hunter-analysis-scoreline"><div><span>綜合評分</span><b class="'+(analysis.eligible?'':'muted')+'">'+scoreText+'</b></div><div><span>對戰勝率</span><b>'+percentText(analysis.winRate,analysis.matches>0)+'</b></div><div><span>得分占比</span><b>'+percentText(analysis.pointEfficiency,analysis.totalFor+analysis.totalAgainst>0)+'</b></div><div><span>有效回合</span><b>'+analysis.validRounds+'</b></div></div>'+
-      '<div class="hunter-radar-shell"><div class="hunter-radar-placeholder"><span class="axis axis-xtreme">極限<br><b>'+percentText(analysis.attack.extreme.share,analysis.totalFor>0)+'</b></span><span class="axis axis-knockout">擊飛<br><b>'+percentText(analysis.attack.knockout.share,analysis.totalFor>0)+'</b></span><span class="axis axis-burst">爆裂<br><b>'+percentText(analysis.attack.burst.share,analysis.totalFor>0)+'</b></span><span class="axis axis-spin">轉停<br><b>'+percentText(analysis.attack.spin.share,analysis.totalFor>0)+'</b></span>'+
-      '<span class="axis loss axis-taken-xtreme">被極限<br><b>'+percentText(analysis.defense.extreme.share,analysis.totalAgainst>0)+'</b></span><span class="axis loss axis-taken-knockout">被擊飛<br><b>'+percentText(analysis.defense.knockout.share,analysis.totalAgainst>0)+'</b></span><span class="axis loss axis-taken-burst">被爆裂<br><b>'+percentText(analysis.defense.burst.share,analysis.totalAgainst>0)+'</b></span><span class="axis loss axis-taken-spin">被轉停<br><b>'+percentText(analysis.defense.spin.share,analysis.totalAgainst>0)+'</b></span>'+
-      hunterRadarSvg(analysis)+'</div></div>'+
-      '<div class="hunter-sample-note '+(analysis.eligible?'ready':'')+'">'+(!completeHistory?'資料尚未完整｜暫停綜合評分與戰型結論；以下僅顯示已成功讀取的原始統計。':!analysis.scoreAllowed?'此分類不產生綜合能力分；附魔攻防使用基礎分，混合來源不判定戰型。'+sampleText:analysis.eligible?'樣本達標｜'+sampleText+'。雷達圖數字為實際得失分分布；視覺半徑以 50% 分布為滿格。':'樣本不足｜'+sampleText+'；至少需要 '+HUNTER_ANALYSIS_MIN_MATCHES+' 場＋'+HUNTER_ANALYSIS_MIN_ROUNDS+' 回合才產生綜合評分與戰型結論。')+'</div></section>'+
-      '<div class="hunter-score-panels"><section class="panel"><div class="panel-title">進攻得分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.attack,type,"for")).join('')+'</div></section>'+
-      '<section class="panel hunter-loss-panel"><div class="panel-title">防守失分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.defense,type,"against")).join('')+'</div></section></div>'+
+      hunterRadarHtml(analysis,hunterRadarMetric)+
+      '<div class="hunter-sample-note '+(analysis.eligible?'ready':'')+'">'+(!completeHistory?'資料尚未完整｜暫停綜合評分與戰型結論；以下僅顯示已成功讀取的原始統計。':!analysis.scoreAllowed?'此分類不產生綜合能力分；附魔攻防使用基礎分，混合來源不判定戰型。'+sampleText:analysis.eligible?'樣本達標｜'+sampleText+'。雷達圖數字依所選口徑呈現得失分方式分布；視覺半徑以 100% 分布為滿格，次數／分數口徑依上方切換。':'樣本不足｜'+sampleText+'；至少需要 '+HUNTER_ANALYSIS_MIN_MATCHES+' 場＋'+HUNTER_ANALYSIS_MIN_ROUNDS+' 回合才產生綜合評分與戰型結論。')+'</div></section>'+
+      '<div class="hunter-score-panels"><section class="panel"><div class="panel-title">進攻得分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.attack,type,"for",hunterRadarMetric)).join('')+'</div></section>'+
+      '<section class="panel hunter-loss-panel"><div class="panel-title">防守失分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.defense,type,"against",hunterRadarMetric)).join('')+'</div></section></div>'+
       '<section class="panel"><div class="panel-title">分析結論</div><div class="hunter-analysis-grid"><div><span>主要優勢</span><strong>'+esc(analysis.primary)+'</strong></div><div><span>次要優勢</span><strong>'+esc(analysis.secondary)+'</strong></div><div><span>主要弱點</span><strong>'+esc(analysis.mainWeakness)+'</strong></div><div><span>戰型判定</span><strong>'+esc(analysis.style)+'</strong></div></div>'+
       '<div class="hunter-framework-note">綜合評分只採正規賽資料。附魔攻防採卡牌調整前基礎分；卡牌加分與減分另列，失誤判罰獨立核對。評分公式：60% 對戰勝率＋40% 得分占比。勝率＝可分析勝場／可分析場數；得分占比＝四種方式得分／雙方四種方式總得分。有效回合為比分核對通過的極限、擊飛、爆裂與轉停事件；失誤判罰用於核對比分，不計入四種方式或有效回合。Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析。點擊任一進攻／防守項目，可追溯到對手、Match 與原始 Round Timeline。</div></section>';
   }else if(playerStatsSubTab==="achievements"){
@@ -19903,6 +19922,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="hunter-h2h-quick"){
     hunterH2HQuery=target.getAttribute("data-value")||"";
     renderPreservingScroll();
+    return;
+  }
+  if(action==="hunter-radar-metric"){
+    const value=target.getAttribute("data-value");
+    if(["points","events"].includes(value)){hunterRadarMetric=value;renderPreservingScroll();}
+    return;
+  }
+  if(action==="hunter-radar-axis"){
+    const type=target.getAttribute("data-type"),perspective=target.getAttribute("data-perspective");
+    if(HUNTER_ANALYSIS_TYPES.includes(type)&&["for","against"].includes(perspective)){
+      const detail=document.getElementById("hunter-analysis-"+perspective+"-"+type);
+      if(detail){detail.open=true;detail.scrollIntoView({block:"nearest"});}
+    }
     return;
   }
   if(action==="hunter-battle-filter"){

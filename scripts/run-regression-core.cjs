@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    { name: 'hunter B3 radar denominator, scale and inline evidence', args: ['--test', 'tests/hunter-b3-radar.test.cjs'] },
     { name: 'hunter B2 source categories and enchantment base scoring', args: ['--test', 'tests/hunter-b2-modes.test.cjs'] },
     { name: 'hunter B1 statistics and partial-read states', args: ['--test', 'tests/hunter-b1-statistics.test.cjs', 'tests/hunter-b1-cloud.test.cjs'] },
     { name: 'inline mailbox reading and stable refresh', args: ['--test', 'tests/mailbox-inline.test.cjs'] },
