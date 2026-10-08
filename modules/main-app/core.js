@@ -9347,7 +9347,7 @@ let liveCourtSwitchCenterRequested=false;
 function liveCourtSelection(stationCount){
   const room=String(state.cloudCode||state.id||"");
   if(room!==liveSelectedRoom){liveSelectedRoom=room;liveSelectedCourt=0;liveCourtSwitchScrollLeft=0;}
-  if(liveSelectedCourt<1||liveSelectedCourt>stationCount){
+  if((liveSelectedCourt<1&&liveSelectedCourt!==-1)||liveSelectedCourt>stationCount){
     liveSelectedCourt=Array.from({length:stationCount},(_,i)=>i+1)
       .find(i=>liveCurrentMatchForStation(i).m&&!liveCurrentMatchForStation(i).m.completed)||1;
     liveCourtSwitchCenterRequested=true;
@@ -9374,7 +9374,7 @@ function liveCourtCardHtml(stationNum,selectedCourt){
   }else{
     body='<div class="live-court-empty"><b>'+(future?"等待晉級結果":"本台賽程已完成")+'</b><span>'+(future?"前序賽果確認後將自動安排":"目前沒有待執行場次")+'</span></div>'+(future?nextPreview:"");
   }
-  return '<section class="live-court-card" data-live-court="'+stationNum+'" data-selected="'+(stationNum===selectedCourt)+'" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
+  return '<section class="live-court-card" data-live-court="'+stationNum+'" data-selected="'+(selectedCourt===-1||stationNum===selectedCourt)+'" style="'+courtAtmosphereStyle(stationNum)+'"><div class="live-court-head"><div class="live-court-titleline"><span class="court-badge">'+stationNum+'號台</span><span class="live-court-ref" title="'+esc(assigned)+'">裁判：'+esc(assigned)+'</span></div><span class="ref-station-status '+status.cls+'">'+status.label+'</span></div>'+body+'</section>';
 }
 function renderLive(){
   const fmt = state.meta.formatType || "single";
@@ -9389,7 +9389,7 @@ function renderLive(){
   const stationCount=Math.max(1,Number(state.meta.stations)||1);
   const selectedCourt=liveCourtSelection(stationCount);
   const liveCourtsHtml=Array.from({length:stationCount},(_,i)=>liveCourtCardHtml(i+1,selectedCourt)).join("");
-  const liveCourtSwitchHtml=stationCount>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track">${Array.from({length:stationCount},(_,i)=>{
+  const liveCourtSwitchHtml=stationCount>1?`<div class="live-court-switch" role="group" aria-label="切換現場戰鬥台"><div class="live-court-switch-track"><button type="button" class="live-court-switch-btn live-court-switch-all ${selectedCourt===-1?"is-selected":""}" data-action="live-select-court" data-court="0" aria-pressed="${selectedCourt===-1}"><strong>全部</strong><span>${stationCount}台</span></button>${Array.from({length:stationCount},(_,i)=>{
     const n=i+1,current=liveCurrentMatchForStation(n),m=current.m;
     const hasFuture=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===n&&!mm.completed);
     const status=m?refereeStationStatus(m).label:(hasFuture?"等待中":"已完成");
@@ -10817,7 +10817,7 @@ function previousMatchCorrectionHtml(stationNum,currentId){
 }
 function refereeWorkstationHeader(m, stationNum){
   const closed=state.forcedCourtExits?.[stationNum]?.closed;
-  const exitButton=(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<button class="btn btn-ghost btn-sm" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'強制退場'}</button>`:"";
+  const exitButton=(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<button class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'強制退場'}</button>`:"";
   const assigned=refereeDisplayForStation(stationNum);
   const status=refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
@@ -21319,15 +21319,15 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="live-select-court"){
     const n=Number(target.getAttribute("data-court"));
     const count=Math.max(1,Number(state.meta.stations)||1);
-    if(!Number.isInteger(n)||n<1||n>count)return;
-    liveSelectedCourt=n;
+    if(!Number.isInteger(n)||n<0||n>count)return;
+    liveSelectedCourt=n===0?-1:n;
     document.querySelectorAll(".live-court-switch-btn").forEach(button=>{
       const selected=Number(button.getAttribute("data-court"))===n;
       button.classList.toggle("is-selected",selected);
       button.setAttribute("aria-pressed",String(selected));
     });
     document.querySelectorAll(".live-dashboard-courts .live-court-card").forEach(card=>{
-      card.setAttribute("data-selected",String(Number(card.getAttribute("data-live-court"))===n));
+      card.setAttribute("data-selected",String(n===0||Number(card.getAttribute("data-live-court"))===n));
     });
     target.scrollIntoView?.({behavior:"smooth",block:"nearest",inline:"center"});
     return;
