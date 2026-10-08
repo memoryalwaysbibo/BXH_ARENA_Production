@@ -370,7 +370,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.32";
+const APP_VERSION = "v14.3.33";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.32",date:"2026/10/07",timezone:"Asia/Taipei",title:"玩家房間名單同步修復",updateLevel:"patch",added:[],changed:["快速報名名單由伺服器同步並保留報到資料"],fixed:["一般玩家房主可即時收到正備取名單，並可手動重試同步","離開房間或切換帳號時停止舊名單讀取，避免舊結果覆蓋目前畫面"],security:[]},
@@ -13195,7 +13195,7 @@ function renderAccountManagementScreen(){
   return `<div class="stickytop account-management-stickytop"><header class="topbar account-management-topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統 <small style="opacity:.55;font-size:9px;">${APP_VERSION}</small></span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><span class="gundam-haro-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
       <div class="header-account-controls">${accountMenuHtml()}</div>
     </header>${renderSuperAdminManagementTabs(page)}</div>
     ${accountMenuOverlayHtml()}
@@ -13493,7 +13493,7 @@ function renderPlayerCenterScreen(){
   return `<div class="stickytop"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><span class="gundam-haro-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
     </header>
     <div class="role-indicator">玩家模式｜${esc(ctx.name)}　<button class="btn btn-ghost btn-sm" data-action="account-back-to-role">返回身分選擇</button></div>
     </div>
@@ -13938,7 +13938,7 @@ function renderPlayerCenterLoggedIn(){
   return `<div class="stickytop player-shell mode-shell"><header class="topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統</span>${topbarConnectionRailHtml()}</div>
-      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+      <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><span class="gundam-haro-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
       <div class="header-account-controls"><button type="button" id="activity-points-summary" class="activity-points-account-row" data-activity="open" aria-label="查看我的活躍積分" style="border:1px solid rgba(var(--accent-rgb),.34)!important;border-radius:8px!important;background:rgba(15,17,23,.40)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important;backdrop-filter:blur(12px) saturate(1.08)!important;-webkit-backdrop-filter:blur(12px) saturate(1.08)!important;"><span>活躍積分</span><strong>… 分</strong></button>${accountEquippedTitleHtml()}${mailboxButtonHtml()}${accountMenuHtml()}</div>
     </header>
     ${renderPlayerNavHtml()}
@@ -17184,7 +17184,8 @@ const BXH_INTERFACE_THEME_OPTIONS=[
   {id:"hunter",label:"獵人Hunter",english:"Hunter License",color:"#67d78f"},
   {id:"akatsuki",label:"曉組織",english:"Akatsuki",color:"#ed5369"},
   {id:"clow",label:"庫洛魔法使",english:"Cardcaptor Sakura",color:"#efa7cb"},
-  {id:"zeon",label:"吉翁",english:"Zeon",color:"#d8b46a"}
+  {id:"zeon",label:"吉翁",english:"Zeon",color:"#d8b46a"},
+  {id:"gundam",label:"鋼彈",english:"Gundam",color:"#d8b46a"}
 ];
 function normalizeInterfaceTheme(value){
   return BXH_INTERFACE_THEME_OPTIONS.some(item=>item.id===value)?value:"gold";
@@ -17253,8 +17254,15 @@ function canUseZeonTheme(){
   if(firebaseUser || !entranceThemeAccountUid)return false;
   try{return localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+entranceThemeAccountUid)==="zeon";}catch(e){return false;}
 }
+function canUseGundamTheme(){
+  if(firebaseUser && userProfile){
+    return userProfile.active===true && ["super_admin","admin","staff"].includes(userProfile.role);
+  }
+  if(firebaseUser || !entranceThemeAccountUid)return false;
+  try{return localStorage.getItem(BXH_INTERFACE_THEME_ACCOUNT_PREFIX+entranceThemeAccountUid)==="gundam";}catch(e){return false;}
+}
 function syncInterfaceThemeVisibility(){
-  const visibleTheme=!firebaseUser?(canUseZeonTheme()?"zeon":canUseClowTheme()?"clow":canUseAkatsukiTheme()?"akatsuki":canUseHunterTheme()?"hunter":canUseThreeGodsTheme()?"three-gods":canUseDirectiveTheme()?"directive":"gold"):((interfaceTheme==="directive" && !canUseDirectiveTheme()) || (interfaceTheme==="three-gods" && !canUseThreeGodsTheme()) || (interfaceTheme==="hunter" && !canUseHunterTheme()) || (interfaceTheme==="akatsuki" && !canUseAkatsukiTheme()) || (interfaceTheme==="clow" && !canUseClowTheme()) || (interfaceTheme==="zeon" && !canUseZeonTheme())?"gold":interfaceTheme);
+  const visibleTheme=!firebaseUser?(canUseGundamTheme()?"gundam":canUseZeonTheme()?"zeon":canUseClowTheme()?"clow":canUseAkatsukiTheme()?"akatsuki":canUseHunterTheme()?"hunter":canUseThreeGodsTheme()?"three-gods":canUseDirectiveTheme()?"directive":"gold"):((interfaceTheme==="directive" && !canUseDirectiveTheme()) || (interfaceTheme==="three-gods" && !canUseThreeGodsTheme()) || (interfaceTheme==="hunter" && !canUseHunterTheme()) || (interfaceTheme==="akatsuki" && !canUseAkatsukiTheme()) || (interfaceTheme==="clow" && !canUseClowTheme()) || (interfaceTheme==="zeon" && !canUseZeonTheme()) || (interfaceTheme==="gundam" && !canUseGundamTheme())?"gold":interfaceTheme);
   if(document.documentElement.getAttribute("data-bxh-theme")!==visibleTheme){
     document.documentElement.setAttribute("data-bxh-theme",visibleTheme);
   }
@@ -17267,6 +17275,7 @@ function applyInterfaceTheme(value,persist=true){
   if(nextTheme==="akatsuki" && !canUseAkatsukiTheme())return;
   if(nextTheme==="clow" && !canUseClowTheme())return;
   if(nextTheme==="zeon" && !canUseZeonTheme())return;
+  if(nextTheme==="gundam" && !canUseGundamTheme())return;
   interfaceTheme=nextTheme;
   syncInterfaceThemeVisibility();
   if(persist){
@@ -17286,8 +17295,8 @@ function applyInterfaceTheme(value,persist=true){
   }
 }
 function themePickerHtml(){
-  const visibleThemes=BXH_INTERFACE_THEME_OPTIONS.filter(item=>(item.id!=="directive" || canUseDirectiveTheme()) && (item.id!=="three-gods" || canUseThreeGodsTheme()) && (item.id!=="hunter" || canUseHunterTheme()) && (item.id!=="akatsuki" || canUseAkatsukiTheme()) && (item.id!=="clow" || canUseClowTheme()) && (item.id!=="zeon" || canUseZeonTheme()));
-  const visibleTheme=(interfaceTheme==="directive" && !canUseDirectiveTheme()) || (interfaceTheme==="three-gods" && !canUseThreeGodsTheme()) || (interfaceTheme==="hunter" && !canUseHunterTheme()) || (interfaceTheme==="akatsuki" && !canUseAkatsukiTheme()) || (interfaceTheme==="clow" && !canUseClowTheme()) || (interfaceTheme==="zeon" && !canUseZeonTheme())?"gold":interfaceTheme;
+  const visibleThemes=BXH_INTERFACE_THEME_OPTIONS.filter(item=>(item.id!=="directive" || canUseDirectiveTheme()) && (item.id!=="three-gods" || canUseThreeGodsTheme()) && (item.id!=="hunter" || canUseHunterTheme()) && (item.id!=="akatsuki" || canUseAkatsukiTheme()) && (item.id!=="clow" || canUseClowTheme()) && (item.id!=="zeon" || canUseZeonTheme()) && (item.id!=="gundam" || canUseGundamTheme()));
+  const visibleTheme=(interfaceTheme==="directive" && !canUseDirectiveTheme()) || (interfaceTheme==="three-gods" && !canUseThreeGodsTheme()) || (interfaceTheme==="hunter" && !canUseHunterTheme()) || (interfaceTheme==="akatsuki" && !canUseAkatsukiTheme()) || (interfaceTheme==="clow" && !canUseClowTheme()) || (interfaceTheme==="zeon" && !canUseZeonTheme()) || (interfaceTheme==="gundam" && !canUseGundamTheme())?"gold":interfaceTheme;
   const activeTheme=visibleThemes.find(item=>item.id===visibleTheme)||visibleThemes[0];
   return `<div class="account-theme-entry ${accountThemeOpen?"open":""}">
     <button type="button" class="account-theme-trigger" data-action="toggle-account-theme" aria-expanded="${accountThemeOpen?"true":"false"}">
@@ -18032,7 +18041,7 @@ function renderApp(){
           <span class="t2">戰鬥陀螺賽事系統</span>
           ${topbarConnectionRailHtml()}
         </div>
-        <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
+        <div class="spacer"></div><span class="three-gods-puzzle-layer" aria-hidden="true"></span><span class="hunter-license-layer" aria-hidden="true"></span><span class="akatsuki-red-cloud-layer" aria-hidden="true"></span><span class="clow-seal-layer" aria-hidden="true"></span><span class="zeon-emblem-layer" aria-hidden="true"></span><span class="gundam-haro-layer" aria-hidden="true"></span><img class="directive-warning-layer" src="./assets/ui/bxh-directive-warning.webp?v=20260927-2325" alt="" aria-hidden="true">
         <div class="header-account-controls">${accountMenuHtml()}</div>
       </header>
       ${tournamentViewContextHeaderHtml()}

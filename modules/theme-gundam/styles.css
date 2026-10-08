@@ -1,0 +1,29 @@
+/* Approved Gundam entrance artwork; existing role actions remain native buttons. */
+.gundam-haro-layer{display:none}
+:root[data-bxh-theme="gundam"]{--accent-color:#d8b46a;--accent-rgb:216,180,106;--accent-glow:rgba(216,180,106,.28);--accent-soft:rgba(216,180,106,.11);--accent-border:rgba(216,180,106,.42);--accent-contrast:#101b30;--glass-surface:rgba(10,20,39,.8);--glass-surface-strong:rgba(10,20,39,.94)}
+:root[data-bxh-theme="gundam"] body{background:radial-gradient(ellipse at top right,#16374a44,transparent 50%),#090e17!important}
+:root[data-bxh-theme="gundam"] .auth-shell{background:#070e18!important;overflow-y:auto!important}
+:root[data-bxh-theme="gundam"] .auth-wm,:root[data-bxh-theme="gundam"] .auth-beams,:root[data-bxh-theme="gundam"] .auth-particles,:root[data-bxh-theme="gundam"] .auth-shell::after{display:none!important}
+:root[data-bxh-theme="gundam"] .landing-home>.auth-brand-header,:root[data-bxh-theme="gundam"] .landing-home>.auth-tagline{display:none!important}
+:root[data-bxh-theme="gundam"] .landing-home{max-width:540px;width:100%;margin:auto!important;padding:0!important}
+:root[data-bxh-theme="gundam"] .auth-content{width:100%;padding:12px!important}
+:root[data-bxh-theme="gundam"] .landing-role-cards{position:relative;display:block!important;width:100%;max-width:540px;aspect-ratio:2/3;margin:0 auto!important;background:url('../../assets/gundam/entrance.webp') center/100% 100% no-repeat}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card{position:absolute!important;left:3.2%;width:93.6%;height:23.5%;min-height:0!important;padding:0!important;border:0!important;border-radius:10px!important;background:transparent!important;box-shadow:none!important;transform:none!important}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card-player{top:17%}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card-admin{top:41.5%}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card-guest{top:66.3%}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card::before,:root[data-bxh-theme="gundam"] .landing-role-cards .role-card::after,:root[data-bxh-theme="gundam"] .landing-role-cards .directive-portrait{display:none!important}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card-inner{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;overflow:hidden!important;clip-path:inset(50%);white-space:nowrap}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card:focus-visible{outline:3px solid #b6e4ff!important;outline-offset:-6px}
+:root[data-bxh-theme="gundam"] .landing-role-cards .role-card:hover{box-shadow:inset 0 0 18px #a9dfff55!important}
+:root[data-bxh-theme="gundam"] .landing-home>.btn-row{padding:0 10px}
+:root[data-bxh-theme="gundam"] .landing-home>.auth-footnote{padding:0 12px}
+:root[data-bxh-theme="gundam"] header.topbar{position:relative;isolation:isolate;background:repeating-linear-gradient(90deg,transparent 0 36px,#40577018 37px,transparent 38px),linear-gradient(135deg,#0c1a28,#0c111c)!important;border-bottom:1px solid #d6b16988!important}
+:root[data-bxh-theme="gundam"] header.topbar .gundam-haro-layer{display:block;position:absolute;right:14px;top:8px;width:clamp(135px,32vw,250px);height:calc(100% - 16px);background:url('../../assets/gundam/haro-header.webp') right top/contain no-repeat;pointer-events:none;z-index:-1;opacity:.94}
+:root[data-bxh-theme="gundam"] header.topbar .brandtext{position:relative;text-shadow:0 2px 6px #07111c}
+:root[data-bxh-theme="gundam"] header.topbar .brandtext .t1{color:#f1dca5!important}
+:root[data-bxh-theme="gundam"] header.topbar::after{background:linear-gradient(90deg,#639ed3,#d8b46a,#639ed3)!important}
+:root[data-bxh-theme="gundam"] header.topbar .account-badge{background:#0d1425f2!important;border-color:#aa8b4c!important}
+:root[data-bxh-theme="gundam"] nav.tabs{background:#0b111be8!important;border-bottom:1px solid #49647d!important}
+:root[data-bxh-theme="gundam"] nav.tabs button.active{color:#efd79a!important;border-color:#796740!important;background:#213349!important}
+@media(max-width:640px){:root[data-bxh-theme="gundam"] header.topbar .gundam-haro-layer{right:8px;width:42%;max-width:210px;height:110px;top:10px}}
