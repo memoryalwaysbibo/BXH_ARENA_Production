@@ -84,7 +84,7 @@ function harness() {
   });
   vm.runInContext(domain + '\n' + registration, ctx);
   Object.assign(ctx, ctx.window.BXHDomainUtils, ctx.window.BXHRegistrationUtils);
-  for (const name of ['buildPublicMirrorFields', 'computeTournamentPhase', 'reconstructPublicStateFromDoc']) vm.runInContext(cloudFunction(name), ctx);
+  for (const name of ['courtLifecycleWritePatch', 'buildPublicMirrorFields', 'computeTournamentPhase', 'reconstructPublicStateFromDoc']) vm.runInContext(cloudFunction(name), ctx);
   const names = ['createCommunityRoom', 'createRoom', 'pushUpdate', 'syncCommunityRegistrationSummary', 'joinRoom', 'joinRoomPublic', 'getPublicTournamentFull', 'getPublicTournamentSummary', 'queryPublicTournaments', 'queryAdminTournaments', 'promoteLocalWaitlistRoster', 'mutateRegistrationRoster'];
   vm.runInContext('api={' + names.map(method).join(',\n') + '}', ctx);
   ctx.window.engagementService = { familyRegistration: async payload => {

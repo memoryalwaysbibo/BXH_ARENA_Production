@@ -19,7 +19,12 @@ function harness(){
  const fx={doc:(_db,...parts)=>parts.join('/'),getDoc:async key=>snap(docs.get(key)),getDocFromServer:async key=>{reads.push(key);const queue=stale.get(key)||[];return snap(queue.length?queue.shift():docs.get(key));},
  runTransaction:async(_db,fn)=>{const pending=[];const result=await fn({get:async key=>snap(docs.get(key)),set:(key,patch,options)=>pending.push({key,patch,deep:!!options?.merge}),update:(key,patch)=>pending.push({key,patch,deep:false})});for(const {key,patch,deep} of pending)docs.set(key,deep?merge(docs.get(key),patch):{...clone(docs.get(key)||{}),...clone(patch)});if(afterCommit){const f=afterCommit;afterCommit=null;await f();}return result;}};
  const context={window:{},console:{warn:(...args)=>logs.push(args)},setTimeout:fn=>{fn();return 1;},fx,dbHandle:{},cloudEnabled:true,authHandle:{currentUser:{uid:'admin'}},USERS_COLLECTION:'users',userProfile:{role:'admin',active:true},currentUserDisplayNameForWrites:()=> 'Admin',currentUserUidForWrites:()=> 'admin',isPartnerOrganizerMode:()=>false,isEventStaffMode:()=>false,computeTournamentPhase:()=> 'waiting',buildPublicMirrorFields:state=>({meta:{refereeStationNames:state.meta.refereeStationNames,refereeStationRestrictionEnabled:state.meta.refereeStationRestrictionEnabled}})};
- vm.createContext(context);vm.runInContext('api={'+['pushUpdate','saveStaffAssignments','saveRefereeStationAssignments'].map(method).join(',\n')+'}',context);
+ vm.createContext(context);
+ const lifecycleStart=cloud.indexOf('  function courtLifecycleWritePatch(');
+ const lifecycleEnd=cloud.indexOf('\n  function ',lifecycleStart+3);
+ assert(lifecycleStart>=0&&lifecycleEnd>lifecycleStart);
+ vm.runInContext(cloud.slice(lifecycleStart,lifecycleEnd),context);
+ vm.runInContext('api={'+['pushUpdate','saveStaffAssignments','saveRefereeStationAssignments'].map(method).join(',\n')+'}',context);
  return {api:context.api,docs,reads,stale,logs,afterCommit:fn=>afterCommit=fn};
 }
 
@@ -52,6 +57,16 @@ test('reducing courts replaces assignment maps instead of retaining obsolete map
  const h=harness();const doc=h.docs.get('tournaments/ROOM');doc.refereeStationAssignments={'1':['ref'],'12':['ref']};doc.refereeStationNames={'1':['Referee'],'12':['Referee']};
  const data=room();data.meta.refereeStationAssignments={'1':['ref']};
  const result=await h.api.saveRefereeStationAssignments('ROOM',data);assert.equal(result.ok,true);assert.deepEqual(Object.keys(h.docs.get('tournaments/ROOM').refereeStationAssignments),['1']);
+});
+
+test('referee assignment save advances the active court lifecycle while removing old Courts',async()=>{
+ const h=harness(),doc=h.docs.get('tournaments/ROOM'),active=JSON.parse(doc.data);
+ active.courtLifecycleEpoch=1;doc.data=JSON.stringify(active);doc.courtLifecycleEpoch=1;doc.courtLifecycleWriteSeq=7;
+ doc.refereeStationAssignments={'1':['ref'],'12':['ref']};
+ const data=room();data.meta.refereeStationAssignments={'1':['ref']};
+ const result=await h.api.saveRefereeStationAssignments('ROOM',data);
+ assert.equal(result.ok,true);assert.equal(h.docs.get('tournaments/ROOM').courtLifecycleWriteSeq,8);
+ assert.deepEqual(Object.keys(h.docs.get('tournaments/ROOM').refereeStationAssignments),['1']);
 });
 
 test('persistent mismatch stays unverified but reports the transaction committed',async()=>{

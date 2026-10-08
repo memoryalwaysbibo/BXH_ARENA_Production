@@ -76,7 +76,7 @@
   matchNames.set(key(code,m.id),{A:typeof playerName==='function'?playerName(m.a?.playerId):'選手 A',B:typeof playerName==='function'?playerName(m.b?.playerId):'選手 B'});
   const id=quote(m.id),c=quote(code),locked=stationLocked?'disabled':'';
   setTimeout(()=>refresh(code,m.id),0);
-  return `<section class="panel" data-enchantment-referee data-code="${c}" data-match-id="${id}" style="margin:12px 16px;padding:14px">
+  return `<section class="panel" data-enchantment-referee data-code="${c}" data-match-id="${id}" data-dispatch-revision="${Number(m.dispatchRevision||0)}" style="margin:12px 16px;padding:14px">
    <strong data-enchantment-title>附魔之戰｜5 分制｜等待裁判開始</strong>
    <style>
     [data-enchantment-referee] .enchant-active{border-color:#b889ff!important;box-shadow:0 0 0 1px #b889ff55,0 0 20px #9d62ff38;animation:enchant-glow 2.5s ease-in-out infinite}
@@ -425,6 +425,7 @@
   busy.add(k);
   try{
    const payload={code,matchId:id,action};
+   if(action==='start')payload.dispatchRevision=Number([...document.querySelectorAll('[data-enchantment-referee]')].find(el=>el.dataset.code===code&&el.dataset.matchId===id)?.dataset.dispatchRevision||0);
    if(action!=='start')payload.version=item.version;
    if(action==='score'){payload.round=item.state.round;payload.winner=d.side;payload.type=d.type;}
    if(action==='fault'){payload.round=item.state.round;payload.offender=d.side;}

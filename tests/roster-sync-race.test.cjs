@@ -12,6 +12,7 @@ function rosterHarness(status){
  runTransaction:async(_db,fn)=>fn({get:async key=>snap(key),update:(key,patch)=>Object.assign(docs[key],patch)}),getDoc:async key=>snap(key)};
  const sandbox={fx,dbHandle:{},authReady:true,authHandle:{currentUser:{uid:'admin'}},buildPublicMirrorFields:x=>x,console};
  vm.createContext(sandbox);
+ vm.runInContext(block(cloud,'function courtLifecycleWritePatch(','function buildPublicMirrorFields('),sandbox);
  vm.runInContext('api={'+block(cloud,'async mutateRegistrationRoster(','    async promoteEarliestWaitlist(')+'}',sandbox);
  return {api:sandbox.api,docs};
 }
@@ -24,6 +25,16 @@ for(const [action,status,confirmed,waiting] of [['promote','waitlist',1,0],['dem
   assert.equal(docs.tour.confirmedCount,confirmed);assert.equal(docs.tour.waitlistCount,waiting);
  });
 }
+test('roster mutation advances an activated court lifecycle sequence',async()=>{
+ const {api,docs}=rosterHarness('waitlist');
+ docs.tour.courtLifecycleEpoch=1;docs.tour.courtLifecycleWriteSeq=7;
+ docs.tour.data=JSON.stringify({...JSON.parse(docs.tour.data),courtLifecycleEpoch:1});
+ const result=await api.mutateRegistrationRoster('BXH-X','r','promote');
+ assert.equal(result.verified,true);
+ assert.equal(docs.tour.courtLifecycleWriteSeq,8);
+ assert.equal(JSON.parse(docs.tour.data).courtLifecycleEpoch,1);
+ assert.equal(JSON.parse(docs.pub.bracketView).courtLifecycleEpoch,1);
+});
 test('committed result retains other waitlist rows and patches promoted status',async()=>{
  const sandbox={state:{id:'room',cloudCode:'BXH-X'},adminRegistrationsCache:[{registrationId:'r',status:'waitlist'},{registrationId:'other',status:'waitlist'}],peopleRegistrationIdOf:r=>r.registrationId,saveRecord:async()=>true,resetRegistrationFormDraft(){},render(){},showToast(){},Date};
  vm.createContext(sandbox);
