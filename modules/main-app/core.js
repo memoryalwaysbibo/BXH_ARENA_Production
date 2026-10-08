@@ -15238,7 +15238,7 @@ function hunterFilteredRecords(){
     return true;
   });
 }
-const {hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
+const {hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary}=window.BXHHunterUtils||{};
 const {hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth}=window.BXHHunterUtils||{};
 
 /* ==== v14.0.54 HUNTER PROFILE P6.7: server-authoritative permanent awards ==== */
@@ -15700,6 +15700,7 @@ function hunterEnchantmentSummaryHtml(records){
 }
 function hunterRecordsForPeriod(period){
   const rows=hunterFilterByMode(hunterProfileCache&&Array.isArray(hunterProfileCache.records)?hunterProfileCache.records:[],hunterBattleFilter);
+  if(period==="recent20")return hunterTrendWindows(rows).recent;
   const start=hunterPeriodStartMs(period);
   return rows.filter(r=>period==="career"||start<=0||hunterRecordTimestamp(r)>=start);
 }
@@ -15752,10 +15753,41 @@ function hunterBuildAnalysis(records){
       style="複合攻勢型";
     }
   }
-  return {rows,analyzable,matches,wins,winRate,pointEfficiency,totalFor,totalAgainst,validRounds,distributionEligible,scoreAllowed,eligible,overall,attack,defense,offense,weakness,primary,secondary,mainWeakness,style};
+  return {rows,analyzable,matches,wins,winRate,pointEfficiency,totalFor,totalAgainst,validRounds,version:"hunter-analysis-v1-b2-base",computedAt:Date.now(),distributionEligible,scoreAllowed,eligible,overall,attack,defense,offense,weakness,primary,secondary,mainWeakness,style};
 }
 
 
+
+function hunterAnalysisContextHtml(analysis,partial=false){
+  const maturity=hunterSampleMaturity(analysis,partial);
+  const dateText=ts=>Number(ts)>0?new Date(ts).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",hour12:false}):"尚未核對";
+  const excluded=analysis.rows.length-analysis.matches;
+  const loss=analysis.weakness.filter(row=>row.points>0&&row.points===analysis.weakness[0].points);
+  const lossText=partial?"資料尚未完整，暫不判定":!analysis.distributionEligible?"樣本不足或來源混合，暫不判定":loss.length?loss.map(row=>'被'+row.label+' '+row.share+'%').join('／')+"（初步）":"尚無有效失分事件";
+  return '<section class="panel hunter-analysis-context"><div class="hunter-section-head"><div class="panel-title">樣本與分析紀錄</div><span class="badge badge-metal">'+maturity.label+'</span></div>'+
+    '<div class="hint">納入 '+analysis.matches+' / '+analysis.rows.length+' 場｜有效回合 '+analysis.validRounds+'｜排除 '+excluded+' 場。初步門檻：3 場可分析對戰＋8 個有效回合。穩定分析門檻待歷史回測校準；樣本量不等於準確率。</div>'+
+    '<div class="hunter-main-loss"><span>較常見失分方式</span><strong>'+esc(lossText)+'</strong></div>'+
+    '<div class="hunter-analysis-meta">分析版本 '+esc(analysis.version)+'｜分析時間 '+esc(dateText(analysis.computedAt))+'（台灣）<br>資料核對 '+esc(dateText(hunterProfileCache&&hunterProfileCache.loadedAt))+'｜八軸口徑 '+(hunterRadarMetric==="events"?'次數占比':'分數占比')+'。失分提示以四種方式基礎分排序，可從下方來源核對。舊紀錄以本版重新計算，不直接比較舊版分析分數。</div></section>';
+}
+function hunterTrendHtml(records,partial=false){
+  const windows=hunterTrendWindows(records),recent=hunterBuildAnalysis(windows.recent),previous=hunterBuildAnalysis(windows.previous);
+  const enough=recent.matches>=3&&recent.validRounds>=8&&previous.matches>=3&&previous.validRounds>=8;
+  const comparable=windows.comparable&&enough&&!partial;
+  const messages={undated:"部分對戰缺少可排序時間，暫停趨勢比較。","insufficient-windows":"需要兩組完整的 20 場，才能比較最近 20 場與前 20 場。","mixed-versions":"兩區間含不同來源或計分版本，暫停跨口徑比較。","incomplete-ledger":"區間內有快速判定或不完整回合，暫停能力趨勢比較。"};
+  const delta=(a,b)=>comparable?(a-b>0?'+':'')+(a-b)+' 個百分點':'—';
+  const share=(a,key,hasData)=>hasData?a[key]+'%':'—';
+  const topLoss=a=>a.totalAgainst>0?a.weakness.filter(r=>r.points>0&&r.points===a.weakness[0].points).map(r=>'被'+r.label+' '+r.share+'%').join('／'):'—';
+  const row=(label,current,past,change='—')=>'<tr><th scope="row">'+label+'</th><td>'+esc(current)+'</td><td>'+esc(past)+'</td><td>'+esc(change)+'</td></tr>';
+  const range=rows=>rows.length?hunterAchievementDateText(hunterRecordTimestamp(rows[rows.length-1]))+'～'+hunterAchievementDateText(hunterRecordTimestamp(rows[0])):'—';
+  return '<section class="panel hunter-trend-panel"><div class="panel-title">最近 20 場與前期比較</div><div class="hint">依目前分類的生涯戰績排序，不受上方期間篩選影響；兩區間不重疊。'+windows.undated+' 場缺少時間，未排入近期窗口。</div>'+
+    '<div class="hunter-trend-table-wrap"><table class="hunter-trend-table"><thead><tr><th>統計</th><th>最近 '+windows.recent.length+' 場</th><th>前期 '+windows.previous.length+' 場</th><th>變化</th></tr></thead><tbody>'+
+    row('可分析場次',recent.matches,previous.matches)+row('有效回合',recent.validRounds,previous.validRounds)+
+    row('可分析勝率',share(recent,'winRate',recent.matches>0),share(previous,'winRate',previous.matches>0),delta(recent.winRate,previous.winRate))+
+    row('基礎得分占比',share(recent,'pointEfficiency',recent.totalFor+recent.totalAgainst>0),share(previous,'pointEfficiency',previous.totalFor+previous.totalAgainst>0),delta(recent.pointEfficiency,previous.pointEfficiency))+
+    row('原始失分分布',topLoss(recent),topLoss(previous))+'</tbody></table></div>'+
+    '<div class="hunter-trend-status">'+(partial?'部分資料缺失，暫停趨勢結論。':comparable?'同口徑比較｜變化僅描述這兩組戰績，不代表實力必然提升或下降。':esc(messages[windows.reason]||"樣本不足，暫停趨勢比較。"))+'</div>'+
+    '<div class="hunter-analysis-meta">來源計分版本 '+esc(windows.versions.join('／')||'尚無資料')+'<br>最近區間 '+esc(range(windows.recent))+'｜前期區間 '+esc(range(windows.previous))+'<br>公式版本 '+esc(recent.version)+'｜趨勢版本 hunter-trend-v1｜每組最多 20 場；得分占比＝四種方式基礎得分／雙方基礎總分，失誤與卡牌調整不計入。不同版本或不完整資料不顯示差值。</div></section>';
+}
 
 function hunterRadarSvg(analysis,metric="points"){
   const attack=hunterDistributionRows(analysis.attack,metric),defense=hunterDistributionRows(analysis.defense,metric);
@@ -16157,7 +16189,7 @@ async function loadHunterProfile(force=false){
     const canonicalRecords=hunterUniqueRecords(sourceRecords);
     const skippedRecords=Array.isArray(result&&result.skipped)?result.skipped:[];
     const achievementCore=hunterBuildAchievementCore(canonicalRecords);
-    hunterProfileCache={records:canonicalRecords,skipped:skippedRecords,achievementCore,integrityAudit:hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore),permanentAwards:null};
+    hunterProfileCache={records:canonicalRecords,skipped:skippedRecords,achievementCore,integrityAudit:hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore),permanentAwards:null,loadedAt:Date.now()};
     try{
       if(window.engagementService&&window.engagementService.syncHunterAchievements){
         const permanentAwards=await window.engagementService.syncHunterAchievements();
@@ -16247,11 +16279,11 @@ function renderPlayerStatsTab(p){
     const analysis=hunterBuildAnalysis(analysisRows);
     if(!completeHistory){analysis.eligible=false;analysis.overall=null;analysis.primary=analysis.secondary=analysis.mainWeakness=analysis.style="資料尚未完整";}
     const seasonAvailable=hunterSeasonStartMs()>0;
-    const periods=[["career","生涯",true],["season","本季",seasonAvailable],["month","本月",true],["week","本週",true],["today","今日",true]].map(([key,label,enabled])=>'<button class="btn '+(hunterAnalysisPeriod===key?'btn-primary':'btn-ghost')+' btn-sm" '+(enabled?'data-action="hunter-analysis-period" data-value="'+key+'"':'disabled title="賽季起始時間尚未載入"')+'>'+label+'</button>').join('');
+    const periods=[["career","生涯",true],["season","本季",seasonAvailable],["month","本月",true],["week","本週",true],["today","今日",true],["recent20","最近20場",true]].map(([key,label,enabled])=>'<button class="btn '+(hunterAnalysisPeriod===key?'btn-primary':'btn-ghost')+' btn-sm" '+(enabled?'data-action="hunter-analysis-period" data-value="'+key+'"':'disabled title="賽季起始時間尚未載入"')+'>'+label+'</button>').join('');
     const scoreText=analysis.eligible?String(analysis.overall):"—";
     const percentText=(value,hasSamples)=>hasSamples?value+"%":"—";
     const sampleText=analysis.matches+' 場可分析對戰｜'+analysis.validRounds+' 個有效回合';
-    body='<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HUNTER ANALYSIS</div><div class="panel-title">能力分析</div></div><span class="badge badge-metal">P4 LIVE</span></div>'+
+    body=hunterAnalysisContextHtml(analysis,!completeHistory)+'<section class="panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HUNTER ANALYSIS</div><div class="panel-title">能力分析</div></div><span class="badge badge-metal">P4 LIVE</span></div>'+
       '<div class="hunter-period-tabs">'+periods+'</div>'+hunterEnchantmentSummaryHtml(analysisRows)+
       '<div class="hunter-analysis-scoreline"><div><span>綜合評分</span><b class="'+(analysis.eligible?'':'muted')+'">'+scoreText+'</b></div><div><span>對戰勝率</span><b>'+percentText(analysis.winRate,analysis.matches>0)+'</b></div><div><span>得分占比</span><b>'+percentText(analysis.pointEfficiency,analysis.totalFor+analysis.totalAgainst>0)+'</b></div><div><span>有效回合</span><b>'+analysis.validRounds+'</b></div></div>'+
       hunterRadarHtml(analysis,hunterRadarMetric)+
@@ -16260,6 +16292,7 @@ function renderPlayerStatsTab(p){
       '<section class="panel hunter-loss-panel"><div class="panel-title">防守失分統計 <span class="badge badge-metal">可展開來源</span></div><div class="hunter-score-list">'+HUNTER_ANALYSIS_TYPES.map(type=>hunterAnalysisStatHtml(analysis.defense,type,"against",hunterRadarMetric)).join('')+'</div></section></div>'+
       '<section class="panel"><div class="panel-title">分析結論</div><div class="hunter-analysis-grid"><div><span>主要優勢</span><strong>'+esc(analysis.primary)+'</strong></div><div><span>次要優勢</span><strong>'+esc(analysis.secondary)+'</strong></div><div><span>主要弱點</span><strong>'+esc(analysis.mainWeakness)+'</strong></div><div><span>戰型判定</span><strong>'+esc(analysis.style)+'</strong></div></div>'+
       '<div class="hunter-framework-note">綜合評分只採正規賽資料。附魔攻防採卡牌調整前基礎分；卡牌加分與減分另列，失誤判罰獨立核對。評分公式：60% 對戰勝率＋40% 得分占比。勝率＝可分析勝場／可分析場數；得分占比＝四種方式得分／雙方四種方式總得分。有效回合為比分核對通過的極限、擊飛、爆裂與轉停事件；失誤判罰用於核對比分，不計入四種方式或有效回合。Quick Decision 與無可信 Round ledger 的比賽不進入 P4 能力分析。點擊任一進攻／防守項目，可追溯到對手、Match 與原始 Round Timeline。</div></section>';
+    body+=hunterTrendHtml(hunterFilterByMode(allRecords,hunterBattleFilter),!completeHistory);
   }else if(playerStatsSubTab==="achievements"){
     const achievementCore=hunterProfileCache&&hunterProfileCache.achievementCore
       ? hunterProfileCache.achievementCore
@@ -19949,7 +19982,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="hunter-analysis-period"){
     const value=target.getAttribute("data-value");
-    if(["career","season","month","week","today"].includes(value)){ hunterAnalysisPeriod=value; renderPreservingScroll(); }
+    if(["career","season","month","week","today","recent20"].includes(value)){ hunterAnalysisPeriod=value; renderPreservingScroll(); }
     return;
   }
   if(action==="hunter-record-filter"){
