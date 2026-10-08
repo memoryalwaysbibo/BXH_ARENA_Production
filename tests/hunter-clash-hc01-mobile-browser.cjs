@@ -81,7 +81,11 @@ const server=spawn(process.execPath,['hunter-clash/hc01/local-lab.cjs'],{cwd:pat
     }
     assert.equal(await A.locator('.room-radar .radar-player').count(),1);
     assert.deepEqual(await A.locator('.radar-label').allTextContents(),['極限75%','擊飛0%','爆裂0%','轉停25%','被極限75%','被擊飛0%','被爆裂0%','被轉停25%']);
-    assert.match(await A.locator('.room-stat').first().textContent(),/3 勝 2 敗.*評價：初步・優勢/);
+    assert.match(await A.locator('.room-stat').first().textContent(),/3 勝 2 敗.*評價：初步・極限突擊型/);
+    assert.match(await A.locator('.room-feedback-metrics').first().textContent(),/主要得分極限 75%（9 分）主要失分被極限 75%（6 分）得分效率60%（12 得分／8 失分）/);
+    assert.match(await A.locator('.room-feedback-metrics').last().textContent(),/得分效率40%（8 得分／12 失分）/);
+    assert.match(await A.locator('.room-feedback-advice').first().textContent(),/回看「被極限」/);
+    for(const width of [320,390,430]){await A.setViewportSize({width,height:844});assert.equal(await A.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}await A.setViewportSize({width:390,height:844});
     await A.locator('.radar-tabs button').last().click();assert.equal(await A.locator('.radar-tabs button').last().getAttribute('aria-pressed'),'true');
     assert.equal(await A.locator('.radar-label').first().textContent(),'極限75%');
     const seriesFinal=await command(A,'confirmFinish');await B.waitForFunction(rev=>document.querySelector('.state').dataset.revision===String(rev),seriesFinal.challenge.revision);await command(B,'confirmFinish');

@@ -2,6 +2,27 @@ import{createController}from'../controller.mjs';
 import{pairingPayload,parsePairingPayload,renderPairingQr}from'../pairing.mjs';
 import{createScanner}from'../scanner.mjs';
 const labels={proposed:'等待對手配對',accepted:'配對成功，等待確認開賽',in_progress:'對戰中',round_pending:'等待本局確認',game_pending:'本場結束，可繼續下一場',final_pending:'等待完賽確認',completed:'完賽紀錄已保存',disputed:'有爭議，保留紀錄',score_review:'請核對比分',cancelled:'已取消',expired:'配對已過期',rejected:'已拒絕'};
+const finishLabels={extreme:'極限',knockout:'擊飛',burst:'爆裂',spin:'轉停'};
+function roomPlayerStats(c,games,player){
+  const types=Object.keys(finishLabels),opponent=c.participants.find(uid=>uid!==player);
+  const attack=Object.fromEntries(types.map(type=>[type,0])),defense=Object.fromEntries(types.map(type=>[type,0]));
+  for(const game of games)for(const round of game.rounds||[]){
+    if(!types.includes(round.finish)||!Number.isFinite(round.points))continue;
+    if(round.winnerUid===player)attack[round.finish]+=round.points;
+    else if(round.winnerUid===opponent)defense[round.finish]+=round.points;
+  }
+  const totalFor=types.reduce((sum,type)=>sum+attack[type],0),totalAgainst=types.reduce((sum,type)=>sum+defense[type],0);
+  const ranked=types.map(type=>({type,points:attack[type],share:totalFor?Math.round(attack[type]/totalFor*100):0})).sort((a,b)=>b.points-a.points);
+  const top=ranked[0],second=ranked[1];
+  const style=!totalFor?'得分模式待建立':top.points===second.points?'複合均衡型':top.share>=45?{extreme:'極限突擊型',knockout:'擊飛壓制型',burst:'爆裂破壞型',spin:'持久轉停型'}[top.type]:Math.abs(top.share-second.share)<=10?'複合均衡型':'複合攻勢型';
+  const leading=(bucket,total,prefix='')=>{const max=Math.max(...Object.values(bucket));return total?types.filter(type=>bucket[type]===max).map(type=>prefix+finishLabels[type]+' '+Math.round(max/total*100)+'%（'+max+' 分）').join('、'):'本輪尚無'+(prefix?'失分':'得分');};
+  const wins=games.filter(game=>game.winnerUid===player).length,losses=games.length-wins;
+  const efficiency=totalFor+totalAgainst?Math.round(totalFor/(totalFor+totalAgainst)*100):0;
+  const summary=wins===games.length?'本輪全勝，已將得分轉成勝場。':wins===0?(totalFor?'尚未拿下勝場，但已有得分；可回看比分接近的場次。':'本輪尚未取得得分，先以建立有效得分回合為目標。'):wins>losses?(efficiency<50?'勝場領先，但總得分落後；可回看失分較多的敗局。':'勝場領先，得分占比也達到一半以上。'):wins===losses?'本輪勝敗相當，可比較勝局與敗局的得失分方式。':efficiency>=50?'勝場較少，但總得分不低於對手；可回看未能拿下的場次。':'本輪勝場與總得分較少，先找出最常見的失分方式。';
+  const maxLoss=Math.max(...Object.values(defense)),lossTypes=types.filter(type=>defense[type]===maxLoss);
+  const advice=totalAgainst?'下一輪可優先回看「被'+lossTypes.map(type=>finishLabels[type]).join('／被')+'」的回合，記下當時配置與情境，再比較調整後的失分次數。':'本輪沒有失分；可更換對手或配置，觀察得分方式是否仍能維持。';
+  return {attack,defense,totalFor,totalAgainst,style,efficiency,summary,advice,attackText:leading(attack,totalFor),defenseText:leading(defense,totalAgainst,'被')};
+}
 export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=globalThis.localStorage}={}){
   const app=root.querySelector('#app'),message=text=>root.querySelector('#message').textContent=text;
   app.innerHTML=`<form id="login"><section><h2>內測帳號登入</h2><label>玩家名稱<input name="playerName" autocomplete="nickname" maxlength="40" placeholder="對戰時顯示的名稱" required></label><label>電子郵件<input name="email" type="email" autocomplete="username" required></label><label>密碼<input name="password" type="password" autocomplete="current-password" required></label><label class="remember"><input name="remember" type="checkbox">記憶帳號</label><button type="submit">登入</button><p>帳號由測試主持者提供。</p></section></form><section id="identity" hidden><span class="account-dot" aria-hidden="true"></span><span id="who"></span><button type="button" data-op="logout">登出</button></section><section id="match" hidden><div class="match-heading"><div class="state"></div><span class="sync-label">自動同步</span></div><div class="welcome"><h2>下一場，換你上場。</h2><p>建立挑戰，或加入對手的挑戰。</p></div><div class="score">0 : 0</div><p class="round"></p><small class="policy"></small><div class="pairing-share" hidden><h3>邀請對手加入</h3><p>請對手掃描 QR，或輸入下方 4 碼。</p><div class="qr"></div><strong class="pairing-code"></strong><p class="pairing-expiry"></p></div><div class="room-options"><label>對練場次<input name="matchCount" type="number" min="1" max="100" placeholder="未填預設 1 場"></label><label class="remember"><input name="practice" type="checkbox">循環練習（每房最多 100 場）</label></div><div class="home-actions row"><button data-op="createChallenge"><span class="entrance-art entrance-create" aria-hidden="true"><img src="./cloud/entrance-cards-v2.png" alt=""></span><strong>建立挑戰</strong><small>出示 QR 與 4 碼</small></button><button data-op="join"><span class="entrance-art entrance-join" aria-hidden="true"><img src="./cloud/entrance-cards-v2.png" alt=""></span><strong>加入挑戰</strong><small>掃碼或輸入序號</small></button></div><div class="join-panel" hidden><h3>加入挑戰</h3><div class="camera" hidden><video playsinline muted></video><p>將對手的 QR 放入畫面即可掃描</p></div><button data-op="scan" hidden>重新啟動掃描</button><canvas hidden></canvas><p class="divider">或輸入 4 碼</p><label>配對序號<input name="pairingCode" placeholder="例如 A7K3" autocomplete="off" autocapitalize="characters" maxlength="4"></label><button data-op="acceptCode">確認加入</button><div class="scan-confirm" hidden><p>已辨識挑戰 QR，確認加入此挑戰？</p><button data-op="accept">確認加入</button></div><textarea hidden></textarea><button data-op="back">返回</button></div><div class="pairing-actions row"><button data-op="start">確認開賽</button><button data-op="reject">拒絕配對</button></div><p class="ready-help" hidden></p><button class="flow-back" data-op="cancel">返回</button><details class="more-actions"><summary>更多操作</summary><div class="row"><button data-op="getChallenge">重新同步</button></div></details><button data-op="retry" hidden>重送原操作</button><div class="scoreboards"></div><p class="confirmation-wait" role="status" aria-live="polite" hidden></p><p class="review-help" hidden></p><button data-op="undoRound">撤銷上一筆得分</button><button data-op="resumeReview">比分已核對，繼續</button><div class="series-actions row"><button data-op="nextGame">下一場</button><button data-op="endSession">結束對練</button></div><details class="room-analysis" hidden><summary>本輪評價</summary><p class="analysis-description">本房已完成場次的即時分析；八角圖不代表正式執照能力值。</p><div class="room-stats" aria-label="本輪戰績"></div><h3 class="radar-title">即時八角圖</h3><div class="room-radar"></div></details><div class="session-results"></div><p class="score-help">建立挑戰者替雙方記分，比分自動同步；整場結束後雙方確認結果。</p><div class="row"><button data-op="confirmRound">確認本局</button><button data-op="confirmFinish">確認完賽</button><button data-op="dispute">有爭議</button></div></section><section id="history" hidden><details><summary>我的 PK 戰績</summary><p class="history-status" role="status"></p><div class="history-stats"></div><p class="history-note">僅計入雙方確認完賽的 PK；明細顯示最近 50 場。</p><div class="history-list"></div><button data-op="history">更新戰績</button></details></section>`;
@@ -74,8 +95,15 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
         const card=document.createElement('div');card.className='room-stat';
         const name=document.createElement('strong');name.textContent=c.participantNames?.[player]||'未設定名稱';
         const rate=document.createElement('p');rate.textContent='本輪勝率：'+(games.length?Math.round(wins/games.length*100)+'%':'—')+'（'+wins+' 勝 '+losses+' 敗）';
-        const evaluation=document.createElement('p');evaluation.textContent='評價：'+(games.length<5?'資料不足（滿 5 場後顯示）':(games.length<10?'初步・':'')+(wins===games.length?'全勝':wins===0?'待突破':wins>losses?'優勢':wins===losses?'勢均力敵':'持續挑戰'));
+        const stats=roomPlayerStats(c,games,player);
+        const evaluation=document.createElement('p');evaluation.className='room-evaluation';evaluation.textContent='評價：'+(games.length<5?'資料不足（滿 5 場後顯示）':(games.length<10?'初步・':'')+stats.style);
         card.append(name,rate,evaluation);roomStats.append(card);
+        if(games.length>=5){
+          const summary=document.createElement('p');summary.className='room-feedback-summary';summary.textContent=stats.summary;card.append(summary);
+          const metrics=document.createElement('dl');metrics.className='room-feedback-metrics';
+          for(const [label,value] of [['主要得分',stats.attackText],['主要失分',stats.defenseText],['得分效率',stats.efficiency+'%（'+stats.totalFor+' 得分／'+stats.totalAgainst+' 失分）']]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;metrics.append(term,detail);}card.append(metrics);
+          const advice=document.createElement('p');advice.className='room-feedback-advice';advice.textContent='對練建議：'+stats.advice;card.append(advice);
+        }
       }
       const note=document.createElement('p');note.className='room-stats-note';note.textContent=c.status==='completed'?'雙方已確認，本房對戰明細已保存；評價與八角圖由明細即時計算，沒有另存固定報告。':'本輪資料為暫計；雙方確認整組結果後，才保存對戰明細並計入 PK 戰績。';roomStats.append(note);
       const radarTitle=select('.radar-title');radarTitle.hidden=games.length<5;
@@ -111,20 +139,14 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
     }
   }
   function renderRoomRadar(container,c,games){
-    const ns='http://www.w3.org/2000/svg',types=['extreme','knockout','burst','spin'];
+    const ns='http://www.w3.org/2000/svg';
     const tabs=document.createElement('div');tabs.className='radar-tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','選擇查看的玩家');
     for(const [index,player] of c.participants.entries()){
       const tab=document.createElement('button');tab.type='button';tab.textContent=c.participantNames?.[player]||'未設定名稱';tab.setAttribute('aria-pressed',String(radarPlayer===index));
       tab.addEventListener('click',()=>{radarPlayer=index;container.replaceChildren();renderRoomRadar(container,c,games);});tabs.append(tab);
     }
-    const player=c.participants[radarPlayer]||c.participants[0],opponent=c.participants.find(uid=>uid!==player);
-    const totals={for:Object.fromEntries(types.map(type=>[type,0])),against:Object.fromEntries(types.map(type=>[type,0]))};
-    for(const game of games)for(const round of game.rounds||[]){
-      if(!types.includes(round.finish)||!Number.isFinite(round.points))continue;
-      if(round.winnerUid===player)totals.for[round.finish]+=round.points;
-      else if(round.winnerUid===opponent)totals.against[round.finish]+=round.points;
-    }
-    const totalFor=types.reduce((sum,type)=>sum+totals.for[type],0),totalAgainst=types.reduce((sum,type)=>sum+totals.against[type],0);
+    const player=c.participants[radarPlayer]||c.participants[0],stats=roomPlayerStats(c,games,player);
+    const totals={for:stats.attack,against:stats.defense},totalFor=stats.totalFor,totalAgainst=stats.totalAgainst;
     const axes=[['極限','for','extreme'],['擊飛','for','knockout'],['爆裂','for','burst'],['轉停','for','spin'],['被極限','against','extreme'],['被擊飛','against','knockout'],['被爆裂','against','burst'],['被轉停','against','spin']];
     const shares=axes.map(([,side,type])=>{const total=side==='for'?totalFor:totalAgainst;return total?Math.round(totals[side][type]/total*100):0;});
     const shell=document.createElement('div');shell.className='license-radar';
@@ -138,7 +160,7 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
     const center=document.createElementNS(ns,'text');center.setAttribute('x','160');center.setAttribute('y','164');center.setAttribute('class','radar-center');center.textContent='50% 分布＝滿格';svg.append(center);
     shell.append(svg);
     axes.forEach(([label,side],index)=>{const axis=document.createElement('span');axis.className='radar-label radar-label-'+index+(side==='against'?' loss':'');axis.textContent=label;const value=document.createElement('b');value.textContent=shares[index]+'%';axis.append(value);shell.append(axis);});
-    const note=document.createElement('p');note.className='radar-note';note.textContent='進攻四軸為本人各種得分占總得分的比例；防守四軸為對手各種得分占本人總失分的比例。數字是真實百分比，圖形以 50% 占比為滿格。僅分析本房已完成場次。';
+    const note=document.createElement('p');note.className='radar-note';note.textContent='戰型與攻防分布依本房得失分明細計算；得分效率＝本人得分÷雙方總得分。進攻四軸各占本人總得分，防守四軸各占本人總失分。圖形以 50% 占比為滿格。評價與建議只反映本輪對練，無法判定發射技術、陀螺配置優劣或整體實力。';
     container.append(tabs,shell,note);
   }
   function clearHistory(){historyEpoch++;historyRequest?.abort();historyRequest=null;historyCompletion=null;select('.history-list').replaceChildren();select('.history-stats').replaceChildren();select('.history-status').textContent='';}
