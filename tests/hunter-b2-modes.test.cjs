@@ -71,7 +71,9 @@ test('license uses standard records while XP continues to include all connected 
  const isolated=c.hunterBuildAnalysis(c.hunterFilterByMode(mixed,'standard'));
  assert.equal(isolated.overall,92);assert.equal(isolated.matches,3);assert.ok(c.hunterBuildGrowth(mixed).xp>c.hunterBuildGrowth(rows).xp);
  assert.equal(c.hunterLicenseGrade(isolated,c.hunterBuildGrowth(rows).level).score,original.score);
- assert.match(core,/const careerAnalysis=hunterBuildAnalysis\(hunterFilterByMode\(allRecords,"standard"\)\);/);
+ const overview=c.hunterLicenseOverview(mixed,c.hunterBuildAnalysis);
+ assert.equal(overview.analysis.overall,92);assert.equal(overview.analysis.matches,3);
+ assert.equal(overview.growth.xp,c.hunterBuildGrowth(mixed).xp);
  // Exercise the actual click handler with its real target contract.
  const a=core.indexOf('  if(action==="hunter-battle-filter")'),b=core.indexOf('  if(action==="hunter-overview-period")',a);
  c.target={getAttribute:()=> 'enchantment'};c.renderPreservingScroll=()=>c.rendered=true;c.action='hunter-battle-filter';

@@ -536,3 +536,10 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .hunter-strength-research>summary{cursor:pointer;line-height:1.6}
 .hunter-strength-research-body{margin-top:12px}
 .hunter-research-metrics{font-size:12px;line-height:1.7;margin:12px 0;overflow-wrap:anywhere}
+
+/* B6 career grade explanation and simultaneous next-rank gates. */
+.hunter-grade-next,.hunter-grade-comparison{padding:10px;border:1px solid rgba(153,167,188,.22);border-radius:10px;line-height:1.6}
+.hunter-grade-next ul{list-style:none;margin:8px 0 0;padding:0}
+.hunter-grade-next li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding:5px 0}
+.hunter-grade-next li small{grid-column:1/-1}
+.hunter-grade-comparison,.hunter-grade-detail .hunter-analysis-meta{overflow-wrap:anywhere}
