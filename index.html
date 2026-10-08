@@ -132,7 +132,7 @@
   try{
     var uid=localStorage.getItem("bxh.interface.theme.entrance.uid.v1");
     var saved=uid&&localStorage.getItem("bxh.interface.theme.account.v1."+uid);
-    if(saved==="directive"||saved==="three-gods"||saved==="hunter"||saved==="akatsuki"||saved==="clow")theme=saved;
+    if(saved==="directive"||saved==="three-gods"||saved==="hunter"||saved==="akatsuki"||saved==="clow"||saved==="zeon")theme=saved;
   }catch(e){}
   document.documentElement.setAttribute("data-bxh-theme",theme);
 })();
@@ -153,6 +153,7 @@
 <link rel="stylesheet" href="client-entrance-theme.css?v=2.0.17-directive-warning">
 <link id="directive-warning-critical-v1" rel="stylesheet" href="modules/theme-directive/styles.css?v=20261002-m2-2">
 <link id="three-gods-theme-v1" rel="stylesheet" href="modules/theme-three-gods/styles.css?v=20261008.1">
+<link id="zeon-theme-v1" rel="stylesheet" href="modules/theme-zeon/styles.css?v=20261008.1">
 <link id="clow-theme-v1" rel="stylesheet" href="modules/theme-clow/styles.css?v=20261008.1">
 <link id="akatsuki-theme-v1" rel="stylesheet" href="modules/theme-akatsuki/styles.css?v=20261008.1">
 <link id="hunter-theme-v1" rel="stylesheet" href="modules/theme-hunter/styles.css?v=20261008.1">
@@ -213,11 +214,11 @@
 <script id="bxh-mailbox-p2a" src="modules/main-app/mailbox.js?v=20261005-inline-mail-1"></script>
 <script id="bxh-mood-p2b" src="modules/main-app/mood-station.js?v=20261002-p2b-1"></script>
 <script id="bxh-card-album-p2c" src="modules/main-app/card-album.js?v=20261003-card-album-entry-1"></script>
-<script id="bxh-community-host-p2d" src="modules/main-app/community-host.js?v=20261004-room-cleanup-1&quick-registration=20261006.6&room-retention=20261007-24h&client-cleanup=disabled-20261007.3&court-retirement=20261007-2&three-gods=20261008.1&hunter=20261008.1&akatsuki=20261008.1&clow=20261008.1"></script>
+<script id="bxh-community-host-p2d" src="modules/main-app/community-host.js?v=20261004-room-cleanup-1&quick-registration=20261006.6&room-retention=20261007-24h&client-cleanup=disabled-20261007.3&court-retirement=20261007-2&three-gods=20261008.1&hunter=20261008.1&akatsuki=20261008.1&clow=20261008.1&zeon=20261008.1"></script>
 <script id="bxh-player-cards-p2e" src="modules/main-app/player-cards.js?v=20261002-p2e-1"></script>
 <script id="bxh-double-elim-core-v1" src="double-elimination-core.js?v=20261003-de1"></script>
 <script src="modules/main-app/court-retirement.js?v=20261007-2"></script>
-<script id="bxh-main-app-m7" src="modules/main-app/core.js?v=20261006-roster-promotion-1&roster-sync=2&auto-fill=1&registration=20261006-1&install-entry=20261005-1&inline-mail=20261005-1&management-load=20261006.5&header-title=row-3&quick-registration=20261006.6&community-roster=20261007.3&room-retention=20261007-24h&staff-names=20261008-5&live-court-switch=20261008.2&court-retirement=20261007-2&three-gods=20261008.1&hunter=20261008.1&akatsuki=20261008.1&clow=20261008.1"></script>
+<script id="bxh-main-app-m7" src="modules/main-app/core.js?v=20261006-roster-promotion-1&roster-sync=2&auto-fill=1&registration=20261006-1&install-entry=20261005-1&inline-mail=20261005-1&management-load=20261006.5&header-title=row-3&quick-registration=20261006.6&community-roster=20261007.3&room-retention=20261007-24h&staff-names=20261008-5&live-court-switch=20261008.2&court-retirement=20261007-2&three-gods=20261008.1&hunter=20261008.1&akatsuki=20261008.1&clow=20261008.1&zeon=20261008.1"></script>
 <script id="bxh-public-watch-isolation" src="modules/main-app/public-watch-isolation.js?v=20261005-captain-isolation-1"></script>
 <script id="bxh-c6bata-rescue-v1" src="modules/main-app/c6bata-rescue.js?v=20261003-c6bata-rescue1"></script>
 
