@@ -1,0 +1,51 @@
+/* 庫洛魔法使 skin, scoped to the account theme. */
+.clow-portrait,.clow-seal-layer,.clow-character-name{display:none}
+:root[data-bxh-theme="clow"]{
+  --accent-color:#e6be68;--accent-rgb:230,190,104;
+  --accent-glow:rgba(230,190,104,.28);--accent-soft:rgba(230,190,104,.11);
+  --accent-border:rgba(230,190,104,.42);--accent-contrast:#101b30;
+  --glass-surface:rgba(10,20,39,.65);--glass-surface-strong:rgba(10,20,39,.87);
+}
+:root[data-bxh-theme="clow"] .auth-shell{background:linear-gradient(180deg,rgba(6,8,14,.10),rgba(4,10,25,.26) 55%,rgba(6,8,14,.15)),url('../../assets/clow/tomoeda-night.webp') center top/cover no-repeat,#120b23}
+:root[data-bxh-theme="clow"] .landing-tagline-brand{color:#ffe49c;text-shadow:0 0 16px #f0c56377}
+:root[data-bxh-theme="clow"] .auth-brand-header::after{content:"庫洛魔法使";display:block;color:#ffe3a0;letter-spacing:.27em;margin-top:12px;font-size:15px}
+:root[data-bxh-theme="clow"] .landing-role-cards{grid-template-columns:1fr;gap:13px;max-width:540px;margin:24px auto 0}
+:root[data-bxh-theme="clow"] .role-card{--clow-tone:#ffc3df;position:relative;isolation:isolate;overflow:hidden;min-height:180px!important;border:1px solid var(--clow-tone)!important;border-radius:18px!important;background:#1b102b!important;box-shadow:0 0 22px color-mix(in srgb,var(--clow-tone) 17%,transparent)}
+:root[data-bxh-theme="clow"] .role-card-player{--clow-tone:#9fe3c3}
+:root[data-bxh-theme="clow"] .role-card-guest{--clow-tone:#c9baff}
+:root[data-bxh-theme="clow"] .directive-portrait{display:none!important}
+:root[data-bxh-theme="clow"] .clow-portrait{display:block;position:absolute;inset:0 0 0 auto;width:72%;max-width:280px;z-index:-1;background-image:linear-gradient(90deg,#120b23bf,transparent 76%),url('../../assets/clow/entrance-battle-atlas.webp');background-size:100% 100%,300% auto;background-position:center,left center;background-repeat:no-repeat}
+:root[data-bxh-theme="clow"] .role-card-player .clow-portrait{background-position:center,center center}
+:root[data-bxh-theme="clow"] .role-card-guest .clow-portrait{background-position:center,right center}
+:root[data-bxh-theme="clow"] .role-card::before{content:"櫻";position:absolute;left:24px;top:40px;font-size:58px;font-weight:900;line-height:1.1;color:var(--clow-tone);text-shadow:0 0 18px var(--clow-tone);pointer-events:none}
+:root[data-bxh-theme="clow"] .role-card-player::before{content:"狼"}
+:root[data-bxh-theme="clow"] .role-card-guest::before{content:"知"}
+:root[data-bxh-theme="clow"] .role-card-inner{position:relative;display:flex!important;align-items:flex-start;flex-direction:column;min-height:180px!important;padding:28px 16px 46px 110px!important;gap:5px}
+:root[data-bxh-theme="clow"] .role-card-icon{display:none!important}
+:root[data-bxh-theme="clow"] .role-card-cn{color:var(--clow-tone)!important;font-size:20px}
+:root[data-bxh-theme="clow"] .clow-character-name{display:block;align-self:flex-start!important;width:auto!important;max-width:100%;margin:0!important;text-align:left!important;color:#f7f6e9;font-size:13px;font-weight:700;letter-spacing:.15em;text-shadow:0 1px 5px #120921}
+:root[data-bxh-theme="clow"] .role-card-en{display:none!important}
+:root[data-bxh-theme="clow"] .landing-role-cards .role-card-cn{align-self:flex-start!important;text-shadow:0 1px 5px #120921}
+:root[data-bxh-theme="clow"] .role-card-desc{color:#f2f7ef!important;font-size:11px;max-width:174px;line-height:1.5;text-shadow:0 1px 4px #000}
+:root[data-bxh-theme="clow"] .role-card-assist{display:none}
+:root[data-bxh-theme="clow"] .role-card-enter{position:absolute;bottom:0;left:0;width:100%;height:34px;display:grid;place-items:center;margin:0!important;opacity:1;color:var(--clow-tone)!important;background:#140b22dc;border-top:1px solid color-mix(in srgb,var(--clow-tone) 42%,transparent)}
+:root[data-bxh-theme="clow"] .role-card:focus-visible{outline:2px solid var(--clow-tone);outline-offset:4px}
+:root[data-bxh-theme="clow"] header.topbar{position:relative;isolation:isolate;overflow:hidden;background:#0a1427!important}
+:root[data-bxh-theme="clow"] header.topbar .clow-seal-layer{display:block;position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('../../assets/clow/kero-guardian.webp') right center/auto 100% no-repeat;opacity:.92;animation:clow-license-glow 3.6s ease-in-out infinite}
+:root[data-bxh-theme="clow"] header.topbar::before{content:"";position:absolute;left:-58%;bottom:0;width:58%;height:3px;pointer-events:none;background:linear-gradient(90deg,transparent,#b98931,#ffe5ba,transparent);box-shadow:0 0 12px #e6be6891;animation:clow-license-rail 3.6s linear infinite}
+@keyframes clow-license-rail{to{transform:translateX(275%)}}
+@keyframes clow-license-glow{0%,100%{opacity:.82}50%{opacity:1}}
+@media(max-width:400px){:root[data-bxh-theme="clow"] .role-card-inner{padding-left:98px!important}:root[data-bxh-theme="clow"] .role-card::before{left:20px;font-size:54px}:root[data-bxh-theme="clow"] .role-card-desc{max-width:145px;font-size:10px}}
+@media(prefers-reduced-motion:reduce){:root[data-bxh-theme="clow"] header.topbar::before,:root[data-bxh-theme="clow"] .clow-seal-layer{animation:none!important}}
+
+/* Tomoeda magical cherry blossom scene behind the entrance cards. */
+:root[data-bxh-theme="clow"] .auth-wm,:root[data-bxh-theme="clow"] .auth-beams,:root[data-bxh-theme="clow"] .auth-particles{display:none}
+:root[data-bxh-theme="clow"] .auth-shell::after{position:absolute;background:linear-gradient(90deg,rgba(3,4,10,.18),transparent 35%,transparent 65%,rgba(3,4,10,.18));animation:none}
+:root[data-bxh-theme="clow"] .auth-brand-header{padding-top:60px;margin-bottom:18px}
+:root[data-bxh-theme="clow"] .auth-brand-header .celeb-brand{color:#fff2ce;text-shadow:0 2px 8px #040917,0 0 26px #e7bf6388}
+:root[data-bxh-theme="clow"] .auth-brand-header::after{color:#ffe3a0;text-shadow:0 2px 7px #05050b;letter-spacing:.45em}
+:root[data-bxh-theme="clow"] .auth-tagline,:root[data-bxh-theme="clow"] .auth-footnote{color:#e9e3d2;text-shadow:0 1px 5px #000}
+:root[data-bxh-theme="clow"] .role-card{box-shadow:0 0 6px color-mix(in srgb,var(--clow-tone) 50%,transparent),0 0 22px color-mix(in srgb,var(--clow-tone) 23%,transparent),0 12px 26px #0008}
+:root[data-bxh-theme="clow"] .landing-home>.btn-row .btn-primary{background:linear-gradient(135deg,#c99638,#f0d18a)!important;border:1px solid #ffe0b2!important;color:#182035!important;box-shadow:0 0 15px #e4b75955}
+:root[data-bxh-theme="clow"] .landing-home>.btn-row .btn-ghost{background:#0a0b13c9!important;border:1px solid #9593a266!important;color:#eae4ee!important}
+@media(min-width:700px){:root[data-bxh-theme="clow"] .auth-shell{background-size:cover;background-position:center 28%}:root[data-bxh-theme="clow"] .auth-brand-header{padding-top:24px}}
