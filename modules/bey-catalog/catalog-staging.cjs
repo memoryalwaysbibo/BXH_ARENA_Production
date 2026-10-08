@@ -27,7 +27,7 @@ function planStaging(batch){
 async function applyEmulatorStaging(plan,adapter,target){
  assertIsolatedTarget(target);
  assert(plan?.mode==='DRY_RUN'&&plan.productionWritable===false&&plan.autoPublish===false,'PLAN_NOT_SAFE');
- assert(adapter&&typeof adapter.get==='function'&&typeof adapter.put==='function','ADAPTER_REQUIRED');
+ assert(adapter&&adapter.emulatorOnly===true&&typeof adapter.get==='function'&&typeof adapter.put==='function','EMULATOR_ADAPTER_REQUIRED');
  let inserted=0,unchanged=0,conflicts=0;
  for(const r of plan.records){assert(allowedCollections.includes(r.collection),'COLLECTION_NOT_ALLOWED');const old=await adapter.get(r.collection,r.id);if(old){if(old.sha256===r.sha256)unchanged++;else conflicts++;continue;}
  await adapter.put(r.collection,r.id,{sha256:r.sha256,origin:'research_staging',batchId:plan.batchId,payload:r.data,publicationStatus:'unpublished'});inserted++;}
