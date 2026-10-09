@@ -43,10 +43,12 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   await a.locator('[data-op=confirmFinish]').click();await a.locator('#match[data-stage=completed]').waitFor({timeout:8000});await b.locator('#match[data-stage=completed]').waitFor({timeout:8000});
   await a.waitForFunction(()=>BXHArenaPK.state().status==='ready');assert.equal(await a.evaluate(()=>BXHArenaPK.state().records.length),1);
   await a.evaluate(()=>fixture.shell());assert.equal(await a.locator('#match[data-stage=completed]').count(),1);
-  await a.getByRole('button',{name:'獵人檔案',exact:true}).click();assert.match(await a.locator('#license').innerText(),/黑爸 vs 大黑 4:0/);assert.equal(await a.locator('#app').count(),0);
-  await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('#match[data-stage=completed]').waitFor();
   await a.locator('.room-analysis summary').click();
   for(const width of [320,390,430,1024]){assert.equal(await a.locator('.room-stat').count(),1);await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await a.locator('img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)),true);}
+  await a.getByRole('button',{name:'獵人檔案',exact:true}).click();assert.match(await a.locator('#license').innerText(),/黑爸 vs 大黑 4:0/);assert.equal(await a.locator('#app').count(),0);
+  await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('[data-op=createChallenge]').waitFor({state:'visible'});
+  assert.equal(await a.locator('.recovery-panel').isVisible(),false);
+  assert.equal(await a.evaluate(()=>sessionStorage.getItem('arena-pk:mobile:last:a')||localStorage.getItem('arena-pk:mobile:last:a')),null);
   // Five-game analysis fixture verifies that the same selector controls the radar.
   const finished=(await service.run('b','getChallenge',{challengeId:qr.challengeId})).challenge;
   const analysisRoom={...finished,challengeId:'analysis-fixture',gameNumber:5,games:Array.from({length:4},(_,i)=>({number:i+1,score:finished.score,winnerUid:finished.winnerUid,rounds:finished.rounds}))};
