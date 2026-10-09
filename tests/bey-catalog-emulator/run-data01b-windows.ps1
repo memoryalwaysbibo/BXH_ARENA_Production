@@ -1,5 +1,5 @@
 # DB-01 197-record acceptance on Windows, without merging or deploying ARENA.
-param([switch]$PreflightOnly)
+param([switch]$PreflightOnly, [switch]$InstallJava)
 # Run from a private folder alongside catalog-research.json.
 # Requires Node.js 22, Java 21, Git and npm internet access.
 $ErrorActionPreference = "Stop"
@@ -39,6 +39,27 @@ if ($PreflightOnly) {
   if ($total -ne 197) { throw "DATA01B_EXPECTED_197" }
   Write-Host "PASS: genuine DATA-01B original SHA-256, 197 records, 9 sections and safe flags." -ForegroundColor Green
   Write-Host "PREFLIGHT_ONLY: no Java, Node, Git, npm or Firestore writes required." -ForegroundColor Yellow
+  return
+}
+
+# Explicit opt-in installer. Never installs anything during normal or offline runs.
+if ($InstallJava) {
+  $java21Available = $false
+  if (Get-Command "java" -ErrorAction SilentlyContinue) {
+    $installedVersion = (& cmd.exe /d /c "java -version 2>&1" | Out-String)
+    $java21Available = $installedVersion -match '(?:version |openjdk )"?21(?:[.+-]|")'
+  }
+  if ($java21Available) {
+    Write-Host "Java 21 already available. No installation required." -ForegroundColor Green
+    return
+  }
+  if (-not (Get-Command "winget" -ErrorAction SilentlyContinue)) {
+    throw "WINGET_REQUIRED: install Eclipse Temurin JDK 21 manually from https://adoptium.net/temurin/releases/?version=21"
+  }
+  Write-Host "Installing Eclipse Temurin JDK 21 using winget (may prompt for Windows permission)." -ForegroundColor Cyan
+  & winget install --id EclipseAdoptium.Temurin.21.JDK --exact --source winget --accept-package-agreements --accept-source-agreements
+  if ($LASTEXITCODE -ne 0) { throw "JAVA_INSTALL_FAILED: winget exited $LASTEXITCODE. No Emulator write attempted." }
+  Write-Host "Java installer completed. Close this terminal, open a new PowerShell window, run java -version, then rerun without -InstallJava." -ForegroundColor Yellow
   return
 }
 
