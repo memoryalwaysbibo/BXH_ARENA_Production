@@ -9,6 +9,11 @@ const {parseRequest}=require('./catalog-tw08-read-gateway.cjs');
 const MAX_BODY_BYTES=4096;
 const ALLOWED_FIELDS=new Set(['filter','query','limit','cursor']);
 function errorStatus(error){
+ // Admin SDK rejects invalid/revoked/disabled credentials with stable error codes.
+ // Operational failures still return 503; never expose SDK messages or tokens.
+ if(['auth/argument-error','auth/invalid-id-token','auth/id-token-expired',
+     'auth/id-token-revoked','auth/user-disabled','auth/user-not-found'].includes(error?.code))
+  return [401,'UNAUTHENTICATED'];
  const code=String(error?.message||'');
  if(['TW12_CREDENTIALS_REQUIRED','TW12_VERIFIED_USER_REQUIRED','TOKEN_REVOKED'].includes(code))return [401,'UNAUTHENTICATED'];
  if(['TW12_APP_CHECK_DENIED','INVALID_APP_CHECK'].includes(code))return [403,'APP_CHECK_DENIED'];

@@ -1,11 +1,13 @@
 'use strict';
 /** Private DATA-01B -> real Firestore Emulator -> Taiwan review HTTP adapter.
- * Auth/App Check and onRequest are explicit test doubles, not deployed services.
+ * --real-auth uses Firebase Auth Emulator; default Auth is a test double.
+ * App Check and onRequest remain explicit test doubles, not deployed services.
  * No fixture contents are printed or committed. No production initialization.
  */
 const fs=require('node:fs'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {initializeTestEnvironment}=require('@firebase/rules-unit-testing');
 const {initializeApp,deleteApp}=require('firebase-admin/app');
+const {getAuth}=require('firebase-admin/auth');
 const {getFirestore,Timestamp,FieldValue}=require('firebase-admin/firestore');
 const {planStaging}=require('../../modules/bey-catalog/catalog-staging.cjs');
 const {resumeEmulatorBatch,manifestDigest}=require('../../modules/bey-catalog/catalog-emulator-batch.cjs');
@@ -31,8 +33,9 @@ function readPrivateFixture(){
  assert.equal(plan.recordCount,197);assert.equal(manifestDigest(plan),EXPECTED_MANIFEST);
  return {file,raw,base,plan};
 }
-async function main(){
+async function main({realAuth=false}={}){
  if(process.env.FIRESTORE_EMULATOR_HOST!==target.emulatorHost)throw Error('LOCAL_EMULATOR_REQUIRED');
+ if(realAuth&&process.env.FIREBASE_AUTH_EMULATOR_HOST!=='127.0.0.1:9098')throw Error('LOCAL_AUTH_EMULATOR_REQUIRED');
  const {file,raw,base,plan}=readPrivateFixture();
  const env=await initializeTestEnvironment({projectId:target.projectId,firestore:{host:'127.0.0.1',port:8189}});
  const app=initializeApp({projectId:target.projectId},'data01b-taiwan-real');
@@ -40,7 +43,22 @@ async function main(){
  const actor='data01b_tw_admin',player='data01b_tw_player';
  const secret='data01b-taiwan-emulator-only-audit-key';
  let researchLoads=0;
+ let adminToken='admin-test-token',playerToken='player-test-token',anonymousToken;
+ const auth=realAuth?getAuth(app):null;
  try{
+  if(realAuth){
+   assert.equal((await auth.listUsers()).users.length,0,'clean Auth Emulator required');
+   const password='Emulator-only-password-20261009';
+   async function authPost(method,body){
+    const r=await fetch('http://127.0.0.1:9098/identitytoolkit.googleapis.com/v1/accounts:'+method+'?key=emulator-only',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    assert.equal(r.status,200,'Auth Emulator REST login');return r.json();
+   }
+   for(const uid of [actor,player])await auth.createUser({uid,email:uid+'@example.invalid',password});
+   adminToken=(await authPost('signInWithPassword',{email:actor+'@example.invalid',password,returnSecureToken:true})).idToken;
+   playerToken=(await authPost('signInWithPassword',{email:player+'@example.invalid',password,returnSecureToken:true})).idToken;
+   anonymousToken=(await authPost('signUp',{returnSecureToken:true})).idToken;
+   assert.equal((await auth.verifyIdToken(adminToken,true)).uid,actor);
+  }
   for(const collection of [...Object.values(sections).map(s=>s[0]),'beyCatalogImportRuns','users','beyCatalogTw15Quota','beyCatalogTw15Audit'])assert.equal((await db.collection(collection).get()).size,0,'clean Emulator required');
   await env.withSecurityRulesDisabled(async ctx=>{
    const imported=await resumeEmulatorBatch(ctx.firestore(),target,plan);
@@ -81,11 +99,11 @@ async function main(){
   const guards=createTw15AdminEmulatorGuards({db,target,Timestamp,FieldValue,secret,clock:()=>WINDOW_MS*99002});
   const dependencies={allowedAppIds:['data01b-test-app'],
    adminAppCheck:{verifyToken:async token=>{if(token!=='test-app')throw Error('INVALID_APP_CHECK');return {appId:'data01b-test-app'};}},
-   adminAuth:{verifyIdToken:async(token,revoked)=>{assert.equal(revoked,true);assert(['admin-test-token','player-test-token'].includes(token));return {uid:token==='admin-test-token'?actor:player,firebase:{sign_in_provider:'password'}};}},
+   adminAuth:auth||{verifyIdToken:async(token,revoked)=>{assert.equal(revoked,true);assert(['admin-test-token','player-test-token'].includes(token));return {uid:token==='admin-test-token'?actor:player,firebase:{sign_in_provider:'password'}};}},
    adminFirestore:db,loadResearchBatch:async()=>{researchLoads++;return applyTw05ColorLabels(deriveTaiwanTw04(await loadStoredOriginal()));},
    consumeRateLimit:guards.consumeRateLimit,recordAudit:guards.recordAudit};
   const handler=createTw13HttpV2Handler({onRequest:(options,fn)=>fn,dependencies,allowedOrigins:['https://arena.bxh.com.tw']});
-  async function request(body={},token='admin-test-token',appToken='test-app'){
+  async function request(body={},token=adminToken,appToken='test-app'){
    const response={headers:{},set(k,v){this.headers[k]=v;return this;},status(code){this.code=code;return this;},json(body){this.body=body;return this;},send(body){this.body=body;return this;}};
    await handler({method:'POST',headers:{origin:'https://arena.bxh.com.tw','content-type':'application/json',authorization:'Bearer '+token,'x-firebase-appcheck':appToken},body},response);
    return response;
@@ -102,8 +120,22 @@ async function main(){
   const p0=await request({filter:'P0',limit:10});assert.equal(p0.code,200);assert.equal(p0.body.items.length,5);
   assert.equal((await request()).code,429);
   assert.equal(researchLoads,5);
-  assert.equal((await request({},'player-test-token')).code,403);assert.equal(researchLoads,5);
-  assert.equal((await request({},'admin-test-token','bad-app')).code,403);assert.equal(researchLoads,5);
+  assert.equal((await request({},playerToken)).code,403);assert.equal(researchLoads,5);
+  assert.equal((await request({},adminToken,'bad-app')).code,403);assert.equal(researchLoads,5);
+  if(realAuth){
+   assert.equal((await request({},anonymousToken)).code,401,'anonymous ID token');
+   assert.equal((await request({},'not-a-valid-jwt')).code,401,'malformed ID token');
+   const pieces=adminToken.split('.');
+   const claims=JSON.parse(Buffer.from(pieces[1],'base64url'));
+   const invalidAudience=[pieces[0],Buffer.from(JSON.stringify({...claims,aud:'demo-other-project'})).toString('base64url'),pieces[2]].join('.');
+   assert.equal((await request({},invalidAudience)).code,401,'wrong audience');
+   await auth.updateUser(player,{disabled:true});
+   assert.equal((await request({},playerToken)).code,401,'disabled account');
+   await new Promise(resolve=>setTimeout(resolve,1200));
+   await auth.revokeRefreshTokens(actor);
+   assert.equal((await request({},adminToken)).code,401,'revoked ID token');
+   assert.equal(researchLoads,5,'denied auth must not load research');
+  }
   const audits=await db.collection('beyCatalogTw15Audit').get();
   const hash=uid=>crypto.createHmac('sha256',secret).update('actor\0'+uid).digest('hex');
   assert.equal(audits.docs.filter(d=>d.data().actorHash===hash(actor)&&d.data().outcome==='preview').length,5);
@@ -111,7 +143,8 @@ async function main(){
   assert(audits.docs.every(d=>d.data().emulatorOnly===true&&d.data().recordedAt instanceof Timestamp));
   assert.deepEqual(await loadStoredOriginal(),originalSnapshot);
   assert.deepEqual(fs.readFileSync(file),raw);
-  console.log(JSON.stringify({batchId:base.batchId,originalSha256:EXPECTED_SHA,manifestDigest:EXPECTED_MANIFEST,verifiedDocuments:197,reviewQueue:queue.summary,paginatedItems:seen.length,adminRequests:5,rateLimitStatus:429,playerStatus:403,researchLoads,originalPreserved:true,published:0,cloudWrites:0,emulator:true,auth:'test-double',appCheck:'test-double',http:'in-process-handler'}));
+  console.log(JSON.stringify({batchId:base.batchId,originalSha256:EXPECTED_SHA,manifestDigest:EXPECTED_MANIFEST,verifiedDocuments:197,reviewQueue:queue.summary,paginatedItems:seen.length,adminRequests:5,rateLimitStatus:429,playerStatus:403,researchLoads,originalPreserved:true,published:0,cloudWrites:0,emulator:true,auth:realAuth?'firebase-auth-emulator':'test-double',authCases:realAuth?['login','anonymous','malformed','wrong-audience','disabled','revoked']:[],appCheck:'test-double',http:'in-process-handler'}));
  }finally{await deleteApp(app);await env.cleanup();}
 }
-main().catch(e=>{console.error(e);process.exitCode=1;});
+if(require.main===module)main({realAuth:process.argv.includes('--real-auth')}).catch(e=>{console.error(e);process.exitCode=1;});
+module.exports={main};

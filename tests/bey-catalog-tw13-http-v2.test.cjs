@@ -1,7 +1,13 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {createTw13HttpV2Handler}=require('../modules/bey-catalog/catalog-tw13-http-v2.cjs');
+const {createTw13HttpV2Handler,errorStatus}=require('../modules/bey-catalog/catalog-tw13-http-v2.cjs');
 const SECTIONS=['sources','products','parts','variants','colors','options','assemblyClaims','contentClaims','issues'];
+test('real Admin Auth credential errors return 401 without leaking SDK details',()=>{
+ for(const code of ['auth/argument-error','auth/invalid-id-token','auth/id-token-expired','auth/id-token-revoked','auth/user-disabled','auth/user-not-found'])
+  assert.deepEqual(errorStatus({code,message:'private SDK diagnostic'}),[401,'UNAUTHENTICATED']);
+ for(const code of ['auth/network-request-failed','auth/invalid-credential','unknown'])
+  assert.deepEqual(errorStatus({code,message:'private service diagnostic'}),[503,'SERVICE_UNAVAILABLE']);
+});
 function research(){
  const b={batchId:'DATA-01B-20261009-ZHTW-TW05',productionWritable:false,autoPublish:false,
   sources:[],products:[],parts:[],variants:[],colors:[],options:[],assemblyClaims:[],contentClaims:[],issues:[]};
