@@ -17,11 +17,14 @@ function buildTw06ReviewQueue(batch){
   if(p.localizationStatus==='provisional_translation')add('products',p.productId,'TAIWAN_PRODUCT_NAME_PENDING','P1','需台灣正式商品名稱證據');
  }
  for(const p of batch.parts){
-  if(p.localizationStatus==='taiwan_name_pending')add('parts',p.partId,'TAIWAN_PART_NAME_PENDING','P1','需原廠或台灣正式零件名稱證據');
+  if(['taiwan_name_pending','provisional_translation'].includes(p.localizationStatus))add('parts',p.partId,'TAIWAN_PART_NAME_PENDING','P1','需原廠或台灣正式零件名稱證據');
+  if(p.verificationStatus==='supplier_pending')add('parts',p.partId,'PART_SOURCE_PENDING','P1','零件來源仍為商家資料，須確認原廠零件規格');
  }
  for(const g of batch.assemblyClaims){
   if(g.requiresManufacturerCompositionReview===true||g.verificationStatus==='supplier_pending')
    add('assemblyClaims',g.groupId,'ORIGINAL_COMPOSITION_PENDING','P0','商家來源或交叉佐證不足，須補原廠包裝／說明書');
+  if(g.localizationStatus==='taiwan_name_pending_supplier_source')
+   add('assemblyClaims',g.groupId,'ASSEMBLY_TAIWAN_NAME_PENDING','P1','原配中文名稱尚無台灣正式證據');
   if(g.localizationStatus==='needs_original_kit_recheck')
    add('assemblyClaims',g.groupId,'ORIGINAL_KIT_RECHECK','P0','原配 BOM 更正須核對原廠來源與修正歷程');
  }
