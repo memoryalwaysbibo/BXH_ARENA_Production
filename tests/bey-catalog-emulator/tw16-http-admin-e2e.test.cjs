@@ -27,7 +27,7 @@ function syntheticBatch(){
 }
 const actor='tw16_root_admin',guest='tw16_player';
 const secret='tw16-emulator-only-fixed-test-key-20261009';
-const actorHash=uid=>crypto.createHmac('sha256',secret).update('actor\\0'+uid).digest('hex');
+const actorHash=uid=>crypto.createHmac('sha256',secret).update('actor\0'+uid).digest('hex');
 const guards=createTw15AdminEmulatorGuards({db,target,Timestamp,FieldValue,
  secret,
  clock:()=>WINDOW_MS*99001});
