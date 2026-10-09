@@ -9,9 +9,9 @@ test('Windows local runner pins branch, original SHA and demo project',()=>{
  assert.match(ps1,/DATA01B_SHA256_MISMATCH/);
 });
 test('runner checks final 197 docs and manual correction preservation',()=>{
- assert.match(ps1,/"verifiedDocuments":197/);
- assert.match(ps1,/"manualCorrectionPreserved":true/);
- assert.match(ps1,/"published":0/);
+ assert.match(ps1,/data01b-verify-receipt\.cjs/);
+ assert.match(ps1,/DB01_RECEIPT_FAILED/);
+ assert.match(ps1,/all four real 197-document Firestore Emulator stages verified/);
  assert.match(ps1,/Get-FileHash/);
  assert.match(ps1,/emulators:exec/);
 });
