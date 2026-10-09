@@ -1,0 +1,52 @@
+name: BEY Catalog DATA-01B Real Emulator Acceptance
+# Manual-only, trusted default-branch workflow. No PR secrets exposure.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-data-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: catalog-integration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install isolated Emulator dependencies
+        run: npm install --no-save --no-package-lock --ignore-scripts firebase@12.4.0 @firebase/rules-unit-testing@5.0.0 firebase-tools@15.30.0
+      - name: Decode private research fixture and verify SHA-256
+        env:
+          DATA01B_GZIP_BASE64: ${{ secrets.BXH_DATA01B_GZIP_BASE64 }}
+          BXH_CATALOG_DATA01B_FILE: ${{ runner.temp }}/catalog-research.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,base64,gzip,hashlib,pathlib
+          encoded=os.environ.get('DATA01B_GZIP_BASE64','')
+          if not encoded:
+              raise SystemExit('Missing private GitHub environment secret BXH_DATA01B_GZIP_BASE64')
+          raw=gzip.decompress(base64.b64decode(encoded,validate=True))
+          expected='2a53b4d0164d97a5f0607b4d4fd8a536a84b388530bca3eb371453f525cb7d42'
+          if hashlib.sha256(raw).hexdigest()!=expected:
+              raise SystemExit('DATA01B_SHA256_MISMATCH')
+          pathlib.Path(os.environ['BXH_CATALOG_DATA01B_FILE']).write_bytes(raw)
+          print('DATA01B private fixture checksum verified; bytes:',len(raw))
+          PY
+      - name: Real 197-record Firestore Emulator interruption and replay
+        env:
+          BXH_CATALOG_DATA01B_FILE: ${{ runner.temp }}/catalog-research.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f "$BXH_CATALOG_DATA01B_FILE"' EXIT
+          npx firebase emulators:exec --only firestore \
+            --project demo-bxh-catalog-db01 \
+            --config tests/bey-catalog-emulator/firebase.json \
+            "node tests/bey-catalog-emulator/data01b-full-import.cjs"
