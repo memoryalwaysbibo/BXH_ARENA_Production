@@ -51,8 +51,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trap 'rm -f "$BXH_CATALOG_DATA01B_FILE"' EXIT
+          receipt="$RUNNER_TEMP/data01b-emulator-receipt.log"
+          trap 'rm -f "$BXH_CATALOG_DATA01B_FILE" "$receipt"' EXIT
           npx firebase emulators:exec --only firestore \
             --project demo-bxh-catalog-db01 \
             --config tests/bey-catalog-emulator/firebase.json \
-            "node tests/bey-catalog-emulator/data01b-full-import.cjs"
+            "node tests/bey-catalog-emulator/data01b-full-import.cjs" | tee "$receipt"
+          node tests/bey-catalog-emulator/data01b-verify-receipt.cjs "$receipt"
