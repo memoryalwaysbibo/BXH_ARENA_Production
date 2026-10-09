@@ -38,3 +38,20 @@ test('PK App Check shares the ARENA app, deduplicates initialization and retries
  await Promise.all([c.ensureHunterClashAppCheck(),c.ensureHunterClashAppCheck()]);
  assert.equal(attempts,2);assert.equal(calls.length,1);assert.equal(calls[0].a,app);assert.equal(calls[0].options.isTokenAutoRefreshEnabled,true);assert.equal(calls[0].options.provider.key,'public-key');
 });
+
+
+test('unfinished recovery hints survive a closed tab, isolate accounts and clear persistent hints on completion',async()=>{
+ const {createRecoveryStore}=await import('../hunter-clash/arena/recovery.mjs');
+ const memoryStorage=()=>{const data=new Map();return {getItem:key=>data.get(key)||null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};};
+ const session=memoryStorage(),persistent=memoryStorage();let recovery=createRecoveryStore({session,persistent});
+ recovery.remember('a',{challengeId:'pk_room',status:'final_pending'});
+ assert.equal(recovery.id('b'),null);
+ recovery=createRecoveryStore({session:memoryStorage(),persistent});assert.equal(recovery.id('a'),'pk_room');
+ recovery.remember('a',{challengeId:'pk_room',status:'completed'});
+ assert.equal(createRecoveryStore({session:memoryStorage(),persistent}).id('a'),null);
+ assert.equal(recovery.id('a'),'pk_room'); // Current tab can still show its completed result.
+ recovery.clear('a');assert.equal(recovery.id('a'),null);
+ const blocked={getItem(){throw Error('blocked');},setItem(){throw Error('blocked');},removeItem(){throw Error('blocked');}};
+ assert.doesNotThrow(()=>createRecoveryStore({session,persistent:blocked}).remember('a',{challengeId:'pk_room',status:'final_pending'}));
+ assert.equal(createRecoveryStore({session,persistent:blocked}).id('a'),'pk_room');
+});
