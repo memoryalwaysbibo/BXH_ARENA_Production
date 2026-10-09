@@ -66,3 +66,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps
 - 新版先檢查 Git remote URL 與分支、已追蹤檔案是否有未保存修改；若有本機修改，直接停止，不覆蓋。
 - 對 Git shallow clone 先 `fetch --unshallow` 取得祖先紀錄，其他 clone 使用一般 fetch；再以 `merge --ff-only FETCH_HEAD` 更新。非快轉、無法下載或版本不明時停止，不會 `reset --hard`、`clean -fd` 或刪除使用者資料。
 - 完成版本確認後才進入私有資料 SHA／Manifest 與 Emulator 真實寫入驗收。這項改善只作用於本機測試 checkout，不觸及正式 ARENA。
+
+## 2026-10-10｜四階段驗收憑證綁定真實來源
+- `data01b-full-import.cjs` 的最後一筆 JSON 驗收憑證新增 `sourceSha256` 與 `manifestDigest`，分別固定原始 DATA-01B 檔案及 197 筆寫入計畫的校驗值。
+- `data01b-verify-receipt.cjs` 除檢查 73 筆中斷、124 筆恢復、197 筆重送、197 筆逐筆比對、9 類資料、人工修正保護及零發布外，也會拒絕缺少／不一致的來源 SHA 與 Manifest。
+- 憑證檢查只是內容一致性驗證，**不能獨立證明日誌來源真實**；最終驗收必須連同受控 Emulator 執行環境、原始 JSON SHA、執行結束碼及原始日誌一併保存。
+- 既有 GitHub CI 的合成資料與 Emulator Safety 測試仍不能替代私有原始 197 筆實際寫入。
