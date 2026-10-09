@@ -5,7 +5,6 @@
  */
 const crypto=require('node:crypto');
 const {createOriginalAssemblyCandidates}=require('./stock-evidence-candidates.cjs');
-const {structuralCheck}=require('./assembly-validator.cjs');
 function digest(v){return crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex');}
 function toRuleDraft(candidate){
  if(!candidate||candidate.status!=='ready_for_human_review'||candidate.scope!=='exact_stock_configuration_only'||candidate.structuralStatus!=='complete')throw Error('CANDIDATE_NOT_READY');
