@@ -60,3 +60,12 @@ test('missing trusted security services and malformed request are rejected',asyn
  await assert.rejects(()=>readTw12CatalogQueue({...args(e),request:{limit:500}}),/TW08_REQUEST_INVALID/);
  assert.deepEqual(e.events,[]);
 });
+
+test('identity changing between quota check and backend read fails closed',async()=>{
+ const d=deps();
+ let count=0;
+ d.dependencies.adminAuth.verifyIdToken=async()=>({uid:++count===1?'admin_1':'other_admin',firebase:{sign_in_provider:'password'}});
+ await assert.rejects(()=>readTw12CatalogQueue(args(d)),/TW12_AUTH_CONTEXT_MISMATCH/);
+ assert(!d.events.includes('research'));
+ assert(!d.events.includes('audit'));
+});
