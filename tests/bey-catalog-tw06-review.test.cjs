@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {makeProposal,firstReview,secondReview,previewCorrection,applyApprovedToDraft,revertDraftCorrection}=require('../modules/bey-catalog/catalog-tw06-review.cjs');
 const SECTIONS=['sources','products','parts','variants','colors','options','assemblyClaims','contentClaims','issues'];
 function fixture(){
- const x={batchId:'DATA-01B-20261009-ZHTW-TW05',productionWritable:false,autoPublish:false,
+ const x={batchId:'DATA-01B-20261009-ZHTW-TW05',batchRevision:7,localizationRevision:5,productionWritable:false,autoPublish:false,
  sources:[],products:[{productId:'product_000001',displayName:'魔導神杖 5-70DB',displayNameZhTW:'魔導神杖 5-70DB',productCode:'UX-03'}],
  parts:[{partId:'part_000001',displayName:'魔導神杖',displayNameZhTW:'魔導神杖',category:'blade',selectable:false}],
  variants:[],colors:[{colorId:'black',displayName:'黑色',displayNameZhTW:'黑色'}],
@@ -71,4 +71,11 @@ test('wrong batch or malformed data cannot be used as a production write',()=>{
  assert.throws(()=>makeProposal({...fixture(),productionWritable:true},change),/TW06_RESEARCH_BATCH_REQUIRED/);
  assert.throws(()=>makeProposal({...fixture(),batchId:'production'},change),/TW06_RESEARCH_BATCH_REQUIRED/);
  assert.throws(()=>makeProposal({...fixture(),issues:[]},change),/TW06_EXPECTED_197/);
+});
+
+test('forged correction payload cannot bypass field allowlist or proposal digest',()=>{
+ const batch=fixture(),p=approved(batch);
+ assert.throws(()=>applyApprovedToDraft(batch,{...p,changes:{partId:'evil'}}),/TW06_FIELD_NOT_ALLOWED/);
+ assert.throws(()=>applyApprovedToDraft(batch,{...p,changes:{displayName:'偽造名稱',displayNameZhTW:'偽造名稱'}}),/TW06_PROPOSAL_TAMPERED/);
+ assert.throws(()=>applyApprovedToDraft(batch,{...p,proposalId:'tw06_forged'}),/TW06_PROPOSAL_TAMPERED/);
 });
