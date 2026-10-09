@@ -6,6 +6,7 @@
  * accept client role claims, deploy, or write Firestore documents.
  */
 const {readTaiwanReviewQueue}=require('./catalog-tw08-read-gateway.cjs');
+const {projectTrustedUserProfile}=require('./catalog-tw11-role-policy.cjs');
 const UID=/^[A-Za-z0-9_-]{2,128}$/;
 function createTw10AdminAdapter({adminAuth,adminFirestore,loadResearchBatch}={}){
  if(!adminAuth||typeof adminAuth.verifyIdToken!=='function'||
@@ -21,9 +22,8 @@ function createTw10AdminAdapter({adminAuth,adminFirestore,loadResearchBatch}={})
    const snap=await adminFirestore.collection('users').doc(uid).get();
    if(!snap.exists)return null;
    const data=snap.data();
-   if(!data||typeof data!=='object')return null;
    // No client-provided role or status is accepted.
-   return {role:data.role,active:data.active===true,isTestAccount:data.isTestAccount===true};
+   return projectTrustedUserProfile(data);
   },
   loadResearchBatch:async()=>{
    const batch=await loadResearchBatch();
