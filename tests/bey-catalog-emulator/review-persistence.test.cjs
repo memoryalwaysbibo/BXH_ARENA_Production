@@ -47,9 +47,26 @@ test('canonical draft mismatch cannot be reviewed',async()=>{
 test('first reviewer role revocation blocks final approval',async()=>{
  const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{
   const db=ctx.firestore();
+  // A unique draft makes this test independent of the earlier finalized review.
+  const revocationDraft={...draft,draftId:'draft_emulator_revocation'};
+  await setDoc(doc(db,'beyCatalogRuleDrafts',revocationDraft.draftId),{
+   draftHash:hash(normalizeDraft(revocationDraft)),
+   reviewStatus:'requires_authorized_source_review',publicationStatus:'unpublished'
+  });
+  const first=await persistReview(opts(db,'admin_a','accept',{draft:revocationDraft}));
+  assert.equal(first.phase,'awaiting_second');
   await setDoc(doc(db,'users','admin_a'),{role:'player',active:true});
-  await assert.rejects(()=>persistReview(opts(db,'admin_b','approve')),/FIRST_REVIEWER_NO_LONGER_AUTHORIZED/);
-  await setDoc(doc(db,'users','admin_a'),{role:'admin',active:true});
+  try{
+   await assert.rejects(
+    ()=>persistReview(opts(db,'admin_b','approve',{draft:revocationDraft})),
+    /FIRST_REVIEWER_NO_LONGER_AUTHORIZED/
+   );
+   const saved=(await getDoc(doc(db,'beyCatalogReviewDrafts',revocationDraft.draftId))).data();
+   assert.equal(saved.phase,'awaiting_second');
+   assert.equal(saved.reviewLog.length,1);
+  }finally{
+   await setDoc(doc(db,'users','admin_a'),{role:'admin',active:true});
+  }
  });
 });
 test('two concurrent first reviews never both commit',async()=>{
