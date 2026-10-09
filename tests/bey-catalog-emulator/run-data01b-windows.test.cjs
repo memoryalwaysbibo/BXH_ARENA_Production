@@ -64,5 +64,6 @@ test('existing checkout fetches latest branch and only fast-forwards clean track
  assert.match(ps1,/CHECKOUT_HAS_LOCAL_CHANGES/);
  assert.match(ps1,/CHECKOUT_FETCH_FAILED/);
  assert.match(ps1,/CHECKOUT_NOT_FAST_FORWARD/);
- assert.doesNotMatch(ps1,/git -C \\$checkout (?:reset --hard|clean -fd)/);
+ assert(!ps1.includes('git -C $checkout reset --hard'));
+ assert(!ps1.includes('git -C $checkout clean -fd'));
 });
