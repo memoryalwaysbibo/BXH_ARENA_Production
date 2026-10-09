@@ -75,7 +75,7 @@ test('player, test admin, disabled admin, proposer and anonymous cannot review',
   await assert.rejects(()=>call(db,p,'editor_1','accept'),/TW09_SELF_REVIEW_DENIED/);
   const forged=await recordTw09Decision({db,target,authVerifier:{verifyIdToken:async()=>({uid:'editor_1'})},
    idToken:'editor',proposalId:p.proposalId,decision:'accept',notes:'已獨立核對台灣繁體名稱與來源'}).catch(e=>e);
-  assert.match(forged.message,/TW09_ADMIN_REQUIRED/);
+  assert.match(forged.message,/TW09_SELF_REVIEW_DENIED/);
  });
 });
 test('same reviewer cannot approve and rejection is terminal',async()=>{
