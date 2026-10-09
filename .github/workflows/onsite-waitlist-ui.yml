@@ -1,0 +1,43 @@
+name: Onsite Waitlist Host UI
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/onsite-waitlist-ui.yml'
+      - 'modules/main-app/onsite-waitlist*'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'tests/onsite-*'
+      - 'tests/fixtures/onsite-backend/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onsite-waitlist-ui-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host_ui:
+    name: Synthetic onsite host lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install existing test dependencies
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Verify production integration contracts
+        run: node --test tests/onsite-production-integration.test.cjs
+      - name: Verify synthetic host cancellation, retry and finalization
+        run: node tests/onsite-host-ui-smoke.cjs
+      - name: Upload synthetic host verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onsite-host-ui-${{ github.run_id }}
+          path: host-ui-results.json
+          if-no-files-found: ignore
+          retention-days: 7

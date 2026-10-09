@@ -24,6 +24,8 @@ function harness(){
  const lifecycleEnd=cloud.indexOf('\n  function ',lifecycleStart+3);
  assert(lifecycleStart>=0&&lifecycleEnd>lifecycleStart);
  vm.runInContext(cloud.slice(lifecycleStart,lifecycleEnd),context);
+ const fenceStart=cloud.indexOf('  function advanceOnsiteWriteFence('),fenceEnd=cloud.indexOf('\n  }',fenceStart)+4;
+ vm.runInContext(cloud.slice(fenceStart,fenceEnd),context);
  vm.runInContext('api={'+['pushUpdate','saveStaffAssignments','saveRefereeStationAssignments'].map(method).join(',\n')+'}',context);
  return {api:context.api,docs,reads,stale,logs,afterCommit:fn=>afterCommit=fn};
 }
@@ -174,3 +176,4 @@ test('legacy self-directory writes preserve admin-enriched names without a rule-
  vm.createContext(context);vm.runInContext('api={'+method('ensureMyStaffDirectory')+'}',context);
  assert.equal((await context.api.ensureMyStaffDirectory()).ok,true);assert.equal(writes,0);
 });
+

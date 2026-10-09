@@ -3205,10 +3205,12 @@ function applyRemoteState(remote, authoritative=false){
     const newerExit=Object.entries(remoteExits).some(([n,c])=>Number(c.revision||0)>Number(localExits[n]?.revision||0));
     if(remoteAppliedRoomId!==remote.id){remoteAppliedRoomId=remote.id;remoteAppliedAt=0;}
     if(!newerExit&&(remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
+    if(Number(remote.onsiteWaitlistRuntimeRevision||0)<Number(state.onsiteWaitlistRuntimeRevision||0))return;
+    const newerRuntime=Number(remote.onsiteWaitlistRuntimeRevision||0)>Number(state.onsiteWaitlistRuntimeRevision||0);
     const localRosterRevision=Number(state.registrationRosterRevision||0);
     const remoteRosterRevision=Number(remote.registrationRosterRevision||0);
     if(remoteRosterRevision<localRosterRevision) return;
-    const newerRoster=remoteRosterRevision>localRosterRevision;
+    const newerRoster=remoteRosterRevision>localRosterRevision||newerRuntime;
     const localUpdated = state.updatedAt || 0;
     const remoteUpdated = remote.updatedAt || 0;
     if(!authoritative&&!newerExit&&!newerRoster&&remoteUpdated<=localUpdated&&Number(remote.callRevision||0)<=Number(state.callRevision||0)&&Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0)&&isCommunityQuickRegistration(remote)&&Number.isSafeInteger(remote.communityParticipantCount)&&remote.communityParticipantCount>=0&&remote.communityParticipantCount!==state.communityParticipantCount){
@@ -6174,6 +6176,7 @@ async function saveState(options={}){
   saveTarget.updatedAt = Date.now();
   if(saveTarget.meta && saveTarget.meta.registrationEnabled){
     saveTarget.meta.registrationStatus = computeRegistrationStatus(saveTarget.meta,saveTarget);
+    if(saveTarget.onsiteWaitlistServerOwned===true&&!["closed","started","cancelled"].includes(saveTarget.meta.registrationStatus))saveTarget.meta.registrationStatus="closed";
   }
   touchCommunityActivity(saveTarget);
 
@@ -6201,10 +6204,14 @@ async function saveState(options={}){
         cloudSyncPending = false;
         cloudStatus = "connected";
         cloudLastSyncAt = Date.now();
+        if(snapshot.onsiteWaitlistFinalized===true){
+          if(state.id===snapshot.id&&state.cloudCode===snapshot.cloudCode&&Number(state.onsiteWaitlistRuntimeRevision||0)<Number(snapshot.onsiteWaitlistRuntimeRevision||0))state.onsiteWaitlistRuntimeRevision=snapshot.onsiteWaitlistRuntimeRevision;
+          await saveRecord(snapshot);
+        }
         return localOk ? true : false;
       }
       const lastCode = (typeof window!=="undefined" && window.__BXH_LAST_CLOUD_ERROR_CODE) || "";
-      if(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"){
+      if(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"||lastCode==="onsite-runtime-stale"||lastCode==="onsite-waitlist-managed"){
         cloudAccessLimited = true;
         cloudAccessMessage = "線上名單已更新；請重新整理頁面，再進行操作。";
         cloudStatus = "connected";
@@ -9096,6 +9103,7 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   requireRegistrationRosterContext(context);
   if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
   requireRegistrationRosterContext(context);
+  if(peopleOnsiteWaitlistManaged()) return refreshBackendRegistrationRoster(context);
   if(isCommunityQuickRegistration(state)) return refreshBackendRegistrationRoster(context,canCatchUpCommunityRegistrationRoster());
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
   const publicRoom=await window.cloudSync.getPublicTournamentFull(context.code);
@@ -11641,6 +11649,60 @@ async function handleEntrySelection(action){
 }
 
 
+// This callable deliberately retains the live roster-service manager scope.
+// Broader editor/referee/partner UI grants do not authorize a draw session.
+function canManageOnsiteWaitlist(){
+  const user=userProfile,actorId=firebaseUser?.uid;
+  if(!actorId||user?.active!==true||user.deleted||['deleted','disabled','frozen'].includes(user.accountStatus)||user.isTestAccount===true)return false;
+  if(['super_admin','admin'].includes(user.role))return true;
+  if(user.role==='player'&&state.meta?.eventAuthority==='community'&&[state.ownerUid,state.createdBy].includes(actorId))return true;
+  return ['staff','partner_organizer'].includes(user.role)&&
+    ([...(state.assignedStaffUids||[]),...(state.meta?.assignedStaffUids||[])].includes(actorId)||[state.ownerUid,state.createdBy,state.meta?.ownerUid,state.meta?.createdBy].includes(actorId));
+}
+function peopleOnsiteWaitlistManaged(){
+  return state.meta?.registrationOnsiteWaitlistEnabled===true && state.onsiteWaitlistFinalized!==true;
+}
+function peopleOnsiteWaitlistAvailable(){
+  return !!state.cloudCode && canManageOnsiteWaitlist() &&
+    (state.onsiteWaitlistFinalized===true || state.meta?.battleMode!=="team" && !peopleRegistrationSelectionManaged() && !state.startedAt && !state.bracketSize);
+}
+let onsiteCheckinContext=null;
+async function peopleSetOnsiteCheckIn(player,checkedIn,retry=false){
+  if(peopleRosterBusy)return;
+  const code=state.cloudCode,actorId=firebaseUser?.uid,roomId=state.id;
+  const isCurrent=()=>state.cloudCode===code&&state.id===roomId&&firebaseUser?.uid===actorId&&canManageOnsiteWaitlist();
+  const busyContext={code,actorId,roomId};onsiteCheckinContext=busyContext;
+  peopleRosterBusy=true;render();
+  try{
+    const result=await window.BXHOnsiteWaitlistIntegration.command({code,actorId,isCurrent,api:data=>window.cloudSync.manageOnsiteWaitlist(data)},'checkIn',{playerId:player?.id,checkedIn},retry);
+    if(!isCurrent())return;
+    const remote=result.canonicalState?{ok:true,data:result.canonicalState}:await window.cloudSync.joinRoom(code);
+    if(!isCurrent())return;
+    if(remote?.ok!==true||remote.data?.id!==roomId||Number(remote.data.onsiteWaitlistDrawRevision||0)<Number(result.committedRevision||0))throw new Error("onsite-readback-failed");
+    applyRemoteState(remote.data,true);
+    showToast("報到狀態已保存");
+  }catch(e){if(isCurrent())showToast(window.BXHOnsiteWaitlistIntegration.pendingCommand(code,actorId)?"報到結果尚未確認，請按「確認同一筆報到操作」取回結果。":peopleMutationErrorMessage(e),true);}
+  finally{if(onsiteCheckinContext===busyContext){onsiteCheckinContext=null;peopleRosterBusy=false;if(isCurrent())render();}}
+}
+function bindOnsiteWaitlistPanel(){
+  const code=state.cloudCode,actorId=firebaseUser?.uid,roomId=state.id;
+  const isCurrent=()=>state.cloudCode===code&&state.id===roomId&&firebaseUser?.uid===actorId&&canManageOnsiteWaitlist()&&registrationRosterPeopleView()&&peopleRosterSection==="waitlist";
+  window.BXHOnsiteWaitlistIntegration?.bind({
+    enabled:peopleOnsiteWaitlistAvailable(),revision:state.onsiteWaitlistDrawRevision||0,isCurrent,
+    api:data=>window.cloudSync.manageOnsiteWaitlist(data),
+    onCommitted:async result=>{
+      if(!isCurrent())return;
+      const remote=result.canonicalState?{ok:true,data:result.canonicalState}:await window.cloudSync.joinRoom(code);
+      if(!isCurrent())return;
+      if(remote?.ok!==true||remote.data?.id!==roomId||Number(remote.data.onsiteWaitlistDrawRevision||0)<Number(result.committedRevision||0))throw new Error("onsite-readback-failed");
+      // Draw view state is not a tournament. Always read back the complete
+      // canonical record, including siblings' distinct registration identities.
+      applyRemoteState(remote.data,true);
+      publicTournamentsCache=null;myRegistrationsCache=null;
+      if(remote.data.onsiteWaitlistFinalized===true){peopleRosterSection="bracket";render();}
+    }
+  });
+}
 function peopleRosterMutationLocked(){
   return !!state.startedAt || !!state.bracketSize || state.archiveStatus==="completed";
 }
@@ -11875,6 +11937,7 @@ function renderPeopleManagement(){
   const onlineWait=peopleOnlineWaitlistRows();
   const onlineIds=new Set(onlineWait.map(peopleRegistrationIdOf).filter(Boolean));
   const localWait=peopleLocalWaitlist().filter(p=>{
+    if(["not_selected","withdrawn","cancelled"].includes(p.status))return false;
     if(!online&&!isCommunityQuickRegistration(state)) return true;
     // Once registrations are loaded they own every online participant's status.
     if(Array.isArray(adminRegistrationsCache) && (p.registrationId||p.source==="online")) return false;
@@ -11897,7 +11960,7 @@ function renderPeopleManagement(){
     ?'<span class="badge badge-neon">線上報名</span>'
     :(p.source==="test"?'<span class="badge badge-metal">測試名單</span>':'<span class="badge badge-metal">現場新增</span>');
   const sourceText=p=>p.source==="online"?"線上報名":(p.source==="test"?"測試名單":"現場新增");
-  const checkinActionLocked=!!state.startedAt||state.archiveStatus==="completed"||checkinClosed;
+  const checkinActionLocked=peopleRosterBusy||!!state.startedAt||state.archiveStatus==="completed"||checkinClosed;
   const checkinToggle=p=>needsCheckin?`<button class="people-checkin-toggle ${p.checkedIn?'is-checked':'is-unchecked'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinActionLocked?'disabled':''} aria-label="${p.checkedIn?'已報到，點擊取消報到':'未報到，點擊完成報到'}"><span class="people-checkin-dot"></span>${p.checkedIn?'已報到':'未報到'}</button>`:"";
   const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
 
@@ -11936,7 +11999,9 @@ function renderPeopleManagement(){
     const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
     return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
-  const waitlistPanel=`
+  const onsiteWaitlistPanel=peopleOnsiteWaitlistAvailable()
+    ?window.BXHOnsiteWaitlistIntegration?.placeholder({code:state.cloudCode,actorId:firebaseUser?.uid})||"":"";
+  const waitlistPanel=onsiteWaitlistPanel+(peopleOnsiteWaitlistManaged()?"":`
     <div class="panel">
       <div class="people-capacity-banner"><div><div class="panel-title">備取區（${waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
       <div class="btn-row" style="margin:12px 0;">
@@ -11945,7 +12010,7 @@ function renderPeopleManagement(){
       </div>
       ${selectionManaged?'<div class="banner warn"><span>本場為抽籤名額模式，請由「參賽名額抽籤」異動正備取。</span></div>':''}
       ${adminRegistrationsLoading?'<div class="empty-state">正在同步線上備取名單……</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th><th>升正取</th><th>更多</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
-    </div>`;
+    </div>`);
 
   const toolsPanel=`
     ${online||isCommunityQuickRegistration(state)?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt||peopleRosterBusy?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
@@ -11961,7 +12026,9 @@ function renderPeopleManagement(){
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
   const syncError=adminRegistrationsError?`<div class="banner warn" role="alert"><span>線上名單尚未同步：${esc(adminRegistrationsError)}</span><button class="btn btn-ghost btn-sm" data-action="${state.startedAt?"load-admin-registrations":"load-online-roster"}" ${peopleRosterBusy?"disabled":""}>重新同步名單</button></div>`:"";
-  return syncError+subnav+(panels[peopleRosterSection]||confirmedPanel);
+  const pendingOnsite=window.BXHOnsiteWaitlistIntegration?.pendingCommand(state.cloudCode,firebaseUser?.uid);
+  const pendingBanner=pendingOnsite?'<div class="banner warn" role="alert"><span>有一筆報到操作尚未確認。</span><button class="btn btn-primary" data-action="onsite-checkin-retry" '+(peopleRosterBusy?'disabled':'')+'>確認同一筆報到操作</button></div>':'';
+  return syncError+pendingBanner+subnav+(panels[peopleRosterSection]||confirmedPanel);
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -14651,6 +14718,7 @@ function reconcileRegistrationRosterContext(){
     resetAdminRegistrationsCache();
     adminRegistrationsLoading=false;
     if(adminRosterManualContext){peopleRosterBusy=false;adminRosterManualContext=null;}
+    if(typeof onsiteCheckinContext!=="undefined"&&onsiteCheckinContext){peopleRosterBusy=false;onsiteCheckinContext=null;}
     adminRosterContextKey=key;
   }else if(adminRosterCode && (!canManageRegistrationRoster() || !registrationRosterPeopleView() || (!state.meta?.registrationEnabled&&!isCommunityQuickRegistration(state)))){
     stopAdminRosterWatch();
@@ -14729,7 +14797,9 @@ async function startAdminRosterWatch(){
       adminRosterSyncChain=adminRosterSyncChain.catch(()=>{}).then(async()=>{
         if(!registrationRosterContextIsCurrent(context) || rows!==adminRegistrationsCache || peopleRosterBusy) return;
         let result;
-        if(isCommunityQuickRegistration(state)){
+        if(peopleOnsiteWaitlistManaged()){
+          result=await refreshBackendRegistrationRoster(context);
+        }else if(isCommunityQuickRegistration(state)){
           const catchup=catchupPending&&canCatchUpCommunityRegistrationRoster();
           catchupPending=false;
           result=await refreshBackendRegistrationRoster(context,catchup);
@@ -17241,6 +17311,7 @@ function render(){
   reconcileHistoryCloudContext();
   rememberAuthenticatedView();
   const __viewportSnapshot = captureRenderViewport();
+  window.BXHOnsiteWaitlistIntegration?.beforeRender();
   try{
     const app = document.getElementById("app");
     syncReleaseAdminBadge();
@@ -17281,6 +17352,7 @@ function render(){
     bindTitleEditor();
     bindPlayerCardInputs();
     renderPlayerCardOverlay();
+    bindOnsiteWaitlistPanel();
     finishRenderViewport(__viewportSnapshot);
     setTimeout(positionAccountMenuOverlay,0);
   }
@@ -18913,6 +18985,12 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(peopleOnsiteWaitlistManaged()){
+    const rosterActions=['people-toggle-auto-fill','people-promote-waitlist','people-move-to-waitlist','people-delete-waitlist','delete-player','quick-add-players','random-test-roster','update-players','load-test','reg-add-quick','reg-mark-noshow','reg-promote','reg-cancel','reg-delete','import-roster-from-registrations','save-meta','save-registration-settings','close-checkin-early','set-registration-enabled','set-waitlist-enabled','set-checkin-required','unlock-roster','clear-data','import-data'];
+    if(rosterActions.includes(action)||action.startsWith('entry-')){showToast("本場使用現場候補抽選，請由「人員管理 → 備取」處理名單。",true);return;}
+    if(['draw-bracket','start-tournament'].includes(action)){showToast("請先在「人員管理 → 備取」結束候補並完成抽選，再進行賽事編排。",true);return;}
+  }
+
   if(action.startsWith("team-lineup-")||action==="team-score-direct"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
@@ -20333,7 +20411,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!confirm("確認送出「"+teamName+"」？\n\n本場："+size+"V"+size+"\n隊員："+members.join("、")+"\n預計狀態："+statusText+"\n\n送出後，本場出場順序仍會在每次對戰前另外提交。")){tournamentDetailBusy=false;target.disabled=false;return;}
         const result=await window.engagementService.teamRegistration({action:"join",code,teamName,members,operationId:crypto.randomUUID()});
         showToast(result.status==="confirmed"?"隊伍報名成功（正取）":"隊伍報名成功（備取）");
-        publicTournamentsCache=null;myRegistrationsCache=null;tournamentDetailBusy=false;
+        publicTournamentsCache=null;myRegistrationsCache=null;
+      if(remote.data.onsiteWaitlistFinalized===true){peopleRosterSection="bracket";render();}tournamentDetailBusy=false;
         await loadTournamentDetail(code);
       }catch(e){
         tournamentDetailBusy=false;target.disabled=false;
@@ -20355,7 +20434,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           if(!window.engagementService?.teamRegistration)throw {code:"network"};
           await window.engagementService.teamRegistration({action:"cancel",code,operationId:crypto.randomUUID()});
           showToast("已取消整隊報名");
-          publicTournamentsCache=null;myRegistrationsCache=null;tournamentDetailBusy=false;
+          publicTournamentsCache=null;myRegistrationsCache=null;
+      if(remote.data.onsiteWaitlistFinalized===true){peopleRosterSection="bracket";render();}tournamentDetailBusy=false;
           await loadTournamentDetail(code);
         }catch(e){tournamentDetailBusy=false;showToast(mapRegistrationError(e),true);render();}
       })();
@@ -21961,9 +22041,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     document.getElementById("import-backup-input").click();
     return;
   }
+  if(action==="onsite-checkin-retry"){peopleSetOnsiteCheckIn(null,false,true);return;}
   if(action==="toggle-checkin"){
     const pid = target.getAttribute("data-id");
     const p = state.players.find(x=>x.id===pid);
+    if(p && peopleOnsiteWaitlistManaged()){peopleSetOnsiteCheckIn(p,!!target.checked);return;}
     if(p){ p.checkedIn = !!target.checked; saveState(); }
     return;
   }
@@ -22026,6 +22108,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(state.startedAt || state.archiveStatus==="completed" || state.meta.checkinClosedEarly){
       showToast("目前報到已鎖定，無法變更報到狀態",true);
       return;
+    }
+    if(peopleOnsiteWaitlistManaged()){
+      if(!p.checkedIn){peopleSetOnsiteCheckIn(p,true);return;}
+      const context={code:state.cloudCode,uid:firebaseUser?.uid,id:state.id};
+      openModal({type:"generic",title:"是否要取消報到？",message:"「"+p.name+"」目前為已報到狀態。是否要取消報到？",danger:true,confirmLabel:"是",cancelLabel:"否",onConfirm:()=>{
+        if(state.cloudCode===context.code&&state.id===context.id&&firebaseUser?.uid===context.uid)peopleSetOnsiteCheckIn(p,false);
+      }});return;
     }
     if(!p.checkedIn){
       p.checkedIn = true;

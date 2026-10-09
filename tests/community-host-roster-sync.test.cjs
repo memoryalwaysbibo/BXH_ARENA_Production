@@ -21,7 +21,7 @@ function harness(overrides={}){
  ctx.window.cloudSync={connect:async()=>true,subscribeRegistrationsForAdmin:(code,next,error)=>{calls.subscribe.push({code,next,error});return ()=>{calls.unsub++;};},syncCommunityRegistrationSummary:async()=>{calls.catchup++;return {ok:true,communityParticipantCount:2};},joinRoom:async()=>{calls.read++;return {ok:true,data:clone(ctx.remote)};},getPublicTournamentFull:async()=>{calls.publicRead++;return {};},listRegistrationsForAdmin:async()=>{calls.list++;return [];}};
  vm.runInContext(domain,ctx);Object.assign(ctx,ctx.window.BXHDomainUtils);
  vm.runInContext(block('let communityRoomSnapshotGeneration=0;','let remoteAppliedRoomId=null'),ctx);
- for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','applyRemoteState'])vm.runInContext(fn(name),ctx);
+ for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','applyRemoteState'])vm.runInContext(fn(name),ctx);
  vm.runInContext(block('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;','let myRegistrationsError = null;'),ctx);
  vm.runInContext(fn('syncLatestOnlineRosterBeforeLock'),ctx);
  vm.runInContext('globalThis.drainRoster=()=>adminRosterSyncChain;globalThis.rosterCode=()=>adminRosterCode;',ctx);
@@ -312,7 +312,7 @@ test('disabled quick room shows one authoritative waitlist row and visible sync 
  const {ctx}=harness();ctx.state.meta.registrationEnabled=false;
  ctx.state.waitlistPlayers=[{id:'shadow',registrationId:'waiting',source:'online',name:'Waiter'}];ctx.adminRegistrationsCache=[{registrationId:'waiting',status:'waitlist',publicName:'Waiter'}];ctx.adminRegistrationsError='offline';
  Object.assign(ctx,{setTimeout(){},esc:value=>String(value??''),peopleRosterSection:'waitlist',participantDisplayName:p=>p.name,normalizeDateTime:()=>0,renderStaffAssignmentPanel:()=>'',renderRefereeStationAssignmentPanel:()=>'',BATTLE_MODE_LABELS:{},FORMAT_LABELS:{},entryRosterValid:()=>true,renderEntrySelection:()=>''});
- for(const name of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','renderPeopleManagement'])vm.runInContext(fn(name),ctx);
+ for(const name of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','canManageOnsiteWaitlist','peopleOnsiteWaitlistAvailable','renderPeopleManagement'])vm.runInContext(fn(name),ctx);
  const html=ctx.renderPeopleManagement();assert.match(html,/備取區（1）/);assert.match(html,/role="alert"/);assert.match(html,/線上名單尚未同步：offline/);assert.match(html,/data-action="load-online-roster"/);
 });
 
@@ -336,3 +336,4 @@ test('a delayed manual query cannot replace registrations already advanced by th
  calls.subscribe[0].next([{registrationId:'latest',status:'confirmed'}]);await ctx.drainRoster();pending.resolve([{registrationId:'stale'}]);await load;
  assert.equal(ctx.adminRegistrationsCache[0].registrationId,'latest');assert.equal(ctx.adminRegistrationsLoading,false);
 });
+
