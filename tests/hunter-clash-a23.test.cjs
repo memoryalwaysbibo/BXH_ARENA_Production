@@ -25,6 +25,10 @@ test('actual license render uses PK for presentation only: XP, grade and earned 
  c.hunterBattleFilter='all';const before=c.renderPlayerStatsTab({displayName:'黑爸'}),xp=before.match(/<strong>(\d+) XP<\/strong>/)[1];c.hunterProfileCache.achievementCore={unlocked:['existing-award'],metrics:{matches:10}};const achievements=JSON.stringify(c.hunterProfileCache.achievementCore);
  c.window.BXHArenaPK={displayRecords:rows=>[...rows,...pk],statusHtml:()=>'<p>PK 已核對</p>',state:()=>({status:'ready'})};
  const after=c.renderPlayerStatsTab({displayName:'黑爸'});assert.match(after,/20 場/);assert.equal(after.match(/<strong>(\d+) XP<\/strong>/)[1],xp);assert.match(after,/A 級獵人/);assert.match(before,/A 級獵人/);assert.equal(JSON.stringify(c.hunterProfileCache.achievementCore),achievements);assert.equal(c.hunterBuildAnalysis(pk).overall,null);assert.equal(c.hunterBuildAnalysis(pk).validRounds,30);
+ c.window.BXHArenaPK.practiceGrowth=g=>({...c.window.BXHHunterUtils.hunterGrowthWithPractice(g,500),practiceXpReady:true});
+ const credited=c.renderPlayerStatsTab({displayName:'黑爸'});assert.equal(Number(credited.match(/<strong>(\d+) XP<\/strong>/)[1]),Number(xp)+500);
+ assert.match(credited,/A 級獵人/);assert.match(credited,/獵人交鋒練習/);assert.match(credited,/\+500 XP/);assert.equal(JSON.stringify(c.hunterProfileCache.achievementCore),achievements);
+
 });
 
 test('PK App Check shares the ARENA app, deduplicates initialization and retries failed loading',async()=>{

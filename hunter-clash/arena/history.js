@@ -1,5 +1,6 @@
 (function(root){
 'use strict';
+function haveXp(p){return p==null||p.version==='arena-practice-xp-v1'&&typeof p.enabled==='boolean'&&Number.isSafeInteger(p.totalXp*2)&&p.totalXp>=0&&Number.isSafeInteger(p.todayXp*2)&&p.todayXp>=0&&Number.isSafeInteger(p.completedToday)&&p.completedToday>=0&&Number.isSafeInteger(p.remainingGames)&&p.remainingGames===Math.max(0,10-p.completedToday)&&/^\d{4}-\d{2}-\d{2}$/.test(p.day);}
 function createHistory({transport,changed=()=>{}}){
  let uid='',epoch=0,pending=null;let state={status:'unconnected',records:[],total:null,excluded:0};
  const snapshot=()=>({...state,records:state.records.slice()});
@@ -15,7 +16,9 @@ function createHistory({transport,changed=()=>{}}){
     // In-progress pages are deliberately not published as a complete lifetime denominator.
    }while(cursor);
    const records=root.BXHArenaPKAdapter.adapt(rows,owner);if(records.length!==meta.total)throw Error('history-count-mismatch');
-   state={status:records.length?'ready':'empty',records,total:meta.total,excluded:records.filter(r=>!r.analyzable).length,generation,loadedAt:Date.now()};
+   if(haveXp(meta.practiceXp)===false)throw Error('history-xp-invalid');
+   if(meta.practiceXp&&records.reduce((sum,r)=>sum+(r.practiceXp?.units||0),0)!==meta.practiceXp.totalXp*2)throw Error('history-xp-count-mismatch');
+   state={status:records.length?'ready':'empty',practiceXp:meta.practiceXp||null,records,total:meta.total,excluded:records.filter(r=>!r.analyzable).length,generation,loadedAt:Date.now()};
   }catch(error){if(stamp!==epoch||uid!==owner)return null;
     let records=state.records;try{if(rows.length)records=root.BXHArenaPKAdapter.adapt(rows,owner);}catch{}
     const unavailable=['closed','account-unavailable'].includes(error.message)||String(error.code).includes('not-found');

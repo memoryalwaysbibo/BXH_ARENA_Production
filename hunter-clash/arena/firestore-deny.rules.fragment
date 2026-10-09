@@ -6,5 +6,6 @@ match /arenaPKAttempts/{uid} { allow read, write: if false; }
 match /arenaPKAudit/{id} { allow read, write: if false; }
 match /arenaPKPlayers/{uid} { allow read, write: if false;
   match /matches/{id} { allow read, write: if false; }
+  match /xpDays/{day} { allow read, write: if false; }
 }
 match /systemSettings/hunterClash { allow read, write: if false; }

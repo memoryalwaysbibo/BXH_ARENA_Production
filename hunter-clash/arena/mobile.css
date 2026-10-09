@@ -32,3 +32,6 @@
 .state{font-size:18px;line-height:1.5}.round{font-size:16px;margin:12px 0 8px}.policy{display:block;font-size:15px;line-height:1.6}
 .room-win-rate>span,.metric-detail,.room-main-finish>span{display:block}.metric-detail{margin-top:3px}.room-main-finish{font-size:13px;margin:14px 0;line-height:1.6}.room-main-finish>span:last-child{color:var(--hc-text);font-weight:700;margin-top:4px}
 @media(max-width:350px){.state{font-size:16px}.round{font-size:15px}.policy{font-size:14px}.sync-label{font-size:9px}}
+
+/* Practice XP is compact; expand the policy only when needed. */
+.practice-xp:empty{display:none}.practice-xp .panel{padding:12px;border:1px solid var(--hc-line);border-radius:12px;margin:12px 0}.practice-xp p{font-size:13px;line-height:1.65;margin:7px 0}.practice-xp .hint{color:var(--hc-muted)}.session-xp{padding:12px;border:1px solid var(--hc-line);border-radius:12px;color:var(--hc-accent);line-height:1.6}
