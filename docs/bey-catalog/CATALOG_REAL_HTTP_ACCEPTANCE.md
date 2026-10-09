@@ -2,6 +2,8 @@
 
 2026-10-10。延續已規劃的隔離整合驗收，未建立正式入口、Functions export、部署設定或正式Firebase初始化。
 
+> **後續狀態（2026-10-10）**：另新增 Firebase Functions Emulator 的公開 CI 邊界驗收，直接呼叫 Emulator 提供的函式 URL；驗收範圍與限制見 [CATALOG_FUNCTIONS_EMULATOR_ACCEPTANCE.md](CATALOG_FUNCTIONS_EMULATOR_ACCEPTANCE.md)。本文件的私有原始197筆 loopback 結果仍保留，兩者不能互相替代。
+
 ## 實際接線
 
 createTw13HttpV2Handler 注入 firebase-functions 6.4.0 的真正 firebase-functions/v2/https.onRequest；以 Express 4.21.2 解析 JSON，Node HTTP 僅綁定 127.0.0.1 隨機埠，透過 fetch 送出真正請求。Auth／Firestore 使用既有固定 demo-bxh-catalog-db01 Emulator、真實 Admin SDK 與私有資料載入器；App Check 仍為明確測試替身。
@@ -25,6 +27,6 @@ createTw13HttpV2Handler 注入 firebase-functions 6.4.0 的真正 firebase-funct
 
     node tests/bey-catalog-emulator/data01b-taiwan-real.cjs --real-auth --real-http
 
---real-http必須同時使用--real-auth。正式App Check、Google登入簽章、Cloud Functions Emulator、雲端HTTP、IAM、TTL與保留政策仍未驗收；31項補證／双人審核維持pending。兩個PR保持Draft，未合併、未部署、未修改正式ARENA。
+--real-http必須同時使用--real-auth。正式App Check、Google登入簽章、雲端HTTP、IAM、TTL與保留政策仍未驗收；Functions Emulator 另以不含私有資料的公開 CI 驗收。31項補證／双人審核維持pending。兩個PR保持Draft，未合併、未部署、未修改正式ARENA。
 
 SDK接線參考：[Firebase官方HTTP Functions文件](https://firebase.google.com/docs/functions/http-events)。實際通過聲明以本次本機日誌與程序退出碼為準，官方文件不替代測試證據。
