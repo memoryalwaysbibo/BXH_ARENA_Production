@@ -1,0 +1,31 @@
+name: BEY Catalog DB-01 Emulator Safety
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'modules/bey-catalog/**'
+      - 'tests/bey-catalog-*/**'
+      - '.github/workflows/bey-catalog-emulator.yml'
+permissions:
+  contents: read
+jobs:
+  emulator-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install isolated test dependencies
+        run: npm install --no-save --no-package-lock --ignore-scripts firebase@12.4.0 @firebase/rules-unit-testing@5.0.0 firebase-tools@15.30.0
+      - name: Run pure contract tests
+        run: node --test tests/bey-catalog-safety-gate.test.cjs tests/bey-catalog-staging.test.cjs
+      - name: Check DATA-01B full fixture runner syntax
+        run: node --check tests/bey-catalog-emulator/data01b-full-import.cjs
+      - name: Run Firestore Emulator rules tests
+        run: npx firebase emulators:exec --only firestore --project demo-bxh-catalog-db01 --config tests/bey-catalog-emulator/firebase.json "node --test tests/bey-catalog-emulator/rules.test.cjs && node --test tests/bey-catalog-emulator/transactions.test.cjs && node --test tests/bey-catalog-emulator/batch-recovery.test.cjs"

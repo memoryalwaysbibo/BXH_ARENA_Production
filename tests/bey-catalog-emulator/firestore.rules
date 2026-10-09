@@ -1,0 +1,27 @@
+rules_version = '2';
+// TEST ONLY: isolated emulator candidate. Never deploy directly to production.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function catalogAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('active', false) == true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isTestAccount', false) != true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['admin', 'super_admin'];
+    }
+    match /beyCatalogPublished/{id} {
+      allow get, list: if resource.data.get('publicationStatus', '') == 'published';
+      allow create, update, delete: if false;
+    }
+    match /beyCatalogStaging/{id} {
+      allow get, list: if catalogAdmin();
+      allow create, update, delete: if false;
+    }
+    match /beyCatalogAudit/{id} {
+      allow get, list: if catalogAdmin();
+      allow create, update, delete: if false;
+    }
+    match /users/{uid} { allow read, write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
