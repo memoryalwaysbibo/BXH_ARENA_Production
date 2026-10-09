@@ -10,12 +10,13 @@ let env;
 async function setup(){if(!env)env=await initializeTestEnvironment({projectId:target.projectId,firestore:{host:'127.0.0.1',port:8189}});return env;}
 after(async()=>{if(env)await env.cleanup()});
 function release(id,result='compatible'){return createRelease({releaseId:id,createdBy:'admin_a',createdAt:'2026-10-09T02:00:00Z',rules:[{ruleId:'rule_a',version:id,result,evidenceStatus:'verified',partIds:['blade_a','ratchet_a','bit_a'],sourceId:'official_a',sourceUrl:'https://example.org/official',reviewedBy:'admin_a',reviewedAt:'2026-10-09T02:00:00Z'}]});}
-function review(overrides={}){return {phase:'ready_for_server_verification',publicationStatus:'unpublished',selectable:false,firstReviewerUid:'admin_a',secondReviewerUid:'admin_b',reviewLog:[{uid:'admin_a',action:'accept'},{uid:'admin_b',action:'approve'}],...overrides};}
+function review(overrides={}){return {draftHash:'canonical_hash_a',phase:'ready_for_server_verification',publicationStatus:'unpublished',selectable:false,firstReviewerUid:'admin_a',secondReviewerUid:'admin_b',reviewLog:[{uid:'admin_a',action:'accept'},{uid:'admin_b',action:'approve'}],...overrides};}
 test('approved evidence creates unpublished immutable proposal and replay is idempotent',async()=>{
  const e=await setup(),rel=release('catalog_emulator_v1');
  await e.withSecurityRulesDisabled(async ctx=>{
   const db=ctx.firestore(),draftId='draft_release_a';
   await setDoc(doc(db,'beyCatalogReviewDrafts',draftId),review());
+  await setDoc(doc(db,'beyCatalogRuleDrafts',draftId),{draftHash:'canonical_hash_a',reviewStatus:'requires_authorized_source_review',publicationStatus:'unpublished',partIds:['blade_a','ratchet_a','bit_a'],sourceRefs:[{sourceId:'official_a',authority:'manufacturer',url:'https://example.org/official'}]});
   const a=await stageReleaseProposal({db,target,release:rel,draftId});
   const b=await stageReleaseProposal({db,target,release:rel,draftId});
   assert.equal(a.status,'created');assert.equal(b.status,'unchanged');
@@ -46,5 +47,16 @@ test('browser cannot forge rule releases, production target forbidden',async()=>
  await assertFails(setDoc(doc(client,'beyCatalogRuleReleases','forged'),{publicationStatus:'published'}));
  await e.withSecurityRulesDisabled(async ctx=>{
   await assert.rejects(()=>stageReleaseProposal({db:ctx.firestore(),target:{...target,projectId:'bxh-arena'},release:release('catalog_emulator_v3'),draftId:'draft_release_a'}),/PRODUCTION/);
+ });
+});
+
+test('release with unrelated parts or source cannot reuse a reviewed draft',async()=>{
+ const e=await setup(),draftId='draft_release_a';
+ await e.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();
+  const wrongParts=createRelease({releaseId:'catalog_wrong_parts',createdBy:'admin_a',createdAt:'2026-10-09T02:00:00Z',rules:[{ruleId:'rule_a',version:'catalog_wrong_parts',result:'compatible',evidenceStatus:'verified',partIds:['blade_a','ratchet_a','bit_other'],sourceId:'official_a',sourceUrl:'https://example.org/official',reviewedBy:'admin_a',reviewedAt:'2026-10-09T02:00:00Z'}]});
+  await assert.rejects(()=>stageReleaseProposal({db,target,release:wrongParts,draftId}),/RELEASE_EXACT_STOCK_SCOPE_REQUIRED/);
+  const wrongSource=createRelease({releaseId:'catalog_wrong_source',createdBy:'admin_a',createdAt:'2026-10-09T02:00:00Z',rules:[{ruleId:'rule_a',version:'catalog_wrong_source',result:'compatible',evidenceStatus:'verified',partIds:['blade_a','ratchet_a','bit_a'],sourceId:'unrelated',sourceUrl:'https://example.org/unrelated',reviewedBy:'admin_a',reviewedAt:'2026-10-09T02:00:00Z'}]});
+  await assert.rejects(()=>stageReleaseProposal({db,target,release:wrongSource,draftId}),/RELEASE_SOURCE_NOT_MATCHED/);
  });
 });
