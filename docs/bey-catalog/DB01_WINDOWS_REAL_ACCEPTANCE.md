@@ -49,3 +49,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps
 ```
 
 這是完整性檢查而非真實 Firestore Emulator 寫入；原始 SHA 固定於已審查的 manifest。若需真正寫入驗收，移除 `-PreflightOnly` 並具備 Java 21、Node 22、Git 與 npm 網路。舊 ZIP 的腳本不含此修正，須使用本 PR 最新版本。
+
+## Java 21 安裝輔助（明確授權才會安裝）
+新版腳本新增 `-InstallJava`，**只有使用者明確帶入此參數**才會透過 Windows `winget` 安裝 Eclipse Temurin JDK 21；一般驗收及 `-PreflightOnly` 不會自行安裝任何軟體。
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps1 -InstallJava
+```
+
+此模式先核對真實原始 JSON 的 SHA-256，若已有 Java 21 就不做變更；否則檢查 winget、要求 Windows 安裝授權並執行 `winget install --id EclipseAdoptium.Temurin.21.JDK --exact --source winget --accept-package-agreements --accept-source-agreements`。安裝結束後腳本**立即停止，不執行 Firestore 寫入**。關閉並重新開啟 PowerShell，確認 `java -version` 後，再執行一般模式。
+
+若 Windows 無 winget 或使用者不允許安裝，會安全停止並指向 Adoptium 官方下載頁；不改系統 PATH 或嘗試其他來源。使用者舊版 ZIP 不會自動更新，須取得最新版腳本。
