@@ -54,13 +54,15 @@ function activateRelease(state,release,{actor,reason,expectedActive}={}){
 function registerRelease(state,release){
  if(!state||!Array.isArray(state.releases)||!release?.immutable||!release.checksum)fail('INVALID_RELEASE');
  if(state.releases.some(r=>r.releaseId===release.releaseId))fail('RELEASE_ID_ALREADY_EXISTS');
- // Validate checksum, not merely an arbitrary immutable flag.
- if(hash({releaseId:release.releaseId,createdBy:release.createdBy,createdAt:release.createdAt,rules:release.rules})!==release.checksum)fail('RELEASE_CHECKSUM_MISMATCH');
+ // Revalidate every rule; a checksum alone is not evidence or authorization.
+ const validated=createRelease({releaseId:release.releaseId,createdBy:release.createdBy,createdAt:release.createdAt,rules:release.rules});
+ if(validated.checksum!==release.checksum)fail('RELEASE_CHECKSUM_MISMATCH');
  return deepFreeze({...state,releases:[...state.releases,release]});
 }
 function evaluateWithActiveRelease({state,parts,template}={}){
  const release=state?.releases?.find(r=>r.releaseId===state.activeReleaseId);
  if(!release)return {status:'pending',reason:'NO_ACTIVE_RELEASE',canSaveAsVerified:false};
+ if(!Array.isArray(parts)||parts.some(p=>p?.selectable!==true))return {status:'pending',reason:'PART_NOT_RELEASED_FOR_SELECTION',canSaveAsVerified:false};
  if(hash({releaseId:release.releaseId,createdBy:release.createdBy,createdAt:release.createdAt,rules:release.rules})!==release.checksum)return {status:'pending',reason:'RELEASE_INTEGRITY_FAILED',canSaveAsVerified:false};
  return validateAssembly({parts,template,interfaceRules:release.rules,ruleVersion:release.releaseId});
 }
