@@ -67,6 +67,25 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   assert.match(await analysis.locator('.license-radar-svg').getAttribute('aria-label'),/^黑爸 /);
   assert.equal(await analysis.locator('.room-stat').count(),1);
   await analysis.evaluate(()=>analysisMount.dispose());await analysis.close();
+  const recoveryPage=await browser.newPage({viewport:{width:390,height:844}});
+  await recoveryPage.goto('http://127.0.0.1:'+server.address().port+'/tests/fixtures/blank.html');
+  await recoveryPage.evaluate(async()=>{
+   const {mountMobile}=await import('/hunter-clash/arena/mobile.mjs');
+   const root=document.body.attachShadow({mode:'open'});root.innerHTML='<div id="message"></div><main id="app"></main>';
+   const values=new Map([['arena-pk:mobile:last:a','pk_stale']]),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+   window.recoveryValues=values;window.lookupMissing=false;
+   window.recoveryMount=mountMobile(root,{playerName:()=> '黑爸',watch:fn=>{fn({uid:'a'});return()=>{};},transport:async()=>{throw window.lookupMissing?Object.assign(Error('challenge-unavailable'),{definitive:true}):Error('offline');},history:async()=>({status:'empty',total:0,records:[]})},{storage,accountStorage:storage});
+  });
+  await recoveryPage.locator('[data-op="recoveryBack"]').waitFor({state:'visible'});
+  await recoveryPage.waitForFunction(()=>document.body.shadowRoot.querySelector('#message').textContent.includes('紀錄仍保留'));
+  assert.equal(await recoveryPage.evaluate(()=>recoveryValues.get('arena-pk:mobile:last:a')),'pk_stale');
+  await recoveryPage.evaluate(()=>{lookupMissing=true;});
+  await recoveryPage.locator('[data-op="recoveryBack"]').click();
+  await recoveryPage.locator('[data-op="createChallenge"]').waitFor({state:'visible'});
+  assert.equal(await recoveryPage.locator('[data-op="createChallenge"]').isEnabled(),true);
+  assert.equal(await recoveryPage.locator('.recovery-panel').isVisible(),false);
+  assert.equal(await recoveryPage.evaluate(()=>recoveryValues.has('arena-pk:mobile:last:a')),false);
+  await recoveryPage.evaluate(()=>recoveryMount.dispose());await recoveryPage.close();
   await a.evaluate(()=>fixture.switch());assert.equal(await a.getByRole('button',{name:'獵人交鋒',exact:true}).count(),0);assert.equal(await a.evaluate(()=>BXHArenaPK.state().records.length),0);assert.deepEqual(errors,[]);console.log('PASS A2/A3 real module two-player lifecycle, actual QR decoding, four-code join, automatic sync, waiting, shared history, route/session cleanup and 320/390/430px');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exit(1);});
