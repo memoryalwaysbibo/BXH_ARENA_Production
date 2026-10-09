@@ -46,7 +46,7 @@ async function readTaiwanReviewQueue({adapter,idToken,request}={}){
  const batch=await adapter.loadResearchBatch();
  const queue=buildTw06ReviewQueue(batch);
  const view=createReviewMobileModel(queue,{viewerRole:profile.role,filter:params.filter,query:params.query});
- const fingerprint=digest({batchId:queue.batchId,queueVersion:queue.queueVersion,ids:view.visibleItems.map(x=>x.queueId),filter:params.filter,query:params.query}).slice(0,20);
+ const fingerprint=digest({batchId:queue.batchId,queueVersion:queue.queueVersion,items:view.visibleItems,filter:params.filter,query:params.query}).slice(0,20);
  const offset=decodeCursor(params.cursor,fingerprint);
  if(offset>view.visibleItems.length)throw Error('TW08_CURSOR_OUT_OF_RANGE');
  const items=view.visibleItems.slice(offset,offset+params.limit).map(item=>Object.freeze({...item}));
