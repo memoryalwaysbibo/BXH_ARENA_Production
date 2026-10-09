@@ -77,3 +77,21 @@ test('recovery clears unavailable rooms only after definitive lookup and retains
  assert.equal(recovery.clearUnavailable('a',Object.assign(Error('challenge-unavailable'),{definitive:true})),true);
  assert.equal(recovery.id('a'),null);
 });
+
+test('recovery return persists dismissal without removing the room bookmark',async()=>{
+ const {createRecoveryStore}=await import('../hunter-clash/arena/recovery.mjs');
+ const values=new Map(),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ let recovery=createRecoveryStore({session:storage,persistent:storage});
+ recovery.remember('a',{challengeId:'pk_room',status:'final_pending'});recovery.dismiss('a');
+ recovery=createRecoveryStore({session:storage,persistent:storage});
+ assert.equal(recovery.dismissed('a'),true);assert.equal(recovery.dismissed('b'),false);assert.equal(recovery.id('a'),'pk_room');
+ assert.equal(recovery.clearUnavailable('a',Object.assign(Error('challenge-unavailable functions/failed-precondition'),{definitive:true})),true);
+ recovery.clear('a');assert.equal(recovery.dismissed('a'),false);
+});
+test('recovery read timeout releases buttons and ignores a late server response',async()=>{
+ const {createController}=await import('../hunter-clash/arena/controller.mjs');
+ let resolve;const client=createController({readTimeoutMs:10,transport:()=>new Promise(r=>{resolve=r;})});
+ client.setSession('a');await assert.rejects(client.read('pk_room'),/read-timeout/);
+ assert.equal(client.state().busy,false);resolve({challenge:{challengeId:'pk_room',revision:1}});
+ await new Promise(r=>setTimeout(r,0));assert.equal(client.state().snapshot,null);client.dispose();
+});
