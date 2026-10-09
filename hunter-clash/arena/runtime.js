@@ -31,8 +31,8 @@ let vendors=null;
 function loadVendors(){if(vendors)return vendors;vendors=Promise.all([['QRCode','qrcode.min.js'],['jsQR','jsQR.js']].map(([symbol,file])=>typeof root[symbol]==='function'?Promise.resolve():new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=new URL('hunter-clash/arena/vendor/'+file+'?v=20261009-a23',document.baseURI).href;script.onload=resolve;script.onerror=()=>{script.remove();reject(Error('qr-library-unavailable'));};document.head.append(script);}))).catch(error=>{vendors=null;throw error;});return vendors;}
 async function mount(host){
  const owner=user,stamp=epoch;if(!authorized||!owner)return null;
- await loadVendors();const module=await import('./mobile.mjs?v=20261009-dragon-entry-1');if(stamp!==epoch||user!==owner||!authorized)return null;
- const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<link rel="stylesheet" href="hunter-clash/arena/mobile.css?v=20261009-dragon-entry-1"><div id="message" role="status"></div><div id="app"></div>';
+ await loadVendors();const module=await import('./mobile.mjs?v=20261009-dragon-card-2');if(stamp!==epoch||user!==owner||!authorized)return null;
+ const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<link rel="stylesheet" href="hunter-clash/arena/mobile.css?v=20261009-dragon-card-2"><div id="message" role="status"></div><div id="app"></div>';
  return module.mountMobile(shadow,{transport,playerName:()=>profile?.displayName||profile?.nickname||profile?.gameId||profile?.realName||'未設定名稱',watch:fn=>{queueMicrotask(()=>{if(stamp===epoch)fn(owner);});return()=>{};},history:force=>history.load(force)},{storage:sessionStorage,accountStorage:localStorage});
 }
 root.BXHArenaPK={setSession,transport,displayRecords,state,statusHtml,renderLicense,mount,load:force=>history.load(force),listen:fn=>{changed=fn;}};
