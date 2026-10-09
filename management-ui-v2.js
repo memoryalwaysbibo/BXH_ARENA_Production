@@ -8,7 +8,7 @@
     {id:"event",label:"賽事",tabs:["management","registrations","settings","people"]},
     {id:"field",label:"現場",tabs:["live","bracket","referee","duty"]},
     {id:"ranking",label:"排行",tabs:["ladder"]},
-    {id:"hunter",label:"獵人",tabs:[],placeholder:true},
+    {id:"hunter",label:"獵人",tabs:[],placeholder:true,hidden:true},
     {id:"activity",label:"活動",tabs:["member-raffles","inventory-admin"]},
     {id:"system",label:"系統",tabs:["operations","history","version"]}
   ];
@@ -31,7 +31,7 @@
   }
   function visibleGroups(visibleTabKeys){
     const allowed=new Set(visibleTabKeys||[]);
-    return GROUPS.map(g=>({...g,tabs:g.tabs.filter(t=>allowed.has(t))})).filter(g=>g.tabs.length||g.placeholder);
+    return GROUPS.filter(g=>!g.hidden).map(g=>({...g,tabs:g.tabs.filter(t=>allowed.has(t))})).filter(g=>g.tabs.length||g.placeholder);
   }
   function renderRails(activeTab,visibleTabs){
     const groups=visibleGroups(visibleTabs),selected=resolveActiveGroup(activeTab,visibleTabs);
