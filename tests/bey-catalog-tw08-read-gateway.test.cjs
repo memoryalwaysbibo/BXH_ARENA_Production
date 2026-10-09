@@ -68,6 +68,6 @@ test('invalid request, client dataset injection and unsafe batch fail closed',as
   await assert.rejects(()=>readTaiwanReviewQueue({adapter:a,idToken:'verified-token',request}),/TW08_REQUEST_INVALID/);
  }
  const bad=adapter({batch:{...fixture(),productionWritable:true}});
- await assert.rejects(()=>readTaiwanReviewQueue({adapter:bad,idToken:'verified-token',request:{batch:fixture()}}),/TW06_RESEARCH_BATCH_REQUIRED/);
+ await assert.rejects(()=>readTaiwanReviewQueue({adapter:bad,idToken:'verified-token',request:{batch:fixture()}}),/TW06_QUEUE_RESEARCH_REQUIRED/);
  await assert.rejects(()=>readTaiwanReviewQueue({adapter:{},idToken:'verified-token'}),/TW08_TRUSTED_BACKEND_ADAPTER_REQUIRED/);
 });
