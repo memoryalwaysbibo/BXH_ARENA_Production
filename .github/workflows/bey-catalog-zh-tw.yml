@@ -10,6 +10,8 @@ on:
       - 'tests/bey-catalog-tw03-evidence.test.cjs'
       - 'modules/bey-catalog/catalog-tw03-corrections.cjs'
       - 'tests/bey-catalog-tw03-corrections.test.cjs'
+      - 'modules/bey-catalog/catalog-tw04-corrections.cjs'
+      - 'tests/bey-catalog-tw04-corrections.test.cjs'
       - '.github/workflows/bey-catalog-zh-tw.yml'
   workflow_dispatch:
 permissions:
@@ -23,4 +25,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test tests/bey-catalog-locale-zh-tw.test.cjs tests/bey-catalog-tw02-corrections.test.cjs tests/bey-catalog-tw03-evidence.test.cjs tests/bey-catalog-tw03-corrections.test.cjs
+      - run: node --test tests/bey-catalog-locale-zh-tw.test.cjs tests/bey-catalog-tw02-corrections.test.cjs tests/bey-catalog-tw03-evidence.test.cjs tests/bey-catalog-tw03-corrections.test.cjs tests/bey-catalog-tw04-corrections.test.cjs
