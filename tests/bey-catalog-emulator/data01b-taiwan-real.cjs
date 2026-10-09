@@ -1,7 +1,8 @@
 'use strict';
 /** Private DATA-01B -> real Firestore Emulator -> Taiwan review HTTP adapter.
  * --real-auth uses Firebase Auth Emulator; default Auth is a test double.
- * App Check and onRequest remain explicit test doubles, not deployed services.
+ * --real-http uses the actual v2 onRequest SDK over loopback HTTP/Express.
+ * App Check remains a test double; no deployed services or Functions Emulator.
  * No fixture contents are printed or committed. No production initialization.
  */
 const fs=require('node:fs'),crypto=require('node:crypto'),assert=require('node:assert/strict');
@@ -34,16 +35,17 @@ function readPrivateFixture(){
  assert.equal(plan.recordCount,197);assert.equal(manifestDigest(plan),EXPECTED_MANIFEST);
  return {file,raw,base,plan};
 }
-async function main({realAuth=false}={}){
+async function main({realAuth=false,realHttp=false}={}){
  if(process.env.FIRESTORE_EMULATOR_HOST!==target.emulatorHost)throw Error('LOCAL_EMULATOR_REQUIRED');
  if(realAuth&&process.env.FIREBASE_AUTH_EMULATOR_HOST!=='127.0.0.1:9098')throw Error('LOCAL_AUTH_EMULATOR_REQUIRED');
+ if(realHttp&&!realAuth)throw Error('REAL_HTTP_REQUIRES_REAL_AUTH');
  const {file,raw,base,plan}=readPrivateFixture();
  const env=await initializeTestEnvironment({projectId:target.projectId,firestore:{host:'127.0.0.1',port:8189}});
  const app=initializeApp({projectId:target.projectId},'data01b-taiwan-real');
  const db=getFirestore(app);
  const actor='data01b_tw_admin',player='data01b_tw_player';
  const secret='data01b-taiwan-emulator-only-audit-key';
- let researchLoads=0;
+ let researchLoads=0,transport;
  let adminToken='admin-test-token',playerToken='player-test-token',anonymousToken;
  const auth=realAuth?getAuth(app):null;
  try{
@@ -90,18 +92,31 @@ async function main({realAuth=false}={}){
    adminAuth:auth||{verifyIdToken:async(token,revoked)=>{assert.equal(revoked,true);assert(['admin-test-token','player-test-token'].includes(token));return {uid:token==='admin-test-token'?actor:player,firebase:{sign_in_provider:'password'}};}},
    adminFirestore:db,loadResearchBatch:async()=>{researchLoads++;return loader.loadResearchBatch();},
    consumeRateLimit:guards.consumeRateLimit,recordAudit:guards.recordAudit};
-  const handler=createTw13HttpV2Handler({onRequest:(options,fn)=>fn,dependencies,allowedOrigins:['https://arena.bxh.com.tw']});
+  const handler=createTw13HttpV2Handler({onRequest:realHttp?require('firebase-functions/v2/https').onRequest:(options,fn)=>fn,dependencies,allowedOrigins:['https://arena.bxh.com.tw']});
+  if(realHttp)transport=await require('./http-loopback.cjs').startLoopbackHttp(handler);
   async function request(body={},token=adminToken,appToken='test-app'){
+   if(transport)return transport.request({body,headers:{origin:'https://arena.bxh.com.tw',authorization:'Bearer '+token,'x-firebase-appcheck':appToken}});
    const response={headers:{},set(k,v){this.headers[k]=v;return this;},status(code){this.code=code;return this;},json(body){this.body=body;return this;},send(body){this.body=body;return this;}};
    await handler({method:'POST',headers:{origin:'https://arena.bxh.com.tw','content-type':'application/json',authorization:'Bearer '+token,'x-firebase-appcheck':appToken},body},response);
    return response;
+  }
+  if(transport){
+   const headers={origin:'https://arena.bxh.com.tw'};
+   const preflight=await transport.request({method:'OPTIONS',headers});assert.equal(preflight.code,204);
+   assert.equal(preflight.headers['access-control-allow-origin'],headers.origin);
+   assert.equal((await transport.request({method:'GET',headers})).code,405);
+   assert.equal((await transport.request({headers:{origin:'https://untrusted.example'},body:{}})).code,403);
+   for(const body of ['{invalid-json',JSON.stringify({query:'x'.repeat(5000)})]){
+    const r=await transport.request({headers,body});assert.equal(r.code,400);assert.deepEqual(r.body,{error:'INVALID_REQUEST'});
+   }
+   assert.equal(researchLoads,0);
   }
   const seen=[];let cursor=null;
   do{
    const r=await request({limit:10,cursor});assert.equal(r.code,200);
    assert.deepEqual({total:r.body.summary.total,P0:r.body.summary.P0,P1:r.body.summary.P1,P2:r.body.summary.P2},queue.summary);
    assert.equal(r.body.canApprove,false);assert.equal(r.body.canPublish,false);
-   assert.equal(r.headers['Cache-Control'],'no-store');seen.push(...r.body.items);cursor=r.body.nextCursor;
+   assert.equal((r.headers['Cache-Control']||r.headers['cache-control']),'no-store');seen.push(...r.body.items);cursor=r.body.nextCursor;
   }while(cursor);
   assert.equal(seen.length,31);assert.equal(new Set(seen.map(i=>i.queueId)).size,31);
   assert.deepEqual(seen.map(i=>i.queueId).sort(),queue.items.map(i=>i.queueId).sort());
@@ -155,8 +170,8 @@ async function main({realAuth=false}={}){
   await rejectChanged(()=>recordRef.delete(),()=>recordRef.set(savedRecord),/DATA01B_LOADER_COLLECTION_COUNT_MISMATCH/);
   assert.deepEqual(await loadStoredOriginal(),originalSnapshot);
   assert.deepEqual(fs.readFileSync(file),raw);
-  console.log(JSON.stringify({batchId:base.batchId,originalSha256:EXPECTED_SHA,manifestDigest:EXPECTED_MANIFEST,verifiedDocuments:197,corruptionCases,consistentSnapshot:true,reviewQueue:queue.summary,paginatedItems:seen.length,adminRequests:5,rateLimitStatus:429,playerStatus:403,researchLoads,originalPreserved:true,published:0,cloudWrites:0,emulator:true,auth:realAuth?'firebase-auth-emulator':'test-double',authCases:realAuth?['login','anonymous','malformed','wrong-audience','disabled','revoked']:[],appCheck:'test-double',http:'in-process-handler'}));
- }finally{await deleteApp(app);await env.cleanup();}
+  console.log(JSON.stringify({batchId:base.batchId,originalSha256:EXPECTED_SHA,manifestDigest:EXPECTED_MANIFEST,verifiedDocuments:197,corruptionCases,consistentSnapshot:true,reviewQueue:queue.summary,paginatedItems:seen.length,adminRequests:5,rateLimitStatus:429,playerStatus:403,researchLoads,originalPreserved:true,published:0,cloudWrites:0,emulator:true,auth:realAuth?'firebase-auth-emulator':'test-double',authCases:realAuth?['login','anonymous','malformed','wrong-audience','disabled','revoked']:[],appCheck:'test-double',http:realHttp?'loopback-http-real-v2-sdk':'in-process-handler',transportCases:realHttp?['cors-preflight','method','origin','malformed-json','oversized-json']:[]}));
+ }finally{if(transport)await transport.close();await deleteApp(app);await env.cleanup();}
 }
-if(require.main===module)main({realAuth:process.argv.includes('--real-auth')}).catch(e=>{console.error(e);process.exitCode=1;});
+if(require.main===module)main({realAuth:process.argv.includes('--real-auth'),realHttp:process.argv.includes('--real-http')}).catch(e=>{console.error(e);process.exitCode=1;});
 module.exports={main};

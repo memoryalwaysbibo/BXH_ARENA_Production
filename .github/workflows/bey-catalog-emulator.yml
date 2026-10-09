@@ -22,7 +22,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Install isolated test dependencies
-        run: npm install --no-save --no-package-lock --ignore-scripts firebase@12.4.0 firebase-admin@13.5.0 @firebase/rules-unit-testing@5.0.0 firebase-tools@15.30.0
+        run: npm install --no-save --no-package-lock --ignore-scripts firebase@12.4.0 firebase-admin@13.5.0 @firebase/rules-unit-testing@5.0.0 firebase-tools@15.30.0 firebase-functions@6.4.0 express@4.21.2
       - name: Run pure contract tests
         run: node --test tests/bey-catalog-safety-gate.test.cjs tests/bey-catalog-staging.test.cjs tests/bey-catalog-emulator/private-loader-guard.test.cjs
       - name: Check DATA-01B full fixture runner syntax
@@ -32,4 +32,4 @@ jobs:
       - name: Run Firestore Emulator rules tests
         run: npx firebase emulators:exec --only firestore --project demo-bxh-catalog-db01 --config tests/bey-catalog-emulator/firebase.json "node --test tests/bey-catalog-emulator/rules.test.cjs && node --test tests/bey-catalog-emulator/transactions.test.cjs && node --test tests/bey-catalog-emulator/batch-recovery.test.cjs && node --test tests/bey-catalog-emulator/tw09-review-journal.test.cjs && node --test tests/bey-catalog-emulator/tw14-quota-audit.test.cjs && node --test tests/bey-catalog-emulator/tw14-tw12-integration.test.cjs && node --test tests/bey-catalog-emulator/tw15-admin-sdk.test.cjs && node --test tests/bey-catalog-emulator/tw16-http-admin-e2e.test.cjs"
       - name: Real Auth Emulator credential regression (no private fixture)
-        run: npx firebase emulators:exec --only firestore,auth --project demo-bxh-catalog-db01 --config tests/bey-catalog-emulator/firebase-auth.json "node --test tests/bey-catalog-emulator/tw17-auth-emulator.test.cjs"
+        run: npx firebase emulators:exec --only firestore,auth --project demo-bxh-catalog-db01 --config tests/bey-catalog-emulator/firebase-auth.json "BXH_CATALOG_REAL_HTTP=1 node --test tests/bey-catalog-emulator/tw17-auth-emulator.test.cjs"
