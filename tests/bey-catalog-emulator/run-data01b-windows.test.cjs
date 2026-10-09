@@ -20,15 +20,17 @@ test('no production deploy, Firebase project or remote write command',()=>{
  assert.match(ps1,/Remove-Item Env:BXH_CATALOG_DATA01B_FILE/);
 });
 
-test('Java is checked only after real-data preflight and optional preflight-only exit',()=>{
+test('offline preflight verifies pinned raw SHA and 197 records before Git/Node/Java',()=>{
  const sha=ps1.indexOf('DATA01B_SHA256_MISMATCH');
- const plan=ps1.indexOf('data01b-preflight.cjs');
  const only=ps1.indexOf('if ($PreflightOnly)');
+ const git=ps1.indexOf('foreach ($cmd in @("git","node"))');
  const java=ps1.indexOf('JAVA_21_REQUIRED');
- const npm=ps1.indexOf('& npm install');
- assert(sha>=0&&plan>sha&&only>plan&&java>only&&npm>java);
- assert.match(ps1,/param\(\[switch\]\$PreflightOnly\)/);
- assert.match(ps1,/PREFLIGHT_ONLY: No Java, npm or Firestore Emulator required/);
+ assert(sha>=0&&only>sha&&git>only&&java>git);
+ assert.match(ps1,/param\\(\\[switch\\]\\$PreflightOnly\\)/);
+ assert.match(ps1,/Get-Content -LiteralPath \\$fixture -Raw -Encoding UTF8 \\| ConvertFrom-Json/);
+ assert.match(ps1,/DATA01B_SECTION_COUNT_MISMATCH/);
+ assert.match(ps1,/DATA01B_EXPECTED_197/);
+ assert.match(ps1,/PREFLIGHT_ONLY: no Java, Node, Git, npm or Firestore writes required/);
 });
 test('reusing an existing checkout checks expected origin and branch and never deletes user files',()=>{
  assert.match(ps1,/remote get-url origin/);
