@@ -7,7 +7,7 @@ const {resumeEmulatorBatch}=require('../../modules/bey-catalog/catalog-emulator-
 const {verifyData01bFile}=require('./data01b-preflight.cjs');
 const PROJECT='demo-bxh-catalog-db01',HOST='127.0.0.1:8189';
 if(process.env.FIRESTORE_EMULATOR_HOST!==HOST)throw Error('LOCAL_EMULATOR_REQUIRED');
-const {plan}=verifyData01bFile(process.env.BXH_CATALOG_DATA01B_FILE);
+const {plan,summary}=verifyData01bFile(process.env.BXH_CATALOG_DATA01B_FILE);
 const target={projectId:PROJECT,emulatorHost:HOST,mode:'emulator'};
 async function main(){
  const env=await initializeTestEnvironment({projectId:PROJECT,firestore:{host:'127.0.0.1',port:8189}});
@@ -56,7 +56,7 @@ async function main(){
    if(!isDeepStrictEqual((await getDoc(ref)).data(),corrected))throw Error('MANUAL_CORRECTION_OVERWRITTEN');
    const finalStatus=await getDoc(doc(db,'beyCatalogImportRuns',plan.batchId));
    if(finalStatus.data().status!=='completed_with_conflicts')throw Error('CONFLICT_STATUS_MISSING');
-   console.log(JSON.stringify({batchId:plan.batchId,records:197,firstPartial:73,recovered:124,replayUnchanged:197,verifiedDocuments:197,verifiedCollections:counts.size,manualConflicts:1,manualCorrectionPreserved:true,published:0,cloudWrites:0,emulator:true}));
+   console.log(JSON.stringify({batchId:plan.batchId,sourceSha256:summary.sha256,manifestDigest:summary.manifestDigest,records:197,firstPartial:73,recovered:124,replayUnchanged:197,verifiedDocuments:197,verifiedCollections:counts.size,manualConflicts:1,manualCorrectionPreserved:true,published:0,cloudWrites:0,emulator:true}));
   });
  }finally{await env.cleanup();}
 }
