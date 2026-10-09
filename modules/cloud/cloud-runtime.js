@@ -720,7 +720,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(name === 'hunterClashCommand'){
+      if(['hunterClashCommand','manageOnsiteWaitlist'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -840,6 +840,16 @@
     return {courtLifecycleWriteSeq:current+1};
   }
 
+  // Once draw mode is finalized, existing authorized management resumes with
+  // a two-document CAS fence. Old clients cannot replay unfenced runtime JSON.
+  function advanceOnsiteWriteFence(doc,state,expectedRevision=state?.onsiteWaitlistRuntimeRevision){
+    if(doc?.onsiteWaitlistServerOwned!==true)return {};
+    if(doc.onsiteWaitlistFinalized!==true)throw Object.assign(new Error("onsite-waitlist-managed"),{code:"onsite-waitlist-managed"});
+    const revision=doc.onsiteWaitlistRuntimeRevision;
+    if(!Number.isSafeInteger(revision)||revision<1||expectedRevision!==revision||state?.onsiteWaitlistServerOwned!==true||state?.onsiteWaitlistFinalized!==true)throw Object.assign(new Error("onsite-runtime-stale"),{code:"onsite-runtime-stale"});
+    state.onsiteWaitlistRuntimeRevision=revision+1;
+    return {onsiteWaitlistRuntimeRevision:revision+1};
+  }
   function buildPublicMirrorFields(state){
     // Explicit, hand-picked whitelist — NEVER a spread of the full private
     // state. This is the content that ends up INSIDE the "bracketView" JSON
@@ -867,6 +877,7 @@
       courtLifecycleEpoch:Number(state.courtLifecycleEpoch||0),
       callRevision:Number(state.callRevision||0),
       registrationRosterRevision:Number(state.registrationRosterRevision||0),
+      ...(state.onsiteWaitlistServerOwned===true?{onsiteWaitlistRuntimeRevision:state.onsiteWaitlistRuntimeRevision}:{}),
       systemClosure:state.systemClosure?{reason:'idle-24h',label:state.systemClosure.label||'',closedAt:state.systemClosure.closedAt||null,lastActivityAt:state.systemClosure.lastActivityAt||null,restoredAt:state.systemClosure.restoredAt||null}:null,
       eventInfo:buildPublicEventInfo(state),
       meta: {
@@ -1125,6 +1136,7 @@
       let processed=0, failed=0, skipped=0;
       for(const docSnap of snap.docs){
         const d = docSnap.data();
+        if(d.onsiteWaitlistServerOwned===true){skipped++;continue;}
         const hasLegacyData = d.data !== undefined;
         const hasLegacyStaff = d.assignedStaffUids !== undefined;
         if(!hasLegacyData && !hasLegacyStaff){ skipped++; continue; }
@@ -1187,6 +1199,18 @@
       return result;
     },
 
+    async manageOnsiteWaitlist(data){
+      try{return await callEngagementFunction("manageOnsiteWaitlist",data,60000);}
+      catch(e){
+        // Preserve exact application error codes so an uncertain callable result
+        // is retried under the same operation ID rather than becoming a new draw.
+        e.definitive=/^functions\/(invalid-argument|permission-denied|failed-precondition|not-found|unauthenticated)$/.test(String(e?.code||''));
+        const message=String(e?.message||"");
+        const reason=typeof e?.details?.reason==="string"?e.details.reason:message.split(/\s+/).find(x=>/^[a-z][a-z0-9-]+$/.test(x));
+        if(reason)e.code=reason;
+        throw e;
+      }
+    },
     async cancelRoster(code,registrationId="",localId="",intent="admin"){
       return callEngagementFunction("registrationRosterService",{action:"cancel",code,registrationId,localId,intent,operationId:crypto.randomUUID()},60000);
     },
@@ -1274,10 +1298,11 @@
         if(nextStatus==="full"&&(!nextCapacity||runtime.players.length<nextCapacity))nextStatus="open";
         runtime.meta.registrationStatus=nextStatus;
         const now=Date.now();
-        const privatePatch=Object.assign({data:JSON.stringify(runtime),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now},courtLifecycleWritePatch(tour,runtime));
+        const onsiteFence=advanceOnsiteWriteFence(tour,runtime);
+        const privatePatch=Object.assign({},onsiteFence,{data:JSON.stringify(runtime),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now},courtLifecycleWritePatch(tour,runtime));
         if(Number(tour.entrySelectionRevision||0)>0)privatePatch.entrySelectionWriteRevision=Number(tour.entrySelectionRevision);
         tx.update(tourRef,privatePatch);
-        tx.update(pubRef,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime)),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now});
+        tx.update(pubRef,Object.assign({},onsiteFence,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime)),capacity:nextCapacity,registrationStatus:nextStatus,updatedAt:now}));
         return {state:runtime,capacity:nextCapacity,expanded:nextCapacity!==capacity,candidateId};
       });
       // The transaction committed both mirrors. Read back from the server before showing success.
@@ -1415,9 +1440,10 @@
           lastRegistrationMutationType:action+(newCapacity!==capacity?"_expand8":""),
           lastRegistrationMutationBy:staffUid
         };
+        const onsiteFence=advanceOnsiteWriteFence(tour,runtime);
         tx.update(regRef,regPatch);
-        tx.update(tourRef,Object.assign({},common,{data:JSON.stringify(runtime)},courtLifecycleWritePatch(tour,runtime)));
-        tx.update(pubRef,Object.assign({},common,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime))}));
+        tx.update(tourRef,Object.assign({},common,onsiteFence,{data:JSON.stringify(runtime)},courtLifecycleWritePatch(tour,runtime)));
+        tx.update(pubRef,Object.assign({},common,onsiteFence,{bracketView:JSON.stringify(buildPublicMirrorFields(runtime))}));
         return {capacity:newCapacity,confirmedCount:nextConfirmed,waitlistCount:nextWaiting,status:action==="cancel"?"cancelled":action==="demote"?"waitlist":"confirmed",participantRegistrationId:participant};
       });
 
@@ -1808,6 +1834,12 @@
         const archiveStatus=parsed.archiveStatus||d.archiveStatus||"ongoing";
         if(archiveStatus==="completed") phase="done";
         const registrationStatus=(phase==="live"||phase==="done")?"started":(d.registrationStatus||null);
+        if(d.onsiteWaitlistServerOwned===true){
+          if(d.onsiteWaitlistFinalized!==true)return {ok:false,reason:"onsite-waitlist-managed"};
+          parsed.meta=parsed.meta||{};parsed.meta.registrationStatus=registrationStatus;
+          const ok=await this.pushUpdate(code,parsed);
+          return {ok,phase,archiveStatus,reason:ok?undefined:"onsite-runtime-stale"};
+        }
 
         await fx.setDoc(privateRef,{tournamentPhase:phase,archiveStatus,registrationStatus,updatedAt:Date.now()},{merge:true});
         await fx.setDoc(publicRef,{
@@ -2555,6 +2587,7 @@
         const repairs=[];
         privateSnap.forEach(ds=>{
           const d=ds.data()||{};
+          if(d.onsiteWaitlistServerOwned===true)return;
           let parsedMeta=null;
           if(typeof d.data==="string"){
             try{
@@ -2623,9 +2656,11 @@
           const now=Date.now();
           const privatePatch={visibility:next,registrationVisibility:next,updatedAt:now};
           const privateDoc=privateSnap.data()||{};
+          let visibilityState=null;
           if(typeof privateDoc.data==="string"){
             try{
               const parsed=JSON.parse(privateDoc.data);
+              visibilityState=parsed;
               parsed.meta=parsed.meta||{};
               parsed.meta.registrationVisibility=next;
               parsed.updatedAt=now;
@@ -2633,9 +2668,18 @@
               privatePatch.data=JSON.stringify(parsed);
             }catch(e){}
           }
+          const onsiteFence=advanceOnsiteWriteFence(privateDoc,visibilityState);
+          Object.assign(privatePatch,onsiteFence);
+          if(visibilityState)privatePatch.data=JSON.stringify(visibilityState);
           tx.set(privateRef,privatePatch,{merge:true});
           if(publicSnap.exists()){
-            tx.set(publicRef,{visibility:next,registrationVisibility:next,updatedAt:now},{merge:true});
+            const publicPatch={...onsiteFence,visibility:next,registrationVisibility:next,updatedAt:now};
+            if(onsiteFence.onsiteWaitlistRuntimeRevision){
+              const view=JSON.parse(publicSnap.data().bracketView);
+              view.onsiteWaitlistRuntimeRevision=onsiteFence.onsiteWaitlistRuntimeRevision;
+              publicPatch.bracketView=JSON.stringify(view);
+            }
+            tx.set(publicRef,publicPatch,{merge:true});
           }
         });
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;
@@ -2662,6 +2706,7 @@
 
     async pushUpdate(code, data, options={}){
       if(!cloudEnabled || !code) return false;
+      const onsiteInputRevision=data?.onsiteWaitlistRuntimeRevision;
       try{
         const actorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
@@ -2857,7 +2902,23 @@ if(testerSession){
             }
             publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
           }
-          Object.assign(privatePayload,courtLifecycleWritePatch(snap.exists()?snap.data():{},data));
+          const fencedDoc=snap.exists()?snap.data():{};
+          if(fencedDoc.onsiteWaitlistFinalized===true){
+            const canonical=typeof fencedDoc.data==="string"?JSON.parse(fencedDoc.data):fencedDoc.data;
+            const canonicalMeta=canonical?.meta||{};
+            for(const [top,meta] of [['registrationEnabled','registrationEnabled'],['registrationOpenAt','registrationOpenAt'],['registrationCloseAt','registrationCloseAt'],['waitlistEnabled','waitlistEnabled'],['waitlistCapacity','waitlistCapacity'],['capacity','registrationCapacity']]){
+              if(Object.prototype.hasOwnProperty.call(fencedDoc,top)){privatePayload[top]=fencedDoc[top];publicPayload[top]=fencedDoc[top];}
+              else{delete privatePayload[top];delete publicPayload[top];}
+              if(Object.prototype.hasOwnProperty.call(canonicalMeta,meta))data.meta[meta]=canonicalMeta[meta];else delete data.meta[meta];
+            }
+            data.meta.registrationAutoFillEnabled=false;
+            privatePayload.registrationAutoFillEnabled=false;publicPayload.registrationAutoFillEnabled=false;
+            data.meta.registrationStatus=data.meta.eventCancelled?"cancelled":data.startedAt?"started":"closed";
+            privatePayload.registrationStatus=data.meta.registrationStatus;publicPayload.registrationStatus=data.meta.registrationStatus;
+          }
+          const onsiteFence=advanceOnsiteWriteFence(snap.exists()?snap.data():{},data,onsiteInputRevision);
+          Object.assign(privatePayload,onsiteFence,courtLifecycleWritePatch(snap.exists()?snap.data():{},data));
+          Object.assign(publicPayload,onsiteFence);
           privatePayload.data=JSON.stringify(data);
           publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
           tx.set(ref,privatePayload,{merge:true});
@@ -2928,8 +2989,9 @@ if(testerSession){
             ?!!remoteState.meta.refereeStationRestrictionEnabled:!!docData.refereeStationRestrictionEnabled;
           remoteState.updatedAt=now;
 
+          const onsiteFence=advanceOnsiteWriteFence(docData,remoteState);
           const patch={
-            data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,
+            ...onsiteFence,data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,
             refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,
             refereeStationRestrictionEnabled:remoteState.meta.refereeStationRestrictionEnabled
           };
@@ -2941,7 +3003,7 @@ if(testerSession){
           }
           tx.update(ref,patch);
           tx.set(fx.doc(dbHandle,"publicTournaments",normalizedCode),{
-            bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,
+            ...onsiteFence,bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,
             tournamentPhase:computeTournamentPhase(remoteState)
           },{merge:true});
           return {state:remoteState,assignedStaffUids:assigned};
@@ -3095,8 +3157,9 @@ if(testerSession){
           const now=Date.now();
           remoteState.updatedAt=now;
           // Replace each map field completely; recursive merge retains obsolete Courts.
-          tx.update(ref,Object.assign({data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,refereeStationRestrictionEnabled:requestedRestriction},courtLifecycleWritePatch(docData,remoteState)));
-          tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
+          const onsiteFence=advanceOnsiteWriteFence(docData,remoteState);
+          tx.update(ref,Object.assign({},onsiteFence,{data:JSON.stringify(remoteState),updatedAt:now,assignedStaffUids:assigned,refereeStationAssignments:map,refereeStationNames:names,refereeStationUids:allUids,refereeStationRestrictionEnabled:requestedRestriction},courtLifecycleWritePatch(docData,remoteState)));
+          tx.set(publicRef,{...onsiteFence,bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
           return {state:remoteState,map,names,restriction:requestedRestriction};
         });
 
@@ -3186,9 +3249,10 @@ if(testerSession){
           if(!applied?.ok)throw new Error(applied?.reason||"invalid-change");
           rebuildPropagationForState(st);
           const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1);st.updatedAt=now;
-          const lifecyclePatch=courtLifecycleWritePatch(docData,st,true);
+          const onsiteFence=advanceOnsiteWriteFence(docData,st);
+          const lifecyclePatch=Object.assign({},onsiteFence,courtLifecycleWritePatch(docData,st,true));
           tx.set(ref,Object.assign({data:JSON.stringify(st),updatedAt:now},lifecyclePatch),{merge:true});
-          tx.set(pub,{bracketView:JSON.stringify(buildPublicMirrorFields(st)),updatedAt:now,tournamentPhase:computeTournamentPhase(st)},{merge:true});
+          tx.set(pub,{...onsiteFence,bracketView:JSON.stringify(buildPublicMirrorFields(st)),updatedAt:now,tournamentPhase:computeTournamentPhase(st)},{merge:true});
           return {ok:true,state:st};
         });return result;
       }catch(e){return {ok:false,reason:e.message||String(e)};}
@@ -3234,8 +3298,9 @@ if(testerSession){
           if(!result || !result.ok) throw new Error((result&&result.reason)||"validation-failed");
           const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1,Number(remoteState.updatedAt||0)+1);
           result.state.updatedAt=now; rebuildPropagationForState(result.state);
-          tx.set(ref,Object.assign({data:JSON.stringify(result.state),updatedAt:now},courtLifecycleWritePatch(docData,result.state)),{merge:true});
-          tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(result.state)),updatedAt:now,tournamentPhase:computeTournamentPhase(result.state)},{merge:true});
+          const onsiteFence=advanceOnsiteWriteFence(docData,result.state);
+          tx.set(ref,Object.assign({},onsiteFence,{data:JSON.stringify(result.state),updatedAt:now},courtLifecycleWritePatch(docData,result.state)),{merge:true});
+          tx.set(publicRef,{...onsiteFence,bracketView:JSON.stringify(buildPublicMirrorFields(result.state)),updatedAt:now,tournamentPhase:computeTournamentPhase(result.state)},{merge:true});
           return result;
         });
         return {ok:true,state:outcome.state};
@@ -3300,8 +3365,9 @@ if(testerSession){
             version:1,roomCode:code,committedAt:now,committedBy:actorUid,fingerprint:plan.fingerprint,
             operations:plan.operations.map(op=>({sourceMatchId:op.sourceMatchId,targetMatchId:op.targetMatchId,targetSlot:op.targetSlot,playerId:op.playerId,otherPlayerId:op.otherPlayerId,deadSourceMatchIds:op.deadSourceMatchIds}))
           };
-          tx.set(ref,Object.assign({data:JSON.stringify(remoteState),updatedAt:now},courtLifecycleWritePatch(docData,remoteState)),{merge:true});
-          tx.set(publicRef,{bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
+          const onsiteFence=advanceOnsiteWriteFence(docData,remoteState);
+          tx.set(ref,Object.assign({},onsiteFence,{data:JSON.stringify(remoteState),updatedAt:now},courtLifecycleWritePatch(docData,remoteState)),{merge:true});
+          tx.set(publicRef,{...onsiteFence,bracketView:JSON.stringify(buildPublicMirrorFields(remoteState)),updatedAt:now,tournamentPhase:computeTournamentPhase(remoteState)},{merge:true});
           return {state:remoteState,operationCount:plan.operations.length,protected:plan.protected};
         });
         return {ok:true,state:outcome.state,operationCount:outcome.operationCount,protected:outcome.protected};
@@ -3349,8 +3415,9 @@ if(testerSession){
           const community=(result.state.meta&&result.state.meta.eventAuthority)==="community";
           if(community){ result.state.lastActivityAt=now; result.state.expiresAtMs=communityRoomExpiryMs(result.state); }
           const extra=community?{lastActivityAt:now,expiresAt:result.state.expiresAtMs==null?null:new Date(result.state.expiresAtMs),eventAuthority:"community",ownerUid:result.state.ownerUid,ladderMode:"general",registrationEnabled:false,registrationStatus:"closed"}:{};
-          tx.set(ref, Object.assign({ data: JSON.stringify(result.state), updatedAt: now },extra,courtLifecycleWritePatch(docData,result.state)), { merge:true });
-          tx.set(publicRef, Object.assign({ bracketView: JSON.stringify(buildPublicMirrorFields(result.state)), updatedAt: now, tournamentPhase: computeTournamentPhase(result.state) },extra), { merge:true });
+          const onsiteFence=advanceOnsiteWriteFence(docData,result.state);
+          tx.set(ref, Object.assign({},onsiteFence,{ data: JSON.stringify(result.state), updatedAt: now },extra,courtLifecycleWritePatch(docData,result.state)), { merge:true });
+          tx.set(publicRef, Object.assign({},onsiteFence,{ bracketView: JSON.stringify(buildPublicMirrorFields(result.state)), updatedAt: now, tournamentPhase: computeTournamentPhase(result.state) },extra), { merge:true });
           const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
           if(auditMeta && auditMeta.recordDuty===true && actorUid && auditMeta.uid===actorUid && !(userProfile&&(userProfile.role==="tester"||userProfile.isTestAccount===true))){
             const logId=String(code).toUpperCase()+"_"+String(auditMeta.matchId||"match");
