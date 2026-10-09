@@ -8,7 +8,7 @@ const target={projectId:'demo-bxh-catalog-db01',emulatorHost:'127.0.0.1:8189',mo
 if(process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8189')throw Error('LOCAL_EMULATOR_REQUIRED');
 const verifier={verifyIdToken:async (token,revoked)=>{
  assert.equal(revoked,true);
- if(!['admin_a','admin_b','admin_c','player_a','test_admin','disabled_admin','anonymous'].includes(token))throw Error('TOKEN_REVOKED_OR_INVALID');
+ if(!['admin_a','admin_b','admin_c','editor_1','player_a','test_admin','disabled_admin','anonymous'].includes(token))throw Error('TOKEN_REVOKED_OR_INVALID');
  return {uid:token==='anonymous'?'anon_user':token,firebase:{sign_in_provider:token==='anonymous'?'anonymous':'password'}};
 }};
 let env;
@@ -18,7 +18,7 @@ async function setup(){
  await env.withSecurityRulesDisabled(async ctx=>{
   const db=ctx.firestore();
   for(const [uid,role,active,isTestAccount] of [
-   ['admin_a','admin',true,false],['admin_b','admin',true,false],['admin_c','super_admin',true,false],
+   ['admin_a','admin',true,false],['admin_b','admin',true,false],['admin_c','super_admin',true,false],['editor_1','admin',true,false],
    ['player_a','player',true,false],['test_admin','admin',true,true],['disabled_admin','admin',false,false]
   ])await setDoc(doc(db,'users',uid),{role,active,isTestAccount});
  });
@@ -72,6 +72,7 @@ test('player, test admin, disabled admin, proposer and anonymous cannot review',
   for(const uid of ['player_a','test_admin','disabled_admin'])
    await assert.rejects(()=>call(db,p,uid,'accept'),/TW09_ADMIN_REQUIRED/);
   await assert.rejects(()=>call(db,p,'anonymous','accept'),/TW09_VERIFIED_USER_REQUIRED/);
+  await assert.rejects(()=>call(db,p,'editor_1','accept'),/TW09_SELF_REVIEW_DENIED/);
   const forged=await recordTw09Decision({db,target,authVerifier:{verifyIdToken:async()=>({uid:'editor_1'})},
    idToken:'editor',proposalId:p.proposalId,decision:'accept',notes:'已獨立核對台灣繁體名稱與來源'}).catch(e=>e);
   assert.match(forged.message,/TW09_ADMIN_REQUIRED/);
@@ -129,6 +130,7 @@ test('two simultaneous first reviews produce exactly one winner',async()=>{
 test('browser cannot forge review or audit; production target rejected',async()=>{
  const e=await setup(),client=e.authenticatedContext('admin_c').firestore();
  await assertFails(setDoc(doc(client,'beyCatalogTw09Reviews','forged'),{phase:'approved_for_draft_only'}));
+ await assertFails(getDoc(doc(client,'beyCatalogTw09Reviews','forged')));
  await assertFails(setDoc(doc(client,'beyCatalogTw09ReviewEvents','forged'),{actorUid:'admin_c'}));
  await e.withSecurityRulesDisabled(async ctx=>{
   const p=proposal('production');
