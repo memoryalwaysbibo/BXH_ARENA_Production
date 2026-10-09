@@ -7,6 +7,8 @@
  */
 const fs=require('node:fs');
 const EXPECTED_BATCH='DATA-01B-20261009';
+const EXPECTED_SHA='2a53b4d0164d97a5f0607b4d4fd8a536a84b388530bca3eb371453f525cb7d42';
+const EXPECTED_MANIFEST='e8fa4337fa76bd13ebc372ff91e611d03fcd4ccd5ec91623be21f5dabc5992f0';
 function verifyReceiptText(raw){
  if(typeof raw!=='string'||raw.length>4_000_000)throw Error('DB01_RECEIPT_TEXT_INVALID');
  const rows=[];
@@ -22,7 +24,8 @@ function verifyReceiptText(raw){
  const final=rows.filter(x=>x.batchId===EXPECTED_BATCH&&x.verifiedDocuments!==undefined);
  if([interrupted,recovered,replayed,final].some(x=>x.length!==1))throw Error('DB01_RECEIPT_STAGES_MISSING_OR_DUPLICATE');
  const [a,b,c,d]=[interrupted[0],recovered[0],replayed[0],final[0]];
- if(a.persistedDocuments!==73||b.inserted!==124||b.unchanged!==73||b.conflicts!==0||
+ if(d.sourceSha256!==EXPECTED_SHA||d.manifestDigest!==EXPECTED_MANIFEST||
+    a.persistedDocuments!==73||b.inserted!==124||b.unchanged!==73||b.conflicts!==0||
     c.inserted!==0||c.unchanged!==197||c.conflicts!==0||
     d.records!==197||d.firstPartial!==73||d.recovered!==124||
     d.replayUnchanged!==197||d.verifiedDocuments!==197||d.verifiedCollections!==9||
@@ -31,7 +34,7 @@ function verifyReceiptText(raw){
   throw Error('DB01_RECEIPT_ACCEPTANCE_MISMATCH');
  const indices=[a,b,c,d].map(x=>rows.indexOf(x));
  if(indices.some((x,i)=>i>0&&x<=indices[i-1]))throw Error('DB01_RECEIPT_STAGE_ORDER_INVALID');
- return Object.freeze({batchId:d.batchId,verifiedDocuments:197,verifiedCollections:9,
+ return Object.freeze({batchId:d.batchId,sourceSha256:EXPECTED_SHA,manifestDigest:EXPECTED_MANIFEST,verifiedDocuments:197,verifiedCollections:9,
   interrupted:73,recovered:124,replayUnchanged:197,manualConflicts:1,
   manualCorrectionPreserved:true,published:0,cloudWrites:0,emulator:true});
 }
