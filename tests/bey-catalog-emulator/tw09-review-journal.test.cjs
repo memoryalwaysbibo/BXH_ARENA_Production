@@ -58,9 +58,10 @@ test('two independent reviewers persist audit events, no catalog or player write
   const saved=(await getDoc(doc(db,'beyCatalogTw09Reviews',p.proposalId))).data();
   assert.equal(saved.firstReviewerUid,'admin_a');assert.equal(saved.secondReviewerUid,'admin_b');
   assert.equal(saved.publicationStatus,'unpublished');assert.equal(saved.selectable,false);
+  assert.equal(saved.revision,2);assert(saved.updatedAt);
   for(const stage of ['first','second']){
    const event=(await getDoc(doc(db,'beyCatalogTw09ReviewEvents',p.proposalId+'_'+stage))).data();
-   assert.equal(event.publicationStatus,'unpublished');
+   assert.equal(event.publicationStatus,'unpublished');assert(event.reviewedAt);
   }
  });
 });
