@@ -7,6 +7,7 @@ on:
       - 'tests/bey-catalog-*/**'
       - 'tests/bey-catalog-assembly.test.cjs'
       - 'tests/bey-catalog-rule-registry.test.cjs'
+      - 'tests/bey-catalog-rule-impact.test.cjs'
       - '.github/workflows/bey-catalog-emulator.yml'
 permissions:
   contents: read
@@ -26,7 +27,7 @@ jobs:
       - name: Install isolated test dependencies
         run: npm install --no-save --no-package-lock --ignore-scripts firebase@12.4.0 @firebase/rules-unit-testing@5.0.0 firebase-tools@15.30.0
       - name: Run pure contract tests
-        run: node --test tests/bey-catalog-safety-gate.test.cjs tests/bey-catalog-staging.test.cjs tests/bey-catalog-assembly.test.cjs tests/bey-catalog-rule-registry.test.cjs
+        run: node --test tests/bey-catalog-safety-gate.test.cjs tests/bey-catalog-staging.test.cjs tests/bey-catalog-assembly.test.cjs tests/bey-catalog-rule-registry.test.cjs tests/bey-catalog-rule-impact.test.cjs
       - name: Check DATA-01B full fixture runner syntax
         run: node --check tests/bey-catalog-emulator/data01b-full-import.cjs
       - name: Run Firestore Emulator rules tests
