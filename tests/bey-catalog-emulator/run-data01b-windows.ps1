@@ -131,11 +131,11 @@ try {
   $exit = $LASTEXITCODE
   $output | Out-File -LiteralPath $log -Encoding utf8
   if ($exit -ne 0) { throw "Firestore Emulator acceptance FAILED. Inspect DB01_197_Emulator_Result.txt (no fixture data should be printed)." }
-  $resultLine = $output | Where-Object { $_ -match '"verifiedDocuments":197' } | Select-Object -Last 1
-  if (-not $resultLine -or $resultLine -notmatch '"manualCorrectionPreserved":true' -or $resultLine -notmatch '"published":0') {
-    throw "Emulator completed but required acceptance evidence missing. Do not mark DB-01 complete."
+  & node "tests/bey-catalog-emulator/data01b-verify-receipt.cjs" $log
+  if ($LASTEXITCODE -ne 0) {
+    throw "DB01_RECEIPT_FAILED: incomplete recovery, document count, manual correction, or no-publish evidence."
   }
-  Write-Host "PASS: real 197-document Firestore Emulator acceptance. Report: $log" -ForegroundColor Green
+  Write-Host "PASS: all four real 197-document Firestore Emulator stages verified. Report: $log" -ForegroundColor Green
 } finally {
   Remove-Item Env:BXH_CATALOG_DATA01B_FILE -ErrorAction SilentlyContinue
   Pop-Location
