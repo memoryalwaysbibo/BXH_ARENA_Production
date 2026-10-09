@@ -20,7 +20,7 @@ const TAIWAN_CORRECTION_CANDIDATES=Object.freeze({
  })
 });
 const USER_ALIASES=Object.freeze({'UX-19':['子彈獅鷲 H'],'UX-20':['榮耀女武神 LF']});
-const NEEDS_REVIEW=Object.freeze({'products:product_000009':'provisional_translation','variants:variant_000010':'needs_source_recheck','assemblyClaims:group_000014':'needs_original_kit_recheck','parts:part_000034':'taiwan_name_pending','parts:part_000037':'taiwan_name_pending','assemblyClaims:group_000008':'taiwan_name_pending_supplier_source','assemblyClaims:group_000009':'taiwan_name_pending_supplier_source'});
+const NEEDS_REVIEW=Object.freeze({'products:product_000009':'provisional_translation','variants:variant_000010':'needs_source_recheck','assemblyClaims:group_000014':'needs_original_kit_recheck','parts:part_000022':'provisional_translation','parts:part_000034':'taiwan_name_pending','parts:part_000037':'taiwan_name_pending','assemblyClaims:group_000008':'taiwan_name_pending_supplier_source','assemblyClaims:group_000009':'taiwan_name_pending_supplier_source'});
 function nameFor(section,record){
  if(section==='products')return PRODUCT_NAMES[record.productCode];
  if(section==='parts')return PART_NAMES[record.partId]||record.displayName;

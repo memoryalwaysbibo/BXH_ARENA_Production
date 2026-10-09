@@ -46,3 +46,10 @@ test('CX-07 variant attribution remains quarantined pending color evidence',()=>
  assert(variant.displayName.includes('待核對'));
  assert.equal(variant.localizationStatus,'needs_source_recheck');
 });
+
+test('Dran lock-chip tentative translation remains in the pending review queue',()=>{
+ const x={partId:'part_000022',displayName:'Dran 鎖定紋章',category:'lock_chip'};
+ const y=localizeRecord('parts',x);
+ assert.equal(y.localizationStatus,'provisional_translation');
+ assert.equal(x.displayName,'Dran 鎖定紋章');
+});
