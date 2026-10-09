@@ -268,7 +268,10 @@ test('an old Admin room read cannot update state after switching rooms', async (
   const start = core.indexOf('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;');
   const end = core.indexOf('let myRegistrationsError = null;', start);
   assert(start >= 0 && end > start, 'Admin room-watch source boundary exists');
-  const source = core.slice(start, end) + '\nglobalThis.__startAdminWatch=startAdminRosterWatch;globalThis.__stopAdminWatch=stopAdminRosterWatch;globalThis.__adminChain=()=>adminRosterSyncChain;';
+  const managedStart = core.indexOf('function peopleOnsiteWaitlistManaged(){');
+  const managedEnd = core.indexOf('function peopleOnsiteWaitlistAvailable(){', managedStart);
+  assert(managedStart >= 0 && managedEnd > managedStart, 'Actual onsite ownership guard source boundary exists');
+  const source = core.slice(managedStart, managedEnd) + core.slice(start, end) + '\nglobalThis.__startAdminWatch=startAdminRosterWatch;globalThis.__stopAdminWatch=stopAdminRosterWatch;globalThis.__adminChain=()=>adminRosterSyncChain;';
   const context = moduleContext({
     state: { id: 'room-a', cloudCode: 'ROOM-A', meta: { registrationEnabled: true } },
     activeTab: 'people', appPhase: 'app', currentRole: 'admin',
