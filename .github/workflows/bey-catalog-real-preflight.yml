@@ -1,0 +1,27 @@
+name: BEY Catalog DATA-01B Safe Preflight
+# PR checks never access the private research fixture or environment secrets.
+on:
+  pull_request:
+    paths:
+      - 'tests/bey-catalog-emulator/data01b-preflight.cjs'
+      - 'tests/bey-catalog-emulator/data01b-preflight.test.cjs'
+      - 'tests/bey-catalog-emulator/data01b-full-import.cjs'
+      - '.github/workflows/bey-catalog-real-preflight.yml'
+      - '.github/workflows/bey-catalog-real-data.yml'
+permissions:
+  contents: read
+jobs:
+  offline-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax-check private-data runner
+        run: |
+          node --check tests/bey-catalog-emulator/data01b-preflight.cjs
+          node --check tests/bey-catalog-emulator/data01b-full-import.cjs
+      - name: Verify fixture substitution cannot pass
+        run: node --test tests/bey-catalog-emulator/data01b-preflight.test.cjs
