@@ -7,6 +7,7 @@
 const {doc,runTransaction,serverTimestamp}=require('firebase/firestore');
 const {verifyEmulator}=require('./catalog-emulator-transactions.cjs');
 const {digest}=require('./catalog-tw06-review.cjs');
+const {isActiveCatalogAdmin}=require('./catalog-tw11-role-policy.cjs');
 const UID=/^[A-Za-z0-9_-]{2,128}$/;
 const PID=/^tw06_[a-f0-9]{28}$/;
 function requireReason(decision,notes){
@@ -30,8 +31,7 @@ async function recordTw09Decision({db,target,authVerifier,idToken,proposalId,dec
    tx.get(userRef),tx.get(proposalRef),tx.get(reviewRef)
   ]);
   const user=userSnap.exists()?userSnap.data():null;
-  if(!user||user.active!==true||user.isTestAccount===true||
-    !['admin','super_admin'].includes(user.role))throw Error('TW09_ADMIN_REQUIRED');
+  if(!isActiveCatalogAdmin(user))throw Error('TW09_ADMIN_REQUIRED');
   const canonical=proposalSnap.exists()?proposalSnap.data():null;
   if(!canonical||canonical.publicationStatus!=='unpublished'||canonical.productionWritable!==false||
     canonical.autoPublish!==false||canonical.batchId!=='DATA-01B-20261009-ZHTW-TW05'||
@@ -55,8 +55,7 @@ async function recordTw09Decision({db,target,authVerifier,idToken,proposalId,dec
    const firstRef=doc(db,'users',prior.firstReviewerUid);
    const firstSnap=await tx.get(firstRef);
    const first=firstSnap.exists()?firstSnap.data():null;
-   if(!first||first.active!==true||first.isTestAccount===true||
-      !['admin','super_admin'].includes(first.role))throw Error('TW09_FIRST_REVIEWER_REVOKED');
+   if(!isActiveCatalogAdmin(first))throw Error('TW09_FIRST_REVIEWER_REVOKED');
    phase=decision==='approve'?'approved_for_draft_only':'rejected';
    firstReviewerUid=prior.firstReviewerUid;secondReviewerUid=uid;eventStage='second';
   }
