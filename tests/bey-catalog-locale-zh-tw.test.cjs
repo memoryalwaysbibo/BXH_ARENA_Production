@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {PRODUCT_NAMES,PART_NAMES,GROUP_NAMES,VARIANT_NAMES,localizeRecord,localizeCatalog}=require('../modules/bey-catalog/catalog-locale-zh-tw.cjs');
+const {PRODUCT_NAMES,PART_NAMES,GROUP_NAMES,VARIANT_NAMES,TAIWAN_CORRECTION_CANDIDATES,localizeRecord,localizeCatalog}=require('../modules/bey-catalog/catalog-locale-zh-tw.cjs');
 test('all nine products use Taiwan Traditional Chinese primary names',()=>{
  assert.equal(Object.keys(PRODUCT_NAMES).length,9);
  for(const n of Object.values(PRODUCT_NAMES))assert(!/[\u3040-\u309f\u30a0-\u30fa\u30fc-\u30ff]/.test(n));
@@ -31,4 +31,18 @@ test('cannot transform writable or auto-publish payload',()=>{
  const x={batchId:'BATCH',productionWritable:false,autoPublish:false,products:[],parts:[],variants:[],assemblyClaims:[]};
  const y=localizeCatalog(x);
  assert.equal(y.locale,'zh-TW');assert.equal(y.productionWritable,false);assert.equal(x.locale,undefined);
+});
+
+test('Taiwan BX-20 F notation remains a visible candidate, not silent BOM overwrite',()=>{
+ const group=localizeRecord('assemblyClaims',{groupId:'group_000014',displayName:'SharkEdge 3-80LF',bitCode:'LF'});
+ assert(group.displayName.includes('3-80F'));
+ assert.equal(group.bitCode,'LF');
+ assert.equal(group.localizationStatus,'needs_original_kit_recheck');
+ assert.equal(TAIWAN_CORRECTION_CANDIDATES['assemblyClaims:group_000014'].candidateBit,'F');
+});
+test('CX-07 variant attribution remains quarantined pending color evidence',()=>{
+ const variant=localizeRecord('variants',{variantId:'variant_000010',displayName:'1-50',sourceProductCode:'CX-07'});
+ assert.equal(variant.sourceProductCode,'CX-07');
+ assert(variant.displayName.includes('待核對'));
+ assert.equal(variant.localizationStatus,'needs_source_recheck');
 });
