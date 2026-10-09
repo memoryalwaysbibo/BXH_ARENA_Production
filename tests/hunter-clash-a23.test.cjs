@@ -26,3 +26,15 @@ test('actual license render uses PK for presentation only: XP, grade and earned 
  c.window.BXHArenaPK={displayRecords:rows=>[...rows,...pk],statusHtml:()=>'<p>PK 已核對</p>',state:()=>({status:'ready'})};
  const after=c.renderPlayerStatsTab({displayName:'黑爸'});assert.match(after,/20 場/);assert.equal(after.match(/<strong>(\d+) XP<\/strong>/)[1],xp);assert.match(after,/A 級獵人/);assert.match(before,/A 級獵人/);assert.equal(JSON.stringify(c.hunterProfileCache.achievementCore),achievements);assert.equal(c.hunterBuildAnalysis(pk).overall,null);assert.equal(c.hunterBuildAnalysis(pk).validRounds,30);
 });
+
+test('PK App Check shares the ARENA app, deduplicates initialization and retries failed loading',async()=>{
+ const source=fs.readFileSync('modules/cloud/cloud-runtime.js','utf8');
+ const start=source.indexOf('  async function ensureHunterClashAppCheck(){'),end=source.indexOf('\n  let cloudEnabled',start);
+ const helper=source.slice(start,end).replace(/await import\(`https:\/\/www\.gstatic\.com\/firebasejs\/\$\{FIREBASE_SDK_VERSION\}\/firebase-app-check\.js`\)/,'await load()');
+ const app={},calls=[];let attempts=0,fail=true;
+ const mod={ReCaptchaEnterpriseProvider:class{constructor(key){this.key=key;}},initializeAppCheck:(a,options)=>{calls.push({a,options});return {app:a};},getToken:async(h,force)=>{assert.equal(h.app,app);assert.equal(force,false);return {token:'verified'};}};
+ const c=vm.createContext({load:async()=>{attempts++;if(fail)throw Error('offline');return mod;},firebaseAppHandle:app,ARENA_APP_CHECK_SITE_KEY:'public-key',appCheckHandle:null,appCheckModule:null,appCheckInitPromise:null});
+ vm.runInContext(helper,c);await assert.rejects(c.ensureHunterClashAppCheck(),/offline/);fail=false;
+ await Promise.all([c.ensureHunterClashAppCheck(),c.ensureHunterClashAppCheck()]);
+ assert.equal(attempts,2);assert.equal(calls.length,1);assert.equal(calls[0].a,app);assert.equal(calls[0].options.isTokenAutoRefreshEnabled,true);assert.equal(calls[0].options.provider.key,'public-key');
+});

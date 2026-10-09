@@ -39,3 +39,6 @@
 6. 回退先enabled=false清空白名單停止服務，再移除對應claim並刷新token。需要程式回退時revert整合commit；帳本與audit不刪除、不重置既有生涯。
 
 XP每日上限、同對手遞減、PK永久成就、正規／資歷間接升階、反刷警告與懲罰都不在此批開通；依2.0交接最新限制保持待確認。沒有自動封號。
+
+## App Check 網頁接入
+使用 ARENA 相同 Firebase app，PK 首次 callable 呼叫前才載入 Enterprise App Check，啟用權杖自動更新並先核對取得權杖；初始化或驗證失敗不送出 PK 操作，其他既有服務維持原流程。使用公開網站金鑰，不另外嵌入 enterprise.js。Firebase 控制台仍需在 bxh-arena 的 BXH Web app 註冊這組金鑰，TTL 1 小時；網站網域為 arena.bxh.com.tw。尚未完成控制台註冊／實機驗證前，不啟用專案範圍 Firestore、Auth、Storage 強制驗證。
