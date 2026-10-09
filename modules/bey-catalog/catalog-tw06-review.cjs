@@ -73,12 +73,12 @@ function secondReview(proposal,{reviewerId,reviewedAt,decision,notes}={}){
 function previewCorrection(batch,proposal){
  requireBatch(batch);
  if(!proposal||proposal.batchId!==batch.batchId||!SECTIONS[proposal.section])throw Error('TW06_PROPOSAL_SCOPE_INVALID');
+ const record=findRecord(batch,proposal.section,proposal.recordId);
+ if(digest(record)!==proposal.prior)throw Error('TW06_STALE_RECORD');
  // Revalidate untrusted proposal content and allowed fields before any draft change.
  const canonical=makeProposal(batch,{section:proposal.section,recordId:proposal.recordId,changes:proposal.changes,
   proposerId:proposal.proposerId,proposedAt:proposal.proposedAt,reason:proposal.reason,evidenceUrls:proposal.evidenceUrls});
  if(canonical.proposalId!==proposal.proposalId||canonical.prior!==proposal.prior)throw Error('TW06_PROPOSAL_TAMPERED');
- const record=findRecord(batch,proposal.section,proposal.recordId);
- if(digest(record)!==proposal.prior)throw Error('TW06_STALE_RECORD');
  return {proposalId:proposal.proposalId,section:proposal.section,recordId:proposal.recordId,
   before:Object.fromEntries(Object.keys(proposal.changes).map(k=>[k,record[k]??null])),
   after:structuredClone(proposal.changes),reviewStatus:proposal.status,
