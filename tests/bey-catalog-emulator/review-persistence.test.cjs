@@ -42,3 +42,28 @@ test('canonical draft mismatch cannot be reviewed',async()=>{
   await assert.rejects(()=>persistReview(opts(db,'admin_b','approve')),/CANONICAL_DRAFT_MISMATCH/);
  });
 });
+
+test('first reviewer role revocation blocks final approval',async()=>{
+ const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();
+  await setDoc(doc(db,'users','admin_a'),{role:'player',active:true});
+  await assert.rejects(()=>persistReview(opts(db,'admin_b','approve')),/FIRST_REVIEWER_NO_LONGER_AUTHORIZED/);
+  await setDoc(doc(db,'users','admin_a'),{role:'admin',active:true});
+ });
+});
+test('two concurrent first reviews never both commit',async()=>{
+ const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();
+  const raceDraft={...draft,draftId:'draft_emulator_race'};
+  await setDoc(doc(db,'beyCatalogRuleDrafts',raceDraft.draftId),{draftHash:hash(normalizeDraft(raceDraft)),reviewStatus:'requires_authorized_source_review',publicationStatus:'unpublished'});
+  const results=await Promise.allSettled([
+   persistReview(opts(db,'admin_a','accept',{draft:raceDraft})),
+   persistReview(opts(db,'admin_b','accept',{draft:raceDraft}))
+  ]);
+  assert.equal(results.filter(x=>x.status==='fulfilled').length,1);
+  assert.equal(results.filter(x=>x.status==='rejected').length,1);
+  const saved=(await getDoc(doc(db,'beyCatalogReviewDrafts',raceDraft.draftId))).data();
+  assert.equal(saved.reviewLog.length,1);
+  assert.equal(saved.phase,'awaiting_second');
+ });
+});
