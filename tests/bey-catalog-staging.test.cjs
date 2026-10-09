@@ -17,3 +17,27 @@ test('missing references and wrong variant/part combinations are blocked',()=>{c
 test('duplicate IDs and unapproved source are blocked',()=>{const a=batch();a.parts.push({partId:'part-a'});assert.throws(()=>planStaging(a),/DUPLICATE_ID/);const b=batch();b.sources[0].automatedAccess='enabled';assert.throws(()=>planStaging(b),/UNAPPROVED_SOURCE/);});
 test('staging is idempotent and conflict preserving',async()=>{const store=new Map(),adapter={emulatorOnly:true,get:async(c,id)=>store.get(c+'/'+id),put:async(c,id,v)=>store.set(c+'/'+id,v)};const p=planStaging(batch());assert.equal((await applyEmulatorStaging(p,adapter,target)).inserted,10);assert.equal((await applyEmulatorStaging(p,adapter,target)).unchanged,10);store.set('beyProducts/product-a',{sha256:'changed'});const r=await applyEmulatorStaging(p,adapter,target);assert.equal(r.conflicts,1);assert.equal(r.deleted,0);assert.equal(r.published,0);});
 test('production, remote and unverified adapters are refused',async()=>{const p=planStaging(batch()),a={emulatorOnly:true,get:async()=>null,put:async()=>{throw Error('SHOULD_NOT_WRITE')}};await assert.rejects(()=>applyEmulatorStaging(p,a,{...target,projectId:'bxh-arena'}),/PRODUCTION/);await assert.rejects(()=>applyEmulatorStaging(p,a,{...target,emulatorHost:'remote:8080'}),/LOCAL_EMULATOR/);await assert.rejects(()=>applyEmulatorStaging(p,{...a,emulatorOnly:false},target),/EMULATOR_ADAPTER_REQUIRED/);});
+
+test('reject cross-product assembly options and cross-group contents',()=>{
+ const a=batch();a.products.push({productId:'product-b',sourceId:'official-a'});
+ a.options.push({optionId:'option-b',productId:'product-b'});
+ a.assemblyClaims[0].optionId='option-b';
+ assert.throws(()=>planStaging(a),/ASSEMBLY_OPTION_PRODUCT_MISMATCH/);
+ const b=batch();b.products.push({productId:'product-b',sourceId:'official-a'});
+ b.options.push({optionId:'option-b',productId:'product-b'});
+ b.assemblyClaims.push({groupId:'group-b',productId:'product-b',optionId:'option-b'});
+ b.contentClaims[0].groupId='group-b';
+ assert.throws(()=>planStaging(b),/CONTENT_GROUP_SCOPE_MISMATCH/);
+});
+test('reject orphan variant colors and evidence source references',()=>{
+ const a=batch();a.variants[0].colorIds=['not-listed'];
+ assert.throws(()=>planStaging(a),/VARIANT_COLOR_MISSING/);
+ const b=batch();b.contentClaims[0].evidence=[{sourceId:'missing-source'}];
+ assert.throws(()=>planStaging(b),/EVIDENCE_SOURCE_MISSING/);
+});
+test('required product and content links cannot be null',()=>{
+ const a=batch();a.products[0].sourceId=null;
+ assert.throws(()=>planStaging(a),/PRODUCT_SOURCE_MISSING/);
+ const b=batch();b.contentClaims[0].groupId=null;
+ assert.throws(()=>planStaging(b),/CONTENT_REFERENCE_MISSING/);
+});
