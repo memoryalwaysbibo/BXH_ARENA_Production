@@ -5,7 +5,7 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
 (async()=>{
  const m=memory();for(const uid of ['a','b'])m.data.set('users/'+uid,{active:true,role:'player',displayName:uid==='a'?'黑爸':'大黑'});m.data.set('systemSettings/hunterClash',{enabled:true,environment:adapter.ENV,allowedUids:['a','b'],pairingTtlMs:120000,rules:{version:adapter.VERSION,targetScore:4}});
  const service=createService({db:m.db,auth:{app:{options:{projectId:m.db.projectId}},verifyIdToken:async uid=>({uid})}});
- const cwd=process.cwd(),server=http.createServer((req,res)=>{const file=path.resolve(cwd,'.'+new URL(req.url,'http://localhost').pathname);if(!file.startsWith(cwd+path.sep)){res.writeHead(403);return res.end();}try{res.setHeader('Content-Type',/\.m?js$/.test(file)?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.png')?'image/png':'text/html');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const cwd=process.cwd(),server=http.createServer((req,res)=>{const file=path.resolve(cwd,'.'+new URL(req.url,'http://localhost').pathname);if(!file.startsWith(cwd+path.sep)){res.writeHead(403);return res.end();}try{res.setHeader('Content-Type',/\.m?js$/.test(file)?'text/javascript; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':file.endsWith('.png')?'image/png':'text/html; charset=utf-8');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await chromium.launch({executablePath:process.env.HC_A1_BROWSER||undefined});const errors=[];
  try{
   const core=fs.readFileSync('modules/main-app/core.js','utf8');const extract=name=>{const a=core.indexOf('function '+name+'('),b=core.indexOf('\nfunction ',a+1);return core.slice(a,b);};
@@ -42,6 +42,11 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('#match[data-stage=final_pending]').waitFor();await a.locator('#history summary').click();assert.match(await a.locator('.pending-history').innerText(),/尚未計入/);
   await a.locator('[data-op=confirmFinish]').click();await a.locator('#match[data-stage=completed]').waitFor({timeout:8000});await b.locator('#match[data-stage=completed]').waitFor({timeout:8000});
   await a.waitForFunction(()=>BXHArenaPK.state().status==='ready');assert.equal(await a.evaluate(()=>BXHArenaPK.state().records.length),1);
+  assert.equal(await a.evaluate(()=>BXHArenaPK.state().practiceXp.totalXp),5);
+  assert.match(await a.locator('.session-xp').innerText(),/本房獲得 5 XP/);
+  assert.match(await b.locator('.session-xp').innerText(),/本房獲得 5 XP/);
+  assert.match(await a.locator('.practice-xp').first().innerText(),/今日已獲 5 XP/);
+
   await a.evaluate(()=>fixture.shell());assert.equal(await a.locator('#match[data-stage=completed]').count(),1);
   await a.locator('.room-analysis summary').click();
   for(const width of [320,390,430,1024]){assert.equal(await a.locator('.room-stat').count(),1);await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await a.locator('img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)),true);}

@@ -1,5 +1,5 @@
 'use strict';
-// ARENA internal PK domain. Completion is an unrated record, never an award/settlement.
+// ARENA internal PK domain. Completion is an unrated record. Practice XP is settled separately by the service.
 const POINTS = Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
 const OPERATIONS = Object.freeze(['accept','reject','start','proposeRound','recordRound','undoRound','resumeReview','nextGame','endSession','confirmRound','confirmFinish','dispute','cancel']);
 const fail = reason => { throw Error(reason); };

@@ -310,6 +310,15 @@ function hunterBuildGrowth(records){
   return {version:HUNTER_GROWTH_VERSION,rows,eventCount,validRounds,experienceEvents,xp,xpFromMatches,xpFromRounds,xpFromEvents,level,floor,next,progress};
 }
 
+// Called with a verified server XP total. Formal growth remains the grade input.
+function hunterGrowthWithPractice(formal,practiceXp){
+ if(!Number.isSafeInteger(practiceXp*2)||practiceXp<0)throw Error('invalid-practice-xp');
+ const xp=formal.xp+practiceXp;let level=1;
+ while(level<99&&xp>=hunterLevelThreshold(level+1))level++;
+ const floor=hunterLevelThreshold(level),next=hunterLevelThreshold(level+1);
+ return {...formal,xpFromPractice:practiceXp,xp,level,floor,next,progress:next>floor?Math.max(0,Math.min(100,Math.round((xp-floor)/(next-floor)*100))):100};
+}
+
 function hunterSeniorityBonus(level){
   const lv=Math.max(1,Math.min(99,Math.floor(Number(level)||1)));
   return 15*Math.pow((lv-1)/98,0.75);
@@ -364,6 +373,6 @@ function hunterReplayLicense(records,analyze){
     current:summary(hunterLicenseOverview(rows,analyze)),historyReason:undated?"undated":null,officialRulesChanged:false};
 }
 
-Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterLicenseRules,hunterLicenseOverview,hunterReplayLicense,hunterWinRateInterval,hunterPreMatchRating,hunterStrengthDiagnostics,hunterBacktestStrength,hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
+Object.assign(window.BXHHunterUtils||(window.BXHHunterUtils={}),{hunterGrowthWithPractice,hunterLicenseRules,hunterLicenseOverview,hunterReplayLicense,hunterWinRateInterval,hunterPreMatchRating,hunterStrengthDiagnostics,hunterBacktestStrength,hunterSampleMaturity,hunterTrendWindows,hunterDistributionRows,hunterRecordMode,hunterFilterByMode,hunterScoringBreakdown,hunterAnalysisPoints,hunterModeSummary,hunterRoundIntegrity,hunterDataStatus,hunterCoverage,hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef,hunterSeniorityBonus,hunterLicenseGrade,hunterUniqueRecords,hunterLevelThreshold,hunterBuildGrowth,hunterRecordHasTrustedScore,hunterRecordScoreText,hunterCareerSummary});
 
 })();

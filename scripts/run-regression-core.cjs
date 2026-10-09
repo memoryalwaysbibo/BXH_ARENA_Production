@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    {name:'Hunter Clash practice XP atomic settlement and daily limits',args:['--test','tests/hunter-practice-xp.test.cjs']},
     { name: "Hunter Clash A2/A3 ledger, auth, paging and source adapter", args: ["--test", "tests/hunter-clash-a23.test.cjs"] },
     { name: "Hunter Clash A1 identity gate and camera lifecycle", args: ["--test", "tests/hunter-clash-a1-entry.test.cjs"] },
     { name: 'hunter B6 grade transparency and career replay', args: ['--test', 'tests/hunter-b6-license.test.cjs'] },
