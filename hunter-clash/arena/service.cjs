@@ -10,7 +10,7 @@ const view=c=>Object.fromEntries(Object.entries(c).filter(([k])=>!['pairingToken
 function createService({db,auth,clock=Date.now,codeGenerator=code}){
  if(!['bxh-arena','demo-arena-pk'].includes(db.projectId)||auth.app?.options?.projectId!==db.projectId)fail('project-mismatch');
  const ref=(collection,id)=>db.collection(collection).doc(id),ledger=uid=>db.collection('arenaPKPlayers').doc(uid).collection('matches');
- const admit=(profile,config,uid)=>{if(!eligible(profile)||!Array.isArray(config?.allowedUids)||!config.allowedUids.includes(uid))fail('account-unavailable');if(config.enabled!==true||config.environment!==ENV)fail('closed');};
+ const admit=(profile,config,uid)=>{if(!eligible(profile))fail('account-unavailable');if(config.enabled!==true||config.environment!==ENV)fail('closed');};
  async function run(token,operation,input={}){
   if(typeof token!=='string'||!token)fail('unauthenticated');let decoded;try{decoded=await auth.verifyIdToken(token,true);}catch{fail('unauthenticated');}const uid=domain.identifier(decoded.uid);
   const read=['getChallenge','getMyHistory'].includes(operation),create=operation==='createChallenge',accept=operation==='acceptCode'||operation==='accept',revoke=operation==='revokeChallenge';

@@ -8,22 +8,23 @@ function createEntry({media=()=>navigator.mediaDevices,changed=()=>{},escape=s=>
   let uid='',user=null,profile=null,allowed=false,checked=false,epoch=0,stage='home',stream=null,cameraPending=false,cameraError='',active=false;
   function stop(){epoch++;cameraPending=false;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;}
   function reset(){unmount();window.BXHArenaPK?.setSession(null,null,false);stop();allowed=false;checked=false;stage='home';cameraError='';}
+  function eligibleProfile(){return !!uid&&profile?.active===true&&!profile.isTestAccount&&['player','staff','admin','super_admin'].includes(profile.role)&&!['frozen','disabled','deleted'].includes(profile.accountStatus)&&(!profile.uid||profile.uid===uid);}
   function session(nextUser,nextProfile){
     const nextUid=nextUser?.uid||'';
     if(nextUid!==uid||nextUser!==user){reset();uid=nextUid;user=nextUser;}
     profile=nextProfile;
-    if(!uid||profile?.active!==true||(profile.uid&&profile.uid!==uid)){allowed=false;checked=false;unmount();window.BXHArenaPK?.setSession(null,null,false);stop();return;}
+    if(!eligibleProfile()){allowed=false;checked=false;unmount();window.BXHArenaPK?.setSession(null,null,false);stop();return;}
     if(checked){window.BXHArenaPK?.setSession(user,profile,allowed);return;}
     checked=true;const owner=uid,sessionUser=user;
     Promise.resolve().then(async()=>{
       if(window.cloudAuth?.getHunterClashAccess)return window.cloudAuth.getHunterClashAccess(owner);
-      return (await sessionUser.getIdTokenResult())?.claims?.hunterClashA1===true;
+      return !!(await sessionUser.getIdTokenResult())?.token;
     }).then(access=>{
       if(uid!==owner||user!==sessionUser)return;
-      allowed=access===true;window.BXHArenaPK?.setSession(user,profile,allowed);changed();
+      allowed=access===true&&eligibleProfile();window.BXHArenaPK?.setSession(user,profile,allowed);changed();
     }).catch(()=>{if(uid===owner&&user===sessionUser){allowed=false;changed();}});
   }
-  function visible(){return !!uid&&profile?.active===true&&allowed;}
+  function visible(){return eligibleProfile()&&allowed;}
   function name(){return profile?.displayName||profile?.nickname||profile?.gameId||profile?.realName||user?.displayName||'未設定名稱';}
   function render(){
     if(!visible())return '';

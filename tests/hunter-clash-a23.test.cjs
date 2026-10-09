@@ -55,3 +55,13 @@ test('unfinished recovery hints survive a closed tab, isolate accounts and clear
  assert.doesNotThrow(()=>createRecoveryStore({session,persistent:blocked}).remember('a',{challengeId:'pk_room',status:'final_pending'}));
  assert.equal(createRecoveryStore({session,persistent:blocked}).id('a'),'pk_room');
 });
+
+test('ordinary players outside old allowlist complete and save PK; invalid profiles stay blocked',async()=>{
+ const f=fixture();f.data.get('systemSettings/hunterClash').allowedUids=[];
+ await finish(f,await score(f,await start(f)));
+ assert.equal((await f.call('a','getMyHistory')).history.total,1);
+ for(const patch of [{active:false},{isTestAccount:true},{role:'guest'},{accountStatus:'frozen'},{accountStatus:'disabled'},{accountStatus:'deleted'}]){
+   const old={...f.data.get('users/c')};Object.assign(f.data.get('users/c'),patch);
+   await assert.rejects(f.call('c','createChallenge'),/account-unavailable/);f.data.set('users/c',old);
+ }
+});
