@@ -25,6 +25,17 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   const qr=await a.evaluate(async()=>{const host=document.querySelector('[data-hc-runtime-host]').firstChild,canvas=host.shadowRoot.querySelector('.qr canvas');const {decodePairingPixels}=await import('/hunter-clash/arena/scanner.mjs');return decodePairingPixels(canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height),jsQR);});assert.equal(qr.challengeId,[...m.data.keys()].find(k=>k.startsWith('arenaPKChallenges/')).split('/')[1]);
   await b.locator('[data-op=join]').click();await b.locator('[name=pairingCode]').fill(code);await b.locator('[data-op=acceptCode]').click();await b.locator('#match[data-stage=accepted]').waitFor();await a.locator('#match[data-stage=accepted]').waitFor({timeout:8000});await a.locator('[data-op=start]').click();await b.locator('[data-op=start]').click();await a.locator('#match[data-stage=in_progress]').waitFor({timeout:8000});
   await a.locator('[data-op=recordRound][data-player="0"][data-finish=burst]').click();await a.waitForFunction(()=>document.querySelector('[data-hc-runtime-host]').firstChild.shadowRoot.querySelector('.points').textContent==='2');await a.locator('[data-op=recordRound][data-player="0"][data-finish=burst]').click();await a.locator('#match[data-stage=final_pending]').waitFor();await b.locator('#match[data-stage=final_pending]').waitFor({timeout:8000});await b.locator('[data-op=confirmFinish]').click();assert.match(await b.locator('.confirmation-wait').innerText(),/等待 黑爸 確認中/);assert.equal(await b.locator('[data-op=dispute]').isVisible(),false);
+  // Each phone opens its own analysis, using one shared panel at every viewport.
+  for(const [phone,name] of [[a,'黑爸'],[b,'大黑']]){
+   await phone.locator('.room-analysis summary').click();
+   assert.equal(await phone.locator('.room-stat').count(),1);
+   assert.equal(await phone.locator('.room-stat > strong').innerText(),name);
+   assert.equal(await phone.locator('.analysis-player-tabs button[aria-pressed=true]').innerText(),name);
+  }
+  await a.locator('.analysis-player-tabs button',{hasText:'大黑'}).click();
+  assert.equal(await a.locator('.room-stat > strong').innerText(),'大黑');
+  await a.locator('[data-op=reconnect]').click();
+  assert.equal(await a.locator('.room-stat > strong').innerText(),'大黑');
   await a.locator('[data-op=leave]').click();await a.locator('.recovery-panel').waitFor();assert.equal(await a.locator('[data-op=createChallenge]').isVisible(),false);
   assert.equal([...m.data.values()].filter(v=>v.status==='cancelled').length,0);assert.equal(m.data.get('arenaPKPlayers/a'),undefined);
   await a.getByRole('button',{name:'獵人檔案',exact:true}).click();await a.evaluate(()=>sessionStorage.clear());
@@ -34,7 +45,28 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   await a.evaluate(()=>fixture.shell());assert.equal(await a.locator('#match[data-stage=completed]').count(),1);
   await a.getByRole('button',{name:'獵人檔案',exact:true}).click();assert.match(await a.locator('#license').innerText(),/黑爸 vs 大黑 4:0/);assert.equal(await a.locator('#app').count(),0);
   await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('#match[data-stage=completed]').waitFor();
-  for(const width of [320,390,430]){await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await a.locator('img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)),true);}
+  await a.locator('.room-analysis summary').click();
+  for(const width of [320,390,430,1024]){assert.equal(await a.locator('.room-stat').count(),1);await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await a.locator('img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)),true);}
+  // Five-game analysis fixture verifies that the same selector controls the radar.
+  const finished=(await service.run('b','getChallenge',{challengeId:qr.challengeId})).challenge;
+  const analysisRoom={...finished,challengeId:'analysis-fixture',gameNumber:5,games:Array.from({length:4},(_,i)=>({number:i+1,score:finished.score,winnerUid:finished.winnerUid,rounds:finished.rounds}))};
+  const analysis=await browser.newPage({viewport:{width:390,height:844}});
+  await analysis.goto('http://127.0.0.1:'+server.address().port+'/tests/fixtures/blank.html');
+  await analysis.evaluate(async room=>{
+   const {mountMobile}=await import('/hunter-clash/arena/mobile.mjs');
+   const root=document.body.attachShadow({mode:'open'});root.innerHTML='<link rel="stylesheet" href="/hunter-clash/arena/mobile.css"><div id="message"></div><main id="app"></main>';
+   const values=new Map([['arena-pk:mobile:last:b',room.challengeId]]),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+   window.analysisMount=mountMobile(root,{playerName:()=> '大黑',watch:fn=>{fn({uid:'b'});return()=>{};},transport:async()=>({challenge:room}),history:async()=>({status:'empty',total:0,records:[]})},{storage});
+  },analysisRoom);
+  await analysis.locator('.room-analysis summary').click();
+  await analysis.locator('.license-radar-svg').waitFor({state:'visible'});
+  assert.equal(await analysis.locator('.room-stat > strong').innerText(),'大黑');
+  assert.match(await analysis.locator('.license-radar-svg').getAttribute('aria-label'),/^大黑 /);
+  await analysis.locator('.analysis-player-tabs button',{hasText:'黑爸'}).click();
+  assert.equal(await analysis.locator('.room-stat > strong').innerText(),'黑爸');
+  assert.match(await analysis.locator('.license-radar-svg').getAttribute('aria-label'),/^黑爸 /);
+  assert.equal(await analysis.locator('.room-stat').count(),1);
+  await analysis.evaluate(()=>analysisMount.dispose());await analysis.close();
   await a.evaluate(()=>fixture.switch());assert.equal(await a.getByRole('button',{name:'獵人交鋒',exact:true}).count(),0);assert.equal(await a.evaluate(()=>BXHArenaPK.state().records.length),0);assert.deepEqual(errors,[]);console.log('PASS A2/A3 real module two-player lifecycle, actual QR decoding, four-code join, automatic sync, waiting, shared history, route/session cleanup and 320/390/430px');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exit(1);});
