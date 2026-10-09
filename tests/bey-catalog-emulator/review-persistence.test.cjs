@@ -27,7 +27,7 @@ test('second independent admin approval persisted but not published',async()=>{
  const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{const db=ctx.firestore();await assert.rejects(()=>persistReview(opts(db,'admin_a','approve')),/INDEPENDENT_REVIEWER_REQUIRED/);const r=await persistReview(opts(db,'admin_b','approve'));assert.equal(r.phase,'ready_for_server_verification');const saved=(await getDoc(doc(db,'beyCatalogReviewDrafts',draft.draftId))).data();assert.equal(saved.reviewLog.length,2);assert.equal(saved.publicationStatus,'unpublished');assert.equal(saved.selectable,false);});
 });
 test('tampered draft cannot reuse prior review',async()=>{
- const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{await assert.rejects(()=>persistReview(opts(ctx.firestore(),'admin_b','approve',{draft:{...draft,partIds:['blade_1','ratchet_1','changed']}})),/DRAFT_CHANGED_NEW_REVIEW_REQUIRED/);});
+ const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{await assert.rejects(()=>persistReview(opts(ctx.firestore(),'admin_b','approve',{draft:{...draft,partIds:['blade_1','ratchet_1','changed']}})),/CANONICAL_DRAFT_MISMATCH/);});
 });
 test('browser cannot read or write server review records',async()=>{
  const e=await setup(),db=e.authenticatedContext('admin_a').firestore();await assertFails(getDoc(doc(db,'beyCatalogReviewDrafts',draft.draftId)));await assertFails(setDoc(doc(db,'beyCatalogReviewDrafts','forged'),{phase:'ready_for_server_verification'}));
