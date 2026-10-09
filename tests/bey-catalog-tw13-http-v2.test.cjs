@@ -63,7 +63,7 @@ test('preflight responds without invoking credentials or database',async()=>{
 test('player, unregistered app, rate limit, revoked token and audit failure are fail-closed',async()=>{
  for(const [config,status] of [
   [{role:'player'},403],[{appId:'unregistered'},403],
-  [{rate:false},429],[{revoked:true},503],[{audit:false},503]
+  [{rate:false},429],[{revoked:true},401],[{audit:false},503]
  ]){
   const h=harness(config),r=await h.send();
   assert.equal(r.code,status,JSON.stringify(config));
