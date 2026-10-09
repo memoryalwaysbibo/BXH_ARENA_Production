@@ -26,3 +26,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps
 
 ## 驗收完成標準
 完整日誌出現 `records:197`、`verifiedDocuments:197`、`manualConflicts:1`、`manualCorrectionPreserved:true`、`published:0`、`emulator:true`，且程序結束碼為 0；否則 DB-01 仍未結案。
+
+## 2026-10-09｜無 Java 時也能先推進
+使用者在 Windows PowerShell 成功找到腳本，但遭遇 `Required command missing: java`。已調整測試分支腳本，讓真實 DATA-01B SHA／197 筆／9 類／Manifest 驗證先於 Java 與 npm 檢查。
+
+若尚未安裝 Java，可先從**已更新的測試分支腳本**執行：
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps1 -PreflightOnly
+```
+此模式只做真實研究 JSON 離線完整性驗證，成功輸出 `PREFLIGHT_ONLY`；**不代表 Firestore Emulator 寫入驗收完成**。
+
+若先前曾執行並留下 `BXH_ARENA_DB01_TEST`，新版腳本會檢查其 Git origin／分支是否符合預期，再安全重用，不自動刪除資料夾。正式 Emulator 執行仍需 Java 21，版本檢查使用相容 Windows PowerShell 5.1 的 `cmd.exe /d /c` 捕捉標準錯誤。
+
+注意：先前已解壓縮的 ZIP 內腳本不會自動更新；必須取得 GitHub PR #462 最新版腳本，才能使用 `-PreflightOnly`。不需要合併 PR，也不需要部署 ARENA。
