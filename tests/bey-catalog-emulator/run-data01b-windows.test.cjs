@@ -26,8 +26,8 @@ test('offline preflight verifies pinned raw SHA and 197 records before Git/Node/
  const git=ps1.indexOf('foreach ($cmd in @("git","node"))');
  const java=ps1.indexOf('JAVA_21_REQUIRED');
  assert(sha>=0&&only>sha&&git>only&&java>git);
- assert.match(ps1,/param\\(\\[switch\\]\\$PreflightOnly\\)/);
- assert.match(ps1,/Get-Content -LiteralPath \\$fixture -Raw -Encoding UTF8 \\| ConvertFrom-Json/);
+ assert(ps1.includes('param([switch]$PreflightOnly)'));
+ assert(ps1.includes('Get-Content -LiteralPath $fixture -Raw -Encoding UTF8 | ConvertFrom-Json'));
  assert.match(ps1,/DATA01B_SECTION_COUNT_MISMATCH/);
  assert.match(ps1,/DATA01B_EXPECTED_197/);
  assert.match(ps1,/PREFLIGHT_ONLY: no Java, Node, Git, npm or Firestore writes required/);
