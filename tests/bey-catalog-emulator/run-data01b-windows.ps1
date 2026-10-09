@@ -82,7 +82,15 @@ if (Test-Path -LiteralPath $checkout) {
   if ($trackedChanges.Count -gt 0 -and ($trackedChanges -join "").Trim().Length -gt 0) {
     throw "CHECKOUT_HAS_LOCAL_CHANGES: save local edits and retry. No files overwritten."
   }
-  & git -C $checkout fetch --depth 1 origin $branch
+  # Shallow clones cannot reliably prove ancestry when fetching only one tip.
+  # Obtain ancestry before a safe --ff-only update; never force reset.
+  $shallow = (& git -C $checkout rev-parse --is-shallow-repository).Trim()
+  if ($LASTEXITCODE -ne 0) { throw "CHECKOUT_SHALLOW_CHECK_FAILED" }
+  if ($shallow -eq "true") {
+    & git -C $checkout fetch --unshallow origin $branch
+  } else {
+    & git -C $checkout fetch origin $branch
+  }
   if ($LASTEXITCODE -ne 0) { throw "CHECKOUT_FETCH_FAILED: unable to verify latest branch. No Emulator write attempted." }
   $before = (& git -C $checkout rev-parse HEAD).Trim()
   $latest = (& git -C $checkout rev-parse FETCH_HEAD).Trim()
