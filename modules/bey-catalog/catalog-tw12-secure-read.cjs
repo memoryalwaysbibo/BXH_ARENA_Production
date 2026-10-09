@@ -35,8 +35,14 @@ async function readTw12CatalogQueue({dependencies,appCheckToken,idToken,request}
  const permitted=await dependencies.consumeRateLimit({uid,operation:'tw12.catalog.review.read'});
  if(permitted!==true)throw Error('TW12_RATE_LIMITED');
  // Reuse TW-10 server profile check and TW-08 research isolation.
+ const boundAuth={verifyIdToken:async(token,checkRevoked)=>{
+  if(token!==idToken||checkRevoked!==true)throw Error('TW12_AUTH_CONTEXT_MISMATCH');
+  const rechecked=await dependencies.adminAuth.verifyIdToken(token,true);
+  if(rechecked?.uid!==uid||rechecked.firebase?.sign_in_provider==='anonymous')throw Error('TW12_AUTH_CONTEXT_MISMATCH');
+  return rechecked;
+ }};
  const result=await readTw10AdminReviewQueue({
-  adminAuth:dependencies.adminAuth,adminFirestore:dependencies.adminFirestore,
+  adminAuth:boundAuth,adminFirestore:dependencies.adminFirestore,
   loadResearchBatch:dependencies.loadResearchBatch,idToken,request:params
  });
  // Record only non-sensitive metadata. No raw tokens, query or catalog contents.
