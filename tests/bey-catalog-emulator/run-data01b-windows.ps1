@@ -46,7 +46,8 @@ try {
   if (-not (Get-Command "java" -ErrorAction SilentlyContinue)) {
     throw "JAVA_21_REQUIRED: preflight PASSED. Install Temurin JDK 21 (https://adoptium.net/temurin/releases/?version=21) and open a new PowerShell window, then rerun."
   }
-  $javaVersion = (& java -version 2>&1 | Out-String)
+  # Windows PowerShell 5.1 may treat java -version stderr as terminating error.
+  $javaVersion = (& cmd.exe /d /c "java -version 2>&1" | Out-String)
   if ($javaVersion -notmatch '(?:version |openjdk )"?21(?:[.+-]|")') {
     throw "JAVA_21_REQUIRED: installed Java is not version 21. Preflight PASSED; no Emulator write attempted."
   }
