@@ -14,12 +14,35 @@ function planStaging(batch){
  }
  const has=(section,id)=>id==null||ids[section].has(id);
  for(const s of batch.sources)assert(s.url?.startsWith('https://')&&s.automatedAccess==='not_enabled','UNAPPROVED_SOURCE');
- for(const p of batch.products)assert(has('sources',p.sourceId),'PRODUCT_SOURCE_MISSING');
- for(const v of batch.variants)assert(has('parts',v.partId),'VARIANT_PART_MISSING');
- for(const o of batch.options)assert(has('products',o.productId),'OPTION_PRODUCT_MISSING');
- for(const a of batch.assemblyClaims)assert(has('products',a.productId)&&has('options',a.optionId),'ASSEMBLY_REFERENCE_MISSING');
- for(const c of batch.contentClaims){assert(has('products',c.productId)&&has('options',c.optionId)&&has('assemblyClaims',c.groupId)&&has('parts',c.partId)&&has('variants',c.variantId),'CONTENT_REFERENCE_MISSING');if(c.variantId){const variant=batch.variants.find(v=>v.variantId===c.variantId);assert(variant.partId===c.partId,'VARIANT_PART_MISMATCH');}}
- for(const i of batch.issues)assert(has('products',i.productId),'ISSUE_PRODUCT_MISSING');
+ const required=(section,id)=>typeof id==='string'&&ids[section].has(id);
+ const byOption=new Map(batch.options.map(x=>[x.optionId,x]));
+ const byGroup=new Map(batch.assemblyClaims.map(x=>[x.groupId,x]));
+ const byVariant=new Map(batch.variants.map(x=>[x.variantId,x]));
+ for(const p of batch.products)assert(required('sources',p.sourceId),'PRODUCT_SOURCE_MISSING');
+ for(const v of batch.variants){
+  assert(required('parts',v.partId),'VARIANT_PART_MISSING');
+  if(v.colorIds!=null){assert(Array.isArray(v.colorIds),'VARIANT_COLORS_MALFORMED');for(const id of v.colorIds)assert(required('colors',id),'VARIANT_COLOR_MISSING');}
+ }
+ for(const o of batch.options)assert(required('products',o.productId),'OPTION_PRODUCT_MISSING');
+ for(const a of batch.assemblyClaims){
+  assert(required('products',a.productId)&&required('options',a.optionId),'ASSEMBLY_REFERENCE_MISSING');
+  assert(byOption.get(a.optionId).productId===a.productId,'ASSEMBLY_OPTION_PRODUCT_MISMATCH');
+ }
+ for(const c of batch.contentClaims){
+  assert(required('products',c.productId)&&required('options',c.optionId)&&required('assemblyClaims',c.groupId)&&required('parts',c.partId)&&has('variants',c.variantId),'CONTENT_REFERENCE_MISSING');
+  const group=byGroup.get(c.groupId);
+  assert(group.productId===c.productId&&group.optionId===c.optionId,'CONTENT_GROUP_SCOPE_MISMATCH');
+  assert(byOption.get(c.optionId).productId===c.productId,'CONTENT_OPTION_PRODUCT_MISMATCH');
+  if(c.variantId)assert(byVariant.get(c.variantId).partId===c.partId,'VARIANT_PART_MISMATCH');
+ }
+ for(const i of batch.issues)assert(required('products',i.productId),'ISSUE_PRODUCT_MISSING');
+ for(const section of ['products','parts','variants','assemblyClaims','contentClaims']){
+  for(const item of batch[section]){
+   if(item.evidence==null)continue;
+   assert(Array.isArray(item.evidence),'EVIDENCE_MALFORMED');
+   for(const ev of item.evidence)assert(ev&&required('sources',ev.sourceId),'EVIDENCE_SOURCE_MISSING');
+  }
+ }
  const records=[];for(const [section,[collection,key]] of Object.entries(SECTIONS))for(const item of batch[section])records.push(Object.freeze({collection,id:item[key],sha256:digest(item),data:item,reviewState:'research_only'}));
  return Object.freeze({batchId:batch.batchId,mode:'DRY_RUN',productionWritable:false,autoPublish:false,recordCount:records.length,records});
 }

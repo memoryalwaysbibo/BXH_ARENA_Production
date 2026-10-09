@@ -2,15 +2,23 @@
 /** DATA-01B integration runner. Requires an explicitly supplied local JSON fixture. */
 const fs=require('node:fs');
 const path=require('node:path');
+const crypto=require('node:crypto');
 const {initializeTestEnvironment}=require('@firebase/rules-unit-testing');
-const {doc,getDoc}=require('firebase/firestore');
+const {doc,getDoc,getDocs,collection,setDoc}=require('firebase/firestore');
 const {planStaging}=require('../../modules/bey-catalog/catalog-staging.cjs');
 const {resumeEmulatorBatch}=require('../../modules/bey-catalog/catalog-emulator-batch.cjs');
 const PROJECT='demo-bxh-catalog-db01',HOST='127.0.0.1:8189';
 if(process.env.FIRESTORE_EMULATOR_HOST!==HOST)throw Error('LOCAL_EMULATOR_REQUIRED');
 const input=process.env.BXH_CATALOG_DATA01B_FILE;
 if(!input||!fs.existsSync(input))throw Error('DATA01B_FILE_REQUIRED');
-const batch=JSON.parse(fs.readFileSync(path.resolve(input),'utf8'));
+const raw=fs.readFileSync(path.resolve(input));
+const sha256=crypto.createHash('sha256').update(raw).digest('hex');
+const EXPECTED_SHA='2a53b4d0164d97a5f0607b4d4fd8a536a84b388530bca3eb371453f525cb7d42';
+if(sha256!==EXPECTED_SHA)throw Error('DATA01B_SHA256_MISMATCH');
+const batch=JSON.parse(raw.toString('utf8'));
+if(batch.batchId!=='DATA-01B-20261009'||batch.productionWritable!==false||batch.autoPublish!==false)throw Error('DATA01B_METADATA_MISMATCH');
+const expectedCounts={sources:23,products:9,parts:45,variants:11,colors:9,options:14,assemblyClaims:16,contentClaims:52,issues:18};
+for(const [key,count] of Object.entries(expectedCounts))if(!Array.isArray(batch[key])||batch[key].length!==count)throw Error('DATA01B_SECTION_COUNT_MISMATCH:'+key);
 const plan=planStaging(batch);
 if(plan.recordCount!==197)throw Error('EXPECTED_197_RESEARCH_RECORDS');
 const target={projectId:PROJECT,emulatorHost:HOST,mode:'emulator'};
@@ -30,7 +38,26 @@ async function main(){
    if(replay.inserted!==0||replay.unchanged!==197||replay.conflicts!==0)throw Error('REPLAY_COUNTS_WRONG:'+JSON.stringify(replay));
    const status=await getDoc(doc(db,'beyCatalogImportRuns',plan.batchId));
    if(status.data().status!=='completed')throw Error('BATCH_NOT_COMPLETE');
-   console.log(JSON.stringify({batchId:plan.batchId,records:197,firstPartial:73,recovered:124,replayUnchanged:197,published:0,cloudWrites:0,emulator:true}));
+   const counts=new Map();
+   for(const r of plan.records){
+    const snap=await getDoc(doc(db,r.collection,r.id));
+    if(!snap.exists())throw Error('MISSING_EMULATOR_DOCUMENT:'+r.collection+'/'+r.id);
+    const saved=snap.data();
+    if(saved.sha256!==r.sha256||saved.batchId!==plan.batchId||saved.publicationStatus!=='unpublished'||saved.origin!=='research_staging')throw Error('EMULATOR_DOCUMENT_MISMATCH:'+r.collection+'/'+r.id);
+    counts.set(r.collection,(counts.get(r.collection)||0)+1);
+   }
+   for(const [name,count] of counts){
+    const all=await getDocs(collection(db,name));
+    if(all.size!==count)throw Error('UNEXPECTED_COLLECTION_COUNT:'+name+':'+all.size);
+   }
+   const manual=plan.records[10],ref=doc(db,manual.collection,manual.id);
+   await setDoc(ref,{sha256:'manual-correction',batchId:plan.batchId,publicationStatus:'unpublished',origin:'research_staging'});
+   const conflict=await resumeEmulatorBatch(db,target,plan);
+   if(conflict.inserted!==0||conflict.unchanged!==196||conflict.conflicts!==1||conflict.published!==0)throw Error('CONFLICT_COUNTS_WRONG:'+JSON.stringify(conflict));
+   if((await getDoc(ref)).data().sha256!=='manual-correction')throw Error('MANUAL_CORRECTION_OVERWRITTEN');
+   const finalStatus=await getDoc(doc(db,'beyCatalogImportRuns',plan.batchId));
+   if(finalStatus.data().status!=='completed_with_conflicts')throw Error('CONFLICT_STATUS_MISSING');
+   console.log(JSON.stringify({batchId:plan.batchId,records:197,firstPartial:73,recovered:124,replayUnchanged:197,verifiedDocuments:197,verifiedCollections:counts.size,manualConflicts:1,manualCorrectionPreserved:true,published:0,cloudWrites:0,emulator:true}));
   });
  }finally{await env.cleanup();}
 }
