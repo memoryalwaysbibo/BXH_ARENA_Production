@@ -39,3 +39,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps
 若先前曾執行並留下 `BXH_ARENA_DB01_TEST`，新版腳本會檢查其 Git origin／分支是否符合預期，再安全重用，不自動刪除資料夾。正式 Emulator 執行仍需 Java 21，版本檢查使用相容 Windows PowerShell 5.1 的 `cmd.exe /d /c` 捕捉標準錯誤。
 
 注意：先前已解壓縮的 ZIP 內腳本不會自動更新；必須取得 GitHub PR #462 最新版腳本，才能使用 `-PreflightOnly`。不需要合併 PR，也不需要部署 ARENA。
+
+## 離線預檢再次簡化（無 Git／Node／Java／網路）
+新版 `run-data01b-windows.ps1 -PreflightOnly` 在檢查完 SHA-256 後，直接使用 Windows PowerShell 的 `ConvertFrom-Json` 核對 batchId、來源、9 類數量、197 筆及禁止發布旗標，然後立即結束。**不再 Clone GitHub、不檢查 Node、Git、npm、Java，也不會寫 Firestore**。
+
+指令：
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps1 -PreflightOnly
+```
+
+這是完整性檢查而非真實 Firestore Emulator 寫入；原始 SHA 固定於已審查的 manifest。若需真正寫入驗收，移除 `-PreflightOnly` 並具備 Java 21、Node 22、Git 與 npm 網路。舊 ZIP 的腳本不含此修正，須使用本 PR 最新版本。
