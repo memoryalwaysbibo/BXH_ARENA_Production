@@ -43,3 +43,10 @@
 - CX-07：原廠說明書為天馬爆擊 ATr，含三部件上盤及 Tr 一體式下半部，沒有 1-50。原本 variant_000010 的「1-50｜CX-07 圖示版本」移除誤導性 CX-07 歸屬，改為「1-50｜產品與配色歸屬待核對」；需進一步確認是否為 CX-13 配色版本，不能僅憑 1-50 型號直接轉移配色來源。
 - 修正候選集中於 `TAIWAN_CORRECTION_CANDIDATES`，保留來源 URL、原始名稱、建議值及待驗證狀態。
 - 本次沒有變更原始 DATA-01B 的 SHA-256、零件 ID、產品包原配清單或正式 Firestore；仍不允許研究資料自動發布。
+
+## TW-02｜原廠說明書確認後的衍生資料修正
+- TAKARA TOMY BX-20 原廠說明書第 1 頁可直接讀到三顆原配，其中鮫鯊鋒鰭是 **3-80F**，不是 3-80LF：`https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf`。
+- 新增 `catalog-tw02-corrections.cjs`：**只在獨立 zh-TW 衍生批次**，將 `content_000019.partId` 由 `part_000007`（LF）修為 `part_000013`（F），同步修正 `group_000014` 名稱。保留原始零件與來源、校驗碼、所有 197 筆 ID。
+- CX-13 的 `variant_000010`：原始資料的 `sourceProductId` **本來就已正確指向 CX-13**，錯的是 `displayName` 中的 CX-07。修為「1-50｜CX-13 商品圖候選（實物配色待核對）」，配色仍待實物查核。
+- 新增 `bey-catalog-tw02-corrections.test.cjs`：驗證實際 BOM 修正、原始資料不變、配色來源不被誤改、數量不變、錯誤來源阻擋。
+- 修正批次仍維持 `productionWritable=false`、`autoPublish=false`，不會取代 DB-01 真實 197 筆原始 Firestore Emulator 驗收 fixture。
