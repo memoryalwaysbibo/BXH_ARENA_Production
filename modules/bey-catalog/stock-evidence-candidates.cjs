@@ -37,7 +37,7 @@ function createOriginalAssemblyCandidates(dataset){
  return output;
 }
 function approveOriginalAssemblyCandidate(candidate,{reviewerId,reviewedAt,sourceRechecked}={}){
- if(candidate?.status!=='ready_for_human_review'||candidate.scope!=='exact_stock_configuration_only')throw Error('CANDIDATE_NOT_READY');
+ if(candidate?.status!=='ready_for_human_review'||candidate.scope!=='exact_stock_configuration_only'||candidate.structuralStatus!=='complete'||!Array.isArray(candidate.sourceRefs)||!candidate.sourceRefs.some(x=>x.authority==='manufacturer'&&x.url?.startsWith('https://')&&x.locator))throw Error('CANDIDATE_NOT_READY');
  if(!sourceRechecked||!reviewerId||!/^\d{4}-\d{2}-\d{2}T/.test(reviewedAt||''))throw Error('EXPLICIT_REVIEW_REQUIRED');
  if(!Array.isArray(candidate.partIds)||candidate.partIds.length<2||new Set(candidate.partIds).size!==candidate.partIds.length)throw Error('PARTS_INVALID');
  return {candidateId:candidate.candidateId,groupId:candidate.groupId,partIds:[...candidate.partIds],
