@@ -60,3 +60,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-data01b-windows.ps
 此模式先核對真實原始 JSON 的 SHA-256，若已有 Java 21 就不做變更；否則檢查 winget、要求 Windows 安裝授權並執行 `winget install --id EclipseAdoptium.Temurin.21.JDK --exact --source winget --accept-package-agreements --accept-source-agreements`。安裝結束後腳本**立即停止，不執行 Firestore 寫入**。關閉並重新開啟 PowerShell，確認 `java -version` 後，再執行一般模式。
 
 若 Windows 無 winget 或使用者不允許安裝，會安全停止並指向 Adoptium 官方下載頁；不改系統 PATH 或嘗試其他來源。使用者舊版 ZIP 不會自動更新，須取得最新版腳本。
+
+## 續跑可靠性修正：避免使用舊版測試分支
+- 舊腳本曾在 `BXH_ARENA_DB01_TEST` 已存在時直接重用 checkout，可能執行到過時的 `data01b-full-import.cjs`。
+- 新版先檢查 Git remote URL 與分支、已追蹤檔案是否有未保存修改；若有本機修改，直接停止，不覆蓋。
+- 對 Git shallow clone 先 `fetch --unshallow` 取得祖先紀錄，其他 clone 使用一般 fetch；再以 `merge --ff-only FETCH_HEAD` 更新。非快轉、無法下載或版本不明時停止，不會 `reset --hard`、`clean -fd` 或刪除使用者資料。
+- 完成版本確認後才進入私有資料 SHA／Manifest 與 Emulator 真實寫入驗收。這項改善只作用於本機測試 checkout，不觸及正式 ARENA。
