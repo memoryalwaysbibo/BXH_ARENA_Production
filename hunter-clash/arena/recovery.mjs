@@ -6,7 +6,8 @@ export function createRecoveryStore({session,persistent}={}){
  const write=(store,uid,id)=>{try{if(id)store?.setItem(key(uid),id);else store?.removeItem(key(uid));}catch{}};
  return Object.freeze({
   id:uid=>uid?(read(persistent,uid)||read(session,uid)):null,
-  remember(uid,c){if(!uid||!c?.challengeId)return;write(session,uid,c.challengeId);write(persistent,uid,terminalStatus(c.status)?null:c.challengeId);},
+  remember(uid,c){if(!uid||!c?.challengeId)return;const id=terminalStatus(c.status)?null:c.challengeId;write(session,uid,id);write(persistent,uid,id);},
+  clearUnavailable(uid,error,{pending=false}={}){if(!uid||pending||error?.definitive!==true||!['challenge-unavailable','participant-required'].includes(error.message))return false;write(session,uid,null);write(persistent,uid,null);return true;},
   clear(uid){if(uid){write(session,uid,null);write(persistent,uid,null);}}
  });
 }
