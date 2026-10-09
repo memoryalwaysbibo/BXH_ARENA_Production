@@ -5,6 +5,7 @@
  */
 const {doc,runTransaction}=require('firebase/firestore');
 const {verifyEmulator}=require('./catalog-emulator-transactions.cjs');
+const {createRelease}=require('./assembly-rule-registry.cjs');
 const ID=/^[A-Za-z0-9_-]{2,80}$/;
 const SCOPE='assembly';
 async function simulateReleaseSwitch({db,target,authVerifier,idToken,toReleaseId,expectedRevision,reason}={}){
@@ -27,6 +28,9 @@ async function simulateReleaseSwitch({db,target,authVerifier,idToken,toReleaseId
   if(!release.exists())throw Error('RELEASE_NOT_FOUND');
   const candidate=release.data();
   if(candidate.publicationStatus!=='unpublished'||candidate.active!==false||candidate.selectable!==false||candidate.origin!=='reviewed_proposal'||candidate.releaseId!==toReleaseId||!candidate.checksum)throw Error('UNSAFE_RELEASE_PROPOSAL');
+  let reconstructed;
+  try{reconstructed=createRelease({releaseId:candidate.releaseId,createdBy:candidate.createdBy,createdAt:candidate.createdAt,rules:candidate.rules});}catch(_){throw Error('RELEASE_INTEGRITY_FAILED');}
+  if(reconstructed.checksum!==candidate.checksum)throw Error('RELEASE_INTEGRITY_FAILED');
   if(current.activeReleaseId===toReleaseId)throw Error('ALREADY_SELECTED');
   const nextRevision=current.revision+1;
   const auditRef=doc(db,'beyCatalogEmulatorPointerAudits',SCOPE+'_'+nextRevision);
