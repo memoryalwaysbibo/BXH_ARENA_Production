@@ -10,7 +10,7 @@ const MAX_BODY_BYTES=4096;
 const ALLOWED_FIELDS=new Set(['filter','query','limit','cursor']);
 function errorStatus(error){
  const code=String(error?.message||'');
- if(['TW12_CREDENTIALS_REQUIRED','TW12_VERIFIED_USER_REQUIRED'].includes(code))return [401,'UNAUTHENTICATED'];
+ if(['TW12_CREDENTIALS_REQUIRED','TW12_VERIFIED_USER_REQUIRED','TOKEN_REVOKED'].includes(code))return [401,'UNAUTHENTICATED'];
  if(['TW12_APP_CHECK_DENIED','INVALID_APP_CHECK'].includes(code))return [403,'APP_CHECK_DENIED'];
  if(code==='TW12_RATE_LIMITED')return [429,'RATE_LIMITED'];
  if(['TW12_AUDIT_REQUIRED','TW12_TRUSTED_SERVER_DEPENDENCIES_REQUIRED'].includes(code))return [503,'SERVICE_UNAVAILABLE'];
