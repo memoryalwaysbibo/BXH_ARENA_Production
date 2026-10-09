@@ -34,4 +34,4 @@ firebase emulators:exec --only firestore --project demo-bxh-catalog-db01 --confi
 
 公開 CI 只檢查這個私有 runner 的語法；沒有原始資料時，不得將 CI 視為此真實接軌驗收。公開 PR 不包含原始或衍生研究 JSON。
 
-PR 保持 Draft；未合併、未部署正式 ARENA。相對最新主線的衝突仍待正式整合前另行處理。
+PR 保持 Draft；未合併、未部署正式 ARENA。與最新主線的相容性須在正式整合前重新核對；本次未合併任何分支。
