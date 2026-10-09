@@ -49,7 +49,7 @@ test('unfinished recovery hints survive a closed tab, isolate accounts and clear
  recovery=createRecoveryStore({session:memoryStorage(),persistent});assert.equal(recovery.id('a'),'pk_room');
  recovery.remember('a',{challengeId:'pk_room',status:'completed'});
  assert.equal(createRecoveryStore({session:memoryStorage(),persistent}).id('a'),null);
- assert.equal(recovery.id('a'),'pk_room'); // Current tab can still show its completed result.
+ assert.equal(recovery.id('a'),null); // The displayed result lives in the controller snapshot, not a recovery hint.
  recovery.clear('a');assert.equal(recovery.id('a'),null);
  const blocked={getItem(){throw Error('blocked');},setItem(){throw Error('blocked');},removeItem(){throw Error('blocked');}};
  assert.doesNotThrow(()=>createRecoveryStore({session,persistent:blocked}).remember('a',{challengeId:'pk_room',status:'final_pending'}));
@@ -64,4 +64,16 @@ test('ordinary players outside old allowlist complete and save PK; invalid profi
    const old={...f.data.get('users/c')};Object.assign(f.data.get('users/c'),patch);
    await assert.rejects(f.call('c','createChallenge'),/account-unavailable/);f.data.set('users/c',old);
  }
+});
+
+test('recovery clears unavailable rooms only after definitive lookup and retains pending operations',async()=>{
+ const {createRecoveryStore}=await import('../hunter-clash/arena/recovery.mjs');
+ const data=new Map(),storage={getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};
+ const recovery=createRecoveryStore({session:storage,persistent:storage});
+ recovery.remember('a',{challengeId:'pk_old',status:'final_pending'});
+ for(const [error,pending] of [[Error('offline'),false],[Object.assign(Error('unauthenticated'),{definitive:true}),false],[Object.assign(Error('challenge-unavailable'),{definitive:true}),true]]){
+  assert.equal(recovery.clearUnavailable('a',error,{pending}),false);assert.equal(recovery.id('a'),'pk_old');
+ }
+ assert.equal(recovery.clearUnavailable('a',Object.assign(Error('challenge-unavailable'),{definitive:true})),true);
+ assert.equal(recovery.id('a'),null);
 });
