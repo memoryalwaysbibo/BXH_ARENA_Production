@@ -28,10 +28,11 @@ function structuralCheck(parts,template){
 function validateAssembly({parts,template,interfaceRules,ruleVersion}={}){
  const structure=structuralCheck(parts,template);
  if(structure.status!=='complete')return {...structure,canSaveAsVerified:false};
+ if(parts.some(p=>p.selectable===false))return {...structure,status:'pending',reason:'PART_NOT_RELEASED_FOR_SELECTION',canSaveAsVerified:false};
  if(!ruleVersion||!Array.isArray(interfaceRules))return {...structure,status:'pending',reason:'INTERFACE_EVIDENCE_MISSING',canSaveAsVerified:false};
  const known=new Set(parts.map(x=>x.partId));
  for(const r of interfaceRules){
-  if(!r||!Array.isArray(r.partIds)||r.partIds.some(id=>!known.has(id)))continue;
+  if(!r||!Array.isArray(r.partIds)||r.partIds.length===0||r.partIds.some(id=>!known.has(id)))continue;
   if(r.version!==ruleVersion||r.evidenceStatus!=='verified')continue;
   if(r.result==='incompatible')return {...structure,status:'invalid',reason:'VERIFIED_INCOMPATIBILITY',ruleId:r.ruleId,canSaveAsVerified:false};
  }
