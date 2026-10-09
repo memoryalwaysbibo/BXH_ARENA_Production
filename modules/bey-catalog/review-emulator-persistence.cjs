@@ -46,6 +46,9 @@ async function persistReview({db,target,authVerifier,idToken,draft,action,notes,
   if(prior.phase!=='awaiting_second')throw Error('REVIEW_ALREADY_FINALIZED');
   if(prior.firstReviewerUid===uid)throw Error('INDEPENDENT_REVIEWER_REQUIRED');
   if(!['approve','reject'].includes(action))throw Error('SECOND_REVIEW_DECISION_REQUIRED');
+  const firstProfile=await tx.get(doc(db,'users',prior.firstReviewerUid));
+  const firstUser=firstProfile.exists()?firstProfile.data():null;
+  if(!firstUser||firstUser.active!==true||firstUser.isTestAccount===true||!['admin','super_admin'].includes(firstUser.role))throw Error('FIRST_REVIEWER_NO_LONGER_AUTHORIZED');
   const phase=action==='approve'?'ready_for_server_verification':'rejected';
   tx.update(ref,{phase,secondReviewerUid:uid,reviewLog:[...prior.reviewLog,{uid,action,notes:notes.trim()}]});
   return {phase,uid,publicationStatus:'unpublished',selectable:false};
