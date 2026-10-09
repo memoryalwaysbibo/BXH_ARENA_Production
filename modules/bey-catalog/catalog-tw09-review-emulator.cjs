@@ -61,7 +61,9 @@ async function recordTw09Decision({db,target,authVerifier,idToken,proposalId,dec
    firstReviewerUid=prior.firstReviewerUid;secondReviewerUid=uid;eventStage='second';
   }
   const eventRef=doc(db,'beyCatalogTw09ReviewEvents',proposalId+'_'+eventStage);
-  tx.create(eventRef,{
+  const eventSnap=await tx.get(eventRef);
+  if(eventSnap.exists())throw Error('TW09_DUPLICATE_AUDIT_EVENT');
+  tx.set(eventRef,{
    proposalId,proposalHash:canonical.proposalHash,stage:eventStage,actorUid:uid,
    decision,notes:notes.trim(),publicationStatus:'unpublished',autoPublish:false
   });
