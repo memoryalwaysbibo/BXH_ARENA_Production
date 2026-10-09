@@ -13,6 +13,35 @@ $log = Join-Path $PSScriptRoot "DB01_197_Emulator_Result.txt"
 if (-not (Test-Path -LiteralPath $fixture -PathType Leaf)) { throw "Missing catalog-research.json beside this script." }
 $actualSha = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualSha -ne $expectedSha) { throw "DATA01B_SHA256_MISMATCH. Refusing to proceed." }
+
+# Offline integrity gate: no Java, Node, npm, Git or network required.
+# The fixed raw SHA binds the file to the independently reviewed 197-record manifest.
+if ($PreflightOnly) {
+  $batch = Get-Content -LiteralPath $fixture -Raw -Encoding UTF8 | ConvertFrom-Json
+  if ($batch.batchId -ne "DATA-01B-20261009" -or
+      $batch.dataOrigin -ne "source-tiered-research" -or
+      $batch.productionWritable -ne $false -or
+      $batch.autoPublish -ne $false) {
+    throw "DATA01B_METADATA_MISMATCH"
+  }
+  $counts = [ordered]@{
+    sources = 23; products = 9; parts = 45; variants = 11; colors = 9;
+    options = 14; assemblyClaims = 16; contentClaims = 52; issues = 18
+  }
+  $total = 0
+  foreach ($section in $counts.Keys) {
+    $actual = @($batch.$section).Count
+    if ($actual -ne $counts[$section]) {
+      throw "DATA01B_SECTION_COUNT_MISMATCH: $section ($actual / $($counts[$section]))"
+    }
+    $total += $actual
+  }
+  if ($total -ne 197) { throw "DATA01B_EXPECTED_197" }
+  Write-Host "PASS: genuine DATA-01B original SHA-256, 197 records, 9 sections and safe flags." -ForegroundColor Green
+  Write-Host "PREFLIGHT_ONLY: no Java, Node, Git, npm or Firestore writes required." -ForegroundColor Yellow
+  return
+}
+
 foreach ($cmd in @("git","node")) {
   if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { throw "Required command missing: $cmd" }
 }
@@ -39,10 +68,6 @@ try {
   & node "tests/bey-catalog-emulator/data01b-preflight.cjs"
   if ($LASTEXITCODE -ne 0) { throw "Private fixture verification failed. No Emulator write attempted." }
   Write-Host "PASS: original DATA-01B 197-record SHA, manifest and 9 collections verified." -ForegroundColor Green
-  if ($PreflightOnly) {
-    Write-Host "PREFLIGHT_ONLY: No Java, npm or Firestore Emulator required. No database writes." -ForegroundColor Yellow
-    return
-  }
   if (-not (Get-Command "java" -ErrorAction SilentlyContinue)) {
     throw "JAVA_21_REQUIRED: preflight PASSED. Install Temurin JDK 21 (https://adoptium.net/temurin/releases/?version=21) and open a new PowerShell window, then rerun."
   }
