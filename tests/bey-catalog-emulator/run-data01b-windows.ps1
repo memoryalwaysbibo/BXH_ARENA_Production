@@ -75,7 +75,25 @@ if (Test-Path -LiteralPath $checkout) {
   if ($LASTEXITCODE -ne 0 -or $origin -ne $repoUrl -or $currentBranch -ne $branch) {
     throw "Existing checkout origin or branch does not match expected test repository. No files overwritten."
   }
-  Write-Host "Reusing verified local test checkout." -ForegroundColor Cyan
+  # Never silently run an older checkout. Fast-forward only when tracked
+  # files are unchanged; do not reset, clean, overwrite or delete user files.
+  $trackedChanges = @(& git -C $checkout status --porcelain --untracked-files=no)
+  if ($LASTEXITCODE -ne 0) { throw "CHECKOUT_STATUS_FAILED: no files overwritten." }
+  if ($trackedChanges.Count -gt 0 -and ($trackedChanges -join "").Trim().Length -gt 0) {
+    throw "CHECKOUT_HAS_LOCAL_CHANGES: save local edits and retry. No files overwritten."
+  }
+  & git -C $checkout fetch --depth 1 origin $branch
+  if ($LASTEXITCODE -ne 0) { throw "CHECKOUT_FETCH_FAILED: unable to verify latest branch. No Emulator write attempted." }
+  $before = (& git -C $checkout rev-parse HEAD).Trim()
+  $latest = (& git -C $checkout rev-parse FETCH_HEAD).Trim()
+  if ($LASTEXITCODE -ne 0 -or -not $before -or -not $latest) { throw "CHECKOUT_REVISION_INVALID" }
+  if ($before -ne $latest) {
+    & git -C $checkout merge --ff-only FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "CHECKOUT_NOT_FAST_FORWARD: manual review required. No files overwritten." }
+    Write-Host "Updated test checkout to the latest verified branch." -ForegroundColor Cyan
+  } else {
+    Write-Host "Reusing verified up-to-date test checkout." -ForegroundColor Cyan
+  }
 } else {
   & git clone --depth 1 --branch $branch $repoUrl $checkout
   if ($LASTEXITCODE -ne 0) { throw "Git clone failed." }
