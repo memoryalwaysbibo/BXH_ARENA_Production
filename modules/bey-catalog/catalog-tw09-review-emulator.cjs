@@ -4,7 +4,7 @@
  * The injected verifier MUST be a trusted backend adapter; this is not an HTTP endpoint.
  * Never publishes, alters catalog entities, or writes to production Firestore.
  */
-const {doc,runTransaction}=require('firebase/firestore');
+const {doc,runTransaction,serverTimestamp}=require('firebase/firestore');
 const {verifyEmulator}=require('./catalog-emulator-transactions.cjs');
 const {digest}=require('./catalog-tw06-review.cjs');
 const UID=/^[A-Za-z0-9_-]{2,128}$/;
@@ -65,10 +65,11 @@ async function recordTw09Decision({db,target,authVerifier,idToken,proposalId,dec
   if(eventSnap.exists())throw Error('TW09_DUPLICATE_AUDIT_EVENT');
   tx.set(eventRef,{
    proposalId,proposalHash:canonical.proposalHash,stage:eventStage,actorUid:uid,
-   decision,notes:notes.trim(),publicationStatus:'unpublished',autoPublish:false
+   decision,notes:notes.trim(),reviewedAt:serverTimestamp(),publicationStatus:'unpublished',autoPublish:false
   });
   tx.set(reviewRef,{
    proposalId,proposalHash:canonical.proposalHash,phase,firstReviewerUid,secondReviewerUid,
+   revision:eventStage==='first'?1:2,updatedAt:serverTimestamp(),
    publicationStatus:'unpublished',productionWritable:false,autoPublish:false,selectable:false
   });
   return {proposalId,phase,stage:eventStage,readOnlyCatalog:true,published:false,
