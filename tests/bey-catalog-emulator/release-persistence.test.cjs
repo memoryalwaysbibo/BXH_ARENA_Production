@@ -27,7 +27,11 @@ test('approved evidence creates unpublished immutable proposal and replay is ide
 test('conflicting release ID cannot overwrite original proposal',async()=>{
  const e=await setup(),draftId='draft_release_a';
  await e.withSecurityRulesDisabled(async ctx=>{
-  const db=ctx.firestore(),bad=release('catalog_emulator_v1','incompatible');
+  const db=ctx.firestore();
+  const original=release('catalog_emulator_v1');
+  // Same exact reviewed parts/source; only immutable release metadata differs.
+  // This must reach the duplicate release-ID checksum conflict branch.
+  const bad=createRelease({releaseId:original.releaseId,createdBy:original.createdBy,createdAt:'2026-10-09T03:00:00Z',rules:original.rules});
   await assert.rejects(()=>stageReleaseProposal({db,target,release:bad,draftId}),/RELEASE_ID_CONFLICT/);
   assert.equal((await getDoc(doc(db,'beyCatalogRuleReleases','catalog_emulator_v1'))).data().checksum,release('catalog_emulator_v1').checksum);
  });
