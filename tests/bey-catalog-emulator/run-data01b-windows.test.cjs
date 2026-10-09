@@ -42,3 +42,15 @@ test('Java 21 validation uses Windows PowerShell 5.1 safe stderr capture',()=>{
  assert.match(ps1,/cmd\.exe \/d \/c "java -version 2>&1"/);
  assert.match(ps1,/installed Java is not version 21/);
 });
+
+test('Java setup requires explicit InstallJava opt-in and never runs in offline preflight',()=>{
+ assert(ps1.includes('param([switch]$PreflightOnly, [switch]$InstallJava)'));
+ const preflight=ps1.indexOf('if ($PreflightOnly)');
+ const install=ps1.indexOf('if ($InstallJava)');
+ const git=ps1.indexOf('foreach ($cmd in @("git","node"))');
+ assert(preflight>0&&install>preflight&&git>install);
+ assert(ps1.includes('winget install --id EclipseAdoptium.Temurin.21.JDK --exact'));
+ assert(ps1.includes('if ($LASTEXITCODE -ne 0) { throw "JAVA_INSTALL_FAILED'));
+ assert(ps1.includes('No Emulator write attempted.'));
+ assert(ps1.includes('Close this terminal, open a new PowerShell window'));
+});
