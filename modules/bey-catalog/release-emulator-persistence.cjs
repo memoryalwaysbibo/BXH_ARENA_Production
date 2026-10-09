@@ -35,7 +35,7 @@ async function stageReleaseProposal({db,target,release,draftId}={}){
    if(existingSnap.data().checksum!==release.checksum)throw Error('RELEASE_ID_CONFLICT');
    return {status:'unchanged',releaseId:release.releaseId,published:false};
   }
-  tx.set(releaseRef,{releaseId:release.releaseId,checksum:release.checksum,rules:release.rules,sourceDraftId:draftId,publicationStatus:'unpublished',active:false,selectable:false,origin:'reviewed_proposal'});
+  tx.set(releaseRef,{releaseId:release.releaseId,checksum:release.checksum,createdBy:release.createdBy,createdAt:release.createdAt,rules:release.rules,sourceDraftId:draftId,publicationStatus:'unpublished',active:false,selectable:false,origin:'reviewed_proposal'});
   return {status:'created',releaseId:release.releaseId,published:false};
  },{maxAttempts:5});
 }
