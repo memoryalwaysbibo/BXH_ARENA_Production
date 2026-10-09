@@ -20,11 +20,17 @@ async function stageReleaseProposal({db,target,release,draftId}={}){
  if(!ID.test(draftId||''))throw Error('INVALID_DRAFT_ID');
  if(!release?.releaseId||!release?.checksum)throw Error('INVALID_RELEASE');
  const reviewRef=doc(db,'beyCatalogReviewDrafts',draftId);
+ const canonicalRef=doc(db,'beyCatalogRuleDrafts',draftId);
  const releaseRef=doc(db,'beyCatalogRuleReleases',release.releaseId);
  return runTransaction(db,async tx=>{
-  const [reviewSnap,existingSnap]=await Promise.all([tx.get(reviewRef),tx.get(releaseRef)]);
+  const [reviewSnap,canonicalSnap,existingSnap]=await Promise.all([tx.get(reviewRef),tx.get(canonicalRef),tx.get(releaseRef)]);
   const review=reviewSnap.exists()?reviewSnap.data():null;
   assertReview(review,release);
+  const canonical=canonicalSnap.exists()?canonicalSnap.data():null;
+  if(!canonical||canonical.publicationStatus!=='unpublished'||canonical.reviewStatus!=='requires_authorized_source_review'||canonical.draftHash!==review.draftHash)throw Error('CANONICAL_REVIEW_MISMATCH');
+  const exact=Array.isArray(canonical.partIds)?[...canonical.partIds].sort():[];
+  if(exact.length<2||!Array.isArray(release.rules)||release.rules.length!==1||release.rules[0].result!=='compatible'||release.rules[0].partIds.slice().sort().join('|')!==exact.join('|'))throw Error('RELEASE_EXACT_STOCK_SCOPE_REQUIRED');
+  if(!Array.isArray(canonical.sourceRefs)||!canonical.sourceRefs.some(s=>s.authority==='manufacturer'&&s.sourceId===release.rules[0].sourceId&&s.url===release.rules[0].sourceUrl))throw Error('RELEASE_SOURCE_NOT_MATCHED');
   if(existingSnap.exists()){
    if(existingSnap.data().checksum!==release.checksum)throw Error('RELEASE_ID_CONFLICT');
    return {status:'unchanged',releaseId:release.releaseId,published:false};
