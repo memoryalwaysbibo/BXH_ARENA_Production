@@ -2673,13 +2673,15 @@
           if(visibilityState)privatePatch.data=JSON.stringify(visibilityState);
           tx.set(privateRef,privatePatch,{merge:true});
           if(publicSnap.exists()){
-            const publicPatch={...onsiteFence,visibility:next,registrationVisibility:next,updatedAt:now};
             if(onsiteFence.onsiteWaitlistRuntimeRevision){
+              const publicPatch={...onsiteFence,visibility:next,registrationVisibility:next,updatedAt:now};
               const view=JSON.parse(publicSnap.data().bracketView);
               view.onsiteWaitlistRuntimeRevision=onsiteFence.onsiteWaitlistRuntimeRevision;
               publicPatch.bracketView=JSON.stringify(view);
+              tx.set(publicRef,publicPatch,{merge:true});
+            }else{
+              tx.set(publicRef,{visibility:next,registrationVisibility:next,updatedAt:now},{merge:true});
             }
-            tx.set(publicRef,publicPatch,{merge:true});
           }
         });
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE=null;

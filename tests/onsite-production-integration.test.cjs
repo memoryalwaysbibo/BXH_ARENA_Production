@@ -43,6 +43,17 @@ test('stale and markerless original snapshots cannot inherit current fence',asyn
 test('active draw whole-state writes fail closed before finalize',async()=>{
  const {h,state}=await finalizedHarness();h.docs.get('tournaments/LOCAL').onsiteWaitlistFinalized=false;state.onsiteWaitlistFinalized=false;assert.equal(await h.api.pushUpdate('LOCAL',state),false);assert.equal(h.writes.length,0);assert.equal(h.ctx.window.__BXH_LAST_CLOUD_ERROR_CODE,'onsite-waitlist-managed');
 });
+test('legacy visibility patch remains unchanged without onsite ownership',async()=>{
+ const h=fixture.harness();await h.api.createCommunityRoom(fixture.state());h.writes.length=0;const api=vm.runInContext('({'+method('syncTournamentVisibility')+'})',h.ctx);assert.equal((await api.syncTournamentVisibility('LOCAL','private')).ok,true);
+ for(const key of ['tournaments/LOCAL','publicTournaments/LOCAL']){assert.equal(h.docs.get(key).visibility,'private');assert.equal(h.docs.get(key).onsiteWaitlistRuntimeRevision,undefined);}
+});
+test('finalized visibility increments both mirrors and serialized fences',async()=>{
+ const {h}=await finalizedHarness();const api=vm.runInContext('({'+method('syncTournamentVisibility')+'})',h.ctx);assert.equal((await api.syncTournamentVisibility('LOCAL','private')).ok,true);
+ for(const [key,field] of [['tournaments/LOCAL','data'],['publicTournaments/LOCAL','bracketView']]){assert.equal(h.docs.get(key).visibility,'private');assert.equal(h.docs.get(key).onsiteWaitlistRuntimeRevision,8);assert.equal(JSON.parse(h.docs.get(key)[field]).onsiteWaitlistRuntimeRevision,8);}
+});
+test('active draw visibility remains blocked without partial writes',async()=>{
+ const {h}=await finalizedHarness();h.docs.get('tournaments/LOCAL').onsiteWaitlistFinalized=false;const api=vm.runInContext('({'+method('syncTournamentVisibility')+'})',h.ctx);assert.equal((await api.syncTournamentVisibility('LOCAL','private')).ok,false);assert.equal(h.writes.length,0);
+});
 test('Firestore transaction retry keeps the caller original fence',async()=>{
  const {h,state}=await finalizedHarness();const first=h.ctx.fx.runTransaction;let attempted=false;
  h.ctx.fx.runTransaction=async(db,fn)=>{
