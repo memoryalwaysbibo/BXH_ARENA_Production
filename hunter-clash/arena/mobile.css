@@ -27,3 +27,8 @@
 
 /* Inherit account Skin tokens across the shadow boundary; no copied theme state. */
 .home-actions button:first-child{background:var(--hc-button);color:var(--hc-text);border-color:var(--hc-line)}
+
+/* Keep the common next-game action above score correction. */
+.state{font-size:18px;line-height:1.5}.round{font-size:16px;margin:12px 0 8px}.policy{display:block;font-size:15px;line-height:1.6}
+.room-win-rate>span,.metric-detail,.room-main-finish>span{display:block}.metric-detail{margin-top:3px}.room-main-finish{font-size:13px;margin:14px 0;line-height:1.6}.room-main-finish>span:last-child{color:var(--hc-text);font-weight:700;margin-top:4px}
+@media(max-width:350px){.state{font-size:16px}.round{font-size:15px}.policy{font-size:14px}.sync-label{font-size:9px}}
