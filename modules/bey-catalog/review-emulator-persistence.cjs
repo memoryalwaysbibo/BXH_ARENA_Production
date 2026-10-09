@@ -28,8 +28,10 @@ async function persistReview({db,target,authVerifier,idToken,draft,action,notes,
  const digest=hash(snapshot);
  const ref=doc(db,'beyCatalogReviewDrafts',snapshot.draftId);
  const userRef=doc(db,'users',uid);
+ const canonicalRef=doc(db,'beyCatalogRuleDrafts',snapshot.draftId);
  return runTransaction(db,async tx=>{
-  const [profile,existing]=await Promise.all([tx.get(userRef),tx.get(ref)]);
+  const [profile,canonical,existing]=await Promise.all([tx.get(userRef),tx.get(canonicalRef),tx.get(ref)]);
+  if(!canonical.exists()||canonical.data().draftHash!==digest||canonical.data().publicationStatus!=='unpublished'||canonical.data().reviewStatus!=='requires_authorized_source_review')throw Error('CANONICAL_DRAFT_MISMATCH');
   const user=profile.exists()?profile.data():null;
   if(!user||user.active!==true||user.isTestAccount===true||!['admin','super_admin'].includes(user.role))throw Error('ADMIN_ROLE_REQUIRED');
   const prior=existing.exists()?existing.data():null;
