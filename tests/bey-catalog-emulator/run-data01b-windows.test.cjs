@@ -54,3 +54,15 @@ test('Java setup requires explicit InstallJava opt-in and never runs in offline 
  assert(ps1.includes('No Emulator write attempted.'));
  assert(ps1.includes('Close this terminal, open a new PowerShell window'));
 });
+
+test('existing checkout fetches latest branch and only fast-forwards clean tracked files',()=>{
+ const status=ps1.indexOf('status --porcelain --untracked-files=no');
+ const fetch=ps1.indexOf('fetch --depth 1 origin $branch');
+ const merge=ps1.indexOf('merge --ff-only FETCH_HEAD');
+ const run=ps1.indexOf('Push-Location $checkout');
+ assert(status>0&&fetch>status&&merge>fetch&&run>merge);
+ assert.match(ps1,/CHECKOUT_HAS_LOCAL_CHANGES/);
+ assert.match(ps1,/CHECKOUT_FETCH_FAILED/);
+ assert.match(ps1,/CHECKOUT_NOT_FAST_FORWARD/);
+ assert.doesNotMatch(ps1,/git -C \\$checkout (?:reset --hard|clean -fd)/);
+});
