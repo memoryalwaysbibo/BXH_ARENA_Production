@@ -6,6 +6,8 @@ on:
       - 'tests/bey-catalog-emulator/data01b-preflight.cjs'
       - 'tests/bey-catalog-emulator/data01b-preflight.test.cjs'
       - 'tests/bey-catalog-emulator/data01b-full-import.cjs'
+      - 'tests/bey-catalog-emulator/run-data01b-windows.ps1'
+      - 'tests/bey-catalog-emulator/run-data01b-windows.test.cjs'
       - '.github/workflows/bey-catalog-real-preflight.yml'
       - '.github/workflows/bey-catalog-real-data.yml'
 permissions:
@@ -24,4 +26,4 @@ jobs:
           node --check tests/bey-catalog-emulator/data01b-preflight.cjs
           node --check tests/bey-catalog-emulator/data01b-full-import.cjs
       - name: Verify fixture substitution cannot pass
-        run: node --test tests/bey-catalog-emulator/data01b-preflight.test.cjs
+        run: node --test tests/bey-catalog-emulator/data01b-preflight.test.cjs tests/bey-catalog-emulator/run-data01b-windows.test.cjs
