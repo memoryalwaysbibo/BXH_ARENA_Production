@@ -1,5 +1,5 @@
 // Client-side recovery does not grant permission; every command remains server-validated.
-export function createController({transport,storage=null,onChange=()=>{},clock=Date.now,requestId=()=>crypto.randomUUID()}){
+export function createController({transport,storage=null,onChange=()=>{},clock=Date.now,requestId=()=>crypto.randomUUID(),readTimeoutMs=10000}){
   let uid=null,epoch=0,snapshot=null,pending=null,busy=false,abort=null,backgroundAbort=null;
   const key=id=>'arena-pk:pending:'+id;
   const state=()=>({uid,snapshot:structuredClone(snapshot),pending:structuredClone(pending),busy});
@@ -27,9 +27,9 @@ export function createController({transport,storage=null,onChange=()=>{},clock=D
     }finally{if(backgroundAbort===signalController)backgroundAbort=null;}
   }
   async function read(challengeId){
-    if(!uid||busy)throw Error('session-unavailable');const generation=epoch;abort=new AbortController();busy=true;publish();
-    try{const result=await transport('getChallenge',{challengeId},{uid,signal:abort.signal});if(generation!==epoch)return null;snapshot=result.challenge;return result;}
-    finally{if(generation===epoch){busy=false;abort=null;publish();}}
+    if(!uid||busy)throw Error('session-unavailable');const generation=epoch;abort=new AbortController();const requestAbort=abort;let timer;busy=true;publish();
+    try{const result=await Promise.race([transport('getChallenge',{challengeId},{uid,signal:requestAbort.signal}),new Promise((_,reject)=>{timer=setTimeout(()=>{requestAbort.abort();reject(Error('read-timeout'));},readTimeoutMs);})]);if(generation!==epoch)return null;snapshot=result.challenge;return result;}
+    finally{clearTimeout(timer);if(generation===epoch){busy=false;abort=null;publish();}}
   }
   async function retry(){
     if(!uid||busy||!pending)throw Error('pending-unavailable');
