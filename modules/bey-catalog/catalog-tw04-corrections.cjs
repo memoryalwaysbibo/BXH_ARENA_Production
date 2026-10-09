@@ -17,7 +17,7 @@ const CROSSCHECK=Object.freeze({
  group_000010:Object.freeze({model:'UX-18-05',expectedOriginal:'ドランダガー7-55G',urls:['https://beyblade.phstudy.org/p/ja-JP/SR-PRD-097167-05.html','https://www.1999.co.jp/11228862']}),
  group_000011:Object.freeze({model:'UX-18-06',expectedOriginal:'ヴァイスタイガー4-80LR',urls:['https://beyblade.phstudy.org/p/en-US/SR-PRD-097167-06.html','https://www.1999.co.jp/11228862']})
 });
-const REVIEW_CATEGORIES=Object.freeze(['source_only','independent_catalog_corroborated','manufacturer_original_verified']);
+const REVIEW_CATEGORIES=Object.freeze(['source_only','independent_catalog_corroborated','manufacturer_named_stock']);
 function deriveTaiwanTw04(base){
  const tw=deriveTaiwanTw03(base);
  const groups=new Map(tw.assemblyClaims.map(g=>[g.groupId,g]));
@@ -39,8 +39,8 @@ function deriveTaiwanTw04(base){
  }
  const official=groups.get('group_000006');
  if(!official||official.verificationStatus!=='official_direct')throw Error('TW04_OFFICIAL_ROW_MISSING');
- official.evidenceReview={model:'UX-18-01',sourceTier:'manufacturer_original_verified',
-  manufacturerOriginalPartsVerified:true,reviewerDecision:'pending',publicationStatus:'unpublished'};
+ official.evidenceReview={model:'UX-18-01',sourceTier:'manufacturer_named_stock',
+  manufacturerOriginalPartsVerified:false,reviewerDecision:'pending',publicationStatus:'unpublished'};
  for(const part of tw.parts){
   const label=CX_CATEGORY_ZHTW[part.category];
   if(!label)throw Error('TW04_UNKNOWN_PART_CATEGORY:'+part.category);
@@ -51,7 +51,7 @@ function deriveTaiwanTw04(base){
  for(const v of tw.variants){v.colorPhysicalVerification='pending';v.canAutoPublish=false;}
  tw.batchId='DATA-01B-20261009-ZHTW-TW04';
  tw.batchRevision=6;tw.localizationRevision=4;
- tw.tw04ReviewSummary={ux18ManufacturerDirect:1,ux18IndependentlyCorroborated:5,
+ tw.tw04ReviewSummary={ux18ManufacturerNamedStock:1,ux18IndependentlyCorroborated:5,
   manufacturerBoxManualPending:5,unverifiedColorVariants:10,autoPublished:0};
  tw.tw04Corrections=Object.keys(CROSSCHECK).map(id=>({
   id:'TW04-'+id,groupId:id,kind:'independent_catalog_corroboration',
