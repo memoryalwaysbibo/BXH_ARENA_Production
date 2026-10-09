@@ -16,8 +16,8 @@
 .entrance-art{position:relative;display:block;overflow:hidden;width:100%;aspect-ratio:1;margin-bottom:0;background:#0b0b0a;pointer-events:none}
 .entrance-art img{display:block;width:100%;height:100%;object-fit:contain}
 .entrance-art:after{content:"";position:absolute;inset:auto 0 0;height:24%;background:linear-gradient(transparent,#0b0b0a);pointer-events:none}
-.home-actions strong,.home-actions small{display:block;padding:0 10px;text-align:center;position:relative}.home-actions strong{color:var(--hc-accent);font-size:17px;line-height:1.5}.home-actions small{color:var(--hc-muted);opacity:1;font-size:10px}
-@media(max-width:350px){.home-actions button{padding:0 0 12px}.home-actions strong{font-size:15px}.home-actions small{font-size:9px}}
+.home-actions strong,.home-actions small{display:block;padding:0 10px;text-align:center;position:relative}.home-actions strong{color:var(--hc-accent);font-size:34px;line-height:1.3;text-wrap:balance}.home-actions small{color:var(--hc-muted);opacity:1;font-size:20px;line-height:1.5;text-wrap:balance}
+@media(max-width:350px){.home-actions button{padding:0 0 12px}.home-actions strong{font-size:30px}.home-actions small{font-size:18px}}
 
 .confirmation-wait{padding:16px;border:1px solid var(--hc-line);border-radius:12px;background:var(--hc-card);color:var(--hc-accent);font-size:14px;line-height:1.7}
 
@@ -26,7 +26,7 @@
 :host{display:block;font:16px var(--font-b,system-ui,sans-serif);color:var(--hc-text);background:transparent;padding:12px;max-width:100%;overflow:hidden}.entrance-symbol{display:grid;place-items:center;height:110px;font-size:72px;color:var(--hc-accent);background:radial-gradient(ellipse,var(--accent-glow,rgba(217,185,92,.22)),transparent 70%)}.history-match details{grid-column:1/-1}.history-match details p{font-size:12px}
 
 /* Inherit account Skin tokens across the shadow boundary; no copied theme state. */
-.home-actions button:first-child{background:var(--hc-button);color:var(--hc-text);border-color:var(--hc-line)}
+
 
 /* Keep the common next-game action above score correction. */
 .state{font-size:18px;line-height:1.5}.round{font-size:16px;margin:12px 0 8px}.policy{display:block;font-size:15px;line-height:1.6}
