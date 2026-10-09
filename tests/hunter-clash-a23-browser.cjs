@@ -17,7 +17,7 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   await a.locator('[data-op=createChallenge]').waitFor();
   for(const [accent,expected] of [['#ffd700','rgb(255, 215, 0)'],['#00f3ff','rgb(0, 243, 255)'],['#ff3366','rgb(255, 51, 102)'],['#71d995','rgb(113, 217, 149)']]){
    await a.evaluate(accent=>{document.documentElement.style.setProperty('--accent-color',accent);document.documentElement.style.setProperty('--glass-surface-strong','rgb(8,24,19)');},accent);
-   await a.waitForFunction(expected=>{const s=document.querySelector('[data-hc-runtime-host]').firstChild.shadowRoot;return getComputedStyle(s.querySelector('.home-actions strong')).color===expected&&getComputedStyle(s.querySelector('section')).backgroundImage.includes('8, 24, 19');},expected);
+   await a.waitForFunction(expected=>{const s=document.querySelector('[data-hc-runtime-host]').firstChild.shadowRoot;return getComputedStyle(s.querySelector('.home-actions strong')).color===expected&&getComputedStyle(s.querySelector('#match')).backgroundImage.includes('8, 24, 19');},expected);
   }
   await a.evaluate(()=>{document.documentElement.style.removeProperty('--accent-color');document.documentElement.style.removeProperty('--glass-surface-strong');});
   await a.locator('[data-op=createChallenge]').click();await a.locator('.pairing-code').waitFor();const code=await a.locator('.pairing-code').innerText();assert.match(code,/^[2-9A-HJ-NP-Z]{4}$/);assert.equal(await a.locator('#login').count(),0);assert.equal(await a.locator('[name=playerName]').count(),0);
