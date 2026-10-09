@@ -1,10 +1,31 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const source=fs.readFileSync('modules/main-app/hunter-clash-entry.js','utf8');
-function entry(options){const context={window:{},navigator:{},Promise};vm.runInNewContext(source,context);return context.window.BXHHunterClashEntry.createEntry(options);}
+function entry(options,cloudAuth){const context={window:{cloudAuth},navigator:{},Promise};vm.runInNewContext(source,context);return context.window.BXHHunterClashEntry.createEntry(options);}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const actor=(uid,claims={hunterClashA1:true})=>({uid,getIdTokenResult:async()=>({claims})});
 const root=()=>{const video={play:async()=>{}};const status={textContent:''};return{video,status,querySelector:s=>s==='[data-hc-camera]'?video:status};};
+test('production summary identity reads access through ARENA auth bridge once',async()=>{
+  const calls=[];const e=entry(undefined,{getHunterClashAccess:async uid=>{calls.push(uid);return true;}});
+  const summary={uid:'a',email:'a@example.test'};
+  e.session(summary,{active:true});await flush();assert.equal(e.visible(),true);
+  e.session(summary,{active:true});await flush();assert.deepEqual(calls,['a']);
+});
+test('auth bridge denies absent claim and ignores stale account authorization',async()=>{
+  let resolve;const e=entry(undefined,{getHunterClashAccess:uid=>uid==='a'?new Promise(r=>resolve=r):Promise.resolve(false)});
+  e.session({uid:'a'},{active:true});await flush();
+  e.session({uid:'b'},{active:true});resolve(true);await flush();assert.equal(e.visible(),false);
+});
+test('auth bridge uses actual SDK user, refreshes claim and fences sign-out',async()=>{
+  const cloud=fs.readFileSync('modules/cloud/cloud-runtime.js','utf8');
+  const method=cloud.match(/async getHunterClashAccess\(expectedUid\)\{([\s\S]*?)\n    \},/)[1];
+  let resolve,calls=0;const user={uid:'a',getIdTokenResult:force=>{assert.equal(force,true);calls++;return new Promise(r=>resolve=r);}};
+  const context={authReady:true,authHandle:{currentUser:user}};
+  const read=vm.runInNewContext('(async function(expectedUid){'+method+'})',context);
+  assert.equal(await read('b'),false);assert.equal(calls,0);
+  const pending=read('a');context.authHandle.currentUser=null;resolve({claims:{hunterClashA1:true}});assert.equal(await pending,false);
+  context.authHandle.currentUser=user;const next=read('a');resolve({claims:{hunterClashA1:true}});assert.equal(await next,true);
+});
 test('no login, absent claim, inactive and mismatched profile fail closed',async()=>{
   const e=entry();e.session(null,null);assert.equal(e.visible(),false);
   e.session(actor('a',{}),{uid:'a',active:true,hunterClashA1:true});await flush();assert.equal(e.visible(),false);

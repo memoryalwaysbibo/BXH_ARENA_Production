@@ -15,9 +15,12 @@ function createEntry({media=()=>navigator.mediaDevices,changed=()=>{},escape=s=>
     if(!uid||profile?.active!==true||(profile.uid&&profile.uid!==uid)){allowed=false;checked=false;unmount();window.BXHArenaPK?.setSession(null,null,false);stop();return;}
     if(checked){window.BXHArenaPK?.setSession(user,profile,allowed);return;}
     checked=true;const owner=uid,sessionUser=user;
-    Promise.resolve().then(()=>sessionUser.getIdTokenResult()).then(result=>{
+    Promise.resolve().then(async()=>{
+      if(window.cloudAuth?.getHunterClashAccess)return window.cloudAuth.getHunterClashAccess(owner);
+      return (await sessionUser.getIdTokenResult())?.claims?.hunterClashA1===true;
+    }).then(access=>{
       if(uid!==owner||user!==sessionUser)return;
-      allowed=result?.claims?.hunterClashA1===true;window.BXHArenaPK?.setSession(user,profile,allowed);changed();
+      allowed=access===true;window.BXHArenaPK?.setSession(user,profile,allowed);changed();
     }).catch(()=>{if(uid===owner&&user===sessionUser){allowed=false;changed();}});
   }
   function visible(){return !!uid&&profile?.active===true&&allowed;}

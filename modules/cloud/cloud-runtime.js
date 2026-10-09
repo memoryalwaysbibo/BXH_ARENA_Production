@@ -193,6 +193,12 @@
 
   window.cloudAuth = {
     isReady(){ return authReady; },
+    async getHunterClashAccess(expectedUid){
+      const user=authHandle?.currentUser;
+      if(!authReady || !expectedUid || user?.uid!==expectedUid) return false;
+      const result=await user.getIdTokenResult(true);
+      return authHandle?.currentUser===user && result?.claims?.hunterClashA1===true;
+    },
     // Direct, synchronous read of Firebase's own current-user state — used as
     // a manual recovery check if onAuthStateChanged's event itself never
     // fires after a successful sign-in (an observed possibility in some
