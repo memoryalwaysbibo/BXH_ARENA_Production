@@ -8,6 +8,7 @@ const fs=require('node:fs'),crypto=require('node:crypto'),assert=require('node:a
 const {initializeTestEnvironment}=require('@firebase/rules-unit-testing');
 const {initializeApp,deleteApp}=require('firebase-admin/app');
 const {getAuth}=require('firebase-admin/auth');
+const {createData01bEmulatorLoader}=require('../../modules/bey-catalog/catalog-data01b-private-emulator-loader.cjs');
 const {getFirestore,Timestamp,FieldValue}=require('firebase-admin/firestore');
 const {planStaging}=require('../../modules/bey-catalog/catalog-staging.cjs');
 const {resumeEmulatorBatch,manifestDigest}=require('../../modules/bey-catalog/catalog-emulator-batch.cjs');
@@ -64,22 +65,8 @@ async function main({realAuth=false}={}){
    const imported=await resumeEmulatorBatch(ctx.firestore(),target,plan);
    assert.equal(imported.inserted,197);assert.equal(imported.published,0);
   });
-  async function loadStoredOriginal(){
-   const stored=structuredClone(base);
-   for(const [section,[collection,idKey,count]] of Object.entries(sections)){
-    const snapshots=await db.collection(collection).get();
-    assert.equal(snapshots.size,count);
-    const documents=new Map(snapshots.docs.map(d=>[d.id,d.data()]));
-    stored[section]=base[section].map(original=>{
-     const saved=documents.get(original[idKey]);assert(saved);
-     const record=plan.records.find(r=>r.collection===collection&&r.id===original[idKey]);
-     assert.equal(saved.sha256,record.sha256);assert.equal(saved.batchId,base.batchId);
-     assert.equal(saved.publicationStatus,'unpublished');assert.equal(saved.origin,'research_staging');
-     assert.deepEqual(saved.payload,original);return saved.payload;
-    });
-   }
-   assert.deepEqual(stored,base);return stored;
-  }
+  const loader=createData01bEmulatorLoader({db,target,fixtureFile:file});
+  const loadStoredOriginal=loader.loadOriginal;
   const originalSnapshot=await loadStoredOriginal();
   const derived=applyTw05ColorLabels(deriveTaiwanTw04(originalSnapshot));
   const queue=buildTw06ReviewQueue(derived);
@@ -96,11 +83,12 @@ async function main({realAuth=false}={}){
   assert(derived.variants.every(v=>v.selectable===false&&v.canAutoPublish===false));
   await db.collection('users').doc(actor).set({role:'super_admin',active:true,isTestAccount:false});
   await db.collection('users').doc(player).set({role:'player',active:true,isTestAccount:false});
-  const guards=createTw15AdminEmulatorGuards({db,target,Timestamp,FieldValue,secret,clock:()=>WINDOW_MS*99002});
+  let quotaClock=WINDOW_MS*99002;
+  const guards=createTw15AdminEmulatorGuards({db,target,Timestamp,FieldValue,secret,clock:()=>quotaClock});
   const dependencies={allowedAppIds:['data01b-test-app'],
    adminAppCheck:{verifyToken:async token=>{if(token!=='test-app')throw Error('INVALID_APP_CHECK');return {appId:'data01b-test-app'};}},
    adminAuth:auth||{verifyIdToken:async(token,revoked)=>{assert.equal(revoked,true);assert(['admin-test-token','player-test-token'].includes(token));return {uid:token==='admin-test-token'?actor:player,firebase:{sign_in_provider:'password'}};}},
-   adminFirestore:db,loadResearchBatch:async()=>{researchLoads++;return applyTw05ColorLabels(deriveTaiwanTw04(await loadStoredOriginal()));},
+   adminFirestore:db,loadResearchBatch:async()=>{researchLoads++;return loader.loadResearchBatch();},
    consumeRateLimit:guards.consumeRateLimit,recordAudit:guards.recordAudit};
   const handler=createTw13HttpV2Handler({onRequest:(options,fn)=>fn,dependencies,allowedOrigins:['https://arena.bxh.com.tw']});
   async function request(body={},token=adminToken,appToken='test-app'){
@@ -141,9 +129,33 @@ async function main({realAuth=false}={}){
   assert.equal(audits.docs.filter(d=>d.data().actorHash===hash(actor)&&d.data().outcome==='preview').length,5);
   assert.equal(audits.docs.filter(d=>d.data().actorHash===hash(player)&&d.data().outcome==='denied').length,1);
   assert(audits.docs.every(d=>d.data().emulatorOnly===true&&d.data().recordedAt instanceof Timestamp));
+  let corruptionCases=0;
+  const record=plan.records[0],recordRef=db.collection(record.collection).doc(record.id);
+  const savedRecord=(await recordRef.get()).data();
+  const runRef=db.collection('beyCatalogImportRuns').doc(base.batchId),savedRun=(await runRef.get()).data();
+  async function rejectChanged(change,restore,error){
+   await change();
+   try{
+    await assert.rejects(loader.loadOriginal,error);
+    if(!realAuth){
+     quotaClock+=WINDOW_MS;
+     const response=await request();assert.equal(response.code,503);
+     assert.deepEqual(response.body,{error:'SERVICE_UNAVAILABLE'});
+    }
+    corruptionCases++;
+   }finally{await restore();}
+  }
+  await rejectChanged(()=>recordRef.set({...savedRecord,payload:{...savedRecord.payload,manualReviewNote:'emulator tamper check'}}),()=>recordRef.set(savedRecord),/DATA01B_LOADER_DOCUMENT_MISMATCH/);
+  await rejectChanged(()=>recordRef.update({publicationStatus:'published'}),()=>recordRef.set(savedRecord),/DATA01B_LOADER_DOCUMENT_MISMATCH/);
+  await rejectChanged(()=>runRef.update({status:'in_progress'}),()=>runRef.set(savedRun),/DATA01B_LOADER_BATCH_NOT_VERIFIED/);
+  await rejectChanged(()=>runRef.update({status:'completed_with_conflicts',conflicts:1}),()=>runRef.set(savedRun),/DATA01B_LOADER_BATCH_NOT_VERIFIED/);
+  await rejectChanged(()=>runRef.update({manifestDigest:'wrong-manifest'}),()=>runRef.set(savedRun),/DATA01B_LOADER_BATCH_NOT_VERIFIED/);
+  const extra=db.collection(record.collection).doc('emulator_extra');
+  await rejectChanged(()=>extra.set(savedRecord),()=>extra.delete(),/DATA01B_LOADER_COLLECTION_COUNT_MISMATCH/);
+  await rejectChanged(()=>recordRef.delete(),()=>recordRef.set(savedRecord),/DATA01B_LOADER_COLLECTION_COUNT_MISMATCH/);
   assert.deepEqual(await loadStoredOriginal(),originalSnapshot);
   assert.deepEqual(fs.readFileSync(file),raw);
-  console.log(JSON.stringify({batchId:base.batchId,originalSha256:EXPECTED_SHA,manifestDigest:EXPECTED_MANIFEST,verifiedDocuments:197,reviewQueue:queue.summary,paginatedItems:seen.length,adminRequests:5,rateLimitStatus:429,playerStatus:403,researchLoads,originalPreserved:true,published:0,cloudWrites:0,emulator:true,auth:realAuth?'firebase-auth-emulator':'test-double',authCases:realAuth?['login','anonymous','malformed','wrong-audience','disabled','revoked']:[],appCheck:'test-double',http:'in-process-handler'}));
+  console.log(JSON.stringify({batchId:base.batchId,originalSha256:EXPECTED_SHA,manifestDigest:EXPECTED_MANIFEST,verifiedDocuments:197,corruptionCases,consistentSnapshot:true,reviewQueue:queue.summary,paginatedItems:seen.length,adminRequests:5,rateLimitStatus:429,playerStatus:403,researchLoads,originalPreserved:true,published:0,cloudWrites:0,emulator:true,auth:realAuth?'firebase-auth-emulator':'test-double',authCases:realAuth?['login','anonymous','malformed','wrong-audience','disabled','revoked']:[],appCheck:'test-double',http:'in-process-handler'}));
  }finally{await deleteApp(app);await env.cleanup();}
 }
 if(require.main===module)main({realAuth:process.argv.includes('--real-auth')}).catch(e=>{console.error(e);process.exitCode=1;});
