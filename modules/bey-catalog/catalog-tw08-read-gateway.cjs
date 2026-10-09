@@ -7,6 +7,7 @@
 const {buildTw06ReviewQueue}=require('./catalog-tw06-review-queue.cjs');
 const {createReviewMobileModel}=require('./catalog-tw07-mobile-model.cjs');
 const {digest}=require('./catalog-tw06-review.cjs');
+const {isActiveCatalogAdmin}=require('./catalog-tw11-role-policy.cjs');
 const FILTERS=new Set(['all','P0','P1','P2']);
 const UID=/^[A-Za-z0-9_-]{2,128}$/;
 function requireAdapter(adapter){
@@ -40,8 +41,7 @@ async function readTaiwanReviewQueue({adapter,idToken,request}={}){
  const decoded=await adapter.verifyIdToken(idToken,true);
  if(!UID.test(decoded?.uid||'')||decoded?.firebase?.sign_in_provider==='anonymous')return deny();
  const profile=await adapter.loadUserByUid(decoded.uid);
- if(!profile||profile.active!==true||profile.isTestAccount===true||
-    !['admin','super_admin'].includes(profile.role))return deny();
+ if(!isActiveCatalogAdmin(profile))return deny();
  // Read batch only after authorization. Do not accept client-provided dataset.
  const batch=await adapter.loadResearchBatch();
  const queue=buildTw06ReviewQueue(batch);
