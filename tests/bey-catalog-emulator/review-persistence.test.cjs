@@ -40,6 +40,7 @@ test('canonical draft mismatch cannot be reviewed',async()=>{
  const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{
   const db=ctx.firestore();await setDoc(doc(db,'beyCatalogRuleDrafts',draft.draftId),{draftHash:'tampered',reviewStatus:'requires_authorized_source_review',publicationStatus:'unpublished'});
   await assert.rejects(()=>persistReview(opts(db,'admin_b','approve')),/CANONICAL_DRAFT_MISMATCH/);
+  await setDoc(doc(db,'beyCatalogRuleDrafts',draft.draftId),{draftHash:hash(normalizeDraft(draft)),reviewStatus:'requires_authorized_source_review',publicationStatus:'unpublished'});
  });
 });
 
