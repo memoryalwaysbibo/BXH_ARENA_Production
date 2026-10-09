@@ -3,6 +3,9 @@ const {test,after}=require('node:test'),assert=require('node:assert/strict');
 const {initializeTestEnvironment,assertFails}=require('@firebase/rules-unit-testing');
 const {doc,getDoc,setDoc}=require('firebase/firestore');
 const {simulateReleaseSwitch}=require('../../modules/bey-catalog/release-pointer-emulator.cjs');
+const {createRelease}=require('../../modules/bey-catalog/assembly-rule-registry.cjs');
+function fixtureRelease(id){return createRelease({releaseId:id,createdBy:'root_admin',createdAt:'2026-10-09T03:00:00Z',rules:[{ruleId:'rule_a',version:id,result:'compatible',evidenceStatus:'verified',partIds:['blade_a','ratchet_a','bit_a'],sourceId:'official_a',sourceUrl:'https://example.org/official',reviewedBy:'root_admin',reviewedAt:'2026-10-09T03:00:00Z'}]});}
+function storedRelease(id){const r=fixtureRelease(id);return {...r,origin:'reviewed_proposal',publicationStatus:'unpublished',active:false,selectable:false};}
 const target={projectId:'demo-bxh-catalog-db01',emulatorHost:'127.0.0.1:8189',mode:'emulator'};
 if(process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8189')throw Error('LOCAL_EMULATOR_REQUIRED');
 const verifier={verifyIdToken:async token=>{if(!['root_admin','regular_admin','player_a','tester_admin'].includes(token))throw Error('INVALID_TOKEN');return {uid:token,firebase:{sign_in_provider:'password'}}}};
@@ -17,8 +20,8 @@ async function setup(){
    setDoc(doc(db,'users','regular_admin'),{active:true,role:'admin'}),
    setDoc(doc(db,'users','player_a'),{active:true,role:'player'}),
    setDoc(doc(db,'users','tester_admin'),{active:true,role:'super_admin',isTestAccount:true}),
-   setDoc(doc(db,'beyCatalogRuleReleases','catalog_v1'),{releaseId:'catalog_v1',checksum:'hash1',origin:'reviewed_proposal',publicationStatus:'unpublished',active:false,selectable:false}),
-   setDoc(doc(db,'beyCatalogRuleReleases','catalog_v2'),{releaseId:'catalog_v2',checksum:'hash2',origin:'reviewed_proposal',publicationStatus:'unpublished',active:false,selectable:false})
+   setDoc(doc(db,'beyCatalogRuleReleases','catalog_v1'),storedRelease('catalog_v1')),
+   setDoc(doc(db,'beyCatalogRuleReleases','catalog_v2'),storedRelease('catalog_v2'))
   ]);
  });
  return env;
@@ -72,5 +75,14 @@ test('no client may forge pointer or audit and production targets are rejected',
  await assertFails(setDoc(doc(client,'beyCatalogEmulatorPointerAudits','assembly_999'),{actorUid:'root_admin'}));
  await e.withSecurityRulesDisabled(async ctx=>{
   await assert.rejects(()=>simulateReleaseSwitch({...args(ctx.firestore(),'catalog_v1',4),target:{...target,projectId:'bxh-arena'}}),/PRODUCTION/);
+ });
+});
+
+test('tampered stored release checksum blocks preview switch',async()=>{
+ const e=await setup();
+ await e.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();
+  await setDoc(doc(db,'beyCatalogRuleReleases','catalog_tampered'),{...storedRelease('catalog_tampered'),checksum:'forged'});
+  await assert.rejects(()=>simulateReleaseSwitch(args(db,'catalog_tampered',4)),/RELEASE_INTEGRITY_FAILED/);
  });
 });
