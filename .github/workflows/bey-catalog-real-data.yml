@@ -39,6 +39,12 @@ jobs:
           pathlib.Path(os.environ['BXH_CATALOG_DATA01B_FILE']).write_bytes(raw)
           print('DATA01B private fixture checksum verified; bytes:',len(raw))
           PY
+      - name: Validate canonical 197-record fixture and pinned manifest
+        env:
+          BXH_CATALOG_DATA01B_FILE: ${{ runner.temp }}/catalog-research.json
+        run: |
+          node --test tests/bey-catalog-emulator/data01b-preflight.test.cjs
+          node tests/bey-catalog-emulator/data01b-preflight.cjs
       - name: Real 197-record Firestore Emulator interruption and replay
         env:
           BXH_CATALOG_DATA01B_FILE: ${{ runner.temp }}/catalog-research.json
