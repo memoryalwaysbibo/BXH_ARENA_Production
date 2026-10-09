@@ -48,7 +48,7 @@ test('three independent people required; no self-approval or missing evidence',(
 test('rejected proposal cannot be applied and approved proposal stays draft only',()=>{
  const batch=fixture(),p=makeProposal(batch,change);
  assert.throws(()=>applyApprovedToDraft(batch,p),/TW06_APPROVAL_REQUIRED/);
- const rejected=firstReview(p,{reviewerId:'reviewer_1',reviewedAt:'2026-10-09T05:10:00Z',decision:'reject',notes:'來源無法支持這個名稱'});
+ const rejected=firstReview(p,{reviewerId:'reviewer_1',reviewedAt:'2026-10-09T05:10:00Z',decision:'reject',notes:'來源無法支持這個名稱，請補充官方證據'});
  assert.throws(()=>applyApprovedToDraft(batch,rejected),/TW06_APPROVAL_REQUIRED/);
  const accepted=approved(batch),out=applyApprovedToDraft(batch,accepted);
  assert.equal(out.parts[0].displayName,'魔導神杖（新版台灣名稱）');
