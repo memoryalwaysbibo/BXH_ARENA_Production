@@ -1,5 +1,7 @@
 # TW-13｜Cloud Functions v2 HTTP 安全入口隔離驗收（尚未部署）
 
+> **後續狀態（2026-10-10）**：本文件保留 TW-13 當時的 factory 隔離測試；DB-01 原始 197 筆真實驗收已完成，並已注入真正 v2 `onRequest` SDK 經 loopback HTTP／真實 Auth Emulator 驗收。最新結果見 [CATALOG_REAL_HTTP_ACCEPTANCE.md](CATALOG_REAL_HTTP_ACCEPTANCE.md)。仍未部署，App Check 仍為替身。
+
 ## 本批交付
 - `modules/bey-catalog/catalog-tw13-http-v2.cjs`：接受受信任的 `firebase-functions/v2/https.onRequest` 注入，產生未部署的 HTTPS v2 處理函式。
 - 僅允許受控 HTTPS Origin 白名單，處理 CORS 預檢、POST 與 JSON，限制請求內容 4 KiB、查詢參數白名單。

@@ -1,5 +1,7 @@
 # TW-17 真實 Auth Emulator × DATA-01B 接軌驗收
 
+> **後續狀態（2026-10-10）**：TW-17 的 Auth Emulator 結果保留；HTTP 已從程序內 handler 接續到真正 v2 `onRequest` SDK 的 loopback 傳輸驗收，詳見 [CATALOG_REAL_HTTP_ACCEPTANCE.md](CATALOG_REAL_HTTP_ACCEPTANCE.md)。App Check、雲端 HTTP 與正式 IAM 仍未驗收。
+
 2026-10-09。前一提交 d002f93 的繁中、Emulator Safety、前端完整回歸三項 CI 全部成功。
 
 ## 發現與修正

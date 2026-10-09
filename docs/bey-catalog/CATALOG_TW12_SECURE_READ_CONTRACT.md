@@ -1,5 +1,7 @@
 # TW-12｜Cloud Function 受控查詢入口契約（未部署）
 
+> **後續狀態（2026-10-10）**：本文件保留 TW-12 當時的傳輸中立契約；DB-01 原始 197 筆真實驗收已完成，並已接續通過真實 Auth Emulator 與 v2 SDK loopback HTTP。最新 HTTP 邊界見 [CATALOG_REAL_HTTP_ACCEPTANCE.md](CATALOG_REAL_HTTP_ACCEPTANCE.md)；正式 App Check／IAM／部署仍未驗收。
+
 ## 本批內容
 - 新增 `catalog-tw12-secure-read.cjs`：傳輸層中立的伺服端查詢流程，不直接宣稱是已部署的 Cloud Function。
 - 請求依序檢查：

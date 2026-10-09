@@ -1,5 +1,7 @@
 # TW-18 私有原始研究資料載入器
 
+> **後續狀態（2026-10-10）**：TW-18 的私有載入器與七種破壞拒絕結果保留；其後已接續通過真正 v2 `onRequest` SDK 的 loopback HTTP／真實 Auth Emulator 驗收，詳見 [CATALOG_REAL_HTTP_ACCEPTANCE.md](CATALOG_REAL_HTTP_ACCEPTANCE.md)。App Check、雲端 HTTP、正式 IAM／TTL 仍未驗收。
+
 2026-10-10。前一 HEAD 1ae462a 的繁中、Emulator Safety、前端三項 CI 全部成功；本批未重做 DB-01 或 TW-17。
 
 ## 本批行為

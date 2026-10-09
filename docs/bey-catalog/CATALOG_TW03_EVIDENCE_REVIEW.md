@@ -1,5 +1,7 @@
 # BXH ARENA｜TW-03 UX-18 六款與 CX 配色來源稽核
 
+> **後續狀態（2026-10-10）**：本文件保留 TW-03 當時的批次邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收已完成，請以 [DB01_REAL_EMULATOR_RECEIPT.md](DB01_REAL_EMULATOR_RECEIPT.md) 為準。來源不足的名稱／原配／配色仍維持 pending。
+
 ## 實際 DATA-01B 結果
 - 來源資料：DATA-01B-20261009，197 個實體，原始 SHA-256 `2a53b4d0164d97a5f0607b4d4fd8a536a84b388530bca3eb371453f525cb7d42`，未覆蓋。
 - UX-18：6 款，1 款有原廠商品文字列名（MummyCurse 7-55W），另 5 款原配組合只依商家清單，仍需原廠包裝／說明書複核。
