@@ -23,6 +23,7 @@ test('TW-12 read uses real Emulator transactions for 5 quotas and 5 audit events
  const e=await setup();
  await e.withSecurityRulesDisabled(async ctx=>{
   const db=ctx.firestore(),guards=createTw14EmulatorGuards({db,target,clock:()=>WINDOW_MS*444});
+  const before=(await getDocs(collection(db,'beyCatalogTw14Audit'))).size;
   const dependencies={
    allowedAppIds:['catalog-test-app'],
    adminAppCheck:{verifyToken:async()=>({appId:'catalog-test-app'})},
@@ -42,7 +43,9 @@ test('TW-12 read uses real Emulator transactions for 5 quotas and 5 audit events
   }
   await assert.rejects(()=>readTw12CatalogQueue(input),/TW12_RATE_LIMITED/);
   const audit=await getDocs(collection(db,'beyCatalogTw14Audit'));
-  assert.equal(audit.size,5);
-  assert(audit.docs.every(d=>d.data().outcome==='preview'));
+  assert.equal(audit.size-before,5);
+  const newEvents=audit.docs.filter(d=>d.data().actorHash===require('node:crypto').createHash('sha256').update('tw14_integration_admin').digest('hex'));
+  assert.equal(newEvents.length,5);
+  assert(newEvents.every(d=>d.data().outcome==='preview'));
  });
 });
