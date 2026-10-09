@@ -1,0 +1,10 @@
+{
+  "purpose": "Synthetic loopback-only onsite host smoke tests; never imported by production assets",
+  "companionCoreSource": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/blob/30b18ddb08719311f8132ad585d31f800c79abed/onsite-waitlist-service/onsite-waitlist/core.js",
+  "files": {
+    "core.js": "0ddf2d490daf8cd416cf299bdc7acfb3f98dd02e61d3df0dbbf3b3c2f2dfa39c",
+    "json-file-store.js": "ea31872ae419a2b47032db6d909ef6bf0e118c9b42aeb6a6818161c013e0a7a2",
+    "demo-seed.js": "0dde4a04d019dab5415e1bc4bbe741bc9b2d2ba61e6ca349ede6f22531a94458"
+  },
+  "companionCoreGitBlob": "8c5513d06a74df92df8257b8c2f4b13736bb997e"
+}
