@@ -16,14 +16,13 @@ for(const role of ['admin','staff'])for(const width of [390,1280]){
   const response=await page.goto('/fixture?role='+role);expect(response.status()).toBe(200);
   await expect(page.locator('html')).toHaveAttribute('data-bxh-management-ui','v2');
   await expect(page.locator('[data-management-v2-group]:not(.is-placeholder)')).toHaveCount(role==='admin'?5:3);
-  await expect(page.locator('[data-management-v2-group="hunter"]')).toHaveAttribute('aria-disabled','true');
+  await expect(page.locator('[data-management-v2-group="hunter"]')).toHaveCount(0);
   for(const asset of assets){
    const matches=responses.filter(r=>new URL(r.url()).pathname==='/'+asset);expect(matches).toHaveLength(1);
    expect(matches[0].status()).toBe(200);expect(await matches[0].body()).toEqual(fs.readFileSync(path.join(root,asset)));
   }
   await page.screenshot({path:info.outputPath(`${role}-${width}.png`)});
   await page.locator('[data-management-v2-tab="bracket"]').click();
-  await page.locator('[data-management-v2-group="hunter"]').evaluate(el=>el.click());
   expect(await page.evaluate(()=>window.__actions)).toEqual(['bracket']);
   await page.locator('[data-management-v2-group="system"]').click();
   expect(await page.evaluate(()=>window.__actions)).toEqual(['bracket','operations']);
