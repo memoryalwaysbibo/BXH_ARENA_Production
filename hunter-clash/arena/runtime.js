@@ -32,7 +32,7 @@ function loadVendors(){if(vendors)return vendors;vendors=Promise.all([['QRCode',
 async function mount(host){
  const owner=user,stamp=epoch;if(!authorized||!owner)return null;
  await loadVendors();const module=await import('./mobile.mjs?v=20261009-a23');if(stamp!==epoch||user!==owner||!authorized)return null;
- const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<link rel="stylesheet" href="hunter-clash/arena/mobile.css?v=20261009-a23"><div id="message" role="status"></div><div id="app"></div>';
+ const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<link rel="stylesheet" href="hunter-clash/arena/mobile.css?v=20261009-skin-1"><div id="message" role="status"></div><div id="app"></div>';
  return module.mountMobile(shadow,{transport,playerName:()=>profile?.displayName||profile?.nickname||profile?.gameId||profile?.realName||'未設定名稱',watch:fn=>{queueMicrotask(()=>{if(stamp===epoch)fn(owner);});return()=>{};},history:force=>history.load(force)},{storage:sessionStorage});
 }
 root.BXHArenaPK={setSession,transport,displayRecords,state,statusHtml,renderLicense,mount,load:force=>history.load(force),listen:fn=>{changed=fn;}};
