@@ -36,7 +36,7 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   assert.equal(await a.locator('.room-stat > strong').innerText(),'大黑');
   await a.locator('[data-op=reconnect]').click();
   assert.equal(await a.locator('.room-stat > strong').innerText(),'大黑');
-  await a.locator('[data-op=leave]').click();await a.locator('.recovery-panel').waitFor();assert.equal(await a.locator('[data-op=createChallenge]').isVisible(),false);
+  await a.locator('[data-op=leave]').click();await a.locator('[data-op=resumeSaved]').waitFor();assert.equal(await a.locator('[data-op=createChallenge]').isVisible(),true);
   assert.equal([...m.data.values()].filter(v=>v.status==='cancelled').length,0);assert.equal(m.data.get('arenaPKPlayers/a'),undefined);
   await a.getByRole('button',{name:'獵人檔案',exact:true}).click();await a.evaluate(()=>sessionStorage.clear());
   await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('#match[data-stage=final_pending]').waitFor();await a.locator('#history summary').click();assert.match(await a.locator('.pending-history').innerText(),/尚未計入/);
