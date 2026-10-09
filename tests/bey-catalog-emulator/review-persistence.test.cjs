@@ -3,6 +3,8 @@ const {test,after}=require('node:test'),assert=require('node:assert/strict');
 const {initializeTestEnvironment,assertFails}=require('@firebase/rules-unit-testing');
 const {doc,getDoc,setDoc}=require('firebase/firestore');
 const {persistReview}=require('../../modules/bey-catalog/review-emulator-persistence.cjs');
+const {normalizeDraft}=require('../../modules/bey-catalog/stock-review-gate.cjs');
+const {hash}=require('../../modules/bey-catalog/assembly-rule-registry.cjs');
 const target={projectId:'demo-bxh-catalog-db01',emulatorHost:'127.0.0.1:8189',mode:'emulator'};
 if(process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8189')throw Error('LOCAL_EMULATOR_REQUIRED');
 const draft={draftId:'draft_emulator_1',reviewStatus:'requires_authorized_source_review',evidenceStatus:'pending',publicationStatus:'unpublished',canAutoPublish:false,scope:'exact_stock_configuration_only',partIds:['blade_1','ratchet_1','bit_1'],sourceRefs:[{sourceId:'manufacturer_1',authority:'manufacturer',url:'https://example.org/official',locator:'package list'}]};
@@ -13,7 +15,8 @@ async function setup(){if(env)return env;env=await initializeTestEnvironment({pr
  setDoc(doc(db,'users','admin_b'),{role:'super_admin',active:true}),
  setDoc(doc(db,'users','player_1'),{role:'player',active:true}),
  setDoc(doc(db,'users','tester_1'),{role:'admin',active:true,isTestAccount:true}),
- setDoc(doc(db,'users','inactive_1'),{role:'admin',active:false})
+ setDoc(doc(db,'users','inactive_1'),{role:'admin',active:false}),
+ setDoc(doc(db,'beyCatalogRuleDrafts',draft.draftId),{draftHash:hash(normalizeDraft(draft)),reviewStatus:'requires_authorized_source_review',publicationStatus:'unpublished'})
 ]);});return env;}
 after(async()=>{if(env)await env.cleanup()});
 const opts=(db,idToken,action,extra={})=>({db,target,authVerifier:tokenVerifier,idToken,draft,action,notes:'Evidence independently verified',sourceRechecked:true,...extra});
@@ -31,4 +34,11 @@ test('browser cannot read or write server review records',async()=>{
 });
 test('reject remote emulator or mismatched project before writing',async()=>{
  const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{await assert.rejects(()=>persistReview({...opts(ctx.firestore(),'admin_a','accept'),target:{...target,projectId:'bxh-arena'}}),/PRODUCTION/);});
+});
+
+test('canonical draft mismatch cannot be reviewed',async()=>{
+ const e=await setup();await e.withSecurityRulesDisabled(async ctx=>{
+  const db=ctx.firestore();await setDoc(doc(db,'beyCatalogRuleDrafts',draft.draftId),{draftHash:'tampered',reviewStatus:'requires_authorized_source_review',publicationStatus:'unpublished'});
+  await assert.rejects(()=>persistReview(opts(db,'admin_b','approve')),/CANONICAL_DRAFT_MISMATCH/);
+ });
 });
