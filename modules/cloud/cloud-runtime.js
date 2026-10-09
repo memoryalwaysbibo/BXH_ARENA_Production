@@ -197,7 +197,7 @@
       const user=authHandle?.currentUser;
       if(!authReady || !expectedUid || user?.uid!==expectedUid) return false;
       const result=await user.getIdTokenResult(true);
-      return authHandle?.currentUser===user && result?.claims?.hunterClashA1===true;
+      return authHandle?.currentUser===user && !!result?.token;
     },
     // Direct, synchronous read of Firebase's own current-user state — used as
     // a manual recovery check if onAuthStateChanged's event itself never
