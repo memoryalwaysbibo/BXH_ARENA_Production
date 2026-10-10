@@ -59,6 +59,27 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   await a.evaluate(()=>fixture.shell());assert.equal(await a.locator('#match[data-stage=completed]').count(),1);
   await a.locator('.room-analysis summary').click();
   for(const width of [320,390,430,1024]){assert.equal(await a.locator('.room-stat').count(),1);await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await a.locator('img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)),true);}
+  // Additional dual-confirmed rooms exercise lifetime streak/comeback rendering with real ledger rows.
+  let badgeSeq=0;
+  const badgeCall=(uid,operation,input={})=>service.run(uid,operation,{...input,requestId:'browser-badge-'+(++badgeSeq)});
+  for(const comeback of [false,true]){
+   const created=await badgeCall('a','createChallenge');
+   let c=(await badgeCall('b','acceptCode',{pairingCode:created.pairingCode,expectedRevision:0})).challenge;
+   for(const uid of ['a','b'])c=(await badgeCall(uid,'start',{challengeId:c.challengeId,expectedRevision:c.revision})).challenge;
+   const rounds=[...(comeback?[{winnerUid:'b',finish:'extreme'}]:[]),{winnerUid:'a',finish:'burst'},{winnerUid:'a',finish:'burst'}];
+   for(const round of rounds)c=(await badgeCall('a','recordRound',{challengeId:c.challengeId,expectedRevision:c.revision,...round})).challenge;
+   for(const uid of ['a','b'])c=(await badgeCall(uid,'confirmFinish',{challengeId:c.challengeId,expectedRevision:c.revision,resultRevision:c.resultRevision})).challenge;
+  }
+  await a.evaluate(()=>BXHArenaPK.load(true));await b.evaluate(()=>BXHArenaPK.load(true));
+  assert.deepEqual(await a.evaluate(()=>{const s=BXHPKAchievements.summarize(BXHArenaPK.state().records);return [s.bestStreak,s.comebacks,s.badges.find(b=>b.id==='streak_3').unlocked,s.badges.find(b=>b.id==='comeback').unlocked];}),[3,1,true,true]);
+  assert.deepEqual(await b.evaluate(()=>{const s=BXHPKAchievements.summarize(BXHArenaPK.state().records);return [s.bestStreak,s.comebacks];}),[0,0]);
+  if(await a.locator('#history > details').getAttribute('open')===null)await a.locator('#history > details > summary').click();
+  await a.locator('[data-op=history]').click();
+  await a.getByText('3 / 3 連勝',{exact:true}).waitFor({state:'visible'});
+  assert.match(await a.locator('.pk-achievements').innerText(),/三連勝/);
+  assert.match(await a.locator('.pk-achievements').innerText(),/3 \/ 3 連勝/);
+  assert.match(await a.locator('.pk-achievements').innerText(),/1 \/ 1 場逆轉/);
+  for(const width of [320,390,430]){await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
   await a.getByRole('button',{name:'獵人檔案',exact:true}).click();assert.match(await a.locator('#license').innerText(),/黑爸 vs 大黑 4:0/);assert.equal(await a.locator('#app').count(),0);
   await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('[data-op=createChallenge]').waitFor({state:'visible'});
   assert.equal(await a.locator('.recovery-panel').isVisible(),false);

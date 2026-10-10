@@ -9,11 +9,11 @@ function fixture(){
  const call=(uid,op,input={})=>service.run(uid,op,{...input,...(!['getMyHistory','getChallenge'].includes(op)?{requestId:'xp'+(++seq)}:{})});
  return {...m,service,call,setTime:v=>now=Date.parse(v)};
 }
-async function ready(f,peer='b',count=1){
+async function ready(f,peer='b',count=1,plans){
  const out=await f.call('a','createChallenge',{matchCount:count});let c=(await f.call(peer,'acceptCode',{pairingCode:out.pairingCode,expectedRevision:0})).challenge;
  for(const uid of ['a',peer])c=(await f.call(uid,'start',{challengeId:c.challengeId,expectedRevision:c.revision})).challenge;
  for(let n=0;n<count;n++){
-  for(let r=0;r<2;r++)c=(await f.call('a','recordRound',{challengeId:c.challengeId,expectedRevision:c.revision,winnerUid:n%2?peer:'a',finish:'burst'})).challenge;
+  for(const round of plans?.[n]||Array.from({length:2},()=>({winnerUid:n%2?peer:'a',finish:'burst'})))c=(await f.call('a','recordRound',{challengeId:c.challengeId,expectedRevision:c.revision,...round})).challenge;
   if(n<count-1)c=(await f.call('a','nextGame',{challengeId:c.challengeId,expectedRevision:c.revision})).challenge;
  }
  c=(await f.call('a','confirmFinish',{challengeId:c.challengeId,expectedRevision:c.revision,resultRevision:c.resultRevision})).challenge;
@@ -50,7 +50,7 @@ test('badge thresholds, distinct opponents, deduplication and same-day ordinals 
   rows.push({isWin:true,completed:true,analyzable:true,sourceType:'hunter-clash',eventCode:'pk'+d,matchId:'game'+n,opponent:{uid:'peer'+n%5},confirmedAt:at,pkAchievement:{version:ach.VERSION,day:xp.dayKey(at),dayOrdinal:n,opponentOrdinal:1,counted:true}});
  }
  assert.equal(ach.summarize(rows.slice(0,9)).badges[1].unlocked,false);assert.equal(ach.summarize(rows.slice(0,10)).badges[1].unlocked,true);
- assert.equal(ach.summarize(rows.slice(0,99)).badges[2].unlocked,false);const s=ach.summarize([...rows,...rows]);assert.equal(s.matches,100);assert.equal(s.opponents,5);assert(s.badges.every(b=>b.unlocked));
+ assert.equal(ach.summarize(rows.slice(0,99)).badges[2].unlocked,false);const s=ach.summarize([...rows,...rows]);assert.equal(s.matches,100);assert.equal(s.opponents,5);assert(s.badges.slice(0,6).every(b=>b.unlocked));assert.equal(s.badges.find(b=>b.id==='comeback').unlocked,false);
  assert.equal(ach.summarize(rows.map(r=>({...r,completed:false}))).matches,0);
 });
 
@@ -88,4 +88,38 @@ test('ten-win threshold uses qualified deduplicated wins rather than played matc
  const ten=ach.summarize([...wins,...losses,...wins]);assert.equal(ten.wins,10);assert.equal(badge(ten).unlocked,true);
  const excluded=[{...row(30),pkAchievement:undefined},{...row(31),completed:false},{...row(32),tombstone:true},{...row(33),analyzable:false},{...row(34),pkAchievement:{...row(34).pkAchievement,dayOrdinal:11,counted:false}},{...row(35),pkAchievement:{...row(35).pkAchievement,dayOrdinal:7,opponentOrdinal:7,counted:false}}];
  assert.equal(ach.summarize(excluded).wins,0);assert.equal(ach.summarize([...wins.slice(0,9),...excluded]).wins,9);
+});
+
+test('streaks follow settlement ordinals across rooms, pages and days; excluded losses break, wins do not add',()=>{
+ const row=(day,n,isWin=true,counted=true)=>({completed:true,analyzable:true,sourceType:'hunter-clash',isWin,eventCode:'pk'+day+'_'+n,matchId:'game1',opponent:{uid:'peer'},confirmedAt:Date.parse(day+'T12:00:00+08:00'),pkAchievement:{version:ach.VERSION,day,dayOrdinal:n,opponentOrdinal:counted?1:7,counted}});
+ const d='2026-10-10',e='2026-10-11';
+ const first=[row(d,5),row(d,6),row(d,7,true,false)];
+ assert.equal(ach.summarize(first.reverse()).bestStreak,2);assert.equal(ach.summarize([row(e,1),...first]).bestStreak,3);
+ const loss=row(d,8,false,false),next=row(e,1);
+ let s=ach.summarize([next,...first,loss]);assert.equal(s.bestStreak,2);assert.equal(s.currentStreak,1);assert.equal(s.badges.find(b=>b.id==='streak_3').unlocked,false);
+ s=ach.summarize([row(e,3),next,row(e,2),loss,...first,...first]);assert.equal(s.bestStreak,3);assert.equal(s.currentStreak,3);assert.equal(s.badges.find(b=>b.id==='streak_3').unlocked,true);
+ const gap={...row(e,2),analyzable:false};assert.equal(ach.summarize([...first,loss,next,gap,row(e,3)]).bestStreak,2);
+ const legacy={...row(e,2),isWin:false,pkAchievement:undefined};assert.equal(ach.summarize([next,legacy,row(e,3),row(e,4)]).bestStreak,3);
+});
+test('a real three-room streak waits for both confirmations and is recalculated after revocation',async()=>{
+ const f=fixture();await finish(f,await ready(f));await finish(f,await ready(f));
+ const pending=await ready(f);assert.equal(ach.summarize(adapter.adapt((await history(f)).rows,'a')).bestStreak,2);
+ const done=await finish(f,pending);assert.equal(ach.summarize(adapter.adapt((await history(f)).rows,'a')).bestStreak,3);
+ assert.equal(ach.summarize(adapter.adapt((await history(f,'b')).rows,'b')).bestStreak,0);
+ const input={challengeId:done.challengeId,expectedRevision:done.revision,reason:'experiment',requestId:'revoke-streak'};
+ await f.service.run('admin','revokeChallenge',input);await f.service.run('admin','revokeChallenge',input);
+ const s=ach.summarize(adapter.adapt((await history(f)).rows,'a'));assert.equal(s.bestStreak,2);assert.equal(s.badges.find(b=>b.id==='streak_3').unlocked,false);
+});
+test('comeback replays validated rounds: actual deficit and victory required; revoked evidence is removed',async()=>{
+ const f=fixture(),plans=[[{winnerUid:'b',finish:'extreme'},{winnerUid:'a',finish:'knockout'},{winnerUid:'a',finish:'burst'}]];
+ const pending=await ready(f,'b',1,plans);assert.equal(ach.summarize(adapter.adapt((await history(f)).rows,'a')).comebacks,0);
+ const done=await finish(f,pending),rows=adapter.adapt((await history(f)).rows,'a');
+ let s=ach.summarize([...rows,...rows]);assert.equal(s.comebacks,1);assert.equal(s.badges.find(b=>b.id==='comeback').unlocked,true);
+ assert.equal(ach.summarize(adapter.adapt((await history(f,'b')).rows,'b')).comebacks,0);
+ const tie=[{perspective:'for',points:2},{perspective:'against',points:2},{perspective:'for',points:2}];
+ assert.equal(ach.summarize([{...rows[0],roundsPerspective:tie}]).comebacks,0);
+ assert.equal(ach.summarize([{...rows[0],analyzable:false}]).comebacks,0);
+ assert.equal(ach.summarize([{...rows[0],pkAchievement:{...rows[0].pkAchievement,dayOrdinal:7,opponentOrdinal:7,counted:false}}]).comebacks,0);
+ await f.service.run('admin','revokeChallenge',{challengeId:done.challengeId,expectedRevision:done.revision,reason:'experiment',requestId:'revoke-comeback'});
+ s=ach.summarize(adapter.adapt((await history(f)).rows,'a'));assert.equal(s.comebacks,0);assert.equal(s.badges.find(b=>b.id==='comeback').unlocked,false);
 });
