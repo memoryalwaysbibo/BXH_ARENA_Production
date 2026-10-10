@@ -45,10 +45,15 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   assert.equal(await a.evaluate(()=>BXHArenaPK.state().practiceXp.totalXp),5);
   assert.equal(await a.evaluate(()=>BXHPKAchievements.summarize(BXHArenaPK.state().records).badges[0].unlocked),true);
   assert.match(await a.locator('.pk-achievements').innerText(),/初次交鋒/);
+  assert.match(await a.locator('.pk-achievements').innerText(),/初嚐勝果/);
+  assert.match(await a.locator('.pk-achievements').innerText(),/1 \/ 1 勝/);
+  assert.equal(await a.evaluate(()=>BXHPKAchievements.summarize(BXHArenaPK.state().records).badges.find(b=>b.id==='first_win').unlocked),true);
   assert.match(await a.locator('.session-xp').innerText(),/本房獲得 5 XP/);
   assert.match(await b.locator('.session-xp').innerText(),/本房獲得 5 XP/);
   await b.evaluate(()=>BXHArenaPK.load(true));
   assert.equal(await b.evaluate(()=>BXHPKAchievements.summarize(BXHArenaPK.state().records).matches),1);
+  assert.equal(await b.evaluate(()=>BXHPKAchievements.summarize(BXHArenaPK.state().records).wins),0);
+  assert.equal(await b.evaluate(()=>BXHPKAchievements.summarize(BXHArenaPK.state().records).badges.find(b=>b.id==='first_win').unlocked),false);
   assert.match(await a.locator('.practice-xp').first().innerText(),/今日已獲 5 XP/);
 
   await a.evaluate(()=>fixture.shell());assert.equal(await a.locator('#match[data-stage=completed]').count(),1);
