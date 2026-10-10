@@ -1,6 +1,6 @@
 'use strict';
 const {createHash,randomBytes,randomInt}=require('node:crypto');
-const domain=require('./domain.cjs'),adapter=require('./adapter.js'),xp=require('./practice-xp.cjs');
+const domain=require('./domain.cjs'),adapter=require('./adapter.js'),xp=require('./practice-xp.cjs'),ach=require('./achievements.js');
 const ENV=adapter.ENV,hash=v=>createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
 const fail=s=>{throw Error(s);},alphabet='23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 const code=()=>Array.from({length:4},()=>alphabet[randomInt(alphabet.length)]).join('');
@@ -48,7 +48,7 @@ function createService({db,auth,clock=Date.now,codeGenerator=code}){
     const challengeRef=ref('arenaPKChallenges',challengeId),[snapshot]=await tx.getAll(challengeRef),current=snapshot.data();let next,outcome,consume=null;
     if(create){
       if(current)fail('challenge-already-exists');if(config.rules?.version!==adapter.VERSION||config.rules.targetScore!==4)fail('invalid-rules');const ttl=config.pairingTtlMs;if(!Number.isSafeInteger(ttl)||ttl<1000||ttl>300000)fail('invalid-pairing-policy');
-      next=domain.create({challengeId,creatorUid:uid,rules:config.rules,now,expiresAt:now+ttl,matchCount:input.matchCount});next.practiceXpPolicy=xp.VERSION;next.participantNames={[uid]:name(profile)};next.pairingTokenHash=hash(tokenValue);next.pairingCodeHash=hash(pairingCode);outcome={challenge:view(next),pairingToken:tokenValue,pairingCode};
+      next=domain.create({challengeId,creatorUid:uid,rules:config.rules,now,expiresAt:now+ttl,matchCount:input.matchCount});next.practiceXpPolicy=xp.VERSION;next.pkAchievementPolicy=ach.VERSION;next.participantNames={[uid]:name(profile)};next.pairingTokenHash=hash(tokenValue);next.pairingCodeHash=hash(pairingCode);outcome={challenge:view(next),pairingToken:tokenValue,pairingCode};
     }else{
       if(!current||current.environment!==ENV)fail('challenge-unavailable');
       if(!accept&&!revoke&&!current.participants.includes(uid))fail('participant-required');
@@ -65,21 +65,24 @@ function createService({db,auth,clock=Date.now,codeGenerator=code}){
       const writes=[],day=xp.dayKey(now),enabled=!revoke&&next.practiceXpPolicy===xp.VERSION&&config.practiceXpEnabled!==false;
       const dayRefs=next.participants.map(p=>ref('arenaPKPlayers',p).collection('xpDays').doc(day));
       const days=enabled?await tx.getAll(...dayRefs):[];
+      const achievementEnabled=!revoke&&next.pkAchievementPolicy===ach.VERSION;
+      const achievementRefs=next.participants.map(p=>ref('arenaPKPlayers',p).collection('achievementDays').doc(day));
+      const achievementDays=achievementEnabled?await tx.getAll(...achievementRefs):[];
       const oldRows=revoke?await tx.getAll(...next.participants.flatMap(p=>games.map(g=>ledger(p).doc(next.challengeId+'_g'+String(g.number).padStart(3,'0'))))):[];
       next.practiceXpByPlayer={};
       for(const [i,p]of next.participants.entries()){
         const prior=players[i].data()||{uid:p,environment:ENV,total:0,wins:0,losses:0,generation:0};if(prior.uid!==p||prior.environment!==ENV||![prior.total,prior.wins,prior.losses,prior.generation].every(v=>Number.isSafeInteger(v)&&v>=0)||prior.wins+prior.losses!==prior.total)fail('history-unavailable');
-        const state=enabled?xp.daily(days[i].data(),p,day):null;let deltaUnits=0;
+        const state=enabled?xp.daily(days[i].data(),p,day):null;let deltaUnits=0;const achievementState=achievementEnabled?ach.daily(achievementDays[i].data(),p,day):null;
         const wins=games.filter(g=>g.winnerUid===p).length,sign=revoke?-1:1;if(prior.total+sign*games.length<0)fail('history-unavailable');
         for(const [gameIndex,game]of games.entries()){
-          let reward=null;
+          let reward=null;let achievement=achievementState?ach.award(achievementState,next.participants.find(uid=>uid!==p)):null;
           if(enabled){reward=xp.award(state,next.participants.find(uid=>uid!==p));deltaUnits+=reward.units;}
-          if(revoke){const old=oldRows[i*games.length+gameIndex].data();if(!old||old.completed!==true)fail('ledger-incomplete');if(old.practiceXp){if(old.practiceXp.version!==xp.VERSION||!Number.isSafeInteger(old.practiceXp.units)||old.practiceXp.units<0)fail('ledger-xp-invalid');reward={...old.practiceXp,revoked:true};deltaUnits-=reward.units;}}
-          const row={schemaVersion:1,environment:ENV,challengeId:next.challengeId,playerUid:p,participants:next.participants,names:next.participantNames,rules:next.rules,certificationSource:'SELF',completed:!revoke,confirmedBy:next.finishConfirmedBy,confirmedAt:next.completedAt,sourceRevision:next.revision,updatedAt:now,game,...(reward?{practiceXp:reward}:{})};const r=adapter.record(row,p);if(!revoke&&!r.analyzable)fail('ledger-incomplete');writes.push([ledger(p).doc(next.challengeId+'_g'+String(game.number).padStart(3,'0')),row]);}
+          if(revoke){const old=oldRows[i*games.length+gameIndex].data();if(!old||old.completed!==true)fail('ledger-incomplete');if(!ach.validate(old.pkAchievement,old.confirmedAt))fail('ledger-achievement-invalid');achievement=old.pkAchievement||null;if(old.practiceXp){if(old.practiceXp.version!==xp.VERSION||!Number.isSafeInteger(old.practiceXp.units)||old.practiceXp.units<0)fail('ledger-xp-invalid');reward={...old.practiceXp,revoked:true};deltaUnits-=reward.units;}}
+          const row={schemaVersion:1,environment:ENV,challengeId:next.challengeId,playerUid:p,participants:next.participants,names:next.participantNames,rules:next.rules,certificationSource:'SELF',completed:!revoke,confirmedBy:next.finishConfirmedBy,confirmedAt:next.completedAt,sourceRevision:next.revision,updatedAt:now,game,...(reward?{practiceXp:reward}:{}),...(achievement?{pkAchievement:achievement}:{})};const r=adapter.record(row,p);if(!revoke&&!r.analyzable)fail('ledger-incomplete');writes.push([ledger(p).doc(next.challengeId+'_g'+String(game.number).padStart(3,'0')),row]);}
         const totalUnits=xp.units(prior)+deltaUnits;if(!Number.isSafeInteger(totalUnits)||totalUnits<0)fail('ledger-xp-invalid');
         next.practiceXpByPlayer[p]={version:xp.VERSION,xp:revoke?0:deltaUnits/2,reason:revoke?'revoked':enabled?'settled':next.practiceXpPolicy===xp.VERSION?'disabled':'before-launch',...(state?{day,remainingGames:Math.max(0,xp.DAILY_LIMIT-state.completedGames)}:{})};
         writes.push([ref('arenaPKPlayers',p),{...prior,uid:p,environment:ENV,total:prior.total+sign*games.length,wins:prior.wins+sign*wins,losses:prior.losses+sign*(games.length-wins),generation:prior.generation+1,practiceXpUnits:totalUnits,updatedAt:now}]);
-        if(state)writes.push([dayRefs[i],state]);
+        if(state)writes.push([dayRefs[i],state]);if(achievementState)writes.push([achievementRefs[i],achievementState]);
       }
       for(const [r,v]of writes)tx.set(r,v);
     }

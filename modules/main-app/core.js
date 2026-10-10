@@ -16417,6 +16417,7 @@ function renderPlayerStatsTab(p){
     body+=hunterStrengthDiagnosticsHtml(analysisRows,!displayCompleteHistory);
     body+=hunterTrendHtml(hunterFilterByMode(window.BXHArenaPK?.displayRecords(allRecords)||allRecords,hunterBattleFilter),!displayCompleteHistory);
   }else if(playerStatsSubTab==="achievements"){
+    if(window.BXHArenaPK&&typeof hunterClashEntry!=='undefined'&&hunterClashEntry?.visible()&&window.BXHArenaPK.state().status==='unconnected')setTimeout(()=>window.BXHArenaPK.load(false),0);
     const achievementCore=hunterProfileCache&&hunterProfileCache.achievementCore
       ? hunterProfileCache.achievementCore
       : hunterBuildAchievementCore(allRecords);
@@ -16456,6 +16457,7 @@ function renderPlayerStatsTab(p){
       (skipped.length?'<div class="hunter-profile-error">'+skipped.join('；')+'。統計僅涵蓋已讀取資料，暫停綜合評分與評級。</div><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button>':'')+
       '</section>'+body;
   }
+  if(playerStatsSubTab==="achievements"&&window.BXHArenaPK&&typeof hunterClashEntry!=='undefined'&&hunterClashEntry?.visible())body+=window.BXHArenaPK.achievementsHtml?.()||"";
   return '<section class="hunter-profile-shell"><div class="hunter-profile-title"><div><div class="hunter-kicker">BXH HUNTER PROFILE</div><h2>獵人檔案</h2></div><span class="badge badge-metal">P6.6</span></div>'+
     '<div class="player-stats-subtabs hunter-profile-tabs">'+tabs.map(([key,label])=>'<button class="player-stats-subtab '+(playerStatsSubTab===key?'active':'')+'" data-action="player-stats-subtab" data-tab="'+key+'">'+label+'</button>').join('')+'</div>'+(playerStatsSubTab!=="achievements"?hunterBattleFiltersHtml():"")+body+'</section>';
 }
