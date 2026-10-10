@@ -94,7 +94,9 @@ export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=
     select('.score').textContent=c?c.score.a+' : '+c.score.b:'0 : 0';
     select('.round').textContent=c?.pendingRound?'第 '+c.pendingRound.number+' 局：'+(c.participantNames?.[c.pendingRound.winnerUid]||'未設定名稱')+' 得 '+c.pendingRound.points+' 分，等待另一方確認。':c?'已記錄 '+c.rounds.length+' 局':'';
     select('.practice-xp').innerHTML=runtime.xpHtml?.()||'';
-    select('.pk-achievements').innerHTML=runtime.achievementsHtml?.()||'';
+    const badges=select('.pk-achievements'),openDetails=badges.dataset.owner===uid?new Set([...badges.querySelectorAll('details[data-pk-detail][open]')].map(d=>d.dataset.pkDetail)):new Set();
+    badges.innerHTML=runtime.achievementsHtml?.()||'';badges.dataset.owner=uid||'';
+    for(const detail of badges.querySelectorAll('details[data-pk-detail]'))detail.open=openDetails.has(detail.dataset.pkDetail);
     const notice=select('.achievement-notice');notice.hidden=!achievementNotice||achievementNotice.uid!==uid||achievementNotice.challengeId!==c?.challengeId||c?.status!=='completed';notice.querySelector('p').textContent=notice.hidden?'':achievementNotice.names.join('、');
     const reward=c?.practiceXpByPlayer?.[uid],xpLine=select('.session-xp');
     xpLine.hidden=c?.status!=='completed';
