@@ -11,6 +11,7 @@ const suites = {
     { name: "Hunter Clash A1 identity gate and camera lifecycle", args: ["--test", "tests/hunter-clash-a1-entry.test.cjs"] },
     { name: 'hunter B6 grade transparency and career replay', args: ['--test', 'tests/hunter-b6-license.test.cjs'] },
     { name: 'hunter B5 offline replay and strength diagnostics', args: ['--test', 'tests/hunter-b5-strength.test.cjs'] },
+    { name: 'hunter Phase 2 opponent-strength candidate behavior', args: ['--test', 'tests/hunter-phase2-strength-candidate.test.cjs'] },
     { name: 'hunter B4 sample maturity and comparable recent windows', args: ['--test', 'tests/hunter-b4-trends.test.cjs'] },
     { name: 'hunter B3 radar denominator, scale and inline evidence', args: ['--test', 'tests/hunter-b3-radar.test.cjs'] },
     { name: 'hunter B2 source categories and enchantment base scoring', args: ['--test', 'tests/hunter-b2-modes.test.cjs'] },
