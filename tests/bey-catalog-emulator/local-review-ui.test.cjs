@@ -36,7 +36,8 @@ before(async () => {
   await auth.createUser({uid, email: uid + '@example.invalid', password});
   await db.collection('users').doc(uid).set({role: uid === 'local_ui_denied' ? 'player' : 'admin', active: true, isTestAccount: false});
  }
- const guards = createTw15AdminEmulatorGuards({db, target, Timestamp, FieldValue, secret: 'public-local-ui-test-secret-never-production'});
+ // Hold the injected clock inside one quota window so a real minute boundary cannot make the browser test flaky.
+ const guards = createTw15AdminEmulatorGuards({db, target, Timestamp, FieldValue, secret: 'public-local-ui-test-secret-never-production', clock: () => 60000});
  server = await startLocalReviewServer({target, dependencies: {
   adminAuth: auth, adminFirestore: db, ...guards, loadResearchBatch: async () => {loads++; return syntheticBatch();}
  }});
