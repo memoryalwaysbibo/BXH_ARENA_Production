@@ -131,10 +131,19 @@ test(`${integration ? 'ARENA integration' : 'isolated module'} preserves input, 
   await expect(guide(page)).toHaveCount(0);
   await page.locator('#player-login-email').fill('draft-player');
   await page.locator('#player-login-password').fill('draft-password');
+  if(integration){
+    await page.evaluate(()=>window.dispatchEvent(new CustomEvent('bxh-offline-queue-change',{detail:{pending:0}})));
+    await expect(page.locator('#player-login-password')).toHaveValue('draft-password');
+  }
   const before = await page.evaluate(() => ({ href: location.href, history: history.length }));
   await entry(page).click();
   await expect(guide(page)).toBeVisible();
   await expect(guide(page)).toContainText('安裝應用程式');
+  if(integration){
+    await page.evaluate(()=>window.dispatchEvent(new CustomEvent('bxh-offline-queue-change',{detail:{pending:0}})));
+    await expect(guide(page)).toBeVisible();
+    await expect(page.locator('#player-login-password')).toHaveValue('draft-password');
+  }
   await expect(page.getByRole('button', { name: '關閉安裝說明' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(page.getByRole('button', { name: '稍後再說' })).toBeFocused();
@@ -158,12 +167,20 @@ test(`${integration ? 'ARENA integration' : 'isolated module'} preserves input, 
   await page.locator('#apply-email').fill('draft@example.test');
   await page.locator('#apply-password').fill('draft-password');
   await page.locator('#apply-agree').check();
+  if(integration){
+    await page.evaluate(()=>window.dispatchEvent(new CustomEvent('bxh-offline-queue-change',{detail:{pending:0}})));
+    await expect(page.locator('#apply-password')).toHaveValue('draft-password');
+  }
   await entry(page).click();
   await page.getByRole('button', { name: '關閉安裝說明' }).click();
   await expect(page.locator('#apply-realname')).toHaveValue('測試草稿');
   await expect(page.locator('#apply-email')).toHaveValue('draft@example.test');
   await expect(page.locator('#apply-password')).toHaveValue('draft-password');
   await expect(page.locator('#apply-agree')).toBeChecked();
+  if(integration){
+    await page.locator('[data-action="player-goto-login"]').click();
+    await expect(page.locator('#player-login-password')).toHaveValue('');
+  }
 });
 
 }
