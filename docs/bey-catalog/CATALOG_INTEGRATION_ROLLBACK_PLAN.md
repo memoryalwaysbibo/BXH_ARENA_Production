@@ -22,7 +22,7 @@
 1. 保持#462、#463 Draft，避免重做已完成且未改動的真實資料驗收；每次以最新HEAD核對CI。
 2. 實際 v2 SDK loopback HTTP 與真正 Functions Emulator URL 邊界已完成隔離驗收；除非相關程式或依賴變更，不重跑私有原始197筆或另造批次。App Check 仍是明確替身，不能把此結果說成正式雲端驗收。
    後續已補上[本機唯讀操作頁](CATALOG_LOCAL_REVIEW_UI.md)，串接既有安全查詢，支援測試登入、搜尋、篩選、分頁；Chromium與真實Auth／Firestore Emulator的六項回歸成功，研究fixture明確為合成。私有快照操作、常駐測試網站與正式整合尚未完成；頁面不能核准或發布。2026-10-10再核對時，三個本機端口均未執行，工作區沒有Firestore export metadata，既有私有證據包也不含資料快照；不得為了開頁重新匯入已驗收原始資料。
-3. 31項補證與雙人審核：P0=5、P1=15、P2=11。已整理[UX-18五款官方零件圖候選證據](CATALOG_UX18_OFFICIAL_EVIDENCE_CANDIDATES.md)，保持pending；缺少原廠包裝／說明書或台灣正式名稱時維持pending，不以商家交叉佐證自動核准。自動化不能代替兩名獨立人工審核者。
+3. 31項補證與雙人審核：P0=5、P1=15、P2=11。[UX-18官方候選證據與更正](CATALOG_UX18_OFFICIAL_EVIDENCE_CANDIDATES.md)已撤回a9ef63a中「詳細圖包含五款分解」及「UX18_02附六款名稱」的錯誤描述，改以商品頁8頁產品說明書第1頁支持五款完整名稱；逐件BOM、台灣正式名稱及實物仍須補證與雙人審核，保持pending，不自動核准。自動化不能代替兩名獨立人工審核者。
 4. 正式App Check需確認註冊App IDs、provider及token驗證；Firebase 的 [Web CI debug provider](https://firebase.google.com/docs/app-check/web/debug-provider) 也需要在 Firebase Console 註冊且必須保密的 debug token，不能公開提交或用自簽替身冒充。正式IAM需指定服務帳戶及最小讀取／稽核範圍；TTL與稽核保留期限需使用者決策。現有expiresAt只是欄位，尚無TTL policy。這些正式設定未獲授權前不變更。
 5. 目前 main 已前進27個提交。日後取得明確整合授權後，才在隔離整合分支納入當時最新 main、核對兩個 PR 的順序並跑最新 HEAD 全套回歸；只有資料載入／交易程式或固定來源改變時，才評估重跑原始197筆真實驗收。
 6. 完成後呈現固定提交、CI、部署範圍及回退點供批准；本文件不授權合併、部署或正式資料寫入。
