@@ -1,6 +1,6 @@
 # 獵人交鋒一般玩家開放
 
-有效 ARENA 玩家（player/staff/admin/super_admin）登入後即可使用；不再需要 hunterClashA1 custom claim 或 allowedUids 白名單。測試、停用、凍結、刪除與非玩家角色仍被拒絕。enabled 總開關、App Check、雙方確認、分頁帳本核對均保留；練習 XP 接軌規則見 [練習 XP 發布說明](hunter-clash-practice-xp.md)；PK 不計成就、正規實力或階級。
+有效 ARENA 玩家（player/staff/admin/super_admin）登入後即可使用；不再需要 hunterClashA1 custom claim 或 allowedUids 白名單。測試、停用、凍結、刪除與非玩家角色仍被拒絕。enabled 總開關、App Check、雙方確認、分頁帳本核對均保留；練習 XP 接軌規則見 [練習 XP 發布說明](hunter-clash-practice-xp.md)；PK 專屬徽章見 [PK 成就說明](hunter-clash-pk-achievements.md)，不計既有永久成就、正規實力或階級。
 
 ## 發布順序
 

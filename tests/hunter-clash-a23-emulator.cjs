@@ -17,6 +17,7 @@ const {createService}=require('../hunter-clash/arena/service.cjs'),adapter=requi
  c=(await call(other,'confirmFinish',{challengeId:pending.challengeId,expectedRevision:pending.revision,resultRevision:pending.resultRevision})).challenge;
  const first=(await call('a','getMyHistory')).history,tail=(await call('a','getMyHistory',{cursor:first.nextCursor,generation:first.generation})).history;
  assert.equal(first.total,51);assert.equal(first.practiceXp.totalXp,22.5);assert.equal(first.practiceXp.remainingGames,0);assert.equal(tail.practiceXp.totalXp,22.5);assert.equal(first.rows.length,50);assert.equal(tail.rows.length,1);assert.equal(adapter.adapt([...first.rows,...tail.rows],'a').length,51);assert.equal((await call('b','getMyHistory')).history.losses,26);
+ assert.equal(require('../hunter-clash/arena/achievements.js').summarize(adapter.adapt([...first.rows,...tail.rows],'a')).matches,6);
  const revoke={challengeId:c.challengeId,expectedRevision:c.revision,reason:'emulator correction',requestId:'revoke-once'};await service.run(tokens.admin,'revokeChallenge',revoke);await service.run(tokens.admin,'revokeChallenge',revoke);assert.equal((await call('a','getMyHistory')).history.total,0);assert.equal((await call('a','getMyHistory')).history.practiceXp.totalXp,0);await assert.rejects(call('a','getMyHistory',{cursor:first.nextCursor,generation:first.generation}),/history-changed/);
  // SDK client REST cannot bypass the server ledger; emulator deny-all rules actually evaluated.
  const rest=await fetch('http://'+process.env.FIRESTORE_EMULATOR_HOST+'/v1/projects/'+projectId+'/databases/(default)/documents/arenaPKPlayers/a',{headers:{authorization:'Bearer '+tokens.a}});assert.equal(rest.status,403);
@@ -32,6 +33,6 @@ const {createService}=require('../hunter-clash/arena/service.cjs'),adapter=requi
  }
  const rooms=[await pendingRoom(),await pendingRoom()];
  await Promise.all(rooms.map(c=>later('b','confirmFinish',{challengeId:c.challengeId,expectedRevision:c.revision,resultRevision:c.resultRevision})));
- const xpHistory=(await later('a','getMyHistory')).history;assert.equal(xpHistory.practiceXp.totalXp,10);assert.equal(xpHistory.practiceXp.completedToday,2);
+ const xpHistory=(await later('a','getMyHistory')).history;assert.equal(xpHistory.practiceXp.totalXp,10);assert.equal(xpHistory.practiceXp.completedToday,2);const xpTail=(await later('a','getMyHistory',{cursor:xpHistory.nextCursor,generation:xpHistory.generation})).history;assert.equal(require('../hunter-clash/arena/achievements.js').summarize(adapter.adapt([...xpHistory.rows,...xpTail.rows],'a')).matches,2);
  await db.doc('users/b').update({active:false});await assert.rejects(call('b','getMyHistory'),/account-unavailable/);await assert.rejects(service.run('invalid-token','getMyHistory',{}));await db.terminate();console.log('PASS real Auth/Firestore SDK transactions, concurrent confirmation, 51 game paging, dual ledger, revoke replay, revoked auth and denied direct client reads');
 })().catch(e=>{console.error(e);process.exitCode=1;});
