@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "bxh-arena"
+  },
+  "targets": {
+    "bxh-arena": {
+      "hosting": {
+        "pwa-auth-test": [
+          "bxh-arena-pwa-auth-test"
+        ]
+      }
+    }
+  }
+}

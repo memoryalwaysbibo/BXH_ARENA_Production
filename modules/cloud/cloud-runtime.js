@@ -80,6 +80,9 @@
         const appMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app.js`);
         const fsMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`);
         const authMod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`);
+        // Firebase Hosting PWA-auth test site serves the Auth helper on the same origin.
+        // Keep Production on firebaseapp.com; only the dedicated test hostname opts in.
+        if(location.hostname==="bxh-arena-pwa-auth-test.web.app") FIREBASE_CONFIG.authDomain=location.hostname;
         const app = appMod.initializeApp(FIREBASE_CONFIG);
         firebaseAppHandle = app;
         dbHandle = fsMod.getFirestore(app);
@@ -162,6 +165,16 @@
             try{sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);}catch(e){}
           }
         }
+        try{
+          if(sessionStorage.getItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY)){
+            const result=await ax.getRedirectResult(authHandle,ax.browserPopupRedirectResolver);
+            if(result?.user && !result.user.providerData.some(p=>p.providerId==="google.com")) throw Error("google-provider-missing");
+          }
+        }catch(redirectError){
+          console.warn("BXH ARENA Google 登入 redirect 結果未確認",redirectError);
+        }finally{
+          try{sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);}catch(e){}
+        }
         return true;
       }catch(e){
         console.warn("BXH ARENA 雲端同步：Firebase 初始化失敗，自動退回僅本機模式。", e);
@@ -189,6 +202,13 @@
   const GOOGLE_LINK_PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
   const googleLinkProfileCache = new Map();
   const GOOGLE_LINK_REDIRECT_SESSION_KEY = "bxh_google_link_redirect_v1";
+  const GOOGLE_SIGNIN_REDIRECT_SESSION_KEY = "bxh_google_signin_redirect_v1";
+
+  function shouldUseRedirectGoogleAuth(){
+    try{
+      return navigator.standalone===true || !!window.matchMedia?.("(display-mode: standalone)").matches;
+    }catch(e){ return false; }
+  }
   let pendingGoogleLinkRedirectOutcome = null;
 
   window.cloudAuth = {
@@ -271,12 +291,29 @@
 
     async signInWithLinkedGoogle(){
       if(!authReady)return {ok:false,error:"雲端服務尚未連線。"};
+      const provider=new ax.GoogleAuthProvider();
+      provider.setCustomParameters({prompt:"select_account"});
+      const useRedirect=shouldUseRedirectGoogleAuth();
+      const startRedirect=async()=>{
+        try{
+          sessionStorage.setItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY,"1");
+          await ax.signInWithRedirect(authHandle,provider,ax.browserPopupRedirectResolver);
+          return {ok:true,redirecting:true};
+        }catch(redirectError){
+          try{sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);}catch(e){}
+          throw redirectError;
+        }
+      };
       try{
-        const provider=new ax.GoogleAuthProvider();
-        provider.setCustomParameters({prompt:"select_account"});
-        const result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
-        if(!result.user.providerData.some(p=>p.providerId==="google.com"))throw Error("google-provider-missing");
-        return {ok:true,uid:result.user.uid};
+        if(useRedirect)return await startRedirect();
+        try{
+          const result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
+          if(!result.user.providerData.some(p=>p.providerId==="google.com"))throw Error("google-provider-missing");
+          return {ok:true,uid:result.user.uid};
+        }catch(popupError){
+          if(popupError?.code==="auth/popup-blocked"||popupError?.code==="auth/operation-not-supported-in-this-environment")return await startRedirect();
+          throw popupError;
+        }
       }catch(e){
         if(e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request")return {ok:false,error:"已取消 Google 登入。"};
         if(e?.code==="auth/permission-denied"||e?.code==="auth/internal-error")return {ok:false,error:"此 Google 帳號尚未綁定 ARENA；請先用原帳密登入並完成綁定。"};
