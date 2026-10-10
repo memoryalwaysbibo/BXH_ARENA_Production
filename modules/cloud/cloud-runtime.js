@@ -2042,6 +2042,12 @@
           if(!participant){
             const wantedNames=[reg.displayName,reg.publicName,reg.participantName,reg.realName].map(cleanName).filter(Boolean);
             const nameMatches=players.filter(p=>p&&wantedNames.includes(cleanName(p.name))).length;
+            // A cancelled or unpromoted waitlist registration is not match history.
+            // Keep unresolved identity blocking if any roster/name or match evidence remains.
+            const matches=Array.isArray(runtime.matches)?runtime.matches:Object.values(runtime.matches||{});
+            const hasMatchEvidence=matches.some(m=>m&&[m.a&&m.a.playerId,m.b&&m.b.playerId,m.winnerId,m.loserId]
+              .some(id=>id!=null&&candidateIds.has(String(id))));
+            if(["cancelled","waitlist"].includes(String(reg.status||""))&&nameMatches===0&&!hasMatchEvidence) continue;
             skipped.push({code,reason:"identity-unresolved",eventName:String(d.name||""),eventDate:String(d.eventDate||""),identityIssue:nameMatches>1?"ambiguous-name":"participant-not-found"});
             continue;
           }
