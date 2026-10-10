@@ -5,6 +5,8 @@ on:
     paths:
       - 'modules/bey-catalog/**'
       - 'tests/bey-catalog-*/**'
+      - 'bey-catalog-local-review.html'
+      - 'scripts/bey-catalog-local-review.cjs'
       - '.github/workflows/bey-catalog-emulator.yml'
 permissions:
   contents: read
@@ -35,3 +37,7 @@ jobs:
         run: npx firebase emulators:exec --only firestore,auth --project demo-bxh-catalog-db01 --config tests/bey-catalog-emulator/firebase-auth.json "BXH_CATALOG_REAL_HTTP=1 node --test tests/bey-catalog-emulator/tw17-auth-emulator.test.cjs"
       - name: Actual Functions Emulator HTTP boundary (no private fixture)
         run: npx firebase emulators:exec --only firestore,auth,functions --project demo-bxh-catalog-db01 --config tests/bey-catalog-emulator/firebase-functions.json "node --test tests/bey-catalog-emulator/functions-http.test.cjs"
+      - name: Install isolated browser
+        run: npx playwright install --with-deps chromium
+      - name: Local read-only UI with real Auth (synthetic research shapes only)
+        run: npx firebase emulators:exec --only firestore,auth --project demo-bxh-catalog-db01 --config tests/bey-catalog-emulator/firebase-auth.json "node --test tests/bey-catalog-emulator/local-review-ui.test.cjs"
