@@ -17304,7 +17304,29 @@ function finishRenderViewport(snapshot){
   setTimeout(restore, 80);
   setTimeout(restore, 180);
 }
+let authFormRenderContext=null;
+function renderAuthFormPreservingInputs(app,html,phase){
+  // The login identifier follows input events; ignore that draft in the render
+  // signature so unrelated background refreshes do not replace the live form.
+  const signature=html.replace(/(<input\b[^>]*\bid="player-login-email"[^>]*\bvalue=")[^"]*(")/g,"$1$2");
+  const sameScreen=authFormRenderContext&&authFormRenderContext.phase===phase&&authFormRenderContext.root===app.firstElementChild;
+  if(sameScreen&&authFormRenderContext.signature===signature)return;
+  const fields=sameScreen?[...app.querySelectorAll('input[id],textarea[id],select[id]')].map(el=>({id:el.id,value:el.value,checked:el.checked})):[];
+  const focused=sameScreen&&app.contains(document.activeElement)?document.activeElement.id:null;
+  app.innerHTML=html;
+  for(const field of fields){
+    const el=document.getElementById(field.id);
+    if(!el||!app.contains(el)||el.type==='file')continue;
+    el.value=field.value;
+    if(el.type==='checkbox'||el.type==='radio')el.checked=field.checked;
+  }
+  authFormRenderContext={phase,signature,root:app.firstElementChild};
+  bindAuthInputs();
+  const focusTarget=focused&&document.getElementById(focused);
+  if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
+}
 function render(){
+  if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
   if(!communitySettingsDraftContext())communitySettingsRenderedContext=null;
   reconcileRegistrationRosterContext();
@@ -17341,8 +17363,8 @@ function render(){
   if(appPhase==="watch-error"){ app.innerHTML = renderWatchErrorScreen(); return; }
   if(appPhase==="guest-lobby"){ app.innerHTML = renderGuestLobbyScreen(); bindAuthInputs(); bindDynamicInputs(); return; }
   if(appPhase==="player-home"){ app.innerHTML = renderPlayerHomeScreen(); bindAuthInputs(); return; }
-  if(appPhase==="player-login"){ app.innerHTML = renderPlayerLoginScreen(); bindAuthInputs(); return; }
-  if(appPhase==="player-apply"){ app.innerHTML = renderPlayerApplyScreen(); bindAuthInputs(); return; }
+  if(appPhase==="player-login"){ renderAuthFormPreservingInputs(app,renderPlayerLoginScreen(),appPhase); return; }
+  if(appPhase==="player-apply"){ renderAuthFormPreservingInputs(app,renderPlayerApplyScreen(),appPhase); return; }
   if(appPhase==="player-complete-profile"){ app.innerHTML = renderPlayerCompleteProfileScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-lookup"){ app.innerHTML = renderPlayerLookupScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }
