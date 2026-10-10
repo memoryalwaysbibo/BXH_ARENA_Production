@@ -1,7 +1,7 @@
 (function(root){
 'use strict';
 const VERSION='arena-pk-achievements-v1';
-const definitions=[['first','初次交鋒',1,'matches'],['rookie','交鋒新秀',10,'matches'],['veteran','百戰獵人',100,'matches'],['friends','廣結戰友',5,'opponents']];
+const definitions=[['first','初次交鋒',1,'matches'],['rookie','交鋒新秀',10,'matches'],['veteran','百戰獵人',100,'matches'],['friends','廣結戰友',5,'opponents'],['first_win','初嚐勝果',1,'wins'],['wins_10','十勝獵人',10,'wins']];
 const valid=n=>Number.isSafeInteger(n)&&n>=0;
 function daily(data,uid,day){
  if(!data)return {version:VERSION,uid,day,total:0,opponents:{}};
@@ -20,15 +20,15 @@ function validate(entry,confirmedAt){
  return entry.version===VERSION&&typeof entry.counted==='boolean'&&valid(entry.dayOrdinal)&&entry.dayOrdinal>0&&valid(entry.opponentOrdinal)&&entry.opponentOrdinal>0&&entry.opponentOrdinal<=entry.dayOrdinal&&entry.counted===(entry.dayOrdinal<=10&&entry.opponentOrdinal<=6)&&entry.day===new Date(confirmedAt+8*3600000).toISOString().slice(0,10);
 }
 function summarize(records){
- const seen=new Set(),opponents=new Set();let matches=0;
+ const seen=new Set(),opponents=new Set();let matches=0,wins=0;
  for(const r of records){
   if(!r.completed||r.tombstone||r.sourceType!=='hunter-clash'||!r.analyzable)continue;
   const e=r.pkAchievement;if(!validate(e,r.confirmedAt))throw Error('ledger-achievement-invalid');
   if(!e?.counted)continue;
   const key=r.eventCode+'|'+r.matchId;if(seen.has(key))continue;seen.add(key);
-  matches++;opponents.add(r.opponent.uid);
+  matches++;if(r.isWin===true)wins++;opponents.add(r.opponent.uid);
  }
- const counts={matches,opponents:opponents.size};
+ const counts={matches,wins,opponents:opponents.size};
  return {version:VERSION,...counts,badges:definitions.map(([id,name,target,metric])=>({id,name,target,metric,current:counts[metric],unlocked:counts[metric]>=target}))};
 }
 const api=Object.freeze({VERSION,daily,award,validate,summarize});

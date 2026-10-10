@@ -28,7 +28,7 @@ test('dual-confirmed PK badges use independent daily and opponent caps, no legac
  f.data.get('systemSettings/hunterClash').practiceXpEnabled=false;
  await finish(f,await ready(f,'b',7));await finish(f,await ready(f,'c',4),'c');
  const h=await history(f),s=ach.summarize(adapter.adapt(h.rows,'a'));
- assert.equal(h.practiceXp.totalXp,5);assert.equal(s.matches,9);assert.equal(s.opponents,2);assert.equal(s.badges[0].unlocked,true);assert.equal(s.badges[1].unlocked,false);
+ assert.equal(h.practiceXp.totalXp,5);assert.equal(s.matches,9);assert.equal(s.wins,5);assert.equal(s.opponents,2);assert.equal(s.badges[0].unlocked,true);assert.equal(s.badges[1].unlocked,false);
  const c=await ready(f,'c');assert.equal((await history(f)).total,12);await finish(f,c,'c');
  assert.equal(ach.summarize(adapter.adapt((await history(f)).rows,'a')).matches,9);
  assert.equal(ach.summarize(adapter.adapt((await history(f,'c')).rows,'c')).matches,5);
@@ -47,7 +47,7 @@ test('revocation removes badge eligibility without reopening quotas, retry is id
 test('badge thresholds, distinct opponents, deduplication and same-day ordinals are exact',()=>{
  const rows=[];for(let d=0;d<10;d++)for(let n=1;n<=10;n++){
   const at=Date.parse('2026-10-'+String(10+d).padStart(2,'0')+'T12:00:00+08:00');
-  rows.push({completed:true,analyzable:true,sourceType:'hunter-clash',eventCode:'pk'+d,matchId:'game'+n,opponent:{uid:'peer'+n%5},confirmedAt:at,pkAchievement:{version:ach.VERSION,day:xp.dayKey(at),dayOrdinal:n,opponentOrdinal:1,counted:true}});
+  rows.push({isWin:true,completed:true,analyzable:true,sourceType:'hunter-clash',eventCode:'pk'+d,matchId:'game'+n,opponent:{uid:'peer'+n%5},confirmedAt:at,pkAchievement:{version:ach.VERSION,day:xp.dayKey(at),dayOrdinal:n,opponentOrdinal:1,counted:true}});
  }
  assert.equal(ach.summarize(rows.slice(0,9)).badges[1].unlocked,false);assert.equal(ach.summarize(rows.slice(0,10)).badges[1].unlocked,true);
  assert.equal(ach.summarize(rows.slice(0,99)).badges[2].unlocked,false);const s=ach.summarize([...rows,...rows]);assert.equal(s.matches,100);assert.equal(s.opponents,5);assert(s.badges.every(b=>b.unlocked));
@@ -63,4 +63,29 @@ test('invalid daily badge counters roll back settlement without awarding XP or h
  assert.equal((await history(f)).total,0);assert.equal((await history(f)).practiceXp.totalXp,0);
  f.data.delete(path);await finish(f,c);
  assert.equal(ach.summarize(adapter.adapt((await history(f)).rows,'a')).matches,1);
+});
+
+test('victory badges require eligible wins, dual confirmation and the correct player; revocation recalculates',async()=>{
+ const f=fixture(),c=await ready(f);
+ assert.equal(ach.summarize(adapter.adapt((await history(f)).rows,'a')).wins,0);
+ const done=await finish(f,c);
+ const winner=ach.summarize(adapter.adapt((await history(f)).rows,'a'));
+ const loser=ach.summarize(adapter.adapt((await history(f,'b')).rows,'b'));
+ assert.equal(winner.wins,1);assert.equal(winner.badges.find(b=>b.id==='first_win').unlocked,true);
+ assert.equal(loser.matches,1);assert.equal(loser.wins,0);assert.equal(loser.badges.find(b=>b.id==='first_win').unlocked,false);
+ await f.service.run('admin','revokeChallenge',{challengeId:done.challengeId,expectedRevision:done.revision,reason:'experiment',requestId:'revoke-win'});
+ const revoked=ach.summarize(adapter.adapt((await history(f)).rows,'a'));
+ assert.equal(revoked.wins,0);assert.equal(revoked.badges.find(b=>b.id==='first_win').unlocked,false);
+});
+test('ten-win threshold uses qualified deduplicated wins rather than played matches',()=>{
+ const at=Date.parse('2026-10-10T12:00:00+08:00');
+ const row=n=>({completed:true,analyzable:true,sourceType:'hunter-clash',isWin:true,eventCode:'pk'+n,matchId:'game1',opponent:{uid:'peer'},confirmedAt:at,pkAchievement:{version:ach.VERSION,day:xp.dayKey(at),dayOrdinal:1,opponentOrdinal:1,counted:true}});
+ const wins=Array.from({length:10},(_,i)=>row(i));
+ const losses=Array.from({length:10},(_,i)=>({...row(i+10),isWin:false}));
+ const badge=s=>s.badges.find(b=>b.id==='wins_10');
+ const nine=ach.summarize([...wins.slice(0,9),...losses,...wins.slice(0,9)]);
+ assert.equal(nine.matches,19);assert.equal(nine.wins,9);assert.equal(badge(nine).unlocked,false);
+ const ten=ach.summarize([...wins,...losses,...wins]);assert.equal(ten.wins,10);assert.equal(badge(ten).unlocked,true);
+ const excluded=[{...row(30),pkAchievement:undefined},{...row(31),completed:false},{...row(32),tombstone:true},{...row(33),analyzable:false},{...row(34),pkAchievement:{...row(34).pkAchievement,dayOrdinal:11,counted:false}},{...row(35),pkAchievement:{...row(35).pkAchievement,dayOrdinal:7,opponentOrdinal:7,counted:false}}];
+ assert.equal(ach.summarize(excluded).wins,0);assert.equal(ach.summarize([...wins.slice(0,9),...excluded]).wins,9);
 });
