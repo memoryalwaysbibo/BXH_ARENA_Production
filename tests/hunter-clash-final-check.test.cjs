@@ -41,7 +41,7 @@ async function completedComebackRoom(f){
   let c = (await f.call('b','acceptCode',{pairingCode:created.pairingCode,expectedRevision:0})).challenge;
   for (const uid of ['a','b']) c = (await f.call(uid,'start',{challengeId:c.challengeId,expectedRevision:c.revision})).challenge;
 
-  c = (await f.call('b','recordRound',{challengeId:c.challengeId,expectedRevision:c.revision,winnerUid:'b',finish:'extreme'})).challenge;
+  c = (await f.call('a','recordRound',{challengeId:c.challengeId,expectedRevision:c.revision,winnerUid:'b',finish:'extreme'})).challenge;
   c = (await f.call('a','recordRound',{challengeId:c.challengeId,expectedRevision:c.revision,winnerUid:'a',finish:'burst'})).challenge;
   c = (await f.call('a','recordRound',{challengeId:c.challengeId,expectedRevision:c.revision,winnerUid:'a',finish:'burst'})).challenge;
 
