@@ -95,3 +95,10 @@ test('empty finish-stat breakdown uses a dash instead of an invented percentage'
  const c=setup();c.esc=String;c.hunterEvidenceHtml=()=>'';
  const a=c.hunterBuildAnalysis([]);assert(!c.hunterAnalysisStatHtml(a.attack,'spin').includes('0%'));
 });
+test('partial history lists every problematic room and available event metadata',()=>{
+ const c=setup(),html=render(c,{records:[],skipped:[
+  {code:'BXH-CES5T8',eventName:'雪山貓門票戰',eventDate:'2026-10-09',reason:'identity-unresolved',identityIssue:'ambiguous-name'},
+  {code:'BXH-OTHER',reason:'registration-read-failed'}
+ ]});
+ for(const text of ['需要核對的賽事','BXH-CES5T8','雪山貓門票戰','2026-10-09','名單有多位同名選手','BXH-OTHER','本人報名資料讀取失敗','暫停綜合評分與評級'])assert(html.includes(text));
+});
