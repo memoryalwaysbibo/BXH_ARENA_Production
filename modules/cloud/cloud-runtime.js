@@ -2040,7 +2040,9 @@
             }
           }
           if(!participant){
-            skipped.push({code,reason:"identity-unresolved"});
+            const wantedNames=[reg.displayName,reg.publicName,reg.participantName,reg.realName].map(cleanName).filter(Boolean);
+            const nameMatches=players.filter(p=>p&&wantedNames.includes(cleanName(p.name))).length;
+            skipped.push({code,reason:"identity-unresolved",eventName:String(d.name||""),eventDate:String(d.eventDate||""),identityIssue:nameMatches>1?"ambiguous-name":"participant-not-found"});
             continue;
           }
 

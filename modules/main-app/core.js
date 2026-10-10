@@ -16450,11 +16450,18 @@ function renderPlayerStatsTab(p){
     const labels={"quick-decision":"快速判定（只計勝敗）","round-incomplete":"回合資料不完整","score-ledger-mismatch":"回合與比分不符","invalid-round-event":"回合格式不符","duplicate-round-event":"回合事件重複","no-finish-rounds":"只有失誤判罰","identity-unresolved":"玩家身分無法確認","read-failed":"賽事讀取失敗","registration-read-failed":"本人報名資料讀取失敗","public-missing":"公開賽事資料缺失","public-corrupt":"公開賽事資料無法解析","unknown-scoring-version":"計分版本未識別","enchantment-breakdown-missing":"附魔拆分資料不完整"};
     const reasons=Object.entries(coverage.reasons).map(([key,count])=>esc(labels[key]||"其他資料問題")+' '+count+' 場對戰');
     const skipped=Object.entries(coverage.skippedReasons).map(([key,count])=>esc(labels[key]||"其他資料問題")+' '+count+' 場賽事');
+    const skippedDetails=(hunterProfileCache.skipped||[]).map(row=>{
+      const issue=row.identityIssue==="ambiguous-name"?"名單有多位同名選手，無法唯一確認本人":row.reason==="identity-unresolved"?"本人報名身分無法對應該場選手名單":labels[row.reason]||"其他資料問題";
+      return '<li><strong>'+esc(row.eventName||row.code||"賽事名稱未取得")+'</strong>'+
+        (row.eventName&&row.code?' <span>'+esc(row.code)+'</span>':'')+
+        (row.eventDate?' <span>'+esc(row.eventDate)+'</span>':'')+
+        '<div>'+esc(issue)+'</div></li>';
+    }).join('');
     body='<section class="panel hunter-data-coverage" role="status"><strong>'+
       (dataStatus==="partial"?'部分賽事資料缺失':dataStatus==="empty"?'尚無已完成對戰':'戰績已讀取')+
       '</strong><div class="hint">已讀取 '+coverage.totalMatches+' 場對戰｜可分析 '+coverage.analyzableMatches+' 場｜有效回合 '+coverage.validRounds+' 回</div>'+
       (reasons.length?'<div class="hint">能力分析排除：'+reasons.join('；')+'</div>':'')+
-      (skipped.length?'<div class="hunter-profile-error">'+skipped.join('；')+'。統計僅涵蓋已讀取資料，暫停綜合評分與評級。</div><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button>':'')+
+      (skipped.length?'<div class="hunter-profile-error">'+skipped.join('；')+'。統計僅涵蓋已讀取資料，暫停綜合評分與評級。</div><div class="hunter-skipped-events"><strong>需要核對的賽事</strong><ul>'+skippedDetails+'</ul></div><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button>':'')+
       '</section>'+body;
   }
   if(playerStatsSubTab==="achievements"&&window.BXHArenaPK&&typeof hunterClashEntry!=='undefined'&&hunterClashEntry?.visible())body+=window.BXHArenaPK.achievementsHtml?.()||"";
