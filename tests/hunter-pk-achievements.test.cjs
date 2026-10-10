@@ -110,7 +110,7 @@ test('a real three-room streak waits for both confirmations and is recalculated 
  await f.service.run('admin','revokeChallenge',input);await f.service.run('admin','revokeChallenge',input);
  const s=ach.summarize(adapter.adapt((await history(f)).rows,'a'));assert.equal(s.bestStreak,2);assert.equal(s.badges.find(b=>b.id==='streak_3').unlocked,false);
 });
-test('comeback replays validated rounds: actual deficit and victory required; revoked evidence is removed',async()=>{
+test('comeback replays validated rounds: zero versus three activation and victory required; revoked evidence is removed',async()=>{
  const f=fixture(),plans=[[{winnerUid:'b',finish:'extreme'},{winnerUid:'a',finish:'knockout'},{winnerUid:'a',finish:'burst'}]];
  const pending=await ready(f,'b',1,plans);assert.equal(ach.summarize(adapter.adapt((await history(f)).rows,'a')).comebacks,0);
  const done=await finish(f,pending),rows=adapter.adapt((await history(f)).rows,'a');
@@ -118,6 +118,15 @@ test('comeback replays validated rounds: actual deficit and victory required; re
  assert.equal(ach.summarize(adapter.adapt((await history(f,'b')).rows,'b')).comebacks,0);
  const tie=[{perspective:'for',points:2},{perspective:'against',points:2},{perspective:'for',points:2}];
  assert.equal(ach.summarize([{...rows[0],roundsPerspective:tie}]).comebacks,0);
+ const replay=events=>ach.summarize([{...rows[0],roundsPerspective:events.map(([perspective,points])=>({perspective,points}))}]).comebacks;
+ for(const points of [[2,2],[2,3],[3,3]])assert.equal(replay([['against',3],...points.map(p=>['for',p])]),1,'0:3 then win with 4/5/6 points');
+ assert.equal(replay([['against',1],['against',2],['for',2],['for',2]]),1,'multiple opponent scores activate 0:3');
+ assert.equal(replay([['for',1],['against',3],['for',3]]),0,'1:3 does not activate');
+ assert.equal(replay([['for',2],['against',3],['for',2]]),0,'2:3 does not activate');
+ assert.equal(replay([['against',2],['for',2],['for',2]]),0,'0:2 does not activate');
+ assert.equal(replay([['against',1],['for',1],['against',2],['for',3]]),0,'a prior smaller deficit does not activate');
+ assert.equal(ach.summarize([{...rows[0],isWin:false}]).comebacks,0,'0:3 followed by defeat does not unlock');
+
  assert.equal(ach.summarize([{...rows[0],analyzable:false}]).comebacks,0);
  assert.equal(ach.summarize([{...rows[0],pkAchievement:{...rows[0].pkAchievement,dayOrdinal:7,opponentOrdinal:7,counted:false}}]).comebacks,0);
  await f.service.run('admin','revokeChallenge',{challengeId:done.challengeId,expectedRevision:done.revision,reason:'experiment',requestId:'revoke-comeback'});

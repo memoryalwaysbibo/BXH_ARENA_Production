@@ -21,12 +21,12 @@ function validate(entry,confirmedAt){
 }
 function comeback(r){
  if(r.isWin!==true||!Array.isArray(r.roundsPerspective))return false;
- let scoreFor=0,scoreAgainst=0,behind=false;
+ let scoreFor=0,scoreAgainst=0,activated=false;
  for(const round of r.roundsPerspective){
   if(round.perspective==='for')scoreFor+=round.points;else if(round.perspective==='against')scoreAgainst+=round.points;
-  if(scoreFor<scoreAgainst)behind=true;
+  if(scoreFor===0&&scoreAgainst===3)activated=true;
  }
- return behind;
+ return activated;
 }
 function summarize(records){
  const seen=new Set(),opponents=new Set();let matches=0,wins=0,currentStreak=0,bestStreak=0,comebacks=0;
