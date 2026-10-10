@@ -28,7 +28,8 @@ function comeback(r){
  }
  return activated;
 }
-function summarize(records){
+function summarize(records,{evidence=false}={}){
+ const proof={matches:[],wins:[],opponents:[],bestStreak:[],comebacks:[]};let streak=[];
  const seen=new Set(),opponents=new Set();let matches=0,wins=0,currentStreak=0,bestStreak=0,comebacks=0;
  const ordered=records.filter(r=>r.completed&&!r.tombstone&&r.sourceType==='hunter-clash'&&r.pkAchievement);
  for(const r of ordered)if(!validate(r.pkAchievement,r.confirmedAt))throw Error('ledger-achievement-invalid');
@@ -37,13 +38,25 @@ function summarize(records){
  for(const r of ordered){
   const key=r.eventCode+'|'+r.matchId;if(seen.has(key))continue;seen.add(key);
   // An excluded loss still breaks a streak; incomplete round evidence cannot bridge one.
-  if(!r.analyzable||r.isWin!==true)currentStreak=0;
+  if(!r.analyzable||r.isWin!==true){currentStreak=0;streak=[];}
   if(!r.analyzable||!r.pkAchievement.counted)continue;
-  matches++;opponents.add(r.opponent.uid);
-  if(r.isWin===true){wins++;currentStreak++;bestStreak=Math.max(bestStreak,currentStreak);if(comeback(r))comebacks++;}
+  matches++;
+  if(evidence){if(proof.matches.length<100)proof.matches.push(r);if(!opponents.has(r.opponent.uid)&&proof.opponents.length<5)proof.opponents.push(r);}
+  opponents.add(r.opponent.uid);
+  if(r.isWin===true){
+   wins++;currentStreak++;
+   if(evidence){if(proof.wins.length<10)proof.wins.push(r);if(streak.length<3)streak.push(r);if(currentStreak>bestStreak&&bestStreak<3)proof.bestStreak=[...streak];}
+   bestStreak=Math.max(bestStreak,currentStreak);
+   if(comeback(r)){comebacks++;if(evidence&&!proof.comebacks.length)proof.comebacks.push(r);}
+  }
  }
  const counts={matches,wins,opponents:opponents.size,currentStreak,bestStreak,comebacks};
- return {version:VERSION,...counts,badges:definitions.map(([id,name,target,metric])=>({id,name,target,metric,current:counts[metric],unlocked:counts[metric]>=target}))};
+ return {version:VERSION,...counts,badges:definitions.map(([id,name,target,metric])=>({id,name,target,metric,current:counts[metric],unlocked:counts[metric]>=target,...(evidence?{evidence:['matches','wins'].includes(metric)?proof[metric].slice(Math.max(0,Math.min(counts[metric],target)-1),Math.min(counts[metric],target)):proof[metric]}:{})}))};
+}
+function presentation(records){
+ const result=summarize(records,{evidence:true});
+ result.badges=result.badges.map((badge,index)=>({...badge,index})).sort((a,b)=>Number(b.unlocked)-Number(a.unlocked)||(a.unlocked?0:b.current/b.target-a.current/a.target)||a.index-b.index);
+ return result;
 }
 function newUnlocks(records,challengeId){
  const room=records.filter(r=>r.eventCode==='pk:arena-internal:'+challengeId&&r.completed&&!r.tombstone&&r.pkAchievement);
@@ -55,6 +68,6 @@ function newUnlocks(records,challengeId){
  const unlocked=new Set(before.badges.filter(b=>b.unlocked).map(b=>b.id));
  return after.badges.filter(b=>b.unlocked&&!unlocked.has(b.id));
 }
-const api=Object.freeze({VERSION,daily,award,validate,summarize,newUnlocks});
+const api=Object.freeze({VERSION,daily,award,validate,summarize,presentation,newUnlocks});
 if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHPKAchievements=api;
 })(globalThis);

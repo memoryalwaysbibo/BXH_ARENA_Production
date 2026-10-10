@@ -21,10 +21,24 @@ function practiceXpHtml(){
  const s=state(),p=['ready','empty'].includes(s.status)?s.practiceXp:null;
  return '<div class="panel practice-xp"><strong>練習 XP</strong><p>'+(!p?'XP 尚未完成核對，請更新戰績。':!p.enabled?'練習 XP 發放已暫停；既有 XP 保留。':p.day!==new Date(Date.now()+8*3600000).toISOString().slice(0,10)?'日期已更新，請更新戰績核對今日額度。':'今日已獲 '+p.todayXp+' XP · 剩餘 '+p.remainingGames+' 場額度（仍受同對手限制）')+'</p><details><summary>XP 發放規則</summary><p class="hint">每日前 10 場；同對手前 3 場每場 5 XP，第 4～6 場每場 2.5 XP，第 7 場起 0 XP。雙方結案時依台灣日期計算，午夜重置；額度之外仍保存戰績。只計啟用後建立的對戰，不補發舊紀錄。</p></details></div>';
 }
+function badgeEvidenceHtml(b){
+ const rows=b.evidence||[],label=b.unlocked?'解鎖依據':'目前進度依據';
+ if(!rows.length)return '<p class="hint">尚無符合條件的場次。</p>';
+ const finishes={extreme:'極限',knockout:'擊飛',burst:'爆裂',spin:'轉停'};
+ return '<details data-pk-detail="badge-'+b.id+'"><summary>'+label+'</summary><p class="hint">'+(b.metric==='bestStreak'?'以下為依結案順序計入的連勝場次。':b.metric==='opponents'?'每位對手列出首次符合資格的場次。':b.metric==='comebacks'?'以下場次曾達 0：3，且最終獲勝。':'列出'+(b.unlocked?'達成目標':'最新計入')+'的第 '+Math.min(b.current,b.target)+(b.metric==='wins'?' 勝':' 場')+'。')+'</p>'+rows.map((r,i)=>{
+  let own=0,peer=0;
+  const rounds=(r.roundsPerspective||[]).map((round,n)=>{
+   if(round.perspective==='for')own+=round.points;else peer+=round.points;
+   const activation=b.id==='comeback'&&own===0&&peer===3?' · 觸發 0：3 逆轉條件':'';
+   return '<p>第 '+(n+1)+' 回合 · '+escape(round.perspective==='for'?r.playerName:r.opponent.name)+' '+(finishes[round.type]||'得分')+' +'+round.points+'<br>累積 '+own+'：'+peer+activation+'</p>';
+  }).join('');
+  return '<article style="border-top:1px solid currentColor;padding-top:8px;overflow-wrap:anywhere"><strong>'+escape(r.playerName)+' vs '+escape(r.opponent.name)+'</strong><p>'+(r.isWin?'勝':'敗')+' '+r.scoreFor+'：'+r.scoreAgainst+'<br>'+escape(new Date(r.confirmedAt).toLocaleString('zh-TW'))+'<br>第 '+r.round+' 場</p><details data-pk-detail="rounds-'+b.id+'-'+i+'"><summary>逐回合比分</summary>'+rounds+'</details></article>';
+ }).join('')+'</details>';
+}
 function achievementsHtml(){
  const s=state();if(!['ready','empty'].includes(s.status))return '<section class="panel"><strong>PK 專屬成就</strong><p>完整戰績尚未核對，暫不判定成就資格。</p><button class="btn btn-ghost" data-action="hunter-pk-refresh">更新 PK 戰績</button></section>';
- const result=root.BXHPKAchievements.summarize(s.records);
- return '<section class="panel pk-badge-panel"><strong>PK 專屬成就</strong><p class="hint">生涯累積 · 已計入 '+result.matches+' 場 · '+result.wins+' 勝 · '+result.opponents+' 位不同對手</p><div class="hunter-analysis-grid">'+result.badges.map(b=>'<div class="panel"><span class="badge '+(b.unlocked?'badge-neon':'badge-metal')+'">'+(b.unlocked?'◆ 已解鎖':'◇ 未解鎖')+'</span><h3>'+b.name+'</h3><p>'+b.current+' / '+b.target+(b.metric==='opponents'?' 位對手':b.metric==='wins'?' 勝':b.metric==='bestStreak'?' 連勝':b.metric==='comebacks'?' 場逆轉':' 場')+'</p><p class="hint">'+(b.unlocked?'已達成':b.metric==='bestStreak'?'最佳紀錄還差 '+(b.target-b.current)+' 連勝':b.metric==='comebacks'?'還差 '+(b.target-b.current)+' 場逆轉獲勝':'還差 '+(b.target-b.current)+(b.metric==='opponents'?' 位不同對手':b.metric==='wins'?' 勝':' 場'))+'</p>'+(b.id==='comeback'?'<p class="hint">曾以 0：3 落後，最後逆轉獲勝，雙方確認結案後計入。</p>':'')+'</div>').join('')+'</div><details><summary>成就計算規則</summary><p class="hint">只計更新後新建立、雙方確認結案的對戰。每個台灣日期前 10 場，同對手前 6 場；撤銷後重新核對資格，不返還當日額度。額度以結案順序計算，生涯成就不隨期間篩選改變。勝場成就只計符合上述資格的勝場。連勝依結案順序跨日累積，超額勝場不增加；敗場（含超額）或回合資料不完整會中斷。三連勝顯示生涯最佳紀錄。逆轉獵人須在同一場對戰中曾出現本人 0 分、對手 3 分（0：3），最後逆轉獲勝，且雙方確認結案。1：3 或 2：3 後逆轉不計；0：3 後落敗也不計。既有合資格紀錄依此條件重新核對。徽章不另發 XP、稱號或正式階級獎勵。</p></details></section>';
+ const result=root.BXHPKAchievements.presentation(s.records);
+ return '<section class="panel pk-badge-panel"><style>.pk-badge-panel [data-pk-badge]:has(>details[open]){grid-column:1/-1}.pk-badge-panel [data-pk-badge] summary{cursor:pointer}.pk-badge-panel [data-pk-badge] article p{line-height:1.65}</style><strong>PK 專屬成就</strong><p class="hint">生涯累積 · 已計入 '+result.matches+' 場 · '+result.wins+' 勝 · '+result.opponents+' 位不同對手</p><div class="hunter-analysis-grid">'+result.badges.map(b=>'<div class="panel" data-pk-badge="'+b.id+'"><span class="badge '+(b.unlocked?'badge-neon':'badge-metal')+'">'+(b.unlocked?'◆ 已解鎖':'◇ 未解鎖')+'</span><h3>'+b.name+'</h3><p>'+b.current+' / '+b.target+(b.metric==='opponents'?' 位對手':b.metric==='wins'?' 勝':b.metric==='bestStreak'?' 連勝':b.metric==='comebacks'?' 場逆轉':' 場')+'</p><p class="hint">'+(b.unlocked?'已達成':b.metric==='bestStreak'?'最佳紀錄還差 '+(b.target-b.current)+' 連勝':b.metric==='comebacks'?'還差 '+(b.target-b.current)+' 場逆轉獲勝':'還差 '+(b.target-b.current)+(b.metric==='opponents'?' 位不同對手':b.metric==='wins'?' 勝':' 場'))+'</p>'+(b.id==='comeback'?'<p class="hint">曾以 0：3 落後，最後逆轉獲勝，雙方確認結案後計入。</p>':'')+badgeEvidenceHtml(b)+'</div>').join('')+'</div><details><summary>成就計算規則</summary><p class="hint">只計更新後新建立、雙方確認結案的對戰。每個台灣日期前 10 場，同對手前 6 場；撤銷後重新核對資格，不返還當日額度。額度以結案順序計算，生涯成就不隨期間篩選改變。勝場成就只計符合上述資格的勝場。連勝依結案順序跨日累積，超額勝場不增加；敗場（含超額）或回合資料不完整會中斷。三連勝顯示生涯最佳紀錄。逆轉獵人須在同一場對戰中曾出現本人 0 分、對手 3 分（0：3），最後逆轉獲勝，且雙方確認結案。1：3 或 2：3 後逆轉不計；0：3 後落敗也不計。既有合資格紀錄依此條件重新核對。徽章不另發 XP、稱號或正式階級獎勵。</p></details></section>';
 }
 function practiceGrowth(growth){
  const s=state(),p=['ready','empty'].includes(s.status)?s.practiceXp:null;
@@ -45,8 +59,8 @@ let vendors=null;
 function loadVendors(){if(vendors)return vendors;vendors=Promise.all([['QRCode','qrcode.min.js'],['jsQR','jsQR.js']].map(([symbol,file])=>typeof root[symbol]==='function'?Promise.resolve():new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=new URL('hunter-clash/arena/vendor/'+file+'?v=20261009-a23',document.baseURI).href;script.onload=resolve;script.onerror=()=>{script.remove();reject(Error('qr-library-unavailable'));};document.head.append(script);}))).catch(error=>{vendors=null;throw error;});return vendors;}
 async function mount(host){
  const owner=user,stamp=epoch;if(!authorized||!owner)return null;
- await loadVendors();const module=await import('./mobile.mjs?v=20261010-pk-feedback-1');if(stamp!==epoch||user!==owner||!authorized)return null;
- const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<link rel="stylesheet" href="hunter-clash/arena/mobile.css?v=20261010-pk-feedback-1"><div id="message" role="status"></div><div id="app"></div>';
+ await loadVendors();const module=await import('./mobile.mjs?v=20261010-pk-evidence-1');if(stamp!==epoch||user!==owner||!authorized)return null;
+ const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<link rel="stylesheet" href="hunter-clash/arena/mobile.css?v=20261010-pk-evidence-1"><div id="message" role="status"></div><div id="app"></div>';
  return module.mountMobile(shadow,{transport,playerName:()=>profile?.displayName||profile?.nickname||profile?.gameId||profile?.realName||'未設定名稱',watch:fn=>{queueMicrotask(()=>{if(stamp===epoch)fn(owner);});return()=>{};},history:force=>history.load(force),achievementUnlocks:(records,id)=>root.BXHPKAchievements.newUnlocks(records,id),xpHtml:practiceXpHtml,achievementsHtml},{storage:sessionStorage,accountStorage:localStorage});
 }
 root.BXHArenaPK={achievementsHtml,practiceXpHtml,practiceGrowth,setSession,transport,displayRecords,state,statusHtml,renderLicense,mount,load:force=>history.load(force),listen:fn=>{changed=fn;}};

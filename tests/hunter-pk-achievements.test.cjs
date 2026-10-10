@@ -156,3 +156,26 @@ test('notice receipts isolate accounts, survive remounts, retry stale history an
  feedback=createAchievementFeedback({unlocks:ach.newUnlocks,storage:broken});feedback.arm('a',done.challengeId);assert.equal(feedback.settle('a',done.challengeId,records).length,2);
  feedback.arm('a',done.challengeId);assert.deepEqual(feedback.settle('a',done.challengeId,records),[]);
 });
+
+test('presentation sorts progress without changing definitions and evidence follows eligible settlement records',async()=>{
+ const f=fixture();
+ const first=await finish(f,await ready(f));
+ const second=await finish(f,await ready(f));
+ const third=await finish(f,await ready(f,'b',1,[[{winnerUid:'b',finish:'extreme'},{winnerUid:'a',finish:'burst'},{winnerUid:'a',finish:'burst'}]]));
+ let rows=adapter.adapt((await history(f)).rows,'a'),result=ach.presentation([...rows].reverse().concat(rows));
+ assert.deepEqual(result.badges.map(b=>b.id),['first','first_win','streak_3','comeback','rookie','wins_10','friends','veteran']);
+ assert.deepEqual(ach.summarize(rows).badges.map(b=>b.id),['first','rookie','veteran','friends','first_win','wins_10','streak_3','comeback']);
+ const badge=id=>result.badges.find(b=>b.id===id);
+ assert.equal(badge('first').evidence[0].eventCode,'pk:arena-internal:'+first.challengeId);
+ assert.equal(badge('rookie').evidence[0].eventCode,'pk:arena-internal:'+third.challengeId);
+ assert.equal(badge('friends').evidence.length,1);
+ assert.deepEqual(badge('streak_3').evidence.map(r=>r.eventCode),[first,second,third].map(c=>'pk:arena-internal:'+c.challengeId));
+ assert.equal(badge('comeback').evidence[0].eventCode,'pk:arena-internal:'+third.challengeId);
+ assert.equal(badge('comeback').evidence[0].roundsPerspective[0].perspective,'against');
+ await f.service.run('admin','revokeChallenge',{challengeId:third.challengeId,expectedRevision:third.revision,reason:'experiment',requestId:'evidence-revoke'});
+ result=ach.presentation(adapter.adapt((await history(f)).rows,'a'));
+ assert.equal(badge('comeback').evidence.length,0);assert.equal(badge('streak_3').evidence.length,2);
+ assert(!result.badges.some(b=>b.evidence.some(r=>r.eventCode.endsWith(third.challengeId))));
+ const excluded=rows.map(r=>({...r,pkAchievement:{...r.pkAchievement,dayOrdinal:11,opponentOrdinal:7,counted:false}}));
+ assert(ach.presentation(excluded).badges.every(b=>b.evidence.length===0));
+});

@@ -87,6 +87,17 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   assert.match(await a.locator('.pk-achievements').innerText(),/三連勝/);
   assert.match(await a.locator('.pk-achievements').innerText(),/3 \/ 3 連勝/);
   assert.match(await a.locator('.pk-achievements').innerText(),/1 \/ 1 場逆轉/);
+  const comebackBadge=a.locator('[data-pk-badge="comeback"]');
+  await comebackBadge.locator('details > summary').first().click();
+  await comebackBadge.getByText('逐回合比分',{exact:true}).click();
+  assert.match(await comebackBadge.innerText(),/觸發 0：3 逆轉條件/);
+  assert.match(await comebackBadge.innerText(),/累積 4：3/);
+  assert.equal(await a.locator('[data-pk-badge="streak_3"] article').count(),3);
+  assert.deepEqual(await a.locator('[data-pk-badge]').evaluateAll(nodes=>nodes.map(n=>n.dataset.pkBadge)),['first','first_win','streak_3','comeback','rookie','wins_10','friends','veteran']);
+  await a.locator('[data-op=history]').click();
+  await a.waitForFunction(()=>BXHArenaPK.state().status==='ready');
+  assert.equal(await comebackBadge.locator('details[open]').count(),2);
+  assert.equal(await comebackBadge.evaluate(n=>getComputedStyle(n).gridColumn),'1 / -1');
   for(const width of [320,390,430]){await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
   await a.getByRole('button',{name:'獵人檔案',exact:true}).click();assert.match(await a.locator('#license').innerText(),/黑爸 vs 大黑 4:0/);assert.equal(await a.locator('#app').count(),0);
   await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('[data-op=createChallenge]').waitFor({state:'visible'});
