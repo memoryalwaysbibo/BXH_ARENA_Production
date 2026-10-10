@@ -40,6 +40,7 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   assert.equal([...m.data.values()].filter(v=>v.status==='cancelled').length,0);assert.equal(m.data.get('arenaPKPlayers/a'),undefined);
   await a.getByRole('button',{name:'獵人檔案',exact:true}).click();await a.evaluate(()=>sessionStorage.clear());
   await a.getByRole('button',{name:'獵人交鋒',exact:true}).click();await a.locator('#match[data-stage=final_pending]').waitFor();await a.locator('#history > details > summary').click();assert.match(await a.locator('.pending-history').innerText(),/尚未計入/);
+  assert.equal(await a.locator('.achievement-notice').isVisible(),false);assert.equal(await b.locator('.achievement-notice').isVisible(),false);
   await a.locator('[data-op=confirmFinish]').click();await a.locator('#match[data-stage=completed]').waitFor({timeout:8000});await b.locator('#match[data-stage=completed]').waitFor({timeout:8000});
   await a.waitForFunction(()=>BXHArenaPK.state().status==='ready');assert.equal(await a.evaluate(()=>BXHArenaPK.state().records.length),1);
   assert.equal(await a.evaluate(()=>BXHArenaPK.state().practiceXp.totalXp),5);
@@ -48,6 +49,13 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   assert.match(await a.locator('.pk-achievements').innerText(),/初嚐勝果/);
   assert.match(await a.locator('.pk-achievements').innerText(),/1 \/ 1 勝/);
   assert.equal(await a.evaluate(()=>BXHPKAchievements.summarize(BXHArenaPK.state().records).badges.find(b=>b.id==='first_win').unlocked),true);
+  await a.locator('.achievement-notice').waitFor({state:'visible'});await b.locator('.achievement-notice').waitFor({state:'visible'});
+  assert.match(await a.locator('.achievement-notice p').innerText(),/初次交鋒、初嚐勝果/);
+  assert.equal(await b.locator('.achievement-notice p').innerText(),'初次交鋒');
+  assert.match(await a.locator('.pk-achievements').innerText(),/還差 9 勝/);
+  await a.locator('[data-op=dismissAchievement]').click();await a.locator('[data-op=history]').click();
+  await a.waitForFunction(()=>!document.querySelector('[data-hc-runtime-host]').firstChild.shadowRoot.querySelector('.history-status').textContent.includes('載入'));
+  assert.equal(await a.locator('.achievement-notice').isVisible(),false);
   assert.match(await a.locator('.session-xp').innerText(),/本房獲得 5 XP/);
   assert.match(await b.locator('.session-xp').innerText(),/本房獲得 5 XP/);
   await b.evaluate(()=>BXHArenaPK.load(true));
@@ -56,7 +64,7 @@ const {memory}=require('./helpers/arena-pk-memory.cjs'),{createService}=require(
   assert.equal(await b.evaluate(()=>BXHPKAchievements.summarize(BXHArenaPK.state().records).badges.find(b=>b.id==='first_win').unlocked),false);
   assert.match(await a.locator('.practice-xp').first().innerText(),/今日已獲 5 XP/);
 
-  await a.evaluate(()=>fixture.shell());assert.equal(await a.locator('#match[data-stage=completed]').count(),1);
+  await a.evaluate(()=>fixture.shell());assert.equal(await a.locator('#match[data-stage=completed]').count(),1);assert.equal(await a.locator('.achievement-notice').isVisible(),false);
   await a.locator('.room-analysis summary').click();
   for(const width of [320,390,430,1024]){assert.equal(await a.locator('.room-stat').count(),1);await a.setViewportSize({width,height:844});assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.equal(await a.locator('img').evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)),true);}
   // Additional dual-confirmed rooms exercise lifetime streak/comeback rendering with real ledger rows.

@@ -123,3 +123,27 @@ test('comeback replays validated rounds: actual deficit and victory required; re
  await f.service.run('admin','revokeChallenge',{challengeId:done.challengeId,expectedRevision:done.revision,reason:'experiment',requestId:'revoke-comeback'});
  s=ach.summarize(adapter.adapt((await history(f)).rows,'a'));assert.equal(s.comebacks,0);assert.equal(s.badges.find(b=>b.id==='comeback').unlocked,false);
 });
+
+test('completion feedback compares the room settlement boundary, not later history',async()=>{
+ const f=fixture(),first=await finish(f,await ready(f));await finish(f,await ready(f));await finish(f,await ready(f));
+ const records=adapter.adapt((await history(f)).rows,'a');
+ assert.deepEqual(ach.newUnlocks(records,first.challengeId).map(b=>b.id),['first','first_win']);
+ assert.deepEqual(ach.newUnlocks(records,'missing'),[]);
+ const loss=adapter.adapt((await history(f,'b')).rows,'b');assert.deepEqual(ach.newUnlocks(loss,first.challengeId).map(b=>b.id),['first']);
+});
+test('notice receipts isolate accounts, survive remounts, retry stale history and tolerate unavailable storage',async()=>{
+ const {createAchievementFeedback}=await import('../hunter-clash/arena/achievement-feedback.mjs');
+ const f=fixture(),done=await finish(f,await ready(f)),records=adapter.adapt((await history(f)).rows,'a');
+ const data=new Map(),storage={getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v)};
+ const make=()=>createAchievementFeedback({unlocks:ach.newUnlocks,storage});let feedback=make();
+ assert.deepEqual(feedback.settle('a',done.challengeId,records),[]);
+ feedback.arm('a',done.challengeId);assert.deepEqual(feedback.settle('a',done.challengeId,[]),[]);
+ assert.deepEqual(feedback.settle('b',done.challengeId,records),[]);
+ assert.equal(feedback.settle('a',done.challengeId,records).length,2);
+ feedback=make();feedback.arm('a',done.challengeId);assert.deepEqual(feedback.settle('a',done.challengeId,records),[]);
+ feedback.arm('b',done.challengeId);assert.equal(feedback.settle('b',done.challengeId,adapter.adapt((await history(f,'b')).rows,'b')).length,1);
+ feedback.arm('a',done.challengeId);feedback.reset();assert.deepEqual(feedback.settle('a',done.challengeId,records),[]);
+ const broken={getItem(){throw Error('blocked');},setItem(){throw Error('full');}};
+ feedback=createAchievementFeedback({unlocks:ach.newUnlocks,storage:broken});feedback.arm('a',done.challengeId);assert.equal(feedback.settle('a',done.challengeId,records).length,2);
+ feedback.arm('a',done.challengeId);assert.deepEqual(feedback.settle('a',done.challengeId,records),[]);
+});

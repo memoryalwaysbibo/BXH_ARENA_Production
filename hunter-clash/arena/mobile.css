@@ -38,3 +38,5 @@
 
 /* Independent lifetime PK badges; keep progress legible on narrow phones. */
 .pk-badge-panel{margin:16px 0;padding:16px;border:1px solid var(--hc-line);border-radius:16px}.pk-badge-panel>strong{color:var(--hc-accent)}.pk-badge-panel .hunter-analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pk-badge-panel .hunter-analysis-grid .panel{min-width:0;padding:12px;border:1px solid var(--hc-line);border-radius:12px}.pk-badge-panel h3{font-size:16px;margin:10px 0}.pk-badge-panel p{font-size:13px;line-height:1.65}.pk-badge-panel .badge{font-size:12px;color:var(--hc-muted)}.pk-badge-panel .badge-neon{color:var(--hc-accent)}.pk-badge-panel details{margin-top:14px}.pk-badge-panel .hint{color:var(--hc-muted)}
+
+.achievement-notice{margin:14px 0;padding:16px;border:1px solid var(--hc-accent);border-radius:14px;background:var(--hc-card);line-height:1.6}.achievement-notice strong{color:var(--hc-accent);font-size:18px}.achievement-notice p{margin:8px 0 12px;overflow-wrap:anywhere}.achievement-notice button{font-size:14px;padding:8px 16px}

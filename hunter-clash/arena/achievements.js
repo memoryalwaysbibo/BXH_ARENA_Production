@@ -45,6 +45,16 @@ function summarize(records){
  const counts={matches,wins,opponents:opponents.size,currentStreak,bestStreak,comebacks};
  return {version:VERSION,...counts,badges:definitions.map(([id,name,target,metric])=>({id,name,target,metric,current:counts[metric],unlocked:counts[metric]>=target}))};
 }
-const api=Object.freeze({VERSION,daily,award,validate,summarize});
+function newUnlocks(records,challengeId){
+ const room=records.filter(r=>r.eventCode==='pk:arena-internal:'+challengeId&&r.completed&&!r.tombstone&&r.pkAchievement);
+ if(!room.length)return [];
+ const compare=(a,b)=>a.day.localeCompare(b.day)||a.dayOrdinal-b.dayOrdinal;
+ const entries=room.map(r=>r.pkAchievement).sort(compare),first=entries[0],last=entries.at(-1);
+ const before=summarize(records.filter(r=>r.pkAchievement&&compare(r.pkAchievement,first)<0));
+ const after=summarize(records.filter(r=>r.pkAchievement&&compare(r.pkAchievement,last)<=0));
+ const unlocked=new Set(before.badges.filter(b=>b.unlocked).map(b=>b.id));
+ return after.badges.filter(b=>b.unlocked&&!unlocked.has(b.id));
+}
+const api=Object.freeze({VERSION,daily,award,validate,summarize,newUnlocks});
 if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHPKAchievements=api;
 })(globalThis);
