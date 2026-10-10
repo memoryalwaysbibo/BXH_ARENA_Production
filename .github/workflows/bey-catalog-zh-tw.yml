@@ -1,0 +1,57 @@
+name: BEY Catalog Taiwan Names
+on:
+  pull_request:
+    paths:
+      - 'modules/bey-catalog/catalog-locale-zh-tw.cjs'
+      - 'tests/bey-catalog-locale-zh-tw.test.cjs'
+      - 'modules/bey-catalog/catalog-tw02-corrections.cjs'
+      - 'tests/bey-catalog-tw02-corrections.test.cjs'
+      - 'modules/bey-catalog/catalog-tw03-evidence-audit.cjs'
+      - 'tests/bey-catalog-tw03-evidence.test.cjs'
+      - 'modules/bey-catalog/catalog-tw03-corrections.cjs'
+      - 'tests/bey-catalog-tw03-corrections.test.cjs'
+      - 'modules/bey-catalog/catalog-tw04-corrections.cjs'
+      - 'tests/bey-catalog-tw04-corrections.test.cjs'
+      - 'modules/bey-catalog/catalog-tw05-colors.cjs'
+      - 'tests/bey-catalog-tw05-colors.test.cjs'
+      - 'modules/bey-catalog/catalog-tw06-review.cjs'
+      - 'tests/bey-catalog-tw06-review.test.cjs'
+      - 'modules/bey-catalog/catalog-tw06-review-queue.cjs'
+      - 'tests/bey-catalog-tw06-review-queue.test.cjs'
+      - 'modules/bey-catalog/catalog-tw07-mobile-model.cjs'
+      - 'tests/bey-catalog-tw07-mobile-model.test.cjs'
+      - 'bey-catalog-tw07-mobile-preview.html'
+      - 'tests/bey-catalog-tw07-mobile-preview.test.cjs'
+      - 'modules/bey-catalog/catalog-tw08-read-gateway.cjs'
+      - 'tests/bey-catalog-tw08-read-gateway.test.cjs'
+      - 'modules/bey-catalog/catalog-tw10-admin-adapter.cjs'
+      - 'tests/bey-catalog-tw10-admin-adapter.test.cjs'
+      - 'modules/bey-catalog/catalog-tw11-role-policy.cjs'
+      - 'tests/bey-catalog-tw11-role-parity.test.cjs'
+      - 'modules/bey-catalog/catalog-tw12-secure-read.cjs'
+      - 'tests/bey-catalog-tw12-secure-read.test.cjs'
+      - 'modules/bey-catalog/catalog-tw13-http-v2.cjs'
+      - 'tests/bey-catalog-tw13-http-v2.test.cjs'
+      - 'modules/bey-catalog/catalog-local-review-server.cjs'
+      - 'modules/bey-catalog/catalog-local-review-ui.js'
+      - 'bey-catalog-local-review.html'
+      - 'scripts/bey-catalog-local-review.cjs'
+      - '.github/workflows/bey-catalog-zh-tw.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  locale-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/bey-catalog-locale-zh-tw.test.cjs tests/bey-catalog-tw02-corrections.test.cjs tests/bey-catalog-tw03-evidence.test.cjs tests/bey-catalog-tw03-corrections.test.cjs tests/bey-catalog-tw04-corrections.test.cjs tests/bey-catalog-tw05-colors.test.cjs tests/bey-catalog-tw06-review.test.cjs tests/bey-catalog-tw06-review-queue.test.cjs tests/bey-catalog-tw07-mobile-model.test.cjs tests/bey-catalog-tw07-mobile-preview.test.cjs tests/bey-catalog-tw08-read-gateway.test.cjs tests/bey-catalog-tw10-admin-adapter.test.cjs tests/bey-catalog-tw11-role-parity.test.cjs tests/bey-catalog-tw12-secure-read.test.cjs tests/bey-catalog-tw13-http-v2.test.cjs
+      - name: Check isolated review UI syntax
+        run: |
+          node --check modules/bey-catalog/catalog-local-review-server.cjs
+          node --check modules/bey-catalog/catalog-local-review-ui.js
+          node --check scripts/bey-catalog-local-review.cjs
