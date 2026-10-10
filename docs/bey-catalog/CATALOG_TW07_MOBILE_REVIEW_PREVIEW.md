@@ -1,6 +1,6 @@
 # TW-07｜BXH ARENA 管理員手機版圖鑑審核預覽
 
-> **後續狀態（2026-10-10）**：本文件保留 TW-07 當時的 UI 預覽邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收已完成，請以 [DB01_REAL_EMULATOR_RECEIPT.md](DB01_REAL_EMULATOR_RECEIPT.md) 為準。此頁仍是獨立唯讀預覽，未接正式 ARENA。
+> **後續狀態（2026-10-10）**：本文件保留 TW-07 當時的 UI 預覽邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收已完成，請以 [DB01_REAL_EMULATOR_RECEIPT.md](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/blob/b770b0ee3d75ed5688bbcce7688cb212cc947e46/docs/bey-catalog/DB01_REAL_EMULATOR_RECEIPT.md) 為準。此頁仍是獨立唯讀預覽，未接正式 ARENA。
 
 ## 本批交付
 - `bey-catalog-tw07-mobile-preview.html`：獨立手機直列式頁面，沿用 ARENA 深色底、螢光黃重點色、金色狀態標籤與卡片排版。

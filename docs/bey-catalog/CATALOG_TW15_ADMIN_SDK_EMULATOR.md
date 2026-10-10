@@ -1,6 +1,6 @@
 # TW-15｜Firebase Admin SDK × Firestore Emulator 實際交易驗收
 
-> **後續狀態（2026-10-10）**：本文件保留 TW-15 當時以合成形狀資料測試 Admin SDK 的批次邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收其後已完成，並已接續通過私有載入器、真實 Auth Emulator 與 v2 SDK loopback HTTP。請分別參考 [DB01_REAL_EMULATOR_RECEIPT.md](DB01_REAL_EMULATOR_RECEIPT.md) 與 [CATALOG_REAL_HTTP_ACCEPTANCE.md](CATALOG_REAL_HTTP_ACCEPTANCE.md)。
+> **後續狀態（2026-10-10）**：本文件保留 TW-15 當時以合成形狀資料測試 Admin SDK 的批次邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收其後已完成，並已接續通過私有載入器、真實 Auth Emulator 與 v2 SDK loopback HTTP。請分別參考 [DB01_REAL_EMULATOR_RECEIPT.md](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/blob/b770b0ee3d75ed5688bbcce7688cb212cc947e46/docs/bey-catalog/DB01_REAL_EMULATOR_RECEIPT.md) 與 [CATALOG_REAL_HTTP_ACCEPTANCE.md](CATALOG_REAL_HTTP_ACCEPTANCE.md)。
 
 ## 本批交付
 - `modules/bey-catalog/catalog-tw15-admin-emulator.cjs`：使用 **firebase-admin/firestore** 的 Firestore `runTransaction`、`DocumentReference.create`、`Timestamp` 與 `FieldValue.serverTimestamp`；僅允許 `demo-bxh-catalog-db01` + `127.0.0.1:8189` 的隔離 Emulator。

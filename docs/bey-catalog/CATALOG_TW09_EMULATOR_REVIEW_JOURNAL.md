@@ -1,6 +1,6 @@
 # TW-09｜台灣繁中圖鑑管理員審核紀錄：隔離 Emulator 驗收
 
-> **後續狀態（2026-10-10）**：本文件保留 TW-09 當時的審核交易邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收已完成，請以 [DB01_REAL_EMULATOR_RECEIPT.md](DB01_REAL_EMULATOR_RECEIPT.md) 為準。審核紀錄仍限 Emulator，31 項內容未核准。
+> **後續狀態（2026-10-10）**：本文件保留 TW-09 當時的審核交易邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收已完成，請以 [DB01_REAL_EMULATOR_RECEIPT.md](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/blob/b770b0ee3d75ed5688bbcce7688cb212cc947e46/docs/bey-catalog/DB01_REAL_EMULATOR_RECEIPT.md) 為準。審核紀錄仍限 Emulator，31 項內容未核准。
 
 ## 本批交付
 - `catalog-tw09-review-emulator.cjs`：**只允許本機 loopback 的 demo-bxh-catalog-db01 Firestore Emulator**，透過 transaction 保存兩階段審核狀態及不可變審核事件。

@@ -1,5 +1,7 @@
 # TW-11｜與 ARENA 正式管理員權限規則對齊
 
+> **後續狀態（2026-10-10）**：本文件保留當時批次的驗收邊界；原始197筆其後已在真實Firestore Emulator完成DB-01驗收，請以[PR #462固定收據](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/blob/b770b0ee3d75ed5688bbcce7688cb212cc947e46/docs/bey-catalog/DB01_REAL_EMULATOR_RECEIPT.md)為準。此結果不代替31項內容審核或正式Firebase驗收。
+
 ## 正式規則核對
 核對來源：`memoryalwaysbibo/BXH_ARENA_Functions_Deploy/production-firestore-rules/firestore.rules`，版本註記 v13.40.10（2026-10-06）。
 

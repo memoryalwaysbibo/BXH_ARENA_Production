@@ -1,6 +1,6 @@
 # BXH ARENA｜TW-04 UX-18 來源交叉佐證與 CX 零件繁中類別
 
-> **後續狀態（2026-10-10）**：本文件保留 TW-04 當時的批次邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收已完成，請以 [DB01_REAL_EMULATOR_RECEIPT.md](DB01_REAL_EMULATOR_RECEIPT.md) 為準。商家交叉佐證仍不等於原廠確認。
+> **後續狀態（2026-10-10）**：本文件保留 TW-04 當時的批次邊界；DB-01 原始 197 筆真實 Firestore Emulator 驗收已完成，請以 [DB01_REAL_EMULATOR_RECEIPT.md](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/blob/b770b0ee3d75ed5688bbcce7688cb212cc947e46/docs/bey-catalog/DB01_REAL_EMULATOR_RECEIPT.md) 為準。商家交叉佐證仍不等於原廠確認。
 
 ## 真實資料盤查
 - 原始 DATA-01B：197 個研究實體，SHA-256 `2a53b4d0164d97a5f0607b4d4fd8a536a84b388530bca3eb371453f525cb7d42`，保持不變。
