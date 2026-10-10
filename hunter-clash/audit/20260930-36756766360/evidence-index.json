@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+  "readOnly": true,
+  "runId": 36756766360,
+  "runAttempt": 1,
+  "workflowCommit": "e20fa91c661f28bb6cc303a748e85c2b2337c7cc",
+  "mergedToolPR": 89,
+  "toolHeadCommit": "7c1f9dc662aa5c918a28a068580603f811de0198",
+  "toolValidationRuns": [
+    36756436583,
+    36756488483
+  ],
+  "toolTests": 27,
+  "artifactId": 11117326029,
+  "artifactZipSha256": "e465fba1a78b5cbf5f1210ec4733fbda36ddcc081d587ac330cb4d7a4fb8e61d",
+  "artifactEntryWhitelist": [
+    "hc00-runtime-inventory.json",
+    "hc00-build-source-metadata.json",
+    "hc00-rules-comparison.json",
+    "hc00-audit-provenance.json"
+  ],
+  "buildMetadataCollected": true,
+  "buildCount": 35,
+  "functionCount": 98,
+  "resolvedCommitCount": 0,
+  "resolvedStorageSourceCount": 0,
+  "sourceHashCount": 0,
+  "observedRulesContentUnchanged": true,
+  "rulesContentEvidence": "../20260930-36696307510/observed-rules-source.json",
+  "candidateRulesComparison": "MISMATCH",
+  "runConclusion": "failure",
+  "runtimeReconciled": false,
+  "hcDeploymentVerified": false,
+  "nextRequiredEvidence": "Trusted deployed source package or immutable deployment source manifest; current sourceProvenance fields do not establish repository origin."
+}
