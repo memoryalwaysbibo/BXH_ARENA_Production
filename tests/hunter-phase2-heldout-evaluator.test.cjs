@@ -28,6 +28,8 @@ test('player split is deterministic and disjoint',()=>{
   assert.deepEqual(a,b);
   assert.equal(a.calibration.some(x=>a.holdout.includes(x)),false);
   assert.equal(a.calibration.length+a.holdout.length,100);
+  assert.ok(a.calibration.length>0);
+  assert.ok(a.holdout.length>0);
 });
 
 test('prediction rows skip warmup matches and require precomputed before-scores',()=>{
