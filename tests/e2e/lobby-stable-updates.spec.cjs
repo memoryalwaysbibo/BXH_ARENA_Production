@@ -5,9 +5,22 @@ const { test, expect } = require('@playwright/test');
 // Run against the complete shipped index, Core, feature scripts and CSS. Only
 // the cloud service boundary is replaced. No Firebase SDK, account, production
 // read, or registration write is allowed in this suite.
-test.use({ serviceWorkers: 'block', reducedMotion: 'reduce' });
+test.use({
+  serviceWorkers: 'block', reducedMotion: 'reduce',
+  // Keep DOM snapshots and normal failure screenshots; omit only the trace's
+  // continuous screencast to diagnose the Linux WebKit frame stall.
+  trace: { mode: 'retain-on-failure', screenshots: false, snapshots: true },
+});
 const pageErrors = new WeakMap();
-test.afterEach(async ({ page }) => {
+const pageDiagnostics = new WeakMap();
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    // Collected on the driver side, so a stalled renderer cannot block the
+    // diagnostic attachment. The trace retains the same console events.
+    await testInfo.attach('lobby-frame-diagnostics', {
+      body: JSON.stringify(pageDiagnostics.get(page) || [], null, 2), contentType: 'application/json',
+    });
+  }
   expect(pageErrors.get(page) || [], 'No runtime errors may occur during lobby interactions').toEqual([]);
 });
 
@@ -15,6 +28,15 @@ async function openLobby(page, options = {}) {
   const errors = [];
   pageErrors.set(page, errors);
   page.on('pageerror', error => errors.push(error.message));
+  const diagnostics = [];
+  pageDiagnostics.set(page, diagnostics);
+  page.on('console', message => {
+    const text = message.text();
+    if (text.startsWith('[lobby-frame] ')) {
+      diagnostics.push(text.slice(14));
+      console.log(text);
+    }
+  });
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (!['127.0.0.1', 'localhost'].includes(url.hostname)) return route.abort('blockedbyclient');
@@ -31,6 +53,24 @@ async function openLobby(page, options = {}) {
       holdPublic: false, holdRegistrations: false, registrations: [], authCallback: null,
       flushes: 0, fresh,
     };
+    // Observe scheduling without replacing requestAnimationFrame, forcing an
+    // action, reading geometry, or changing the shipped rendering/CSS.
+    let mutations = 0, phase = 'init';
+    new MutationObserver(records => { mutations += records.length; })
+      .observe(document, { childList: true, subtree: true, attributes: true });
+    fixture.diagnostic = nextPhase => {
+      if (nextPhase) phase = nextPhase;
+      console.debug('[lobby-frame] ' + JSON.stringify({
+        ms: Math.round(performance.now()), phase, visibility: document.visibilityState,
+        focus: document.hasFocus(), flushes: fixture.flushes, mutations,
+      }));
+    };
+    let pulses = 0;
+    const diagnosticTimer = setInterval(() => {
+      fixture.diagnostic();
+      if (++pulses >= 20) clearInterval(diagnosticTimer);
+    }, 2000);
+    document.addEventListener('visibilitychange', () => fixture.diagnostic());
     window.cloudSync = {
       isEnabled: () => true,
       connect: async () => true,
@@ -134,15 +174,23 @@ async function openLobby(page, options = {}) {
 }
 
 async function settle(page) {
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(() => new Promise(resolve => {
+    lobbyFixture.diagnostic('settle:start');
+    requestAnimationFrame(() => {
+      lobbyFixture.diagnostic('settle:raf1');
+      requestAnimationFrame(time => { lobbyFixture.diagnostic('settle:raf2'); resolve(time); });
+    });
+  }));
 }
 
 const card = (page, code = 'BXH-FIXTURE-1') => page.locator('[data-lobby-code="' + code + '"]');
 const action = (page, code = 'BXH-FIXTURE-1') => card(page, code).locator('.lobby-card-actions [data-action="view-public-tournament"]');
 
 async function expandCard(page, code = 'BXH-FIXTURE-1') {
+  await page.evaluate(() => lobbyFixture.diagnostic('expand:before-click'));
   await card(page, code).locator(':scope > summary').click();
   await expect(card(page, code)).toHaveAttribute('open', '');
+  await page.evaluate(() => lobbyFixture.diagnostic('expand:after-click'));
 }
 
 test('public updates and unrelated render calls retain card, roster, focus and scroll', async ({ page }) => {
@@ -353,7 +401,10 @@ test('T0 refresh keeps existing cards while the public request is still pending'
   await openLobby(page);
   await page.evaluate(() => {
     const rows = structuredClone(lobbyFixture.rows);
-    rows[0].registrationOpenAt = Date.now() + 2000;
+    // Give native WebKit setup time without allowing the boundary to expire
+    // before the assertions; the actual crossing is advanced explicitly below.
+    lobbyFixture.openingAt = Date.now() + 60000;
+    rows[0].registrationOpenAt = lobbyFixture.openingAt;
     rows[0].registrationStatus = 'scheduled';
     lobbyFixture.publish(rows);
   });
@@ -362,11 +413,14 @@ test('T0 refresh keeps existing cards while the public request is still pending'
   await expect(card(page).locator('[data-registration-countdown]')).toHaveCount(1);
   await page.evaluate(() => {
     lobbyFixture.holdPublic = true;
+    lobbyFixture.publicQueriesBeforeOpening = lobbyFixture.publicQueries.length;
     lobbyFixture.card = document.querySelector('[data-lobby-code="BXH-FIXTURE-1"]');
   });
-  await page.clock.fastForward(2500);
+  const untilOpening = await page.evaluate(() => lobbyFixture.openingAt - Date.now());
+  expect(untilOpening, 'The clock boundary must still be in the future after native setup').toBeGreaterThan(0);
+  await page.clock.fastForward(untilOpening + 1500);
   await settle(page);
-  await expect.poll(() => page.evaluate(() => lobbyFixture.publicQueries.length)).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => lobbyFixture.publicQueries.length - lobbyFixture.publicQueriesBeforeOpening)).toBeGreaterThan(0);
   expect(await page.evaluate(() => lobbyFixture.readState().cache === null)).toBe(false);
   expect(await page.evaluate(() => lobbyFixture.card === document.querySelector('[data-lobby-code="BXH-FIXTURE-1"]'))).toBe(true);
   await expect(card(page)).toBeVisible();
@@ -375,14 +429,24 @@ test('T0 refresh keeps existing cards while the public request is still pending'
 
 test('poster permission hooks and async control text survive unrelated count changes', async ({ page }) => {
   await openLobby(page);
+  await expect(card(page)).toHaveAttribute('data-poster-access-hook', '1');
+  await page.evaluate(() => {
+    // Native details dispatches toggle asynchronously. Wait for the real poster
+    // permission handler before adding the plugin-owned presentation state.
+    const card = document.querySelector('[data-lobby-code="BXH-FIXTURE-1"]');
+    lobbyFixture.posterOpened = new Promise(resolve => card.addEventListener('toggle', resolve, { once: true }));
+  });
   await expandCard(page);
+  await page.evaluate(() => lobbyFixture.posterOpened.then(() => undefined));
+  await expect(card(page).locator('[data-poster-manage]')).toBeHidden();
   await page.evaluate(() => {
     const card = document.querySelector('[data-lobby-code="BXH-FIXTURE-1"]');
     const button = card.querySelector('[data-poster-manage]');
     lobbyFixture.posterButton = button;
     card.dataset.posterAccessHook = '1';
     card.dataset.posterPermissionBusy = '1';
-    button.hidden = false; button.textContent = '更換照片'; button.dataset.posterHasPhoto = '1';
+    // A player may not manage a poster. Preserve that real permission result.
+    button.textContent = '更換照片'; button.dataset.posterHasPhoto = '1';
     const rows = structuredClone(lobbyFixture.rows); rows[0].confirmedCount++;
     lobbyFixture.publish(rows);
   });
@@ -393,7 +457,7 @@ test('poster permission hooks and async control text survive unrelated count cha
     return { same: button === lobbyFixture.posterButton, hook: card.dataset.posterAccessHook,
       busy: card.dataset.posterPermissionBusy, hidden: button.hidden, text: button.textContent,
       photo: button.dataset.posterHasPhoto };
-  })).toEqual({ same: true, hook: '1', busy: '1', hidden: false, text: '更換照片', photo: '1' });
+  })).toEqual({ same: true, hook: '1', busy: '1', hidden: true, text: '更換照片', photo: '1' });
 });
 
 test('missing-room cached snapshots withdraw old actions and keep the raw cache faithful', async ({ page }) => {
