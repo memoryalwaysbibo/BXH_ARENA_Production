@@ -1064,7 +1064,7 @@
         }
 
         console.log("[queryPublicTournaments] raw doc count:", snap.size, "| usable:", results.length, "| excluded:", JSON.stringify(excluded));
-        return { ok:true, items: results, rawCount: snap.size, excluded };
+        return { ok:true, items: results, rawCount: snap.size, excluded, fromCache:snap.metadata?.fromCache!==false, hasPendingWrites:snap.metadata?.hasPendingWrites!==false };
       }catch(e){
         const code = (e && e.code) || "unknown";
         console.warn("[queryPublicTournaments] query FAILED — this is why the list may look empty even though documents exist. Firebase error code:", code, "| query: where(visibility==public) on publicTournaments | raw error:", e);
@@ -1093,7 +1093,7 @@
               excluded.push({code:docSnap.id,reason:"parse-error"});
             }
           });
-          callback({ok:true,items:results,rawCount:snap.size,excluded,fromCache:!!(snap.metadata&&snap.metadata.fromCache)});
+          callback({ok:true,items:results,rawCount:snap.size,excluded,fromCache:snap.metadata?.fromCache!==false,hasPendingWrites:snap.metadata?.hasPendingWrites!==false});
         },err=>{
           const code=(err&&err.code)||"unknown";
           const reason=code==="permission-denied"?"permission-denied":code==="failed-precondition"?"failed-precondition":"network";

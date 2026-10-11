@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    { name: "stable lobby updates, identity and callback isolation", args: ["--test", "tests/lobby-stable-updates.test.cjs"] },
     {name:'Hunter Clash final rehydration, revocation and legacy isolation',args:['--test','tests/hunter-clash-final-check.test.cjs']},
     {name:'Hunter Clash PK badge settlement, quotas and revocation',args:['--test','tests/hunter-pk-achievements.test.cjs']},
     {name:'Hunter Clash practice XP atomic settlement and daily limits',args:['--test','tests/hunter-practice-xp.test.cjs']},

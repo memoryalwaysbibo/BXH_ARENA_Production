@@ -35,13 +35,13 @@ function extractFunction(source, name) {
 }
 
 function context(extra = {}) {
-  const ctx = vm.createContext({ console, Date: FixedDate, window: {}, esc, communitySettingsSaving: false, communityCreateSaving: false, communitySettingsWriteGate: null, ...extra });
+  const ctx = vm.createContext({ console, Date: FixedDate, window: {}, publicTournamentsFreshness: "server", esc, communitySettingsSaving: false, communityCreateSaving: false, communitySettingsWriteGate: null, ...extra });
   for (const [name, source] of [['domain', domain], ['registration', registration], ['input', input]]) {
     vm.runInContext(source, ctx, { filename: name + '-utils.js' });
   }
   Object.assign(ctx, ctx.window.BXHDomainUtils, ctx.window.BXHRegistrationUtils, ctx.window.BXHInputUtils);
   for (const name of [
-    'computeRegistrationStatus', 'getEffectiveRegistrationStatus', 'lobbyEventStartMs',
+    'computeRegistrationStatus', 'getEffectiveRegistrationStatus', 'lobbyRegistrationStateKnown', 'lobbyEventStartMs',
     'lobbyMyRegistration', 'lobbySummary', 'lobbyNewestFirst', 'lobbyLists',
     'lobbyRegistrationButtons', 'publicEventLifecycleStatus',
   ]) vm.runInContext(extractFunction(core, name), ctx, { filename: name + '.js' });

@@ -37,6 +37,7 @@ function authHarness(getUserProfile) {
       storage: { async delete() {}, async set() {} },
       cloudAuth: { getUserProfile, touchLastLogin() {} },
     },
+    lobbyAuthEpoch: 0,
     firebaseUser: null,
     userProfile: null,
     currentRole: 'admin',
