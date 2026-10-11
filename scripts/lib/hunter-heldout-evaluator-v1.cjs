@@ -6,7 +6,7 @@ const VERSION='hunter-phase2-heldout-evaluator-v1';
 
 function hashUnit(value){
   const hex=crypto.createHash('sha256').update(String(value)).digest('hex').slice(0,13);
-  return parseInt(hex,16)/0x1fffffffffffff;
+  return parseInt(hex,16)/0xfffffffffffff;
 }
 function splitPlayers(playerIds,{calibrationShare=0.7,salt='hunter-p2-heldout-v1'}={}){
   if(!(calibrationShare>0&&calibrationShare<1))throw Error('split-share-invalid');
