@@ -224,8 +224,11 @@ test('public updates and unrelated render calls retain card, roster, focus and s
   await expect(card(page).locator('.lobby-detail-grid')).toContainText('3 / 32');
 });
 
-test('pointer down survives an intervening update and opens the intended detail once', async ({ page }) => {
+async function exercisePointerUpdate(page, { disableCardHoverFilter = false } = {}) {
   await openLobby(page);
+  if (disableCardHoverFilter) {
+    await page.addStyleTag({ content: '[data-lobby-root] .lobby-compact-card:hover{filter:none!important}' });
+  }
   await expandCard(page);
   await action(page).scrollIntoViewIfNeeded();
   const box = await action(page).boundingBox();
@@ -242,6 +245,16 @@ test('pointer down survives an intervening update and opens the intended detail 
   await expect.poll(() => page.evaluate(() => lobbyFixture.detailReads)).toEqual(['BXH-FIXTURE-1']);
   expect(await page.evaluate(() => lobbyFixture.readState().code)).toBe('BXH-FIXTURE-1');
   expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+}
+
+test('pointer down survives an intervening update and opens the intended detail once', async ({ page }) => {
+  await exercisePointerUpdate(page);
+});
+
+// Diagnostic comparison only. The original native pointer gate above retains
+// the shipped CSS; success here cannot replace that baseline's result.
+test('diagnostic: pointer interaction with lobby card hover filter disabled', async ({ page }) => {
+  await exercisePointerUpdate(page, { disableCardHoverFilter: true });
 });
 
 test('keyboard focus remains usable across a public update', async ({ page }) => {
@@ -458,6 +471,21 @@ test('poster permission hooks and async control text survive unrelated count cha
       busy: card.dataset.posterPermissionBusy, hidden: button.hidden, text: button.textContent,
       photo: button.dataset.posterHasPhoto };
   })).toEqual({ same: true, hook: '1', busy: '1', hidden: true, text: '更換照片', photo: '1' });
+  await expect(card(page).locator('[data-poster-manage]')).toBeHidden();
+  await page.evaluate(() => {
+    // Presentation-only clone: no room target, enabled action, or permission
+    // change. Prove the CSS rule does not hide controls without [hidden].
+    const clone = lobbyFixture.posterButton.cloneNode(true);
+    clone.hidden = false; clone.disabled = true; clone.inert = true;
+    clone.removeAttribute('data-code'); clone.removeAttribute('data-action');
+    clone.dataset.fixturePosterPresentation = '1';
+    lobbyFixture.posterButton.parentNode.appendChild(clone);
+  });
+  const presentation = card(page).locator('[data-fixture-poster-presentation]');
+  await expect(presentation).toBeVisible();
+  await presentation.evaluate(node => node.remove());
+  await expect(card(page).locator('[data-poster-manage]')).toBeHidden();
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
 });
 
 test('missing-room cached snapshots withdraw old actions and keep the raw cache faithful', async ({ page }) => {

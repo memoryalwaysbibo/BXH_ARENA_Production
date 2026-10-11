@@ -5368,7 +5368,9 @@ function patchLobbyChildren(parent,template,patch){
   }
 }
 function renderStableLobbyScreen(app,html){
-  lobbyRegistrationBoundaryAt=nextLobbyRegistrationBoundary(publicTournamentsCache);
+  // Rendering can run just after T0 but before the one-second ticker. Keep a
+  // due boundary until the ticker consumes it, even if its countdown disappears.
+  lobbyRegistrationBoundaryAt=Math.min(lobbyRegistrationBoundaryAt,nextLobbyRegistrationBoundary(publicTournamentsCache));
   const context=captureLobbyContext(),fragment=document.createElement("template");fragment.innerHTML=html;
   if(!isTournamentLobbyVisible()||!fragment.content.querySelector("[data-lobby-root]")||lobbyMountedContext!==context.key||!app.querySelector("[data-lobby-root]")){
     app.innerHTML=html;lobbyTemplates=new WeakMap();rememberLobbyTemplate(app);

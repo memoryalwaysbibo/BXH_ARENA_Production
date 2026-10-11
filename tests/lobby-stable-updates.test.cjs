@@ -342,6 +342,36 @@ test('T0 expiry requests refresh without clearing the current cache', async () =
   await microtasks();
 });
 
+test('an unrelated render cannot consume an overdue registration boundary before its ticker', async () => {
+  for (const field of ['registrationOpenAt', 'registrationCloseAt', 'cancellationDeadline']) {
+    const h = harness(), items = [row({ [field]: 1800000000100,
+      ...(field === 'registrationOpenAt' ? { registrationStatus: 'scheduled' } : {}) })];
+    h.apply(items, { source: fresh(items) }); h.frame();
+    h.advance(101);
+    // Execute the actual renderer's mount path after the wall-clock change.
+    // The newly generated presentation no longer contains an expired countdown.
+    h.document.createElement = () => ({ content: { querySelector: () => ({}) } });
+    const app = element('main', {}); app.querySelector = () => null;
+    h.run('renderStableLobbyScreen')(app, '<div data-lobby-root></div>');
+    h.tick(); await microtasks();
+    assert.equal(h.queries.length, 1, field + ' still requires a fresh public query after another render');
+    assert.equal(h.state().cache, items, 'Keep the existing lobby while the fresh query is pending');
+    h.tick(); await microtasks();
+    assert.equal(h.queries.length, 1, 'An overdue boundary is consumed only once');
+    h.queries[0].resolve(fresh(items)); await microtasks();
+  }
+});
+
+test('a newer snapshot may replace a superseded registration boundary before the ticker', async () => {
+  const h = harness(), items = [row({ registrationOpenAt: 1800000000100, registrationStatus: 'scheduled' })];
+  h.apply(items, { source: fresh(items) }); h.frame(); h.advance(101);
+  const newer = [row({ registrationOpenAt: 1800000100000, registrationStatus: 'scheduled' })];
+  h.apply(newer, { source: fresh(newer) }); h.frame();
+  h.tick(); await microtasks();
+  assert.equal(h.queries.length, 0, 'A complete newer source supersedes the old schedule');
+  assert.equal(h.state().cache, newer);
+});
+
 test('wall-clock cutoff without a snapshot immediately removes signup wording', async () => {
   const h = harness(), items = [row({ registrationCloseAt: 1800000000100 })];
   h.apply(items, { source: fresh(items) }); h.frame();
@@ -553,4 +583,12 @@ test('renderPreservingScroll does not override stable-lobby anchor correction', 
   h.context.renderPreservingScroll(); assert.equal(h.getY(), 140);
   h.context.isTournamentLobbyVisible = () => false;
   h.context.renderPreservingScroll(); assert.equal(h.getY(), 140, 'Other screens retain legacy scroll restoration');
+});
+
+
+test('poster hidden CSS is scoped to permission controls and its entrypoint cache key is updated', () => {
+  const css = read('modules/main-css/lobby-community.css');
+  assert.match(css, /\[data-poster-manage\]\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*;?\s*\}/);
+  const index = read('index.html');
+  assert.match(index, /href="modules\/main-css\/lobby-community\.css\?[^"\n]*poster-hidden=20261011-1[^"\n]*"/);
 });

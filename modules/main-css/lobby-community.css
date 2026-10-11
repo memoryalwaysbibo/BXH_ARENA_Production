@@ -859,6 +859,7 @@ body .celebration-overlay{z-index:3000!important;}
 .lobby-event-intro-head h3{font-size:1rem;margin:0;color:#f5e9cf}
 .lobby-poster-manage{flex:0 0 auto;color:#e7d5b2;border-color:rgba(231,213,178,.35);background:rgba(255,255,255,.045)}
 .lobby-poster-manage:hover{background:rgba(255,255,255,.1)}
+[data-poster-manage][hidden]{display:none!important}
 .lobby-poster-slot:empty{display:none}
 .lobby-poster-figure{position:relative;width:min(100%,560px);margin:.75rem auto 1rem;text-align:center}
 .lobby-poster-open{display:block;width:100%;padding:0;border:0;background:transparent;cursor:zoom-in}
