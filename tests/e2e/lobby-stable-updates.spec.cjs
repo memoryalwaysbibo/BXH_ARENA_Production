@@ -5,12 +5,7 @@ const { test, expect } = require('@playwright/test');
 // Run against the complete shipped index, Core, feature scripts and CSS. Only
 // the cloud service boundary is replaced. No Firebase SDK, account, production
 // read, or registration write is allowed in this suite.
-test.use({
-  serviceWorkers: 'block', reducedMotion: 'reduce',
-  // Keep DOM snapshots and normal failure screenshots; omit only the trace's
-  // continuous screencast to diagnose the Linux WebKit frame stall.
-  trace: { mode: 'retain-on-failure', screenshots: false, snapshots: true },
-});
+test.use({ serviceWorkers: 'block', reducedMotion: 'reduce' });
 const pageErrors = new WeakMap();
 const pageDiagnostics = new WeakMap();
 test.afterEach(async ({ page }, testInfo) => {
@@ -224,16 +219,15 @@ test('public updates and unrelated render calls retain card, roster, focus and s
   await expect(card(page).locator('.lobby-detail-grid')).toContainText('3 / 32');
 });
 
-async function exercisePointerUpdate(page, { disableCardHoverFilter = false } = {}) {
+test('pointer down survives an intervening update and opens the intended detail once', async ({ page }) => {
   await openLobby(page);
-  if (disableCardHoverFilter) {
-    await page.addStyleTag({ content: '[data-lobby-root] .lobby-compact-card:hover{filter:none!important}' });
-  }
   await expandCard(page);
   await action(page).scrollIntoViewIfNeeded();
   const box = await action(page).boundingBox();
   expect(box).toBeTruthy();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  // This is the shipped stylesheet, with no test-only style injection.
+  await expect(card(page)).toHaveCSS('filter', 'none');
   await page.mouse.down();
   await page.evaluate(() => {
     const rows = structuredClone(lobbyFixture.rows);
@@ -245,16 +239,6 @@ async function exercisePointerUpdate(page, { disableCardHoverFilter = false } = 
   await expect.poll(() => page.evaluate(() => lobbyFixture.detailReads)).toEqual(['BXH-FIXTURE-1']);
   expect(await page.evaluate(() => lobbyFixture.readState().code)).toBe('BXH-FIXTURE-1');
   expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
-}
-
-test('pointer down survives an intervening update and opens the intended detail once', async ({ page }) => {
-  await exercisePointerUpdate(page);
-});
-
-// Diagnostic comparison only. The original native pointer gate above retains
-// the shipped CSS; success here cannot replace that baseline's result.
-test('diagnostic: pointer interaction with lobby card hover filter disabled', async ({ page }) => {
-  await exercisePointerUpdate(page, { disableCardHoverFilter: true });
 });
 
 test('keyboard focus remains usable across a public update', async ({ page }) => {

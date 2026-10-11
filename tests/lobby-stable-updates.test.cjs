@@ -592,3 +592,11 @@ test('poster hidden CSS is scoped to permission controls and its entrypoint cach
   const index = read('index.html');
   assert.match(index, /href="modules\/main-css\/lobby-community\.css\?[^"\n]*poster-hidden=20261011-1[^"\n]*"/);
 });
+
+
+test('shipped lobby hover fix only disables the card filter and has a fresh stylesheet cache key', () => {
+  const css = read('modules/main-css/lobby-community.css');
+  assert.match(css, /\[data-lobby-root\]\s+\.lobby-compact-card:hover\s*\{\s*filter\s*:\s*none\s*!important\s*;?\s*\}/);
+  const index = read('index.html');
+  assert.match(index, /href="modules\/main-css\/lobby-community\.css\?[^"\n]*lobby-hover=20261011-1[^"\n]*"/);
+});
