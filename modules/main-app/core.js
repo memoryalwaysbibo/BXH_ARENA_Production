@@ -3161,6 +3161,7 @@ function cloudAvailable(){
 // must never yank the viewport back to the top or the middle of an unrelated
 // section, since this app's render() always does a full innerHTML replace.
 function renderPreservingScroll(){
+  if(isTournamentLobbyVisible())return render();
   const scrollY = (typeof window!=="undefined" && window.scrollY) || 0;
   render();
   if(typeof window!=="undefined" && window.scrollTo){
@@ -5210,38 +5211,230 @@ let publicTournamentsLastSignature = "";
 const PUBLIC_TOURNAMENTS_RECONCILE_MS = 90000;
 
 function isTournamentLobbyVisible(){
-  return (appPhase==="player-center" && playerActiveTab==="home")
+  return (appPhase==="player-center" && playerActiveTab==="home" && !!firebaseUser && !!userProfile && currentRole==="player" && !mailboxContext().open)
     || (appPhase==="guest-lobby" && guestActiveTab==="events");
 }
 
 
-function publicTournamentListSignature(items){
-  return (Array.isArray(items)?items:[]).map(t=>[
-    String(t&&t.code||""),
-    Number(t&&t.updatedAt||0),
-    String(t&&t.tournamentPhase||""),
-    String(t&&t.registrationStatus||""),
-    Number(t&&t.confirmedCount||0),
-    Number(t&&t.waitlistCount||0),
-    communityRegistrationParticipantCount(t),
-    isUnlimitedCommunityRegistration(t)?"unlimited":Number(t&&t.capacity||0),
-    t?.communityQuickRegistration===true?"quick":"",
-    fastLobbyHash(t&&t.bracketView||"")
-  ].join(":")).sort().join("|");
+// Lobby refreshes own data, not the user's current DOM interaction. Other screens
+// retain their existing renderer. These epochs also fence callbacks after navigation.
+let lobbyGeneration=0, lobbyAuthEpoch=0, lobbyContext="", lobbyFrame=null, lobbyRenderPending=false;
+let lobbyMountedContext="", lobbyTemplates=new WeakMap(), lobbyGestureTarget=null;
+let lobbyReleaseTimer=null, publicTournamentsDataRevision=0;
+const lobbyInputBindings=new WeakMap();
+let publicTournamentsFreshness="unknown", myRegistrationsOwner="", myRegistrationsRequest=0;
+let lobbyRegistrationBoundaryAt=Infinity;
+function lobbyAuthKey(){
+  return [currentAuthUid()||"",userProfile?.role||"",currentRole||"",userProfile?.active===false?"inactive":"active",lobbyAuthEpoch].join("|");
 }
-function applyPublicTournamentItems(items,{renderIfChanged=true}={}){
+function lobbyContextKey(){
+  return [lobbyAuthKey(),appPhase,playerActiveTab,typeof guestActiveTab==="undefined"?"":guestActiveTab,
+    appPhase==="player-center"&&typeof mailboxContext==="function"&&mailboxContext().open?"mailbox":""].join("|");
+}
+function reconcileLobbyContext(){
+  const key=lobbyContextKey();
+  if(key!==lobbyContext){
+    lobbyContext=key;lobbyGeneration++;lobbyGestureTarget=null;lobbyMountedContext="";
+    if(lobbyFrame!==null){if(window.cancelAnimationFrame)window.cancelAnimationFrame(lobbyFrame);else clearTimeout(lobbyFrame);lobbyFrame=null;}
+    lobbyRenderPending=false;
+    stopPublicTournamentsRealtime();
+    publicTournamentsReconcilePromise=null;publicTournamentsLoading=false;
+  }
+  const owner=lobbyAuthKey();
+  if(myRegistrationsOwner!==owner){
+    myRegistrationsOwner=owner;myRegistrationsRequest++;
+    myRegistrationsCache=null;myRegistrationsLoading=false;myRegistrationsError=null;myRegistrationsTournamentInfo={};
+    publicTournamentsFreshness="unknown";
+  }
+}
+function captureLobbyContext(){reconcileLobbyContext();return {key:lobbyContext,generation:lobbyGeneration};}
+function lobbyContextIsCurrent(context){
+  return !!context&&context.generation===lobbyGeneration&&context.key===lobbyContextKey();
+}
+function requestLobbyRender(){
+  if(!isTournamentLobbyVisible())return;
+  const context=captureLobbyContext();lobbyRenderPending=true;
+  if(lobbyFrame!==null||document.hidden)return;
+  const schedule=window.requestAnimationFrame?fn=>window.requestAnimationFrame(fn):fn=>setTimeout(fn,16);
+  lobbyFrame=schedule(()=>{
+    lobbyFrame=null;if(!lobbyContextIsCurrent(context)||!isTournamentLobbyVisible())return;
+    flushLobbyRender();
+  });
+}
+function flushLobbyRender(){
+  if(!lobbyRenderPending||!isTournamentLobbyVisible())return;
+  lobbyRenderPending=false;render();
+}
+function nextLobbyRegistrationBoundary(items,now=Date.now()){
+  let next=Infinity;
+  for(const item of Array.isArray(items)?items:[]){
+    for(const value of [item?.registrationOpenAt,item?.registrationCloseAt,item?.cancellationDeadline]){
+      const at=normalizeDateTime(value);if(at!=null&&at>now&&at<next)next=at;
+    }
+  }
+  return next;
+}
+function tickLobbyRegistrationBoundary(){
+  if(!isTournamentLobbyVisible()||document.hidden||Date.now()<lobbyRegistrationBoundaryAt)return;
+  lobbyRegistrationBoundaryAt=nextLobbyRegistrationBoundary(publicTournamentsCache);
+  requestLobbyRender();reconcilePublicTournamentsNow("registration-boundary");
+}
+function lobbyRegistrationStateKnown(t){
+  if(publicTournamentsFreshness!=="server"||!t)return false;
+  if(t.eventCancelled||t.registrationStatus==="cancelled"||publicTournamentRegistrationLocked(t))return true;
+  if(t.registrationEnabled===false)return false;
+  const configured=!!normalizeRegistrationStatusValue(t.registrationStatus)||normalizeDateTime(t.registrationOpenAt)!=null
+    || (isCommunityQuickRegistration(t)&&t.registrationEnabled===true);
+  if(!configured)return false;
+  const status=getEffectiveRegistrationStatus(t);
+  if(["scheduled","closed","cancelled","started","draft"].includes(status))return true;
+  const count=isCommunityQuickRegistration(t)?t.communityParticipantCount??t.confirmedCount:t.confirmedCount;
+  if(count==null||!Number.isSafeInteger(Number(count))||Number(count)<0)return false;
+  const capacity=t.registrationSelection?.capacity??communityRegistrationCapacity(t);
+  if(!isUnlimitedCommunityRegistration(t)&&(!Number.isSafeInteger(Number(capacity))||Number(capacity)<=0))return false;
+  if(t.waitlistEnabled&&(t.waitlistCount==null||!Number.isSafeInteger(Number(t.waitlistCount))||Number(t.waitlistCount)<0||
+    !Number.isSafeInteger(Number(t.waitlistCapacity))||Number(t.waitlistCapacity)<0))return false;
+  return true;
+}
+function publicTournamentSourceState(source){
+  return source&&source.ok===true&&source.fromCache===false&&source.hasPendingWrites===false?"server":"unknown";
+}
+function markLobbySourceUnknown(){
+  if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
+}
+function invalidateMyRegistrationsCache(){
+  myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
+}
+function shouldBindLobbyInput(element,key){
+  if(!isTournamentLobbyVisible())return true;
+  let keys=lobbyInputBindings.get(element);
+  if(!keys){keys=new Set();lobbyInputBindings.set(element,keys);}
+  if(keys.has(key))return false;
+  keys.add(key);return true;
+}
+function lobbyNodeKey(node){
+  if(node.nodeType!==1)return "";
+  if(node.hasAttribute("data-lobby-code"))return "room:"+node.getAttribute("data-lobby-code");
+  if(node.hasAttribute("data-lobby-section"))return "section:"+node.getAttribute("data-lobby-section");
+  if(node.id)return "id:"+node.id;
+  if(node.hasAttribute("data-lobby-root"))return "lobby";
+  if(node.hasAttribute("data-action"))return "action:"+[node.getAttribute("data-action"),node.getAttribute("data-code"),node.getAttribute("data-id"),node.getAttribute("data-player-id"),node.getAttribute("data-section"),node.getAttribute("data-tab"),node.getAttribute("data-value")].join(":");
+  return "";
+}
+function rememberLobbyTemplate(node,template=node){
+  lobbyTemplates.set(node,{html:template.nodeType===1?template.outerHTML:template.nodeValue,
+    attrs:template.nodeType===1?Object.fromEntries([...template.attributes].map(a=>[a.name,a.value])):{}});
+  [...node.childNodes].forEach((child,i)=>{if(template.childNodes[i])rememberLobbyTemplate(child,template.childNodes[i]);});
+}
+function patchLobbyNode(node,template,patch){
+  const prior=lobbyTemplates.get(node);
+  const html=template.nodeType===1?template.outerHTML:template.nodeValue;
+  // Comparing generated templates, rather than the live DOM, preserves native
+  // details state and the poster module's permission UI and event-hook flags.
+  if(prior&&prior.html===html)return;
+  if(node.nodeType!==1){if(node.nodeValue!==template.nodeValue)node.nodeValue=template.nodeValue;rememberLobbyTemplate(node,template);return;}
+  const before=prior?.attrs||{},after=Object.fromEntries([...template.attributes].map(a=>[a.name,a.value]));
+  for(const name of new Set([...Object.keys(before),...Object.keys(after)])){
+    if(name==="open"&&node.tagName==="DETAILS")continue;
+    if(before[name]===after[name])continue;
+    if(after[name]===undefined)node.removeAttribute(name);else node.setAttribute(name,after[name]);
+  }
+  // Form properties are user drafts; generated value attributes may change but
+  // an existing editor's current value/selection must never be overwritten.
+  const selectedValue=node.tagName==="SELECT"?node.value:null;
+  if(!["INPUT","TEXTAREA"].includes(node.tagName))patchLobbyChildren(node,template,patch);
+  if(selectedValue!==null&&[...node.options].some(option=>option.value===selectedValue))node.value=selectedValue;
+  if(!patch.deferred)lobbyTemplates.set(node,{html,attrs:after});
+}
+function patchLobbyChildren(parent,template,patch){
+  const previous=[...parent.childNodes],used=new Set(),candidates=new Map();let cursor=parent.firstChild;
+  const matchKey=node=>node.nodeType+":"+node.nodeName+":"+lobbyNodeKey(node);
+  for(const node of previous){const key=matchKey(node);if(!candidates.has(key))candidates.set(key,{nodes:[],index:0});candidates.get(key).nodes.push(node);}
+  for(const next of [...template.childNodes]){
+    const key=lobbyNodeKey(next),queue=candidates.get(matchKey(next));
+    let node=queue?.nodes[queue.index++];
+    if(!node&&key.startsWith("room:"))node=patch.cards.get(key);
+    if(node){
+      used.add(node);
+      if(node!==cursor){if(patch.hold){patch.deferred=true;}else parent.insertBefore(node,cursor);}
+      patchLobbyNode(node,next,patch);
+      cursor=node.parentNode===parent?node.nextSibling:cursor;
+    }else if(patch.hold){patch.deferred=true;}
+    else{node=next.cloneNode(true);parent.insertBefore(node,cursor);used.add(node);rememberLobbyTemplate(node);cursor=node.nextSibling;}
+  }
+  for(const node of previous){
+    if(used.has(node)||node.parentNode!==parent)continue;
+    if(patch.hold){patch.deferred=true;}else node.remove();
+  }
+}
+function renderStableLobbyScreen(app,html){
+  // Rendering can run just after T0 but before the one-second ticker. Keep a
+  // due boundary until the ticker consumes it, even if its countdown disappears.
+  lobbyRegistrationBoundaryAt=Math.min(lobbyRegistrationBoundaryAt,nextLobbyRegistrationBoundary(publicTournamentsCache));
+  const context=captureLobbyContext(),fragment=document.createElement("template");fragment.innerHTML=html;
+  if(!isTournamentLobbyVisible()||!fragment.content.querySelector("[data-lobby-root]")||lobbyMountedContext!==context.key||!app.querySelector("[data-lobby-root]")){
+    app.innerHTML=html;lobbyTemplates=new WeakMap();rememberLobbyTemplate(app);
+    lobbyMountedContext=isTournamentLobbyVisible()?context.key:"";return false;
+  }
+  const focused=document.activeElement;
+  const anchor=[...app.querySelectorAll("[data-lobby-code]")].find(n=>n.getBoundingClientRect().bottom>0);
+  const anchorTop=anchor?.getBoundingClientRect().top,scrollX=window.scrollX,scrollY=window.scrollY;
+  const hold=!!(lobbyGestureTarget&&lobbyGestureTarget.isConnected&&app.contains(lobbyGestureTarget));
+  const patch={hold,deferred:false,cards:new Map([...app.querySelectorAll("[data-lobby-code]")].map(n=>[lobbyNodeKey(n),n]))};
+  // An action removed by fresh state becomes inert immediately, even if its
+  // physical removal must wait for a held pointer/keyboard activation to finish.
+  const replacements=new Map([...fragment.content.querySelectorAll("[data-lobby-code] [data-action]")].map(node=>[
+    node.closest("[data-lobby-code]").getAttribute("data-lobby-code")+"|"+lobbyNodeKey(node),node]));
+  for(const button of app.querySelectorAll("[data-lobby-code] [data-action]")){
+    const code=button.closest("[data-lobby-code]").getAttribute("data-lobby-code");
+    const replacement=replacements.get(code+"|"+lobbyNodeKey(button));
+    if(!replacement){button.setAttribute("data-lobby-blocked","true");if("disabled" in button)button.disabled=true;}
+    else if(button.hasAttribute("data-lobby-blocked")){button.removeAttribute("data-lobby-blocked");if("disabled" in button)button.disabled=replacement.disabled;}
+  }
+  // Even a text wrap can move a pressed hit target. Keep its hit box stable;
+  // removed/unsafe actions above are already inert until the gesture ends.
+  if(hold){lobbyRenderPending=true;return true;}
+  patchLobbyChildren(app,fragment.content,patch);
+  if(focused?.isConnected&&app.contains(focused)&&document.activeElement!==focused)focused.focus?.({preventScroll:true});
+  const delta=anchor?.isConnected?anchor.getBoundingClientRect().top-anchorTop:0;
+  if(delta||window.scrollY!==scrollY)window.scrollTo(scrollX,scrollY+delta);
+  if(patch.deferred)lobbyRenderPending=true;
+  return true;
+}
+function releaseLobbyGesture(){
+  if(lobbyReleaseTimer)clearTimeout(lobbyReleaseTimer);
+  // Run after native activation/click; never move the target between down/up.
+  lobbyReleaseTimer=setTimeout(()=>{lobbyReleaseTimer=null;lobbyGestureTarget=null;if(lobbyRenderPending)requestLobbyRender();},0);
+}
+document.addEventListener("pointerdown",e=>{if(isTournamentLobbyVisible()&&e.target.closest?.("[data-lobby-root]"))lobbyGestureTarget=e.target;},true);
+document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&isTournamentLobbyVisible()&&e.target.closest?.("[data-lobby-root]"))lobbyGestureTarget=e.target;},true);
+document.addEventListener("pointerup",releaseLobbyGesture,true);
+document.addEventListener("pointercancel",releaseLobbyGesture,true);
+document.addEventListener("keyup",e=>{if(e.key==="Enter"||e.key===" ")releaseLobbyGesture();},true);
+window.addEventListener("blur",releaseLobbyGesture);
+window.addEventListener("offline",markLobbySourceUnknown);
+// End stable lobby rendering helpers.
+
+function publicTournamentListSignature(items){
+  return JSON.stringify((Array.isArray(items)?items:[]).filter(t=>t&&t.code).map(raw=>{
+    const summary=lobbySummary(raw);const {raw:ignored,...view}=summary;
+    return {...view,players:lobbyPublicPlayers(summary)};
+  }).sort((a,b)=>String(a.code).localeCompare(String(b.code))));
+}
+function applyPublicTournamentItems(items,{renderIfChanged=true,source=null}={}){
+  const previousFreshness=publicTournamentsFreshness;
+  if(source)publicTournamentsFreshness=publicTournamentSourceState(source);
   const next=Array.isArray(items)?items:[];
   const signature=publicTournamentListSignature(next);
-  const changed=publicTournamentsCache===null || signature!==publicTournamentsLastSignature;
+  const changed=publicTournamentsCache===null || signature!==publicTournamentsLastSignature || previousFreshness!==publicTournamentsFreshness;
   publicTournamentsCache=next;
+  lobbyRegistrationBoundaryAt=nextLobbyRegistrationBoundary(next);
+  publicTournamentsDataRevision++;
   publicTournamentsLastSignature=signature;
   publicTournamentsError=null;
   publicTournamentsLastRefreshAt=Date.now();
   try{ if(window.BXHLobbyFastCache) window.BXHLobbyFastCache.write(next); }catch(e){}
-  if(changed && renderIfChanged && isTournamentLobbyVisible()){
-    if(typeof renderPreservingScroll==="function") renderPreservingScroll();
-    else render();
-  }
+  if(changed && renderIfChanged && isTournamentLobbyVisible())requestLobbyRender();
   return changed;
 }
 function stopPublicTournamentsRealtime(){
@@ -5263,34 +5456,38 @@ function schedulePublicTournamentsReconcile(delay=PUBLIC_TOURNAMENTS_RECONCILE_M
   },Math.max(1000,Number(delay)||PUBLIC_TOURNAMENTS_RECONCILE_MS));
 }
 async function reconcilePublicTournamentsNow(reason="manual"){
-  if(publicTournamentsReconcilePromise) return publicTournamentsReconcilePromise;
-  if(!isTournamentLobbyVisible()) return false;
+  const context=captureLobbyContext();
+  if(publicTournamentsReconcilePromise)return publicTournamentsReconcilePromise;
+  if(!isTournamentLobbyVisible())return false;
+  const revision=publicTournamentsDataRevision;
   publicTournamentsReconcilePromise=(async()=>{
     try{
-      if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
-      if(!cloudAvailable()||!window.cloudSync||!window.cloudSync.queryPublicTournaments) return false;
+      if(window.cloudSync&&window.cloudSync.connect)await window.cloudSync.connect();
+      if(!lobbyContextIsCurrent(context)||!cloudAvailable()||!window.cloudSync?.queryPublicTournaments)return false;
       const result=await window.cloudSync.queryPublicTournaments();
-      if(result&&result.ok){
-        applyPublicTournamentItems(result.items,{renderIfChanged:true});
-        return true;
-      }
+      if(!lobbyContextIsCurrent(context)||revision!==publicTournamentsDataRevision)return false;
+      if(result?.ok){applyPublicTournamentItems(result.items,{source:result});return true;}
+      markLobbySourceUnknown();
       if(publicTournamentsCache===null){
         publicTournamentsCache=[];
-        publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
-        render();
+        publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result?.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
+        requestLobbyRender();
       }
       return false;
     }catch(e){
-      console.warn("[lobby reconcile]",reason,e);
-      return false;
+      if(lobbyContextIsCurrent(context)&&revision===publicTournamentsDataRevision)markLobbySourceUnknown();
+      console.warn("[lobby reconcile]",reason,e);return false;
     }finally{
-      publicTournamentsReconcilePromise=null;
-      if(isTournamentLobbyVisible()) schedulePublicTournamentsReconcile();
+      if(lobbyContextIsCurrent(context)){
+        publicTournamentsReconcilePromise=null;
+        if(isTournamentLobbyVisible())schedulePublicTournamentsReconcile();
+      }
     }
   })();
   return publicTournamentsReconcilePromise;
 }
 function startPublicTournamentsRealtime(){
+  const context=captureLobbyContext();
   if(publicTournamentsRealtimeUnsub || publicTournamentsRealtimeStarting || !isTournamentLobbyVisible()) return;
   if(!cloudAvailable() || !window.cloudSync || !window.cloudSync.subscribePublicTournaments){
     schedulePublicTournamentsReconcile(5000);
@@ -5299,16 +5496,17 @@ function startPublicTournamentsRealtime(){
   publicTournamentsRealtimeStarting=true;
   try{
     publicTournamentsRealtimeUnsub=window.cloudSync.subscribePublicTournaments((result)=>{
-      if(!isTournamentLobbyVisible()) return;
+      if(!lobbyContextIsCurrent(context)||!isTournamentLobbyVisible()) return;
       if(result&&result.ok){
-        applyPublicTournamentItems(result.items,{renderIfChanged:true});
+        applyPublicTournamentItems(result.items,{source:result});
       }else if(publicTournamentsCache===null){
         publicTournamentsCache=[];
         publicTournamentsError=PUBLIC_TOURNAMENTS_ERROR_MESSAGES[result&&result.reason]||PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
-        render();
-      }
+        requestLobbyRender();
+      }else{markLobbySourceUnknown();}
     });
   }catch(e){
+    markLobbySourceUnknown();
     console.warn("[lobby realtime subscribe]",e);
     publicTournamentsRealtimeUnsub=null;
   }finally{
@@ -5317,6 +5515,7 @@ function startPublicTournamentsRealtime(){
   }
 }
 function syncPublicTournamentsRealtimeState(){
+  reconcileLobbyContext();
   if(isTournamentLobbyVisible()){
     startPublicTournamentsRealtime();
     schedulePublicTournamentsReconcile();
@@ -5329,7 +5528,7 @@ function queuePublicTournamentsBackgroundRefresh(){
 }
 document.addEventListener("visibilitychange",()=>{
   syncPublicTournamentsRealtimeState();
-  if(!document.hidden && isTournamentLobbyVisible()) reconcilePublicTournamentsNow("foreground");
+  if(!document.hidden && isTournamentLobbyVisible()){requestLobbyRender();reconcilePublicTournamentsNow("foreground");}
 });
 window.addEventListener("focus",()=>{
   if(isTournamentLobbyVisible()) reconcilePublicTournamentsNow("focus");
@@ -14066,14 +14265,16 @@ function renderRegistrationCountdown(code,openAt){
  return `<span class="hint">距離開放時間為台灣時間 ${esc(new Date(at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))} 開放倒數 </span><span class="registration-countdown" data-registration-countdown="${at}" data-urgency="${registrationCountdownUrgency(at)}" data-code="${esc(code)}">${esc(registrationCountdownText(at))}</span>`;
 }
 function tickRegistrationCountdowns(){
- if(document.hidden)return;let expired=false;
+ if(document.hidden)return;
+ tickLobbyRegistrationBoundary();
+ let expired=false;
  document.querySelectorAll('[data-registration-countdown]').forEach(el=>{
   const at=Number(el.getAttribute('data-registration-countdown'));el.textContent=registrationCountdownText(at);el.dataset.urgency=registrationCountdownUrgency(at);
   if(at<=Date.now()&&!el.dataset.expired){el.dataset.expired='true';expired=true;}
  });
  if(!expired)return;
  if(appPhase==='tournament-detail'&&tournamentDetailCode){tournamentDetailLoading=true;render();loadTournamentDetail(tournamentDetailCode);}
- else if(!publicTournamentsLoading){publicTournamentsCache=null;handleAction('refresh-public-tournaments',{getAttribute:()=>null});}
+ else if(isTournamentLobbyVisible()){requestLobbyRender();reconcilePublicTournamentsNow('registration-boundary');}
 }
 setInterval(tickRegistrationCountdowns,1000);
 document.addEventListener('visibilitychange',tickRegistrationCountdowns);
@@ -14197,7 +14398,7 @@ function lobbyMyRegistration(code){
 function lobbySummary(raw){
   const pd = raw.parsedData || {};
   const m = pd.meta || {};
-  const regStatus = getEffectiveRegistrationStatus(raw);
+  const regStatus = lobbyRegistrationStateKnown(raw)?getEffectiveRegistrationStatus(raw):"unknown";
   const authority=raw.eventAuthority||m.eventAuthority||"official";
   const hostName=raw.hostName||raw.createdByName||raw.ownerName||m.hostName||(authority==="official"?"BXH":"玩家主辦");
   return {
@@ -14247,6 +14448,7 @@ function lobbyRegistrationButtons(t, loggedIn){
   if(t.phase==="cancelled" || t.eventCancelled || t.regStatus==="cancelled"){
     return infoButton("查看取消資訊");
   }
+  if(t.regStatus==="unknown")return infoButton("查看資訊（報名狀態待確認）");
   if(t.authority==="community"){
     const quickOpen=isCommunityQuickRegistration(t)&&(t.regStatus==="open"||t.regStatus==="full");
     return infoButton(quickOpen?(t.regStatus==="full"?"查看報名名額":"查看與報名"):"查看賽事資訊");
@@ -14334,7 +14536,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
   ].filter(Boolean);
   const coverUrl=/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/bxh-arena\.firebasestorage\.app\/o\/room-covers%2F[A-Z0-9-]+%2F[a-f0-9-]+\.jpg\?alt=media&token=[a-f0-9-]+$/.test(t.coverUrl||"")?t.coverUrl:"";
   const posterFullUrl=/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/bxh-arena\.firebasestorage\.app\/o\/room-posters%2FBXH-[A-Z0-9-]{4,24}%2F[a-f0-9-]{36}\.(?:jpg|png)\?alt=media&token=[a-f0-9-]{36}$/.test(t.posterUrl||"")?t.posterUrl:"";
-  return `<details class="lobby-compact-card ${authorityClass}" ${expanded?"open":""}>
+  return `<details data-lobby-code="${esc(t.code)}" class="lobby-compact-card ${authorityClass}" ${expanded?"open":""}>
     <summary>
       <div class="lobby-card-with-cover">
       ${coverUrl?`<img class="lobby-poster-cover" src="${esc(coverUrl)}" alt="${esc(t.name)} 海報縮圖" loading="lazy" referrerpolicy="no-referrer">`:""}
@@ -14404,7 +14606,7 @@ function lobbyFilterPanelHtml(){
 function lobbySectionHtml(key,title,count,body,defaultOpen=false){
   const stored=lobbySectionExpanded[key];
   const open=stored===null?defaultOpen:stored===true;
-  return `<section class="panel lobby-section lobby-collapse-section ${open?"is-open":""}">
+  return `<section data-lobby-section="${esc(key)}" class="panel lobby-section lobby-collapse-section ${open?"is-open":""}">
     <button type="button" class="lobby-collapse-toggle" data-action="toggle-lobby-section" data-section="${esc(key)}" aria-expanded="${open?"true":"false"}">
       <span class="lobby-collapse-title">${title} <span class="badge badge-metal">${Number(count||0)}</span></span>
       <span class="lobby-collapse-control">${open?"收合":"展開"} <i aria-hidden="true">${open?"∧":"∨"}</i></span>
@@ -14414,6 +14616,9 @@ function lobbySectionHtml(key,title,count,body,defaultOpen=false){
 }
 
 function renderTournamentLobby(opts={}){
+  return `<div data-lobby-root>${renderTournamentLobbyContent(opts)}</div>`;
+}
+function renderTournamentLobbyContent(opts={}){
   const loggedIn=!!opts.loggedIn;
   if(publicTournamentsCache!==null && typeof queuePublicTournamentsBackgroundRefresh==="function") queuePublicTournamentsBackgroundRefresh();
   if(publicTournamentsCache===null){
@@ -17326,6 +17531,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
+  reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
   if(!communitySettingsDraftContext())communitySettingsRenderedContext=null;
@@ -17361,6 +17567,11 @@ function render(){
   if(appPhase==="admin-success"){ app.innerHTML = renderAdminSuccessScreen(); return; }
   if(appPhase==="watch-connecting"){ app.innerHTML = renderWatchConnectingScreen(); return; }
   if(appPhase==="watch-error"){ app.innerHTML = renderWatchErrorScreen(); return; }
+  if(isTournamentLobbyVisible()){
+    __viewportSnapshot.lobbyPatched=renderStableLobbyScreen(app,appPhase==="guest-lobby"?renderGuestLobbyScreen():renderPlayerCenterScreen());
+    bindAuthInputs();bindDynamicInputs();
+    return;
+  }
   if(appPhase==="guest-lobby"){ app.innerHTML = renderGuestLobbyScreen(); bindAuthInputs(); bindDynamicInputs(); return; }
   if(appPhase==="player-home"){ app.innerHTML = renderPlayerHomeScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-login"){ renderAuthFormPreservingInputs(app,renderPlayerLoginScreen(),appPhase); return; }
@@ -17384,7 +17595,10 @@ function render(){
     bindPlayerCardInputs();
     renderPlayerCardOverlay();
     bindOnsiteWaitlistPanel();
-    finishRenderViewport(__viewportSnapshot);
+    if(__viewportSnapshot.lobbyPatched){
+      __lastRenderedViewportKey=__viewportSnapshot.key;
+      ++__viewportRestoreToken; // Cancel old delayed restores; stable nodes keep their own viewport.
+    }else finishRenderViewport(__viewportSnapshot);
     setTimeout(positionAccountMenuOverlay,0);
   }
 }
@@ -18436,7 +18650,7 @@ function bindAuthInputs(){
       }
     });
     const joinCodeInput = document.getElementById("cloud-join-code-input");
-    if(joinCodeInput){
+    if(joinCodeInput&&shouldBindLobbyInput(joinCodeInput,"join")){
       // "Enter" on a physical keyboard, or the "Go"/"前往" action on a mobile
       // keyboard (which also fires a regular Enter keydown for a plain text
       // input in every major mobile browser, including LINE's in-app one),
@@ -18449,7 +18663,7 @@ function bindAuthInputs(){
       });
     }
     const switchCodeInput = document.getElementById("switch-tournament-code-input");
-    if(switchCodeInput){
+    if(switchCodeInput&&shouldBindLobbyInput(switchCodeInput,"switch")){
       switchCodeInput.addEventListener("keydown", (e)=>{
         if(e.key==="Enter"){
           e.preventDefault();
@@ -18827,7 +19041,7 @@ function bindDynamicInputs(){
   }catch(e){ /* no-op outside a real browser DOM */ }
 
   const modalConfirmBtn = document.getElementById("modal-confirm-btn");
-  if(modalConfirmBtn){
+  if(modalConfirmBtn&&shouldBindLobbyInput(modalConfirmBtn,"confirm")){
     modalConfirmBtn.addEventListener("click", (ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
@@ -18835,7 +19049,7 @@ function bindDynamicInputs(){
     });
   }
   const modalCancelBtn = document.getElementById("modal-cancel-btn");
-  if(modalCancelBtn){
+  if(modalCancelBtn&&shouldBindLobbyInput(modalCancelBtn,"cancel")){
     modalCancelBtn.addEventListener("click", (ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
@@ -20165,40 +20379,41 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="load-my-registrations"){
-    if(myRegistrationsLoading) return;
-    myRegistrationsLoading = true;
-    myRegistrationsError = null;
-    render();
-    (async ()=>{
+    reconcileLobbyContext();
+    if(myRegistrationsLoading)return;
+    const owner=lobbyAuthKey(),request=++myRegistrationsRequest;
+    const current=()=>owner===lobbyAuthKey()&&request===myRegistrationsRequest;
+    const refresh=()=>{if(isTournamentLobbyVisible())requestLobbyRender();else render();};
+    myRegistrationsLoading=true;myRegistrationsError=null;refresh();
+    (async()=>{
       try{
-        if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
-        if(!cloudAvailable() || !window.cloudSync.queryMyRegistrations){
-          myRegistrationsCache = []; myRegistrationsError = PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network;
-          myRegistrationsLoading = false; render(); return;
-        }
-        const regs = await window.cloudSync.queryMyRegistrations();
-        // 批次補上顯示用的賽事資訊（name/date/tournamentPhase），來源是
-        // publicTournaments（公開安全欄位），不會讀到私人資料。
-        const uniqueCodes = [...new Set(regs.map(r=>r.tournamentCode))];
-        for(const code of uniqueCodes){
+        if(window.cloudSync?.connect)await window.cloudSync.connect();
+        if(!current())return;
+        if(!cloudAvailable()||!window.cloudSync?.queryMyRegistrations)throw new Error(PUBLIC_TOURNAMENTS_ERROR_MESSAGES.network);
+        const regs=await window.cloudSync.queryMyRegistrations();
+        if(!current())return;
+        const infoByCode={};
+        for(const code of [...new Set(regs.map(r=>r.tournamentCode))]){
           try{
-            const info = await window.cloudSync.getPublicTournamentSummary(code);
-            if(info) myRegistrationsTournamentInfo[code] = info;
-          }catch(e){ /* best-effort display info only, never blocks the list itself */ }
+            const info=await window.cloudSync.getPublicTournamentSummary(code);
+            if(!current())return;
+            if(info)infoByCode[code]=info;
+          }catch(e){if(!current())return;}
         }
-        myRegistrationsCache = regs;
-        myRegistrationsError = null;
+        if(!current())return;
+        myRegistrationsTournamentInfo=infoByCode;myRegistrationsCache=regs;myRegistrationsError=null;
       }catch(e){
-        myRegistrationsCache = [];
-        myRegistrationsError = mapRegistrationError(e);
+        if(current()){myRegistrationsCache=[];myRegistrationsError=mapRegistrationError(e);}
+      }finally{
+        if(current()){myRegistrationsLoading=false;refresh();}
       }
-      myRegistrationsLoading = false;
-      render();
     })();
     return;
   }
   if(action==="load-public-tournaments" || action==="refresh-public-tournaments"){
+    const context=captureLobbyContext();
     if(publicTournamentsLoading) return;
+    const refresh=()=>{if(isTournamentLobbyVisible())requestLobbyRender();else render();};
     if(action==="load-public-tournaments" && publicTournamentsCache===null && window.BXHLobbyFastCache){
       try{
         const cached=window.BXHLobbyFastCache.read();
@@ -20207,8 +20422,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           publicTournamentsLastSignature=publicTournamentListSignature(cached.items);
           publicTournamentsLastRefreshAt=cached.savedAt||Date.now();
           publicTournamentsError=null;
-          if(typeof renderPreservingScroll==="function") renderPreservingScroll();
-          else render();
+          publicTournamentsFreshness="unknown";
+          refresh();
         }
       }catch(e){}
     }
@@ -20216,15 +20431,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     publicTournamentsLastRefreshAt=Date.now();
     publicTournamentsLoading=true;
     publicTournamentsError=null;
-    if(initialLoad) render();
+    refresh();
+    const revision=publicTournamentsDataRevision;
     (async ()=>{
       let changed=false;
       try{
         if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
+        if(!lobbyContextIsCurrent(context))return;
         if(cloudAvailable()&&window.cloudSync.queryPublicTournaments){
           const result=await window.cloudSync.queryPublicTournaments();
+          if(!lobbyContextIsCurrent(context)||revision!==publicTournamentsDataRevision)return;
           if(result.ok){
-            changed=applyPublicTournamentItems(result.items,{renderIfChanged:false});
+            changed=applyPublicTournamentItems(result.items,{renderIfChanged:false,source:result});
+          }else if(!initialLoad){markLobbySourceUnknown();
           }else if(initialLoad){
             publicTournamentsCache=[];
             publicTournamentsLastSignature=publicTournamentListSignature([]);
@@ -20238,6 +20457,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           changed=true;
         }
       }catch(e){
+        if(!lobbyContextIsCurrent(context)||revision!==publicTournamentsDataRevision)return;
+        markLobbySourceUnknown();
         console.warn("[load public tournaments]",e);
         if(initialLoad){
           publicTournamentsCache=[];
@@ -20246,12 +20467,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           changed=true;
         }
       }finally{
+        if(!lobbyContextIsCurrent(context))return;
         publicTournamentsLoading=false;
         publicTournamentsLastRefreshAt=Date.now();
-        if(initialLoad||changed){
-          if(typeof renderPreservingScroll==="function") renderPreservingScroll();
-          else render();
-        }
+        refresh();
         syncPublicTournamentsRealtimeState();
         schedulePublicTournamentsReconcile();
       }
@@ -20405,7 +20624,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!window.cloudSync || !window.cloudSync.joinTournamentAsPlayer) throw {code:"network"};
         const result=await window.cloudSync.joinTournamentAsPlayer(code,true);
         showToast(result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
-        publicTournamentsCache=null; myRegistrationsCache=null; render();
+        publicTournamentsCache=null; invalidateMyRegistrationsCache(); render();
       }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }
     })();
     return;
@@ -20442,7 +20661,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!confirm("確認送出「"+teamName+"」？\n\n本場："+size+"V"+size+"\n隊員："+members.join("、")+"\n預計狀態："+statusText+"\n\n送出後，本場出場順序仍會在每次對戰前另外提交。")){tournamentDetailBusy=false;target.disabled=false;return;}
         const result=await window.engagementService.teamRegistration({action:"join",code,teamName,members,operationId:crypto.randomUUID()});
         showToast(result.status==="confirmed"?"隊伍報名成功（正取）":"隊伍報名成功（備取）");
-        publicTournamentsCache=null;myRegistrationsCache=null;
+        publicTournamentsCache=null;invalidateMyRegistrationsCache();
       if(remote.data.onsiteWaitlistFinalized===true){peopleRosterSection="bracket";render();}tournamentDetailBusy=false;
         await loadTournamentDetail(code);
       }catch(e){
@@ -20465,7 +20684,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           if(!window.engagementService?.teamRegistration)throw {code:"network"};
           await window.engagementService.teamRegistration({action:"cancel",code,operationId:crypto.randomUUID()});
           showToast("已取消整隊報名");
-          publicTournamentsCache=null;myRegistrationsCache=null;
+          publicTournamentsCache=null;invalidateMyRegistrationsCache();
       if(remote.data.onsiteWaitlistFinalized===true){peopleRosterSection="bracket";render();}tournamentDetailBusy=false;
           await loadTournamentDetail(code);
         }catch(e){tournamentDetailBusy=false;showToast(mapRegistrationError(e),true);render();}
@@ -20495,7 +20714,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         pendingRegistrationCode = null;
         clearRegistrationParamFromUrl();
         publicTournamentsCache = null; // force refresh of the public list
-        myRegistrationsCache = null; // force refresh of 已報名 tab
+        invalidateMyRegistrationsCache(); // force refresh of 已報名 tab
         tournamentDetailBusy = false;
         await loadTournamentDetail(code);
         setTimeout(()=>{
@@ -20528,7 +20747,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           const result=await window.cloudSync.cancelRegistrationAsPlayer(code);
           showToast(result?.autoPromoted?"已取消報名；備取已自動遞補":"已取消報名");
           publicTournamentsCache = null;
-          myRegistrationsCache = null;
+          invalidateMyRegistrationsCache();
           tournamentDetailBusy = false;
           if(appPhase==="tournament-detail" && tournamentDetailCode===code){
             await loadTournamentDetail(code);
@@ -20661,7 +20880,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
       userProfile=Object.assign({},userProfile,result.profile||{});
       playerProfileEditOpen=false;
-      publicTournamentsCache=null; myRegistrationsCache=null;
+      publicTournamentsCache=null; invalidateMyRegistrationsCache();
       engagementRequestGeneration++;engagementLoading=false;engagementSnapshot=null;requestEngagementSnapshot(true);
       showToast(oldRealName!==realName?"資料已更新；本名修改後需重新由後台確認":"會員資料已更新");
       render();
@@ -20724,7 +20943,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     // here so entering player mode always re-fetches fresh.
     publicTournamentsCache = null;
     publicTournamentsError = null;
-    myRegistrationsCache = null; // same staleness bug applies to the 已報名 tab's data
+    invalidateMyRegistrationsCache(); // same staleness bug applies to the 已報名 tab's data
     myRegistrationsError = null;
     (async ()=>{
       await saveActiveMode("player");
@@ -23601,6 +23820,7 @@ document.addEventListener("click", (e)=>{
   const target = e.target.closest("[data-action]");
   if(!target) return;
   const action = target.getAttribute("data-action");
+  if(target.getAttribute("data-lobby-blocked")==="true"){e.preventDefault();return;}
   if(action==="open-match"){
     const matchId=target.getAttribute("data-id")||"";
     if(matchId && matchId===bracketCorrectionSuppressClickId && Date.now()<bracketCorrectionSuppressClickUntil){
@@ -23756,6 +23976,7 @@ async function init(){
           async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
             if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
+            lobbyAuthEpoch++;
             if(typeof invalidateCommunityRoomSnapshotContext==="function")invalidateCommunityRoomSnapshotContext();
             const communityRoomAuthContext=captureCommunityRoomStateContext(fbUser&&fbUser.uid);
             if(typeof stopAdminRosterWatch==="function") stopAdminRosterWatch();
