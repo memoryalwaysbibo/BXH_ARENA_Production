@@ -14,6 +14,7 @@ const suites = {
     { name: 'hunter Phase 2 opponent-strength candidate behavior', args: ['--test', 'tests/hunter-phase2-strength-candidate.test.cjs'] },
     { name: 'hunter Phase 2 prematch rating snapshot trust boundary', args: ['--test', 'tests/hunter-phase2-prematch-snapshot.test.cjs'] },
     { name: 'hunter Phase 2 server rating provider v0', args: ['--test', 'tests/hunter-phase2-rating-provider.test.cjs'] },
+    { name: 'hunter Phase 2 rating ledger deterministic replay', args: ['--test', 'tests/hunter-phase2-rating-ledger.test.cjs'] },
     { name: 'hunter B4 sample maturity and comparable recent windows', args: ['--test', 'tests/hunter-b4-trends.test.cjs'] },
     { name: 'hunter B3 radar denominator, scale and inline evidence', args: ['--test', 'tests/hunter-b3-radar.test.cjs'] },
     { name: 'hunter B2 source categories and enchantment base scoring', args: ['--test', 'tests/hunter-b2-modes.test.cjs'] },
