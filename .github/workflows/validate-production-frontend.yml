@@ -158,7 +158,7 @@ jobs:
       - name: Verify management list loading and stale responses
         run: node --test tests/management-loading.test.cjs
       - name: Verify roster mutation and snapshot races
-        run: node --test tests/roster-sync-race.test.cjs
+        run: node --test tests/roster-sync-race.test.cjs tests/auto-fill-switch-ui.test.cjs
       - name: Verify community quick registration and cloud contract
         run: node --test tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/community-host-roster-sync.test.cjs tests/community-summary-fixture.test.cjs tests/community-client-cleanup-disabled.test.cjs
       - name: Verify family roster check-in preservation

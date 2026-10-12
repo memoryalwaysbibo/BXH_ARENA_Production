@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    { name: "shared automatic waitlist switch, permissions and save isolation", args: ["--test", "tests/auto-fill-switch-ui.test.cjs"] },
     { name: "stable lobby updates, identity and callback isolation", args: ["--test", "tests/lobby-stable-updates.test.cjs"] },
     {name:'Hunter Clash final rehydration, revocation and legacy isolation',args:['--test','tests/hunter-clash-final-check.test.cjs']},
     {name:'Hunter Clash PK badge settlement, quotas and revocation',args:['--test','tests/hunter-pk-achievements.test.cjs']},

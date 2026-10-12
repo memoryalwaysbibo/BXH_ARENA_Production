@@ -20,7 +20,7 @@ assert(saveStart>=0&&saveEnd>saveStart,'Missing community settings action seam')
 const manualStart=core.indexOf('  if(action==="load-online-roster"){'),manualEnd=core.indexOf('  if(action==="close-checkin-early"){',manualStart);
 const watchStart=core.indexOf('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;'),watchEnd=core.indexOf('let myRegistrationsError = null;',watchStart);
 const action='function handleFixtureAction(action,target){if(action==="people-section"){peopleRosterSection=target.dataset.section;render();return;}'+core.slice(saveStart,saveEnd)+core.slice(manualStart,manualEnd)+'}';
-const rosterSource=core.slice(watchStart,watchEnd)+'\n'+['canManageOnsiteWaitlist','peopleOnsiteWaitlistManaged','peopleOnsiteWaitlistAvailable','hasAdminAccess','isCommunityRoom','isTester','syncLatestOnlineRosterBeforeLock','peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','renderPeopleManagement'].map(fn).join('\n');
+const rosterSource=core.slice(watchStart,watchEnd)+'\n'+['canManageOnsiteWaitlist','peopleOnsiteWaitlistManaged','peopleOnsiteWaitlistAvailable','hasAdminAccess','isCommunityRoom','isTester','syncLatestOnlineRosterBeforeLock','peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','peopleAutoFillOperationIsCurrent','peopleAutoFillControlState','renderPeopleAutoFillControl','renderPeopleManagement'].map(fn).join('\n');
 const state={id:'fixture-room',cloudCode:'LOCAL-ONLY',ownerUid:'fixture-user',createdBy:'fixture-user',players:[],matches:[],startedAt:null,archiveStatus:'ongoing',meta:{name:'一般玩家的房間',date:'2026-10-05',location:'玩家即時對戰',startTime:'10:00',formatType:'single',format:'單淘汰賽',stations:1,eventAuthority:'community',ladderMode:'general',registrationEnabled:false,registrationStatus:'closed',registrationCapacity:16,waitlistCapacity:2,roomAccessMode:'public'}};
 const bootstrap=`
 window.fixture={state:${JSON.stringify(state)},cloud:null,local:null,saves:0,fail:false,toasts:[],screen:'settings'};
@@ -30,7 +30,7 @@ let state=fixture.state,communitySettingsSaving=false,communitySettingsWriteGate
 let publicTournamentsCache=[],communityEventsCache=[],myRegistrationsCache=[];
 let communitySettingsRenderedContext=null,communityRoomSnapshotGeneration=0;
 let appPhase='community-room',communityRoomActiveTab='settings',activeTab='live',peopleRosterSection='confirmed',peopleRosterBusy=false;
-let adminRegistrationsCache=null,adminRegistrationsLoading=false,adminRegistrationsError=null;
+let adminRegistrationsCache=null,adminRegistrationsLoading=false,adminRegistrationsError=null,adminRegistrationsBusy=false,peopleAutoFillOperation=null;
 const resetAdminRegistrationsCache=()=>{adminRegistrationsCache=null;adminRegistrationsError=null;};
 const participantDisplayName=p=>p.name,BATTLE_MODE_LABELS={individual:'個人戰'},entryRosterValid=()=>true,renderEntrySelection=()=>'',renderStaffAssignmentPanel=()=>'',renderRefereeStationAssignmentPanel=()=>'';
 const isOwnTestTournament=()=>false,bracketRosterIsCurrent=()=>true,mapRegistrationError=e=>e.message||'讀取失敗';
