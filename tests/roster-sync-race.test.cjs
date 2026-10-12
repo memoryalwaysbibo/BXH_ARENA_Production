@@ -76,11 +76,12 @@ test('atomic cancel and fill patches both registration statuses without clearing
 });
 test('per-room switch sends a boolean and waits for committed state',async()=>{
  let sent,applied;
- const sandbox={state:{cloudCode:'BXH-X',meta:{}},peopleRosterBusy:false,render(){},showToast(){},
- window:{cloudSync:{configureAutoFill:async(code,enabled)=>{sent={code,enabled};return {ok:true,enabled,state:{meta:{registrationAutoFillEnabled:enabled}}};}}},
+ const sandbox={state:{id:'room',cloudCode:'BXH-X',meta:{}},firebaseUser:{uid:'admin'},peopleRosterBusy:false,adminRegistrationsBusy:false,render(){},showToast(){},
+ peopleOnsiteWaitlistManaged:()=>false,canManageOnsiteWaitlist:()=>true,peopleRosterMutationLocked:()=>false,peopleRegistrationSelectionManaged:()=>false,
+ window:{cloudSync:{configureAutoFill:async(code,enabled)=>{sent={code,enabled};return {ok:true,enabled,state:{id:'room',cloudCode:code,meta:{registrationAutoFillEnabled:enabled}}};}}},
  peopleApplyCloudRosterResult:async(result)=>{applied=result;sandbox.state=result.state;sandbox.peopleRosterBusy=false;},peopleMutationErrorMessage:e=>e.message};
  vm.createContext(sandbox);
- vm.runInContext(block(core,'async function peopleToggleAutoFill(','async function peoplePromoteLocal('),sandbox);
+ vm.runInContext(block(core,'let peopleAutoFillOperation=null;','async function peoplePromoteLocal('),sandbox);
  await sandbox.peopleToggleAutoFill();assert.equal(sent.enabled,true);assert.equal(applied.enabled,true);
  sandbox.state.cloudCode='BXH-X';await sandbox.peopleToggleAutoFill();assert.equal(sent.enabled,false);
 });
