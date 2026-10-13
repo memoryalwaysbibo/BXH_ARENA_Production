@@ -16237,7 +16237,7 @@ async function resolveHunterOpponentIdentities(records){
             const publicPlayerId=String(result.card&&result.card.playerId||"").trim();
             value=publicPlayerId
               ? {scope:"cross-event",playerId:publicPlayerId,source:"public-card"}
-              : {scope:"event-only",playerId:null,source:"event-local"};
+              : {scope:"event-only",playerId:null,source:"event-local",reason:result.card?"missing-player-id":"card-unavailable"};
           }
         }catch(e){
           value={scope:"unresolved",playerId:null,source:"event-card-error"};
@@ -16268,6 +16268,21 @@ function hunterOpponentIdentityText(record){
   if(identity.scope==="loading") return "正在辨識公開玩家身分";
   if(identity.scope==="unresolved") return "本次辨識失敗｜重新整理可重試";
   return "僅本場識別";
+}
+function hunterH2HExclusionReason(record){
+  const identity=hunterOpponentIdentityValue(record);
+  if(identity.scope==="cross-event"&&identity.playerId) return "";
+  if(identity.scope==="loading") return "正在核對對手身分，H2H 將於辨識完成後更新。";
+  if(identity.scope==="unresolved") return "本次對手身分查詢失敗；可重新整理重試。";
+  if(!hunterOpponentIdentityRef(record)) return "本場缺少對手的賽事或選手識別資料。";
+  if(identity.reason==="card-unavailable") return "目前名片查詢未提供跨賽事身分（名片未公開或目前無法查看）；不代表對手沒有帳號。";
+  if(identity.reason==="missing-player-id") return "已取得對手名片，但缺少跨賽事玩家編號。";
+  return "尚未取得可確認的跨賽事對手身分。";
+}
+function hunterH2HExclusionNote(record){
+  const identity=hunterOpponentIdentityValue(record),reason=hunterH2HExclusionReason(record);
+  if(!reason) return "";
+  return '<div class="hunter-record-warning">'+(identity.scope==="loading"?'H2H 辨識中：':'本場未納入 H2H：')+esc(reason)+' 本場勝敗與可信比分仍保留於對戰紀錄。</div>';
 }
 function hunterOpponentCardButton(record){
   const code=String(record&&record.eventCode||"");
@@ -16487,6 +16502,7 @@ function hunterRecordCardHtml(r){
   return '<article class="hunter-record-card">'+
     '<div class="hunter-record-card-head"><div class="hunter-record-event"><strong>'+esc(r.eventName||r.eventCode||"BXH 賽事")+'</strong><small>'+esc(r.eventDate||"日期未記錄")+'｜'+esc(typeLabel)+'</small></div><span class="hunter-record-result '+resultClass+'">'+resultText+'</span></div>'+
     '<div class="hunter-record-score-row"><div class="hunter-record-opponent">VS <b>'+esc(opp)+'</b>'+hunterOpponentIdentityChip(r)+'</div><div class="hunter-record-score">'+esc(score)+'</div></div>'+
+    hunterH2HExclusionNote(r)+
     '<div class="hunter-record-meta">'+esc(roundLabel+station+(r.eventCode?"｜"+r.eventCode:""))+'</div>'+
     (rounds?'<div class="hunter-round-strip">'+rounds+'</div>':'<div class="hunter-record-warning">'+(r.resultMethod==="quick_decision"?"判定模式｜不納入回合能力分析":r.analyzable===true?"本場沒有可分析的逐回合資料":"Round 資料未通過完整性驗證｜不納入能力分析")+'</div>')+
     hunterRecordDetailHtml(r)+

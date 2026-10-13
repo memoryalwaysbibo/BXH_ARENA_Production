@@ -9,7 +9,7 @@ function setup(){
     hunterH2HQuery:'',hunterH2HSort:'matches-desc'});
   for(const file of ['domain-utils','hunter-utils'])vm.runInContext(fs.readFileSync(path.join(root,'modules/main-app/'+file+'.js'),'utf8'),c);
   Object.assign(c,c.window.BXHHunterUtils);
-  for(const name of ['hunterOpponentIdentityValue','hunterApplyOpponentIdentity','resolveHunterOpponentIdentities','hunterBuildH2H','hunterH2HDirectoryView','hunterH2HPanelHtml']){
+  for(const name of ['hunterOpponentIdentityValue','hunterApplyOpponentIdentity','resolveHunterOpponentIdentities','hunterH2HExclusionReason','hunterH2HExclusionNote','hunterBuildH2H','hunterH2HDirectoryView','hunterH2HPanelHtml']){
     const start=core.indexOf((name.startsWith('resolve')?'async ':'')+'function '+name+'(');
     assert(start>=0,name);
     const next=core.slice(start+1).search(/\n(?:async )?function /);
@@ -66,4 +66,26 @@ test('stale identity responses cannot apply after refresh or account change',asy
     finish({ok:true,card:{playerId:'STALE'}});await pending;
     assert.equal(c.hunterOpponentIdentityCache.size,0);assert.equal(rows[0].opponentIdentity.playerId,null);
   }
+});
+test('successful lookup distinguishes unavailable card from a card missing stable identity',async()=>{
+  for(const [result,reason] of [[{ok:true,card:null},'card-unavailable'],[{ok:true,card:{name:'對手'}},'missing-player-id']]){
+    const c=setup(),rows=[record({opponent:{localPlayerId:'1'}})];
+    c.window.engagementService={playerCard:async()=>result};await c.resolveHunterOpponentIdentities(rows);
+    assert.equal(rows[0].opponentIdentity.reason,reason);
+    assert.equal(c.hunterBuildH2H(rows).excluded,1);
+    assert.equal(c.hunterCareerSummary(rows).matches,1);
+    assert.equal(c.hunterCareerSummary(rows).wins,1);
+    assert(c.hunterH2HExclusionNote(rows[0]).includes('本場勝敗與可信比分仍保留'));
+  }
+});
+test('exclusion notes explain only known reasons; stable identity has no exclusion and loading is pending',()=>{
+  const c=setup();assert.equal(c.hunterH2HExclusionNote(record()),'');
+  const r=scope=>record({opponent:{localPlayerId:'1'},opponentIdentity:{scope,playerId:null}});
+  assert(c.hunterH2HExclusionNote(r('unresolved')).includes('查詢失敗'));
+  assert(c.hunterH2HExclusionNote(r('loading')).includes('H2H 辨識中：'));
+  assert(!c.hunterH2HExclusionNote(r('loading')).includes('本場未納入'));
+  assert(c.hunterH2HExclusionReason(record({opponent:{}})).includes('缺少對手的賽事或選手識別資料'));
+  assert(!c.hunterH2HExclusionReason(r('event-only')).includes('名片未公開'));
+  const hidden=r('event-only');hidden.opponentIdentity.reason='card-unavailable';
+  assert(c.hunterH2HExclusionReason(hidden).includes('不代表對手沒有帳號'));
 });
