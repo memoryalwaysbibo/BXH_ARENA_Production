@@ -95,7 +95,7 @@ test('backend match identity takes priority over public cards and direct public 
   await c.resolveHunterOpponentIdentities(rows);assert.equal(calls,2);
   const h=c.hunterBuildH2H(rows);assert.equal(h.list.length,1);assert.equal(h.list[0].matches,2);
   assert.equal(h.list[0].publicPlayerId,null);
-  assert(!c.hunterOpponentIdentityChip(rows[0]).includes(key));assert(c.hunterOpponentIdentityText(rows[0]).includes('確認帳號身分'));
+  assert(!c.hunterOpponentIdentityChip(rows[0]).includes(key));assert(c.hunterOpponentIdentityText(rows[0]).includes('確認玩家身分'));
   c.hunterH2HQuery=key;assert.equal(c.hunterH2HDirectoryView(h).length,0);
   c.hunterH2HQuery='';c.hunterH2HSelectedKey=key;assert.equal(c.hunterH2HDirectoryView(h).length,1);
 });

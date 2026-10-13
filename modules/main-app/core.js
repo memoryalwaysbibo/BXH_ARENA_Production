@@ -16269,7 +16269,7 @@ async function resolveHunterOpponentIdentities(records){
 }
 function hunterOpponentIdentityChip(record){
   const identity=hunterOpponentIdentityValue(record);
-  if(identity.scope==="cross-event"&&identity.source==="verified-match") return '<span class="hunter-opponent-identity stable">帳號身分已確認</span>';
+  if(identity.scope==="cross-event"&&identity.source==="verified-match") return '<span class="hunter-opponent-identity stable">玩家身分已確認</span>';
   if(identity.scope==="cross-event") return '<span class="hunter-opponent-identity stable">玩家 '+esc(identity.playerId)+'</span>';
   if(identity.scope==="loading") return '<span class="hunter-opponent-identity loading">辨識中…</span>';
   if(identity.scope==="unresolved") return '<span class="hunter-opponent-identity unresolved">辨識失敗</span>';
@@ -16277,7 +16277,7 @@ function hunterOpponentIdentityChip(record){
 }
 function hunterOpponentIdentityText(record){
   const identity=hunterOpponentIdentityValue(record);
-  if(identity.scope==="cross-event"&&identity.source==="verified-match") return "已由本場參賽紀錄確認帳號身分";
+  if(identity.scope==="cross-event"&&identity.source==="verified-match") return "已由本場參賽紀錄確認玩家身分";
   if(identity.scope==="cross-event") return "跨賽事可識別｜"+identity.playerId;
   if(identity.scope==="loading") return "正在辨識公開玩家身分";
   if(identity.scope==="unresolved") return "本次辨識失敗｜重新整理可重試";
@@ -16291,7 +16291,7 @@ function hunterH2HExclusionReason(record){
   if(!hunterOpponentIdentityRef(record)) return "本場缺少對手的賽事或選手識別資料。";
   if(identity.reason==="card-unavailable") return "目前名片查詢未提供跨賽事身分（名片未公開或目前無法查看）；不代表對手沒有帳號。";
   if(identity.reason==="missing-player-id") return "已取得對手名片，但缺少跨賽事玩家編號。";
-  const backendReasons={"event-not-found":"後台未找到這場賽事。","invalid-event-state":"後台賽事資料無法解析。","match-not-found":"後台未找到可唯一確認的本場對戰。","match-not-completed":"本場尚未完成或不是有效雙人對戰。","ambiguous-participant":"本場選手身分有重複或缺漏，尚待核對。","no-account-link":"本場對手未有已確認的帳號關聯。","ambiguous-account-link":"本場對手的帳號關聯資料互相衝突。","family-identity-pending":"兒童或家庭參賽身分尚未完成獨立帳號關聯核對。","account-unavailable":"對手帳號不存在、已停用或不符合正式統計資格。"};
+  const backendReasons={"event-not-found":"後台未找到這場賽事。","invalid-event-state":"後台賽事資料無法解析。","match-not-found":"後台未找到可唯一確認的本場對戰。","match-not-completed":"本場尚未完成或不是有效雙人對戰。","ambiguous-participant":"本場選手身分有重複或缺漏，尚待核對。","no-account-link":"本場對手未有已確認的帳號關聯。","ambiguous-account-link":"本場對手的帳號關聯資料互相衝突。","family-identity-pending":"兒童或家庭玩家的獨立身分資料尚待後台核對。","account-unavailable":"對手帳號不存在、已停用或不符合正式統計資格。"};
   if(identity.source==="verified-match"&&backendReasons[identity.reason]) return backendReasons[identity.reason];
   return "尚未取得可確認的跨賽事對手身分。";
 }
@@ -16396,7 +16396,7 @@ function hunterH2HItemHtml(group){
   const netText=group.scoredMatches?((group.net>0?"+":"")+group.net):"—";
   const scoreText=group.scoredMatches?(group.totalFor+" / "+group.totalAgainst):"—";
   const latest=group.latestRecord||group.records[0]||null;
-  return '<details class="hunter-h2h-item"><summary><div class="hunter-h2h-name"><strong>'+esc(group.name)+'</strong><small>'+(group.publicPlayerId?'玩家 '+esc(group.publicPlayerId):'帳號身分已確認')+'｜交手 '+group.matches+' 場</small></div><div class="hunter-h2h-summary"><b>'+group.winRate+'%</b><span>'+group.wins+' 勝 '+group.losses+' 敗</span></div></summary>'+
+  return '<details class="hunter-h2h-item"><summary><div class="hunter-h2h-name"><strong>'+esc(group.name)+'</strong><small>'+(group.publicPlayerId?'玩家 '+esc(group.publicPlayerId):'玩家身分已確認')+'｜交手 '+group.matches+' 場</small></div><div class="hunter-h2h-summary"><b>'+group.winRate+'%</b><span>'+group.wins+' 勝 '+group.losses+' 敗</span></div></summary>'+
     '<div class="hunter-h2h-body"><div class="hunter-h2h-grid"><div><span>交手</span><b>'+group.matches+' 場</b></div><div><span>勝敗</span><b>'+group.wins+'W / '+group.losses+'L</b></div><div><span>得失分</span><b>'+esc(scoreText)+'</b></div><div><span>淨得失分</span><b>'+esc(netText)+'</b></div></div>'+
     '<div class="hunter-evidence-meta">最近 5 場</div><div class="hunter-h2h-recent">'+recent.map(r=>'<span class="hunter-h2h-result '+(r.isWin?"win":"loss")+'" title="'+esc((r.eventDate||"")+" "+(r.eventName||r.eventCode||""))+'">'+(r.isWin?"W":"L")+'</span>').join('')+'</div>'+
     hunterOpponentAnalysisHtml(group)+
