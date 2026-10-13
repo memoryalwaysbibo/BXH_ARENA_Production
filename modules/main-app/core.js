@@ -14872,6 +14872,7 @@ let hunterOpponentIdentityLoading = false;
 let hunterOpponentIdentityGeneration = 0;
 const hunterOpponentIdentityCache = new Map();
 let hunterH2HQuery = "";
+let hunterH2HSelectedKey = "";
 let hunterH2HSort = "matches-desc"; // matches-desc | recent-desc | name-asc
 // Tournament detail screen state (Phase 3)
 let tournamentDetailCode = null;
@@ -16191,7 +16192,7 @@ function hunterAnalysisStatHtml(bucket,type,perspective="for",metric="points"){
 function hunterOpponentIdentityValue(record){
   if(record&&record.opponentIdentity&&record.opponentIdentity.scope) return record.opponentIdentity;
   const direct=String(record&&record.opponent&&record.opponent.playerId||"").trim();
-  if(direct) return {scope:"cross-event",playerId:direct,source:"match-record"};
+  if(direct&&typeof window.engagementService?.hunterOpponentIdentity!=="function") return {scope:"cross-event",playerId:direct,source:"match-record"};
   const ref=hunterOpponentIdentityRef(record);
   if(ref&&hunterOpponentIdentityCache.has(ref)) return hunterOpponentIdentityCache.get(ref);
   if(ref&&hunterOpponentIdentityLoading) return {scope:"loading",playerId:null,source:"event-card"};
@@ -16203,14 +16204,15 @@ function hunterApplyOpponentIdentity(records,ref,value){
   });
 }
 async function resolveHunterOpponentIdentities(records){
-  if(hunterOpponentIdentityLoading || !window.engagementService?.playerCard) return;
+  const backend=typeof window.engagementService?.hunterOpponentIdentity==="function";
+  if(hunterOpponentIdentityLoading || (!backend&&!window.engagementService?.playerCard)) return;
   const rows=Array.isArray(records)?records:[];
   const pending=new Map();
   rows.forEach(record=>{
     const direct=String(record&&record.opponent&&record.opponent.playerId||"").trim();
     const ref=hunterOpponentIdentityRef(record);
     if(!ref) return;
-    if(direct){
+    if(direct&&!backend){
       const value={scope:"cross-event",playerId:direct,source:"match-record"};
       hunterOpponentIdentityCache.set(ref,value);hunterApplyOpponentIdentity(rows,ref,value);return;
     }
@@ -16232,12 +16234,22 @@ async function resolveHunterOpponentIdentities(records){
         try{
           const code=String(record.eventCode||"").toUpperCase();
           const localId=String(record.opponent&&record.opponent.localPlayerId||"");
-          const result=await window.engagementService.playerCard({action:"event-card",code,playerId:localId});
+          const result=backend
+            ? await window.engagementService.hunterOpponentIdentity({code,matchId:record.matchId,opponentLocalPlayerId:localId})
+            : await window.engagementService.playerCard({action:"event-card",code,playerId:localId});
           if(result&&result.ok){
+            if(backend){
+              if(result.scope==="cross-event"&&/^H2H_[a-f0-9]{64}$/.test(result.opponentKey||"")){
+                value={scope:"cross-event",playerId:result.opponentKey,source:"verified-match"};
+              }else if(result.scope==="event-only"&&typeof result.reason==="string"){
+                value={scope:"event-only",playerId:null,source:"verified-match",reason:result.reason};
+              }
+            }else{
             const publicPlayerId=String(result.card&&result.card.playerId||"").trim();
             value=publicPlayerId
               ? {scope:"cross-event",playerId:publicPlayerId,source:"public-card"}
               : {scope:"event-only",playerId:null,source:"event-local",reason:result.card?"missing-player-id":"card-unavailable"};
+            }
           }
         }catch(e){
           value={scope:"unresolved",playerId:null,source:"event-card-error"};
@@ -16257,6 +16269,7 @@ async function resolveHunterOpponentIdentities(records){
 }
 function hunterOpponentIdentityChip(record){
   const identity=hunterOpponentIdentityValue(record);
+  if(identity.scope==="cross-event"&&identity.source==="verified-match") return '<span class="hunter-opponent-identity stable">帳號身分已確認</span>';
   if(identity.scope==="cross-event") return '<span class="hunter-opponent-identity stable">玩家 '+esc(identity.playerId)+'</span>';
   if(identity.scope==="loading") return '<span class="hunter-opponent-identity loading">辨識中…</span>';
   if(identity.scope==="unresolved") return '<span class="hunter-opponent-identity unresolved">辨識失敗</span>';
@@ -16264,6 +16277,7 @@ function hunterOpponentIdentityChip(record){
 }
 function hunterOpponentIdentityText(record){
   const identity=hunterOpponentIdentityValue(record);
+  if(identity.scope==="cross-event"&&identity.source==="verified-match") return "已由本場參賽紀錄確認帳號身分";
   if(identity.scope==="cross-event") return "跨賽事可識別｜"+identity.playerId;
   if(identity.scope==="loading") return "正在辨識公開玩家身分";
   if(identity.scope==="unresolved") return "本次辨識失敗｜重新整理可重試";
@@ -16277,6 +16291,8 @@ function hunterH2HExclusionReason(record){
   if(!hunterOpponentIdentityRef(record)) return "本場缺少對手的賽事或選手識別資料。";
   if(identity.reason==="card-unavailable") return "目前名片查詢未提供跨賽事身分（名片未公開或目前無法查看）；不代表對手沒有帳號。";
   if(identity.reason==="missing-player-id") return "已取得對手名片，但缺少跨賽事玩家編號。";
+  const backendReasons={"event-not-found":"後台未找到這場賽事。","invalid-event-state":"後台賽事資料無法解析。","match-not-found":"後台未找到可唯一確認的本場對戰。","match-not-completed":"本場尚未完成或不是有效雙人對戰。","ambiguous-participant":"本場選手身分有重複或缺漏，尚待核對。","no-account-link":"本場對手未有已確認的帳號關聯。","ambiguous-account-link":"本場對手的帳號關聯資料互相衝突。","family-identity-pending":"兒童或家庭參賽身分尚未完成獨立帳號關聯核對。","account-unavailable":"對手帳號不存在、已停用或不符合正式統計資格。"};
+  if(identity.source==="verified-match"&&backendReasons[identity.reason]) return backendReasons[identity.reason];
   return "尚未取得可確認的跨賽事對手身分。";
 }
 function hunterH2HExclusionNote(record){
@@ -16303,6 +16319,7 @@ function hunterBuildH2H(records){
     const key=String(identity.playerId);
     if(!groups.has(key)) groups.set(key,{
       playerId:key,name:(record.opponent&&record.opponent.name)||"未知對手",
+      publicPlayerId:identity.source==="verified-match"?null:key,
       matches:0,wins:0,losses:0,scoredMatches:0,totalFor:0,totalAgainst:0,records:[],latestAt:0
     });
     const g=groups.get(key);
@@ -16379,7 +16396,7 @@ function hunterH2HItemHtml(group){
   const netText=group.scoredMatches?((group.net>0?"+":"")+group.net):"—";
   const scoreText=group.scoredMatches?(group.totalFor+" / "+group.totalAgainst):"—";
   const latest=group.latestRecord||group.records[0]||null;
-  return '<details class="hunter-h2h-item"><summary><div class="hunter-h2h-name"><strong>'+esc(group.name)+'</strong><small>玩家 '+esc(group.playerId)+'｜交手 '+group.matches+' 場</small></div><div class="hunter-h2h-summary"><b>'+group.winRate+'%</b><span>'+group.wins+' 勝 '+group.losses+' 敗</span></div></summary>'+
+  return '<details class="hunter-h2h-item"><summary><div class="hunter-h2h-name"><strong>'+esc(group.name)+'</strong><small>'+(group.publicPlayerId?'玩家 '+esc(group.publicPlayerId):'帳號身分已確認')+'｜交手 '+group.matches+' 場</small></div><div class="hunter-h2h-summary"><b>'+group.winRate+'%</b><span>'+group.wins+' 勝 '+group.losses+' 敗</span></div></summary>'+
     '<div class="hunter-h2h-body"><div class="hunter-h2h-grid"><div><span>交手</span><b>'+group.matches+' 場</b></div><div><span>勝敗</span><b>'+group.wins+'W / '+group.losses+'L</b></div><div><span>得失分</span><b>'+esc(scoreText)+'</b></div><div><span>淨得失分</span><b>'+esc(netText)+'</b></div></div>'+
     '<div class="hunter-evidence-meta">最近 5 場</div><div class="hunter-h2h-recent">'+recent.map(r=>'<span class="hunter-h2h-result '+(r.isWin?"win":"loss")+'" title="'+esc((r.eventDate||"")+" "+(r.eventName||r.eventCode||""))+'">'+(r.isWin?"W":"L")+'</span>').join('')+'</div>'+
     hunterOpponentAnalysisHtml(group)+
@@ -16391,9 +16408,10 @@ function hunterH2HDirectoryView(h2h){
   const source=(h2h&&Array.isArray(h2h.list))?h2h.list:[];
   const query=String(hunterH2HQuery||"").trim().toLocaleLowerCase("zh-Hant");
   let list=source.filter(group=>{
+    if(hunterH2HSelectedKey) return group.playerId===hunterH2HSelectedKey;
     if(!query) return true;
     return String(group.name||"").toLocaleLowerCase("zh-Hant").includes(query) ||
-      String(group.playerId||"").toLocaleLowerCase("zh-Hant").includes(query);
+      String(group.publicPlayerId||"").toLocaleLowerCase("zh-Hant").includes(query);
   });
   if(hunterH2HSort==="recent-desc"){
     list.sort((a,b)=>b.latestAt-a.latestAt||b.matches-a.matches||String(a.name).localeCompare(String(b.name),"zh-Hant"));
@@ -16413,7 +16431,7 @@ function hunterH2HDirectoryHtml(h2h){
   const frequent=source.slice().sort((a,b)=>b.matches-a.matches||b.latestAt-a.latestAt).slice(0,3);
   const sortButtons=[["matches-desc","交手最多"],["recent-desc","最近交手"],["name-asc","名稱"]].map(([key,label])=>'<button class="btn '+(hunterH2HSort===key?'btn-primary':'btn-ghost')+' btn-sm" data-action="hunter-h2h-sort" data-value="'+key+'">'+label+'</button>').join('');
   return '<div class="hunter-h2h-directory"><div class="hunter-h2h-directory-head"><strong>對手檔案</strong><span class="badge badge-metal">P5.6</span></div>'+
-    '<div class="hunter-h2h-search-row"><input id="hunter-h2h-query" type="search" maxlength="40" value="'+esc(hunterH2HQuery)+'" placeholder="搜尋對手名稱或 Player ID"><button class="btn btn-primary btn-sm" data-action="hunter-h2h-search">搜尋</button><button class="btn btn-ghost btn-sm clear" data-action="hunter-h2h-clear">清除</button></div>'+
+    '<div class="hunter-h2h-search-row"><input id="hunter-h2h-query" type="search" maxlength="40" value="'+esc(hunterH2HQuery)+'" placeholder="搜尋對手名稱"><button class="btn btn-primary btn-sm" data-action="hunter-h2h-search">搜尋</button><button class="btn btn-ghost btn-sm clear" data-action="hunter-h2h-clear">清除</button></div>'+
     '<div class="hunter-h2h-sort-row">'+sortButtons+'</div>'+
     '<div class="hunter-h2h-quick"><section><h4>最近交手</h4><div class="hunter-h2h-quick-list">'+(recent.length?recent.map(hunterH2HQuickButton).join(''):'<span class="hint">尚無資料</span>')+'</div></section>'+
     '<section><h4>常遇對手</h4><div class="hunter-h2h-quick-list">'+(frequent.length?frequent.map(hunterH2HQuickButton).join(''):'<span class="hint">尚無資料</span>')+'</div></section></div></div>';
@@ -16435,8 +16453,8 @@ function hunterH2HPanelHtml(records){
   return '<section class="panel hunter-h2h-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HEAD TO HEAD</div><div class="panel-title">H2H 對手統計</div></div><span class="badge badge-metal">P5.6</span></div>'+
     '<div class="hint">依目前對戰類型與期間篩選｜'+h2h.list.length+' 位可識別對手'+esc(status)+'</div>'+
     hunterH2HDirectoryHtml(h2h)+
-    (visible.length?'<div class="hunter-h2h-list">'+visible.map(hunterH2HItemHtml).join('')+'</div>':'<div class="hunter-h2h-empty-search">找不到符合「'+esc(hunterH2HQuery)+'」的對手。</div>')+
-    '<div class="hunter-framework-note">H2H 只使用穩定 playerId 聚合；搜尋只比對公開名稱與穩定 playerId，不會使用名字建立跨賽事身分。P5.5 的回合分布分析仍直接沿用同一份 H2H records。</div></section>';
+    (visible.length?'<div class="hunter-h2h-list">'+visible.map(hunterH2HItemHtml).join('')+'</div>':'<div class="hunter-h2h-empty-search">'+(hunterH2HSelectedKey?'目前篩選範圍沒有這位對手的交手紀錄。':'找不到符合「'+esc(hunterH2HQuery)+'」的對手。')+'</div>')+
+    '<div class="hunter-framework-note">H2H 只使用穩定 playerId 聚合；後台確認的身分不受名片公開設定影響。搜尋只比對對戰名稱與公開玩家編號，不會使用名字建立跨賽事身分。P5.5 的回合分布分析仍直接沿用同一份 H2H records。</div></section>';
 }
 
 function hunterSingleMatchBreakdown(record){
@@ -20334,15 +20352,18 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     hunterOpponentIdentityLoading=false;
     hunterOpponentIdentityCache.clear();
     hunterH2HQuery="";
+    hunterH2HSelectedKey="";
     loadHunterProfile(true);
     return;
   }
   if(action==="hunter-h2h-search"){
+    hunterH2HSelectedKey="";
     hunterH2HQuery=(document.getElementById("hunter-h2h-query")?.value||"").trim();
     renderPreservingScroll();
     return;
   }
   if(action==="hunter-h2h-clear"){
+    hunterH2HSelectedKey="";
     hunterH2HQuery="";
     renderPreservingScroll();
     return;
@@ -20353,7 +20374,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="hunter-h2h-quick"){
-    hunterH2HQuery=target.getAttribute("data-value")||"";
+    hunterH2HSelectedKey=target.getAttribute("data-value")||"";
+    hunterH2HQuery="";
     renderPreservingScroll();
     return;
   }
