@@ -16221,6 +16221,7 @@ async function resolveHunterOpponentIdentities(records){
   const generation=++hunterOpponentIdentityGeneration;
   const owner=(typeof currentAuthUid==="function"?currentAuthUid():"")||"";
   hunterOpponentIdentityLoading=true;
+  pending.forEach((record,ref)=>hunterApplyOpponentIdentity(rows,ref,{scope:"loading",playerId:null,source:"event-card"}));
   if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
   const entries=Array.from(pending.entries());
   try{
@@ -16413,6 +16414,7 @@ function hunterH2HPanelHtml(records){
   const status=statusParts.length?'｜'+statusParts.join('｜'):'';
   if(!h2h.list.length){
     return '<section class="panel hunter-h2h-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HEAD TO HEAD</div><div class="panel-title">H2H 對手統計</div></div><span class="badge badge-metal">P5.6</span></div>'+
+      '<div class="hint">依目前對戰類型與期間篩選｜0 位可識別對手'+esc(status)+'</div>'+
       '<div class="hunter-record-empty"><strong>目前沒有可安全跨賽事聚合的對手</strong><p>'+(h2h.loading?'正在辨識公開玩家身分。':h2h.unresolved?'部分對手本次辨識失敗，可按重新整理再次嘗試。':'只有 P5.3 確認到穩定玩家編號的對手才會出現在這裡。')+'</p></div></section>';
   }
   return '<section class="panel hunter-h2h-panel"><div class="hunter-section-head"><div><div class="hunter-kicker">HEAD TO HEAD</div><div class="panel-title">H2H 對手統計</div></div><span class="badge badge-metal">P5.6</span></div>'+
