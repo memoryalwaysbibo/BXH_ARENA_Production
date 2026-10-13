@@ -6,10 +6,10 @@ const core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
 function setup(){
   const c=vm.createContext({window:{},console,Map,esc:String,render:()=>{},currentAuthUid:()=> 'owner',
     hunterOpponentIdentityCache:new Map(),hunterOpponentIdentityLoading:false,hunterOpponentIdentityGeneration:0,
-    hunterH2HQuery:'',hunterH2HSort:'matches-desc'});
+    hunterH2HQuery:'',hunterH2HSelectedKey:'',hunterH2HSort:'matches-desc'});
   for(const file of ['domain-utils','hunter-utils'])vm.runInContext(fs.readFileSync(path.join(root,'modules/main-app/'+file+'.js'),'utf8'),c);
   Object.assign(c,c.window.BXHHunterUtils);
-  for(const name of ['hunterOpponentIdentityValue','hunterApplyOpponentIdentity','resolveHunterOpponentIdentities','hunterH2HExclusionReason','hunterH2HExclusionNote','hunterBuildH2H','hunterH2HDirectoryView','hunterH2HPanelHtml']){
+  for(const name of ['hunterOpponentIdentityValue','hunterApplyOpponentIdentity','resolveHunterOpponentIdentities','hunterOpponentIdentityChip','hunterOpponentIdentityText','hunterH2HExclusionReason','hunterH2HExclusionNote','hunterBuildH2H','hunterH2HDirectoryView','hunterH2HPanelHtml']){
     const start=core.indexOf((name.startsWith('resolve')?'async ':'')+'function '+name+'(');
     assert(start>=0,name);
     const next=core.slice(start+1).search(/\n(?:async )?function /);
@@ -88,4 +88,24 @@ test('exclusion notes explain only known reasons; stable identity has no exclusi
   assert(!c.hunterH2HExclusionReason(r('event-only')).includes('名片未公開'));
   const hidden=r('event-only');hidden.opponentIdentity.reason='card-unavailable';
   assert(c.hunterH2HExclusionReason(hidden).includes('不代表對手沒有帳號'));
+});
+test('backend match identity takes priority over public cards and direct public IDs',async()=>{
+  const c=setup(),key='H2H_'+'a'.repeat(64),rows=[record(),record({matchId:'m2',opponent:{localPlayerId:'2',name:'同名'}})];
+  let calls=0;c.window.engagementService={hunterOpponentIdentity:async payload=>{calls++;assert(payload.matchId);return {ok:true,scope:'cross-event',opponentKey:key};},playerCard:()=>{throw Error('must-not-query-public-card');}};
+  await c.resolveHunterOpponentIdentities(rows);assert.equal(calls,2);
+  const h=c.hunterBuildH2H(rows);assert.equal(h.list.length,1);assert.equal(h.list[0].matches,2);
+  assert.equal(h.list[0].publicPlayerId,null);
+  assert(!c.hunterOpponentIdentityChip(rows[0]).includes(key));assert(c.hunterOpponentIdentityText(rows[0]).includes('確認帳號身分'));
+  c.hunterH2HQuery=key;assert.equal(c.hunterH2HDirectoryView(h).length,0);
+  c.hunterH2HQuery='';c.hunterH2HSelectedKey=key;assert.equal(c.hunterH2HDirectoryView(h).length,1);
+});
+test('backend exclusions retain reasons and do not invoke public-card lookup as a fallback',async()=>{
+  const c=setup(),rows=[record()];c.window.engagementService={hunterOpponentIdentity:async()=>({ok:true,scope:'event-only',reason:'ambiguous-account-link'}),playerCard:()=>{throw Error('must-not-query-public-card');}};
+  await c.resolveHunterOpponentIdentities(rows);assert.equal(c.hunterBuildH2H(rows).excluded,1);
+  assert(c.hunterH2HExclusionNote(rows[0]).includes('互相衝突'));
+});
+test('malformed backend stable identities are retryable failures rather than cached identities',async()=>{
+  const c=setup(),rows=[record()];c.window.engagementService={hunterOpponentIdentity:async()=>({ok:true,scope:'cross-event',opponentKey:'raw-uid'})};
+  await c.resolveHunterOpponentIdentities(rows);assert.equal(c.hunterBuildH2H(rows).unresolved,1);
+  assert.equal(c.hunterOpponentIdentityCache.size,0);
 });

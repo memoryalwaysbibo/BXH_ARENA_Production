@@ -741,6 +741,7 @@
     async changeManagedAccounts(payload){return callEngagementFunction("changeManagedAccounts",payload,30000);},
     async tournamentOperation(name,payload){return callEngagementFunction(name,payload,30000);},
     async playerCard(payload){return callEngagementFunction("playerCardService",payload,120000);},
+    async hunterOpponentIdentity(payload){return callEngagementFunction("hunterOpponentIdentity",payload,30000);},
     async health(){return callEngagementFunction('getEngagementHealth',{});},
     async presence(payload){return callEngagementFunction("onlinePresence",payload,15000);},
     async mood(payload){return callEngagementFunction("moodStation",payload,20000);},
