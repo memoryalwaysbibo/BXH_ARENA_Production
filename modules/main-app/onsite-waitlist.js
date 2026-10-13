@@ -3,8 +3,10 @@
   'use strict';
   const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const statusLabels = {confirmed:'正取',waitlist:'備取',not_selected:'未中選'};
-  const definitiveErrors = new Set(['stale-revision','candidate-changed','candidate-list-changed','candidate-hash-mismatch','invalid-candidate-hash','failed-precondition','permission-denied','unauthenticated','invalid-argument','feature-disabled','event-disabled','waitlist-closed','invalid-slots','insufficient-candidates','no-eligible-candidates','no-vacancies','not-found','operation-conflict','lock-required','lock-invalidated','selection-locked','lock-mismatch','lock-active','lock-consumed','lock-payload-mismatch','insufficient-selected-participants','no-replacement-candidates','withdrawal-not-replaceable','replacement-already-completed','withdrawal-not-found','participant-not-active','original-accepted-protected','not-waitlist','insufficient-capacity','rounds-closed','invalid-operation','invalid-participant','invalid-slot-count','auth-required','event-feature-disabled','bracket-locked','participant-frozen','frozen-participants-present']);
+  const definitiveErrors = new Set(['reopen-unavailable','reopen-snapshot-changed','draw-session-finalized','stale-revision','candidate-changed','candidate-list-changed','candidate-hash-mismatch','invalid-candidate-hash','failed-precondition','permission-denied','unauthenticated','invalid-argument','feature-disabled','event-disabled','waitlist-closed','invalid-slots','insufficient-candidates','no-eligible-candidates','no-vacancies','not-found','operation-conflict','lock-required','lock-invalidated','selection-locked','lock-mismatch','lock-active','lock-consumed','lock-payload-mismatch','insufficient-selected-participants','no-replacement-candidates','withdrawal-not-replaceable','replacement-already-completed','withdrawal-not-found','participant-not-active','original-accepted-protected','not-waitlist','insufficient-capacity','rounds-closed','invalid-operation','invalid-participant','invalid-slot-count','auth-required','event-feature-disabled','bracket-locked','participant-frozen','frozen-participants-present']);
   const errorLabels = {
+    'reopen-unavailable':'目前無法重新開啟候補，請重新讀取賽事狀態。',
+    'reopen-snapshot-changed':'名單已更新，請重新確認要恢復的候補。',
     'candidate-list-changed':'本輪名單或空缺已改變，請重新讀取後確認。',
     'accepted-roster-incomplete':'請先同步最新正取名單，再啟用或完成現場候補抽選。',
     'draw-session-finalized':'本場抽選已完成，請返回一般賽事管理；原抽選紀錄保持不變。',
@@ -74,7 +76,7 @@
       const saved=storage.getItem(pendingKey);
       if(saved){
         const parsed=JSON.parse(saved);
-        if(parsed.code===code && typeof parsed.operationId==='string' && ['configure','finalize','checkIn','draw','close','setEligibility','lock','unlock','freeze','unfreeze','withdraw','replace','addOnsite','increaseCapacity'].includes(parsed.action)) pending=parsed;
+        if(parsed.code===code && typeof parsed.operationId==='string' && ['reopen','configure','finalize','checkIn','draw','close','setEligibility','lock','unlock','freeze','unfreeze','withdraw','replace','addOnsite','increaseCapacity'].includes(parsed.action)) pending=parsed;
       }
     } catch(_){ /* No mutation may begin unless a fresh pending operation can be persisted. */ }
 
@@ -212,6 +214,11 @@
           const round=result.round || result.state.rounds.find(r=>r.operationId===body.operationId) || result.state.rounds.at(-1);
           dialog={type:'result',round};
           notice={type:'success',text:'第 '+round.number+' 輪已完成。結果已保存，未中選者繼續保留備取。'};
+        }else if(body.action==='reopen'){
+          selectionDraft.clear();dialog=null;
+          slots=Math.max(1,Math.min(10,result.state.availableSlots||1));
+          const restored=result.restoredRegistrationIds?.length||0,excluded=result.excludedRegistrations?.length||0;
+          notice={type:'success',text:'候補已重新開啟，恢復 '+restored+' 位備取。原正取與抽籤紀錄已保留。'+(excluded?'另有 '+excluded+' 筆身分已在現有名單中，未重複加入。':'')};
         }else if(body.action==='close'){
           dialog=null;notice={type:'success',text:'候補已結束。剩餘備取標示為未中選，未產生取消紀錄或取消次數。'};
         }else{
@@ -265,6 +272,17 @@
         if(snapshot.state.status==='closed') throw Object.assign(new Error('本場候補已結束。'),{code:'waitlist-closed'});
         const selected=waiting();
         setDialog({type,slots,revision:snapshot.state.revision,hash:snapshot.candidateHash,participants:selected.map(p=>Object.assign({},p))});
+      }catch(error){showError(error);}
+      finally{busy=false;render();if(dialog)focusDialog();}
+    }
+    async function prepareReopen(){
+      if(busy || pending)return;
+      busy=true;notice=null;render();
+      try{
+        applySnapshot(await request({action:'preview'}));
+        const info=snapshot.state.reopen;
+        if(!info?.allowed)throw Object.assign(new Error('目前無法重新開啟候補。'),{code:info?.reason||'reopen-unavailable'});
+        setDialog({type:'reopen',revision:snapshot.state.revision,hash:info.hash,count:info.restoreCount,excluded:info.excludedCount});
       }catch(error){showError(error);}
       finally{busy=false;render();if(dialog)focusDialog();}
     }
@@ -340,6 +358,10 @@
         head='<div><div class="owd-eyebrow">INCREASE CAPACITY</div><h2>確認加開名額</h2></div>';
         body=`<p>正取上限將從 ${snapshot.state.capacity} 人增加至 ${dialog.capacity} 人，新增 ${dialog.capacity-snapshot.state.capacity} 個空缺。</p><div class="owd-notice">線上報名維持關閉。現場選手仍需加入備取，由工作人員確認到場後抽籤。</div>`;
         actions=`<button data-focus data-owd-action="dismiss" ${busy?'disabled':''}>返回</button><button class="owd-primary" data-owd-action="confirm-capacity" ${busy?'disabled':''}>${busy?'保存中…':'確認加開'}</button>`;
+      }else if(dialog.type==='reopen'){
+        head='<h2>重新開啟候補</h2>';
+        body='<p>將恢復因「結束候補」而標示未中選的 '+Number(dialog.count||0)+' 位備取，可繼續抽剩餘空缺。</p><p class="owd-small owd-muted">既有正取、抽籤與報到紀錄會保留；主動放棄者不會恢復，凍結狀態也會保留。線上報名維持關閉。</p>'+(dialog.excluded?'<p>另有 '+Number(dialog.excluded)+' 筆身分已在現有名單中，不會重複加入。</p>':'');
+        actions='<button data-focus data-owd-action="dismiss" '+(busy?'disabled':'')+'>返回</button><button class="owd-primary" data-owd-action="confirm-reopen" '+(busy?'disabled':'')+'>'+(busy?'保存中…':'確認重新開啟')+'</button>';
       }else if(dialog.type==='finalize'){
         head='<div><div class="owd-eyebrow">FINISH ONSITE DRAW</div><h2>完成抽選，返回賽事管理？</h2></div>';
         body='<p>此步完成後不能再抽選、加抽或從抽選頁補額。原抽選與放棄紀錄會保留。</p><p>一般報到、賽事編排、開賽與裁判操作將恢復；公開報名與自動補位仍維持關閉。</p>';
@@ -353,7 +375,7 @@
         body=`<p>剩餘 ${dialog.participants.length} 位備取將標示為「未中選」，本場不再開放後續候補抽籤。</p><div class="owd-notice">這是系統結束候補，不算玩家取消；不增加取消次數，也不觸發取消限制。</div><p class="owd-small owd-muted">已中選及原有正取不受影響。</p><div class="owd-snapshot">名單快照 v${dialog.revision}</div>`;
         actions=`<button data-focus data-owd-action="dismiss" ${busy?'disabled':''}>繼續候補</button><button class="owd-primary" data-owd-action="confirm-close" ${busy?'disabled':''}>${busy?'保存中…':'確認結束候補'}</button>`;
       }
-      return `<div class="owd-overlay" data-owd-action="backdrop"><section class="owd-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-label="${({finalize:'完成抽選，返回賽事管理',configure:'啟用現場候補抽選',result:'抽籤結果',withdraw:'確認放棄本次抽選',replacement:'選擇遞補方式','replacement-manual':'手動選取遞補人員','replacement-result':'遞補已完成',capacity:'確認加開名額',close:'結束本場候補'})[dialog.type]}"><div class="owd-dialog-head">${head}<button class="owd-close" aria-label="關閉" data-owd-action="dismiss" ${busy?'disabled':''}>×</button></div><div class="owd-dialog-body">${body}</div><div class="owd-dialog-actions ${dialog.type==='replacement'?'owd-replacement-actions':''}">${actions}</div></section></div>`;
+      return `<div class="owd-overlay" data-owd-action="backdrop"><section class="owd-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-label="${({reopen:'重新開啟候補',finalize:'完成抽選，返回賽事管理',configure:'啟用現場候補抽選',result:'抽籤結果',withdraw:'確認放棄本次抽選',replacement:'選擇遞補方式','replacement-manual':'手動選取遞補人員','replacement-result':'遞補已完成',capacity:'確認加開名額',close:'結束本場候補'})[dialog.type]}"><div class="owd-dialog-head">${head}<button class="owd-close" aria-label="關閉" data-owd-action="dismiss" ${busy?'disabled':''}>×</button></div><div class="owd-dialog-body">${body}</div><div class="owd-dialog-actions ${dialog.type==='replacement'?'owd-replacement-actions':''}">${actions}</div></section></div>`;
     }
     function footerStatus(){
       if(pending && !busy)return notice?.text || '有一筆操作尚未確認，請先確認同一筆操作。';
@@ -429,7 +451,7 @@
       const roster = closed?`<div class="owd-list-head"><h2>未中選名單 <span class="owd-muted owd-small">${notSelected.length} 人</span></h2></div><p class="owd-list-help">系統結束候補 · 不列入取消紀錄</p><div class="owd-list">${notSelected.map((p,i)=>`<div class="owd-person"><span class="owd-index">${String(i+1).padStart(2,'0')}</span><div class="owd-person-main"><div class="owd-name">${escapeHTML(p.name)}</div><div class="owd-person-meta">候補結束，未中選</div></div><span class="owd-tag">未中選</span></div>`).join('')||'<div class="owd-empty">沒有剩餘備取</div>'}</div>`:`<div class="owd-list-head"><h2><span class="owd-step">1</span>本輪抽選名單</h2><div class="owd-roster-counts"><span class="owd-gold owd-small" data-owd-roster-count>${selectedCount()} / ${w.length} 人</span><span class="owd-small owd-frozen-count" data-owd-frozen-count>凍結 ${frozenCount()} 人</span></div></div><p class="owd-list-help">未凍結者預設全選。取消勾選只排除本輪；凍結會暫停後續抽選，解凍後可再參加。放棄則退出本場並保留紀錄。</p><div class="owd-toolbar"><span class="owd-muted" data-owd-toolbar-status>${selectionLock()?'名單已鎖定':c.length?'已勾選 '+c.length+' 人':'尚未勾選抽選名單'}</span><button class="owd-text-btn" data-owd-action="select-all" ${eligibilityDisabled()||!drawableWaiting().length?'disabled':''}>${all?'取消全部勾選':'全部選取'}</button></div><div class="owd-list">${w.map(personRow).join('')||'<div class="owd-empty">已無備取選手</div>'}</div>`;
       const overview=`<section class="owd-card" aria-label="名額概況"><div class="owd-stat-grid"><div class="owd-stat"><strong data-testid="accepted-count">${s.acceptedCount}</strong><span>目前正取</span></div><div class="owd-stat"><strong class="owd-stat-gold" data-testid="available-slots">${s.availableSlots}</strong><span>可遞補空缺</span></div><div class="owd-stat"><strong data-testid="waitlist-count">${w.length}</strong><span>備取人數</span></div></div><div class="owd-protection"><span class="owd-shield" aria-hidden="true">◇</span>原有正取保留，只遞補剩餘空缺</div></section>`;
       const guide=closed?`<section class="owd-closed"><div class="owd-result-icon" aria-hidden="true">✓</div><h2>本場候補已結束</h2><p class="owd-muted owd-small">剩餘備取 ${notSelected.length} 人標示為未中選。<br>沒有取消次數或取消限制。</p></section>`:`<div class="owd-flow-steps" aria-label="抽選流程"><span>1 全選可抽名單，取消本輪不抽的人</span><span>2 鎖定名單與名額</span><span>3 開始抽選</span></div>`;
-      const secondary=`<div class="owd-secondary-tools">${closed&&!s.finalized?'<button class="owd-primary" data-owd-action="finalize" '+(busy||pending?'disabled':'')+'>完成抽選，返回賽事管理</button>':''}${!closed?`<div class="owd-end-row"><div><p>現場候補全部結束了？</p><p class="owd-small owd-muted">剩餘備取標示為未中選</p></div><button class="owd-outline" data-owd-action="close" ${staffDisabled()?'disabled':''}>結束候補</button></div>${staffTools()}`:''}${history()}<button id="owd-refresh" class="owd-text-btn" data-owd-action="refresh" ${busy?'disabled':''}>${busy?'處理中…':'↻ 重新讀取名單'}</button></div>`;
+      const secondary=`<div class="owd-secondary-tools">${closed&&s.reopen?.allowed?'<button class="owd-outline" data-owd-action="reopen" '+(busy||pending?'disabled':'')+'>重新開啟候補</button>':''}${closed&&!s.finalized?'<button class="owd-primary" data-owd-action="finalize" '+(busy||pending?'disabled':'')+'>完成抽選，返回賽事管理</button>':''}${!closed?`<div class="owd-end-row"><div><p>現場候補全部結束了？</p><p class="owd-small owd-muted">剩餘備取標示為未中選</p></div><button class="owd-outline" data-owd-action="close" ${staffDisabled()?'disabled':''}>結束候補</button></div>${staffTools()}`:''}${history()}<button id="owd-refresh" class="owd-text-btn" data-owd-action="refresh" ${busy?'disabled':''}>${busy?'處理中…':'↻ 重新讀取名單'}</button></div>`;
       root.innerHTML=`<div class="owd-main-content" ${dialog?'inert':''}><header class="owd-head"><div><div class="owd-eyebrow">ONSITE WAITLIST</div><h1>現場候補抽籤</h1><p class="owd-small owd-muted">${s.finalized?'以下為完成抽選時的歷史紀錄，不代表目前賽事名單。':'選好名單、鎖定後，再公平抽選。'}</p></div><span class="owd-round-chip">${closed?'已結束':'第 '+String(nextRound()).padStart(2,'0')+' 輪'}</span></header><div class="owd-notice-slot">${renderNotice()}</div><div class="owd-layout"><div class="owd-left">${overview}${guide}</div><div class="owd-right">${roster}${drawFollowups()}</div>${secondary}</div>${!closed?renderFooter():''}</div>${renderDialog()}`;
       if(dialog && bodyOverflow===null){bodyOverflow=document.body.style.overflow;document.body.style.overflow='hidden';}
       if(!dialog && bodyOverflow!==null){document.body.style.overflow=bodyOverflow;bodyOverflow=null;}
@@ -454,6 +476,8 @@
       if(action==='refresh'){await refresh();return;}
       if(action==='configure' && options.allowConfigure===true && snapshot?.state.enabled!==true && !busy && !pending){setDialog({type:'configure'});return;}
       if(action==='confirm-configure' && dialog?.type==='configure' && options.allowConfigure===true){await startMutation('configure',{enabled:true});return;}
+      if(action==='reopen'){await prepareReopen();return;}
+      if(action==='confirm-reopen' && dialog?.type==='reopen'){await startMutation('reopen',{reopenHash:dialog.hash,expectedRevision:dialog.revision});return;}
       if(action==='finalize' && snapshot?.state.status==='closed' && !snapshot?.state.finalized && !busy && !pending){setDialog({type:'finalize',revision:snapshot.state.revision,hash:snapshot.candidateHash});return;}
       if(action==='confirm-finalize' && dialog?.type==='finalize' && snapshot?.state.status==='closed' && !snapshot?.state.finalized){await startMutation('finalize',{candidateHash:dialog.hash,expectedRevision:dialog.revision});return;}
       if(action==='retry'){if(pending) await commit(pending);return;}
@@ -543,3 +567,4 @@
   }
   global.BXHOnsiteWaitlistDraw=Object.freeze({mount,version:'0.4.0-production'});
 })(window);
+
