@@ -91,7 +91,9 @@ test('two courts preserve independent work and queue a skipped match onto a busy
   await page.locator('[data-action="community-switch-room-tab"][data-tab="settings"]').click();
   await page.locator('#cset-stations').fill('2');
   await page.locator('[data-action="community-save-settings"]').click();
-  await page.waitForFunction(()=>Number(state.meta?.stations)===2,null,{timeout:30000});
+  // The local station count changes before the settings transaction finishes.
+  // Wait for the existing write gate to release before creating the roster.
+  await page.waitForFunction(()=>Number(state.meta?.stations)===2&&!communitySettingsSaving&&!communitySettingsWriteGate,null,{timeout:30000});
 
   // Host + three on-site players = four-player field.
   await page.locator('[data-action="community-switch-room-tab"][data-tab="people"]').click();
