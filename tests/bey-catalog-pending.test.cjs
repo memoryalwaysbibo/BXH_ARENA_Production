@@ -58,7 +58,7 @@ const vm = require('node:vm');
 function harness(fetcher, view = 'pending', suppliedModel = model, candidateGlobals = {}) {
  const html=fs.readFileSync(path.join(root,'bey-catalog.html'),'utf8');
  const ids=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element('div')]));
- ids['pending-search'].value='';ids['pending-series'].value='all';
+ ids['pending-search'].value='';ids['pending-series'].value='all';ids['pending-image-filter'].value='all';
  const buttons=['verified','pending'].map(view=>{const b=new Element('button');b.dataset.catalogView=view;return b;});
  const calls=[],historyCalls=[],listeners={},timers=new Map();let tid=0;
  const window={...candidateGlobals,BXHPendingInventory:suppliedModel,location:{href:'https://catalog.test/bey-catalog.html'+(view==='pending'?'?view=pending':'')},setTimeout:cb=>{timers.set(++tid,cb);return tid;},clearTimeout:id=>timers.delete(id),addEventListener:(name,cb)=>{listeners[name]=cb;}};
@@ -121,4 +121,26 @@ test('candidate failure leaves pending text intact; retry overlap is suppressed'
  let broken=true,resolve;const h=harness(async url=>url===model.DATA_URL?response():broken?response(Buffer.from('{}')):new Promise(r=>{resolve=r;}),'pending',model,candidateGlobals);
  await settled(h);await candidatesSettled(h,/暫時無法/);assert.equal(h.ids['pending-results'].children.length,285);assert.equal(h.ids['pending-controls'].disabled,false);
  broken=false;const first=h.ids['candidate-retry'].emit('click');await h.ids['candidate-retry'].emit('click');assert.equal(h.calls.length,3);resolve(response(candidateBytes));await first;await candidatesSettled(h);assert.equal(h.ids['candidate-retry'].hidden,true);
+});
+
+test('missing-image filter counts only validated absent candidates and combines search and series',async()=>{
+ const h=harness(async url=>response(url===model.DATA_URL?bytes:candidateBytes),'pending',model,candidateGlobals);
+ await settled(h);await candidatesSettled(h);
+ const ids=new Set(JSON.parse(candidateBytes).entries.map(r=>r.recordId));const missing=data.entries.filter(r=>!ids.has(r.suppliedId));
+ assert.equal(missing.length,63);assert.equal(h.ids['pending-image-filter'].disabled,false);assert.match(h.ids['pending-missing-option'].textContent,/63/);
+ h.ids['pending-image-filter'].value='missing';await h.ids['pending-image-filter'].emit('change');
+ assert.deepEqual(Array.from(h.ids['pending-results'].children,r=>r.dataset.suppliedId),missing.map(r=>r.suppliedId));
+ assert.equal(descendants(h.ids['pending-results']).filter(e=>e.tagName==='TEXTAREA').length,63);assert.match(h.ids['pending-count'].textContent,/顯示 63／63 筆待補圖/);
+ h.ids['pending-series'].value='BX';await h.ids['pending-series'].emit('change');assert.equal(h.ids['pending-results'].children.length,1);assert.match(h.ids['pending-results'].textContent,/BX-54/);
+ h.ids['pending-search'].value='BX-01';await h.ids['pending-search'].emit('input');assert.match(h.ids['pending-results'].textContent,/沒有符合/);assert.match(h.ids['pending-count'].textContent,/顯示 0／63/);
+ await h.buttons[0].emit('click');await h.buttons[1].emit('click');assert.equal(h.ids['pending-image-filter'].value,'missing');assert.equal(h.calls.length,2);
+ await h.ids['pending-reset'].emit('click');assert.equal(h.ids['pending-image-filter'].value,'all');assert.equal(h.ids['pending-results'].children.length,285);
+});
+test('unavailable, loading, failed and retrying candidate data never classifies all rows missing',async()=>{
+ const unavailable=harness(async()=>response());await settled(unavailable);assert.equal(unavailable.ids['pending-image-filter'].disabled,true);assert.doesNotMatch(unavailable.ids['pending-count'].textContent,/待補圖 285/);
+ let resolve;const h=harness(async url=>url===model.DATA_URL?response():new Promise(r=>{resolve=r;}),'pending',model,candidateGlobals);await settled(h);
+ assert.equal(h.ids['pending-image-filter'].disabled,true);assert.match(h.ids['pending-results'].textContent,/配圖狀態尚未確認/);assert.doesNotMatch(h.ids['pending-results'].textContent,/圖片待補|尚無候選圖片/);assert.equal(descendants(h.ids['pending-results']).filter(e=>e.tagName==='TEXTAREA').length,0);
+ h.ids['pending-image-filter'].value='missing';await h.ids['pending-image-filter'].emit('change');assert.equal(h.ids['pending-results'].children.length,285);assert.doesNotMatch(h.ids['pending-count'].textContent,/285 筆待補圖/);
+ resolve(response(Buffer.from('{}')));await candidatesSettled(h,/暫時無法/);assert.equal(h.ids['pending-image-filter'].disabled,true);assert.match(h.ids['candidate-status'].textContent,/篩選暫不可用/);
+ const retry=h.ids['candidate-retry'].emit('click');assert.equal(h.ids['pending-image-filter'].disabled,true);resolve(response(candidateBytes));await retry;await candidatesSettled(h);assert.equal(h.ids['pending-results'].children.length,63);
 });

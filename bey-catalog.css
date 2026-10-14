@@ -89,3 +89,8 @@ footer{font-size:12px;line-height:1.8;color:var(--muted);padding:28px 0 0}
 .manual-image-handoff textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px; border: 1px solid #64748b; border-radius: 8px; background: #0f172a; color: #e2e8f0; font: inherit; font-size: .8rem; resize: vertical; }
 .manual-image-handoff button { margin-top: 8px; }
 .manual-image-handoff summary:focus-visible, .manual-image-handoff textarea:focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+
+/* Pending image filter stays separate from verified catalog controls. */
+#pending-controls .catalog-filters{grid-template-columns:minmax(0,1fr) minmax(120px,160px) minmax(160px,200px) auto}
+@media(max-width:900px){#pending-controls .catalog-filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#pending-controls .search-field{grid-column:1/-1}}
+@media(max-width:359px){#pending-controls .catalog-filters{grid-template-columns:minmax(0,1fr)}}
