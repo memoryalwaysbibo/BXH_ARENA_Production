@@ -118,10 +118,34 @@
     });
     card.append(details); return card;
   }
+  function partIllustration(part) {
+    const image = model.partImage(part);
+    if (!image) return null;
+    const figure = node('figure', '', 'part-image');
+    const frame = node('div', '', 'part-image-frame');
+    const photo = node('img');
+    photo.alt = part.originalName + ' 軸心原廠資料圖（' + image.sourceProductCode + '）';
+    photo.width = image.width; photo.height = image.height;
+    photo.loading = 'lazy'; photo.decoding = 'async'; photo.referrerPolicy = 'no-referrer';
+    const fallback = node('span', '圖片暫時無法顯示，請查看原廠頁面。', 'image-fallback');
+    fallback.hidden = true; fallback.setAttribute('role', 'status');
+    photo.addEventListener('error', () => { photo.hidden = true; fallback.hidden = false; });
+    photo.src = './' + image.path;
+    frame.append(photo, fallback);
+    const caption = node('figcaption');
+    caption.append(node('p', '參考圖片來源：' + image.sourceProductCode + '；僅供零件型別辨識，不代表所有配色。', 'missing-note'));
+    caption.append(node('p', '重量：待補（尚無已核對數值）', 'missing-note'));
+    caption.append(node('p', '圖片：TAKARA TOMY · © Homura Kawamoto, Hikaru Muno, Posuka Demizu, BBXProject · © TOMY', 'image-credit'));
+    caption.append(sourceLinks({sourceUrls: {image: [image.sourcePage]}}));
+    figure.append(frame, caption);
+    return figure;
+  }
   function partCard(part) {
     const card = node('article', '', 'catalog-card'); card.dataset.partId = part.partId;
     card.append(node('span', model.CATEGORY_LABELS[part.category], 'category-tag'));
     appendName(card, part, 'h2');
+    const illustration = partIllustration(part);
+    if (illustration) card.append(illustration);
     card.append(node('p', '零件型別資料；台灣官方中文名稱與實物配色待補。', 'missing-note'), sourceLinks(part));
     const products = [...new Set(catalog.contentFacts.filter(fact => fact.partId === part.partId).map(fact => fact.productId))];
     const productMap = new Map(catalog.products.map(product => [product.productId, product]));

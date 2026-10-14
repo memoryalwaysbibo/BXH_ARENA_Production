@@ -7,12 +7,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="description" content="BXH ARENA 公開唯讀戰鬥陀螺圖鑑，以中文暫譯、原廠名稱、商品代碼、零件型別與來源連結查找資料。">
   <title>BXH ARENA｜戰鬥陀螺圖鑑</title>
-  <link rel="stylesheet" href="./bey-catalog.css?v=public-ux18-images-1">
-  <script src="./modules/bey-catalog/catalog-public-model.js?v=public-ux18-images-1" defer></script>
-  <script src="./modules/bey-catalog/catalog-public-ui.js?v=public-ux18-images-1" defer></script>
+  <link rel="stylesheet" href="./bey-catalog.css?v=public-pending-inventory-1">
+  <script src="./modules/bey-catalog/catalog-public-model.js?v=public-pending-inventory-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-public-ui.js?v=public-pending-inventory-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-pending-model.js?v=public-pending-inventory-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-pending-ui.js?v=public-pending-inventory-1" defer></script>
 </head>
 <body data-catalog-state="loading">
-  <a class="skip-link" href="#catalog-controls">跳至搜尋與篩選</a>
+  <a id="catalog-skip" class="skip-link" href="#catalog-controls">跳至搜尋與篩選</a>
   <main>
     <header class="catalog-header">
       <div class="header-row"><div class="brand">BXH <b>ARENA</b></div><a class="return-link" href="./index.html">返回首頁 <span aria-hidden="true">↗</span></a></div>
@@ -21,7 +23,32 @@
       <p class="intro">查找商品與零件，從原廠資料認識你的組合。</p>
     </header>
 
-    <section class="catalog-body" aria-label="圖鑑內容">
+    <nav class="catalog-view-switch" aria-label="選擇資料範圍">
+      <button type="button" data-catalog-view="verified" aria-pressed="true" aria-controls="verified-panel">有來源的圖鑑</button>
+      <button type="button" data-catalog-view="pending" aria-pressed="false" aria-controls="pending-panel">待補清冊 · 285</button>
+    </nav>
+    <section id="pending-panel" class="catalog-body" aria-labelledby="pending-title" data-state="idle" hidden>
+      <h2 id="pending-title">待補清冊</h2>
+      <div class="catalog-notice pending-notice">
+        <p><strong>使用者提供清單，尚未核實</strong></p>
+        <p>285 筆完整清單列，另有 1 筆不完整項目。名稱、型號與配置依提供內容保留，尚未核對；這不是完整商品或配件目錄，也不代表全部曾於台灣官方發售。</p>
+        <p>台灣官方名稱、上市狀態、圖片及規格待核／待補。同一型號的不同名稱分列保留，不合併成已核實商品。</p>
+      </div>
+      <aside class="pending-unresolved" aria-label="不完整項目"><strong>另有 1 筆待補完整資料：BXA-</strong><p>型號及名稱不足，等待補充；未計入 285 筆清冊，也不顯示為一般商品。</p><p>BXA 原清單標題寫 9 款，實際提供 7 筆完整列與 1 筆殘缺列；差異待確認，未自行補出第 9 筆。</p></aside>
+      <div class="load-status"><p id="pending-status" role="status" aria-live="polite">選擇待補清冊以載入資料。</p><button id="pending-retry" type="button" hidden>重新讀取待補清冊</button></div>
+      <fieldset id="pending-controls" disabled>
+        <legend class="visually-hidden">搜尋與篩選待補清冊</legend>
+        <div class="catalog-filters">
+          <div class="search-field"><label for="pending-search">搜尋提供的型號、名稱或配置</label><input id="pending-search" type="search" maxlength="120" placeholder="例如 BXA-03、蒼龍、3-60F" autocomplete="off" enterkeyhint="search"></div>
+          <div><label for="pending-series">系列</label><select id="pending-series"><option value="all">全部系列 · 285</option><option value="BX">BX · 85</option><option value="UX">UX · 44</option><option value="CX">CX · 43</option><option value="BXG">BXG · 74</option><option value="BXH">BXH · 18</option><option value="BXC">BXC · 14</option><option value="BXA">BXA · 7</option></select></div>
+          <button id="pending-reset" class="secondary" type="button">清除篩選</button>
+        </div>
+      </fieldset>
+      <p id="pending-count" class="catalog-count" aria-live="polite" aria-atomic="true"></p>
+      <div id="pending-results" class="catalog-results" aria-busy="false" aria-label="待補清冊搜尋結果"></div>
+      <footer>BXH ARENA · 使用者提供的待核清單<br>此區與有來源的圖鑑分開呈現，未核資料不會覆蓋已核實欄位。</footer>
+    </section>
+    <section id="verified-panel" class="catalog-body" aria-label="圖鑑內容">
       <div class="catalog-notice">
         <p>目前收錄部分有來源的資料。中文名稱為暫譯，非台灣官方命名；每筆保留原文與代碼供對照。台灣官方中文名稱、實物配色及其他未確認欄位待補。</p>
         <details><summary>資料範圍與完整性</summary>

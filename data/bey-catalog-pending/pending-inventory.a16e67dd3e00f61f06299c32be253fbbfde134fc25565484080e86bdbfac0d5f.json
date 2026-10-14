@@ -1,0 +1,1725 @@
+{
+  "schemaVersion": 1,
+  "sourceLabel": "使用者提供清單，尚未核實",
+  "taiwanReleaseStatus": "unknown",
+  "entries": [
+    {
+      "suppliedId": "supplied_20261014_0001",
+      "series": "BX",
+      "code": "BX-01",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0002",
+      "series": "BX",
+      "code": "BX-02",
+      "suppliedNameConfiguration": "惡魔紅鐮 4-60T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0003",
+      "series": "BX",
+      "code": "BX-03",
+      "suppliedNameConfiguration": "魔導幻箭 4-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0004",
+      "series": "BX",
+      "code": "BX-04",
+      "suppliedNameConfiguration": "騎士重盾 3-80N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0005",
+      "series": "BX",
+      "code": "BX-05",
+      "suppliedNameConfiguration": "魔導幻箭 4-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0006",
+      "series": "BX",
+      "code": "BX-06",
+      "suppliedNameConfiguration": "騎士重盾 3-80N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0007",
+      "series": "BX",
+      "code": "BX-07",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（特別版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0008",
+      "series": "BX",
+      "code": "BX-08-01",
+      "suppliedNameConfiguration": "惡魔紅鐮 3-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0009",
+      "series": "BX",
+      "code": "BX-08-02",
+      "suppliedNameConfiguration": "騎士重盾 4-80T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0010",
+      "series": "BX",
+      "code": "BX-08-03",
+      "suppliedNameConfiguration": "魔導幻箭 4-60N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0011",
+      "series": "BX",
+      "code": "BX-13",
+      "suppliedNameConfiguration": "騎士長槍 4-80HN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0012",
+      "series": "BX",
+      "code": "BX-14-01",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 3-60LF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0013",
+      "series": "BX",
+      "code": "BX-14-02",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 4-80N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0014",
+      "series": "BX",
+      "code": "BX-14-03",
+      "suppliedNameConfiguration": "蒼龍神劍 3-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0015",
+      "series": "BX",
+      "code": "BX-14-04",
+      "suppliedNameConfiguration": "惡魔紅鐮 4-80LF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0016",
+      "series": "BX",
+      "code": "BX-14-05",
+      "suppliedNameConfiguration": "騎士重盾 4-60LF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0017",
+      "series": "BX",
+      "code": "BX-14-06",
+      "suppliedNameConfiguration": "魔導幻箭 3-60T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0018",
+      "series": "BX",
+      "code": "BX-15",
+      "suppliedNameConfiguration": "雄獅獵爪 5-60P"
+    },
+    {
+      "suppliedId": "supplied_20261014_0019",
+      "series": "BX",
+      "code": "BX-16-01",
+      "suppliedNameConfiguration": "王蛇鞭尾 5-80O"
+    },
+    {
+      "suppliedId": "supplied_20261014_0020",
+      "series": "BX",
+      "code": "BX-16-02",
+      "suppliedNameConfiguration": "王蛇鞭尾 4-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0021",
+      "series": "BX",
+      "code": "BX-16-03",
+      "suppliedNameConfiguration": "王蛇鞭尾 3-80HN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0022",
+      "series": "BX",
+      "code": "BX-17-01",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（火紅版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0023",
+      "series": "BX",
+      "code": "BX-17-02",
+      "suppliedNameConfiguration": "魔導幻箭 4-80B（水藍版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0024",
+      "series": "BX",
+      "code": "BX-19",
+      "suppliedNameConfiguration": "戰犀重角 3-80S"
+    },
+    {
+      "suppliedId": "supplied_20261014_0025",
+      "series": "BX",
+      "code": "BX-20-01",
+      "suppliedNameConfiguration": "蒼龍利刃 4-60R"
+    },
+    {
+      "suppliedId": "supplied_20261014_0026",
+      "series": "BX",
+      "code": "BX-20-02",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 3-80F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0027",
+      "series": "BX",
+      "code": "BX-20-03",
+      "suppliedNameConfiguration": "騎士重盾 5-80T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0028",
+      "series": "BX",
+      "code": "BX-21-01",
+      "suppliedNameConfiguration": "惡魔鎖鏈 5-60HT"
+    },
+    {
+      "suppliedId": "supplied_20261014_0029",
+      "series": "BX",
+      "code": "BX-21-02",
+      "suppliedNameConfiguration": "騎士長槍 3-60LF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0030",
+      "series": "BX",
+      "code": "BX-21-03",
+      "suppliedNameConfiguration": "魔導幻箭 4-80N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0031",
+      "series": "BX",
+      "code": "BX-22",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0032",
+      "series": "BX",
+      "code": "BX-23",
+      "suppliedNameConfiguration": "鳳凰飛翼 9-60GF（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0033",
+      "series": "BX",
+      "code": "BX-24-01",
+      "suppliedNameConfiguration": "飛龍旋翼 5-80GB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0034",
+      "series": "BX",
+      "code": "BX-24-02",
+      "suppliedNameConfiguration": "飛龍旋翼 3-60T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0035",
+      "series": "BX",
+      "code": "BX-24-03",
+      "suppliedNameConfiguration": "騎士長槍 4-60GB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0036",
+      "series": "BX",
+      "code": "BX-24-04",
+      "suppliedNameConfiguration": "王蛇鞭尾 5-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0037",
+      "series": "BX",
+      "code": "BX-24-05",
+      "suppliedNameConfiguration": "雄獅獵爪 3-80HN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0038",
+      "series": "BX",
+      "code": "BX-24-06",
+      "suppliedNameConfiguration": "魔導幻箭 4-80GB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0039",
+      "series": "BX",
+      "code": "BX-26",
+      "suppliedNameConfiguration": "幻獸刺心 5-60GP"
+    },
+    {
+      "suppliedId": "supplied_20261014_0040",
+      "series": "BX",
+      "code": "BX-27-01",
+      "suppliedNameConfiguration": "魔獸護甲 9-80GN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0041",
+      "series": "BX",
+      "code": "BX-27-02",
+      "suppliedNameConfiguration": "魔獸護甲 4-80HT"
+    },
+    {
+      "suppliedId": "supplied_20261014_0042",
+      "series": "BX",
+      "code": "BX-27-03",
+      "suppliedNameConfiguration": "魔獸護甲 5-60O"
+    },
+    {
+      "suppliedId": "supplied_20261014_0043",
+      "series": "BX",
+      "code": "BX-31-01",
+      "suppliedNameConfiguration": "暴龍霸擊 4-70Q"
+    },
+    {
+      "suppliedId": "supplied_20261014_0044",
+      "series": "BX",
+      "code": "BX-31-02",
+      "suppliedNameConfiguration": "暴龍霸擊 3-60S"
+    },
+    {
+      "suppliedId": "supplied_20261014_0045",
+      "series": "BX",
+      "code": "BX-31-03",
+      "suppliedNameConfiguration": "惡魔鎖鏈 9-80O"
+    },
+    {
+      "suppliedId": "supplied_20261014_0046",
+      "series": "BX",
+      "code": "BX-31-04",
+      "suppliedNameConfiguration": "蒼龍利刃 4-70P"
+    },
+    {
+      "suppliedId": "supplied_20261014_0047",
+      "series": "BX",
+      "code": "BX-31-05",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 1-60Q"
+    },
+    {
+      "suppliedId": "supplied_20261014_0048",
+      "series": "BX",
+      "code": "BX-31-06",
+      "suppliedNameConfiguration": "戰犀重角 5-80Q"
+    },
+    {
+      "suppliedId": "supplied_20261014_0049",
+      "series": "BX",
+      "code": "BX-33",
+      "suppliedNameConfiguration": "皓戰猛虎 3-60U"
+    },
+    {
+      "suppliedId": "supplied_20261014_0050",
+      "series": "BX",
+      "code": "BX-34",
+      "suppliedNameConfiguration": "蒼穹龍騎士 2-60C"
+    },
+    {
+      "suppliedId": "supplied_20261014_0051",
+      "series": "BX",
+      "code": "BX-35-01",
+      "suppliedNameConfiguration": "玄冥戰甲 4-60D"
+    },
+    {
+      "suppliedId": "supplied_20261014_0052",
+      "series": "BX",
+      "code": "BX-35-02",
+      "suppliedNameConfiguration": "玄冥戰甲 9-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0053",
+      "series": "BX",
+      "code": "BX-35-03",
+      "suppliedNameConfiguration": "幻獸刺心 3-70D"
+    },
+    {
+      "suppliedId": "supplied_20261014_0054",
+      "series": "BX",
+      "code": "BX-35-04",
+      "suppliedNameConfiguration": "魔導神杖 1-60R"
+    },
+    {
+      "suppliedId": "supplied_20261014_0055",
+      "series": "BX",
+      "code": "BX-35-05",
+      "suppliedNameConfiguration": "鳳凰飛翼 5-80H"
+    },
+    {
+      "suppliedId": "supplied_20261014_0056",
+      "series": "BX",
+      "code": "BX-35-06",
+      "suppliedNameConfiguration": "王蛇鞭尾 5-70D"
+    },
+    {
+      "suppliedId": "supplied_20261014_0057",
+      "series": "BX",
+      "code": "BX-36-01",
+      "suppliedNameConfiguration": "巨鯨怒濤 5-80E"
+    },
+    {
+      "suppliedId": "supplied_20261014_0058",
+      "series": "BX",
+      "code": "BX-36-02",
+      "suppliedNameConfiguration": "巨鯨怒濤 4-70HN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0059",
+      "series": "BX",
+      "code": "BX-36-03",
+      "suppliedNameConfiguration": "巨鯨怒濤 3-80GB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0060",
+      "series": "BX",
+      "code": "BX-37",
+      "suppliedNameConfiguration": "悍熊猛爪 5-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0061",
+      "series": "BX",
+      "code": "BX-38",
+      "suppliedNameConfiguration": "赫燃天鳳 4-70TP"
+    },
+    {
+      "suppliedId": "supplied_20261014_0062",
+      "series": "BX",
+      "code": "BX-39-01",
+      "suppliedNameConfiguration": "護城龍神 7-80GP"
+    },
+    {
+      "suppliedId": "supplied_20261014_0063",
+      "series": "BX",
+      "code": "BX-39-02",
+      "suppliedNameConfiguration": "護城龍神 5-70O"
+    },
+    {
+      "suppliedId": "supplied_20261014_0064",
+      "series": "BX",
+      "code": "BX-39-03",
+      "suppliedNameConfiguration": "護城龍神 3-60D"
+    },
+    {
+      "suppliedId": "supplied_20261014_0065",
+      "series": "BX",
+      "code": "BX-44",
+      "suppliedNameConfiguration": "三角強襲 M-85BS"
+    },
+    {
+      "suppliedId": "supplied_20261014_0066",
+      "series": "BX",
+      "code": "BX-45",
+      "suppliedNameConfiguration": "武士魂斬 6-70M"
+    },
+    {
+      "suppliedId": "supplied_20261014_0067",
+      "series": "BX",
+      "code": "BX-46-01",
+      "suppliedNameConfiguration": "蒼穹龍神 9-60R（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0068",
+      "series": "BX",
+      "code": "BX-46-02",
+      "suppliedNameConfiguration": "戰羊阻截 7-70T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0069",
+      "series": "BX",
+      "code": "BX-48-01",
+      "suppliedNameConfiguration": "蒼穹龍騎士 9-80F（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0070",
+      "series": "BX",
+      "code": "BX-48-02",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 4-70E（金屬塗層：水藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0071",
+      "series": "BX",
+      "code": "BX-48-03",
+      "suppliedNameConfiguration": "猛瑪長牙 7-60S（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0072",
+      "series": "BX",
+      "code": "BX-48-04",
+      "suppliedNameConfiguration": "惡魔紅鐮 3-85GB（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0073",
+      "series": "BX",
+      "code": "BX-48-05",
+      "suppliedNameConfiguration": "蒼龍爆刃 2-80Q（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0074",
+      "series": "BX",
+      "code": "BX-49",
+      "suppliedNameConfiguration": "蒼龍突擊 4-50FF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0075",
+      "series": "BX",
+      "code": "BX-50-01",
+      "suppliedNameConfiguration": "天國日輪 0-80DS"
+    },
+    {
+      "suppliedId": "supplied_20261014_0076",
+      "series": "BX",
+      "code": "BX-50-02",
+      "suppliedNameConfiguration": "天國日輪 6-60TP"
+    },
+    {
+      "suppliedId": "supplied_20261014_0077",
+      "series": "BX",
+      "code": "BX-50-03",
+      "suppliedNameConfiguration": "衝擊龍神 7-55FB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0078",
+      "series": "BX",
+      "code": "BX-50-04",
+      "suppliedNameConfiguration": "幽靈元魂 M-85DS"
+    },
+    {
+      "suppliedId": "supplied_20261014_0079",
+      "series": "BX",
+      "code": "BX-50-05",
+      "suppliedNameConfiguration": "銀狼烈焰 D9-65L"
+    },
+    {
+      "suppliedId": "supplied_20261014_0080",
+      "series": "BX",
+      "code": "BX-50-06",
+      "suppliedNameConfiguration": "魔犬獵魂 B0-80WB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0081",
+      "series": "BX",
+      "code": "BX-52",
+      "suppliedNameConfiguration": "輝耀龍騎士 6-60LC"
+    },
+    {
+      "suppliedId": "supplied_20261014_0082",
+      "series": "BX",
+      "code": "BX-53-01",
+      "suppliedNameConfiguration": "空力天馬 3-70A（金屬塗層：藍／青）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0083",
+      "series": "BX",
+      "code": "BX-53-02",
+      "suppliedNameConfiguration": "魔導幻箭 4-80B（版本 2.0）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0084",
+      "series": "BX",
+      "code": "BX-53-03",
+      "suppliedNameConfiguration": "騎士重盾 3-80N（版本 2.0）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0085",
+      "series": "BX",
+      "code": "BX-54",
+      "suppliedNameConfiguration": "巨神壓制 0-70LP"
+    },
+    {
+      "suppliedId": "supplied_20261014_0086",
+      "series": "UX",
+      "code": "UX-01",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A"
+    },
+    {
+      "suppliedId": "supplied_20261014_0087",
+      "series": "UX",
+      "code": "UX-02",
+      "suppliedNameConfiguration": "惡魔重錘 3-70H"
+    },
+    {
+      "suppliedId": "supplied_20261014_0088",
+      "series": "UX",
+      "code": "UX-03",
+      "suppliedNameConfiguration": "魔導神杖 5-70DB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0089",
+      "series": "UX",
+      "code": "UX-04-01",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（特別版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0090",
+      "series": "UX",
+      "code": "UX-04-02",
+      "suppliedNameConfiguration": "魔導神杖 5-70DB（特別版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0091",
+      "series": "UX",
+      "code": "UX-05-01",
+      "suppliedNameConfiguration": "忍者闇影 1-80MN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0092",
+      "series": "UX",
+      "code": "UX-05-02",
+      "suppliedNameConfiguration": "忍者闇影 9-60LF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0093",
+      "series": "UX",
+      "code": "UX-05-03",
+      "suppliedNameConfiguration": "忍者闇影 3-70GP"
+    },
+    {
+      "suppliedId": "supplied_20261014_0094",
+      "series": "UX",
+      "code": "UX-06",
+      "suppliedNameConfiguration": "雄獅巔峰 7-60GN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0095",
+      "series": "UX",
+      "code": "UX-07-01",
+      "suppliedNameConfiguration": "鳳凰尾翼 9-70G（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0096",
+      "series": "UX",
+      "code": "UX-07-02",
+      "suppliedNameConfiguration": "飛龍旋翼 2-60S"
+    },
+    {
+      "suppliedId": "supplied_20261014_0097",
+      "series": "UX",
+      "code": "UX-07-03",
+      "suppliedNameConfiguration": "魔獸護甲 1-80GF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0098",
+      "series": "UX",
+      "code": "UX-08",
+      "suppliedNameConfiguration": "霜輝銀狼 3-80FB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0099",
+      "series": "UX",
+      "code": "UX-09",
+      "suppliedNameConfiguration": "武士星劍 2-70L"
+    },
+    {
+      "suppliedId": "supplied_20261014_0100",
+      "series": "UX",
+      "code": "UX-10-01",
+      "suppliedNameConfiguration": "騎士圓甲 3-85BS"
+    },
+    {
+      "suppliedId": "supplied_20261014_0101",
+      "series": "UX",
+      "code": "UX-10-02",
+      "suppliedNameConfiguration": "暴龍霸擊 1-60RA（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0102",
+      "series": "UX",
+      "code": "UX-10-03",
+      "suppliedNameConfiguration": "翼龍神翼 7-70B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0103",
+      "series": "UX",
+      "code": "UX-11",
+      "suppliedNameConfiguration": "衝擊龍神 9-60LR"
+    },
+    {
+      "suppliedId": "supplied_20261014_0104",
+      "series": "UX",
+      "code": "UX-12-01",
+      "suppliedNameConfiguration": "幽靈元魂 0-80GB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0105",
+      "series": "UX",
+      "code": "UX-12-02",
+      "suppliedNameConfiguration": "幽靈元魂 4-60H"
+    },
+    {
+      "suppliedId": "supplied_20261014_0106",
+      "series": "UX",
+      "code": "UX-12-03",
+      "suppliedNameConfiguration": "忍者闇影 3-80F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0107",
+      "series": "UX",
+      "code": "UX-12-04",
+      "suppliedNameConfiguration": "雄獅獵爪 0-80E"
+    },
+    {
+      "suppliedId": "supplied_20261014_0108",
+      "series": "UX",
+      "code": "UX-12-05",
+      "suppliedNameConfiguration": "鳳凰翔羽 2-60N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0109",
+      "series": "UX",
+      "code": "UX-12-06",
+      "suppliedNameConfiguration": "飛龍旋翼 0-80C"
+    },
+    {
+      "suppliedId": "supplied_20261014_0110",
+      "series": "UX",
+      "code": "UX-13",
+      "suppliedNameConfiguration": "魔像奇岩 1-60UN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0111",
+      "series": "UX",
+      "code": "UX-14",
+      "suppliedNameConfiguration": "天蠍長矛 0-70Z"
+    },
+    {
+      "suppliedId": "supplied_20261014_0112",
+      "series": "UX",
+      "code": "UX-15-01",
+      "suppliedNameConfiguration": "鮫鯊狂鱗 4-50UF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0113",
+      "series": "UX",
+      "code": "UX-15-02",
+      "suppliedNameConfiguration": "暴龍咆哮 1-70L"
+    },
+    {
+      "suppliedId": "supplied_20261014_0114",
+      "series": "UX",
+      "code": "UX-15-03",
+      "suppliedNameConfiguration": "惡魔勇氣 J3-60GF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0115",
+      "series": "UX",
+      "code": "UX-16-01",
+      "suppliedNameConfiguration": "時鐘幻象 9-65B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0116",
+      "series": "UX",
+      "code": "UX-16-02",
+      "suppliedNameConfiguration": "時鐘幻象 9-65B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0117",
+      "series": "UX",
+      "code": "UX-16-03",
+      "suppliedNameConfiguration": "時鐘幻象 9-65B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0118",
+      "series": "UX",
+      "code": "UX-17",
+      "suppliedNameConfiguration": "隕星龍騎士 3-70J（金屬塗層：白）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0119",
+      "series": "UX",
+      "code": "UX-18-01",
+      "suppliedNameConfiguration": "古屍詛咒 7-55W"
+    },
+    {
+      "suppliedId": "supplied_20261014_0120",
+      "series": "UX",
+      "code": "UX-18-02",
+      "suppliedNameConfiguration": "古屍詛咒 4-60C"
+    },
+    {
+      "suppliedId": "supplied_20261014_0121",
+      "series": "UX",
+      "code": "UX-18-03",
+      "suppliedNameConfiguration": "天馬九尾 M3-85W"
+    },
+    {
+      "suppliedId": "supplied_20261014_0122",
+      "series": "UX",
+      "code": "UX-18-04",
+      "suppliedNameConfiguration": "焰神勇氣 C9-70TP"
+    },
+    {
+      "suppliedId": "supplied_20261014_0123",
+      "series": "UX",
+      "code": "UX-18-05",
+      "suppliedNameConfiguration": "蒼龍利刃 7-55G"
+    },
+    {
+      "suppliedId": "supplied_20261014_0124",
+      "series": "UX",
+      "code": "UX-18-06",
+      "suppliedNameConfiguration": "皓戰猛虎 4-80LR"
+    },
+    {
+      "suppliedId": "supplied_20261014_0125",
+      "series": "UX",
+      "code": "UX-19",
+      "suppliedNameConfiguration": "彈丸獅鷲 H"
+    },
+    {
+      "suppliedId": "supplied_20261014_0126",
+      "series": "UX",
+      "code": "UX-20",
+      "suppliedNameConfiguration": "榮耀武神 LF（金屬塗層：白）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0127",
+      "series": "UX",
+      "code": "UX-21-01",
+      "suppliedNameConfiguration": "惡魔冥界 Z"
+    },
+    {
+      "suppliedId": "supplied_20261014_0128",
+      "series": "UX",
+      "code": "UX-21-02",
+      "suppliedNameConfiguration": "霜輝銀狼 9-70R（金屬塗層：紫）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0129",
+      "series": "UX",
+      "code": "UX-21-03",
+      "suppliedNameConfiguration": "飛龍凌空 8-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0130",
+      "series": "CX",
+      "code": "CX-01",
+      "suppliedNameConfiguration": "蒼龍勇氣 S6-60V"
+    },
+    {
+      "suppliedId": "supplied_20261014_0131",
+      "series": "CX",
+      "code": "CX-02",
+      "suppliedNameConfiguration": "魔導至尊 R4-55LO"
+    },
+    {
+      "suppliedId": "supplied_20261014_0132",
+      "series": "CX",
+      "code": "CX-03",
+      "suppliedNameConfiguration": "英仙幽冥 B6-80W"
+    },
+    {
+      "suppliedId": "supplied_20261014_0133",
+      "series": "CX",
+      "code": "CX-04-01",
+      "suppliedNameConfiguration": "蒼龍勇氣 S6-60V（特別版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0134",
+      "series": "CX",
+      "code": "CX-04-02",
+      "suppliedNameConfiguration": "英仙幽冥 B6-80W（特別版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0135",
+      "series": "CX",
+      "code": "CX-05-01",
+      "suppliedNameConfiguration": "惡魔獵魂 T4-70K"
+    },
+    {
+      "suppliedId": "supplied_20261014_0136",
+      "series": "CX",
+      "code": "CX-05-02",
+      "suppliedNameConfiguration": "戰犀獵魂 C4-55D"
+    },
+    {
+      "suppliedId": "supplied_20261014_0137",
+      "series": "CX",
+      "code": "CX-05-03",
+      "suppliedNameConfiguration": "惡魔至尊 T3-85O"
+    },
+    {
+      "suppliedId": "supplied_20261014_0138",
+      "series": "CX",
+      "code": "CX-05-04",
+      "suppliedNameConfiguration": "雄獅巔峰 9-80K"
+    },
+    {
+      "suppliedId": "supplied_20261014_0139",
+      "series": "CX",
+      "code": "CX-05-05",
+      "suppliedNameConfiguration": "鳳凰尾翼 4-70LF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0140",
+      "series": "CX",
+      "code": "CX-05-06",
+      "suppliedNameConfiguration": "巨鯨怒濤 7-60K"
+    },
+    {
+      "suppliedId": "supplied_20261014_0141",
+      "series": "CX",
+      "code": "CX-06-01",
+      "suppliedNameConfiguration": "極狐九尾 J9-70GR"
+    },
+    {
+      "suppliedId": "supplied_20261014_0142",
+      "series": "CX",
+      "code": "CX-06-02",
+      "suppliedNameConfiguration": "極狐九尾 J0-80DB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0143",
+      "series": "CX",
+      "code": "CX-06-03",
+      "suppliedNameConfiguration": "極狐九尾 J2-60U"
+    },
+    {
+      "suppliedId": "supplied_20261014_0144",
+      "series": "CX",
+      "code": "CX-07",
+      "suppliedNameConfiguration": "天馬爆擊 ATr（金屬塗層：碧綠）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0145",
+      "series": "CX",
+      "code": "CX-08-01",
+      "suppliedNameConfiguration": "魔犬烈焰 W5-80WB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0146",
+      "series": "CX",
+      "code": "CX-08-02",
+      "suppliedNameConfiguration": "巨鯨烈焰 M3-85HT"
+    },
+    {
+      "suppliedId": "supplied_20261014_0147",
+      "series": "CX",
+      "code": "CX-08-03",
+      "suppliedNameConfiguration": "魔犬幽冥 W1-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0148",
+      "series": "CX",
+      "code": "CX-08-04",
+      "suppliedNameConfiguration": "蒼龍爆刃 5-80MN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0149",
+      "series": "CX",
+      "code": "CX-08-05",
+      "suppliedNameConfiguration": "玄冥戰甲 7-70WB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0150",
+      "series": "CX",
+      "code": "CX-08-06",
+      "suppliedNameConfiguration": "蒼穹龍騎士 4-55WB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0151",
+      "series": "CX",
+      "code": "CX-09",
+      "suppliedNameConfiguration": "焰神滅世 D5-70TK"
+    },
+    {
+      "suppliedId": "supplied_20261014_0152",
+      "series": "CX",
+      "code": "CX-10",
+      "suppliedNameConfiguration": "銀狼狩獵 F0-60DB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0153",
+      "series": "CX",
+      "code": "CX-11-01",
+      "suppliedNameConfiguration": "帝王威能 HOp（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0154",
+      "series": "CX",
+      "code": "CX-11-02",
+      "suppliedNameConfiguration": "魔像奇岩 M-85HN（金屬塗層：碧綠）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0155",
+      "series": "CX",
+      "code": "CX-11-03",
+      "suppliedNameConfiguration": "鮫鯊撕裂 5-60FB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0156",
+      "series": "CX",
+      "code": "CX-12",
+      "suppliedNameConfiguration": "鳳凰閃焰 Z9-80WW（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0157",
+      "series": "CX",
+      "code": "CX-13",
+      "suppliedNameConfiguration": "龍王閃擊 BK1-50I"
+    },
+    {
+      "suppliedId": "supplied_20261014_0158",
+      "series": "CX",
+      "code": "CX-14",
+      "suppliedNameConfiguration": "騎士堡壘 GV8-70UN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0159",
+      "series": "CX",
+      "code": "CX-15",
+      "suppliedNameConfiguration": "邪神狂怒 FE4-55Y"
+    },
+    {
+      "suppliedId": "supplied_20261014_0160",
+      "series": "CX",
+      "code": "CX-16",
+      "suppliedNameConfiguration": "龍王閃擊 BK1-50I（異色版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0161",
+      "series": "CX",
+      "code": "CX-17-01",
+      "suppliedNameConfiguration": "獨角極變 PO3-60GU"
+    },
+    {
+      "suppliedId": "supplied_20261014_0162",
+      "series": "CX",
+      "code": "CX-17-02",
+      "suppliedNameConfiguration": "獨角極變 PO1-80GR"
+    },
+    {
+      "suppliedId": "supplied_20261014_0163",
+      "series": "CX",
+      "code": "CX-17-03",
+      "suppliedNameConfiguration": "武士星劍 9-65LO"
+    },
+    {
+      "suppliedId": "supplied_20261014_0164",
+      "series": "CX",
+      "code": "CX-17-04",
+      "suppliedNameConfiguration": "惡魔重錘 3-85GU"
+    },
+    {
+      "suppliedId": "supplied_20261014_0165",
+      "series": "CX",
+      "code": "CX-17-05",
+      "suppliedNameConfiguration": "暴龍霸擊 3-60N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0166",
+      "series": "CX",
+      "code": "CX-17-06",
+      "suppliedNameConfiguration": "赫燃天鳳 7-80GU"
+    },
+    {
+      "suppliedId": "supplied_20261014_0167",
+      "series": "CX",
+      "code": "CX-18-01",
+      "suppliedNameConfiguration": "腕龍鞭打 OW5-70Nr"
+    },
+    {
+      "suppliedId": "supplied_20261014_0168",
+      "series": "CX",
+      "code": "CX-18-02",
+      "suppliedNameConfiguration": "腕龍鞭打 OW5-70Nr"
+    },
+    {
+      "suppliedId": "supplied_20261014_0169",
+      "series": "CX",
+      "code": "CX-18-03",
+      "suppliedNameConfiguration": "腕龍鞭打 OW5-70Nr"
+    },
+    {
+      "suppliedId": "supplied_20261014_0170",
+      "series": "CX",
+      "code": "CX-19-01",
+      "suppliedNameConfiguration": "鱷魚裂甲 TQ5-50GN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0171",
+      "series": "CX",
+      "code": "CX-19-02",
+      "suppliedNameConfiguration": "鱷魚裂甲 TQ5-50GN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0172",
+      "series": "CX",
+      "code": "CX-19-03",
+      "suppliedNameConfiguration": "鱷魚裂甲 TQ5-50GN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0173",
+      "series": "BXG",
+      "code": "BXG-01",
+      "suppliedNameConfiguration": "烈焰飛鳳 S3-80T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0174",
+      "series": "BXG",
+      "code": "BXG-03",
+      "suppliedNameConfiguration": "惡魔紅鐮 4-60T（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0175",
+      "series": "BXG",
+      "code": "BXG-04",
+      "suppliedNameConfiguration": "銀牙烈虎 4-80P"
+    },
+    {
+      "suppliedId": "supplied_20261014_0176",
+      "series": "BXG",
+      "code": "BXG-05",
+      "suppliedNameConfiguration": "雄獅獵爪 5-60P（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0177",
+      "series": "BXG",
+      "code": "BXG-06",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 5-60GF（金屬塗層：水藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0178",
+      "series": "BXG",
+      "code": "BXG-07-00",
+      "suppliedNameConfiguration": "雷霆天龍 1-60F（上升攻擊型）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0179",
+      "series": "BXG",
+      "code": "BXG-07-01",
+      "suppliedNameConfiguration": "雷霆天龍 1-60F（連擊型）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0180",
+      "series": "BXG",
+      "code": "BXG-08",
+      "suppliedNameConfiguration": "惡魔鎖鏈 5-60HT（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0181",
+      "series": "BXG",
+      "code": "BXG-09",
+      "suppliedNameConfiguration": "蒼穹龍騎士 2-60C（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0182",
+      "series": "BXG",
+      "code": "BXG-11",
+      "suppliedNameConfiguration": "堅甲戰龜 S7-60D"
+    },
+    {
+      "suppliedId": "supplied_20261014_0183",
+      "series": "BXG",
+      "code": "BXG-12-01",
+      "suppliedNameConfiguration": "龍騎士 S4-60RA"
+    },
+    {
+      "suppliedId": "supplied_20261014_0184",
+      "series": "BXG",
+      "code": "BXG-12-02",
+      "suppliedNameConfiguration": "暴風天馬 3-70RA"
+    },
+    {
+      "suppliedId": "supplied_20261014_0185",
+      "series": "BXG",
+      "code": "BXG-12-03",
+      "suppliedNameConfiguration": "天翼戰神 2-60RA"
+    },
+    {
+      "suppliedId": "supplied_20261014_0186",
+      "series": "BXG",
+      "code": "BXG-12-04",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（閃耀貼紙版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0187",
+      "series": "BXG",
+      "code": "BXG-13",
+      "suppliedNameConfiguration": "神力聖劍 3-60GF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0188",
+      "series": "BXG",
+      "code": "BXG-14",
+      "suppliedNameConfiguration": "蒼龍利刃 2-80GP（金屬塗層：闇黑，巨人隊版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0189",
+      "series": "BXG",
+      "code": "BXG-15",
+      "suppliedNameConfiguration": "烈焰飛鳳 S3-80T（闇黑版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0190",
+      "series": "BXG",
+      "code": "BXG-16",
+      "suppliedNameConfiguration": "忍者刺刀 4-60LF（金屬塗層：水藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0191",
+      "series": "BXG",
+      "code": "BXG-18",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（金屬塗層：藍，FC 巴塞隆納版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0192",
+      "series": "BXG",
+      "code": "BXG-19",
+      "suppliedNameConfiguration": "惡魔重錘 3-70H（金屬塗層：紅，FC 巴塞隆納版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0193",
+      "series": "BXG",
+      "code": "BXG-20",
+      "suppliedNameConfiguration": "巨岩雄獅 6-80GN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0194",
+      "series": "BXG",
+      "code": "BXG-21",
+      "suppliedNameConfiguration": "暴風巨神 2-70M"
+    },
+    {
+      "suppliedId": "supplied_20261014_0195",
+      "series": "BXG",
+      "code": "BXG-22",
+      "suppliedNameConfiguration": "龍騎士 S4-60RA"
+    },
+    {
+      "suppliedId": "supplied_20261014_0196",
+      "series": "BXG",
+      "code": "BXG-23",
+      "suppliedNameConfiguration": "蒼穹龍神 4-60F（透明版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0197",
+      "series": "BXG",
+      "code": "BXG-24",
+      "suppliedNameConfiguration": "空力天馬 3-70A（火紅版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0198",
+      "series": "BXG",
+      "code": "BXG-25-01",
+      "suppliedNameConfiguration": "蒼龍神劍 4-80DB（金屬塗層：珍珠白）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0199",
+      "series": "BXG",
+      "code": "BXG-25-02",
+      "suppliedNameConfiguration": "蒼龍爆刃 3-70N（金屬塗層：珍珠白）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0200",
+      "series": "BXG",
+      "code": "BXG-25-03",
+      "suppliedNameConfiguration": "蒼龍利刃 9-60LF（金屬塗層：珍珠白）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0201",
+      "series": "BXG",
+      "code": "BXG-29-01",
+      "suppliedNameConfiguration": "鋼鐵人 4-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0202",
+      "series": "BXG",
+      "code": "BXG-29-02",
+      "suppliedNameConfiguration": "薩諾斯 4-60P"
+    },
+    {
+      "suppliedId": "supplied_20261014_0203",
+      "series": "BXG",
+      "code": "BXG-30-01",
+      "suppliedNameConfiguration": "蜘蛛人 3-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0204",
+      "series": "BXG",
+      "code": "BXG-30-02",
+      "suppliedNameConfiguration": "猛毒 3-80N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0205",
+      "series": "BXG",
+      "code": "BXG-31-01",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（金屬塗層：青）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0206",
+      "series": "BXG",
+      "code": "BXG-31-02",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0207",
+      "series": "BXG",
+      "code": "BXG-31-03",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（金屬塗層：紫）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0208",
+      "series": "BXG",
+      "code": "BXG-32",
+      "suppliedNameConfiguration": "猛瑪長牙 2-80E（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0209",
+      "series": "BXG",
+      "code": "BXG-33-01",
+      "suppliedNameConfiguration": "路克天行者 4-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0210",
+      "series": "BXG",
+      "code": "BXG-33-02",
+      "suppliedNameConfiguration": "達斯維達 4-60P"
+    },
+    {
+      "suppliedId": "supplied_20261014_0211",
+      "series": "BXG",
+      "code": "BXG-34-01",
+      "suppliedNameConfiguration": "曼達洛人 3-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0212",
+      "series": "BXG",
+      "code": "BXG-34-02",
+      "suppliedNameConfiguration": "星區長吉迪恩 3-80N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0213",
+      "series": "BXG",
+      "code": "BXG-35",
+      "suppliedNameConfiguration": "鳳凰飛翼 9-60GF（金屬塗層：闇黑，木谷龍也版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0214",
+      "series": "BXG",
+      "code": "BXG-36-01",
+      "suppliedNameConfiguration": "柯博文 4-60P"
+    },
+    {
+      "suppliedId": "supplied_20261014_0215",
+      "series": "BXG",
+      "code": "BXG-36-02",
+      "suppliedNameConfiguration": "密卡登 4-80B"
+    },
+    {
+      "suppliedId": "supplied_20261014_0216",
+      "series": "BXG",
+      "code": "BXG-37-01",
+      "suppliedNameConfiguration": "金剛王 3-60F"
+    },
+    {
+      "suppliedId": "supplied_20261014_0217",
+      "series": "BXG",
+      "code": "BXG-37-02",
+      "suppliedNameConfiguration": "天王星 3-80N"
+    },
+    {
+      "suppliedId": "supplied_20261014_0218",
+      "series": "BXG",
+      "code": "BXG-38",
+      "suppliedNameConfiguration": "雄獅獠牙 T4-60A（火紅版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0219",
+      "series": "BXG",
+      "code": "BXG-39",
+      "suppliedNameConfiguration": "飛龍凌空 2-80GN（金屬塗層：紫，DMM 抽獎最後獎）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0220",
+      "series": "BXG",
+      "code": "BXG-39-01",
+      "suppliedNameConfiguration": "飛龍凌空 2-80GN（DMM 抽獎 A 獎）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0221",
+      "series": "BXG",
+      "code": "BXG-40-01",
+      "suppliedNameConfiguration": "暴龍 1-80GB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0222",
+      "series": "BXG",
+      "code": "BXG-40-02",
+      "suppliedNameConfiguration": "滄龍 9-60U"
+    },
+    {
+      "suppliedId": "supplied_20261014_0223",
+      "series": "BXG",
+      "code": "BXG-41-01",
+      "suppliedNameConfiguration": "棘龍 3-85A"
+    },
+    {
+      "suppliedId": "supplied_20261014_0224",
+      "series": "BXG",
+      "code": "BXG-41-02",
+      "suppliedNameConfiguration": "翼龍 4-55D"
+    },
+    {
+      "suppliedId": "supplied_20261014_0225",
+      "series": "BXG",
+      "code": "BXG-42",
+      "suppliedNameConfiguration": "騎士圓甲 3-85BS（金屬塗層：夜藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0226",
+      "series": "BXG",
+      "code": "BXG-43",
+      "suppliedNameConfiguration": "魔導至尊 R4-55LO（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0227",
+      "series": "BXG",
+      "code": "BXG-45",
+      "suppliedNameConfiguration": "天馬爆擊 ATr（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0228",
+      "series": "BXG",
+      "code": "BXG-47",
+      "suppliedNameConfiguration": "暴風天馬 3-70RA"
+    },
+    {
+      "suppliedId": "supplied_20261014_0229",
+      "series": "BXG",
+      "code": "BXG-49",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（版本 2.0）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0230",
+      "series": "BXG",
+      "code": "BXG-51",
+      "suppliedNameConfiguration": "蒼龍勇氣 S6-60V（金屬塗層：闇黑）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0231",
+      "series": "BXG",
+      "code": "BXG-52",
+      "suppliedNameConfiguration": "蒼龍神劍 1-60V（金屬塗層：闇黑，日本職業足球聯盟版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0232",
+      "series": "BXG",
+      "code": "BXG-53",
+      "suppliedNameConfiguration": "蒼穹龍騎士 9-60F（金屬塗層：白，日本職業足球聯盟版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0233",
+      "series": "BXG",
+      "code": "BXG-54",
+      "suppliedNameConfiguration": "武士星劍 5-60K（金屬塗層：武士藍，足球日本代表版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0234",
+      "series": "BXG",
+      "code": "BXG-55",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 2-60GP（金屬塗層：闇黑，釣魚魂 Wonder 版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0235",
+      "series": "BXG",
+      "code": "BXG-56",
+      "suppliedNameConfiguration": "巨鯨怒濤 1-80GF（金屬塗層：藍，釣魚魂 Wonder 版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0236",
+      "series": "BXG",
+      "code": "BXG-57-01",
+      "suppliedNameConfiguration": "新世紀福音戰士至尊 B0-70E（金屬塗層：橘，零號機版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0237",
+      "series": "BXG",
+      "code": "BXG-57-02",
+      "suppliedNameConfiguration": "新世紀福音戰士勇氣 A1-70V（金屬塗層：紫，初號機版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0238",
+      "series": "BXG",
+      "code": "BXG-57-03",
+      "suppliedNameConfiguration": "新世紀福音戰士九尾 T2-70A（金屬塗層：紅，2 號機版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0239",
+      "series": "BXG",
+      "code": "BXG-61",
+      "suppliedNameConfiguration": "天蠍長矛 0-70Z（金屬塗層：品紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0240",
+      "series": "BXG",
+      "code": "BXG-63",
+      "suppliedNameConfiguration": "榮耀武神 LF（金屬塗層：藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0241",
+      "series": "BXG",
+      "code": "BXG-70",
+      "suppliedNameConfiguration": "迪卡狂怒 FT3-60T"
+    },
+    {
+      "suppliedId": "supplied_20261014_0242",
+      "series": "BXG",
+      "code": "BXG-71-01",
+      "suppliedNameConfiguration": "英勇野牛 DB（DMM 抽獎 A 獎）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0243",
+      "series": "BXG",
+      "code": "BXG-71-02",
+      "suppliedNameConfiguration": "英勇野牛 DB（金屬塗層：白，DMM 抽獎最後獎）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0244",
+      "series": "BXG",
+      "code": "BXG-79",
+      "suppliedNameConfiguration": "黃蜂要塞 R7-60T（金屬塗層：黃）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0245",
+      "series": "BXG",
+      "code": "BXG-80",
+      "suppliedNameConfiguration": "海怪扭擺 S3-70O（金屬塗層：藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0246",
+      "series": "BXG",
+      "code": "BXG-81",
+      "suppliedNameConfiguration": "雄鹿戰角 B2-60D（金屬塗層：橘）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0247",
+      "series": "BXH",
+      "code": "BXH-00-01",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（鍍金版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0248",
+      "series": "BXH",
+      "code": "BXH-00-02",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（鍍銀版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0249",
+      "series": "BXH",
+      "code": "BXH-00-03",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（鍍銅版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0250",
+      "series": "BXH",
+      "code": "BXH-01",
+      "suppliedNameConfiguration": "蒼穹龍神 4-60F（金屬塗層：藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0251",
+      "series": "BXH",
+      "code": "BXH-02",
+      "suppliedNameConfiguration": "騎士重盾 3-80N（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0252",
+      "series": "BXH",
+      "code": "BXH-09",
+      "suppliedNameConfiguration": "魔導神杖 5-70DB（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0253",
+      "series": "BXH",
+      "code": "BXH-10",
+      "suppliedNameConfiguration": "空力天馬 3-70A（金屬塗層：藍／綠）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0254",
+      "series": "BXH",
+      "code": "BXH-14",
+      "suppliedNameConfiguration": "戰神伏特 S4-70V（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0255",
+      "series": "BXH",
+      "code": "BXH-15",
+      "suppliedNameConfiguration": "英仙幽冥 B6-80W（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0256",
+      "series": "BXH",
+      "code": "BXH-16-01",
+      "suppliedNameConfiguration": "蒼龍勇氣 S6-60V（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0257",
+      "series": "BXH",
+      "code": "BXH-16-02",
+      "suppliedNameConfiguration": "蒼龍勇氣 S6-60V（金屬塗層：白銀）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0258",
+      "series": "BXH",
+      "code": "BXH-16-03",
+      "suppliedNameConfiguration": "蒼龍勇氣 S6-60V（金屬塗層：黃銅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0259",
+      "series": "BXH",
+      "code": "BXH-22",
+      "suppliedNameConfiguration": "邪神狂怒 FE4-55Y（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0260",
+      "series": "BXH",
+      "code": "BXH-23-01",
+      "suppliedNameConfiguration": "龍神勇氣 G4-70I（金屬塗層：水藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0261",
+      "series": "BXH",
+      "code": "BXH-23-02",
+      "suppliedNameConfiguration": "龍神勇氣 G4-70I（金屬塗層：水藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0262",
+      "series": "BXH",
+      "code": "BXH-25-01",
+      "suppliedNameConfiguration": "蒼龍突擊 4-50FF（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0263",
+      "series": "BXH",
+      "code": "BXH-25-02",
+      "suppliedNameConfiguration": "蒼龍突擊 4-50FF（金屬塗層：白銀）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0264",
+      "series": "BXH",
+      "code": "BXH-25-03",
+      "suppliedNameConfiguration": "蒼龍突擊 4-50FF（金屬塗層：黃銅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0265",
+      "series": "BXC",
+      "code": "BXC-00-01",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（金屬塗層：燦金）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0266",
+      "series": "BXC",
+      "code": "BXC-00-02",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（金屬塗層：白銀）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0267",
+      "series": "BXC",
+      "code": "BXC-00-03",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（金屬塗層：黃銅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0268",
+      "series": "BXC",
+      "code": "BXC-02",
+      "suppliedNameConfiguration": "惡魔紅鐮 3-80F（特別合體陀螺）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0269",
+      "series": "BXC",
+      "code": "BXC-03",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（金屬塗層：火紅）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0270",
+      "series": "BXC",
+      "code": "BXC-05",
+      "suppliedNameConfiguration": "鳳凰飛翼 9-80DB（金屬塗層：夜藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0271",
+      "series": "BXC",
+      "code": "BXC-07",
+      "suppliedNameConfiguration": "鱷魚粉碎 2-60Q（金屬塗層：綠）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0272",
+      "series": "BXC",
+      "code": "BXC-11",
+      "suppliedNameConfiguration": "武士鋼鐵 5-70GF（金屬塗層：白）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0273",
+      "series": "BXC",
+      "code": "BXC-12",
+      "suppliedNameConfiguration": "武士星劍 2-70L（金屬塗層：橘）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0274",
+      "series": "BXC",
+      "code": "BXC-13",
+      "suppliedNameConfiguration": "蒼龍至尊 S2-70K（金屬塗層：水藍）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0275",
+      "series": "BXC",
+      "code": "BXC-15",
+      "suppliedNameConfiguration": "大蛇簇擁 6-60LF"
+    },
+    {
+      "suppliedId": "supplied_20261014_0276",
+      "series": "BXC",
+      "code": "BXC-19",
+      "suppliedNameConfiguration": "龍王閃擊 BK1-50I（金屬塗層：黃）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0277",
+      "series": "BXC",
+      "code": "BXC-20",
+      "suppliedNameConfiguration": "時鐘幻象 4-55S（金屬塗層：闇黑，命運的倒帶士版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0278",
+      "series": "BXC",
+      "code": "BXC-21",
+      "suppliedNameConfiguration": "基德狩獵 K4-70TK（金屬塗層：白）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0279",
+      "series": "BXA",
+      "code": "BXA-01",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（壽司郎聯名版）"
+    },
+    {
+      "suppliedId": "supplied_20261014_0280",
+      "series": "BXA",
+      "code": "BXA-03",
+      "suppliedNameConfiguration": "美國隊長 4-70GB"
+    },
+    {
+      "suppliedId": "supplied_20261014_0281",
+      "series": "BXA",
+      "code": "BXA-03",
+      "suppliedNameConfiguration": "紅浩克 1-80R"
+    },
+    {
+      "suppliedId": "supplied_20261014_0282",
+      "series": "BXA",
+      "code": "BXA-04",
+      "suppliedNameConfiguration": "終極蜘蛛人 1-60GN"
+    },
+    {
+      "suppliedId": "supplied_20261014_0283",
+      "series": "BXA",
+      "code": "BXA-04",
+      "suppliedNameConfiguration": "綠惡魔 9-80HT"
+    },
+    {
+      "suppliedId": "supplied_20261014_0284",
+      "series": "BXA",
+      "code": "BXA-05",
+      "suppliedNameConfiguration": "歐比王肯諾比 4-60P"
+    },
+    {
+      "suppliedId": "supplied_20261014_0285",
+      "series": "BXA",
+      "code": "BXA-05",
+      "suppliedNameConfiguration": "葛里維斯將軍 3-80HN"
+    }
+  ],
+  "unresolved": [
+    {
+      "suppliedId": "supplied_20261014_0286",
+      "series": "BXA",
+      "code": "BXA-",
+      "reason": "型號及名稱不足，等待補充"
+    }
+  ]
+}

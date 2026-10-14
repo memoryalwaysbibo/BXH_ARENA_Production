@@ -186,7 +186,7 @@ jobs:
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
       - name: Verify public catalog evidence, projection, UI contract and artifact boundary
-        run: node --test tests/bey-catalog-public-evidence-policy.test.cjs tests/bey-catalog-public-ui.test.cjs tests/bey-catalog-public-package.test.cjs
+        run: node --test tests/bey-catalog-public-evidence-policy.test.cjs tests/bey-catalog-public-ui.test.cjs tests/bey-catalog-pending.test.cjs tests/bey-catalog-public-package.test.cjs
       - name: Verify ladder V1 scoring and inline-script syntax
         run: node --experimental-vm-modules tests/ladder-v1.cjs
       - name: Verify ladder V1 settlement trust boundary
@@ -260,7 +260,15 @@ jobs:
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         env:
           PUBLIC_CATALOG_QA_OUTPUT_DIR: test-results/public-catalog
-        run: node --test tests/bey-catalog-public-browser.test.cjs
+        run: node --test tests/bey-catalog-public-browser.test.cjs tests/bey-catalog-pending-browser.test.cjs
+      - name: Upload isolated catalog screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-public-catalog-${{ github.run_id }}
+          path: test-results/public-catalog/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload community quick registration screenshots and results
         if: always()
         uses: actions/upload-artifact@v4

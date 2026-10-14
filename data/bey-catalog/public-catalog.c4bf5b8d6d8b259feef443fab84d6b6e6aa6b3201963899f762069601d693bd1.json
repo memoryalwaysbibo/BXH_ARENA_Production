@@ -758,6 +758,32 @@
           "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux11.png"
         ]
       }
+    },
+    {
+      "partId": "part_000046",
+      "originalName": "B",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000047",
+      "originalName": "N",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx04.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx04.png"
+        ]
+      }
     }
   ],
   "options": [

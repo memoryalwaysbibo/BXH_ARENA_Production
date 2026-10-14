@@ -24,10 +24,10 @@ function allFiles(root, parent = '') {
     return entry.isDirectory() ? allFiles(root, name) : [name];
   }).sort();
 }
-test('public overlay has exactly eleven reviewed runtime files and safe manifest', async () => {
+test('public overlay has exactly eighteen reviewed runtime files and safe manifest', async () => {
   const {manifest} = await inspectRuntime();
-  assert.equal(manifest.files.length, 11);
-  assert.deepEqual(manifest.counts, {products: 9, parts: 45, options: 13, assemblyRelations: 11, contentFacts: 38});
+  assert.equal(manifest.files.length, 18);
+  assert.deepEqual(manifest.counts, {products: 9, parts: 47, options: 13, assemblyRelations: 11, contentFacts: 38});
   assert.equal(manifest.requiredExistingHostPath, 'index.html');
   assert.ok(manifest.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256) && file.bytes > 0));
 });
@@ -97,4 +97,23 @@ test('six packaged images match source manifest and contain actual WebP bytes', 
     const bytes=fs.readFileSync(path.join(ROOT,image.path));assert.equal(bytes.toString('ascii',0,4),'RIFF');assert.equal(bytes.toString('ascii',8,12),'WEBP');
   }
   assert.ok(source.assets.reduce((sum,image)=>sum+image.bytes,0)<220000);
+});
+
+test('part image manifest exactly matches runtime mapping and verified local bytes', () => {
+  const model=require('../modules/bey-catalog/catalog-public-model.js');
+  const source=JSON.parse(fs.readFileSync(path.join(ROOT,'docs/bey-catalog/BASIC_BIT_IMAGE_SOURCES.json')));
+  assert.deepEqual(source.assets,model.PART_IMAGES);
+  for(const image of model.PART_IMAGES) {
+    const bytes=fs.readFileSync(path.join(ROOT,image.path));assert.equal(bytes.length,image.bytes);assert.equal(hash(bytes),image.sha256);
+    assert.match(image.sourceSha256,/^[a-f0-9]{64}$/);assert.match(image.identitySourceSha256,/^[a-f0-9]{64}$/);
+  }
+});
+
+test('each altered part image is rejected before packaging output is created', async t => {
+  const model=require('../modules/bey-catalog/catalog-public-model.js');
+  for(const image of model.PART_IMAGES) {
+    const {repo,output}=fixture(t);const target=path.join(repo,image.path);
+    const bytes=fs.readFileSync(target);bytes[20]^=1;fs.writeFileSync(target,bytes);
+    await assert.rejects(packageRuntime(output,repo),/IMAGE_VERSION_MISMATCH/);assert.equal(fs.existsSync(output),false);
+  }
 });

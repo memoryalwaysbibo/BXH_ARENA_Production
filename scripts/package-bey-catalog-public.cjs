@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const model = require('../modules/bey-catalog/catalog-public-model.js');
+const pendingModel = require('../modules/bey-catalog/catalog-pending-model.js');
 const ROOT = path.resolve(__dirname, '..');
 const RUNTIME_FILES = Object.freeze([
   'bey-catalog.html',
@@ -12,7 +13,10 @@ const RUNTIME_FILES = Object.freeze([
   'modules/bey-catalog/catalog-public-model.js',
   'modules/bey-catalog/catalog-public-ui.js',
   model.DATA_URL.replace(/^\.\//, ''),
-  ...model.OPTION_IMAGES.map(image => image.path)
+  ...[...model.OPTION_IMAGES, ...model.PART_IMAGES].map(image => image.path),
+  'modules/bey-catalog/catalog-pending-model.js',
+  'modules/bey-catalog/catalog-pending-ui.js',
+  pendingModel.DATA_URL.replace(/^\.\//, '')
 ]);
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -32,22 +36,25 @@ async function inspectRuntime(root = ROOT) {
   const bytes = new Map(RUNTIME_FILES.map(file => [file, readRegular(root, file)]));
   const data = bytes.get(RUNTIME_FILES[4]);
   const catalog = await model.decodeSnapshot(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-  for (const image of model.OPTION_IMAGES) {
+  for (const image of [...model.OPTION_IMAGES, ...model.PART_IMAGES]) {
     const asset = bytes.get(image.path);
     if (asset.length !== image.bytes || sha256(asset) !== image.sha256) throw new Error('IMAGE_VERSION_MISMATCH');
   }
+  const pendingBytes = bytes.get(pendingModel.DATA_URL.replace(/^\.\//, ''));
+  const pending = await pendingModel.decodeSnapshot(pendingBytes.buffer.slice(pendingBytes.byteOffset, pendingBytes.byteOffset + pendingBytes.byteLength));
   const html = bytes.get('bey-catalog.html').toString('utf8');
-  const expectedAssets = new Set(RUNTIME_FILES.slice(1, 4));
+  const expectedAssets = new Set([...RUNTIME_FILES.slice(1, 4), 'modules/bey-catalog/catalog-pending-model.js', 'modules/bey-catalog/catalog-pending-ui.js']);
   const actualAssets = [...html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi)]
     .map(match => match[1].split(/[?#]/)[0].replace(/^\.\//, ''));
   if (actualAssets.length !== expectedAssets.size || actualAssets.some(file => !expectedAssets.has(file))) throw new Error('UNEXPECTED_RUNTIME_DEPENDENCY');
-  for (const name of ['bey-catalog.html', 'modules/bey-catalog/catalog-public-model.js', 'modules/bey-catalog/catalog-public-ui.js']) {
+  for (const name of ['bey-catalog.html', 'modules/bey-catalog/catalog-public-model.js', 'modules/bey-catalog/catalog-public-ui.js', 'modules/bey-catalog/catalog-pending-model.js', 'modules/bey-catalog/catalog-pending-ui.js']) {
     if (/\b(?:eval\s*\(|importScripts\s*\(|serviceWorker\s*\.|XMLHttpRequest\b|WebSocket\b)/.test(bytes.get(name).toString('utf8'))) throw new Error('UNEXPECTED_ACTIVE_DEPENDENCY');
   }
   const manifest = {
     artifactType: 'catalog-public-runtime-overlay',
     schemaVersion: 1,
     snapshotSha256: model.EXPECTED_SHA256,
+    pendingInventory: {sha256: pendingModel.EXPECTED_SHA256, entries: pending.entries.length, unresolved: pending.unresolved.length},
     counts: Object.fromEntries(Object.entries(catalog).map(([key, rows]) => [key, rows.length])),
     requiredExistingHostPath: 'index.html',
     files: RUNTIME_FILES.map(file => ({path: file, bytes: bytes.get(file).length, sha256: sha256(bytes.get(file))}))

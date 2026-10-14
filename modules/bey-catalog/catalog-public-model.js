@@ -4,10 +4,10 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.BXHPublicCatalog = factory();
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  const EXPECTED_SHA256 = 'd8f36e95e0a12ae411df9e336411c0dd65f9797729b2f772c00a5abb4507b927';
-  const EXPECTED_BYTES = 64615;
+  const EXPECTED_SHA256 = 'c4bf5b8d6d8b259feef443fab84d6b6e6aa6b3201963899f762069601d693bd1';
+  const EXPECTED_BYTES = 65353;
   const DATA_URL = './data/bey-catalog/public-catalog.' + EXPECTED_SHA256 + '.json';
-  const COUNTS = Object.freeze({products: 9, parts: 45, options: 13, assemblyRelations: 11, contentFacts: 38});
+  const COUNTS = Object.freeze({products: 9, parts: 47, options: 13, assemblyRelations: 11, contentFacts: 38});
   const PACKAGE_LABELS = Object.freeze({booster: '強化組', starter: '入門組', random_booster: '隨機強化組', deck_set: '套組', part_set: '零件組'});
   const CATEGORY_LABELS = Object.freeze({blade: '刀刃', ratchet: '棘輪', bit: '軸心', blade_ratchet: '刀刃／棘輪整合型', lock_chip: '鎖定晶片', main_blade: '主刀刃', assist_blade: '輔助刀刃', ratchet_bit: '棘輪／軸心整合型', metal_blade: '金屬刀刃', over_blade: '外層刀刃'});
   // Presentation-only aliases, keyed by the exact sourced name. These are provisional
@@ -139,8 +139,90 @@
     if (!product || !option || product.productId !== "product_000006" || product.productCode !== "UX-18" || product.originalName !== "ランダムブースターVol.8" || option.productId !== product.productId) return null;
     return OPTION_IMAGES.find(image => image.optionId === option.optionId && image.optionCode === option.optionCode && image.originalName === option.originalName) || null;
   }
+  // Exact reviewed part identities only; reference images remain source-product scoped.
+  // A reference image represents its named source product, never every color variant.
+  const PART_IMAGES = Object.freeze([
+  {
+    "partId": "part_000013",
+    "originalName": "F",
+    "category": "bit",
+    "sourceProductCode": "BX-01",
+    "sourcePage": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx01.html",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX01_04@1.png",
+    "sourceSha256": "f8181955b343d985d119ccc1141558621cf4e1b801cc8e127ec1744e50336ad1",
+    "sourceBytes": 25274,
+    "path": "assets/bey-catalog/bits/bit-f-bx01.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 9450,
+    "sha256": "875edfc3802d39d9a8771fdc960b11eace9bca7959edb12e284f9163eda84434",
+    "identitySourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx01.png",
+    "identitySourceSha256": "58a2932e67c4636f22ab4747f5d5171df48588836c0adeb6bfa82788684d7013"
+  },
+  {
+    "partId": "part_000021",
+    "originalName": "T",
+    "category": "bit",
+    "sourceProductCode": "BX-02",
+    "sourcePage": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx02.html",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX02_04@1.png",
+    "sourceSha256": "e162ad27a3128c4b3a32fba57b2da9f920e71d9976624fa8c3e0507be4c58210",
+    "sourceBytes": 24503,
+    "path": "assets/bey-catalog/bits/bit-t-bx02.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 7932,
+    "sha256": "bff5221b99bba3312e7e9edf876d73feb2aa3532ab80dd7f39dc4a1669420377",
+    "identitySourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx02.png",
+    "identitySourceSha256": "1dd55f38f0c7633a75d4f5d818195a931084c5f51c244b9a5e8ec6caf756f4f6"
+  },
+  {
+    "partId": "part_000046",
+    "originalName": "B",
+    "category": "bit",
+    "sourceProductCode": "BX-03",
+    "sourcePage": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx03.html",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX03_04@1.png",
+    "sourceSha256": "97d9cd677fdfcd860a42f1eb819654b50ffc4141934ce2514c87e7c2f335abbe",
+    "sourceBytes": 23620,
+    "path": "assets/bey-catalog/bits/bit-b-bx03.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 7120,
+    "sha256": "401c7282fd12e85329683666c8cca053923c9f04fa02250243599b55c89bc3ad",
+    "identitySourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png",
+    "identitySourceSha256": "af4aed4466d45b12de787c5a8c0c752871f984ab1589968e68072a1bd852b497"
+  },
+  {
+    "partId": "part_000047",
+    "originalName": "N",
+    "category": "bit",
+    "sourceProductCode": "BX-04",
+    "sourcePage": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx04.html",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX04_04@1.png",
+    "sourceSha256": "a6f3b8aba2631a278f6bbabd4d59c6ada59b81367fecdbf87a99ee71b9848179",
+    "sourceBytes": 23276,
+    "path": "assets/bey-catalog/bits/bit-n-bx04.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 7000,
+    "sha256": "8ef613eb3ec5d7730b7f8940d342ab6a8adef70a9c3bfa6f7972e0659bc6e910",
+    "identitySourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx04.png",
+    "identitySourceSha256": "77020bfab1bfa46ca6b34ba3b63189158f1d168f27d846ad0665f6e47038c9f6"
+  }
+].map(image => Object.freeze(image)));
+  function partImage(part) {
+    if (!part || part.category !== 'bit') return null;
+    return PART_IMAGES.find(image => image.partId === part.partId && image.originalName === part.originalName && image.category === part.category) || null;
+  }
   // Exact reviewed URLs only. Neither payload nor query parameters can extend this allowlist.
   const SOURCE_URLS = new Set([
+    "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx04.png",
+    "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx02.png",
+    "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx01.png",
+    "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx04.html",
+    "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx03.html",
+    "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx02.html",
     "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_UX18.png",
     "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png",
     "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx33.png",
@@ -307,5 +389,5 @@
       return !needle || fields.some(field => normalized(field).includes(needle));
     });
   }
-  return Object.freeze({EXPECTED_SHA256, EXPECTED_BYTES, DATA_URL, COUNTS, PACKAGE_LABELS, CATEGORY_LABELS, DISPLAY_NAMES, OPTION_IMAGES, optionImage, displayName, safeSourceUrl, validateCatalog, decodeSnapshot, uniqueSources, filterCatalog});
+  return Object.freeze({EXPECTED_SHA256, EXPECTED_BYTES, DATA_URL, COUNTS, PACKAGE_LABELS, CATEGORY_LABELS, DISPLAY_NAMES, OPTION_IMAGES, optionImage, PART_IMAGES, partImage, displayName, safeSourceUrl, validateCatalog, decodeSnapshot, uniqueSources, filterCatalog});
 });
