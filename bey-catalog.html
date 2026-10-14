@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="BXH ARENA 公開唯讀戰鬥陀螺圖鑑，以中文暫譯、原廠名稱、商品代碼、零件型別與來源連結查找資料。">
+  <title>BXH ARENA｜戰鬥陀螺圖鑑</title>
+  <link rel="stylesheet" href="./bey-catalog.css?v=public-zh-tw-1">
+  <script src="./modules/bey-catalog/catalog-public-model.js?v=public-zh-tw-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-public-ui.js?v=public-zh-tw-1" defer></script>
+</head>
+<body data-catalog-state="loading">
+  <a class="skip-link" href="#catalog-controls">跳至搜尋與篩選</a>
+  <main>
+    <header class="catalog-header">
+      <div class="header-row"><div class="brand">BXH <b>ARENA</b></div><a class="return-link" href="./index.html">返回首頁 <span aria-hidden="true">↗</span></a></div>
+      <div class="eyebrow">戰鬥陀螺X・公開圖鑑</div>
+      <div class="title-row"><h1>戰鬥陀螺圖鑑</h1><span class="readonly-tag">免登入 · 唯讀</span></div>
+      <p class="intro">查找商品與零件，從原廠資料認識你的組合。</p>
+    </header>
+
+    <section class="catalog-body" aria-label="圖鑑內容">
+      <div class="catalog-notice">
+        <p>目前收錄部分有來源的資料。中文名稱為暫譯，非台灣官方命名；每筆保留原文與代碼供對照。台灣官方中文名稱、實物配色及其他未確認欄位待補。</p>
+        <details><summary>資料範圍與完整性</summary>
+          <p>部件清單只描述已核對的對戰部件型別，不代表整盒內容、成品配色或所有款式都已收錄；商品與款式的完整組成仍待補。</p>
+          <p>純代碼零件以「代碼＋分類」顯示，分類文字僅供檢索，不代表官方全名。原名中的顏色版本詞可在暫譯中對照呈現，不延伸為實物色版認證。此頁不提供重量、性能、相容性、賽事合法性或發售狀態的判定。</p>
+        </details>
+      </div>
+
+      <div class="catalog-stats" aria-label="已收錄資料筆數">
+        <div><strong id="catalog-product-count">—</strong><span>商品</span></div>
+        <div><strong id="catalog-part-count">—</strong><span>零件型別</span></div>
+        <div><strong id="catalog-group-count">—</strong><span>部件清單</span></div>
+      </div>
+
+      <div class="load-status">
+        <p id="catalog-status" role="status" aria-live="polite">正在讀取並檢查資料版本…</p>
+        <button id="catalog-retry" type="button" hidden>重新讀取</button>
+      </div>
+      <noscript><p class="catalog-notice">請啟用 JavaScript，才能檢查資料版本並使用圖鑑。</p></noscript>
+
+      <fieldset id="catalog-controls" disabled>
+        <legend class="visually-hidden">搜尋與篩選圖鑑</legend>
+        <div class="catalog-tabs" role="group" aria-label="圖鑑分類">
+          <button type="button" data-catalog-tab="products" aria-pressed="true" aria-controls="catalog-results">商品</button>
+          <button type="button" data-catalog-tab="parts" aria-pressed="false" aria-controls="catalog-results">零件</button>
+        </div>
+        <div class="catalog-filters">
+          <div class="search-field"><label for="catalog-search">搜尋中文、原文或商品代碼</label><input id="catalog-search" type="search" maxlength="120" placeholder="例如 魔導神杖、UX-18、5-70" autocomplete="off" enterkeyhint="search"></div>
+          <div><label id="catalog-category-label" for="catalog-category">商品類別</label><select id="catalog-category"><option value="all">全部類別</option></select></div>
+          <button id="catalog-reset" class="secondary" type="button">清除篩選</button>
+        </div>
+      </fieldset>
+      <p id="catalog-count" class="catalog-count" aria-live="polite" aria-atomic="true"></p>
+      <div id="catalog-results" class="catalog-results" aria-busy="true" aria-label="搜尋結果"></div>
+      <footer>BXH ARENA · 公開唯讀資料快照 <span id="catalog-version"></span><br>依來源持續補充，未收錄不代表不存在。</footer>
+    </section>
+  </main>
+</body>
+</html>
