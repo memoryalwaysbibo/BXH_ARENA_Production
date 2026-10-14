@@ -6,6 +6,9 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const model = require('../modules/bey-catalog/catalog-public-model.js');
 const pendingModel = require('../modules/bey-catalog/catalog-pending-model.js');
+const candidateModel = require('../modules/bey-catalog/catalog-candidate-model.js');
+const candidatePolicy = require('../modules/bey-catalog/catalog-candidate-policy.js');
+const CANDIDATE_SCRIPTS = ['modules/bey-catalog/catalog-candidate-model.js','modules/bey-catalog/catalog-candidate-policy.js','modules/bey-catalog/catalog-candidate-presentation.js'];
 const ROOT = path.resolve(__dirname, '..');
 const RUNTIME_FILES = Object.freeze([
   'bey-catalog.html',
@@ -16,7 +19,10 @@ const RUNTIME_FILES = Object.freeze([
   ...[...model.OPTION_IMAGES, ...model.PART_IMAGES].map(image => image.path),
   'modules/bey-catalog/catalog-pending-model.js',
   'modules/bey-catalog/catalog-pending-ui.js',
-  pendingModel.DATA_URL.replace(/^\.\//, '')
+  pendingModel.DATA_URL.replace(/^\.\//, ''),
+  ...CANDIDATE_SCRIPTS,
+  candidatePolicy.dataURL.replace(/^\.\//, ''),
+  ...candidatePolicy.imageURLs
 ]);
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -42,12 +48,19 @@ async function inspectRuntime(root = ROOT) {
   }
   const pendingBytes = bytes.get(pendingModel.DATA_URL.replace(/^\.\//, ''));
   const pending = await pendingModel.decodeSnapshot(pendingBytes.buffer.slice(pendingBytes.byteOffset, pendingBytes.byteOffset + pendingBytes.byteLength));
+  const candidateBytes = bytes.get(candidatePolicy.dataURL.replace(/^\.\//, ''));
+  const candidateData = await candidateModel.decodeSnapshot(candidateBytes.buffer.slice(candidateBytes.byteOffset,candidateBytes.byteOffset+candidateBytes.byteLength),candidatePolicy);
+  if (new Set(candidateData.entries.map(row=>row.imageURL)).size !== candidatePolicy.imageURLs.length || candidateData.entries.some(row=>!candidatePolicy.imageURLs.includes(row.imageURL))) throw Error('CANDIDATE_ASSET_LIST_MISMATCH');
+  for(const row of candidateData.entries) {
+    const asset=bytes.get(row.imageURL);
+    if(!asset || asset.length>2097152 || sha256(asset)!==row.imageSha256 || asset.toString('ascii',0,4)!=='RIFF' || asset.toString('ascii',8,12)!=='WEBP') throw Error('CANDIDATE_IMAGE_MISMATCH');
+  }
   const html = bytes.get('bey-catalog.html').toString('utf8');
-  const expectedAssets = new Set([...RUNTIME_FILES.slice(1, 4), 'modules/bey-catalog/catalog-pending-model.js', 'modules/bey-catalog/catalog-pending-ui.js']);
+  const expectedAssets = new Set([...RUNTIME_FILES.slice(1, 4), 'modules/bey-catalog/catalog-pending-model.js', 'modules/bey-catalog/catalog-pending-ui.js', ...CANDIDATE_SCRIPTS]);
   const actualAssets = [...html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi)]
     .map(match => match[1].split(/[?#]/)[0].replace(/^\.\//, ''));
   if (actualAssets.length !== expectedAssets.size || actualAssets.some(file => !expectedAssets.has(file))) throw new Error('UNEXPECTED_RUNTIME_DEPENDENCY');
-  for (const name of ['bey-catalog.html', 'modules/bey-catalog/catalog-public-model.js', 'modules/bey-catalog/catalog-public-ui.js', 'modules/bey-catalog/catalog-pending-model.js', 'modules/bey-catalog/catalog-pending-ui.js']) {
+  for (const name of ['bey-catalog.html', 'modules/bey-catalog/catalog-public-model.js', 'modules/bey-catalog/catalog-public-ui.js', 'modules/bey-catalog/catalog-pending-model.js', 'modules/bey-catalog/catalog-pending-ui.js', ...CANDIDATE_SCRIPTS]) {
     if (/\b(?:eval\s*\(|importScripts\s*\(|serviceWorker\s*\.|XMLHttpRequest\b|WebSocket\b)/.test(bytes.get(name).toString('utf8'))) throw new Error('UNEXPECTED_ACTIVE_DEPENDENCY');
   }
   const manifest = {
@@ -55,6 +68,7 @@ async function inspectRuntime(root = ROOT) {
     schemaVersion: 1,
     snapshotSha256: model.EXPECTED_SHA256,
     pendingInventory: {sha256: pendingModel.EXPECTED_SHA256, entries: pending.entries.length, unresolved: pending.unresolved.length},
+    candidateImages: {sha256:candidatePolicy.sha256,entries:candidateData.entries.length,images:candidatePolicy.imageURLs.length,status:'candidate'},
     counts: Object.fromEntries(Object.entries(catalog).map(([key, rows]) => [key, rows.length])),
     requiredExistingHostPath: 'index.html',
     files: RUNTIME_FILES.map(file => ({path: file, bytes: bytes.get(file).length, sha256: sha256(bytes.get(file))}))

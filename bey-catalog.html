@@ -11,6 +11,9 @@
   <script src="./modules/bey-catalog/catalog-public-model.js?v=public-pending-inventory-1" defer></script>
   <script src="./modules/bey-catalog/catalog-public-ui.js?v=public-pending-inventory-1" defer></script>
   <script src="./modules/bey-catalog/catalog-pending-model.js?v=public-pending-inventory-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-candidate-model.js?v=candidate-images-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-candidate-policy.js?v=candidate-images-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-candidate-presentation.js?v=candidate-images-1" defer></script>
   <script src="./modules/bey-catalog/catalog-pending-ui.js?v=public-pending-inventory-1" defer></script>
 </head>
 <body data-catalog-state="loading">
@@ -44,9 +47,12 @@
           <button id="pending-reset" class="secondary" type="button">清除篩選</button>
         </div>
       </fieldset>
+      <div class="load-status"><p id="candidate-status" role="status" aria-live="polite">候選配圖尚未載入。</p><button id="candidate-retry" type="button" hidden>重新讀取候選配圖</button></div>
       <p id="pending-count" class="catalog-count" aria-live="polite" aria-atomic="true"></p>
       <div id="pending-results" class="catalog-results" aria-busy="false" aria-label="待補清冊搜尋結果"></div>
-      <footer>BXH ARENA · 使用者提供的待核清單<br>此區與有來源的圖鑑分開呈現，未核資料不會覆蓋已核實欄位。</footer>
+      <footer>BXH ARENA · 使用者提供的待核清單<br>此區與有來源的圖鑑分開呈現，未核資料不會覆蓋已核實欄位。
+        <p id="candidate-rights">候選圖片來源見各卡片連結；圖片與商標屬各原權利人。BX-01 官方商品來源的著作權標示：©Homura Kawamoto, Hikaru Muno, Posuka Demizu, BBXProject © ＴＯＭＹ。個別商品的完整著作權標示以各卡片來源頁為準。本頁未授予圖片或商標的再利用權。</p>
+      </footer>
     </section>
     <section id="verified-panel" class="catalog-body" aria-label="圖鑑內容">
       <div class="catalog-notice">
