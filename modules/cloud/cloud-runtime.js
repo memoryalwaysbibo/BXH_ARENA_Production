@@ -2015,12 +2015,23 @@
           const snap=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
           if(!snap.exists()){ skipped.push({code,reason:"public-missing"}); continue; }
           const d=snap.data()||{};
+          // A published registration-only event may not have a bracket yet.
+          const waiting=String(d.tournamentPhase||"")==="waiting";
+          const topLevelHistory=d.startedAt||d.completedAt||d.archivedAt||d.archiveStatus==="completed"||d.registrationStatus==="started";
+          if(waiting&&!topLevelHistory&&!d.bracketView&&!d.data) continue;
           let runtime;
           try{ runtime=reconstructPublicStateFromDoc(code,d); }
           catch(e){ skipped.push({code,reason:"public-corrupt"}); continue; }
           runtime.cloudCode=code;
           runtime.meta=runtime.meta||{};
           runtime.meta.ladderMode=(d.ladderMode==="ranked"||runtime.meta.ladderMode==="ranked")?"ranked":"general";
+
+          // Draft draws and automatic byes are not played history. Preserve review
+          // for stale waiting mirrors that contain started or completed evidence.
+          const historyMatches=Array.isArray(runtime.matches)?runtime.matches:Object.values(runtime.matches||{});
+          const hasPlayedHistory=historyMatches.some(m=>m&&!m.isBye&&(m.startedAt||m.completedAt||m.confirmedAt||m.completed===true||m.winnerId||m.loserId||Number(m.scoreA)>0||Number(m.scoreB)>0||(Array.isArray(m.log)&&m.log.length>0)));
+          const runtimeHistory=runtime.startedAt||runtime.completedAt||runtime.archivedAt||runtime.archiveStatus==="completed"||runtime.meta.registrationStatus==="started";
+          if(waiting&&!topLevelHistory&&!runtimeHistory&&!hasPlayedHistory) continue;
 
           const players=Array.isArray(runtime.players)?runtime.players:[];
           const regId=String(reg.registrationId||reg.id||uid);
@@ -2043,12 +2054,12 @@
           if(!participant){
             const wantedNames=[reg.displayName,reg.publicName,reg.participantName,reg.realName].map(cleanName).filter(Boolean);
             const nameMatches=players.filter(p=>p&&wantedNames.includes(cleanName(p.name))).length;
-            // A cancelled or unpromoted waitlist registration is not match history.
+            // Cancelled, unpromoted waitlist and raffle-not-selected registrations are not match history.
             // Keep unresolved identity blocking if any roster/name or match evidence remains.
             const matches=Array.isArray(runtime.matches)?runtime.matches:Object.values(runtime.matches||{});
             const hasMatchEvidence=matches.some(m=>m&&[m.a&&m.a.playerId,m.b&&m.b.playerId,m.winnerId,m.loserId]
               .some(id=>id!=null&&candidateIds.has(String(id))));
-            if(["cancelled","waitlist"].includes(String(reg.status||""))&&nameMatches===0&&!hasMatchEvidence) continue;
+            if(["cancelled","waitlist","not_selected"].includes(String(reg.status||""))&&nameMatches===0&&!hasMatchEvidence) continue;
             skipped.push({code,reason:"identity-unresolved",eventName:String(d.name||""),eventDate:String(d.eventDate||""),identityIssue:nameMatches>1?"ambiguous-name":"participant-not-found"});
             continue;
           }
