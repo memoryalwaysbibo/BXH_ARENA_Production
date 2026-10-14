@@ -185,6 +185,8 @@ jobs:
           node --test tests/double-elimination-core.test.cjs
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
+      - name: Verify public catalog evidence, projection, UI contract and artifact boundary
+        run: node --test tests/bey-catalog-public-evidence-policy.test.cjs tests/bey-catalog-public-ui.test.cjs tests/bey-catalog-public-package.test.cjs
       - name: Verify ladder V1 scoring and inline-script syntax
         run: node --experimental-vm-modules tests/ladder-v1.cjs
       - name: Verify ladder V1 settlement trust boundary
@@ -254,6 +256,11 @@ jobs:
       - name: Verify compact bracket finals labels
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/bracket-final-label-layout.cjs
+      - name: Verify public catalog in isolated Chromium without authentication
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        env:
+          PUBLIC_CATALOG_QA_OUTPUT_DIR: test-results/public-catalog
+        run: node --test tests/bey-catalog-public-browser.test.cjs
       - name: Upload community quick registration screenshots and results
         if: always()
         uses: actions/upload-artifact@v4

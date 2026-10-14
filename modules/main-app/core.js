@@ -12851,6 +12851,7 @@ function renderLandingScreen(){
         </button>
       </div>
       <div class="btn-row" style="justify-content:center;margin-top:18px;">
+        <a class="btn btn-ghost" href="./bey-catalog.html" data-catalog-entry="public">陀螺圖鑑 · 免登入</a>
         <button class="btn btn-primary" data-action="open-qr-scanner" data-source="landing">掃描賽事 QR</button>
         <button class="btn btn-ghost" data-action="raffle-public">會員抽獎</button>
         <button class="btn btn-ghost" data-action="force-refresh-version" title="強制重新載入最新版本">↻ 刷新版本</button>
