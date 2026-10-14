@@ -1,0 +1,1989 @@
+{
+  "products": [
+    {
+      "productId": "product_000001",
+      "productCode": "UX-03",
+      "originalName": "ウィザードロッド5-70DB",
+      "packageType": "booster",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux03.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux03.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux03.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000002",
+      "productCode": "UX-19",
+      "originalName": "バレットグリフォンH",
+      "packageType": "starter",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux19.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux19.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux19.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000003",
+      "productCode": "UX-20",
+      "originalName": "グローリーワルキューレLF",
+      "packageType": "starter",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux20.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux20.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux20.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000004",
+      "productCode": "CX-07",
+      "originalName": "ペガサスブラストATr",
+      "packageType": "starter",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx07.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx07.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx07.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000005",
+      "productCode": "CX-13",
+      "originalName": "バハムートブリッツBK1-50I",
+      "packageType": "starter",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx13.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx13.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx13.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000006",
+      "productCode": "UX-18",
+      "originalName": "ランダムブースターVol.8",
+      "packageType": "random_booster",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000007",
+      "productCode": "BX-01",
+      "originalName": "ドランソード3-60F",
+      "packageType": "starter",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx01.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx01.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx01.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000008",
+      "productCode": "BX-20",
+      "originalName": "ドランダガーデッキセット",
+      "packageType": "deck_set",
+      "sourceUrls": {
+        "productCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx20.html"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx20.html"
+        ],
+        "packageType": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx20.html"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "productId": "product_000009",
+      "productCode": "CX-00",
+      "originalName": "ロックチップ/ドラン クリアブラックVer. and ベイバトルパスシート",
+      "packageType": "part_set",
+      "sourceUrls": {
+        "productCode": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ],
+        "originalName": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ],
+        "packageType": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ]
+      },
+      "compositionComplete": false
+    }
+  ],
+  "parts": [
+    {
+      "partId": "part_000001",
+      "originalName": "ウィザードロッド",
+      "category": "blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000002",
+      "originalName": "5-70",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000003",
+      "originalName": "DB",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000004",
+      "originalName": "バレットグリフォン",
+      "category": "blade_ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-19_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-19_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000005",
+      "originalName": "H",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-19_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-19_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000006",
+      "originalName": "グローリーワルキューレ",
+      "category": "blade_ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000007",
+      "originalName": "LF",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000008",
+      "originalName": "マミーカース",
+      "category": "blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_UX18.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_UX18.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000009",
+      "originalName": "7-55",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_UX18.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_UX18.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000010",
+      "originalName": "W",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000011",
+      "originalName": "ドランソード",
+      "category": "blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000012",
+      "originalName": "3-60",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx33.png",
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx33.png",
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000013",
+      "originalName": "F",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000014",
+      "originalName": "ドランダガー",
+      "category": "blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000015",
+      "originalName": "4-60",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000016",
+      "originalName": "R",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux11.png",
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux11.png",
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000017",
+      "originalName": "シャークエッジ",
+      "category": "blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000018",
+      "originalName": "3-80",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000019",
+      "originalName": "ナイトシールド",
+      "category": "blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000020",
+      "originalName": "5-80",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000021",
+      "originalName": "T",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000022",
+      "originalName": "ロックチップ/ドラン",
+      "category": "lock_chip",
+      "sourceUrls": {
+        "originalName": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ],
+        "category": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ]
+      }
+    },
+    {
+      "partId": "part_000023",
+      "originalName": "ペガサス",
+      "category": "lock_chip",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf",
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf",
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000024",
+      "originalName": "ブラスト",
+      "category": "main_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000025",
+      "originalName": "A（アサルト）",
+      "category": "assist_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000026",
+      "originalName": "Tr",
+      "category": "ratchet_bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000027",
+      "originalName": "バハムート",
+      "category": "lock_chip",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000028",
+      "originalName": "ブリッツ",
+      "category": "metal_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000029",
+      "originalName": "B（ブレイク）",
+      "category": "over_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000030",
+      "originalName": "K（ナックル）",
+      "category": "assist_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000031",
+      "originalName": "1-50",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000032",
+      "originalName": "I",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000033",
+      "originalName": "C",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx34.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx34.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000034",
+      "originalName": "ブラッシュ",
+      "category": "main_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000035",
+      "originalName": "M（マッシブ）",
+      "category": "assist_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000036",
+      "originalName": "3-85",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000037",
+      "originalName": "ソル",
+      "category": "lock_chip",
+      "sourceUrls": {
+        "originalName": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000038",
+      "originalName": "ブレイブ",
+      "category": "main_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000039",
+      "originalName": "C（チャージ）",
+      "category": "assist_blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000040",
+      "originalName": "9-70",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux07_r.png",
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux07_r.png",
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000041",
+      "originalName": "TP",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx38.png",
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx38.png",
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "partId": "part_000042",
+      "originalName": "G",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux07_r.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux07_r.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000043",
+      "originalName": "ヴァイスタイガー",
+      "category": "blade",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx33.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx33.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000044",
+      "originalName": "4-80",
+      "category": "ratchet",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000045",
+      "originalName": "LR",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux11.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_ux11.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000046",
+      "originalName": "B",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx03.png"
+        ]
+      }
+    },
+    {
+      "partId": "part_000047",
+      "originalName": "N",
+      "category": "bit",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx04.png"
+        ],
+        "category": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_bx04.png"
+        ]
+      }
+    }
+  ],
+  "options": [
+    {
+      "optionId": "option_000001",
+      "productId": "product_000001",
+      "sourceUrls": {
+        "optionId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ],
+        "productId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000003",
+      "productId": "product_000003",
+      "sourceUrls": {
+        "optionId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ],
+        "productId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000004",
+      "productId": "product_000004",
+      "sourceUrls": {
+        "optionId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "productId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000005",
+      "productId": "product_000005",
+      "sourceUrls": {
+        "optionId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "productId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000006",
+      "productId": "product_000006",
+      "optionCode": "01",
+      "originalName": "マミーカース7-55W",
+      "sourceUrls": {
+        "optionCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000007",
+      "productId": "product_000006",
+      "optionCode": "02",
+      "originalName": "マミーカース4-60C",
+      "sourceUrls": {
+        "optionCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000008",
+      "productId": "product_000006",
+      "optionCode": "03",
+      "originalName": "ペガサスブラッシュM3-85W",
+      "sourceUrls": {
+        "optionCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000009",
+      "productId": "product_000006",
+      "optionCode": "04",
+      "originalName": "ソルブレイブC9-70TP",
+      "sourceUrls": {
+        "optionCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000010",
+      "productId": "product_000006",
+      "optionCode": "05",
+      "originalName": "ドランダガー7-55G",
+      "sourceUrls": {
+        "optionCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000011",
+      "productId": "product_000006",
+      "optionCode": "06",
+      "originalName": "ヴァイスタイガー4-80LR",
+      "sourceUrls": {
+        "optionCode": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ],
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000012",
+      "productId": "product_000007",
+      "sourceUrls": {
+        "optionId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ],
+        "productId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000013",
+      "productId": "product_000008",
+      "sourceUrls": {
+        "optionId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "productId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      },
+      "compositionComplete": false
+    },
+    {
+      "optionId": "option_000014",
+      "productId": "product_000009",
+      "sourceUrls": {
+        "optionId": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ],
+        "productId": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ]
+      },
+      "compositionComplete": false
+    }
+  ],
+  "assemblyRelations": [
+    {
+      "groupId": "group_000001",
+      "productId": "product_000001",
+      "optionId": "option_000001",
+      "originalName": "ウィザードロッド5-70DB",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux03.html"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "content_000001",
+          "partId": "part_000001",
+          "category": "blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000002",
+          "partId": "part_000002",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000003",
+          "partId": "part_000003",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000003",
+      "productId": "product_000003",
+      "optionId": "option_000003",
+      "originalName": "グローリーワルキューレLF",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux20.html"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "content_000006",
+          "partId": "part_000006",
+          "category": "blade_ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000007",
+          "partId": "part_000007",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000004",
+      "productId": "product_000004",
+      "optionId": "option_000004",
+      "originalName": "ペガサスブラストATr",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx07.html"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "claim_000024",
+          "partId": "part_000023",
+          "category": "lock_chip",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000025",
+          "partId": "part_000024",
+          "category": "main_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000026",
+          "partId": "part_000025",
+          "category": "assist_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000027",
+          "partId": "part_000026",
+          "category": "ratchet_bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000005",
+      "productId": "product_000005",
+      "optionId": "option_000005",
+      "originalName": "バハムートブリッツBK1-50I",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx13.html"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "claim_000028",
+          "partId": "part_000027",
+          "category": "lock_chip",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000029",
+          "partId": "part_000029",
+          "category": "over_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000030",
+          "partId": "part_000028",
+          "category": "metal_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000031",
+          "partId": "part_000030",
+          "category": "assist_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000032",
+          "partId": "part_000031",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000033",
+          "partId": "part_000032",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000008",
+      "productId": "product_000006",
+      "optionId": "option_000008",
+      "originalName": "ペガサスブラッシュM3-85W",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "claim_000037",
+          "partId": "part_000023",
+          "category": "lock_chip",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000038",
+          "partId": "part_000034",
+          "category": "main_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000039",
+          "partId": "part_000035",
+          "category": "assist_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000040",
+          "partId": "part_000036",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000041",
+          "partId": "part_000010",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000009",
+      "productId": "product_000006",
+      "optionId": "option_000009",
+      "originalName": "ソルブレイブC9-70TP",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-18_manual.pdf"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "claim_000042",
+          "partId": "part_000037",
+          "category": "lock_chip",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000043",
+          "partId": "part_000038",
+          "category": "main_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000044",
+          "partId": "part_000039",
+          "category": "assist_blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000045",
+          "partId": "part_000040",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "claim_000046",
+          "partId": "part_000041",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000012",
+      "productId": "product_000007",
+      "optionId": "option_000012",
+      "originalName": "ドランソード3-60F",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx01.html"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "content_000011",
+          "partId": "part_000011",
+          "category": "blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000012",
+          "partId": "part_000012",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000013",
+          "partId": "part_000013",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000013",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "originalName": "ドランダガー4-60R",
+      "sourceUrls": {
+        "originalName": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx20.html"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "content_000014",
+          "partId": "part_000014",
+          "category": "blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000015",
+          "partId": "part_000015",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000016",
+          "partId": "part_000016",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000014",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "sourceUrls": {},
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "content_000017",
+          "partId": "part_000017",
+          "category": "blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000018",
+          "partId": "part_000018",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000019",
+          "partId": "part_000013",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000015",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "sourceUrls": {},
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "content_000020",
+          "partId": "part_000019",
+          "category": "blade",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000021",
+          "partId": "part_000020",
+          "category": "ratchet",
+          "quantity": 1
+        },
+        {
+          "contentClaimId": "content_000022",
+          "partId": "part_000021",
+          "category": "bit",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+      ]
+    },
+    {
+      "groupId": "group_000016",
+      "productId": "product_000009",
+      "optionId": "option_000014",
+      "originalName": "ロックチップ/ドラン クリアブラックVer.",
+      "sourceUrls": {
+        "originalName": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ]
+      },
+      "compositionComplete": true,
+      "expectedParts": [
+        {
+          "contentClaimId": "content_000023",
+          "partId": "part_000022",
+          "category": "lock_chip",
+          "quantity": 1
+        }
+      ],
+      "compositionSourceUrls": [
+        "https://takaratomymall.jp/shop/g/g8202610953715/"
+      ]
+    }
+  ],
+  "contentFacts": [
+    {
+      "contentClaimId": "content_000001",
+      "productId": "product_000001",
+      "optionId": "option_000001",
+      "groupId": "group_000001",
+      "partId": "part_000001",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000002",
+      "productId": "product_000001",
+      "optionId": "option_000001",
+      "groupId": "group_000001",
+      "partId": "part_000002",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000003",
+      "productId": "product_000001",
+      "optionId": "option_000001",
+      "groupId": "group_000001",
+      "partId": "part_000003",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-03_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000006",
+      "productId": "product_000003",
+      "optionId": "option_000003",
+      "groupId": "group_000003",
+      "partId": "part_000006",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000007",
+      "productId": "product_000003",
+      "optionId": "option_000003",
+      "groupId": "group_000003",
+      "partId": "part_000007",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/UX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000024",
+      "productId": "product_000004",
+      "optionId": "option_000004",
+      "groupId": "group_000004",
+      "partId": "part_000023",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000025",
+      "productId": "product_000004",
+      "optionId": "option_000004",
+      "groupId": "group_000004",
+      "partId": "part_000024",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000026",
+      "productId": "product_000004",
+      "optionId": "option_000004",
+      "groupId": "group_000004",
+      "partId": "part_000025",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000027",
+      "productId": "product_000004",
+      "optionId": "option_000004",
+      "groupId": "group_000004",
+      "partId": "part_000026",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-07_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000028",
+      "productId": "product_000005",
+      "optionId": "option_000005",
+      "groupId": "group_000005",
+      "partId": "part_000027",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000029",
+      "productId": "product_000005",
+      "optionId": "option_000005",
+      "groupId": "group_000005",
+      "partId": "part_000029",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000030",
+      "productId": "product_000005",
+      "optionId": "option_000005",
+      "groupId": "group_000005",
+      "partId": "part_000028",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000031",
+      "productId": "product_000005",
+      "optionId": "option_000005",
+      "groupId": "group_000005",
+      "partId": "part_000030",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000032",
+      "productId": "product_000005",
+      "optionId": "option_000005",
+      "groupId": "group_000005",
+      "partId": "part_000031",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000033",
+      "productId": "product_000005",
+      "optionId": "option_000005",
+      "groupId": "group_000005",
+      "partId": "part_000032",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/CX-13_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000037",
+      "productId": "product_000006",
+      "optionId": "option_000008",
+      "groupId": "group_000008",
+      "partId": "part_000023",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000038",
+      "productId": "product_000006",
+      "optionId": "option_000008",
+      "groupId": "group_000008",
+      "partId": "part_000034",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000039",
+      "productId": "product_000006",
+      "optionId": "option_000008",
+      "groupId": "group_000008",
+      "partId": "part_000035",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000040",
+      "productId": "product_000006",
+      "optionId": "option_000008",
+      "groupId": "group_000008",
+      "partId": "part_000036",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000041",
+      "productId": "product_000006",
+      "optionId": "option_000008",
+      "groupId": "group_000008",
+      "partId": "part_000010",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000042",
+      "productId": "product_000006",
+      "optionId": "option_000009",
+      "groupId": "group_000009",
+      "partId": "part_000037",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000043",
+      "productId": "product_000006",
+      "optionId": "option_000009",
+      "groupId": "group_000009",
+      "partId": "part_000038",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000044",
+      "productId": "product_000006",
+      "optionId": "option_000009",
+      "groupId": "group_000009",
+      "partId": "part_000039",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000045",
+      "productId": "product_000006",
+      "optionId": "option_000009",
+      "groupId": "group_000009",
+      "partId": "part_000040",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "claim_000046",
+      "productId": "product_000006",
+      "optionId": "option_000009",
+      "groupId": "group_000009",
+      "partId": "part_000041",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ],
+        "quantity": [
+          "https://www.takaratomy.co.jp/support/manual/items/4904810097167_%EF%BC%B5%EF%BC%B8%EF%BC%8D%EF%BC%91%EF%BC%98%E3%80%80%E3%83%A9%E3%83%B3%E3%83%80%E3%83%A0%E3%83%96%E3%83%BC%E3%82%B9%E3%82%BF%E3%83%BC%EF%BC%B6%EF%BD%8F%EF%BD%8C%EF%BC%8E%EF%BC%98.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000011",
+      "productId": "product_000007",
+      "optionId": "option_000012",
+      "groupId": "group_000012",
+      "partId": "part_000011",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000012",
+      "productId": "product_000007",
+      "optionId": "option_000012",
+      "groupId": "group_000012",
+      "partId": "part_000012",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000013",
+      "productId": "product_000007",
+      "optionId": "option_000012",
+      "groupId": "group_000012",
+      "partId": "part_000013",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-01_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000014",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000013",
+      "partId": "part_000014",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000015",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000013",
+      "partId": "part_000015",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000016",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000013",
+      "partId": "part_000016",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000017",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000014",
+      "partId": "part_000017",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000018",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000014",
+      "partId": "part_000018",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000019",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000014",
+      "partId": "part_000013",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000020",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000015",
+      "partId": "part_000019",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000021",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000015",
+      "partId": "part_000020",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000022",
+      "productId": "product_000008",
+      "optionId": "option_000013",
+      "groupId": "group_000015",
+      "partId": "part_000021",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ],
+        "quantity": [
+          "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-20_manual.pdf"
+        ]
+      }
+    },
+    {
+      "contentClaimId": "content_000023",
+      "productId": "product_000009",
+      "optionId": "option_000014",
+      "groupId": "group_000016",
+      "partId": "part_000022",
+      "quantity": 1,
+      "sourceUrls": {
+        "partId": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ],
+        "quantity": [
+          "https://takaratomymall.jp/shop/g/g8202610953715/"
+        ]
+      }
+    }
+  ]
+}

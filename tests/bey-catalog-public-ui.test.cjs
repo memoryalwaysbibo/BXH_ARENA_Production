@@ -15,13 +15,13 @@ const html = fs.readFileSync(path.join(root, 'bey-catalog.html'), 'utf8');
 const ui = fs.readFileSync(path.join(root, 'modules/bey-catalog/catalog-public-ui.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'bey-catalog.css'), 'utf8');
 
-test('the only public JSON is the exact pinned snapshot and contains 116 cross-category records', async () => {
+test('the only public JSON is the exact pinned snapshot and contains 118 cross-category records', async () => {
   assert.equal(bytes.length, model.EXPECTED_BYTES);
   assert.equal(createHash('sha256').update(bytes).digest('hex'), model.EXPECTED_SHA256);
   assert.match(model.DATA_URL, new RegExp(model.EXPECTED_SHA256 + '\\.json$'));
   const data = await model.decodeSnapshot(arrayBuffer(bytes));
   assert.deepEqual(Object.fromEntries(Object.entries(data).map(([key, value]) => [key, value.length])), model.COUNTS);
-  assert.equal(Object.values(model.COUNTS).reduce((a, b) => a + b), 116);
+  assert.equal(Object.values(model.COUNTS).reduce((a, b) => a + b), 118);
   assert.deepEqual(fs.readdirSync(path.join(root, 'data/bey-catalog')), [path.basename(model.DATA_URL)]);
 });
 
@@ -94,7 +94,7 @@ test('source allowlist is exact and resists credential, path, query, fragment an
 
 test('search supports codes, kana, full-width text, part names and category filtering', () => {
   assert.equal(model.filterCatalog(original, 'products').length, 9);
-  assert.equal(model.filterCatalog(original, 'parts').length, 45);
+  assert.equal(model.filterCatalog(original, 'parts').length, 47);
   assert.deepEqual(model.filterCatalog(original, 'products', 'ｕｘ１８').map(item => item.productCode), ['UX-18']);
   assert.deepEqual(model.filterCatalog(original, 'products', 'UX-18').map(item => item.productCode), ['UX-18']);
   for (const code of ['UX-18-03', 'UX-18-05', 'ｕｘ１８０３']) assert.deepEqual(model.filterCatalog(original, 'products', code).map(item => item.productCode), ['UX-18']);
@@ -128,9 +128,9 @@ test('display aliases cover every named record, remain provisional, and retain e
   assert.equal(Object.keys(model.DISPLAY_NAMES).length, 39);
 });
 
-test('23 code-only parts keep their exact code and category without inventing an official full name', () => {
+test('25 code-only parts keep their exact code and category without inventing an official full name', () => {
   const codeParts = original.parts.filter(part => model.displayName(part).status === 'code_label');
-  assert.equal(codeParts.length, 23);
+  assert.equal(codeParts.length, 25);
   for (const part of codeParts) {
     const name = model.displayName(part);
     assert.equal(name.primary, part.originalName + ' ' + model.CATEGORY_LABELS[part.category]);
@@ -229,7 +229,7 @@ test('UI loads only the fixed public resource anonymously, renders 9 products, a
   assert.equal(h.calls.length, 1);assert.equal(h.calls[0].url, model.DATA_URL);
   assert.equal(h.calls[0].options.credentials, 'omit');assert.equal(h.calls[0].options.cache, 'no-store');assert.equal(h.calls[0].options.redirect, 'error');assert.equal(h.calls[0].options.method, 'GET');
   assert.equal(h.ids['catalog-results'].children.length, 9);assert.equal(h.ids['catalog-product-count'].textContent, '9');
-  assert.equal(h.ids['catalog-part-count'].textContent, '45');assert.equal(h.ids['catalog-group-count'].textContent, '11');
+  assert.equal(h.ids['catalog-part-count'].textContent, '47');assert.equal(h.ids['catalog-group-count'].textContent, '11');
   assert.equal(h.ids['catalog-controls'].disabled, false);assert.equal(h.timeouts.size, 0);
   h.ids['catalog-search'].value = 'UX-18';await h.ids['catalog-search'].emit('input');
   assert.equal(h.ids['catalog-results'].children.length, 1);assert.match(h.ids['catalog-count'].textContent, /1／9/);
@@ -237,11 +237,11 @@ test('UI loads only the fixed public resource anonymously, renders 9 products, a
   h.ids['catalog-search'].value = 'unmatched';await h.ids['catalog-search'].emit('input');
   assert.match(h.ids['catalog-results'].textContent, /沒有符合條件/);
   await h.ids['catalog-reset'].emit('click');assert.equal(h.ids['catalog-results'].children.length, 9);assert.equal(h.ids['catalog-search'].focused, true);
-  await h.tabs[1].emit('click');assert.equal(h.ids['catalog-results'].children.length, 45);assert.equal(h.tabs[1].attributes['aria-pressed'], 'true');
+  await h.tabs[1].emit('click');assert.equal(h.ids['catalog-results'].children.length, 47);assert.equal(h.tabs[1].attributes['aria-pressed'], 'true');
   h.ids['catalog-category'].value = 'blade';await h.ids['catalog-category'].emit('change');
   assert.equal(h.ids['catalog-results'].children.length, original.parts.filter(part => part.category === 'blade').length);
-  await h.ids['catalog-reset'].emit('click');assert.equal(h.ids['catalog-results'].children.length, 45);
-  await h.tabs[1].emit('click');assert.equal(h.ids['catalog-results'].children.length, 45);
+  await h.ids['catalog-reset'].emit('click');assert.equal(h.ids['catalog-results'].children.length, 47);
+  await h.tabs[1].emit('click');assert.equal(h.ids['catalog-results'].children.length, 47);
   await h.tabs[0].emit('click');assert.equal(h.ids['catalog-results'].children.length, 9);assert.equal(h.ids['catalog-category'].value, 'all');
   assert.equal(h.calls.length, 1);
 });
@@ -281,7 +281,7 @@ test('UI uses marked Chinese primary names and verbatim original secondary text 
   assert.equal(all.filter(row => row.dataset.nameStatus === 'untranslated').length, 0);
 });
 
-test('all 45 part cards distinguish provisional names from code labels, with Chinese search kept local', async () => {
+test('all 47 part cards distinguish provisional names from code labels, with Chinese search kept local', async () => {
   const h = harness(async () => response());await waitState(h, 'ready');await h.tabs[1].emit('click');
   for (const part of original.parts) {
     const card = h.ids['catalog-results'].children.find(row => row.dataset.partId === part.partId), name = model.displayName(part);
@@ -445,4 +445,62 @@ test('repeated filters and tabs neither duplicate images nor issue additional da
 test('no image requests or image nodes are created when snapshot authentication fails', async () => {
   const h = harness(async () => response(Buffer.from('bad')));await waitState(h,'error');
   assert.equal(descendants(h.ids['catalog-results']).filter(row => row.tagName==='IMG').length,0);
+});
+
+test('part image lookup rejects unknown or mismatched identities', () => {
+  assert.ok(Object.isFrozen(model.PART_IMAGES));
+  for (const value of [null, {}, {partId:'part_000013',originalName:'F',category:'blade'}, {partId:'part_999999',originalName:'F',category:'bit'}]) assert.equal(model.partImage(value), null);
+});
+
+test('synthetic part-image fixture renders local dimensions, source context, unknown mass and stable failure state', async () => {
+  // Synthetic presentation fixture only: not a claim that this image is reviewed or exists.
+  const fixture = {path:'assets/bey-catalog/test-fixture.webp',width:400,height:300,sourceProductCode:'BX-01',sourcePage:'https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx01.html'};
+  const suppliedModel = {...model, partImage: part => part.partId === 'part_000013' ? fixture : null};
+  const h = harness(async () => response(), suppliedModel);await waitState(h,'ready');
+  await h.tabs[1].emit('click');
+  const frame = descendants(h.ids['catalog-results']).find(row => row.className === 'part-image-frame');
+  assert.ok(frame);const photo = frame.children[0];
+  assert.equal(photo.src,'./'+fixture.path);assert.equal(photo.width,400);assert.equal(photo.height,300);
+  assert.equal(photo.loading,'lazy');assert.equal(photo.decoding,'async');assert.equal(photo.referrerPolicy,'no-referrer');
+  assert.match(photo.alt,/F 軸心.*BX-01/);
+  assert.match(h.ids['catalog-results'].textContent,/重量：待補/);
+  assert.match(h.ids['catalog-results'].textContent,/不代表所有配色/);
+  await photo.emit('error');await photo.emit('error');
+  assert.equal(photo.hidden,true);assert.equal(frame.children[1].hidden,false);
+  assert.equal(h.body.dataset.catalogState,'ready');assert.equal(h.calls.length,1);
+});
+
+test('four bit image identities are exact, immutable and source-product scoped', () => {
+  assert.deepEqual(model.PART_IMAGES.map(x=>[x.originalName,x.partId,x.sourceProductCode]),[['F','part_000013','BX-01'],['T','part_000021','BX-02'],['B','part_000046','BX-03'],['N','part_000047','BX-04']]);
+  for(const image of model.PART_IMAGES) {
+    const part=original.parts.find(p=>p.partId===image.partId);assert.equal(model.partImage(part),image);assert.ok(Object.isFrozen(image));
+    for(const patch of [{partId:'part_999999'},{originalName:'DB'},{category:'assist_blade'}])assert.equal(model.partImage({...part,...patch}),null);
+    assert.equal(model.safeSourceUrl(image.sourcePage),image.sourcePage);
+    assert.equal(image.width,586);assert.equal(image.height,709);
+    assert.match(image.path,/^assets\/bey-catalog\/bits\/bit-[ftbn]-bx0[1-4]\.webp$/);
+  }
+});
+
+test('B and N are the only snapshot additions and create no inferred product or color facts', () => {
+  const previous=copy();previous.parts=previous.parts.filter(p=>!['part_000046','part_000047'].includes(p.partId));
+  assert.equal(createHash('sha256').update(JSON.stringify(previous,null,2)+'\n').digest('hex'),'d8f36e95e0a12ae411df9e336411c0dd65f9797729b2f772c00a5abb4507b927');
+  for(const id of ['part_000046','part_000047']) {
+    assert.equal(original.contentFacts.filter(x=>x.partId===id).length,0);
+    const part=original.parts.find(p=>p.partId===id);
+    assert.deepEqual(Object.keys(part).sort(),['partId','originalName','category','sourceUrls'].sort());
+    assert.equal(model.displayName(part).status,'code_label');
+  }
+});
+
+test('four real bit frames keep weight unknown and repeated tab/filter flows remain single-fetch', async () => {
+  const h=harness(async()=>response());await waitState(h,'ready');
+  for(let repeat=0;repeat<3;repeat++) {
+    await h.tabs[1].emit('click');h.ids['catalog-category'].value='bit';await h.ids['catalog-category'].emit('change');
+    const photos=descendants(h.ids['catalog-results']).filter(x=>x.tagName==='IMG');assert.equal(photos.length,4);
+    assert.deepEqual(photos.map(x=>x.src),model.PART_IMAGES.map(x=>'./'+x.path));
+    assert.equal((h.ids['catalog-results'].textContent.match(/重量：待補/g)||[]).length,4);
+    await photos[0].emit('error');assert.equal(photos[0].hidden,true);
+    await h.tabs[0].emit('click');assert.equal(descendants(h.ids['catalog-results']).filter(x=>x.tagName==='IMG').length,6);
+  }
+  assert.equal(h.calls.length,1);
 });

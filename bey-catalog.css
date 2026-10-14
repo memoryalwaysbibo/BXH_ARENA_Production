@@ -63,3 +63,14 @@ footer{font-size:12px;line-height:1.8;color:var(--muted);padding:28px 0 0}
 .image-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;color:#4b515a;font-size:12px}
 .image-credit{font-size:10px!important;line-height:1.6;color:var(--muted)}
 @media(max-width:359px){.option-image-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Reviewed part illustrations retain their full source frame. */
+.part-image{margin:14px 0;min-width:0}.part-image-frame{position:relative;min-height:180px;background:#f7f7fa;border-radius:8px;overflow:hidden}
+.part-image img{display:block;width:100%;height:auto;object-fit:contain}.part-image figcaption{font-size:12px;line-height:1.6;padding-top:8px}
+
+/* Separate provisional list; no invented product pictures. */
+.catalog-view-switch{display:flex;gap:10px;padding:20px 28px 0}.catalog-view-switch button{flex:1}.catalog-view-switch [aria-pressed="false"]{background:#25292f;color:var(--text)}
+.pending-notice{border-color:#7e6a35}.pending-unresolved{border:1px dashed #7e6a35;border-radius:10px;padding:13px 16px;margin:16px 0;color:#f0dc9b;font-size:13px}.pending-unresolved p{margin:5px 0 0}
+.pending-card h3{margin:12px 0 7px;font-size:18px}.pending-image-placeholder{display:flex;align-items:center;justify-content:center;min-height:76px;margin:12px 0;border:1px dashed var(--border);border-radius:8px;color:var(--muted);font-size:13px}.pending-source{color:#f0dc9b;font-size:11px!important}
+#pending-status{margin:0;font-size:13px;color:var(--muted)}#pending-panel[data-state="error"] #pending-status{color:#ffb1a5}
+@media(max-width:680px){.catalog-view-switch{padding:16px 14px 0;gap:8px}.catalog-view-switch button{padding:10px 8px;font-size:14px}}

@@ -21,14 +21,14 @@ const ROOT = path.resolve(__dirname, '..');
 const OUTPUT = path.resolve(process.env.PUBLIC_CATALOG_QA_OUTPUT_DIR || path.join(os.tmpdir(), 'bxh-public-catalog-browser'));
 const MODEL_PATH = '/modules/bey-catalog/catalog-public-model.js';
 const UI_PATH = '/modules/bey-catalog/catalog-public-ui.js';
-const ASSET_PATHS = ['/bey-catalog.html', '/bey-catalog.css', MODEL_PATH, UI_PATH];
+const ASSET_PATHS = ['/bey-catalog.html', '/bey-catalog.css', MODEL_PATH, UI_PATH, '/modules/bey-catalog/catalog-pending-model.js', '/modules/bey-catalog/catalog-pending-ui.js'];
 const model = require('..' + MODEL_PATH);
-ASSET_PATHS.push(...model.OPTION_IMAGES.map(image => '/' + image.path));
+ASSET_PATHS.push(...[...model.OPTION_IMAGES, ...model.PART_IMAGES].map(image => '/' + image.path));
 const DATA_PATH = '/' + model.DATA_URL.replace(/^\.\//, '');
 const baseline = fs.readFileSync(path.join(ROOT, DATA_PATH));
 const payload = JSON.parse(baseline.toString('utf8'));
 const baselineModel = fs.readFileSync(path.join(ROOT, MODEL_PATH), 'utf8');
-const report = {scope: 'Public entry static audit plus isolated catalog Chromium scenarios. Main-app authentication and production are never exercised.', startedAt: new Date().toISOString(), browser: {status: 'not_run', reason: 'No Chromium launch has completed in this invocation'}, expectedBrowserScenarios: 18, checks: [], sessions: []};
+const report = {scope: 'Public entry static audit plus isolated catalog Chromium scenarios. Main-app authentication and production are never exercised.', startedAt: new Date().toISOString(), browser: {status: 'not_run', reason: 'No Chromium launch has completed in this invocation'}, expectedBrowserScenarios: 22, checks: [], sessions: []};
 fs.mkdirSync(OUTPUT, {recursive: true});
 
 function saveReport() {
@@ -75,7 +75,7 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
   after(async () => {
     if (browser) await browser.close();
     if (browser) report.browser.status = report.sessions.every(session => session.status === 'passed') ? 'passed_selected_scenarios' : 'failed';
-    report.coverage = {executedBrowserScenarios: report.sessions.length, notRunBrowserScenarios: 18 - report.sessions.length};
+    report.coverage = {executedBrowserScenarios: report.sessions.length, notRunBrowserScenarios: 22 - report.sessions.length};
     report.finishedAt = new Date().toISOString();
     saveReport();
   });
@@ -200,10 +200,42 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     assert.equal(await restored.isVisible(),true);assert.equal(await page.locator('.image-fallback').first().isVisible(),false);
   }));
 
+  for (const width of [320, 375, 1440]) test(`four bit images load locally at ${width}px`, async () => scenario(`basic-bits-${width}`, async ({page,origin,state}) => {
+    await loaded(page,origin);await page.locator('[data-catalog-tab="parts"]').click();
+    await page.locator('#catalog-category').selectOption('bit');
+    const photos=page.locator('.part-image img');assert.equal(await photos.count(),4);
+    for(let index=0;index<4;index++) {
+      const photo=photos.nth(index);await photo.scrollIntoViewIfNeeded();await photo.evaluate(element=>element.decode());
+      assert.equal(await photo.evaluate(element=>element.naturalWidth),586);
+      assert.equal(await photo.getAttribute('src'),'./'+model.PART_IMAGES[index].path);
+      assert.equal(await photo.getAttribute('loading'),'lazy');
+    }
+    assert.equal(await page.locator('.part-image').filter({hasText:'重量：待補'}).count(),4);
+    await noOverflow(page);await screenshot(page,`basic-bits-${width}.png`);
+    await page.locator('[data-catalog-tab="products"]').click();await page.locator('#catalog-search').fill('UX-18');
+    assert.equal(await page.locator('.option-gallery img').count(),6);assert.equal(state.dataRequests,1);
+  },{viewport:{width,height:900}}));
+
+  test('bit image failure stays local and repeated filtering recovers without refetch', async () => scenario('basic-bit-image-fallback', async ({page,origin,state}) => {
+    const target='**/'+model.PART_IMAGES[0].path;
+    await page.route(target,async route=>{state.intentional404s++;await route.fulfill({status:404,body:'Not found'});});
+    await loaded(page,origin);await page.locator('[data-catalog-tab="parts"]').click();
+    const frame=page.locator('.part-image-frame').first();await frame.scrollIntoViewIfNeeded();
+    await frame.locator('.image-fallback').waitFor({state:'visible'});
+    assert.equal(await frame.locator('img').isVisible(),false);await noOverflow(page);
+    await page.unroute(target);
+    for(let i=0;i<3;i++) {
+      await page.locator('#catalog-search').fill('F 軸心');
+      const photo=page.locator('[data-part-id="part_000013"] img');await photo.scrollIntoViewIfNeeded();await photo.evaluate(element=>element.decode());
+      await page.locator('#catalog-reset').click();assert.equal(await page.locator('.part-image img').count(),4);
+    }
+    assert.equal(state.dataRequests,1);assert.equal(await page.locator('body').getAttribute('data-catalog-state'),'ready');
+  }));
+
   test('desktop renders exact public counts, source links and partial composition honestly', async () => scenario('desktop-public-snapshot', async ({page, origin, state}) => {
     await loaded(page, origin);
     assert.match(await page.locator('#catalog-product-count').innerText(), /9/);
-    assert.match(await page.locator('#catalog-part-count').innerText(), /45/);
+    assert.match(await page.locator('#catalog-part-count').innerText(), /47/);
     assert.equal(await visibleCards(page, 'products'), 9);
     assert.equal(state.dataRequests, 1);
     const allText = await page.locator('body').innerText();
@@ -264,7 +296,7 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     await page.locator('#catalog-reset').click();
     await page.locator('[data-catalog-tab="parts"]').click();
     assert.equal(await page.locator('[data-catalog-tab="parts"]').getAttribute('aria-pressed'), 'true');
-    assert.equal(await visibleCards(page, 'parts'), 45);
+    assert.equal(await visibleCards(page, 'parts'), 47);
     for (const [category, count] of Object.entries(countBy(payload.parts, 'category'))) {
       await page.locator('#catalog-category').selectOption(category);
       assert.equal(await visibleCards(page, 'parts'), count, category);
@@ -278,12 +310,12 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     await screenshot(page, 'desktop-empty-state.png', false);
     await page.locator('#catalog-reset').click();
     assert.equal(await page.locator('#catalog-search').inputValue(), '');
-    assert.equal(await visibleCards(page, 'parts'), 45);
+    assert.equal(await visibleCards(page, 'parts'), 47);
     for (let i = 0; i < 3; i++) {
       await page.locator('[data-catalog-tab="products"]').click();
       assert.equal(await visibleCards(page, 'products'), 9);
       await page.locator('[data-catalog-tab="parts"]').click();
-      assert.equal(await visibleCards(page, 'parts'), 45);
+      assert.equal(await visibleCards(page, 'parts'), 47);
     }
     for (const part of payload.parts) {
       const card = page.locator(`[data-part-id="${part.partId}"]`), name = model.displayName(part);
@@ -333,7 +365,7 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     await page.locator('#catalog-search').fill('NO_MATCH_MOBILE');
     await noOverflow(page);
     await page.locator('#catalog-reset').click();
-    assert.equal(await visibleCards(page, 'parts'), 45);
+    assert.equal(await visibleCards(page, 'parts'), 47);
   }, {viewport: {width, height: 812}}));
 
   for (const mode of ['404', 'malformed', 'hash-mismatch']) test(`${mode} fails closed and explicit retry recovers`, async () => scenario(`failure-${mode}`, async ({page, origin, state}) => {
