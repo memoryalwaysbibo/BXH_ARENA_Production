@@ -55,13 +55,13 @@ class Element {
   focus() { this.focused = true; }
 }
 const vm = require('node:vm');
-function harness(fetcher, view = 'pending', suppliedModel = model) {
+function harness(fetcher, view = 'pending', suppliedModel = model, candidateGlobals = {}) {
  const html=fs.readFileSync(path.join(root,'bey-catalog.html'),'utf8');
  const ids=Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element('div')]));
  ids['pending-search'].value='';ids['pending-series'].value='all';
  const buttons=['verified','pending'].map(view=>{const b=new Element('button');b.dataset.catalogView=view;return b;});
  const calls=[],historyCalls=[],listeners={},timers=new Map();let tid=0;
- const window={BXHPendingInventory:suppliedModel,location:{href:'https://catalog.test/bey-catalog.html'+(view==='pending'?'?view=pending':'')},setTimeout:cb=>{timers.set(++tid,cb);return tid;},clearTimeout:id=>timers.delete(id),addEventListener:(name,cb)=>{listeners[name]=cb;}};
+ const window={...candidateGlobals,BXHPendingInventory:suppliedModel,location:{href:'https://catalog.test/bey-catalog.html'+(view==='pending'?'?view=pending':'')},setTimeout:cb=>{timers.set(++tid,cb);return tid;},clearTimeout:id=>timers.delete(id),addEventListener:(name,cb)=>{listeners[name]=cb;}};
  const history={pushState:(_,__,url)=>{window.location.href=String(url);historyCalls.push(String(url));}};
  const document={getElementById:id=>ids[id],createElement:tag=>new Element(tag),querySelectorAll:()=>buttons};
  vm.runInNewContext(fs.readFileSync(path.join(root,'modules/bey-catalog/catalog-pending-ui.js'),'utf8'),{window,document,history,URL,AbortController,fetch:(...args)=>{calls.push(args);return fetcher(...args);}});
@@ -99,4 +99,26 @@ test('synthetic hostile name is text only and no image or external links are inv
  const card=h.ids['pending-results'].children[0];assert.ok(card.textContent.includes('<img src=x onerror=alert(1)>'));
  function descend(e){return[e,...e.children.flatMap(descend)];}
  assert.equal(descend(card).filter(e=>['IMG','A','SCRIPT'].includes(e.tagName)).length,0);
+});
+
+const candidatePolicy=require('../modules/bey-catalog/catalog-candidate-policy.js');
+const candidateBytes=fs.readFileSync(path.join(root,candidatePolicy.dataURL));
+const candidateGlobals={BXHCandidatePolicy:candidatePolicy,BXHCandidateImages:require('../modules/bey-catalog/catalog-candidate-model.js'),BXHCandidatePresentation:require('../modules/bey-catalog/catalog-candidate-presentation.js')};
+async function candidatesSettled(h,pattern=/已配/){for(let i=0;i<100&&!pattern.test(h.ids['candidate-status'].textContent);i++)await new Promise(r=>setTimeout(r,5));assert.match(h.ids['candidate-status'].textContent,pattern);}
+function descendants(e){return[e,...e.children.flatMap(descendants)];}
+test('real candidate loader preserves all rows and existing filter after asynchronous load',async()=>{
+ let resolve;const h=harness(async url=>url===model.DATA_URL?response():new Promise(r=>{resolve=r;}),'pending',model,candidateGlobals);await settled(h);
+ h.ids['pending-search'].value='BX-01';await h.ids['pending-search'].emit('input');resolve(response(candidateBytes));await candidatesSettled(h);
+ assert.equal(h.ids['pending-results'].children.length,1);assert.equal(descendants(h.ids['pending-results']).filter(e=>e.tagName==='IMG').length,1);
+ assert.match(h.ids['pending-results'].textContent,/候選配圖/);assert.equal(h.calls.length,2);
+ await h.ids['pending-reset'].emit('click');assert.equal(h.ids['pending-results'].children.length,285);
+ assert.equal(descendants(h.ids['pending-results']).filter(e=>e.tagName==='IMG').length,JSON.parse(candidateBytes).entries.length);
+ assert.equal(descendants(h.ids['pending-results']).filter(e=>e.tagName==='BUTTON').length,285);
+ assert.equal(descendants(h.ids['pending-results']).filter(e=>e.tagName==='TEXTAREA').length,285);
+ await h.buttons[0].emit('click');await h.buttons[1].emit('click');assert.equal(h.calls.length,2);assert.equal(h.timers.size,0);
+});
+test('candidate failure leaves pending text intact; retry overlap is suppressed',async()=>{
+ let broken=true,resolve;const h=harness(async url=>url===model.DATA_URL?response():broken?response(Buffer.from('{}')):new Promise(r=>{resolve=r;}),'pending',model,candidateGlobals);
+ await settled(h);await candidatesSettled(h,/暫時無法/);assert.equal(h.ids['pending-results'].children.length,285);assert.equal(h.ids['pending-controls'].disabled,false);
+ broken=false;const first=h.ids['candidate-retry'].emit('click');await h.ids['candidate-retry'].emit('click');assert.equal(h.calls.length,3);resolve(response(candidateBytes));await first;await candidatesSettled(h);assert.equal(h.ids['candidate-retry'].hidden,true);
 });

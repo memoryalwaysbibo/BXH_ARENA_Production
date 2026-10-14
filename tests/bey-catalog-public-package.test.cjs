@@ -24,9 +24,9 @@ function allFiles(root, parent = '') {
     return entry.isDirectory() ? allFiles(root, name) : [name];
   }).sort();
 }
-test('public overlay has exactly eighteen reviewed runtime files and safe manifest', async () => {
+test('public overlay has exact reviewed base, candidate scripts, manifest and local images', async () => {
   const {manifest} = await inspectRuntime();
-  assert.equal(manifest.files.length, 18);
+  assert.equal(manifest.files.length, 22 + require('../modules/bey-catalog/catalog-candidate-policy.js').imageURLs.length);
   assert.deepEqual(manifest.counts, {products: 9, parts: 47, options: 13, assemblyRelations: 11, contentFacts: 38});
   assert.equal(manifest.requiredExistingHostPath, 'index.html');
   assert.ok(manifest.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256) && file.bytes > 0));
@@ -116,4 +116,12 @@ test('each altered part image is rejected before packaging output is created', a
     const bytes=fs.readFileSync(target);bytes[20]^=1;fs.writeFileSync(target,bytes);
     await assert.rejects(packageRuntime(output,repo),/IMAGE_VERSION_MISMATCH/);assert.equal(fs.existsSync(output),false);
   }
+});
+
+test('candidate image or manifest tamper stops packaging before output creation',async t=>{
+ const policy=require('../modules/bey-catalog/catalog-candidate-policy.js');
+ for(const file of [policy.imageURLs[0],policy.dataURL.replace(/^\.\//,'')]){
+  const {repo,output}=fixture(t),target=path.join(repo,file),b=fs.readFileSync(target);b[b.length-5]^=1;fs.writeFileSync(target,b);
+  await assert.rejects(packageRuntime(output,repo),/CANDIDATE_(?:IMAGE_MISMATCH|VERSION_MISMATCH)/);assert.equal(fs.existsSync(output),false);
+ }
 });

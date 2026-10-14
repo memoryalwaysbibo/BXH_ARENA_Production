@@ -11,6 +11,8 @@ const os=require('node:os');
 const {chromium}=require('playwright');
 const {RUNTIME_FILES}=require('../scripts/package-bey-catalog-public.cjs');
 const model=require('../modules/bey-catalog/catalog-pending-model.js');
+const candidatePolicy=require('../modules/bey-catalog/catalog-candidate-policy.js');
+const candidateCount=JSON.parse(fs.readFileSync(path.resolve(__dirname,'..',candidatePolicy.dataURL),'utf8')).entries.length;
 const ROOT=path.resolve(__dirname,'..');
 const output=path.resolve(process.env.PUBLIC_CATALOG_QA_OUTPUT_DIR||path.join(os.tmpdir(),'bxh-pending-browser'));
 const allowed=new Set(RUNTIME_FILES.map(f=>'/'+f));
@@ -43,13 +45,14 @@ async function scenario(name,fn,viewport={width:1280,height:900}){
  try{await fn(page);assert.deepEqual(errors,[]);report.cases.push({name,status:'passed'});}catch(error){report.cases.push({name,status:'failed',reason:String(error)});throw error;}finally{await context.close();save();}
 }
 const ready=page=>page.locator('#pending-panel[data-state="ready"]').waitFor();
-test('direct pending link, exact counts, seven series and no guessed pictures',()=>scenario('direct link and counts',async page=>{
+test('direct pending link, exact counts, seven series and labeled candidate pictures',()=>scenario('direct link and counts',async page=>{
  await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
  assert.equal(await page.locator('.pending-card').count(),285);assert.equal(await page.locator('#verified-panel').isVisible(),false);
  assert.match(await page.locator('#pending-panel').innerText(),/使用者提供清單，尚未核實/);
- assert.match(await page.locator('.pending-unresolved').innerText(),/BXA-/);assert.equal(await page.locator('.pending-card img').count(),0);
+ assert.match(await page.locator('.pending-unresolved').innerText(),/BXA-/);await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.startsWith('已配'));assert.equal(await page.locator('.pending-card img').count(),candidateCount);assert.equal(await page.locator('.pending-card .manual-image-handoff').count(),await page.locator('.pending-card').count());
+ assert.equal(await page.locator('.pending-card button').filter({hasText:/核實|錯誤/}).count(),0);
  for(const [series,count] of Object.entries(model.SERIES_COUNTS)){await page.selectOption('#pending-series',series);assert.equal(await page.locator('.pending-card').count(),count);}
- await page.screenshot({path:path.join(output,'pending-desktop.png'),fullPage:true});
+ await page.screenshot({path:path.join(output,'pending-desktop.png'),fullPage:false});
 }));
 test('duplicate package codes retain separate stable rows and search configuration',()=>scenario('search and duplicates',async page=>{
  await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
@@ -76,3 +79,72 @@ for(const width of [320,375,390])test('mobile '+width+'px is readable and keyboa
  await page.locator('#pending-reset').focus();await page.keyboard.press('Enter');assert.equal(await page.locator('.pending-card').count(),285);
  await page.fill('#pending-search','BXA-03');await page.screenshot({path:path.join(output,'pending-mobile-'+width+'.png'),fullPage:true});
 },{width,height:844}));
+test('candidate tamper isolates images and retry preserves current search',()=>scenario('candidate tamper and retry',async page=>{
+ const pattern='**/'+candidatePolicy.dataURL.replace(/^\.\//,'');let broken=true;
+ await page.route(pattern,route=>broken?route.fulfill({status:200,contentType:'application/json',body:'{}'}):route.continue());
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
+ await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.includes('暫時無法'));
+ assert.equal(await page.locator('.pending-card').count(),285);assert.equal(await page.locator('.pending-card img').count(),0);
+ await page.fill('#pending-search','BX-01');broken=false;await page.click('#candidate-retry');
+ await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.startsWith('已配'));
+ assert.equal(await page.locator('.pending-card').count(),1);assert.equal(await page.locator('.pending-card img').count(),1);
+}));
+test('failed candidate image remains explicitly unverified',()=>scenario('candidate image failure',async page=>{
+ await page.route('**/assets/bey-catalog/candidates/*',route=>route.fulfill({status:404,body:''}));
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
+ await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.startsWith('已配'));
+ await page.fill('#pending-search','BX-01');await page.locator('.candidate-image img[hidden]').waitFor({state:'attached'});
+ assert.match(await page.locator('.candidate-image figcaption').innerText(),/載入失敗/);
+ assert.equal(await page.locator('.pending-card .manual-image-handoff').count(),await page.locator('.pending-card').count());
+ assert.equal(await page.locator('.pending-card button').filter({hasText:/核實|錯誤/}).count(),0);
+}));
+
+test('product reference never claims the supplied custom assembly is confirmed',()=>scenario('product reference wording',async page=>{
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
+ await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.startsWith('已配'));
+ for(const code of ['UX-10-02','UX-10-03']){
+  await page.fill('#pending-search',code);assert.equal(await page.locator('.pending-card').count(),1);
+  assert.equal(await page.locator('.candidate-image figcaption').innerText(),'同商品參考圖，尚未確認本款配置');
+ }
+}));
+for(const width of [1280,375])test('loaded candidate cards fit '+width+'px and produce bounded visual evidence',()=>scenario('candidate visual evidence '+width,async page=>{
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
+ await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.startsWith('已配'));
+ for(const [code,label] of [['BX-01','exact'],['UX-10-02','reference']]){
+  await page.fill('#pending-search',code);const figure=page.locator('.candidate-image');
+  await figure.scrollIntoViewIfNeeded();
+  await page.waitForFunction(()=>{const img=document.querySelector('.pending-card img');return img&&img.complete&&img.naturalWidth>0;});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+  assert.equal(await page.locator('.pending-card img').getAttribute('loading'),'lazy');
+  await page.screenshot({path:path.join(output,'candidate-'+label+'-'+width+'.png'),fullPage:false});
+ }
+},{width,height:900}));
+test('manual image handoff is keyboard-accessible, row-specific and has clipboard-denial fallback',()=>scenario('manual image handoff fallback',async page=>{
+ await page.addInitScript(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('clipboard denied');}}}));
+ const writes=[];page.on('request',r=>{if(r.method()!=='GET')writes.push(r.method()+' '+r.url());});
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
+ await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.startsWith('已配'));
+ await page.fill('#pending-search','BXA-03');const cards=page.locator('.pending-card');assert.equal(await cards.count(),2);
+ const templates=[];
+ for(let i=0;i<2;i++){
+  const card=cards.nth(i),summary=card.locator('summary');await summary.focus();await page.keyboard.press('Enter');
+  assert.equal(await card.locator('details').getAttribute('open'),'');
+  const input=card.locator('textarea');assert.equal(await input.getAttribute('readonly'),'');
+  const value=await input.inputValue(),id=await card.getAttribute('data-supplied-id');assert.ok(value.includes(id));assert.match(value,/型號：BXA-03/);templates.push(value);
+  await card.locator('button').focus();await page.keyboard.press('Enter');
+  await page.waitForFunction(id=>{const e=document.querySelector('[data-supplied-id="'+id+'"] [role=status]');return e&&e.textContent.includes('已選取');},id);
+  assert.equal(await input.evaluate(e=>e.selectionEnd-e.selectionStart),value.length);
+  assert.match(await card.innerText(),/此頁目前不會上傳或儲存圖片/);
+ }
+ assert.notEqual(templates[0],templates[1]);assert.equal(await page.locator('input[type=file], form').count(),0);assert.deepEqual(writes,[]);
+ await page.screenshot({path:path.join(output,'manual-image-handoff.png'),fullPage:false});
+},{width:375,height:900}));
+test('manual image handoff reports success only after exact template copy',()=>scenario('manual image handoff copy',async page=>{
+ await page.addInitScript(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__manualCopied=text;}}}));
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);
+ await page.waitForFunction(()=>document.getElementById('candidate-status').textContent.startsWith('已配'));
+ await page.fill('#pending-search','BX-01');await page.locator('.manual-image-handoff summary').click();await page.locator('.manual-image-handoff button').click();
+ await page.waitForFunction(()=>document.querySelector('.manual-image-handoff [role=status]').textContent.startsWith('已複製'));
+ assert.equal(await page.evaluate(()=>window.__manualCopied),await page.locator('.manual-image-handoff textarea').inputValue());
+ assert.equal(await page.locator('.pending-card button').filter({hasText:/核實|錯誤/}).count(),0);
+}));
