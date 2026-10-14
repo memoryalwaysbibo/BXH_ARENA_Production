@@ -47,13 +47,98 @@
     'ヴァイスタイガー': '皓戰猛虎',
     'マミーカース7-55W': '古屍詛咒 7-55W',
     'マミーカース4-60C': '古屍詛咒 4-60C',
-    'ペガサスブラッシュM3-85W': '天馬布拉許 M3-85W',
-    'ソルブレイブC9-70TP': '索爾勇氣 C9-70TP',
+    'ペガサスブラッシュM3-85W': '天馬九尾 M3-85W',
+    'ソルブレイブC9-70TP': '焰神勇氣 C9-70TP',
     'ドランダガー7-55G': '蒼龍利刃 7-55G',
     'ヴァイスタイガー4-80LR': '皓戰猛虎 4-80LR',
     'ドランダガー4-60R': '蒼龍利刃 4-60R',
     'ロックチップ/ドラン クリアブラックVer.': '蒼龍鎖定紋章〈透明黑版〉'
   });
+  // Bounded presentation assets; never infer an image from a record ID or filename.
+  const OPTION_IMAGES = Object.freeze([
+  {
+    "optionCode": "01",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_02@1.png",
+    "sourceSha256": "b5c5e8ecece69d06fea387088db83f44d1372cfa7ccbc39546ff53bcce37e03e",
+    "sourceBytes": 223301,
+    "path": "assets/bey-catalog/ux18/ux18-01.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 29100,
+    "sha256": "86895189698e65ca5e051569d4d1d0d88a8a7056580600f7fde52deadbfd93b5",
+    "originalName": "マミーカース7-55W",
+    "optionId": "option_000006"
+  },
+  {
+    "optionCode": "02",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_03@1.png",
+    "sourceSha256": "9232f8abd2f8047db85d247058137732b59ab8cacc347c9fe117d001f16db5b8",
+    "sourceBytes": 242421,
+    "path": "assets/bey-catalog/ux18/ux18-02.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 32586,
+    "sha256": "582a72113ba30ceda15ace7f1ba2308a3215aab96ac8b724266c7f65505a7589",
+    "originalName": "マミーカース4-60C",
+    "optionId": "option_000007"
+  },
+  {
+    "optionCode": "03",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_06@1.png",
+    "sourceSha256": "303331e4298913f994525efbe1d1ab21f53729264c0eee74090047e447bc252e",
+    "sourceBytes": 255692,
+    "path": "assets/bey-catalog/ux18/ux18-03.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 41528,
+    "sha256": "ad2514bbd680a721a06cbdf57f7b177bc832c6f7fd53ccc537ff32588e07b12e",
+    "originalName": "ペガサスブラッシュM3-85W",
+    "optionId": "option_000008"
+  },
+  {
+    "optionCode": "04",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_07@1.png",
+    "sourceSha256": "f6bbbd7467c470fedc0761e2290557d0a715b4bddc88040b332d0cfe7639bf30",
+    "sourceBytes": 236306,
+    "path": "assets/bey-catalog/ux18/ux18-04.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 35522,
+    "sha256": "a27b3b0a51d4c14db1cb449c89196b56cda0fa84428cd408e5c6162d91dae1c7",
+    "originalName": "ソルブレイブC9-70TP",
+    "optionId": "option_000009"
+  },
+  {
+    "optionCode": "05",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_04@1.png",
+    "sourceSha256": "4b46df7767c6a52fb167c3e6c28e94d87b6037d671db08e6c3c9a796034dc4ac",
+    "sourceBytes": 229232,
+    "path": "assets/bey-catalog/ux18/ux18-05.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 31824,
+    "sha256": "cae4857fc81a2a48547aca02f47fe0bbe40903cd2b83745f9ab9951b86399be1",
+    "originalName": "ドランダガー7-55G",
+    "optionId": "option_000010"
+  },
+  {
+    "optionCode": "06",
+    "sourceUrl": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_05@1.png",
+    "sourceSha256": "ff951457d3444adc6eae73d2afe07f23cf3822aac6f4874c64d66a042bc9208e",
+    "sourceBytes": 238548,
+    "path": "assets/bey-catalog/ux18/ux18-06.webp",
+    "width": 586,
+    "height": 709,
+    "bytes": 34640,
+    "sha256": "87c8e8a9e9f24a2fe76cbcb891e770ff929bb5deedb711568902a7681eb74e44",
+    "originalName": "ヴァイスタイガー4-80LR",
+    "optionId": "option_000011"
+  }
+].map(image => Object.freeze(image)));
+  function optionImage(product, option) {
+    if (!product || !option || product.productId !== "product_000006" || product.productCode !== "UX-18" || product.originalName !== "ランダムブースターVol.8" || option.productId !== product.productId) return null;
+    return OPTION_IMAGES.find(image => image.optionId === option.optionId && image.optionCode === option.optionCode && image.originalName === option.originalName) || null;
+  }
   // Exact reviewed URLs only. Neither payload nor query parameters can extend this allowlist.
   const SOURCE_URLS = new Set([
     "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/detail_UX18.png",
@@ -222,5 +307,5 @@
       return !needle || fields.some(field => normalized(field).includes(needle));
     });
   }
-  return Object.freeze({EXPECTED_SHA256, EXPECTED_BYTES, DATA_URL, COUNTS, PACKAGE_LABELS, CATEGORY_LABELS, DISPLAY_NAMES, displayName, safeSourceUrl, validateCatalog, decodeSnapshot, uniqueSources, filterCatalog});
+  return Object.freeze({EXPECTED_SHA256, EXPECTED_BYTES, DATA_URL, COUNTS, PACKAGE_LABELS, CATEGORY_LABELS, DISPLAY_NAMES, OPTION_IMAGES, optionImage, displayName, safeSourceUrl, validateCatalog, decodeSnapshot, uniqueSources, filterCatalog});
 });

@@ -54,3 +54,12 @@ label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 footer{font-size:12px;line-height:1.8;color:var(--muted);padding:28px 0 0}
 @media(max-width:680px){.catalog-header{padding:19px 16px}.catalog-body{padding:0 14px}.brand{font-size:21px}.eyebrow{font-size:10px;letter-spacing:1.5px}.readonly-tag{font-size:11px}.catalog-stats{gap:8px}.catalog-stats>div{padding:12px 5px}.catalog-filters{grid-template-columns:minmax(0,1fr) auto}.search-field{grid-column:1/-1}.catalog-results{grid-template-columns:minmax(0,1fr)}.catalog-card{padding:14px}.catalog-notice{padding:11px 12px}.catalog-stats strong{font-size:26px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* Local, explicitly reviewed UX-18 illustrations. Full frames are preserved. */
+.option-image-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.option-image{margin:0;min-width:0}.option-image-frame{position:relative;aspect-ratio:586/709;background:#f7f7fa;border-radius:8px;overflow:hidden}
+.option-image img{display:block;width:100%;height:auto;object-fit:contain}.option-image figcaption{font-size:12px;line-height:1.5;padding-top:8px}
+.option-image figcaption>.product-code{font-size:12px}.option-image .localized-name{margin-top:4px}.option-image .original-name{font-size:10px!important;margin-top:4px}
+.image-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;color:#4b515a;font-size:12px}
+.image-credit{font-size:10px!important;line-height:1.6;color:var(--muted)}
+@media(max-width:359px){.option-image-grid{grid-template-columns:minmax(0,1fr)}}

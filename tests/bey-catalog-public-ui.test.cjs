@@ -216,7 +216,8 @@ function harness(fetcher, suppliedModel = model) {
 }
 const response = (buffer = bytes, ok = true) => ({ok,arrayBuffer: async () => arrayBuffer(buffer)});
 async function waitState(h, desired) {
-  for (let attempts = 0; attempts < 200 && h.body.dataset.catalogState !== desired; attempts++) await new Promise(resolve => setImmediate(resolve));
+  const deadline = Date.now() + 5000;
+  while (h.body.dataset.catalogState !== desired && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(h.body.dataset.catalogState, desired);
 }
 function descendants(element) {return [element, ...element.children.flatMap(descendants)];}
@@ -335,7 +336,7 @@ test('synthetic validated-name rendering treats markup as literal text and never
   // This test injects already-decoded synthetic data. Production decodeSnapshot still rejects changed bytes.
   const h = harness(async () => response(), {...model,decodeSnapshot: async () => model.validateCatalog(data)});
   await waitState(h, 'ready');assert.match(h.ids['catalog-results'].textContent, /<img src=x onerror=alert\(1\)>/);
-  assert.equal(descendants(h.ids['catalog-results']).filter(node => ['IMG','SCRIPT','IFRAME'].includes(node.tagName)).length, 0);
+  assert.equal(descendants(h.ids['catalog-results'].children[0]).filter(node => ['IMG','SCRIPT','IFRAME'].includes(node.tagName)).length, 0);
 });
 
 test('missing model and unsupported crypto report a recoverable error without any records', async () => {
@@ -358,7 +359,7 @@ test('static page is accessible, same-origin-only and contains no auth or admin 
   assert.match(html, /戰鬥陀螺X・公開圖鑑/);assert.doesNotMatch(html, /PUBLIC CATALOG|placeholder="[^"]*[\p{Script=Hiragana}\p{Script=Katakana}]/u);
   assert.match(html, /中文名稱為暫譯，非台灣官方命名/);assert.match(html, /代碼＋分類/);
   assert.match(html, /lang="zh-Hant-TW"/);assert.match(html, /width=device-width,initial-scale=1/);
-  assert.match(html, /Content-Security-Policy/);assert.match(html, /connect-src 'self'/);assert.match(html, /img-src 'none'/);assert.match(html, /base-uri 'none'/);
+  assert.match(html, /Content-Security-Policy/);assert.match(html, /connect-src 'self'/);assert.match(html, /img-src 'self'/);assert.match(html, /base-uri 'none'/);
   assert.match(html, /href="\.\/index.html"/);assert.match(html, /<noscript>/);assert.match(html, /role="status"/);assert.match(html, /aria-pressed="true"/);
   for (const id of ['catalog-search','catalog-category']) assert.match(html, new RegExp('for="' + id + '"'));
   assert.match(css, /focus-visible/);assert.match(css, /@media\(max-width:680px\)/);assert.match(css, /min-height:46px/);
@@ -372,4 +373,76 @@ test('main app integration is an ordinary public anchor with a fresh core asset 
   assert.match(landing, /<a class="btn btn-ghost" href="\.\/bey-catalog.html" data-catalog-entry="public">陀螺圖鑑 · 免登入<\/a>/);
   const index = fs.readFileSync(path.join(root,'index.html'),'utf8');
   assert.match(index, /id="bxh-main-app-m7"[^>]+&catalog-public=20261014\.1/);
+});
+
+test('UX-18 maps exactly six option identities to the manual-verified official photos (not carousel order)', () => {
+  const product = original.products.find(row => row.productCode === 'UX-18');
+  const options = original.options.filter(row => row.productId === product.productId);
+  assert.equal(model.OPTION_IMAGES.length, 6);
+  options.forEach((option, index) => {
+    const image = model.optionImage(product, option);
+    assert.equal(image.optionCode, String(index + 1).padStart(2, '0'));
+    assert.equal(image.sourceUrl, `https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_${String([2,3,6,7,4,5][index]).padStart(2, '0')}@1.png`);
+    assert.equal(image.originalName, option.originalName);
+    assert.equal(image.width, 586);assert.equal(image.height, 709);
+  });
+});
+test('image lookup rejects mismatched names, option codes and products', () => {
+  const product = original.products.find(row => row.productCode === 'UX-18');
+  const option = original.options.find(row => row.productId === product.productId);
+  for (const changed of [{originalName:'unknown'}, {optionCode:'07'}, {optionId:'option_999999'}, {productId:'product_000001'}]) assert.equal(model.optionImage(product, {...option,...changed}), null);
+  assert.equal(model.optionImage({...product,productCode:'BX-01'}, option), null);
+  assert.equal(model.optionImage({...product,originalName:'Unknown'}, option), null);
+  assert.equal(model.optionImage(null, option), null);assert.equal(model.optionImage(product, null), null);
+});
+test('image metadata is immutable and lookup never changes evidence or snapshot', () => {
+  assert(Object.isFrozen(model.OPTION_IMAGES));
+  for (const image of model.OPTION_IMAGES) {assert(Object.isFrozen(image));assert.throws(() => {image.path='https://example.com/evil';}, TypeError);}
+  const data = copy(), before = JSON.stringify(data);
+  for (const product of data.products) for (const option of data.options) model.optionImage(product, option);
+  assert.equal(JSON.stringify(data), before);
+  assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'), model.EXPECTED_SHA256);
+});
+test('the six owner-provided combination names remain provisional, searchable and preserve originals', () => {
+  const names = ['古屍詛咒 7-55W','古屍詛咒 4-60C','天馬九尾 M3-85W','焰神勇氣 C9-70TP','蒼龍利刃 7-55G','皓戰猛虎 4-80LR'];
+  for (const [index,image] of model.OPTION_IMAGES.entries()) {
+    const option = original.options.find(row => row.optionId === image.optionId), display = model.displayName(option);
+    assert.equal(display.primary, names[index]);assert.equal(display.original, option.originalName);
+    assert.equal(display.status, 'provisional_translation');assert.equal(display.label, '中文暫譯');
+    assert.equal(model.filterCatalog(original, 'products', names[index])[0].productCode, 'UX-18');
+  }
+});
+test('six local lazy images have dimensions, meaningful alt text and attribution', async () => {
+  const h = harness(async () => response());await waitState(h, 'ready');
+  const all = descendants(h.ids['catalog-results']), images = all.filter(row => row.tagName === 'IMG');
+  assert.equal(images.length, 6);
+  images.forEach((image,index) => {
+    assert.equal(image.src, './' + model.OPTION_IMAGES[index].path);
+    assert.equal(image.width,586);assert.equal(image.height,709);assert.equal(image.loading,'lazy');assert.equal(image.decoding,'async');
+    assert.match(image.alt,new RegExp('UX-18-0'+(index+1)));assert.match(image.alt,/原廠商品示意圖/);
+    assert.equal(image.referrerPolicy,'no-referrer');
+  });
+  assert.match(h.ids['catalog-results'].textContent,/© TOMY/);assert.match(h.ids['catalog-results'].textContent,/BBXProject/);
+});
+test('image failure shows a stable text fallback while other images and catalog stay available', async () => {
+  const h = harness(async () => response());await waitState(h, 'ready');
+  const frames = descendants(h.ids['catalog-results']).filter(row => row.className === 'option-image-frame');
+  await frames[0].children[0].emit('error');await frames[0].children[0].emit('error');
+  assert.equal(frames[0].children[0].hidden,true);assert.equal(frames[0].children[1].hidden,false);
+  assert.equal(frames[1].children[0].hidden,false);assert.equal(frames[1].children[1].hidden,true);
+  assert.equal(h.body.dataset.catalogState,'ready');assert.equal(h.ids['catalog-product-count'].textContent,'9');
+});
+test('repeated filters and tabs neither duplicate images nor issue additional data fetches', async () => {
+  const h = harness(async () => response());await waitState(h,'ready');
+  for (let i=0;i<3;i++) {
+    h.ids['catalog-search'].value='UX-18';await h.ids['catalog-search'].emit('input');
+    assert.equal(descendants(h.ids['catalog-results']).filter(row => row.tagName==='IMG').length,6);
+    await h.tabs[1].emit('click');assert.equal(descendants(h.ids['catalog-results']).filter(row => row.tagName==='IMG').length,0);
+    await h.tabs[0].emit('click');await h.ids['catalog-reset'].emit('click');
+  }
+  assert.equal(h.calls.length,1);
+});
+test('no image requests or image nodes are created when snapshot authentication fails', async () => {
+  const h = harness(async () => response(Buffer.from('bad')));await waitState(h,'error');
+  assert.equal(descendants(h.ids['catalog-results']).filter(row => row.tagName==='IMG').length,0);
 });

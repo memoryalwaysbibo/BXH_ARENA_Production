@@ -11,7 +11,8 @@ const RUNTIME_FILES = Object.freeze([
   'bey-catalog.css',
   'modules/bey-catalog/catalog-public-model.js',
   'modules/bey-catalog/catalog-public-ui.js',
-  model.DATA_URL.replace(/^\.\//, '')
+  model.DATA_URL.replace(/^\.\//, ''),
+  ...model.OPTION_IMAGES.map(image => image.path)
 ]);
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -31,6 +32,10 @@ async function inspectRuntime(root = ROOT) {
   const bytes = new Map(RUNTIME_FILES.map(file => [file, readRegular(root, file)]));
   const data = bytes.get(RUNTIME_FILES[4]);
   const catalog = await model.decodeSnapshot(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+  for (const image of model.OPTION_IMAGES) {
+    const asset = bytes.get(image.path);
+    if (asset.length !== image.bytes || sha256(asset) !== image.sha256) throw new Error('IMAGE_VERSION_MISMATCH');
+  }
   const html = bytes.get('bey-catalog.html').toString('utf8');
   const expectedAssets = new Set(RUNTIME_FILES.slice(1, 4));
   const actualAssets = [...html.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/gi)]
