@@ -23,11 +23,12 @@ const MODEL_PATH = '/modules/bey-catalog/catalog-public-model.js';
 const UI_PATH = '/modules/bey-catalog/catalog-public-ui.js';
 const ASSET_PATHS = ['/bey-catalog.html', '/bey-catalog.css', MODEL_PATH, UI_PATH];
 const model = require('..' + MODEL_PATH);
+ASSET_PATHS.push(...model.OPTION_IMAGES.map(image => '/' + image.path));
 const DATA_PATH = '/' + model.DATA_URL.replace(/^\.\//, '');
 const baseline = fs.readFileSync(path.join(ROOT, DATA_PATH));
 const payload = JSON.parse(baseline.toString('utf8'));
 const baselineModel = fs.readFileSync(path.join(ROOT, MODEL_PATH), 'utf8');
-const report = {scope: 'Public entry static audit plus isolated catalog Chromium scenarios. Main-app authentication and production are never exercised.', startedAt: new Date().toISOString(), browser: {status: 'not_run', reason: 'No Chromium launch has completed in this invocation'}, expectedBrowserScenarios: 14, checks: [], sessions: []};
+const report = {scope: 'Public entry static audit plus isolated catalog Chromium scenarios. Main-app authentication and production are never exercised.', startedAt: new Date().toISOString(), browser: {status: 'not_run', reason: 'No Chromium launch has completed in this invocation'}, expectedBrowserScenarios: 18, checks: [], sessions: []};
 fs.mkdirSync(OUTPUT, {recursive: true});
 
 function saveReport() {
@@ -74,7 +75,7 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
   after(async () => {
     if (browser) await browser.close();
     if (browser) report.browser.status = report.sessions.every(session => session.status === 'passed') ? 'passed_selected_scenarios' : 'failed';
-    report.coverage = {executedBrowserScenarios: report.sessions.length, notRunBrowserScenarios: 14 - report.sessions.length};
+    report.coverage = {executedBrowserScenarios: report.sessions.length, notRunBrowserScenarios: 18 - report.sessions.length};
     report.finishedAt = new Date().toISOString();
     saveReport();
   });
@@ -109,7 +110,7 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
         }
         response.end(fixture?.body || baseline); return;
       }
-      response.setHeader('content-type', url.pathname.endsWith('.html') ? 'text/html; charset=utf-8' : url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8');
+      response.setHeader('content-type', url.pathname.endsWith('.webp') ? 'image/webp' : url.pathname.endsWith('.html') ? 'text/html; charset=utf-8' : url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8');
       response.end(url.pathname === MODEL_PATH && fixture ? fixture.source : fs.readFileSync(path.join(ROOT, url.pathname)));
     });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
@@ -167,6 +168,37 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     assert.equal((await page.locator('#catalog-results').innerText()).trim(), '');
     assert.notEqual((await page.locator('#catalog-status').innerText()).trim(), '');
   }
+
+  for (const width of [320, 375, 1440]) test(`UX-18 images load locally and remain readable at ${width}px`, async () => scenario(`ux18-images-${width}`, async ({page,origin,state}) => {
+    await loaded(page,origin);await page.locator('#catalog-search').fill('UX-18');
+    const images=page.locator('.option-gallery img');assert.equal(await images.count(),6);
+    for(let index=0;index<6;index++) {
+      const image=images.nth(index);await image.scrollIntoViewIfNeeded();
+      await image.evaluate(element => element.decode());
+      assert.equal(await image.evaluate(element=>element.naturalWidth),586);
+      assert.equal(await image.getAttribute('loading'),'lazy');
+      assert.equal(await image.getAttribute('width'),'586');assert.equal(await image.getAttribute('height'),'709');
+      assert.equal(await image.getAttribute('src'),'./'+model.OPTION_IMAGES[index].path);
+      assert.match(await image.getAttribute('alt'),new RegExp('UX-18-0'+(index+1)));
+    }
+    assert.match(await page.locator('.image-credit').innerText(),/© TOMY/);
+    await noOverflow(page);await screenshot(page,`ux18-images-${width}.png`);
+    assert.equal(state.dataRequests,1);
+  },{viewport:{width,height:900}}));
+
+  test('UX-18 missing image has a stable fallback without breaking search or reload', async () => scenario('ux18-image-fallback', async ({page,origin,state}) => {
+    await page.route('**/assets/bey-catalog/ux18/ux18-01.webp',async route=>{state.intentional404s++;await route.fulfill({status:404,body:'Not found'});});
+    await loaded(page,origin);await page.locator('#catalog-search').fill('UX-18');
+    const frame=page.locator('.option-image-frame').first();await frame.scrollIntoViewIfNeeded();
+    await frame.locator('.image-fallback').waitFor({state:'visible'});assert.equal(await frame.locator('img').isVisible(),false);
+    assert.equal(await page.locator('body').getAttribute('data-catalog-state'),'ready');
+    await noOverflow(page);await screenshot(page,'ux18-image-fallback.png');
+    await page.locator('[data-catalog-tab="parts"]').click();assert.equal(await page.locator('.option-gallery').count(),0);
+    await page.locator('[data-catalog-tab="products"]').click();assert.equal(await page.locator('.option-gallery img').count(),6);
+    await page.unroute('**/assets/bey-catalog/ux18/ux18-01.webp');await page.reload();await page.locator('#catalog-search').fill('UX-18');
+    const restored=page.locator('.option-gallery img').first();await restored.scrollIntoViewIfNeeded();await restored.evaluate(element=>element.decode());
+    assert.equal(await restored.isVisible(),true);assert.equal(await page.locator('.image-fallback').first().isVisible(),false);
+  }));
 
   test('desktop renders exact public counts, source links and partial composition honestly', async () => scenario('desktop-public-snapshot', async ({page, origin, state}) => {
     await loaded(page, origin);
@@ -289,7 +321,7 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     const ux18 = page.locator('[data-product-id="product_000006"]');
     await ux18.locator('summary').click();
     const option = ux18.locator('[data-option-id="option_000008"]');
-    assert((await option.innerText()).includes('天馬布拉許 M3-85W'));
+    assert((await option.innerText()).includes('天馬九尾 M3-85W'));
     assert((await option.innerText()).includes('ペガサスブラッシュM3-85W'));
     await noOverflow(page);
     await page.locator('#catalog-reset').click();
@@ -352,7 +384,7 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     await scenario('synthetic-text-only-xss', async ({page, origin}) => {
       await loaded(page, origin);
       assert((await page.locator('[data-product-id="product_000001"]').innerText()).includes(attack));
-      assert.equal(await page.locator('#catalog-results img, #catalog-results svg, #catalog-results script').count(), 0);
+      assert.equal(await page.locator('[data-product-id="product_000001"] img, #catalog-results svg, #catalog-results script').count(), 0);
       assert.equal(await page.evaluate(() => window.__catalogXss), undefined);
       await page.locator('[data-catalog-tab="parts"]').click();
       assert((await page.locator('[data-part-id="part_000001"]').innerText()).includes(attack));

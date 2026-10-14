@@ -24,9 +24,9 @@ function allFiles(root, parent = '') {
     return entry.isDirectory() ? allFiles(root, name) : [name];
   }).sort();
 }
-test('public overlay has exactly five reviewed runtime files and safe manifest', async () => {
+test('public overlay has exactly eleven reviewed runtime files and safe manifest', async () => {
   const {manifest} = await inspectRuntime();
-  assert.equal(manifest.files.length, 5);
+  assert.equal(manifest.files.length, 11);
   assert.deepEqual(manifest.counts, {products: 9, parts: 45, options: 13, assemblyRelations: 11, contentFacts: 38});
   assert.equal(manifest.requiredExistingHostPath, 'index.html');
   assert.ok(manifest.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256) && file.bytes > 0));
@@ -81,4 +81,20 @@ test('CI invokes all new catalog contracts and browser suite without changed dep
   const ci = fs.readFileSync(path.join(ROOT, '.github/workflows/validate-production-frontend.yml'), 'utf8');
   for (const file of ['bey-catalog-public-evidence-policy.test.cjs', 'bey-catalog-public-ui.test.cjs', 'bey-catalog-public-package.test.cjs', 'bey-catalog-public-browser.test.cjs']) assert.ok(ci.includes(file));
   assert.match(ci, /permissions:\n  contents: read\n/);
+});
+
+test('tampered local image fails packaging before output exists', async t => {
+  const {repo,output}=fixture(t);
+  const target=path.join(repo,RUNTIME_FILES[5]);const bytes=fs.readFileSync(target);bytes[20]^=1;fs.writeFileSync(target,bytes);
+  await assert.rejects(packageRuntime(output,repo),/IMAGE_VERSION_MISMATCH/);assert.equal(fs.existsSync(output),false);
+});
+test('six packaged images match source manifest and contain actual WebP bytes', async () => {
+  const source=JSON.parse(fs.readFileSync(path.join(ROOT,'docs/bey-catalog/UX18_IMAGE_SOURCES.json')));
+  const {manifest}=await inspectRuntime();
+  assert.equal(source.assets.length,6);
+  for (const image of source.assets) {
+    const entry=manifest.files.find(row=>row.path===image.path);assert.equal(entry.sha256,image.sha256);assert.equal(entry.bytes,image.bytes);
+    const bytes=fs.readFileSync(path.join(ROOT,image.path));assert.equal(bytes.toString('ascii',0,4),'RIFF');assert.equal(bytes.toString('ascii',8,12),'WEBP');
+  }
+  assert.ok(source.assets.reduce((sum,image)=>sum+image.bytes,0)<220000);
 });

@@ -65,6 +65,34 @@
     section.append(list, sourceLinks(group));
     return section;
   }
+  function imageGallery(product, options) {
+    const images = options.map(option => ({option, image: model.optionImage(product, option)})).filter(item => item.image);
+    if (!images.length) return null;
+    const gallery = node('section', '', 'option-gallery');
+    gallery.setAttribute('aria-label', product.productCode + ' 款式圖片');
+    const grid = node('div', '', 'option-image-grid');
+    images.forEach(({option, image}) => {
+      const figure = node('figure', '', 'option-image');
+      figure.dataset.imageOptionCode = option.optionCode;
+      const frame = node('div', '', 'option-image-frame');
+      const photo = node('img');
+      photo.alt = product.productCode + '-' + option.optionCode + ' ' + model.displayName(option).primary + ' 原廠商品示意圖';
+      photo.width = image.width; photo.height = image.height;
+      photo.loading = 'lazy'; photo.decoding = 'async'; photo.referrerPolicy = 'no-referrer';
+      const fallback = node('span', '圖片暫時無法顯示，請查看原廠頁面。', 'image-fallback');
+      fallback.hidden = true; fallback.setAttribute('role', 'status');
+      photo.addEventListener('error', () => { photo.hidden = true; fallback.hidden = false; });
+      photo.src = './' + image.path;
+      frame.append(photo, fallback);
+      const caption = node('figcaption');
+      caption.append(node('span', product.productCode + '-' + option.optionCode, 'product-code'));
+      appendName(caption, option, 'span');
+      figure.append(frame, caption); grid.append(figure);
+    });
+    gallery.append(grid, node('p', '原廠商品示意圖，僅供辨識參考；不作實物配色或完整內容認證。', 'missing-note'));
+    gallery.append(node('p', '圖片：TAKARA TOMY · © Homura Kawamoto, Hikaru Muno, Posuka Demizu, BBXProject · © TOMY', 'image-credit'), sourceLinks(product));
+    return gallery;
+  }
   function productCard(product, partMap) {
     const card = node('article', '', 'catalog-card'); card.dataset.productId = product.productId;
     const meta = node('div', '', 'card-meta');
@@ -72,6 +100,8 @@
     card.append(meta); appendName(card, product, 'h2');
     card.append(node('p', '台灣官方中文名稱、實物配色待補', 'missing-note'), sourceLinks(product));
     const options = catalog.options.filter(option => option.productId === product.productId);
+    const gallery = imageGallery(product, options);
+    if (gallery) card.append(gallery);
     const details = node('details');
     details.append(node('summary', '查看已收錄款式與部件'));
     details.append(node('p', '商品／款式的完整組成待補。以下清單只涵蓋已核對的對戰部件型別，不表示整盒內容、成品配色或所有款式皆完整。', 'scope-note'));
