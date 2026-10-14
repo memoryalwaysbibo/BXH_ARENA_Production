@@ -7,14 +7,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="description" content="BXH ARENA 公開唯讀戰鬥陀螺圖鑑，以中文暫譯、原廠名稱、商品代碼、零件型別與來源連結查找資料。">
   <title>BXH ARENA｜戰鬥陀螺圖鑑</title>
-  <link rel="stylesheet" href="./bey-catalog.css?v=candidate-images-manual-1">
+  <link rel="stylesheet" href="./bey-catalog.css?v=missing-image-filter-1">
   <script src="./modules/bey-catalog/catalog-public-model.js?v=public-pending-inventory-1" defer></script>
   <script src="./modules/bey-catalog/catalog-public-ui.js?v=public-pending-inventory-1" defer></script>
   <script src="./modules/bey-catalog/catalog-pending-model.js?v=public-pending-inventory-1" defer></script>
   <script src="./modules/bey-catalog/catalog-candidate-model.js?v=candidate-images-1" defer></script>
   <script src="./modules/bey-catalog/catalog-candidate-policy.js?v=candidate-images-1" defer></script>
   <script src="./modules/bey-catalog/catalog-candidate-presentation.js?v=candidate-images-1" defer></script>
-  <script src="./modules/bey-catalog/catalog-pending-ui.js?v=candidate-images-manual-1" defer></script>
+  <script src="./modules/bey-catalog/catalog-pending-ui.js?v=missing-image-filter-1" defer></script>
 </head>
 <body data-catalog-state="loading">
   <a id="catalog-skip" class="skip-link" href="#catalog-controls">跳至搜尋與篩選</a>
@@ -44,6 +44,7 @@
         <div class="catalog-filters">
           <div class="search-field"><label for="pending-search">搜尋提供的型號、名稱或配置</label><input id="pending-search" type="search" maxlength="120" placeholder="例如 BXA-03、蒼龍、3-60F" autocomplete="off" enterkeyhint="search"></div>
           <div><label for="pending-series">系列</label><select id="pending-series"><option value="all">全部系列 · 285</option><option value="BX">BX · 85</option><option value="UX">UX · 44</option><option value="CX">CX · 43</option><option value="BXG">BXG · 74</option><option value="BXH">BXH · 18</option><option value="BXC">BXC · 14</option><option value="BXA">BXA · 7</option></select></div>
+          <div><label for="pending-image-filter">圖片</label><select id="pending-image-filter" disabled aria-describedby="candidate-status"><option value="all">全部圖片狀態</option><option id="pending-missing-option" value="missing">待補圖（確認中）</option></select></div>
           <button id="pending-reset" class="secondary" type="button">清除篩選</button>
         </div>
       </fieldset>
