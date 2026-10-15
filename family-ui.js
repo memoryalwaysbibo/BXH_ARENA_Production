@@ -108,6 +108,14 @@ async function chooseFamilyRegistrationToCancel(rows){
 
 async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode='self'){
  const owner=currentAuthUid(),epoch=engagementSessionEpoch;
+ // Clicking self registration is the user's submission; preserve the server
+ // allocation preflight without opening a second confirmation dialog.
+ if(mode!=='children'){
+  const preview=await window.engagementService.familyRegistration({action:'preview',code,childIds:[null],childEligibilityConfirmed:childEligibilityConfirmed===true});
+  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
+  if(!preview?.ok)throw Error('preview-failed');
+  return {childIds:[null],allocation:preview.allocation||[]};
+ }
  const r=await window.engagementService.family({action:'list'});
  if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
  if(!r?.ok)throw Error('unavailable');
@@ -144,7 +152,7 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
    +'<p class="hint">'+(requestedMode==='children'?(availableChildren.length?'已報名的孩子不會重複出現在可選清單。':'可先建立孩子資料後再回到本場報名。'):'本人與兒童報名分開處理；之後仍可再使用「兒童報名」新增孩子。')+'</p>'
    +'<p data-family="allocation" role="status" aria-live="polite"></p>'
    +'<p class="hint">'+(unlimitedCapacity?'本場目前不限人數；實際報名狀態以送出時為準。':'名額以送出時為準；若正取已滿，可能轉為備取。')+'</p>'
-   +'<button class="btn btn-primary" type="submit" disabled>確認報名</button></form>';
+   +'<button class="btn btn-primary" type="submit" disabled>報名</button></form>';
   let done=false;
   const finish=(error,value)=>{if(done)return;done=true;clearInterval(timer);dialog.close();dialog.remove();focus?.focus?.();if(error)reject(Error(error));else resolve(value)};
   const timer=setInterval(()=>{if(document.hidden)return;if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)finish('auth-required')},1000);
