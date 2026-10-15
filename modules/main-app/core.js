@@ -5303,6 +5303,7 @@ function markLobbySourceUnknown(){
   if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
 }
 function invalidateMyRegistrationsCache(){
+  if(uidActiveEventsEnabled()&&uidActiveEventsController)uidActiveEventsController.invalidate();
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key){
@@ -14626,7 +14627,7 @@ function renderTournamentLobbyContent(opts={}){
     if(!publicTournamentsLoading) setTimeout(()=>handleAction("load-public-tournaments",{getAttribute:()=>null}),0);
     return `<div class="panel"><div class="empty-state">正在讀取賽事大廳……</div></div>`;
   }
-  if(loggedIn && myRegistrationsCache===null && !myRegistrationsLoading){
+  if(loggedIn && !uidActiveEventsEnabled() && myRegistrationsCache===null && !myRegistrationsLoading){
     setTimeout(()=>handleAction("load-my-registrations",{getAttribute:()=>null}),0);
   }
   if(publicTournamentsError) return `<div class="panel"><div class="empty-state">${esc(publicTournamentsError)}</div><div class="btn-row" style="justify-content:center;margin-top:12px;"><button class="btn btn-ghost" data-action="refresh-public-tournaments">重新整理</button></div></div>`;
@@ -15366,6 +15367,7 @@ function smartCallCardHtml(r,info){
   return window.BXHQueueDashboard.html(r,{...info,queueAutoRefresh:on},model,controls);
 }
 function scheduleSmartCallAutoRefresh(){
+  if(uidActiveEventsEnabled()){if(smartCallAutoRefreshTimer)clearTimeout(smartCallAutoRefreshTimer);smartCallAutoRefreshTimer=null;smartCallAutoRefreshKey="";return;}
   // Reuse the existing public-summary cadence. Never create a second listener,
   // callable, or per-family duplicate read for the queue dashboard.
   if(appPhase!=="player-center"||playerActiveTab!=="registered"||!Array.isArray(myRegistrationsCache)||document.hidden){
@@ -15396,7 +15398,55 @@ function scheduleSmartCallAutoRefresh(){
   },20000);
 }
 
+// Local candidate flag is deliberately absent/false in the shipped document.
+function uidActiveEventsEnabled(){return window.BXH_FEATURE_FLAGS?.uidActiveEvents===true;}
+let uidActiveEventsController=null;
+let uidActiveEventsRefreshTimer=null;
+let uidActiveEventsRefreshOwner="";
+function activeEventsOwner(){return {uid:firebaseUser?.uid||"",epoch:engagementSessionEpoch};}
+function activeEventsVisible(){return uidActiveEventsEnabled()&&appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open&&!document.hidden;}
+function getUidActiveEventsController(){
+  if(!window.BXHActiveEvents?.createController)return null;
+  if(!uidActiveEventsController)uidActiveEventsController=window.BXHActiveEvents.createController({
+    owner:activeEventsOwner,
+    readIndex:async context=>{
+      if(!window.cloudSync?.readMyActiveMemberships)throw Error("active-events-unavailable");
+      return window.cloudSync.readMyActiveMemberships(context);
+    },
+    readRoom:(code,context)=>window.cloudSync.readMyActivePublicRoom(code,context),
+    onChange:()=>{if(activeEventsVisible())renderPreservingScroll();}
+  });
+  return uidActiveEventsController;
+}
+function noteActiveEventMutation(uid,epoch,code,sourceRevision){
+  if(!uidActiveEventsEnabled()||uid!==firebaseUser?.uid||epoch!==engagementSessionEpoch)return;
+  getUidActiveEventsController()?.noteKnownEvent(code,sourceRevision);
+}
+window.addEventListener("bxh-active-event-mutation",event=>{
+  const d=event.detail||{};noteActiveEventMutation(d.uid,d.epoch,d.code,d.sourceRevision);
+});
+function renderUidActiveEvents(){
+  const controller=getUidActiveEventsController();
+  if(!controller)return '<section class="panel" role="alert">目前賽事元件未能載入，請重新載入頁面再試。<button class="btn btn-ghost" data-action="active-events-reload">重新載入頁面</button></section>';
+  const snapshot=controller.snapshot();
+  const ownerKey=activeEventsOwner().uid+"|"+engagementSessionEpoch;
+  if(uidActiveEventsRefreshTimer&&uidActiveEventsRefreshOwner!==ownerKey){clearTimeout(uidActiveEventsRefreshTimer);uidActiveEventsRefreshTimer=null;}
+  uidActiveEventsRefreshOwner=ownerKey;
+  if(snapshot.status==='idle')setTimeout(()=>{if(activeEventsVisible())controller.load();},0);
+  // Refresh only successful snapshots while this tab is visible. Error and
+  // pending states require an explicit retry; no render-triggered retry loop.
+  if(snapshot.status==='ready'&&!uidActiveEventsRefreshTimer){
+    const owner=activeEventsOwner();
+    uidActiveEventsRefreshTimer=setTimeout(()=>{
+      uidActiveEventsRefreshTimer=null;
+      if(activeEventsVisible()&&owner.uid===firebaseUser?.uid&&owner.epoch===engagementSessionEpoch)controller.load(true);
+    },20000);
+  }
+  return window.BXHActiveEvents.html(snapshot);
+}
+
 function renderPlayerRegisteredTab(){
+  if(uidActiveEventsEnabled())return renderUidActiveEvents();
   if(myRegistrationsCache===null){
     if(!myRegistrationsLoading){
       setTimeout(()=>{ handleAction("load-my-registrations", {getAttribute:()=>null}); }, 0);
@@ -20391,7 +20441,16 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(["career","season","month","week","today"].includes(value)){ hunterRecordPeriodFilter=value; renderPreservingScroll(); }
     return;
   }
+  if(action==="active-events-reload"){
+    if(uidActiveEventsEnabled())window.location.reload();
+    return;
+  }
+  if(action==="active-events-refresh"){
+    if(uidActiveEventsEnabled())getUidActiveEventsController()?.load(true);
+    return;
+  }
   if(action==="load-my-registrations"){
+    if(uidActiveEventsEnabled()&&playerActiveTab==='registered'){getUidActiveEventsController()?.load(true);return;}
     reconcileLobbyContext();
     if(myRegistrationsLoading)return;
     const owner=lobbyAuthKey(),request=++myRegistrationsRequest;

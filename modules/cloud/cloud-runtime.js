@@ -95,7 +95,7 @@
         fx = {
           doc: fsMod.doc, setDoc: fsMod.setDoc, getDoc: fsMod.getDoc, getDocFromServer: fsMod.getDocFromServer, deleteDoc: fsMod.deleteDoc,
           onSnapshot: fsMod.onSnapshot, serverTimestamp: fsMod.serverTimestamp,
-          collection: fsMod.collection, query: fsMod.query, where: fsMod.where, getDocs: fsMod.getDocs, updateDoc: fsMod.updateDoc,
+          collection: fsMod.collection, query: fsMod.query, where: fsMod.where, getDocs: fsMod.getDocs, getDocsFromServer: fsMod.getDocsFromServer, updateDoc: fsMod.updateDoc,
           runTransaction: fsMod.runTransaction, writeBatch: fsMod.writeBatch, deleteField: fsMod.deleteField,
           increment: fsMod.increment, collectionGroup: fsMod.collectionGroup, orderBy: fsMod.orderBy, limit: fsMod.limit
         };
@@ -728,7 +728,13 @@
       const call=fnx.httpsCallable(functionsHandle,name,{timeout:timeoutMs});
       const response=await call(payload||{});
       if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
-      return response&&response.data ? response.data : {ok:false,error:"empty-response"};
+      const result=response&&response.data ? response.data : {ok:false,error:"empty-response"};
+      if(window.BXH_FEATURE_FLAGS?.uidActiveEvents===true&&result.ok!==false&&
+        ['familyRegistration','teamRegistration','lotteryRegistration','registrationRosterService'].includes(name)&&
+        ['join','cancel'].includes(payload?.action)&&payload?.code){
+        window.dispatchEvent(new CustomEvent('bxh-active-event-mutation',{detail:{uid,epoch,code:String(payload.code).toUpperCase(),sourceRevision:result.membershipSourceRevision}}));
+      }
+      return result;
     }catch(e){
       const detailReason=e&&e.details&&typeof e.details==="object"?e.details.reason:e&&e.details;
       const raw=[e&&e.message,detailReason,e&&e.code].filter(Boolean).map(String).join(" ");
@@ -1961,6 +1967,26 @@
     // 或 permission-denied，導致玩家明明已成功報名，這個分頁卻只顯示未知錯誤。
     // 現在不需要 collection-group index；每筆 registration 仍只 get 自己 uid 的文件，
     // 因此沿用既有 Security Rules 的本人讀取限制，不會讀到其他玩家資料。
+    // Disabled-by-default frontend candidate; no new discovery or writes.
+    activeEventsReader(){
+      if(!cloudEnabled||!window.BXHActiveEventsReader)throw Error("active-events-unavailable");
+      return window.BXHActiveEventsReader.create({sdk:fx,db:dbHandle,
+        session:()=>({uid:authHandle?.currentUser?.uid||"",epoch:engagementSessionEpoch}),
+        reconstruct:reconstructPublicStateFromDoc});
+    },
+    async readMyActiveMemberships(context){return this.activeEventsReader().readIndex(context);},
+    async readMyActivePublicRoom(code,context){return this.activeEventsReader().readRoom(code,context);},
+    async queryMyActiveRegistrationHints(){
+      const context={uid:authHandle?.currentUser?.uid||"",epoch:engagementSessionEpoch};
+      const index=await this.readMyActiveMemberships(context);
+      const problem=window.BXHActiveEvents?.validateIndex(index);
+      if(!window.BXHActiveEvents||problem)throw Error(problem||"active-events-unavailable");
+      return index.memberships.flatMap(m=>m.participants.filter(p=>typeof p.participantId==="string"&&!!p.participantId).map(p=>({
+        tournamentCode:m.code,registrationId:p.registrationId||"",participantId:p.participantId||null,
+        familyPlayerId:p.familyPlayerId||null,status:p.registrationStatus,uid:context.uid
+      })));
+    },
+
     async queryMyRegistrations(options={}){
       const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
       if(!uid) return [];

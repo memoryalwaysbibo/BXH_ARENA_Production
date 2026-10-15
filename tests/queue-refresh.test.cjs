@@ -20,7 +20,7 @@ function harness() {
   context.smartCallEnabled = () => context.enabled;
   context.lobbyAuthKey = () => context.owner;
   context.renderPreservingScroll = () => { context.renders++; };
-  context.window = { cloudSync: { getPublicTournamentSummary: async code => { reads.push(code); return { tournamentPhase: 'live', parsedData: { updated: true } }; } } };
+  context.window = { addEventListener() {}, cloudSync: { getPublicTournamentSummary: async code => { reads.push(code); return { tournamentPhase: 'live', parsedData: { updated: true } }; } } };
   vm.createContext(context); vm.runInContext(source, context);
   return { context, timers, reads, schedule: () => context.scheduleSmartCallAutoRefresh(), fire: async () => { const [handle, item] = timers.entries().next().value; timers.delete(handle); await item.fn(); } };
 }
@@ -68,4 +68,9 @@ test('failed/null summaries preserve last content with explicit stale flag', asy
     assert.equal(h.context.myRegistrationsTournamentInfo['BXH-ONE'].queueSyncFailed, true);
     assert.equal(h.context.renders, 1);
   }
+});
+test('UID-index flag stops the legacy registered queue timer without reads',()=>{
+ const h=harness();h.schedule();assert.equal(h.timers.size,1);
+ h.context.window.BXH_FEATURE_FLAGS={uidActiveEvents:true};h.context.window.BXHActiveEvents={};
+ h.schedule();assert.equal(h.timers.size,0);assert.deepEqual(h.reads,[]);
 });

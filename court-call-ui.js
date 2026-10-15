@@ -667,16 +667,21 @@ function courtCallNotifyChanges(c,newRows,oldRows,newPrepares=[],oldPrepares=[])
 }
 
 async function discoverCourtCallPlayerCodes(force=false){
- const uid=courtCallUserKey();
+ const uid=courtCallUserKey(),epoch=engagementSessionEpoch;
+ const indexed=window.BXH_FEATURE_FLAGS?.uidActiveEvents===true;
+ const current=()=>!indexed||(uid===courtCallUserKey()&&epoch===engagementSessionEpoch);
  if(!uid||courtCallDiscoveryBusy)return;
  if(!force&&Date.now()-courtCallDiscoveryAt<30000)return;
  if(!window.cloudSync||typeof window.cloudSync.queryMyRegistrations!=='function')return;
  courtCallDiscoveryBusy=true;courtCallDiscoveryAt=Date.now();
  try{
   if(window.cloudSync.connect)await window.cloudSync.connect();
-  const regs=await window.cloudSync.queryMyRegistrations();
+  if(!current())return;
+  if(indexed&&!window.cloudSync.queryMyActiveRegistrationHints)return;
+  const regs=await (indexed?window.cloudSync.queryMyActiveRegistrationHints():window.cloudSync.queryMyRegistrations());
+  if(!current())return;
   const codes=(Array.isArray(regs)?regs:[]).filter(r=>r&&r.status==='confirmed'&&/^BXH-[A-Z0-9]{4,16}$/.test(String(r.tournamentCode||'').toUpperCase())).map(r=>String(r.tournamentCode).toUpperCase());
-  courtCallPlayerCodes=[...new Set([...codes,...courtCallPlayerCodes])].slice(0,8);
+  courtCallPlayerCodes=[...new Set(indexed?codes:[...codes,...courtCallPlayerCodes])].slice(0,8);
   courtCallSaveKnownCodes(courtCallPlayerCodes);
  }catch(e){
   // Discovery is best-effort. Existing known codes keep polling.

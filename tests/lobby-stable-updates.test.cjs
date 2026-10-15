@@ -83,6 +83,7 @@ function harness() {
     mapRegistrationError: error => String(error.message || error),
   };
   vm.createContext(context);
+  vm.runInContext(between(core, 'function uidActiveEventsEnabled()', '\nlet uidActiveEventsController'), context);
   vm.runInContext(read('modules/main-app/domain-utils.js'), context);
   vm.runInContext(read('modules/main-app/registration-utils.js'), context);
   Object.assign(context, window.BXHDomainUtils, window.BXHRegistrationUtils);
