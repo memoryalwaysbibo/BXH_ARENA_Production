@@ -588,3 +588,74 @@ test('queue stable-render integration explicitly excludes an open mailbox', () =
     /if\(playerActiveTab===['"]registered['"]\s*&&\s*!mailboxContext\(\)\.open\)\s*__viewportSnapshot\.lobbyPatched=window\.BXHQueueDashboard\.renderStable\(/,
     'mailbox must retain its own rendering and viewport lifecycle');
 });
+
+// Theme regression: use the shipped palette cascade, not theme-picker swatches.
+const themeRoot = path.join(__dirname, '..');
+const queueCss = fs.readFileSync(path.join(themeRoot, 'modules/main-css/queue-dashboard.css'), 'utf8');
+const themeIds = ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 'hunter', 'akatsuki', 'clow', 'zeon', 'gundam'];
+function rootPalette(theme) {
+  const files = ['modules/main-css/core-competition.css', 'client-entrance-theme.css',
+    ...['three-gods', 'gundam', 'zeon', 'clow', 'akatsuki', 'hunter'].map(id => `modules/theme-${id}/styles.css`)];
+  const vars = {};
+  for (const file of files) {
+    const css = fs.readFileSync(path.join(themeRoot, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const block of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!block[1].split(',').some(s => [':root', `:root[data-bxh-theme="${theme}"]`].includes(s.trim()))) continue;
+      for (const property of block[2].matchAll(/(--[\w-]+)\s*:\s*([^;]+)(?:;|$)/g)) vars[property[1]] = property[2].trim();
+    }
+  }
+  return vars;
+}
+function rgb(value) {
+  if (/^#[\da-f]{6}$/i.test(value)) return [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16)).concat(1);
+  const values = value.match(/^rgba?\(([^)]+)\)$/)?.[1].split(',').map(Number);
+  assert.ok(values && values.length >= 3, `Unsupported palette color: ${value}`);
+  return [values[0], values[1], values[2], values[3] ?? 1];
+}
+function over(front, back) { return front.slice(0, 3).map((v, i) => v * front[3] + back[i] * (1 - front[3])).concat(1); }
+function contrast(a, b) {
+  const luminance = c => c.slice(0, 3).map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+  const [light, dark] = [luminance(a), luminance(b)].sort((a, b) => b - a);
+  return (light + .05) / (dark + .05);
+}
+
+test('queue colors inherit shared theme tokens without a fixed blue palette', () => {
+  for (const token of ['--bg', '--glass-surface-strong', '--glass-surface', '--white', '--metal', '--accent-color', '--accent-soft', '--accent-border', '--border']) {
+    assert.ok(queueCss.includes(`var(${token}`), token);
+  }
+  assert.doesNotMatch(queueCss, /#[\da-f]{3,8}\b/i);
+  assert.doesNotMatch(queueCss, /89\s*,\s*224\s*,\s*232|149\s*,\s*186\s*,\s*211/);
+  assert.doesNotMatch(queueCss, /\.court-call-notify-icon[^,{]*\{/);
+  assert.doesNotMatch(queueCss, /\.smart-call-switch[^,{]*\{/);
+  assert.doesNotMatch(queueCss, /\.smart-call-unified-[\w-]+[^,{]*\{/);
+  assert.match(queueCss, /\.queue-court-card\.is-mine\s*\{[^}]*border-color:\s*var\(--queue-accent\)/);
+  assert.match(queueCss, /\.queue-court-card\.is-mine\s*\{[^}]*background:\s*var\(--queue-card\)/);
+  assert.match(queueCss, /:focus-visible[\s\S]*?outline:\s*2px solid var\(--queue-accent\)/);
+});
+
+for (const theme of themeIds) test(`queue text and button contrast remain readable in ${theme}`, () => {
+  const vars = rootPalette(theme);
+  for (const name of ['--accent-color', '--accent-soft', '--accent-border', '--glass-surface', '--glass-surface-strong']) assert.ok(vars[name], `${theme}: ${name}`);
+  const bg = rgb(vars['--bg']), card = over(rgb(vars['--glass-surface-strong']), bg);
+  const court = over(rgb(vars['--glass-surface']), bg), badge = over(rgb(vars['--accent-soft']), card);
+  const accent = rgb(vars['--accent-color']), white = rgb(vars['--white']), muted = rgb(vars['--metal']);
+  assert.ok(contrast(accent, card) >= 4.5, `${theme}: heading contrast`);
+  assert.ok(contrast(accent, badge) >= 4.5, `${theme}: badge contrast`);
+  assert.ok(contrast(white, rgb(vars['--panel-2'])) >= 4.5, `${theme}: button contrast`);
+  assert.ok(contrast(white, badge) >= 4.5, `${theme}: hovered button contrast`);
+  for (const surface of [card, court]) assert.ok(contrast(muted, surface) >= 4.5, `${theme}: note contrast`);
+});
+
+test('queue stylesheet cache key changes without changing the queue runtime asset', () => {
+  const index = fs.readFileSync(path.join(themeRoot, 'index.html'), 'utf8');
+  assert.match(index, /queue-dashboard\.css\?v=20261015-theme-3/);
+  assert.match(index, /queue-dashboard\.js\?v=20261015-1/);
+});
+
+
+test('queue focus compatibility only narrows its own ancestor filter transition', () => {
+  assert.match(queueCss, /@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{\s*html \.schedule-fold \.find-event-card:has\(\.queue-dashboard\)\s*\{\s*transition-property:\s*transform, box-shadow, background !important;/);
+  assert.equal((queueCss.match(/transition-property:/g) || []).length, 1);
+  assert.doesNotMatch(queueCss, /(?:^|[;{])\s*(?:-webkit-)?(?:backdrop-)?filter\s*:/m);
+  assert.doesNotMatch(queueCss, /(?:^|[;{])\s*animation(?:-name)?\s*:/m);
+});

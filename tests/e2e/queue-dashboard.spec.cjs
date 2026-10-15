@@ -5,8 +5,9 @@ const path = require('node:path');
 
 // Full shipped page and CSS. Only the service boundary is synthetic: no live
 // Firebase SDK, player account, registration write, or backend request is used.
-test.use({ serviceWorkers: 'block', reducedMotion: 'reduce' });
-async function openQueue(page) {
+test.use({ serviceWorkers: 'block', contextOptions: { reducedMotion: 'reduce' } });
+
+async function openQueue(page, motion = 'reduce') {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => {
@@ -39,6 +40,7 @@ async function openQueue(page) {
     };
   });
   await page.goto('/', { waitUntil: 'load' });
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), 'Browser must use the requested motion preference').toBe(motion === 'reduce');
   await page.waitForFunction(() => typeof queueFixture.authCallback === 'function');
   await page.evaluate(async () => {
     pendingLoginIntent = 'player';
@@ -128,4 +130,189 @@ test('missing assignments and long names remain readable without invented queue 
   const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
   await page.locator('.queue-dashboard').screenshot({ path: path.join(output, testInfo.project.name + '-unassigned-320.png') });
   expect(errors).toEqual([]);
+});
+
+// A timer is diagnostic only: a missing rendering frame still fails the test.
+async function requireQueueFrame(page, label) {
+  let watchdog;
+  try {
+    const outcome = await Promise.race([(async () => {
+      const before = await page.evaluate(() => ({ theme: document.documentElement.getAttribute('data-bxh-theme'), hidden: document.hidden, visibility: document.visibilityState, focus: document.hasFocus(), reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, viewport: [innerWidth, innerHeight], rect: document.querySelector('.queue-dashboard').getBoundingClientRect().toJSON() }));
+      console.log('QUEUE_FRAME_BEFORE', label, JSON.stringify(before));
+      const result = await page.evaluate(async () => {
+        let frameId, deadline, heartbeat, ticks = 0;
+        heartbeat = setInterval(() => { ticks++; }, 100);
+        const frame = await Promise.race([
+          new Promise(resolve => { frameId = requestAnimationFrame(() => resolve(true)); }),
+          new Promise(resolve => { deadline = setTimeout(() => resolve(false), 5000); }),
+        ]);
+        clearInterval(heartbeat); clearTimeout(deadline); cancelAnimationFrame(frameId);
+        return { frame, ticks, theme: document.documentElement.getAttribute('data-bxh-theme'), hidden: document.hidden, visibility: document.visibilityState, focus: document.hasFocus(), rect: document.querySelector('.queue-dashboard').getBoundingClientRect().toJSON() };
+      });
+      return { before, result };
+    })(), new Promise(resolve => { watchdog = setTimeout(() => resolve({ result: { frame: false, nodeWatchdog: true } }), 7000); })]);
+    console.log('QUEUE_FRAME_AFTER', label, JSON.stringify(outcome));
+    expect(outcome.result.frame, `${label}: ${JSON.stringify(outcome)}`).toBe(true);
+  } finally { clearTimeout(watchdog); }
+}
+
+// Each theme gets a fresh browser context and named diagnostic steps.
+// Keep full-page palette samples bounded on mobile WebKit; retain every theme.
+for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 'hunter', 'akatsuki', 'clow', 'zeon', 'gundam']) {
+  test(`queue inherits ${theme} immediately without replacing cards or reading services`, async ({ page }, testInfo) => {
+    test.setTimeout(45000);
+    const errors = await openQueue(page);
+    await page.keyboard.press('Tab');
+    await page.locator('.queue-bracket-button').focus();
+    await test.step('prepare actual controls and stable-node baseline', async () => {
+      await page.evaluate(() => {
+        const root = document.documentElement, card = document.querySelector('.queue-self-card');
+        const mine = document.querySelector('.queue-court-card.is-mine'), button = document.querySelector('.queue-bracket-button');
+        const control = document.querySelector('.queue-dashboard .smart-call-unified-control');
+        const bell = control?.querySelector('.smart-call-unified-bell');
+        const track = control?.querySelector('.smart-call-unified-track');
+        const knob = control?.querySelector('.smart-call-unified-knob');
+        if (![control, bell, track, knob].every(Boolean)) throw Error('Expected real unified call controls');
+        const motion = document.createElement('style');
+        motion.textContent = '.queue-dashboard .smart-call-unified-control * { transition: none !important; }';
+        document.head.appendChild(motion);
+        const probe = document.createElement('span'); probe.hidden = true; document.body.appendChild(probe);
+        const color = value => { probe.style.color = value; return getComputedStyle(probe).color; };
+        const read = (el, pseudo) => {
+          const style = getComputedStyle(el, pseudo);
+          return [style.color, style.backgroundColor, style.borderColor, style.backgroundImage, style.content];
+        };
+        const status = () => {
+          const original = [control.className, bell.className], states = [];
+          // CSS-only state samples: never click the control or request permission.
+          for (const on of [false, true]) for (const background of [false, true]) {
+            control.className = `smart-call-unified-control ${on ? 'is-on' : 'is-off'} ${background ? 'has-background' : 'no-background'}`;
+            bell.className = `smart-call-unified-bell ${background ? '' : 'is-notify-off'}`;
+            states.push({ on, background, bell: read(bell), slash: read(bell, '::after'), track: read(track), knob: read(knob) });
+          }
+          [control.className, bell.className] = original;
+          return states;
+        };
+        window.queueThemeProbe = {
+          status,
+          snapshot: () => ({
+            theme: root.getAttribute('data-bxh-theme'),
+            accent: color('var(--accent-color)'),
+            title: getComputedStyle(document.querySelector('.queue-self-head h3')).color,
+            badge: getComputedStyle(document.querySelector('.queue-status')).color,
+            count: getComputedStyle(document.querySelector('.queue-ahead-value')).color,
+            edge: getComputedStyle(mine, '::before').backgroundColor,
+            border: getComputedStyle(mine).borderTopColor,
+            focus: getComputedStyle(button).outlineColor,
+            card: getComputedStyle(card).backgroundColor,
+            expectedCard: color('var(--glass-surface-strong)'),
+            hostTransition: getComputedStyle(card.closest('.find-event-card')).transitionProperty,
+            statusColors: status(),
+          }),
+          stable: () => card === document.querySelector('.queue-self-card') && mine === document.querySelector('.queue-court-card.is-mine') && document.activeElement === button,
+          cleanup: () => { probe.remove(); motion.remove(); },
+          reads: queueFixture.reads.length, subscriptions: queueFixture.subscriptions.length,
+        };
+      });
+    });
+    const statusColors = await test.step('sample all four semantic notification states', async () => page.evaluate(() => queueThemeProbe.status()));
+    expect(statusColors).toHaveLength(4);
+    const [offQuiet, offBackground, onQuiet] = statusColors;
+    expect(offQuiet.bell).not.toEqual(offBackground.bell);
+    expect(offQuiet.track).not.toEqual(onQuiet.track);
+    expect(offQuiet.knob).not.toEqual(onQuiet.knob);
+    expect(offQuiet.slash[3]).toContain('linear-gradient');
+    expect(offBackground.slash[3]).toBe('none');
+    await test.step(`switch from gold to ${theme} and cross a browser frame`, async () => {
+      // CSS palette inheritance only; no role, entitlement, preference or backend write.
+      await page.evaluate(theme => document.documentElement.setAttribute('data-bxh-theme', theme), theme);
+      await requireQueueFrame(page, `palette-${theme}`);
+    });
+    const state = await test.step(`read ${theme} computed palette`, async () => page.evaluate(() => ({
+      ...queueThemeProbe.snapshot(), stable: queueThemeProbe.stable(),
+      reads: queueFixture.reads.length - queueThemeProbe.reads,
+      subscriptions: queueFixture.subscriptions.length - queueThemeProbe.subscriptions,
+    })));
+    expect(state.theme).toBe(theme);
+    for (const name of ['title', 'badge', 'count', 'edge', 'border', 'focus']) expect(state[name], `${theme}: ${name}`).toBe(state.accent);
+    expect(state.card, `${theme}: surface`).toBe(state.expectedCard);
+    expect(state.hostTransition, `${theme}: reduced-motion remains respected`).toBe('none');
+    expect(state.statusColors, `${theme}: semantic call states`).toEqual(statusColors);
+    expect(state.stable).toBe(true);
+    expect(state.reads).toBe(0); expect(state.subscriptions).toBe(0);
+    await page.evaluate(() => { queueThemeProbe.cleanup(); delete window.queueThemeProbe; });
+    await expect(page.locator('.queue-ahead-value span')).toHaveText('1');
+    await expect(page.locator('.queue-station strong')).toHaveText('第 3 台');
+    await expect(page.locator('.queue-player-identity')).toHaveText('7號｜測試選手');
+    if (['gold', 'red', 'hunter', 'directive'].includes(theme)) {
+      const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
+      const geometry = () => page.evaluate(() => {
+        const rect = document.querySelector('.queue-dashboard').getBoundingClientRect();
+        return { viewport: [innerWidth, innerHeight], scroll: [scrollX, scrollY], rect: rect.toJSON(), documentTop: rect.top + scrollY };
+      });
+      const before = await geometry();
+      await page.locator('.queue-dashboard').screenshot({ path: path.join(output, `${testInfo.project.name}-theme-${theme}.png`), timeout: 10000 });
+      const after = await geometry();
+      const geometryPath = path.join(output, `${testInfo.project.name}-theme-${theme}-geometry.json`);
+      fs.writeFileSync(geometryPath, JSON.stringify({ before, after }, null, 2));
+      if (theme === 'directive' && testInfo.project.name === 'desktop-chromium') {
+        await page.screenshot({ path: path.join(output, `${testInfo.project.name}-theme-${theme}-full-page.png`), fullPage: true, timeout: 10000 });
+      }
+      fs.writeFileSync(geometryPath, JSON.stringify({ before, after, afterFullPage: await geometry() }, null, 2));
+    }
+    expect(errors).toEqual([]);
+  });
+}
+
+test.describe('normal-motion theme rendering', () => {
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+test('queue repeats same-page theme switches and returns to its original palette (shipped)', async ({ page }, testInfo) => {
+  test.setTimeout(45000);
+  const errors = await openQueue(page, 'no-preference');
+  await page.keyboard.press('Tab');
+  await page.locator('.queue-bracket-button').focus();
+  const baseline = await page.evaluate(() => {
+    queueFixture.themeCard = document.querySelector('.queue-self-card');
+    queueFixture.themeButton = document.querySelector('.queue-bracket-button');
+    queueFixture.themeReads = queueFixture.reads.length;
+    queueFixture.themeSubscriptions = queueFixture.subscriptions.length;
+    const host = document.querySelector('.queue-dashboard').closest('.find-event-card');
+    if (!host) throw Error('Queue diagnostic requires its shipped activity-card ancestor');
+    const hostStyle = getComputedStyle(host);
+    // A hidden empty sibling samples the exact same activity-card classes, but
+    // without a queue descendant. It must retain the original filter transition.
+    const ordinary = host.cloneNode(false); ordinary.removeAttribute('id'); ordinary.style.display = 'none'; host.after(ordinary);
+    const ordinaryTransition = getComputedStyle(ordinary).transitionProperty; ordinary.remove();
+    return { ordinaryTransition, title: getComputedStyle(document.querySelector('.queue-self-head h3')).color, card: getComputedStyle(queueFixture.themeCard).backgroundColor, hostTransition: hostStyle.transitionProperty, hostDuration: hostStyle.transitionDuration, hostFilter: hostStyle.filter, hostFocus: host.matches(':focus-within') };
+  });
+  console.log('QUEUE_SURFACE_BASELINE', 'shipped', JSON.stringify(baseline));
+  expect(baseline.hostFocus).toBe(true);
+  expect(baseline.ordinaryTransition).toBe('transform, box-shadow, filter, background');
+  expect(baseline.hostTransition).toBe('transform, box-shadow, background');
+  expect(baseline.hostDuration.split(',').every(value => parseFloat(value) > 0)).toBe(true);
+  expect(baseline.hostFilter).not.toBe('none');
+  for (const theme of ['red', 'gold', 'green', 'gold']) await test.step(`same-page switch to ${theme}`, async () => {
+    await page.evaluate(theme => document.documentElement.setAttribute('data-bxh-theme', theme), theme);
+    await requireQueueFrame(page, `shipped-${theme}`);
+    const state = await page.evaluate(() => ({
+      theme: document.documentElement.getAttribute('data-bxh-theme'),
+      title: getComputedStyle(document.querySelector('.queue-self-head h3')).color,
+      card: getComputedStyle(document.querySelector('.queue-self-card')).backgroundColor,
+      stable: queueFixture.themeCard === document.querySelector('.queue-self-card') && document.activeElement === queueFixture.themeButton,
+      reads: queueFixture.reads.length - queueFixture.themeReads,
+      subscriptions: queueFixture.subscriptions.length - queueFixture.themeSubscriptions,
+    }));
+    expect(state.theme).toBe(theme);
+    expect(state.stable).toBe(true);
+    expect(state.reads).toBe(0); expect(state.subscriptions).toBe(0);
+    if (theme === 'gold') {
+      expect(state.title).toBe(baseline.title); expect(state.card).toBe(baseline.card);
+    } else expect(state.title).not.toBe(baseline.title);
+  });
+  await expect(page.locator('.queue-player-identity')).toHaveText('7號｜測試選手');
+  await expect(page.locator('.queue-ahead-value span')).toHaveText('1');
+  const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
+  await page.locator('.queue-dashboard').screenshot({ path: path.join(output, `${testInfo.project.name}-roundtrip-shipped.png`), timeout: 10000 });
+  expect(errors).toEqual([]);
+});
 });
