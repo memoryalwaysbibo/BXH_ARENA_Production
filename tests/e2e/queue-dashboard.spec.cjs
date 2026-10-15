@@ -223,3 +223,38 @@ for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 
     expect(errors).toEqual([]);
   });
 }
+
+test('queue repeats same-page theme switches and returns to its original palette', async ({ page }) => {
+  test.setTimeout(45000);
+  const errors = await openQueue(page);
+  await page.keyboard.press('Tab');
+  await page.locator('.queue-bracket-button').focus();
+  const baseline = await page.evaluate(() => {
+    queueFixture.themeCard = document.querySelector('.queue-self-card');
+    queueFixture.themeButton = document.querySelector('.queue-bracket-button');
+    queueFixture.themeReads = queueFixture.reads.length;
+    queueFixture.themeSubscriptions = queueFixture.subscriptions.length;
+    return { title: getComputedStyle(document.querySelector('.queue-self-head h3')).color, card: getComputedStyle(queueFixture.themeCard).backgroundColor };
+  });
+  for (const theme of ['red', 'gold', 'green', 'gold']) await test.step(`same-page switch to ${theme}`, async () => {
+    await page.evaluate(theme => document.documentElement.setAttribute('data-bxh-theme', theme), theme);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    const state = await page.evaluate(() => ({
+      theme: document.documentElement.getAttribute('data-bxh-theme'),
+      title: getComputedStyle(document.querySelector('.queue-self-head h3')).color,
+      card: getComputedStyle(document.querySelector('.queue-self-card')).backgroundColor,
+      stable: queueFixture.themeCard === document.querySelector('.queue-self-card') && document.activeElement === queueFixture.themeButton,
+      reads: queueFixture.reads.length - queueFixture.themeReads,
+      subscriptions: queueFixture.subscriptions.length - queueFixture.themeSubscriptions,
+    }));
+    expect(state.theme).toBe(theme);
+    expect(state.stable).toBe(true);
+    expect(state.reads).toBe(0); expect(state.subscriptions).toBe(0);
+    if (theme === 'gold') {
+      expect(state.title).toBe(baseline.title); expect(state.card).toBe(baseline.card);
+    } else expect(state.title).not.toBe(baseline.title);
+  });
+  await expect(page.locator('.queue-player-identity')).toHaveText('7號｜測試選手');
+  await expect(page.locator('.queue-ahead-value span')).toHaveText('1');
+  expect(errors).toEqual([]);
+});
