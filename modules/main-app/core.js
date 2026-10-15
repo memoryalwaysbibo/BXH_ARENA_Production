@@ -5306,7 +5306,7 @@ function invalidateMyRegistrationsCache(){
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key){
-  if(!isTournamentLobbyVisible())return true;
+  if(!isTournamentLobbyVisible()&&!(appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open))return true;
   let keys=lobbyInputBindings.get(element);
   if(!keys){keys=new Set();lobbyInputBindings.set(element,keys);}
   if(keys.has(key))return false;
@@ -15311,6 +15311,7 @@ function renderTournamentDetailScreen(){
 const SMART_CALL_PREF_KEY = "bxh_smart_call_prefs_v1";
 const SMART_CALL_LAST_KEY = "bxh_smart_call_last_v1";
 let smartCallAutoRefreshTimer = null;
+let smartCallAutoRefreshKey = "";
 let smartCallRefreshBusy = false;
 function smartCallStorageRead(key){
   try{ return JSON.parse(localStorage.getItem(key)||"{}"); }catch(e){ return {}; }
@@ -15328,11 +15329,7 @@ function setSmartCallEnabled(code,on){
 }
 function smartCallNorm(v){ return window.BXHInputUtils.smartCallNorm(v); }
 function smartCallFindPlayerId(st,r){
-  if(!st||!Array.isArray(st.players)) return null;
-  if(r?.familyPlayerId)return st.players.find(p=>p.id==="family_"+r.familyPlayerId||p.familyPlayerId===r.familyPlayerId)?.id||null;
-  const candidates=[r&&r.displayName,r&&r.realName,r&&r.gameId,r&&r.publicName,userProfile&&userProfile.realName,userProfile&&userProfile.displayName,userProfile&&userProfile.gameId].map(smartCallNorm).filter(Boolean);
-  const found=st.players.find(p=>candidates.includes(smartCallNorm(p&&p.name)));
-  return found ? found.id : null;
+  return window.BXHQueueDashboard.findPlayerId(st,r);
 }
 function smartCallPlayerName(st,id){ const p=st&&Array.isArray(st.players)?st.players.find(x=>x.id===id):null; return p&&p.name?p.name:"待定"; }
 function smartCallRemainingSeconds(m){
@@ -15346,45 +15343,16 @@ function smartCallRemainingSeconds(m){
   return 165;
 }
 function smartCallModel(r,info){
-  const st=info&&info.parsedData;
-  if((info&&info.battleMode)==="team" || (st&&st.meta&&st.meta.battleMode)==="team") return {kind:"pending",message:"團體戰上場提醒將於團體裁判台完成後啟用"};
-  if(!st || !Array.isArray(st.matches) || !Array.isArray(st.players)) return {kind:"pending",message:"等待賽事對戰資料同步"};
-  if(r.status!=="confirmed") return {kind:"waitlist",message:"目前為備取，遞補為正取後才會啟用叫號"};
-  const pid=smartCallFindPlayerId(st,r);
-  if(!pid) return {kind:"pending",message:st.startedAt?"尚未在目前對戰表找到你的出賽位置":"等待主辦完成對戰編排"};
-  const livePhase=(info.tournamentPhase==="live") || !!st.startedAt;
-  if(!livePhase) return {kind:"waiting",message:"等待賽事開始",playerId:pid};
-  const matches=st.matches.filter(m=>m && !m.isBye && !m.completed);
-  const mine=matches.filter(m=>(m.a&&m.a.playerId===pid)||(m.b&&m.b.playerId===pid)).sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
-  const currentMine=mine.find(m=>m.status==="in_progress" || Object.values(st.courtAssignments||{}).some(c=>c&&c.currentMatchId===m.id));
-  if(currentMine){
-    const opp=(currentMine.a&&currentMine.a.playerId===pid)?(currentMine.b&&currentMine.b.playerId):(currentMine.a&&currentMine.a.playerId);
-    return {kind:"playing",ahead:0,station:currentMine.station||1,opponent:smartCallPlayerName(st,opp),etaSec:0,message:"正在進行你的對戰"};
-  }
-  const target=mine[0];
-  if(!target){
-    const hadLoss=(st.matches||[]).some(m=>m&&m.completed&&m.loserId===pid);
-    if(info.tournamentPhase==="done" || st.archiveStatus==="completed") return {kind:"done",message:"本場賽程已完成"};
-    if(hadLoss && (st.meta&&st.meta.formatType)==="single") return {kind:"done",message:"本場個人賽程已結束"};
-    return {kind:"pending",message:"下一輪對戰組合尚未產生"};
-  }
-  if(!target.a || !target.b || !target.a.playerId || !target.b.playerId) return {kind:"pending",station:target.station||1,message:"下一輪對手尚未確定"};
-  const station=target.station||1;
-  const queue=courtCallPublicQueue(st,station);
-  let idx=queue.findIndex(m=>m.id===target.id); if(idx<0) idx=0;
-  let eta=0; for(let i=0;i<idx;i++) eta+=smartCallRemainingSeconds(queue[i]);
-  const opp=(target.a.playerId===pid)?target.b.playerId:target.a.playerId;
-  const kind=idx<=1?"soon":idx<=3?"prepare":"waiting";
-  return {kind,ahead:idx,station,opponent:smartCallPlayerName(st,opp),etaSec:eta,message:idx===0?"下一場就是你":"前方還有 "+idx+" 場"};
+  return window.BXHQueueDashboard.model(r,info);
 }
 
 function smartCallMaybeNotify(code,model){
-  if(!smartCallEnabled(code) || !model || typeof model.ahead!=="number") return;
+  if(!smartCallEnabled(code) || !model || model.kind==="paused" || typeof model.ahead!=="number") return;
   const all=smartCallStorageRead(SMART_CALL_LAST_KEY), uk=smartCallUserKey(); all[uk]=all[uk]||{}; const prev=all[uk][code]||{};
-  let level=0; if(model.kind==="playing") level=3; else if(model.ahead<=1) level=2; else if(model.ahead<=3) level=1;
+  let level=0; if(model.kind==="playing"||model.kind==="called") level=3; else if(model.ahead<=1) level=2; else if(model.ahead<=3) level=1;
   if(level>Number(prev.level||0)){
     let msg="";
-    if(level===1) msg=`BXH CALL｜前方剩 ${model.ahead} 場，${smartCallEtaText(model.etaSec)}`;
+    if(level===1) msg=`BXH CALL｜前方剩 ${model.ahead} 場，請留意現場叫號`;
     if(level===2) msg=`BXH CALL｜下一場就是你，請前往 ${model.station||1}號台準備`;
     if(level===3) msg=`BXH CALL｜輪到你了｜${model.station||1}號台`;
     if(msg){ showToast(msg); try{ if(navigator.vibrate) navigator.vibrate(level>=2?[180,80,180]:120); }catch(e){} }
@@ -15392,41 +15360,39 @@ function smartCallMaybeNotify(code,model){
   }
 }
 function smartCallCardHtml(r,info){
-  const on=smartCallEnabled(r.tournamentCode); const model=smartCallModel(r,info); if(on) smartCallMaybeNotify(r.tournamentCode,model);
-  const statusText = model.kind==="playing" ? "⚔️ 正在上場" : model.kind==="soon" ? "🔴 即將上場" : model.kind==="prepare" ? "🟡 準備" : model.kind==="done" ? "已完成" : "🟢 等待中";
-  const focusText=model.kind==="playing"?"你的對戰進行中":(model.message||"等待賽事狀態更新");
-  return `<div class="smart-call-box">
-    <div class="smart-call-head">
-      <div class="smart-call-title">BXH CALL｜上場提醒</div>
-      <div class="smart-call-head-actions">
-        ${typeof renderCourtCallHeaderControls==='function'?renderCourtCallHeaderControls(r.tournamentCode,on):''}
-      </div>
-    </div>
-    ${renderCourtCallPlayer(r.tournamentCode)}
-    ${on?`<div class="smart-call-body">
-      <div class="smart-call-grid">
-        <div class="smart-call-stat"><div class="k">狀態</div><div class="v">${esc(statusText)}</div></div>
-        <div class="smart-call-stat"><div class="k">戰鬥台</div><div class="v">${model.station?`${esc(String(model.station))}號台`:"—"}</div></div>
-        <div class="smart-call-stat"><div class="k">預估等待</div><div class="v">${esc(smartCallEtaText(model.etaSec))}</div></div>
-      </div>
-      <div class="smart-call-focus">
-        <strong class="smart-call-focus-title">${esc(focusText)}</strong>
-        ${model.opponent?`<span class="smart-call-opponent">VS ${esc(model.opponent)}</span>`:""}
-        <div class="smart-call-note">ETA 以每場 3 分鐘估算，會依比分動態修正。</div>
-      </div>
-    </div>`:`<div class="smart-call-disabled">智慧提醒已關閉｜裁判正式叫號仍保留</div>`}
-  </div>`;
+  const on=smartCallEnabled(r.tournamentCode),model=smartCallModel(r,info);
+  if(on)smartCallMaybeNotify(r.tournamentCode,model);
+  const controls=`<div class="smart-call-head"><div class="smart-call-title">BXH CALL｜上場提醒</div><div class="smart-call-head-actions">${typeof renderCourtCallHeaderControls==='function'?renderCourtCallHeaderControls(r.tournamentCode,on):''}</div></div>${renderCourtCallPlayer(r.tournamentCode)}${on?'':'<div class="smart-call-disabled">智慧提醒已關閉｜裁判正式叫號仍保留</div>'}`;
+  return window.BXHQueueDashboard.html(r,{...info,queueAutoRefresh:on},model,controls);
 }
 function scheduleSmartCallAutoRefresh(){
-  if(smartCallAutoRefreshTimer){ clearTimeout(smartCallAutoRefreshTimer); smartCallAutoRefreshTimer=null; }
-  if(appPhase!=="player-center" || playerActiveTab!=="registered" || !Array.isArray(myRegistrationsCache)) return;
-  const enabled=myRegistrationsCache.filter(r=>r.status==="confirmed"&&schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{})==='live'&&smartCallModel(r,myRegistrationsTournamentInfo[r.tournamentCode]||{}).kind!=='done'&&smartCallEnabled(r.tournamentCode)); if(!enabled.length) return;
+  // Reuse the existing public-summary cadence. Never create a second listener,
+  // callable, or per-family duplicate read for the queue dashboard.
+  if(appPhase!=="player-center"||playerActiveTab!=="registered"||!Array.isArray(myRegistrationsCache)||document.hidden){
+    if(smartCallAutoRefreshTimer)clearTimeout(smartCallAutoRefreshTimer);
+    smartCallAutoRefreshTimer=null;smartCallAutoRefreshKey="";return;
+  }
+  const codes=[...new Set(myRegistrationsCache.filter(r=>r.status==="confirmed"&&schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{})==='live'&&smartCallModel(r,myRegistrationsTournamentInfo[r.tournamentCode]||{}).kind!=='done'&&smartCallEnabled(r.tournamentCode)).map(r=>r.tournamentCode))];
+  const owner=lobbyAuthKey(),request=myRegistrationsRequest;
+  const key=owner+'|'+request+'|'+codes.join(',');
+  if(smartCallAutoRefreshTimer&&(smartCallAutoRefreshKey!==key||!codes.length)){clearTimeout(smartCallAutoRefreshTimer);smartCallAutoRefreshTimer=null;}
+  smartCallAutoRefreshKey=key;
+  if(!codes.length||smartCallAutoRefreshTimer||smartCallRefreshBusy)return;
+  const current=()=>owner===lobbyAuthKey()&&request===myRegistrationsRequest&&appPhase==='player-center'&&playerActiveTab==='registered'&&!document.hidden;
   smartCallAutoRefreshTimer=setTimeout(async()=>{
-    if(smartCallRefreshBusy || appPhase!=="player-center" || playerActiveTab!=="registered") return;
+    smartCallAutoRefreshTimer=null;if(!current())return;
     smartCallRefreshBusy=true;
     try{
-      for(const r of enabled){ try{ const info=await window.cloudSync.getPublicTournamentSummary(r.tournamentCode); if(info) myRegistrationsTournamentInfo[r.tournamentCode]=info; }catch(e){} }
-    }finally{ smartCallRefreshBusy=false; if(appPhase==="player-center"&&playerActiveTab==="registered"){ renderPreservingScroll(); } }
+      for(const code of codes){
+        if(!current())return;
+        try{
+          const info=await window.cloudSync.getPublicTournamentSummary(code);
+          if(!current())return;
+          if(info)myRegistrationsTournamentInfo[code]=info;
+          else if(myRegistrationsTournamentInfo[code])myRegistrationsTournamentInfo[code]={...myRegistrationsTournamentInfo[code],queueSyncFailed:true};
+        }catch(e){if(current()&&myRegistrationsTournamentInfo[code])myRegistrationsTournamentInfo[code]={...myRegistrationsTournamentInfo[code],queueSyncFailed:true};}
+      }
+    }finally{smartCallRefreshBusy=false;if(current())renderPreservingScroll();else scheduleSmartCallAutoRefresh();}
   },20000);
 }
 
@@ -15461,7 +15427,9 @@ function renderPlayerRegisteredTab(){
     ].filter(Boolean);
     const bracketData=info.parsedData||null;
     const bracketReady=!!(bracketData && (Number(bracketData.bracketSize)>0 || (Array.isArray(bracketData.matches)&&bracketData.matches.length>0)));
-    return `<div class="find-event-card my-schedule-card">
+    const activeQueue=r.status==='confirmed'&&schedulePhase(info)==='live'&&smartCallModel(r,info).kind!=='done';
+    return `<div class="find-event-card my-schedule-card" data-queue-key="event:${esc(r.tournamentCode)}:${esc(r.familyPlayerId||r.registrationId||'self')}">
+      ${activeQueue?`<div class="queue-event-name">${esc(info.name||r.tournamentCode)}</div>${smartCallCardHtml(r,info)}`:''}
       <div class="my-schedule-head">
         <div class="fe-name">${esc(info.name||r.tournamentCode)}</div>
         <div class="my-schedule-meta">${esc(metaParts.length ? metaParts.join("　｜　") : "活動資訊待公布")}</div>
@@ -15472,7 +15440,7 @@ function renderPlayerRegisteredTab(){
         </div>
       </div>
       ${r.status==='confirmed'&&info.checkInAt?`<p class="hint"><b>現場報到尚待完成：</b>請於 ${esc(info.checkInAt)} 向工作人員繳費並完成報到。</p>`:''}
-      ${r.status==='confirmed' && schedulePhase(info)==='live' && smartCallModel(r,info).kind!=='done' ? smartCallCardHtml(r,info) : (schedulePhase(info)==='live'&&smartCallModel(r,info).kind==='done'?'<p class="hint">本次參賽已結束｜賽事進行中，名次待結算</p>':'')}
+      ${schedulePhase(info)==='live'&&smartCallModel(r,info).kind==='done'?'<p class="hint">本次參賽已結束｜賽事進行中，名次待結算</p>':''}
       ${window.BXHEnchantmentUI?.player(r,info)||''}
       <div class="fe-card-action my-schedule-actions">
         <button class="btn btn-ghost btn-sm" data-action="view-public-tournament" data-code="${esc(r.tournamentCode)}">查看詳情</button>
@@ -17615,7 +17583,11 @@ function render(){
   if(appPhase==="player-apply"){ renderAuthFormPreservingInputs(app,renderPlayerApplyScreen(),appPhase); return; }
   if(appPhase==="player-complete-profile"){ app.innerHTML = renderPlayerCompleteProfileScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-lookup"){ app.innerHTML = renderPlayerLookupScreen(); bindAuthInputs(); return; }
-  if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }
+  if(appPhase==="player-center"){
+    if(playerActiveTab==='registered'&&!mailboxContext().open)__viewportSnapshot.lobbyPatched=window.BXHQueueDashboard.renderStable(app,renderPlayerCenterScreen(),currentRenderViewportKey()+'|'+lobbyContextKey());
+    else app.innerHTML=renderPlayerCenterScreen();
+    bindAuthInputs();bindDynamicInputs();return;
+  }
   if(appPhase==="community-create"){ app.innerHTML = renderCommunityCreateScreen(); bindAuthInputs(); initHalfHourTimePickers(); return; }
   if(appPhase==="community-room"){ renderCommunityRoomPreservingSettings(app); return; }
   if(appPhase==="team-lineup"){ app.innerHTML = renderTeamCaptainScreen(); return; }
@@ -24239,4 +24211,4 @@ init().then(()=>{
 
 // Release the A1 camera on backgrounding and navigation; no PK polling exists in A1.
 window.addEventListener("pagehide",()=>hunterClashEntry?.suspend());
-document.addEventListener("visibilitychange",()=>{if(document.hidden)hunterClashEntry?.suspend();else hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]"));});
+document.addEventListener("visibilitychange",()=>{scheduleSmartCallAutoRefresh();if(document.hidden)hunterClashEntry?.suspend();else hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]"));});
