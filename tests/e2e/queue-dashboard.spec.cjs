@@ -129,3 +129,92 @@ test('missing assignments and long names remain readable without invented queue 
   await page.locator('.queue-dashboard').screenshot({ path: path.join(output, testInfo.project.name + '-unassigned-320.png') });
   expect(errors).toEqual([]);
 });
+
+test('queue inherits every theme palette immediately without replacing cards or reading services', async ({ page }, testInfo) => {
+  test.setTimeout(45000); // Bounded budget for four visual captures on mobile WebKit.
+  const errors = await openQueue(page);
+  await page.keyboard.press('Tab');
+  await page.locator('.queue-bracket-button').focus();
+  const result = await page.evaluate(async () => {
+    const root = document.documentElement, card = document.querySelector('.queue-self-card');
+    const mine = document.querySelector('.queue-court-card.is-mine'), button = document.querySelector('.queue-bracket-button');
+    const control = document.querySelector('.queue-dashboard .smart-call-unified-control');
+    const bell = control?.querySelector('.smart-call-unified-bell');
+    const track = control?.querySelector('.smart-call-unified-track');
+    const knob = control?.querySelector('.smart-call-unified-knob');
+    if (![control, bell, track, knob].every(Boolean)) throw Error('Expected real unified call controls');
+    const motion = document.createElement('style');
+    motion.textContent = '.queue-dashboard .smart-call-unified-control * { transition: none !important; }';
+    document.head.appendChild(motion);
+    const read = (el, pseudo) => {
+      const style = getComputedStyle(el, pseudo);
+      return [style.color, style.backgroundColor, style.borderColor, style.backgroundImage, style.content];
+    };
+    const status = () => {
+      const original = [control.className, bell.className], states = [];
+      // CSS-only state samples: never click the control or request permission.
+      for (const on of [false, true]) for (const background of [false, true]) {
+        control.className = `smart-call-unified-control ${on ? 'is-on' : 'is-off'} ${background ? 'has-background' : 'no-background'}`;
+        bell.className = `smart-call-unified-bell ${background ? '' : 'is-notify-off'}`;
+        states.push({ on, background, bell: read(bell), slash: read(bell, '::after'), track: read(track), knob: read(knob) });
+      }
+      [control.className, bell.className] = original;
+      return states;
+    };
+    const statusColors = status();
+    const before = { reads: queueFixture.reads.length, subscriptions: queueFixture.subscriptions.length };
+    const probe = document.createElement('span'); root.appendChild(probe);
+    const color = value => { probe.style.color = value; return getComputedStyle(probe).color; };
+    const snapshots = [];
+    // Test CSS palette inheritance only. Theme ownership/access is covered by
+    // separate tests; no role, entitlement, account preference, or backend write.
+    for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 'hunter', 'akatsuki', 'clow', 'zeon', 'gundam']) {
+      root.setAttribute('data-bxh-theme', theme);
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const accent = color('var(--accent-color)');
+      snapshots.push({
+        theme, accent,
+        title: getComputedStyle(document.querySelector('.queue-self-head h3')).color,
+        badge: getComputedStyle(document.querySelector('.queue-status')).color,
+        count: getComputedStyle(document.querySelector('.queue-ahead-value')).color,
+        edge: getComputedStyle(mine, '::before').backgroundColor,
+        border: getComputedStyle(mine).borderTopColor,
+        focus: getComputedStyle(button).outlineColor,
+        card: getComputedStyle(card).backgroundColor,
+        expectedCard: color('var(--glass-surface-strong)'),
+        statusColors: status(),
+      });
+    }
+    root.setAttribute('data-bxh-theme', 'gold'); probe.remove(); motion.remove();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    return {
+      snapshots, statusColors,
+      stable: card === document.querySelector('.queue-self-card') && mine === document.querySelector('.queue-court-card.is-mine') && document.activeElement === button,
+      reads: queueFixture.reads.length - before.reads,
+      subscriptions: queueFixture.subscriptions.length - before.subscriptions,
+    };
+  });
+  expect(result.statusColors).toHaveLength(4);
+  const [offQuiet, offBackground, onQuiet] = result.statusColors;
+  expect(offQuiet.bell).not.toEqual(offBackground.bell);
+  expect(offQuiet.track).not.toEqual(onQuiet.track);
+  expect(offQuiet.knob).not.toEqual(onQuiet.knob);
+  expect(offQuiet.slash[3]).toContain('linear-gradient');
+  expect(offBackground.slash[3]).toBe('none');
+  expect(result.stable).toBe(true);
+  expect(result.reads).toBe(0); expect(result.subscriptions).toBe(0);
+  for (const state of result.snapshots) {
+    for (const name of ['title', 'badge', 'count', 'edge', 'border', 'focus']) expect(state[name], `${state.theme}: ${name}`).toBe(state.accent);
+    expect(state.card, `${state.theme}: surface`).toBe(state.expectedCard);
+    expect(state.statusColors, `${state.theme}: semantic call states`).toEqual(result.statusColors);
+  }
+  await expect(page.locator('.queue-ahead-value span')).toHaveText('1');
+  await expect(page.locator('.queue-station strong')).toHaveText('第 3 台');
+  await expect(page.locator('.queue-player-identity')).toHaveText('7號｜測試選手');
+  const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
+  for (const theme of ['gold', 'red', 'hunter', 'directive']) {
+    await page.evaluate(theme => document.documentElement.setAttribute('data-bxh-theme', theme), theme);
+    await page.locator('.queue-dashboard').screenshot({ path: path.join(output, `${testInfo.project.name}-theme-${theme}.png`) });
+  }
+  expect(errors).toEqual([]);
+});
