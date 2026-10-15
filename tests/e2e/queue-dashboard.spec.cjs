@@ -5,8 +5,8 @@ const path = require('node:path');
 
 // Full shipped page and CSS. Only the service boundary is synthetic: no live
 // Firebase SDK, player account, registration write, or backend request is used.
-test.use({ serviceWorkers: 'block', reducedMotion: 'reduce' });
-async function openQueue(page) {
+test.use({ serviceWorkers: 'block', contextOptions: { reducedMotion: 'reduce' } });
+async function openQueue(page, motion = 'reduce') {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => {
@@ -39,6 +39,7 @@ async function openQueue(page) {
     };
   });
   await page.goto('/', { waitUntil: 'load' });
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), 'Browser must use the requested motion preference').toBe(motion === 'reduce');
   await page.waitForFunction(() => typeof queueFixture.authCallback === 'function');
   await page.evaluate(async () => {
     pendingLoginIntent = 'player';
@@ -130,6 +131,30 @@ test('missing assignments and long names remain readable without invented queue 
   expect(errors).toEqual([]);
 });
 
+// A timer is diagnostic only: a missing rendering frame still fails the test.
+async function requireQueueFrame(page, label) {
+  let watchdog;
+  try {
+    const outcome = await Promise.race([(async () => {
+      const before = await page.evaluate(() => ({ theme: document.documentElement.getAttribute('data-bxh-theme'), hidden: document.hidden, visibility: document.visibilityState, focus: document.hasFocus(), reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, viewport: [innerWidth, innerHeight], rect: document.querySelector('.queue-dashboard').getBoundingClientRect().toJSON() }));
+      console.log('QUEUE_FRAME_BEFORE', label, JSON.stringify(before));
+      const result = await page.evaluate(async () => {
+        let frameId, deadline, heartbeat, ticks = 0;
+        heartbeat = setInterval(() => { ticks++; }, 100);
+        const frame = await Promise.race([
+          new Promise(resolve => { frameId = requestAnimationFrame(() => resolve(true)); }),
+          new Promise(resolve => { deadline = setTimeout(() => resolve(false), 5000); }),
+        ]);
+        clearInterval(heartbeat); clearTimeout(deadline); cancelAnimationFrame(frameId);
+        return { frame, ticks, theme: document.documentElement.getAttribute('data-bxh-theme'), hidden: document.hidden, visibility: document.visibilityState, focus: document.hasFocus(), rect: document.querySelector('.queue-dashboard').getBoundingClientRect().toJSON() };
+      });
+      return { before, result };
+    })(), new Promise(resolve => { watchdog = setTimeout(() => resolve({ result: { frame: false, nodeWatchdog: true } }), 7000); })]);
+    console.log('QUEUE_FRAME_AFTER', label, JSON.stringify(outcome));
+    expect(outcome.result.frame, `${label}: ${JSON.stringify(outcome)}`).toBe(true);
+  } finally { clearTimeout(watchdog); }
+}
+
 // Each theme gets a fresh browser context and named diagnostic steps.
 // Keep full-page palette samples bounded on mobile WebKit; retain every theme.
 for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 'hunter', 'akatsuki', 'clow', 'zeon', 'gundam']) {
@@ -199,7 +224,7 @@ for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 
     await test.step(`switch from gold to ${theme} and cross a browser frame`, async () => {
       // CSS palette inheritance only; no role, entitlement, preference or backend write.
       await page.evaluate(theme => document.documentElement.setAttribute('data-bxh-theme', theme), theme);
-      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+      await requireQueueFrame(page, `palette-${theme}`);
     });
     const state = await test.step(`read ${theme} computed palette`, async () => page.evaluate(() => ({
       ...queueThemeProbe.snapshot(), stable: queueThemeProbe.stable(),
@@ -218,15 +243,33 @@ for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 
     await expect(page.locator('.queue-player-identity')).toHaveText('7號｜測試選手');
     if (['gold', 'red', 'hunter', 'directive'].includes(theme)) {
       const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
-      await page.locator('.queue-dashboard').screenshot({ path: path.join(output, `${testInfo.project.name}-theme-${theme}.png`) });
+      await page.locator('.queue-dashboard').screenshot({ path: path.join(output, `${testInfo.project.name}-theme-${theme}.png`), timeout: 10000 });
     }
     expect(errors).toEqual([]);
   });
 }
 
-test('queue repeats same-page theme switches and returns to its original palette', async ({ page }) => {
+test.describe('normal-motion theme rendering', () => {
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+for (const surface of ['shipped', 'opaque-control']) test(`queue repeats same-page theme switches and returns to its original palette (${surface})`, async ({ page }, testInfo) => {
   test.setTimeout(45000);
-  const errors = await openQueue(page);
+  const errors = await openQueue(page, 'no-preference');
+  if (surface === 'opaque-control') {
+    // Diagnostic A/B only. The shipped case and full theme matrix stay unchanged.
+    await page.addStyleTag({ content: '.queue-dashboard { --queue-card: var(--panel); --queue-court: var(--panel-2); }' });
+    const surfaces = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const rgb = token => {
+        const hex = root.getPropertyValue(token).trim();
+        if (!/^#[0-9a-f]{6}$/i.test(hex)) throw Error(`Expected opaque six-digit panel token: ${token}=${hex}`);
+        return `rgb(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
+      };
+      return { card: getComputedStyle(document.querySelector('.queue-self-card')).backgroundColor,
+        court: getComputedStyle(document.querySelector('.queue-court-card:not(.is-mine)')).backgroundColor,
+        panel: rgb('--panel'), panel2: rgb('--panel-2') };
+    });
+    expect(surfaces.card).toBe(surfaces.panel); expect(surfaces.court).toBe(surfaces.panel2);
+  }
   await page.keyboard.press('Tab');
   await page.locator('.queue-bracket-button').focus();
   const baseline = await page.evaluate(() => {
@@ -238,7 +281,7 @@ test('queue repeats same-page theme switches and returns to its original palette
   });
   for (const theme of ['red', 'gold', 'green', 'gold']) await test.step(`same-page switch to ${theme}`, async () => {
     await page.evaluate(theme => document.documentElement.setAttribute('data-bxh-theme', theme), theme);
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    await requireQueueFrame(page, `${surface}-${theme}`);
     const state = await page.evaluate(() => ({
       theme: document.documentElement.getAttribute('data-bxh-theme'),
       title: getComputedStyle(document.querySelector('.queue-self-head h3')).color,
@@ -256,5 +299,8 @@ test('queue repeats same-page theme switches and returns to its original palette
   });
   await expect(page.locator('.queue-player-identity')).toHaveText('7號｜測試選手');
   await expect(page.locator('.queue-ahead-value span')).toHaveText('1');
+  const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
+  await page.locator('.queue-dashboard').screenshot({ path: path.join(output, `${testInfo.project.name}-roundtrip-${surface}.png`), timeout: 10000 });
   expect(errors).toEqual([]);
+});
 });
