@@ -6,12 +6,144 @@ const path = require('node:path');
 // Full shipped page and CSS. Only the service boundary is synthetic: no live
 // Firebase SDK, player account, registration write, or backend request is used.
 test.use({ serviceWorkers: 'block', contextOptions: { reducedMotion: 'reduce' } });
-async function openQueue(page, motion = 'reduce') {
+
+// Diagnostic baseline: complete PR512 CSS blob ecee20b679b7f2e3de477df4ab10d8f3859627b0.
+// Reconstruct only from the pinned current CSS, then verify the entire result.
+function releasedQueueCss() {
+  const current = fs.readFileSync(path.join(__dirname, '../../modules/main-css/queue-dashboard.css'), 'utf8');
+  const digest = value => require('node:crypto').createHash('sha256').update(value).digest('hex');
+  expect(digest(current)).toBe('cbc00ba4ac9b5e62e4e5a982c0c2d1da28ba5379bd0234a7c977d8506f3a6980');
+  const lines = current.split(/(?<=\n)/);
+  const patches = [
+  [
+    2,
+    12,
+    "  --queue-bg: #07111e;\n  --queue-card: #112536;\n  --queue-court: #0e1b2b;\n  --queue-text: #edf3fc;\n  --queue-muted: #9aadc1;\n  --queue-cyan: #59e0e8;\n  --queue-yellow: #ffda78;\n  --queue-line: rgba(149, 186, 211, .17);\n"
+  ],
+  [
+    38,
+    39,
+    "  border: 1px solid rgba(89, 224, 232, .35);\n"
+  ],
+  [
+    51,
+    52,
+    "  background: var(--queue-cyan);\n"
+  ],
+  [
+    69,
+    70,
+    "  color: var(--queue-cyan);\n"
+  ],
+  [
+    83,
+    85,
+    "  background: rgba(89, 224, 232, .12);\n  color: var(--queue-cyan);\n"
+  ],
+  [
+    120,
+    121,
+    "  color: #c4d1df;\n"
+  ],
+  [
+    133,
+    134,
+    "  color: var(--queue-yellow);\n"
+  ],
+  [
+    169,
+    170,
+    "  border: 1px solid rgba(149, 186, 211, .12);\n"
+  ],
+  [
+    171,
+    172,
+    "  background: #183041;\n"
+  ],
+  [
+    230,
+    231,
+    "  border: 1px solid rgba(149, 186, 211, .16);\n"
+  ],
+  [
+    232,
+    233,
+    "  background: #1b3245;\n"
+  ],
+  [
+    255,
+    257,
+    "  border-color: rgba(89, 224, 232, .55);\n  background: #203d50;\n"
+  ],
+  [
+    264,
+    265,
+    "  outline: 2px solid var(--queue-cyan);\n"
+  ],
+  [
+    296,
+    297,
+    "  border: 1px solid rgba(149, 186, 211, .13);\n"
+  ],
+  [
+    302,
+    305,
+    "  border-color: rgba(89, 224, 232, .6);\n  background: #102333;\n"
+  ],
+  [
+    314,
+    315,
+    "  background: var(--queue-cyan);\n"
+  ],
+  [
+    337,
+    338,
+    "  background: #526a82;\n"
+  ],
+  [
+    345,
+    346,
+    "  background: #526a82;\n"
+  ],
+  [
+    355,
+    356,
+    "  color: #aebed0;\n"
+  ],
+  [
+    372,
+    374,
+    "  background: rgba(89, 224, 232, .14);\n  color: var(--queue-cyan);\n"
+  ],
+  [
+    403,
+    404,
+    "  color: #8298af;\n"
+  ],
+  [
+    439,
+    441,
+    "  border-color: rgba(89, 224, 232, .2);\n  background: #102131;\n"
+  ],
+  [
+    445,
+    446,
+    "  color: var(--queue-cyan);\n"
+  ]
+];
+  for (const [start, end, value] of patches.reverse()) lines.splice(start, end - start, value);
+  const released = lines.join('');
+  expect(digest(released)).toBe('9dc90c7cce27c332e257bd02962ecf5e1a25187c3a1d7c88c7b4c84c095b6e17');
+  return released;
+}
+
+async function openQueue(page, motion = 'reduce', stylesheet = null) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => {
     const url = new URL(route.request().url());
     if (!['127.0.0.1', 'localhost'].includes(url.hostname)) return route.abort('blockedbyclient');
+    if (stylesheet && url.pathname === '/modules/main-css/queue-dashboard.css') return route.fulfill({ contentType: 'text/css', body: stylesheet });
     if (url.pathname === '/modules/cloud/cloud-runtime.js') return route.fulfill({ contentType: 'text/javascript', body: '// Isolated queue test services.' });
     return route.continue();
   });
@@ -243,7 +375,19 @@ for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 
     await expect(page.locator('.queue-player-identity')).toHaveText('7號｜測試選手');
     if (['gold', 'red', 'hunter', 'directive'].includes(theme)) {
       const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
+      const geometry = () => page.evaluate(() => {
+        const rect = document.querySelector('.queue-dashboard').getBoundingClientRect();
+        return { viewport: [innerWidth, innerHeight], scroll: [scrollX, scrollY], rect: rect.toJSON(), documentTop: rect.top + scrollY };
+      });
+      const before = await geometry();
       await page.locator('.queue-dashboard').screenshot({ path: path.join(output, `${testInfo.project.name}-theme-${theme}.png`), timeout: 10000 });
+      const after = await geometry();
+      const geometryPath = path.join(output, `${testInfo.project.name}-theme-${theme}-geometry.json`);
+      fs.writeFileSync(geometryPath, JSON.stringify({ before, after }, null, 2));
+      if (theme === 'directive' && testInfo.project.name === 'desktop-chromium') {
+        await page.screenshot({ path: path.join(output, `${testInfo.project.name}-theme-${theme}-full-page.png`), fullPage: true, timeout: 10000 });
+      }
+      fs.writeFileSync(geometryPath, JSON.stringify({ before, after, afterFullPage: await geometry() }, null, 2));
     }
     expect(errors).toEqual([]);
   });
@@ -251,9 +395,14 @@ for (const theme of ['gold', 'blue', 'red', 'green', 'directive', 'three-gods', 
 
 test.describe('normal-motion theme rendering', () => {
   test.use({ contextOptions: { reducedMotion: 'no-preference' } });
-for (const surface of ['shipped', 'opaque-control']) test(`queue repeats same-page theme switches and returns to its original palette (${surface})`, async ({ page }, testInfo) => {
+for (const surface of ['shipped', 'opaque-control', 'released-baseline', 'filter-transition-control']) test(`queue repeats same-page theme switches and returns to its original palette (${surface})`, async ({ page }, testInfo) => {
   test.setTimeout(45000);
-  const errors = await openQueue(page, 'no-preference');
+  const errors = await openQueue(page, 'no-preference', surface === 'released-baseline' ? releasedQueueCss() : null);
+  if (surface === 'filter-transition-control') {
+    // Diagnostic only: keep focus, normal motion, filter effect and every other
+    // shipped transition; isolate only this ancestor's animated filter channel.
+    await page.addStyleTag({ content: 'html .schedule-fold .find-event-card:has(.queue-dashboard) { transition-property: transform, box-shadow, background !important; }' });
+  }
   if (surface === 'opaque-control') {
     // Diagnostic A/B only. The shipped case and full theme matrix stay unchanged.
     await page.addStyleTag({ content: 'html .queue-dashboard { --queue-card: var(--panel); --queue-court: var(--panel-2); }' });
@@ -277,8 +426,21 @@ for (const surface of ['shipped', 'opaque-control']) test(`queue repeats same-pa
     queueFixture.themeButton = document.querySelector('.queue-bracket-button');
     queueFixture.themeReads = queueFixture.reads.length;
     queueFixture.themeSubscriptions = queueFixture.subscriptions.length;
-    return { title: getComputedStyle(document.querySelector('.queue-self-head h3')).color, card: getComputedStyle(queueFixture.themeCard).backgroundColor };
+    const host = document.querySelector('.queue-dashboard').closest('.find-event-card');
+    if (!host) throw Error('Queue diagnostic requires its shipped activity-card ancestor');
+    const hostStyle = getComputedStyle(host);
+    return { title: getComputedStyle(document.querySelector('.queue-self-head h3')).color, card: getComputedStyle(queueFixture.themeCard).backgroundColor, hostTransition: hostStyle.transitionProperty, hostDuration: hostStyle.transitionDuration, hostFilter: hostStyle.filter, hostFocus: host.matches(':focus-within') };
   });
+  console.log('QUEUE_SURFACE_BASELINE', surface, JSON.stringify(baseline));
+  expect(baseline.hostFocus).toBe(true);
+  if (surface === 'released-baseline') {
+    expect(baseline.title).toBe('rgb(89, 224, 232)'); expect(baseline.card).toBe('rgb(17, 37, 54)');
+  }
+  if (surface === 'filter-transition-control') {
+    expect(baseline.hostTransition).toBe('transform, box-shadow, background');
+    expect(baseline.hostDuration.split(',').every(value => parseFloat(value) > 0)).toBe(true);
+    expect(baseline.hostFilter).not.toBe('none');
+  } else expect(baseline.hostTransition.split(',').map(value => value.trim())).toContain('filter');
   for (const theme of ['red', 'gold', 'green', 'gold']) await test.step(`same-page switch to ${theme}`, async () => {
     await page.evaluate(theme => document.documentElement.setAttribute('data-bxh-theme', theme), theme);
     await requireQueueFrame(page, `${surface}-${theme}`);
@@ -294,6 +456,8 @@ for (const surface of ['shipped', 'opaque-control']) test(`queue repeats same-pa
     expect(state.stable).toBe(true);
     expect(state.reads).toBe(0); expect(state.subscriptions).toBe(0);
     if (theme === 'gold') {
+      expect(state.title).toBe(baseline.title); expect(state.card).toBe(baseline.card);
+    } else if (surface === 'released-baseline') {
       expect(state.title).toBe(baseline.title); expect(state.card).toBe(baseline.card);
     } else expect(state.title).not.toBe(baseline.title);
   });
