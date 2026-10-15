@@ -256,7 +256,7 @@ for (const surface of ['shipped', 'opaque-control']) test(`queue repeats same-pa
   const errors = await openQueue(page, 'no-preference');
   if (surface === 'opaque-control') {
     // Diagnostic A/B only. The shipped case and full theme matrix stay unchanged.
-    await page.addStyleTag({ content: '.queue-dashboard { --queue-card: var(--panel); --queue-court: var(--panel-2); }' });
+    await page.addStyleTag({ content: 'html .queue-dashboard { --queue-card: var(--panel); --queue-court: var(--panel-2); }' });
     const surfaces = await page.evaluate(() => {
       const root = getComputedStyle(document.documentElement);
       const rgb = token => {
