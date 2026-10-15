@@ -97,6 +97,30 @@ test('two courts preserve independent work and queue a skipped match onto a busy
 
   // Host + three on-site players = four-player field.
   await page.locator('[data-action="community-switch-room-tab"][data-tab="people"]').click();
+  // Re-entering People starts an owner roster catch-up. Its final render can
+  // replace the quick-add editor, so finish that read before typing the fixture.
+  await page.waitForFunction(() =>
+    adminRosterCode === state.cloudCode && typeof adminRosterUnsub === 'function' &&
+    Array.isArray(adminRegistrationsCache), null, {timeout:30000});
+  await page.evaluate(async () => {
+    const roomId=state.id, code=state.cloudCode, generation=adminRosterGeneration;
+    let timer;
+    try {
+      await Promise.race([
+        (async () => {
+          let pending;
+          do {
+            pending=adminRosterSyncChain;
+            await pending;
+            if(state.id!==roomId || state.cloudCode!==code || adminRosterGeneration!==generation ||
+              appPhase!=='community-room' || communityRoomActiveTab!=='people') throw Error('Roster context changed during fixture setup');
+            if(adminRegistrationsError) throw Error('Initial roster synchronization failed: '+adminRegistrationsError);
+          } while(pending!==adminRosterSyncChain);
+        })(),
+        new Promise((_,reject) => { timer=setTimeout(() => reject(Error('Initial roster synchronization timed out')),30000); })
+      ]);
+    } finally { clearTimeout(timer); }
+  });
   await page.locator('[data-action="people-section"][data-section="tools"]').click();
   await page.locator('#quick-add-textarea').fill('Court A\nCourt B\nCourt C');
   await page.locator('[data-action="quick-add-players"]').click();

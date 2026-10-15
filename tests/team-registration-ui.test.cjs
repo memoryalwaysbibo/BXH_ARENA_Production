@@ -2,6 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=process.argv[2]||path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','main-app','core.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'modules','cloud','cloud-runtime.js'),'utf8');
+const queue=require(path.join(root,'modules','main-app','queue-dashboard.js'));
 const family=fs.readFileSync(path.join(root,'family-ui.js'),'utf8');
 let count=0;
 const test=(name,fn)=>{fn();count++;console.log('PASS '+name);};
@@ -56,7 +57,11 @@ test('team lineup remains a later per-match step',()=>{
 });
 
 test('team smart call does not use individual match assumptions',()=>{
-  assert(html.includes('團體戰上場提醒將於團體裁判台完成後啟用'));
+  const result=queue.model({status:'confirmed'}, {battleMode:'team',parsedData:{meta:{battleMode:'team'},players:[],matches:[]}});
+  assert.equal(result.message,'團體戰上場提醒將於團體裁判台完成後啟用');
+  assert.equal(result.kind,'pending');
+  assert.equal(result.ahead,null);
+  assert.deepEqual(result.courts,[]);
 });
 
 console.log('PASS '+count+' team registration UI regression cases.');

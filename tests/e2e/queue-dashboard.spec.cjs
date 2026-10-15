@@ -60,6 +60,9 @@ async function openQueue(page) {
   });
   await expect(page.locator('.queue-dashboard')).toBeVisible();
   await page.waitForTimeout(220); // Allow only the initial legacy viewport restore to finish.
+  // Let the existing 2.7s call toast finish before visual capture or switching
+  // fixture assignments; screenshots should show the settled dashboard.
+  await expect(page.locator('#toast-root .toast')).toHaveCount(0);
   return errors;
 }
 
@@ -73,6 +76,7 @@ test('registered queue keeps stable nodes, focused actions and scroll through li
   await expect(page.locator('.queue-bracket-button')).toHaveAttribute('data-view', 'bracket');
   const output = path.join('test-results', 'queue-dashboard'); fs.mkdirSync(output, { recursive: true });
   await page.locator('.queue-dashboard').screenshot({ path: path.join(output, testInfo.project.name + '-next.png') });
+  await page.screenshot({ path: path.join(output, testInfo.project.name + '-registered-page.png'), fullPage: true });
   await page.locator('.queue-bracket-button').focus();
   await page.evaluate(() => {
     const f = queueFixture;

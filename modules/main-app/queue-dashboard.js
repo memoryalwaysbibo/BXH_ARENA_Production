@@ -81,7 +81,7 @@
     const r=registration||{},st=info?.parsedData,pid=findPlayerId(st,r,profile);
     const me=person(st,pid,r.displayName||r.publicName||r.realName||'參賽者');
     const base={kind:'pending',ahead:null,station:null,playerId:pid,me,opponent:null,courts:[],message:'等待賽事對戰資料同步'};
-    if(info?.battleMode==='team'||st?.meta?.battleMode==='team')return {...base,message:'團體戰請查看本隊出場順序'};
+    if(info?.battleMode==='team'||st?.meta?.battleMode==='team')return {...base,message:'團體戰上場提醒將於團體裁判台完成後啟用'};
     if(!st||!Array.isArray(st.matches)||!Array.isArray(st.players))return base;
     base.courts=courts(st);
     if(r.status!=='confirmed')return {...base,kind:'waitlist',message:'正取後顯示候場資訊'};
