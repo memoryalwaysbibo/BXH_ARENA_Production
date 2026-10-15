@@ -518,3 +518,12 @@
     transition: none;
   }
 }
+
+/* Keep the focused activity-card glow, without interpolating its filter.
+   Repeated theme changes with this focused ancestor stalled mobile WebKit in
+   both released and themed queue fixtures. Other card transitions stay intact. */
+@media (prefers-reduced-motion: no-preference) {
+  html .schedule-fold .find-event-card:has(.queue-dashboard) {
+    transition-property: transform, box-shadow, background !important;
+  }
+}

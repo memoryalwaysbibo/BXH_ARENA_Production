@@ -648,6 +648,14 @@ for (const theme of themeIds) test(`queue text and button contrast remain readab
 
 test('queue stylesheet cache key changes without changing the queue runtime asset', () => {
   const index = fs.readFileSync(path.join(themeRoot, 'index.html'), 'utf8');
-  assert.match(index, /queue-dashboard\.css\?v=20261015-theme-2/);
+  assert.match(index, /queue-dashboard\.css\?v=20261015-theme-3/);
   assert.match(index, /queue-dashboard\.js\?v=20261015-1/);
+});
+
+
+test('queue focus compatibility only narrows its own ancestor filter transition', () => {
+  assert.match(queueCss, /@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{\s*html \.schedule-fold \.find-event-card:has\(\.queue-dashboard\)\s*\{\s*transition-property:\s*transform, box-shadow, background !important;/);
+  assert.equal((queueCss.match(/transition-property:/g) || []).length, 1);
+  assert.doesNotMatch(queueCss, /(?:^|[;{])\s*(?:-webkit-)?(?:backdrop-)?filter\s*:/m);
+  assert.doesNotMatch(queueCss, /(?:^|[;{])\s*animation(?:-name)?\s*:/m);
 });
