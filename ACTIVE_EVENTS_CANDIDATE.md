@@ -22,7 +22,7 @@ Readiness requires state→memberships→state agreement on status, generation a
 - `backend/backfill-dryrun.cjs`: synthetic dry-run only; no readiness writer.
 - `backend/firestore.rules.candidate`: standalone owner-only read rules, not a replacement production ruleset.
 - `tests/active-events.test.cjs`, `tests/active-events-review.test.cjs`: unit, reader and actual-core VM checks.
-- `tests/e2e/active-events.spec.cjs`, `playwright.active-events.config.cjs`: four browser scenarios across desktop/mobile Chromium (eight cases).
+- `tests/e2e/active-events.candidate.cjs`, `playwright.active-events.config.cjs`: four browser scenarios across desktop Chromium, iPhone WebKit and Android Chromium (12 cases).
 - `backend/membership.test.cjs`, `backend/rules.emulator.test.cjs`, `backend/run-rules-emulator.sh`: projector/adapter and real standalone Rules validation.
 - `scripts/run-regression-core.cjs`: registers new frontend suites; existing queue/lobby VM harnesses include the new optional wiring dependencies without removing old assertions.
 
@@ -42,9 +42,9 @@ bash backend/run-rules-emulator.sh
 
 The standalone Rules suite ran against a real loopback Firestore Emulator using a demo project, isolated HOME/config and no production credentials. It validates owner read/list and denial for other users, anonymous clients, client writes and reverse projections. This is not merged-production-Rules validation.
 
-Browser launch was attempted but blocked by the environment's Chromium socket policy before any assertions ran. The eight browser cases therefore have NO browser acceptance result, and no visual/screenshots evidence exists. VM tests are not a substitute for this check. The browser fixture blocks non-loopback requests and mocks cloud APIs.
+Browser launch was attempted but blocked by the environment's Chromium socket policy before any assertions ran. The initial eight browser cases therefore had NO local browser acceptance result; the dedicated CI configuration now covers 12 cases across desktop, iPhone WebKit and Android. These also require actual CI results, and no visual/screenshots evidence exists. VM tests are not a substitute for this check. The browser fixture blocks non-loopback requests and mocks cloud APIs.
 
-After separate authorization to submit a branch/run remote CI, a standard GitHub Linux runner can run the existing regressions plus `npx playwright test -c playwright.active-events.config.cjs` with an approved/pinned `@playwright/test` install and its Chromium browser. The emulator helper currently defaults to a previously installed local Firebase CLI path; CI should provide `FIREBASE_CLI_JS` pointing at an official pinned firebase-tools installation and Java 21. The frontend browser cases must pass before any rollout discussion. The release build must also update cache-busting versions for changed entrypoint scripts.
+After separate authorization to submit a branch/run remote CI, a standard GitHub Linux runner can run the existing regressions plus `npx playwright test -c playwright.active-events.config.cjs` with the existing pinned `@playwright/test` install and its Chromium/WebKit browsers. The emulator helper currently defaults to a previously installed local Firebase CLI path; CI should provide `FIREBASE_CLI_JS` pointing at an official pinned firebase-tools installation and Java 21. The frontend browser cases must pass before any rollout discussion. The release build must also update cache-busting versions for changed entrypoint scripts.
 
 ## Production gates still open
 

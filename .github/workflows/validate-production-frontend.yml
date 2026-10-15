@@ -245,7 +245,7 @@ jobs:
             echo "::error title=CODE_FAIL_OR_INFRA_FAIL::UI Smoke failed twice."
             exit "$rc"
           fi
-      - name: Verify UID-first active events in isolated desktop and mobile Chromium
+      - name: Verify UID-first active events on Desktop, iPhone WebKit and Android
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: npx playwright test --config=playwright.active-events.config.cjs
       - name: Upload UID active-events screenshots and results
