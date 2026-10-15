@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "auditedOn": "2026-09-30",
+  "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+  "candidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
+  "runtimeReconciled": false,
+  "hcDeploymentVerified": false,
+  "observedRuns": [
+    {
+      "id": 36668868791,
+      "name": "Deploy BXH ARENA Production Backend",
+      "sourceCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflowPath": ".github/workflows/deploy-production-backend.yml",
+      "url": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/runs/36668868791",
+      "jobs": [
+        {
+          "run_id": 36668868791,
+          "name": "production",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Stop after validation",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Deploy Production Firestore Rules",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Deploy Production Functions",
+              "status": "completed",
+              "conclusion": "skipped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 36669590858,
+      "name": "Deploy Player Card Hotfix Trusted",
+      "sourceCommit": "500df0ec7c1ab5b16bdce97ca49adf99abecb535",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflowPath": ".github/workflows/deploy-player-card-hotfix-trusted.yml",
+      "url": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/runs/36669590858",
+      "jobs": [
+        {
+          "run_id": 36669590858,
+          "name": "deploy-player-card",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Deploy only playerCardService",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 36607499724,
+      "name": "HUNTER LOOP Reward Rules P2 Production",
+      "sourceCommit": "3824b0795204076488ad4d9b7eecc26ead1f8d62",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflowPath": ".github/workflows/deploy-reward-rules-p2.yml",
+      "url": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/runs/36607499724",
+      "jobs": [
+        {
+          "run_id": 36607499724,
+          "name": "validate",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": []
+        },
+        {
+          "run_id": 36607499724,
+          "name": "deploy",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Deploy HUNTER LOOP reward and inventory functions only",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify deployed HUNTER LOOP reward and inventory functions",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "manualRunQuery": {
+    "url": "https://api.github.com/repos/memoryalwaysbibo/BXH_ARENA_Functions_Production/actions/runs?event=workflow_dispatch&per_page=30",
+    "totalCount": 5,
+    "returnedCount": 5,
+    "candidateWorkflowRuns": []
+  },
+  "limits": [
+    "Historical observedRuns are GitHub run/step records; direct GCP metadata is separately preserved in liveRuntimeAudit",
+    "Scoped deployments of other modules do not establish a complete HC-compatible backend baseline",
+    "Live metadata collected; Rules content identity established, but complete Functions source and unique deployment origin remain unverified"
+  ],
+  "liveRuntimeAudit": {
+    "runId": 36696307510,
+    "workflowCommit": "036369e2430f60ea7cab55bcfb514f9df7f5734b",
+    "collectionStatus": "COLLECTED",
+    "functionsV1": 0,
+    "functionsV2": 96,
+    "uniqueFunctionBuilds": 36,
+    "candidateRulesComparison": "MISMATCH",
+    "observedRulesSourceCommit": "ed1fc0d2befd6b9becae3a1e759e887f2645342b",
+    "observedRulesContentMatches": true,
+    "hcSandboxCommandPresent": false,
+    "artifactId": 11088092507,
+    "artifactSha256": "fc4b5fefe411b21a011f1b53401056ef37c01615cdff4dc00b9658cb39d68c48",
+    "evidenceDirectory": "audit/20260930-36696307510",
+    "runtimeReconciled": false,
+    "hcDeploymentVerified": false
+  }
+}

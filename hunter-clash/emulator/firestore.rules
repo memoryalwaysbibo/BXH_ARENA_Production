@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function internalActor() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/hcActors/$(request.auth.uid))
+        && get(/databases/$(database)/documents/hcActors/$(request.auth.uid)).data.active == true
+        && get(/databases/$(database)/documents/hcActors/$(request.auth.uid)).data.get('deleted', false) == false
+        && !(get(/databases/$(database)/documents/hcActors/$(request.auth.uid)).data.get('accountStatus', 'active') in ['frozen', 'disabled', 'deleted'])
+        && get(/databases/$(database)/documents/hcActors/$(request.auth.uid)).data.role in ['staff', 'admin', 'super_admin'];
+    }
+    match /hcChallenges/{challengeId} {
+      allow get: if internalActor()
+        && resource.data.environment == 'sandbox'
+        && request.auth.uid in resource.data.participants;
+      allow list, create, update, delete: if false;
+    }
+    // All writes are server-owned. This file is only for the isolated demo.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

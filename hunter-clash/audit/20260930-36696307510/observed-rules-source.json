@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "projectId": "bxh-arena",
+  "observedAt": "2026-09-30T09:28:55.878Z",
+  "status": "CONTENT_MATCH",
+  "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+  "sourceCommit": "ed1fc0d2befd6b9becae3a1e759e887f2645342b",
+  "sourceBranchAtAudit": "fix/firestore-battle-mode-sync-20260928",
+  "rulesetName": "projects/bxh-arena/rulesets/e9014a09-8c33-4859-8e3a-a4b3b6e0ea1a",
+  "file": {
+    "name": "firestore.rules",
+    "bytes": 78887,
+    "sha256": "df10098a1fd880871fbecfd93c066ab4e87ab6b31109c3dcf0b6c337cd2c46c7",
+    "gitBlob": "b1a026574b31bb1affaa4af21319b4944f3850cf"
+  },
+  "validationRun": {
+    "id": 36376433320,
+    "event": "pull_request",
+    "validateRules": "success",
+    "deployRules": "skipped",
+    "provesDeployment": false
+  },
+  "runtimeReconciled": false,
+  "hcDeploymentVerified": false,
+  "limits": [
+    "Exact source content identity at snapshot time, not unique deployment origin",
+    "No complete Functions build-to-source reconciliation",
+    "No HC deployment or isolated cloud acceptance"
+  ]
+}

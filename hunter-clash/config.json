@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "enabled": false,
+  "audience": "internal",
+  "environment": "sandbox",
+  "lifetimeResetEnabled": false,
+  "ladderEffectsEnabled": false,
+  "xpEffectsEnabled": false
+}
