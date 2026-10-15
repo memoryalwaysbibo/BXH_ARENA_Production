@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    { name: 'authoritative player queue dashboard', args: ['--test', 'tests/queue-dashboard.test.cjs', 'tests/queue-refresh.test.cjs'] },
     { name: "stable lobby updates, identity and callback isolation", args: ["--test", "tests/lobby-stable-updates.test.cjs"] },
     {name:'Hunter Clash final rehydration, revocation and legacy isolation',args:['--test','tests/hunter-clash-final-check.test.cjs']},
     {name:'Hunter Clash PK badge settlement, quotas and revocation',args:['--test','tests/hunter-pk-achievements.test.cjs']},

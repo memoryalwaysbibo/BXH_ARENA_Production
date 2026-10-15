@@ -215,7 +215,7 @@ must(/@media\(max-width:760px\)[\s\S]*?grid-template-columns:30px minmax\(0,1fr\
 must(/\.people-col-source\{display:none!important;\}/, 'Mobile source badge must leave the primary row',htmlAndLocalCss);
 console.log('PASS compact single-line attendance roster');
 mustInclude('if(appPhase==="guest-lobby"){ app.innerHTML = renderGuestLobbyScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','guest ladder must bind city/district filters');
-mustInclude('if(appPhase==="player-center"){ app.innerHTML = renderPlayerCenterScreen(); bindAuthInputs(); bindDynamicInputs(); return; }','player ladder must bind city/district filters');
+must(/if\(appPhase==="player-center"\)\{[\s\S]*?if\(playerActiveTab==='registered'&&!mailboxContext\(\)\.open\)[\s\S]*?BXHQueueDashboard\.renderStable\([\s\S]*?else app\.innerHTML=renderPlayerCenterScreen\(\);\s*bindAuthInputs\(\);bindDynamicInputs\(\);return;/,'player ladder and queue must retain input bindings');
 mustInclude('ladderLocationCity=normalizeTaiwanCityName(ladderCityFilter.value);','ladder city filter must update normalized city');
 mustInclude('ladderLocationRegion="";','ladder city change must reset district');
 console.log('PASS ladder city/district binding');

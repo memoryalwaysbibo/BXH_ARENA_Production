@@ -277,6 +277,14 @@ jobs:
           path: test-results/community-quick-registration/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Upload isolated queue dashboard screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-queue-dashboard-${{ github.run_id }}
+          path: test-results/queue-dashboard/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

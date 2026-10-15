@@ -1,0 +1,517 @@
+/* Personal waiting queue. Keep every rule inside this dashboard. */
+.queue-dashboard {
+  --queue-bg: #07111e;
+  --queue-card: #112536;
+  --queue-court: #0e1b2b;
+  --queue-text: #edf3fc;
+  --queue-muted: #9aadc1;
+  --queue-cyan: #59e0e8;
+  --queue-yellow: #ffda78;
+  --queue-line: rgba(149, 186, 211, .17);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-width: 760px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--queue-bg);
+  color: var(--queue-text);
+  font-family: var(--font-b, 'Noto Sans TC', sans-serif);
+  line-height: 1.5;
+}
+
+.queue-dashboard *,
+.queue-dashboard *::before,
+.queue-dashboard *::after {
+  box-sizing: border-box;
+}
+
+.queue-dashboard .queue-self-card {
+  position: relative;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(89, 224, 232, .35);
+  border-radius: 16px;
+  background: var(--queue-card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.queue-dashboard .queue-self-card::before {
+  position: absolute;
+  top: -1px;
+  left: 16px;
+  width: 28%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--queue-cyan);
+  content: '';
+  pointer-events: none;
+}
+
+.queue-dashboard .queue-self-head,
+.queue-dashboard .queue-courts-head,
+.queue-dashboard .queue-court-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.queue-dashboard .queue-self-head h3 {
+  margin: 0;
+  color: var(--queue-cyan);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.queue-dashboard .queue-status,
+.queue-dashboard .queue-court-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(89, 224, 232, .12);
+  color: var(--queue-cyan);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.queue-dashboard .queue-player-identity {
+  min-width: 0;
+  margin: 12px 0 0;
+  color: var(--queue-text);
+  font-size: clamp(21px, 4.5vw, 30px);
+  font-weight: 800;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.queue-dashboard .queue-self-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  margin: 20px 0 22px;
+}
+
+.queue-dashboard .queue-self-stats > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.queue-dashboard .queue-ahead-label {
+  display: block;
+  margin: 0 0 2px;
+  color: #c4d1df;
+  font-size: clamp(17px, 3.7vw, 23px);
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.queue-dashboard .queue-ahead-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  max-width: 100%;
+  margin: 0;
+  color: var(--queue-yellow);
+  font-size: clamp(34px, 7vw, 52px);
+  font-weight: 800;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-dashboard .queue-ahead-value > span {
+  font-size: clamp(68px, 15vw, 104px);
+  font-weight: 800;
+  letter-spacing: -.04em;
+  line-height: 1;
+}
+
+.queue-dashboard .queue-ahead-value.is-pending {
+  margin-top: 8px;
+  font-size: clamp(24px, 5vw, 34px);
+  line-height: 1.3;
+}
+
+.queue-dashboard .queue-ahead-value > small {
+  font-size: clamp(22px, 4.5vw, 30px);
+  font-weight: 800;
+}
+
+.queue-dashboard .queue-station {
+  display: flex;
+  flex: 0 1 132px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 94px;
+  max-width: 100%;
+  padding: 11px 13px;
+  border: 1px solid rgba(149, 186, 211, .12);
+  border-radius: 12px;
+  background: #183041;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.queue-dashboard .queue-station > span {
+  color: var(--queue-muted);
+  font-size: 12px;
+}
+
+.queue-dashboard .queue-station > strong {
+  color: var(--queue-text);
+  font-size: clamp(19px, 4vw, 25px);
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.queue-dashboard .queue-opponent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 16px;
+  min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--queue-line);
+}
+
+.queue-dashboard .queue-opponent > span {
+  color: var(--queue-muted);
+  font-size: 13px;
+}
+
+.queue-dashboard .queue-opponent > strong {
+  min-width: 0;
+  color: var(--queue-text);
+  font-size: clamp(16px, 3.7vw, 20px);
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.queue-dashboard .queue-note {
+  display: block;
+  margin: 12px 0 0;
+  color: var(--queue-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.queue-dashboard .queue-bracket-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 18px;
+  padding: 10px 34px;
+  border: 1px solid rgba(149, 186, 211, .16);
+  border-radius: 10px;
+  background: #1b3245;
+  color: var(--queue-text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.queue-dashboard .queue-bracket-button > [aria-hidden="true"] {
+  position: absolute;
+  right: 16px;
+  color: var(--queue-muted);
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.queue-dashboard .queue-bracket-button:hover {
+  border-color: rgba(89, 224, 232, .55);
+  background: #203d50;
+  color: var(--queue-text);
+}
+
+.queue-dashboard .queue-bracket-button:focus-visible,
+.queue-dashboard .queue-call-controls button:focus-visible,
+.queue-dashboard .queue-call-controls input:focus-visible,
+.queue-dashboard .queue-call-controls summary:focus-visible {
+  outline: 2px solid var(--queue-cyan);
+  outline-offset: 3px;
+}
+
+.queue-dashboard .queue-courts-head {
+  margin: 28px 0 16px;
+}
+
+.queue-dashboard .queue-courts-head h3 {
+  margin: 0;
+  color: var(--queue-text);
+  font-size: clamp(20px, 4.5vw, 26px);
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.queue-dashboard .queue-courts-head > span {
+  color: var(--queue-muted);
+  font-size: 12px;
+}
+
+.queue-dashboard .queue-courts-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.queue-dashboard .queue-court-card {
+  position: relative;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(149, 186, 211, .13);
+  border-radius: 14px;
+  background: var(--queue-court);
+}
+
+.queue-dashboard .queue-court-card.is-mine {
+  border-color: rgba(89, 224, 232, .6);
+  background: #102333;
+}
+
+.queue-dashboard .queue-court-card.is-mine::before {
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: -1px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--queue-cyan);
+  content: '';
+  pointer-events: none;
+}
+
+.queue-dashboard .queue-court-head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--queue-line);
+}
+
+.queue-dashboard .queue-court-head > strong {
+  min-width: 0;
+  color: var(--queue-text);
+  font-size: 19px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.queue-dashboard .queue-court-card:not(.is-mine) .queue-court-head::after {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #526a82;
+  content: '';
+}
+
+.queue-dashboard .queue-court-tag:empty {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  background: #526a82;
+}
+
+.queue-dashboard .queue-court-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-top: 13px;
+  color: #aebed0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.queue-dashboard .queue-row-label {
+  justify-self: start;
+  max-width: 100%;
+  color: var(--queue-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.queue-dashboard .queue-court-row.is-current .queue-row-label {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(89, 224, 232, .14);
+  color: var(--queue-cyan);
+  font-weight: 800;
+}
+
+.queue-dashboard .queue-versus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.queue-dashboard .queue-player {
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.queue-dashboard .queue-player:last-child {
+  text-align: right;
+}
+
+.queue-dashboard .queue-court-row.is-current .queue-player {
+  color: var(--queue-text);
+  font-weight: 750;
+}
+
+.queue-dashboard .queue-vs {
+  color: #8298af;
+  font-size: 11px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.queue-dashboard .queue-empty {
+  min-width: 0;
+  margin: 0;
+  padding: 18px 14px;
+  border: 1px dashed var(--queue-line);
+  border-radius: 12px;
+  color: var(--queue-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.queue-dashboard .queue-court-row .queue-empty {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Existing call buttons, switches and their state classes stay functional. */
+.queue-dashboard .queue-call-controls {
+  min-width: 0;
+  margin-top: 14px;
+}
+
+.queue-dashboard .queue-call-controls:empty {
+  display: none;
+}
+
+.queue-dashboard .queue-call-controls .smart-call-box {
+  border-color: rgba(89, 224, 232, .2);
+  background: #102131;
+}
+
+.queue-dashboard .queue-call-controls .smart-call-title,
+.queue-dashboard .queue-call-controls .court-call-help summary {
+  color: var(--queue-cyan);
+}
+
+.queue-dashboard .queue-call-controls .court-call-notify-state,
+.queue-dashboard .queue-call-controls .court-call-empty,
+.queue-dashboard .queue-call-controls .court-call-compact-summary {
+  color: var(--queue-muted);
+}
+
+@media (min-width: 380px) {
+  .queue-dashboard .queue-court-row {
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (min-width: 600px) {
+  .queue-dashboard {
+    padding: 22px;
+  }
+
+  .queue-dashboard .queue-self-card {
+    padding: 22px;
+    border-radius: 18px;
+  }
+
+  .queue-dashboard .queue-self-card::before {
+    left: 22px;
+  }
+
+  .queue-dashboard .queue-self-head h3 {
+    font-size: 17px;
+  }
+
+  .queue-dashboard .queue-self-stats {
+    margin-top: 24px;
+    margin-bottom: 26px;
+  }
+
+  .queue-dashboard .queue-station {
+    flex-basis: 154px;
+    padding: 13px 16px;
+  }
+
+  .queue-dashboard .queue-courts-head {
+    margin-top: 34px;
+    margin-bottom: 20px;
+  }
+
+  .queue-dashboard .queue-court-card {
+    padding: 18px 22px;
+  }
+
+  .queue-dashboard .queue-court-row {
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 18px;
+    margin-top: 15px;
+    font-size: 16px;
+  }
+
+  .queue-dashboard .queue-row-label,
+  .queue-dashboard .queue-courts-head > span {
+    font-size: 14px;
+  }
+
+  .queue-dashboard .queue-versus {
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-dashboard .queue-bracket-button {
+    transition: none;
+  }
+}
