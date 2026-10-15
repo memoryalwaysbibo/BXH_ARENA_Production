@@ -1,0 +1,265 @@
+import{createController}from'../controller.mjs';
+import{pairingPayload,parsePairingPayload,renderPairingQr}from'../pairing.mjs';
+import{createScanner}from'../scanner.mjs';
+const labels={proposed:'等待對手配對',accepted:'配對成功，等待確認開賽',in_progress:'對戰中',round_pending:'等待本局確認',game_pending:'本場結束，可繼續下一場',final_pending:'等待完賽確認',completed:'完賽紀錄已保存',disputed:'有爭議，保留紀錄',score_review:'請核對比分',cancelled:'已取消',expired:'配對已過期',rejected:'已拒絕'};
+const finishLabels={extreme:'極限',knockout:'擊飛',burst:'爆裂',spin:'轉停'};
+export function roomPlayerStats(c,games,player){
+  const types=Object.keys(finishLabels),opponent=c.participants.find(uid=>uid!==player);
+  const attack=Object.fromEntries(types.map(type=>[type,0])),defense=Object.fromEntries(types.map(type=>[type,0]));
+  const attackCount=Object.fromEntries(types.map(type=>[type,0])),defenseCount=Object.fromEntries(types.map(type=>[type,0]));
+  for(const game of games)for(const round of game.rounds||[]){
+    if(!types.includes(round.finish)||!Number.isFinite(round.points))continue;
+    if(round.winnerUid===player){attack[round.finish]+=round.points;attackCount[round.finish]++;}
+    else if(round.winnerUid===opponent){defense[round.finish]+=round.points;defenseCount[round.finish]++;}
+  }
+  const totalFor=types.reduce((sum,type)=>sum+attack[type],0),totalAgainst=types.reduce((sum,type)=>sum+defense[type],0);
+  const ranked=types.map(type=>({type,points:attack[type],share:totalFor?Math.round(attack[type]/totalFor*100):0})).sort((a,b)=>b.points-a.points);
+  const top=ranked[0],second=ranked[1];
+  const style=!totalFor?'得分模式待建立':top.points===second.points?'複合均衡型':top.share>=45?{extreme:'極限突擊型',knockout:'擊飛壓制型',burst:'爆裂破壞型',spin:'持久轉停型'}[top.type]:Math.abs(top.share-second.share)<=10?'複合均衡型':'複合攻勢型';
+  const leading=(bucket,total,prefix='')=>{const max=Math.max(...Object.values(bucket));return total?types.filter(type=>bucket[type]===max).map(type=>prefix+finishLabels[type]+' '+Math.round(max/total*100)+'%（'+max+' 分）').join('、'):'本輪尚無'+(prefix?'失分':'得分');};
+  const wins=games.filter(game=>game.winnerUid===player).length,losses=games.length-wins;
+  const efficiency=totalFor+totalAgainst?Math.round(totalFor/(totalFor+totalAgainst)*100):0;
+  const summary=wins===games.length?'本輪全勝，已將得分轉成勝場。':wins===0?(totalFor?'尚未拿下勝場，但已有得分；可回看比分接近的場次。':'本輪尚未取得得分，先以建立有效得分回合為目標。'):wins>losses?(efficiency<50?'勝場領先，但總得分落後；可回看失分較多的敗局。':'勝場領先，得分占比也達到一半以上。'):wins===losses?'本輪勝敗相當，可比較勝局與敗局的得失分方式。':efficiency>=50?'勝場較少，但總得分不低於對手；可回看未能拿下的場次。':'本輪勝場與總得分較少，先找出最常見的失分方式。';
+  const maxLoss=Math.max(...Object.values(defense)),lossTypes=types.filter(type=>defense[type]===maxLoss);
+  const advice=totalAgainst?'下一輪可優先回看「被'+lossTypes.map(type=>finishLabels[type]).join('／被')+'」的回合，記下當時配置與情境，再比較調整後的失分次數。':'本輪沒有失分；可更換對手或配置，觀察得分方式是否仍能維持。';
+  const maxAttack=Math.max(...Object.values(attack)),mainTypes=types.filter(type=>attack[type]===maxAttack);
+  const scoreComment=!totalFor?'本輪尚無得分。':mainTypes.length>1?'本輪'+mainTypes.map(type=>finishLabels[type]).join('與')+'取得分數並列，得分來源較多元。':'本輪主要得分來自'+finishLabels[mainTypes[0]]+'。';
+  const countMax=Math.max(...Object.values(attackCount)),frequentTypes=types.filter(type=>attackCount[type]===countMax);
+  const frequentText=totalFor?frequentTypes.map(type=>finishLabels[type]+' '+countMax+' 次').join('、'):'本輪尚無得分';
+  const breakdown=types.map(type=>finishLabels[type]+' '+attackCount[type]+' 次／'+attack[type]+' 分／'+(totalFor?Math.round(attack[type]/totalFor*100):0)+'%').join('；');
+  let firstTotal=0,firstWins=0,ledGames=0,lostLead=0,trailedGames=0,comebacks=0;
+  const positions=[];
+  for(const game of games){
+    let own=0,other=0,led=false,trailed=false;
+    for(const [index,round] of (game.rounds||[]).entries()){
+      if(!types.includes(round.finish)||!Number.isFinite(round.points)||![player,opponent].includes(round.winnerUid))continue;
+      const won=round.winnerUid===player;
+      if(index===0){firstTotal++;if(won)firstWins++;}
+      positions[index]??={number:index+1,total:0,losses:0};positions[index].total++;if(!won)positions[index].losses++;
+      if(won)own+=round.points;else other+=round.points;
+      // Only a lead/deficit before the deciding score describes a comeback opportunity.
+      if(index<(game.rounds||[]).length-1){if(own>other)led=true;if(own<other)trailed=true;}
+    }
+    if(led){ledGames++;if(game.winnerUid===opponent)lostLead++;}
+    if(trailed){trailedGames++;if(game.winnerUid===player)comebacks++;}
+  }
+  const eligible=positions.filter(position=>position&&position.total>=5);
+  const highest=eligible.length?Math.max(...eligible.map(position=>position.losses/position.total)):0;
+  const concentrated=eligible.filter(position=>position.losses>0&&Math.abs(position.losses/position.total-highest)<1e-9);
+  const positionText=concentrated.length?concentrated.map(position=>'第 '+position.number+' 回合失分 '+position.losses+'／'+position.total+' 場（'+Math.round(position.losses/position.total*100)+'%）').join('；')+(concentrated.length>1?'，失分率並列。':'，為本輪失分率最高的回合。'):eligible.length?'符合樣本門檻的回合沒有失分。':'資料不足：各回合至少需有 5 場到達，才比較失分率。';
+  const firstText=firstTotal>=5?'首回合得分 '+firstWins+'／'+firstTotal+' 場（'+Math.round(firstWins/firstTotal*100)+'%）。':'首回合樣本不足（'+firstTotal+'／5 場）。';
+  const leadText='曾領先 '+ledGames+' 場，其中 '+lostLead+' 場最後落敗。';
+  const comebackText='曾落後 '+trailedGames+' 場，其中 '+comebacks+' 場逆轉獲勝。';
+  return {attackCount,defenseCount,scoreComment,frequentText,breakdown,firstText,positionText,leadText,comebackText,attack,defense,totalFor,totalAgainst,style,efficiency,summary,advice,attackText:leading(attack,totalFor),defenseText:leading(defense,totalAgainst,'被')};
+}
+export function mountMobile(root,runtime,{storage=sessionStorage,accountStorage=globalThis.localStorage}={}){
+  const app=root.querySelector('#app'),message=text=>root.querySelector('#message').textContent=text;
+  app.innerHTML=`<form id="login"><section><h2>內測帳號登入</h2><label>玩家名稱<input name="playerName" autocomplete="nickname" maxlength="40" placeholder="對戰時顯示的名稱" required></label><label>電子郵件<input name="email" type="email" autocomplete="username" required></label><label>密碼<input name="password" type="password" autocomplete="current-password" required></label><label class="remember"><input name="remember" type="checkbox">記憶帳號</label><button type="submit">登入</button><p>帳號由測試主持者提供。</p></section></form><section id="identity" hidden><span class="account-dot" aria-hidden="true"></span><span id="who"></span><button type="button" data-op="logout">登出</button></section><section id="match" hidden><div class="match-heading"><div class="state"></div><span class="sync-label">自動同步</span></div><div class="welcome"><h2>下一場，換你上場。</h2><p>建立挑戰，或加入對手的挑戰。</p></div><div class="score">0 : 0</div><p class="round"></p><small class="policy"></small><div class="pairing-share" hidden><h3>邀請對手加入</h3><p>請對手掃描 QR，或輸入下方 4 碼。</p><div class="qr"></div><strong class="pairing-code"></strong><p class="pairing-expiry"></p></div><div class="room-options"><label>對練場次<input name="matchCount" type="number" min="1" max="100" placeholder="未填預設 1 場"></label><label class="remember"><input name="practice" type="checkbox">循環練習（每房最多 100 場）</label></div><div class="home-actions row"><button data-op="createChallenge"><span class="entrance-art entrance-create" aria-hidden="true"><img src="./cloud/entrance-cards-v2.png" alt=""></span><strong>建立挑戰</strong><small>出示 QR 與 4 碼</small></button><button data-op="join"><span class="entrance-art entrance-join" aria-hidden="true"><img src="./cloud/entrance-cards-v2.png" alt=""></span><strong>加入挑戰</strong><small>掃碼或輸入序號</small></button></div><div class="join-panel" hidden><h3>加入挑戰</h3><div class="camera" hidden><video playsinline muted></video><p>將對手的 QR 放入畫面即可掃描</p></div><button data-op="scan" hidden>重新啟動掃描</button><canvas hidden></canvas><p class="divider">或輸入 4 碼</p><label>配對序號<input name="pairingCode" placeholder="例如 A7K3" autocomplete="off" autocapitalize="characters" maxlength="4"></label><button data-op="acceptCode">確認加入</button><div class="scan-confirm" hidden><p>已辨識挑戰 QR，確認加入此挑戰？</p><button data-op="accept">確認加入</button></div><textarea hidden></textarea><button data-op="back">返回</button></div><div class="pairing-actions row"><button data-op="start">確認開賽</button><button data-op="reject">拒絕配對</button></div><p class="ready-help" hidden></p><button class="flow-back" data-op="cancel">返回</button><details class="more-actions"><summary>更多操作</summary><div class="row"><button data-op="getChallenge">重新同步</button></div></details><button data-op="retry" hidden>重送原操作</button><div class="scoreboards"></div><p class="confirmation-wait" role="status" aria-live="polite" hidden></p><p class="review-help" hidden></p><button data-op="undoRound">撤銷上一筆得分</button><button data-op="resumeReview">比分已核對，繼續</button><div class="series-actions row"><button data-op="nextGame">下一場</button><button data-op="endSession">結束對練</button></div><details class="room-analysis" hidden><summary>本輪評價</summary><p class="analysis-description">本房已完成場次的即時分析；八角圖不代表正式執照能力值。</p><div class="room-stats" aria-label="本輪戰績"></div><h3 class="radar-title">即時八角圖</h3><div class="room-radar"></div></details><div class="session-results"></div><p class="score-help">建立挑戰者替雙方記分，比分自動同步；整場結束後雙方確認結果。</p><div class="row"><button data-op="confirmRound">確認本局</button><button data-op="confirmFinish">確認完賽</button><button data-op="dispute">有爭議</button></div></section><section id="history" hidden><details><summary>我的 PK 戰績</summary><p class="history-status" role="status"></p><div class="history-stats"></div><p class="history-note">僅計入雙方確認完賽的 PK；明細顯示最近 50 場。</p><div class="history-list"></div><button data-op="history">更新戰績</button></details></section>`;
+  const select=s=>app.querySelector(s),video=select('video');let view={},previousUid=null,loginBusy=false,joining=false,scanning=false,scanFound=false,swapped=false,radarPlayer=0,radarChallengeId=null,historyEpoch=0,historyRequest=null,historyCompletion=null;
+  const accountKey='hc01:remembered-email',nameKey='hc01:remembered-name';
+  const playerName=()=>select('[name="playerName"]').value.trim()||runtime.auth?.currentUser?.displayName||'未設定名稱';
+  try{const email=accountStorage?.getItem(accountKey);if(email){select('[name="email"]').value=email;select('[name="remember"]').checked=true;select('[name="playerName"]').value=accountStorage?.getItem(nameKey)||'';}}catch{}
+  select('[name="remember"]').addEventListener('change',()=>{if(!select('[name="remember"]').checked)try{accountStorage?.removeItem(accountKey);accountStorage?.removeItem(nameKey);}catch{}});
+  select('[name="practice"]').addEventListener('change',render);
+  const savedKey=uid=>'hc01:mobile:last:'+uid;
+  const savedId=uid=>{try{return storage?.getItem(savedKey(uid));}catch{return null;}};
+  const saveId=(uid,id)=>{try{if(id)storage?.setItem(savedKey(uid),id);else storage?.removeItem(savedKey(uid));}catch{}};
+  const clearPairing=()=>{scanner.stop();scanning=false;scanFound=false;joining=false;swapped=false;video.hidden=true;select('textarea').value='';select('.qr').replaceChildren();select('.pairing-share').hidden=true;select('.pairing-code').textContent='';select('[name="pairingCode"]').value='';};
+  const scanner=createScanner({video,canvas:select('canvas'),onPairing:found=>{select('textarea').value=found.payload;scanning=false;scanFound=true;render();message('配對碼已辨識，請確認加入挑戰。');},onMessage:message});
+  const client=createController({transport:runtime.transport,storage,onChange:next=>{view=next;render();const c=next.snapshot;if(c?.status==='completed'&&historyCompletion!==c.challengeId){historyCompletion=c.challengeId;refreshHistory();}}});
+  const goHome=()=>{saveId(view.uid,null);clearPairing();client.setSession(view.uid);message('');};
+  function render(){
+    const c=view.snapshot,uid=view.uid;
+    if(c?.challengeId!==radarChallengeId){radarChallengeId=c?.challengeId||null;radarPlayer=0;}
+    const waiting=c?.status==='final_pending'&&c.finishConfirmedBy.includes(uid);
+    select('#history').hidden=!uid;select('#login').hidden=!!uid;select('#identity').hidden=!uid;select('#match').hidden=!uid;select('#who').textContent=uid?(c?.participantNames?.[uid]||playerName()):'';
+    select('.state').textContent=waiting?'等待對方確認中':c?(labels[c.status]||c.status):view.pending?'操作待確認':'準備對戰';
+    select('.state').dataset.revision=c?String(c.revision):'';
+    select('.confirmation-wait').hidden=!waiting;
+    select('.confirmation-wait').textContent=waiting?'你已確認比分，等待 '+(c.participantNames?.[c.participants.find(player=>player!==uid)]||'對方')+' 確認中。完成後會自動顯示結果。':'';
+    select('.welcome').hidden=!!c||joining||!!view.pending;
+    select('.sync-label').hidden=!c||['completed','disputed','cancelled','expired','rejected'].includes(c.status);
+    select('.more-actions').hidden=!c&&!view.pending;
+    select('#match').dataset.stage=c?.status||(joining?'joining':'home');
+    select('.score').textContent=c?c.score.a+' : '+c.score.b:'0 : 0';
+    select('.round').textContent=c?.pendingRound?'第 '+c.pendingRound.number+' 局：'+(c.participantNames?.[c.pendingRound.winnerUid]||'未設定名稱')+' 得 '+c.pendingRound.points+' 分，等待另一方確認。':c?'已記錄 '+c.rounds.length+' 局':'';
+    select('.policy').textContent=c?'一般對戰 · '+c.rules.targetScore+' 分勝 · 第 '+(c.gameNumber||1)+' / '+(c.matchCount===0?'循環':c.matchCount||1)+' 場':'';
+    const active=c&&!['completed','disputed','cancelled','expired','rejected'].includes(c.status);
+    if(active)joining=false;
+    select('.home-actions').hidden=!!active||joining;select('.room-options').hidden=!!active||joining;
+    select('[name="matchCount"]').disabled=select('[name="practice"]').checked;
+    select('.join-panel').hidden=!joining||!!active;
+    select('.camera').hidden=!scanning;video.hidden=!scanning;
+    select('.scan-confirm').hidden=!scanFound;
+    select('[data-op="scan"]').hidden=!joining||scanning||scanFound;
+    select('[data-op="acceptCode"]').hidden=scanFound;
+    select('[name="pairingCode"]').closest('label').hidden=scanFound;
+    select('[data-op="start"]').hidden=c?.status!=='accepted';
+    select('[data-op="reject"]').hidden=c?.status!=='accepted'||c.participants[0]===uid;
+    select('[data-op="cancel"]').hidden=!active||waiting;
+    select('.ready-help').hidden=c?.status!=='accepted';
+    select('.ready-help').textContent=c?.ready.includes(uid)?'已確認開賽，等待對手確認。':'對手已加入。雙方確認開賽後開始計分。';
+    select('.score').hidden=!c||['proposed','accepted'].includes(c.status);
+    select('.score-help').hidden=waiting||!['in_progress','game_pending','final_pending'].includes(c?.status);
+    select('.score-help').textContent=c&&(c.matchCount??1)!==1?'每場比分自動保存；按下一場繼續，整組結束後雙方確認才計入戰績。':'建立挑戰者替雙方記分，比分自動同步；整場結束後雙方確認結果。';
+    select('[data-op="confirmRound"]').hidden=c?.status!=='round_pending'||c.pendingRound.confirmedBy.includes(uid);
+    select('[data-op="confirmFinish"]').hidden=c?.status!=='final_pending'||c.finishConfirmedBy.includes(uid);
+    select('.review-help').hidden=c?.status!=='score_review';
+    select('.review-help').textContent=c?.participants[0]===uid?'對戰保留中。請核對比分，可撤銷誤記得分後重新記分；核對完成再繼續。':'對戰保留中，等待記分方核對修正；完賽仍需雙方重新確認。';
+    select('[data-op="undoRound"]').hidden=waiting||c?.participants[0]!==uid||!['in_progress','round_pending','game_pending','final_pending','score_review'].includes(c?.status);
+    select('[data-op="resumeReview"]').hidden=c?.status!=='score_review'||c.participants[0]!==uid;
+    select('[data-op="dispute"]').hidden=waiting||!['in_progress','round_pending','game_pending','final_pending'].includes(c?.status);
+    select('[data-op="getChallenge"]').hidden=!c&&!view.pending&&!savedId(uid);
+    select('[data-op="nextGame"]').hidden=c?.status!=='game_pending'||c.participants[0]!==uid;
+    select('[data-op="endSession"]').hidden=c?.status!=='game_pending'||c.participants[0]!==uid;
+    select('[data-op="confirmFinish"]').textContent=c&&(c.matchCount??1)!==1?'確認整組結果':'確認完賽';
+    const results=select('.session-results'),analysis=select('.room-analysis'),roomStats=select('.room-stats'),radar=select('.room-radar');results.replaceChildren();roomStats.replaceChildren();radar.replaceChildren();
+    const games=c?[...(c.games||[]),...(c.winnerUid?[{number:c.gameNumber||1,score:c.score,winnerUid:c.winnerUid,rounds:c.rounds}]:[])]:[];
+    results.hidden=!c||(c.matchCount??1)===1;
+    analysis.hidden=!c||c.participants.length!==2||['proposed','accepted','cancelled','expired','rejected'].includes(c.status);
+    if(c){
+      for(const game of games){const line=document.createElement('p');line.textContent='第 '+game.number+' 場：'+(c.participantNames?.[c.participants[0]]||'未設定名稱')+' '+game.score.a+' : '+game.score.b+' '+(c.participantNames?.[c.participants[1]]||'未設定名稱');results.append(line);}
+      for(const player of c.participants){
+        const wins=games.filter(game=>game.winnerUid===player).length,losses=games.length-wins;
+        const card=document.createElement('div');card.className='room-stat';
+        const name=document.createElement('strong');name.textContent=c.participantNames?.[player]||'未設定名稱';
+        const rate=document.createElement('p');rate.textContent='本輪勝率：'+(games.length?Math.round(wins/games.length*100)+'%':'—')+'（'+wins+' 勝 '+losses+' 敗）';
+        const stats=roomPlayerStats(c,games,player);
+        const evaluation=document.createElement('p');evaluation.className='room-evaluation';evaluation.textContent='評價：'+(games.length<5?'資料不足（滿 5 場後顯示）':(games.length<10?'初步・':'')+stats.style);
+        card.append(name,rate,evaluation);roomStats.append(card);
+        if(games.length>=5){
+          const summary=document.createElement('p');summary.className='room-feedback-summary';summary.textContent=stats.summary;card.append(summary);
+          const metrics=document.createElement('dl');metrics.className='room-feedback-metrics';
+          for(const [label,value] of [['主要得分',stats.attackText],['主要失分',stats.defenseText],['得分效率',stats.efficiency+'%（'+stats.totalFor+' 得分／'+stats.totalAgainst+' 失分）']]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;metrics.append(term,detail);}card.append(metrics);
+          const scoring=document.createElement('p');scoring.className='room-feedback-summary';scoring.textContent=stats.scoreComment;card.append(scoring);
+          const details=document.createElement('dl');details.className='room-feedback-metrics';
+          for(const [label,value] of [['最常得分方式',stats.frequentText],['首回合表現',stats.firstText],['失分集中回合',stats.positionText],['領先後落敗',stats.leadText],['落後後逆轉',stats.comebackText]]){const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;details.append(term,detail);}card.append(details);
+          const table=document.createElement('table');table.className='finish-breakdown';
+          const caption=document.createElement('caption');caption.textContent='四種得分明細';table.append(caption);
+          const head=document.createElement('thead'),heading=document.createElement('tr');
+          for(const label of ['方式','次數','累計得分','占比']){const cell=document.createElement('th');cell.scope='col';cell.textContent=label;heading.append(cell);}head.append(heading);table.append(head);
+          const body=document.createElement('tbody');
+          for(const type of Object.keys(finishLabels)){const row=document.createElement('tr');for(const [index,value] of [finishLabels[type],stats.attackCount[type]+' 次',stats.attack[type]+' 分',(stats.totalFor?Math.round(stats.attack[type]/stats.totalFor*100):0)+'%'].entries()){const cell=document.createElement(index===0?'th':'td');if(index===0)cell.scope='row';cell.textContent=value;row.append(cell);}body.append(row);}table.append(body);card.append(table);
+          const advice=document.createElement('p');advice.className='room-feedback-advice';advice.textContent='對練建議：'+stats.advice;card.append(advice);
+        }
+      }
+      const note=document.createElement('p');note.className='room-stats-note';note.textContent=c.status==='completed'?'雙方已確認，本房對戰明細已保存；評價與八角圖由明細即時計算，沒有另存固定報告。':'本輪資料為暫計；雙方確認整組結果後，才保存對戰明細並計入 PK 戰績。';roomStats.append(note);
+      const radarTitle=select('.radar-title');radarTitle.hidden=games.length<5;
+      if(c.participants.length===2&&games.length>=5)renderRoomRadar(radar,c,games);
+      else if(games.length<5){const threshold=document.createElement('p');threshold.className='radar-note';threshold.textContent='已完成 '+games.length+' 場；滿 5 場才顯示初步八角圖，滿 10 場後資料較充分。';radar.append(threshold);}
+      if(games.length>=5){const threshold=document.createElement('p');threshold.className='radar-note';threshold.textContent=games.length<10?'目前 '+games.length+' 場，屬初步分析；滿 10 場後資料較充分。':'目前 '+games.length+' 場，已達 10 場分析門檻；僅供本輪參考。';radar.append(threshold);}
+    }
+    const boards=select('.scoreboards');boards.replaceChildren();boards.hidden=!['in_progress','round_pending','game_pending','final_pending','score_review','completed','disputed'].includes(c?.status);
+    const players=Array.from((c?.participants||[]).entries());if(swapped)players.reverse();
+    for(const [position,[index,player]] of players.entries()){
+      if(position===1){const exchange=document.createElement('button');exchange.type='button';exchange.className='exchange';exchange.dataset.op='exchange';exchange.textContent='⇄';exchange.setAttribute('aria-label','交換左右玩家');boards.append(exchange);}
+      const panel=document.createElement('div');panel.className='player-score';
+      const name=document.createElement('h3');name.textContent=c.participantNames?.[player]||(player===uid?playerName():'未設定名稱');panel.append(name);
+      const score=document.createElement('div');score.className='points';score.textContent=String(c.score[index===0?'a':'b']);panel.append(score);
+      for(const [finish,label] of [['spin','轉停 +1'],['knockout','擊飛 +2'],['burst','爆裂 +2'],['extreme','極限 +3']]){
+        const button=document.createElement('button');button.type='button';button.dataset.op='recordRound';button.dataset.player=String(index);button.dataset.finish=finish;button.textContent=label;button.hidden=!['in_progress','score_review'].includes(c.status)||!!c.pendingRound||Math.max(c.score.a,c.score.b)>=c.rules.targetScore||c.participants[0]!==uid;panel.append(button);
+      }
+      boards.append(panel);
+    }
+    select('.round').hidden=!c||!c.rounds.length&&!c.pendingRound;select('.policy').hidden=!c;
+    if(c){saveId(uid,c.challengeId);if(c.status!=='proposed'){select('.qr').replaceChildren();select('.pairing-share').hidden=true;select('.pairing-code').textContent='';}}
+    for(const button of app.querySelectorAll('[data-op]')){
+      const op=button.dataset.op;if(op==='logout'){button.disabled=false;continue;}if(op==='retry')button.hidden=!view.pending;
+      const active=c&&!['completed','disputed','cancelled','expired','rejected'].includes(c.status);
+      button.disabled=!uid||!!view.busy||(!!view.pending&&!['retry','getChallenge','stopScan'].includes(op))||
+        (op==='retry'&&!view.pending)||(op==='getChallenge'&&!c&&!view.pending?.input.challengeId&&!savedId(uid))||
+        (op==='undoRound'&&(c?.participants[0]!==uid||!['in_progress','round_pending','game_pending','final_pending','score_review'].includes(c?.status)||(!c?.pendingRound&&!c?.rounds.length)))||
+        (op==='resumeReview'&&(c?.status!=='score_review'||c.participants[0]!==uid))||
+        (op==='createChallenge'&&active)||(['accept','acceptCode'].includes(op)&&active)||(op==='start'&&(c?.status!=='accepted'||c.ready.includes(uid)))||
+        (op==='proposeRound'&&c?.status!=='in_progress')||(op==='recordRound'&&(!['in_progress','score_review'].includes(c?.status)||!!c?.pendingRound||Math.max(c?.score.a||0,c?.score.b||0)>=c?.rules.targetScore))||(op==='confirmRound'&&(c?.status!=='round_pending'||c.pendingRound.confirmedBy.includes(uid)))||
+        (op==='confirmFinish'&&(c?.status!=='final_pending'||c.finishConfirmedBy.includes(uid)))||
+        (op==='dispute'&&!['in_progress','round_pending','game_pending','final_pending'].includes(c?.status))||(op==='reject'&&(c?.status!=='accepted'||c.participants[0]===uid))||(op==='cancel'&&!active);
+    }
+  }
+  function renderRoomRadar(container,c,games){
+    const ns='http://www.w3.org/2000/svg';
+    const tabs=document.createElement('div');tabs.className='radar-tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','選擇查看的玩家');
+    for(const [index,player] of c.participants.entries()){
+      const tab=document.createElement('button');tab.type='button';tab.textContent=c.participantNames?.[player]||'未設定名稱';tab.setAttribute('aria-pressed',String(radarPlayer===index));
+      tab.addEventListener('click',()=>{radarPlayer=index;container.replaceChildren();renderRoomRadar(container,c,games);});tabs.append(tab);
+    }
+    const player=c.participants[radarPlayer]||c.participants[0],stats=roomPlayerStats(c,games,player);
+    const totals={for:stats.attack,against:stats.defense},totalFor=stats.totalFor,totalAgainst=stats.totalAgainst;
+    const axes=[['極限','for','extreme'],['擊飛','for','knockout'],['爆裂','for','burst'],['轉停','for','spin'],['被極限','against','extreme'],['被擊飛','against','knockout'],['被爆裂','against','burst'],['被轉停','against','spin']];
+    const shares=axes.map(([,side,type])=>{const total=side==='for'?totalFor:totalAgainst;return total?Math.round(totals[side][type]/total*100):0;});
+    const shell=document.createElement('div');shell.className='license-radar';
+    const svg=document.createElementNS(ns,'svg');svg.classList.add('license-radar-svg');svg.setAttribute('viewBox','0 0 320 320');svg.setAttribute('role','img');svg.setAttribute('aria-label',(c.participantNames?.[player]||'玩家')+' 本輪得分及失分分布八角圖');
+    const point=(index,radius)=>{const angle=(-90+index*45)*Math.PI/180;return [(160+Math.cos(angle)*radius).toFixed(1),(160+Math.sin(angle)*radius).toFixed(1)]};
+    const polygon=(radii,className)=>{const el=document.createElementNS(ns,'polygon');el.setAttribute('points',radii.map((radius,index)=>point(index,radius).join(',')).join(' '));el.setAttribute('class',className);svg.append(el);return el;};
+    for(const scale of [.25,.5,.75,1])polygon(axes.map(()=>105*scale),'radar-grid');
+    for(let i=0;i<8;i++){const axis=document.createElementNS(ns,'line'),[x,y]=point(i,105);axis.setAttribute('x1','160');axis.setAttribute('y1','160');axis.setAttribute('x2',x);axis.setAttribute('y2',y);axis.setAttribute('class','radar-axis');svg.append(axis);}
+    const radii=shares.map(share=>105*Math.min(100,share*2)/100);polygon(radii,'radar-player');
+    for(let i=0;i<8;i++){const node=document.createElementNS(ns,'circle'),[x,y]=point(i,radii[i]);node.setAttribute('cx',x);node.setAttribute('cy',y);node.setAttribute('r','2.8');node.setAttribute('class','radar-node');svg.append(node);}
+    const center=document.createElementNS(ns,'text');center.setAttribute('x','160');center.setAttribute('y','164');center.setAttribute('class','radar-center');center.textContent='50% 分布＝滿格';svg.append(center);
+    shell.append(svg);
+    axes.forEach(([label,side],index)=>{const axis=document.createElement('span');axis.className='radar-label radar-label-'+index+(side==='against'?' loss':'');axis.textContent=label;const value=document.createElement('b');value.textContent=shares[index]+'%';axis.append(value);shell.append(axis);});
+    const note=document.createElement('p');note.className='radar-note';note.textContent='戰型與攻防分布依本房得失分明細計算；得分效率＝本人得分÷雙方總得分。進攻四軸各占本人總得分，防守四軸各占本人總失分。圖形以 50% 占比為滿格。回合序號依有效記分順序計算，不含未記錄的平手或重賽；失分不等於失誤。集中失分以到達該回合的場次為分母，至少 5 場才比較；領先與逆轉以已完成場次的比分走勢統計。評價與建議只反映本輪對練，無法判定發射技術、陀螺配置優劣或整體實力。';
+    container.append(tabs,shell,note);
+  }
+  function clearHistory(){historyEpoch++;historyRequest?.abort();historyRequest=null;historyCompletion=null;select('.history-list').replaceChildren();select('.history-stats').replaceChildren();select('.history-status').textContent='';}
+  async function refreshHistory(){
+    const uid=view.uid;if(!uid)return;
+    historyRequest?.abort();const request=new AbortController(),epoch=++historyEpoch;historyRequest=request;
+    select('.history-status').textContent='載入戰績中…';
+    try{
+      const result=await runtime.transport('getMyHistory',{},{uid,signal:request.signal});
+      if(epoch!==historyEpoch||view.uid!==uid)return;
+      const h=result.history;select('.history-stats').textContent=h.total+' 場 · '+h.wins+' 勝 '+h.losses+' 敗 · 勝率 '+(h.total?Math.round(h.wins/h.total*100)+'%':'—');
+      const list=select('.history-list');list.replaceChildren();
+      for(const m of h.matches){
+        const card=document.createElement('article');card.className='history-match';
+        const names=document.createElement('strong');names.textContent=m.playerName+' vs '+m.opponentName;
+        const score=document.createElement('span');score.className=m.won?'history-win':'history-loss';score.textContent=(m.won?'勝':'敗')+' '+m.score+' : '+m.opponentScore;
+        const date=document.createElement('small');date.textContent=new Date(m.completedAt).toLocaleString('zh-TW')+' · 第 '+(m.gameNumber||1)+' 場';card.append(names,score,date);list.append(card);
+      }
+      select('.history-status').textContent=h.total?'':'尚無已確認的 PK 戰績。';
+    }catch{if(epoch===historyEpoch&&view.uid===uid)select('.history-status').textContent='戰績更新未完成，請按更新戰績重試。';}
+    finally{if(historyRequest===request)historyRequest=null;}
+  }
+  const unsubscribe=runtime.watch(user=>{
+    const uid=user?.uid||null;if(uid!==previousUid){clearHistory();clearPairing();if(previousUid)saveId(previousUid,null);previousUid=uid;client.setSession(uid);}
+    if(uid){refreshHistory();message('');const id=savedId(uid);if(id&&!view.busy&&!view.snapshot)client.read(id).catch(()=>{if(view.uid===uid)message('無法恢復對戰，請按刷新或重送原操作。');});}
+    else{client.setSession(null);message('請登入你的測試帳號。');}
+  });
+  select('#login').addEventListener('submit',async event=>{event.preventDefault();if(loginBusy)return;loginBusy=true;const button=select('#login button');button.disabled=true;
+    try{const email=select('[name="email"]').value.trim();await runtime.login(email,select('[name="password"]').value);try{if(select('[name="remember"]').checked){accountStorage?.setItem(accountKey,email);accountStorage?.setItem(nameKey,playerName());}else{accountStorage?.removeItem(accountKey);accountStorage?.removeItem(nameKey);}}catch{}}
+    catch{message('登入失敗，請確認測試帳號及密碼。');}finally{select('[name="password"]').value='';loginBusy=false;button.disabled=false;}
+  });
+  async function startScan(){const uid=view.uid;scanning=true;scanFound=false;render();try{await scanner.start();}catch{if(view.uid===uid&&joining&&scanning){scanning=false;render();message('無法使用相機，可直接輸入 4 碼，或允許相機權限後重新啟動掃描。');}}}
+  app.addEventListener('click',async event=>{
+    const action=event.target.closest('[data-op]');const op=action?.dataset.op;if(!op||action.disabled)return;const uid=view.uid;if(op==='stopScan'){scanner.stop();scanning=false;render();return;}
+    if(['nextGame','endSession'].includes(op)&&view.snapshot?.status!=='game_pending')return;
+    if(op==='history'){refreshHistory();return;}
+    if(op==='exchange'){swapped=!swapped;render();return;}
+    if(op==='join'){joining=true;await startScan();return;}
+    if(op==='back'){goHome();return;}
+    if(op==='logout'){clearHistory();clearPairing();if(uid)saveId(uid,null);client.dispose();try{await runtime.logout();}catch{message('登出未完成，請重新整理後確認。');}return;}
+    if(!uid||view.busy)return;
+    if(op==='scan'){await startScan();return;}
+    if(op==='createChallenge'&&!select('[name="practice"]').checked){const count=select('[name="matchCount"]').value===''?1:Number(select('[name="matchCount"]').value);if(!Number.isSafeInteger(count)||count<1||count>100){message('場次請輸入 1 到 100 的整數，留白預設一場。');return;}}
+    if(['accept','acceptCode'].includes(op)){scanner.stop();scanning=false;render();}
+    try{
+      let result;if(op==='retry')result=await client.retry();
+      else if(op==='getChallenge')result=await client.read(view.snapshot?.challengeId||view.pending?.input.challengeId||savedId(uid));
+      else{const c=view.snapshot;let input;if(op==='createChallenge')input={playerName:playerName(),matchCount:select('[name="practice"]').checked?0:select('[name="matchCount"]').value===''?1:Number(select('[name="matchCount"]').value)};else if(op==='acceptCode')input={pairingCode:select('[name="pairingCode"]').value,expectedRevision:0,playerName:playerName()};else if(op==='accept')input={...parsePairingPayload(select('textarea').value),expectedRevision:0,playerName:playerName()};
+        else{if(!c)throw Error('challenge-required');input={challengeId:c.challengeId,expectedRevision:c.revision};
+          if(['proposeRound','recordRound'].includes(op)){input.winnerUid=c.participants[Number(action.dataset.player)];input.finish=action.dataset.finish;}
+          if(op==='confirmRound')input.roundRevision=c.pendingRound?.roundRevision;if(op==='confirmFinish')input.resultRevision=c.resultRevision;}
+        result=await client.mutate(op,input);}
+      if(view.uid!==uid||!result)return;
+      if(op==='cancel'){goHome();return;}
+      if(['accept','acceptCode'].includes(op)){clearPairing();render();}
+      if(result.pairingToken){const payload=pairingPayload(result.challenge.challengeId,result.pairingToken);select('textarea').value=payload;select('.pairing-share').hidden=false;select('.pairing-code').textContent=result.pairingCode||'';select('.pairing-expiry').textContent='配對期限：'+new Date(result.challenge.expiresAt).toLocaleTimeString()+'，成功配對後失效。';renderPairingQr(select('.qr'),payload,globalThis.QRCode);}
+      message(result.pairingToken?'':result.challenge?.status==='final_pending'&&result.challenge.finishConfirmedBy.includes(uid)?'已確認比分，等待對方確認中。':'操作已完成。');
+    }catch(error){if(view.uid!==uid)return;message(view.pending?'操作結果尚未確認，請重送原操作。':error.message==='revision-conflict'?'狀態已更新，請先刷新。':error.message==='pairing-rate-limited'?'輸入序號次數過多，請稍候一分鐘再試。':error.message==='closed'?'測試站對戰功能尚未開啟，暫時無法建立或接受挑戰。':error.message==='pairing-unavailable'?'配對資料無效、已使用或已失效，請對手重新建立挑戰。':error.message==='account-unavailable'?'此帳號沒有內測授權，請聯絡測試主持者。':'操作未完成，請刷新並確認配對資料或目前狀態。');}
+  });
+  const stop=()=>{scanner.stop();scanning=false;render();};const synchronize=()=>{const c=view.snapshot;if(!document.hidden&&view.uid&&c&&!view.busy&&!view.pending&&!['completed','disputed','cancelled','expired','rejected'].includes(c.status))client.sync(c.challengeId).catch(()=>{});};
+  const syncTimer=setInterval(synchronize,1500);
+  const background=()=>{if(document.hidden)stop();else synchronize();};addEventListener('pagehide',stop);document.addEventListener('visibilitychange',background);
+  render();return{dispose(){clearHistory();unsubscribe();clearInterval(syncTimer);stop();client.dispose();app.replaceChildren();removeEventListener('pagehide',stop);document.removeEventListener('visibilitychange',background);}};
+}
