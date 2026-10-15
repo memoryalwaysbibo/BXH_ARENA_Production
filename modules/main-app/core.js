@@ -20626,19 +20626,21 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可報名，請切換至玩家模式", true); return; }
     const lobbyTarget=(publicTournamentsCache||[]).map(lobbySummary).find(x=>x.code===target.getAttribute("data-code"));
     if(lobbyTarget && publicTournamentRegistrationLocked(lobbyTarget)){ showToast("賽事已開始，報名系統已鎖定",true); return; }
+    if(target.disabled)return;
     const code=target.getAttribute("data-code");
     const targetGroup=target.getAttribute("data-target-group")||"open";
     if(!code) return;
     if(targetGroup==="children" || (lobbyTarget&&lobbyTarget.battleMode==="team")){
       resetTournamentDetailState(); tournamentDetailCode=code; tournamentDetailLoading=true; appPhase="tournament-detail"; render(); loadTournamentDetail(code); return;
     }
+    target.disabled=true;
     (async ()=>{
       try{
         if(!window.cloudSync || !window.cloudSync.joinTournamentAsPlayer) throw {code:"network"};
         const result=await window.cloudSync.joinTournamentAsPlayer(code,true);
         showToast(result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
         publicTournamentsCache=null; invalidateMyRegistrationsCache(); render();
-      }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }
+      }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }finally{target.disabled=false;}
     })();
     return;
   }
@@ -20669,9 +20671,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async()=>{
       try{
         if(!window.engagementService?.teamRegistration)throw {code:"network"};
-        const preview=await window.engagementService.teamRegistration({action:"preview",code,teamName,members});
-        const statusText=preview.status==="confirmed"?"正取":"備取";
-        if(!confirm("確認送出「"+teamName+"」？\n\n本場："+size+"V"+size+"\n隊員："+members.join("、")+"\n預計狀態："+statusText+"\n\n送出後，本場出場順序仍會在每次對戰前另外提交。")){tournamentDetailBusy=false;target.disabled=false;return;}
+        await window.engagementService.teamRegistration({action:"preview",code,teamName,members});
         const result=await window.engagementService.teamRegistration({action:"join",code,teamName,members,operationId:crypto.randomUUID()});
         showToast(result.status==="confirmed"?"隊伍報名成功（正取）":"隊伍報名成功（備取）");
         publicTournamentsCache=null;invalidateMyRegistrationsCache();
