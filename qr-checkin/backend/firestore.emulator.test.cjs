@@ -22,7 +22,7 @@ async function seed(){
  batch.set(db.doc('users/manager'),{active:true,role:'admin'});
  batch.set(ref,{data:JSON.stringify(state),tournamentPhase:'waiting',qrCheckin:{enabled:true,session:'s1'}});
  batch.set(pub,{bracketView:JSON.stringify({players:players.map(p=>({id:p.id,name:p.name,checkedIn:false}))})});
- for(const [i,uid] of ['u1','u2'].entries())batch.set(ref.collection('registrations').doc('r'+(i+1)),{uid,status:'confirmed'});
+ for(const [i,uid] of ['u1','u2'].entries())batch.set(ref.collection('registrations').doc('r'+(i+1)),{uid,status:'confirmed',displayName:players[i].name});
  await batch.commit();
  const token=signToken(code,'s1',Date.now(),secret);
  return {code,ref,pub,token,scan:uid=>handle({auth:{uid},data:{action:'scan',code,token}}),command:data=>handle({auth:{uid:'manager'},data:{code,...data}})};
