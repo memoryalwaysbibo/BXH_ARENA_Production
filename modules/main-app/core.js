@@ -12227,7 +12227,7 @@ function renderPeopleManagement(){
   const syncError=adminRegistrationsError?`<div class="banner warn" role="alert"><span>線上名單尚未同步：${esc(adminRegistrationsError)}</span><button class="btn btn-ghost btn-sm" data-action="${state.startedAt?"load-admin-registrations":"load-online-roster"}" ${peopleRosterBusy?"disabled":""}>重新同步名單</button></div>`:"";
   const pendingOnsite=window.BXHOnsiteWaitlistIntegration?.pendingCommand(state.cloudCode,firebaseUser?.uid);
   const pendingBanner=pendingOnsite?'<div class="banner warn" role="alert"><span>有一筆報到操作尚未確認。</span><button class="btn btn-primary" data-action="onsite-checkin-retry" '+(peopleRosterBusy?'disabled':'')+'>確認同一筆報到操作</button></div>':'';
-  return syncError+pendingBanner+subnav+(panels[peopleRosterSection]||confirmedPanel);
+  return syncError+pendingBanner+subnav+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+(panels[peopleRosterSection]||confirmedPanel);
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -17536,6 +17536,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
+  window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
@@ -17562,6 +17563,8 @@ function render(){
       finishRenderViewport(__viewportSnapshot);
       return;
     }
+  const qrCheckinEntry=window.BXHQrCheckin?.renderEntry();
+  if(firebaseUser&&userProfile?.active===true&&qrCheckinEntry){app.innerHTML=qrCheckinEntry;return;}
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
   if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {currentRole="admin";appPhase="app";activeTab="management";} }
   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
@@ -18530,6 +18533,7 @@ function renderApp(){
     ${renderModal()}
     ${celebrationOpen ? renderCelebrationOverlay() : ""}
     ${shareModalOpen ? renderShareModal() : ""}
+    ${window.BXHQrCheckin?.renderModal()||""}
     ${renderCloudJoinModal()}
     ${renderEventEntryModal()}
     ${renderQrScannerModal()}
@@ -22371,6 +22375,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(state.startedAt || state.archiveStatus==="completed" || state.meta.checkinClosedEarly){
       showToast("目前報到已鎖定，無法變更報到狀態",true);
       return;
+    }
+    if(window.BXHQrCheckin?.managed()){
+      if(!p.checkedIn){window.BXHQrCheckin.manual(p,true);return;}
+      const roomCode=state.cloudCode;
+      openModal({type:"generic",title:"是否要取消報到？",message:p.name,danger:true,confirmLabel:"是",cancelLabel:"否",onConfirm:()=>{if(state.cloudCode===roomCode)window.BXHQrCheckin.manual(p,false);}});return;
     }
     if(peopleOnsiteWaitlistManaged()){
       if(!p.checkedIn){peopleSetOnsiteCheckIn(p,true);return;}

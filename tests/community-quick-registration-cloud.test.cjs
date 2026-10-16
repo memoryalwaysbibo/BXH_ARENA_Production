@@ -83,6 +83,7 @@ function harness() {
     buildPublicEventInfo: () => ({}), communityRoomExpiryMs: () => NOW + 3600000,
   });
   vm.runInContext(domain + '\n' + registration, ctx);
+  ctx.window.BXHQrCheckinFence = require('../modules/main-app/qr-checkin-fence.js');
   Object.assign(ctx, ctx.window.BXHDomainUtils, ctx.window.BXHRegistrationUtils);
   for (const name of ['advanceOnsiteWriteFence', 'courtLifecycleWritePatch', 'buildPublicMirrorFields', 'computeTournamentPhase', 'reconstructPublicStateFromDoc']) vm.runInContext(cloudFunction(name), ctx);
   const names = ['createCommunityRoom', 'createRoom', 'pushUpdate', 'syncCommunityRegistrationSummary', 'joinRoom', 'joinRoomPublic', 'getPublicTournamentFull', 'getPublicTournamentSummary', 'queryPublicTournaments', 'queryAdminTournaments', 'promoteLocalWaitlistRoster', 'mutateRegistrationRoster'];
@@ -94,6 +95,38 @@ function harness() {
   } };
   return { ctx, api: ctx.api, docs, writes, logs, summaryCalls, stats };
 }
+
+function activateQrCheckinFixture(h, revision = 3) {
+  const data=state({checkinRequired:true});
+  data.qrCheckinManaged=true;data.qrCheckinRevision=revision;
+  data.players=[{id:'p1',name:'Player',checkedIn:true,checkinAt:NOW,checkinMethod:'qr'}];
+  const common={qrCheckinManaged:true,qrCheckinRevision:revision,eventAuthority:'community',communityQuickRegistration:true,tournamentPhase:'waiting'};
+  h.docs.set('tournaments/LOCAL',{...common,data:JSON.stringify(data)});
+  h.docs.set('publicTournaments/LOCAL',{...common,bracketView:JSON.stringify(h.ctx.buildPublicMirrorFields(data))});
+  return clone(data);
+}
+test('QR-managed ordinary push preserves canonical attendance in both mirrors',async()=>{
+  const h=harness(),data=activateQrCheckinFixture(h);data.players[0].checkedIn=false;
+  assert.equal(await h.api.pushUpdate('LOCAL',data),true);
+  assert.equal(JSON.parse(h.docs.get('tournaments/LOCAL').data).players[0].checkedIn,true);
+  assert.equal(JSON.parse(h.docs.get('publicTournaments/LOCAL').bracketView).players[0].checkedIn,true);
+  assert.equal(h.docs.get('tournaments/LOCAL').qrCheckinRevision,4);
+  assert.equal(h.docs.get('publicTournaments/LOCAL').qrCheckinRevision,4);
+});
+test('QR-managed push from a stale tab writes neither mirror',async()=>{
+  const h=harness(),data=activateQrCheckinFixture(h);data.qrCheckinRevision=2;
+  const before=JSON.stringify([...h.docs]);assert.equal(await h.api.pushUpdate('LOCAL',data),false);
+  assert.equal(JSON.stringify([...h.docs]),before);assert.equal(h.writes.length,0);
+});
+test('QR-managed room rejects a pre-feature client state with no revision',async()=>{
+  const h=harness(),data=activateQrCheckinFixture(h);delete data.qrCheckinManaged;delete data.qrCheckinRevision;
+  assert.equal(await h.api.pushUpdate('LOCAL',data),false);assert.equal(h.writes.length,0);
+});
+test('QR-managed full-state push cannot report a newly added player as checked in',async()=>{
+  const h=harness(),data=activateQrCheckinFixture(h);data.players.push({id:'p2',name:'New player',checkedIn:true});
+  assert.equal(await h.api.pushUpdate('LOCAL',data),true);
+  assert.equal(JSON.parse(h.docs.get('tournaments/LOCAL').data).players.find(p=>p.id==='p2').checkedIn,false);
+});
 
 for (const capacity of [null, 1, 257, Number.MAX_SAFE_INTEGER]) {
   test('community creation serializes opt-in and exact capacity in both mirrors: ' + capacity, async () => {

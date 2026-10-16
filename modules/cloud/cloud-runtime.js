@@ -720,7 +720,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','manageOnsiteWaitlist'].includes(name)){
+      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -843,13 +843,14 @@
 
   // Once draw mode is finalized, existing authorized management resumes with
   // a two-document CAS fence. Old clients cannot replay unfenced runtime JSON.
-  function advanceOnsiteWriteFence(doc,state,expectedRevision=state?.onsiteWaitlistRuntimeRevision){
-    if(doc?.onsiteWaitlistServerOwned!==true)return {};
+  function advanceOnsiteWriteFence(doc,state,expectedRevision=state?.onsiteWaitlistRuntimeRevision,expectedQrRevision=state?.qrCheckinRevision){
+    const qrFence=doc?.qrCheckinManaged===true?window.BXHQrCheckinFence.advance(doc,state,expectedQrRevision):{};
+    if(doc?.onsiteWaitlistServerOwned!==true)return qrFence;
     if(doc.onsiteWaitlistFinalized!==true)throw Object.assign(new Error("onsite-waitlist-managed"),{code:"onsite-waitlist-managed"});
     const revision=doc.onsiteWaitlistRuntimeRevision;
     if(!Number.isSafeInteger(revision)||revision<1||expectedRevision!==revision||state?.onsiteWaitlistServerOwned!==true||state?.onsiteWaitlistFinalized!==true)throw Object.assign(new Error("onsite-runtime-stale"),{code:"onsite-runtime-stale"});
     state.onsiteWaitlistRuntimeRevision=revision+1;
-    return {onsiteWaitlistRuntimeRevision:revision+1};
+    return {...qrFence,onsiteWaitlistRuntimeRevision:revision+1};
   }
   function buildPublicMirrorFields(state){
     // Explicit, hand-picked whitelist — NEVER a spread of the full private
@@ -2693,10 +2694,10 @@
           if(visibilityState)privatePatch.data=JSON.stringify(visibilityState);
           tx.set(privateRef,privatePatch,{merge:true});
           if(publicSnap.exists()){
-            if(onsiteFence.onsiteWaitlistRuntimeRevision){
+            if(onsiteFence.onsiteWaitlistRuntimeRevision||onsiteFence.qrCheckinRevision){
               const publicPatch={...onsiteFence,visibility:next,registrationVisibility:next,updatedAt:now};
               const view=JSON.parse(publicSnap.data().bracketView);
-              view.onsiteWaitlistRuntimeRevision=onsiteFence.onsiteWaitlistRuntimeRevision;
+              if(onsiteFence.onsiteWaitlistRuntimeRevision)view.onsiteWaitlistRuntimeRevision=onsiteFence.onsiteWaitlistRuntimeRevision;
               publicPatch.bracketView=JSON.stringify(view);
               tx.set(publicRef,publicPatch,{merge:true});
             }else{
@@ -2729,6 +2730,7 @@
     async pushUpdate(code, data, options={}){
       if(!cloudEnabled || !code) return false;
       const onsiteInputRevision=data?.onsiteWaitlistRuntimeRevision;
+      const qrInputRevision=data?.qrCheckinRevision;
       try{
         const actorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
@@ -2938,7 +2940,7 @@ if(testerSession){
             data.meta.registrationStatus=data.meta.eventCancelled?"cancelled":data.startedAt?"started":"closed";
             privatePayload.registrationStatus=data.meta.registrationStatus;publicPayload.registrationStatus=data.meta.registrationStatus;
           }
-          const onsiteFence=advanceOnsiteWriteFence(snap.exists()?snap.data():{},data,onsiteInputRevision);
+          const onsiteFence=advanceOnsiteWriteFence(snap.exists()?snap.data():{},data,onsiteInputRevision,qrInputRevision);
           Object.assign(privatePayload,onsiteFence,courtLifecycleWritePatch(snap.exists()?snap.data():{},data));
           Object.assign(publicPayload,onsiteFence);
           privatePayload.data=JSON.stringify(data);

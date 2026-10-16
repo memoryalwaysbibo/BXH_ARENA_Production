@@ -1,0 +1,32 @@
+// CANDIDATE FRAGMENT ONLY. Never deploy as a complete ruleset.
+// Must be AND-ed to EVERY existing allow update predicate on tournaments
+// and publicTournaments, including any broad match that could authorize them.
+// Existing authorization predicates must remain in force.
+function qrCheckinWriteAllowed(code) {
+  let before = get(/databases/$(database)/documents/tournaments/$(code)).data;
+  let after = getAfter(/databases/$(database)/documents/tournaments/$(code)).data;
+  let pubBefore = get(/databases/$(database)/documents/publicTournaments/$(code)).data;
+  let pubAfter = getAfter(/databases/$(database)/documents/publicTournaments/$(code)).data;
+  return before.get('qrCheckinManaged', false) != true
+    ? after.get('qrCheckinManaged', false) == before.get('qrCheckinManaged', false)
+      && after.get('qrCheckinRevision', 0) == before.get('qrCheckinRevision', 0)
+      && after.get('qrCheckin', null) == before.get('qrCheckin', null)
+      && pubAfter.get('qrCheckinManaged', false) == pubBefore.get('qrCheckinManaged', false)
+      && pubAfter.get('qrCheckinRevision', 0) == pubBefore.get('qrCheckinRevision', 0)
+    : after.qrCheckinManaged == true
+      && after.qrCheckin == before.qrCheckin
+      && before.qrCheckinRevision is int
+      && after.qrCheckinRevision == before.qrCheckinRevision + 1
+      && pubAfter.qrCheckinManaged == true
+      && pubAfter.qrCheckinRevision == after.qrCheckinRevision
+      && pubBefore.qrCheckinRevision == before.qrCheckinRevision;
+}
+// Example modification, retain all original permissions:
+// allow update: if EXISTING_PREDICATE && qrCheckinWriteAllowed(code);
+// Add denial to broad collection/document rules too. A separate deny cannot
+// override another matching allow in Firestore.
+// The existing broad rules must not authorize these subcollections:
+// tournaments/{code}/checkinReceipts/{id}
+// tournaments/{code}/checkinAudit/{id}
+// tournaments/{code}/checkinOperations/{id}
+// This candidate exposes history only via the authorized Callable.

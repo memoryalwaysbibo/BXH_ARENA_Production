@@ -1,0 +1,27 @@
+name: QR Check-in Candidate Tests
+on:
+  push:
+    branches: ['feature/qr-checkin-20261016']
+  pull_request:
+    paths: ['qr-checkin/**', 'modules/main-app/qr-checkin*.js', '.github/workflows/qr-checkin-candidate.yml']
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test QR policy, UI flow, write protection and existing roster behavior
+        run: node --test qr-checkin/backend/core.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
+      - name: Install browser test dependency
+        run: npm install --no-save --ignore-scripts playwright@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test eight mobile browser scenarios with a mocked backend
+        run: node qr-checkin/browser.cjs
