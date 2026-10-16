@@ -1,17 +1,20 @@
 'use strict';
 const crypto = require('node:crypto');
+const eventStaff = require('./event-staff-core.cjs');
 class CheckinError extends Error { constructor(code) { super(code); this.code=code; } }
 const fail=code=>{throw new CheckinError(code);};
 const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
 function active(user) {
   return user?.active===true && !user.deleted && !['deleted','disabled','frozen'].includes(user.accountStatus) && user.isTestAccount!==true && user.role!=='tester';
 }
-function manager(user,uid,room,state) {
+function manager(user,uid,room,state,{parentUser,now=Date.now()}={}) {
   if(!active(user))return false;
   if(['super_admin','admin'].includes(user.role))return true;
   const owners=[room.ownerUid,room.createdBy,state.ownerUid,state.createdBy,state.meta?.ownerUid,state.meta?.createdBy];
   if(user.role==='player'&&(room.eventAuthority||state.meta?.eventAuthority)==='community')return owners.includes(uid);
-  return ['staff','partner_organizer'].includes(user.role) && [...owners,...(room.assignedStaffUids||[]),...(state.meta?.assignedStaffUids||[])].includes(uid);
+  if(user.role==='staff')return room.assignedStaffUids===undefined || Array.isArray(room.assignedStaffUids)&&(room.assignedStaffUids.length===0||room.assignedStaffUids.includes(uid));
+  if(eventStaff.ownsEvent({...user,uid},uid,room,now))return true;
+  return eventStaff.effective(room.eventStaffAssignments?.[uid],{...user,uid},parentUser,room,now);
 }
 function mutable(room,state) {
   if(room.startedAt||state.startedAt||state.archiveStatus==='completed'||['live','settling','done','cancelled'].includes(room.tournamentPhase)||state.meta?.eventCancelled)fail('checkin-closed');
@@ -39,11 +42,11 @@ function verifyToken(token,code,session,now,secret) {
 }
 // Called only inside the adapter's Firestore transaction. All inputs except d
 // come from server reads; uid comes from verified Firebase Authentication.
-function transition({code,uid,user,room,state,registration,receipt,operation,config,d,now,secret,newSession}) {
+function transition({code,uid,user,parentUser,room,state,registration,receipt,operation,config,d,now,secret,newSession}) {
   if(!uid)fail('auth-required');
   if(!active(user))fail('account-unavailable');
   if(config?.enabled!==true||config?.writerGuardsVerified!==true||!Array.isArray(config.roomCodes)||!config.roomCodes.includes(code))fail('feature-unavailable');
-  const isManager=manager(user,uid,room,state);
+  const isManager=manager(user,uid,room,state,{parentUser,now});
   if(!['scan','status','history','configure','manual','revoke'].includes(d.action))fail('invalid-action');
   if(d.action!=='scan'&&!isManager)fail('permission-denied');
   const settings=room.qrCheckin||{enabled:false,session:''};

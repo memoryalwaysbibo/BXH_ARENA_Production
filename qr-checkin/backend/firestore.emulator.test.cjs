@@ -92,3 +92,34 @@ test('verified roster-sync overlay preserves QR check-in while advancing both re
  assert.equal(privateDoc.qrCheckinRevision,2);assert.equal(publicDoc.qrCheckinRevision,2);
  assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
 });
+test('guarded original roster service preserves attendance during configuration',async()=>{
+ const x=await seed();await x.scan('u1');
+ const {guardFirestore}=require('./guard-firestore.cjs');
+ const {createRosterService}=require('./overlays/roster-service.js');
+ const {FieldValue}=require('firebase-admin/firestore');
+ const run=createRosterService(guardFirestore(db),FieldValue);
+ await run({auth:{uid:'manager'},data:{action:'configure',code:x.code,enabled:true,operationId:'emulator-configure-001'}});
+ const t=(await x.ref.get()).data(),p=(await x.pub.get()).data();
+ assert.equal(JSON.parse(t.data).players.find(p=>p.id==='p1').checkedIn,true);
+ assert.equal(t.qrCheckinRevision,2);assert.equal(p.qrCheckinRevision,2);
+});
+test('guard rolls back an incomplete private-only original backend write',async()=>{
+ const x=await seed();await x.scan('u1');const before=(await x.ref.get()).data();
+ const {guardFirestore}=require('./guard-firestore.cjs');
+ const guarded=guardFirestore(db);
+ await assert.rejects(guarded.runTransaction(async tx=>{const t=await tx.get(x.ref);await tx.get(x.pub);tx.update(x.ref,{data:t.data().data,updatedAt:1});}),/paired-write-required/);
+ assert.deepEqual((await x.ref.get()).data(),before);
+});
+test('event staff authorization is rechecked against the parent within each request',async()=>{
+ const x=await seed(),C=require('./event-staff-core.cjs');
+ const parent={role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org1',orderCode:'ORDER1',expiresAtMs:Date.now()+3600000}};
+ const room={createdBy:'organizer',createdByRole:'partner_organizer',eventAuthority:'official',partnerOrganizationCode:'org1',partnerContractOrderCode:'ORDER1'};
+ const invitation={...C.makeInvitation({eventCode:x.code,targetUid:'helper',organizerUid:'organizer',organizerProfile:parent,tournament:room,duties:['checkin'],displayName:'報到協助'}),status:'accepted'};
+ await db.doc('users/organizer').set(parent);await db.doc('users/helper').set({role:'player',active:true});
+ await x.ref.update({...room,eventStaffAssignments:{helper:invitation}});
+ const request={auth:{uid:'helper'},data:{action:'manual',code:x.code,playerId:'p1',operationId:'helper-operation-001'}};
+ assert.equal((await handle(request)).ok,true);
+ await db.doc('users/organizer').update({'partnerOrganizer.status':'revoked'});
+ await assert.rejects(handle({...request,data:{...request.data,playerId:'p2',operationId:'helper-operation-002'}}),/permission-denied/);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});

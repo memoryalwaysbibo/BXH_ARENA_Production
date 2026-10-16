@@ -64,3 +64,17 @@ test('ledger restores server-owned check-ins after a stale full-state save',()=>
 test('status after tournament starts never issues a working QR',()=>{
  const x=input({user:{active:true,role:'admin'},d:{action:'status'}});x.state.startedAt=1;assert.equal(transition(x).result.token,null);
 });
+function eventStaffInput(){
+ const organizer={role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org1',orderCode:'ORDER1',expiresAtMs:now+100000}};
+ const room={createdBy:'organizer',createdByRole:'partner_organizer',eventAuthority:'official',partnerOrganizationCode:'org1',partnerContractOrderCode:'ORDER1',qrCheckin:{enabled:true,session:'s1'}};
+ const C=require('./event-staff-core.cjs');
+ room.eventStaffAssignments={helper:{...C.makeInvitation({eventCode:code,targetUid:'helper',organizerUid:'organizer',organizerProfile:organizer,tournament:room,duties:['checkin'],displayName:'報到人員',now}),status:'accepted'}};
+ return input({uid:'helper',user:{role:'player',active:true},parentUser:organizer,room,d:{action:'status'}});
+}
+test('accepted event staff can manage check-in using the deployed grant model',()=>assert.equal(transition(eventStaffInput()).result.ok,true));
+test('revoking parent organizer immediately removes event staff authority',()=>{const x=eventStaffInput();x.parentUser.partnerOrganizer.status='revoked';rejects(x,'permission-denied');});
+test('expired parent organizer immediately removes event staff authority',()=>{const x=eventStaffInput();x.parentUser.partnerOrganizer.expiresAtMs=now-1;rejects(x,'permission-denied');});
+test('invited but unaccepted event staff cannot manage check-in',()=>{const x=eventStaffInput();x.room.eventStaffAssignments.helper.status='invited';rejects(x,'permission-denied');});
+test('a stale user membership does not override a revoked room assignment',()=>{const x=eventStaffInput();x.user.eventStaffMemberships={[code]:{status:'accepted'}};x.room.eventStaffAssignments.helper.status='revoked';rejects(x,'permission-denied');});
+test('active partner organizer manages only the matching event and contract',()=>{const x=eventStaffInput();x.uid='organizer';x.user=x.parentUser;assert.equal(transition(x).result.ok,true);x.room.partnerContractOrderCode='OTHER';rejects(x,'permission-denied');});
+test('regular staff follows the existing room assignment scope',()=>{const x=input({uid:'staff1',user:{role:'staff',active:true},d:{action:'status'}});assert.equal(transition(x).result.ok,true);x.room.assignedStaffUids=['other'];rejects(x,'permission-denied');});

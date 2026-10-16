@@ -23,8 +23,9 @@ function createCheckinHandler(db,secretValue){return async request=>{
     const receiptRef=player?ref.collection('checkinReceipts').doc(digest(player.id)):null;
     const operationRef=typeof d.operationId==='string'?ref.collection('checkinOperations').doc(digest(uid+':'+d.operationId)):null;
     const registrationRef=player?.registrationId?ref.collection('registrations').doc(player.registrationId):null;
-    const [receiptSnap,operationSnap,registrationSnap]=await Promise.all([receiptRef?tx.get(receiptRef):null,operationRef?tx.get(operationRef):null,registrationRef?tx.get(registrationRef):null]);
-    const output=transition({code,uid,user:userSnap.data(),room,state,registration:registrationSnap?.data(),receipt:receiptSnap?.data(),operation:operationSnap?.data(),config:cfgSnap.data(),d,now,secret:secretValue(),newSession:session});
+    const parentRef=room.eventStaffAssignments?.[uid]&&room.createdBy?db.doc('users/'+room.createdBy):null;
+    const [receiptSnap,operationSnap,registrationSnap,parentSnap]=await Promise.all([receiptRef?tx.get(receiptRef):null,operationRef?tx.get(operationRef):null,registrationRef?tx.get(registrationRef):null,parentRef?tx.get(parentRef):null]);
+    const output=transition({code,uid,user:userSnap.data(),parentUser:parentSnap?.data(),room,state,registration:registrationSnap?.data(),receipt:receiptSnap?.data(),operation:operationSnap?.data(),config:cfgSnap.data(),d,now,secret:secretValue(),newSession:session});
     if(d.action==='history') {
       const history=await tx.get(ref.collection('checkinAudit').orderBy('at','desc').limit(100));
       return {ok:true,records:history.docs.map(s=>({...s.data(),at:s.data().at.toMillis()}))};
