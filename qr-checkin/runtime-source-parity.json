@@ -1,0 +1,120 @@
+{
+  "recordedAt": "2026-10-16T15:34:40Z",
+  "auditRunId": 38925435175,
+  "artifactId": 12056621417,
+  "completeRulesAvailable": true,
+  "services": [
+    {
+      "name": "registrationRosterService",
+      "updateTime": "2026-10-09T09:49:08.957161687Z",
+      "sourceGeneration": "1791539286469033",
+      "verifiedSourceMatches": []
+    },
+    {
+      "name": "familyRegistration",
+      "updateTime": "2026-10-09T10:43:30.531598919Z",
+      "sourceGeneration": "1791542523417623",
+      "verifiedSourceMatches": [
+        {
+          "sourcePath": "registration-roster-sync.js",
+          "candidate": "registration-roster-sync-original.js",
+          "sha256": "eb4eeb9690a4d8770e0ba0de2103ab84b5b4899c4eb39254c688d9ac731f95af"
+        }
+      ]
+    },
+    {
+      "name": "registrationInvitations",
+      "updateTime": "2026-10-12T20:10:31.674196328Z",
+      "sourceGeneration": "1791835740901210",
+      "verifiedSourceMatches": [
+        {
+          "sourcePath": "registration-roster-sync.js",
+          "candidate": "registration-roster-sync-original.js",
+          "sha256": "eb4eeb9690a4d8770e0ba0de2103ab84b5b4899c4eb39254c688d9ac731f95af"
+        }
+      ]
+    },
+    {
+      "name": "syncRegistrationRoster",
+      "updateTime": "2026-10-09T10:47:15.778921915Z",
+      "sourceGeneration": "1791542769329962",
+      "verifiedSourceMatches": [
+        {
+          "sourcePath": "registration-roster-sync.js",
+          "candidate": "registration-roster-sync.js",
+          "sha256": "e847a6454604f0001a936d5c772c5bf93e7a61f161fde434169c8a13325270b5"
+        }
+      ]
+    },
+    {
+      "name": "backfillRegistrationRoster",
+      "updateTime": "2026-10-09T10:49:24.642401228Z",
+      "sourceGeneration": "1791542871224800",
+      "verifiedSourceMatches": [
+        {
+          "sourcePath": "registration-roster-sync.js",
+          "candidate": "registration-roster-sync.js",
+          "sha256": "e847a6454604f0001a936d5c772c5bf93e7a61f161fde434169c8a13325270b5"
+        }
+      ]
+    },
+    {
+      "name": "lotteryRegistration",
+      "updateTime": "2026-10-09T10:50:53.892712216Z",
+      "sourceGeneration": "1791542992314068",
+      "verifiedSourceMatches": [
+        {
+          "sourcePath": "registration-roster-sync.js",
+          "candidate": "registration-roster-sync-original.js",
+          "sha256": "eb4eeb9690a4d8770e0ba0de2103ab84b5b4899c4eb39254c688d9ac731f95af"
+        }
+      ]
+    },
+    {
+      "name": "manageRegistrationSelection",
+      "updateTime": "2026-10-09T10:52:19.566115828Z",
+      "sourceGeneration": "1791543080586438",
+      "verifiedSourceMatches": []
+    },
+    {
+      "name": "manageEntrySelection",
+      "updateTime": "2026-10-09T10:54:10.429208487Z",
+      "sourceGeneration": "1791543168968214",
+      "verifiedSourceMatches": []
+    },
+    {
+      "name": "teamRegistration",
+      "updateTime": "2026-10-09T10:56:03.017729064Z",
+      "sourceGeneration": "1791543279227642",
+      "verifiedSourceMatches": [
+        {
+          "sourcePath": "registration-roster-sync.js",
+          "candidate": "registration-roster-sync-original.js",
+          "sha256": "eb4eeb9690a4d8770e0ba0de2103ab84b5b4899c4eb39254c688d9ac731f95af"
+        }
+      ]
+    },
+    {
+      "name": "getTournamentOperations",
+      "updateTime": "2026-09-27T05:58:52.796144213Z",
+      "sourceGeneration": "1790488724217260",
+      "verifiedSourceMatches": []
+    },
+    {
+      "name": "setTournamentOperations",
+      "updateTime": "2026-09-27T05:58:53.084189604Z",
+      "sourceGeneration": "1790488723913555",
+      "verifiedSourceMatches": []
+    },
+    {
+      "name": "courtCallService",
+      "updateTime": "2026-10-08T03:40:52.778128355Z",
+      "sourceGeneration": "1791430757530820",
+      "verifiedSourceMatches": []
+    }
+  ],
+  "rules": {
+    "sha256": "da88176f471ba88fd288b2d4a6d953bc9c63f83952559f61947abc7a28572118",
+    "sourceFileName": "release/onsite-waitlist/firestore.rules"
+  }
+}

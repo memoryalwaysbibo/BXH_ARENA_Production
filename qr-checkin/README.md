@@ -1,6 +1,6 @@
 # ARENA 正取 QR 報到候選版
 
-狀態：第二版候選程式。已接入正式前端的本機獨立分支 feature/qr-checkin-20261016；未推送 GitHub、未部署、未啟用。此包不是可直接覆蓋上線的版本。
+狀態：整合中的候選程式，GitHub 草稿 PR #517（https://github.com/memoryalwaysbibo/BXH_ARENA_Production/pull/517）。已推送開發分支 feature/qr-checkin-20261016，尚未合併、部署或啟用。
 
 ## 已實作
 
@@ -17,14 +17,14 @@
 
 ## 尚未完成，禁止啟用的原因
 
-正式 Functions 儲存庫 main 未包含現行完整 functions 原始碼；不同功能散落獨立部署分支。目前參考的是 `feature/onsite-waitlist-final-enable-20261009` 的資料形狀，並非已證實與線上所有函式相符的部署快照。
+正式 Functions 儲存庫 main 未包含現行完整 functions 原始碼；不同功能散落獨立部署分支。已於 2026-10-16 重新取得 12 個部署函式的原始碼雜湊盤點，並找到 syncRegistrationRoster／backfillRegistrationRoster 使用的完全相符原始檔，以及數個其他獨立部署套件中的舊版本。仍未取得所有線上寫入者完整且一致的原始碼集。
 
 1. 取得正在運作的 Functions 原始碼、Firestore Rules 與各函式實際版本，核對管理員、活動工作人員、合作主辦及上層授權失效規則。本候選權限模型尚未驗證所有正式角色。
 2. 將 `preserveCheckins(nextState, receipts)` 接入所有既有伺服器名單／賽事寫入者，在交易內讀取完整 checkinReceipts 並合併。現在只有輔助函式及單元測試，尚未接入線上寫入者。
 3. 新版前端共用交易入口已增加 revision 與報到欄位保留邏輯，並有真實 cloud-runtime 方法的記憶體 stub 測試。仍需將 firestore.rules.fragment 合入實際生效的完整 Rules，盤點未經共用入口的客戶端寫入、既有伺服器寫入，以及單文件修復／刪除路徑。未完成前不能只發布 UI 或 Callable。
 4. 加入 `checkinReceipts`、`checkinAudit`、`checkinOperations` 專用集合規則：前端不能直接新增／修改／刪除，讀取仍需活動管理權限；檢查廣域 match 不會繞過。
 5. 現場抽籤使用另一組 server-owned revision／凍結名單，本候選目前明確拒絕這類房間。需整合原本 manageOnsiteWaitlist.checkIn 後才可支援。
-6. Firestore Emulator 驗證真實交易並行、鏡像、規則及舊畫面覆寫；真機測試登入返回、手機掃描、跨帳號、多人同掃、讀回失敗。已備妥 8 個 Playwright 瀏覽器情境，啟動時因環境禁止 Chromium singleton socket 而中止，沒有任何瀏覽器案例可計為通過。真機／Emulator 仍未驗收。
+6. Firestore Emulator 驗證真實交易並行、鏡像、規則及舊畫面覆寫；真機測試登入返回、手機掃描、跨帳號、多人同掃、讀回失敗。雲端已通過 8 個 Playwright 瀏覽器情境（mock 後端）與 9 個真正 Firestore Emulator 交易情境。這些驗證不涵蓋合併正式 Rules、App Check HTTP 端點、現場抽籤整合或手機真機驗收。
 
 ## 後端整合方式（完成上述項目後）
 
@@ -40,7 +40,15 @@
 
 瀏覽器情境：`node qr-checkin/browser.cjs`。需 Playwright 與可啟動 Chromium 的環境；可用 PLAYWRIGHT_CHROMIUM_EXECUTABLE 指定執行檔。
 
-2026-10-16 第二版結果：96 項本機測試通過，包含 41 項 QR 核心／VM／寫入保護案例，以及 55 項既有雲端名單與家庭報到回歸案例。雲端交易測試使用記憶體 stub，不是 Firestore Emulator。
+2026-10-16 驗證結果：
+
+- 96 項 Node／VM／記憶體交易 stub 測試通過（41 項 QR 案例＋55 項既有回歸案例）。
+- 8 個 Chromium 行動瀏覽器情境通過，使用 mock 後端。
+- 9 項 Firestore Emulator 真實交易測試通過，限定本機 demo-qr-checkin 專案，包含同人併發去重、不同人併發、鏡像失敗完整回復、最新備取拒絕、人工撤銷／重放、歷史權限、雙文件 revision 與停止報到。
+- 雲端驗證來源：GitHub Actions run 38925172391，commit c38a1cdc46836fb34b25aea887888f6924ea1b96。
+- Emulator 使用 deny-all 規則及 Admin SDK，驗證伺服器交易；不等於正式客戶端 Rules 驗收。
+
+Emulator 指令：`npx firebase emulators:exec --only firestore --project demo-qr-checkin --config qr-checkin/firebase.emulator.json 'node --test qr-checkin/backend/firestore.emulator.test.cjs'`。
 
 四份新增／修改 JavaScript 已通過 node --check：主程式、cloud-runtime、新 QR 介面、Firebase adapter。
 
