@@ -346,7 +346,7 @@ test('actual idle-close and restore handlers preserve audit and resume QR check-
 async function writerSeed(extra={}){
  const x=await seed(),t=(await x.ref.get()).data(),state=JSON.parse(t.data),now=Date.now();
  state.matches=[];state.players=state.players.map(p=>({...p,source:'online'}));
- const common={capacity:10,confirmedCount:2,waitlistCount:0,registrationEnabled:true,visibility:'public',registrationVisibility:'public',publishedAt:now-1000,registrationOpenAt:now-1000,registrationCloseAt:now+3600000,cancellationDeadline:now+3600000,...extra};
+ const common={capacity:10,confirmedCount:2,waitlistCount:0,tournamentPhase:'waiting',registrationEnabled:true,visibility:'public',registrationVisibility:'public',publishedAt:now-1000,registrationOpenAt:now-1000,registrationCloseAt:now+3600000,cancellationDeadline:now+3600000,...extra};
  const batch=db.batch();batch.update(x.ref,{...common,data:JSON.stringify(state)});batch.update(x.pub,common);
  batch.set(db.doc('users/u3'),{active:true,role:'player',realName:'新選手',phone:'0900000000',profileCompleted:true});await batch.commit();
  await x.scan('u1');return x;
@@ -429,4 +429,42 @@ test('exact deployed court handler list preserves QR state after the event start
  const run=loadWriter('courtCallService','court-call-service.js',db).createCourtCallService(require('./guard-firestore.cjs').guardFirestore(db));
  assert.equal((await run({auth:{uid:'manager'},data:{code:x.code,action:'list'}})).ok,true);
  assert.equal((await assertWriterAttendance(x)).qrCheckinRevision,1);
+});
+test('exact deployed court PASS writes preserve attendance and advance both QR mirrors',async()=>{
+ const x=await writerSeed(),t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ s.startedAt=Date.now();s.matches=[1,2].map(n=>({id:'m'+n,seq:n,station:1,bracket:'SE',round:0,a:{playerId:'p1'},b:{playerId:'p2'},completed:false,status:n===1?'in_progress':'pending'}));
+ s.courtAssignments={court1:{currentMatchId:'m1',nextMatchId:'m2',status:'in_progress'}};
+ await x.ref.update({data:JSON.stringify(s),assignedStaffUids:['manager']});await x.pub.update({bracketView:JSON.stringify({players:s.players.map(p=>({id:p.id,name:p.name,checkedIn:p.checkedIn})),matches:s.matches})});
+ const run=loadWriter('courtCallService','court-call-service.js',db).createCourtCallService(require('./guard-firestore.cjs').guardFirestore(db));
+ await run({auth:{uid:'manager'},data:{code:x.code,action:'notify',matchId:'m1',operationId:'court-notify-001'}});
+ const req={auth:{uid:'u1'},data:{code:x.code,action:'respond',matchId:'m1',response:'pass',reason:'裝備處理',sequence:1,operationId:'court-pass-001'}};
+ assert.equal((await run(req)).ok,true);
+ const after=await assertWriterAttendance(x);assert.equal(after.qrCheckinRevision,2);
+ assert.equal(JSON.parse(after.data).courtAssignments.court1.currentMatchId,'m2');
+});
+test('exact deployed final team score and replay preserve QR attendance',async()=>{
+ const x=await writerSeed(),t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ Object.assign(s.meta,{battleMode:'team',formatType:'single'});s.startedAt=Date.now();
+ s.matches=[{id:'tm1',station:1,bracket:'SE',round:0,indexInRound:0,teamIds:['ta','tb'],completed:false}];
+ await x.ref.update({data:JSON.stringify(s)});await x.pub.update({bracketView:JSON.stringify({players:s.players.map(p=>({id:p.id,name:p.name,checkedIn:p.checkedIn})),matches:s.matches})});
+ await x.ref.collection('teamLineups').doc('tm1').set({lineupsRevealed:true,lineups:{ta:['a1','a2','a3'],tb:['b1','b2','b3']}});
+ const run=loadWriter('teamScoring','team-scoring-service.js',db).createTeamScoringService(require('./guard-firestore.cjs').guardFirestore(db));
+ let req,result;
+ for(let n=1;n<=3;n++){
+  req={auth:{uid:'manager'},data:{code:x.code,action:'score',matchId:'tm1',winnerSide:0,finish:'extreme',operationId:'team-score-00'+n}};
+  result=await run(req);
+ }
+ assert.equal(result.matchCompleted,true);assert.equal((await run(req)).replayed,true);
+ const after=await assertWriterAttendance(x);assert.equal(after.qrCheckinRevision,2);assert.equal(JSON.parse(after.data).championId,'ta');
+});
+test('exact deployed already-awarded ladder archive preserves QR attendance without awarding twice',async()=>{
+ const x=await writerSeed({eventAuthority:'official',ladderMode:'ranked',ladderPointsAwarded:true}),t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ s.meta.formatType='single';s.championId='p1';s.runnerUpId='p2';s.startedAt=Date.now();
+ s.matches=[{id:'m1',bracket:'SE',round:0,a:{playerId:'p1'},b:{playerId:'p2'},completed:true,winnerId:'p1',loserId:'p2'}];
+ await x.ref.update({data:JSON.stringify(s)});
+ const run=loadWriter('ladderAutoSettlement','ladder-auto-settlement.js',db)._ladderAutoSettlementTest.createSettlementService({db:require('./guard-firestore.cjs').guardFirestore(db)});
+ const result=await run.settle(x.code);assert.equal(result.archived,true);assert.equal(result.alreadyAwarded,true);
+ assert.equal((await run.settle(x.code)).alreadyArchived,true);
+ const after=await assertWriterAttendance(x);assert.equal(after.qrCheckinRevision,2);assert.equal(after.archiveStatus,'completed');
+ assert.equal((await db.collection('ladderTransactions').where('eventCode','==',x.code).get()).size,0);
 });

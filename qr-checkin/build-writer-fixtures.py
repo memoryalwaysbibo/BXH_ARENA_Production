@@ -14,6 +14,8 @@ ENTRIES = {
     'teamRegistration': 'team-registration-service.js',
     'registrationInvitations': 'registration-invitations.js',
     'courtCallService': 'court-call-service.js',
+    'teamScoring': 'team-scoring-service.js',
+    'ladderAutoSettlement': 'ladder-auto-settlement.js',
 }
 
 
