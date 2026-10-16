@@ -14,7 +14,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent
 PIN = ROOT / 'reference/backend-sources-20261016.json'
-PIN_HASH = '63e788cd3f56dbd325b66c7a1d5965d2022b0deb5d8f2a1d327d774aa8909c76'
+PIN_HASH = '36efa74d9b03ababaf2dafd1afc4a0aa3b4f72c889e5d06eda9fdb3dbcc63504'
 ADMIN = re.compile(r"require\((['\"])firebase-admin/firestore\1\)")
 
 
@@ -70,6 +70,7 @@ module.exports={...admin,getFirestore:(...args)=>guardFirestore(admin.getFiresto
         report = {
             'kind': 'REVIEW_ONLY_NOT_DEPLOYABLE', 'deploymentReady': False,
             'project': manifest['project'], 'sourceAuditRunId': manifest['auditRunId'],
+            'missingServices': manifest.get('missingServices', []),
             'verifiedSourceFiles': len(inputs),
             'unresolved': ['direct and batch writers require coverage review',
                            'onsite checkIn must use the shared immutable audit',

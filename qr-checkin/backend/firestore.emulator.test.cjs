@@ -136,6 +136,48 @@ test('ordinary backend deletion of a QR managed room rolls back',async()=>{
  assert.deepEqual((await x.ref.get()).data(),before);
  assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
 });
+test('actual room access configuration preserves attendance, mirror and replay behavior',async()=>{
+ const x=await seed();await x.scan('u1');await x.ref.update({eventAuthority:'community',ownerUid:'manager'});
+ const {guardFirestore}=require('./guard-firestore.cjs');
+ const {createRoomAccessService}=require('./overlays/room-access-service.js');
+ const run=createRoomAccessService(guardFirestore(db));
+ const req={auth:{uid:'manager'},data:{action:'configure',code:x.code,mode:'password',password:'emu-password-123',operationId:'access-configure-001'}};
+ assert.equal((await run(req)).ok,true);assert.equal((await run(req)).replayed,true);
+ const t=(await x.ref.get()).data(),p=(await x.pub.get()).data();
+ assert.equal(t.qrCheckinRevision,2);assert.equal(p.qrCheckinRevision,2);
+ assert.equal(JSON.parse(t.data).players[0].checkedIn,true);assert.equal(JSON.parse(p.bracketView).players[0].checkedIn,true);
+ assert.equal(t.roomAccessMode,'password');assert.equal(p.roomLocked,true);
+ assert.equal(p.roomAccessHash,undefined);assert.equal(p.roomAccessSalt,undefined);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
+test('actual completed-room hosting trigger retains attendance and counts the host once',async()=>{
+ const x=await seed();await x.scan('u1');
+ const state=JSON.parse((await x.ref.get()).data().data);
+ state.archiveStatus='completed';state.completedAt=Date.now();state.expiresAtMs=Date.now()+86400000;
+ state.matches=[{id:'m1',a:{playerId:'p1'},b:{playerId:'p2'},winnerId:'p1',completed:true}];
+ await x.ref.update({eventAuthority:'community',createdBy:'manager',expiresAt:state.expiresAtMs,data:JSON.stringify(state)});
+ const fs=require('node:fs'),path=require('node:path'),module={exports:{}};
+ const {guardFirestore}=require('./guard-firestore.cjs');
+ const guarded=guardFirestore(db);
+ function load(name){
+  if(name==='firebase-functions/v2/firestore')return {onDocumentWritten:(_opts,fn)=>fn};
+  if(name==='firebase-functions/v2/scheduler')return {onSchedule:(_opts,fn)=>fn};
+  if(name==='firebase-functions/v2/https')return {...require(name),onCall:(_opts,fn)=>fn};
+  if(name==='firebase-admin/firestore')return {...require(name),getFirestore:()=>guarded};
+  if(name.startsWith('./'))return require(path.join(__dirname,'overlays',name));
+  return require(name);
+ }
+ new Function('require','module','exports',fs.readFileSync(__dirname+'/overlays/hosting.js','utf8'))(load,module,module.exports);
+ const event={data:{after:{exists:true}},params:{code:x.code}};
+ await module.exports.preserveCompletedRoomAndCountHost(event);await module.exports.preserveCompletedRoomAndCountHost(event);
+ const t=(await x.ref.get()).data(),p=(await x.pub.get()).data();
+ assert.equal(t.expiresAt,null);assert.equal(p.expiresAt,null);
+ assert.equal(t.qrCheckinRevision,2);assert.equal(p.qrCheckinRevision,2);
+ assert.equal(JSON.parse(t.data).players[0].checkedIn,true);assert.equal(JSON.parse(p.bracketView).players[0].checkedIn,true);
+ assert.equal((await db.doc('hostCompletionLedger/'+x.code).get()).exists,true);
+ assert.equal((await db.doc('hostStats/manager').get()).data().completedHostedCount,1);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
 test('event staff authorization is rechecked against the parent within each request',async()=>{
  const x=await seed(),C=require('./event-staff-core.cjs');
  const parent={role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org1',orderCode:'ORDER1',expiresAtMs:Date.now()+3600000}};

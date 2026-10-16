@@ -16,7 +16,7 @@
 
 ## 實際來源與整合
 
-已取回 13 個現行部署服務的 889 個來源檔，逐檔核對 SHA-256 與大小。來源世代、雜湊及取得批次記於 `reference/backend-sources-20261016.json`；Firestore Rules 的原始版本與雜湊也已固定。
+已取回 20 個現行部署服務的 1,531 個來源檔，逐檔核對 SHA-256 與大小。來源世代、雜湊及取得批次記於 `reference/backend-sources-20261016.json`；Firestore Rules 的原始版本與雜湊也已固定。
 
 `build-writer-packages.py --sources <來源目錄> --output <新目錄>` 逐一驗證全部來源後，才原子產生候選套件。各服務保留自己的部署版本；包裝其 Admin SDK Firestore 入口，接入 `backend/guard-firestore.cjs`。輸出明確標記 `REVIEW_ONLY_NOT_DEPLOYABLE`，不是部署授權或覆蓋率證明。來源不符或輸出已存在即拒絕。
 
@@ -24,7 +24,7 @@
 
 ## 上線前剩餘工作
 
-1. 已追加 8 個存取／計分／生命週期服務的唯讀來源盤點（Functions PR #141 已合併），結果尚待取回。各服務真實 handler 的寫入路徑與回傳值逐一回歸；直接 document、batch 及刪除修復路徑尚未完整覆蓋，不能把一般交易包裝器視為所有寫入者已驗證。
+1. 已完成區域內 106 個函式名稱／世代的唯讀盤點（Functions PR #142），確認 asia-east1 未部署舊 `autoPromoteWaitlist`；這不表示其他區域的狀態。20 個服務來源已取回並固定。額外發現 `closeIdleTournaments`、`restoreIdleTournament` 與 `settleLadderTournament` 等獨立部署入口，仍需取得其實際版本。各服務真實 handler 的寫入路徑與回傳值逐一回歸；直接 document、batch 及刪除修復路徑尚未完整覆蓋，不能把一般交易包裝器視為所有寫入者已驗證。
 2. 現場候補抽籤的人工報到需接入相同稽核，並保持抽籤、凍結名單與另一組 revision。QR adapter 現在明確拒絕 `onsiteWaitlistServerOwned` 房間，避免繞過原流程。
 3. 完整 Rules 的其他角色及既有保存流程回歸。Rules 交易配對限制不會解析 JSON 字串中的選手欄位，不能宣稱已單靠 Rules 強制所有管理者的報到異動都經稽核。
 4. 部署 Callable、簽章 Secret 與整合後的寫入者；部署前核對來源版本未漂移。簽章值不能進入 Git 或前端。
@@ -39,7 +39,7 @@
 - 16 項 Firestore Emulator 真實交易測試，包括原始名單服務、同步函式與上層授權撤銷。
 - 10 項候選完整 Rules 的 Emulator 測試。
 
-上述交易測試包含單邊公開投影、後端刪除、原始名單服務與掃碼並行。規則測試已對照原始正式 Rules：既有純 metadata 儲存由原規則拒絕，候選規則結果相同。另有 4 項來源包裝安全測試通過。最新提交另補強選手帳號與操作帳號的稽核快照及畫面區分，須以其 CI 結果為準。候選套件的 451 個修改／新增 JavaScript 檔已在本機通過語法檢查；此項不是行為驗證。
+上述交易測試包含單邊公開投影、後端刪除、原始名單服務與掃碼並行。規則測試已對照原始正式 Rules：既有純 metadata 儲存由原規則拒絕，候選規則結果相同。另有 4 項來源包裝安全測試通過。最新提交另補強選手帳號與操作帳號的稽核快照及畫面區分，須以其 CI 結果為準。候選套件的 20 個服務版本已逐檔驗證，修改／新增 JavaScript 已在本機通過語法檢查；此項不是行為驗證。
 
 ```sh
 node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
