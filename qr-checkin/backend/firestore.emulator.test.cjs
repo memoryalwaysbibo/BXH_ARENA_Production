@@ -12,7 +12,7 @@ const secret='emulator-only-test-secret';
 const handle=createCheckinHandler(db,()=>secret);
 let serial=0;
 async function seed(){
- const code='BXH-EMU'+String(++serial).padStart(4,'0');
+ const code='BXH-EM'+String(++serial).padStart(4,'0');
  const players=[{id:'p1',name:'選手甲',registrationUid:'u1',registrationId:'r1',checkedIn:false},{id:'p2',name:'選手乙',registrationUid:'u2',registrationId:'r2',checkedIn:false}];
  const state={id:code,meta:{checkinRequired:true,name:'模擬器賽事'},players};
  const ref=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
@@ -280,4 +280,35 @@ test('mismatched QR mirror revision is rejected before any new check-in writes',
  const x=await seed();await x.scan('u1');await x.pub.update({qrCheckinRevision:99});const before=(await x.ref.get()).data();
  await assert.rejects(x.scan('u2'),/checkin-state-stale/);assert.deepEqual((await x.ref.get()).data(),before);
  assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
+test('automatic cleanup cannot resume deletion of a QR room or remove its audit',async()=>{
+ const x=await seed();await x.scan('u1');
+ await x.ref.update({eventAuthority:'community'});
+ await db.doc('systemSettings/communityCleanup').set({enabled:true,mode:'delete',readinessVerified:true});
+ const job=db.doc('communityCleanupJobs/'+x.code);
+ await job.set({status:'deleting',leaseUntil:0,token:'old-cleanup-token'});
+ const {cleanRoom}=require('./overlays/cleanup/community-cleanup-engine.js');
+ let deletes=0;
+ const wrapped=new Proxy(db,{get(target,key){if(key==='recursiveDelete')return()=>{deletes++;throw Error('unexpected-delete');};const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}});
+ const r=await cleanRoom(wrapped,x.code,Date.now(),'new-cleanup-token');
+ assert.equal(r.status,'qr-checkin-records-retained');assert.equal(deletes,0);
+ assert.equal((await x.ref.get()).exists,true);assert.equal((await x.pub.get()).exists,true);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);assert.equal((await job.get()).data().token,'old-cleanup-token');
+});
+test('ordinary expired unmanaged community room cleanup still completes',async()=>{
+ const x=await seed();const t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ s.meta.eventAuthority='community';s.updatedAt=Date.now()-3*86400000;s.matches=[];
+ await x.ref.update({eventAuthority:'community',updatedAt:s.updatedAt,data:JSON.stringify(s)});
+ await db.doc('systemSettings/communityCleanup').set({enabled:true,mode:'delete',readinessVerified:true});
+ const {cleanRoom}=require('./overlays/cleanup/community-cleanup-engine.js');
+ const r=await cleanRoom(db,x.code,Date.now()+40*86400000,'unmanaged-cleanup-token');
+ assert.equal(r.status,'deleted');assert.equal((await x.ref.get()).exists,false);assert.equal((await x.pub.get()).exists,false);
+ assert.equal((await db.doc('communityCleanupJobs/'+x.code).get()).data().status,'done');
+});
+test('deletion freeze and public closure both block new QR check-in while history stays readable',async()=>{
+ const x=await seed();await x.ref.update({systemClosed:true,deletionStatus:'deleting'});
+ await assert.rejects(x.scan('u1'),/checkin-closed/);assert.equal((await x.command({action:'history'})).records.length,0);
+ const y=await seed();await y.pub.update({systemClosed:true});await assert.rejects(y.scan('u1'),/checkin-closed/);
+ assert.equal((await y.command({action:'status'})).enabled,false);
+ assert.equal((await y.ref.collection('checkinAudit').get()).size,0);
 });

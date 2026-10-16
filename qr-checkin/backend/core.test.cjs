@@ -64,6 +64,11 @@ test('ledger restores server-owned check-ins after a stale full-state save',()=>
 test('status after tournament starts never issues a working QR',()=>{
  const x=input({user:{active:true,role:'admin'},d:{action:'status'}});x.state.startedAt=1;assert.equal(transition(x).result.token,null);
 });
+test('system closure, deletion freeze and top-level archive prevent new check-in',()=>{
+ for(const patch of [{systemClosed:true},{eventCancelled:true},{deletionStatus:'deleting'},{archiveStatus:'completed'},{archiveStatus:'archived'}]){
+  const x=input();Object.assign(x.room,patch);rejects(x,'checkin-closed');
+ }
+});
 function eventStaffInput(){
  const organizer={role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org1',orderCode:'ORDER1',expiresAtMs:now+100000}};
  const room={createdBy:'organizer',createdByRole:'partner_organizer',eventAuthority:'official',partnerOrganizationCode:'org1',partnerContractOrderCode:'ORDER1',qrCheckin:{enabled:true,session:'s1'}};

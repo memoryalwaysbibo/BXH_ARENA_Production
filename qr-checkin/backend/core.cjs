@@ -17,7 +17,7 @@ function manager(user,uid,room,state,{parentUser,now=Date.now()}={}) {
   return eventStaff.effective(room.eventStaffAssignments?.[uid],{...user,uid},parentUser,room,now);
 }
 function mutable(room,state,onsiteReady=false) {
-  if(room.startedAt||state.startedAt||state.archiveStatus==='completed'||['live','settling','done','cancelled'].includes(room.tournamentPhase)||state.meta?.eventCancelled)fail('checkin-closed');
+  if(room.systemClosed===true||room.eventCancelled===true||room.deletionStatus||room.startedAt||state.startedAt||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus)||['live','settling','done','cancelled'].includes(room.tournamentPhase)||state.meta?.eventCancelled)fail('checkin-closed');
   if(state.meta?.checkinRequired!==true||state.meta?.checkinClosedEarly===true)fail('checkin-closed');
   if(room.onsiteWaitlistServerOwned===true&&!onsiteReady)fail('onsite-integration-required');
 }

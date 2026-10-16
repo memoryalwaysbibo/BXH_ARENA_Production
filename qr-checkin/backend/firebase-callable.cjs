@@ -35,6 +35,10 @@ function createCheckinHandler(db,secretValue){return async request=>{
       const history=await tx.get(ref.collection('checkinAudit').orderBy('at','desc').limit(100));
       return {ok:true,records:history.docs.map(s=>({...s.data(),at:s.data().at.toMillis()}))};
     }
+    if(publicRoom.systemClosed===true||publicRoom.eventCancelled===true||publicRoom.deletionStatus||['completed','archived'].includes(publicRoom.archiveStatus)||['live','settling','done','cancelled'].includes(publicRoom.tournamentPhase)){
+      if(d.action==='status')return {ok:true,enabled:false,token:null,expiresAt:null};
+      throw new CheckinError('checkin-closed');
+    }
     // Pure authorization above does not return a token or commit until the
     // existing draw aggregate and public mirror also pass their own checks.
     let aggregate=null;

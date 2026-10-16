@@ -1,0 +1,15 @@
+{
+  "service": "cleanupExpiredCommunityRooms",
+  "sourceGeneration": "1791355806512161",
+  "auditRunId": 38932368893,
+  "originalFiles": {
+    "community-cleanup-policy.js": {
+      "sha256": "aee177db1b4e3289a8f30a94c653df6e57838e84e47069893f198de4fc1cad2e",
+      "bytes": 4413
+    },
+    "community-cleanup-engine.js": {
+      "sha256": "4284cc07007d22222afb05d5af92a549031d9c5591df31dba30e336c8d40f283",
+      "bytes": 3207
+    }
+  }
+}

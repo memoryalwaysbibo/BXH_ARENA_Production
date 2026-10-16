@@ -20,6 +20,10 @@ ONSITE_SOURCE_HASHES = {
     'onsite-waitlist/core.js': 'ded4853ec976cdac18bfe0603c9fcca73faeb4e1ebabf3755d8f1615c15b3b82',
     'onsite-waitlist/firestore-store.js': '5dc921853c45912b77c869854384a2b3b9acc8e05d12427e1f67558b42e4b9d2',
 }
+CLEANUP_SOURCE_HASHES = {
+    'community-cleanup-policy.js': 'aee177db1b4e3289a8f30a94c653df6e57838e84e47069893f198de4fc1cad2e',
+    'community-cleanup-engine.js': '4284cc07007d22222afb05d5af92a549031d9c5591df31dba30e336c8d40f283',
+}
 
 
 def build(source, output):
@@ -34,6 +38,8 @@ def build(source, output):
         for name, expected in service['files'].items():
             if service['name'] == 'manageOnsiteWaitlist' and name in ONSITE_SOURCE_HASHES and expected['sha256'] != ONSITE_SOURCE_HASHES[name]:
                 raise ValueError('Onsite source changed; rebase integration before packaging')
+            if service['name'] == 'cleanupExpiredCommunityRooms' and name in CLEANUP_SOURCE_HASHES and expected['sha256'] != CLEANUP_SOURCE_HASHES[name]:
+                raise ValueError('Cleanup source changed; rebase retention before packaging')
             relative = pathlib.PurePosixPath(service['name'], name)
             path = source / relative
             if '..' in relative.parts or not path.resolve().is_relative_to(source):
@@ -59,6 +65,8 @@ def build(source, output):
                     text = (ROOT / 'backend/onsite/core.cjs').read_text()
                 if is_onsite and local_name == 'onsite-waitlist/firestore-store.js':
                     text = (ROOT / 'backend/onsite/firestore-store.cjs').read_text().replace("require('./core.cjs')", "require('./core')").replace("require('../onsite-commit.cjs')", "require('../_qr_checkin/onsite-commit.cjs')")
+                if relative.parts[0] == 'cleanupExpiredCommunityRooms' and local_name in CLEANUP_SOURCE_HASHES:
+                    text = (ROOT / 'backend/overlays/cleanup' / local_name).read_text()
                 shim = pathlib.Path(relative.parts[0], '_qr_checkin/admin-firestore.cjs')
                 link = os.path.relpath(shim, relative.parent).replace(os.sep, '/')
                 if not link.startswith('.'):
