@@ -399,7 +399,7 @@ test('exact deployed entry selection configure, draw and replay preserve checked
 });
 test('exact deployed family quick signup and cancellation retain an existing QR check-in',async()=>{
  const x=await writerSeed({eventAuthority:'community',communityQuickRegistration:true,ownerUid:'u3',createdBy:'u3',registrationOpenAt:null,registrationCloseAt:null,cancellationDeadline:null});
- await db.doc('familyPlayers/u3').set({profiles:[{id:'child1',guardianUid:'u3',name:'家庭小選手',nickname:'小選手'}]});
+ await db.doc('familyPlayers/u3').set({profiles:[{id:'child1',playerId:'CCHILD001',displayCode:'P003C1',guardianUid:'u3',name:'家庭小選手',nickname:'小選手'}]});
  const run=loadWriter('familyRegistration','family-registration.js',db).createFamilyRegistration(require('./guard-firestore.cjs').guardFirestore(db));
  const join={code:x.code,action:'join',childIds:['child1'],operationId:'family-qr-join-001'};
  assert.equal((await run({auth:{uid:'u3'},data:join})).status,'confirmed');
