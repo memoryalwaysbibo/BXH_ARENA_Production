@@ -1974,17 +1974,25 @@
         session:()=>({uid:authHandle?.currentUser?.uid||"",epoch:engagementSessionEpoch}),
         reconstruct:reconstructPublicStateFromDoc});
     },
-    async readMyActiveMemberships(context){return this.activeEventsReader().readIndex(context);},
+    async verifyMyActiveMembershipHealth(index,context){return this.activeEventsReader().verifyIndexHealth(index,context);},
+    async readMyActiveMemberships(context){
+      const key=context?.uid+"|"+context?.epoch;
+      if(this._activeMembershipFlight?.key===key)return this._activeMembershipFlight.promise;
+      const promise=this.activeEventsReader().readIndex(context);this._activeMembershipFlight={key,promise};
+      try{return await promise;}finally{if(this._activeMembershipFlight?.promise===promise)this._activeMembershipFlight=null;}
+    },
     async readMyActivePublicRoom(code,context){return this.activeEventsReader().readRoom(code,context);},
     async queryMyActiveRegistrationHints(){
       const context={uid:authHandle?.currentUser?.uid||"",epoch:engagementSessionEpoch};
       const index=await this.readMyActiveMemberships(context);
       const problem=window.BXHActiveEvents?.validateIndex(index);
       if(!window.BXHActiveEvents||problem)throw Error(problem||"active-events-unavailable");
-      return index.memberships.flatMap(m=>m.participants.filter(p=>typeof p.participantId==="string"&&!!p.participantId).map(p=>({
+      const verified=await this.verifyMyActiveMembershipHealth(index,context);
+      const rows=index.memberships.flatMap(m=>m.participants.filter(p=>typeof p.participantId==="string"&&!!p.participantId).map(p=>({
         tournamentCode:m.code,registrationId:p.registrationId||"",participantId:p.participantId||null,
         familyPlayerId:p.familyPlayerId||null,status:p.registrationStatus,uid:context.uid
       })));
+      rows.displayDeadline=verified.displayDeadline;return rows;
     },
 
     async queryMyRegistrations(options={}){

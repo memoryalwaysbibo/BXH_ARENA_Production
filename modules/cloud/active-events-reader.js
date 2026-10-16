@@ -1,7 +1,8 @@
 (function(root){
   'use strict';
   // Read-only server adapter. It never calls the legacy all-events discovery.
-  function create({sdk,db,session,reconstruct}){
+  const DISPLAY_BUDGET_MS=20000;
+  function create({sdk,db,session,reconstruct,monotonicNow=()=>performance.now()}){
     function assertOwner(context){
       const current=session();
       if(!context?.uid||context.uid!==current.uid||context.epoch!==current.epoch)throw Error('stale-session');
@@ -11,8 +12,33 @@
       return snap;
     }
     async function get(ref,context){assertOwner(context);const snap=serverSnapshot(await sdk.getDocFromServer(ref));assertOwner(context);return snap;}
+    function healthValue(data){
+      const expiry=data?.leaseExpiresAt?.toMillis?.();
+      if(data?.schemaVersion!==1||data.status!=='healthy'||typeof data.generation!=='string'||!data.generation||
+        !Number.isSafeInteger(data.revision)||data.revision<0||!Number.isSafeInteger(data.sourceEpoch)||data.sourceEpoch<0||
+        data.sourceEpoch!==data.projectedEpoch||typeof data.receiptHash!=='string'||!data.receiptHash||!Number.isFinite(expiry))throw Error('membership-health-unavailable');
+      return {schemaVersion:1,status:'healthy',generation:data.generation,revision:data.revision,sourceEpoch:data.sourceEpoch,projectedEpoch:data.projectedEpoch,receiptHash:data.receiptHash,leaseExpiresAtMs:expiry};
+    }
+    async function readHealth(context){
+      const started=monotonicNow();
+      const snap=await get(sdk.doc(db,'activeTournamentMembershipHealth','current'),context);
+      if(!snap.exists())throw Error('membership-health-missing');
+      const health=healthValue(snap.data());
+      // Candidate Rules reserve this full display budget beyond request.time.
+      // Start before the request: network delay consumes, never extends, it.
+      const displayDeadline=started+DISPLAY_BUDGET_MS;
+      if(monotonicNow()>=displayDeadline)throw Error('membership-health-read-too-slow');
+      return {health,displayDeadline};
+    }
+    function sameHealth(a,b){return a&&b&&['generation','revision','sourceEpoch','projectedEpoch','receiptHash','leaseExpiresAtMs'].every(k=>a[k]===b[k]);}
+    async function verifyIndexHealth(index,context){
+      const verified=await readHealth(context);
+      if(!sameHealth(index.health,verified.health)||index.generation!==verified.health.generation||index.receiptHash!==verified.health.receiptHash||index.verifiedSourceEpoch!==verified.health.sourceEpoch)throw Error('membership-health-changed');
+      return verified;
+    }
     async function readIndex(context){
       assertOwner(context);
+      const initialHealth=await readHealth(context);
       const stateRef=sdk.doc(db,'users',context.uid,'activeTournamentMembershipState','current');
       const beforeSnap=await get(stateRef,context);
       if(!beforeSnap.exists())return {schemaVersion:1,status:'pending'};
@@ -30,7 +56,9 @@
       if(memberships.length>64)throw Error('membership-overflow');
       const afterSnap=await get(stateRef,context),after=afterSnap.exists()?afterSnap.data():null;
       if(!after||after.schemaVersion!==1||after.status!=='ready'||before.generation!==after.generation||before.revision!==after.revision)throw Error('index-changed-during-read');
-      return {...after,memberships};
+      const index={...after,memberships,health:initialHealth.health};
+      await verifyIndexHealth(index,context);
+      return index;
     }
     async function readRoom(code,context){
       if(typeof code!=='string'||!/^[A-Z0-9-]{4,40}$/.test(code))throw Error('invalid-room-code');
@@ -44,9 +72,9 @@
       assertOwner(context);
       return {...data,code,parsedData};
     }
-    return {readIndex,readRoom};
+    return {readIndex,readRoom,verifyIndexHealth};
   }
-  const api={create};
+  const api={create,DISPLAY_BUDGET_MS};
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.BXHActiveEventsReader=api;
 })(typeof window!=='undefined'?window:null);
