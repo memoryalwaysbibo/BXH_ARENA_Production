@@ -8,7 +8,7 @@ async function open(page,enabled=true){
   window.BXH_FEATURE_FLAGS={uidActiveEvents:enabled};
   const clone=x=>JSON.parse(JSON.stringify(x));
   const f=window.activeFixture={legacy:0,indexReads:0,roomReads:[],state:'pending',memberships:[],rooms:{},error:false,auth:null};
-  window.cloudSync={isEnabled:()=>true,connect:async()=>true,queryPublicTournaments:async()=>({ok:true,items:[],fromCache:false,hasPendingWrites:false}),subscribePublicTournaments:()=>()=>{},queryMyRegistrations:async()=>{f.legacy++;return []},getPublicTournamentSummary:async()=>null,queryMyActiveRegistrationHints:async()=>[],
+  window.cloudSync={verifyMyActiveMembershipHealth:async()=>{if(f.healthError)throw Error('health-unavailable');return {displayDeadline:performance.now()+(f.displayBudget??20000)}},isEnabled:()=>true,connect:async()=>true,queryPublicTournaments:async()=>({ok:true,items:[],fromCache:false,hasPendingWrites:false}),subscribePublicTournaments:()=>()=>{},queryMyRegistrations:async()=>{f.legacy++;return []},getPublicTournamentSummary:async()=>null,queryMyActiveRegistrationHints:async()=>[],
    readMyActiveMemberships:async context=>{f.indexReads++;if(f.error)throw Error('permission-denied');if(f.defer){const result=await new Promise(resolve=>f.release=resolve);return result}return {schemaVersion:1,status:f.state,generation:'g1',revision:1,memberships:clone(f.memberships)}},readMyActivePublicRoom:async code=>{f.roomReads.push(code);if(!f.rooms[code])throw Error('missing');return clone(f.rooms[code])}};
   window.cloudAuth={isReady:()=>true,hasSuperAdmin:async()=>true,onAuthChange:callback=>{f.auth=callback;return ()=>{}},getUserProfile:async uid=>({uid,role:'player',active:true,realName:'隔離測試選手',displayName:'隔離測試選手',email:'fixture@example.invalid'}),touchLastLogin:()=>{},signOutUser:async()=>{}};
   window.engagementService={mailbox:async()=>({ok:true,messages:[],unreadCount:0}),mood:async()=>({ok:true,messages:[]}),courtCall:async()=>({ok:true,rows:[],prepares:[]})};
@@ -44,4 +44,30 @@ test('late previous-account response cannot populate the new account',async({pag
   release({schemaVersion:1,status:'ready',generation:'g1',revision:1,memberships:[{schemaVersion:1,code:'BXH-PRIVATE-A',generation:'g1',sourceRevision:'old',participants:[{kind:'self',registrationId:'user-a',participantId:'p1',registrationStatus:'confirmed'}]}]});
  });
  await expect(page.getByText('目前已同步的賽事中，沒有進行中的個人賽程。')).toBeVisible();expect(await page.evaluate(()=>activeFixture.roomReads.includes('BXH-PRIVATE-A'))).toBe(false);expect(errors).toEqual([]);
+});
+
+test('health failure cannot retain confirmed empty and visibility resume revalidates',async({page},testInfo)=>{
+ const errors=await open(page);
+ await page.evaluate(()=>{activeFixture.state='ready'});
+ await page.locator('[data-action="active-events-refresh"]').click();
+ await expect(page.getByText('目前已同步的賽事中，沒有進行中的個人賽程。')).toBeVisible();
+ await page.evaluate(()=>{activeFixture.healthError=true;window.dispatchEvent(new Event('pageshow'));});
+ await expect(page.getByText('目前無法確認你的賽事，請稍後重新整理。這不代表你沒有賽事。')).toBeVisible();
+ await expect(page.getByText('目前已同步的賽事中，沒有進行中的個人賽程。')).toHaveCount(0);
+ fs.mkdirSync('test-results/active-events',{recursive:true});await page.screenshot({path:`test-results/active-events/${testInfo.project.name}-health-error.png`,fullPage:true});
+ expect(errors).toEqual([]);
+});
+test('expired display budget drops certainty without polling and manual refresh rechecks',async({page},testInfo)=>{
+ const errors=await open(page);
+ await page.evaluate(()=>{activeFixture.state='ready';activeFixture.displayBudget=800});
+ await page.locator('[data-action="active-events-refresh"]').click();
+ await expect(page.getByText('目前已同步的賽事中，沒有進行中的個人賽程。')).toBeVisible();
+ const reads=await page.evaluate(()=>{activeFixture.state='pending';return activeFixture.indexReads});
+ await expect(page.getByText('賽事清單待更新，以下保留上次核對內容。可按重新整理確認最新賽事。')).toBeVisible();
+ expect(await page.evaluate(()=>activeFixture.indexReads)).toBe(reads);
+ fs.mkdirSync('test-results/active-events',{recursive:true});await page.screenshot({path:`test-results/active-events/${testInfo.project.name}-stale.png`,fullPage:true});
+ await page.locator('[data-action="active-events-refresh"]').click();
+ await expect(page.getByText('你的賽事清單仍在建立或更新，尚不能確認目前是否有賽事。')).toBeVisible();
+ await expect(page.getByText('目前已同步的賽事中，沒有進行中的個人賽程。')).toHaveCount(0);
+ expect(errors).toEqual([]);
 });
