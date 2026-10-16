@@ -1,9 +1,7 @@
 name: QR Check-in Candidate Tests
 on:
-  push:
-    branches: ['feature/qr-checkin-20261016']
   pull_request:
-    paths: ['qr-checkin/**', 'modules/main-app/qr-checkin*.js', '.github/workflows/qr-checkin-candidate.yml']
+    paths: ['qr-checkin/**', 'modules/main-app/qr-checkin*.js', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/community-quick-registration-cloud.test.cjs', 'tests/family-roster-checkin.test.cjs', '.github/workflows/qr-checkin-candidate.yml']
 permissions:
   contents: read
 jobs:
@@ -40,10 +38,13 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Install emulator dependencies
+        id: emulator-deps
         run: npm install --no-save --ignore-scripts firebase-admin@13 firebase-functions@6 firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11
       - name: Test real Firestore transactions against local demo project only
         run: npx firebase emulators:exec --only firestore --project demo-qr-checkin --config qr-checkin/firebase.emulator.json 'node --test qr-checkin/backend/firestore.emulator.test.cjs'
       - name: Verify exact Production snapshot and regenerate candidate rules
+        if: ${{ !cancelled() && steps.emulator-deps.outcome == 'success' }}
         run: python3 qr-checkin/build-rules.py
       - name: Test candidate client rules against local demo project only
+        if: ${{ !cancelled() && steps.emulator-deps.outcome == 'success' }}
         run: npx firebase emulators:exec --only firestore --project demo-qr-checkin --config qr-checkin/firebase.emulator.json 'node --test qr-checkin/rules.emulator.test.cjs'

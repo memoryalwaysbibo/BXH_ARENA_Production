@@ -25,18 +25,18 @@
     return code&&token&&/^BXH-[A-Z0-9]{4,16}$/.test(code)?{code,token}:null;
   }
   function qrUrl(){const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set('checkin',ctx.state().cloudCode);u.searchParams.set('checkinToken',settings.token);return u.href;}
-  async function refresh(){
+  async function refresh(loadHistory=true){
     const k=key(),code=ctx.state().cloudCode;
     const s=await call({action:'status',code});
-    const history=await call({action:'history',code});
+    const history=loadHistory?await call({action:'history',code}):null;
     if(!modal||key()!==k)return;
-    settings=s;rows=history.records||[];
+    settings=s;if(history)rows=history.records||[];
     ctx.render();
     if(s.enabled) {
       setTimeout(()=>{if(modal&&key()===k&&settings===s)ctx.qr('qr-checkin-code',qrUrl(),280);},0);
     }
     clearTimeout(timer);
-    timer=setTimeout(()=>{if(modal&&key()===k)refresh().catch(e=>{settings=null;message=errorText(e);ctx.render();});},45000);
+    timer=setTimeout(()=>{if(modal&&key()===k)refresh(false).catch(e=>{settings=null;message=errorText(e);ctx.render();});},45000);
   }
   async function open(){
     modal=true;settings=null;rows=[];message='正在讀取報到資料…';ctx.render();

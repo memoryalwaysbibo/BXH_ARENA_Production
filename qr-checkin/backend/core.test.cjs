@@ -37,6 +37,8 @@ test('rollout requires both writer verification and explicit room allowlist',()=
  for(const config of [{enabled:false},{enabled:true,writerGuardsVerified:false,roomCodes:[code]},{enabled:true,writerGuardsVerified:true,roomCodes:[]}])rejects(input({config}),'feature-unavailable');
 });
 test('disabled accounts cannot scan',()=>rejects(input({user:{role:'player',active:false}}),'account-unavailable'));
+test('test-only identities cannot scan an official roster',()=>rejects(input({user:{role:'tester',active:true}}),'account-unavailable'));
+test('non-ASCII forged signatures produce a controlled invalid-QR error',()=>{const x=input();x.d.token=x.d.token.split('.')[0]+'.'+'漢'.repeat(43);rejects(x,'invalid-qr');});
 test('player cannot manage or forge operator authority',()=>rejects(input({d:{action:'configure',enabled:true,role:'super_admin'}}),'permission-denied'));
 test('manager manual check-in and revoke retain first time and operator',()=>{
  const x=input({uid:'staff1',user:{active:true,role:'admin'},d:{action:'manual',playerId:'p1',operationId:'operation-0000001'}});

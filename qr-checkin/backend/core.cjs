@@ -4,7 +4,7 @@ class CheckinError extends Error { constructor(code) { super(code); this.code=co
 const fail=code=>{throw new CheckinError(code);};
 const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
 function active(user) {
-  return user?.active===true && !user.deleted && !['deleted','disabled','frozen'].includes(user.accountStatus) && user.isTestAccount!==true;
+  return user?.active===true && !user.deleted && !['deleted','disabled','frozen'].includes(user.accountStatus) && user.isTestAccount!==true && user.role!=='tester';
 }
 function manager(user,uid,room,state) {
   if(!active(user))return false;
@@ -33,7 +33,7 @@ function verifyToken(token,code,session,now,secret) {
   if(typeof token!=='string'||token.length>2048)fail('invalid-qr');
   const [body,mac,...extra]=token.split('.');
   const expected=crypto.createHmac('sha256',secret).update(body||'').digest('base64url');
-  if(extra.length||!mac||mac.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(mac),Buffer.from(expected)))fail('invalid-qr');
+  if(extra.length||!mac||!/^[A-Za-z0-9_-]{43}$/.test(mac)||!crypto.timingSafeEqual(Buffer.from(mac),Buffer.from(expected)))fail('invalid-qr');
   let data;try{data=JSON.parse(Buffer.from(body,'base64url').toString());}catch{fail('invalid-qr');}
   if(data.code!==code||data.session!==session||!Number.isSafeInteger(data.expiresAt)||data.expiresAt<=now||data.expiresAt>now+90000)fail('qr-expired');
 }
