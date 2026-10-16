@@ -7,8 +7,8 @@ const defer=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;
 const participant=(id='p1',extra={})=>({kind:'self',registrationId:'u1',participantId:id,registrationStatus:'confirmed',...extra});
 const room=(extra={})=>({visibility:'public',name:'Fixture',tournamentPhase:'live',parsedData:{startedAt:1,bracketSize:8,meta:{formatType:'single',bronzeMatch:false},players:[{id:'p1',name:'Tester'}],matches:[{id:'m1',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}]},...extra});
 const membership=(code='BXH-TEST',extra={})=>({schemaVersion:1,code,generation:'g1',sourceRevision:'r1',participants:[participant()],...extra});
-const index=(memberships=[],extra={})=>({schemaVersion:1,status:'ready',generation:'g1',revision:1,memberships,...extra});
-function controller(options={}){return api.createController({owner:()=>({uid:'u1',epoch:1}),readIndex:async()=>index([membership()]),readRoom:async()=>room(),...options});}
+const index=(memberships=[],extra={})=>({schemaVersion:1,status:'ready',generation:'g1',revision:1,receiptHash:'receipt',verifiedSourceEpoch:1,memberships,...extra});
+function controller(options={}){return api.createController({owner:()=>({uid:'u1',epoch:1}),readIndex:async()=>index([membership()]),readRoom:async()=>room(),verifyIndexHealth:async()=>({displayDeadline:performance.now()+20000}),...options});}
 test('valid ready empty is distinct from pending/error/missing schema',async()=>{
  for(const [value,status] of [[index(),'ready'],[index([],{status:'pending'}),'syncing'],[index([],{status:'error'}),'error'],[{},'error']]){
   let reads=0;const c=controller({readIndex:async()=>value,readRoom:async()=>{reads++;return room()}});await c.load();assert.equal(c.snapshot().status,status);assert.equal(reads,0);assert.equal(c.snapshot().confirmedEmpty===true,status==='ready');
@@ -76,21 +76,21 @@ test('HTML escapes labels and never displays confirmed no-events for unknown',()
  const text=api.html({status:'ready',confirmedEmpty:false,rows:[{group:'unknown',title:'<img>',reason:'<bad>',code:'BXH-X',accessible:false}]});assert.match(text,/&lt;img&gt;/);assert.doesNotMatch(text,/沒有進行中/);assert.doesNotMatch(text,/data-code/);
 });
 function readerFixture({second=index(),first=index(),members=[membership()],owner={uid:'u1',epoch:1},error=null,cache=false}={}){
- let stateReads=0;const paths=[];let current=owner;
+ let stateReads=0;const paths=[];let current=owner;const healthExpiry=Date.now()+60000;
  const snap=data=>({metadata:{fromCache:cache,hasPendingWrites:false},exists:()=>data!=null,data:()=>data});
  const sdk={doc:(_, ...parts)=>parts.join('/'),collection:(_, ...parts)=>parts.join('/'),limit:n=>n,query:(ref,limit)=>({ref,limit}),
-  getDocFromServer:async path=>{paths.push(path);if(error)throw Error(error);return path.startsWith('users/')?snap(stateReads++?second:first):snap({...room(),bracketView:'{}'})},
+  getDocFromServer:async path=>{paths.push(path);if(error)throw Error(error);return path==='activeTournamentMembershipHealth/current'?snap({schemaVersion:1,status:'healthy',generation:'g1',revision:1,sourceEpoch:1,projectedEpoch:1,receiptHash:'receipt',leaseExpiresAt:{toMillis:()=>healthExpiry}}):path.startsWith('users/')?snap(stateReads++?second:first):snap({...room(),bracketView:'{}'})},
   getDocsFromServer:async q=>{paths.push(q.ref);assert.equal(q.limit,65);return {metadata:{fromCache:cache,hasPendingWrites:false},forEach:fn=>members.forEach(row=>fn({id:row.code,data:()=>row}))}}};
  const reader=create({sdk,db:{},session:()=>current,reconstruct:()=>room().parsedData});return {reader,paths,setOwner:x=>current=x};
 }
 test('reader accesses only owner state/members and verifies revision before returning',async()=>{
- const f=readerFixture();const value=await f.reader.readIndex({uid:'u1',epoch:1});assert.equal(value.memberships.length,1);assert.deepEqual(f.paths,['users/u1/activeTournamentMembershipState/current','users/u1/activeTournamentMemberships','users/u1/activeTournamentMembershipState/current']);
+ const f=readerFixture();const value=await f.reader.readIndex({uid:'u1',epoch:1});assert.equal(value.memberships.length,1);assert.deepEqual(f.paths,['activeTournamentMembershipHealth/current','users/u1/activeTournamentMembershipState/current','users/u1/activeTournamentMemberships','users/u1/activeTournamentMembershipState/current','activeTournamentMembershipHealth/current']);
 });
 test('same-generation revision changes are rejected',async()=>{
  const f=readerFixture({second:index([],{revision:2})});await assert.rejects(f.reader.readIndex({uid:'u1',epoch:1}),/index-changed/);
 });
 test('missing readiness never lists memberships or produces ready empty',async()=>{
- const f=readerFixture({first:null});const result=await f.reader.readIndex({uid:'u1',epoch:1});assert.equal(result.status,'pending');assert.equal(f.paths.length,1);
+ const f=readerFixture({first:null});const result=await f.reader.readIndex({uid:'u1',epoch:1});assert.equal(result.status,'pending');assert.equal(f.paths.length,2);
 });
 test('offline cache, denied reads and stale owner are errors',async()=>{
  for(const fixture of [{cache:true},{error:'permission-denied'},{owner:{uid:'u1',epoch:3}}]){
