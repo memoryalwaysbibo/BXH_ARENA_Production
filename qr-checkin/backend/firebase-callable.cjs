@@ -5,12 +5,12 @@ const {getFirestore,Timestamp}=require('firebase-admin/firestore');
 const crypto=require('node:crypto');
 const {transition,ownedPlayer,digest,CheckinError}=require('./core.cjs');
 const signingKey=defineSecret('QR_CHECKIN_SIGNING_KEY');
-exports.tournamentCheckin=onCall({region:'asia-east1',cors:true,enforceAppCheck:true,secrets:[signingKey]},async request=>{
+function createCheckinHandler(db,secretValue){return async request=>{
   const uid=request.auth?.uid;
   if(!uid)throw new HttpsError('unauthenticated','auth-required');
   const d=request.data||{},code=String(d.code||'').trim().toUpperCase();
   if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw new HttpsError('invalid-argument','invalid-code');
-  const db=getFirestore(),ref=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
+  const ref=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
   // This timestamp originates on the server and stays stable during retries.
   const now=Timestamp.now().toMillis(),session=crypto.randomUUID(),auditId=crypto.randomUUID();
   try{return await db.runTransaction(async tx=>{
@@ -24,7 +24,7 @@ exports.tournamentCheckin=onCall({region:'asia-east1',cors:true,enforceAppCheck:
     const operationRef=typeof d.operationId==='string'?ref.collection('checkinOperations').doc(digest(uid+':'+d.operationId)):null;
     const registrationRef=player?.registrationId?ref.collection('registrations').doc(player.registrationId):null;
     const [receiptSnap,operationSnap,registrationSnap]=await Promise.all([receiptRef?tx.get(receiptRef):null,operationRef?tx.get(operationRef):null,registrationRef?tx.get(registrationRef):null]);
-    const output=transition({code,uid,user:userSnap.data(),room,state,registration:registrationSnap?.data(),receipt:receiptSnap?.data(),operation:operationSnap?.data(),config:cfgSnap.data(),d,now,secret:signingKey.value(),newSession:session});
+    const output=transition({code,uid,user:userSnap.data(),room,state,registration:registrationSnap?.data(),receipt:receiptSnap?.data(),operation:operationSnap?.data(),config:cfgSnap.data(),d,now,secret:secretValue(),newSession:session});
     if(d.action==='history') {
       const history=await tx.get(ref.collection('checkinAudit').orderBy('at','desc').limit(100));
       return {ok:true,records:history.docs.map(s=>({...s.data(),at:s.data().at.toMillis()}))};
@@ -56,4 +56,6 @@ exports.tournamentCheckin=onCall({region:'asia-east1',cors:true,enforceAppCheck:
     if(e instanceof CheckinError)throw new HttpsError(e.code==='permission-denied'?'permission-denied':'failed-precondition',e.code);
     throw new HttpsError('internal','checkin-unavailable');
   }
-});
+};}
+exports.createCheckinHandler=createCheckinHandler;
+exports.tournamentCheckin=onCall({region:'asia-east1',cors:true,enforceAppCheck:true,secrets:[signingKey]},createCheckinHandler(getFirestore(),()=>signingKey.value()));
