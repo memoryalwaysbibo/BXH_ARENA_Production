@@ -312,3 +312,33 @@ test('deletion freeze and public closure both block new QR check-in while histor
  assert.equal((await y.command({action:'status'})).enabled,false);
  assert.equal((await y.ref.collection('checkinAudit').get()).size,0);
 });
+test('actual idle-close and restore handlers preserve audit and resume QR check-in after restoration',async()=>{
+ const x=await seed();await x.scan('u1');await db.doc('users/manager').update({role:'super_admin'});
+ const old=Date.now()-3*86400000,t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ Object.assign(s,{archiveStatus:'ongoing',matches:[]});Object.assign(s.meta,{date:new Date(old).toISOString().slice(0,10),startTime:'00:00',registrationStatus:'closed'});
+ await x.ref.update({data:JSON.stringify(s),archiveStatus:'ongoing',registrationStatus:'closed'});
+ const fs=require('node:fs'),path=require('node:path'),module={exports:{}};
+ const C=require('./overlays/lifecycle/operations-core.js');
+ await db.doc('systemSettings/tournamentOperations').set({enabled:true,enabledAt:old});
+ await db.doc('tournamentActivity/'+x.code).set({observedAt:old,lastAt:old,fingerprint:C.fingerprint((await x.ref.get()).data())});
+ const {guardFirestore}=require('./guard-firestore.cjs');const guarded=guardFirestore(db);
+ function load(name){
+  if(name==='firebase-functions/v2/firestore')return {onDocumentWritten:(_opts,fn)=>fn};
+  if(name==='firebase-functions/v2/scheduler')return {onSchedule:(_opts,fn)=>fn};
+  if(name==='firebase-functions/v2/https')return {...require(name),onCall:(_opts,fn)=>fn};
+  if(name==='firebase-admin/firestore')return {...require(name),getFirestore:()=>guarded};
+  if(name==='./release-controls')return {backgroundJobsEnabled:async()=>true};
+  if(name.startsWith('./'))return require(path.join(__dirname,'overlays/lifecycle',name));
+  return require(name);
+ }
+ const source=fs.readFileSync(__dirname+'/overlays/lifecycle/operations.js','utf8')+'\nexports.__checkAndClose=checkAndClose;';
+ new Function('require','module','exports',source)(load,module,module.exports);
+ await module.exports.__checkAndClose(x.code);
+ const closed=(await x.ref.get()).data();assert.equal(closed.systemClosed,true);assert.equal(closed.qrCheckinRevision,2);
+ assert.equal(JSON.parse(closed.data).players[0].checkedIn,true);await assert.rejects(x.scan('u2'),/checkin-closed/);
+ assert.equal((await module.exports.restoreIdleTournament({auth:{uid:'manager'},data:{code:x.code,reason:'模擬器恢復報到驗證'}})).ok,true);
+ const restored=(await x.ref.get()).data(),pub=(await x.pub.get()).data();
+ assert.equal(restored.systemClosed,false);assert.equal(restored.qrCheckinRevision,3);assert.equal(pub.qrCheckinRevision,3);
+ assert.equal(JSON.parse(restored.data).players[0].checkedIn,true);assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+ assert.equal((await x.scan('u2')).ok,true);assert.equal((await x.ref.collection('checkinAudit').get()).size,2);
+});

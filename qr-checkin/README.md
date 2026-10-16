@@ -2,69 +2,60 @@
 
 草稿 PR：https://github.com/memoryalwaysbibo/BXH_ARENA_Production/pull/517
 
-此功能尚未合併、部署或啟用。`systemConfig/qrCheckin` 預設不存在即拒絕所有操作；不能以設定 `writerGuardsVerified=true` 代替實際整合。
+尚未合併、部署或啟用。目標是讓正取選手登入後掃碼直接報到，並保留 QR 與人工操作紀錄。所有生效條件仍由伺服器控制，不能用開啟設定代替實際部署與驗收。
 
-## 功能
+## 行為
 
-- 人員管理中的「現場報到 QR／紀錄」窗口，可開始、停止、全螢幕及查看最近 100 筆異動；後端保留全部紀錄。
-- QR 每 45 秒更新，簽章有效 90 秒。選手登入後掃碼直接報到，伺服器重新檢查當前正取池與已連結報名的最新狀態。
-- 備取不得自助報到。工作人員先移入正取，再人工或掃碼報到；報到服務本身不會升正取。
-- 記錄選手、帳號、賽事／房號、伺服器時間、方式、操作人。重複掃描返回原時間，不重複寫入稽核；撤銷與重新報到保留首次時間和異動歷史。
-- 無帳號、家庭代報及一個帳號對應多名選手，交由工作人員人工處理，避免代掃錯人。
-- 權限使用現行部署的活動工作人員授權模型：接受邀請且上層主辦仍有有效授權；每次交易重讀角色、房間指派及上層資料。
-- 前端保存入口保留伺服器報到欄位，並拒絕過期 revision。候選完整 Rules 要求原有角色權限及兩份賽事文件的 revision 同步推進，禁止客戶端直接存取稽核、receipt、operation。
+- 「人員管理 → 現場報到 QR／紀錄」提供開始／停止、全螢幕與最近 100 筆異動；後端保留完整歷史。
+- QR 每 45 秒更新，簽章有效 90 秒。重新核對帳號、當前正取池與已連結報名的最新狀態；成功提交後才顯示報到成功。
+- 備取不能自行報到。工作人員先移入正取後才可掃碼；報到服務不會升正取，也不以同名匹配帳號。
+- 無連結帳號、家庭代報或同一帳號對應多名選手，交由工作人員人工處理。
+- 稽核保存選手、帳號、報名識別碼、房號／賽事、伺服器時間、方式、狀態、首次時間與操作人。重複掃碼返回原時間；撤銷與重報另留異動。
+- 權限使用現行角色／活動工作人員／合作主辦模型，每次交易重讀帳號、房間指派及必要的上層授權。
+- 私人與公開房間的系統關閉、刪除中、取消或封存狀態都阻止新報到；管理者仍可查歷史。
 
-## 實際來源與整合
+## 抽籤與其他寫入者
 
-已取回 24 個現行部署服務的 1,731 個來源檔，逐檔核對 SHA-256 與大小。來源世代、雜湊及取得批次記於 `reference/backend-sources-20261016.json`；Firestore Rules 的原始版本與雜湊也已固定。
+已取得 24 個相關部署服務的 1,731 個來源檔，逐一核對 SHA-256、大小與來源世代。固定資料見 `reference/backend-sources-20261016.json`；區域內 106 個函式名稱／世代也已盤點。asia-east1 未部署舊 `autoPromoteWaitlist`，不據此推定其他區域狀態。
 
-`build-writer-packages.py --sources <來源目錄> --output <新目錄>` 逐一驗證全部來源後，才原子產生候選套件。各服務保留自己的部署版本；包裝其 Admin SDK Firestore 入口，接入 `backend/guard-firestore.cjs`。輸出明確標記 `REVIEW_ONLY_NOT_DEPLOYABLE`，不是部署授權或覆蓋率證明。來源不符或輸出已存在即拒絕。
+`build-writer-packages.py` 驗證全部原始來源後，原子產生逐服務候選套件，拒絕受損來源及覆寫輸出。一般交易保留報到欄位、同步兩份鏡像版本，拒絕單邊投影或一般交易刪除。套件仍標記 `REVIEW_ONLY_NOT_DEPLOYABLE`，不代表所有實際 handler 已完成部署驗收。
 
-目前保護器涵蓋交易內的名單儲存：保留目前報到欄位、同步私人／公開 revision、拒絕單邊投影與一般交易刪除。已用現行 `registrationRosterService` 與核對過來源的名單同步函式進行 Emulator 整合驗證。
+抽籤進行中，QR adapter 在驗證身分、簽章與正取資格後，只委派原本的 `checkIn` 動作，維持原抽籤及 runtime revision。內部 `authorizedCheckin` 選項不開放給客戶端，不授予設定、抽籤、遞補、關閉或重開權限。抽籤結束後只改目前名單與 runtime revision，保留歷史抽籤快照。
 
-## 上線前剩餘工作
+原抽籤人工報到透過專用 store，把 receipt、稽核、原操作紀錄與雙鏡像放在同一交易。其他抽籤動作保留已有報到。重放不重新報到、不增加稽核。抽籤核心／store 與清理 policy／engine 的正式原始雜湊一旦改變，套件產生器即要求重整合。
 
-1. 已完成區域內 106 個函式名稱／世代的唯讀盤點（Functions PR #142），確認 asia-east1 未部署舊 `autoPromoteWaitlist`；這不表示其他區域的狀態。24 個服務來源已取回並固定，包含獨立部署的自動關閉、復原、結算及清理入口。各服務真實 handler 的寫入路徑與回傳值逐一回歸；直接 document、batch 及刪除修復路徑尚未完整覆蓋，不能把一般交易包裝器視為所有寫入者已驗證。
-2. 現場候補抽籤已加入候選整合：進行中的 QR 報到只委派原本 `checkIn` 動作；結束抽籤後保留歷史快照、僅更新目前報到與 runtime revision；原人工報到共用稽核／receipt。必須另外由伺服器設定 `onsiteIntegrationVerified=true`，且仍需完成 Emulator 回歸、打包與部署驗收。客戶端不能開啟這個旗標。
-3. 完整 Rules 的其他角色及既有保存流程回歸。Rules 交易配對限制不會解析 JSON 字串中的選手欄位，不能宣稱已單靠 Rules 強制所有管理者的報到異動都經稽核。
-4. 部署 Callable、簽章 Secret 與整合後的寫入者；部署前核對來源版本未漂移。簽章值不能進入 Git 或前端。
-5. 在明確允許的測試房啟用，驗證實際 Authentication、App Check、手機掃碼、登入返回與紀錄讀回，再擴大使用。
+過期社群房清理排除 QR 管理房，包含舊清理租約的續跑；一般房維持原清理規則。原本明確授權的整場賽事刪除功能不在此自動保留條件內。
 
-## 驗證證據
+## 生效條件與部署前項目
 
-2026-10-16，commit `9dc025d4d4ab0d5a110bcb6d0e621a54f0dd82c2` 的雲端工作流程 [38930283842](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/38930283842) 通過：
+`systemConfig/qrCheckin` 必須同時有 `enabled=true`、`writerGuardsVerified=true`、明確允許的 `roomCodes`。抽籤房另需 `onsiteIntegrationVerified=true`。預設缺少設定即拒絕，這些設定從不接受客戶端代傳。
 
-- 112 項 Node／VM／記憶體交易測試。
-- 8 個 Chromium 行動尺寸瀏覽器情境，使用 mock 後端。
-- 16 項 Firestore Emulator 真實交易測試，包括原始名單服務、同步函式與上層授權撤銷。
-- 10 項候選完整 Rules 的 Emulator 測試。
+部署前須完成各寫入路徑與角色回歸，核對目前來源未漂移，並準備原部署設定一致的 scoped Functions／Rules 發布。Callable、寫入者及 Rules 必須先部署完成，再限測試房啟用；不得只發布 UI 或開啟旗標。簽章值使用 Secret Manager 的 `QR_CHECKIN_SIGNING_KEY`，不得放進前端、Git 或紀錄。
 
-上述交易測試包含單邊公開投影、後端刪除、原始名單服務與掃碼並行。規則測試已對照原始正式 Rules：既有純 metadata 儲存由原規則拒絕，候選規則結果相同。另有 4 項來源包裝安全測試通過。最新提交另補強選手帳號與操作帳號的稽核快照及畫面區分，須以其 CI 結果為準。候選套件的 24 個服務版本已逐檔驗證，修改／新增 JavaScript 已在本機通過語法檢查；此項不是行為驗證。
+候選 Rules 在原有角色條件外要求雙鏡像 revision 同步，禁止客戶端直接存取 receipt／audit／operation。Rules 不能解析 JSON 字串中的選手欄位，因此不能把此版本配對限制稱為所有管理者異動都無法繞過稽核的證明。
+
+最後仍須驗證正式 Authentication／App Check HTTP 端點、登入返回、手機真機掃碼與紀錄讀回，再擴大房號清單。目前沒有啟用任何正式 QR 房間。
+
+## 驗證
+
+雲端提交 `19957152852d8a4ea0839583a2df22f51d0cd36f`、[Actions 38935771488](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/38935771488) 全部通過：
+
+- 122 項 Node／VM／記憶體交易測試。
+- 5 項套件來源與路徑檢查。
+- 8 個行動尺寸 Chromium 情境，後端為 mock。
+- 30 項 Firestore Emulator 真實交易測試，包括抽籤與 QR 併發、重放、結束抽籤後報到、清理保留與一般房刪除。
+- 10 項完整候選 Rules 測試，包含原始正式 Rules 的 metadata 儲存結果對照。
+
+24 個候選套件的所有相對 require 路徑已核對，899 個新增／修改 JavaScript 通過本機語法檢查；這不是實際行為驗證。最新提交另補自動關閉／復原的實際 handler 測試，以其 CI 結果為準。
 
 ```sh
-node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
+node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/onsite.test.cjs qr-checkin/backend/cleanup.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
 python3 qr-checkin/build-writer-packages.test.py
 python3 qr-checkin/build-rules.py
 ```
 
-Emulator 必須使用 `demo-qr-checkin` 與 `127.0.0.1:8091`；CI 的伺服器交易與客戶端 Rules 分開執行。瀏覽器測試需可啟動 Chromium 的環境。上述測試不等於正式 HTTP 端點或手機真機驗收。
+Emulator 限用 `demo-qr-checkin` 與 `127.0.0.1:8091`。CI 分別執行伺服器交易與客戶端 Rules 測試；這些結果不等於正式端點或真機驗收。
 
-## 程式版本
+## 使用的程式
 
-以 PR 內的實際檔案為準。`frontend.patch`、早期 ZIP 及 `BASELINE.json` 是較早的參考快照，不能用來覆蓋最新分支或直接部署。前端入口在 `modules/main-app/qr-checkin.js`；後端入口為 `backend/firebase-callable.cjs`，需由完成 Admin SDK 初始化的正式入口匯出。
-
-## 現場抽籤候選整合（尚未部署）
-
-`backend/onsite/BASELINE.json` 固定現行抽籤核心及 store 的原始雜湊。核心僅增加伺服器內部 `authorizedCheckin` 選項，限 `checkIn`；不授予抽籤、設定、遞補、關閉或重開權限，原 callable 的 payload 白名單仍拒絕此欄位。
-
-`onsite-commit.cjs` 在原交易的純轉移完成後、任何寫入之前讀取 receipt 與上層權限，再把人工異動、稽核與雙鏡像一起提交。其他抽籤動作保留已報到欄位。套件產生器對抽籤服務使用此專用 store，避免一般保存保護器把合法人工報到還原；核心或 store 的正式原始雜湊一旦改變，打包會拒絕並要求重整合。
-
-本機 119 項程式測試與 5 項包裝檢查通過。新增資料庫情境涵蓋抽籤房掃碼去重、人工撤銷／重放、人工與 QR 同時報到、名額調整、抽籤結束後報到、停止／重開、鏡像損毀及偽造開關；雲端結果須以最新提交為準。
-
-## 過期房間與關閉保護
-
-過期社群房清理的候選 policy 與 engine 加入 `qr-checkin-records-retained`，QR 管理房不自動遞迴刪除，包含舊清理租約的續跑；一般未啟用 QR 的過期房維持原流程。這不移除原本明確授權的整場賽事刪除功能。
-
-新報到同時檢查私人及公開房間的系統關閉、刪除中、取消與封存狀態，避免清理凍結後又寫入報到。管理者仍可查閱已關閉房間的報到歷史。
-
-抽籤整合提交 `ccb63cb54b5523295018b65680cee1899a4c763a` 的雲端驗證 [38935138122](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/38935138122) 已通過 119 項程式測試、5 項包裝檢查、8 個瀏覽器情境、27 項資料庫交易測試及 10 項完整規則測試。後續清理／凍結防護測試以其最新提交為準；目前仍未部署或啟用。
+以 PR 內的實際檔案為準。`frontend.patch`、早期 ZIP 及 `BASELINE.json` 是早期參考快照，不能覆蓋最新分支或直接部署。介面入口是 `modules/main-app/qr-checkin.js`；Callable 入口是 `backend/firebase-callable.cjs`，必須由完成 Admin SDK 初始化的正式入口匯出。
