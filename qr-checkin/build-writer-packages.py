@@ -1,4 +1,4 @@
-"""Prepare review-only writer packages from pinned deployed sources; never deploy.
+"""Prepare writer source packages from pinned deployed sources; publishing is separate.
 
 Every service keeps its own source generation. No service is rebuilt from another
 service's newer/older copy of a shared module. All inputs are verified before any
@@ -77,6 +77,15 @@ def build(source, output):
                 if count:
                     changes[relative.parts[0]].append({'path': str(pathlib.PurePosixPath(*relative.parts[1:])), 'importsWrapped': count})
                 content = text.encode('utf8')
+            if relative.name == 'package.json':
+                package = json.loads(content)
+                dependencies = package.get('dependencies', {})
+                pair = (dependencies.get('firebase-admin'), dependencies.get('firebase-functions'))
+                versions = {('^13.0.0', '^6.0.0'): ('13.10.0', '6.6.0'), ('^14.4.0', '^7.3.2'): ('14.4.0', '7.3.2')}
+                if pair not in versions:
+                    raise ValueError('Unverified Firebase dependency family: ' + str(relative))
+                dependencies['firebase-admin'], dependencies['firebase-functions'] = versions[pair]
+                content = (json.dumps(package, indent=2) + '\n').encode()
             dest.write_bytes(content)
         shim_source = """'use strict';
 const admin=require('firebase-admin/firestore');
@@ -95,13 +104,14 @@ module.exports={...admin,getFirestore:(...args)=>guardFirestore(admin.getFiresto
                 text = (ROOT / 'backend/onsite-commit.cjs').read_text().replace("require('./onsite/core.cjs')", "require('../onsite-waitlist/core')")
                 (dest / 'onsite-commit.cjs').write_text(text)
         report = {
-            'kind': 'REVIEW_ONLY_NOT_DEPLOYABLE', 'deploymentReady': False,
+            'kind': 'PINNED_CANDIDATE_SOURCES', 'deploymentReady': False,
             'project': manifest['project'], 'sourceAuditRunId': manifest['auditRunId'],
             'missingServices': manifest.get('missingServices', []),
             'verifiedSourceFiles': len(inputs),
-            'unresolved': ['direct and batch writers require coverage review',
-                           'onsite integration requires its additional server rollout flag and regression validation',
-                           'each actual handler requires emulator regression coverage'],
+            'publishRequirements': ['exact-source package verification and current SDK emulator checks',
+                                    'source-only deployment preserving service and trigger configuration',
+                                    'disabled QR rollout and deployed candidate Rules',
+                                    'separate test-room acceptance before enablement'],
             'services': [{'name': f['name'], 'sourceGeneration': f['sourceGeneration'],
                           'wrappedImports': changes[f['name']]} for f in manifest['functions']],
         }

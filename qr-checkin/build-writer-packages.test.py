@@ -59,6 +59,26 @@ class PackageTest(unittest.TestCase):
             builder.build(self.source, self.output)
         self.assertEqual((self.output / 'keep').read_text(), 'keep')
 
+    def package_dependency(self, admin='^14.4.0', functions='^7.3.2'):
+        raw = json.dumps({'dependencies': {'firebase-admin': admin, 'firebase-functions': functions}}).encode()
+        (self.source / 'first/package.json').write_bytes(raw)
+        manifest = json.loads(self.pin.read_text())
+        manifest['functions'][0]['files']['package.json'] = {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+        self.pin.write_text(json.dumps(manifest))
+        builder.PIN_HASH = hashlib.sha256(self.pin.read_bytes()).hexdigest()
+
+    def test_dependencies_are_frozen_to_the_verified_sdk_versions(self):
+        self.package_dependency()
+        builder.build(self.source, self.output)
+        dependencies = json.loads((self.output / 'first/package.json').read_text())['dependencies']
+        self.assertEqual(dependencies, {'firebase-admin': '14.4.0', 'firebase-functions': '7.3.2'})
+
+    def test_unverified_dependency_family_leaves_no_partial_package(self):
+        self.package_dependency('^99.0.0')
+        with self.assertRaisesRegex(ValueError, 'Unverified Firebase'):
+            builder.build(self.source, self.output)
+        self.assertFalse(self.output.exists())
+
     def test_onsite_package_resolves_shared_audit_helpers_and_keeps_native_transactions(self):
         manifest = json.loads(self.pin.read_text())
         files = {}
