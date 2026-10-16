@@ -342,3 +342,91 @@ test('actual idle-close and restore handlers preserve audit and resume QR check-
  assert.equal(JSON.parse(restored.data).players[0].checkedIn,true);assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
  assert.equal((await x.scan('u2')).ok,true);assert.equal((await x.ref.collection('checkinAudit').get()).size,2);
 });
+
+async function writerSeed(extra={}){
+ const x=await seed(),t=(await x.ref.get()).data(),state=JSON.parse(t.data),now=Date.now();
+ state.matches=[];state.players=state.players.map(p=>({...p,source:'online'}));
+ const common={capacity:10,confirmedCount:2,waitlistCount:0,registrationEnabled:true,visibility:'public',registrationVisibility:'public',publishedAt:now-1000,registrationOpenAt:now-1000,registrationCloseAt:now+3600000,cancellationDeadline:now+3600000,...extra};
+ const batch=db.batch();batch.update(x.ref,{...common,data:JSON.stringify(state)});batch.update(x.pub,common);
+ batch.set(db.doc('users/u3'),{active:true,role:'player',realName:'新選手',phone:'0900000000',profileCompleted:true});await batch.commit();
+ await x.scan('u1');return x;
+}
+async function assertWriterAttendance(x,audits=1){
+ const t=(await x.ref.get()).data(),p=(await x.pub.get()).data();
+ const player=JSON.parse(t.data).players.find(p=>p.id==='p1');
+ assert.equal(player.checkedIn,true);assert.ok(player.checkinFirstAt>0);
+ assert.equal(JSON.parse(p.bracketView).players.find(p=>p.id==='p1').checkedIn,true);
+ assert.equal(t.qrCheckinRevision,p.qrCheckinRevision);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,audits);
+ return t;
+}
+const {loadWriter}=require('./writer-fixtures.cjs');
+test('exact deployed lottery join preserves attendance without advancing roster revision',async()=>{
+ const x=await writerSeed({registrationSelection:{status:'open',capacity:2,version:2},registeredCount:2});
+ const run=loadWriter('lotteryRegistration','registration-selection.js',db).lotteryRegistration;
+ const result=await run({auth:{uid:'u3'},data:{code:x.code,action:'join'}});
+ assert.equal(result.status,'pending_draw');assert.equal((await assertWriterAttendance(x)).qrCheckinRevision,1);
+ assert.equal((await x.ref.collection('registrations').doc('u3').get()).data().status,'pending_draw');
+});
+test('exact deployed lottery cancellation pairs multiple private writes with the public mirror',async()=>{
+ const x=await writerSeed({registrationSelection:{status:'drawn',capacity:2,version:2},registeredCount:2});
+ const t=(await x.ref.get()).data(),s=JSON.parse(t.data);s.entrySelection={vacancies:0,waitingCount:0};
+ await x.ref.update({data:JSON.stringify(s)});await x.ref.collection('registrations').doc('u2').set({uid:'u2',status:'confirmed'});
+ const run=loadWriter('lotteryRegistration','registration-selection.js',db).lotteryRegistration;
+ assert.equal((await run({auth:{uid:'u2'},data:{code:x.code,action:'cancel'}})).status,'cancelled');
+ assert.equal((await assertWriterAttendance(x)).qrCheckinRevision,2);
+ assert.equal(JSON.parse((await x.pub.get()).data().bracketView).players.length,2);
+});
+test('exact deployed registration selection configure preserves attendance and denies player management',async()=>{
+ const x=await writerSeed(),run=loadWriter('manageRegistrationSelection','registration-selection.js',db).manageRegistrationSelection;
+ const data={code:x.code,action:'configure',capacity:2,operationId:'selection-config-001'};
+ await assert.rejects(run({auth:{uid:'u1'},data}),/tournament-access-denied/);
+ const before=(await x.ref.get()).data();
+ assert.equal((await run({auth:{uid:'manager'},data})).ok,true);
+ const after=await assertWriterAttendance(x);assert.equal(after.qrCheckinRevision,before.qrCheckinRevision+1);
+});
+test('exact deployed entry selection configure, draw and replay preserve checked-in players',async()=>{
+ const x=await writerSeed();await x.scan('u2');
+ const run=loadWriter('manageEntrySelection','entry-selection.js',db).manageEntrySelection;
+ const command=data=>run({auth:{uid:'manager'},data:{code:x.code,...data}});
+ await command({action:'configure',capacity:2,operationId:'entry-config-001'});
+ const preview=await command({action:'preview'});assert.equal(preview.count,2);
+ const draw={action:'draw',operationId:'entry-draw-001',candidateHash:preview.candidateHash};
+ const result=await command(draw);assert.equal(result.state.players.filter(p=>p.checkedIn).length,2);
+ const before=(await x.ref.get()).data().qrCheckinRevision;
+ assert.equal((await command(draw)).replayed,true);
+ assert.equal((await assertWriterAttendance(x,2)).qrCheckinRevision,before);
+});
+test('exact deployed family quick signup and cancellation retain an existing QR check-in',async()=>{
+ const x=await writerSeed({eventAuthority:'community',communityQuickRegistration:true,ownerUid:'u3',createdBy:'u3',registrationOpenAt:null,registrationCloseAt:null,cancellationDeadline:null});
+ await db.doc('familyPlayers/u3').set({profiles:[{id:'child1',guardianUid:'u3',name:'家庭小選手',nickname:'小選手'}]});
+ const run=loadWriter('familyRegistration','family-registration.js',db).createFamilyRegistration(require('./guard-firestore.cjs').guardFirestore(db));
+ const join={code:x.code,action:'join',childIds:['child1'],operationId:'family-qr-join-001'};
+ assert.equal((await run({auth:{uid:'u3'},data:join})).status,'confirmed');
+ let t=await assertWriterAttendance(x);assert.equal(JSON.parse(t.data).players.some(p=>p.familyPlayerId==='child1'),true);
+ assert.equal((await run({auth:{uid:'u3'},data:join})).replayed,true);
+ await run({auth:{uid:'u3'},data:{code:x.code,action:'cancel',registrationId:'family_child1',operationId:'family-qr-cancel-001'}});
+ t=await assertWriterAttendance(x);assert.equal(JSON.parse(t.data).players.some(p=>p.familyPlayerId==='child1'),false);
+});
+test('exact deployed team signup and replay leave attendance and QR revision unchanged',async()=>{
+ const x=await writerSeed({battleMode:'team',teamSize:3});
+ const run=loadWriter('teamRegistration','team-registration-service.js',db).createTeamRegistration(require('./guard-firestore.cjs').guardFirestore(db));
+ const req={auth:{uid:'u3'},data:{code:x.code,action:'join',teamName:'測試隊伍',members:['甲','乙','丙'],operationId:'team-qr-join-001'}};
+ assert.equal((await run(req)).status,'confirmed');assert.equal((await run(req)).replayed,true);
+ assert.equal((await assertWriterAttendance(x)).qrCheckinRevision,1);
+});
+test('exact deployed invitation acceptance and replay leave the current QR attendance intact',async()=>{
+ const x=await writerSeed();await x.ref.collection('registrationInvitations').doc('u3').set({targetUid:'u3',status:'pending',expiresAt:Date.now()+600000});
+ const run=loadWriter('registrationInvitations','registration-invitations.js',db).createRegistrationInvitationService(require('./guard-firestore.cjs').guardFirestore(db));
+ const req={auth:{uid:'u3'},data:{code:x.code,action:'respond',decision:'accept'}};
+ assert.equal((await run(req)).status,'confirmed');assert.equal((await run(req)).replayed,true);
+ assert.equal((await assertWriterAttendance(x)).qrCheckinRevision,1);
+});
+test('exact deployed court handler list preserves QR state after the event starts',async()=>{
+ const x=await writerSeed(),t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ s.startedAt=Date.now();s.matches=[{id:'m1',station:1,round:0,a:{playerId:'p1'},b:{playerId:'p2'},completed:false}];
+ await x.ref.update({data:JSON.stringify(s),assignedStaffUids:['manager']});
+ const run=loadWriter('courtCallService','court-call-service.js',db).createCourtCallService(require('./guard-firestore.cjs').guardFirestore(db));
+ assert.equal((await run({auth:{uid:'manager'},data:{code:x.code,action:'list'}})).ok,true);
+ assert.equal((await assertWriterAttendance(x)).qrCheckinRevision,1);
+});
