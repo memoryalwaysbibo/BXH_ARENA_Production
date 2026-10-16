@@ -238,18 +238,32 @@
  // Public brackets created before this fix can omit playMode. Use the signed-in
  // player's confirmed registration to find the active match; the callable
  // verifies the UID and only returns an enchantment round to its participants.
- let discoveryBusy=false,lastRegistrations=0,registrations=[],dismissedMatch='';
+ let discoveryBusy=false,lastRegistrations=0,registrations=[],dismissedMatch='',discoveryOwner='',registrationDeadline=0,discoveryNeedsRefresh=true;
+ root.addEventListener('bxh-active-event-discovery-refresh',()=>{if(root.BXH_FEATURE_FLAGS?.uidActiveEvents===true){lastRegistrations=0;discoveryNeedsRefresh=true;}});
+ function indexedDiscoveryContext(){try{return {uid:typeof currentAuthUid==='function'?currentAuthUid():'',epoch:typeof engagementSessionEpoch==='number'?engagementSessionEpoch:-1};}catch{return {uid:'',epoch:-1};}}
  async function discoverPlayerDraw(){
+  const indexed=root.BXH_FEATURE_FLAGS?.uidActiveEvents===true,context=indexedDiscoveryContext();
+  const owner=context.uid+'|'+context.epoch;
+  if(indexed&&owner!==discoveryOwner){discoveryOwner=owner;registrations=[];discoveryNeedsRefresh=true;registrationDeadline=0;lastRegistrations=0;discoveryBusy=false;cache.clear();matchNames.clear();dismissedMatch='';document.querySelector('[data-enchantment-draw-overlay]')?.remove();}
+  const current=()=>!indexed||(discoveryOwner===owner&&indexedDiscoveryContext().uid===context.uid&&indexedDiscoveryContext().epoch===context.epoch);
+  if(indexed&&!context.uid)return;
   if(discoveryBusy||!root.cloudSync?.queryMyRegistrations||!root.engagementService?.enchantment)return;
   discoveryBusy=true;
   try{
-   if(Date.now()-lastRegistrations>30000){registrations=await root.cloudSync.queryMyRegistrations();lastRegistrations=Date.now();}
+   if(indexed?discoveryNeedsRefresh:Date.now()-lastRegistrations>30000){
+    if(indexed)discoveryNeedsRefresh=false;
+    if(indexed&&!root.cloudSync.queryMyActiveRegistrationHints)return;
+    const rows=await(indexed?root.cloudSync.queryMyActiveRegistrationHints():root.cloudSync.queryMyRegistrations());if(!current())return;
+    if(indexed){if(!Number.isFinite(rows?.displayDeadline)||rows.displayDeadline<=performance.now())throw Error('membership-hints-expired');registrationDeadline=rows.displayDeadline;}
+    registrations=rows;lastRegistrations=Date.now();
+   }
    for(const r of registrations.filter(x=>x.status==='confirmed')){
     const code=r.tournamentCode;
-    const info=await root.cloudSync.getPublicTournamentSummary(code);
+    const info=await(indexed?root.cloudSync.readMyActivePublicRoom(code,context):root.cloudSync.getPublicTournamentSummary(code));
+    if(!current())return;
     const data=info?.parsedData;
     if(!data?.startedAt||!Array.isArray(data.matches))continue;
-    const pid=typeof smartCallFindPlayerId==='function'?smartCallFindPlayerId(data,r):null;
+    const pid=indexed?r.participantId:(typeof smartCallFindPlayerId==='function'?smartCallFindPlayerId(data,r):null);
     const m=data.matches.find(x=>!x.completed&&!x.isBye&&x.a?.playerId&&x.b?.playerId&&
      (x.a.playerId===pid||x.b.playerId===pid)&&
      (x.status==='in_progress'||Object.values(data.courtAssignments||{}).some(c=>c?.currentMatchId===x.id)));
@@ -270,6 +284,7 @@
     matchNames.set(key(code,m.id),{A:matchPlayerName('A'),B:matchPlayerName('B')});
     let result;
     try{result=await call({action:'get',code,matchId:m.id});}catch(e){continue;}
+    if(!current())return;
     cache.set(key(code,m.id),{version:result.version,state:result.state});
     const s=result.state;
     const show=!!s&&s.phase!=='completed';
@@ -310,7 +325,7 @@
     break;
    }
   }catch(e){/* Registration and public bracket may be temporarily unavailable. */}
-  finally{discoveryBusy=false;}
+  finally{if(current())discoveryBusy=false;}
  }
  function openEnchantmentPreview(){
   if(document.querySelector('[data-enchantment-preview-overlay]'))return;
