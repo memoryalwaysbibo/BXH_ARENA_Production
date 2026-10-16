@@ -16,12 +16,10 @@ function manager(user,uid,room,state,{parentUser,now=Date.now()}={}) {
   if(eventStaff.ownsEvent({...user,uid},uid,room,now))return true;
   return eventStaff.effective(room.eventStaffAssignments?.[uid],{...user,uid},parentUser,room,now);
 }
-function mutable(room,state) {
+function mutable(room,state,onsiteReady=false) {
   if(room.startedAt||state.startedAt||state.archiveStatus==='completed'||['live','settling','done','cancelled'].includes(room.tournamentPhase)||state.meta?.eventCancelled)fail('checkin-closed');
   if(state.meta?.checkinRequired!==true||state.meta?.checkinClosedEarly===true)fail('checkin-closed');
-  // Its draw/check-in callable owns additional revisions and frozen pools.
-  // Do not bypass it until a live-source integration is verified.
-  if(room.onsiteWaitlistServerOwned===true)fail('onsite-integration-required');
+  if(room.onsiteWaitlistServerOwned===true&&!onsiteReady)fail('onsite-integration-required');
 }
 function ownedPlayer(players,uid) {
   const found=(players||[]).filter(p=>p && !p.familyPlayerId && !p.guardianUid && (p.registrationUid===uid||p.uid===uid||p.accountUid===uid));
@@ -42,7 +40,7 @@ function verifyToken(token,code,session,now,secret) {
 }
 // Called only inside the adapter's Firestore transaction. All inputs except d
 // come from server reads; uid comes from verified Firebase Authentication.
-function transition({code,uid,user,parentUser,room,state,registration,receipt,operation,config,d,now,secret,newSession}) {
+function transition({code,uid,user,parentUser,room,state,registration,receipt,operation,config,d,now,secret,newSession,onsiteReady=false}) {
   if(!uid)fail('auth-required');
   if(!active(user))fail('account-unavailable');
   if(config?.enabled!==true||config?.writerGuardsVerified!==true||!Array.isArray(config.roomCodes)||!config.roomCodes.includes(code))fail('feature-unavailable');
@@ -50,12 +48,13 @@ function transition({code,uid,user,parentUser,room,state,registration,receipt,op
   if(!['scan','status','history','configure','manual','revoke'].includes(d.action))fail('invalid-action');
   if(d.action!=='scan'&&!isManager)fail('permission-denied');
   const settings=room.qrCheckin||{enabled:false,session:''};
+  const allowOnsite=onsiteReady===true&&config.onsiteIntegrationVerified===true;
   if(d.action==='history')return {result:{ok:true}};
   if(d.action==='status') {
-    let enabled=settings.enabled===true;try{mutable(room,state);}catch{enabled=false;}
+    let enabled=settings.enabled===true;try{mutable(room,state,allowOnsite);}catch{enabled=false;}
     return {result:{ok:true,enabled,token:enabled?signToken(code,settings.session,now,secret):null,expiresAt:enabled?now+90000:null}};
   }
-  mutable(room,state);
+  mutable(room,state,allowOnsite);
   if(d.action==='configure') {
     if(typeof d.enabled!=='boolean')fail('invalid-enabled');
     return {settings:{enabled:d.enabled,session:newSession},audit:{action:d.enabled?'open':'close',actorUid:uid,method:'manual',at:now},result:{ok:true,enabled:d.enabled}};

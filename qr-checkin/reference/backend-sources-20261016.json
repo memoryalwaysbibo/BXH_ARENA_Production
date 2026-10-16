@@ -6713,8 +6713,840 @@
           "bytes": 4983
         }
       }
+    },
+    {
+      "name": "closeIdleTournaments",
+      "updateTime": "2026-09-27T05:58:59.973014295Z",
+      "entryPoint": "closeIdleTournaments",
+      "sourceGeneration": "1790488724343135",
+      "files": {
+        "accounts-core.js": {
+          "sha256": "fb528be22bd6910e26eca6981702ffe33cfd70b90e194032d3f8b73924888d01",
+          "bytes": 4557
+        },
+        "accounts.js": {
+          "sha256": "61e2811842f0cefe1e0ef49c1073da7fdb43a92c71591b408ffc8e502131a3dd",
+          "bytes": 2091
+        },
+        "activity-points.js": {
+          "sha256": "ffb899e50063092df3774ea32154c2dcef2658538d0d06822cf0c69b74b7c17f",
+          "bytes": 11403
+        },
+        "ai-create-core.js": {
+          "sha256": "31695e36f415ca5faabb17aa5f7d317c66906d1ccf90a2adaf9f759e9e692cbf",
+          "bytes": 8705
+        },
+        "ai-create-poster-core.js": {
+          "sha256": "4f40206a7a8177d28a02b063a7c2bed4fd3073cdbfeb5c9ba95422f97d83cd57",
+          "bytes": 9871
+        },
+        "ai-create-poster-smoke.js": {
+          "sha256": "30b69bbebd4fbfb9b905a2c4ff7e06d33298af6674bdc600b63676abd9cfb0a3",
+          "bytes": 3895
+        },
+        "ai-create-poster.js": {
+          "sha256": "92a170b7eb752bb37a4bf17d289fbe26079f5d8bf1ace12c591cc6f244991873",
+          "bytes": 1497
+        },
+        "ai-create-provider.js": {
+          "sha256": "506d6f7003f2e3f4bd86529888ac1aae4450e7fcd4a787371db170476af03462",
+          "bytes": 11807
+        },
+        "ai-create.js": {
+          "sha256": "8fe6eda0b68ba7b8487d28be917a041f9ccd855e2385ea283e2a4d64b62a7ce1",
+          "bytes": 5665
+        },
+        "court-call-core.js": {
+          "sha256": "a8d2d48eda77dc144be9c0d129928189f55ea345f24de50385410f2c36da8bfd",
+          "bytes": 3439
+        },
+        "court-call-push-service.js": {
+          "sha256": "215b9ff260833cca04fa7daac59e9635a20ec09d6907592e69873cd04844da65",
+          "bytes": 5349
+        },
+        "court-call-push.js": {
+          "sha256": "4eac3d84e27e8c3ecf70d25a93afab75b3fe256d45450cfb2d4783d7279844fd",
+          "bytes": 2423
+        },
+        "court-call-service.js": {
+          "sha256": "7e1f469acea0f6fbca2fc896773f629693dcdd6157e94269ff6d1d08ada1a3d7",
+          "bytes": 12406
+        },
+        "court-call.js": {
+          "sha256": "102163d004df209e475bcef37e63075999ca4b76bd2bf4ad4f52eeca6f3bdf1d",
+          "bytes": 1955
+        },
+        "daily-checkin-core.js": {
+          "sha256": "8570ac30d63922fb28a46639bc3fb682c0123f966402a8575df52b3f52259848",
+          "bytes": 1520
+        },
+        "entry-selection.js": {
+          "sha256": "7b4494b344bfc76d62d4aa19946a95639b0d3df89deff1333516e6a429dfbfde",
+          "bytes": 5271
+        },
+        "event-template.js": {
+          "sha256": "75ad89ab23f2c3131953e790c1eb45909d29a7f0ac8fb5ab11ccb72051e1c3d6",
+          "bytes": 6149
+        },
+        "family-registration.js": {
+          "sha256": "59c578f42af88f8948bfbea9058b635a0be1d5c02f2a0823a8ede2cb709e649a",
+          "bytes": 10203
+        },
+        "family-service.js": {
+          "sha256": "e7885adbc6f96f6fc97cbcad64c0f6b3e9ba596463d8a4b76a851ed104128bf0",
+          "bytes": 4270
+        },
+        "family.js": {
+          "sha256": "9e09363e36433f58c0b05a8073ae3e6fbd494364d8cbe6cb733a752da74cad22",
+          "bytes": 2029
+        },
+        "hosting-core.js": {
+          "sha256": "8f904bbfc58b2b1e50c0bce9b989be5790a5e3d1dccca2850bac9db868f31951",
+          "bytes": 1224
+        },
+        "hosting.js": {
+          "sha256": "051434ba81773ea581dc40f8e13a4cbc80252275c8695130449f3565e500dcc2",
+          "bytes": 3280
+        },
+        "import-codex-drafts.cjs": {
+          "sha256": "30f9134e0d5a5b5420a52e33feec8114ce17fe5e541ee2ee947f52beb1979f64",
+          "bytes": 1869
+        },
+        "index.js": {
+          "sha256": "5a653dd4569ea41dc36cbd2962a737f61d125baa817cb4ea37904439488220a9",
+          "bytes": 55970
+        },
+        "inventory-catalog-service.js": {
+          "sha256": "f1945facaef8cc440c2f55aa5d1d78c6428ae0618dee0f35361e74109bc5fc2b",
+          "bytes": 4813
+        },
+        "inventory-core.js": {
+          "sha256": "5537eb9ffde02bac84dfa7b8c620b15c83a8ef90badc473178a59f6956d3543c",
+          "bytes": 2415
+        },
+        "inventory-service.js": {
+          "sha256": "1fa9162096852416bf327a7abec17877e1741ff2f113ac99d580448231e4237f",
+          "bytes": 9286
+        },
+        "inventory.js": {
+          "sha256": "b03b548d0ca20e8f6937283ce8164f6c39805593795db7f618fd794acb80c8c0",
+          "bytes": 4367
+        },
+        "ladder-auto-settlement.js": {
+          "sha256": "5dbd28e94edd6fd6eaf6f408ff3f5c8ea5f20b58ee40530ec120a4ae5e4b665b",
+          "bytes": 11498
+        },
+        "ladder-settlement-core.js": {
+          "sha256": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6",
+          "bytes": 10630
+        },
+        "mailbox-attachments.js": {
+          "sha256": "3afc6eeb979c44731bad6d3d0d0d229d9af1f454a5ff739352e97e09c0632a5c",
+          "bytes": 5539
+        },
+        "mailbox-core.js": {
+          "sha256": "8c34f25f251047173b4a26e60661e1da18d6eb91d643d6e79a4d1904a3afba1e",
+          "bytes": 1887
+        },
+        "mailbox.js": {
+          "sha256": "2acfb28755afdded4ce282770336ffb753066c0647f774dbc82950c7f21d7684",
+          "bytes": 6355
+        },
+        "migrate-completed.js": {
+          "sha256": "574b481155e2eb220a0ef10d54cf153b224c3c4159171a3c05415904e91659a1",
+          "bytes": 464
+        },
+        "mood-core.js": {
+          "sha256": "73c3c0248030849533103c0358bda05ee09328ffe9b22b4c8932d44f6db56206",
+          "bytes": 1288
+        },
+        "mood-station.js": {
+          "sha256": "c9dd458d2bc94f11bf3d38c2cf49829db509988a6bece6ee9ab8f0b4911b6661",
+          "bytes": 8014
+        },
+        "operations-core.js": {
+          "sha256": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
+          "bytes": 6339
+        },
+        "operations.js": {
+          "sha256": "0b948bdc0a14e2a526e13066a3fc284e348a2e2171def51ae6a79a498bca6500",
+          "bytes": 15320
+        },
+        "package.json": {
+          "sha256": "e2712f55c5da1fa6f9166f7f15499daf90ca4ac00121328d57760e30bc257465",
+          "bytes": 3215
+        },
+        "partner-access-core.js": {
+          "sha256": "5e6fa6387bf47dbdabd08623dd45f3596cae52343b7b6a25d587aaa7e07a7f55",
+          "bytes": 917
+        },
+        "partner-activate-contract.js": {
+          "sha256": "4599802b756a8b3e105732120ab0e6ee593fc8bcf22410619d56e2a50d898500",
+          "bytes": 5338
+        },
+        "partner-contract-core.js": {
+          "sha256": "6644ae44b507d6c2f6ccfc82c5c930f7e8a892b2c674eb78b482512ddea2b0bb",
+          "bytes": 5225
+        },
+        "partner-contracts.js": {
+          "sha256": "14c96c5af45613580e935266fc27651f5f555aef77797b6a5b132430ad75bb79",
+          "bytes": 7492
+        },
+        "partner-plan-catalog.js": {
+          "sha256": "47624681325f23f0ca4428f8795348b9e92ede921e67b7bd8b05d040ca4ce9da",
+          "bytes": 966
+        },
+        "partner-read-contract.js": {
+          "sha256": "37bbefbfbb11a33186b8d277a5f441216606cc92dda67815946f4dfe1a1a5914",
+          "bytes": 1860
+        },
+        "partner-send-contract.js": {
+          "sha256": "6db8a11f7805ef3f6f6ef65de8832b4a89eff9302cf85ec194ca1718bd391d53",
+          "bytes": 3690
+        },
+        "partner-sign-contract.js": {
+          "sha256": "b26a1b85f1b6b18b366013db87a23f682164184ff212d21aa340a62fd51824e2",
+          "bytes": 3821
+        },
+        "partner-signature-evidence.js": {
+          "sha256": "0e4a07e9e8689a6e14232171e5ea1830c2b4eb749d7c6e462ae78394629c6c61",
+          "bytes": 4620
+        },
+        "pioneer.js": {
+          "sha256": "63e1e8902ab804b48810a4611fa040372459ba5a025ff3ad7488c958bc15f994",
+          "bytes": 1224
+        },
+        "player-cards.js": {
+          "sha256": "437592f1ec9052b176bd9ad3cb1cfa8c32bc23d40178e1ac91f4b214ddc05506",
+          "bytes": 7826
+        },
+        "presence-core.js": {
+          "sha256": "b270f855dd12bcd421b486bc329f1c7e597b1619b704034afea7fce34155f345",
+          "bytes": 1483
+        },
+        "presence.js": {
+          "sha256": "3a1e4d4a7521b0a19f3bb925a10dcb04562023213bf5fb651c6e3d3063fffcc5",
+          "bytes": 359
+        },
+        "profile-completion.js": {
+          "sha256": "0ae8464bc81889d05fb6b30ff3d9097619fa108cbe20b33d4c7418f6b8a4fd74",
+          "bytes": 2682
+        },
+        "raffle-core.js": {
+          "sha256": "e6134b67dff4a2c28f627e9690ad402839efd3f6496119e99574711799901be5",
+          "bytes": 5378
+        },
+        "raffle-service.js": {
+          "sha256": "d9e020aced1d80b0fa54628c46bc60cff79b40d75ab13426adfe3d3014dc7d3d",
+          "bytes": 40345
+        },
+        "raffle-ticket-adapter.js": {
+          "sha256": "5eb95d884fb23382d33b46643e3516b5e7929409392ffa26f579db133b9ed8b1",
+          "bytes": 5522
+        },
+        "raffle-ticket-core.js": {
+          "sha256": "03c4ce7743ed84d08d605b07c41c6605ba57b7291637f72496137975f16f4d02",
+          "bytes": 3848
+        },
+        "raffle.js": {
+          "sha256": "364e5386c3fe66cf19e8aabdbc9534c99666a5684059ed400e1918ea40a19da5",
+          "bytes": 1360
+        },
+        "registration-invitations.js": {
+          "sha256": "4025c2ca3115c70aab1bab04be8635ea074c3c565cdec4faabeba8ac0108f1a7",
+          "bytes": 7498
+        },
+        "registration-maintenance.js": {
+          "sha256": "d2379bfee463de2fbf39239ba1b05fe94f90ff3cf0ad45c5f4de6f999cf092aa",
+          "bytes": 3356
+        },
+        "registration-roster-core.js": {
+          "sha256": "326e2a6767b7b91679fcbf2862193f562922e6659f280d27ad5faa8f11131cf4",
+          "bytes": 2160
+        },
+        "registration-roster-sync.js": {
+          "sha256": "77d7d82143fa93a67cd6483a03cca88dbe4b604984b4fe0b77fd215907508226",
+          "bytes": 4522
+        },
+        "registration-selection.js": {
+          "sha256": "c2b5221a3cbd9bcdc455bb36523a05a7bae899d3e06e45699b5f4c6af3760516",
+          "bytes": 16306
+        },
+        "release-controls.js": {
+          "sha256": "f7b2ea90058bf4c817afdb8690d7e0d26c07f35359a059df0f80d910f360d6c2",
+          "bytes": 860
+        },
+        "reward-rules-core.js": {
+          "sha256": "03e0a0515c2930bbb247ef58dd3c2a8de07883a1bb493a3ff6bef9c78d093c70",
+          "bytes": 8930
+        },
+        "reward-rules-engine.js": {
+          "sha256": "ea492bd8817b0234b608a911e49c4902de406b26207a5faa02d08359a93f07d4",
+          "bytes": 6739
+        },
+        "reward-rules-service.js": {
+          "sha256": "157cfcbd6a54471d59c242df57566dea7c1d3594f29c2ac1cdb349bbcb169b01",
+          "bytes": 5531
+        },
+        "reward-rules.js": {
+          "sha256": "c60762e42ed1e4855bd53b38523d15038568074f4c06d5bd5d3f16a2d1dab82f",
+          "bytes": 1030
+        },
+        "room-access-core.js": {
+          "sha256": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+          "bytes": 2337
+        },
+        "room-access-service.js": {
+          "sha256": "7e50ce14aec91c3abd7fb238b0a3294de8a6a51d3f3cd33d489f95c42d2ff323",
+          "bytes": 5448
+        },
+        "room-access.js": {
+          "sha256": "8d52dbefd075d939a67775898ccef0bc86349bacaba444c5b49bfa33235d50d3",
+          "bytes": 849
+        },
+        "room-poster-cover.js": {
+          "sha256": "dd8f9175cb23d1d094fdd6c0853b08dcc72868eb2601bbe87cb7d10a0b69c37b",
+          "bytes": 4082
+        },
+        "test-support/transaction-db.js": {
+          "sha256": "b3247f81799273e4b6018854c16f933522bbd7253cb46c2e65759312060d14c0",
+          "bytes": 7402
+        }
+      }
+    },
+    {
+      "name": "restoreIdleTournament",
+      "updateTime": "2026-09-27T05:58:51.921038904Z",
+      "entryPoint": "restoreIdleTournament",
+      "sourceGeneration": "1790488723899106",
+      "files": {
+        "accounts-core.js": {
+          "sha256": "fb528be22bd6910e26eca6981702ffe33cfd70b90e194032d3f8b73924888d01",
+          "bytes": 4557
+        },
+        "accounts.js": {
+          "sha256": "61e2811842f0cefe1e0ef49c1073da7fdb43a92c71591b408ffc8e502131a3dd",
+          "bytes": 2091
+        },
+        "activity-points.js": {
+          "sha256": "ffb899e50063092df3774ea32154c2dcef2658538d0d06822cf0c69b74b7c17f",
+          "bytes": 11403
+        },
+        "ai-create-core.js": {
+          "sha256": "31695e36f415ca5faabb17aa5f7d317c66906d1ccf90a2adaf9f759e9e692cbf",
+          "bytes": 8705
+        },
+        "ai-create-poster-core.js": {
+          "sha256": "4f40206a7a8177d28a02b063a7c2bed4fd3073cdbfeb5c9ba95422f97d83cd57",
+          "bytes": 9871
+        },
+        "ai-create-poster-smoke.js": {
+          "sha256": "30b69bbebd4fbfb9b905a2c4ff7e06d33298af6674bdc600b63676abd9cfb0a3",
+          "bytes": 3895
+        },
+        "ai-create-poster.js": {
+          "sha256": "92a170b7eb752bb37a4bf17d289fbe26079f5d8bf1ace12c591cc6f244991873",
+          "bytes": 1497
+        },
+        "ai-create-provider.js": {
+          "sha256": "506d6f7003f2e3f4bd86529888ac1aae4450e7fcd4a787371db170476af03462",
+          "bytes": 11807
+        },
+        "ai-create.js": {
+          "sha256": "8fe6eda0b68ba7b8487d28be917a041f9ccd855e2385ea283e2a4d64b62a7ce1",
+          "bytes": 5665
+        },
+        "court-call-core.js": {
+          "sha256": "a8d2d48eda77dc144be9c0d129928189f55ea345f24de50385410f2c36da8bfd",
+          "bytes": 3439
+        },
+        "court-call-push-service.js": {
+          "sha256": "215b9ff260833cca04fa7daac59e9635a20ec09d6907592e69873cd04844da65",
+          "bytes": 5349
+        },
+        "court-call-push.js": {
+          "sha256": "4eac3d84e27e8c3ecf70d25a93afab75b3fe256d45450cfb2d4783d7279844fd",
+          "bytes": 2423
+        },
+        "court-call-service.js": {
+          "sha256": "7e1f469acea0f6fbca2fc896773f629693dcdd6157e94269ff6d1d08ada1a3d7",
+          "bytes": 12406
+        },
+        "court-call.js": {
+          "sha256": "102163d004df209e475bcef37e63075999ca4b76bd2bf4ad4f52eeca6f3bdf1d",
+          "bytes": 1955
+        },
+        "daily-checkin-core.js": {
+          "sha256": "8570ac30d63922fb28a46639bc3fb682c0123f966402a8575df52b3f52259848",
+          "bytes": 1520
+        },
+        "entry-selection.js": {
+          "sha256": "7b4494b344bfc76d62d4aa19946a95639b0d3df89deff1333516e6a429dfbfde",
+          "bytes": 5271
+        },
+        "event-template.js": {
+          "sha256": "75ad89ab23f2c3131953e790c1eb45909d29a7f0ac8fb5ab11ccb72051e1c3d6",
+          "bytes": 6149
+        },
+        "family-registration.js": {
+          "sha256": "59c578f42af88f8948bfbea9058b635a0be1d5c02f2a0823a8ede2cb709e649a",
+          "bytes": 10203
+        },
+        "family-service.js": {
+          "sha256": "e7885adbc6f96f6fc97cbcad64c0f6b3e9ba596463d8a4b76a851ed104128bf0",
+          "bytes": 4270
+        },
+        "family.js": {
+          "sha256": "9e09363e36433f58c0b05a8073ae3e6fbd494364d8cbe6cb733a752da74cad22",
+          "bytes": 2029
+        },
+        "hosting-core.js": {
+          "sha256": "8f904bbfc58b2b1e50c0bce9b989be5790a5e3d1dccca2850bac9db868f31951",
+          "bytes": 1224
+        },
+        "hosting.js": {
+          "sha256": "051434ba81773ea581dc40f8e13a4cbc80252275c8695130449f3565e500dcc2",
+          "bytes": 3280
+        },
+        "import-codex-drafts.cjs": {
+          "sha256": "30f9134e0d5a5b5420a52e33feec8114ce17fe5e541ee2ee947f52beb1979f64",
+          "bytes": 1869
+        },
+        "index.js": {
+          "sha256": "5a653dd4569ea41dc36cbd2962a737f61d125baa817cb4ea37904439488220a9",
+          "bytes": 55970
+        },
+        "inventory-catalog-service.js": {
+          "sha256": "f1945facaef8cc440c2f55aa5d1d78c6428ae0618dee0f35361e74109bc5fc2b",
+          "bytes": 4813
+        },
+        "inventory-core.js": {
+          "sha256": "5537eb9ffde02bac84dfa7b8c620b15c83a8ef90badc473178a59f6956d3543c",
+          "bytes": 2415
+        },
+        "inventory-service.js": {
+          "sha256": "1fa9162096852416bf327a7abec17877e1741ff2f113ac99d580448231e4237f",
+          "bytes": 9286
+        },
+        "inventory.js": {
+          "sha256": "b03b548d0ca20e8f6937283ce8164f6c39805593795db7f618fd794acb80c8c0",
+          "bytes": 4367
+        },
+        "ladder-auto-settlement.js": {
+          "sha256": "5dbd28e94edd6fd6eaf6f408ff3f5c8ea5f20b58ee40530ec120a4ae5e4b665b",
+          "bytes": 11498
+        },
+        "ladder-settlement-core.js": {
+          "sha256": "9ba05fa0548bd6cb52225c18f8e52d078c70e10be3e6ef7c28a2e676abbf32a6",
+          "bytes": 10630
+        },
+        "mailbox-attachments.js": {
+          "sha256": "3afc6eeb979c44731bad6d3d0d0d229d9af1f454a5ff739352e97e09c0632a5c",
+          "bytes": 5539
+        },
+        "mailbox-core.js": {
+          "sha256": "8c34f25f251047173b4a26e60661e1da18d6eb91d643d6e79a4d1904a3afba1e",
+          "bytes": 1887
+        },
+        "mailbox.js": {
+          "sha256": "2acfb28755afdded4ce282770336ffb753066c0647f774dbc82950c7f21d7684",
+          "bytes": 6355
+        },
+        "migrate-completed.js": {
+          "sha256": "574b481155e2eb220a0ef10d54cf153b224c3c4159171a3c05415904e91659a1",
+          "bytes": 464
+        },
+        "mood-core.js": {
+          "sha256": "73c3c0248030849533103c0358bda05ee09328ffe9b22b4c8932d44f6db56206",
+          "bytes": 1288
+        },
+        "mood-station.js": {
+          "sha256": "c9dd458d2bc94f11bf3d38c2cf49829db509988a6bece6ee9ab8f0b4911b6661",
+          "bytes": 8014
+        },
+        "operations-core.js": {
+          "sha256": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
+          "bytes": 6339
+        },
+        "operations.js": {
+          "sha256": "0b948bdc0a14e2a526e13066a3fc284e348a2e2171def51ae6a79a498bca6500",
+          "bytes": 15320
+        },
+        "package.json": {
+          "sha256": "e2712f55c5da1fa6f9166f7f15499daf90ca4ac00121328d57760e30bc257465",
+          "bytes": 3215
+        },
+        "partner-access-core.js": {
+          "sha256": "5e6fa6387bf47dbdabd08623dd45f3596cae52343b7b6a25d587aaa7e07a7f55",
+          "bytes": 917
+        },
+        "partner-activate-contract.js": {
+          "sha256": "4599802b756a8b3e105732120ab0e6ee593fc8bcf22410619d56e2a50d898500",
+          "bytes": 5338
+        },
+        "partner-contract-core.js": {
+          "sha256": "6644ae44b507d6c2f6ccfc82c5c930f7e8a892b2c674eb78b482512ddea2b0bb",
+          "bytes": 5225
+        },
+        "partner-contracts.js": {
+          "sha256": "14c96c5af45613580e935266fc27651f5f555aef77797b6a5b132430ad75bb79",
+          "bytes": 7492
+        },
+        "partner-plan-catalog.js": {
+          "sha256": "47624681325f23f0ca4428f8795348b9e92ede921e67b7bd8b05d040ca4ce9da",
+          "bytes": 966
+        },
+        "partner-read-contract.js": {
+          "sha256": "37bbefbfbb11a33186b8d277a5f441216606cc92dda67815946f4dfe1a1a5914",
+          "bytes": 1860
+        },
+        "partner-send-contract.js": {
+          "sha256": "6db8a11f7805ef3f6f6ef65de8832b4a89eff9302cf85ec194ca1718bd391d53",
+          "bytes": 3690
+        },
+        "partner-sign-contract.js": {
+          "sha256": "b26a1b85f1b6b18b366013db87a23f682164184ff212d21aa340a62fd51824e2",
+          "bytes": 3821
+        },
+        "partner-signature-evidence.js": {
+          "sha256": "0e4a07e9e8689a6e14232171e5ea1830c2b4eb749d7c6e462ae78394629c6c61",
+          "bytes": 4620
+        },
+        "pioneer.js": {
+          "sha256": "63e1e8902ab804b48810a4611fa040372459ba5a025ff3ad7488c958bc15f994",
+          "bytes": 1224
+        },
+        "player-cards.js": {
+          "sha256": "437592f1ec9052b176bd9ad3cb1cfa8c32bc23d40178e1ac91f4b214ddc05506",
+          "bytes": 7826
+        },
+        "presence-core.js": {
+          "sha256": "b270f855dd12bcd421b486bc329f1c7e597b1619b704034afea7fce34155f345",
+          "bytes": 1483
+        },
+        "presence.js": {
+          "sha256": "3a1e4d4a7521b0a19f3bb925a10dcb04562023213bf5fb651c6e3d3063fffcc5",
+          "bytes": 359
+        },
+        "profile-completion.js": {
+          "sha256": "0ae8464bc81889d05fb6b30ff3d9097619fa108cbe20b33d4c7418f6b8a4fd74",
+          "bytes": 2682
+        },
+        "raffle-core.js": {
+          "sha256": "e6134b67dff4a2c28f627e9690ad402839efd3f6496119e99574711799901be5",
+          "bytes": 5378
+        },
+        "raffle-service.js": {
+          "sha256": "d9e020aced1d80b0fa54628c46bc60cff79b40d75ab13426adfe3d3014dc7d3d",
+          "bytes": 40345
+        },
+        "raffle-ticket-adapter.js": {
+          "sha256": "5eb95d884fb23382d33b46643e3516b5e7929409392ffa26f579db133b9ed8b1",
+          "bytes": 5522
+        },
+        "raffle-ticket-core.js": {
+          "sha256": "03c4ce7743ed84d08d605b07c41c6605ba57b7291637f72496137975f16f4d02",
+          "bytes": 3848
+        },
+        "raffle.js": {
+          "sha256": "364e5386c3fe66cf19e8aabdbc9534c99666a5684059ed400e1918ea40a19da5",
+          "bytes": 1360
+        },
+        "registration-invitations.js": {
+          "sha256": "4025c2ca3115c70aab1bab04be8635ea074c3c565cdec4faabeba8ac0108f1a7",
+          "bytes": 7498
+        },
+        "registration-maintenance.js": {
+          "sha256": "d2379bfee463de2fbf39239ba1b05fe94f90ff3cf0ad45c5f4de6f999cf092aa",
+          "bytes": 3356
+        },
+        "registration-roster-core.js": {
+          "sha256": "326e2a6767b7b91679fcbf2862193f562922e6659f280d27ad5faa8f11131cf4",
+          "bytes": 2160
+        },
+        "registration-roster-sync.js": {
+          "sha256": "77d7d82143fa93a67cd6483a03cca88dbe4b604984b4fe0b77fd215907508226",
+          "bytes": 4522
+        },
+        "registration-selection.js": {
+          "sha256": "c2b5221a3cbd9bcdc455bb36523a05a7bae899d3e06e45699b5f4c6af3760516",
+          "bytes": 16306
+        },
+        "release-controls.js": {
+          "sha256": "f7b2ea90058bf4c817afdb8690d7e0d26c07f35359a059df0f80d910f360d6c2",
+          "bytes": 860
+        },
+        "reward-rules-core.js": {
+          "sha256": "03e0a0515c2930bbb247ef58dd3c2a8de07883a1bb493a3ff6bef9c78d093c70",
+          "bytes": 8930
+        },
+        "reward-rules-engine.js": {
+          "sha256": "ea492bd8817b0234b608a911e49c4902de406b26207a5faa02d08359a93f07d4",
+          "bytes": 6739
+        },
+        "reward-rules-service.js": {
+          "sha256": "157cfcbd6a54471d59c242df57566dea7c1d3594f29c2ac1cdb349bbcb169b01",
+          "bytes": 5531
+        },
+        "reward-rules.js": {
+          "sha256": "c60762e42ed1e4855bd53b38523d15038568074f4c06d5bd5d3f16a2d1dab82f",
+          "bytes": 1030
+        },
+        "room-access-core.js": {
+          "sha256": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+          "bytes": 2337
+        },
+        "room-access-service.js": {
+          "sha256": "7e50ce14aec91c3abd7fb238b0a3294de8a6a51d3f3cd33d489f95c42d2ff323",
+          "bytes": 5448
+        },
+        "room-access.js": {
+          "sha256": "8d52dbefd075d939a67775898ccef0bc86349bacaba444c5b49bfa33235d50d3",
+          "bytes": 849
+        },
+        "room-poster-cover.js": {
+          "sha256": "dd8f9175cb23d1d094fdd6c0853b08dcc72868eb2601bbe87cb7d10a0b69c37b",
+          "bytes": 4082
+        },
+        "test-support/transaction-db.js": {
+          "sha256": "b3247f81799273e4b6018854c16f933522bbd7253cb46c2e65759312060d14c0",
+          "bytes": 7402
+        }
+      }
+    },
+    {
+      "name": "settleLadderTournament",
+      "updateTime": "2026-09-21T14:13:28.975848286Z",
+      "entryPoint": "settleLadderTournament",
+      "sourceGeneration": "1789999963356023",
+      "files": {
+        "accounts-core.js": {
+          "sha256": "1bdb93dc23792e907c60bb7093a51bb7a4e71f8d40ec7c14a2a024ebba47db78",
+          "bytes": 3061
+        },
+        "accounts.js": {
+          "sha256": "61e2811842f0cefe1e0ef49c1073da7fdb43a92c71591b408ffc8e502131a3dd",
+          "bytes": 2091
+        },
+        "activity-points.js": {
+          "sha256": "3deb0bbe3081085c0ac157895ea734007b52447cfe18e5c0b4dfb52cd57a0f5d",
+          "bytes": 7243
+        },
+        "court-call-core.js": {
+          "sha256": "1653ac015117e69ae63e5ee8f8559fd0a788b92cd1edb5f216f54d649e801c67",
+          "bytes": 3165
+        },
+        "court-call-service.js": {
+          "sha256": "f9ede2be93ae234fcab135662678cc44e573498c1248355f851c80e9be78ef8f",
+          "bytes": 7683
+        },
+        "court-call.js": {
+          "sha256": "8e13d3dfa9dcbf5331b25d835bd3ca6a557b728e7e42ac9f7ad22be5aa236e78",
+          "bytes": 897
+        },
+        "entry-selection.js": {
+          "sha256": "7b4494b344bfc76d62d4aa19946a95639b0d3df89deff1333516e6a429dfbfde",
+          "bytes": 5271
+        },
+        "family-registration.js": {
+          "sha256": "02b4263c5ade41391815c82d5d1eccf9fa49f5d313cd35abf6cb5cccaf967d89",
+          "bytes": 10129
+        },
+        "family-service.js": {
+          "sha256": "e7885adbc6f96f6fc97cbcad64c0f6b3e9ba596463d8a4b76a851ed104128bf0",
+          "bytes": 4270
+        },
+        "family.js": {
+          "sha256": "9e09363e36433f58c0b05a8073ae3e6fbd494364d8cbe6cb733a752da74cad22",
+          "bytes": 2029
+        },
+        "hosting-core.js": {
+          "sha256": "8f904bbfc58b2b1e50c0bce9b989be5790a5e3d1dccca2850bac9db868f31951",
+          "bytes": 1224
+        },
+        "hosting.js": {
+          "sha256": "051434ba81773ea581dc40f8e13a4cbc80252275c8695130449f3565e500dcc2",
+          "bytes": 3280
+        },
+        "index.js": {
+          "sha256": "35a28f097d1fcfaffd7aa9897f39532d7c38651932253023344acd14c0ba5a06",
+          "bytes": 61730
+        },
+        "inventory-core.js": {
+          "sha256": "c9d859ec30bd8e44594e3ae1bc383762cf018566a95dbe4840ae55c8142081c8",
+          "bytes": 2204
+        },
+        "inventory-service.js": {
+          "sha256": "a75979b4d3ccc10265070411d3395052b2a69736c553a2ca052d1d13fb6be45c",
+          "bytes": 4238
+        },
+        "inventory.js": {
+          "sha256": "ff1ab3708fca8f23dd78267ad7d398e7b4a4990922aff849914364a3d1cb1afa",
+          "bytes": 1087
+        },
+        "ladder-settlement.js": {
+          "sha256": "3ea58fe50263ed20e2d7fa7e2415d83b44a28b80d75ee84dc05bc515def95d29",
+          "bytes": 16437
+        },
+        "ladder-v1.js": {
+          "sha256": "acc793297324e78cf1a0363d6c63834690a333c7300e9bba798add6418191d11",
+          "bytes": 5350
+        },
+        "mailbox-core.js": {
+          "sha256": "8c34f25f251047173b4a26e60661e1da18d6eb91d643d6e79a4d1904a3afba1e",
+          "bytes": 1887
+        },
+        "mailbox.js": {
+          "sha256": "13247377e11b634eb25d9f31bffa2ac2594acaff6863d6c6f12bbfaacb74ebc7",
+          "bytes": 6138
+        },
+        "migrate-completed.js": {
+          "sha256": "574b481155e2eb220a0ef10d54cf153b224c3c4159171a3c05415904e91659a1",
+          "bytes": 464
+        },
+        "mood-core.js": {
+          "sha256": "73c3c0248030849533103c0358bda05ee09328ffe9b22b4c8932d44f6db56206",
+          "bytes": 1288
+        },
+        "mood-station.js": {
+          "sha256": "431b665f5618f1f8fc8590d1df4f8b53fc8545047a951a6824d940a9a404a014",
+          "bytes": 3546
+        },
+        "operations-core.js": {
+          "sha256": "87db6a51c6d218ee861b3c5f39a59dbfb58514b401cd253047f6deca43473705",
+          "bytes": 4734
+        },
+        "operations.js": {
+          "sha256": "2810eb1d1234cf93859e1c1c76ed68567300dac069d08a657dc1ee204836540d",
+          "bytes": 14739
+        },
+        "package.json": {
+          "sha256": "58cef3cf37167ae65e122030cf72777a74fb83baef46ced8836682906b0445e7",
+          "bytes": 1642
+        },
+        "pioneer.js": {
+          "sha256": "63e1e8902ab804b48810a4611fa040372459ba5a025ff3ad7488c958bc15f994",
+          "bytes": 1224
+        },
+        "player-cards.js": {
+          "sha256": "437592f1ec9052b176bd9ad3cb1cfa8c32bc23d40178e1ac91f4b214ddc05506",
+          "bytes": 7826
+        },
+        "presence-core.js": {
+          "sha256": "b270f855dd12bcd421b486bc329f1c7e597b1619b704034afea7fce34155f345",
+          "bytes": 1483
+        },
+        "presence.js": {
+          "sha256": "3a1e4d4a7521b0a19f3bb925a10dcb04562023213bf5fb651c6e3d3063fffcc5",
+          "bytes": 359
+        },
+        "profile-completion.js": {
+          "sha256": "0ae8464bc81889d05fb6b30ff3d9097619fa108cbe20b33d4c7418f6b8a4fd74",
+          "bytes": 2682
+        },
+        "raffle-core.js": {
+          "sha256": "11ed734c59fd6ed779fc2a89e7783152b4fd9ba42d0aab089009e2c6be28e92d",
+          "bytes": 4952
+        },
+        "raffle-service.js": {
+          "sha256": "15b1795c58b8fcf60f1ac352d96e5fe545e41da7a1e829b7b11a0aa6dd746601",
+          "bytes": 28383
+        },
+        "raffle.js": {
+          "sha256": "6e56c4f0208782f91150676607af8a7f38755e9e0e145ddba9096242c9db12e8",
+          "bytes": 1339
+        },
+        "registration-invitations.js": {
+          "sha256": "4025c2ca3115c70aab1bab04be8635ea074c3c565cdec4faabeba8ac0108f1a7",
+          "bytes": 7498
+        },
+        "registration-selection.js": {
+          "sha256": "8748e7feb109f0b606c3d9b0877b3af823cb0228f88163bab44640472e71c7dd",
+          "bytes": 16010
+        },
+        "release-controls.js": {
+          "sha256": "b24472b7827f652086427e0be3fbfb0cce0ca8bfc3027d30eb452efb2d37a0cc",
+          "bytes": 463
+        },
+        "s0-migrate.js": {
+          "sha256": "4fa58cb16fd65c9b946be2ee5e970407da293f842db3200b9a3788e571a21ade",
+          "bytes": 11766
+        }
+      }
+    },
+    {
+      "name": "cleanupExpiredCommunityRooms",
+      "updateTime": "2026-10-07T06:51:06.748736835Z",
+      "entryPoint": "cleanupExpiredCommunityRooms",
+      "sourceGeneration": "1791355806512161",
+      "files": {
+        "accounts-core.js": {
+          "sha256": "1bdb93dc23792e907c60bb7093a51bb7a4e71f8d40ec7c14a2a024ebba47db78",
+          "bytes": 3061
+        },
+        "accounts.js": {
+          "sha256": "61e2811842f0cefe1e0ef49c1073da7fdb43a92c71591b408ffc8e502131a3dd",
+          "bytes": 2091
+        },
+        "community-cleanup-audit.js": {
+          "sha256": "d762529d67d1796d549a5639ff5b8b322ccf3545a4af22532751513d92a6e9a1",
+          "bytes": 744
+        },
+        "community-cleanup-engine.js": {
+          "sha256": "4284cc07007d22222afb05d5af92a549031d9c5591df31dba30e336c8d40f283",
+          "bytes": 3207
+        },
+        "community-cleanup-pass.js": {
+          "sha256": "eda87c03bcbfeb31cdbf54731594708119d2f065b7754aa54e7527346c165825",
+          "bytes": 1465
+        },
+        "community-cleanup-policy.js": {
+          "sha256": "aee177db1b4e3289a8f30a94c653df6e57838e84e47069893f198de4fc1cad2e",
+          "bytes": 4413
+        },
+        "entry-selection.js": {
+          "sha256": "7b4494b344bfc76d62d4aa19946a95639b0d3df89deff1333516e6a429dfbfde",
+          "bytes": 5271
+        },
+        "hosting-core.js": {
+          "sha256": "8f904bbfc58b2b1e50c0bce9b989be5790a5e3d1dccca2850bac9db868f31951",
+          "bytes": 1224
+        },
+        "hosting.js": {
+          "sha256": "5f5ac055e4218e81e4d475f6c222fef2d47a0909a7a2e46fcf5ea6cf07668698",
+          "bytes": 3174
+        },
+        "index.js": {
+          "sha256": "fa1f6b94e029b8e637f29c2a870cce81548ee4e1302ea847a6d530f4babde483",
+          "bytes": 50973
+        },
+        "migrate-completed.js": {
+          "sha256": "574b481155e2eb220a0ef10d54cf153b224c3c4159171a3c05415904e91659a1",
+          "bytes": 464
+        },
+        "operations-core.js": {
+          "sha256": "87db6a51c6d218ee861b3c5f39a59dbfb58514b401cd253047f6deca43473705",
+          "bytes": 4734
+        },
+        "operations.js": {
+          "sha256": "9b2e600bd3835d2119d25c5c4e9f506723198ca44a332a924786781f2f472ce1",
+          "bytes": 14633
+        },
+        "package.json": {
+          "sha256": "6074e7dfd5f1bbdf503034e2043d3e5faa7d53e6f5bdcade0ba02cb774333d24",
+          "bytes": 687
+        },
+        "player-cards.js": {
+          "sha256": "437592f1ec9052b176bd9ad3cb1cfa8c32bc23d40178e1ac91f4b214ddc05506",
+          "bytes": 7826
+        },
+        "registration-selection.js": {
+          "sha256": "8748e7feb109f0b606c3d9b0877b3af823cb0228f88163bab44640472e71c7dd",
+          "bytes": 16010
+        }
+      }
     }
   ],
-  "auditRunId": 38931467343,
-  "artifactId": 12058339650
+  "auditRunId": 38932368893,
+  "artifactId": 12059886493
 }

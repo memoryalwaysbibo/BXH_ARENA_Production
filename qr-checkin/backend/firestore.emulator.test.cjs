@@ -27,6 +27,21 @@ async function seed(){
  const token=signToken(code,'s1',Date.now(),secret);
  return {code,ref,pub,token,scan:uid=>handle({auth:{uid},data:{action:'scan',code,token}}),command:data=>handle({auth:{uid:'manager'},data:{code,...data}})};
 }
+async function seedOnsite(){
+ const x=await seed(),t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ const common={capacity:3,confirmedCount:2,waitlistCount:1,registrationStatus:'closed',onsiteWaitlistDrawEnabled:true,onsiteWaitlistServerOwned:true,onsiteWaitlistRuntimeRevision:1,qrCheckinManaged:true,qrCheckinRevision:1};
+ Object.assign(s,{qrCheckinManaged:true,qrCheckinRevision:1,onsiteWaitlistServerOwned:true,onsiteWaitlistRuntimeRevision:1,waitlistPlayers:[{id:'p3',name:'備取丙',registrationId:'r3',registrationUid:'u3',source:'online',checkedIn:false}]});
+ s.players=s.players.map(p=>({...p,source:'online'}));s.meta.registrationCapacity=3;
+ const batch=db.batch();
+ batch.update(x.ref,{...common,data:JSON.stringify(s),onsiteWaitlistDraw:{enabled:true,status:'open',revision:1,roundNumber:0}});
+ batch.update(x.pub,{...common,bracketView:JSON.stringify({meta:{},players:s.players.map(p=>({id:p.id,name:p.name,checkedIn:false})),onsiteWaitlistServerOwned:true,onsiteWaitlistRuntimeRevision:1})});
+ batch.set(x.ref.collection('registrations').doc('r3'),{uid:'u3',status:'waitlist',displayName:'備取丙',waitRank:1});
+ batch.set(db.doc('users/u3'),{role:'player',active:true});
+ batch.update(db.doc('systemConfig/qrCheckin'),{onsiteIntegrationVerified:true});await batch.commit();
+ const O=require('./onsite/core.cjs'),{FirestoreStore}=require('./onsite/firestore-store.cjs'),{FieldValue}=require('firebase-admin/firestore');
+ const run=O.createOnsiteWaitlistService({store:new FirestoreStore(db,FieldValue),enabled:true});
+ return {...x,legacy:data=>run({auth:{uid:'manager'},data:{code:x.code,...data}})};
+}
 test('four concurrent scans of one player commit one audit and one receipt',async()=>{
  const x=await seed();const rs=await Promise.all(Array.from({length:4},()=>x.scan('u1')));
  assert.equal(rs.filter(r=>!r.already).length,1);assert.equal(new Set(rs.map(r=>r.firstAt)).size,1);
@@ -189,5 +204,80 @@ test('event staff authorization is rechecked against the parent within each requ
  assert.equal((await handle(request)).ok,true);
  await db.doc('users/organizer').update({'partnerOrganizer.status':'revoked'});
  await assert.rejects(handle({...request,data:{...request.data,playerId:'p2',operationId:'helper-operation-002'}}),/permission-denied/);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
+test('onsite confirmed scan and duplicate use the original draw counters without promotion',async()=>{
+ const x=await seedOnsite();const first=await x.scan('u1'),again=await x.scan('u1');
+ assert.equal(again.already,true);assert.equal(again.firstAt,first.firstAt);
+ const t=(await x.ref.get()).data(),p=(await x.pub.get()).data(),s=JSON.parse(t.data);
+ assert.equal(t.onsiteWaitlistDraw.revision,2);assert.equal(t.onsiteWaitlistRuntimeRevision,2);assert.equal(p.onsiteWaitlistRuntimeRevision,2);
+ assert.equal(t.qrCheckinRevision,2);assert.equal(p.qrCheckinRevision,2);
+ assert.equal(s.players[0].checkedIn,true);assert.equal(s.waitlistPlayers.length,1);
+ assert.equal((await x.ref.collection('registrations').doc('r3').get()).data().status,'waitlist');
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);assert.equal((await x.ref.collection('onsiteWaitlistOperations').get()).size,1);
+ await assert.rejects(x.scan('u3'),/not-confirmed/);
+});
+test('onsite manual revoke, replay and recheck share the same first-time ledger',async()=>{
+ const x=await seedOnsite();
+ const manual={action:'checkIn',playerId:'p1',checkedIn:true,operationId:'onsite-manual-001',expectedRevision:1};
+ await x.legacy(manual);const first=(await x.command({action:'history'})).records[0];
+ await x.legacy({...manual,checkedIn:false,operationId:'onsite-revoke-001',expectedRevision:2});
+ assert.equal((await x.legacy(manual)).replayed,true);
+ assert.equal(JSON.parse((await x.ref.get()).data().data).players[0].checkedIn,false);
+ await x.scan('u1');const records=(await x.command({action:'history'})).records;
+ assert.equal(records.length,3);assert.equal(records.find(r=>r.action==='scan').firstAt,first.firstAt);
+ assert.equal(first.actorUid,'manager');assert.equal(first.accountUid,'u1');
+ assert.equal((await x.ref.get()).data().qrCheckinRevision,4);
+});
+test('concurrent onsite manual check-in and scan never create duplicate attendance audits',async()=>{
+ const x=await seedOnsite();
+ const results=await Promise.allSettled([x.scan('u1'),x.legacy({action:'checkIn',playerId:'p1',checkedIn:true,operationId:'onsite-concurrent-001',expectedRevision:1})]);
+ assert.equal(results[0].status,'fulfilled');
+ if(results[1].status==='rejected')assert.match(results[1].reason.message,/stale-revision/);
+ const t=(await x.ref.get()).data();assert.equal(JSON.parse(t.data).players[0].checkedIn,true);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);assert.equal((await x.ref.collection('checkinReceipts').get()).size,1);
+ assert.equal(t.qrCheckinRevision,2);
+});
+test('onsite capacity changes preserve QR attendance and update the returned canonical roster',async()=>{
+ const x=await seedOnsite();await x.scan('u1');
+ const result=await x.legacy({action:'increaseCapacity',capacity:4,operationId:'onsite-capacity-001',expectedRevision:2});
+ assert.equal(result.canonicalState.players[0].checkedIn,true);assert.equal(result.canonicalState.qrCheckinRevision,3);
+ assert.equal(result.state.participants.find(p=>p.playerId==='p1').checkedIn,true);
+ const t=(await x.ref.get()).data(),p=(await x.pub.get()).data();assert.equal(t.qrCheckinRevision,3);assert.equal(p.qrCheckinRevision,3);
+ assert.equal(t.capacity,4);assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
+test('finalized draw still accepts confirmed scans while keeping the frozen draw snapshot unchanged',async()=>{
+ const x=await seedOnsite();let preview=await x.legacy({action:'preview'});
+ await x.legacy({action:'close',candidateHash:preview.candidateHash,operationId:'onsite-close-001',expectedRevision:1});
+ preview=await x.legacy({action:'preview'});
+ await x.legacy({action:'finalize',candidateHash:preview.candidateHash,operationId:'onsite-finalize-001',expectedRevision:2});
+ const before=(await x.ref.get()).data(),snapshot=JSON.stringify(before.onsiteWaitlistDraw.finalization);
+ assert.equal((await x.scan('u1')).ok,true);
+ const after=(await x.ref.get()).data(),pub=(await x.pub.get()).data();
+ assert.equal(JSON.stringify(after.onsiteWaitlistDraw.finalization),snapshot);assert.equal(after.onsiteWaitlistDraw.revision,before.onsiteWaitlistDraw.revision);
+ assert.equal(after.onsiteWaitlistRuntimeRevision,before.onsiteWaitlistRuntimeRevision+1);assert.equal(pub.onsiteWaitlistRuntimeRevision,after.onsiteWaitlistRuntimeRevision);
+ assert.equal(JSON.parse(after.data).players[0].checkedIn,true);assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
+test('onsite QR stop and restart advance runtime mirrors without altering the draw round',async()=>{
+ const x=await seedOnsite();await x.command({action:'configure',enabled:false});await assert.rejects(x.scan('u1'),/checkin-closed/);
+ await x.command({action:'configure',enabled:true});const status=await x.command({action:'status'});
+ assert.equal(status.enabled,true);await handle({auth:{uid:'u1'},data:{action:'scan',code:x.code,token:status.token}});
+ const t=(await x.ref.get()).data(),pub=(await x.pub.get()).data();
+ assert.equal(t.onsiteWaitlistDraw.revision,2);assert.equal(t.onsiteWaitlistRuntimeRevision,4);assert.equal(pub.onsiteWaitlistRuntimeRevision,4);assert.equal(t.qrCheckinRevision,4);
+});
+test('onsite mirror inconsistency rolls back every receipt, operation and audit',async()=>{
+ const x=await seedOnsite();await x.pub.update({onsiteWaitlistRuntimeRevision:2});const before=(await x.ref.get()).data();
+ await assert.rejects(x.scan('u1'),/registration-state-conflict/);assert.deepEqual((await x.ref.get()).data(),before);
+ for(const collection of ['checkinReceipts','checkinAudit','onsiteWaitlistOperations'])assert.equal((await x.ref.collection(collection).get()).size,0);
+});
+test('onsite verification cannot be enabled from a scan payload or bypassed by legacy manual check-in',async()=>{
+ const x=await seedOnsite();await db.doc('systemConfig/qrCheckin').update({onsiteIntegrationVerified:false});const before=(await x.ref.get()).data();
+ await assert.rejects(handle({auth:{uid:'u1'},data:{action:'scan',code:x.code,token:x.token,onsiteReady:true,onsiteIntegrationVerified:true}}),/onsite-integration-required/);
+ await assert.rejects(x.legacy({action:'checkIn',playerId:'p1',checkedIn:true,operationId:'onsite-disabled-001',expectedRevision:1}),/onsite-integration-required/);
+ assert.deepEqual((await x.ref.get()).data(),before);assert.equal((await x.ref.collection('checkinAudit').get()).size,0);
+});
+test('mismatched QR mirror revision is rejected before any new check-in writes',async()=>{
+ const x=await seed();await x.scan('u1');await x.pub.update({qrCheckinRevision:99});const before=(await x.ref.get()).data();
+ await assert.rejects(x.scan('u2'),/checkin-state-stale/);assert.deepEqual((await x.ref.get()).data(),before);
  assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
 });

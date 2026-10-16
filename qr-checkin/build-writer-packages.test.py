@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import json
 import pathlib
+import re
 import tempfile
 import unittest
 
@@ -57,6 +58,31 @@ class PackageTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'refusing to overwrite'):
             builder.build(self.source, self.output)
         self.assertEqual((self.output / 'keep').read_text(), 'keep')
+
+    def test_onsite_package_resolves_shared_audit_helpers_and_keeps_native_transactions(self):
+        manifest = json.loads(self.pin.read_text())
+        files = {}
+        for name, raw in [('index.js', b"const {getFirestore}=require('firebase-admin/firestore');"), ('onsite-waitlist/core.js', b'// original core'), ('onsite-waitlist/firestore-store.js', b'// original store')]:
+            p = self.source / 'manageOnsiteWaitlist' / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(raw)
+            files[name] = {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+        manifest['functions'].append({'name': 'manageOnsiteWaitlist', 'sourceGeneration': '3', 'files': files})
+        self.pin.write_text(json.dumps(manifest))
+        builder.PIN_HASH = hashlib.sha256(self.pin.read_bytes()).hexdigest()
+        before = builder.ONSITE_SOURCE_HASHES
+        self.addCleanup(lambda: setattr(builder, 'ONSITE_SOURCE_HASHES', before))
+        builder.ONSITE_SOURCE_HASHES = {n: e['sha256'] for n, e in files.items() if n != 'index.js'}
+        builder.build(self.source, self.output)
+        package = self.output / 'manageOnsiteWaitlist'
+        self.assertIn("require('firebase-admin/firestore')", (package / 'index.js').read_text())
+        self.assertIn('await prepare(', (package / 'onsite-waitlist/firestore-store.js').read_text())
+        for p in package.rglob('*'):
+            if p.suffix not in ('.js', '.cjs'):
+                continue
+            for name in re.findall(r"require\(['\"](\.[^'\"]+)['\"]\)", p.read_text()):
+                target = p.parent / name
+                self.assertTrue(target.is_file() or target.with_suffix('.js').is_file(), str(target))
 
 
 if __name__ == '__main__':

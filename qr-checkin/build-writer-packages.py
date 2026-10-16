@@ -14,8 +14,12 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent
 PIN = ROOT / 'reference/backend-sources-20261016.json'
-PIN_HASH = '36efa74d9b03ababaf2dafd1afc4a0aa3b4f72c889e5d06eda9fdb3dbcc63504'
+PIN_HASH = 'c5660b5980c62a7ebb53aed7a0860d0c01d0e3cc81458359d81633206fb38fb0'
 ADMIN = re.compile(r"require\((['\"])firebase-admin/firestore\1\)")
+ONSITE_SOURCE_HASHES = {
+    'onsite-waitlist/core.js': 'ded4853ec976cdac18bfe0603c9fcca73faeb4e1ebabf3755d8f1615c15b3b82',
+    'onsite-waitlist/firestore-store.js': '5dc921853c45912b77c869854384a2b3b9acc8e05d12427e1f67558b42e4b9d2',
+}
 
 
 def build(source, output):
@@ -28,6 +32,8 @@ def build(source, output):
     inputs = []
     for service in manifest['functions']:
         for name, expected in service['files'].items():
+            if service['name'] == 'manageOnsiteWaitlist' and name in ONSITE_SOURCE_HASHES and expected['sha256'] != ONSITE_SOURCE_HASHES[name]:
+                raise ValueError('Onsite source changed; rebase integration before packaging')
             relative = pathlib.PurePosixPath(service['name'], name)
             path = source / relative
             if '..' in relative.parts or not path.resolve().is_relative_to(source):
@@ -47,11 +53,19 @@ def build(source, output):
             dest.parent.mkdir(parents=True, exist_ok=True)
             if dest.suffix in ('.js', '.cjs'):
                 text = content.decode('utf8')
+                is_onsite = relative.parts[0] == 'manageOnsiteWaitlist'
+                local_name = str(pathlib.PurePosixPath(*relative.parts[1:]))
+                if is_onsite and local_name == 'onsite-waitlist/core.js':
+                    text = (ROOT / 'backend/onsite/core.cjs').read_text()
+                if is_onsite and local_name == 'onsite-waitlist/firestore-store.js':
+                    text = (ROOT / 'backend/onsite/firestore-store.cjs').read_text().replace("require('./core.cjs')", "require('./core')").replace("require('../onsite-commit.cjs')", "require('../_qr_checkin/onsite-commit.cjs')")
                 shim = pathlib.Path(relative.parts[0], '_qr_checkin/admin-firestore.cjs')
                 link = os.path.relpath(shim, relative.parent).replace(os.sep, '/')
                 if not link.startswith('.'):
                     link = './' + link
-                text, count = ADMIN.subn(lambda _: 'require(' + json.dumps(link) + ')', text)
+                # The onsite store handles intentional audited attendance itself.
+                # A generic preservation wrapper would undo that valid mutation.
+                text, count = (text, 0) if is_onsite else ADMIN.subn(lambda _: 'require(' + json.dumps(link) + ')', text)
                 if count:
                     changes[relative.parts[0]].append({'path': str(pathlib.PurePosixPath(*relative.parts[1:])), 'importsWrapped': count})
                 content = text.encode('utf8')
@@ -67,13 +81,18 @@ module.exports={...admin,getFirestore:(...args)=>guardFirestore(admin.getFiresto
             (dest / 'admin-firestore.cjs').write_text(shim_source)
             for name in ('guard-firestore.cjs', 'qr-checkin-fence.cjs'):
                 (dest / name).write_bytes((ROOT / 'backend' / name).read_bytes())
+            if service['name'] == 'manageOnsiteWaitlist':
+                for name in ('core.cjs', 'event-staff-core.cjs'):
+                    (dest / name).write_bytes((ROOT / 'backend' / name).read_bytes())
+                text = (ROOT / 'backend/onsite-commit.cjs').read_text().replace("require('./onsite/core.cjs')", "require('../onsite-waitlist/core')")
+                (dest / 'onsite-commit.cjs').write_text(text)
         report = {
             'kind': 'REVIEW_ONLY_NOT_DEPLOYABLE', 'deploymentReady': False,
             'project': manifest['project'], 'sourceAuditRunId': manifest['auditRunId'],
             'missingServices': manifest.get('missingServices', []),
             'verifiedSourceFiles': len(inputs),
             'unresolved': ['direct and batch writers require coverage review',
-                           'onsite checkIn must use the shared immutable audit',
+                           'onsite integration requires its additional server rollout flag and regression validation',
                            'each actual handler requires emulator regression coverage'],
             'services': [{'name': f['name'], 'sourceGeneration': f['sourceGeneration'],
                           'wrappedImports': changes[f['name']]} for f in manifest['functions']],
