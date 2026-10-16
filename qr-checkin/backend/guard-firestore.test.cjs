@@ -23,3 +23,17 @@ test('unmanaged room writes retain existing fields and no QR revision is added',
 test('guard is idempotent and unrelated collections are unaffected',async()=>{
  const x=fixture();assert.equal(guardFirestore(x.db),x.db);await x.db.runTransaction(async tx=>tx.set(x.db.doc('other/path'),{value:1}));assert.deepEqual(x.docs.get('other/path'),{value:1});
 });
+test('public-only projection cannot erase attendance in a managed room',async()=>{
+ const x=fixture(),before=JSON.stringify([...x.docs]);
+ await assert.rejects(x.db.runTransaction(async tx=>{const pr=x.db.doc('publicTournaments/BXH-TEST01');await tx.get(pr);tx.update(pr,{bracketView:JSON.stringify({players:[]})});}),/paired-write-required/);
+ assert.equal(JSON.stringify([...x.docs]),before);
+});
+test('metadata-only public update leaves existing attendance intact',async()=>{
+ const x=fixture();await x.db.runTransaction(async tx=>tx.update(x.db.doc('publicTournaments/BXH-TEST01'),{updatedAt:2}));
+ assert.equal(JSON.parse(x.docs.get('publicTournaments/BXH-TEST01').bracketView).players[0].checkedIn,true);
+});
+test('managed root cannot be deleted through an ordinary transaction',async()=>{
+ const x=fixture(),before=JSON.stringify([...x.docs]);
+ await assert.rejects(x.db.runTransaction(async tx=>{const tr=x.db.doc('tournaments/BXH-TEST01');await tx.get(tr);tx.delete(tr);}),/audited-delete-required/);
+ assert.equal(JSON.stringify([...x.docs]),before);
+});

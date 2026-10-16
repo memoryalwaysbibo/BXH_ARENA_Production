@@ -1,59 +1,54 @@
 # ARENA 正取 QR 報到候選版
 
-狀態：整合中的候選程式，GitHub 草稿 PR #517（https://github.com/memoryalwaysbibo/BXH_ARENA_Production/pull/517）。已推送開發分支 feature/qr-checkin-20261016，尚未合併、部署或啟用。
+草稿 PR：https://github.com/memoryalwaysbibo/BXH_ARENA_Production/pull/517
 
-## 已實作
+此功能尚未合併、部署或啟用。`systemConfig/qrCheckin` 預設不存在即拒絕所有操作；不能以設定 `writerGuardsVerified=true` 代替實際整合。
 
-- 人員管理新增「現場報到 QR／紀錄」窗口。
-- 開始／停止報到、QR 全螢幕、每 45 秒更新 QR，簽章有效 90 秒。
-- 正取選手登入後掃碼直接報到，不再按確認；伺服器重新核對帳號與最新正取／報名狀態。
-- 備取不能自行報到；工作人員先移入正取，再人工或掃碼報到。本服務不自行升正取。
-- 紀錄選手、帳號、賽事／房號、伺服器時間、QR／人工、操作人；撤銷與重報另留稽核。
-- 重複掃描傳回原時間，不新增稽核、不覆蓋首次時間。
-- 查閱最近 100 筆異動。所有資料留在後端，並非僅保留 100 筆。
-- 非帳號選手由工作人員人工處理；家庭代報及帳號對應多名選手暫交人工，防止代掃到另一名子女。
-- 新版前端共用交易保存入口增加 QR revision 檢查：落後畫面不能保存；同版保存保留伺服器報到欄位。已接入 cloud-runtime 原有共用寫入保護流程。
-- 附 Firestore Rules 條件草案，要求雙份賽事鏡像一起推進 revision；尚未套用至正式完整 Rules。
+## 功能
 
-## 尚未完成，禁止啟用的原因
+- 人員管理中的「現場報到 QR／紀錄」窗口，可開始、停止、全螢幕及查看最近 100 筆異動；後端保留全部紀錄。
+- QR 每 45 秒更新，簽章有效 90 秒。選手登入後掃碼直接報到，伺服器重新檢查當前正取池與已連結報名的最新狀態。
+- 備取不得自助報到。工作人員先移入正取，再人工或掃碼報到；報到服務本身不會升正取。
+- 記錄選手、帳號、賽事／房號、伺服器時間、方式、操作人。重複掃描返回原時間，不重複寫入稽核；撤銷與重新報到保留首次時間和異動歷史。
+- 無帳號、家庭代報及一個帳號對應多名選手，交由工作人員人工處理，避免代掃錯人。
+- 權限使用現行部署的活動工作人員授權模型：接受邀請且上層主辦仍有有效授權；每次交易重讀角色、房間指派及上層資料。
+- 前端保存入口保留伺服器報到欄位，並拒絕過期 revision。候選完整 Rules 要求原有角色權限及兩份賽事文件的 revision 同步推進，禁止客戶端直接存取稽核、receipt、operation。
 
-正式 Functions 儲存庫 main 未包含現行完整 functions 原始碼；不同功能散落獨立部署分支。已於 2026-10-16 重新取得 12 個部署函式的原始碼雜湊盤點，並找到 syncRegistrationRoster／backfillRegistrationRoster 使用的完全相符原始檔，以及數個其他獨立部署套件中的舊版本。仍未取得所有線上寫入者完整且一致的原始碼集。
+## 實際來源與整合
 
-1. 取得正在運作的 Functions 原始碼、Firestore Rules 與各函式實際版本，核對管理員、活動工作人員、合作主辦及上層授權失效規則。本候選權限模型尚未驗證所有正式角色。
-2. 將 `preserveCheckins(nextState, receipts)` 接入所有既有伺服器名單／賽事寫入者，在交易內讀取完整 checkinReceipts 並合併。現在只有輔助函式及單元測試，尚未接入線上寫入者。
-3. 新版前端共用交易入口已增加 revision 與報到欄位保留邏輯，並有真實 cloud-runtime 方法的記憶體 stub 測試。仍需將 firestore.rules.fragment 合入實際生效的完整 Rules，盤點未經共用入口的客戶端寫入、既有伺服器寫入，以及單文件修復／刪除路徑。未完成前不能只發布 UI 或 Callable。
-4. 加入 `checkinReceipts`、`checkinAudit`、`checkinOperations` 專用集合規則：前端不能直接新增／修改／刪除，讀取仍需活動管理權限；檢查廣域 match 不會繞過。
-5. 現場抽籤使用另一組 server-owned revision／凍結名單，本候選目前明確拒絕這類房間。需整合原本 manageOnsiteWaitlist.checkIn 後才可支援。
-6. Firestore Emulator 驗證真實交易並行、鏡像、規則及舊畫面覆寫；真機測試登入返回、手機掃描、跨帳號、多人同掃、讀回失敗。雲端已通過 8 個 Playwright 瀏覽器情境（mock 後端）與 9 個真正 Firestore Emulator 交易情境。這些驗證不涵蓋合併正式 Rules、App Check HTTP 端點、現場抽籤整合或手機真機驗收。
+已取回 13 個現行部署服務的 889 個來源檔，逐檔核對 SHA-256 與大小。來源世代、雜湊及取得批次記於 `reference/backend-sources-20261016.json`；Firestore Rules 的原始版本與雜湊也已固定。
 
-## 後端整合方式（完成上述項目後）
+`build-writer-packages.py --sources <來源目錄> --output <新目錄>` 逐一驗證全部來源後，才原子產生候選套件。各服務保留自己的部署版本；包裝其 Admin SDK Firestore 入口，接入 `backend/guard-firestore.cjs`。輸出明確標記 `REVIEW_ONLY_NOT_DEPLOYABLE`，不是部署授權或覆蓋率證明。來源不符或輸出已存在即拒絕。
 
-- 將 backend/core.cjs 與 backend/firebase-callable.cjs 放進正式 Functions source 的同一個子目錄，入口匯出 tournamentCheckin。先初始化 Admin SDK，再 require 此匯出。
-- 使用 Secret Manager 提供隨機且私密的 QR_CHECKIN_SIGNING_KEY；不得放入前端、ZIP 或 Git。
-- Callable 使用 Firebase Authentication、App Check、asia-east1。前端已接入既有 tournamentOperation 與 App Check 路徑。
-- 正式 writer guards、權限及 Emulator 全數驗證完成後，才可設定 systemConfig/qrCheckin：enabled=true、writerGuardsVerified=true、roomCodes=[明確允許的測試房號]。預設不存在或缺任一條件均拒絕。
-- 先單一測試房驗收，再擴大房號清單。不能用 writerGuardsVerified=true 取代實際整合。
+目前保護器涵蓋交易內的名單儲存：保留目前報到欄位、同步私人／公開 revision、拒絕單邊投影與一般交易刪除。已用現行 `registrationRosterService` 與核對過來源的名單同步函式進行 Emulator 整合驗證。
 
-## 驗證
+## 上線前剩餘工作
 
-執行 `node --test qr-checkin/backend/core.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs`。
+1. 各服務真實 handler 的寫入路徑與回傳值逐一回歸；直接 document、batch 及刪除修復路徑尚未完整覆蓋，不能把一般交易包裝器視為所有寫入者已驗證。
+2. 現場候補抽籤的人工報到需接入相同稽核，並保持抽籤、凍結名單與另一組 revision。QR adapter 現在明確拒絕 `onsiteWaitlistServerOwned` 房間，避免繞過原流程。
+3. 完整 Rules 的其他角色及既有保存流程回歸。Rules 交易配對限制不會解析 JSON 字串中的選手欄位，不能宣稱已單靠 Rules 強制所有管理者的報到異動都經稽核。
+4. 部署 Callable、簽章 Secret 與整合後的寫入者；部署前核對來源版本未漂移。簽章值不能進入 Git 或前端。
+5. 在明確允許的測試房啟用，驗證實際 Authentication、App Check、手機掃碼、登入返回與紀錄讀回，再擴大使用。
 
-瀏覽器情境：`node qr-checkin/browser.cjs`。需 Playwright 與可啟動 Chromium 的環境；可用 PLAYWRIGHT_CHROMIUM_EXECUTABLE 指定執行檔。
+## 驗證證據
 
-2026-10-16 驗證結果：
+2026-10-16，commit `5e4a7cccc3d66eb5a2b84868cbb82554cb544e82` 的雲端工作流程 [38929478653](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/38929478653) 通過：
 
-- 96 項 Node／VM／記憶體交易 stub 測試通過（41 項 QR 案例＋55 項既有回歸案例）。
-- 8 個 Chromium 行動瀏覽器情境通過，使用 mock 後端。
-- 9 項 Firestore Emulator 真實交易測試通過，限定本機 demo-qr-checkin 專案，包含同人併發去重、不同人併發、鏡像失敗完整回復、最新備取拒絕、人工撤銷／重放、歷史權限、雙文件 revision 與停止報到。
-- 雲端驗證來源：GitHub Actions run 38925172391，commit c38a1cdc46836fb34b25aea887888f6924ea1b96。
-- Emulator 使用 deny-all 規則及 Admin SDK，驗證伺服器交易；不等於正式客戶端 Rules 驗收。
+- 109 項 Node／VM／記憶體交易測試。
+- 8 個 Chromium 行動尺寸瀏覽器情境，使用 mock 後端。
+- 13 項 Firestore Emulator 真實交易測試，包括原始名單服務、同步函式與上層授權撤銷。
+- 9 項候選完整 Rules 的 Emulator 測試。
 
-Emulator 指令：`npx firebase emulators:exec --only firestore --project demo-qr-checkin --config qr-checkin/firebase.emulator.json 'node --test qr-checkin/backend/firestore.emulator.test.cjs'`。
+後續新增的單邊公開投影、後端刪除、原始名單服務與掃碼並行，以及正式 Rules 基準對照，須以更新提交的 CI 結果為準。候選套件的 451 個修改／新增 JavaScript 檔已在本機通過語法檢查；此項不是行為驗證。
 
-四份新增／修改 JavaScript 已通過 node --check：主程式、cloud-runtime、新 QR 介面、Firebase adapter。
+```sh
+node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
+python3 qr-checkin/build-writer-packages.test.py
+python3 qr-checkin/build-rules.py
+```
 
-## 檔案使用
+Emulator 必須使用 `demo-qr-checkin` 與 `127.0.0.1:8091`；CI 的伺服器交易與客戶端 Rules 分開執行。瀏覽器測試需可啟動 Chromium 的環境。上述測試不等於正式 HTTP 端點或手機真機驗收。
 
-`frontend.patch` 修改目前已確認的三個前端檔案及一份既有測試檔，避免覆蓋整份 core.js。套用前須核對 BASELINE.json，並處理同時進行中的其他修改。另加入 modules/main-app/qr-checkin.js 與 modules/main-app/qr-checkin-fence.js。候選版先保持未發布。
+## 程式版本
 
-後端核心傳入的時間、帳號、角色、名單、設定、receipt 與 operation 必須全由 adapter 的可信讀取提供，不接受客戶端代傳。成功訊息必須在伺服器交易提交後才能顯示。
+以 PR 內的實際檔案為準。`frontend.patch`、早期 ZIP 及 `BASELINE.json` 是較早的參考快照，不能用來覆蓋最新分支或直接部署。前端入口在 `modules/main-app/qr-checkin.js`；後端入口為 `backend/firebase-callable.cjs`，需由完成 Admin SDK 初始化的正式入口匯出。

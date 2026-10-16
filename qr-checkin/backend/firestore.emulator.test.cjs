@@ -110,6 +110,32 @@ test('guard rolls back an incomplete private-only original backend write',async(
  await assert.rejects(guarded.runTransaction(async tx=>{const t=await tx.get(x.ref);await tx.get(x.pub);tx.update(x.ref,{data:t.data().data,updatedAt:1});}),/paired-write-required/);
  assert.deepEqual((await x.ref.get()).data(),before);
 });
+test('concurrent original roster configuration and a second scan preserve both players',async()=>{
+ const x=await seed();await x.scan('u1');
+ const {guardFirestore}=require('./guard-firestore.cjs');
+ const {createRosterService}=require('./overlays/roster-service.js');
+ const {FieldValue}=require('firebase-admin/firestore');
+ const run=createRosterService(guardFirestore(db),FieldValue);
+ await Promise.all([x.scan('u2'),run({auth:{uid:'manager'},data:{action:'configure',code:x.code,enabled:true,operationId:'concurrent-configure-001'}})]);
+ const t=(await x.ref.get()).data(),p=(await x.pub.get()).data();
+ assert.equal(JSON.parse(t.data).players.filter(p=>p.checkedIn).length,2);
+ assert.equal(JSON.parse(p.bracketView).players.filter(p=>p.checkedIn).length,2);
+ assert.equal(t.qrCheckinRevision,3);assert.equal(p.qrCheckinRevision,3);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,2);
+});
+test('public-only backend projection rolls back without erasing attendance',async()=>{
+ const x=await seed();await x.scan('u1');const before=(await x.pub.get()).data();
+ const {guardFirestore}=require('./guard-firestore.cjs');
+ await assert.rejects(guardFirestore(db).runTransaction(async tx=>{await tx.get(x.pub);tx.update(x.pub,{bracketView:'{"players":[]}'});}),/paired-write-required/);
+ assert.deepEqual((await x.pub.get()).data(),before);
+});
+test('ordinary backend deletion of a QR managed room rolls back',async()=>{
+ const x=await seed();await x.scan('u1');const before=(await x.ref.get()).data();
+ const {guardFirestore}=require('./guard-firestore.cjs');
+ await assert.rejects(guardFirestore(db).runTransaction(async tx=>{await tx.get(x.ref);tx.delete(x.ref);}),/audited-delete-required/);
+ assert.deepEqual((await x.ref.get()).data(),before);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
 test('event staff authorization is rechecked against the parent within each request',async()=>{
  const x=await seed(),C=require('./event-staff-core.cjs');
  const parent={role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org1',orderCode:'ORDER1',expiresAtMs:Date.now()+3600000}};

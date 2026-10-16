@@ -17,6 +17,8 @@ jobs:
           node-version: 22
       - name: Test QR policy, UI flow, write protection and existing roster behavior
         run: node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
+      - name: Test pinned source packaging refuses changed baselines
+        run: python3 qr-checkin/build-writer-packages.test.py
       - name: Install browser test dependency
         run: npm install --no-save --ignore-scripts playwright@1.55.0
       - name: Install Chromium

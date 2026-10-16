@@ -35,11 +35,27 @@ function guardFirestore(db){
      plan.mirrored=true;
      return [ref,{...patch,...plan.fields,bracketView:JSON.stringify(view)},...args.slice(2)];
     }
+    // A public-only projection must not silently erase server attendance.
+    // Metadata-only writes remain compatible with existing services.
+    if(collection==='publicTournaments'&&typeof patch.bracketView==='string'){
+     const snapshot=snapshots.get(path);
+     if(!snapshot)fail('qr-checkin-transaction-read-required');
+     if(snapshot.data()?.qrCheckinManaged===true)fail('qr-checkin-paired-write-required');
+    }
     return args;
    }
    tx=new Proxy(native,{get(transaction,method){
     if(method==='get')return async(...args)=>{const result=await transaction.get(...args);remember(result);return result;};
     if(method==='getAll')return async(...args)=>{const result=await transaction.getAll(...args);result.forEach(remember);return result;};
+    if(method==='delete')return(ref,...args)=>{
+     const path=roomPath(ref);
+     if(path){
+      const snapshot=snapshots.get(path);
+      if(!snapshot)fail('qr-checkin-transaction-read-required');
+      if(snapshot.data()?.qrCheckinManaged===true)fail('qr-checkin-audited-delete-required');
+     }
+     transaction.delete(ref,...args);return tx;
+    };
     if(['update','set','create'].includes(method))return(...args)=>{transaction[method](...transform(method,args));return tx;};
     const value=Reflect.get(transaction,method,transaction);return typeof value==='function'?value.bind(transaction):value;
    }});
