@@ -77,16 +77,18 @@
     }));
     return rows;
   }
-  function createController({owner,readIndex,readRoom,onChange=()=>{},now=Date.now,timeoutMs=10000}){
-    let key='',state={status:'idle',rows:[]},request=0,inFlight=null,known=new Map();
+  function createController({owner,readIndex,readRoom,verifyIndexHealth,onChange=()=>{},now=Date.now,monotonicNow=()=>performance.now(),timeoutMs=10000}){
+    let key='',state={status:'idle',rows:[]},request=0,inFlight=null,known=new Map(),expiryTimer=null;
+    const clearExpiry=()=>{if(expiryTimer!==null)clearTimeout(expiryTimer);expiryTimer=null;};
     const ownerKey=o=>o?.uid?o.uid+'|'+o.epoch:'';
     function sync(){
       const next=ownerKey(owner());
-      if(next!==key){key=next;request++;state={status:'idle',rows:[]};known=new Map();inFlight=null;}
+      if(next!==key){clearExpiry();key=next;request++;state={status:'idle',rows:[]};known=new Map();inFlight=null;}
       return key;
     }
-    function snapshot(){sync();return state;}
-    function invalidate(){sync();request++;state={status:'idle',rows:[]};onChange();}
+    function snapshot(){sync();if(state.status==='ready'&&monotonicNow()>=state.displayDeadline){clearExpiry();request++;state={...state,status:'stale',confirmedEmpty:false,reason:'snapshot-expired'};}return state;}
+    function invalidate(){sync();clearExpiry();request++;state={...state,status:'idle',confirmedEmpty:false};onChange();}
+    function suspend(){sync();clearExpiry();request++;state={...state,status:'stale',confirmedEmpty:false,reason:'display-suspended'};onChange();}
     function noteKnownEvent(code,expectedSourceRevision){
       if(!sync()||!codeOK(code))return;
       known.set(code,{expectedSourceRevision:typeof expectedSourceRevision==='string'?expectedSourceRevision:null});
@@ -98,7 +100,7 @@
       if(!force&&state.status!=='idle')return Promise.resolve(state);
       const context={...owner()},capturedKey=key,id=++request;
       const current=()=>ownerKey(owner())===capturedKey&&key===capturedKey&&request===id;
-      state={status:'loading',rows:[],startedAt:now()};onChange();
+      clearExpiry();const previousRows=state.rows||[];state={status:'loading',rows:previousRows,confirmedEmpty:false,startedAt:now()};onChange();
       let timer;
       // Keep the underlying promise single-flight even after the UI deadline:
       // a timeout cannot cancel a Firestore read and must not trigger overlap.
@@ -106,10 +108,13 @@
         try{
           const index=await readIndex(context);if(!current())return state;
           const problem=validateIndex(index);
-          if(problem){state={status:problem==='index-pending'?'syncing':'error',reason:problem,rows:[]};return state;}
+          if(problem){state={status:problem==='index-pending'?'syncing':'error',reason:problem,rows:previousRows,confirmedEmpty:false};return state;}
           const memberships=index.memberships;
           const rooms=await mapBounded(memberships,m=>readRoom(m.code,context),current);
           if(!current())return state;
+          if(typeof verifyIndexHealth!=='function')throw Error('membership-health-verifier-missing');
+          const verified=await verifyIndexHealth(index,context);if(!current())return state;
+          if(!Number.isFinite(verified?.displayDeadline)||verified.displayDeadline<=monotonicNow())throw Error('membership-health-expired');
           const rows=[];
           memberships.forEach((m,i)=>{
             const room=rooms[i];
@@ -124,8 +129,11 @@
             if(pending.expectedSourceRevision&&m?.sourceRevision===pending.expectedSourceRevision){known.delete(code);continue;}
             rows.push({code,group:'unknown',reason:'剛才的參賽變更仍待索引核對',accessible:false});
           }
-          state={status:'ready',rows,generation:index.generation,revision:index.revision,loadedAt:now(),confirmedEmpty:rows.every(r=>r.group!=='current'&&r.group!=='unknown')};
-        }catch(error){if(current())state={status:'error',reason:String(error?.code||error?.message||'read-failed'),rows:[]};}
+          if(verified.displayDeadline<=monotonicNow())throw Error('membership-health-expired');
+          state={status:'ready',rows,displayDeadline:verified.displayDeadline,generation:index.generation,revision:index.revision,loadedAt:now(),confirmedEmpty:rows.every(r=>r.group!=='current'&&r.group!=='unknown')};
+          expiryTimer=setTimeout(()=>{if(current()){request++;state={...state,status:'stale',confirmedEmpty:false,reason:'snapshot-expired'};expiryTimer=null;onChange();}},Math.max(0,verified.displayDeadline-monotonicNow()));
+          expiryTimer?.unref?.();
+        }catch(error){if(current())state={status:'error',reason:String(error?.code||error?.message||'read-failed'),rows:previousRows,confirmedEmpty:false};}
         finally{clearTimeout(timer);if(current())onChange();}
         return state;
       })();
@@ -139,24 +147,27 @@
         }
       });inFlight=flight;
       timer=setTimeout(()=>{
-        if(!current())return;
-        request++;state={status:'error',reason:'read-timeout',rows:[],retryBlocked:true};onChange();
+        if(inFlight!==flight||ownerKey(owner())!==capturedKey||key!==capturedKey)return;
+        request++;state={status:'error',reason:'read-timeout',rows:previousRows,confirmedEmpty:false,retryBlocked:true};onChange();
       },timeoutMs);
       return flight;
     }
-    return {snapshot,load,invalidate,noteKnownEvent};
+    return {snapshot,load,invalidate,suspend,noteKnownEvent};
   }
   function html(state){
     const header='<div class="panel-title">我的目前賽事<button class="btn btn-ghost btn-sm" data-action="active-events-refresh"'+(state.retryBlocked?' disabled':'')+'>重新整理</button></div>';
-    if(state.retryBlocked)return header+'<section class="panel" role="alert">資料讀取已逾時，原請求仍未結束。請重新載入頁面再試，避免重複發送。<button class="btn btn-ghost" data-action="active-events-reload">重新載入頁面</button></section>';
-    if(['idle','loading'].includes(state.status))return header+'<section class="panel" role="status">正在查詢你的賽事清單……</section>';
-    if(state.status==='syncing')return header+'<section class="panel" role="status">你的賽事清單仍在建立或更新，尚不能確認目前是否有賽事。</section>';
-    if(state.status==='error')return header+'<section class="panel" role="alert">目前無法確認你的賽事，請稍後重新整理。這不代表你沒有賽事。</section>';
+    let notice='';
+    if(state.retryBlocked)notice='<section class="panel" role="alert">資料讀取已逾時，原請求仍未結束。請重新載入頁面再試，避免重複發送。<button class="btn btn-ghost" data-action="active-events-reload">重新載入頁面</button></section>';
+    else if(['idle','loading'].includes(state.status))notice='<section class="panel" role="status">正在查詢你的賽事清單……</section>';
+    else if(state.status==='syncing')notice='<section class="panel" role="status">你的賽事清單仍在建立或更新，尚不能確認目前是否有賽事。</section>';
+    else if(state.status==='error')notice='<section class="panel" role="alert">目前無法確認你的賽事，請稍後重新整理。這不代表你沒有賽事。</section>';
+    else if(state.status==='stale')notice='<section class="panel" role="status">賽事清單待更新，以下保留上次核對內容。可按重新整理確認最新賽事。</section>';
+    if(!state.rows?.length&&state.status!=='ready')return header+notice;
     const card=r=>'<article class="find-event-card"><strong>'+esc(r.title||r.code)+'</strong>'+(r.name||r.participantLabel?'<p>'+esc(r.name||r.participantLabel)+(r.name&&r.participant?.kind==='family'?'（家庭選手）':'')+'</p>':'')+'<p>'+esc(r.reason)+'</p>'+(r.accessible?'<button class="btn btn-ghost btn-sm" data-action="view-public-tournament" data-code="'+esc(r.code)+'">查看賽事</button>':'')+'</article>';
-    let out=header;
+    let out=header+notice;
     const current=state.rows.filter(r=>r.group==='current');
-    if(current.length)out+='<section class="panel"><h3>目前進行中</h3>'+current.map(card).join('')+'</section>';
-    else if(state.confirmedEmpty)out+='<section class="panel" role="status">目前已同步的賽事中，沒有進行中的個人賽程。</section>';
+    if(current.length)out+='<section class="panel"><h3>'+(state.status==='ready'?'目前進行中':'上次核對為進行中')+'</h3>'+current.map(card).join('')+'</section>';
+    else if(state.status==='ready'&&state.confirmedEmpty)out+='<section class="panel" role="status">目前已同步的賽事中，沒有進行中的個人賽程。</section>';
     for(const [group,title] of [['unknown','待核對／更新中'],['waiting','待開賽／待確認'],['finished','本次清單中已結束的賽程']]){
       const rows=state.rows.filter(r=>r.group===group);if(!rows.length)continue;
       out+='<details class="panel"'+(group==='unknown'?' open':'')+'><summary>'+title+'（'+rows.length+'）</summary>'+rows.map(card).join('')+'</details>';

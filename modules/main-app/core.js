@@ -15414,17 +15414,34 @@ function getUidActiveEventsController(){
       return window.cloudSync.readMyActiveMemberships(context);
     },
     readRoom:(code,context)=>window.cloudSync.readMyActivePublicRoom(code,context),
+    verifyIndexHealth:(index,context)=>window.cloudSync.verifyMyActiveMembershipHealth(index,context),
     onChange:()=>{if(activeEventsVisible())renderPreservingScroll();}
   });
   return uidActiveEventsController;
 }
 function noteActiveEventMutation(uid,epoch,code,sourceRevision){
   if(!uidActiveEventsEnabled()||uid!==firebaseUser?.uid||epoch!==engagementSessionEpoch)return;
-  getUidActiveEventsController()?.noteKnownEvent(code,sourceRevision);
+  refreshActiveEventDiscovery();getUidActiveEventsController()?.noteKnownEvent(code,sourceRevision);
 }
 window.addEventListener("bxh-active-event-mutation",event=>{
   const d=event.detail||{};noteActiveEventMutation(d.uid,d.epoch,d.code,d.sourceRevision);
 });
+function refreshActiveEventDiscovery(){
+  if(uidActiveEventsEnabled())window.dispatchEvent(new Event("bxh-active-event-discovery-refresh"));
+}
+function invalidateActiveEventsDisplay(event){
+  if(!uidActiveEventsEnabled()||!uidActiveEventsController)return;
+  if(uidActiveEventsRefreshTimer)clearTimeout(uidActiveEventsRefreshTimer);
+  uidActiveEventsRefreshTimer=null;
+  if(!document.hidden&&event?.type!=="pagehide"&&event?.type!=="offline"&&activeEventsVisible()){
+    uidActiveEventsController.invalidate();refreshActiveEventDiscovery();uidActiveEventsController.load(true);
+  }else uidActiveEventsController.suspend();
+}
+document.addEventListener?.("visibilitychange",invalidateActiveEventsDisplay);
+window.addEventListener("pagehide",invalidateActiveEventsDisplay);
+window.addEventListener("pageshow",invalidateActiveEventsDisplay);
+window.addEventListener("focus",invalidateActiveEventsDisplay);
+window.addEventListener("offline",invalidateActiveEventsDisplay);
 function renderUidActiveEvents(){
   const controller=getUidActiveEventsController();
   if(!controller)return '<section class="panel" role="alert">目前賽事元件未能載入，請重新載入頁面再試。<button class="btn btn-ghost" data-action="active-events-reload">重新載入頁面</button></section>';
@@ -15433,15 +15450,9 @@ function renderUidActiveEvents(){
   if(uidActiveEventsRefreshTimer&&uidActiveEventsRefreshOwner!==ownerKey){clearTimeout(uidActiveEventsRefreshTimer);uidActiveEventsRefreshTimer=null;}
   uidActiveEventsRefreshOwner=ownerKey;
   if(snapshot.status==='idle')setTimeout(()=>{if(activeEventsVisible())controller.load();},0);
-  // Refresh only successful snapshots while this tab is visible. Error and
-  // pending states require an explicit retry; no render-triggered retry loop.
-  if(snapshot.status==='ready'&&!uidActiveEventsRefreshTimer){
-    const owner=activeEventsOwner();
-    uidActiveEventsRefreshTimer=setTimeout(()=>{
-      uidActiveEventsRefreshTimer=null;
-      if(activeEventsVisible()&&owner.uid===firebaseUser?.uid&&owner.epoch===engagementSessionEpoch)controller.load(true);
-    },20000);
-  }
+  // Membership discovery is an intent-driven snapshot, not a background poll.
+  // The controller expires certainty while retaining cards; explicit refresh or
+  // returning to this visible page revalidates. Live room updates stay separate.
   return window.BXHActiveEvents.html(snapshot);
 }
 
@@ -20446,7 +20457,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="active-events-refresh"){
-    if(uidActiveEventsEnabled())getUidActiveEventsController()?.load(true);
+    if(uidActiveEventsEnabled()){refreshActiveEventDiscovery();getUidActiveEventsController()?.load(true);}
     return;
   }
   if(action==="load-my-registrations"){
