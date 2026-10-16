@@ -6,6 +6,8 @@
 
 let courtCallCache=new Map(),courtCallTimer=null,courtCallIdentity='';
 let courtCallPlayerCodes=[],courtCallDiscoveryAt=0,courtCallDiscoveryBusy=false;
+let courtCallIndexDeadline=0,courtCallIndexOwner="",courtCallIndexAttemptedOwner="";
+window.addEventListener("bxh-active-event-discovery-refresh",()=>{if(window.BXH_FEATURE_FLAGS?.uidActiveEvents===true){courtCallDiscoveryAt=0;courtCallIndexAttemptedOwner="";}});
 const courtCallDelayDismissed=new Set();
 const courtCallSystemNotifySeen=new Set();
 let courtCallPushBusy=false,courtCallPushSyncAt=0,courtCallPushError='',courtCallServiceWorkerListenerBound=false;
@@ -671,20 +673,26 @@ async function discoverCourtCallPlayerCodes(force=false){
  const indexed=window.BXH_FEATURE_FLAGS?.uidActiveEvents===true;
  const current=()=>!indexed||(uid===courtCallUserKey()&&epoch===engagementSessionEpoch);
  if(!uid||courtCallDiscoveryBusy)return;
- if(!force&&Date.now()-courtCallDiscoveryAt<30000)return;
+ if(!force&&(indexed?courtCallIndexAttemptedOwner===uid+"|"+epoch:Date.now()-courtCallDiscoveryAt<30000))return;
  if(!window.cloudSync||typeof window.cloudSync.queryMyRegistrations!=='function')return;
- courtCallDiscoveryBusy=true;courtCallDiscoveryAt=Date.now();
+ courtCallDiscoveryBusy=true;courtCallDiscoveryAt=Date.now();if(indexed)courtCallIndexAttemptedOwner=uid+"|"+epoch;
  try{
   if(window.cloudSync.connect)await window.cloudSync.connect();
   if(!current())return;
   if(indexed&&!window.cloudSync.queryMyActiveRegistrationHints)return;
   const regs=await (indexed?window.cloudSync.queryMyActiveRegistrationHints():window.cloudSync.queryMyRegistrations());
   if(!current())return;
+  if(indexed){
+   if(!Number.isFinite(regs?.displayDeadline)||regs.displayDeadline<=performance.now())throw Error("membership-hints-expired");
+   courtCallIndexDeadline=regs.displayDeadline;courtCallIndexOwner=uid+"|"+epoch;
+  }
   const codes=(Array.isArray(regs)?regs:[]).filter(r=>r&&r.status==='confirmed'&&/^BXH-[A-Z0-9]{4,16}$/.test(String(r.tournamentCode||'').toUpperCase())).map(r=>String(r.tournamentCode).toUpperCase());
   courtCallPlayerCodes=[...new Set(indexed?codes:[...codes,...courtCallPlayerCodes])].slice(0,8);
   courtCallSaveKnownCodes(courtCallPlayerCodes);
  }catch(e){
-  // Discovery is best-effort. Existing known codes keep polling.
+  if(indexed&&current())courtCallIndexDeadline=0;
+  // Keep last discovered rooms for their separately authorized live updates.
+  // Discovery failure never proves an empty membership list or grants access.
  }finally{
   courtCallDiscoveryBusy=false;
  }
@@ -692,9 +700,10 @@ async function discoverCourtCallPlayerCodes(force=false){
 
 function courtCallVisibleCodes(){
  if(!courtCallUserKey())return [];
+ const indexed=window.BXH_FEATURE_FLAGS?.uidActiveEvents===true;
  const codes=new Set(courtCallPlayerCodes);
  try{
-  if(typeof myRegistrationsCache!=='undefined'&&Array.isArray(myRegistrationsCache)){
+  if(!indexed&&typeof myRegistrationsCache!=='undefined'&&Array.isArray(myRegistrationsCache)){
    myRegistrationsCache.filter(r=>r&&r.status==='confirmed').forEach(r=>{
     const code=String(r.tournamentCode||'').toUpperCase();if(/^BXH-[A-Z0-9]{4,16}$/.test(code))codes.add(code);
    });

@@ -238,20 +238,24 @@
  // Public brackets created before this fix can omit playMode. Use the signed-in
  // player's confirmed registration to find the active match; the callable
  // verifies the UID and only returns an enchantment round to its participants.
- let discoveryBusy=false,lastRegistrations=0,registrations=[],dismissedMatch='',discoveryOwner='';
+ let discoveryBusy=false,lastRegistrations=0,registrations=[],dismissedMatch='',discoveryOwner='',registrationDeadline=0,discoveryNeedsRefresh=true;
+ root.addEventListener('bxh-active-event-discovery-refresh',()=>{if(root.BXH_FEATURE_FLAGS?.uidActiveEvents===true){lastRegistrations=0;discoveryNeedsRefresh=true;}});
  function indexedDiscoveryContext(){try{return {uid:typeof currentAuthUid==='function'?currentAuthUid():'',epoch:typeof engagementSessionEpoch==='number'?engagementSessionEpoch:-1};}catch{return {uid:'',epoch:-1};}}
  async function discoverPlayerDraw(){
   const indexed=root.BXH_FEATURE_FLAGS?.uidActiveEvents===true,context=indexedDiscoveryContext();
   const owner=context.uid+'|'+context.epoch;
-  if(indexed&&owner!==discoveryOwner){discoveryOwner=owner;registrations=[];lastRegistrations=0;discoveryBusy=false;cache.clear();matchNames.clear();dismissedMatch='';document.querySelector('[data-enchantment-draw-overlay]')?.remove();}
+  if(indexed&&owner!==discoveryOwner){discoveryOwner=owner;registrations=[];discoveryNeedsRefresh=true;registrationDeadline=0;lastRegistrations=0;discoveryBusy=false;cache.clear();matchNames.clear();dismissedMatch='';document.querySelector('[data-enchantment-draw-overlay]')?.remove();}
   const current=()=>!indexed||(discoveryOwner===owner&&indexedDiscoveryContext().uid===context.uid&&indexedDiscoveryContext().epoch===context.epoch);
   if(indexed&&!context.uid)return;
   if(discoveryBusy||!root.cloudSync?.queryMyRegistrations||!root.engagementService?.enchantment)return;
   discoveryBusy=true;
   try{
-   if(Date.now()-lastRegistrations>30000){
+   if(indexed?discoveryNeedsRefresh:Date.now()-lastRegistrations>30000){
+    if(indexed)discoveryNeedsRefresh=false;
     if(indexed&&!root.cloudSync.queryMyActiveRegistrationHints)return;
-    const rows=await(indexed?root.cloudSync.queryMyActiveRegistrationHints():root.cloudSync.queryMyRegistrations());if(!current())return;registrations=rows;lastRegistrations=Date.now();
+    const rows=await(indexed?root.cloudSync.queryMyActiveRegistrationHints():root.cloudSync.queryMyRegistrations());if(!current())return;
+    if(indexed){if(!Number.isFinite(rows?.displayDeadline)||rows.displayDeadline<=performance.now())throw Error('membership-hints-expired');registrationDeadline=rows.displayDeadline;}
+    registrations=rows;lastRegistrations=Date.now();
    }
    for(const r of registrations.filter(x=>x.status==='confirmed')){
     const code=r.tournamentCode;

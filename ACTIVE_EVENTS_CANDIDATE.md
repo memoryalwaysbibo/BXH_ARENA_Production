@@ -4,7 +4,7 @@ Date: 2026-10-15. Frontend source checked against released main `42d5e4a4a7cca06
 
 ## Result
 
-The new optional current-events entry reads the signed-in account's candidate room memberships, then at most K authorized public rooms, with four concurrent room reads and a hard 64-room limit. Its normal successful read shape is two state documents + K membership documents + K public room documents, O(K), rather than an application-wide tournament scan. Firestore empty-query minimum billing and retries are not represented by that simple document count. No production latency in seconds was measured.
+The new optional current-events entry reads the signed-in account's candidate room memberships, then at most K authorized public rooms, with four concurrent room reads and a hard 64-room limit. Its normal successful read shape is two state documents + three health documents + K membership documents + K public room documents, O(K), rather than an application-wide tournament scan. Firestore empty-query minimum billing and retries are not represented by that simple document count. No production latency in seconds was measured.
 
 Default feature flag is OFF. To opt in only in an isolated fixture, set `window.BXH_FEATURE_FLAGS={uidActiveEvents:true}` before loading the application. A missing module with the flag requested fails closed with a reload message. It never silently falls back to a broad scan. History/Hunter and `queryMyRegistrations` retain their existing semantics. This prototype is not the separate Hunter-achievement or ladder performance fix.
 
@@ -58,3 +58,23 @@ After separate authorization to submit a branch/run remote CI, a standard GitHub
 8. Obtain explicit approval for remote submission/CI, then separately for deployment, production Rules changes, bounded production backfill and cohort enablement. None occurred in this task.
 
 Rollback remains an explicit flag change. Turning this feature off restores the existing application behavior; the feature never automatically flips itself off in response to missing modules or read errors.
+
+
+## Readiness and health candidate continuation
+
+The frontend now requires global server-owned `activeTournamentMembershipHealth/current`: schemaVersion 1, healthy status, generation, revision, equal safe-integer sourceEpoch/projectedEpoch, and a Firestore Timestamp leaseExpiresAt. Reads are health → owner state → memberships → owner state → health, followed by another health check after public rooms finish. Missing, changed or denied health cannot publish ready or confirmed empty.
+
+The candidate Rules must reserve 20 seconds beyond server request.time for every healthy health read and membership read. The display deadline starts at performance.now() BEFORE the final health request, so response latency consumes the budget; client wall-clock time cannot extend it. On expiry, the UI retains last-known cards and replaces certainty with a stable update-needed notice. It does not start a read. Returning to the visible page or explicit refresh performs one revalidation; hidden/pagehide/offline suspends certainty. Loading, pending and failed refresh preserve prior cards without claiming current emptiness. Indexed discovery hints carry the acquisition deadline but are non-authoritative room-discovery snapshots. They are fetched on entry/auth scope change or explicit refresh intent, not every 30 seconds. Known active-room polling and score/court updates retain their own authoritative service checks and are not disabled by membership snapshot expiry. Hints never grant action authorization.
+
+This contract requires the corresponding new backend candidate Rules. It is default off and does not authorize installing those Rules. A short lease proves a bounded fresh verified snapshot, not zero instantaneous delay or completeness of existing deployed source writers. The demo source-fence architecture explicitly assumes atomic source epoch advancement; the current production writer coverage must still be established before any real readiness publication or backfill.
+
+The browser suite now contains 18 cases across three devices, including health failure and display-expiry recovery. Final CI evidence for this continuation will be recorded on the draft PR; the earlier 12-case run only certifies the prior candidate.
+
+
+### Read/write budget and no-background-work policy
+
+For K candidate rooms, the current-events page alone performs 2K+5 document reads (K membership docs, K public room docs, two state reads and three health reads), before Firestore minimum-query billing/retries. This is an analytical count, not measured production latency or billing. Court/enchantment discovery each require at most K+5 additional index/health reads for a separate intent; overlapping same-UID/auth-epoch index reads share one in-flight promise. Without coalescing, the upper bound for all three discovery consumers on entry is 4K+15, excluding the pre-existing active-room service polling. There is no claim that these constants are optimal.
+
+While the page sits untouched, membership expiry causes zero additional index/health reads and zero writes per minute. No heartbeat, lease-renewal schedule or background backfill is added. Membership discovery also stops after its attempt until another user/navigation intent; active-room score/court channels continue their existing independent behavior. Repeated focus/visibility events coalesce through the same single flight; auth changes discard previous-account data. On hidden/pagehide the expiry timer is cancelled and certainty is suspended.
+
+The 20-second display budget and 60-second demo health lease are test parameters, not a decided production freshness policy. Production needs observed latency/read cost and a source-writer completeness decision before selecting a policy. An alternative with complete atomic source-version fencing can avoid periodic lease renewal; a lease alone cannot prove no missed memberships. This candidate intentionally does not install any periodic service.
