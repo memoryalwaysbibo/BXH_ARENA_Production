@@ -22,7 +22,7 @@ async function fixture(managed=true){
  const db=env.authenticatedContext('manager').firestore();
  function batch({privateRevision=4,publicRevision=4,uid='manager',privateOnly=false,publicOnly=false,includeRevision=managed}={}){
   const db=env.authenticatedContext(uid).firestore(),b=writeBatch(db);
-  if(!publicOnly)b.update(doc(db,'tournaments/'+code),{data:JSON.stringify({...state,...(includeRevision?{qrCheckinRevision:privateRevision}:{})}),updatedAt:2,...(includeRevision?{qrCheckinRevision:privateRevision}:{})});
+  if(!publicOnly)b.update(doc(db,'tournaments/'+code),{data:JSON.stringify({...state,marker:'new',...(includeRevision?{qrCheckinRevision:privateRevision}:{})}),updatedAt:2,...(includeRevision?{qrCheckinRevision:privateRevision}:{})});
   if(!privateOnly)b.update(doc(db,'publicTournaments/'+code),{bracketView:JSON.stringify({players:[],marker:'new'}),updatedAt:2,...(includeRevision?{qrCheckinRevision:publicRevision}:{})});
   return b.commit();
  }

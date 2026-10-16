@@ -71,3 +71,24 @@ test('configure and scan advance matching private and public revision',async()=>
 test('closing check-in invalidates an unexpired QR',async()=>{
  const x=await seed();await x.command({action:'configure',enabled:false});await assert.rejects(x.scan('u1'),/checkin-closed/);
 });
+test('verified roster-sync overlay preserves QR check-in while advancing both revisions',async()=>{
+ const x=await seed();await x.scan('u1');
+ await db.doc('systemConfig/registrationRosterSync').set({enabled:true});
+ await x.ref.update({registrationEnabled:true});await x.pub.update({registrationEnabled:true,registrationRosterSyncBackendEnabled:true});
+ await x.ref.collection('registrations').doc('r3').set({uid:'u3',status:'confirmed',displayName:'新選手'});
+ const fs=require('node:fs'),path=require('node:path'),module={exports:{}};
+ const source=fs.readFileSync(__dirname+'/overlays/registration-roster-sync.js','utf8');
+ function load(name){
+  if(name==='firebase-functions/v2/firestore')return {onDocumentWritten:(_opts,fn)=>fn};
+  if(name==='firebase-functions/v2/https')return {...require(name),onCall:(_opts,fn)=>fn};
+  if(name.startsWith('./'))return require(path.join(__dirname,'overlays',name));
+  return require(name);
+ }
+ new Function('require','module','exports',source)(load,module,module.exports);
+ await module.exports.syncRegistrationRoster({data:true,params:{code:x.code}});
+ const privateDoc=(await x.ref.get()).data(),publicDoc=(await x.pub.get()).data(),state=JSON.parse(privateDoc.data);
+ assert.equal(state.players.find(p=>p.id==='p1').checkedIn,true);
+ assert.equal(state.players.find(p=>p.registrationUid==='u3').checkedIn,false);
+ assert.equal(privateDoc.qrCheckinRevision,2);assert.equal(publicDoc.qrCheckinRevision,2);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});

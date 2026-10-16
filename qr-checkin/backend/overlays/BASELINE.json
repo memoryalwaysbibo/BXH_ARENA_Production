@@ -1,0 +1,18 @@
+{
+  "auditRunId": 38925435175,
+  "functions": [
+    "syncRegistrationRoster",
+    "backfillRegistrationRoster"
+  ],
+  "originalSourceFiles": {
+    "registration-roster-core.js": {
+      "sha256": "daa5aa8333ecb9bfebeb427d243992ecdcd909e2802dfb09e09071fca295bddc",
+      "bytes": 4367
+    },
+    "registration-roster-sync.js": {
+      "sha256": "e847a6454604f0001a936d5c772c5bf93e7a61f161fde434169c8a13325270b5",
+      "bytes": 5218
+    }
+  },
+  "deployed": false
+}
