@@ -9,7 +9,7 @@ function input(overrides={}) {
 }
 const rejects=(x,code)=>assert.throws(()=>transition(x),e=>e.code===code);
 test('confirmed scan produces receipt and exactly one audit, using server time',()=>{
- const x=input(),r=transition(x);assert.equal(r.result.ok,true);assert.equal(r.receipt.firstAt,now);assert.equal(r.receipt.actorUid,'u1');assert.equal(r.audit.method,'qr');assert.equal(x.state.players[0].checkedIn,false);
+ const x=input(),r=transition(x);assert.equal(r.result.ok,true);assert.equal(r.receipt.firstAt,now);assert.equal(r.receipt.actorUid,'u1');assert.equal(r.audit.method,'qr');assert.equal(r.audit.accountUid,'u1');assert.equal(r.audit.registrationId,'r1');assert.equal(r.audit.checkedIn,true);assert.equal(r.audit.firstAt,now);assert.equal(x.state.players[0].checkedIn,false);
 });
 test('waitlist-only account cannot scan',()=>rejects(input({state:{meta:{checkinRequired:true},players:[],waitlistPlayers:[{registrationUid:'u1'}]}}),'not-confirmed'));
 test('stale confirmed projection cannot override cancelled registration',()=>rejects(input({registration:{status:'cancelled',uid:'u1'}}),'not-confirmed'));
@@ -42,7 +42,7 @@ test('non-ASCII forged signatures produce a controlled invalid-QR error',()=>{co
 test('player cannot manage or forge operator authority',()=>rejects(input({d:{action:'configure',enabled:true,role:'super_admin'}}),'permission-denied'));
 test('manager manual check-in and revoke retain first time and operator',()=>{
  const x=input({uid:'staff1',user:{active:true,role:'admin'},d:{action:'manual',playerId:'p1',operationId:'operation-0000001'}});
- const r=transition(x);assert.equal(r.receipt.method,'manual');assert.equal(r.receipt.actorUid,'staff1');
+ const r=transition(x);assert.equal(r.receipt.method,'manual');assert.equal(r.receipt.actorUid,'staff1');assert.equal(r.audit.accountUid,'u1');assert.equal(r.audit.actorUid,'staff1');
  x.state.players[0].checkedIn=true;x.receipt=r.receipt;x.d={...x.d,action:'revoke'};x.now+=1000;
  const revoke=transition(x);assert.equal(revoke.receipt.firstAt,now);assert.equal(revoke.receipt.currentAt,null);assert.equal(revoke.receipt.checkedIn,false);
  x.state.players[0].checkedIn=false;x.receipt=revoke.receipt;x.d.action='manual';x.now+=1000;

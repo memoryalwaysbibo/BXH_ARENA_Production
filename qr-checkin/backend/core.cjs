@@ -84,7 +84,7 @@ function transition({code,uid,user,parentUser,room,state,registration,receipt,op
   const method=d.action==='scan'?'qr':'manual';
   const nextReceipt={playerId:player.id,name:player.name,accountUid:player.registrationUid||player.uid||player.accountUid||null,code,firstAt:receipt?.firstAt||(checked?now:null),currentAt:checked?now:null,checkedIn:checked,method,actorUid:uid};
   const result={ok:true,checkedIn:checked,name:player.name,firstAt:nextReceipt.firstAt,currentAt:nextReceipt.currentAt};
-  return {playerId:player.id,receipt:nextReceipt,audit:{action:d.action,playerId:player.id,name:player.name,actorUid:uid,method,at:now},operation:d.action==='scan'?null:{actorUid:uid,action:d.action,playerId:player.id,result},result};
+  return {playerId:player.id,receipt:nextReceipt,audit:{action:d.action,playerId:player.id,name:player.name,accountUid:nextReceipt.accountUid,registrationId:player.registrationId||null,checkedIn:checked,firstAt:nextReceipt.firstAt,currentAt:nextReceipt.currentAt,actorUid:uid,method,at:now},operation:d.action==='scan'?null:{actorUid:uid,action:d.action,playerId:player.id,result},result};
 }
 // Integrate into EVERY trusted state writer, after its roster projection.
 // The ledger stays authoritative even if a manager tab holds an old snapshot.

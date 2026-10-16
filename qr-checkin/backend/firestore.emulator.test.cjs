@@ -61,7 +61,7 @@ test('player cannot read management history',async()=>{
 });
 test('manager history contains committed audit time, actor and event',async()=>{
  const x=await seed();await x.scan('u1');const r=await x.command({action:'history'});
- assert.equal(r.records.length,1);assert.equal(r.records[0].actorUid,'u1');assert.equal(r.records[0].eventName,'模擬器賽事');assert.equal(typeof r.records[0].at,'number');
+ assert.equal(r.records.length,1);assert.equal(r.records[0].actorUid,'u1');assert.equal(r.records[0].accountUid,'u1');assert.equal(r.records[0].registrationId,'r1');assert.equal(r.records[0].checkedIn,true);assert.equal(r.records[0].eventName,'模擬器賽事');assert.equal(typeof r.records[0].at,'number');
 });
 test('configure and scan advance matching private and public revision',async()=>{
  const x=await seed();await x.command({action:'configure',enabled:true});const s=await x.command({action:'status'});

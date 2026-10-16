@@ -24,7 +24,7 @@
 
 ## 上線前剩餘工作
 
-1. 各服務真實 handler 的寫入路徑與回傳值逐一回歸；直接 document、batch 及刪除修復路徑尚未完整覆蓋，不能把一般交易包裝器視為所有寫入者已驗證。
+1. 已追加 8 個存取／計分／生命週期服務的唯讀來源盤點（Functions PR #141 已合併），結果尚待取回。各服務真實 handler 的寫入路徑與回傳值逐一回歸；直接 document、batch 及刪除修復路徑尚未完整覆蓋，不能把一般交易包裝器視為所有寫入者已驗證。
 2. 現場候補抽籤的人工報到需接入相同稽核，並保持抽籤、凍結名單與另一組 revision。QR adapter 現在明確拒絕 `onsiteWaitlistServerOwned` 房間，避免繞過原流程。
 3. 完整 Rules 的其他角色及既有保存流程回歸。Rules 交易配對限制不會解析 JSON 字串中的選手欄位，不能宣稱已單靠 Rules 強制所有管理者的報到異動都經稽核。
 4. 部署 Callable、簽章 Secret 與整合後的寫入者；部署前核對來源版本未漂移。簽章值不能進入 Git 或前端。
@@ -32,14 +32,14 @@
 
 ## 驗證證據
 
-2026-10-16，commit `5e4a7cccc3d66eb5a2b84868cbb82554cb544e82` 的雲端工作流程 [38929478653](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/38929478653) 通過：
+2026-10-16，commit `9dc025d4d4ab0d5a110bcb6d0e621a54f0dd82c2` 的雲端工作流程 [38930283842](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/38930283842) 通過：
 
-- 109 項 Node／VM／記憶體交易測試。
+- 112 項 Node／VM／記憶體交易測試。
 - 8 個 Chromium 行動尺寸瀏覽器情境，使用 mock 後端。
-- 13 項 Firestore Emulator 真實交易測試，包括原始名單服務、同步函式與上層授權撤銷。
-- 9 項候選完整 Rules 的 Emulator 測試。
+- 16 項 Firestore Emulator 真實交易測試，包括原始名單服務、同步函式與上層授權撤銷。
+- 10 項候選完整 Rules 的 Emulator 測試。
 
-後續新增的單邊公開投影、後端刪除、原始名單服務與掃碼並行，以及正式 Rules 基準對照，須以更新提交的 CI 結果為準。候選套件的 451 個修改／新增 JavaScript 檔已在本機通過語法檢查；此項不是行為驗證。
+上述交易測試包含單邊公開投影、後端刪除、原始名單服務與掃碼並行。規則測試已對照原始正式 Rules：既有純 metadata 儲存由原規則拒絕，候選規則結果相同。另有 4 項來源包裝安全測試通過。最新提交另補強選手帳號與操作帳號的稽核快照及畫面區分，須以其 CI 結果為準。候選套件的 451 個修改／新增 JavaScript 檔已在本機通過語法檢查；此項不是行為驗證。
 
 ```sh
 node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs

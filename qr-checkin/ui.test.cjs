@@ -34,3 +34,10 @@ test('repeat scan displays original time and already-completed text',async()=>{
 test('untrusted display names are escaped in success screen',async()=>{
  const x=setup();x.tasks.shift()();await flush();x.complete({ok:true,name:'<img src=x onerror=alert(1)>',currentAt:1800000000000});await flush();assert.doesNotMatch(x.feature.renderEntry(),/<img/);assert.match(x.feature.renderEntry(),/&lt;img/);
 });
+test('history distinguishes player and operator accounts and escapes both',async()=>{
+ const x=setup('https://arena.bxh.com.tw/');
+ const pending=x.handler()({target:{closest:()=>({dataset:{qrCheckin:'open'}})},preventDefault(){},stopImmediatePropagation(){}});
+ assert.equal(x.calls[0].data.action,'status');x.complete({enabled:false});await flush();
+ assert.equal(x.calls[1].data.action,'history');x.complete({records:[{playerId:'p1',name:'選手',accountUid:'<player>',actorUid:'<staff>',action:'manual',at:1800000000000}]});await pending;
+ const html=x.feature.renderModal();assert.match(html,/選手帳號：&lt;player&gt;/);assert.match(html,/操作帳號：&lt;staff&gt;/);assert.doesNotMatch(html,/<player>|<staff>/);
+});
