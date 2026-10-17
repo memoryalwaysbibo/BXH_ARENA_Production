@@ -52,7 +52,11 @@ function titleLimitedTypeValue(t){
   if(Object.prototype.hasOwnProperty.call(TITLE_LIMITED_LABELS,explicit))return explicit;
   return t&&(t.isLimited===true||String(t.rarity||"")==="limited")?"legacy":"none";
 }
-function titleLimitedLabel(t){return TITLE_LIMITED_LABELS[titleLimitedTypeValue(t)]||"";}
+// Display-only limited marker: eligibility remains the five-event achievement contract.
+function titleLimitedLabel(t){
+  if(t&&((t.id||t.titleId)==='first_exit_5'||t.displayLimitedLabel==='限定'))return '限定';
+  return TITLE_LIMITED_LABELS[titleLimitedTypeValue(t)]||"";
+}
 function titlePermanentLabel(t){return t&&t.isPermanent===false?"期間制":"永久持有";}
 function titleClassificationText(t){const tag=titleLimitedLabel(t);return titleTierLabel(t)+(tag?"｜"+tag:"")+"｜"+titlePermanentLabel(t);}
 function titleClassificationHtml(t){
