@@ -12235,7 +12235,8 @@ function renderPeopleManagement(){
   const syncError=adminRegistrationsError?`<div class="banner warn" role="alert"><span>線上名單尚未同步：${esc(adminRegistrationsError)}</span><button class="btn btn-ghost btn-sm" data-action="${state.startedAt?"load-admin-registrations":"load-online-roster"}" ${peopleRosterBusy?"disabled":""}>重新同步名單</button></div>`:"";
   const pendingOnsite=window.BXHOnsiteWaitlistIntegration?.pendingCommand(state.cloudCode,firebaseUser?.uid);
   const pendingBanner=pendingOnsite?'<div class="banner warn" role="alert"><span>有一筆報到操作尚未確認。</span><button class="btn btn-primary" data-action="onsite-checkin-retry" '+(peopleRosterBusy?'disabled':'')+'>確認同一筆報到操作</button></div>':'';
-  return syncError+pendingBanner+subnav+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+(panels[peopleRosterSection]||confirmedPanel);
+  const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
+  return syncError+pendingBanner+subnav+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
