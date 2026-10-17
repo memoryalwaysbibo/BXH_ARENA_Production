@@ -2727,6 +2727,22 @@
       }catch(e){window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:false};throw e;}
     },
 
+    async readBracketFromServer(code){
+      if(!cloudEnabled||!fx.getDocFromServer)return {ok:false};
+      try{
+        const normalized=String(code).toUpperCase();
+        const [privateSnap,publicSnap]=await Promise.all([
+          fx.getDocFromServer(fx.doc(dbHandle,'tournaments',normalized)),
+          fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',normalized))
+        ]);
+        if(!privateSnap.exists()||!publicSnap.exists())return {ok:false};
+        const d=privateSnap.data(),data=JSON.parse(d.data),publicData=JSON.parse(publicSnap.data().bracketView);
+        for(const key of ['createdBy','ownerUid','createdByRole'])if(d[key])data[key]=d[key];
+        data.cloudCode=normalized;
+        return {ok:true,data,publicData};
+      }catch{return {ok:false};}
+    },
+
     async pushUpdate(code, data, options={}){
       if(!cloudEnabled || !code) return false;
       const onsiteInputRevision=data?.onsiteWaitlistRuntimeRevision;
@@ -2853,6 +2869,11 @@ if(testerSession){
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
+              if(remoteState.bracketDraw||options.bracketCommit||options.bracketStartSignature){
+                if(!window.BXHBracketCommit)throw new Error('bracket-verifier-unavailable');
+                const verdict=window.BXHBracketCommit.assertWrite(remoteState,data,options);
+                if(verdict==='already-committed')return;
+              }
               if(JSON.stringify(remoteState.forcedCourtExits||{})!==JSON.stringify(data.forcedCourtExits||{}))throw new Error("court-exit-stale");
               const dispatchById=new Map((data.matches||[]).map(m=>[m.id,m]));
               for(const m of remoteState.matches||[]){if(m.forceDetached||m.dispatchRevision){const incoming=dispatchById.get(m.id);if(!incoming||Number(incoming.dispatchRevision||0)!==Number(m.dispatchRevision||0)||Number(incoming.station)!==Number(m.station))throw new Error("court-dispatch-stale");}}
@@ -2955,7 +2976,7 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.message)==="registration-roster-stale" ? "registration-roster-stale" : (e&&e.code)||"unknown";
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = ["registration-roster-stale","bracket-version-conflict","bracket-started"].includes(e&&e.message) ? e.message : (e&&e.code)||"unknown";
         console.warn("雲端同步寫入失敗", e);
         return false;
       }
