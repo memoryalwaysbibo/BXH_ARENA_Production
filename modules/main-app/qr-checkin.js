@@ -111,6 +111,8 @@
   window.BXHQrCheckin={
     bind(context){
       ctx=context;
+      const loginNotice=document.getElementById('qr-checkin-login-notice');
+      if(loginNotice)loginNotice.hidden=!entry()||!!identity();
       const nextKey=key();
       if(boundKey!==nextKey){modal=false;settings=null;scanStarted='';scanResult=null;clearTimeout(timer);boundKey=nextKey;}
       if(entry()&&identity()&&!scanBusy)setTimeout(()=>scan(),0);
