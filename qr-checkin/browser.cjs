@@ -1,6 +1,9 @@
 'use strict';
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
+const core=fs.readFileSync(__dirname+'/../modules/main-app/core.js','utf8');
+const scannerParser=core.slice(core.indexOf('function parseScannedTournamentEntry('),core.indexOf('function setQrScannerStatus('));
+const scannerAccept=core.slice(core.indexOf('async function acceptScannedQrValue('),core.indexOf('async function startQrScanner('));
 const playwrightModule=process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES?process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright':'playwright';
 const {chromium}=require(playwrightModule);
 (async()=>{
@@ -16,6 +19,11 @@ async function scenario(name,config,run){
  window.room={cloudCode:'BXH-ABC123',meta:{name:'測試賽'},players:[{id:'p1',name:'選手甲',checkedIn:false}]};
  window.engagementService={async tournamentOperation(name,d){calls.push(d);if(d.action==='scan'){${config.delay?'await new Promise(r=>window.finishScan=r);':''}if(scanResponse.error)throw Error(scanResponse.error);return scanResponse;}if(d.action==='status')return {ok:true,enabled:false};if(d.action==='history')return {ok:true,records:[]};return {ok:true};}};
  </script><script>${src}</script><script>
+ let qrScannerOpen=false,firebaseUser=window.uid?{uid:window.uid}:null,userProfile={active:true},currentRole='player',guestReadOnlyMode=false,appPhase='player-center';
+ function stopQrScanner(){} function setQrScannerStatus(){} function showToast(){} function normalizeRoomCodeInput(v){return String(v||'').trim().toUpperCase();} function isValidRoomCode(v){return /^BXH-[A-Z0-9]{4,16}$/.test(v);} function normalizeTournamentEntryType(v){return v||'event';}
+ function replaceTournamentEntryInUrl(){} async function routeTournamentEntry(code,entry){window.routed={code,entry};}
+ ${scannerParser}
+ ${scannerAccept}
  function render(){BXHQrCheckin.bind({uid:()=>window.uid,state:()=>room,render,toast(){},qr(){},applyRemote(){}});if(!window.uid){document.querySelector('#app').innerHTML='<button>登入</button>';return;}document.querySelector('#app').innerHTML=BXHQrCheckin.renderEntry()||BXHQrCheckin.button();document.querySelector('#app').insertAdjacentHTML('beforeend',BXHQrCheckin.renderModal());}render();
  </script>`;
  await page.route('https://arena.test/**',route=>route.fulfill({contentType:'text/html',body:fixture}));
@@ -31,6 +39,8 @@ try{
  await scenario('過期QR可重新掃描，沒有假成功',{response:{error:'qr-expired'}},async p=>{await p.getByText(/QR 已過期/).waitFor();assert.equal(await p.getByRole('heading',{name:'報到成功',exact:true}).count(),0);});
  await scenario('登出後丟棄舊帳號的回覆',{delay:true},async p=>{await p.getByRole('heading',{name:'正在確認報到…'}).waitFor();await p.evaluate(()=>{uid=null;render();finishScan();});await p.getByText(/請先登入/).waitFor();assert.equal(await p.getByText('選手甲',{exact:true}).count(),0);});
  await scenario('手機管理窗口載入狀態與異動紀錄',{manager:true},async p=>{await p.getByRole('button',{name:'現場報到 QR／紀錄'}).click();await p.getByRole('button',{name:'開始報到'}).waitFor({state:'visible'});await p.waitForFunction(()=>calls.some(c=>c.action==='history'));await p.getByText('最近 100 筆報到異動').waitFor();await p.getByRole('button',{name:'關閉',exact:true}).click();assert.equal(await p.getByRole('dialog').count(),0);});
+ await scenario('站內掃報到QR沿用登入，不重新載入或找房間',{manager:true},async p=>{await p.evaluate(()=>{window.sessionMarker='retained';return acceptScannedQrValue('https://arena.test/?checkin=BXH-ABC123&checkinToken=in-app');});await p.getByRole('heading',{name:'報到成功',exact:true}).waitFor();assert.equal(await p.evaluate(()=>sessionMarker),'retained');assert.equal(await p.evaluate(()=>calls.filter(c=>c.action==='scan').length),1);assert.equal(await p.evaluate(()=>window.routed),undefined);});
+ await scenario('站內掃描仍保留既有找房間路由',{manager:true},async p=>{await p.evaluate(()=>acceptScannedQrValue('BXH-ABC123'));assert.deepEqual(await p.evaluate(()=>window.routed),{code:'BXH-ABC123',entry:'event'});assert.equal(await p.evaluate(()=>calls.length),0);});
  console.log('Browser scenarios: '+passed+' passed');
 }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
