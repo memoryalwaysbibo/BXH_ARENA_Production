@@ -1,6 +1,6 @@
 {
-  "build": "20261008.3",
+  "build": "20261017.1",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-08T12:23:34.304202+00:00",
-  "releaseTrigger": "gundam-entrance-blur-fade-fix"
+  "updatedAt": "2026-10-17T00:27:28.644676+00:00",
+  "releaseTrigger": "confirmed-qr-checkin-gated-rollout"
 }

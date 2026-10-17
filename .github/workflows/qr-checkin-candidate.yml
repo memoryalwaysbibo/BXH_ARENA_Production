@@ -1,0 +1,61 @@
+name: QR Check-in Candidate Tests
+on:
+  pull_request:
+    paths: ['qr-checkin/**', 'modules/main-app/qr-checkin*.js', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/community-quick-registration-cloud.test.cjs', 'tests/family-roster-checkin.test.cjs', '.github/workflows/qr-checkin-candidate.yml']
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test QR policy, UI flow, write protection and existing roster behavior
+        run: node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/onsite.test.cjs qr-checkin/backend/cleanup.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
+      - name: Test pinned source packaging refuses changed baselines
+        run: python3 qr-checkin/build-writer-packages.test.py
+      - name: Install browser test dependency
+        run: npm install --no-save --ignore-scripts playwright@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test eight mobile browser scenarios with a mocked backend
+        run: node qr-checkin/browser.cjs
+  firestore:
+    name: firestore-${{ matrix.sdk.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk:
+          - {name: roster, admin: '13', functions: '6'}
+          - {name: production, admin: '14.4.0', functions: '7.3.2'}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install emulator dependencies
+        id: emulator-deps
+        run: |
+          npm install --no-save --ignore-scripts firebase-admin@${{ matrix.sdk.admin }} firebase-functions@${{ matrix.sdk.functions }} firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11
+          npm ls firebase-admin firebase-functions --depth=0
+      - name: Test real Firestore transactions against local demo project only
+        run: npx firebase emulators:exec --only firestore --project demo-qr-checkin --config qr-checkin/firebase.emulator.json 'node --test qr-checkin/backend/firestore.emulator.test.cjs'
+      - name: Verify exact Production snapshot and regenerate candidate rules
+        if: ${{ !cancelled() && steps.emulator-deps.outcome == 'success' }}
+        run: python3 qr-checkin/build-rules.py
+      - name: Test candidate client rules against local demo project only
+        if: ${{ !cancelled() && steps.emulator-deps.outcome == 'success' }}
+        run: npx firebase emulators:exec --only firestore --project demo-qr-checkin --config qr-checkin/firebase.emulator.json 'node --test qr-checkin/rules.emulator.test.cjs'

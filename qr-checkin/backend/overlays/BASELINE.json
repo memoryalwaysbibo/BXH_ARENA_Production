@@ -1,0 +1,51 @@
+{
+  "auditRunId": 38925435175,
+  "functions": [
+    "syncRegistrationRoster",
+    "backfillRegistrationRoster"
+  ],
+  "originalSourceFiles": {
+    "registration-roster-core.js": {
+      "sha256": "daa5aa8333ecb9bfebeb427d243992ecdcd909e2802dfb09e09071fca295bddc",
+      "bytes": 4367
+    },
+    "registration-roster-sync.js": {
+      "sha256": "e847a6454604f0001a936d5c772c5bf93e7a61f161fde434169c8a13325270b5",
+      "bytes": 5218
+    }
+  },
+  "deployed": false,
+  "roomAccess": {
+    "sourceGeneration": "1791309315689256",
+    "auditRunId": 38931467343,
+    "files": {
+      "room-access-core.js": {
+        "sha256": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+        "bytes": 2337
+      },
+      "room-access-service.js": {
+        "sha256": "7e50ce14aec91c3abd7fb238b0a3294de8a6a51d3f3cd33d489f95c42d2ff323",
+        "bytes": 5448
+      }
+    }
+  },
+  "hosting": {
+    "service": "preserveCompletedRoomAndCountHost",
+    "sourceGeneration": "1790537242507188",
+    "auditRunId": 38931467343,
+    "files": {
+      "hosting.js": {
+        "sha256": "54d3d6bf2b76dcaf60e6d78dcb5e81b93bcaa7b93875e06bb7e426b1f946a523",
+        "bytes": 4734
+      },
+      "hosting-core.js": {
+        "sha256": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+        "bytes": 1952
+      }
+    },
+    "alsoMatchesDeployedServices": [
+      "syncMyHostingProgress",
+      "preserveExistingCompletedRooms"
+    ]
+  }
+}

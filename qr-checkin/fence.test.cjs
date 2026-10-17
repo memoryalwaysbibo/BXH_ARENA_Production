@@ -1,0 +1,15 @@
+'use strict';
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {advance}=require('../modules/main-app/qr-checkin-fence');
+const make=()=>({qrCheckinManaged:true,qrCheckinRevision:3,data:JSON.stringify({players:[{id:'p1',checkedIn:true,checkinAt:123,checkinFirstAt:100,checkinMethod:'qr'},{id:'p2',checkedIn:false}]})});
+const state=()=>({qrCheckinManaged:true,qrCheckinRevision:3,players:[{id:'p1',checkedIn:false},{id:'p2',checkedIn:true}]});
+test('same revision preserves server check-ins and advances write fence',()=>{const s=state(),p=advance(make(),s);assert.equal(s.players[0].checkedIn,true);assert.equal(s.players[0].checkinAt,123);assert.equal(s.players[1].checkedIn,false);assert.equal(p.qrCheckinRevision,4);});
+test('a page opened before QR activation cannot save a managed room',()=>assert.throws(()=>advance(make(),{players:[]}),/state-stale/));
+test('a page opened before a new check-in must reload',()=>{const s=state();s.qrCheckinRevision=2;assert.throws(()=>advance(make(),s),/state-stale/);});
+test('non QR rooms retain existing behavior',()=>{const s=state();assert.deepEqual(advance({},s),{});assert.equal(s.qrCheckinRevision,3);});
+test('new participant cannot gain check-in from a full-state payload',()=>{const s=state();s.players.push({id:'new',checkedIn:true,checkinAt:1});advance(make(),s);assert.equal(s.players[2].checkedIn,false);assert.equal(s.players[2].checkinAt,undefined);});
+test('cancelled participant is not resurrected by merging attendance',()=>{const s=state();s.players=[];advance(make(),s);assert.equal(s.players.length,0);});
+test('corrupt canonical state refuses writes',()=>{const d=make();d.data='broken';assert.throws(()=>advance(d,state()),/state-corrupt/);});
+test('explicit captured revision survives a transaction callback retry',()=>{const s=state(),d=make(),expected=s.qrCheckinRevision;advance(d,s,expected);advance(d,s,expected);assert.equal(s.qrCheckinRevision,4);});
+test('concurrent newer revision rejects previous captured revision',()=>{const s=state(),d=make();d.qrCheckinRevision=4;assert.throws(()=>advance(d,s,3),/state-stale/);});

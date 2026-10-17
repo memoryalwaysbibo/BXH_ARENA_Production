@@ -1,0 +1,30 @@
+{
+  "repository": "memoryalwaysbibo/BXH_ARENA_Production",
+  "branch": "main",
+  "capturedOn": "2026-10-16",
+  "files": [
+    {
+      "path": "index.html",
+      "blobSha": "f7d14e96dd789019d3db6a050d8575150b8bb4aa"
+    },
+    {
+      "path": "modules/cloud/cloud-runtime.js",
+      "blobSha": "5719a17b85cfd660cd8661d0f2391b4ccfc67579"
+    },
+    {
+      "path": "modules/main-app/core.js",
+      "blobSha": "dd78e71fcdb478cb5122432c60d9166a84e5fe64"
+    },
+    {
+      "path": "tests/community-quick-registration-cloud.test.cjs",
+      "blobSha": "040395d47757aa3d6d377e27824a99e04b94ff52"
+    }
+  ],
+  "backendReference": {
+    "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+    "branch": "feature/onsite-waitlist-final-enable-20261009",
+    "verifiedLive": false
+  },
+  "commit": "42d5e4a4a7cca06b9de2af383e99d83fb4cdabf4",
+  "candidateVersion": 2
+}

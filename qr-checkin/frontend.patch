@@ -1,0 +1,175 @@
+diff --git a/index.html b/index.html
+index f7d14e9..05fe987 100644
+--- a/index.html
++++ b/index.html
+@@ -213,6 +213,8 @@
+ <script id="bxh-domain-utils-p1k" src="modules/main-app/domain-utils.js?v=20261002-p1k-1&quick-registration=20261006.6"></script>
+ <script id="bxh-tournament-operations-p2a" src="modules/main-app/tournament-operations.js?v=20261002-p2a-1"></script>
+ <script id="bxh-share-feature-p2a" src="modules/main-app/share-feature.js?v=20261002-p2a-1"></script>
++<script src="modules/main-app/qr-checkin.js?v=20261016-candidate-1"></script>
++<script src="modules/main-app/qr-checkin-fence.js?v=20261016-candidate-2"></script>
+ <script id="bxh-mailbox-p2a" src="modules/main-app/mailbox.js?v=20261005-inline-mail-1"></script>
+ <script id="bxh-mood-p2b" src="modules/main-app/mood-station.js?v=20261002-p2b-1"></script>
+ <script id="bxh-card-album-p2c" src="modules/main-app/card-album.js?v=20261003-card-album-entry-1"></script>
+diff --git a/modules/cloud/cloud-runtime.js b/modules/cloud/cloud-runtime.js
+index 5719a17..6248ed6 100644
+--- a/modules/cloud/cloud-runtime.js
++++ b/modules/cloud/cloud-runtime.js
+@@ -720,7 +720,7 @@
+     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
+     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
+     try{
+-      if(['hunterClashCommand','manageOnsiteWaitlist'].includes(name)){
++      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin'].includes(name)){
+         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
+         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
+         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
+@@ -843,13 +843,14 @@
+ 
+   // Once draw mode is finalized, existing authorized management resumes with
+   // a two-document CAS fence. Old clients cannot replay unfenced runtime JSON.
+-  function advanceOnsiteWriteFence(doc,state,expectedRevision=state?.onsiteWaitlistRuntimeRevision){
+-    if(doc?.onsiteWaitlistServerOwned!==true)return {};
++  function advanceOnsiteWriteFence(doc,state,expectedRevision=state?.onsiteWaitlistRuntimeRevision,expectedQrRevision=state?.qrCheckinRevision){
++    const qrFence=doc?.qrCheckinManaged===true?window.BXHQrCheckinFence.advance(doc,state,expectedQrRevision):{};
++    if(doc?.onsiteWaitlistServerOwned!==true)return qrFence;
+     if(doc.onsiteWaitlistFinalized!==true)throw Object.assign(new Error("onsite-waitlist-managed"),{code:"onsite-waitlist-managed"});
+     const revision=doc.onsiteWaitlistRuntimeRevision;
+     if(!Number.isSafeInteger(revision)||revision<1||expectedRevision!==revision||state?.onsiteWaitlistServerOwned!==true||state?.onsiteWaitlistFinalized!==true)throw Object.assign(new Error("onsite-runtime-stale"),{code:"onsite-runtime-stale"});
+     state.onsiteWaitlistRuntimeRevision=revision+1;
+-    return {onsiteWaitlistRuntimeRevision:revision+1};
++    return {...qrFence,onsiteWaitlistRuntimeRevision:revision+1};
+   }
+   function buildPublicMirrorFields(state){
+     // Explicit, hand-picked whitelist — NEVER a spread of the full private
+@@ -2693,10 +2694,10 @@
+           if(visibilityState)privatePatch.data=JSON.stringify(visibilityState);
+           tx.set(privateRef,privatePatch,{merge:true});
+           if(publicSnap.exists()){
+-            if(onsiteFence.onsiteWaitlistRuntimeRevision){
++            if(onsiteFence.onsiteWaitlistRuntimeRevision||onsiteFence.qrCheckinRevision){
+               const publicPatch={...onsiteFence,visibility:next,registrationVisibility:next,updatedAt:now};
+               const view=JSON.parse(publicSnap.data().bracketView);
+-              view.onsiteWaitlistRuntimeRevision=onsiteFence.onsiteWaitlistRuntimeRevision;
++              if(onsiteFence.onsiteWaitlistRuntimeRevision)view.onsiteWaitlistRuntimeRevision=onsiteFence.onsiteWaitlistRuntimeRevision;
+               publicPatch.bracketView=JSON.stringify(view);
+               tx.set(publicRef,publicPatch,{merge:true});
+             }else{
+@@ -2729,6 +2730,7 @@
+     async pushUpdate(code, data, options={}){
+       if(!cloudEnabled || !code) return false;
+       const onsiteInputRevision=data?.onsiteWaitlistRuntimeRevision;
++      const qrInputRevision=data?.qrCheckinRevision;
+       try{
+         const actorUid=currentUserUidForWrites();
+         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
+@@ -2938,7 +2940,7 @@ if(testerSession){
+             data.meta.registrationStatus=data.meta.eventCancelled?"cancelled":data.startedAt?"started":"closed";
+             privatePayload.registrationStatus=data.meta.registrationStatus;publicPayload.registrationStatus=data.meta.registrationStatus;
+           }
+-          const onsiteFence=advanceOnsiteWriteFence(snap.exists()?snap.data():{},data,onsiteInputRevision);
++          const onsiteFence=advanceOnsiteWriteFence(snap.exists()?snap.data():{},data,onsiteInputRevision,qrInputRevision);
+           Object.assign(privatePayload,onsiteFence,courtLifecycleWritePatch(snap.exists()?snap.data():{},data));
+           Object.assign(publicPayload,onsiteFence);
+           privatePayload.data=JSON.stringify(data);
+diff --git a/modules/main-app/core.js b/modules/main-app/core.js
+index dd78e71..0e3d45a 100644
+--- a/modules/main-app/core.js
++++ b/modules/main-app/core.js
+@@ -12227,7 +12227,7 @@ function renderPeopleManagement(){
+   const syncError=adminRegistrationsError?`<div class="banner warn" role="alert"><span>線上名單尚未同步：${esc(adminRegistrationsError)}</span><button class="btn btn-ghost btn-sm" data-action="${state.startedAt?"load-admin-registrations":"load-online-roster"}" ${peopleRosterBusy?"disabled":""}>重新同步名單</button></div>`:"";
+   const pendingOnsite=window.BXHOnsiteWaitlistIntegration?.pendingCommand(state.cloudCode,firebaseUser?.uid);
+   const pendingBanner=pendingOnsite?'<div class="banner warn" role="alert"><span>有一筆報到操作尚未確認。</span><button class="btn btn-primary" data-action="onsite-checkin-retry" '+(peopleRosterBusy?'disabled':'')+'>確認同一筆報到操作</button></div>':'';
+-  return syncError+pendingBanner+subnav+(panels[peopleRosterSection]||confirmedPanel);
++  return syncError+pendingBanner+subnav+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+(panels[peopleRosterSection]||confirmedPanel);
+ }
+ 
+ function renderBxhEventTemplateSettingsSection(readOnly){
+@@ -17536,6 +17536,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
+   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
+ }
+ function render(){
++  window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
+   reconcileLobbyContext();
+   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
+   hunterClashEntry?.session(firebaseUser,userProfile);
+@@ -17562,6 +17563,8 @@ function render(){
+       finishRenderViewport(__viewportSnapshot);
+       return;
+     }
++  const qrCheckinEntry=window.BXHQrCheckin?.renderEntry();
++  if(firebaseUser&&userProfile?.active===true&&qrCheckinEntry){app.innerHTML=qrCheckinEntry;return;}
+   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
+   if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {currentRole="admin";appPhase="app";activeTab="management";} }
+   if(appPhase==="landing"){ app.innerHTML = renderLandingScreen(); bindAuthInputs(); return; }
+@@ -18530,6 +18533,7 @@ function renderApp(){
+     ${renderModal()}
+     ${celebrationOpen ? renderCelebrationOverlay() : ""}
+     ${shareModalOpen ? renderShareModal() : ""}
++    ${window.BXHQrCheckin?.renderModal()||""}
+     ${renderCloudJoinModal()}
+     ${renderEventEntryModal()}
+     ${renderQrScannerModal()}
+@@ -22372,6 +22376,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
+       showToast("目前報到已鎖定，無法變更報到狀態",true);
+       return;
+     }
++    if(window.BXHQrCheckin?.managed()){
++      if(!p.checkedIn){window.BXHQrCheckin.manual(p,true);return;}
++      const roomCode=state.cloudCode;
++      openModal({type:"generic",title:"是否要取消報到？",message:p.name,danger:true,confirmLabel:"是",cancelLabel:"否",onConfirm:()=>{if(state.cloudCode===roomCode)window.BXHQrCheckin.manual(p,false);}});return;
++    }
+     if(peopleOnsiteWaitlistManaged()){
+       if(!p.checkedIn){peopleSetOnsiteCheckIn(p,true);return;}
+       const context={code:state.cloudCode,uid:firebaseUser?.uid,id:state.id};
+diff --git a/tests/community-quick-registration-cloud.test.cjs b/tests/community-quick-registration-cloud.test.cjs
+index 040395d..5d83357 100644
+--- a/tests/community-quick-registration-cloud.test.cjs
++++ b/tests/community-quick-registration-cloud.test.cjs
+@@ -83,6 +83,7 @@ function harness() {
+     buildPublicEventInfo: () => ({}), communityRoomExpiryMs: () => NOW + 3600000,
+   });
+   vm.runInContext(domain + '\n' + registration, ctx);
++  ctx.window.BXHQrCheckinFence = require('../modules/main-app/qr-checkin-fence.js');
+   Object.assign(ctx, ctx.window.BXHDomainUtils, ctx.window.BXHRegistrationUtils);
+   for (const name of ['advanceOnsiteWriteFence', 'courtLifecycleWritePatch', 'buildPublicMirrorFields', 'computeTournamentPhase', 'reconstructPublicStateFromDoc']) vm.runInContext(cloudFunction(name), ctx);
+   const names = ['createCommunityRoom', 'createRoom', 'pushUpdate', 'syncCommunityRegistrationSummary', 'joinRoom', 'joinRoomPublic', 'getPublicTournamentFull', 'getPublicTournamentSummary', 'queryPublicTournaments', 'queryAdminTournaments', 'promoteLocalWaitlistRoster', 'mutateRegistrationRoster'];
+@@ -95,6 +96,38 @@ function harness() {
+   return { ctx, api: ctx.api, docs, writes, logs, summaryCalls, stats };
+ }
+ 
++function activateQrCheckinFixture(h, revision = 3) {
++  const data=state({checkinRequired:true});
++  data.qrCheckinManaged=true;data.qrCheckinRevision=revision;
++  data.players=[{id:'p1',name:'Player',checkedIn:true,checkinAt:NOW,checkinMethod:'qr'}];
++  const common={qrCheckinManaged:true,qrCheckinRevision:revision,eventAuthority:'community',communityQuickRegistration:true,tournamentPhase:'waiting'};
++  h.docs.set('tournaments/LOCAL',{...common,data:JSON.stringify(data)});
++  h.docs.set('publicTournaments/LOCAL',{...common,bracketView:JSON.stringify(h.ctx.buildPublicMirrorFields(data))});
++  return clone(data);
++}
++test('QR-managed ordinary push preserves canonical attendance in both mirrors',async()=>{
++  const h=harness(),data=activateQrCheckinFixture(h);data.players[0].checkedIn=false;
++  assert.equal(await h.api.pushUpdate('LOCAL',data),true);
++  assert.equal(JSON.parse(h.docs.get('tournaments/LOCAL').data).players[0].checkedIn,true);
++  assert.equal(JSON.parse(h.docs.get('publicTournaments/LOCAL').bracketView).players[0].checkedIn,true);
++  assert.equal(h.docs.get('tournaments/LOCAL').qrCheckinRevision,4);
++  assert.equal(h.docs.get('publicTournaments/LOCAL').qrCheckinRevision,4);
++});
++test('QR-managed push from a stale tab writes neither mirror',async()=>{
++  const h=harness(),data=activateQrCheckinFixture(h);data.qrCheckinRevision=2;
++  const before=JSON.stringify([...h.docs]);assert.equal(await h.api.pushUpdate('LOCAL',data),false);
++  assert.equal(JSON.stringify([...h.docs]),before);assert.equal(h.writes.length,0);
++});
++test('QR-managed room rejects a pre-feature client state with no revision',async()=>{
++  const h=harness(),data=activateQrCheckinFixture(h);delete data.qrCheckinManaged;delete data.qrCheckinRevision;
++  assert.equal(await h.api.pushUpdate('LOCAL',data),false);assert.equal(h.writes.length,0);
++});
++test('QR-managed full-state push cannot report a newly added player as checked in',async()=>{
++  const h=harness(),data=activateQrCheckinFixture(h);data.players.push({id:'p2',name:'New player',checkedIn:true});
++  assert.equal(await h.api.pushUpdate('LOCAL',data),true);
++  assert.equal(JSON.parse(h.docs.get('tournaments/LOCAL').data).players.find(p=>p.id==='p2').checkedIn,false);
++});
++
+ for (const capacity of [null, 1, 257, Number.MAX_SAFE_INTEGER]) {
+   test('community creation serializes opt-in and exact capacity in both mirrors: ' + capacity, async () => {
+     const h = harness();

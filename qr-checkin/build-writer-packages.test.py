@@ -1,0 +1,109 @@
+"""Regression checks for reproducible packaging and refusing damaged sources."""
+import hashlib
+import importlib.util
+import json
+import pathlib
+import re
+import tempfile
+import unittest
+
+spec = importlib.util.spec_from_file_location('writer_build', pathlib.Path(__file__).with_name('build-writer-packages.py'))
+builder = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(builder)
+
+
+class PackageTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = pathlib.Path(self.temp.name)
+        self.source, self.output = self.root / 'source', self.root / 'output'
+        services = []
+        for name, version in [('first', 1), ('second', 2)]:
+            path = self.source / name / 'nested/index.js'
+            path.parent.mkdir(parents=True)
+            raw = ("const {getFirestore}=require('firebase-admin/firestore');\nexports.version=" + str(version) + ';\n').encode()
+            path.write_bytes(raw)
+            services.append({'name': name, 'sourceGeneration': str(version), 'files': {'nested/index.js': {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}}})
+        self.pin = self.root / 'pin.json'
+        self.pin.write_text(json.dumps({'project': 'demo-only', 'auditRunId': 1, 'functions': services}))
+        old_pin, old_hash = builder.PIN, builder.PIN_HASH
+        self.addCleanup(lambda: (setattr(builder, 'PIN', old_pin), setattr(builder, 'PIN_HASH', old_hash)))
+        builder.PIN, builder.PIN_HASH = self.pin, hashlib.sha256(self.pin.read_bytes()).hexdigest()
+
+    def test_independent_service_versions_and_nested_imports(self):
+        report = builder.build(self.source, self.output)
+        self.assertFalse(report['deploymentReady'])
+        for name, version in [('first', 1), ('second', 2)]:
+            text = (self.output / name / 'nested/index.js').read_text()
+            self.assertIn('../_qr_checkin/admin-firestore.cjs', text)
+            self.assertIn('exports.version=' + str(version), text)
+            self.assertTrue((self.output / name / '_qr_checkin/guard-firestore.cjs').is_file())
+
+    def test_mismatched_source_creates_no_partial_package(self):
+        (self.source / 'second/nested/index.js').write_text('changed')
+        with self.assertRaisesRegex(ValueError, 'Deployed source mismatch'):
+            builder.build(self.source, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_changed_manifest_is_not_trusted(self):
+        self.pin.write_text('{}')
+        with self.assertRaisesRegex(ValueError, 'manifest changed'):
+            builder.build(self.source, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_existing_output_is_not_overwritten(self):
+        self.output.mkdir()
+        (self.output / 'keep').write_text('keep')
+        with self.assertRaisesRegex(ValueError, 'refusing to overwrite'):
+            builder.build(self.source, self.output)
+        self.assertEqual((self.output / 'keep').read_text(), 'keep')
+
+    def package_dependency(self, admin='^14.4.0', functions='^7.3.2'):
+        raw = json.dumps({'dependencies': {'firebase-admin': admin, 'firebase-functions': functions}}).encode()
+        (self.source / 'first/package.json').write_bytes(raw)
+        manifest = json.loads(self.pin.read_text())
+        manifest['functions'][0]['files']['package.json'] = {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+        self.pin.write_text(json.dumps(manifest))
+        builder.PIN_HASH = hashlib.sha256(self.pin.read_bytes()).hexdigest()
+
+    def test_dependencies_are_frozen_to_the_verified_sdk_versions(self):
+        self.package_dependency()
+        builder.build(self.source, self.output)
+        dependencies = json.loads((self.output / 'first/package.json').read_text())['dependencies']
+        self.assertEqual(dependencies, {'firebase-admin': '14.4.0', 'firebase-functions': '7.3.2'})
+
+    def test_unverified_dependency_family_leaves_no_partial_package(self):
+        self.package_dependency('^99.0.0')
+        with self.assertRaisesRegex(ValueError, 'Unverified Firebase'):
+            builder.build(self.source, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_onsite_package_resolves_shared_audit_helpers_and_keeps_native_transactions(self):
+        manifest = json.loads(self.pin.read_text())
+        files = {}
+        for name, raw in [('index.js', b"const {getFirestore}=require('firebase-admin/firestore');"), ('onsite-waitlist/core.js', b'// original core'), ('onsite-waitlist/firestore-store.js', b'// original store')]:
+            p = self.source / 'manageOnsiteWaitlist' / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(raw)
+            files[name] = {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+        manifest['functions'].append({'name': 'manageOnsiteWaitlist', 'sourceGeneration': '3', 'files': files})
+        self.pin.write_text(json.dumps(manifest))
+        builder.PIN_HASH = hashlib.sha256(self.pin.read_bytes()).hexdigest()
+        before = builder.ONSITE_SOURCE_HASHES
+        self.addCleanup(lambda: setattr(builder, 'ONSITE_SOURCE_HASHES', before))
+        builder.ONSITE_SOURCE_HASHES = {n: e['sha256'] for n, e in files.items() if n != 'index.js'}
+        builder.build(self.source, self.output)
+        package = self.output / 'manageOnsiteWaitlist'
+        self.assertIn("require('firebase-admin/firestore')", (package / 'index.js').read_text())
+        self.assertIn('await prepare(', (package / 'onsite-waitlist/firestore-store.js').read_text())
+        for p in package.rglob('*'):
+            if p.suffix not in ('.js', '.cjs'):
+                continue
+            for name in re.findall(r"require\(['\"](\.[^'\"]+)['\"]\)", p.read_text()):
+                target = p.parent / name
+                self.assertTrue(target.is_file() or target.with_suffix('.js').is_file(), str(target))
+
+
+if __name__ == '__main__':
+    unittest.main()

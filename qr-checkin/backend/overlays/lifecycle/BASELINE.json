@@ -1,0 +1,21 @@
+{
+  "auditRunId": 38932368893,
+  "services": {
+    "closeIdleTournaments": "1790488724343135",
+    "restoreIdleTournament": "1790488723899106"
+  },
+  "originalFiles": {
+    "operations.js": {
+      "sha256": "0b948bdc0a14e2a526e13066a3fc284e348a2e2171def51ae6a79a498bca6500",
+      "bytes": 15320
+    },
+    "operations-core.js": {
+      "sha256": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
+      "bytes": 6339
+    },
+    "release-controls.js": {
+      "sha256": "f7b2ea90058bf4c817afdb8690d7e0d26c07f35359a059df0f80d910f360d6c2",
+      "bytes": 860
+    }
+  }
+}

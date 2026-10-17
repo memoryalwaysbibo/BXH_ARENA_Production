@@ -1,0 +1,16 @@
+{
+  "service": "manageOnsiteWaitlist",
+  "sourceGeneration": "1791872538877975",
+  "auditRunId": 38932368893,
+  "originalFiles": {
+    "onsite-waitlist/core.js": {
+      "sha256": "ded4853ec976cdac18bfe0603c9fcca73faeb4e1ebabf3755d8f1615c15b3b82",
+      "bytes": 53225
+    },
+    "onsite-waitlist/firestore-store.js": {
+      "sha256": "5dc921853c45912b77c869854384a2b3b9acc8e05d12427e1f67558b42e4b9d2",
+      "bytes": 3136
+    }
+  },
+  "deploymentReady": false
+}
