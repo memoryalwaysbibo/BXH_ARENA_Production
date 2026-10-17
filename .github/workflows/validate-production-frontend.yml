@@ -131,7 +131,9 @@ jobs:
         run: node tests/offline-resilience-v2-wiring.test.cjs
 
       - name: Verify compact next-match prepare UI
-        run: node tests/court-call-next-prepare-ui.test.cjs
+        run: |
+          node tests/court-call-next-prepare-ui.test.cjs
+          node --test tests/court-call-pending-recovery.test.cjs
 
       - name: Verify tournament raffle winner count stepper
         run: node tests/tournament-operations-count-stepper.test.cjs

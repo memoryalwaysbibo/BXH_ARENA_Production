@@ -253,7 +253,18 @@ function courtCallError(e){
 }
 
 function courtCallCommon(c){
- return `${c.error?`<p class="auth-error" role="alert">${esc(c.error)}</p>`:''}${c.pending?`<button class="btn btn-ghost" data-action="court-call-retry" data-code="${esc(c.code)}" ${c.busy?'disabled':''}>重試待確認操作</button>`:''}`;
+ return `${c.error?`<p class="auth-error" role="alert">${esc(c.error)}</p>`:''}${c.pending?`<button class="btn btn-ghost" data-action="court-call-retry" data-code="${esc(c.code)}" ${c.busy?'disabled':''}>重試待確認操作</button><button class="btn btn-ghost" data-action="court-call-release-pending" data-code="${esc(c.code)}" ${c.busy?'disabled':''}>解除待確認狀態</button><p class="hint">重試會沿用原操作，避免重複送出。若場次已變更，可解除本裝置的待確認狀態；已送出的通知不會撤回。</p>`:''}`;
+}
+
+function courtCallClearPending(c){
+ c.pending=null;
+ try{sessionStorage.removeItem(c.storageKey);}catch{}
+}
+
+function courtCallDefinitiveFailure(e){
+ return ['functions/failed-precondition','functions/permission-denied',
+  'functions/invalid-argument','functions/not-found','functions/unauthenticated',
+  'functions/out-of-range'].includes(String(e?.code||''));
 }
 
 function courtCallStationLabel(station){
@@ -818,6 +829,16 @@ async function handleCourtCall(action,target){
  const code=String(target.getAttribute('data-code')||'').toUpperCase();
  if(!code)return;
  const c=courtCallContext(code);if(c.busy)return;
+ if(action==='court-call-release-pending'){
+  if(!c.pending)return;
+  if(!confirm('原操作可能已送達。解除只會清除本裝置的待確認狀態，不會撤回通知或重送叫號。解除後請先核對目前場次，再決定是否通知。是否解除？'))return;
+  courtCallClearPending(c);c.error='';
+  syncCourtCallGlobalOverlay();
+  try{renderPreservingScroll();}catch{}
+  await loadCourtCalls(code);
+  showToast('已解除本裝置待確認狀態，請核對目前場次後再叫號');
+  return;
+ }
  let payload=c.pending;
  let requestedResponse='';
  if(!payload){
@@ -848,7 +869,7 @@ async function handleCourtCall(action,target){
   const r=await window.engagementService.courtCall(payload);
   if(c!==courtCallContext(code))return;
   if(!r.ok)throw Error('operation-failed');
-  c.pending=null;sessionStorage.removeItem(storageKey);
+  courtCallClearPending(c);
   if(r.state&&typeof state!=='undefined'&&state.cloudCode===code)applyRemoteState(r.state,true);
   c.busy=false;
   await loadCourtCalls(code);
@@ -860,8 +881,8 @@ async function handleCourtCall(action,target){
  }catch(e){
   if(c===courtCallContext(code)){
    c.error=courtCallError(e);
-   if(['functions/failed-precondition','functions/permission-denied'].includes(e.code)){
-    c.pending=null;sessionStorage.removeItem(storageKey);
+   if(courtCallDefinitiveFailure(e)){
+    courtCallClearPending(c);
    }
    showToast(c.error,true);
   }
