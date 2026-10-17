@@ -5,13 +5,46 @@
   const held=m=>pending(m)&&(m.offlinePendingSync||!m.skippedAt&&(m.status==='in_progress'||m.status==='paused'||Number(m.scoreA)>0||Number(m.scoreB)>0||(m.log||[]).length>0));
   function target(st){return count(st.courtRetirementPlan?.targetCount||st.meta?.stations);}
   function accepts(st,n){return Number.isInteger(Number(n))&&Number(n)>0&&Number(n)<=target(st)&&!st.forcedCourtExits?.[n]?.closed;}
+  // Without authoritative call records, every displayed next is reserved too.
+  // Keep PASS predecessors together; moving either endpoint can change its order.
+  function movableQueuedMatches(st){
+    const reserved=new Set();
+    for(const c of Object.values(st.courtAssignments||{})){
+      if(c?.currentMatchId)reserved.add(c.currentMatchId);
+      if(c?.nextMatchId)reserved.add(c.nextMatchId);
+    }
+    for(const m of st.matches||[]){
+      for(const id of m?.skipWaitFor||[])reserved.add(id);
+      for(const id of m?.callPass?.waitFor||[])reserved.add(id);
+    }
+    return (st.matches||[]).filter(m=>pending(m)&&!reserved.has(m.id)&&
+      Number.isInteger(Number(m.station))&&Number(m.station)>0&&!m.forceDetached&&!st.forcedCourtExits?.[m.station]?.closed&&
+      ['pending','ready'].includes(m.status||'pending')&&!m.startedAt&&!m.completedAt&&!m.confirmedAt&&!m.confirmedBy&&!m.resultMethod&&
+      !m.winnerId&&!m.loserId&&!m.offlinePendingSync&&!m.skippedAt&&!m.resumeQueuedAt&&!m.skipManualOnly&&!m.callPass&&!(m.skipWaitFor||[]).length&&
+      !Number(m.scoreA||0)&&!Number(m.scoreB||0)&&!(m.log||[]).length&&!(m.faultActions||[]).length);
+  }
+  function expandQueuedMatches(st,n,now){
+    const movable=movableQueuedMatches(st).slice().sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
+    const ids=new Set(movable.map(m=>m.id));
+    const courts=Array.from({length:n},(_,i)=>i+1).filter(i=>accepts(st,i));
+    if(!courts.length)return;
+    const load=new Map(courts.map(i=>[i,0]));
+    for(const m of st.matches||[])if(pending(m)&&!ids.has(m.id)&&load.has(Number(m.station)))load.set(Number(m.station),load.get(Number(m.station))+1);
+    for(const m of movable){
+      const to=courts.reduce((best,i)=>load.get(i)<load.get(best)?i:best,courts[0]);
+      load.set(to,load.get(to)+1);
+      if(Number(m.station)===to)continue;
+      // Only routing changes: do not reset slots, scores, readiness or dependencies.
+      m.station=to;m.dispatchRevision=Number(m.dispatchRevision||0)+1;m.updatedAt=now;
+    }
+  }
   function reconcile(st,now=Date.now()){
     const p=st.courtRetirementPlan;if(!p)return;
     let changed=false;
     const load=Array(p.targetCount).fill(0);
     for(const m of st.matches||[])if(pending(m)&&Number(m.station)<=p.targetCount)load[Number(m.station)-1]++;
     for(const m of st.matches||[]){
-      if(!pending(m)||Number(m.station)<=p.targetCount||held(m))continue;
+      if(!pending(m)||Number(m.station)<=p.targetCount||held(m)||(p.expansionHeldIds||[]).includes(m.id))continue;
       const to=load.indexOf(Math.min(...load))+1;load[to-1]++;move(st,m,to,now);changed=true;
     }
     for(const [key,c] of Object.entries(p.courts||{})){
@@ -29,17 +62,26 @@
     const status=draining.length?'draining':'completed';if(p.status!==status){p.status=status;changed=true;}
     if(changed){p.revision=Number(p.revision||0)+1;p.updatedAt=now;}
   }
-  function request(st,n,expectedTarget=target(st),now=Date.now()){
+  function request(st,n,expectedTarget=target(st),now=Date.now(),expectedRevision=Number(st.courtRetirementPlan?.revision||0)){
     if(!Number.isInteger(n)||n<1||n>32)return {ok:false,reason:'invalid-court-count'};
     if(target(st)!==expectedTarget)return {ok:false,reason:'court-plan-stale'};
+    if(!Number.isSafeInteger(expectedRevision)||expectedRevision!==Number(st.courtRetirementPlan?.revision||0))return {ok:false,reason:'court-plan-stale'};
     if(st.archiveStatus==='completed')return {ok:false,reason:'already-completed'};
+    if(n===expectedTarget)return {ok:true,state:st};
     const old=st.courtRetirementPlan;const p={targetCount:n,revision:Number(old?.revision||0)+1,requestedAt:now,updatedAt:now,status:'draining',courts:{}};
     const physical=Math.max(n,count(st.meta.stations));
     for(let i=n+1;i<=physical;i++)p.courts[i]={status:'draining',holdIds:[],requestedAt:old?.courts?.[i]?.requestedAt||now,updatedAt:now};
     st.courtRetirementPlan=p;
+    if(n>expectedTarget){
+      const movable=new Set(movableQueuedMatches(st).map(m=>m.id));
+      // Expanding a still-draining plan (6→1→3) must not let the legacy
+      // shrink/reconcile pass move a reserved next or other protected work.
+      p.expansionHeldIds=(st.matches||[]).filter(m=>pending(m)&&Number(m.station)>n&&!movable.has(m.id)).map(m=>m.id);
+      expandQueuedMatches(st,n,now);
+    }
     const load=Array(n).fill(0);for(const m of st.matches||[])if(pending(m)&&Number(m.station)<=n)load[Number(m.station)-1]++;
     for(const m of (st.matches||[]).slice().sort((a,b)=>Number(a.seq||0)-Number(b.seq||0))){
-      if(!pending(m)||Number(m.station)<=n||held(m))continue;
+      if(!pending(m)||Number(m.station)<=n||held(m)||(p.expansionHeldIds||[]).includes(m.id))continue;
       const to=load.indexOf(Math.min(...load))+1;load[to-1]++;
       move(st,m,to,now); // PASS dependencies and score ledgers remain attached to the match.
     }
@@ -99,5 +141,5 @@
     if(m.offlinePendingSync)return {ok:false,reason:'offline-sync-pending'};
     move(st,m,to,now);delete m.forceDetached;return {ok:true,state:st};
   }
-  root.BXHCourtRetirement={target,accepts,request,reconcile,transfer,forceExit,reopen,claimDetached};
+  root.BXHCourtRetirement={target,accepts,request,reconcile,transfer,forceExit,reopen,claimDetached,movableQueuedMatches};
 })(typeof window==='undefined'?globalThis:window);
