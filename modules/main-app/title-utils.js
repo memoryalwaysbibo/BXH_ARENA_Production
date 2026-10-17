@@ -21,7 +21,7 @@ function titleArtworkPath(name,rarity){
     '四強霸主':'assets/title-epic-top4-overlord.webp',
     '冠軍獵人':'assets/title-epic-champion-hunter.webp',
     '百日戰士':'assets/title-epic-hundred-day-warrior.webp',
-    '準時回家':'assets/title-rare-home-on-time.svg',
+    '準時回家':'assets/title-common-home-on-time.svg',
     '開場即結束':'assets/title-rare-over-at-start.svg',
     '誰能比我慘':'assets/title-epic-unluckiest.svg',
     '初次開局':'assets/title-rare-first-match.webp',
