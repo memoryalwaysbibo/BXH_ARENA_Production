@@ -77,3 +77,7 @@ test('failed transaction cannot mutate the saved candidate fences before retry',
 test('storage failure prevents the candidate from being sent',async()=>{
  const h=fixture();h.ctx.storage.setItem=()=>{throw Error('quota');};const c=h.make();assert.equal(await c.begin(),false);assert.equal(await c.retry(),false);assert.equal(h.writes.length,0);assert.equal(h.success,0);
 });
+
+test('account switch during server preflight never sends a write',async()=>{
+ const h=fixture(),read=h.ctx.read,wait=deferred();h.ctx.read=async()=>{await wait.promise;return read();};const c=h.make(),p=c.begin();await tick();h.leave();wait.resolve();await p;assert.equal(h.writes.length,0);assert.equal(h.applied,0);
+});

@@ -31,11 +31,13 @@ function create(ctx){
    keep();
    if(ctx.cloud()){
     let latest=await deadline(ctx.read());
+    if(!ctx.current())return false;
     if(!matches(latest,pending.snapshot)){
      if(!latest?.ok||signature(latest.data)!==pending.baseSignature||latest.data.startedAt)throw Error('bracket-version-conflict');
      // Never regenerate on retry. The transaction rejects concurrent draws/starts.
      const ok=await deadline(ctx.write(clone(pending.snapshot),{bracketCommit:{baseSignature:pending.baseSignature}}));
      keep();
+     if(!ctx.current())return false;
      if(ok!==true)throw Error('cloud-save-unconfirmed');
      latest=await deadline(ctx.read());
      if(!matches(latest,pending.snapshot))throw Error('cloud-readback-unconfirmed');

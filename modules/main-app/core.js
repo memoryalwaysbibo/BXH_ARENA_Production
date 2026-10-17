@@ -6319,6 +6319,7 @@ function enqueueCloudStateWrite(code, snapshot, options={}){
   cloudWriteChain = cloudWriteChain
     .catch(()=>false)
     .then(async ()=>{
+      if(options.isCurrent&&!options.isCurrent())return false;
       if(!normalizedCode || !cloudAvailable() || !window.cloudSync || !window.cloudSync.pushUpdate) return false;
       return await window.cloudSync.pushUpdate(normalizedCode, snapshot, options);
     });
@@ -10168,7 +10169,7 @@ function bracketCommitController(){
    finally{state=prior;}
   },
   read:()=>window.cloudSync.readBracketFromServer(code),
-  write:(snapshot,options)=>enqueueCloudStateWrite(code,snapshot,options),
+  write:(snapshot,options)=>enqueueCloudStateWrite(code,snapshot,{...options,isCurrent:current}),
   local:snapshot=>saveRecord(snapshot),
   apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;saveRecord(state);},
   changed:()=>{if(current())renderPreservingScroll();},
