@@ -34,7 +34,7 @@ function create(ctx){
     if(!matches(latest,pending.snapshot)){
      if(!latest?.ok||signature(latest.data)!==pending.baseSignature||latest.data.startedAt)throw Error('bracket-version-conflict');
      // Never regenerate on retry. The transaction rejects concurrent draws/starts.
-     const ok=await deadline(ctx.write(pending.snapshot,{bracketCommit:{baseSignature:pending.baseSignature}}));
+     const ok=await deadline(ctx.write(clone(pending.snapshot),{bracketCommit:{baseSignature:pending.baseSignature}}));
      keep();
      if(ok!==true)throw Error('cloud-save-unconfirmed');
      latest=await deadline(ctx.read());

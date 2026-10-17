@@ -69,3 +69,11 @@ test('actual cloud transaction and server-only private/public readback enforce v
  assert.equal(await h.api.pushUpdate('ROOM',{...clone(candidate),startedAt:2},{bracketStartSignature:api.signature(old)}),false);
  assert.equal(await h.api.pushUpdate('ROOM',{...clone(candidate),startedAt:2},{bracketStartSignature:api.signature(candidate)}),true);
 });
+
+test('failed transaction cannot mutate the saved candidate fences before retry',async()=>{
+ const h=fixture(),write=h.ctx.write;let first=true;h.ctx.write=async(s,o)=>{if(first){first=false;s.qrCheckinRevision=999;s.matches[0].id='mutated';return false;}return write(s,o);};
+ const c=h.make();assert.equal(await c.begin(),false);assert.equal(await c.retry(),true);assert.equal(h.local.matches[0].id,'m1');assert.equal(h.local.qrCheckinRevision,undefined);assert.equal(h.count,1);
+});
+test('storage failure prevents the candidate from being sent',async()=>{
+ const h=fixture();h.ctx.storage.setItem=()=>{throw Error('quota');};const c=h.make();assert.equal(await c.begin(),false);assert.equal(await c.retry(),false);assert.equal(h.writes.length,0);assert.equal(h.success,0);
+});
