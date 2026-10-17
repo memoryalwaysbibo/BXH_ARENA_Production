@@ -3648,6 +3648,8 @@ async function routeTournamentEntry(rawCode, rawEntry){
 
 function parseScannedTournamentEntry(value){
   const raw=String(value||"").trim();
+  const checkin=window.BXHQrCheckin?.parseUrl(raw);
+  if(checkin)return {...checkin,entry:"checkin"};
   const direct=normalizeRoomCodeInput(raw);
   if(isValidRoomCode(direct)) return {code:direct,entry:"event"};
   try{
@@ -3691,6 +3693,11 @@ async function acceptScannedQrValue(value){
   if(!parsed){setQrScannerStatus('這不是有效的 BXH ARENA 賽事 QR，請重新對準。',true);return false;}
   stopQrScanner();qrScannerOpen=false;
   try{if(navigator.vibrate)navigator.vibrate(80);}catch(e){}
+  if(parsed.entry==='checkin'){
+    if(!firebaseUser||userProfile?.active!==true){currentRole='player';guestReadOnlyMode=false;appPhase='player-home';}
+    if(!window.BXHQrCheckin?.acceptUrl(value)){render();showToast('目前無法讀取報到 QR，請重試。',true);return false;}
+    return true;
+  }
   replaceTournamentEntryInUrl(parsed.code,parsed.entry);render();
   await routeTournamentEntry(parsed.code,parsed.entry);return true;
 }
@@ -12852,7 +12859,7 @@ function renderLandingScreen(){
       </div>
       <div class="btn-row" style="justify-content:center;margin-top:18px;">
         <a class="btn btn-ghost" href="./bey-catalog.html" data-catalog-entry="public">陀螺圖鑑 · 免登入</a>
-        <button class="btn btn-primary" data-action="open-qr-scanner" data-source="landing">掃描賽事 QR</button>
+        <button class="btn btn-primary" data-action="open-qr-scanner" data-source="landing">掃描賽事／報到 QR</button>
         <button class="btn btn-ghost" data-action="raffle-public">會員抽獎</button>
         <button class="btn btn-ghost" data-action="force-refresh-version" title="強制重新載入最新版本">↻ 刷新版本</button>
       </div>
@@ -14238,7 +14245,7 @@ let moodState=null;
 const {renderMoodStation,handleMood}=window.BXHMoodFeature;
 
 function renderPlayerHomeTab(p){
-  return `${renderMoodStation()}${renderTournamentLobby({ loggedIn:true, profile:p })}`;
+  return `<div class="panel"><button class="btn btn-primary btn-block" data-action="open-qr-scanner">掃碼報到</button><p class="hint">掃描現場報到 QR，使用目前帳號直接報到，無需重新登入。</p></div>${renderMoodStation()}${renderTournamentLobby({ loggedIn:true, profile:p })}`;
 }
 
 let hostAchievementCount=null;
@@ -18140,7 +18147,7 @@ function renderQrScannerModal(){
   return `<div class="modal-overlay" data-action="close-qr-scanner">
     <div class="modal-box" style="max-width:460px;">
       <h3>掃描 BXH ARENA QR</h3>
-      <p class="hint">請允許相機權限，並將賽事 QR 放入框內。</p>
+      <p class="hint">請允許相機權限，並將賽事或現場報到 QR 放入框內。</p>
       <div class="qr-scanner-box">
         <video id="qr-scanner-video" class="qr-scanner-video" playsinline webkit-playsinline autoplay muted></video>
         <canvas id="qr-scanner-canvas" style="display:none;"></canvas>

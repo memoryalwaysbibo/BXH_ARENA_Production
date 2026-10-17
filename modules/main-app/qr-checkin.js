@@ -24,6 +24,24 @@
     const u=new URL(location.href),code=u.searchParams.get('checkin'),token=u.searchParams.get('checkinToken');
     return code&&token&&/^BXH-[A-Z0-9]{4,16}$/.test(code)?{code,token}:null;
   }
+  // Route within the current origin to preserve the existing authenticated session.
+  function parseUrl(value){
+    try{
+      const u=new URL(String(value||''),location.href),here=new URL(location.href);
+      const code=u.searchParams.get('checkin'),token=u.searchParams.get('checkinToken');
+      if(u.origin!==here.origin||!['http:','https:'].includes(u.protocol)||!code||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!token||token.length>2048)return null;
+      return {code,token};
+    }catch{return null;}
+  }
+  function acceptUrl(value){
+    const e=parseUrl(value);if(!e||scanBusy||!ctx)return false;
+    const u=new URL(location.href);u.search='';u.hash='';
+    u.searchParams.set('checkin',e.code);u.searchParams.set('checkinToken',e.token);
+    scanStarted='';scanResult=null;
+    history.replaceState(null,'',u.href);
+    ctx.render();
+    return true;
+  }
   function qrUrl(){const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set('checkin',ctx.state().cloudCode);u.searchParams.set('checkinToken',settings.token);return u.href;}
   async function refresh(loadHistory=true){
     const k=key(),code=ctx.state().cloudCode;
@@ -93,7 +111,7 @@
     const s=ctx.state(),players=s.players||[];
     return '<div class="modal-overlay"><div class="modal-box" role="dialog" aria-modal="true" aria-label="現場報到"><h2>現場報到</h2><p>'+esc(s.meta?.name)+'｜'+esc(s.cloudCode)+'</p><p>正取 '+players.length+' 人｜已報到 '+players.filter(p=>p.checkedIn).length+' 人｜未報到 '+players.filter(p=>!p.checkedIn).length+' 人</p>'+
       '<div class="btn-row"><button class="btn btn-primary" data-qr-checkin="'+(settings?.enabled?'stop':'start')+'" '+(busy||!settings?'disabled':'')+'>'+(settings?.enabled?'停止報到':'開始報到')+'</button><button class="btn btn-ghost" data-qr-checkin="refresh" '+(busy?'disabled':'')+'>更新紀錄</button><button class="btn btn-ghost" data-qr-checkin="fullscreen" '+(!settings?.enabled?'disabled':'')+'>全螢幕 QR</button></div>'+
-      (settings?.enabled?'<div id="qr-checkin-display" style="text-align:center;background:#fff;color:#111;padding:20px"><h3>正取選手掃碼報到</h3><div id="qr-checkin-code" style="display:flex;justify-content:center"></div><p>QR 每 45 秒更新，請掃描現場畫面</p></div>':'<p>QR 報到未開放</p>')+
+      (settings?.enabled?'<div id="qr-checkin-display" style="text-align:center;background:#fff;color:#111;padding:20px"><h3 style="color:#111!important">正取選手掃碼報到</h3><div id="qr-checkin-code" style="display:flex;justify-content:center"></div><p>QR 每 45 秒更新，請掃描現場畫面</p></div>':'<p>QR 報到未開放</p>')+
       '<p role="status">'+esc(message)+'</p><h3>最近 100 筆報到異動</h3><div style="max-height:240px;overflow:auto">'+rows.map(r=>'<p>'+esc(r.name||'報到窗口')+'｜'+esc(({scan:'QR 報到',manual:'人工報到',revoke:'撤銷報到',open:'開啟報到',close:'停止報到'})[r.action]||r.action)+'｜'+esc(time(r.at))+'<br><small>'+((r.playerId||r.accountUid)?'選手帳號：'+esc(r.accountUid||'無連結帳號')+'｜':'')+'操作帳號：'+esc(r.actorUid)+'</small></p>').join('')+'</div><p class="hint">備取請先由工作人員移入正取，再掃碼或人工報到。</p><button class="btn btn-ghost btn-block" data-qr-checkin="close">關閉</button></div></div>';
   }
   document.addEventListener('click',async event=>{
@@ -118,7 +136,7 @@
       if(entry()&&identity()&&!scanBusy)setTimeout(()=>scan(),0);
     },
     button(){return '<button class="btn btn-primary" data-qr-checkin="open">現場報到 QR／紀錄</button>';},
-    renderEntry,renderModal,manual,
+    renderEntry,renderModal,manual,parseUrl,acceptUrl,
     managed(){return ctx?.state().qrCheckinManaged===true;}
   };
 })();

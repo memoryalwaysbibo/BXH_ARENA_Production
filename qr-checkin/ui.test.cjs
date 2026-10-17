@@ -48,3 +48,30 @@ test('real-shell login notice follows pending QR and authenticated identity inde
  x.setUid('u1');assert.equal(x.loginNotice.hidden,true);
  const normal=setup('https://arena.bxh.com.tw/');normal.setUid(null);assert.equal(normal.loginNotice.hidden,true);
 });
+
+test('in-app QR uses the existing account without a page navigation',async()=>{
+ const x=setup('https://arena.bxh.com.tw/?watch=BXH-OTHER');
+ assert.equal(x.feature.acceptUrl('https://arena.bxh.com.tw/?checkin=BXH-ABC123&checkinToken=onsite'),true);
+ x.feature.bind({state:()=>({cloudCode:'BXH-ABC123'}),uid:()=> 'u1',render(){},toast(){},qr(){}});
+ for(const fn of x.tasks.splice(0))fn();await flush();
+ assert.equal(x.calls.length,1);assert.equal(x.calls[0].data.token,'onsite');
+ x.complete({ok:true,name:'選手',currentAt:1800000000000});await flush();assert.match(x.feature.renderEntry(),/報到成功/);
+});
+test('scanned credentials reject foreign origins, missing tokens and oversized tokens',()=>{
+ const x=setup('https://arena.bxh.com.tw/');
+ for(const url of ['https://evil.test/?checkin=BXH-ABC123&checkinToken=test','https://arena.bxh.com.tw/?checkin=BXH-ABC123','https://arena.bxh.com.tw/?checkin=bad&checkinToken=test','https://arena.bxh.com.tw/?checkin=BXH-ABC123&checkinToken='+ 'a'.repeat(2049)]){
+  assert.equal(x.feature.acceptUrl(url),false);assert.equal(x.location.href,'https://arena.bxh.com.tw/');
+ }
+ assert.equal(x.calls.length,0);
+});
+test('unauthenticated in-app QR waits for login then continues',async()=>{
+ const x=setup('https://arena.bxh.com.tw/');x.setUid(null);
+ assert.equal(x.feature.acceptUrl('https://arena.bxh.com.tw/?checkin=BXH-ABC123&checkinToken=onsite'),true);
+ for(const fn of x.tasks.splice(0))fn();assert.equal(x.calls.length,0);
+ x.setUid('u2');for(const fn of x.tasks.splice(0))fn();await flush();assert.equal(x.calls.length,1);
+});
+test('busy submission rejects another credential without replacing pending URL',async()=>{
+ const x=setup();x.tasks.shift()();await flush();const original=x.location.href;
+ assert.equal(x.feature.acceptUrl('https://arena.bxh.com.tw/?checkin=BXH-ABC123&checkinToken=other'),false);
+ assert.equal(x.location.href,original);assert.equal(x.calls.length,1);
+});
