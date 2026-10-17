@@ -1,0 +1,2238 @@
+{
+  "schemaVersion": 1,
+  "inventorySha256": "a16e67dd3e00f61f06299c32be253fbbfde134fc25565484080e86bdbfac0d5f",
+  "entries": [
+    {
+      "recordId": "supplied_20261014_0001",
+      "imageURL": "assets/bey-catalog/candidates/b6fee6c0f3c71cb060aa8bd0246d1a9c6c53fa8bc9d1c8e8399f85b9b0441bbb.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx01.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX01_01@1.png",
+      "imageSha256": "b6fee6c0f3c71cb060aa8bd0246d1a9c6c53fa8bc9d1c8e8399f85b9b0441bbb",
+      "sourceImageSha256": "82aaa884854fe2c381798c35d91caaf768e141951f870833c9a278eda653ed0f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0002",
+      "imageURL": "assets/bey-catalog/candidates/0e67efaced05dc38199fd8efaaa45d5f7b72479dd10e7ed95ed6c6c2e7aa14db.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx02.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX02_01@1.png",
+      "imageSha256": "0e67efaced05dc38199fd8efaaa45d5f7b72479dd10e7ed95ed6c6c2e7aa14db",
+      "sourceImageSha256": "9f5120004f7793286cee2532028d5fcea17ee5f3978febe122cc4821e358fd02",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0003",
+      "imageURL": "assets/bey-catalog/candidates/af454baac2761558380a47a7aef49a79fbc3ae5871554e86cd7898ef8a46e98f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx03.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX03_01@1.png",
+      "imageSha256": "af454baac2761558380a47a7aef49a79fbc3ae5871554e86cd7898ef8a46e98f",
+      "sourceImageSha256": "3889aa28bdfe23a1ce75e3feb452223e075da03948ac5307937909e60a49290f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0004",
+      "imageURL": "assets/bey-catalog/candidates/833157fc64d18152dc38663cbfe6941053d35962d4837c6e49b4950c002b32b7.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx04.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX04_01@1.png",
+      "imageSha256": "833157fc64d18152dc38663cbfe6941053d35962d4837c6e49b4950c002b32b7",
+      "sourceImageSha256": "89d90ff31b74af37aa6e8020a16e7462ff8123db72b7fae4f402ad9642d16d0b",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0005",
+      "imageURL": "assets/bey-catalog/candidates/9c37c86633c7e4b8f9d91652744ea15677a151f39f1c748765e63d99a5b9a7fa.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX05@1.png",
+      "imageSha256": "9c37c86633c7e4b8f9d91652744ea15677a151f39f1c748765e63d99a5b9a7fa",
+      "sourceImageSha256": "854e4b2c165ba217cbfe515e6ec714e2bcce1be125fd00dc610ccf1c7d25bc90",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0006",
+      "imageURL": "assets/bey-catalog/candidates/e1024b17667b5428f253f95ed10e826c088ea39d1b53f5da3e571a1dc75b368c.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx06.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX06@1.png",
+      "imageSha256": "e1024b17667b5428f253f95ed10e826c088ea39d1b53f5da3e571a1dc75b368c",
+      "sourceImageSha256": "1be9f460ec2057d482eaa4e86681d117ed344c70d6cd55739c6df89558adbca6",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0007",
+      "imageURL": "assets/bey-catalog/candidates/6d86b252ad9f741ac701f9891de758d7f276b61d3dc7fc8913e36b8f85dc77ff.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx07.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX07_08@1.png",
+      "imageSha256": "6d86b252ad9f741ac701f9891de758d7f276b61d3dc7fc8913e36b8f85dc77ff",
+      "sourceImageSha256": "b764e921be59b8e42ecb532fe6ef0a6ff9272b3b8ec7d49ce7d500f339f27762",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0008",
+      "imageURL": "assets/bey-catalog/candidates/66cc1feda0acc6c0be5ffbdf9b56727e6f5a447cd5fa1197fa98d37f93ee779a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX08_y@1.png",
+      "imageSha256": "66cc1feda0acc6c0be5ffbdf9b56727e6f5a447cd5fa1197fa98d37f93ee779a",
+      "sourceImageSha256": "0c4300c2759621cf6e5db18226c1f7fcd30d19261cd4b3bbdba155bbd7688d21",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0009",
+      "imageURL": "assets/bey-catalog/candidates/058e7d4964b85fd71959cc36f23643e7c22a057174070c0294522cb830835a1c.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX08_r@1.png",
+      "imageSha256": "058e7d4964b85fd71959cc36f23643e7c22a057174070c0294522cb830835a1c",
+      "sourceImageSha256": "f1c7e3ddeb467ac7b5323ab9bc7f21b980abce8e838bd84d9f8305b1613c4762",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0010",
+      "imageURL": "assets/bey-catalog/candidates/fec6c6bbaef5d0c2a279cff811f951ee8cff31d4b96ad2f6b12afc7d9bcb7f57.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX08_g@1.png",
+      "imageSha256": "fec6c6bbaef5d0c2a279cff811f951ee8cff31d4b96ad2f6b12afc7d9bcb7f57",
+      "sourceImageSha256": "1a58373c955ad1a949b1f8fd0ee17442aa1a57421a78e831103c31a540091759",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0011",
+      "imageURL": "assets/bey-catalog/candidates/c8dd3e4cbb63bbb8959068d73a7784424b8f6e0bc265b9696037a2f30c435f9e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx13.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX13@1.png",
+      "imageSha256": "c8dd3e4cbb63bbb8959068d73a7784424b8f6e0bc265b9696037a2f30c435f9e",
+      "sourceImageSha256": "fcee4304a46a0c34096fb71631d54de7bfa7ecf0338ee6b675ba5f1866991c9f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0012",
+      "imageURL": "assets/bey-catalog/candidates/b44bd55892d07ff8ea266bc69880391194f30c8156862c9f9133e43dcd8ce67f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX14_01@1.png",
+      "imageSha256": "b44bd55892d07ff8ea266bc69880391194f30c8156862c9f9133e43dcd8ce67f",
+      "sourceImageSha256": "5ba06e3dcc451e98420cbaf541263c4a501354ec30959f205c8062c032e72549",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0013",
+      "imageURL": "assets/bey-catalog/candidates/b526d5da9975cc6065613b0fbce6a1191f3806d81736fe45d3f11a38efa28acc.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX14_02@1.png",
+      "imageSha256": "b526d5da9975cc6065613b0fbce6a1191f3806d81736fe45d3f11a38efa28acc",
+      "sourceImageSha256": "00f34ded46706e42b3ddc1bc71811d4d84b0d06117b02244fd1e6f5bb87f9fa3",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0014",
+      "imageURL": "assets/bey-catalog/candidates/4c9eead0a7fe48c4f09304733bfcb5567100abefe33a32f17fa5d784335d03e1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX14_03@1.png",
+      "imageSha256": "4c9eead0a7fe48c4f09304733bfcb5567100abefe33a32f17fa5d784335d03e1",
+      "sourceImageSha256": "3e3f6f20b4585197e47917edc7c158062ae6f62e67176b4835d0ec0f4555649a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0015",
+      "imageURL": "assets/bey-catalog/candidates/10aa1cb8f15651d531bb914bbb991c0d381061ac29c193531a494840328d1954.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX14_04@1.png",
+      "imageSha256": "10aa1cb8f15651d531bb914bbb991c0d381061ac29c193531a494840328d1954",
+      "sourceImageSha256": "ccc2642d29e9fd2e2a9fad7037c604ea2a7dcdc6da3e54c074f39e5656197a38",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0016",
+      "imageURL": "assets/bey-catalog/candidates/b135dc83a2a92d3904aad8c61b8a4df85a04cd82aca258d25223dd06aa7a2123.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX14_05@1.png",
+      "imageSha256": "b135dc83a2a92d3904aad8c61b8a4df85a04cd82aca258d25223dd06aa7a2123",
+      "sourceImageSha256": "51849203dda8ec1c71de41a64acd8eceb511718d1ce6f5fdaa4b69d1e2334966",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0017",
+      "imageURL": "assets/bey-catalog/candidates/e00d61fae61404b5faf7b12fe8e83d8316538b4f63e55d94ab1bc75090524d35.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX14_06@1.png",
+      "imageSha256": "e00d61fae61404b5faf7b12fe8e83d8316538b4f63e55d94ab1bc75090524d35",
+      "sourceImageSha256": "c1ed3941e0b00f07f1d6c919123ba286385febbdefe8bef971a4447b3e2bc687",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0018",
+      "imageURL": "assets/bey-catalog/candidates/994aacecb6fc03bc3725b3d15c690db2ea301c9132d0ab3d58269a1c13eae8e3.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx15.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX15_01@1.png",
+      "imageSha256": "994aacecb6fc03bc3725b3d15c690db2ea301c9132d0ab3d58269a1c13eae8e3",
+      "sourceImageSha256": "63e981509c33180c7304dd3ed856a7c0af35c6a8b3719c740149dad0d593fe2c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0019",
+      "imageURL": "assets/bey-catalog/candidates/aadcc460d811952d75212f0346cce7eee0ebf52f2a77cee9b3977a0211bec287.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx16.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX16_02@1.png",
+      "imageSha256": "aadcc460d811952d75212f0346cce7eee0ebf52f2a77cee9b3977a0211bec287",
+      "sourceImageSha256": "f830dce98b1724c15c82d3244e4bd0f145903965401a3b8393111908e87b2545",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0020",
+      "imageURL": "assets/bey-catalog/candidates/0ceacc0f31e4b7845d1006884608d9622a7cfeac17ae59c8e3e3ed4f380c98d8.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx16.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX16_03@1.png",
+      "imageSha256": "0ceacc0f31e4b7845d1006884608d9622a7cfeac17ae59c8e3e3ed4f380c98d8",
+      "sourceImageSha256": "d7619acd70609fb6eb8a5bc1bb06bb9f8cc1fa8be99f385799a88d45809288ea",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0021",
+      "imageURL": "assets/bey-catalog/candidates/63a56325690ce937ee468fed82510c7186426e3b8736ed4420d27280605e8d28.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx16.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX16_04@1.png",
+      "imageSha256": "63a56325690ce937ee468fed82510c7186426e3b8736ed4420d27280605e8d28",
+      "sourceImageSha256": "e8b0cf46f6d9b908c72e3ab60d84ab31c4c626ba50ad91970c5d8c41801d2e5a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0022",
+      "imageURL": "assets/bey-catalog/candidates/13081307571ed7d8f8de532be98caadde447c12f3673b3a947484bafd586b4a4.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX17_01@1.png",
+      "imageSha256": "13081307571ed7d8f8de532be98caadde447c12f3673b3a947484bafd586b4a4",
+      "sourceImageSha256": "cbb0830baadb1386ba59a71777336767fb9bae049ad7eb05af38d28783fca8a5",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0023",
+      "imageURL": "assets/bey-catalog/candidates/3455cf187d39b5beb897a7f4320451ea20798dde9232baf15be1b2c4eac49567.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX17_03@1.png",
+      "imageSha256": "3455cf187d39b5beb897a7f4320451ea20798dde9232baf15be1b2c4eac49567",
+      "sourceImageSha256": "ce52c7e522f8baadb4894d77e9aac469dd5c95ded776403307d8c917c1b49517",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0024",
+      "imageURL": "assets/bey-catalog/candidates/a754f63bff746150f4a50447f17682876a28ac381fca2f616b4938f9211ceece.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx19.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX19@1.png",
+      "imageSha256": "a754f63bff746150f4a50447f17682876a28ac381fca2f616b4938f9211ceece",
+      "sourceImageSha256": "abc200cd21a8d87e9e66f9a371ae08873ec6828ebc28bd46626b3261d0f9290c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0025",
+      "imageURL": "assets/bey-catalog/candidates/089c5ee884eb9a541e51a0d54d92728dbce00bf185e7de7cd06fd827b5d0c215.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx20.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX20_b@1.png",
+      "imageSha256": "089c5ee884eb9a541e51a0d54d92728dbce00bf185e7de7cd06fd827b5d0c215",
+      "sourceImageSha256": "230ef16ccb6aec978618edd0e6f484f1156c190425558a0d0668536a292ecb8c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0026",
+      "imageURL": "assets/bey-catalog/candidates/88a770ce5cb3951eab55fda4069c5c6a8b9e32e71c4825fc8f7ede646b62b819.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx20.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX20_g_01@1.png",
+      "imageSha256": "88a770ce5cb3951eab55fda4069c5c6a8b9e32e71c4825fc8f7ede646b62b819",
+      "sourceImageSha256": "46015ec92c41462254e62bde982222726b67afa2c5ae150a208351f88ffed6f2",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0027",
+      "imageURL": "assets/bey-catalog/candidates/5705e5faeeb9a3c486f42b55753849d3349285f64402b316ec49e3a456d42090.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx20.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX20_p_01@1.png",
+      "imageSha256": "5705e5faeeb9a3c486f42b55753849d3349285f64402b316ec49e3a456d42090",
+      "sourceImageSha256": "8df350c13e115774e79e00d80e1f574ff485d2495833c7e7061a2145d0195e00",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0028",
+      "imageURL": "assets/bey-catalog/candidates/46fd5e194bfc3a0d27b53f696b7470dc04f504bdc70fead1b27636d8d3992a5f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx21.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX21_p@1.png",
+      "imageSha256": "46fd5e194bfc3a0d27b53f696b7470dc04f504bdc70fead1b27636d8d3992a5f",
+      "sourceImageSha256": "cbc30d9475b6ccbe8010b9097296466f6c948c7b24d5701686014fc1079f63e4",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0029",
+      "imageURL": "assets/bey-catalog/candidates/78b4fb7baf93d467d60791bba0e95794d2bd4261fbb1d3513d6ae51831d01f51.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx21.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX21_y_01@1.png",
+      "imageSha256": "78b4fb7baf93d467d60791bba0e95794d2bd4261fbb1d3513d6ae51831d01f51",
+      "sourceImageSha256": "efbe5bfd488eeafb9d22443138053b65d8ff5a149d636c3b26fed41a325e5c0a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0030",
+      "imageURL": "assets/bey-catalog/candidates/fbdf3a6c3840ef862d6d0ed6888919b8c34123a583ecdfeefefa3289a03c7e97.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx21.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX21_o_01@1.png",
+      "imageSha256": "fbdf3a6c3840ef862d6d0ed6888919b8c34123a583ecdfeefefa3289a03c7e97",
+      "sourceImageSha256": "6db2cd478b3a8c0b4787bb26673221837084c1b58b2f5e155bdda301649fcdd5",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0031",
+      "imageURL": "assets/bey-catalog/candidates/43189ebd89047d162f9ca4f704de827ce186f793a56b913873ee080b68e126e7.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx22.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX22_01@1.png",
+      "imageSha256": "43189ebd89047d162f9ca4f704de827ce186f793a56b913873ee080b68e126e7",
+      "sourceImageSha256": "b079edd0d2ef52a2c9af4c26a4d589c3293e3ce8954579eb00f67c919c65e3e0",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0032",
+      "imageURL": "assets/bey-catalog/candidates/4bbb51f675dce2ecd936212f74efa9660737ac94224fbe42ceedd29f3a5715eb.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx23.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX23_01@1.png",
+      "imageSha256": "4bbb51f675dce2ecd936212f74efa9660737ac94224fbe42ceedd29f3a5715eb",
+      "sourceImageSha256": "65ae2fadab830d7deaecb30a18f0720d00e8f43b3df7de613ecbc082b7b208ff",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0033",
+      "imageURL": "assets/bey-catalog/candidates/1b6c0a1c32559b2a59b707384c059cdfc1a74fbf3e2dcc5b5eaa63a837659387.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx24.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX24_01@1.png",
+      "imageSha256": "1b6c0a1c32559b2a59b707384c059cdfc1a74fbf3e2dcc5b5eaa63a837659387",
+      "sourceImageSha256": "1fb5e01d5d74de3caa267c85ff924edaff53aa504b9391101fc1f021565c929e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0034",
+      "imageURL": "assets/bey-catalog/candidates/d96c0202a5c9565bae5ce82994aa3bed0abbfb8a14d6d05aa1e6e5efc71e5155.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx24.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX24_02@1.png",
+      "imageSha256": "d96c0202a5c9565bae5ce82994aa3bed0abbfb8a14d6d05aa1e6e5efc71e5155",
+      "sourceImageSha256": "f3b34fd4c4d61945353e3cb9106a536fea1229e772cf768fcb180581ba306ae3",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0035",
+      "imageURL": "assets/bey-catalog/candidates/9d65d6a46849f41cbf2d67bce8e19ddbc3d9b53de99d2f7d0a29e35b17c08de7.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx24.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX24_03@1.png",
+      "imageSha256": "9d65d6a46849f41cbf2d67bce8e19ddbc3d9b53de99d2f7d0a29e35b17c08de7",
+      "sourceImageSha256": "9da1027a00e114468ed4c93cbd2b36c7759de70cffeec2863113ee84390116b4",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0036",
+      "imageURL": "assets/bey-catalog/candidates/7e28e7d69377b6aae7b08d747066e0e3bc2a6481de19bb138d846bcffa09c5ae.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx24.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX24_04@1.png",
+      "imageSha256": "7e28e7d69377b6aae7b08d747066e0e3bc2a6481de19bb138d846bcffa09c5ae",
+      "sourceImageSha256": "5d19babfa7a49a3e9dc779be3455e76fba75fb9bdc3939a4d338fcc4185996e1",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0037",
+      "imageURL": "assets/bey-catalog/candidates/e8f4ba2d3641c2ac6489a1fa66deca49a6a1f14b1b5be82844a70d0b728c21f5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx24.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX24_05@1.png",
+      "imageSha256": "e8f4ba2d3641c2ac6489a1fa66deca49a6a1f14b1b5be82844a70d0b728c21f5",
+      "sourceImageSha256": "42f546a11e1830f348678e50b6f61fed3c1034712568b2b527feefd97e3d083e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0038",
+      "imageURL": "assets/bey-catalog/candidates/9e9ffa5f45690499312bc752b462e6b1446a59f6cb08a0556679a137e777b783.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx24.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX24_06@1.png",
+      "imageSha256": "9e9ffa5f45690499312bc752b462e6b1446a59f6cb08a0556679a137e777b783",
+      "sourceImageSha256": "2586828c4a438e300f17d0e308e85cd30b21ac3d78bc03f78ec325fdbbebbf9b",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0039",
+      "imageURL": "assets/bey-catalog/candidates/f530581194f54d1bad66086729885c8f2cead18da6775170f936d25cb30fc694.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx26.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX26@1.png",
+      "imageSha256": "f530581194f54d1bad66086729885c8f2cead18da6775170f936d25cb30fc694",
+      "sourceImageSha256": "cb70b0afcba0d6cc6380d9d2a8bbc0e29c68b3a39c8e0a9e265b77635c29b82a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0040",
+      "imageURL": "assets/bey-catalog/candidates/8866d238c42cf817adff17326d238d138e58176288974bcaf293efbfc8051243.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx27.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX27_02@1.png",
+      "imageSha256": "8866d238c42cf817adff17326d238d138e58176288974bcaf293efbfc8051243",
+      "sourceImageSha256": "f1761fed5c29cc5497a55eca9a2e2ef4abd5c14a97a682578714381a3a602ac8",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0041",
+      "imageURL": "assets/bey-catalog/candidates/3c638aac2635cc64c062cdb038da7711363a870869ae6f1104195c0d832273b2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx27.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX27_03@1.png",
+      "imageSha256": "3c638aac2635cc64c062cdb038da7711363a870869ae6f1104195c0d832273b2",
+      "sourceImageSha256": "997f458f29cfa66f6169f58fb7e7c33a8f64c3064e61720169a4579e7794b5d4",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0042",
+      "imageURL": "assets/bey-catalog/candidates/a21f583296339da37a8b10a8f2f498763d400998e8022cc825480ca7f279674f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx27.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX27_04@1.png",
+      "imageSha256": "a21f583296339da37a8b10a8f2f498763d400998e8022cc825480ca7f279674f",
+      "sourceImageSha256": "432ae33d3179f05557ea7e20d8beb0346aa0b2a5aaf59d6c9ee90704f0ce97a0",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0043",
+      "imageURL": "assets/bey-catalog/candidates/6303c59086338ad99285db5328eec4689b007cf571328e62ac3b66fda6b9a332.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx31.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX31_01@1.png",
+      "imageSha256": "6303c59086338ad99285db5328eec4689b007cf571328e62ac3b66fda6b9a332",
+      "sourceImageSha256": "7d20ed7c4fe22c061b19670620d9bd523a3e95b35f49d00e714f6e1b47f25a84",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0044",
+      "imageURL": "assets/bey-catalog/candidates/ff77277f3383792c34e561518d4d4130d7f7a6eca01916b476757b7e52aa5d9a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx31.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX31_02@1.png",
+      "imageSha256": "ff77277f3383792c34e561518d4d4130d7f7a6eca01916b476757b7e52aa5d9a",
+      "sourceImageSha256": "1780b2a10cfa66a2535ce502753532497023dfe62785ad63bdf4328de5e50b21",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0045",
+      "imageURL": "assets/bey-catalog/candidates/2d120eee4d93bed474fcbb75b47bf5f708fc929669b4973d2f46de793bc8f865.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx31.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX31_04@1.png",
+      "imageSha256": "2d120eee4d93bed474fcbb75b47bf5f708fc929669b4973d2f46de793bc8f865",
+      "sourceImageSha256": "465ce17c9b94f46ad6c2350f5e8fd96cc9494b4908169a45adfee7120997dcde",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0046",
+      "imageURL": "assets/bey-catalog/candidates/d8c5b73ce92361d445da37a72240d2bba7cdae129eef32f12dae82c0ce850db4.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx31.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX31_03@1.png",
+      "imageSha256": "d8c5b73ce92361d445da37a72240d2bba7cdae129eef32f12dae82c0ce850db4",
+      "sourceImageSha256": "9b149d956937dfd5e560c6e601b40efcbf217044b39073505b05649a33cc0e7c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0047",
+      "imageURL": "assets/bey-catalog/candidates/0f545b0103b9ddb414d1776a9e904bb758da2a12e011731677db9149c3a498b3.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx31.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX31_05@1.png",
+      "imageSha256": "0f545b0103b9ddb414d1776a9e904bb758da2a12e011731677db9149c3a498b3",
+      "sourceImageSha256": "476fd4da1443ed894703536fbbdc7ace4df5ed5ad5462f6c52dd3af47f2e06b7",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0048",
+      "imageURL": "assets/bey-catalog/candidates/b049c27fc9e7a5d2b682c718860a2eaa6d5b32f0b428c9f8f105981d9e2a8e37.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx31.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX31_06@1.png",
+      "imageSha256": "b049c27fc9e7a5d2b682c718860a2eaa6d5b32f0b428c9f8f105981d9e2a8e37",
+      "sourceImageSha256": "8ff6feaa5ef912342abf96cb22410a6d3aacf04914f060baafea994462c550e0",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0049",
+      "imageURL": "assets/bey-catalog/candidates/a119bf227a13caabc6c4aa6b3dd42cfca9e51d4ae8fb9287d2e9f6f62d417cb4.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx33.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX33@1.png",
+      "imageSha256": "a119bf227a13caabc6c4aa6b3dd42cfca9e51d4ae8fb9287d2e9f6f62d417cb4",
+      "sourceImageSha256": "14cfeff0b1d8f9b0bc447915286ab547b8f03f47440e14112708f2fda783934e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0050",
+      "imageURL": "assets/bey-catalog/candidates/5fed952c789c60847d5905ae5548c6b04bd0baa506aeb6f7829287007c83c0b2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx34.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX34_01@1.png",
+      "imageSha256": "5fed952c789c60847d5905ae5548c6b04bd0baa506aeb6f7829287007c83c0b2",
+      "sourceImageSha256": "21ab6c3c9cdcc498c70a3a0bebcd19f4b4f0ba5cc10e751b137d084f4a6eedf4",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0051",
+      "imageURL": "assets/bey-catalog/candidates/e5d7454d8987080aa7a783b904634d46f79b160762a6855a6c2cfb9aa784d86f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx35.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX35_02@1.png",
+      "imageSha256": "e5d7454d8987080aa7a783b904634d46f79b160762a6855a6c2cfb9aa784d86f",
+      "sourceImageSha256": "8a1ebcbeaaa79bca5746642cd394fecefeb062e9b67abb6ea96379d3b8b200d7",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0052",
+      "imageURL": "assets/bey-catalog/candidates/9bda8aa6f7ea83359cad84751ad1d3d291cf53e0aa352945603544226df9eeb1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx35.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX35_03@1.png",
+      "imageSha256": "9bda8aa6f7ea83359cad84751ad1d3d291cf53e0aa352945603544226df9eeb1",
+      "sourceImageSha256": "634b08b192bcfacfa1e239131c0e9f3f0dc86ce8d69a6387fa488724bdfd9c23",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0053",
+      "imageURL": "assets/bey-catalog/candidates/92f3d6766c2a2438fb9359754c4f701e3f8d6c79556117c0188812ee75c61aa0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx35.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX35_04@1.png",
+      "imageSha256": "92f3d6766c2a2438fb9359754c4f701e3f8d6c79556117c0188812ee75c61aa0",
+      "sourceImageSha256": "fd852cbabe859b4c4c7518fa7f2492443e8f5b1f0471b9adf68e5e51d5ca2b99",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0054",
+      "imageURL": "assets/bey-catalog/candidates/044c1ecc97755d72287d0bc2698f3052bec739c5fb85f50490cd49e293baee60.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx35.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX35_07@1.png",
+      "imageSha256": "044c1ecc97755d72287d0bc2698f3052bec739c5fb85f50490cd49e293baee60",
+      "sourceImageSha256": "5cf281d4eb7bde8f99d8b6f5677ba74c505cd6ea44d564960a6fb0f6b70d1334",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0055",
+      "imageURL": "assets/bey-catalog/candidates/a6453f17ab01bcd36230d79c0b31cac8932bf57a485a7c063a6b58f7a1117d16.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx35.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX35_06@1.png",
+      "imageSha256": "a6453f17ab01bcd36230d79c0b31cac8932bf57a485a7c063a6b58f7a1117d16",
+      "sourceImageSha256": "1ff3c1ec55ee57f821cc97a23ac0516edc7a32176670239c60aa6b3ad8faa8d5",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0056",
+      "imageURL": "assets/bey-catalog/candidates/6315aff2f4f49fd80fdbdeedbd50e8e27a16a30b83fb1b4e2b1eeb1c54403b02.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx35.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX35_05@1.png",
+      "imageSha256": "6315aff2f4f49fd80fdbdeedbd50e8e27a16a30b83fb1b4e2b1eeb1c54403b02",
+      "sourceImageSha256": "e6bb3975bce67d40b7a3d6a53fa757c2c88e3192b08598fe57ef7a3d46002540",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0057",
+      "imageURL": "assets/bey-catalog/candidates/062532498aa0fa0212c53984b42cb1daaddfb2c83a852f2a889f32684c2e547b.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx36.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX36_02@1.png",
+      "imageSha256": "062532498aa0fa0212c53984b42cb1daaddfb2c83a852f2a889f32684c2e547b",
+      "sourceImageSha256": "803c37992149e6d44a3426b705bddd64a68455496c93cc90886c9c549a29f6cd",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0058",
+      "imageURL": "assets/bey-catalog/candidates/2253584560a9db17c1de8d15e235d69eca4b29c2cdc728e639c7700945d17bf2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx36.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX36_03@1.png",
+      "imageSha256": "2253584560a9db17c1de8d15e235d69eca4b29c2cdc728e639c7700945d17bf2",
+      "sourceImageSha256": "7b4756269a52c77f38d513ede841900238aaa9a450226f058c12ce1594d0ff9d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0059",
+      "imageURL": "assets/bey-catalog/candidates/85faa9e7e490ddfaa0bd72a67f28bc3500369e4b403425913e26abef50c817f1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx36.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX36_04@1.png",
+      "imageSha256": "85faa9e7e490ddfaa0bd72a67f28bc3500369e4b403425913e26abef50c817f1",
+      "sourceImageSha256": "aa96114177ff2d53d5af898f7cf0493d568908ef3e77bab983f37e9dc0dc68f5",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0060",
+      "imageURL": "assets/bey-catalog/candidates/5505ae622efdfd90850c9875d8fc07e2a1c0ffd00d3ce79427b286ef4f937f66.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx37.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX37_03@1.png",
+      "imageSha256": "5505ae622efdfd90850c9875d8fc07e2a1c0ffd00d3ce79427b286ef4f937f66",
+      "sourceImageSha256": "49ec86ddf6ac21a2ee693b9dd3378ffcfda4945f7de33d53ffe885b4767b473d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0061",
+      "imageURL": "assets/bey-catalog/candidates/9c1bba69ff515d66ffd13243feb0c82dc51f534a10786f819fca89374e9ad100.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx38.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX38@1.png",
+      "imageSha256": "9c1bba69ff515d66ffd13243feb0c82dc51f534a10786f819fca89374e9ad100",
+      "sourceImageSha256": "3c58a07e04dfaeaa1265b7c426684a8a69e183c2907c8900f2669bc5c7ec0aa8",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0062",
+      "imageURL": "assets/bey-catalog/candidates/374be76d1cacdd3c678d529f0143710cf4fcf11ef6cfcd0bf20f471e1cb2daff.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx39.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX39_02@1.png",
+      "imageSha256": "374be76d1cacdd3c678d529f0143710cf4fcf11ef6cfcd0bf20f471e1cb2daff",
+      "sourceImageSha256": "79d884b52546da1eeb7fdf45e46283602f3e9ae3df18aeededf712ce3851238d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0063",
+      "imageURL": "assets/bey-catalog/candidates/7de22a2502f08c6489dd05973f22353ea6f96807e1f99d4d64cabfa1b8787bbb.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx39.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX39_03@1.png",
+      "imageSha256": "7de22a2502f08c6489dd05973f22353ea6f96807e1f99d4d64cabfa1b8787bbb",
+      "sourceImageSha256": "9c146d9309cf674697d06a74e72ab640b1a62ede999164d40b0feef711e247a9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0064",
+      "imageURL": "assets/bey-catalog/candidates/1ba82fa1d346911d9fa225e5e08e8598661c3a95ab35ef7dcff1ee74c17c4721.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx39.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX39_04@1.png",
+      "imageSha256": "1ba82fa1d346911d9fa225e5e08e8598661c3a95ab35ef7dcff1ee74c17c4721",
+      "sourceImageSha256": "3797571b7b287d6708e17fa300ac194ba25e47c4ba462326439dd7b2abbb3476",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0065",
+      "imageURL": "assets/bey-catalog/candidates/a0d99e1a8c2b7c078608cacd860d08b96263434f7c5e781c90727275bb9cc109.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx44.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX44@1.png",
+      "imageSha256": "a0d99e1a8c2b7c078608cacd860d08b96263434f7c5e781c90727275bb9cc109",
+      "sourceImageSha256": "147257215c247c3e0a93fab386065ec302bdc053cc74cf3fed0453c8bfcaa5df",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0066",
+      "imageURL": "assets/bey-catalog/candidates/5e8c117c18d288625b4268dba3c9717e65e82e5135a053d5d56bc543bf0eb947.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx45.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX45@1.png",
+      "imageSha256": "5e8c117c18d288625b4268dba3c9717e65e82e5135a053d5d56bc543bf0eb947",
+      "sourceImageSha256": "41e312aaca9cc54d2f3f98dda1652150c321630796f591a24a1d2c2d4912a5e2",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0067",
+      "imageURL": "assets/bey-catalog/candidates/d6aa68a9f1d5f88dbafbe9e2c9f43408180e6ae7f7e4de5597c22ed5c8fb8c23.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx46.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX46_01@1.png",
+      "imageSha256": "d6aa68a9f1d5f88dbafbe9e2c9f43408180e6ae7f7e4de5597c22ed5c8fb8c23",
+      "sourceImageSha256": "9585b3e6d6c7c5f11244b65ce17bd1a13678b59002f41dc652b21c30ec9aa690",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0068",
+      "imageURL": "assets/bey-catalog/candidates/9a43e7cf8063378b977c8f0716a3118c58d045bf177c7ac737d1752605601d99.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx46.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX46_02@1.png",
+      "imageSha256": "9a43e7cf8063378b977c8f0716a3118c58d045bf177c7ac737d1752605601d99",
+      "sourceImageSha256": "8bd129b7bd75d7fca716efcfe52c09fc3ed9c0f435801589c386a6f3344d2915",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0069",
+      "imageURL": "assets/bey-catalog/candidates/59bafe277a86b0cff8616880192531545c438dbe789afe7e35252c333d39351a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx48.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX48_02@1.png",
+      "imageSha256": "59bafe277a86b0cff8616880192531545c438dbe789afe7e35252c333d39351a",
+      "sourceImageSha256": "bdde2fc7b6108092e2c8fad45a042a7f60fd5952715faf1d34766fe390b6e99d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0070",
+      "imageURL": "assets/bey-catalog/candidates/5b3ee13cae6f8970a162e67a296e213705d053419026d32a9b4273a05902d0e6.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx48.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX48_04@1.png",
+      "imageSha256": "5b3ee13cae6f8970a162e67a296e213705d053419026d32a9b4273a05902d0e6",
+      "sourceImageSha256": "6f9d06647e2f54011648e444a91c285eba8e8d935a0523d034037dfd1153d1e0",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0071",
+      "imageURL": "assets/bey-catalog/candidates/8bc01435dd767e9d69bce1a2ae00cbb961f139bce483ceb23a0e51b0999768c0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx48.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX48_03@1.png",
+      "imageSha256": "8bc01435dd767e9d69bce1a2ae00cbb961f139bce483ceb23a0e51b0999768c0",
+      "sourceImageSha256": "e9f830438500b7c9b899cb57183ec26c7a364b3c2824d447b47efbcb7fa10ff8",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0072",
+      "imageURL": "assets/bey-catalog/candidates/5f5b5fb148b1e4e243eef28edce3341b79d21a63361bae16373fa0e759bcdea6.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx48.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX48_05@1.png",
+      "imageSha256": "5f5b5fb148b1e4e243eef28edce3341b79d21a63361bae16373fa0e759bcdea6",
+      "sourceImageSha256": "a38566141fb0205b19583816eff14be25fdbc1e451f8f188a1d5e73394d87040",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0073",
+      "imageURL": "assets/bey-catalog/candidates/485990bd9ca8aca17e64bf8c5b789386e839a8f975aed257d887b643c91490a7.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx48.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX48_06@1.png",
+      "imageSha256": "485990bd9ca8aca17e64bf8c5b789386e839a8f975aed257d887b643c91490a7",
+      "sourceImageSha256": "0142ba173ab77cea616635622dbcd3ae52574ebdf4befaf945e30f0bb6c57c07",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0074",
+      "imageURL": "assets/bey-catalog/candidates/0df677447f68610d2de24c54549d5debaa772c0e84530fe0c92d9c12c36d2656.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx49.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX49_01@1.png",
+      "imageSha256": "0df677447f68610d2de24c54549d5debaa772c0e84530fe0c92d9c12c36d2656",
+      "sourceImageSha256": "390cedff58474dad8b2f0190cbabd25fdaaef9a6c7803861a1f7621945e3fc2d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0075",
+      "imageURL": "assets/bey-catalog/candidates/b8ed0e5185b562314d3dc634ec76d2dce73cfa5de71fbefcd48f6a7f545dc877.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx50.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX50_02@1.png",
+      "imageSha256": "b8ed0e5185b562314d3dc634ec76d2dce73cfa5de71fbefcd48f6a7f545dc877",
+      "sourceImageSha256": "6e0319328ea2222d5d92fec53adb5a3d362b3eb1007677685d31ca5fd52f4902",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0076",
+      "imageURL": "assets/bey-catalog/candidates/241a9d456a308adaa2aee99f667b5c23bd7e4ecfa7e737b2c8ae490d4c85f3d4.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx50.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX50_03@1.png",
+      "imageSha256": "241a9d456a308adaa2aee99f667b5c23bd7e4ecfa7e737b2c8ae490d4c85f3d4",
+      "sourceImageSha256": "5638deb0ce7a3af4819a69997d91dcc5d88bcd8c67c1cc70f03f4b9ef6ac5fa7",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0077",
+      "imageURL": "assets/bey-catalog/candidates/e98134f2662cc2455cca452aca4734eb22bd3ced335f92ba68a513db4073d9f5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx50.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX50_04@1.png",
+      "imageSha256": "e98134f2662cc2455cca452aca4734eb22bd3ced335f92ba68a513db4073d9f5",
+      "sourceImageSha256": "5ceda6fe08e49bce993b747ac1e0753aaf6cf524499a454c82e608d48118a9ca",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0078",
+      "imageURL": "assets/bey-catalog/candidates/f4b15d696315566c9ada166eebe0eb94b85a867cee52484092d2b8189f5455c1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx50.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX50_05@1.png",
+      "imageSha256": "f4b15d696315566c9ada166eebe0eb94b85a867cee52484092d2b8189f5455c1",
+      "sourceImageSha256": "e566c05a4287e601e2284d2c6b6a39c5964c9ab70f07e07aa2a8e9fb5b4896d9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0079",
+      "imageURL": "assets/bey-catalog/candidates/6f4848e97bf2e8c5f2ccfaeb078d61f4549aeec76473fdcab7a8ede930671de2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx50.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX50_06@1.png",
+      "imageSha256": "6f4848e97bf2e8c5f2ccfaeb078d61f4549aeec76473fdcab7a8ede930671de2",
+      "sourceImageSha256": "94329525f8eb3dc98925b1d1945645dda0c8272b20c14b03dc12723c5ee8151d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0080",
+      "imageURL": "assets/bey-catalog/candidates/a32886cd9a7d064caa57fe9bc1aee06744a7070236296b341ef6483ad9d84945.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx50.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX50_07@1.png",
+      "imageSha256": "a32886cd9a7d064caa57fe9bc1aee06744a7070236296b341ef6483ad9d84945",
+      "sourceImageSha256": "0d936c0c1b3ec0ca1e453556b720c078cf2078b09758d36e9f079f14a7c8c0c9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0081",
+      "imageURL": "assets/bey-catalog/candidates/a828ad0de8fb2368f6274022f5122cfb21ff6f857c7b358c7aaf2da82f53dc50.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx52.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX52_01@1.png",
+      "imageSha256": "a828ad0de8fb2368f6274022f5122cfb21ff6f857c7b358c7aaf2da82f53dc50",
+      "sourceImageSha256": "9fead6131aa2e1eedde434dbeee3820645f1a29c62f1cdb93dba49eac8036b38",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0082",
+      "imageURL": "assets/bey-catalog/candidates/6ab09797d59a88b91a24679b02b9448f674146d1b320b42599b894ea1fef89d0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx53.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX53_01@1.png",
+      "imageSha256": "6ab09797d59a88b91a24679b02b9448f674146d1b320b42599b894ea1fef89d0",
+      "sourceImageSha256": "c1192959fe809a1a64d84729944febd930abad1568b359884122268f8e7ec176",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0083",
+      "imageURL": "assets/bey-catalog/candidates/1ab954ac3a1bc4667d2347520e1067371bc2fb7b80d308ec6385588cc5cd2789.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx53.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX53_02@1.png",
+      "imageSha256": "1ab954ac3a1bc4667d2347520e1067371bc2fb7b80d308ec6385588cc5cd2789",
+      "sourceImageSha256": "fdb49ce4c2fa105a1c0a3744cc66893228304c7f7ae1603ed6b530475f16d4be",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0084",
+      "imageURL": "assets/bey-catalog/candidates/dac6ff922465f1adb6551033bf388ede5dd4e044137ab7c0af3e08ba0132d712.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx53.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BX53_03@1.png",
+      "imageSha256": "dac6ff922465f1adb6551033bf388ede5dd4e044137ab7c0af3e08ba0132d712",
+      "sourceImageSha256": "888b85a826e39e7863698b79a6ad864a84ae51c17c8ef4a16cc609af52467ebb",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0085",
+      "imageURL": "assets/bey-catalog/candidates/948062cf8f37cdaecad243aaca25874c8dc1104536bb06d86489b3fef4ebf82c.png",
+      "sourceURL": "https://www.yodobashi.com/product/100000001010262959/",
+      "sourceImageURL": "https://image.yodobashi.com/product/100/000/001/010/262/959/100000001010262959_10204.jpg",
+      "imageSha256": "948062cf8f37cdaecad243aaca25874c8dc1104536bb06d86489b3fef4ebf82c",
+      "sourceImageSha256": "d99b8242b341a2a7db0451ab8b9af4446c1e7db86790158f34cc78327257c760",
+      "pairingConfidence": "user_assigned",
+      "status": "candidate",
+      "provenance": "user_supplied_retail_source",
+      "rightsStatus": "unverified"
+    },
+    {
+      "recordId": "supplied_20261014_0086",
+      "imageURL": "assets/bey-catalog/candidates/348f95712fae87e72fefde79aa1e15c7facf5a10e0f994cd406ccdf0ea4a7e8f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux01.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX01_01@1.png",
+      "imageSha256": "348f95712fae87e72fefde79aa1e15c7facf5a10e0f994cd406ccdf0ea4a7e8f",
+      "sourceImageSha256": "8facf3c1200b79d73f811c43594681028cf5031e4d6c1255f1add82091006792",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0087",
+      "imageURL": "assets/bey-catalog/candidates/65cac2b19a22ff4aa00a83fc8d09e664070b87032c032d09529fe8072393a253.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux02.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX02_01@1.png",
+      "imageSha256": "65cac2b19a22ff4aa00a83fc8d09e664070b87032c032d09529fe8072393a253",
+      "sourceImageSha256": "22d131b4034ede2d037d69aaccc323a7c91677e1b37af6788f2e47b81b281f8d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0088",
+      "imageURL": "assets/bey-catalog/candidates/be2736c078dfcde9e8bc28d15b16780bd6e20a057d4109437ae5f57d9cc38b13.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux03.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX03_01@1.png",
+      "imageSha256": "be2736c078dfcde9e8bc28d15b16780bd6e20a057d4109437ae5f57d9cc38b13",
+      "sourceImageSha256": "cad73cd518db90ead3fbd8d5d37c0d261bd78a235d35d9ed2c9648462519db6a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0089",
+      "imageURL": "assets/bey-catalog/candidates/88383e7cdb45614fe69b093372e84c8b51f5023980f759b46c0c32b5d5ce4b34.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux04.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX04_02@1.png",
+      "imageSha256": "88383e7cdb45614fe69b093372e84c8b51f5023980f759b46c0c32b5d5ce4b34",
+      "sourceImageSha256": "dd4e9ea00d7b92cbce77d583171650d12f21956bab457dea38e925a2a5ef9237",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0090",
+      "imageURL": "assets/bey-catalog/candidates/f6af9cea65a30e4845e962a868d649cff9e1daf16546a282cdaaeb94503d183f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux04.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX04_04@1.png",
+      "imageSha256": "f6af9cea65a30e4845e962a868d649cff9e1daf16546a282cdaaeb94503d183f",
+      "sourceImageSha256": "3252eec1bcb692d6c9fb77d553d7ba4370547ef3af75787b0d18fb9cd1e6af2c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0091",
+      "imageURL": "assets/bey-catalog/candidates/89509d3aad502623656be562e272b4d2d70fb3086516fb31b8d589993fa39b18.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX05_02@1.png",
+      "imageSha256": "89509d3aad502623656be562e272b4d2d70fb3086516fb31b8d589993fa39b18",
+      "sourceImageSha256": "608ecbf5748abd8f5aeef41769fe20315da84dd81f9e3d144a62a161a6acc29b",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0092",
+      "imageURL": "assets/bey-catalog/candidates/7e83e344c6409cdb74384551b04fc3cd11c64bb1583d45aaa09de4c4340f0c84.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX05_03@1.png",
+      "imageSha256": "7e83e344c6409cdb74384551b04fc3cd11c64bb1583d45aaa09de4c4340f0c84",
+      "sourceImageSha256": "cdd6bb40c0200e06191f991b60f875c0bcb4bab4ea708970e2d0c2bee7ab35b1",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0093",
+      "imageURL": "assets/bey-catalog/candidates/6109388d7c5cd9b2a7e8d843faeb43096286354dbb521e5d1e5c769c692053cd.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX05_04@1.png",
+      "imageSha256": "6109388d7c5cd9b2a7e8d843faeb43096286354dbb521e5d1e5c769c692053cd",
+      "sourceImageSha256": "2920da4d9d7e00cf0e43da1cde4daf988f3ce764a19142ad21945759225f3b65",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0094",
+      "imageURL": "assets/bey-catalog/candidates/3386429e17ccda240c516b796be77952b602de8a5196ae417a7b2f9de0509de0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux06.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX06_01@1.png",
+      "imageSha256": "3386429e17ccda240c516b796be77952b602de8a5196ae417a7b2f9de0509de0",
+      "sourceImageSha256": "072739dbfd97d8e0b17b180629d4b75ae9fe9b99015247256953ba6c9f63dec2",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0095",
+      "imageURL": "assets/bey-catalog/candidates/e91867a3893df9c111a751de4b64963020be1a0ec01f0a24abee7e60a9193b7c.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux07.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX07_r_01@1.png",
+      "imageSha256": "e91867a3893df9c111a751de4b64963020be1a0ec01f0a24abee7e60a9193b7c",
+      "sourceImageSha256": "770d52ea2b8082beb864caf541d127480d99e140e9f8cd4dd6b40abbef21a7ab",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0096",
+      "imageURL": "assets/bey-catalog/candidates/cfa90af39b41b850e898dbdde6fd293238a837396076d5a1ba8b108ba5794122.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux07.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX07_g_01@1.png",
+      "imageSha256": "cfa90af39b41b850e898dbdde6fd293238a837396076d5a1ba8b108ba5794122",
+      "sourceImageSha256": "daecb55fba3fbda1cfe623975141fe6890cfc3a32e05dc7e110549d49b7c3850",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0097",
+      "imageURL": "assets/bey-catalog/candidates/8c3943e730125146710895892948bef9d2eed21abff6fbc8f9f3a3504e6e2b4a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux07.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX07_b_01@1.png",
+      "imageSha256": "8c3943e730125146710895892948bef9d2eed21abff6fbc8f9f3a3504e6e2b4a",
+      "sourceImageSha256": "d21d64964869304285b5442dfb0fa79c4e5afc90178d8bde7ff03df6b1dfa90f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0098",
+      "imageURL": "assets/bey-catalog/candidates/bd1d88455241e6f1d222752e93230521de9fedf63be54a2f5d682d83de531baf.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX08_01@1.png",
+      "imageSha256": "bd1d88455241e6f1d222752e93230521de9fedf63be54a2f5d682d83de531baf",
+      "sourceImageSha256": "2b13fe9a4a7e69ecea37341c51049b8a0193ba448d1f737cf10519eca6722f38",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0099",
+      "imageURL": "assets/bey-catalog/candidates/f3da09ca177129a28f604bb5962ee6868c4cecde26b1ec80322c9cbb2850d1a6.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux09.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX09_01@1.png",
+      "imageSha256": "f3da09ca177129a28f604bb5962ee6868c4cecde26b1ec80322c9cbb2850d1a6",
+      "sourceImageSha256": "4abfed8bc336de9de72ab0525c7d55bb4fab7f61aad83d57aa92dde407df038a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0100",
+      "imageURL": "assets/bey-catalog/candidates/7122b875cc1af56d65c2eefded673f02ca75b733a08e4cf60a04f3925e3b79a4.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux10.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX10_02@1.png",
+      "imageSha256": "7122b875cc1af56d65c2eefded673f02ca75b733a08e4cf60a04f3925e3b79a4",
+      "sourceImageSha256": "eeecd3166e9692224ecab1f75ee2657efa2b377632fe77289d130b1f78b36e01",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0101",
+      "imageURL": "assets/bey-catalog/candidates/6b58b7164d39e9e5dc45223e11dfe6af3da206f662c1869db6b86251cf688c65.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux10.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX10@1.png",
+      "imageSha256": "6b58b7164d39e9e5dc45223e11dfe6af3da206f662c1869db6b86251cf688c65",
+      "sourceImageSha256": "cb566d7f393d80cc802d122bec8e4b0e6612c9cd7ba961302f7720f863afee18",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0102",
+      "imageURL": "assets/bey-catalog/candidates/6b58b7164d39e9e5dc45223e11dfe6af3da206f662c1869db6b86251cf688c65.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux10.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX10@1.png",
+      "imageSha256": "6b58b7164d39e9e5dc45223e11dfe6af3da206f662c1869db6b86251cf688c65",
+      "sourceImageSha256": "cb566d7f393d80cc802d122bec8e4b0e6612c9cd7ba961302f7720f863afee18",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0103",
+      "imageURL": "assets/bey-catalog/candidates/75eb10d574de84ce49753c7d7d47db8618de2822b331bcfb62750390c0b1f751.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux11.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX11_01@1.png",
+      "imageSha256": "75eb10d574de84ce49753c7d7d47db8618de2822b331bcfb62750390c0b1f751",
+      "sourceImageSha256": "2e7f1d54e13d1f8c9d979f73c24bbd20be6246dbfc26b900a397cabd9ddb2ec9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0104",
+      "imageURL": "assets/bey-catalog/candidates/eef7f0908f3964d9b13c18df273fe632fc07a0c2e74a50217435876274fea795.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux12.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX12_02@1.png",
+      "imageSha256": "eef7f0908f3964d9b13c18df273fe632fc07a0c2e74a50217435876274fea795",
+      "sourceImageSha256": "89da29cd3241509c5db43292506b4d11d7747de440418bae56afd3187747ccc4",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0105",
+      "imageURL": "assets/bey-catalog/candidates/4860e58ef90d447475e39b9cd4b9849a3d40be8ae4a4cf52988abc57b7210d73.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux12.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX12_03@1.png",
+      "imageSha256": "4860e58ef90d447475e39b9cd4b9849a3d40be8ae4a4cf52988abc57b7210d73",
+      "sourceImageSha256": "80a486b30a3f8d9113f5aee7657f9cca8463cc3c8c237fa905f4a4138672e0fd",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0106",
+      "imageURL": "assets/bey-catalog/candidates/b9dcd4d4131850fd705b68806d656c9c347455269d91c859c26a3c59c57e1498.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux12.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX12_04@1.png",
+      "imageSha256": "b9dcd4d4131850fd705b68806d656c9c347455269d91c859c26a3c59c57e1498",
+      "sourceImageSha256": "e90e525a3d4eb6a59acd8784e821612a8b7bbbf9f450bc41c26b711555f67a10",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0107",
+      "imageURL": "assets/bey-catalog/candidates/d87047e6bb26fbb2794ee2da23ac6ce14d0b1f01ad9692348b3617582e209b5b.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux12.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX12_05@1.png",
+      "imageSha256": "d87047e6bb26fbb2794ee2da23ac6ce14d0b1f01ad9692348b3617582e209b5b",
+      "sourceImageSha256": "72423e836e9f44d08d5c5a07e076998fd3b3d99d10a2eda5e0ee9cd2cf0d46c2",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0108",
+      "imageURL": "assets/bey-catalog/candidates/c72fcfbe74c3d3d6cb0d1dcf27f2b50ca700107a5bad56db4a26c0b291ce7f51.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux12.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX12_06@1.png",
+      "imageSha256": "c72fcfbe74c3d3d6cb0d1dcf27f2b50ca700107a5bad56db4a26c0b291ce7f51",
+      "sourceImageSha256": "5bafc71c4357960cf98feffd1fac4f98caa037430332c97e30d2b316b9d59c9f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0109",
+      "imageURL": "assets/bey-catalog/candidates/eaa3fbeb21616ec98c6a8660721b9709553e8c53e56643bf73241de6f8fd7ca2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux12.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX12_07@1.png",
+      "imageSha256": "eaa3fbeb21616ec98c6a8660721b9709553e8c53e56643bf73241de6f8fd7ca2",
+      "sourceImageSha256": "464b35ddc8faa25c85db78f1a2bf626167e6d6b7bef8a6a64408378619acd278",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0110",
+      "imageURL": "assets/bey-catalog/candidates/69bd403fbfdd2b5f43fb15fcb4bf10991bd83e31b20d34a3daf168d36f602ee7.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux13.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX13_01@1.png",
+      "imageSha256": "69bd403fbfdd2b5f43fb15fcb4bf10991bd83e31b20d34a3daf168d36f602ee7",
+      "sourceImageSha256": "259ac937e826666811c8bf8d0233ad1a0de8e3614d61a5f610506a60b950df9b",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0111",
+      "imageURL": "assets/bey-catalog/candidates/64f9c6189411d563f73cff96ba6f3dcc23db8e9747b67c216c69228e40ca69d5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX14_01@1.png",
+      "imageSha256": "64f9c6189411d563f73cff96ba6f3dcc23db8e9747b67c216c69228e40ca69d5",
+      "sourceImageSha256": "e4776150c63ec5a9266be91d2e5f636319a52034e72c2fedf9b599b548991055",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0112",
+      "imageURL": "assets/bey-catalog/candidates/a9146934aa95d273369765292400adab419bc781f335bc07cb343c5675707350.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux15.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX15_02@1.png",
+      "imageSha256": "a9146934aa95d273369765292400adab419bc781f335bc07cb343c5675707350",
+      "sourceImageSha256": "79ff56e3ab08a4cebbcd0c22432fc2f4e490e5efaf51a1df81d7f898ad95adb7",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0113",
+      "imageURL": "assets/bey-catalog/candidates/031f58cc9f83e796d25c374c9979b6c7e3b140c7329b7c0876d03af0d9b3377a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux15.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX15_06@1.png",
+      "imageSha256": "031f58cc9f83e796d25c374c9979b6c7e3b140c7329b7c0876d03af0d9b3377a",
+      "sourceImageSha256": "55b23119da41b43b03559f719e12832153d0cebb3eb22fe2df4a7b9ec3188e9e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0114",
+      "imageURL": "assets/bey-catalog/candidates/6ed92ebeba52d0c933757b35a013e1fc10a44beeebc0d8d42c1b7f3610517043.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux15.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX15_10@1.png",
+      "imageSha256": "6ed92ebeba52d0c933757b35a013e1fc10a44beeebc0d8d42c1b7f3610517043",
+      "sourceImageSha256": "82ef65e52f797f7f771d5db4251cb14450eb2a1c2bba903abe973129e9dc29c8",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0115",
+      "imageURL": "assets/bey-catalog/candidates/7d2922bce44c77a9a42c96619c72ecc4f8c39c908d1f2eec99d7fe2666e6cca5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux16.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX16_02@1.png",
+      "imageSha256": "7d2922bce44c77a9a42c96619c72ecc4f8c39c908d1f2eec99d7fe2666e6cca5",
+      "sourceImageSha256": "9ff73dc56f0f7e33e1378031c61ab2d191bc4ee52e253835c0fc88295a269df3",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0116",
+      "imageURL": "assets/bey-catalog/candidates/30753bd2c5d84a7207fd98fc00c0a519c11a6f4e0cabd205d88a1c278e9c5b6c.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux16.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX16_03@1.png",
+      "imageSha256": "30753bd2c5d84a7207fd98fc00c0a519c11a6f4e0cabd205d88a1c278e9c5b6c",
+      "sourceImageSha256": "657b34957726fc8b466f4dbc4c0507b7b72627d947740780117a3f286e915096",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0117",
+      "imageURL": "assets/bey-catalog/candidates/7292aa82bfb5da0118f97ee1db8cb9bea0a3d2858d9cac92c254697543254528.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux16.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX16_04@1.png",
+      "imageSha256": "7292aa82bfb5da0118f97ee1db8cb9bea0a3d2858d9cac92c254697543254528",
+      "sourceImageSha256": "57aab41072dc07fc356e02f60e61be5f621d5f9d8ec120a06c6b0dc63dfa0998",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0118",
+      "imageURL": "assets/bey-catalog/candidates/37e9dd7768d6a1aa39db86eb886124dc50e504fc03a081f1c5eb605ccebed0a3.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX17_01@1.png",
+      "imageSha256": "37e9dd7768d6a1aa39db86eb886124dc50e504fc03a081f1c5eb605ccebed0a3",
+      "sourceImageSha256": "0a56cad3ebc596c18c3c12ac115d5a5c9af542782f7c814e9cec9054174f1297",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0119",
+      "imageURL": "assets/bey-catalog/candidates/9958d3134bd965d190494d8a52542f40f864523777f5456130233db02736a010.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_02@1.png",
+      "imageSha256": "9958d3134bd965d190494d8a52542f40f864523777f5456130233db02736a010",
+      "sourceImageSha256": "b5c5e8ecece69d06fea387088db83f44d1372cfa7ccbc39546ff53bcce37e03e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0120",
+      "imageURL": "assets/bey-catalog/candidates/578d545131944e259986e57c48eea4a0fa76a2be522875e14f4aa6af9a4535d0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_03@1.png",
+      "imageSha256": "578d545131944e259986e57c48eea4a0fa76a2be522875e14f4aa6af9a4535d0",
+      "sourceImageSha256": "9232f8abd2f8047db85d247058137732b59ab8cacc347c9fe117d001f16db5b8",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0121",
+      "imageURL": "assets/bey-catalog/candidates/4ea333a1262ce0b2c8a872aa7d9c18baf7aad6acd290e82d40bafcf8dca4749a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_06@1.png",
+      "imageSha256": "4ea333a1262ce0b2c8a872aa7d9c18baf7aad6acd290e82d40bafcf8dca4749a",
+      "sourceImageSha256": "303331e4298913f994525efbe1d1ab21f53729264c0eee74090047e447bc252e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0122",
+      "imageURL": "assets/bey-catalog/candidates/486086456fefb435fe9d488df8ea9aebec8adafd0f70b60f234dc461ac981d6e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_07@1.png",
+      "imageSha256": "486086456fefb435fe9d488df8ea9aebec8adafd0f70b60f234dc461ac981d6e",
+      "sourceImageSha256": "f6bbbd7467c470fedc0761e2290557d0a715b4bddc88040b332d0cfe7639bf30",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0123",
+      "imageURL": "assets/bey-catalog/candidates/187c41fec060e4ae548c6e166293349451bb5a3c7a505df0f648b02660fd3ba8.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_04@1.png",
+      "imageSha256": "187c41fec060e4ae548c6e166293349451bb5a3c7a505df0f648b02660fd3ba8",
+      "sourceImageSha256": "4b46df7767c6a52fb167c3e6c28e94d87b6037d671db08e6c3c9a796034dc4ac",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0124",
+      "imageURL": "assets/bey-catalog/candidates/137b3bec5e961f3df2fb46d3ef124d896afde7f3a2d9e35df48d606c73abfea5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX18_05@1.png",
+      "imageSha256": "137b3bec5e961f3df2fb46d3ef124d896afde7f3a2d9e35df48d606c73abfea5",
+      "sourceImageSha256": "ff951457d3444adc6eae73d2afe07f23cf3822aac6f4874c64d66a042bc9208e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0125",
+      "imageURL": "assets/bey-catalog/candidates/e223174c6f3e42020f33df701ad4de9a4eb5ab23a484c02424ea8ef6eede11a5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux19.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX19_01@1.png",
+      "imageSha256": "e223174c6f3e42020f33df701ad4de9a4eb5ab23a484c02424ea8ef6eede11a5",
+      "sourceImageSha256": "ba2ce482b3e334aa62777ea7857b0550f8c4488ec39d01c37227c040c272e7d8",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0126",
+      "imageURL": "assets/bey-catalog/candidates/976cbdd5e3c6f7b194d5669878255c6c3b934ab94c525384404745b5fca78fed.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux20.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX20_01@1.png",
+      "imageSha256": "976cbdd5e3c6f7b194d5669878255c6c3b934ab94c525384404745b5fca78fed",
+      "sourceImageSha256": "be1e0b2bacecc0a1a5dd4e96aaada15de3f3d0fcce087979d7262219b7d85cc6",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0127",
+      "imageURL": "assets/bey-catalog/candidates/7c8056a43550395d85018fa1b1de2cde4d4900fd3b8b9378c9c8fcc794470f6d.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux21.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX21_02@1.png",
+      "imageSha256": "7c8056a43550395d85018fa1b1de2cde4d4900fd3b8b9378c9c8fcc794470f6d",
+      "sourceImageSha256": "864f65738e79c61a622e7674812f25940d74d9b9750e936dea77d4e7058a47d9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0128",
+      "imageURL": "assets/bey-catalog/candidates/9f861dd6b4c5959c6f072470766dd0f96db22622c10a6fe0656c6fdd676ae23b.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux21.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX21_05@1.png",
+      "imageSha256": "9f861dd6b4c5959c6f072470766dd0f96db22622c10a6fe0656c6fdd676ae23b",
+      "sourceImageSha256": "8c9c67357aa9d2bd7879d3d37db28c6bb8eb20103e4d27caea454d8c1b1e6fa2",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0129",
+      "imageURL": "assets/bey-catalog/candidates/546a8a85e44fff835b268ecce5ed5d38037fbb81749cb655b0fa28d557bff2f8.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux21.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/UX21_09@1.png",
+      "imageSha256": "546a8a85e44fff835b268ecce5ed5d38037fbb81749cb655b0fa28d557bff2f8",
+      "sourceImageSha256": "8076a9f2c8bb4fa11990427c7442e480349f37d04d7f10d8f1a3d8cc2df5b9dd",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0130",
+      "imageURL": "assets/bey-catalog/candidates/1974a50746cdf37eb4992764e5b379e930ca0ae1525ca55f0ce98248533cac21.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx01.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX01_01@1.png",
+      "imageSha256": "1974a50746cdf37eb4992764e5b379e930ca0ae1525ca55f0ce98248533cac21",
+      "sourceImageSha256": "4f30ab3fd9b2d43bddfdb889b10770126c990d0926de4325fcc5fd1e993d5a4d",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0131",
+      "imageURL": "assets/bey-catalog/candidates/e2d8b248e45dcf59adf4c35bf5f15acb2c759561bc74909b8c707e75a7b45da1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx02.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX02_01@1.png",
+      "imageSha256": "e2d8b248e45dcf59adf4c35bf5f15acb2c759561bc74909b8c707e75a7b45da1",
+      "sourceImageSha256": "abf3e07cfc6ac02b893b80def1c8790e2ced30ba23a6a4be9517ee8305b898c8",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0132",
+      "imageURL": "assets/bey-catalog/candidates/afa4c950c4d4fca3beeb1b74bf8cc4b8b12d80f838286642e831e3fd6dad7fbb.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx03.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX03_01@1.png",
+      "imageSha256": "afa4c950c4d4fca3beeb1b74bf8cc4b8b12d80f838286642e831e3fd6dad7fbb",
+      "sourceImageSha256": "6c5c9f1fc0c3601529b511649fcc888fc33c3ca1ba4f88977b9ad7b63fdd015e",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0133",
+      "imageURL": "assets/bey-catalog/candidates/ebd0bae156dd35583c6fc501745fed36558eac324f4221694de4a8559ff68f21.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx04.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX04_01@1.png",
+      "imageSha256": "ebd0bae156dd35583c6fc501745fed36558eac324f4221694de4a8559ff68f21",
+      "sourceImageSha256": "1a76cda10cf047ef1fa62c63ac8ed452193c7813f5da29751ed978abfcf4e835",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0134",
+      "imageURL": "assets/bey-catalog/candidates/e86fd2be124e39c761f3103758b554e15694795b0528014247cb982633987110.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx04.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX04_02@1.png",
+      "imageSha256": "e86fd2be124e39c761f3103758b554e15694795b0528014247cb982633987110",
+      "sourceImageSha256": "f6728b3ee85ea99e5ee1597eca05ff976ccd990c9098c5a5c52356d097e8ea82",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0135",
+      "imageURL": "assets/bey-catalog/candidates/7b2c85d3443374316c8d092124670b4f6537a6c7dd4033636f4ba2176cb43f37.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX05_02@1.png",
+      "imageSha256": "7b2c85d3443374316c8d092124670b4f6537a6c7dd4033636f4ba2176cb43f37",
+      "sourceImageSha256": "86312af7234cc685ac2edc787ca61d24c8f619b944af324dd31e63c817d82e61",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0136",
+      "imageURL": "assets/bey-catalog/candidates/4e1f14c57f0a0939ad608f74f403ac4381792b33122f86760ebfe141201c33e2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX05_03@1.png",
+      "imageSha256": "4e1f14c57f0a0939ad608f74f403ac4381792b33122f86760ebfe141201c33e2",
+      "sourceImageSha256": "cb0818c7dcf9af0d4e2b1d50acaaf83967a7e5f0acbeded242566180dc3fb476",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0137",
+      "imageURL": "assets/bey-catalog/candidates/31f1f6d925f9e7ce214f44bbea9a3fddcef8728a195ca5000a7a92a6969c2163.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX05_04@1.png",
+      "imageSha256": "31f1f6d925f9e7ce214f44bbea9a3fddcef8728a195ca5000a7a92a6969c2163",
+      "sourceImageSha256": "54230059fc9dca3895cd78160da7e3cf15df859bf40e1aa46420725ad5bbc48c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0138",
+      "imageURL": "assets/bey-catalog/candidates/ede6ba5a779ecfde30d878e25771bfb6a2b1ad58d97c222c5503e1c20e6ba221.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX05_06@1.png",
+      "imageSha256": "ede6ba5a779ecfde30d878e25771bfb6a2b1ad58d97c222c5503e1c20e6ba221",
+      "sourceImageSha256": "aef7b720ced1e0c034c10cc311b4b1403e8311f79a9a11f2c3b852906d381f60",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0139",
+      "imageURL": "assets/bey-catalog/candidates/45eab777000611901d9bc2065e6092815a90e512178b7121a1f7d9c5a2b9f16a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX05_05@1.png",
+      "imageSha256": "45eab777000611901d9bc2065e6092815a90e512178b7121a1f7d9c5a2b9f16a",
+      "sourceImageSha256": "ee91fb7e4fa138738907bb68c538aa3c99b71783e94a838375f6d7f666aec927",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0140",
+      "imageURL": "assets/bey-catalog/candidates/a50cf188588345c3c46a4cf969e80cae58ea68c64c8111f5386259f3df67db31.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx05.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX05_07@1.png",
+      "imageSha256": "a50cf188588345c3c46a4cf969e80cae58ea68c64c8111f5386259f3df67db31",
+      "sourceImageSha256": "ef8888d0d0990470a6a3866ba63c1d0e8a01b2f5d9fbc4ca7c424fdae67fb796",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0141",
+      "imageURL": "assets/bey-catalog/candidates/e438cffdd7c8785ed64225656aab6181e610a2ae0222c7848490009d68bfa5b0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx06.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX06_02@1.png",
+      "imageSha256": "e438cffdd7c8785ed64225656aab6181e610a2ae0222c7848490009d68bfa5b0",
+      "sourceImageSha256": "30be6fb240afb75f35e4c26d20b20d5cf94dcb6e821251ab86e5cf78fbf95786",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0142",
+      "imageURL": "assets/bey-catalog/candidates/1c5a717bd12cc375358b6406df3bb899a3ba0e86b724957f2affb9a260644c8a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx06.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX06_03@1.png",
+      "imageSha256": "1c5a717bd12cc375358b6406df3bb899a3ba0e86b724957f2affb9a260644c8a",
+      "sourceImageSha256": "c616102295db9d347239003d51f060cc61449da046067dca4eed9202c8e4e5cd",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0143",
+      "imageURL": "assets/bey-catalog/candidates/ec7d9755b8ee19b54ce08ce200ac80ab13a34d0afecdb9d007ee5ad1e08f5e3c.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx06.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX06_04@1.png",
+      "imageSha256": "ec7d9755b8ee19b54ce08ce200ac80ab13a34d0afecdb9d007ee5ad1e08f5e3c",
+      "sourceImageSha256": "4f3372a8dd5c361488d26beb2c1de0ae88b06b7d4c02b70c0cfb2f09deb9a463",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0144",
+      "imageURL": "assets/bey-catalog/candidates/f8faa2361f7f35d80d3ce16381eb7d0f6b18a45f0e1e28f7263baf59cda32686.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx07.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX07_01@1.png",
+      "imageSha256": "f8faa2361f7f35d80d3ce16381eb7d0f6b18a45f0e1e28f7263baf59cda32686",
+      "sourceImageSha256": "7298784c430546ab088dcedd7024d86ba3176c6df10f3dc999eefe2382cecf09",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0145",
+      "imageURL": "assets/bey-catalog/candidates/6aa44bf481770cdfc5f3e3f5db4379fe74beaf4bef5ad4e020e9d35246a834fa.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX08_02@1.png",
+      "imageSha256": "6aa44bf481770cdfc5f3e3f5db4379fe74beaf4bef5ad4e020e9d35246a834fa",
+      "sourceImageSha256": "8f6d2148e76dda048f00d3f47c23f0acc821e43f37d2454b2c081dc9e59b83c0",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0146",
+      "imageURL": "assets/bey-catalog/candidates/8375e8d431f3ccff811d7c6b175560d1cc49414ed73aa021084305f7ab8174ab.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX08_03@1.png",
+      "imageSha256": "8375e8d431f3ccff811d7c6b175560d1cc49414ed73aa021084305f7ab8174ab",
+      "sourceImageSha256": "6fda66f4d1e2369b7361eb183ad87c4f78c057873bde3cca97e0dc3ee1664bb1",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0147",
+      "imageURL": "assets/bey-catalog/candidates/fe89315df2fb5a247399483ab6d2bd3a590a2d351670d9d452a6637743ea01cd.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX08_04@1.png",
+      "imageSha256": "fe89315df2fb5a247399483ab6d2bd3a590a2d351670d9d452a6637743ea01cd",
+      "sourceImageSha256": "dcefc1fd94ea1f8350488eaa9b18a65c56e99c10626d04dd449445fbec663219",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0148",
+      "imageURL": "assets/bey-catalog/candidates/566f8bf50da94e7b3543d3d63e259e513d7744ac0a4689bfedfa93a19a14ab7a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX08_05@1.png",
+      "imageSha256": "566f8bf50da94e7b3543d3d63e259e513d7744ac0a4689bfedfa93a19a14ab7a",
+      "sourceImageSha256": "2051c0358362b781e2d09e6008adb67008b9f62c8eb64cf1db68237c1a99f7fa",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0149",
+      "imageURL": "assets/bey-catalog/candidates/835554ea545a02dfd191125309d108070f590467239a4308564b25c7e7d29ae5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX08_06@1.png",
+      "imageSha256": "835554ea545a02dfd191125309d108070f590467239a4308564b25c7e7d29ae5",
+      "sourceImageSha256": "c121d246c5e6ee1ef9f88644087a9969851536b7fdd073da7f23397c2980d428",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0150",
+      "imageURL": "assets/bey-catalog/candidates/91f7ac01f33638ad7a37b8f067b6e4ae211a6b8982b10a3264823fd50c6fe7d2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx08.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX08_07@1.png",
+      "imageSha256": "91f7ac01f33638ad7a37b8f067b6e4ae211a6b8982b10a3264823fd50c6fe7d2",
+      "sourceImageSha256": "52a2baae0ab300d167edd031ad0ee7c93c6b0450d9c6759cb071922a9d6e311b",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0151",
+      "imageURL": "assets/bey-catalog/candidates/0150558ba79d64ebae1b43b78260acb0385f731165a8a8fff77377ae78af7444.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx09.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX09_02@1.png",
+      "imageSha256": "0150558ba79d64ebae1b43b78260acb0385f731165a8a8fff77377ae78af7444",
+      "sourceImageSha256": "5d4b6cca30b7b403cb58f3f903e3df1a3831f367ac77f7cd15c9544e5107931f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0152",
+      "imageURL": "assets/bey-catalog/candidates/d2df60cc8bb9f906b64ebe339db2edef2d0d8503e183e22b3bc61b22dde296a1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx10.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX10_01@1.png",
+      "imageSha256": "d2df60cc8bb9f906b64ebe339db2edef2d0d8503e183e22b3bc61b22dde296a1",
+      "sourceImageSha256": "291685d5b3998d1f17a24143aca4bd3f6be4dcef0cbf15163bd58fb6b62770b1",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0153",
+      "imageURL": "assets/bey-catalog/candidates/e3c5ed522847c305123688d0723978b626a8b8ee4c012b7231b3e1bcead4ca8e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx11.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX11_02@1.png",
+      "imageSha256": "e3c5ed522847c305123688d0723978b626a8b8ee4c012b7231b3e1bcead4ca8e",
+      "sourceImageSha256": "42a609cefaa5787f207e22c0548c2bfead962688cdaf5e747b95e7bdc9e44590",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0154",
+      "imageURL": "assets/bey-catalog/candidates/9796a379d945c5affa1f782fc195c861f5784d95e64a7ea481523076c4683631.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx11.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX11_12@1.png",
+      "imageSha256": "9796a379d945c5affa1f782fc195c861f5784d95e64a7ea481523076c4683631",
+      "sourceImageSha256": "a8693861a6085ad8bf2749004d5ca16bc3984a3bad4431f3a92286aa10fe89ee",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0155",
+      "imageURL": "assets/bey-catalog/candidates/ab0489d1b36d119c2248b3406a1787de8f48ba0aa7615f2abdce11672ec42811.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx11.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX11_08@1.png",
+      "imageSha256": "ab0489d1b36d119c2248b3406a1787de8f48ba0aa7615f2abdce11672ec42811",
+      "sourceImageSha256": "2c72f2d009d80b41d0eceac876e40b21b0ab66ee049aac50aff097f1834f1fd2",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0156",
+      "imageURL": "assets/bey-catalog/candidates/ef66140b975e1ed2166e908da8ff39f6b2815b0bd78178e5e5d79100a892be14.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx12.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX12_01@1.png",
+      "imageSha256": "ef66140b975e1ed2166e908da8ff39f6b2815b0bd78178e5e5d79100a892be14",
+      "sourceImageSha256": "be2469d9ac16e2bc7fdae1fb21d50ec0786d918b616236a8e6d6afd70b350731",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0157",
+      "imageURL": "assets/bey-catalog/candidates/6ddf882c953a9ffb2b5ba96912b779cd86de120b038d3dcc288bc6663ba978be.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx13.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX13_01@1.png",
+      "imageSha256": "6ddf882c953a9ffb2b5ba96912b779cd86de120b038d3dcc288bc6663ba978be",
+      "sourceImageSha256": "dbde7d40b9af10474d166ebf7d0ca589dc20258375383d507a6d22ee3a1b2526",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0158",
+      "imageURL": "assets/bey-catalog/candidates/f0efdd204bfb3a1262669ae25f3c878083918dc6a3e21b7286298b135d021621.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx14.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX14_01@1.png",
+      "imageSha256": "f0efdd204bfb3a1262669ae25f3c878083918dc6a3e21b7286298b135d021621",
+      "sourceImageSha256": "bd3108a48f75c297e40a11821908c36133ee00ecbc1ae566d027f4d17b76b2e2",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0159",
+      "imageURL": "assets/bey-catalog/candidates/823b6c8b2d88bca7cb9e71ab632866cf2b4082d00073d8fc13e82bad8c43b567.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx15.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX15_01@1.png",
+      "imageSha256": "823b6c8b2d88bca7cb9e71ab632866cf2b4082d00073d8fc13e82bad8c43b567",
+      "sourceImageSha256": "2a35121dd7263931935b6758cd10979313c2f2e2e941d8a6b9d42aa559c1816f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0160",
+      "imageURL": "assets/bey-catalog/candidates/1f034022c58e43bdb29ac33d99db92495cf89ff8024fbde7867094f7191a04e1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx16.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX16_01@1.png",
+      "imageSha256": "1f034022c58e43bdb29ac33d99db92495cf89ff8024fbde7867094f7191a04e1",
+      "sourceImageSha256": "85b2a9048de05a3a6c696e04d393f8868c387f74abcbbb825c9c4100c523fbe1",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0161",
+      "imageURL": "assets/bey-catalog/candidates/0f155000c4bbe6544ff088864fd12f21d8317aa98632cf8810e768d5d0b8759b.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX17_02@1.png",
+      "imageSha256": "0f155000c4bbe6544ff088864fd12f21d8317aa98632cf8810e768d5d0b8759b",
+      "sourceImageSha256": "4ee84bce653b9fa25099e5c4d8036cbe1d86931523111c2e77c6386ba747daf4",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0162",
+      "imageURL": "assets/bey-catalog/candidates/d9c4baba3e092655ce8e0fbfdbe8570f36a6e58bf29b7df2c6766e2faa5d41f0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX17_03@1.png",
+      "imageSha256": "d9c4baba3e092655ce8e0fbfdbe8570f36a6e58bf29b7df2c6766e2faa5d41f0",
+      "sourceImageSha256": "9927dea1853cdb9588f6b29742ac272494d4495664700c56d4bf3f798e2ebe2a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0163",
+      "imageURL": "assets/bey-catalog/candidates/03f461194c75ad4d254f05992dbf4d5dea7f7774f9dd339c32b9e32cb12676f4.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX17_04@1.png",
+      "imageSha256": "03f461194c75ad4d254f05992dbf4d5dea7f7774f9dd339c32b9e32cb12676f4",
+      "sourceImageSha256": "ef46c5359e22567f7d9030c917385c281c455d68bb9711027f569cfc4c16ebbc",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0164",
+      "imageURL": "assets/bey-catalog/candidates/3141653a8e8c636d307424183f82ae69f4818611748d1a85cfe5d9263de6761b.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX17_05@1.png",
+      "imageSha256": "3141653a8e8c636d307424183f82ae69f4818611748d1a85cfe5d9263de6761b",
+      "sourceImageSha256": "98ced0e643a1b1a195ccac1693b0015313a8d95391decd9b3fa0e2383b875294",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0165",
+      "imageURL": "assets/bey-catalog/candidates/31c89073d964bc817665f005f603451298c2b42a3b9f89b8673ed3ec2d914cd9.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX17_06@1.png",
+      "imageSha256": "31c89073d964bc817665f005f603451298c2b42a3b9f89b8673ed3ec2d914cd9",
+      "sourceImageSha256": "7dc269d5cdbc288db67450507dd99eb8aa033bbd7124e147d3c1ebc022bac12f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0166",
+      "imageURL": "assets/bey-catalog/candidates/3030d0b3ba7c8aee9c9e56b510ab1f7b3f2491c3013bd95714651e85dca5c50d.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx17.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX17_07@1.png",
+      "imageSha256": "3030d0b3ba7c8aee9c9e56b510ab1f7b3f2491c3013bd95714651e85dca5c50d",
+      "sourceImageSha256": "47670863d68a513574b86d798efe8ea74cc1417a269a11050d59972b69191fa4",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0167",
+      "imageURL": "assets/bey-catalog/candidates/80f3c39b9ef82c75df2e4e8fadce628a506bc47af7f0dc7aca257ff4d1b9c760.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX18_02@1.png",
+      "imageSha256": "80f3c39b9ef82c75df2e4e8fadce628a506bc47af7f0dc7aca257ff4d1b9c760",
+      "sourceImageSha256": "8050c4ebbd510d282015b0fba599fb6a5e0686ebd56f9355a8d2eb6629a2b2e5",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0168",
+      "imageURL": "assets/bey-catalog/candidates/29e601a39a04dc339487e469950e19c2611f2a8c6d72df11b7676f20ebf06fec.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX18_03@1.png",
+      "imageSha256": "29e601a39a04dc339487e469950e19c2611f2a8c6d72df11b7676f20ebf06fec",
+      "sourceImageSha256": "f1e7911d81e44bd32bff491421b7a547f2a32bc7258b699896f2769c6e997d71",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0169",
+      "imageURL": "assets/bey-catalog/candidates/67f8999e9ff84a9c013a7e5e79636c41ff5f19a8927ea8366d7558a7508964c5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx18.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX18_04@1.png",
+      "imageSha256": "67f8999e9ff84a9c013a7e5e79636c41ff5f19a8927ea8366d7558a7508964c5",
+      "sourceImageSha256": "8a303cef9f7f6f28aba11d23071521995fac7a7da3a7ab108793b212df852f72",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0170",
+      "imageURL": "assets/bey-catalog/candidates/7fb1c3b26fce21c66ed23b4d39373814bca1046578003a170016d6e215c41170.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx19.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX19_02@1.png",
+      "imageSha256": "7fb1c3b26fce21c66ed23b4d39373814bca1046578003a170016d6e215c41170",
+      "sourceImageSha256": "f02647e258b1fe5496ae69780c70bde13a56d1cb825c4814bad2a0bff82db7f5",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0171",
+      "imageURL": "assets/bey-catalog/candidates/3b4d39f63eb27dce257fe7e2d43fae3d5e51e4e857668f796832254d0ea499d2.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx19.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX19_03@1.png",
+      "imageSha256": "3b4d39f63eb27dce257fe7e2d43fae3d5e51e4e857668f796832254d0ea499d2",
+      "sourceImageSha256": "bb40b2ff1b67204a7a24d9df4fe712dfe7c2c053f3ce3afc6c04e55c95a0dd1f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0172",
+      "imageURL": "assets/bey-catalog/candidates/22cb223337ef7e5c9d99ebb48f3cc326dce9fdc1c958cafc44a20eb42d4cb043.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx19.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/CX19_04@1.png",
+      "imageSha256": "22cb223337ef7e5c9d99ebb48f3cc326dce9fdc1c958cafc44a20eb42d4cb043",
+      "sourceImageSha256": "2312f3828bbff83e91c0d5e234377439759c9999b0283607262a6d4b056ac490",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0174",
+      "imageURL": "assets/bey-catalog/candidates/0fadfc073deb6cd96db4f164830e2aff2017d437385acd845ab3b4b7b18f2b41.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-hc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG03_01@1.png",
+      "imageSha256": "0fadfc073deb6cd96db4f164830e2aff2017d437385acd845ab3b4b7b18f2b41",
+      "sourceImageSha256": "3177f2ed2a7fd6ae07dc948f80c4b6fdf9b36590bb69f2d02bc740adcaba9318",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0175",
+      "imageURL": "assets/bey-catalog/candidates/25b18c20f835a38cf25174e3bf4e5ec2e3c91aa37b0e5d01a6f39f380783ea09.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-drs.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG04_01@1.png",
+      "imageSha256": "25b18c20f835a38cf25174e3bf4e5ec2e3c91aa37b0e5d01a6f39f380783ea09",
+      "sourceImageSha256": "ed7242bead9711e97d6efe32d26ef19bfa2df7ce978117cca788d7002cfc3c77",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0176",
+      "imageURL": "assets/bey-catalog/candidates/c77cfa738ed1c14c0ea2e970ad899155a98913196442979d2b4cef3741449e73.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-lc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG05_01@1.png",
+      "imageSha256": "c77cfa738ed1c14c0ea2e970ad899155a98913196442979d2b4cef3741449e73",
+      "sourceImageSha256": "c748f374831977e37244762fc8cef603780e3a47ea789a16ed908ff5671ce02c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0177",
+      "imageURL": "assets/bey-catalog/candidates/eef07282f4290aa0b5fe84896f4368efc057670570b754c7eda8fe7b50cddd4e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-se.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG06_01@1.png",
+      "imageSha256": "eef07282f4290aa0b5fe84896f4368efc057670570b754c7eda8fe7b50cddd4e",
+      "sourceImageSha256": "21cd3a6501da1f9418c442424ab1a3bf81b142ebe1b68ecb0af7491d0fbcf01f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0178",
+      "imageURL": "assets/bey-catalog/candidates/0e630ea225161022a73634db318c5b423d1dc13d0a3f5883376d167f22cda91a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-ld.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG_07@1.png",
+      "imageSha256": "0e630ea225161022a73634db318c5b423d1dc13d0a3f5883376d167f22cda91a",
+      "sourceImageSha256": "5a588c8ecd43a75d6c68bc1756061991d0c201b95d279233ad0ff2ab2c5cc7ac",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0179",
+      "imageURL": "assets/bey-catalog/candidates/0e630ea225161022a73634db318c5b423d1dc13d0a3f5883376d167f22cda91a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-ld.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG_07@1.png",
+      "imageSha256": "0e630ea225161022a73634db318c5b423d1dc13d0a3f5883376d167f22cda91a",
+      "sourceImageSha256": "5a588c8ecd43a75d6c68bc1756061991d0c201b95d279233ad0ff2ab2c5cc7ac",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0180",
+      "imageURL": "assets/bey-catalog/candidates/4a497102e614daf0c203a122edbd20d1f94fdcfc58e99f90b12acafd52eb10a8.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-hch.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG08_01@1.png",
+      "imageSha256": "4a497102e614daf0c203a122edbd20d1f94fdcfc58e99f90b12acafd52eb10a8",
+      "sourceImageSha256": "47ee3ad302529fccadd72be012598dea1b822ebe7e1a2389c4633de21c995200",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0181",
+      "imageURL": "assets/bey-catalog/candidates/587a92f8799f85dc1ad9b653121e63b8abbd816ab732304e9cc6ef74682643d5.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-cd.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG14_01@1.png",
+      "imageSha256": "587a92f8799f85dc1ad9b653121e63b8abbd816ab732304e9cc6ef74682643d5",
+      "sourceImageSha256": "8cb4f189f0d833799b13abeaf213dd2597acc4fe0798356e5dabd86cab619956",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0184",
+      "imageURL": "assets/bey-catalog/candidates/8942986a2ab7ab98501b26b52c9e869a9cae94b8f51f616cc58b3b069d3db0ad.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-25set.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG00_03@1.png",
+      "imageSha256": "8942986a2ab7ab98501b26b52c9e869a9cae94b8f51f616cc58b3b069d3db0ad",
+      "sourceImageSha256": "eab3be32fb4cc62f6158840cfea16720e97e336fcb3acd55ce031a2e42883c9c",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0185",
+      "imageURL": "assets/bey-catalog/candidates/f3f474f28138d1b2476de727fde0fbe7ead0fd4a1b1b6d1ea76c8e0169d13aec.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-25set.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG00_05@1.png",
+      "imageSha256": "f3f474f28138d1b2476de727fde0fbe7ead0fd4a1b1b6d1ea76c8e0169d13aec",
+      "sourceImageSha256": "21a86b0a5ce145bc7649193f8ccc89629199639bfa30982628fa8418fcec72b6",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0186",
+      "imageURL": "assets/bey-catalog/candidates/c44377a06f720225931f609e76c63ee1ae23cc6bd3d96a55c2e9fe583938af0e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-25set.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG00_07@1.png",
+      "imageSha256": "c44377a06f720225931f609e76c63ee1ae23cc6bd3d96a55c2e9fe583938af0e",
+      "sourceImageSha256": "883969dfd3773c5197ca810b982616d98b5e4bfc516dac6cf2650ad5c0894218",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0187",
+      "imageURL": "assets/bey-catalog/candidates/55dd4ce3285c848c34ce95e65276a36bd3fd2bf927eca2c1e0115d8791107f59.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-xc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG13_01@1.png",
+      "imageSha256": "55dd4ce3285c848c34ce95e65276a36bd3fd2bf927eca2c1e0115d8791107f59",
+      "sourceImageSha256": "2b3264bfa79001ba93b19ea694cde1bf470592d6c0bf719b850d4f2bf89c8282",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0193",
+      "imageURL": "assets/bey-catalog/candidates/77aad43a09f3ee097bb464937946fbaa4f661cfc140b5f712ee1c40775c52d0f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-rl.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG20_01@1.png",
+      "imageSha256": "77aad43a09f3ee097bb464937946fbaa4f661cfc140b5f712ee1c40775c52d0f",
+      "sourceImageSha256": "1ab28d221e968801d344a1b926edc2bb891459a0bdc0e028c36f8540e3967124",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0194",
+      "imageURL": "assets/bey-catalog/candidates/d6680d9f0c3683747211a40fd560015bc1f615819b68f499f66f6dcb7d76f1ae.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-ss.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG21_01@1.png",
+      "imageSha256": "d6680d9f0c3683747211a40fd560015bc1f615819b68f499f66f6dcb7d76f1ae",
+      "sourceImageSha256": "ef6f54f1ccb9b46a6c64e47e884e336d9951c45f409b508a40513d7fc04b79b6",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0196",
+      "imageURL": "assets/bey-catalog/candidates/d825dc5fc6a57cf7cdd1ac4ba33675fa65b25b03db76dab7c1a0e252867ece52.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-cdr.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG23_01@1.png",
+      "imageSha256": "d825dc5fc6a57cf7cdd1ac4ba33675fa65b25b03db76dab7c1a0e252867ece52",
+      "sourceImageSha256": "c7e861bd044a230d0f4d804e76b9cc74fba654fa2f040b507943f11a901536e9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0197",
+      "imageURL": "assets/bey-catalog/candidates/ae665e1636f4f514f0172928e23ec1c50da17eae2c8e21bf7701671e1912af77.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux00-ap_red.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG24_01@1.png",
+      "imageSha256": "ae665e1636f4f514f0172928e23ec1c50da17eae2c8e21bf7701671e1912af77",
+      "sourceImageSha256": "7b1899d16ae4d56d7e07185e8880520300ce273ee7b672be184f874b67eacad9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0198",
+      "imageURL": "assets/bey-catalog/candidates/8a30bed8a7e02425b3191c3b47993dd5313c6f4ad115f7b31aa3d8355d8c9c0e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bxa02.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXA02@1.png",
+      "imageSha256": "8a30bed8a7e02425b3191c3b47993dd5313c6f4ad115f7b31aa3d8355d8c9c0e",
+      "sourceImageSha256": "4b9b8dd79fe418769b9495bdeb8014793909d345f74f29dc179fb5d11af2dbd2",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0199",
+      "imageURL": "assets/bey-catalog/candidates/8a30bed8a7e02425b3191c3b47993dd5313c6f4ad115f7b31aa3d8355d8c9c0e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bxa02.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXA02@1.png",
+      "imageSha256": "8a30bed8a7e02425b3191c3b47993dd5313c6f4ad115f7b31aa3d8355d8c9c0e",
+      "sourceImageSha256": "4b9b8dd79fe418769b9495bdeb8014793909d345f74f29dc179fb5d11af2dbd2",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0200",
+      "imageURL": "assets/bey-catalog/candidates/8a30bed8a7e02425b3191c3b47993dd5313c6f4ad115f7b31aa3d8355d8c9c0e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bxa02.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXA02@1.png",
+      "imageSha256": "8a30bed8a7e02425b3191c3b47993dd5313c6f4ad115f7b31aa3d8355d8c9c0e",
+      "sourceImageSha256": "4b9b8dd79fe418769b9495bdeb8014793909d345f74f29dc179fb5d11af2dbd2",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0205",
+      "imageURL": "assets/bey-catalog/candidates/bb96737444d7f13e8de67ff540fd51ca5e0eea2a4548e3a4c260a361fedd9e4e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-cc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG31@1.png",
+      "imageSha256": "bb96737444d7f13e8de67ff540fd51ca5e0eea2a4548e3a4c260a361fedd9e4e",
+      "sourceImageSha256": "127c0dd6d29b004e2b68caba4771ee81e9e83e0fa15ad1b3fcb86eef167a937f",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0206",
+      "imageURL": "assets/bey-catalog/candidates/bb96737444d7f13e8de67ff540fd51ca5e0eea2a4548e3a4c260a361fedd9e4e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-cc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG31@1.png",
+      "imageSha256": "bb96737444d7f13e8de67ff540fd51ca5e0eea2a4548e3a4c260a361fedd9e4e",
+      "sourceImageSha256": "127c0dd6d29b004e2b68caba4771ee81e9e83e0fa15ad1b3fcb86eef167a937f",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0207",
+      "imageURL": "assets/bey-catalog/candidates/bb96737444d7f13e8de67ff540fd51ca5e0eea2a4548e3a4c260a361fedd9e4e.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-cc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG31@1.png",
+      "imageSha256": "bb96737444d7f13e8de67ff540fd51ca5e0eea2a4548e3a4c260a361fedd9e4e",
+      "sourceImageSha256": "127c0dd6d29b004e2b68caba4771ee81e9e83e0fa15ad1b3fcb86eef167a937f",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0208",
+      "imageURL": "assets/bey-catalog/candidates/a8adc89c68f4e72db3b720c00a31d813ca7f35f1d825c18f8e43cda1d01b8a1f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-mt.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG32_01@1.png",
+      "imageSha256": "a8adc89c68f4e72db3b720c00a31d813ca7f35f1d825c18f8e43cda1d01b8a1f",
+      "sourceImageSha256": "29de3c39c56bc2a985b8dbb8dd5f4527cdd23acefa52ccd7f318fa8f88805cf3",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0225",
+      "imageURL": "assets/bey-catalog/candidates/71595e5c34d5497f6d3907a097f7a3ab7df2afbd77cbc228c8c0fc9fb83ce13c.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux00-nm.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG42_01@1.png",
+      "imageSha256": "71595e5c34d5497f6d3907a097f7a3ab7df2afbd77cbc228c8c0fc9fb83ce13c",
+      "sourceImageSha256": "0d40987bd0717c1e2e7040885b32aa8de327e38710356084dd55f6b6c76c52af",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0226",
+      "imageURL": "assets/bey-catalog/candidates/30a3ccaab526dde049c9e4a16bbdf01f20253bc0de4b93f4cd604e147b84004c.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-wa.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG43_01@1.png",
+      "imageSha256": "30a3ccaab526dde049c9e4a16bbdf01f20253bc0de4b93f4cd604e147b84004c",
+      "sourceImageSha256": "e4a0bb45384fc39ec684e8a04891fcd54e69ad9b7eae6f97bba1f35f035ae7af",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0227",
+      "imageURL": "assets/bey-catalog/candidates/b8f1f47bab3711eb3630664a0cbcb42d8bc76dc5d7df61b60f4a799cc6458f61.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-pb.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG45_01@1.png",
+      "imageSha256": "b8f1f47bab3711eb3630664a0cbcb42d8bc76dc5d7df61b60f4a799cc6458f61",
+      "sourceImageSha256": "1ef832f0475db7b5cdac79d3a0b38748bb97cfdb4cf0c4b5a1e038d94b6fb022",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0228",
+      "imageURL": "assets/bey-catalog/candidates/27a291598df06a9b8f389fe343b6e7aa885d1e424e1cb6680df9c8c262c159d9.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-sp.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG47_01@1.png",
+      "imageSha256": "27a291598df06a9b8f389fe343b6e7aa885d1e424e1cb6680df9c8c262c159d9",
+      "sourceImageSha256": "1a6acf98f8699606cc9649d6efeb27a2b23eecc0031a36c8cdd59dd86563a87f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0229",
+      "imageURL": "assets/bey-catalog/candidates/b501dce5cabcb08d25349e202858077ac54840ca48a6e06d790c49356e5cf301.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-ds_v2.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG49_01@1.png",
+      "imageSha256": "b501dce5cabcb08d25349e202858077ac54840ca48a6e06d790c49356e5cf301",
+      "sourceImageSha256": "5b6e2c35b0665b1f8547e15227e681917fa1de8855d41f2aa48438cace149381",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0230",
+      "imageURL": "assets/bey-catalog/candidates/304a605360ea326ded124115f9e453efc44d3aeef4202900c8c9b0e33aa409aa.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-db.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG51_01@1.png",
+      "imageSha256": "304a605360ea326ded124115f9e453efc44d3aeef4202900c8c9b0e33aa409aa",
+      "sourceImageSha256": "bd782be53fa874ce3963600b83db3c00a815b707538116dd35585714590f0ac9",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0239",
+      "imageURL": "assets/bey-catalog/candidates/3085caedb198a386f7a62d133ad8327d9b17bcb2ef7c6f8f90da7394f514b95f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux00-ss.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG61_01@1.png",
+      "imageSha256": "3085caedb198a386f7a62d133ad8327d9b17bcb2ef7c6f8f90da7394f514b95f",
+      "sourceImageSha256": "ada44b9a1889c292a9cba5abf4f2d705bcc58c138b5f1ec93f2e74ad0a5aab64",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0240",
+      "imageURL": "assets/bey-catalog/candidates/0066a987a599811003693f7d0c47123005b390b258769248401f80ec084853a4.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux00-gv.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG63_01@1.png",
+      "imageSha256": "0066a987a599811003693f7d0c47123005b390b258769248401f80ec084853a4",
+      "sourceImageSha256": "154769174ba87c80eac715dbc7709a250b9a5854adc6bd6f620f04cb76fca68a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0244",
+      "imageURL": "assets/bey-catalog/candidates/28d11a616280e7f43f8c36c97cc4b5dd8728d2fb9fd0ba804f8bb42904eb870b.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-hf.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG79_01@1.png",
+      "imageSha256": "28d11a616280e7f43f8c36c97cc4b5dd8728d2fb9fd0ba804f8bb42904eb870b",
+      "sourceImageSha256": "b52c5777ea7136c52625f19f73db0683005016245638760efcd2ab29c0da3b5b",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0245",
+      "imageURL": "assets/bey-catalog/candidates/736e13f3824ecc4292eef81a3275b35f3a3ee21eda55744e064202861a2adc5f.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-kw.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG80_01@1.png",
+      "imageSha256": "736e13f3824ecc4292eef81a3275b35f3a3ee21eda55744e064202861a2adc5f",
+      "sourceImageSha256": "956977faab25ffdb2cda221bf25e63e0314a6f214c167d62320a2b2905e8c152",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0246",
+      "imageURL": "assets/bey-catalog/candidates/42c1cd07c617de3e0652f84739f542adc05f796348036c70abf25aa60ad7a5f1.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-ba.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG81_01@1.png",
+      "imageSha256": "42c1cd07c617de3e0652f84739f542adc05f796348036c70abf25aa60ad7a5f1",
+      "sourceImageSha256": "201694337e15cc5823f5437566b38e5475bc554cffe992444bb470acb977ee3a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0247",
+      "imageURL": "assets/bey-catalog/candidates/873e42c8d240534d1d26aefa73923b2531885b1e98e4f27c3b7c254546267b0a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2024.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2024_1_3.png",
+      "imageSha256": "873e42c8d240534d1d26aefa73923b2531885b1e98e4f27c3b7c254546267b0a",
+      "sourceImageSha256": "16c49cd168b7fe0523009d251f9c1fc93879d1910def698998ad2cdb84ad7fb9",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0248",
+      "imageURL": "assets/bey-catalog/candidates/51d66da24c6f825a3ac350c4ee47c254c95735f6029388bc1d663d6519d1ffde.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2024.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2024_2_3.png",
+      "imageSha256": "51d66da24c6f825a3ac350c4ee47c254c95735f6029388bc1d663d6519d1ffde",
+      "sourceImageSha256": "f280c4f0083c476d3f6a23c9b08890072bb7239425a753816688679aa283072f",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0249",
+      "imageURL": "assets/bey-catalog/candidates/480e3cb714c39a7c37befab9771ead398e4c10285140839189dfa5cb80dfbd97.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2024.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2024_3_3.png",
+      "imageSha256": "480e3cb714c39a7c37befab9771ead398e4c10285140839189dfa5cb80dfbd97",
+      "sourceImageSha256": "7efd2d325eee3aef1bb32539d627ad674547eb2248317d053056c6d6bd4d24c9",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0250",
+      "imageURL": "assets/bey-catalog/candidates/3ea9a2783cfcae7c4b35d942c4ee5b92c8efc5f7a59f28f18e47c1ecb3284a43.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/news/news240930.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/news/_image/news240930_2.png",
+      "imageSha256": "3ea9a2783cfcae7c4b35d942c4ee5b92c8efc5f7a59f28f18e47c1ecb3284a43",
+      "sourceImageSha256": "9a66348109224d98dff8e83f2107b20c588f31fc25a8ff4e76914fa88eec7213",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0253",
+      "imageURL": "assets/bey-catalog/candidates/4a35661016d700e3d57692aef991317065d1813c7774fe6999ab8b07a5f98303.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/news/news240712_2.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/news/_image/news240712_2_1@2x.png",
+      "imageSha256": "4a35661016d700e3d57692aef991317065d1813c7774fe6999ab8b07a5f98303",
+      "sourceImageSha256": "98a2d8419a18ffdd3a9ae6f47e8800a49087800a3103f5296f8b3e5e97ab182f",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0254",
+      "imageURL": "assets/bey-catalog/candidates/ee75ac761bfc45611e8041330b256142a5e6472c3331367694709ed1fe45af0a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/app/",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/app/_image/app_reaG1.webp",
+      "imageSha256": "ee75ac761bfc45611e8041330b256142a5e6472c3331367694709ed1fe45af0a",
+      "sourceImageSha256": "3792d5bf5880bd3ee76a8aab25f70ea699054fd50d6ae951469d186ba198276a",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0256",
+      "imageURL": "assets/bey-catalog/candidates/e2566a9fbaa4b8b18582175265aa2497100e5241eb92636dd70e2a876567e184.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2025.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2025_1.png",
+      "imageSha256": "e2566a9fbaa4b8b18582175265aa2497100e5241eb92636dd70e2a876567e184",
+      "sourceImageSha256": "883fb98fcea4c0b480e78286528a6d6e78ff5f596921491469e0b8c2e950fe82",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0257",
+      "imageURL": "assets/bey-catalog/candidates/811b72eec4fa6097f80626de84826055361ffb9a1f0d9ea6c429369e68b3a171.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2025.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2025_2.png",
+      "imageSha256": "811b72eec4fa6097f80626de84826055361ffb9a1f0d9ea6c429369e68b3a171",
+      "sourceImageSha256": "2101d58a2b1be71bfd6c41a3521d83ccd087a08d7ca17707739423f16431e7b9",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0258",
+      "imageURL": "assets/bey-catalog/candidates/d7ac1ad32411d9cd374fbe4c5a87497a4e341654434b205f704039a5ede4e932.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2025.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2025_3.png",
+      "imageSha256": "d7ac1ad32411d9cd374fbe4c5a87497a4e341654434b205f704039a5ede4e932",
+      "sourceImageSha256": "68476d54c5964f5b1c713240cedb2cd5d1d6859ae8d603fcd3da61b8acdbff26",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0260",
+      "imageURL": "assets/bey-catalog/candidates/97e8b457e9affa8863199bf1130c5a604dea49885deb863f5f47fb694b7a2f93.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-drb.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXH23_01@1.png",
+      "imageSha256": "97e8b457e9affa8863199bf1130c5a604dea49885deb863f5f47fb694b7a2f93",
+      "sourceImageSha256": "da6e71edccc9933061201b86e7302573d6663cf147f9f7cf5e5d99f00fe42d48",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0261",
+      "imageURL": "assets/bey-catalog/candidates/97e8b457e9affa8863199bf1130c5a604dea49885deb863f5f47fb694b7a2f93.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-drb.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXH23_01@1.png",
+      "imageSha256": "97e8b457e9affa8863199bf1130c5a604dea49885deb863f5f47fb694b7a2f93",
+      "sourceImageSha256": "da6e71edccc9933061201b86e7302573d6663cf147f9f7cf5e5d99f00fe42d48",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0262",
+      "imageURL": "assets/bey-catalog/candidates/269b83be75d23ed82ea1177bd3976ad2ca43bd1289250a18c6cda11189f5375a.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2026.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2026_1.webp",
+      "imageSha256": "269b83be75d23ed82ea1177bd3976ad2ca43bd1289250a18c6cda11189f5375a",
+      "sourceImageSha256": "622513da3c277f672a84edc0a8c4b19904323708d40e306d308807f31c7a4b5b",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0263",
+      "imageURL": "assets/bey-catalog/candidates/e3a468e7f8273ff7bfbac6806eaa73bdf5d323be5568b63a03bf439d14c831df.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2026.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2026_2.webp",
+      "imageSha256": "e3a468e7f8273ff7bfbac6806eaa73bdf5d323be5568b63a03bf439d14c831df",
+      "sourceImageSha256": "b72a3124849efdbf841af0bef2fabd86f163360848631d6000f24f428a5a4461",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0264",
+      "imageURL": "assets/bey-catalog/candidates/b27a9fbace53b437ea767315569c0f90f25b8c68c0b0e89ed785ecbae07c3e91.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/gp_2026.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/gp2026_3.webp",
+      "imageSha256": "b27a9fbace53b437ea767315569c0f90f25b8c68c0b0e89ed785ecbae07c3e91",
+      "sourceImageSha256": "5559f6e23a0cced892a5a0d90cdf262fc1f32bb2c7c5fa0b7d747449061cc063",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0265",
+      "imageURL": "assets/bey-catalog/candidates/22bb3bb580af0004d1c888438fd398d355d6a40f12292bf57bd568bd47cb86a0.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/g1_regularpre2024_kanto.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/g1_4.png",
+      "imageSha256": "22bb3bb580af0004d1c888438fd398d355d6a40f12292bf57bd568bd47cb86a0",
+      "sourceImageSha256": "165e318db0a2eafa4f09312bb9fe91aa3f319deb4039e9d8f8d3bfe5ae4d4a10",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0266",
+      "imageURL": "assets/bey-catalog/candidates/9fdf369d1cc8916ef099564c6b75eb79bd7810cfce570181857f40af5160d2d6.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/g1_regularpre2024_kanto.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/g1_5.png",
+      "imageSha256": "9fdf369d1cc8916ef099564c6b75eb79bd7810cfce570181857f40af5160d2d6",
+      "sourceImageSha256": "084bd19d269c2919f1f90c506038b3e2ee4dff591c4fddfe1f0eddb0079880e0",
+      "pairingConfidence": "exact_variant",
+      "status": "candidate"
+    },
+    {
+      "recordId": "supplied_20261014_0267",
+      "imageURL": "assets/bey-catalog/candidates/b3b8c64c2a44339be8e7b3506b60a9b8dafebb7c7fe6f4cf102866e16d3e42ab.webp",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/g1_regularpre2024_kanto.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/event/_image/g1_6.png",
+      "imageSha256": "b3b8c64c2a44339be8e7b3506b60a9b8dafebb7c7fe6f4cf102866e16d3e42ab",
+      "sourceImageSha256": "a869ff6cfa5a546466d3eb1a4401e235d0fe498eb324e57430bb4c2cd4cd77da",
+      "pairingConfidence": "product_reference",
+      "status": "candidate"
+    }
+  ]
+}
