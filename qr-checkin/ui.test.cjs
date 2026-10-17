@@ -5,13 +5,13 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 function setup(url='https://arena.bxh.com.tw/?checkin=BXH-ABC123&checkinToken=test') {
  let uid='u1',handler,resolve;
- const tasks=[],calls=[],location={href:url};
- const sandbox={URL,Date,crypto:require('node:crypto').webcrypto,location,history:{replaceState(a,b,url){location.href=url;}},document:{addEventListener(type,fn){handler=fn;}},setTimeout(fn){tasks.push(fn);return tasks.length;},clearTimeout(){},window:{engagementService:{tournamentOperation(name,data){calls.push({name,data});return new Promise(r=>{resolve=r;});}}}};
+ const tasks=[],calls=[],location={href:url},loginNotice={hidden:true};
+ const sandbox={URL,Date,crypto:require('node:crypto').webcrypto,location,history:{replaceState(a,b,url){location.href=url;}},document:{getElementById(id){return id==='qr-checkin-login-notice'?loginNotice:null;},addEventListener(type,fn){handler=fn;}},setTimeout(fn){tasks.push(fn);return tasks.length;},clearTimeout(){},window:{engagementService:{tournamentOperation(name,data){calls.push({name,data});return new Promise(r=>{resolve=r;});}}}};
  vm.createContext(sandbox);vm.runInContext(fs.readFileSync(__dirname+'/../modules/main-app/qr-checkin.js','utf8'),sandbox);
  const feature=sandbox.window.BXHQrCheckin;
  function bind(){feature.bind({state:()=>({cloudCode:'BXH-ABC123'}),uid:()=>uid,render(){},toast(){},qr(){}});}
  bind();
- return {feature,calls,tasks,location,setUid(value){uid=value;bind();},complete(result){resolve(result);},handler:()=>handler};
+ return {feature,calls,tasks,location,loginNotice,setUid(value){uid=value;bind();},complete(result){resolve(result);},handler:()=>handler};
 }
 const flush=()=>new Promise(r=>setImmediate(r));
 test('logged-in QR visitor auto-submits once without confirmation button',async()=>{
@@ -40,4 +40,11 @@ test('history distinguishes player and operator accounts and escapes both',async
  assert.equal(x.calls[0].data.action,'status');x.complete({enabled:false});await flush();
  assert.equal(x.calls[1].data.action,'history');x.complete({records:[{playerId:'p1',name:'選手',accountUid:'<player>',actorUid:'<staff>',action:'manual',at:1800000000000}]});await pending;
  const html=x.feature.renderModal();assert.match(html,/選手帳號：&lt;player&gt;/);assert.match(html,/操作帳號：&lt;staff&gt;/);assert.doesNotMatch(html,/<player>|<staff>/);
+});
+
+test('real-shell login notice follows pending QR and authenticated identity independently of app rendering',()=>{
+ const x=setup();assert.equal(x.loginNotice.hidden,true);
+ x.setUid(null);assert.equal(x.loginNotice.hidden,false);
+ x.setUid('u1');assert.equal(x.loginNotice.hidden,true);
+ const normal=setup('https://arena.bxh.com.tw/');normal.setUid(null);assert.equal(normal.loginNotice.hidden,true);
 });

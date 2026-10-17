@@ -9,12 +9,14 @@ let passed=0;
 async function scenario(name,config,run){
  const page=await browser.newPage({viewport:{width:390,height:844}});
  const src=fs.readFileSync(__dirname+'/../modules/main-app/qr-checkin.js','utf8');
- const fixture=`<!doctype html><meta charset="utf-8"><div id="app"></div><script>
+ const loginNotice=fs.readFileSync(__dirname+'/../index.html','utf8').match(/<section id="qr-checkin-login-notice"[\s\S]*?<\/section>/)?.[0];
+ assert.ok(loginNotice,'Production shell QR login notice is required');
+ const fixture=`<!doctype html><meta charset="utf-8">${loginNotice}<div id="app"></div><script>
  window.calls=[];window.scanResponse=${JSON.stringify(config.response||{ok:true,name:'選手甲',eventName:'測試賽',code:'BXH-ABC123',currentAt:1800000000000})};window.uid=${JSON.stringify(config.uid===undefined?'u1':config.uid)};
  window.room={cloudCode:'BXH-ABC123',meta:{name:'測試賽'},players:[{id:'p1',name:'選手甲',checkedIn:false}]};
  window.engagementService={async tournamentOperation(name,d){calls.push(d);if(d.action==='scan'){${config.delay?'await new Promise(r=>window.finishScan=r);':''}if(scanResponse.error)throw Error(scanResponse.error);return scanResponse;}if(d.action==='status')return {ok:true,enabled:false};if(d.action==='history')return {ok:true,records:[]};return {ok:true};}};
  </script><script>${src}</script><script>
- function render(){BXHQrCheckin.bind({uid:()=>window.uid,state:()=>room,render,toast(){},qr(){},applyRemote(){}});document.querySelector('#app').innerHTML=BXHQrCheckin.renderEntry()||BXHQrCheckin.button();document.querySelector('#app').insertAdjacentHTML('beforeend',BXHQrCheckin.renderModal());}render();
+ function render(){BXHQrCheckin.bind({uid:()=>window.uid,state:()=>room,render,toast(){},qr(){},applyRemote(){}});if(!window.uid){document.querySelector('#app').innerHTML='<button>登入</button>';return;}document.querySelector('#app').innerHTML=BXHQrCheckin.renderEntry()||BXHQrCheckin.button();document.querySelector('#app').insertAdjacentHTML('beforeend',BXHQrCheckin.renderModal());}render();
  </script>`;
  await page.route('https://arena.test/**',route=>route.fulfill({contentType:'text/html',body:fixture}));
  await page.goto('https://arena.test/'+(config.manager?'':'?checkin=BXH-ABC123&checkinToken=test'));
