@@ -74,7 +74,7 @@ function create(ctx){
  }
  return {begin,retry,discard,blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,error}),async verify(snapshot){
   if(busy||pending)return false;if(!ctx.cloud())return true;
-  try{const latest=await deadline(ctx.read());return ctx.current()&&latest?.ok===true&&!latest.data.startedAt&&signature(latest.data)===signature(snapshot)&&signature(latest.publicData)===signature(snapshot);}catch{return false;}
+  try{const latest=await deadline(ctx.read());return ctx.current()&&!busy&&!pending&&signature(ctx.state())===signature(snapshot)&&latest?.ok===true&&!latest.data.startedAt&&signature(latest.data)===signature(snapshot)&&signature(latest.publicData)===signature(snapshot);}catch{return false;}
  }};
 }
 const api={signature,assertWrite,create};if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHBracketCommit=api;

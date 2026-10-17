@@ -81,3 +81,8 @@ test('storage failure prevents the candidate from being sent',async()=>{
 test('account switch during server preflight never sends a write',async()=>{
  const h=fixture(),read=h.ctx.read,wait=deferred();h.ctx.read=async()=>{await wait.promise;return read();};const c=h.make(),p=c.begin();await tick();h.leave();wait.resolve();await p;assert.equal(h.writes.length,0);assert.equal(h.applied,0);
 });
+
+test('a redraw started during start verification keeps start blocked',async()=>{
+ const h=fixture(),c=h.make();await c.begin();const read=h.ctx.read,wait=deferred();h.ctx.read=async()=>{await wait.promise;return read();};
+ const verify=c.verify(h.local),draw=c.begin();wait.resolve();assert.equal(await verify,false);await draw;
+});

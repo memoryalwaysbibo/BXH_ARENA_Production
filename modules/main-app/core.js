@@ -10171,7 +10171,7 @@ function bracketCommitController(){
   read:()=>window.cloudSync.readBracketFromServer(code),
   write:(snapshot,options)=>enqueueCloudStateWrite(code,snapshot,{...options,isCurrent:current}),
   local:snapshot=>saveRecord(snapshot),
-  apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;saveRecord(state);},
+  apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
   changed:()=>{if(current())renderPreservingScroll();},
   success:()=>{activeTab='people';render();showToast(code?'對戰表已儲存雲端並核對完成':'對戰表已儲存完成');}
  });
@@ -23463,6 +23463,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               if(await saveState()===false){
                 state.startedAt=prior.startedAt;state.rosterLocked=prior.rosterLocked;state.meta.registrationStatus=prior.status;
                 state.meta.checkinClosedEarly=prior.checkinClosedEarly;state.meta.checkinClosedAt=prior.checkinClosedAt;
+                await saveRecord(state);
                 render();showToast("雲端未確認開賽，請稍後重試",true);return;
               }
               activeTab="bracket";render();showToast("團體戰已開始，裁判可進行雙命守擂判定");
