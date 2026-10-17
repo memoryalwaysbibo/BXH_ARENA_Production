@@ -1,0 +1,24 @@
+name: Personnel Roster Search and Stroke Sort
+on:
+  push:
+    branches: ['main']
+    paths: ['modules/main-app/roster-view.js', 'modules/main-app/core.js', 'index.html', 'tests/roster-view*', '.github/workflows/roster-view.yml']
+  pull_request:
+    paths: ['modules/main-app/roster-view.js', 'modules/main-app/core.js', 'index.html', 'tests/roster-view*', '.github/workflows/roster-view.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/roster-view.test.cjs
+      - run: npm install --no-save --ignore-scripts playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/roster-view.browser.cjs

@@ -1,6 +1,6 @@
 {
-  "build": "20261017.3",
+  "build": "20261018.1",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-17T03:01:30.844Z",
-  "releaseTrigger": "qr-checkin-in-app-scan"
+  "updatedAt": "2026-10-17T18:52:11.788Z",
+  "releaseTrigger": "roster-name-search-stroke-sort"
 }
