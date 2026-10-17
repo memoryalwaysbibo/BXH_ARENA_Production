@@ -10,16 +10,20 @@ const sandbox={window:{},Date,Number,Object,Set,Array,String,Math,
  matchHasDecisionData:m=>!!(m.completed||m.scoreA||m.scoreB||m.log?.length),
  clearCourtAssignmentRefs:(st,ids)=>Object.values(st.courtAssignments).forEach(c=>{if(ids.includes(c.currentMatchId))c.currentMatchId=null;if(ids.includes(c.nextMatchId))c.nextMatchId=null;})};
 vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../modules/main-app/court-retirement.js'),'utf8'),sandbox);
 vm.runInContext(fn('idleCourtCandidates','function applyIdleCourtClaim')+'\n'+fn('applyIdleCourtClaim','async function claimIdleCourt'),sandbox);
-const state=()=>({meta:{formatType:'double'},matches:[
+const state=()=>({meta:{formatType:'double',stations:2},matches:[
  {id:'playing',station:1,status:'in_progress',a:{},b:{},seq:1},
  {id:'queued',station:1,status:'ready',a:{},b:{},seq:2,dispatchRevision:0},
  {id:'scored',station:1,status:'ready',a:{},b:{},seq:3,scoreA:1},
- {id:'waiting',station:2,status:'pending',a:{},b:null,seq:4}],
- courtAssignments:{court1:{currentMatchId:'playing',nextMatchId:'queued'},court2:{currentMatchId:null,nextMatchId:null}}});
+ {id:'waiting',station:2,status:'pending',a:{},b:null,seq:4},
+ {id:'prepared',station:1,status:'ready',a:{},b:{},seq:1.5}],
+ courtAssignments:{court1:{currentMatchId:'playing',nextMatchId:'prepared'},court2:{currentMatchId:null,nextMatchId:null}}});
 const st=state();assert.deepEqual(Array.from(sandbox.idleCourtCandidates(st,2),m=>m.id),['queued']);
 assert.equal(sandbox.applyIdleCourtClaim(st,'queued',2).ok,true);
 assert.equal(st.matches[1].station,2);assert.equal(st.matches[1].dispatchRevision,1);
+assert.equal(st.courtAssignments.court1.nextMatchId,'prepared','a displayed next may already be notified');
+assert.equal(st.courtAssignments.court2.currentMatchId,'queued','claim reserves its destination immediately');
 assert.equal(sandbox.applyIdleCourtClaim(st,'playing',2).ok,false);
 const busy=state();busy.courtAssignments.court2.currentMatchId='waiting';
 assert.equal(sandbox.applyIdleCourtClaim(busy,'queued',2).reason,'court-no-longer-idle');

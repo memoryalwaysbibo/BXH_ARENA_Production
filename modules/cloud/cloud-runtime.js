@@ -3261,7 +3261,8 @@ if(testerSession){
           if(st.archiveStatus==="completed")throw new Error("already-completed");
           let applied;
           if(change.kind==="resize"){
-            applied=window.BXHCourtRetirement.request(st,change.count,change.expectedTarget);
+            if(!Number.isSafeInteger(change.expectedRevision))throw new Error("court-plan-stale");
+            applied=window.BXHCourtRetirement.request(st,change.count,change.expectedTarget,Date.now(),change.expectedRevision);
             if(applied.ok&&change.meta){
               const physical=st.meta.stations,oldMeta=st.meta;
               st.meta=Object.assign({},oldMeta,change.meta,{stations:physical,refereeStationAssignments:oldMeta.refereeStationAssignments,refereeStationNames:oldMeta.refereeStationNames,refereeStationRestrictionEnabled:oldMeta.refereeStationRestrictionEnabled});
