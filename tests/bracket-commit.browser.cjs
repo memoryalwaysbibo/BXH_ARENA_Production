@@ -2,7 +2,7 @@
 const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 (async()=>{
- const server=http.createServer((_,r)=>r.end('<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:12px}button{max-width:100%;white-space:normal}.btn-row{display:flex;flex-wrap:wrap;gap:8px}.panel{padding:12px}</style><main id="app"></main>'));
+ const server=http.createServer((_,r)=>r.end('<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:12px}button{max-width:100%;white-space:normal}.btn-row{display:flex;flex-wrap:wrap;gap:8px}.panel{padding:12px}</style><main id="app"></main><p id="notice"></p>'));
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await chromium.launch({headless:true});
  try{
@@ -25,7 +25,7 @@ const {chromium}=require('playwright');
  function showToast(s){success++;document.querySelector('#notice').textContent=s;}
  function renderPreservingScroll(){render();}
  ${core.slice(a,b)}
- function render(){document.querySelector('#app').innerHTML=bracketCommitStatusHtml()+'<button id="draw" '+(bracketCommitBlocked()?'disabled':'')+'>重抽</button><button id="start" '+(bracketCommitBlocked()?'disabled':'')+'>開賽</button><p id="notice"></p>';document.querySelector('#draw').onclick=()=>bracketCommitController().begin();}
+ function render(){document.querySelector('#app').innerHTML=bracketCommitStatusHtml()+'<button id="draw" '+(bracketCommitBlocked()?'disabled':'')+'>重抽</button><button id="start" '+(bracketCommitBlocked()?'disabled':'')+'>開賽</button>';document.querySelector('#draw').onclick=()=>bracketCommitController().begin();}
  document.addEventListener('click',e=>{if(e.target.dataset.action==='bracket-commit-retry')bracketCommitController().retry();if(e.target.dataset.action==='bracket-commit-discard')bracketCommitController().discard();});
  window.fixture={stats:()=>({generations,success,writeCount,local:clone(state),server:clone(serverState)}),retry:()=>{fail=false;},release:()=>release(),canStart:()=>verifyBracketBeforeStart()};
  render();
