@@ -2873,6 +2873,10 @@ if(testerSession){
                 if(!window.BXHBracketCommit)throw new Error('bracket-verifier-unavailable');
                 const verdict=window.BXHBracketCommit.assertWrite(remoteState,data,options);
                 if(verdict==='already-committed')return;
+                if(options.bracketCommit){
+                  data.updatedAt=Math.max(Date.now(),Number(remoteState.updatedAt||0)+1,Number(data.updatedAt||0));
+                  privatePayload.updatedAt=data.updatedAt;publicPayload.updatedAt=data.updatedAt;
+                }
               }
               if(JSON.stringify(remoteState.forcedCourtExits||{})!==JSON.stringify(data.forcedCourtExits||{}))throw new Error("court-exit-stale");
               const dispatchById=new Map((data.matches||[]).map(m=>[m.id,m]));

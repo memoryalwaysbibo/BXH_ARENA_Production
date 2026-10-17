@@ -62,9 +62,10 @@ test('actual cloud transaction and server-only private/public readback enforce v
  fixtureSource=fixtureSource.replace('window:{},console:','window:{BXHBracketCommit:bracketApi},console:').replace("['pushUpdate','saveStaffAssignments','saveRefereeStationAssignments']","['pushUpdate','readBracketFromServer','saveStaffAssignments','saveRefereeStationAssignments']").replace("return {api:context.api,docs,reads,stale,logs,","return {context,api:context.api,docs,reads,stale,logs,");
  const outer={require,bracketApi:api};vm.createContext(outer);vm.runInContext(fixtureSource+'\nglobalThis.h=harness();globalThis.initial=room();',outer);
  const h=outer.h;h.context.buildPublicMirrorFields=s=>clone(s);
- const old=clone(outer.initial),candidate={...clone(old),drawnAt:1,bracketSize:2,matches:[{id:'new',bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}],bracketDraw:{id:'draw-one'}};
+ const old=clone(outer.initial),future=Date.now()+60000;h.docs.get('tournaments/ROOM').data=JSON.stringify({...old,updatedAt:future});
+ const candidate={...clone(old),drawnAt:1,bracketSize:2,matches:[{id:'new',bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}],bracketDraw:{id:'draw-one'}};
  assert.equal(await h.api.pushUpdate('ROOM',candidate,{bracketCommit:{baseSignature:api.signature(old)}}),true);
- const read=await h.api.readBracketFromServer('ROOM');assert.equal(read.ok,true);assert.equal(api.signature(read.data),api.signature(read.publicData));assert.deepEqual(Array.from(h.reads).slice(-2),['tournaments/ROOM','publicTournaments/ROOM']);
+ const read=await h.api.readBracketFromServer('ROOM');assert.equal(read.ok,true);assert(read.data.updatedAt>future);assert.equal(api.signature(read.data),api.signature(read.publicData));assert.deepEqual(Array.from(h.reads).slice(-2),['tournaments/ROOM','publicTournaments/ROOM']);
  assert.equal(await h.api.pushUpdate('ROOM',old),false);assert.equal(JSON.parse(h.docs.get('tournaments/ROOM').data).bracketDraw.id,'draw-one');
  assert.equal(await h.api.pushUpdate('ROOM',{...clone(candidate),startedAt:2},{bracketStartSignature:api.signature(old)}),false);
  assert.equal(await h.api.pushUpdate('ROOM',{...clone(candidate),startedAt:2},{bracketStartSignature:api.signature(candidate)}),true);
