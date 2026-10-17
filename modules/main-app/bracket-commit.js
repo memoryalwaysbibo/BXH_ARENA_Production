@@ -57,6 +57,7 @@ function create(ctx){
   const base=ctx.state();if(base.startedAt||base.archiveStatus==='completed')return false;
   const snapshot=ctx.generate();if(!snapshot)return false;
   const id=ctx.operationId(),at=Date.now();
+  snapshot.updatedAt=Math.max(at,Number(base.updatedAt||0)+1);
   snapshot.bracketDraw={id,revision:Number(base.bracketDraw?.revision||0)+1,at,actorUid:ctx.actorUid};
   snapshot.bracketDrawHistory=[...(base.bracketDrawHistory||[]),snapshot.bracketDraw].slice(-20);
   pending={baseSignature:signature(base),snapshot:clone(snapshot)};

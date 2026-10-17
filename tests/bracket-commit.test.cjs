@@ -4,7 +4,7 @@ const api=require('../modules/main-app/bracket-commit.js');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(r=>setImmediate(r));
 const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:x=>resolve(x)};};
-function room(){return {id:'r',cloudCode:'ROOM',meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'};}
+function room(){return {id:'r',cloudCode:'ROOM',updatedAt:1,meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'};}
 function fixture(){
  let local=room(),remote=clone(local),pub=clone(local),count=0,success=0,applied=0,active=true,writes=[];
  const storage=new Map(),ctx={key:'u:ROOM',actorUid:'u',storage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},current:()=>active,state:()=>local,cloud:()=>true,operationId:()=> 'op'+count,
@@ -17,7 +17,7 @@ function fixture(){
 test('delayed write blocks start/re-draw and never reports success before readback',async()=>{
  const h=fixture(),wait=deferred(),write=h.ctx.write;h.ctx.write=async(...args)=>{await wait.promise;return write(...args);};
  const c=h.make(),promise=c.begin();await tick();assert(c.blocked());assert.equal(h.success,0);assert.equal(h.local.matches.length,0);assert.equal(await c.begin(),false);assert.equal(await c.verify(h.local),false);
- wait.resolve();assert.equal(await promise,true);assert.equal(h.success,1);assert.equal(h.local.matches.length,1);assert(!c.blocked());assert.equal(h.local.bracketDrawHistory.length,1);
+ wait.resolve();assert.equal(await promise,true);assert.equal(h.success,1);assert.equal(h.local.matches.length,1);assert(!c.blocked());assert.equal(h.local.bracketDrawHistory.length,1);assert(h.local.updatedAt>1);
 });
 test('failed save survives controller recreation and retries identical draw exactly once',async()=>{
  const h=fixture(),write=h.ctx.write;h.ctx.write=async()=>false;
