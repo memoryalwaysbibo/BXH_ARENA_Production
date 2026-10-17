@@ -133,7 +133,7 @@
         "百日戰士":"assets/title-epic-hundred-day-warrior.webp",
         "準時回家":"assets/title-common-home-on-time.svg",
         "開場即結束":"assets/title-rare-over-at-start.svg",
-        "誰能比我慘":"assets/title-epic-unluckiest.svg",
+        "誰能比我慘":"assets/title-epic-unluckiest-heartbreak-v5.webp",
         "初次開局":"assets/title-rare-first-match.webp",
         "整裝待發":"assets/title-common-ready.svg",
         "初次上陣":"assets/title-common-debut.svg",
