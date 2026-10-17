@@ -1,0 +1,25 @@
+name: Confirmed Bracket Draw
+on:
+  push:
+    branches: ['main']
+    paths: ['modules/main-app/bracket-commit.js', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/bracket-commit*', '.github/workflows/bracket-commit.yml']
+  pull_request:
+    paths: ['modules/main-app/bracket-commit.js', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/bracket-commit*', '.github/workflows/bracket-commit.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/bracket-commit.test.cjs tests/assignment-cloud-confirmation.test.cjs tests/community-host-roster-sync.test.cjs tests/community-quick-registration-cloud.test.cjs
+      - run: npm install --no-save --ignore-scripts playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/bracket-commit.browser.cjs
+      - run: node tests/e2e/community-quick-registration-browser.cjs

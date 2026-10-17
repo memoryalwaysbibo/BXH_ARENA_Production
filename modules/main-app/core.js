@@ -6319,6 +6319,7 @@ function enqueueCloudStateWrite(code, snapshot, options={}){
   cloudWriteChain = cloudWriteChain
     .catch(()=>false)
     .then(async ()=>{
+      if(options.isCurrent&&!options.isCurrent())return false;
       if(!normalizedCode || !cloudAvailable() || !window.cloudSync || !window.cloudSync.pushUpdate) return false;
       return await window.cloudSync.pushUpdate(normalizedCode, snapshot, options);
     });
@@ -6337,6 +6338,7 @@ function queueCloudSyncRetry(tournamentId, code){
   cloudSyncPending = true;
   if(cloudSyncQueueTimer) return;
   cloudSyncQueueTimer = setInterval(async ()=>{
+    if(window.BXHBracketCommit&&bracketCommitBlocked())return;
     if(communitySettingsWriteGate&&communitySettingsWriteGate.isCurrent()&&communitySettingsWriteGate.roomId===tournamentId&&communitySettingsWriteGate.roomCode===code)return;
     if(!cloudSyncPending || state.id!==tournamentId || state.cloudCode!==code || !cloudAvailable()){
       clearInterval(cloudSyncQueueTimer); cloudSyncQueueTimer=null; return;
@@ -6370,6 +6372,7 @@ function queueCloudSyncRetry(tournamentId, code){
 
 
 async function saveState(options={}){
+  if(window.BXHBracketCommit&&bracketCommitBlocked())return false;
   const requestedState=state;
   const settingsGate=communitySettingsWriteGate;
   if(settingsGate&&settingsGate.isCurrent()&&settingsGate.roomId===requestedState.id&&settingsGate.roomCode===requestedState.cloudCode&&options.settingsToken!==settingsGate){
@@ -6404,7 +6407,7 @@ async function saveState(options={}){
 
   if(snapshot.cloudCode && cloudAvailable() && currentRole!=="guest"){
     try{
-      const cloudPromise = enqueueCloudStateWrite(snapshot.cloudCode, snapshot);
+      const cloudPromise = enqueueCloudStateWrite(snapshot.cloudCode, snapshot, snapshot.startedAt&&window.BXHBracketCommit?{bracketStartSignature:window.BXHBracketCommit.signature(snapshot)}:{});
       const localOk = await localSavePromise;
       const ok = await cloudPromise;
       if(ok){
@@ -10148,16 +10151,52 @@ const BOARD_ICON_MINUS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="
 const BOARD_ICON_PLUS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5 v14 M5 12 h14"/></svg>';
 const BOARD_ICON_FULLSCREEN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M4 9 V4 h5 M20 9 V4 h-5 M4 15 v5 h5 M20 15 v5 h-5"/></svg>';
 
+// Bracket generation is detached until persistence and server readback agree.
+let bracketCommitContext=null;
+function bracketCommitController(){
+ if(!window.BXHBracketCommit)return null;
+ const key=String(firebaseUser?.uid||currentRole||'local')+':'+String(state.cloudCode||state.id);
+ if(bracketCommitContext?.key===key)return bracketCommitContext.controller;
+ const roomId=state.id,code=state.cloudCode,actorUid=firebaseUser?.uid||null;
+ const current=()=>state.id===roomId&&state.cloudCode===code&&(firebaseUser?.uid||null)===actorUid;
+ let storage;try{storage=window.sessionStorage;}catch{}
+ const controller=window.BXHBracketCommit.create({key,actorUid,storage,current,
+  state:()=>state,cloud:()=>!!code,
+  operationId:()=>window.crypto.randomUUID(),
+  generate:()=>{
+   const prior=state;state=JSON.parse(JSON.stringify(prior));
+   try{if(!generateBracket())return null;return JSON.parse(JSON.stringify(state));}
+   finally{state=prior;}
+  },
+  read:()=>window.cloudSync.readBracketFromServer(code),
+  write:(snapshot,options)=>enqueueCloudStateWrite(code,snapshot,{...options,isCurrent:current}),
+  local:snapshot=>saveRecord(snapshot),
+  apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
+  changed:()=>{if(current())renderPreservingScroll();},
+  success:()=>{activeTab='people';render();showToast(code?'對戰表已儲存雲端並核對完成':'對戰表已儲存完成');}
+ });
+ bracketCommitContext={key,controller};return controller;
+}
+function bracketCommitBlocked(){return bracketCommitController()?.blocked()||false;}
+function bracketCommitStatusHtml(){
+ const c=bracketCommitController(),s=c?.status();if(!s?.pending)return '';
+ return '<section class="panel" role="status"><b>'+(s.busy?'正在儲存並核對對戰表…':'對戰表尚未確認儲存成功')+'</b><p>本次配對已保留；確認完成前無法重抽、重設或開賽。</p>'+
+ (s.busy?'':'<p>請確認網路後重試。若其他裝置已修改配對或名單，請讀取雲端版本後重新編排。</p><div class="btn-row"><button class="btn btn-primary" data-action="bracket-commit-retry">重試儲存同一份配對</button><button class="btn btn-ghost" data-action="bracket-commit-discard">讀取雲端版本</button></div>')+'</section>';
+}
+async function verifyBracketBeforeStart(){
+ const c=bracketCommitController();if(!c)return true;
+ const ok=await c.verify(state);if(!ok)showToast('對戰表尚未儲存完成，或雲端配對已變更；請先讀取雲端版本核對，暫不開賽',true);return ok;
+}
+
 function canReshuffleBracket(){
-  if(!state.bracketSize || state.matches.length===0) return false;
-  return state.matches.every(m => !m.completed && m.status!=="in_progress" && m.status!=="paused" && (!m.log || m.log.length===0) && !m.scoreA && !m.scoreB && !m.winnerId);
+  if(state.startedAt || (window.BXHBracketCommit&&bracketCommitBlocked()) || !state.bracketSize || state.matches.length===0) return false;
+  return state.matches.filter(m=>!m.isBye).every(m => !m.completed && m.status!=="in_progress" && m.status!=="paused" && (!m.log || m.log.length===0) && !m.scoreA && !m.scoreB && !m.winnerId);
 }
 
 function reshuffleBracket(){
   if(!isAdminTierOrAbove()){ showToast("只有 super_admin 或 admin 可以重新抽籤。", true); return; }
   if(!canReshuffleBracket()){ showToast("賽事開始後不可重新抽籤", true); return; }
-  const ok = generateBracket();
-  if(ok){ saveState(); render(); showToast("已重新抽籤"); }
+  void bracketCommitController()?.begin();
 }
 
 function currentRoundLabelForBoard(){
@@ -10169,6 +10208,7 @@ function currentRoundLabelForBoard(){
 }
 
 function renderBoardMode(){
+  const commitStatus=bracketCommitStatusHtml();
   const fmt = state.meta.formatType || "single";
   let inner;
   if(fmt==="double") inner = renderDoubleElimBracket();
@@ -10187,7 +10227,7 @@ function renderBoardMode(){
     </div>
   ` : "";
 
-  return `<div class="board-shell" data-board-theme="${boardTheme}" id="board-shell">
+  return `${commitStatus}<div class="board-shell" data-board-theme="${boardTheme}" id="board-shell">
     <div class="board-wm" aria-hidden="true"><img src="${LOGO_SRC}" alt=""></div>
     <div class="board-header">
       <div class="board-header-left">
@@ -12228,7 +12268,7 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const bracketPanel=`
-    <div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket">重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament">賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()?'disabled':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
@@ -19252,6 +19292,9 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
+  if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}
+  if(['draw-bracket','board-reshuffle','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('請先完成本次對戰表儲存或讀取雲端版本',true);return;}
   if(peopleOnsiteWaitlistManaged()){
     const rosterActions=['people-toggle-auto-fill','people-promote-waitlist','people-move-to-waitlist','people-delete-waitlist','delete-player','quick-add-players','random-test-roster','update-players','load-test','reg-add-quick','reg-mark-noshow','reg-promote','reg-cancel','reg-delete','import-roster-from-registrations','save-meta','save-registration-settings','close-checkin-early','set-registration-enabled','set-waitlist-enabled','set-checkin-required','unlock-roster','clear-data','import-data'];
     if(rosterActions.includes(action)||action.startsWith('entry-')){showToast("本場使用現場候補抽選，請由「人員管理 → 備取」處理名單。",true);return;}
@@ -23406,10 +23449,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         try{
           await syncLatestOnlineRosterBeforeLock();
           if(!bracketRosterIsCurrent()){render();showToast("名單已有異動，請重新產生團體對戰表",true);return;}
+          if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
           openModal({type:"generic",title:"確認團體戰開賽",message:"將鎖定 "+eligibleBracketTeams().length+" 支隊伍與對戰表，並停止報名。請確認雙方人員與報到狀態。",danger:true,confirmLabel:"正式開始",onConfirm:async()=>{
             try{
               await syncLatestOnlineRosterBeforeLock();
               if(!bracketRosterIsCurrent()){render();showToast("名單已變更，請重新抽籤",true);return;}
+              if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
               const prior={startedAt:state.startedAt,rosterLocked:state.rosterLocked,status:state.meta.registrationStatus,
                 checkinClosedEarly:state.meta.checkinClosedEarly,checkinClosedAt:state.meta.checkinClosedAt};
               state.startedAt=Date.now();state.rosterLocked=true;state.meta.registrationStatus="started";
@@ -23418,6 +23463,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               if(await saveState()===false){
                 state.startedAt=prior.startedAt;state.rosterLocked=prior.rosterLocked;state.meta.registrationStatus=prior.status;
                 state.meta.checkinClosedEarly=prior.checkinClosedEarly;state.meta.checkinClosedAt=prior.checkinClosedAt;
+                await saveRecord(state);
                 render();showToast("雲端未確認開賽，請稍後重試",true);return;
               }
               activeTab="bracket";render();showToast("團體戰已開始，裁判可進行雙命守擂判定");
@@ -23446,13 +23492,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             danger:true,
             confirmLabel:"重新產生對戰表",
             onConfirm:()=>{
-              const ok=generateBracket();
-              if(ok){ saveState(); render(); showToast("已依最新參賽名單重新產生對戰表，請再次確認後開始賽事"); }
+              void bracketCommitController()?.begin();
             }
           });
           return;
         }
 
+        if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
         const eligible=eligiblePlayers().length;
         const pending=state.meta.checkinRequired
           ? state.players.filter(p=>p.checkedIn!==true).length : 0;
@@ -23476,6 +23522,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
               return;
             }
+            if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
+            const beforeStart=JSON.parse(JSON.stringify(state));
             state.startedAt=Date.now();
             rebuildCourtAssignments();
             state.rosterLocked=true;
@@ -23486,6 +23534,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             }
 
             const synced=await saveState();
+            if(synced===false){state=beforeStart;await saveRecord(state);render();showToast('雲端未確認開賽，本次未開始，請核對網路與對戰表後重試',true);return;}
             publicTournamentsCache=null;
             myRegistrationsCache=null;
             resetAdminRegistrationsCache();
@@ -23556,15 +23605,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="draw-bracket"){
-    const doDraw = ()=>{
-      const ok = generateBracket();
-      if(ok){
-        activeTab="people";
-        saveState();
-        render();
-        showToast("對戰表已依最新參賽名單產生，可確認後開始賽事");
-      }
-    };
+    const doDraw = ()=>{void bracketCommitController()?.begin();};
     const doCheckThenDraw = ()=>{
       if(state.meta.battleMode==="team"){doDraw();return;}
       const total = state.players.length;
