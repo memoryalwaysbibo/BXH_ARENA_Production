@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const core=fs.readFileSync('modules/main-app/core.js','utf8');
-function extract(name){const a=core.indexOf('function '+name+'('),b=core.indexOf('\n}',a+1)+2;assert.ok(a>=0);return core.slice(a,b);}
+function extract(name){let a=core.indexOf('function '+name+'(');if(core.slice(a-6,a)==='async ')a-=6;const b=core.indexOf('\n}',a+1)+2;assert.ok(a>=0);return core.slice(a,b);}
 function setup(){
  const c=vm.createContext({window:{},console,setTimeout:()=>0,sessionStorage:{getItem:()=>null}});
  for(const file of ['domain-utils','hunter-utils'])vm.runInContext(fs.readFileSync('modules/main-app/'+file+'.js','utf8'),c);
@@ -9,11 +9,11 @@ function setup(){
  esc:s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])),
  hunterProfileCache:{records:[],skipped:[]},hunterProfileLoading:false,hunterProfileError:null,
  myRegistrationsTournamentInfo:{},myRegistrationsCache:[],myRegistrationsLoading:false,myRegistrationsError:null,
- playerCenterPeriod:'career',currentAuthUid:()=> 'self',hunterSeasonStartMs:()=>Date.parse('2026-10-01T00:00:00+08:00'),
+ playerCenterResultScope:'',playerCenterResultRequest:0,playerCenterEventResults:new Map(),engagementSessionEpoch:1,ladderReadWithTimeout:p=>p,renderPreservingScroll:()=>{},playerCenterPeriod:'career',currentAuthUid:()=> 'self',hunterSeasonStartMs:()=>Date.parse('2026-10-01T00:00:00+08:00'),
  effectiveGameId:p=>p.gameId,playerDerivedId:()=> 'P1',ROLE_ICON_PLAYER:'本人',myLadderProfileCache:null,
  hunterRecordCardHtml:r=>'<article>'+c.esc(r.opponent?.name||'對手')+'</article>',
  renderPlayerRegisteredTab:()=>'<div>目前賽程</div>',schedulePhase:info=>info.phase||'waiting'});
- for(const name of ['playerCenterEventGroups','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','renderPlayerCenterOverview'])vm.runInContext(extract(name),c);
+ for(const name of ['playerCenterResultContext','loadPlayerCenterEventResult','playerCenterEventOutcome','playerCenterEventOutcomeHtml','playerCenterEventGroups','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','renderPlayerCenterOverview'])vm.runInContext(extract(name),c);
  return c;
 }
 const record=(overrides={})=>({eventCode:'E1',eventName:'週末賽',eventDate:'2026-10-18',matchId:'m1',completedAt:Date.parse('2026-10-18T15:00:00+08:00'),completed:true,isWin:true,scoringVersion:'bxh-4pt-v1',round:1,...overrides});
@@ -34,8 +34,8 @@ test('loading, errors and missing season never show zero victories as verified s
 });
 test('career preserves nonstandard sources and unknown dates without inventing placement or leaking markup',()=>{
  const c=setup();c.hunterProfileCache.records=[record({eventName:'<img src=x onerror=alert(1)>',completedAt:0,eventDate:'',opponent:{name:'對手'}}),record({eventCode:'EN',scoringVersion:'bxh-enchantment-v2'})];
- const html=c.renderPlayerCenterCareer();assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<img src=x'));assert.ok(html.includes('日期未記錄'));assert.ok(html.includes('賽事狀態尚未核對'));assert.ok(html.includes('EN'));assert.ok(!html.includes('冠軍'));
- c.myRegistrationsTournamentInfo.E1={phase:'live'};assert.ok(c.renderPlayerCenterCareer().includes('名次待結算'));c.myRegistrationsTournamentInfo.E1={phase:'done'};assert.ok(c.renderPlayerCenterCareer().includes('最終名次未接入'));
+ const html=c.renderPlayerCenterCareer();assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<img src=x'));assert.ok(html.includes('日期未記錄'));assert.ok(html.includes('尚未核對入帳紀錄'));assert.ok(html.includes('EN'));assert.ok(!html.includes('冠軍'));
+ c.myRegistrationsTournamentInfo.E1={phase:'live'};assert.ok(c.renderPlayerCenterCareer().includes('名次待結算'));c.myRegistrationsTournamentInfo.E1={phase:'done'};assert.ok(c.renderPlayerCenterCareer().includes('未記錄名次'));
 });
 test('active schedule excludes completed and cancelled entries, keeps family participants distinct',()=>{
  const c=setup();Object.assign(c,{normalizeRoomCodeInput:String,smartCallModel:()=>({kind:'waiting'}),isCommunityQuickRegistration:()=>false,publicTournamentRegistrationLocked:()=>true,scheduleSmartCallAutoRefresh:()=>{},scheduleGroups:(key,rows,card)=>rows.map(card).join('')});
@@ -49,5 +49,66 @@ test('profile keeps basic data and title paths while new account defaults to ove
  assert.ok(core.includes('playerProfileSection="overview"'));assert.ok(core.includes("['overview','career','basic','titles'].includes(section)"));assert.ok(core.includes("v.playerTab==='profile'?'profile'"));
  for(const section of ['overview','career','basic','titles'])assert.ok(core.includes('data-section="'+section+'"'));
  assert.ok(extract('renderPlayerProfileTab').includes('data-action="family-open"'));assert.ok(extract('renderPlayerProfileTab').includes('renderPlayerTitleCenter(p)'));
+});
+test('settled evidence preserves real zero points and exact placement rather than guessing',()=>{
+ const c=setup();c.playerCenterResultContext();const group=c.playerCenterEventGroups([record({eventCode:'BXH-E1',participantLocalPlayerId:'local'})])[0];
+ c.playerCenterEventResults.set('BXH-E1',{evidence:{status:'settled',points:0,placement:8},info:{phase:'done'}});
+ let outcome=c.playerCenterEventOutcome(group);assert.equal(outcome.points,'0 PT');assert.equal(outcome.placeLabel,'第 8 名');assert.equal(outcome.status,'本人已入帳');
+ c.playerCenterEventResults.set('BXH-E1',{evidence:{status:'settled',points:42,placement:2},info:{phase:'done'}});
+ assert.equal(c.playerCenterEventOutcome(group).placeLabel,'亞軍');assert.equal(c.playerCenterEventOutcome(group).points,'+42 PT');
+});
+test('public podium requires finished state and one resolved participant ID; names and family IDs cannot grant placement',()=>{
+ const c=setup();c.playerCenterResultContext();const g=c.playerCenterEventGroups([record({participantLocalPlayerId:'local'})])[0];
+ c.myRegistrationsTournamentInfo.E1={phase:'live',parsedData:{championId:'local'}};assert.equal(c.playerCenterEventOutcome(g).placeLabel,'名次待結算');
+ c.myRegistrationsTournamentInfo.E1.phase='done';assert.equal(c.playerCenterEventOutcome(g).placeLabel,'冠軍');
+ g.records.push(record({participantLocalPlayerId:'child'}));assert.equal(c.playerCenterEventOutcome(g).placeLabel,'未記錄名次');
+ g.records=[record({opponent:{name:'local'}})];assert.equal(c.playerCenterEventOutcome(g).placeLabel,'未記錄名次');
+});
+test('no receipt, partial failure and multiple receipts never become zero points or settled self results',()=>{
+ const c=setup();c.playerCenterResultContext();const g=c.playerCenterEventGroups([record({eventCode:'BXH-E1'})])[0];
+ for(const [row,status] of [[{evidence:{status:'none'},info:{phase:'done',ladderMode:'ranked',ladderPointsAwarded:true}},'全場已結算，未查得本人入帳'],[{evidence:{status:'none'},info:{phase:'done',ladderMode:'general'}},'一般賽事，不計天梯'],[{error:true},'部分成績讀取失敗'],[{evidence:{status:'ambiguous'}},'多筆入帳紀錄，需核對']]){
+ c.playerCenterEventResults.set(g.code,row);const outcome=c.playerCenterEventOutcome(g);assert.equal(outcome.points,'—');assert.equal(outcome.status,status);
+ }
+});
+test('lazy result reads deduplicate, can retry failure, and never write after account/session changes',async()=>{
+ const c=setup();let calls=0,finish;let uid='self';c.currentAuthUid=()=>uid;
+ c.window.cloudSync={getMyLadderEventResult:()=>{calls++;return new Promise(r=>finish=r);},getPublicTournamentSummary:async()=>({phase:'done'})};
+ const p=c.loadPlayerCenterEventResult('BXH-E1');await c.loadPlayerCenterEventResult('BXH-E1');assert.equal(calls,1);
+ uid='other';c.playerCenterResultContext();finish({status:'settled',points:99,placement:1});await p;assert.equal(c.playerCenterEventResults.size,0);
+ c.window.cloudSync.getMyLadderEventResult=async()=>{calls++;throw Error('network');};await c.loadPlayerCenterEventResult('BXH-E1');assert.equal(c.playerCenterEventResults.get('BXH-E1').error,true);
+ c.window.cloudSync.getMyLadderEventResult=async()=>{calls++;return {status:'settled',points:2};};await c.loadPlayerCenterEventResult('BXH-E1',true);assert.equal(c.playerCenterEventResults.get('BXH-E1').evidence.points,2);
+ const previous=calls;await c.loadPlayerCenterEventResult('BXH-E1');assert.equal(calls,previous);
+ c.engagementSessionEpoch++;c.playerCenterResultContext();assert.equal(c.playerCenterEventResults.size,0);
+});
+test('late result from previous login epoch cannot populate the same UID cache',async()=>{
+ const c=setup();let finish;c.window.cloudSync={getMyLadderEventResult:()=>new Promise(r=>finish=r),getPublicTournamentSummary:async()=>({phase:'done'})};
+ const p=c.loadPlayerCenterEventResult('BXH-E1');c.engagementSessionEpoch++;finish({status:'settled',points:100});await p;assert.equal(c.playerCenterEventResults.size,0);
+});
+
+const cloudRuntime=fs.readFileSync('modules/cloud/cloud-runtime.js','utf8');
+function resultCloud(){
+ let query,resolve;const rows=[];
+ const c=vm.createContext({cloudEnabled:true,authHandle:{currentUser:{uid:'self'}},engagementSessionEpoch:1,dbHandle:{},cloudSafeTimestampMs:v=>v||0,
+ fx:{collection:(_db,name)=>name,where:(...a)=>['where',...a],query:(...a)=>a,limit:n=>['limit',n],getDocs:async q=>{query=q;return {forEach:cb=>rows.forEach(r=>cb({data:()=>r}))};}}});
+ const a=cloudRuntime.indexOf('    async getMyLadderEventResult('),b=cloudRuntime.indexOf('    async getTestLadderRanking(',a);vm.runInContext('var api={'+cloudRuntime.slice(a,b)+'};',c);
+ return {c,rows,query:()=>JSON.parse(JSON.stringify(query))};
+}
+test('event evidence is always self-only across roles and seasons, without querying admin-wide audit logs',async()=>{
+ const {c,rows,query}=resultCloud();c.userProfile={role:'super_admin'};rows.push({type:'event',playerUid:'self',eventCode:'BXH-E1',seasonId:'S0',delta:0,placement:2,createdAt:123,actorUid:'private'});
+ const out=await c.api.getMyLadderEventResult('bxh-e1');assert.deepEqual(query(),['ladderTransactions',['where','playerUid','==','self'],['where','eventCode','==','BXH-E1'],['where','type','==','event'],['limit',2]]);
+ assert.equal(out.points,0);assert.equal(out.seasonId,'S0');assert.equal(out.placement,2);assert.ok(!JSON.stringify(out).includes('actorUid'));
+});
+test('missing and ambiguous transactions return explicit states, malformed points never become zero',async()=>{
+ const {c,rows}=resultCloud();assert.equal((await c.api.getMyLadderEventResult('BXH-E1')).status,'none');
+ rows.push({type:'event',playerUid:'self',eventCode:'BXH-E1',pointsEarned:8,placement:null});assert.equal((await c.api.getMyLadderEventResult('BXH-E1')).points,8);
+ rows[0].pointsEarned=null;await assert.rejects(()=>c.api.getMyLadderEventResult('BXH-E1'),/event-points-invalid/);
+ rows.push({...rows[0],delta:5});assert.equal((await c.api.getMyLadderEventResult('BXH-E1')).status,'ambiguous');
+});
+test('authentication, event identity, test isolation and session epoch guard event evidence',async()=>{
+ const {c,rows}=resultCloud();await assert.rejects(()=>c.api.getMyLadderEventResult('bad'),/invalid-event-code/);
+ c.authHandle.currentUser=null;await assert.rejects(()=>c.api.getMyLadderEventResult('BXH-E1'),/auth-required/);c.authHandle.currentUser={uid:'self'};
+ rows.push({type:'event',playerUid:'child',eventCode:'BXH-E1',delta:10});await assert.rejects(()=>c.api.getMyLadderEventResult('BXH-E1'),/event-evidence-invalid/);
+ rows[0].playerUid='self';rows[0].eventAuthority='test';await assert.rejects(()=>c.api.getMyLadderEventResult('BXH-E1'),/event-evidence-invalid/);
+ const previous=c.fx.getDocs;c.fx.getDocs=async q=>{const data=await previous(q);c.engagementSessionEpoch++;return data;};await assert.rejects(()=>c.api.getMyLadderEventResult('BXH-E1'),/stale-session/);
 });
 module.exports={setup,extract,record};

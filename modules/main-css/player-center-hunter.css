@@ -416,6 +416,9 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .player-center-ladder strong{margin-right:auto;}
 .player-center-notice{overflow-wrap:anywhere;}
 .player-center-notice ul{padding-left:20px;}
+.player-center-event-outcome{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0;}
+.player-center-event-outcome span{display:block;color:var(--muted);font-size:12px;margin-bottom:5px;}
+.player-center-event-outcome strong{display:block;overflow-wrap:anywhere;}
 @media(max-width:380px){.player-center-metrics{grid-template-columns:minmax(0,1fr);}.player-center-event>summary{align-items:flex-start;}.player-center-event>summary>.hint{max-width:48px;}}
 .profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:0 0 14px;border:1px solid rgba(217,185,92,.15);border-radius:12px;background:rgba(255,255,255,.018);}
 .profile-secondary-tabs .btn{min-height:38px;border-radius:9px;font-size:12.5px;}

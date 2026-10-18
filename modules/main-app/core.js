@@ -16899,6 +16899,59 @@ function renderPlayerProfileEditModal(){
 
 let playerProfileSection="overview", playerProfileSectionUid=null;
 let playerCenterPeriod="season", playerCenterLadderRequestedUid=null;
+let playerCenterResultScope="", playerCenterResultRequest=0;
+const playerCenterEventResults=new Map();
+
+function playerCenterResultContext(){
+  const scope=currentAuthUid()+'|'+(typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0);
+  if(scope!==playerCenterResultScope){playerCenterResultScope=scope;playerCenterResultRequest++;playerCenterEventResults.clear();}
+  return scope;
+}
+async function loadPlayerCenterEventResult(code,force=false){
+  const scope=playerCenterResultContext(),old=playerCenterEventResults.get(code);
+  if(!currentAuthUid()||!/^BXH-[A-Z0-9]+$/.test(code)||old?.loading||(!force&&old))return;
+  const request=++playerCenterResultRequest;
+  playerCenterEventResults.set(code,{loading:true,request});
+  renderPreservingScroll();
+  const current=()=>scope===playerCenterResultContext()&&playerCenterEventResults.get(code)?.request===request;
+  try{
+    if(!window.cloudSync?.getMyLadderEventResult||!window.cloudSync?.getPublicTournamentSummary)throw new Error('unavailable');
+    const result=await Promise.allSettled([ladderReadWithTimeout(window.cloudSync.getMyLadderEventResult(code),10000,'personal-event-result'),ladderReadWithTimeout(window.cloudSync.getPublicTournamentSummary(code),10000,'personal-event-summary')]);
+    if(!current())return;
+    const evidence=result[0].status==='fulfilled'?result[0].value:null;
+    const info=result[1].status==='fulfilled'?result[1].value:null;
+    playerCenterEventResults.set(code,{request,loading:false,evidence,info,error:!evidence||!info});
+  }catch(e){if(current())playerCenterEventResults.set(code,{request,loading:false,error:true});}
+  finally{if(current())renderPreservingScroll();}
+}
+function playerCenterEventOutcome(group){
+  playerCenterResultContext();
+  const result=playerCenterEventResults.get(group.code);
+  const info=result?.info||myRegistrationsTournamentInfo[group.code];
+  const phase=info?schedulePhase(info):null;
+  const evidence=result?.evidence;
+  const state=info?.parsedData||{};
+  let placement=null;
+  // Identity already resolved by Hunter's loader. Do not match names or family
+  // registration UIDs; all records must refer to the same local participant.
+  const ids=new Set(group.records.map(r=>String(r.participantLocalPlayerId||'')).filter(Boolean));
+  if(phase==='done'&&ids.size===1&&group.records.every(r=>r.participantLocalPlayerId)){
+    const id=[...ids][0],slots=['championId','runnerUpId','thirdId','fourthId'];
+    const matches=slots.map((key,index)=>String(state[key]||'')===id?index+1:null).filter(Boolean);
+    if(matches.length===1)placement=matches[0];
+  }
+  const settled=evidence?.status==='settled';
+  if(settled&&evidence.placement!=null)placement=evidence.placement;
+  const placeLabel=placement?({1:'冠軍',2:'亞軍',3:'季軍',4:'殿軍'}[placement]||'第 '+placement+' 名'):phase==='done'?'未記錄名次':phase==='live'?'名次待結算':'名次待確認';
+  const status=evidence?.status==='ambiguous'?'多筆入帳紀錄，需核對':settled?'本人已入帳':result?.loading?'正在核對成績':result?.error?'部分成績讀取失敗':!result?'尚未核對入帳紀錄':info?.ladderMode==='general'?'一般賽事，不計天梯':info?.ladderPointsAwarded?'全場已結算，未查得本人入帳':phase==='done'?'未查得本人入帳紀錄':phase==='live'?'比賽進行中':'賽事狀態待核對';
+  const points=settled?(evidence.points>0?'+':'')+evidence.points+' PT':'—';
+  return {placeLabel,status,points,loaded:!!result,loading:!!result?.loading,error:!!result?.error};
+}
+function playerCenterEventOutcomeHtml(group){
+  const outcome=playerCenterEventOutcome(group);
+  const canRead=/^BXH-[A-Z0-9]+$/.test(group.code);
+  return '<div class="player-center-event-outcome"><div><span>最終名次</span><strong>'+esc(outcome.placeLabel)+'</strong></div><div><span>本場原始入帳</span><strong>'+esc(outcome.points)+'</strong></div></div><p class="hint" role="status">'+esc(outcome.status)+'</p><p class="hint">人工更正另列於天梯紀錄；沒有名次來源時不從勝敗推算。</p>'+(canRead?'<button class="btn btn-ghost btn-sm" data-action="player-center-event-refresh" data-code="'+esc(group.code)+'" '+(outcome.loading?'disabled':'')+'>'+(!outcome.loaded?'核對名次與積分':outcome.loading?'核對中…':'重新核對名次與積分')+'</button>':'<p class="hint">舊紀錄缺少有效房號，保留對戰但無法核對入帳。</p>');
+}
 
 // The personal center is a view over existing Hunter and registration caches.
 // It never writes scores, derives placements, or combines family members.
@@ -16923,13 +16976,11 @@ function playerCenterDataNotice(){
   return '<details class="panel player-center-notice" open><summary>部分戰績尚未完成核對（'+skipped.length+' 筆）</summary><p class="hint">以下統計只涵蓋已讀取資料，不代表完整生涯。</p><ul>'+skipped.map(r=>'<li>'+esc(r.eventName||r.code||'賽事未識別')+'：'+esc(reasons[r.reason]||'資料待核對')+'</li>').join('')+'</ul><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></details>';
 }
 function playerCenterEventHtml(group){
-  const info=myRegistrationsTournamentInfo[group.code];
-  const phase=info?schedulePhase(info):null;
-  const status=phase==='done'?'賽事已完成 · 最終名次未接入':phase==='live'?'賽事進行中 · 名次待結算':'賽事狀態尚未核對';
   const foldKey='profile-career:'+group.key;
   let open=false;try{open=sessionStorage.getItem('bxh-fold:'+currentAuthUid()+':'+foldKey)==='1';}catch(e){}
-  return '<details class="panel player-center-event" data-fold-key="'+esc(foldKey)+'" '+(open?'open':'')+'><summary><span><strong>'+esc(group.name)+'</strong><small>'+esc(group.date||'日期未記錄')+' · '+group.summary.wins+' 勝 '+group.summary.losses+' 敗</small></span><span class="hint">展開／收合</span></summary><div class="player-center-event-body"><p class="hint">'+esc(status)+'｜已讀取 '+group.summary.matches+' 場對戰</p>'+group.records.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)).map(hunterRecordCardHtml).join('')+'</div></details>';
+  return '<details class="panel player-center-event" data-personal-event="'+esc(group.code)+'" data-fold-key="'+esc(foldKey)+'" '+(open?'open':'')+'><summary><span><strong>'+esc(group.name)+'</strong><small>'+esc(group.date||'日期未記錄')+' · '+group.summary.wins+' 勝 '+group.summary.losses+' 敗</small></span><span class="hint">展開／收合</span></summary><div class="player-center-event-body">'+playerCenterEventOutcomeHtml(group)+'<p class="hint">已讀取 '+group.summary.matches+' 場對戰</p>'+group.records.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)).map(hunterRecordCardHtml).join('')+'</div></details>';
 }
+document.addEventListener('toggle',e=>{const code=e.target?.dataset?.personalEvent;if(e.target?.open&&code)void loadPlayerCenterEventResult(code);},true);
 function renderPlayerCenterCareer(){
   const status=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
   const groups=playerCenterEventGroups(hunterProfileCache?.records||[]);
@@ -19989,6 +20040,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(period!=="season"&&period!=="career")return;
     playerCenterPeriod=period;
     renderPreservingScroll();return;
+  }
+  if(action==="player-center-event-refresh"){
+    void loadPlayerCenterEventResult(target.getAttribute('data-code')||'',true);return;
   }
   if(action==="test-ladder-toggle"){
     if(!canReadTestLadder()) return;

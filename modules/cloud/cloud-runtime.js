@@ -1663,6 +1663,29 @@
       return out.sort((a,b)=>Number(b.createdAtMs||0)-Number(a.createdAtMs||0));
     },
 
+    // Personal center: self-only event evidence, including when the current
+    // account is an admin. Never reuse the admin-wide recent transaction query.
+    async getMyLadderEventResult(code){
+      if(!cloudEnabled)throw new Error("network");
+      const uid=authHandle&&authHandle.currentUser&&authHandle.currentUser.uid;
+      if(!uid)throw new Error("auth-required");
+      const eventCode=String(code||"").trim().toUpperCase();
+      if(!/^BXH-[A-Z0-9]+$/.test(eventCode))throw new Error("invalid-event-code");
+      const epoch=typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0;
+      const q=fx.query(fx.collection(dbHandle,"ladderTransactions"),fx.where("playerUid","==",uid),fx.where("eventCode","==",eventCode),fx.where("type","==","event"),fx.limit(2));
+      const snapshot=await fx.getDocs(q);
+      if(uid!==(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||epoch!==(typeof engagementSessionEpoch!=="undefined"?engagementSessionEpoch:0))throw new Error("stale-session");
+      const rows=[];snapshot.forEach(doc=>rows.push(doc.data()));
+      if(rows.length>1)return {status:"ambiguous"};
+      if(!rows.length)return {status:"none"};
+      const row=rows[0];
+      if(row.playerUid!==uid||row.eventCode!==eventCode||row.type!=="event"||row.eventAuthority==="test"||row.testMode===true)throw new Error("event-evidence-invalid");
+      const rawPoints=row.delta??row.pointsEarned;
+      if(typeof rawPoints!=="number"||!Number.isFinite(rawPoints))throw new Error("event-points-invalid");
+      const placement=Number.isSafeInteger(row.placement)&&row.placement>0?row.placement:null;
+      return {status:"settled",points:rawPoints,placement,seasonId:String(row.seasonId||""),awardedAt:cloudSafeTimestampMs(row.createdAt)};
+    },
+
     async getTestLadderRanking(){
       if(!cloudEnabled) return [];
       const snap=await fx.getDocs(fx.collection(dbHandle,"testLadderPlayers"));
@@ -2131,6 +2154,8 @@
           location: d.location||"", battleMode:(d.battleMode||(parsedData&&parsedData.meta&&parsedData.meta.battleMode))==="team"?"team":"individual",
           teamSize:Math.max(3,Number(d.teamSize||(parsedData&&parsedData.meta&&parsedData.meta.teamSize))||3),
           formatType: d.formatType||"", fee: d.fee,
+          ladderMode:(d.ladderMode||(parsedData&&parsedData.meta&&parsedData.meta.ladderMode))==="ranked"?"ranked":"general",
+          ladderPointsAwarded:d.ladderPointsAwarded===true||(parsedData&&parsedData.ladderPointsAwarded===true),
           tournamentPhase: canonicalPublicTournamentPhase(view),
           registrationStatus: publicTournamentRegistrationLocked(view) ? "started" : (d.registrationStatus||""),
           archiveStatus: (parsedData&&parsedData.archiveStatus)||d.archiveStatus||"ongoing",
