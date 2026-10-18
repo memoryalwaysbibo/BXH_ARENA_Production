@@ -15450,7 +15450,8 @@ function smartCallCardHtml(r,info){
 function scheduleSmartCallAutoRefresh(){
   // Reuse the existing public-summary cadence. Never create a second listener,
   // callable, or per-family duplicate read for the queue dashboard.
-  if(appPhase!=="player-center"||playerActiveTab!=="registered"||!Array.isArray(myRegistrationsCache)||document.hidden){
+  const scheduleVisible=()=>playerActiveTab==='registered'||(playerActiveTab==='profile'&&playerProfileSection==='overview');
+  if(appPhase!=="player-center"||!scheduleVisible()||!Array.isArray(myRegistrationsCache)||document.hidden){
     if(smartCallAutoRefreshTimer)clearTimeout(smartCallAutoRefreshTimer);
     smartCallAutoRefreshTimer=null;smartCallAutoRefreshKey="";return;
   }
@@ -15460,7 +15461,7 @@ function scheduleSmartCallAutoRefresh(){
   if(smartCallAutoRefreshTimer&&(smartCallAutoRefreshKey!==key||!codes.length)){clearTimeout(smartCallAutoRefreshTimer);smartCallAutoRefreshTimer=null;}
   smartCallAutoRefreshKey=key;
   if(!codes.length||smartCallAutoRefreshTimer||smartCallRefreshBusy)return;
-  const current=()=>owner===lobbyAuthKey()&&request===myRegistrationsRequest&&appPhase==='player-center'&&playerActiveTab==='registered'&&!document.hidden;
+  const current=()=>owner===lobbyAuthKey()&&request===myRegistrationsRequest&&appPhase==='player-center'&&scheduleVisible()&&!document.hidden;
   smartCallAutoRefreshTimer=setTimeout(async()=>{
     smartCallAutoRefreshTimer=null;if(!current())return;
     smartCallRefreshBusy=true;
@@ -15478,7 +15479,7 @@ function scheduleSmartCallAutoRefresh(){
   },20000);
 }
 
-function renderPlayerRegisteredTab(){
+function renderPlayerRegisteredTab(options={}){
   if(myRegistrationsCache===null){
     if(!myRegistrationsLoading){
       setTimeout(()=>{ handleAction("load-my-registrations", {getAttribute:()=>null}); }, 0);
@@ -15493,7 +15494,8 @@ function renderPlayerRegisteredTab(){
       </div>
     </div>`;
   }
-  if(myRegistrationsCache.length===0){
+  const registrations=options.activeOnly?myRegistrationsCache.filter(r=>r.status!=="cancelled"&&['waiting','live'].includes(schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}))):myRegistrationsCache;
+  if(registrations.length===0){
     return `<div class="panel"><div class="empty-state">目前沒有進行中的個人賽程</div></div>`;
   }
   const renderCard = (r)=>{
@@ -15536,7 +15538,7 @@ function renderPlayerRegisteredTab(){
     </div>`;
   };
   scheduleSmartCallAutoRefresh();
-  return `<div class="panel-title">我的賽程<button class="btn btn-ghost btn-sm" data-action="load-my-registrations">重新整理</button></div>`+scheduleGroups('registered',myRegistrationsCache,renderCard,r=>r.status==='cancelled'?'cancelled':schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}));
+  return `<div class="panel-title">${options.activeOnly?'我正在參加':'我的賽程'}<button class="btn btn-ghost btn-sm" data-action="load-my-registrations">重新整理</button></div>`+scheduleGroups('registered',registrations,renderCard,r=>r.status==='cancelled'?'cancelled':schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}));
 }
 
 const {hunterRecordTimestamp,hunterAchievementDateText,hunterAchievementIntegrityStatusLabel,hunterRadarVisualValue,hunterRadarPolygonPoints,hunterRadarGridPoints,hunterTrustLabel,hunterEvidenceMatchKey,hunterPointLabel,hunterOpponentIdentityRef}=window.BXHHunterUtils;
@@ -16895,14 +16897,81 @@ function renderPlayerProfileEditModal(){
   </div>`;
 }
 
-let playerProfileSection="basic", playerProfileSectionUid=null;
+let playerProfileSection="overview", playerProfileSectionUid=null;
+let playerCenterPeriod="season", playerCenterLadderRequestedUid=null;
+
+// The personal center is a view over existing Hunter and registration caches.
+// It never writes scores, derives placements, or combines family members.
+function playerCenterEventGroups(records){
+  const groups=new Map();
+  hunterUniqueRecords(records).forEach(r=>{
+    const key=hunterRecordEventKey(r);
+    if(!groups.has(key))groups.set(key,{key,code:r.eventCode||"",name:r.eventName||r.eventCode||"賽事名稱未記錄",date:r.eventDate||"",timestamp:0,records:[]});
+    const group=groups.get(key);
+    group.records.push(r);
+    group.timestamp=Math.max(group.timestamp,hunterRecordTimestamp(r));
+  });
+  return [...groups.values()].sort((a,b)=>b.timestamp-a.timestamp||a.key.localeCompare(b.key)).map(g=>({...g,summary:hunterCareerSummary(g.records)}));
+}
+function playerCenterDataNotice(){
+  const status=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
+  if(status==='loading')return '<div class="panel" role="status">正在讀取本人戰績…</div>';
+  if(status==='error')return '<div class="panel" role="status">'+esc(hunterProfileError)+'<button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div>';
+  if(status!=='partial')return '';
+  const skipped=hunterProfileCache.skipped||[];
+  const reasons={'identity-unresolved':'本人身分無法確認','registration-read-failed':'報名資料讀取失敗','read-failed':'賽事讀取失敗','public-missing':'公開資料缺失','public-corrupt':'公開資料無法解析'};
+  return '<details class="panel player-center-notice" open><summary>部分戰績尚未完成核對（'+skipped.length+' 筆）</summary><p class="hint">以下統計只涵蓋已讀取資料，不代表完整生涯。</p><ul>'+skipped.map(r=>'<li>'+esc(r.eventName||r.code||'賽事未識別')+'：'+esc(reasons[r.reason]||'資料待核對')+'</li>').join('')+'</ul><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></details>';
+}
+function playerCenterEventHtml(group){
+  const info=myRegistrationsTournamentInfo[group.code];
+  const phase=info?schedulePhase(info):null;
+  const status=phase==='done'?'賽事已完成 · 最終名次未接入':phase==='live'?'賽事進行中 · 名次待結算':'賽事狀態尚未核對';
+  const foldKey='profile-career:'+group.key;
+  let open=false;try{open=sessionStorage.getItem('bxh-fold:'+currentAuthUid()+':'+foldKey)==='1';}catch(e){}
+  return '<details class="panel player-center-event" data-fold-key="'+esc(foldKey)+'" '+(open?'open':'')+'><summary><span><strong>'+esc(group.name)+'</strong><small>'+esc(group.date||'日期未記錄')+' · '+group.summary.wins+' 勝 '+group.summary.losses+' 敗</small></span><span class="hint">展開／收合</span></summary><div class="player-center-event-body"><p class="hint">'+esc(status)+'｜已讀取 '+group.summary.matches+' 場對戰</p>'+group.records.slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b)).map(hunterRecordCardHtml).join('')+'</div></details>';
+}
+function renderPlayerCenterCareer(){
+  const status=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
+  const groups=playerCenterEventGroups(hunterProfileCache?.records||[]);
+  return '<section class="player-center-integrated"><div class="hunter-section-head"><h2>生涯賽事紀錄</h2><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div><p class="hint">本人賽事依活動彙整，展開查看每輪對戰。沿用獵人檔案生涯資料；PK 請至獵人交鋒查看。</p>'+playerCenterDataNotice()+(['loading','error'].includes(status)?'':groups.length?groups.map(playerCenterEventHtml).join(''):'<div class="panel empty-state">尚無已完成的本人對戰紀錄</div>')+'</section>';
+}
+function renderPlayerCenterOverview(p){
+  const status=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
+  const ready=['ready','empty','partial'].includes(status);
+  const all=hunterUniqueRecords(hunterProfileCache?.records||[]);
+  const standard=hunterFilterByMode(all,'standard');
+  const seasonStart=hunterSeasonStartMs();
+  const periodReady=playerCenterPeriod==='career'||seasonStart>0;
+  const rows=playerCenterPeriod==='career'?standard:standard.filter(r=>hunterRecordTimestamp(r)>=seasonStart&&hunterRecordTimestamp(r)>0);
+  const summary=hunterCareerSummary(rows);
+  const groups=playerCenterEventGroups(all).filter(g=>g.timestamp>0);
+  const eventCount=playerCenterEventGroups(rows).length;
+  const value=v=>ready&&periodReady?String(v):'—';
+  const ladder=myLadderProfileCache;
+  const metrics=[['有完成對戰的賽事',value(eventCount)],['對戰勝–敗',value(summary.wins+'–'+summary.losses)],['對戰勝率',ready&&periodReady?value(summary.winRate)+'%':'—']];
+  const recent=standard.slice().sort((a,b)=>hunterRecordTimestamp(b)-hunterRecordTimestamp(a)).filter(r=>hunterRecordTimestamp(r)>0).slice(0,5);
+  return '<section class="player-center-integrated"><div class="panel profile-hero"><div class="profile-hero-avatar">'+(p.avatarUrl?'<img src="'+esc(p.avatarUrl)+'" alt="玩家頭像">':ROLE_ICON_PLAYER)+'</div><div class="profile-hero-copy"><div class="profile-hero-name">'+esc(effectiveGameId(p)||p.realName||'玩家')+'</div><div class="profile-hero-meta">玩家編號 '+esc(playerDerivedId(p))+'｜本人</div><div class="profile-hero-actions"><button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="basic">編輯基本資料</button><button class="btn btn-ghost btn-sm" data-action="player-switch-tab" data-tab="stats">獵人執照與能力分析</button></div></div></div>'+
+    '<section class="player-center-schedule">'+renderPlayerRegisteredTab({activeOnly:true})+'<p class="hint">家庭代報名保留參賽者標示；孩子的戰績不併入本人。</p></section>'+
+    '<div class="panel"><div class="hunter-section-head"><h2>我的戰績</h2><div class="btn-row"><button class="btn '+(playerCenterPeriod==='season'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="season" aria-pressed="'+(playerCenterPeriod==='season')+'">本季</button><button class="btn '+(playerCenterPeriod==='career'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="career" aria-pressed="'+(playerCenterPeriod==='career')+'">生涯</button><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div></div>'+playerCenterDataNotice()+'<div class="player-center-metrics">'+metrics.map(([label,v])=>'<div class="stat-box"><div class="value small">'+esc(v)+'</div><div class="label">'+esc(label)+'</div></div>').join('')+'</div><p class="hint">正規賽已完成對戰，包含一般與積分賽；輪空不計勝敗。'+(playerCenterPeriod==='season'&&!seasonStart?'賽季起始時間尚未載入。':'')+(standard.some(r=>!hunterRecordTimestamp(r))?'部分紀錄日期未明，不納入本季與近期排序。':'')+'</p>'+
+    (ready&&recent.length?'<div class="player-center-recent">近 5 場（新→舊）'+recent.map(r=>'<span class="badge badge-metal">'+(r.isWin?'勝':'敗')+'</span>').join('')+'</div>':'')+
+    '<div class="player-center-ladder"><span>天梯'+(playerCenterPeriod==='career'?'生涯累積':'本季')+'積分</span><strong>'+(ladder?esc(playerCenterPeriod==='career'?ladder.careerPoints??0:ladder.seasonPoints??0)+' PT':'尚未讀取')+'</strong><button class="btn btn-ghost btn-sm" data-action="player-switch-tab" data-tab="ladder">查看天梯</button></div></div>'+
+    '<div class="hunter-section-head"><h2>近期賽事</h2><button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="career">全部紀錄</button></div>'+(ready?(groups.length?groups.slice(0,3).map(playerCenterEventHtml).join(''):'<div class="panel empty-state">尚無已完成對戰</div>'):'<p class="hint">戰績尚未完成讀取。</p>')+'</section>';
+}
 function renderPlayerProfileTab(p){
   const profileUid=currentAuthUid();
-  if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="basic";}
+  if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="overview";playerCenterPeriod="season";}
+  if(['overview','career'].includes(playerProfileSection)){
+    if(!hunterProfileCache&&!hunterProfileLoading&&!hunterProfileError)setTimeout(()=>loadHunterProfile(false),0);
+    if(playerProfileSection==='overview'&&!myLadderProfileCache&&!myLadderProfileLoading&&playerCenterLadderRequestedUid!==profileUid){playerCenterLadderRequestedUid=profileUid;setTimeout(()=>loadMyLadderProfile(false),0);}
+  }
   const sectionNav=`<div class="profile-primary-tabs" role="tablist" aria-label="我的資料分類">
+    <button class="btn ${playerProfileSection==='overview'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='overview'}" data-action="profile-section" data-section="overview">個人總覽</button>
+    <button class="btn ${playerProfileSection==='career'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='career'}" data-action="profile-section" data-section="career">生涯紀錄</button>
     <button class="btn ${playerProfileSection==='basic'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='basic'}" data-action="profile-section" data-section="basic">基本資料</button>
     <button class="btn ${playerProfileSection==='titles'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='titles'}" data-action="profile-section" data-section="titles">我的稱號</button>
   </div>`;
+  if(playerProfileSection==="overview") return sectionNav+renderPlayerCenterOverview(p);
+  if(playerProfileSection==="career") return sectionNav+renderPlayerCenterCareer();
   if(playerProfileSection==="titles") return sectionNav+safeEngagementRender(()=>renderPlayerTitleCenter(p));
   return `${sectionNav}<div class="profile-secondary-tabs" role="tablist" aria-label="基本資料分類"><button class="btn btn-primary" role="tab" aria-selected="true">個人資料</button><button class="btn btn-ghost" role="tab" aria-selected="false" data-action="family-open">家庭資料</button></div>
     <div class="panel profile-hero">
@@ -17539,7 +17608,7 @@ function restoreAuthenticatedView(uid,intent){
  }
  if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
-  appPhase='player-center';playerActiveTab=playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=v.profileSection==='titles'?'titles':'basic';return true;
+  appPhase='player-center';playerActiveTab=v.playerTab==='profile'?'profile':playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=['overview','career','basic','titles'].includes(v.profileSection)?v.profileSection:'overview';return true;
  }
  if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer'||intent==='event_staff')){
   appPhase='app';
@@ -19911,9 +19980,15 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="profile-section"){
     const section=target.getAttribute("data-section");
-    if(section!=="basic"&&section!=="titles") return;
+    if(!['overview','career','basic','titles'].includes(section)) return;
     playerProfileSection=section;
     renderPreservingScroll(); return;
+  }
+  if(action==="player-center-period"){
+    const period=target.getAttribute("data-period");
+    if(period!=="season"&&period!=="career")return;
+    playerCenterPeriod=period;
+    renderPreservingScroll();return;
   }
   if(action==="test-ladder-toggle"){
     if(!canReadTestLadder()) return;
