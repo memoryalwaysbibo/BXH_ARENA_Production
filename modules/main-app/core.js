@@ -7721,7 +7721,9 @@ function rebuildCourtAssignments(){
     }
     // A paused match STAYS as the court's current match (paused ≠ vacated).
     if(!current){
-      current = queue.find(m=>true) || null;
+      const first=queue[0];
+      const explicit=first&&(first.dispatchPriorityAt||first.resumeQueuedAt||first.skippedAt);
+      current = (explicit?first:queue.find(m=>m.id===court.nextMatchId)||first) || null;
       court.currentMatchId = current ? current.id : null;
       if(current){
         ensureMatchStatusFields(current);
@@ -7743,7 +7745,11 @@ function rebuildCourtAssignments(){
       current.status="in_progress";current.startedAt=current.startedAt||Date.now();current.updatedAt=Date.now();
     }
     const remaining = queue.filter(m=>m.id!==court.currentMatchId);
-    const nextM = remaining[0] || null;
+    // Preserve a displayed next (possibly notified), except for an explicit
+    // swap/transfer/resume or the existing PASS dependency priority.
+    const first=remaining[0];
+    const explicit=first&&(first.dispatchPriorityAt||first.resumeQueuedAt||first.skippedAt);
+    const nextM = (explicit?first:remaining.find(m=>m.id===court.nextMatchId)||first) || null;
     court.nextMatchId = nextM ? nextM.id : null;
     court.status = current ? (current.status||"in_progress") : "idle";
     court.updatedAt = Date.now();
@@ -10827,10 +10833,12 @@ function canCourtSwapTarget(m,sourceMatch,st=state){
 // court's current match can be underway before its first score is entered.
 function idleCourtCandidates(st,stationNum){
   if(window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,stationNum))return [];
+  if(!window.BXHCourtRetirement?.movableQueuedMatches)return [];
+  const movable=new Set(window.BXHCourtRetirement.movableQueuedMatches(st).map(m=>m.id));
   const courts=st.courtAssignments||{};
   const busy=new Set(Object.values(courts).map(c=>c&&c.currentMatchId).filter(Boolean));
   const phase=(st.meta.formatType||"single")==="single"?activeSingleElimSchedulePhase(st.matches,st.meta):null;
-  return (st.matches||[]).filter(m=>m&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
+  return (st.matches||[]).filter(m=>m&&movable.has(m.id)&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
     !m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&
     !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&
     (!phase||isInActiveSingleElimPhase(m,phase,st.matches)||!singleElimBronzeBeforeFinalBlocked(m,st.matches,st.meta)))
@@ -10847,6 +10855,8 @@ function applyIdleCourtClaim(st,matchId,stationNum){
   match.dispatchPriorityAt=now;match.dispatchRevision=Number(match.dispatchRevision||0)+1;
   match.updatedAt=now;
   st.currentMatchId=match.id;
+  // Reserve immediately, before the next idle court selects its candidate.
+  court.currentMatchId=match.id;
   return {ok:true,state:st};
 }
 async function claimIdleCourt(matchId,stationNum){
@@ -11246,16 +11256,16 @@ function renderSkippedMatches(){
 let courtRetirementBusy=false;
 function canForceExitCourt(n){return canManageCourtRetirement()||(canOperateCurrentTournament()&&canOperateStation(n));}
 function canManageCourtRetirement(){return canManageRefereeStationAssignments()||isCommunityRoomOwner()||(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator());}
-async function resizeCourtsSafely(n,expected,nextMeta){
+async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(state.courtRetirementPlan?.revision||0)){
   if(courtRetirementBusy)return;courtRetirementBusy=true;const roomId=state.id;
   try{
     let result;
     if(state.cloudCode){
       if(!cloudAvailable()||!window.cloudSync?.courtRetirementTransaction)throw new Error("cloud-unavailable");
       if(!await flushStationMatchMutations()||!await flushCloudStateWrites())throw new Error("sync-pending");
-      result=await window.cloudSync.courtRetirementTransaction(state.cloudCode,{kind:"resize",count:n,expectedTarget:expected,meta:nextMeta},currentAuthUid());
+      result=await window.cloudSync.courtRetirementTransaction(state.cloudCode,{kind:"resize",count:n,expectedTarget:expected,expectedRevision,meta:nextMeta},currentAuthUid());
     }else{
-      result=window.BXHCourtRetirement.request(state,n,expected);
+      result=window.BXHCourtRetirement.request(state,n,expected,Date.now(),expectedRevision);
       if(result.ok){const physical=state.meta.stations;Object.assign(state.meta,nextMeta,{stations:physical});rebuildPropagation();await saveState();}
     }
     if(!result?.ok)throw new Error(result?.reason||"resize-failed");

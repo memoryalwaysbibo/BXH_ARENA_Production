@@ -29,6 +29,7 @@ const suites = {
     { name: 'Core module exports, shared state, and stale callback guards', args: ['--test', 'tests/module-seam-contracts.test.cjs'] },
     { name: 'public lobby ordering utility and Core seam', args: ['--test', 'tests/lobby-ordering.test.cjs'] },
     { name: 'idle court dispatch', args: ['tests/idle-court-dispatch.test.cjs'] },
+    { name: 'safe court expansion, reserved queues and transaction retry fences', args: ['--test', 'tests/court-expansion.test.cjs', 'tests/court-retirement.test.cjs'] },
     { name: 'event staff permission boundary', args: ['--test', 'tests/event-staff-permission.test.cjs'] },
     { name: 'staff assignment real-name display', args: ['--test', 'tests/staff-assignment-realname.test.cjs'] },
     { name: 'assignment commit / confirmation separation', args: ['--test', 'tests/assignment-cloud-confirmation.test.cjs'] },
