@@ -5,11 +5,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const core = fs.readFileSync(path.join(__dirname, '../modules/main-app/core.js'), 'utf8');
-const source = core.slice(core.indexOf('function scheduleSmartCallAutoRefresh(){'), core.indexOf('\nfunction renderPlayerRegisteredTab(){'));
+const source = core.slice(core.indexOf('function scheduleSmartCallAutoRefresh(){'), core.indexOf('\nfunction renderPlayerRegisteredTab('));
 function harness() {
   let id = 0; const timers = new Map(), reads = [], context = {
     smartCallAutoRefreshTimer: null, smartCallAutoRefreshKey: '', smartCallRefreshBusy: false,
-    appPhase: 'player-center', playerActiveTab: 'registered', myRegistrationsRequest: 1,
+    appPhase: 'player-center', playerActiveTab: 'registered', playerProfileSection:'overview', myRegistrationsRequest: 1,
     myRegistrationsCache: [{ tournamentCode: 'BXH-ONE', status: 'confirmed' }, { tournamentCode: 'BXH-ONE', status: 'confirmed', familyPlayerId: 'child' }],
     myRegistrationsTournamentInfo: { 'BXH-ONE': { tournamentPhase: 'live', parsedData: {} } },
     owner: 'first-account', enabled: true, renders: 0,
@@ -30,6 +30,13 @@ test('retains one existing 20-second timer and deduplicates a family event read'
   assert.equal(h.timers.size, 1); assert.equal(h.context.smartCallAutoRefreshTimer, handle);
   assert.equal(h.timers.get(handle).ms, 20000);
   await h.fire(); assert.deepEqual(h.reads, ['BXH-ONE']); assert.equal(h.context.renders, 1);
+});
+test('personal overview shares the schedule timer and stops reading on career tab',async()=>{
+ const h=harness();h.schedule();const timer=h.context.smartCallAutoRefreshTimer;
+ h.context.playerActiveTab='profile';h.context.playerProfileSection='overview';h.schedule();
+ assert.equal(h.timers.size,1);assert.equal(h.context.smartCallAutoRefreshTimer,timer);
+ await h.fire();assert.deepEqual(h.reads,['BXH-ONE']);
+ h.schedule();h.context.playerProfileSection='career';h.schedule();assert.equal(h.timers.size,0);
 });
 test('hidden or disabled reminders add no queue reads and clear pending timer', () => {
   for (const apply of [c => { c.document.hidden = true; }, c => { c.enabled = false; }, c => { c.playerActiveTab = 'home'; }]) {
