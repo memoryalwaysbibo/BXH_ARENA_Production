@@ -24,6 +24,8 @@ function titleArtworkPath(name,rarity){
     '準時回家':'assets/title-common-home-on-time.svg',
     '開場即結束':'assets/title-rare-over-at-start.svg',
     '誰能比我慘':'assets/title-epic-unluckiest-heartbreak-v5.webp',
+    '初代戰士':'assets/title-epic-first-generation-warrior-v1.webp',
+    '四方征戰':'assets/title-epic-four-venues-v1.webp',
     '初次開局':'assets/title-rare-first-match.webp',
     '整裝待發':'assets/title-common-ready.svg',
     '初次上陣':'assets/title-common-debut.svg',
