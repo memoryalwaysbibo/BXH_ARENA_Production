@@ -96,6 +96,8 @@
       return '<div class="empty-state" role="status">'+escLocal((typeof ladderPublicError!=="undefined"&&ladderPublicError)||"正在讀取天梯資料…")+'</div>';
     }
     var rows=ladderActiveRankingRows();
+    var locationNotice=typeof ladderLocationNoticeHtml==="function"?ladderLocationNoticeHtml():"";
+    if(locationNotice)return locationNotice;
     var myUid=typeof firebaseUser!=="undefined"&&firebaseUser&&firebaseUser.uid;
     var myIndex=myUid?rows.findIndex(function(p){return p.uid===myUid;}):-1;
     var mine=myIndex>=0?rows[myIndex]:null;
@@ -107,7 +109,7 @@
         '<div class="ladder-my-rank-empty">尚未上榜'+(typeof ladderLocationLabel==="function"?'（'+escLocal(ladderLocationLabel())+'）':'')+'</div>')+
     '</div>':"";
     if(!rows.length){
-      return myCard+'<div class="empty-state"><strong>排行尚未產生</strong><br>'+(ladderScoreMode==="career"?'目前尚無玩家取得生涯積分。':'目前尚無玩家取得賽季積分。完成第一場積分賽後，排名將自動顯示。')+'</div>';
+      return myCard+ladderEmptyRankingHtml(ladderScoreMode);
     }
     var body=rows.slice(0,ladderVisibleCount).map(function(p){
       var rank=Number(p.__rank||0);

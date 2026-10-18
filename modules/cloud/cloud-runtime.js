@@ -1605,6 +1605,12 @@
     },
 
     async getPlayerBadges(uids){const call=fnx.httpsCallable(functionsHandle,'playerCardService',{timeout:15000});const r=await call({action:'badges',uids});return r.data;},
+    async getLadderLocations(uids){
+      if(!cloudEnabled||!functionsHandle) throw new Error("cloud-unavailable");
+      const call=fnx.httpsCallable(functionsHandle,"ladderLocationService",{timeout:15000});
+      const result=await call({uids});
+      return result.data;
+    },
     async getLadderSnapshot(){
       if(!cloudEnabled) return {control:null,season:null,players:[]};
 

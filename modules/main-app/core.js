@@ -13921,13 +13921,28 @@ let ladderLocationRegion="";
 function ladderLocationRows(players){
   const city=normalizeTaiwanCityName(ladderLocationCity);
   const region=String(ladderLocationRegion||"").trim();
+  if(!city)return players||[];
+  const locations=window.BXHLadderLocations?.ensure(ladderPublicData);
+  if(locations?.status!=="ready")return [];
   return (players||[]).filter(p=>{
-    if(!city)return true;
-    const loc=profileLocationParts(p);
+    const loc=locations.locations.get(p.uid)||{city:"",region:""};
     if(loc.city!==city)return false;
     if(region&&loc.region!==region)return false;
     return true;
   });
+}
+function ladderLocationNoticeHtml(){
+  if(!normalizeTaiwanCityName(ladderLocationCity))return "";
+  const status=window.BXHLadderLocations?.ensure(ladderPublicData).status;
+  if(status==="ready")return "";
+  return status==="loading"
+    ? '<div class="empty-state" role="status">正在讀取玩家最新地區…</div>'
+    : '<div class="empty-state" role="alert">地區資料讀取失敗，暫時無法確認地區排名。<br><button class="btn btn-ghost btn-sm" data-action="ladder-refresh">重新整理</button></div>';
+}
+function ladderEmptyRankingHtml(mode="season"){
+  return normalizeTaiwanCityName(ladderLocationCity)
+    ? '<div class="empty-state"><strong>此地區目前沒有符合的玩家</strong><br>目前沒有已設定此地區且具有'+(mode==="career"?'生涯':'賽季')+'積分的玩家；可切換全區總榜查看。</div>'
+    : '<div class="empty-state"><strong>排行尚未產生</strong><br>目前尚無玩家取得'+(mode==="career"?'生涯':'賽季')+'積分。</div>';
 }
 function ladderLocationLabel(){
   const city=normalizeTaiwanCityName(ladderLocationCity);
@@ -14047,7 +14062,9 @@ let playerCardsUI={uid:'',query:'',results:null,settings:null,savedSettings:null
 const {playerSearchPanel,playerPrivacyPanel,renderPlayerCardOverlay,handlePlayerCard,bindPlayerCardInputs}=window.BXHPlayerCardsFeature;
 
 function ladderLeaderboardTable(rows, adminMode=false){
-  if(!rows.length) return '<div class="empty-state"><strong>排行尚未產生</strong><br>目前尚無玩家取得賽季積分。完成第一場積分賽後，排名將自動顯示。</div>';
+  const locationNotice=ladderLocationNoticeHtml();
+  if(locationNotice)return locationNotice;
+  if(!rows.length) return ladderEmptyRankingHtml();
   return `<div class="rank-scroll"><table class="rank-table ladder-rank-table">
     <thead><tr><th>排名</th><th>玩家姓名</th><th>目前階級</th><th>賽季積分</th><th>生涯積分</th><th>參賽場次</th><th>冠軍</th>${adminMode?'<th>管理</th>':''}</tr></thead>
     <tbody>${rows.map(p=>`<tr>
@@ -14727,7 +14744,9 @@ function isGuestReadOnlyContext(){
 }
 
 function guestLadderRowsHtml(rows){
-  if(!rows.length) return `<div class="empty-state">目前尚無天梯玩家資料</div>`;
+  const locationNotice=ladderLocationNoticeHtml();
+  if(locationNotice)return locationNotice;
+  if(!rows.length) return ladderEmptyRankingHtml();
   return `<div class="guest-ladder-list" id="guest-ladder-list">
     ${rows.map((p,i)=>`<div class="guest-ladder-row ${i>=guestLadderVisibleCount?'guest-ladder-collapsed':''}" data-guest-ladder-index="${i}" data-search-name="${esc(String(p.playerName||p.publicName||"").toLowerCase())}">
       <div class="guest-rank">NO.${p.__rank}</div>
@@ -14747,7 +14766,7 @@ function guestLadderRowsHtml(rows){
 function renderGuestLadder(){
   if(!ladderPublicLoaded && !ladderPublicLoading) setTimeout(()=>loadLadderPublic(false),0);
   const control=ladderPublicData.control;
-  const rows=rankLadderRows((ladderPublicData.players||[]).filter(p=>Number(p.seasonPoints||0)>0));
+  const rows=rankLadderRows(ladderLocationRows((ladderPublicData.players||[]).filter(p=>Number(p.seasonPoints||0)>0)));
   const total=rows.length;
   return `
     <div class="guest-ladder-head">
@@ -14759,6 +14778,7 @@ function renderGuestLadder(){
       <button class="btn btn-ghost btn-sm" data-action="ladder-refresh">重新整理</button>
     </div>
 
+    ${ladderLocationFilterHtml()}
     ${ladderRulesHtml()}
     <div class="guest-ladder-search-wrap">
       <span class="guest-search-icon">⌕</span>
@@ -16774,23 +16794,20 @@ function normalizeTaiwanCityName(value){
 }
 function profileLocationParts(p){
   const raw=String(p&&p.region||"").trim().replace(/^臺/,"台");
-  const directCity=normalizeTaiwanCityName(p&&p.city);
-  if(directCity){
-    const district=(TAIWAN_CITY_DISTRICTS[directCity]||[]).find(d=>raw===d||raw.endsWith(d))||"";
-    return {city:directCity,region:district};
-  }
+  if(p&&Object.prototype.hasOwnProperty.call(p,"region")&&!raw)return {city:"",region:""};
+  // Current profile edits write a combined region; prefer it to a legacy city.
   for(const city of Object.keys(TAIWAN_CITY_DISTRICTS)){
     const base=city.replace(/[市縣]$/,"");
     if(raw===city||raw===base)return {city,region:""};
     for(const prefix of [city,base]){
       if(raw.startsWith(prefix)){
         const tail=raw.slice(prefix.length).trim().replace(/^[・｜|,，\s]+/,"");
-        const district=(TAIWAN_CITY_DISTRICTS[city]||[]).find(d=>d===tail)||"";
-        return {city,region:district};
+        if((TAIWAN_CITY_DISTRICTS[city]||[]).includes(tail))return {city,region:tail};
       }
     }
   }
-  return {city:"",region:""};
+  const city=normalizeTaiwanCityName(p&&p.city);
+  return city?{city,region:(TAIWAN_CITY_DISTRICTS[city]||[]).includes(raw)?raw:""}:{city:"",region:""};
 }
 function profileCityOptionsHtml(selected,allLabel="未設定"){
   const city=normalizeTaiwanCityName(selected);
@@ -20962,6 +20979,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
       userProfile=Object.assign({},userProfile,result.profile||{});
       playerProfileEditOpen=false;
+      // Drop the old location snapshot even if its request is still in flight.
+      ladderPublicData={...ladderPublicData};
+      ladderPublicLoaded=false;
+      myLadderProfileCache=null;
       publicTournamentsCache=null; invalidateMyRegistrationsCache();
       engagementRequestGeneration++;engagementLoading=false;engagementSnapshot=null;requestEngagementSnapshot(true);
       showToast(oldRealName!==realName?"資料已更新；本名修改後需重新由後台確認":"會員資料已更新");

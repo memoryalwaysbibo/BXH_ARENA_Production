@@ -6,6 +6,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 const ui=fs.readFileSync(path.join(__dirname,'../ladder-secondary-ui.js'),'utf8');
 const runtime=fs.readFileSync(path.join(__dirname,'../modules/cloud/cloud-runtime.js'),'utf8');
+const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 
 function context(read){
@@ -18,6 +19,7 @@ function context(read){
     firebaseUser:null,userProfile:null,ladderAdminLogs:[],ladderAdminLogsLoaded:false,engagementSessionEpoch:0,
   });
   vm.runInContext('function isAdminTierOrAbove(){return !!(userProfile&&userProfile.active!==false&&["admin","super_admin"].includes(userProfile.role));}',ctx);
+  vm.runInContext('let ladderLocationCity="";function normalizeTaiwanCityName(){return "";}'+core.slice(core.indexOf('function ladderEmptyRankingHtml('),core.indexOf('function ladderLocationLabel(')),ctx);
   vm.runInContext(ui.replace(/\}\)\(\);\s*$/, 'window.testUI={ensureHistory,historyTableHtml,ladderRankingTableHtml};})();'),ctx);
   return ctx;
 }
