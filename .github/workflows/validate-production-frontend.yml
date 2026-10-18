@@ -87,6 +87,8 @@ jobs:
           node-version: 22
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
+      - name: Verify latest member location and regional leaderboard states
+        run: node --test tests/ladder-location.test.cjs
       - name: Verify interface theme account isolation
         run: |
           node tests/theme-entrance-account.test.cjs
@@ -250,6 +252,9 @@ jobs:
         run: |
           node tests/hunter-clash-a1-browser.cjs
           node tests/hunter-clash-a23-browser.cjs
+      - name: Verify regional leaderboard in mobile and desktop Chromium
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node --test tests/ladder-location-browser.test.cjs
       - name: Verify isolated community quick registration in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/community-quick-registration-browser.cjs
