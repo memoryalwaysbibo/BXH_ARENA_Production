@@ -1,6 +1,6 @@
 {
-  "build": "20261018.2",
+  "build": "20261019.1",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-17T19:45:55.296Z",
-  "releaseTrigger": "confirmed-bracket-draw"
+  "updatedAt": "2026-10-18T17:15:07.404401Z",
+  "releaseTrigger": "ladder-current-member-location"
 }
