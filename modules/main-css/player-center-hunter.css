@@ -399,6 +399,24 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 
 .profile-primary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px;}
 .profile-primary-tabs .btn{min-height:44px;border-radius:11px;}
+.player-center-integrated{min-width:0;}
+.player-center-integrated .hunter-section-head{flex-wrap:wrap;gap:10px;margin:16px 0 12px;}
+.player-center-integrated h2{font-size:17px;margin:0;}
+.player-center-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.player-center-metrics .stat-box{min-width:0;padding:12px 6px;}
+.player-center-metrics .value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.player-center-metrics .label{white-space:normal;overflow-wrap:anywhere;}
+.player-center-event>summary{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:48px;cursor:pointer;}
+.player-center-event>summary>span{min-width:0;overflow-wrap:anywhere;}
+.player-center-event>summary small{display:block;color:var(--muted);margin-top:6px;}
+.player-center-event-body{margin-top:14px;border-top:1px solid var(--border);padding-top:8px;}
+.player-center-event .hunter-record-card{min-width:0;max-width:100%;}
+.player-center-recent,.player-center-ladder{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.player-center-ladder{border-top:1px solid var(--border);padding-top:14px;}
+.player-center-ladder strong{margin-right:auto;}
+.player-center-notice{overflow-wrap:anywhere;}
+.player-center-notice ul{padding-left:20px;}
+@media(max-width:380px){.player-center-metrics{grid-template-columns:minmax(0,1fr);}.player-center-event>summary{align-items:flex-start;}.player-center-event>summary>.hint{max-width:48px;}}
 .profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:0 0 14px;border:1px solid rgba(217,185,92,.15);border-radius:12px;background:rgba(255,255,255,.018);}
 .profile-secondary-tabs .btn{min-height:38px;border-radius:9px;font-size:12.5px;}
 .profile-hero{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:16px;padding:17px 18px;text-align:left!important;border-color:rgba(217,185,92,.28);background:linear-gradient(135deg,rgba(217,185,92,.075),rgba(18,19,21,.92));}
