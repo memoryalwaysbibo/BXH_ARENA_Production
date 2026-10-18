@@ -5716,10 +5716,13 @@ function renderDailyCheckInCard(){
   </section>`;
 }
 function titleConditionMeta(t){
-  const type=String((t&&t.conditionType)||'manual');
+  const reserved={first_generation_warrior:'season_completed_tournaments',four_venues:'unique_venues'};
+  const type=String(reserved[t&&(t.id||t.titleId)]||(t&&t.conditionType)||'manual');
   const target=Math.max(1,Number((t&&t.targetValue)||1));
   const map={
     completed_tournaments:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽計入；一般交流賽、測試賽與封測賽事不計入。',task:`完成 ${target} 場 BXH 官方積分賽`},
+    season_completed_tournaments:{category:'official',label:'第一賽季成就',scope:'僅 ARENA 第一賽季（S1）完成結算的 BXH 官方積分賽計入；一般交流賽、測試賽不計入。取得後永久持有。',task:`第一賽季完成 ${target} 場 BXH 官方積分賽`},
+    unique_venues:{category:'official',label:'正式場地征戰',scope:'僅完成結算的 BXH 官方積分賽計入；依正式場地識別碼去重，同一場地參賽多次仍只計一處。一般交流賽、測試賽不計入。',task:`在 ${target} 個不同正式場地完成 BXH 官方積分賽`},
     championships:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽冠軍紀錄計入；一般交流賽、測試賽與封測賽事不計入。',task:`累積取得 ${target} 次 BXH 官方積分賽冠軍`},
     best_placement:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽最終名次計入。',task:`BXH 官方積分賽最佳名次達第 ${target} 名或更佳`},
     hosted_tournaments:{category:'event',label:'主辦成就',scope:'依系統認定且完成結算的 BXH 賽事主辦紀錄計入。',task:`成功完成主辦 ${target} 場 BXH 賽事`},
