@@ -1,7 +1,8 @@
 (function(){
 'use strict';
 // Pure, versioned 2.1 evaluator. No cloud writes or changes to the legacy analysis API.
-const U=window.BXHHunterUtils,D=window.BXHDomainUtils;
+const U=window.BXHHunterUtils;
+const eventKey=r=>window.BXHDomainUtils.hunterRecordEventKey(r);
 const VERSION='hunter-license-v2.1',START=Date.parse('2026-10-01T00:00:00+08:00'),WINDOW=20;
 const RULES=[
   ['e','E 級獵人',25,20,2,1,2,0,0],
@@ -48,7 +49,7 @@ function strength(rows){
 function experience(rows){
   const events=new Map(),opponents=new Set();let unknownSizes=0,unresolvedOpponents=0;
   rows.forEach(r=>{
-    const key=D.hunterRecordEventKey(r),identity=opponentKey(r);
+    const key=eventKey(r),identity=opponentKey(r);
     if(identity)opponents.add(identity);else unresolvedOpponents++;
     const count=Number(r.licenseEventParticipants);
     const verified=r.licenseParticipantSource==='completed-match-roster-v1'&&Number.isSafeInteger(count)&&count>=2;
@@ -85,7 +86,7 @@ function overview(records,_analyze,complete=true){
       const at=U.hunterRecordTimestamp(timeline[i]);
       // Do not infer an achievement from an arbitrary ordering of simultaneous results.
       while(i<timeline.length&&U.hunterRecordTimestamp(timeline[i])===at){
-        const r=timeline[i++],key=D.hunterRecordEventKey(r);
+        const r=timeline[i++],key=eventKey(r);
         xp+=10+(r.analyzable&&Array.isArray(r.roundsPerspective)?r.roundsPerspective.length*2:0);
         if(!xpEvents.has(key)){xpEvents.add(key);xp+=20;}
         if(valid(r)){

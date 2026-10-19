@@ -11,3 +11,15 @@ test('a current S can drop while replayed career peak stays S; season boundaries
 test('partial reads cannot issue current or historical ranks; corrections and bye exclusions are respected',()=>{const V=setup(),rows=Array.from({length:12},(_,i)=>record(i)),partial=V.overview(rows,null,false);assert.equal(partial.grade.tier,'pending');assert.equal(partial.highest.tier,'pending');assert.equal(partial.analysis.overall,null);assert.ok(partial.gates.every(g=>g.current===null&&!g.met));rows.push({...record(0),completed:false,updatedAt:T+999999});const o=V.overview(rows);assert.equal(o.life.matches,11);assert.equal(o.grade.tier,'c');assert.equal(V.overview([record(1,true,{isBye:true}),record(2,true,{eventAuthority:'test'}),record(3,true,{completedAt:T-86400000*5}),record(4,true,{formatType:'team'}),record(5,true,{completedAt:0,eventDate:''})]).analysis.matches,0);});
 test('opponent identity must be verified; repeated stable identity counts once',()=>{const V=setup(),rows=[record(1),record(2,true,{opponentIdentity:{scope:'cross-event',playerId:'opponent1'}})];assert.equal(V.overview(rows).life.opponents,1);assert.equal(V.overview(rows).grade.tier,'ungraded');});
 test('new UI exposes window, separate sizes and honest replay status',()=>{const V=setup(),html=V.renderOverview(V.overview([record(1),record(2)]),String);for(const text of ['2.1','最近 20 場','生涯最高','E 級獵人','尚未寫入永久授予','B 級獵人','96–127'])assert.ok(html.includes(text),text);});
+test('script dependencies and legacy round formats do not crash license calculation',()=>{
+  const page=fs.readFileSync('index.html','utf8');
+  assert.ok(page.indexOf('domain-utils.js?')<page.indexOf('hunter-license-v21.js?'));
+  const c=vm.createContext({window:{}});
+  for(const name of ['hunter-utils','hunter-license-v21','domain-utils'])vm.runInContext(fs.readFileSync('modules/main-app/'+name+'.js','utf8'),c);
+  const legacy={eventCode:'before-s1',eventDate:'2026-09-20',roundsPerspective:{legacy:true},isWin:false};
+  assert.equal(c.window.BXHHunterUtils.hunterRecordMode(legacy),'standard');
+  const summary=c.window.BXHHunterLicenseV21.overview([legacy,record(1),record(2)]);
+  assert.equal(summary.life.matches,2);
+  assert.equal(summary.excluded,1);
+  assert.equal(summary.grade.tier,'e');
+});
