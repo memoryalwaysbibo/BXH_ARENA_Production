@@ -136,6 +136,8 @@
         "準時回家":"assets/title-common-home-on-time.svg",
         "開場即結束":"assets/title-rare-over-at-start.svg",
         "誰能比我慘":"assets/title-epic-unluckiest-heartbreak-v5.webp",
+        "晚點回家":"assets/title-common-home-later-v1.webp",
+        "連勝之刃":"assets/title-rare-winning-blade-kai-v3.webp",
         "勢如破竹":"assets/title-epic-unstoppable-bamboo-v1.webp",
         "不敗傳說":"assets/title-legendary-undefeated-kai-v2.webp",
         "S1 賽季王者":"assets/title-legendary-season-king-s1-kai-v2.webp",
