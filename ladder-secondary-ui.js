@@ -91,6 +91,20 @@
     '</div>';
   }
 
+  // Only change the name foreground and subtle glow, never font dimensions or badge artwork.
+  (function installLadderNameRankColors(){
+    if(document.getElementById("bxh-ladder-name-rank-colors")) return;
+    var style=document.createElement("style");
+    style.id="bxh-ladder-name-rank-colors";
+    style.textContent=
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-1{color:#f4c85e;text-shadow:0 0 5px rgba(244,200,94,.24)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-2{color:#d6dfe9;text-shadow:0 0 5px rgba(214,223,233,.20)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-3{color:#dca077;text-shadow:0 0 5px rgba(220,160,119,.22)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-4{color:#ee7b80;text-shadow:0 0 5px rgba(238,123,128,.22)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-elite{color:#84c9f0;text-shadow:none}';
+    (document.head||document.documentElement).appendChild(style);
+  })();
+
   function ladderRankingTableHtml(adminMode){
     if(typeof ladderPublicLoaded!=="undefined"&&!ladderPublicLoaded){
       return '<div class="empty-state" role="status">'+escLocal((typeof ladderPublicError!=="undefined"&&ladderPublicError)||"正在讀取天梯資料…")+'</div>';
@@ -168,7 +182,7 @@
       return '<article class="ladder-rank-grid ladder-rank-row-v2'+topClass+'"'+(p.uid===myUid?' id="ladder-my-row"':'')+'>'+
         '<div class="ladder-rank-position">NO.'+rank+'</div>'+
         '<div class="ladder-player-block">'+
-          '<button class="ladder-player-link" data-action="card-open" data-uid="'+escLocal(p.uid||"")+'" title="'+escLocal(p.playerName||p.publicName||"—")+'">'+escLocal(p.playerName||p.publicName||"—")+'</button>'+
+          '<button class="ladder-player-link'+(rank===1?' ladder-name-rank-1':rank===2?' ladder-name-rank-2':rank===3?' ladder-name-rank-3':rank===4?' ladder-name-rank-4':rank>=5&&rank<=10?' ladder-name-rank-elite':'')+'" data-action="card-open" data-uid="'+escLocal(p.uid||"")+'" title="'+escLocal(p.playerName||p.publicName||"—")+'">'+escLocal(p.playerName||p.publicName||"—")+'</button>'+
           title+
         '</div>'+
         '<div class="ladder-tier-cell">'+ladderTierEmblemHtml(p)+'</div>'+
