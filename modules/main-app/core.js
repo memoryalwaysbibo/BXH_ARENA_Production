@@ -16898,7 +16898,7 @@ function renderPlayerProfileEditModal(){
 }
 
 let playerProfileSection="overview", playerProfileSectionUid=null;
-let playerCenterPeriod="season", playerCenterLadderRequestedUid=null;
+let playerCenterPeriod="season", playerCenterLadderRequestedUid=null, playerCenterHistoryVisibleCount=10;
 let playerCenterResultScope="", playerCenterResultRequest=0;
 const playerCenterEventResults=new Map();
 
@@ -16966,6 +16966,16 @@ function playerCenterEventGroups(records){
   });
   return [...groups.values()].sort((a,b)=>b.timestamp-a.timestamp||a.key.localeCompare(b.key)).map(g=>({...g,summary:hunterCareerSummary(g.records)}));
 }
+// S1 began at midnight in Taiwan on 2026/10/01. Keep earlier and undated
+// matches visible as history without crediting them to official career totals.
+function playerCenterRecordPartition(records){
+  const partitions={official:[],prelaunch:[],undated:[]};
+  hunterUniqueRecords(records).forEach(record=>{
+    const time=hunterRecordTimestamp(record);
+    partitions[time<=0?'undated':time<HUNTER_OFFICIAL_LAUNCH_AT?'prelaunch':'official'].push(record);
+  });
+  return partitions;
+}
 function playerCenterDataNotice(){
   const status=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
   if(status==='loading')return '<div class="panel" role="status">正在讀取本人戰績…</div>';
@@ -16983,19 +16993,27 @@ function playerCenterEventHtml(group){
 document.addEventListener('toggle',e=>{const code=e.target?.dataset?.personalEvent;if(e.target?.open&&code)void loadPlayerCenterEventResult(code);},true);
 function renderPlayerCenterCareer(){
   const status=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
-  const groups=playerCenterEventGroups(hunterProfileCache?.records||[]);
-  return '<section class="player-center-integrated"><div class="hunter-section-head"><h2>生涯賽事紀錄</h2><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div><p class="hint">本人賽事依活動彙整，展開查看每輪對戰。沿用獵人檔案生涯資料；PK 請至獵人交鋒查看。</p>'+playerCenterDataNotice()+(['loading','error'].includes(status)?'':groups.length?groups.map(playerCenterEventHtml).join(''):'<div class="panel empty-state">尚無已完成的本人對戰紀錄</div>')+'</section>';
+  const partitions=playerCenterRecordPartition(hunterProfileCache?.records||[]);
+  const groups=playerCenterEventGroups(partitions.official);
+  const prelaunch=playerCenterEventGroups(partitions.prelaunch);
+  const undated=playerCenterEventGroups(partitions.undated);
+  const history=(prelaunch.length?'<details class="panel"><summary>S1 前紀錄（'+prelaunch.length+' 場賽事）</summary><p class="hint">2026/10/1 前的對戰，保留查閱，不計正式生涯。</p>'+prelaunch.slice(0,playerCenterHistoryVisibleCount).map(playerCenterEventHtml).join('')+'</details>':'')+
+    (undated.length?'<details class="panel"><summary>日期待核對（'+undated.length+' 場賽事）</summary><p class="hint">沒有可靠日期，暫不計正式生涯。</p>'+undated.slice(0,playerCenterHistoryVisibleCount).map(playerCenterEventHtml).join('')+'</details>':'');
+  const moreHistory=Math.max(0,prelaunch.length-playerCenterHistoryVisibleCount)+Math.max(0,undated.length-playerCenterHistoryVisibleCount);
+  return '<section class="player-center-integrated"><div class="hunter-section-head"><h2>生涯賽事紀錄</h2><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div><p class="hint">正式生涯從 2026/10/1 起算；S1 前與日期待核對紀錄分開保留。展開賽事可查看每輪對戰；PK 請至獵人交鋒查看。</p>'+playerCenterDataNotice()+(['loading','error'].includes(status)?'':'<h3>正式生涯</h3>'+(groups.length?groups.map(playerCenterEventHtml).join(''):'<div class="panel empty-state">尚無已完成的正式對戰紀錄</div>')+history+(moreHistory?'<button class="btn btn-ghost" data-action="player-center-history-more">載入更多舊紀錄（'+moreHistory+' 場）</button>':''))+'</section>';
 }
 function renderPlayerCenterOverview(p){
   const status=hunterDataStatus(hunterProfileCache,hunterProfileLoading,hunterProfileError);
   const ready=['ready','empty','partial'].includes(status);
   const all=hunterUniqueRecords(hunterProfileCache?.records||[]);
-  const standard=hunterFilterByMode(all,'standard');
+  const partitions=playerCenterRecordPartition(all);
+  const standard=hunterFilterByMode(partitions.official,'standard');
+  const prelaunch=hunterFilterByMode(partitions.prelaunch,'standard');
   const seasonStart=hunterSeasonStartMs();
-  const periodReady=playerCenterPeriod==='career'||seasonStart>0;
-  const rows=playerCenterPeriod==='career'?standard:standard.filter(r=>hunterRecordTimestamp(r)>=seasonStart&&hunterRecordTimestamp(r)>0);
+  const periodReady=playerCenterPeriod!=='season'||seasonStart>0;
+  const rows=playerCenterPeriod==='prelaunch'?prelaunch:playerCenterPeriod==='career'?standard:standard.filter(r=>hunterRecordTimestamp(r)>=seasonStart);
   const summary=hunterCareerSummary(rows);
-  const groups=playerCenterEventGroups(all).filter(g=>g.timestamp>0);
+  const groups=playerCenterEventGroups(partitions.official);
   const eventCount=playerCenterEventGroups(rows).length;
   const value=v=>ready&&periodReady?String(v):'—';
   const ladder=myLadderProfileCache;
@@ -17003,14 +17021,14 @@ function renderPlayerCenterOverview(p){
   const recent=standard.slice().sort((a,b)=>hunterRecordTimestamp(b)-hunterRecordTimestamp(a)).filter(r=>hunterRecordTimestamp(r)>0).slice(0,5);
   return '<section class="player-center-integrated"><div class="panel profile-hero"><div class="profile-hero-avatar">'+(p.avatarUrl?'<img src="'+esc(p.avatarUrl)+'" alt="玩家頭像">':ROLE_ICON_PLAYER)+'</div><div class="profile-hero-copy"><div class="profile-hero-name">'+esc(effectiveGameId(p)||p.realName||'玩家')+'</div><div class="profile-hero-meta">玩家編號 '+esc(playerDerivedId(p))+'｜本人</div><div class="profile-hero-actions"><button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="basic">編輯基本資料</button><button class="btn btn-ghost btn-sm" data-action="player-switch-tab" data-tab="stats">獵人執照與能力分析</button></div></div></div>'+
     '<section class="player-center-schedule">'+renderPlayerRegisteredTab({activeOnly:true})+'<p class="hint">家庭代報名保留參賽者標示；孩子的戰績不併入本人。</p></section>'+
-    '<div class="panel"><div class="hunter-section-head"><h2>我的戰績</h2><div class="btn-row"><button class="btn '+(playerCenterPeriod==='season'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="season" aria-pressed="'+(playerCenterPeriod==='season')+'">本季</button><button class="btn '+(playerCenterPeriod==='career'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="career" aria-pressed="'+(playerCenterPeriod==='career')+'">生涯</button><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div></div>'+playerCenterDataNotice()+'<div class="player-center-metrics">'+metrics.map(([label,v])=>'<div class="stat-box"><div class="value small">'+esc(v)+'</div><div class="label">'+esc(label)+'</div></div>').join('')+'</div><p class="hint">正規賽已完成對戰，包含一般與積分賽；輪空不計勝敗。'+(playerCenterPeriod==='season'&&!seasonStart?'賽季起始時間尚未載入。':'')+(standard.some(r=>!hunterRecordTimestamp(r))?'部分紀錄日期未明，不納入本季與近期排序。':'')+'</p>'+
+    '<div class="panel"><div class="hunter-section-head"><h2>我的戰績</h2><div class="btn-row"><button class="btn '+(playerCenterPeriod==='season'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="season" aria-pressed="'+(playerCenterPeriod==='season')+'">本季</button><button class="btn '+(playerCenterPeriod==='career'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="career" aria-pressed="'+(playerCenterPeriod==='career')+'">正式生涯</button><button class="btn '+(playerCenterPeriod==='prelaunch'?'btn-primary':'btn-ghost')+' btn-sm" data-action="player-center-period" data-period="prelaunch" aria-pressed="'+(playerCenterPeriod==='prelaunch')+'">S1 前</button><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新整理</button></div></div>'+playerCenterDataNotice()+'<div class="player-center-metrics">'+metrics.map(([label,v])=>'<div class="stat-box"><div class="value small">'+esc(v)+'</div><div class="label">'+esc(label)+'</div></div>').join('')+'</div><p class="hint">正式生涯從 2026/10/1 起算；S1 前紀錄另列。正規賽包含一般與積分賽，輪空不計勝敗。'+(playerCenterPeriod==='season'&&!seasonStart?'賽季起始時間尚未載入。':'')+(partitions.undated.length?'日期待核對 '+partitions.undated.length+' 場對戰，暫不計正式生涯。':'')+'</p>'+
     (ready&&recent.length?'<div class="player-center-recent">近 5 場（新→舊）'+recent.map(r=>'<span class="badge badge-metal">'+(r.isWin?'勝':'敗')+'</span>').join('')+'</div>':'')+
-    '<div class="player-center-ladder"><span>天梯'+(playerCenterPeriod==='career'?'生涯累積':'本季')+'積分</span><strong>'+(ladder?esc(playerCenterPeriod==='career'?ladder.careerPoints??0:ladder.seasonPoints??0)+' PT':'尚未讀取')+'</strong><button class="btn btn-ghost btn-sm" data-action="player-switch-tab" data-tab="ladder">查看天梯</button></div></div>'+
+    (playerCenterPeriod==='prelaunch'?'<p class="hint">S1 前對戰不計入正式天梯積分。</p>':'<div class="player-center-ladder"><span>天梯'+(playerCenterPeriod==='career'?'生涯累積':'本季')+'積分</span><strong>'+(ladder?esc(playerCenterPeriod==='career'?ladder.careerPoints??0:ladder.seasonPoints??0)+' PT':'尚未讀取')+'</strong><button class="btn btn-ghost btn-sm" data-action="player-switch-tab" data-tab="ladder">查看天梯</button></div>')+'</div>'+
     '<div class="hunter-section-head"><h2>近期賽事</h2><button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="career">全部紀錄</button></div>'+(ready?(groups.length?groups.slice(0,3).map(playerCenterEventHtml).join(''):'<div class="panel empty-state">尚無已完成對戰</div>'):'<p class="hint">戰績尚未完成讀取。</p>')+'</section>';
 }
 function renderPlayerProfileTab(p){
   const profileUid=currentAuthUid();
-  if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="overview";playerCenterPeriod="season";}
+  if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="overview";playerCenterPeriod="season";playerCenterHistoryVisibleCount=10;}
   if(['overview','career'].includes(playerProfileSection)){
     if(!hunterProfileCache&&!hunterProfileLoading&&!hunterProfileError)setTimeout(()=>loadHunterProfile(false),0);
     if(playerProfileSection==='overview'&&!myLadderProfileCache&&!myLadderProfileLoading&&playerCenterLadderRequestedUid!==profileUid){playerCenterLadderRequestedUid=profileUid;setTimeout(()=>loadMyLadderProfile(false),0);}
@@ -20035,9 +20053,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     playerProfileSection=section;
     renderPreservingScroll(); return;
   }
+  if(action==="player-center-history-more"){playerCenterHistoryVisibleCount+=10;renderPreservingScroll();return;}
   if(action==="player-center-period"){
     const period=target.getAttribute("data-period");
-    if(period!=="season"&&period!=="career")return;
+    if(!["season","career","prelaunch"].includes(period))return;
     playerCenterPeriod=period;
     renderPreservingScroll();return;
   }

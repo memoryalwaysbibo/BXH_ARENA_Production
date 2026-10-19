@@ -9,11 +9,12 @@ function setup(){
  esc:s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])),
  hunterProfileCache:{records:[],skipped:[]},hunterProfileLoading:false,hunterProfileError:null,
  myRegistrationsTournamentInfo:{},myRegistrationsCache:[],myRegistrationsLoading:false,myRegistrationsError:null,
- playerCenterResultScope:'',playerCenterResultRequest:0,playerCenterEventResults:new Map(),engagementSessionEpoch:1,ladderReadWithTimeout:p=>p,renderPreservingScroll:()=>{},playerCenterPeriod:'career',currentAuthUid:()=> 'self',hunterSeasonStartMs:()=>Date.parse('2026-10-01T00:00:00+08:00'),
+ playerCenterResultScope:'',playerCenterResultRequest:0,playerCenterEventResults:new Map(),engagementSessionEpoch:1,ladderReadWithTimeout:p=>p,renderPreservingScroll:()=>{},playerCenterPeriod:'career',playerCenterHistoryVisibleCount:10,currentAuthUid:()=> 'self',hunterSeasonStartMs:()=>Date.parse('2026-10-01T00:00:00+08:00'),
+ HUNTER_OFFICIAL_LAUNCH_AT:Date.parse('2026-10-01T00:00:00+08:00'),
  effectiveGameId:p=>p.gameId,playerDerivedId:()=> 'P1',ROLE_ICON_PLAYER:'本人',myLadderProfileCache:null,
  hunterRecordCardHtml:r=>'<article>'+c.esc(r.opponent?.name||'對手')+'</article>',
  renderPlayerRegisteredTab:()=>'<div>目前賽程</div>',schedulePhase:info=>info.phase||'waiting'});
- for(const name of ['playerCenterResultContext','loadPlayerCenterEventResult','playerCenterEventOutcome','playerCenterEventOutcomeHtml','playerCenterEventGroups','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','renderPlayerCenterOverview'])vm.runInContext(extract(name),c);
+ for(const name of ['playerCenterResultContext','loadPlayerCenterEventResult','playerCenterEventOutcome','playerCenterEventOutcomeHtml','playerCenterEventGroups','playerCenterRecordPartition','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','renderPlayerCenterOverview'])vm.runInContext(extract(name),c);
  return c;
 }
 const record=(overrides={})=>({eventCode:'E1',eventName:'週末賽',eventDate:'2026-10-18',matchId:'m1',completedAt:Date.parse('2026-10-18T15:00:00+08:00'),completed:true,isWin:true,scoringVersion:'bxh-4pt-v1',round:1,...overrides});
@@ -24,7 +25,16 @@ test('event groups share Hunter canonicalization: corrections replace wins, revo
 test('overview uses its own source and period without touching Hunter filters; PK and enchantment excluded from headline',()=>{
  const c=setup();c.hunterBattleFilter='pk';c.hunterOverviewPeriod='today';c.hunterProfileCache.records=[record(),record({matchId:'m2',isWin:false}),record({eventCode:'OLD',completedAt:Date.parse('2026-09-01')}),record({eventCode:'PK',sourceType:'hunter-clash'}),record({eventCode:'EN',scoringVersion:'bxh-enchantment-v2'})];
  c.playerCenterPeriod='season';let html=c.renderPlayerCenterOverview({gameId:'黑爸'});assert.ok(html.includes('>1</div><div class="label">有完成對戰的賽事'));assert.ok(html.includes('2–1')===false);assert.ok(html.includes('1–1'));assert.ok(html.includes('50%'));assert.equal(c.hunterBattleFilter,'pk');assert.equal(c.hunterOverviewPeriod,'today');
- c.playerCenterPeriod='career';html=c.renderPlayerCenterOverview({});assert.ok(html.includes('2–1'));assert.ok(html.includes('67%'));
+ c.playerCenterPeriod='career';html=c.renderPlayerCenterOverview({});assert.ok(html.includes('1–1'));assert.ok(html.includes('50%'));assert.ok(!html.includes('2–1'));
+ c.playerCenterPeriod='prelaunch';html=c.renderPlayerCenterOverview({});assert.ok(html.includes('1–0'));assert.ok(html.includes('S1 前對戰不計入正式天梯積分'));
+});
+test('S1 boundary keeps Loft results official and prelaunch or undated records separate',()=>{
+ const c=setup(),loft=record({eventCode:'BXH-GJHTTW',eventName:'BXH x Loft',eventDate:'2026-10-17',matchId:'m6'});
+ c.hunterProfileCache.records=[loft,{...loft,matchId:'m70',isWin:false},record({eventCode:'S0',eventDate:'2026-09-30',completedAt:Date.parse('2026-09-30T23:59:59+08:00')}),record({eventCode:'S1',eventDate:'2026-10-01',completedAt:Date.parse('2026-10-01T00:00:00+08:00')}),record({eventCode:'UNKNOWN',eventDate:'',completedAt:0,confirmedAt:0})];
+ const partition=c.playerCenterRecordPartition(c.hunterProfileCache.records);
+ assert.equal(partition.official.length,3);assert.equal(partition.prelaunch.length,1);assert.equal(partition.undated.length,1);
+ c.playerCenterPeriod='career';const html=c.renderPlayerCenterOverview({});assert.ok(html.includes('2–1'));assert.ok(html.includes('日期待核對 1 場對戰'));
+ const career=c.renderPlayerCenterCareer();assert.ok(career.includes('BXH x Loft'));assert.ok(career.includes('1 勝 1 敗'));assert.ok(career.includes('S1 前紀錄（1 場賽事）'));assert.ok(career.includes('日期待核對（1 場賽事）'));
 });
 test('loading, errors and missing season never show zero victories as verified stats; partial history is explicit',()=>{
  const c=setup();c.hunterProfileCache=null;let html=c.renderPlayerCenterOverview({});assert.ok(html.includes('正在讀取本人戰績'));assert.ok(!html.includes('>0–0<'));assert.ok(!html.includes('>0%<'));
