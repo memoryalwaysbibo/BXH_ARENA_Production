@@ -370,7 +370,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.34";
+const APP_VERSION = "v14.3.33";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.32",date:"2026/10/07",timezone:"Asia/Taipei",title:"玩家房間名單同步修復",updateLevel:"patch",added:[],changed:["快速報名名單由伺服器同步並保留報到資料"],fixed:["一般玩家房主可即時收到正備取名單，並可手動重試同步","離開房間或切換帳號時停止舊名單讀取，避免舊結果覆蓋目前畫面"],security:[]},
@@ -5716,7 +5716,7 @@ function renderDailyCheckInCard(){
   </section>`;
 }
 function titleConditionMeta(t){
-  const reserved={first_generation_warrior:'season_completed_tournaments',four_venues:'unique_venues',first_win_1:'event_opening_win_streak',winning_blade:'event_opening_win_streak',first_win_5:'event_opening_win_streak',undefeated_legend:'double_elimination_zero_loss_champion',season_king:'s1_final_rank'};
+  const reserved={first_generation_warrior:'season_completed_tournaments',four_venues:'unique_venues'};
   const type=String(reserved[t&&(t.id||t.titleId)]||(t&&t.conditionType)||'manual');
   const target=Math.max(1,Number((t&&t.targetValue)||1));
   const map={
@@ -5726,9 +5726,6 @@ function titleConditionMeta(t){
     championships:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽冠軍紀錄計入；一般交流賽、測試賽與封測賽事不計入。',task:`累積取得 ${target} 次 BXH 官方積分賽冠軍`},
     best_placement:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽最終名次計入。',task:`BXH 官方積分賽最佳名次達第 ${target} 名或更佳`},
     hosted_tournaments:{category:'event',label:'主辦成就',scope:'依系統認定且完成結算的 BXH 賽事主辦紀錄計入。',task:`成功完成主辦 ${target} 場 BXH 賽事`},
-    event_opening_win_streak:{category:'fun',label:'賽事首戰連勝',scope:'一般與官方賽事皆計入；每場僅計第一場實際對戰。種子輪空不算勝場，首戰落敗中斷連勝；取消、未到與未對戰棄權不計次。取得後永久持有。',task:target===1?'一場賽事首場實際對戰獲勝':`連續 ${target} 場賽事首場實際對戰獲勝`},
-    double_elimination_zero_loss_champion:{category:'official',label:'雙敗制不敗冠軍',scope:'僅完成正式結算的 BXH 官方雙敗制賽事計入；須從勝部全程零敗奪冠。敗部逆襲、總決賽先敗後重置奪冠不符合。',task:'正式雙敗制賽事全程零敗奪冠'},
-    s1_final_rank:{category:'official',label:'S1 賽季最終榮耀',scope:'僅 ARENA S1 正式結算並封存後的最終排名計入，即時榜首不授予。取得後永久持有。',task:'ARENA S1 賽季最終天梯排名第 1 名'},
     first_match_exit_streak:{category:'fun',label:'賽事趣味成就',scope:'一般與官方賽事皆計入；首場實際對戰落敗且出局才計次，種子與輪空不算勝場。實際獲勝中斷連續紀錄；取消、未到與未對戰棄權不計次。取得後永久持有。',task:target===1?'完成 1 場賽事首戰出局':`連續 ${target} 場賽事首戰出局`},
     total_checkins:{category:'activity',label:'每日簽到',scope:'由 BXH ARENA 每日簽到紀錄累積；與賽事報到完全分離。',task:`累積完成 ${target} 天每日簽到`},
     checkin_streak:{category:'activity',label:'每日簽到',scope:'依 BXH ARENA 連續每日簽到紀錄計算；中斷後重新累積。',task:`連續完成 ${target} 天每日簽到`},

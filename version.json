@@ -1,6 +1,6 @@
 {
-  "build": "20261019.2",
-  "version": "v14.3.34",
-  "updatedAt": "2026-10-19T00:22:31.000Z",
-  "releaseTrigger": "opening-win-series-1-3-5"
+  "build": "20261019.1",
+  "version": "v14.3.33",
+  "updatedAt": "2026-10-18T17:15:07.404401Z",
+  "releaseTrigger": "ladder-current-member-location"
 }
