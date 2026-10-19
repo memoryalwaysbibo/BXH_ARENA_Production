@@ -34,10 +34,11 @@ assert(html.includes('<div class="guest-tier">${ladderBadgeHtml(p)}</div>'), 'gu
 assert(html.includes('<div class="guest-player-mobile-badge">${ladderBadgeHtml(p)}</div>'), 'mobile guest leaderboard must show tier badges');
 assert(html.includes('class="value small profile-tier-badge">${ladderBadgeHtml(l)}'), 'player profile must show tier badge');
 assert(titleUtils.includes("'諸神典藏者':'assets/title-limited-gods-collector.webp'"), 'Gods Collector artwork must support its production Rare rarity');
-for(const [name,file] of [['整裝待發','title-common-ready.svg'],['初次上陣','title-common-debut.svg']]){
+for(const [name,file] of [['整裝待發','title-common-ready-zhulu-v2.webp'],['初次上陣','title-common-debut-zhulu-v2.webp']]){
   assert(titleUtils.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
   assert(source.includes("\""+name+"\":\"assets/"+file+"\""), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
+  assert(fs.existsSync(path.join(__dirname,'..','assets',file.replace(/\.webp$/,'.png'))), name+' PNG fallback missing');
 }
 for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp'],['百日戰士','title-epic-hundred-day-warrior.webp'],['初次開局','title-rare-first-match.webp'],['資深主辦','title-rare-host-20.webp'],['賽事推手','title-rare-host-10.webp'],['競技場主','title-rare-host-30.webp'],['封測先鋒','title-limited-closed-beta.webp']]){
   assert(titleUtils.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
