@@ -564,3 +564,8 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .hunter-grade-next li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding:5px 0}
 .hunter-grade-next li small{grid-column:1/-1}
 .hunter-grade-comparison,.hunter-grade-detail .hunter-analysis-meta{overflow-wrap:anywhere}
+
+/* Hunter License 2.1: B rank and horizontally scrollable review conditions. */
+.hunter-grade-badge.grade-b{border-color:#74d8c1;background:linear-gradient(115deg,#174c45,#101f2b);color:#b9ffea;box-shadow:inset 0 0 0 1px #74d8c133,0 0 10px #74d8c133}
+.hunter-grade-badge.grade-ungraded{border-color:#6d7885;background:#182029;color:#bdc7d2;box-shadow:none}
+.hunter-v21-table{max-width:100%;overflow-x:auto;margin:12px 0}.hunter-v21-table table{border-collapse:collapse;width:100%;min-width:560px;font-size:12px}.hunter-v21-table th,.hunter-v21-table td{padding:8px;text-align:center;border-bottom:1px solid #ffffff20;white-space:nowrap}.hunter-v21-table th{color:var(--mint,#7bdcb2)}

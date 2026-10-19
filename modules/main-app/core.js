@@ -16006,7 +16006,9 @@ function hunterPermanentAwardSummaryHtml(core){
 function hunterAchievementsHtml(core,records,audit){
   return hunterPermanentAwardSummaryHtml(core)+hunterAchievementIntegrityAuditHtml(audit)+hunterMatchAchievementsHtml(core,records)+hunterRoundAchievementsHtml(core,records)+hunterStreakSpecialAchievementsHtml(core,records);
 }
-const {hunterLicenseRules,hunterLicenseOverview,hunterSeniorityBonus,hunterLicenseGrade}=window.BXHHunterUtils||{};
+const {hunterSeniorityBonus,hunterLicenseGrade}=window.BXHHunterUtils||{};
+const hunterLicenseRules=window.BXHHunterLicenseV21?.rules||window.BXHHunterUtils.hunterLicenseRules;
+const hunterLicenseOverview=window.BXHHunterLicenseV21?.overview||window.BXHHunterUtils.hunterLicenseOverview;
 function hunterPeriodSummary(period){
   const rows=hunterUniqueRecords(hunterRecordsForPeriod(period));
   const base=hunterCareerSummary(rows);
@@ -16094,6 +16096,7 @@ function hunterBuildAnalysis(records){
 
 
 function hunterLicenseOverviewHtml(overview){
+  if(overview.version===window.BXHHunterLicenseV21?.version)return window.BXHHunterLicenseV21.renderOverview(overview,esc);
   const {grade,growth,analysis,next,gates,complete,versions}=overview;
   const value=n=>n==null?'—':Number.isInteger(n)?String(n):n.toFixed(1);
   const rows=hunterLicenseRules().map(r=>'<div>'+esc(r.label.replace('獵人',''))+'</div><div>'+r.score+' 起</div><div>'+(r.ability?'實力 ≥'+r.ability+'、':'')+r.matches+' 場、'+r.rounds+' 回合</div>').join('');
@@ -16658,10 +16661,10 @@ function renderPlayerStatsTab(p){
     const overviewPeriods=[["career","生涯",true],["season","本季",seasonAvailable],["month","本月",true],["week","本週",true],["today","今日",true]].map(([key,label,enabled])=>'<button class="btn '+(hunterOverviewPeriod===key?'btn-primary':'btn-ghost')+' btn-sm" '+(enabled?'data-action="hunter-overview-period" data-value="'+key+'"':'disabled title="賽季起始時間尚未載入"')+'>'+label+'</button>').join('');
     const growthRemaining=Math.max(0,growth.next-growth.xp);
     body='<section class="panel hunter-license-card">'+
-      '<div class="hunter-license-head"><div><div class="hunter-kicker">BXH HUNTER LICENSE</div><div class="panel-title">獵人執照</div></div><span class="badge badge-metal">P5</span></div>'+
-      '<div class="hunter-license-main"><div class="hunter-license-avatar">'+avatar+'</div><div class="hunter-license-copy"><div class="hunter-license-name-line"><div class="hunter-license-name">'+esc(playerName)+'</div><span class="hunter-grade-badge grade-'+licenseGrade.tier+'"><span class="hunter-grade-ornament" aria-hidden="true">'+(licenseGrade.tier==="pending"?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span><span class="hunter-grade-label">'+esc(licenseGrade.label)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+(licenseGrade.tier==="pending"?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span></span></div>'+
+      '<div class="hunter-license-head"><div><div class="hunter-kicker">BXH HUNTER LICENSE</div><div class="panel-title">獵人執照</div></div><span class="badge badge-metal">2.1</span></div>'+
+      '<div class="hunter-license-main"><div class="hunter-license-avatar">'+avatar+'</div><div class="hunter-license-copy"><div class="hunter-license-name-line"><div class="hunter-license-name">'+esc(playerName)+'</div><span class="hunter-grade-badge grade-'+licenseGrade.tier+'"><span class="hunter-grade-ornament" aria-hidden="true">'+(["pending","ungraded"].includes(licenseGrade.tier)?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="b"?'✥':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span><span class="hunter-grade-label">'+esc(licenseGrade.label)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+(["pending","ungraded"].includes(licenseGrade.tier)?'':licenseGrade.tier==="e"?'◇':licenseGrade.tier==="d"?'◆':licenseGrade.tier==="c"?'❧':licenseGrade.tier==="b"?'✥':licenseGrade.tier==="a"?'✦':licenseGrade.tier==="s"?'✧':'龍')+'</span></span></div>'+
       '<div class="hunter-license-meta">'+(gameId?('遊戲 ID '+esc(gameId)+'　｜　'):'')+'玩家編號 '+esc(playerId)+'</div>'+
-      '<div class="hunter-license-rank-row"><div><span>獵人等級</span><strong>LV.'+growth.level+'</strong></div><div><span>實力分（正規賽）</span><strong>'+(careerAnalysis.eligible?careerAnalysis.overall:'—')+'</strong></div><div><span>正規有效回合</span><strong>'+statValue(careerAnalysis.validRounds)+'</strong></div></div></div></div>'+
+      '<div class="hunter-license-rank-row"><div><span>獵人等級</span><strong>LV.'+growth.level+'</strong></div><div><span>實力分（最近 20 場）</span><strong>'+(careerAnalysis.eligible?careerAnalysis.overall:'—')+'</strong></div><div><span>近期有效回合</span><strong>'+statValue(careerAnalysis.validRounds)+'</strong></div></div></div></div>'+
       hunterLicenseOverviewHtml(licenseOverview)+
       '<div class="hunter-growth"><div class="hunter-growth-head"><strong>'+growth.xp+' XP</strong><span>'+(growth.level>=99?'MAX':('距離 LV.'+(growth.level+1)+' 還有 '+growthRemaining+' XP'))+'</span></div>'+
       '<p class="hint">練習 XP 可增加獵人等級；階級資歷仍採既有賽事 XP。</p>'+

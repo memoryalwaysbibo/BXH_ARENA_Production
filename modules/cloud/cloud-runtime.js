@@ -2095,6 +2095,11 @@
           }
 
           const built=buildHunterTournamentMatchRecords(runtime);
+          // Count actual played participants from completed canonical matches, never capacity.
+          const licenseParticipants=new Set();
+          built.forEach(r=>{if(r.analyzable===true&&Array.isArray(r.rounds)&&r.rounds.length>0&&r.resultMethod!=="quick_decision"){
+            for(const side of [r.playerA,r.playerB])if(side?.localPlayerId)licenseParticipants.add(String(side.localPlayerId));
+          }});
           built.forEach(rec=>{
             const side=rec.playerA&&rec.playerA.localPlayerId===participant.id?"A":
               (rec.playerB&&rec.playerB.localPlayerId===participant.id?"B":null);
@@ -2103,6 +2108,11 @@
             const scoreFor=side==="A"?rec.scoreA:rec.scoreB;
             const scoreAgainst=side==="A"?rec.scoreB:rec.scoreA;
             records.push(Object.assign({},rec,{
+              licenseEventParticipants:licenseParticipants.size,
+              licenseParticipantSource:"completed-match-roster-v1",
+              eventAuthority:d.eventAuthority||runtime.meta.eventAuthority||rec.eventAuthority||"unknown",
+              testMode:d.testMode===true||runtime.testMode===true||runtime.meta.testMode===true,
+              battleMode:runtime.meta.battleMode||"individual",
               participantLocalPlayerId:participant.id,
               playerSide:side,
               opponent:opponent||null,
