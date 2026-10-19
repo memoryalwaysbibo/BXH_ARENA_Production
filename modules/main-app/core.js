@@ -5553,6 +5553,7 @@ const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>rend
 function playerVisibleTabs(){return hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:PLAYER_TABS;}
 
 let engagementSnapshot=null;
+let engagementSnapshotFetchedAt=0;
 let engagementSnapshotUid="";
 let engagementLoading=false;
 let engagementError="";
@@ -5574,7 +5575,7 @@ function syncEngagementIdentity(uid){
   const key=uid===undefined ? ((firebaseUser&&firebaseUser.uid)||"") : (uid||"");
   if(key===engagementSessionKey) return;
   engagementSessionKey=key; engagementSessionEpoch++; engagementRequestGeneration++;
-  engagementSnapshot=null; engagementSnapshotUid=""; engagementRequestUid=""; checkinStampAnimationDate="";
+  engagementSnapshot=null; engagementSnapshotFetchedAt=0; engagementSnapshotUid=""; engagementRequestUid=""; checkinStampAnimationDate="";
   engagementError=""; engagementLoading=false; engagementActionBusy=false;
   engagementAdminOverview=null; engagementAdminError=""; engagementDiagnostic=null;
   engagementBackfillCursor=""; engagementBackfillResult=null; engagementBackfillDone=false;
@@ -5654,6 +5655,7 @@ function requestEngagementSnapshot(force=false){
       if(!result || result.ok!==true) throw new Error((result&&result.error)||"snapshot-failed");
       if(requestGeneration!==engagementRequestGeneration || !firebaseUser || firebaseUser.uid!==requestedUid) return;
       engagementSnapshot=result;
+      engagementSnapshotFetchedAt=Date.now();
       engagementSnapshotUid=requestedUid;
       scheduleEngagementDayRefresh(result);
       if(result.profilePatch) userProfile=Object.assign({},userProfile||{},result.profilePatch);
@@ -5670,6 +5672,11 @@ function requestEngagementSnapshot(force=false){
     }
   });
 }
+function refreshVisibleTitleProgress(force=false){
+  if(document.hidden || appPhase!=="player-center" || playerActiveTab!=="profile" || playerProfileSection!=="titles")return;
+  if(!engagementLoading && (force || Date.now()-engagementSnapshotFetchedAt>30000))requestEngagementSnapshot(true);
+}
+document.addEventListener("visibilitychange",()=>refreshVisibleTitleProgress(false));
 const {titleArtworkPath,titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml}=window.BXHTitleUtils;
 function titleChipHtml(name,rarity,extra=''){
   const art=titleArtworkPath(name,rarity);
@@ -19927,6 +19934,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const section=target.getAttribute("data-section");
     if(section!=="basic"&&section!=="titles") return;
     playerProfileSection=section;
+    if(section==="titles")refreshVisibleTitleProgress(true);
     renderPreservingScroll(); return;
   }
   if(action==="test-ladder-toggle"){
@@ -20371,6 +20379,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(playerActiveTab==="home" && newTab!=="home") findEventsFiltersOpen=false;
     const leavingCheckIn=playerActiveTab==="checkin";
     playerActiveTab = newTab;
+    if(newTab==="profile")refreshVisibleTitleProgress(true);
     render();
     if(newTab==="checkin" || leavingCheckIn) window.scrollTo(0,0);
     return;

@@ -1,6 +1,6 @@
 {
-  "build": "20261020.1",
+  "build": "20261020.2",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-19T16:40:00.000Z",
-  "releaseTrigger": "first-exit-progress-label"
+  "updatedAt": "2026-10-19T17:20:00.000Z",
+  "releaseTrigger": "first-exit-auto-sync"
 }
