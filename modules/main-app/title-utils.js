@@ -32,6 +32,8 @@ function titleArtworkPath(name,rarity){
     'S1賽季王者':'assets/title-legendary-season-king-s1-kai-v2.webp',
     '初代戰士':'assets/title-epic-first-generation-warrior-v1.webp',
     '四方征戰':'assets/title-epic-four-venues-v1.webp',
+    '初入鋒芒':'assets/title-rare-top16-first-edge-v2.webp',
+    '八強壁壘':'assets/title-epic-top8-bastion-v2.webp',
     '初次開局':'assets/title-rare-first-match.webp',
     '整裝待發':'assets/title-common-ready.svg',
     '初次上陣':'assets/title-common-debut.svg',
