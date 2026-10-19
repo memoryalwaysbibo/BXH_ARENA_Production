@@ -1,6 +1,6 @@
 {
-  "build": "20261020.2",
+  "build": "20261020.3",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-19T17:20:00.000Z",
-  "releaseTrigger": "first-exit-auto-sync"
+  "updatedAt": "2026-10-19T19:03:44.000Z",
+  "releaseTrigger": "ladder-name-rank-colors-pr541"
 }
