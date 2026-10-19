@@ -1,6 +1,6 @@
 {
-  "build": "20261019.4",
+  "build": "20261020.1",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-19T15:41:22.000Z",
-  "releaseTrigger": "common-title-zhulu-redesign"
+  "updatedAt": "2026-10-19T16:40:00.000Z",
+  "releaseTrigger": "first-exit-progress-label"
 }
