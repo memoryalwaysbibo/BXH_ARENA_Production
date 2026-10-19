@@ -93,6 +93,7 @@
 
   // Only change the name foreground and subtle glow, never font dimensions or badge artwork.
   (function installLadderNameRankColors(){
+    if(typeof document==="undefined"||typeof document.getElementById!=="function"||typeof document.createElement!=="function"||!document.head||typeof document.head.appendChild!=="function") return;
     if(document.getElementById("bxh-ladder-name-rank-colors")) return;
     var style=document.createElement("style");
     style.id="bxh-ladder-name-rank-colors";
