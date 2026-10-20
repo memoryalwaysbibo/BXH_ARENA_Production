@@ -2,6 +2,14 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 function setup(){const c=vm.createContext({window:{}});for(const name of ['domain-utils','hunter-utils','hunter-license-v21'])vm.runInContext(fs.readFileSync('modules/main-app/'+name+'.js','utf8'),c);return c.window.BXHHunterLicenseV21;}
 const T=Date.parse('2026-10-02T12:00:00+08:00');
+test('audited C6BATA results cannot alter XP, strength, experience or peak even with official metadata',()=>{
+ const V=setup(),clean=[record(1),record(2)],baseline=V.overview(clean);
+ for(const isWin of [true,false]){
+  const result=V.overview([...clean,record(3,isWin,{eventCode:'bxh-c6bata',eventAuthority:'official',testMode:false})]);
+  for(const key of ['growth','analysis','grade','life','highest'])assert.deepEqual(result[key],baseline[key]);
+ }
+ assert.equal(V.overview([record(3,true,{eventName:'雙敗制測試',eventCode:'OTHER'})]).life.matches,1);
+});
 function record(i,win=true,extra={}){const scoreFor=win?4:1,scoreAgainst=win?1:4;return {eventCode:'event'+i,matchId:'match'+i,completedAt:T+i*1000,eventAuthority:'official',formatType:'single',scoringVersion:'bxh-4pt-v1',analyzable:true,isWin:win,scoreFor,scoreAgainst,opponentIdentity:{scope:'cross-event',playerId:'opponent'+i},roundsPerspective:[...Array.from({length:scoreFor},()=>({type:'spin',points:1,perspective:'for'})),...Array.from({length:scoreAgainst},()=>({type:'spin',points:1,perspective:'against'}))],licenseEventParticipants:32,licenseParticipantSource:'completed-match-roster-v1',...extra};}
 test('new entry gate supports two matches, no hidden legacy 3-match/8-round gate',()=>{const V=setup(),one=V.overview([record(1)]),two=V.overview([record(1),record(2)]);assert.equal(one.grade.tier,'ungraded');assert.equal(two.grade.tier,'e');assert.equal(two.analysis.overall,92);assert.equal(two.analysis.matches,2);assert.equal(two.gates.find(g=>g.key==='matches').target,4);assert.equal(V.overview([]).grade.label,'未分級');});
 test('latest twenty played matches replace oldest regardless of input order; invalid ledger does not displace a valid match',()=>{const V=setup(),rows=Array.from({length:21},(_,i)=>record(i,i>0));rows.push(record(30,false,{scoreFor:99}));const o=V.overview(rows.reverse());assert.equal(o.analysis.matches,20);assert.equal(o.analysis.winRate,100);assert.equal(o.analysis.overall,92);assert.equal(o.life.matches,21);assert.equal(o.excluded,1);});

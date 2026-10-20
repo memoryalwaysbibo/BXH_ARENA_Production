@@ -17014,7 +17014,7 @@ function playerCenterEventGroups(records){
 function playerCenterRecordPartition(records){
   const partitions={official:[],prelaunch:[],undated:[],test:[]};
   hunterUniqueRecords(records).forEach(record=>{
-    if(record.testMode===true||record.eventAuthority==='test'){
+    if(window.BXHDomainUtils.hunterRecordIsTest(record)){
       partitions.test.push(record);return;
     }
     const time=hunterRecordTimestamp(record);

@@ -2154,7 +2154,7 @@
               licenseEventParticipants:licenseParticipants.size,
               licenseParticipantSource:"completed-match-roster-v1",
               eventAuthority:d.eventAuthority||runtime.meta.eventAuthority||rec.eventAuthority||"unknown",
-              testMode:d.testMode===true||runtime.testMode===true||runtime.meta.testMode===true,
+              testMode:d.testMode===true||runtime.testMode===true||runtime.meta.testMode===true||window.BXHDomainUtils.hunterRecordIsTest({eventCode:code}),
               battleMode:runtime.meta.battleMode||"individual",
               participantLocalPlayerId:participant.id,
               playerSide:side,

@@ -1,6 +1,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const core=fs.readFileSync('modules/main-app/core.js','utf8');
+test('audited test room remains in the test archive despite stale official metadata',()=>{
+ const c=setup(),r=record({eventCode:'BXH-C6BATA',eventName:'雙敗制測試',eventAuthority:'official',testMode:false});
+ const result=c.playerCenterRecordPartition([r]);
+ assert.equal(result.official.length,0);assert.equal(result.test.length,1);
+ c.hunterProfileCache.records=[r];
+ assert.ok(c.renderPlayerCenterCareer().includes('測試紀錄（1 場賽事）'));
+ assert.ok(!c.renderPlayerCenterOverview({}).includes('雙敗制測試'));
+});
 function extract(name){let a=core.indexOf('function '+name+'(');if(core.slice(a-6,a)==='async ')a-=6;const b=core.indexOf('\n}',a+1)+2;assert.ok(a>=0);return core.slice(a,b);}
 function setup(){
  const c=vm.createContext({window:{},console,setTimeout:()=>0,sessionStorage:{getItem:()=>null}});

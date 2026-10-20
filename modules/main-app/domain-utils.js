@@ -15,6 +15,16 @@ function scheduledTournamentStartMs(meta){
   return isNaN(ms)?null:ms;
 }
 
+// Audited legacy test rooms may predate testMode metadata. Match only the
+// immutable room code; names and dates never establish test status.
+const HUNTER_LEGACY_TEST_EVENTS=Object.freeze({'BXH-C6BATA':'double-elimination-review-20261002'});
+function hunterRecordIsTest(record){
+  if(!record)return false;
+  const code=String(record.eventCode||'').trim().toUpperCase();
+  return record.testMode===true||record.eventAuthority==='test'||Object.prototype.hasOwnProperty.call(HUNTER_LEGACY_TEST_EVENTS,code);
+}
+Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{hunterRecordIsTest});
+
 function canonicalPublicTournamentPhase(t){
   if(!t) return "waiting";
   const parsed=t.parsedData||{};
