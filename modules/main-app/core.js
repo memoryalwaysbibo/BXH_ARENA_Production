@@ -5553,6 +5553,7 @@ const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>rend
 function playerVisibleTabs(){return hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:PLAYER_TABS;}
 
 let engagementSnapshot=null;
+let engagementSnapshotFetchedAt=0;
 let engagementSnapshotUid="";
 let engagementLoading=false;
 let engagementError="";
@@ -5574,7 +5575,7 @@ function syncEngagementIdentity(uid){
   const key=uid===undefined ? ((firebaseUser&&firebaseUser.uid)||"") : (uid||"");
   if(key===engagementSessionKey) return;
   engagementSessionKey=key; engagementSessionEpoch++; engagementRequestGeneration++;
-  engagementSnapshot=null; engagementSnapshotUid=""; engagementRequestUid=""; checkinStampAnimationDate="";
+  engagementSnapshot=null; engagementSnapshotFetchedAt=0; engagementSnapshotUid=""; engagementRequestUid=""; checkinStampAnimationDate="";
   engagementError=""; engagementLoading=false; engagementActionBusy=false;
   engagementAdminOverview=null; engagementAdminError=""; engagementDiagnostic=null;
   engagementBackfillCursor=""; engagementBackfillResult=null; engagementBackfillDone=false;
@@ -5654,6 +5655,7 @@ function requestEngagementSnapshot(force=false){
       if(!result || result.ok!==true) throw new Error((result&&result.error)||"snapshot-failed");
       if(requestGeneration!==engagementRequestGeneration || !firebaseUser || firebaseUser.uid!==requestedUid) return;
       engagementSnapshot=result;
+      engagementSnapshotFetchedAt=Date.now();
       engagementSnapshotUid=requestedUid;
       scheduleEngagementDayRefresh(result);
       if(result.profilePatch) userProfile=Object.assign({},userProfile||{},result.profilePatch);
@@ -5670,6 +5672,11 @@ function requestEngagementSnapshot(force=false){
     }
   });
 }
+function refreshVisibleTitleProgress(force=false){
+  if(document.hidden || appPhase!=="player-center" || playerActiveTab!=="profile" || playerProfileSection!=="titles")return;
+  if(!engagementLoading && (force || Date.now()-engagementSnapshotFetchedAt>30000))requestEngagementSnapshot(true);
+}
+document.addEventListener("visibilitychange",()=>refreshVisibleTitleProgress(false));
 const {titleArtworkPath,titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml}=window.BXHTitleUtils;
 function titleChipHtml(name,rarity,extra=''){
   const art=titleArtworkPath(name,rarity);
@@ -5724,6 +5731,9 @@ function titleConditionMeta(t){
     season_completed_tournaments:{category:'official',label:'第一賽季成就',scope:'僅 ARENA 第一賽季（S1）完成結算的 BXH 官方積分賽計入；一般交流賽、測試賽不計入。取得後永久持有。',task:`第一賽季完成 ${target} 場 BXH 官方積分賽`},
     unique_venues:{category:'official',label:'正式場地征戰',scope:'僅完成結算的 BXH 官方積分賽計入；依正式場地識別碼去重，同一場地參賽多次仍只計一處。一般交流賽、測試賽不計入。',task:`在 ${target} 個不同正式場地完成 BXH 官方積分賽`},
     championships:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽冠軍紀錄計入；一般交流賽、測試賽與封測賽事不計入。',task:`累積取得 ${target} 次 BXH 官方積分賽冠軍`},
+    verified_top8_debut:{category:'official',label:'首次八強成就',scope:'每場至少 32 位實際出賽的正式賽事；最終第 1～8 名均符合，取得後永久持有。',task:'首次進入正式賽事八強'},
+    verified_top16_debut:{category:'official',label:'十六強成就',scope:'僅完成結算的正式賽事計入；至少十六位實際出賽，依可信最終名次核對。取得後永久持有。',task:'首次進入正式賽事十六強'},
+    verified_top8_exit_count:{category:'official',label:'八強累積成就',scope:'每場至少 32 位實際出賽；僅最終第 5～8 名計入。累計而非連續，取得後永久持有。',task:`累積 ${target} 次止步八強`},
     best_placement:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽最終名次計入。',task:`BXH 官方積分賽最佳名次達第 ${target} 名或更佳`},
     hosted_tournaments:{category:'event',label:'主辦成就',scope:'依系統認定且完成結算的 BXH 賽事主辦紀錄計入。',task:`成功完成主辦 ${target} 場 BXH 賽事`},
     first_match_exit_streak:{category:'fun',label:'賽事趣味成就',scope:'一般與官方賽事皆計入；首場實際對戰落敗且出局才計次，種子與輪空不算勝場。實際獲勝中斷連續紀錄；取消、未到與未對戰棄權不計次。取得後永久持有。',task:target===1?'完成 1 場賽事首戰出局':`連續 ${target} 場賽事首戰出局`},
@@ -5738,6 +5748,17 @@ function titleConditionMeta(t){
   return map[type]||{category:'special',label:'特殊任務',scope:'依此稱號公告的指定條件判定。',task:(t&&t.description)||'完成指定條件'};
 }
 function titleConditionBadge(t){const m=titleConditionMeta(t);return `<div class="hint" style="margin-top:7px"><b>【${esc(m.label)}】</b> ${esc(m.task)}</div><div class="hint" style="margin-top:3px">計算範圍：${esc(m.scope)}</div>`;}
+function titleGalleryProgressText(t,got){
+  if(got)return '✓ 已取得';
+  const progress=t&&t.progress||null;
+  const current=Math.max(0,Number(progress&&progress.currentValue||0));
+  const target=Math.max(1,Number(t&&t.targetValue||1));
+  if(t&&t.conditionType!=='first_match_exit_streak')return current+'／'+target;
+  if(!progress||!Number(progress.updatedAt))return '連續紀錄尚未核對';
+  const best=Math.max(current,Number(progress.bestValue||0));
+  const checkedAt=new Date(Number(progress.updatedAt)).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'});
+  return '上次核對：連續 '+current+'／'+target+'・歷史最高 '+best+'・'+checkedAt;
+}
 let titleGalleryFilter='all';
 function renderPlayerTitleCenter(p){
   if(engagementTitleDraft) p=Object.assign({},p,engagementTitleDraft);
@@ -5773,7 +5794,7 @@ function renderPlayerTitleCenter(p){
     <div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="player-save-title-settings" ${engagementActionBusy?'disabled':''}>${engagementActionBusy?'儲存中…':'儲存稱號設定'}</button></div>
     ${engagementError?`<div class="hint">${esc(engagementError)}；已確認儲存的設定不受影響。<button class="btn btn-ghost btn-sm" data-action="player-refresh-engagement">重新連線</button></div>`:''}
     <div class="panel-title" style="margin-top:20px;">稱號圖鑑</div>
-    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['fun','趣味成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,titleTierClass(t))?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,titleTierClass(t))}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span>${titleClassificationHtml(t)}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${got?'✓ 已取得':`${current}／${target}`}${t.isActive===false?'・籌備中':''}${titleLimitedTypeValue(t)!=='none'?'・'+titleLimitedLabel(t):''}${t.isPermanent===false?'・期間制':'・永久'}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
+    ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['fun','趣味成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,titleTierClass(t))?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,titleTierClass(t))}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span>${titleClassificationHtml(t)}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${esc(titleGalleryProgressText(t,got))}${t.isActive===false?'・籌備中':''}${titleLimitedTypeValue(t)!=='none'?'・'+titleLimitedLabel(t):''}${t.isPermanent===false?'・期間制':'・永久'}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
   </section>`;
 }
 let communityEventsCache = null;
@@ -13372,7 +13393,7 @@ function renderTitleEditor(inline=false){
  <div class="field"><label>榮譽等級</label><select id="title-editor-rarity-tier">${Object.entries({common:'一般',rare:'稀有',epic:'史詩',legendary:'傳說',eternal:'永恆',...(titleTierValue(d)==='unrated'?{unrated:'待分級（舊制）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleTierValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">決定稱號本身的榮譽層級與視覺規格：一般 → 稀有 → 史詩 → 傳說 → 永恆。</div></div>
  <div class="field"><label>取得標籤</label><select id="title-editor-limited-type">${Object.entries({none:'常態取得',event:'活動限定',season:'賽季限定',identity:'身分限定',unique:'唯一限定',launch:'開服限定',beta:'封測限定',...(titleLimitedTypeValue(d)==='legacy'?{legacy:'限定（舊制待整理）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleLimitedTypeValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">描述「為什麼難以取得」，不影響榮譽等級；唯一限定會自動限制正式持有人數為 1。</div></div>
  <label><input id="title-editor-permanent" type="checkbox" ${d.isPermanent!==false?'checked':''}> 永久持有（取消則標記為期間制）</label>
- <div class="field"><label>達成條件</label><select id="title-editor-condition">${Object.entries({manual:'指定 UID 人工授予',profile_completion:'個人資料完成度達100%',hosted_tournaments:'成功完成主辦場數',completed_tournaments:'正式賽事完成場數',championships:'正式賽事冠軍次數',best_placement:'正式賽事名次不大於',total_checkins:'正式累積簽到天數',checkin_streak:'正式連續簽到天數',...(['first_exit_1','first_exit_3','first_exit_5'].includes(d.titleId)?{first_match_exit_streak:'連續賽事首戰出局場數'}:{}),...(d.titleId==='pioneer'?{pioneer_registration:'開拓者：9/21 23:59 前註冊自動授予'}:{})}).map(([k,v])=>`<option value="${k}" ${d.conditionType===k?'selected':''}>${v}</option>`).join('')}</select></div>
+ <div class="field"><label>達成條件</label><select id="title-editor-condition">${Object.entries({manual:'指定 UID 人工授予',profile_completion:'個人資料完成度達100%',hosted_tournaments:'成功完成主辦場數',completed_tournaments:'正式賽事完成場數',championships:'正式賽事冠軍次數',best_placement:'正式賽事名次不大於',total_checkins:'正式累積簽到天數',checkin_streak:'正式連續簽到天數',...(['first_exit_1','first_exit_3','first_exit_5'].includes(d.titleId)?{first_match_exit_streak:'連續賽事首戰出局場數'}:{}),...(d.titleId==='top8_debut'?{verified_top8_debut:'首次正式賽事八強（至少32位實際出賽）'}:{}),...(d.titleId==='top16_debut'?{verified_top16_debut:'首次正式賽事十六強'}:{}),...(d.titleId==='top8_wall'?{verified_top8_exit_count:'累計五次八強（至少32位實際出賽）'}:{}),...(d.titleId==='pioneer'?{pioneer_registration:'開拓者：9/21 23:59 前註冊自動授予'}:{})}).map(([k,v])=>`<option value="${k}" ${d.conditionType===k?'selected':''}>${v}</option>`).join('')}</select></div>
  <div class="field"><label>門檻數值（人工授予填1，資料完成度填100）</label><input id="title-editor-target" type="number" min="1" max="100000" value="${Number(d.targetValue)||1}"></div>
  <div class="field"><label>說明</label><textarea id="title-editor-description" maxlength="500">${esc(d.description||'')}</textarea></div>
  <label><input id="title-editor-active" type="checkbox" ${d.isActive?'checked':''}>啟用</label>
@@ -20076,6 +20097,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const section=target.getAttribute("data-section");
     if(!['overview','career','basic','titles'].includes(section)) return;
     playerProfileSection=section;
+    if(section==="titles")refreshVisibleTitleProgress(true);
     renderPreservingScroll(); return;
   }
   if(action==="player-center-history-more"){playerCenterHistoryVisibleCount+=10;renderPreservingScroll();return;}
@@ -20530,6 +20552,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(playerActiveTab==="home" && newTab!=="home") findEventsFiltersOpen=false;
     const leavingCheckIn=playerActiveTab==="checkin";
     playerActiveTab = newTab;
+    if(newTab==="profile")refreshVisibleTitleProgress(true);
     render();
     if(newTab==="checkin" || leavingCheckIn) window.scrollTo(0,0);
     return;

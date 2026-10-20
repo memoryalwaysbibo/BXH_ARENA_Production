@@ -91,6 +91,21 @@
     '</div>';
   }
 
+  // Only change the name foreground and subtle glow, never font dimensions or badge artwork.
+  (function installLadderNameRankColors(){
+    if(typeof document==="undefined"||typeof document.getElementById!=="function"||typeof document.createElement!=="function"||!document.head||typeof document.head.appendChild!=="function") return;
+    if(document.getElementById("bxh-ladder-name-rank-colors")) return;
+    var style=document.createElement("style");
+    style.id="bxh-ladder-name-rank-colors";
+    style.textContent=
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-1{color:#f4c85e;text-shadow:0 0 5px rgba(244,200,94,.24)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-2{color:#d6dfe9;text-shadow:0 0 5px rgba(214,223,233,.20)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-3{color:#dca077;text-shadow:0 0 5px rgba(220,160,119,.22)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-4{color:#ee7b80;text-shadow:0 0 5px rgba(238,123,128,.22)}'+
+      '.ladder-rank-row-v2 .ladder-player-link.ladder-name-rank-elite{color:#84c9f0;text-shadow:none}';
+    (document.head||document.documentElement).appendChild(style);
+  })();
+
   function ladderRankingTableHtml(adminMode){
     if(typeof ladderPublicLoaded!=="undefined"&&!ladderPublicLoaded){
       return '<div class="empty-state" role="status">'+escLocal((typeof ladderPublicError!=="undefined"&&ladderPublicError)||"正在讀取天梯資料…")+'</div>';
@@ -133,18 +148,23 @@
         "四強霸主":"assets/title-epic-top4-overlord.webp",
         "冠軍獵人":"assets/title-epic-champion-hunter.webp",
         "百日戰士":"assets/title-epic-hundred-day-warrior.webp",
-        "準時回家":"assets/title-common-home-on-time.svg",
-        "開場即結束":"assets/title-rare-over-at-start.svg",
+        "準時回家":"assets/title-common-home-on-time-v2.webp",
+        "開場即結束":"assets/title-rare-over-at-start-v2.webp",
         "誰能比我慘":"assets/title-epic-unluckiest-heartbreak-v5.webp",
+        "晚點回家":"assets/title-common-home-later-v1.webp",
+        "連勝之刃":"assets/title-rare-winning-blade-kai-v3.webp",
         "勢如破竹":"assets/title-epic-unstoppable-bamboo-v1.webp",
         "不敗傳說":"assets/title-legendary-undefeated-kai-v2.webp",
         "S1 賽季王者":"assets/title-legendary-season-king-s1-kai-v2.webp",
         "S1賽季王者":"assets/title-legendary-season-king-s1-kai-v2.webp",
         "初代戰士":"assets/title-epic-first-generation-warrior-v1.webp",
     "四方征戰":"assets/title-epic-four-venues-v1.webp",
+        "八強逐鹿":"assets/title-rare-top8-zhulu-v1.webp",
+        "初入鋒芒":"assets/title-rare-top16-first-edge-v2.webp",
+        "八強壁壘":"assets/title-epic-top8-bastion-v2.webp",
     "初次開局":"assets/title-rare-first-match.webp",
-        "整裝待發":"assets/title-common-ready.svg",
-        "初次上陣":"assets/title-common-debut.svg",
+        "整裝待發":"assets/title-common-ready-zhulu-v2.webp",
+        "初次上陣":"assets/title-common-debut-zhulu-v2.webp",
         "對戰召集人":"assets/title-rare-host-3.webp",
         "賽事推手":"assets/title-rare-host-10.webp",
         "資深主辦":"assets/title-rare-host-20.webp",
@@ -163,7 +183,7 @@
       return '<article class="ladder-rank-grid ladder-rank-row-v2'+topClass+'"'+(p.uid===myUid?' id="ladder-my-row"':'')+'>'+
         '<div class="ladder-rank-position">NO.'+rank+'</div>'+
         '<div class="ladder-player-block">'+
-          '<button class="ladder-player-link" data-action="card-open" data-uid="'+escLocal(p.uid||"")+'" title="'+escLocal(p.playerName||p.publicName||"—")+'">'+escLocal(p.playerName||p.publicName||"—")+'</button>'+
+          '<button class="ladder-player-link'+(rank===1?' ladder-name-rank-1':rank===2?' ladder-name-rank-2':rank===3?' ladder-name-rank-3':rank===4?' ladder-name-rank-4':rank>=5&&rank<=10?' ladder-name-rank-elite':'')+'" data-action="card-open" data-uid="'+escLocal(p.uid||"")+'" title="'+escLocal(p.playerName||p.publicName||"—")+'">'+escLocal(p.playerName||p.publicName||"—")+'</button>'+
           title+
         '</div>'+
         '<div class="ladder-tier-cell">'+ladderTierEmblemHtml(p)+'</div>'+
