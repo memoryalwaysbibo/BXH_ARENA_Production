@@ -354,6 +354,22 @@
       });
     },
 
+    // Explicit status API for PWA recovery screens. Unlike getUserProfile(),
+    // this never confuses an unreadable document with an absent document.
+    async getUserProfileStatus(uid){
+      if(!authReady) return {status:"auth_not_ready"};
+      if(!uid || authHandle?.currentUser?.uid!==uid) return {status:"auth_mismatch"};
+      try{
+        const snap=await fx.getDocFromServer(fx.doc(dbHandle, USERS_COLLECTION, uid));
+        if(!snap.exists()) return {status:"not_found"};
+        const profile=snap.data();
+        googleLinkProfileCache.set(uid,{profile,loadedAt:Date.now()});
+        return {status:"found",profile};
+      }catch(e){
+        return {status:e?.code==="permission-denied"?"permission_denied":"read_failed",code:String(e?.code||"unknown")};
+      }
+    },
+
     async getUserProfile(uid){
       if(!authReady || !uid) return null;
       try{
