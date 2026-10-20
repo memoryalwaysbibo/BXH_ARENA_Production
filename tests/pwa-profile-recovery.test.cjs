@@ -28,4 +28,7 @@ assert.match(core, /data-action="player-profile-retry"/, 'Blocked profile screen
 assert.match(core, /data-action="player-logout"/, 'Blocked profile screen needs sign-out control');
 assert.match(core, /if\(action==="player-profile-retry"\)/, 'Retry handler must exist');
 assert.match(core, /getUserProfileStatus\(pending\.uid\)/, 'Retry must query authoritative profile status');
+assert.match(core, /const status=await window\.cloudAuth\.getUserProfileStatus\(pending\.uid\)/, 'Submit must check authoritative status');
+assert.match(core, /status\.status==="found" && !isExistingAccount/, 'Existing accounts must not enter new account creation');
+assert.match(core, /status\.status!=="found" && status\.status!=="not_found"/, 'Failed status must block writes');
 console.log('PASS PWA profile read and onboarding safeguards (static regression)');
