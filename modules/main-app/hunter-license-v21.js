@@ -108,17 +108,31 @@ function overview(records,_analyze,complete=true){
     highestStatus:complete?'replayed-not-persisted':'incomplete',excluded:all.length-rows.length,
     versions:{xp:growth.version,strength:analysis.version,grade:VERSION},candidate:{status:'future-only',strength:null,grade:null,connected:false}};
 }
-function renderOverview(o,esc){
+function verifiedSnapshot(value){
+  if(!value||value.version!==VERSION||!['awarded','unchanged','needs_review','blocked_incomplete_history'].includes(value.status)||
+     typeof value.awarded!=='boolean'||(value.highestTier!==null&&rank(value.highestTier)<0))return null;
+  if(value.status==='awarded'&&(!value.awarded||!value.highestTier))return null;
+  const c=value.current;
+  if(c!==null&&(!c||(!['ungraded',...RULES.map(r=>r.tier)].includes(c.tier))||
+     !Number.isFinite(c.score)||c.score<0||c.score>100||!Number.isFinite(c.strength)||c.strength<0||c.strength>100||
+     !Number.isSafeInteger(c.matches)||c.matches<0||c.matches>WINDOW))return null;
+  if(value.status==='blocked_incomplete_history'&&c!==null)return null;
+  return {status:value.status,highestTier:value.highestTier,awarded:value.awarded,current:c};
+}
+function renderOverview(o,esc,snapshot){
+  const persisted=verifiedSnapshot(snapshot),current=persisted?.current;
+  const currentLabel=current?(RULES.find(r=>r.tier===current.tier)?.label||'未分級'):o.grade.label;
+  const highestLabel=persisted?.highestTier?RULES.find(r=>r.tier===persisted.highestTier)?.label:o.highest.label;
   const number=n=>n==null?'—':Number.isInteger(n)?String(n):(Math.floor(n*10)/10).toFixed(1);
   const table=RULES.map(r=>'<tr>'+[r.label,r.score,r.ability,r.matches,r.events,r.opponents,r.medium,r.large].map(v=>'<td>'+esc(String(v))+'</td>').join('')+'</tr>').join('');
-  return '<details class="hunter-grade-detail"><summary><b>獵人執照 2.1｜階級判定</b><strong>'+number(o.grade.score)+'</strong></summary><div class="hunter-grade-detail-content">'+
-    '<p>最近 '+o.analysis.matches+' 場實力 '+number(o.analysis.overall)+' ＋ 歷練加成 '+number(o.grade.bonus)+' ＝ 評級分 '+number(o.grade.score)+'</p>'+
-    '<p>目前：'+esc(o.grade.label)+'｜生涯最高（歷史回算）：'+esc(o.highest.label)+'</p>'+
+  return '<details class="hunter-grade-detail"><summary><b>獵人執照 2.1｜階級判定</b><strong>'+number(current?.score??o.grade.score)+'</strong></summary><div class="hunter-grade-detail-content">'+
+    '<p>最近 '+(current?.matches??o.analysis.matches)+' 場實力 '+number(current?.strength??o.analysis.overall)+' ＋ 歷練加成 '+number(o.grade.bonus)+' ＝ 評級分 '+number(current?.score??o.grade.score)+'</p>'+
+    '<p>目前：'+esc(currentLabel)+'｜生涯最高（'+(persisted?.highestTier?'永久授予':'歷史回算')+'）：'+esc(highestLabel)+'</p>'+
     '<small>實力分採最近 20 場有效對戰：勝率 ×60%＋得分占比 ×40%；不足 20 場採現有場次。各項百分比與實力分沿用整數四捨五入；判級使用未四捨五入的歷練加成。歷練加成依賽事 LV，最高 +15，不含練習 XP。換季與休息不扣分。</small>'+
     (!o.complete?'<p>部分資料缺失，暫停階級判定與升級差距。</p>':o.next?'<div class="hunter-grade-next"><b>下一階級：'+esc(o.next.label)+'</b><ul>'+o.gates.map(g=>'<li><span>'+esc(g.label)+'</span><strong>'+number(g.current)+' / '+g.target+'</strong><small>'+(g.met?'已達標':g.remaining==null?'尚未出分':'還差 '+number(g.remaining))+'</small></li>').join('')+'</ul></div>':'<p>目前已達最高階級。</p>')+
     '<div class="hunter-v21-table"><table><thead><tr>'+['階級','評級分','最低實力','對戰','賽事','對手','中型','大型'].map(s=>'<th>'+s+'</th>').join('')+'</tr></thead><tbody>'+table+'</tbody></table></div>'+
     '<small>各項條件需同時達標；生涯歷練跨季累積。中型 96–127 人、大型 128 人以上，兩者分開計算；不同對手只計已核對的唯一身分。有效回合保留統計，不另作晉級門檻。</small>'+
-    '<p class="hint">賽事規模待核對 '+o.life.unknownSizes+' 次；對手身分待核對 '+o.life.unresolvedOpponents+' 場。只採 2026/10/1 起正式個人賽可信對戰，其他紀錄仍保留。生涯最高目前為新版歷史回算，尚未寫入永久授予紀錄。</p></div></details>';
+    '<p class="hint">賽事規模待核對 '+o.life.unknownSizes+' 次；對手身分待核對 '+o.life.unresolvedOpponents+' 場。只採 2026/10/1 起正式個人賽可信對戰，其他紀錄仍保留。'+(persisted?.highestTier?'最高階級已由後端核對並保存。':'生涯最高目前為新版歷史回算，尚未寫入永久授予紀錄。')+'</p></div></details>';
 }
-window.BXHHunterLicenseV21=Object.freeze({version:VERSION,rules,overview,strength,experience,ordered,gradeOf,renderOverview});
+window.BXHHunterLicenseV21=Object.freeze({version:VERSION,rules,overview,strength,experience,ordered,gradeOf,renderOverview,verifiedSnapshot});
 })();
