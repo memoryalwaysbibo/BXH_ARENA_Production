@@ -24,7 +24,11 @@ const expectedArtwork = {
   '諸神收藏家': 'assets/title-limited-gods-collector.webp',
   'S2總冠軍': 'assets/title-limited-s2-champion.webp',
   'S3總冠軍': 'assets/title-limited-s3-champion.webp',
-  '三冠王': 'assets/title-legendary-triple-crown.webp',
+  '新銳獵人': 'assets/title-common-rookie-hunter-v1.webp',
+  '戰場熟面孔': 'assets/title-rare-familiar-face-v1.webp',
+  '三冠王': 'assets/title-legendary-triple-crown-v2.webp',
+  '初來乍到': 'assets/title-common-first-checkin-v1.webp',
+  '七日常客': 'assets/title-common-seven-day-guest-v1.webp',
   '二當家': 'assets/title-limited-co-leader.webp',
   '三當家': 'assets/title-limited-third-leader.webp',
   'BXH 工作人員': 'assets/title-limited-bxh-staff.webp',
@@ -34,13 +38,20 @@ const expectedArtwork = {
   '冠軍獵人': 'assets/title-epic-champion-hunter.webp',
   '百日戰士': 'assets/title-epic-hundred-day-warrior.webp',
   '初次開局': 'assets/title-rare-first-match.webp',
-  '整裝待發': 'assets/title-common-ready.svg',
-  '初次上陣': 'assets/title-common-debut.svg',
+  '整裝待發': 'assets/title-common-ready-zhulu-v2.webp',
+  '初次上陣': 'assets/title-common-debut-zhulu-v2.webp',
   '對戰召集人': 'assets/title-rare-host-3.webp',
   '賽事推手': 'assets/title-rare-host-10.webp',
   '資深主辦': 'assets/title-rare-host-20.webp',
   '競技場主': 'assets/title-rare-host-30.webp',
 };
+for (const name of ['新銳獵人','戰場熟面孔','三冠王','初來乍到','七日常客']) {
+  const webp = expectedArtwork[name];
+  const png = webp.slice(0, -5) + '.png';
+  assert(fs.existsSync(path.join(root, webp)), name + ' WebP missing');
+  assert(fs.existsSync(path.join(root, png)), name + ' PNG fallback missing');
+  assert(ladder.includes('"' + name + '":"' + webp + '"'), name + ' ladder artwork mapping missing');
+}
 for (const [name, expected] of Object.entries(expectedArtwork)) {
   assert.equal(artworkPath(name), expected, `Artwork mapping changed for ${name}`);
 }
