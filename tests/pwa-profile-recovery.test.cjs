@@ -31,4 +31,5 @@ assert.match(core, /getUserProfileStatus\(pending\.uid\)/, 'Retry must query aut
 assert.match(core, /const status=await window\.cloudAuth\.getUserProfileStatus\(pending\.uid\)/, 'Submit must check authoritative status');
 assert.match(core, /status\.status==="found" && !isExistingAccount/, 'Existing accounts must not enter new account creation');
 assert.match(core, /status\.status!=="found" && status\.status!=="not_found"/, 'Failed status must block writes');
+assert.match(core, /status\.status==="not_found" && isExistingAccount/, 'Existing account completion must reject missing server profile');
 console.log('PASS PWA profile read and onboarding safeguards (static regression)');
