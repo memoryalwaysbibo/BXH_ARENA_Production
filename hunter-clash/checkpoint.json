@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "stage": "HC-00",
+  "status": "IN_PROGRESS",
+  "frontendBaseCommit": "2974f7461e64db5e4a188cff635fa6c9e21f3906",
+  "backendHistoricalReference": "7c7d110ba3d57647db7b6037e1ed8616caa1c5e0",
+  "backendReferenceIsLiveVerified": false,
+  "entryWired": false,
+  "deployed": false,
+  "evidence": {
+    "sourcePinned": "PASS",
+    "backendAuthorization": "NOT RUN",
+    "sandboxIsolation": "NOT RUN",
+    "idempotentSettlement": "NOT RUN",
+    "concurrentSubmission": "NOT RUN",
+    "legacyRegression": "PASS",
+    "internalBeta": "NOT RUN"
+  },
+  "next": [
+    "Obtain trusted deployed source package or immutable source manifest for the 35 currently observed Functions builds; Cloud Build sourceProvenance supplied no resolved commits or source hashes",
+    "Verify production signature/revocation, IAM and App Check when isolated deployed runtime is available",
+    "Verify the dedicated bxh-hc-test Firebase project, then configure minimum-permission deployment and run supervised staff internal beta"
+  ],
+  "backendCandidateCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
+  "backendCandidateValidation": {
+    "runId": 36668868791,
+    "conclusion": "success",
+    "rulesDeployment": "skipped",
+    "functionsDeployment": "skipped",
+    "provesDeployment": false
+  },
+  "lastLocalVerification": {
+    "tests": 81,
+    "result": "PASS",
+    "scope": "43 contracts/transport/isolation/cloud-test-bundle/runtime-audit/rules-comparison/legacy regressions plus 38 demo service, Auth, Rules, browser and lab fixture tests; no production deployment"
+  },
+  "partialEvidence": {
+    "isolatedFirestoreRules": "PASS",
+    "trustedFunctionsAuthorization": "PASS (demo Functions only)",
+    "serverTransactionConcurrency": "PASS (demo only)",
+    "runtimeProvenance": "PARTIAL (latest live inventory, unchanged matched Rules content and Cloud Build metadata; deployed Functions source identity unverified)",
+    "sandboxTokenAuthorization": "PASS",
+    "sandboxRequestReplay": "PASS",
+    "sandboxConcurrentSubmission": "PASS",
+    "sandboxIdempotentSettlement": "PASS",
+    "sandboxAtomicRollback": "PASS",
+    "sandboxCertificationWorkflow": "PASS",
+    "sandboxManualRiskReview": "PASS",
+    "sandboxSubmitThroughSettlement": "PASS",
+    "sandboxCallableTransport": "PASS",
+    "sandboxClientSDKFlow": "PASS",
+    "sandboxFunctionsDeploymentGuard": "PASS",
+    "sandboxInternalUi": "PASS",
+    "sandboxBrowserWorkflow": "PASS",
+    "sandboxLostResponseReplay": "PASS",
+    "sandboxMobileLayout": "PASS",
+    "supervisedStaffInternalBeta": "NOT RUN",
+    "sandboxManualLabSeed": "PASS",
+    "sandboxSeedRollback": "PASS",
+    "sandboxManualLabStartup": "PASS",
+    "readOnlyRuntimeAuditCollector": "PASS (7 synthetic-response tests; real inventory collected in runs 36696307510 and 36756766360)",
+    "pinnedRulesSourceHash": "PASS (candidate source blob and repository SHA-256 manifest agree; not deployment evidence)",
+    "runtimeRulesComparisonTool": "PASS (7 synthetic-report tests; original candidate live comparison MISMATCH)",
+    "cloudMetadataReadAuthorization": "PASS (existing OIDC, Functions list and Rules get only)",
+    "liveRulesSourceContent": "PASS (snapshot content matches repository blob; not complete deployment provenance)",
+    "cloudBuildMetadataReadAuthorization": "PASS (35 fixed-project Cloud Build GETs; no IAM change)"
+    ,"cloudTestCandidateBundle": "PASS (deterministic candidate bundle only; no project, IAM or deployment)"
+  },
+  "emulator": {
+    "projectId": "demo-hunter-clash",
+    "host": "127.0.0.1:8180",
+    "rulesAreProduction": false,
+    "javaVersion": 21,
+    "authHost": "127.0.0.1:9098",
+    "functionsHost": "127.0.0.1:5003"
+  },
+  "sandboxUiWired": true,
+  "deploymentAuditFile": "deployment-audit.json",
+  "blockingDependencies": [
+    "Complete Functions build-to-source and unique deployment provenance reconciliation pending",
+    "Dedicated isolated Firebase test project not configured",
+    "Supervised staff internal beta not executed"
+  ],
+  "runtimeAuditCollector": {
+    "file": "runtime-audit.cjs",
+    "instructions": "RUNTIME_AUDIT.md",
+    "liveCollection": "COLLECTED",
+    "blocker": "Cloud Build GETs completed, but resolved source commit/hash fields absent; trusted deployment source evidence still needed",
+    "updatesReleaseGate": false
+  },
+  "architectureStatusFile": "ARCHITECTURE_STATUS.md",
+  "rulesSourceReferenceFile": "rules-source-reference.json",
+  "runtimeRulesComparison": {
+    "file": "compare-runtime-rules.cjs",
+    "liveComparison": "MISMATCH (original candidate)",
+    "provesFunctionsDeployment": false,
+    "updatesReleaseGate": false,
+    "observedSourceContent": "CONTENT_MATCH at ed1fc0d2befd6b9becae3a1e759e887f2645342b; deployment origin not established"
+  },
+  "readOnlyCloudAuditWorkflow": {
+    "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+    "url": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/pull/88",
+    "branch": "feature/hc00-readonly-runtime-audit-20260930",
+    "sourceCommit": "e7fdde4fb843e93fb152b944e31f78288e9e72fa",
+    "status": "MERGED_AND_EXECUTED",
+    "localToolAndWorkflowTests": 18,
+    "pullRequestValidationRun": 36694116617,
+    "pushValidationRun": 36694113335,
+    "cloudInventoryExecuted": true,
+    "note": "User authorized merge and one read-only dispatch. OIDC and API collection succeeded; job failed closed because candidate Rules differ from live Rules.",
+    "mergedPR": 88,
+    "mergeCommit": "036369e2430f60ea7cab55bcfb514f9df7f5734b",
+    "liveRunId": 36696307510,
+    "liveRunConclusion": "failure",
+    "collectionStatus": "COLLECTED",
+    "candidateRulesComparison": "MISMATCH"
+  },
+  "liveAuditDirectory": "audit/20260930-36696307510",
+  "readOnlyBuildSourceAudit": {
+    "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+    "url": "https://github.com/memoryalwaysbibo/BXH_ARENA_Functions_Production/pull/89",
+    "status": "MERGED_AND_EXECUTED",
+    "mergeCommit": "e20fa91c661f28bb6cc303a748e85c2b2337c7cc",
+    "liveRunId": 36756766360,
+    "liveRunConclusion": "failure",
+    "localAndCIToolTests": 27,
+    "collectionStatus": "COLLECTED",
+    "functions": 98,
+    "builds": 35,
+    "resolvedCommits": 0,
+    "sourceHashes": 0,
+    "sourceReconciled": false,
+    "candidateRulesComparison": "MISMATCH",
+    "updatesReleaseGate": false
+  },
+  "latestLiveAuditDirectory": "audit/20260930-36756766360"
+  ,"cloudTestBundle": {
+    "builder": "prepare-cloud-test-bundle.cjs",
+    "projectId": "bxh-hc-test",
+    "region": "asia-east1",
+    "codebase": "hc-isolated-test",
+    "functionTarget": "hcSandboxCommand",
+    "appCheckEnforced": true,
+    "privateInvoker": true,
+    "productionDataAllowed": false,
+    "publicEntryEnabled": false,
+    "deploymentAuthorized": false,
+    "status": "PROJECT_CREATED_AWAITING_ACCESS_CONFIGURATION",
+    "validationCommit": "7e1850879eb846f61226300f4c5f8cf07eea833f",
+    "foundationPullRequestRun": 36906438694,
+    "productionFrontendRun": 36906438766
+  }
+}

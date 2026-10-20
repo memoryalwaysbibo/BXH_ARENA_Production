@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+  "projectId": "bxh-arena",
+  "sourceCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
+  "sourceStatus": "CANDIDATE_ONLY",
+  "releaseNames": [
+    "projects/bxh-arena/releases/cloud.firestore",
+    "projects/bxh-arena/releases/cloud.firestore/(default)"
+  ],
+  "files": [
+    {
+      "name": "firestore.rules",
+      "bytes": 68657,
+      "sha256": "eadd1d81f9dc7dea3a39c52704d3b4e037bc719fc61beb11c30e15919c4b4597",
+      "gitBlob": "657f89b3397d509103f2a0e745b6409e61d32c19"
+    }
+  ],
+  "verification": "Fetched at sourceCommit; Git blob SHA-1 and FIRESTORE_RULES_SOURCE.sha256 both matched. This does not establish deployment."
+}

@@ -1,0 +1,641 @@
+{
+  "schemaVersion": 1,
+  "kind": "READ_ONLY_BUILD_SOURCE_METADATA",
+  "projectId": "bxh-arena",
+  "readOnly": true,
+  "startedAt": "2026-09-30T18:12:03.124Z",
+  "completedAt": "2026-09-30T18:12:39.752Z",
+  "inventorySha256": "30f17151873d9804f25e76c747a1fdc25962455e3e8bc7fe702cc4833f1b799a",
+  "inventoryStartedAt": "2026-09-30T18:12:00.880Z",
+  "inventoryCompletedAt": "2026-09-30T18:12:02.322Z",
+  "buildCount": 35,
+  "functionCount": 98,
+  "collectionStatus": "COLLECTED",
+  "runtimeReconciled": false,
+  "hcDeploymentVerified": false,
+  "records": [
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/080923c1-d2fa-4e0c-ab5d-62fd7b15667f",
+      "id": "080923c1-d2fa-4e0c-ab5d-62fd7b15667f",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T19:09:01.080233221Z",
+      "startTime": "2026-09-27T19:09:02.309238893Z",
+      "finishTime": "2026-09-27T19:09:26.139614Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/onPioneerRegistrationWritten"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/0be7a6c8-628c-41f9-a8db-052eb5f9c9ab",
+      "id": "0be7a6c8-628c-41f9-a8db-052eb5f9c9ab",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T06:52:44.094301847Z",
+      "startTime": "2026-09-27T06:52:45.334384946Z",
+      "finishTime": "2026-09-27T06:53:19.104401Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/parseTournamentPosterV1"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/0dc1082b-7c00-43ae-aaaa-d08088b24892",
+      "id": "0dc1082b-7c00-43ae-aaaa-d08088b24892",
+      "status": "SUCCESS",
+      "createTime": "2026-09-25T06:47:00.911577799Z",
+      "startTime": "2026-09-25T06:47:02.313558585Z",
+      "finishTime": "2026-09-25T06:47:39.808630Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/memberRaffle",
+        "projects/bxh-arena/locations/asia-east1/functions/runMemberRaffles"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/1b476204-3770-41de-bfca-2ad7848f6697",
+      "id": "1b476204-3770-41de-bfca-2ad7848f6697",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T15:07:41.632674688Z",
+      "startTime": "2026-09-27T15:07:42.903593788Z",
+      "finishTime": "2026-09-27T15:08:21.525293Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/inventoryCatalog"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/2a11b4d2-69f3-4988-b71f-ae1ee92ee7e0",
+      "id": "2a11b4d2-69f3-4988-b71f-ae1ee92ee7e0",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:50:06.839374493Z",
+      "startTime": "2026-09-29T17:50:08.061441084Z",
+      "finishTime": "2026-09-29T17:50:37.527164Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/mailboxAttachmentService"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/3ac354eb-f1d5-49c5-a1d5-83e2c3de5058",
+      "id": "3ac354eb-f1d5-49c5-a1d5-83e2c3de5058",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T14:28:46.181933348Z",
+      "startTime": "2026-09-29T14:28:47.583455752Z",
+      "finishTime": "2026-09-29T14:29:26.638660Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/enchantmentService"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/431b46a2-7010-49e6-a26f-1b868085d98c",
+      "id": "431b46a2-7010-49e6-a26f-1b868085d98c",
+      "status": "SUCCESS",
+      "createTime": "2026-09-22T06:55:00.849316786Z",
+      "startTime": "2026-09-22T06:55:02.307775134Z",
+      "finishTime": "2026-09-22T06:55:39.991546Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/activityInactivityPenalty"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/43847d12-d980-4293-86db-fa3166e5bd10",
+      "id": "43847d12-d980-4293-86db-fa3166e5bd10",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T18:36:05.734186547Z",
+      "startTime": "2026-09-27T18:36:06.983084875Z",
+      "finishTime": "2026-09-27T18:36:33.161093Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/activityCompletedTournamentBackfill",
+        "projects/bxh-arena/locations/asia-east1/functions/activityOnlinePresenceWritten",
+        "projects/bxh-arena/locations/asia-east1/functions/activityPoints",
+        "projects/bxh-arena/locations/asia-east1/functions/activityTournamentCompleted"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/46db043e-4af9-40c5-87cd-e0041b54703d",
+      "id": "46db043e-4af9-40c5-87cd-e0041b54703d",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:05:42.276120652Z",
+      "startTime": "2026-09-29T17:05:43.646067547Z",
+      "finishTime": "2026-09-29T17:06:11.700847Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/updateTitleDefinition"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/4bf03ee3-7311-4dd9-8fc4-eda66c5af65e",
+      "id": "4bf03ee3-7311-4dd9-8fc4-eda66c5af65e",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:50.589240699Z",
+      "startTime": "2026-09-29T17:49:51.825891382Z",
+      "finishTime": "2026-09-29T17:50:13.372598Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/moodStation"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/5079caa6-c65c-4034-92c3-562ed9f93d53",
+      "id": "5079caa6-c65c-4034-92c3-562ed9f93d53",
+      "status": "SUCCESS",
+      "createTime": "2026-09-28T07:30:46.550512908Z",
+      "startTime": "2026-09-28T07:30:47.885877407Z",
+      "finishTime": "2026-09-28T07:31:26.439949Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/familyTransfer"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/5674dba5-7f49-4dbf-8534-7ed4aa2b0853",
+      "id": "5674dba5-7f49-4dbf-8534-7ed4aa2b0853",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:54.022154446Z",
+      "startTime": "2026-09-29T17:49:55.335625586Z",
+      "finishTime": "2026-09-29T17:50:22.569650Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/familyRegistration",
+        "projects/bxh-arena/locations/asia-east1/functions/lotteryRegistration",
+        "projects/bxh-arena/locations/asia-east1/functions/roomAccess"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/5a852d76-7fbd-4952-b654-2ffe43327677",
+      "id": "5a852d76-7fbd-4952-b654-2ffe43327677",
+      "status": "SUCCESS",
+      "createTime": "2026-09-30T01:14:23.826283412Z",
+      "startTime": "2026-09-30T01:14:25.134124421Z",
+      "finishTime": "2026-09-30T01:14:59.496511Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/cardAlbumBackfill",
+        "projects/bxh-arena/locations/asia-east1/functions/cardAlbumEventAward",
+        "projects/bxh-arena/locations/asia-east1/functions/cardAlbumService",
+        "projects/bxh-arena/locations/asia-east1/functions/cardAlbumStaffAward"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/710881b1-7661-4a5e-ab61-c77efc42ba40",
+      "id": "710881b1-7661-4a5e-ab61-c77efc42ba40",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:45.862038820Z",
+      "startTime": "2026-09-29T17:49:47.229992429Z",
+      "finishTime": "2026-09-29T17:50:18.259269Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/eventStaffService"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/7ee9a7ee-af86-4949-8275-6019dce2bdf6",
+      "id": "7ee9a7ee-af86-4949-8275-6019dce2bdf6",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T15:51:07.817551950Z",
+      "startTime": "2026-09-27T15:51:09.043762908Z",
+      "finishTime": "2026-09-27T15:51:41.660354Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/backfillRegistrationRoster",
+        "projects/bxh-arena/locations/asia-east1/functions/syncRegistrationRoster"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/7effa893-0c92-43b6-9372-c5d881236188",
+      "id": "7effa893-0c92-43b6-9372-c5d881236188",
+      "status": "SUCCESS",
+      "createTime": "2026-09-21T12:08:46.156637984Z",
+      "startTime": "2026-09-21T12:08:47.451028Z",
+      "finishTime": "2026-09-21T12:09:29.754606Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/rolloverLadderSeasonAtCutover"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/8f29cf41-fbc9-4a80-92bc-09f083336d9f",
+      "id": "8f29cf41-fbc9-4a80-92bc-09f083336d9f",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T01:03:12.030922055Z",
+      "startTime": "2026-09-29T01:03:13.295123669Z",
+      "finishTime": "2026-09-29T01:03:48.426006Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/makeupCheckIn"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/901cf522-6fd3-4f47-8ba0-4035efe274f2",
+      "id": "901cf522-6fd3-4f47-8ba0-4035efe274f2",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T05:57:50.333679039Z",
+      "startTime": "2026-09-27T05:57:51.532975022Z",
+      "finishTime": "2026-09-27T05:58:28.612640Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/closeIdleTournaments",
+        "projects/bxh-arena/locations/asia-east1/functions/drawTournamentRaffle",
+        "projects/bxh-arena/locations/asia-east1/functions/getTournamentOperations",
+        "projects/bxh-arena/locations/asia-east1/functions/previewTournamentRaffle",
+        "projects/bxh-arena/locations/asia-east1/functions/restoreIdleTournament",
+        "projects/bxh-arena/locations/asia-east1/functions/setTournamentOperations",
+        "projects/bxh-arena/locations/asia-east1/functions/trackTournamentActivity",
+        "projects/bxh-arena/locations/asia-east1/functions/trackTournamentRegistrationActivity",
+        "projects/bxh-arena/locations/asia-east1/functions/updateTournamentRaffleWinner"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/9084fc1e-663e-4dde-b14a-d5530bdb522b",
+      "id": "9084fc1e-663e-4dde-b14a-d5530bdb522b",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T15:51:20.280361676Z",
+      "startTime": "2026-09-27T15:51:21.566841956Z",
+      "finishTime": "2026-09-27T15:51:58.341006Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/changeManagedAccounts"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+      "id": "a38b0b47-88f0-4aa4-9a75-725e4bbffccc",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:50:06.968377670Z",
+      "startTime": "2026-09-29T17:50:08.210096469Z",
+      "finishTime": "2026-09-29T17:50:35.775683Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/activatePartnerContract",
+        "projects/bxh-arena/locations/asia-east1/functions/createPartnerContractDraft",
+        "projects/bxh-arena/locations/asia-east1/functions/getPartnerContract",
+        "projects/bxh-arena/locations/asia-east1/functions/listPartnerContracts",
+        "projects/bxh-arena/locations/asia-east1/functions/listPartnerPlans",
+        "projects/bxh-arena/locations/asia-east1/functions/mailboxService",
+        "projects/bxh-arena/locations/asia-east1/functions/savePartnerPlan",
+        "projects/bxh-arena/locations/asia-east1/functions/sendPartnerContract",
+        "projects/bxh-arena/locations/asia-east1/functions/signPartnerContract"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/a99b5e26-3e11-4f93-b7ac-bd3690542d36",
+      "id": "a99b5e26-3e11-4f93-b7ac-bd3690542d36",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:53.313698455Z",
+      "startTime": "2026-09-29T17:49:54.564882537Z",
+      "finishTime": "2026-09-29T17:50:25.702387Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/dailyCheckIn",
+        "projects/bxh-arena/locations/asia-east1/functions/inventoryService",
+        "projects/bxh-arena/locations/asia-east1/functions/rewardRulesService"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/b504acac-946b-42f1-a7f2-9dc144dc089e",
+      "id": "b504acac-946b-42f1-a7f2-9dc144dc089e",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:03.740653946Z",
+      "startTime": "2026-09-29T17:49:05.385124682Z",
+      "finishTime": "2026-09-29T17:49:35.188977Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/beforeGoogleAuthUserCreated"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/baf6954f-91f1-4dd3-bd68-e1de802e2a4c",
+      "id": "baf6954f-91f1-4dd3-bd68-e1de802e2a4c",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:43.670386502Z",
+      "startTime": "2026-09-29T17:49:44.971730790Z",
+      "finishTime": "2026-09-29T17:50:21.896102Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/onProfileCompletionWritten",
+        "projects/bxh-arena/locations/asia-east1/functions/pioneerDefinitionMaintenance",
+        "projects/bxh-arena/locations/asia-east1/functions/seedInitialTitles",
+        "projects/bxh-arena/locations/asia-east1/functions/titleClassificationV2Maintenance"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/c8535a26-baea-4c6b-b149-6dad786e0ac0",
+      "id": "c8535a26-baea-4c6b-b149-6dad786e0ac0",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:39.279874845Z",
+      "startTime": "2026-09-29T17:49:40.459295010Z",
+      "finishTime": "2026-09-29T17:50:01.718988Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/roomPosterCoverCleanup"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/c86cac87-f07b-4437-b1a1-0c18e7bb8e8b",
+      "id": "c86cac87-f07b-4437-b1a1-0c18e7bb8e8b",
+      "status": "SUCCESS",
+      "createTime": "2026-09-26T05:29:16.636102797Z",
+      "startTime": "2026-09-26T05:29:17.883215586Z",
+      "finishTime": "2026-09-26T05:30:04.295068Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/courtCallPushService",
+        "projects/bxh-arena/locations/asia-east1/functions/courtCallService"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/caf55454-3f42-42cb-bcce-365a97df8b92",
+      "id": "caf55454-3f42-42cb-bcce-365a97df8b92",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:38.526097846Z",
+      "startTime": "2026-09-29T17:49:39.801343310Z",
+      "finishTime": "2026-09-29T17:50:07.285619Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/roomPosterCover"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+      "id": "cfef50ce-83cd-4ea3-8375-d9f50b0f8117",
+      "status": "SUCCESS",
+      "createTime": "2026-09-19T14:23:05.491214046Z",
+      "startTime": "2026-09-19T14:23:06.935546334Z",
+      "finishTime": "2026-09-19T14:23:47.059114Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/deleteTitleDefinition",
+        "projects/bxh-arena/locations/asia-east1/functions/familyPlayers",
+        "projects/bxh-arena/locations/asia-east1/functions/getEngagementHealth",
+        "projects/bxh-arena/locations/asia-east1/functions/manageEntrySelection",
+        "projects/bxh-arena/locations/asia-east1/functions/manageRegistrationSelection",
+        "projects/bxh-arena/locations/asia-east1/functions/onlinePresence",
+        "projects/bxh-arena/locations/asia-east1/functions/registrationInvitations",
+        "projects/bxh-arena/locations/asia-east1/functions/revokeTitle",
+        "projects/bxh-arena/locations/asia-east1/functions/saveEngagementSettings",
+        "projects/bxh-arena/locations/asia-east1/functions/syncPlayerDirectory"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+      "id": "d30c38d1-b2d4-4e9f-9514-ce517fd6bbd9",
+      "status": "SUCCESS",
+      "createTime": "2026-09-27T19:26:37.787349551Z",
+      "startTime": "2026-09-27T19:26:38.926490092Z",
+      "finishTime": "2026-09-27T19:27:19.161772Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/awardHostingTitles",
+        "projects/bxh-arena/locations/asia-east1/functions/preserveCompletedRoomAndCountHost",
+        "projects/bxh-arena/locations/asia-east1/functions/preserveExistingCompletedRooms",
+        "projects/bxh-arena/locations/asia-east1/functions/runTitleBackfill",
+        "projects/bxh-arena/locations/asia-east1/functions/syncMyHostingProgress",
+        "projects/bxh-arena/locations/asia-east1/functions/titleParticipationBackfill",
+        "projects/bxh-arena/locations/asia-east1/functions/titleProgressMaintenance"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/d7b1f351-6187-4b4f-ae50-9c6e9a68feea",
+      "id": "d7b1f351-6187-4b4f-ae50-9c6e9a68feea",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:47.453075573Z",
+      "startTime": "2026-09-29T17:49:48.759626871Z",
+      "finishTime": "2026-09-29T17:50:16.524391Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/eventTemplateService"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/db4992ce-eb2f-4d32-b3e6-06cd7b723014",
+      "id": "db4992ce-eb2f-4d32-b3e6-06cd7b723014",
+      "status": "SUCCESS",
+      "createTime": "2026-09-21T14:12:44.177486728Z",
+      "startTime": "2026-09-21T14:12:45.483204503Z",
+      "finishTime": "2026-09-21T14:13:13.468152Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/settleLadderTournament"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/dd0a88ff-1416-49ad-8567-1e3f21bf4368",
+      "id": "dd0a88ff-1416-49ad-8567-1e3f21bf4368",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:11.147496370Z",
+      "startTime": "2026-09-29T17:49:12.559461488Z",
+      "finishTime": "2026-09-29T17:49:35.055036Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/teamLineup",
+        "projects/bxh-arena/locations/asia-east1/functions/teamRegistration",
+        "projects/bxh-arena/locations/asia-east1/functions/teamScoring"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/ded60ca9-d7c9-48db-a6bc-0cba65007e33",
+      "id": "ded60ca9-d7c9-48db-a6bc-0cba65007e33",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:49:53.487259434Z",
+      "startTime": "2026-09-29T17:49:54.708468846Z",
+      "finishTime": "2026-09-29T17:50:21.776374Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/inventoryImageUpload"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204",
+      "id": "ef66bf87-45c0-492a-a962-13009889f204",
+      "status": "SUCCESS",
+      "createTime": "2026-09-30T18:04:10.538524499Z",
+      "startTime": "2026-09-30T18:04:11.876969493Z",
+      "finishTime": "2026-09-30T18:04:44.563218Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/activateLadderS1",
+        "projects/bxh-arena/locations/asia-east1/functions/autoAwardStaffTitle",
+        "projects/bxh-arena/locations/asia-east1/functions/backfillOctoberCardReward",
+        "projects/bxh-arena/locations/asia-east1/functions/claimCardReward",
+        "projects/bxh-arena/locations/asia-east1/functions/claimTitleReward",
+        "projects/bxh-arena/locations/asia-east1/functions/deleteTournamentSafely",
+        "projects/bxh-arena/locations/asia-east1/functions/getEngagementSnapshot",
+        "projects/bxh-arena/locations/asia-east1/functions/grantTitle",
+        "projects/bxh-arena/locations/asia-east1/functions/onLadderTransactionCreated",
+        "projects/bxh-arena/locations/asia-east1/functions/parseTournamentAnnouncementV1",
+        "projects/bxh-arena/locations/asia-east1/functions/prepareLadderS1Cutover",
+        "projects/bxh-arena/locations/asia-east1/functions/reconcileOctoberCardRewards",
+        "projects/bxh-arena/locations/asia-east1/functions/resetHunterPrelaunchData",
+        "projects/bxh-arena/locations/asia-east1/functions/setTitlePreferences",
+        "projects/bxh-arena/locations/asia-east1/functions/syncHunterAchievements"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/f8cfe6bc-65de-468d-be38-e8739e9095ae",
+      "id": "f8cfe6bc-65de-468d-be38-e8739e9095ae",
+      "status": "SUCCESS",
+      "createTime": "2026-09-30T04:37:28.560818780Z",
+      "startTime": "2026-09-30T04:37:29.927566653Z",
+      "finishTime": "2026-09-30T04:38:07.256487Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/playerCardService"
+      ],
+      "collectionStatus": "COLLECTED"
+    },
+    {
+      "name": "projects/87261141693/locations/asia-east1/builds/f94872ee-af0d-487b-9632-f6c52155e4d3",
+      "id": "f94872ee-af0d-487b-9632-f6c52155e4d3",
+      "status": "SUCCESS",
+      "createTime": "2026-09-29T17:11:45.834287689Z",
+      "startTime": "2026-09-29T17:11:47.081267920Z",
+      "finishTime": "2026-09-29T17:12:19.363066Z",
+      "resolvedStorageSource": null,
+      "resolvedCommits": [],
+      "fileHashes": [],
+      "sourceReconciled": false,
+      "functions": [
+        "projects/bxh-arena/locations/asia-east1/functions/getEngagementAdminOverview"
+      ],
+      "collectionStatus": "COLLECTED"
+    }
+  ]
+}
