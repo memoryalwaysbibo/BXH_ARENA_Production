@@ -45,6 +45,9 @@
   let dbHandle = null;
   let fx = null; // firestore function references
   let initPromise = null;
+  // Share the in-flight personal scan, scoped to the signed-in account.
+  let personalScan=null;
+  let personalPublicDocs=new Map();
 
   function isConfigPresent(){
     return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId === "bxh-arena");
@@ -1994,43 +1997,83 @@
     async queryMyRegistrations(options={}){
       const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
       if(!uid) return [];
-
-      const q = fx.query(
-        fx.collection(dbHandle, "publicTournaments"),
-        fx.where("visibility", "==", "public")
-      );
-      const tourSnap = await fx.getDocs(q);
-      const codes = [];
-      tourSnap.forEach(docSnap => codes.push(docSnap.id));
-      if(codes.length===0) return [];
-
-      const reads = await Promise.all(codes.map(async code=>{
-        try{
-          const regSnap = await fx.getDoc(fx.doc(dbHandle, "tournaments", code, "registrations", uid));
-          if(!regSnap.exists()) return null;
-          return Object.assign({ tournamentCode: code }, regSnap.data());
-        }catch(e){
-          // 一場讀取失敗不應讓整個「已報名」頁崩潰；但權限/連線類錯誤仍保留診斷資訊。
-          console.warn("[queryMyRegistrations] registration read failed", code, e);
-          if(typeof options.onReadFailure==="function")options.onReadFailure(code);
-          return null;
-        }
-      }));
-
-      return reads.filter(Boolean).sort((a,b)=>{
-        const ta = a.createdAt && typeof a.createdAt.toMillis==="function" ? a.createdAt.toMillis() : 0;
-        const tb = b.createdAt && typeof b.createdAt.toMillis==="function" ? b.createdAt.toMillis() : 0;
-        return tb-ta;
-      });
+      if(!personalScan||personalScan.uid!==uid||(personalScan.settled&&(options.force===true||Date.now()-personalScan.finishedAt>30000))){
+        personalPublicDocs=new Map();
+        const scan={uid,finishedAt:0,settled:false,promise:null,subscribers:new Set(),failureSubscribers:new Set(),failures:[],reads:[],completed:0,total:0};
+        personalScan=scan;
+        const announce=()=>{
+          if(personalScan!==scan||authHandle?.currentUser?.uid!==uid)return;
+          const progress={registrations:scan.reads.slice(),scanned:scan.completed,total:scan.total};
+          scan.subscribers.forEach(callback=>{try{callback(progress);}catch(e){console.warn('[personal scan progress]',e);}});
+        };
+        scan.promise=(async()=>{
+          const q=fx.query(fx.collection(dbHandle,'publicTournaments'),fx.where('visibility','==','public'));
+          const tourSnap=await fx.getDocs(q),docs=[];
+          tourSnap.forEach(doc=>docs.push(doc));
+          docs.sort((a,b)=>String(b.data()?.eventDate||b.data()?.date||'').localeCompare(String(a.data()?.eventDate||a.data()?.date||'')));
+          scan.total=docs.length;
+          const reads=scan.reads,failures=[];let cursor=0;
+          announce();
+          async function worker(){
+            while(cursor<docs.length){
+              const doc=docs[cursor++];
+              let found=false;
+              try{
+                const ref=fx.doc(dbHandle,'tournaments',doc.id,'registrations',uid);
+                let reg;
+                for(let attempt=0;attempt<2;attempt++){
+                  try{reg=await fx.getDoc(ref);break;}
+                  catch(error){
+                    const transient=['unavailable','deadline-exceeded','resource-exhausted','aborted','internal','review/read-timeout'].includes(String(error?.code||''));
+                    if(!transient||attempt===1)throw error;
+                  }
+                }
+                if(reg.exists()){
+                  found=true;
+                  reads.push(Object.assign({tournamentCode:doc.id},reg.data()));
+                  if(personalScan===scan)personalPublicDocs.set(doc.id,doc);
+                }
+              }catch(error){
+                const data=doc.data()||{};
+                failures.push({code:doc.id,error,eventDate:String(data.eventDate||data.date||''),eventName:String(data.name||'')});
+              }
+              scan.completed++;
+              if(found||scan.completed%12===0||scan.completed===docs.length)announce();
+            }
+          }
+          await Promise.all(Array.from({length:Math.min(4,docs.length)},worker));
+          if(authHandle?.currentUser?.uid!==uid){const error=new Error('auth-changed');error.code='auth-changed';throw error;}
+          scan.failures=failures;scan.settled=true;scan.finishedAt=Date.now();
+          const result=reads.sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+          if(failures.length){
+            Object.defineProperty(result,'partial',{value:true,enumerable:false});
+            Object.defineProperty(result,'failedReads',{value:failures.map(({code,error,eventDate,eventName})=>({code,reason:String(error?.code||'read-failed'),eventDate,eventName})),enumerable:false});
+            failures.forEach(({code,error,eventDate,eventName})=>scan.failureSubscribers.forEach(callback=>{try{callback(code,error?.code||'read-failed',{eventDate,eventName});}catch(e){}}));
+          }
+          return result;
+        })().catch(error=>{if(personalScan===scan)personalScan=null;throw error;});
+      }
+      if(typeof options.onReadFailure==='function'){
+        const scan=personalScan;scan.failureSubscribers.add(options.onReadFailure);
+        if(scan.settled&&scan.failures.length)queueMicrotask(()=>{if(personalScan===scan&&authHandle?.currentUser?.uid===uid)scan.failures.forEach(({code,error,eventDate,eventName})=>options.onReadFailure(code,error?.code||'read-failed',{eventDate,eventName}));});
+      }
+      if(typeof options.onProgress==='function'){
+        const scan=personalScan;scan.subscribers.add(options.onProgress);
+        if(scan.total>0)queueMicrotask(()=>{if(personalScan===scan&&authHandle?.currentUser?.uid===uid)options.onProgress({registrations:scan.reads.slice(),scanned:scan.completed,total:scan.total});});
+        scan.promise.finally(()=>scan.subscribers.delete(options.onProgress)).catch(()=>{});
+      }
+      return personalScan.promise;
     },
 
     // P3 Hunter Profile: reads only public tournament mirrors plus the signed-in user's own
     // registration documents. No new collection and no access to other players' private data.
-    async queryMyHunterMatches(){
+    async queryMyHunterMatches(options={}){
       const uid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
       if(!uid) throw new Error("hunter-auth-required");
       const records=[],skipped=[];
-      const regs=await this.queryMyRegistrations({onReadFailure:code=>skipped.push({code,reason:"registration-read-failed"})});
+      const regs=await this.queryMyRegistrations({force:options.force===true});
+      (regs.failedReads||[]).forEach(row=>skipped.push({code:row.code,reason:"registration-read-failed",readCode:row.reason,eventDate:row.eventDate,eventName:row.eventName}));
+      if(regs.partial===true&&!skipped.length)skipped.push({reason:"registration-read-failed",readCode:"incomplete-scan"});
       // Cancellation must not erase a completed historical match.
       const selfRegs=(regs||[]).filter(r=>r&&!r.familyPlayerId);
       const seenCodes=new Set();
@@ -2042,7 +2085,7 @@
         if(!code||seenCodes.has(code)) continue;
         seenCodes.add(code);
         try{
-          const snap=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
+          const snap=personalPublicDocs.get(code)||await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
           if(!snap.exists()){ skipped.push({code,reason:"public-missing"}); continue; }
           const d=snap.data()||{};
           // A published registration-only event may not have a bracket yet.
@@ -2152,7 +2195,7 @@
     // 的公開安全欄位，不含任何私人資料。
     async getPublicTournamentSummary(code){
       try{
-        const snap = await fx.getDoc(fx.doc(dbHandle, "publicTournaments", code));
+        const snap = personalPublicDocs.get(code)||await fx.getDoc(fx.doc(dbHandle, "publicTournaments", code));
         if(!snap.exists()) return null;
         const d = snap.data();
         let parsedData=null;

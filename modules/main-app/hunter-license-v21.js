@@ -70,8 +70,8 @@ function gradeOf(analysis,level,life,complete){
 }
 function overview(records,_analyze,complete=true){
   const all=U.hunterUniqueRecords(records),rows=ordered(all);
-  // Keep the existing event-XP source and curve; practice XP does not affect grade.
-  const growth=U.hunterBuildGrowth(all),analysis=strength(rows.slice(-WINDOW)),life=experience(rows);
+  // Keep the established event-XP curve, but test events cannot grant XP.
+  const growth=U.hunterBuildGrowth(all.filter(r=>r.testMode!==true&&r.eventAuthority!=='test')),analysis=strength(rows.slice(-WINDOW)),life=experience(rows);
   const grade=gradeOf(analysis,growth.level,life,complete);
   const next=RULES[rank(grade.tier)+1]||null;
   const fields=[['score','評級分',grade.score],['ability','最近 20 場實力分',analysis.overall],['matches','生涯有效對戰',life.matches],['events','不同賽事',life.events],['opponents','不同對手（已核對）',life.opponents],['medium','中型賽事（96–127 人）',life.medium],['large','大型賽事（128 人以上）',life.large]];
@@ -79,7 +79,7 @@ function overview(records,_analyze,complete=true){
   // Historical replay is a preview/backfill, not an irreversible server grant.
   let highest={tier:complete?'ungraded':'pending',label:complete?'未分級':'資料待核對',at:null};
   if(complete){
-    const timeline=all.filter(r=>U.hunterRecordTimestamp(r)>0).sort((a,b)=>U.hunterRecordTimestamp(a)-U.hunterRecordTimestamp(b)||U.hunterEvidenceMatchKey(a).localeCompare(U.hunterEvidenceMatchKey(b)));
+    const timeline=all.filter(r=>r.testMode!==true&&r.eventAuthority!=='test'&&U.hunterRecordTimestamp(r)>0).sort((a,b)=>U.hunterRecordTimestamp(a)-U.hunterRecordTimestamp(b)||U.hunterEvidenceMatchKey(a).localeCompare(U.hunterEvidenceMatchKey(b)));
     const played=[],xpEvents=new Set(),lifeEvents=new Map(),lifeOpponents=new Set();
     let xp=0;
     for(let i=0;i<timeline.length;){

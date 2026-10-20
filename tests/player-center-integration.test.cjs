@@ -36,6 +36,13 @@ test('S1 boundary keeps Loft results official and prelaunch or undated records s
  c.playerCenterPeriod='career';const html=c.renderPlayerCenterOverview({});assert.ok(html.includes('2–1'));assert.ok(html.includes('日期待核對 1 場對戰'));
  const career=c.renderPlayerCenterCareer();assert.ok(career.includes('BXH x Loft'));assert.ok(career.includes('1 勝 1 敗'));assert.ok(career.includes('S1 前紀錄（1 場賽事）'));assert.ok(career.includes('日期待核對（1 場賽事）'));
 });
+test('explicit test metadata separates archived test matches without classifying by title',()=>{
+ const c=setup();c.hunterProfileCache.records=[record({eventCode:'TEST',eventName:'雙敗制測試',testMode:true}),record({eventCode:'OFFICIAL',eventName:'名稱包含測試的正式賽',eventAuthority:'official',matchId:'m2'})];
+ const partition=c.playerCenterRecordPartition(c.hunterProfileCache.records);
+ assert.equal(partition.test.length,1);assert.equal(partition.official.length,1);
+ const career=c.renderPlayerCenterCareer();assert.ok(career.includes('測試紀錄（1 場賽事）'));assert.ok(career.includes('雙敗制測試'));
+ const overview=c.renderPlayerCenterOverview({});assert.ok(overview.includes('1–0'));assert.ok(!overview.includes('雙敗制測試'));
+});
 test('loading, errors and missing season never show zero victories as verified stats; partial history is explicit',()=>{
  const c=setup();c.hunterProfileCache=null;let html=c.renderPlayerCenterOverview({});assert.ok(html.includes('正在讀取本人戰績'));assert.ok(!html.includes('>0–0<'));assert.ok(!html.includes('>0%<'));
  c.hunterProfileCache={records:[],skipped:[]};c.hunterProfileError='連線失敗';html=c.renderPlayerCenterOverview({});assert.ok(html.includes('連線失敗'));assert.ok(!html.includes('>0–0<'));
