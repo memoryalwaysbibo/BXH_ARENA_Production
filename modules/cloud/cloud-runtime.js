@@ -2953,6 +2953,38 @@ if(testerSession){
             if(Number(remoteDoc.callRevision||0)!==Number(data.callRevision||0)) throw new Error("call-state-stale");
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
+            // Room ownership is established on creation, never by a later editor.
+            // Use the server document as the source of truth, not the caller's
+            // possibly stale local room or current signed-in user's display name.
+            const creatorUid=remoteDoc.createdBy||remoteState?.createdBy||null;
+            const creatorName=String(remoteDoc.createdByName||remoteState?.createdByName||"").trim();
+            if(creatorUid){
+              data.createdBy=creatorUid;
+              privatePayload.createdBy=creatorUid;
+            }else{
+              // Do not manufacture an owner from the editing account.
+              delete privatePayload.createdBy;
+            }
+            const originalOwner=remoteDoc.ownerUid||remoteState?.ownerUid||null;
+            if(originalOwner){
+              data.ownerUid=originalOwner;
+              privatePayload.ownerUid=originalOwner;
+              publicPayload.ownerUid=originalOwner;
+            }else{
+              delete privatePayload.ownerUid;
+              delete publicPayload.ownerUid;
+            }
+            if(creatorName)privatePayload.createdByName=creatorName;
+            // A missing creator label must not be replaced with the editor's name.
+            // Existing legacy host labels remain only as a fallback for old rooms.
+            const hostName=creatorName||String(remoteDoc.hostName||"").trim();
+            if(hostName){
+              privatePayload.hostName=hostName;
+              publicPayload.hostName=hostName;
+            }else{
+              delete privatePayload.hostName;
+              delete publicPayload.hostName;
+            }
             if(remoteState){
               if(remoteState.bracketDraw||options.bracketCommit||options.bracketStartSignature){
                 if(!window.BXHBracketCommit)throw new Error('bracket-verifier-unavailable');
