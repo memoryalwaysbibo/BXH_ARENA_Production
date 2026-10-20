@@ -501,12 +501,18 @@
     // account's role). The account's uid, email, and role are all untouched.
     async completeExistingAccountPlayerProfile(uid, { realName, nickname, phone }){
       if(!authReady) return { ok:false, error:"雲端服務尚未就緒" };
+      if(!uid || authHandle?.currentUser?.uid!==uid) return {ok:false,error:"登入狀態失效，請重新登入"};
       try{
+        const ref = fx.doc(dbHandle, USERS_COLLECTION, uid);
+        const snap = await fx.getDocFromServer(ref);
+        if(!snap.exists()) return {ok:false,error:"找不到既有帳號，請重新登入"};
+        const existing = snap.data() || {};
+        if(existing.profileCompleted===true || String(existing.realName||"").trim()) return {ok:false,error:"玩家資料已存在，請重新讀取，不需再次完成設定"};
         const now = Date.now();
         const publicName = nickname || realName;
-        await fx.updateDoc(fx.doc(dbHandle, USERS_COLLECTION, uid), {
+        await fx.updateDoc(ref, {
           realName, nickname: nickname||"", gameId:nickname||"", phone: phone||"", birthDate:"", gender:"", region:"", preferredNameMode:"realName",
-          realNameVerified:false, realNameVerifiedAt:null, realNameVerifiedBy:null, profileCompleted:true, profileCompletedAt:fx.serverTimestamp(), updatedAt: now
+          profileCompleted:true, profileCompletedAt:fx.serverTimestamp(), updatedAt: now
         });
         try{
           await fx.setDoc(fx.doc(dbHandle, "publicPlayers", uid), {
