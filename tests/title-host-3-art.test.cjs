@@ -33,7 +33,16 @@ const expectedArtwork = {
   '三當家': 'assets/title-limited-third-leader.webp',
   'BXH 工作人員': 'assets/title-limited-bxh-staff.webp',
   '封測先鋒': 'assets/title-limited-closed-beta.webp',
-  '百戰磨練': 'assets/title-epic-hundred-battles.webp',
+  '百戰磨練': 'assets/title-milestone-100.webp',
+  '雙生修羅': 'assets/title-milestone-200.webp',
+  '三途橫渡': 'assets/title-milestone-300.webp',
+  '四神俱滅': 'assets/title-milestone-400.webp',
+  '五嶽崩摧': 'assets/title-milestone-500.webp',
+  '六道輪迴': 'assets/title-milestone-600.webp',
+  '七星隕落': 'assets/title-milestone-700.webp',
+  '八荒血帝': 'assets/title-milestone-800.webp',
+  '九天終焉': 'assets/title-milestone-900.webp',
+  '千古不滅': 'assets/title-milestone-1000.webp',
   '四強霸主': 'assets/title-epic-top4-overlord.webp',
   '冠軍獵人': 'assets/title-epic-champion-hunter.webp',
   '百日戰士': 'assets/title-epic-hundred-day-warrior.webp',
@@ -69,4 +78,40 @@ assert.equal(webp.subarray(0, 4).toString(), 'RIFF');
 assert.equal(webp.subarray(8, 12).toString(), 'WEBP');
 assert.equal(webp.readUInt32LE(4) + 8, webp.length, 'WebP container is truncated');
 assert(webp.length > 1000 && webp.length < 1000000, 'WebP image size outside expected budget');
-console.log('PASS host-3 original artwork, transparency metadata, catalog and ladder mapping');
+
+// The ten milestone artworks retain the existing WebP -> PNG fallback contract.
+const milestoneArtwork = {
+  "百戰磨練": "assets/title-milestone-100.webp",
+  "雙生修羅": "assets/title-milestone-200.webp",
+  "三途橫渡": "assets/title-milestone-300.webp",
+  "四神俱滅": "assets/title-milestone-400.webp",
+  "五嶽崩摧": "assets/title-milestone-500.webp",
+  "六道輪迴": "assets/title-milestone-600.webp",
+  "七星隕落": "assets/title-milestone-700.webp",
+  "八荒血帝": "assets/title-milestone-800.webp",
+  "九天終焉": "assets/title-milestone-900.webp",
+  "千古不滅": "assets/title-milestone-1000.webp"
+};
+for (const [name, asset] of Object.entries(milestoneArtwork)) {
+  assert.equal(artworkPath(name), asset, name + ' milestone mapping missing');
+  assert(ladder.includes('"' + name + '":"' + asset + '"'), name + ' ladder mapping missing');
+  const webpBytes = fs.readFileSync(path.join(root, asset));
+  const pngBytes = fs.readFileSync(path.join(root, asset.replace(/\.webp$/, '.png')));
+  assert.equal(webpBytes.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(webpBytes.toString('ascii', 8, 12), 'WEBP');
+  assert.equal(webpBytes.readUInt32LE(4) + 8, webpBytes.length, name + ' WebP truncated');
+  assert.equal(webpBytes.toString('ascii', 12, 16), 'VP8L', name + ' WebP must remain lossless');
+  assert.equal(webpBytes[20], 0x2f, name + ' lossless WebP signature missing');
+  const flags = webpBytes.readUInt32LE(21);
+  const width = (flags & 0x3fff) + 1;
+  const height = ((flags >>> 14) & 0x3fff) + 1;
+  assert.equal(width, 768, name + ' website artwork width changed');
+  assert(webpBytes.length < 400000, name + ' WebP exceeds website size budget');
+  assert.equal((flags >>> 28) & 1, 1, name + ' WebP alpha missing');
+  assert.equal(pngBytes.subarray(1, 4).toString(), 'PNG');
+  assert.equal(pngBytes.readUInt32BE(16), width, name + ' fallback width mismatch');
+  assert.equal(pngBytes.readUInt32BE(20), height, name + ' fallback height mismatch');
+  assert.equal(pngBytes[25], 6, name + ' PNG must retain RGBA transparency');
+}
+
+console.log('PASS host-3 and ten milestone artwork, transparency, fallback and mapping');
