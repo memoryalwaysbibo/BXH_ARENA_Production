@@ -9,12 +9,14 @@ function setup(){
  esc:s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])),
  hunterProfileCache:{records:[],skipped:[]},hunterProfileLoading:false,hunterProfileError:null,
  myRegistrationsTournamentInfo:{},myRegistrationsCache:[],myRegistrationsLoading:false,myRegistrationsError:null,
- playerCenterResultScope:'',playerCenterResultRequest:0,playerCenterEventResults:new Map(),engagementSessionEpoch:1,ladderReadWithTimeout:p=>p,renderPreservingScroll:()=>{},playerCenterPeriod:'career',playerCenterHistoryVisibleCount:10,currentAuthUid:()=> 'self',hunterSeasonStartMs:()=>Date.parse('2026-10-01T00:00:00+08:00'),
+ myRegistrationsPartial:false,
+ playerCenterResultScope:'',playerCenterResultRequest:0,playerCenterEventResults:new Map(),engagementSessionEpoch:1,ladderReadWithTimeout:p=>p,renderPreservingScroll:()=>{},playerCenterPeriod:'career',playerCenterHistoryVisibleCount:10,playerCenterCareerVisibleCount:10,currentAuthUid:()=> 'self',hunterSeasonStartMs:()=>Date.parse('2026-10-01T00:00:00+08:00'),
  HUNTER_OFFICIAL_LAUNCH_AT:Date.parse('2026-10-01T00:00:00+08:00'),
  effectiveGameId:p=>p.gameId,playerDerivedId:()=> 'P1',ROLE_ICON_PLAYER:'本人',myLadderProfileCache:null,
+ accountEquippedTitleHtml:()=>'',engagementSnapshot:null,hunterBuildAnalysis:()=>({}),hunterLicenseOverview:c.window.BXHHunterUtils.hunterLicenseOverview,
  hunterRecordCardHtml:r=>'<article>'+c.esc(r.opponent?.name||'對手')+'</article>',
  renderPlayerRegisteredTab:()=>'<div>目前賽程</div>',schedulePhase:info=>info.phase||'waiting'});
- for(const name of ['playerCenterResultContext','loadPlayerCenterEventResult','playerCenterEventOutcome','playerCenterEventOutcomeHtml','playerCenterEventGroups','playerCenterRecordPartition','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','renderPlayerCenterOverview'])vm.runInContext(extract(name),c);
+ for(const name of ['playerCenterResultContext','loadPlayerCenterEventResult','playerCenterEventOutcome','playerCenterEventOutcomeHtml','playerCenterEventGroups','playerCenterRecordPartition','playerCenterDataNotice','playerCenterEventHtml','renderPlayerCenterCareer','playerCenterHunterSummaryHtml','renderPlayerCenterOverview'])vm.runInContext(extract(name),c);
  return c;
 }
 const record=(overrides={})=>({eventCode:'E1',eventName:'週末賽',eventDate:'2026-10-18',matchId:'m1',completedAt:Date.parse('2026-10-18T15:00:00+08:00'),completed:true,isWin:true,scoringVersion:'bxh-4pt-v1',round:1,...overrides});
@@ -42,6 +44,16 @@ test('explicit test metadata separates archived test matches without classifying
  assert.equal(partition.test.length,1);assert.equal(partition.official.length,1);
  const career=c.renderPlayerCenterCareer();assert.ok(career.includes('測試紀錄（1 場賽事）'));assert.ok(career.includes('雙敗制測試'));
  const overview=c.renderPlayerCenterOverview({});assert.ok(overview.includes('1–0'));assert.ok(!overview.includes('雙敗制測試'));
+ assert.ok(overview.includes('我的獵人旅程'));assert.ok(!overview.includes('player-center-schedule'));
+ assert.ok(!overview.includes('renderPlayerRegisteredTab'));
+});
+test('hunter journey milestones use official records and show partial grade honestly',()=>{
+ const c=setup();c.hunterProfileCache.records=[record({eventCode:'TEST',testMode:true,eventDate:'2026-10-01'}),record({eventCode:'OFFICIAL',matchId:'m2',eventDate:'2026-10-03'})];
+ let html=c.playerCenterHunterSummaryHtml(c.hunterProfileCache.records,'ready');
+ assert.ok(html.includes('2026-10-03'));assert.ok(!html.includes('2026-10-01'));
+ c.hunterProfileCache.skipped=[{code:'MISSING',reason:'read-failed'}];
+ html=c.playerCenterHunterSummaryHtml(c.hunterProfileCache.records,'partial');
+ assert.ok(html.includes('等級待核對'));assert.ok(html.includes('資料待核對')||html.includes('評級中'));
 });
 test('loading, errors and missing season never show zero victories as verified stats; partial history is explicit',()=>{
  const c=setup();c.hunterProfileCache=null;let html=c.renderPlayerCenterOverview({});assert.ok(html.includes('正在讀取本人戰績'));assert.ok(!html.includes('>0–0<'));assert.ok(!html.includes('>0%<'));
@@ -54,6 +66,11 @@ test('career preserves nonstandard sources and unknown dates without inventing p
  const html=c.renderPlayerCenterCareer();assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<img src=x'));assert.ok(html.includes('日期未記錄'));assert.ok(html.includes('尚未核對入帳紀錄'));assert.ok(html.includes('EN'));assert.ok(!html.includes('冠軍'));
  c.myRegistrationsTournamentInfo.E1={phase:'live'};assert.ok(c.renderPlayerCenterCareer().includes('名次待結算'));c.myRegistrationsTournamentInfo.E1={phase:'done'};assert.ok(c.renderPlayerCenterCareer().includes('未記錄名次'));
 });
+test('career history initially limits full event cards and reveals the rest on demand',()=>{
+ const c=setup();c.hunterProfileCache.records=Array.from({length:12},(_,i)=>record({eventCode:'E'+i,matchId:'m'+i}));
+ let html=c.renderPlayerCenterCareer();assert.ok(html.includes('載入更多賽事'));assert.equal((html.match(/data-personal-event=/g)||[]).length,10);
+ c.playerCenterCareerVisibleCount=20;html=c.renderPlayerCenterCareer();assert.equal((html.match(/data-personal-event=/g)||[]).length,12);assert.ok(!html.includes('載入更多賽事'));
+});
 test('active schedule excludes completed and cancelled entries, keeps family participants distinct',()=>{
  const c=setup();Object.assign(c,{normalizeRoomCodeInput:String,smartCallModel:()=>({kind:'waiting'}),isCommunityQuickRegistration:()=>false,publicTournamentRegistrationLocked:()=>true,scheduleSmartCallAutoRefresh:()=>{},scheduleGroups:(key,rows,card)=>rows.map(card).join('')});
  vm.runInContext(extract('renderPlayerRegisteredTab'),c);
@@ -61,6 +78,8 @@ test('active schedule excludes completed and cancelled entries, keeps family par
  c.myRegistrationsCache=[{tournamentCode:'LIVE',status:'waitlist',displayName:'本人'},{tournamentCode:'LIVE',status:'waitlist',displayName:'孩子',familyPlayerId:'child'},{tournamentCode:'DONE',status:'confirmed'},{tournamentCode:'CANCEL',status:'cancelled'}];
  const html=c.renderPlayerRegisteredTab({activeOnly:true});assert.ok(html.includes('參賽者：本人'));assert.ok(html.includes('孩子，由家長代報名'));assert.ok(!html.includes('完賽'));assert.ok(!html.includes('CANCEL'));
  assert.ok(c.renderPlayerRegisteredTab().includes('完賽'));
+ c.myRegistrationsCache=[];c.myRegistrationsPartial=true;
+ assert.ok(c.renderPlayerRegisteredTab().includes('清單可能不完整'));
 });
 test('profile keeps basic data and title paths while new account defaults to overview',()=>{
  assert.ok(core.includes('playerProfileSection="overview"'));assert.ok(core.includes("['overview','career','basic','titles'].includes(section)"));assert.ok(core.includes("v.playerTab==='profile'?'profile'"));
