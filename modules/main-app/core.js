@@ -13802,6 +13802,10 @@ function renderPlayerCompleteProfileScreen(){
       </div>
       <div class="field"><label>手機號碼（選填）</label><input type="tel" id="complete-phone"></div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-complete-profile-submit" ${playerApplyBusy?'disabled':''}>${playerApplyBusy?'處理中……':'完成設定'}</button>
+      <div class="btn-row" style="margin-top:12px;justify-content:center;gap:8px;flex-wrap:wrap;">
+        <button class="hoc-btn" data-action="player-profile-retry" ${playerApplyBusy?'disabled':''}>重新讀取帳號</button>
+        <button class="hoc-btn" data-action="player-logout" ${playerApplyBusy?'disabled':''}>登出並重新登入</button>
+      </div>
     </div>
   ` + authShellClose();
 }
@@ -19894,6 +19898,26 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       if(!result.ok){ playerApplyError = result.error || "申請失敗，請稍後再試"; render(); return; }
       showToast("帳號申請成功，已自動登入");
       render();
+    })();
+    return;
+  }
+  if(action==="player-profile-retry"){
+    const pending=pendingNewPlayerProfile||pendingExistingAccountProfile;
+    if(playerApplyBusy||!pending) return;
+    playerApplyBusy=true;playerApplyError="";render();
+    (async()=>{
+      try{
+        const result=await window.cloudAuth.getUserProfileStatus(pending.uid);
+        if(result.status==="found"){
+          // Existing profile found: refresh the normal auth routing, never write it.
+          pendingNewPlayerProfile=null;pendingExistingAccountProfile=null;
+          window.location.reload();return;
+        }
+        playerApplyError=result.status==="not_found"?"伺服器尚無玩家資料，可繼續完成設定。":
+          result.status==="permission_denied"?"無法讀取玩家資料（權限不足），請登出後重新登入。":
+          "玩家資料讀取失敗，請檢查連線後重試，或登出重新登入。";
+      }catch(e){playerApplyError="重新讀取失敗，請登出後重新登入。";}
+      finally{playerApplyBusy=false;render();}
     })();
     return;
   }
