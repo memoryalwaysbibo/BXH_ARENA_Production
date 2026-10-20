@@ -17,4 +17,10 @@ const existing = source.match(/async completeExistingAccountPlayerProfile\(uid,[
 assert.ok(existing, 'existing-account completion must exist');
 assert.match(existing[0], /existing\.profileCompleted===true/, 'completed profiles must not be initialized again');
 assert.doesNotMatch(existing[0], /realNameVerified\s*:\s*false/, 'existing verification must be preserved');
+const status = source.match(/async getUserProfileStatus\(uid\)\{([\s\S]*?)\n    \},\n\n    async getUserProfile/);
+assert.ok(status, 'PWA recovery status API must exist');
+for (const value of ['auth_not_ready','auth_mismatch','not_found','found','permission_denied','read_failed']) {
+  assert.ok(status[1].includes(value), 'PWA status missing: '+value);
+}
+assert.match(status[1], /getDocFromServer/, 'PWA recovery must query authoritative server data');
 console.log('PASS PWA profile read and onboarding safeguards (static regression)');
