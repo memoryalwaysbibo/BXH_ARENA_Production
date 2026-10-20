@@ -23,4 +23,9 @@ for (const value of ['auth_not_ready','auth_mismatch','not_found','found','permi
   assert.ok(status[1].includes(value), 'PWA status missing: '+value);
 }
 assert.match(status[1], /getDocFromServer/, 'PWA recovery must query authoritative server data');
+const core = fs.readFileSync(path.join(__dirname, '..', 'modules/main-app/core.js'), 'utf8');
+assert.match(core, /data-action="player-profile-retry"/, 'Blocked profile screen needs retry control');
+assert.match(core, /data-action="player-logout"/, 'Blocked profile screen needs sign-out control');
+assert.match(core, /if\(action==="player-profile-retry"\)/, 'Retry handler must exist');
+assert.match(core, /getUserProfileStatus\(pending\.uid\)/, 'Retry must query authoritative profile status');
 console.log('PASS PWA profile read and onboarding safeguards (static regression)');
