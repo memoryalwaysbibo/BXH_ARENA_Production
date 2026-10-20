@@ -467,7 +467,12 @@
     // always created as role=player with password provider.
     async completeNewPlayerProfile(uid, { email, realName, nickname, phone }){
       if(!authReady) return { ok:false, error:"雲端服務尚未就緒" };
+      if(!uid || authHandle?.currentUser?.uid!==uid) return {ok:false,error:"登入狀態失效，請重新登入"};
       try{
+        // Fail closed: never overwrite an existing account during onboarding.
+        // Read errors (including permission-denied) must NOT be treated as absence.
+        const existing = await fx.getDocFromServer(fx.doc(dbHandle, USERS_COLLECTION, uid));
+        if(existing.exists()) return {ok:false,error:"此帳號已有玩家資料，請重新讀取或重新登入，勿重複建立"};
         const now = Date.now();
         const publicName = nickname || realName;
         await fx.setDoc(fx.doc(dbHandle, USERS_COLLECTION, uid), {
