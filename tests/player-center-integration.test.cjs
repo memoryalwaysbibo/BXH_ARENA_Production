@@ -34,6 +34,8 @@ test('saved maximum is labeled permanent only with a valid server response; inco
  c.hunterProfileCache.permanentLicense=response;
  let html=c.playerCenterHunterSummaryHtml([], 'ready');assert.ok(html.includes('生涯最高（永久授予）'));assert.ok(html.includes('B 級獵人'));
  assert.ok(html.includes('C 級獵人'));assert.ok(html.includes('48.8'));
+ c.hunterProfileCache.permanentLicense={version:response.version,status:'unchanged',highestTier:'b',awarded:false,current:null};
+ html=c.playerCenterHunterSummaryHtml([], 'ready');assert.ok(html.includes('生涯最高（永久授予）'));assert.ok(html.includes('B 級獵人'));
  c.hunterProfileCache.permanentLicense={...response,version:'unverified'};
  html=c.playerCenterHunterSummaryHtml([], 'ready');assert.ok(html.includes('生涯最高（歷史回算）'));assert.ok(!html.includes('生涯最高（永久授予）'));
  c.hunterProfileCache.permanentLicense={...response,status:'blocked_incomplete_history',current:null};

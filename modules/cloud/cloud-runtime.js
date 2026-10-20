@@ -779,6 +779,7 @@
     async raffle(payload){return callEngagementFunction("memberRaffle",payload,540000,['list','get','announcements'].includes(payload?.action));},
     async getSnapshot(){ return callEngagementFunction("getEngagementSnapshot",{}); },
     async syncHunterAchievements(){ return callEngagementFunction("syncHunterAchievements",{},120000); },
+    async getHunterLicenseV21(){ return callEngagementFunction("syncHunterLicenseV21",{action:'status'},30000); },
     async syncHunterLicenseV21(){ return callEngagementFunction("syncHunterLicenseV21",{},120000); },
     async dailyCheckIn(){ return callEngagementFunction("dailyCheckIn",{}); },
     async setTitlePreferences(payload){ return callEngagementFunction("setTitlePreferences",payload); },
