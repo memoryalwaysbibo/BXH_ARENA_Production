@@ -19934,6 +19934,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       let result;
       try{
         const status=await window.cloudAuth.getUserProfileStatus(pending.uid);
+        if(status.status==="not_found" && isExistingAccount){
+          playerApplyError="原有帳號資料未找到，已停止補完操作。請登出重新登入或聯絡管理員。";
+          playerApplyBusy=false;render();return;
+        }
         if(status.status==="found" && !isExistingAccount){
           playerApplyError="此帳號已有玩家資料，請使用「重新讀取帳號」恢復登入。";
           playerApplyBusy=false;render();return;
