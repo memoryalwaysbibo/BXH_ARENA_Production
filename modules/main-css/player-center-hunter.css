@@ -406,8 +406,9 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .player-center-metrics .stat-box{min-width:0;padding:12px 6px;}
 .player-center-metrics .value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
 .player-center-metrics .label{white-space:normal;overflow-wrap:anywhere;}
-.player-center-event>summary{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:48px;cursor:pointer;}
-.player-center-event>summary>span{min-width:0;overflow-wrap:anywhere;}
+.player-center-event>summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;min-height:48px;cursor:pointer;}
+.player-center-event>summary>span:first-child{min-width:0;overflow-wrap:anywhere;}
+.player-center-event>summary>.hint{max-width:none;white-space:nowrap;overflow-wrap:normal;word-break:keep-all;justify-self:end;}
 .player-center-event>summary small{display:block;color:var(--muted);margin-top:6px;}
 .player-center-event-body{margin-top:14px;border-top:1px solid var(--border);padding-top:8px;}
 .player-center-event .hunter-record-card{min-width:0;max-width:100%;}
@@ -419,7 +420,7 @@ html,body,#app{max-width:100%;overflow-x:hidden;}
 .player-center-event-outcome{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0;}
 .player-center-event-outcome span{display:block;color:var(--muted);font-size:12px;margin-bottom:5px;}
 .player-center-event-outcome strong{display:block;overflow-wrap:anywhere;}
-@media(max-width:380px){.player-center-metrics{grid-template-columns:minmax(0,1fr);}.player-center-event>summary{align-items:flex-start;}.player-center-event>summary>.hint{max-width:48px;}}
+@media(max-width:380px){.player-center-metrics{grid-template-columns:minmax(0,1fr);}}
 .profile-secondary-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:0 0 14px;border:1px solid rgba(217,185,92,.15);border-radius:12px;background:rgba(255,255,255,.018);}
 .profile-secondary-tabs .btn{min-height:38px;border-radius:9px;font-size:12.5px;}
 .profile-hero{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:16px;padding:17px 18px;text-align:left!important;border-color:rgba(217,185,92,.28);background:linear-gradient(135deg,rgba(217,185,92,.075),rgba(18,19,21,.92));}
