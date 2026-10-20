@@ -420,8 +420,12 @@
       event.stopPropagation();
       var uid=typeof firebaseUser!=="undefined"&&firebaseUser&&firebaseUser.uid;
       var index=uid?ladderActiveRankingRows().findIndex(function(p){return p.uid===uid;}):-1;
-      if(index<0) return;
-      ladderVisibleCount=Math.max(ladderVisibleCount,10+20*Math.ceil(Math.max(0,index-9)/20));
+      if(index<0){
+        console.warn("[ladder-find-me] current UID not found in active ranking", {hasUid:!!uid, scoreMode:ladderScoreMode});
+        if(typeof showToast==="function")showToast("目前榜單找不到你的排名，請確認賽季與地區篩選");
+        return;
+      }
+      ladderVisibleCount=Math.max(ladderVisibleCount,index+1);
       rerender();
       // Wait for the leaderboard row to exist after rendering; scroll restoration
       // and deferred rendering can otherwise make this action appear to do nothing.
@@ -429,7 +433,9 @@
       function focusMyRank(){
         var row=document.getElementById("ladder-my-row");
         if(row&&row.isConnected){
-          row.scrollIntoView({behavior:"smooth",block:"center"});
+          row.scrollIntoView({behavior:"auto",block:"center"});
+          // Reapply after the preserving-scroll render has settled.
+          requestAnimationFrame(function(){if(row.isConnected)row.scrollIntoView({behavior:"smooth",block:"center"});});
           row.classList.add("ladder-find-me-highlight");
           window.setTimeout(function(){if(row.isConnected)row.classList.remove("ladder-find-me-highlight");},2400);
           return;
