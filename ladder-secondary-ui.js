@@ -413,6 +413,7 @@
     return output.innerHTML;
   };
 
+  // Capture this action before other app-level delegated handlers can stop bubbling.
   document.addEventListener("click",function(event){
     var findMe=event.target&&event.target.closest?event.target.closest("[data-ladder-find-me]"):null;
     if(findMe){
@@ -446,6 +447,9 @@
       requestAnimationFrame(focusMyRank);
       return;
     }
+  },true);
+
+  document.addEventListener("click",function(event){
     var more=event.target&&event.target.closest?event.target.closest("[data-ladder-more]"):null;
     if(more){
       event.preventDefault();
