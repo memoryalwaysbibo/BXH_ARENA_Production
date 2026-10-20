@@ -5723,7 +5723,7 @@ function renderDailyCheckInCard(){
   </section>`;
 }
 function titleConditionMeta(t){
-  const reserved={first_generation_warrior:'season_completed_tournaments',four_venues:'unique_venues'};
+  const reserved={first_generation_warrior:'season_completed_tournaments',four_venues:'unique_venues',rookie_hunter:'completed_tournaments',familiar_face:'completed_tournaments',triple_crown:'championships',first_checkin:'total_checkins',seven_day_guest:'total_checkins'};
   const type=String(reserved[t&&(t.id||t.titleId)]||(t&&t.conditionType)||'manual');
   const target=Math.max(1,Number((t&&t.targetValue)||1));
   const map={
