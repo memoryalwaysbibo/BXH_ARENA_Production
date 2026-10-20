@@ -1,6 +1,6 @@
 {
-  "build": "20261020.3",
+  "build": "20261020.4",
   "version": "v14.3.33",
-  "updatedAt": "2026-10-19T19:03:44.000Z",
-  "releaseTrigger": "ladder-name-rank-colors-pr541"
+  "updatedAt": "2026-10-20T01:11:38.360Z",
+  "releaseTrigger": "five-title-art-and-condition-labels"
 }
