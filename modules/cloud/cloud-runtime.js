@@ -365,7 +365,12 @@
       }catch(e){
         googleLinkProfileCache.delete(uid);
         console.warn("讀取使用者資料失敗", e);
-        return null;
+        // A failed read is NOT evidence that the profile is missing.
+        // Never route an existing user into the account-creation flow.
+        const failure = new Error("玩家資料讀取失敗，請重新連線或重新登入。");
+        failure.code = e?.code || "profile/read-failed";
+        failure.cause = e;
+        throw failure;
       }
     },
 
