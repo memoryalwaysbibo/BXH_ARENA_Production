@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.33";
+const APP_VERSION = "v14.3.34";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.34",date:"2026/10/20",timezone:"Asia/Taipei",title:"個人歷史整合與獵人執照 2.1",updateLevel:"minor",added:["個人總覽整合獵人旅程、正式戰績與可展開的生涯賽事紀錄","獵人執照 2.1 採最近 20 場有效對戰，顯示目前階級與歷史回算最高階級"],changed:["我的賽程集中顯示參賽中資訊；個人資料頁作為歷史查閱入口","已核對的測試賽獨立保留，從正式戰績與執照計算排除"],fixed:["讀取失敗可重試，部分資料缺失時暫停階級判定","手機里程碑縮排及長賽事名稱旁的展開提示"],security:[],publicSummary:"個人歷史集中查閱；生涯最高標示為歷史回算，永久授階將另行接入。"},
   {version:"v14.3.32",date:"2026/10/07",timezone:"Asia/Taipei",title:"玩家房間名單同步修復",updateLevel:"patch",added:[],changed:["快速報名名單由伺服器同步並保留報到資料"],fixed:["一般玩家房主可即時收到正備取名單，並可手動重試同步","離開房間或切換帳號時停止舊名單讀取，避免舊結果覆蓋目前畫面"],security:[]},
   {version:"v14.3.31",date:"2026/10/06",timezone:"Asia/Taipei",title:"玩家房間快速報名",updateLevel:"patch",added:["玩家一般房間可勾選立即開放報名，人數上限留空即不限人數"],changed:["報名時間與備取移至進階選填設定；已填人數上限包含參賽中的房主與現場選手","本人與兒童代報名共用快速報名規則，未填取消期限時可於開賽前取消"],fixed:["設定儲存等待雲端確認，失敗不套用報名變更，完成後可再次儲存"],security:[]},
   {version:"v14.3.23",date:"2026/10/04",timezone:"Asia/Taipei",title:"團體隊長與裁判介面完全分流",updateLevel:"patch",added:[],changed:["裁判台只顯示雙方排陣檢視、公開、退回與計分操作","玩家端僅隊長顯示本隊排陣選單"],fixed:["修正同時具有隊長與裁判身分時，裁判台仍出現本隊排陣提交表單，造成模式看似顛倒"],security:[]},
@@ -5723,7 +5724,7 @@ function renderDailyCheckInCard(){
   </section>`;
 }
 function titleConditionMeta(t){
-  const reserved={first_generation_warrior:'season_completed_tournaments',four_venues:'unique_venues',rookie_hunter:'completed_tournaments',familiar_face:'completed_tournaments',triple_crown:'championships',first_checkin:'total_checkins',seven_day_guest:'total_checkins'};
+  const reserved={first_generation_warrior:'season_completed_tournaments',four_venues:'unique_venues',rookie_hunter:'completed_tournaments',familiar_face:'completed_tournaments',triple_crown:'championships',first_checkin:'total_checkins',seven_day_guest:'checkin_streak'};
   const type=String(reserved[t&&(t.id||t.titleId)]||(t&&t.conditionType)||'manual');
   const target=Math.max(1,Number((t&&t.targetValue)||1));
   const map={

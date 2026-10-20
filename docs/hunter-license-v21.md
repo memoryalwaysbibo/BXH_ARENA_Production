@@ -32,13 +32,15 @@ Formal grade experience uses known-dated official individual matches from 2026-1
 
 Distinct opponent counts use resolved cross-event identity, never display-name matching. Event size is derived from the public canonical completed-match participant roster. Missing sizes or unresolved identities are displayed as pending evidence and cannot satisfy the corresponding gates. No new private data reads are introduced.
 
-## Remaining before public production
+## First release scope and backend follow-up
+
+2026-10-20: owner accepted phased publication after the R20 mobile layout review. The first frontend release includes the personal archive, current v2.1 calculation and an explicitly labeled historical replay. Permanent lifetime grants, old identity migrations, source metadata repairs and backend achievement backfills remain separate follow-up work. This release performs no identity migration or permanent-grade write. The frontend is served by GitHub Pages; Firebase connection is required for backend changes, not for publishing this static frontend.
 
 - Lifetime highest in this candidate is explicitly labeled historical replay under v2.1, not a permanent server-issued award. Backfill must not be misrepresented as proof that an old grade was actually awarded.
 - Add an authenticated, idempotent server-side maximum-grade ledger before claiming a permanent lifetime highest. The callable must reconstruct trusted results from the signed-in account's registration and public canonical completed matches, not accept a browser-submitted grade or match list. Persist `{uid, highestTier, ruleVersion, firstAwardedAt, awardEvidence, evaluatedAt}` under a server-only write path. Use a transaction to advance only when the verified tier outranks the saved tier, and a deterministic award ID per uid/rule version/tier to make retries safe. Preserve the highest grant when the current grade falls; put conflicting corrections or revocations into an audit/review state rather than silently rewriting an irrevocable award. Incomplete registration or identity scans must not grant a tier. Backfill the existing population under this same evidence gate and label historical replays as provisional until grant policy is approved.
 - Confirm grade-history migration/cutoff and any existing issued ranks; no automatic migration or deletion was performed.
 - Complete actual account/mobile acceptance and numeric checks against private registration identity links. The public metadata audit and numeric difference for `BXH-C6BATA` are recorded below; its source metadata and server achievement service still need the corresponding correction before claiming system-wide backend consistency.
-- PR #530 includes the verified personal scan retry, Hunter journey and paged archive UI and has merged the 2026-10-20 main snapshot. Review the remaining private-only diagnostics/guards for production suitability; the private read-only guard must never be copied into production.
+- PR #530 includes the verified personal scan retry, Hunter journey, paged archive UI and R20 compact layouts. Production source contains no private-only read guard or review banner. Latest main changes to ranking navigation and title labels must remain included at merge time.
 
 ## Public sample check
 

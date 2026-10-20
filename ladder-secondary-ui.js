@@ -423,10 +423,21 @@
       if(index<0) return;
       ladderVisibleCount=Math.max(ladderVisibleCount,10+20*Math.ceil(Math.max(0,index-9)/20));
       rerender();
-      requestAnimationFrame(function(){
+      // Wait for the leaderboard row to exist after rendering; scroll restoration
+      // and deferred rendering can otherwise make this action appear to do nothing.
+      var attempts=0;
+      function focusMyRank(){
         var row=document.getElementById("ladder-my-row");
-        if(row) row.scrollIntoView({behavior:"smooth",block:"center"});
-      });
+        if(row&&row.isConnected){
+          row.scrollIntoView({behavior:"smooth",block:"center"});
+          row.classList.add("ladder-find-me-highlight");
+          window.setTimeout(function(){if(row.isConnected)row.classList.remove("ladder-find-me-highlight");},2400);
+          return;
+        }
+        if(++attempts<12){requestAnimationFrame(focusMyRank);return;}
+        if(typeof showToast==="function")showToast("無法定位榜上位置，請重新整理排行榜");
+      }
+      requestAnimationFrame(focusMyRank);
       return;
     }
     var more=event.target&&event.target.closest?event.target.closest("[data-ladder-more]"):null;
@@ -507,6 +518,7 @@
     ".ladder-my-rank-label{grid-column:1/-1;font-size:14px;font-weight:900;color:var(--gold);white-space:nowrap}.ladder-my-rank-label span{margin-left:8px;color:var(--metal);font-size:12px}"+
     ".ladder-my-rank-content{display:flex;align-items:center;min-width:0;gap:10px}.ladder-my-rank-content>strong{font:900 16px var(--font-d);color:var(--gold);white-space:nowrap}.ladder-my-rank-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800;font-size:16px}.ladder-my-rank-content .ladder-tier-display{flex-direction:row;gap:0;flex:none}.ladder-my-rank-content .ladder-tier-emblem{width:40px;height:40px;flex-basis:40px}.ladder-my-rank-content .ladder-tier-name{display:none}.ladder-my-rank-points{white-space:nowrap;color:var(--gold);font-weight:900;font-size:16px}.ladder-my-rank-empty{grid-column:1/-1;font-size:12px;color:var(--metal)}.ladder-my-rank .btn{white-space:nowrap}"+
     "#ladder-my-row{background:rgba(217,185,92,.08);box-shadow:inset 3px 0 var(--gold)}"+
+    ".ladder-find-me-highlight{outline:2px solid var(--gold);outline-offset:-2px;transition:outline-color .3s}"+
     "@media(max-width:520px){.ladder-my-rank{column-gap:8px;padding:12px 10px}.ladder-my-rank-content{gap:5px}.ladder-my-rank-content>strong,.ladder-my-rank-name,.ladder-my-rank-points{font-size:13px}.ladder-my-rank-content .ladder-tier-emblem{width:30px;height:30px;flex-basis:30px}.ladder-my-rank .btn{font-size:11px;padding:7px}}"+
     "@media(max-width:350px){.ladder-my-rank{grid-template-columns:1fr}.ladder-my-rank .btn{justify-self:end}}"+
     ".ladder-rank-grid{display:grid;grid-template-columns:64px minmax(0,1fr) 96px 78px;gap:8px;align-items:center;min-width:0;}"+
