@@ -5728,6 +5728,7 @@ function titleConditionMeta(t){
   const type=String(reserved[t&&(t.id||t.titleId)]||(t&&t.conditionType)||'manual');
   const target=Math.max(1,Number((t&&t.targetValue)||1));
   const map={
+    official_matches:{category:'official',label:'正式對戰累積',scope:'僅完成結算的 BXH 官方積分賽內、可核對帳號的已完成對戰計入；每場對局計1場，輪空、取消、未到、測試對戰不計。',task:`累積完成 ${target} 場 BXH 官方積分賽正式對戰`},
     completed_tournaments:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽計入；一般交流賽、測試賽與封測賽事不計入。',task:`完成 ${target} 場 BXH 官方積分賽`},
     season_completed_tournaments:{category:'official',label:'第一賽季成就',scope:'僅 ARENA 第一賽季（S1）完成結算的 BXH 官方積分賽計入；一般交流賽、測試賽不計入。取得後永久持有。',task:`第一賽季完成 ${target} 場 BXH 官方積分賽`},
     unique_venues:{category:'official',label:'正式場地征戰',scope:'僅完成結算的 BXH 官方積分賽計入；依正式場地識別碼去重，同一場地參賽多次仍只計一處。一般交流賽、測試賽不計入。',task:`在 ${target} 個不同正式場地完成 BXH 官方積分賽`},
