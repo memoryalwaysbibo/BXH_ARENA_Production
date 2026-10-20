@@ -5769,7 +5769,7 @@ function renderPlayerTitleCenter(p){
   if(engagementError && !engagementSnapshot) return `<div class="panel engagement-panel"><div class="engagement-disabled">${esc(engagementError)}<div class="btn-row" style="justify-content:center;margin-top:10px;"><button class="btn btn-ghost btn-sm" data-action="player-refresh-engagement">重新連線</button></div></div></div>`;
   const settings=engagementSettings();
   if(settings.titlesEnabled!==true) return "";
-  const catalog=(engagementSnapshot&&engagementSnapshot.catalog)||[];
+  const catalog=[...((engagementSnapshot&&engagementSnapshot.catalog)||[])].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
   const earned=(engagementSnapshot&&engagementSnapshot.earned)||[];
   const earnedIds=earnedTitleIds();
   const equipped=p.equippedTitleId||"";
