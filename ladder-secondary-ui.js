@@ -143,7 +143,7 @@
         "戰場熟面孔":"assets/title-rare-familiar-face-v1.webp",
         "初來乍到":"assets/title-common-first-checkin-v1.webp",
         "七日常客":"assets/title-common-seven-day-guest-v1.webp",
-        "三冠王":"assets/title-legendary-triple-crown-v2.webp",
+        "三冠王":"assets/title-legendary-triple-crown-v3.webp",
         "二當家":"assets/title-limited-co-leader.webp",
         "三當家":"assets/title-limited-third-leader.webp",
         "BXH 工作人員":"assets/title-limited-bxh-staff.webp",
