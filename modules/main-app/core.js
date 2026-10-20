@@ -19931,9 +19931,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     playerApplyBusy = true; playerApplyError=""; render();
     (async ()=>{
       const isExistingAccount = !!pendingExistingAccountProfile;
-      const result = isExistingAccount
-        ? await window.cloudAuth.completeExistingAccountPlayerProfile(pending.uid, { realName, nickname, phone })
-        : await window.cloudAuth.completeNewPlayerProfile(pending.uid, { email: pending.email, realName, nickname, phone });
+      let result;
+      try{
+        const status=await window.cloudAuth.getUserProfileStatus(pending.uid);
+        if(status.status==="found" && !isExistingAccount){
+          playerApplyError="此帳號已有玩家資料，請使用「重新讀取帳號」恢復登入。";
+          playerApplyBusy=false;render();return;
+        }
+        if(status.status!=="found" && status.status!=="not_found"){
+          playerApplyError="無法確認帳號資料，請重新讀取或登出後重新登入。";
+          playerApplyBusy=false;render();return;
+        }
+        result = isExistingAccount
+          ? await window.cloudAuth.completeExistingAccountPlayerProfile(pending.uid, { realName, nickname, phone })
+          : await window.cloudAuth.completeNewPlayerProfile(pending.uid, { email: pending.email, realName, nickname, phone });
+      }catch(e){
+        playerApplyBusy=false;
+        playerApplyError="帳號驗證或資料設定失敗，請重新讀取或登出後重新登入。";
+        render();return;
+      }
       playerApplyBusy = false;
       if(!result.ok){ playerApplyError = result.error || "設定失敗，請稍後再試"; render(); return; }
       const profile = await window.cloudAuth.getUserProfile(pending.uid);
