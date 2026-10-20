@@ -13,4 +13,8 @@ assert.ok(create, 'completeNewPlayerProfile must exist');
 assert.match(create[0], /authHandle\?\.currentUser\?\.uid!==uid/, 'Creation requires matching current user');
 assert.match(create[0], /getDocFromServer\(fx\.doc\(dbHandle, USERS_COLLECTION, uid\)\)/, 'Creation checks server document');
 assert.match(create[0], /if\(existing\.exists\(\)\) return/, 'Creation refuses existing profile');
+const existing = source.match(/async completeExistingAccountPlayerProfile\(uid,[\s\S]*?\n    \},\n\n    async updateMyPlayerProfile/);
+assert.ok(existing, 'existing-account completion must exist');
+assert.match(existing[0], /existing\.profileCompleted===true/, 'completed profiles must not be initialized again');
+assert.doesNotMatch(existing[0], /realNameVerified\s*:\s*false/, 'existing verification must be preserved');
 console.log('PASS PWA profile read and onboarding safeguards (static regression)');
