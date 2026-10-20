@@ -5728,6 +5728,7 @@ function titleConditionMeta(t){
   const type=String(reserved[t&&(t.id||t.titleId)]||(t&&t.conditionType)||'manual');
   const target=Math.max(1,Number((t&&t.targetValue)||1));
   const map={
+    official_matches:{category:'official',label:'正式對戰累積',scope:'僅完成結算的 BXH 官方積分賽內、可核對帳號的已完成對戰計入；每場對局計1場，輪空、取消、未到、測試對戰不計。',task:`累積完成 ${target} 場 BXH 官方積分賽正式對戰`},
     completed_tournaments:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽計入；一般交流賽、測試賽與封測賽事不計入。',task:`完成 ${target} 場 BXH 官方積分賽`},
     season_completed_tournaments:{category:'official',label:'第一賽季成就',scope:'僅 ARENA 第一賽季（S1）完成結算的 BXH 官方積分賽計入；一般交流賽、測試賽不計入。取得後永久持有。',task:`第一賽季完成 ${target} 場 BXH 官方積分賽`},
     unique_venues:{category:'official',label:'正式場地征戰',scope:'僅完成結算的 BXH 官方積分賽計入；依正式場地識別碼去重，同一場地參賽多次仍只計一處。一般交流賽、測試賽不計入。',task:`在 ${target} 個不同正式場地完成 BXH 官方積分賽`},
@@ -5768,7 +5769,7 @@ function renderPlayerTitleCenter(p){
   if(engagementError && !engagementSnapshot) return `<div class="panel engagement-panel"><div class="engagement-disabled">${esc(engagementError)}<div class="btn-row" style="justify-content:center;margin-top:10px;"><button class="btn btn-ghost btn-sm" data-action="player-refresh-engagement">重新連線</button></div></div></div>`;
   const settings=engagementSettings();
   if(settings.titlesEnabled!==true) return "";
-  const catalog=(engagementSnapshot&&engagementSnapshot.catalog)||[];
+  const catalog=[...((engagementSnapshot&&engagementSnapshot.catalog)||[])].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
   const earned=(engagementSnapshot&&engagementSnapshot.earned)||[];
   const earnedIds=earnedTitleIds();
   const equipped=p.equippedTitleId||"";
@@ -13394,7 +13395,7 @@ function renderTitleEditor(inline=false){
  <div class="field"><label>榮譽等級</label><select id="title-editor-rarity-tier">${Object.entries({common:'一般',rare:'稀有',epic:'史詩',legendary:'傳說',eternal:'永恆',...(titleTierValue(d)==='unrated'?{unrated:'待分級（舊制）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleTierValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">決定稱號本身的榮譽層級與視覺規格：一般 → 稀有 → 史詩 → 傳說 → 永恆。</div></div>
  <div class="field"><label>取得標籤</label><select id="title-editor-limited-type">${Object.entries({none:'常態取得',event:'活動限定',season:'賽季限定',identity:'身分限定',unique:'唯一限定',launch:'開服限定',beta:'封測限定',...(titleLimitedTypeValue(d)==='legacy'?{legacy:'限定（舊制待整理）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleLimitedTypeValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">描述「為什麼難以取得」，不影響榮譽等級；唯一限定會自動限制正式持有人數為 1。</div></div>
  <label><input id="title-editor-permanent" type="checkbox" ${d.isPermanent!==false?'checked':''}> 永久持有（取消則標記為期間制）</label>
- <div class="field"><label>達成條件</label><select id="title-editor-condition">${Object.entries({manual:'指定 UID 人工授予',profile_completion:'個人資料完成度達100%',hosted_tournaments:'成功完成主辦場數',completed_tournaments:'正式賽事完成場數',championships:'正式賽事冠軍次數',best_placement:'正式賽事名次不大於',total_checkins:'正式累積簽到天數',checkin_streak:'正式連續簽到天數',...(['first_exit_1','first_exit_3','first_exit_5'].includes(d.titleId)?{first_match_exit_streak:'連續賽事首戰出局場數'}:{}),...(d.titleId==='top8_debut'?{verified_top8_debut:'首次正式賽事八強（至少32位實際出賽）'}:{}),...(d.titleId==='top16_debut'?{verified_top16_debut:'首次正式賽事十六強'}:{}),...(d.titleId==='top8_wall'?{verified_top8_exit_count:'累計五次八強（至少32位實際出賽）'}:{}),...(d.titleId==='pioneer'?{pioneer_registration:'開拓者：9/21 23:59 前註冊自動授予'}:{})}).map(([k,v])=>`<option value="${k}" ${d.conditionType===k?'selected':''}>${v}</option>`).join('')}</select></div>
+ <div class="field"><label>達成條件</label><select id="title-editor-condition">${Object.entries({manual:'指定 UID 人工授予',profile_completion:'個人資料完成度達100%',hosted_tournaments:'成功完成主辦場數',official_matches:'官方積分賽正式對戰場數',completed_tournaments:'正式賽事完成場數',championships:'正式賽事冠軍次數',best_placement:'正式賽事名次不大於',total_checkins:'正式累積簽到天數',checkin_streak:'正式連續簽到天數',...(['first_exit_1','first_exit_3','first_exit_5'].includes(d.titleId)?{first_match_exit_streak:'連續賽事首戰出局場數'}:{}),...(d.titleId==='top8_debut'?{verified_top8_debut:'首次正式賽事八強（至少32位實際出賽）'}:{}),...(d.titleId==='top16_debut'?{verified_top16_debut:'首次正式賽事十六強'}:{}),...(d.titleId==='top8_wall'?{verified_top8_exit_count:'累計五次八強（至少32位實際出賽）'}:{}),...(d.titleId==='pioneer'?{pioneer_registration:'開拓者：9/21 23:59 前註冊自動授予'}:{})}).map(([k,v])=>`<option value="${k}" ${d.conditionType===k?'selected':''}>${v}</option>`).join('')}</select></div>
  <div class="field"><label>門檻數值（人工授予填1，資料完成度填100）</label><input id="title-editor-target" type="number" min="1" max="100000" value="${Number(d.targetValue)||1}"></div>
  <div class="field"><label>說明</label><textarea id="title-editor-description" maxlength="500">${esc(d.description||'')}</textarea></div>
  <label><input id="title-editor-active" type="checkbox" ${d.isActive?'checked':''}>啟用</label>
