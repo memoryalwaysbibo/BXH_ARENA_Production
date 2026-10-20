@@ -2195,7 +2195,7 @@
     // 的公開安全欄位，不含任何私人資料。
     async getPublicTournamentSummary(code){
       try{
-        const snap = personalPublicDocs.get(code)||await fx.getDoc(fx.doc(dbHandle, "publicTournaments", code));
+        const snap = await fx.getDoc(fx.doc(dbHandle, "publicTournaments", code));
         if(!snap.exists()) return null;
         const d = snap.data();
         let parsedData=null;
