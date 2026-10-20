@@ -187,6 +187,8 @@ jobs:
           node --test tests/double-elimination-core.test.cjs
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
+      - name: Verify personal history and Hunter License 2.1
+        run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs
       - name: Verify public catalog evidence, projection, UI contract and artifact boundary
         run: node --test tests/bey-catalog-public-evidence-policy.test.cjs tests/bey-catalog-public-ui.test.cjs tests/bey-catalog-candidate.test.cjs tests/bey-catalog-pending.test.cjs tests/bey-catalog-public-package.test.cjs
       - name: Verify ladder V1 scoring and inline-script syntax

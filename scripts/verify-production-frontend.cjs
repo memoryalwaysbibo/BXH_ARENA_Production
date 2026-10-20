@@ -270,7 +270,7 @@ mustInclude('function buildHunterTournamentMatchRecords(st)','Hunter tournament 
 mustInclude('reason:"round-ledger-mismatch"','Hunter round/score mismatch guard missing');
 mustInclude('analyzable:false,roundCount:0','Quick decision must be excluded from Hunter round analysis');
 console.log('PASS Hunter Profile P2 round-ledger core');
-mustInclude('async queryMyHunterMatches(){','Hunter P3 player match query missing');
+mustInclude('async queryMyHunterMatches(options={}){','Hunter P3 player match query missing');
 mustInclude('function loadHunterProfile(force=false)','Hunter P3 loader missing');
 mustInclude('function hunterCareerSummary(records)','Hunter P3 career aggregation missing');
 mustInclude('data-action="hunter-record-filter"','Hunter P3 type filter missing');
@@ -518,7 +518,7 @@ mustInclude('persistentAwardGate:"pending_server_sync"','Hunter P6.7 initial ser
 mustInclude('function hunterAchievementIntegrityAuditHtml(audit)','Hunter P6.6 audit UI missing');
 mustInclude('歷史回算檢查','Hunter P6.6 audit panel label missing');
 mustInclude('永久徽章只由伺服器複核並寫入','Hunter P6.7 server-only write disclosure missing');
-mustInclude('integrityAudit:hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore)','Hunter P6.6 load-time audit wiring missing');
+mustInclude('loaded.integrityAudit=hunterBuildAchievementIntegrityAudit(sourceRecords,canonicalRecords,skippedRecords,achievementCore)','Hunter P6.6 load-time audit wiring missing');
 mustInclude('if(!result||result.ok!==true||!Array.isArray(result.records)) throw new Error("hunter-profile-invalid-response")','Hunter audit must reject failed responses');
 mustInclude('integrityAudit:null','Hunter audit must not report success after failed load');
 mustInclude('partial_read_failures','Hunter audit must identify skipped tournament reads');
@@ -533,8 +533,8 @@ mustInclude('function hunterPermanentAwardSummaryHtml(core)','Hunter P6.7 perman
 mustInclude('PERMANENT AWARDS','Hunter P6.7 permanent award panel missing');
 mustInclude('P6.7</span>','Hunter P6.7 profile badge missing');
 mustInclude('window.engagementService.syncHunterAchievements','Hunter P6.7 load-time sync wiring missing');
-mustInclude('hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,permanentAwards||null)','Hunter P6.7 server snapshot application missing');
-mustInclude('hunterApplyPermanentAchievementSnapshot(hunterProfileCache.achievementCore,null)','Hunter P6.7 safe fallback missing');
+mustInclude('hunterApplyPermanentAchievementSnapshot(achievementCore,permanentAwards||null)','Hunter P6.7 server snapshot application missing');
+mustInclude('hunterApplyPermanentAchievementSnapshot(achievementCore,null)','Hunter P6.7 safe fallback missing');
 console.log('PASS Hunter Profile P6.7 permanent achievement awards');
 
 mustInclude('const HUNTER_OFFICIAL_LAUNCH_AT=Date.parse("2026-10-01T00:00:00+08:00");','Hunter official launch cutoff missing');

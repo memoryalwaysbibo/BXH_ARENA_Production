@@ -168,7 +168,8 @@ function hunterRecordMode(record){
   if(version==="bxh-enchantment-v2")return "enchantment";
   if(version&&version!=="bxh-4pt-v1")return "unknown";
   if(record&&record.playMode==="enchantment")return version?"unknown":"enchantment";
-  if(!version&&(record&&record.roundsPerspective||[]).some(ev=>ev.v===2))return "unknown";
+  const rounds=record&&record.roundsPerspective;
+  if(!version&&Array.isArray(rounds)&&rounds.some(ev=>ev&&ev.v===2))return "unknown";
   return "standard";
 }
 function hunterFilterByMode(records,mode="all"){
