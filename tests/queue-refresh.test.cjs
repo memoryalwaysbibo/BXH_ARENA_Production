@@ -31,12 +31,13 @@ test('retains one existing 20-second timer and deduplicates a family event read'
   assert.equal(h.timers.get(handle).ms, 20000);
   await h.fire(); assert.deepEqual(h.reads, ['BXH-ONE']); assert.equal(h.context.renders, 1);
 });
-test('personal overview shares the schedule timer and stops reading on career tab',async()=>{
- const h=harness();h.schedule();const timer=h.context.smartCallAutoRefreshTimer;
+test('personal library cancels schedule polling and returning to schedule restores one timer',async()=>{
+ const h=harness();h.schedule();assert.equal(h.timers.size,1);
  h.context.playerActiveTab='profile';h.context.playerProfileSection='overview';h.schedule();
- assert.equal(h.timers.size,1);assert.equal(h.context.smartCallAutoRefreshTimer,timer);
+ assert.equal(h.timers.size,0);assert.deepEqual(h.reads,[]);
+ h.context.playerProfileSection='career';h.schedule();assert.equal(h.timers.size,0);
+ h.context.playerActiveTab='registered';h.schedule();assert.equal(h.timers.size,1);
  await h.fire();assert.deepEqual(h.reads,['BXH-ONE']);
- h.schedule();h.context.playerProfileSection='career';h.schedule();assert.equal(h.timers.size,0);
 });
 test('hidden or disabled reminders add no queue reads and clear pending timer', () => {
   for (const apply of [c => { c.document.hidden = true; }, c => { c.enabled = false; }, c => { c.playerActiveTab = 'home'; }]) {
