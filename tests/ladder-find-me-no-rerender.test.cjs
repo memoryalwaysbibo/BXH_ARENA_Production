@@ -9,7 +9,7 @@ const end=source.indexOf("    var more=event.target",start);
 const handler=source.slice(start,end);
 test("find-me only expands when current player is outside rendered rows",()=>{
   assert.match(handler,/if\(targetCount>ladderVisibleCount\)/);
-  assert.match(handler,/ladderVisibleCount=Math\.max\(ladderVisibleCount,index\+1\)/);
+  assert.match(handler,/targetCount=Math\.max\(ladderVisibleCount,index\+1\)/);
 });
 test("find-me patches the ranking board instead of triggering a full app render",()=>{
   assert.match(handler,/board\.innerHTML=updated\.innerHTML/);
