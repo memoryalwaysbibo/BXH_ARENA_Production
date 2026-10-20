@@ -463,8 +463,21 @@
         if(typeof showToast==="function")showToast("目前榜單找不到你的排名，請確認賽季與地區篩選");
         return;
       }
-      ladderVisibleCount=Math.max(ladderVisibleCount,index+1);
-      rerender();
+      var targetCount=Math.max(ladderVisibleCount,index+1);
+      if(targetCount>ladderVisibleCount){
+        ladderVisibleCount=targetCount;
+        // Update only the ranking board. Full app rerenders reset the viewport
+        // and cause an obvious flash on mobile Safari.
+        var board=document.querySelector(".ladder-rank-board-v2");
+        if(board){
+          var template=document.createElement("template");
+          var adminMode=!!board.querySelector(".ladder-rank-admin-actions");
+          template.innerHTML=ladderRankingTableHtml(adminMode);
+          var updated=template.content.querySelector(".ladder-rank-board-v2");
+          if(updated)board.innerHTML=updated.innerHTML;
+          else rerender();
+        }else rerender();
+      }
       // The app can restore its previous viewport after rerender(). Do not
       // treat a highlight as evidence that the row was actually scrolled into view.
       var attempts=0;
