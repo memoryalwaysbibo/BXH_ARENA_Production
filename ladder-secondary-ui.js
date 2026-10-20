@@ -210,6 +210,43 @@
     catch(e){return new Intl.Collator("zh-TW",{sensitivity:"base",numeric:true});}
   })();
 
+  // Scroll the real vertical scroll container and verify that the row moved.
+  // iOS Safari and the app's viewport restoration can ignore scrollIntoView().
+  function ladderScrollToRankRow(row,attempt){
+    if(!row||!row.isConnected)return;
+    var root=document.scrollingElement||document.documentElement;
+    var scroller=null;
+    for(var el=row.parentElement;el&&el!==document.body&&el!==document.documentElement;el=el.parentElement){
+      var style=window.getComputedStyle(el);
+      if(/auto|scroll|overlay/.test(style.overflowY)&&el.scrollHeight>el.clientHeight+2){
+        scroller=el;break;
+      }
+    }
+    var rect=row.getBoundingClientRect();
+    var box=scroller?scroller.getBoundingClientRect():{top:0,height:window.innerHeight};
+    var viewportHeight=scroller?scroller.clientHeight:window.innerHeight;
+    var delta=rect.top-box.top-(viewportHeight-rect.height)/2;
+    var target=(scroller?scroller.scrollTop:(window.scrollY||root.scrollTop||0))+delta;
+    var max=(scroller?scroller.scrollHeight-scroller.clientHeight:root.scrollHeight-window.innerHeight);
+    target=Math.max(0,Math.min(Math.max(0,max),target));
+    if(scroller){
+      if(typeof scroller.scrollTo==="function")scroller.scrollTo({top:target,behavior:"auto"});
+      else scroller.scrollTop=target;
+    }else{
+      window.scrollTo({top:target,behavior:"auto"});
+    }
+    window.setTimeout(function(){
+      if(!row.isConnected)return;
+      var current=row.getBoundingClientRect();
+      var bounds=scroller?scroller.getBoundingClientRect():{top:0,bottom:window.innerHeight};
+      var visible=current.top>=bounds.top+4&&current.bottom<=bounds.bottom-4;
+      if(visible)return;
+      if(attempt<2){ladderScrollToRankRow(row,attempt+1);return;}
+      console.warn("[ladder-find-me] scroll target not visible", {attempts:attempt+1,scroller:scroller&&scroller.className});
+      if(typeof showToast==="function")showToast("已找到排名，但無法自動捲動，請手動向下查看");
+    },120);
+  }
+
   function rerender(){
     try{
       if(typeof renderPreservingScroll==="function") renderPreservingScroll();
@@ -428,21 +465,26 @@
       }
       ladderVisibleCount=Math.max(ladderVisibleCount,index+1);
       rerender();
-      // Wait for the leaderboard row to exist after rendering; scroll restoration
-      // and deferred rendering can otherwise make this action appear to do nothing.
+      // The app can restore its previous viewport after rerender(). Do not
+      // treat a highlight as evidence that the row was actually scrolled into view.
       var attempts=0;
       function focusMyRank(){
         var row=document.getElementById("ladder-my-row");
-        if(row&&row.isConnected){
-          row.scrollIntoView({behavior:"auto",block:"center"});
-          // Reapply after the preserving-scroll render has settled.
-          requestAnimationFrame(function(){if(row.isConnected)row.scrollIntoView({behavior:"smooth",block:"center"});});
-          row.classList.add("ladder-find-me-highlight");
-          window.setTimeout(function(){if(row.isConnected)row.classList.remove("ladder-find-me-highlight");},2400);
+        if(!row||!row.isConnected){
+          if(++attempts<12){requestAnimationFrame(focusMyRank);return;}
+          if(typeof showToast==="function")showToast("無法定位榜上位置，請重新整理排行榜");
           return;
         }
-        if(++attempts<12){requestAnimationFrame(focusMyRank);return;}
-        if(typeof showToast==="function")showToast("無法定位榜上位置，請重新整理排行榜");
+        // Allow the app's viewport restoration to finish before moving the
+        // actual scroll container (which may not be the document on mobile).
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){
+            if(!row.isConnected)return;
+            row.classList.add("ladder-find-me-highlight");
+            window.setTimeout(function(){if(row.isConnected)row.classList.remove("ladder-find-me-highlight");},2400);
+            ladderScrollToRankRow(row,0);
+          });
+        });
       }
       requestAnimationFrame(focusMyRank);
       return;
