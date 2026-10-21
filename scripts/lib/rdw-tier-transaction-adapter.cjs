@@ -9,6 +9,7 @@ async function sealMatchTierPair({tx,matchRef,eventId,matchId,revision=0,playerA
   const [matchSnap,aSnap,bSnap]=await Promise.all([tx.get(matchRef),tx.get(playerA.ref),tx.get(playerB.ref)]);
   if(!aSnap?.exists||!bSnap?.exists)throw Error('player-grade-missing');
   const a=aSnap.data(),b=bSnap.data();
+  if(!a||!b||typeof a!=='object'||typeof b!=='object')throw Error('player-grade-missing');
   if(a.uid!==playerA.uid||b.uid!==playerB.uid)throw Error('player-identity-mismatch');
   // A verified server-issued current tier, not client supplied grade or historical replay.
   function tier(p){const g=p?.permanentLicenseCurrent;if(!g||g.source!=='server'||g.verified!==true||g.version!=='hunter-license-v2.1'||typeof g.tier!=='string')throw Error('verified-current-tier-required');return g.tier;}
