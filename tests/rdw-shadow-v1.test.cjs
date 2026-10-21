@@ -25,3 +25,10 @@ test('only verified server snapshots captured before start can be weighted',()=>
     assert.equal(RDW.verifiedPreMatchWeight({...s,...patch}),null);
   assert.equal(RDW.verifiedPreMatchWeight(null),null);
 });
+
+test('ungraded players receive neutral 100% in protected shadow calculation',()=>{
+  for(const t of tiers){assert.equal(RDW.protectedWeight('ungraded',t),1);assert.equal(RDW.protectedWeight(t,'ungraded'),1);}
+  assert.equal(RDW.protectedWeight('c','a'),1.02);
+  const snapshot={source:'server',verified:true,capturedAt:100,matchStartedAt:200,selfTierBefore:'ungraded',opponentTierBefore:'national'};
+  assert.equal(RDW.verifiedPreMatchWeight(snapshot),1);
+});
