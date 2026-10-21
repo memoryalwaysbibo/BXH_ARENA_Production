@@ -341,6 +341,10 @@ jobs:
             exit "$rc"
           fi
 
+      - name: Probe room-owner persistence on isolated Firestore Emulator
+        shell: bash
+        run: npx firebase emulators:exec --only firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "node tests/room-owner-emulator.cjs"
+
       - name: Install ARENA PK server SDK for integration tests
         working-directory: hunter-clash/arena
         run: npm ci --ignore-scripts
