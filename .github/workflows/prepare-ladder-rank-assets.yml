@@ -1,0 +1,48 @@
+name: Prepare Ladder Rank WebP Assets
+on:
+  push:
+    branches:
+      - feat/ladder-rank-independent-webp-20261021
+    paths:
+      - scripts/split-ladder-rank-badges.py
+      - .github/workflows/prepare-ladder-rank-assets.yml
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install image optimizer
+        run: python -m pip install pillow
+      - name: Split existing original sprite
+        run: python scripts/split-ladder-rank-badges.py
+      - name: Assert nine optimized transparent images
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          files = sorted(Path('assets/rank-badges').glob('rank-*.webp'))
+          assert len(files) == 9, len(files)
+          for f in files:
+              im = Image.open(f)
+              assert im.size == (256,256)
+              assert im.mode == 'RGBA'
+              assert im.getchannel('A').getextrema()[0] == 0
+              assert f.stat().st_size < 100000, (f, f.stat().st_size)
+              print(f, f.stat().st_size)
+          PY
+      - name: Commit generated badge files to this feature branch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/rank-badges/
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(ladder): add nine lightweight standalone WebP badges"
+            git push origin HEAD:feat/ladder-rank-independent-webp-20261021
+          fi
