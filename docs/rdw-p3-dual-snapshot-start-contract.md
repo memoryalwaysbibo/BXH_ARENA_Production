@@ -10,7 +10,7 @@ Status: design accepted by owner; **not deployed or wired to production**.
 
 ## Proposed two-layer snapshot
 
-1. **Tournament baseline**: after the latest roster/draw revision is validated, the host confirms start. The trusted backend transaction reads canonical entrants and their server-verified CURRENT tiers, seals the event baseline keyed by event + draw revision, and atomically transitions the event to started. If capture fails, reject start with an actionable error; do not silently start.
+1. **Tournament baseline**: after the latest roster/draw revision is validated, the host confirms start. The trusted backend transaction reads canonical entrants and their server-verified CURRENT tiers, seals the event baseline keyed by event + draw revision, and atomically transitions the event to started. If capture fails, first check whether the server already committed a snapshot; then offer retry or an explicitly authorized RDW-only PASS. PASS permits normal tournament start without claiming a verified snapshot. Never bypass existing roster, identity, or tournament safety checks.
 2. **Match baseline**: when each actual pairing is committed to a trusted server start transition, seal both perspectives using the same server timestamp, matchId and dispatch revision. Later-round opponents must never be guessed from the initial draw.
 3. Repeated requests return the existing snapshot; changed entrants, tiers, revision or timestamps must not overwrite sealed evidence. Cancellation and replay require separate auditable revision entries.
 4. No RDW writes to current tier, highest lifetime award, XP, season points or referee scoring. The shadow evaluator reads snapshots only.
@@ -26,3 +26,14 @@ Status: design accepted by owner; **not deployed or wired to production**.
 ## Important
 
 Do not hook snapshot capture into `courtCallService.notify`: calling a player is not necessarily starting a match.
+
+## RDW-only PASS fallback (approved)
+
+- Trigger: RDW capture fails or remains unconfirmed after a bounded retry/readback. Never show PASS for a roster or authorization failure.
+- Host must explicitly confirm PASS; no silent fallback. Record actor UID, event code, draw revision, server time, error category and a stable idempotency key in an append-only audit trail.
+- PASS bypasses **only RDW snapshot capture**, not match authorization, bracket validity, scoring, or settlement.
+- Shadow evaluator marks skipped/unverified snapshots as ineligible. No retroactive claim that a late upload is a pre-match verified snapshot.
+- A timeout may mean the server committed. Read back before PASS, and if a verified snapshot already exists, use it rather than marking skipped.
+- Repeated PASS requests are idempotent; a changed draw revision requires fresh validation.
+- This PASS is distinct from the player's existing tournament PASS rule.
+- Feature remains OFF in production until end-to-end emulator verification and explicit owner release approval.
