@@ -43,3 +43,16 @@ test('public mirror is separate from top-level hostName and requires explicit di
  assert.ok(mirror.includes('eventInfo:buildPublicEventInfo(state)'));
  assert.ok(!/hostName\s*:/.test(mirror));
 });
+
+test('lobby actually prefers stale public hostName over creator name',()=>{
+ const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+ const from=core.indexOf('function lobbySummary(raw){');
+ const to=core.indexOf('function lobbyNewestFirst(',from);
+ assert.ok(from>=0&&to>from,'lobby summary implementation exists');
+ const getSummary=new Function('lobbyRegistrationStateKnown','getEffectiveRegistrationStatus','isCommunityQuickRegistration','canonicalPublicTournamentPhase','communityRegistrationParticipantCount','normalizeDateTime','lobbyEventStartMs',core.slice(from,to)+';return lobbySummary;')(
+  ()=>false,()=>null,()=>false,()=> 'waiting',()=>0,()=>null,()=>0);
+ const base={code:'BXH-TTSMJJ',eventAuthority:'official',createdByName:'翔宇',parsedData:{meta:{name:'北京麻辣鍋'}}};
+ assert.equal(getSummary({...base,hostName:'黑爸'}).hostName,'黑爸','stale public field currently wins');
+ assert.equal(getSummary({...base,hostName:'翔宇'}).hostName,'翔宇');
+ assert.equal(getSummary({...base,hostName:''}).hostName,'翔宇','creator label used only as fallback');
+});
