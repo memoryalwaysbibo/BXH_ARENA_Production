@@ -1,0 +1,74 @@
+{
+  "status": "review-draft; NOT production ready",
+  "notes": [
+    "Eight delivered PNG drafts preserved byte-for-byte; no -clean variants used.",
+    "Visible edge fringing remains pending visual QA.",
+    "Staging assets only: no runtime image mapping, title award, license rules, player writes, deployment or production activation."
+  ],
+  "files": [
+    {
+      "grade": "ungraded",
+      "path": "assets/hunter-ranks/review-v1/ungraded.png",
+      "bytes": 1390936,
+      "sha256": "887ed2f9441fc40e39a0672d5dc2155503bef67e1aaa65b1c1162833ebe6271a",
+      "git_blob_sha": "788131748e6a3521985f90662f521dd0c72cfce1",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    },
+    {
+      "grade": "e",
+      "path": "assets/hunter-ranks/review-v1/e.png",
+      "bytes": 1271772,
+      "sha256": "47c876b1cb5af531c1b8a6612b88778f1618e35a09998df21eb516d4978a561b",
+      "git_blob_sha": "54a9f0173791416b9121d48737108c5ec6741e7c",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    },
+    {
+      "grade": "d",
+      "path": "assets/hunter-ranks/review-v1/d.png",
+      "bytes": 1351856,
+      "sha256": "b751bce251e1d8f2f1f65fbce62ef46e4e01dd020075015344f9b3087119fa52",
+      "git_blob_sha": "2bc68b9ad962a1aa1e4db2cb33e5a4d06b3370aa",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    },
+    {
+      "grade": "c",
+      "path": "assets/hunter-ranks/review-v1/c.png",
+      "bytes": 1273173,
+      "sha256": "28614f618524726d769925f171450a8e3aa27e40c3f0ce35b267b3cd1ff73d60",
+      "git_blob_sha": "2967400e779add0ffcb89749877e87ec067c4eec",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    },
+    {
+      "grade": "b",
+      "path": "assets/hunter-ranks/review-v1/b.png",
+      "bytes": 1243482,
+      "sha256": "15a0b73caf1b63b44a31fa7851ad3bd2845364479fd3e8e55d2984a43e813c74",
+      "git_blob_sha": "c13df1bd6001fce7e1e834b80a683ca6b229f6e2",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    },
+    {
+      "grade": "a",
+      "path": "assets/hunter-ranks/review-v1/a.png",
+      "bytes": 1423046,
+      "sha256": "e6574a545a45d735cff6c52a8419e1bfdb5fc17a5d1d4efc6dfa69fd5828c56d",
+      "git_blob_sha": "9bc3abc9b74e8bd6a3659eec297be491338defe4",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    },
+    {
+      "grade": "s",
+      "path": "assets/hunter-ranks/review-v1/s.png",
+      "bytes": 1368066,
+      "sha256": "05e60a60bcd00d87856b1083df0cb33e845925ebc3edced363b5612dc4038d06",
+      "git_blob_sha": "9e220f4b15009af88e9704c0e5099cfd17c1cac3",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    },
+    {
+      "grade": "national",
+      "path": "assets/hunter-ranks/review-v1/national.png",
+      "bytes": 1894405,
+      "sha256": "9adfa18e9d639421cd92741859a3a99f52d1bddfa726279cf7016c8917ec95f6",
+      "git_blob_sha": "e14ae94238984f1951b6f99d9596e4557866232b",
+      "qa_status": "review-draft; visible edge fringing; not production ready"
+    }
+  ]
+}
