@@ -68,3 +68,21 @@ test('owner preservation precedes both transaction writes and JSON serialization
  assert.match(update,/tx\.set\(ref,privatePayload,\{merge:true\}\)/);
  assert.match(update,/tx\.set\(fx\.doc\(dbHandle,"publicTournaments",normalized\),publicPayload,\{merge:true\}\)/);
 });
+
+test('repeated edits and republishes never substitute the current editor for recorded creator',()=>{
+ let remote=room();
+ for(const action of ['edit-settings','republish','resync','reopen','settlement']){
+   const {data,privatePayload,publicPayload}=simulate(action,remote);
+   assert.equal(data.createdBy,SHIANG,action+' state creator');
+   assert.equal(data.ownerUid,SHIANG,action+' state owner');
+   assert.equal(privatePayload.createdByName,'翔宇',action+' private label');
+   assert.equal(publicPayload.hostName,'翔宇',action+' public lobby label');
+   remote={...remote,...privatePayload};
+ }
+});
+test('diagnostic: legacy stale public label remains unresolved without a recorded creator name',()=>{
+ const {privatePayload,publicPayload}=simulate('legacy-publish',{createdBy:SHIANG,ownerUid:SHIANG,hostName:'黑爸'});
+ assert.equal(privatePayload.createdBy,SHIANG);
+ assert.equal(publicPayload.ownerUid,SHIANG);
+ assert.equal(publicPayload.hostName,'黑爸','known legacy data problem must not be silently called repaired');
+});
