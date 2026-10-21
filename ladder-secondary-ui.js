@@ -78,8 +78,13 @@
 
   function ladderTierEmblemHtml(p){
     var tier=ladderTierVisual(p);
+    var files=["unranked","bronze","silver","gold","platinum","diamond","master","grandmaster","legend"];
+    var asset="assets/rank-badges/rank-"+(tier.legend?"legend":files[tier.index]||files[0])+".webp";
     return '<div class="ladder-tier-display" title="'+escLocal(tier.display)+'">'+
-      '<span class="ladder-tier-emblem ladder-tier-emblem-'+tier.index+(tier.legend?' is-legend':'')+'" aria-hidden="true"><span>'+escLocal(tier.glyph)+'</span></span>'+
+      '<span class="ladder-tier-emblem ladder-tier-emblem-'+tier.index+(tier.legend?' is-legend':'')+'" aria-hidden="true">'+
+        '<span>'+escLocal(tier.glyph)+'</span>'+
+        '<img src="'+asset+'" width="72" height="72" alt="" decoding="async" loading="eager" onload="this.parentNode.classList.add(\'is-loaded\')" onerror="this.remove()">'+
+      '</span>'+
       '<span class="ladder-tier-name">'+escLocal(tier.display)+'</span>'+
     '</div>';
   }
@@ -627,6 +632,10 @@
     ".ladder-tier-emblem-0{background-position:0% 0%}.ladder-tier-emblem-1{background-position:50% 0%}.ladder-tier-emblem-2{background-position:100% 0%}"+
     ".ladder-tier-emblem-3{background-position:0% 50%}.ladder-tier-emblem-4{background-position:50% 50%}.ladder-tier-emblem-5{background-position:100% 50%}"+
     ".ladder-tier-emblem-6{background-position:0% 100%}.ladder-tier-emblem-7{background-position:50% 100%}.ladder-tier-emblem.is-legend{background-position:100% 100%;filter:none}"+
-    "@media(max-width:430px){.ladder-rank-row-v2{min-height:88px}.ladder-tier-emblem{width:60px;height:60px;flex-basis:60px}.ladder-tier-name{font-size:10px}}";
+    "@media(max-width:430px){.ladder-rank-row-v2{min-height:88px}.ladder-tier-emblem{width:60px;height:60px;flex-basis:60px}.ladder-tier-name{font-size:10px}}"+
+    ".ladder-tier-emblem{background-image:none!important;display:grid;place-items:center;overflow:hidden;clip-path:none;border-radius:12px;background-color:rgba(217,185,92,.1)}"+
+    ".ladder-tier-emblem:before{display:none}.ladder-tier-emblem>span{display:block;font-size:13px}"+
+    ".ladder-tier-emblem.is-loaded{background-color:transparent}.ladder-tier-emblem.is-loaded>span{display:none}"+
+    ".ladder-tier-emblem>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}";
   document.head.appendChild(rankingStyle);
 })();
