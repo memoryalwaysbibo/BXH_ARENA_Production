@@ -370,7 +370,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.34";
+const APP_VERSION = "v14.3.35";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.34",date:"2026/10/20",timezone:"Asia/Taipei",title:"個人歷史整合與獵人執照 2.1",updateLevel:"minor",added:["個人總覽整合獵人旅程、正式戰績與可展開的生涯賽事紀錄","獵人執照 2.1 採最近 20 場有效對戰，顯示目前階級與歷史回算最高階級"],changed:["我的賽程集中顯示參賽中資訊；個人資料頁作為歷史查閱入口","已核對的測試賽獨立保留，從正式戰績與執照計算排除"],fixed:["讀取失敗可重試，部分資料缺失時暫停階級判定","手機里程碑縮排及長賽事名稱旁的展開提示"],security:[],publicSummary:"個人歷史集中查閱；生涯最高標示為歷史回算，永久授階將另行接入。"},
