@@ -5,7 +5,7 @@ const { randomUUID } = require('node:crypto');
 const PROJECT = 'demo-bxh-arena-e2e';
 const host = process.env.FIRESTORE_EMULATOR_HOST;
 assert.equal(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT, PROJECT, 'demo project required');
-assert.match(host || '', /^(127\\.0\\.1|localhost):8080$/, 'local emulator required');
+assert.match(host || '', /^(127\.0\.0\.1|localhost):8080$/, 'local emulator required');
 const url = `http://${host}/v1/projects/${PROJECT}/databases/(default)/documents/roomOwnerLab/${randomUUID()}`;
 const creator = 'creator-fixture', editor = 'editor-fixture';
 const stringField = s => ({ stringValue:s });
