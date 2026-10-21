@@ -191,6 +191,8 @@ jobs:
         run: |
           node --check modules/main-app/rdw-shadow-v1.js
           node --test tests/rdw-shadow-v1.test.cjs
+          node --check scripts/lib/rdw-prematch-tier-snapshot.cjs
+          node --test tests/rdw-prematch-tier-snapshot.test.cjs
       - name: Verify personal history and Hunter License 2.1
         run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs
       - name: Verify public catalog evidence, projection, UI contract and artifact boundary
