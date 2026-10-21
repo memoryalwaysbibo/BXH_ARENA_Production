@@ -56,3 +56,15 @@ test('lobby actually prefers stale public hostName over creator name',()=>{
  assert.equal(getSummary({...base,hostName:'翔宇'}).hostName,'翔宇');
  assert.equal(getSummary({...base,hostName:''}).hostName,'翔宇','creator label used only as fallback');
 });
+
+test('owner preservation precedes both transaction writes and JSON serialization',()=>{
+ const identity=update.indexOf('const creatorUid=remoteDoc.createdBy');
+ const serialize=update.lastIndexOf('privatePayload.data=JSON.stringify(data)');
+ const publicSerialize=update.lastIndexOf('publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data))');
+ const privateWrite=update.lastIndexOf('tx.set(ref,privatePayload,{merge:true})');
+ const publicWrite=update.lastIndexOf('tx.set(fx.doc(dbHandle,"publicTournaments",normalized),publicPayload,{merge:true})');
+ assert.ok(identity>=0&&serialize>identity&&publicSerialize>identity,'preserve identity before building stored payloads');
+ assert.ok(privateWrite>serialize&&publicWrite>publicSerialize,'both documents written after identity preservation');
+ assert.match(update,/tx\.set\(ref,privatePayload,\{merge:true\}\)/);
+ assert.match(update,/tx\.set\(fx\.doc\(dbHandle,"publicTournaments",normalized\),publicPayload,\{merge:true\}\)/);
+});
