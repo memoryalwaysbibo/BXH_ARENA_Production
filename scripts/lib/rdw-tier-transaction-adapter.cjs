@@ -11,10 +11,16 @@ async function sealMatchTierPair({tx,matchRef,eventId,matchId,revision=0,playerA
   const a=aSnap.data(),b=bSnap.data();
   if(!a||!b||typeof a!=='object'||typeof b!=='object')throw Error('player-grade-missing');
   if(a.uid!==playerA.uid||b.uid!==playerB.uid)throw Error('player-identity-mismatch');
-  // A verified server-issued current tier, not client supplied grade or historical replay.
-  function tier(p){const g=p?.permanentLicenseCurrent;if(!g||g.source!=='server'||g.verified!==true||g.version!=='hunter-license-v2.1'||typeof g.tier!=='string')throw Error('verified-current-tier-required');return g.tier;}
+  // Explicit trusted resolver: no unverified Firestore field assumptions or highest-tier fallback.
+  // Caller must resolve the CURRENT tier using a verified server-owned source.
+  if(typeof arguments[0].resolveCurrentTier!=='function')throw Error('trusted-tier-resolver-required');
+  const tier=async(p,uid)=>{
+    const result=await arguments[0].resolveCurrentTier({player:p,uid});
+    if(!result||result.source!=='server'||result.verified!==true||result.version!=='hunter-license-v2.1'||!contract.TIERS.includes(result.tier))throw Error('verified-current-tier-required');
+    return result.tier;
+  };
   const existing=matchSnap?.exists?matchSnap.data()?.rdwTierSnapshots:null;
-  const result=contract.seal(existing,{eventId,matchId,revision,playerA:playerA.uid,playerB:playerB.uid,tierA:tier(a),tierB:tier(b),capturedAt,matchStartedAt});
+  const result=contract.seal(existing,{eventId,matchId,revision,playerA:playerA.uid,playerB:playerB.uid,tierA:await tier(a,playerA.uid),tierB:await tier(b,playerB.uid),capturedAt,matchStartedAt});
   if(result.created)tx.set(matchRef,{rdwTierSnapshots:result.pair},{merge:true});
   return result;
 }
