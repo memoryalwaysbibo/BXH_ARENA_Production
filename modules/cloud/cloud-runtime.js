@@ -357,6 +357,22 @@
       });
     },
 
+    // Explicit status API for PWA recovery screens. Unlike getUserProfile(),
+    // this never confuses an unreadable document with an absent document.
+    async getUserProfileStatus(uid){
+      if(!authReady) return {status:"auth_not_ready"};
+      if(!uid || authHandle?.currentUser?.uid!==uid) return {status:"auth_mismatch"};
+      try{
+        const snap=await fx.getDocFromServer(fx.doc(dbHandle, USERS_COLLECTION, uid));
+        if(!snap.exists()) return {status:"not_found"};
+        const profile=snap.data();
+        googleLinkProfileCache.set(uid,{profile,loadedAt:Date.now()});
+        return {status:"found",profile};
+      }catch(e){
+        return {status:e?.code==="permission-denied"?"permission_denied":"read_failed",code:String(e?.code||"unknown")};
+      }
+    },
+
     async getUserProfile(uid){
       if(!authReady || !uid) return null;
       try{
@@ -368,7 +384,12 @@
       }catch(e){
         googleLinkProfileCache.delete(uid);
         console.warn("讀取使用者資料失敗", e);
-        return null;
+        // A failed read is NOT evidence that the profile is missing.
+        // Never route an existing user into the account-creation flow.
+        const failure = new Error("玩家資料讀取失敗，請重新連線或重新登入。");
+        failure.code = e?.code || "profile/read-failed";
+        failure.cause = e;
+        throw failure;
       }
     },
 
@@ -465,7 +486,12 @@
     // always created as role=player with password provider.
     async completeNewPlayerProfile(uid, { email, realName, nickname, phone }){
       if(!authReady) return { ok:false, error:"雲端服務尚未就緒" };
+      if(!uid || authHandle?.currentUser?.uid!==uid) return {ok:false,error:"登入狀態失效，請重新登入"};
       try{
+        // Fail closed: never overwrite an existing account during onboarding.
+        // Read errors (including permission-denied) must NOT be treated as absence.
+        const existing = await fx.getDocFromServer(fx.doc(dbHandle, USERS_COLLECTION, uid));
+        if(existing.exists()) return {ok:false,error:"此帳號已有玩家資料，請重新讀取或重新登入，勿重複建立"};
         const now = Date.now();
         const publicName = nickname || realName;
         await fx.setDoc(fx.doc(dbHandle, USERS_COLLECTION, uid), {
@@ -494,12 +520,18 @@
     // account's role). The account's uid, email, and role are all untouched.
     async completeExistingAccountPlayerProfile(uid, { realName, nickname, phone }){
       if(!authReady) return { ok:false, error:"雲端服務尚未就緒" };
+      if(!uid || authHandle?.currentUser?.uid!==uid) return {ok:false,error:"登入狀態失效，請重新登入"};
       try{
+        const ref = fx.doc(dbHandle, USERS_COLLECTION, uid);
+        const snap = await fx.getDocFromServer(ref);
+        if(!snap.exists()) return {ok:false,error:"找不到既有帳號，請重新登入"};
+        const existing = snap.data() || {};
+        if(existing.profileCompleted===true || String(existing.realName||"").trim()) return {ok:false,error:"玩家資料已存在，請重新讀取，不需再次完成設定"};
         const now = Date.now();
         const publicName = nickname || realName;
-        await fx.updateDoc(fx.doc(dbHandle, USERS_COLLECTION, uid), {
+        await fx.updateDoc(ref, {
           realName, nickname: nickname||"", gameId:nickname||"", phone: phone||"", birthDate:"", gender:"", region:"", preferredNameMode:"realName",
-          realNameVerified:false, realNameVerifiedAt:null, realNameVerifiedBy:null, profileCompleted:true, profileCompletedAt:fx.serverTimestamp(), updatedAt: now
+          profileCompleted:true, profileCompletedAt:fx.serverTimestamp(), updatedAt: now
         });
         try{
           await fx.setDoc(fx.doc(dbHandle, "publicPlayers", uid), {

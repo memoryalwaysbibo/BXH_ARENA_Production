@@ -13804,6 +13804,10 @@ function renderPlayerCompleteProfileScreen(){
       </div>
       <div class="field"><label>手機號碼（選填）</label><input type="tel" id="complete-phone"></div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-complete-profile-submit" ${playerApplyBusy?'disabled':''}>${playerApplyBusy?'處理中……':'完成設定'}</button>
+      <div class="btn-row" style="margin-top:12px;justify-content:center;gap:8px;flex-wrap:wrap;">
+        <button class="hoc-btn" data-action="player-profile-retry" ${playerApplyBusy?'disabled':''}>重新讀取帳號</button>
+        <button class="hoc-btn" data-action="player-logout" ${playerApplyBusy?'disabled':''}>登出並重新登入</button>
+      </div>
     </div>
   ` + authShellClose();
 }
@@ -20111,6 +20115,26 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     })();
     return;
   }
+  if(action==="player-profile-retry"){
+    const pending=pendingNewPlayerProfile||pendingExistingAccountProfile;
+    if(playerApplyBusy||!pending) return;
+    playerApplyBusy=true;playerApplyError="";render();
+    (async()=>{
+      try{
+        const result=await window.cloudAuth.getUserProfileStatus(pending.uid);
+        if(result.status==="found"){
+          // Existing profile found: refresh the normal auth routing, never write it.
+          pendingNewPlayerProfile=null;pendingExistingAccountProfile=null;
+          window.location.reload();return;
+        }
+        playerApplyError=result.status==="not_found"?"伺服器尚無玩家資料，可繼續完成設定。":
+          result.status==="permission_denied"?"無法讀取玩家資料（權限不足），請登出後重新登入。":
+          "玩家資料讀取失敗，請檢查連線後重試，或登出重新登入。";
+      }catch(e){playerApplyError="重新讀取失敗，請登出後重新登入。";}
+      finally{playerApplyBusy=false;render();}
+    })();
+    return;
+  }
   if(action==="player-complete-profile-submit"){
     const pending = pendingNewPlayerProfile || pendingExistingAccountProfile;
     if(playerApplyBusy || !pending) return;
@@ -20121,9 +20145,29 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     playerApplyBusy = true; playerApplyError=""; render();
     (async ()=>{
       const isExistingAccount = !!pendingExistingAccountProfile;
-      const result = isExistingAccount
-        ? await window.cloudAuth.completeExistingAccountPlayerProfile(pending.uid, { realName, nickname, phone })
-        : await window.cloudAuth.completeNewPlayerProfile(pending.uid, { email: pending.email, realName, nickname, phone });
+      let result;
+      try{
+        const status=await window.cloudAuth.getUserProfileStatus(pending.uid);
+        if(status.status==="not_found" && isExistingAccount){
+          playerApplyError="原有帳號資料未找到，已停止補完操作。請登出重新登入或聯絡管理員。";
+          playerApplyBusy=false;render();return;
+        }
+        if(status.status==="found" && !isExistingAccount){
+          playerApplyError="此帳號已有玩家資料，請使用「重新讀取帳號」恢復登入。";
+          playerApplyBusy=false;render();return;
+        }
+        if(status.status!=="found" && status.status!=="not_found"){
+          playerApplyError="無法確認帳號資料，請重新讀取或登出後重新登入。";
+          playerApplyBusy=false;render();return;
+        }
+        result = isExistingAccount
+          ? await window.cloudAuth.completeExistingAccountPlayerProfile(pending.uid, { realName, nickname, phone })
+          : await window.cloudAuth.completeNewPlayerProfile(pending.uid, { email: pending.email, realName, nickname, phone });
+      }catch(e){
+        playerApplyBusy=false;
+        playerApplyError="帳號驗證或資料設定失敗，請重新讀取或登出後重新登入。";
+        render();return;
+      }
       playerApplyBusy = false;
       if(!result.ok){ playerApplyError = result.error || "設定失敗，請稍後再試"; render(); return; }
       const profile = await window.cloudAuth.getUserProfile(pending.uid);

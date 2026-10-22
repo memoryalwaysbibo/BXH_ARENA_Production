@@ -87,6 +87,11 @@ jobs:
           node-version: 22
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
+      - name: Verify PWA account recovery safeguards
+        run: |
+          node --check modules/cloud/cloud-runtime.js
+          node --test tests/pwa-profile-recovery.test.cjs
+
       - name: Verify latest member location and regional leaderboard states
         run: node --test tests/ladder-location.test.cjs
       - name: Verify interface theme account isolation
