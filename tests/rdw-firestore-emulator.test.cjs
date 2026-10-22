@@ -34,3 +34,20 @@ test('Admin SDK Emulator rollback leaves start unchanged after conflicting audit
  assert.equal((await e.get()).data().started,false);
  assert.equal((await a.get()).data().actorUid,'prior');
 });
+
+const {startInEmulator}=require('../scripts/lib/rdw-emulator-start-adapter.cjs');
+test('Emulator invokes actual RDW start contract for verified snapshot',async()=>{
+ const e=db.collection('rdwEmulatorTests').doc(prefix+'-contract-event');
+ const s=db.collection('rdwEmulatorTests').doc(prefix+'-contract-snapshot');
+ await e.create({code:'BXH-TEST',drawRevision:2,started:false});
+ await s.create({source:'server',verified:true,eventCode:'BXH-TEST',drawRevision:2,sealed:true});
+ const result=await startInEmulator({db,eventRef:e,snapshotRef:s,eventCode:'BXH-TEST',drawRevision:2,actorUid:'host',authorized:true,rosterValid:true,drawRevisionValid:true,snapshotState:'verified',readbackStatus:'verified'});
+ assert.equal(result.mode,'rdw-verified');assert.equal((await e.get()).data().rdwEligible,true);
+});
+test('Emulator invokes actual RDW PASS contract with atomic audit',async()=>{
+ const e=db.collection('rdwEmulatorTests').doc(prefix+'-pass-event');
+ const a=db.collection('rdwEmulatorTests').doc(prefix+'-pass-audit');
+ await e.create({code:'BXH-TEST',drawRevision:3,started:false});
+ const result=await startInEmulator({db,eventRef:e,auditRef:a,eventCode:'BXH-TEST',drawRevision:3,actorUid:'host',authorized:true,rosterValid:true,drawRevisionValid:true,snapshotState:'failed',readbackStatus:'missing',passRequested:true,failureReason:'cloud-timeout',serverTime:123,idempotencyKey:'BXH-TEST:3:pass'});
+ assert.equal(result.mode,'rdw-pass');assert.equal((await e.get()).data().rdwEligible,false);assert.equal((await a.get()).data().actorUid,'host');
+});
