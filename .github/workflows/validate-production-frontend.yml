@@ -215,6 +215,8 @@ jobs:
           node --test tests/rdw-cloud-function-registration.test.cjs
           node --check scripts/lib/rdw-roster-inspection.cjs
           node --test tests/rdw-roster-inspection.test.cjs
+          node --check scripts/lib/rdw-canonical-identity.cjs
+          node --test tests/rdw-canonical-identity.test.cjs
       - name: Verify personal history and Hunter License 2.1
         run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs
       - name: Verify public catalog evidence, projection, UI contract and artifact boundary
