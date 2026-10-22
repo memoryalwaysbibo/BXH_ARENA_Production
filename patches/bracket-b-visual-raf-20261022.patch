@@ -1,0 +1,54 @@
+--- a/modules/main-app/core.js
++++ b/modules/main-app/core.js
+@@ -10634,8 +10634,10 @@
+       const cls="se-path-classic";
+ 
+       // Each source leaves from the card's exact vertical center.
+-      sourcePoints.forEach(p=>{
+-        paths += `<path class="${cls}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
++      sourcePoints.forEach((p, sourceIndex)=>{
++        const sourceMatch=getMatch(sourceBoxes[sourceIndex].getAttribute("data-id"));
++        const advanced=!!(sourceMatch?.completed && sourceMatch.winnerId && !sourceMatch.isBye);
++        paths += `<path class="${cls}${advanced?' se-path-advanced':''}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
+       });
+@@ -19070,7 +19072,20 @@
+   boardZoom = Math.max(0.5, Math.min(1.5, newZoom));
+   applyBoardTransform();
+ }
++// Batch pan and pinch DOM writes to at most one per animation frame.
++let boardTransformFrame = 0;
+ function applyBoardTransform(){
++  if(boardTransformFrame) return;
++  if(typeof requestAnimationFrame !== 'function'){
++    flushBoardTransform();
++    return;
++  }
++  boardTransformFrame = requestAnimationFrame(()=>{
++    boardTransformFrame = 0;
++    flushBoardTransform();
++  });
++}
++function flushBoardTransform(){
+   try{
+     const canvas = document.getElementById("board-canvas");
+     if(canvas) canvas.style.transform = "translate("+boardPanX+"px, "+boardPanY+"px) scale("+boardZoom+")";
+--- a/modules/main-css/core-competition.css
++++ b/modules/main-css/core-competition.css
+@@ -2289,3 +2289,17 @@
+   .hoc-trophy-halo{animation:none !important;}
+ }
+ 
++
++/* Bracket B candidate: theme-linked winner emphasis without animated paint. */
++.board-shell .board-canvas .match-box.ms-card-completed .mb-row.winner {
++  background:color-mix(in srgb,var(--board-accent,#d9b95c) 16%,#17191d);
++  box-shadow:inset 3px 0 var(--board-accent,#d9b95c);
++  color:#f5f5f7;
++}
++.board-shell .board-canvas .match-box.ms-card-completed .mb-row.winner .nm {
++  color:#f5f5f7; font-weight:700;
++}
++.board-shell .board-canvas .se-bracket-svg .se-path-classic.se-path-advanced {
++  stroke:var(--board-accent,#d9b95c)!important;
++  stroke-width:2.25!important;
++}
