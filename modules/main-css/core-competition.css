@@ -2289,3 +2289,18 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   .hoc-trophy-halo{animation:none !important;}
 }
 
+
+/* BXH bracket B: winner emphasis and confirmed advancement theme accents. */
+.board-shell .board-canvas .match-box.done .mb-row.winner {
+  background:color-mix(in srgb,var(--board-accent,#d9b95c) 16%,#17191d);
+  box-shadow:inset 3px 0 var(--board-accent,#d9b95c);
+  color:#f5f5f7;
+}
+.board-shell .board-canvas .match-box.done .mb-row.winner .nm {
+  color:#f5f5f7;
+  font-weight:700;
+}
+.board-shell .board-canvas .se-bracket-svg .se-path-classic.se-path-advanced {
+  stroke:var(--board-accent,#d9b95c)!important;
+  stroke-width:2.25!important;
+}
