@@ -152,7 +152,7 @@
   background:linear-gradient(145deg,rgba(20,24,25,.72),rgba(7,10,11,.61)) padding-box,linear-gradient(135deg,rgba(242,225,157,.16),rgba(255,255,255,.025) 52%,rgba(206,239,0,.085)) border-box!important;
   -webkit-backdrop-filter:blur(14px) saturate(1.06);backdrop-filter:blur(14px) saturate(1.06);
   box-shadow:0 13px 30px rgba(0,0,0,.19),inset 0 1px 0 rgba(255,255,255,.025);overflow:hidden;
-  transition:transform .17s,box-shadow .2s,background .2s;animation:bxh-lobby-rise .4s ease both;
+  transition:transform .17s,box-shadow .2s,background .2s;animation:none;
 }
 .lobby-compact-card:active{transform:scale(.994)}
 .lobby-compact-card[open]{box-shadow:0 17px 40px rgba(0,0,0,.28),0 0 25px rgba(220,255,0,.035)!important}
@@ -281,7 +281,7 @@
              linear-gradient(135deg,rgba(240,222,151,.17),rgba(255,255,255,.026) 48%,rgba(208,241,0,.09)) border-box!important;
   -webkit-backdrop-filter:blur(15px) saturate(1.07);backdrop-filter:blur(15px) saturate(1.07);
   box-shadow:0 16px 34px rgba(0,0,0,.21),inset 0 1px 0 rgba(255,255,255,.028)!important;
-  overflow:hidden;animation:bxh-schedule-rise .38s ease both;
+  overflow:hidden;animation:none;
 }
 .schedule-fold .find-event-card::after{
   content:"";position:absolute;inset:0;pointer-events:none;
@@ -379,7 +379,7 @@
              linear-gradient(135deg,rgba(239,220,146,.2),rgba(255,255,255,.027) 50%,rgba(211,243,0,.11)) border-box!important;
   -webkit-backdrop-filter:blur(15px) saturate(1.07);backdrop-filter:blur(15px) saturate(1.07);
   box-shadow:0 17px 37px rgba(0,0,0,.23),inset 0 1px 0 rgba(255,255,255,.03)!important;
-  overflow:hidden;animation:bxh-room-rise .38s ease both;
+  overflow:hidden;animation:none;
 }
 .community-event-card::after{
   content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(108deg,transparent 15%,rgba(255,255,255,.018) 47%,transparent 72%);
