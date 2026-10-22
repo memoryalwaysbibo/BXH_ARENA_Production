@@ -422,3 +422,22 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  rdw_firestore_emulator:
+    name: RDW Firestore Emulator atomicity
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Firebase Emulator tooling
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Verify RDW atomicity against Firestore Emulator
+        run: npx firebase emulators:exec --only firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "node --test tests/rdw-firestore-emulator.test.cjs"
