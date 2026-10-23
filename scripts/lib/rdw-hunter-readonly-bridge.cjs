@@ -14,7 +14,7 @@ function createReadOnlyTierResolver({db,createReader,clock}){
   return db.runTransaction(async tx=>{
    const userSnap=await tx.get(db.doc('users/'+uid));
    const user=userSnap.exists?userSnap.data():null;
-   if(!user||user.active===false||user.isTestAccount===true||user.role==='tester')return {ok:false,reason:'account-not-eligible'};
+   if(!user||user.active!==true||user.isTestAccount===true||user.role==='tester'||user.deleted===true||['deleted','disabled','frozen','pending_family_transfer'].includes(user.accountStatus)||user.familyTransferPending===true)return {ok:false,reason:'account-not-eligible'};
    const evidence=await evaluate({tx,uid});
    if(!evidence||evidence.uid!==uid||evidence.version!==VERSION||evidence.complete!==true||evidence.unresolvedIdentities!==0||evidence.sourceScope!=='public-official-canonical-self-history-v1'||!(/^[a-f0-9]{64}$/.test(evidence.sourceDigest||'')))return {ok:false,reason:'incomplete-server-history'};
    const grade=evidence.overview?.grade;
