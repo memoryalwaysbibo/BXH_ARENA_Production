@@ -25,7 +25,7 @@ function inspectRdwDiagnostic({room,eventCode,adminVerified=false,tierEvidenceBy
   seen.add(identity.uid);
   const evidence=Object.prototype.hasOwnProperty.call(tierEvidenceByUid,identity.uid)?tierEvidenceByUid[identity.uid]:null;
   const tier=verifiedCurrentTier(evidence,{uid:identity.uid,atMs:serverTime});
-  if(!tier.ok){unverified++;continue;}
+  if(!tier.ok||evidence.complete!==true||evidence.unresolvedIdentities!==0||evidence.sourceScope!=='public-official-canonical-self-history-v1'||!/^[a-f0-9]{64}$/.test(evidence.sourceDigest||'')){unverified++;continue;}
   valid++;tiers.push(tier.tier);
  }
  const formulaBands=[];
