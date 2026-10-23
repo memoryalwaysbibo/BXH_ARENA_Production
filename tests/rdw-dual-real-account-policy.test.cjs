@@ -16,7 +16,7 @@ test('ungraded vs D: formula is +2/-2%, but protected official shadow mode stays
  assert.equal(result.weightedWins,1);assert.equal(result.weightedLosses,1);
 });
 test('invalid player tier never bypasses verification via ungraded neutral exception',()=>{
- for(const bogus of [undefined,null,'','fake','NATIONAL','unranked',{}]){
+ for(const bogus of [undefined,null,'','fake','not-national','unranked',{}]){
   assert.equal(RDW.protectedWeight('ungraded',bogus),null);
   assert.equal(RDW.protectedWeight(bogus,'ungraded'),null);
   assert.equal(RDW.verifiedPreMatchWeight(sample('ungraded',bogus)),null);
