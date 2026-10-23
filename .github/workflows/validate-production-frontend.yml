@@ -241,6 +241,8 @@ jobs:
           node --test tests/rdw-production-event-guard.test.cjs
           node --check scripts/lib/rdw-production-start-readiness.cjs
           node --test tests/rdw-production-start-readiness.test.cjs
+          node --check scripts/lib/rdw-admin-diagnostic.cjs
+          node --test tests/rdw-admin-diagnostic.test.cjs
           node --check scripts/lib/rdw-canonical-room-reader.cjs
           node --test tests/rdw-canonical-room-reader.test.cjs
           node --check scripts/lib/rdw-participant-attestation.cjs
