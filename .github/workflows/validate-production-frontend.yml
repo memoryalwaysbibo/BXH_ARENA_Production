@@ -236,6 +236,8 @@ jobs:
           node --test tests/rdw-atomic-roster-start.test.cjs
           node --check scripts/lib/rdw-trusted-start-coordinator.cjs
           node --test tests/rdw-trusted-start-coordinator.test.cjs
+          node --check scripts/lib/rdw-production-event-guard.cjs
+          node --test tests/rdw-production-event-guard.test.cjs
           node --check tests/rdw-hunter-multi-event-history.test.cjs
           node --test tests/rdw-hunter-multi-event-history.test.cjs
           node --check tests/rdw-hunter-tier-e-progression.test.cjs
