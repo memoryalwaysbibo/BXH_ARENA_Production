@@ -228,6 +228,8 @@ jobs:
           node --test tests/rdw-production-hunter-reader-integration.test.cjs
           node --check tests/rdw-hunter-official-match-fixture.test.cjs
           node --test tests/rdw-hunter-official-match-fixture.test.cjs
+          node --check tests/rdw-hunter-tier-e-progression.test.cjs
+          node --test tests/rdw-hunter-tier-e-progression.test.cjs
       - name: Verify personal history and Hunter License 2.1
         run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs
       - name: Verify public catalog evidence, projection, UI contract and artifact boundary
