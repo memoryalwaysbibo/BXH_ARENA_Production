@@ -469,4 +469,4 @@ jobs:
       - name: Install Firebase Emulator tooling
         run: npm install --no-package-lock --ignore-scripts
       - name: Verify RDW atomicity against Firestore Emulator
-        run: npx firebase emulators:exec --only firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "node --test tests/rdw-firestore-emulator.test.cjs"
+        run: npx firebase emulators:exec --only firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "node --test tests/rdw-firestore-emulator.test.cjs tests/rdw-atomic-roster-firestore-emulator.test.cjs"
