@@ -10634,8 +10634,10 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
       const cls="se-path-classic";
 
       // Each source leaves from the card's exact vertical center.
-      sourcePoints.forEach(p=>{
-        paths += `<path class="${cls}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
+      sourcePoints.forEach((p, sourceIndex)=>{
+        const sourceMatch = getMatch(sourceBoxes[sourceIndex].getAttribute("data-id"));
+        const advanced = !!(sourceMatch && sourceMatch.completed && sourceMatch.winnerId && !sourceMatch.isBye);
+        paths += `<path class="${cls}${advanced?' se-path-advanced':''}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
       });
 
       // One shared vertical spine, Challonge-style.
@@ -19070,7 +19072,16 @@ function setBoardPinchZoom(newZoom){
   boardZoom = Math.max(0.5, Math.min(1.5, newZoom));
   applyBoardTransform();
 }
+let __bxhBoardTransformFrame = 0;
 function applyBoardTransform(){
+  if(__bxhBoardTransformFrame) return;
+  if(typeof requestAnimationFrame !== "function") return flushBoardTransform();
+  __bxhBoardTransformFrame = requestAnimationFrame(()=>{
+    __bxhBoardTransformFrame = 0;
+    flushBoardTransform();
+  });
+}
+function flushBoardTransform(){
   try{
     const canvas = document.getElementById("board-canvas");
     if(canvas) canvas.style.transform = "translate("+boardPanX+"px, "+boardPanY+"px) scale("+boardZoom+")";

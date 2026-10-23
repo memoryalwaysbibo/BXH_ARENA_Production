@@ -1,0 +1,22 @@
+--- a/modules/main-app/core.js
++++ b/modules/main-app/core.js
+@@ -19070,7 +19070,21 @@
+   applyBoardTransform();
+ }
++// Coalesce high-frequency pan/pinch events into one DOM update per frame.
++let boardTransformFrame = 0;
+ function applyBoardTransform(){
++  if(boardTransformFrame) return;
++  if(typeof requestAnimationFrame !== 'function'){
++    flushBoardTransform();
++    return;
++  }
++  boardTransformFrame = requestAnimationFrame(()=>{
++    boardTransformFrame = 0;
++    flushBoardTransform();
++  });
++}
++function flushBoardTransform(){
+   try{
+     const canvas = document.getElementById("board-canvas");
+     if(canvas) canvas.style.transform = "translate("+boardPanX+"px, "+boardPanY+"px) scale("+boardZoom+")";
