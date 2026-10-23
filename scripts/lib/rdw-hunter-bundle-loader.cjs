@@ -24,4 +24,4 @@ function loadVerifiedReader({root,manifest}){
  if(typeof createReader!=='function')throw Error('hunter-reader-export-missing');
  return createReader;
 }
-module.exports={verifyBundle,loadVerifiedReader};
+module.exports={verifyBundle,loadVerifiedReader,EXPECTED_FILES};
