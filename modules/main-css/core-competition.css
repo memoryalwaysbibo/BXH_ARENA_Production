@@ -2290,17 +2290,36 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 }
 
 
-/* BXH bracket B: winner emphasis and confirmed advancement theme accents. */
-.board-shell .board-canvas .match-box.done .mb-row.winner {
-  background:color-mix(in srgb,var(--board-accent,#d9b95c) 16%,#17191d);
-  box-shadow:inset 3px 0 var(--board-accent,#d9b95c);
+/* BXH bracket B 1.1: higher-contrast winner/advancement without animations.
+   Covers both the classic .done and modern .ms-card-completed card states.
+   Uses the existing --board-accent for gold, ice and all other board themes. */
+.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row.winner {
+  background:color-mix(in srgb,var(--board-accent,#d9b95c) 30%,#17191d);
+  box-shadow:inset 4px 0 var(--board-accent,#d9b95c);
   color:#f5f5f7;
 }
-.board-shell .board-canvas .match-box.done .mb-row.winner .nm {
-  color:#f5f5f7;
+.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row.winner .nm {
+  color:#fff;
   font-weight:700;
+}
+.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row.winner .nm::after {
+  content:"勝";
+  display:inline-block;
+  margin-inline-start:6px;
+  padding:1px 4px;
+  border:1px solid var(--board-accent,#d9b95c);
+  border-radius:4px;
+  background:color-mix(in srgb,var(--board-accent,#d9b95c) 22%,#17191d);
+  color:#fff;
+  font-size:10px;
+  font-weight:700;
+  line-height:1.35;
+  vertical-align:middle;
+}
+.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row:not(.winner) {
+  opacity:.65;
 }
 .board-shell .board-canvas .se-bracket-svg .se-path-classic.se-path-advanced {
   stroke:var(--board-accent,#d9b95c)!important;
-  stroke-width:2.25!important;
+  stroke-width:3!important;
 }
