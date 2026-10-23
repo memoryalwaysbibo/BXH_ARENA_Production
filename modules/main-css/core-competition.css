@@ -2302,10 +2302,17 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   color:#fff;
   font-weight:700;
 }
-.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row.winner .nm::after {
+/* Keep winner status readable even when a long player name is truncated. */
+.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row.winner .nm {
+  min-width:0;
+  flex:1 1 auto;
+}
+.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row.winner::after {
   content:"勝";
   display:inline-block;
-  margin-inline-start:6px;
+  order:1;
+  flex:0 0 auto;
+  margin-inline-start:3px;
   padding:1px 4px;
   border:1px solid var(--board-accent,#d9b95c);
   border-radius:4px;
@@ -2314,7 +2321,10 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   font-size:10px;
   font-weight:700;
   line-height:1.35;
-  vertical-align:middle;
+}
+.board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row.winner .sc {
+  order:2;
+  flex:0 0 auto;
 }
 .board-shell .board-canvas .match-box:is(.done,.ms-card-completed) .mb-row:not(.winner) {
   opacity:.65;
