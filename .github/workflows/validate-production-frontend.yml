@@ -191,6 +191,7 @@ jobs:
         run: |
           node --check modules/main-app/rdw-shadow-v1.js
           node --test tests/rdw-shadow-v1.test.cjs
+          node --test tests/rdw-dual-real-account-policy.test.cjs
           node --check scripts/lib/rdw-prematch-tier-snapshot.cjs
           node --test tests/rdw-prematch-tier-snapshot.test.cjs
           node --check scripts/lib/rdw-tier-transaction-adapter.cjs
