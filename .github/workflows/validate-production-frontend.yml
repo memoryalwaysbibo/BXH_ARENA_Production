@@ -228,6 +228,8 @@ jobs:
           node --test tests/rdw-production-hunter-reader-integration.test.cjs
           node --check tests/rdw-hunter-official-match-fixture.test.cjs
           node --test tests/rdw-hunter-official-match-fixture.test.cjs
+          node --check tests/rdw-hunter-multi-event-history.test.cjs
+          node --test tests/rdw-hunter-multi-event-history.test.cjs
           node --check tests/rdw-hunter-tier-e-progression.test.cjs
           node --test tests/rdw-hunter-tier-e-progression.test.cjs
       - name: Verify personal history and Hunter License 2.1
