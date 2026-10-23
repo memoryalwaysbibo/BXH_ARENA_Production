@@ -232,6 +232,8 @@ jobs:
           node --test tests/rdw-hunter-rank-progression-real-reader.test.cjs
           node --check scripts/lib/rdw-roster-tier-snapshot.cjs
           node --test tests/rdw-roster-tier-snapshot.test.cjs
+          node --check scripts/lib/rdw-atomic-roster-start.cjs
+          node --test tests/rdw-atomic-roster-start.test.cjs
           node --check tests/rdw-hunter-multi-event-history.test.cjs
           node --test tests/rdw-hunter-multi-event-history.test.cjs
           node --check tests/rdw-hunter-tier-e-progression.test.cjs
