@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
 const {createVerifiedTierResolver}=require('../scripts/lib/rdw-verified-tier-resolver.cjs');
+const {EXPECTED_FILES}=require('../scripts/lib/rdw-hunter-bundle-loader.cjs');
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'rdw-verified-reader-'));
@@ -11,6 +12,7 @@ function fixture(){
   'evaluator.cjs':'module.exports={};',
   'vendor/provenance.json':'{}'
  };
+ for(const name of EXPECTED_FILES)if(!Object.hasOwn(files,name))files[name]='{}';
  const manifest={};for(const [name,contents] of Object.entries(files)){fs.writeFileSync(path.join(root,name),contents);manifest[name]=hash(contents);}
  fs.writeFileSync(path.join(root,'bundle-manifest.json'),JSON.stringify(manifest));
  const writes=[];
