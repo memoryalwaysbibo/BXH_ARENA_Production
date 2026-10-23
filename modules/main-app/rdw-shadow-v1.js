@@ -9,8 +9,10 @@
     return Number((1+(opponent-self)*0.01).toFixed(2));
   }
   function protectedWeight(selfTier,opponentTier){
+    const calculated=weight(selfTier,opponentTier);
+    if(calculated===null)return null;
     if(selfTier==='ungraded'||opponentTier==='ungraded')return 1;
-    return weight(selfTier,opponentTier);
+    return calculated;
   }
   function verifiedPreMatchWeight(snapshot){
     if(!snapshot||snapshot.source!=='server'||snapshot.verified!==true||
