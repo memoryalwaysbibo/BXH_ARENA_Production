@@ -16,3 +16,9 @@ test('rejects missing provenance digest and wrong source scope',async()=>{
   const f=fixture({evidence});assert.equal((await f.resolve('u1')).ok,false);assert.deepEqual(f.writes,[]);
  }
 });
+
+test('missing active flag and frozen profiles are not eligible',async()=>{
+ for(const user of [{},{active:false},{active:true,accountStatus:'frozen'},{active:true,deleted:true},{active:true,familyTransferPending:true}]){
+  const f=fixture({user});assert.equal((await f.resolve('u1')).ok,false);assert.deepEqual(f.writes,[]);
+ }
+});
