@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {inspectRdwDiagnostic}=require('../scripts/lib/rdw-admin-diagnostic.cjs');
 const code='BXH-FIXTUR',time=2000;
-const verified=(uid,tier)=>({source:'server',verified:true,version:'hunter-license-v2.1',uid,status:'unchanged',computedAt:1800,current:{tier}});
+const verified=(uid,tier)=>({source:'server',verified:true,version:'hunter-license-v2.1',uid,status:'unchanged',computedAt:1800,current:{tier},complete:true,unresolvedIdentities:0,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)});
 const room=players=>({code,data:JSON.stringify({cloudCode:code,registrationRosterRevision:4,startedAt:null,rosterLocked:false,players})});
 test('denies all data to caller without verified admin privilege',()=>{
  assert.deepEqual(inspectRdwDiagnostic({room:room([{uid:'a'}]),eventCode:code,serverTime:time}),{ok:false,reason:'admin-authorization-required'});
@@ -26,4 +26,12 @@ test('complete verified roster can be eligible but diagnostic performs no writes
  const original=room([{uid:'one'},{uid:'two'}]),before=JSON.stringify(original);
  const result=inspectRdwDiagnostic({room:original,eventCode:code,serverTime:time,adminVerified:true,tierEvidenceByUid:{one:verified('one','c'),two:verified('two','d')}});
  assert.equal(result.fullSnapshotEligible,true);assert.equal(JSON.stringify(original),before);
+});
+
+test('incomplete Hunter history or missing source digest never becomes verified',()=>{
+ const players=[{uid:'a'},{uid:'b'}];
+ for(const patch of [{complete:false},{unresolvedIdentities:1},{sourceDigest:null},{sourceScope:'client-replay'}]){
+  const result=inspectRdwDiagnostic({room:room(players),eventCode:code,serverTime:time,adminVerified:true,tierEvidenceByUid:{a:{...verified('a','c'),...patch},b:verified('b','d')}});
+  assert.equal(result.verifiedAccounts,1);assert.equal(result.unverifiedAccounts,1);assert.equal(result.fullSnapshotEligible,false);
+ }
 });
