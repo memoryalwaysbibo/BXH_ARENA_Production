@@ -19,3 +19,16 @@ test('snapshot failure blocks start without explicit PASS',async()=>{const f=fix
 test('authorized explicit PASS appends audit and start atomically',async()=>{const f=fixture();f.input.verifiedTiers=null;f.input.passRequested=true;const r=await commitAtomicRosterStart(f.input);assert.equal(r.mode,'rdw-pass');assert.deepEqual(f.writes.map(v=>v[0]),['create','update']);assert.equal(f.writes[0][1],'audit');assert.equal(f.writes[1][2].rdwEligible,false);});
 test('stale roster and unauthorized actor never write',async()=>{for(const mismatch of ['stale','unauthorized']){const f=fixture();if(mismatch==='stale')f.input.rosterUids=[...f.input.rosterUids].reverse();else f.input.authorized=false;if(mismatch==='stale')await assert.rejects(commitAtomicRosterStart(f.input),/event-roster-mismatch/);else assert.equal((await commitAtomicRosterStart(f.input)).committed,false);assert.equal(f.writes.length,0);}});
 test('immutable snapshot conflict refuses start',async()=>{const f=fixture();f.store.set('snapshot',{snapshotDigest:'a'.repeat(64),rosterDigest:'b'.repeat(64)});await assert.rejects(commitAtomicRosterStart(f.input),/snapshot-immutable-conflict/);assert.equal(f.writes.length,0);});
+
+test('forged previously sealed record is rejected even if digest matches',async()=>{
+ const f=fixture(),{buildRosterSnapshot}=require('../scripts/lib/rdw-roster-tier-snapshot.cjs');
+ const s=buildRosterSnapshot({eventCode:f.input.eventCode,drawRevision:f.input.drawRevision,rosterUids:f.input.rosterUids,verifiedTiers:f.input.verifiedTiers,capturedAt:f.input.capturedAt});
+ f.store.set('snapshot',{...s,source:'client',verified:false});
+ await assert.rejects(commitAtomicRosterStart(f.input),/snapshot-immutable-conflict/);
+ assert.equal(f.writes.length,0);
+});
+test('snapshot capture after trusted server time cannot verify start',async()=>{
+ const f=fixture();f.input.capturedAt=3000;
+ const result=await commitAtomicRosterStart(f.input);
+ assert.equal(result.committed,false);assert.equal(f.writes.length,0);
+});
