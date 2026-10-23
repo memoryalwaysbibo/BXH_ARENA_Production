@@ -242,6 +242,8 @@ jobs:
           node --test tests/rdw-canonical-room-reader.test.cjs
           node --check scripts/lib/rdw-participant-attestation.cjs
           node --test tests/rdw-participant-attestation.test.cjs
+          node --check scripts/rdw-live-room-readonly.cjs
+          node --test tests/rdw-live-room-readonly.test.cjs
           node --check tests/rdw-hunter-multi-event-history.test.cjs
           node --test tests/rdw-hunter-multi-event-history.test.cjs
           node --check tests/rdw-hunter-tier-e-progression.test.cjs
