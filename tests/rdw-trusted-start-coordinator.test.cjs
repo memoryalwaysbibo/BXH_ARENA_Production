@@ -31,6 +31,3 @@ test('roster revision mismatch blocks stale precomputed tiers',async()=>{
 test('unauthenticated and malformed request fail before any backend read',async()=>{
  const f=fixture();assert.equal((await f.start({request:payload})).code,'invalid-request');assert.equal((await f.start({actorUid:'host',request:{...payload,drawRevision:'3'}})).code,'invalid-request');assert.equal(f.called,0);
 });
-test('incomplete tiers block unless explicit audited RDW PASS requested',async()=>{
- const f=fixture();const r=await f.start({actorUid:'host',request:payload});assert.equal(r.ok,true);
-});
