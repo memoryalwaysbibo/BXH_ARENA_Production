@@ -16,13 +16,13 @@ async function commitAtomicRosterStart({tx,eventRef,snapshotRef,auditRef,eventCo
  // Never trust these booleans or arrays directly from an HTTP request.
  if(!Array.isArray(event.rosterUids)||JSON.stringify(event.rosterUids)!==JSON.stringify(rosterUids))throw Error('event-roster-mismatch');
  let snapshot=null,mode=null,audit=null,priorSnapshot=null,priorAudit=null;
- if(Array.isArray(verifiedTiers)&&verifiedTiers.length===rosterUids.length){
+ if(Number.isSafeInteger(serverTime)&&Number.isSafeInteger(capturedAt)&&capturedAt<=serverTime&&Array.isArray(verifiedTiers)&&verifiedTiers.length===rosterUids.length){
   try{snapshot=buildRosterSnapshot({eventCode,drawRevision,rosterUids,verifiedTiers,capturedAt});}catch{snapshot=null;}
  }
  if(snapshot&&snapshotRef){
   const snapDoc=await tx.get(snapshotRef);
   priorSnapshot=snapDoc?.exists?snapDoc.data():null;
-  if(priorSnapshot&&(priorSnapshot.snapshotDigest!==snapshot.snapshotDigest||priorSnapshot.rosterDigest!==snapshot.rosterDigest))throw Error('snapshot-immutable-conflict');
+  if(priorSnapshot&&(priorSnapshot.source!=='server'||priorSnapshot.verified!==true||priorSnapshot.sealed!==true||priorSnapshot.version!==snapshot.version||priorSnapshot.eventCode!==eventCode||priorSnapshot.drawRevision!==drawRevision||priorSnapshot.rosterSize!==snapshot.rosterSize||priorSnapshot.sourceScope!==snapshot.sourceScope||priorSnapshot.snapshotDigest!==snapshot.snapshotDigest||priorSnapshot.rosterDigest!==snapshot.rosterDigest))throw Error('snapshot-immutable-conflict');
   mode='rdw-verified';
  }
  if(!mode){
