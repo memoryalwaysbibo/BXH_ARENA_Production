@@ -13,7 +13,7 @@ test('authorization gates tier reads, and result reveals no UID',async()=>{
  const f=setup();const r=await f.service({actorUid:'admin',eventCode:code,adminVerified:true,tierEvidenceByUid:{a:{current:{tier:'national'}}}});
  assert.equal(r.ok,true);assert.equal(r.verifiedAccounts,2);assert.equal(r.virtualPlayers,6);assert.equal(r.fullSnapshotEligible,false);
  assert.deepEqual(r.formulaBands,[{rawForwardPercent:102,rawReversePercent:98,protectedForwardPercent:100,protectedReversePercent:100}]);
- assert.deepEqual(f.calls,['auth','room','tier','tier','auth']);
+ assert.deepEqual(f.calls,['auth','room','tier','tier','room','auth']);
  assert.equal(JSON.stringify(r).includes('"a"'),false);
 });
 test('unauthorized caller does not fetch roster or tiers',async()=>{const f=setup({allowed:false});const r=await f.service({actorUid:'admin',eventCode:code});assert.equal(r.reason,'not-authorized');assert.deepEqual(f.calls,['auth']);});
