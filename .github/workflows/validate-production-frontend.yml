@@ -245,6 +245,8 @@ jobs:
           node --test tests/rdw-admin-diagnostic.test.cjs
           node --check scripts/lib/rdw-admin-diagnostic-service.cjs
           node --test tests/rdw-admin-diagnostic-service.test.cjs
+          node --check scripts/lib/rdw-private-public-mirror-gate.cjs
+          node --test tests/rdw-private-public-mirror-gate.test.cjs
           node --check scripts/lib/rdw-diagnostic-admin-authorizer.cjs
           node --test tests/rdw-diagnostic-admin-authorizer.test.cjs
           node --check scripts/lib/rdw-server-diagnostic-wiring.cjs
