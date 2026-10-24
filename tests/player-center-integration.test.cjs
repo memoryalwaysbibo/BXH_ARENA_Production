@@ -92,6 +92,7 @@ test('career history initially limits full event cards and reveals the rest on d
 });
 test('active schedule excludes completed and cancelled entries, keeps family participants distinct',()=>{
  const c=setup();Object.assign(c,{normalizeRoomCodeInput:String,smartCallModel:()=>({kind:'waiting'}),isCommunityQuickRegistration:()=>false,publicTournamentRegistrationLocked:()=>true,scheduleSmartCallAutoRefresh:()=>{},scheduleGroups:(key,rows,card)=>rows.map(card).join('')});
+ vm.runInContext(extract('renderPlayerRegistrationCard'),c);
  vm.runInContext(extract('renderPlayerRegisteredTab'),c);
  c.myRegistrationsTournamentInfo={LIVE:{phase:'live',name:'現場賽'},DONE:{phase:'done',name:'完賽'}};
  c.myRegistrationsCache=[{tournamentCode:'LIVE',status:'waitlist',displayName:'本人'},{tournamentCode:'LIVE',status:'waitlist',displayName:'孩子',familyPlayerId:'child'},{tournamentCode:'DONE',status:'confirmed'},{tournamentCode:'CANCEL',status:'cancelled'}];

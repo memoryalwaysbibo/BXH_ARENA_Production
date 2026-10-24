@@ -7,21 +7,23 @@ const path = require('node:path');
 const core = fs.readFileSync(path.join(__dirname, '../modules/main-app/core.js'), 'utf8');
 const source = core.slice(core.indexOf('function scheduleSmartCallAutoRefresh(){'), core.indexOf('\nfunction renderPlayerRegisteredTab('));
 function harness() {
-  let id = 0; const timers = new Map(), reads = [], context = {
+  let id = 0; const timers = new Map(), reads = [], listeners = {}, context = {
     smartCallAutoRefreshTimer: null, smartCallAutoRefreshKey: '', smartCallRefreshBusy: false,
     appPhase: 'player-center', playerActiveTab: 'registered', playerProfileSection:'overview', myRegistrationsRequest: 1,
     myRegistrationsCache: [{ tournamentCode: 'BXH-ONE', status: 'confirmed' }, { tournamentCode: 'BXH-ONE', status: 'confirmed', familyPlayerId: 'child' }],
     myRegistrationsTournamentInfo: { 'BXH-ONE': { tournamentPhase: 'live', parsedData: {} } },
     owner: 'first-account', enabled: true, renders: 0,
-    document: { hidden: false }, schedulePhase: () => 'live', smartCallModel: () => ({ kind: 'pending' }),
+    document: { hidden: false, addEventListener(type, callback) { listeners['document:' + type] = callback; } }, schedulePhase: () => 'live', smartCallModel: () => ({ kind: 'pending' }),
     setTimeout: (fn, ms) => { const handle = ++id; timers.set(handle, { fn, ms }); return handle; },
     clearTimeout: handle => timers.delete(handle),
   };
   context.smartCallEnabled = () => context.enabled;
   context.lobbyAuthKey = () => context.owner;
   context.renderPreservingScroll = () => { context.renders++; };
-  context.window = { cloudSync: { getPublicTournamentSummary: async code => { reads.push(code); return { tournamentPhase: 'live', parsedData: { updated: true } }; } } };
+  context.window = { addEventListener(type, callback) { listeners['window:' + type] = callback; }, cloudSync: { getPublicTournamentSummary: async code => { reads.push(code); return { tournamentPhase: 'live', parsedData: { updated: true } }; } } };
   vm.createContext(context); vm.runInContext(source, context);
+  assert.equal(typeof listeners['window:storage'], 'function');
+  assert.equal(typeof listeners['document:visibilitychange'], 'function');
   return { context, timers, reads, schedule: () => context.scheduleSmartCallAutoRefresh(), fire: async () => { const [handle, item] = timers.entries().next().value; timers.delete(handle); await item.fn(); } };
 }
 test('retains one existing 20-second timer and deduplicates a family event read', async () => {
