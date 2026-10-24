@@ -253,6 +253,8 @@ jobs:
           node --test tests/rdw-diagnostic-callable-entry.test.cjs
           node --check scripts/lib/rdw-verified-hunter-diagnostic.cjs
           node --test tests/rdw-verified-hunter-diagnostic.test.cjs
+          node --check modules/main-app/rdw-diagnostic-panel.js
+          node --test tests/rdw-diagnostic-panel.test.cjs
           node --check scripts/lib/rdw-canonical-room-reader.cjs
           node --test tests/rdw-canonical-room-reader.test.cjs
           node --check scripts/lib/rdw-participant-attestation.cjs
