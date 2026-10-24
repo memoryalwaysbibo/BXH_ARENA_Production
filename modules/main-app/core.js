@@ -3715,7 +3715,8 @@ async function startQrScanner(){
     qrScannerStream=stream;
     let detector=null;
     if(typeof window.BarcodeDetector==='function'){try{detector=new window.BarcodeDetector({formats:['qr_code']});}catch(e){}}
-    // Resolve video by ID each frame: render() replaces the modal's DOM.
+    // Resolve the video again if the scanner itself has been reopened.
+    let previewDeadline=0;
     const scan=async()=>{
       if(!current())return;
       try{
@@ -3724,7 +3725,14 @@ async function startQrScanner(){
         if(qrScannerVideoElement!==video){
           if(qrScannerVideoElement){try{qrScannerVideoElement.pause();qrScannerVideoElement.srcObject=null;}catch(e){}}
           qrScannerVideoElement=video;video.muted=true;video.autoplay=true;video.playsInline=true;video.srcObject=stream;
-          try{await video.play();}catch(e){if(current()&&document.getElementById('qr-scanner-video')===video)throw e;}
+          let playTimer;
+          try{
+            await Promise.race([video.play(),new Promise((_,reject)=>{
+              playTimer=setTimeout(()=>reject(Object.assign(Error('preview-timeout'),{name:'PreviewTimeoutError'})),8000);
+            })]);
+          }catch(e){if(current()&&document.getElementById('qr-scanner-video')===video)throw e;}
+          finally{clearTimeout(playTimer);}
+          previewDeadline=Date.now()+8000;
           if(!current())return;
           if(document.getElementById('qr-scanner-video')!==video){qrScannerFrame=requestAnimationFrame(scan);return;}
           setQrScannerStatus('請將 BXH ARENA QR 放入框內');
@@ -3734,6 +3742,7 @@ async function startQrScanner(){
           if(!current())return;
         }
         if(video.readyState>=2&&video.videoWidth&&video.videoHeight){
+          previewDeadline=Date.now()+8000;
           let rawValue='';
           if(detector){try{const found=await detector.detect(video);if(!current())return;rawValue=found?.[0]?.rawValue||'';}catch(e){detector=null;}}
           if(!current())return;
@@ -3743,11 +3752,12 @@ async function startQrScanner(){
             if(ctx){ctx.drawImage(video,0,0,canvas.width,canvas.height);const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);rawValue=window.jsQR(pixels.data,pixels.width,pixels.height,{inversionAttempts:'dontInvert'})?.data||'';}
           }
           if(rawValue&&await acceptScannedQrValue(rawValue))return;
-        }
+        }else if(Date.now()>previewDeadline){throw Object.assign(Error('preview-timeout'),{name:'PreviewTimeoutError'});}
       }catch(e){if(current()){stopQrScanner();setQrScannerStatus(e.name==='DecoderError'?'辨識元件載入失敗，請按重新啟動或手動輸入。':'相機預覽中斷，請按重新啟動或手動輸入。',true);}return;}
       if(current())qrScannerFrame=requestAnimationFrame(scan);
     };
-    qrScannerFrame=requestAnimationFrame(scan);
+    // Attach and play immediately after permission resolves, before the first frame.
+    await scan();
   }catch(e){
     if(current()){stopQrScanner();setQrScannerStatus(e.name==='NotAllowedError'?'請允許相機權限，再按重新啟動。':'無法啟動鏡頭，請按重新啟動或手動輸入。',true);}
   }finally{if(current())qrScannerStarting=false;}
@@ -17852,6 +17862,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
+  syncQrScannerModal();
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
@@ -18447,12 +18458,8 @@ function renderEventEntryModal(){
   </div>`;
 }
 
-function renderQrScannerModal(){
+function qrScannerModalMarkup(){
   if(!qrScannerOpen) return "";
-  setTimeout(()=>{
-    if(!qrScannerOpen) return;
-    startQrScanner();
-  },0);
   return `<div class="modal-overlay" data-action="close-qr-scanner">
     <div class="modal-box" style="max-width:460px;">
       <h3>掃描 BXH ARENA QR</h3>
@@ -18468,6 +18475,21 @@ function renderQrScannerModal(){
       </div>
     </div>
   </div>`;
+}
+
+function renderQrScannerModal(){ return ""; }
+function syncQrScannerModal(){
+  let host=document.getElementById('qr-scanner-portal');
+  if(!qrScannerOpen){
+    if(host){stopQrScanner();host.remove();}
+    return;
+  }
+  if(!host){
+    host=document.createElement('div');host.id='qr-scanner-portal';
+    host.innerHTML=qrScannerModalMarkup();document.body.appendChild(host);
+  }
+  // Keep the live video connected while the rest of the app re-renders.
+  startQrScanner();
 }
 
 function renderCloudJoinModal(){
@@ -24564,3 +24586,12 @@ init().then(()=>{
 // Release the A1 camera on backgrounding and navigation; no PK polling exists in A1.
 window.addEventListener("pagehide",()=>hunterClashEntry?.suspend());
 document.addEventListener("visibilitychange",()=>{scheduleSmartCallAutoRefresh();if(document.hidden)hunterClashEntry?.suspend();else hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]"));});
+
+// Release the check-in camera when Safari/PWA leaves the foreground.
+window.addEventListener("pagehide",()=>stopQrScanner());
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden&&qrScannerOpen){
+    stopQrScanner();
+    setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
+  }
+});
