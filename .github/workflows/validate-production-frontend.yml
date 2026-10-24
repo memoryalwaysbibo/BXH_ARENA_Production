@@ -87,6 +87,8 @@ jobs:
           node-version: 22
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
+      - name: Verify QR camera lifecycle and existing check-in routing
+        run: node --test tests/qr-scanner-lifecycle.test.cjs qr-checkin/ui.test.cjs
       - name: Verify latest member location and regional leaderboard states
         run: node --test tests/ladder-location.test.cjs
       - name: Verify interface theme account isolation
@@ -249,6 +251,9 @@ jobs:
             echo "::error title=CODE_FAIL_OR_INFRA_FAIL::UI Smoke failed twice."
             exit "$rc"
           fi
+      - name: Verify stable QR camera preview across app re-renders
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/qr-scanner-browser.cjs
       - name: Verify Hunter Clash A1 entry in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: |
