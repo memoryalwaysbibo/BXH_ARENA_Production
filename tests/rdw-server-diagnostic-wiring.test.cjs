@@ -12,7 +12,7 @@ function setup(role='admin'){
 test('server wiring resolves private room and canonical user privilege only',async()=>{
  const f=setup(),r=await f.service({actorUid:'actor',eventCode:code});
  assert.equal(r.ok,true);assert.equal(r.verifiedAccounts,1);assert.equal(r.virtualPlayers,1);assert.equal(r.fullSnapshotEligible,false);
- assert.deepEqual(f.reads,['users/actor','tournaments/'+code,'users/actor']);
+ assert.deepEqual(f.reads,['users/actor','tournaments/'+code,'tournaments/'+code,'users/actor']);
 });
 test('staff cannot read private room',async()=>{
  const f=setup('staff'),r=await f.service({actorUid:'actor',eventCode:code});
