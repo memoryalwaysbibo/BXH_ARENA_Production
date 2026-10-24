@@ -5320,7 +5320,8 @@ function publicTournamentSourceState(source){
 function markLobbySourceUnknown(){
   if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
 }
-function invalidateMyRegistrationsCache(){
+function invalidateMyRegistrationsCache(result){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)myEventsPlayerSlice?.invalidate(result);
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key){
@@ -14507,6 +14508,7 @@ function lobbyEventStartMs(t){
   return isNaN(ms) ? Infinity : ms;
 }
 function lobbyMyRegistration(code){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)return currentMyEventsPlayerSlice()?.registration(code)||null;
   if(!Array.isArray(myRegistrationsCache)) return null;
   return myRegistrationsCache.find(r=>r.tournamentCode===code && (r.status==="confirmed"||r.status==="waitlist"||r.status==="pending_draw")) || null;
 }
@@ -14572,14 +14574,15 @@ function lobbyRegistrationButtons(t, loggedIn){
   // Official registration events: the lobby is a preview surface. Registration
   // itself is confirmed on the full event-detail page so fee/rules/deadlines are
   // visible before the player commits.
-  if(loggedIn && myRegistrationsCache===null){
+  if(loggedIn && window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true && myRegistrationsCache===null){
     return infoButton("查看賽事資訊");
   }
   const reg=lobbyMyRegistration(t.code);
+  if(loggedIn&&window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true&&!reg)return infoButton('查看資訊（本人報名待確認）');
   const now=Date.now();
   if(reg){
     const label=reg.status==="confirmed"?"已報名（正取）":reg.status==="pending_draw"?"待抽籤":"已報名（備取）";
-    const canCancel=!!t.cancellationDeadline && now<t.cancellationDeadline;
+    const canCancel=window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true?!!currentMyEventsPlayerSlice()?.cancellationContext(t.code)&&!!t.cancellationDeadline&&now<t.cancellationDeadline:!!t.cancellationDeadline&&now<t.cancellationDeadline;
     return `<span class="fe-status-chip status-${esc(reg.status)}">${label}</span>${infoButton(t.registrationSelection?"查看賽事資訊":"查看／新增兒童報名")}${canCancel?`<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(t.code)}">取消報名</button>`:""}`;
   }
   if(t.regStatus==="scheduled"){
@@ -14740,7 +14743,8 @@ function renderTournamentLobbyContent(opts={}){
     if(!publicTournamentsLoading) setTimeout(()=>handleAction("load-public-tournaments",{getAttribute:()=>null}),0);
     return `<div class="panel"><div class="empty-state">正在讀取賽事大廳……</div></div>`;
   }
-  if(loggedIn && myRegistrationsCache===null && !myRegistrationsLoading){
+  if(loggedIn&&window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){currentMyEventsPlayerSlice()?.ensure();}
+  else if(loggedIn && myRegistrationsCache===null && !myRegistrationsLoading){
     setTimeout(()=>handleAction("load-my-registrations",{getAttribute:()=>null}),0);
   }
   if(publicTournamentsError) return `<div class="panel"><div class="empty-state">${esc(publicTournamentsError)}</div><div class="btn-row" style="justify-content:center;margin-top:12px;"><button class="btn btn-ghost" data-action="refresh-public-tournaments">重新整理</button></div></div>`;
@@ -15484,6 +15488,30 @@ function smartCallCardHtml(r,info){
   return window.BXHQueueDashboard.html(r,{...info,queueAutoRefresh:on},model,controls);
 }
 function scheduleSmartCallAutoRefresh(){
+if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){
+  const visible=()=>appPhase==='player-center'&&playerActiveTab==='registered'&&!document.hidden;
+  const slice=currentMyEventsPlayerSlice();
+  const rooms=slice?.snapshot()?.rooms||[];
+  const codes=[...new Set(rooms.filter(room=>room.status==='ready'&&room.info&&
+    schedulePhase(room.info)==='live'&&smartCallEnabled(room.card.code)&&
+    room.rows.some(row=>row.status==='confirmed'&&smartCallModel(row,room.info).kind!=='done')
+  ).map(room=>room.card.code))];
+  const owner=lobbyAuthKey(),key='uid-slice|'+owner+'|'+codes.join(',');
+  if(smartCallAutoRefreshTimer&&(!visible()||smartCallAutoRefreshKey!==key||!codes.length)){
+    clearTimeout(smartCallAutoRefreshTimer);smartCallAutoRefreshTimer=null;
+  }
+  smartCallAutoRefreshKey=key;
+  if(!visible()||!codes.length||smartCallAutoRefreshTimer||smartCallRefreshBusy)return;
+  const current=()=>visible()&&owner===lobbyAuthKey()&&slice===myEventsPlayerSlice;
+  smartCallAutoRefreshTimer=setTimeout(async()=>{
+    smartCallAutoRefreshTimer=null;if(!current())return;
+    smartCallRefreshBusy=true;
+    try{for(const code of codes){if(!current())return;await slice.refreshSummary(code);}}
+    finally{smartCallRefreshBusy=false;scheduleSmartCallAutoRefresh();}
+  },20000);
+  return;
+}
+
   // Reuse the existing public-summary cadence. Never create a second listener,
   // callable, or per-family duplicate read for the queue dashboard.
   const scheduleVisible=()=>playerActiveTab==='registered';
@@ -15515,28 +15543,7 @@ function scheduleSmartCallAutoRefresh(){
   },20000);
 }
 
-function renderPlayerRegisteredTab(options={}){
-  if(myRegistrationsCache===null){
-    if(!myRegistrationsLoading){
-      setTimeout(()=>{ handleAction("load-my-registrations", {getAttribute:()=>null}); }, 0);
-    }
-    return `<div class="panel"><div class="empty-state">正在讀取我的賽程……</div></div>`;
-  }
-  if(myRegistrationsError){
-    return `<div class="panel">
-      <div class="empty-state"><div class="big">${esc(myRegistrationsError)}</div></div>
-      <div class="btn-row" style="justify-content:center;margin-top:12px;">
-        <button class="btn btn-ghost" data-action="load-my-registrations">重新整理</button>
-      </div>
-    </div>`;
-  }
-  const registrations=options.activeOnly?myRegistrationsCache.filter(r=>r.status!=="cancelled"&&['waiting','live'].includes(schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}))):myRegistrationsCache;
-  if(registrations.length===0){
-    if(myRegistrationsPartial)return `<div class="panel"><div class="empty-state">部分賽事尚未讀取，清單可能不完整。請重新整理再試。</div></div>`;
-    return `<div class="panel"><div class="empty-state">目前沒有進行中的個人賽程</div></div>`;
-  }
-  const renderCard = (r)=>{
-    const info = myRegistrationsTournamentInfo[r.tournamentCode] || {};
+function renderPlayerRegistrationCard(r,info,options={}){
     let statusLabel = { pending_draw:"待抽籤", confirmed:"正取", waitlist:"備取", cancelled:"已取消" }[r.status] || r.status;
     if(info.registrationSelection?.status==='drawing')statusLabel='抽籤處理中';
     else if(info.registrationSelection?.status==='open'&&r.status!=='cancelled')statusLabel='待抽籤';
@@ -15568,12 +15575,64 @@ function renderPlayerRegisteredTab(options={}){
         ${bracketReady
           ? `<button class="btn btn-primary btn-sm" data-action="switch-to-player-watch" data-view="bracket" data-return="registered" data-code="${esc(r.tournamentCode)}">查看樹狀圖</button>`
           : `<button class="btn btn-ghost btn-sm" disabled aria-disabled="true">樹狀圖尚未產生</button>`}
-        ${(['confirmed','waitlist','pending_draw'].includes(r.status)) && (isCommunityQuickRegistration(info)?canCancelCommunityRegistration(info):!publicTournamentRegistrationLocked(info))
+        ${options.allowCancel!==false&&(['confirmed','waitlist','pending_draw'].includes(r.status)) && (isCommunityQuickRegistration(info)?canCancelCommunityRegistration(info):!publicTournamentRegistrationLocked(info))
           ? `<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(r.tournamentCode)}">取消報名</button>`
           : ""}
+        ${options.allowCancel===false?'<button class="btn btn-ghost btn-sm" disabled aria-disabled="true">取消條件尚未確認，請先查看詳情</button>':''}
       </div>
     </div>`;
-  };
+}
+let myEventsPlayerSlice=null;
+function currentMyEventsPlayerSlice(){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)return null;
+  if(!myEventsPlayerSlice&&window.BXHMyEventsPlayerSlice?.create){
+    myEventsPlayerSlice=window.BXHMyEventsPlayerSlice.create({
+      call:(name,payload)=>{if(!window.engagementService?.myActiveEventsRead)throw Error('service-unavailable');return window.engagementService.myActiveEventsRead(name,payload);},
+      summary:code=>window.cloudSync?.getPublicTournamentFull(code),
+      storage:(()=>{try{return window.localStorage;}catch{return null;}})(),
+      queryStatus:payload=>window.engagementService.myEventOperationStatus(payload),
+      renderCard:(row,info,options)=>renderPlayerRegistrationCard(row,info,options),
+      ledgerOptions:{visible:()=>!document.hidden},
+      changed:()=>{if(appPhase==='player-center'&&playerActiveTab==='registered')renderPreservingScroll();else if(isTournamentLobbyVisible())requestLobbyRender();}
+    });
+  }
+  myEventsPlayerSlice?.bind(firebaseUser?.uid||null,lobbyAuthEpoch);
+  return myEventsPlayerSlice;
+}
+window.BXHMyEventsDiscovery={read:options=>{if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)throw Error('my-events-disabled');const slice=currentMyEventsPlayerSlice();if(!slice)throw Error('membership-read-unavailable');return slice.discovery(options);}};
+window.BXHMyEventsPlayerOperation={execute:operation=>{
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)throw Error('my-events-disabled');
+  const slice=currentMyEventsPlayerSlice();if(!slice)throw Error('membership-receipt-unavailable');return slice.execute(operation);
+}};
+window.addEventListener('storage',event=>myEventsPlayerSlice?.storageChanged(event));
+document.addEventListener('visibilitychange',()=>myEventsPlayerSlice?.visibilityChanged());
+function renderPlayerRegisteredTab(options={}){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){
+    const slice=currentMyEventsPlayerSlice();
+    if(!slice)return '<div role="status">我的報名服務尚未就緒，無法確認清單。</div>';
+    slice.ensure();scheduleSmartCallAutoRefresh();return slice.render();
+  }
+
+  if(myRegistrationsCache===null){
+    if(!myRegistrationsLoading){
+      setTimeout(()=>{ handleAction("load-my-registrations", {getAttribute:()=>null}); }, 0);
+    }
+    return `<div class="panel"><div class="empty-state">正在讀取我的賽程……</div></div>`;
+  }
+  if(myRegistrationsError){
+    return `<div class="panel">
+      <div class="empty-state"><div class="big">${esc(myRegistrationsError)}</div></div>
+      <div class="btn-row" style="justify-content:center;margin-top:12px;">
+        <button class="btn btn-ghost" data-action="load-my-registrations">重新整理</button>
+      </div>
+    </div>`;
+  }
+  const registrations=options.activeOnly?myRegistrationsCache.filter(r=>r.status!=="cancelled"&&['waiting','live'].includes(schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}))):myRegistrationsCache;
+  if(registrations.length===0){
+    if(myRegistrationsPartial)return `<div class="panel"><div class="empty-state">部分賽事尚未讀取，清單可能不完整。請重新整理再試。</div></div>`;
+    return `<div class="panel"><div class="empty-state">目前沒有進行中的個人賽程</div></div>`;
+  }
+  const renderCard=r=>renderPlayerRegistrationCard(r,myRegistrationsTournamentInfo[r.tournamentCode]||{});
   scheduleSmartCallAutoRefresh();
   return `<div class="panel-title">${options.activeOnly?'我正在參加':'我的賽程'}<button class="btn btn-ghost btn-sm" data-action="load-my-registrations">重新整理</button></div>`+(myRegistrationsPartial?'<p class="hint" role="status">部分賽事尚未讀取，清單可能不完整。</p>':'')+scheduleGroups('registered',registrations,renderCard,r=>r.status==='cancelled'?'cancelled':schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}));
 }
@@ -20758,6 +20817,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(["career","season","month","week","today"].includes(value)){ hunterRecordPeriodFilter=value; renderPreservingScroll(); }
     return;
   }
+  if(action==='my-events-refresh'||action==='my-events-more'||action==='my-events-detail-more'||action==='my-events-receipt-recheck'){
+    if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)currentMyEventsPlayerSlice()?.action(action,target.getAttribute("data-code"));
+    return;
+  }
   if(action==="load-my-registrations"){
     reconcileLobbyContext();
     if(myRegistrationsLoading)return;
@@ -21006,7 +21069,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!window.cloudSync || !window.cloudSync.joinTournamentAsPlayer) throw {code:"network"};
         const result=await window.cloudSync.joinTournamentAsPlayer(code,true);
         showToast(result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
-        publicTournamentsCache=null; invalidateMyRegistrationsCache(); render();
+        publicTournamentsCache=null; invalidateMyRegistrationsCache(result); render();
       }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }finally{target.disabled=false;}
     })();
     return;
@@ -21094,7 +21157,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         pendingRegistrationCode = null;
         clearRegistrationParamFromUrl();
         publicTournamentsCache = null; // force refresh of the public list
-        invalidateMyRegistrationsCache(); // force refresh of 已報名 tab
+        invalidateMyRegistrationsCache(result); // force refresh of 已報名 tab
         tournamentDetailBusy = false;
         await loadTournamentDetail(code);
         setTimeout(()=>{
@@ -21113,12 +21176,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="cancel-my-registration"){
+
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可取消報名，請切換至玩家模式", true); return; }
     const code = target.getAttribute("data-code");
+    const uidFirstCancel=window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true&&appPhase!=='tournament-detail';
+    const cancelContext=uidFirstCancel?currentMyEventsPlayerSlice()?.cancellationContext(code):null;
+    const cancelOwner=lobbyAuthKey();
+    if(uidFirstCancel&&!cancelContext){showToast("報名或取消條件尚未確認，請重新讀取此場資料",true);return;}
+    const cancelSummary=uidFirstCancel?cancelContext.info:myRegistrationsTournamentInfo[code];
     const detailLock=(tournamentDetailCode===code && tournamentDetailData && (publicTournamentRegistrationLocked(tournamentDetailData)||(isCommunityQuickRegistration(tournamentDetailData)&&communityRegistrationLocked(tournamentDetailData))));
-    const summaryLock=myRegistrationsTournamentInfo[code] && (publicTournamentRegistrationLocked(myRegistrationsTournamentInfo[code])||(isCommunityQuickRegistration(myRegistrationsTournamentInfo[code])&&communityRegistrationLocked(myRegistrationsTournamentInfo[code])));
+    const summaryLock=uidFirstCancel?(publicTournamentRegistrationLocked(cancelSummary)||(isCommunityQuickRegistration(cancelSummary)&&!canCancelCommunityRegistration(cancelSummary))):(myRegistrationsTournamentInfo[code] && (publicTournamentRegistrationLocked(myRegistrationsTournamentInfo[code])||(isCommunityQuickRegistration(myRegistrationsTournamentInfo[code])&&communityRegistrationLocked(myRegistrationsTournamentInfo[code]))));
     if(detailLock || summaryLock){ showToast("賽事已開始，取消報名功能已鎖定",true); return; }
     openModal({ type:"generic", title:"取消報名？", message:"確定要取消這場賽事的報名嗎？取消後紀錄會保留；若本場開啟自動補位，會依備取順序遞補一位。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
+      if(uidFirstCancel){
+        const fresh=currentMyEventsPlayerSlice()?.cancellationContext(code);
+        if(cancelOwner!==lobbyAuthKey()||!fresh||publicTournamentRegistrationLocked(fresh.info)||(isCommunityQuickRegistration(fresh.info)&&!canCancelCommunityRegistration(fresh.info))){showToast("登入或取消條件已變更，請重新讀取",true);return;}
+      }
       if(tournamentDetailBusy) return;
       tournamentDetailBusy = true; render();
       (async ()=>{
@@ -21127,7 +21200,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           const result=await window.cloudSync.cancelRegistrationAsPlayer(code);
           showToast(result?.autoPromoted?"已取消報名；備取已自動遞補":"已取消報名");
           publicTournamentsCache = null;
-          invalidateMyRegistrationsCache();
+          invalidateMyRegistrationsCache(result);
           tournamentDetailBusy = false;
           if(appPhase==="tournament-detail" && tournamentDetailCode===code){
             await loadTournamentDetail(code);
@@ -24364,6 +24437,7 @@ async function init(){
             if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
             lobbyAuthEpoch++;
+            myEventsPlayerSlice?.reset();
             if(typeof invalidateCommunityRoomSnapshotContext==="function")invalidateCommunityRoomSnapshotContext();
             const communityRoomAuthContext=captureCommunityRoomStateContext(fbUser&&fbUser.uid);
             if(typeof stopAdminRosterWatch==="function") stopAdminRosterWatch();
