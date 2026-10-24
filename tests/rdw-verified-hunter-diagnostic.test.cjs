@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
 const {createVerifiedHunterDiagnostic}=require('../scripts/lib/rdw-verified-hunter-diagnostic.cjs');
+const {EXPECTED_FILES}=require('../scripts/lib/rdw-hunter-bundle-loader.cjs');
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 function fixture({incomplete=false}={}){
  const bundleRoot=fs.mkdtempSync(path.join(os.tmpdir(),'rdw-private-hunter-'));fs.mkdirSync(path.join(bundleRoot,'vendor'));
@@ -10,6 +11,7 @@ function fixture({incomplete=false}={}){
   'evaluator.cjs':'module.exports={};',
   'vendor/provenance.json':'{}'
  };
+ for(const name of EXPECTED_FILES)if(!Object.hasOwn(files,name))files[name]='{}';
  const manifest={};for(const [name,data] of Object.entries(files)){fs.writeFileSync(path.join(bundleRoot,name),data);manifest[name]=hash(data);}
  fs.writeFileSync(path.join(bundleRoot,'bundle-manifest.json'),JSON.stringify(manifest));
  const code='BXH-ABC123',room={code,data:JSON.stringify({cloudCode:code,registrationRosterRevision:4,startedAt:null,rosterLocked:false,players:[{uid:'realA'},{uid:'realB'},...Array.from({length:6},(_,i)=>({id:'virtual'+i}))]})};
