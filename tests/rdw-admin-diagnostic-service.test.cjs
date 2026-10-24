@@ -18,3 +18,31 @@ test('authorization gates tier reads, and result reveals no UID',async()=>{
 });
 test('unauthorized caller does not fetch roster or tiers',async()=>{const f=setup({allowed:false});const r=await f.service({actorUid:'admin',eventCode:code});assert.equal(r.reason,'not-authorized');assert.deepEqual(f.calls,['auth']);});
 test('malformed actor and event rejected before authentication',async()=>{const f=setup();assert.equal((await f.service({actorUid:'',eventCode:code})).reason,'invalid-request');assert.deepEqual(f.calls,[]);});
+
+test('mutated canonical room during tier reads cannot be diagnosed as current',async()=>{
+ let readCount=0;
+ const service=createAdminDiagnosticService({
+  enabled:true,
+  authorizeAdmin:async()=>true,
+  readRoom:async()=>{
+   readCount++;
+   if(readCount===1)return doc;
+   const newState=JSON.parse(doc.data);
+   newState.registrationRosterRevision=5;
+   return {code,data:JSON.stringify(newState)};
+  },
+  readCurrentTierEvidence:async({uid})=>evidence(uid),
+  clock:()=>200
+ });
+ const result=await service({actorUid:'admin',eventCode:code});
+ assert.deepEqual(result,{ok:false,reason:'room-changed-during-diagnostic'});
+ assert.equal(readCount,2);
+});
+test('malformed or missing readback blocks diagnostics',async()=>{
+ const service=createAdminDiagnosticService({
+  enabled:true,authorizeAdmin:async()=>true,
+  readRoom:(()=>{let calls=0;return async()=>++calls===1?doc:null;})(),
+  readCurrentTierEvidence:async({uid})=>evidence(uid),clock:()=>200
+ });
+ assert.deepEqual(await service({actorUid:'admin',eventCode:code}),{ok:false,reason:'room-changed-during-diagnostic'});
+});
