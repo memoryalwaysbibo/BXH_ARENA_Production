@@ -29,9 +29,26 @@ function createAdminDiagnosticService({authorizeAdmin,readRoom,readCurrentTierEv
   for(const uid of canonicalUids)evidenceByUid[uid]=await readCurrentTierEvidence({uid,eventCode});
   const serverTime=clock();
   if(!Number.isSafeInteger(serverTime)||serverTime<=0)throw Error('server-clock-invalid');
+  // A slow Hunter history query may overlap a roster/registration mutation.
+  // Re-read the authoritative room before returning diagnostics; never label a
+  // stale roster or bracket as ready. This is read-only and fail-closed.
+  const latest=await readRoom({eventCode});
+  if(!latest)return {ok:false,reason:'room-changed-during-diagnostic'};
+  const roomState=doc=>{
+   if(!doc||typeof doc!=='object')return null;
+   let value=doc.data;
+   if(typeof value==='string'){try{value=JSON.parse(value);}catch{return null;}}
+   return value&&typeof value==='object'&&!Array.isArray(value)?value:null;
+  };
+  const latestState=roomState(latest);
+  const beforeState=roomState(room);
+  // Compare entire tournament state, including assignments and bracket state:
+  // a change in any field means we must not claim a stable diagnostic result.
+  if(!latestState||!beforeState||JSON.stringify(latestState)!==JSON.stringify(beforeState))
+   return {ok:false,reason:'room-changed-during-diagnostic'};
   // Recheck authorization before returning private diagnostics after potentially slow reads.
   if(await authorizeAdmin({actorUid,eventCode})!==true)return {ok:false,reason:'authorization-changed'};
-  return inspectRdwDiagnostic({room,eventCode,adminVerified:true,tierEvidenceByUid:evidenceByUid,serverTime});
+  return inspectRdwDiagnostic({room:latest,eventCode,adminVerified:true,tierEvidenceByUid:evidenceByUid,serverTime});
  };
 }
 module.exports={createAdminDiagnosticService};
