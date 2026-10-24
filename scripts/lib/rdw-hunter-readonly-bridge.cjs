@@ -21,7 +21,7 @@ function createReadOnlyTierResolver({db,createReader,clock}){
    const atMs=clock();
    const checked=verifiedCurrentTier({uid,source:'server',verified:true,version:VERSION,status:'unchanged',computedAt:atMs,current:grade&&{tier:grade.tier}}, {uid,atMs});
    if(!checked.ok)return checked;
-   return {...checked,sourceDigest:evidence.sourceDigest,sourceScope:evidence.sourceScope};
+   return {...checked,source:'server',verified:true,status:'unchanged',current:{tier:checked.tier},complete:true,unresolvedIdentities:0,sourceDigest:evidence.sourceDigest,sourceScope:evidence.sourceScope};
   });
  };
 }
