@@ -739,7 +739,21 @@
       const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
   }
+  function runMyEventsPlayerOperation(route,code,send){
+    if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)return send(crypto.randomUUID());
+    if(!window.BXHMyEventsPlayerOperation?.execute)throw Error('membership-receipt-unavailable');
+    return window.BXHMyEventsPlayerOperation.execute({route,code,send});
+  }
   window.engagementService={
+    async myEventOperationStatus(payload){
+      if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['route','operationId','code','nonce'].includes(k)))throw Error('unsupported-operation-status-input');
+      return callEngagementFunction('queryMyEventOperationStatus',payload,10000);
+    },
+    async myActiveEventsRead(name,payload){
+      if(!['queryMyActiveEvents','queryMyActiveEventDetails'].includes(name))throw Error('unsupported-my-events-read');
+      if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['code','cursor'].includes(k)))throw Error('unsupported-my-events-input');
+      return callEngagementFunction(name,payload,10000);
+    },
     connectionInfo(){return {projectId:FIREBASE_CONFIG.projectId||'未設定',region:'asia-east1',signedIn:!!(authHandle&&authHandle.currentUser),sdkReady:!!fnx};},
     async changeManagedAccounts(payload){return callEngagementFunction("changeManagedAccounts",payload,30000);},
     async tournamentOperation(name,payload){return callEngagementFunction(name,payload,30000);},
@@ -1186,7 +1200,9 @@
       }
       const selection=await chooseFamilyParticipant(selectionDoc.exists()?selectionDoc.data():{},code,childEligibilityConfirmed,mode);
       if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
-      return window.engagementService.familyRegistration({action:'join',code,childIds:selection.childIds,allocation:selection.allocation,childEligibilityConfirmed:childEligibilityConfirmed===true,operationId:crypto.randomUUID()});
+      const request=JSON.parse(JSON.stringify({action:'join',code,childIds:selection.childIds,allocation:selection.allocation,childEligibilityConfirmed:childEligibilityConfirmed===true}));
+      if(selectionDoc.exists()&&selectionDoc.data().battleMode==='team')return window.engagementService.familyRegistration({...request,operationId:crypto.randomUUID()});
+      return runMyEventsPlayerOperation('family',code,operationId=>window.engagementService.familyRegistration({...request,operationId}));
     },
 
     async cancelRegistrationAsPlayer(code){
@@ -1218,7 +1234,9 @@
       }
     },
     async cancelRoster(code,registrationId="",localId="",intent="admin"){
-      return callEngagementFunction("registrationRosterService",{action:"cancel",code,registrationId,localId,intent,operationId:crypto.randomUUID()},60000);
+      const request={action:"cancel",code,registrationId,localId,intent};
+      if(intent!=="player")return callEngagementFunction("registrationRosterService",{...request,operationId:crypto.randomUUID()},60000);
+      return runMyEventsPlayerOperation('roster',code,operationId=>callEngagementFunction("registrationRosterService",{...request,operationId},60000));
     },
     async configureAutoFill(code,enabled){
       return callEngagementFunction("registrationRosterService",{action:"configure",code,enabled,intent:"admin",operationId:crypto.randomUUID()},60000);
