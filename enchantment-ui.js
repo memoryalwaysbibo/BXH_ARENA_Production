@@ -240,13 +240,18 @@
  // verifies the UID and only returns an enchantment round to its participants.
  let discoveryBusy=false,lastRegistrations=0,registrations=[],dismissedMatch='';
  async function discoverPlayerDraw(){
-  if(discoveryBusy||!root.cloudSync?.queryMyRegistrations||!root.engagementService?.enchantment)return;
+  const uidFirst=root.BXH_MY_EVENTS_PLAYER_READ_SLICE===true;
+  if(discoveryBusy||(uidFirst?!root.BXHMyEventsDiscovery?.read:!root.cloudSync?.queryMyRegistrations)||!root.engagementService?.enchantment)return;
   discoveryBusy=true;
   try{
-   if(Date.now()-lastRegistrations>30000){registrations=await root.cloudSync.queryMyRegistrations();lastRegistrations=Date.now();}
-   for(const r of registrations.filter(x=>x.status==='confirmed')){
+   let snapshot=null,currentRows=registrations;
+   if(uidFirst){snapshot=await root.BXHMyEventsDiscovery.read({refreshSummaries:true});if(!snapshot.isCurrent())return;currentRows=snapshot.rows;}
+   else{if(Date.now()-lastRegistrations>30000){registrations=await root.cloudSync.queryMyRegistrations();lastRegistrations=Date.now();}currentRows=registrations;}
+   for(const r of currentRows.filter(x=>x.status==='confirmed')){
+    if(snapshot&&!snapshot.isCurrent())return;
     const code=r.tournamentCode;
-    const info=await root.cloudSync.getPublicTournamentSummary(code);
+    const info=snapshot?snapshot.summaries[code]:await root.cloudSync.getPublicTournamentSummary(code);
+    if(snapshot&&!snapshot.isCurrent())return;
     const data=info?.parsedData;
     if(!data?.startedAt||!Array.isArray(data.matches))continue;
     const pid=typeof smartCallFindPlayerId==='function'?smartCallFindPlayerId(data,r):null;
@@ -270,6 +275,7 @@
     matchNames.set(key(code,m.id),{A:matchPlayerName('A'),B:matchPlayerName('B')});
     let result;
     try{result=await call({action:'get',code,matchId:m.id});}catch(e){continue;}
+    if(snapshot&&!snapshot.isCurrent())return;
     cache.set(key(code,m.id),{version:result.version,state:result.state});
     const s=result.state;
     const show=!!s&&s.phase!=='completed';
