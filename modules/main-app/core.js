@@ -22619,6 +22619,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
       const ns = defaultState();
       ns.meta = Object.assign({}, src.meta);
+      // A copied event is a new event: do not carry an old room's auto-fill-off default.
+      ns.meta.registrationAutoFillEnabled = true;
       ns.meta.name = (src.meta.name || "未命名賽事") + "（複製）";
       ns.players = src.players.map(p=>({id:uid("p"), name:p.name, checkedIn:false}));
       state = isTester() ? markTesterSandboxState(ns) : ns;
@@ -22714,7 +22716,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       const prevPlayers = state.players.map(p=>({name:p.name}));
       const ns = defaultState();
       if(copySettings){
-        ns.meta = prevMeta;
+        ns.meta = Object.assign({},prevMeta,{registrationAutoFillEnabled:true});
         ns.players = prevPlayers.map(n=>({id:uid("p"), name:n.name, checkedIn:false}));
       }
       state = isTester() ? markTesterSandboxState(ns) : ns;
