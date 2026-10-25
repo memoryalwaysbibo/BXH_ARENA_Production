@@ -1,9 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {inspectProductionStartReadiness}=require('../scripts/lib/rdw-production-start-readiness.cjs');
 const eventCode='BXH-SAMPLE',actorUid='server-host',expectedRosterRevision=4;
-const state={cloudCode:eventCode,startedAt:null,rosterLocked:false,registrationRosterRevision:4,meta:{battleMode:'individual',ladderMode:'ranked'},players:[{uid:'a'},{uid:'b'}]};
+const state={cloudCode:eventCode,startedAt:null,rosterLocked:false,registrationRosterRevision:4,createdBy:'creator',meta:{eventAuthority:'official',battleMode:'individual',ladderMode:'ranked'},players:[{uid:'a'},{uid:'b'}]};
 const room={code:eventCode,data:JSON.stringify(state)};
-const base={room,eventCode,actorUid,expectedRosterRevision};
+const base={room,eventCode,actorUid,expectedRosterRevision,rankedAuthorityEvidence:{source:'trusted-server',verified:true,kind:'official-or-partner-ranked',eventCode,actorUid,creatorUid:'creator',rosterRevision:4,authorized:true}};
 test('production writer must be independently audited before start can be authorized',()=>{
  assert.equal(inspectProductionStartReadiness(base).code,'server-authorization-not-proven');
  assert.equal(inspectProductionStartReadiness({...base,serverAuthorizationVerified:true}).code,'server-bracket-not-proven');
