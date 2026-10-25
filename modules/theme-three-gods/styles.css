@@ -47,3 +47,28 @@
 }
 
 :root[data-bxh-theme="three-gods"] .landing-role-cards .role-card-cn,:root[data-bxh-theme="three-gods"] .landing-role-cards .role-card-en{align-self:flex-start!important}
+
+/* Player entry cards share a legacy player class; map artwork by action. */
+:root[data-bxh-theme="three-gods"] .role-cards:not(.landing-role-cards){
+  display:grid;grid-template-columns:1fr;max-width:540px;gap:14px!important;
+}
+:root[data-bxh-theme="three-gods"] .role-cards>[data-action="player-goto-apply"]{
+  --god-tone:#e8bd62;
+}
+:root[data-bxh-theme="three-gods"] .role-cards>[data-action="player-goto-apply"]::before{content:"翼"}
+:root[data-bxh-theme="three-gods"] .role-cards>[data-action="player-goto-login"]::before{content:"天"}
+:root[data-bxh-theme="three-gods"] .role-cards>[data-action="player-goto-lookup"]::before{content:"巨"}
+:root[data-bxh-theme="three-gods"] .role-cards:not(.landing-role-cards)>[data-action^="player-goto-"]{
+  width:100%;max-width:none;min-width:0;height:auto;
+  padding:22px 18px 56px 96px!important;
+  align-items:flex-start;text-align:left;gap:6px;
+}
+:root[data-bxh-theme="three-gods"] .role-cards:not(.landing-role-cards)>[data-action^="player-goto-"]::before{
+  /* Reset the generic login-card halo geometry, including its hover transform. */
+  inset:auto;left:14px;top:50%;width:64px;height:64px;
+  margin:0;font-size:64px;line-height:1;text-align:center;
+  transform:translateY(-50%);background:none;opacity:1;z-index:0;
+}
+:root[data-bxh-theme="three-gods"] .role-cards:not(.landing-role-cards) .role-card-desc{
+  width:100%;max-width:none;
+}
