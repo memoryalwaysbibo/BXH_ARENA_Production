@@ -16,3 +16,12 @@ test('general tournaments retain legacy browser start and scoring',()=>{
  const remote={meta:{ladderMode:'general'},startedAt:null};const proposed={...remote,startedAt:1000};
  assert.deepEqual(inspectStartWriteFence({remote,proposed}),{ok:true,rdwApplicable:false});
 });
+
+test('old ranked browsers may omit RDW metadata without erasing the server seal',()=>{
+ const verdict=inspectStartWriteFence({remote:ranked,proposed:{...ranked},remoteDoc:sealed});
+ assert.deepEqual(verdict,{ok:true,rdwApplicable:true});
+});
+test('server-sealed event cannot be downgraded to general mode',()=>{
+ assert.equal(inspectStartWriteFence({remote:ranked,proposed:{...ranked,meta:{ladderMode:'general'}},remoteDoc:sealed}).reason,'rdw-server-mode-type-mismatch');
+ assert.equal(inspectStartWriteFence({remote:{...ranked,meta:{ladderMode:'general'}},proposed:ranked,remoteDoc:sealed}).reason,'rdw-server-mode-type-mismatch');
+});
