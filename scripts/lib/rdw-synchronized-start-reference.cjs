@@ -20,10 +20,10 @@ async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCo
  if(!sealed||sealed.source!=='server'||sealed.verified!==true||sealed.sealed!==true||
     sealed.eventCode!==eventCode||sealed.drawRevision!==drawRevision||
     !/^[a-f0-9]{64}$/.test(sealed.snapshotDigest||''))return {committed:false,reason:'snapshot-untrusted'};
- const nextPrivate={...p,startedAt:serverTime,rosterLocked:true};
+ const nextPrivate={...p,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
  const nextPublic={...q,startedAt:serverTime};
  // No tx reads after this point.
- tx.update(eventRef,{data:JSON.stringify(nextPrivate),updatedAt:serverTime,rdwStartMode:'rdw-verified'});
+ tx.update(eventRef,{data:JSON.stringify(nextPrivate),updatedAt:serverTime,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest});
  tx.update(publicRef,{bracketView:JSON.stringify(nextPublic),updatedAt:serverTime});
  return {committed:true,mode:'rdw-verified'};
 }
