@@ -1,6 +1,6 @@
 {
-  "build": "20261025.1",
+  "build": "20261026.1",
   "version": "v14.3.36",
-  "updatedAt": "2026-10-25T06:00:00.000Z",
-  "releaseTrigger": "account-management-search-first"
+  "updatedAt": "2026-10-25T17:00:00.000Z",
+  "releaseTrigger": "mobile-entrance-layout"
 }
