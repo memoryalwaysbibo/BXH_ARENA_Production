@@ -1,3 +1,5 @@
+const {buildRosterSnapshot}=require('../scripts/lib/rdw-roster-tier-snapshot.cjs');
+const makeSnapshot=(eventCode,drawRevision,rosterUids)=>buildRosterSnapshot({eventCode,drawRevision,rosterUids,capturedAt:150,verifiedTiers:rosterUids.map(uid=>({ok:true,uid,tier:'d',computedAt:100,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}))});
 'use strict';
 // P3-46: real Firestore Emulator verification of the isolated synchronized
 // private/public start reference. Not a production start service.
@@ -26,7 +28,7 @@ async function createFixture(label,{general=false,stale=false,missingSnapshot=fa
  await Promise.all([
   r.eventRef.create({code,data:JSON.stringify(privateState),visibility:'public'}),
   r.publicRef.create({bracketView:JSON.stringify(publicView),visibility:'public'}),
-  ...(missingSnapshot?[]:[r.snapshotRef.create({source:'server',verified:true,sealed:true,eventCode:code,drawRevision:7,snapshotDigest:'a'.repeat(64)})])
+  ...(missingSnapshot?[]:[r.snapshotRef.create(makeSnapshot(code,7,['uid_a','uid_b']))])
  ]);
  const args={...r,eventCode:code,expectedRosterRevision:4,drawRevision:7,serverTime:200,authorized:true,bracketVerified:true};
  return {r,args,run:override=>db.runTransaction(tx=>writeSynchronizedStart({...args,...override,tx}))};
@@ -38,8 +40,8 @@ test('Emulator commits private JSON and public bracketView in one transaction',a
  assert.equal(JSON.parse(p.data().data).startedAt,200);
  assert.equal(JSON.parse(q.data().bracketView).startedAt,200);
  assert.equal(JSON.parse(p.data().data).rosterLocked,true);
- assert.equal(JSON.parse(p.data().data).rdwSnapshotDigest,'a'.repeat(64));
- assert.equal(p.data().rdwSnapshotDigest,'a'.repeat(64));
+ assert.equal(JSON.parse(p.data().data).rdwSnapshotDigest,makeSnapshot(code,7,['uid_a','uid_b']).snapshotDigest);
+ assert.equal(p.data().rdwSnapshotDigest,makeSnapshot(code,7,['uid_a','uid_b']).snapshotDigest);
  assert.equal(p.data().visibility,'public');assert.equal(q.data().visibility,'public');
 });
 test('Emulator rollback leaves both mirrors untouched after injected transaction failure',async()=>{
