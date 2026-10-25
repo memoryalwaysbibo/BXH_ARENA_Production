@@ -53,11 +53,11 @@ for (const [theme, symbols] of Object.entries(themes)) {
             e.style.setProperty('font-size', `${parseFloat(getComputedStyle(e).fontSize)*2}px`, 'important');
           });
         });
-        // Check both keyboard focus and the highlighted pointer state.
+        // Touch devices have no hover pointer; check focus there and hover on desktop.
         for (const action of ['apply','login','lookup']) {
           const card = page.locator(`[data-action="player-goto-${action}"]`);
           await card.focus();
-          await card.hover();
+          if (!test.info().project.use.hasTouch) await card.hover();
           const issues = await card.evaluate((e, hasSymbol)=>{
             const failures=[], box=e.getBoundingClientRect();
             const title=e.querySelector('.role-card-cn').getBoundingClientRect();
