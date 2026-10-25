@@ -11,7 +11,7 @@ if(!admin.apps.length)admin.initializeApp({projectId:project});
 const db=admin.firestore();
 const {writeSynchronizedStart}=require('../scripts/lib/rdw-synchronized-start-reference.cjs');
 const prefix='p346-'+Date.now()+'-'+process.pid;
-const code='BXH-START46';
+const code='BXH-STRT46';
 function refs(label){return {
  eventRef:db.collection('rdwMirrorEmulatorTests').doc(prefix+'-'+label+'-private'),
  publicRef:db.collection('rdwMirrorEmulatorTests').doc(prefix+'-'+label+'-public'),
