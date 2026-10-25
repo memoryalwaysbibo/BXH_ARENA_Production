@@ -5,7 +5,9 @@
 function inspectStartWriteFence({remote,proposed,remoteDoc}={}){
  if(!remote||typeof remote!=='object'||!proposed||typeof proposed!=='object')
   return {ok:false,reason:'state-required'};
- // General rooms must keep their original browser start and scoring flow.\n if(remote.meta?.ladderMode!=='ranked'&&remoteDoc?.rdwStartMode!=='rdw-verified'&&remoteDoc?.rdwStartMode!=='rdw-pass')return {ok:true,rdwApplicable:false};\n const remoteStarted=Number(remote.startedAt);
+ // General rooms must keep their original browser start and scoring flow.
+ if(remote.meta?.ladderMode!=='ranked'&&remoteDoc?.rdwStartMode!=='rdw-verified'&&remoteDoc?.rdwStartMode!=='rdw-pass')return {ok:true,rdwApplicable:false};
+ const remoteStarted=Number(remote.startedAt);
  const incomingStarted=Number(proposed.startedAt);
  if(Number.isFinite(remoteStarted)&&remoteStarted>0){
   if(!Number.isFinite(incomingStarted)||incomingStarted!==remoteStarted)
