@@ -257,6 +257,7 @@ jobs:
           node --test tests/rdw-synchronized-start-reference.test.cjs
           node --check scripts/lib/rdw-start-write-fence.cjs
           node --test tests/rdw-start-write-fence.test.cjs
+          node --test tests/rdw-cloud-write-fence-wiring.test.cjs
           node --check scripts/lib/rdw-diagnostic-admin-authorizer.cjs
           node --test tests/rdw-diagnostic-admin-authorizer.test.cjs
           node --check scripts/lib/rdw-server-diagnostic-wiring.cjs
