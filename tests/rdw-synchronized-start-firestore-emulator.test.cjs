@@ -19,7 +19,7 @@ function refs(label){return {
  publicRef:db.collection('rdwMirrorEmulatorTests').doc(prefix+'-'+label+'-public'),
  snapshotRef:db.collection('rdwMirrorEmulatorTests').doc(prefix+'-'+label+'-sealed')
 };}
-async function createFixture(label,{general=false,stale=false,missingSnapshot=false}={}){
+async function createFixture(label,{general=false,stale=false,missingSnapshot=false,createSnapshot=false}={}){
  const r=refs(label);
  const players=[{id:'p1',uid:'uid_a'},{id:'p2',uid:'uid_b'}];
  const matches=[{id:'match1',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}];
@@ -28,9 +28,9 @@ async function createFixture(label,{general=false,stale=false,missingSnapshot=fa
  await Promise.all([
   r.eventRef.create({code,data:JSON.stringify(privateState),visibility:'public'}),
   r.publicRef.create({bracketView:JSON.stringify(publicView),visibility:'public'}),
-  ...(missingSnapshot?[]:[r.snapshotRef.create(makeSnapshot(code,7,['uid_a','uid_b']))])
+  ...(missingSnapshot||createSnapshot?[]:[r.snapshotRef.create(makeSnapshot(code,7,['uid_a','uid_b']))])
  ]);
- const args={...r,eventCode:code,expectedRosterRevision:4,drawRevision:7,serverTime:200,authorized:true,bracketVerified:true};
+ const args={...r,eventCode:code,expectedRosterRevision:4,drawRevision:7,serverTime:200,authorized:true,bracketVerified:true,...(createSnapshot?{snapshotCandidate:makeSnapshot(code,7,['uid_a','uid_b'])}:{})};
  return {r,args,run:override=>db.runTransaction(tx=>writeSynchronizedStart({...args,...override,tx}))};
 }
 test('Emulator commits private JSON and public bracketView in one transaction',async()=>{
@@ -70,4 +70,24 @@ test('Emulator concurrent starts cannot both commit',async()=>{
  assert.equal(JSON.parse(p.data().data).startedAt,200);
  assert.equal(JSON.parse(q.data().bracketView).startedAt,200);
  assert.equal((await f.run()).committed,false);
+});
+
+test('Emulator atomically creates sealed snapshot and both mirrors',async()=>{
+ const f=await createFixture('candidate',{createSnapshot:true});
+ const result=await f.run();assert.equal(result.committed,true);
+ const [e,p,snap]=await Promise.all([f.r.eventRef.get(),f.r.publicRef.get(),f.r.snapshotRef.get()]);
+ assert.equal(snap.exists,true);
+ assert.equal(JSON.parse(e.data().data).rdwSnapshotDigest,snap.data().snapshotDigest);
+ assert.equal(JSON.parse(e.data().data).startedAt,200);
+ assert.equal(JSON.parse(p.data().bracketView).startedAt,200);
+});
+test('Emulator rolls back new snapshot creation with both mirror updates on crash',async()=>{
+ const f=await createFixture('candidate-rollback',{createSnapshot:true});
+ await assert.rejects(db.runTransaction(async tx=>{
+  await writeSynchronizedStart({...f.args,tx});throw Error('simulated-after-staged-write');
+ }),/simulated-after-staged-write/);
+ const [e,p,snap]=await Promise.all([f.r.eventRef.get(),f.r.publicRef.get(),f.r.snapshotRef.get()]);
+ assert.equal(snap.exists,false);
+ assert.equal(JSON.parse(e.data().data).startedAt,null);
+ assert.equal(JSON.parse(p.data().bracketView).startedAt,null);
 });
