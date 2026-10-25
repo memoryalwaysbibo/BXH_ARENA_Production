@@ -19274,6 +19274,16 @@ function bindBoardModeInteractions(){
       setBoardZoom(boardZoom + (e.deltaY<0 ? 0.1 : -0.1));
     }, { passive:false });
 
+    let boardDragFrame=0;
+    const scheduleBoardDragTransform=()=>{
+      if(boardDragFrame) return;
+      boardDragFrame=requestAnimationFrame(()=>{
+        boardDragFrame=0;
+        if(!viewport.isConnected || !canvas.isConnected) return;
+        applyBoardTransform();
+      });
+    };
+
     let dragging=false, startX=0, startY=0, startPanX=0, startPanY=0;
     viewport.addEventListener("mousedown", (e)=>{
       dragging=true; startX=e.clientX; startY=e.clientY; startPanX=boardPanX; startPanY=boardPanY;
@@ -19283,7 +19293,7 @@ function bindBoardModeInteractions(){
       if(!dragging) return;
       boardPanX = startPanX + (e.clientX-startX);
       boardPanY = startPanY + (e.clientY-startY);
-      applyBoardTransform();
+      scheduleBoardDragTransform();
     });
     window.addEventListener("mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
 
@@ -19306,7 +19316,7 @@ function bindBoardModeInteractions(){
         e.preventDefault();
         boardPanX = touchStartPanX + (e.touches[0].clientX-touchStartX);
         boardPanY = touchStartPanY + (e.touches[0].clientY-touchStartY);
-        applyBoardTransform();
+        scheduleBoardDragTransform();
       }
     }, { passive:false });
     viewport.addEventListener("touchend", (e)=>{
