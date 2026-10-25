@@ -13742,7 +13742,7 @@ function renderPlayerHomeScreen(){
     ${authBrandHeader()}
     ${pendingRegistrationCode ? `<div class="banner" style="margin:14px 0;"><span>您正在透過報名 QR 進入賽事 ${esc(normalizeRoomCodeInput(pendingRegistrationCode))}。登入後會直接前往該場報名頁，個人資料將由您的 BXH 帳號自動帶入。</span></div>` : ""}
     <div class="auth-tagline">玩家中心</div>
-    <div class="role-cards" style="margin-top:20px;">
+    <div class="role-cards player-entry-cards" style="margin-top:20px;">
       <button class="role-card role-card-player" data-action="player-goto-login">
         <span class="role-card-icon">${ROLE_ICON_PLAYER}</span>
         <span class="role-card-cn">玩家登入</span>
