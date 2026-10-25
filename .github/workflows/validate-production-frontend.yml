@@ -255,6 +255,8 @@ jobs:
           node --test tests/rdw-private-public-mirror-gate.test.cjs
           node --check scripts/lib/rdw-synchronized-start-reference.cjs
           node --test tests/rdw-synchronized-start-reference.test.cjs
+          node --check scripts/lib/rdw-authorized-mirror-start.cjs
+          node --test tests/rdw-authorized-mirror-start.test.cjs
           node --check scripts/lib/rdw-start-write-fence.cjs
           node --test tests/rdw-start-write-fence.test.cjs
           node --test tests/rdw-cloud-write-fence-wiring.test.cjs
