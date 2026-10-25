@@ -5,6 +5,7 @@
 // This narrow writer is NOT sufficient for production start until court assignments,
 // bracket signature, and original client saveState transition are fully replicated.
 const {compareMirrors}=require('./rdw-private-public-mirror-gate.cjs');
+const {validateSealedSnapshot}=require('./rdw-sealed-snapshot-verifier.cjs');
 function parse(v){if(typeof v==='string'){try{return JSON.parse(v);}catch{return null;}}return v&&typeof v==='object'?v:null;}
 async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCode,expectedRosterRevision,drawRevision,serverTime,authorized=false,bracketVerified=false}={}){
  if(!tx||typeof tx.get!=='function'||typeof tx.update!=='function'||!eventRef||!publicRef||!snapshotRef)throw Error('trusted-transaction-required');
@@ -20,6 +21,9 @@ async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCo
  if(!sealed||sealed.source!=='server'||sealed.verified!==true||sealed.sealed!==true||
     sealed.eventCode!==eventCode||sealed.drawRevision!==drawRevision||
     !/^[a-f0-9]{64}$/.test(sealed.snapshotDigest||''))return {committed:false,reason:'snapshot-untrusted'};
+ const canonicalUids=(p.players||[]).map(player=>player?.uid);
+ const proof=validateSealedSnapshot({snapshot:sealed,eventCode,drawRevision,rosterUids:canonicalUids});
+ if(!proof.ok)return {committed:false,reason:proof.reason};
  const nextPrivate={...p,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
  const nextPublic={...q,startedAt:serverTime};
  // No tx reads after this point.
