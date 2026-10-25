@@ -7,7 +7,7 @@ test('existing cloud pushUpdate transaction fences only server-sealed ranked sta
  const excerpt=src.slice(guard-1100,guard+1100);
  assert.match(excerpt,/remoteDoc\.rdwStartMode==="rdw-verified"/);
  assert.match(excerpt,/remoteDoc\.rdwStartMode==="rdw-pass"/);
- assert.match(excerpt,/remoteState\.meta\?\.ladderMode==="ranked"/);
+ assert.match(excerpt,/remoteState\.meta\?\.ladderMode!=="ranked"/);
  assert.match(excerpt,/Number\(data\.startedAt\)!==sealedStart/);
  assert.match(excerpt,/data\.rosterLocked!==true/);
 });
