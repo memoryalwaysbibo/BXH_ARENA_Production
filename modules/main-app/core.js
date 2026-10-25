@@ -370,7 +370,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.35";
+const APP_VERSION = "v14.3.36";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.34",date:"2026/10/20",timezone:"Asia/Taipei",title:"個人歷史整合與獵人執照 2.1",updateLevel:"minor",added:["個人總覽整合獵人旅程、正式戰績與可展開的生涯賽事紀錄","獵人執照 2.1 採最近 20 場有效對戰，顯示目前階級與歷史回算最高階級"],changed:["我的賽程集中顯示參賽中資訊；個人資料頁作為歷史查閱入口","已核對的測試賽獨立保留，從正式戰績與執照計算排除"],fixed:["讀取失敗可重試，部分資料缺失時暫停階級判定","手機里程碑縮排及長賽事名稱旁的展開提示"],security:[],publicSummary:"個人歷史集中查閱；生涯最高標示為歷史回算，永久授階將另行接入。"},
@@ -5880,7 +5880,7 @@ const COMMUNITY_OWNER_ACTIONS = new Set([
 const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
   "open-account-management","super-admin-page","create-managed-user-submit","set-user-role","toggle-user-active",
-  "account-role-filter","account-search-apply","account-search-clear","account-clear-filters",
+  "account-role-filter","account-search-apply","account-search-clear","account-clear-filters","account-summary-refresh","account-page-prev","account-page-next",
   "unarchive-current","unarchive-record","preview-cleanup-public-mirrors","run-cleanup-public-mirrors","ladder-new-season",
   "admin-refresh-engagement","admin-seed-initial-titles","admin-save-engagement-settings","admin-grant-title","admin-revoke-title",
   "admin-load-engagement-overview","admin-update-title-definition","admin-backfill-preview","admin-backfill-execute","admin-backfill-restart","admin-engagement-diagnose",
@@ -13024,6 +13024,70 @@ const ACCOUNT_ROLE_FILTERS = [
 
 
 
+const ACCOUNT_PAGE_SIZE=30;
+let accountDirectoryState=null;
+function accountDirectoryContext(){
+  const key=currentAuthUid()+':'+engagementSessionEpoch;
+  if(!accountDirectoryState||accountDirectoryState.key!==key){
+    accountDirectoryState={key,summary:null,summaryBusy:false,summaryAt:0,summaryGeneration:0,searched:false,busy:false,error:'',generation:0,page:0,truncated:false,opened:new Set()};
+    accountMgmtUsers=[];
+  }
+  return accountDirectoryState;
+}
+function accountDirectoryCurrent(c){return c===accountDirectoryState&&c.key===currentAuthUid()+':'+engagementSessionEpoch&&isSuperAdmin();}
+function patchAccountDirectorySummary(c){
+  if(!accountDirectoryCurrent(c)||appPhase!=='account-management')return;
+  const summary=c.summary||{},metric=value=>value==null?(c.summaryBusy?'…':'—'):String(value);
+  document.querySelectorAll('[data-account-stat]').forEach(el=>{el.textContent=metric(summary[el.getAttribute('data-account-stat')]);});
+  document.querySelectorAll('[data-account-role-count]').forEach(el=>{el.textContent=metric(summary.roles?.[el.getAttribute('data-account-role-count')]);});
+  const error=document.querySelector('[data-account-summary-error]');
+  if(error)error.textContent=summary.errors?.length?'部分統計未能讀取，請按「更新統計」重試；查詢仍可使用。':'';
+  const refresh=document.querySelector('[data-action="account-summary-refresh"]');if(refresh)refresh.disabled=c.summaryBusy;
+}
+async function loadAccountDirectorySummary(force=false){
+  if(!isSuperAdmin())return;
+  const c=accountDirectoryContext();
+  if(c.summaryBusy||(!force&&c.summaryAt&&Date.now()-c.summaryAt<60000))return;
+  c.summaryBusy=true;const generation=++c.summaryGeneration;
+  try{
+    const result=await window.cloudAuth.getManagedAccountSummary(partial=>{
+      if(!accountDirectoryCurrent(c)||generation!==c.summaryGeneration)return;
+      c.summary=partial;patchAccountDirectorySummary(c);
+    });
+    if(accountDirectoryCurrent(c)&&generation===c.summaryGeneration){c.summary=result;c.summaryAt=Date.now();}
+  }catch(e){if(accountDirectoryCurrent(c))c.summary={...(c.summary||{}),errors:['summary']};}
+  finally{if(accountDirectoryCurrent(c)&&generation===c.summaryGeneration){c.summaryBusy=false;patchAccountDirectorySummary(c);}}
+}
+function resetAccountDirectorySearch(){
+  const c=accountDirectoryContext();c.generation++;c.searched=false;c.busy=false;c.error='';c.page=0;c.truncated=false;c.opened.clear();accountMgmtUsers=[];
+}
+async function searchAccountDirectory(){
+  if(!isSuperAdmin())return;
+  const c=accountDirectoryContext(),generation=++c.generation;
+  c.searched=true;c.busy=true;c.error='';c.page=0;c.truncated=false;c.opened.clear();accountMgmtUsers=[];render();
+  try{
+    const result=await window.cloudAuth.queryManagedAccounts({keyword:accountMgmtQuery,role:accountMgmtRoleFilter});
+    if(!accountDirectoryCurrent(c)||generation!==c.generation||appPhase!=='account-management')return;
+    accountMgmtUsers=result.users;c.truncated=result.truncated;
+  }catch(e){if(accountDirectoryCurrent(c)&&generation===c.generation)c.error='帳號查詢失敗或逾時，請重新搜尋。';}
+  finally{if(accountDirectoryCurrent(c)&&generation===c.generation){c.busy=false;if(appPhase==='account-management')render();}}
+}
+async function refreshManagedAccountResults(){
+  if(!isSuperAdmin())return;
+  const c=accountDirectoryContext();
+  await Promise.all([loadAccountDirectorySummary(true),c.searched?searchAccountDirectory():Promise.resolve()]);
+}
+function bindAccountDirectoryDetails(){
+  document.querySelectorAll('.account-user-card[data-account-uid]').forEach(card=>{
+    card.addEventListener('toggle',()=>{
+      const c=accountDirectoryContext(),uid=card.getAttribute('data-account-uid');
+      if(!card.isConnected)return;
+      if(card.open&&!c.opened.has(uid)){c.opened.add(uid);render();}
+      else if(!card.open)c.opened.delete(uid);
+    });
+  });
+}
+
 function getVisibleAccountUsers(users,now=Date.now()){
   const keyword=String(accountMgmtQuery||"").trim().toLowerCase();
   const visible=(users||[]).filter(user=>{
@@ -13032,7 +13096,7 @@ function getVisibleAccountUsers(users,now=Date.now()){
     if(accountMgmtStatusFilter==="inactive"&&user.active!==false) return false;
     if(!accountMatchesActivity(user,accountMgmtActivityFilter,now)) return false;
     if(keyword){
-      const haystack=[accountPrimaryName(user),accountGameId(user),user.email,user.role].join(" ").toLowerCase();
+      const haystack=[accountPrimaryName(user),accountGameId(user),user.nickname,user.email,user.uid,user.playerId].join(" ").toLowerCase();
       if(!haystack.includes(keyword)) return false;
     }
     return true;
@@ -13260,7 +13324,7 @@ function renderAccountBatchPanel(){
 function accountChangeError(message){const map={'tester-role-requires-test-identity':'封測角色必須保留測試身分，請同時改為其他角色','last-super-admin-protected':'必須保留至少一位啟用的最高管理員','super-admin-required':'只有啟用的最高管理員可管理帳號','test-account-cannot-be-super-admin':'測試身分不能成為最高管理員','account-not-found':'找不到帳號','operation-conflict':'操作識別不一致','select-1-to-50-accounts':'請選擇1至50個帳號'};for(const [key,value]of Object.entries(map))if(String(message).includes(key))return value;return '操作結果尚未確認，請確認上次操作結果。';}
 async function handleAccountBatch(action,target){
  if(!isSuperAdmin())return;const b=accountBatchContext();if(b.busy)return;
- if(action==='account-batch-select'){b.selected=new Set(getVisibleAccountUsers(accountMgmtUsers||[]).slice(0,50).map(u=>u.uid));render();return;}
+ if(action==='account-batch-select'){b.selected=new Set(getVisibleAccountUsers(accountMgmtUsers||[]).slice(accountDirectoryContext().page*ACCOUNT_PAGE_SIZE,(accountDirectoryContext().page+1)*ACCOUNT_PAGE_SIZE).map(u=>u.uid));render();return;}
  if(action==='account-batch-clear'){b.selected.clear();render();return;}
  const actor=currentAuthUid();let payload=accountBatchPending();
  if(!payload){if(action==='account-batch-retry')return;const patch={},role=document.getElementById('batch-role')?.value,active=document.getElementById('batch-active')?.value;if(role)patch.role=role;if(active)patch.active=active==='true';const test=document.getElementById('batch-test')?.value;if(test)patch.isTestAccount=test==='true';if(document.getElementById('batch-note-apply')?.checked)patch.managementNote=document.getElementById('batch-note')?.value||'';
@@ -13270,7 +13334,7 @@ async function handleAccountBatch(action,target){
   payload={uids:[...b.selected],patch,operationId:crypto.randomUUID()};try{sessionStorage.setItem(accountBatchPendingKey(),JSON.stringify(payload));}catch(e){showToast('無法保存操作請求，請更換瀏覽器後再試',true);return;}
  }
  b.busy=true;b.error='';render();
- try{const result=await window.engagementService.changeManagedAccounts(payload);if(actor!==currentAuthUid())return;if(!result.ok)throw Error('operation-failed');sessionStorage.removeItem(accountBatchPendingKey());b.result=result.results;b.selected=new Set(result.results.filter(r=>r.status==='failed').map(r=>r.uid));const freshUsers=await window.cloudAuth.listUsers();if(actor===currentAuthUid()&&isSuperAdmin())accountMgmtUsers=freshUsers;}
+ try{const result=await window.engagementService.changeManagedAccounts(payload);if(actor!==currentAuthUid())return;if(!result.ok)throw Error('operation-failed');sessionStorage.removeItem(accountBatchPendingKey());b.result=result.results;b.selected=new Set(result.results.filter(r=>r.status==='failed').map(r=>r.uid));await refreshManagedAccountResults();}
  catch(e){if(actor===currentAuthUid())b.error=accountChangeError(e.message);}
  finally{if(actor===currentAuthUid()){b.busy=false;render();}}
 }
@@ -13323,7 +13387,7 @@ async function changeSingleManagedAccount(uid,patch,el){
   if(!result.ok)throw Error('operation-failed');sessionStorage.removeItem(key);
   const outcome=result.results[0];showToast(outcome.status==='failed'?accountChangeError(outcome.reason):'帳號設定已更新',outcome.status==='failed');
   if(outcome.status!=='failed')managedAccountDrafts.delete(uid);
-  const users=await window.cloudAuth.listUsers();if(actor===currentAuthUid()&&isSuperAdmin())accountMgmtUsers=users;
+  await refreshManagedAccountResults();
  }catch(e){if(actor===currentAuthUid())showToast(accountChangeError(e.message),true);}
  finally{if(actor===currentAuthUid()){if(el)el.disabled=false;render();}}
 }
@@ -13557,11 +13621,16 @@ function renderPartnerContractCard(user){
 
 function renderAccountManagementScreen(){
   const page=["accounts","checkin","titles"].includes(superAdminManagementPage)?superAdminManagementPage:"accounts";
-  if(page==='accounts'&&partnerPlansState.plans===null&&!partnerPlansState.loading)setTimeout(()=>loadPartnerPlans(),0);
-  const loading=accountMgmtUsers===null;
+  const directory=accountDirectoryContext();
+  if(page==='accounts'&&!directory.summary&&!directory.summaryBusy)setTimeout(()=>loadAccountDirectorySummary(),0);
+  if(page==='accounts'&&directory.opened.size&&partnerPlansState.plans===null&&!partnerPlansState.loading)setTimeout(()=>loadPartnerPlans(),0);
+  const loading=directory.busy;
   const users=accountMgmtUsers||[];
-  const activity=accountActivitySummary(users);
-  const visibleUsers=getVisibleAccountUsers(users);
+  const activity=directory.summary||{};
+  const metric=value=>value==null?(directory.summaryBusy?'…':'—'):value;
+  const matchedUsers=directory.searched?getVisibleAccountUsers(users):[];
+  directory.page=Math.min(directory.page,Math.max(0,Math.ceil(matchedUsers.length/ACCOUNT_PAGE_SIZE)-1));
+  const visibleUsers=matchedUsers.slice(directory.page*ACCOUNT_PAGE_SIZE,(directory.page+1)*ACCOUNT_PAGE_SIZE);
   return `<div class="stickytop account-management-stickytop"><header class="topbar account-management-topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統 <small style="opacity:.55;font-size:9px;">${APP_VERSION}</small></span>${topbarConnectionRailHtml()}</div>
@@ -13571,39 +13640,42 @@ function renderAccountManagementScreen(){
     ${accountMenuOverlayHtml()}
     <main class="account-management-main">
       ${page==="accounts"?`<div class="panel account-management-panel">
-        <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
-        <p class="hint">選擇玩家帳號並展開，即可在「合作主辦權限」開通或撤銷；帳號分類維持玩家。</p>
+        <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-summary-refresh" ${directory.summaryBusy?'disabled':''}>更新統計</button><button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
+        <p class="hint">先查看統計；搜尋或點選分類後才載入帳號，展開後可管理設定。</p>
 
 
         ${authFormError ? `<div class="auth-error">${esc(authFormError)}</div>` : ""}
         <div class="account-overview-grid">
-          <div class="stat-box"><div class="label">全部帳號</div><div class="value">${activity.total}</div></div>
-          <div class="stat-box"><div class="label">啟用帳號</div><div class="value">${activity.enabled}</div></div>
-          <div class="stat-box"><div class="label">日活躍｜近 24 小時</div><div class="value">${activity.daily}</div></div>
-          <div class="stat-box"><div class="label">週活躍｜近 7 天</div><div class="value">${activity.weekly}</div></div>
+          <div class="stat-box"><div class="label">全部帳號</div><div class="value" data-account-stat="total">${metric(activity.total)}</div></div>
+          <div class="stat-box"><div class="label">啟用帳號</div><div class="value" data-account-stat="enabled">${metric(activity.enabled)}</div></div>
+          <div class="stat-box"><div class="label">日活躍｜近 24 小時</div><div class="value" data-account-stat="daily">${metric(activity.daily)}</div></div>
+          <div class="stat-box"><div class="label">週活躍｜近 7 天</div><div class="value" data-account-stat="weekly">${metric(activity.weekly)}</div></div>
         </div>
-        <div class="hint" style="margin-top:8px;">封測管理員：${activity.testers}｜日／週活躍以啟用帳號的 lastLoginAt 去重計算；週活躍包含日活躍。</div>
+        <div class="hint" style="margin-top:8px;">封測管理員：<span data-account-stat="testers">${metric(activity.testers)}</span>｜日／週活躍以啟用帳號的 lastLoginAt 去重計算；週活躍包含日活躍。統計快取最多 60 秒，可按「更新統計」重查。</div>
         <div class="account-role-filter-bar" aria-label="帳號角色快速分類">
-          ${ACCOUNT_ROLE_FILTERS.map(([key,label])=>`<button class="account-filter-chip ${accountMgmtRoleFilter===key?'active':''}" data-action="account-role-filter" data-role="${key}" aria-pressed="${accountMgmtRoleFilter===key?'true':'false'}">${label} ${accountRoleCount(users,key)}</button>`).join("")}
+          ${ACCOUNT_ROLE_FILTERS.map(([key,label])=>`<button class="account-filter-chip ${accountMgmtRoleFilter===key?'active':''}" data-action="account-role-filter" data-role="${key}" aria-pressed="${accountMgmtRoleFilter===key?'true':'false'}">${label} <span data-account-role-count="${key}">${metric(activity.roles?.[key])}</span></button>`).join("")}
         </div>
         <div class="account-filter-toolbar">
-          <div class="field"><label>搜尋姓名／帳號</label><div class="account-filter-search"><input id="account-mgmt-search" value="${esc(accountMgmtQuery)}" placeholder="姓名、遊戲 ID 或 Email"><button class="btn btn-ghost" data-action="account-search-apply">搜尋</button><button class="btn btn-ghost" data-action="account-search-clear" aria-label="清除搜尋關鍵字">清除</button></div></div>
+          <div class="field"><label>搜尋姓名／帳號</label><div class="account-filter-search"><input id="account-mgmt-search" value="${esc(accountMgmtQuery)}" placeholder="姓名、遊戲 ID、Email 開頭或完整 UID"><button class="btn btn-ghost" data-action="account-search-apply">搜尋</button><button class="btn btn-ghost" data-action="account-search-clear" aria-label="清除搜尋關鍵字">清除</button></div></div>
           <div class="field"><label>帳號狀態</label><select class="account-filter-select" data-filter-key="status"><option value="all" ${accountMgmtStatusFilter==='all'?'selected':''}>全部狀態</option><option value="active" ${accountMgmtStatusFilter==='active'?'selected':''}>啟用中</option><option value="inactive" ${accountMgmtStatusFilter==='inactive'?'selected':''}>已停用</option></select></div>
           <div class="field"><label>活躍度</label><select class="account-filter-select" data-filter-key="activity"><option value="all" ${accountMgmtActivityFilter==='all'?'selected':''}>全部活躍度</option><option value="daily" ${accountMgmtActivityFilter==='daily'?'selected':''}>今日活躍</option><option value="weekly" ${accountMgmtActivityFilter==='weekly'?'selected':''}>近 7 天活躍</option><option value="stale" ${accountMgmtActivityFilter==='stale'?'selected':''}>逾 7 天</option><option value="never" ${accountMgmtActivityFilter==='never'?'selected':''}>從未登入</option></select></div>
           <div class="field"><label>排序</label><select class="account-filter-select" data-filter-key="sort"><option value="created-desc" ${accountMgmtSort==='created-desc'?'selected':''}>申辦時間｜最新</option><option value="created-asc" ${accountMgmtSort==='created-asc'?'selected':''}>申辦時間｜最早</option><option value="activity-desc" ${accountMgmtSort==='activity-desc'?'selected':''}>最近登入</option><option value="name" ${accountMgmtSort==='name'?'selected':''}>姓名筆畫</option></select></div>
           <button class="btn btn-ghost" data-action="account-clear-filters">清除條件</button>
         </div>
-        ${renderAccountBatchPanel()}
-        <div class="account-result-line"><span>${loading?'正在讀取帳號……':`顯示 ${visibleUsers.length}／${users.length} 筆`}</span><span>點擊帳號查看詳細資料⌄</span></div>
-        ${loading?'<div class="empty-state">正在讀取帳號資料……</div>':visibleUsers.length===0?'<div class="empty-state">沒有符合目前條件的帳號</div>':`
+        ${directory.searched?renderAccountBatchPanel():""}
+        <p class="auth-error" data-account-summary-error role="status">${activity.errors?.length?'部分統計未能讀取，請按「更新統計」重試；查詢仍可使用。':''}</p>
+        ${directory.error?`<p class="auth-error" role="alert">${esc(directory.error)}</p>`:''}
+        ${directory.truncated?'<p class="hint">結果較多，目前為部分結果；請輸入更完整的姓名或帳號縮小查詢。篩選與排序套用於已載入的結果。</p>':''}
+        <div class="account-result-line"><span>${loading?'正在查詢帳號……':directory.searched?`顯示 ${visibleUsers.length}／${matchedUsers.length} 筆查詢結果`:'尚未查詢帳號'}</span><span>點擊帳號查看詳細資料⌄</span></div>
+        ${!directory.searched?'<div class="empty-state">輸入姓名、遊戲 ID 或 Email 開頭搜尋，或點選上方分類；英文 ID 請依原大小寫輸入。</div>':loading?'<div class="empty-state">正在查詢帳號資料……</div>':directory.error?'':visibleUsers.length===0?'<div class="empty-state">沒有符合目前條件的帳號</div>':`
         <div class="account-user-list">
-          ${visibleUsers.map(user=>{const status=accountActivityStatus(user);const gameId=accountGameId(user);const draft=managedAccountDraft(user);const active=draft.active;const dirty=Object.keys(managedAccountPatch(user,draft)).length>0;return `<details class="account-user-card">
+          ${visibleUsers.map(user=>{const status=accountActivityStatus(user);const gameId=accountGameId(user);const draft=managedAccountDraft(user);const active=draft.active;const dirty=Object.keys(managedAccountPatch(user,draft)).length>0;return `<details class="account-user-card" data-account-uid="${esc(user.uid)}" ${directory.opened.has(user.uid)?'open':''}>
             <summary>
               <label><input class="account-batch-checkbox" type="checkbox" aria-label="選取此帳號" data-uid="${esc(user.uid)}" ${accountBatchContext().selected.has(user.uid)?'checked':''} ${accountBatchContext().busy?'disabled':''}></label><div class="account-user-identity"><div class="account-user-name">${esc(accountPrimaryName(user))}</div><div class="account-user-gameid">${gameId?`遊戲 ID｜${esc(gameId)}`:'尚未設定遊戲 ID'}</div></div>
               <div class="account-user-email">${esc(user.email||"未提供 Email")}</div>
               <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${user.partnerOrganizer?.status==="active"&&(user.partnerOrganizer.expiresAt==null||Number(user.partnerOrganizer.expiresAt)>Date.now())?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
             </summary>
-            <div class="account-user-detail">
+            ${directory.opened.has(user.uid)?`<div class="account-user-detail">
               <div class="account-detail-grid">
                 <div class="account-detail-item"><div class="label">本名</div><div class="value">${esc(user.realName||user.displayName||"—")}</div></div>
                 <div class="account-detail-item"><div class="label">遊戲 ID</div><div class="value">${esc(gameId||"—")}</div></div>
@@ -13623,9 +13695,10 @@ function renderAccountManagementScreen(){
                   ${user.partnerOrganizer?.status==="active"?`<button type="button" class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" disabled>確認撤銷舊授權</button>`:""}
                 </div>`:""}
               </div>
-            </div>
+            </div>`:''}
           </details>`;}).join("")}
         </div>`}
+        ${directory.searched&&matchedUsers.length>ACCOUNT_PAGE_SIZE?`<div class="btn-row"><button class="btn btn-ghost" data-action="account-page-prev" ${directory.page===0?'disabled':''}>上一頁</button><span>第 ${directory.page+1}／${Math.ceil(matchedUsers.length/ACCOUNT_PAGE_SIZE)} 頁</span><button class="btn btn-ghost" data-action="account-page-next" ${(directory.page+1)*ACCOUNT_PAGE_SIZE>=matchedUsers.length?'disabled':''}>下一頁</button></div>`:''}
         <details class="account-tools-card">
           <summary><span>新增後台帳號</span><span class="hint">需要時展開⌄</span></summary>
           <div class="account-tools-body">
@@ -17841,7 +17914,7 @@ function restoreAuthenticatedView(uid,intent){
  if(!v||v.uid!==uid||v.mode!==intent)return false;
  if(v.phase==='account-management'&&intent==='admin'&&isSuperAdmin()){
   appPhase='account-management';superAdminManagementPage=['accounts','checkin','titles'].includes(v.adminPage)?v.adminPage:'accounts';
-  accountMgmtUsers=null;window.cloudAuth.listUsers().then(users=>{if(firebaseUser?.uid===uid){accountMgmtUsers=users;render();}}).catch(()=>{});return true;
+  resetAccountDirectorySearch();loadAccountDirectorySummary();return true;
  }
  if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
@@ -17957,7 +18030,7 @@ function render(){
   if(appPhase==="admin-login"){ app.innerHTML = renderAdminLoginScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-setup"){ app.innerHTML = renderAdminSetupScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-change-password"){ app.innerHTML = renderAdminChangePasswordScreen(); bindAuthInputs(); return; }
-  if(appPhase==="account-management"){ app.innerHTML = renderAccountManagementScreen(); bindAuthInputs(); bindAccountBatchSelection(); return; }
+  if(appPhase==="account-management"){ app.innerHTML = renderAccountManagementScreen(); bindAuthInputs(); bindAccountBatchSelection(); bindAccountDirectoryDetails(); return; }
   if(appPhase==="admin-success"){ app.innerHTML = renderAdminSuccessScreen(); return; }
   if(appPhase==="watch-connecting"){ app.innerHTML = renderWatchConnectingScreen(); return; }
   if(appPhase==="watch-error"){ app.innerHTML = renderWatchErrorScreen(); return; }
@@ -19091,7 +19164,7 @@ function bindAuthInputs(){
           if(key==="status") accountMgmtStatusFilter=el.value;
           else if(key==="activity") accountMgmtActivityFilter=el.value;
           else if(key==="sort") accountMgmtSort=el.value;
-          render();
+          accountDirectoryContext().page=0;render();
         });
       });
       const accountSearch=document.getElementById("account-mgmt-search");
@@ -21225,7 +21298,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       const r=await window.cloudAuth.verifyPlayerRealName(uid);
       if(r&&r.ok){
         showToast("已確認玩家本名");
-        accountMgmtUsers=await window.cloudAuth.listUsers();
+        await refreshManagedAccountResults();
       }else showToast((r&&r.error)||"本名確認失敗",true);
       render();
     })();
@@ -21650,21 +21723,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="super-admin-page"){ const page=target.getAttribute("data-page"); if(["accounts","checkin","titles"].includes(page)){ if(page==="titles"&&!engagementActionBusy){resetTitleRecipientForm();engagementAdminOverview=null;requestEngagementSnapshot(true);} superAdminManagementPage=page; accountMenuOpen=false; render(); } return; }
   if(action==="account-goto-home"){ accountMenuOpen=false; appPhase="app"; activeTab="live"; render(); return; }
   if(action==="account-change-password"){ accountMenuOpen=false; authFormError=""; appPhase="admin-change-password"; render(); return; }
+  if(action==="account-summary-refresh"){loadAccountDirectorySummary(true);render();return;}
+  if(action==="account-page-prev"||action==="account-page-next"){
+    const c=accountDirectoryContext();c.page=Math.max(0,c.page+(action==='account-page-next'?1:-1));render();return;
+  }
   if(action==="account-role-filter"){
     const role=target.getAttribute("data-role");
     if(ACCOUNT_ROLE_FILTERS.some(item=>item[0]===role)) accountMgmtRoleFilter=role;
-    render(); return;
+    searchAccountDirectory(); return;
   }
   if(action==="account-search-apply"){
     const input=document.getElementById("account-mgmt-search");
     accountMgmtQuery=input?input.value.trim():"";
-    render(); return;
+    searchAccountDirectory(); return;
   }
   if(action==="account-search-clear"){
     const input=document.getElementById("account-mgmt-search");
     if(input) input.value="";
     accountMgmtQuery="";
-    render(); return;
+    resetAccountDirectorySearch();render(); return;
   }
   if(action==="account-clear-filters"){
     accountMgmtRoleFilter="all";
@@ -21672,7 +21749,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     accountMgmtActivityFilter="all";
     accountMgmtSort="created-desc";
     accountMgmtQuery="";
-    render(); return;
+    resetAccountDirectorySearch();render(); return;
   }
   if(action==="admin-engagement-diagnose"){
     if(engagementActionBusy) return;
@@ -21755,7 +21832,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     accountMenuOpen=false; authFormError="";
     appPhase="account-management";
     superAdminManagementPage="accounts";
-    accountMgmtUsers = null;
+    resetAccountDirectorySearch();
     accountMgmtRoleFilter="all";
     accountMgmtStatusFilter="all";
     accountMgmtActivityFilter="all";
@@ -21764,10 +21841,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     legacyPublicDocsPreview = null;
     legacyCleanupResult = null;
     render();
-    (async ()=>{
-      accountMgmtUsers = await window.cloudAuth.listUsers();
-      render();
-    })();
+    loadAccountDirectorySummary();
     return;
   }
   if(action==="preview-cleanup-public-mirrors"){
@@ -21917,7 +21991,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       accountMgmtBusy = false;
       if(result.ok){
         showToast("已建立帳號："+email);
-        accountMgmtUsers = await window.cloudAuth.listUsers();
+        await refreshManagedAccountResults();
       } else {
         authFormError = result.error || "建立失敗";
       }
@@ -24496,8 +24570,8 @@ async function init(){
                   userProfile = profile;
                   restoreAccountInterfaceTheme(fbUser.uid,profile);
                   if((profile.role==="staff"||profile.role==="admin"||profile.role==="super_admin"||(profile.role==="tester"||profile.isTestAccount===true)) && window.cloudAuth.ensureMyStaffDirectory){ window.cloudAuth.ensureMyStaffDirectory().catch(()=>{}); }
-                  if((profile.role==="admin"||profile.role==="super_admin") && window.cloudAuth.listUsers && window.cloudAuth.syncStaffDirectory){
-                    Promise.resolve().then(async()=>{ try{ const all=await window.cloudAuth.listUsers(); await window.cloudAuth.syncStaffDirectory(all); }catch(e){} });
+                  if((profile.role==="admin"||profile.role==="super_admin") && window.cloudAuth.syncManagedStaffDirectory){
+                    Promise.resolve().then(()=>window.cloudAuth.syncManagedStaffDirectory()).catch(()=>{});
                   }
                   await saveActiveMode(intent);
                   currentRole = intent==="partner_organizer" ? "admin" : (intent==="event_staff" ? "admin" : (intent==="player" ? "player" : mapRoleToAppRole(profile.role)));
