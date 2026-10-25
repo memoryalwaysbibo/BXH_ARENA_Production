@@ -15,6 +15,8 @@ test('atomic writer updates both mirror JSON records only after all reads',async
  assert.deepEqual(f.writes.map(w=>w.id),['private','public']);
  assert.equal(JSON.parse(f.writes[0].payload.data).startedAt,200);
  assert.equal(JSON.parse(f.writes[0].payload.data).rosterLocked,true);
+ assert.equal(JSON.parse(f.writes[0].payload.data).rdwSnapshotDigest,'a'.repeat(64));
+ assert.equal(f.writes[0].payload.rdwSnapshotDigest,'a'.repeat(64));
  assert.equal(JSON.parse(f.writes[1].payload.bracketView).startedAt,200);
 });
 test('general room, stale mirror and missing snapshot are never written',async()=>{
