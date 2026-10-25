@@ -6,7 +6,9 @@ function inspectStartWriteFence({remote,proposed,remoteDoc}={}){
  if(!remote||typeof remote!=='object'||!proposed||typeof proposed!=='object')
   return {ok:false,reason:'state-required'};
  // General rooms must keep their original browser start and scoring flow.
- if(remote.meta?.ladderMode!=='ranked'&&remoteDoc?.rdwStartMode!=='rdw-verified'&&remoteDoc?.rdwStartMode!=='rdw-pass')return {ok:true,rdwApplicable:false};
+ const sealed=remoteDoc?.rdwStartMode==='rdw-verified'||remoteDoc?.rdwStartMode==='rdw-pass';
+ if(!sealed&&remote.meta?.ladderMode!=='ranked')return {ok:true,rdwApplicable:false};
+ if(sealed&&(remote.meta?.ladderMode!=='ranked'||proposed.meta?.ladderMode!=='ranked'))return {ok:false,reason:'rdw-server-mode-type-mismatch'};
  const remoteStarted=Number(remote.startedAt);
  const incomingStarted=Number(proposed.startedAt);
  if(Number.isFinite(remoteStarted)&&remoteStarted>0){
@@ -17,9 +19,9 @@ function inspectStartWriteFence({remote,proposed,remoteDoc}={}){
   // RDW is server-sealed. Ordinary clients cannot change or remove the mode.
   const sealedMode=remoteDoc?.rdwStartMode;
   if(sealedMode==='rdw-verified'||sealedMode==='rdw-pass'){
-   if(proposed.rdwStartMode!==sealedMode)
+   if(proposed.rdwStartMode!==undefined&&proposed.rdwStartMode!==sealedMode)
     return {ok:false,reason:'rdw-start-mode-monotonicity'};
-   if(remoteDoc.rdwSnapshotDigest&&proposed.rdwSnapshotDigest!==remoteDoc.rdwSnapshotDigest)
+   if(remoteDoc.rdwSnapshotDigest&&proposed.rdwSnapshotDigest!==undefined&&proposed.rdwSnapshotDigest!==remoteDoc.rdwSnapshotDigest)
     return {ok:false,reason:'rdw-snapshot-digest-monotonicity'};
   }
  }
@@ -27,6 +29,6 @@ function inspectStartWriteFence({remote,proposed,remoteDoc}={}){
  // not accepted based on a browser timestamp or cloned snapshot fields.
  if(!(Number.isFinite(remoteStarted)&&remoteStarted>0)&&Number.isFinite(incomingStarted)&&incomingStarted>0)
   return {ok:false,reason:'client-cannot-transition-start'};
- return {ok:true};
+ return {ok:true,rdwApplicable:true};
 }
 module.exports={inspectStartWriteFence};
