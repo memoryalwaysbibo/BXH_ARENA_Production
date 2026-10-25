@@ -26,6 +26,8 @@ function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolv
    // Resolve audited Hunter tiers outside the writer transaction, then bind
    // the snapshot to the canonical roster again under transaction locks.
    const preflight=await db.runTransaction(async tx=>{
+    const auth=await resolveAuthority({eventCode,actorUid,expectedRosterRevision,tx});
+    if(!auth.ok)return {ok:false,reason:auth.reason};
     const snap=await tx.get(eventRef);
     if(!snap?.exists)return {ok:false,reason:'room-missing'};
     let state;
