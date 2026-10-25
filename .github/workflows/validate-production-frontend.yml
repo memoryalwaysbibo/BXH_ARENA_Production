@@ -245,6 +245,8 @@ jobs:
           node --test tests/rdw-event-type-policy.test.cjs
           node --check scripts/lib/rdw-ranked-authority-gate.cjs
           node --test tests/rdw-ranked-authority-gate.test.cjs
+          node --check scripts/lib/rdw-ranked-authority-resolver.cjs
+          node --test tests/rdw-ranked-authority-resolver.test.cjs
           node --check scripts/lib/rdw-admin-diagnostic.cjs
           node --test tests/rdw-admin-diagnostic.test.cjs
           node --check scripts/lib/rdw-admin-diagnostic-service.cjs
