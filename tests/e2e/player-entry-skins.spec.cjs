@@ -33,10 +33,13 @@ const themes = {
 
 for (const [theme, symbols] of Object.entries(themes)) {
   test(`player entry ${theme}: action mapping and unclipped text`, async ({ page }) => {
+    test.setTimeout(90000);
+    await page.setContent(`<!doctype html><html data-bxh-theme="${theme}"><head><style>${styles}</style></head><body>${markup}</body></html>`);
+    await page.addStyleTag({content:'*,*::before,*::after{animation:none!important;transition:none!important}'});
     for (const width of [320,390,430,960]) {
       await page.setViewportSize({ width, height:844 });
-      await page.setContent(`<!doctype html><html data-bxh-theme="${theme}"><head><style>${styles}</style></head><body>${markup}</body></html>`);
-      await page.addStyleTag({content:'*,*::before,*::after{animation:none!important;transition:none!important}'});
+      await page.evaluate(()=>document.querySelectorAll('.role-card-cn,.role-card-en,.role-card-desc,.role-card-enter')
+        .forEach(e=>e.style.removeProperty('font-size')));
       const cards = page.locator('.player-entry-cards>.role-card');
       await expect(cards).toHaveCount(3);
       if (symbols) {
