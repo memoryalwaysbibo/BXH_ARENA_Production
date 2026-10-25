@@ -38,6 +38,8 @@ test('Emulator commits private JSON and public bracketView in one transaction',a
  assert.equal(JSON.parse(p.data().data).startedAt,200);
  assert.equal(JSON.parse(q.data().bracketView).startedAt,200);
  assert.equal(JSON.parse(p.data().data).rosterLocked,true);
+ assert.equal(JSON.parse(p.data().data).rdwSnapshotDigest,'a'.repeat(64));
+ assert.equal(p.data().rdwSnapshotDigest,'a'.repeat(64));
  assert.equal(p.data().visibility,'public');assert.equal(q.data().visibility,'public');
 });
 test('Emulator rollback leaves both mirrors untouched after injected transaction failure',async()=>{
