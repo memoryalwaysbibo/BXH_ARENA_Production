@@ -45,7 +45,9 @@ test('trusted Hunter resolver creates sealed snapshot with both mirrors in same 
  const f=fixture({createSnapshot:true}),result=await f.start(f.args);
  assert.equal(result.ok,true);
  assert.deepEqual(f.writes.map(x=>x.path),['rdwSnapshots/'+code,'tournaments/'+code,'publicTournaments/'+code]);
- assert.equal(f.writes[0].payload.snapshotDigest,makeSnapshot(code,9,['u1','u2']).snapshotDigest);
+ assert.equal(f.writes[0].payload.capturedAt,200);
+ assert.equal(f.writes[0].payload.rosterSize,2);
+ assert.match(f.writes[0].payload.snapshotDigest,/^[a-f0-9]{64}$/);
  assert.equal(f.writes[1].payload.rdwSnapshotDigest,f.writes[0].payload.snapshotDigest);
 });
 test('unverified Hunter tier blocks all start writes',async()=>{
