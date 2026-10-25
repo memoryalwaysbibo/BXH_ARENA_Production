@@ -4,7 +4,7 @@ const makeSnapshot=(eventCode,drawRevision,rosterUids)=>buildRosterSnapshot({eve
 const test=require('node:test'),assert=require('node:assert/strict');
 const {createAuthorizedMirrorStart}=require('../scripts/lib/rdw-authorized-mirror-start.cjs');
 const code='BXH-ABC123';
-function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',changed=false,createSnapshot=false}={}){
+function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',changed=false,createSnapshot=false,badTiers=false}={}){
  const players=[{id:'p1',uid:'u1'},{id:'p2',uid:'u2'}];
  const matches=[{id:'m',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}];
  const state={cloudCode:code,createdBy:creator,registrationRosterRevision:4,meta:{ladderMode:mode,eventAuthority:'official'},players,matches,drawnAt:100,startedAt:null,rosterLocked:false};
@@ -15,12 +15,12 @@ function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',chan
   ['publicTournaments/'+code]:{bracketView:JSON.stringify(publicState)},
   ['rdwSnapshots/'+code]:createSnapshot?undefined:makeSnapshot(code,9,['u1','u2'])
  };
- const writes=[],reads=[];
+ const writes=[],reads=[],tierCalls=[];
  const tx={get:async ref=>{reads.push(ref.path);const val=docs[ref.path];return {exists:!!val,data:()=>val};},update:(ref,payload)=>writes.push({path:ref.path,payload}),create:(ref,payload)=>writes.push({path:ref.path,payload,created:true})};
  const db={doc:path=>({path}),runTransaction:fn=>fn(tx)};
- const start=createAuthorizedMirrorStart({db,clock:()=>200,verifyBracketInTransaction:async()=>bracketOk,resolveVerifiedTiers:createSnapshot?async ({rosterUids})=>rosterUids.map(uid=>({ok:true,uid,tier:'d',computedAt:100,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)})):undefined,enabled:true});
+ const start=createAuthorizedMirrorStart({db,clock:()=>200,verifyBracketInTransaction:async()=>bracketOk,resolveVerifiedTiers:createSnapshot?async ({rosterUids})=>{tierCalls.push(rosterUids);return badTiers?[{uid:'u1',ok:true,tier:'national'}]:rosterUids.map(uid=>({ok:true,uid,tier:'d',computedAt:100,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}));}:undefined,enabled:true});
  const args={eventCode:code,actorUid:'actor',expectedRosterRevision:changed?5:4,drawRevision:9};
- return {start,args,writes,reads};
+ return {start,args,writes,reads,tierCalls};
 }
 test('single transaction authorizes and verifies both canonical mirrors before writing',async()=>{
  const f=fixture(),r=await f.start(f.args);
@@ -51,10 +51,14 @@ test('trusted Hunter resolver creates sealed snapshot with both mirrors in same 
  assert.equal(f.writes[1].payload.rdwSnapshotDigest,f.writes[0].payload.snapshotDigest);
 });
 test('unverified Hunter tier blocks all start writes',async()=>{
- const f=fixture({createSnapshot:true});
- // Invalid grade evidence is never accepted by snapshot builder.
- const {createAuthorizedMirrorStart}=require('../scripts/lib/rdw-authorized-mirror-start.cjs');
- const db={doc:path=>({path}),runTransaction:async fn=>fn({get:async ref=>({exists:true,data:()=>ref.path.startsWith('tournaments/')?{data:JSON.stringify({registrationRosterRevision:4,meta:{ladderMode:'ranked',eventAuthority:'official'},players:[{uid:'u1'},{uid:'u2'}]})}:{}})})};
- const bad=createAuthorizedMirrorStart({db,clock:()=>200,verifyBracketInTransaction:async()=>true,resolveVerifiedTiers:async()=>[{ok:true,uid:'u1',tier:'national'}],enabled:true});
- assert.equal((await bad(f.args)).code,'hunter-tiers-unverified');
+ const f=fixture({createSnapshot:true,badTiers:true});
+ assert.equal((await f.start(f.args)).code,'hunter-tiers-unverified');
+ assert.equal(f.tierCalls.length,1);
+ assert.equal(f.writes.length,0);
+});
+test('unauthorized client is denied before even reading Hunter tiers',async()=>{
+ const f=fixture({createSnapshot:true,role:'player'});
+ assert.equal((await f.start(f.args)).ok,false);
+ assert.equal(f.tierCalls.length,0);
+ assert.equal(f.writes.length,0);
 });
