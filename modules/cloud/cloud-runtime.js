@@ -2954,6 +2954,25 @@ if(testerSession){
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
             if(remoteState){
+              // RDW server-sealed starts are monotonic. Older browsers may still
+              // save match scores, but may not undo an attested ranked start.
+              // General tournaments and ranked rooms without a server RDW seal
+              // keep the legacy saveState start path unchanged.
+              if((remoteDoc.rdwStartMode==="rdw-verified"||remoteDoc.rdwStartMode==="rdw-pass") &&
+                 remoteState.meta?.ladderMode==="ranked"){
+                const sealedStart=Number(remoteState.startedAt);
+                if(!Number.isSafeInteger(sealedStart)||sealedStart<=0||
+                   Number(data.startedAt)!==sealedStart)throw new Error("rdw-server-start-stale");
+                if(remoteState.rosterLocked===true&&data.rosterLocked!==true)
+                  throw new Error("rdw-server-roster-lock-stale");
+                // RDW metadata is server-owned: never silently let an old
+                // client change the durable mode or source digest.
+                if(data.rdwStartMode!==undefined&&data.rdwStartMode!==remoteDoc.rdwStartMode)
+                  throw new Error("rdw-server-mode-stale");
+                if(remoteDoc.rdwSnapshotDigest!=null&&data.rdwSnapshotDigest!==undefined&&
+                   data.rdwSnapshotDigest!==remoteDoc.rdwSnapshotDigest)
+                  throw new Error("rdw-server-snapshot-stale");
+              }
               if(remoteState.bracketDraw||options.bracketCommit||options.bracketStartSignature){
                 if(!window.BXHBracketCommit)throw new Error('bracket-verifier-unavailable');
                 const verdict=window.BXHBracketCommit.assertWrite(remoteState,data,options);
