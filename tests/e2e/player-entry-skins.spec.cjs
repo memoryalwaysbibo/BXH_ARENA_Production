@@ -6,9 +6,11 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
 const core = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8');
 const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-// Use the production render functions and stylesheet order, with no backend.
+// Use the production render functions and the entry-related styles in document order.
+// The full app stylesheets include unrelated screens and exhaust WebKit's test renderer.
+const entryStyles = /^(?:modules\/main-css\/(?:auth-player|lobby-community|player-center-hunter|player-entry-skins)\.css|modules\/mobile-overrides\/styles\.css|client-entrance-theme\.css|modules\/theme-[^/]+\/styles\.css)$/;
 const styles = [...index.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"?]+)/g)]
-  .map(match => match[1]).filter(file => !file.startsWith('http'))
+  .map(match => match[1]).filter(file => entryStyles.test(file))
   .map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
 const context = {
   LOGO_SRC:'', pendingRegistrationCode:'', APP_VERSION:'test', esc:String, window:{},
@@ -30,6 +32,7 @@ const themes = {
   hunter:['傑','犽','酷'], clow:['櫻','狼','知'], zeon:['薩','洲','比'],
   directive:['零','初','貳'], gundam:null
 };
+test.describe.configure({ mode:'default' });
 
 for (const [theme, symbols] of Object.entries(themes)) {
   test(`player entry ${theme}: action mapping and unclipped text`, async ({ page }) => {
