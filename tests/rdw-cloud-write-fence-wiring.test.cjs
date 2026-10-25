@@ -24,3 +24,12 @@ test('server mode and digest cannot be replaced but unchanged clients remain abl
  assert.match(excerpt,/rdw-server-snapshot-stale/);
  assert.doesNotMatch(excerpt,/data\.rdwStartMode===undefined\)throw/);
 });
+
+test('server-sealed ranked state is re-inserted before serialization of private JSON and public mirror',()=>{
+ const start=src.indexOf('async pushUpdate('),fence=src.indexOf('rdw-server-start-stale',start);
+ const modeRebase=src.indexOf('data.rdwStartMode=remoteDoc.rdwStartMode',fence);
+ const digestRebase=src.indexOf('data.rdwSnapshotDigest=remoteDoc.rdwSnapshotDigest',fence);
+ const persist=src.indexOf('tx.set(ref,privatePayload,{merge:true})',fence);
+ assert.ok(start>=0&&modeRebase>fence&&digestRebase>modeRebase&&persist>digestRebase);
+ assert.match(src.slice(fence-650,fence),/rdw-server-mode-type-mismatch/);
+});
