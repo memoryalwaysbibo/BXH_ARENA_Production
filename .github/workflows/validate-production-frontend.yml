@@ -257,6 +257,8 @@ jobs:
           node --test tests/rdw-synchronized-start-reference.test.cjs
           node --check scripts/lib/rdw-authorized-mirror-start.cjs
           node --test tests/rdw-authorized-mirror-start.test.cjs
+          node --check scripts/lib/rdw-hunter-start-wiring.cjs
+          node --test tests/rdw-hunter-start-wiring.test.cjs
           node --check scripts/lib/rdw-sealed-snapshot-verifier.cjs
           node --test tests/rdw-sealed-snapshot-verifier.test.cjs
           node --check scripts/lib/rdw-start-write-fence.cjs
