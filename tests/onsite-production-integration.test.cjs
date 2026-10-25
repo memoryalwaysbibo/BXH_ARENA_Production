@@ -93,3 +93,24 @@ test('activation matches the callable manager scope without broader editor grant
 test('new activation is individual and pre-bracket; finalized historical records remain readable',()=>{
  const ctx=vm.createContext({state:{cloudCode:'BXH-ROOM',meta:{battleMode:'individual'}},canManageOnsiteWaitlist:()=>true,peopleRegistrationSelectionManaged:()=>false});vm.runInContext(fn(core,'peopleOnsiteWaitlistAvailable'),ctx);assert.equal(ctx.peopleOnsiteWaitlistAvailable(),true);ctx.state.meta.battleMode='team';assert.equal(ctx.peopleOnsiteWaitlistAvailable(),false);ctx.state.meta.battleMode='individual';ctx.state.bracketSize=32;assert.equal(ctx.peopleOnsiteWaitlistAvailable(),false);ctx.state.bracketSize=0;ctx.state.startedAt=1;assert.equal(ctx.peopleOnsiteWaitlistAvailable(),false);ctx.state.onsiteWaitlistFinalized=true;assert.equal(ctx.peopleOnsiteWaitlistAvailable(),true);
 });
+
+test('new rooms persist automatic waitlist fill by default without overwriting saved settings',()=>{
+ const ctx=vm.createContext({emptyEventInfoV2:()=>({})});vm.runInContext(fn(core,'defaultState'),ctx);
+ const fresh=clone(ctx.defaultState('new-room'));assert.equal(fresh.meta.registrationAutoFillEnabled,true);
+ for(const savedMeta of [{registrationAutoFillEnabled:false},{registrationAutoFillEnabled:true},{}]){
+  const restored=Object.assign(ctx.defaultState('existing-room'),{meta:savedMeta});
+  assert.equal(restored.meta.registrationAutoFillEnabled,savedMeta.registrationAutoFillEnabled);
+ }
+});
+
+test('roster exposes draw navigation and a direct shortcut only to eligible managers',()=>{
+ const ctx=vm.createContext({state:{id:'room',cloudCode:'BXH-ROOM',meta:{registrationAutoFillEnabled:true},players:[]},peopleRosterSection:'confirmed',peopleRosterBusy:false,adminRosterCode:'BXH-ROOM',adminRegistrationsError:'',adminRegistrationsCache:[],adminRegistrationsLoading:false,firebaseUser:{uid:'manager'},window:{},esc:x=>String(x??''),
+  peopleRosterMutationLocked:()=>false,peopleRegistrationSelectionManaged:()=>false,canManageRegistrationRoster:()=>true,isCommunityQuickRegistration:()=>false,
+  peopleOnlineWaitlistRows:()=>[],peopleLocalWaitlist:()=>[],peopleRegistrationIdOf:r=>r.registrationId,
+  peopleOnsiteWaitlistAvailable:()=>true,peopleOnsiteWaitlistManaged:()=>false,
+  renderStaffAssignmentPanel:()=>'',renderRefereeStationAssignmentPanel:()=>'',bracketCommitStatusHtml:()=>'',bracketCommitBlocked:()=>false,entryRosterValid:()=>true,renderEntrySelection:()=>'',BATTLE_MODE_LABELS:{},FORMAT_LABELS:{}});
+ vm.runInContext(fn(core,'renderPeopleManagement'),ctx);
+ assert.match(ctx.renderPeopleManagement(),/前往備取／抽籤/);
+ ctx.peopleRosterSection='waitlist';assert.doesNotMatch(ctx.renderPeopleManagement(),/前往備取／抽籤/);
+ ctx.peopleRosterSection='confirmed';ctx.peopleOnsiteWaitlistAvailable=()=>false;assert.doesNotMatch(ctx.renderPeopleManagement(),/前往備取／抽籤|備取／抽籤/);
+});
