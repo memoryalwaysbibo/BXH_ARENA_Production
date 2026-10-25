@@ -100,7 +100,7 @@
           onSnapshot: fsMod.onSnapshot, serverTimestamp: fsMod.serverTimestamp,
           collection: fsMod.collection, query: fsMod.query, where: fsMod.where, getDocs: fsMod.getDocs, updateDoc: fsMod.updateDoc,
           runTransaction: fsMod.runTransaction, writeBatch: fsMod.writeBatch, deleteField: fsMod.deleteField,
-          increment: fsMod.increment, collectionGroup: fsMod.collectionGroup, orderBy: fsMod.orderBy, limit: fsMod.limit
+          increment: fsMod.increment, collectionGroup: fsMod.collectionGroup, orderBy: fsMod.orderBy, limit: fsMod.limit, getCountFromServer: fsMod.getCountFromServer, or: fsMod.or
         };
         // Select durable storage at initialization; avoid racing persistence migrations.
         authHandle = authMod.initializeAuth(app, {
@@ -648,6 +648,88 @@
         if(count) await batch.commit();
         return true;
       }catch(e){ console.warn("同步裁判安全目錄失敗",e); return false; }
+    },
+
+    // Account management uses counts and bounded indexed queries. Never fall
+    // back to an unbounded collection read when a query fails.
+    async getManagedAccountSummary(onProgress){
+      if(!authReady) throw Error("auth-not-ready");
+      const collection=fx.collection(dbHandle,USERS_COLLECTION), now=Date.now();
+      const stats={total:null,enabled:null,daily:null,weekly:null,testers:null,roles:{},errors:[]};
+      let disabled=null,daily=null,weekly=null,testers=null,playerTests=null,players=null,partners=null;
+      const count=(...filters)=>fx.getCountFromServer(filters.length?fx.query(collection,...filters):collection).then(s=>s.data().count);
+      const publish=()=>{
+        if(stats.total!==null&&disabled)stats.enabled=stats.total-disabled.length;
+        if(daily!==null&&disabled)stats.daily=daily-disabled.filter(u=>Number(u.lastLoginAt)>=now-86400000).length;
+        if(weekly!==null&&disabled)stats.weekly=weekly-disabled.filter(u=>Number(u.lastLoginAt)>=now-7*86400000).length;
+        if(testers!==null){stats.roles.tester=testers;if(disabled)stats.testers=testers-disabled.filter(u=>u.role==='tester'||u.isTestAccount===true).length;}
+        if(players!==null&&playerTests!==null)stats.roles.player=players-playerTests;
+        if(stats.roles.admin!=null&&stats.roles.super_admin!=null)stats.roles.management=stats.roles.admin+stats.roles.super_admin;
+        if(partners)stats.roles.partner_organizer=partners.filter(u=>u.partnerOrganizer?.expiresAt==null||Number(u.partnerOrganizer.expiresAt)>now).length;
+        stats.roles.all=stats.total;
+        if(onProgress)onProgress({...stats,roles:{...stats.roles},errors:[...stats.errors]});
+      };
+      const job=async(key,promise,apply)=>{
+        const failure=Symbol('account-summary-timeout');
+        const value=await withTimeout(promise,10000,failure);
+        if(value===failure)stats.errors.push(key);else apply(value);
+        publish();
+      };
+      const rows=snapshot=>snapshot.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));
+      await Promise.all([
+        job('total',count(),n=>stats.total=n),
+        // Legacy profiles without active are enabled, so subtract only false.
+        job('disabled',fx.getDocs(fx.query(collection,fx.where('active','==',false))).then(rows),v=>disabled=v),
+        job('daily',count(fx.where('lastLoginAt','>=',now-86400000)),n=>daily=n),
+        job('weekly',count(fx.where('lastLoginAt','>=',now-7*86400000)),n=>weekly=n),
+        ...['super_admin','admin','staff','viewer'].map(role=>job(role,count(fx.where('role','==',role)),n=>stats.roles[role]=n)),
+        job('player',count(fx.where('role','==','player')),n=>players=n),
+        job('player-tests',count(fx.where('role','==','player'),fx.where('isTestAccount','==',true)),n=>playerTests=n),
+        job('tester',count(fx.or(fx.where('role','==','tester'),fx.where('isTestAccount','==',true))),n=>testers=n),
+        job('partner',fx.getDocs(fx.query(collection,fx.where('partnerOrganizer.status','==','active'))).then(rows),v=>partners=v)
+      ]);
+      return stats;
+    },
+
+    async queryManagedAccounts({keyword='',role='all'}={}){
+      if(!authReady) throw Error("auth-not-ready");
+      const collection=fx.collection(dbHandle,USERS_COLLECTION), queries=[];
+      keyword=String(keyword).trim();
+      const cap=50;
+      if(keyword){
+        if(keyword.length>200)throw Error('search-too-long');
+        // Single-field prefix indexes require no new composite index or backfill.
+        for(const field of ['realName','displayName','gameId','nickname','email','playerId']){
+          const values=field==='email'?[...new Set([keyword,keyword.toLowerCase()])]:[keyword];
+          for(const value of values)queries.push(fx.getDocs(fx.query(collection,fx.where(field,'>=',value),fx.where(field,'<=',value+'\uf8ff'),fx.orderBy(field),fx.limit(cap+1))));
+        }
+      }else{
+        const filters=[];
+        if(role==='management')filters.push(fx.where('role','in',['super_admin','admin']));
+        else if(role==='tester')filters.push(fx.or(fx.where('role','==','tester'),fx.where('isTestAccount','==',true)));
+        else if(role==='partner_organizer')filters.push(fx.where('partnerOrganizer.status','==','active'));
+        else if(role!=='all')filters.push(fx.where('role','==',role));
+        queries.push(fx.getDocs(fx.query(collection,...filters,fx.limit(cap+1))));
+      }
+      const timeout=Symbol('account-search-timeout');
+      const snapshots=await withTimeout(Promise.all(queries),10000,timeout);
+      if(snapshots===timeout)throw Error('account-search-failed-or-timeout');
+      const users=new Map();let truncated=false;
+      for(const snapshot of snapshots){
+        if(snapshot.docs.length>cap)truncated=true;
+        for(const d of snapshot.docs.slice(0,cap))users.set(d.id,Object.assign({},d.data(),{uid:d.id}));
+      }
+      if(keyword&&!keyword.includes('/')){
+        const doc=await withTimeout(fx.getDoc(fx.doc(dbHandle,USERS_COLLECTION,keyword)),3000,null);
+        if(doc?.exists())users.set(doc.id,Object.assign({},doc.data(),{uid:doc.id}));
+      }
+      return {users:[...users.values()],truncated};
+    },
+
+    async syncManagedStaffDirectory(){
+      if(!authReady)return false;
+      const snap=await fx.getDocs(fx.query(fx.collection(dbHandle,USERS_COLLECTION),fx.where('role','in',['staff','admin','super_admin'])));
+      return this.syncStaffDirectory(snap.docs.map(d=>Object.assign({},d.data(),{uid:d.id})));
     },
 
     async listUsers(){
