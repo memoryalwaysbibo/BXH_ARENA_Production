@@ -30,7 +30,7 @@ function setup(){
 const record=(overrides={})=>({eventCode:'E1',eventName:'週末賽',eventDate:'2026-10-18',matchId:'m1',completedAt:Date.parse('2026-10-18T15:00:00+08:00'),completed:true,isWin:true,scoringVersion:'bxh-4pt-v1',round:1,...overrides});
 test('saved maximum is labeled permanent only with a valid server response; incomplete or malformed responses retain replay labeling',()=>{
  const c=setup();vm.runInContext(fs.readFileSync('modules/main-app/hunter-license-v21.js','utf8'),c);
- const response={version:'hunter-license-v2.1',status:'awarded',highestTier:'b',awarded:true,current:{tier:'c',score:48.84622717893441,strength:47,matches:19}};
+ const response={version:'hunter-license-v2.1',promotionPolicy:'medium-or-larger-v1',status:'awarded',highestTier:'b',awarded:true,current:{tier:'c',score:48.84622717893441,strength:47,matches:19}};
  c.hunterProfileCache.permanentLicense=response;
  let html=c.playerCenterHunterSummaryHtml([], 'ready');assert.ok(html.includes('生涯最高（永久授予）'));assert.ok(html.includes('B 級獵人'));
  assert.ok(html.includes('C 級獵人'));assert.ok(html.includes('48.8'));
