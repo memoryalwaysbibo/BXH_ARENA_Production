@@ -140,10 +140,15 @@ function displayGrade(o,snapshot){
     return {...current,tier:'pending',label:'對手資料待核對'};
   return {...current,label:RULES.find(r=>r.tier===current.tier)?.label||current.label||'未分級'};
 }
+function displayHighest(o,snapshot){
+  const tier=verifiedSnapshot(snapshot)?.highestTier;
+  if(tier)return RULES.find(r=>r.tier===tier).label;
+  return o.highest?.tier==='ungraded'&&identityStatus(o).pending>0?'對手資料待核對':o.highest?.label||'待核對';
+}
 function renderOverview(o,esc,snapshot){
   const persisted=verifiedSnapshot(snapshot),current=persisted?.current;
   const currentLabel=displayGrade(o,snapshot).label,identity=identityStatus(o);
-  const highestLabel=persisted?.highestTier?RULES.find(r=>r.tier===persisted.highestTier)?.label:o.highest.tier==='ungraded'&&identity.pending>0?'對手資料待核對':o.highest.label;
+  const highestLabel=displayHighest(o,snapshot);
   const number=n=>n==null?'—':Number.isInteger(n)?String(n):(Math.floor(n*10)/10).toFixed(1);
   const table=RULES.map(r=>'<tr>'+[r.label,r.score,r.ability,r.matches,r.events,r.opponents,r.medium,r.large].map(v=>'<td>'+esc(String(v))+'</td>').join('')+'</tr>').join('');
   return '<details class="hunter-grade-detail"><summary><b>獵人執照 2.1｜階級判定</b><strong>'+number(current?.score??o.grade.score)+'</strong></summary><div class="hunter-grade-detail-content">'+
@@ -156,5 +161,5 @@ function renderOverview(o,esc,snapshot){
     '<small>各項條件需同時達標；生涯歷練跨季累積。中型 96–127 人、大型 128 人以上，兩者分開計算；不同對手只計已核對的唯一身分。有效回合保留統計，不另作晉級門檻。</small>'+
     '<p class="hint">賽事規模待核對 '+o.life.unknownSizes+' 次；對手身分待核對 '+o.life.unresolvedOpponents+' 場。只採 2026/10/1 起正式個人賽可信對戰，其他紀錄仍保留。'+(persisted?.highestTier?'最高階級已由後端核對並保存。':'生涯最高目前為新版歷史回算，尚未寫入永久授予紀錄。')+'</p></div></details>';
 }
-window.BXHHunterLicenseV21=Object.freeze({version:VERSION,rules,overview,strength,experience,ordered,gradeOf,renderOverview,verifiedSnapshot,identityStatus,displayGrade});
+window.BXHHunterLicenseV21=Object.freeze({version:VERSION,rules,overview,strength,experience,ordered,gradeOf,renderOverview,verifiedSnapshot,identityStatus,displayGrade,displayHighest});
 })();

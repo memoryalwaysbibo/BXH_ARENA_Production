@@ -63,3 +63,11 @@ test('pending identity display does not hide a verified server grade or claim a 
  const html=V.renderOverview(o,String,snapshot);assert(html.includes('目前：E 級獵人'));
  assert.equal(V.displayGrade(V.overview([],null,false)).label,'資料待核對');
 });
+test('both license badges and career peak use shared pending display state',()=>{
+ const V=setup(),o=V.overview([record(1,true,{opponentIdentity:{scope:'unresolved'}})]);
+ assert.equal(V.displayHighest(o),'對手資料待核對');
+ const core=fs.readFileSync('modules/main-app/core.js','utf8');
+ assert(core.includes('displayGrade?.(licenseOverview,hunterProfileCache?.permanentLicense)'));
+ assert(core.includes('displayHighest?.(license,hunterProfileCache?.permanentLicense)'));
+ assert.equal(V.displayHighest({grade:{tier:'ungraded'}}),'待核對');
+});
