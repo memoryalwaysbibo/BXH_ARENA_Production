@@ -739,6 +739,25 @@
       const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
   }
+  // RDW ranked-only start adapter. No local state mutations and no legacy fallback.
+  // The server remains disabled until trusted roster/tier resolution is deployed.
+  window.BXHRdwStartBridge=Object.freeze({
+    async start({eventCode,drawRevision,expectedRosterRevision}={}){
+      if(typeof eventCode!=="string"||!/^BXH-[A-Z0-9]{6}$/.test(eventCode))throw Error("rdw-invalid-event-code");
+      if(!Number.isSafeInteger(drawRevision)||drawRevision<0)throw Error("rdw-draw-revision-required");
+      if(!Number.isSafeInteger(expectedRosterRevision)||expectedRosterRevision<0)throw Error("rdw-roster-revision-required");
+      if(!await tryInitFirebase()||!functionsHandle||!fnx?.httpsCallable)throw Error("rdw-firebase-unavailable");
+      const actor=authHandle?.currentUser;
+      if(!actor?.uid)throw Error("rdw-auth-required");
+      await ensureHunterClashAppCheck();
+      const invoke=fnx.httpsCallable(functionsHandle,"rdwStartService",{timeout:65000});
+      const response=await invoke({eventCode,drawRevision,expectedRosterRevision});
+      if(authHandle?.currentUser?.uid!==actor.uid)throw Error("rdw-auth-session-changed");
+      const data=response?.data;
+      if(data?.ok!==true||data.eventCode!==eventCode)throw Error("rdw-invalid-server-confirmation");
+      return {ok:true,eventCode,mode:data.mode||"rdw-verified"};
+    }
+  });
   window.engagementService={
     connectionInfo(){return {projectId:FIREBASE_CONFIG.projectId||'未設定',region:'asia-east1',signedIn:!!(authHandle&&authHandle.currentUser),sdkReady:!!fnx};},
     async changeManagedAccounts(payload){return callEngagementFunction("changeManagedAccounts",payload,30000);},
