@@ -2570,6 +2570,7 @@
         // community hosts are not allowed to read private tournament documents
         // before they own one. The atomic create batch below prevents overwrites.
         const code = generateRoomCode();
+        if(data.meta){delete data.meta.refereeSeatsV1;delete data.meta.refereeSeatNames;}
         const creatorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
         const partnerSession=!!(partnerGrant&&creatorUid);
@@ -2752,6 +2753,7 @@
         if(d.testExpiresAt&&typeof d.testExpiresAt.toMillis==="function") parsed.testExpiresAtMs=d.testExpiresAt.toMillis();
         if(d.expiresAt&&typeof d.expiresAt.toMillis==="function") parsed.expiresAtMs=d.expiresAt.toMillis();
         parsed.meta=parsed.meta||{};
+        if(d.refereeSeatsV1?.version===1){parsed.meta.refereeSeatsV1=d.refereeSeatsV1;parsed.meta.refereeSeatNames=d.refereeSeatNames||{};}
         if(Array.isArray(d.assignedStaffUids)) parsed.meta.assignedStaffUids=d.assignedStaffUids;
         if(d.refereeStationAssignments && typeof d.refereeStationAssignments==="object") parsed.meta.refereeStationAssignments=d.refereeStationAssignments;
         if(d.refereeStationNames && typeof d.refereeStationNames==="object") parsed.meta.refereeStationNames=d.refereeStationNames;
@@ -3140,6 +3142,7 @@ if(testerSession){
               ? [...new Set(remoteDoc.refereeStationUids.map(String).filter(Boolean))]
               : (()=>{ const out=[]; Object.values(canonicalAssignments).forEach(list=>{ if(Array.isArray(list)) list.forEach(uid=>{ uid=String(uid||""); if(uid&&!out.includes(uid)) out.push(uid); }); }); return out; })();
             data.meta=data.meta||{};
+            if(remoteDoc.refereeSeatsV1?.version===1){data.meta.refereeSeatsV1=remoteDoc.refereeSeatsV1;data.meta.refereeSeatNames=remoteDoc.refereeSeatNames||{};}
             data.meta.refereeStationAssignments=canonicalAssignments;
             data.meta.refereeStationNames=canonicalNames;
             data.meta.refereeStationRestrictionEnabled=canonicalRestriction;
@@ -3335,6 +3338,7 @@ if(testerSession){
           if(!actorSnap.exists()) throw new Error("unauthenticated");
           const actor=actorSnap.data()||{};
           const docData=snap.data()||{};
+          if(docData.refereeSeatsV1?.version===1) throw new Error("seat-managed");
           let remoteState;
           try{ remoteState=JSON.parse(docData.data); }catch(e){ throw new Error("corrupt-data"); }
           if(!remoteState||!remoteState.meta) throw new Error("corrupt-data");
@@ -3525,6 +3529,24 @@ if(testerSession){
       }catch(e){return {ok:false,reason:e.message||String(e)};}
     },
 
+    async manageRefereeSeats(data){
+      if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
+      try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}
+      catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
+    },
+    subscribeRefereeSeats(code,callback){
+      if(!cloudEnabled||!code)return ()=>{};
+      return fx.onSnapshot(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()),snap=>{
+        if(!snap.exists()||snap.metadata.hasPendingWrites)return;
+        const d=snap.data();if(d.refereeSeatsV1?.version!==1)return;
+        callback({model:d.refereeSeatsV1,projection:{
+          assignedStaffUids:d.assignedStaffUids||[],refereeStationAssignments:d.refereeStationAssignments||{},
+          refereeStationNames:d.refereeStationNames||{},refereeStationUids:d.refereeStationUids||[],
+          refereeSeatNames:d.refereeSeatNames||{},refereeStationRestrictionEnabled:true
+        }});
+      },error=>console.warn("裁判席位同步失敗",error));
+    },
+
     async mutateMatchTransaction(code, matchId, station, mutateFn, expectedActorUid, queueOptions={}){
       if(!cloudEnabled || !code || !fx.runTransaction) return {ok:false,reason:"cloud-unavailable"};
       const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
@@ -3542,7 +3564,11 @@ if(testerSession){
           const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
             &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
             &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
-          if((actor.role==="staff"||actorIsEventReferee) && docData.refereeStationRestrictionEnabled===true){
+          if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && actorUid!==docData.createdBy){
+            const court=docData.refereeSeatsV1.courts?.[String(Number(queueOptions.targetStation||station))];
+            if(!["main","backup1","backup2"].some(slot=>court?.[slot]?.uid===actorUid))throw new Error("station-not-assigned");
+          }
+          if((actor.role==="staff"||actorIsEventReferee) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
             const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
             const list=Array.isArray(map[String(Number(queueOptions.targetStation||station))])?map[String(Number(queueOptions.targetStation||station))]:[];
             if(!list.includes(actorUid)) throw new Error("station-not-assigned");
@@ -3561,8 +3587,10 @@ if(testerSession){
             const ownCommunity=remoteState.meta&&remoteState.meta.eventAuthority==="community" && remoteState.ownerUid===actorUid;
             if(!privileged&&!ownTest&&!ownCommunity) throw new Error("permission-denied");
           }
+          if(docData.refereeSeatsV1?.version===1 && Number(remoteMatch.refereeSeatScoreRevision||0)!==Number(queueOptions.expectedSeatScoreRevision||0))throw new Error("score-stale");
           const result=mutateFn(remoteState,remoteMatch);
           if(!result || !result.ok) throw new Error((result&&result.reason)||"validation-failed");
+          if(docData.refereeSeatsV1?.version===1){const changed=result.state.matches.find(m=>m.id===matchId);changed.refereeSeatScoreRevision=Number(remoteMatch.refereeSeatScoreRevision||0)+1;}
           const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1,Number(remoteState.updatedAt||0)+1);
           result.state.updatedAt=now; rebuildPropagationForState(result.state);
           const onsiteFence=advanceOnsiteWriteFence(docData,result.state);
@@ -3661,7 +3689,11 @@ if(testerSession){
               const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
                 &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
                 &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
-              if((actor.role==="staff"||actorIsEventReferee) && docData.refereeStationRestrictionEnabled===true){
+              if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && actorUid!==docData.createdBy){
+                const court=docData.refereeSeatsV1.courts?.[String(Number(auditMeta.station))];
+                if(!["main","backup1","backup2"].some(slot=>court?.[slot]?.uid===actorUid))throw new Error("station-not-assigned");
+              }
+              if((actor.role==="staff"||actorIsEventReferee) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
                 const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
                 const list=Array.isArray(map[String(Number(auditMeta.station))])?map[String(Number(auditMeta.station))]:[];
                 if(!list.includes(actorUid)) throw new Error("station-not-assigned");
@@ -3674,9 +3706,11 @@ if(testerSession){
             if(Number(auditMeta.station)<1||remoteState.forcedCourtExits?.[auditMeta.station]?.closed)throw new Error("court-retired");
             const match=(remoteState.matches||[]).find(m=>m.id===auditMeta.matchId);
             if(!match || Number(match.station)!==Number(auditMeta.station)) throw new Error("station-mismatch");
+            if(docData.refereeSeatsV1?.version===1 && Number(match.refereeSeatScoreRevision||0)!==Number(auditMeta.expectedSeatScoreRevision||0))throw new Error("score-stale");
             if(match.skippedAt || (auditMeta.dispatchRevision!=null && (match.dispatchRevision||0)!==auditMeta.dispatchRevision)) throw new Error("dispatch-stale");
           }
           const result = validateAndApplyFn(remoteState);
+          if(result?.ok&&docData.refereeSeatsV1?.version===1&&auditMeta?.matchId){const changed=result.state.matches.find(m=>m.id===auditMeta.matchId);if(changed)changed.refereeSeatScoreRevision=Number(changed.refereeSeatScoreRevision||0)+1;}
           if(!result || !result.ok) throw new Error((result && result.reason) || "validation-failed");
           const now=Date.now();
           const community=(result.state.meta&&result.state.meta.eventAuthority)==="community";
@@ -3711,6 +3745,7 @@ if(testerSession){
           const d = snap.data();
           try{
             const parsed = JSON.parse(d.data);
+            if(d.refereeSeatsV1?.version===1)parsed.meta={...parsed.meta,refereeSeatsV1:d.refereeSeatsV1,refereeSeatNames:d.refereeSeatNames||{},refereeStationAssignments:d.refereeStationAssignments||{},refereeStationNames:d.refereeStationNames||{},refereeStationRestrictionEnabled:true,assignedStaffUids:d.assignedStaffUids||[]};
             if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
             callback(parsed, d.updatedAt);
           }catch(e){}
