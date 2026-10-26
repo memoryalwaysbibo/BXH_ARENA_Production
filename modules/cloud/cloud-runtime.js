@@ -3176,7 +3176,22 @@ if(testerSession){
           if(fencedDoc.onsiteWaitlistFinalized===true){
             const canonical=typeof fencedDoc.data==="string"?JSON.parse(fencedDoc.data):fencedDoc.data;
             const canonicalMeta=canonical?.meta||{};
-            for(const [top,meta] of [['registrationEnabled','registrationEnabled'],['registrationOpenAt','registrationOpenAt'],['registrationCloseAt','registrationCloseAt'],['waitlistEnabled','waitlistEnabled'],['waitlistCapacity','waitlistCapacity'],['capacity','registrationCapacity']]){
+            const protectedSettings=[['registrationEnabled','registrationEnabled'],['registrationOpenAt','registrationOpenAt'],['registrationCloseAt','registrationCloseAt'],['waitlistEnabled','waitlistEnabled'],['waitlistCapacity','waitlistCapacity'],['capacity','registrationCapacity'],['cancellationDeadline','cancellationDeadline']];
+            if(options.registrationSettings===true){
+              // Explicit edits must not report success after silently restoring
+              // draw-owned settings. Automatic score/state saves still rebase.
+              if(data.meta?.registrationAutoFillEnabled===true)throw Object.assign(new Error('onsite-registration-settings-managed'),{code:'onsite-registration-settings-managed'});
+              const normalize=(key,value)=>['registrationEnabled','waitlistEnabled'].includes(key)?!!value:(value||null);
+              for(const [top,meta] of protectedSettings){
+                // This flag is derived from capacity by the legacy serializer,
+                // but finalized draws may retain a positive limit while closed.
+                // The actual editable capacity is compared independently.
+                if(top==='waitlistEnabled')continue;
+                const current=Object.prototype.hasOwnProperty.call(fencedDoc,top)?fencedDoc[top]:canonicalMeta[meta];
+                if(normalize(top,registrationFields[top])!==normalize(top,current))throw Object.assign(new Error('onsite-registration-settings-managed'),{code:'onsite-registration-settings-managed'});
+              }
+            }
+            for(const [top,meta] of protectedSettings){
               if(Object.prototype.hasOwnProperty.call(fencedDoc,top)){privatePayload[top]=fencedDoc[top];publicPayload[top]=fencedDoc[top];}
               else{delete privatePayload[top];delete publicPayload[top];}
               if(Object.prototype.hasOwnProperty.call(canonicalMeta,meta))data.meta[meta]=canonicalMeta[meta];else delete data.meta[meta];
@@ -3800,3 +3815,4 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
