@@ -1,0 +1,43 @@
+name: Three-seat referee candidate
+on:
+  pull_request:
+    paths: ['referee-seats/**', 'modules/main-app/referee-seats.*', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', '.github/workflows/referee-seats.yml']
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Unit and existing assignment regressions
+        run: node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/cloud.test.cjs referee-seats/scoring.test.cjs referee-seats/dispatch.test.cjs referee-seats/scoring-bridge.test.cjs tests/assignment-cloud-confirmation.test.cjs tests/event-staff-permission.test.cjs tests/referee-fault-core.test.cjs tests/referee-fault-ui.test.cjs tests/referee-score-v2-ui.test.cjs tests/community-room-cloud-sync.test.cjs tests/staff-assignment-realname.test.cjs tests/module-seam-contracts.test.cjs
+      - name: Install isolated test dependencies
+        run: npm install --prefix /tmp/seat-test-deps --no-save --ignore-scripts playwright@1.55.0 firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11 firebase-admin@13.10.0 acorn@8 acorn-walk@8
+      - name: Verify trusted engine is reproducible from reviewed source
+        env:
+          NODE_PATH: /tmp/seat-test-deps/node_modules
+        run: |
+          node referee-seats/tools/build-engine.cjs
+          git diff --exit-code -- referee-seats/functions/engine
+      - name: Verify composed rules are reproducible
+        run: |
+          python3 referee-seats/build-rules.py --source referee-seats/reference/firestore.production-20261026.rules --output /tmp/seat.rules
+          cmp /tmp/seat.rules referee-seats/firestore.candidate.rules
+      - name: Firestore compilation, guard and actual service transactions
+        env:
+          NODE_PATH: /tmp/seat-test-deps/node_modules
+        run: /tmp/seat-test-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-referee-seat-compile --config referee-seats/firebase.emulator.json 'node --test referee-seats/rules.test.cjs referee-seats/full-rules.test.cjs referee-seats/firestore.test.cjs'
+      - name: Install Chromium
+        run: node /tmp/seat-test-deps/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Three devices and mobile layouts with simulated backend
+        env:
+          NODE_PATH: /tmp/seat-test-deps/node_modules
+        run: node referee-seats/browser.test.cjs
