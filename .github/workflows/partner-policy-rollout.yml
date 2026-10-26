@@ -1,7 +1,7 @@
 name: Partner Policy Compatibility Candidate
 on:
   pull_request:
-    paths: ['partner-quota-policy.js', 'partner-policy/**', 'tests/partner-quota-policy.test.cjs', '.github/workflows/partner-policy-rollout.yml']
+    paths: ['index.html', 'modules/cloud/cloud-runtime.js', 'modules/main-app/core.js', 'partner-organizer-ui.js', 'partner-quota-policy.js', 'partner-policy/**', 'tests/partner-quota-policy.test.cjs', '.github/workflows/partner-policy-rollout.yml']
 permissions:
   contents: read
 jobs:
