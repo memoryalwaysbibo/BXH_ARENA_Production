@@ -17996,6 +17996,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
+  clearBoardModeInteractions();
   syncQrScannerModal();
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
@@ -19242,7 +19243,8 @@ function flushBoardTransform(){
     const canvas = document.getElementById("board-canvas");
     if(canvas) canvas.style.transform = "translate("+boardPanX+"px, "+boardPanY+"px) scale("+boardZoom+")";
     const pctEl = document.getElementById("board-zoom-pct");
-    if(pctEl) pctEl.textContent = Math.round(boardZoom*100)+"%";
+    const pct = Math.round(boardZoom*100)+"%";
+    if(pctEl && pctEl.textContent!==pct) pctEl.textContent = pct;
   }catch(e){}
 }
 
@@ -19333,37 +19335,57 @@ async function exportBoardAsImage(){
   }
 }
 
+let boardModeInteractionCleanup = null;
+function clearBoardModeInteractions(){
+  if(boardModeInteractionCleanup){
+    boardModeInteractionCleanup();
+    boardModeInteractionCleanup = null;
+  }
+}
 function bindBoardModeInteractions(){
+  clearBoardModeInteractions();
   if(bracketViewMode!=="board") return;
   try{
     const viewport = document.getElementById("board-viewport");
     const canvas = document.getElementById("board-canvas");
     if(!viewport || !canvas) return;
 
+    const removers = [];
+    const listen = (target, type, handler, options)=>{
+      target.addEventListener(type, handler, options);
+      removers.push(()=>target.removeEventListener(type, handler, options));
+    };
+    boardModeInteractionCleanup = ()=>{
+      removers.forEach(remove=>remove());
+      viewport.style.cursor="grab";
+    };
+
     bindCompletedMatchCorrectionLongPress(viewport);
     bindManualCourtAssignLongPress(viewport);
 
-    viewport.addEventListener("wheel", (e)=>{
+    listen(viewport, "wheel", (e)=>{
       if(!e.ctrlKey) return;
       e.preventDefault();
       setBoardZoom(boardZoom + (e.deltaY<0 ? 0.1 : -0.1));
     }, { passive:false });
 
     let dragging=false, startX=0, startY=0, startPanX=0, startPanY=0;
-    viewport.addEventListener("mousedown", (e)=>{
+    listen(viewport, "mousedown", (e)=>{
       dragging=true; startX=e.clientX; startY=e.clientY; startPanX=boardPanX; startPanY=boardPanY;
       viewport.style.cursor="grabbing";
     });
-    window.addEventListener("mousemove", (e)=>{
-      if(!dragging) return;
+    listen(window, "mousemove", (e)=>{
+      if(!dragging || !viewport.isConnected) return;
       boardPanX = startPanX + (e.clientX-startX);
       boardPanY = startPanY + (e.clientY-startY);
       applyBoardTransform();
     });
-    window.addEventListener("mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
+    listen(window, "mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
+
+    listen(window, "blur", ()=>{ dragging=false; viewport.style.cursor="grab"; });
 
     let touchStartDist=0, touchStartZoom=1, touchStartX=0, touchStartY=0, touchStartPanX=0, touchStartPanY=0;
-    viewport.addEventListener("touchstart", (e)=>{
+    listen(viewport, "touchstart", (e)=>{
       if(e.touches.length===2){
         touchStartDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         touchStartZoom = boardZoom;
@@ -19372,7 +19394,7 @@ function bindBoardModeInteractions(){
         touchStartPanX = boardPanX; touchStartPanY = boardPanY;
       }
     }, { passive:true });
-    viewport.addEventListener("touchmove", (e)=>{
+    listen(viewport, "touchmove", (e)=>{
       if(e.touches.length===2){
         e.preventDefault();
         const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
@@ -19384,7 +19406,7 @@ function bindBoardModeInteractions(){
         applyBoardTransform();
       }
     }, { passive:false });
-    viewport.addEventListener("touchend", (e)=>{
+    listen(viewport, "touchend", (e)=>{
       if(e.touches.length===1){
         touchStartX=e.touches[0].clientX; touchStartY=e.touches[0].clientY;
         touchStartPanX=boardPanX; touchStartPanY=boardPanY;
@@ -19394,9 +19416,11 @@ function bindBoardModeInteractions(){
       }
     }, { passive:true });
 
+    listen(viewport, "touchcancel", ()=>{ touchStartDist=0; }, { passive:true });
+
     const themeSelect = document.getElementById("board-theme-select");
     if(themeSelect){
-      themeSelect.addEventListener("change", ()=>{
+      listen(themeSelect, "change", ()=>{
         boardTheme = themeSelect.value;
         const shell = document.getElementById("board-shell");
         if(shell) shell.setAttribute("data-board-theme", boardTheme);
