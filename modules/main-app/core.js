@@ -6077,6 +6077,39 @@ function stationMutationErrorMessage(reason){
   };
   return map[reason] || ("雲端場次更新失敗（"+reason+"），請重新整理後再試。");
 }
+
+const refereeSeatCommandBusy=new Set();
+async function executeRefereeSeatCommand(matchId,command){
+  const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(matchId);
+  if(!code||!m||!canOperateCurrentTournament()||!requireStationPermission(m))return false;
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
+  const key=code+":"+actorUid+":"+matchId;if(refereeSeatCommandBusy.has(key))return false;
+  refereeSeatCommandBusy.add(key);
+  try{
+    const request={...command,code,matchId,operationId:crypto.randomUUID(),station:Number(m.station),
+      expectedCourtRevision:state.meta.refereeSeatsV1.courts?.[m.station]?.revision??0,
+      expectedScoreRevision:Number(m.refereeSeatScoreRevision||0),expectedDispatchRevision:Number(m.dispatchRevision||0),
+      playerAId:m.a?.playerId||null,playerBId:m.b?.playerId||null};
+    const result=await window.cloudSync?.commitRefereeCommand?.(request);
+    if(state.id!==roomId||state.cloudCode!==code||currentAuthUid()!==actorUid)return false;
+    if(!result?.ok){
+      const reason=result?.reason||"cloud-unavailable";
+      showToast(({"seat-stale":"裁判席位已變更，請確認權限後再操作。","seat-command-required":"請使用最新版裁判台送分。","release-not-ready":"後端計分服務尚未開放。","not-started":"賽事尚未正式開始。","nothing-to-undo":"目前沒有可撤銷的紀錄。"})[reason]||stationMutationErrorMessage(reason),true);
+      const fresh=await window.cloudSync?.joinRoom?.(code);
+      if(state.id===roomId&&currentAuthUid()===actorUid&&fresh?.ok&&fresh.data)applyRemoteState(fresh.data,true);
+      return false;
+    }
+    if(["confirm","quick"].includes(command.action))pendingModal=null;
+    applyRemoteState(result.state,true);cloudStatus="connected";cloudLastSyncAt=Date.now();
+    const current=getMatch(matchId);
+    if(["score","fault"].includes(command.action)&&current&&!current.completed&&checkWinnerSide(current))openModal({type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"});
+    else render();
+    showToast(command.action==="fault"?"失誤紀錄已由雲端確認":command.action==="confirm"||command.action==="quick"?"結果已由雲端確認並晉級":"本台操作已由雲端確認");
+    return true;
+  }catch(error){if(state.id===roomId&&currentAuthUid()===actorUid)showToast("本次操作尚未確認，請重連後核對雲端比分。",true);return false;}
+  finally{refereeSeatCommandBusy.delete(key);}
+}
+
 function persistRefereeMatchMutation(matchId, mutateRemoteFn){
   const m=getMatch(matchId);
   state.updatedAt=Date.now();
@@ -7215,6 +7248,7 @@ function autoAdvanceReadyMatches(){
 }
 
 function setMatchInProgress(matchId, force){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"start"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
@@ -7247,6 +7281,7 @@ function setMatchInProgress(matchId, force){
 }
 
 function setMatchReady(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"ready"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   const m = getMatch(matchId);
   if(!m || m.isBye) return;
@@ -7275,6 +7310,7 @@ function setMatchReady(matchId){
 }
 
 function pauseMatchStatus(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"pause"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
@@ -7304,6 +7340,7 @@ function markMatchSkipped(matchId){
   rebuildCourtAssignments();
 }
 async function skipMatch(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"skip"});
   if(!canOperateCurrentTournament() || !requireTournamentStartedForMatchAction()) return;
   const m=getMatch(matchId);
   if(!m || m.completed || !requireStationPermission(m)) return;
@@ -7366,6 +7403,7 @@ async function claimSkippedMatch(matchId,target){
 }
 
 function resumeMatchStatus(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"resume"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
@@ -7534,6 +7572,7 @@ function correctionFailureMessage(reason){
   return map[reason]||("場次修正失敗（"+reason+"），請重新整理後再試。");
 }
 async function reopenCompletedMatchForCorrection(matchId,mode){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"correct",mode});
   if(!canOperateCurrentTournament()){showToast("目前身分沒有此操作權限。",true);return false;}
   if(!requireTournamentStartedForMatchAction()) return false;
   const local=getMatch(matchId);
@@ -8473,6 +8512,7 @@ function refereeFaultLast(m){
   return api?api.lastPending(m):null;
 }
 function addScore(matchId, side, type){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"score",side,finish:type});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   // The existing round ledger only accepts unmodified BXH points. Until the
@@ -8530,6 +8570,7 @@ function addScore(matchId, side, type){
 }
 
 function addFault(matchId, offendingSide){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"fault",side:offendingSide});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8573,6 +8614,7 @@ function addFault(matchId, offendingSide){
 }
 
 function undoLast(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"undo"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8612,6 +8654,7 @@ function undoLast(matchId){
 }
 
 function rematch(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"rematch"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8736,6 +8779,7 @@ async function queueOfflineMatchConfirmation(matchId,mode,selectedWinnerId){
 }
 
 async function confirmResultWithCloudGuard(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"confirm"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8893,6 +8937,7 @@ function confirmQuickDecision(matchId, selectedWinnerId){
 }
 
 async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"quick",winnerId:selectedWinnerId});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -17999,10 +18044,10 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
+  syncQrScannerModal();
   window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,operator:canOperateCurrentTournament,
     eligible:()=>isAdminTierOrAbove()||(userProfile?.active===true&&userProfile?.isTestAccount!==true&&userProfile?.role==="staff"&&(state.createdBy===currentAuthUid()||(state.meta?.assignedStaffUids||[]).includes(currentAuthUid()))),
     manager:()=>isAdminTierOrAbove()||(userProfile?.active===true&&userProfile?.isTestAccount!==true&&userProfile?.role==="staff"&&state.createdBy===currentAuthUid()),render,toast:showToast});
-  syncQrScannerModal();
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;

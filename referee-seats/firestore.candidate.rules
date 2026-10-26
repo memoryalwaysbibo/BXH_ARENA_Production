@@ -83,8 +83,9 @@ service cloud.firestore {
       return !changed.hasAny(['refereeSeatsV1','refereeSeatNames'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
-          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room)
-          || (isSignedIn() && request.auth.uid in room.get('refereeStationUids', [])));
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
+        && (!enabled || privateDoc || !changed.hasAny(['bracketView'])
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room));
     }
 
     // ==== 路徑輔助函式 ====
@@ -987,6 +988,8 @@ service cloud.firestore {
     }
     match /tournaments/{code} {
       match /refereeSeatOperations/{id} { allow read, write: if false; }
+      match /refereeScoreOperations/{id} { allow read, write: if false; }
+      match /refereeScoreAudit/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 
       match /checkinReceipts/{id} { allow read, write: if false; }

@@ -30,3 +30,23 @@ test('real Firestore retries produce one claim and atomic swap with immutable ma
  const mirror=JSON.parse((await db.doc('publicTournaments/'+code).get()).data().bracketView);assert.equal(mirror.meta.refereeSeatNames['1'].main.name,backup);assert(!JSON.stringify(mirror).includes('"uid"'));
  const audits=await ref().collection('refereeSeatAudit').get();assert.equal(audits.size,5);
 });
+
+test('trusted scoring commits once, rejects stale concurrent score and revoked/off-court referee',async()=>{
+ const {createScoringHandler}=require('./functions/scoring-service.cjs'),C=require('./functions/core.cjs'),score=createScoringHandler(db);
+ const scoreCode='BXH-SCORETEST',scoreRef=db.doc('tournaments/'+scoreCode);
+ const model={version:1,revision:1,requests:{},courts:{'1':{revision:1,main:{uid:'a',name:'A'},backup1:{uid:'b',name:'B'},backup2:null}}};
+ const st={id:'score-room',cloudCode:scoreCode,meta:{eventAuthority:'official',formatType:'single',stations:1,scoringMode:'standard'},bracketSize:2,startedAt:1,players:[{id:'p1',name:'P1'},{id:'p2',name:'P2'}],matches:[{id:'m',bracket:'SE',round:0,indexInRound:0,station:1,a:{playerId:'p1'},b:{playerId:'p2'},scoreA:0,scoreB:0,log:[],faultActions:[],completed:false,status:'in_progress'}]};
+ await scoreRef.set({createdBy:'host',eventAuthority:'official',assignedStaffUids:['a','b','c'],refereeSeatsV1:model,...C.project(model),data:JSON.stringify(st),updatedAt:1});
+ await db.doc('publicTournaments/'+scoreCode).set({bracketView:JSON.stringify({meta:{},matches:st.matches})});
+ function cmd(uid,action,revision,args={}){return {auth:{uid},data:{code:scoreCode,operationId:'trusted-score-op-'+(++seq),action,station:1,matchId:'m',expectedCourtRevision:1,expectedScoreRevision:revision,expectedDispatchRevision:0,playerAId:'p1',playerBId:'p2',...args}};}
+ const requests=['a','b'].map(uid=>cmd(uid,'score',0,{side:'A',finish:'spin'}));
+ const race=await Promise.allSettled(requests.map(r=>score(r)));assert.equal(race.filter(r=>r.status==='fulfilled').length,1);
+ const winnerIndex=race.findIndex(r=>r.status==='fulfilled');await score(requests[winnerIndex]);
+ let data=(await scoreRef.get()).data(),parsed=JSON.parse(data.data);assert.equal(parsed.matches[0].scoreA,1);assert.equal((await scoreRef.collection('refereeScoreAudit').get()).size,1);
+ await score(cmd('a','fault',1,{side:'A'}));await score(cmd('b','fault',2,{side:'A'}));
+ parsed=JSON.parse((await scoreRef.get()).data().data);assert.equal(parsed.matches[0].scoreB,1);
+ await assert.rejects(score(cmd('c','score',3,{side:'A',finish:'spin'})),/station-not-assigned/);
+ await handle({auth:{uid:'host'},data:{code:scoreCode,operationId:'revoke-score-main-123',action:'revoke',station:1,slot:'main',expectedCourtRevision:1,expectedUid:'a'}});
+ await assert.rejects(score(cmd('a','score',3,{side:'A',finish:'spin'})),/station-not-assigned/);
+ const mirror=JSON.parse((await db.doc('publicTournaments/'+scoreCode).get()).data().bracketView);assert.equal(mirror.matches[0].scoreB,1);assert(!JSON.stringify(mirror).includes('confirmedByUid'));
+});

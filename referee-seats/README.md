@@ -12,15 +12,21 @@
 
 ## 檔案
 
-`functions/core.cjs` 是可單獨測試的狀態機，`service.cjs` 實作 Firestore 交易，`index.js` 匯出 asia-east1 Callable `manageRefereeSeats`。前端在原裁判台標頭下呈現三席；賽事設定提供切換入口。舊分配非空時拒絕自動搬移，防止錯認主裁；複製房間不得繼承三席或交接請求。
+`functions/core.cjs` 是可單獨測試的狀態機，`service.cjs` 實作 Firestore 交易，`index.js` 匯出 asia-east1 Callable `manageRefereeSeats` 與 `commitRefereeCommand`。前端在原裁判台標頭下呈現三席；賽事設定提供切換入口。舊分配非空時拒絕自動搬移，防止錯認主裁；複製房間不得繼承三席或交接請求。
 
-## 上線前必須完成的安全整合
+## 後端計分整合進度（第二版）
 
-**目前不能宣稱正式計分已完成後端逐台授權。** 原系統將整份 matches 存成一段 JSON；Firestore Rules 無法解析 JSON 逐台檢驗差異。目前新增的規則保護席位／交接資料、拒絕已無任何席位的一般 staff 寫入 data；既有兩條計分交易在讀取雲端時檢查本台三席並使用比分版本拒絕衝突，但這些交易程式仍在瀏覽器執行，不能當成不可繞過的伺服器授權。
+已新增 `commitRefereeCommand` Callable。手機只傳固定命令及席位／比分／派場版本、當場兩位選手，伺服器重讀正式資料與使用者資格、驗證本台權限，再重算比分與晉級；不接受手機上傳完整 state、比分或回合紀錄。
 
-因此 Callable 預設拒絕啟用，要求伺服器設定 `systemConfig/refereeSeatsV1` 同時具備 `enabled: true` 和 `perCourtScoringVerified: true`。**不得在尚未將所有計分／修正／離線補送入口接入可信逐台授權後端前，將第二個旗標設為 true。** 此旗標是發布閘門，不是完成該整合的替代品。
+已接線：旋轉／擊飛／爆裂／極限得分、失誤、撤銷、重賽、確認結果、簡易判定、安全修正／撤回結果、準備／開始／暫停／恢復、跳過。每個命令有操作 ID 去重、比分版本及席位世代檢查；主裁與備裁同時操作舊版本時只會一筆成功。
 
-仍需把整份 JSON 計分改走可信的逐台命令後端，或拆分為受 Rules 精確保護的逐場文件，然後驗證跨台惡意寫入、被撤銷後的離線補送，以及修正結果／派場的完整相容性。未完成前保留本 PR 為 draft，不能讓正式房間切換。
+Firestore 候選規則現在拒絕所有一般 staff 直接寫入三席房的私人 JSON 或公開 bracketView，即使仍占有席位也不能繞過 Callable；場主／管理員保有原本的本場管理能力。舊瀏覽器計分交易及離線 snapshot 補送在三席房直接回覆 `seat-command-required`。新三席計分目前要求在線，不在斷線時假裝計分成功或新建離線 snapshot。
+
+伺服器的晉級／修正引擎由受版本控制的純函式產生，隨函式包部署，不執行請求提供的程式碼。`tools/build-engine.cjs` 及 `engine/manifest.json` 保留來源函式與純模組雜湊，CI 重新產生後必須無差異。已測單淘晉級、季殿門檻、雙敗總決賽重置、循環賽排名與下游已有實際比分時禁止撤回。
+
+仍維持 draft 與預設關閉：跨台承接／人工交換／PASS 與退場相關入口尚未全面改為命令後端。受限 staff 呼叫舊交易會失敗，不會退回可繞過的舊計分路徑；這是尚待補齊的相容性項目。尚未部署正式 Callable／Rules、尚未驗證實機網路中斷與正式房相容性。
+
+伺服器設定 `systemConfig/refereeSeatsV1` 必須同時有 `enabled: true`、`perCourtScoringVerified: true` 才能啟用；未完成所有入口與正式規則整合前，不可設定旗標。測試中的旗標僅存在 demo emulator。
 
 ## 規則候選與部署
 
@@ -32,7 +38,7 @@
 
 ## 測試
 
-- `node --test referee-seats/core.test.cjs referee-seats/service.test.cjs`
+- `node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/scoring.test.cjs referee-seats/scoring-bridge.test.cjs`
 - `node referee-seats/browser.test.cjs`：需要 Playwright 及 Chromium，使用模擬後端、三個獨立頁面，驗證加入、主備交換、拒絕通知、撤銷、退出與四種寬度。
 - `python3 referee-seats/build-rules.py --source qr-checkin/firestore.candidate.rules --output /tmp/referee-seats.rules`
 

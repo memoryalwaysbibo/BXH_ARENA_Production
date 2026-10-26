@@ -15,11 +15,15 @@ before(async()=>{
  function isStaffOfficialCreatorExistingData(room){return request.auth!=null&&room.createdBy==request.auth.uid;}
  ${helper}
  match /tournaments/{code}{allow read:if isSignedIn();allow update:if isSignedIn()&&refereeSeatWriteValid(code,true);}
+ match /publicTournaments/{code}{allow read:if true;allow update:if isSignedIn()&&refereeSeatWriteValid(code,false);}
  } }`;
  env=await initializeTestEnvironment({projectId:'demo-referee-seat-guard',firestore:{host:'127.0.0.1',port:8197,rules}});
  await env.withSecurityRulesDisabled(async c=>setDoc(doc(c.firestore(),'tournaments/BXH-TEST'),{createdBy:'host',data:'old',refereeSeatsV1:{version:1},refereeSeatNames:{},refereeStationAssignments:{'1':['seated']},refereeStationNames:{'1':['A']},refereeStationUids:['seated'],refereeStationRestrictionEnabled:true}));
+ await env.withSecurityRulesDisabled(async c=>setDoc(doc(c.firestore(),'publicTournaments/BXH-TEST'),{bracketView:'{}'}));
 });
 after(async()=>{await env?.cleanup();});
 test('full candidate and actual seat guard compile',()=>{assert(helper.includes('function refereeSeatWriteValid'));});
 test('even administrator cannot overwrite callable-owned seats or legacy projection directly',async()=>{const db=env.authenticatedContext('admin',{admin:true}).firestore();await assertFails(updateDoc(doc(db,'tournaments/BXH-TEST'),{refereeSeatsV1:{version:1,revision:999}}));await assertFails(updateDoc(doc(db,'tournaments/BXH-TEST'),{refereeStationAssignments:{'1':['intruder']}}));});
-test('revoked staff cannot submit data; seated referee and host retain aggregate access',async()=>{await assertFails(updateDoc(doc(env.authenticatedContext('revoked',{admin:false}).firestore(),'tournaments/BXH-TEST'),{data:'tamper'}));await assertSucceeds(updateDoc(doc(env.authenticatedContext('seated',{admin:false}).firestore(),'tournaments/BXH-TEST'),{data:'score'}));await assertSucceeds(updateDoc(doc(env.authenticatedContext('host',{admin:false}).firestore(),'tournaments/BXH-TEST'),{data:'host'}));});
+test('all ordinary staff, including occupied seats, cannot directly submit JSON; host retains management access',async()=>{await assertFails(updateDoc(doc(env.authenticatedContext('revoked',{admin:false}).firestore(),'tournaments/BXH-TEST'),{data:'tamper'}));await assertFails(updateDoc(doc(env.authenticatedContext('seated',{admin:false}).firestore(),'tournaments/BXH-TEST'),{data:'score'}));await assertSucceeds(updateDoc(doc(env.authenticatedContext('host',{admin:false}).firestore(),'tournaments/BXH-TEST'),{data:'host'}));});
+
+test('seated staff cannot bypass the command service by overwriting public bracket JSON',async()=>{await assertFails(updateDoc(doc(env.authenticatedContext('seated',{admin:false}).firestore(),'publicTournaments/BXH-TEST'),{bracketView:'tampered score'}));await assertSucceeds(updateDoc(doc(env.authenticatedContext('host',{admin:false}).firestore(),'publicTournaments/BXH-TEST'),{bracketView:'host update'}));});

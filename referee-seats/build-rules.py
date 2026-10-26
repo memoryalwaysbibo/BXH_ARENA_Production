@@ -14,8 +14,9 @@ helper='''
       return !changed.hasAny(['refereeSeatsV1','refereeSeatNames'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
-          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room)
-          || (isSignedIn() && request.auth.uid in room.get('refereeStationUids', [])));
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
+        && (!enabled || privateDoc || !changed.hasAny(['bracketView'])
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room));
     }
 '''
 anchor='    // ==== 路徑輔助函式 ===='
@@ -30,6 +31,8 @@ assert s.count(old)==1;s=s.replace(old,old+"'refereeSeatsV1','refereeSeatNames',
 anchor='    match /tournaments/{code} {'
 assert s.count(anchor)==1;s=s.replace(anchor,anchor+'''
       match /refereeSeatOperations/{id} { allow read, write: if false; }
+      match /refereeScoreOperations/{id} { allow read, write: if false; }
+      match /refereeScoreAudit/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 ''')
 pathlib.Path(a.output).write_text(s)

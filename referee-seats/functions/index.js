@@ -12,3 +12,12 @@ exports.manageRefereeSeats=onCall({region:'asia-east1',timeoutSeconds:30,maxInst
   throw new HttpsError(code,error.seatCode||error.message);
  }
 });
+
+const {createScoringHandler}=require('./scoring-service.cjs');
+const score=createScoringHandler(getFirestore());
+exports.commitRefereeCommand=onCall({region:'asia-east1',timeoutSeconds:30,maxInstances:10,invoker:'public'},async request=>{
+ try{return await score(request);}catch(error){
+  const denied=['permission-denied','station-not-assigned','not-event-staff'];
+  throw new HttpsError(error.message==='unauthenticated'?'unauthenticated':denied.includes(error.message)?'permission-denied':'failed-precondition',error.seatCode||error.message);
+ }
+});

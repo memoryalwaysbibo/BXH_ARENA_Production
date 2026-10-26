@@ -3529,6 +3529,11 @@ if(testerSession){
       }catch(e){return {ok:false,reason:e.message||String(e)};}
     },
 
+    async commitRefereeCommand(data){
+      if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
+      try{const result=await fnx.httpsCallable(functionsHandle,"commitRefereeCommand")(data);return result.data;}
+      catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
+    },
     async manageRefereeSeats(data){
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}
@@ -3556,6 +3561,7 @@ if(testerSession){
           const snap=await tx.get(ref);
           if(!snap.exists()) throw new Error("not-found");
           const docData=snap.data();
+          if(docData.refereeSeatsV1?.version===1) throw new Error("seat-command-required");
           const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
           if(!actorUid || (expectedActorUid && expectedActorUid!==actorUid)) throw new Error("auth-mismatch");
           const actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid));
@@ -3680,6 +3686,7 @@ if(testerSession){
           const snap = await tx.get(ref);
           if(!snap.exists()) throw new Error("not-found");
           const docData = snap.data();
+          if(docData.refereeSeatsV1?.version===1) throw new Error("seat-command-required");
           if(auditMeta && auditMeta.station!=null){
             const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
             if(actorUid){
