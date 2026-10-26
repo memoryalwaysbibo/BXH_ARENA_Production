@@ -3,8 +3,21 @@
 (function(root){
   function grant(profile){
     const value=profile&&profile.partnerOrganizer;
-    const rawExpiry=value&&(value.expiresAtMs??value.expiresAt),expiry=rawExpiry==null?0:(Number(rawExpiry)||Date.parse(rawExpiry)||0);
-    return profile&&profile.active===true&&value&&typeof value==='object'&&value.status==='active'&&typeof value.organizationId==='string'&&value.organizationId.length>0&&(!expiry||expiry>Date.now())?value:null;
+    if(!profile||profile.active!==true||profile.role!=='player'||profile.isTestAccount===true
+      ||profile.deleted===true||['deleted','disabled','frozen'].includes(profile.accountStatus)
+      ||!value||typeof value!=='object'||value.status!=='active'
+      ||typeof value.organizationId!=='string'||!value.organizationId.trim())return null;
+    const timestamp=raw=>{
+      if(typeof raw!=='number'&&typeof raw!=='string')return NaN;
+      if(typeof raw==='string'&&!raw.trim())return NaN;
+      const numeric=Number(raw);
+      return Number.isFinite(numeric)?numeric:Date.parse(raw);
+    };
+    const rawStart=value.startsAtMs??value.startsAt;
+    const start=rawStart==null?(value.scope==='contract'?NaN:0):timestamp(rawStart);
+    const expiry=timestamp(value.expiresAtMs??value.expiresAt);
+    const now=Date.now();
+    return Number.isFinite(start)&&start>=0&&start<=now&&Number.isFinite(expiry)&&expiry>now&&expiry>start?value:null;
   }
   function safe(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function render(profile){
