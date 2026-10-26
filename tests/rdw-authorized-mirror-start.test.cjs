@@ -4,7 +4,7 @@ const makeSnapshot=(eventCode,drawRevision,rosterUids)=>buildRosterSnapshot({eve
 const test=require('node:test'),assert=require('node:assert/strict');
 const {createAuthorizedMirrorStart}=require('../scripts/lib/rdw-authorized-mirror-start.cjs');
 const code='BXH-ABC123';
-function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',changed=false,createSnapshot=false,badTiers=false}={}){
+function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',changed=false,createSnapshot=false,badTiers=false,noDispatch=false}={}){
  const players=[{id:'p1',uid:'u1'},{id:'p2',uid:'u2'}];
  const matches=[{id:'m',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}];
  const state={cloudCode:code,createdBy:creator,registrationRosterRevision:4,meta:{ladderMode:mode,eventAuthority:'official',stations:1},players,matches,drawnAt:100,startedAt:null,rosterLocked:false};
@@ -18,7 +18,7 @@ function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',chan
  const writes=[],reads=[],tierCalls=[];
  const tx={get:async ref=>{reads.push(ref.path);const val=docs[ref.path];return {exists:!!val,data:()=>val};},update:(ref,payload)=>writes.push({path:ref.path,payload}),create:(ref,payload)=>writes.push({path:ref.path,payload,created:true})};
  const db={doc:path=>({path}),runTransaction:fn=>fn(tx)};
- const start=createAuthorizedMirrorStart({db,clock:()=>200,verifyBracketInTransaction:async()=>bracketOk,buildServerDispatch:async()=>({matches,courtAssignments:{court1:{currentMatchId:'m',nextMatchId:null}}}),resolveVerifiedTiers:createSnapshot?async ({rosterUids})=>{tierCalls.push(rosterUids);return badTiers?[{uid:'u1',ok:true,tier:'national'}]:rosterUids.map(uid=>({ok:true,uid,tier:'d',computedAt:100,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}));}:undefined,enabled:true});
+ const start=createAuthorizedMirrorStart({db,clock:()=>200,verifyBracketInTransaction:async()=>bracketOk,...(noDispatch?{}:{buildServerDispatch:async()=>({matches,courtAssignments:{court1:{currentMatchId:'m',nextMatchId:null}}})}),resolveVerifiedTiers:createSnapshot?async ({rosterUids})=>{tierCalls.push(rosterUids);return badTiers?[{uid:'u1',ok:true,tier:'national'}]:rosterUids.map(uid=>({ok:true,uid,tier:'d',computedAt:100,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}));}:undefined,enabled:true});
  const args={eventCode:code,actorUid:'actor',expectedRosterRevision:changed?5:4,drawRevision:9};
  return {start,args,writes,reads,tierCalls};
 }
@@ -60,5 +60,13 @@ test('unauthorized client is denied before even reading Hunter tiers',async()=>{
  const f=fixture({createSnapshot:true,role:'player'});
  assert.equal((await f.start(f.args)).ok,false);
  assert.equal(f.tierCalls.length,0);
+ assert.equal(f.writes.length,0);
+});
+
+test('no server dispatch producer fails closed without changing tournament documents',async()=>{
+ const f=fixture({noDispatch:true});
+ const result=await f.start(f.args);
+ assert.equal(result.ok,false);
+ assert.equal(result.code,'server-dispatch-unavailable');
  assert.equal(f.writes.length,0);
 });
