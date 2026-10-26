@@ -17228,8 +17228,8 @@ function playerCenterHunterSummaryHtml(records,status){
   const levelReady=['ready','empty'].includes(status)&&growth.practiceXpReady!==false;
   const grade=license.grade;
   const persisted=window.BXHHunterLicenseV21?.verifiedSnapshot?.(hunterProfileCache?.permanentLicense);
-  const current=persisted?.current||grade;
-  const currentLabel=persisted?.current?window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label:grade.label;
+  const current=window.BXHHunterLicenseV21?.displayGrade?.(license,hunterProfileCache?.permanentLicense)||persisted?.current||grade;
+  const currentLabel=current.label||window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label;
   const ornament={pending:'',e:'◇',d:'◆',c:'❧',b:'✥',a:'✦',s:'✧',national:'龍'}[current.tier]||'';
   const gradeHtml='<span class="hunter-grade-badge grade-'+esc(current.tier)+'"><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span><span class="hunter-grade-label">'+esc(currentLabel)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span></span>';
   const official=hunterFilterByMode(playerCenterRecordPartition(records).official,'standard').slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b));
