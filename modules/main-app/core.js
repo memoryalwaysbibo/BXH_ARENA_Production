@@ -13642,13 +13642,19 @@ document.addEventListener('change',event=>{
   const save=status.closest('.account-partner-grant')?.querySelector('[data-action="save-partner-grant"]');
   if(save)save.disabled=status.value==='active';
 });
+function legacyPartnerRevocationPatch(user){
+  const grant=user?.partnerOrganizer;
+  if(user?.role!=='player'||user.active!==true||user.isTestAccount===true||grant?.status!=='active'
+    ||![undefined,null,'manual'].includes(grant.scope)||grant.orderCode||grant.contractOrderCode||user.partnerContractOrderCode)return null;
+  return {partnerOrganizer:{status:'revoked',organizationId:grant.organizationId,organizationName:grant.organizationName,plan:grant.plan,expiresAt:grant.expiresAt??null}};
+}
 function renderPartnerContractCard(user){
   const activePlans=(partnerPlansState.plans||[]).filter(plan=>plan.active&&plan.rankedMode);
   const draft=partnerOrderFor(user.uid);
   return `<div class="account-partner-grant">
     <div class="panel-title">合作主辦｜合作方案與合約</div>
     <p class="hint">選擇方案後建立合約草稿；玩家於站內信閱讀並簽名，再由最高管理員確認。合作代碼由成立時自動產生。</p>
-    ${user.partnerOrganizer?.status==='active'?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:''}
+    ${legacyPartnerRevocationPatch(user)?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:user.partnerOrganizer?.status==='active'?'<p class="hint">此帳號已有合作授權；合約授權須依合約流程處理，不可當作舊版手動授權撤銷。</p>':''}
     <div class="grid grid-2">
       <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.planCode)}｜${esc(plan.name)}${Number.isSafeInteger(plan.priceTwd)?'｜NT$ '+plan.priceTwd+'｜'+plan.includedEvents+' 場／每場上限 '+plan.maxParticipants+' 人':''}</option>`).join('')}</select></div>
       <div class="field"><label>合作方名稱</label><input class="partner-contract-name" data-uid="${esc(user.uid)}" maxlength="200" value="${esc(user.partnerOrganizer?.organizationName||'')}"></div>
@@ -13717,7 +13723,7 @@ function renderAccountManagementScreen(){
             <summary>
               <label><input class="account-batch-checkbox" type="checkbox" aria-label="選取此帳號" data-uid="${esc(user.uid)}" ${accountBatchContext().selected.has(user.uid)?'checked':''} ${accountBatchContext().busy?'disabled':''}></label><div class="account-user-identity"><div class="account-user-name">${esc(accountPrimaryName(user))}</div><div class="account-user-gameid">${gameId?`遊戲 ID｜${esc(gameId)}`:'尚未設定遊戲 ID'}</div></div>
               <div class="account-user-email">${esc(user.email||"未提供 Email")}</div>
-              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${user.partnerOrganizer?.status==="active"&&(user.partnerOrganizer.expiresAt==null||Number(user.partnerOrganizer.expiresAt)>Date.now())?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
+              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${window.BXHPartnerOrganizer?.hasGrant(user)===true?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
             </summary>
             ${directory.opened.has(user.uid)?`<div class="account-user-detail">
               <div class="account-detail-grid">
@@ -13736,7 +13742,7 @@ function renderAccountManagementScreen(){
                 <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
                 ${user.role==="player"?`<div class="account-partner-grant"><div class="field"><label>合作主辦權限</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>選擇合作主辦方案（待簽約）</option></select></div>
                   <div class="partner-config" ${user.partnerOrganizer?.status==="active"?"":"hidden"}>${renderPartnerContractCard(user)}</div>
-                  ${user.partnerOrganizer?.status==="active"?`<button type="button" class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" disabled>確認撤銷舊授權</button>`:""}
+                  ${legacyPartnerRevocationPatch(user)?`<button type="button" class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" disabled>確認撤銷舊授權</button>`:""}
                 </div>`:""}
               </div>
             </div>`:''}
@@ -21915,19 +21921,30 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     openModal({ type:"generic", title:"執行公開賽事資料清理", message:"即將檢查並重建 publicTournaments 集合中每份文件的公開安全欄位，移除舊版可能殘留的私人資料。不會刪除任何賽事，不會變更文件 ID 或賽事代碼。是否繼續？", confirmLabel:"確定執行", onConfirm:doCleanup });
     return;
   }
-  if(action==="save-partner-grant"){
+  if(action==="save-partner-grant"||action==="partner-revoke-legacy"){
     if(!isSuperAdmin()){showToast("只有最高管理員可設定合作主辦",true);return;}
     const uid=target.getAttribute("data-uid")||"";
     const user=(accountMgmtUsers||[]).find(item=>item.uid===uid);
     if(!user||user.role!=="player"){showToast("僅可授權玩家帳號",true);return;}
     const get=selector=>managedAccountControl(selector,uid);
-    const status=get(".partner-status")?.value;
+    const status=action==="partner-revoke-legacy"?'revoked':get(".partner-status")?.value;
     if(status==="active"){showToast("請先完成合作合約與付款確認；此處不能直接啟用授權",true);return;}
     if(status!=="revoked"||user.partnerOrganizer?.status!=="active"){
       showToast("目前沒有可撤銷的合作主辦授權",true);return;
     }
-    const grant={...user.partnerOrganizer,status:"revoked"};
-    openModal({type:"generic",title:"確認撤銷合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\\n撤銷後將停止合作主辦權限。",confirmLabel:"確認撤銷",onConfirm:()=>{(async()=>{await changeSingleManagedAccount(uid,{partnerOrganizer:grant},null);})();}});
+    const patch=legacyPartnerRevocationPatch(user);
+    if(!patch){showToast("此授權不是可撤銷的舊版手動授權，請核對合約流程",true);return;}
+    const actor=currentAuthUid(),snapshot=JSON.stringify(user.partnerOrganizer);
+    openModal({type:"generic",title:"確認撤銷合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\n主辦："+user.partnerOrganizer.organizationName+"\n撤銷後將停止這筆舊版手動授權。",confirmLabel:"確認撤銷",onConfirm:async()=>{
+      if(!isSuperAdmin()||actor!==currentAuthUid())return;
+      const current=(accountMgmtUsers||[]).find(item=>item.uid===uid);
+      if(!legacyPartnerRevocationPatch(current)||JSON.stringify(current.partnerOrganizer)!==snapshot){showToast("授權資料已變更，請重新載入後確認",true);return;}
+      try{
+        const pending=JSON.parse(sessionStorage.getItem('bxh-account-single:'+actor+':'+uid)||'null');
+        if(pending&&(JSON.stringify(pending.uids)!==JSON.stringify([uid])||JSON.stringify(pending.patch)!==JSON.stringify(patch))){showToast("尚有其他帳號變更未確認，請先確認上一筆結果",true);return;}
+      }catch(error){showToast("無法確認上一筆帳號變更，請重新載入後核對",true);return;}
+      await changeSingleManagedAccount(uid,patch,null);
+    }});
     return;
   }
   if(action==='partner-create-contract'){

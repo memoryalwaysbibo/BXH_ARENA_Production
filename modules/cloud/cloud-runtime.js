@@ -665,7 +665,11 @@
         if(testers!==null){stats.roles.tester=testers;if(disabled)stats.testers=testers-disabled.filter(u=>u.role==='tester'||u.isTestAccount===true).length;}
         if(players!==null&&playerTests!==null)stats.roles.player=players-playerTests;
         if(stats.roles.admin!=null&&stats.roles.super_admin!=null)stats.roles.management=stats.roles.admin+stats.roles.super_admin;
-        if(partners)stats.roles.partner_organizer=partners.filter(u=>u.partnerOrganizer?.expiresAt==null||Number(u.partnerOrganizer.expiresAt)>now).length;
+        if(partners){
+          const policy=typeof window!=='undefined'?window.BXHPartnerOrganizer:null;
+          if(typeof policy?.hasGrant==='function')stats.roles.partner_organizer=partners.filter(u=>policy.hasGrant(u)).length;
+          else{stats.roles.partner_organizer=null;if(!stats.errors.includes('partner-policy-unavailable'))stats.errors.push('partner-policy-unavailable');}
+        }
         stats.roles.all=stats.total;
         if(onProgress)onProgress({...stats,roles:{...stats.roles},errors:[...stats.errors]});
       };
