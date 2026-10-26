@@ -38,6 +38,11 @@ test('unmanaged rooms still accept explicit capacity changes',async()=>{
 test('zero and null waitlist/time representations do not falsely reject metadata edits',async()=>{
  const {h,state}=await finalized();state.meta.waitlistCapacity=0;state.meta.registrationCloseAt=null;assert.equal(await h.api.pushUpdate('LOCAL',state,{registrationSettings:true}),true);
 });
+test('a retained positive waitlist limit with a closed draw permits metadata edits',async()=>{
+ const {h,state}=await finalized();state.meta.waitlistCapacity=8;state.meta.name='Updated';
+ for(const [key,field]of [['tournaments/LOCAL','data'],['publicTournaments/LOCAL','bracketView']])Object.assign(h.docs.get(key),{waitlistCapacity:8,waitlistEnabled:false,[field]:JSON.stringify(state)});
+ assert.equal(await h.api.pushUpdate('LOCAL',state,{registrationSettings:true}),true);assert.equal(h.docs.get('tournaments/LOCAL').waitlistEnabled,false);assert.equal(JSON.parse(h.docs.get('tournaments/LOCAL').data).meta.name,'Updated');
+});
 function savingContext(extra={}){
  const calls={cached:[],writes:[],toasts:[],reset:0};
  const ctx=vm.createContext({window:{},state:{id:'room',cloudCode:'BXH-ROOM',meta:{registrationEnabled:false}},currentRole:'admin',communitySettingsWriteGate:null,

@@ -3179,6 +3179,10 @@ if(testerSession){
               if(data.meta?.registrationAutoFillEnabled===true)throw Object.assign(new Error('onsite-registration-settings-managed'),{code:'onsite-registration-settings-managed'});
               const normalize=(key,value)=>['registrationEnabled','waitlistEnabled'].includes(key)?!!value:(value||null);
               for(const [top,meta] of protectedSettings){
+                // This flag is derived from capacity by the legacy serializer,
+                // but finalized draws may retain a positive limit while closed.
+                // The actual editable capacity is compared independently.
+                if(top==='waitlistEnabled')continue;
                 const current=Object.prototype.hasOwnProperty.call(fencedDoc,top)?fencedDoc[top]:canonicalMeta[meta];
                 if(normalize(top,registrationFields[top])!==normalize(top,current))throw Object.assign(new Error('onsite-registration-settings-managed'),{code:'onsite-registration-settings-managed'});
               }
