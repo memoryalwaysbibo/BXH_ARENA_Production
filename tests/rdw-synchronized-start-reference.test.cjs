@@ -4,11 +4,12 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {writeSynchronizedStart}=require('../scripts/lib/rdw-synchronized-start-reference.cjs');
 const code='BXH-ABC123',eventRef={id:'private'},publicRef={id:'public'},snapshotRef={id:'snapshot'};
 function fixture({general=false,stale=false,missingSnapshot=false}={}){
- const p={cloudCode:code,registrationRosterRevision:4,meta:{ladderMode:general?'general':'ranked',eventAuthority:'official'},players:[{id:'p1',uid:'u1'},{id:'p2',uid:'u2'}],matches:[{id:'m1',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}],drawnAt:100,startedAt:null,rosterLocked:false};
+ const p={cloudCode:code,registrationRosterRevision:4,meta:{ladderMode:general?'general':'ranked',eventAuthority:'official',stations:1},players:[{id:'p1',uid:'u1'},{id:'p2',uid:'u2'}],matches:[{id:'m1',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}],drawnAt:100,startedAt:null,rosterLocked:false};
  const q={cloudCode:code,registrationRosterRevision:stale?3:4,players:[{id:'p1'},{id:'p2'}],matches:[{id:'m1',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}],drawnAt:100,startedAt:null};
+ const dispatchCandidate={matches:p.matches,courtAssignments:{court1:{currentMatchId:'m1',nextMatchId:null}}};
  const doc={private:{code,data:JSON.stringify(p)},public:{bracketView:JSON.stringify(q)},snapshot:makeSnapshot(code,9,['u1','u2'])};
  const reads=[],writes=[];const tx={get:async ref=>{reads.push(ref.id);return {exists:ref.id!=='snapshot'||!missingSnapshot,data:()=>doc[ref.id]};},update:(ref,payload)=>{writes.push({id:ref.id,payload});}};
- return {tx,reads,writes,args:{tx,eventRef,publicRef,snapshotRef,eventCode:code,expectedRosterRevision:4,drawRevision:9,serverTime:200,authorized:true,bracketVerified:true}};
+ return {tx,reads,writes,args:{tx,eventRef,publicRef,snapshotRef,eventCode:code,expectedRosterRevision:4,drawRevision:9,serverTime:200,authorized:true,bracketVerified:true,dispatchCandidate}};
 }
 test('atomic writer updates both mirror JSON records only after all reads',async()=>{
  const f=fixture(),result=await writeSynchronizedStart(f.args);
@@ -31,4 +32,12 @@ test('unverified caller and wrong snapshot draw revision cannot write',async()=>
  const f=fixture();assert.equal((await writeSynchronizedStart({...f.args,authorized:false})).committed,false);
  const g=fixture();assert.equal((await writeSynchronizedStart({...g.args,drawRevision:10})).committed,false);
  assert.equal(f.writes.length+g.writes.length,0);
+});
+
+test('server dispatch is mandatory and failures never produce writes',async()=>{
+ const f=fixture();const result=await writeSynchronizedStart({...f.args,dispatchCandidate:null});
+ assert.equal(result.committed,false);assert.equal(result.reason,'server-dispatch-unavailable');assert.equal(f.writes.length,0);
+ const g=fixture();const bad={matches:g.args.dispatchCandidate.matches,courtAssignments:{}};
+ const rejected=await writeSynchronizedStart({...g.args,dispatchCandidate:bad});
+ assert.equal(rejected.committed,false);assert.equal(rejected.reason,'missing-court');assert.equal(g.writes.length,0);
 });
