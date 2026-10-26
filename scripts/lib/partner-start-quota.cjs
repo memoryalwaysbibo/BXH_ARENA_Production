@@ -64,10 +64,10 @@ async function preparePartnerStartQuota(args){
  const [start,end]=period(contract),[grantStart,grantEnd]=period(grant);
  if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||start>serverTime||end<=serverTime||end<=start||grantStart!==start||grantEnd!==end)fail('partner-contract-period-invalid');
  if(!Number.isSafeInteger(contract.includedEvents)||contract.includedEvents<1||!Number.isSafeInteger(contract.usedEvents)||contract.usedEvents<0||contract.usedEvents>=contract.includedEvents)fail('partner-quota-unavailable');
- if(!p||room.eventAuthority!=='official'||p.meta?.ladderMode!=='ranked'||p.meta?.eventAuthority!=='official'||p.testMode===true||p.startedAt!=null||(p.createdBy&&p.createdBy!==id.organizerUid)||(p.cloudCode&&p.cloudCode!==id.eventCode)||p.registrationRosterRevision!==id.rosterRevision||!Array.isArray(p.players))fail('partner-ranked-roster-required');
+ if(!p||room.eventAuthority!=='official'||room.systemClosed===true||room.cancelled===true||p.cancelled===true||p.meta?.ladderMode!=='ranked'||p.meta?.eventAuthority!=='official'||p.testMode===true||p.startedAt!=null||(p.createdBy&&p.createdBy!==id.organizerUid)||(p.cloudCode&&p.cloudCode!==id.eventCode)||p.registrationRosterRevision!==id.rosterRevision||!Array.isArray(p.players))fail('partner-ranked-roster-required');
  const uids=p.players.map(player=>player?.uid);
  if(!Number.isSafeInteger(contract.minParticipants)||contract.minParticipants<2||!Number.isSafeInteger(contract.maxParticipants)||contract.maxParticipants<contract.minParticipants||uids.length<contract.minParticipants||uids.length>contract.maxParticipants||uids.some(uid=>!validUid(uid))||new Set(uids).size!==uids.length||p.players.some(player=>player.isTestAccount===true||player.isVirtual===true||player.synthetic===true))fail('partner-participant-limits');
- if(!/^[a-f0-9]{64}$/.test(snapshot?.snapshotDigest||''))fail('partner-snapshot-required');
+ if(!validateSealedSnapshot({snapshot,eventCode:id.eventCode,drawRevision:id.drawRevision,rosterUids:uids}).ok)fail('partner-snapshot-required');
  const receipt=Object.freeze({...id,source:'server',verified:true,debit:1,identityHash:hash(id),startedAt:serverTime,startedBy:args.actorUid,snapshotDigest:snapshot.snapshotDigest,rosterDigest:hash(uids),participants:uids.length,termsHash:contract.termsHash,termsVersion:contract.termsVersion,usedBefore:contract.usedEvents,usedAfter:contract.usedEvents+1});
  let applied=false;
  return {replayed:false,receipt,apply(transaction){

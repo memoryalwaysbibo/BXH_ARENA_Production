@@ -23,7 +23,7 @@ async function fixture(options={}){
  const room={code,createdBy:owner,createdByRole:'partner_organizer',eventAuthority:'official',partnerOrganizationCode:'org',partnerContractOrderCode:order,partnerQuotaPolicy:'start-v1',data:JSON.stringify(state),...options.room};
  const r={eventRef:db.doc('tournaments/'+code),publicRef:db.doc('publicTournaments/'+code),snapshotRef:db.doc('rdwSnapshots/'+code),receiptRef:db.doc('partnerEventDebits/'+code),contractRef:db.doc('partnerContracts/'+order),ownerRef:db.doc('users/'+owner)};
  const snapshot=buildRosterSnapshot({eventCode:code,drawRevision:7,rosterUids:players.map(p=>p.uid),verifiedTiers:tiers(players.map(p=>p.uid),now),capturedAt:now-1000});
- await Promise.all([r.eventRef.set(room),r.publicRef.set({bracketView:JSON.stringify({...state,createdBy:undefined}) .replace(/,"createdBy":undefined/g,'')}),...(!options.newSnapshot?[r.snapshotRef.set(snapshot)]:[]),...(!options.shared?[r.contractRef.set(contract),r.ownerRef.set({...profile,...options.profile})]:[])]);
+ await Promise.all([r.eventRef.set(room),r.publicRef.set({bracketView:JSON.stringify({...state,createdBy:undefined})}),...(!options.newSnapshot?[r.snapshotRef.set(snapshot)]:[]),...(!options.shared?[r.contractRef.set(contract),r.ownerRef.set({...profile,...options.profile})]:[])]);
  const args={...r,eventCode:code,expectedRosterRevision:4,drawRevision:7,serverTime:now,authorized:true,bracketVerified:true,quotaContext:{db,actorUid:owner},dispatchCandidate:{matches,courtAssignments:{court1:{currentMatchId:'m1',nextMatchId:null}}},...(options.newSnapshot?{snapshotCandidate:snapshot}:{})};
  const writer=(override={})=>db.runTransaction(tx=>writeSynchronizedStart({...args,...override,tx}));
  const start=createAuthorizedMirrorStart({db,clock:()=>now,enabled:true,
@@ -52,11 +52,19 @@ test('two rooms competing for the last slot can commit only one start',async()=>
  const a=await fixture(),b=await fixture({shared:a}),out=await Promise.all([a.start(a.request),b.start(b.request)]);assert.equal(out.filter(x=>x.ok).length,1);assert.equal((await read(a)).counter,1);assert.equal((await a.r.receiptRef.get()).exists!==(await b.r.receiptRef.get()).exists,true);
 });
 test('legacy counters, policy, participant limits and authority mismatch fail without writes',async()=>{
- const cases=[{missingCounter:true},{room:{partnerQuotaPolicy:'creation-v1'}},{contract:{quotaPolicy:'creation-v1'}},{contract:{minParticipants:3}},{contract:{maxParticipants:1}},{contract:{organizationCode:'other-org'}},{contract:{targetUid:'other-owner'}},{profile:{active:false}},{contract:{usedEvents:1}}];
+ const cases=[{missingCounter:true},{room:{partnerQuotaPolicy:'creation-v1'}},{room:{systemClosed:true}},{room:{cancelled:true}},{contract:{quotaPolicy:'creation-v1'}},{contract:{minParticipants:3}},{contract:{maxParticipants:1}},{contract:{organizationCode:'other-org'}},{contract:{targetUid:'other-owner'}},{profile:{active:false}},{profile:{accountStatus:'frozen'}},{contract:{usedEvents:1}}];
  for(const options of cases){const f=await fixture(options),out=await f.writer();assert.equal(out.committed,false,JSON.stringify(options));const v=await read(f);assert.equal(v.privateState.startedAt,null);assert.equal(v.receipt.exists,false);assert.equal(v.counter,options.missingCounter?undefined:options.contract?.usedEvents??0);}
 });
 test('future and expired contract periods refuse first starts',async()=>{
  for(const direction of [-1,1]){const f=await fixture();const start=f.now+(direction===1?86400000:-172800000),end=f.now+(direction===1?172800000:-86400000);await f.r.contractRef.update({startsAt:new Date(start).toISOString(),expiresAt:new Date(end).toISOString()});assert.equal((await f.writer()).committed,false);assert.equal((await read(f)).counter,0);}
+});
+test('contract start is inclusive and expiry is exclusive with matching owner grant dates',async()=>{
+ for(const [startOffset,endOffset,allowed] of [[0,86400000,true],[1,86400000,false],[-86400000,0,false]]){
+  const f=await fixture(),start=f.now+startOffset,end=f.now+endOffset;
+  await f.r.contractRef.update({startsAt:new Date(start).toISOString(),expiresAt:new Date(end).toISOString()});
+  await f.r.ownerRef.update({'partnerOrganizer.startsAtMs':start,'partnerOrganizer.expiresAtMs':end});
+  assert.equal((await f.writer()).committed,allowed);assert.equal((await read(f)).counter,allowed?1:0);
+ }
 });
 test('lost response replays the original success after renewal without needing fresh tiers or debit',async()=>{
  const f=await fixture();assert.equal((await f.start(f.request)).ok,true);
