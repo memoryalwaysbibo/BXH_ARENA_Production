@@ -16440,6 +16440,11 @@ async function resolveHunterOpponentIdentities(records){
   const backend=typeof window.engagementService?.hunterOpponentIdentity==="function";
   if(hunterOpponentIdentityLoading || (!backend&&!window.engagementService?.playerCard)) return;
   const rows=Array.isArray(records)?records:[];
+  // UI failures must not cancel the read-only identity work or strand its lock.
+  const redraw=()=>{
+    try{if(typeof renderPreservingScroll==='function')renderPreservingScroll();else render();}
+    catch(error){console.warn('[Hunter Identity] progress render failed');}
+  };
   const pending=new Map();
   rows.forEach(record=>{
     const direct=String(record&&record.opponent&&record.opponent.playerId||"").trim();
@@ -16452,15 +16457,16 @@ async function resolveHunterOpponentIdentities(records){
     if(!hunterOpponentIdentityCache.has(ref)) pending.set(ref,record);
     else hunterApplyOpponentIdentity(rows,ref,hunterOpponentIdentityCache.get(ref));
   });
-  if(!pending.size) return;
+  if(!pending.size){if(rows.length)redraw();return;}
   const generation=++hunterOpponentIdentityGeneration;
   const owner=(typeof currentAuthUid==="function"?currentAuthUid():"")||"";
   hunterOpponentIdentityLoading=true;
   pending.forEach((record,ref)=>hunterApplyOpponentIdentity(rows,ref,{scope:"loading",playerId:null,source:"event-card"}));
-  if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
   const entries=Array.from(pending.entries());
   try{
+    redraw();
     for(let i=0;i<entries.length;i+=4){
+      if(generation!==hunterOpponentIdentityGeneration||(owner&&currentAuthUid()!==owner))break;
       const batch=entries.slice(i,i+4);
       await Promise.all(batch.map(async ([ref,record])=>{
         let value={scope:"unresolved",playerId:null,source:"event-card-error"};
@@ -16492,11 +16498,12 @@ async function resolveHunterOpponentIdentities(records){
         if(value.scope!=="unresolved") hunterOpponentIdentityCache.set(ref,value);
         hunterApplyOpponentIdentity(rows,ref,value);
       }));
+      if(generation===hunterOpponentIdentityGeneration&&(!owner||currentAuthUid()===owner))redraw();
     }
   }finally{
     if(generation===hunterOpponentIdentityGeneration){
       hunterOpponentIdentityLoading=false;
-      if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
+      if(!owner||currentAuthUid()===owner)redraw();
     }
   }
 }

@@ -109,3 +109,35 @@ test('malformed backend stable identities are retryable failures rather than cac
   await c.resolveHunterOpponentIdentities(rows);assert.equal(c.hunterBuildH2H(rows).unresolved,1);
   assert.equal(c.hunterOpponentIdentityCache.size,0);
 });
+test('verified opponents appear after each batch while later identity requests are still pending',async()=>{
+ const c=setup(),rows=Array.from({length:8},(_,i)=>record({matchId:'m'+i,opponent:{localPlayerId:'peer'+i}}));
+ const waiting=[],progress=[];
+ c.render=()=>progress.push(c.hunterBuildH2H(rows).list.length);
+ c.window.engagementService={hunterOpponentIdentity:()=>new Promise(resolve=>waiting.push(resolve))};
+ const task=c.resolveHunterOpponentIdentities(rows);assert.equal(waiting.length,4);
+ waiting.slice(0,4).forEach((finish,i)=>finish({ok:true,scope:'cross-event',opponentKey:'H2H_'+String(i).repeat(64)}));
+ for(let i=0;i<8;i++)await Promise.resolve();
+ assert.equal(waiting.length,8);assert(progress.includes(4),'first verified batch must be rendered before the next batch finishes');
+ waiting.slice(4).forEach((finish,i)=>finish({ok:true,scope:'cross-event',opponentKey:'H2H_'+String(i+4).repeat(64)}));
+ await task;assert.equal(progress.at(-1),8);assert.equal(c.hunterOpponentIdentityLoading,false);
+});
+test('a render failure cannot suppress identity calls or permanently lock loading',async()=>{
+ const c=setup(),rows=[record()];let calls=0;
+ c.render=()=>{throw Error('render-fixture-failure');};c.console={warn:()=>{}};
+ c.window.engagementService={hunterOpponentIdentity:async()=>{calls++;return {ok:true,scope:'cross-event',opponentKey:'H2H_'+'a'.repeat(64)};}};
+ await c.resolveHunterOpponentIdentities(rows);
+ assert.equal(calls,1);assert.equal(c.hunterBuildH2H(rows).list.length,1);assert.equal(c.hunterOpponentIdentityLoading,false);
+});
+test('cache-only resolution redraws new record objects instead of leaving the old zero count visible',async()=>{
+ const c=setup(),rows=[record()];let renders=0;
+ c.render=()=>renders++;c.hunterOpponentIdentityCache.set(c.hunterOpponentIdentityRef(rows[0]),{scope:'cross-event',playerId:'H2H_'+'a'.repeat(64),source:'verified-match'});
+ c.window.engagementService={hunterOpponentIdentity:()=>{throw Error('must use cache');}};
+ await c.resolveHunterOpponentIdentities(rows);assert.equal(renders,1);assert.equal(c.hunterBuildH2H(rows).list.length,1);
+});
+test('account changes stop dispatching later batches from the previous account',async()=>{
+ const c=setup(),rows=Array.from({length:8},(_,i)=>record({matchId:'m'+i,opponent:{localPlayerId:'peer'+i}}));const waiting=[];
+ let calls=0;c.window.engagementService={hunterOpponentIdentity:()=>++calls<=4?new Promise(resolve=>waiting.push(resolve)):Promise.resolve({ok:false})};
+ const task=c.resolveHunterOpponentIdentities(rows);assert.equal(waiting.length,4);c.currentAuthUid=()=> 'different';
+ waiting.forEach(finish=>finish({ok:true,scope:'cross-event',opponentKey:'H2H_'+'a'.repeat(64)}));
+ await task;assert.equal(calls,4);assert.equal(c.hunterOpponentIdentityCache.size,0);
+});
