@@ -179,7 +179,8 @@ function roomStatusDescriptor(phase){
   if(p==="settling")return {key:"settling",label:"結算中",dot:"orange"};
   if(p==="live")return {key:"live",label:"比賽中",dot:"yellow"};
   if(p==="prestart")return {key:"prestart",label:"等待開始",dot:"gray"};
-  return {key:"registration",label:"報名中",dot:"green"};
+  // A waiting tournament may have closed or not-yet-open registration.
+  return {key:"registration",label:"尚未開始",dot:"green"};
 }
 function fastLobbyHash(value){
   const str=String(value==null?"":value);let h=2166136261;
