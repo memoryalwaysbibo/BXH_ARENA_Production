@@ -23907,6 +23907,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="start-tournament"){
+    // Team RDW must not bypass the server-sealed ranked start route.
+    if(state.meta?.ladderMode==="ranked"&&state.meta?.battleMode==="team"){
+      showToast("團體積分賽 RDW 尚未通過開賽驗證，未開始賽事",true);
+      return;
+    }
     if(state.meta.battleMode==="team"){
       (async()=>{
         if(state.startedAt||!state.bracketSize)return;
@@ -23987,6 +23992,30 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               return;
             }
             if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
+            // RDW applies ONLY to ranked events. Never fall back to the legacy
+            // client-side startedAt/saveState path when server start is missing.
+            if(state.meta?.ladderMode==="ranked"){
+              const bridge=window.BXHRdwStartBridge;
+              if(typeof bridge?.start!=="function"){
+                showToast("積分賽 RDW 後端開賽尚未就緒，未開始賽事",true);
+                return;
+              }
+              try{
+                const result=await bridge.start({
+                  eventCode:state.cloudCode,
+                  expectedRosterRevision:state.registrationRosterRevision
+                });
+                if(result?.ok!==true){
+                  showToast("RDW 後端未確認開賽，請保持賽事未開始狀態",true);
+                  return;
+                }
+                showToast("RDW 後端已確認開賽，請重新載入賽事以取得最新派場");
+              }catch(error){
+                console.warn("[rdw-ranked-start]",error);
+                showToast("RDW 後端開賽失敗，未執行本機開賽",true);
+              }
+              return;
+            }
             const beforeStart=JSON.parse(JSON.stringify(state));
             state.startedAt=Date.now();
             rebuildCourtAssignments();

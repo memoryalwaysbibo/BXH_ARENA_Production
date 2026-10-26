@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
+            # Preserve the merge-base graph; --depth=1 can shallow the PR base.\n            git fetch origin "${{ github.base_ref }}"
             files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
             override=auto
           elif [[ "${{ github.event_name }}" == "push" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
@@ -189,6 +189,108 @@ jobs:
           node --test tests/double-elimination-core.test.cjs
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
+      - name: Verify RDW shadow weighting (isolated, no production scoring)
+        run: |
+          node --check modules/main-app/rdw-shadow-v1.js
+          node --test tests/rdw-shadow-v1.test.cjs
+          node --test tests/rdw-dual-real-account-policy.test.cjs
+          node --check scripts/lib/rdw-prematch-tier-snapshot.cjs
+          node --test tests/rdw-prematch-tier-snapshot.test.cjs
+          node --check scripts/lib/rdw-tier-transaction-adapter.cjs
+          node --test tests/rdw-tier-transaction-adapter.test.cjs
+          node --check scripts/lib/rdw-shadow-comparison.cjs
+          node --test tests/rdw-shadow-comparison.test.cjs
+          node --check scripts/lib/rdw-production-source-gate.cjs
+          node --test tests/rdw-production-source-gate.test.cjs
+          node --check scripts/lib/rdw-pass-gate.cjs
+          node --test tests/rdw-pass-gate.test.cjs
+          node --check scripts/lib/rdw-start-gate.cjs
+          node --test tests/rdw-start-gate.test.cjs
+          node --check scripts/lib/rdw-pass-audit.cjs
+          node --test tests/rdw-pass-audit.test.cjs
+          node --check scripts/lib/rdw-start-orchestrator.cjs
+          node --test tests/rdw-start-orchestrator.test.cjs
+          node --check scripts/lib/rdw-atomic-start-reference.cjs
+          node --test tests/rdw-atomic-start-reference.test.cjs
+          node --check scripts/lib/rdw-start-service-preflight.cjs
+          node --test tests/rdw-start-service-preflight.test.cjs
+          node --check rdw-start/server-entry.cjs
+          node --test tests/rdw-cloud-function-registration.test.cjs
+          node --check scripts/lib/rdw-roster-inspection.cjs
+          node --test tests/rdw-roster-inspection.test.cjs
+          node --check scripts/lib/rdw-canonical-identity.cjs
+          node --test tests/rdw-canonical-identity.test.cjs
+          node --check scripts/lib/rdw-current-tier-source.cjs
+          node --test tests/rdw-current-tier-source.test.cjs
+          node --check scripts/lib/rdw-hunter-readonly-bridge.cjs
+          node --test tests/rdw-hunter-readonly-bridge.test.cjs
+          node --check scripts/lib/rdw-hunter-bundle-loader.cjs
+          node --test tests/rdw-hunter-bundle-loader.test.cjs
+          node --check scripts/lib/rdw-verified-tier-resolver.cjs
+          node --test tests/rdw-verified-tier-resolver.test.cjs
+          node --test tests/rdw-production-hunter-reader-integration.test.cjs
+          node --check tests/rdw-hunter-official-match-fixture.test.cjs
+          node --test tests/rdw-hunter-official-match-fixture.test.cjs
+          node --check tests/rdw-hunter-rank-progression-real-reader.test.cjs
+          node --test tests/rdw-hunter-rank-progression-real-reader.test.cjs
+          node --check scripts/lib/rdw-roster-tier-snapshot.cjs
+          node --test tests/rdw-roster-tier-snapshot.test.cjs
+          node --check scripts/lib/rdw-atomic-roster-start.cjs
+          node --test tests/rdw-atomic-roster-start.test.cjs
+          node --check scripts/lib/rdw-trusted-start-coordinator.cjs
+          node --test tests/rdw-trusted-start-coordinator.test.cjs
+          node --check scripts/lib/rdw-production-event-guard.cjs
+          node --test tests/rdw-production-event-guard.test.cjs
+          node --check scripts/lib/rdw-production-start-readiness.cjs
+          node --test tests/rdw-production-start-readiness.test.cjs
+          node --check scripts/lib/rdw-event-type-policy.cjs
+          node --test tests/rdw-event-type-policy.test.cjs
+          node --check scripts/lib/rdw-ranked-authority-gate.cjs
+          node --test tests/rdw-ranked-authority-gate.test.cjs
+          node --check scripts/lib/rdw-ranked-authority-resolver.cjs
+          node --test tests/rdw-ranked-authority-resolver.test.cjs
+          node --check scripts/lib/rdw-admin-diagnostic.cjs
+          node --test tests/rdw-admin-diagnostic.test.cjs
+          node --check scripts/lib/rdw-admin-diagnostic-service.cjs
+          node --test tests/rdw-admin-diagnostic-service.test.cjs
+          node --check scripts/lib/rdw-private-public-mirror-gate.cjs
+          node --test tests/rdw-private-public-mirror-gate.test.cjs
+          node --check scripts/lib/rdw-synchronized-start-reference.cjs
+          node --test tests/rdw-synchronized-start-reference.test.cjs
+          node --check scripts/lib/rdw-authorized-mirror-start.cjs
+          node --test tests/rdw-authorized-mirror-start.test.cjs
+          node --check scripts/lib/rdw-hunter-start-wiring.cjs
+          node --test tests/rdw-hunter-start-wiring.test.cjs
+          node --check rdw-start/server-entry.cjs
+          node --test tests/rdw-start-callable-entry.test.cjs
+          node --check scripts/lib/rdw-sealed-snapshot-verifier.cjs
+          node --test tests/rdw-sealed-snapshot-verifier.test.cjs
+          node --check scripts/lib/rdw-start-write-fence.cjs
+          node --test tests/rdw-start-write-fence.test.cjs
+          node --test tests/rdw-cloud-write-fence-wiring.test.cjs
+          node --test tests/rdw-main-activity-start-routing.test.cjs
+          node --check scripts/lib/rdw-diagnostic-admin-authorizer.cjs
+          node --test tests/rdw-diagnostic-admin-authorizer.test.cjs
+          node --check scripts/lib/rdw-server-diagnostic-wiring.cjs
+          node --test tests/rdw-server-diagnostic-wiring.test.cjs
+          node --check rdw-start/diagnostic-entry.cjs
+          node --test tests/rdw-diagnostic-callable-entry.test.cjs
+          node --check scripts/lib/rdw-verified-hunter-diagnostic.cjs
+          node --test tests/rdw-verified-hunter-diagnostic.test.cjs
+          node --check modules/main-app/rdw-diagnostic-panel.js
+          node --test tests/rdw-diagnostic-panel.test.cjs
+          node --check modules/main-app/rdw-diagnostic-callable-adapter.js
+          node --test tests/rdw-diagnostic-callable-adapter.test.cjs
+          node --check scripts/lib/rdw-canonical-room-reader.cjs
+          node --test tests/rdw-canonical-room-reader.test.cjs
+          node --check scripts/lib/rdw-participant-attestation.cjs
+          node --test tests/rdw-participant-attestation.test.cjs
+          node --check scripts/rdw-live-room-readonly.cjs
+          node --test tests/rdw-live-room-readonly.test.cjs
+          node --check tests/rdw-hunter-multi-event-history.test.cjs
+          node --test tests/rdw-hunter-multi-event-history.test.cjs
+          node --check tests/rdw-hunter-tier-e-progression.test.cjs
+          node --test tests/rdw-hunter-tier-e-progression.test.cjs
       - name: Verify personal history and Hunter License 2.1
         run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs
       - name: Verify public catalog evidence, projection, UI contract and artifact boundary
@@ -405,3 +507,22 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  rdw_firestore_emulator:
+    name: RDW Firestore Emulator atomicity
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Firebase Emulator tooling
+        run: npm install --no-package-lock --ignore-scripts
+      - name: Verify RDW atomicity against Firestore Emulator
+        run: npx firebase emulators:exec --only firestore --project demo-bxh-arena-e2e --config tests/e2e/firebase.json "node --test tests/rdw-firestore-emulator.test.cjs tests/rdw-atomic-roster-firestore-emulator.test.cjs tests/rdw-diagnostic-firestore-emulator.test.cjs tests/rdw-synchronized-start-firestore-emulator.test.cjs"
