@@ -23183,20 +23183,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const enabled=target.getAttribute("data-value")==="true";
     registrationFormDraft.registrationEnabled=enabled;
     if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
-
-    const wasEnabled=!!state.meta.registrationEnabled;
-    state.meta.registrationEnabled=enabled;
-    if(wasEnabled&&!enabled){
-      state.meta.publishedAt=null;
-      state.meta.registrationStatus=null;
-      state.meta.checkinRequired=false;
-      if(settingsFormDraft) settingsFormDraft.checkinRequired=false;
-    }
-    registrationFormDraftDirty=enabled;
-
-    saveState().then(ok=>{
-      if(ok===false) showToast("報名方式已保存本機，等待雲端同步",true);
-    });
+    // Switching modes only edits the draft. A half-completed registration
+    // configuration must never be sent ahead of the explicit save/publish.
+    registrationFormDraftDirty=true;
     render();
     return;
   }
@@ -23556,7 +23545,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     // Only NOW does anything touch state.meta / saveState() / Firebase.
     const wasEnabled = state.meta.registrationEnabled;
     state.meta.registrationEnabled = d.registrationEnabled;
-    if(wasEnabled && !d.registrationEnabled){ state.meta.publishedAt = null; }
+    if(wasEnabled && !d.registrationEnabled){
+      state.meta.publishedAt = null;
+      state.meta.registrationStatus = null;
+      state.meta.checkinRequired = false;
+      if(settingsFormDraft)settingsFormDraft.checkinRequired=false;
+    }
     state.meta.registrationOpenAt = d.registrationOpenAt;
     state.meta.registrationCloseAt = d.registrationCloseAt;
     state.meta.cancellationDeadline = d.registrationCloseAt ? (d.registrationCloseAt + 3 * 60 * 60 * 1000) : null;
@@ -23772,7 +23766,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
       const wasEnabled=!!state.meta.registrationEnabled;
       state.meta.registrationEnabled=!!rd.registrationEnabled;
-      if(wasEnabled && !rd.registrationEnabled) state.meta.publishedAt=null;
+      if(wasEnabled && !rd.registrationEnabled){
+        state.meta.publishedAt=null;
+        state.meta.registrationStatus=null;
+        state.meta.checkinRequired=false;
+      }
       state.meta.registrationOpenAt=rd.registrationOpenAt;
       state.meta.registrationCloseAt=rd.registrationCloseAt;
       state.meta.cancellationDeadline=rd.registrationCloseAt ? (rd.registrationCloseAt+3*60*60*1000) : null;
