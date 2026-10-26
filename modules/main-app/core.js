@@ -3327,6 +3327,8 @@ async function ensureCloudRoomForTournament(){
 
 function cloudCreateRoomErrorMessage(prefix="建立失敗"){
   const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
+  const partnerHint=window.BXHPartnerQuota?.creationErrorMessage?.(code,partnerOrganizerGrant());
+  if(partnerHint)return prefix+"："+partnerHint;
   if(code==="partner-room-quota-exhausted" || (code==="permission-denied"&&isPartnerOrganizerMode()&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerOrganizerGrant()?.orderCode)===0))return prefix+"：合作方案開房次數已用完";
   if(code==="permission-denied") return prefix+"：Firestore 權限被拒絕，請重新整理後再試";
   if(code==="unauthenticated") return prefix+"：登入狀態已失效，請重新登入";
@@ -3813,7 +3815,7 @@ let playerLookupQuery = "";
 let playerCenterContext = null; // { name, records:[...] } — set for the name-search (no-login) flow
 let authFormError = "";
 let accountMgmtUsers = null;
-let partnerPlansState={plans:null,loading:false,error:''};
+let partnerPlansState={plans:null,quotaPolicies:['creation-v1'],loading:false,error:''};
 const partnerDraftOrders=new Map();
 function partnerOrderFor(uid){
   if(partnerDraftOrders.has(uid))return partnerDraftOrders.get(uid);
@@ -3833,6 +3835,7 @@ async function loadPartnerPlans(force=false){
     const result=await window.engagementService.listPartnerPlans({});
     if(actor!==currentAuthUid())return;
     partnerPlansState.plans=Array.isArray(result.plans)?result.plans:[];
+    partnerPlansState.quotaPolicies=['creation-v1',...(result.quotaPolicies?.includes('start-v1')?['start-v1']:[])];
   }catch(error){if(actor===currentAuthUid()){partnerPlansState.plans=[];partnerPlansState.error=String(error.message||error);}}
   finally{partnerPlansState.loading=false;if(actor===currentAuthUid())render();}
 }
@@ -13810,12 +13813,14 @@ function legacyPartnerRevocationPatch(user){
 function renderPartnerContractCard(user){
   const activePlans=(partnerPlansState.plans||[]).filter(plan=>plan.active&&plan.rankedMode);
   const draft=partnerOrderFor(user.uid);
+  const startPolicyAvailable=partnerPlansState.quotaPolicies?.includes('start-v1')===true;
   return `<div class="account-partner-grant">
     <div class="panel-title">合作主辦｜合作方案與合約</div>
     <p class="hint">選擇方案後建立合約草稿；玩家於站內信閱讀並簽名，再由最高管理員確認。合作代碼由成立時自動產生。</p>
     ${legacyPartnerRevocationPatch(user)?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:user.partnerOrganizer?.status==='active'?'<p class="hint">此帳號已有合作授權；合約授權須依合約流程處理，不可當作舊版手動授權撤銷。</p>':''}
     <div class="grid grid-2">
       <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.planCode)}｜${esc(plan.name)}${Number.isSafeInteger(plan.priceTwd)?'｜NT$ '+plan.priceTwd+'｜'+plan.includedEvents+' 場／每場上限 '+plan.maxParticipants+' 人':''}</option>`).join('')}</select></div>
+      <div class="field"><label>扣場方式</label><select class="partner-contract-quota-policy" data-uid="${esc(user.uid)}">${startPolicyAvailable?'<option value="start-v1" selected>正式開賽時扣場</option>':''}<option value="creation-v1">建房時扣場</option></select></div>
       <div class="field"><label>合作方名稱</label><input class="partner-contract-name" data-uid="${esc(user.uid)}" maxlength="200" value="${esc(user.partnerOrganizer?.organizationName||'')}"></div>
       <div class="field"><label>費用 NT$（內建方案依固定價格自動帶入）</label><input class="partner-contract-amount" data-uid="${esc(user.uid)}" type="number" min="0" step="1" placeholder="請填寫合約金額"></div>
       <div class="field"><label>生效日期</label><input class="partner-contract-start" data-uid="${esc(user.uid)}" type="date"></div>
@@ -22155,6 +22160,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!user||user.role!=='player'){showToast('請選擇既有玩家',true);return;}
     const get=selector=>managedAccountControl(selector,uid);
     const planCode=get('.partner-contract-plan')?.value||'';
+    const quotaPolicy=get('.partner-contract-quota-policy')?.value||'creation-v1';
+    if(quotaPolicy!=='creation-v1'&&(quotaPolicy!=='start-v1'||!partnerPlansState.quotaPolicies?.includes('start-v1'))){showToast('扣場方式尚未開放，請更新方案後重試',true);return;}
     const organizationName=(get('.partner-contract-name')?.value||'').trim();
     const selectedPlan=(partnerPlansState.plans||[]).find(plan=>plan.planCode===planCode&&plan.active);
     const amountRaw=Number.isSafeInteger(selectedPlan?.priceTwd)?String(selectedPlan.priceTwd):(get('.partner-contract-amount')?.value||'');
@@ -22166,7 +22173,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       showToast('請選擇方案並填妥合作方、金額、日期及完整條款',true);return;
     }
     const fixedSummary=Number.isSafeInteger(selectedPlan.priceTwd)?'\n方案 '+selectedPlan.planCode+'：'+selectedPlan.includedEvents+' 場；每場 '+selectedPlan.minParticipants+'–'+selectedPlan.maxParticipants+' 人；總價 NT$ '+selectedPlan.priceTwd+'。':'';
-    const data={targetUid:uid,planCode,organizationName,amountTwd,
+    const data={targetUid:uid,planCode,organizationName,amountTwd,...(quotaPolicy==='start-v1'?{quotaPolicy}:{}),
       startsAt:starts+'T00:00:00+08:00',expiresAt:expires+'T23:59:59+08:00',terms:terms+fixedSummary};
     if(Date.parse(data.expiresAt)<=Date.parse(data.startsAt)){showToast('到期日期必須晚於生效日期',true);return;}
     const key='bxh-partner-draft:'+currentAuthUid()+':'+uid;
@@ -22182,7 +22189,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       sessionStorage.setItem('bxh-partner-order:'+currentAuthUid()+':'+uid,JSON.stringify({orderCode:result.orderCode,status:'draft'}));
       sessionStorage.removeItem(key);
       showToast('合約草稿已建立：'+result.orderCode);
-    }catch(error){showToast('建立草稿失敗：'+String(error.message||error),true);}
+    }catch(error){const message=String(error.message||error);showToast('建立草稿失敗：'+(message.includes('partner-start-policy-not-ready')?'扣場方式尚未開放，請更新方案後重試':message),true);}
     finally{target.disabled=false;render();}})();return;
   }
   if(action==='partner-refresh-contract'||action==='partner-activate-contract'){

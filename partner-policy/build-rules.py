@@ -17,6 +17,7 @@ helpers='''
             && myProfile().partnerOrganizer.get('quotaPolicy','creation-v1') == 'start-v1'
             && myProfile().partnerOrganizer.get('quotaPolicyVersion',0) == 1
             && contract.get('quotaPolicyVersion',0) == 1
+            && d.get('ladderMode','') == 'ranked'
             && d.get('partnerQuotaPolicy','') == 'start-v1'
             && d.get('partnerStartState','') == 'draft'
             && contract.status == 'active' && contract.targetUid == request.auth.uid

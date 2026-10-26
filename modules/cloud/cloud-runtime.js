@@ -2620,7 +2620,10 @@
           if(typeof window.BXHPartnerQuota?.creationPlan!=="function"||typeof window.engagementService?.getPartnerContract!=="function")throw Object.assign(new Error("partner-quota-policy-unavailable"),{code:"partner-quota-policy-unavailable"});
           const contract=await window.engagementService.getPartnerContract({orderCode:partnerGrant.orderCode});
           partnerQuotaPlan=window.BXHPartnerQuota.creationPlan({grant:partnerGrant,contract,uid:creatorUid});
-          if(partnerQuotaPlan.policy==="start-v1")window.BXHPartnerQuota.restoreState(data,partnerQuotaPlan.privateFields);
+          if(partnerQuotaPlan.policy==="start-v1"){
+            if(data.meta?.ladderMode!=="ranked"||data.testMode===true)throw Object.assign(new Error("partner-ranked-room-required"),{code:"partner-ranked-room-required"});
+            window.BXHPartnerQuota.restoreState(data,partnerQuotaPlan.privateFields);
+          }
         }
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&creatorUid);
         if(testerSession){

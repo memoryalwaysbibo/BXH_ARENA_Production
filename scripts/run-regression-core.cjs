@@ -32,7 +32,7 @@ const suites = {
     { name: 'idle court dispatch', args: ['tests/idle-court-dispatch.test.cjs'] },
     { name: 'safe court expansion, reserved queues and transaction retry fences', args: ['--test', 'tests/court-expansion.test.cjs', 'tests/court-retirement.test.cjs'] },
     { name: 'event staff permission boundary', args: ['--test', 'tests/event-staff-permission.test.cjs'] },
-    { name: 'partner authorization identity, time and revocation boundaries', args: ['--test', 'tests/partner-organizer-ui.test.cjs', 'tests/partner-legacy-revocation.test.cjs', 'tests/partner-workspace-access.test.cjs', 'tests/partner-contract-review-ui.test.cjs'] },
+    { name: 'partner authorization identity, time and revocation boundaries', args: ['--test', 'tests/partner-organizer-ui.test.cjs', 'tests/partner-legacy-revocation.test.cjs', 'tests/partner-workspace-access.test.cjs', 'tests/partner-contract-review-ui.test.cjs', 'tests/partner-quota-policy.test.cjs'] },
     { name: 'staff assignment real-name display', args: ['--test', 'tests/staff-assignment-realname.test.cjs'] },
     { name: 'assignment commit / confirmation separation', args: ['--test', 'tests/assignment-cloud-confirmation.test.cjs'] },
     { name: 'offline queue render dedupe', args: ['tests/offline-queue-render-dedupe.test.cjs'] },
