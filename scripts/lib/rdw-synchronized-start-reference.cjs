@@ -6,8 +6,9 @@
 // bracket signature, and original client saveState transition are fully replicated.
 const {compareMirrors}=require('./rdw-private-public-mirror-gate.cjs');
 const {validateSealedSnapshot}=require('./rdw-sealed-snapshot-verifier.cjs');
+const {verifyStartDispatch}=require('./rdw-start-dispatch-gate.cjs');
 function parse(v){if(typeof v==='string'){try{return JSON.parse(v);}catch{return null;}}return v&&typeof v==='object'?v:null;}
-async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCode,expectedRosterRevision,drawRevision,serverTime,authorized=false,bracketVerified=false,snapshotCandidate=null}={}){
+async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCode,expectedRosterRevision,drawRevision,serverTime,authorized=false,bracketVerified=false,snapshotCandidate=null,dispatchCandidate=null}={}){
  if(!tx||typeof tx.get!=='function'||typeof tx.update!=='function'||!eventRef||!publicRef||!snapshotRef)throw Error('trusted-transaction-required');
  if(authorized!==true||bracketVerified!==true||!Number.isSafeInteger(drawRevision)||drawRevision<0||!Number.isSafeInteger(serverTime)||serverTime<=0)return {committed:false,reason:'trusted-gate-required'};
  const [privateSnap,publicSnap,snapshotSnap]=await Promise.all([tx.get(eventRef),tx.get(publicRef),tx.get(snapshotRef)]);
@@ -29,9 +30,16 @@ async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCo
   if(!candidateProof.ok||candidateProof.snapshotDigest!==sealed.snapshotDigest)
    return {committed:false,reason:'snapshot-candidate-mismatch'};
  }
+ // A start without server-computed dispatch must never become a persisted start.
+ // Candidate must be created by an audited server dispatcher, never by the caller.
+ if(!dispatchCandidate||typeof dispatchCandidate!=='object')return {committed:false,reason:'server-dispatch-unavailable'};
+ const dispatchProof=verifyStartDispatch({before:p,after:dispatchCandidate,stationCount:p.meta?.stations});
+ if(!dispatchProof.ok)return {committed:false,reason:dispatchProof.reason};
+ if(JSON.stringify(dispatchCandidate.matches)!==JSON.stringify(q.matches) &&
+    JSON.stringify(p.matches)!==JSON.stringify(q.matches))return {committed:false,reason:'bracket-mirror-stale'};
  if(!snapshotSnap.exists&&typeof tx.create!=='function')throw Error('trusted-snapshot-create-required');
- const nextPrivate={...p,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
- const nextPublic={...q,startedAt:serverTime};
+ const nextPrivate={...p,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
+ const nextPublic={...q,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime};
  // No tx reads after this point. New snapshot and both mirrors commit together.
  if(!snapshotSnap.exists)tx.create(snapshotRef,snapshotCandidate);
  tx.update(eventRef,{data:JSON.stringify(nextPrivate),updatedAt:serverTime,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest});
