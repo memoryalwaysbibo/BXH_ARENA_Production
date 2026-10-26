@@ -7,7 +7,7 @@ const code='BXH-ABC123';
 function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',changed=false,createSnapshot=false,badTiers=false}={}){
  const players=[{id:'p1',uid:'u1'},{id:'p2',uid:'u2'}];
  const matches=[{id:'m',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}];
- const state={cloudCode:code,createdBy:creator,registrationRosterRevision:4,meta:{ladderMode:mode,eventAuthority:'official'},players,matches,drawnAt:100,startedAt:null,rosterLocked:false};
+ const state={cloudCode:code,createdBy:creator,registrationRosterRevision:4,meta:{ladderMode:mode,eventAuthority:'official',stations:1},players,matches,drawnAt:100,startedAt:null,rosterLocked:false};
  const publicState={cloudCode:code,registrationRosterRevision:4,players,matches,drawnAt:100,startedAt:null};
  const docs={
   ['tournaments/'+code]:{createdBy:creator,eventAuthority:'official',code,data:JSON.stringify(state)},
@@ -18,7 +18,7 @@ function fixture({mode='ranked',role='staff',bracketOk=true,creator='actor',chan
  const writes=[],reads=[],tierCalls=[];
  const tx={get:async ref=>{reads.push(ref.path);const val=docs[ref.path];return {exists:!!val,data:()=>val};},update:(ref,payload)=>writes.push({path:ref.path,payload}),create:(ref,payload)=>writes.push({path:ref.path,payload,created:true})};
  const db={doc:path=>({path}),runTransaction:fn=>fn(tx)};
- const start=createAuthorizedMirrorStart({db,clock:()=>200,verifyBracketInTransaction:async()=>bracketOk,resolveVerifiedTiers:createSnapshot?async ({rosterUids})=>{tierCalls.push(rosterUids);return badTiers?[{uid:'u1',ok:true,tier:'national'}]:rosterUids.map(uid=>({ok:true,uid,tier:'d',computedAt:100,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}));}:undefined,enabled:true});
+ const start=createAuthorizedMirrorStart({db,clock:()=>200,verifyBracketInTransaction:async()=>bracketOk,buildServerDispatch:async()=>({matches,courtAssignments:{court1:{currentMatchId:'m',nextMatchId:null}}}),resolveVerifiedTiers:createSnapshot?async ({rosterUids})=>{tierCalls.push(rosterUids);return badTiers?[{uid:'u1',ok:true,tier:'national'}]:rosterUids.map(uid=>({ok:true,uid,tier:'d',computedAt:100,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}));}:undefined,enabled:true});
  const args={eventCode:code,actorUid:'actor',expectedRosterRevision:changed?5:4,drawRevision:9};
  return {start,args,writes,reads,tierCalls};
 }
