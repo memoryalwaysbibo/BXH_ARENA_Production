@@ -6034,6 +6034,7 @@ function canOperateMatchStation(matchOrId, st=state){
 function requireStationPermission(matchOrId, st=state){
   if(st&&st.archiveStatus==="completed"){ showToast("此賽事已完成並封存，目前為唯讀。",true); return false; }
   const m=typeof matchOrId==="string" ? ((st&&st.matches)||[]).find(x=>x.id===matchOrId) : matchOrId;
+  if(refereeFaultWritePending(m,st)){showToast("失誤判定儲存中，請稍候再操作本場。",true);return false;}
   if(!canOperateMatchStation(m,st)){
     showToast(`此戰鬥台未指派給你${m&&m.station?`（${m.station}號台）`:""}，目前僅可查看。`, true);
     return false;
@@ -6069,6 +6070,7 @@ function stationMutationErrorMessage(reason){
     "not-found":"雲端找不到此場比賽。",
     "already-completed":"本場已由其他裁判完成判定。",
     "invalid-score":"雲端比分已變更，請重新整理後再操作。",
+    "fault-state-stale":"本局比分或失誤紀錄已變更，已重新讀取；請核對後再判定。",
     "cloud-unavailable":"目前無法連線雲端，請稍後再試。",
     "corrupt-data":"雲端賽事資料異常，已停止寫入。",
     "bronze-before-final":"季殿尚未完成，冠亞必須等待季殿結束後才能開始。"
@@ -8527,7 +8529,13 @@ function addScore(matchId, side, type){
   render();
 }
 
-function addFault(matchId, offendingSide){
+const refereeFaultWrites = new Set();
+function refereeFaultWriteKey(m,st=state){return JSON.stringify([st.id,st.cloudCode||"",m&&m.id]);}
+function refereeFaultWritePending(m,st=state){return refereeFaultWrites.has(refereeFaultWriteKey(m,st));}
+function refereeFaultStateKey(m){
+  return JSON.stringify([Number(m.scoreA||0),Number(m.scoreB||0),m.log||[],refereeFaultApi().snapshot(m)]);
+}
+async function addFault(matchId, offendingSide){
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8548,26 +8556,58 @@ function addFault(matchId, offendingSide){
   const faultApi=refereeFaultApi();
   if(!faultApi){showToast("失誤計數模組尚未載入，請重新整理",true);return;}
   const at=Date.now();
-  const localResult=faultApi.applyFault(m,offendingSide,at);
+  const before=JSON.parse(JSON.stringify(m));
+  const expected=refereeFaultStateKey(m);
+  const candidate=JSON.parse(JSON.stringify(m));
+  const localResult=faultApi.applyFault(candidate,offendingSide,at);
   if(!localResult.ok){showToast(localResult.reason==="invalid-score"?"目前比分無法再加分，請先確認結果":"失誤紀錄失敗",true);return;}
-  m.updatedAt=at;
-  persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
-    if(!remoteMatch || remoteMatch.completed || remoteMatch.status==="completed") return {ok:false,reason:"already-completed"};
-    if(checkWinnerSide(remoteMatch)) return {ok:false,reason:"invalid-score"};
-    const result=faultApi.applyFault(remoteMatch,offendingSide,at);
-    if(!result.ok)return result;
-    remoteMatch.updatedAt=at;
-    return {ok:true,state:remoteState};
-  });
-  const offenderName=offendingSide==="A"?playerName(m.a&&m.a.playerId):playerName(m.b&&m.b.playerId);
-  const recipientName=offendingSide==="A"?playerName(m.b&&m.b.playerId):playerName(m.a&&m.a.playerId);
-  if(localResult.scored){
-    showToast(offenderName+" 本局第 2 次失誤｜"+recipientName+" +1 分");
-    if(checkWinnerSide(m))pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
-  }else{
-    showToast(offenderName+" 失誤 1/2");
+  const roomId=state.id,code=state.cloudCode,actorUid=currentAuthUid();
+  const current=()=>state.id===roomId&&state.cloudCode===code&&currentAuthUid()===actorUid;
+  const key=refereeFaultWriteKey(m);
+  const scoped=shouldUseStationScopedMutation(m);
+  if(code&&!scoped){showToast("雲端失誤判定服務尚未就緒，請重新連線後再操作。",true);return;}
+  refereeFaultWrites.add(key);
+  try{
+    // Cloud scoring remains unchanged until the transaction acknowledges it.
+    // Offline/local rooms still need their candidate applied before saveState.
+    if(!scoped)Object.assign(m,candidate,{updatedAt:at});
+    const saved=persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
+      if(!remoteMatch || remoteMatch.completed || remoteMatch.status==="completed") return {ok:false,reason:"already-completed"};
+      if(checkWinnerSide(remoteMatch)) return {ok:false,reason:"invalid-score"};
+      // Never reinterpret a delayed click as a fault in a different round.
+      if(refereeFaultStateKey(remoteMatch)!==expected)return {ok:false,reason:"fault-state-stale"};
+      const result=faultApi.applyFault(remoteMatch,offendingSide,at);
+      if(!result.ok)return result;
+      remoteMatch.updatedAt=at;
+      return {ok:true,state:remoteState};
+    });
+    render();
+    const result=await saved;
+    if(!current())return;
+    if(!(result===true||result&&result.ok===true)){
+      if(!scoped)Object.assign(m,before);
+      showToast("失誤判定未確認儲存（"+((result&&result.reason)||"save-failed")+"），請核對目前比分與失誤次數。",true);
+      return;
+    }
+    const confirmed=getMatch(matchId);
+    if(!confirmed||confirmed.completed||confirmed.status==="completed")return;
+    const offenderName=offendingSide==="A"?playerName(confirmed.a&&confirmed.a.playerId):playerName(confirmed.b&&confirmed.b.playerId);
+    const recipientName=offendingSide==="A"?playerName(confirmed.b&&confirmed.b.playerId):playerName(confirmed.a&&confirmed.a.playerId);
+    if(localResult.scored){
+      showToast(offenderName+" 本局第 2 次失誤｜"+recipientName+" +1 分（已儲存）");
+      if(checkWinnerSide(confirmed)&&!pendingModal)pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
+    }else{
+      showToast(offenderName+" 失誤 1/2（已儲存）");
+    }
+  }catch(e){
+    if(current()){
+      if(!scoped)Object.assign(m,before);
+      showToast("失誤判定儲存失敗，請重新連線並核對比分後再操作。",true);
+    }
+  }finally{
+    refereeFaultWrites.delete(key);
+    if(current())render();
   }
-  render();
 }
 
 function undoLast(matchId){
@@ -11207,7 +11247,8 @@ function renderCourtCard(stationNum){
   const preStartLocked=!state.startedAt;
   const stationLocked=!canOperateStation(stationNum);
   const enchantmentPending=state.meta&&state.meta.playMode==="enchantment";
-  const scoreLocked=locked || preStartLocked || stationLocked || !!winSide || enchantmentPending;
+  const faultSaving=refereeFaultWritePending(m);
+  const scoreLocked=locked || faultSaving || preStartLocked || stationLocked || !!winSide || enchantmentPending;
 
   const scoreBtn = (side, type) => `<button data-action="score" data-id="${m.id}" data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
   const faultBtn = (side) => {
@@ -11229,6 +11270,7 @@ function renderCourtCard(stationNum){
     ${stationLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>唯讀｜你未被指派 Court ${stationNum}，本台所有比分與判定操作已鎖定。</span></div>`:""}
     ${enchantmentPending?'<div class="banner warn" style="margin:12px 16px 0;"><span>附魔之戰尚在串接選手手機抽卡與裁判計分，此場暫不可送分。</span></div>':""}
     ${warnBanner}
+    ${faultSaving?'<div class="banner warn"><span>失誤判定儲存中，請稍候。</span></div>':""}
     ${preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
       <span class="msc-label">場次狀態：${matchStatusBarHtml(m, true)}</span>
@@ -11260,9 +11302,9 @@ function renderCourtCard(stationNum){
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
-      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${!undoAvailable||locked||stationLocked?'disabled':''}>${undoLabel}</button>
-      <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||stationLocked?'disabled':''}>本局重賽</button>
-      <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
+      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${!undoAvailable||locked||faultSaving||stationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||faultSaving||stationLocked?'disabled':''}>本局重賽</button>
+      <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!faultSaving&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
     </div>
 
   </div>`;
