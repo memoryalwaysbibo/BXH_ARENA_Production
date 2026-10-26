@@ -17996,8 +17996,8 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
-  clearBoardModeInteractions();
   syncQrScannerModal();
+  clearBoardModeInteractions();
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
