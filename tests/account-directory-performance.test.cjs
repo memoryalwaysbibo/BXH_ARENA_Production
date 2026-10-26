@@ -10,11 +10,12 @@ const root=path.join(__dirname,'..');
 const core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
 const cloud=fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8');
 const utils=fs.readFileSync(path.join(root,'modules/main-app/account-utils.js'),'utf8');
+const partnerPolicy=require('../partner-organizer-ui.js');
 function between(source,start,end){const a=source.indexOf(start),b=source.indexOf(end,a+start.length);assert.ok(a>=0&&b>a,start);return source.slice(a,b);}
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 function ui(){
   let renders=0;
-  const ctx={window:{},document:{querySelectorAll:()=>[],querySelector:()=>null},setTimeout:()=>0,Date,Intl,Map,Set,
+  const ctx={window:{BXHPartnerOrganizer:partnerPolicy},document:{querySelectorAll:()=>[],querySelector:()=>null},setTimeout:()=>0,Date,Intl,Map,Set,
     currentAuthUid:()=>ctx.actor,isSuperAdmin:()=>ctx.allowed,actor:'admin-a',allowed:true,engagementSessionEpoch:1,
     accountMgmtUsers:[],accountMgmtRoleFilter:'all',accountMgmtQuery:'',accountMgmtStatusFilter:'all',accountMgmtActivityFilter:'all',accountMgmtSort:'created-desc',
     appPhase:'account-management',superAdminManagementPage:'accounts',partnerPlansState:{plans:null,loading:false},
@@ -26,6 +27,7 @@ function ui(){
     accountBatchContext:()=>({selected:new Set(),busy:false}),renderAccountBatchPanel:()=>'',render:()=>renders++};
   vm.createContext(ctx);vm.runInContext(utils,ctx);Object.assign(ctx,ctx.window.BXHAccountUtils);
   vm.runInContext(between(core,'const ACCOUNT_ROLE_FILTERS = [','\nfunction renderAdminSetupScreen(){'),ctx);
+  vm.runInContext(between(core,'function legacyPartnerRevocationPatch(user){','function renderPartnerContractCard(user){'),ctx);
   vm.runInContext(between(core,'function renderAccountManagementScreen(){','\nfunction renderPlayerHomeScreen(){'),ctx);
   ctx.window.cloudAuth={listUsers:()=>{throw Error('unbounded read forbidden');},getManagedAccountSummary:async progress=>{const s={total:908,enabled:907,daily:246,weekly:508,testers:0,roles:{all:908,player:900},errors:[]};progress(s);return s;},queryManagedAccounts:async()=>({users:[],truncated:false})};
   return {ctx,run:s=>vm.runInContext(s,ctx),view:()=>ctx.renderAccountManagementScreen(),renders:()=>renders};
@@ -73,24 +75,42 @@ function cloudHarness(rows){
   getDocs:async q=>{reads.push(q);assert.ok(q.filters?.length||q.limit,'never download the whole collection');return snapshot(select(q));},
   getCountFromServer:async q=>{aggregates.push(q);return {data:()=>({count:select(q).length})};},
   doc:(_db,_col,id)=>({id}),getDoc:async ref=>{const row=rows.find(r=>r.uid===ref.id);return {id:ref.id,exists:()=>!!row,data:()=>row};}};
- const ctx={authReady:true,fx,dbHandle:{},USERS_COLLECTION:'users',Date,Map,Set,console,withTimeout:async(p,_ms,fallback)=>{try{return await p;}catch{return fallback;}}};
+ const ctx={authReady:true,fx,dbHandle:{},USERS_COLLECTION:'users',Date,Map,Set,console,window:{BXHPartnerOrganizer:partnerPolicy},withTimeout:async(p,_ms,fallback)=>{try{return await p;}catch{return fallback;}}};
  vm.createContext(ctx);vm.runInContext('service=({'+between(cloud,'    async getManagedAccountSummary(','    async listUsers(){')+'})',ctx);
  return {ctx,reads,aggregates};
 }
-test('counts preserve legacy enabled/tester/partner semantics without downloading enabled players',async()=>{
+test('counts retain enabled/tester semantics and use effective partner grants without downloading enabled players',async()=>{
  const now=Date.now(),h=cloudHarness([
   {uid:'a',role:'super_admin',lastLoginAt:now},
   {uid:'b',role:'player',active:true,lastLoginAt:now},
   {uid:'c',role:'player',active:false,lastLoginAt:now},
   {uid:'d',role:'player',isTestAccount:true,lastLoginAt:now-2*86400000},
   {uid:'e',role:'tester',isTestAccount:true,active:false,lastLoginAt:now-2*86400000},
-  {uid:'f',role:'player',partnerOrganizer:{status:'active',expiresAt:now+86400000}},
-  {uid:'g',role:'player',partnerOrganizer:{status:'active',expiresAt:now-1}}
+  {uid:'f',role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org-f',expiresAt:now+86400000}},
+  {uid:'g',role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org-g',expiresAt:now-1}}
  ]);
  const s=await h.ctx.service.getManagedAccountSummary();
  assert.equal(s.total,7);assert.equal(s.enabled,5);assert.equal(s.daily,2);assert.equal(s.weekly,3);assert.equal(s.testers,1);
  assert.equal(s.roles.player,4);assert.equal(s.roles.tester,2);assert.equal(s.roles.management,1);assert.equal(s.roles.partner_organizer,1);
  assert.equal(h.reads.length,2,'only disabled and authorized-partner subsets are read as documents');assert.ok(h.aggregates.length>0);
+});
+test('partner statistics and role filters share the ISO/epoch period and account policy',async()=>{
+ const now=Date.now(),grant={status:'active',scope:'contract',organizationId:'org',startsAt:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000).toISOString()};
+ const users=[
+  {uid:'iso',role:'player',active:true,partnerOrganizer:{...grant}},
+  {uid:'epoch',role:'player',active:true,partnerOrganizer:{...grant,startsAtMs:now-1000,expiresAtMs:now+86400000}},
+  {uid:'future',role:'player',active:true,partnerOrganizer:{...grant,startsAtMs:now+3600000}},
+  {uid:'disabled',role:'player',active:false,partnerOrganizer:{...grant}},
+  {uid:'test',role:'player',active:true,isTestAccount:true,partnerOrganizer:{...grant}},
+  {uid:'missing-expiry',role:'player',active:true,partnerOrganizer:{status:'active',organizationId:'org'}},
+  {uid:'frozen',role:'player',active:true,accountStatus:'frozen',partnerOrganizer:{...grant}}
+ ];
+ const h=cloudHarness(users),stats=await h.ctx.service.getManagedAccountSummary();assert.equal(stats.roles.partner_organizer,2);
+ const t=ui();for(const user of users)assert.equal(t.ctx.accountRoleMatches(user,'partner_organizer'),['iso','epoch'].includes(user.uid),user.uid);
+});
+test('missing partner policy keeps the count unknown rather than reporting a false zero',async()=>{
+ const h=cloudHarness([{uid:'p',role:'player',active:true,partnerOrganizer:{status:'active'}}]);h.ctx.window.BXHPartnerOrganizer=null;
+ const stats=await h.ctx.service.getManagedAccountSummary();assert.equal(stats.roles.partner_organizer,null);assert.ok(stats.errors.includes('partner-policy-unavailable'));
 });
 test('server search returns bounded indexed matches; large categories require a narrower query',async()=>{
  const h=cloudHarness(fixture);
