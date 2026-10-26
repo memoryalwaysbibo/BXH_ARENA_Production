@@ -6,7 +6,7 @@
 const {createRankedAuthorityResolver}=require('./rdw-ranked-authority-resolver.cjs');
 const {writeSynchronizedStart}=require('./rdw-synchronized-start-reference.cjs');
 const {buildRosterSnapshot}=require('./rdw-roster-tier-snapshot.cjs');
-function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolveVerifiedTiers,enabled=false}={}){
+function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolveVerifiedTiers,buildServerDispatch,enabled=false}={}){
  if(!enabled)return async()=>({ok:false,code:'rdw-disabled'});
  if(typeof db?.runTransaction!=='function'||typeof db?.doc!=='function'||
     typeof clock!=='function'||typeof verifyBracketInTransaction!=='function')
@@ -50,9 +50,13 @@ function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolv
    if(bracket!==true)return {committed:false,reason:'bracket-unverified'};
    const now=clock();
    if(!Number.isSafeInteger(now)||now<=0)throw Error('server-clock-invalid');
+   // Court initialization must be derived from canonical server state.
+   // No browser-supplied matches/courts are accepted.
+   if(typeof buildServerDispatch!== 'function')return {committed:false,reason:'server-dispatch-unavailable'};
+   const dispatchCandidate=await buildServerDispatch({tx,eventCode,drawRevision,expectedRosterRevision});
    return writeSynchronizedStart({
     tx,eventRef,publicRef,snapshotRef,eventCode,expectedRosterRevision,
-    drawRevision,serverTime:now,authorized:true,bracketVerified:true,snapshotCandidate
+    drawRevision,serverTime:now,authorized:true,bracketVerified:true,snapshotCandidate,dispatchCandidate
    });
   });
   return {ok:result.committed===true,code:result.reason||null,mode:result.mode||null};
