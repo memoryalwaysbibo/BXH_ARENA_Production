@@ -1,6 +1,6 @@
 {
-  "build": "20261020.8",
-  "version": "v14.3.34",
-  "updatedAt": "2026-10-20T05:27:00.000Z",
-  "releaseTrigger": "official-match-milestones"
+  "build": "20261026.3",
+  "version": "v14.3.36",
+  "updatedAt": "2026-10-25T17:45:35.689Z",
+  "releaseTrigger": "all-skin-player-entry"
 }

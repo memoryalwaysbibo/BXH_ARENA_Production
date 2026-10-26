@@ -1,0 +1,21 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {createHandler}=require('./functions/service.cjs');
+const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
+function harness(){
+ const room={createdBy:'host',eventAuthority:'official',assignedStaffUids:['main','backup'],refereeStationAssignments:{},updatedAt:1,data:JSON.stringify({id:'r',cloudCode:'BXH-TEST',meta:{eventAuthority:'official',stations:1},matches:[{id:'m',scoreA:2,faultActions:[{side:'A'}]}]})};
+ const docs=new Map([['tournaments/BXH-TEST',room],['publicTournaments/BXH-TEST',{bracketView:JSON.stringify({meta:{},matches:[{id:'m',scoreA:2}]})}],['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true}],...['host','main','backup'].map(uid=>['users/'+uid,{active:true,role:'staff',realName:uid}])]);
+ let tail=Promise.resolve(),seq=0;
+ const ref=path=>({path,collection:name=>({doc:id=>ref(path+'/'+name+'/'+id)})});
+ const db={doc:ref,runTransaction:fn=>{const result=tail.then(async()=>{const writes=[],out=await fn({get:async r=>({exists:docs.has(r.path),data:()=>clone(docs.get(r.path))}),update:(r,patch)=>writes.push(()=>docs.set(r.path,{...docs.get(r.path),...clone(patch)})),create:(r,data)=>writes.push(()=>{assert(!docs.has(r.path));docs.set(r.path,clone(data));})});writes.forEach(w=>w());return out;});tail=result.catch(()=>{});return result;}};
+ const handle=createHandler(db,{clock:()=>1000,uuid:()=> 'request-'+(++seq)});
+ let opSeq=0;
+ const run=(uid,action,args={})=>handle({auth:{uid},data:{code:'BXH-TEST',operationId:'operation-number-'+(++opSeq),action,...args}});
+ const doc=()=>docs.get('tournaments/BXH-TEST');
+ return {docs,handle,run,doc};
+}
+test('callable writes seats, mirrors and audit atomically without changing match or fault data',async()=>{const h=harness();await h.run('host','enable');await h.run('main','claim',{station:1,slot:'main',expectedCourtRevision:0});const d=h.doc(),s=JSON.parse(d.data),mirror=JSON.parse(h.docs.get('publicTournaments/BXH-TEST').bracketView);assert.equal(d.refereeSeatsV1.courts['1'].main.uid,'main');assert.equal(s.matches[0].scoreA,2);assert.deepEqual(s.matches[0].faultActions,[{side:'A'}]);assert.equal(mirror.meta.refereeSeatNames['1'].main.name,'main');assert(!JSON.stringify(mirror).includes('"uid"'));assert(!JSON.stringify(mirror).includes('requests'));assert.equal([...h.docs.keys()].filter(k=>k.includes('/refereeSeatAudit/')).length,2);});
+test('idempotent retry returns previous receipt and never creates two claims',async()=>{const h=harness();await h.run('host','enable');const request={auth:{uid:'main'},data:{code:'BXH-TEST',operationId:'idempotency-example-123',action:'claim',station:1,slot:'main',expectedCourtRevision:0}};const a=await h.handle(request),b=await h.handle(request);assert.deepEqual(a,b);assert.equal(h.doc().refereeSeatsV1.revision,2);await assert.rejects(h.handle({...request,data:{...request.data,slot:'backup1'}}),/operation-conflict/);});
+test('concurrent same-seat requests produce exactly one successful claim',async()=>{const h=harness();await h.run('host','enable');const results=await Promise.allSettled(['main','backup'].map(uid=>h.run(uid,'claim',{station:1,slot:'main',expectedCourtRevision:0})));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(h.doc().refereeStationUids.length,1);});
+test('a lost eligibility after request blocks acceptance without mutating seats',async()=>{const h=harness();await h.run('host','enable');await h.run('main','claim',{station:1,slot:'main',expectedCourtRevision:0});const r=await h.run('backup','request',{station:1,slot:'main',expectedCourtRevision:1,expectedUid:'main'});h.docs.get('users/backup').active=false;const before=clone(h.doc());await assert.rejects(h.run('main','respond',{station:1,slot:'main',requestId:r.requestId,response:'accept'}),/requester-ineligible/);assert.deepEqual(h.doc(),before);});
+test('unverified deployment fails closed and unauthenticated requests cannot invoke it',async()=>{const h=harness();h.docs.get('systemConfig/refereeSeatsV1').perCourtScoringVerified=false;await assert.rejects(h.run('host','enable'),/release-not-ready/);await assert.rejects(h.handle({data:{}}),/unauthenticated/);assert(!h.doc().refereeSeatsV1);});

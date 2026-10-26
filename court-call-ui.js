@@ -670,11 +670,14 @@ async function discoverCourtCallPlayerCodes(force=false){
  const uid=courtCallUserKey();
  if(!uid||courtCallDiscoveryBusy)return;
  if(!force&&Date.now()-courtCallDiscoveryAt<30000)return;
- if(!window.cloudSync||typeof window.cloudSync.queryMyRegistrations!=='function')return;
+ const uidFirst=window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true;
+ if(uidFirst?!window.BXHMyEventsDiscovery?.read:!window.cloudSync||typeof window.cloudSync.queryMyRegistrations!=='function')return;
  courtCallDiscoveryBusy=true;courtCallDiscoveryAt=Date.now();
  try{
-  if(window.cloudSync.connect)await window.cloudSync.connect();
-  const regs=await window.cloudSync.queryMyRegistrations();
+  let result=null,regs;
+  if(uidFirst){result=await window.BXHMyEventsDiscovery.read();if(!result.isCurrent())return;regs=result.rows;}
+  else{if(window.cloudSync.connect)await window.cloudSync.connect();regs=await window.cloudSync.queryMyRegistrations();}
+  if(uid!==courtCallUserKey()||(result&&!result.isCurrent()))return;
   const codes=(Array.isArray(regs)?regs:[]).filter(r=>r&&r.status==='confirmed'&&/^BXH-[A-Z0-9]{4,16}$/.test(String(r.tournamentCode||'').toUpperCase())).map(r=>String(r.tournamentCode).toUpperCase());
   courtCallPlayerCodes=[...new Set([...codes,...courtCallPlayerCodes])].slice(0,8);
   courtCallSaveKnownCodes(courtCallPlayerCodes);

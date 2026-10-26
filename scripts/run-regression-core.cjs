@@ -4,8 +4,9 @@ const { spawnSync } = require('node:child_process');
 
 const suites = {
   critical: [
+    { name: "account statistics, bounded search and lazy account forms", args: ["--test", "tests/account-directory-performance.test.cjs"] },
     { name: 'authoritative player queue dashboard', args: ['--test', 'tests/queue-dashboard.test.cjs', 'tests/queue-refresh.test.cjs'] },
-    { name: "stable lobby updates, identity and callback isolation", args: ["--test", "tests/lobby-stable-updates.test.cjs"] },
+    { name: "stable lobby updates, identity and callback isolation", args: ["--test", "tests/lobby-stable-updates.test.cjs", "tests/room-host-identity-regression.test.cjs"] },
     {name:'Hunter Clash final rehydration, revocation and legacy isolation',args:['--test','tests/hunter-clash-final-check.test.cjs']},
     {name:'Hunter Clash PK badge settlement, quotas and revocation',args:['--test','tests/hunter-pk-achievements.test.cjs']},
     {name:'Hunter Clash practice XP atomic settlement and daily limits',args:['--test','tests/hunter-practice-xp.test.cjs']},
@@ -31,6 +32,7 @@ const suites = {
     { name: 'idle court dispatch', args: ['tests/idle-court-dispatch.test.cjs'] },
     { name: 'safe court expansion, reserved queues and transaction retry fences', args: ['--test', 'tests/court-expansion.test.cjs', 'tests/court-retirement.test.cjs'] },
     { name: 'event staff permission boundary', args: ['--test', 'tests/event-staff-permission.test.cjs'] },
+    { name: 'partner authorization identity, time and revocation boundaries', args: ['--test', 'tests/partner-organizer-ui.test.cjs', 'tests/partner-legacy-revocation.test.cjs', 'tests/partner-workspace-access.test.cjs', 'tests/partner-contract-review-ui.test.cjs'] },
     { name: 'staff assignment real-name display', args: ['--test', 'tests/staff-assignment-realname.test.cjs'] },
     { name: 'assignment commit / confirmation separation', args: ['--test', 'tests/assignment-cloud-confirmation.test.cjs'] },
     { name: 'offline queue render dedupe', args: ['tests/offline-queue-render-dedupe.test.cjs'] },

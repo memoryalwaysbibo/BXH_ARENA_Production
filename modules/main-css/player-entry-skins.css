@@ -1,0 +1,87 @@
+/* Shared second-level layout. Theme artwork is selected by navigation action,
+   never by the legacy player role class or the visible card order. */
+:root[data-bxh-theme="three-gods"] .player-entry-cards{
+  --entry-primary-symbol:"翼";--entry-primary-tone:#e8bd62;
+  --entry-secondary-symbol:"天";--entry-secondary-tone:#f46a64;
+  --entry-tertiary-symbol:"巨";--entry-tertiary-tone:#58b7ff;
+}
+:root[data-bxh-theme="akatsuki"] .player-entry-cards{
+  --entry-primary-symbol:"恩";--entry-primary-tone:#ce9cff;
+  --entry-secondary-symbol:"鼬";--entry-secondary-tone:#ff8b92;
+  --entry-tertiary-symbol:"鮫";--entry-tertiary-tone:#65cafa;
+}
+:root[data-bxh-theme="hunter"] .player-entry-cards{
+  --entry-primary-symbol:"傑";--entry-primary-tone:#84e59d;
+  --entry-secondary-symbol:"犽";--entry-secondary-tone:#8dc6ff;
+  --entry-tertiary-symbol:"酷";--entry-tertiary-tone:#ffc09b;
+}
+:root[data-bxh-theme="clow"] .player-entry-cards{
+  --entry-primary-symbol:"櫻";--entry-primary-tone:#ffc3df;
+  --entry-secondary-symbol:"狼";--entry-secondary-tone:#9fe3c3;
+  --entry-tertiary-symbol:"知";--entry-tertiary-tone:#c9baff;
+}
+:root[data-bxh-theme="zeon"] .player-entry-cards{
+  --entry-primary-symbol:"薩";--entry-primary-tone:#ffaaaa;
+  --entry-secondary-symbol:"洲";--entry-secondary-tone:#ff7972;
+  --entry-tertiary-symbol:"比";--entry-tertiary-tone:#ffc077;
+}
+:root[data-bxh-theme="directive"] .player-entry-cards{
+  --entry-primary-symbol:"零";--entry-primary-tone:#ffad70;
+  --entry-secondary-symbol:"初";--entry-secondary-tone:#c29aff;
+  --entry-tertiary-symbol:"貳";--entry-tertiary-tone:#ff8290;
+}
+/* Gundam's approved landing uses baked artwork; keep its native player/eye
+   icons on this level instead of inventing a new character assignment. */
+:root[data-bxh-theme="gundam"] .player-entry-cards{
+  --entry-primary-tone:#d8b46a;--entry-secondary-tone:#b6e4ff;--entry-tertiary-tone:#efd79a;
+}
+.player-entry-cards>[data-action="player-goto-apply"]{
+  --entry-symbol:var(--entry-primary-symbol);--entry-tone:var(--entry-primary-tone);
+}
+.player-entry-cards>[data-action="player-goto-login"]{
+  --entry-symbol:var(--entry-secondary-symbol);--entry-tone:var(--entry-secondary-tone);
+}
+.player-entry-cards>[data-action="player-goto-lookup"]{
+  --entry-symbol:var(--entry-tertiary-symbol);--entry-tone:var(--entry-tertiary-tone);
+}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards{
+  display:grid;grid-template-columns:1fr;max-width:540px;gap:14px!important;
+}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards>.role-card{
+  --god-tone:var(--entry-tone);--akatsuki-tone:var(--entry-tone);
+  --hunter-tone:var(--entry-tone);--clow-tone:var(--entry-tone);--zeon-tone:var(--entry-tone);
+  display:grid;grid-template-columns:64px minmax(0,1fr);
+  grid-template-areas:"symbol title" "symbol english" "symbol description" "enter enter";
+  grid-template-rows:auto auto 1fr auto;
+  column-gap:12px;row-gap:6px;align-items:start;text-align:left;
+  width:100%;max-width:none;min-width:0;min-height:180px!important;height:auto;
+  padding:18px 16px 0!important;border-color:var(--entry-tone)!important;
+}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards>.role-card::before{
+  content:var(--entry-symbol,"");grid-area:symbol;position:static;inset:auto;
+  width:64px;height:auto;min-height:64px;margin:0;align-self:center;
+  font-size:56px;line-height:1.1;text-align:center;font-weight:900;
+  color:var(--entry-tone);text-shadow:0 0 18px var(--entry-tone);
+  transform:none!important;background:none;opacity:1;z-index:0;pointer-events:none;
+}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards .role-card-icon{display:none!important}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards .role-card-cn{
+  grid-area:title;min-width:0;color:var(--entry-tone)!important;line-height:1.35;
+}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards .role-card-en{grid-area:english;min-width:0}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards .role-card-desc{
+  grid-area:description;width:100%;min-width:0;max-width:none;margin:0;
+  font-size:12px!important;line-height:1.65!important;overflow-wrap:break-word;
+}
+:root[data-bxh-theme]:not([data-bxh-theme="gold"]) .auth-shell .player-entry-cards .role-card-enter{
+  grid-area:enter;position:static!important;inset:auto;
+  display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+  width:calc(100% + 32px);min-height:40px;height:auto!important;
+  margin:12px -16px 0!important;padding:8px 16px;
+  opacity:1;line-height:1.4;color:var(--entry-tone)!important;transform:none!important;
+}
+:root[data-bxh-theme="gundam"] .auth-shell .player-entry-cards>.role-card::before{display:none}
+:root[data-bxh-theme="gundam"] .auth-shell .player-entry-cards .role-card-icon{
+  display:block!important;grid-area:symbol;align-self:center;justify-self:center;
+  width:46px!important;height:46px!important;margin:0!important;
+}
