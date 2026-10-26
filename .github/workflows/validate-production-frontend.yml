@@ -165,6 +165,8 @@ jobs:
         run: node --test tests/roster-sync-race.test.cjs
       - name: Verify community quick registration and cloud contract
         run: node --test tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/community-host-roster-sync.test.cjs tests/community-summary-fixture.test.cjs tests/community-client-cleanup-disabled.test.cjs
+      - name: Verify managed registration settings and draft save boundary
+        run: node --test tests/managed-registration-settings.test.cjs tests/registration-mode-draft.test.cjs
       - name: Verify family roster check-in preservation
         run: |
           node --check family-ui.js
@@ -265,6 +267,9 @@ jobs:
       - name: Verify isolated community quick registration in Chromium
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/community-quick-registration-browser.cjs
+      - name: Verify managed registration settings in mobile and desktop Chromium
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/e2e/managed-registration-settings-browser.cjs
       - name: Verify compact bracket finals labels
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/bracket-final-label-layout.cjs
@@ -405,3 +410,4 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+

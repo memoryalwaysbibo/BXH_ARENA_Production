@@ -103,7 +103,9 @@ mustInclude('tx.set(privateRef,privatePatch,{merge:true});','Private tournament 
 mustInclude('tx.set(publicRef,{visibility:next,registrationVisibility:next,updatedAt:now},{merge:true});','Public mirror visibility patch missing');
 mustInclude('已設為不公開，賽事已從公開大廳隱藏','Published private toggle must confirm immediate lobby hide');
 mustInclude('[visibility repair] private mirror repair failed','Legacy private mirror self-heal missing');
-mustInclude('公開大廳可能仍顯示舊狀態','Registration save must disclose cloud-sync failure');
+mustInclude('設定尚未確認儲存，請確認連線並重試；輸入草稿仍保留。','Registration save must disclose unconfirmed cloud persistence');
+mustInclude('if(ok===false&&!options.cloudSaved){','Registration save must distinguish cloud rejection from local cache failure');
+mustInclude('void saveRegistrationSettingsAndReport(previousMeta,"已儲存線上報名設定")','Registration settings must use confirmed-save reporting');
 console.log('PASS immediate/private visibility sync and legacy self-heal');
 mustInclude('async repairLegacyPrivateVisibilityMirrors(){','Legacy private visibility sweep missing');
 mustInclude('const explicitlyPrivate=d.registrationVisibility===\"private\"','Legacy sweep must use private state as authority');
@@ -560,3 +562,4 @@ mustInclude('if(settlementRoute==="official-ranked")','Official ranked route gat
 mustInclude('正式積分賽至少需要兩位有效 BXH 玩家帳號','Official ranked minimum-player error missing');
 must(/function isSystemSyntheticTestRoster[\s\S]*?p\.source!==["']test["'][\s\S]*?\^T\\d\{3\}\$[\s\S]*?accountLinked!==true/, 'Synthetic roster classifier must require system TEST identity and no linked account');
 console.log('PASS settlement preflight routing / synthetic TEST isolation');
+
