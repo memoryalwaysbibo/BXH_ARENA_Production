@@ -1,0 +1,11 @@
+# Policy-aware creation and protected start evidence candidate
+
+This candidate synchronizes the RDW feature work with production commit `e87fb658932f58159d6629df85ab5a6b03e9a8f3`, then adds the matching frontend and Rules protocol for backend policy issuance PR #222. No production Rules or rollout control is published here.
+
+Paid room creation always fetches the contract again. Missing/unknown/conflicting policies, versions, counters or failed reads stop creation. Legacy `creation-v1` contracts retain their original creation-time debit; `start-v1` contracts create paired draft mirrors without changing the counter. Both contract and grant must identify the same policy. The new policy's quota display is labelled as start slots.
+
+The root `partnerStartState`, `partnerStartedAt`, policy and debit evidence are server-owned. The ranked start writer stamps both roots with the same start time/digest; browser hydration restores these canonical fields and ordinary save rejects a local attempt to start or erase the proof. The Rules overlay protects these structured fields and `partnerEventDebits` from all browser writes, including administrators. The serialized JSON is not treated as authoritative proof: both settlement source overlays in #222 must verify the original contract, immutable debit receipt and sealed snapshot before new-policy points can be awarded.
+
+`build-rules.py` starts from the exact SHA-256-pinned Rules obtained by audit 40374239019 and emits an emulator candidate. It does not deploy. The final publisher must read fresh deployed Rules and compose all pending compatible features, including referee changes, rather than replacing the production release with an old snapshot. It must also verify the six endpoint overlays, the actual RDW Callable/dispatcher/private Hunter bundle, frontend versions, signed policy fields and full settlement integration before enabling issuance.
+
+Only new drafts explicitly requesting `start-v1` can acquire this policy, after the server readiness gate is enabled. Legacy contracts/rooms are never silently converted, signed terms never overwritten, and missing usage is never guessed to be zero. Cancellation/refund and continuation after expiry remain separate work.

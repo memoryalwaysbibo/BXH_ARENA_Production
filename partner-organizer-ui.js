@@ -25,7 +25,8 @@
     if(!value)return '';
     const name=safe(value.organizationName||'合作主辦');
     const orderCode=value.orderCode||profile.partnerContractOrderCode||'';
-    const quota=orderCode?`<p class="hint" data-partner-room-quota="${safe(orderCode)}" role="status">開房次數｜讀取中……</p>`:'<p class="hint">目前為手動授權；尚無合約場次紀錄。</p>';
+    const quotaLabel=value.quotaPolicy==='start-v1'?'開賽場次':'開房次數';
+    const quota=orderCode?`<p class="hint" data-partner-room-quota="${safe(orderCode)}" data-partner-quota-label="${quotaLabel}" role="status">${quotaLabel}｜讀取中……</p>`:'<p class="hint">目前為手動授權；尚無合約場次紀錄。</p>';
     return `<div class="partner-workspace"><div class="role-indicator">合作主辦｜${name} <button class="btn btn-ghost btn-sm" data-action="switch-to-player-mode">切換回玩家模式</button></div><section class="auth-card"><h2>合作主辦工作台</h2>${quota}<p>此身分已開通。方案與賽事權限將由 BXH 後台設定並於此顯示。</p><p class="hint">正式開賽與積分資格需通過後端授權檢查。</p></section></div>`;
   }
   const quotaState={orderCode:'',actor:'',loading:false,used:null,total:null,error:'',generation:0};
@@ -34,7 +35,8 @@
     const orderCode=label.getAttribute('data-partner-room-quota')||'',actor=actorUid();
     if(!orderCode||!actor)return;
     if(quotaState.orderCode!==orderCode||quotaState.actor!==actor){Object.assign(quotaState,{orderCode,actor,loading:false,used:null,total:null,error:'',generation:quotaState.generation+1});}
-    const display=quotaState.error?`開房次數｜讀取失敗：${quotaState.error}`:quotaState.total===null?'開房次數｜讀取中……':`開房次數｜剩餘 ${Math.max(0,quotaState.total-quotaState.used)} / ${quotaState.total} 場（已使用 ${quotaState.used} 場）`;
+    const quotaLabel=label.getAttribute('data-partner-quota-label')||'開房次數';
+    const display=quotaState.error?`${quotaLabel}｜讀取失敗：${quotaState.error}`:quotaState.total===null?`${quotaLabel}｜讀取中……`:`${quotaLabel}｜剩餘 ${Math.max(0,quotaState.total-quotaState.used)} / ${quotaState.total} 場（已使用 ${quotaState.used} 場）`;
     if(label.textContent!==display)label.textContent=display;
     if(quotaState.loading||quotaState.total!==null||quotaState.error)return;
     quotaState.loading=true;const generation=quotaState.generation;

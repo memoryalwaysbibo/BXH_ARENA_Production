@@ -1119,6 +1119,7 @@
       out.meta.registrationOpenAt=d.registrationOpenAt??null;out.meta.registrationCloseAt=d.registrationCloseAt??null;
       out.meta.cancellationDeadline=d.cancellationDeadline??null;out.meta.registrationStatus=d.registrationStatus||"closed";
     }
+    if(d.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.restoreState(out,d,{publicView:true});
     return out;
   }
 
@@ -2614,8 +2615,12 @@
         const creatorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
         const partnerSession=!!(partnerGrant&&creatorUid);
-        if(partnerSession&&partnerGrant.scope==="contract"&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerGrant.orderCode)===0){
-          throw Object.assign(new Error("partner-room-quota-exhausted"),{code:"partner-room-quota-exhausted"});
+        let partnerQuotaPlan=null;
+        if(partnerSession&&partnerGrant.scope==="contract"){
+          if(typeof window.BXHPartnerQuota?.creationPlan!=="function"||typeof window.engagementService?.getPartnerContract!=="function")throw Object.assign(new Error("partner-quota-policy-unavailable"),{code:"partner-quota-policy-unavailable"});
+          const contract=await window.engagementService.getPartnerContract({orderCode:partnerGrant.orderCode});
+          partnerQuotaPlan=window.BXHPartnerQuota.creationPlan({grant:partnerGrant,contract,uid:creatorUid});
+          if(partnerQuotaPlan.policy==="start-v1")window.BXHPartnerQuota.restoreState(data,partnerQuotaPlan.privateFields);
         }
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&creatorUid);
         if(testerSession){
@@ -2741,10 +2746,11 @@
         // Both documents must be created in one atomic batch. Beta Rules validate
         // the public mirror with getAfter(), which only sees the paired private
         // tournament when both writes are in the same batch.
+        if(partnerQuotaPlan){Object.assign(privatePayload,partnerQuotaPlan.privateFields);Object.assign(publicPayload,partnerQuotaPlan.publicFields);}
         const batch=fx.writeBatch(dbHandle);
         batch.set(fx.doc(dbHandle,"tournaments",code),privatePayload);
         batch.set(fx.doc(dbHandle,"publicTournaments",code),publicPayload);
-        if(partnerSession&&partnerGrant.scope==="contract"&&data.partnerContractOrderCode){
+        if(partnerQuotaPlan?.debitOnCreate===true&&data.partnerContractOrderCode){
           batch.update(fx.doc(dbHandle,"partnerContracts",data.partnerContractOrderCode),{
             usedEvents:fx.increment(1),lastRoomCode:code
           });
@@ -2778,6 +2784,7 @@
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
         const parsed = JSON.parse(d.data);
+        if(d.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.restoreState(parsed,d);
         if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
         if(d.ladderPointsAwarded===true) parsed.ladderPointsAwarded=true;
         if(d.ladderSeasonId) parsed.ladderSeasonId=d.ladderSeasonId;
@@ -2964,6 +2971,7 @@
         ]);
         if(!privateSnap.exists()||!publicSnap.exists())return {ok:false};
         const d=privateSnap.data(),data=JSON.parse(d.data),publicData=JSON.parse(publicSnap.data().bracketView);
+        if(d.partnerQuotaPolicy==="start-v1"){window.BXHPartnerQuota.restoreState(data,d);window.BXHPartnerQuota.restoreState(publicData,publicSnap.data(),{publicView:true});}
         for(const key of ['createdBy','ownerUid','createdByRole'])if(d[key])data[key]=d[key];
         data.cloudCode=normalized;
         return {ok:true,data,publicData};
@@ -3092,6 +3100,7 @@ if(testerSession){
           const ref=fx.doc(dbHandle,"tournaments",normalized),snap=await tx.get(ref);
           if(snap.exists()){
             const remoteDoc=snap.data()||{};
+            if(remoteDoc.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.assertRuntimeWrite(data,remoteDoc);
             if(Number(remoteDoc.callRevision||0)!==Number(data.callRevision||0)) throw new Error("call-state-stale");
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
@@ -3833,6 +3842,7 @@ if(testerSession){
           const d = snap.data();
           try{
             const parsed = JSON.parse(d.data);
+            if(d.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.restoreState(parsed,d);
             if(d.refereeSeatsV1?.version===1)parsed.meta={...parsed.meta,refereeSeatsV1:d.refereeSeatsV1,refereeSeatNames:d.refereeSeatNames||{},refereeStationAssignments:d.refereeStationAssignments||{},refereeStationNames:d.refereeStationNames||{},refereeStationRestrictionEnabled:true,assignedStaffUids:d.assignedStaffUids||[]};
             if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
             callback(parsed, d.updatedAt);
