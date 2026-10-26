@@ -26,6 +26,7 @@ function ui(){
     accountBatchContext:()=>({selected:new Set(),busy:false}),renderAccountBatchPanel:()=>'',render:()=>renders++};
   vm.createContext(ctx);vm.runInContext(utils,ctx);Object.assign(ctx,ctx.window.BXHAccountUtils);
   vm.runInContext(between(core,'const ACCOUNT_ROLE_FILTERS = [','\nfunction renderAdminSetupScreen(){'),ctx);
+  vm.runInContext(between(core,'function legacyPartnerRevocationPatch(user){','function renderPartnerContractCard(user){'),ctx);
   vm.runInContext(between(core,'function renderAccountManagementScreen(){','\nfunction renderPlayerHomeScreen(){'),ctx);
   ctx.window.cloudAuth={listUsers:()=>{throw Error('unbounded read forbidden');},getManagedAccountSummary:async progress=>{const s={total:908,enabled:907,daily:246,weekly:508,testers:0,roles:{all:908,player:900},errors:[]};progress(s);return s;},queryManagedAccounts:async()=>({users:[],truncated:false})};
   return {ctx,run:s=>vm.runInContext(s,ctx),view:()=>ctx.renderAccountManagementScreen(),renders:()=>renders};
