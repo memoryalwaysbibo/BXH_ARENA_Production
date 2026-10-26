@@ -1,0 +1,10 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {verifyStartDispatch}=require('../scripts/lib/rdw-start-dispatch-gate.cjs');
+const before={matches:[{id:'m1',scoreA:0,scoreB:0,log:[],faultActions:[],completed:false},{id:'m2',scoreA:0,scoreB:0,log:[],faultActions:[],completed:false}]};
+const after={meta:{stations:1},matches:before.matches.map(m=>({...m})),courtAssignments:{court1:{currentMatchId:'m1',nextMatchId:'m2'}}};
+test('preserves match decisions and verifies unique current and next assignments',()=>assert.equal(verifyStartDispatch({before,after}).ok,true));
+test('missing court dispatch cannot be marked as initialized',()=>assert.equal(verifyStartDispatch({before,after:{...after,courtAssignments:{}}}).reason,'missing-court'));
+test('duplicate current and next dispatch is rejected',()=>assert.equal(verifyStartDispatch({before,after:{...after,courtAssignments:{court1:{currentMatchId:'m1',nextMatchId:'m1'}}}}).reason,'duplicate-assigned-match'));
+test('scoring data mutation is rejected',()=>assert.equal(verifyStartDispatch({before,after:{...after,matches:[{...after.matches[0],scoreA:1},after.matches[1]]}}).reason,'match-result-mutated'));
+test('unknown match assignment is rejected',()=>assert.equal(verifyStartDispatch({before,after:{...after,courtAssignments:{court1:{currentMatchId:'unknown'}}}}).reason,'unknown-assigned-match'));
