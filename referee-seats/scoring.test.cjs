@@ -35,3 +35,5 @@ test('double elimination propagates lower-bracket bye and creates/resolves grand
 });
 
 test('prototype names cannot masquerade as finish types',()=>{for(const finish of ['__proto__','constructor','toString']){const f=fixture();assert.throws(()=>f.run('score',{side:'A',finish}),/invalid-finish/);assert.equal(f.state.matches[0].scoreA,0);}});
+
+test('deferred PASS blocks quick judgement, confirmation and status changes until every predecessor finishes',()=>{for(const action of ['score','fault','quick','confirm','start','ready','resume','rematch','undo']){const f=fixture();const m=f.state.matches[0];m.callPass={waitFor:['m2']};m.scoringMode='quick';const before=JSON.stringify(f.state);assert.throws(()=>f.run(action,{winnerId:'a',side:'A',finish:'spin'}),/pass-protected/);assert.equal(JSON.stringify(f.state),before);}const f=fixture();f.state.matches[0].callPass={waitFor:['m2']};f.state.matches[0].scoringMode='quick';f.state.matches[1].completed=true;f.run('quick',{winnerId:'a'});assert.equal(f.state.matches[0].completed,true);});

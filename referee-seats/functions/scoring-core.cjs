@@ -21,6 +21,8 @@ function transition({room,state,user,uid,d,now}){
  if(d.expectedScoreRevision!==Number(m.refereeSeatScoreRevision||0))fail('score-stale');
  if(d.expectedDispatchRevision!==Number(m.dispatchRevision||0))fail('dispatch-stale');
  if(d.playerAId!==m.a?.playerId||d.playerBId!==m.b?.playerId||!m.a?.playerId||!m.b?.playerId||m.isBye)fail('player-mismatch');
+ // A deferred PASS cannot be completed through quick judgement or restarted early.
+ if(m.callPass?.waitFor?.some(id=>!state.matches.find(x=>x.id===id)?.completed))fail('pass-protected');
  m.scoringMode=m.scoringMode||state.meta.roundScoringModes?.[m.bracket+':'+m.round]||state.meta.scoringMode||'standard';
  const identity={uid,name:String(user.realName||user.gameId||user.displayName||'裁判').slice(0,80)},engine=createEngine(state,identity,now,d.operationId),action=d.action;
  if(action==='correct'){
@@ -30,7 +32,6 @@ function transition({room,state,user,uid,d,now}){
   if(m.completed||m.status==='completed')fail('already-completed');
   if(engine.singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta))fail('bronze-before-final');
   if(action==='score'||action==='fault'){
-   if(m.callPass?.waitFor?.some(id=>!state.matches.find(x=>x.id===id)?.completed))fail('pass-protected');
    if(engine.checkWinnerSide(m))fail('no-more-score');
    if(m.scoringMode==='quick')fail('quick-mode');
    if(!['A','B'].includes(d.side))fail('invalid-side');

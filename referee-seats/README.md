@@ -24,7 +24,7 @@ Firestore 候選規則現在拒絕所有一般 staff 直接寫入三席房的私
 
 伺服器的晉級／修正引擎由受版本控制的純函式產生，隨函式包部署，不執行請求提供的程式碼。`tools/build-engine.cjs` 及 `engine/manifest.json` 保留來源函式與純模組雜湊，CI 重新產生後必須無差異。已測單淘晉級、季殿門檻、雙敗總決賽重置、循環賽排名與下游已有實際比分時禁止撤回。
 
-已將空台承接、跳過場次承接、手動派台、交換、強制退場、重新開台、脫離場次承接、退役轉台及增減台接至同一命令後端。換台要求相關兩台權限與版本；有實際比分／失誤的目標台不得覆蓋。增減台僅接受明列的一般場地資訊，其他設定變更須分開儲存。PASS 等待中的場次及前置場次暫時阻擋移台與退場，等待鏈未完成時阻擋增減台，避免遺失依賴。
+已將空台承接、跳過場次承接、手動派台、交換、強制退場、重新開台、脫離場次承接、退役轉台及增減台接至同一命令後端。換台要求相關兩台權限與版本；有實際比分／失誤的目標台不得覆蓋。增減台僅接受明列的一般場地資訊，其他設定變更須分開儲存。PASS 等待中的場次及前置場次暫時阻擋移台與退場，等待鏈未完成時阻擋增減台，避免遺失依賴。遞延場次在所有前置場次完成前，同樣禁止簡易判定、確認、開始／恢復及重賽等命令，避免從其他入口提早結束等待。
 
 CALL／PASS 沿用既有獨立後端及原本推播，不調整既有 PASS 規則。舊權限投影含房主與三席持有人，房主不占第四席；撤銷後立即移除本台權限。整合測試使用雜湊鎖定的既有 CALL 服務來源，串接實際 emulator 的交接、PASS、計分與自動回叫。
 
@@ -45,5 +45,7 @@ CALL／PASS 沿用既有獨立後端及原本推播，不調整既有 PASS 規�
 - `node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/scoring.test.cjs referee-seats/dispatch.test.cjs referee-seats/scoring-bridge.test.cjs`
 - `node referee-seats/browser.test.cjs`：需要 Playwright 及 Chromium，使用模擬後端、三個獨立頁面，驗證加入、主備交換、拒絕通知、撤銷、退出與四種寬度。
 - `python3 referee-seats/build-rules.py --source qr-checkin/firestore.candidate.rules --output /tmp/referee-seats.rules`
+
+另有 `full-rules.test.cjs` 直接載入完整候選規則，驗證裁判直接寫入被拒、場主管理保留、管理員不可竄改席位，以及各角色不可讀寫收據／稽核。這不代表已核對最新正式規則。
 
 瀏覽器測試不可宣稱為正式 Firebase／實機驗收。

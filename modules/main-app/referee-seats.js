@@ -82,7 +82,7 @@
  }
  function settings(){
   if(enabled(state()))return '<div class="panel"><div class="panel-title">三席裁判制</div><p class="hint">請在裁判台點選主裁判、備用裁判 1 或備用裁判 2 加入。未取得席位的工作人員僅能查看。</p></div>';
-  if(!manager()||state()?.meta?.eventAuthority!=='official'||locked())return '';
+  if(!manager()||state()?.meta?.eventAuthority!=='official'||['team'].includes(state()?.meta?.battleMode)||state()?.meta?.playMode==='enchantment'||locked())return '';
   return '<div class="panel"><div class="panel-title">三席裁判制</div><p class="hint">每台一位主裁、兩位備裁自行加入，三位共同擁有該台操作權。啟用前請確認本場工作人員名單，並清空舊版裁判台分配。</p><button type="button" class="btn btn-primary" data-seat-action="enable">啟用三席裁判制</button></div>';
  }
  function click(action,station,slot,requestId){

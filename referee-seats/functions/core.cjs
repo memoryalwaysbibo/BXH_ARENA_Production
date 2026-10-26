@@ -28,6 +28,7 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser}){
  let model=room.refereeSeatsV1?clone(room.refereeSeatsV1):null;
  if(action==='enable'){
   if(state.meta?.battleMode==='team')fail('team-not-supported');
+  if(state.meta?.playMode==='enchantment')fail('enchantment-not-supported');
   if(!isManager)fail('permission-denied');
   if(model?.version===1)fail('already-enabled');
   if(Object.values(room.refereeStationAssignments||{}).some(list=>Array.isArray(list)&&list.length))fail('legacy-assignments-exist');

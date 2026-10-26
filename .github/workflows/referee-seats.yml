@@ -34,7 +34,7 @@ jobs:
       - name: Firestore compilation, guard and actual service transactions
         env:
           NODE_PATH: /tmp/seat-test-deps/node_modules
-        run: /tmp/seat-test-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-referee-seat-compile --config referee-seats/firebase.emulator.json 'node --test referee-seats/rules.test.cjs referee-seats/firestore.test.cjs'
+        run: /tmp/seat-test-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-referee-seat-compile --config referee-seats/firebase.emulator.json 'node --test referee-seats/rules.test.cjs referee-seats/full-rules.test.cjs referee-seats/firestore.test.cjs'
       - name: Install Chromium
         run: node /tmp/seat-test-deps/node_modules/playwright/cli.js install --with-deps chromium
       - name: Three devices and mobile layouts with simulated backend
