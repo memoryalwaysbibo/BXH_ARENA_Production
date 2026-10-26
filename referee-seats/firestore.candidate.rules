@@ -1193,7 +1193,7 @@ isAdminOrAbove() || (isSignedIn() && isCommunityOwnerData(resource.data)) || (is
           && entrySelectionWriteValid()
           && callWriteValid()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-               ['data','capacity','confirmedCount','waitlistCount','registrationStatus','updatedAt','lastRegistrationMutationUid','lastRegistrationMutationType','lastRegistrationMutationBy','courtLifecycleWriteSeq']
+               ['qrCheckinRevision','data','capacity','confirmedCount','waitlistCount','registrationStatus','updatedAt','lastRegistrationMutationUid','lastRegistrationMutationType','lastRegistrationMutationBy','courtLifecycleWriteSeq']
              )
           && staffRosterMutationAuthorizedAndValid(code, request.resource.data.lastRegistrationMutationUid, request.resource.data.lastRegistrationMutationType)
         )
@@ -1793,7 +1793,7 @@ isAdminOrAbove()
           && noOperationsChange()
           && callMirrorValid(code)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-               ['bracketView','capacity','confirmedCount','waitlistCount','registrationStatus','updatedAt','lastRegistrationMutationUid','lastRegistrationMutationType','lastRegistrationMutationBy']
+               ['qrCheckinRevision','bracketView','capacity','confirmedCount','waitlistCount','registrationStatus','updatedAt','lastRegistrationMutationUid','lastRegistrationMutationType','lastRegistrationMutationBy']
              )
           && request.resource.data.bracketView is string
           && publicStaffRosterMutationValid(code)

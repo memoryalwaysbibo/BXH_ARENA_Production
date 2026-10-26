@@ -34,7 +34,7 @@ CALL／PASS 沿用既有獨立後端及原本推播，不調整既有 PASS 規�
 
 ## 規則候選與部署
 
-`build-rules.py` 接受明確基線，保留原規則所有條件並附加席位保護。已提交的產物是以本 repo 的 QR candidate 產生，並非已核實的最新 live rules。部署前必須先拉取最新 live rules、整合其他正在進行的修復及執行 emulator 驗證；不得把本檔直接覆蓋正式規則。
+`build-rules.py` 接受明確基線，保留原規則所有條件並附加席位保護。已提交產物改以 2026-10-26 18:03:35 UTC 的正式規則唯讀快照產生；來源為 Functions run 40374239019 的 artifact 12672839053，雜湊及 ruleset 證據記於 `reference/firestore.production-20261026.json`。保留目前正式版兩處 `qrCheckinRevision` 名單修復。部署時必須再次讀取 live rules，比對快照 SHA-256；不一致就停止並重新整合，不得覆蓋同時發布的其他修復。
 
 服務部署是獨立 codebase：`firebase deploy --only functions:referee-seats --project bxh-arena --config referee-seats/firebase.json`（部署前在 functions 安裝鎖定依賴）。目前未執行部署。
 
@@ -44,7 +44,7 @@ CALL／PASS 沿用既有獨立後端及原本推播，不調整既有 PASS 規�
 
 - `node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/scoring.test.cjs referee-seats/dispatch.test.cjs referee-seats/scoring-bridge.test.cjs`
 - `node referee-seats/browser.test.cjs`：需要 Playwright 及 Chromium，使用模擬後端、三個獨立頁面，驗證加入、主備交換、拒絕通知、撤銷、退出與四種寬度。
-- `python3 referee-seats/build-rules.py --source qr-checkin/firestore.candidate.rules --output /tmp/referee-seats.rules`
+- `python3 referee-seats/build-rules.py --source referee-seats/reference/firestore.production-20261026.rules --output /tmp/referee-seats.rules`
 
 另有 `full-rules.test.cjs` 直接載入完整候選規則，驗證裁判直接寫入被拒、場主管理保留、管理員不可竄改席位，以及各角色不可讀寫收據／稽核。這不代表已核對最新正式規則。
 

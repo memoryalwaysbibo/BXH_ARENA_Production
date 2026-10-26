@@ -29,7 +29,7 @@ jobs:
           git diff --exit-code -- referee-seats/functions/engine
       - name: Verify composed rules are reproducible
         run: |
-          python3 referee-seats/build-rules.py --source qr-checkin/firestore.candidate.rules --output /tmp/seat.rules
+          python3 referee-seats/build-rules.py --source referee-seats/reference/firestore.production-20261026.rules --output /tmp/seat.rules
           cmp /tmp/seat.rules referee-seats/firestore.candidate.rules
       - name: Firestore compilation, guard and actual service transactions
         env:
