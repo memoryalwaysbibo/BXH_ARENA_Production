@@ -1,5 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const C=require('./functions/core.cjs');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function fixture(){
@@ -33,3 +34,34 @@ test('public projection contains names without UIDs or request data',()=>{const 
 test('activation cannot silently convert legacy assignees or team scoring',()=>{const f=fixture();delete f.room.refereeSeatsV1;f.room.refereeStationAssignments={'1':['main']};assert.throws(()=>f.run('host','enable'),/legacy-assignments-exist/);f.room.refereeStationAssignments={};f.state.meta.battleMode='team';assert.throws(()=>f.run('host','enable'),/team-not-supported/);});
 
 test('unsupported enchantment cannot enable seats and strand its scoring',()=>{const f=fixture();delete f.room.refereeSeatsV1;f.state.meta.playMode='enchantment';assert.throws(()=>f.run('host','enable'),/enchantment-not-supported/);assert.equal(f.room.refereeSeatsV1,undefined);});
+
+function cancellationUi(f,beforeCommand=()=>{}){
+ const state=clone(f.state),calls=[],toasts=[];
+ state.cloudCode='BXH-TEST';state.meta.refereeSeatsV1=clone(f.room.refereeSeatsV1);
+ const context={
+  // Notification timers are unrelated to the click response under test.
+  setTimeout:()=>0,clearTimeout:()=>{},
+  cloudSync:{async manageRefereeSeats(data){calls.push(data);beforeCommand();return f.run('other',data.action,data).result;}}
+ };
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/referee-seats.js'),'utf8'),context);
+ context.BXHRefereeSeats.bind({state:()=>state,uid:()=>'other',eligible:()=>true,operator:()=>true,manager:()=>false,render:()=>{},toast:(message,error)=>toasts.push({message,error:error===true})});
+ return {ui:context.BXHRefereeSeats,calls,toasts};
+}
+test('requester cancel UI sends the court revision and confirms cancellation without changing seats',async()=>{
+ const f=fixture();f.op('main','claim','main');f.op('b1','claim','backup1');
+ const requestId=f.op('other','request','main').result.requestId,courts=clone(f.room.refereeSeatsV1.courts),before=clone(f.state);
+ const {ui,calls,toasts}=cancellationUi(f);
+ await ui.click('cancel',1,'main',requestId);
+ assert.equal(f.room.refereeSeatsV1.requests[requestId].status,'cancelled');
+ assert.equal(calls.length,1);assert.equal(calls[0].expectedCourtRevision,courts['1'].revision);
+ assert.deepEqual(f.room.refereeSeatsV1.courts,courts);assert.deepEqual(f.state,before);
+ assert.deepEqual(toasts,[{message:'已取消交接申請',error:false}]);
+});
+test('requester cancel UI preserves newer seats and reports a concurrent seat change',async()=>{
+ const f=fixture();f.op('main','claim','main');const requestId=f.op('other','request','main').result.requestId;
+ const {ui,toasts}=cancellationUi(f,()=>{f.op('host','revoke','main');f.op('b1','claim','main');});
+ await ui.click('cancel',1,'main',requestId);
+ assert.equal(f.room.refereeSeatsV1.courts['1'].main.uid,'b1');
+ assert.equal(f.room.refereeSeatsV1.requests[requestId].status,'stale');
+ assert.deepEqual(toasts,[{message:'席位已變更，請重新操作。',error:true}]);
+});

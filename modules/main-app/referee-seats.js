@@ -33,7 +33,7 @@
    const result=await root.cloudSync?.manageRefereeSeats?.({...data,code,operationId});
    if(!isCurrent(k))return;
    if(!result?.ok)throw new Error(result?.reason||'cloud-unavailable');
-   ctx.toast(data.action==='request'?'已提出交接申請，等待對方確認':data.action==='respond'?(data.response==='accept'?'交接完成':'已取消交接'):data.action==='enable'?'三席裁判制已啟用':data.action==='leave'?'已退出本台':data.action==='revoke'?'已撤銷該席位權限':'已加入本台');
+   ctx.toast(data.action==='request'?'已提出交接申請，等待對方確認':data.action==='respond'?(data.response==='accept'?'交接完成':'已取消交接'):data.action==='cancel'?'已取消交接申請':data.action==='enable'?'三席裁判制已啟用':data.action==='leave'?'已退出本台':data.action==='revoke'?'已撤銷該席位權限':'已加入本台');
   }catch(error){if(isCurrent(k))ctx.toast(messages[error.message]||'裁判席位未完成變更，請確認網路或服務狀態後重試。',true);}
   finally{if(isCurrent(k)){busy=false;ctx.render();}}
  }
@@ -89,7 +89,7 @@
   if(locked()||busy)return;
   if(action==='enable')return modal('啟用三席裁判制後，工作人員須加入該台席位才能計分。是否啟用？',[{label:'確定',run:()=>send({action:'enable'})},{label:'取消'}]);
   if(!eligible())return ctx.toast('您不在本場工作人員名單，請聯絡場主。',true);
-  if(action==='cancel')return send({action:'cancel',station,slot,requestId});
+  if(action==='cancel')return send({action:'cancel',station,slot,requestId,expectedCourtRevision:model()?.courts?.[station]?.revision||0});
   const court=model()?.courts?.[station]||{},seat=court[slot],base={station,slot,expectedCourtRevision:court.revision||0,expectedUid:seat?.uid||null};
   if(!seat)return send({...base,action:'claim'});
   if(seat.uid===uid())return modal(`是否退出 ${station} 號台${labels[slot]}？`,[{label:'確定',run:()=>send({...base,action:'leave'})},{label:'取消'}]);
