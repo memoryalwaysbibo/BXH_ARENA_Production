@@ -11,7 +11,7 @@
 - No additional win-rate gate; no Elo/opponent-strength implementation in this update.
 - Current grade can fall; highest attained grade is a separate lifetime concept. No seasonal reset or inactivity deduction.
 
-| Grade | Rating | Minimum strength | Lifetime matches | Events | Verified different opponents | Medium | Large |
+| Grade | Rating | Minimum strength | Lifetime matches | Events | Verified different opponents | Medium or larger | Large |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | E | 25 | 20 | 2 | 1 | 2 | 0 | 0 |
 | D | 35 | 25 | 4 | 2 | 3 | 0 | 0 |
@@ -22,7 +22,7 @@
 | National | 85 | 75 | 50 | 20 | 30 | 2 | 2 |
 
 All gates apply simultaneously. Failure to reach E means ungraded. Valid round counts are displayed but no longer an extra promotion gate in this draft.
-Medium is 96–127 actual played participants; large is 128+. The buckets are exclusive. Registration capacity and waitlists are not used. A player's valid completed match is required to count an event.
+2026-10-27 owner-approved promotion policy (`medium-or-larger-v1`): medium-or-larger gates require 96+ actual played participants, including large events (128+). Raw medium (96–127) and large (128+) history buckets remain exclusive. For promotion, use medium + large; a large event can satisfy both gates while counting once in total events. Current grade and historical replay use the same policy, including eligible past events. Other eligibility and evidence rules are unchanged. Old backend current-grade snapshots without this policy marker cannot override the new browser calculation; verified lifetime awards are preserved. Registration capacity and waitlists are not used. A player's valid completed match is required to count an event.
 
 ## Implementation boundary
 
@@ -44,7 +44,7 @@ Distinct opponent counts use resolved cross-event identity, never display-name m
 
 ## Public sample check
 
-A partial public S1 sample of 225 identified players yielded: ungraded 93, E 62, D 34, C 26, B 10, A/S/National 0. These are sample-only computations, not production player grades. No sampled player has more than 20 analyzable matches, so this sample cannot validate 20-versus-30 window behavior; synthetic boundary/rollover tests cover the window mechanics. No 96–127-player event exists in the sample, which blocks A+ under the exclusive medium requirement. Opponent identity coverage and historical completeness limit conclusions.
+A partial public S1 sample of 225 identified players yielded: ungraded 93, E 62, D 34, C 26, B 10, A/S/National 0. These are sample-only computations, not production player grades. No sampled player has more than 20 analyzable matches, so this sample cannot validate 20-versus-30 window behavior; synthetic boundary/rollover tests cover the window mechanics. No 96–127-player event exists in the sample, which blocked A+ under the former exclusive medium requirement (superseded on 2026-10-27). Opponent identity coverage and historical completeness limit conclusions.
 
 ## 2026-10-20 public numerical audit
 
