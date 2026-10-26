@@ -6435,12 +6435,31 @@ async function saveState(options={}){
     // Explicit settings saves stay detached until the cloud accepts them. They
     // never become an optimistic local snapshot or an automatic retry payload.
     if(!snapshot.cloudCode||!cloudAvailable()||currentRole==="guest"||!options.settingsToken.isCurrent())return false;
-    const ok=await enqueueCloudStateWrite(snapshot.cloudCode,snapshot,{syncCommunitySummary:true});
+    const ok=await enqueueCloudStateWrite(snapshot.cloudCode,snapshot,{syncCommunitySummary:true,registrationSettings:true});
     if(ok!==true)return false;
     options.cloudSaved=true;
     cloudStatus="connected";cloudLastSyncAt=Date.now();
     if(!options.settingsToken.isCurrent())return false;
     try{return await saveRecord(snapshot)===true;}catch(e){console.warn("[community settings local cache]",e);return false;}
+  }
+  if(options.registrationSettings===true && snapshot.cloudCode){
+    if(!cloudAvailable()||currentRole==='guest'){window.__BXH_LAST_CLOUD_ERROR_CODE=cloudAvailable()?'permission-denied':'unavailable';return false;}
+    try{
+      const writeOptions={registrationSettings:true,...(snapshot.startedAt&&window.BXHBracketCommit?{bracketStartSignature:window.BXHBracketCommit.signature(snapshot)}:{})};
+      const ok=await enqueueCloudStateWrite(snapshot.cloudCode,snapshot,writeOptions);
+      if(ok!==true){
+        // Policy rejection is not a disconnected Firebase session. Keep the
+        // original draft for explicit retry, never an unmarked auto-retry.
+        const error=window.__BXH_LAST_CLOUD_ERROR_CODE;
+        if(['onsite-registration-settings-managed','onsite-waitlist-managed','onsite-runtime-stale','registration-roster-stale'].includes(error)){
+          cloudStatus='connected';cloudAccessLimited=false;cloudAccessMessage='';
+        }
+        return false;
+      }
+      options.cloudSaved=true;cloudStatus='connected';cloudLastSyncAt=Date.now();
+      if(state===requestedState&&snapshot.onsiteWaitlistFinalized===true)state.onsiteWaitlistRuntimeRevision=snapshot.onsiteWaitlistRuntimeRevision;
+      try{return await saveRecord(snapshot)===true;}catch(e){return false;}
+    }catch(e){return false;}
   }
   const localSavePromise = saveRecord(snapshot);
 
@@ -9299,10 +9318,49 @@ async function publishPendingPosterCover(code){
     showToast(retrySaved?"賽事已發布，海報縮圖上傳失敗；舊圖保留，請按「更新並重新發布」重試":"賽事已發布，海報縮圖上傳失敗；舊圖保留。本機無法保存重試資料，請留在此頁按「更新並重新發布」重試",true);
   }
 }
+function onsiteRegistrationSettingsLocked(st=state){
+  return st.onsiteWaitlistServerOwned===true || st.onsiteWaitlistFinalized===true || st.meta?.registrationOnsiteWaitlistEnabled===true;
+}
+function managedRegistrationSettingsChanged(next,st=state){
+  if(!onsiteRegistrationSettingsLocked(st))return false;
+  return ['registrationEnabled','registrationOpenAt','registrationCloseAt','registrationCapacity','waitlistCapacity','cancellationDeadline'].some(key=>{
+    if(!Object.prototype.hasOwnProperty.call(next,key))return false;
+    const normalize=value=>key==='registrationEnabled'?!!value:(value||null);
+    return normalize(next[key])!==normalize(st.meta?.[key]);
+  });
+}
+function managedRegistrationSettingsNotice(){
+  if(!onsiteRegistrationSettingsLocked())return '';
+  return '<div class="banner warn" role="status"><span>本場報名時間與名額由候補抽選管理，請從備取／抽籤調整。重新開啟候補不會重新開放線上報名。</span>'+
+    (canManageOnsiteWaitlist()?'<button class="btn btn-ghost btn-sm" data-action="open-registration-waitlist">前往備取／抽籤</button>':'')+'</div>';
+}
+function reportManagedRegistrationSettings(){
+  showToast('報名設定未儲存：本場已由候補抽選管理，請重新讀取賽事後，從「備取／抽籤」調整名額。',true);
+}
+let registrationSettingsSaveEpoch=0;
+async function saveRegistrationSettingsAndReport(previousMeta,message,resetSettings=false){
+  const epoch=++registrationSettingsSaveEpoch,room=state,meta=state.meta;
+  const actor=typeof currentAuthUid==='function'?currentAuthUid():null;
+  const options={registrationSettings:true};
+  let ok;try{ok=await saveState(options);}catch(e){ok=false;}
+  if(epoch!==registrationSettingsSaveEpoch||state.id!==room.id||state.cloudCode!==room.cloudCode||(typeof currentAuthUid==='function'?currentAuthUid():null)!==actor)return false;
+  if(ok===false&&!options.cloudSaved){
+    // The failed draft never becomes a retryable whole-room snapshot.
+    if(state.meta===meta)state.meta=previousMeta;
+    render();
+    if(window.__BXH_LAST_CLOUD_ERROR_CODE==='onsite-registration-settings-managed'||window.__BXH_LAST_CLOUD_ERROR_CODE==='onsite-waitlist-managed')reportManagedRegistrationSettings();
+    else showToast('設定尚未確認儲存，請確認連線並重試；輸入草稿仍保留。',true);
+    return false;
+  }
+  resetRegistrationFormDraft();if(resetSettings)resetSettingsFormDraft();render();
+  showToast(ok===false?'設定已儲存到雲端，但本機快取未完成，請重新整理確認':message,ok===false);
+  return true;
+}
+
 async function publishRegistrationConfig(){
   state.meta.publishedAt = Date.now();
   state.meta.registrationStatus = computeRegistrationStatus(state.meta);
-  await saveRecord(state); // 先保存草稿；此步驟不建立任何雲端代碼
+  if(!state.cloudCode)await saveRecord(state); // New-room drafts are local; existing-room edits wait for cloud confirmation.
 
   if(!state.cloudCode){
     if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
@@ -9341,12 +9399,19 @@ async function publishRegistrationConfig(){
     return;
   }
 
-  const syncResult = await saveState();
+  const publishOptions={registrationSettings:true};
+  const syncResult = await saveState(publishOptions);
+  if(syncResult===false&&!publishOptions.cloudSaved){
+    render();
+    if(['onsite-registration-settings-managed','onsite-waitlist-managed'].includes(window.__BXH_LAST_CLOUD_ERROR_CODE))reportManagedRegistrationSettings();
+    else showToast("報名設定尚未確認發布，請重新讀取賽事後再試。",true);
+    return;
+  }
   await publishPendingPosterCover(state.cloudCode);
   publicTournamentsCache = null; publicTournamentsError = null;
   render();
   showToast("賽事設定已更新");
-  if(syncResult===false) showToast("已儲存本機，等待雲端同步", true);
+  if(syncResult===false) showToast("設定已儲存到雲端，但本機快取未完成，請重新整理確認", true);
 }
 
 function tournamentStatus(){
@@ -11809,9 +11874,10 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     capacity: m.registrationCapacity, confirmedCount: 0,
     registrationStatus: null, eventCancelled: false
   })));
-  const locked = state.bracketSize > 0;
+  const locked = state.bracketSize > 0 || onsiteRegistrationSettingsLocked();
   return `<div class="panel">
     <div class="panel-title">線上報名設定</div>
+    ${managedRegistrationSettingsNotice()}
     ${registrationFormDraftDirty ? `<div class="banner warn"><span>尚有未儲存的變更，請記得點擊下方「儲存報名設定」。</span></div>` : ""}
     ${showModeSelector ? `<div class="scoring-mode-cards">
       <button class="scoring-mode-card ${!d.registrationEnabled?'active':''}" data-action="set-registration-enabled" data-value="false" ${locked?'disabled':''}>
@@ -11823,7 +11889,7 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
         <div class="smc-desc">發布後玩家可掃 QR 或從賽事大廳自行報名。</div>
       </button>
     </div>
-    ${locked ? `<p class="hint" style="margin-top:10px;">已產生對戰表，無法變更是否啟用線上報名。</p>` : ""}` : ""}
+    ${state.bracketSize>0 ? `<p class="hint" style="margin-top:10px;">已產生對戰表，無法變更是否啟用線上報名。</p>` : ""}` : ""}
     ${d.registrationEnabled ? `
     ${teamRegistrationMode?`<div class="banner" style="margin-top:14px;"><span><b>${teamRegistrationSize}V${teamRegistrationSize} 團體戰</b>｜報名與正備取名額都以「隊伍」計算；玩家端先填隊名，再完整填入 ${teamRegistrationSize} 位隊員。</span></div>`:`<div class="field" style="margin-top:14px;">
       <label>參賽名稱顯示</label>
@@ -11841,16 +11907,17 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
       </div>
       <p class="hint" style="margin-top:6px;">${d.targetGroup==='children' ? "限 6 歲以上、13 歲以下參加。" : "不限年齡，符合活動規則者皆可參加。"}</p>
     </div>`}
-    <div class="grid grid-2" style="margin-top:14px;">
+    <fieldset style="border:0;padding:0;margin:0;min-width:0" ${onsiteRegistrationSettingsLocked()?'disabled':''}><div class="grid grid-2" style="margin-top:14px;">
       <div class="field"><label>報名開放時間</label>${renderHalfHourDatetimeDraft("reg-open-at","registrationOpenAt",d.registrationOpenAt)}</div>
       <div class="field"><label>報名截止時間</label>${renderHalfHourDatetimeDraft("reg-close-at","registrationCloseAt",d.registrationCloseAt)}</div>
       <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
+    </div></fieldset><div class="grid grid-2">
       <div class="field"><label>報名費（元，選填）</label><input type="number" id="reg-fee" data-draft-field="registrationFee" data-draft-type="int-or-null" min="0" value="${d.registrationFee!=null?d.registrationFee:""}"></div>
     </div>
     ${state.entrySelection?.mode==='registration'?'<p class="hint">本場已啟用報名抽籤：報名不限額、備取不限額，正取人數請至「參賽名額抽籤」調整。下列舊制上限不套用於本場。</p>':''}
     <div class="field" style="margin-top:8px;">
       <label>${teamRegistrationMode?"備取隊伍上限（選填）":"備取人數上限（選填）"}</label>
-      <input type="number" id="reg-waitlist-capacity" data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
+      <input type="number" id="reg-waitlist-capacity" ${onsiteRegistrationSettingsLocked()?'disabled':''} data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
       <p class="hint" style="margin-top:6px;">有需要備取就填${teamRegistrationMode?"隊伍數":"人數"}；留空即代表 0、不開放備取。</p>
     </div>
     <div class="field" style="margin-top:8px;"><label>活動說明（選填）</label><textarea id="reg-event-desc" data-draft-field="eventDescription" data-draft-type="string" rows="3">${esc(d.eventDescription)}</textarea></div>
@@ -12458,10 +12525,10 @@ function renderSettings(){
   </div>
   <div class="panel settings-flow-panel">
     <div class="settings-choice-row">
-      <button class="scoring-mode-card ${!registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="false" ${state.bracketSize>0?'disabled':''}>
+      <button class="scoring-mode-card ${!registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="false" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
         <div class="smc-title">現場報名</div><div class="smc-desc">現場直接新增選手，不開放線上報名。</div>
       </button>
-      <button class="scoring-mode-card ${registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="true" ${state.bracketSize>0?'disabled':''}>
+      <button class="scoring-mode-card ${registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="true" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
         <div class="smc-title">線上報名</div><div class="smc-desc">玩家可由賽事大廳或 QR CODE 進入報名。</div>
       </button>
     </div>
@@ -16482,6 +16549,11 @@ async function resolveHunterOpponentIdentities(records){
   const backend=typeof window.engagementService?.hunterOpponentIdentity==="function";
   if(hunterOpponentIdentityLoading || (!backend&&!window.engagementService?.playerCard)) return;
   const rows=Array.isArray(records)?records:[];
+  // UI failures must not cancel the read-only identity work or strand its lock.
+  const redraw=()=>{
+    try{if(typeof renderPreservingScroll==='function')renderPreservingScroll();else render();}
+    catch(error){console.warn('[Hunter Identity] progress render failed');}
+  };
   const pending=new Map();
   rows.forEach(record=>{
     const direct=String(record&&record.opponent&&record.opponent.playerId||"").trim();
@@ -16494,15 +16566,16 @@ async function resolveHunterOpponentIdentities(records){
     if(!hunterOpponentIdentityCache.has(ref)) pending.set(ref,record);
     else hunterApplyOpponentIdentity(rows,ref,hunterOpponentIdentityCache.get(ref));
   });
-  if(!pending.size) return;
+  if(!pending.size){if(rows.length)redraw();return;}
   const generation=++hunterOpponentIdentityGeneration;
   const owner=(typeof currentAuthUid==="function"?currentAuthUid():"")||"";
   hunterOpponentIdentityLoading=true;
   pending.forEach((record,ref)=>hunterApplyOpponentIdentity(rows,ref,{scope:"loading",playerId:null,source:"event-card"}));
-  if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
   const entries=Array.from(pending.entries());
   try{
+    redraw();
     for(let i=0;i<entries.length;i+=4){
+      if(generation!==hunterOpponentIdentityGeneration||(owner&&currentAuthUid()!==owner))break;
       const batch=entries.slice(i,i+4);
       await Promise.all(batch.map(async ([ref,record])=>{
         let value={scope:"unresolved",playerId:null,source:"event-card-error"};
@@ -16534,11 +16607,12 @@ async function resolveHunterOpponentIdentities(records){
         if(value.scope!=="unresolved") hunterOpponentIdentityCache.set(ref,value);
         hunterApplyOpponentIdentity(rows,ref,value);
       }));
+      if(generation===hunterOpponentIdentityGeneration&&(!owner||currentAuthUid()===owner))redraw();
     }
   }finally{
     if(generation===hunterOpponentIdentityGeneration){
       hunterOpponentIdentityLoading=false;
-      if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
+      if(!owner||currentAuthUid()===owner)redraw();
     }
   }
 }
@@ -16887,7 +16961,8 @@ function renderPlayerStatsTab(p){
   const dataReady=dataStatus==="ready"||dataStatus==="empty"||dataStatus==="partial";
   const completeHistory=dataStatus==="ready"||dataStatus==="empty";
   const licenseOverview=hunterLicenseOverview(allRecords,hunterBuildAnalysis,completeHistory);
-  const {analysis:careerAnalysis,grade:licenseGrade}=licenseOverview;
+  const {analysis:careerAnalysis}=licenseOverview;
+  const licenseGrade=window.BXHHunterLicenseV21?.displayGrade?.(licenseOverview,hunterProfileCache?.permanentLicense)||licenseOverview.grade;
   const growth=window.BXHArenaPK?.practiceGrowth?.(licenseOverview.growth)||licenseOverview.growth;
   if(!completeHistory){careerAnalysis.eligible=false;careerAnalysis.overall=null;}
   const statValue=(value,suffix="")=>dataReady?String(value)+suffix:"—";
@@ -17270,8 +17345,9 @@ function playerCenterHunterSummaryHtml(records,status){
   const levelReady=['ready','empty'].includes(status)&&growth.practiceXpReady!==false;
   const grade=license.grade;
   const persisted=window.BXHHunterLicenseV21?.verifiedSnapshot?.(hunterProfileCache?.permanentLicense);
-  const current=persisted?.current||grade;
-  const currentLabel=persisted?.current?window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label:grade.label;
+  const current=window.BXHHunterLicenseV21?.displayGrade?.(license,hunterProfileCache?.permanentLicense)||persisted?.current||grade;
+  const currentLabel=current.label||window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label;
+  const highestLabel=window.BXHHunterLicenseV21?.displayHighest?.(license,hunterProfileCache?.permanentLicense)||(persisted?.highestTier?window.BXHHunterLicenseV21.rules().find(r=>r.tier===persisted.highestTier)?.label:license.highest?.label)||'待核對';
   const ornament={pending:'',e:'◇',d:'◆',c:'❧',b:'✥',a:'✦',s:'✧',national:'龍'}[current.tier]||'';
   const gradeHtml='<span class="hunter-grade-badge grade-'+esc(current.tier)+'"><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span><span class="hunter-grade-label">'+esc(currentLabel)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span></span>';
   const official=hunterFilterByMode(playerCenterRecordPartition(records).official,'standard').slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b));
@@ -17279,7 +17355,7 @@ function playerCenterHunterSummaryHtml(records,status){
   const milestones=[['首次出賽'+(pending?'（待核對）':''),official[0]],['首場勝利'+(pending?'（待核對）':''),official.find(r=>r.isWin)]];
   return '<section class="panel player-center-hunter-summary"><div class="hunter-section-head"><div><p class="hunter-kicker">HUNTER JOURNEY</p><h2>我的獵人旅程</h2></div><div class="player-center-hunter-ranks"><div><span class="hint">經驗等級</span><strong class="player-center-level">'+(levelReady?(practiceAllowed?'LV.':'賽事 LV.')+growth.level:'等級待核對')+'</strong></div><div><span class="hint">目前證照階級</span>'+gradeHtml+'</div></div></div>'+
     '<div class="hunter-growth"><div class="hunter-growth-head"><strong>'+(levelReady?growth.xp+(practiceAllowed?' XP':' 賽事 XP'):ready?'已讀取 '+growth.xp+' XP':status==='loading'?'經驗讀取中':'經驗尚未讀取')+'</strong><span>'+(levelReady?(growth.level>=99?'MAX':'距離 LV.'+(growth.level+1)+' 還有 '+Math.max(0,growth.next-growth.xp)+' XP'):'')+'</span></div><div class="hunter-growth-track"><div class="hunter-growth-fill" style="width:'+(levelReady?growth.progress:0)+'%"></div></div></div><p class="hint">等級代表累積經驗。'+(!practiceAllowed?'此樣本顯示賽事等級與 XP，尚未包含獵人交鋒練習經驗。':!levelReady&&ready?'完整等級待賽事與練習經驗核對完成後顯示。':'')+'</p>'+
-    '<p class="hint">獵人執照 2.1｜評級分 '+(current.score==null?'—':(Math.floor(current.score*10)/10).toFixed(1))+'｜最近 '+(persisted?.current?.matches??license.analysis.matches)+' 場實力 '+(persisted?.current?.strength??license.analysis.overall??'—')+'｜歷練加成 '+(Math.floor(grade.bonus*10)/10).toFixed(1)+'</p><p>生涯最高'+(persisted?.highestTier?'（永久授予）':'（歷史回算）')+'：<strong>'+esc(persisted?.highestTier?window.BXHHunterLicenseV21.rules().find(r=>r.tier===persisted.highestTier)?.label||'待核對':license.highest?.label||'待核對')+'</strong></p>'+(persisted?.highestTier?(persisted.status==='needs_review'?'<p class="hint">近期回算與授階紀錄不同，保留已授予的最高階級並等待核對。</p>':''):'<p class="hint">生涯最高永久授予紀錄尚未接入；此處先依新版規則回算。</p>')+
+    '<p class="hint">獵人執照 2.1｜評級分 '+(current.score==null?'—':(Math.floor(current.score*10)/10).toFixed(1))+'｜最近 '+(persisted?.current?.matches??license.analysis.matches)+' 場實力 '+(persisted?.current?.strength??license.analysis.overall??'—')+'｜歷練加成 '+(Math.floor(grade.bonus*10)/10).toFixed(1)+'</p><p>生涯最高'+(persisted?.highestTier?'（永久授予）':'（歷史回算）')+'：<strong>'+esc(highestLabel)+'</strong></p>'+(persisted?.highestTier?(persisted.status==='needs_review'?'<p class="hint">近期回算與授階紀錄不同，保留已授予的最高階級並等待核對。</p>':''):'<p class="hint">生涯最高永久授予紀錄尚未接入；此處先依新版規則回算。</p>')+
     '<h3>生涯里程碑</h3><div class="player-center-milestones">'+milestones.map(([label,record])=>'<article><span class="hunter-kicker">'+label+'</span><strong>'+(record?esc(record.eventDate||hunterAchievementDateText(hunterRecordTimestamp(record))):ready?'尚待達成':'尚未讀取')+'</strong><p>'+(record?esc(record.eventName||record.eventCode||'賽事名稱未記錄'):ready?'等待下一篇賽場故事':'')+'</p>'+(record?'<button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="career">查看賽事紀錄</button>':'')+'</article>').join('')+'</div><p class="hint">里程碑依 2026/10/1 起已核對的正式對戰紀錄顯示。'+(status==='partial'?'部分歷史尚未讀取，首次紀錄仍待完整核對。':'')+'</p></section>';
 }
 function renderPlayerCenterOverview(p){
@@ -18045,6 +18121,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
 }
 function render(){
   syncQrScannerModal();
+  clearBoardModeInteractions();
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
@@ -19290,7 +19367,8 @@ function flushBoardTransform(){
     const canvas = document.getElementById("board-canvas");
     if(canvas) canvas.style.transform = "translate("+boardPanX+"px, "+boardPanY+"px) scale("+boardZoom+")";
     const pctEl = document.getElementById("board-zoom-pct");
-    if(pctEl) pctEl.textContent = Math.round(boardZoom*100)+"%";
+    const pct = Math.round(boardZoom*100)+"%";
+    if(pctEl && pctEl.textContent!==pct) pctEl.textContent = pct;
   }catch(e){}
 }
 
@@ -19381,37 +19459,57 @@ async function exportBoardAsImage(){
   }
 }
 
+let boardModeInteractionCleanup = null;
+function clearBoardModeInteractions(){
+  if(boardModeInteractionCleanup){
+    boardModeInteractionCleanup();
+    boardModeInteractionCleanup = null;
+  }
+}
 function bindBoardModeInteractions(){
+  clearBoardModeInteractions();
   if(bracketViewMode!=="board") return;
   try{
     const viewport = document.getElementById("board-viewport");
     const canvas = document.getElementById("board-canvas");
     if(!viewport || !canvas) return;
 
+    const removers = [];
+    const listen = (target, type, handler, options)=>{
+      target.addEventListener(type, handler, options);
+      removers.push(()=>target.removeEventListener(type, handler, options));
+    };
+    boardModeInteractionCleanup = ()=>{
+      removers.forEach(remove=>remove());
+      viewport.style.cursor="grab";
+    };
+
     bindCompletedMatchCorrectionLongPress(viewport);
     bindManualCourtAssignLongPress(viewport);
 
-    viewport.addEventListener("wheel", (e)=>{
+    listen(viewport, "wheel", (e)=>{
       if(!e.ctrlKey) return;
       e.preventDefault();
       setBoardZoom(boardZoom + (e.deltaY<0 ? 0.1 : -0.1));
     }, { passive:false });
 
     let dragging=false, startX=0, startY=0, startPanX=0, startPanY=0;
-    viewport.addEventListener("mousedown", (e)=>{
+    listen(viewport, "mousedown", (e)=>{
       dragging=true; startX=e.clientX; startY=e.clientY; startPanX=boardPanX; startPanY=boardPanY;
       viewport.style.cursor="grabbing";
     });
-    window.addEventListener("mousemove", (e)=>{
-      if(!dragging) return;
+    listen(window, "mousemove", (e)=>{
+      if(!dragging || !viewport.isConnected) return;
       boardPanX = startPanX + (e.clientX-startX);
       boardPanY = startPanY + (e.clientY-startY);
       applyBoardTransform();
     });
-    window.addEventListener("mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
+    listen(window, "mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
+
+    listen(window, "blur", ()=>{ dragging=false; viewport.style.cursor="grab"; });
 
     let touchStartDist=0, touchStartZoom=1, touchStartX=0, touchStartY=0, touchStartPanX=0, touchStartPanY=0;
-    viewport.addEventListener("touchstart", (e)=>{
+    listen(viewport, "touchstart", (e)=>{
       if(e.touches.length===2){
         touchStartDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         touchStartZoom = boardZoom;
@@ -19420,7 +19518,7 @@ function bindBoardModeInteractions(){
         touchStartPanX = boardPanX; touchStartPanY = boardPanY;
       }
     }, { passive:true });
-    viewport.addEventListener("touchmove", (e)=>{
+    listen(viewport, "touchmove", (e)=>{
       if(e.touches.length===2){
         e.preventDefault();
         const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
@@ -19432,7 +19530,7 @@ function bindBoardModeInteractions(){
         applyBoardTransform();
       }
     }, { passive:false });
-    viewport.addEventListener("touchend", (e)=>{
+    listen(viewport, "touchend", (e)=>{
       if(e.touches.length===1){
         touchStartX=e.touches[0].clientX; touchStartY=e.touches[0].clientY;
         touchStartPanX=boardPanX; touchStartPanY=boardPanY;
@@ -19442,9 +19540,11 @@ function bindBoardModeInteractions(){
       }
     }, { passive:true });
 
+    listen(viewport, "touchcancel", ()=>{ touchStartDist=0; }, { passive:true });
+
     const themeSelect = document.getElementById("board-theme-select");
     if(themeSelect){
-      themeSelect.addEventListener("change", ()=>{
+      listen(themeSelect, "change", ()=>{
         boardTheme = themeSelect.value;
         const shell = document.getElementById("board-shell");
         if(shell) shell.setAttribute("data-board-theme", boardTheme);
@@ -20035,6 +20135,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="load-admin-registrations"){
     loadAdminRegistrationRows();
     return;
+  }
+  if(action==="open-registration-waitlist"){
+    if(!canManageOnsiteWaitlist())return;
+    if(appPhase==='community-room')communityRoomActiveTab='people';else activeTab='people';
+    peopleRosterSection='waitlist';render();return;
   }
   if(action==="people-section"){
     const section=target.getAttribute("data-section");
@@ -20664,6 +20769,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       registrationVisibility:m.registrationVisibility||"public",registrationOpenAt:openAt,registrationCloseAt:closeAt,
       cancellationDeadline:quickRegistration?cancellationDeadline:(cancellationDeadline??closeAt),registrationCapacity:quickRegistration?capacity:(capacity??m.registrationCapacity??0),waitlistCapacity:waitlist,
       registrationStatus:registrationEnabled?(openAt!==null&&Date.now()<openAt?"scheduled":"open"):"closed"};
+    if(managedRegistrationSettingsChanged(nextMeta)){reportManagedRegistrationSettings();return;}
     const roomId=state.id,roomCode=state.cloudCode,actorUid=currentAuthUid(),roomGeneration=communityRoomSnapshotGeneration;
     const initial=JSON.parse(JSON.stringify(state));
     const sameContext=()=>appPhase==="community-room"&&communityRoomSnapshotGeneration===roomGeneration&&state.id===roomId&&state.cloudCode===roomCode&&currentAuthUid()===actorUid&&isCommunityRoomOwner()&&canManageRegistrationRoster();
@@ -20767,7 +20873,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           try{await saveRecord(state);}catch(cacheError){console.warn("[community settings local cache]",cacheError);}
           if(!sameContext())return;
           render();
-          if(raw.includes("room-access-locked"))showToast("比賽已開始，不能再修改房間密碼",true);
+          if(raw.includes("onsite-registration-settings-managed")||raw.includes("onsite-waitlist-managed"))reportManagedRegistrationSettings();
+          else if(raw.includes("room-access-locked"))showToast("比賽已開始，不能再修改房間密碼",true);
           else if(raw.includes("invalid-room-password"))showToast("房間密碼需為 4～20 字元",true);
           else if(writeGate.rejectPendingWrites||raw.includes("settings-"))showToast(accessSaved?"房間存取已更新；其他設定或名單同時變更，尚未儲存的輸入已保留，請重新整理後再試":"設定或名單同時變更，尚未儲存的輸入已保留，請重新整理後再試",true);
           else showToast(accessSaved?"房間存取已更新，但一般賽事設定未確認儲存，請重新整理後再試":"一般賽事設定未儲存，請確認連線後再試",true);
@@ -23235,6 +23342,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="set-registration-enabled"){
+    if(onsiteRegistrationSettingsLocked()){reportManagedRegistrationSettings();return;}
     if(state.bracketSize>0){ showToast("已產生對戰表，無法變更是否啟用線上報名", true); return; }
 
     syncSettingsDraftFromDom();
@@ -23601,6 +23709,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
       if(d.targetGroup!=="open" && d.targetGroup!=="children"){ showToast("活動組別設定有誤，請重新選擇", true); return; }
     }
+    if(managedRegistrationSettingsChanged(d)){reportManagedRegistrationSettings();return;}
+    const previousMeta=JSON.parse(JSON.stringify(state.meta));
     // Only NOW does anything touch state.meta / saveState() / Firebase.
     const wasEnabled = state.meta.registrationEnabled;
     state.meta.registrationEnabled = d.registrationEnabled;
@@ -23612,7 +23722,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }
     state.meta.registrationOpenAt = d.registrationOpenAt;
     state.meta.registrationCloseAt = d.registrationCloseAt;
-    state.meta.cancellationDeadline = d.registrationCloseAt ? (d.registrationCloseAt + 3 * 60 * 60 * 1000) : null;
+    state.meta.cancellationDeadline = onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(d.registrationCloseAt ? (d.registrationCloseAt + 3 * 60 * 60 * 1000) : null);
     state.meta.registrationCapacity = d.registrationCapacity;
     state.meta.registrationFee = d.registrationFee;
     state.meta.targetGroup = d.targetGroup;
@@ -23623,13 +23733,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.eventDescription = d.eventDescription;
     state.meta.registrationNotes = "";
     state.meta.registrationVisibility = d.registrationVisibility;
-    resetRegistrationFormDraft();
-    (async()=>{
-      const ok=await saveState();
-      render();
-      if(ok===false) showToast("設定已保存在本機，但雲端尚未同步；公開大廳可能仍顯示舊狀態",true);
-      else showToast("已儲存線上報名設定");
-    })();
+    void saveRegistrationSettingsAndReport(previousMeta,"已儲存線上報名設定");
     return;
   }
   if(action==="copy-registration-url"){
@@ -23652,6 +23756,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(managedRegistrationSettingsChanged(rd)){reportManagedRegistrationSettings();return;}
     if(!aiCreateReviewGate("進入發布預覽")) return;
 
     if(isTester()){
@@ -23688,7 +23793,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.registrationEnabled=!!rd.registrationEnabled;
     state.meta.registrationOpenAt=rd.registrationOpenAt;
     state.meta.registrationCloseAt=rd.registrationCloseAt;
-    state.meta.cancellationDeadline=rd.registrationCloseAt ? rd.registrationCloseAt+3*60*60*1000 : null;
+    state.meta.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? rd.registrationCloseAt+3*60*60*1000 : null);
     state.meta.registrationCapacity=rd.registrationCapacity;
     state.meta.registrationFee=rd.registrationFee;
     state.meta.targetGroup=rd.targetGroup;
@@ -23781,6 +23886,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(managedRegistrationSettingsChanged(rd)){reportManagedRegistrationSettings();return;}
+    const previousRegistrationMeta=JSON.parse(JSON.stringify(state.meta));
     if(!aiCreateReviewGate("儲存賽事設定")) return;
     if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
       showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
@@ -23832,7 +23939,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
       state.meta.registrationOpenAt=rd.registrationOpenAt;
       state.meta.registrationCloseAt=rd.registrationCloseAt;
-      state.meta.cancellationDeadline=rd.registrationCloseAt ? (rd.registrationCloseAt+3*60*60*1000) : null;
+      state.meta.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? (rd.registrationCloseAt+3*60*60*1000) : null);
       state.meta.registrationCapacity=rd.registrationCapacity;
       state.meta.registrationFee=rd.registrationFee;
       state.meta.targetGroup=rd.targetGroup;
@@ -23851,9 +23958,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state.championId=null; state.runnerUpId=null; state.thirdId=null; state.fourthId=null;
         state.gfMatchId=null; state.gfResetMatchId=null; state.bronzeMatchId=null; state.rrRounds=0;
         state.courtAssignments={};
-        resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null; aiCreateReviewAcknowledged=false; aiCreateReviewAcknowledged=false;
-        saveState(); render();
-        showToast("賽制已更換，請重新產生對戰表");
+        aiCreateLastApplied=null; aiCreateReviewAcknowledged=false; aiCreateReviewAcknowledged=false;
+        void saveRegistrationSettingsAndReport(previousRegistrationMeta,"賽制已更換，請重新產生對戰表",true);
       }});
       return;
     }
@@ -23884,9 +23990,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     });
 
     rebuildCourtAssignments();
-    resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null;
-    saveState(); render();
-    showToast("賽事設定已儲存");
+    aiCreateLastApplied=null;
+    void saveRegistrationSettingsAndReport(previousRegistrationMeta,"賽事設定已儲存",true);
     return;
   }
   if(action==="load-test"){
@@ -24804,3 +24909,4 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
