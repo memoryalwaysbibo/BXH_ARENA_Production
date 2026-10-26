@@ -1,0 +1,25 @@
+name: Partner Policy Compatibility Candidate
+on:
+  pull_request:
+    paths: ['index.html', 'modules/cloud/cloud-runtime.js', 'modules/main-app/core.js', 'partner-organizer-ui.js', 'partner-quota-policy.js', 'partner-policy/**', 'tests/partner-quota-policy.test.cjs', '.github/workflows/partner-policy-rollout.yml']
+permissions:
+  contents: read
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: python3 partner-policy/build-rules.py
+      - run: node --test tests/partner-quota-policy.test.cjs
+      - run: npm install --no-save --ignore-scripts @firebase/rules-unit-testing@4.0.1 firebase@11 firebase-tools@14
+      - run: npx firebase emulators:exec --only firestore --project demo-bxh-partner-rules --config partner-policy/firebase.emulator.json 'node --test partner-policy/rules.test.cjs'

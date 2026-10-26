@@ -52,7 +52,8 @@ function renderCommunitySettings(){
     ${window.__BXH_COMMUNITY_SUMMARY_STATUS?.[state.cloudCode]?.ok===false?'<div class="banner warn"><span>設定已儲存，參賽人數摘要尚未同步。</span><button class="btn btn-ghost btn-sm" data-action="community-sync-summary">重新同步人數</button></div>':""}
     <div class="grid grid-2"><div class="field"><label>賽事名稱</label><input id="cset-name" value="${esc(m.name||"")}"></div><div class="field"><label>活動日期</label><input id="cset-date" type="date" value="${esc(m.date||"")}"></div><div class="field"><label>活動地點</label><input id="cset-location" value="${esc(m.location||"")}"></div><div class="field"><label>開賽時間</label><input id="cset-start" type="time" step="1800" value="${esc(m.startTime||"")}"></div></div>
     <div class="grid grid-2"><div class="field"><label>賽制</label><select id="cset-format"><option value="single" ${m.formatType==="single"?"selected":""}>單淘汰賽</option><option value="double" ${m.formatType==="double"?"selected":""}>雙敗制</option><option value="roundrobin" ${m.formatType==="roundrobin"?"selected":""}>單循環賽</option></select></div><div class="field"><label>戰鬥台數</label><input id="cset-stations" type="number" min="1" max="16" value="${Number(m.stations||1)}"></div></div>
-    <div class="panel" style="margin-top:14px">
+    ${managedRegistrationSettingsNotice()}
+    <fieldset style="border:0;padding:0;margin:14px 0 0;min-width:0" ${onsiteRegistrationSettingsLocked()?"disabled":""}><div class="panel">
       <label class="settings-check-row"><input id="cset-registration-enabled" type="checkbox" ${reg?"checked":""}><span><b>開放線上報名</b><small style="display:block;color:var(--metal-dim)">${quickRegistration?"勾選並儲存後即可報名；未設定時間時，持續開放到房主關閉報名或開賽。":"團體賽沿用排程報名，需設定正取隊伍上限與報名開放／截止時間。"}</small></span></label>
       <div class="field" style="margin-top:12px"><label>${quickRegistration?"人數上限（選填）":"正取隊伍上限"}</label><input id="cset-capacity" type="number" min="1" step="1" value="${Number(m.registrationCapacity)>0?esc(String(m.registrationCapacity)):quickRegistration?"":"16"}" placeholder="${quickRegistration?"留空不限人數":"請填寫正整數"}"><small class="hint">${quickRegistration?"沒填就沒上限；有填就依設定，包含參賽中的房主與現場選手。":"團體賽名額以隊伍計算，須填寫正整數。"}</small></div>
       <details class="settings-accordion" ${!quickRegistration||m.registrationOpenAt||m.registrationCloseAt||m.cancellationDeadline||m.waitlistCapacity?"open":""}><summary><span>${quickRegistration?"進階設定（選填）：備取與排程":"團體賽報名排程與備取"}</span></summary><div class="grid grid-2" style="margin-top:12px">
@@ -62,6 +63,7 @@ function renderCommunitySettings(){
         <div class="field"><label>${quickRegistration?"取消報名期限（留空可於開賽前取消）":"取消報名期限（留空沿用報名截止時間）"}</label><input id="cset-reg-cancel" type="datetime-local" value="${esc(communityDateTimeValue(m.cancellationDeadline))}"></div>
       </div><p class="hint">${quickRegistration?"已有排程會保留；清空開放／截止時間後，改用立即開放與房主手動關閉。":"團體賽保留既有排程報名方式。"}</p></details>
     </div>
+    </fieldset>
     <div class="panel" style="margin-top:14px"><div class="panel-title">🔐 房間存取</div><div class="grid grid-2"><div class="field"><label>房間類型</label><select id="cset-access-mode" ${accessLocked?"disabled":""}><option value="public" ${m.roomAccessMode!=="password"?"selected":""}>公開房間</option><option value="password" ${m.roomAccessMode==="password"?"selected":""}>密碼房間</option></select></div><div class="field"><label>房間密碼</label><input id="cset-access-password" type="password" maxlength="20" autocomplete="new-password" ${accessLocked?"disabled":""} placeholder="${m.roomAccessMode==="password"?"留空保留原密碼；輸入新值可重設":"切換為密碼房時輸入 4～20 字元"}"></div></div><p class="hint">${accessLocked?"比賽已開始或已建立對戰結構，房間存取設定已鎖定。":"切換或重設密碼會撤銷舊的 Access Grant；玩家需以新密碼重新解鎖。密碼不會寫入公開房間資料。"}</p></div>
     <div class="btn-row"><button class="btn btn-primary" data-action="community-save-settings" ${communitySettingsSaving?"disabled":""}>${communitySettingsSaving?"儲存中…":"儲存一般賽事設定"}</button><button class="btn btn-ghost" data-action="community-copy-code" data-code="${esc(state.cloudCode||"")}">複製房間代碼</button><button class="btn btn-ghost" data-action="open-share-modal">分享賽事／QR</button></div>
   </div>`;
@@ -79,3 +81,4 @@ function renderCommunityRoomApp(){
 Object.assign(window.BXHCommunityHostFeature||(window.BXHCommunityHostFeature={}),{communityPhaseLabel,communityExpiryLabel,renderPlayerCommunityHostTab,renderCommunityCreateScreen,renderCommunitySettings,renderCommunityRoomApp});
 
 })();
+

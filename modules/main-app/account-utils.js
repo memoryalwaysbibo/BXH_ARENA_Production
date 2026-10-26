@@ -54,7 +54,7 @@ function accountGameId(user){
 function accountRoleMatches(user,filter){
   if(filter==="all") return true;
   if(filter==="management") return user.role==="super_admin"||user.role==="admin";
-  if(filter==="partner_organizer") return user.partnerOrganizer?.status==="active" && (user.partnerOrganizer.expiresAt==null||Number(user.partnerOrganizer.expiresAt)>Date.now());
+  if(filter==="partner_organizer") return window.BXHPartnerOrganizer?.hasGrant(user)===true;
   if(filter==="tester") return user.role==="tester"||user.isTestAccount===true;
   if(filter==="player") return user.role==="player"&&user.isTestAccount!==true;
   return user.role===filter;

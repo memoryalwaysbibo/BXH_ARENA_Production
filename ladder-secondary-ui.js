@@ -78,8 +78,13 @@
 
   function ladderTierEmblemHtml(p){
     var tier=ladderTierVisual(p);
+    var files=["unranked","bronze","silver","gold","platinum","diamond","master","grandmaster","legend"];
+    var asset="assets/rank-badges/rank-"+(tier.legend?"legend":files[tier.index]||files[0])+".webp";
     return '<div class="ladder-tier-display" title="'+escLocal(tier.display)+'">'+
-      '<span class="ladder-tier-emblem ladder-tier-emblem-'+tier.index+(tier.legend?' is-legend':'')+'" aria-hidden="true"><span>'+escLocal(tier.glyph)+'</span></span>'+
+      '<span class="ladder-tier-emblem ladder-tier-emblem-'+tier.index+(tier.legend?' is-legend':'')+'" aria-hidden="true">'+
+        '<span>'+escLocal(tier.glyph)+'</span>'+
+        '<img src="'+asset+'" width="72" height="72" alt="" decoding="async" loading="eager" onload="this.parentNode.classList.add(\'is-loaded\')" onerror="this.remove()">'+
+      '</span>'+
       '<span class="ladder-tier-name">'+escLocal(tier.display)+'</span>'+
     '</div>';
   }
@@ -148,7 +153,16 @@
         "三當家":"assets/title-limited-third-leader.webp",
         "BXH 工作人員":"assets/title-limited-bxh-staff.webp",
         "封測先鋒":"assets/title-limited-closed-beta.webp",
-        "百戰磨練":"assets/title-epic-hundred-battles.webp",
+        "百戰磨練":"assets/title-milestone-100.webp",
+        "雙生修羅":"assets/title-milestone-200.webp",
+        "三途橫渡":"assets/title-milestone-300.webp",
+        "四神俱滅":"assets/title-milestone-400.webp",
+        "五嶽崩摧":"assets/title-milestone-500.webp",
+        "六道輪迴":"assets/title-milestone-600.webp",
+        "七星隕落":"assets/title-milestone-700.webp",
+        "八荒血帝":"assets/title-milestone-800.webp",
+        "九天終焉":"assets/title-milestone-900.webp",
+        "千古不滅":"assets/title-milestone-1000.webp",
         "四強霸主":"assets/title-epic-top4-overlord.webp",
         "冠軍獵人":"assets/title-epic-champion-hunter.webp",
         "百日戰士":"assets/title-epic-hundred-day-warrior.webp",
@@ -209,6 +223,43 @@
     try{return new Intl.Collator("zh-Hant-u-co-stroke",{sensitivity:"base",numeric:true});}
     catch(e){return new Intl.Collator("zh-TW",{sensitivity:"base",numeric:true});}
   })();
+
+  // Scroll the real vertical scroll container and verify that the row moved.
+  // iOS Safari and the app's viewport restoration can ignore scrollIntoView().
+  function ladderScrollToRankRow(row,attempt){
+    if(!row||!row.isConnected)return;
+    var root=document.scrollingElement||document.documentElement;
+    var scroller=null;
+    for(var el=row.parentElement;el&&el!==document.body&&el!==document.documentElement;el=el.parentElement){
+      var style=window.getComputedStyle(el);
+      if(/auto|scroll|overlay/.test(style.overflowY)&&el.scrollHeight>el.clientHeight+2){
+        scroller=el;break;
+      }
+    }
+    var rect=row.getBoundingClientRect();
+    var box=scroller?scroller.getBoundingClientRect():{top:0,height:window.innerHeight};
+    var viewportHeight=scroller?scroller.clientHeight:window.innerHeight;
+    var delta=rect.top-box.top-(viewportHeight-rect.height)/2;
+    var target=(scroller?scroller.scrollTop:(window.scrollY||root.scrollTop||0))+delta;
+    var max=(scroller?scroller.scrollHeight-scroller.clientHeight:root.scrollHeight-window.innerHeight);
+    target=Math.max(0,Math.min(Math.max(0,max),target));
+    if(scroller){
+      if(typeof scroller.scrollTo==="function")scroller.scrollTo({top:target,behavior:"auto"});
+      else scroller.scrollTop=target;
+    }else{
+      window.scrollTo({top:target,behavior:"auto"});
+    }
+    window.setTimeout(function(){
+      if(!row.isConnected)return;
+      var current=row.getBoundingClientRect();
+      var bounds=scroller?scroller.getBoundingClientRect():{top:0,bottom:window.innerHeight};
+      var visible=current.top>=bounds.top+4&&current.bottom<=bounds.bottom-4;
+      if(visible)return;
+      if(attempt<2){ladderScrollToRankRow(row,attempt+1);return;}
+      console.warn("[ladder-find-me] scroll target not visible", {attempts:attempt+1,scroller:scroller&&scroller.className});
+      if(typeof showToast==="function")showToast("已找到排名，但無法自動捲動，請手動向下查看");
+    },120);
+  }
 
   function rerender(){
     try{
@@ -426,23 +477,41 @@
         if(typeof showToast==="function")showToast("目前榜單找不到你的排名，請確認賽季與地區篩選");
         return;
       }
-      ladderVisibleCount=Math.max(ladderVisibleCount,index+1);
-      rerender();
-      // Wait for the leaderboard row to exist after rendering; scroll restoration
-      // and deferred rendering can otherwise make this action appear to do nothing.
+      var targetCount=Math.max(ladderVisibleCount,index+1);
+      if(targetCount>ladderVisibleCount){
+        ladderVisibleCount=targetCount;
+        // Update only the ranking board. Full app rerenders reset the viewport
+        // and cause an obvious flash on mobile Safari.
+        var board=document.querySelector(".ladder-rank-board-v2");
+        if(board){
+          var template=document.createElement("template");
+          var adminMode=!!board.querySelector(".ladder-rank-admin-actions");
+          template.innerHTML=ladderRankingTableHtml(adminMode);
+          var updated=template.content.querySelector(".ladder-rank-board-v2");
+          if(updated)board.innerHTML=updated.innerHTML;
+          else rerender();
+        }else rerender();
+      }
+      // The app can restore its previous viewport after rerender(). Do not
+      // treat a highlight as evidence that the row was actually scrolled into view.
       var attempts=0;
       function focusMyRank(){
         var row=document.getElementById("ladder-my-row");
-        if(row&&row.isConnected){
-          row.scrollIntoView({behavior:"auto",block:"center"});
-          // Reapply after the preserving-scroll render has settled.
-          requestAnimationFrame(function(){if(row.isConnected)row.scrollIntoView({behavior:"smooth",block:"center"});});
-          row.classList.add("ladder-find-me-highlight");
-          window.setTimeout(function(){if(row.isConnected)row.classList.remove("ladder-find-me-highlight");},2400);
+        if(!row||!row.isConnected){
+          if(++attempts<12){requestAnimationFrame(focusMyRank);return;}
+          if(typeof showToast==="function")showToast("無法定位榜上位置，請重新整理排行榜");
           return;
         }
-        if(++attempts<12){requestAnimationFrame(focusMyRank);return;}
-        if(typeof showToast==="function")showToast("無法定位榜上位置，請重新整理排行榜");
+        // Allow the app's viewport restoration to finish before moving the
+        // actual scroll container (which may not be the document on mobile).
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){
+            if(!row.isConnected)return;
+            row.classList.add("ladder-find-me-highlight");
+            window.setTimeout(function(){if(row.isConnected)row.classList.remove("ladder-find-me-highlight");},2400);
+            ladderScrollToRankRow(row,0);
+          });
+        });
       }
       requestAnimationFrame(focusMyRank);
       return;
@@ -563,6 +632,10 @@
     ".ladder-tier-emblem-0{background-position:0% 0%}.ladder-tier-emblem-1{background-position:50% 0%}.ladder-tier-emblem-2{background-position:100% 0%}"+
     ".ladder-tier-emblem-3{background-position:0% 50%}.ladder-tier-emblem-4{background-position:50% 50%}.ladder-tier-emblem-5{background-position:100% 50%}"+
     ".ladder-tier-emblem-6{background-position:0% 100%}.ladder-tier-emblem-7{background-position:50% 100%}.ladder-tier-emblem.is-legend{background-position:100% 100%;filter:none}"+
-    "@media(max-width:430px){.ladder-rank-row-v2{min-height:88px}.ladder-tier-emblem{width:60px;height:60px;flex-basis:60px}.ladder-tier-name{font-size:10px}}";
+    "@media(max-width:430px){.ladder-rank-row-v2{min-height:88px}.ladder-tier-emblem{width:60px;height:60px;flex-basis:60px}.ladder-tier-name{font-size:10px}}"+
+    ".ladder-tier-emblem{background-image:none!important;display:grid;place-items:center;overflow:hidden;clip-path:none;border-radius:12px;background-color:rgba(217,185,92,.1)}"+
+    ".ladder-tier-emblem:before{display:none}.ladder-tier-emblem>span{display:block;font-size:13px}"+
+    ".ladder-tier-emblem.is-loaded{background-color:transparent}.ladder-tier-emblem.is-loaded>span{display:none}"+
+    ".ladder-tier-emblem>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}";
   document.head.appendChild(rankingStyle);
 })();

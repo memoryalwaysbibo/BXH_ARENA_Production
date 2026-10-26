@@ -1,0 +1,1 @@
+{"firestore":{"rules":"firestore.candidate.rules"},"emulators":{"firestore":{"host":"127.0.0.1","port":8197},"ui":{"enabled":false},"singleProjectMode":true}}

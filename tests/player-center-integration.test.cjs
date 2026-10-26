@@ -30,7 +30,7 @@ function setup(){
 const record=(overrides={})=>({eventCode:'E1',eventName:'週末賽',eventDate:'2026-10-18',matchId:'m1',completedAt:Date.parse('2026-10-18T15:00:00+08:00'),completed:true,isWin:true,scoringVersion:'bxh-4pt-v1',round:1,...overrides});
 test('saved maximum is labeled permanent only with a valid server response; incomplete or malformed responses retain replay labeling',()=>{
  const c=setup();vm.runInContext(fs.readFileSync('modules/main-app/hunter-license-v21.js','utf8'),c);
- const response={version:'hunter-license-v2.1',status:'awarded',highestTier:'b',awarded:true,current:{tier:'c',score:48.84622717893441,strength:47,matches:19}};
+ const response={version:'hunter-license-v2.1',promotionPolicy:'medium-or-larger-v1',status:'awarded',highestTier:'b',awarded:true,current:{tier:'c',score:48.84622717893441,strength:47,matches:19}};
  c.hunterProfileCache.permanentLicense=response;
  let html=c.playerCenterHunterSummaryHtml([], 'ready');assert.ok(html.includes('生涯最高（永久授予）'));assert.ok(html.includes('B 級獵人'));
  assert.ok(html.includes('C 級獵人'));assert.ok(html.includes('48.8'));
@@ -92,6 +92,7 @@ test('career history initially limits full event cards and reveals the rest on d
 });
 test('active schedule excludes completed and cancelled entries, keeps family participants distinct',()=>{
  const c=setup();Object.assign(c,{normalizeRoomCodeInput:String,smartCallModel:()=>({kind:'waiting'}),isCommunityQuickRegistration:()=>false,publicTournamentRegistrationLocked:()=>true,scheduleSmartCallAutoRefresh:()=>{},scheduleGroups:(key,rows,card)=>rows.map(card).join('')});
+ vm.runInContext(extract('renderPlayerRegistrationCard'),c);
  vm.runInContext(extract('renderPlayerRegisteredTab'),c);
  c.myRegistrationsTournamentInfo={LIVE:{phase:'live',name:'現場賽'},DONE:{phase:'done',name:'完賽'}};
  c.myRegistrationsCache=[{tournamentCode:'LIVE',status:'waitlist',displayName:'本人'},{tournamentCode:'LIVE',status:'waitlist',displayName:'孩子',familyPlayerId:'child'},{tournamentCode:'DONE',status:'confirmed'},{tournamentCode:'CANCEL',status:'cancelled'}];

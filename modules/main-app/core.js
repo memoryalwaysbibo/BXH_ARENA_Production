@@ -219,7 +219,7 @@ function defaultState(id){
     settlementPhase: "idle",
     settlementAttempt: 0,
     meta:{ name:"BXH 戰鬥陀螺賽事", date:"", location:"", checkin:"", startTime:"", format:"單淘汰賽", formatType:"single", battleMode:"individual", teamSize:3, playMode:"standard", stations:1, bronzeMatch:false, checkinRequired:false, checkinLeadMinutes:60, checkinClosedEarly:false, checkinClosedAt:null, scoringMode:"standard", roundScoringModes:{}, ladderMode:"general", eventAuthority:"official", roomAccessMode:"public",
-      registrationEnabled:false, registrationOpenAt:null, registrationCloseAt:null, registrationCapacity:null,
+      registrationEnabled:false, registrationAutoFillEnabled:true, registrationOpenAt:null, registrationCloseAt:null, registrationCapacity:null,
       waitlistEnabled:false, waitlistCapacity:0, registrationFee:null, targetGroup:"open", participantNameMode:"realName", cancellationDeadline:null,
       eventDescription:"", registrationNotes:"", registrationVisibility:"public", publishedAt:null, registrationStatus:"scheduled", eventCancelled:false, assignedStaffUids:[], refereeStationAssignments:{}, refereeStationNames:{}, refereeStationRestrictionEnabled:false },
     eventInfo:emptyEventInfoV2(),
@@ -370,7 +370,7 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.34";
+const APP_VERSION = "v14.3.36";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
   {version:"v14.3.34",date:"2026/10/20",timezone:"Asia/Taipei",title:"個人歷史整合與獵人執照 2.1",updateLevel:"minor",added:["個人總覽整合獵人旅程、正式戰績與可展開的生涯賽事紀錄","獵人執照 2.1 採最近 20 場有效對戰，顯示目前階級與歷史回算最高階級"],changed:["我的賽程集中顯示參賽中資訊；個人資料頁作為歷史查閱入口","已核對的測試賽獨立保留，從正式戰績與執照計算排除"],fixed:["讀取失敗可重試，部分資料缺失時暫停階級判定","手機里程碑縮排及長賽事名稱旁的展開提示"],security:[],publicSummary:"個人歷史集中查閱；生涯最高標示為歷史回算，永久授階將另行接入。"},
@@ -3327,6 +3327,8 @@ async function ensureCloudRoomForTournament(){
 
 function cloudCreateRoomErrorMessage(prefix="建立失敗"){
   const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
+  const partnerHint=window.BXHPartnerQuota?.creationErrorMessage?.(code,partnerOrganizerGrant());
+  if(partnerHint)return prefix+"："+partnerHint;
   if(code==="partner-room-quota-exhausted" || (code==="permission-denied"&&isPartnerOrganizerMode()&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerOrganizerGrant()?.orderCode)===0))return prefix+"：合作方案開房次數已用完";
   if(code==="permission-denied") return prefix+"：Firestore 權限被拒絕，請重新整理後再試";
   if(code==="unauthenticated") return prefix+"：登入狀態已失效，請重新登入";
@@ -3715,7 +3717,8 @@ async function startQrScanner(){
     qrScannerStream=stream;
     let detector=null;
     if(typeof window.BarcodeDetector==='function'){try{detector=new window.BarcodeDetector({formats:['qr_code']});}catch(e){}}
-    // Resolve video by ID each frame: render() replaces the modal's DOM.
+    // Resolve the video again if the scanner itself has been reopened.
+    let previewDeadline=0;
     const scan=async()=>{
       if(!current())return;
       try{
@@ -3724,7 +3727,14 @@ async function startQrScanner(){
         if(qrScannerVideoElement!==video){
           if(qrScannerVideoElement){try{qrScannerVideoElement.pause();qrScannerVideoElement.srcObject=null;}catch(e){}}
           qrScannerVideoElement=video;video.muted=true;video.autoplay=true;video.playsInline=true;video.srcObject=stream;
-          try{await video.play();}catch(e){if(current()&&document.getElementById('qr-scanner-video')===video)throw e;}
+          let playTimer;
+          try{
+            await Promise.race([video.play(),new Promise((_,reject)=>{
+              playTimer=setTimeout(()=>reject(Object.assign(Error('preview-timeout'),{name:'PreviewTimeoutError'})),8000);
+            })]);
+          }catch(e){if(current()&&document.getElementById('qr-scanner-video')===video)throw e;}
+          finally{clearTimeout(playTimer);}
+          previewDeadline=Date.now()+8000;
           if(!current())return;
           if(document.getElementById('qr-scanner-video')!==video){qrScannerFrame=requestAnimationFrame(scan);return;}
           setQrScannerStatus('請將 BXH ARENA QR 放入框內');
@@ -3734,6 +3744,7 @@ async function startQrScanner(){
           if(!current())return;
         }
         if(video.readyState>=2&&video.videoWidth&&video.videoHeight){
+          previewDeadline=Date.now()+8000;
           let rawValue='';
           if(detector){try{const found=await detector.detect(video);if(!current())return;rawValue=found?.[0]?.rawValue||'';}catch(e){detector=null;}}
           if(!current())return;
@@ -3743,11 +3754,12 @@ async function startQrScanner(){
             if(ctx){ctx.drawImage(video,0,0,canvas.width,canvas.height);const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);rawValue=window.jsQR(pixels.data,pixels.width,pixels.height,{inversionAttempts:'dontInvert'})?.data||'';}
           }
           if(rawValue&&await acceptScannedQrValue(rawValue))return;
-        }
+        }else if(Date.now()>previewDeadline){throw Object.assign(Error('preview-timeout'),{name:'PreviewTimeoutError'});}
       }catch(e){if(current()){stopQrScanner();setQrScannerStatus(e.name==='DecoderError'?'辨識元件載入失敗，請按重新啟動或手動輸入。':'相機預覽中斷，請按重新啟動或手動輸入。',true);}return;}
       if(current())qrScannerFrame=requestAnimationFrame(scan);
     };
-    qrScannerFrame=requestAnimationFrame(scan);
+    // Attach and play immediately after permission resolves, before the first frame.
+    await scan();
   }catch(e){
     if(current()){stopQrScanner();setQrScannerStatus(e.name==='NotAllowedError'?'請允許相機權限，再按重新啟動。':'無法啟動鏡頭，請按重新啟動或手動輸入。',true);}
   }finally{if(current())qrScannerStarting=false;}
@@ -3803,7 +3815,7 @@ let playerLookupQuery = "";
 let playerCenterContext = null; // { name, records:[...] } — set for the name-search (no-login) flow
 let authFormError = "";
 let accountMgmtUsers = null;
-let partnerPlansState={plans:null,loading:false,error:''};
+let partnerPlansState={plans:null,quotaPolicies:['creation-v1'],loading:false,error:''};
 const partnerDraftOrders=new Map();
 function partnerOrderFor(uid){
   if(partnerDraftOrders.has(uid))return partnerDraftOrders.get(uid);
@@ -3823,6 +3835,7 @@ async function loadPartnerPlans(force=false){
     const result=await window.engagementService.listPartnerPlans({});
     if(actor!==currentAuthUid())return;
     partnerPlansState.plans=Array.isArray(result.plans)?result.plans:[];
+    partnerPlansState.quotaPolicies=['creation-v1',...(result.quotaPolicies?.includes('start-v1')?['start-v1']:[])];
   }catch(error){if(actor===currentAuthUid()){partnerPlansState.plans=[];partnerPlansState.error=String(error.message||error);}}
   finally{partnerPlansState.loading=false;if(actor===currentAuthUid())render();}
 }
@@ -5310,7 +5323,8 @@ function publicTournamentSourceState(source){
 function markLobbySourceUnknown(){
   if(publicTournamentsFreshness!=="unknown"){publicTournamentsFreshness="unknown";requestLobbyRender();}
 }
-function invalidateMyRegistrationsCache(){
+function invalidateMyRegistrationsCache(result){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)myEventsPlayerSlice?.invalidate(result);
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key){
@@ -5869,7 +5883,7 @@ const COMMUNITY_OWNER_ACTIONS = new Set([
 const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
   "open-account-management","super-admin-page","create-managed-user-submit","set-user-role","toggle-user-active",
-  "account-role-filter","account-search-apply","account-search-clear","account-clear-filters",
+  "account-role-filter","account-search-apply","account-search-clear","account-clear-filters","account-summary-refresh","account-page-prev","account-page-next",
   "unarchive-current","unarchive-record","preview-cleanup-public-mirrors","run-cleanup-public-mirrors","ladder-new-season",
   "admin-refresh-engagement","admin-seed-initial-titles","admin-save-engagement-settings","admin-grant-title","admin-revoke-title",
   "admin-load-engagement-overview","admin-update-title-definition","admin-backfill-preview","admin-backfill-execute","admin-backfill-restart","admin-engagement-diagnose",
@@ -6012,6 +6026,7 @@ function canOperateStation(stationNum, st=state){
   if(isAdminTierOrAbove()) return true;
   if(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator()) return true;
   if(!isStaffTier()) return hasAdminAccess();
+  if(st?.meta?.refereeSeatsV1?.version===1) return isCurrentOfficialTournamentCreator()||!!window.BXHRefereeSeats?.canScore(st,stationNum,currentAuthUid());
   if(!refereeStationRestrictionEnabled(st)) return true;
   const uid=currentAuthUid();
   return !!(uid && refereeUidsForStation(stationNum,st).includes(uid));
@@ -6023,6 +6038,7 @@ function canOperateMatchStation(matchOrId, st=state){
 function requireStationPermission(matchOrId, st=state){
   if(st&&st.archiveStatus==="completed"){ showToast("此賽事已完成並封存，目前為唯讀。",true); return false; }
   const m=typeof matchOrId==="string" ? ((st&&st.matches)||[]).find(x=>x.id===matchOrId) : matchOrId;
+  if(refereeFaultWritePending(m,st)){showToast("失誤判定儲存中，請稍候再操作本場。",true);return false;}
   if(!canOperateMatchStation(m,st)){
     showToast(`此戰鬥台未指派給你${m&&m.station?`（${m.station}號台）`:""}，目前僅可查看。`, true);
     return false;
@@ -6055,15 +6071,80 @@ function stationMutationErrorMessage(reason){
     "station-not-assigned":"此戰鬥台未指派給你，無法修改本台資料。",
     "station-mismatch":"場次已改派，請以最新戰鬥台資料操作。",
     "dispatch-stale":"場次已被承接或狀態已改變，請依最新清單操作。",
+    "score-stale":"另一位裁判已更新本場，請確認最新比分後再操作。",
     "not-found":"雲端找不到此場比賽。",
     "already-completed":"本場已由其他裁判完成判定。",
     "invalid-score":"雲端比分已變更，請重新整理後再操作。",
+    "fault-state-stale":"本局比分或失誤紀錄已變更，已重新讀取；請核對後再判定。",
     "cloud-unavailable":"目前無法連線雲端，請稍後再試。",
     "corrupt-data":"雲端賽事資料異常，已停止寫入。",
     "bronze-before-final":"季殿尚未完成，冠亞必須等待季殿結束後才能開始。"
   };
   return map[reason] || ("雲端場次更新失敗（"+reason+"），請重新整理後再試。");
 }
+
+const refereeSeatCommandBusy=new Set();
+async function executeRefereeSeatCommand(matchId,command){
+  const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(matchId);
+  if(!code||!m||!canOperateCurrentTournament()||!requireStationPermission(m))return false;
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
+  const key=code+":"+actorUid+":"+matchId;if(refereeSeatCommandBusy.has(key))return false;
+  refereeSeatCommandBusy.add(key);
+  try{
+    const request={...command,code,matchId,operationId:crypto.randomUUID(),station:Number(m.station),
+      expectedCourtRevision:state.meta.refereeSeatsV1.courts?.[m.station]?.revision??0,
+      expectedScoreRevision:Number(m.refereeSeatScoreRevision||0),expectedDispatchRevision:Number(m.dispatchRevision||0),
+      playerAId:m.a?.playerId||null,playerBId:m.b?.playerId||null};
+    const result=await window.cloudSync?.commitRefereeCommand?.(request);
+    if(state.id!==roomId||state.cloudCode!==code||currentAuthUid()!==actorUid)return false;
+    if(!result?.ok){
+      const reason=result?.reason||"cloud-unavailable";
+      showToast(({"seat-stale":"裁判席位已變更，請確認權限後再操作。","seat-command-required":"請使用最新版裁判台送分。","release-not-ready":"後端計分服務尚未開放。","not-started":"賽事尚未正式開始。","nothing-to-undo":"目前沒有可撤銷的紀錄。"})[reason]||stationMutationErrorMessage(reason),true);
+      const fresh=await window.cloudSync?.joinRoom?.(code);
+      if(state.id===roomId&&currentAuthUid()===actorUid&&fresh?.ok&&fresh.data)applyRemoteState(fresh.data,true);
+      return false;
+    }
+    if(["confirm","quick"].includes(command.action))pendingModal=null;
+    applyRemoteState(result.state,true);cloudStatus="connected";cloudLastSyncAt=Date.now();
+    const current=getMatch(matchId);
+    if(["score","fault"].includes(command.action)&&current&&!current.completed&&checkWinnerSide(current))openModal({type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"});
+    else render();
+    showToast(command.action==="fault"?"失誤紀錄已由雲端確認":command.action==="confirm"||command.action==="quick"?"結果已由雲端確認並晉級":"本台操作已由雲端確認");
+    return true;
+  }catch(error){if(state.id===roomId&&currentAuthUid()===actorUid)showToast("本次操作尚未確認，請重連後核對雲端比分。",true);return false;}
+  finally{refereeSeatCommandBusy.delete(key);}
+}
+
+
+async function executeRefereeDispatchCommand(command){
+  const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(command.matchId),targetCurrentId=state.courtAssignments?.["court"+command.targetStation]?.currentMatchId||null,other=getMatch(command.targetMatchId||(command.action==="manual-assign"?targetCurrentId:null));
+  const targetActions=["idle-claim","claim-skipped","claim-detached","retirement-transfer","manual-assign"];
+  const station=m?Number(m.station):Number(command.station||0),authority=targetActions.includes(command.action)?Number(command.targetStation):station;
+  if(!code||!canOperateCurrentTournament())return false;
+  if(command.action==="resize"||command.action==="reopen"){
+    if(!canManageCourtRetirement()){showToast("此操作需由場主或管理員處理。",true);return false;}
+  }else if(!canOperateStation(authority)){showToast("你目前沒有此戰鬥台的調度權限。",true);return false;}
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("調度需要連線確認，本次操作尚未送出。",true);return false;}
+  const key=code+":"+actorUid+":dispatch";if(refereeSeatCommandBusy.has(key))return false;refereeSeatCommandBusy.add(key);
+  try{
+    const request={...command,code,operationId:crypto.randomUUID(),station,
+      expectedCourtRevisions:Object.fromEntries(Array.from({length:Number(state.meta.stations)||0},(_,i)=>[i+1,Number(state.meta.refereeSeatsV1.courts?.[i+1]?.revision||0)])),
+      expectedScoreRevision:Number(m?.refereeSeatScoreRevision||0),expectedDispatchRevision:Number(m?.dispatchRevision||0),
+      playerAId:m?.a?.playerId||null,playerBId:m?.b?.playerId||null,
+      expectedTargetCurrentMatchId:targetCurrentId,expectedTargetScoreRevision:Number(other?.refereeSeatScoreRevision||0),expectedTargetDispatchRevision:Number(other?.dispatchRevision||0),
+      targetPlayerAId:other?.a?.playerId||null,targetPlayerBId:other?.b?.playerId||null};
+    const result=await window.cloudSync?.commitRefereeCommand?.(request);
+    if(state.id!==roomId||currentAuthUid()!==actorUid)return false;
+    if(!result?.ok){
+      showToast(({"pass-protected":"PASS 回補及前置場次尚未完成，暫時不能移台或退場。","target-has-play-data":"目標台已有比分或失誤紀錄，不能覆蓋目前場次。","seat-stale":"裁判席位已變更，請確認後重新操作。","unsupported-resize-settings":"請先單獨調整台數，再儲存其他賽事設定。"})[result?.reason]||stationMutationErrorMessage(result?.reason||"cloud-unavailable"),true);
+      const fresh=await window.cloudSync?.joinRoom?.(code);if(state.id===roomId&&currentAuthUid()===actorUid&&fresh?.ok&&fresh.data)applyRemoteState(fresh.data,true);
+      return false;
+    }
+    applyRemoteState(result.state,true);cloudStatus="connected";cloudLastSyncAt=Date.now();render();showToast("場次調度已由雲端確認，比分與失誤紀錄保留。");return true;
+  }catch(error){if(state.id===roomId&&currentAuthUid()===actorUid)showToast("調度尚未確認，請重連後核對雲端狀態。",true);return false;}
+  finally{refereeSeatCommandBusy.delete(key);}
+}
+
 function persistRefereeMatchMutation(matchId, mutateRemoteFn){
   const m=getMatch(matchId);
   state.updatedAt=Date.now();
@@ -6082,7 +6163,7 @@ function persistRefereeMatchMutation(matchId, mutateRemoteFn){
     // they are committed before the first Court-scoped score/status mutation.
     const preOk=await flushCloudStateWrites();
     if(!preOk && cloudSyncPending) return {ok:false,reason:"cloud-unavailable"};
-    return await window.cloudSync.mutateMatchTransaction(code, matchId, station, mutateRemoteFn, actorUid, {expectedRevision:dispatchRevision});
+    return await window.cloudSync.mutateMatchTransaction(code, matchId, station, mutateRemoteFn, actorUid, {expectedRevision:dispatchRevision,expectedSeatScoreRevision:m.refereeSeatScoreRevision||0});
   }).then(result=>{
     if(state.cloudCode!==code || currentAuthUid()!==actorUid) return result;
     if(!result || !result.ok){
@@ -6422,12 +6503,31 @@ async function saveState(options={}){
     // Explicit settings saves stay detached until the cloud accepts them. They
     // never become an optimistic local snapshot or an automatic retry payload.
     if(!snapshot.cloudCode||!cloudAvailable()||currentRole==="guest"||!options.settingsToken.isCurrent())return false;
-    const ok=await enqueueCloudStateWrite(snapshot.cloudCode,snapshot,{syncCommunitySummary:true});
+    const ok=await enqueueCloudStateWrite(snapshot.cloudCode,snapshot,{syncCommunitySummary:true,registrationSettings:true});
     if(ok!==true)return false;
     options.cloudSaved=true;
     cloudStatus="connected";cloudLastSyncAt=Date.now();
     if(!options.settingsToken.isCurrent())return false;
     try{return await saveRecord(snapshot)===true;}catch(e){console.warn("[community settings local cache]",e);return false;}
+  }
+  if(options.registrationSettings===true && snapshot.cloudCode){
+    if(!cloudAvailable()||currentRole==='guest'){window.__BXH_LAST_CLOUD_ERROR_CODE=cloudAvailable()?'permission-denied':'unavailable';return false;}
+    try{
+      const writeOptions={registrationSettings:true,...(snapshot.startedAt&&window.BXHBracketCommit?{bracketStartSignature:window.BXHBracketCommit.signature(snapshot)}:{})};
+      const ok=await enqueueCloudStateWrite(snapshot.cloudCode,snapshot,writeOptions);
+      if(ok!==true){
+        // Policy rejection is not a disconnected Firebase session. Keep the
+        // original draft for explicit retry, never an unmarked auto-retry.
+        const error=window.__BXH_LAST_CLOUD_ERROR_CODE;
+        if(['onsite-registration-settings-managed','onsite-waitlist-managed','onsite-runtime-stale','registration-roster-stale'].includes(error)){
+          cloudStatus='connected';cloudAccessLimited=false;cloudAccessMessage='';
+        }
+        return false;
+      }
+      options.cloudSaved=true;cloudStatus='connected';cloudLastSyncAt=Date.now();
+      if(state===requestedState&&snapshot.onsiteWaitlistFinalized===true)state.onsiteWaitlistRuntimeRevision=snapshot.onsiteWaitlistRuntimeRevision;
+      try{return await saveRecord(snapshot)===true;}catch(e){return false;}
+    }catch(e){return false;}
   }
   const localSavePromise = saveRecord(snapshot);
 
@@ -7202,6 +7302,7 @@ function autoAdvanceReadyMatches(){
 }
 
 function setMatchInProgress(matchId, force){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"start"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
@@ -7234,6 +7335,7 @@ function setMatchInProgress(matchId, force){
 }
 
 function setMatchReady(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"ready"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   const m = getMatch(matchId);
   if(!m || m.isBye) return;
@@ -7262,6 +7364,7 @@ function setMatchReady(matchId){
 }
 
 function pauseMatchStatus(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"pause"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
@@ -7291,6 +7394,7 @@ function markMatchSkipped(matchId){
   rebuildCourtAssignments();
 }
 async function skipMatch(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"skip"});
   if(!canOperateCurrentTournament() || !requireTournamentStartedForMatchAction()) return;
   const m=getMatch(matchId);
   if(!m || m.completed || !requireStationPermission(m)) return;
@@ -7343,6 +7447,7 @@ function applySkippedDispatch(remote,m,target,expectedRevision){
   return {ok:true,state:remote};
 }
 async function claimSkippedMatch(matchId,target){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"claim-skipped",matchId,targetStation:target});
   if(!canOperateCurrentTournament() || !requireTournamentStartedForMatchAction()) return;
   if(state.archiveStatus==="completed" || !canOperateStation(target)) return;
   const m=getMatch(matchId); if(!m) return;
@@ -7353,6 +7458,7 @@ async function claimSkippedMatch(matchId,target){
 }
 
 function resumeMatchStatus(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"resume"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   const m = getMatch(matchId);
@@ -7521,6 +7627,7 @@ function correctionFailureMessage(reason){
   return map[reason]||("場次修正失敗（"+reason+"），請重新整理後再試。");
 }
 async function reopenCompletedMatchForCorrection(matchId,mode){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"correct",mode});
   if(!canOperateCurrentTournament()){showToast("目前身分沒有此操作權限。",true);return false;}
   if(!requireTournamentStartedForMatchAction()) return false;
   const local=getMatch(matchId);
@@ -8460,6 +8567,7 @@ function refereeFaultLast(m){
   return api?api.lastPending(m):null;
 }
 function addScore(matchId, side, type){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"score",side,finish:type});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   // The existing round ledger only accepts unmodified BXH points. Until the
@@ -8516,7 +8624,14 @@ function addScore(matchId, side, type){
   render();
 }
 
-function addFault(matchId, offendingSide){
+const refereeFaultWrites = new Set();
+function refereeFaultWriteKey(m,st=state){return JSON.stringify([st.id,st.cloudCode||"",m&&m.id]);}
+function refereeFaultWritePending(m,st=state){return refereeFaultWrites.has(refereeFaultWriteKey(m,st));}
+function refereeFaultStateKey(m){
+  return JSON.stringify([Number(m.scoreA||0),Number(m.scoreB||0),m.log||[],refereeFaultApi().snapshot(m)]);
+}
+async function addFault(matchId, offendingSide){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"fault",side:offendingSide});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8537,29 +8652,62 @@ function addFault(matchId, offendingSide){
   const faultApi=refereeFaultApi();
   if(!faultApi){showToast("失誤計數模組尚未載入，請重新整理",true);return;}
   const at=Date.now();
-  const localResult=faultApi.applyFault(m,offendingSide,at);
+  const before=JSON.parse(JSON.stringify(m));
+  const expected=refereeFaultStateKey(m);
+  const candidate=JSON.parse(JSON.stringify(m));
+  const localResult=faultApi.applyFault(candidate,offendingSide,at);
   if(!localResult.ok){showToast(localResult.reason==="invalid-score"?"目前比分無法再加分，請先確認結果":"失誤紀錄失敗",true);return;}
-  m.updatedAt=at;
-  persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
-    if(!remoteMatch || remoteMatch.completed || remoteMatch.status==="completed") return {ok:false,reason:"already-completed"};
-    if(checkWinnerSide(remoteMatch)) return {ok:false,reason:"invalid-score"};
-    const result=faultApi.applyFault(remoteMatch,offendingSide,at);
-    if(!result.ok)return result;
-    remoteMatch.updatedAt=at;
-    return {ok:true,state:remoteState};
-  });
-  const offenderName=offendingSide==="A"?playerName(m.a&&m.a.playerId):playerName(m.b&&m.b.playerId);
-  const recipientName=offendingSide==="A"?playerName(m.b&&m.b.playerId):playerName(m.a&&m.a.playerId);
-  if(localResult.scored){
-    showToast(offenderName+" 本局第 2 次失誤｜"+recipientName+" +1 分");
-    if(checkWinnerSide(m))pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
-  }else{
-    showToast(offenderName+" 失誤 1/2");
+  const roomId=state.id,code=state.cloudCode,actorUid=currentAuthUid();
+  const current=()=>state.id===roomId&&state.cloudCode===code&&currentAuthUid()===actorUid;
+  const key=refereeFaultWriteKey(m);
+  const scoped=shouldUseStationScopedMutation(m);
+  if(code&&!scoped){showToast("雲端失誤判定服務尚未就緒，請重新連線後再操作。",true);return;}
+  refereeFaultWrites.add(key);
+  try{
+    // Cloud scoring remains unchanged until the transaction acknowledges it.
+    // Offline/local rooms still need their candidate applied before saveState.
+    if(!scoped)Object.assign(m,candidate,{updatedAt:at});
+    const saved=persistRefereeMatchMutation(matchId,(remoteState,remoteMatch)=>{
+      if(!remoteMatch || remoteMatch.completed || remoteMatch.status==="completed") return {ok:false,reason:"already-completed"};
+      if(checkWinnerSide(remoteMatch)) return {ok:false,reason:"invalid-score"};
+      // Never reinterpret a delayed click as a fault in a different round.
+      if(refereeFaultStateKey(remoteMatch)!==expected)return {ok:false,reason:"fault-state-stale"};
+      const result=faultApi.applyFault(remoteMatch,offendingSide,at);
+      if(!result.ok)return result;
+      remoteMatch.updatedAt=at;
+      return {ok:true,state:remoteState};
+    });
+    render();
+    const result=await saved;
+    if(!current())return;
+    if(!(result===true||result&&result.ok===true)){
+      if(!scoped)Object.assign(m,before);
+      showToast("失誤判定未確認儲存（"+((result&&result.reason)||"save-failed")+"），請核對目前比分與失誤次數。",true);
+      return;
+    }
+    const confirmed=getMatch(matchId);
+    if(!confirmed||confirmed.completed||confirmed.status==="completed")return;
+    const offenderName=offendingSide==="A"?playerName(confirmed.a&&confirmed.a.playerId):playerName(confirmed.b&&confirmed.b.playerId);
+    const recipientName=offendingSide==="A"?playerName(confirmed.b&&confirmed.b.playerId):playerName(confirmed.a&&confirmed.a.playerId);
+    if(localResult.scored){
+      showToast(offenderName+" 本局第 2 次失誤｜"+recipientName+" +1 分（已儲存）");
+      if(checkWinnerSide(confirmed)&&!pendingModal)pendingModal={type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"};
+    }else{
+      showToast(offenderName+" 失誤 1/2（已儲存）");
+    }
+  }catch(e){
+    if(current()){
+      if(!scoped)Object.assign(m,before);
+      showToast("失誤判定儲存失敗，請重新連線並核對比分後再操作。",true);
+    }
+  }finally{
+    refereeFaultWrites.delete(key);
+    if(current())render();
   }
-  render();
 }
 
 function undoLast(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"undo"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8599,6 +8747,7 @@ function undoLast(matchId){
 }
 
 function rematch(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"rematch"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8717,12 +8866,13 @@ async function queueOfflineMatchConfirmation(matchId,mode,selectedWinnerId){
   const m=getMatch(matchId);if(!m||!state.cloudCode||!window.BXHOfflineQueue)return false;
   const ref=currentRefereeIdentity(),actor=ref.name||adminDisplayName||(userProfile&&userProfile.email)||"admin";
   const ev=mode==="quick_decision"?evaluateQuickDecision(m,selectedWinnerId):evaluateMatchCompletion(m);if(!ev.ok)return false;
-  await window.BXHOfflineQueue.enqueue({tournamentCode:String(state.cloudCode).toUpperCase(),matchId:m.id,station:Number(m.station||0),dispatchRevision:m.dispatchRevision||0,mode:mode||"score",selectedWinnerId:ev.winnerId,playerAId:m.a&&m.a.playerId||null,playerBId:m.b&&m.b.playerId||null,scoreA:m.scoreA,scoreB:m.scoreB,log:Array.isArray(m.log)?JSON.parse(JSON.stringify(m.log)):[],faultActions:Array.isArray(m.faultActions)?JSON.parse(JSON.stringify(m.faultActions)):[],actorUid:ref.uid||null,actorName:actor,auditMeta:{recordDuty:ref.isStaff,uid:ref.uid,matchId:m.id,tournamentName:(state.meta&&state.meta.name)||"",station:Number(m.station||0),dispatchRevision:m.dispatchRevision||0,roundLabel:refereeStageLabel(m),playerA:m.a?playerName(m.a.playerId):"",playerB:m.b?playerName(m.b.playerId):"",winnerName:playerName(ev.winnerId),resultMethod:mode==="quick_decision"?"quick_decision":"score",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"}});
+  await window.BXHOfflineQueue.enqueue({tournamentCode:String(state.cloudCode).toUpperCase(),matchId:m.id,station:Number(m.station||0),dispatchRevision:m.dispatchRevision||0,mode:mode||"score",selectedWinnerId:ev.winnerId,playerAId:m.a&&m.a.playerId||null,playerBId:m.b&&m.b.playerId||null,scoreA:m.scoreA,scoreB:m.scoreB,log:Array.isArray(m.log)?JSON.parse(JSON.stringify(m.log)):[],faultActions:Array.isArray(m.faultActions)?JSON.parse(JSON.stringify(m.faultActions)):[],actorUid:ref.uid||null,actorName:actor,auditMeta:{recordDuty:ref.isStaff,uid:ref.uid,matchId:m.id,tournamentName:(state.meta&&state.meta.name)||"",station:Number(m.station||0),dispatchRevision:m.dispatchRevision||0,expectedSeatScoreRevision:m.refereeSeatScoreRevision||0,roundLabel:refereeStageLabel(m),playerA:m.a?playerName(m.a.playerId):"",playerB:m.b?playerName(m.b.playerId):"",winnerName:playerName(ev.winnerId),resultMethod:mode==="quick_decision"?"quick_decision":"score",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"}});
   if(mode==="quick_decision")applyQuickDecisionFields(m,ev,actor);else applyMatchCompletionFields(m,ev,actor);
   m.offlinePendingSync=true;m.offlineOperationQueuedAt=Date.now();rebuildPropagation();await saveRecord(cloneStateForSave(state));render();showToast("目前離線：比賽結果已安全暫存，恢復網路後會自動驗證並同步雲端。",true);return true;
 }
 
 async function confirmResultWithCloudGuard(matchId){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"confirm"});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8771,7 +8921,7 @@ async function confirmResultWithCloudGuard(matchId){
     return { ok:true, state: remoteState };
   }, (()=>{
     const ref=currentRefereeIdentity();
-    return {recordDuty:ref.isStaff,uid:ref.uid,matchId,tournamentName:(state.meta&&state.meta.name)||"",station:m&&m.station,dispatchRevision:m&&m.dispatchRevision||0,roundLabel:refereeStageLabel(m),playerA:m&&m.a?playerName(m.a.playerId):"",playerB:m&&m.b?playerName(m.b.playerId):"",winnerName:localEval&&localEval.winnerId?playerName(localEval.winnerId):"",resultMethod:"score",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"};
+    return {recordDuty:ref.isStaff,uid:ref.uid,matchId,tournamentName:(state.meta&&state.meta.name)||"",station:m&&m.station,dispatchRevision:m&&m.dispatchRevision||0,expectedSeatScoreRevision:m&&m.refereeSeatScoreRevision||0,roundLabel:refereeStageLabel(m),playerA:m&&m.a?playerName(m.a.playerId):"",playerB:m&&m.b?playerName(m.b.playerId):"",winnerName:localEval&&localEval.winnerId?playerName(localEval.winnerId):"",resultMethod:"score",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"};
   })());
   if(!result.ok){
     const reason=result.reason||"validation-failed";
@@ -8880,6 +9030,7 @@ function confirmQuickDecision(matchId, selectedWinnerId){
 }
 
 async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"quick",winnerId:selectedWinnerId});
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8928,7 +9079,7 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
     return { ok:true, state: remoteState };
   }, (()=>{
     const ref=currentRefereeIdentity();
-    return {recordDuty:ref.isStaff,uid:ref.uid,matchId,tournamentName:(state.meta&&state.meta.name)||"",station:m&&m.station,dispatchRevision:m&&m.dispatchRevision||0,roundLabel:refereeStageLabel(m),playerA:m&&m.a?playerName(m.a.playerId):"",playerB:m&&m.b?playerName(m.b.playerId):"",winnerName:selectedWinnerId?playerName(selectedWinnerId):"",resultMethod:"quick_decision",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"};
+    return {recordDuty:ref.isStaff,uid:ref.uid,matchId,tournamentName:(state.meta&&state.meta.name)||"",station:m&&m.station,dispatchRevision:m&&m.dispatchRevision||0,expectedSeatScoreRevision:m&&m.refereeSeatScoreRevision||0,roundLabel:refereeStageLabel(m),playerA:m&&m.a?playerName(m.a.playerId):"",playerB:m&&m.b?playerName(m.b.playerId):"",winnerName:selectedWinnerId?playerName(selectedWinnerId):"",resultMethod:"quick_decision",eventAuthority:(state.meta&&state.meta.eventAuthority)||"official"};
   })());
   if(!result.ok){
     const reason=result.reason||"validation-failed";
@@ -9248,10 +9399,49 @@ async function publishPendingPosterCover(code){
     showToast(retrySaved?"賽事已發布，海報縮圖上傳失敗；舊圖保留，請按「更新並重新發布」重試":"賽事已發布，海報縮圖上傳失敗；舊圖保留。本機無法保存重試資料，請留在此頁按「更新並重新發布」重試",true);
   }
 }
+function onsiteRegistrationSettingsLocked(st=state){
+  return st.onsiteWaitlistServerOwned===true || st.onsiteWaitlistFinalized===true || st.meta?.registrationOnsiteWaitlistEnabled===true;
+}
+function managedRegistrationSettingsChanged(next,st=state){
+  if(!onsiteRegistrationSettingsLocked(st))return false;
+  return ['registrationEnabled','registrationOpenAt','registrationCloseAt','registrationCapacity','waitlistCapacity','cancellationDeadline'].some(key=>{
+    if(!Object.prototype.hasOwnProperty.call(next,key))return false;
+    const normalize=value=>key==='registrationEnabled'?!!value:(value||null);
+    return normalize(next[key])!==normalize(st.meta?.[key]);
+  });
+}
+function managedRegistrationSettingsNotice(){
+  if(!onsiteRegistrationSettingsLocked())return '';
+  return '<div class="banner warn" role="status"><span>本場報名時間與名額由候補抽選管理，請從備取／抽籤調整。重新開啟候補不會重新開放線上報名。</span>'+
+    (canManageOnsiteWaitlist()?'<button class="btn btn-ghost btn-sm" data-action="open-registration-waitlist">前往備取／抽籤</button>':'')+'</div>';
+}
+function reportManagedRegistrationSettings(){
+  showToast('報名設定未儲存：本場已由候補抽選管理，請重新讀取賽事後，從「備取／抽籤」調整名額。',true);
+}
+let registrationSettingsSaveEpoch=0;
+async function saveRegistrationSettingsAndReport(previousMeta,message,resetSettings=false){
+  const epoch=++registrationSettingsSaveEpoch,room=state,meta=state.meta;
+  const actor=typeof currentAuthUid==='function'?currentAuthUid():null;
+  const options={registrationSettings:true};
+  let ok;try{ok=await saveState(options);}catch(e){ok=false;}
+  if(epoch!==registrationSettingsSaveEpoch||state.id!==room.id||state.cloudCode!==room.cloudCode||(typeof currentAuthUid==='function'?currentAuthUid():null)!==actor)return false;
+  if(ok===false&&!options.cloudSaved){
+    // The failed draft never becomes a retryable whole-room snapshot.
+    if(state.meta===meta)state.meta=previousMeta;
+    render();
+    if(window.__BXH_LAST_CLOUD_ERROR_CODE==='onsite-registration-settings-managed'||window.__BXH_LAST_CLOUD_ERROR_CODE==='onsite-waitlist-managed')reportManagedRegistrationSettings();
+    else showToast('設定尚未確認儲存，請確認連線並重試；輸入草稿仍保留。',true);
+    return false;
+  }
+  resetRegistrationFormDraft();if(resetSettings)resetSettingsFormDraft();render();
+  showToast(ok===false?'設定已儲存到雲端，但本機快取未完成，請重新整理確認':message,ok===false);
+  return true;
+}
+
 async function publishRegistrationConfig(){
   state.meta.publishedAt = Date.now();
   state.meta.registrationStatus = computeRegistrationStatus(state.meta);
-  await saveRecord(state); // 先保存草稿；此步驟不建立任何雲端代碼
+  if(!state.cloudCode)await saveRecord(state); // New-room drafts are local; existing-room edits wait for cloud confirmation.
 
   if(!state.cloudCode){
     if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
@@ -9290,12 +9480,19 @@ async function publishRegistrationConfig(){
     return;
   }
 
-  const syncResult = await saveState();
+  const publishOptions={registrationSettings:true};
+  const syncResult = await saveState(publishOptions);
+  if(syncResult===false&&!publishOptions.cloudSaved){
+    render();
+    if(['onsite-registration-settings-managed','onsite-waitlist-managed'].includes(window.__BXH_LAST_CLOUD_ERROR_CODE))reportManagedRegistrationSettings();
+    else showToast("報名設定尚未確認發布，請重新讀取賽事後再試。",true);
+    return;
+  }
   await publishPendingPosterCover(state.cloudCode);
   publicTournamentsCache = null; publicTournamentsError = null;
   render();
   showToast("賽事設定已更新");
-  if(syncResult===false) showToast("已儲存本機，等待雲端同步", true);
+  if(syncResult===false) showToast("設定已儲存到雲端，但本機快取未完成，請重新整理確認", true);
 }
 
 function tournamentStatus(){
@@ -9612,7 +9809,7 @@ function liveCourtSelection(stationCount){
 function liveCourtCardHtml(stationNum,selectedCourt){
   const current=liveCurrentMatchForStation(stationNum);
   const court=current.court,m=current.m;
-  const assigned=refereeDisplayForStation(stationNum);
+  const assigned=state.meta?.refereeSeatsV1?.version===1?"主裁判與備用裁判":refereeDisplayForStation(stationNum);
   const future=state.matches.some(mm=>!mm.isBye&&Number(mm.station)===Number(stationNum)&&!mm.completed);
   const status=m?refereeStationStatus(m):(future?{label:"等待中",cls:"waiting"}:{label:"已完成",cls:"done"});
   const stage=m?(esc(refereeStageLabel(m))+" · 第 "+(Number(m.indexInRound||0)+1)+" 場"):(future?"等待安排場次":"本台賽程完成");
@@ -10634,8 +10831,10 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
       const cls="se-path-classic";
 
       // Each source leaves from the card's exact vertical center.
-      sourcePoints.forEach(p=>{
-        paths += `<path class="${cls}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
+      sourcePoints.forEach((p, sourceIndex)=>{
+        const sourceMatch = getMatch(sourceBoxes[sourceIndex].getAttribute("data-id"));
+        const advanced = !!(sourceMatch && sourceMatch.completed && sourceMatch.winnerId && !sourceMatch.isBye);
+        paths += `<path class="${cls}${advanced?' se-path-advanced':''}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
       });
 
       // One shared vertical spine, Challonge-style.
@@ -10883,6 +11082,7 @@ function applyIdleCourtClaim(st,matchId,stationNum){
   return {ok:true,state:st};
 }
 async function claimIdleCourt(matchId,stationNum){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"idle-claim",matchId,targetStation:stationNum});
   if(!canOperateStation(stationNum)){showToast("你未被指派此戰鬥台",true);return;}
   const match=getMatch(matchId);
   if(!match||!idleCourtCandidates(state,stationNum).some(m=>m.id===matchId)){
@@ -10949,6 +11149,10 @@ function courtSwapErrorMessage(reason){
   return map[reason]||("換場失敗（"+String(reason||"unknown")+"），請重新整理後再試。");
 }
 async function executeCourtSwap(targetId){
+  if(state.meta?.refereeSeatsV1?.version===1){
+    if(!courtSwapDraft)return;const ok=await executeRefereeDispatchCommand({action:"swap",matchId:courtSwapDraft.sourceMatchId,targetMatchId:targetId});
+    if(ok){courtSwapDraft=null;render();}return;
+  }
   const draft=courtSwapDraft;if(!draft)return;
   const source=getMatch(draft.sourceMatchId),target=getMatch(targetId);
   if(!source||!canCourtSwapSource(source)){courtSwapDraft=null;render();showToast("原場次已無法交換",true);return;}
@@ -10981,6 +11185,7 @@ function applyManualCourtAssign(st,matchId,targetStation){
  if(target){target.currentMatchId=m.id;target.nextMatchId=null;target.status="ready";target.updatedAt=now;}st.currentMatchId=m.id;return {ok:true,state:st};
 }
 async function executeManualCourtAssign(matchId,targetStation){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"manual-assign",matchId,targetStation});
  const m=getMatch(matchId);if(!m||!canManualAssignMatch(m)){showToast("此場目前無法指定",true);return;}let result;
  if(state.cloudCode){if(!cloudAvailable()||!window.cloudSync?.mutateMatchTransaction){showToast("雲端未連線，無法人工指定",true);return;}result=await window.cloudSync.mutateMatchTransaction(state.cloudCode,m.id,Number(m.station||0),remote=>applyManualCourtAssign(remote,m.id,targetStation),currentAuthUid(),{targetStation,expectedRevision:Number(m.dispatchRevision||0)});}
  else{result=applyManualCourtAssign(state,m.id,targetStation);if(result.ok){rebuildPropagation();if(!await saveState())result={ok:false,reason:"save-failed"};}}
@@ -11117,7 +11322,7 @@ function refereeWorkstationHeader(m, stationNum){
   const assigned=refereeDisplayForStation(stationNum);
   const status=refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
-  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>`;
+  return `<div class="ref-workstation-head"><div class="ref-workstation-identity"><span class="court-badge">台${stationNum}</span><div><span>責任裁判</span><b title="${esc(assigned)}">${esc(assigned)}</b></div></div><div class="ref-workstation-meta"><span class="ref-station-status ${status.cls}">${status.label}</span><small>${matchMeta}｜已完成 ${stationCompletedCount(stationNum)} 場${refereeStationRestrictionEnabled()?"｜桌次限制":""}</small>${exitButton}</div></div>${window.BXHRefereeSeats?.render(state,stationNum)||""}`;
 }
 function renderQuickDecisionPanel(m, court, stationNum){
   const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
@@ -11194,7 +11399,8 @@ function renderCourtCard(stationNum){
   const preStartLocked=!state.startedAt;
   const stationLocked=!canOperateStation(stationNum);
   const enchantmentPending=state.meta&&state.meta.playMode==="enchantment";
-  const scoreLocked=locked || preStartLocked || stationLocked || !!winSide || enchantmentPending;
+  const faultSaving=refereeFaultWritePending(m);
+  const scoreLocked=locked || faultSaving || preStartLocked || stationLocked || !!winSide || enchantmentPending;
 
   const scoreBtn = (side, type) => `<button data-action="score" data-id="${m.id}" data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
   const faultBtn = (side) => {
@@ -11216,6 +11422,7 @@ function renderCourtCard(stationNum){
     ${stationLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>唯讀｜你未被指派 Court ${stationNum}，本台所有比分與判定操作已鎖定。</span></div>`:""}
     ${enchantmentPending?'<div class="banner warn" style="margin:12px 16px 0;"><span>附魔之戰尚在串接選手手機抽卡與裁判計分，此場暫不可送分。</span></div>':""}
     ${warnBanner}
+    ${faultSaving?'<div class="banner warn"><span>失誤判定儲存中，請稍候。</span></div>':""}
     ${preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
       <span class="msc-label">場次狀態：${matchStatusBarHtml(m, true)}</span>
@@ -11247,9 +11454,9 @@ function renderCourtCard(stationNum){
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
-      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${!undoAvailable||locked||stationLocked?'disabled':''}>${undoLabel}</button>
-      <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||stationLocked?'disabled':''}>本局重賽</button>
-      <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
+      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${!undoAvailable||locked||faultSaving||stationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||faultSaving||stationLocked?'disabled':''}>本局重賽</button>
+      <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!faultSaving&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
     </div>
 
   </div>`;
@@ -11280,6 +11487,11 @@ let courtRetirementBusy=false;
 function canForceExitCourt(n){return canManageCourtRetirement()||(canOperateCurrentTournament()&&canOperateStation(n));}
 function canManageCourtRetirement(){return canManageRefereeStationAssignments()||isCommunityRoomOwner()||(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator());}
 async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(state.courtRetirementPlan?.revision||0)){
+  if(state.meta?.refereeSeatsV1?.version===1){
+    const metaPatch=Object.fromEntries(Object.entries(nextMeta||{}).filter(([key,value])=>key!=="stations"&&JSON.stringify(value)!==JSON.stringify(state.meta[key])));
+    const ok=await executeRefereeDispatchCommand({action:"resize",count:n,expectedTarget:expected,expectedPlanRevision:expectedRevision,metaPatch});
+    if(ok){resetSettingsFormDraft();resetRegistrationFormDraft();}return;
+  }
   if(courtRetirementBusy)return;courtRetirementBusy=true;const roomId=state.id;
   try{
     let result;
@@ -11300,6 +11512,7 @@ async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(st
   finally{courtRetirementBusy=false;renderPreservingScroll();}
 }
 async function transferRetiringCourtMatch(id,to){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"retirement-transfer",matchId:id,targetStation:to});
   if(!canManageCourtRetirement()||courtRetirementBusy)return;
   const m=getMatch(id);if(!m)return;
   courtRetirementBusy=true;const revision=Number(m.dispatchRevision||0),roomId=state.id;
@@ -11317,6 +11530,7 @@ async function transferRetiringCourtMatch(id,to){
   finally{courtRetirementBusy=false;renderPreservingScroll();}
 }
 async function executeCourtForceAction(change){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:change.kind,station:change.station,matchId:change.matchId||null,targetStation:change.to,expectedExitRevision:change.exitRevision});
   if(!(change.kind==="force-exit"?canForceExitCourt(change.station):canManageCourtRetirement())||courtRetirementBusy)return;
   courtRetirementBusy=true;const roomId=state.id;
   try{
@@ -11534,6 +11748,7 @@ function renderStaffAssignmentPanel(){
 }
 
 function renderRefereeStationAssignmentPanel(){
+  if(window.BXHRefereeSeats?.enabled(state)) return window.BXHRefereeSeats.settings();
   if(!state || !state.meta || state.meta.eventAuthority==="community") return "";
   if(!canManageRefereeStationAssignments()) return "";
   if(state.archiveStatus==="completed") return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><div class="banner"><span>此賽事已完成並封存，裁判台分配目前為唯讀。</span></div></div>`;
@@ -11542,7 +11757,7 @@ function renderRefereeStationAssignmentPanel(){
   const map=refereeStationAssignmentsMap();
   const creatorUid=state.createdBy||"";
   if(refereeDirectoryUsers===null){
-    return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">指定每位裁判負責的戰鬥台。啟用限制後，staff 只能操作本人被指派的 Court；admin／super_admin 保留全桌操作權。</p><button class="btn btn-ghost" data-action="load-referee-directory">載入裁判清單</button></div>`;
+    return `${window.BXHRefereeSeats?.settings()||""}<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">指定每位裁判負責的戰鬥台。啟用限制後，staff 只能操作本人被指派的 Court；admin／super_admin 保留全桌操作權。</p><button class="btn btn-ghost" data-action="load-referee-directory">載入裁判清單</button></div>`;
   }
   const eligible=refereeDirectoryUsers.filter(u=>u&&u.active!==false&&(isOwnTestTournament()?((u.role==="tester"||u.isTestAccount===true)&&u.uid===currentAuthUid()):(u.role==="staff"||u.role==="admin"||u.role==="super_admin"||(isPartnerOrganizerMode()&&u.role==="event_staff"))));
   const eventStaff=Array.isArray(state.meta.assignedStaffUids)?state.meta.assignedStaffUids:[];
@@ -11557,7 +11772,7 @@ function renderRefereeStationAssignmentPanel(){
     return `<div class="panel" style="margin:0;padding:14px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><b>Court ${station}</b><span class="badge ${assigned.length?'badge-neon':'badge-metal'}">${assigned.length?assigned.length+' 位裁判':'未指派'}</span></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${candidates.length?candidates.map((u,index)=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" class="referee-station-checkbox" data-station="${station}" data-uid="${esc(u.uid)}" ${assigned.includes(u.uid)?'checked':''} ${refereeAssignmentSaving?'disabled':''} style="width:18px;height:18px;"><span style="min-width:3ch;flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums;">${index+1}.</span><span>${esc((typeof u.realName==="string" && u.realName.trim()) || (([u.gameId,u.displayName,u.nickname].find(value=>typeof value==="string" && value.trim()) || "未設定ID").trim()+"（缺少本名）"))}</span><span class="hint" style="margin:0;">${u.uid===creatorUid?'建立者｜':''}${u.role==='super_admin'?'最高管理員':u.role==='admin'?'管理員':u.role==='tester'?'封測管理員（測試）':u.role==='event_staff'?'工作人員（活動）':'工作人員'}</span></label>`).join(''):'<span class="hint">目前沒有可用的裁判帳號。</span>'}</div></div>`;
   }).join('');
   const draftHint=typeof refereeAssignmentDraftEnabled==="boolean"&&refereeAssignmentDraftEnabled!==refereeStationRestrictionEnabled()?'<div class="hint" style="margin-top:8px;color:var(--gold);">桌次限制尚未儲存，請按「儲存裁判台分配」。</div>':'';
-  return `<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">建議賽前完成分配。啟用後，未被指定的 staff 在其他 Court 只可查看，不能計分、確認結果、簡易判定、暫停、跳過或重賽。玩家端只會看到裁判顯示名稱，不公開 UID。</p>${directoryHint}${refereeDirectoryError?`<div class="auth-error">${esc(refereeDirectoryError)}</div>`:""}<div class="toggle-row" style="margin:12px 0;"><span><b>啟用桌次限制</b><small>未啟用時沿用既有賽事權限；啟用後依 Court 指派限制。</small></span><button class="toggle ${enabled?'on':''}" data-action="toggle-referee-station-restriction" data-value="${enabled?'false':'true'}" ${refereeAssignmentSaving?'disabled':''}><span></span></button></div>${draftHint}<div style="display:flex;flex-direction:column;gap:10px;">${rows}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="save-referee-station-assignment" ${refereeAssignmentSaving?'disabled':''}>${refereeAssignmentSaving?'雲端交易確認中…':'儲存裁判台分配'}</button><button class="btn btn-ghost" data-action="load-referee-directory" ${refereeAssignmentSaving?'disabled':''}>重新載入名單</button></div></div>`;
+  return `${window.BXHRefereeSeats?.settings()||""}<div class="panel"><div class="panel-title">裁判台責任綁定</div><p class="hint">建議賽前完成分配。啟用後，未被指定的 staff 在其他 Court 只可查看，不能計分、確認結果、簡易判定、暫停、跳過或重賽。玩家端只會看到裁判顯示名稱，不公開 UID。</p>${directoryHint}${refereeDirectoryError?`<div class="auth-error">${esc(refereeDirectoryError)}</div>`:""}<div class="toggle-row" style="margin:12px 0;"><span><b>啟用桌次限制</b><small>未啟用時沿用既有賽事權限；啟用後依 Court 指派限制。</small></span><button class="toggle ${enabled?'on':''}" data-action="toggle-referee-station-restriction" data-value="${enabled?'false':'true'}" ${refereeAssignmentSaving?'disabled':''}><span></span></button></div>${draftHint}<div style="display:flex;flex-direction:column;gap:10px;">${rows}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="save-referee-station-assignment" ${refereeAssignmentSaving?'disabled':''}>${refereeAssignmentSaving?'雲端交易確認中…':'儲存裁判台分配'}</button><button class="btn btn-ghost" data-action="load-referee-directory" ${refereeAssignmentSaving?'disabled':''}>重新載入名單</button></div></div>`;
 }
 
 
@@ -11754,9 +11969,10 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     capacity: m.registrationCapacity, confirmedCount: 0,
     registrationStatus: null, eventCancelled: false
   })));
-  const locked = state.bracketSize > 0;
+  const locked = state.bracketSize > 0 || onsiteRegistrationSettingsLocked();
   return `<div class="panel">
     <div class="panel-title">線上報名設定</div>
+    ${managedRegistrationSettingsNotice()}
     ${registrationFormDraftDirty ? `<div class="banner warn"><span>尚有未儲存的變更，請記得點擊下方「儲存報名設定」。</span></div>` : ""}
     ${showModeSelector ? `<div class="scoring-mode-cards">
       <button class="scoring-mode-card ${!d.registrationEnabled?'active':''}" data-action="set-registration-enabled" data-value="false" ${locked?'disabled':''}>
@@ -11768,7 +11984,7 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
         <div class="smc-desc">發布後玩家可掃 QR 或從賽事大廳自行報名。</div>
       </button>
     </div>
-    ${locked ? `<p class="hint" style="margin-top:10px;">已產生對戰表，無法變更是否啟用線上報名。</p>` : ""}` : ""}
+    ${state.bracketSize>0 ? `<p class="hint" style="margin-top:10px;">已產生對戰表，無法變更是否啟用線上報名。</p>` : ""}` : ""}
     ${d.registrationEnabled ? `
     ${teamRegistrationMode?`<div class="banner" style="margin-top:14px;"><span><b>${teamRegistrationSize}V${teamRegistrationSize} 團體戰</b>｜報名與正備取名額都以「隊伍」計算；玩家端先填隊名，再完整填入 ${teamRegistrationSize} 位隊員。</span></div>`:`<div class="field" style="margin-top:14px;">
       <label>參賽名稱顯示</label>
@@ -11786,16 +12002,17 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
       </div>
       <p class="hint" style="margin-top:6px;">${d.targetGroup==='children' ? "限 6 歲以上、13 歲以下參加。" : "不限年齡，符合活動規則者皆可參加。"}</p>
     </div>`}
-    <div class="grid grid-2" style="margin-top:14px;">
+    <fieldset style="border:0;padding:0;margin:0;min-width:0" ${onsiteRegistrationSettingsLocked()?'disabled':''}><div class="grid grid-2" style="margin-top:14px;">
       <div class="field"><label>報名開放時間</label>${renderHalfHourDatetimeDraft("reg-open-at","registrationOpenAt",d.registrationOpenAt)}</div>
       <div class="field"><label>報名截止時間</label>${renderHalfHourDatetimeDraft("reg-close-at","registrationCloseAt",d.registrationCloseAt)}</div>
       <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
+    </div></fieldset><div class="grid grid-2">
       <div class="field"><label>報名費（元，選填）</label><input type="number" id="reg-fee" data-draft-field="registrationFee" data-draft-type="int-or-null" min="0" value="${d.registrationFee!=null?d.registrationFee:""}"></div>
     </div>
     ${state.entrySelection?.mode==='registration'?'<p class="hint">本場已啟用報名抽籤：報名不限額、備取不限額，正取人數請至「參賽名額抽籤」調整。下列舊制上限不套用於本場。</p>':''}
     <div class="field" style="margin-top:8px;">
       <label>${teamRegistrationMode?"備取隊伍上限（選填）":"備取人數上限（選填）"}</label>
-      <input type="number" id="reg-waitlist-capacity" data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
+      <input type="number" id="reg-waitlist-capacity" ${onsiteRegistrationSettingsLocked()?'disabled':''} data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
       <p class="hint" style="margin-top:6px;">有需要備取就填${teamRegistrationMode?"隊伍數":"人數"}；留空即代表 0、不開放備取。</p>
     </div>
     <div class="field" style="margin-top:8px;"><label>活動說明（選填）</label><textarea id="reg-event-desc" data-draft-field="eventDescription" data-draft-type="string" rows="3">${esc(d.eventDescription)}</textarea></div>
@@ -12232,7 +12449,7 @@ function renderPeopleManagement(){
   const navItems=[
     ["confirmed","正取",confirmed.length],
     ["pending","待報到",pending.length],
-    ["waitlist","備取",waitCount],
+    ["waitlist",peopleOnsiteWaitlistAvailable()?"備取／抽籤":"備取",waitCount],
     ["tools","新增／同步",null],
     ["staff","工作人員",null],
     ["bracket","賽事編排",null]
@@ -12289,7 +12506,7 @@ function renderPeopleManagement(){
       <div class="people-capacity-banner"><div><div class="panel-title">備取區（${waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
       <div class="btn-row" style="margin:12px 0;">
         <button class="btn ${state.meta.registrationAutoFillEnabled===true?'btn-primary':'btn-ghost'}" role="switch" aria-checked="${state.meta.registrationAutoFillEnabled===true}" data-action="people-toggle-auto-fill" ${!state.cloudCode||locked||selectionManaged||state.meta.battleMode==='team'||peopleRosterBusy?'disabled':''}>自動補位：${state.meta.registrationAutoFillEnabled===true?'開啟':'關閉'}</button>
-        <span class="hint">${selectionManaged||state.meta.battleMode==='team'?'此開關適用一般個人賽；本場依專用名額規則處理。':'開啟後取消正取時，依備取順序補一位；不會增加名額。'}</span>
+        <span class="hint">${selectionManaged||state.meta.battleMode==='team'?'此開關適用一般個人賽；本場依專用名額規則處理。':(state.meta.registrationAutoFillEnabled===true?'正取退出時，依備取順序自動遞補；不會增加名額。':'目前關閉：正取退出後不會自動遞補，建議開啟以保障備取順位。')}</span>
       </div>
       ${selectionManaged?'<div class="banner warn"><span>本場為抽籤名額模式，請由「參賽名額抽籤」異動正備取。</span></div>':''}
       ${adminRegistrationsLoading?'<div class="empty-state">正在同步線上備取名單……</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th><th>升正取</th><th>更多</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
@@ -12312,7 +12529,9 @@ function renderPeopleManagement(){
   const pendingOnsite=window.BXHOnsiteWaitlistIntegration?.pendingCommand(state.cloudCode,firebaseUser?.uid);
   const pendingBanner=pendingOnsite?'<div class="banner warn" role="alert"><span>有一筆報到操作尚未確認。</span><button class="btn btn-primary" data-action="onsite-checkin-retry" '+(peopleRosterBusy?'disabled':'')+'>確認同一筆報到操作</button></div>':'';
   const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
-  return syncError+pendingBanner+subnav+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
+  const waitlistShortcut=peopleOnsiteWaitlistAvailable()&&peopleRosterSection!=="waitlist"
+    ?'<div class="panel"><div class="people-section-summary"><div><div class="panel-title">備取／現場抽籤</div><p class="hint">備取名單、抽選名額與加開名額，統一從這裡操作。</p></div><button class="btn btn-primary" data-action="people-section" data-section="waitlist">'+(state.onsiteWaitlistFinalized===true?'查看抽籤紀錄':'前往備取／抽籤')+'</button></div></div>':"";
+  return syncError+pendingBanner+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -12401,10 +12620,10 @@ function renderSettings(){
   </div>
   <div class="panel settings-flow-panel">
     <div class="settings-choice-row">
-      <button class="scoring-mode-card ${!registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="false" ${state.bracketSize>0?'disabled':''}>
+      <button class="scoring-mode-card ${!registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="false" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
         <div class="smc-title">現場報名</div><div class="smc-desc">現場直接新增選手，不開放線上報名。</div>
       </button>
-      <button class="scoring-mode-card ${registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="true" ${state.bracketSize>0?'disabled':''}>
+      <button class="scoring-mode-card ${registrationChoice?"active":""}" data-action="set-registration-enabled" data-value="true" ${state.bracketSize>0||onsiteRegistrationSettingsLocked()?'disabled':''}>
         <div class="smc-title">線上報名</div><div class="smc-desc">玩家可由賽事大廳或 QR CODE 進入報名。</div>
       </button>
     </div>
@@ -13011,6 +13230,70 @@ const ACCOUNT_ROLE_FILTERS = [
 
 
 
+const ACCOUNT_PAGE_SIZE=30;
+let accountDirectoryState=null;
+function accountDirectoryContext(){
+  const key=currentAuthUid()+':'+engagementSessionEpoch;
+  if(!accountDirectoryState||accountDirectoryState.key!==key){
+    accountDirectoryState={key,summary:null,summaryBusy:false,summaryAt:0,summaryGeneration:0,searched:false,busy:false,error:'',generation:0,page:0,truncated:false,opened:new Set()};
+    accountMgmtUsers=[];
+  }
+  return accountDirectoryState;
+}
+function accountDirectoryCurrent(c){return c===accountDirectoryState&&c.key===currentAuthUid()+':'+engagementSessionEpoch&&isSuperAdmin();}
+function patchAccountDirectorySummary(c){
+  if(!accountDirectoryCurrent(c)||appPhase!=='account-management')return;
+  const summary=c.summary||{},metric=value=>value==null?(c.summaryBusy?'…':'—'):String(value);
+  document.querySelectorAll('[data-account-stat]').forEach(el=>{el.textContent=metric(summary[el.getAttribute('data-account-stat')]);});
+  document.querySelectorAll('[data-account-role-count]').forEach(el=>{el.textContent=metric(summary.roles?.[el.getAttribute('data-account-role-count')]);});
+  const error=document.querySelector('[data-account-summary-error]');
+  if(error)error.textContent=summary.errors?.length?'部分統計未能讀取，請按「更新統計」重試；查詢仍可使用。':'';
+  const refresh=document.querySelector('[data-action="account-summary-refresh"]');if(refresh)refresh.disabled=c.summaryBusy;
+}
+async function loadAccountDirectorySummary(force=false){
+  if(!isSuperAdmin())return;
+  const c=accountDirectoryContext();
+  if(c.summaryBusy||(!force&&c.summaryAt&&Date.now()-c.summaryAt<60000))return;
+  c.summaryBusy=true;const generation=++c.summaryGeneration;
+  try{
+    const result=await window.cloudAuth.getManagedAccountSummary(partial=>{
+      if(!accountDirectoryCurrent(c)||generation!==c.summaryGeneration)return;
+      c.summary=partial;patchAccountDirectorySummary(c);
+    });
+    if(accountDirectoryCurrent(c)&&generation===c.summaryGeneration){c.summary=result;c.summaryAt=Date.now();}
+  }catch(e){if(accountDirectoryCurrent(c))c.summary={...(c.summary||{}),errors:['summary']};}
+  finally{if(accountDirectoryCurrent(c)&&generation===c.summaryGeneration){c.summaryBusy=false;patchAccountDirectorySummary(c);}}
+}
+function resetAccountDirectorySearch(){
+  const c=accountDirectoryContext();c.generation++;c.searched=false;c.busy=false;c.error='';c.page=0;c.truncated=false;c.opened.clear();accountMgmtUsers=[];
+}
+async function searchAccountDirectory(){
+  if(!isSuperAdmin())return;
+  const c=accountDirectoryContext(),generation=++c.generation;
+  c.searched=true;c.busy=true;c.error='';c.page=0;c.truncated=false;c.opened.clear();accountMgmtUsers=[];render();
+  try{
+    const result=await window.cloudAuth.queryManagedAccounts({keyword:accountMgmtQuery,role:accountMgmtRoleFilter});
+    if(!accountDirectoryCurrent(c)||generation!==c.generation||appPhase!=='account-management')return;
+    accountMgmtUsers=result.users;c.truncated=result.truncated;
+  }catch(e){if(accountDirectoryCurrent(c)&&generation===c.generation)c.error='帳號查詢失敗或逾時，請重新搜尋。';}
+  finally{if(accountDirectoryCurrent(c)&&generation===c.generation){c.busy=false;if(appPhase==='account-management')render();}}
+}
+async function refreshManagedAccountResults(){
+  if(!isSuperAdmin())return;
+  const c=accountDirectoryContext();
+  await Promise.all([loadAccountDirectorySummary(true),c.searched?searchAccountDirectory():Promise.resolve()]);
+}
+function bindAccountDirectoryDetails(){
+  document.querySelectorAll('.account-user-card[data-account-uid]').forEach(card=>{
+    card.addEventListener('toggle',()=>{
+      const c=accountDirectoryContext(),uid=card.getAttribute('data-account-uid');
+      if(!card.isConnected)return;
+      if(card.open&&!c.opened.has(uid)){c.opened.add(uid);render();}
+      else if(!card.open)c.opened.delete(uid);
+    });
+  });
+}
+
 function getVisibleAccountUsers(users,now=Date.now()){
   const keyword=String(accountMgmtQuery||"").trim().toLowerCase();
   const visible=(users||[]).filter(user=>{
@@ -13019,7 +13302,7 @@ function getVisibleAccountUsers(users,now=Date.now()){
     if(accountMgmtStatusFilter==="inactive"&&user.active!==false) return false;
     if(!accountMatchesActivity(user,accountMgmtActivityFilter,now)) return false;
     if(keyword){
-      const haystack=[accountPrimaryName(user),accountGameId(user),user.email,user.role].join(" ").toLowerCase();
+      const haystack=[accountPrimaryName(user),accountGameId(user),user.nickname,user.email,user.uid,user.playerId].join(" ").toLowerCase();
       if(!haystack.includes(keyword)) return false;
     }
     return true;
@@ -13247,7 +13530,7 @@ function renderAccountBatchPanel(){
 function accountChangeError(message){const map={'tester-role-requires-test-identity':'封測角色必須保留測試身分，請同時改為其他角色','last-super-admin-protected':'必須保留至少一位啟用的最高管理員','super-admin-required':'只有啟用的最高管理員可管理帳號','test-account-cannot-be-super-admin':'測試身分不能成為最高管理員','account-not-found':'找不到帳號','operation-conflict':'操作識別不一致','select-1-to-50-accounts':'請選擇1至50個帳號'};for(const [key,value]of Object.entries(map))if(String(message).includes(key))return value;return '操作結果尚未確認，請確認上次操作結果。';}
 async function handleAccountBatch(action,target){
  if(!isSuperAdmin())return;const b=accountBatchContext();if(b.busy)return;
- if(action==='account-batch-select'){b.selected=new Set(getVisibleAccountUsers(accountMgmtUsers||[]).slice(0,50).map(u=>u.uid));render();return;}
+ if(action==='account-batch-select'){b.selected=new Set(getVisibleAccountUsers(accountMgmtUsers||[]).slice(accountDirectoryContext().page*ACCOUNT_PAGE_SIZE,(accountDirectoryContext().page+1)*ACCOUNT_PAGE_SIZE).map(u=>u.uid));render();return;}
  if(action==='account-batch-clear'){b.selected.clear();render();return;}
  const actor=currentAuthUid();let payload=accountBatchPending();
  if(!payload){if(action==='account-batch-retry')return;const patch={},role=document.getElementById('batch-role')?.value,active=document.getElementById('batch-active')?.value;if(role)patch.role=role;if(active)patch.active=active==='true';const test=document.getElementById('batch-test')?.value;if(test)patch.isTestAccount=test==='true';if(document.getElementById('batch-note-apply')?.checked)patch.managementNote=document.getElementById('batch-note')?.value||'';
@@ -13257,7 +13540,7 @@ async function handleAccountBatch(action,target){
   payload={uids:[...b.selected],patch,operationId:crypto.randomUUID()};try{sessionStorage.setItem(accountBatchPendingKey(),JSON.stringify(payload));}catch(e){showToast('無法保存操作請求，請更換瀏覽器後再試',true);return;}
  }
  b.busy=true;b.error='';render();
- try{const result=await window.engagementService.changeManagedAccounts(payload);if(actor!==currentAuthUid())return;if(!result.ok)throw Error('operation-failed');sessionStorage.removeItem(accountBatchPendingKey());b.result=result.results;b.selected=new Set(result.results.filter(r=>r.status==='failed').map(r=>r.uid));const freshUsers=await window.cloudAuth.listUsers();if(actor===currentAuthUid()&&isSuperAdmin())accountMgmtUsers=freshUsers;}
+ try{const result=await window.engagementService.changeManagedAccounts(payload);if(actor!==currentAuthUid())return;if(!result.ok)throw Error('operation-failed');sessionStorage.removeItem(accountBatchPendingKey());b.result=result.results;b.selected=new Set(result.results.filter(r=>r.status==='failed').map(r=>r.uid));await refreshManagedAccountResults();}
  catch(e){if(actor===currentAuthUid())b.error=accountChangeError(e.message);}
  finally{if(actor===currentAuthUid()){b.busy=false;render();}}
 }
@@ -13310,7 +13593,7 @@ async function changeSingleManagedAccount(uid,patch,el){
   if(!result.ok)throw Error('operation-failed');sessionStorage.removeItem(key);
   const outcome=result.results[0];showToast(outcome.status==='failed'?accountChangeError(outcome.reason):'帳號設定已更新',outcome.status==='failed');
   if(outcome.status!=='failed')managedAccountDrafts.delete(uid);
-  const users=await window.cloudAuth.listUsers();if(actor===currentAuthUid()&&isSuperAdmin())accountMgmtUsers=users;
+  await refreshManagedAccountResults();
  }catch(e){if(actor===currentAuthUid())showToast(accountChangeError(e.message),true);}
  finally{if(actor===currentAuthUid()){if(el)el.disabled=false;render();}}
 }
@@ -13521,15 +13804,23 @@ document.addEventListener('change',event=>{
   const save=status.closest('.account-partner-grant')?.querySelector('[data-action="save-partner-grant"]');
   if(save)save.disabled=status.value==='active';
 });
+function legacyPartnerRevocationPatch(user){
+  const grant=user?.partnerOrganizer;
+  if(user?.role!=='player'||user.active!==true||user.isTestAccount===true||grant?.status!=='active'
+    ||![undefined,null,'manual'].includes(grant.scope)||grant.orderCode||grant.contractOrderCode||user.partnerContractOrderCode)return null;
+  return {partnerOrganizer:{status:'revoked',organizationId:grant.organizationId,organizationName:grant.organizationName,plan:grant.plan,expiresAt:grant.expiresAt??null}};
+}
 function renderPartnerContractCard(user){
   const activePlans=(partnerPlansState.plans||[]).filter(plan=>plan.active&&plan.rankedMode);
   const draft=partnerOrderFor(user.uid);
+  const startPolicyAvailable=partnerPlansState.quotaPolicies?.includes('start-v1')===true;
   return `<div class="account-partner-grant">
     <div class="panel-title">合作主辦｜合作方案與合約</div>
     <p class="hint">選擇方案後建立合約草稿；玩家於站內信閱讀並簽名，再由最高管理員確認。合作代碼由成立時自動產生。</p>
-    ${user.partnerOrganizer?.status==='active'?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:''}
+    ${legacyPartnerRevocationPatch(user)?`<p class="hint">此帳號有舊版手動授權（${esc(user.partnerOrganizer.plan||'未設定方案')}）。如須停止，請撤銷舊授權。</p><button class="btn btn-ghost btn-sm" data-action="partner-revoke-legacy" data-uid="${esc(user.uid)}">撤銷舊授權</button>`:user.partnerOrganizer?.status==='active'?'<p class="hint">此帳號已有合作授權；合約授權須依合約流程處理，不可當作舊版手動授權撤銷。</p>':''}
     <div class="grid grid-2">
       <div class="field"><label>合作方案</label><select class="partner-contract-plan" data-uid="${esc(user.uid)}"><option value="">請選擇合作方案</option>${activePlans.map(plan=>`<option value="${esc(plan.planCode)}">${esc(plan.planCode)}｜${esc(plan.name)}${Number.isSafeInteger(plan.priceTwd)?'｜NT$ '+plan.priceTwd+'｜'+plan.includedEvents+' 場／每場上限 '+plan.maxParticipants+' 人':''}</option>`).join('')}</select></div>
+      <div class="field"><label>扣場方式</label><select class="partner-contract-quota-policy" data-uid="${esc(user.uid)}">${startPolicyAvailable?'<option value="start-v1" selected>正式開賽時扣場</option>':''}<option value="creation-v1">建房時扣場</option></select></div>
       <div class="field"><label>合作方名稱</label><input class="partner-contract-name" data-uid="${esc(user.uid)}" maxlength="200" value="${esc(user.partnerOrganizer?.organizationName||'')}"></div>
       <div class="field"><label>費用 NT$（內建方案依固定價格自動帶入）</label><input class="partner-contract-amount" data-uid="${esc(user.uid)}" type="number" min="0" step="1" placeholder="請填寫合約金額"></div>
       <div class="field"><label>生效日期</label><input class="partner-contract-start" data-uid="${esc(user.uid)}" type="date"></div>
@@ -13544,11 +13835,16 @@ function renderPartnerContractCard(user){
 
 function renderAccountManagementScreen(){
   const page=["accounts","checkin","titles"].includes(superAdminManagementPage)?superAdminManagementPage:"accounts";
-  if(page==='accounts'&&partnerPlansState.plans===null&&!partnerPlansState.loading)setTimeout(()=>loadPartnerPlans(),0);
-  const loading=accountMgmtUsers===null;
+  const directory=accountDirectoryContext();
+  if(page==='accounts'&&!directory.summary&&!directory.summaryBusy)setTimeout(()=>loadAccountDirectorySummary(),0);
+  if(page==='accounts'&&directory.opened.size&&partnerPlansState.plans===null&&!partnerPlansState.loading)setTimeout(()=>loadPartnerPlans(),0);
+  const loading=directory.busy;
   const users=accountMgmtUsers||[];
-  const activity=accountActivitySummary(users);
-  const visibleUsers=getVisibleAccountUsers(users);
+  const activity=directory.summary||{};
+  const metric=value=>value==null?(directory.summaryBusy?'…':'—'):value;
+  const matchedUsers=directory.searched?getVisibleAccountUsers(users):[];
+  directory.page=Math.min(directory.page,Math.max(0,Math.ceil(matchedUsers.length/ACCOUNT_PAGE_SIZE)-1));
+  const visibleUsers=matchedUsers.slice(directory.page*ACCOUNT_PAGE_SIZE,(directory.page+1)*ACCOUNT_PAGE_SIZE);
   return `<div class="stickytop account-management-stickytop"><header class="topbar account-management-topbar">
       <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
       <div class="brandtext"><span class="t1"><span class="w-bxh">BXH</span><span class="w-arena">ARENA</span></span><span class="t2">戰鬥陀螺賽事系統 <small style="opacity:.55;font-size:9px;">${APP_VERSION}</small></span>${topbarConnectionRailHtml()}</div>
@@ -13558,39 +13854,42 @@ function renderAccountManagementScreen(){
     ${accountMenuOverlayHtml()}
     <main class="account-management-main">
       ${page==="accounts"?`<div class="panel account-management-panel">
-        <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
-        <p class="hint">選擇玩家帳號並展開，即可在「合作主辦權限」開通或撤銷；帳號分類維持玩家。</p>
+        <div class="panel-title">帳號管理<button class="btn btn-ghost btn-sm" data-action="account-summary-refresh" ${directory.summaryBusy?'disabled':''}>更新統計</button><button class="btn btn-ghost btn-sm" data-action="account-goto-home">返回系統首頁</button></div>
+        <p class="hint">先查看統計；搜尋或點選分類後才載入帳號，展開後可管理設定。</p>
 
 
         ${authFormError ? `<div class="auth-error">${esc(authFormError)}</div>` : ""}
         <div class="account-overview-grid">
-          <div class="stat-box"><div class="label">全部帳號</div><div class="value">${activity.total}</div></div>
-          <div class="stat-box"><div class="label">啟用帳號</div><div class="value">${activity.enabled}</div></div>
-          <div class="stat-box"><div class="label">日活躍｜近 24 小時</div><div class="value">${activity.daily}</div></div>
-          <div class="stat-box"><div class="label">週活躍｜近 7 天</div><div class="value">${activity.weekly}</div></div>
+          <div class="stat-box"><div class="label">全部帳號</div><div class="value" data-account-stat="total">${metric(activity.total)}</div></div>
+          <div class="stat-box"><div class="label">啟用帳號</div><div class="value" data-account-stat="enabled">${metric(activity.enabled)}</div></div>
+          <div class="stat-box"><div class="label">日活躍｜近 24 小時</div><div class="value" data-account-stat="daily">${metric(activity.daily)}</div></div>
+          <div class="stat-box"><div class="label">週活躍｜近 7 天</div><div class="value" data-account-stat="weekly">${metric(activity.weekly)}</div></div>
         </div>
-        <div class="hint" style="margin-top:8px;">封測管理員：${activity.testers}｜日／週活躍以啟用帳號的 lastLoginAt 去重計算；週活躍包含日活躍。</div>
+        <div class="hint" style="margin-top:8px;">封測管理員：<span data-account-stat="testers">${metric(activity.testers)}</span>｜日／週活躍以啟用帳號的 lastLoginAt 去重計算；週活躍包含日活躍。統計快取最多 60 秒，可按「更新統計」重查。</div>
         <div class="account-role-filter-bar" aria-label="帳號角色快速分類">
-          ${ACCOUNT_ROLE_FILTERS.map(([key,label])=>`<button class="account-filter-chip ${accountMgmtRoleFilter===key?'active':''}" data-action="account-role-filter" data-role="${key}" aria-pressed="${accountMgmtRoleFilter===key?'true':'false'}">${label} ${accountRoleCount(users,key)}</button>`).join("")}
+          ${ACCOUNT_ROLE_FILTERS.map(([key,label])=>`<button class="account-filter-chip ${accountMgmtRoleFilter===key?'active':''}" data-action="account-role-filter" data-role="${key}" aria-pressed="${accountMgmtRoleFilter===key?'true':'false'}">${label} <span data-account-role-count="${key}">${metric(activity.roles?.[key])}</span></button>`).join("")}
         </div>
         <div class="account-filter-toolbar">
-          <div class="field"><label>搜尋姓名／帳號</label><div class="account-filter-search"><input id="account-mgmt-search" value="${esc(accountMgmtQuery)}" placeholder="姓名、遊戲 ID 或 Email"><button class="btn btn-ghost" data-action="account-search-apply">搜尋</button><button class="btn btn-ghost" data-action="account-search-clear" aria-label="清除搜尋關鍵字">清除</button></div></div>
+          <div class="field"><label>搜尋姓名／帳號</label><div class="account-filter-search"><input id="account-mgmt-search" value="${esc(accountMgmtQuery)}" placeholder="姓名、遊戲 ID、Email 開頭或完整 UID"><button class="btn btn-ghost" data-action="account-search-apply">搜尋</button><button class="btn btn-ghost" data-action="account-search-clear" aria-label="清除搜尋關鍵字">清除</button></div></div>
           <div class="field"><label>帳號狀態</label><select class="account-filter-select" data-filter-key="status"><option value="all" ${accountMgmtStatusFilter==='all'?'selected':''}>全部狀態</option><option value="active" ${accountMgmtStatusFilter==='active'?'selected':''}>啟用中</option><option value="inactive" ${accountMgmtStatusFilter==='inactive'?'selected':''}>已停用</option></select></div>
           <div class="field"><label>活躍度</label><select class="account-filter-select" data-filter-key="activity"><option value="all" ${accountMgmtActivityFilter==='all'?'selected':''}>全部活躍度</option><option value="daily" ${accountMgmtActivityFilter==='daily'?'selected':''}>今日活躍</option><option value="weekly" ${accountMgmtActivityFilter==='weekly'?'selected':''}>近 7 天活躍</option><option value="stale" ${accountMgmtActivityFilter==='stale'?'selected':''}>逾 7 天</option><option value="never" ${accountMgmtActivityFilter==='never'?'selected':''}>從未登入</option></select></div>
           <div class="field"><label>排序</label><select class="account-filter-select" data-filter-key="sort"><option value="created-desc" ${accountMgmtSort==='created-desc'?'selected':''}>申辦時間｜最新</option><option value="created-asc" ${accountMgmtSort==='created-asc'?'selected':''}>申辦時間｜最早</option><option value="activity-desc" ${accountMgmtSort==='activity-desc'?'selected':''}>最近登入</option><option value="name" ${accountMgmtSort==='name'?'selected':''}>姓名筆畫</option></select></div>
           <button class="btn btn-ghost" data-action="account-clear-filters">清除條件</button>
         </div>
-        ${renderAccountBatchPanel()}
-        <div class="account-result-line"><span>${loading?'正在讀取帳號……':`顯示 ${visibleUsers.length}／${users.length} 筆`}</span><span>點擊帳號查看詳細資料⌄</span></div>
-        ${loading?'<div class="empty-state">正在讀取帳號資料……</div>':visibleUsers.length===0?'<div class="empty-state">沒有符合目前條件的帳號</div>':`
+        ${directory.searched?renderAccountBatchPanel():""}
+        <p class="auth-error" data-account-summary-error role="status">${activity.errors?.length?'部分統計未能讀取，請按「更新統計」重試；查詢仍可使用。':''}</p>
+        ${directory.error?`<p class="auth-error" role="alert">${esc(directory.error)}</p>`:''}
+        ${directory.truncated?'<p class="hint">結果較多，目前為部分結果；請輸入更完整的姓名或帳號縮小查詢。篩選與排序套用於已載入的結果。</p>':''}
+        <div class="account-result-line"><span>${loading?'正在查詢帳號……':directory.searched?`顯示 ${visibleUsers.length}／${matchedUsers.length} 筆查詢結果`:'尚未查詢帳號'}</span><span>點擊帳號查看詳細資料⌄</span></div>
+        ${!directory.searched?'<div class="empty-state">輸入姓名、遊戲 ID 或 Email 開頭搜尋，或點選上方分類；英文 ID 請依原大小寫輸入。</div>':loading?'<div class="empty-state">正在查詢帳號資料……</div>':directory.error?'':visibleUsers.length===0?'<div class="empty-state">沒有符合目前條件的帳號</div>':`
         <div class="account-user-list">
-          ${visibleUsers.map(user=>{const status=accountActivityStatus(user);const gameId=accountGameId(user);const draft=managedAccountDraft(user);const active=draft.active;const dirty=Object.keys(managedAccountPatch(user,draft)).length>0;return `<details class="account-user-card">
+          ${visibleUsers.map(user=>{const status=accountActivityStatus(user);const gameId=accountGameId(user);const draft=managedAccountDraft(user);const active=draft.active;const dirty=Object.keys(managedAccountPatch(user,draft)).length>0;return `<details class="account-user-card" data-account-uid="${esc(user.uid)}" ${directory.opened.has(user.uid)?'open':''}>
             <summary>
               <label><input class="account-batch-checkbox" type="checkbox" aria-label="選取此帳號" data-uid="${esc(user.uid)}" ${accountBatchContext().selected.has(user.uid)?'checked':''} ${accountBatchContext().busy?'disabled':''}></label><div class="account-user-identity"><div class="account-user-name">${esc(accountPrimaryName(user))}</div><div class="account-user-gameid">${gameId?`遊戲 ID｜${esc(gameId)}`:'尚未設定遊戲 ID'}</div></div>
               <div class="account-user-email">${esc(user.email||"未提供 Email")}</div>
-              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${user.partnerOrganizer?.status==="active"&&(user.partnerOrganizer.expiresAt==null||Number(user.partnerOrganizer.expiresAt)>Date.now())?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
+              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${window.BXHPartnerOrganizer?.hasGrant(user)===true?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
             </summary>
-            <div class="account-user-detail">
+            ${directory.opened.has(user.uid)?`<div class="account-user-detail">
               <div class="account-detail-grid">
                 <div class="account-detail-item"><div class="label">本名</div><div class="value">${esc(user.realName||user.displayName||"—")}</div></div>
                 <div class="account-detail-item"><div class="label">遊戲 ID</div><div class="value">${esc(gameId||"—")}</div></div>
@@ -13607,12 +13906,13 @@ function renderAccountManagementScreen(){
                 <div class="account-user-save-row">${user.role==="player"||user.realName?(user.realNameVerified===true?'<span class="badge badge-neon">本名已確認</span>':`<button class="btn btn-ghost btn-sm" data-action="verify-player-realname" data-uid="${esc(user.uid)}">確認玩家本名</button>`):"<span></span>"}<button class="btn btn-primary account-user-save-button" data-action="save-managed-account" data-uid="${esc(user.uid)}" ${dirty?'':'disabled'}>儲存變更</button></div>
                 ${user.role==="player"?`<div class="account-partner-grant"><div class="field"><label>合作主辦權限</label><select class="partner-status" data-uid="${esc(user.uid)}"><option value="revoked" ${user.partnerOrganizer?.status!=="active"?"selected":""}>未授權／撤銷</option><option value="active" ${user.partnerOrganizer?.status==="active"?"selected":""}>選擇合作主辦方案（待簽約）</option></select></div>
                   <div class="partner-config" ${user.partnerOrganizer?.status==="active"?"":"hidden"}>${renderPartnerContractCard(user)}</div>
-                  ${user.partnerOrganizer?.status==="active"?`<button type="button" class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" disabled>確認撤銷舊授權</button>`:""}
+                  ${legacyPartnerRevocationPatch(user)?`<button type="button" class="btn btn-ghost btn-sm" data-action="save-partner-grant" data-uid="${esc(user.uid)}" disabled>確認撤銷舊授權</button>`:""}
                 </div>`:""}
               </div>
-            </div>
+            </div>`:''}
           </details>`;}).join("")}
         </div>`}
+        ${directory.searched&&matchedUsers.length>ACCOUNT_PAGE_SIZE?`<div class="btn-row"><button class="btn btn-ghost" data-action="account-page-prev" ${directory.page===0?'disabled':''}>上一頁</button><span>第 ${directory.page+1}／${Math.ceil(matchedUsers.length/ACCOUNT_PAGE_SIZE)} 頁</span><button class="btn btn-ghost" data-action="account-page-next" ${(directory.page+1)*ACCOUNT_PAGE_SIZE>=matchedUsers.length?'disabled':''}>下一頁</button></div>`:''}
         <details class="account-tools-card">
           <summary><span>新增後台帳號</span><span class="hint">需要時展開⌄</span></summary>
           <div class="account-tools-body">
@@ -13656,7 +13956,7 @@ function renderPlayerHomeScreen(){
     ${authBrandHeader()}
     ${pendingRegistrationCode ? `<div class="banner" style="margin:14px 0;"><span>您正在透過報名 QR 進入賽事 ${esc(normalizeRoomCodeInput(pendingRegistrationCode))}。登入後會直接前往該場報名頁，個人資料將由您的 BXH 帳號自動帶入。</span></div>` : ""}
     <div class="auth-tagline">玩家中心</div>
-    <div class="role-cards" style="margin-top:20px;">
+    <div class="role-cards player-entry-cards" style="margin-top:20px;">
       <button class="role-card role-card-player" data-action="player-goto-login">
         <span class="role-card-icon">${ROLE_ICON_PLAYER}</span>
         <span class="role-card-cn">玩家登入</span>
@@ -14495,6 +14795,7 @@ function lobbyEventStartMs(t){
   return isNaN(ms) ? Infinity : ms;
 }
 function lobbyMyRegistration(code){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)return currentMyEventsPlayerSlice()?.registration(code)||null;
   if(!Array.isArray(myRegistrationsCache)) return null;
   return myRegistrationsCache.find(r=>r.tournamentCode===code && (r.status==="confirmed"||r.status==="waitlist"||r.status==="pending_draw")) || null;
 }
@@ -14560,14 +14861,15 @@ function lobbyRegistrationButtons(t, loggedIn){
   // Official registration events: the lobby is a preview surface. Registration
   // itself is confirmed on the full event-detail page so fee/rules/deadlines are
   // visible before the player commits.
-  if(loggedIn && myRegistrationsCache===null){
+  if(loggedIn && window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true && myRegistrationsCache===null){
     return infoButton("查看賽事資訊");
   }
   const reg=lobbyMyRegistration(t.code);
+  if(loggedIn&&window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true&&!reg)return infoButton('查看資訊（本人報名待確認）');
   const now=Date.now();
   if(reg){
     const label=reg.status==="confirmed"?"已報名（正取）":reg.status==="pending_draw"?"待抽籤":"已報名（備取）";
-    const canCancel=!!t.cancellationDeadline && now<t.cancellationDeadline;
+    const canCancel=window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true?!!currentMyEventsPlayerSlice()?.cancellationContext(t.code)&&!!t.cancellationDeadline&&now<t.cancellationDeadline:!!t.cancellationDeadline&&now<t.cancellationDeadline;
     return `<span class="fe-status-chip status-${esc(reg.status)}">${label}</span>${infoButton(t.registrationSelection?"查看賽事資訊":"查看／新增兒童報名")}${canCancel?`<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(t.code)}">取消報名</button>`:""}`;
   }
   if(t.regStatus==="scheduled"){
@@ -14728,7 +15030,8 @@ function renderTournamentLobbyContent(opts={}){
     if(!publicTournamentsLoading) setTimeout(()=>handleAction("load-public-tournaments",{getAttribute:()=>null}),0);
     return `<div class="panel"><div class="empty-state">正在讀取賽事大廳……</div></div>`;
   }
-  if(loggedIn && myRegistrationsCache===null && !myRegistrationsLoading){
+  if(loggedIn&&window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){currentMyEventsPlayerSlice()?.ensure();}
+  else if(loggedIn && myRegistrationsCache===null && !myRegistrationsLoading){
     setTimeout(()=>handleAction("load-my-registrations",{getAttribute:()=>null}),0);
   }
   if(publicTournamentsError) return `<div class="panel"><div class="empty-state">${esc(publicTournamentsError)}</div><div class="btn-row" style="justify-content:center;margin-top:12px;"><button class="btn btn-ghost" data-action="refresh-public-tournaments">重新整理</button></div></div>`;
@@ -15472,6 +15775,30 @@ function smartCallCardHtml(r,info){
   return window.BXHQueueDashboard.html(r,{...info,queueAutoRefresh:on},model,controls);
 }
 function scheduleSmartCallAutoRefresh(){
+if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){
+  const visible=()=>appPhase==='player-center'&&playerActiveTab==='registered'&&!document.hidden;
+  const slice=currentMyEventsPlayerSlice();
+  const rooms=slice?.snapshot()?.rooms||[];
+  const codes=[...new Set(rooms.filter(room=>room.status==='ready'&&room.info&&
+    schedulePhase(room.info)==='live'&&smartCallEnabled(room.card.code)&&
+    room.rows.some(row=>row.status==='confirmed'&&smartCallModel(row,room.info).kind!=='done')
+  ).map(room=>room.card.code))];
+  const owner=lobbyAuthKey(),key='uid-slice|'+owner+'|'+codes.join(',');
+  if(smartCallAutoRefreshTimer&&(!visible()||smartCallAutoRefreshKey!==key||!codes.length)){
+    clearTimeout(smartCallAutoRefreshTimer);smartCallAutoRefreshTimer=null;
+  }
+  smartCallAutoRefreshKey=key;
+  if(!visible()||!codes.length||smartCallAutoRefreshTimer||smartCallRefreshBusy)return;
+  const current=()=>visible()&&owner===lobbyAuthKey()&&slice===myEventsPlayerSlice;
+  smartCallAutoRefreshTimer=setTimeout(async()=>{
+    smartCallAutoRefreshTimer=null;if(!current())return;
+    smartCallRefreshBusy=true;
+    try{for(const code of codes){if(!current())return;await slice.refreshSummary(code);}}
+    finally{smartCallRefreshBusy=false;scheduleSmartCallAutoRefresh();}
+  },20000);
+  return;
+}
+
   // Reuse the existing public-summary cadence. Never create a second listener,
   // callable, or per-family duplicate read for the queue dashboard.
   const scheduleVisible=()=>playerActiveTab==='registered';
@@ -15503,28 +15830,7 @@ function scheduleSmartCallAutoRefresh(){
   },20000);
 }
 
-function renderPlayerRegisteredTab(options={}){
-  if(myRegistrationsCache===null){
-    if(!myRegistrationsLoading){
-      setTimeout(()=>{ handleAction("load-my-registrations", {getAttribute:()=>null}); }, 0);
-    }
-    return `<div class="panel"><div class="empty-state">正在讀取我的賽程……</div></div>`;
-  }
-  if(myRegistrationsError){
-    return `<div class="panel">
-      <div class="empty-state"><div class="big">${esc(myRegistrationsError)}</div></div>
-      <div class="btn-row" style="justify-content:center;margin-top:12px;">
-        <button class="btn btn-ghost" data-action="load-my-registrations">重新整理</button>
-      </div>
-    </div>`;
-  }
-  const registrations=options.activeOnly?myRegistrationsCache.filter(r=>r.status!=="cancelled"&&['waiting','live'].includes(schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}))):myRegistrationsCache;
-  if(registrations.length===0){
-    if(myRegistrationsPartial)return `<div class="panel"><div class="empty-state">部分賽事尚未讀取，清單可能不完整。請重新整理再試。</div></div>`;
-    return `<div class="panel"><div class="empty-state">目前沒有進行中的個人賽程</div></div>`;
-  }
-  const renderCard = (r)=>{
-    const info = myRegistrationsTournamentInfo[r.tournamentCode] || {};
+function renderPlayerRegistrationCard(r,info,options={}){
     let statusLabel = { pending_draw:"待抽籤", confirmed:"正取", waitlist:"備取", cancelled:"已取消" }[r.status] || r.status;
     if(info.registrationSelection?.status==='drawing')statusLabel='抽籤處理中';
     else if(info.registrationSelection?.status==='open'&&r.status!=='cancelled')statusLabel='待抽籤';
@@ -15556,12 +15862,64 @@ function renderPlayerRegisteredTab(options={}){
         ${bracketReady
           ? `<button class="btn btn-primary btn-sm" data-action="switch-to-player-watch" data-view="bracket" data-return="registered" data-code="${esc(r.tournamentCode)}">查看樹狀圖</button>`
           : `<button class="btn btn-ghost btn-sm" disabled aria-disabled="true">樹狀圖尚未產生</button>`}
-        ${(['confirmed','waitlist','pending_draw'].includes(r.status)) && (isCommunityQuickRegistration(info)?canCancelCommunityRegistration(info):!publicTournamentRegistrationLocked(info))
+        ${options.allowCancel!==false&&(['confirmed','waitlist','pending_draw'].includes(r.status)) && (isCommunityQuickRegistration(info)?canCancelCommunityRegistration(info):!publicTournamentRegistrationLocked(info))
           ? `<button class="btn btn-danger btn-sm" data-action="cancel-my-registration" data-code="${esc(r.tournamentCode)}">取消報名</button>`
           : ""}
+        ${options.allowCancel===false?'<button class="btn btn-ghost btn-sm" disabled aria-disabled="true">取消條件尚未確認，請先查看詳情</button>':''}
       </div>
     </div>`;
-  };
+}
+let myEventsPlayerSlice=null;
+function currentMyEventsPlayerSlice(){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)return null;
+  if(!myEventsPlayerSlice&&window.BXHMyEventsPlayerSlice?.create){
+    myEventsPlayerSlice=window.BXHMyEventsPlayerSlice.create({
+      call:(name,payload)=>{if(!window.engagementService?.myActiveEventsRead)throw Error('service-unavailable');return window.engagementService.myActiveEventsRead(name,payload);},
+      summary:code=>window.cloudSync?.getPublicTournamentFull(code),
+      storage:(()=>{try{return window.localStorage;}catch{return null;}})(),
+      queryStatus:payload=>window.engagementService.myEventOperationStatus(payload),
+      renderCard:(row,info,options)=>renderPlayerRegistrationCard(row,info,options),
+      ledgerOptions:{visible:()=>!document.hidden},
+      changed:()=>{if(appPhase==='player-center'&&playerActiveTab==='registered')renderPreservingScroll();else if(isTournamentLobbyVisible())requestLobbyRender();}
+    });
+  }
+  myEventsPlayerSlice?.bind(firebaseUser?.uid||null,lobbyAuthEpoch);
+  return myEventsPlayerSlice;
+}
+window.BXHMyEventsDiscovery={read:options=>{if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)throw Error('my-events-disabled');const slice=currentMyEventsPlayerSlice();if(!slice)throw Error('membership-read-unavailable');return slice.discovery(options);}};
+window.BXHMyEventsPlayerOperation={execute:operation=>{
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)throw Error('my-events-disabled');
+  const slice=currentMyEventsPlayerSlice();if(!slice)throw Error('membership-receipt-unavailable');return slice.execute(operation);
+}};
+window.addEventListener('storage',event=>myEventsPlayerSlice?.storageChanged(event));
+document.addEventListener('visibilitychange',()=>myEventsPlayerSlice?.visibilityChanged());
+function renderPlayerRegisteredTab(options={}){
+  if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true){
+    const slice=currentMyEventsPlayerSlice();
+    if(!slice)return '<div role="status">我的報名服務尚未就緒，無法確認清單。</div>';
+    slice.ensure();scheduleSmartCallAutoRefresh();return slice.render();
+  }
+
+  if(myRegistrationsCache===null){
+    if(!myRegistrationsLoading){
+      setTimeout(()=>{ handleAction("load-my-registrations", {getAttribute:()=>null}); }, 0);
+    }
+    return `<div class="panel"><div class="empty-state">正在讀取我的賽程……</div></div>`;
+  }
+  if(myRegistrationsError){
+    return `<div class="panel">
+      <div class="empty-state"><div class="big">${esc(myRegistrationsError)}</div></div>
+      <div class="btn-row" style="justify-content:center;margin-top:12px;">
+        <button class="btn btn-ghost" data-action="load-my-registrations">重新整理</button>
+      </div>
+    </div>`;
+  }
+  const registrations=options.activeOnly?myRegistrationsCache.filter(r=>r.status!=="cancelled"&&['waiting','live'].includes(schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}))):myRegistrationsCache;
+  if(registrations.length===0){
+    if(myRegistrationsPartial)return `<div class="panel"><div class="empty-state">部分賽事尚未讀取，清單可能不完整。請重新整理再試。</div></div>`;
+    return `<div class="panel"><div class="empty-state">目前沒有進行中的個人賽程</div></div>`;
+  }
+  const renderCard=r=>renderPlayerRegistrationCard(r,myRegistrationsTournamentInfo[r.tournamentCode]||{});
   scheduleSmartCallAutoRefresh();
   return `<div class="panel-title">${options.activeOnly?'我正在參加':'我的賽程'}<button class="btn btn-ghost btn-sm" data-action="load-my-registrations">重新整理</button></div>`+(myRegistrationsPartial?'<p class="hint" role="status">部分賽事尚未讀取，清單可能不完整。</p>':'')+scheduleGroups('registered',registrations,renderCard,r=>r.status==='cancelled'?'cancelled':schedulePhase(myRegistrationsTournamentInfo[r.tournamentCode]||{}));
 }
@@ -16288,6 +16646,11 @@ async function resolveHunterOpponentIdentities(records){
   const backend=typeof window.engagementService?.hunterOpponentIdentity==="function";
   if(hunterOpponentIdentityLoading || (!backend&&!window.engagementService?.playerCard)) return;
   const rows=Array.isArray(records)?records:[];
+  // UI failures must not cancel the read-only identity work or strand its lock.
+  const redraw=()=>{
+    try{if(typeof renderPreservingScroll==='function')renderPreservingScroll();else render();}
+    catch(error){console.warn('[Hunter Identity] progress render failed');}
+  };
   const pending=new Map();
   rows.forEach(record=>{
     const direct=String(record&&record.opponent&&record.opponent.playerId||"").trim();
@@ -16300,15 +16663,16 @@ async function resolveHunterOpponentIdentities(records){
     if(!hunterOpponentIdentityCache.has(ref)) pending.set(ref,record);
     else hunterApplyOpponentIdentity(rows,ref,hunterOpponentIdentityCache.get(ref));
   });
-  if(!pending.size) return;
+  if(!pending.size){if(rows.length)redraw();return;}
   const generation=++hunterOpponentIdentityGeneration;
   const owner=(typeof currentAuthUid==="function"?currentAuthUid():"")||"";
   hunterOpponentIdentityLoading=true;
   pending.forEach((record,ref)=>hunterApplyOpponentIdentity(rows,ref,{scope:"loading",playerId:null,source:"event-card"}));
-  if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
   const entries=Array.from(pending.entries());
   try{
+    redraw();
     for(let i=0;i<entries.length;i+=4){
+      if(generation!==hunterOpponentIdentityGeneration||(owner&&currentAuthUid()!==owner))break;
       const batch=entries.slice(i,i+4);
       await Promise.all(batch.map(async ([ref,record])=>{
         let value={scope:"unresolved",playerId:null,source:"event-card-error"};
@@ -16340,11 +16704,12 @@ async function resolveHunterOpponentIdentities(records){
         if(value.scope!=="unresolved") hunterOpponentIdentityCache.set(ref,value);
         hunterApplyOpponentIdentity(rows,ref,value);
       }));
+      if(generation===hunterOpponentIdentityGeneration&&(!owner||currentAuthUid()===owner))redraw();
     }
   }finally{
     if(generation===hunterOpponentIdentityGeneration){
       hunterOpponentIdentityLoading=false;
-      if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
+      if(!owner||currentAuthUid()===owner)redraw();
     }
   }
 }
@@ -16693,7 +17058,8 @@ function renderPlayerStatsTab(p){
   const dataReady=dataStatus==="ready"||dataStatus==="empty"||dataStatus==="partial";
   const completeHistory=dataStatus==="ready"||dataStatus==="empty";
   const licenseOverview=hunterLicenseOverview(allRecords,hunterBuildAnalysis,completeHistory);
-  const {analysis:careerAnalysis,grade:licenseGrade}=licenseOverview;
+  const {analysis:careerAnalysis}=licenseOverview;
+  const licenseGrade=window.BXHHunterLicenseV21?.displayGrade?.(licenseOverview,hunterProfileCache?.permanentLicense)||licenseOverview.grade;
   const growth=window.BXHArenaPK?.practiceGrowth?.(licenseOverview.growth)||licenseOverview.growth;
   if(!completeHistory){careerAnalysis.eligible=false;careerAnalysis.overall=null;}
   const statValue=(value,suffix="")=>dataReady?String(value)+suffix:"—";
@@ -17076,8 +17442,9 @@ function playerCenterHunterSummaryHtml(records,status){
   const levelReady=['ready','empty'].includes(status)&&growth.practiceXpReady!==false;
   const grade=license.grade;
   const persisted=window.BXHHunterLicenseV21?.verifiedSnapshot?.(hunterProfileCache?.permanentLicense);
-  const current=persisted?.current||grade;
-  const currentLabel=persisted?.current?window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label:grade.label;
+  const current=window.BXHHunterLicenseV21?.displayGrade?.(license,hunterProfileCache?.permanentLicense)||persisted?.current||grade;
+  const currentLabel=current.label||window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label;
+  const highestLabel=window.BXHHunterLicenseV21?.displayHighest?.(license,hunterProfileCache?.permanentLicense)||(persisted?.highestTier?window.BXHHunterLicenseV21.rules().find(r=>r.tier===persisted.highestTier)?.label:license.highest?.label)||'待核對';
   const ornament={pending:'',e:'◇',d:'◆',c:'❧',b:'✥',a:'✦',s:'✧',national:'龍'}[current.tier]||'';
   const gradeHtml='<span class="hunter-grade-badge grade-'+esc(current.tier)+'"><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span><span class="hunter-grade-label">'+esc(currentLabel)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span></span>';
   const official=hunterFilterByMode(playerCenterRecordPartition(records).official,'standard').slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b));
@@ -17085,7 +17452,7 @@ function playerCenterHunterSummaryHtml(records,status){
   const milestones=[['首次出賽'+(pending?'（待核對）':''),official[0]],['首場勝利'+(pending?'（待核對）':''),official.find(r=>r.isWin)]];
   return '<section class="panel player-center-hunter-summary"><div class="hunter-section-head"><div><p class="hunter-kicker">HUNTER JOURNEY</p><h2>我的獵人旅程</h2></div><div class="player-center-hunter-ranks"><div><span class="hint">經驗等級</span><strong class="player-center-level">'+(levelReady?(practiceAllowed?'LV.':'賽事 LV.')+growth.level:'等級待核對')+'</strong></div><div><span class="hint">目前證照階級</span>'+gradeHtml+'</div></div></div>'+
     '<div class="hunter-growth"><div class="hunter-growth-head"><strong>'+(levelReady?growth.xp+(practiceAllowed?' XP':' 賽事 XP'):ready?'已讀取 '+growth.xp+' XP':status==='loading'?'經驗讀取中':'經驗尚未讀取')+'</strong><span>'+(levelReady?(growth.level>=99?'MAX':'距離 LV.'+(growth.level+1)+' 還有 '+Math.max(0,growth.next-growth.xp)+' XP'):'')+'</span></div><div class="hunter-growth-track"><div class="hunter-growth-fill" style="width:'+(levelReady?growth.progress:0)+'%"></div></div></div><p class="hint">等級代表累積經驗。'+(!practiceAllowed?'此樣本顯示賽事等級與 XP，尚未包含獵人交鋒練習經驗。':!levelReady&&ready?'完整等級待賽事與練習經驗核對完成後顯示。':'')+'</p>'+
-    '<p class="hint">獵人執照 2.1｜評級分 '+(current.score==null?'—':(Math.floor(current.score*10)/10).toFixed(1))+'｜最近 '+(persisted?.current?.matches??license.analysis.matches)+' 場實力 '+(persisted?.current?.strength??license.analysis.overall??'—')+'｜歷練加成 '+(Math.floor(grade.bonus*10)/10).toFixed(1)+'</p><p>生涯最高'+(persisted?.highestTier?'（永久授予）':'（歷史回算）')+'：<strong>'+esc(persisted?.highestTier?window.BXHHunterLicenseV21.rules().find(r=>r.tier===persisted.highestTier)?.label||'待核對':license.highest?.label||'待核對')+'</strong></p>'+(persisted?.highestTier?(persisted.status==='needs_review'?'<p class="hint">近期回算與授階紀錄不同，保留已授予的最高階級並等待核對。</p>':''):'<p class="hint">生涯最高永久授予紀錄尚未接入；此處先依新版規則回算。</p>')+
+    '<p class="hint">獵人執照 2.1｜評級分 '+(current.score==null?'—':(Math.floor(current.score*10)/10).toFixed(1))+'｜最近 '+(persisted?.current?.matches??license.analysis.matches)+' 場實力 '+(persisted?.current?.strength??license.analysis.overall??'—')+'｜歷練加成 '+(Math.floor(grade.bonus*10)/10).toFixed(1)+'</p><p>生涯最高'+(persisted?.highestTier?'（永久授予）':'（歷史回算）')+'：<strong>'+esc(highestLabel)+'</strong></p>'+(persisted?.highestTier?(persisted.status==='needs_review'?'<p class="hint">近期回算與授階紀錄不同，保留已授予的最高階級並等待核對。</p>':''):'<p class="hint">生涯最高永久授予紀錄尚未接入；此處先依新版規則回算。</p>')+
     '<h3>生涯里程碑</h3><div class="player-center-milestones">'+milestones.map(([label,record])=>'<article><span class="hunter-kicker">'+label+'</span><strong>'+(record?esc(record.eventDate||hunterAchievementDateText(hunterRecordTimestamp(record))):ready?'尚待達成':'尚未讀取')+'</strong><p>'+(record?esc(record.eventName||record.eventCode||'賽事名稱未記錄'):ready?'等待下一篇賽場故事':'')+'</p>'+(record?'<button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="career">查看賽事紀錄</button>':'')+'</article>').join('')+'</div><p class="hint">里程碑依 2026/10/1 起已核對的正式對戰紀錄顯示。'+(status==='partial'?'部分歷史尚未讀取，首次紀錄仍待完整核對。':'')+'</p></section>';
 }
 function renderPlayerCenterOverview(p){
@@ -17770,7 +18137,7 @@ function restoreAuthenticatedView(uid,intent){
  if(!v||v.uid!==uid||v.mode!==intent)return false;
  if(v.phase==='account-management'&&intent==='admin'&&isSuperAdmin()){
   appPhase='account-management';superAdminManagementPage=['accounts','checkin','titles'].includes(v.adminPage)?v.adminPage:'accounts';
-  accountMgmtUsers=null;window.cloudAuth.listUsers().then(users=>{if(firebaseUser?.uid===uid){accountMgmtUsers=users;render();}}).catch(()=>{});return true;
+  resetAccountDirectorySearch();loadAccountDirectorySummary();return true;
  }
  if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
@@ -17850,6 +18217,11 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
+  syncQrScannerModal();
+  clearBoardModeInteractions();
+  window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,operator:canOperateCurrentTournament,
+    eligible:()=>isAdminTierOrAbove()||(userProfile?.active===true&&userProfile?.isTestAccount!==true&&userProfile?.role==="staff"&&(state.createdBy===currentAuthUid()||(state.meta?.assignedStaffUids||[]).includes(currentAuthUid()))),
+    manager:()=>isAdminTierOrAbove()||(userProfile?.active===true&&userProfile?.isTestAccount!==true&&userProfile?.role==="staff"&&state.createdBy===currentAuthUid()),render,toast:showToast});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
@@ -17885,7 +18257,7 @@ function render(){
   if(appPhase==="admin-login"){ app.innerHTML = renderAdminLoginScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-setup"){ app.innerHTML = renderAdminSetupScreen(); bindAuthInputs(); return; }
   if(appPhase==="admin-change-password"){ app.innerHTML = renderAdminChangePasswordScreen(); bindAuthInputs(); return; }
-  if(appPhase==="account-management"){ app.innerHTML = renderAccountManagementScreen(); bindAuthInputs(); bindAccountBatchSelection(); return; }
+  if(appPhase==="account-management"){ app.innerHTML = renderAccountManagementScreen(); bindAuthInputs(); bindAccountBatchSelection(); bindAccountDirectoryDetails(); return; }
   if(appPhase==="admin-success"){ app.innerHTML = renderAdminSuccessScreen(); return; }
   if(appPhase==="watch-connecting"){ app.innerHTML = renderWatchConnectingScreen(); return; }
   if(appPhase==="watch-error"){ app.innerHTML = renderWatchErrorScreen(); return; }
@@ -18445,12 +18817,8 @@ function renderEventEntryModal(){
   </div>`;
 }
 
-function renderQrScannerModal(){
+function qrScannerModalMarkup(){
   if(!qrScannerOpen) return "";
-  setTimeout(()=>{
-    if(!qrScannerOpen) return;
-    startQrScanner();
-  },0);
   return `<div class="modal-overlay" data-action="close-qr-scanner">
     <div class="modal-box" style="max-width:460px;">
       <h3>掃描 BXH ARENA QR</h3>
@@ -18466,6 +18834,21 @@ function renderQrScannerModal(){
       </div>
     </div>
   </div>`;
+}
+
+function renderQrScannerModal(){ return ""; }
+function syncQrScannerModal(){
+  let host=document.getElementById('qr-scanner-portal');
+  if(!qrScannerOpen){
+    if(host){stopQrScanner();host.remove();}
+    return;
+  }
+  if(!host){
+    host=document.createElement('div');host.id='qr-scanner-portal';
+    host.innerHTML=qrScannerModalMarkup();document.body.appendChild(host);
+  }
+  // Keep the live video connected while the rest of the app re-renders.
+  startQrScanner();
 }
 
 function renderCloudJoinModal(){
@@ -19008,7 +19391,7 @@ function bindAuthInputs(){
           if(key==="status") accountMgmtStatusFilter=el.value;
           else if(key==="activity") accountMgmtActivityFilter=el.value;
           else if(key==="sort") accountMgmtSort=el.value;
-          render();
+          accountDirectoryContext().page=0;render();
         });
       });
       const accountSearch=document.getElementById("account-mgmt-search");
@@ -19070,12 +19453,22 @@ function setBoardPinchZoom(newZoom){
   boardZoom = Math.max(0.5, Math.min(1.5, newZoom));
   applyBoardTransform();
 }
+let __bxhBoardTransformFrame = 0;
 function applyBoardTransform(){
+  if(__bxhBoardTransformFrame) return;
+  if(typeof requestAnimationFrame !== "function") return flushBoardTransform();
+  __bxhBoardTransformFrame = requestAnimationFrame(()=>{
+    __bxhBoardTransformFrame = 0;
+    flushBoardTransform();
+  });
+}
+function flushBoardTransform(){
   try{
     const canvas = document.getElementById("board-canvas");
     if(canvas) canvas.style.transform = "translate("+boardPanX+"px, "+boardPanY+"px) scale("+boardZoom+")";
     const pctEl = document.getElementById("board-zoom-pct");
-    if(pctEl) pctEl.textContent = Math.round(boardZoom*100)+"%";
+    const pct = Math.round(boardZoom*100)+"%";
+    if(pctEl && pctEl.textContent!==pct) pctEl.textContent = pct;
   }catch(e){}
 }
 
@@ -19166,37 +19559,57 @@ async function exportBoardAsImage(){
   }
 }
 
+let boardModeInteractionCleanup = null;
+function clearBoardModeInteractions(){
+  if(boardModeInteractionCleanup){
+    boardModeInteractionCleanup();
+    boardModeInteractionCleanup = null;
+  }
+}
 function bindBoardModeInteractions(){
+  clearBoardModeInteractions();
   if(bracketViewMode!=="board") return;
   try{
     const viewport = document.getElementById("board-viewport");
     const canvas = document.getElementById("board-canvas");
     if(!viewport || !canvas) return;
 
+    const removers = [];
+    const listen = (target, type, handler, options)=>{
+      target.addEventListener(type, handler, options);
+      removers.push(()=>target.removeEventListener(type, handler, options));
+    };
+    boardModeInteractionCleanup = ()=>{
+      removers.forEach(remove=>remove());
+      viewport.style.cursor="grab";
+    };
+
     bindCompletedMatchCorrectionLongPress(viewport);
     bindManualCourtAssignLongPress(viewport);
 
-    viewport.addEventListener("wheel", (e)=>{
+    listen(viewport, "wheel", (e)=>{
       if(!e.ctrlKey) return;
       e.preventDefault();
       setBoardZoom(boardZoom + (e.deltaY<0 ? 0.1 : -0.1));
     }, { passive:false });
 
     let dragging=false, startX=0, startY=0, startPanX=0, startPanY=0;
-    viewport.addEventListener("mousedown", (e)=>{
+    listen(viewport, "mousedown", (e)=>{
       dragging=true; startX=e.clientX; startY=e.clientY; startPanX=boardPanX; startPanY=boardPanY;
       viewport.style.cursor="grabbing";
     });
-    window.addEventListener("mousemove", (e)=>{
-      if(!dragging) return;
+    listen(window, "mousemove", (e)=>{
+      if(!dragging || !viewport.isConnected) return;
       boardPanX = startPanX + (e.clientX-startX);
       boardPanY = startPanY + (e.clientY-startY);
       applyBoardTransform();
     });
-    window.addEventListener("mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
+    listen(window, "mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
+
+    listen(window, "blur", ()=>{ dragging=false; viewport.style.cursor="grab"; });
 
     let touchStartDist=0, touchStartZoom=1, touchStartX=0, touchStartY=0, touchStartPanX=0, touchStartPanY=0;
-    viewport.addEventListener("touchstart", (e)=>{
+    listen(viewport, "touchstart", (e)=>{
       if(e.touches.length===2){
         touchStartDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         touchStartZoom = boardZoom;
@@ -19205,7 +19618,7 @@ function bindBoardModeInteractions(){
         touchStartPanX = boardPanX; touchStartPanY = boardPanY;
       }
     }, { passive:true });
-    viewport.addEventListener("touchmove", (e)=>{
+    listen(viewport, "touchmove", (e)=>{
       if(e.touches.length===2){
         e.preventDefault();
         const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
@@ -19217,7 +19630,7 @@ function bindBoardModeInteractions(){
         applyBoardTransform();
       }
     }, { passive:false });
-    viewport.addEventListener("touchend", (e)=>{
+    listen(viewport, "touchend", (e)=>{
       if(e.touches.length===1){
         touchStartX=e.touches[0].clientX; touchStartY=e.touches[0].clientY;
         touchStartPanX=boardPanX; touchStartPanY=boardPanY;
@@ -19227,9 +19640,11 @@ function bindBoardModeInteractions(){
       }
     }, { passive:true });
 
+    listen(viewport, "touchcancel", ()=>{ touchStartDist=0; }, { passive:true });
+
     const themeSelect = document.getElementById("board-theme-select");
     if(themeSelect){
-      themeSelect.addEventListener("change", ()=>{
+      listen(themeSelect, "change", ()=>{
         boardTheme = themeSelect.value;
         const shell = document.getElementById("board-shell");
         if(shell) shell.setAttribute("data-board-theme", boardTheme);
@@ -19820,6 +20235,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="load-admin-registrations"){
     loadAdminRegistrationRows();
     return;
+  }
+  if(action==="open-registration-waitlist"){
+    if(!canManageOnsiteWaitlist())return;
+    if(appPhase==='community-room')communityRoomActiveTab='people';else activeTab='people';
+    peopleRosterSection='waitlist';render();return;
   }
   if(action==="people-section"){
     const section=target.getAttribute("data-section");
@@ -20449,6 +20869,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       registrationVisibility:m.registrationVisibility||"public",registrationOpenAt:openAt,registrationCloseAt:closeAt,
       cancellationDeadline:quickRegistration?cancellationDeadline:(cancellationDeadline??closeAt),registrationCapacity:quickRegistration?capacity:(capacity??m.registrationCapacity??0),waitlistCapacity:waitlist,
       registrationStatus:registrationEnabled?(openAt!==null&&Date.now()<openAt?"scheduled":"open"):"closed"};
+    if(managedRegistrationSettingsChanged(nextMeta)){reportManagedRegistrationSettings();return;}
     const roomId=state.id,roomCode=state.cloudCode,actorUid=currentAuthUid(),roomGeneration=communityRoomSnapshotGeneration;
     const initial=JSON.parse(JSON.stringify(state));
     const sameContext=()=>appPhase==="community-room"&&communityRoomSnapshotGeneration===roomGeneration&&state.id===roomId&&state.cloudCode===roomCode&&currentAuthUid()===actorUid&&isCommunityRoomOwner()&&canManageRegistrationRoster();
@@ -20552,7 +20973,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           try{await saveRecord(state);}catch(cacheError){console.warn("[community settings local cache]",cacheError);}
           if(!sameContext())return;
           render();
-          if(raw.includes("room-access-locked"))showToast("比賽已開始，不能再修改房間密碼",true);
+          if(raw.includes("onsite-registration-settings-managed")||raw.includes("onsite-waitlist-managed"))reportManagedRegistrationSettings();
+          else if(raw.includes("room-access-locked"))showToast("比賽已開始，不能再修改房間密碼",true);
           else if(raw.includes("invalid-room-password"))showToast("房間密碼需為 4～20 字元",true);
           else if(writeGate.rejectPendingWrites||raw.includes("settings-"))showToast(accessSaved?"房間存取已更新；其他設定或名單同時變更，尚未儲存的輸入已保留，請重新整理後再試":"設定或名單同時變更，尚未儲存的輸入已保留，請重新整理後再試",true);
           else showToast(accessSaved?"房間存取已更新，但一般賽事設定未確認儲存，請重新整理後再試":"一般賽事設定未儲存，請確認連線後再試",true);
@@ -20723,6 +21145,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="hunter-period-filter"){
     const value=target.getAttribute("data-value");
     if(["career","season","month","week","today"].includes(value)){ hunterRecordPeriodFilter=value; renderPreservingScroll(); }
+    return;
+  }
+  if(action==='my-events-refresh'||action==='my-events-more'||action==='my-events-detail-more'||action==='my-events-receipt-recheck'){
+    if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true)currentMyEventsPlayerSlice()?.action(action,target.getAttribute("data-code"));
     return;
   }
   if(action==="load-my-registrations"){
@@ -20973,7 +21399,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         if(!window.cloudSync || !window.cloudSync.joinTournamentAsPlayer) throw {code:"network"};
         const result=await window.cloudSync.joinTournamentAsPlayer(code,true);
         showToast(result.status==="pending_draw"?"報名成功，等待抽籤":result.status==="confirmed"?"報名成功（正取）":"報名成功（備取）");
-        publicTournamentsCache=null; invalidateMyRegistrationsCache(); render();
+        publicTournamentsCache=null; invalidateMyRegistrationsCache(result); render();
       }catch(e){ const raw=String(e?.message||e||""); if(raw.includes("room-password-required")){openRoomPasswordGate(code,()=>handleAction("lobby-register",target));return;} showToast(mapRegistrationError(e),true); }finally{target.disabled=false;}
     })();
     return;
@@ -21061,7 +21487,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         pendingRegistrationCode = null;
         clearRegistrationParamFromUrl();
         publicTournamentsCache = null; // force refresh of the public list
-        invalidateMyRegistrationsCache(); // force refresh of 已報名 tab
+        invalidateMyRegistrationsCache(result); // force refresh of 已報名 tab
         tournamentDetailBusy = false;
         await loadTournamentDetail(code);
         setTimeout(()=>{
@@ -21080,12 +21506,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="cancel-my-registration"){
+
     if(isGuestReadOnlyContext()){ showToast("遊客模式不可取消報名，請切換至玩家模式", true); return; }
     const code = target.getAttribute("data-code");
+    const uidFirstCancel=window.BXH_MY_EVENTS_PLAYER_READ_SLICE===true&&appPhase!=='tournament-detail';
+    const cancelContext=uidFirstCancel?currentMyEventsPlayerSlice()?.cancellationContext(code):null;
+    const cancelOwner=lobbyAuthKey();
+    if(uidFirstCancel&&!cancelContext){showToast("報名或取消條件尚未確認，請重新讀取此場資料",true);return;}
+    const cancelSummary=uidFirstCancel?cancelContext.info:myRegistrationsTournamentInfo[code];
     const detailLock=(tournamentDetailCode===code && tournamentDetailData && (publicTournamentRegistrationLocked(tournamentDetailData)||(isCommunityQuickRegistration(tournamentDetailData)&&communityRegistrationLocked(tournamentDetailData))));
-    const summaryLock=myRegistrationsTournamentInfo[code] && (publicTournamentRegistrationLocked(myRegistrationsTournamentInfo[code])||(isCommunityQuickRegistration(myRegistrationsTournamentInfo[code])&&communityRegistrationLocked(myRegistrationsTournamentInfo[code])));
+    const summaryLock=uidFirstCancel?(publicTournamentRegistrationLocked(cancelSummary)||(isCommunityQuickRegistration(cancelSummary)&&!canCancelCommunityRegistration(cancelSummary))):(myRegistrationsTournamentInfo[code] && (publicTournamentRegistrationLocked(myRegistrationsTournamentInfo[code])||(isCommunityQuickRegistration(myRegistrationsTournamentInfo[code])&&communityRegistrationLocked(myRegistrationsTournamentInfo[code]))));
     if(detailLock || summaryLock){ showToast("賽事已開始，取消報名功能已鎖定",true); return; }
     openModal({ type:"generic", title:"取消報名？", message:"確定要取消這場賽事的報名嗎？取消後紀錄會保留；若本場開啟自動補位，會依備取順序遞補一位。", danger:true, confirmLabel:"確定取消", onConfirm:()=>{
+      if(uidFirstCancel){
+        const fresh=currentMyEventsPlayerSlice()?.cancellationContext(code);
+        if(cancelOwner!==lobbyAuthKey()||!fresh||publicTournamentRegistrationLocked(fresh.info)||(isCommunityQuickRegistration(fresh.info)&&!canCancelCommunityRegistration(fresh.info))){showToast("登入或取消條件已變更，請重新讀取",true);return;}
+      }
       if(tournamentDetailBusy) return;
       tournamentDetailBusy = true; render();
       (async ()=>{
@@ -21094,7 +21530,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           const result=await window.cloudSync.cancelRegistrationAsPlayer(code);
           showToast(result?.autoPromoted?"已取消報名；備取已自動遞補":"已取消報名");
           publicTournamentsCache = null;
-          invalidateMyRegistrationsCache();
+          invalidateMyRegistrationsCache(result);
           tournamentDetailBusy = false;
           if(appPhase==="tournament-detail" && tournamentDetailCode===code){
             await loadTournamentDetail(code);
@@ -21119,7 +21555,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       const r=await window.cloudAuth.verifyPlayerRealName(uid);
       if(r&&r.ok){
         showToast("已確認玩家本名");
-        accountMgmtUsers=await window.cloudAuth.listUsers();
+        await refreshManagedAccountResults();
       }else showToast((r&&r.error)||"本名確認失敗",true);
       render();
     })();
@@ -21544,21 +21980,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="super-admin-page"){ const page=target.getAttribute("data-page"); if(["accounts","checkin","titles"].includes(page)){ if(page==="titles"&&!engagementActionBusy){resetTitleRecipientForm();engagementAdminOverview=null;requestEngagementSnapshot(true);} superAdminManagementPage=page; accountMenuOpen=false; render(); } return; }
   if(action==="account-goto-home"){ accountMenuOpen=false; appPhase="app"; activeTab="live"; render(); return; }
   if(action==="account-change-password"){ accountMenuOpen=false; authFormError=""; appPhase="admin-change-password"; render(); return; }
+  if(action==="account-summary-refresh"){loadAccountDirectorySummary(true);render();return;}
+  if(action==="account-page-prev"||action==="account-page-next"){
+    const c=accountDirectoryContext();c.page=Math.max(0,c.page+(action==='account-page-next'?1:-1));render();return;
+  }
   if(action==="account-role-filter"){
     const role=target.getAttribute("data-role");
     if(ACCOUNT_ROLE_FILTERS.some(item=>item[0]===role)) accountMgmtRoleFilter=role;
-    render(); return;
+    searchAccountDirectory(); return;
   }
   if(action==="account-search-apply"){
     const input=document.getElementById("account-mgmt-search");
     accountMgmtQuery=input?input.value.trim():"";
-    render(); return;
+    searchAccountDirectory(); return;
   }
   if(action==="account-search-clear"){
     const input=document.getElementById("account-mgmt-search");
     if(input) input.value="";
     accountMgmtQuery="";
-    render(); return;
+    resetAccountDirectorySearch();render(); return;
   }
   if(action==="account-clear-filters"){
     accountMgmtRoleFilter="all";
@@ -21566,7 +22006,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     accountMgmtActivityFilter="all";
     accountMgmtSort="created-desc";
     accountMgmtQuery="";
-    render(); return;
+    resetAccountDirectorySearch();render(); return;
   }
   if(action==="admin-engagement-diagnose"){
     if(engagementActionBusy) return;
@@ -21649,7 +22089,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     accountMenuOpen=false; authFormError="";
     appPhase="account-management";
     superAdminManagementPage="accounts";
-    accountMgmtUsers = null;
+    resetAccountDirectorySearch();
     accountMgmtRoleFilter="all";
     accountMgmtStatusFilter="all";
     accountMgmtActivityFilter="all";
@@ -21658,10 +22098,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     legacyPublicDocsPreview = null;
     legacyCleanupResult = null;
     render();
-    (async ()=>{
-      accountMgmtUsers = await window.cloudAuth.listUsers();
-      render();
-    })();
+    loadAccountDirectorySummary();
     return;
   }
   if(action==="preview-cleanup-public-mirrors"){
@@ -21691,19 +22128,30 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     openModal({ type:"generic", title:"執行公開賽事資料清理", message:"即將檢查並重建 publicTournaments 集合中每份文件的公開安全欄位，移除舊版可能殘留的私人資料。不會刪除任何賽事，不會變更文件 ID 或賽事代碼。是否繼續？", confirmLabel:"確定執行", onConfirm:doCleanup });
     return;
   }
-  if(action==="save-partner-grant"){
+  if(action==="save-partner-grant"||action==="partner-revoke-legacy"){
     if(!isSuperAdmin()){showToast("只有最高管理員可設定合作主辦",true);return;}
     const uid=target.getAttribute("data-uid")||"";
     const user=(accountMgmtUsers||[]).find(item=>item.uid===uid);
     if(!user||user.role!=="player"){showToast("僅可授權玩家帳號",true);return;}
     const get=selector=>managedAccountControl(selector,uid);
-    const status=get(".partner-status")?.value;
+    const status=action==="partner-revoke-legacy"?'revoked':get(".partner-status")?.value;
     if(status==="active"){showToast("請先完成合作合約與付款確認；此處不能直接啟用授權",true);return;}
     if(status!=="revoked"||user.partnerOrganizer?.status!=="active"){
       showToast("目前沒有可撤銷的合作主辦授權",true);return;
     }
-    const grant={...user.partnerOrganizer,status:"revoked"};
-    openModal({type:"generic",title:"確認撤銷合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\\n撤銷後將停止合作主辦權限。",confirmLabel:"確認撤銷",onConfirm:()=>{(async()=>{await changeSingleManagedAccount(uid,{partnerOrganizer:grant},null);})();}});
+    const patch=legacyPartnerRevocationPatch(user);
+    if(!patch){showToast("此授權不是可撤銷的舊版手動授權，請核對合約流程",true);return;}
+    const actor=currentAuthUid(),snapshot=JSON.stringify(user.partnerOrganizer);
+    openModal({type:"generic",title:"確認撤銷合作主辦授權",message:"帳號："+accountPrimaryName(user)+"\n主辦："+user.partnerOrganizer.organizationName+"\n撤銷後將停止這筆舊版手動授權。",confirmLabel:"確認撤銷",onConfirm:async()=>{
+      if(!isSuperAdmin()||actor!==currentAuthUid())return;
+      const current=(accountMgmtUsers||[]).find(item=>item.uid===uid);
+      if(!legacyPartnerRevocationPatch(current)||JSON.stringify(current.partnerOrganizer)!==snapshot){showToast("授權資料已變更，請重新載入後確認",true);return;}
+      try{
+        const pending=JSON.parse(sessionStorage.getItem('bxh-account-single:'+actor+':'+uid)||'null');
+        if(pending&&(JSON.stringify(pending.uids)!==JSON.stringify([uid])||JSON.stringify(pending.patch)!==JSON.stringify(patch))){showToast("尚有其他帳號變更未確認，請先確認上一筆結果",true);return;}
+      }catch(error){showToast("無法確認上一筆帳號變更，請重新載入後核對",true);return;}
+      await changeSingleManagedAccount(uid,patch,null);
+    }});
     return;
   }
   if(action==='partner-create-contract'){
@@ -21712,6 +22160,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!user||user.role!=='player'){showToast('請選擇既有玩家',true);return;}
     const get=selector=>managedAccountControl(selector,uid);
     const planCode=get('.partner-contract-plan')?.value||'';
+    const quotaPolicy=get('.partner-contract-quota-policy')?.value||'creation-v1';
+    if(quotaPolicy!=='creation-v1'&&(quotaPolicy!=='start-v1'||!partnerPlansState.quotaPolicies?.includes('start-v1'))){showToast('扣場方式尚未開放，請更新方案後重試',true);return;}
     const organizationName=(get('.partner-contract-name')?.value||'').trim();
     const selectedPlan=(partnerPlansState.plans||[]).find(plan=>plan.planCode===planCode&&plan.active);
     const amountRaw=Number.isSafeInteger(selectedPlan?.priceTwd)?String(selectedPlan.priceTwd):(get('.partner-contract-amount')?.value||'');
@@ -21723,7 +22173,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       showToast('請選擇方案並填妥合作方、金額、日期及完整條款',true);return;
     }
     const fixedSummary=Number.isSafeInteger(selectedPlan.priceTwd)?'\n方案 '+selectedPlan.planCode+'：'+selectedPlan.includedEvents+' 場；每場 '+selectedPlan.minParticipants+'–'+selectedPlan.maxParticipants+' 人；總價 NT$ '+selectedPlan.priceTwd+'。':'';
-    const data={targetUid:uid,planCode,organizationName,amountTwd,
+    const data={targetUid:uid,planCode,organizationName,amountTwd,...(quotaPolicy==='start-v1'?{quotaPolicy}:{}),
       startsAt:starts+'T00:00:00+08:00',expiresAt:expires+'T23:59:59+08:00',terms:terms+fixedSummary};
     if(Date.parse(data.expiresAt)<=Date.parse(data.startsAt)){showToast('到期日期必須晚於生效日期',true);return;}
     const key='bxh-partner-draft:'+currentAuthUid()+':'+uid;
@@ -21739,7 +22189,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       sessionStorage.setItem('bxh-partner-order:'+currentAuthUid()+':'+uid,JSON.stringify({orderCode:result.orderCode,status:'draft'}));
       sessionStorage.removeItem(key);
       showToast('合約草稿已建立：'+result.orderCode);
-    }catch(error){showToast('建立草稿失敗：'+String(error.message||error),true);}
+    }catch(error){const message=String(error.message||error);showToast('建立草稿失敗：'+(message.includes('partner-start-policy-not-ready')?'扣場方式尚未開放，請更新方案後重試':message),true);}
     finally{target.disabled=false;render();}})();return;
   }
   if(action==='partner-refresh-contract'||action==='partner-activate-contract'){
@@ -21811,7 +22261,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       accountMgmtBusy = false;
       if(result.ok){
         showToast("已建立帳號："+email);
-        accountMgmtUsers = await window.cloudAuth.listUsers();
+        await refreshManagedAccountResults();
       } else {
         authFormError = result.error || "建立失敗";
       }
@@ -22437,6 +22887,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
       const ns = defaultState();
       ns.meta = Object.assign({}, src.meta);
+      delete ns.meta.refereeSeatsV1;delete ns.meta.refereeSeatNames;
+      // A copied event is a new event: do not carry an old room's auto-fill-off default.
+      ns.meta.registrationAutoFillEnabled = true;
       ns.meta.name = (src.meta.name || "未命名賽事") + "（複製）";
       ns.players = src.players.map(p=>({id:uid("p"), name:p.name, checkedIn:false}));
       state = isTester() ? markTesterSandboxState(ns) : ns;
@@ -22532,7 +22985,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       const prevPlayers = state.players.map(p=>({name:p.name}));
       const ns = defaultState();
       if(copySettings){
-        ns.meta = prevMeta;
+        ns.meta = Object.assign({},prevMeta,{registrationAutoFillEnabled:true});
+        delete ns.meta.refereeSeatsV1;delete ns.meta.refereeSeatNames;
         ns.players = prevPlayers.map(n=>({id:uid("p"), name:n.name, checkedIn:false}));
       }
       state = isTester() ? markTesterSandboxState(ns) : ns;
@@ -22992,6 +23446,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="set-registration-enabled"){
+    if(onsiteRegistrationSettingsLocked()){reportManagedRegistrationSettings();return;}
     if(state.bracketSize>0){ showToast("已產生對戰表，無法變更是否啟用線上報名", true); return; }
 
     syncSettingsDraftFromDom();
@@ -22999,20 +23454,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const enabled=target.getAttribute("data-value")==="true";
     registrationFormDraft.registrationEnabled=enabled;
     if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
-
-    const wasEnabled=!!state.meta.registrationEnabled;
-    state.meta.registrationEnabled=enabled;
-    if(wasEnabled&&!enabled){
-      state.meta.publishedAt=null;
-      state.meta.registrationStatus=null;
-      state.meta.checkinRequired=false;
-      if(settingsFormDraft) settingsFormDraft.checkinRequired=false;
-    }
-    registrationFormDraftDirty=enabled;
-
-    saveState().then(ok=>{
-      if(ok===false) showToast("報名方式已保存本機，等待雲端同步",true);
-    });
+    // Switching modes only edits the draft. A half-completed registration
+    // configuration must never be sent ahead of the explicit save/publish.
+    registrationFormDraftDirty=true;
     render();
     return;
   }
@@ -23133,6 +23577,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="save-referee-station-assignment"){
+    if(window.BXHRefereeSeats?.enabled(state)){showToast("三席制請直接在裁判台管理席位",true);return;}
     if(refereeAssignmentSaving) return;
     if(!canManageRefereeStationAssignments()){ showToast("目前身分沒有裁判台分派權限",true); return; }
     if(state.archiveStatus==="completed"){ showToast("此賽事已完成並封存，無法變更裁判分配。",true); return; }
@@ -23369,13 +23814,20 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
       if(d.targetGroup!=="open" && d.targetGroup!=="children"){ showToast("活動組別設定有誤，請重新選擇", true); return; }
     }
+    if(managedRegistrationSettingsChanged(d)){reportManagedRegistrationSettings();return;}
+    const previousMeta=JSON.parse(JSON.stringify(state.meta));
     // Only NOW does anything touch state.meta / saveState() / Firebase.
     const wasEnabled = state.meta.registrationEnabled;
     state.meta.registrationEnabled = d.registrationEnabled;
-    if(wasEnabled && !d.registrationEnabled){ state.meta.publishedAt = null; }
+    if(wasEnabled && !d.registrationEnabled){
+      state.meta.publishedAt = null;
+      state.meta.registrationStatus = null;
+      state.meta.checkinRequired = false;
+      if(settingsFormDraft)settingsFormDraft.checkinRequired=false;
+    }
     state.meta.registrationOpenAt = d.registrationOpenAt;
     state.meta.registrationCloseAt = d.registrationCloseAt;
-    state.meta.cancellationDeadline = d.registrationCloseAt ? (d.registrationCloseAt + 3 * 60 * 60 * 1000) : null;
+    state.meta.cancellationDeadline = onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(d.registrationCloseAt ? (d.registrationCloseAt + 3 * 60 * 60 * 1000) : null);
     state.meta.registrationCapacity = d.registrationCapacity;
     state.meta.registrationFee = d.registrationFee;
     state.meta.targetGroup = d.targetGroup;
@@ -23386,13 +23838,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.eventDescription = d.eventDescription;
     state.meta.registrationNotes = "";
     state.meta.registrationVisibility = d.registrationVisibility;
-    resetRegistrationFormDraft();
-    (async()=>{
-      const ok=await saveState();
-      render();
-      if(ok===false) showToast("設定已保存在本機，但雲端尚未同步；公開大廳可能仍顯示舊狀態",true);
-      else showToast("已儲存線上報名設定");
-    })();
+    void saveRegistrationSettingsAndReport(previousMeta,"已儲存線上報名設定");
     return;
   }
   if(action==="copy-registration-url"){
@@ -23415,6 +23861,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(managedRegistrationSettingsChanged(rd)){reportManagedRegistrationSettings();return;}
     if(!aiCreateReviewGate("進入發布預覽")) return;
 
     if(isTester()){
@@ -23451,7 +23898,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.registrationEnabled=!!rd.registrationEnabled;
     state.meta.registrationOpenAt=rd.registrationOpenAt;
     state.meta.registrationCloseAt=rd.registrationCloseAt;
-    state.meta.cancellationDeadline=rd.registrationCloseAt ? rd.registrationCloseAt+3*60*60*1000 : null;
+    state.meta.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? rd.registrationCloseAt+3*60*60*1000 : null);
     state.meta.registrationCapacity=rd.registrationCapacity;
     state.meta.registrationFee=rd.registrationFee;
     state.meta.targetGroup=rd.targetGroup;
@@ -23544,6 +23991,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
     const d=settingsFormDraft;
     const rd=registrationFormDraft;
+    if(managedRegistrationSettingsChanged(rd)){reportManagedRegistrationSettings();return;}
+    const previousRegistrationMeta=JSON.parse(JSON.stringify(state.meta));
     if(!aiCreateReviewGate("儲存賽事設定")) return;
     if(d.playMode==="enchantment"&&!(isSuperAdmin()&&d.battleMode!=="team"&&d.formatType==="single"&&d.bronzeMatch!==true&&d.ladderMode!=="ranked")){
       showToast("附魔測試目前限最高管理員建立一般單淘賽，且不開季軍賽。",true);return;
@@ -23588,10 +24037,14 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
 
       const wasEnabled=!!state.meta.registrationEnabled;
       state.meta.registrationEnabled=!!rd.registrationEnabled;
-      if(wasEnabled && !rd.registrationEnabled) state.meta.publishedAt=null;
+      if(wasEnabled && !rd.registrationEnabled){
+        state.meta.publishedAt=null;
+        state.meta.registrationStatus=null;
+        state.meta.checkinRequired=false;
+      }
       state.meta.registrationOpenAt=rd.registrationOpenAt;
       state.meta.registrationCloseAt=rd.registrationCloseAt;
-      state.meta.cancellationDeadline=rd.registrationCloseAt ? (rd.registrationCloseAt+3*60*60*1000) : null;
+      state.meta.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? (rd.registrationCloseAt+3*60*60*1000) : null);
       state.meta.registrationCapacity=rd.registrationCapacity;
       state.meta.registrationFee=rd.registrationFee;
       state.meta.targetGroup=rd.targetGroup;
@@ -23610,9 +24063,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         state.championId=null; state.runnerUpId=null; state.thirdId=null; state.fourthId=null;
         state.gfMatchId=null; state.gfResetMatchId=null; state.bronzeMatchId=null; state.rrRounds=0;
         state.courtAssignments={};
-        resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null; aiCreateReviewAcknowledged=false; aiCreateReviewAcknowledged=false;
-        saveState(); render();
-        showToast("賽制已更換，請重新產生對戰表");
+        aiCreateLastApplied=null; aiCreateReviewAcknowledged=false; aiCreateReviewAcknowledged=false;
+        void saveRegistrationSettingsAndReport(previousRegistrationMeta,"賽制已更換，請重新產生對戰表",true);
       }});
       return;
     }
@@ -23643,9 +24095,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     });
 
     rebuildCourtAssignments();
-    resetSettingsFormDraft(); resetRegistrationFormDraft(); aiCreateLastApplied=null;
-    saveState(); render();
-    showToast("賽事設定已儲存");
+    aiCreateLastApplied=null;
+    void saveRegistrationSettingsAndReport(previousRegistrationMeta,"賽事設定已儲存",true);
     return;
   }
   if(action==="load-test"){
@@ -24360,6 +24811,7 @@ async function init(){
             if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
             lobbyAuthEpoch++;
+            myEventsPlayerSlice?.reset();
             if(typeof invalidateCommunityRoomSnapshotContext==="function")invalidateCommunityRoomSnapshotContext();
             const communityRoomAuthContext=captureCommunityRoomStateContext(fbUser&&fbUser.uid);
             if(typeof stopAdminRosterWatch==="function") stopAdminRosterWatch();
@@ -24418,8 +24870,8 @@ async function init(){
                   userProfile = profile;
                   restoreAccountInterfaceTheme(fbUser.uid,profile);
                   if((profile.role==="staff"||profile.role==="admin"||profile.role==="super_admin"||(profile.role==="tester"||profile.isTestAccount===true)) && window.cloudAuth.ensureMyStaffDirectory){ window.cloudAuth.ensureMyStaffDirectory().catch(()=>{}); }
-                  if((profile.role==="admin"||profile.role==="super_admin") && window.cloudAuth.listUsers && window.cloudAuth.syncStaffDirectory){
-                    Promise.resolve().then(async()=>{ try{ const all=await window.cloudAuth.listUsers(); await window.cloudAuth.syncStaffDirectory(all); }catch(e){} });
+                  if((profile.role==="admin"||profile.role==="super_admin") && window.cloudAuth.syncManagedStaffDirectory){
+                    Promise.resolve().then(()=>window.cloudAuth.syncManagedStaffDirectory()).catch(()=>{});
                   }
                   await saveActiveMode(intent);
                   currentRole = intent==="partner_organizer" ? "admin" : (intent==="event_staff" ? "admin" : (intent==="player" ? "player" : mapRoleToAppRole(profile.role)));
@@ -24582,3 +25034,13 @@ init().then(()=>{
 // Release the A1 camera on backgrounding and navigation; no PK polling exists in A1.
 window.addEventListener("pagehide",()=>hunterClashEntry?.suspend());
 document.addEventListener("visibilitychange",()=>{scheduleSmartCallAutoRefresh();if(document.hidden)hunterClashEntry?.suspend();else hunterClashEntry?.bind(document,appPhase==="player-center"&&playerActiveTab==="clash"&&!!document.querySelector("[data-hunter-clash-a1]"));});
+
+// Release the check-in camera when Safari/PWA leaves the foreground.
+window.addEventListener("pagehide",()=>stopQrScanner());
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden&&qrScannerOpen){
+    stopQrScanner();
+    setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
+  }
+});
+

@@ -1,0 +1,15 @@
+{
+  "project": "bxh-arena",
+  "release": "cloud.firestore",
+  "rulesetName": "projects/bxh-arena/rulesets/81253da3-6d9f-4627-aa52-7a2eec993662",
+  "readTime": "2026-10-26T18:03:35Z",
+  "releaseUpdateTime": "2026-10-17T10:41:09.722687Z",
+  "sha256": "16a63af99700746ed095120cb4652dafe38572d78806a638ad2fabace74988c8",
+  "stableDuringRead": true,
+  "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+  "runId": 40374239019,
+  "artifactId": 12672839053,
+  "artifactSha256": "dcddaf39f70f4d799897e1921331882a8dcd7763b0756f43994ef047b3846222",
+  "sourceFile": "rules-0.rules",
+  "localFile": "firestore.production-20261026.rules"
+}

@@ -3,6 +3,7 @@
 // Pure, versioned 2.1 evaluator. No cloud writes or changes to the legacy analysis API.
 const U=window.BXHHunterUtils;
 const eventKey=r=>window.BXHDomainUtils.hunterRecordEventKey(r);
+const PROMOTION_POLICY='medium-or-larger-v1';
 const VERSION='hunter-license-v2.1',START=Date.parse('2026-10-01T00:00:00+08:00'),WINDOW=20;
 const RULES=[
   ['e','E 級獵人',25,20,2,1,2,0,0],
@@ -47,10 +48,17 @@ function strength(rows){
     eligible:rows.length>0,overall:rows.length?Math.round(winRate*.6+pointEfficiency*.4):null};
 }
 function experience(rows){
-  const events=new Map(),opponents=new Set();let unknownSizes=0,unresolvedOpponents=0;
+  const events=new Map(),opponents=new Set();let unknownSizes=0,unresolvedOpponents=0,identityLoading=0,identityFailed=0,identityUnverified=0,identityExcluded=0;
   rows.forEach(r=>{
     const key=eventKey(r),identity=opponentKey(r);
-    if(identity)opponents.add(identity);else unresolvedOpponents++;
+    if(identity)opponents.add(identity);else {
+      unresolvedOpponents++;
+      const scope=r.opponentIdentity?.scope;
+      if(scope==='loading')identityLoading++;
+      else if(scope==='unresolved')identityFailed++;
+      else if(scope==='event-only')identityExcluded++;
+      else identityUnverified++;
+    }
     const count=Number(r.licenseEventParticipants);
     const verified=r.licenseParticipantSource==='completed-match-roster-v1'&&Number.isSafeInteger(count)&&count>=2;
     if(!events.has(key))events.set(key,verified?count:null);
@@ -58,13 +66,13 @@ function experience(rows){
   });
   let medium=0,large=0;
   events.forEach(n=>{if(n==null)unknownSizes++;else if(n>=128)large++;else if(n>=96)medium++;});
-  return {matches:rows.length,events:events.size,opponents:opponents.size,medium,large,unknownSizes,unresolvedOpponents};
+  return {matches:rows.length,events:events.size,opponents:opponents.size,medium,large,unknownSizes,unresolvedOpponents,identityLoading,identityFailed,identityUnverified,identityExcluded};
 }
 function gradeOf(analysis,level,life,complete){
   const bonus=U.hunterSeniorityBonus(level),score=complete&&analysis.eligible?Math.min(100,analysis.overall+bonus):null;
   let grade={version:VERSION,tier:complete?'ungraded':'pending',label:complete?'未分級':'資料待核對',eligible:complete&&analysis.eligible,score,bonus};
   if(score!=null)RULES.forEach(r=>{
-    if(score>=r.score&&analysis.overall>=r.ability&&['matches','events','opponents','medium','large'].every(k=>life[k]>=r[k]))grade={...grade,tier:r.tier,label:r.label};
+    if(score>=r.score&&analysis.overall>=r.ability&&['matches','events','opponents','medium','large'].every(k=>(k==='medium'?life.medium+life.large:life[k])>=r[k]))grade={...grade,tier:r.tier,label:r.label};
   });
   return grade;
 }
@@ -74,7 +82,7 @@ function overview(records,_analyze,complete=true){
   const growth=U.hunterBuildGrowth(all.filter(r=>!window.BXHDomainUtils.hunterRecordIsTest(r))),analysis=strength(rows.slice(-WINDOW)),life=experience(rows);
   const grade=gradeOf(analysis,growth.level,life,complete);
   const next=RULES[rank(grade.tier)+1]||null;
-  const fields=[['score','評級分',grade.score],['ability','最近 20 場實力分',analysis.overall],['matches','生涯有效對戰',life.matches],['events','不同賽事',life.events],['opponents','不同對手（已核對）',life.opponents],['medium','中型賽事（96–127 人）',life.medium],['large','大型賽事（128 人以上）',life.large]];
+  const fields=[['score','評級分',grade.score],['ability','最近 20 場實力分',analysis.overall],['matches','生涯有效對戰',life.matches],['events','不同賽事',life.events],['opponents','不同對手（已核對）',life.opponents],['medium','中型以上賽事（96 人以上）',life.medium+life.large],['large','大型賽事（128 人以上）',life.large]];
   const gates=next?fields.filter(([key])=>next[key]>0).map(([key,label,value])=>({key,label,target:next[key],current:complete?value:null,remaining:complete&&value!=null?Math.max(0,next[key]-value):null,met:complete&&value!=null&&value>=next[key]})):[];
   // Historical replay is a preview/backfill, not an irreversible server grant.
   let highest={tier:complete?'ungraded':'pending',label:complete?'未分級':'資料待核對',at:null};
@@ -104,7 +112,7 @@ function overview(records,_analyze,complete=true){
   }
   if(complete&&rank(grade.tier)>rank(highest.tier))highest={tier:grade.tier,label:grade.label,at:null};
   if(!complete){analysis.eligible=false;analysis.overall=null;}
-  return {version:VERSION,growth,analysis,grade,next,gates,complete,life,highest,window:WINDOW,
+  return {version:VERSION,promotionPolicy:PROMOTION_POLICY,growth,analysis,grade,next,gates,complete,life,highest,window:WINDOW,
     highestStatus:complete?'replayed-not-persisted':'incomplete',excluded:all.length-rows.length,
     versions:{xp:growth.version,strength:analysis.version,grade:VERSION},candidate:{status:'future-only',strength:null,grade:null,connected:false}};
 }
@@ -117,22 +125,42 @@ function verifiedSnapshot(value){
      !Number.isFinite(c.score)||c.score<0||c.score>100||!Number.isFinite(c.strength)||c.strength<0||c.strength>100||
      !Number.isSafeInteger(c.matches)||c.matches<0||c.matches>WINDOW))return null;
   if(value.status==='blocked_incomplete_history'&&c!==null)return null;
-  return {status:value.status,highestTier:value.highestTier,awarded:value.awarded,current:c};
+  return {version:VERSION,promotionPolicy:value.promotionPolicy,status:value.status,highestTier:value.highestTier,awarded:value.awarded,current:value.promotionPolicy===PROMOTION_POLICY?c:null};
+}
+// A zero verified count is not proof that an identity query completed.
+// Keep the evaluator and permanent awards unchanged; disclose incomplete evidence.
+function identityStatus(o){
+  const life=o.life||{};
+  const pending=(life.identityLoading||0)+(life.identityFailed||0)+(life.identityUnverified||0);
+  return {pending,loading:life.identityLoading||0,failed:life.identityFailed||0,
+    unverified:life.identityUnverified||0,excluded:life.identityExcluded||0};
+}
+function displayGrade(o,snapshot){
+  const current=verifiedSnapshot(snapshot)?.current||o.grade;
+  if(current.tier==='ungraded'&&identityStatus(o).pending>0)
+    return {...current,tier:'pending',label:'對手資料待核對'};
+  return {...current,label:RULES.find(r=>r.tier===current.tier)?.label||current.label||'未分級'};
+}
+function displayHighest(o,snapshot){
+  const tier=verifiedSnapshot(snapshot)?.highestTier;
+  if(tier)return RULES.find(r=>r.tier===tier).label;
+  return o.highest?.tier==='ungraded'&&identityStatus(o).pending>0?'對手資料待核對':o.highest?.label||'待核對';
 }
 function renderOverview(o,esc,snapshot){
   const persisted=verifiedSnapshot(snapshot),current=persisted?.current;
-  const currentLabel=current?(RULES.find(r=>r.tier===current.tier)?.label||'未分級'):o.grade.label;
-  const highestLabel=persisted?.highestTier?RULES.find(r=>r.tier===persisted.highestTier)?.label:o.highest.label;
+  const currentLabel=displayGrade(o,snapshot).label,identity=identityStatus(o);
+  const highestLabel=displayHighest(o,snapshot);
   const number=n=>n==null?'—':Number.isInteger(n)?String(n):(Math.floor(n*10)/10).toFixed(1);
   const table=RULES.map(r=>'<tr>'+[r.label,r.score,r.ability,r.matches,r.events,r.opponents,r.medium,r.large].map(v=>'<td>'+esc(String(v))+'</td>').join('')+'</tr>').join('');
   return '<details class="hunter-grade-detail"><summary><b>獵人執照 2.1｜階級判定</b><strong>'+number(current?.score??o.grade.score)+'</strong></summary><div class="hunter-grade-detail-content">'+
     '<p>最近 '+(current?.matches??o.analysis.matches)+' 場實力 '+number(current?.strength??o.analysis.overall)+' ＋ 歷練加成 '+number(o.grade.bonus)+' ＝ 評級分 '+number(current?.score??o.grade.score)+'</p>'+
     '<p>目前：'+esc(currentLabel)+'｜生涯最高（'+(persisted?.highestTier?'永久授予':'歷史回算')+'）：'+esc(highestLabel)+'</p>'+
     '<small>實力分採最近 20 場有效對戰：勝率 ×60%＋得分占比 ×40%；不足 20 場採現有場次。各項百分比與實力分沿用整數四捨五入；判級使用未四捨五入的歷練加成。歷練加成依賽事 LV，最高 +15，不含練習 XP。換季與休息不扣分。</small>'+
-    (!o.complete?'<p>部分資料缺失，暫停階級判定與升級差距。</p>':o.next?'<div class="hunter-grade-next"><b>下一階級：'+esc(o.next.label)+'</b><ul>'+o.gates.map(g=>'<li><span>'+esc(g.label)+'</span><strong>'+number(g.current)+' / '+g.target+'</strong><small>'+(g.met?'已達標':g.remaining==null?'尚未出分':'還差 '+number(g.remaining))+'</small></li>').join('')+'</ul></div>':'<p>目前已達最高階級。</p>')+
-    '<div class="hunter-v21-table"><table><thead><tr>'+['階級','評級分','最低實力','對戰','賽事','對手','中型','大型'].map(s=>'<th>'+s+'</th>').join('')+'</tr></thead><tbody>'+table+'</tbody></table></div>'+
-    '<small>各項條件需同時達標；生涯歷練跨季累積。中型 96–127 人、大型 128 人以上，兩者分開計算；不同對手只計已核對的唯一身分。有效回合保留統計，不另作晉級門檻。</small>'+
+    (!o.complete?'<p>部分資料缺失，暫停階級判定與升級差距。</p>':o.next?'<div class="hunter-grade-next"><b>下一階級：'+esc(o.next.label)+'</b><ul>'+o.gates.map(g=>'<li><span>'+esc(g.label)+'</span><strong>'+number(g.current)+' / '+g.target+'</strong><small>'+(g.met?'已達標':g.key==='opponents'&&identity.pending>0?'有 '+identity.pending+' 場待核對':g.remaining==null?'尚未出分':'還差 '+number(g.remaining))+'</small></li>').join('')+'</ul></div>':'<p>目前已達最高階級。</p>')+
+    (o.complete&&o.life.unresolvedOpponents>0?'<p class="hint" role="status">對手身分：已確認 '+o.life.opponents+' 位；辨識中 '+identity.loading+' 場、查詢失敗 '+identity.failed+' 場、尚待核對 '+identity.unverified+' 場、僅本場識別 '+identity.excluded+' 場。待核對紀錄不代表沒有對手；完成核對後會重新計算階級。</p><button class="btn btn-ghost btn-sm" data-action="hunter-refresh">重新讀取並核對對手身分</button>':'')+
+    '<div class="hunter-v21-table"><table><thead><tr>'+['階級','評級分','最低實力','對戰','賽事','對手','中型以上','大型'].map(s=>'<th>'+s+'</th>').join('')+'</tr></thead><tbody>'+table+'</tbody></table></div>'+
+    '<small>各項條件需同時達標；生涯歷練跨季累積。升階中型以上採 96 人以上，大型採 128 人以上；大型同時滿足中型以上門檻，同一賽事在各項門檻各計一次，總賽事數不重複；不同對手只計已核對的唯一身分。有效回合保留統計，不另作晉級門檻。</small>'+
     '<p class="hint">賽事規模待核對 '+o.life.unknownSizes+' 次；對手身分待核對 '+o.life.unresolvedOpponents+' 場。只採 2026/10/1 起正式個人賽可信對戰，其他紀錄仍保留。'+(persisted?.highestTier?'最高階級已由後端核對並保存。':'生涯最高目前為新版歷史回算，尚未寫入永久授予紀錄。')+'</p></div></details>';
 }
-window.BXHHunterLicenseV21=Object.freeze({version:VERSION,rules,overview,strength,experience,ordered,gradeOf,renderOverview,verifiedSnapshot});
+window.BXHHunterLicenseV21=Object.freeze({version:VERSION,promotionPolicy:PROMOTION_POLICY,rules,overview,strength,experience,ordered,gradeOf,renderOverview,verifiedSnapshot,identityStatus,displayGrade,displayHighest});
 })();

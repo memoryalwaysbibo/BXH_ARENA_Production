@@ -49,8 +49,8 @@ async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCo
  // No tx reads after this point. New snapshot and both mirrors commit together.
  if(!snapshotSnap.exists)tx.create(snapshotRef,snapshotCandidate);
  if(quota)quota.apply(tx);
- tx.update(eventRef,{data:JSON.stringify(nextPrivate),updatedAt:serverTime,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest,...(quota?{partnerQuotaDebit:quota.receipt}:{})});
- tx.update(publicRef,{bracketView:JSON.stringify(nextPublic),updatedAt:serverTime});
+ tx.update(eventRef,{data:JSON.stringify(nextPrivate),updatedAt:serverTime,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest,...(quota?{partnerQuotaDebit:quota.receipt,partnerStartState:"started",partnerStartedAt:serverTime}:{})});
+ tx.update(publicRef,{bracketView:JSON.stringify(nextPublic),updatedAt:serverTime,...(quota?{partnerQuotaPolicy:"start-v1",partnerStartState:"started",partnerStartedAt:serverTime,rdwSnapshotDigest:sealed.snapshotDigest}:{})});
  return {committed:true,mode:'rdw-verified',...(quota?{replayed:false,startedAt:serverTime}:{})};
 }
 module.exports={writeSynchronizedStart};

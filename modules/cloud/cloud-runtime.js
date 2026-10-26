@@ -100,7 +100,7 @@
           onSnapshot: fsMod.onSnapshot, serverTimestamp: fsMod.serverTimestamp,
           collection: fsMod.collection, query: fsMod.query, where: fsMod.where, getDocs: fsMod.getDocs, updateDoc: fsMod.updateDoc,
           runTransaction: fsMod.runTransaction, writeBatch: fsMod.writeBatch, deleteField: fsMod.deleteField,
-          increment: fsMod.increment, collectionGroup: fsMod.collectionGroup, orderBy: fsMod.orderBy, limit: fsMod.limit
+          increment: fsMod.increment, collectionGroup: fsMod.collectionGroup, orderBy: fsMod.orderBy, limit: fsMod.limit, getCountFromServer: fsMod.getCountFromServer, or: fsMod.or
         };
         // Select durable storage at initialization; avoid racing persistence migrations.
         authHandle = authMod.initializeAuth(app, {
@@ -650,6 +650,92 @@
       }catch(e){ console.warn("同步裁判安全目錄失敗",e); return false; }
     },
 
+    // Account management uses counts and bounded indexed queries. Never fall
+    // back to an unbounded collection read when a query fails.
+    async getManagedAccountSummary(onProgress){
+      if(!authReady) throw Error("auth-not-ready");
+      const collection=fx.collection(dbHandle,USERS_COLLECTION), now=Date.now();
+      const stats={total:null,enabled:null,daily:null,weekly:null,testers:null,roles:{},errors:[]};
+      let disabled=null,daily=null,weekly=null,testers=null,playerTests=null,players=null,partners=null;
+      const count=(...filters)=>fx.getCountFromServer(filters.length?fx.query(collection,...filters):collection).then(s=>s.data().count);
+      const publish=()=>{
+        if(stats.total!==null&&disabled)stats.enabled=stats.total-disabled.length;
+        if(daily!==null&&disabled)stats.daily=daily-disabled.filter(u=>Number(u.lastLoginAt)>=now-86400000).length;
+        if(weekly!==null&&disabled)stats.weekly=weekly-disabled.filter(u=>Number(u.lastLoginAt)>=now-7*86400000).length;
+        if(testers!==null){stats.roles.tester=testers;if(disabled)stats.testers=testers-disabled.filter(u=>u.role==='tester'||u.isTestAccount===true).length;}
+        if(players!==null&&playerTests!==null)stats.roles.player=players-playerTests;
+        if(stats.roles.admin!=null&&stats.roles.super_admin!=null)stats.roles.management=stats.roles.admin+stats.roles.super_admin;
+        if(partners){
+          const policy=typeof window!=='undefined'?window.BXHPartnerOrganizer:null;
+          if(typeof policy?.hasGrant==='function')stats.roles.partner_organizer=partners.filter(u=>policy.hasGrant(u)).length;
+          else{stats.roles.partner_organizer=null;if(!stats.errors.includes('partner-policy-unavailable'))stats.errors.push('partner-policy-unavailable');}
+        }
+        stats.roles.all=stats.total;
+        if(onProgress)onProgress({...stats,roles:{...stats.roles},errors:[...stats.errors]});
+      };
+      const job=async(key,promise,apply)=>{
+        const failure=Symbol('account-summary-timeout');
+        const value=await withTimeout(promise,10000,failure);
+        if(value===failure)stats.errors.push(key);else apply(value);
+        publish();
+      };
+      const rows=snapshot=>snapshot.docs.map(d=>Object.assign({},d.data(),{uid:d.id}));
+      await Promise.all([
+        job('total',count(),n=>stats.total=n),
+        // Legacy profiles without active are enabled, so subtract only false.
+        job('disabled',fx.getDocs(fx.query(collection,fx.where('active','==',false))).then(rows),v=>disabled=v),
+        job('daily',count(fx.where('lastLoginAt','>=',now-86400000)),n=>daily=n),
+        job('weekly',count(fx.where('lastLoginAt','>=',now-7*86400000)),n=>weekly=n),
+        ...['super_admin','admin','staff','viewer'].map(role=>job(role,count(fx.where('role','==',role)),n=>stats.roles[role]=n)),
+        job('player',count(fx.where('role','==','player')),n=>players=n),
+        job('player-tests',count(fx.where('role','==','player'),fx.where('isTestAccount','==',true)),n=>playerTests=n),
+        job('tester',count(fx.or(fx.where('role','==','tester'),fx.where('isTestAccount','==',true))),n=>testers=n),
+        job('partner',fx.getDocs(fx.query(collection,fx.where('partnerOrganizer.status','==','active'))).then(rows),v=>partners=v)
+      ]);
+      return stats;
+    },
+
+    async queryManagedAccounts({keyword='',role='all'}={}){
+      if(!authReady) throw Error("auth-not-ready");
+      const collection=fx.collection(dbHandle,USERS_COLLECTION), queries=[];
+      keyword=String(keyword).trim();
+      const cap=50;
+      if(keyword){
+        if(keyword.length>200)throw Error('search-too-long');
+        // Single-field prefix indexes require no new composite index or backfill.
+        for(const field of ['realName','displayName','gameId','nickname','email','playerId']){
+          const values=field==='email'?[...new Set([keyword,keyword.toLowerCase()])]:[keyword];
+          for(const value of values)queries.push(fx.getDocs(fx.query(collection,fx.where(field,'>=',value),fx.where(field,'<=',value+'\uf8ff'),fx.orderBy(field),fx.limit(cap+1))));
+        }
+      }else{
+        const filters=[];
+        if(role==='management')filters.push(fx.where('role','in',['super_admin','admin']));
+        else if(role==='tester')filters.push(fx.or(fx.where('role','==','tester'),fx.where('isTestAccount','==',true)));
+        else if(role==='partner_organizer')filters.push(fx.where('partnerOrganizer.status','==','active'));
+        else if(role!=='all')filters.push(fx.where('role','==',role));
+        queries.push(fx.getDocs(fx.query(collection,...filters,fx.limit(cap+1))));
+      }
+      const timeout=Symbol('account-search-timeout');
+      const snapshots=await withTimeout(Promise.all(queries),10000,timeout);
+      if(snapshots===timeout)throw Error('account-search-failed-or-timeout');
+      const users=new Map();let truncated=false;
+      for(const snapshot of snapshots){
+        if(snapshot.docs.length>cap)truncated=true;
+        for(const d of snapshot.docs.slice(0,cap))users.set(d.id,Object.assign({},d.data(),{uid:d.id}));
+      }
+      if(keyword&&!keyword.includes('/')){
+        const doc=await withTimeout(fx.getDoc(fx.doc(dbHandle,USERS_COLLECTION,keyword)),3000,null);
+        if(doc?.exists())users.set(doc.id,Object.assign({},doc.data(),{uid:doc.id}));
+      }
+      return {users:[...users.values()],truncated};
+    },
+
+    async syncManagedStaffDirectory(){
+      if(!authReady)return false;
+      const snap=await fx.getDocs(fx.query(fx.collection(dbHandle,USERS_COLLECTION),fx.where('role','in',['staff','admin','super_admin'])));
+      return this.syncStaffDirectory(snap.docs.map(d=>Object.assign({},d.data(),{uid:d.id})));
+    },
+
     async listUsers(){
       if(!authReady) return [];
       try{
@@ -775,7 +861,21 @@
       return {ok:true,eventCode,mode:data.mode||"rdw-verified"};
     }
   });
+  function runMyEventsPlayerOperation(route,code,send){
+    if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)return send(crypto.randomUUID());
+    if(!window.BXHMyEventsPlayerOperation?.execute)throw Error('membership-receipt-unavailable');
+    return window.BXHMyEventsPlayerOperation.execute({route,code,send});
+  }
   window.engagementService={
+    async myEventOperationStatus(payload){
+      if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['route','operationId','code','nonce'].includes(k)))throw Error('unsupported-operation-status-input');
+      return callEngagementFunction('queryMyEventOperationStatus',payload,10000);
+    },
+    async myActiveEventsRead(name,payload){
+      if(!['queryMyActiveEvents','queryMyActiveEventDetails'].includes(name))throw Error('unsupported-my-events-read');
+      if(!payload||typeof payload!=='object'||Array.isArray(payload)||Object.keys(payload).some(k=>!['code','cursor'].includes(k)))throw Error('unsupported-my-events-input');
+      return callEngagementFunction(name,payload,10000);
+    },
     connectionInfo(){return {projectId:FIREBASE_CONFIG.projectId||'未設定',region:'asia-east1',signedIn:!!(authHandle&&authHandle.currentUser),sdkReady:!!fnx};},
     async changeManagedAccounts(payload){return callEngagementFunction("changeManagedAccounts",payload,30000);},
     async tournamentOperation(name,payload){return callEngagementFunction(name,payload,30000);},
@@ -1019,6 +1119,7 @@
       out.meta.registrationOpenAt=d.registrationOpenAt??null;out.meta.registrationCloseAt=d.registrationCloseAt??null;
       out.meta.cancellationDeadline=d.cancellationDeadline??null;out.meta.registrationStatus=d.registrationStatus||"closed";
     }
+    if(d.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.restoreState(out,d,{publicView:true});
     return out;
   }
 
@@ -1222,7 +1323,9 @@
       }
       const selection=await chooseFamilyParticipant(selectionDoc.exists()?selectionDoc.data():{},code,childEligibilityConfirmed,mode);
       if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
-      return window.engagementService.familyRegistration({action:'join',code,childIds:selection.childIds,allocation:selection.allocation,childEligibilityConfirmed:childEligibilityConfirmed===true,operationId:crypto.randomUUID()});
+      const request=JSON.parse(JSON.stringify({action:'join',code,childIds:selection.childIds,allocation:selection.allocation,childEligibilityConfirmed:childEligibilityConfirmed===true}));
+      if(selectionDoc.exists()&&selectionDoc.data().battleMode==='team')return window.engagementService.familyRegistration({...request,operationId:crypto.randomUUID()});
+      return runMyEventsPlayerOperation('family',code,operationId=>window.engagementService.familyRegistration({...request,operationId}));
     },
 
     async cancelRegistrationAsPlayer(code){
@@ -1254,7 +1357,9 @@
       }
     },
     async cancelRoster(code,registrationId="",localId="",intent="admin"){
-      return callEngagementFunction("registrationRosterService",{action:"cancel",code,registrationId,localId,intent,operationId:crypto.randomUUID()},60000);
+      const request={action:"cancel",code,registrationId,localId,intent};
+      if(intent!=="player")return callEngagementFunction("registrationRosterService",{...request,operationId:crypto.randomUUID()},60000);
+      return runMyEventsPlayerOperation('roster',code,operationId=>callEngagementFunction("registrationRosterService",{...request,operationId},60000));
     },
     async configureAutoFill(code,enabled){
       return callEngagementFunction("registrationRosterService",{action:"configure",code,enabled,intent:"admin",operationId:crypto.randomUUID()},60000);
@@ -2506,11 +2611,19 @@
         // community hosts are not allowed to read private tournament documents
         // before they own one. The atomic create batch below prevents overwrites.
         const code = generateRoomCode();
+        if(data.meta){delete data.meta.refereeSeatsV1;delete data.meta.refereeSeatNames;}
         const creatorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
         const partnerSession=!!(partnerGrant&&creatorUid);
-        if(partnerSession&&partnerGrant.scope==="contract"&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerGrant.orderCode)===0){
-          throw Object.assign(new Error("partner-room-quota-exhausted"),{code:"partner-room-quota-exhausted"});
+        let partnerQuotaPlan=null;
+        if(partnerSession&&partnerGrant.scope==="contract"){
+          if(typeof window.BXHPartnerQuota?.creationPlan!=="function"||typeof window.engagementService?.getPartnerContract!=="function")throw Object.assign(new Error("partner-quota-policy-unavailable"),{code:"partner-quota-policy-unavailable"});
+          const contract=await window.engagementService.getPartnerContract({orderCode:partnerGrant.orderCode});
+          partnerQuotaPlan=window.BXHPartnerQuota.creationPlan({grant:partnerGrant,contract,uid:creatorUid});
+          if(partnerQuotaPlan.policy==="start-v1"){
+            if(data.meta?.ladderMode!=="ranked"||data.testMode===true)throw Object.assign(new Error("partner-ranked-room-required"),{code:"partner-ranked-room-required"});
+            window.BXHPartnerQuota.restoreState(data,partnerQuotaPlan.privateFields);
+          }
         }
         const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&creatorUid);
         if(testerSession){
@@ -2636,10 +2749,11 @@
         // Both documents must be created in one atomic batch. Beta Rules validate
         // the public mirror with getAfter(), which only sees the paired private
         // tournament when both writes are in the same batch.
+        if(partnerQuotaPlan){Object.assign(privatePayload,partnerQuotaPlan.privateFields);Object.assign(publicPayload,partnerQuotaPlan.publicFields);}
         const batch=fx.writeBatch(dbHandle);
         batch.set(fx.doc(dbHandle,"tournaments",code),privatePayload);
         batch.set(fx.doc(dbHandle,"publicTournaments",code),publicPayload);
-        if(partnerSession&&partnerGrant.scope==="contract"&&data.partnerContractOrderCode){
+        if(partnerQuotaPlan?.debitOnCreate===true&&data.partnerContractOrderCode){
           batch.update(fx.doc(dbHandle,"partnerContracts",data.partnerContractOrderCode),{
             usedEvents:fx.increment(1),lastRoomCode:code
           });
@@ -2673,6 +2787,7 @@
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
         const parsed = JSON.parse(d.data);
+        if(d.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.restoreState(parsed,d);
         if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
         if(d.ladderPointsAwarded===true) parsed.ladderPointsAwarded=true;
         if(d.ladderSeasonId) parsed.ladderSeasonId=d.ladderSeasonId;
@@ -2688,6 +2803,7 @@
         if(d.testExpiresAt&&typeof d.testExpiresAt.toMillis==="function") parsed.testExpiresAtMs=d.testExpiresAt.toMillis();
         if(d.expiresAt&&typeof d.expiresAt.toMillis==="function") parsed.expiresAtMs=d.expiresAt.toMillis();
         parsed.meta=parsed.meta||{};
+        if(d.refereeSeatsV1?.version===1){parsed.meta.refereeSeatsV1=d.refereeSeatsV1;parsed.meta.refereeSeatNames=d.refereeSeatNames||{};}
         if(Array.isArray(d.assignedStaffUids)) parsed.meta.assignedStaffUids=d.assignedStaffUids;
         if(d.refereeStationAssignments && typeof d.refereeStationAssignments==="object") parsed.meta.refereeStationAssignments=d.refereeStationAssignments;
         if(d.refereeStationNames && typeof d.refereeStationNames==="object") parsed.meta.refereeStationNames=d.refereeStationNames;
@@ -2858,6 +2974,7 @@
         ]);
         if(!privateSnap.exists()||!publicSnap.exists())return {ok:false};
         const d=privateSnap.data(),data=JSON.parse(d.data),publicData=JSON.parse(publicSnap.data().bracketView);
+        if(d.partnerQuotaPolicy==="start-v1"){window.BXHPartnerQuota.restoreState(data,d);window.BXHPartnerQuota.restoreState(publicData,publicSnap.data(),{publicView:true});}
         for(const key of ['createdBy','ownerUid','createdByRole'])if(d[key])data[key]=d[key];
         data.cloudCode=normalized;
         return {ok:true,data,publicData};
@@ -2986,9 +3103,42 @@ if(testerSession){
           const ref=fx.doc(dbHandle,"tournaments",normalized),snap=await tx.get(ref);
           if(snap.exists()){
             const remoteDoc=snap.data()||{};
+            if(remoteDoc.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.assertRuntimeWrite(data,remoteDoc);
             if(Number(remoteDoc.callRevision||0)!==Number(data.callRevision||0)) throw new Error("call-state-stale");
             let remoteState=null;
             try{ remoteState=typeof remoteDoc.data==="string"?JSON.parse(remoteDoc.data):remoteDoc.data; }catch(e){}
+            // Room ownership is established on creation, never by a later editor.
+            // Use the server document as the source of truth, not the caller's
+            // possibly stale local room or current signed-in user's display name.
+            const creatorUid=remoteDoc.createdBy||remoteState?.createdBy||null;
+            const creatorName=String(remoteDoc.createdByName||remoteState?.createdByName||"").trim();
+            if(creatorUid){
+              data.createdBy=creatorUid;
+              privatePayload.createdBy=creatorUid;
+            }else{
+              // Do not manufacture an owner from the editing account.
+              delete privatePayload.createdBy;
+            }
+            const originalOwner=remoteDoc.ownerUid||remoteState?.ownerUid||null;
+            if(originalOwner){
+              data.ownerUid=originalOwner;
+              privatePayload.ownerUid=originalOwner;
+              publicPayload.ownerUid=originalOwner;
+            }else{
+              delete privatePayload.ownerUid;
+              delete publicPayload.ownerUid;
+            }
+            if(creatorName)privatePayload.createdByName=creatorName;
+            // A missing creator label must not be replaced with the editor's name.
+            // Existing legacy host labels remain only as a fallback for old rooms.
+            const hostName=creatorName||String(remoteDoc.hostName||"").trim();
+            if(hostName){
+              privatePayload.hostName=hostName;
+              publicPayload.hostName=hostName;
+            }else{
+              delete privatePayload.hostName;
+              delete publicPayload.hostName;
+            }
             if(remoteState){
               // RDW server-sealed starts are monotonic. Older browsers may still
               // save match scores, but may not undo an attested ranked start.
@@ -3069,6 +3219,7 @@ if(testerSession){
               ? [...new Set(remoteDoc.refereeStationUids.map(String).filter(Boolean))]
               : (()=>{ const out=[]; Object.values(canonicalAssignments).forEach(list=>{ if(Array.isArray(list)) list.forEach(uid=>{ uid=String(uid||""); if(uid&&!out.includes(uid)) out.push(uid); }); }); return out; })();
             data.meta=data.meta||{};
+            if(remoteDoc.refereeSeatsV1?.version===1){data.meta.refereeSeatsV1=remoteDoc.refereeSeatsV1;data.meta.refereeSeatNames=remoteDoc.refereeSeatNames||{};}
             data.meta.refereeStationAssignments=canonicalAssignments;
             data.meta.refereeStationNames=canonicalNames;
             data.meta.refereeStationRestrictionEnabled=canonicalRestriction;
@@ -3101,7 +3252,22 @@ if(testerSession){
           if(fencedDoc.onsiteWaitlistFinalized===true){
             const canonical=typeof fencedDoc.data==="string"?JSON.parse(fencedDoc.data):fencedDoc.data;
             const canonicalMeta=canonical?.meta||{};
-            for(const [top,meta] of [['registrationEnabled','registrationEnabled'],['registrationOpenAt','registrationOpenAt'],['registrationCloseAt','registrationCloseAt'],['waitlistEnabled','waitlistEnabled'],['waitlistCapacity','waitlistCapacity'],['capacity','registrationCapacity']]){
+            const protectedSettings=[['registrationEnabled','registrationEnabled'],['registrationOpenAt','registrationOpenAt'],['registrationCloseAt','registrationCloseAt'],['waitlistEnabled','waitlistEnabled'],['waitlistCapacity','waitlistCapacity'],['capacity','registrationCapacity'],['cancellationDeadline','cancellationDeadline']];
+            if(options.registrationSettings===true){
+              // Explicit edits must not report success after silently restoring
+              // draw-owned settings. Automatic score/state saves still rebase.
+              if(data.meta?.registrationAutoFillEnabled===true)throw Object.assign(new Error('onsite-registration-settings-managed'),{code:'onsite-registration-settings-managed'});
+              const normalize=(key,value)=>['registrationEnabled','waitlistEnabled'].includes(key)?!!value:(value||null);
+              for(const [top,meta] of protectedSettings){
+                // This flag is derived from capacity by the legacy serializer,
+                // but finalized draws may retain a positive limit while closed.
+                // The actual editable capacity is compared independently.
+                if(top==='waitlistEnabled')continue;
+                const current=Object.prototype.hasOwnProperty.call(fencedDoc,top)?fencedDoc[top]:canonicalMeta[meta];
+                if(normalize(top,registrationFields[top])!==normalize(top,current))throw Object.assign(new Error('onsite-registration-settings-managed'),{code:'onsite-registration-settings-managed'});
+              }
+            }
+            for(const [top,meta] of protectedSettings){
               if(Object.prototype.hasOwnProperty.call(fencedDoc,top)){privatePayload[top]=fencedDoc[top];publicPayload[top]=fencedDoc[top];}
               else{delete privatePayload[top];delete publicPayload[top];}
               if(Object.prototype.hasOwnProperty.call(canonicalMeta,meta))data.meta[meta]=canonicalMeta[meta];else delete data.meta[meta];
@@ -3264,6 +3430,7 @@ if(testerSession){
           if(!actorSnap.exists()) throw new Error("unauthenticated");
           const actor=actorSnap.data()||{};
           const docData=snap.data()||{};
+          if(docData.refereeSeatsV1?.version===1) throw new Error("seat-managed");
           let remoteState;
           try{ remoteState=JSON.parse(docData.data); }catch(e){ throw new Error("corrupt-data"); }
           if(!remoteState||!remoteState.meta) throw new Error("corrupt-data");
@@ -3416,6 +3583,7 @@ if(testerSession){
           const snap=await tx.get(ref),actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,uid));
           if(!snap.exists()||!actorSnap.exists())throw new Error("not-found");
           const docData=snap.data(),actor=actorSnap.data(),st=JSON.parse(docData.data);
+          if(docData.refereeSeatsV1?.version===1)throw new Error("seat-command-required");
           if(actor.active!==true)throw new Error("permission-denied");
           const creator=docData.createdBy||st.createdBy;
           const admin=actor.isTestAccount!==true&&["super_admin","admin"].includes(actor.role);
@@ -3454,6 +3622,29 @@ if(testerSession){
       }catch(e){return {ok:false,reason:e.message||String(e)};}
     },
 
+    async commitRefereeCommand(data){
+      if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
+      try{const result=await fnx.httpsCallable(functionsHandle,"commitRefereeCommand")(data);return result.data;}
+      catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
+    },
+    async manageRefereeSeats(data){
+      if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
+      try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}
+      catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
+    },
+    subscribeRefereeSeats(code,callback){
+      if(!cloudEnabled||!code)return ()=>{};
+      return fx.onSnapshot(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()),snap=>{
+        if(!snap.exists()||snap.metadata.hasPendingWrites)return;
+        const d=snap.data();if(d.refereeSeatsV1?.version!==1)return;
+        callback({model:d.refereeSeatsV1,projection:{
+          assignedStaffUids:d.assignedStaffUids||[],refereeStationAssignments:d.refereeStationAssignments||{},
+          refereeStationNames:d.refereeStationNames||{},refereeStationUids:d.refereeStationUids||[],
+          refereeSeatNames:d.refereeSeatNames||{},refereeStationRestrictionEnabled:true
+        }});
+      },error=>console.warn("裁判席位同步失敗",error));
+    },
+
     async mutateMatchTransaction(code, matchId, station, mutateFn, expectedActorUid, queueOptions={}){
       if(!cloudEnabled || !code || !fx.runTransaction) return {ok:false,reason:"cloud-unavailable"};
       const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
@@ -3463,6 +3654,7 @@ if(testerSession){
           const snap=await tx.get(ref);
           if(!snap.exists()) throw new Error("not-found");
           const docData=snap.data();
+          if(docData.refereeSeatsV1?.version===1) throw new Error("seat-command-required");
           const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
           if(!actorUid || (expectedActorUid && expectedActorUid!==actorUid)) throw new Error("auth-mismatch");
           const actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid));
@@ -3471,7 +3663,11 @@ if(testerSession){
           const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
             &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
             &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
-          if((actor.role==="staff"||actorIsEventReferee) && docData.refereeStationRestrictionEnabled===true){
+          if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && actorUid!==docData.createdBy){
+            const court=docData.refereeSeatsV1.courts?.[String(Number(queueOptions.targetStation||station))];
+            if(!["main","backup1","backup2"].some(slot=>court?.[slot]?.uid===actorUid))throw new Error("station-not-assigned");
+          }
+          if((actor.role==="staff"||actorIsEventReferee) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
             const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
             const list=Array.isArray(map[String(Number(queueOptions.targetStation||station))])?map[String(Number(queueOptions.targetStation||station))]:[];
             if(!list.includes(actorUid)) throw new Error("station-not-assigned");
@@ -3490,8 +3686,10 @@ if(testerSession){
             const ownCommunity=remoteState.meta&&remoteState.meta.eventAuthority==="community" && remoteState.ownerUid===actorUid;
             if(!privileged&&!ownTest&&!ownCommunity) throw new Error("permission-denied");
           }
+          if(docData.refereeSeatsV1?.version===1 && Number(remoteMatch.refereeSeatScoreRevision||0)!==Number(queueOptions.expectedSeatScoreRevision||0))throw new Error("score-stale");
           const result=mutateFn(remoteState,remoteMatch);
           if(!result || !result.ok) throw new Error((result&&result.reason)||"validation-failed");
+          if(docData.refereeSeatsV1?.version===1){const changed=result.state.matches.find(m=>m.id===matchId);changed.refereeSeatScoreRevision=Number(remoteMatch.refereeSeatScoreRevision||0)+1;}
           const now=Math.max(Date.now(),Number(docData.updatedAt||0)+1,Number(remoteState.updatedAt||0)+1);
           result.state.updatedAt=now; rebuildPropagationForState(result.state);
           const onsiteFence=advanceOnsiteWriteFence(docData,result.state);
@@ -3581,6 +3779,7 @@ if(testerSession){
           const snap = await tx.get(ref);
           if(!snap.exists()) throw new Error("not-found");
           const docData = snap.data();
+          if(docData.refereeSeatsV1?.version===1) throw new Error("seat-command-required");
           if(auditMeta && auditMeta.station!=null){
             const actorUid=(authHandle&&authHandle.currentUser&&authHandle.currentUser.uid)||null;
             if(actorUid){
@@ -3590,7 +3789,11 @@ if(testerSession){
               const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
                 &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
                 &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
-              if((actor.role==="staff"||actorIsEventReferee) && docData.refereeStationRestrictionEnabled===true){
+              if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && actorUid!==docData.createdBy){
+                const court=docData.refereeSeatsV1.courts?.[String(Number(auditMeta.station))];
+                if(!["main","backup1","backup2"].some(slot=>court?.[slot]?.uid===actorUid))throw new Error("station-not-assigned");
+              }
+              if((actor.role==="staff"||actorIsEventReferee) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
                 const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
                 const list=Array.isArray(map[String(Number(auditMeta.station))])?map[String(Number(auditMeta.station))]:[];
                 if(!list.includes(actorUid)) throw new Error("station-not-assigned");
@@ -3603,9 +3806,11 @@ if(testerSession){
             if(Number(auditMeta.station)<1||remoteState.forcedCourtExits?.[auditMeta.station]?.closed)throw new Error("court-retired");
             const match=(remoteState.matches||[]).find(m=>m.id===auditMeta.matchId);
             if(!match || Number(match.station)!==Number(auditMeta.station)) throw new Error("station-mismatch");
+            if(docData.refereeSeatsV1?.version===1 && Number(match.refereeSeatScoreRevision||0)!==Number(auditMeta.expectedSeatScoreRevision||0))throw new Error("score-stale");
             if(match.skippedAt || (auditMeta.dispatchRevision!=null && (match.dispatchRevision||0)!==auditMeta.dispatchRevision)) throw new Error("dispatch-stale");
           }
           const result = validateAndApplyFn(remoteState);
+          if(result?.ok&&docData.refereeSeatsV1?.version===1&&auditMeta?.matchId){const changed=result.state.matches.find(m=>m.id===auditMeta.matchId);if(changed)changed.refereeSeatScoreRevision=Number(changed.refereeSeatScoreRevision||0)+1;}
           if(!result || !result.ok) throw new Error((result && result.reason) || "validation-failed");
           const now=Date.now();
           const community=(result.state.meta&&result.state.meta.eventAuthority)==="community";
@@ -3640,6 +3845,8 @@ if(testerSession){
           const d = snap.data();
           try{
             const parsed = JSON.parse(d.data);
+            if(d.partnerQuotaPolicy==="start-v1")window.BXHPartnerQuota.restoreState(parsed,d);
+            if(d.refereeSeatsV1?.version===1)parsed.meta={...parsed.meta,refereeSeatsV1:d.refereeSeatsV1,refereeSeatNames:d.refereeSeatNames||{},refereeStationAssignments:d.refereeStationAssignments||{},refereeStationNames:d.refereeStationNames||{},refereeStationRestrictionEnabled:true,assignedStaffUids:d.assignedStaffUids||[]};
             if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
             callback(parsed, d.updatedAt);
           }catch(e){}
@@ -3725,3 +3932,4 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+

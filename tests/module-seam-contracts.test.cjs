@@ -38,6 +38,7 @@ function authHarness(getUserProfile) {
       cloudAuth: { getUserProfile, touchLastLogin() {} },
     },
     lobbyAuthEpoch: 0,
+    myEventsPlayerSlice: null,
     firebaseUser: null,
     userProfile: null,
     currentRole: 'admin',

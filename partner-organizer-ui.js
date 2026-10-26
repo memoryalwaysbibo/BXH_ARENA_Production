@@ -3,8 +3,21 @@
 (function(root){
   function grant(profile){
     const value=profile&&profile.partnerOrganizer;
-    const rawExpiry=value&&(value.expiresAtMs??value.expiresAt),expiry=rawExpiry==null?0:(Number(rawExpiry)||Date.parse(rawExpiry)||0);
-    return profile&&profile.active===true&&value&&typeof value==='object'&&value.status==='active'&&typeof value.organizationId==='string'&&value.organizationId.length>0&&(!expiry||expiry>Date.now())?value:null;
+    if(!profile||profile.active!==true||profile.role!=='player'||profile.isTestAccount===true
+      ||profile.deleted===true||['deleted','disabled','frozen'].includes(profile.accountStatus)
+      ||!value||typeof value!=='object'||value.status!=='active'
+      ||typeof value.organizationId!=='string'||!value.organizationId.trim())return null;
+    const timestamp=raw=>{
+      if(typeof raw!=='number'&&typeof raw!=='string')return NaN;
+      if(typeof raw==='string'&&!raw.trim())return NaN;
+      const numeric=Number(raw);
+      return Number.isFinite(numeric)?numeric:Date.parse(raw);
+    };
+    const rawStart=value.startsAtMs??value.startsAt;
+    const start=rawStart==null?(value.scope==='contract'?NaN:0):timestamp(rawStart);
+    const expiry=timestamp(value.expiresAtMs??value.expiresAt);
+    const now=Date.now();
+    return Number.isFinite(start)&&start>=0&&start<=now&&Number.isFinite(expiry)&&expiry>now&&expiry>start?value:null;
   }
   function safe(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function render(profile){
@@ -12,7 +25,8 @@
     if(!value)return '';
     const name=safe(value.organizationName||'合作主辦');
     const orderCode=value.orderCode||profile.partnerContractOrderCode||'';
-    const quota=orderCode?`<p class="hint" data-partner-room-quota="${safe(orderCode)}" role="status">開房次數｜讀取中……</p>`:'<p class="hint">目前為手動授權；尚無合約場次紀錄。</p>';
+    const quotaLabel=value.quotaPolicy==='start-v1'?'開賽場次':'開房次數';
+    const quota=orderCode?`<p class="hint" data-partner-room-quota="${safe(orderCode)}" data-partner-quota-label="${quotaLabel}" role="status">${quotaLabel}｜讀取中……</p>`:'<p class="hint">目前為手動授權；尚無合約場次紀錄。</p>';
     return `<div class="partner-workspace"><div class="role-indicator">合作主辦｜${name} <button class="btn btn-ghost btn-sm" data-action="switch-to-player-mode">切換回玩家模式</button></div><section class="auth-card"><h2>合作主辦工作台</h2>${quota}<p>此身分已開通。方案與賽事權限將由 BXH 後台設定並於此顯示。</p><p class="hint">正式開賽與積分資格需通過後端授權檢查。</p></section></div>`;
   }
   const quotaState={orderCode:'',actor:'',loading:false,used:null,total:null,error:'',generation:0};
@@ -21,7 +35,8 @@
     const orderCode=label.getAttribute('data-partner-room-quota')||'',actor=actorUid();
     if(!orderCode||!actor)return;
     if(quotaState.orderCode!==orderCode||quotaState.actor!==actor){Object.assign(quotaState,{orderCode,actor,loading:false,used:null,total:null,error:'',generation:quotaState.generation+1});}
-    const display=quotaState.error?`開房次數｜讀取失敗：${quotaState.error}`:quotaState.total===null?'開房次數｜讀取中……':`開房次數｜剩餘 ${Math.max(0,quotaState.total-quotaState.used)} / ${quotaState.total} 場（已使用 ${quotaState.used} 場）`;
+    const quotaLabel=label.getAttribute('data-partner-quota-label')||'開房次數';
+    const display=quotaState.error?`${quotaLabel}｜讀取失敗：${quotaState.error}`:quotaState.total===null?`${quotaLabel}｜讀取中……`:`${quotaLabel}｜剩餘 ${Math.max(0,quotaState.total-quotaState.used)} / ${quotaState.total} 場（已使用 ${quotaState.used} 場）`;
     if(label.textContent!==display)label.textContent=display;
     if(quotaState.loading||quotaState.total!==null||quotaState.error)return;
     quotaState.loading=true;const generation=quotaState.generation;

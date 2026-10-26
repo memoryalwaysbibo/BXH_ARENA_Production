@@ -50,7 +50,14 @@ jobs:
         id: emulator-deps
         run: |
           npm install --no-save --ignore-scripts firebase-admin@${{ matrix.sdk.admin }} firebase-functions@${{ matrix.sdk.functions }} firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11
-          npm ls firebase-admin firebase-functions --depth=0
+          node - <<'NODE'
+          const assert = require('node:assert/strict');
+          for (const [name, wanted] of [['firebase-admin', '${{ matrix.sdk.admin }}'], ['firebase-functions', '${{ matrix.sdk.functions }}']]) {
+            const actual = JSON.parse(require('node:fs').readFileSync(require('node:path').join(process.cwd(), 'node_modules', name, 'package.json'), 'utf8')).version;
+            console.log(name + '@' + actual);
+            assert.ok(wanted.includes('.') ? actual === wanted : actual.startsWith(wanted + '.'), name + ': expected ' + wanted + ', got ' + actual);
+          }
+          NODE
       - name: Test real Firestore transactions against local demo project only
         run: npx firebase emulators:exec --only firestore --project demo-qr-checkin --config qr-checkin/firebase.emulator.json 'node --test qr-checkin/backend/firestore.emulator.test.cjs'
       - name: Verify exact Production snapshot and regenerate candidate rules

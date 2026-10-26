@@ -28,6 +28,7 @@ function checkReplay({room,publicDoc,snapshot,receipt,actorProfile,args}){
  const id=identity(room,args),p=stateOf(room),q=stateOf({data:publicDoc?.bracketView});
  if(!actorMayRead(actorProfile,args.actorUid,id.organizerUid))fail('partner-quota-actor-denied');
  if(!receipt||receipt.source!=='server'||receipt.verified!==true||receipt.debit!==1||receipt.identityHash!==hash(id)||Object.keys(id).some(k=>receipt[k]!==id[k])||!Number.isSafeInteger(receipt.startedAt)||receipt.startedAt<=0||!Number.isSafeInteger(receipt.usedBefore)||receipt.usedBefore<0||receipt.usedAfter!==receipt.usedBefore+1)fail('partner-quota-receipt-conflict');
+ if(room.partnerStartState!=='started'||room.partnerStartedAt!==receipt.startedAt||publicDoc?.partnerQuotaPolicy!==POLICY||publicDoc?.partnerStartState!=='started'||publicDoc?.partnerStartedAt!==receipt.startedAt||publicDoc?.rdwSnapshotDigest!==receipt.snapshotDigest)fail('partner-start-receipt-not-committed');
  if(!p||!q||p.meta?.ladderMode!=='ranked'||p.meta?.eventAuthority!=='official'||p.startedAt!==receipt.startedAt||q.startedAt!==receipt.startedAt||p.registrationRosterRevision!==id.rosterRevision||q.registrationRosterRevision!==id.rosterRevision||room.partnerQuotaDebit?.identityHash!==receipt.identityHash||room.partnerQuotaDebit?.snapshotDigest!==receipt.snapshotDigest||room.rdwSnapshotDigest!==receipt.snapshotDigest||p.rdwSnapshotDigest!==receipt.snapshotDigest||snapshot?.source!=='server'||snapshot?.verified!==true||snapshot?.sealed!==true||snapshot?.eventCode!==id.eventCode||snapshot?.drawRevision!==id.drawRevision||snapshot?.snapshotDigest!==receipt.snapshotDigest)fail('partner-start-receipt-not-committed');
  const uids=(p.players||[]).map(player=>player?.uid);
  if(receipt.rosterDigest!==hash(uids)||Object.keys(receipt).some(k=>room.partnerQuotaDebit[k]!==receipt[k])||!validateSealedSnapshot({snapshot,eventCode:id.eventCode,drawRevision:id.drawRevision,rosterUids:uids}).ok)fail('partner-start-receipt-not-committed');
@@ -55,6 +56,7 @@ async function preparePartnerStartQuota(args){
  // Existing creation-time contracts/rooms are NOT guessed to have zero usage.
  // They require a separately reviewed reconciliation proof before migration.
  if(room.partnerQuotaPolicy!==POLICY)fail('legacy-partner-quota-reconciliation-required');
+ if(room.partnerStartState!=='draft'||room.partnerStartedAt!=null||room.partnerQuotaDebit||publicDoc?.partnerQuotaPolicy!==POLICY||publicDoc?.partnerStartState!=='draft')fail('partner-start-state-invalid');
  const contractRef=args.db.doc('partnerContracts/'+id.orderCode),ownerRef=args.db.doc('users/'+id.organizerUid);
  const [contractSnap,ownerSnap]=await Promise.all([tx.get(contractRef),tx.get(ownerRef)]);
  const contract=contractSnap.data(),owner=ownerSnap.data(),grant=owner?.partnerOrganizer;

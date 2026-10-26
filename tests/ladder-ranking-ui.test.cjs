@@ -40,7 +40,7 @@ for(const [name,file] of [['整裝待發','title-common-ready-zhulu-v2.webp'],['
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file.replace(/\.webp$/,'.png'))), name+' PNG fallback missing');
 }
-for(const [name,file] of [['百戰磨練','title-epic-hundred-battles.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp'],['百日戰士','title-epic-hundred-day-warrior.webp'],['初次開局','title-rare-first-match.webp'],['資深主辦','title-rare-host-20.webp'],['賽事推手','title-rare-host-10.webp'],['競技場主','title-rare-host-30.webp'],['封測先鋒','title-limited-closed-beta.webp']]){
+for(const [name,file] of [['百戰磨練','title-milestone-100.webp'],['雙生修羅','title-milestone-200.webp'],['三途橫渡','title-milestone-300.webp'],['四神俱滅','title-milestone-400.webp'],['五嶽崩摧','title-milestone-500.webp'],['六道輪迴','title-milestone-600.webp'],['七星隕落','title-milestone-700.webp'],['八荒血帝','title-milestone-800.webp'],['九天終焉','title-milestone-900.webp'],['千古不滅','title-milestone-1000.webp'],['四強霸主','title-epic-top4-overlord.webp'],['冠軍獵人','title-epic-champion-hunter.webp'],['百日戰士','title-epic-hundred-day-warrior.webp'],['初次開局','title-rare-first-match.webp'],['資深主辦','title-rare-host-20.webp'],['賽事推手','title-rare-host-10.webp'],['競技場主','title-rare-host-30.webp'],['封測先鋒','title-limited-closed-beta.webp']]){
   assert(titleUtils.includes("'"+name+"':'assets/"+file+"'"), name+' artwork missing from title catalog');
   assert(source.includes('"'+name+'":"assets/'+file+'"'), name+' artwork missing from ladder');
   assert(fs.existsSync(path.join(__dirname,'..','assets',file)), name+' artwork asset missing');
