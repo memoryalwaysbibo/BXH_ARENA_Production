@@ -1,6 +1,7 @@
 'use strict';
 const {test,after}=require('node:test'),assert=require('node:assert/strict');
 const {randomBytes}=require('node:crypto');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{createHash}=require('node:crypto');
 const project='demo-bxh-partner-start';
 assert.match(process.env.FIRESTORE_EMULATOR_HOST||'',/^(127\.0\.0\.1|localhost):8186$/,'local emulator required');
 assert.ok(!process.env.GCLOUD_PROJECT||process.env.GCLOUD_PROJECT===project,'production projects forbidden');
@@ -9,6 +10,8 @@ const app=initializeApp({projectId:project},'partner-start-test'),db=getFirestor
 const {writeSynchronizedStart}=require('../scripts/lib/rdw-synchronized-start-reference.cjs');
 const {createAuthorizedMirrorStart}=require('../scripts/lib/rdw-authorized-mirror-start.cjs');
 const {buildRosterSnapshot}=require('../scripts/lib/rdw-roster-tier-snapshot.cjs');
+const {createHunterVerifiedRankedStart}=require('../scripts/lib/rdw-hunter-start-wiring.cjs');
+const {EXPECTED_FILES}=require('../scripts/lib/rdw-hunter-bundle-loader.cjs');
 after(()=>deleteApp(app));
 const uid=()=>randomBytes(8).toString('hex'),eventCode=()=>'BXH-'+randomBytes(3).toString('hex').toUpperCase();
 const tiers=(uids,now)=>uids.map(uid=>({ok:true,uid,tier:'d',computedAt:now-2000,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}));
@@ -77,4 +80,19 @@ test('wrong actor, missing quota context, frozen actor and tampered receipt cann
  assert.equal((await f.writer({quotaContext:{db,actorUid:'outsider'}})).committed,false);assert.equal((await f.writer({quotaContext:null})).committed,false);assert.equal((await read(f)).counter,0);
  assert.equal((await f.start(f.request)).ok,true);await f.r.receiptRef.update({usedAfter:999});assert.equal((await f.start(f.request)).ok,false);assert.equal((await read(f)).counter,1);
  const g=await fixture();assert.equal((await g.start(g.request)).ok,true);await g.r.ownerRef.update({accountStatus:'frozen'});assert.equal((await g.start(g.request)).ok,false);assert.equal((await read(g)).counter,1);
+});
+test('full Hunter composition creates a fresh sealed snapshot, dispatch and quota in one transaction',async t=>{
+ const f=await fixture({newSnapshot:true}),bundleRoot=fs.mkdtempSync(path.join(os.tmpdir(),'partner-hunter-emulator-'));
+ t.after(()=>fs.rmSync(bundleRoot,{recursive:true,force:true}));fs.mkdirSync(path.join(bundleRoot,'vendor'));
+ const reader="module.exports={createReader:()=>async({uid})=>({uid,version:'hunter-license-v2.1',complete:true,unresolvedIdentities:0,sourceDigest:'a'.repeat(64),sourceScope:'public-official-canonical-self-history-v1',overview:{grade:{tier:'d'}}})};";
+ const manifest={};for(const name of EXPECTED_FILES){const text=name==='reader.cjs'?reader:'{}';fs.writeFileSync(path.join(bundleRoot,name),text);manifest[name]=createHash('sha256').update(text).digest('hex');}
+ fs.writeFileSync(path.join(bundleRoot,'bundle-manifest.json'),JSON.stringify(manifest));
+ await Promise.all(f.state.players.map(p=>db.doc('users/'+p.uid).set({uid:p.uid,active:true,role:'player',isTestAccount:false})));
+ let dispatches=0;
+ const start=createHunterVerifiedRankedStart({db,clock:()=>f.now,bundleRoot,enabled:true,
+  verifyBracketInTransaction:async({tx})=>JSON.parse((await tx.get(f.r.eventRef)).data().data).startedAt==null,
+  buildServerDispatch:async({tx})=>{dispatches++;return {matches:JSON.parse((await tx.get(f.r.eventRef)).data().data).matches,courtAssignments:{court1:{currentMatchId:'m1',nextMatchId:null}}};}});
+ const first=await start(f.request);assert.equal(first.ok,true);assert.equal(first.replayed,false);
+ const v=await read(f);assert.equal(v.counter,1);assert.equal(v.snapshot.exists,true);assert.equal(v.snapshot.data().capturedAt,f.now);assert.equal(v.room.partnerQuotaDebit.snapshotDigest,v.snapshot.data().snapshotDigest);assert.equal(v.publicState.startedAt,f.now);
+ const again=await start(f.request);assert.equal(again.ok,true);assert.equal(again.replayed,true);assert.equal(dispatches,1);assert.equal((await read(f)).counter,1);
 });
