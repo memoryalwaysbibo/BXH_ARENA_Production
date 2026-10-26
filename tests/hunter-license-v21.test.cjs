@@ -32,3 +32,42 @@ test('script dependencies and legacy round formats do not crash license calculat
   assert.equal(summary.excluded,1);
   assert.equal(summary.grade.tier,'e');
 });
+test('identity lookup failures are disclosed as pending evidence rather than an ungraded player',()=>{
+ const V=setup(),rows=Array.from({length:25},(_,i)=>record(i,true,{eventCode:'event'+i%6,opponentIdentity:{scope:'unresolved',playerId:null}}));
+ const o=V.overview(rows),html=V.renderOverview(o,String);
+ assert.equal(o.life.matches,25);assert.equal(o.life.events,6);assert.equal(o.life.opponents,0);
+ assert.equal(o.life.identityFailed,25);assert.equal(o.grade.tier,'ungraded');
+ assert.equal(V.displayGrade(o).label,'對手資料待核對');
+ assert(html.includes('查詢失敗 25 場'));assert(html.includes('有 25 場待核對'));
+ assert(html.includes('data-action="hunter-refresh"'));assert(!html.includes('還差 2</small>'));
+ // Recovery recomputes both the current and historical grade from verified identities.
+ rows.forEach((r,i)=>r.opponentIdentity={scope:'cross-event',playerId:'H2H_'+i%8});
+ const recovered=V.overview(rows);
+ assert.equal(recovered.life.opponents,8);assert.equal(V.displayGrade(recovered).tier,'b');
+ assert.equal(recovered.highest.tier,'b');assert(!V.renderOverview(recovered,String).includes('data-action="hunter-refresh"'));
+});
+test('loading, failed, unverified and confirmed event-only identities remain distinct',()=>{
+ const V=setup(),scopes=['loading','unresolved',null,'event-only'];
+ const rows=scopes.map((scope,i)=>record(i,true,{opponentIdentity:scope?{scope,playerId:null}:undefined}));
+ const o=V.overview(rows),s=V.identityStatus(o);
+ assert.equal(s.pending,3);assert.equal(s.loading,1);assert.equal(s.failed,1);assert.equal(s.unverified,1);assert.equal(s.excluded,1);
+ const excluded=V.overview(rows.slice(3));assert.equal(V.displayGrade(excluded).tier,'ungraded');
+ assert.equal(V.displayGrade(V.overview([])).tier,'ungraded');
+});
+test('pending identity display does not hide a verified server grade or claim a permanent award',()=>{
+ const V=setup(),o=V.overview([record(1,true,{opponentIdentity:{scope:'loading'}}),record(2,true,{opponentIdentity:{scope:'loading'}})]);
+ const snapshot={version:V.version,status:'unchanged',highestTier:null,awarded:false,current:{tier:'ungraded',score:92,strength:92,matches:2}};
+ assert.equal(V.displayGrade(o,snapshot).tier,'pending');
+ snapshot.current.tier='e';snapshot.highestTier='e';
+ assert.equal(V.displayGrade(o,snapshot).tier,'e');assert.equal(V.displayGrade(o,snapshot).label,'E 級獵人');
+ const html=V.renderOverview(o,String,snapshot);assert(html.includes('目前：E 級獵人'));
+ assert.equal(V.displayGrade(V.overview([],null,false)).label,'資料待核對');
+});
+test('both license badges and career peak use shared pending display state',()=>{
+ const V=setup(),o=V.overview([record(1,true,{opponentIdentity:{scope:'unresolved'}})]);
+ assert.equal(V.displayHighest(o),'對手資料待核對');
+ const core=fs.readFileSync('modules/main-app/core.js','utf8');
+ assert(core.includes('displayGrade?.(licenseOverview,hunterProfileCache?.permanentLicense)'));
+ assert(core.includes('displayHighest?.(license,hunterProfileCache?.permanentLicense)'));
+ assert.equal(V.displayHighest({grade:{tier:'ungraded'}}),'待核對');
+});
