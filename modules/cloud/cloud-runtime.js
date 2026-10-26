@@ -744,8 +744,25 @@
   window.BXHRdwStartBridge=Object.freeze({
     async start({eventCode,drawRevision,expectedRosterRevision}={}){
       if(typeof eventCode!=="string"||!/^BXH-[A-Z0-9]{6}$/.test(eventCode))throw Error("rdw-invalid-event-code");
-      if(!Number.isSafeInteger(drawRevision)||drawRevision<0)throw Error("rdw-draw-revision-required");
-      if(!Number.isSafeInteger(expectedRosterRevision)||expectedRosterRevision<0)throw Error("rdw-roster-revision-required");
+      // Read the authoritative private and public bracket before constructing
+      // the callable request. Never substitute a guessed revision or a local one.
+      const latest=await window.cloudSync?.readBracketFromServer?.(eventCode);
+      if(latest?.ok!==true||!latest.data||!latest.publicData)throw Error("rdw-canonical-readback-required");
+      const authoritativeDraw=latest.data.bracketDraw;
+      const publicDraw=latest.publicData.bracketDraw;
+      const canonicalRevision=authoritativeDraw?.revision;
+      if(!Number.isSafeInteger(canonicalRevision)||canonicalRevision<=0||
+        !authoritativeDraw?.id||publicDraw?.id!==authoritativeDraw.id||
+        publicDraw?.revision!==canonicalRevision)throw Error("rdw-draw-revision-unverified");
+      if(drawRevision!==undefined&&drawRevision!==canonicalRevision)throw Error("rdw-draw-revision-stale");
+      drawRevision=canonicalRevision;
+      const canonicalRosterRevision=latest.data.registrationRosterRevision;
+      if(!Number.isSafeInteger(canonicalRosterRevision)||canonicalRosterRevision<0||
+        latest.publicData.registrationRosterRevision!==canonicalRosterRevision)
+        throw Error("rdw-roster-revision-unverified");
+      if(expectedRosterRevision!==undefined&&expectedRosterRevision!==canonicalRosterRevision)
+        throw Error("rdw-roster-revision-stale");
+      expectedRosterRevision=canonicalRosterRevision;
       if(!await tryInitFirebase()||!functionsHandle||!fnx?.httpsCallable)throw Error("rdw-firebase-unavailable");
       const actor=authHandle?.currentUser;
       if(!actor?.uid)throw Error("rdw-auth-required");
