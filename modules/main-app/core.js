@@ -13681,7 +13681,7 @@ function renderAccountManagementScreen(){
             <summary>
               <label><input class="account-batch-checkbox" type="checkbox" aria-label="選取此帳號" data-uid="${esc(user.uid)}" ${accountBatchContext().selected.has(user.uid)?'checked':''} ${accountBatchContext().busy?'disabled':''}></label><div class="account-user-identity"><div class="account-user-name">${esc(accountPrimaryName(user))}</div><div class="account-user-gameid">${gameId?`遊戲 ID｜${esc(gameId)}`:'尚未設定遊戲 ID'}</div></div>
               <div class="account-user-email">${esc(user.email||"未提供 Email")}</div>
-              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${user.partnerOrganizer?.status==="active"&&(user.partnerOrganizer.expiresAt==null||Number(user.partnerOrganizer.expiresAt)>Date.now())?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
+              <div class="account-user-badges"><span class="badge badge-gold">${esc(roleDisplayLabel(user.role||"viewer"))}</span>${window.BXHPartnerOrganizer?.hasGrant(user)===true?'<span class="badge badge-neon">合作主辦</span>':""}<span class="badge ${active?'badge-neon':'badge-metal'}">${active?'啟用中':'已停用'}</span><span class="badge ${status.badge}">${status.label}</span><span class="account-expand-caret">⌄</span></div>
             </summary>
             ${directory.opened.has(user.uid)?`<div class="account-user-detail">
               <div class="account-detail-grid">
