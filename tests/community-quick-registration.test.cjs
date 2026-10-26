@@ -41,6 +41,7 @@ function context(extra = {}) {
   }
   Object.assign(ctx, ctx.window.BXHDomainUtils, ctx.window.BXHRegistrationUtils, ctx.window.BXHInputUtils);
   for (const name of [
+    'onsiteRegistrationSettingsLocked','managedRegistrationSettingsChanged','managedRegistrationSettingsNotice','reportManagedRegistrationSettings',
     'computeRegistrationStatus', 'getEffectiveRegistrationStatus', 'lobbyRegistrationStateKnown', 'lobbyEventStartMs',
     'lobbyMyRegistration', 'lobbySummary', 'lobbyNewestFirst', 'lobbyLists',
     'lobbyRegistrationButtons', 'publicEventLifecycleStatus',
@@ -1395,3 +1396,4 @@ for (const shape of ['old-revision', 'missing-creator', 'out-of-order']) test('d
   assert.equal(cached.meta.stations, 2); assert.equal(cached.createdBy, 'local-test-user');
   assert.equal(h.ctx.state.registrationRosterRevision, 1); assert.equal(h.ctx.state.players[0].id, 'local-pending');
 });
+

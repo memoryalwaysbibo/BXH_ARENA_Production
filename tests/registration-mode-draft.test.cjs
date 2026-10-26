@@ -21,6 +21,8 @@ test('selecting online registration does not write an incomplete room to cloud',
     ensureRegistrationFormDraft() {},
     render() {},
     showToast() {},
+    onsiteRegistrationSettingsLocked:()=>false,
+    reportManagedRegistrationSettings() {},
     saveState() { writes++; return Promise.resolve(true); },
   };
   vm.createContext(context);
@@ -31,3 +33,4 @@ test('selecting online registration does not write an incomplete room to cloud',
   assert.equal(state.meta.registrationEnabled, false);
   assert.equal(writes, 0);
 });
+
