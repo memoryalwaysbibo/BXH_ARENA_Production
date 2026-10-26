@@ -15,7 +15,7 @@ function makeBundle(){
 function makeDb({general=false,role='staff',badRoster=false}={}){
  const ids=['u1','u2'],players=ids.map((uid,i)=>({uid,id:'p'+i}));
  const matches=[{id:'m1',a:{playerId:'p0'},b:{playerId:'p1'},completed:false}];
- const state={cloudCode:eventCode,createdBy:'actor',registrationRosterRevision:4,meta:{ladderMode:general?'general':'ranked',eventAuthority:'official'},players:badRoster?[players[0],{id:'virtual'}]:players,matches,drawnAt:100,startedAt:null,rosterLocked:false};
+ const state={cloudCode:eventCode,createdBy:'actor',registrationRosterRevision:4,meta:{ladderMode:general?'general':'ranked',eventAuthority:'official',stations:1},players:badRoster?[players[0],{id:'virtual'}]:players,matches,drawnAt:100,startedAt:null,rosterLocked:false};
  const docs={
   ['tournaments/'+eventCode]:{code:eventCode,createdBy:'actor',eventAuthority:'official',data:JSON.stringify(state)},
   ['publicTournaments/'+eventCode]:{bracketView:JSON.stringify({cloudCode:eventCode,registrationRosterRevision:4,players:state.players,matches,drawnAt:100,startedAt:null})},
@@ -26,12 +26,13 @@ function makeDb({general=false,role='staff',badRoster=false}={}){
   get:async ref=>{reads.push(ref.path);return {exists:!!docs[ref.path],data:()=>docs[ref.path]};},
   update:(ref,data)=>writes.push({path:ref.path,data}),create:(ref,data)=>writes.push({path:ref.path,data})
  })};
- return {db,writes,reads};
+ const buildServerDispatch=async({tx})=>({matches:JSON.parse((await tx.get(db.doc('tournaments/'+eventCode))).data().data).matches,courtAssignments:{court1:{currentMatchId:'m1',nextMatchId:null}}});
+ return {db,writes,reads,buildServerDispatch};
 }
 const req={eventCode,actorUid:'actor',expectedRosterRevision:4,drawRevision:7};
 test('audited Hunter reader creates a SHA256 sealed snapshot and both mirrors',async t=>{
  const bundleRoot=makeBundle();t.after(()=>fs.rmSync(bundleRoot,{recursive:true,force:true}));
- const f=makeDb();const run=createHunterVerifiedRankedStart({db:f.db,clock:()=>200,bundleRoot,verifyBracketInTransaction:async()=>true,enabled:true});
+ const f=makeDb();const run=createHunterVerifiedRankedStart({db:f.db,clock:()=>200,bundleRoot,verifyBracketInTransaction:async()=>true,buildServerDispatch:f.buildServerDispatch,enabled:true});
  const result=await run(req);assert.equal(result.ok,true);
  assert.deepEqual(f.writes.map(x=>x.path),['rdwSnapshots/'+eventCode,'tournaments/'+eventCode,'publicTournaments/'+eventCode]);
  assert.equal(f.writes[0].data.rosterSize,2);
@@ -57,4 +58,9 @@ test('incomplete roster denies tier snapshot and all writes',async t=>{
 test('feature disabled without bundle or database access',async()=>{
  const run=createHunterVerifiedRankedStart({enabled:false});
  assert.deepEqual(await run(req),{ok:false,code:'rdw-disabled'});
+});
+test('missing trusted dispatch producer cannot be bypassed by Hunter tier verification',async t=>{
+ const bundleRoot=makeBundle();t.after(()=>fs.rmSync(bundleRoot,{recursive:true,force:true}));
+ const f=makeDb(),run=createHunterVerifiedRankedStart({db:f.db,clock:()=>200,bundleRoot,verifyBracketInTransaction:async()=>true,enabled:true});
+ const result=await run(req);assert.equal(result.ok,false);assert.equal(result.code,'server-dispatch-unavailable');assert.equal(f.writes.length,0);
 });

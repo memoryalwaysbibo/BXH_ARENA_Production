@@ -6,6 +6,7 @@
 const {createRankedAuthorityResolver}=require('./rdw-ranked-authority-resolver.cjs');
 const {writeSynchronizedStart}=require('./rdw-synchronized-start-reference.cjs');
 const {buildRosterSnapshot}=require('./rdw-roster-tier-snapshot.cjs');
+const {readPartnerStartReplay}=require('./partner-start-quota.cjs');
 function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolveVerifiedTiers,buildServerDispatch,enabled=false}={}){
  if(!enabled)return async()=>({ok:false,code:'rdw-disabled'});
  if(typeof db?.runTransaction!=='function'||typeof db?.doc!=='function'||
@@ -21,6 +22,12 @@ function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolv
   const eventRef=db.doc('tournaments/'+eventCode);
   const publicRef=db.doc('publicTournaments/'+eventCode);
   const snapshotRef=db.doc('rdwSnapshots/'+eventCode);
+  // Recover a committed partner start before checking current grant/tier state.
+  // Every value here is server-derived; HTTP callers cannot supply this proof.
+  try{
+   const replay=await db.runTransaction(tx=>readPartnerStartReplay({tx,db,eventCode,actorUid,drawRevision,expectedRosterRevision}));
+   if(replay)return {ok:true,code:null,mode:'rdw-verified',replayed:true,startedAt:replay.startedAt};
+  }catch(error){return {ok:false,code:error.message};}
   let snapshotCandidate=null;
   if(typeof resolveVerifiedTiers==='function'){
    // Resolve audited Hunter tiers outside the writer transaction, then bind
@@ -44,6 +51,10 @@ function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolv
    catch{return {ok:false,code:'hunter-tiers-unverified'};}
   }
   const result=await db.runTransaction(async tx=>{
+   try{
+    const replay=await readPartnerStartReplay({tx,db,eventCode,actorUid,drawRevision,expectedRosterRevision});
+    if(replay)return {committed:true,mode:'rdw-verified',replayed:true,startedAt:replay.startedAt};
+   }catch(error){return {committed:false,reason:error.message};}
    const auth=await resolveAuthority({eventCode,actorUid,expectedRosterRevision,tx});
    if(!auth.ok)return {committed:false,reason:auth.reason};
    const bracket=await verifyBracketInTransaction({tx,eventCode,drawRevision,expectedRosterRevision});
@@ -56,10 +67,10 @@ function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolv
    const dispatchCandidate=await buildServerDispatch({tx,eventCode,drawRevision,expectedRosterRevision});
    return writeSynchronizedStart({
     tx,eventRef,publicRef,snapshotRef,eventCode,expectedRosterRevision,
-    drawRevision,serverTime:now,authorized:true,bracketVerified:true,snapshotCandidate,dispatchCandidate
+    drawRevision,serverTime:now,authorized:true,bracketVerified:true,snapshotCandidate,dispatchCandidate,quotaContext:{db,actorUid}
    });
   });
-  return {ok:result.committed===true,code:result.reason||null,mode:result.mode||null};
+  return {ok:result.committed===true,code:result.reason||null,mode:result.mode||null,...(result.startedAt?{replayed:result.replayed===true,startedAt:result.startedAt}:{})};
  };
 }
 module.exports={createAuthorizedMirrorStart};

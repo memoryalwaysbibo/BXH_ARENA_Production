@@ -5,7 +5,7 @@
 // clients never pass tiers, UIDs, bundle paths, or authorization flags.
 const {createVerifiedTierResolver}=require('./rdw-verified-tier-resolver.cjs');
 const {createAuthorizedMirrorStart}=require('./rdw-authorized-mirror-start.cjs');
-function createHunterVerifiedRankedStart({db,clock,bundleRoot,verifyBracketInTransaction,enabled=false}={}){
+function createHunterVerifiedRankedStart({db,clock,bundleRoot,verifyBracketInTransaction,buildServerDispatch,enabled=false}={}){
  if(!enabled)return async()=>({ok:false,code:'rdw-disabled'});
  if(typeof verifyBracketInTransaction!=='function')throw Error('trusted-bracket-verifier-required');
  const resolveCurrentTier=createVerifiedTierResolver({db,clock,bundleRoot});
@@ -27,7 +27,7 @@ function createHunterVerifiedRankedStart({db,clock,bundleRoot,verifyBracketInTra
   });
  };
  return createAuthorizedMirrorStart({
-  db,clock,verifyBracketInTransaction,resolveVerifiedTiers,enabled:true
+  db,clock,verifyBracketInTransaction,resolveVerifiedTiers,buildServerDispatch,enabled:true
  });
 }
 module.exports={createHunterVerifiedRankedStart};
