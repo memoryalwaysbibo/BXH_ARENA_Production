@@ -35,8 +35,6 @@ async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCo
  if(!dispatchCandidate||typeof dispatchCandidate!=='object')return {committed:false,reason:'server-dispatch-unavailable'};
  const dispatchProof=verifyStartDispatch({before:p,after:dispatchCandidate,stationCount:p.meta?.stations});
  if(!dispatchProof.ok)return {committed:false,reason:dispatchProof.reason};
- if(JSON.stringify(dispatchCandidate.matches)!==JSON.stringify(q.matches) &&
-    JSON.stringify(p.matches)!==JSON.stringify(q.matches))return {committed:false,reason:'bracket-mirror-stale'};
  if(!snapshotSnap.exists&&typeof tx.create!=='function')throw Error('trusted-snapshot-create-required');
  const nextPrivate={...p,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
  const nextPublic={...q,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime};
