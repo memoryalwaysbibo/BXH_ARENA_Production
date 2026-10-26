@@ -53,7 +53,7 @@ jobs:
           node - <<'NODE'
           const assert = require('node:assert/strict');
           for (const [name, wanted] of [['firebase-admin', '${{ matrix.sdk.admin }}'], ['firebase-functions', '${{ matrix.sdk.functions }}']]) {
-            const actual = require(name + '/package.json').version;
+            const actual = JSON.parse(require('node:fs').readFileSync(require('node:path').join(process.cwd(), 'node_modules', name, 'package.json'), 'utf8')).version;
             console.log(name + '@' + actual);
             assert.ok(wanted.includes('.') ? actual === wanted : actual.startsWith(wanted + '.'), name + ': expected ' + wanted + ', got ' + actual);
           }
