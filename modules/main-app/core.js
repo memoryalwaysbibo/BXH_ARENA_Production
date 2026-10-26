@@ -16507,6 +16507,11 @@ async function resolveHunterOpponentIdentities(records){
   const backend=typeof window.engagementService?.hunterOpponentIdentity==="function";
   if(hunterOpponentIdentityLoading || (!backend&&!window.engagementService?.playerCard)) return;
   const rows=Array.isArray(records)?records:[];
+  // UI failures must not cancel the read-only identity work or strand its lock.
+  const redraw=()=>{
+    try{if(typeof renderPreservingScroll==='function')renderPreservingScroll();else render();}
+    catch(error){console.warn('[Hunter Identity] progress render failed');}
+  };
   const pending=new Map();
   rows.forEach(record=>{
     const direct=String(record&&record.opponent&&record.opponent.playerId||"").trim();
@@ -16519,15 +16524,16 @@ async function resolveHunterOpponentIdentities(records){
     if(!hunterOpponentIdentityCache.has(ref)) pending.set(ref,record);
     else hunterApplyOpponentIdentity(rows,ref,hunterOpponentIdentityCache.get(ref));
   });
-  if(!pending.size) return;
+  if(!pending.size){if(rows.length)redraw();return;}
   const generation=++hunterOpponentIdentityGeneration;
   const owner=(typeof currentAuthUid==="function"?currentAuthUid():"")||"";
   hunterOpponentIdentityLoading=true;
   pending.forEach((record,ref)=>hunterApplyOpponentIdentity(rows,ref,{scope:"loading",playerId:null,source:"event-card"}));
-  if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
   const entries=Array.from(pending.entries());
   try{
+    redraw();
     for(let i=0;i<entries.length;i+=4){
+      if(generation!==hunterOpponentIdentityGeneration||(owner&&currentAuthUid()!==owner))break;
       const batch=entries.slice(i,i+4);
       await Promise.all(batch.map(async ([ref,record])=>{
         let value={scope:"unresolved",playerId:null,source:"event-card-error"};
@@ -16559,11 +16565,12 @@ async function resolveHunterOpponentIdentities(records){
         if(value.scope!=="unresolved") hunterOpponentIdentityCache.set(ref,value);
         hunterApplyOpponentIdentity(rows,ref,value);
       }));
+      if(generation===hunterOpponentIdentityGeneration&&(!owner||currentAuthUid()===owner))redraw();
     }
   }finally{
     if(generation===hunterOpponentIdentityGeneration){
       hunterOpponentIdentityLoading=false;
-      if(typeof renderPreservingScroll==="function") renderPreservingScroll(); else render();
+      if(!owner||currentAuthUid()===owner)redraw();
     }
   }
 }
@@ -16912,7 +16919,8 @@ function renderPlayerStatsTab(p){
   const dataReady=dataStatus==="ready"||dataStatus==="empty"||dataStatus==="partial";
   const completeHistory=dataStatus==="ready"||dataStatus==="empty";
   const licenseOverview=hunterLicenseOverview(allRecords,hunterBuildAnalysis,completeHistory);
-  const {analysis:careerAnalysis,grade:licenseGrade}=licenseOverview;
+  const {analysis:careerAnalysis}=licenseOverview;
+  const licenseGrade=window.BXHHunterLicenseV21?.displayGrade?.(licenseOverview,hunterProfileCache?.permanentLicense)||licenseOverview.grade;
   const growth=window.BXHArenaPK?.practiceGrowth?.(licenseOverview.growth)||licenseOverview.growth;
   if(!completeHistory){careerAnalysis.eligible=false;careerAnalysis.overall=null;}
   const statValue=(value,suffix="")=>dataReady?String(value)+suffix:"—";
@@ -17295,8 +17303,9 @@ function playerCenterHunterSummaryHtml(records,status){
   const levelReady=['ready','empty'].includes(status)&&growth.practiceXpReady!==false;
   const grade=license.grade;
   const persisted=window.BXHHunterLicenseV21?.verifiedSnapshot?.(hunterProfileCache?.permanentLicense);
-  const current=persisted?.current||grade;
-  const currentLabel=persisted?.current?window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label:grade.label;
+  const current=window.BXHHunterLicenseV21?.displayGrade?.(license,hunterProfileCache?.permanentLicense)||persisted?.current||grade;
+  const currentLabel=current.label||window.BXHHunterLicenseV21.rules().find(r=>r.tier===current.tier)?.label||grade.label;
+  const highestLabel=window.BXHHunterLicenseV21?.displayHighest?.(license,hunterProfileCache?.permanentLicense)||(persisted?.highestTier?window.BXHHunterLicenseV21.rules().find(r=>r.tier===persisted.highestTier)?.label:license.highest?.label)||'待核對';
   const ornament={pending:'',e:'◇',d:'◆',c:'❧',b:'✥',a:'✦',s:'✧',national:'龍'}[current.tier]||'';
   const gradeHtml='<span class="hunter-grade-badge grade-'+esc(current.tier)+'"><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span><span class="hunter-grade-label">'+esc(currentLabel)+'</span><span class="hunter-grade-ornament" aria-hidden="true">'+ornament+'</span></span>';
   const official=hunterFilterByMode(playerCenterRecordPartition(records).official,'standard').slice().sort((a,b)=>hunterRecordTimestamp(a)-hunterRecordTimestamp(b));
@@ -17304,7 +17313,7 @@ function playerCenterHunterSummaryHtml(records,status){
   const milestones=[['首次出賽'+(pending?'（待核對）':''),official[0]],['首場勝利'+(pending?'（待核對）':''),official.find(r=>r.isWin)]];
   return '<section class="panel player-center-hunter-summary"><div class="hunter-section-head"><div><p class="hunter-kicker">HUNTER JOURNEY</p><h2>我的獵人旅程</h2></div><div class="player-center-hunter-ranks"><div><span class="hint">經驗等級</span><strong class="player-center-level">'+(levelReady?(practiceAllowed?'LV.':'賽事 LV.')+growth.level:'等級待核對')+'</strong></div><div><span class="hint">目前證照階級</span>'+gradeHtml+'</div></div></div>'+
     '<div class="hunter-growth"><div class="hunter-growth-head"><strong>'+(levelReady?growth.xp+(practiceAllowed?' XP':' 賽事 XP'):ready?'已讀取 '+growth.xp+' XP':status==='loading'?'經驗讀取中':'經驗尚未讀取')+'</strong><span>'+(levelReady?(growth.level>=99?'MAX':'距離 LV.'+(growth.level+1)+' 還有 '+Math.max(0,growth.next-growth.xp)+' XP'):'')+'</span></div><div class="hunter-growth-track"><div class="hunter-growth-fill" style="width:'+(levelReady?growth.progress:0)+'%"></div></div></div><p class="hint">等級代表累積經驗。'+(!practiceAllowed?'此樣本顯示賽事等級與 XP，尚未包含獵人交鋒練習經驗。':!levelReady&&ready?'完整等級待賽事與練習經驗核對完成後顯示。':'')+'</p>'+
-    '<p class="hint">獵人執照 2.1｜評級分 '+(current.score==null?'—':(Math.floor(current.score*10)/10).toFixed(1))+'｜最近 '+(persisted?.current?.matches??license.analysis.matches)+' 場實力 '+(persisted?.current?.strength??license.analysis.overall??'—')+'｜歷練加成 '+(Math.floor(grade.bonus*10)/10).toFixed(1)+'</p><p>生涯最高'+(persisted?.highestTier?'（永久授予）':'（歷史回算）')+'：<strong>'+esc(persisted?.highestTier?window.BXHHunterLicenseV21.rules().find(r=>r.tier===persisted.highestTier)?.label||'待核對':license.highest?.label||'待核對')+'</strong></p>'+(persisted?.highestTier?(persisted.status==='needs_review'?'<p class="hint">近期回算與授階紀錄不同，保留已授予的最高階級並等待核對。</p>':''):'<p class="hint">生涯最高永久授予紀錄尚未接入；此處先依新版規則回算。</p>')+
+    '<p class="hint">獵人執照 2.1｜評級分 '+(current.score==null?'—':(Math.floor(current.score*10)/10).toFixed(1))+'｜最近 '+(persisted?.current?.matches??license.analysis.matches)+' 場實力 '+(persisted?.current?.strength??license.analysis.overall??'—')+'｜歷練加成 '+(Math.floor(grade.bonus*10)/10).toFixed(1)+'</p><p>生涯最高'+(persisted?.highestTier?'（永久授予）':'（歷史回算）')+'：<strong>'+esc(highestLabel)+'</strong></p>'+(persisted?.highestTier?(persisted.status==='needs_review'?'<p class="hint">近期回算與授階紀錄不同，保留已授予的最高階級並等待核對。</p>':''):'<p class="hint">生涯最高永久授予紀錄尚未接入；此處先依新版規則回算。</p>')+
     '<h3>生涯里程碑</h3><div class="player-center-milestones">'+milestones.map(([label,record])=>'<article><span class="hunter-kicker">'+label+'</span><strong>'+(record?esc(record.eventDate||hunterAchievementDateText(hunterRecordTimestamp(record))):ready?'尚待達成':'尚未讀取')+'</strong><p>'+(record?esc(record.eventName||record.eventCode||'賽事名稱未記錄'):ready?'等待下一篇賽場故事':'')+'</p>'+(record?'<button class="btn btn-ghost btn-sm" data-action="profile-section" data-section="career">查看賽事紀錄</button>':'')+'</article>').join('')+'</div><p class="hint">里程碑依 2026/10/1 起已核對的正式對戰紀錄顯示。'+(status==='partial'?'部分歷史尚未讀取，首次紀錄仍待完整核對。':'')+'</p></section>';
 }
 function renderPlayerCenterOverview(p){
