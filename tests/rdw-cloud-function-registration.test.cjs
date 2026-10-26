@@ -6,6 +6,7 @@ function load(){const exports={},module={exports};const HttpsError=class extends
  'firebase-admin/firestore':{getFirestore:()=>({})}};
  const ctx={exports,module,process:{env:{GCLOUD_PROJECT:'demo-rdw',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099'}},require:name=>{if(!(name in mocks))throw Error(name);return mocks[name];}};
  vm.runInNewContext(source,ctx);return {fn:exports.rdwStartService,createHandler:module.exports.createHandler};}
-test('callable is registered but never performs writes',async()=>{const {fn}=load();await assert.rejects(fn({auth:{uid:'test'},data:{eventCode:'BXH-SDSAQZ'}}),e=>e.code==='failed-precondition'&&e.message==='rdw-start-disabled');});
+test('callable is registered but never performs writes',async()=>{const {fn}=load();await assert.rejects(fn({auth:{uid:'test'},app:{appId:'test-app'},data:{eventCode:'BXH-SDSAQZ'}}),e=>e.code==='failed-precondition'&&e.message==='rdw-start-disabled');});
 test('missing auth rejected before feature gate',async()=>{const {fn}=load();await assert.rejects(fn({data:{}}),e=>e.code==='unauthenticated');});
-test('even explicitly enabled placeholder remains unimplemented',async()=>{const {createHandler}=load();await assert.rejects(createHandler({enabled:true})({auth:{uid:'test'},data:{}}),e=>e.code==='unimplemented');});
+test('explicit enable without trusted start integration remains unavailable',async()=>{const {createHandler}=load();await assert.rejects(createHandler({enabled:true})({auth:{uid:'test'},app:{appId:'test-app'},data:{}}),e=>e.code==='unavailable');});
+test('missing App Check rejected before feature gate',async()=>{const {fn}=load();await assert.rejects(fn({auth:{uid:'test'},data:{eventCode:'BXH-SDSAQZ'}}),e=>e.code==='failed-precondition'&&e.message==='app-check-required');});
