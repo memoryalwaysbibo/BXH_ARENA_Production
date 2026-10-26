@@ -1,7 +1,7 @@
 name: Partner Atomic Start Quota Candidate
 on:
   pull_request:
-    paths: ['scripts/lib/partner-start-quota.cjs', 'scripts/lib/rdw-synchronized-start-reference.cjs', 'scripts/lib/rdw-authorized-mirror-start.cjs', 'tests/partner-start-quota-emulator.test.cjs', 'tests/helpers/partner-start-*', '.github/workflows/partner-start-quota.yml']
+    paths: ['scripts/lib/partner-start-quota.cjs', 'scripts/lib/rdw-synchronized-start-reference.cjs', 'scripts/lib/rdw-authorized-mirror-start.cjs', 'scripts/lib/rdw-hunter-start-wiring.cjs', 'tests/rdw-hunter-start-wiring.test.cjs', 'tests/partner-start-quota-emulator.test.cjs', 'tests/helpers/partner-start-*', '.github/workflows/partner-start-quota.yml']
 permissions:
   contents: read
 jobs:
@@ -21,6 +21,6 @@ jobs:
           java-version: 21
       - run: npm install --no-save --ignore-scripts firebase-admin@14.4.0 firebase-tools@14
       - name: Validate existing ranked start reference gates
-        run: node --test tests/rdw-synchronized-start-reference.test.cjs tests/rdw-authorized-mirror-start.test.cjs
+        run: node --test tests/rdw-synchronized-start-reference.test.cjs tests/rdw-authorized-mirror-start.test.cjs tests/rdw-hunter-start-wiring.test.cjs
       - name: Verify quota and start together on isolated Firestore Emulator
         run: npx firebase emulators:exec --only firestore --project demo-bxh-partner-start --config tests/helpers/partner-start-emulator.json 'node --test tests/partner-start-quota-emulator.test.cjs'
