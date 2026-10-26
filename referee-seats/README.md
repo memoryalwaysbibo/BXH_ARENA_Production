@@ -14,7 +14,7 @@
 
 `functions/core.cjs` 是可單獨測試的狀態機，`service.cjs` 實作 Firestore 交易，`index.js` 匯出 asia-east1 Callable `manageRefereeSeats` 與 `commitRefereeCommand`。前端在原裁判台標頭下呈現三席；賽事設定提供切換入口。舊分配非空時拒絕自動搬移，防止錯認主裁；複製房間不得繼承三席或交接請求。
 
-## 後端計分整合進度（第二版）
+## 後端計分與調度整合進度（第三版）
 
 已新增 `commitRefereeCommand` Callable。手機只傳固定命令及席位／比分／派場版本、當場兩位選手，伺服器重讀正式資料與使用者資格、驗證本台權限，再重算比分與晉級；不接受手機上傳完整 state、比分或回合紀錄。
 
@@ -24,7 +24,11 @@ Firestore 候選規則現在拒絕所有一般 staff 直接寫入三席房的私
 
 伺服器的晉級／修正引擎由受版本控制的純函式產生，隨函式包部署，不執行請求提供的程式碼。`tools/build-engine.cjs` 及 `engine/manifest.json` 保留來源函式與純模組雜湊，CI 重新產生後必須無差異。已測單淘晉級、季殿門檻、雙敗總決賽重置、循環賽排名與下游已有實際比分時禁止撤回。
 
-仍維持 draft 與預設關閉：跨台承接／人工交換／PASS 與退場相關入口尚未全面改為命令後端。受限 staff 呼叫舊交易會失敗，不會退回可繞過的舊計分路徑；這是尚待補齊的相容性項目。尚未部署正式 Callable／Rules、尚未驗證實機網路中斷與正式房相容性。
+已將空台承接、跳過場次承接、手動派台、交換、強制退場、重新開台、脫離場次承接、退役轉台及增減台接至同一命令後端。換台要求相關兩台權限與版本；有實際比分／失誤的目標台不得覆蓋。增減台僅接受明列的一般場地資訊，其他設定變更須分開儲存。PASS 等待中的場次及前置場次暫時阻擋移台與退場，等待鏈未完成時阻擋增減台，避免遺失依賴。
+
+CALL／PASS 沿用既有獨立後端及原本推播，不調整既有 PASS 規則。舊權限投影含房主與三席持有人，房主不占第四席；撤銷後立即移除本台權限。整合測試使用雜湊鎖定的既有 CALL 服務來源，串接實際 emulator 的交接、PASS、計分與自動回叫。
+
+仍維持 draft 與預設關閉。尚未部署正式 Callable／Rules，尚未完成最新 live rules 整合、實機網路中斷與正式房相容性驗收。
 
 伺服器設定 `systemConfig/refereeSeatsV1` 必須同時有 `enabled: true`、`perCourtScoringVerified: true` 才能啟用；未完成所有入口與正式規則整合前，不可設定旗標。測試中的旗標僅存在 demo emulator。
 
@@ -38,7 +42,7 @@ Firestore 候選規則現在拒絕所有一般 staff 直接寫入三席房的私
 
 ## 測試
 
-- `node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/scoring.test.cjs referee-seats/scoring-bridge.test.cjs`
+- `node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/scoring.test.cjs referee-seats/dispatch.test.cjs referee-seats/scoring-bridge.test.cjs`
 - `node referee-seats/browser.test.cjs`：需要 Playwright 及 Chromium，使用模擬後端、三個獨立頁面，驗證加入、主備交換、拒絕通知、撤銷、退出與四種寬度。
 - `python3 referee-seats/build-rules.py --source qr-checkin/firestore.candidate.rules --output /tmp/referee-seats.rules`
 

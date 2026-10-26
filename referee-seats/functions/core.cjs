@@ -11,11 +11,13 @@ function writable(room,state){
  if(room.eventAuthority!=='official'||state.meta?.eventAuthority!=='official'||room.eventCancelled===true||room.systemClosed===true||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');
 }
 function invalidate(model,station,now){for(const req of Object.values(model.requests)){if(req.status==='pending'&&(req.station===station||req.expiresAt<=now)){req.status=req.expiresAt<=now?'expired':'stale';req.resolvedAt=now;}}}
-function project(model){
+function project(model,ownerUid=null,stations=0){
  const assignments={},names={},publicSeats={},uids=new Set();
- for(const [station,court] of Object.entries(model.courts)){
+ const courts={...model.courts};for(let n=1;n<=Math.min(32,Number(stations)||0);n++)courts[n]=courts[n]||{main:null,backup1:null,backup2:null};
+ for(const [station,court] of Object.entries(courts)){
   assignments[station]=[];names[station]=[];publicSeats[station]={};
-  for(const slot of SLOTS){const seat=court[slot];publicSeats[station][slot]=seat?{name:seat.name}:null;if(seat){assignments[station].push(seat.uid);names[station].push(seat.name);uids.add(seat.uid);}}
+  if(ownerUid)assignments[station].push(ownerUid);
+  for(const slot of SLOTS){const seat=court[slot];publicSeats[station][slot]=seat?{name:seat.name}:null;if(seat){if(!assignments[station].includes(seat.uid))assignments[station].push(seat.uid);names[station].push(seat.name);uids.add(seat.uid);}}
  }
  return {refereeStationAssignments:assignments,refereeStationNames:names,refereeStationUids:[...uids],refereeStationRestrictionEnabled:true,refereeSeatNames:publicSeats};
 }

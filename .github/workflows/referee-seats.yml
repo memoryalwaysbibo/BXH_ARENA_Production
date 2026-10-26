@@ -18,7 +18,7 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Unit and existing assignment regressions
-        run: node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/cloud.test.cjs referee-seats/scoring.test.cjs referee-seats/scoring-bridge.test.cjs tests/assignment-cloud-confirmation.test.cjs tests/event-staff-permission.test.cjs tests/referee-fault-core.test.cjs tests/referee-fault-ui.test.cjs tests/referee-score-v2-ui.test.cjs tests/community-room-cloud-sync.test.cjs tests/staff-assignment-realname.test.cjs tests/module-seam-contracts.test.cjs
+        run: node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/cloud.test.cjs referee-seats/scoring.test.cjs referee-seats/dispatch.test.cjs referee-seats/scoring-bridge.test.cjs tests/assignment-cloud-confirmation.test.cjs tests/event-staff-permission.test.cjs tests/referee-fault-core.test.cjs tests/referee-fault-ui.test.cjs tests/referee-score-v2-ui.test.cjs tests/community-room-cloud-sync.test.cjs tests/staff-assignment-realname.test.cjs tests/module-seam-contracts.test.cjs
       - name: Install isolated test dependencies
         run: npm install --prefix /tmp/seat-test-deps --no-save --ignore-scripts playwright@1.55.0 firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11 firebase-admin@13.10.0 acorn@8 acorn-walk@8
       - name: Verify trusted engine is reproducible from reviewed source

@@ -3491,6 +3491,7 @@ if(testerSession){
           const snap=await tx.get(ref),actorSnap=await tx.get(fx.doc(dbHandle,USERS_COLLECTION,uid));
           if(!snap.exists()||!actorSnap.exists())throw new Error("not-found");
           const docData=snap.data(),actor=actorSnap.data(),st=JSON.parse(docData.data);
+          if(docData.refereeSeatsV1?.version===1)throw new Error("seat-command-required");
           if(actor.active!==true)throw new Error("permission-denied");
           const creator=docData.createdBy||st.createdBy;
           const admin=actor.isTestAccount!==true&&["super_admin","admin"].includes(actor.role);

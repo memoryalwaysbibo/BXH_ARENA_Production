@@ -6,12 +6,16 @@ function createEngine(initialState,identity,now,operationId){
  const Math=globalThis.Math;
  const uid=prefix=>prefix+'_'+require('node:crypto').createHash('sha256').update(operationId+':'+prefix).digest('hex').slice(0,20);
  const currentRefereeIdentity=()=>identity;
- const window={BXHDoubleElim:require('./double-elimination.cjs'),BXHCourtRetirement:require('./court-retirement.cjs').BXHCourtRetirement};
+ const retirement=require('./court-retirement.cjs').BXHCourtRetirement;
+ const window={BXHDoubleElim:require('./double-elimination.cjs'),BXHCourtRetirement:{...retirement,reconcile:st=>retirement.reconcile(st,now)}};
  const {courtKey,correctionMatchHasActualPlay,correctionParticipantSignature,matchHasDecisionData}=require('./match-utils.cjs');
  const POINT_TYPES = { spin:1, knockout:2, burst:2, extreme:3, fault:1 };
 const HUNTER_ROUND_SCHEMA_VERSION = 1;
 const HUNTER_SCORING_VERSION = "bxh-4pt-v1";
 const HUNTER_VALID_POINT_TYPES = new Set(Object.keys(POINT_TYPES));
+ function callPassProtected(s,m){
+ return !!(m&&(m.callPass&&!m.completed||(s.matches||[]).some(x=>!x.completed&&x.skippedAt&&x.callPass?.waitFor.includes(m.id))));
+}
  function activeSingleElimSchedulePhase(matches=state.matches, meta=state.meta){
   // Placement gate is stronger than normal per-court progression: once both
   // semifinal losers are known, 季殿 must finish before 冠亞 can become ready,
@@ -86,6 +90,21 @@ function applyCompletedMatchCorrection(st,matchId,mode,actor){
   return {ok:true,state:st};
 }
 
+function applyCourtSwapMutation(remoteState,sourceId,targetId){
+  const source=(remoteState.matches||[]).find(m=>m.id===sourceId);
+  const target=(remoteState.matches||[]).find(m=>m.id===targetId);
+  if(!canCourtSwapSource(source)) return {ok:false,reason:"source-no-longer-swappable"};
+  if(!canCourtSwapTarget(target,source,remoteState)) return {ok:false,reason:"target-no-longer-swappable"};
+  const sourceStation=Number(source.station||0),targetStation=Number(target.station||sourceStation||0);
+  if(!sourceStation||!targetStation) return {ok:false,reason:"station-mismatch"};
+  const now=Date.now();
+  clearCourtAssignmentRefs(remoteState,[source.id,target.id]);
+  source.station=targetStation;source.status="pending";source.startedAt=null;source.updatedAt=now;source.dispatchPriorityAt=null;source.dispatchRevision=Number(source.dispatchRevision||0)+1;
+  target.station=sourceStation;target.status="ready";target.startedAt=null;target.updatedAt=now;target.dispatchPriorityAt=now;target.dispatchRevision=Number(target.dispatchRevision||0)+1;
+  remoteState.currentMatchId=target.id;
+  return {ok:true,state:remoteState};
+}
+
 function applyIdleCourtClaim(st,matchId,stationNum){
   const court=st.courtAssignments&&st.courtAssignments[courtKey(stationNum)];
   if(!court||court.currentMatchId) return {ok:false,reason:"court-no-longer-idle"};
@@ -100,6 +119,15 @@ function applyIdleCourtClaim(st,matchId,stationNum){
   // Reserve immediately, before the next idle court selects its candidate.
   court.currentMatchId=match.id;
   return {ok:true,state:st};
+}
+
+function applyManualCourtAssign(st,matchId,targetStation){
+ const m=(st.matches||[]).find(x=>x.id===matchId);if(!canManualAssignMatch(m,st))return {ok:false,reason:"match-no-longer-available"};
+ const n=window.BXHCourtRetirement?window.BXHCourtRetirement.target(st):Math.max(1,Number(st.meta?.stations||1));if(targetStation<1||targetStation>n||window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,targetStation))return {ok:false,reason:"station-not-assigned"};
+ const now=Date.now();clearCourtAssignmentRefs(st,[m.id]);const target=st.courtAssignments&&st.courtAssignments[courtKey(targetStation)];
+ if(target&&target.currentMatchId&&target.currentMatchId!==m.id){const d=(st.matches||[]).find(x=>x.id===target.currentMatchId);if(d&&!d.completed&&!matchHasDecisionData(d)){d.status="pending";d.startedAt=null;d.dispatchPriorityAt=null;d.dispatchRevision=Number(d.dispatchRevision||0)+1;d.updatedAt=now;}target.currentMatchId=null;}
+ m.station=targetStation;m.status="ready";m.startedAt=null;m.updatedAt=now;m.dispatchPriorityAt=now;m.dispatchRevision=Number(m.dispatchRevision||0)+1;
+ if(target){target.currentMatchId=m.id;target.nextMatchId=null;target.status="ready";target.updatedAt=now;}st.currentMatchId=m.id;return {ok:true,state:st};
 }
 
 function applyMatchCompletionFields(m, evalResult, actor){
@@ -159,6 +187,18 @@ function applyQuickDecisionFields(m, evalResult, actor){
   m.hunterData={schemaVersion:HUNTER_ROUND_SCHEMA_VERSION,scoringVersion:HUNTER_SCORING_VERSION,analyzable:false,roundCount:0,scoreA:null,scoreB:null,reason:"quick_decision",validatedAt:Date.now()};
 }
 
+function applySkippedDispatch(remote,m,target,expectedRevision){
+  if(callPassProtected(remote,m))return {ok:false,reason:"dispatch-stale"};
+  if(!m || m.completed || !m.skippedAt || m.resumeQueuedAt || !m.a || !m.b || (m.dispatchRevision||0)!==expectedRevision) return {ok:false,reason:"dispatch-stale"};
+  if(!Number.isInteger(target)||target<1||target>(window.BXHCourtRetirement?window.BXHCourtRetirement.target(remote):Number(remote.meta.stations||1))) return {ok:false,reason:"station-mismatch"};
+  if(window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(remote,target))return {ok:false,reason:"court-retired"};
+  if(Object.values(remote.courtAssignments||{}).some(c=>c.currentMatchId===m.id)) return {ok:false,reason:"dispatch-stale"};
+  m.lastDispatch={from:Number(m.station),to:target,at:Date.now()};
+  m.station=target; m.skipWaitFor=[]; m.resumeQueuedAt=Date.now(); m.dispatchRevision=expectedRevision+1;
+  rebuildPropagationForState(remote);
+  return {ok:true,state:remote};
+}
+
 function autoAdvanceReadyMatches(){
   // Heal stale/legacy rooms first: a championship final that was preassigned
   // before the bronze gate existed must be released as long as no real play
@@ -202,6 +242,20 @@ function autoAdvanceReadyMatches(){
     claimed.add(m.station);
   });
 }
+
+function canCourtSwapSource(m){
+  return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&!matchHasDecisionData(m)&&m.status!=="paused");
+}
+
+function canCourtSwapTarget(m,sourceMatch,st=state){
+  if(window.BXHCourtRetirement&&(!window.BXHCourtRetirement.accepts(st,m?.station)||!window.BXHCourtRetirement.accepts(st,sourceMatch?.station)))return false;
+  if(!m||!sourceMatch||m.id===sourceMatch.id||m.isBye||m.completed||!m.a||!m.b) return false;
+  if(singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{})) return false;
+  if(m.status==="in_progress"||m.status==="paused"||m.skippedAt||m.callPass||matchHasDecisionData(m)) return false;
+  return true;
+}
+
+function canManualAssignMatch(m,st=state){return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!matchHasDecisionData(m)&&m.status!=="paused"&&!m.skippedAt&&!m.callPass&&!singleElimBronzeBeforeFinalBlocked(m,(st&&st.matches)||[],(st&&st.meta)||{}));}
 
 function checkWinnerSide(m){
   if(m.scoreA>=4 && m.scoreA>m.scoreB) return "A";
@@ -852,6 +906,6 @@ function validateHunterRoundLedger(match){
   else if(scoreA!==expectedA||scoreB!==expectedB) errors.push({reason:"score-ledger-mismatch",scoreA,scoreB,expectedA,expectedB});
   return {ok:errors.length===0,events,roundCount:events.length,scoreA,scoreB,errors};
 }
- return {rebuildPropagationForState,evaluateMatchCompletion,evaluateQuickDecision,applyMatchCompletionFields,applyQuickDecisionFields,createHunterRoundEvent,singleElimBronzeBeforeFinalBlocked,applyCompletedMatchCorrection,checkWinnerSide,markMatchSkipped};
+ return {rebuildPropagationForState,evaluateMatchCompletion,evaluateQuickDecision,applyMatchCompletionFields,applyQuickDecisionFields,createHunterRoundEvent,singleElimBronzeBeforeFinalBlocked,applyCompletedMatchCorrection,checkWinnerSide,markMatchSkipped,applyIdleCourtClaim,applySkippedDispatch,applyCourtSwapMutation,applyManualCourtAssign};
 }
 module.exports={createEngine};

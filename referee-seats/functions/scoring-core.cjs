@@ -15,9 +15,9 @@ function transition({room,state,user,uid,d,now}){
  if(!state.startedAt)fail('not-started');
  const m=state.matches?.find(m=>m.id===d.matchId);if(!m)fail('not-found');
  const station=Number(m.station),court=room.refereeSeatsV1.courts?.[station];
- if(!Number.isInteger(station)||station<1||Number(d.station)!==station||state.forcedCourtExits?.[station]?.closed)fail('station-mismatch');
+ if(!Number.isInteger(station)||station<1||station>Number(state.meta.stations)||Number(d.station)!==station||state.forcedCourtExits?.[station]?.closed)fail('station-mismatch');
  if(!allowed(room,user,uid,station))fail('station-not-assigned');
- if(!court||d.expectedCourtRevision!==court.revision)fail('seat-stale');
+ if(d.expectedCourtRevision!==Number(court?.revision||0))fail('seat-stale');
  if(d.expectedScoreRevision!==Number(m.refereeSeatScoreRevision||0))fail('score-stale');
  if(d.expectedDispatchRevision!==Number(m.dispatchRevision||0))fail('dispatch-stale');
  if(d.playerAId!==m.a?.playerId||d.playerBId!==m.b?.playerId||!m.a?.playerId||!m.b?.playerId||m.isBye)fail('player-mismatch');
@@ -30,6 +30,7 @@ function transition({room,state,user,uid,d,now}){
   if(m.completed||m.status==='completed')fail('already-completed');
   if(engine.singleElimBronzeBeforeFinalBlocked(m,state.matches,state.meta))fail('bronze-before-final');
   if(action==='score'||action==='fault'){
+   if(m.callPass?.waitFor?.some(id=>!state.matches.find(x=>x.id===id)?.completed))fail('pass-protected');
    if(engine.checkWinnerSide(m))fail('no-more-score');
    if(m.scoringMode==='quick')fail('quick-mode');
    if(!['A','B'].includes(d.side))fail('invalid-side');
@@ -69,6 +70,8 @@ function publicProjection(state,previous){
  const mirror=JSON.parse(JSON.stringify(previous));
  mirror.matches=state.matches.map(m=>({id:m.id,seq:m.seq??null,bracket:m.bracket||null,round:m.round??0,indexInRound:m.indexInRound??0,station:m.station??null,a:m.a?{playerId:m.a.playerId}:null,b:m.b?{playerId:m.b.playerId}:null,isBye:!!m.isBye,scoreA:m.scoreA??null,scoreB:m.scoreB??null,log:m.log||[],winnerId:m.winnerId||null,loserId:m.loserId||null,completed:!!m.completed,resultMethod:m.resultMethod||null,completedAt:m.completedAt||null,confirmedAt:m.confirmedAt||null,status:m.status||'pending',skippedAt:m.skippedAt||null,callPass:m.callPass||null,skipWaitFor:m.skipWaitFor||[],skipManualOnly:m.skipManualOnly===true,resumeQueuedAt:m.resumeQueuedAt||null}));
  mirror.courtAssignments=Object.fromEntries(Object.entries(state.courtAssignments||{}).map(([key,c])=>[key,{currentMatchId:c.currentMatchId||null,nextMatchId:c.nextMatchId||null,status:c.status||'idle'}]));
+ mirror.forcedCourtExits=Object.fromEntries(Object.entries(state.forcedCourtExits||{}).map(([n,c])=>[n,{closed:!!c.closed,revision:Number(c.revision||0),at:c.at||null,reopenedAt:c.reopenedAt||null,matchId:c.matchId||null}]));
+ mirror.callRevision=Number(state.callRevision||0);mirror.courtLifecycleEpoch=Number(state.courtLifecycleEpoch||0);
  for(const key of ['championId','runnerUpId','thirdId','fourthId','gfMatchId','gfResetMatchId','bronzeMatchId','rrRounds','updatedAt'])mirror[key]=state[key]??null;
  return mirror;
 }

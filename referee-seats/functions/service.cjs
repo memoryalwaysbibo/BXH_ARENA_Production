@@ -22,7 +22,7 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   if(d.action==='request'&&targetUid)targetUser=(await tx.get(db.doc('users/'+targetUid))).data();
   if(d.action==='respond'&&requesterUid)requesterUser=(await tx.get(db.doc('users/'+requesterUid))).data();
   const out=C.transition({room,state,user,uid,d,now,id,targetUser,requesterUser});
-  const projection=out.projection,staff=[...new Set([...(room.assignedStaffUids||[]),...projection.refereeStationUids])];
+  const projection=C.project(out.model,room.createdBy,state.meta.stations),staff=[...new Set([...(room.assignedStaffUids||[]),room.createdBy,...projection.refereeStationUids].filter(Boolean))];
   state.meta={...state.meta,...projection,assignedStaffUids:staff,refereeSeatsV1:out.model};
   const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);state.updatedAt=updatedAt;
   let mirror;try{mirror=JSON.parse(publicSnap.data().bracketView);}catch{throw new Error('public-mirror-missing');}

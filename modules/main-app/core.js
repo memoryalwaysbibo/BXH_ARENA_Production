@@ -6110,6 +6110,36 @@ async function executeRefereeSeatCommand(matchId,command){
   finally{refereeSeatCommandBusy.delete(key);}
 }
 
+
+async function executeRefereeDispatchCommand(command){
+  const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(command.matchId),targetCurrentId=state.courtAssignments?.["court"+command.targetStation]?.currentMatchId||null,other=getMatch(command.targetMatchId||(command.action==="manual-assign"?targetCurrentId:null));
+  const targetActions=["idle-claim","claim-skipped","claim-detached","retirement-transfer","manual-assign"];
+  const station=m?Number(m.station):Number(command.station||0),authority=targetActions.includes(command.action)?Number(command.targetStation):station;
+  if(!code||!canOperateCurrentTournament())return false;
+  if(command.action==="resize"||command.action==="reopen"){
+    if(!canManageCourtRetirement()){showToast("此操作需由場主或管理員處理。",true);return false;}
+  }else if(!canOperateStation(authority)){showToast("你目前沒有此戰鬥台的調度權限。",true);return false;}
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("調度需要連線確認，本次操作尚未送出。",true);return false;}
+  const key=code+":"+actorUid+":dispatch";if(refereeSeatCommandBusy.has(key))return false;refereeSeatCommandBusy.add(key);
+  try{
+    const request={...command,code,operationId:crypto.randomUUID(),station,
+      expectedCourtRevisions:Object.fromEntries(Array.from({length:Number(state.meta.stations)||0},(_,i)=>[i+1,Number(state.meta.refereeSeatsV1.courts?.[i+1]?.revision||0)])),
+      expectedScoreRevision:Number(m?.refereeSeatScoreRevision||0),expectedDispatchRevision:Number(m?.dispatchRevision||0),
+      playerAId:m?.a?.playerId||null,playerBId:m?.b?.playerId||null,
+      expectedTargetCurrentMatchId:targetCurrentId,expectedTargetScoreRevision:Number(other?.refereeSeatScoreRevision||0),expectedTargetDispatchRevision:Number(other?.dispatchRevision||0),
+      targetPlayerAId:other?.a?.playerId||null,targetPlayerBId:other?.b?.playerId||null};
+    const result=await window.cloudSync?.commitRefereeCommand?.(request);
+    if(state.id!==roomId||currentAuthUid()!==actorUid)return false;
+    if(!result?.ok){
+      showToast(({"pass-protected":"PASS 回補及前置場次尚未完成，暫時不能移台或退場。","target-has-play-data":"目標台已有比分或失誤紀錄，不能覆蓋目前場次。","seat-stale":"裁判席位已變更，請確認後重新操作。","unsupported-resize-settings":"請先單獨調整台數，再儲存其他賽事設定。"})[result?.reason]||stationMutationErrorMessage(result?.reason||"cloud-unavailable"),true);
+      const fresh=await window.cloudSync?.joinRoom?.(code);if(state.id===roomId&&currentAuthUid()===actorUid&&fresh?.ok&&fresh.data)applyRemoteState(fresh.data,true);
+      return false;
+    }
+    applyRemoteState(result.state,true);cloudStatus="connected";cloudLastSyncAt=Date.now();render();showToast("場次調度已由雲端確認，比分與失誤紀錄保留。");return true;
+  }catch(error){if(state.id===roomId&&currentAuthUid()===actorUid)showToast("調度尚未確認，請重連後核對雲端狀態。",true);return false;}
+  finally{refereeSeatCommandBusy.delete(key);}
+}
+
 function persistRefereeMatchMutation(matchId, mutateRemoteFn){
   const m=getMatch(matchId);
   state.updatedAt=Date.now();
@@ -7393,6 +7423,7 @@ function applySkippedDispatch(remote,m,target,expectedRevision){
   return {ok:true,state:remote};
 }
 async function claimSkippedMatch(matchId,target){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"claim-skipped",matchId,targetStation:target});
   if(!canOperateCurrentTournament() || !requireTournamentStartedForMatchAction()) return;
   if(state.archiveStatus==="completed" || !canOperateStation(target)) return;
   const m=getMatch(matchId); if(!m) return;
@@ -10943,6 +10974,7 @@ function applyIdleCourtClaim(st,matchId,stationNum){
   return {ok:true,state:st};
 }
 async function claimIdleCourt(matchId,stationNum){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"idle-claim",matchId,targetStation:stationNum});
   if(!canOperateStation(stationNum)){showToast("你未被指派此戰鬥台",true);return;}
   const match=getMatch(matchId);
   if(!match||!idleCourtCandidates(state,stationNum).some(m=>m.id===matchId)){
@@ -11009,6 +11041,10 @@ function courtSwapErrorMessage(reason){
   return map[reason]||("換場失敗（"+String(reason||"unknown")+"），請重新整理後再試。");
 }
 async function executeCourtSwap(targetId){
+  if(state.meta?.refereeSeatsV1?.version===1){
+    if(!courtSwapDraft)return;const ok=await executeRefereeDispatchCommand({action:"swap",matchId:courtSwapDraft.sourceMatchId,targetMatchId:targetId});
+    if(ok){courtSwapDraft=null;render();}return;
+  }
   const draft=courtSwapDraft;if(!draft)return;
   const source=getMatch(draft.sourceMatchId),target=getMatch(targetId);
   if(!source||!canCourtSwapSource(source)){courtSwapDraft=null;render();showToast("原場次已無法交換",true);return;}
@@ -11041,6 +11077,7 @@ function applyManualCourtAssign(st,matchId,targetStation){
  if(target){target.currentMatchId=m.id;target.nextMatchId=null;target.status="ready";target.updatedAt=now;}st.currentMatchId=m.id;return {ok:true,state:st};
 }
 async function executeManualCourtAssign(matchId,targetStation){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"manual-assign",matchId,targetStation});
  const m=getMatch(matchId);if(!m||!canManualAssignMatch(m)){showToast("此場目前無法指定",true);return;}let result;
  if(state.cloudCode){if(!cloudAvailable()||!window.cloudSync?.mutateMatchTransaction){showToast("雲端未連線，無法人工指定",true);return;}result=await window.cloudSync.mutateMatchTransaction(state.cloudCode,m.id,Number(m.station||0),remote=>applyManualCourtAssign(remote,m.id,targetStation),currentAuthUid(),{targetStation,expectedRevision:Number(m.dispatchRevision||0)});}
  else{result=applyManualCourtAssign(state,m.id,targetStation);if(result.ok){rebuildPropagation();if(!await saveState())result={ok:false,reason:"save-failed"};}}
@@ -11340,6 +11377,11 @@ let courtRetirementBusy=false;
 function canForceExitCourt(n){return canManageCourtRetirement()||(canOperateCurrentTournament()&&canOperateStation(n));}
 function canManageCourtRetirement(){return canManageRefereeStationAssignments()||isCommunityRoomOwner()||(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator());}
 async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(state.courtRetirementPlan?.revision||0)){
+  if(state.meta?.refereeSeatsV1?.version===1){
+    const metaPatch=Object.fromEntries(Object.entries(nextMeta||{}).filter(([key,value])=>key!=="stations"&&JSON.stringify(value)!==JSON.stringify(state.meta[key])));
+    const ok=await executeRefereeDispatchCommand({action:"resize",count:n,expectedTarget:expected,expectedPlanRevision:expectedRevision,metaPatch});
+    if(ok){resetSettingsFormDraft();resetRegistrationFormDraft();}return;
+  }
   if(courtRetirementBusy)return;courtRetirementBusy=true;const roomId=state.id;
   try{
     let result;
@@ -11360,6 +11402,7 @@ async function resizeCourtsSafely(n,expected,nextMeta,expectedRevision=Number(st
   finally{courtRetirementBusy=false;renderPreservingScroll();}
 }
 async function transferRetiringCourtMatch(id,to){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:"retirement-transfer",matchId:id,targetStation:to});
   if(!canManageCourtRetirement()||courtRetirementBusy)return;
   const m=getMatch(id);if(!m)return;
   courtRetirementBusy=true;const revision=Number(m.dispatchRevision||0),roomId=state.id;
@@ -11377,6 +11420,7 @@ async function transferRetiringCourtMatch(id,to){
   finally{courtRetirementBusy=false;renderPreservingScroll();}
 }
 async function executeCourtForceAction(change){
+  if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeDispatchCommand({action:change.kind,station:change.station,matchId:change.matchId||null,targetStation:change.to,expectedExitRevision:change.exitRevision});
   if(!(change.kind==="force-exit"?canForceExitCourt(change.station):canManageCourtRetirement())||courtRetirementBusy)return;
   courtRetirementBusy=true;const roomId=state.id;
   try{

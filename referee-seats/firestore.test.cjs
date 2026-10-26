@@ -50,3 +50,40 @@ test('trusted scoring commits once, rejects stale concurrent score and revoked/o
  await assert.rejects(score(cmd('a','score',3,{side:'A',finish:'spin'})),/station-not-assigned/);
  const mirror=JSON.parse((await db.doc('publicTournaments/'+scoreCode).get()).data().bracketView);assert.equal(mirror.matches[0].scoreB,1);assert(!JSON.stringify(mirror).includes('confirmedByUid'));
 });
+
+test('pinned CALL/PASS service survives seat replacement and recalls after trusted predecessor confirmation',async()=>{
+ const {loadWriter}=require('../qr-checkin/backend/writer-fixtures.cjs'),{createScoringHandler}=require('./functions/scoring-service.cjs'),C=require('./functions/core.cjs');
+ let now=20000;const call=loadWriter('courtCallService','court-call-service.js',db).createCourtCallService(db,()=>now+=11000),score=createScoringHandler(db);
+ const passCode='BXH-PASSTEST',tour=db.doc('tournaments/'+passCode),model={version:1,revision:1,requests:{},courts:{1:{revision:1,main:{uid:'a',name:'A'},backup1:null,backup2:null}}};
+ const players=['p1','p2','p3','p4'].map(id=>({id,name:id,playerUid:id}));
+ const matches=[['m1','p1','p2'],['m2','p3','p4']].map(([id,a,b],seq)=>({id,station:1,bracket:'RR',round:0,seq,a:{playerId:a},b:{playerId:b},scoreA:0,scoreB:0,log:[],faultActions:[],completed:false,status:seq?'pending':'in_progress'}));
+ const state={id:'pass-room',cloudCode:passCode,createdBy:'host',meta:{eventAuthority:'official',formatType:'roundrobin',stations:1,scoringMode:'standard'},startedAt:1,players,matches,courtAssignments:{court1:{currentMatchId:'m1',nextMatchId:'m2',status:'in_progress'}}};
+ await Promise.all([tour.set({createdBy:'host',eventAuthority:'official',assignedStaffUids:['a','b','c','host'],refereeSeatsV1:model,...C.project(model,'host',1),data:JSON.stringify(state)}),db.doc('publicTournaments/'+passCode).set({bracketView:JSON.stringify(state)}),...players.map(p=>db.doc('users/'+p.id).set({active:true,role:'player'}))]);
+ const callReq=(uid,action,args={})=>({auth:{uid},data:{code:passCode,action,operationId:'pass-emulator-op-'+(++seq),matchId:'m1',...args}});
+ await call(callReq('host','notify'));
+ await call(callReq('p1','respond',{sequence:1,response:'pass',participantId:'p1',reason:'裝備處理'}));
+ let saved=JSON.parse((await tour.get()).data().data);assert.deepEqual(saved.matches[0].callPass.waitFor,['m2']);assert.equal(saved.courtAssignments.court1.currentMatchId,'m2');
+ const seats=(uid,action,args)=>handle({auth:{uid},data:{code:passCode,action,operationId:'pass-seat-operation-'+(++seq),station:1,slot:'main',...args}});
+ const handoff=await seats('b','request',{expectedCourtRevision:1,expectedUid:'a'});await seats('a','respond',{requestId:handoff.requestId,response:'accept'});
+ await assert.rejects(call(callReq('a','notify',{matchId:'m2'})),/permission-denied|referee-required/);
+ await call(callReq('b','notify',{matchId:'m2'}));
+ function scoreReq(matchId,action,rev,args={}){const pair=matchId==='m1'?['p1','p2']:['p3','p4'];return {auth:{uid:'b'},data:{code:passCode,operationId:'pass-score-op-'+(++seq),action,matchId,station:1,expectedCourtRevision:2,expectedScoreRevision:rev,expectedDispatchRevision:matchId==='m1'?1:0,playerAId:pair[0],playerBId:pair[1],...args}};}
+ await assert.rejects(score(scoreReq('m1','score',0,{side:'A',finish:'spin'})),/pass-protected/);
+ await score(scoreReq('m2','score',0,{side:'A',finish:'extreme'}));await score(scoreReq('m2','score',1,{side:'A',finish:'spin'}));await score(scoreReq('m2','confirm',2));
+ const recalled=await call(callReq('b','list'));assert(recalled.rows.some(r=>r.matchId==='m1'&&r.sequence===2&&r.waitingFor.length===0));
+ const record=(await db.doc('courtCalls/'+passCode).get()).data();assert(record.used.p1);assert.equal(record.calls.m1.pass.status,'approved');
+ await score(scoreReq('m1','score',0,{side:'B',finish:'spin'}));saved=JSON.parse((await tour.get()).data().data);assert.equal(saved.matches[0].scoreB,1);assert.deepEqual(saved.matches[0].callPass.waitFor,['m2']);
+});
+
+test('actual dispatch exit, retry, reopen and detached recovery preserve scores and faults',async()=>{
+ const {createScoringHandler}=require('./functions/scoring-service.cjs'),C=require('./functions/core.cjs'),dispatch=createScoringHandler(db),dispatchCode='BXH-DISPATCH',tour=db.doc('tournaments/'+dispatchCode);
+ const model={version:1,revision:1,requests:{},courts:{1:{revision:1,main:{uid:'a',name:'A'},backup1:null,backup2:null}}};
+ const state={id:'dispatch-room',cloudCode:dispatchCode,meta:{eventAuthority:'official',formatType:'roundrobin',stations:1},startedAt:1,players:[{id:'p1',name:'P1'},{id:'p2',name:'P2'}],matches:[{id:'m',station:1,bracket:'RR',round:0,seq:0,a:{playerId:'p1'},b:{playerId:'p2'},scoreA:2,scoreB:1,log:[{test:'preserve'}],faultActions:[{offender:'A'}],completed:false,status:'in_progress'}],courtAssignments:{court1:{currentMatchId:'m',nextMatchId:null}}};
+ await Promise.all([tour.set({createdBy:'host',eventAuthority:'official',assignedStaffUids:['a','host'],refereeSeatsV1:model,...C.project(model,'host',1),data:JSON.stringify(state)}),db.doc('publicTournaments/'+dispatchCode).set({bracketView:JSON.stringify(state)})]);
+ const req=(uid,action,args={})=>({auth:{uid},data:{code:dispatchCode,operationId:'dispatch-emulator-op-'+(++seq),action,station:1,matchId:'m',expectedCourtRevisions:{1:1},expectedScoreRevision:0,expectedDispatchRevision:0,playerAId:'p1',playerBId:'p2',expectedExitRevision:0,...args}});
+ const exit=req('a','force-exit');await dispatch(exit);await dispatch(exit);
+ let saved=(await tour.get()).data(),s=JSON.parse(saved.data);assert.equal(saved.courtLifecycleWriteSeq,1);assert.equal(s.matches[0].station,0);assert.equal(s.matches[0].scoreA,2);assert.equal(s.matches[0].faultActions.length,1);
+ await dispatch(req('host','reopen',{matchId:null,expectedExitRevision:1}));
+ await dispatch(req('host','claim-detached',{station:0,targetStation:1,expectedScoreRevision:1,expectedDispatchRevision:1}));
+ s=JSON.parse((await tour.get()).data().data);assert.equal(s.matches[0].station,1);assert.equal(s.matches[0].scoreA,2);assert.equal(s.matches[0].scoreB,1);assert.equal(s.matches[0].faultActions.length,1);assert.deepEqual(s.matches[0].log,[{test:'preserve'}]);
+});

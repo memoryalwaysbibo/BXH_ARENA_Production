@@ -1,5 +1,5 @@
 'use strict';
-const {createHash}=require('node:crypto'),C=require('./core.cjs'),S=require('./scoring-core.cjs');
+const {createHash}=require('node:crypto'),C=require('./core.cjs'),S=require('./scoring-core.cjs'),D=require('./dispatch-core.cjs');
 function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
  const uid=request.auth?.uid,d=request.data||{},code=String(d.code||'').trim().toUpperCase();
  if(!uid)throw Error('unauthenticated');
@@ -12,17 +12,21 @@ function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
   if(releaseSnap.data()?.enabled!==true||releaseSnap.data()?.perCourtScoringVerified!==true)throw Error('release-not-ready');
   const room=roomSnap.data(),user=userSnap.data();let state,previous;
   try{state=JSON.parse(room.data);previous=JSON.parse(pubSnap.data().bracketView);}catch{throw Error('corrupt-data');}
-  if(!C.eligible(room,user,uid)||!S.allowed(room,user,uid,Number(d.station)))throw Error('station-not-assigned');
+  const dispatch=D.ACTIONS.has(d.action),authority=dispatch?D.authorizationStation(d):Number(d.station);
+  if(!C.eligible(room,user,uid)||!(dispatch&&d.action==='resize'?C.manager(room,user,uid):S.allowed(room,user,uid,authority)))throw Error('station-not-assigned');
   // Deduplicate before score-version validation; retries return current authoritative state.
   if(receipt.exists){if(receipt.data().hash!==hash)throw Error('operation-conflict');return {...receipt.data().result,state};}
-  const result=S.transition({room,state,user,uid,d,now});
+  const result=(dispatch?D:S).transition({room,state,user,uid,d,now});
   state.updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);
-  state.meta={...state.meta,refereeSeatsV1:room.refereeSeatsV1,...C.project(room.refereeSeatsV1),assignedStaffUids:room.assignedStaffUids||[]};
+  const projection=C.project(room.refereeSeatsV1,room.createdBy,state.meta.stations);
+  state.meta={...state.meta,refereeSeatsV1:room.refereeSeatsV1,...projection,assignedStaffUids:room.assignedStaffUids||[]};
   const response={ok:true,matchId:result.matchId,scoreRevision:result.scoreRevision};
-  tx.update(ref,{data:JSON.stringify(state),updatedAt:state.updatedAt});
+  const changed=state.matches.find(m=>m.id===result.matchId);
+  const lifecycle=dispatch?{courtLifecycleWriteSeq:Number(room.courtLifecycleWriteSeq||0)+1}:{};
+  tx.update(ref,{...lifecycle,...projection,data:JSON.stringify(state),updatedAt:state.updatedAt});
   tx.update(pub,{bracketView:JSON.stringify(S.publicProjection(state,previous)),updatedAt:state.updatedAt});
   tx.create(receiptRef,{uid,hash,at:now,result:response});
-  tx.create(ref.collection('refereeScoreAudit').doc(opKey),{uid,at:now,action:d.action,station:result.station,matchId:result.matchId,scoreRevision:result.scoreRevision,scoreA:state.matches.find(m=>m.id===result.matchId).scoreA??null,scoreB:state.matches.find(m=>m.id===result.matchId).scoreB??null});
+  tx.create(ref.collection('refereeScoreAudit').doc(opKey),{uid,at:now,action:d.action,station:result.station,matchId:result.matchId,scoreRevision:result.scoreRevision,scoreA:changed?.scoreA??null,scoreB:changed?.scoreB??null});
   if(['confirm','quick'].includes(d.action))tx.set(db.doc('staffActivityLogs/'+uid+'/matches/'+code+'_'+result.matchId),{uid,tournamentCode:code,tournamentName:state.meta.name||'',matchId:result.matchId,station:result.station,confirmedAt:now,resultMethod:d.action==='quick'?'quick_decision':'score',eventAuthority:'official'},{merge:true});
   return {...response,state};
  });
