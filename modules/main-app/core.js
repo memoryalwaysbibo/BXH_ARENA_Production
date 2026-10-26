@@ -23725,6 +23725,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="start-tournament"){
+    // Team RDW must not bypass the server-sealed ranked start route.
+    if(state.meta?.ladderMode==="ranked"&&state.meta?.battleMode==="team"){
+      showToast("團體積分賽 RDW 尚未通過開賽驗證，未開始賽事",true);
+      return;
+    }
     if(state.meta.battleMode==="team"){
       (async()=>{
         if(state.startedAt||!state.bracketSize)return;
