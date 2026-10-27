@@ -9,8 +9,8 @@ function createReadHandler({db,auth,HttpsError,enabled=false}){
   if(!request?.app?.appId)fail('failed-precondition','app-check-required');
   const uid=request.auth?.uid;if(!uid)fail('unauthenticated','sign-in-required');
   const data=request.data;
-  if(!data||!['members','history','reason','list','mine','applications','ranking'].includes(data.action))fail('invalid-argument','invalid-team-read');
-  const allowed=data.action==='reason'?['action','teamId','historyId']:['list','ranking'].includes(data.action)?['action','query']:data.action==='mine'?['action']:data.action==='history'?['action','teamId','cursor']:['action','teamId'];
+  if(!data||!['members','history','reason','list','mine','applications','ranking','card-team'].includes(data.action))fail('invalid-argument','invalid-team-read');
+  const allowed=data.action==='reason'?['action','teamId','historyId']:['list','ranking'].includes(data.action)?['action','query']:data.action==='mine'?['action']:data.action==='card-team'?['action','targetUid']:data.action==='history'?['action','teamId','cursor']:['action','teamId'];
   if(Object.keys(data).some(k=>!allowed.includes(k)))fail('invalid-argument','unexpected-read-field');
   let user;try{user=await auth.getUser(uid);}catch(_){fail('unauthenticated','account-unavailable');}
   if(user.disabled)fail('permission-denied','account-disabled');
