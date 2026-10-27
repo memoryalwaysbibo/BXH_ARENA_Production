@@ -4,14 +4,15 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  if(!container||!ui||!controllers)throw Error('team-components-required');
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
-  container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='mine'?'mine':'lobby')+(state.screen==='mine'&&!state.loading&&!state.error?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&!state.error&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query}));
-  if(state.busy)for(const button of container.querySelectorAll('button[data-team-id]'))button.disabled=true;
+  container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':state.screen==='mine'?'mine':'lobby')+(state.screen==='create'&&!state.loading&&!state.error?ui.createTeam(state.team):state.screen==='mine'&&!state.loading&&!state.error?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&!state.error&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query}));
+  if(state.busy)for(const button of container.querySelectorAll('button'))button.disabled=true;
   if(state.error){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent=state.error;container.append(p);}
  }
  const click=async event=>{
   const button=event.target.closest('[data-team-action]');if(!button||!container.contains(button)||button.disabled)return;
   const action=button.dataset.teamAction,id=button.dataset.teamId;
   if(action==='tab'&&button.dataset.value==='mine')await controller.mine();
+  else if(action==='tab'&&button.dataset.value==='create')await controller.create();
   else if(action==='tab'&&button.dataset.value==='lobby')await controller.search(controller.snapshot().query);
   else if(action==='view')await controller.view(id);
   else if(action==='clear')await controller.clear();
@@ -20,6 +21,12 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  };
  const submit=async event=>{
   const form=event.target.closest('[data-team-form]');if(!form||!container.contains(form))return;
+  if(form.dataset.teamForm==='create'){
+   event.preventDefault();const data=new FormData(form),name=String(data.get('name')||'').trim();
+   if(name.length<2||name.length>24){form.reportValidity();return;}
+   if(!root.crypto?.randomUUID){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent='目前無法安全建立戰隊，請重新載入再試。';container.append(p);return;}
+   await controller.operate('create',root.crypto.randomUUID(),{name});return;
+  }
   if(form.dataset.teamForm==='admission'){
    event.preventDefault();const data=new FormData(form),team=controller.snapshot().team;
    if(team?.id)await controller.operate('admission',team.id,{policy:{mode:String(data.get('mode')||''),minLadderTier:String(data.get('minLadderTier')||'')||null,minTier:String(data.get('minTier')||'')||null}});return;
