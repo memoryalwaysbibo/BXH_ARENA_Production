@@ -1068,6 +1068,7 @@
       // Bracket progression fields — explicit list, not "progression fields"
       // as a vague catch-all: bracketSize, drawnAt, archiveStatus, and the
       // named result-slot ids below are the complete set.
+      bracketDraw: typeof state.bracketDraw?.id==='string'&&Number.isSafeInteger(state.bracketDraw.revision)&&state.bracketDraw.revision>0?{id:state.bracketDraw.id,revision:state.bracketDraw.revision}:null,
       bracketSize: state.bracketSize||0, drawnAt: state.drawnAt||null, archiveStatus: state.archiveStatus||"ongoing",
       startedAt: state.startedAt||null, completedAt: state.completedAt||null, archivedAt: state.archivedAt||null,
       ladderPointsAwarded: state.ladderPointsAwarded===true,

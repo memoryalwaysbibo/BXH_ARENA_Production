@@ -1,12 +1,16 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync('rdw-start/server-entry.cjs','utf8');
-function load(){const exports={},module={exports};const HttpsError=class extends Error{constructor(code,message){super(message);this.code=code;}};const mocks={
+function load(){const exports={},module={exports},composed=[],forwarded=[];const HttpsError=class extends Error{constructor(code,message){super(message);this.code=code;}};const mocks={
  'firebase-functions/v2/https':{onCall:(opts,fn)=>{assert.equal(opts.region,'asia-east1');assert.equal(opts.enforceAppCheck,true);return fn;},HttpsError},
  'firebase-admin/app':{getApps:()=>[],initializeApp:()=>({})},
+ '../scripts/lib/rdw-wired-ranked-start.cjs':{createWiredRankedStart:options=>{composed.push(options);return async args=>{forwarded.push(args);return {ok:true,mode:'rdw-verified'};};}},
  'firebase-admin/firestore':{getFirestore:()=>({})}};
  const ctx={exports,module,process:{env:{GCLOUD_PROJECT:'demo-rdw',FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099'}},require:name=>{if(!(name in mocks))throw Error(name);return mocks[name];}};
- vm.runInNewContext(source,ctx);return {fn:exports.rdwStartService,createHandler:module.exports.createHandler};}
+ vm.runInNewContext(source,ctx);return {fn:exports.rdwStartService,createHandler:module.exports.createHandler,createWiredHandler:module.exports.createWiredHandler,composed,forwarded};}
 test('callable is registered but never performs writes',async()=>{const {fn}=load();await assert.rejects(fn({auth:{uid:'test'},app:{appId:'test-app'},data:{eventCode:'BXH-SDSAQZ'}}),e=>e.code==='failed-precondition'&&e.message==='rdw-start-disabled');});
 test('missing auth rejected before feature gate',async()=>{const {fn}=load();await assert.rejects(fn({data:{}}),e=>e.code==='unauthenticated');});
 test('explicit enable without trusted start integration remains unavailable',async()=>{const {createHandler}=load();await assert.rejects(createHandler({enabled:true})({auth:{uid:'test'},app:{appId:'test-app'},data:{}}),e=>e.code==='unavailable');});
 test('missing App Check rejected before feature gate',async()=>{const {fn}=load();await assert.rejects(fn({auth:{uid:'test'},data:{eventCode:'BXH-SDSAQZ'}}),e=>e.code==='failed-precondition'&&e.message==='app-check-required');});
+
+test('wired callable uses only server bundle configuration and authenticated actor',async()=>{const f=load(),handler=f.createWiredHandler({enabled:true,bundleRoot:'/server/reviewed-hunter'});const out=await handler({auth:{uid:'verified-actor'},app:{appId:'verified-app'},data:{eventCode:'BXH-ABC123',drawRevision:7,expectedRosterRevision:4}});assert.equal(out.ok,true);assert.equal(f.composed[0].bundleRoot,'/server/reviewed-hunter');assert.equal(typeof f.composed[0].clock,'function');assert.equal(f.forwarded[0].actorUid,'verified-actor');assert.deepEqual(Object.keys(f.forwarded[0]).sort(),['actorUid','drawRevision','eventCode','expectedRosterRevision']);});
+test('wired callable refuses caller-supplied actor, tier, courts or bundle configuration',async()=>{const f=load(),handler=f.createWiredHandler({enabled:true,bundleRoot:'/server/reviewed-hunter'});for(const key of ['actorUid','tiers','courtAssignments','bundleRoot'])await assert.rejects(handler({auth:{uid:'verified-actor'},app:{appId:'verified-app'},data:{eventCode:'BXH-ABC123',drawRevision:7,expectedRosterRevision:4,[key]:'forged'}}),e=>e.code==='invalid-argument');assert.equal(f.forwarded.length,0);});
