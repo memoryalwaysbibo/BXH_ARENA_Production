@@ -6,5 +6,10 @@ test('ranking loads only after signed-in render, shows partial warning and escap
  assert.match(c.render(esc),/請先登入/);assert.equal(calls,0);uid='u';c.render(esc);await new Promise(setImmediate);const html=c.render(esc);assert.equal(calls,1);assert.match(html,/&lt;隊&gt;/);assert.match(html,/名次可能變動/);
 });
 test('changing account before response discards old ranking',async()=>{
- let uid='a',resolve;const c=create({identity:()=>uid,read:()=>new Promise(r=>{resolve=r;})});c.render(esc);uid=null;resolve({items:[{name:'OLD'}],total:1,excluded:0});await new Promise(setImmediate);assert.match(c.render(esc),/請先登入/);assert.doesNotMatch(c.render(esc),/OLD/);
+ let uid='a',resolve;const c=create({identity:()=>uid,read:()=>new Promise(r=>{resolve=r;})});c.render(esc);await Promise.resolve();uid=null;resolve({items:[{name:'OLD'}],total:1,excluded:0});await new Promise(setImmediate);assert.match(c.render(esc),/請先登入/);assert.doesNotMatch(c.render(esc),/OLD/);
+});
+test('first render defers change notification and ignores a queued load after account switch',async()=>{
+ let uid='a',calls=0,changes=0;const c=create({identity:()=>uid,read:async()=>{calls++;return {items:[],total:0,excluded:0};},onChange:()=>{changes++;c.render(esc);}});
+ c.render(esc);assert.equal(changes,0);uid='b';c.render(esc);await new Promise(setImmediate);
+ assert.equal(calls,1);assert.ok(changes>=1);
 });
