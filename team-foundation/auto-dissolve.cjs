@@ -34,7 +34,7 @@ function createAutoDissolver({db,clock=Date.now,newId=randomUUID,documentId}){
   const {anchor,...result}=await readBatch(null);return result;
  }
  // A bounded sweep advances even when all earlier candidates fail. The limit keeps
- // one invocation predictable; cross-invocation cursor persistence is still needed.
+ // one invocation predictable; the coordinator uses runSweepFrom for checkpoints.
  async function runSweep(){
   let cursor=null,examined=0,dissolved=0,failed=0,batches=0,mayHaveMore=false;
   while(batches<MAX_BATCHES){
