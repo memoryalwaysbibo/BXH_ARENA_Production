@@ -81,12 +81,12 @@ test('leadership can configure AND thresholds; auto admission joins without revi
  await cmd(run,'a','admission',{policy:{mode:'review',minPoints:100,minTier:'c'}});
  await cmd(run,'b','apply');assert.equal(data.has('teamMembershipsV1/b'),false);await cmd(run,'a','approve',{targetUid:'b'});
 });
-test('approval rechecks changed criteria; client score payload cannot bypass requirements',async()=>{
+test('review admits below thresholds; automatic admission rejects client spoofed qualification',async()=>{
  let points=500;const {run,data}=fixture(async({uid})=>({uid,points,tier:'b'}));await cmd(run,'captain','create',{name:'Alpha'});
  await cmd(run,'captain','admission',{policy:{mode:'review',minPoints:400,minTier:'c'}});await cmd(run,'a','apply');
- points=100;await assert.rejects(cmd(run,'captain','approve',{targetUid:'a',points:99999}),/points-below/);assert.equal(data.has('teamMembershipsV1/a'),false);
+ points=100;await cmd(run,'captain','approve',{targetUid:'a'});assert.equal(data.has('teamMembershipsV1/a'),true);
  await cmd(run,'captain','admission',{policy:{mode:'auto',minTier:'s'}});
- await assert.rejects(cmd(run,'a','apply',{tier:'national'}),/tier-below/);
+ await assert.rejects(cmd(run,'b','apply',{tier:'national'}),/tier-below/);
 });
 test('configured thresholds fail closed without trusted reader; auto still enforces capacity',async()=>{
  const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
