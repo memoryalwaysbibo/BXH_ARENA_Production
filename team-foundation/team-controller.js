@@ -5,6 +5,33 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
  if(!api||!['list','members','command','mine'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
  const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,busy:false,error:null,pending:false};
  let generation=0,disposed=false,pendingPayload=null;
+ // Only known server rejections prove the transaction did not commit.
+ const rejectionMessages={
+  'already-in-team':'你已有戰隊，請先確認目前的戰隊。',
+  'team-id-taken':'戰隊資料已存在，請重新整理後確認。',
+  'team-not-found':'找不到這支戰隊，請重新整理。',
+  'team-dissolved':'這支戰隊已解散。',
+  'team-full':'戰隊已滿員。',
+  'ladder-tier-below-minimum':'未達戰隊設定的天梯排位條件。',
+  'tier-below-minimum':'未達戰隊設定的獵人排位條件。',
+  'captain-required':'此操作需要隊長權限。',
+  'leadership-required':'此操作需要隊長或副隊長權限。',
+  'not-member':'你目前不是這支戰隊的成員。',
+  'transfer-captain-first':'請先轉移隊長職位。',
+  'team-must-be-solo':'解散前戰隊必須只剩隊長。',
+  'application-not-pending':'這筆申請已不在待審核狀態。',
+  'role-full':'此職位名額已滿。',
+  'frame-locked':'尚未解鎖此戰隊框。',
+  'account-disabled':'帳號無法使用此功能。',
+  'sign-in-required':'請先登入。',
+  'sign-in-again':'登入已過期，請重新登入。',
+  'teams-unavailable':'戰隊功能目前尚未開放。'
+ };
+ function rejection(error){
+  const code=String(error?.code||'').replace(/^functions\//,'');
+  const message=String(error?.message||'');
+  return ['invalid-argument','failed-precondition','permission-denied','unauthenticated'].includes(code)&&Object.hasOwn(rejectionMessages,message)?rejectionMessages[message]:null;
+ }
  const snapshot=()=>structuredClone(state);
  const emit=()=>{if(!disposed)onChange(snapshot());};
  async function load(screen,payload){
@@ -31,9 +58,10 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
    pendingPayload=null;state.pending=false;
    if(!disposed&&generation===requestGeneration){if(payload.action==='admission'||payload.action==='create')await load('mine',{});else await search(state.query);}
    return {ok:true};
-  }catch(_){
-   if(!disposed){pendingPayload=payload;state.pending=true;state.error='操作結果尚未確認，可重試同一筆操作。';emit();}
-   return {ok:false,reason:'unconfirmed'};
+  }catch(error){
+   const rejected=rejection(error);
+   if(!disposed){pendingPayload=rejected?null:payload;state.pending=!rejected;state.error=rejected||'操作結果尚未確認，可重試同一筆操作。';emit();}
+   return {ok:false,reason:rejected?'rejected':'unconfirmed'};
   }finally{if(!disposed){state.busy=false;emit();}}
  }
  async function operate(action,teamId,extra={}){
