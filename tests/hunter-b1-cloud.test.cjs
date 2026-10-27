@@ -124,3 +124,16 @@ test('archived referee test room is explicitly tagged even with official ranked 
  api.queryMyRegistrations=async()=>[{tournamentCode:'BXH-BMFT9Z',localPlayerId:'self'}];
  assert.equal((await api.queryMyHunterMatches()).records[0].testMode,true);
 });
+
+test('owner-authorized deleted room never reads a stale mirror or creates a history gap',async()=>{
+ const {api,publicReads}=setup({players:[]});
+ api.queryMyRegistrations=async()=>[{tournamentCode:'BXH-F8FQQR',status:'cancelled',localPlayerId:'self'}];
+ const r=await api.queryMyHunterMatches();assert.equal(r.records.length,0);assert.equal(r.skipped.length,0);assert.equal(publicReads(),0);
+});
+test('failed registration reads for the removed room do not block unrelated official history',async()=>{
+ const {api}=setup();api.queryMyRegistrations=async()=>Object.assign([{tournamentCode:'BXH-TEST',localPlayerId:'self'}],
+  {partial:true,failedReads:[{code:'BXH-F8FQQR',reason:'unavailable'}]});
+ const r=await api.queryMyHunterMatches();assert.equal(r.records.length,1);assert.equal(r.skipped.length,0);
+ api.queryMyRegistrations=async()=>Object.assign([],{partial:true,failedReads:[{code:'BXH-OTHER',reason:'unavailable'}]});
+ assert.equal((await api.queryMyHunterMatches()).skipped[0].code,'BXH-OTHER');
+});

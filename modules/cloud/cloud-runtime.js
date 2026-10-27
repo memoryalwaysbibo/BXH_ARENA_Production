@@ -2189,8 +2189,8 @@
       if(!uid) throw new Error("hunter-auth-required");
       const records=[],skipped=[];
       const regs=await this.queryMyRegistrations({force:options.force===true});
-      (regs.failedReads||[]).forEach(row=>skipped.push({code:row.code,reason:"registration-read-failed",readCode:row.reason,eventDate:row.eventDate,eventName:row.eventName}));
-      if(regs.partial===true&&!skipped.length)skipped.push({reason:"registration-read-failed",readCode:"incomplete-scan"});
+      (regs.failedReads||[]).filter(row=>!window.BXHDomainUtils.hunterRecordIsRemoved({eventCode:row.code})).forEach(row=>skipped.push({code:row.code,reason:"registration-read-failed",readCode:row.reason,eventDate:row.eventDate,eventName:row.eventName}));
+      if(regs.partial===true&&!skipped.length&&!(regs.failedReads||[]).length)skipped.push({reason:"registration-read-failed",readCode:"incomplete-scan"});
       // Cancellation must not erase a completed historical match.
       const selfRegs=(regs||[]).filter(r=>r&&!r.familyPlayerId);
       const seenCodes=new Set();
@@ -2199,7 +2199,7 @@
 
       for(const reg of selfRegs){
         const code=String(reg.tournamentCode||"").toUpperCase();
-        if(!code||seenCodes.has(code)) continue;
+        if(!code||seenCodes.has(code)||window.BXHDomainUtils.hunterRecordIsRemoved({eventCode:code})) continue;
         seenCodes.add(code);
         try{
           const snap=personalPublicDocs.get(code)||await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
@@ -3906,6 +3906,3 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
-
-
-
