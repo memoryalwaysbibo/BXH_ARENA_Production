@@ -5996,7 +5996,7 @@ function isCurrentOfficialTournamentCreator(){
   return !!(uid && state && state.meta && state.meta.eventAuthority!=="community" && state.createdBy===uid);
 }
 // Enable only after both partner-aware Callables pass deployed-source review.
-const PARTNER_REFEREE_SEATS_ROLLOUT = false;
+const PARTNER_REFEREE_SEATS_ROLLOUT = true;
 function isPartnerRefereeSeatRoom(st=state){return st?.createdByRole==='partner_organizer';}
 function canManageRefereeSeats(st=state){
   if(isPartnerRefereeSeatRoom(st)&&!PARTNER_REFEREE_SEATS_ROLLOUT)return false;
