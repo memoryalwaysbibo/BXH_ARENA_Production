@@ -17,7 +17,7 @@ function create({read,identity,onChange=()=>{}}){
  function render(esc){
   sync();if(!uid)return '<section><h2>戰隊排行</h2><p>請先登入後查看。</p></section>';
   if(!loaded&&!loading&&!error&&!scheduled){scheduled=true;const owner=uid,call=ticket;queueMicrotask(()=>{if(call!==ticket||owner!==(identity()||null))return;scheduled=false;if(!loaded&&!loading&&!error)void load();});}
-  const rows=items.map(x=>'<tr><td>'+esc(x.rank)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.captainName)+'</td><td>'+esc(x.memberCount)+'</td><td>'+esc(x.strength)+'</td></tr>').join('');
+  const rows=items.map(x=>'<tr><td>'+esc(x.rank)+'</td><td><div class="team-identity'+([4,7,10].includes(x.selectedFrame)?' team-frame-'+x.selectedFrame:'')+'">'+esc(x.name)+'</div></td><td>'+esc(x.captainName)+'</td><td>'+esc(x.memberCount)+'</td><td>'+esc(x.strength)+'</td></tr>').join('');
   return '<section class="bxh-team-ui">'+(root.BXHTeamUI?.css?'<style>'+root.BXHTeamUI.css+'</style>':'')+'<h2>戰隊排行</h2><p>依戰隊成員本賽季天梯積分總和排序；同分並列。</p><button type="button" data-action="team-ranking-refresh"'+(loading?' disabled':'')+'>重新整理</button>'+(loading?'<p role="status">正在載入戰隊排行…</p>':error?'<p role="alert">'+esc(error)+'</p>':(partial?'<p role="status">'+esc(excluded)+' 支戰隊資料更新中，目前名次可能變動。</p>':'')+(items.length?'<div class="team-table-scroll"><table><thead><tr><th>排名</th><th>戰隊</th><th>隊長</th><th>人數</th><th>戰力</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p>目前沒有可列入排行的戰隊。</p>')+(offset>0?'<button type="button" data-action="team-ranking-prev">上一頁</button>':'')+(offset+items.length<total?'<button type="button" data-action="team-ranking-next">下一頁</button>':''))+'</section>';
  }
  return {render,refresh:()=>load(0),next:()=>load(offset+20),previous:()=>load(Math.max(0,offset-20))};
