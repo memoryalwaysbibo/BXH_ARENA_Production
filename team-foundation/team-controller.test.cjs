@@ -89,3 +89,8 @@ test('role assignment sends selected target and reloads member management',async
  let reads=0,payload;const c=setup({mine:async()=>({team:{id:'t',role:'captain'}}),members:async()=>{reads++;return {id:'t',members:[]};},command:async p=>(payload=p,{ok:true})});
  await c.manage('t');await c.operate('assign','t',{targetUid:'m',role:'elite'});assert.equal(payload.targetUid,'m');assert.equal(payload.role,'elite');assert.equal(reads,2);
 });
+
+test('captain transfer sends the target and returns to updated my-team view',async()=>{
+ let payload,role='captain';const c=setup({mine:async()=>({team:{id:'t',role}}),members:async()=>({id:'t',members:[]}),command:async p=>{payload=p;role='member';return {ok:true};}});
+ await c.manage('t');await c.operate('transfer','t',{targetUid:'new'});assert.equal(payload.targetUid,'new');assert.equal(payload.action,'transfer');assert.equal(c.snapshot().screen,'mine');assert.equal(c.snapshot().team.role,'member');
+});
