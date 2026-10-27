@@ -45,8 +45,10 @@ function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolv
     return {ok:true,rosterUids:state.players.map(p=>p?.uid)};
    });
    if(!preflight.ok)return {ok:false,code:preflight.reason};
+   const resolutionStartedAt=clock();
+   const verifiedTiers=await resolveVerifiedTiers({eventCode,drawRevision,rosterUids:preflight.rosterUids,capturedAt:resolutionStartedAt});
+   // Tier readers stamp completion time. Capture only after all reads finish.
    const capturedAt=clock();
-   const verifiedTiers=await resolveVerifiedTiers({eventCode,drawRevision,rosterUids:preflight.rosterUids,capturedAt});
    try{snapshotCandidate=buildRosterSnapshot({eventCode,drawRevision,rosterUids:preflight.rosterUids,verifiedTiers,capturedAt});}
    catch{return {ok:false,code:'hunter-tiers-unverified'};}
   }
