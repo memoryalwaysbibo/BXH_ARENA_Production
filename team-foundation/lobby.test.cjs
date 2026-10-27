@@ -14,7 +14,7 @@ test('join statuses respect membership, pending, capacity and auto eligibility',
  assert.equal(joinState(t,{membershipTeamId:'b'}).label,'已有所屬戰隊');assert.equal(joinState(t,{pendingTeamIds:['a']}).label,'審核中');
  assert.equal(joinState({...t,memberCount:10}).label,'已滿員');
  const restricted={...t,admission:{mode:'auto',minLadderTier:'黃金',minTier:'b'}};
- assert.equal(joinState(restricted).label,'資格待確認');assert.equal(joinState(restricted,{player:{ladderPoints:299,hunterTier:'b'}}).label,'未達條件');
+ assert.deepEqual(joinState(restricted),{label:'加入',disabled:false,action:'join'});assert.equal(joinState(restricted,{player:{ladderPoints:299,hunterTier:'b'}}).label,'未達條件');
  assert.equal(joinState({...restricted,admission:{...restricted.admission,mode:'review'}}).action,'apply');
 });
 test('search and combined filters work for already affiliated viewers',()=>{
