@@ -78,3 +78,9 @@ test('history navigation returns to the previous page and refresh resets to newe
  await c.historyPrevious();assert.equal(c.snapshot().historyPage,1);assert.equal(c.snapshot().items[0].name,'first');
  await c.historyNext();await c.history('team');assert.equal(c.snapshot().historyPage,1);assert.deepEqual(requests.map(x=>x.cursor||null),[null,'next',null,'next',null]);
 });
+test('member management verifies own team and refreshes after removal',async()=>{
+ let reads=0,payload;const c=setup({mine:async()=>({team:{id:'t',role:'captain'}}),members:async()=>{reads++;return {id:'t',members:[]};},command:async p=>(payload=p,{ok:true})});
+ assert.equal((await c.manage('t')).ok,true);await c.operate('remove','t',{targetUid:'m',reasonCode:'other',reasonNote:'原因'});
+ assert.equal(reads,2);assert.equal(payload.reasonNote,'原因');assert.equal(c.snapshot().screen,'manage');
+ const no=setup({mine:async()=>({team:{id:'t',role:'member'}})});assert.equal((await no.manage('t')).reason,'load-failed');
+});
