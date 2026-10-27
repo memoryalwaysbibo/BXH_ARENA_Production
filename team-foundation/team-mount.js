@@ -32,6 +32,11 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  };
  const submit=async event=>{
   const form=event.target.closest('[data-team-form]');if(!form||!container.contains(form))return;
+  if(form.dataset.teamForm==='assign'){
+   event.preventDefault();const role=String(new FormData(form).get('role')||'');
+   if(!['member','elite','deputy'].includes(role))return;
+   await controller.operate('assign',form.dataset.teamId,{targetUid:form.dataset.targetUid,role});return;
+  }
   if(form.dataset.teamForm==='remove'){
    event.preventDefault();const data=new FormData(form),reasonCode=String(data.get('reasonCode')||''),reasonNote=String(data.get('reasonNote')||'').trim();
    const note=form.querySelector('[name="reasonNote"]');note.setCustomValidity(reasonCode==='other'&&!reasonNote?'請填寫移除原因。':'');
