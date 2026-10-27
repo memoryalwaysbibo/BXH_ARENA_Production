@@ -19,3 +19,7 @@ test('switching signed-in accounts disposes the previous team state',()=>{
  let uid='a',destroys=0,mounts=0;const host=createTeamHost({container:{replaceChildren(){}},isEnabled:()=>true,getIdentity:()=>uid,apiFactory:()=>({}),component:{mount:()=>{mounts++;return {destroy(){destroys++;}};}}});
  host.open();uid='b';host.sync();assert.equal(destroys,1);host.open();assert.equal(mounts,2);
 });
+test('host routes a public team view and the lobby through the mounted controller',async()=>{
+ const calls=[],host=createTeamHost({container:{replaceChildren(){}},isEnabled:()=>true,getIdentity:()=>'u',apiFactory:()=>({}),component:{mount:()=>({destroy(){},controller:{view:async id=>{calls.push(['view',id]);return {ok:true};},search:async q=>{calls.push(['search',q]);return {ok:true};}}})}});
+ assert.equal((await host.navigate('t')).ok,true);assert.equal((await host.navigate(null)).ok,true);assert.deepEqual(calls,[['view','t'],['search',{}]]);
+});
