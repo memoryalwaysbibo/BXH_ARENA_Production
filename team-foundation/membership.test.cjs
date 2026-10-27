@@ -39,7 +39,7 @@ test('cancel, reject and remove close applications or memberships',async()=>{
  const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});await cmd(run,'player','apply');await cmd(run,'player','cancel');
  await assert.rejects(cmd(run,'captain','approve',{targetUid:'player'}),/not-pending/);
  await cmd(run,'player','apply');await cmd(run,'captain','reject',{targetUid:'player'});await cmd(run,'player','apply');
- await cmd(run,'captain','approve',{targetUid:'player'});await cmd(run,'captain','remove',{targetUid:'player'});
+ await cmd(run,'captain','approve',{targetUid:'player'});await cmd(run,'captain','remove',{reasonCode:'adjustment',targetUid:'player'});
  assert.equal(data.has('teamMembershipsV1/player'),false);
 });
 test('deputy reviews applications; transfer clears old captain role',async()=>{
@@ -47,8 +47,8 @@ test('deputy reviews applications; transfer clears old captain role',async()=>{
  for(const uid of ['a','b']){await cmd(run,uid,'apply');await cmd(run,'captain','approve',{targetUid:uid});}
  await cmd(run,'captain','assign',{targetUid:'a',role:'deputy'});
  await cmd(run,'new','apply');await cmd(run,'a','approve',{targetUid:'new'});
- await assert.rejects(cmd(run,'a','remove',{targetUid:'captain'}));
- await cmd(run,'a','remove',{targetUid:'new'});
+ await assert.rejects(cmd(run,'a','remove',{reasonCode:'adjustment',targetUid:'captain'}));
+ await cmd(run,'a','remove',{reasonCode:'adjustment',targetUid:'new'});
  await cmd(run,'captain','transfer',{targetUid:'a'});
  assert.deepEqual(data.get('teamsV1/alpha').roles,{captain:'member',a:'captain',b:'member'});
 });
@@ -94,4 +94,12 @@ test('configured thresholds fail closed without trusted reader; auto still enfor
  await cmd(run,'captain','admission',{policy:{mode:'auto'}});
  data.get('teamsV1/alpha').memberUids.push(...Array.from({length:9},(_,i)=>'u'+i));await assert.rejects(cmd(run,'a','apply'),/team-full/);
  await assert.rejects(cmd(run,'captain','admission',{policy:{mode:'auto',minTier:'fake'}}),/invalid-min-tier/);
+});
+test('removal writes public history and separate private reason atomically',async()=>{
+ const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});await cmd(run,'a','apply');await cmd(run,'captain','approve',{targetUid:'a'});
+ const before=JSON.stringify([...data]);await assert.rejects(cmd(run,'captain','remove',{targetUid:'a',reasonCode:'other',reasonNote:' '}),/other-reason-required/);assert.equal(JSON.stringify([...data]),before);
+ await cmd(run,'captain','remove',{targetUid:'a',reasonCode:'other',reasonNote:'測試原因'});
+ const histories=[...data].filter(([key])=>key.includes('/history/')).map(([,v])=>v);
+ assert.equal(histories.filter(x=>x.method==='approve').length,1);const removed=histories.find(x=>x.method==='remove');assert.equal(removed.subjectUid,'a');assert.equal(removed.actorRole,'captain');assert.equal(JSON.stringify(histories).includes('測試原因'),false);
+ assert.equal([...data].filter(([key])=>key.includes('/historyReasons/'))[0][1].note,'測試原因');
 });
