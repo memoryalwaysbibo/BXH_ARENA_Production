@@ -22,3 +22,7 @@ test('emblem upload uses the dedicated authenticated callable',async()=>{
  const calls=[],api=createTeamApiFromEngagement({engagementService:{tournamentOperation:async(name,payload)=>(calls.push({name,payload}),{ok:true})}});
  const payload={teamId:'t',requestId:'request-1234567890',contentType:'image/webp',base64:'YWJj'};await api.uploadEmblem(payload);assert.deepEqual(calls,[{name:'teamEmblemUpload',payload}]);
 });
+test('emblem read uses teamRead and only the selected team ID',async()=>{
+ const calls=[],api=createTeamApiFromEngagement({engagementService:{tournamentOperation:async(name,payload)=>(calls.push({name,payload}),{image:null})}});
+ await api.emblem({teamId:'t'});assert.deepEqual(calls,[{name:'teamRead',payload:{action:'emblem',teamId:'t'}}]);
+});
