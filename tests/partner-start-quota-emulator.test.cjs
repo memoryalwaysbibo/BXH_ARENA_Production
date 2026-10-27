@@ -11,14 +11,15 @@ const {writeSynchronizedStart}=require('../scripts/lib/rdw-synchronized-start-re
 const {createAuthorizedMirrorStart}=require('../scripts/lib/rdw-authorized-mirror-start.cjs');
 const {buildRosterSnapshot}=require('../scripts/lib/rdw-roster-tier-snapshot.cjs');
 const {createHunterVerifiedRankedStart}=require('../scripts/lib/rdw-hunter-start-wiring.cjs');
+const {createWiredRankedStart}=require('../scripts/lib/rdw-wired-ranked-start.cjs');
 const {EXPECTED_FILES}=require('../scripts/lib/rdw-hunter-bundle-loader.cjs');
 after(()=>deleteApp(app));
 const uid=()=>randomBytes(8).toString('hex'),eventCode=()=>'BXH-'+randomBytes(3).toString('hex').toUpperCase();
 const tiers=(uids,now)=>uids.map(uid=>({ok:true,uid,tier:'d',computedAt:now-2000,sourceScope:'public-official-canonical-self-history-v1',sourceDigest:'a'.repeat(64)}));
 async function fixture(options={}){
  const code=eventCode(),owner=options.shared?.owner||uid(),order=options.shared?.order||'BXH-CO-20261027-'+randomBytes(6).toString('hex').toUpperCase(),now=Date.now();
- const players=[{id:'p1',uid:uid()},{id:'p2',uid:uid()}],matches=[{id:'m1',a:{playerId:'p1'},b:{playerId:'p2'},completed:false}];
- const state={cloudCode:code,createdBy:owner,registrationRosterRevision:4,meta:{ladderMode:'ranked',eventAuthority:'official',stations:1},players,matches,drawnAt:now-3000,startedAt:null,rosterLocked:false};
+ const players=[{id:'p1',uid:uid()},{id:'p2',uid:uid()}],matches=[{id:'m1',a:{playerId:'p1'},b:{playerId:'p2'},completed:false,station:1,bracket:'SE',round:0,indexInRound:0,seq:1,scoreA:0,scoreB:0,log:[],faultActions:[],winnerId:null,loserId:null,status:'ready',startedAt:null}];
+ const state={cloudCode:code,createdBy:owner,registrationRosterRevision:4,bracketSize:2,bracketDraw:{id:'synthetic-draw',revision:7},meta:{ladderMode:'ranked',eventAuthority:'official',formatType:'single',stations:1},players,matches,drawnAt:now-3000,startedAt:null,rosterLocked:false};
  const grant={status:'active',scope:'contract',rankedMode:true,organizationId:'org',orderCode:order,startsAtMs:now-86400000,expiresAtMs:now+86400000};
  const profile={uid:owner,role:'player',active:true,isTestAccount:false,partnerOrganizer:grant,partnerContractOrderCode:order};
  const contract={orderCode:order,status:'active',quotaPolicy:'start-v1',targetUid:owner,organizationCode:'org',signedBy:owner,signatureHash:'a'.repeat(64),termsHash:'b'.repeat(64),termsVersion:1,paymentReference:'SYNTHETIC',startsAt:new Date(grant.startsAtMs).toISOString(),expiresAt:new Date(grant.expiresAtMs).toISOString(),includedEvents:1,usedEvents:0,minParticipants:2,maxParticipants:32,...options.contract};
@@ -95,4 +96,13 @@ test('full Hunter composition creates a fresh sealed snapshot, dispatch and quot
  const first=await start(f.request);assert.equal(first.ok,true);assert.equal(first.replayed,false);
  const v=await read(f);assert.equal(v.counter,1);assert.equal(v.snapshot.exists,true);assert.equal(v.snapshot.data().capturedAt,f.now);assert.equal(v.room.partnerQuotaDebit.snapshotDigest,v.snapshot.data().snapshotDigest);assert.equal(v.publicState.startedAt,f.now);
  const again=await start(f.request);assert.equal(again.ok,true);assert.equal(again.replayed,true);assert.equal(dispatches,1);assert.equal((await read(f)).counter,1);
+});
+
+test('concrete wired start uses real bracket reader and real engine, locks registration and debits once',async t=>{
+ const f=await fixture({newSnapshot:true}),bundleRoot=fs.mkdtempSync(path.join(os.tmpdir(),'partner-wired-emulator-'));t.after(()=>fs.rmSync(bundleRoot,{recursive:true,force:true}));fs.mkdirSync(path.join(bundleRoot,'vendor'));
+ const reader="module.exports={createReader:()=>async({uid})=>({uid,version:'hunter-license-v2.1',complete:true,unresolvedIdentities:0,sourceDigest:'a'.repeat(64),sourceScope:'public-official-canonical-self-history-v1',overview:{grade:{tier:'d'}}})};";const manifest={};for(const name of EXPECTED_FILES){const value=name==='reader.cjs'?reader:'{}';fs.writeFileSync(path.join(bundleRoot,name),value);manifest[name]=createHash('sha256').update(value).digest('hex');}fs.writeFileSync(path.join(bundleRoot,'bundle-manifest.json'),JSON.stringify(manifest));
+ f.state.meta.checkinRequired=true;f.state.meta.registrationStatus='open';f.state.matches[0].refereeUid='private-referee';f.state.courtAssignments={court1:{currentMatchId:'m1',nextMatchId:null,lockedBy:'private-referee',lockedAt:100}};
+ await Promise.all([f.r.eventRef.update({data:JSON.stringify(f.state),registrationStatus:'open'}),f.r.publicRef.update({bracketView:JSON.stringify({...f.state,players:f.state.players.map(p=>({id:p.id}))}),registrationStatus:'open'}),...f.state.players.map(p=>db.doc('users/'+p.uid).set({uid:p.uid,active:true,role:'player'}))]);
+ const start=createWiredRankedStart({db,clock:()=>f.now,bundleRoot,enabled:true});assert.equal((await start(f.request)).ok,true);const v=await read(f);assert.equal(v.counter,1);assert.equal(v.room.registrationStatus,'started');assert.equal(v.room.tournamentPhase,'live');for(const state of [v.privateState,v.publicState]){assert.equal(state.meta.registrationStatus,'started');assert.equal(state.meta.checkinClosedEarly,true);assert.equal(state.meta.checkinClosedAt,f.now);assert.equal(state.matches[0].status,'in_progress');assert.equal(state.courtAssignments.court1.status,'in_progress');}
+ assert.equal(v.privateState.matches[0].startedAt,f.now);assert.equal(v.privateState.matches[0].refereeUid,'private-referee');assert.ok(!JSON.stringify(v.publicState).includes('private-referee'));assert.equal((await f.r.publicRef.get()).data().registrationStatus,'started');assert.equal((await start(f.request)).replayed,true);assert.equal((await read(f)).counter,1);
 });

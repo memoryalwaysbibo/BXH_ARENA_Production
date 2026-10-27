@@ -39,3 +39,11 @@ function createHandler({enabled=false,start}={}){
 }
 exports.rdwStartService=onCall({region:'asia-east1',enforceAppCheck:true,timeoutSeconds:60,maxInstances:5},createHandler());
 module.exports.createHandler=createHandler;
+
+// Build-time server dependencies only. The registered production export above
+// remains disabled until the private runtime and release gates are verified.
+function createWiredHandler({bundleRoot,enabled=false}={}){
+ const {createWiredRankedStart}=require('../scripts/lib/rdw-wired-ranked-start.cjs');
+ return createHandler({enabled,start:createWiredRankedStart({db,clock:()=>Date.now(),bundleRoot,enabled})});
+}
+module.exports.createWiredHandler=createWiredHandler;

@@ -4,6 +4,7 @@
 // Mutates only legacy private JSON and public bracketView in ONE transaction.
 // This narrow writer is NOT sufficient for production start until court assignments,
 // bracket signature, and original client saveState transition are fully replicated.
+const {publicStartView}=require('./rdw-public-start-view.cjs');
 const {compareMirrors}=require('./rdw-private-public-mirror-gate.cjs');
 const {validateSealedSnapshot}=require('./rdw-sealed-snapshot-verifier.cjs');
 const {verifyStartDispatch}=require('./rdw-start-dispatch-gate.cjs');
@@ -41,16 +42,20 @@ async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCo
  // A start without server-computed dispatch must never become a persisted start.
  // Candidate must be created by an audited server dispatcher, never by the caller.
  if(!dispatchCandidate||typeof dispatchCandidate!=='object')return {committed:false,reason:'server-dispatch-unavailable'};
- const dispatchProof=verifyStartDispatch({before:p,after:dispatchCandidate,stationCount:p.meta?.stations});
+ const liveDispatch=dispatchCandidate.source==='server'&&dispatchCandidate.verified===true;
+ if(liveDispatch&&dispatchCandidate.startedAt!==serverTime)return {committed:false,reason:'dispatch-clock-mismatch'};
+ const dispatchProof=verifyStartDispatch({before:p,after:dispatchCandidate,stationCount:p.meta?.stations,requireLive:liveDispatch,serverTime});
  if(!dispatchProof.ok)return {committed:false,reason:dispatchProof.reason};
  if(!snapshotSnap.exists&&typeof tx.create!=='function')throw Error('trusted-snapshot-create-required');
- const nextPrivate={...p,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
- const nextPublic={...q,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime};
+ const registrationPatch={registrationStatus:'started',...(p.meta.checkinRequired?{checkinClosedEarly:true,checkinClosedAt:Number.isSafeInteger(p.meta.checkinClosedAt)&&p.meta.checkinClosedAt>0&&p.meta.checkinClosedAt<=serverTime?p.meta.checkinClosedAt:serverTime}:{})};
+ const projected=publicStartView(dispatchCandidate);
+ const nextPrivate={...p,meta:{...p.meta,...registrationPatch},updatedAt:serverTime,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
+ const nextPublic={...q,meta:{...(q.meta||{}),...registrationPatch},...projected,startedAt:serverTime};
  // No tx reads after this point. New snapshot and both mirrors commit together.
  if(!snapshotSnap.exists)tx.create(snapshotRef,snapshotCandidate);
  if(quota)quota.apply(tx);
- tx.update(eventRef,{data:JSON.stringify(nextPrivate),updatedAt:serverTime,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest,...(quota?{partnerQuotaDebit:quota.receipt,partnerStartState:"started",partnerStartedAt:serverTime}:{})});
- tx.update(publicRef,{bracketView:JSON.stringify(nextPublic),updatedAt:serverTime,...(quota?{partnerQuotaPolicy:"start-v1",partnerStartState:"started",partnerStartedAt:serverTime,rdwSnapshotDigest:sealed.snapshotDigest}:{})});
+ tx.update(eventRef,{data:JSON.stringify(nextPrivate),updatedAt:serverTime,registrationStatus:'started',tournamentPhase:'live',rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest,...(quota?{partnerQuotaDebit:quota.receipt,partnerStartState:"started",partnerStartedAt:serverTime}:{})});
+ tx.update(publicRef,{bracketView:JSON.stringify(nextPublic),updatedAt:serverTime,registrationStatus:'started',tournamentPhase:'live',...(quota?{partnerQuotaPolicy:"start-v1",partnerStartState:"started",partnerStartedAt:serverTime,rdwSnapshotDigest:sealed.snapshotDigest}:{})});
  return {committed:true,mode:'rdw-verified',...(quota?{replayed:false,startedAt:serverTime}:{})};
 }
 module.exports={writeSynchronizedStart};
