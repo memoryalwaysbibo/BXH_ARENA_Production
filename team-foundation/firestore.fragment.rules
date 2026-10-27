@@ -9,5 +9,6 @@ match /teamMembershipsV1/{uid} { allow read, write: if false; }
 match /teamsPublicV1/{teamId} { allow read, write: if false; }
 
 match /teamOperationReceiptsV1/{receiptId} { allow read, write: if false; }
+match /teamActivityReceiptsV1/{receiptId} { allow read, write: if false; }
 match /teamProjectionControlV1/{controlId} { allow read, write: if false; }
 match /teamDissolutionControlV1/{controlId} { allow read, write: if false; }
