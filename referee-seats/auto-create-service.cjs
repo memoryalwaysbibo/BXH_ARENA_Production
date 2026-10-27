@@ -34,7 +34,9 @@ function createHandler(db,{clock=Date.now}={}){
     'registrationEnabled','registrationOpenAt','registrationCloseAt','registrationStatus',
     'capacity','waitlistEnabled','waitlistCapacity','confirmedCount','waitlistCount',
     'registrationVisibility','publishedAt','eventDate','checkInAt','startAt','fee',
-    'timezone','assignedStaffUids','tournamentPhase','location','battleMode','teamSize',
+    'timezone','assignedStaffUids','refereeStationAssignments','refereeStationNames',
+    'refereeStationUids','refereeStationRestrictionEnabled',
+    'tournamentPhase','location','battleMode','teamSize',
     'playMode','formatType','name','ladderMode','targetGroup','participantNameMode',
     'eventCancelled','cancellationDeadline','eventDescription','registrationNotes',
     'eventAuthority','hostName']);
@@ -47,10 +49,16 @@ function createHandler(db,{clock=Date.now}={}){
    if(state.ownerUid&&state.ownerUid!==uid)err('owner-mismatch');
    if(original.ownerUid&&original.ownerUid!==uid)err('owner-mismatch');
    if(state.createdByRole&&state.createdByRole!==user.role)err('owner-role-mismatch');
-   const forbiddenPrivate=['refereeSeatsV1','refereeSeatNames','refereeStationUids','refereeStationAssignments','refereeStationNames','refereeStationRestrictionEnabled'];
-   if(forbiddenPrivate.some(k=>Object.hasOwn(original,k)))err('protected-create-field');
+   // The current client createRoom payload includes empty legacy referee
+   // fields. Accept only their inert defaults, then overwrite them atomically
+   // with the canonical three-seat projection; reject forged nonempty values.
+   if(['refereeSeatsV1','refereeSeatNames'].some(k=>Object.hasOwn(original,k)))err('protected-create-field');
+   for(const k of ['refereeStationAssignments','refereeStationNames'])
+    if(Object.hasOwn(original,k)&&(original[k]===null||typeof original[k]!=='object'||Array.isArray(original[k])||Object.keys(original[k]).length))err('protected-create-field');
+   if(Object.hasOwn(original,'refereeStationUids')&&(!Array.isArray(original.refereeStationUids)||original.refereeStationUids.length))err('protected-create-field');
+   if(original.refereeStationRestrictionEnabled===true)err('protected-create-field');
    if(['refereeSeatsV1','refereeSeatNames','refereeStationUids'].some(k=>Object.hasOwn(state.meta,k)))err('protected-create-field');
-   if(state.meta.refereeStationRestrictionEnabled===true)err('protected-create-field');
+   if(state.meta.refereeStationRestrictionEnabled===true||Object.keys(state.meta.refereeStationNames||{}).length)err('protected-create-field');
    if(state.meta.refereeStationAssignments&&Object.values(state.meta.refereeStationAssignments).some(x=>Array.isArray(x)&&x.length))err('legacy-assignments-exist');
    if(!Array.isArray(state.players)||!Array.isArray(state.matches)||!Array.isArray(state.teams||[])||
       state.players.length||state.matches.length||(state.teams||[]).length||

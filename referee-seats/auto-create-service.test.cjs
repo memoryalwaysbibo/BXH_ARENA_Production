@@ -101,3 +101,25 @@ test('privileged create fields cannot bypass client Firestore rules',async()=>{
   await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,...patch}}),/protected-create-field/);
  assert(!h.docs.has('tournaments/BXH-ABCD12'));
 });
+
+test('production createRoom empty legacy referee defaults are normalized to three-seat projection',async()=>{
+ const h=harness(),p=h.payload,state=JSON.parse(p.privatePayload.data);
+ state.meta.refereeStationAssignments={};
+ state.meta.refereeStationNames={};
+ state.meta.refereeStationRestrictionEnabled=false;
+ const privatePayload={...p.privatePayload,
+  refereeStationAssignments:{},refereeStationNames:{},refereeStationUids:[],
+  refereeStationRestrictionEnabled:false,data:JSON.stringify(state)};
+ const out=await h.run('admin',{privatePayload});
+ assert.equal(out.ok,true);
+ const doc=h.docs.get('tournaments/BXH-ABCD12');
+ assert.deepEqual(doc.refereeStationAssignments['1'],['admin']);
+ assert.equal(doc.refereeStationRestrictionEnabled,true);
+ assert.equal(JSON.parse(doc.data).meta.refereeSeatsV1.version,1);
+});
+test('forged nonempty legacy referee defaults remain rejected',async()=>{
+ const h=harness(),p=h.payload;
+ for(const patch of [{refereeStationAssignments:{1:['forged']}},{refereeStationNames:{1:['forged']}},{refereeStationUids:['forged']},{refereeStationRestrictionEnabled:true}])
+  await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,...patch}}),/protected-create-field/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));
+});
