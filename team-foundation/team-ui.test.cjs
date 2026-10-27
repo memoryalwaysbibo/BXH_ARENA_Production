@@ -5,6 +5,11 @@ test('lobby escapes names and IDs and maintains disabled state',()=>{
  const html=ui.lobby({total:1,items:[{id:'"><script>',name:'<img onerror=x>',captainName:'<script>',strength:10,memberCount:10,capacity:10,join:{label:'已滿員',disabled:true}}]});
  assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<script>'));assert.ok(html.includes(' disabled'));assert.ok(html.includes('清除篩選'));
 });
+test('lobby team frames render known variants and ignore arbitrary values',()=>{
+ const item={id:'t',name:'隊伍',captainName:'隊長',memberCount:2,capacity:10,join:{label:'加入',disabled:false}};
+ assert.match(ui.lobby({items:[{...item,selectedFrame:7}]}),/team-identity team-frame-7/);
+ assert.doesNotMatch(ui.lobby({items:[{...item,selectedFrame:'evil'}]}),/team-frame-evil/);
+});
 test('member screen never interpolates private supplied fields',()=>{
  const html=ui.publicMembers({name:'隊伍',members:[{name:'小A',role:'captain',ladderPoints:12,hunterTier:'b',lastSeenAt:'PRIVATE',reason:'SECRET',experienceContribution:'XPPRIVATE'}]});
  for(const value of ['PRIVATE','SECRET','XPPRIVATE'])assert.ok(!html.includes(value));assert.ok(html.includes('B級'));
