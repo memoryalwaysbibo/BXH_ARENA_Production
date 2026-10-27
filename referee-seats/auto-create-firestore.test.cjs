@@ -10,8 +10,8 @@ let seq=0;
 function request(code='BXH-NEWSEAT',op='new-room-emulator-op-001',uid='owner',override={}){
  const state={id:'new',cloudCode:code,createdBy:uid,meta:{eventAuthority:'official',battleMode:'individual',playMode:'standard',stations:3,assignedStaffUids:[]},players:[],matches:[],teams:[],bracketSize:0};
  return {auth:{uid},data:{code,operationId:op,
-  privatePayload:{data:JSON.stringify(state),createdBy:uid,eventAuthority:'official',battleMode:'individual',playMode:'standard',confirmedCount:0,waitlistCount:0},
-  publicPayload:{bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3}}),eventAuthority:'official',battleMode:'individual'},
+  privatePayload:{visibility:'public',data:JSON.stringify(state),createdBy:uid,eventAuthority:'official',battleMode:'individual',playMode:'standard',confirmedCount:0,waitlistCount:0},
+  publicPayload:{visibility:'public',bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3}}),eventAuthority:'official',battleMode:'individual'},
   ...override}};
 }
 before(async()=>{
@@ -52,7 +52,7 @@ test('unauthorized and invalid requests leave neither document behind',async()=>
  const code='BXH-NOACCESS';
  await assert.rejects(create(request(code,'new-room-emulator-op-003','player')),/permission-denied/);
  await assert.rejects(create(request(code,'new-room-emulator-op-004','owner',{
-  publicPayload:{bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3},private:{uid:'leak'}}),eventAuthority:'official',battleMode:'individual'}
+  publicPayload:{visibility:'public',bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3},private:{uid:'leak'}}),eventAuthority:'official',battleMode:'individual'}
  })),/private-mirror-data/);
  const [a,b]=await Promise.all([db.doc('tournaments/'+code).get(),db.doc('publicTournaments/'+code).get()]);
  assert.equal(a.exists,false);assert.equal(b.exists,false);
