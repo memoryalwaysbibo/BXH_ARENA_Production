@@ -272,8 +272,8 @@ async function selectAndCheck(page, size, bracketSize) {
       });
     });
     assert.equal(collisions,false,'champion overlaps final or bronze');
+    await page.locator('.se-player-path-button[data-player-id="p1"]').last().click();
     const selected=await page.evaluate(()=>{
-      selectSingleBracketPlayerPath('p1');
       return {message:window.__pathModal.message,history:singleBracketPlayerHistory('p1').length,
         paths:document.querySelectorAll('.se-player-path-selected').length,
         buttons:document.querySelectorAll('.se-player-path-button[aria-pressed="true"]').length,
