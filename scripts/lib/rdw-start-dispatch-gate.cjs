@@ -19,6 +19,7 @@ function verifyStartDispatch({before,after,stationCount,requireLive=false,server
  }
  const courts=after.courtAssignments;
  if(!courts||typeof courts!=='object'||Array.isArray(courts))return fail('court-assignments-missing');
+ const activePlayers=new Set();
  const ids=new Set(),matchIds=new Set(after.matches.map(m=>m.id));
  for(let i=1;i<=n;i++){
   const c=courts['court'+i];
@@ -32,6 +33,10 @@ function verifyStartDispatch({before,after,stationCount,requireLive=false,server
     if(m.station!==i||m.completed||m.isBye||!m.a?.playerId||!m.b?.playerId)return fail('assigned-match-not-ready');
     if(key==='currentMatchId'&&(m.status!=='in_progress'||m.startedAt!==serverTime))return fail('current-match-not-started');
     if(key==='nextMatchId'&&(m.status==='in_progress'||m.startedAt))return fail('next-match-started-early');
+    if(key==='currentMatchId')for(const playerId of [m.a.playerId,m.b.playerId]){
+     if(activePlayers.has(playerId))return fail('player-double-booked');
+     activePlayers.add(playerId);
+    }
    }
    ids.add(id);
   }

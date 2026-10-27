@@ -39,6 +39,7 @@
     "rebuildPropagationSingle",
     "refereeMatches",
     "resolveScoringModeForRound",
+    "roundRobinPlayersBusyElsewhere",
     "singleElimBronzeBeforeFinalBlocked",
     "singleElimBronzeGatePhase",
     "singleElimScheduleTier",
@@ -47,7 +48,7 @@
     "tournamentEligiblePlayers",
     "validateHunterRoundLedger"
   ],
-  "sourceFunctionSha256": "fae439f135b071ea7b6acb743cfc741cfba8c2e6e56c7713cf410b338e25703e",
+  "sourceFunctionSha256": "f1b55fb788c24519631620d50ef8385c043a16e1986811d14ea434f90bf10bf7",
   "modules": {
     "double-elimination-core.js": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
     "referee-fault-core.js": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
