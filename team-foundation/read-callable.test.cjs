@@ -11,3 +11,8 @@ test('forged viewer identity and missing Auth/AppCheck cannot read',async()=>{
 test('history member permission checked in service; internal error data is hidden',async()=>{
  const f=fixture(),r=req();r.data.action='history';await assert.rejects(f.handler(r),e=>e.code==='permission-denied');
 });
+test('emblem read derives the viewer from auth and enforces App Check and input allowlist',async()=>{
+ let calls=[];const handler=createReadHandler({db:{},auth:{getUser:async()=>({})},HttpsError,enabled:true,readEmblem:async p=>(calls.push(p),{image:null})});
+ const r=req();r.data={action:'emblem',teamId:'t'};assert.deepEqual(await handler(r),{image:null});assert.deepEqual(calls,[{actorUid:'real',teamId:'t'}]);
+ r.data.actorUid='forged';await assert.rejects(handler(r),e=>e.code==='invalid-argument');delete r.data.actorUid;delete r.app;await assert.rejects(handler(r),e=>e.code==='failed-precondition');assert.equal(calls.length,1);
+});
