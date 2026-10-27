@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');const {cr
 function setup({count=2,stale=false,membership=null,pending=false}={}){
  const data=new Map([['hunterLeaderboardMeta/current',{generation:'g'}],['ladderSystem/current',{currentSeason:'S1'}]]);
  if(membership)data.set('teamMembershipsV1/u',{teamId:membership});
- const docs=Array.from({length:count},(_,i)=>{const id='t'+i,p={name:'戰隊'+i,captainName:'隊長',level:1,capacity:10,memberCount:1,strength:i===0?null:100,createdAt:100,admission:{mode:'auto',minPoints:null,minTier:null},hunterGeneration:stale&&i===0?'old':'g',ladderSeason:'S1',members:[{uid:'c',role:'captain'}],secret:'private'};data.set('teamsV1/'+id,{status:'active',captainUid:'c',memberUids:['c']});return{id,data:()=>p};});
+ const docs=Array.from({length:count},(_,i)=>{const id='t'+i,p={name:'戰隊'+i,captainName:'隊長',level:1,capacity:10,memberCount:1,strength:i===0?null:100,createdAt:100,admission:{mode:'auto',minLadderTier:null,minTier:null},hunterGeneration:stale&&i===0?'old':'g',ladderSeason:'S1',members:[{uid:'c',role:'captain'}],secret:'private'};data.set('teamsV1/'+id,{status:'active',captainUid:'c',memberUids:['c']});return{id,data:()=>p};});
  if(pending)data.set('teamsV1/t1/applications/u',{status:'pending'});
  const db={doc:p=>p,collection:()=>({limit:n=>({kind:'query',n})}),runTransaction:fn=>fn({get:async p=>typeof p==='object'?{docs:docs.slice(0,p.n)}:{exists:data.has(p),data:()=>data.get(p)}})};
  return createListService({db});
