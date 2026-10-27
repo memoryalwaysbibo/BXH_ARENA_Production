@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createTeamController}=require('./team-controller.js');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
-function setup(overrides={}){return createTeamController({newRequestId:()=> 'test-operation-00000001',api:{list:async()=>({items:[],total:0}),members:async()=>({name:'Alpha',members:[]}),mine:async()=>({team:null}),applications:async()=>({items:[],hasMore:false}),command:async()=>({ok:true}),...overrides}});}
+function setup(overrides={}){return createTeamController({newRequestId:()=> 'test-operation-00000001',api:{list:async()=>({items:[],total:0}),members:async()=>({name:'Alpha',members:[]}),mine:async()=>({team:null}),applications:async()=>({items:[],hasMore:false}),history:async()=>({items:[]}),command:async()=>({ok:true}),...overrides}});}
 test('slow search cannot overwrite newer results or member view',async()=>{
  const d=deferred();const c=setup({list:async q=>q.query==='old'?d.promise:{items:[{id:'new'}],total:1}});
  const old=c.search({query:'old'});await c.search({query:'new'});d.resolve({items:[{id:'old'}],total:1});await old;assert.equal(c.snapshot().items[0].id,'new');
@@ -65,4 +65,9 @@ test('review rejection identifies an applicant already in another team',async()=
  const c=setup({command:async()=>{throw Object.assign(Error('already-in-team'),{code:'functions/failed-precondition'});}});
  await c.applications('team');assert.equal((await c.operate('approve','team',{targetUid:'person'})).reason,'rejected');
  assert.match(c.snapshot().error,/申請者已有戰隊/);assert.equal(c.snapshot().pending,false);
+});
+
+test('history reads selected team and retains records separately from lobby',async()=>{
+ let request;const c=setup({history:async p=>(request=p,{items:[{name:'小賈',date:'2026/10/27',time:'18:10',method:'自行退出'}]})});
+ await c.history('team');assert.deepEqual(request,{teamId:'team'});assert.equal(c.snapshot().items[0].name,'小賈');assert.equal(c.snapshot().screen,'history');
 });
