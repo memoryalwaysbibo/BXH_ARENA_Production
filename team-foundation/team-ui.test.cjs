@@ -27,3 +27,8 @@ test('pending application exposes its status and a cancel control',()=>{
  const html=ui.lobby({items:[{id:'team1',name:'甲',captainName:'乙',memberCount:1,capacity:10,join:{label:'審核中',disabled:true}}],total:1});
  assert.match(html,/審核中/);assert.match(html,/data-team-action="cancel"/);assert.match(html,/取消申請/);
 });
+
+test('application list safely presents review actions and remaining count notice',()=>{
+ const html=ui.applications({items:[{uid:'p',name:'<script>'}],teamId:'t',hasMore:true});
+ assert.ok(!html.includes('<script>'));assert.match(html,/data-team-action="approve"/);assert.match(html,/data-team-action="reject"/);assert.match(html,/還有其他申請/);
+});
