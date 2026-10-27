@@ -1,12 +1,22 @@
 'use strict';
+const {admissionPolicy}=require('./admission.cjs');
 const {historyView,mayReadReason}=require('./history.cjs');
 const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value);
 // actorUid MUST be provided by the server Auth boundary, not client JSON.
 function createReadService({db}){
  const read=async(tx,path)=>{const snap=await tx.get(db.doc(path));return snap.exists?snap.data():null;};
  return async({actorUid,action,teamId,historyId})=>{
-  if(!valid(actorUid)||!valid(teamId)||!['members','history','reason'].includes(action)||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
+  if(!valid(actorUid)||!['members','history','reason','mine'].includes(action)||(action!=='mine'&&!valid(teamId))||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
   return db.runTransaction(async tx=>{
+   if(action==='mine'){
+    const member=await read(tx,'teamMembershipsV1/'+actorUid);
+    if(!member)return {team:null};
+    if(!valid(member.teamId))throw Error('membership-unavailable');
+    const own=await read(tx,'teamsV1/'+member.teamId);
+    if(!own||own.status==='dissolved'||!own.memberUids?.includes(actorUid))throw Error('membership-unavailable');
+    const role=own.captainUid===actorUid?'captain':own.roles?.[actorUid]||'member';
+    return {team:{id:member.teamId,name:own.name,role,admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
+   }
    if(action==='members'){
     // Only a server-maintained public projection is exposed; raw team docs never returned.
     const [data,team,board,ladder]=await Promise.all([read(tx,'teamsPublicV1/'+teamId),read(tx,'teamsV1/'+teamId),read(tx,'hunterLeaderboardMeta/current'),read(tx,'ladderSystem/current')]);
