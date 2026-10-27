@@ -1,0 +1,5 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');const code=fs.readFileSync(__dirname+'/team-loader.js','utf8');
+function fixture(flag){const paths=[];let renders=0;const window={BXH_TEAM_PREVIEW:flag,console:{warn(){}}};const document={createElement:()=>({}),head:{appendChild:s=>{paths.push(s.src);queueMicrotask(()=>s.onload());}}};vm.runInNewContext(code,{window,document,Promise,render:()=>renders++});return {paths,get renders(){return renders;},window};}
+test('disabled loader requests no team files',async()=>{const f=fixture(false);await new Promise(setImmediate);assert.deepEqual(f.paths,[]);assert.equal(f.renders,0);});
+test('enabled loader requests files in dependency order then refreshes navigation',async()=>{const f=fixture(true);await new Promise(setImmediate);assert.equal(f.paths.length,6);assert.match(f.paths[0],/team-api\.js/);assert.match(f.paths[5],/team-main-integration\.js/);assert.equal(f.renders,1);});
