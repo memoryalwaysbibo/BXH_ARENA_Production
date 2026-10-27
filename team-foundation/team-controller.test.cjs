@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createTeamController}=require('./team-controller.js');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
-function setup(overrides={}){return createTeamController({newRequestId:()=> 'test-operation-00000001',api:{list:async()=>({items:[],total:0}),members:async()=>({name:'Alpha',members:[]}),mine:async()=>({team:null}),command:async()=>({ok:true}),...overrides}});}
+function setup(overrides={}){return createTeamController({newRequestId:()=> 'test-operation-00000001',api:{list:async()=>({items:[],total:0}),members:async()=>({name:'Alpha',members:[]}),mine:async()=>({team:null}),applications:async()=>({items:[],hasMore:false}),command:async()=>({ok:true}),...overrides}});}
 test('slow search cannot overwrite newer results or member view',async()=>{
  const d=deferred();const c=setup({list:async q=>q.query==='old'?d.promise:{items:[{id:'new'}],total:1}});
  const old=c.search({query:'old'});await c.search({query:'new'});d.resolve({items:[{id:'old'}],total:1});await old;assert.equal(c.snapshot().items[0].id,'new');
@@ -53,4 +53,10 @@ test('command rejection preserves loaded page; failed page load never appears lo
  const c=setup({mine:async()=>({team:{id:'t',role:'captain'}}),command:async()=>{throw Object.assign(Error('team-full'),{code:'functions/failed-precondition'});}});
  await c.mine();await c.operate('apply','t');assert.equal(c.snapshot().screen,'mine');assert.equal(c.snapshot().loaded,true);assert.equal(c.snapshot().team.id,'t');
  const bad=setup({mine:async()=>{throw Error('network');}});await bad.mine();assert.equal(bad.snapshot().loaded,false);assert.equal(bad.snapshot().team,null);
+});
+
+test('review commands send the selected applicant and reload the pending list',async()=>{
+ let reads=0,payload;const c=setup({applications:async()=>{reads++;return {items:[],hasMore:false};},command:async p=>{payload=p;return {ok:true};}});
+ await c.applications('team');await c.operate('approve','team',{targetUid:'person'});
+ assert.deepEqual(payload,{action:'approve',teamId:'team',targetUid:'person',requestId:'test-operation-00000001'});assert.equal(reads,2);assert.equal(c.snapshot().screen,'applications');
 });
