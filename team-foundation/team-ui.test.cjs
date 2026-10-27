@@ -85,4 +85,6 @@ test('only the captain can choose an unlocked frame and the saved choice is sele
  const team={id:'t',name:'隊伍',role:'captain',memberCount:3,level:7,capacity:16,currentXp:0,nextXp:9,unlockedFrames:[4,7],selectedFrame:7};
  const html=ui.myTeam(team);assert.match(html,/data-team-form="frame"/);assert.match(html,/<option value="7" selected>/);assert.match(html,/<option value="10" disabled>/);assert.doesNotMatch(html.match(/<select name="frame">.*?<\/select>/)[0],/<option value="" selected>/);
  const member=ui.myTeam({...team,role:'member'});assert.match(member,/目前戰隊框：LV 7/);assert.doesNotMatch(member,/data-team-form="frame"/);
+ assert.match(member,/class="team-identity team-frame-7"/);assert.match(ui.css,/\.team-frame-7/);
+ const invalid=ui.myTeam({...team,selectedFrame:10});assert.doesNotMatch(invalid,/class="team-identity team-frame-10"/);assert.match(invalid,/目前戰隊框：未使用/);
 });
