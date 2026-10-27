@@ -10,6 +10,11 @@ test('lobby team frames render known variants and ignore arbitrary values',()=>{
  assert.match(ui.lobby({items:[{...item,selectedFrame:7}]}),/team-identity team-frame-7/);
  assert.doesNotMatch(ui.lobby({items:[{...item,selectedFrame:'evil'}]}),/team-frame-evil/);
 });
+test('team detail displays only bounded WebP data images',()=>{
+ const team={id:'t',name:'隊伍',members:[],role:'member',emblemSource:'data:image/webp;base64,UklGRgAAAABXRUJQ'};
+ assert.match(ui.myTeam(team),/alt="戰隊圖案"/);assert.match(ui.publicMembers(team),/alt="戰隊圖案"/);
+ assert.doesNotMatch(ui.myTeam({...team,emblemSource:'javascript:alert(1)'}),/javascript:/);
+});
 test('member screen never interpolates private supplied fields',()=>{
  const html=ui.publicMembers({name:'隊伍',members:[{name:'小A',role:'captain',ladderPoints:12,hunterTier:'b',lastSeenAt:'PRIVATE',reason:'SECRET',experienceContribution:'XPPRIVATE'}]});
  for(const value of ['PRIVATE','SECRET','XPPRIVATE'])assert.ok(!html.includes(value));assert.ok(html.includes('B級'));
