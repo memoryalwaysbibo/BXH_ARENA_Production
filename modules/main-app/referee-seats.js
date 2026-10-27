@@ -21,7 +21,7 @@
   dialog.append(panel);document.body.append(dialog);panel.querySelector('button')?.focus();return true;
  }
  const messages={
-  'release-not-ready':'三席裁判服務尚未完成正式環境驗證，目前未啟用。','not-event-staff':'您不在本場工作人員名單，請聯絡場主。','seat-occupied':'此席位已被承接，請重新查看。','seat-stale':'席位已變更，請重新操作。','already-seated':'您已在本台擔任裁判，請向另一席位申請交接。',
+  'release-not-ready':'三席裁判服務尚未完成正式環境驗證，目前未啟用。','not-event-staff':'帳號尚未具備有效工作人員身分，請聯絡管理員。','seat-occupied':'此席位已被承接，請重新查看。','seat-stale':'席位已變更，請重新操作。','already-seated':'您已在本台擔任裁判，請向另一席位申請交接。',
   'request-pending':'已有交接申請等待確認，請稍後再試。','request-stale':'席位已變更或申請逾時，交接未執行。','request-unavailable':'交接申請已結束。','permission-denied':'目前沒有此操作權限。','legacy-assignments-exist':'本場已有舊版裁判分配，請先由場主確認並清空後再啟用。',
   'team-not-supported':'三席裁判制目前支援個人賽，團體賽尚未開放。','room-read-only':'此賽事目前不開放裁判異動。','invalid-seat':'此戰鬥台目前無法承接。','requester-ineligible':'申請人已失去本場資格，無法交接。','target-ineligible':'對方已失去本場資格，請由場主處理。'
  };
@@ -88,7 +88,7 @@
  function click(action,station,slot,requestId){
   if(locked()||busy)return;
   if(action==='enable')return modal('啟用三席裁判制後，工作人員須加入該台席位才能計分。是否啟用？',[{label:'確定',run:()=>send({action:'enable'})},{label:'取消'}]);
-  if(!eligible())return ctx.toast('您不在本場工作人員名單，請聯絡場主。',true);
+  if(!eligible())return ctx.toast('帳號尚未具備有效工作人員身分，請聯絡管理員。',true);
   if(action==='cancel')return send({action:'cancel',station,slot,requestId,expectedCourtRevision:model()?.courts?.[station]?.revision||0});
   const court=model()?.courts?.[station]||{},seat=court[slot],base={station,slot,expectedCourtRevision:court.revision||0,expectedUid:seat?.uid||null};
   if(!seat)return send({...base,action:'claim'});

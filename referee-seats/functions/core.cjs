@@ -5,7 +5,8 @@ const clone=value=>JSON.parse(JSON.stringify(value));
 function fail(code){throw Object.assign(new Error(code),{seatCode:code});}
 function admin(user){return user?.active===true&&user.isTestAccount!==true&&['admin','super_admin'].includes(user.role);}
 function manager(room,user,uid){return admin(user)||(user?.active===true&&user.isTestAccount!==true&&room.createdBy===uid&&['staff','admin','super_admin'].includes(user.role));}
-function eligible(room,user,uid){return admin(user)||manager(room,user,uid)||(user?.active===true&&user.isTestAccount!==true&&user.role==='staff'&&Array.isArray(room.assignedStaffUids)&&room.assignedStaffUids.includes(uid));}
+// Active Staff may claim/request seats without pre-assignment; scoring still checks seat UID.
+function eligible(room,user,uid){return !!uid&&user?.active===true&&user.isTestAccount!==true&&['staff','admin','super_admin'].includes(user.role);}
 function display(user){return String(user.realName||user.gameId||user.displayName||'未設定姓名').trim().slice(0,80);}
 function writable(room,state){
  if(room.eventAuthority!=='official'||state.meta?.eventAuthority!=='official'||room.eventCancelled===true||room.systemClosed===true||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');
