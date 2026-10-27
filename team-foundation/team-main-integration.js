@@ -24,4 +24,10 @@ render=function(){
  slot.append(teamNode);host.sync();const result=host.open();
  if(!result.ok)teamNode.textContent=result.reason==='sign-in-required'?'請先登入。':'戰隊功能暫時無法載入，請稍後再試。';
 };
+window.BXHTeamOpenPublic=function(teamId){
+ if(window.BXH_TEAM_PREVIEW!==true||currentRole!=='player'||!currentAuthUid()||(teamId!==null&&teamId!==undefined&&!/^[A-Za-z0-9_-]{1,128}$/.test(teamId)))return false;
+ appPhase='player-center';playerActiveTab='teams';render();
+ if(!host||typeof host.navigate!=='function')return false;
+ void host.navigate(teamId||null);return true;
+};
 })();
