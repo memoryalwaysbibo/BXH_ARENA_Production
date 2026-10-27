@@ -6,12 +6,13 @@ function setup(){
  ['teamMembershipsV1/c',{teamId:'t'}],['teamMembershipsV1/d',{teamId:'t'}],['teamMembershipsV1/m',{teamId:'t'}],
  ['teamsV1/t/history/h',{subjectUid:'gone',subjectName:'小賈',actorName:'黑爸',actorRole:'captain',method:'remove',occurredAt:1793095800000}],
  ['teamsV1/t/historyReasons/h',{code:'other',label:'其他',note:'私有說明',subjectUid:'gone'}],
- ['teamsPublicV1/t',{name:'隊伍',members:[{uid:'c',name:'黑爸',role:'captain',ladderPoints:12,hunterTier:'b',secret:'PRIVATE'}],secret:'PRIVATE'}]
+ ['hunterLeaderboardMeta/current',{generation:'g'}],['ladderSystem/current',{currentSeason:'S1'}],
+ ['teamsPublicV1/t',{name:'隊伍',hunterGeneration:'g',ladderSeason:'S1',members:[{uid:'c',name:'黑爸',role:'captain',ladderPoints:12,hunterTier:'b',secret:'PRIVATE'},{uid:'d',name:'D',role:'deputy'},{uid:'m',name:'M',role:'member'}],secret:'PRIVATE'}]
  ]);const reads=[];
  const db={doc:p=>p,collection:p=>({orderBy:()=>({limit:n=>({path:p,limit:n})})}),runTransaction:fn=>fn({get:async p=>{reads.push(p);if(typeof p==='object')return {docs:[{id:'h',data:()=>data.get('teamsV1/t/history/h')}]};return {exists:data.has(p),data:()=>data.get(p)};}})};
  return {read:createReadService({db}),data,reads};
 }
-test('public member endpoint excludes unexpected fields',async()=>{const f=setup();const r=await f.read({actorUid:'outsider',action:'members',teamId:'t'});assert.equal(JSON.stringify(r).includes('PRIVATE'),false);assert.deepEqual(f.reads,['teamsPublicV1/t']);});
+test('public member endpoint excludes unexpected fields',async()=>{const f=setup();const r=await f.read({actorUid:'outsider',action:'members',teamId:'t'});assert.equal(JSON.stringify(r).includes('PRIVATE'),false);assert.equal(f.reads.length,4);});
 test('history requires current membership and returns separate date/time without reason',async()=>{
  const f=setup();await assert.rejects(f.read({actorUid:'outsider',action:'history',teamId:'t'}),/permission/);
  const r=await f.read({actorUid:'m',action:'history',teamId:'t'});assert.ok(r.items[0].date);assert.ok(r.items[0].time);assert.equal(JSON.stringify(r).includes('私有說明'),false);assert.equal(r.pageLimit,50);
@@ -21,3 +22,5 @@ test('reason is visible to subject and current leadership; stale roles do not au
  for(const uid of ['m','outsider']){const f=setup();await assert.rejects(f.read({actorUid:uid,action:'reason',teamId:'t',historyId:'h'}),/permission/);assert.ok(!f.reads.some(p=>typeof p==='string'&&p.includes('historyReasons')));}
  const f=setup();f.data.delete('teamMembershipsV1/d');await assert.rejects(f.read({actorUid:'d',action:'reason',teamId:'t',historyId:'h'}),/permission/);
 });
+
+test('old projection is withheld during roster, tier generation and season changes',async()=>{for(const kind of ['roster','generation','season']){const f=setup();if(kind==='roster')f.data.get('teamsV1/t').memberUids.pop();if(kind==='generation')f.data.get('hunterLeaderboardMeta/current').generation='new';if(kind==='season')f.data.get('ladderSystem/current').currentSeason='S2';await assert.rejects(f.read({actorUid:'outsider',action:'members',teamId:'t'}),/projection-stale/);}});
