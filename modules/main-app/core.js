@@ -18214,8 +18214,9 @@ function renderAuthFormPreservingInputs(app,html,phase){
 function render(){
   syncQrScannerModal();
   clearBoardModeInteractions();
-  window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,operator:canOperateCurrentTournament,
-    eligible:()=>isAdminTierOrAbove()||(userProfile?.active===true&&userProfile?.isTestAccount!==true&&userProfile?.role==="staff"&&(state.createdBy===currentAuthUid()||(state.meta?.assignedStaffUids||[]).includes(currentAuthUid()))),
+  window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,
+    operator:()=>canOperateCurrentTournament()||(state?.meta?.refereeSeatsV1?.version===1&&userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role)),
+    eligible:()=>userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role),
     manager:()=>isAdminTierOrAbove()||(userProfile?.active===true&&userProfile?.isTestAccount!==true&&userProfile?.role==="staff"&&state.createdBy===currentAuthUid()),render,toast:showToast});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
