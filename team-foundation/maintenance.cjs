@@ -10,6 +10,8 @@ function createTeamMaintenance({enabled,reconciler,dissolution}){
    dissolution.run()
   ]);
   if(jobs.some(job=>job.status==='rejected'))throw Error('team-maintenance-failed');
+  const result=jobs[1].value;
+  if(result?.status==='lease-expired'||(Number.isSafeInteger(result?.failed)&&result.failed>0))throw Error('team-dissolution-needs-attention');
   return {status:'completed',projection:jobs[0].value,dissolution:jobs[1].value};
  };
 }
