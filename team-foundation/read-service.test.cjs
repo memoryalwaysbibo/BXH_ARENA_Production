@@ -25,7 +25,7 @@ test('reason is visible to subject and current leadership; stale roles do not au
 
 test('old projection is withheld during roster, tier generation and season changes',async()=>{for(const kind of ['roster','generation','season']){const f=setup();if(kind==='roster')f.data.get('teamsV1/t').memberUids.pop();if(kind==='generation')f.data.get('hunterLeaderboardMeta/current').generation='new';if(kind==='season')f.data.get('ladderSystem/current').currentSeason='S2';await assert.rejects(f.read({actorUid:'outsider',action:'members',teamId:'t'}),/projection-stale/);}});
 test('mine resolves team only from authenticated actor, settings visible only to leadership',async()=>{
- const f=setup();let result=await f.read({actorUid:'c',action:'mine'});assert.equal(result.team.id,'t');assert.equal(result.team.role,'captain');assert.equal(result.team.admission.mode,'review');
+ const f=setup();let result=await f.read({actorUid:'c',action:'mine'});assert.equal(result.team.id,'t');assert.equal(result.team.role,'captain');assert.equal(result.team.memberCount,3);assert.equal(result.team.admission.mode,'review');
  result=await f.read({actorUid:'d',action:'mine'});assert.equal(result.team.role,'deputy');assert.ok(result.team.admission);
  result=await f.read({actorUid:'m',action:'mine'});assert.equal(result.team.admission,null);
  assert.equal((await f.read({actorUid:'outsider',action:'mine'})).team,null);
