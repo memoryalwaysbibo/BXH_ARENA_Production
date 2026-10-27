@@ -38,3 +38,7 @@ test('application date and time are displayed separately in Taipei time',()=>{
  assert.match(html,/申請日期：2026\/10\/27<\/div><div>申請時間：15:30/);
  assert.match(ui.applications({items:[{uid:'p',name:'小明'}],teamId:'t'}),/申請日期：未提供/);
 });
+
+test('application review offers a manual refresh for changes made by others',()=>{
+ const html=ui.applications({teamId:'t'});assert.match(html,/data-team-action="reload-applications"/);assert.match(html,/重新整理名單/);
+});
