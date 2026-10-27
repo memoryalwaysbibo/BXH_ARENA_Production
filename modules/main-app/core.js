@@ -6547,7 +6547,10 @@ async function saveState(options={}){
         return localOk ? true : false;
       }
       const lastCode = (typeof window!=="undefined" && window.__BXH_LAST_CLOUD_ERROR_CODE) || "";
-      if(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"||lastCode==="onsite-runtime-stale"||lastCode==="onsite-waitlist-managed"){
+      if(lastCode==="tournament-payload-too-large"){
+        cloudSyncPending=false;cloudStatus="connected";
+        showToast(window.BXHBracketCommit.CAPACITY_MESSAGE,true);
+      }else if(lastCode==="registration-roster-stale"||lastCode==="team-result-stale"||lastCode==="onsite-runtime-stale"||lastCode==="onsite-waitlist-managed"){
         cloudAccessLimited = true;
         cloudAccessMessage = "線上名單已更新；請重新整理頁面，再進行操作。";
         cloudStatus = "connected";
@@ -10425,10 +10428,14 @@ function bracketCommitController(){
 }
 function bracketCommitBlocked(){return bracketCommitController()?.blocked()||false;}
 function bracketCommitStatusHtml(){
- const c=bracketCommitController(),s=c?.status();if(!s?.pending)return '';
+ const c=bracketCommitController(),s=c?.status();
+ const oversized=s?.error==='tournament-payload-too-large';
+ if(oversized&&!s.pending)return '<section class="panel" role="alert"><b>對戰表資料量超過目前儲存容量</b><p>本次配對尚未儲存，原房間與配對維持不變。請減少參賽人數或選擇其他賽制後重試。</p></section>';
+ if(!s?.pending)return '';
  return '<section class="panel" role="status"><b>'+(s.busy?'正在儲存並核對對戰表…':'對戰表尚未確認儲存成功')+'</b><p>本次配對已保留；確認完成前無法重抽、重設或開賽。</p>'+
- (s.busy?'':'<p>請確認網路後重試。若其他裝置已修改配對或名單，請讀取雲端版本後重新編排。</p><div class="btn-row"><button class="btn btn-primary" data-action="bracket-commit-retry">重試儲存同一份配對</button><button class="btn btn-ghost" data-action="bracket-commit-discard">讀取雲端版本</button></div>')+'</section>';
+ (s.busy?'':(oversized?'<p>本次配對超過儲存容量，重試無法排除此問題；請讀取雲端版本後重新編排。</p>':'<p>請確認網路後重試。若其他裝置已修改配對或名單，請讀取雲端版本後重新編排。</p>')+'<div class="btn-row">'+(oversized?'':'<button class="btn btn-primary" data-action="bracket-commit-retry">重試儲存同一份配對</button>')+'<button class="btn btn-ghost" data-action="bracket-commit-discard">讀取雲端版本</button></div>')+'</section>';
 }
+
 async function verifyBracketBeforeStart(){
  const c=bracketCommitController();if(!c)return true;
  const ok=await c.verify(state);if(!ok)showToast('對戰表尚未儲存完成，或雲端配對已變更；請先讀取雲端版本核對，暫不開賽',true);return ok;

@@ -106,3 +106,13 @@ test('concrete wired start uses real bracket reader and real engine, locks regis
  const start=createWiredRankedStart({db,clock:()=>f.now,bundleRoot,enabled:true});assert.equal((await start(f.request)).ok,true);const v=await read(f);assert.equal(v.counter,1);assert.equal(v.room.registrationStatus,'started');assert.equal(v.room.tournamentPhase,'live');for(const state of [v.privateState,v.publicState]){assert.equal(state.meta.registrationStatus,'started');assert.equal(state.meta.checkinClosedEarly,true);assert.equal(state.meta.checkinClosedAt,f.now);assert.equal(state.matches[0].status,'in_progress');assert.equal(state.courtAssignments.court1.status,'in_progress');}
  assert.equal(v.privateState.matches[0].startedAt,f.now);assert.equal(v.privateState.matches[0].refereeUid,'private-referee');assert.ok(!JSON.stringify(v.publicState).includes('private-referee'));assert.equal((await f.r.publicRef.get()).data().registrationStatus,'started');assert.equal((await start(f.request)).replayed,true);assert.equal((await read(f)).counter,1);
 });
+
+for(const side of ['private','public'])test(`oversized ${side} start payload leaves quota, snapshot and both mirrors untouched`,async()=>{
+ const f=await fixture({newSnapshot:true}),ref=side==='private'?f.r.eventRef:f.r.publicRef,key=side==='private'?'data':'bracketView';
+ const doc=(await ref.get()).data(),state=JSON.parse(doc[key]);state.capacityTestPadding='x'.repeat(require('../modules/main-app/bracket-commit.js').MAX_PAYLOAD_BYTES);
+ await ref.update({[key]:JSON.stringify(state)});
+ const before=await read(f),out=await f.writer();
+ assert.equal(out.committed,false);assert.equal(out.reason,'tournament-payload-too-large');
+ const after=await read(f);assert.equal(after.counter,0);assert.equal(after.receipt.exists,false);assert.equal(after.snapshot.exists,false);
+ assert.deepEqual(after.privateState,before.privateState);assert.deepEqual(after.publicState,before.publicState);
+});

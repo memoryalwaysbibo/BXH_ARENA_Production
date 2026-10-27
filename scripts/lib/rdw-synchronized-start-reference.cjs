@@ -4,6 +4,7 @@
 // Mutates only legacy private JSON and public bracketView in ONE transaction.
 // This narrow writer is NOT sufficient for production start until court assignments,
 // bracket signature, and original client saveState transition are fully replicated.
+const {assertCapacity}=require('../../modules/main-app/bracket-commit.js');
 const {publicStartView}=require('./rdw-public-start-view.cjs');
 const {compareMirrors}=require('./rdw-private-public-mirror-gate.cjs');
 const {validateSealedSnapshot}=require('./rdw-sealed-snapshot-verifier.cjs');
@@ -51,6 +52,7 @@ async function writeSynchronizedStart({tx,eventRef,publicRef,snapshotRef,eventCo
  const projected=publicStartView(dispatchCandidate);
  const nextPrivate={...p,meta:{...p.meta,...registrationPatch},updatedAt:serverTime,matches:dispatchCandidate.matches,courtAssignments:dispatchCandidate.courtAssignments,startedAt:serverTime,rosterLocked:true,rdwStartMode:'rdw-verified',rdwSnapshotDigest:sealed.snapshotDigest};
  const nextPublic={...q,meta:{...(q.meta||{}),...registrationPatch},...projected,startedAt:serverTime};
+ try{assertCapacity(nextPrivate);assertCapacity(nextPublic);}catch(e){return {committed:false,reason:e.code||e.message};}
  // No tx reads after this point. New snapshot and both mirrors commit together.
  if(!snapshotSnap.exists)tx.create(snapshotRef,snapshotCandidate);
  if(quota)quota.apply(tx);

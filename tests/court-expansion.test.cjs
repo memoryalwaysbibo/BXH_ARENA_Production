@@ -27,7 +27,7 @@ function harness(size=32,started=true){
   id:'r'+r+'m'+i,bracket:'SE',round:r,indexInRound:i,a:r?null:{type:'player',playerId:'p'+i*2},
   b:r?null:{type:'player',playerId:'p'+(i*2+1)},isBye:false,completed:false,scoreA:0,scoreB:0,
   log:[],faultActions:[],winnerId:null,loserId:null,status:'pending',station:1});
- const ctx={window:{},state:st,console};
+ const ctx={window:{BXHBracketCommit:require('../modules/main-app/bracket-commit.js')},state:st,console};
  vm.createContext(ctx);
  for(const f of ['modules/main-app/match-utils.js','modules/main-app/court-retirement.js','modules/main-app/qr-checkin-fence.js'])vm.runInContext(read(f),ctx);
  vm.runInContext('const {courtKey,matchHasDecisionData}=window.BXHMatchUtils;\n'+names.map(n=>extract(core,n)).join('\n'),ctx);

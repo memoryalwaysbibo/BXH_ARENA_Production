@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test tests/bracket-commit.test.cjs tests/assignment-cloud-confirmation.test.cjs tests/community-host-roster-sync.test.cjs tests/community-quick-registration-cloud.test.cjs
+      - run: node --test tests/bracket-commit-capacity.test.cjs tests/bracket-commit.test.cjs tests/assignment-cloud-confirmation.test.cjs tests/community-host-roster-sync.test.cjs tests/community-quick-registration-cloud.test.cjs
       - run: npm install --no-save --ignore-scripts playwright@1.55.0
       - run: npx playwright install --with-deps chromium
       - run: node tests/bracket-commit.browser.cjs
