@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');const {createCommandHandler}=require('./callable.cjs');
 class HttpsError extends Error{constructor(code,message){super(message);this.code=code;}}
-const request=()=>({app:{appId:'verified-app'},auth:{uid:'real',token:{auth_time:200}},data:{action:'apply',teamId:'alpha'}});
+const request=()=>({app:{appId:'verified-app'},auth:{uid:'real',token:{auth_time:200}},data:{action:'apply',teamId:'alpha',requestId:'request-operation-000001'}});
 function fixture(options={}){let reads=0,transactions=0;const handler=createCommandHandler({db:{runTransaction:async()=>{transactions++;throw Error('private database detail');}},auth:{getUser:async()=>{reads++;return options.user||{};}},HttpsError,enabled:options.enabled??true});return {handler,get reads(){return reads;},get transactions(){return transactions;}};}
 test('disabled, missing Auth/App Check fail before account and database operations',async()=>{
  const disabled=fixture({enabled:false});await assert.rejects(disabled.handler(request()),/teams-unavailable/);assert.equal(disabled.reads,0);
