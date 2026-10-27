@@ -611,3 +611,44 @@ test('actual production official createRoom payload is accepted by trusted three
   assert.equal(JSON.parse(docs.get('tournaments/BXH-AUTO1').data).meta.refereeSeatsV1.version,1);
   assert.equal(JSON.parse(docs.get('publicTournaments/BXH-AUTO1').bracketView).meta.refereeSeatNames['1'].main,null);
 });
+
+test('rollout-gated official individual create uses only trusted Callable, never browser batch',async()=>{
+ const h=harness(),calls=[];
+ h.ctx.generateRoomCode=()=> 'BXH-AUTO2';
+ h.ctx.userProfile={role:'staff',active:true,displayName:'Local Host'};
+ h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=true;
+ h.ctx.functionsHandle={};
+ h.ctx.fnx={httpsCallable:(_handle,name,opts)=>async payload=>{
+  calls.push({name,opts,payload});
+  return {data:{ok:true,code:payload.code}};
+ }};
+ const data=state({eventAuthority:'official',communityQuickRegistration:false,stations:2,battleMode:'individual',playMode:'standard'});
+ assert.equal(await h.api.createRoom(data),'BXH-AUTO2');
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].name,'createOfficialRoomWithRefereeSeats');
+ assert.equal(calls[0].payload.code,'BXH-AUTO2');
+ assert.equal(h.writes.length,0,'trusted mode must never write via browser batch');
+ assert.equal(h.docs.size,0);
+});
+test('trusted create failure must not fall back to legacy room creation',async()=>{
+ const h=harness();
+ h.ctx.generateRoomCode=()=> 'BXH-AUTO3';
+ h.ctx.userProfile={role:'staff',active:true,displayName:'Local Host'};
+ h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=true;
+ h.ctx.functionsHandle={};
+ h.ctx.fnx={httpsCallable:()=>async()=>{throw new Error('auto-create-not-enabled');}};
+ const data=state({eventAuthority:'official',communityQuickRegistration:false,stations:2,battleMode:'individual',playMode:'standard'});
+ assert.equal(await h.api.createRoom(data),null);
+ assert.equal(h.writes.length,0);
+ assert.equal(h.docs.size,0);
+});
+test('rollout disabled preserves legacy official room batch creation',async()=>{
+ const h=harness();
+ h.ctx.generateRoomCode=()=> 'BXH-AUTO4';
+ h.ctx.userProfile={role:'staff',active:true,displayName:'Local Host'};
+ h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=false;
+ const data=state({eventAuthority:'official',communityQuickRegistration:false,stations:2,battleMode:'individual',playMode:'standard'});
+ assert.equal(await h.api.createRoom(data),'BXH-AUTO4');
+ assert.equal(h.writes.length,2);
+ assert.equal(h.docs.get('tournaments/BXH-AUTO4').refereeSeatsV1,undefined);
+});

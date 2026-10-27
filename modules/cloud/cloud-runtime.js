@@ -2708,6 +2708,29 @@
           updatedAt: Date.now(),
           visibility: lobbyVisibility
         }, publicRegistrationFields, testFields);
+        // Official individual rooms may switch to the trusted atomic create
+        // Callable ONLY after both releases are independently approved. Default
+        // remains OFF: never call an undeployed function in production.
+        // Once enabled, do not silently fall back to the legacy create path on
+        // any backend failure; that would create a room without three seats.
+        const trustedAutoSeatCreate = typeof AUTO_SEAT_ROOM_CREATE_ROLLOUT!=="undefined"
+          && AUTO_SEAT_ROOM_CREATE_ROLLOUT===true
+          && !partnerSession && !testerSession
+          && m.eventAuthority==="official"
+          && m.battleMode!=="team" && m.playMode!=="enchantment";
+        if(trustedAutoSeatCreate){
+          if(!creatorUid||!functionsHandle||!fnx||typeof fnx.httpsCallable!=="function")
+            throw Object.assign(new Error("auto-seat-create-unavailable"),{code:"auto-seat-create-unavailable"});
+          const operationId=(typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function")
+            ?crypto.randomUUID():"";
+          if(!operationId)throw Object.assign(new Error("auto-seat-create-unavailable"),{code:"auto-seat-create-unavailable"});
+          const create=fnx.httpsCallable(functionsHandle,"createOfficialRoomWithRefereeSeats",{timeout:30000});
+          const response=await create({code,operationId,privatePayload,publicPayload});
+          if(response?.data?.ok!==true||response.data.code!==code)
+            throw Object.assign(new Error("auto-seat-create-unverified"),{code:"auto-seat-create-unverified"});
+          if(typeof window!=="undefined")window.__BXH_LAST_CLOUD_ERROR_CODE=null;
+          return code;
+        }
         // Both documents must be created in one atomic batch. Beta Rules validate
         // the public mirror with getAfter(), which only sees the paired private
         // tournament when both writes are in the same batch.
