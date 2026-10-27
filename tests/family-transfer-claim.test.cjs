@@ -4,6 +4,14 @@ require('../modules/main-app/family-transfer-claim.js');
 const {complete}=globalThis.BXHFamilyTransferClaim;
 const pending={active:true,accountStatus:'pending_family_transfer',familyTransferPending:true};
 const normal={active:true,accountStatus:'normal',familyTransferPending:false};
+test('production entrypoint loads claim before the auth handler and wires only the pending account',()=>{
+ const fs=require('node:fs'),path=require('node:path'),root=path.join(__dirname,'..');
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ const core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
+ assert.ok(html.indexOf('modules/main-app/family-transfer-claim.js?')<html.indexOf('id="bxh-main-app-m7"'));
+ assert.match(core,/profile\.familyTransferPending===true && profile\.accountStatus==="pending_family_transfer"/);
+ assert.match(core,/BXHFamilyTransferClaim\.complete\(/);
+});
 test('claims only a pending family account and confirms the refreshed profile',async()=>{
  let calls=0;
  const result=await complete({uid:'child',profile:pending,claim:async()=>{calls++;return {ok:true,status:'completed'};},reload:async()=>normal,isCurrent:()=>true});
