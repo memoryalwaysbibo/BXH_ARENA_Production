@@ -11,7 +11,7 @@ test('mobile page opens team settings and submits selected ranks through mounted
    assert.equal(await page.locator('[name=minLadderTier]').inputValue(),'');assert.equal(await page.locator('[name=minTier]').inputValue(),'');
    await page.selectOption('[name=minLadderTier]','黃金');await page.selectOption('[name=minTier]','b');await page.getByRole('button',{name:'儲存設定'}).click();
    await page.waitForFunction(()=>window.commands.length===1);const [payload]=await page.evaluate(()=>window.commands);
-   assert.deepEqual(payload,{action:'admission',teamId:'t',policy:{mode:'auto',minLadderTier:'黃金',minTier:'b'}});
+   assert.equal(typeof payload.requestId,'string');delete payload.requestId;assert.deepEqual(payload,{action:'admission',teamId:'t',policy:{mode:'auto',minLadderTier:'黃金',minTier:'b'}});
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'page must not overflow at '+width);
    await page.close();
   }
