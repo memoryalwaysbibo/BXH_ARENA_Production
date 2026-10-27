@@ -38,3 +38,13 @@ test('explicit retry reuses the exact request and blocks new mutations while out
  assert.equal(c.snapshot().pending,true);assert.equal((await c.operate('create','team-2',{name:'其他'})).reason,'pending-confirmation');
  assert.equal((await c.retryPending()).ok,true);assert.deepEqual(calls[0],calls[1]);assert.equal(c.snapshot().pending,false);
 });
+
+test('definitive server rejection permits another operation and shows the reason',async()=>{
+ let count=0;const c=setup({command:async()=>{count++;if(count===1)throw Object.assign(Error('team-full'),{code:'functions/failed-precondition'});return {ok:true};}});
+ assert.equal((await c.operate('apply','full')).reason,'rejected');assert.equal(c.snapshot().pending,false);assert.match(c.snapshot().error,/滿員/);
+ assert.equal((await c.operate('apply','available')).ok,true);assert.equal(count,2);
+});
+test('unknown and network errors remain uncertain even when they resemble rejections',async()=>{
+ const c=setup({command:async()=>{throw Object.assign(Error('unknown-server-message'),{code:'functions/failed-precondition'});}});
+ assert.equal((await c.operate('apply','t')).reason,'unconfirmed');assert.equal(c.snapshot().pending,true);
+});
