@@ -35,6 +35,8 @@ test('RR paused players remain reserved; manual and skipped dispatch refuse with
  const target=Number(held.station)===1?2:1;
  const engine=createEngine(state,{uid:'ref'},300,'manual');let before=JSON.stringify(state);
  assert.equal(engine.applyManualCourtAssign(state,queued.id,target).reason,'player-busy');assert.equal(JSON.stringify(state),before);
+ const source=active(state).find(m=>m.id!==held.id);
+ assert.equal(engine.applyCourtSwapMutation(state,source.id,queued.id).reason,'player-busy');assert.equal(JSON.stringify(state),before);
  queued.skippedAt=250;queued.resumeQueuedAt=null;queued.dispatchRevision=0;before=JSON.stringify(state);
  assert.equal(engine.applySkippedDispatch(state,queued,target,0).reason,'player-busy');assert.equal(JSON.stringify(state),before);
  engine.rebuildPropagationForState(state);uniquePlayers(state);assert.equal(held.status,'paused');
