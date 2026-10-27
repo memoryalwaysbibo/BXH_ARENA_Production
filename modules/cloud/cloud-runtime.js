@@ -2725,7 +2725,17 @@
             ?crypto.randomUUID():"";
           if(!operationId)throw Object.assign(new Error("auto-seat-create-unavailable"),{code:"auto-seat-create-unavailable"});
           const create=fnx.httpsCallable(functionsHandle,"createOfficialRoomWithRefereeSeats",{timeout:30000});
-          const response=await create({code,operationId,privatePayload,publicPayload});
+          // A timeout may occur after the server commits both documents.
+          // Retry once with the EXACT same code and operationId so the server
+          // can return its idempotent receipt without creating another room.
+          const payload={code,operationId,privatePayload,publicPayload};
+          let response;
+          try{response=await create(payload);}
+          catch(error){
+            const transient=String(error?.code||"");
+            if(!["functions/unavailable","functions/deadline-exceeded","unavailable","deadline-exceeded"].includes(transient))throw error;
+            response=await create(payload);
+          }
           if(response?.data?.ok!==true||response.data.code!==code)
             throw Object.assign(new Error("auto-seat-create-unverified"),{code:"auto-seat-create-unverified"});
           if(typeof window!=="undefined")window.__BXH_LAST_CLOUD_ERROR_CODE=null;

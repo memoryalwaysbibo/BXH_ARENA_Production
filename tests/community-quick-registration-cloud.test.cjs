@@ -652,3 +652,36 @@ test('rollout disabled preserves legacy official room batch creation',async()=>{
  assert.equal(h.writes.length,2);
  assert.equal(h.docs.get('tournaments/BXH-AUTO4').refereeSeatsV1,undefined);
 });
+
+test('transient lost Callable response retries exact same code and operation ID once',async()=>{
+ const h=harness(),calls=[];
+ h.ctx.generateRoomCode=()=> 'BXH-AUTO5';
+ h.ctx.userProfile={role:'staff',active:true,displayName:'Local Host'};
+ h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=true;
+ h.ctx.functionsHandle={};
+ h.ctx.fnx={httpsCallable:()=>async payload=>{
+  calls.push(clone(payload));
+  if(calls.length===1){const e=new Error('timeout after commit');e.code='functions/deadline-exceeded';throw e;}
+  return {data:{ok:true,code:payload.code,idempotent:true}};
+ }};
+ const data=state({eventAuthority:'official',communityQuickRegistration:false,stations:2,battleMode:'individual',playMode:'standard'});
+ assert.equal(await h.api.createRoom(data),'BXH-AUTO5');
+ assert.equal(calls.length,2);
+ assert.deepEqual(calls[0],calls[1]);
+ assert.equal(h.writes.length,0);
+});
+test('permission denied never retries or falls back to browser batch',async()=>{
+ const h=harness(),calls=[];
+ h.ctx.generateRoomCode=()=> 'BXH-AUTO6';
+ h.ctx.userProfile={role:'staff',active:true,displayName:'Local Host'};
+ h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=true;
+ h.ctx.functionsHandle={};
+ h.ctx.fnx={httpsCallable:()=>async payload=>{
+  calls.push(payload);
+  const e=new Error('permission denied');e.code='functions/permission-denied';throw e;
+ }};
+ const data=state({eventAuthority:'official',communityQuickRegistration:false,stations:2,battleMode:'individual',playMode:'standard'});
+ assert.equal(await h.api.createRoom(data),null);
+ assert.equal(calls.length,1);
+ assert.equal(h.writes.length,0);
+});
