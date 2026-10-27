@@ -24803,7 +24803,25 @@ async function init(){
                   throw (profileRead.error || new Error("profile-read-failed"));
                 }
                 if(!authStateIsCurrent()) return;
-                const profile = profileRead.value;
+                let profile = profileRead.value;
+                if(profile?.active===true && profile.familyTransferPending===true && profile.accountStatus==="pending_family_transfer"){
+                  const transfer=window.BXHFamilyTransferClaim
+                    ? await window.BXHFamilyTransferClaim.complete({
+                        uid:fbUser.uid,profile,
+                        claim:()=>window.engagementService.familyTransfer({action:"claim"}),
+                        reload:()=>window.cloudAuth.getUserProfile(fbUser.uid),
+                        isCurrent:()=>authStateIsCurrent()&&window.cloudAuth.getCurrentUser()?.uid===fbUser.uid
+                      })
+                    : {profile,error:"claim-module-unavailable"};
+                  if(!authStateIsCurrent())return;
+                  profile=transfer.profile;
+                  if(transfer.error){
+                    console.warn("[Family Transfer] claim pending",transfer.error);
+                    setTimeout(()=>{if(authStateIsCurrent())showToast("家庭帳號移轉尚未完成，重新開啟頁面時會重試。",true);},0);
+                  }else if(transfer.claimed){
+                    setTimeout(()=>{if(authStateIsCurrent())showToast("家庭帳號移轉完成");},0);
+                  }
+                }
                 if(profile && profile.active===true){
                   // Determine which mode this specific sign-in should land in.
                   // pendingLoginIntent (set by whichever button was clicked) wins;
