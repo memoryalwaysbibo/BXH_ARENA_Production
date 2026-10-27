@@ -36,3 +36,14 @@ test('captain image preview revokes old URLs and ignores results after unmount',
   prepare=()=>new Promise(resolve=>{resolveNext=resolve;});const pending=change({target:input});assert.deepEqual(revoked,['blob:test1']);mounted.destroy();resolveNext({});await pending;assert.equal(created,1);
  }finally{global.BXHTeamEmblem=oldEmblem;global.URL.createObjectURL=oldCreate;global.URL.revokeObjectURL=oldRevoke;}
 });
+test('captain uploads only the prepared preview through controller',async()=>{
+ let change,click,operation;const img={hidden:true},status={},button={disabled:true,dataset:{teamAction:'emblem-upload'}};button.closest=()=>button;
+ const oldEmblem=global.BXHTeamEmblem,oldCreate=global.URL.createObjectURL,oldRevoke=global.URL.revokeObjectURL;
+ global.BXHTeamEmblem={prepare:async()=>new Blob(['abc'],{type:'image/webp'})};global.URL.createObjectURL=()=> 'blob:test';global.URL.revokeObjectURL=()=>{};
+ const controller={search:async()=>{},dispose(){},snapshot:()=>({team:{id:'t',role:'captain'}}),operate:async(...args)=>(operation=args,{ok:true})};
+ const container={addEventListener:(name,fn)=>{if(name==='change')change=fn;if(name==='click')click=fn;},removeEventListener(){},replaceChildren(){},contains:()=>true,querySelector:s=>s.includes('preview')?img:s.includes('status')?status:button};
+ try{
+  const mounted=mount({container,ui:{},controllers:{createTeamController:()=>controller},api:{}});const input={hasAttribute:()=>true,files:[{type:'image/png'}]};await change({target:input});assert.equal(button.disabled,false);
+  await click({target:button});assert.deepEqual(operation,['emblem','t',{base64:'YWJj'}]);assert.match(status.textContent,/已儲存/);mounted.destroy();
+ }finally{global.BXHTeamEmblem=oldEmblem;global.URL.createObjectURL=oldCreate;global.URL.revokeObjectURL=oldRevoke;}
+});
