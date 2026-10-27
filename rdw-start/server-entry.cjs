@@ -37,7 +37,7 @@ function createHandler({enabled=false,start}={}){
   return {ok:true,eventCode:data.eventCode,mode:result.mode||'rdw-verified'};
  };
 }
-exports.rdwStartService=onCall({region:'asia-east1',enforceAppCheck:true,timeoutSeconds:60,maxInstances:5},createHandler());
+exports.rdwStartService=onCall({region:'asia-east1',enforceAppCheck:true,timeoutSeconds:60,maxInstances:5},createWiredHandler());
 module.exports.createHandler=createHandler;
 
 // Build-time server dependencies only. The registered production export above
