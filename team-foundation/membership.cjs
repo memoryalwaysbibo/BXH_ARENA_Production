@@ -1,5 +1,5 @@
 'use strict';
-const {randomUUID}=require('node:crypto');
+const {randomUUID,createHash}=require('node:crypto');
 const {removalReason}=require('./history.cjs');
 const {admissionPolicy,requireEligible}=require('./admission.cjs');
 const {progression} = require('./progression.cjs');
@@ -7,17 +7,26 @@ const {roster,assignRole,canManage,populationState,canDissolve,selectFrame}=requ
 const id = value => { if(typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) throw Error('invalid-id'); return value; };
 // Server-only candidate. actorUid MUST come from verified Auth, never request data.
 // No endpoint or production writes are registered by importing this module.
+const canonical=value=>value===null||typeof value!=='object'?JSON.stringify(value):Array.isArray(value)?'['+value.map(canonical).join(',')+']':'{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')+'}';
 function createMembershipService({db,clock=Date.now,readEligibility,readDisplayName}) {
  const ref = path => db.doc(path);
  const read = async(tx,r) => {const s=await tx.get(r); return s.exists?s.data():null;};
- return async function command({actorUid,action,teamId,targetUid,name,role,frame,policy,reasonCode,reasonNote}) {
+ return async function command({actorUid,action,teamId,targetUid,name,role,frame,policy,reasonCode,reasonNote,requestId}) {
   id(actorUid); id(teamId);
   if(!['create','apply','cancel','approve','reject','leave','remove','transfer','assign','frame','dissolve','admission'].includes(action)) throw Error('invalid-action');
   if(['approve','reject','remove','transfer','assign'].includes(action)) id(targetUid);
   if(action==='create' && (typeof name!=='string'||name.trim().length<2||name.trim().length>24)) throw Error('invalid-name');
+  if(typeof requestId!=='string'||!/^[A-Za-z0-9_-]{16,128}$/.test(requestId))throw Error('invalid-request-id');
+  const receiptId=createHash('sha256').update(actorUid+'\0'+requestId).digest('hex');
+  const requestFields={action,teamId,targetUid:targetUid??null,name:name??null,role:role??null,frame:frame??null,policy:policy??null,reasonCode:reasonCode??null,reasonNote:reasonNote??null};
+  const requestHash=createHash('sha256').update(canonical(requestFields)).digest('hex');
   const historyId=randomUUID();
   const removal=action==='remove'?removalReason(reasonCode,reasonNote):null;
   return db.runTransaction(async tx=>{
+   const receiptRef=ref('teamOperationReceiptsV1/'+receiptId);
+   const prior=await read(tx,receiptRef);
+   if(prior){if(prior.requestHash!==requestHash)throw Error('operation-id-conflict');return prior.result;}
+   const execute=async()=>{
    const tr=ref('teamsV1/'+teamId), ar=ref('teamMembershipsV1/'+actorUid);
    const team=await read(tx,tr), actor=await read(tx,ar);
    const now=clock();
@@ -91,6 +100,10 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
    else {writeRoster({...team,memberUids:members.filter(x=>x!==targetUid)});tx.delete(ur);}
    log(action,roles[actorUid]);
    return {ok:true};
+   };
+   const result=await execute();
+   tx.create(receiptRef,{requestHash,result,actorUid,action,teamId,createdAt:clock()});
+   return result;
   });
  };
 }
