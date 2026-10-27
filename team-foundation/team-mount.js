@@ -2,12 +2,13 @@
 'use strict';
 function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamController}){
  if(!container||!ui||!controllers)throw Error('team-components-required');
- let previewVersion=0,previewUrl=null,previewBlob=null;
- function clearPreview(){previewVersion++;previewBlob=null;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
+ let previewVersion=0,previewUrl=null,previewBlob=null,previewTeam=null;
+ function clearPreview(){previewVersion++;previewBlob=null;previewTeam=null;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
-  clearPreview();
+  if(state.screen!=='mine'||state.team?.id!==previewTeam||state.busy)clearPreview();
   container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':['mine','applications','history','manage'].includes(state.screen)?'mine':'lobby')+(state.screen==='manage'&&state.loading?'<p role="status">正在載入成員…</p>':state.screen==='manage'&&!state.loaded?'<section><h2>管理成員</h2><button type="button" data-team-action="reload-manage">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='manage'?ui.manageMembers(state.team):state.screen==='history'&&state.loading?'<p role="status">正在載入戰隊紀錄…</p>':state.screen==='history'&&!state.loaded?'<section><h2>戰隊紀錄</h2><button type="button" data-team-action="reload-history">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='history'?ui.history({items:state.items,nextCursor:state.historyNextCursor,page:state.historyPage}):state.screen==='applications'&&state.loading?'<p role="status">正在載入加入申請…</p>':state.screen==='applications'&&!state.loaded?'<section><h2>加入申請</h2><button type="button" data-team-action="reload-applications">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='applications'&&!state.loading&&state.loaded?ui.applications({items:state.items,hasMore:state.hasMore,teamId:state.applicationsTeamId}):state.screen==='create'&&!state.loading&&state.loaded?ui.createTeam(state.team):state.screen==='mine'&&!state.loading&&state.loaded?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&state.loaded&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query,error:state.loaded?null:state.error}));
+  if(previewUrl&&previewBlob){const img=container.querySelector('[data-emblem-preview]'),button=container.querySelector('[data-team-action="emblem-upload"]');if(img){img.src=previewUrl;img.hidden=false;}if(button)button.disabled=false;}
   if(state.busy)for(const button of container.querySelectorAll('button'))button.disabled=true;
   if(state.pending){const retry=container.ownerDocument.createElement('button');retry.type='button';retry.dataset.teamAction='retry';retry.textContent='重試上一筆操作';retry.disabled=state.busy||state.loading;container.append(retry);}
   if(state.error){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent=state.error;container.append(p);}
@@ -77,10 +78,10 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  const change=async event=>{const select=event.target;
   if(select.hasAttribute?.('data-team-emblem')){
    if(!container.contains(select)||controller.snapshot().team?.role!=='captain')return;
-   clearPreview();const version=previewVersion,file=select.files?.[0],img=container.querySelector('[data-emblem-preview]'),status=container.querySelector('[data-emblem-status]'),button=container.querySelector('[data-team-action="emblem-upload"]');
+   clearPreview();previewTeam=controller.snapshot().team?.id;const version=previewVersion,file=select.files?.[0],img=container.querySelector('[data-emblem-preview]'),status=container.querySelector('[data-emblem-status]'),button=container.querySelector('[data-team-action="emblem-upload"]');
    if(button)button.disabled=true;
    if(!file||!img||!status)return;img.hidden=true;status.textContent='正在處理圖案…';
-   try{if(!root.BXHTeamEmblem||!root.URL?.createObjectURL)throw Error('unavailable');const blob=await root.BXHTeamEmblem.prepare(file);if(version!==previewVersion||!container.contains(select))return;previewBlob=blob;previewUrl=root.URL.createObjectURL(blob);img.src=previewUrl;img.hidden=false;if(button)button.disabled=false;status.textContent='圖片尚未儲存，確認後請按上傳。';}
+   try{if(!root.BXHTeamEmblem||!root.URL?.createObjectURL)throw Error('unavailable');const blob=await root.BXHTeamEmblem.prepare(file);if(version!==previewVersion)return;const currentImg=container.querySelector('[data-emblem-preview]'),currentStatus=container.querySelector('[data-emblem-status]'),currentButton=container.querySelector('[data-team-action="emblem-upload"]');if(!currentImg||!currentStatus)return;previewBlob=blob;previewUrl=root.URL.createObjectURL(blob);currentImg.src=previewUrl;currentImg.hidden=false;if(currentButton)currentButton.disabled=false;currentStatus.textContent='圖片尚未儲存，確認後請按上傳。';}
    catch(error){if(version===previewVersion&&container.contains(select))status.textContent=error?.message==='invalid-image-type'?'請選擇 JPG、PNG 或 WebP 圖片。':error?.message==='invalid-image-size'?'請選擇 10 MB 以下的圖片。':'圖片無法預覽，請換一張圖片再試。';}
    return;
   }
