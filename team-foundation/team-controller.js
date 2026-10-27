@@ -27,9 +27,13 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
   'sign-in-again':'登入已過期，請重新登入。',
   'teams-unavailable':'戰隊功能目前尚未開放。'
  };
+ function rejectionMessage(error){
+  const raw=String(error?.message||''),code=String(error?.code||'');
+  return code&&raw.endsWith(' '+code)?raw.slice(0,-code.length-1):raw;
+ }
  function rejection(error){
   const code=String(error?.code||'').replace(/^functions\//,'');
-  const message=String(error?.message||'');
+  const message=rejectionMessage(error);
   return ['invalid-argument','failed-precondition','permission-denied','unauthenticated'].includes(code)&&Object.hasOwn(rejectionMessages,message)?rejectionMessages[message]:null;
  }
  const snapshot=()=>structuredClone(state);
@@ -78,7 +82,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
    return {ok:true};
   }catch(error){
    let rejected=rejection(error);
-   if(payload.action==='approve'&&error?.message==='already-in-team'&&rejected)rejected='申請者已有戰隊，無法核准加入。';
+   if(payload.action==='approve'&&rejectionMessage(error)==='already-in-team'&&rejected)rejected='申請者已有戰隊，無法核准加入。';
    if(!disposed){pendingPayload=rejected?null:payload;state.pending=!rejected;state.error=rejected||'操作結果尚未確認，可重試同一筆操作。';emit();}
    return {ok:false,reason:rejected?'rejected':'unconfirmed'};
   }finally{if(!disposed){state.busy=false;emit();}}
