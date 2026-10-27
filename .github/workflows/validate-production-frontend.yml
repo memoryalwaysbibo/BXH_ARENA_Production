@@ -286,6 +286,9 @@ jobs:
       - name: Verify compact bracket finals labels
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         run: node tests/e2e/bracket-final-label-layout.cjs
+      - name: Verify bracket stage switching and compact layout
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/e2e/bracket-stage-switch.cjs
       - name: Verify public catalog in isolated Chromium without authentication
         if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
         env:
