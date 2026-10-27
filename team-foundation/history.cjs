@@ -12,7 +12,7 @@ function historyView(record){
  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(record.occurredAt);
  const v=Object.fromEntries(parts.map(x=>[x.type,x.value]));
  const role={captain:'隊長',deputy:'副隊長'}[record.actorRole]||'成員';
- const method={create:'建立戰隊',auto:'系統自動加入',approve:role+'－'+record.actorName+'核准',leave:'自行退出',remove:role+'－'+record.actorName+'移除',assign:'職位調整',transfer:'隊長轉讓',dissolve:'隊長解散'}[record.method]||record.method;
+ const method={create:'建立戰隊',auto:'系統自動加入',approve:role+'－'+record.actorName+'核准',leave:'自行退出',remove:role+'－'+record.actorName+'移除',assign:'職位調整',transfer:'隊長轉讓',dissolve:'隊長解散','auto-dissolve':'系統自動解散'}[record.method]||record.method;
  return {name:record.subjectName,date:v.year+'/'+v.month+'/'+v.day,time:v.hour+':'+v.minute,method};
 }
 // Enforce this again in the real server read endpoint and Rules; UI filtering is insufficient.
