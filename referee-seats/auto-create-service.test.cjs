@@ -55,3 +55,10 @@ test('release gate and concurrent same-code create fail closed',async()=>{
  assert.equal(r.filter(x=>x.status==='fulfilled').length,1);
  assert.equal(r.filter(x=>x.status==='rejected').length,1);
 });
+
+test('public payload rejects unexpected fields and nested private identities',async()=>{
+ const h=harness(),p=h.payload;
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,secretToken:'no'}}),/private-mirror-data/);
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3},private:{uid:'secret'}})}}),/private-mirror-data/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
+});
