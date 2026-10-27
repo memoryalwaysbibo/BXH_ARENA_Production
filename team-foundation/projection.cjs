@@ -14,7 +14,7 @@ function createProjectionWriter({db,readPlayers,clock=Date.now}){
   return db.runTransaction(async tx=>{
    const teamRef=db.doc('teamsV1/'+teamId),publicRef=db.doc('teamsPublicV1/'+teamId);
    const snap=await tx.get(teamRef);
-   if(!snap.exists)throw Error('team-not-found');
+   if(!snap.exists){tx.delete(publicRef);return {status:'removed'};}
    const team=snap.data();
    if(team.status==='dissolved'){tx.delete(publicRef);return {status:'removed'};}
    const roles=roster(team);
@@ -34,7 +34,7 @@ function createProjectionWriter({db,readPlayers,clock=Date.now}){
    const projection={status:'active',name:team.name,captainName:members.find(m=>m.uid===team.captainUid).name,
     level:p.level,capacity:p.capacity,memberCount:members.length,admission:admissionPolicy(team.admission),
     strength:complete?members.reduce((sum,m)=>sum+m.ladderPoints,0):null,strengthComplete:complete,
-    members,createdAt:team.createdAt,updatedAt:current,sourceVersion:'team-public-v1'};
+    members,createdAt:team.createdAt,updatedAt:current,hunterGeneration:data.hunterGeneration??null,sourceVersion:'team-public-v1'};
    tx.set(publicRef,projection);return {status:'updated',strengthComplete:complete};
   });
  };
