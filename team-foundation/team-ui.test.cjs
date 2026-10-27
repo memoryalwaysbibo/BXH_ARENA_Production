@@ -22,3 +22,8 @@ test('recruitment uses unset defaults and rank dropdowns',()=>{
 test('create screen handles team membership and safely renders form',()=>{
  assert.ok(ui.createTeam(null).includes('data-team-form="create"'));assert.ok(ui.createTeam({id:'a'}).includes('已有所屬戰隊'));
 });
+
+test('pending application exposes its status and a cancel control',()=>{
+ const html=ui.lobby({items:[{id:'team1',name:'甲',captainName:'乙',memberCount:1,capacity:10,join:{label:'審核中',disabled:true}}],total:1});
+ assert.match(html,/審核中/);assert.match(html,/data-team-action="cancel"/);assert.match(html,/取消申請/);
+});
