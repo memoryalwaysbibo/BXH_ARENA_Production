@@ -19,3 +19,20 @@ test('unarchived, mismatched and late membership cannot add experience',async()=
   const f=fixture();change(f);assert.deepEqual(await f.award(id),{status:'ineligible'});assert.equal(f.docs.get('teamsV1/t').totalXp,2);assert.equal(f.docs.has('teamActivityReceiptsV1/'+id),false);
  }
 });
+test('two members in one event each contribute once, while duplicate results fail closed',async()=>{
+ const f=fixture(),other='second',otherId=code+'_'+other;
+ f.docs.set('ladderTransactions/'+otherId,{type:'event',eventCode:code,playerUid:other,seasonId:'S1',pointsEarned:0});
+ f.docs.set('teamMembershipsV1/'+other,{teamId:'t',joinedAt:199});
+ f.docs.get('teamsV1/t').memberUids.push(other);
+ f.docs.get('tournaments/'+code).ladderResults.push({eventCode:code,playerUid:other,seasonId:'S1',pointsEarned:0});
+ assert.equal((await f.award(id)).status,'awarded');assert.equal((await f.award(otherId)).status,'awarded');
+ assert.equal(f.docs.get('teamsV1/t').totalXp,4);
+ assert.equal((await f.award(otherId)).status,'already-awarded');assert.equal(f.docs.get('teamsV1/t').totalXp,4);
+ const bad=fixture();bad.docs.get('tournaments/'+code).ladderResults.push(null,{eventCode:code,playerUid:uid,seasonId:'S1',pointsEarned:12});
+ assert.equal((await bad.award(id)).status,'ineligible');assert.equal(bad.docs.get('teamsV1/t').totalXp,2);
+});
+test('cancelled events and invalid joining timestamps never award',async()=>{
+ for(const change of [f=>{f.docs.get('tournaments/'+code).eventCancelled=true;},f=>{f.docs.get('teamMembershipsV1/'+uid).joinedAt=-1;}]){
+  const f=fixture();change(f);assert.equal((await f.award(id)).status,'ineligible');assert.equal(f.docs.get('teamsV1/t').totalXp,2);
+ }
+});
