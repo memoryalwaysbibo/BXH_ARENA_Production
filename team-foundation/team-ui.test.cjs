@@ -42,3 +42,8 @@ test('application date and time are displayed separately in Taipei time',()=>{
 test('application review offers a manual refresh for changes made by others',()=>{
  const html=ui.applications({teamId:'t'});assert.match(html,/data-team-action="reload-applications"/);assert.match(html,/重新整理名單/);
 });
+
+test('history shows separate fields and escapes record content',()=>{
+ const html=ui.history({items:[{name:'<小賈>',date:'2026/10/27',time:'18:10',method:'隊長移除'}]});
+ assert.match(html,/<th>姓名<\/th><th>日期<\/th><th>時間<\/th><th>方式/);assert.match(html,/&lt;小賈&gt;/);assert.match(html,/18:10/);assert.doesNotMatch(html,/<小賈>/);
+});
