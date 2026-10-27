@@ -36,7 +36,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
  const emit=()=>{if(!disposed)onChange(snapshot());};
  async function load(screen,payload){
   if(disposed)return {ok:false,reason:'disposed'};
-  const ticket=++generation;state.screen=screen;state.loading=true;state.loaded=false;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
+  const ticket=++generation;if(screen==='applications')state.applicationsTeamId=payload.teamId;state.screen=screen;state.loading=true;state.loaded=false;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
   try{
    const result=await(screen==='applications'?api.applications(payload):screen==='members'?api.members(payload):(screen==='mine'||screen==='create')?api.mine():api.list(payload));
    if(disposed||ticket!==generation)return {ok:false,reason:'superseded'};
