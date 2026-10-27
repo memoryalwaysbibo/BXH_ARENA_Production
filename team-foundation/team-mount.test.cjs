@@ -47,3 +47,14 @@ test('captain uploads only the prepared preview through controller',async()=>{
   await click({target:button});assert.deepEqual(operation,['emblem','t',{base64:'YWJj'}]);assert.match(status.textContent,/已儲存/);mounted.destroy();
  }finally{global.BXHTeamEmblem=oldEmblem;global.URL.createObjectURL=oldCreate;global.URL.revokeObjectURL=oldRevoke;}
 });
+test('image refresh of the same team preserves the captain preview',async()=>{
+ let change,render,revoked=0;const img={},status={},button={disabled:true},team={id:'t',role:'captain'};
+ const oldEmblem=global.BXHTeamEmblem,oldCreate=global.URL.createObjectURL,oldRevoke=global.URL.revokeObjectURL;
+ global.BXHTeamEmblem={prepare:async()=>new Blob(['abc'])};global.URL.createObjectURL=()=> 'blob:preview';global.URL.revokeObjectURL=()=>revoked++;
+ const controller={search:async()=>{},dispose(){},snapshot:()=>({team})};
+ const container={innerHTML:'',addEventListener:(name,fn)=>{if(name==='change')change=fn;},removeEventListener(){},replaceChildren(){},contains:()=>true,querySelectorAll:()=>[],querySelector:s=>s.includes('preview')?img:s.includes('status')?status:button};
+ try{
+  const mounted=mount({container,ui:{css:'',tabs:()=>'',myTeam:()=>''},controllers:{createTeamController:({onChange})=>(render=onChange,controller)},api:{}});
+  await change({target:{hasAttribute:()=>true,files:[{}]}});render({screen:'mine',team,loaded:true,loading:false,busy:false});assert.equal(img.src,'blob:preview');assert.equal(button.disabled,false);assert.equal(revoked,0);mounted.destroy();assert.equal(revoked,1);
+ }finally{global.BXHTeamEmblem=oldEmblem;global.URL.createObjectURL=oldCreate;global.URL.revokeObjectURL=oldRevoke;}
+});
