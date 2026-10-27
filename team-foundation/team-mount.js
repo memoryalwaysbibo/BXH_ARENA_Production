@@ -2,8 +2,8 @@
 'use strict';
 function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamController}){
  if(!container||!ui||!controllers)throw Error('team-components-required');
- let previewVersion=0,previewUrl=null;
- function clearPreview(){previewVersion++;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
+ let previewVersion=0,previewUrl=null,previewBlob=null;
+ function clearPreview(){previewVersion++;previewBlob=null;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
   clearPreview();
@@ -16,6 +16,14 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
   const button=event.target.closest('[data-team-action]');if(!button||!container.contains(button)||button.disabled)return;
   const action=button.dataset.teamAction,id=button.dataset.teamId;
   if(action==='retry')await controller.retryPending();
+  else if(action==='emblem-upload'){
+   const team=controller.snapshot().team,version=previewVersion,blob=previewBlob;if(!blob||team?.role!=='captain'||!team.id)return;
+   button.disabled=true;
+   try{const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);const base64=root.btoa(binary);
+    if(version!==previewVersion||controller.snapshot().team?.id!==team.id||controller.snapshot().team?.role!=='captain')return;
+    const result=await controller.operate('emblem',team.id,{base64});const status=container.querySelector('[data-emblem-status]');if(result.ok&&status)status.textContent='圖案已儲存。';
+   }catch(_){const status=container.querySelector('[data-emblem-status]');if(version===previewVersion&&status){status.textContent='圖片無法上傳，請重新選擇。';button.disabled=false;}}
+  }
   else if(action==='tab'&&button.dataset.value==='mine')await controller.mine();
   else if(action==='tab'&&button.dataset.value==='create')await controller.create();
   else if(action==='tab'&&button.dataset.value==='lobby')await controller.search(controller.snapshot().query);
@@ -69,9 +77,10 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  const change=async event=>{const select=event.target;
   if(select.hasAttribute?.('data-team-emblem')){
    if(!container.contains(select)||controller.snapshot().team?.role!=='captain')return;
-   clearPreview();const version=previewVersion,file=select.files?.[0],img=container.querySelector('[data-emblem-preview]'),status=container.querySelector('[data-emblem-status]');
+   clearPreview();const version=previewVersion,file=select.files?.[0],img=container.querySelector('[data-emblem-preview]'),status=container.querySelector('[data-emblem-status]'),button=container.querySelector('[data-team-action="emblem-upload"]');
+   if(button)button.disabled=true;
    if(!file||!img||!status)return;img.hidden=true;status.textContent='正在處理圖案…';
-   try{if(!root.BXHTeamEmblem||!root.URL?.createObjectURL)throw Error('unavailable');const blob=await root.BXHTeamEmblem.prepare(file);if(version!==previewVersion||!container.contains(select))return;previewUrl=root.URL.createObjectURL(blob);img.src=previewUrl;img.hidden=false;status.textContent='圖片僅供預覽，尚未儲存。';}
+   try{if(!root.BXHTeamEmblem||!root.URL?.createObjectURL)throw Error('unavailable');const blob=await root.BXHTeamEmblem.prepare(file);if(version!==previewVersion||!container.contains(select))return;previewBlob=blob;previewUrl=root.URL.createObjectURL(blob);img.src=previewUrl;img.hidden=false;if(button)button.disabled=false;status.textContent='圖片尚未儲存，確認後請按上傳。';}
    catch(error){if(version===previewVersion&&container.contains(select))status.textContent=error?.message==='invalid-image-type'?'請選擇 JPG、PNG 或 WebP 圖片。':error?.message==='invalid-image-size'?'請選擇 10 MB 以下的圖片。':'圖片無法預覽，請換一張圖片再試。';}
    return;
   }
