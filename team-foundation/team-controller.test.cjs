@@ -114,3 +114,11 @@ test('uncertain emblem upload retries the same request and image',async()=>{
  await c.mine();assert.equal((await c.operate('emblem','t',{base64:'YWJj'})).reason,'unconfirmed');assert.equal(c.snapshot().pending,true);
  assert.equal((await c.retryPending()).ok,true);assert.deepEqual(calls[0],calls[1]);assert.deepEqual(calls[0],{teamId:'t',requestId:'test-operation-00000001',contentType:'image/webp',base64:'YWJj'});assert.equal(c.snapshot().screen,'mine');
 });
+test('team image loads once per page load and late responses cannot cross navigation',async()=>{
+ let calls=0;const d=deferred(),c=setup({mine:async()=>({team:{id:'own'}}),members:async()=>({id:'other',members:[]}),emblem:async({teamId})=>{calls++;return teamId==='own'?d.promise:{image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQ'}};}});
+ await c.mine();assert.equal(calls,1);await c.view('other');await new Promise(setImmediate);assert.match(c.snapshot().team.emblemSource,/^data:image\/webp/);
+ d.resolve({image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQAAAA'}});await new Promise(setImmediate);assert.equal(c.snapshot().team.id,'other');assert.equal(c.snapshot().team.emblemSource,'data:image/webp;base64,UklGRgAAAABXRUJQ');assert.equal(calls,2);
+});
+test('failed image lookup does not fail the team page',async()=>{
+ const c=setup({mine:async()=>({team:{id:'t'}}),emblem:async()=>{throw Error('storage');}});await c.mine();await new Promise(setImmediate);assert.equal(c.snapshot().loaded,true);assert.equal(c.snapshot().team.emblemSource,undefined);
+});
