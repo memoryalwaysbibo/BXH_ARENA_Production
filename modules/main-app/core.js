@@ -11838,7 +11838,7 @@ function renderAdminRegistrationsTab(){
     <td>${esc(r.phone||"")}</td>
     <td>${esc(r.email||"—")}</td>
     <td>${normalizeDateTime(r.createdAt)?esc(new Date(normalizeDateTime(r.createdAt)).toLocaleString()):"—"}</td>
-    <td>${esc(r.source==="admin"?"管理員新增":"玩家自行報名")}</td>
+    <td>${esc(registrationSourceLabel(r))}</td>
     ${showCancel ? `<td><button class="btn btn-danger btn-sm" data-action="admin-cancel-registration" data-uid="${esc(r.uid)}" ${adminRegistrationsBusy||registrationLocked?'disabled':''}>手動取消</button></td>` : `<td>—</td>`}
   </tr>`;
   const card = (r, showCancel)=>{
@@ -11856,7 +11856,7 @@ function renderAdminRegistrationsTab(){
         <div><span>電話</span><b>${esc(r.phone||"—")}</b></div>
         <div><span>Email</span><b class="break-anywhere">${esc(r.email||"—")}</b></div>
         <div><span>報名時間</span><b>${esc(created)}</b></div>
-        <div><span>來源</span><b>${esc(r.source==="admin"?"管理員新增":"玩家自行報名")}</b></div>
+        <div><span>來源</span><b>${esc(registrationSourceLabel(r))}</b></div>
         ${showCancel?`<div class="registration-mobile-actions"><button class="btn btn-danger btn-sm" data-action="admin-cancel-registration" data-uid="${esc(r.uid)}" ${adminRegistrationsBusy||registrationLocked?'disabled':''}>手動取消</button></div>`:""}
       </div>
     </details>`;
@@ -12418,6 +12418,11 @@ async function peoplePromoteLocal(waitId,name,expandCapacity){
   }
 }
 
+function registrationSourceLabel(row){
+  if(row?.source==="host_invitation")return "主辦邀請";
+  if(row?.source==="admin")return "管理員新增";
+  return "玩家自行報名";
+}
 function renderPeopleManagement(){
   const online=!!(state.meta&&state.meta.registrationEnabled);
   const needsCheckin=!!(state.meta&&state.meta.checkinRequired);
@@ -12441,6 +12446,8 @@ function renderPeopleManagement(){
     return !p.registrationId||!onlineIds.has(String(p.registrationId));
   });
   const waitCount=onlineWait.length+localWait.length;
+  const rosterUnresolved=!!(state.cloudCode&&(online||isCommunityQuickRegistration(state))&&canManageRegistrationRoster()&&!Array.isArray(adminRegistrationsCache));
+  const rosterPendingLabel=adminRegistrationsError?"尚未同步":"讀取中";
   const capacity=Number((selectionManaged&&state.entrySelection&&state.entrySelection.capacity)||state.meta.registrationCapacity||0);
 
   const navItems=[
@@ -12451,7 +12458,7 @@ function renderPeopleManagement(){
     ["staff","工作人員",null],
     ["bracket","賽事編排",null]
   ];
-  const subnav='<div class="people-subnav">'+navItems.map(x=>'<button class="btn '+(peopleRosterSection===x[0]?'btn-primary':'btn-ghost')+'" data-action="people-section" data-section="'+x[0]+'"><strong>'+x[1]+'</strong>'+(x[2]!=null?'<span>'+x[2]+' 人</span>':'')+'</button>').join('')+'</div>';
+  const subnav='<div class="people-subnav">'+navItems.map(x=>'<button class="btn '+(peopleRosterSection===x[0]?'btn-primary':'btn-ghost')+'" data-action="people-section" data-section="'+x[0]+'"><strong>'+x[1]+'</strong>'+(x[0]==="waitlist"&&rosterUnresolved?'<span>'+rosterPendingLabel+'</span>':x[2]!=null?'<span>'+x[2]+' 人</span>':'')+'</button>').join('')+'</div>';
 
   const sourceBadge=p=>p.source==="online"
     ?'<span class="badge badge-neon">線上報名</span>'
@@ -12500,13 +12507,13 @@ function renderPeopleManagement(){
     ?window.BXHOnsiteWaitlistIntegration?.placeholder({code:state.cloudCode,actorId:firebaseUser?.uid})||"":"";
   const waitlistPanel=onsiteWaitlistPanel+(peopleOnsiteWaitlistManaged()?"":`
     <div class="panel">
-      <div class="people-capacity-banner"><div><div class="panel-title">備取區（${waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
+      <div class="people-capacity-banner"><div><div class="panel-title">備取區（${rosterUnresolved?rosterPendingLabel:waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
       <div class="btn-row" style="margin:12px 0;">
         <button class="btn ${state.meta.registrationAutoFillEnabled===true?'btn-primary':'btn-ghost'}" role="switch" aria-checked="${state.meta.registrationAutoFillEnabled===true}" data-action="people-toggle-auto-fill" ${!state.cloudCode||locked||selectionManaged||state.meta.battleMode==='team'||peopleRosterBusy?'disabled':''}>自動補位：${state.meta.registrationAutoFillEnabled===true?'開啟':'關閉'}</button>
         <span class="hint">${selectionManaged||state.meta.battleMode==='team'?'此開關適用一般個人賽；本場依專用名額規則處理。':(state.meta.registrationAutoFillEnabled===true?'正取退出時，依備取順序自動遞補；不會增加名額。':'目前關閉：正取退出後不會自動遞補，建議開啟以保障備取順位。')}</span>
       </div>
       ${selectionManaged?'<div class="banner warn"><span>本場為抽籤名額模式，請由「參賽名額抽籤」異動正備取。</span></div>':''}
-      ${adminRegistrationsLoading?'<div class="empty-state">正在同步線上備取名單……</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th><th>升正取</th><th>更多</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
+      ${rosterUnresolved||adminRegistrationsLoading?'<div class="empty-state">線上備取名單尚未讀取完成，請以同步完成後的人數為準。</div>':waitCount===0?'<div class="empty-state">目前沒有備取選手</div>':`<div class="table-scroll people-roster-scroll"><table class="rank-table people-roster-table"><thead><tr><th>順位</th><th>姓名</th><th>來源</th><th>升正取</th><th>更多</th></tr></thead><tbody>${waitOnlineRows+waitLocalRows}</tbody></table></div>`}
     </div>`);
 
   const toolsPanel=`
@@ -25008,4 +25015,5 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
