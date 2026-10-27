@@ -3,7 +3,7 @@
 // Transport is deliberately injected; no unverified production endpoint is assumed.
 function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.crypto?.randomUUID)throw Error('secure-id-unavailable');return root.crypto.randomUUID();}}){
  if(!api||!['list','members','command','mine','applications','history'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
- const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,historyTeamId:null,hasMore:false};
+ const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,historyTeamId:null,historyNextCursor:null,hasMore:false};
  let generation=0,disposed=false,pendingPayload=null;
  // Only known server rejections prove the transaction did not commit.
  const rejectionMessages={
@@ -40,7 +40,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
   try{
    const result=await(screen==='applications'?api.applications(payload):screen==='history'?api.history(payload):screen==='members'?api.members(payload):(screen==='mine'||screen==='create')?api.mine():api.list(payload));
    if(disposed||ticket!==generation)return {ok:false,reason:'superseded'};
-   if(screen==='history'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;}else if(screen==='applications'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.hasMore=result.hasMore===true;state.applicationsTeamId=payload.teamId;}else if(screen==='members')state.team=result;else if(screen==='mine'||screen==='create')state.team=result.team;else{
+   if(screen==='history'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.historyNextCursor=typeof result.nextCursor==='string'?result.nextCursor:null;}else if(screen==='applications'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.hasMore=result.hasMore===true;state.applicationsTeamId=payload.teamId;}else if(screen==='members')state.team=result;else if(screen==='mine'||screen==='create')state.team=result.team;else{
     if(!Array.isArray(result.items)||!Number.isSafeInteger(result.total)||result.total<0)throw Error('invalid-response');
     state.items=result.items;state.total=result.total;state.partial=result.partial===true;state.totalIsUpperBound=result.totalIsUpperBound===true;state.staleCount=Number.isSafeInteger(result.staleCount)?result.staleCount:0;
    }
@@ -83,7 +83,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
   return send(pendingPayload);
  }
 
- return {snapshot,search,mine:()=>load('mine',{}),create:()=>load('create',{}),clear:()=>search({}),view:teamId=>load('members',{teamId}),applications:teamId=>load('applications',{teamId}),history:teamId=>load('history',{teamId}),operate,retryPending,dispose:()=>{disposed=true;generation++;}};
+ return {snapshot,search,mine:()=>load('mine',{}),create:()=>load('create',{}),clear:()=>search({}),view:teamId=>load('members',{teamId}),applications:teamId=>load('applications',{teamId}),history:(teamId,cursor)=>load('history',{teamId,...(cursor?{cursor}:{})}),operate,retryPending,dispose:()=>{disposed=true;generation++;}};
 }
 if(typeof module==='object'&&module.exports)module.exports={createTeamController};else root.BXHTeamController={createTeamController};
 })(typeof window==='object'?window:globalThis);
