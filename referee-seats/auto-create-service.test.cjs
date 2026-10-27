@@ -66,7 +66,7 @@ test('public payload rejects unexpected fields and nested private identities',as
 
 test('new room rejects forged ownership and stale seat permissions',async()=>{
  const h=harness(),p=h.payload;
- await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,ownerUid:'other'}}),/owner-mismatch/);
+ await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,ownerUid:'other'}}),/protected-create-field/);
  await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,refereeSeatsV1:{version:1}}}),/protected-create-field/);
  const state=JSON.parse(p.privatePayload.data);
  state.meta.refereeStationRestrictionEnabled=true;
