@@ -1,6 +1,7 @@
 'use strict';
 const {progression}=require('./progression.cjs');
-const {admissionPolicy,TIERS}=require('./admission.cjs');
+const ladder=require('./official-ladder-v1.js');
+const {admissionPolicy,TIERS,LADDER_TIERS}=require('./admission.cjs');
 function publicTeam(team,players){
  const p=progression(team.totalXp),policy=admissionPolicy(team.admission);
  // Explicit allowlist; no presence, contribution, history, reasons or application data.
@@ -9,8 +10,8 @@ function publicTeam(team,players){
 }
 function eligibility(team,player){
  const p=team.admission;
- if(p.minPoints!==null&&!Number.isFinite(player?.ladderPoints)||p.minTier!==null&&!TIERS.includes(player?.hunterTier))return null;
- return (p.minPoints===null||player.ladderPoints>=p.minPoints)&&(p.minTier===null||TIERS.indexOf(player.hunterTier)>=TIERS.indexOf(p.minTier));
+ if(p.minLadderTier!==null&&(!Number.isFinite(player?.ladderPoints)||player.ladderPoints<0)||p.minTier!==null&&!TIERS.includes(player?.hunterTier))return null;
+ return (p.minLadderTier===null||LADDER_TIERS.indexOf(ladder.tier(player.ladderPoints))>=LADDER_TIERS.indexOf(p.minLadderTier))&&(p.minTier===null||TIERS.indexOf(player.hunterTier)>=TIERS.indexOf(p.minTier));
 }
 function joinState(team,{membershipTeamId=null,pendingTeamIds=[],player=null}={}){
  if(membershipTeamId===team.id)return {label:'我的戰隊',disabled:false,action:'view'};
