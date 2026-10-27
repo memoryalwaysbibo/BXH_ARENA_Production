@@ -3,7 +3,7 @@
 // Transport is deliberately injected; no unverified production endpoint is assumed.
 function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.crypto?.randomUUID)throw Error('secure-id-unavailable');return root.crypto.randomUUID();}}){
  if(!api||!['list','members','command','mine'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
- const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,busy:false,error:null,pending:false};
+ const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false};
  let generation=0,disposed=false,pendingPayload=null;
  // Only known server rejections prove the transaction did not commit.
  const rejectionMessages={
@@ -36,7 +36,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
  const emit=()=>{if(!disposed)onChange(snapshot());};
  async function load(screen,payload){
   if(disposed)return {ok:false,reason:'disposed'};
-  const ticket=++generation;state.screen=screen;state.loading=true;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
+  const ticket=++generation;state.screen=screen;state.loading=true;state.loaded=false;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
   try{
    const result=await(screen==='members'?api.members(payload):(screen==='mine'||screen==='create')?api.mine():api.list(payload));
    if(disposed||ticket!==generation)return {ok:false,reason:'superseded'};
@@ -44,7 +44,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
     if(!Array.isArray(result.items)||!Number.isSafeInteger(result.total)||result.total<0)throw Error('invalid-response');
     state.items=result.items;state.total=result.total;state.partial=result.partial===true;state.totalIsUpperBound=result.totalIsUpperBound===true;state.staleCount=Number.isSafeInteger(result.staleCount)?result.staleCount:0;
    }
-   return {ok:true};
+   state.loaded=true;return {ok:true};
   }catch(_){if(!disposed&&ticket===generation)state.error='資料暫時無法載入，請重試。';return {ok:false,reason:'load-failed'};}
   finally{if(!disposed&&ticket===generation){state.loading=false;emit();}}
  }
