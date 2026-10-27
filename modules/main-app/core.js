@@ -3089,6 +3089,8 @@ const CHANGELOG_TEXT = "" +
 
 /* ==== board (kiosk) mode: display-only wrapper around existing bracket data ==== */
 let bracketViewMode = "board"; // 'board' = 樹狀總覽；'standard' = 賽事清單
+const BOARD_STAGE_SIZES = [128, 64, 32, 16];
+let boardStageSelection = {key:"", size:0}; // Display preference only; never saved in tournament state.
 let singleBracketLayoutMode = "auto"; // 'auto' | 'compact' | 'full'
 let boardZoom = 1; // 0.5 - 1.5
 let boardPanX = 0, boardPanY = 0;
@@ -10465,6 +10467,60 @@ function currentRoundLabelForBoard(){
   return "尚未開始";
 }
 
+function boardStageContext(){
+  return JSON.stringify([state.cloudCode||state.id||"",state.bracketSize,state.meta.formatType||"single",state.meta.battleMode||"individual"]);
+}
+function availableBoardStage(size){
+  const bracketSize=Number(state.bracketSize);
+  return (state.meta.formatType||"single")==="single" && state.meta.battleMode!=="team"
+    && bracketSize>=2 && Number.isInteger(Math.log2(bracketSize))
+    && (size===0 || (BOARD_STAGE_SIZES.includes(size) && size<=bracketSize));
+}
+function selectedBoardStage(){
+  return boardStageSelection.key===boardStageContext() && availableBoardStage(boardStageSelection.size) ? boardStageSelection.size : 0;
+}
+function boardStageStartRound(){
+  const size=selectedBoardStage();
+  return size ? Math.max(0,numRoundsTotal()-Math.log2(size)) : 0;
+}
+function boardStageSummary(){
+  const size=selectedBoardStage();
+  return size ? "顯示："+size+" 強至決賽" : "顯示：全部輪次";
+}
+function boardExportLabel(){
+  const size=selectedBoardStage();
+  return size ? size+"強起對戰表" : "完整對戰表";
+}
+function renderBoardStageSwitch(){
+  if(!availableBoardStage(0))return "";
+  const selected=selectedBoardStage();
+  return `<div class="board-stage-switch" role="group" aria-label="樹狀圖顯示範圍">
+    ${[0,...BOARD_STAGE_SIZES].map(size=>`<button type="button" class="board-stage-btn ${selected===size?'active':''}" data-action="set-board-stage" data-stage="${size}" aria-pressed="${selected===size}" aria-controls="board-canvas" ${availableBoardStage(size)?'':'disabled'} title="${size ? (availableBoardStage(size)?'從 '+size+' 強顯示至決賽':'本場沒有 '+size+' 強輪次') : '顯示全部輪次，包含入圍戰'}">${size ? size+' 強' : '全部'}</button>`).join("")}
+  </div>`;
+}
+function setBoardStage(size){
+  if(bracketViewMode!=="board" || !availableBoardStage(size) || size===selectedBoardStage())return;
+  if(boardExportBusy){showToast("圖片產生中，請完成後再切換顯示範圍");return;}
+  boardStageSelection={key:boardStageContext(),size};
+  boardZoom=1;boardPanX=0;boardPanY=0;
+  const canvas=document.getElementById("board-canvas");
+  if(!canvas){render();return;}
+  // Keep the shell/viewport in place so native fullscreen and focused controls survive.
+  canvas.innerHTML=renderSingleElimBracket(true);
+  document.querySelectorAll('.board-stage-switch [data-stage]').forEach(button=>{
+    const active=Number(button.getAttribute("data-stage"))===size;
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-pressed",String(active));
+  });
+  const summary=document.getElementById("board-stage-summary");
+  if(summary)summary.textContent=boardStageSummary();
+  const exportButton=document.querySelector('#board-shell [data-action="board-export-image"]');
+  if(exportButton)exportButton.innerHTML=BOARD_ICON_EXPORT+" 儲存"+boardExportLabel();
+  flushBoardTransform();
+  bindBoardModeInteractions();
+  scheduleSeRelayout();
+}
+
 function renderBoardMode(){
   const commitStatus=bracketCommitStatusHtml();
   const fmt = state.meta.formatType || "single";
@@ -10492,14 +10548,14 @@ function renderBoardMode(){
         <img class="board-logo" src="${LOGO_SRC}" alt="BXH">
         <div>
           <div class="board-title">${esc(state.meta.name||"未命名賽事")}</div>
-          <div class="board-sub"><span>${esc(FORMAT_LABELS[fmt]||"")}</span><span>${esc(currentRoundLabelForBoard())}</span><span class="board-status-chip status-${st}">${stLabel}</span></div>
+          <div class="board-sub"><span>${esc(FORMAT_LABELS[fmt]||"")}</span><span>${esc(currentRoundLabelForBoard())}</span><span class="board-status-chip status-${st}">${stLabel}</span>${availableBoardStage(0)?`<span id="board-stage-summary" role="status">${boardStageSummary()}</span>`:""}</div>
         </div>
       </div>
       <button class="share-btn" data-action="open-share-modal" title="分享賽事" aria-label="分享賽事">${SHARE_ICON_SVG}</button>
     </div>
 
     <div class="board-toolbar">
-      <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 儲存完整對戰表</button>
+      <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 儲存${boardExportLabel()}</button>
       ${reshuffleAllowed?`<button class="btn btn-ghost btn-sm" data-action="board-reshuffle">${BOARD_ICON_SHUFFLE} 重新抽籤</button>`:""}
       <span class="board-zoom-group">
         <button class="btn btn-ghost btn-sm" data-action="board-zoom-out" aria-label="縮小對戰表">${BOARD_ICON_MINUS}</button>
@@ -10512,7 +10568,8 @@ function renderBoardMode(){
         ${Object.keys(BOARD_THEMES).map(k=>`<option value="${k}" ${boardTheme===k?'selected':''}>${BOARD_THEMES[k].label}</option>`).join("")}
       </select>
     </div>
-    <div class="board-help">整場賽事對戰表｜單指拖曳、雙指縮放；全螢幕後仍可拖曳查看各輪。</div>
+    ${renderBoardStageSwitch()}
+    <div class="board-help">單指拖曳、雙指縮放；全螢幕後仍可拖曳查看各輪。</div>
 
     ${matchLegendHtml()}
 
@@ -10579,8 +10636,9 @@ function renderCompactSingleElimBracket(){
 function renderSingleElimBracket(forceTree=false){
   if(!forceTree && effectiveSingleBracketLayout()==="compact") return renderCompactSingleElimBracket();
   const total = numRoundsTotal();
+  const startRound = forceTree ? boardStageStartRound() : 0;
   let cols = "";
-  for(let r=0;r<total;r++){
+  for(let r=startRound;r<total;r++){
     const ms = matchesInRound(r);
     const isFinalRound=r===total-1;
     const title = isFinalRound ? "冠亞" : singleRoundTitle(r);
@@ -19532,7 +19590,8 @@ async function exportBoardAsImage(){
   if(boardExportBusy)return;
   const shell=document.getElementById('board-shell'),content=document.getElementById('board-canvas'),viewport=document.getElementById('board-viewport');
   if(!shell||!content||!viewport){showToast('找不到看板內容，請先切換至賽事看板模式',true);return;}
-  boardExportBusy=true;showToast('正在產生完整對戰表 PNG……');
+  const exportLabel=boardExportLabel();
+  boardExportBusy=true;showToast('正在產生'+exportLabel+' PNG……');
   try{
     await ensureHtml2Canvas();
     if(!shell.isConnected)throw Error('board-changed');
@@ -19547,19 +19606,19 @@ async function exportBoardAsImage(){
         copy.style.cssText='position:relative;inset:auto;display:block;width:'+width+'px;height:auto;max-height:none;overflow:visible;box-sizing:border-box;padding:18px';
         view.style.cssText='height:auto;min-height:0;overflow:visible;display:block';
         inner.style.transform='none';inner.style.transition='none';
-        copy.querySelectorAll('.board-toolbar,.board-help,.share-btn,.event-title-bar').forEach(el=>el.style.display='none');
+        copy.querySelectorAll('.board-toolbar,.board-stage-switch,.board-help,.share-btn,.event-title-bar').forEach(el=>el.style.display='none');
       }
     });
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(Error('png-encode-failed')),'image/png'));
     const dateStr=new Date().toISOString().slice(0,10);
     const safeName=(state.meta.name||'賽事').replace(/[\\\/:*?"<>|]/g,'_');
-    const filename='BXH_'+safeName+'_'+dateStr+'_完整對戰表.png';
+    const filename='BXH_'+safeName+'_'+dateStr+'_'+exportLabel+'.png';
     let shared=false;
     try{
       if(typeof File==='function'&&navigator&&typeof navigator.share==='function'&&typeof navigator.canShare==='function'){
         const file=new File([blob],filename,{type:'image/png'});
         if(navigator.canShare({files:[file]})){
-          await navigator.share({title:'BXH ARENA｜完整對戰表',text:state.meta.name||'完整對戰表',files:[file]});
+          await navigator.share({title:'BXH ARENA｜'+exportLabel,text:state.meta.name||exportLabel,files:[file]});
           shared=true;
           showToast('已開啟系統分享；iPhone 請選「儲存影像」加入照片相簿。');
         }
@@ -22682,6 +22741,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     boardZoom = 1; boardPanX = 0; boardPanY = 0;
     render();
     if(mode==="board") scheduleSeRelayout();
+    return;
+  }
+  if(action==="set-board-stage"){
+    setBoardStage(Number(target.getAttribute("data-stage")));
     return;
   }
   if(action==="set-team-bracket-view"){
