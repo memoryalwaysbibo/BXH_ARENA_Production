@@ -41,6 +41,15 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
  }
  const snapshot=()=>structuredClone(state);
  const emit=()=>{if(!disposed)onChange(snapshot());};
+ async function loadEmblem(teamId,ticket){
+  if(typeof api.emblem!=='function')return;
+  try{const result=await api.emblem({teamId}),image=result?.image;
+   if(disposed||ticket!==generation||state.team?.id!==teamId)return;
+   const base64=image?.base64;
+   if(image?.contentType!=='image/webp'||typeof base64!=='string'||base64.length<16||base64.length>174764||!/^UklGR[A-Za-z0-9+/]*(?:={0,2})$/.test(base64))return;
+   state.team.emblemSource='data:image/webp;base64,'+base64;emit();
+  }catch(_){/* Image failure never removes an otherwise available team page. */}
+ }
  async function load(screen,payload){
   if(disposed)return {ok:false,reason:'disposed'};
   const ticket=++generation;if(screen==='manage')state.managementTeamId=payload.teamId;if(screen==='applications')state.applicationsTeamId=payload.teamId;if(screen==='history')state.historyTeamId=payload.teamId;state.screen=screen;state.loading=true;state.loaded=false;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
@@ -51,7 +60,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
     if(!Array.isArray(result.items)||!Number.isSafeInteger(result.total)||result.total<0)throw Error('invalid-response');
     state.items=result.items;state.total=result.total;state.partial=result.partial===true;state.totalIsUpperBound=result.totalIsUpperBound===true;state.staleCount=Number.isSafeInteger(result.staleCount)?result.staleCount:0;
    }
-   state.loaded=true;return {ok:true};
+   state.loaded=true;if(['mine','members'].includes(screen)&&state.team?.id)void loadEmblem(state.team.id,ticket);return {ok:true};
   }catch(_){if(!disposed&&ticket===generation)state.error='資料暫時無法載入，請重試。';return {ok:false,reason:'load-failed'};}
   finally{if(!disposed&&ticket===generation){state.loading=false;emit();}}
  }
