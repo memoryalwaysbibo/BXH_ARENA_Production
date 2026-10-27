@@ -46,7 +46,8 @@ function scanPlayer(players,uid,playerId) {
   const matches=(players||[]).filter(p=>p?.id===playerId);
   if(matches.length!==1)fail('not-confirmed');
   const p=matches[0];
-  if(p.familyPlayerId ? p.guardianUid!==uid : p.guardianUid||![p.registrationUid,p.uid,p.accountUid].includes(uid))fail('not-confirmed');
+  if(p.familyPlayerId){if(p.guardianUid!==uid)fail('not-confirmed');}
+  else if(ownedPlayer(players,uid).id!==playerId)fail('not-confirmed');
   return p;
 }
 function signToken(code,session,now,secret) {
@@ -85,6 +86,8 @@ function transition({code,uid,user,parentUser,room,state,registration,registrati
   if(d.action==='candidates') {
     if(settings.enabled!==true)fail('checkin-closed');
     verifyToken(d.token,code,settings.session,now,secret);
+    const self=(state.players||[]).filter(p=>p&&!p.familyPlayerId&&!p.guardianUid&&[p.registrationUid,p.uid,p.accountUid].includes(uid));
+    if(self.length>1)fail('ambiguous-player');
     const players=(state.players||[]).filter(p=>eligiblePlayer(p,uid,registrations[p.registrationId],familyProfiles));
     return {result:{ok:true,players:players.map(p=>({id:p.id,name:p.name,checkedIn:p.checkedIn===true,family:!!p.familyPlayerId}))}};
   }

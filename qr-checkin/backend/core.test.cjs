@@ -128,3 +128,8 @@ test('candidate discovery requires live valid QR and enabled check-in',()=>{
  const x=familyInput();x.d.action='candidates';x.now+=90000;rejects(x,'qr-expired');
  const y=familyInput();y.d.action='candidates';y.room.qrCheckin.enabled=false;rejects(y,'checkin-closed');
 });
+
+test('explicit self selection cannot bypass an ambiguous account or team roster',()=>{
+ const x=input();x.state.players.push({...x.state.players[0],id:'team-member'});x.d.playerId='p1';rejects(x,'ambiguous-player');
+ x.d.action='candidates';rejects(x,'ambiguous-player');
+});
