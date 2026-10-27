@@ -9,7 +9,9 @@ remain below the card without changes to their calculations or service calls.
 
 ## Provenance
 
-Integration base: `4bd2e051352f3086f507b0ec16d7d373b82ab41f`.
+Original integration base: `4bd2e051352f3086f507b0ec16d7d373b82ab41f`.
+Main compatibility merge: `5d4ce00083061920043dbc0aba7a1be649aa1d8e`;
+the core script URL preserves both family-transfer and Hunter visual cache keys.
 
 The user supplied `Hunter-License-Preview-v9.1.1.zip` as a readable local attachment.
 Its HTML is 15,057,432 bytes with SHA-256
@@ -70,7 +72,8 @@ fixtures; no real Auth, profile loader or player data is accessed. Coverage:
 avatars, missing identifiers, pending grade, request/decoding errors, resize
 without rerender, back/reopen/repeat and recovery after failure.
 
-Local unit/regression checks: 53 passed. Browser geometry: 96 rank/name/width
+Local unit/regression checks after the main merge: 58 passed, including the
+main family-transfer regression tests. Browser geometry: 96 rank/name/width
 cases plus 8 avatar-aspect cases and lifecycle/failure checks. Eight rank cards
 at 390px and additional narrow/desktop/long-name/failure screenshots were
 visually reviewed: rank text remains readable at tested sizes, without observed

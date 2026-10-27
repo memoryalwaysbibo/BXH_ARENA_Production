@@ -31,7 +31,7 @@ const tiers=['ungraded','e','d','c','b','a','s','national'];
     const before=requests.length;
     await page.evaluate(({tier,name})=>fixture.set({profile:{displayName:' '+name+' ',realName:'不應顯示',equippedTitle:'national',playerId:'FAKE',joinedAt:'2026-01-01'},grade:{tier}}),{tier,name});
     await page.waitForFunction(()=>[...document.querySelectorAll('.hl3 img')].every(i=>i.complete&&i.naturalWidth>0));
-    await page.evaluate(()=>document.fonts.ready);
+    await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.querySelectorAll('.hl3 img')].map(img=>img.decode()));await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
     const geometry=await page.evaluate(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};return {name:rect('.hl3-identity h4'),rank:rect('.hl3-rank'),art:rect('.hl3-rank img'),meta:rect('.hl3-identity dl'),portrait:rect('.hl3-portrait'),card:rect('.hl3'),overflow:[...document.querySelectorAll('.hl3,.hl3-identity,.hl3-identity h4,.hl3-identity dd')].some(e=>e.scrollWidth>e.clientWidth+1),count:document.querySelectorAll('.hl3-rank').length,rankParent:document.querySelector('.hl3-rank').parentElement.className};});
     assert.ok(geometry.name.height>0&&geometry.meta.height>0,'Text requires working fonts');assert.equal(geometry.overflow,false,JSON.stringify({width,tier,name,geometry}));assert.equal(geometry.count,1);
     assert.equal(await page.locator('.hl3-identity h4').textContent(),name);
