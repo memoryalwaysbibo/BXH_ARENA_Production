@@ -7223,10 +7223,9 @@ function roundGroupLocked(group){
 }
 
 function resolveScoringModeForRound(bracket, round){
-  const key = bracket+":"+round;
-  const rm = state.meta.roundScoringModes || {};
-  if(rm[key]) return rm[key];
-  return state.meta.scoringMode || "standard";
+  // New matches always record every scoring round. Existing match modes remain
+  // intact for legacy results and server-authoritative matches already created.
+  return "standard";
 }
 function ensureMatchScoringFields(m){
   if(!m.scoringMode) m.scoringMode = resolveScoringModeForRound(m.bracket, m.round);
@@ -11460,20 +11459,6 @@ function renderCourtCard(stationNum){
 }
 
 
-function renderRefereeScoringControls(){
-  const current=state.meta.scoringMode==="quick"?"quick":"standard";
-  const canChange=canConfigureCurrentTournament();
-  return `<div class="panel referee-scoring-settings">
-    <div class="referee-scoring-compact">
-      <div class="rsc-label">判定模式</div>
-      <div class="rsc-toggle" role="group" aria-label="判定模式">
-        <button type="button" class="rsc-option ${current==="standard"?"active":""}" data-action="referee-set-scoring-mode" data-mode="standard" aria-pressed="${current==="standard"?"true":"false"}" ${!canChange?'disabled':''}>正常</button>
-        <button type="button" class="rsc-option ${current==="quick"?"active":""}" data-action="referee-set-scoring-mode" data-mode="quick" aria-pressed="${current==="quick"?"true":"false"}" ${!canChange?'disabled':''}>簡單</button>
-      </div>
-    </div>
-  </div>`;
-}
-
 function renderSkippedMatches(){
   const skipped=refereeMatches().filter(m=>!m.completed&&m.skippedAt&&m.a&&m.b);
   if(!skipped.length) return "";
@@ -11591,7 +11576,7 @@ function renderReferee(){
     : (n===2
       ? "court-grid court-grid-2"
       : (n===4 ? "court-grid court-grid-many court-grid-4fit" : "court-grid court-grid-many"));
-  return `${quickNav}${renderForcedCourtExitPanel()}${renderCourtRetirementPanel()}${renderRefereeScoringControls()}${renderSkippedMatches()}${jumpNav}<div class="${gridClass}">${cards}</div>`;
+  return `${quickNav}${renderForcedCourtExitPanel()}${renderCourtRetirementPanel()}${renderSkippedMatches()}${jumpNav}<div class="${gridClass}">${cards}</div>`;
 }
 
 /* ==== tab: settings ==== */
@@ -12748,7 +12733,7 @@ function renderSettings(){
           <input type="checkbox" id="f-bronze" data-settings-draft="bronzeMatch" data-settings-type="bool" ${d.bronzeMatch?'checked':''} ${(ladderMode==="ranked"&&d.formatType==="single")?'disabled':''}>
           <span>四強敗者加賽季軍賽（僅單淘汰）${(ladderMode==="ranked"&&d.formatType==="single")?'｜積分賽事必須啟用':''}</span>
         </label>
-        <p class="hint" style="margin-top:10px;">比賽判定模式已移至「裁判台」，由現場裁判依賽事需求設定。</p>
+
       </div>
     </div>
 
@@ -23334,36 +23319,6 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(refereeSwappedViews.has(key)) refereeSwappedViews.delete(key); else refereeSwappedViews.add(key);
     renderPreservingScroll(); return;
   }
-  if(action==="referee-set-scoring-mode"){
-    if(!canConfigureCurrentTournament()){ showToast("目前身分沒有修改判定模式的權限",true); return; }
-    const newMode=target.getAttribute("data-mode");
-    if(newMode!=="standard"&&newMode!=="quick") return;
-    if(newMode===state.meta.scoringMode) return;
-    openModal({type:"generic",title:"切換判定模式",message:"確定要切換尚未開始場次的預設判定模式嗎？已開始或已完成場次不受影響。",confirmLabel:"確定切換",onConfirm:()=>{
-      state.meta.scoringMode=newMode;
-      state.meta.roundScoringModes={};
-      resetSettingsFormDraft();
-      state.matches.forEach(mt=>{
-        if(mt.isBye) return;
-        const locked=mt.completed||mt.status==="completed"||mt.status==="in_progress"||(mt.log&&mt.log.length>0)||mt.scoreA>0||mt.scoreB>0;
-        if(!locked) mt.scoringMode=newMode;
-      });
-      saveState(); render();
-      showToast("已更新裁判台預設判定模式");
-    }});
-    return;
-  }
-  if(action==="set-scoring-mode"){
-    const newMode=target.getAttribute("data-mode");
-    if(newMode!=="standard"&&newMode!=="quick") return;
-    syncSettingsDraftFromDom();
-    ensureSettingsFormDraft();
-    if(newMode===settingsFormDraft.scoringMode) return;
-    settingsFormDraft.scoringMode=newMode;
-    settingsFormDraftDirty=true;
-    render();
-    return;
-  }
   if(action==="set-checkin-required"){
     if(state.rosterLocked || state.bracketSize>0){ showToast("賽事已經開始，無法更改是否需要報到的設定", true); return; }
     syncSettingsDraftFromDom();
@@ -23890,7 +23845,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.stations=Math.max(1,parseInt(d.stations,10)||1);
     state.testLadderEnabled=isTester()?(d.ladderMode==="ranked"):false;
     state.meta.ladderMode=isTester()?"general":(d.ladderMode==="ranked"?"ranked":"general");
-    state.meta.scoringMode=d.scoringMode==="quick"?"quick":"standard";
+    state.meta.scoringMode="standard";
     state.meta.bronzeMatch=!!d.bronzeMatch;
     if(state.meta.ladderMode==="ranked" && state.meta.formatType==="single") state.meta.bronzeMatch=true;
     state.meta.checkinRequired=!!d.checkinRequired;
@@ -24030,7 +23985,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.testLadderEnabled=isTester()?(d.ladderMode==="ranked"):false;
       state.meta.ladderMode=isTester()?"general":(d.ladderMode==="ranked"?"ranked":"general");
       if(isTester()) markTesterSandboxState(state);
-      state.meta.scoringMode=d.scoringMode==="quick"?"quick":"standard";
+      state.meta.scoringMode="standard";
       state.meta.bronzeMatch=!!d.bronzeMatch;
       if(state.meta.ladderMode==="ranked" && newFormatType==="single") state.meta.bronzeMatch=true;
       state.meta.checkinRequired=!!d.checkinRequired;
