@@ -60,3 +60,9 @@ test('review commands send the selected applicant and reload the pending list',a
  await c.applications('team');await c.operate('approve','team',{targetUid:'person'});
  assert.deepEqual(payload,{action:'approve',teamId:'team',targetUid:'person',requestId:'test-operation-00000001'});assert.equal(reads,2);assert.equal(c.snapshot().screen,'applications');
 });
+
+test('review rejection identifies an applicant already in another team',async()=>{
+ const c=setup({command:async()=>{throw Object.assign(Error('already-in-team'),{code:'functions/failed-precondition'});}});
+ await c.applications('team');assert.equal((await c.operate('approve','team',{targetUid:'person'})).reason,'rejected');
+ assert.match(c.snapshot().error,/申請者已有戰隊/);assert.equal(c.snapshot().pending,false);
+});
