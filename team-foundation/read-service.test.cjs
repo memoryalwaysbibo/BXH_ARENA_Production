@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');const {createReadService}=require('./read-service.cjs');
 function setup(){
  const data=new Map([
- ['teamsV1/t',{captainUid:'c',memberUids:['c','d','m'],roles:{d:'deputy'},status:'active'}],
+ ['teamsV1/t',{captainUid:'c',memberUids:['c','d','m'],roles:{d:'deputy'},status:'active',totalXp:6}],
  ['teamMembershipsV1/c',{teamId:'t'}],['teamMembershipsV1/d',{teamId:'t'}],['teamMembershipsV1/m',{teamId:'t'}],
  ['teamsV1/t/history/h',{subjectUid:'gone',subjectName:'小賈',actorName:'黑爸',actorRole:'captain',method:'remove',occurredAt:1793095800000}],
  ['teamsV1/t/historyReasons/h',{code:'other',label:'其他',note:'私有說明',subjectUid:'gone'}],
@@ -26,6 +26,7 @@ test('reason is visible to subject and current leadership; stale roles do not au
 test('old projection is withheld during roster, tier generation and season changes',async()=>{for(const kind of ['roster','generation','season']){const f=setup();if(kind==='roster')f.data.get('teamsV1/t').memberUids.pop();if(kind==='generation')f.data.get('hunterLeaderboardMeta/current').generation='new';if(kind==='season')f.data.get('ladderSystem/current').currentSeason='S2';await assert.rejects(f.read({actorUid:'outsider',action:'members',teamId:'t'}),/projection-stale/);}});
 test('mine resolves team only from authenticated actor, settings visible only to leadership',async()=>{
  const f=setup();let result=await f.read({actorUid:'c',action:'mine'});assert.equal(result.team.id,'t');assert.equal(result.team.role,'captain');assert.equal(result.team.memberCount,3);assert.equal(result.team.admission.mode,'review');
+ assert.equal(result.team.level,2);assert.equal(result.team.capacity,11);assert.equal(result.team.currentXp,3);assert.equal(result.team.nextXp,4);assert.deepEqual(result.team.unlockedFrames,[]);
  result=await f.read({actorUid:'d',action:'mine'});assert.equal(result.team.role,'deputy');assert.ok(result.team.admission);
  result=await f.read({actorUid:'m',action:'mine'});assert.equal(result.team.admission,null);
  assert.equal((await f.read({actorUid:'outsider',action:'mine'})).team,null);
