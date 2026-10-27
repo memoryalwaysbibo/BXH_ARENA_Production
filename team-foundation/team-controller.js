@@ -3,19 +3,19 @@
 // Transport is deliberately injected; no unverified production endpoint is assumed.
 function createTeamController({api,onChange=()=>{}}){
  if(!api||!['list','members','command'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
- const state={screen:'lobby',items:[],total:0,query:{},team:null,loading:false,busy:false,error:null};
+ const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,loading:false,busy:false,error:null};
  let generation=0,disposed=false;
  const snapshot=()=>structuredClone(state);
  const emit=()=>{if(!disposed)onChange(snapshot());};
  async function load(screen,payload){
   if(disposed)return {ok:false,reason:'disposed'};
-  const ticket=++generation;state.screen=screen;state.loading=true;state.error=null;state.team=null;state.items=[];state.total=0;emit();
+  const ticket=++generation;state.screen=screen;state.loading=true;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;emit();
   try{
    const result=await(screen==='members'?api.members(payload):api.list(payload));
    if(disposed||ticket!==generation)return {ok:false,reason:'superseded'};
    if(screen==='members')state.team=result;else{
     if(!Array.isArray(result.items)||!Number.isSafeInteger(result.total)||result.total<0)throw Error('invalid-response');
-    state.items=result.items;state.total=result.total;
+    state.items=result.items;state.total=result.total;state.partial=result.partial===true;state.staleCount=Number.isSafeInteger(result.staleCount)?result.staleCount:0;
    }
    return {ok:true};
   }catch(_){if(!disposed&&ticket===generation)state.error='資料暫時無法載入，請重試。';return {ok:false,reason:'load-failed'};}
