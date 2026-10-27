@@ -52,3 +52,8 @@ test('history offers previous and next buttons only when available',()=>{
  const first=ui.history({page:1,nextCursor:'next'});assert.match(first,/下一頁/);assert.doesNotMatch(first,/上一頁/);
  const second=ui.history({page:2});assert.match(second,/上一頁/);assert.doesNotMatch(second,/下一頁/);assert.match(second,/第 2 頁/);
 });
+test('member removal form enforces visible role limits and escapes names',()=>{
+ const members=[{uid:'c',name:'隊長',role:'captain'},{uid:'d',name:'副隊長',role:'deputy'},{uid:'m',name:'<玩家>',role:'member'}];
+ const captain=ui.manageMembers({id:'t',viewerRole:'captain',members});assert.equal((captain.match(/data-team-form="remove"/g)||[]).length,2);assert.match(captain,/data-other-reason hidden/);assert.match(captain,/value="other"/);assert.doesNotMatch(captain,/<玩家>/);
+ const deputy=ui.manageMembers({id:'t',viewerRole:'deputy',members});assert.equal((deputy.match(/data-team-form="remove"/g)||[]).length,1);assert.match(deputy,/data-target-uid="m"/);
+});
