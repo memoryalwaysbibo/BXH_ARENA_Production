@@ -2806,6 +2806,7 @@
         if(d.expiresAt&&typeof d.expiresAt.toMillis==="function") parsed.expiresAtMs=d.expiresAt.toMillis();
         parsed.meta=parsed.meta||{};
         if(d.refereeSeatsV1?.version===1){parsed.meta.refereeSeatsV1=d.refereeSeatsV1;parsed.meta.refereeSeatNames=d.refereeSeatNames||{};}
+        if(d.createdByRole==='partner_organizer')parsed.meta.refereeSeatActivityAssignment=d.eventStaffAssignments?.[currentUserUidForWrites()]||null;
         if(Array.isArray(d.assignedStaffUids)) parsed.meta.assignedStaffUids=d.assignedStaffUids;
         if(d.refereeStationAssignments && typeof d.refereeStationAssignments==="object") parsed.meta.refereeStationAssignments=d.refereeStationAssignments;
         if(d.refereeStationNames && typeof d.refereeStationNames==="object") parsed.meta.refereeStationNames=d.refereeStationNames;
@@ -3613,11 +3614,15 @@ if(testerSession){
         if(!snap.exists()||snap.metadata.hasPendingWrites)return;
         const d=snap.data();if(d.refereeSeatsV1?.version!==1)return;
         callback({model:d.refereeSeatsV1,projection:{
+          ...(d.createdByRole==='partner_organizer'?{refereeSeatActivityAssignment:d.eventStaffAssignments?.[authHandle?.currentUser?.uid]||null,refereeSeatAccessRevoked:false}:{}),
           assignedStaffUids:d.assignedStaffUids||[],refereeStationAssignments:d.refereeStationAssignments||{},
           refereeStationNames:d.refereeStationNames||{},refereeStationUids:d.refereeStationUids||[],
           refereeSeatNames:d.refereeSeatNames||{},refereeStationRestrictionEnabled:true
         }});
-      },error=>console.warn("裁判席位同步失敗",error));
+      },error=>{
+        if(error?.code==='permission-denied')callback({accessRevoked:true});
+        console.warn("裁判席位同步失敗",error);
+      });
     },
 
     async mutateMatchTransaction(code, matchId, station, mutateFn, expectedActorUid, queueOptions={}){

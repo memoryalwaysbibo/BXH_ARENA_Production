@@ -5995,6 +5995,34 @@ function isCurrentOfficialTournamentCreator(){
   const uid=currentAuthUid();
   return !!(uid && state && state.meta && state.meta.eventAuthority!=="community" && state.createdBy===uid);
 }
+// Enable only after both partner-aware Callables pass deployed-source review.
+const PARTNER_REFEREE_SEATS_ROLLOUT = false;
+function isPartnerRefereeSeatRoom(st=state){return st?.createdByRole==='partner_organizer';}
+function canManageRefereeSeats(st=state){
+  if(isPartnerRefereeSeatRoom(st)&&!PARTNER_REFEREE_SEATS_ROLLOUT)return false;
+  if(userProfile?.active!==true||userProfile?.isTestAccount===true||userProfile?.deleted===true||['deleted','disabled','frozen'].includes(userProfile?.accountStatus)||st?.meta?.refereeSeatAccessRevoked)return false;
+  if(isAdminTierOrAbove())return true;
+  if(st?.createdBy!==currentAuthUid())return false;
+  if(userProfile?.role==='staff')return true;
+  const grant=partnerOrganizerGrant();
+  return isPartnerRefereeSeatRoom(st)&&!!grant&&st?.meta?.eventAuthority==='official'
+    &&st.partnerOrganizationCode===grant.organizationId
+    &&(st.partnerContractOrderCode||null)===(grant.orderCode||userProfile.partnerContractOrderCode||null);
+}
+function canJoinRefereeSeats(st=state){
+  if(userProfile?.active!==true||userProfile?.isTestAccount===true||userProfile?.deleted===true||['deleted','disabled','frozen'].includes(userProfile?.accountStatus)||st?.meta?.refereeSeatAccessRevoked)return false;
+  if(isPartnerRefereeSeatRoom(st)&&!PARTNER_REFEREE_SEATS_ROLLOUT)return false;
+  if(['staff','admin','super_admin'].includes(userProfile?.role))return true;
+  if(canManageRefereeSeats(st))return true;
+  if(!isPartnerRefereeSeatRoom(st)||!isEventStaffMode()||userProfile?.role!=='player')return false;
+  const assignment=Object.prototype.hasOwnProperty.call(st.meta||{},'refereeSeatActivityAssignment')
+    ?st.meta.refereeSeatActivityAssignment:currentEventStaffMembership(st);
+  return assignment?.status==='accepted'&&assignment.targetUid===currentAuthUid()
+    &&assignment.organizerUid===st.createdBy&&assignment.organizationId===st.partnerOrganizationCode
+    &&Number(assignment.parentExpiresAtMs)>Date.now()
+    &&(assignment.parentOrderCode||null)===(st.partnerContractOrderCode||null)
+    &&Array.isArray(assignment.duties)&&assignment.duties.some(duty=>duty==='referee'||duty==='head_referee');
+}
 function canManageRefereeStationAssignments(){
   return isAdminTierOrAbove() || isOwnTestTournament() || (isStaffTier() && isCurrentOfficialTournamentCreator());
 }
@@ -6026,9 +6054,9 @@ function canOperateStation(stationNum, st=state){
   if(isOwnTestTournament(st)) return true;
   if(isTester()) return false;
   if(isAdminTierOrAbove()) return true;
+  if(st?.meta?.refereeSeatsV1?.version===1) return canManageRefereeSeats(st)||(canJoinRefereeSeats(st)&&!!window.BXHRefereeSeats?.canScore(st,stationNum,currentAuthUid()));
   if(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator()) return true;
   if(!isStaffTier()) return hasAdminAccess();
-  if(st?.meta?.refereeSeatsV1?.version===1) return isCurrentOfficialTournamentCreator()||!!window.BXHRefereeSeats?.canScore(st,stationNum,currentAuthUid());
   if(!refereeStationRestrictionEnabled(st)) return true;
   const uid=currentAuthUid();
   return !!(uid && refereeUidsForStation(stationNum,st).includes(uid));
@@ -18213,8 +18241,8 @@ function render(){
   clearBoardModeInteractions();
   window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,
     operator:()=>canOperateCurrentTournament()||(state?.meta?.refereeSeatsV1?.version===1&&userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role)),
-    eligible:()=>userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role),
-    manager:()=>isAdminTierOrAbove()||(userProfile?.active===true&&userProfile?.isTestAccount!==true&&userProfile?.role==="staff"&&state.createdBy===currentAuthUid()),render,toast:showToast});
+    eligible:()=>canJoinRefereeSeats(),
+    manager:()=>canManageRefereeSeats(),render,toast:showToast});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;

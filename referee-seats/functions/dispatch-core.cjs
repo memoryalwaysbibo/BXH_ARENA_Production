@@ -5,15 +5,15 @@ const ACTIONS=new Set(['idle-claim','claim-skipped','manual-assign','swap','forc
 const fail=reason=>{throw Object.assign(new Error(reason),{seatCode:reason});};
 function authorizationStation(d){return ['idle-claim','claim-skipped','claim-detached','retirement-transfer','manual-assign'].includes(d.action)?Number(d.targetStation):Number(d.station);}
 function protectedPass(s,m){return !!(m&&(m.callPass&&!m.completed||(s.matches||[]).some(x=>!x.completed&&x.skippedAt&&x.callPass?.waitFor?.includes(m.id))));}
-function transition({room,state,user,uid,d,now}){
+function transition({room,state,user,uid,d,now,authority={}}){
  if(!ACTIONS.has(d.action))fail('invalid-action');
  if(room.refereeSeatsV1?.version!==1)fail('not-enabled');
  if(room.eventAuthority!=='official'||state.meta?.eventAuthority!=='official'||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
  if(room.eventCancelled||room.systemClosed||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');
- if(!C.eligible(room,user,uid))fail('station-not-assigned');
- const manager=C.manager(room,user,uid),action=d.action,station=Number(d.station),to=Number(d.targetStation),m=state.matches?.find(m=>m.id===d.matchId);
+ if(!C.eligible(room,user,uid,authority))fail('station-not-assigned');
+ const manager=C.manager(room,user,uid,authority),action=d.action,station=Number(d.station),to=Number(d.targetStation),m=state.matches?.find(m=>m.id===d.matchId);
  const identity={uid,name:String(user.realName||user.gameId||user.displayName||'裁判').slice(0,80)},engine=createEngine(state,identity,now,d.operationId);
- function permission(n){if(!Number.isInteger(n)||n<1||n>32)fail('invalid-court');if(!S.allowed(room,user,uid,n))fail('station-not-assigned');if(d.expectedCourtRevisions?.[n]!==Number(room.refereeSeatsV1.courts?.[n]?.revision||0))fail('seat-stale');}
+ function permission(n){if(!Number.isInteger(n)||n<1||n>32)fail('invalid-court');if(!S.allowed(room,user,uid,n,authority))fail('station-not-assigned');if(d.expectedCourtRevisions?.[n]!==Number(room.refereeSeatsV1.courts?.[n]?.revision||0))fail('seat-stale');}
  function matchVersion(target,secondary=false){
   if(!target||target.isBye||target.completed)fail('match-unavailable');
   const version=secondary?d.expectedTargetScoreRevision:d.expectedScoreRevision,dispatch=secondary?d.expectedTargetDispatchRevision:d.expectedDispatchRevision;
