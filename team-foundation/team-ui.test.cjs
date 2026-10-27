@@ -47,3 +47,8 @@ test('history shows separate fields and escapes record content',()=>{
  const html=ui.history({items:[{name:'<小賈>',date:'2026/10/27',time:'18:10',method:'隊長移除'}]});
  assert.match(html,/<th>姓名<\/th><th>日期<\/th><th>時間<\/th><th>方式/);assert.match(html,/&lt;小賈&gt;/);assert.match(html,/18:10/);assert.doesNotMatch(html,/<小賈>/);
 });
+
+test('history offers previous and next buttons only when available',()=>{
+ const first=ui.history({page:1,nextCursor:'next'});assert.match(first,/下一頁/);assert.doesNotMatch(first,/上一頁/);
+ const second=ui.history({page:2});assert.match(second,/上一頁/);assert.doesNotMatch(second,/下一頁/);assert.match(second,/第 2 頁/);
+});
