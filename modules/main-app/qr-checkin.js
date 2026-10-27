@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  let ctx=null,boundKey='',modal=false,busy=false,settings=null,rows=[],message='',timer=null,scanStarted='',scanResult=null,scanBusy=false;
+  let ctx=null,boundKey='',modal=false,busy=false,settings=null,rows=[],message='',timer=null,scanStarted='',scanResult=null,scanBusy=false,scanPlayers=null;
   const errorText=(e,action='manage')=>{
     const reason=e?.details&&typeof e.details==='object'?e.details.reason:e?.details;
     const raw=[e?.message||e,reason,e?.code].filter(Boolean).map(String).join(' ');
@@ -40,7 +40,7 @@
     const e=parseUrl(value);if(!e||scanBusy||!ctx)return false;
     const u=new URL(location.href);u.search='';u.hash='';
     u.searchParams.set('checkin',e.code);u.searchParams.set('checkinToken',e.token);
-    scanStarted='';scanResult=null;
+    scanStarted='';scanResult=null;scanPlayers=null;
     history.replaceState(null,'',u.href);
     ctx.render();
     return true;
@@ -86,26 +86,39 @@
     }catch(e){if(key()===k)ctx.toast(errorText(e),true);}
     finally{busy=false;ctx.render();}
   }
-  async function scan(force=false){
+  async function scan(force=false,playerId){
     const e=entry(),uid=identity();if(!e||!uid||scanBusy)return;
     const k=uid+':'+e.code+':'+e.token;
     if(!force&&scanStarted===k)return;
     scanStarted=k;scanBusy=true;scanResult=null;ctx.render();
     try{
-      const r=await call({action:'scan',...e});
-      if(identity()!==uid)return;
+      if(playerId===undefined){
+        const candidates=await call({action:'candidates',...e});
+        if(identity()!==uid||entry()?.token!==e.token)return;
+        if(candidates.ok!==true||!Array.isArray(candidates.players))throw Error('not-confirmed');
+        scanPlayers=candidates.players;
+        if(scanPlayers.length===0)throw Error('not-confirmed');
+        if(scanPlayers.some(p=>p.family)||scanPlayers.length>1)return;
+        playerId=scanPlayers[0].id;
+      }
+      const r=await call({action:'scan',...e,playerId});
+      if(identity()!==uid||entry()?.token!==e.token)return;
       if(r.ok!==true)throw Error('not-confirmed');
       scanResult=r;
-      const url=new URL(location.href);url.searchParams.delete('checkin');url.searchParams.delete('checkinToken');history.replaceState(null,'',url.href);
+      if(scanPlayers?.some(p=>p.family)||scanPlayers?.length>1){
+        scanPlayers=scanPlayers.map(p=>p.id===playerId?{...p,checkedIn:true}:p);
+      }else clearEntry();
     }catch(error){if(identity()===uid)scanResult={error:errorText(error,'scan')};}
     finally{scanBusy=false;ctx.render();}
   }
+  function clearEntry(){const url=new URL(location.href);url.searchParams.delete('checkin');url.searchParams.delete('checkinToken');history.replaceState(null,'',url.href);}
   function renderEntry(){
     const e=entry();
     if(!e&&!scanResult&&!scanBusy)return '';
-    if(e&&!identity())return '<section class="panel" role="status"><b>現場報到</b><p>請先登入您的 ARENA 帳號，登入後自動完成正取報到。</p></section>';
+    if(e&&!identity())return '<section class="panel" role="status"><b>現場報到</b><p>請先登入您的 ARENA 帳號，登入後確認本人及家庭兒童的報到資格。</p></section>';
     if(e&&!scanStarted&&!scanBusy)setTimeout(()=>scan(),0);
     const r=scanResult;
+    if(scanPlayers&&(scanPlayers.some(p=>p.family)||scanPlayers.length>1))return '<section class="panel" aria-live="polite"><h2>選擇報到對象</h2><p>請逐位選擇本次到場的選手。</p>'+scanPlayers.map(p=>'<p><button class="btn btn-primary" data-qr-checkin="select" data-player-id="'+esc(p.id)+'" '+(scanBusy||p.checkedIn?'disabled':'')+'>'+esc(p.name)+'（'+(p.family?'家庭兒童':'本人')+'）'+(p.checkedIn?'｜已報到':'｜報到')+'</button></p>').join('')+(scanBusy?'<p>正在確認報到…</p>':r?.error?'<p role="alert">'+esc(r.error)+'</p>':r?'<p>'+esc(r.name)+'｜'+(r.already?'已完成報到':'報到成功')+'</p>':'')+'<button class="btn btn-ghost" data-qr-checkin="retry" '+(scanBusy?'disabled':'')+'>重新確認名單</button><button class="btn btn-primary" data-qr-checkin="dismiss" '+(scanBusy?'disabled':'')+'>完成</button></section>';
     return '<section class="panel" role="status" aria-live="polite"><h2>'+(!r?'正在確認報到…':r.error?'報到尚未完成':r.already?'您已完成報到':'報到成功')+'</h2>'+(r?.error?'<p>'+esc(r.error)+'</p><button class="btn btn-primary" data-qr-checkin="retry">重試</button>':r?'<p>'+esc(r.name)+'｜'+esc(r.eventName||'')+'｜'+esc(r.code||e?.code||scanStarted.split(':')[1])+'</p><p>'+esc(time(r.currentAt))+'（台灣時間）</p><button class="btn btn-primary" data-qr-checkin="dismiss">完成</button>':'')+'</section>';
   }
   function renderModal(){
@@ -126,8 +139,9 @@
     if(a==='start'||a==='stop')await configure(a==='start');
     if(a==='refresh'){try{await refresh();}catch(e){message=errorText(e);ctx.render();}}
     if(a==='fullscreen'){try{await document.getElementById('qr-checkin-display')?.requestFullscreen();}catch{ctx.toast('此裝置不支援全螢幕',true);}}
+    if(a==='select'&&!scanBusy)await scan(true,b.dataset.playerId);
     if(a==='retry')await scan(true);
-    if(a==='dismiss'){scanResult=null;ctx.render();}
+    if(a==='dismiss'&&!scanBusy){clearEntry();scanResult=null;scanPlayers=null;ctx.render();}
   },true);
   window.BXHQrCheckin={
     bind(context){
@@ -135,7 +149,7 @@
       const loginNotice=document.getElementById('qr-checkin-login-notice');
       if(loginNotice)loginNotice.hidden=!entry()||!!identity();
       const nextKey=key();
-      if(boundKey!==nextKey){modal=false;settings=null;scanStarted='';scanResult=null;clearTimeout(timer);boundKey=nextKey;}
+      if(boundKey!==nextKey){modal=false;settings=null;scanStarted='';scanResult=null;scanPlayers=null;clearTimeout(timer);boundKey=nextKey;}
       if(entry()&&identity()&&!scanBusy)setTimeout(()=>scan(),0);
     },
     button(){return '<button class="btn btn-primary" data-qr-checkin="open">現場報到 QR／紀錄</button>';},

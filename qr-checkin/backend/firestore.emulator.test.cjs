@@ -468,3 +468,36 @@ test('exact deployed already-awarded ladder archive preserves QR attendance with
  const after=await assertWriterAttendance(x);assert.equal(after.qrCheckinRevision,2);assert.equal(after.archiveStatus,'completed');
  assert.equal((await db.collection('ladderTransactions').where('eventCode','==',x.code).get()).size,0);
 });
+
+async function seedFamily(){
+ const x=await seed(),state=JSON.parse((await x.ref.get()).data().data);
+ for(const id of ['child1','child2'])state.players.push({id:'row-'+id,name:id,source:'online',registrationId:'reg-'+id,registrationUid:'u1',guardianUid:'u1',familyPlayerId:id,checkedIn:false});
+ const batch=db.batch();batch.update(x.ref,{data:JSON.stringify(state)});
+ batch.set(db.doc('familyPlayers/u1'),{profiles:['child1','child2'].map(id=>({id,guardianUid:'u1'}))});
+ for(const id of ['child1','child2'])batch.set(x.ref.collection('registrations').doc('reg-'+id),{uid:'u1',guardianUid:'u1',familyPlayerId:id,status:'confirmed'});
+ await batch.commit();
+ return {...x,choose:()=>handle({auth:{uid:'u1'},data:{code:x.code,token:x.token,action:'candidates'}}),child:(id,uid='u1')=>handle({auth:{uid},data:{code:x.code,token:x.token,action:'scan',playerId:'row-'+id}})};
+}
+test('family discovery is read only and exposes only the caller confirmed participants',async()=>{
+ const x=await seedFamily(),before=(await x.ref.get()).data();const r=await x.choose();
+ assert.deepEqual(r.players.map(p=>p.id),['p1','row-child1','row-child2']);
+ assert.deepEqual((await x.ref.get()).data(),before);assert.equal((await x.ref.collection('checkinAudit').get()).size,0);
+});
+test('concurrent sibling scans and duplicate taps commit independent receipts and public states',async()=>{
+ const x=await seedFamily();await Promise.all([x.child('child1'),x.child('child2'),x.child('child1')]);
+ const privatePlayers=JSON.parse((await x.ref.get()).data().data).players;
+ const publicPlayers=JSON.parse((await x.pub.get()).data().bracketView).players;
+ for(const rows of [privatePlayers,publicPlayers]){assert.equal(rows.find(p=>p.id==='p1').checkedIn,false);assert.equal(rows.filter(p=>p.checkedIn).length,2);}
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,2);assert.equal((await x.ref.collection('checkinReceipts').get()).size,2);
+});
+test('a different logged in guardian cannot use a valid room QR to check in this child',async()=>{
+ const x=await seedFamily();await assert.rejects(x.child('child1','u2'),/not-confirmed/);assert.equal((await x.ref.collection('checkinAudit').get()).size,0);
+});
+test('cancellation after family discovery is rechecked transactionally without any attendance writes',async()=>{
+ const x=await seedFamily();await x.choose();await x.ref.collection('registrations').doc('reg-child1').update({status:'cancelled'});
+ await assert.rejects(x.child('child1'),/not-confirmed/);assert.equal((await x.ref.collection('checkinAudit').get()).size,0);
+});
+test('independent account transfer after discovery blocks the old guardian',async()=>{
+ const x=await seedFamily();await x.choose();await db.doc('familyPlayers/u1').update({profiles:[{id:'child1',guardianUid:'u1',accountUid:'independent',transferStatus:'completed'},{id:'child2',guardianUid:'u1'}]});
+ await assert.rejects(x.child('child1'),/not-confirmed/);assert.deepEqual((await x.choose()).players.map(p=>p.id),['p1','row-child2']);
+});

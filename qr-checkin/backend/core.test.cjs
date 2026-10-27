@@ -83,3 +83,48 @@ test('invited but unaccepted event staff cannot manage check-in',()=>{const x=ev
 test('a stale user membership does not override a revoked room assignment',()=>{const x=eventStaffInput();x.user.eventStaffMemberships={[code]:{status:'accepted'}};x.room.eventStaffAssignments.helper.status='revoked';rejects(x,'permission-denied');});
 test('active partner organizer manages only the matching event and contract',()=>{const x=eventStaffInput();x.uid='organizer';x.user=x.parentUser;assert.equal(transition(x).result.ok,true);x.room.partnerContractOrderCode='OTHER';rejects(x,'permission-denied');});
 test('regular staff follows the existing room assignment scope',()=>{const x=input({uid:'staff1',user:{role:'staff',active:true},d:{action:'status'}});assert.equal(transition(x).result.ok,true);x.room.assignedStaffUids=['other'];rejects(x,'permission-denied');});
+
+function familyInput(){
+ const x=input();
+ x.state.players.push({id:'child-row',name:'孩子一',registrationUid:'u1',registrationId:'child-reg',familyPlayerId:'child1',guardianUid:'u1',checkedIn:false});
+ x.familyProfiles=[{id:'child1',guardianUid:'u1'}];
+ x.registrations={r1:x.registration,'child-reg':{uid:'u1',guardianUid:'u1',familyPlayerId:'child1',status:'confirmed'}};
+ return x;
+}
+test('candidates include self and only verified confirmed family children without writes',()=>{
+ const x=familyInput();x.d.action='candidates';const r=transition(x);
+ assert.deepEqual(r.result.players.map(p=>[p.id,p.family]),[['p1',false],['child-row',true]]);
+ assert.equal(r.receipt,undefined);assert.equal(r.audit,undefined);
+});
+test('explicit child scan records guardian operator and leaves self and siblings untouched',()=>{
+ const x=familyInput();x.d.playerId='child-row';x.registration=x.registrations['child-reg'];
+ x.state.players.push({...x.state.players[1],id:'sibling',familyPlayerId:'child2'});
+ const before=JSON.stringify(x.state),r=transition(x);
+ assert.equal(r.playerId,'child-row');assert.equal(r.receipt.actorUid,'u1');assert.equal(r.audit.registrationId,'child-reg');assert.equal(JSON.stringify(x.state),before);
+});
+test('a sole family child still requires explicit selection',()=>{
+ const x=familyInput();x.state.players.shift();rejects(x,'not-confirmed');
+});
+test('foreign child id or forged request guardian never grants authority',()=>{
+ const x=familyInput();x.uid='stranger';x.d.playerId='child-row';x.d.guardianUid='u1';x.registration=x.registrations['child-reg'];rejects(x,'not-confirmed');
+});
+test('family selection rejects cancellation and mismatched current registration',()=>{
+ for(const patch of [{status:'cancelled'},{status:'waitlist'},{uid:'stranger'},{guardianUid:'stranger'},{familyPlayerId:'child2'}]){
+  const x=familyInput();x.d.playerId='child-row';x.registration={...x.registrations['child-reg'],...patch};rejects(x,'not-confirmed');
+ }
+});
+test('family selection rechecks authoritative relationship and transfer after chooser opened',()=>{
+ for(const patch of [{archived:true},{deleted:true},{accountUid:'independent'},{pendingAccountUid:'independent'},{transferStatus:'pending'},{transferStatus:'completed'},{guardianUid:'stranger'},{testMode:true}]){
+  const x=familyInput();x.d.playerId='child-row';x.registration=x.registrations['child-reg'];Object.assign(x.familyProfiles[0],patch);rejects(x,'not-confirmed');
+ }
+ const x=familyInput();x.d.playerId='child-row';x.registration=x.registrations['child-reg'];x.familyProfiles=[];rejects(x,'not-confirmed');
+});
+test('candidates hide unconfirmed and transferred family records and foreign participants',()=>{
+ const x=familyInput();x.d.action='candidates';x.registrations['child-reg'].status='waitlist';
+ x.state.players.push({id:'foreign',registrationUid:'stranger',name:'PRIVATE'});
+ assert.deepEqual(transition(x).result.players.map(p=>p.id),['p1']);
+});
+test('candidate discovery requires live valid QR and enabled check-in',()=>{
+ const x=familyInput();x.d.action='candidates';x.now+=90000;rejects(x,'qr-expired');
+ const y=familyInput();y.d.action='candidates';y.room.qrCheckin.enabled=false;rejects(y,'checkin-closed');
+});

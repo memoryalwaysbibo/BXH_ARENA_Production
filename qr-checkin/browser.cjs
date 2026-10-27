@@ -17,7 +17,7 @@ async function scenario(name,config,run){
  const fixture=`<!doctype html><meta charset="utf-8">${loginNotice}<div id="app"></div><script>
  window.calls=[];window.scanResponse=${JSON.stringify(config.response||{ok:true,name:'選手甲',eventName:'測試賽',code:'BXH-ABC123',currentAt:1800000000000})};window.uid=${JSON.stringify(config.uid===undefined?'u1':config.uid)};
  window.room={cloudCode:'BXH-ABC123',meta:{name:'測試賽'},players:[{id:'p1',name:'選手甲',checkedIn:false}]};
- window.engagementService={async tournamentOperation(name,d){calls.push(d);if(d.action==='scan'){${config.delay?'await new Promise(r=>window.finishScan=r);':''}if(scanResponse.error)throw Error(scanResponse.error);return scanResponse;}if(d.action==='status')return {ok:true,enabled:false};if(d.action==='history')return {ok:true,records:[]};return {ok:true};}};
+ window.engagementService={async tournamentOperation(name,d){calls.push(d);if(d.action==='candidates')return {ok:true,players:${JSON.stringify(config.players||[{id:'p1',name:'選手甲',family:false}])}};if(d.action==='scan'){${config.delay?'await new Promise(r=>window.finishScan=r);':''}if(scanResponse.error)throw Error(scanResponse.error);return scanResponse;}if(d.action==='status')return {ok:true,enabled:false};if(d.action==='history')return {ok:true,records:[]};return {ok:true};}};
  </script><script>${src}</script><script>
  let qrScannerOpen=false,firebaseUser=window.uid?{uid:window.uid}:null,userProfile={active:true},currentRole='player',guestReadOnlyMode=false,appPhase='player-center';
  function stopQrScanner(){} function setQrScannerStatus(){} function showToast(){} function normalizeRoomCodeInput(v){return String(v||'').trim().toUpperCase();} function isValidRoomCode(v){return /^BXH-[A-Z0-9]{4,16}$/.test(v);} function normalizeTournamentEntryType(v){return v||'event';}
@@ -41,6 +41,19 @@ try{
  await scenario('手機管理窗口載入狀態與異動紀錄',{manager:true},async p=>{await p.getByRole('button',{name:'現場報到 QR／紀錄'}).click();await p.getByRole('button',{name:'開始報到'}).waitFor({state:'visible'});await p.waitForFunction(()=>calls.some(c=>c.action==='history'));await p.getByText('最近 100 筆報到異動').waitFor();await p.getByRole('button',{name:'關閉',exact:true}).click();assert.equal(await p.getByRole('dialog').count(),0);});
  await scenario('站內掃報到QR沿用登入，不重新載入或找房間',{manager:true},async p=>{await p.evaluate(()=>{window.sessionMarker='retained';return acceptScannedQrValue('https://arena.test/?checkin=BXH-ABC123&checkinToken=in-app');});await p.getByRole('heading',{name:'報到成功',exact:true}).waitFor();assert.equal(await p.evaluate(()=>sessionMarker),'retained');assert.equal(await p.evaluate(()=>calls.filter(c=>c.action==='scan').length),1);assert.equal(await p.evaluate(()=>window.routed),undefined);});
  await scenario('站內掃描仍保留既有找房間路由',{manager:true},async p=>{await p.evaluate(()=>acceptScannedQrValue('BXH-ABC123'));assert.deepEqual(await p.evaluate(()=>window.routed),{code:'BXH-ABC123',entry:'event'});assert.equal(await p.evaluate(()=>calls.length),0);});
+ await scenario('家長逐位替兩個孩子報到，不自動替全家報到',{players:[{id:'p1',name:'家長',family:false},{id:'c1',name:'孩子一',family:true},{id:'c2',name:'孩子二',family:true}],response:{ok:true,name:'孩子',currentAt:1800000000000}},async p=>{
+  await p.getByRole('heading',{name:'選擇報到對象'}).waitFor();assert.equal(await p.evaluate(()=>calls.filter(c=>c.action==='scan').length),0);
+  await p.getByRole('button',{name:'孩子一（家庭兒童）｜報到',exact:true}).click();
+  await p.getByRole('button',{name:'孩子一（家庭兒童）｜已報到',exact:true}).waitFor();
+  assert.equal(await p.getByRole('button',{name:'孩子二（家庭兒童）｜報到',exact:true}).isEnabled(),true);
+  await p.getByRole('button',{name:'孩子二（家庭兒童）｜報到',exact:true}).click();
+  await p.getByRole('button',{name:'孩子二（家庭兒童）｜已報到',exact:true}).waitFor();
+  assert.deepEqual(await p.evaluate(()=>calls.filter(c=>c.action==='scan').map(c=>c.playerId)),['c1','c2']);
+  assert.equal(await p.getByRole('button',{name:'家長（本人）｜報到',exact:true}).isEnabled(),true);
+  await p.getByRole('button',{name:'完成',exact:true}).click();assert.equal(new URL(p.url()).searchParams.has('checkinToken'),false);
+ });
+ await scenario('只有一位家庭兒童也先讓家長選擇',{players:[{id:'c1',name:'孩子一',family:true}]},async p=>{await p.getByRole('heading',{name:'選擇報到對象'}).waitFor();assert.equal(await p.evaluate(()=>calls.filter(c=>c.action==='scan').length),0);});
+ await scenario('孩子資格變更後拒絕報到，畫面不顯示成功',{players:[{id:'c1',name:'孩子一',family:true}],response:{error:'not-confirmed'}},async p=>{await p.getByRole('button',{name:'孩子一（家庭兒童）｜報到',exact:true}).click();await p.getByText(/不在正取名單/).waitFor();assert.equal(await p.getByRole('button',{name:'孩子一（家庭兒童）｜已報到',exact:true}).count(),0);});
  console.log('Browser scenarios: '+passed+' passed');
 }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
