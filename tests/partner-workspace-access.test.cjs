@@ -12,9 +12,15 @@ test('active partner organizer enters the operational tournament workspace',()=>
   assert.match(app,/if\(intent==="partner_organizer"\)\{appPhase="app";activeTab="management"/);
 });
 
-test('partner organizer sees only tournaments created for the active organization',()=>{
-  assert.match(cloud,/fx\.where\("createdBy","==",actorUid\)/);
-  assert.match(cloud,/d\.partnerOrganizationCode!==partnerOrganizerGrant\(\)\.organizationId/);
+test('partner organizer room-list query proves every Firestore read-rule field',()=>{
+  const query=cloud.slice(cloud.indexOf('async queryAdminTournaments(){'),cloud.indexOf('async queryAdminTournaments(){')+3000);
+  assert.match(query,/fx\.where\("createdBy","==",actorUid\)/);
+  assert.match(query,/fx\.where\("createdByRole","==","partner_organizer"\)/);
+  assert.match(query,/fx\.where\("eventAuthority","==","official"\)/);
+  assert.match(query,/fx\.where\("partnerOrganizationCode","==",partnerGrant\.organizationId\)/);
+  assert.match(query,/fx\.where\("partnerContractOrderCode","==",partnerOrderCode\)/);
+  assert.match(query,/partnerGrant\?\.scope==="contract"&&!partnerOrderCode/);
+  assert.match(query,/d\.partnerOrganizationCode!==partnerGrant\.organizationId/);
   assert.match(cloud,/partnerOrganizationCode:partnerGrant\.organizationId/);
   assert.match(cloud,/createdByRole:"partner_organizer"/);
 });
