@@ -1,12 +1,12 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 function setup(){const c=vm.createContext({window:{},setTimeout,Date});vm.runInContext(fs.readFileSync('modules/main-app/hunter-leaderboard.js','utf8'),c);return c.window.BXHHunterLeaderboard;}
-const row=(key='a')=>({key,playerName:'<img src=x onerror=alert(1)>',tier:'b',rank:1,score:60,strength:58,replayedHighest:'a'});
+const row=(key='a')=>({key,playerName:'<img src=x onerror=alert(1)>',tier:'b',rank:1,score:60,strength:58,matchCount:47,replayedHighest:'a'});
 const page=(n=1,extra={})=>({ok:true,version:'hunter-leaderboard-v1',promotionPolicy:'medium-or-larger-v1',status:'complete',generation:'g1793000000000-abcdefabcdef',page:n,pageSize:50,total:1,hasMore:false,rows:[row()],mine:null,counts:{eligible:1,ranked:1,pending:0,noHistory:0,notPublic:0},updatedAt:2000,startedAt:1000,highest:{tier:'b'},...extra});
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 test('render escapes names, reports coverage and distinguishes current from replayed highest',async()=>{
  const V=setup(),v=V.create({load:async()=>page(),identity:()=>'',onChange:()=>{}});await v.refresh();const h=v.render(esc);
- assert(h.includes('&lt;img'));assert(!h.includes('<img src=x'));assert(h.includes('生涯最高（回算）'));assert(h.includes('最高階級'));assert(h.includes('登入後查看'));assert(h.includes('60.0'));
+ assert(h.includes('&lt;img'));assert(!h.includes('<img src=x'));assert(h.includes('生涯最高（回算）'));assert(h.includes('最高階級'));assert(h.includes('登入後查看'));assert(h.includes('60.0'));assert(h.includes('累計有效對戰'));assert(h.includes('47 場'));
 });
 test('incomplete scans never claim a global highest and service failures do not become an empty zero board',async()=>{
  const V=setup(),v=V.create({load:async()=>page(1,{status:'partial',counts:{eligible:2,ranked:1,pending:1,noHistory:0,notPublic:0}}),identity:()=>'',onChange:()=>{}});
@@ -25,8 +25,13 @@ test('pagination stays on one generation and retries the same failed page withou
  assert.equal(calls[1].generation,calls[2].generation);assert.equal(calls[1].page,2);
 });
 test('loader rejects wrong rule versions, malformed rows and mixed generations',()=>{
- const V=setup();for(const extra of [{promotionPolicy:'old'},{rows:[{...row(),score:NaN}]},{rows:[{...row(),rank:0}]},{total:-1}])assert.equal(V.validPage(page(1,extra),1),false);
+ const V=setup();for(const extra of [{promotionPolicy:'old'},{rows:[{...row(),score:NaN}]},{rows:[{...row(),rank:0}]},{total:-1},{rows:[{...row(),matchCount:-1}]},{rows:[{...row(),matchCount:1.5}]}])assert.equal(V.validPage(page(1,extra),1),false);
  assert.equal(V.validPage(page(),1,'different-generation'),false);
  const html=fs.readFileSync('index.html','utf8');assert(html.indexOf('hunter-leaderboard.js')<html.indexOf('modules/main-app/core.js'));
  const core=fs.readFileSync('modules/main-app/hunter-leaderboard-integration.js','utf8');assert(core.includes("view==='hunter'"));assert(core.includes("data-action=\"ranking-board\""));
+});
+
+test('legacy snapshots show unavailable match counts instead of inventing zero',async()=>{
+ const r=row();delete r.matchCount;const V=setup(),v=V.create({load:async()=>page(1,{rows:[r]}),identity:()=>'',onChange:()=>{}});
+ await v.refresh();assert(v.render(esc).includes('<td>—</td>'));assert(!v.render(esc).includes('<td>0 場</td>'));
 });
