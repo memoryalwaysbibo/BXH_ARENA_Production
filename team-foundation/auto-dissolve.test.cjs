@@ -27,3 +27,9 @@ test('sweep advances past a full page of invalid teams without exceeding batch l
  const db={doc:p=>p,collection:()=>{let cursor=null;return {where(){return this;},orderBy(){return this;},startAfter(doc){cursor=doc;return this;},limit(n){assert.equal(n,20);return this;},async get(){const start=cursor?docs.indexOf(cursor)+1:0;queries.push(start);return {docs:docs.slice(start,start+20)};}};},runTransaction:async fn=>fn({get:async p=>({exists:true,data:()=>p.startsWith('teamsV1/')?{...solo,captainUid:p.slice(8),memberUids:[p.slice(8)],roles:{}}:{teamId:'different'}})})};
  const result=await createAutoDissolver({db,clock:()=>86400100}).runSweep();assert.deepEqual(queries,[0,20]);assert.equal(result.failed,21);assert.equal(result.batches,2);assert.equal(result.mayHaveMore,false);
 });
+test('serializable cursor resumes after equal deadlines without reading an anchor document',async()=>{
+ const docs=Array.from({length:101},(_,i)=>({id:'t'+String(i).padStart(3,'0'),data:()=>({dissolveAt:50})}));const starts=[];
+ const db={doc:p=>p,collection:()=>{let cursor=null;return {where(){return this;},orderBy(){return this;},startAfter(due,id){cursor={due,id};return this;},limit(){return this;},async get(){const start=cursor?docs.findIndex(d=>d.id===cursor.id)+1:0;starts.push(start);return {docs:docs.slice(start,start+20)};}};},runTransaction:async fn=>fn({get:async()=>({exists:false})})};
+ const worker=createAutoDissolver({db,clock:()=>100,documentId:'__name__'});const first=await worker.runSweepFrom();assert.equal(first.examined,100);assert.deepEqual(first.nextCursor,{dueAt:50,id:'t099'});
+ const next=await worker.runSweepFrom(first.nextCursor);assert.equal(next.examined,1);assert.equal(next.nextCursor,null);assert.equal(starts.at(-1),100);
+});
