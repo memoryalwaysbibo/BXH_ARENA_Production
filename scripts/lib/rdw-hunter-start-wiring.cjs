@@ -9,18 +9,20 @@ function createHunterVerifiedRankedStart({db,clock,bundleRoot,verifyBracketInTra
  if(!enabled)return async()=>({ok:false,code:'rdw-disabled'});
  if(typeof verifyBracketInTransaction!=='function')throw Error('trusted-bracket-verifier-required');
  const resolveCurrentTier=createVerifiedTierResolver({db,clock,bundleRoot});
- const resolveVerifiedTiers=async({rosterUids,capturedAt})=>{
+ const resolveVerifiedTiers=async({rosterUids})=>{
   if(!Array.isArray(rosterUids)||rosterUids.length<2||rosterUids.length>320||new Set(rosterUids).size!==rosterUids.length)
    throw Error('trusted-roster-required');
   // Account-grade evidence is read-only and gathered before the write
   // transaction; the transaction rechecks the canonical roster afterward.
   const results=await Promise.all(rosterUids.map(uid=>resolveCurrentTier(uid)));
+  const resolvedAt=clock();
+  if(!Number.isSafeInteger(resolvedAt)||resolvedAt<=0)throw Error('trusted-server-clock-invalid');
   return results.map((result,i)=>{
    if(result?.ok!==true||result.uid!==rosterUids[i]||
       result.source!=='server'||result.verified!==true||
       result.complete!==true||result.unresolvedIdentities!==0||
       result.sourceScope!=='public-official-canonical-self-history-v1'||
-      !Number.isSafeInteger(result.computedAt)||result.computedAt>capturedAt)
+      !Number.isSafeInteger(result.computedAt)||result.computedAt<=0||result.computedAt>resolvedAt)
     throw Error('trusted-hunter-tier-unavailable');
    return {ok:true,uid:result.uid,tier:result.tier,computedAt:result.computedAt,
     sourceScope:result.sourceScope,sourceDigest:result.sourceDigest};

@@ -64,3 +64,14 @@ test('missing trusted dispatch producer cannot be bypassed by Hunter tier verifi
  const f=makeDb(),run=createHunterVerifiedRankedStart({db:f.db,clock:()=>200,bundleRoot,verifyBracketInTransaction:async()=>true,enabled:true});
  const result=await run(req);assert.equal(result.ok,false);assert.equal(result.code,'server-dispatch-unavailable');assert.equal(f.writes.length,0);
 });
+
+test('advancing server clock captures the baseline after all Hunter reads finish',async t=>{
+ const bundleRoot=makeBundle();t.after(()=>fs.rmSync(bundleRoot,{recursive:true,force:true}));
+ const f=makeDb();let now=200;
+ const run=createHunterVerifiedRankedStart({db:f.db,clock:()=>++now,bundleRoot,verifyBracketInTransaction:async()=>true,buildServerDispatch:f.buildServerDispatch,enabled:true});
+ const out=await run(req);assert.equal(out.ok,true);
+ const snapshot=f.writes.find(w=>w.path==='rdwSnapshots/'+eventCode).data;
+ assert.ok(snapshot.tiers.every(t=>t.computedAt<=snapshot.capturedAt));
+ const started=JSON.parse(f.writes.find(w=>w.path==='tournaments/'+eventCode).data.data).startedAt;
+ assert.ok(snapshot.capturedAt<started);
+});
