@@ -19,3 +19,6 @@ test('loading and errors never render stale available join buttons',()=>{
 test('recruitment uses unset defaults and rank dropdowns',()=>{
  const html=ui.recruitmentSettings();assert.equal((html.match(/未指定/g)||[]).length,2);assert.ok(html.includes('青銅以上'));assert.ok(html.includes('國家級以上'));assert.ok(!html.includes('minPoints'));
 });
+test('create screen handles team membership and safely renders form',()=>{
+ assert.ok(ui.createTeam(null).includes('data-team-form="create"'));assert.ok(ui.createTeam({id:'a'}).includes('已有所屬戰隊'));
+});
