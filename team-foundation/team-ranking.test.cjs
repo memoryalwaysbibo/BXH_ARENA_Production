@@ -13,3 +13,7 @@ test('first render defers change notification and ignores a queued load after ac
  c.render(esc);assert.equal(changes,0);uid='b';c.render(esc);await new Promise(setImmediate);
  assert.equal(calls,1);assert.ok(changes>=1);
 });
+test('ranking displays known frame variants without accepting arbitrary classes',async()=>{
+ const c=create({identity:()=> 'u',read:async()=>({items:[{rank:1,name:'A',captainName:'C',memberCount:2,strength:5,selectedFrame:4},{rank:2,name:'B',captainName:'C',memberCount:2,strength:4,selectedFrame:'evil'}],total:2,excluded:0})});
+ c.render(esc);await new Promise(setImmediate);const html=c.render(esc);assert.match(html,/team-identity team-frame-4/);assert.doesNotMatch(html,/team-frame-evil/);
+});
