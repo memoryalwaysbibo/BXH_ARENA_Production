@@ -2012,6 +2012,9 @@
       const testerSession=!!(userProfile&&userProfile.active!==false&&(userProfile.role==="tester"||userProfile.isTestAccount===true)&&actorUid);
       const partnerSession=isPartnerOrganizerMode()&&actorUid;
       const eventStaffSession=isEventStaffMode()&&actorUid;
+      const partnerGrant=partnerSession?partnerOrganizerGrant():null;
+      const partnerOrderCode=partnerGrant?.orderCode||partnerGrant?.contractOrderCode||userProfile?.partnerContractOrderCode||null;
+      if(partnerGrant?.scope==="contract"&&!partnerOrderCode) throw new Error("partner-order-missing");
       let docs=[];
       if(eventStaffSession){
         const access=await window.engagementService.eventStaff({action:"listMine"});
@@ -2021,7 +2024,10 @@
         const source=testerSession
           ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("eventAuthority","==","test"))
           : partnerSession
-            ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("partnerOrganizationCode","==",partnerOrganizerGrant().organizationId))
+            ? fx.query(fx.collection(dbHandle,"tournaments"),
+                fx.where("createdBy","==",actorUid),fx.where("createdByRole","==","partner_organizer"),
+                fx.where("eventAuthority","==","official"),fx.where("partnerOrganizationCode","==",partnerGrant.organizationId),
+                fx.where("partnerContractOrderCode","==",partnerOrderCode))
             : fx.collection(dbHandle,"tournaments");
         docs=(await fx.getDocs(source)).docs;
       }
@@ -2030,7 +2036,8 @@
         const d = docSnap.data() || {};
         let savedState=null;
         try{savedState=typeof d.data==="string"?JSON.parse(d.data):d.data;}catch(e){}
-        if(partnerSession&&(d.eventAuthority!=="official"||d.partnerOrganizationCode!==partnerOrganizerGrant().organizationId))return;
+        if(partnerSession&&(d.eventAuthority!=="official"||d.createdBy!==actorUid||d.createdByRole!=="partner_organizer"
+          ||d.partnerOrganizationCode!==partnerGrant.organizationId||(d.partnerContractOrderCode??null)!==partnerOrderCode))return;
         if(eventStaffSession&&!((d.eventStaffAssignments||{})[actorUid]?.status==="accepted"))return;
         items.push({
           code: docSnap.id,
