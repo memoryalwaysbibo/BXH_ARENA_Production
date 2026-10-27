@@ -314,6 +314,9 @@ async function selectAndCheck(page, size, bracketSize) {
     await page.waitForFunction(()=>document.fullscreenElement===document.getElementById('board-shell'));
     await selectAndCheck(page,32,128);
     assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true);
+    if(await page.locator('.se-player-path-button[data-player-id="p1"]').last().getAttribute('aria-pressed')==='true'){
+      await page.locator('.se-player-path-button[data-player-id="p1"]').last().click();
+    }
     await page.locator('.se-player-path-button[data-player-id="p1"]').last().click();
     assert.equal(await page.locator('.se-player-path-dialog').isVisible(),true);
     assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true,'opening path details exited fullscreen');
