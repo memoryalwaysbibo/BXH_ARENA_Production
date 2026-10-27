@@ -21,3 +21,9 @@ test('one invalid team cannot stop other due teams in the same batch',async()=>{
  const db={doc:p=>p,collection:()=>query,runTransaction:async fn=>{const writes=[],tx={get:async p=>({exists:data.has(p),data:()=>data.get(p)}),update:(p,v)=>writes.push(['update',p,v]),delete:p=>writes.push(['delete',p]),create:(p,v)=>writes.push(['create',p,v])};const result=await fn(tx);for(const [op,p,v] of writes){if(op==='delete')data.delete(p);else data.set(p,op==='update'?{...data.get(p),...v}:v);}return result;}};
  const worker=createAutoDissolver({db,clock:()=>86400100,newId:()=> 'h'});assert.deepEqual(await worker.runBatch(),{examined:2,dissolved:1,failed:1,mayHaveMore:false});assert.equal(data.get('teamsV1/good').status,'dissolved');assert.equal(data.get('teamsV1/bad').status,'active');
 });
+
+test('sweep advances past a full page of invalid teams without exceeding batch limit',async()=>{
+ const docs=Array.from({length:21},(_,i)=>({id:'team'+i}));const queries=[];
+ const db={doc:p=>p,collection:()=>{let cursor=null;return {where(){return this;},orderBy(){return this;},startAfter(doc){cursor=doc;return this;},limit(n){assert.equal(n,20);return this;},async get(){const start=cursor?docs.indexOf(cursor)+1:0;queries.push(start);return {docs:docs.slice(start,start+20)};}};},runTransaction:async fn=>fn({get:async p=>({exists:true,data:()=>p.startsWith('teamsV1/')?{...solo,captainUid:p.slice(8),memberUids:[p.slice(8)],roles:{}}:{teamId:'different'}})})};
+ const result=await createAutoDissolver({db,clock:()=>86400100}).runSweep();assert.deepEqual(queries,[0,20]);assert.equal(result.failed,21);assert.equal(result.batches,2);assert.equal(result.mayHaveMore,false);
+});
