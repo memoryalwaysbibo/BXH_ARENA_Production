@@ -14,7 +14,8 @@ function createTeamHost({container,isEnabled,getIdentity,apiFactory,component}){
   catch(_){close();return {ok:false,reason:'unavailable'};}
  }
  function sync(){if(!isEnabled()||!getIdentity()||active&&activeUid!==getIdentity())close();}
- return {open,close,sync};
+ function navigate(teamId){const result=open();if(!result.ok)return result;if(!active?.controller)return {ok:false,reason:'unavailable'};if(teamId)return active.controller.view(teamId);return active.controller.search({});}
+ return {open,close,sync,navigate};
 }
 if(typeof module==='object'&&module.exports)module.exports={createTeamHost};else root.BXHTeamHost={createTeamHost};
 })(typeof window==='object'?window:globalThis);
