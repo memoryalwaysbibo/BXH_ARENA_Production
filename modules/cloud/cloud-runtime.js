@@ -1482,6 +1482,7 @@
         // Counters count online registrations; onsite players occupy seats too.
         // Keep counter units unchanged and fail conservatively if projection lags.
         const team=tour.battleMode==="team"||pub.battleMode==="team"||runtime.meta.battleMode==="team";
+        if(options.individualOnly===true&&team)throw Object.assign(new Error("team-roster-managed"),{code:"team-roster-managed"});
         const occupiedCount=(rows,count)=>team?count:Math.max(count+rows.filter(p=>p&&p.source!=="online"&&!p.registrationId).length,rows.length);
         const guardian=String(reg.guardianUid||reg.uid||"");
         const participant=String(reg.registrationId||regId);
@@ -1601,41 +1602,42 @@
     },
 
     async promoteEarliestWaitlist(code){
-      const staffUid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
-      if(!staffUid) throw { code: "auth-required" };
-
-      const q = fx.query(
-        fx.collection(dbHandle, "tournaments", code, "registrations"),
-        fx.where("status", "==", "waitlist"),
-        fx.orderBy("createdAt", "asc"),
-        fx.limit(1)
-      );
-      const snap = await fx.getDocs(q);
-      if(snap.empty) throw { code: "no-waitlist-candidate" };
-      const candidateUid = snap.docs[0].id;
-
-      const tourRef = fx.doc(dbHandle, "tournaments", code);
-      const pubRef = fx.doc(dbHandle, "publicTournaments", code);
-      const regRef = fx.doc(dbHandle, "tournaments", code, "registrations", candidateUid);
-
-      return await fx.runTransaction(dbHandle, async (tx) => {
-        const pubSnap = await tx.get(pubRef);
-        if(!pubSnap.exists()) throw { code:"not-found" };
-        const pub=pubSnap.data();
-        let publicRuntime=null;
-        try{ publicRuntime=pub.bracketView?JSON.parse(pub.bracketView):null; }catch(e){}
-        if(pub.tournamentPhase === "live" || pub.tournamentPhase === "settling" || pub.tournamentPhase === "done" || pub.tournamentPhase === "cancelled" || (publicRuntime&&publicRuntime.archiveStatus==="completed")) throw { code:"tournament-started" };
-        const regSnap = await tx.get(regRef);
-        if(!regSnap.exists() || regSnap.data().status !== "waitlist") throw { code: "candidate-changed-retry" };
-
-        tx.update(regRef, { status: "confirmed", promotedAt: fx.serverTimestamp(), promotedBy: staffUid, updatedAt: fx.serverTimestamp() });
-        tx.update(tourRef, {
-          confirmedCount: fx.increment(1), waitlistCount: fx.increment(-1), updatedAt: Date.now(),
-          lastRegistrationMutationUid: candidateUid, lastRegistrationMutationType: "promote",
-        });
-        tx.update(pubRef, { confirmedCount: fx.increment(1), waitlistCount: fx.increment(-1), updatedAt: Date.now() });
-
-        return { ok: true, promotedUid: candidateUid };
+      const staffUid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
+      if(!staffUid)throw {code:"auth-required"};
+      const eventCode=String(code||"").toUpperCase();
+      const tourRef=fx.doc(dbHandle,"tournaments",eventCode),pubRef=fx.doc(dbHandle,"publicTournaments",eventCode);
+      const [initialTour,initialPub]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
+      if(!initialTour.exists()||!initialPub.exists())throw {code:"not-found"};
+      let initialRuntime;try{initialRuntime=typeof initialTour.data().data==="string"?JSON.parse(initialTour.data().data):(initialTour.data().data||{});}catch(e){throw {code:"corrupt-state"};}
+      const team=initialTour.data().battleMode==="team"||initialPub.data().battleMode==="team"||initialRuntime.meta?.battleMode==="team";
+      const q=fx.query(fx.collection(dbHandle,"tournaments",eventCode,"registrations"),fx.where("status","==","waitlist"),fx.orderBy("createdAt","asc"),fx.limit(1));
+      const snap=await fx.getDocs(q);
+      if(snap.empty)throw {code:"no-waitlist-candidate"};
+      const candidateUid=snap.docs[0].id;
+      // Individual entrants use the same capacity, lock, projection and read-back
+      // checks as a named promotion. This entry never implicitly expands capacity.
+      if(!team)return Object.assign({},await this.mutateRegistrationRoster(eventCode,candidateUid,"promote",{individualOnly:true}),{promotedUid:candidateUid});
+      const regRef=fx.doc(dbHandle,"tournaments",eventCode,"registrations",candidateUid);
+      return fx.runTransaction(dbHandle,async tx=>{
+        const tourSnap=await tx.get(tourRef),pubSnap=await tx.get(pubRef),regSnap=await tx.get(regRef);
+        if(!tourSnap.exists()||!pubSnap.exists()||!regSnap.exists())throw {code:"not-found"};
+        const tour=tourSnap.data(),pub=pubSnap.data();
+        let runtime;try{runtime=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});}catch(e){throw {code:"corrupt-state"};}
+        if(tour.battleMode!=="team"||pub.battleMode!=="team"||(runtime.meta?.battleMode&&runtime.meta.battleMode!=="team"))throw {code:"registration-state-conflict"};
+        if(tour.registrationSelection||pub.registrationSelection||runtime.entrySelection?.mode==="registration")throw {code:"selection-managed"};
+        if(runtime.startedAt||runtime.bracketSize||runtime.archiveStatus==="completed"||["live","settling","done","cancelled"].includes(String(pub.tournamentPhase||""))||["live","settling","done","cancelled"].includes(String(tour.tournamentPhase||"")))throw {code:"bracket-locked"};
+        if(regSnap.data().status!=="waitlist")throw {code:"candidate-changed-retry"};
+        const capacity=Number(tour.capacity),confirmed=Number(tour.confirmedCount),waiting=Number(tour.waitlistCount);
+        if(!Number.isSafeInteger(capacity)||capacity<1||!Number.isSafeInteger(confirmed)||confirmed<0||!Number.isSafeInteger(waiting)||waiting<1||Number(pub.capacity)!==capacity||Number(pub.confirmedCount)!==confirmed||Number(pub.waitlistCount)!==waiting)throw {code:"registration-state-conflict"};
+        if(confirmed>=capacity)throw {code:"capacity-full"};
+        // Team counters remain team units; do not project a team as one player.
+        const previousStatus=String(pub.registrationStatus||tour.registrationStatus||"open");
+        const registrationStatus=confirmed+1>=capacity?"full":previousStatus==="full"?"open":previousStatus;
+        tx.update(regRef,{status:"confirmed",promotedAt:fx.serverTimestamp(),promotedBy:staffUid,updatedAt:fx.serverTimestamp()});
+        const common={confirmedCount:confirmed+1,waitlistCount:waiting-1,registrationStatus,updatedAt:Date.now()};
+        tx.update(tourRef,Object.assign({},common,{lastRegistrationMutationUid:candidateUid,lastRegistrationMutationType:"promote"}));
+        tx.update(pubRef,common);
+        return {ok:true,promotedUid:candidateUid,status:"confirmed"};
       });
     },
 
@@ -3864,5 +3866,6 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 
 
