@@ -69,3 +69,9 @@ test('only the captain can initiate transfer to another member',()=>{
  const cap=ui.manageMembers({id:'t',viewerRole:'captain',members});assert.equal((cap.match(/data-team-action="transfer"/g)||[]).length,1);assert.match(cap,/data-target-uid="m"/);
  assert.doesNotMatch(ui.manageMembers({id:'t',viewerRole:'deputy',members}),/data-team-action="transfer"/);
 });
+
+test('exit controls respect captain and solo dissolution conditions',()=>{
+ assert.match(ui.myTeam({id:'t',role:'member'}),/data-team-action="leave"/);
+ const solo=ui.myTeam({id:'t',role:'captain',memberCount:1});assert.match(solo,/data-team-action="dissolve"/);assert.doesNotMatch(solo,/data-team-action="leave"/);
+ const group=ui.myTeam({id:'t',role:'captain',memberCount:2});assert.doesNotMatch(group,/data-team-action="dissolve"/);assert.match(group,/僅剩隊長/);
+});
