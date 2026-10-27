@@ -6,12 +6,14 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  function render(state){
   container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':state.screen==='mine'?'mine':'lobby')+(state.screen==='create'&&!state.loading&&!state.error?ui.createTeam(state.team):state.screen==='mine'&&!state.loading&&!state.error?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&!state.error&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query}));
   if(state.busy)for(const button of container.querySelectorAll('button'))button.disabled=true;
+  if(state.pending){const retry=container.ownerDocument.createElement('button');retry.type='button';retry.dataset.teamAction='retry';retry.textContent='重試上一筆操作';retry.disabled=state.busy||state.loading;container.append(retry);}
   if(state.error){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent=state.error;container.append(p);}
  }
  const click=async event=>{
   const button=event.target.closest('[data-team-action]');if(!button||!container.contains(button)||button.disabled)return;
   const action=button.dataset.teamAction,id=button.dataset.teamId;
-  if(action==='tab'&&button.dataset.value==='mine')await controller.mine();
+  if(action==='retry')await controller.retryPending();
+  else if(action==='tab'&&button.dataset.value==='mine')await controller.mine();
   else if(action==='tab'&&button.dataset.value==='create')await controller.create();
   else if(action==='tab'&&button.dataset.value==='lobby')await controller.search(controller.snapshot().query);
   else if(action==='view')await controller.view(id);
