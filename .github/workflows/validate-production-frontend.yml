@@ -125,6 +125,9 @@ jobs:
           new Function(match[1]);
           JS
 
+      - name: Verify safe default referee-seat initialization candidate
+        run: node --test referee-seats/auto-init-core.test.cjs
+
       - name: Verify header logo refresh control
         run: node tests/header-logo-refresh.test.cjs
 
