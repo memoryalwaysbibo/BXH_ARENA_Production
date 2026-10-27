@@ -24,7 +24,7 @@ function createHandler(db,{clock=Date.now}={}){
     tx.get(roomRef),tx.get(pubRef),tx.get(receiptRef)]);
    const user=userSnap.data();
    if(releaseSnap.data()?.autoCreateEnabled!==true)err('auto-create-not-enabled');
-   if(user?.active!==true||user?.isTestAccount===true||!['staff','admin','super_admin'].includes(user.role))err('permission-denied');
+   if(user?.active!==true||user?.isTestAccount===true||user?.deleted===true||['deleted','frozen','disabled'].includes(user?.accountStatus)||!['staff','admin','super_admin'].includes(user.role))err('permission-denied');
    if(receiptSnap.exists){const receipt=receiptSnap.data();if(receipt.uid!==uid||receipt.hash!==hash||receipt.code!==code)err('operation-conflict');return {ok:true,code,idempotent:true};}
    if(roomSnap.exists||pubSnap.exists)err('room-code-conflict');
    const original=d.privatePayload,publicOriginal=d.publicPayload;
