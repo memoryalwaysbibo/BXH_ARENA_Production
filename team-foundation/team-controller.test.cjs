@@ -109,3 +109,8 @@ test('selecting or clearing a frame sends the value and refreshes my team',async
  await c.mine();await c.operate('frame','t',{frame:4});assert.deepEqual(payload,{action:'frame',teamId:'t',requestId:'test-operation-00000001',frame:4});assert.equal(c.snapshot().team.selectedFrame,4);
  await c.operate('frame','t',{frame:null});assert.equal(payload.frame,null);assert.equal(c.snapshot().team.selectedFrame,null);assert.equal(reads,3);
 });
+test('uncertain emblem upload retries the same request and image',async()=>{
+ const calls=[];const c=setup({mine:async()=>({team:{id:'t',role:'captain'}}),uploadEmblem:async p=>{calls.push(structuredClone(p));if(calls.length===1)throw Error('lost');return {ok:true};}});
+ await c.mine();assert.equal((await c.operate('emblem','t',{base64:'YWJj'})).reason,'unconfirmed');assert.equal(c.snapshot().pending,true);
+ assert.equal((await c.retryPending()).ok,true);assert.deepEqual(calls[0],calls[1]);assert.deepEqual(calls[0],{teamId:'t',requestId:'test-operation-00000001',contentType:'image/webp',base64:'YWJj'});assert.equal(c.snapshot().screen,'mine');
+});
