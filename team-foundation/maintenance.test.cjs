@@ -13,3 +13,10 @@ test('successful maintenance reports both worker results',async()=>{
  const f=createTeamMaintenance({enabled:()=>true,reconciler:{enqueue:async()=>{},runBatch:async()=>({status:'done'})},dissolution:{run:async()=>({status:'completed'})}});
  assert.deepEqual(await f(),{status:'completed',projection:{status:'done'},dissolution:{status:'completed'}});
 });
+
+test('maintenance reports failed dissolution candidates and expired leases',async()=>{
+ for(const result of [{status:'completed',failed:1},{status:'lease-expired',failed:0}]){
+  const f=createTeamMaintenance({enabled:()=>true,reconciler:{enqueue:async()=>{},runBatch:async()=>({status:'done'})},dissolution:{run:async()=>result}});
+  await assert.rejects(f(),/team-dissolution-needs-attention/);
+ }
+});
