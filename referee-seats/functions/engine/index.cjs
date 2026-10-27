@@ -775,10 +775,9 @@ function rebuildPropagationSingle(){
 function refereeMatches(){ return orderedMatches().filter(m=>!m.isBye); }
 
 function resolveScoringModeForRound(bracket, round){
-  const key = bracket+":"+round;
-  const rm = state.meta.roundScoringModes || {};
-  if(rm[key]) return rm[key];
-  return state.meta.scoringMode || "standard";
+  // New matches always record every scoring round. Existing match modes remain
+  // intact for legacy results and server-authoritative matches already created.
+  return "standard";
 }
 
 function singleElimBronzeBeforeFinalBlocked(match,matches=state.matches,meta=state.meta){
