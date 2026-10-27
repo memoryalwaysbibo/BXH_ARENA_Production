@@ -1,9 +1,9 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');const {createListService}=require('./list-service.cjs');
-function setup({count=2,stale=false,membership=null,pending=false,reads=[]}={}){
+function setup({count=2,stale=false,membership=null,pending=false,restricted=false,reads=[]}={}){
  const data=new Map([['hunterLeaderboardMeta/current',{generation:'g'}],['ladderSystem/current',{currentSeason:'S1'}]]);
  if(membership)data.set('teamMembershipsV1/u',{teamId:membership});
- const docs=Array.from({length:count},(_,i)=>{const id='t'+i,p={name:'戰隊'+i,captainName:'隊長',level:1,capacity:10,memberCount:1,strength:i===0?null:100,createdAt:100,admission:{mode:'auto',minLadderTier:null,minTier:null},hunterGeneration:stale&&i===0?'old':'g',ladderSeason:'S1',members:[{uid:'c',role:'captain'}],secret:'private'};data.set('teamsV1/'+id,{status:'active',name:'戰隊'+i,totalXp:0,admission:{mode:'auto'},captainUid:'c',memberUids:['c']});return{id,data:()=>p};});
+ const docs=Array.from({length:count},(_,i)=>{const id='t'+i,p={name:'戰隊'+i,captainName:'隊長',level:1,capacity:10,memberCount:1,strength:i===0?null:100,createdAt:100,admission:{mode:'auto',minLadderTier:restricted?'黃金':null,minTier:null},hunterGeneration:stale&&i===0?'old':'g',ladderSeason:'S1',members:[{uid:'c',role:'captain'}],secret:'private'};data.set('teamsV1/'+id,{status:'active',name:'戰隊'+i,totalXp:0,admission:{mode:'auto',minLadderTier:restricted?'黃金':null},captainUid:'c',memberUids:['c']});return{id,data:()=>p};});
  if(pending)data.set('teamsV1/t1/applications/u',{status:'pending'});
  const db={doc:p=>p,collection:()=>({limit:n=>({kind:'query',n})}),runTransaction:fn=>fn({get:async p=>{reads.push(p);return typeof p==='object'?{docs:docs.slice(0,p.n)}:{exists:data.has(p),data:()=>data.get(p)};}})};
  return createListService({db});
@@ -21,3 +21,7 @@ test('untrusted query fields, unsupported filters and oversized requests rejecte
 });
 
 test('page reads only selected teams and applications even with 200 catalog entries',async()=>{const reads=[],list=setup({count:200,reads});const r=await list({actorUid:'u',query:{limit:20}});const teamReads=reads.filter(p=>typeof p==='string'&&/^teamsV1\/[^/]+$/.test(p));const appReads=reads.filter(p=>typeof p==='string'&&p.includes('/applications/'));assert.equal(teamReads.length,20);assert.equal(appReads.length,20);assert.equal(r.items.length,20);assert.equal(r.totalIsUpperBound,true);});
+
+test('restricted automatic admission remains actionable and relies on server validation',async()=>{
+ const r=await setup({restricted:true})({actorUid:'u'});assert.deepEqual(r.items[0].join,{label:'加入',disabled:false,action:'join'});
+});
