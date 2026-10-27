@@ -6,7 +6,7 @@ const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value)
 function createReadService({db}){
  const read=async(tx,path)=>{const snap=await tx.get(db.doc(path));return snap.exists?snap.data():null;};
  return async({actorUid,action,teamId,historyId})=>{
-  if(!valid(actorUid)||!['members','history','reason','mine'].includes(action)||(action!=='mine'&&!valid(teamId))||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
+  if(!valid(actorUid)||!['members','history','reason','mine','applications'].includes(action)||(action!=='mine'&&!valid(teamId))||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
   return db.runTransaction(async tx=>{
    if(action==='mine'){
     const member=await read(tx,'teamMembershipsV1/'+actorUid);
@@ -26,6 +26,14 @@ function createReadService({db}){
     return {id:teamId,name:data.name,members:(data.members||[]).map(p=>({uid:p.uid,name:p.name,role:p.role,ladderPoints:p.ladderPoints??null,hunterTier:p.hunterTier??null}))};
    }
    const team=await read(tx,'teamsV1/'+teamId),membership=await read(tx,'teamMembershipsV1/'+actorUid);
+   if(action==='applications'){
+    if(team?.status!=='active'||membership?.teamId!==teamId||!team.memberUids?.includes(actorUid)||!(team.captainUid===actorUid||team.roles?.[actorUid]==='deputy'))throw Error('permission-denied');
+    // At most 20 profiles per request; expose only public display names and application time.
+    const snaps=await tx.get(db.collection('teamsV1/'+teamId+'/applications').where('status','==','pending').limit(21));
+    const page=snaps.docs.slice(0,20);
+    const profiles=await Promise.all(page.map(s=>read(tx,'publicPlayers/'+s.id)));
+    return {items:page.map((s,i)=>({uid:s.id,name:typeof profiles[i]?.publicName==='string'&&profiles[i].publicName.trim()?profiles[i].publicName.trim():'玩家',requestedAt:s.data().requestedAt})),hasMore:snaps.docs.length>20};
+   }
    if(action==='history'){
     if(team?.status==='dissolved'||membership?.teamId!==teamId||!team?.memberUids?.includes(actorUid))throw Error('permission-denied');
     // Bounded newest page. Pagination support is intentionally not implied.
