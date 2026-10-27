@@ -8,7 +8,7 @@ function createReadHandler({db,auth,HttpsError,enabled=false}){
   if(!request?.app?.appId)fail('failed-precondition','app-check-required');
   const uid=request.auth?.uid;if(!uid)fail('unauthenticated','sign-in-required');
   const data=request.data;
-  if(!data||!['members','history','reason','list','mine'].includes(data.action))fail('invalid-argument','invalid-team-read');
+  if(!data||!['members','history','reason','list','mine','applications'].includes(data.action))fail('invalid-argument','invalid-team-read');
   const allowed=data.action==='reason'?['action','teamId','historyId']:data.action==='list'?['action','query']:data.action==='mine'?['action']:['action','teamId'];
   if(Object.keys(data).some(k=>!allowed.includes(k)))fail('invalid-argument','unexpected-read-field');
   let user;try{user=await auth.getUser(uid);}catch(_){fail('unauthenticated','account-unavailable');}
