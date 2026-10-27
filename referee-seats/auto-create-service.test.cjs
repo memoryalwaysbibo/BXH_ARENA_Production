@@ -139,3 +139,13 @@ test('trusted create permits only whitelisted event-info keys',async()=>{
  const out=await h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify(mirror)}});
  assert.equal(out.ok,true);
 });
+
+test('auto-create release gate remains fail-closed even when three-seat scoring is enabled',async()=>{
+ const h=harness();
+ delete h.docs.get('systemConfig/refereeSeatsV1').autoCreateEnabled;
+ await assert.rejects(h.run(),/auto-create-not-enabled/);
+ h.docs.get('systemConfig/refereeSeatsV1').autoCreateEnabled=false;
+ await assert.rejects(h.run(),/auto-create-not-enabled/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));
+ assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
+});
