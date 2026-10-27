@@ -21,7 +21,7 @@ function createPublicPlayerReader({db}){
    if(typeof name!=='string'||!name.trim()||name.trim().length>80)throw Error('public-name-unavailable');
    return {uid,name:name.trim(),ladderPoints:ladder.get(uid).points,hunterTier:rows.get(uid)?.tier??null};
   });
-  return {complete:true,players,hunterGeneration:generation};
+  return {complete:true,players,hunterGeneration:generation,ladderSeason:ladder.get(uids[0]).season};
  };
 }
 module.exports={createPublicPlayerReader};
