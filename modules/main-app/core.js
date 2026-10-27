@@ -10380,6 +10380,58 @@ function renderTournamentMatchList(){
   </div>`;
 }
 
+let singleBracketPathSelection=null;
+function singleBracketPathRoom(){
+  return String(state.cloudCode||state.id||"");
+}
+function singleBracketPathPlayer(){
+  return singleBracketPathSelection?.room===singleBracketPathRoom()
+    ? singleBracketPathSelection.playerId : null;
+}
+function singleBracketPlayerHtml(id,name){
+  const content=playerBracketRowHtml(id,name);
+  if(!id) return content;
+  return `<button type="button" class="se-player-path-button" data-action="single-player-path" data-player-id="${esc(id)}" aria-label="查看${esc(name)}的晉級路徑" aria-pressed="${singleBracketPathPlayer()===id}">${content}</button>`;
+}
+function singleBracketPlayerHistory(id){
+  return state.matches.filter(m=>(m.bracket==null||m.bracket==="SE")&&(m.a?.playerId===id||m.b?.playerId===id||m.isBye&&m.winnerId===id))
+    .sort((a,b)=>a.round-b.round||a.indexInRound-b.indexInRound);
+}
+function applySingleBracketPlayerPath(outer){
+  if(!outer) return;
+  const player=singleBracketPathPlayer();
+  const matches=new Map(state.matches.map(m=>[m.id,m]));
+  outer.querySelectorAll('.se-player-path-button').forEach(button=>{
+    const selected=!!player&&button.getAttribute('data-player-id')===player;
+    button.setAttribute('aria-pressed',String(selected));
+    button.closest('.mb-row')?.classList.toggle('se-player-path-row',selected);
+  });
+  outer.querySelectorAll('.se-bracket-svg path[data-source-match]').forEach(path=>{
+    const source=matches.get(path.getAttribute('data-source-match'));
+    const target=matches.get(path.getAttribute('data-target-match'));
+    const occupant=path.getAttribute('data-target-side')==='A'?target?.a:target?.b;
+    const selected=!!player&&source?.completed&&source.winnerId===player&&occupant?.playerId===player;
+    path.classList.toggle('se-player-path-selected',!!selected);
+  });
+}
+function selectSingleBracketPlayerPath(id){
+  if(!id||!state.players.some(p=>p.id===id)) return;
+  const clear=singleBracketPathPlayer()===id;
+  singleBracketPathSelection=clear?null:{room:singleBracketPathRoom(),playerId:id};
+  document.querySelectorAll('.se-bracket-outer').forEach(applySingleBracketPlayerPath);
+  if(clear) return;
+  const history=singleBracketPlayerHistory(id);
+  const lines=history.map(m=>{
+    if(m.isBye) return singleRoundTitle(m.round)+'：輪空晉級';
+    const opponent=m.a?.playerId===id?m.b?.playerId:m.a?.playerId;
+    const result=!m.completed?'等待比賽':m.winnerId===id?'勝出晉級':m.winnerId?'止步':'結果待確認';
+    return singleRoundTitle(m.round)+'｜對手：'+(opponent?playerName(opponent):'待定')+'｜'+result;
+  });
+  openModal({type:'generic',title:playerName(id)+' 的晉級路徑',
+    message:(lines.length?lines.join('\n'):'尚未安排場次')+'\n\n包含目前範圍以外的已知場次；高亮只標示已確認晉級的路線。再次點選同一位選手可取消。',
+    confirmLabel:'返回樹狀圖'});
+}
+
 function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
   if(m.isBye){
     return `<div class="match-box bye-placeholder" aria-hidden="true" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}">
@@ -10398,8 +10450,8 @@ function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
   <div class="match-box ${m.completed?'done':''} ${matchStatusClass(m)}${courtSwapMatchClass(m)}" style="${activeMatchCourtAtmosphereStyle(m)}" data-action="open-match" data-id="${m.id}" data-round="${roundIdx}" data-index="${boxIdx}" data-match-number="${matchNo==null?'':matchNo}">
     ${matchNo==null?'':`<span class="match-order-badge" aria-label="第 ${matchNo} 場">${matchNo}</span>`}
     <div class="mb-head"><span>${headLabel}${quickModeTagHtml(m)}${courtSwapMatchBadge(m)}</span><span>台${m.station}</span></div>
-    <div class="mb-row ${aWin?'winner':''}" data-side="A">${playerBracketRowHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
-    <div class="mb-row ${bWin?'winner':''}" data-side="B">${playerBracketRowHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
+    <div class="mb-row ${aWin?'winner':''}" data-side="A">${singleBracketPlayerHtml(m.a?.playerId,aName)}<span class="sc">${matchScoreCellHtml(m,"A")}</span></div>
+    <div class="mb-row ${bWin?'winner':''}" data-side="B">${singleBracketPlayerHtml(m.b?.playerId,bName)}<span class="sc">${matchScoreCellHtml(m,"B")}</span></div>
     ${matchStatusBarHtml(m)}
   </div>`;
 }
@@ -10875,14 +10927,23 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
   suffix = suffix || "";
   const svg = document.getElementById("se-bracket-svg"+suffix);
   if(!svg) return;
+  const matches=new Map(state.matches.map(m=>[m.id,m]));
   const colsWrap = document.getElementById("se-bracket-cols"+suffix);
-  const outerRect = outer.getBoundingClientRect();
-  const geometryScale = outer.closest?.("#board-canvas") ? boardZoom : 1;
   const totalWidth = colsWrap ? colsWrap.scrollWidth : outer.scrollWidth;
   const totalHeight = colsWrap ? colsWrap.scrollHeight : outer.scrollHeight;
   svg.setAttribute("width", totalWidth);
   svg.setAttribute("height", totalHeight);
   svg.setAttribute("viewBox", "0 0 " + totalWidth + " " + totalHeight);
+
+  // Measure in SVG coordinates, including the transform actually painted by
+  // the browser. boardZoom may already contain a queued, unpainted value.
+  const screenMatrix=svg.getScreenCTM?.();
+  const inverse=screenMatrix?.inverse();
+  const svgRect=svg.getBoundingClientRect();
+  const toLocal=(x,y)=>inverse
+    ? {x:inverse.a*x+inverse.c*y+inverse.e,y:inverse.b*x+inverse.d*y+inverse.f}
+    : {x:(x-svgRect.left)*totalWidth/(svgRect.width||totalWidth||1),
+       y:(y-svgRect.top)*totalHeight/(svgRect.height||totalHeight||1)};
 
   let paths = "";
   for(let r=1; r<=maxRound; r++){
@@ -10895,48 +10956,41 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
     const curBoxes = Array.from(curCol.querySelectorAll(".match-box"))
       .sort((a,b)=>(+a.getAttribute("data-index"))-(+b.getAttribute("data-index")));
 
-    curBoxes.forEach((curBox, i)=>{
-      const sourceBoxes=[prevBoxes[i*2],prevBoxes[i*2+1]].filter(Boolean).filter(box=>{
-        const m=getMatch(box.getAttribute("data-id"));
-        return !!(m && !m.isBye);
-      });
-      if(!sourceBoxes.length) return;
+    // Logical indices survive hidden BYEs and filtered/reordered DOM cards.
+    const prevByIndex=new Map(prevBoxes.map(box=>{
+      const m=matches.get(box.getAttribute("data-id"));
+      return [m?.indexInRound??Number(box.getAttribute("data-index")),box];
+    }));
 
+    curBoxes.forEach(curBox=>{
+      const target=matches.get(curBox.getAttribute("data-id"));
+      if(!target||target.isBye) return;
+      const targetIndex=target.indexInRound??Number(curBox.getAttribute("data-index"));
       const curRect=curBox.getBoundingClientRect();
-      const endX=(curRect.left-outerRect.left)/geometryScale;
-      const targetY=(curRect.top-outerRect.top+curRect.height/2)/geometryScale;
-      const sourcePoints=sourceBoxes.map(srcBox=>{
-        const rect=srcBox.getBoundingClientRect();
-        return {
-          x:(rect.right-outerRect.left)/geometryScale,
-          y:(rect.top-outerRect.top+rect.height/2)/geometryScale
-        };
-      });
-      const furthestStartX=Math.max(...sourcePoints.map(p=>p.x));
-      const joinX=furthestStartX + Math.max(8,(endX-furthestStartX)*0.5);
+      if(!curRect.width||!curRect.height) return;
       const stroke="rgba(235,235,235,0.72)";
       const cls="se-path-classic";
-
-      // Each source leaves from the card's exact vertical center.
-      sourcePoints.forEach((p, sourceIndex)=>{
-        const sourceMatch = getMatch(sourceBoxes[sourceIndex].getAttribute("data-id"));
-        const advanced = !!(sourceMatch && sourceMatch.completed && sourceMatch.winnerId && !sourceMatch.isBye);
-        paths += `<path class="${cls}${advanced?' se-path-advanced':''}" d="M ${p.x} ${p.y} H ${joinX}" fill="none" stroke="${stroke}"/>`;
+      [0,1].forEach(side=>{
+        const sourceBox=prevByIndex.get(targetIndex*2+side);
+        const sourceMatch=sourceBox&&matches.get(sourceBox.getAttribute("data-id"));
+        if(!sourceMatch||sourceMatch.isBye) return;
+        const sourceRect=sourceBox.getBoundingClientRect();
+        if(!sourceRect.width||!sourceRect.height) return;
+        const row=curBox.querySelectorAll(".mb-row")[side];
+        const rowRect=row?.getBoundingClientRect();
+        const start=toLocal(sourceRect.right,sourceRect.top+sourceRect.height/2);
+        const end=toLocal(curRect.left,rowRect?.height?rowRect.top+rowRect.height/2:curRect.top+curRect.height/2);
+        const joinX=(start.x+end.x)/2;
+        const targetPlayer=(side===0?target.a:target.b)?.playerId;
+        const advanced=!!(sourceMatch.completed&&sourceMatch.winnerId&&sourceMatch.winnerId===targetPlayer);
+        // One continuous path per feeder: no separate horizontal/vertical
+        // fragments, and each endpoint lands on its actual destination row.
+        paths += `<path class="${cls}${advanced?' se-path-advanced':''}" data-source-match="${esc(sourceMatch.id)}" data-target-match="${esc(target.id)}" data-target-side="${side===0?'A':'B'}" d="M ${start.x} ${start.y} H ${joinX} V ${end.y} H ${end.x}" fill="none" stroke="${stroke}"/>`;
       });
-
-      // One shared vertical spine, Challonge-style.
-      const ys=sourcePoints.map(p=>p.y);
-      const minY=Math.min(...ys,targetY);
-      const maxY=Math.max(...ys,targetY);
-      if(maxY>minY){
-        paths += `<path class="${cls}" d="M ${joinX} ${minY} V ${maxY}" fill="none" stroke="${stroke}"/>`;
-      }
-
-      // One clean horizontal branch into the center of the next match.
-      paths += `<path class="${cls}" d="M ${joinX} ${targetY} H ${endX}" fill="none" stroke="${stroke}"/>`;
     });
   }
   svg.innerHTML = paths;
+  applySingleBracketPlayerPath(outer);
 }
 
 let __seRelayoutQueued = false;
@@ -19675,18 +19729,24 @@ function bindBoardModeInteractions(){
       setBoardZoom(boardZoom + (e.deltaY<0 ? 0.1 : -0.1));
     }, { passive:false });
 
-    let dragging=false, startX=0, startY=0, startPanX=0, startPanY=0;
+    let dragging=false, dragged=false, startX=0, startY=0, startPanX=0, startPanY=0;
     listen(viewport, "mousedown", (e)=>{
-      dragging=true; startX=e.clientX; startY=e.clientY; startPanX=boardPanX; startPanY=boardPanY;
+      dragging=true; dragged=false; startX=e.clientX; startY=e.clientY; startPanX=boardPanX; startPanY=boardPanY;
       viewport.style.cursor="grabbing";
     });
     listen(window, "mousemove", (e)=>{
       if(!dragging || !viewport.isConnected) return;
+      if(Math.hypot(e.clientX-startX,e.clientY-startY)>6) dragged=true;
       boardPanX = startPanX + (e.clientX-startX);
       boardPanY = startPanY + (e.clientY-startY);
       applyBoardTransform();
     });
     listen(window, "mouseup", ()=>{ dragging=false; viewport.style.cursor="grab"; });
+    listen(viewport, "click", e=>{
+      if(dragged&&e.detail!==0&&e.target.closest?.('.se-player-path-button')){
+        e.preventDefault();e.stopPropagation();dragged=false;
+      }
+    }, true);
 
     listen(window, "blur", ()=>{ dragging=false; viewport.style.cursor="grab"; });
 
@@ -22747,6 +22807,10 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     setBoardStage(Number(target.getAttribute("data-stage")));
     return;
   }
+  if(action==="single-player-path"){
+    selectSingleBracketPlayerPath(target.getAttribute("data-player-id"));
+    return;
+  }
   if(action==="set-team-bracket-view"){
     const mode=target.getAttribute("data-mode");
     if(mode!=="tree"&&mode!=="live")return;
@@ -25088,6 +25152,3 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
-
-
-

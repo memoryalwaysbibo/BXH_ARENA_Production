@@ -31,6 +31,8 @@ const functionNames = [
   'matchesInRound', 'numRoundsTotal', 'singleRoundTitle', 'effectiveSingleBracketLayout',
   'seMatchBoxHtml', 'renderCompactSingleElimBracket', 'renderSingleElimBracket',
   'layoutSingleElimBracket', 'positionSingleElimFinalDecorations', 'drawSingleElimConnectors',
+  'singleBracketPathRoom', 'singleBracketPathPlayer', 'singleBracketPlayerHtml',
+  'singleBracketPlayerHistory', 'applySingleBracketPlayerPath', 'selectSingleBracketPlayerPath',
   'scheduleSeRelayout', 'renderBoardMode', 'currentRoundLabelForBoard',
   'tournamentMatchListGroup', 'renderTournamentMatchList', 'renderPrintBracket', 'wrapPrintWatermark',
   'clearBoardModeInteractions', 'bindBoardModeInteractions', 'setBoardZoom', 'setBoardPinchZoom',
@@ -82,6 +84,7 @@ function fixture(count, { completed = false, bronze = false, code = 'BXH-STAGES'
 
 const scaffold = `
   let state, bracketViewMode='board', singleBracketLayoutMode='full';
+  let singleBracketPathSelection=null;
   let boardZoom=1, boardPanX=0, boardPanY=0, boardTheme='gold', boardExportBusy=false;
   let boardModeInteractionCleanup=null, __bxhBoardTransformFrame=0, __seRelayoutQueued=false;
   let boardExpanded=false, boardFullscreenFallback=false, boardExpandedRoom=null, boardBodyOverflow=null, boardFullscreenBusy=false;
@@ -112,6 +115,7 @@ const scaffold = `
   function bracketCommitStatusHtml(){return ''} function isAdminTierOrAbove(){return false}
   function tournamentStatus(){return state.championId?'done':'waiting'}
   function showToast(){} function bindCompletedMatchCorrectionLongPress(){} function bindManualCourtAssignLongPress(){}
+  function openModal(value){window.__pathModal=value}
   function saveBoardThemePreference(){} function render(){throw Error('stage switch unexpectedly replaced the app shell')}
   async function ensureHtml2Canvas(){}
   function downloadBoardPng(blob,filename){window.__download={filename,type:blob.type}}
@@ -146,6 +150,7 @@ const scaffold = `
     if(!button||button.disabled)return;
     if(button.dataset.action==='set-board-stage')setBoardStage(Number(button.dataset.stage));
     if(button.dataset.action==='board-fullscreen')void toggleBoardFullscreen();
+    if(button.dataset.action==='single-player-path')selectSingleBracketPlayerPath(button.dataset.playerId);
   });
 `;
 
@@ -177,6 +182,22 @@ async function snapshot(page) {
     }
     const paths = [...document.querySelectorAll('#se-bracket-svg path')];
     if (paths.some(path => /NaN|undefined|Infinity/.test(path.getAttribute('d')) || path.getTotalLength() <= 0)) violations.push('invalid connector');
+    for(const path of paths){
+      const source=document.querySelector('.match-box[data-id="'+path.dataset.sourceMatch+'"]');
+      const target=document.querySelector('.match-box[data-id="'+path.dataset.targetMatch+'"]');
+      if(!source||!target){violations.push('missing route card');continue;}
+      const sourceRect=source.getBoundingClientRect(),targetRect=target.getBoundingClientRect();
+      const row=target.querySelector('.mb-row[data-side="'+path.dataset.targetSide+'"]');
+      const rowRect=row.getBoundingClientRect();
+      const matrix=path.getScreenCTM();
+      const start=path.getPointAtLength(0).matrixTransform(matrix);
+      const end=path.getPointAtLength(path.getTotalLength()).matrixTransform(matrix);
+      if(Math.abs(start.x-sourceRect.right)>1||Math.abs(start.y-sourceRect.top-sourceRect.height/2)>1)violations.push('detached source '+path.dataset.sourceMatch);
+      if(Math.abs(end.x-targetRect.left)>1||Math.abs(end.y-rowRect.top-rowRect.height/2)>1)violations.push('detached target '+path.dataset.targetMatch);
+      const from=getMatch(path.dataset.sourceMatch),to=getMatch(path.dataset.targetMatch);
+      const advanced=!!(from.completed&&from.winnerId===(path.dataset.targetSide==='A'?to.a:to.b)?.playerId&&from.winnerId);
+      if(path.classList.contains('se-path-advanced')!==advanced)violations.push('unconfirmed winner route');
+    }
     return {
       rounds: columns.map(col => Number(col.dataset.round)),
       count: columns.reduce((n,col)=>n+col.querySelectorAll('.match-box').length,0),
@@ -251,6 +272,20 @@ async function selectAndCheck(page, size, bracketSize) {
       });
     });
     assert.equal(collisions,false,'champion overlaps final or bronze');
+    const selected=await page.evaluate(()=>{
+      selectSingleBracketPlayerPath('p1');
+      return {message:window.__pathModal.message,history:singleBracketPlayerHistory('p1').length,
+        paths:document.querySelectorAll('.se-player-path-selected').length,
+        buttons:document.querySelectorAll('.se-player-path-button[aria-pressed="true"]').length,
+        unchanged:JSON.stringify(state)===window.__originalState};
+    });
+    assert.equal(selected.history,7,'history must include rounds hidden by the 16-stage filter');
+    assert.ok(selected.paths>0&&selected.buttons>0,'selected confirmed route is highlighted');
+    assert.ok(selected.message.includes('128強')&&selected.message.includes('冠軍賽'));
+    assert.equal(selected.unchanged,true,'path selection must not mutate tournament state');
+    await page.evaluate(()=>selectSingleBracketPlayerPath('p1'));
+    assert.equal(await page.locator('.se-player-path-selected').count(),0,'repeat selection clears route');
+    await page.evaluate(()=>selectSingleBracketPlayerPath('p1'));
     await capture(page,'desktop-128-completed-show16.png');
     console.log('PASS completed tournament retains bronze, champion and nonoverlapping final geometry');passed++;
 
@@ -305,6 +340,8 @@ async function selectAndCheck(page, size, bracketSize) {
     console.log('PASS image export uses chosen scope in filename and caption, hides controls and guards scope during export');passed++;
 
     await page.evaluate(model=>mount(model),fixture(16,{code:'BXH-NEXT'}));
+    assert.equal(await page.locator('.se-player-path-selected').count(),0,'player path must not leak into another room');
+    assert.equal(await page.locator('.se-player-path-button[aria-pressed="true"]').count(),0);
     assert.equal(await page.evaluate(()=>selectedBoardStage()),0);
     assert.equal(await page.locator('.board-stage-btn[data-stage="128"]').isDisabled(),true);
     assert.equal(await page.locator('.board-stage-btn[data-stage="64"]').isDisabled(),true);

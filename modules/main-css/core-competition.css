@@ -2360,3 +2360,17 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
   stroke:var(--board-accent,#d9b95c)!important;
   stroke-width:3!important;
 }
+
+/* Player route inspection remains a view-only action. */
+.se-player-path-button{
+  display:flex;align-items:center;flex:1;min-width:0;
+  border:0;border-radius:3px;padding:0;background:none;color:inherit;
+  font:inherit;text-align:inherit;cursor:pointer;
+}
+.se-player-path-button .player-line{flex:1;min-width:0;}
+.se-player-path-button:focus-visible{outline:2px solid var(--board-accent,#d4af37);outline-offset:2px;}
+.se-player-path-row{outline:2px solid var(--board-accent,#d4af37);outline-offset:-2px;}
+.board-shell .board-canvas .se-bracket-svg path.se-path-classic.se-player-path-selected,
+.se-bracket-svg path.se-path-classic.se-player-path-selected{
+  stroke:var(--board-accent,#d4af37)!important;stroke-width:3!important;
+}
