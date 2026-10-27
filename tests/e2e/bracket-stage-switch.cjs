@@ -319,6 +319,11 @@ async function selectAndCheck(page, size, bracketSize) {
     assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true,'opening path details exited fullscreen');
     await page.getByRole('button',{name:'返回樹狀圖',exact:true}).click();
     assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true,'closing path details exited fullscreen');
+    await page.locator('.se-player-path-button[data-player-id="p1"]').last().click();
+    await page.locator('.se-player-path-button[data-player-id="p1"]').last().click();
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>!document.querySelector('.se-player-path-dialog'));
+    assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true,'Escape from path dialog exited fullscreen');
     await capture(page,'native-fullscreen-show32.png');
     await page.evaluate(()=>document.exitFullscreen());
     console.log('PASS native fullscreen survives stage change with the same shell');passed++;

@@ -10429,6 +10429,8 @@ function showSingleBracketPathDetails(title,message){
   const close=document.createElement('button');
   close.type='button';close.className='btn btn-primary';close.textContent='返回樹狀圖';
   close.addEventListener('click',()=>dialog.close());
+  // Let Escape close the dialog without reaching the page-fullscreen fallback.
+  dialog.addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation();});
   dialog.addEventListener('close',()=>dialog.remove(),{once:true});
   dialog.append(heading,body,close);shell.append(dialog);dialog.showModal();
 }
@@ -22825,6 +22827,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="single-player-path"){
+    const matchId=target.closest('.match-box')?.getAttribute('data-id');
+    if(matchId&&((matchId===bracketCorrectionSuppressClickId&&Date.now()<bracketCorrectionSuppressClickUntil)
+      ||(matchId===bracketManualAssignSuppressClickId&&Date.now()<bracketManualAssignSuppressClickUntil))) return;
     selectSingleBracketPlayerPath(target.getAttribute("data-player-id"));
     return;
   }
