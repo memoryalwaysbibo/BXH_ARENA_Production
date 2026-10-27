@@ -149,3 +149,23 @@ test('auto-create release gate remains fail-closed even when three-seat scoring 
  assert(!h.docs.has('tournaments/BXH-ABCD12'));
  assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
 });
+
+test('idempotent receipt refuses missing room or public mirror',async()=>{
+ const h=harness();await h.run();
+ const publicDoc=h.docs.get('publicTournaments/BXH-ABCD12');
+ h.docs.delete('publicTournaments/BXH-ABCD12');
+ await assert.rejects(h.run(),/room-receipt-inconsistent/);
+ h.docs.set('publicTournaments/BXH-ABCD12',publicDoc);
+ const privateDoc=h.docs.get('tournaments/BXH-ABCD12');
+ h.docs.delete('tournaments/BXH-ABCD12');
+ await assert.rejects(h.run(),/room-receipt-inconsistent/);
+ h.docs.set('tournaments/BXH-ABCD12',privateDoc);
+ assert.equal((await h.run()).idempotent,true);
+});
+test('forged public owner and role cannot be written',async()=>{
+ const h=harness(),p=h.payload;
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,ownerUid:'other'}}),/owner-mismatch/);
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,createdByRole:'super_admin'}}),/owner-role-mismatch/);
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,testMode:true}}),/unsupported-mode/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));
+});

@@ -25,7 +25,15 @@ function createHandler(db,{clock=Date.now}={}){
    const user=userSnap.data();
    if(releaseSnap.data()?.autoCreateEnabled!==true)err('auto-create-not-enabled');
    if(user?.active!==true||user?.isTestAccount===true||user?.deleted===true||['deleted','frozen','disabled'].includes(user?.accountStatus)||!['staff','admin','super_admin'].includes(user.role))err('permission-denied');
-   if(receiptSnap.exists){const receipt=receiptSnap.data();if(receipt.uid!==uid||receipt.hash!==hash||receipt.code!==code)err('operation-conflict');return {ok:true,code,idempotent:true};}
+   if(receiptSnap.exists){
+    const receipt=receiptSnap.data();
+    if(receipt.uid!==uid||receipt.hash!==hash||receipt.code!==code)err('operation-conflict');
+    // Never report a successful retry when one or both room documents have
+    // since been deleted. This would otherwise strand a user in a dead room.
+    if(!roomSnap.exists||!pubSnap.exists)err('room-receipt-inconsistent');
+    if(roomSnap.data()?.createdBy!==uid)err('room-receipt-inconsistent');
+    return {ok:true,code,idempotent:true};
+   }
    if(roomSnap.exists||pubSnap.exists)err('room-code-conflict');
    const original=d.privatePayload,publicOriginal=d.publicPayload;
    // Admin SDK bypasses Firestore Rules: reproduce the production client-create
@@ -50,6 +58,14 @@ function createHandler(db,{clock=Date.now}={}){
    if(state.ownerUid&&state.ownerUid!==uid)err('owner-mismatch');
    if(original.ownerUid&&original.ownerUid!==uid)err('owner-mismatch');
    if(state.createdByRole&&state.createdByRole!==user.role)err('owner-role-mismatch');
+   // A new room must not grant arbitrary Staff rights through client-supplied
+   // assignedStaffUids. The creator is added by the trusted projection.
+   const safeNewRoomStaff=list=>list===undefined||
+      (Array.isArray(list)&&list.every(x=>x===uid)&&list.length<=1);
+   if(!safeNewRoomStaff(original.assignedStaffUids)||
+      !safeNewRoomStaff(state.meta.assignedStaffUids)||
+      !safeNewRoomStaff(state.assignedStaffUids))
+      err('unverified-staff-assignment');
    // The current client createRoom payload includes empty legacy referee
    // fields. Accept only their inert defaults, then overwrite them atomically
    // with the canonical three-seat projection; reject forged nonempty values.
@@ -69,7 +85,18 @@ function createHandler(db,{clock=Date.now}={}){
       (mirror.players||[]).length||(mirror.matches||[]).length||(mirror.teams||[]).length||
       mirror.startedAt||mirror.bracketSize||mirror.completedAt)err('mirror-mismatch');
    if(publicOriginal.confirmedCount||publicOriginal.waitlistCount||publicOriginal.tournamentPhase==='live'||publicOriginal.tournamentPhase==='done')err('mirror-mismatch');
+   // The new-room endpoint must not accept a forged live/settling/finished
+   // phase even when the serialized bracket is still empty.
+   if(original.tournamentPhase&&original.tournamentPhase!=='waiting'||
+      publicOriginal.tournamentPhase&&publicOriginal.tournamentPhase!=='waiting'||
+      original.bracketSize||original.ladderPointsAwarded===true||
+      state.meta.eventCancelled===true||original.eventCancelled===true||
+      publicOriginal.eventCancelled===true)
+      err('not-empty-room');
 
+   if(publicOriginal.ownerUid&&publicOriginal.ownerUid!==uid)err('owner-mismatch');
+   if(publicOriginal.createdByRole&&publicOriginal.createdByRole!==user.role)err('owner-role-mismatch');
+   if(publicOriginal.testMode===true)err('unsupported-mode');
    if(original.createdBy&&original.createdBy!==uid)err('owner-mismatch');
    if(state.createdBy&&state.createdBy!==uid)err('owner-mismatch');
    if(original.eventAuthority!=='official'||state.meta.eventAuthority!=='official'||publicOriginal.eventAuthority!=='official')err('unsupported-mode');
