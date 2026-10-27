@@ -1,15 +1,16 @@
 'use strict';
+const {admissionPolicy,requireEligible}=require('./admission.cjs');
 const {progression} = require('./progression.cjs');
 const {roster,assignRole,canManage,populationState,canDissolve,selectFrame}=require('./team-policy.cjs');
 const id = value => { if(typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) throw Error('invalid-id'); return value; };
 // Server-only candidate. actorUid MUST come from verified Auth, never request data.
 // No endpoint or production writes are registered by importing this module.
-function createMembershipService({db,clock=Date.now}) {
+function createMembershipService({db,clock=Date.now,readEligibility}) {
  const ref = path => db.doc(path);
  const read = async(tx,r) => {const s=await tx.get(r); return s.exists?s.data():null;};
- return async function command({actorUid,action,teamId,targetUid,name,role,frame}) {
+ return async function command({actorUid,action,teamId,targetUid,name,role,frame,policy}) {
   id(actorUid); id(teamId);
-  if(!['create','apply','cancel','approve','reject','leave','remove','transfer','assign','frame','dissolve'].includes(action)) throw Error('invalid-action');
+  if(!['create','apply','cancel','approve','reject','leave','remove','transfer','assign','frame','dissolve','admission'].includes(action)) throw Error('invalid-action');
   if(['approve','reject','remove','transfer','assign'].includes(action)) id(targetUid);
   if(action==='create' && (typeof name!=='string'||name.trim().length<2||name.trim().length>24)) throw Error('invalid-name');
   return db.runTransaction(async tx=>{
@@ -18,7 +19,7 @@ function createMembershipService({db,clock=Date.now}) {
    const now=clock();
    if(action==='create') {
     if(actor) throw Error('already-in-team'); if(team) throw Error('team-id-taken');
-    const fresh={name:name.trim(),captainUid:actorUid,memberUids:[actorUid],roles:{[actorUid]:'captain'},totalXp:0,createdAt:now,selectedFrame:null,status:'active'};
+    const fresh={name:name.trim(),captainUid:actorUid,memberUids:[actorUid],roles:{[actorUid]:'captain'},totalXp:0,createdAt:now,selectedFrame:null,status:'active',admission:admissionPolicy()};
     tx.create(tr,{...fresh,...populationState(fresh,now)});
     tx.create(ar,{teamId,joinedAt:now}); return {ok:true};
    }
@@ -35,12 +36,22 @@ function createMembershipService({db,clock=Date.now}) {
     tx.update(tr,{status:'dissolved',dissolvedAt:now,dissolvedBy:actorUid,dissolveAt:null});tx.delete(ar);return {ok:true};
    }
    if(!Array.isArray(members)||new Set(members).size!==members.length||!members.includes(team.captainUid)) throw Error('invalid-team-state');
+   if(action==='admission'){
+    if(actor?.teamId!==teamId||!['captain','deputy'].includes(roles[actorUid]))throw Error('leadership-required');
+    tx.update(tr,{admission:admissionPolicy(policy),admissionUpdatedAt:now,admissionUpdatedBy:actorUid});return {ok:true};
+   }
    const applicant=['approve','reject'].includes(action)?targetUid:actorUid;
    const qr=ref('teamsV1/'+teamId+'/applications/'+applicant);
    const application=await read(tx,qr);
    if(action==='apply') {
     if(actor) throw Error('already-in-team');
     if(members.length>=progression(team.totalXp).capacity) throw Error('team-full');
+    const admission=admissionPolicy(team.admission);
+    await requireEligible({policy:admission,readEligibility,tx,uid:actorUid});
+    if(admission.mode==='auto'){
+     tx.create(ar,{teamId,joinedAt:now});writeRoster({...team,memberUids:[...members,actorUid],roles:{...roles,[actorUid]:'member'}});
+     tx.set(qr,{uid:actorUid,status:'approved',requestedAt:application?.requestedAt??now,resolvedAt:now,method:'auto'});return {ok:true,joined:true};
+    }
     if(application?.status==='pending') return {ok:true,duplicate:true};
     tx.set(qr,{uid:actorUid,status:'pending',requestedAt:now}); return {ok:true};
    }
@@ -58,6 +69,7 @@ function createMembershipService({db,clock=Date.now}) {
     if(action==='approve') {
      if(target||members.includes(targetUid)) throw Error('already-in-team');
      if(members.length>=progression(team.totalXp).capacity) throw Error('team-full');
+     await requireEligible({policy:team.admission,readEligibility,tx,uid:targetUid});
      tx.create(ur,{teamId,joinedAt:now});writeRoster({...team,memberUids:[...members,targetUid],roles:{...roles,[targetUid]:'member'}});
     }
     tx.update(qr,{status:action==='approve'?'approved':'rejected',resolvedAt:now});return {ok:true};
