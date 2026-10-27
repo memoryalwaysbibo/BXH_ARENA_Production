@@ -14,7 +14,7 @@ function rosterHarness(status){
  vm.createContext(sandbox);
  vm.runInContext(block(cloud,'function courtLifecycleWritePatch(','function buildPublicMirrorFields('),sandbox);
  vm.runInContext('api={'+block(cloud,'async mutateRegistrationRoster(','    async promoteEarliestWaitlist(')+'}',sandbox);
- return {api:sandbox.api,docs};
+ return {api:sandbox.api,docs,fx,sandbox};
 }
 function occupancyRoom(local,online,capacity){
  const h=rosterHarness('waitlist'),runtime=JSON.parse(h.docs.tour.data);
@@ -25,6 +25,21 @@ function occupancyRoom(local,online,capacity){
  Object.assign(h.docs.pub,{capacity,confirmedCount:online,waitlistCount:1});
  return h;
 }
+function earliestHarness(local,online,capacity,team=false){
+ const h=occupancyRoom(local,online,capacity),{fx,docs,sandbox}=h;
+ fx.collection=(_db,...parts)=>parts.join('/');fx.where=(...args)=>args;fx.orderBy=(...args)=>args;fx.limit=x=>x;fx.query=(...args)=>args;
+ fx.getDocs=async()=>({empty:false,docs:[{id:'r'}]});fx.increment=n=>({increment:n});
+ fx.runTransaction=async(_db,fn)=>fn({get:async key=>({exists:()=>true,data:()=>docs[key]}),update:(key,patch)=>{for(const [k,v] of Object.entries(patch))docs[key][k]=v&&typeof v==='object'&&'increment'in v?Number(docs[key][k]||0)+v.increment:v;}});
+ if(team){docs.tour.battleMode=docs.pub.battleMode='team';const r=JSON.parse(docs.tour.data);r.meta.battleMode='team';docs.tour.data=JSON.stringify(r);}
+ vm.runInContext('earliest={'+block(cloud,'async promoteEarliestWaitlist(','    async staffCancelRegistration(')+'}',sandbox);
+ h.promote=()=>sandbox.earliest.promoteEarliestWaitlist.call(h.api,'BXH-X');return h;
+}
+test('earliest individual promotion rejects a room full of onsite players without writes',async()=>{const h=earliestHarness(2,0,2),before=JSON.stringify(h.docs);await assert.rejects(h.promote(),e=>e.code==='capacity-full');assert.equal(JSON.stringify(h.docs),before);});
+test('earliest individual promotion atomically fills vacancy in both rosters and counters',async()=>{const h=earliestHarness(1,0,2),r=await h.promote();assert.equal(r.promotedUid,'r');assert.equal(r.verified,true);assert.equal(h.docs.reg.status,'confirmed');assert.equal(JSON.parse(h.docs.tour.data).players.length,2);assert.equal(JSON.parse(h.docs.pub.bracketView).players.length,2);assert.equal(h.docs.pub.registrationStatus,'full');assert.equal(h.docs.tour.capacity,2);});
+test('earliest team promotion refuses a full team capacity without writes',async()=>{const h=earliestHarness(0,2,2,true),before=JSON.stringify(h.docs);await assert.rejects(h.promote(),e=>e.code==='capacity-full');assert.equal(JSON.stringify(h.docs),before);});
+test('earliest team promotion retains team units and never creates an individual player',async()=>{const h=earliestHarness(0,1,2,true),before=h.docs.tour.data;await h.promote();assert.equal(h.docs.tour.confirmedCount,2);assert.equal(h.docs.pub.confirmedCount,2);assert.equal(h.docs.tour.waitlistCount,0);assert.equal(h.docs.reg.status,'confirmed');assert.equal(h.docs.tour.data,before);});
+for(const [kind,patch] of [['draw',{registrationSelection:true}],['bracket',{data:JSON.stringify({id:'room',meta:{registrationCapacity:2},players:[],bracketSize:8})}]])test('earliest promotion cannot bypass '+kind+' control',async()=>{const h=earliestHarness(0,0,2);Object.assign(h.docs.tour,patch);const before=JSON.stringify(h.docs);await assert.rejects(h.promote(),e=>['selection-managed','bracket-locked'].includes(e.code));assert.equal(JSON.stringify(h.docs),before);});
+test('earliest candidate changed before commit is rejected without touching others',async()=>{const h=earliestHarness(0,0,2);h.fx.getDocs=async()=>{h.docs.reg.status='cancelled';return {empty:false,docs:[{id:'r'}]};};await assert.rejects(h.promote(),e=>['not-waitlist','candidate-changed-retry'].includes(e.code));assert.equal(h.docs.tour.confirmedCount,0);assert.equal(h.docs.reg.status,'cancelled');});
 for(const [local,online] of [[2,0],[1,1]])test(`manual promotion counts ${local} onsite plus ${online} online seats before admitting`,async()=>{
  const {api,docs}=occupancyRoom(local,online,2),before=JSON.stringify(docs);
  await assert.rejects(api.mutateRegistrationRoster('BXH-X','r','promote'),e=>e.code==='capacity-full'&&e.capacity===2);
@@ -126,3 +141,9 @@ test('both online and onsite cancellation use one server call without client pro
  assert.deepEqual(Array.from(calls[0]),['BXH-X','r','','admin']);assert.deepEqual(Array.from(calls[1]),['BXH-X','','onsite','admin']);
 });
 
+
+
+test('earliest individual promotion rejects a switch to team mode during the transaction',async()=>{const h=earliestHarness(0,0,2),run=h.fx.runTransaction;h.fx.runTransaction=async(db,fn)=>{h.docs.tour.battleMode=h.docs.pub.battleMode='team';const r=JSON.parse(h.docs.tour.data);r.meta.battleMode='team';h.docs.tour.data=JSON.stringify(r);return run(db,fn);};await assert.rejects(h.promote(),e=>e.code==='team-roster-managed');assert.equal(h.docs.reg.status,'waitlist');assert.equal(h.docs.tour.confirmedCount,0);});
+test('earliest team promotion rejects switched mode and divergent mirrors',async()=>{for(const mode of ['switch','counter']){const h=earliestHarness(0,0,2,true),run=h.fx.runTransaction;h.fx.runTransaction=async(db,fn)=>{if(mode==='switch')h.docs.pub.battleMode='individual';else h.docs.pub.confirmedCount=1;return run(db,fn);};await assert.rejects(h.promote(),e=>e.code==='registration-state-conflict');assert.equal(h.docs.reg.status,'waitlist');assert.equal(h.docs.tour.confirmedCount,0);}});
+test('earliest promotion rejects missing auth and empty queue without writes',async()=>{for(const mode of ['auth','empty']){const h=earliestHarness(0,0,2),before=JSON.stringify(h.docs);if(mode==='auth')h.sandbox.authHandle.currentUser=null;else h.fx.getDocs=async()=>({empty:true,docs:[]});await assert.rejects(h.promote(),e=>e.code===(mode==='auth'?'auth-required':'no-waitlist-candidate'));assert.equal(JSON.stringify(h.docs),before);}});
+for(const team of [false,true])test('registration screen applies canonical individual result without treating teams as individuals '+team,async()=>{let applied=0,toasts=[];const s={state:{cloudCode:'BXH-X',meta:{battleMode:team?'team':'individual'}},adminRegistrationsBusy:false,currentTournamentRegistrationLocked:()=>false,render(){},showToast:m=>toasts.push(m),publicTournamentsCache:{},resetAdminRegistrationsCache(){},peopleApplyCloudRosterResult:async()=>{applied++},window:{cloudSync:{promoteEarliestWaitlist:async()=>team?{ok:true}:{ok:true,state:{id:'room'}}}},mapRegistrationError:String};vm.createContext(s);vm.runInContext('function invoke(){const action="admin-promote-waitlist";'+block(core,'  if(action==="admin-promote-waitlist"){','  if(action==="admin-cancel-registration"){')+'}',s);s.invoke();await new Promise(resolve=>setImmediate(resolve));assert.equal(applied,team?0:1);assert.equal(toasts.length,team?1:0);assert.equal(s.adminRegistrationsBusy,false);});

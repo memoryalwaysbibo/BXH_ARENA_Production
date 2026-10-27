@@ -5203,6 +5203,11 @@ const REGISTRATION_ERROR_MESSAGES = {
   "registration-locked": "賽事已開始，報名相關功能已鎖定",
   "candidate-changed-retry": "候選名單已變動，請重試",
   "no-waitlist-candidate": "目前沒有備取名單",
+  "capacity-full": "正取名額已滿，請先調整名額，再遞補備取。",
+  "not-waitlist": "候補名單已變動，請重新整理後再試。",
+  "team-roster-managed": "本場已切換團體賽，請重新整理後使用整隊報名管理。",
+  "selection-managed": "本場由抽籤名額管理，請從抽籤區調整名單。",
+  "bracket-locked": "對戰表已產生或賽事已開始，無法遞補。",
   "permission-denied": "操作未完成，請重新整理後再試；持續發生請聯絡主辦單位",
   "unavailable": "網路連線異常，請稍後再試",
   "network": "網路連線異常，請稍後再試",
@@ -20284,7 +20289,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       try{
         if(!window.cloudSync || !window.cloudSync.promoteEarliestWaitlist) throw { code:"network" };
         const result = await window.cloudSync.promoteEarliestWaitlist(code);
-        showToast(state.meta.battleMode==="team"?"已遞補一支隊伍為正取":"已遞補一位候選人為正取");
+        const message=state.meta.battleMode==="team"?"已遞補一支隊伍為正取":"已遞補一位候選人為正取";
+        if(result?.state)await peopleApplyCloudRosterResult(result,message);
+        else showToast(message);
         publicTournamentsCache = null;
         adminRegistrationsBusy = false;
         resetAdminRegistrationsCache();
@@ -24970,5 +24977,6 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
 
