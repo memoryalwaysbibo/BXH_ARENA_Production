@@ -1,5 +1,7 @@
 'use strict';
 const {browseLobby}=require('./lobby.cjs');
+const {progression}=require('./progression.cjs');
+const {admissionPolicy}=require('./admission.cjs');
 // Bounded candidate for small installations; explicitly fails above cap instead of silently omitting teams.
 const MAX_SCAN=200;
 const validId=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
@@ -14,22 +16,27 @@ function createListService({db}){
    ]);
    if(!board?.generation||!ladder?.currentSeason)throw Error('source-unavailable');
    if(publicDocs.docs.length>MAX_SCAN)throw Error('team-list-capacity-exceeded');
-   const teams=await Promise.all(publicDocs.docs.map(s=>read(tx,'teamsV1/'+s.id)));
-   let stale=0;const eligible=[];
-   for(let i=0;i<publicDocs.docs.length;i++){
-    const snap=publicDocs.docs[i],p=snap.data(),team=teams[i];
-    if(!team||team.status==='dissolved')continue;
-    const fresh=p.hunterGeneration===board.generation&&p.ladderSeason===ladder.currentSeason&&Array.isArray(p.members)&&Array.isArray(team.memberUids)&&p.members.length===team.memberUids.length&&p.members.every((m,j)=>m.uid===team.memberUids[j]&&m.role===(m.uid===team.captainUid?'captain':team.roles?.[m.uid]||'member'));
-    if(!fresh){stale++;continue;}
-    // projection write is server only; allowlist excludes player UIDs and member details.
-    eligible.push({id:snap.id,name:p.name,captainName:p.captainName,level:p.level,capacity:p.capacity,memberCount:p.memberCount,strength:p.strength,createdAt:p.createdAt,admission:p.admission});
+   // Narrow first using server-maintained public summaries; verify authoritative
+   // team state only for this page. Counts are an upper bound until verified.
+   const candidates=publicDocs.docs.map(s=>{const p=s.data();return {id:s.id,name:p.name,captainName:p.captainName,level:p.level,capacity:p.capacity,memberCount:p.memberCount,strength:p.strength,createdAt:p.createdAt,admission:p.admission,projection:p};});
+   const selected=browseLobby(candidates,options,{membershipTeamId:membership?.teamId??null});
+   const checked=await Promise.all(selected.items.map(async p=>({p,team:await read(tx,'teamsV1/'+p.id)})));
+   let stale=0;const items=[];
+   for(const {p,team} of checked){
+    const projection=p.projection;
+    const fresh=team&&team.status!=='dissolved'&&projection.hunterGeneration===board.generation&&projection.ladderSeason===ladder.currentSeason&&Array.isArray(projection.members)&&Array.isArray(team.memberUids)&&projection.members.length===team.memberUids.length&&projection.members.every((m,j)=>m.uid===team.memberUids[j]&&m.role===(m.uid===team.captainUid?'captain':team.roles?.[m.uid]||'member'));
+    let consistent=false;
+    if(fresh){try{const level=progression(team.totalXp);consistent=projection.name===team.name&&projection.level===level.level&&projection.capacity===level.capacity&&projection.memberCount===team.memberUids.length&&JSON.stringify(admissionPolicy(projection.admission))===JSON.stringify(admissionPolicy(team.admission));}catch{consistent=false;}}
+    if(!consistent){stale++;continue;}
+    const {projection:discard,...safe}=p;items.push(safe);
    }
-   const result=browseLobby(eligible,options,{membershipTeamId:membership?.teamId??null});
    if(!membership?.teamId){
-    const apps=await Promise.all(result.items.map(p=>read(tx,'teamsV1/'+p.id+'/applications/'+actorUid)));
-    result.items=result.items.map((p,i)=>apps[i]?.status==='pending'?{...p,join:{label:'審核中',disabled:true,action:null}}:p);
+    const apps=await Promise.all(items.map(p=>read(tx,'teamsV1/'+p.id+'/applications/'+actorUid)));
+    for(let i=0;i<items.length;i++)if(apps[i]?.status==='pending')items[i]={...items[i],join:{label:'審核中',disabled:true,action:null}};
    }
-   return {...result,partial:stale>0,staleCount:stale};
+   // Only the selected page has been checked; a count from all summaries is
+   // not an exact number of currently valid teams.
+   return {items,total:selected.total,partial:stale>0||selected.total>selected.items.length,staleCount:stale,totalIsUpperBound:true};
   });
  };
 }
