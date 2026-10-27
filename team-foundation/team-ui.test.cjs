@@ -16,3 +16,6 @@ test('navigation provides three rankings and empty membership guidance',()=>{
 test('loading and errors never render stale available join buttons',()=>{
  assert.ok(ui.lobby({loading:true}).includes('正在載入'));assert.ok(ui.lobby({error:'secret server detail'}).includes('請重試'));assert.ok(!ui.lobby({error:'secret server detail'}).includes('secret server detail'));
 });
+test('recruitment uses unset defaults and rank dropdowns',()=>{
+ const html=ui.recruitmentSettings();assert.equal((html.match(/未指定/g)||[]).length,2);assert.ok(html.includes('青銅以上'));assert.ok(html.includes('國家級以上'));assert.ok(!html.includes('minPoints'));
+});
