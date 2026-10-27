@@ -47,7 +47,7 @@ function createMembershipService({db,clock=Date.now,readEligibility}) {
     if(actor) throw Error('already-in-team');
     if(members.length>=progression(team.totalXp).capacity) throw Error('team-full');
     const admission=admissionPolicy(team.admission);
-    await requireEligible({policy:admission,readEligibility,tx,uid:actorUid});
+    if(admission.mode==='auto')await requireEligible({policy:admission,readEligibility,tx,uid:actorUid});
     if(admission.mode==='auto'){
      tx.create(ar,{teamId,joinedAt:now});writeRoster({...team,memberUids:[...members,actorUid],roles:{...roles,[actorUid]:'member'}});
      tx.set(qr,{uid:actorUid,status:'approved',requestedAt:application?.requestedAt??now,resolvedAt:now,method:'auto'});return {ok:true,joined:true};
@@ -69,7 +69,6 @@ function createMembershipService({db,clock=Date.now,readEligibility}) {
     if(action==='approve') {
      if(target||members.includes(targetUid)) throw Error('already-in-team');
      if(members.length>=progression(team.totalXp).capacity) throw Error('team-full');
-     await requireEligible({policy:team.admission,readEligibility,tx,uid:targetUid});
      tx.create(ur,{teamId,joinedAt:now});writeRoster({...team,memberUids:[...members,targetUid],roles:{...roles,[targetUid]:'member'}});
     }
     tx.update(qr,{status:action==='approve'?'approved':'rejected',resolvedAt:now});return {ok:true};
