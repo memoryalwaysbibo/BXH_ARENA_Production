@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createMembershipService}=require('./membership.cjs');
-function fixture(){
+function fixture(readEligibility){
  const data=new Map();
  const db={doc:p=>p,runTransaction:async fn=>{
   const staged=[];let writing=false;
@@ -11,7 +11,7 @@ function fixture(){
   for(const [op,p,v]of staged){if(op==='delete')data.delete(p);else data.set(p,op==='update'?{...data.get(p),...v}:v);}
   return result;
  }};
- return {data,run:createMembershipService({db,clock:()=>100})};
+ return {data,run:createMembershipService({db,clock:()=>100,readEligibility})};
 }
 const cmd=(run,actorUid,action,extra={})=>run({actorUid,action,teamId:'alpha',...extra});
 test('create, apply, approve, transfer, leave preserve membership and experience',async()=>{
@@ -70,4 +70,28 @@ test('role limit failures leave transaction unchanged and frame command rejects 
  const before=JSON.stringify([...data]);await assert.rejects(cmd(run,'captain','assign',{targetUid:'c',role:'deputy'}),/role-full/);assert.equal(JSON.stringify([...data]),before);
  await assert.rejects(cmd(run,'captain','frame',{frame:4}),/frame-locked/);
  data.get('teamsV1/alpha').totalXp=12;await cmd(run,'captain','frame',{frame:4});assert.equal(data.get('teamsV1/alpha').selectedFrame,4);
+});
+test('leadership can configure AND thresholds; auto admission joins without review',async()=>{
+ const {run,data}=fixture(async({uid})=>({uid,points:500,tier:'b'}));await cmd(run,'captain','create',{name:'Alpha'});
+ await cmd(run,'captain','admission',{policy:{mode:'auto',minPoints:500,minTier:'b'}});
+ const r=await cmd(run,'a','apply');assert.equal(r.joined,true);assert.equal(data.get('teamMembershipsV1/a').teamId,'alpha');
+ assert.equal(data.get('teamsV1/alpha').understaffedSince,null);
+ await assert.rejects(cmd(run,'a','admission',{policy:{mode:'review'}}),/leadership/);
+ await cmd(run,'captain','assign',{targetUid:'a',role:'deputy'});
+ await cmd(run,'a','admission',{policy:{mode:'review',minPoints:100,minTier:'c'}});
+ await cmd(run,'b','apply');assert.equal(data.has('teamMembershipsV1/b'),false);await cmd(run,'a','approve',{targetUid:'b'});
+});
+test('approval rechecks changed criteria; client score payload cannot bypass requirements',async()=>{
+ let points=500;const {run,data}=fixture(async({uid})=>({uid,points,tier:'b'}));await cmd(run,'captain','create',{name:'Alpha'});
+ await cmd(run,'captain','admission',{policy:{mode:'review',minPoints:400,minTier:'c'}});await cmd(run,'a','apply');
+ points=100;await assert.rejects(cmd(run,'captain','approve',{targetUid:'a',points:99999}),/points-below/);assert.equal(data.has('teamMembershipsV1/a'),false);
+ await cmd(run,'captain','admission',{policy:{mode:'auto',minTier:'s'}});
+ await assert.rejects(cmd(run,'a','apply',{tier:'national'}),/tier-below/);
+});
+test('configured thresholds fail closed without trusted reader; auto still enforces capacity',async()=>{
+ const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
+ await cmd(run,'captain','admission',{policy:{mode:'auto',minPoints:1}});await assert.rejects(cmd(run,'a','apply'),/reader-required/);
+ await cmd(run,'captain','admission',{policy:{mode:'auto'}});
+ data.get('teamsV1/alpha').memberUids.push(...Array.from({length:9},(_,i)=>'u'+i));await assert.rejects(cmd(run,'a','apply'),/team-full/);
+ await assert.rejects(cmd(run,'captain','admission',{policy:{mode:'auto',minTier:'fake'}}),/invalid-min-tier/);
 });
