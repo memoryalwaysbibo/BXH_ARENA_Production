@@ -104,3 +104,8 @@ test('ARENA callable bridge error suffix preserves confirmed rejection',async()=
  const c=setup({command:async()=>{throw Object.assign(Error('team-full functions/failed-precondition'),{code:'functions/failed-precondition'});}});
  assert.equal((await c.operate('apply','t')).reason,'rejected');assert.match(c.snapshot().error,/滿員/);assert.equal(c.snapshot().pending,false);
 });
+test('selecting or clearing a frame sends the value and refreshes my team',async()=>{
+ let payload,selected=null,reads=0;const c=setup({mine:async()=>{reads++;return {team:{id:'t',role:'captain',selectedFrame:selected}};},command:async p=>{payload=p;selected=p.frame;return {ok:true};}});
+ await c.mine();await c.operate('frame','t',{frame:4});assert.deepEqual(payload,{action:'frame',teamId:'t',requestId:'test-operation-00000001',frame:4});assert.equal(c.snapshot().team.selectedFrame,4);
+ await c.operate('frame','t',{frame:null});assert.equal(payload.frame,null);assert.equal(c.snapshot().team.selectedFrame,null);assert.equal(reads,3);
+});
