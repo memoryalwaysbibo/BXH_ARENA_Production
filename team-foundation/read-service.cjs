@@ -9,8 +9,10 @@ function createReadService({db}){
   return db.runTransaction(async tx=>{
    if(action==='members'){
     // Only a server-maintained public projection is exposed; raw team docs never returned.
-    const data=await read(tx,'teamsPublicV1/'+teamId);
-    if(!data||data.status==='dissolved')throw Error('team-not-found');
+    const [data,team,board,ladder]=await Promise.all([read(tx,'teamsPublicV1/'+teamId),read(tx,'teamsV1/'+teamId),read(tx,'hunterLeaderboardMeta/current'),read(tx,'ladderSystem/current')]);
+    if(!data||!team||team.status==='dissolved')throw Error('team-not-found');
+    if(!board?.generation||!ladder?.currentSeason||data.hunterGeneration!==board.generation||data.ladderSeason!==ladder.currentSeason)throw Error('projection-stale');
+    if(!Array.isArray(data.members)||!Array.isArray(team.memberUids)||data.members.length!==team.memberUids.length||data.members.some((p,i)=>p.uid!==team.memberUids[i]||p.role!==(p.uid===team.captainUid?'captain':team.roles?.[p.uid]||'member')))throw Error('projection-stale');
     return {id:teamId,name:data.name,members:(data.members||[]).map(p=>({uid:p.uid,name:p.name,role:p.role,ladderPoints:p.ladderPoints??null,hunterTier:p.hunterTier??null}))};
    }
    const team=await read(tx,'teamsV1/'+teamId),membership=await read(tx,'teamMembershipsV1/'+actorUid);
