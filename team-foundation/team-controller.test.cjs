@@ -71,3 +71,10 @@ test('history reads selected team and retains records separately from lobby',asy
  let request;const c=setup({history:async p=>(request=p,{items:[{name:'小賈',date:'2026/10/27',time:'18:10',method:'自行退出'}]})});
  await c.history('team');assert.deepEqual(request,{teamId:'team'});assert.equal(c.snapshot().items[0].name,'小賈');assert.equal(c.snapshot().screen,'history');
 });
+
+test('history navigation returns to the previous page and refresh resets to newest',async()=>{
+ const requests=[];const c=setup({history:async p=>{requests.push(p);return {items:[{name:p.cursor||'first'}],nextCursor:p.cursor?null:'next'};}});
+ await c.history('team');await c.historyNext();assert.equal(c.snapshot().historyPage,2);assert.equal(c.snapshot().items[0].name,'next');
+ await c.historyPrevious();assert.equal(c.snapshot().historyPage,1);assert.equal(c.snapshot().items[0].name,'first');
+ await c.historyNext();await c.history('team');assert.equal(c.snapshot().historyPage,1);assert.deepEqual(requests.map(x=>x.cursor||null),[null,'next',null,'next',null]);
+});
