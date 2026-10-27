@@ -9,3 +9,5 @@ test('bad responses fail closed',async()=>{const api=createTeamApi({functions:{}
 test('mine API uses authenticated context without a client-selected UID',async()=>{
  let payload;const api=createTeamApi({functions:{},httpsCallable:()=>async p=>(payload=p,{data:{team:null}})});await api.mine();assert.deepEqual(payload,{action:'mine'});
 });
+
+test('applications read sends only team ID to the callable',async()=>{let payload;const api=createTeamApi({functions:{},httpsCallable:()=>async p=>(payload=p,{data:{items:[]}})});await api.applications({teamId:'t'});assert.deepEqual(payload,{action:'applications',teamId:'t'});});
