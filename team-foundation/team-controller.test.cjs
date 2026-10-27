@@ -48,3 +48,9 @@ test('unknown and network errors remain uncertain even when they resemble reject
  const c=setup({command:async()=>{throw Object.assign(Error('unknown-server-message'),{code:'functions/failed-precondition'});}});
  assert.equal((await c.operate('apply','t')).reason,'unconfirmed');assert.equal(c.snapshot().pending,true);
 });
+
+test('command rejection preserves loaded page; failed page load never appears loaded',async()=>{
+ const c=setup({mine:async()=>({team:{id:'t',role:'captain'}}),command:async()=>{throw Object.assign(Error('team-full'),{code:'functions/failed-precondition'});}});
+ await c.mine();await c.operate('apply','t');assert.equal(c.snapshot().screen,'mine');assert.equal(c.snapshot().loaded,true);assert.equal(c.snapshot().team.id,'t');
+ const bad=setup({mine:async()=>{throw Error('network');}});await bad.mine();assert.equal(bad.snapshot().loaded,false);assert.equal(bad.snapshot().team,null);
+});
