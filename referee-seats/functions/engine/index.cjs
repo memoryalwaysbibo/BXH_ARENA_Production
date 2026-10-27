@@ -97,6 +97,7 @@ function applyCourtSwapMutation(remoteState,sourceId,targetId){
   if(!canCourtSwapTarget(target,source,remoteState)) return {ok:false,reason:"target-no-longer-swappable"};
   const sourceStation=Number(source.station||0),targetStation=Number(target.station||sourceStation||0);
   if(!sourceStation||!targetStation) return {ok:false,reason:"station-mismatch"};
+  if(roundRobinPlayersBusyElsewhere(target,sourceStation,remoteState))return {ok:false,reason:"player-busy"};
   const now=Date.now();
   clearCourtAssignmentRefs(remoteState,[source.id,target.id]);
   source.station=targetStation;source.status="pending";source.startedAt=null;source.updatedAt=now;source.dispatchPriorityAt=null;source.dispatchRevision=Number(source.dispatchRevision||0)+1;
@@ -124,6 +125,7 @@ function applyIdleCourtClaim(st,matchId,stationNum){
 function applyManualCourtAssign(st,matchId,targetStation){
  const m=(st.matches||[]).find(x=>x.id===matchId);if(!canManualAssignMatch(m,st))return {ok:false,reason:"match-no-longer-available"};
  const n=window.BXHCourtRetirement?window.BXHCourtRetirement.target(st):Math.max(1,Number(st.meta?.stations||1));if(targetStation<1||targetStation>n||window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(st,targetStation))return {ok:false,reason:"station-not-assigned"};
+ if(roundRobinPlayersBusyElsewhere(m,targetStation,st))return {ok:false,reason:"player-busy"};
  const now=Date.now();clearCourtAssignmentRefs(st,[m.id]);const target=st.courtAssignments&&st.courtAssignments[courtKey(targetStation)];
  if(target&&target.currentMatchId&&target.currentMatchId!==m.id){const d=(st.matches||[]).find(x=>x.id===target.currentMatchId);if(d&&!d.completed&&!matchHasDecisionData(d)){d.status="pending";d.startedAt=null;d.dispatchPriorityAt=null;d.dispatchRevision=Number(d.dispatchRevision||0)+1;d.updatedAt=now;}target.currentMatchId=null;}
  m.station=targetStation;m.status="ready";m.startedAt=null;m.updatedAt=now;m.dispatchPriorityAt=now;m.dispatchRevision=Number(m.dispatchRevision||0)+1;
@@ -193,6 +195,7 @@ function applySkippedDispatch(remote,m,target,expectedRevision){
   if(!Number.isInteger(target)||target<1||target>(window.BXHCourtRetirement?window.BXHCourtRetirement.target(remote):Number(remote.meta.stations||1))) return {ok:false,reason:"station-mismatch"};
   if(window.BXHCourtRetirement&&!window.BXHCourtRetirement.accepts(remote,target))return {ok:false,reason:"court-retired"};
   if(Object.values(remote.courtAssignments||{}).some(c=>c.currentMatchId===m.id)) return {ok:false,reason:"dispatch-stale"};
+  if(roundRobinPlayersBusyElsewhere(m,target,remote))return {ok:false,reason:"player-busy"};
   m.lastDispatch={from:Number(m.station),to:target,at:Date.now()};
   m.station=target; m.skipWaitFor=[]; m.resumeQueuedAt=Date.now(); m.dispatchRevision=expectedRevision+1;
   rebuildPropagationForState(remote);
@@ -430,7 +433,7 @@ function idleCourtCandidates(st,stationNum){
   const phase=(st.meta.formatType||"single")==="single"?activeSingleElimSchedulePhase(st.matches,st.meta):null;
   return (st.matches||[]).filter(m=>m&&movable.has(m.id)&&Number(m.station)!==Number(stationNum)&&!busy.has(m.id)&&
     !m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&
-    !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&
+    !matchHasDecisionData(m)&&["pending","ready"].includes(m.status||"pending")&&!roundRobinPlayersBusyElsewhere(m,stationNum,st)&&
     (!phase||isInActiveSingleElimPhase(m,phase,st.matches)||!singleElimBronzeBeforeFinalBlocked(m,st.matches,st.meta)))
     .sort((a,b)=>Number(a.seq||0)-Number(b.seq||0));
 }
@@ -523,6 +526,9 @@ function rebuildCourtAssignments(){
     if(current && (current.completed || current.station!==i)) current = null;
     if(current && singleElimBronzeBeforeFinalBlocked(current,state.matches,state.meta) && !matchHasDecisionData(current)){
       current.status="pending";current.startedAt=null;court.currentMatchId=null;current=null;
+    }
+    if(current&&["pending","ready"].includes(current.status)&&roundRobinPlayersBusyElsewhere(current,i)){
+      current.status="ready";current.startedAt=null;court.currentMatchId=null;current=null;
     }
     // A paused match STAYS as the court's current match (paused ≠ vacated).
     if(!current){
@@ -781,6 +787,17 @@ function resolveScoringModeForRound(bracket, round){
   return state.meta.scoringMode || "standard";
 }
 
+function roundRobinPlayersBusyElsewhere(match,stationNum,st=state){
+  if(!st.startedAt||(st.meta?.formatType||"single")!=="roundrobin")return false;
+  const players=new Set([match.a?.playerId,match.b?.playerId].filter(Boolean));
+  return Object.entries(st.courtAssignments||{}).some(([key,court])=>{
+    if(key===courtKey(Number(stationNum)))return false;
+    const other=(st.matches||[]).find(m=>m.id===court?.currentMatchId);
+    return other&&other.id!==match.id&&!other.completed&&["in_progress","paused"].includes(other.status)&&
+      [other.a?.playerId,other.b?.playerId].some(id=>id&&players.has(id));
+  });
+}
+
 function singleElimBronzeBeforeFinalBlocked(match,matches=state.matches,meta=state.meta){
   if(!match||match.bracket!=="SE") return false;
   const gate=singleElimBronzeGatePhase(matches,meta);
@@ -821,8 +838,8 @@ function singleElimScheduleTier(match, matches=state.matches){
 function stationExecutionQueue(stationNum){
   if(state.forcedCourtExits?.[stationNum]?.closed)return [];
   const retirement=state.courtRetirementPlan?.courts?.[stationNum];
-  if(retirement&&Number(stationNum)>window.BXHCourtRetirement.target(state))return refereeMatches().filter(m=>Number(m.station)===Number(stationNum)&&!m.completed&&retirement.holdIds.includes(m.id)&&m.a&&m.b&&!m.skippedAt);
-  let available=refereeMatches().filter(m=>m.station===stationNum&&!m.completed&&m.a&&m.b&&m.status!=="paused");
+  if(retirement&&Number(stationNum)>window.BXHCourtRetirement.target(state))return refereeMatches().filter(m=>Number(m.station)===Number(stationNum)&&!m.completed&&retirement.holdIds.includes(m.id)&&m.a&&m.b&&!m.skippedAt&&!roundRobinPlayersBusyElsewhere(m,stationNum));
+  let available=refereeMatches().filter(m=>m.station===stationNum&&!m.completed&&m.a&&m.b&&m.status!=="paused"&&!roundRobinPlayersBusyElsewhere(m,stationNum));
   if((state.meta.formatType||"single")==="single"){
     const phase=activeSingleElimSchedulePhase();
     if(phase){

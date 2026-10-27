@@ -14,7 +14,7 @@ function extract(src,name,indent=''){
   return src.slice(start,start+1+next.index);
 }
 const names=['rebuildPropagation','rebuildPropagationForState','syncMatchStatuses','autoAdvanceReadyMatches',
- 'stationExecutionQueue','rebuildCourtAssignments','idleCourtCandidates','applyIdleCourtClaim','clearCourtAssignmentRefs',
+ 'roundRobinPlayersBusyElsewhere','stationExecutionQueue','rebuildCourtAssignments','idleCourtCandidates','applyIdleCourtClaim','clearCourtAssignmentRefs',
  'rebuildPropagationSingle','singleElimScheduleTier','singleElimBronzeGatePhase','singleElimBronzeBeforeFinalBlocked',
  'activeSingleElimSchedulePhase','isInActiveSingleElimPhase','applyPropagatedSlots','getMatch','orderedMatches',
  'refereeMatches','matchesInRound','numRoundsTotal','ensureMatchStatusFields','resolveScoringModeForRound',
