@@ -12,3 +12,15 @@ test('lobby keeps loaded data on command rejection but hides data after load fai
  render(state);assert.equal(last.error,null);assert.equal(last.items.length,1);
  render({...state,loaded:false,error:'資料暫時無法載入'});assert.equal(last.error,'資料暫時無法載入');
 });
+test('frame form converts the selection and refuses unrecognized values',async()=>{
+ let submit,payload,choice='7',prevented=0;
+ const controller={search:async()=>{},dispose(){},snapshot:()=>({team:{id:'t'}}),operate:async(...args)=>{payload=args;}};
+ const container={innerHTML:'',addEventListener:(event,fn)=>{if(event==='submit')submit=fn;},removeEventListener(){},replaceChildren(){},contains:()=>true,querySelectorAll:()=>[],ownerDocument:{createElement:()=>({setAttribute(){}})},append(){}};
+ const original=global.FormData;global.FormData=class{get(){return choice;}};
+ try{
+  mount({container,ui:{css:'',tabs:()=>'',lobby:()=>''},controllers:{createTeamController:()=>controller},api:{}});
+  const form={dataset:{teamForm:'frame'},closest:()=>form};const event={target:form,preventDefault:()=>prevented++};
+  await submit(event);assert.deepEqual(payload,['frame','t',{frame:7}]);choice='';await submit(event);assert.equal(payload[2].frame,null);
+  payload=null;choice='9';await submit(event);assert.equal(payload,null);assert.equal(prevented,3);
+ }finally{global.FormData=original;}
+});
