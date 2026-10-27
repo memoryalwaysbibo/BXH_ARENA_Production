@@ -6,9 +6,19 @@ const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value)
 // actorUid MUST be provided by the server Auth boundary, not client JSON.
 function createReadService({db}){
  const read=async(tx,path)=>{const snap=await tx.get(db.doc(path));return snap.exists?snap.data():null;};
- return async({actorUid,action,teamId,historyId,cursor})=>{
-  if(!valid(actorUid)||!['members','history','reason','mine','applications'].includes(action)||(action!=='mine'&&!valid(teamId))||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
+ return async({actorUid,action,teamId,historyId,cursor,targetUid})=>{
+  if(!valid(actorUid)||!['members','history','reason','mine','applications','card-team'].includes(action)||(!['mine','card-team'].includes(action)&&!valid(teamId))||(action==='card-team'&&!valid(targetUid))||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
   return db.runTransaction(async tx=>{
+   if(action==='card-team'){
+    if(actorUid!==targetUid){const privacy=await read(tx,'playerPrivacy/'+targetUid);if(privacy?.cardPublic!==true)throw Error('permission-denied');}
+    const member=await read(tx,'teamMembershipsV1/'+targetUid);if(!member)return {team:null};
+    if(!valid(member.teamId))throw Error('membership-unavailable');
+    const team=await read(tx,'teamsV1/'+member.teamId);
+    if(team?.status!=='active'||!Array.isArray(team.memberUids)||!team.memberUids.includes(targetUid))throw Error('membership-unavailable');
+    const rank=progression(team.totalXp),role=team.captainUid===targetUid?'captain':team.roles?.[targetUid]||'member';
+    if(!['captain','deputy','elite','member'].includes(role)||typeof team.name!=='string')throw Error('membership-unavailable');
+    return {team:{id:member.teamId,name:team.name,role,level:rank.level,selectedFrame:rank.unlockedFrames.includes(team.selectedFrame)?team.selectedFrame:null}};
+   }
    if(action==='mine'){
     const member=await read(tx,'teamMembershipsV1/'+actorUid);
     if(!member)return {team:null};
