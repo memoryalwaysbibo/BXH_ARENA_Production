@@ -2987,6 +2987,8 @@
       const onsiteInputRevision=data?.onsiteWaitlistRuntimeRevision;
       const qrInputRevision=data?.qrCheckinRevision;
       try{
+        if(typeof window.BXHBracketCommit?.assertCapacity!=='function')throw Object.assign(new Error('payload-validator-unavailable'),{code:'payload-validator-unavailable'});
+        window.BXHBracketCommit.assertCapacity(data);
         const actorUid=currentUserUidForWrites();
         const partnerGrant=isPartnerOrganizerMode()?partnerOrganizerGrant():null;
         const partnerSession=!!(partnerGrant&&actorUid);
@@ -3283,6 +3285,8 @@ if(testerSession){
           Object.assign(publicPayload,onsiteFence);
           privatePayload.data=JSON.stringify(data);
           publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
+          window.BXHBracketCommit.assertCapacity(privatePayload.data);
+          window.BXHBracketCommit.assertCapacity(publicPayload.bracketView);
           tx.set(ref,privatePayload,{merge:true});
           tx.set(fx.doc(dbHandle,"publicTournaments",normalized),publicPayload,{merge:true});
         });

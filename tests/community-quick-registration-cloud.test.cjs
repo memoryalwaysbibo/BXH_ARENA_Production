@@ -74,7 +74,7 @@ function harness() {
       apply(pending); return result;
     },
   };
-  const ctx = vm.createContext({ window: {}, console: { warn: (...args) => logs.push(args), log: () => {} },
+  const ctx = vm.createContext({ window: {BXHBracketCommit:require('../modules/main-app/bracket-commit.js')}, console: { warn: (...args) => logs.push(args), log: () => {} },
     Date: FixedDate, fx, dbHandle: {}, cloudEnabled: true, authReady: true, crypto: { randomUUID: () => 'local-summary-operation' },
     authHandle: { currentUser: { uid: 'local-host' } },
     userProfile: { role: 'player', active: true, displayName: 'Local Host' },
