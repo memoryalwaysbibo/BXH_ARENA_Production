@@ -4,20 +4,27 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  if(!container||!ui||!controllers)throw Error('team-components-required');
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
-  container.innerHTML='<style>'+ui.css+'</style>'+(state.screen==='members'&&!state.loading&&!state.error&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query}));
+  container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='mine'?'mine':'lobby')+(state.screen==='mine'&&!state.loading&&!state.error?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&!state.error&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query}));
   if(state.busy)for(const button of container.querySelectorAll('button[data-team-id]'))button.disabled=true;
   if(state.error){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent=state.error;container.append(p);}
  }
  const click=async event=>{
   const button=event.target.closest('[data-team-action]');if(!button||!container.contains(button)||button.disabled)return;
   const action=button.dataset.teamAction,id=button.dataset.teamId;
-  if(action==='view')await controller.view(id);
+  if(action==='tab'&&button.dataset.value==='mine')await controller.mine();
+  else if(action==='tab'&&button.dataset.value==='lobby')await controller.search(controller.snapshot().query);
+  else if(action==='view')await controller.view(id);
   else if(action==='clear')await controller.clear();
   else if(action==='back')await controller.search(controller.snapshot().query);
   else if(action==='join'||action==='apply')await controller.operate(action,id);
  };
  const submit=async event=>{
-  const form=event.target.closest('[data-team-form="search"]');if(!form||!container.contains(form))return;
+  const form=event.target.closest('[data-team-form]');if(!form||!container.contains(form))return;
+  if(form.dataset.teamForm==='admission'){
+   event.preventDefault();const data=new FormData(form),team=controller.snapshot().team;
+   if(team?.id)await controller.operate('admission',team.id,{policy:{mode:String(data.get('mode')||''),minLadderTier:String(data.get('minLadderTier')||'')||null,minTier:String(data.get('minTier')||'')||null}});return;
+  }
+  if(form.dataset.teamForm!=='search')return;
   event.preventDefault();const data=new FormData(form);await controller.search({query:String(data.get('query')||''),mode:String(data.get('mode')||'all'),recruitment:String(data.get('recruitment')||'all')});
  };
  container.addEventListener('click',click);container.addEventListener('submit',submit);void controller.search();
