@@ -1479,6 +1479,10 @@
         const oldStatus=String(reg.status||"");
         const players=Array.isArray(runtime.players)?runtime.players.slice():[];
         const waitlist=Array.isArray(runtime.waitlistPlayers)?runtime.waitlistPlayers.slice():[];
+        // Counters count online registrations; onsite players occupy seats too.
+        // Keep counter units unchanged and fail conservatively if projection lags.
+        const team=tour.battleMode==="team"||pub.battleMode==="team"||runtime.meta.battleMode==="team";
+        const occupiedCount=(rows,count)=>team?count:Math.max(count+rows.filter(p=>p&&p.source!=="online"&&!p.registrationId).length,rows.length);
         const guardian=String(reg.guardianUid||reg.uid||"");
         const participant=String(reg.registrationId||regId);
         const familyId=reg.familyPlayerId?String(reg.familyPlayerId):"";
@@ -1512,12 +1516,13 @@
 
         if(action==="promote"){
           if(oldStatus!=="waitlist")throw Object.assign(new Error("not-waitlist"),{code:"not-waitlist"});
-          if(capacity>0&&confirmed>=capacity){
+          if(capacity>0&&occupiedCount(players,confirmed)>=capacity){
             if(expandBy!==8)throw Object.assign(new Error("capacity-full"),{code:"capacity-full",capacity,confirmedCount:confirmed});
             newCapacity=capacity+8;
           }
           nextConfirmed=confirmed+1;nextWaiting=Math.max(0,waiting-1);
           nextPlayers.push(makePlayer());
+          if(newCapacity>0&&occupiedCount(nextPlayers,nextConfirmed)>newCapacity)throw Object.assign(new Error("capacity-full"),{code:"capacity-full",capacity,confirmedCount:confirmed});
           regPatch=Object.assign(regPatch,{status:"confirmed",promotedAt:fx.serverTimestamp(),promotedBy:staffUid});
         }else if(action==="demote"){
           if(oldStatus!=="confirmed")throw Object.assign(new Error("not-confirmed"),{code:"not-confirmed"});
@@ -1536,8 +1541,9 @@
         runtime.waitlistPlayers=nextWait;
         runtime.meta.registrationCapacity=newCapacity;
         let nextRegStatus=String(pub.registrationStatus||tour.registrationStatus||runtime.meta.registrationStatus||"open");
-        if(nextRegStatus==="full"&&(!newCapacity||nextConfirmed<newCapacity))nextRegStatus="open";
-        if(newCapacity>0&&nextConfirmed>=newCapacity)nextRegStatus="full";
+        const nextOccupied=occupiedCount(nextPlayers,nextConfirmed);
+        if(nextRegStatus==="full"&&(!newCapacity||nextOccupied<newCapacity))nextRegStatus="open";
+        if(newCapacity>0&&nextOccupied>=newCapacity)nextRegStatus="full";
         runtime.meta.registrationStatus=nextRegStatus;
 
         const common={
@@ -3858,4 +3864,5 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 

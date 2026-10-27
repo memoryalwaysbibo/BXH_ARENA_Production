@@ -16,6 +16,37 @@ function rosterHarness(status){
  vm.runInContext('api={'+block(cloud,'async mutateRegistrationRoster(','    async promoteEarliestWaitlist(')+'}',sandbox);
  return {api:sandbox.api,docs};
 }
+function occupancyRoom(local,online,capacity){
+ const h=rosterHarness('waitlist'),runtime=JSON.parse(h.docs.tour.data);
+ runtime.players=[...Array.from({length:local},(_,i)=>({id:'local'+i,name:'Onsite QA',source:'onsite'})),...Array.from({length:online},(_,i)=>({id:'online'+i,source:'online',registrationId:'other'+i}))];
+ runtime.meta.registrationCapacity=capacity;
+ h.docs.tour.data=JSON.stringify(runtime);
+ Object.assign(h.docs.tour,{capacity,confirmedCount:online,waitlistCount:1});
+ Object.assign(h.docs.pub,{capacity,confirmedCount:online,waitlistCount:1});
+ return h;
+}
+for(const [local,online] of [[2,0],[1,1]])test(`manual promotion counts ${local} onsite plus ${online} online seats before admitting`,async()=>{
+ const {api,docs}=occupancyRoom(local,online,2),before=JSON.stringify(docs);
+ await assert.rejects(api.mutateRegistrationRoster('BXH-X','r','promote'),e=>e.code==='capacity-full'&&e.capacity===2);
+ assert.equal(JSON.stringify(docs),before,'rejection writes neither capacity, registration nor roster');
+});
+test('explicit expansion admits once while counters retain their online unit',async()=>{
+ const {api,docs}=occupancyRoom(2,0,2);await api.mutateRegistrationRoster('BXH-X','r','promote',{expandBy:8});
+ assert.equal(docs.tour.capacity,10);assert.equal(docs.pub.capacity,10);assert.equal(docs.tour.confirmedCount,1);assert.equal(docs.pub.confirmedCount,1);assert.equal(JSON.parse(docs.tour.data).players.length,3);assert.equal(docs.reg.status,'confirmed');
+});
+test('a remaining seat admits without expansion and marks combined roster full',async()=>{
+ const {api,docs}=occupancyRoom(1,0,2);await api.mutateRegistrationRoster('BXH-X','r','promote');
+ assert.equal(docs.tour.capacity,2);assert.equal(docs.tour.registrationStatus,'full');assert.equal(docs.pub.registrationStatus,'full');assert.equal(JSON.parse(docs.tour.data).meta.registrationStatus,'full');
+});
+test('demoting online entrant keeps room full when onsite seats still occupy capacity',async()=>{
+ const {api,docs}=rosterHarness('confirmed'),s=JSON.parse(docs.tour.data);s.players.push({id:'a',source:'onsite'},{id:'b',source:'onsite'});s.meta.registrationCapacity=2;
+ Object.assign(docs.tour,{data:JSON.stringify(s),capacity:2,registrationStatus:'full'});Object.assign(docs.pub,{capacity:2,registrationStatus:'full'});
+ await api.mutateRegistrationRoster('BXH-X','r','demote');assert.equal(docs.tour.registrationStatus,'full');assert.equal(docs.pub.registrationStatus,'full');assert.equal(JSON.parse(docs.tour.data).players.length,2);assert.equal(docs.reg.status,'waitlist');
+});
+test('projected online rows above a lagging counter cannot be overbooked',async()=>{
+ const {api,docs}=occupancyRoom(0,2,2);docs.tour.confirmedCount=0;docs.pub.confirmedCount=0;const before=JSON.stringify(docs);
+ await assert.rejects(api.mutateRegistrationRoster('BXH-X','r','promote'),e=>e.code==='capacity-full');assert.equal(JSON.stringify(docs),before);
+});
 for(const [action,status,confirmed,waiting] of [['promote','waitlist',1,0],['demote','confirmed',0,1]]){
  test(action+' commits a newer roster revision to both mirrors',async()=>{
   const {api,docs}=rosterHarness(status),result=await api.mutateRegistrationRoster('BXH-X','r',action);
@@ -94,3 +125,4 @@ test('both online and onsite cancellation use one server call without client pro
  await sandbox.peopleCancelOnline('r','Name');await sandbox.peopleCancelLocal('onsite','Local');
  assert.deepEqual(Array.from(calls[0]),['BXH-X','r','','admin']);assert.deepEqual(Array.from(calls[1]),['BXH-X','','onsite','admin']);
 });
+
