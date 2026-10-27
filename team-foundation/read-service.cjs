@@ -1,5 +1,6 @@
 'use strict';
 const {admissionPolicy}=require('./admission.cjs');
+const {progression}=require('./progression.cjs');
 const {historyView,mayReadReason}=require('./history.cjs');
 const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value);
 // actorUid MUST be provided by the server Auth boundary, not client JSON.
@@ -15,7 +16,8 @@ function createReadService({db}){
     const own=await read(tx,'teamsV1/'+member.teamId);
     if(!own||own.status==='dissolved'||!own.memberUids?.includes(actorUid))throw Error('membership-unavailable');
     const role=own.captainUid===actorUid?'captain':own.roles?.[actorUid]||'member';
-    return {team:{id:member.teamId,name:own.name,role,memberCount:own.memberUids.length,admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
+    const rank=progression(own.totalXp);
+    return {team:{id:member.teamId,name:own.name,role,memberCount:own.memberUids.length,level:rank.level,capacity:rank.capacity,totalXp:rank.totalXp,currentXp:rank.currentXp,nextXp:rank.nextXp,unlockedFrames:rank.unlockedFrames,selectedFrame:own.selectedFrame??null,admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
    }
    if(action==='members'){
     // Only a server-maintained public projection is exposed; raw team docs never returned.
