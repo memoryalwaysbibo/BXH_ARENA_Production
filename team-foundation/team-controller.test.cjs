@@ -94,3 +94,8 @@ test('captain transfer sends the target and returns to updated my-team view',asy
  let payload,role='captain';const c=setup({mine:async()=>({team:{id:'t',role}}),members:async()=>({id:'t',members:[]}),command:async p=>{payload=p;role='member';return {ok:true};}});
  await c.manage('t');await c.operate('transfer','t',{targetUid:'new'});assert.equal(payload.targetUid,'new');assert.equal(payload.action,'transfer');assert.equal(c.snapshot().screen,'mine');assert.equal(c.snapshot().team.role,'member');
 });
+
+test('successful leave and solo dissolution reload the no-team view',async()=>{
+ for(const action of ['leave','dissolve']){let team={id:'t',role:action==='leave'?'member':'captain',memberCount:1};let payload;const c=setup({mine:async()=>({team}),command:async p=>{payload=p;team=null;return {ok:true};}});
+ await c.mine();assert.equal((await c.operate(action,'t')).ok,true);assert.equal(payload.action,action);assert.equal(c.snapshot().screen,'mine');assert.equal(c.snapshot().team,null);}
+});
