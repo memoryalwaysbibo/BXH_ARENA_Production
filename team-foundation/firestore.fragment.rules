@@ -1,0 +1,9 @@
+// Candidate fragment only: merge and test with the latest complete Production rules.
+// Firestore allows are additive: these denies cannot override an existing broad allow.
+// All team reads/writes go through authenticated server endpoints in this candidate.
+match /teamsV1/{teamId} {
+  allow read, write: if false;
+  match /{document=**} { allow read, write: if false; }
+}
+match /teamMembershipsV1/{uid} { allow read, write: if false; }
+match /teamsPublicV1/{teamId} { allow read, write: if false; }
