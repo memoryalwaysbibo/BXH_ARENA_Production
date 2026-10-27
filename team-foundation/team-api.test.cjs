@@ -18,3 +18,7 @@ test('ARENA adapter reuses its callable bridge and preserves request IDs',async(
  assert.deepEqual(calls,[{name:'teamRead',payload:{action:'mine'}},{name:'teamRead',payload:{action:'history',teamId:'t',cursor:'last'}},{name:'teamCommand',payload:{action:'apply',teamId:'t',requestId:'operation-1234567890'}}]);
 });
 test('ARENA adapter fails closed if callable bridge is absent',()=>{assert.throws(()=>createTeamApiFromEngagement({}),/engagement-service-required/);});
+test('emblem upload uses the dedicated authenticated callable',async()=>{
+ const calls=[],api=createTeamApiFromEngagement({engagementService:{tournamentOperation:async(name,payload)=>(calls.push({name,payload}),{ok:true})}});
+ const payload={teamId:'t',requestId:'request-1234567890',contentType:'image/webp',base64:'YWJj'};await api.uploadEmblem(payload);assert.deepEqual(calls,[{name:'teamEmblemUpload',payload}]);
+});
