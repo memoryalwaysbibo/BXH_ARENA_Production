@@ -16,6 +16,7 @@ function createReadHandler({db,auth,HttpsError,enabled=false}){
   if(Number.isFinite(revokedAt)&&(!Number.isFinite(request.auth.token?.auth_time)||request.auth.token.auth_time*1000<revokedAt))fail('unauthenticated','sign-in-again');
   try{return await read({...data,actorUid:uid});}catch(error){
    if(error.message==='permission-denied')fail('permission-denied','team-read-denied');
+   if(error.message==='projection-stale')fail('unavailable','team-data-refreshing');
    if(error.message==='invalid-read')fail('invalid-argument','invalid-team-read');
    if(['team-not-found','history-not-found'].includes(error.message))fail('not-found',error.message);
    fail('internal','team-read-unavailable');
