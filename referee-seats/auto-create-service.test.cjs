@@ -62,3 +62,26 @@ test('public payload rejects unexpected fields and nested private identities',as
  await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3},private:{uid:'secret'}})}}),/private-mirror-data/);
  assert(!h.docs.has('tournaments/BXH-ABCD12'));assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
 });
+
+test('new room rejects forged ownership and stale seat permissions',async()=>{
+ const h=harness(),p=h.payload;
+ await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,ownerUid:'other'}}),/owner-mismatch/);
+ await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,refereeSeatsV1:{version:1}}}),/protected-create-field/);
+ const state=JSON.parse(p.privatePayload.data);
+ state.meta.refereeStationRestrictionEnabled=true;
+ await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,data:JSON.stringify(state)}}),/protected-create-field/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));
+});
+test('new room rejects prestarted, populated and forged public mirror payloads',async()=>{
+ const h=harness(),p=h.payload;
+ const state=JSON.parse(p.privatePayload.data);
+ state.startedAt=123;
+ await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,data:JSON.stringify(state)}}),/not-empty-room/);
+ const mirror=JSON.parse(p.publicPayload.bracketView);
+ mirror.players=[{id:'forged'}];
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify(mirror)}}),/mirror-mismatch/);
+ delete mirror.players;
+ mirror.internalNotes='secret';
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify(mirror)}}),/private-mirror-data/);
+ assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
+});

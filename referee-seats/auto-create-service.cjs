@@ -30,6 +30,25 @@ function createHandler(db,{clock=Date.now}={}){
    const state=parse(original.data),mirror=parse(publicOriginal.bracketView);
    if(!state||!mirror||!state.meta||!mirror.meta)err('invalid-room-state');
    if(state.cloudCode&&state.cloudCode!==code)err('room-code-mismatch');
+   // Never let a new-room request smuggle an already-started event or
+   // stale referee authorization into a trusted Admin SDK write.
+   if(state.ownerUid&&state.ownerUid!==uid)err('owner-mismatch');
+   if(original.ownerUid&&original.ownerUid!==uid)err('owner-mismatch');
+   if(state.createdByRole&&state.createdByRole!=='admin'&&state.createdByRole!=='super_admin')err('owner-role-mismatch');
+   const forbiddenPrivate=['refereeSeatsV1','refereeSeatNames','refereeStationUids','refereeStationAssignments','refereeStationNames','refereeStationRestrictionEnabled'];
+   if(forbiddenPrivate.some(k=>Object.hasOwn(original,k)))err('protected-create-field');
+   if(['refereeSeatsV1','refereeSeatNames','refereeStationUids'].some(k=>Object.hasOwn(state.meta,k)))err('protected-create-field');
+   if(state.meta.refereeStationRestrictionEnabled===true)err('protected-create-field');
+   if(state.meta.refereeStationAssignments&&Object.values(state.meta.refereeStationAssignments).some(x=>Array.isArray(x)&&x.length))err('legacy-assignments-exist');
+   if(!Array.isArray(state.players)||!Array.isArray(state.matches)||!Array.isArray(state.teams||[])||
+      state.players.length||state.matches.length||(state.teams||[]).length||
+      state.startedAt||state.completedAt||state.archivedAt||state.bracketSize||
+      state.archiveStatus&&state.archiveStatus!=='ongoing')err('not-empty-room');
+   if(!Array.isArray(mirror.players||[])||!Array.isArray(mirror.matches||[])||!Array.isArray(mirror.teams||[])||
+      (mirror.players||[]).length||(mirror.matches||[]).length||(mirror.teams||[]).length||
+      mirror.startedAt||mirror.bracketSize||mirror.completedAt)err('mirror-mismatch');
+   if(publicOriginal.confirmedCount||publicOriginal.waitlistCount||publicOriginal.tournamentPhase==='live'||publicOriginal.tournamentPhase==='done')err('mirror-mismatch');
+
    if(original.createdBy&&original.createdBy!==uid)err('owner-mismatch');
    if(state.createdBy&&state.createdBy!==uid)err('owner-mismatch');
    if(original.eventAuthority!=='official'||state.meta.eventAuthority!=='official'||publicOriginal.eventAuthority!=='official')err('unsupported-mode');
@@ -42,6 +61,12 @@ function createHandler(db,{clock=Date.now}={}){
    // Do not accept arbitrary public payload fields from a client, even an admin.
    const safePublicKeys=new Set(['bracketView','updatedAt','visibility','registrationEnabled','registrationOpenAt','registrationCloseAt','registrationStatus','capacity','waitlistEnabled','waitlistCapacity','confirmedCount','waitlistCount','registrationVisibility','publishedAt','eventDate','checkInAt','startAt','fee','timezone','tournamentPhase','location','battleMode','teamSize','playMode','formatType','name','ladderMode','targetGroup','participantNameMode','eventCancelled','cancellationDeadline','eventDescription','registrationNotes','eventAuthority','ownerUid','hostName','lastActivityAt','expiresAt','testMode','testLabel','createdByRole','testCreatedAt','testExpiresAt']);
    if(Object.keys(publicOriginal).some(k=>!safePublicKeys.has(k)))err('private-mirror-data');
+   // Root/meta whitelists mirror the production public bracket serializer.
+   const safeMirrorKeys=new Set(['courtLifecycleEpoch','callRevision','registrationRosterRevision','onsiteWaitlistRuntimeRevision','systemClosure','eventInfo','meta','testMode','testCreatedAt','testExpiresAtMs','players','teams','matches','courtAssignments','bracketSize','drawnAt','archiveStatus','startedAt','completedAt','archivedAt','ladderPointsAwarded','championId','runnerUpId','thirdId','fourthId','gfMatchId','gfResetMatchId','bronzeMatchId','rrRounds','teamResultRevision','teamStandings']);
+   const safeMetaKeys=new Set(['name','location','date','battleMode','teamSize','playMode','formatType','format','ladderMode','startTime','checkin','bronzeMatch','stations','refereeStationRestrictionEnabled','refereeStationNames','eventAuthority','communityQuickRegistration']);
+   if(Object.keys(mirror).some(k=>!safeMirrorKeys.has(k))||Object.keys(mirror.meta).some(k=>!safeMetaKeys.has(k)))err('private-mirror-data');
+   if(mirror.meta.playMode&&mirror.meta.playMode!=='standard')err('mirror-mismatch');
+   if(mirror.meta.refereeStationRestrictionEnabled===true||Object.keys(mirror.meta.refereeStationNames||{}).length)err('mirror-mismatch');
    const mirrorText=JSON.stringify(mirror);
    if(/"(?:uid|phone|email|assignedStaffUids|refereeSeatsV1|refereeStationAssignments|refereeStationUids|requests)"\s*:/.test(mirrorText))err('private-mirror-data');
    const result=initialize({state,ownerUid:uid,release:releaseSnap.data()});
