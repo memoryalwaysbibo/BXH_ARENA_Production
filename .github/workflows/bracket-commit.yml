@@ -23,3 +23,15 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node tests/bracket-commit.browser.cjs
       - run: node tests/e2e/community-quick-registration-browser.cjs
+      - name: Verify continuous bracket routes and player selection
+        env:
+          BXH_STAGE_QA_DIR: test-results/bracket-routes
+        run: node tests/e2e/bracket-stage-switch.cjs
+      - name: Upload bracket route screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bracket-routes
+          path: test-results/bracket-routes/
+          if-no-files-found: warn
+          retention-days: 7
