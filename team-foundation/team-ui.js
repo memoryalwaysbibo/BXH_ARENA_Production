@@ -22,8 +22,15 @@ function recruitmentSettings(policy={}){
  return '<form data-team-form="admission"><label>加入方式<select name="mode">'+[['auto','自動加入'],['review','人工審核']].map(([v,l])=>option(v,l,policy.mode||'review')).join('')+'</select></label><label>天梯排位<select name="minLadderTier">'+option('','未指定',selected)+ladderTiers.map(t=>option(t,t+'以上',selected)).join('')+'</select></label><label>獵人排位<select name="minTier">'+option('','未指定',hunter)+hunterTiers.map(([v,l])=>option(v,l+'以上',hunter)).join('')+'</select></label><button type="submit">儲存設定</button></form>';
 }
 function myTeam(team){if(!team)return noTeam();return '<section class="bxh-team-ui"><h2>我的戰隊</h2><p>'+esc(team.name)+'</p>'+(['captain','deputy'].includes(team.role)?'<h3>招募設定</h3>'+recruitmentSettings(team.admission||{})+'<button type="button" data-team-action="applications" data-team-id="'+esc(team.id)+'">查看加入申請</button>':'')+'</section>'; }
+function applicationDateTime(value){
+ if(!Number.isSafeInteger(value)||value<0)return {date:'未提供',time:'未提供'};
+ const date=new Date(value);if(!Number.isFinite(date.getTime()))return {date:'未提供',time:'未提供'};
+ const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
+ const get=k=>parts.find(x=>x.type===k)?.value||'';
+ return {date:get('year')+'/'+get('month')+'/'+get('day'),time:get('hour')+':'+get('minute')};
+}
 function applications({items=[],hasMore=false,teamId}){
- const rows=items.map(a=>'<li><span>'+esc(a.name)+'</span> <button type="button" data-team-action="approve" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">核准</button> <button type="button" data-team-action="reject" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">拒絕</button></li>').join('');
+ const rows=items.map(a=>{const when=applicationDateTime(a.requestedAt);return '<li><span>'+esc(a.name)+'</span><div>申請日期：'+esc(when.date)+'</div><div>申請時間：'+esc(when.time)+'</div> <button type="button" data-team-action="approve" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">核准</button> <button type="button" data-team-action="reject" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">拒絕</button></li>';}).join('');
  return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button>'+(items.length?'<ul>'+rows+'</ul>':'<p>目前沒有待審核的申請。</p>')+(hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
 }
 function createTeam(team){
