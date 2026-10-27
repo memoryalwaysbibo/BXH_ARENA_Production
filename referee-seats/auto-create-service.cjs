@@ -23,10 +23,22 @@ function createHandler(db,{clock=Date.now}={}){
     tx.get(db.doc('users/'+uid)),tx.get(db.doc('systemConfig/refereeSeatsV1')),
     tx.get(roomRef),tx.get(pubRef),tx.get(receiptRef)]);
    const user=userSnap.data();
-   if(user?.active!==true||user?.isTestAccount===true||!['admin','super_admin'].includes(user.role))err('permission-denied');
+   if(user?.active!==true||user?.isTestAccount===true||!['staff','admin','super_admin'].includes(user.role))err('permission-denied');
    if(receiptSnap.exists){const receipt=receiptSnap.data();if(receipt.uid!==uid||receipt.hash!==hash||receipt.code!==code)err('operation-conflict');return {ok:true,code,idempotent:true};}
    if(roomSnap.exists||pubSnap.exists)err('room-code-conflict');
    const original=d.privatePayload,publicOriginal=d.publicPayload;
+   // Admin SDK bypasses Firestore Rules: reproduce the production client-create
+   // field boundary explicitly, rather than spreading arbitrary client keys.
+   const safePrivateKeys=new Set(['data','updatedAt','visibility','createdBy','createdByName',
+    'bracketSize','archiveStatus','ladderPointsAwarded','ladderSeasonId',
+    'registrationEnabled','registrationOpenAt','registrationCloseAt','registrationStatus',
+    'capacity','waitlistEnabled','waitlistCapacity','confirmedCount','waitlistCount',
+    'registrationVisibility','publishedAt','eventDate','checkInAt','startAt','fee',
+    'timezone','assignedStaffUids','tournamentPhase','location','battleMode','teamSize',
+    'playMode','formatType','name','ladderMode','targetGroup','participantNameMode',
+    'eventCancelled','cancellationDeadline','eventDescription','registrationNotes',
+    'eventAuthority','hostName']);
+   if(Object.keys(original).some(k=>!safePrivateKeys.has(k)))err('protected-create-field');
    const state=parse(original.data),mirror=parse(publicOriginal.bracketView);
    if(!state||!mirror||!state.meta||!mirror.meta)err('invalid-room-state');
    if(state.cloudCode&&state.cloudCode!==code)err('room-code-mismatch');
@@ -34,7 +46,7 @@ function createHandler(db,{clock=Date.now}={}){
    // stale referee authorization into a trusted Admin SDK write.
    if(state.ownerUid&&state.ownerUid!==uid)err('owner-mismatch');
    if(original.ownerUid&&original.ownerUid!==uid)err('owner-mismatch');
-   if(state.createdByRole&&state.createdByRole!=='admin'&&state.createdByRole!=='super_admin')err('owner-role-mismatch');
+   if(state.createdByRole&&state.createdByRole!==user.role)err('owner-role-mismatch');
    const forbiddenPrivate=['refereeSeatsV1','refereeSeatNames','refereeStationUids','refereeStationAssignments','refereeStationNames','refereeStationRestrictionEnabled'];
    if(forbiddenPrivate.some(k=>Object.hasOwn(original,k)))err('protected-create-field');
    if(['refereeSeatsV1','refereeSeatNames','refereeStationUids'].some(k=>Object.hasOwn(state.meta,k)))err('protected-create-field');

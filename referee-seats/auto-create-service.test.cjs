@@ -34,9 +34,10 @@ test('same operation retries idempotently and cannot mutate existing room',async
  await assert.rejects(h.run('admin',{operationId:'unique-create-operation-002'}),/room-code-conflict/);
  await assert.rejects(h.run('admin',{privatePayload:{...h.payload.privatePayload,fee:999}}),/operation-conflict/);
 });
-test('unauthenticated, staff, disabled and test identities cannot create',async()=>{
- const h=harness();await assert.rejects(h.run('staff'),/permission-denied/);
- await assert.rejects(h.run('anonymous'),/permission-denied/);
+test('players, disabled and test identities cannot create',async()=>{
+ const h=harness();await assert.rejects(h.run('anonymous'),/permission-denied/);
+ h.docs.set('users/player',{active:true,role:'player'});
+ await assert.rejects(h.run('player'),/permission-denied/);
  h.docs.get('users/admin').active=false;await assert.rejects(h.run(),/permission-denied/);
  assert(!h.docs.has('tournaments/BXH-ABCD12'));
 });
@@ -84,4 +85,19 @@ test('new room rejects prestarted, populated and forged public mirror payloads',
  mirror.internalNotes='secret';
  await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify(mirror)}}),/private-mirror-data/);
  assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
+});
+
+test('official Staff creator may initialize own room, not another account room',async()=>{
+ const h=harness(),p=h.payload;
+ const state=JSON.parse(p.privatePayload.data);state.createdBy='staff';
+ const own={...p.privatePayload,createdBy:'staff',data:JSON.stringify(state)};
+ assert.deepEqual(await h.run('staff',{privatePayload:own}),{ok:true,code:'BXH-ABCD12',idempotent:false});
+ assert.equal(h.docs.get('tournaments/BXH-ABCD12').createdBy,'staff');
+ assert.deepEqual(h.docs.get('tournaments/BXH-ABCD12').assignedStaffUids,['staff']);
+});
+test('privileged create fields cannot bypass client Firestore rules',async()=>{
+ const h=harness(),p=h.payload;
+ for(const patch of [{qrCheckinManaged:true},{registrationSelection:{status:'drawing'}},{systemClosed:true},{refereeSeatNames:{}}])
+  await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,...patch}}),/protected-create-field/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));
 });
