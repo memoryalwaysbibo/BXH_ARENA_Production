@@ -42,3 +42,32 @@ test('cancel, reject and remove close applications or memberships',async()=>{
  await cmd(run,'captain','approve',{targetUid:'player'});await cmd(run,'captain','remove',{targetUid:'player'});
  assert.equal(data.has('teamMembershipsV1/player'),false);
 });
+test('deputy reviews applications; transfer clears old captain role',async()=>{
+ const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
+ for(const uid of ['a','b']){await cmd(run,uid,'apply');await cmd(run,'captain','approve',{targetUid:uid});}
+ await cmd(run,'captain','assign',{targetUid:'a',role:'deputy'});
+ await cmd(run,'new','apply');await cmd(run,'a','approve',{targetUid:'new'});
+ await assert.rejects(cmd(run,'a','remove',{targetUid:'captain'}));
+ await cmd(run,'a','remove',{targetUid:'new'});
+ await cmd(run,'captain','transfer',{targetUid:'a'});
+ assert.deepEqual(data.get('teamsV1/alpha').roles,{captain:'member',a:'captain',b:'member'});
+});
+test('membership transitions reset countdown; dissolve keeps tombstone and removes membership',async()=>{
+ const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
+ assert.equal(data.get('teamsV1/alpha').understaffedSince,100);
+ await cmd(run,'a','apply');await cmd(run,'captain','approve',{targetUid:'a'});
+ assert.equal(data.get('teamsV1/alpha').understaffedSince,null);
+ await assert.rejects(cmd(run,'captain','dissolve'),/solo/);
+ await cmd(run,'a','leave');assert.equal(data.get('teamsV1/alpha').understaffedSince,100);
+ assert.deepEqual(data.get('teamsV1/alpha').roles,{captain:'captain'});
+ await cmd(run,'captain','dissolve');assert.equal(data.get('teamsV1/alpha').status,'dissolved');assert.equal(data.has('teamMembershipsV1/captain'),false);
+ await assert.rejects(cmd(run,'a','apply'),/dissolved/);
+});
+test('role limit failures leave transaction unchanged and frame command rejects locked frames',async()=>{
+ const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
+ for(const uid of ['a','b','c']){await cmd(run,uid,'apply');await cmd(run,'captain','approve',{targetUid:uid});}
+ for(const uid of ['a','b'])await cmd(run,'captain','assign',{targetUid:uid,role:'deputy'});
+ const before=JSON.stringify([...data]);await assert.rejects(cmd(run,'captain','assign',{targetUid:'c',role:'deputy'}),/role-full/);assert.equal(JSON.stringify([...data]),before);
+ await assert.rejects(cmd(run,'captain','frame',{frame:4}),/frame-locked/);
+ data.get('teamsV1/alpha').totalXp=12;await cmd(run,'captain','frame',{frame:4});assert.equal(data.get('teamsV1/alpha').selectedFrame,4);
+});
