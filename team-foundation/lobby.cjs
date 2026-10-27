@@ -20,7 +20,9 @@ function joinState(team,{membershipTeamId=null,pendingTeamIds=[],player=null}={}
  if(team.memberCount>=team.capacity)return {label:'已滿員',disabled:true,action:null};
  if(team.admission.mode==='auto'){
   const ok=eligibility(team,player);
-  if(ok===null)return {label:'資格待確認',disabled:true,action:null};
+  // Missing viewer data must not prevent applying: the server transaction
+  // checks trusted eligibility before any membership write.
+  if(ok===null)return {label:'加入',disabled:false,action:'join'};
   if(!ok)return {label:'未達條件',disabled:true,action:null};
  }
  return {label:'加入',disabled:false,action:team.admission.mode==='auto'?'join':'apply'};
