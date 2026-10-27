@@ -4,7 +4,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  if(!container||!ui||!controllers)throw Error('team-components-required');
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
-  container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':state.screen==='mine'?'mine':'lobby')+(state.screen==='create'&&!state.loading&&state.loaded?ui.createTeam(state.team):state.screen==='mine'&&!state.loading&&state.loaded?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&state.loaded&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query,error:state.loaded?null:state.error}));
+  container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':['mine','applications'].includes(state.screen)?'mine':'lobby')+(state.screen==='applications'&&!state.loading&&state.loaded?ui.applications({items:state.items,hasMore:state.hasMore,teamId:state.applicationsTeamId}):state.screen==='create'&&!state.loading&&state.loaded?ui.createTeam(state.team):state.screen==='mine'&&!state.loading&&state.loaded?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&state.loaded&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query,error:state.loaded?null:state.error}));
   if(state.busy)for(const button of container.querySelectorAll('button'))button.disabled=true;
   if(state.pending){const retry=container.ownerDocument.createElement('button');retry.type='button';retry.dataset.teamAction='retry';retry.textContent='重試上一筆操作';retry.disabled=state.busy||state.loading;container.append(retry);}
   if(state.error){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent=state.error;container.append(p);}
@@ -17,6 +17,8 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
   else if(action==='tab'&&button.dataset.value==='create')await controller.create();
   else if(action==='tab'&&button.dataset.value==='lobby')await controller.search(controller.snapshot().query);
   else if(action==='view')await controller.view(id);
+  else if(action==='applications')await controller.applications(id);
+  else if(action==='approve'||action==='reject')await controller.operate(action,id,{targetUid:button.dataset.targetUid});
   else if(action==='clear')await controller.clear();
   else if(action==='back')await controller.search(controller.snapshot().query);
   else if(action==='join'||action==='apply'||action==='cancel')await controller.operate(action,id);
