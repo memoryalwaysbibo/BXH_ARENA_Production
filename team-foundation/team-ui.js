@@ -21,13 +21,17 @@ function recruitmentSettings(policy={}){
  const selected=policy.minLadderTier??'',hunter=policy.minTier??'';
  return '<form data-team-form="admission"><label>加入方式<select name="mode">'+[['auto','自動加入'],['review','人工審核']].map(([v,l])=>option(v,l,policy.mode||'review')).join('')+'</select></label><label>天梯排位<select name="minLadderTier">'+option('','未指定',selected)+ladderTiers.map(t=>option(t,t+'以上',selected)).join('')+'</select></label><label>獵人排位<select name="minTier">'+option('','未指定',hunter)+hunterTiers.map(([v,l])=>option(v,l+'以上',hunter)).join('')+'</select></label><button type="submit">儲存設定</button></form>';
 }
-function myTeam(team){if(!team)return noTeam();return '<section class="bxh-team-ui"><h2>我的戰隊</h2><p>'+esc(team.name)+'</p>'+(['captain','deputy'].includes(team.role)?'<h3>招募設定</h3>'+recruitmentSettings(team.admission||{}):'')+'</section>'; }
+function myTeam(team){if(!team)return noTeam();return '<section class="bxh-team-ui"><h2>我的戰隊</h2><p>'+esc(team.name)+'</p>'+(['captain','deputy'].includes(team.role)?'<h3>招募設定</h3>'+recruitmentSettings(team.admission||{})+'<button type="button" data-team-action="applications" data-team-id="'+esc(team.id)+'">查看加入申請</button>':'')+'</section>'; }
+function applications({items=[],hasMore=false,teamId}){
+ const rows=items.map(a=>'<li><span>'+esc(a.name)+'</span> <button type="button" data-team-action="approve" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">核准</button> <button type="button" data-team-action="reject" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">拒絕</button></li>').join('');
+ return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button>'+(items.length?'<ul>'+rows+'</ul>':'<p>目前沒有待審核的申請。</p>')+(hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
+}
 function createTeam(team){
  if(team)return '<section class="bxh-team-ui"><h2>建立戰隊</h2><p>你已有所屬戰隊，請先退出後再建立。</p><button type="button" data-team-action="tab" data-value="mine">查看我的戰隊</button></section>';
  return '<section class="bxh-team-ui"><h2>建立戰隊</h2><form data-team-form="create"><label>戰隊名稱<input name="name" required minlength="2" maxlength="24" placeholder="輸入戰隊名稱"></label><p>建立後你將成為隊長，初始成員上限為 10 人。</p><button type="submit">建立戰隊</button></form></section>';
 }
 function noTeam(){return '<section class="bxh-team-ui"><h2>你尚未加入戰隊</h2><p>尋找一起征戰的夥伴，或建立自己的戰隊。</p><button type="button" data-team-action="tab" data-value="lobby">戰隊大廳</button><button type="button" data-team-action="tab" data-value="create">建立戰隊</button></section>';}
 const css='.bxh-team-ui{min-width:0}.bxh-team-ui form{display:flex;flex-wrap:wrap;gap:12px}.bxh-team-ui label{display:flex;flex-direction:column;gap:6px}.bxh-team-ui button,.bxh-team-ui input,.bxh-team-ui select{font:inherit;min-height:44px;max-width:100%;box-sizing:border-box}.bxh-team-ui .team-table-scroll{max-width:100%;overflow-x:auto}.bxh-team-ui table{width:100%;border-collapse:collapse}.bxh-team-ui th,.bxh-team-ui td{padding:12px;text-align:left}.bxh-team-ui td:first-child{overflow-wrap:anywhere}.bxh-team-ui button:disabled{opacity:.5;cursor:not-allowed}@media(max-width:480px){.bxh-team-ui form>label{flex:1 1 140px}.bxh-team-ui th,.bxh-team-ui td{padding:8px}}';
-const api={tabs,rankingTabs,lobby,publicMembers,noTeam,myTeam,createTeam,recruitmentSettings,css};
+const api={tabs,rankingTabs,lobby,publicMembers,noTeam,myTeam,applications,createTeam,recruitmentSettings,css};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHTeamUI=api;
 })(typeof window==='object'?window:globalThis);
