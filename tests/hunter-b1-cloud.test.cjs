@@ -13,7 +13,7 @@ function setup({failure=false,cancelled=false,status,phase,runtimeFields={},publ
  }
  publicReads++;return {exists:()=>true,data:()=>({name:'Test Event',eventDate:'2026-10-09',bracketView:'{}',tournamentPhase:phase,...publicFields})};
  }};
- const context=vm.createContext({authReady:true,authHandle:{currentUser:signedIn?{uid:'u1'}:null},personalScan:null,personalPublicDocs:new Map(),queueMicrotask,fx,dbHandle:{},console:{warn:()=>{}},reconstructPublicStateFromDoc:()=>({players,matches,...runtimeFields}),buildHunterTournamentMatchRecords:()=>[{matchId:'m1',playerA:{localPlayerId:'self'},playerB:{localPlayerId:'op'},winnerLocalPlayerId:'self',scoreA:4,scoreB:0,analyzable:true,rounds:[]}]});
+ const context=vm.createContext({authReady:true,authHandle:{currentUser:signedIn?{uid:'u1'}:null},personalScan:null,personalPublicDocs:new Map(),queueMicrotask,fx,dbHandle:{},console:{warn:()=>{}},reconstructPublicStateFromDoc:()=>({players,matches,archiveStatus:phase==='waiting'?undefined:'completed',...runtimeFields}),buildHunterTournamentMatchRecords:()=>[{matchId:'m1',playerA:{localPlayerId:'self'},playerB:{localPlayerId:'op'},winnerLocalPlayerId:'self',scoreA:4,scoreB:0,analyzable:true,rounds:[]}]});
  context.window={};
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../modules/main-app/domain-utils.js'),'utf8'),context);
  vm.runInContext('api=({'+cloud.slice(regsStart,regsEnd)+cloud.slice(hunterStart,hunterEnd)+'});',context);
@@ -82,7 +82,7 @@ test('waiting registration without a player or played match does not block Hunte
   assert.equal(result.records.length,0);assert.equal(result.skipped.length,0);
  }
 });
-test('stale waiting phase cannot conceal started or completed history',async()=>{
+test('stale waiting phase requires identity review only after event archive',async()=>{
  for(const options of [
   {runtimeFields:{startedAt:1}},
   {runtimeFields:{archiveStatus:'completed'}},
@@ -92,7 +92,8 @@ test('stale waiting phase cannot conceal started or completed history',async()=>
   {matches:[{log:[{type:'spin'}]}]}
  ]){
   const {api}=setup({phase:'waiting',players:[],...options});const result=await api.queryMyHunterMatches();
-  assert.equal(result.skipped[0].reason,'identity-unresolved');
+  if(options.runtimeFields?.archiveStatus==='completed')assert.equal(result.skipped[0].reason,'identity-unresolved');
+  else {assert.equal(result.records.length,0);assert.equal(result.skipped.length,0);}
  }
 });
 test('live and finished events still require unresolved identities to be reviewed',async()=>{
@@ -101,11 +102,25 @@ test('live and finished events still require unresolved identities to be reviewe
  }
 });
 test('waiting mirror with completed matches retains actual linked history',async()=>{
- const {api}=setup({phase:'waiting',matches:[{completed:true,winnerId:'self'}]});
+ const {api}=setup({phase:'waiting',runtimeFields:{archiveStatus:'completed'},matches:[{completed:true,winnerId:'self'}]});
  assert.equal((await api.queryMyHunterMatches()).records.length,1);
 });
 
 test('not-selected registration cannot erase actual match evidence',async()=>{
  const {api}=setup({status:'not_selected',players:[],matches:[{a:{playerId:'self'},completed:true}]});
  assert.equal((await api.queryMyHunterMatches()).skipped[0].reason,'identity-unresolved');
+});
+
+test('completed matches stay provisional until canonical public state is archived',async()=>{
+ for(const archiveStatus of ['ongoing','paused',undefined,null]){
+  const {api}=setup({runtimeFields:{archiveStatus,completedAt:123,ladderPointsAwarded:true},publicFields:{archiveStatus:'completed'},matches:[{completed:true,winnerId:'self'}]});
+  const r=await api.queryMyHunterMatches();assert.equal(r.records.length,0);assert.equal(r.skipped.length,0);
+ }
+ const {api}=setup({runtimeFields:{archiveStatus:'completed'},matches:[{completed:true,winnerId:'self'}]});
+ assert.equal((await api.queryMyHunterMatches()).records.length,1);
+});
+test('archived referee test room is explicitly tagged even with official ranked metadata',async()=>{
+ const {api}=setup({publicFields:{eventAuthority:'official',ladderMode:'ranked'}});
+ api.queryMyRegistrations=async()=>[{tournamentCode:'BXH-BMFT9Z',localPlayerId:'self'}];
+ assert.equal((await api.queryMyHunterMatches()).records[0].testMode,true);
 });

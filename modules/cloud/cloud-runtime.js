@@ -2219,6 +2219,9 @@
           const runtimeHistory=runtime.startedAt||runtime.completedAt||runtime.archivedAt||runtime.archiveStatus==="completed"||runtime.meta.registrationStatus==="started";
           if(waiting&&!topLevelHistory&&!runtimeHistory&&!hasPlayedHistory) continue;
 
+          // Hunter results become official only after the entire event is archived.
+          if(runtime.archiveStatus!=="completed") continue;
+
           const players=Array.isArray(runtime.players)?runtime.players:[];
           const regId=String(reg.registrationId||reg.id||uid);
           const candidateIds=new Set([

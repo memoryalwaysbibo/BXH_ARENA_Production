@@ -17,7 +17,7 @@ function scheduledTournamentStartMs(meta){
 
 // Audited legacy test rooms may predate testMode metadata. Match only the
 // immutable room code; names and dates never establish test status.
-const HUNTER_LEGACY_TEST_EVENTS=Object.freeze({'BXH-C6BATA':'double-elimination-review-20261002'});
+const HUNTER_LEGACY_TEST_EVENTS=Object.freeze({'BXH-C6BATA':'double-elimination-review-20261002','BXH-BMFT9Z':'referee-station-review-20261027'});
 function hunterRecordIsTest(record){
   if(!record)return false;
   const code=String(record.eventCode||'').trim().toUpperCase();
