@@ -10,3 +10,9 @@
 .hunter-board-tier.tier-a{color:#e6c880}.hunter-board-tier.tier-s{color:#dcb8ff}.hunter-board-tier.tier-national{color:#f5bc80}
 .hunter-board-mine{background:rgba(206,175,79,.12)}.hunter-board-mine .hunter-board-name small{color:var(--gold,#e6c880)}
 @media(max-width:480px){.hunter-board-summary{gap:6px}.hunter-board-summary>div{padding:10px 8px}.hunter-board-heading{flex-wrap:wrap}.hunter-board .hint{line-height:1.7}}
+.hunter-board-info{margin:0 0 16px;padding:10px 12px;border:1px solid rgba(255,255,255,.16);border-radius:10px}
+.hunter-board-info>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px;cursor:pointer;list-style:none;font-size:14px}
+.hunter-board-info>summary::-webkit-details-marker{display:none}.hunter-board-info>summary::marker{content:''}
+.hunter-board-info>summary small{font-size:12px;opacity:.75}.hunter-board-info-toggle{flex-shrink:0;color:var(--gold,#e6c880)}
+.hunter-board-info .when-open{display:none}.hunter-board-info[open] .when-open{display:inline}.hunter-board-info[open] .when-closed{display:none}
+.hunter-board-info-content{padding-top:8px}.hunter-board-info-content .hint{margin:0 0 10px}.hunter-board-info-content .hint:last-child{margin-bottom:0}

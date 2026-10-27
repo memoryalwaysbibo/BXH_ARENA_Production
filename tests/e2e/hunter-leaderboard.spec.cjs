@@ -17,7 +17,17 @@ test('hunter board renders safe public rows and scrolls its table inside a mobil
  await expect(page.getByRole('cell',{name:'47 場',exact:true})).toBeAttached();
  await expect(page.locator('img')).toHaveCount(0);
  await expect(page.getByText('第 1 名')).toBeVisible();
+ const info=page.locator('details.hunter-board-info'),toggle=info.locator('summary');
+ await expect(info).not.toHaveAttribute('open','');
+ await expect(page.getByText(/目前不能據此宣告全服最高/)).not.toBeVisible();
+ await expect(toggle).toContainText('1 位待核對');
+ await toggle.click();
+ await expect(info).toHaveAttribute('open','');
  await expect(page.getByText(/目前不能據此宣告全服最高/)).toBeVisible();
+ await expect(page.getByText(/更新時間（台灣）/)).toBeVisible();
+ await toggle.press('Enter');
+ await expect(info).not.toHaveAttribute('open','');
+ await expect(page.getByText(/目前不能據此宣告全服最高/)).not.toBeVisible();
  const dimensions=await page.evaluate(()=>({width:innerWidth,body:document.documentElement.scrollWidth,table:document.querySelector('.rank-scroll').scrollWidth,container:document.querySelector('.rank-scroll').clientWidth}));
  expect(dimensions.body).toBeLessThanOrEqual(dimensions.width);
  if(dimensions.width<650)expect(dimensions.table).toBeGreaterThan(dimensions.container);
