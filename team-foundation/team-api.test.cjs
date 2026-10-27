@@ -6,3 +6,6 @@ test('adapter uses declared callable operations without inventing account data',
  assert.deepEqual(calls,[{name:'teamRead',payload:{action:'list',query:{query:'隊'}}},{name:'teamRead',payload:{action:'members',teamId:'t'}},{name:'teamCommand',payload:{action:'apply',teamId:'t'}}]);
 });
 test('bad responses fail closed',async()=>{const api=createTeamApi({functions:{},httpsCallable:()=>async()=>({})});await assert.rejects(api.list({}),/invalid-callable-response/);});
+test('mine API uses authenticated context without a client-selected UID',async()=>{
+ let payload;const api=createTeamApi({functions:{},httpsCallable:()=>async p=>(payload=p,{data:{team:null}})});await api.mine();assert.deepEqual(payload,{action:'mine'});
+});
