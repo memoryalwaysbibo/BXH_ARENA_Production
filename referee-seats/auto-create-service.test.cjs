@@ -11,8 +11,8 @@ function harness(){
  });writes.forEach(x=>x());return out;});tail=task.catch(()=>{});return task;}};
  const state={id:'new',meta:{eventAuthority:'official',battleMode:'individual',playMode:'standard',stations:3,assignedStaffUids:[]},players:[],matches:[],bracketSize:0};
  const payload={code:'BXH-ABCD12',operationId:'unique-create-operation-001',
-  privatePayload:{data:JSON.stringify(state),createdBy:'admin',eventAuthority:'official',battleMode:'individual',playMode:'standard',confirmedCount:0,waitlistCount:0},
-  publicPayload:{bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3}}),eventAuthority:'official',battleMode:'individual'}};
+  privatePayload:{visibility:'public',data:JSON.stringify(state),createdBy:'admin',eventAuthority:'official',battleMode:'individual',playMode:'standard',confirmedCount:0,waitlistCount:0},
+  publicPayload:{visibility:'public',bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3}}),eventAuthority:'official',battleMode:'individual'}};
  const handle=createHandler(db,{clock:()=>1000});
  const run=(uid='admin',override={})=>handle({auth:{uid},data:{...clone(payload),...override}});
  return {docs,payload,run};
@@ -168,4 +168,23 @@ test('forged public owner and role cannot be written',async()=>{
  await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,createdByRole:'super_admin'}}),/owner-role-mismatch/);
  await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,testMode:true}}),/unsupported-mode/);
  assert(!h.docs.has('tournaments/BXH-ABCD12'));
+});
+
+test('Staff cannot bypass public official-room creation visibility through Admin SDK',async()=>{
+ for(const [privateVisibility,publicVisibility] of [['private','private'],[undefined,'public'],['public','private']]){
+  const h=harness(),p=h.payload,state=JSON.parse(p.privatePayload.data);state.createdBy='staff';
+  await assert.rejects(h.run('staff',{
+   privatePayload:{...p.privatePayload,createdBy:'staff',data:JSON.stringify(state),visibility:privateVisibility},
+   publicPayload:{...p.publicPayload,visibility:publicVisibility}
+  }),/permission-denied/);
+  assert(!h.docs.has('tournaments/BXH-ABCD12'));
+  assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
+  assert(![...h.docs.keys()].some(k=>k.startsWith('roomCreationOperations/')));
+ }
+});
+test('Admin retains existing private official-room creation permission',async()=>{
+ const h=harness(),p=h.payload;
+ assert.equal((await h.run('admin',{
+  privatePayload:{...p.privatePayload,visibility:'private'},publicPayload:{...p.publicPayload,visibility:'private'}
+ })).ok,true);
 });
