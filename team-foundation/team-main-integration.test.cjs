@@ -1,0 +1,8 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');const source=fs.readFileSync(__dirname+'/team-main-integration.js','utf8');
+function fixture(enabled){let uid='a',mounted=0,destroyed=0,slot=null;const ctx={window:{BXH_TEAM_PREVIEW:enabled},PLAYER_TABS:[['home','賽事大廳']],appPhase:'player-center',playerActiveTab:'home',currentRole:'player',currentAuthUid:()=>uid,renderPlayerHomeTab:()=>'<p>HOME</p>',document:{getElementById:()=>slot,createElement:()=>({textContent:''})}};
+ ctx.render=()=>{ctx.output=ctx.renderPlayerHomeTab({});slot=ctx.output.includes('bxh-team-host-slot')?{append(node){this.node=node;}}:null;};
+ ctx.window.BXHTeamApi={createTeamApiFromEngagement:()=>({})};ctx.window.BXHTeamMount={};ctx.window.BXHTeamHost={createTeamHost:()=>({open:()=>{mounted++;return {ok:true};},sync(){},close(){destroyed++;}})};vm.runInNewContext(source,ctx);return {ctx,get mounted(){return mounted;},get destroyed(){return destroyed;},setUid(v){uid=v;}};
+}
+test('disabled candidate leaves existing tabs and render untouched',()=>{const f=fixture(false);assert.equal(f.ctx.PLAYER_TABS.length,1);f.ctx.render();assert.equal(f.ctx.output,'<p>HOME</p>');assert.equal(f.mounted,0);});
+test('enabled candidate provides team tab, keeps node and closes on navigation',()=>{const f=fixture(true),c=f.ctx;assert.equal(c.PLAYER_TABS.at(-1)[0],'teams');c.playerActiveTab='teams';c.render();assert.match(c.output,/bxh-team-host-slot/);assert.equal(f.mounted,1);c.playerActiveTab='home';c.render();assert.equal(c.output,'<p>HOME</p>');assert.equal(f.destroyed,1);});
