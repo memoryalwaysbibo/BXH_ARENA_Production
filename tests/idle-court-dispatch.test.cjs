@@ -11,7 +11,7 @@ const sandbox={window:{},Date,Number,Object,Set,Array,String,Math,
  clearCourtAssignmentRefs:(st,ids)=>Object.values(st.courtAssignments).forEach(c=>{if(ids.includes(c.currentMatchId))c.currentMatchId=null;if(ids.includes(c.nextMatchId))c.nextMatchId=null;})};
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../modules/main-app/court-retirement.js'),'utf8'),sandbox);
-vm.runInContext(fn('idleCourtCandidates','function applyIdleCourtClaim')+'\n'+fn('applyIdleCourtClaim','async function claimIdleCourt'),sandbox);
+vm.runInContext(fn('roundRobinPlayersBusyElsewhere','function stationExecutionQueue')+'\n'+fn('idleCourtCandidates','function applyIdleCourtClaim')+'\n'+fn('applyIdleCourtClaim','async function claimIdleCourt'),sandbox);
 const state=()=>({meta:{formatType:'double',stations:2},matches:[
  {id:'playing',station:1,status:'in_progress',a:{},b:{},seq:1},
  {id:'queued',station:1,status:'ready',a:{},b:{},seq:2,dispatchRevision:0},
