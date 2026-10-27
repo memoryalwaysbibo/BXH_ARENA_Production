@@ -63,3 +63,9 @@ test('only the captain gets role assignment forms for other members',()=>{
  const cap=ui.manageMembers({id:'t',viewerRole:'captain',members});assert.equal((cap.match(/data-team-form="assign"/g)||[]).length,2);assert.match(cap,/副隊長最多 2 位/);assert.match(cap,/菁英隊員最多 3 位/);
  assert.doesNotMatch(ui.manageMembers({id:'t',viewerRole:'deputy',members}),/data-team-form="assign"/);
 });
+
+test('only the captain can initiate transfer to another member',()=>{
+ const members=[{uid:'c',name:'隊長',role:'captain'},{uid:'m',name:'隊員',role:'member'}];
+ const cap=ui.manageMembers({id:'t',viewerRole:'captain',members});assert.equal((cap.match(/data-team-action="transfer"/g)||[]).length,1);assert.match(cap,/data-target-uid="m"/);
+ assert.doesNotMatch(ui.manageMembers({id:'t',viewerRole:'deputy',members}),/data-team-action="transfer"/);
+});
