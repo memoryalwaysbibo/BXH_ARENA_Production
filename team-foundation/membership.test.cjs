@@ -73,24 +73,24 @@ test('role limit failures leave transaction unchanged and frame command rejects 
 });
 test('leadership can configure AND thresholds; auto admission joins without review',async()=>{
  const {run,data}=fixture(async({uid})=>({uid,points:500,tier:'b'}));await cmd(run,'captain','create',{name:'Alpha'});
- await cmd(run,'captain','admission',{policy:{mode:'auto',minPoints:500,minTier:'b'}});
+ await cmd(run,'captain','admission',{policy:{mode:'auto',minLadderTier:'黃金',minTier:'b'}});
  const r=await cmd(run,'a','apply');assert.equal(r.joined,true);assert.equal(data.get('teamMembershipsV1/a').teamId,'alpha');
  assert.equal(data.get('teamsV1/alpha').understaffedSince,null);
  await assert.rejects(cmd(run,'a','admission',{policy:{mode:'review'}}),/leadership/);
  await cmd(run,'captain','assign',{targetUid:'a',role:'deputy'});
- await cmd(run,'a','admission',{policy:{mode:'review',minPoints:100,minTier:'c'}});
+ await cmd(run,'a','admission',{policy:{mode:'review',minLadderTier:'白銀',minTier:'c'}});
  await cmd(run,'b','apply');assert.equal(data.has('teamMembershipsV1/b'),false);await cmd(run,'a','approve',{targetUid:'b'});
 });
 test('review admits below thresholds; automatic admission rejects client spoofed qualification',async()=>{
  let points=500;const {run,data}=fixture(async({uid})=>({uid,points,tier:'b'}));await cmd(run,'captain','create',{name:'Alpha'});
- await cmd(run,'captain','admission',{policy:{mode:'review',minPoints:400,minTier:'c'}});await cmd(run,'a','apply');
+ await cmd(run,'captain','admission',{policy:{mode:'review',minLadderTier:'黃金',minTier:'c'}});await cmd(run,'a','apply');
  points=100;await cmd(run,'captain','approve',{targetUid:'a'});assert.equal(data.has('teamMembershipsV1/a'),true);
  await cmd(run,'captain','admission',{policy:{mode:'auto',minTier:'s'}});
  await assert.rejects(cmd(run,'b','apply',{tier:'national'}),/tier-below/);
 });
 test('configured thresholds fail closed without trusted reader; auto still enforces capacity',async()=>{
  const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
- await cmd(run,'captain','admission',{policy:{mode:'auto',minPoints:1}});await assert.rejects(cmd(run,'a','apply'),/reader-required/);
+ await cmd(run,'captain','admission',{policy:{mode:'auto',minLadderTier:'青銅'}});await assert.rejects(cmd(run,'a','apply'),/reader-required/);
  await cmd(run,'captain','admission',{policy:{mode:'auto'}});
  data.get('teamsV1/alpha').memberUids.push(...Array.from({length:9},(_,i)=>'u'+i));await assert.rejects(cmd(run,'a','apply'),/team-full/);
  await assert.rejects(cmd(run,'captain','admission',{policy:{mode:'auto',minTier:'fake'}}),/invalid-min-tier/);
