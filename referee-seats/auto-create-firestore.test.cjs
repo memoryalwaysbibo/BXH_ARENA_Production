@@ -22,7 +22,7 @@ before(async()=>{
   db.doc('users/owner').set({active:true,isTestAccount:false,role:'staff',realName:'Owner'}),
   db.doc('users/other').set({active:true,isTestAccount:false,role:'staff',realName:'Other'}),
   db.doc('users/player').set({active:true,isTestAccount:false,role:'player',realName:'Player'}),
-  db.doc('systemConfig/refereeSeatsV1').set({enabled:true,perCourtScoringVerified:true})
+  db.doc('systemConfig/refereeSeatsV1').set({enabled:true,perCourtScoringVerified:true,autoCreateEnabled:true})
  ]);
  create=createHandler(db,{clock:()=>1000});
 });

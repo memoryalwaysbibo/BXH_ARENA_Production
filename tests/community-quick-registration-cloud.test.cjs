@@ -589,7 +589,7 @@ test('actual production official createRoom payload is accepted by trusted three
   const {createHandler}=require('../referee-seats/auto-create-service.cjs');
   const docs=new Map([
     ['users/local-host',{active:true,isTestAccount:false,role:'staff',realName:'Local Host'}],
-    ['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true}]
+    ['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true,autoCreateEnabled:true}]
   ]);
   const db={doc:path=>({path}),runTransaction:async fn=>{
     const pending=[];

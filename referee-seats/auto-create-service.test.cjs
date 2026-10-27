@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createHandler}=require('./auto-create-service.cjs');
 const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
 function harness(){
- const docs=new Map([['users/admin',{active:true,role:'admin',realName:'Admin'}],['users/staff',{active:true,role:'staff',realName:'Staff'}],['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true}]]);
+ const docs=new Map([['users/admin',{active:true,role:'admin',realName:'Admin'}],['users/staff',{active:true,role:'staff',realName:'Staff'}],['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true,autoCreateEnabled:true}]]);
  let tail=Promise.resolve();
  const db={doc:path=>({path}),runTransaction:fn=>{const task=tail.then(async()=>{const writes=[],out=await fn({
   get:async ref=>({exists:docs.has(ref.path),data:()=>clone(docs.get(ref.path))}),
