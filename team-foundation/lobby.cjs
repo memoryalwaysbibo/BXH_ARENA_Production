@@ -33,7 +33,7 @@ function browseLobby(teams,{query='',recruitment='all',mode='all',eligibleOnly=f
   const full=t.memberCount>=t.capacity;
   return (!needle||[t.name,t.captainName].some(s=>String(s).normalize('NFKC').toLocaleLowerCase().includes(needle)))&&(recruitment==='all'||(recruitment==='full'?full:!full))&&(mode==='all'||t.admission.mode===mode)&&t.level>=minLevel&&t.level<=maxLevel&&(!pendingOnly||viewer.pendingTeamIds?.includes(t.id))&&(!eligibleOnly||t.admission.mode==='auto'&&eligibility(t,viewer.player)===true);
  });
- filtered.sort((a,b)=>(sort==='strength'?b.strength-a.strength:sort==='level'?b.level-a.level:b.createdAt-a.createdAt)||a.id.localeCompare(b.id));
+ filtered.sort((a,b)=>(sort==='strength'?((a.strength===null)-(b.strength===null)||((b.strength??0)-(a.strength??0))):sort==='level'?b.level-a.level:b.createdAt-a.createdAt)||a.id.localeCompare(b.id));
  return {total:filtered.length,items:filtered.slice(offset,offset+limit).map(t=>({...t,join:joinState(t,viewer)}))};
 }
 module.exports={publicTeam,eligibility,joinState,browseLobby};
