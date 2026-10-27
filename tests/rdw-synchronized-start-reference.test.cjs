@@ -41,3 +41,12 @@ test('server dispatch is mandatory and failures never produce writes',async()=>{
  const rejected=await writeSynchronizedStart({...g.args,dispatchCandidate:bad});
  assert.equal(rejected.committed,false);assert.equal(rejected.reason,'missing-court');assert.equal(g.writes.length,0);
 });
+
+test('start locks registration and required check-in in both mirrors without exposing private match/court fields',async()=>{
+ const f=fixture();const original=f.tx.get;f.tx.get=async ref=>{const snap=await original(ref),doc=snap.data();if(ref.id==='private'){const state=JSON.parse(doc.data);state.meta.checkinRequired=true;state.meta.registrationStatus='open';state.matches[0].refereeUid='private-referee';doc.data=JSON.stringify(state);}return {...snap,data:()=>doc};};
+ f.args.dispatchCandidate.matches[0].refereeUid='private-referee';f.args.dispatchCandidate.matches[0].a.privateNote='secret';f.args.dispatchCandidate.courtAssignments.court1.lockedBy='private-referee';
+ assert.equal((await writeSynchronizedStart(f.args)).committed,true);
+ const privateState=JSON.parse(f.writes[0].payload.data),publicState=JSON.parse(f.writes[1].payload.bracketView);
+ for(const [i,state] of [privateState,publicState].entries()){assert.equal(state.meta.registrationStatus,'started');assert.equal(state.meta.checkinClosedEarly,true);assert.equal(state.meta.checkinClosedAt,200);assert.equal(f.writes[i].payload.registrationStatus,'started');assert.equal(f.writes[i].payload.tournamentPhase,'live');}
+ assert.equal(privateState.matches[0].refereeUid,'private-referee');assert.ok(!JSON.stringify(publicState).includes('private-referee'));assert.ok(!JSON.stringify(publicState).includes('secret'));
+});

@@ -64,7 +64,7 @@ function createAuthorizedMirrorStart({db,clock,verifyBracketInTransaction,resolv
    // Court initialization must be derived from canonical server state.
    // No browser-supplied matches/courts are accepted.
    if(typeof buildServerDispatch!== 'function')return {committed:false,reason:'server-dispatch-unavailable'};
-   const dispatchCandidate=await buildServerDispatch({tx,eventCode,drawRevision,expectedRosterRevision});
+   const dispatchCandidate=await buildServerDispatch({tx,eventCode,drawRevision,expectedRosterRevision,serverTime:now});
    return writeSynchronizedStart({
     tx,eventRef,publicRef,snapshotRef,eventCode,expectedRosterRevision,
     drawRevision,serverTime:now,authorized:true,bracketVerified:true,snapshotCandidate,dispatchCandidate,quotaContext:{db,actorUid}

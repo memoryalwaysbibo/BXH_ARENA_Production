@@ -23,7 +23,7 @@ function createVerifiedBracketReader({db}={}){
   // Exact bracket identity across both mirrors, not merely a matching counter.
   const signature=x=>JSON.stringify({
     drawnAt:x.drawnAt??null,bracketSize:x.bracketSize??null,
-    formatType:x.meta?.formatType??null,battleMode:x.meta?.battleMode??null,
+    formatType:x.meta?.formatType||'single',battleMode:x.meta?.battleMode||'individual',
     matches:(x.matches||[]).map(m=>[m.id,m.bracket,m.round,m.indexInRound,m.a?.playerId??null,m.b?.playerId??null,m.teamIds??null]).sort((l,r)=>String(l[0]).localeCompare(String(r[0])))
   });
   if(!Array.isArray(p.matches)||p.matches.length===0||!Array.isArray(q.matches)||

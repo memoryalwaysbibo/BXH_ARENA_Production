@@ -7,7 +7,8 @@ function factory(){
  const mocks={
   'firebase-functions/v2/https':{onCall:(_options,handler)=>handler,HttpsError},
   'firebase-admin/app':{getApps:()=>[{}],initializeApp:()=>({})},
-  'firebase-admin/firestore':{getFirestore:()=>db}
+  'firebase-admin/firestore':{getFirestore:()=>db},
+  '../scripts/lib/rdw-wired-ranked-start.cjs':{createWiredRankedStart:options=>{assert.equal(options.enabled,false,'registered export must stay disabled');return async()=>({ok:false,code:'rdw-disabled'});}}
  };
  vm.runInNewContext(source,{module:{exports},exports,process:{env:{GCLOUD_PROJECT:'demo-rdw',FIRESTORE_EMULATOR_HOST:'localhost:8080',FIREBASE_AUTH_EMULATOR_HOST:'localhost:9099'}},require:name=>{if(!mocks[name])throw Error('unexpected '+name);return mocks[name];}});
  return exports.createHandler;

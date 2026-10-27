@@ -1,7 +1,7 @@
 'use strict';
 // RDW read-only parity gate for a future server-owned start dispatcher.
 // Never interprets pre-start reservations as already-running matches.
-function verifyStartDispatch({before,after,stationCount}={}){
+function verifyStartDispatch({before,after,stationCount,requireLive=false,serverTime}={}){
  const fail=reason=>({ok:false,reason});
  if(!before||!after||!Array.isArray(before.matches)||!Array.isArray(after.matches))
   return fail('match-state-missing');
@@ -27,6 +27,12 @@ function verifyStartDispatch({before,after,stationCount}={}){
    const id=c[key];if(id==null)continue;
    if(!matchIds.has(id))return fail('unknown-assigned-match');
    if(ids.has(id))return fail('duplicate-assigned-match');
+   if(requireLive){
+    const m=after.matches.find(m=>m.id===id);
+    if(m.station!==i||m.completed||m.isBye||!m.a?.playerId||!m.b?.playerId)return fail('assigned-match-not-ready');
+    if(key==='currentMatchId'&&(m.status!=='in_progress'||m.startedAt!==serverTime))return fail('current-match-not-started');
+    if(key==='nextMatchId'&&(m.status==='in_progress'||m.startedAt))return fail('next-match-started-early');
+   }
    ids.add(id);
   }
  }
