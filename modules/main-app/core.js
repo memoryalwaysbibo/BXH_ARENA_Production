@@ -5975,6 +5975,11 @@ function testSandboxBannerHtml(st=state){
 }
 function canOperateCurrentTournament(){ return (hasAdminAccess() && (!isTester() || isOwnTestTournament())) || (hasPrivilegedTournamentProfile() && !isCommunityRoom()) || isCommunityRoomOwner(); }
 function canConfigureCurrentTournament(){ return isAdminTierOrAbove() || isOwnTestTournament() || isCommunityRoomOwner(); }
+// Starting an event locks registrations and brackets; holding a referee seat is not enough.
+function canStartCurrentTournament(){
+  return isAdminTierOrAbove() || isOwnTestTournament() || isCommunityRoomOwner()
+    || (isStaffTier() && isCurrentOfficialTournamentCreator());
+}
 function canJoinCloudRoom(){ return currentRole === "admin" || currentRole === "guest" || currentRole === "player"; }
 function isSuperAdmin(){ return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin"); }
 function canLinkGoogleAccount(){
@@ -12525,7 +12530,7 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const bracketPanel=`
-    ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()?'disabled':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()||!canStartCurrentTournament()?'disabled title="僅限房主或管理員開始賽事"':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
@@ -24177,6 +24182,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="start-tournament"){
+    if(!canStartCurrentTournament()){showToast("此操作僅限房主或管理員執行。",true);return;}
     if(state.meta.battleMode==="team"){
       (async()=>{
         if(state.startedAt||!state.bracketSize)return;
@@ -24185,6 +24191,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
           if(!bracketRosterIsCurrent()){render();showToast("名單已有異動，請重新產生團體對戰表",true);return;}
           if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
           openModal({type:"generic",title:"確認團體戰開賽",message:"將鎖定 "+eligibleBracketTeams().length+" 支隊伍與對戰表，並停止報名。請確認雙方人員與報到狀態。",danger:true,confirmLabel:"正式開始",onConfirm:async()=>{
+            if(!canStartCurrentTournament()){showToast("此操作僅限房主或管理員執行。",true);return;}
             try{
               await syncLatestOnlineRosterBeforeLock();
               if(!bracketRosterIsCurrent()){render();showToast("名單已變更，請重新抽籤",true);return;}
@@ -24241,6 +24248,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const isEarly=scheduledStart!=null && now<scheduledStart;
 
         const actuallyStart=()=>{
+          if(!canStartCurrentTournament()){showToast("此操作僅限房主或管理員執行。",true);return;}
           (async ()=>{
             // Re-check immediately before committing the lock. This narrows the
             // race window between the confirmation dialog and the final start.
