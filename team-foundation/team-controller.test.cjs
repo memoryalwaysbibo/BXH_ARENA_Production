@@ -84,3 +84,8 @@ test('member management verifies own team and refreshes after removal',async()=>
  assert.equal(reads,2);assert.equal(payload.reasonNote,'原因');assert.equal(c.snapshot().screen,'manage');
  const no=setup({mine:async()=>({team:{id:'t',role:'member'}})});assert.equal((await no.manage('t')).reason,'load-failed');
 });
+
+test('role assignment sends selected target and reloads member management',async()=>{
+ let reads=0,payload;const c=setup({mine:async()=>({team:{id:'t',role:'captain'}}),members:async()=>{reads++;return {id:'t',members:[]};},command:async p=>(payload=p,{ok:true})});
+ await c.manage('t');await c.operate('assign','t',{targetUid:'m',role:'elite'});assert.equal(payload.targetUid,'m');assert.equal(payload.role,'elite');assert.equal(reads,2);
+});
