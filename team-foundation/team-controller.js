@@ -74,7 +74,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
    const result=await api.command(payload);
    if(result?.ok!==true)throw Error('command-failed');
    pendingPayload=null;state.pending=false;
-   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId});else if(payload.action==='admission'||payload.action==='create'||payload.action==='transfer')await load('mine',{});else await search(state.query);}
+   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId});else if(payload.action==='admission'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
    return {ok:true};
   }catch(error){
    let rejected=rejection(error);
@@ -86,7 +86,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
  async function operate(action,teamId,extra={}){
   if(disposed||state.busy||state.loading)return {ok:false,reason:'busy'};
   if(pendingPayload)return {ok:false,reason:'pending-confirmation'};
-  if(!['join','apply','cancel','leave','remove','admission','create','approve','reject','assign','transfer'].includes(action))return {ok:false,reason:'invalid-action'};
+  if(!['join','apply','cancel','leave','remove','admission','create','approve','reject','assign','transfer','dissolve'].includes(action))return {ok:false,reason:'invalid-action'};
   let requestId;try{requestId=newRequestId();}catch(_){state.error='目前無法安全執行操作，請重新載入再試。';emit();return {ok:false,reason:'secure-id-unavailable'};}
   const payload={action:action==='join'?'apply':action,teamId,requestId};
   if(action==='admission')payload.policy=structuredClone(extra.policy);
