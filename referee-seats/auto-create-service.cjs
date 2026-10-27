@@ -36,6 +36,9 @@ function createHandler(db,{clock=Date.now}={}){
    }
    if(roomSnap.exists||pubSnap.exists)err('room-code-conflict');
    const original=d.privatePayload,publicOriginal=d.publicPayload;
+   // Preserve the existing isStaffOfficialCreatorData Rules boundary even
+   // though this trusted Admin SDK transaction bypasses client Rules.
+   if(user.role==='staff'&&(original.visibility!=='public'||publicOriginal.visibility!=='public'))err('permission-denied');
    // Admin SDK bypasses Firestore Rules: reproduce the production client-create
    // field boundary explicitly, rather than spreading arbitrary client keys.
    const safePrivateKeys=new Set(['data','updatedAt','visibility','createdBy','createdByName',
