@@ -99,3 +99,8 @@ test('successful leave and solo dissolution reload the no-team view',async()=>{
  for(const action of ['leave','dissolve']){let team={id:'t',role:action==='leave'?'member':'captain',memberCount:1};let payload;const c=setup({mine:async()=>({team}),command:async p=>{payload=p;team=null;return {ok:true};}});
  await c.mine();assert.equal((await c.operate(action,'t')).ok,true);assert.equal(payload.action,action);assert.equal(c.snapshot().screen,'mine');assert.equal(c.snapshot().team,null);}
 });
+
+test('ARENA callable bridge error suffix preserves confirmed rejection',async()=>{
+ const c=setup({command:async()=>{throw Object.assign(Error('team-full functions/failed-precondition'),{code:'functions/failed-precondition'});}});
+ assert.equal((await c.operate('apply','t')).reason,'rejected');assert.match(c.snapshot().error,/滿員/);assert.equal(c.snapshot().pending,false);
+});
