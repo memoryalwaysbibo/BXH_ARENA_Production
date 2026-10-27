@@ -43,7 +43,7 @@ function createHandler(db,{clock=Date.now}={}){
    const safePublicKeys=new Set(['bracketView','updatedAt','visibility','registrationEnabled','registrationOpenAt','registrationCloseAt','registrationStatus','capacity','waitlistEnabled','waitlistCapacity','confirmedCount','waitlistCount','registrationVisibility','publishedAt','eventDate','checkInAt','startAt','fee','timezone','tournamentPhase','location','battleMode','teamSize','playMode','formatType','name','ladderMode','targetGroup','participantNameMode','eventCancelled','cancellationDeadline','eventDescription','registrationNotes','eventAuthority','ownerUid','hostName','lastActivityAt','expiresAt','testMode','testLabel','createdByRole','testCreatedAt','testExpiresAt']);
    if(Object.keys(publicOriginal).some(k=>!safePublicKeys.has(k)))err('private-mirror-data');
    const mirrorText=JSON.stringify(mirror);
-   if(/"(?:uid|phone|email|assignedStaffUids|refereeSeatsV1|refereeStationAssignments|refereeStationUids|requests)"\\s*:/.test(mirrorText))err('private-mirror-data');
+   if(/"(?:uid|phone|email|assignedStaffUids|refereeSeatsV1|refereeStationAssignments|refereeStationUids|requests)"\s*:/.test(mirrorText))err('private-mirror-data');
    const result=initialize({state,ownerUid:uid,release:releaseSnap.data()});
    if(!result.ok)err(result.reason);
    const now=clock();
