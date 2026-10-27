@@ -57,3 +57,9 @@ test('member removal form enforces visible role limits and escapes names',()=>{
  const captain=ui.manageMembers({id:'t',viewerRole:'captain',members});assert.equal((captain.match(/data-team-form="remove"/g)||[]).length,2);assert.match(captain,/data-other-reason hidden/);assert.match(captain,/value="other"/);assert.doesNotMatch(captain,/<玩家>/);
  const deputy=ui.manageMembers({id:'t',viewerRole:'deputy',members});assert.equal((deputy.match(/data-team-form="remove"/g)||[]).length,1);assert.match(deputy,/data-target-uid="m"/);
 });
+
+test('only the captain gets role assignment forms for other members',()=>{
+ const members=[{uid:'c',name:'隊長',role:'captain'},{uid:'d',name:'副隊長',role:'deputy'},{uid:'m',name:'隊員',role:'member'}];
+ const cap=ui.manageMembers({id:'t',viewerRole:'captain',members});assert.equal((cap.match(/data-team-form="assign"/g)||[]).length,2);assert.match(cap,/副隊長最多 2 位/);assert.match(cap,/菁英隊員最多 3 位/);
+ assert.doesNotMatch(ui.manageMembers({id:'t',viewerRole:'deputy',members}),/data-team-form="assign"/);
+});
