@@ -36,7 +36,7 @@ function create({load,identity,onChange,schedule=fn=>setTimeout(fn,0)}){
   return `<section class="panel hunter-board" aria-label="獵人榜"><div class="hunter-board-heading"><div><div class="panel-title">獵人榜</div><p class="hint">以目前階級排序，同階級比較評級分；顯示分數相同並列，不分賽季。</p></div><button class="btn btn-ghost btn-sm" data-action="hunter-board-refresh" ${s.loading?'disabled':''}>重新整理</button></div>
    <div class="hunter-board-summary"><div><small>${d?.status==='partial'?'已核對最高階級':'最高階級'}</small><strong>${d?.highest?label(d.highest.tier):'待核對'}</strong></div><div><small>列榜人數</small><strong>${d?d.counts.ranked:'—'}</strong></div><div><small>我的排名</small><strong>${s.uid?(d?.mine?'第 '+d.mine.rank+' 名':'尚未列榜'):'登入後查看'}</strong></div></div>
    <p class="hint" role="status">${esc(notice)}${d?` 已完成核算 ${d.counts.ranked+d.counts.noHistory+d.counts.notPublic}／${d.counts.eligible} 位；未有有效戰績 ${d.counts.noHistory} 位，未有公開名稱 ${d.counts.notPublic} 位。`:''}</p>
-   <p class="hint">更新時間（台灣）：${esc(date)}。每 6 小時重新核算；此榜採公開玩家名稱，僅計正式積分賽有效戰績。累計有效對戰與獵人執照採計範圍一致，實力分採最近 20 場。生涯最高為歷史回算。</p>
+   <p class="hint">更新時間（台灣）：${esc(date)}。每 6 小時重新核算；此榜採公開玩家名稱，僅計已封存的正式積分賽有效戰績。累計有效對戰與獵人執照採計範圍一致，實力分採最近 20 場。生涯最高為歷史回算。</p>
    ${s.error?`<p class="auth-error" role="alert">${esc(s.error)}</p>`:''}
    ${s.rows.length?`<div class="rank-scroll"><table class="rank-table hunter-board-table"><caption class="sr-only">獵人階級與評級分排名</caption><thead><tr><th scope="col">排名</th><th scope="col">玩家</th><th scope="col">目前階級</th><th scope="col">評級分</th><th scope="col">實力分</th><th scope="col">累計有效對戰</th><th scope="col">生涯最高（回算）</th></tr></thead><tbody>${rows}</tbody></table></div>`:d&&!s.loading?'<div class="empty-state">本次尚無可列榜資料。</div>':''}
    ${s.loading?'<p class="hint" role="status">正在讀取獵人榜…</p>':''}
