@@ -13,7 +13,8 @@ function fixture(readEligibility){
  }};
  return {data,run:createMembershipService({db,clock:()=>100,readEligibility})};
 }
-const cmd=(run,actorUid,action,extra={})=>run({actorUid,action,teamId:'alpha',...extra});
+let sequence=0;
+const cmd=(run,actorUid,action,extra={})=>run({actorUid,action,teamId:'alpha',requestId:'test-operation-'+String(++sequence).padStart(8,'0'),...extra});
 test('create, apply, approve, transfer, leave preserve membership and experience',async()=>{
  const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
  await cmd(run,'player','apply');assert.equal((await cmd(run,'player','apply')).duplicate,true);
@@ -103,3 +104,5 @@ test('removal writes public history and separate private reason atomically',asyn
  assert.equal(histories.filter(x=>x.method==='approve').length,1);const removed=histories.find(x=>x.method==='remove');assert.equal(removed.subjectUid,'a');assert.equal(removed.actorRole,'captain');assert.equal(JSON.stringify(histories).includes('測試原因'),false);
  assert.equal([...data].filter(([key])=>key.includes('/historyReasons/'))[0][1].note,'測試原因');
 });
+
+test('same operation replays original success without duplicating history; changed payload conflicts',async()=>{const {run,data}=fixture();const req={requestId:'repeat-operation-000001',name:'Alpha'};await cmd(run,'captain','create',req);const before=JSON.stringify([...data]);assert.deepEqual(await cmd(run,'captain','create',req),{ok:true});assert.equal(JSON.stringify([...data]),before);await assert.rejects(cmd(run,'captain','create',{...req,name:'Other'}),/operation-id-conflict/);assert.equal(JSON.stringify([...data]),before);});
