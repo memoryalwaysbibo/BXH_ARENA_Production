@@ -32,3 +32,13 @@ test('mine resolves team only from authenticated actor, settings visible only to
  assert.equal((await f.read({actorUid:'outsider',action:'mine'})).team,null);
  f.data.get('teamsV1/t').memberUids=f.data.get('teamsV1/t').memberUids.filter(x=>x!=='d');await assert.rejects(f.read({actorUid:'d',action:'mine'}),/membership-unavailable/);
 });
+test('card team lookup honors player card privacy and reveals only public fields',async()=>{
+ const f=setup();f.data.get('teamsV1/t').name='測試隊';f.data.get('teamsV1/t').privateNote='SECRET';
+ await assert.rejects(f.read({actorUid:'outsider',action:'card-team',targetUid:'m'}),/permission-denied/);
+ assert.ok(!f.reads.includes('teamMembershipsV1/m'));
+ f.data.set('playerPrivacy/m',{cardPublic:true});const r=await f.read({actorUid:'outsider',action:'card-team',targetUid:'m'});
+ assert.deepEqual(r,{team:{id:'t',name:'測試隊',role:'member',level:2,selectedFrame:null}});assert.ok(!JSON.stringify(r).includes('SECRET'));
+ const own=await f.read({actorUid:'c',action:'card-team',targetUid:'c'});assert.equal(own.team.role,'captain');
+ f.data.set('playerPrivacy/solo',{cardPublic:true});assert.deepEqual(await f.read({actorUid:'outsider',action:'card-team',targetUid:'solo'}),{team:null});
+ f.data.get('teamsV1/t').memberUids=f.data.get('teamsV1/t').memberUids.filter(x=>x!=='m');await assert.rejects(f.read({actorUid:'outsider',action:'card-team',targetUid:'m'}),/membership-unavailable/);
+});
