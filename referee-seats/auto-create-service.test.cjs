@@ -123,3 +123,19 @@ test('forged nonempty legacy referee defaults remain rejected',async()=>{
   await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,...patch}}),/protected-create-field/);
  assert(!h.docs.has('tournaments/BXH-ABCD12'));
 });
+
+test('trusted create rejects unknown nested event-info keys in public mirror',async()=>{
+ const h=harness(),p=h.payload,mirror=JSON.parse(p.publicPayload.bracketView);
+ mirror.eventInfo={schemaVersion:'bxh.event-info.v2',venue:{name:'Arena',address:'',googleMapsUrl:'',navigationEnabled:false,internalToken:'secret'}};
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify(mirror)}}),/private-mirror-data/);
+ delete mirror.eventInfo.venue.internalToken;
+ mirror.eventInfo.standardTemplate={enabled:true,snapshot:{id:'bxh',rules:'ok',privateKey:'secret'}};
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify(mirror)}}),/private-mirror-data/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));
+});
+test('trusted create permits only whitelisted event-info keys',async()=>{
+ const h=harness(),p=h.payload,mirror=JSON.parse(p.publicPayload.bracketView);
+ mirror.eventInfo={schemaVersion:'bxh.event-info.v2',venue:{name:'Arena',address:'Tainan',googleMapsUrl:'',navigationEnabled:false},standardTemplate:{enabled:false}};
+ const out=await h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify(mirror)}});
+ assert.equal(out.ok,true);
+});

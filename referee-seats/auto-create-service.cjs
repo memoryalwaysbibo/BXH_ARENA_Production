@@ -85,6 +85,18 @@ function createHandler(db,{clock=Date.now}={}){
    const safeMirrorKeys=new Set(['courtLifecycleEpoch','callRevision','registrationRosterRevision','onsiteWaitlistRuntimeRevision','systemClosure','eventInfo','meta','testMode','testCreatedAt','testExpiresAtMs','players','teams','matches','courtAssignments','bracketSize','drawnAt','archiveStatus','startedAt','completedAt','archivedAt','ladderPointsAwarded','championId','runnerUpId','thirdId','fourthId','gfMatchId','gfResetMatchId','bronzeMatchId','rrRounds','teamResultRevision','teamStandings']);
    const safeMetaKeys=new Set(['name','location','date','battleMode','teamSize','playMode','formatType','format','ladderMode','startTime','checkin','bronzeMatch','stations','refereeStationRestrictionEnabled','refereeStationNames','eventAuthority','communityQuickRegistration']);
    if(Object.keys(mirror).some(k=>!safeMirrorKeys.has(k))||Object.keys(mirror.meta).some(k=>!safeMetaKeys.has(k)))err('private-mirror-data');
+   // Public event-info may contain freeform rule text, but never arbitrary
+   // object keys. Mirror the explicit frontend buildPublicEventInfo whitelist.
+   const only=(obj,keys)=>obj===null||obj===undefined||
+    (typeof obj==='object'&&!Array.isArray(obj)&&Object.keys(obj).every(k=>keys.includes(k)));
+   const info=mirror.eventInfo;
+   if(!only(info,['schemaVersion','venue','standardTemplate']))err('private-mirror-data');
+   if(info&&(!only(info.venue,['name','address','googleMapsUrl','navigationEnabled'])||
+      !only(info.standardTemplate,['enabled','templateId','version','versionLabel','snapshot'])||
+      !only(info.standardTemplate?.snapshot,['id','name','version','versionLabel','rules','notices','legalPositioning'])))
+      err('private-mirror-data');
+   // New rooms must have no active court routing or historical bracket data.
+   if(mirror.courtAssignments&&Object.keys(mirror.courtAssignments).length)err('mirror-mismatch');
    if(mirror.meta.playMode&&mirror.meta.playMode!=='standard')err('mirror-mismatch');
    if(mirror.meta.refereeStationRestrictionEnabled===true||Object.keys(mirror.meta.refereeStationNames||{}).length)err('mirror-mismatch');
    const mirrorText=JSON.stringify(mirror);
