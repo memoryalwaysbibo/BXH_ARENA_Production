@@ -15,7 +15,7 @@ function createReadService({db}){
     const own=await read(tx,'teamsV1/'+member.teamId);
     if(!own||own.status==='dissolved'||!own.memberUids?.includes(actorUid))throw Error('membership-unavailable');
     const role=own.captainUid===actorUid?'captain':own.roles?.[actorUid]||'member';
-    return {team:{id:member.teamId,name:own.name,role,admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
+    return {team:{id:member.teamId,name:own.name,role,memberCount:own.memberUids.length,admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
    }
    if(action==='members'){
     // Only a server-maintained public projection is exposed; raw team docs never returned.
