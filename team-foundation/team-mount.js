@@ -25,6 +25,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
   else if(action==='history-previous')await controller.historyPrevious();
   else if(action==='applications')await controller.applications(id);
   else if(action==='reload-applications')await controller.applications(controller.snapshot().applicationsTeamId);
+  else if(action==='transfer'){if(typeof root.confirm==='function'&&root.confirm('確定將隊長轉交給 '+button.dataset.targetName+'？轉交後你將成為一般隊員。'))await controller.operate('transfer',id,{targetUid:button.dataset.targetUid});}
   else if(action==='approve'||action==='reject')await controller.operate(action,id,{targetUid:button.dataset.targetUid});
   else if(action==='clear')await controller.clear();
   else if(action==='back')await controller.search(controller.snapshot().query);
