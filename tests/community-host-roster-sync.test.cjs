@@ -150,7 +150,7 @@ function startHarness(){
  ctx.state.players=[{id:'p1',name:'One',source:'online',checkedIn:true},{id:'p2',name:'Two',source:'online',checkedIn:true}];
  ctx.state.bracketSize=2;ctx.state.matches=[{id:'m',a:{type:'player',playerId:'p1'},b:{type:'player',playerId:'p2'},status:'ready'}];
  ctx.remote=clone(ctx.state);
- Object.assign(ctx,{eligiblePlayers:()=>ctx.state.players,sameStringSet:(a,b)=>a.size===b.size&&[...a].every(id=>b.has(id)),scheduledTournamentStartMs:()=>null,openModal:modal=>calls.modals.push(modal),rebuildCourtAssignments:()=>{},BATTLE_MODE_LABELS:{individual:'individual'},FORMAT_LABELS:{},PLAY_MODE_LABELS:{}});
+ Object.assign(ctx,{canStartCurrentTournament:()=>true,eligiblePlayers:()=>ctx.state.players,sameStringSet:(a,b)=>a.size===b.size&&[...a].every(id=>b.has(id)),scheduledTournamentStartMs:()=>null,openModal:modal=>calls.modals.push(modal),rebuildCourtAssignments:()=>{},BATTLE_MODE_LABELS:{individual:'individual'},FORMAT_LABELS:{},PLAY_MODE_LABELS:{}});
  for(const name of ['currentBracketParticipantIds','eligibleRosterIds','bracketRosterIsCurrent'])vm.runInContext(fn(name),ctx);
  vm.runInContext('function startTournament(){const action="start-tournament";'+block('  if(action==="start-tournament"){','  if(action==="reset-bracket"){')+'}',ctx);
  return h;
