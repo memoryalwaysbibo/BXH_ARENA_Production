@@ -32,3 +32,9 @@ test('application list safely presents review actions and remaining count notice
  const html=ui.applications({items:[{uid:'p',name:'<script>'}],teamId:'t',hasMore:true});
  assert.ok(!html.includes('<script>'));assert.match(html,/data-team-action="approve"/);assert.match(html,/data-team-action="reject"/);assert.match(html,/還有其他申請/);
 });
+
+test('application date and time are displayed separately in Taipei time',()=>{
+ const html=ui.applications({items:[{uid:'p',name:'小明',requestedAt:Date.parse('2026-10-27T07:30:00Z')}],teamId:'t'});
+ assert.match(html,/申請日期：2026\/10\/27<\/div><div>申請時間：15:30/);
+ assert.match(ui.applications({items:[{uid:'p',name:'小明'}],teamId:'t'}),/申請日期：未提供/);
+});
