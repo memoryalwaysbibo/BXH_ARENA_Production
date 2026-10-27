@@ -25,6 +25,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
   else if(action==='history-previous')await controller.historyPrevious();
   else if(action==='applications')await controller.applications(id);
   else if(action==='reload-applications')await controller.applications(controller.snapshot().applicationsTeamId);
+  else if(action==='leave'||action==='dissolve'){const message=action==='leave'?'確定退出這支戰隊？':'確定解散戰隊？解散後無法繼續使用這支戰隊。';if(typeof root.confirm==='function'&&root.confirm(message))await controller.operate(action,id);}
   else if(action==='transfer'){if(typeof root.confirm==='function'&&root.confirm('確定將隊長轉交給 '+button.dataset.targetName+'？轉交後你將成為一般隊員。'))await controller.operate('transfer',id,{targetUid:button.dataset.targetUid});}
   else if(action==='approve'||action==='reject')await controller.operate(action,id,{targetUid:button.dataset.targetUid});
   else if(action==='clear')await controller.clear();
