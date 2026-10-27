@@ -26,3 +26,8 @@ test('settings submission passes only selected policy and refreshes current team
  await c.mine();const policy={mode:'auto',minLadderTier:'黃金',minTier:'b'};await c.operate('admission','t',{policy,actorUid:'spoof'});
  assert.deepEqual(payload,{action:'admission',teamId:'t',policy});assert.equal(reads,2);assert.equal(c.snapshot().screen,'mine');
 });
+test('create uses authenticated server command, then reloads own team',async()=>{
+ let payload,hasTeam=false;const c=setup({mine:async()=>({team:hasTeam?{id:'new',name:'新戰隊',role:'captain'}:null}),command:async p=>{payload=p;hasTeam=true;return {ok:true};}});
+ await c.create();assert.equal(c.snapshot().screen,'create');assert.equal(c.snapshot().team,null);
+ await c.operate('create','new',{name:'新戰隊',actorUid:'forged'});assert.deepEqual(payload,{action:'create',teamId:'new',name:'新戰隊'});assert.equal(c.snapshot().screen,'mine');assert.equal(c.snapshot().team.name,'新戰隊');
+});
