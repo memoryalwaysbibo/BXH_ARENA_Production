@@ -4,14 +4,14 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 function setup(url='https://arena.bxh.com.tw/?checkin=BXH-ABC123&checkinToken=test') {
- let uid='u1',handler,resolve;
+ let uid='u1',handler,resolve,reject;
  const tasks=[],calls=[],location={href:url},loginNotice={hidden:true};
- const sandbox={URL,Date,crypto:require('node:crypto').webcrypto,location,history:{replaceState(a,b,url){location.href=url;}},document:{getElementById(id){return id==='qr-checkin-login-notice'?loginNotice:null;},addEventListener(type,fn){handler=fn;}},setTimeout(fn){tasks.push(fn);return tasks.length;},clearTimeout(){},window:{engagementService:{tournamentOperation(name,data){calls.push({name,data});return new Promise(r=>{resolve=r;});}}}};
+ const sandbox={URL,Date,crypto:require('node:crypto').webcrypto,location,history:{replaceState(a,b,url){location.href=url;}},document:{getElementById(id){return id==='qr-checkin-login-notice'?loginNotice:null;},addEventListener(type,fn){handler=fn;}},setTimeout(fn){tasks.push(fn);return tasks.length;},clearTimeout(){},window:{engagementService:{tournamentOperation(name,data){calls.push({name,data});return new Promise((r,j)=>{resolve=r;reject=j;});}}}};
  vm.createContext(sandbox);vm.runInContext(fs.readFileSync(__dirname+'/../modules/main-app/qr-checkin.js','utf8'),sandbox);
  const feature=sandbox.window.BXHQrCheckin;
  function bind(){feature.bind({state:()=>({cloudCode:'BXH-ABC123'}),uid:()=>uid,render(){},toast(){},qr(){}});}
  bind();
- return {feature,calls,tasks,location,loginNotice,setUid(value){uid=value;bind();},complete(result){resolve(result);},handler:()=>handler};
+ return {feature,calls,tasks,location,loginNotice,setUid(value){uid=value;bind();},complete(result){resolve(result);},fail(error){reject(error);},handler:()=>handler};
 }
 const flush=()=>new Promise(r=>setImmediate(r));
 test('logged-in QR visitor auto-submits once without confirmation button',async()=>{
@@ -74,4 +74,30 @@ test('busy submission rejects another credential without replacing pending URL',
  const x=setup();x.tasks.shift()();await flush();const original=x.location.href;
  assert.equal(x.feature.acceptUrl('https://arena.bxh.com.tw/?checkin=BXH-ABC123&checkinToken=other'),false);
  assert.equal(x.location.href,original);assert.equal(x.calls.length,1);
+});
+
+test('App Check failure tells a scanning player to retry verification without claiming missing manager rights',async()=>{
+ const x=setup();x.tasks.shift()();await flush();
+ const error=new Error('網站驗證未完成，請重新嘗試。 functions/permission-denied');
+ error.code='functions/permission-denied';error.details={reason:'app-check-unavailable'};x.fail(error);await flush();
+ const html=x.feature.renderEntry();assert.match(html,/網站驗證未完成/);assert.doesNotMatch(html,/管理權限|報到成功/);
+});
+test('generic permission denial during scan does not diagnose manager rights or mark attendance',async()=>{
+ const x=setup();x.tasks.shift()();await flush();const error=new Error('permission-denied');error.code='functions/permission-denied';x.fail(error);await flush();
+ const html=x.feature.renderEntry();assert.match(html,/報到請求未通過驗證/);assert.doesNotMatch(html,/管理權限|報到成功/);
+ assert.equal(new URL(x.location.href).searchParams.has('checkinToken'),true);
+ const pending=x.handler()({target:{closest:()=>({dataset:{qrCheckin:'retry'}})},preventDefault(){},stopImmediatePropagation(){}});
+ assert.equal(x.calls.length,2);assert.equal(x.calls[1].data.action,'scan');
+ x.complete({ok:true,name:'選手',currentAt:1800000000000});await pending;assert.match(x.feature.renderEntry(),/報到成功/);
+});
+test('manager permission denial keeps the management-specific explanation',async()=>{
+ const x=setup('https://arena.bxh.com.tw/');
+ const pending=x.handler()({target:{closest:()=>({dataset:{qrCheckin:'open'}})},preventDefault(){},stopImmediatePropagation(){}});
+ x.fail(new Error('permission-denied'));await pending;assert.match(x.feature.renderModal(),/您沒有本場報到管理權限/);
+});
+test('manager App Check failure is distinguished from missing manager rights',async()=>{
+ const x=setup('https://arena.bxh.com.tw/');
+ const pending=x.handler()({target:{closest:()=>({dataset:{qrCheckin:'open'}})},preventDefault(){},stopImmediatePropagation(){}});
+ const error=new Error('permission-denied');error.details={reason:'app-check-unavailable'};x.fail(error);await pending;
+ assert.match(x.feature.renderModal(),/網站驗證未完成/);assert.doesNotMatch(x.feature.renderModal(),/您沒有本場報到管理權限/);
 });
