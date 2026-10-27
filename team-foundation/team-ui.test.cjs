@@ -81,3 +81,8 @@ test('my team shows server progression and a bounded experience bar',()=>{
  const maximum=ui.myTeam({id:'t',name:'隊',role:'captain',memberCount:1,level:10,capacity:20,totalXp:63,currentXp:null,nextXp:null,unlockedFrames:[4,7,10]});
  assert.match(maximum,/已達最高等級/);assert.doesNotMatch(maximum,/<progress/);
 });
+test('only the captain can choose an unlocked frame and the saved choice is selected',()=>{
+ const team={id:'t',name:'隊伍',role:'captain',memberCount:3,level:7,capacity:16,currentXp:0,nextXp:9,unlockedFrames:[4,7],selectedFrame:7};
+ const html=ui.myTeam(team);assert.match(html,/data-team-form="frame"/);assert.match(html,/<option value="7" selected>/);assert.match(html,/<option value="10" disabled>/);assert.doesNotMatch(html.match(/<select name="frame">.*?<\/select>/)[0],/<option value="" selected>/);
+ const member=ui.myTeam({...team,role:'member'});assert.match(member,/目前戰隊框：LV 7/);assert.doesNotMatch(member,/data-team-form="frame"/);
+});
