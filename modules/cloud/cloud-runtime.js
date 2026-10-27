@@ -11,6 +11,10 @@
   };
   // ▲▲▲ 貼上設定值後存檔即可，不需要修改下面的程式碼 ▲▲▲
 
+  // Release switch: flip only after the isolated Callable source is verified
+  // and systemConfig/refereeSeatsV1.autoCreateEnabled is enabled.
+  const AUTO_SEAT_ROOM_CREATE_ROLLOUT = true;
+
   const ROOM_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 排除易混淆字元 O 0 I 1 L
   const ROOM_CODE_LENGTH = 6;
   const ROOM_CODE_PREFIX = "BXH-";
@@ -2713,6 +2717,39 @@
           updatedAt: Date.now(),
           visibility: lobbyVisibility
         }, publicRegistrationFields, testFields);
+        // Official individual rooms may switch to the trusted atomic create
+        // Callable ONLY after both releases are independently approved. Default
+        // remains OFF: never call an undeployed function in production.
+        // Once enabled, do not silently fall back to the legacy create path on
+        // any backend failure; that would create a room without three seats.
+        const trustedAutoSeatCreate = typeof AUTO_SEAT_ROOM_CREATE_ROLLOUT!=="undefined"
+          && AUTO_SEAT_ROOM_CREATE_ROLLOUT===true
+          && !partnerSession && !testerSession
+          && m.eventAuthority==="official"
+          && m.battleMode!=="team" && m.playMode!=="enchantment";
+        if(trustedAutoSeatCreate){
+          if(!creatorUid||!functionsHandle||!fnx||typeof fnx.httpsCallable!=="function")
+            throw Object.assign(new Error("auto-seat-create-unavailable"),{code:"auto-seat-create-unavailable"});
+          const operationId=(typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function")
+            ?crypto.randomUUID():"";
+          if(!operationId)throw Object.assign(new Error("auto-seat-create-unavailable"),{code:"auto-seat-create-unavailable"});
+          const create=fnx.httpsCallable(functionsHandle,"createOfficialRoomWithRefereeSeats",{timeout:30000});
+          // A timeout may occur after the server commits both documents.
+          // Retry once with the EXACT same code and operationId so the server
+          // can return its idempotent receipt without creating another room.
+          const payload={code,operationId,privatePayload,publicPayload};
+          let response;
+          try{response=await create(payload);}
+          catch(error){
+            const transient=String(error?.code||"");
+            if(!["functions/unavailable","functions/deadline-exceeded","unavailable","deadline-exceeded"].includes(transient))throw error;
+            response=await create(payload);
+          }
+          if(response?.data?.ok!==true||response.data.code!==code)
+            throw Object.assign(new Error("auto-seat-create-unverified"),{code:"auto-seat-create-unverified"});
+          if(typeof window!=="undefined")window.__BXH_LAST_CLOUD_ERROR_CODE=null;
+          return code;
+        }
         // Both documents must be created in one atomic batch. Beta Rules validate
         // the public mirror with getAfter(), which only sees the paired private
         // tournament when both writes are in the same batch.
