@@ -75,3 +75,9 @@ test('exit controls respect captain and solo dissolution conditions',()=>{
  const solo=ui.myTeam({id:'t',role:'captain',memberCount:1});assert.match(solo,/data-team-action="dissolve"/);assert.doesNotMatch(solo,/data-team-action="leave"/);
  const group=ui.myTeam({id:'t',role:'captain',memberCount:2});assert.doesNotMatch(group,/data-team-action="dissolve"/);assert.match(group,/僅剩隊長/);
 });
+test('my team shows server progression and a bounded experience bar',()=>{
+ const html=ui.myTeam({id:'t',name:'試驗隊',role:'member',memberCount:3,level:2,capacity:11,totalXp:6,currentXp:3,nextXp:4,unlockedFrames:[]});
+ assert.match(html,/LV 2/);assert.match(html,/成員 3／11/);assert.match(html,/<progress value="3" max="4">/);assert.match(html,/LV4、LV7、LV10/);
+ const maximum=ui.myTeam({id:'t',name:'隊',role:'captain',memberCount:1,level:10,capacity:20,totalXp:63,currentXp:null,nextXp:null,unlockedFrames:[4,7,10]});
+ assert.match(maximum,/已達最高等級/);assert.doesNotMatch(maximum,/<progress/);
+});
