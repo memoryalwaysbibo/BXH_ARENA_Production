@@ -13,18 +13,20 @@ function createAutoDissolver({db,clock=Date.now,newId=randomUUID}){
    const team=snap.data(),now=clock();
    if(team.status!=='active'||!Number.isSafeInteger(team.dissolveAt)||team.dissolveAt>now||!canDissolve(team,null,now,{automatic:true}))return false;
    const membershipRef=db.doc('teamMembershipsV1/'+team.captainUid),membership=await tx.get(membershipRef);
+   const profile=await tx.get(db.doc('publicPlayers/'+team.captainUid));
+   const publicName=profile.exists&&typeof profile.data().publicName==='string'?profile.data().publicName.trim():'';
    if(!membership.exists||membership.data().teamId!==teamId)throw Error('membership-inconsistent');
    tx.update(teamRef,{status:'dissolved',dissolvedAt:now,dissolvedBy:'system',dissolveAt:null});
    tx.delete(membershipRef);
-   tx.create(db.doc('teamsV1/'+teamId+'/history/'+historyId),{subjectUid:team.captainUid,subjectName:'隊長',actorUid:'system',actorName:'系統',actorRole:'system',method:'auto-dissolve',occurredAt:now});
+   tx.create(db.doc('teamsV1/'+teamId+'/history/'+historyId),{subjectUid:team.captainUid,subjectName:publicName||'隊長',actorUid:'system',actorName:'系統',actorRole:'system',method:'auto-dissolve',occurredAt:now});
    return true;
   });
  }
  async function runBatch(){
   const now=clock();
   const pending=await db.collection('teamsV1').where('status','==','active').where('dissolveAt','<=',now).orderBy('dissolveAt').limit(BATCH_LIMIT).get();
-  let dissolved=0;for(const doc of pending.docs)if(await dissolveCandidate(doc.id))dissolved++;
-  return {examined:pending.docs.length,dissolved,mayHaveMore:pending.docs.length===BATCH_LIMIT};
+  let dissolved=0,failed=0;for(const doc of pending.docs){try{if(await dissolveCandidate(doc.id))dissolved++;}catch(_){failed++;}}
+  return {examined:pending.docs.length,dissolved,failed,mayHaveMore:pending.docs.length===BATCH_LIMIT};
  }
  return {dissolveCandidate,runBatch};
 }
