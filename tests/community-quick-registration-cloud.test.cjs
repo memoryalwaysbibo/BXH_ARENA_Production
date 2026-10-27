@@ -576,3 +576,38 @@ test('finite and unmarked legacy promotions keep the existing client transaction
   assert.equal(legacy.trustedCalls.length, 0);
 });
 
+
+test('actual production official createRoom payload is accepted by trusted three-seat candidate',async()=>{
+  const h=harness();
+  h.ctx.generateRoomCode=()=> 'BXH-AUTO1';
+  h.ctx.userProfile={role:'staff',active:true,displayName:'Local Host'};
+  const data=state({eventAuthority:'official',communityQuickRegistration:false,stations:3,battleMode:'individual',playMode:'standard'});
+  assert.equal(await h.api.createRoom(data),'BXH-AUTO1');
+  const originalPrivate=clone(h.docs.get('tournaments/BXH-AUTO1'));
+  const originalPublic=clone(h.docs.get('publicTournaments/BXH-AUTO1'));
+  assert(originalPrivate&&originalPublic,'legacy create must produce both documents');
+  const {createHandler}=require('../referee-seats/auto-create-service.cjs');
+  const docs=new Map([
+    ['users/local-host',{active:true,isTestAccount:false,role:'staff',realName:'Local Host'}],
+    ['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true}]
+  ]);
+  const db={doc:path=>({path}),runTransaction:async fn=>{
+    const pending=[];
+    const result=await fn({
+      get:async ref=>({exists:docs.has(ref.path),data:()=>clone(docs.get(ref.path))}),
+      create:(ref,payload)=>pending.push([ref.path,clone(payload)])
+    });
+    for(const [path,payload] of pending){assert(!docs.has(path));docs.set(path,payload);}
+    return result;
+  }};
+  const trusted=createHandler(db,{clock:()=>NOW});
+  const result=await trusted({auth:{uid:'local-host'},data:{
+    code:'BXH-AUTO1',operationId:'real-client-payload-test-001',
+    privatePayload:originalPrivate,publicPayload:originalPublic
+  }});
+  assert.equal(result.ok,true);
+  assert.equal(docs.get('tournaments/BXH-AUTO1').refereeSeatsV1.version,1);
+  assert.equal(Object.keys(docs.get('tournaments/BXH-AUTO1').refereeSeatsV1.courts).length,3);
+  assert.equal(JSON.parse(docs.get('tournaments/BXH-AUTO1').data).meta.refereeSeatsV1.version,1);
+  assert.equal(JSON.parse(docs.get('publicTournaments/BXH-AUTO1').bracketView).meta.refereeSeatNames['1'].main,null);
+});
