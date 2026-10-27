@@ -1,8 +1,11 @@
 (function(){
   'use strict';
   let ctx=null,boundKey='',modal=false,busy=false,settings=null,rows=[],message='',timer=null,scanStarted='',scanResult=null,scanBusy=false;
-  const errorText=e=>{
-    const raw=String(e?.message||e||'');
+  const errorText=(e,action='manage')=>{
+    const reason=e?.details&&typeof e.details==='object'?e.details.reason:e?.details;
+    const raw=[e?.message||e,reason,e?.code].filter(Boolean).map(String).join(' ');
+    if(raw.includes('app-check-unavailable'))return '網站驗證未完成，請重新整理後再掃描現場 QR；若仍無法報到，請洽工作人員協助。';
+    if(raw.includes('permission-denied')&&action==='scan')return '報到請求未通過驗證，請重新整理後再掃描現場 QR；若仍無法報到，請洽工作人員協助。';
     for(const [key,label] of Object.entries({
       'not-confirmed':'您目前不在正取名單，請洽現場工作人員協助。',
       'ambiguous-player':'帳號對應多位選手，請洽工作人員人工報到。',
@@ -94,7 +97,7 @@
       if(r.ok!==true)throw Error('not-confirmed');
       scanResult=r;
       const url=new URL(location.href);url.searchParams.delete('checkin');url.searchParams.delete('checkinToken');history.replaceState(null,'',url.href);
-    }catch(error){if(identity()===uid)scanResult={error:errorText(error)};}
+    }catch(error){if(identity()===uid)scanResult={error:errorText(error,'scan')};}
     finally{scanBusy=false;ctx.render();}
   }
   function renderEntry(){
