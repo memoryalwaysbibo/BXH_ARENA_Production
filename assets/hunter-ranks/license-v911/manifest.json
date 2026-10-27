@@ -1,0 +1,70 @@
+{
+  "sourceHtmlSha256": "24b4e9f648a975537df61059cc6a1fbde4248ce251741d518094b00669871c34",
+  "source": "User-attached Hunter-License-Preview-v9.1.1.zip; embedded PNGs preserved byte-for-byte",
+  "files": [
+    {
+      "tier": "ungraded",
+      "bytes": 1390936,
+      "sha256": "887ed2f9441fc40e39a0672d5dc2155503bef67e1aaa65b1c1162833ebe6271a",
+      "mode": "RGBA",
+      "width": 2172,
+      "height": 724
+    },
+    {
+      "tier": "e",
+      "bytes": 1271772,
+      "sha256": "47c876b1cb5af531c1b8a6612b88778f1618e35a09998df21eb516d4978a561b",
+      "mode": "RGBA",
+      "width": 2172,
+      "height": 724
+    },
+    {
+      "tier": "d",
+      "bytes": 1351856,
+      "sha256": "b751bce251e1d8f2f1f65fbce62ef46e4e01dd020075015344f9b3087119fa52",
+      "mode": "RGBA",
+      "width": 2172,
+      "height": 724
+    },
+    {
+      "tier": "c",
+      "bytes": 1273173,
+      "sha256": "28614f618524726d769925f171450a8e3aa27e40c3f0ce35b267b3cd1ff73d60",
+      "mode": "RGBA",
+      "width": 2172,
+      "height": 724
+    },
+    {
+      "tier": "b",
+      "bytes": 1243482,
+      "sha256": "15a0b73caf1b63b44a31fa7851ad3bd2845364479fd3e8e55d2984a43e813c74",
+      "mode": "RGBA",
+      "width": 2135,
+      "height": 736
+    },
+    {
+      "tier": "a",
+      "bytes": 1423046,
+      "sha256": "e6574a545a45d735cff6c52a8419e1bfdb5fc17a5d1d4efc6dfa69fd5828c56d",
+      "mode": "RGBA",
+      "width": 2172,
+      "height": 724
+    },
+    {
+      "tier": "s",
+      "bytes": 1368066,
+      "sha256": "05e60a60bcd00d87856b1083df0cb33e845925ebc3edced363b5612dc4038d06",
+      "mode": "RGBA",
+      "width": 2172,
+      "height": 724
+    },
+    {
+      "tier": "national",
+      "bytes": 1894405,
+      "sha256": "9adfa18e9d639421cd92741859a3a99f52d1bddfa726279cf7016c8917ec95f6",
+      "mode": "RGBA",
+      "width": 1983,
+      "height": 793
+    }
+  ]
+}
