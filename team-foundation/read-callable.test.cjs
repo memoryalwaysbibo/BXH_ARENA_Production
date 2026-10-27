@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');const {createReadHandler}=require('./read-callable.cjs');
 class HttpsError extends Error{constructor(code,message){super(message);this.code=code;}}
-function fixture(){let transactions=0;const db={doc:p=>p,runTransaction:async fn=>{transactions++;return fn({get:async path=>({exists:path==='teamsPublicV1/a',data:()=>({name:'Alpha',members:[{uid:'c',name:'C',role:'captain',secret:'private'}]})})});}};return {handler:createReadHandler({db,auth:{getUser:async()=>({})},HttpsError,enabled:true}),get transactions(){return transactions;}};}
+function fixture(){let transactions=0;const db={doc:p=>p,runTransaction:async fn=>{transactions++;return fn({get:async path=>({exists:true,data:()=>({'teamsPublicV1/a':{name:'Alpha',hunterGeneration:'g',ladderSeason:'S1',members:[{uid:'c',name:'C',role:'captain',secret:'private'}]},'teamsV1/a':{status:'active',captainUid:'c',memberUids:['c']},'hunterLeaderboardMeta/current':{generation:'g'},'ladderSystem/current':{currentSeason:'S1'}}[path])})});}};return {handler:createReadHandler({db,auth:{getUser:async()=>({})},HttpsError,enabled:true}),get transactions(){return transactions;}};}
 const req=()=>({app:{appId:'verified'},auth:{uid:'real',token:{}},data:{action:'members',teamId:'a'}});
 test('read boundary authorizes signed-in public member lookup and preserves allowlist',async()=>{const f=fixture();const r=await f.handler(req());assert.equal(r.name,'Alpha');assert.ok(!JSON.stringify(r).includes('private'));assert.equal(f.transactions,1);});
 test('forged viewer identity and missing Auth/AppCheck cannot read',async()=>{
