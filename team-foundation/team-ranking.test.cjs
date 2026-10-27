@@ -1,0 +1,10 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');const {create}=require('./team-ranking.js');
+const esc=x=>String(x).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+test('ranking loads only after signed-in render, shows partial warning and escapes names',async()=>{
+ let uid=null,calls=0;const c=create({identity:()=>uid,read:async()=>{calls++;return {items:[{rank:1,name:'<隊>',captainName:'A',memberCount:2,strength:500}],total:1,partial:true,excluded:1};}});
+ assert.match(c.render(esc),/請先登入/);assert.equal(calls,0);uid='u';c.render(esc);await new Promise(setImmediate);const html=c.render(esc);assert.equal(calls,1);assert.match(html,/&lt;隊&gt;/);assert.match(html,/名次可能變動/);
+});
+test('changing account before response discards old ranking',async()=>{
+ let uid='a',resolve;const c=create({identity:()=>uid,read:()=>new Promise(r=>{resolve=r;})});c.render(esc);uid=null;resolve({items:[{name:'OLD'}],total:1,excluded:0});await new Promise(setImmediate);assert.match(c.render(esc),/請先登入/);assert.doesNotMatch(c.render(esc),/OLD/);
+});
