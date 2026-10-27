@@ -13,7 +13,7 @@
 
   // Release switch: flip only after the isolated Callable source is verified
   // and systemConfig/refereeSeatsV1.autoCreateEnabled is enabled.
-  const AUTO_SEAT_ROOM_CREATE_ROLLOUT = false;
+  const AUTO_SEAT_ROOM_CREATE_ROLLOUT = true;
 
   const ROOM_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 排除易混淆字元 O 0 I 1 L
   const ROOM_CODE_LENGTH = 6;
