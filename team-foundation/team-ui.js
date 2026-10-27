@@ -31,7 +31,7 @@ function applicationDateTime(value){
 }
 function applications({items=[],hasMore=false,teamId}){
  const rows=items.map(a=>{const when=applicationDateTime(a.requestedAt);return '<li><span>'+esc(a.name)+'</span><div>申請日期：'+esc(when.date)+'</div><div>申請時間：'+esc(when.time)+'</div> <button type="button" data-team-action="approve" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">核准</button> <button type="button" data-team-action="reject" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">拒絕</button></li>';}).join('');
- return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button>'+(items.length?'<ul>'+rows+'</ul>':'<p>目前沒有待審核的申請。</p>')+(hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
+ return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button><button type="button" data-team-action="reload-applications">重新整理名單</button>'+(items.length?'<ul>'+rows+'</ul>':'<p>目前沒有待審核的申請。</p>')+(hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
 }
 function createTeam(team){
  if(team)return '<section class="bxh-team-ui"><h2>建立戰隊</h2><p>你已有所屬戰隊，請先退出後再建立。</p><button type="button" data-team-action="tab" data-value="mine">查看我的戰隊</button></section>';
