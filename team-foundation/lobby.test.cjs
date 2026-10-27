@@ -13,12 +13,12 @@ test('join statuses respect membership, pending, capacity and auto eligibility',
  const t=team();assert.equal(joinState(t).action,'join');assert.equal(joinState(t,{membershipTeamId:'a'}).action,'view');
  assert.equal(joinState(t,{membershipTeamId:'b'}).label,'已有所屬戰隊');assert.equal(joinState(t,{pendingTeamIds:['a']}).label,'審核中');
  assert.equal(joinState({...t,memberCount:10}).label,'已滿員');
- const restricted={...t,admission:{mode:'auto',minPoints:500,minTier:'b'}};
- assert.equal(joinState(restricted).label,'資格待確認');assert.equal(joinState(restricted,{player:{ladderPoints:499,hunterTier:'b'}}).label,'未達條件');
+ const restricted={...t,admission:{mode:'auto',minLadderTier:'黃金',minTier:'b'}};
+ assert.equal(joinState(restricted).label,'資格待確認');assert.equal(joinState(restricted,{player:{ladderPoints:299,hunterTier:'b'}}).label,'未達條件');
  assert.equal(joinState({...restricted,admission:{...restricted.admission,mode:'review'}}).action,'apply');
 });
 test('search and combined filters work for already affiliated viewers',()=>{
- const a=team(),b={...a,id:'b',name:'隆隆戰隊',captainName:'小恩',strength:2800,admission:{mode:'review',minPoints:null,minTier:null}};
+ const a=team(),b={...a,id:'b',name:'隆隆戰隊',captainName:'小恩',strength:2800,admission:{mode:'review',minLadderTier:null,minTier:null}};
  assert.equal(browseLobby([a,b],{query:'小恩'},{}).items[0].id,'b');
  assert.equal(browseLobby([a,b],{mode:'auto',recruitment:'open'},{membershipTeamId:'b'}).items[0].join.disabled,true);
  assert.equal(browseLobby([a,b],{pendingOnly:true},{pendingTeamIds:['b']}).total,1);
