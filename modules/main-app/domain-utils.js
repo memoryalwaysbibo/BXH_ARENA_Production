@@ -23,7 +23,16 @@ function hunterRecordIsTest(record){
   const code=String(record.eventCode||'').trim().toUpperCase();
   return record.testMode===true||record.eventAuthority==='test'||Object.prototype.hasOwnProperty.call(HUNTER_LEGACY_TEST_EVENTS,code);
 }
-Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{hunterRecordIsTest});
+// Owner confirmed on 2026-10-27 that this specific legacy event was
+// authorized for deletion. Exclude retained remnants by immutable room code;
+// neither the date nor the event name grants an exclusion.
+const HUNTER_OWNER_REMOVED_EVENTS=Object.freeze({'BXH-F8FQQR':'owner-authorized-deletion-20261027'});
+function hunterRecordIsRemoved(record){
+  const code=String(record?.eventCode||'').trim().toUpperCase();
+  return Object.prototype.hasOwnProperty.call(HUNTER_OWNER_REMOVED_EVENTS,code);
+}
+function hunterRecordIsExcluded(record){return hunterRecordIsTest(record)||hunterRecordIsRemoved(record);}
+Object.assign(window.BXHDomainUtils||(window.BXHDomainUtils={}),{hunterRecordIsTest,hunterRecordIsRemoved,hunterRecordIsExcluded});
 
 function canonicalPublicTournamentPhase(t){
   if(!t) return "waiting";

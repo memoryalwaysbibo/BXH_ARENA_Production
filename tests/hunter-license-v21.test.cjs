@@ -95,3 +95,16 @@ test('old server current grade cannot override the new promotion policy; permane
  assert.equal(V.verifiedSnapshot(old).current,null);assert.equal(V.displayGrade(o,old).tier,'a');assert.equal(V.displayHighest(o,old),'B 級獵人');
  old.promotionPolicy=V.promotionPolicy;assert.equal(V.verifiedSnapshot(old).current.tier,'b');assert.equal(V.verifiedSnapshot(V.verifiedSnapshot(old)).current.tier,'b');
 });
+
+test('owner-authorized deleted event is excluded from XP, strength, lifetime and peak without excluding its date or name',()=>{
+ const V=setup(),clean=[record(1),record(2)],baseline=V.overview(clean);
+ for(const win of [true,false]){
+  const result=V.overview([...clean,record(3,win,{eventCode:' bxh-f8fqqr ',eventAuthority:'official',testMode:false})]);
+  for(const key of ['growth','analysis','grade','life','highest'])assert.deepEqual(result[key],baseline[key]);
+ }
+ const c=vm.createContext({window:{}});vm.runInContext(fs.readFileSync('modules/main-app/domain-utils.js','utf8'),c);
+ assert.equal(c.window.BXHDomainUtils.hunterRecordIsRemoved({eventCode:'BXH-F8FQQR'}),true);
+ assert.equal(c.window.BXHDomainUtils.hunterRecordIsTest({eventCode:'BXH-F8FQQR'}),false);
+ assert.equal(c.window.BXHDomainUtils.hunterRecordIsRemoved({eventCode:'BXH-OTHER',eventDate:'2026-09-21',eventName:'9/21 BXH & okay 交流賽',ownerRemoved:true}),false);
+ assert(V.overview([record(4,true,{eventCode:'BXH-OTHER',eventDate:'2026-09-21',completedAt:Date.parse('2026-09-21T12:00:00+08:00')})]).growth.xp>0);
+});

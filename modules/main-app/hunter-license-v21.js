@@ -23,7 +23,7 @@ function opponentKey(r){
   return r.opponent?.accountLinked===true?String(r.opponent.playerId||'').trim():'';
 }
 function valid(r){
-  return U.hunterRecordMode(r)==='standard'&&r.eventAuthority==='official'&&!window.BXHDomainUtils.hunterRecordIsTest(r)&&
+  return U.hunterRecordMode(r)==='standard'&&r.eventAuthority==='official'&&!window.BXHDomainUtils.hunterRecordIsExcluded(r)&&
     !['team','team_battle','relay'].includes(r.formatType)&&(!r.battleMode||r.battleMode==='individual')&&
     U.hunterRecordTimestamp(r)>=START&&typeof r.isWin==='boolean'&&
     U.hunterRoundIntegrity(r).ok&&U.hunterRoundIntegrity(r).validRounds>0&&U.hunterScoringBreakdown(r).available;
@@ -79,7 +79,7 @@ function gradeOf(analysis,level,life,complete){
 function overview(records,_analyze,complete=true){
   const all=U.hunterUniqueRecords(records),rows=ordered(all);
   // Keep the established event-XP curve, but test events cannot grant XP.
-  const growth=U.hunterBuildGrowth(all.filter(r=>!window.BXHDomainUtils.hunterRecordIsTest(r))),analysis=strength(rows.slice(-WINDOW)),life=experience(rows);
+  const growth=U.hunterBuildGrowth(all.filter(r=>!window.BXHDomainUtils.hunterRecordIsExcluded(r))),analysis=strength(rows.slice(-WINDOW)),life=experience(rows);
   const grade=gradeOf(analysis,growth.level,life,complete);
   const next=RULES[rank(grade.tier)+1]||null;
   const fields=[['score','評級分',grade.score],['ability','最近 20 場實力分',analysis.overall],['matches','生涯有效對戰',life.matches],['events','不同賽事',life.events],['opponents','不同對手（已核對）',life.opponents],['medium','中型以上賽事（96 人以上）',life.medium+life.large],['large','大型賽事（128 人以上）',life.large]];
@@ -87,7 +87,7 @@ function overview(records,_analyze,complete=true){
   // Historical replay is a preview/backfill, not an irreversible server grant.
   let highest={tier:complete?'ungraded':'pending',label:complete?'未分級':'資料待核對',at:null};
   if(complete){
-    const timeline=all.filter(r=>!window.BXHDomainUtils.hunterRecordIsTest(r)&&U.hunterRecordTimestamp(r)>0).sort((a,b)=>U.hunterRecordTimestamp(a)-U.hunterRecordTimestamp(b)||U.hunterEvidenceMatchKey(a).localeCompare(U.hunterEvidenceMatchKey(b)));
+    const timeline=all.filter(r=>!window.BXHDomainUtils.hunterRecordIsExcluded(r)&&U.hunterRecordTimestamp(r)>0).sort((a,b)=>U.hunterRecordTimestamp(a)-U.hunterRecordTimestamp(b)||U.hunterEvidenceMatchKey(a).localeCompare(U.hunterEvidenceMatchKey(b)));
     const played=[],xpEvents=new Set(),lifeEvents=new Map(),lifeOpponents=new Set();
     let xp=0;
     for(let i=0;i<timeline.length;){
