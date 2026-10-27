@@ -5,7 +5,7 @@ const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value)
 // actorUid MUST be provided by the server Auth boundary, not client JSON.
 function createReadService({db}){
  const read=async(tx,path)=>{const snap=await tx.get(db.doc(path));return snap.exists?snap.data():null;};
- return async({actorUid,action,teamId,historyId})=>{
+ return async({actorUid,action,teamId,historyId,cursor})=>{
   if(!valid(actorUid)||!['members','history','reason','mine','applications'].includes(action)||(action!=='mine'&&!valid(teamId))||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
   return db.runTransaction(async tx=>{
    if(action==='mine'){
@@ -35,11 +35,12 @@ function createReadService({db}){
     return {items:page.map((s,i)=>({uid:s.id,name:typeof profiles[i]?.publicName==='string'&&profiles[i].publicName.trim()?profiles[i].publicName.trim():'玩家',requestedAt:s.data().requestedAt})),hasMore:snaps.docs.length>20};
    }
    if(action==='history'){
+    if(cursor!==undefined&&cursor!==null&&!valid(cursor))throw Error('invalid-history-cursor');
     if(team?.status==='dissolved'||membership?.teamId!==teamId||!team?.memberUids?.includes(actorUid))throw Error('permission-denied');
-    // Bounded newest page. Pagination support is intentionally not implied.
-    const query=db.collection('teamsV1/'+teamId+'/history').orderBy('occurredAt','desc').limit(50);
-    const snaps=await tx.get(query);
-    return {items:snaps.docs.map(s=>({id:s.id,...historyView(s.data())})),pageLimit:50};
+    let query=db.collection('teamsV1/'+teamId+'/history').orderBy('occurredAt','desc');
+    if(cursor){const anchor=await tx.get(db.doc('teamsV1/'+teamId+'/history/'+cursor));if(!anchor.exists)throw Error('invalid-history-cursor');query=query.startAfter(anchor);}
+    const snaps=await tx.get(query.limit(51));const page=snaps.docs.slice(0,50);
+    return {items:page.map(s=>({id:s.id,...historyView(s.data())})),pageLimit:50,nextCursor:snaps.docs.length>50?page[page.length-1].id:null};
    }
    const record=await read(tx,'teamsV1/'+teamId+'/history/'+historyId);
    if(!record)throw Error('history-not-found');
