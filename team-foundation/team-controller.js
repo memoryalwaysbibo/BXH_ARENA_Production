@@ -59,7 +59,8 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
    if(!disposed&&generation===requestGeneration){if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId});else if(payload.action==='admission'||payload.action==='create')await load('mine',{});else await search(state.query);}
    return {ok:true};
   }catch(error){
-   const rejected=rejection(error);
+   let rejected=rejection(error);
+   if(payload.action==='approve'&&error?.message==='already-in-team'&&rejected)rejected='申請者已有戰隊，無法核准加入。';
    if(!disposed){pendingPayload=rejected?null:payload;state.pending=!rejected;state.error=rejected||'操作結果尚未確認，可重試同一筆操作。';emit();}
    return {ok:false,reason:rejected?'rejected':'unconfirmed'};
   }finally{if(!disposed){state.busy=false;emit();}}
