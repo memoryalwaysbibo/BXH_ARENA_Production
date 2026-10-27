@@ -9,7 +9,7 @@ function createReadHandler({db,auth,HttpsError,enabled=false}){
   const uid=request.auth?.uid;if(!uid)fail('unauthenticated','sign-in-required');
   const data=request.data;
   if(!data||!['members','history','reason','list','mine','applications'].includes(data.action))fail('invalid-argument','invalid-team-read');
-  const allowed=data.action==='reason'?['action','teamId','historyId']:data.action==='list'?['action','query']:data.action==='mine'?['action']:['action','teamId'];
+  const allowed=data.action==='reason'?['action','teamId','historyId']:data.action==='list'?['action','query']:data.action==='mine'?['action']:data.action==='history'?['action','teamId','cursor']:['action','teamId'];
   if(Object.keys(data).some(k=>!allowed.includes(k)))fail('invalid-argument','unexpected-read-field');
   let user;try{user=await auth.getUser(uid);}catch(_){fail('unauthenticated','account-unavailable');}
   if(user.disabled)fail('permission-denied','account-disabled');
@@ -20,7 +20,7 @@ function createReadHandler({db,auth,HttpsError,enabled=false}){
    if(error.message==='projection-stale')fail('unavailable','team-data-refreshing');
    if(['invalid-list-query','invalid-pagination-or-level','invalid-filter'].includes(error.message))fail('invalid-argument','invalid-team-list');
    if(['team-list-capacity-exceeded','source-unavailable'].includes(error.message))fail('unavailable','team-list-unavailable');
-   if(error.message==='invalid-read')fail('invalid-argument','invalid-team-read');
+   if(['invalid-read','invalid-history-cursor'].includes(error.message))fail('invalid-argument','invalid-team-read');
    if(['team-not-found','history-not-found'].includes(error.message))fail('not-found',error.message);
    fail('internal','team-read-unavailable');
   }
