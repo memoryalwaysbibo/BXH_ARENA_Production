@@ -1,6 +1,8 @@
 (function(root){
 'use strict';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ladderTiers=['未定級','青銅','白銀','黃金','白金','鑽石','大師','宗師'];
+const hunterTiers=[['ungraded','未分級'],['e','E級'],['d','D級'],['c','C級'],['b','B級'],['a','A級'],['s','S級'],['national','國家級']];
 const roleNames={captain:'隊長',deputy:'副隊長',elite:'菁英隊員',member:'一般隊員'};
 function tabs(active){return '<nav aria-label="戰隊功能">'+[['lobby','戰隊大廳'],['mine','我的戰隊'],['create','建立戰隊']].map(([key,label])=>'<button type="button" data-team-action="tab" data-value="'+key+'" aria-pressed="'+(active===key)+'">'+label+'</button>').join('')+'</nav>';}
 function rankingTabs(active){return '<nav aria-label="排行榜種類">'+[['ladder','天梯'],['hunter','獵人'],['team','戰隊']].map(([key,label])=>'<button type="button" data-ranking-value="'+key+'" aria-pressed="'+(key===active)+'">'+label+'</button>').join('')+'</nav>';}
@@ -15,8 +17,12 @@ function lobby({items=[],total=0,query='',mode='all',recruitment='all',loading=f
  return '<section class="bxh-team-ui"><h2>戰隊大廳</h2>'+filters+(partial?'<p role="status">部分戰隊資料更新中（'+esc(staleCount)+' 支），請稍後再查看。</p>':'')+(!loading&&!error?'<p>符合條件：'+esc(total)+' 支戰隊</p>':'')+content+'</section>';
 }
 function publicMembers(team){return '<section class="bxh-team-ui"><h2>'+esc(team.name)+'</h2><h3>戰隊成員</h3><div class="team-table-scroll"><table><thead><tr><th>玩家</th><th>職位</th><th>天梯積分</th><th>獵人排位</th></tr></thead><tbody>'+team.members.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(roleNames[p.role]||'一般隊員')+'</td><td>'+esc(p.ladderPoints??'尚無紀錄')+'</td><td>'+esc(({ungraded:'未分級',national:'國家級'}[p.hunterTier]||(p.hunterTier?p.hunterTier.toUpperCase()+'級':'尚無紀錄')))+'</td></tr>').join('')+'</tbody></table></div></section>';}
+function recruitmentSettings(policy={}){
+ const selected=policy.minLadderTier??'',hunter=policy.minTier??'';
+ return '<form data-team-form="admission"><label>加入方式<select name="mode">'+[['auto','自動加入'],['review','人工審核']].map(([v,l])=>option(v,l,policy.mode||'review')).join('')+'</select></label><label>天梯排位<select name="minLadderTier">'+option('','未指定',selected)+ladderTiers.map(t=>option(t,t+'以上',selected)).join('')+'</select></label><label>獵人排位<select name="minTier">'+option('','未指定',hunter)+hunterTiers.map(([v,l])=>option(v,l+'以上',hunter)).join('')+'</select></label><button type="submit">儲存設定</button></form>';
+}
 function noTeam(){return '<section class="bxh-team-ui"><h2>你尚未加入戰隊</h2><p>尋找一起征戰的夥伴，或建立自己的戰隊。</p><button type="button" data-team-action="tab" data-value="lobby">戰隊大廳</button><button type="button" data-team-action="tab" data-value="create">建立戰隊</button></section>';}
 const css='.bxh-team-ui{min-width:0}.bxh-team-ui form{display:flex;flex-wrap:wrap;gap:12px}.bxh-team-ui label{display:flex;flex-direction:column;gap:6px}.bxh-team-ui button,.bxh-team-ui input,.bxh-team-ui select{font:inherit;min-height:44px;max-width:100%;box-sizing:border-box}.bxh-team-ui .team-table-scroll{max-width:100%;overflow-x:auto}.bxh-team-ui table{width:100%;border-collapse:collapse}.bxh-team-ui th,.bxh-team-ui td{padding:12px;text-align:left}.bxh-team-ui td:first-child{overflow-wrap:anywhere}.bxh-team-ui button:disabled{opacity:.5;cursor:not-allowed}@media(max-width:480px){.bxh-team-ui form>label{flex:1 1 140px}.bxh-team-ui th,.bxh-team-ui td{padding:8px}}';
-const api={tabs,rankingTabs,lobby,publicMembers,noTeam,css};
+const api={tabs,rankingTabs,lobby,publicMembers,noTeam,recruitmentSettings,css};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHTeamUI=api;
 })(typeof window==='object'?window:globalThis);
