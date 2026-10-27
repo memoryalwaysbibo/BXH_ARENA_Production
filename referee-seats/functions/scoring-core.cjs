@@ -2,13 +2,13 @@
 const C=require('./core.cjs'),Fault=require('./engine/fault.cjs'),{createEngine}=require('./engine/index.cjs');
 const POINTS=Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
 const fail=reason=>{throw Object.assign(new Error(reason),{seatCode:reason});};
-function allowed(room,user,uid,station){
- if(!C.eligible(room,user,uid))return false;
- if(C.manager(room,user,uid))return true;
+function allowed(room,user,uid,station,authority={}){
+ if(!C.eligible(room,user,uid,authority))return false;
+ if(C.manager(room,user,uid,authority))return true;
  return C.SLOTS.some(slot=>room.refereeSeatsV1?.courts?.[station]?.[slot]?.uid===uid);
 }
 function passProtected(state,m){return !!m.callPass||(state.matches||[]).some(x=>x.callPass?.waitFor?.includes(m.id)&&!x.completed);}
-function transition({room,state,user,uid,d,now}){
+function transition({room,state,user,uid,d,now,authority={}}){
  if(room.refereeSeatsV1?.version!==1)fail('not-enabled');
  if(room.eventAuthority!=='official'||state.meta?.eventAuthority!=='official'||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
  if(room.eventCancelled||room.systemClosed||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');
@@ -16,7 +16,7 @@ function transition({room,state,user,uid,d,now}){
  const m=state.matches?.find(m=>m.id===d.matchId);if(!m)fail('not-found');
  const station=Number(m.station),court=room.refereeSeatsV1.courts?.[station];
  if(!Number.isInteger(station)||station<1||station>Number(state.meta.stations)||Number(d.station)!==station||state.forcedCourtExits?.[station]?.closed)fail('station-mismatch');
- if(!allowed(room,user,uid,station))fail('station-not-assigned');
+ if(!allowed(room,user,uid,station,authority))fail('station-not-assigned');
  if(d.expectedCourtRevision!==Number(court?.revision||0))fail('seat-stale');
  if(d.expectedScoreRevision!==Number(m.refereeSeatScoreRevision||0))fail('score-stale');
  if(d.expectedDispatchRevision!==Number(m.dispatchRevision||0))fail('dispatch-stale');
