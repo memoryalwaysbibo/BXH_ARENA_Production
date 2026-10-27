@@ -55,6 +55,11 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
    event.preventDefault();const data=new FormData(form),team=controller.snapshot().team;
    if(team?.id)await controller.operate('admission',team.id,{policy:{mode:String(data.get('mode')||''),minLadderTier:String(data.get('minLadderTier')||'')||null,minTier:String(data.get('minTier')||'')||null}});return;
   }
+  if(form.dataset.teamForm==='frame'){
+   event.preventDefault();const raw=String(new FormData(form).get('frame')??''),team=controller.snapshot().team;
+   if(!team?.id||!['','4','7','10'].includes(raw))return;
+   await controller.operate('frame',team.id,{frame:raw===''?null:Number(raw)});return;
+  }
   if(form.dataset.teamForm!=='search')return;
   event.preventDefault();const data=new FormData(form);await controller.search({query:String(data.get('query')||''),mode:String(data.get('mode')||'all'),recruitment:String(data.get('recruitment')||'all')});
  };
