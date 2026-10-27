@@ -3,8 +3,8 @@
 // Transport is deliberately injected; no unverified production endpoint is assumed.
 function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.crypto?.randomUUID)throw Error('secure-id-unavailable');return root.crypto.randomUUID();}}){
  if(!api||!['list','members','command','mine','applications','history'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
- const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,historyTeamId:null,historyNextCursor:null,hasMore:false};
- let generation=0,disposed=false,pendingPayload=null;
+ const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,historyTeamId:null,historyNextCursor:null,historyPage:1,hasMore:false};
+ let generation=0,disposed=false,pendingPayload=null,historyCursors=[null];
  // Only known server rejections prove the transaction did not commit.
  const rejectionMessages={
   'already-in-team':'你已有戰隊，請先確認目前的戰隊。',
@@ -48,6 +48,24 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
   }catch(_){if(!disposed&&ticket===generation)state.error='資料暫時無法載入，請重試。';return {ok:false,reason:'load-failed'};}
   finally{if(!disposed&&ticket===generation){state.loading=false;emit();}}
  }
+ async function historyStart(teamId){
+  if(disposed||state.loading)return {ok:false,reason:'busy'};
+  const result=await load('history',{teamId});
+  if(result.ok){historyCursors=[null];state.historyPage=1;emit();}
+  return result;
+ }
+ async function historyNext(){
+  if(disposed||state.loading||state.screen!=='history'||!state.loaded||!state.historyNextCursor)return {ok:false,reason:'unavailable'};
+  const cursor=state.historyNextCursor,result=await load('history',{teamId:state.historyTeamId,cursor});
+  if(result.ok){historyCursors.push(cursor);state.historyPage=historyCursors.length;emit();}
+  return result;
+ }
+ async function historyPrevious(){
+  if(disposed||state.loading||state.screen!=='history'||!state.loaded||historyCursors.length<2)return {ok:false,reason:'unavailable'};
+  const cursor=historyCursors[historyCursors.length-2],result=await load('history',{teamId:state.historyTeamId,...(cursor?{cursor}:{})});
+  if(result.ok){historyCursors.pop();state.historyPage=historyCursors.length;emit();}
+  return result;
+ }
  async function search(query={}){state.query=structuredClone(query);return load('lobby',state.query);}
  async function send(payload){
   const requestGeneration=generation;
@@ -83,7 +101,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
   return send(pendingPayload);
  }
 
- return {snapshot,search,mine:()=>load('mine',{}),create:()=>load('create',{}),clear:()=>search({}),view:teamId=>load('members',{teamId}),applications:teamId=>load('applications',{teamId}),history:(teamId,cursor)=>load('history',{teamId,...(cursor?{cursor}:{})}),operate,retryPending,dispose:()=>{disposed=true;generation++;}};
+ return {snapshot,search,mine:()=>load('mine',{}),create:()=>load('create',{}),clear:()=>search({}),view:teamId=>load('members',{teamId}),applications:teamId=>load('applications',{teamId}),history:historyStart,historyNext,historyPrevious,operate,retryPending,dispose:()=>{disposed=true;generation++;}};
 }
 if(typeof module==='object'&&module.exports)module.exports={createTeamController};else root.BXHTeamController={createTeamController};
 })(typeof window==='object'?window:globalThis);
