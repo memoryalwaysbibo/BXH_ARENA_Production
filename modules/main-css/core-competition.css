@@ -2374,3 +2374,13 @@ body:has(.board-expanded) .toast-wrap{z-index:2200;}
 .se-bracket-svg path.se-path-classic.se-player-path-selected{
   stroke:var(--board-accent,#d4af37)!important;stroke-width:3!important;
 }
+.se-player-path-dialog{
+  width:min(420px,calc(100vw - 32px));max-height:calc(100dvh - 48px);
+  box-sizing:border-box;padding:20px;overflow:auto;
+  border:1px solid var(--board-accent,#d9b95c);border-radius:12px;
+  background:#14171c;color:#f3f4f6;font-family:var(--font-d,sans-serif);
+}
+.se-player-path-dialog::backdrop{background:rgba(0,0,0,.75);}
+.se-player-path-dialog h3{margin:0 0 14px;}
+.se-player-path-dialog p{white-space:pre-line;overflow-wrap:anywhere;line-height:1.7;margin:0 0 18px;}
+.se-player-path-dialog .btn{width:100%;min-height:44px;}

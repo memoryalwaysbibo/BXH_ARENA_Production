@@ -33,6 +33,7 @@ const functionNames = [
   'layoutSingleElimBracket', 'positionSingleElimFinalDecorations', 'drawSingleElimConnectors',
   'singleBracketPathRoom', 'singleBracketPathPlayer', 'singleBracketPlayerHtml',
   'singleBracketPlayerHistory', 'applySingleBracketPlayerPath', 'selectSingleBracketPlayerPath',
+  'showSingleBracketPathDetails',
   'scheduleSeRelayout', 'renderBoardMode', 'currentRoundLabelForBoard',
   'tournamentMatchListGroup', 'renderTournamentMatchList', 'renderPrintBracket', 'wrapPrintWatermark',
   'clearBoardModeInteractions', 'bindBoardModeInteractions', 'setBoardZoom', 'setBoardPinchZoom',
@@ -274,7 +275,7 @@ async function selectAndCheck(page, size, bracketSize) {
     assert.equal(collisions,false,'champion overlaps final or bronze');
     await page.locator('.se-player-path-button[data-player-id="p1"]').last().click();
     const selected=await page.evaluate(()=>{
-      return {message:window.__pathModal.message,history:singleBracketPlayerHistory('p1').length,
+      return {message:document.querySelector('.se-player-path-dialog p').textContent,history:singleBracketPlayerHistory('p1').length,
         paths:document.querySelectorAll('.se-player-path-selected').length,
         buttons:document.querySelectorAll('.se-player-path-button[aria-pressed="true"]').length,
         unchanged:JSON.stringify(state)===window.__originalState};
@@ -283,9 +284,12 @@ async function selectAndCheck(page, size, bracketSize) {
     assert.ok(selected.paths>0&&selected.buttons>0,'selected confirmed route is highlighted');
     assert.ok(selected.message.includes('128強')&&selected.message.includes('冠軍賽'));
     assert.equal(selected.unchanged,true,'path selection must not mutate tournament state');
+    await capture(page,'desktop-player-path-dialog.png');
+    await page.getByRole('button',{name:'返回樹狀圖',exact:true}).click();
     await page.evaluate(()=>selectSingleBracketPlayerPath('p1'));
     assert.equal(await page.locator('.se-player-path-selected').count(),0,'repeat selection clears route');
     await page.evaluate(()=>selectSingleBracketPlayerPath('p1'));
+    await page.getByRole('button',{name:'返回樹狀圖',exact:true}).click();
     await capture(page,'desktop-128-completed-show16.png');
     console.log('PASS completed tournament retains bronze, champion and nonoverlapping final geometry');passed++;
 
@@ -305,11 +309,16 @@ async function selectAndCheck(page, size, bracketSize) {
     }
     console.log('PASS 320/390/430px: all five stage buttons fit and remain operable');passed++;
 
-    await page.setViewportSize({width:1440,height:1000});await page.evaluate(model=>mount(model),fixture(128));
+    await page.setViewportSize({width:1440,height:1000});await page.evaluate(model=>mount(model),fixture(128,{completed:true}));
     await page.locator('[data-action="board-fullscreen"]').click();
     await page.waitForFunction(()=>document.fullscreenElement===document.getElementById('board-shell'));
     await selectAndCheck(page,32,128);
     assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true);
+    await page.locator('.se-player-path-button[data-player-id="p1"]').last().click();
+    assert.equal(await page.locator('.se-player-path-dialog').isVisible(),true);
+    assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true,'opening path details exited fullscreen');
+    await page.getByRole('button',{name:'返回樹狀圖',exact:true}).click();
+    assert.equal(await page.evaluate(()=>document.fullscreenElement===window.__originalNodes.shell),true,'closing path details exited fullscreen');
     await capture(page,'native-fullscreen-show32.png');
     await page.evaluate(()=>document.exitFullscreen());
     console.log('PASS native fullscreen survives stage change with the same shell');passed++;

@@ -10414,12 +10414,30 @@ function applySingleBracketPlayerPath(outer){
     path.classList.toggle('se-player-path-selected',!!selected);
   });
 }
+function showSingleBracketPathDetails(title,message){
+  const shell=document.getElementById('board-shell');
+  if(!shell){openModal({type:'generic',title,message,confirmLabel:'返回樹狀圖'});return;}
+  shell.querySelector('.se-player-path-dialog')?.remove();
+  const dialog=document.createElement('dialog');
+  if(typeof dialog.showModal!=='function'){
+    openModal({type:'generic',title,message,confirmLabel:'返回樹狀圖'});return;
+  }
+  dialog.className='se-player-path-dialog';
+  dialog.setAttribute('aria-label',title);
+  const heading=document.createElement('h3');heading.textContent=title;
+  const body=document.createElement('p');body.textContent=message;
+  const close=document.createElement('button');
+  close.type='button';close.className='btn btn-primary';close.textContent='返回樹狀圖';
+  close.addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  dialog.append(heading,body,close);shell.append(dialog);dialog.showModal();
+}
 function selectSingleBracketPlayerPath(id){
   if(!id||!state.players.some(p=>p.id===id)) return;
   const clear=singleBracketPathPlayer()===id;
   singleBracketPathSelection=clear?null:{room:singleBracketPathRoom(),playerId:id};
   document.querySelectorAll('.se-bracket-outer').forEach(applySingleBracketPlayerPath);
-  if(clear) return;
+  if(clear){document.querySelector('.se-player-path-dialog')?.close();return;}
   const history=singleBracketPlayerHistory(id);
   const lines=history.map(m=>{
     if(m.isBye) return singleRoundTitle(m.round)+'：輪空晉級';
@@ -10427,9 +10445,8 @@ function selectSingleBracketPlayerPath(id){
     const result=!m.completed?'等待比賽':m.winnerId===id?'勝出晉級':m.winnerId?'止步':'結果待確認';
     return singleRoundTitle(m.round)+'｜對手：'+(opponent?playerName(opponent):'待定')+'｜'+result;
   });
-  openModal({type:'generic',title:playerName(id)+' 的晉級路徑',
-    message:(lines.length?lines.join('\n'):'尚未安排場次')+'\n\n包含目前範圍以外的已知場次；高亮只標示已確認晉級的路線。再次點選同一位選手可取消。',
-    confirmLabel:'返回樹狀圖'});
+  showSingleBracketPathDetails(playerName(id)+' 的晉級路徑',
+    (lines.length?lines.join('\n'):'尚未安排場次')+'\n\n包含目前範圍以外的已知場次；高亮只標示已確認晉級的路線。再次點選同一位選手可取消。');
 }
 
 function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
