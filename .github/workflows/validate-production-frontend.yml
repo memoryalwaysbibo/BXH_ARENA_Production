@@ -126,7 +126,7 @@ jobs:
           JS
 
       - name: Verify safe default referee-seat initialization candidate
-        run: node --test referee-seats/auto-init-core.test.cjs
+        run: node --test referee-seats/auto-init-core.test.cjs referee-seats/auto-create-service.test.cjs
 
       - name: Verify header logo refresh control
         run: node tests/header-logo-refresh.test.cjs

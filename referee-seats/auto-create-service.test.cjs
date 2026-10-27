@@ -1,0 +1,57 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {createHandler}=require('./auto-create-service.cjs');
+const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
+function harness(){
+ const docs=new Map([['users/admin',{active:true,role:'admin',realName:'Admin'}],['users/staff',{active:true,role:'staff',realName:'Staff'}],['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true}]]);
+ let tail=Promise.resolve();
+ const db={doc:path=>({path}),runTransaction:fn=>{const task=tail.then(async()=>{const writes=[],out=await fn({
+  get:async ref=>({exists:docs.has(ref.path),data:()=>clone(docs.get(ref.path))}),
+  create:(ref,data)=>writes.push(()=>{assert(!docs.has(ref.path));docs.set(ref.path,clone(data));})
+ });writes.forEach(x=>x());return out;});tail=task.catch(()=>{});return task;}};
+ const state={id:'new',meta:{eventAuthority:'official',battleMode:'individual',playMode:'standard',stations:3,assignedStaffUids:[]},players:[],matches:[],bracketSize:0};
+ const payload={code:'BXH-ABCD12',operationId:'unique-create-operation-001',
+  privatePayload:{data:JSON.stringify(state),createdBy:'admin',eventAuthority:'official',battleMode:'individual',playMode:'standard',confirmedCount:0,waitlistCount:0},
+  publicPayload:{bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:3}}),eventAuthority:'official',battleMode:'individual'}};
+ const handle=createHandler(db,{clock:()=>1000});
+ const run=(uid='admin',override={})=>handle({auth:{uid},data:{...clone(payload),...override}});
+ return {docs,payload,run};
+}
+test('atomically creates private and public seats, no UID leaked to mirror',async()=>{
+ const h=harness();assert.deepEqual(await h.run(),{ok:true,code:'BXH-ABCD12',idempotent:false});
+ const privateDoc=h.docs.get('tournaments/BXH-ABCD12'),pub=h.docs.get('publicTournaments/BXH-ABCD12');
+ assert.equal(privateDoc.refereeSeatsV1.version,1);
+ assert.equal(Object.keys(privateDoc.refereeSeatsV1.courts).length,3);
+ assert.equal(JSON.parse(privateDoc.data).meta.refereeSeatsV1.version,1);
+ assert.deepEqual(privateDoc.assignedStaffUids,['admin']);
+ assert.equal(JSON.parse(pub.bracketView).meta.refereeSeatNames['1'].main,null);
+ assert(!pub.bracketView.includes('"uid"'));assert(!pub.bracketView.includes('refereeSeatsV1'));
+});
+test('same operation retries idempotently and cannot mutate existing room',async()=>{
+ const h=harness();await h.run();const original=clone(h.docs.get('tournaments/BXH-ABCD12'));
+ assert.deepEqual(await h.run(),{ok:true,code:'BXH-ABCD12',idempotent:true});
+ assert.deepEqual(h.docs.get('tournaments/BXH-ABCD12'),original);
+ await assert.rejects(h.run('admin',{operationId:'unique-create-operation-002'}),/room-code-conflict/);
+ await assert.rejects(h.run('admin',{privatePayload:{...h.payload.privatePayload,fee:999}}),/operation-conflict/);
+});
+test('unauthenticated, staff, disabled and test identities cannot create',async()=>{
+ const h=harness();await assert.rejects(h.run('staff'),/permission-denied/);
+ await assert.rejects(h.run('anonymous'),/permission-denied/);
+ h.docs.get('users/admin').active=false;await assert.rejects(h.run(),/permission-denied/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));
+});
+test('unsupported room and inconsistent mirror fail without writing either document',async()=>{
+ const h=harness(),p=h.payload;
+ await assert.rejects(h.run('admin',{privatePayload:{...p.privatePayload,createdBy:'other'}}),/owner-mismatch/);
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,battleMode:'team'}}),/unsupported-mode/);
+ await assert.rejects(h.run('admin',{publicPayload:{...p.publicPayload,bracketView:JSON.stringify({meta:{eventAuthority:'official',battleMode:'individual',stations:2}})}}),/mirror-mismatch/);
+ assert(!h.docs.has('tournaments/BXH-ABCD12'));assert(!h.docs.has('publicTournaments/BXH-ABCD12'));
+});
+test('release gate and concurrent same-code create fail closed',async()=>{
+ const h=harness();h.docs.get('systemConfig/refereeSeatsV1').enabled=false;
+ await assert.rejects(h.run(),/release-not-ready/);assert(!h.docs.has('tournaments/BXH-ABCD12'));
+ h.docs.get('systemConfig/refereeSeatsV1').enabled=true;
+ const r=await Promise.allSettled([h.run('admin',{operationId:'unique-create-operation-001'}),h.run('admin',{operationId:'unique-create-operation-002'})]);
+ assert.equal(r.filter(x=>x.status==='fulfilled').length,1);
+ assert.equal(r.filter(x=>x.status==='rejected').length,1);
+});
