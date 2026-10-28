@@ -9,3 +9,8 @@ test('no-team and unavailable lookups remain distinct',async()=>{
  const error=await load({uid:'u',read:async()=>{throw Error('denied');}});assert.equal(render(error,esc),'');
  assert.equal((await load({uid:'bad/id',read:async()=>{throw Error('must not call');}})).state,'unavailable');
 });
+test('card downloads an emblem only when a verified team reports one',async()=>{
+ const calls=[];const info=await load({uid:'u',read:async query=>{calls.push(query);return query.action==='card-team'?{team:{id:'t',name:'隊伍',role:'member',level:4,hasEmblem:true}}:{image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQ'}};}});
+ assert.deepEqual(calls,[{action:'card-team',targetUid:'u'},{action:'emblem',teamId:'t'}]);assert.match(render(info,esc),/alt="戰隊圖案"/);
+ const fallback=await load({uid:'u',read:async query=>{if(query.action==='emblem')throw Error('storage');return {team:{id:'t',name:'隊伍',role:'member',level:4,hasEmblem:true}};}});assert.equal(fallback.state,'team');assert.doesNotMatch(render(fallback,esc),/alt="戰隊圖案"/);
+});
