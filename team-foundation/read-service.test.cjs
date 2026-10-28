@@ -57,3 +57,11 @@ test('missing or future login timestamps never claim that a player is online',as
  const f=setup();f.data.set('users/c',{lastLoginAt:Number.MAX_SAFE_INTEGER});
  const r=await f.read({actorUid:'m',action:'members',teamId:'t'});assert.equal(r.members[0].recentLogin,'尚無紀錄');assert.equal(r.members[1].recentLogin,'尚無紀錄');
 });
+
+test('solo teams expose the server dissolution deadline only on mine; recovered teams clear warning',async()=>{
+ const f=setup(),team=f.data.get('teamsV1/t');team.memberUids=['c'];team.dissolveAt=1;
+ let r=await f.read({actorUid:'c',action:'mine'});assert.deepEqual(r.team.dissolution,{dueAt:1,overdue:true});
+ team.dissolveAt=Number.MAX_SAFE_INTEGER;r=await f.read({actorUid:'c',action:'mine'});assert.equal(r.team.dissolution.overdue,false);
+ team.memberUids=['c','m'];assert.equal((await f.read({actorUid:'c',action:'mine'})).team.dissolution,null);
+ team.memberUids=['c'];team.dissolveAt=null;assert.equal((await f.read({actorUid:'c',action:'mine'})).team.dissolution,null);
+});
