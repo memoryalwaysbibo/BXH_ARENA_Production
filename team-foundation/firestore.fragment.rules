@@ -14,3 +14,5 @@ match /teamProjectionControlV1/{controlId} { allow read, write: if false; }
 match /teamDissolutionControlV1/{controlId} { allow read, write: if false; }
 match /teamEmblemObjectsV1/{objectId} { allow read, write: if false; }
 match /teamEmblemCleanupControlV1/{controlId} { allow read, write: if false; }
+
+match /teamCapacityControlV1/{controlId} { allow read, write: if false; }
