@@ -22,6 +22,7 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   'application-not-pending':'這筆申請已不在待審核狀態。',
   'role-full':'此職位名額已滿。',
   'frame-locked':'尚未解鎖此戰隊框。',
+  'invalid-emblem-preset':'請選擇有效的系統隊徽與顏色。',
   'invalid-emblem':'圖片格式或大小不符合要求。',
   'emblem-expired':'這筆圖片上傳已逾期，請重新選擇圖片再上傳。',
   'invalid-request':'上傳資料有誤，請重新選擇圖片。',
@@ -97,7 +98,7 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
    const result=action==='emblem'?await api.uploadEmblem(emblemPayload):await api.command(payload);
    if(result?.ok!==true)throw Error('command-failed');
    pendingPayload=null;state.pending=false;
-   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId});else if(payload.action==='admission'||payload.action==='frame'||payload.action==='emblem'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
+   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId});else if(payload.action==='admission'||payload.action==='frame'||payload.action==='emblem-preset'||payload.action==='emblem'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
    return {ok:true};
   }catch(error){
    let rejected=rejection(error);
@@ -109,14 +110,15 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
  async function operate(action,teamId,extra={}){
   if(disposed||state.busy||state.loading)return {ok:false,reason:'busy'};
   if(pendingPayload)return {ok:false,reason:'pending-confirmation'};
-  if(!['join','apply','cancel','leave','remove','admission','frame','emblem','create','approve','reject','assign','transfer','dissolve'].includes(action))return {ok:false,reason:'invalid-action'};
+  if(!['join','apply','cancel','leave','remove','admission','frame','emblem','emblem-preset','create','approve','reject','assign','transfer','dissolve'].includes(action))return {ok:false,reason:'invalid-action'};
   if(action==='emblem'&&(typeof api.uploadEmblem!=='function'||typeof extra.base64!=='string'||!extra.base64||extra.base64.length>174764))return {ok:false,reason:'invalid-emblem'};
   let requestId;try{requestId=newRequestId();}catch(_){state.error='目前無法安全執行操作，請重新載入再試。';emit();return {ok:false,reason:'secure-id-unavailable'};}
   const payload={action:action==='join'?'apply':action,teamId,requestId};
   if(action==='admission')payload.policy=structuredClone(extra.policy);
   if(action==='frame')payload.frame=extra.frame;
   if(action==='emblem'){payload.contentType='image/webp';payload.base64=extra.base64;}
-  if(action==='create')payload.name=extra.name;
+  if(action==='create'){payload.name=extra.name;if(extra.preset!==undefined)payload.preset=structuredClone(extra.preset);}
+  if(action==='emblem-preset')payload.preset=structuredClone(extra.preset);
   if(action==='approve'||action==='reject')payload.targetUid=extra.targetUid;
   if(action==='assign'){payload.targetUid=extra.targetUid;payload.role=extra.role;}
   if(action==='transfer')payload.targetUid=extra.targetUid;
