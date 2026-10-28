@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.41";
+const APP_VERSION = "v14.3.42";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.42",date:"2026/10/29",timezone:"Asia/Taipei",title:"候補抽選設定鎖定提示",updateLevel:"patch",added:[],changed:["候補抽選管理中的報名名額與時間顯示停用原因","停用抽選期間不可變更的報到規則按鈕","抽選尚未完成時，停用房間設定儲存與發布並顯示原因"],fixed:["避免抽選進行中仍能點擊儲存，直到送出才被雲端拒絕"],publicSummary:"抽選管理中的設定清楚顯示鎖定原因，完成抽選後恢復基本資料儲存。"},
   {version:"v14.3.41",date:"2026/10/29",timezone:"Asia/Taipei",title:"移除樹狀圖重新抽籤",updateLevel:"patch",added:[],changed:["樹狀圖移除重新抽籤入口與事件處理，避免查看配對時直接重抽"],fixed:[],publicSummary:"移除樹狀圖的重新抽籤功能。"},
   {version:"v14.3.40",date:"2026/10/29",timezone:"Asia/Taipei",title:"抽籤單次操作自動確認",updateLevel:"patch",added:[],changed:["抽籤遇到暫時讀取或寫入失敗時，自動有限次重試同一份配對","雲端配對核對短暫未一致時持續等待，不要求再次點擊上傳"],fixed:["首次提交過早顯示失敗，需手動再次上傳才能完成"],publicSummary:"抽籤自動完成暫時失敗重試與雲端確認。"},
   {version:"v14.3.39",date:"2026/10/29",timezone:"Asia/Taipei",title:"抽籤上傳等待提示",updateLevel:"patch",added:[],changed:["抽籤自動顯示資料上傳中與進度提示至少兩秒，完成後自動顯示成功或失敗"],fixed:[],publicSummary:"抽籤後清楚提示等待，無須手動確認上傳。"},
@@ -9414,6 +9415,7 @@ function computeRegistrationStatus(m,st=state){
 function publicationValidationErrors(m){return window.BXHDomainUtils.publicationValidationErrors(m);}
 function renderTournamentPublishAction(readOnly){
   if(readOnly) return "";
+  if(onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true)return '<button class="btn btn-primary" data-action="open-registration-publish-preview" disabled aria-describedby="onsite-registration-lock-notice">候補抽選中・暫停發布</button>';
   if(!state.cloudCode&&!canCreateOfficialTournament()) return `<button class="btn btn-ghost" disabled>目前帳號不可建立／發布新賽事</button>`;
   return `<button class="btn btn-primary" data-action="open-registration-publish-preview">${state.meta.publishedAt&&state.cloudCode?'更新並重新發布':'完成架構並發布'}</button>`;
 }
@@ -9448,7 +9450,8 @@ function managedRegistrationSettingsChanged(next,st=state){
 }
 function managedRegistrationSettingsNotice(){
   if(!onsiteRegistrationSettingsLocked())return '';
-  return '<div class="banner warn" role="status"><span>本場報名時間與名額由候補抽選管理，請從備取／抽籤調整。重新開啟候補不會重新開放線上報名。</span>'+
+  return '<div class="banner warn" id="onsite-registration-lock-notice" role="status"><span>本場已由現場候補抽選管理，正取／備取名額與報名時間已鎖定。名額及人員異動請至「人員管理 → 備取／現場抽籤」處理；重新開啟候補不會重新開放線上報名。</span>'+
+    (state.onsiteWaitlistFinalized!==true?'<span>候補抽選尚未完成，房間設定暫停儲存與發布；完成抽選後恢復活動基本資料儲存。</span>':'')+
     (canManageOnsiteWaitlist()?'<button class="btn btn-ghost btn-sm" data-action="open-registration-waitlist">前往備取／抽籤</button>':'')+'</div>';
 }
 function reportManagedRegistrationSettings(){
@@ -12231,10 +12234,12 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     capacity: m.registrationCapacity, confirmedCount: 0,
     registrationStatus: null, eventCancelled: false
   })));
-  const locked = state.bracketSize > 0 || onsiteRegistrationSettingsLocked();
+  const onsiteLocked = onsiteRegistrationSettingsLocked();
+  const onsitePending = onsiteLocked && state.onsiteWaitlistFinalized!==true;
+  const locked = state.bracketSize > 0 || onsiteLocked;
   return `<div class="panel">
     <div class="panel-title">線上報名設定</div>
-    ${managedRegistrationSettingsNotice()}
+    ${showModeSelector?managedRegistrationSettingsNotice():""}
     ${registrationFormDraftDirty ? `<div class="banner warn"><span>尚有未儲存的變更，請記得點擊下方「儲存報名設定」。</span></div>` : ""}
     ${showModeSelector ? `<div class="scoring-mode-cards">
       <button class="scoring-mode-card ${!d.registrationEnabled?'active':''}" data-action="set-registration-enabled" data-value="false" ${locked?'disabled':''}>
@@ -12264,17 +12269,17 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
       </div>
       <p class="hint" style="margin-top:6px;">${d.targetGroup==='children' ? "限 6 歲以上、13 歲以下參加。" : "不限年齡，符合活動規則者皆可參加。"}</p>
     </div>`}
-    <fieldset style="border:0;padding:0;margin:0;min-width:0" ${onsiteRegistrationSettingsLocked()?'disabled':''}><div class="grid grid-2" style="margin-top:14px;">
+    <fieldset style="border:0;padding:0;margin:0;min-width:0;${onsiteLocked?'opacity:.5;cursor:not-allowed':''}" ${onsiteLocked?'disabled aria-describedby="onsite-registration-lock-notice"':''}><div class="grid grid-2" style="margin-top:14px;">
       <div class="field"><label>報名開放時間</label>${renderHalfHourDatetimeDraft("reg-open-at","registrationOpenAt",d.registrationOpenAt)}</div>
       <div class="field"><label>報名截止時間</label>${renderHalfHourDatetimeDraft("reg-close-at","registrationCloseAt",d.registrationCloseAt)}</div>
-      <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
+      <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" ${onsiteLocked?'disabled aria-describedby="onsite-registration-lock-notice"':''} data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
     </div></fieldset><div class="grid grid-2">
       <div class="field"><label>報名費（元，選填）</label><input type="number" id="reg-fee" data-draft-field="registrationFee" data-draft-type="int-or-null" min="0" value="${d.registrationFee!=null?d.registrationFee:""}"></div>
     </div>
     ${state.entrySelection?.mode==='registration'?'<p class="hint">本場已啟用報名抽籤：報名不限額、備取不限額，正取人數請至「參賽名額抽籤」調整。下列舊制上限不套用於本場。</p>':''}
     <div class="field" style="margin-top:8px;">
       <label>${teamRegistrationMode?"備取隊伍上限（選填）":"備取人數上限（選填）"}</label>
-      <input type="number" id="reg-waitlist-capacity" ${onsiteRegistrationSettingsLocked()?'disabled':''} data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
+      <input type="number" id="reg-waitlist-capacity" ${onsiteLocked?'disabled aria-describedby="onsite-registration-lock-notice" style="opacity:.5;cursor:not-allowed"':''} data-draft-field="waitlistCapacity" data-draft-type="int-or-null" min="0" value="${d.waitlistCapacity>0?d.waitlistCapacity:""}" placeholder="留空＝0">
       <p class="hint" style="margin-top:6px;">有需要備取就填${teamRegistrationMode?"隊伍數":"人數"}；留空即代表 0、不開放備取。</p>
     </div>
     <div class="field" style="margin-top:8px;"><label>活動說明（選填）</label><textarea id="reg-event-desc" data-draft-field="eventDescription" data-draft-type="string" rows="3">${esc(d.eventDescription)}</textarea></div>
@@ -12283,15 +12288,15 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
       <button class="btn ${d.registrationVisibility==='private'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-visibility" data-value="private">不公開顯示</button>
     </div>
     <div class="btn-row" style="margin-top:14px;">
-      ${showModeSelector?`<button class="btn btn-primary" data-action="save-registration-settings">儲存報名設定</button>`:""}
-      <button class="btn ${m.eventCancelled?'btn-danger-solid':'btn-ghost'}" data-action="toggle-event-cancelled">${m.eventCancelled?'恢復賽事（取消「賽事取消」狀態）':'將賽事標記為取消'}</button>
+      ${showModeSelector?`<button class="btn btn-primary" data-action="save-registration-settings" ${onsitePending?'disabled aria-describedby="onsite-registration-lock-notice"':''}>${onsitePending?'候補抽選中・暫停儲存':'儲存報名設定'}</button>`:""}
+      <button class="btn ${m.eventCancelled?'btn-danger-solid':'btn-ghost'}" data-action="toggle-event-cancelled" ${onsitePending?'disabled aria-describedby="onsite-registration-lock-notice"':''}>${m.eventCancelled?'恢復賽事（取消「賽事取消」狀態）':'將賽事標記為取消'}</button>
     </div>
     <div class="grid grid-2" style="margin-top:14px;">
       <div class="stat-box"><div class="label">我的賽程狀態</div><div class="value small">${status?esc(REGISTRATION_STATUS_LABELS[status]):"—"}</div></div>
       <div class="stat-box"><div class="label">發布狀態</div><div class="value small">${m.publishedAt?("已發布於 "+new Date(m.publishedAt).toLocaleString()):"尚未發布"}</div></div>
     </div>
     <div class="registration-publish-actions">
-      ${state.cloudCode || canCreateOfficialTournament() ? `<button class="btn btn-primary" data-action="open-registration-publish-preview">${m.publishedAt&&state.cloudCode?"更新並重新發布":"完成架構並發布"}</button>` : `<button class="btn btn-ghost" disabled>目前帳號不可建立／發布新賽事</button>`}
+      ${state.cloudCode || canCreateOfficialTournament() ? `<button class="btn btn-primary" data-action="open-registration-publish-preview" ${onsitePending?'disabled aria-describedby="onsite-registration-lock-notice"':''}>${m.publishedAt&&state.cloudCode?"更新並重新發布":"完成架構並發布"}</button>` : `<button class="btn btn-ghost" disabled>目前帳號不可建立／發布新賽事</button>`}
     </div>
     ${m.publishedAt && state.cloudCode
       ? renderInlineRegistrationShare()
@@ -12850,7 +12855,8 @@ function renderBxhEventTemplateSettingsSection(readOnly){
 function renderSettings(){
   const settingsReadOnly=state.archiveStatus==="completed";
   const ladderModeLocked=settingsReadOnly||state.matches.some(m=>!!m.winnerId);
-  const checkinLocked=!!state.startedAt||state.matches.some(m=>!!m.winnerId);
+  const onsiteRosterLocked=onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true;
+  const checkinLocked=onsiteRosterLocked||!!state.startedAt||state.matches.some(m=>!!m.winnerId);
 
   ensureSettingsFormDraft();
   ensureRegistrationFormDraft();
@@ -12860,6 +12866,7 @@ function renderSettings(){
   const ladderMode=d.ladderMode==="ranked"?"ranked":"general";
 
   return `
+  ${managedRegistrationSettingsNotice()}
   ${settingsReadOnly?'<div class="panel settings-readonly-banner">賽事已封存，設定與發布已停用。請至賽事紀錄解除封存後編輯；系統關閉者僅最高管理員可恢復。</div>':''}
   <div class="settings-toolbar">
     <div>
@@ -12961,7 +12968,7 @@ function renderSettings(){
     ${registrationChoice?`
       <div class="settings-time-checkin-rules">
         <div class="settings-mini-title">報到規則</div>
-        ${checkinLocked?`<div class="banner warn"><span>賽事已開始或已有對戰結果，無法變更報到規則。</span></div>`:""}
+        ${checkinLocked?`<div class="banner warn"><span>${onsiteRosterLocked?'已啟用現場候補抽選，報到規則已鎖定；請至「人員管理 → 備取／現場抽籤」處理人員異動。':'賽事已開始或已有對戰結果，無法變更報到規則。'}</span></div>`:""}
         <div class="btn-row">
           <button class="btn ${d.checkinRequired?'btn-primary':'btn-ghost'}" data-action="set-checkin-required" data-value="true" ${checkinLocked?'disabled':''}>需要報到</button>
           <button class="btn ${!d.checkinRequired?'btn-primary':'btn-ghost'}" data-action="set-checkin-required" data-value="false" ${checkinLocked?'disabled':''}>免報到</button>
@@ -12993,11 +13000,11 @@ function renderSettings(){
     <div class="settings-match-grid settings-match-grid-single">
       <div>
         <div class="settings-mini-title">對戰架構</div>
-        <div class="field"><label>對戰形式</label><select id="f-battle-mode" data-settings-draft="battleMode">
+        <div class="field"><label>對戰形式</label><select id="f-battle-mode" data-settings-draft="battleMode" ${onsiteRosterLocked?'disabled title="現場候補抽選期間，對戰形式已鎖定"':''}>
           <option value="individual" ${d.battleMode!=="team"?"selected":""}>個人戰</option>
           <option value="team" ${d.battleMode==="team"?"selected":""}>團體戰</option>
         </select></div>
-        ${d.battleMode==="team"?`<div class="field"><label>每隊人數</label><input type="number" min="3" step="1" id="f-team-size" data-settings-draft="teamSize" data-settings-type="int" value="${Math.max(3,parseInt(d.teamSize,10)||3)}"><p class="hint">本場固定為 ${Math.max(3,parseInt(d.teamSize,10)||3)}V${Math.max(3,parseInt(d.teamSize,10)||3)}；所有隊伍必須相同人數。</p></div>`:""}
+        ${d.battleMode==="team"?`<div class="field"><label>每隊人數</label><input type="number" min="3" step="1" id="f-team-size" ${onsiteRosterLocked?'disabled':''} data-settings-draft="teamSize" data-settings-type="int" value="${Math.max(3,parseInt(d.teamSize,10)||3)}"><p class="hint">本場固定為 ${Math.max(3,parseInt(d.teamSize,10)||3)}V${Math.max(3,parseInt(d.teamSize,10)||3)}；所有隊伍必須相同人數。</p></div>`:""}
         <div class="field"><label>賽事制度</label><select id="f-format" data-settings-draft="formatType">
           <option value="single" ${d.formatType==='single'?'selected':''}>單淘汰賽</option>
           <option value="double" ${d.formatType==='double'?'selected':''}>雙敗制</option>
@@ -13026,7 +13033,7 @@ function renderSettings(){
       <strong>${settingsFormDraftDirty||registrationFormDraftDirty?'尚有未儲存設定':!state.cloudCode?'草稿已儲存，尚未發布':'設定已儲存'}</strong>
       <span>活動資料、時間、賽制與線上報名資料會一起儲存。</span>
     </div>
-    <button class="btn btn-primary" data-action="save-meta" ${settingsReadOnly?'disabled':''}>${settingsReadOnly?'已完成・設定鎖定':'儲存賽事設定'}</button>
+    <button class="btn btn-primary" data-action="save-meta" ${settingsReadOnly||onsiteRosterLocked?'disabled':''} ${onsiteRosterLocked?'aria-describedby="onsite-registration-lock-notice"':''}>${settingsReadOnly?'已完成・設定鎖定':onsiteRosterLocked?'候補抽選中・暫停儲存':'儲存賽事設定'}</button>
     ${renderTournamentPublishAction(settingsReadOnly)}
   </div>
 
@@ -20260,6 +20267,9 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true&&['save-meta','save-registration-settings','open-registration-publish-preview','community-save-settings','toggle-event-cancelled'].includes(action)){
+    showToast('候補抽選尚未完成，房間設定暫停儲存與發布；請至「人員管理 → 備取／現場抽籤」完成抽選後再操作。',true);return;
+  }
   if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
   if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}

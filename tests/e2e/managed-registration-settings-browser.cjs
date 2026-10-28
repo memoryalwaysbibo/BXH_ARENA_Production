@@ -20,7 +20,7 @@ ${['onsiteRegistrationSettingsLocked','managedRegistrationSettingsNotice','repor
 ${fn(community,'renderCommunitySettings')}
 function handle(action,target){${action('open-registration-waitlist')} ${action('set-registration-enabled')}}
 document.addEventListener('click',e=>{const target=e.target.closest('[data-action]');if(target)handle(target.dataset.action,target);});
-window.fixture={render(kind,locked=true){state.onsiteWaitlistServerOwned=locked;document.body.innerHTML=kind==='community'?renderCommunitySettings():renderRegistrationSettingsPanel();},read(){return {activeTab,communityRoomActiveTab,peopleRosterSection,toastCount,enabled:registrationFormDraft.registrationEnabled};},phase(value){appPhase=value;},staleToggle(){handle('set-registration-enabled',{getAttribute:()=> 'false'});}};
+window.fixture={render(kind,locked=true,finalized=false){state.onsiteWaitlistServerOwned=locked;state.onsiteWaitlistFinalized=finalized;document.body.innerHTML=kind==='community'?renderCommunitySettings():renderRegistrationSettingsPanel();},read(){return {activeTab,communityRoomActiveTab,peopleRosterSection,toastCount,enabled:registrationFormDraft.registrationEnabled};},phase(value){appPhase=value;},staleToggle(){handle('set-registration-enabled',{getAttribute:()=> 'false'});}};
 `;
 (async()=>{
  const options={headless:true};
@@ -40,6 +40,15 @@ window.fixture={render(kind,locked=true){state.onsiteWaitlistServerOwned=locked;
     for(const id of protectedIds)assert(await page.locator('#'+id).isDisabled(),`${width} ${kind} ${id} must be disabled`);
     for(const id of kind==='official'?['reg-fee','reg-event-desc']:['cset-name','cset-date','cset-location'])assert(await page.locator('#'+id).isEnabled(),id+' remains editable');
     assert.equal(await page.getByRole('status').count(),1);
+    const saveAction=kind==='official'?'save-registration-settings':'community-save-settings';
+    assert(await page.locator('[data-action="'+saveAction+'"]').isDisabled(),'active draw cannot save settings');
+    assert(await page.getByRole('status').innerText().then(x=>x.includes('房間設定暫停儲存與發布')));
+    assert.equal(await page.locator('#reg-capacity').count()===1?await page.locator('#reg-capacity').getAttribute('aria-describedby'):await page.locator('#cset-capacity').locator('xpath=ancestor::fieldset').getAttribute('aria-describedby'),'onsite-registration-lock-notice');
+    await page.evaluate(kind=>window.fixture.render(kind,true,true),kind);
+    for(const id of protectedIds)assert(await page.locator('#'+id).isDisabled(),id+' remains protected after finalize');
+    assert(await page.locator('[data-action="'+saveAction+'"]').isEnabled(),'finalized draw permits metadata saves');
+    assert(!(await page.getByRole('status').innerText()).includes('房間設定暫停儲存與發布'));
+
     await page.evaluate(kind=>window.fixture.phase(kind==='community'?'community-room':'settings'),kind);
     await page.locator('[data-action="open-registration-waitlist"]').click();
     const result=await page.evaluate(()=>window.fixture.read());
