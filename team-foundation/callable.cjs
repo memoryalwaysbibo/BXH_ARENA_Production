@@ -22,7 +22,7 @@ function createCommandHandler({db,auth,enabled=false,readEligibility,readDisplay
   catch(error){
    const message=error?.message||'';
    const denied=['captain-required','leadership-required','not-member'];
-   const precondition=['already-in-team','team-id-taken','team-not-found','team-dissolved','team-full','transfer-captain-first','team-must-be-solo','application-not-pending','cannot-target-self','use-captain-transfer','role-full','frame-locked','operation-id-conflict','ladder-tier-below-minimum','tier-below-minimum'];
+   const precondition=['already-in-team','team-id-taken','team-not-found','team-dissolved','team-full','team-capacity-full','team-capacity-unavailable','transfer-captain-first','team-must-be-solo','application-not-pending','cannot-target-self','use-captain-transfer','role-full','frame-locked','operation-id-conflict','ladder-tier-below-minimum','tier-below-minimum'];
    if(denied.includes(message))fail('permission-denied',message);
    if(precondition.includes(message))fail('failed-precondition',message);
    if(/^invalid-(id|request-id|name|action|admission-mode|ladder-tier|min-tier)$/.test(message)||['removal-reason-required','other-reason-required','reason-too-long','invalid-emblem-preset'].includes(message))fail('invalid-argument',message);
