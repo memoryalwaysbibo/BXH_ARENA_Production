@@ -1,0 +1,44 @@
+'use strict';
+const {progression}=require('./progression.cjs');
+const ladder=require('./official-ladder-v1.js');
+const {admissionPolicy,TIERS,LADDER_TIERS}=require('./admission.cjs');
+function publicTeam(team,players){
+ const p=progression(team.totalXp),policy=admissionPolicy(team.admission);
+ // Explicit allowlist; no presence, contribution, history, reasons or application data.
+ return {id:team.id,name:team.name,captainName:players[team.captainUid]?.name??'未提供',level:p.level,capacity:p.capacity,memberCount:team.memberUids.length,strength:team.memberUids.reduce((n,uid)=>n+(Number.isFinite(players[uid]?.ladderPoints)?players[uid].ladderPoints:0),0),createdAt:team.createdAt,admission:policy,
+ members:team.memberUids.map(uid=>({uid,name:players[uid]?.name??'未提供',role:uid===team.captainUid?'captain':team.roles?.[uid]??'member',ladderPoints:Number.isFinite(players[uid]?.ladderPoints)?players[uid].ladderPoints:null,hunterTier:TIERS.includes(players[uid]?.hunterTier)?players[uid].hunterTier:null}))};
+}
+function eligibility(team,player){
+ const p=team.admission;
+ if(p.minLadderTier!==null&&(!Number.isFinite(player?.ladderPoints)||player.ladderPoints<0)||p.minTier!==null&&!TIERS.includes(player?.hunterTier))return null;
+ return (p.minLadderTier===null||LADDER_TIERS.indexOf(ladder.tier(player.ladderPoints))>=LADDER_TIERS.indexOf(p.minLadderTier))&&(p.minTier===null||TIERS.indexOf(player.hunterTier)>=TIERS.indexOf(p.minTier));
+}
+function joinState(team,{membershipTeamId=null,pendingTeamIds=[],player=null}={}){
+ if(membershipTeamId===team.id)return {label:'我的戰隊',disabled:false,action:'view'};
+ if(membershipTeamId)return {label:'已有所屬戰隊',disabled:true,action:null};
+ if(pendingTeamIds.includes(team.id))return {label:'審核中',disabled:true,action:null};
+ if(team.memberCount>=team.capacity)return {label:'已滿員',disabled:true,action:null};
+ if(team.admission.mode==='auto'){
+  const ok=eligibility(team,player);
+  // Missing viewer data must not prevent applying: the server transaction
+  // checks trusted eligibility before any membership write.
+  if(ok===null)return {label:'加入',disabled:false,action:'join'};
+  if(!ok)return {label:'未達條件',disabled:true,action:null};
+ }
+ return {label:'加入',disabled:false,action:team.admission.mode==='auto'?'join':'apply'};
+}
+// Only filter already-public records. Real discovery requires a bounded server query adapter.
+function browseLobby(teams,{query='',recruitment='all',mode='all',eligibleOnly=false,minLevel=1,maxLevel=10,pendingOnly=false,sort='strength',offset=0,limit=20}={},viewer={}){
+ if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>50||!Number.isInteger(minLevel)||!Number.isInteger(maxLevel)||minLevel<1||maxLevel>10||minLevel>maxLevel)throw Error('invalid-pagination-or-level');
+ if(!['all','open','full'].includes(recruitment)||!['all','auto','review'].includes(mode)||!['strength','level','newest','strength_desc','strength_asc','created_desc','created_asc','members_desc','members_asc','level_desc','level_asc'].includes(sort))throw Error('invalid-filter');
+ const needle=query.trim().normalize('NFKC').toLocaleLowerCase();
+ const filtered=teams.filter(t=>{
+  const full=t.memberCount>=t.capacity;
+  return (!needle||[t.name,t.captainName].some(s=>String(s).normalize('NFKC').toLocaleLowerCase().includes(needle)))&&(recruitment==='all'||(recruitment==='full'?full:!full))&&(mode==='all'||t.admission.mode===mode)&&t.level>=minLevel&&t.level<=maxLevel&&(!pendingOnly||viewer.pendingTeamIds?.includes(t.id))&&(!eligibleOnly||t.admission.mode==='auto'&&eligibility(t,viewer.player)===true);
+ });
+ const sortSpec={strength:['strength',-1],strength_desc:['strength',-1],strength_asc:['strength',1],newest:['createdAt',-1],created_desc:['createdAt',-1],created_asc:['createdAt',1],members_desc:['memberCount',-1],members_asc:['memberCount',1],level:['level',-1],level_desc:['level',-1],level_asc:['level',1]};
+ const [field,direction]=sortSpec[sort];
+ filtered.sort((a,b)=>{const av=a[field],bv=b[field],aValid=Number.isFinite(av),bValid=Number.isFinite(bv);return (aValid===bValid?(aValid?(av-bv)*direction:0):aValid?-1:1)||a.id.localeCompare(b.id);});
+ return {total:filtered.length,items:filtered.slice(offset,offset+limit).map(t=>({...t,join:joinState(t,viewer)}))};
+}
+module.exports={publicTeam,eligibility,joinState,browseLobby};

@@ -1,0 +1,33 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');const {create}=require('./team-ranking.js');
+const esc=x=>String(x).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+test('ranking loads only after signed-in render, shows partial warning and escapes names',async()=>{
+ let uid=null,calls=0;const c=create({identity:()=>uid,read:async()=>{calls++;return {items:[{rank:1,name:'<隊>',captainName:'A',memberCount:2,strength:500}],total:1,partial:true,excluded:1};}});
+ assert.match(c.render(esc),/請先登入/);assert.equal(calls,0);uid='u';c.render(esc);await new Promise(setImmediate);const html=c.render(esc);assert.equal(calls,1);assert.match(html,/&lt;隊&gt;/);assert.match(html,/名次可能變動/);
+});
+test('changing account before response discards old ranking',async()=>{
+ let uid='a',resolve;const c=create({identity:()=>uid,read:()=>new Promise(r=>{resolve=r;})});c.render(esc);await Promise.resolve();uid=null;resolve({items:[{name:'OLD'}],total:1,excluded:0});await new Promise(setImmediate);assert.match(c.render(esc),/請先登入/);assert.doesNotMatch(c.render(esc),/OLD/);
+});
+test('first render defers change notification and ignores a queued load after account switch',async()=>{
+ let uid='a',calls=0,changes=0;const c=create({identity:()=>uid,read:async()=>{calls++;return {items:[],total:0,excluded:0};},onChange:()=>{changes++;c.render(esc);}});
+ c.render(esc);assert.equal(changes,0);uid='b';c.render(esc);await new Promise(setImmediate);
+ assert.equal(calls,1);assert.ok(changes>=1);
+});
+test('ranking displays known frame variants without accepting arbitrary classes',async()=>{
+ const c=create({identity:()=> 'u',read:async()=>({items:[{rank:1,name:'A',captainName:'C',memberCount:2,strength:5,selectedFrame:4},{rank:2,name:'B',captainName:'C',memberCount:2,strength:4,selectedFrame:'evil'}],total:2,excluded:0})});
+ c.render(esc);await new Promise(setImmediate);const html=c.render(esc);assert.match(html,/team-identity team-frame-4/);assert.doesNotMatch(html,/team-frame-evil/);
+});
+test('ranking hydrates current page images without rereading the ranking',async()=>{
+ let calls=0;const c=create({identity:()=>'u',emblems:require('./team-emblem.js'),readEmblem:async()=>({image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQ'}}),read:async()=>{calls++;return {items:[{id:'t',rank:1,name:'隊',captainName:'A',memberCount:2,strength:5,hasEmblem:true}],total:1,excluded:0};}});
+ c.render(esc);await new Promise(setImmediate);assert.match(c.render(esc),/alt="戰隊圖案"/);assert.equal(calls,1);
+});
+test('ranking load failure removes prior rows and shows a retry message',async()=>{
+ let fail=false;const c=create({identity:()=> 'player',read:async()=>{if(fail)throw Error('unavailable');return {items:[{id:'a',name:'先前戰隊',rank:1,captainName:'隊長',memberCount:1,strength:10}],total:1,excluded:0};}});
+ await c.refresh();assert.match(c.render(String),/先前戰隊/);fail=true;await c.refresh();const html=c.render(String);assert.doesNotMatch(html,/先前戰隊/);assert.match(html,/暫時無法載入/);assert.match(html,/重新整理/);
+});
+test('top ten team names use ladder rank colors and tied ranks share their color',async()=>{
+ const rows=[1,2,3,4,5,10,11,1].map((rank,i)=>({rank,id:'t'+i,name:'Team'+i,captainName:'A',memberCount:1,strength:100}));
+ const c=create({identity:()=> 'u',read:async()=>({items:rows,total:8,excluded:0})});await c.refresh();const html=c.render(String);
+ for(const [i,cls] of [[0,'1'],[1,'2'],[2,'3'],[3,'4'],[4,'elite'],[5,'elite'],[7,'1']])assert.match(html,new RegExp('team-name-rank-'+cls+'">Team'+i));
+ assert.match(html,/class="team-ranking-name">Team6/);
+});

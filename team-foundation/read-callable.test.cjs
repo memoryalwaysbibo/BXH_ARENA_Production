@@ -1,0 +1,18 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');const {createReadHandler}=require('./read-callable.cjs');
+class HttpsError extends Error{constructor(code,message){super(message);this.code=code;}}
+function fixture(){let transactions=0;const db={doc:p=>p,runTransaction:async fn=>{transactions++;return fn({get:async path=>({exists:true,data:()=>({'teamsPublicV1/a':{name:'Alpha',hunterGeneration:'g',ladderSeason:'S1',members:[{uid:'c',name:'C',role:'captain',secret:'private'}]},'teamsV1/a':{status:'active',captainUid:'c',memberUids:['c']},'hunterLeaderboardMeta/current':{generation:'g'},'ladderSystem/current':{currentSeason:'S1'}}[path])})});}};return {handler:createReadHandler({db,auth:{getUser:async()=>({})},HttpsError,enabled:true}),get transactions(){return transactions;}};}
+const req=()=>({app:{appId:'verified'},auth:{uid:'real',token:{}},data:{action:'members',teamId:'a'}});
+test('read boundary authorizes signed-in public member lookup and preserves allowlist',async()=>{const f=fixture();const r=await f.handler(req());assert.equal(r.name,'Alpha');assert.ok(!JSON.stringify(r).includes('private'));assert.equal(f.transactions,1);});
+test('forged viewer identity and missing Auth/AppCheck cannot read',async()=>{
+ for(const key of ['actorUid','viewerUid','authorized']){const f=fixture(),r=req();r.data[key]='forged';await assert.rejects(f.handler(r));assert.equal(f.transactions,0);}
+ for(const key of ['auth','app']){const f=fixture(),r=req();delete r[key];await assert.rejects(f.handler(r));assert.equal(f.transactions,0);}
+});
+test('history member permission checked in service; internal error data is hidden',async()=>{
+ const f=fixture(),r=req();r.data.action='history';await assert.rejects(f.handler(r),e=>e.code==='permission-denied');
+});
+test('emblem read derives the viewer from auth and enforces App Check and input allowlist',async()=>{
+ let calls=[];const handler=createReadHandler({db:{},auth:{getUser:async()=>({})},HttpsError,enabled:true,readEmblem:async p=>(calls.push(p),{image:null})});
+ const r=req();r.data={action:'emblem',teamId:'t'};assert.deepEqual(await handler(r),{image:null});assert.deepEqual(calls,[{actorUid:'real',teamId:'t'}]);
+ r.data.actorUid='forged';await assert.rejects(handler(r),e=>e.code==='invalid-argument');delete r.data.actorUid;delete r.app;await assert.rejects(handler(r),e=>e.code==='failed-precondition');assert.equal(calls.length,1);
+});

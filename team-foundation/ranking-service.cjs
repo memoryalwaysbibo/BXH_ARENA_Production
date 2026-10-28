@@ -1,0 +1,40 @@
+'use strict';
+const {progression}=require('./progression.cjs');
+const {rankSnapshot}=require('./ranking-order.cjs');
+const presets=require('./emblem-presets.js');
+const MAX_SCAN=200,MAX_PAGE=50;
+const validId=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
+function createRankingService({db}){
+ const read=async(tx,path)=>{const s=await tx.get(db.doc(path));return s.exists?s.data():null;};
+ return async({actorUid,query={}})=>{
+  if(!validId(actorUid)||!query||typeof query!=='object'||Array.isArray(query)||Object.keys(query).some(k=>!['offset','limit'].includes(k)))throw Error('invalid-ranking-query');
+  const offset=query.offset??0,limit=query.limit??20;
+  if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(limit)||limit<1||limit>MAX_PAGE)throw Error('invalid-ranking-query');
+  return db.runTransaction(async tx=>{
+   const [board,ladder,docs]=await Promise.all([read(tx,'hunterLeaderboardMeta/current'),read(tx,'ladderSystem/current'),tx.get(db.collection('teamsPublicV1').limit(MAX_SCAN+1))]);
+   if(!board?.generation||!ladder?.currentSeason)throw Error('source-unavailable');
+   if(docs.docs.length>MAX_SCAN)throw Error('team-list-capacity-exceeded');
+   // Reject unusable projections before spending an authoritative team read.
+   // Valid candidates still undergo the full canonical roster/level/name check.
+   let excluded=0;const candidates=[];
+   for(const doc of docs.docs){const p=doc.data();
+    const usable=p.hunterGeneration===board.generation&&p.ladderSeason===ladder.currentSeason&&p.strengthComplete===true&&Number.isFinite(p.strength)&&p.strength>=0&&Array.isArray(p.members)&&p.members.every(m=>m&&validId(m.uid)&&Number.isFinite(m.ladderPoints)&&m.ladderPoints>=0)&&p.strength===p.members.reduce((sum,m)=>sum+m.ladderPoints,0);
+    if(usable)candidates.push({id:doc.id,p});else excluded++;
+   }
+   const rows=await Promise.all(candidates.map(async row=>({...row,team:await read(tx,'teamsV1/'+row.id)})));
+   const valid=[];
+   for(const {id,p,team} of rows){
+    let ok=!!team&&team.status==='active'&&p.hunterGeneration===board.generation&&p.ladderSeason===ladder.currentSeason&&p.strengthComplete===true&&Number.isFinite(p.strength)&&p.strength>=0&&Array.isArray(p.members)&&Array.isArray(team.memberUids)&&p.members.length===team.memberUids.length;
+    if(ok)ok=p.members.every((m,i)=>m.uid===team.memberUids[i]&&m.role===(m.uid===team.captainUid?'captain':team.roles?.[m.uid]||'member')&&Number.isFinite(m.ladderPoints)&&m.ladderPoints>=0);
+    if(ok)try{ok=p.name===team.name&&p.memberCount===team.memberUids.length&&p.level===progression(team.totalXp).level&&p.strength===p.members.reduce((sum,m)=>sum+m.ladderPoints,0);}catch{ok=false;}
+    if(!ok){excluded++;continue;}
+    const unlocked=progression(team.totalXp).unlockedFrames;
+    const hasEmblem=typeof team.emblemObject==='string'&&team.emblemObject.startsWith('teamEmblemsV1/'+id+'/')&&/^teamEmblemsV1\/[A-Za-z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/.test(team.emblemObject);
+    valid.push({id,name:p.name,captainName:p.captainName,level:p.level,memberCount:p.memberCount,strength:p.strength,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null,preset:team.emblemObject?null:presets.normalize(team.emblemPreset??undefined),hasEmblem});
+   }
+   const ranked=rankSnapshot(valid);
+   return {items:ranked.slice(offset,offset+limit),total:ranked.length,excluded,partial:excluded>0,offset,limit};
+  });
+ };
+}
+module.exports={createRankingService,MAX_SCAN,MAX_PAGE};
