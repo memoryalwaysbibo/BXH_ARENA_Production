@@ -31,3 +31,28 @@ function presenceView({viewerIsMember,lastSeenAt,now}){
  return {state:'last-seen',label};
 }
 module.exports={summarizeActivity,presenceView};
+
+// Calendar days in Taiwan; compact buckets keep reads independent of receipt history size.
+const DAY=86400000,TAIPEI_OFFSET=8*3600000;
+function activityDay(at){if(!Number.isSafeInteger(at)||at<0)throw Error('invalid-activity-time');return Math.floor((at+TAIPEI_OFFSET)/DAY);}
+function recentActivity({dailyActivity={},members,now}){
+ const today=activityDay(now),active=new Set(),current=new Set(members);let participations=0;
+ for(const [key,b] of Object.entries(dailyActivity)){
+  const day=Number(key);if(!Number.isSafeInteger(day)||day<today-29||day>today)continue;
+  if(!Number.isSafeInteger(b?.participations)||b.participations<0||!Array.isArray(b.memberUids))throw Error('invalid-activity-bucket');
+  participations+=b.participations;
+  for(const uid of b.memberUids)if(current.has(uid))active.add(uid);
+ }
+ if(!Number.isSafeInteger(participations))throw Error('invalid-activity-count');
+ return {participations,activeMemberCount:active.size,days:30};
+}
+function recordDailyActivity({dailyActivity={},uid,archivedAt,now,members}){
+ const today=activityDay(now),day=activityDay(archivedAt),next={},current=new Set(members);
+ if(archivedAt>now)throw Error('future-activity');
+ recentActivity({dailyActivity,members:[],now});
+ for(const [key,b] of Object.entries(dailyActivity))if(Number(key)>=today-29&&Number(key)<=today)next[key]={participations:b.participations,memberUids:[...new Set(b.memberUids)].filter(id=>current.has(id))};
+ if(day>=today-29){const b=next[day]||{participations:0,memberUids:[]};if(b.participations>=Number.MAX_SAFE_INTEGER)throw Error('invalid-activity-count');next[day]={participations:b.participations+1,memberUids:[...new Set([...b.memberUids,uid])]};}
+ return next;
+}
+module.exports.recentActivity=recentActivity;
+module.exports.recordDailyActivity=recordDailyActivity;
