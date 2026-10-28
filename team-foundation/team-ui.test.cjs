@@ -126,3 +126,6 @@ test('lobby pagination uses requested page size even when stale rows were omitte
  const last=ui.lobby({items:[],total:45,offset:40,limit:20});assert.doesNotMatch(last,/lobby-next/);assert.match(last,/lobby-previous/);
  assert.doesNotMatch(ui.lobby({loading:true,total:45}),/lobby-next/);
 });
+test('lobby exposes four sort dimensions in both directions and preserves selection',()=>{
+ const html=ui.lobby({sort:'members_asc'});for(const text of ['戰力：由高到低','戰力：由低到高','創隊：由新到舊','創隊：由舊到新','人數：由多到少','人數：由少到多','等級：由高到低','等級：由低到高'])assert.ok(html.includes(text));assert.match(html,/value="members_asc" selected/);
+});
