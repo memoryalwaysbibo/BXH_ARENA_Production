@@ -1,7 +1,7 @@
 (function(root){
 'use strict';
 // Transport is deliberately injected; no unverified production endpoint is assumed.
-function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.crypto?.randomUUID)throw Error('secure-id-unavailable');return root.crypto.randomUUID();}}){
+function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},newRequestId=()=>{if(!root.crypto?.randomUUID)throw Error('secure-id-unavailable');return root.crypto.randomUUID();}}){
  if(!api||!['list','members','command','mine','applications','history'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
  const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,managementTeamId:null,historyTeamId:null,historyNextCursor:null,historyPage:1,hasMore:false};
  let generation=0,disposed=false,pendingPayload=null,historyCursors=[null];
@@ -50,6 +50,11 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
    state.team.emblemSource='data:image/webp;base64,'+base64;emit();
   }catch(_){/* Image failure never removes an otherwise available team page. */}
  }
+ async function loadLobbyEmblems(ticket){
+  if(typeof api.emblem!=='function'||typeof emblems?.hydrate!=='function'||!state.items.some(x=>x.hasEmblem===true))return;
+  const isCurrent=()=>!disposed&&ticket===generation;const result=await emblems.hydrate({items:state.items,read:p=>api.emblem(p),isCurrent});
+  if(isCurrent()){state.items=result;emit();}
+ }
  async function load(screen,payload){
   if(disposed)return {ok:false,reason:'disposed'};
   const ticket=++generation;if(screen==='manage')state.managementTeamId=payload.teamId;if(screen==='applications')state.applicationsTeamId=payload.teamId;if(screen==='history')state.historyTeamId=payload.teamId;state.screen=screen;state.loading=true;state.loaded=false;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
@@ -60,7 +65,7 @@ function createTeamController({api,onChange=()=>{},newRequestId=()=>{if(!root.cr
     if(!Array.isArray(result.items)||!Number.isSafeInteger(result.total)||result.total<0)throw Error('invalid-response');
     state.items=result.items;state.total=result.total;state.partial=result.partial===true;state.totalIsUpperBound=result.totalIsUpperBound===true;state.staleCount=Number.isSafeInteger(result.staleCount)?result.staleCount:0;
    }
-   state.loaded=true;if(['mine','members'].includes(screen)&&state.team?.id)void loadEmblem(state.team.id,ticket);return {ok:true};
+   state.loaded=true;if(['mine','members'].includes(screen)&&state.team?.id)void loadEmblem(state.team.id,ticket);if(screen==='lobby')void loadLobbyEmblems(ticket);return {ok:true};
   }catch(_){if(!disposed&&ticket===generation)state.error='資料暫時無法載入，請重試。';return {ok:false,reason:'load-failed'};}
   finally{if(!disposed&&ticket===generation){state.loading=false;emit();}}
  }
