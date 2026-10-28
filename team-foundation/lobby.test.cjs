@@ -25,3 +25,9 @@ test('search and combined filters work for already affiliated viewers',()=>{
  assert.equal(browseLobby([a,b],{eligibleOnly:true}).total,1);
  assert.throws(()=>browseLobby([a],{limit:51}));
 });
+test('all lobby sort choices order both directions and keep unknown strength last',()=>{
+ const a={...team(),id:'a',strength:300,createdAt:10,memberCount:2,level:1},b={...team(),id:'b',strength:100,createdAt:20,memberCount:5,level:3},c={...team(),id:'c',strength:null,createdAt:15,memberCount:3,level:2};
+ const expected={strength_desc:'abc',strength_asc:'bac',created_desc:'bca',created_asc:'acb',members_desc:'bca',members_asc:'acb',level_desc:'bca',level_asc:'acb'};
+ for(const [sort,order] of Object.entries(expected))assert.equal(browseLobby([c,b,a],{sort}).items.map(x=>x.id).join(''),order,sort);
+ assert.throws(()=>browseLobby([a],{sort:'unknown'}),/invalid-filter/);
+});
