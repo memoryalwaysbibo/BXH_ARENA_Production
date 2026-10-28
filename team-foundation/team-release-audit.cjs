@@ -18,7 +18,7 @@ function createTeamReleaseAudit({db}){
   const projected=new Set(projections.docs.map(d=>d.id)),missingProjectionIds=[...active.keys()].filter(id=>!projected.has(id));
   if(missingProjectionIds.length)issues.push('missing-public-projections');
   const staleProjectionIds=[];
-  for(const d of projections.docs){const p=d.data(),team=active.get(d.id);if(!team||p.name!==team.name||!Array.isArray(p.members)||!Array.isArray(team.memberUids)||p.members.length!==team.memberUids.length||p.members.some((m,i)=>m?.uid!==team.memberUids[i]))staleProjectionIds.push(d.id);}
+  for(const d of projections.docs){const p=d.data(),team=active.get(d.id);if(!team||p.name!==team.name||!Array.isArray(p.members)||!Array.isArray(team.memberUids)||p.members.length!==team.memberUids.length||p.members.some((m,i)=>m?.uid!==team.memberUids[i]||m?.role!==(m?.uid===team.captainUid?'captain':team.roles?.[m?.uid]||'member')))staleProjectionIds.push(d.id);}
   if(staleProjectionIds.length)issues.push('stale-or-orphan-public-projections');
   return {readyForNextCheck:issues.length===0,issues:[...new Set(issues)],activeCount:teams.docs.length,activeCountIsTruncated:teams.docs.length>CAP,projectionCount:projections.docs.length,projectionCountIsTruncated:projections.docs.length>CAP,recordedCount:counter,invalidTeamIds:invalidTeams,staleProjectionIds,missingProjectionIds};
  });
