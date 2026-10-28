@@ -20,3 +20,9 @@ test('maintenance reports failed dissolution candidates and expired leases',asyn
   await assert.rejects(f(),/team-dissolution-needs-attention/);
  }
 });
+test('shared maintenance includes bounded image cleanup and surfaces failures',async()=>{
+ for(const failed of [0,1]){
+  const f=createTeamMaintenance({enabled:()=>true,reconciler:{enqueue:async()=>{},runBatch:async()=>({status:'done'})},dissolution:{run:async()=>({status:'completed'})},emblems:{run:async()=>({status:'completed',failed})}});
+  if(failed)await assert.rejects(f(),/team-emblem-cleanup-needs-attention/);else assert.equal((await f()).emblems.failed,0);
+ }
+});
