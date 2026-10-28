@@ -17,6 +17,15 @@ async function prepare(file,{decode,canvasFactory}={}){
   return blob;
  }finally{bitmap?.close?.();}
 }
-const api={prepare,MAX_INPUT,MAX_OUTPUT,SIZE};
+async function hydrate({items,read,isCurrent=()=>true}){
+ const result=items.map(item=>({...item})),queue=result.slice(0,20).filter(item=>item.hasEmblem===true&&typeof item.id==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(item.id));let index=0;
+ async function worker(){while(index<queue.length&&isCurrent()){
+  const item=queue[index++];try{const r=await read({teamId:item.id}),image=r?.image,b64=image?.base64;
+   if(isCurrent()&&image?.contentType==='image/webp'&&typeof b64==='string'&&b64.length>=16&&b64.length<=174764&&/^UklGR[A-Za-z0-9+/]*={0,2}$/.test(b64))item.emblemSource='data:image/webp;base64,'+b64;
+  }catch(_){/* Keep the page usable if one image is unavailable. */}
+ }}
+ await Promise.all(Array.from({length:Math.min(3,queue.length)},worker));return result;
+}
+const api={prepare,hydrate,MAX_INPUT,MAX_OUTPUT,SIZE};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHTeamEmblem=api;
 })(typeof window==='object'?window:globalThis);
