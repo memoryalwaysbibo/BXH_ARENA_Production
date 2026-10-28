@@ -5570,7 +5570,7 @@ let findEventsFiltersOpen = false;
 let lobbySectionExpanded = { live:null, settling:false, registration:false, waiting:false, ended:false };
 const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","天梯排行"],["shop","商城"]];
 const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>renderPreservingScroll(),escape:esc});
-function playerVisibleTabs(){return hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:PLAYER_TABS;}
+function playerVisibleTabs(){const tabs=hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:[...PLAYER_TABS];if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);return tabs;}
 
 let engagementSnapshot=null;
 let engagementSnapshotFetchedAt=0;
@@ -14866,6 +14866,7 @@ function renderPlayerCenterLoggedIn(){
   // v13.24.0: legacy cached "find" tab now resolves into the unified lobby.
   if(playerActiveTab==="find") playerActiveTab="home";
   if(playerActiveTab==="clash"&&!hunterClashEntry?.visible())playerActiveTab="home";
+  if(playerActiveTab==="team-preview"&&!window.BXHTeamAdminPreview?.visible?.())playerActiveTab="home";
   let content;
   if(mailboxContext().open) content = renderMailboxPage();
   else if(playerActiveTab==="shop") content = window.BXHCommerce.shop();
@@ -14877,6 +14878,7 @@ function renderPlayerCenterLoggedIn(){
   else if(playerActiveTab==="checkin") content = renderDailyCheckInPage();
   else if(playerActiveTab==="host") content = renderPlayerCommunityHostTab();
   else if(playerActiveTab==="clash") content = hunterClashEntry.render();
+  else if(playerActiveTab==="team-preview") content = window.BXHTeamAdminPreview.page();
   else if(playerActiveTab==="stats") content = renderPlayerStatsTab(p);
   else if(playerActiveTab==="ladder") content = renderLadderLeaderboardPage(false);
   else if(playerActiveTab==="profile") content = renderPlayerProfileTab(p);
@@ -18567,6 +18569,7 @@ function render(){
     bindPlayerCardInputs();
     renderPlayerCardOverlay();
     bindOnsiteWaitlistPanel();
+    window.BXHTeamAdminPreview?.bind?.();
     if(__viewportSnapshot.lobbyPatched){
       __lastRenderedViewportKey=__viewportSnapshot.key;
       ++__viewportRestoreToken; // Cancel old delayed restores; stable nodes keep their own viewport.
@@ -19467,11 +19470,14 @@ function renderApp(){
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
   if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
   if(activeTab==='commerce-admin'&&!isSuperAdmin())activeTab='live';
+  if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);
+  if(activeTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.())activeTab='live';
   let content = "";
   if(activeTab==="management") content = renderTournamentManagementTab();
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
+  else if(activeTab==="team-preview") content = window.BXHTeamAdminPreview.page();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
   else if(activeTab==="live") content = wrapBracketWatermark(renderLive());
   else if(activeTab==="bracket") content = renderBracket();
@@ -20625,6 +20631,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(targetTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles())){showToast('目前身分沒有此操作權限。',true);return;}
     if(targetTab==='commerce-admin'&&!isSuperAdmin()){showToast('目前身分沒有商城管理權限。',true);return;}
     if(targetTab==='inventory-admin'&&!isSuperAdmin()){showToast('目前身分沒有道具管理權限。',true);return;}
+    if(targetTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.()){showToast('目前身分沒有戰隊預覽權限。',true);return;}
     if((targetTab==="management" || targetTab==="referee" || targetTab==="settings" || targetTab==="registrations" || targetTab==="people") && !hasAdminAccess()){
       showToast("目前身分沒有此操作權限。", true);
       return;
@@ -21309,6 +21316,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     mailboxContext().open=false;
     let newTab = target.getAttribute("data-tab");
     if(newTab==="clash"&&!hunterClashEntry?.visible())return;
+    if(newTab==="team-preview"&&!window.BXHTeamAdminPreview?.visible?.())return;
     if(newTab==="find") newTab="home"; // legacy v13.23.x cached/action compatibility
     if(newTab==="stats" && playerActiveTab!=="stats") playerStatsSubTab="overview";
     if(playerActiveTab==="home" && newTab!=="home") findEventsFiltersOpen=false;

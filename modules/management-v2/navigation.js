@@ -8,6 +8,7 @@
     {id:"event",label:"賽事",tabs:["management","registrations","settings","people"]},
     {id:"field",label:"現場",tabs:["live","bracket","referee","duty"]},
     {id:"ranking",label:"排行",tabs:["ladder"]},
+    {id:"team",label:"戰隊",tabs:["team-preview"]},
     {id:"hunter",label:"獵人",tabs:[],placeholder:true,hidden:true},
     {id:"activity",label:"活動",tabs:["member-raffles","inventory-admin"]},
     {id:"commerce",label:"商城",tabs:["commerce-admin"]},
@@ -16,7 +17,7 @@
   const LABELS={
     management:"賽事管理",registrations:"報名管理",settings:"賽事設定",people:"人員管理",
     live:"即時戰況",bracket:"對戰表",referee:"裁判台",duty:"我的執勤",
-    ladder:"天梯排行","member-raffles":"會員抽獎管理","inventory-admin":"道具管理",
+    ladder:"天梯排行","team-preview":"戰隊大廳","member-raffles":"會員抽獎管理","inventory-admin":"道具管理",
     "commerce-admin":"商城管理",operations:"抽獎與維護",history:"賽事紀錄",version:"版本更新"
   };
   function groupForTab(tab){return GROUPS.find(g=>g.tabs.includes(tab))||GROUPS[0];}
