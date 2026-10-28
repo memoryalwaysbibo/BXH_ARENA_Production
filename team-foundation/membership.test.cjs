@@ -15,6 +15,11 @@ function fixture(readEligibility){
 }
 let sequence=0;
 const cmd=(run,actorUid,action,extra={})=>run({actorUid,action,teamId:'alpha',requestId:'test-operation-'+String(++sequence).padStart(8,'0'),...extra});
+test('team creation stores the chosen preset and only captain can replace custom emblem',async()=>{
+ const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha',preset:{id:'wings',color:'#00aaFF'}});assert.deepEqual(data.get('teamsV1/alpha').emblemPreset,{id:'wings',color:'#00AAFF'});
+ data.get('teamsV1/alpha').emblemObject='old-image';await assert.rejects(cmd(run,'other','emblem-preset',{preset:{id:'star',color:'#123456'}}),/captain-required/);
+ await cmd(run,'captain','emblem-preset',{preset:{id:'star',color:'#123456'}});assert.equal(data.get('teamsV1/alpha').emblemObject,null);assert.equal(data.get('teamsV1/alpha').emblemPreset.id,'star');
+});
 test('create, apply, approve, transfer, leave preserve membership and experience',async()=>{
  const {run,data}=fixture();await cmd(run,'captain','create',{name:'Alpha'});
  await cmd(run,'player','apply');assert.equal((await cmd(run,'player','apply')).duplicate,true);
