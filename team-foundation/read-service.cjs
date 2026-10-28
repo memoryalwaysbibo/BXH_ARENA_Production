@@ -1,5 +1,6 @@
 'use strict';
 const {admissionPolicy}=require('./admission.cjs');
+const {CAP,CONTROL}=require('./team-capacity.cjs');
 const {progression}=require('./progression.cjs');
 const {recentActivity,presenceView}=require('./activity.cjs');
 const presets=require('./emblem-presets.js');
@@ -24,7 +25,7 @@ function createReadService({db,clock=Date.now}){
    }
    if(action==='mine'){
     const member=await read(tx,'teamMembershipsV1/'+actorUid);
-    if(!member)return {team:null};
+    if(!member){const capacity=await read(tx,CONTROL),count=capacity?.activeCount;const known=Number.isSafeInteger(count)&&count>=0&&count<=CAP;return {team:null,creationCapacity:{status:known?(count===CAP?'full':'open'):'unavailable',activeCount:known?count:null,limit:CAP}};}
     if(!valid(member.teamId))throw Error('membership-unavailable');
     const own=await read(tx,'teamsV1/'+member.teamId);
     if(!own||own.status==='dissolved'||!own.memberUids?.includes(actorUid))throw Error('membership-unavailable');
