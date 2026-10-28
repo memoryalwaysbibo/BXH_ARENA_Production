@@ -126,3 +126,6 @@ test('team cap rejection displays a clear message without retrying a successful 
  const c=setup({command:async()=>{throw Object.assign(Error('team-capacity-full'),{code:'functions/failed-precondition'});}});
  const result=await c.operate('create','new',{name:'新隊'});assert.equal(result.reason,'rejected');assert.equal(c.snapshot().pending,false);assert.match(c.snapshot().error,/戰隊數量已達上限/);
 });
+test('create carries server capacity state and replaces it on refresh',async()=>{
+ let status='full';const c=setup({mine:async()=>({team:null,creationCapacity:{status,limit:200,activeCount:status==='full'?200:199}})});await c.create();assert.equal(c.snapshot().creationCapacity.status,'full');status='open';await c.create();assert.equal(c.snapshot().creationCapacity.activeCount,199);
+});
