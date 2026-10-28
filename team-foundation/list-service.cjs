@@ -9,8 +9,8 @@ const validId=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 function createListService({db}){
  const read=async(tx,path)=>{const s=await tx.get(db.doc(path));return s.exists?s.data():null;};
  return async({actorUid,query={}})=>{
-  if(!validId(actorUid)||!query||typeof query!=='object'||Array.isArray(query)||Object.keys(query).some(k=>!['query','mode','recruitment','offset','limit'].includes(k))||typeof(query.query??'')!=='string'||(query.query??'').length>100)throw Error('invalid-list-query');
-  const options={query:query.query??'',mode:query.mode??'all',recruitment:query.recruitment??'all',offset:query.offset??0,limit:query.limit??20};
+  if(!validId(actorUid)||!query||typeof query!=='object'||Array.isArray(query)||Object.keys(query).some(k=>!['query','mode','recruitment','sort','offset','limit'].includes(k))||typeof(query.query??'')!=='string'||(query.query??'').length>100)throw Error('invalid-list-query');
+  const options={query:query.query??'',mode:query.mode??'all',recruitment:query.recruitment??'all',sort:query.sort??'strength_desc',offset:query.offset??0,limit:query.limit??20};
   return db.runTransaction(async tx=>{
    const [board,ladder,membership,publicDocs]=await Promise.all([
     read(tx,'hunterLeaderboardMeta/current'),read(tx,'ladderSystem/current'),read(tx,'teamMembershipsV1/'+actorUid),tx.get(db.collection('teamsPublicV1').limit(MAX_SCAN+1))
