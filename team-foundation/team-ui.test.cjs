@@ -129,3 +129,8 @@ test('lobby pagination uses requested page size even when stale rows were omitte
 test('lobby exposes four sort dimensions in both directions and preserves selection',()=>{
  const html=ui.lobby({sort:'members_asc'});for(const text of ['戰力：由高到低','戰力：由低到高','創隊：由新到舊','創隊：由舊到新','人數：由多到少','人數：由少到多','等級：由高到低','等級：由低到高'])assert.ok(html.includes(text));assert.match(html,/value="members_asc" selected/);
 });
+test('create screen shows capacity and replaces the form when full or unavailable',()=>{
+ assert.match(ui.createTeam(null,{status:'open',activeCount:199,limit:200}),/199／200/);
+ for(const status of ['full','unavailable']){const html=ui.createTeam(null,{status,activeCount:null,limit:200});assert.doesNotMatch(html,/data-team-form="create"/);assert.match(html,/重新整理名額/);assert.match(html,/前往戰隊大廳/);}
+ assert.match(ui.createTeam(null,{status:'full',activeCount:200,limit:200}),/已達 200 支上限/);
+});
