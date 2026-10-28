@@ -17,7 +17,8 @@ function createReadService({db}){
     if(team?.status!=='active'||!Array.isArray(team.memberUids)||!team.memberUids.includes(targetUid))throw Error('membership-unavailable');
     const rank=progression(team.totalXp),role=team.captainUid===targetUid?'captain':team.roles?.[targetUid]||'member';
     if(!['captain','deputy','elite','member'].includes(role)||typeof team.name!=='string')throw Error('membership-unavailable');
-    return {team:{id:member.teamId,name:team.name,role,level:rank.level,selectedFrame:rank.unlockedFrames.includes(team.selectedFrame)?team.selectedFrame:null}};
+    const hasEmblem=typeof team.emblemObject==='string'&&team.emblemObject.startsWith('teamEmblemsV1/'+member.teamId+'/')&&/^teamEmblemsV1\/[A-Za-z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/.test(team.emblemObject);
+    return {team:{id:member.teamId,name:team.name,role,level:rank.level,selectedFrame:rank.unlockedFrames.includes(team.selectedFrame)?team.selectedFrame:null,hasEmblem}};
    }
    if(action==='mine'){
     const member=await read(tx,'teamMembershipsV1/'+actorUid);
