@@ -1,6 +1,6 @@
 {
-  "build": "20261028.1",
+  "build": "20261028.2",
   "version": "v14.3.37",
-  "updatedAt": "2026-10-28T08:40:00.000Z",
-  "releaseTrigger": "commerce-foundation-closed"
+  "updatedAt": "2026-10-28T10:55:04.395Z",
+  "releaseTrigger": "commerce-hide-quota-vip"
 }
