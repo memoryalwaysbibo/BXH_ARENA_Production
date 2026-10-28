@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createMembershipService}=require('./membership.cjs');
 function fixture(readEligibility){
- const data=new Map();
+ const data=new Map();let now=100;
  const db={doc:p=>p,runTransaction:async fn=>{
   const staged=[];let writing=false;
   const tx={get:async p=>{assert.equal(writing,false,'all reads before writes');return {exists:data.has(p),data:()=>structuredClone(data.get(p))};}};
@@ -11,7 +11,7 @@ function fixture(readEligibility){
   for(const [op,p,v]of staged){if(op==='delete')data.delete(p);else data.set(p,op==='update'?{...data.get(p),...v}:v);}
   return result;
  }};
- return {data,run:createMembershipService({db,clock:()=>100,readEligibility})};
+ return {data,db,setTime:value=>{now=value;},run:createMembershipService({db,clock:()=>now,readEligibility})};
 }
 let sequence=0;
 const cmd=(run,actorUid,action,extra={})=>run({actorUid,action,teamId:'alpha',requestId:'test-operation-'+String(++sequence).padStart(8,'0'),...extra});
@@ -111,3 +111,30 @@ test('removal writes public history and separate private reason atomically',asyn
 });
 
 test('same operation replays original success without duplicating history; changed payload conflicts',async()=>{const {run,data}=fixture();const req={requestId:'repeat-operation-000001',name:'Alpha'};await cmd(run,'captain','create',req);const before=JSON.stringify([...data]);assert.deepEqual(await cmd(run,'captain','create',req),{ok:true});assert.equal(JSON.stringify([...data]),before);await assert.rejects(cmd(run,'captain','create',{...req,name:'Other'}),/operation-id-conflict/);assert.equal(JSON.stringify([...data]),before);});
+
+test('joining at the deadline cancels dissolution; subsequent departure starts a fresh 24 hours',async()=>{
+ const {createAutoDissolver}=require('./auto-dissolve.cjs');const f=fixture();
+ await cmd(f.run,'captain','create',{name:'Alpha'});await cmd(f.run,'captain','admission',{policy:{mode:'auto'}});
+ const due=f.data.get('teamsV1/alpha').dissolveAt;f.setTime(due);
+ await cmd(f.run,'a','apply');const worker=createAutoDissolver({db:f.db,clock:()=>due});
+ assert.equal(await worker.dissolveCandidate('alpha'),false);assert.equal(f.data.get('teamsV1/alpha').dissolveAt,null);
+ f.setTime(due+1000);await cmd(f.run,'a','leave');assert.equal(f.data.get('teamsV1/alpha').dissolveAt,due+1000+86400000);
+ assert.equal(await worker.dissolveCandidate('alpha'),false);
+});
+test('dissolution committing first prevents a later join and retains one system history record',async()=>{
+ const {createAutoDissolver}=require('./auto-dissolve.cjs');const f=fixture();
+ await cmd(f.run,'captain','create',{name:'Alpha'});await cmd(f.run,'captain','admission',{policy:{mode:'auto'}});
+ const due=f.data.get('teamsV1/alpha').dissolveAt;f.setTime(due);
+ const worker=createAutoDissolver({db:f.db,clock:()=>due});assert.equal(await worker.dissolveCandidate('alpha'),true);
+ await assert.rejects(cmd(f.run,'a','apply'),/team-dissolved/);assert.equal(await worker.dissolveCandidate('alpha'),false);
+ assert.equal(f.data.has('teamMembershipsV1/a'),false);assert.equal(f.data.has('teamMembershipsV1/captain'),false);
+ assert.equal([...f.data.values()].filter(v=>v.method==='auto-dissolve').length,1);
+});
+test('automatic join retries do not duplicate history; rejoining resets personal contribution only',async()=>{
+ const f=fixture();await cmd(f.run,'captain','create',{name:'Alpha'});await cmd(f.run,'captain','admission',{policy:{mode:'auto'}});
+ const request={requestId:'join-retry-operation-0001'};await cmd(f.run,'a','apply',request);await cmd(f.run,'a','apply',request);
+ assert.equal([...f.data].filter(([path,v])=>path.includes('/history/')&&v.method==='auto').length,1);
+ f.data.get('teamMembershipsV1/a').experienceContribution=5;f.data.get('teamsV1/alpha').totalXp=5;
+ await cmd(f.run,'a','leave');f.setTime(200);await cmd(f.run,'a','apply');
+ assert.equal(f.data.get('teamMembershipsV1/a').experienceContribution??0,0);assert.equal(f.data.get('teamMembershipsV1/a').joinedAt,200);assert.equal(f.data.get('teamsV1/alpha').totalXp,5);
+});
