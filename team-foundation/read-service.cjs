@@ -1,11 +1,12 @@
 'use strict';
 const {admissionPolicy}=require('./admission.cjs');
 const {progression}=require('./progression.cjs');
+const {recentActivity}=require('./activity.cjs');
 const presets=require('./emblem-presets.js');
 const {historyView,mayReadReason}=require('./history.cjs');
 const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value);
 // actorUid MUST be provided by the server Auth boundary, not client JSON.
-function createReadService({db}){
+function createReadService({db,clock=Date.now}){
  const read=async(tx,path)=>{const snap=await tx.get(db.doc(path));return snap.exists?snap.data():null;};
  return async({actorUid,action,teamId,historyId,cursor,targetUid})=>{
   if(!valid(actorUid)||!['members','history','reason','mine','applications','card-team'].includes(action)||(!['mine','card-team'].includes(action)&&!valid(teamId))||(action==='card-team'&&!valid(targetUid))||(action==='reason'&&!valid(historyId)))throw Error('invalid-read');
@@ -29,7 +30,7 @@ function createReadService({db}){
     if(!own||own.status==='dissolved'||!own.memberUids?.includes(actorUid))throw Error('membership-unavailable');
     const role=own.captainUid===actorUid?'captain':own.roles?.[actorUid]||'member';
     const rank=progression(own.totalXp);
-    return {team:{id:member.teamId,name:own.name,role,memberCount:own.memberUids.length,level:rank.level,capacity:rank.capacity,totalXp:rank.totalXp,experienceContribution:Number.isSafeInteger(member.experienceContribution)&&member.experienceContribution>=0?member.experienceContribution:0,currentXp:rank.currentXp,nextXp:rank.nextXp,unlockedFrames:rank.unlockedFrames,selectedFrame:own.selectedFrame??null,preset:own.emblemObject?null:presets.normalize(own.emblemPreset??undefined),admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
+    return {team:{id:member.teamId,name:own.name,role,memberCount:own.memberUids.length,level:rank.level,capacity:rank.capacity,totalXp:rank.totalXp,recentActivity:recentActivity({dailyActivity:own.dailyActivity,members:own.memberUids,now:clock()}),experienceContribution:Number.isSafeInteger(member.experienceContribution)&&member.experienceContribution>=0?member.experienceContribution:0,currentXp:rank.currentXp,nextXp:rank.nextXp,unlockedFrames:rank.unlockedFrames,selectedFrame:own.selectedFrame??null,preset:own.emblemObject?null:presets.normalize(own.emblemPreset??undefined),admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
    }
    if(action==='members'){
     // Only a server-maintained public projection is exposed; raw team docs never returned.
