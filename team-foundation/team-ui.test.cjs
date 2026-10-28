@@ -107,3 +107,11 @@ test('same-team roster shows escaped login and contribution; public roster hides
  assert.doesNotMatch(ui.publicMembers(t),/最近登入|經驗貢獻|&lt;script/);
  const html=ui.publicMembers({...t,viewerIsMember:true});assert.match(html,/最近登入/);assert.match(html,/經驗貢獻/);assert.match(html,/&lt;script/);assert.doesNotMatch(html,/<script>/);
 });
+
+test('solo dissolution warning separates Taiwan date and time and disappears after recovery',()=>{
+ const team={id:'t',name:'隊伍',role:'captain',memberCount:1,dissolution:{dueAt:Date.UTC(2026,9,28,7,30),overdue:false}};
+ const html=ui.myTeam(team);assert.match(html,/戰隊人數不足/);assert.match(html,/解散檢查日期：2026\/10\/28/);assert.match(html,/解散檢查時間：15:30/);assert.doesNotMatch(html,/已到期限/);
+ assert.match(ui.myTeam({...team,dissolution:{...team.dissolution,overdue:true}}),/已到期限/);
+ assert.doesNotMatch(ui.myTeam({...team,memberCount:2}),/戰隊人數不足/);
+ assert.match(ui.createTeam(null),/24 小時內招募至少 1 位隊員/);
+});
