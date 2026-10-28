@@ -54,6 +54,10 @@ test('application date and time are displayed separately in Taipei time',()=>{
 test('application review offers a manual refresh for changes made by others',()=>{
  const html=ui.applications({teamId:'t'});assert.match(html,/data-team-action="reload-applications"/);assert.match(html,/重新整理名單/);
 });
+test('review pages can be browsed without deciding earlier applications',()=>{
+ const first=ui.applications({teamId:'t',nextCursor:'p19',page:1});assert.match(first,/applications-next/);assert.doesNotMatch(first,/applications-previous/);
+ const last=ui.applications({teamId:'t',page:2});assert.match(last,/applications-previous/);assert.doesNotMatch(last,/applications-next/);assert.match(last,/第 2 頁/);
+});
 test('affiliated applicants cannot be approved but can still be rejected',()=>{
  const html=ui.applications({teamId:'t',items:[{uid:'p',name:'小明',hasTeam:true}]});
  assert.match(html,/已有所屬戰隊，無法核准加入/);
