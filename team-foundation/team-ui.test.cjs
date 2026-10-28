@@ -101,3 +101,9 @@ test('only the captain can choose an unlocked frame and the saved choice is sele
  assert.match(member,/class="team-identity team-frame-7"/);assert.match(ui.css,/\.team-frame-7/);
  const invalid=ui.myTeam({...team,selectedFrame:10});assert.doesNotMatch(invalid,/class="team-identity team-frame-10"/);assert.match(invalid,/目前戰隊框：未使用/);
 });
+
+test('same-team roster shows escaped login and contribution; public roster hides them',()=>{
+ const t={name:'隊伍',members:[{name:'A',role:'member',experienceContribution:4,recentLogin:'<script>登入</script>'}]};
+ assert.doesNotMatch(ui.publicMembers(t),/最近登入|經驗貢獻|&lt;script/);
+ const html=ui.publicMembers({...t,viewerIsMember:true});assert.match(html,/最近登入/);assert.match(html,/經驗貢獻/);assert.match(html,/&lt;script/);assert.doesNotMatch(html,/<script>/);
+});
