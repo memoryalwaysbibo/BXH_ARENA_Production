@@ -33,6 +33,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
   else if(action==='reload-manage')await controller.manage(controller.snapshot().managementTeamId);
   else if(action==='history')await controller.history(id);
   else if(action==='reload-history')await controller.history(controller.snapshot().historyTeamId);
+  else if(action==='lobby-next'||action==='lobby-previous'){const state=controller.snapshot(),offset=Number.isSafeInteger(state.query.offset)?state.query.offset:0,limit=Number.isSafeInteger(state.query.limit)?state.query.limit:20;await controller.search({...state.query,offset:action==='lobby-next'?offset+limit:Math.max(0,offset-limit)});}
   else if(action==='history-next')await controller.historyNext();
   else if(action==='history-previous')await controller.historyPrevious();
   else if(action==='applications')await controller.applications(id);
