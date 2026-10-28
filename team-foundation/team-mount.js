@@ -2,7 +2,7 @@
 'use strict';
 function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamController}){
  if(!container||!ui||!controllers)throw Error('team-components-required');
- let previewVersion=0,previewUrl=null,previewBlob=null,previewTeam=null;
+ let previewVersion=0,previewUrl=null,previewBlob=null,previewTeam=null,creating=false;
  function clearPreview(){previewVersion++;previewBlob=null;previewTeam=null;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
@@ -61,11 +61,20 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
    event.preventDefault();const data=new FormData(form),name=String(data.get('name')||'').trim();
    if(name.length<2||name.length>24){form.reportValidity();return;}
    if(!root.crypto?.randomUUID){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent='目前無法安全建立戰隊，請重新載入再試。';container.append(p);return;}
-   await controller.operate('create',root.crypto.randomUUID(),{name});return;
+   if(creating)return;creating=true;try{
+   const preset={id:String(data.get('presetId')||'shield'),color:String(data.get('presetColor')||'#EC536E')};
+   let base64=null;const file=data.get('customEmblem');if(file&&file.size>0){try{const blob=await root.BXHTeamEmblem.prepare(file),bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);base64=root.btoa(binary);}catch(_){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent='自訂圖片無法處理，請重新選擇。';container.append(p);return;}}
+   if(controller.snapshot().screen!=='create'||controller.snapshot().team)return;
+   const teamId=root.crypto.randomUUID(),result=await controller.operate('create',teamId,{name,preset});if(result.ok&&base64&&controller.snapshot().team?.id===teamId)await controller.operate('emblem',teamId,{base64});return;
+   }finally{creating=false;}
   }
   if(form.dataset.teamForm==='admission'){
    event.preventDefault();const data=new FormData(form),team=controller.snapshot().team;
    if(team?.id)await controller.operate('admission',team.id,{policy:{mode:String(data.get('mode')||''),minLadderTier:String(data.get('minLadderTier')||'')||null,minTier:String(data.get('minTier')||'')||null}});return;
+  }
+  if(form.dataset.teamForm==='emblem-preset'){
+   event.preventDefault();const data=new FormData(form),team=controller.snapshot().team;if(team?.role!=='captain')return;
+   await controller.operate('emblem-preset',team.id,{preset:{id:String(data.get('presetId')||''),color:String(data.get('presetColor')||'')}});return;
   }
   if(form.dataset.teamForm==='frame'){
    event.preventDefault();const raw=String(new FormData(form).get('frame')??''),team=controller.snapshot().team;
@@ -86,7 +95,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
    return;
   }
   if(select.name!=='reasonCode')return;const form=select.closest('[data-team-form="remove"]');if(!form||!container.contains(form))return;const label=form.querySelector('[data-other-reason]'),note=form.querySelector('[name="reasonNote"]');label.hidden=select.value!=='other';note.required=select.value==='other';note.setCustomValidity('');};
- const input=event=>{if(event.target.name==='reasonNote')event.target.setCustomValidity('');};
+ const input=event=>{if(event.target.name==='presetColor'&&/^#[0-9a-fA-F]{6}$/.test(event.target.value)){const form=event.target.closest('form');if(form&&container.contains(form))for(const svg of form.querySelectorAll('svg'))svg.style.color=event.target.value;}if(event.target.name==='reasonNote')event.target.setCustomValidity('');};
  container.addEventListener('click',click);container.addEventListener('submit',submit);container.addEventListener('change',change);container.addEventListener('input',input);void controller.search();
  return {controller,destroy(){clearPreview();controller.dispose();container.removeEventListener('click',click);container.removeEventListener('submit',submit);container.removeEventListener('change',change);container.removeEventListener('input',input);container.replaceChildren();}};
 }
