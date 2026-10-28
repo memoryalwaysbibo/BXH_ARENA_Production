@@ -1,5 +1,6 @@
 'use strict';
 const {randomUUID,createHash}=require('node:crypto');
+const {CONTROL,capacityAfter}=require('./team-capacity.cjs');
 const {removalReason}=require('./history.cjs');
 const {admissionPolicy,requireEligible}=require('./admission.cjs');
 const {progression} = require('./progression.cjs');
@@ -43,6 +44,7 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
    const endTenure=(member)=>{if(member?.tenureId)tx.update(ref('teamsV1/'+teamId+'/tenures/'+id(member.tenureId)),{leftAt:now});};
    if(action==='create') {
     if(actor) throw Error('already-in-team'); if(team) throw Error('team-id-taken');
+    const control=await read(tx,ref(CONTROL));const nextCount=capacityAfter(control?.activeCount,1);tx.update(ref(CONTROL),{activeCount:nextCount});
     const fresh={name:name.trim(),captainUid:actorUid,memberUids:[actorUid],roles:{[actorUid]:'captain'},totalXp:0,createdAt:now,selectedFrame:null,status:'active',admission:admissionPolicy(),emblemPreset:selectedPreset,emblemObject:null};
     tx.create(tr,{...fresh,...populationState(fresh,now)});
     tx.create(ar,startTenure(actorUid));log('create','captain'); return {ok:true};
@@ -58,7 +60,8 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
     if(action==='emblem-preset'){tx.update(tr,{emblemPreset:selectedPreset,emblemObject:null,emblemUpdatedAt:now});return {ok:true};}
     if(action==='frame'){tx.update(tr,{selectedFrame:selectFrame(team,actorUid,frame).selectedFrame});return {ok:true};}
     if(!canDissolve(team,actorUid,now))throw Error('team-must-be-solo');
-    tx.update(tr,{status:'dissolved',dissolvedAt:now,dissolvedBy:actorUid,dissolveAt:null});endTenure(actor);tx.delete(ar);log('dissolve','captain');return {ok:true};
+    const control=await read(tx,ref(CONTROL));const nextCount=capacityAfter(control?.activeCount,-1);tx.update(ref(CONTROL),{activeCount:nextCount});
+    tx.update(tr,{status:'dissolved',dissolvedAt:now,dissolvedBy:actorUid,dissolveAt:null});tx.delete(ref('teamsPublicV1/'+teamId));endTenure(actor);tx.delete(ar);log('dissolve','captain');return {ok:true};
    }
    if(!Array.isArray(members)||new Set(members).size!==members.length||!members.includes(team.captainUid)) throw Error('invalid-team-state');
    if(action==='admission'){
