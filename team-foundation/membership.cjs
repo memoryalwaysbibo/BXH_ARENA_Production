@@ -39,11 +39,13 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
     tx.create(ref('teamsV1/'+teamId+'/history/'+historyId),{subjectUid,subjectName,actorUid,actorName,actorRole:actorRole||team?.roles?.[actorUid]||(team?.captainUid===actorUid?'captain':'member'),method,occurredAt:now});
     if(removal)tx.create(ref('teamsV1/'+teamId+'/historyReasons/'+historyId),{...removal,subjectUid,createdAt:now});
    };
+   const startTenure=(uid)=>{tx.create(ref('teamsV1/'+teamId+'/tenures/'+historyId),{uid,teamId,tenureId:historyId,joinedAt:now,leftAt:null});return {teamId,joinedAt:now,tenureId:historyId};};
+   const endTenure=(member)=>{if(member?.tenureId)tx.update(ref('teamsV1/'+teamId+'/tenures/'+id(member.tenureId)),{leftAt:now});};
    if(action==='create') {
     if(actor) throw Error('already-in-team'); if(team) throw Error('team-id-taken');
     const fresh={name:name.trim(),captainUid:actorUid,memberUids:[actorUid],roles:{[actorUid]:'captain'},totalXp:0,createdAt:now,selectedFrame:null,status:'active',admission:admissionPolicy(),emblemPreset:selectedPreset,emblemObject:null};
     tx.create(tr,{...fresh,...populationState(fresh,now)});
-    tx.create(ar,{teamId,joinedAt:now});log('create','captain'); return {ok:true};
+    tx.create(ar,startTenure(actorUid));log('create','captain'); return {ok:true};
    }
    if(!team) throw Error('team-not-found');
    if(team.status==='dissolved')throw Error('team-dissolved');
@@ -56,7 +58,7 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
     if(action==='emblem-preset'){tx.update(tr,{emblemPreset:selectedPreset,emblemObject:null,emblemUpdatedAt:now});return {ok:true};}
     if(action==='frame'){tx.update(tr,{selectedFrame:selectFrame(team,actorUid,frame).selectedFrame});return {ok:true};}
     if(!canDissolve(team,actorUid,now))throw Error('team-must-be-solo');
-    tx.update(tr,{status:'dissolved',dissolvedAt:now,dissolvedBy:actorUid,dissolveAt:null});tx.delete(ar);log('dissolve','captain');return {ok:true};
+    tx.update(tr,{status:'dissolved',dissolvedAt:now,dissolvedBy:actorUid,dissolveAt:null});endTenure(actor);tx.delete(ar);log('dissolve','captain');return {ok:true};
    }
    if(!Array.isArray(members)||new Set(members).size!==members.length||!members.includes(team.captainUid)) throw Error('invalid-team-state');
    if(action==='admission'){
@@ -72,7 +74,7 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
     const admission=admissionPolicy(team.admission);
     if(admission.mode==='auto')await requireEligible({policy:admission,readEligibility,tx,uid:actorUid});
     if(admission.mode==='auto'){
-     tx.create(ar,{teamId,joinedAt:now});writeRoster({...team,memberUids:[...members,actorUid],roles:{...roles,[actorUid]:'member'}});
+     tx.create(ar,startTenure(actorUid));writeRoster({...team,memberUids:[...members,actorUid],roles:{...roles,[actorUid]:'member'}});
      tx.set(qr,{uid:actorUid,status:'approved',requestedAt:application?.requestedAt??now,resolvedAt:now,method:'auto'});log('auto');return {ok:true,joined:true};
     }
     if(application?.status==='pending') return {ok:true,duplicate:true};
@@ -82,7 +84,7 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
    if(action==='leave') {
     if(actor?.teamId!==teamId||!members.includes(actorUid)) throw Error('not-member');
     if(team.captainUid===actorUid) throw Error('transfer-captain-first');
-    writeRoster({...team,memberUids:members.filter(x=>x!==actorUid)});tx.delete(ar);log('leave',roles[actorUid]);return {ok:true};
+    writeRoster({...team,memberUids:members.filter(x=>x!==actorUid)});endTenure(actor);tx.delete(ar);log('leave',roles[actorUid]);return {ok:true};
    }
    const permission=['approve','reject'].includes(action)?'review':action;
    if(actor?.teamId!==teamId||!canManage(team,actorUid,permission,targetUid))throw Error('captain-required');
@@ -92,7 +94,7 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
     if(action==='approve') {
      if(target||members.includes(targetUid)) throw Error('already-in-team');
      if(members.length>=progression(team.totalXp).capacity) throw Error('team-full');
-     tx.create(ur,{teamId,joinedAt:now});writeRoster({...team,memberUids:[...members,targetUid],roles:{...roles,[targetUid]:'member'}});log('approve',roles[actorUid]);
+     tx.create(ur,startTenure(targetUid));writeRoster({...team,memberUids:[...members,targetUid],roles:{...roles,[targetUid]:'member'}});log('approve',roles[actorUid]);
     }
     tx.update(qr,{status:action==='approve'?'approved':'rejected',resolvedAt:now});return {ok:true};
    }
@@ -100,7 +102,7 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
    if(targetUid===actorUid) throw Error('cannot-target-self');
    if(action==='assign') {const next=assignRole(team,actorUid,targetUid,role);writeRoster(next);}
    else if(action==='transfer')writeRoster({...team,captainUid:targetUid,roles:{...roles,[actorUid]:'member',[targetUid]:'captain'}});
-   else {writeRoster({...team,memberUids:members.filter(x=>x!==targetUid)});tx.delete(ur);}
+   else {writeRoster({...team,memberUids:members.filter(x=>x!==targetUid)});endTenure(target);tx.delete(ur);}
    log(action,roles[actorUid]);
    return {ok:true};
    };
