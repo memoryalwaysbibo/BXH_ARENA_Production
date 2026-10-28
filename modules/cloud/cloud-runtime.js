@@ -874,6 +874,7 @@
     async roomPosterCover(payload){return callEngagementFunction("roomPosterCover",payload,45000);},
     async family(payload){return callEngagementFunction("familyPlayers",payload,60000);},
     async familyTransfer(payload){return callEngagementFunction("familyTransfer",payload,60000);},
+    async commerce(payload){return callEngagementFunction("commerceService",payload,60000);},
     async inventory(payload){return callEngagementFunction("inventoryService",payload,30000);},
     async cardAlbum(payload){return callEngagementFunction("cardAlbumService",payload,30000);},
     async catalog(payload){return callEngagementFunction("inventoryCatalog",payload,30000);},
