@@ -20,7 +20,8 @@ function createRankingService({db}){
     if(ok)try{ok=p.name===team.name&&p.memberCount===team.memberUids.length&&p.level===progression(team.totalXp).level&&p.strength===p.members.reduce((sum,m)=>sum+m.ladderPoints,0);}catch{ok=false;}
     if(!ok){excluded++;continue;}
     const unlocked=progression(team.totalXp).unlockedFrames;
-    valid.push({id,name:p.name,captainName:p.captainName,level:p.level,memberCount:p.memberCount,strength:p.strength,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null});
+    const hasEmblem=typeof team.emblemObject==='string'&&team.emblemObject.startsWith('teamEmblemsV1/'+id+'/')&&/^teamEmblemsV1\/[A-Za-z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/.test(team.emblemObject);
+    valid.push({id,name:p.name,captainName:p.captainName,level:p.level,memberCount:p.memberCount,strength:p.strength,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null,hasEmblem});
    }
    valid.sort((a,b)=>b.strength-a.strength||a.id.localeCompare(b.id));
    for(let i=0;i<valid.length;i++)valid[i].rank=i>0&&valid[i].strength===valid[i-1].strength?valid[i-1].rank:i+1;
