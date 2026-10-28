@@ -37,7 +37,7 @@ test('card team lookup honors player card privacy and reveals only public fields
  await assert.rejects(f.read({actorUid:'outsider',action:'card-team',targetUid:'m'}),/permission-denied/);
  assert.ok(!f.reads.includes('teamMembershipsV1/m'));
  f.data.set('playerPrivacy/m',{cardPublic:true});const r=await f.read({actorUid:'outsider',action:'card-team',targetUid:'m'});
- assert.deepEqual(r,{team:{id:'t',name:'測試隊',role:'member',level:2,selectedFrame:null,hasEmblem:false}});assert.ok(!JSON.stringify(r).includes('SECRET'));
+ assert.deepEqual(r,{team:{id:'t',name:'測試隊',role:'member',level:2,selectedFrame:null,preset:{id:'shield',color:'#EC536E'},hasEmblem:false}});assert.ok(!JSON.stringify(r).includes('SECRET'));
  const own=await f.read({actorUid:'c',action:'card-team',targetUid:'c'});assert.equal(own.team.role,'captain');
  f.data.get('teamsV1/t').emblemObject='teamEmblemsV1/t/'+('a'.repeat(64))+'.webp';const withImage=await f.read({actorUid:'outsider',action:'card-team',targetUid:'m'});assert.equal(withImage.team.hasEmblem,true);assert.ok(!JSON.stringify(withImage).includes('teamEmblemsV1'));
  f.data.set('playerPrivacy/solo',{cardPublic:true});assert.deepEqual(await f.read({actorUid:'outsider',action:'card-team',targetUid:'solo'}),{team:null});
