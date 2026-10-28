@@ -21,6 +21,8 @@ async function open(page,mode='admin',ui='v2'){
    tournamentOperation:async(name,p)=>{
     teamFixture.calls.push({name,p});
     if(name==='teamRead'&&p.action==='list')return {items:[],total:0};
+    if(name==='teamEmblemUpload')return {ok:true};
+    if(name==='teamRead'&&p.action==='emblem')return {image:null};
     if(name==='teamRead'&&p.action==='mine')return {team:teamFixture.created,creationCapacity:{status:teamFixture.capacity,activeCount:0,limit:200}};
     if(name==='teamCommand'&&p.action==='create'){teamFixture.created={id:p.teamId,name:p.name,role:'captain',memberCount:1,level:1,capacity:10,totalXp:0,unlockedFrames:[]};return {ok:true};}
     throw Error('Unexpected test request '+name+':'+p.action);
@@ -54,4 +56,50 @@ test('unknown capacity and existing membership do not offer a create form',async
  await expect(page.locator('[data-team-form="create"]')).toHaveCount(0);await expect(page.locator('#bxh-team-full-slot')).toContainText('戰隊名額暫時無法確認');
  await page.evaluate(()=>{teamFixture.created={id:'existing',name:'原戰隊',role:'member',memberCount:2};});
  await page.getByRole('button',{name:'重新整理名額'}).click();await expect(page.locator('[data-team-form="create"]')).toHaveCount(0);await expect(page.locator('#bxh-team-full-slot')).toContainText('已有所屬戰隊');expect(errors).toEqual([]);
+});
+
+// The native canvas PNG fallback mirrors Safari; cloud APIs remain synthetic.
+test('custom JPEG creates a team and uploads bounded WebP when native encoding and bitmap decoding are unavailable',async({page})=>{
+ const errors=await open(page);
+ await page.evaluate(()=>{
+  window.createImageBitmap=async()=>{throw Error('bitmap unavailable');};
+  const native=HTMLCanvasElement.prototype.toBlob;
+  HTMLCanvasElement.prototype.toBlob=function(cb){return native.call(this,cb,'image/png');};
+ });
+ await page.locator('[data-management-v2-group="team"]').click();
+ await page.getByRole('button',{name:'建立戰隊',exact:true}).click();
+ const form=page.locator('[data-team-form="create"]');
+ await form.locator('[name="name"]').fill('BXH 圖片測試');
+ await form.locator('[name="customEmblem"]').setInputFiles(process.env.BXH_TEAM_IMAGE_FIXTURE||require('node:path').join(__dirname,'fixtures/team-emblem.jpg'));
+ await form.getByRole('button',{name:'建立戰隊',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>teamFixture.calls.filter(c=>c.name==='teamEmblemUpload').length)).toBe(1);
+ const result=await page.evaluate(async()=>{
+  const p=teamFixture.calls.find(c=>c.name==='teamEmblemUpload').p;
+  const bytes=Uint8Array.from(atob(p.base64),c=>c.charCodeAt(0));
+  const url=URL.createObjectURL(new Blob([bytes],{type:'image/webp'})),image=new Image();
+  try{image.src=url;await image.decode();return {type:p.contentType,size:bytes.length,header:new TextDecoder().decode(bytes.slice(0,4)),format:new TextDecoder().decode(bytes.slice(8,12)),width:image.naturalWidth,height:image.naturalHeight};}finally{URL.revokeObjectURL(url);}
+ });
+ expect(result.type).toBe('image/webp');expect(result.size).toBeLessThanOrEqual(128*1024);
+ expect(result.header).toBe('RIFF');expect(result.format).toBe('WEBP');expect(result.width).toBe(256);expect(result.height).toBe(256);
+ await expect(page.getByRole('heading',{name:'我的戰隊',exact:true})).toBeVisible();expect(errors).toEqual([]);
+});
+test('broken custom image does not create a team or accumulate duplicate errors',async({page})=>{
+ await open(page);await page.locator('[data-management-v2-group="team"]').click();
+ await page.getByRole('button',{name:'建立戰隊',exact:true}).click();
+ const form=page.locator('[data-team-form="create"]');await form.locator('[name="name"]').fill('圖片失敗測試');
+ await form.locator('[name="customEmblem"]').setInputFiles({name:'broken.jpg',mimeType:'image/jpeg',buffer:Buffer.from('not an image')});
+ for(let i=0;i<2;i++){
+  await form.getByRole('button',{name:'建立戰隊',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'自訂圖片無法處理'})).toHaveCount(1);
+ }
+ expect(await page.evaluate(()=>teamFixture.calls.filter(c=>c.name==='teamCommand').length)).toBe(0);
+});
+
+test('native custom image preparation produces a decodable square WebP',async({page})=>{
+ await open(page);await page.locator('[data-management-v2-group="team"]').click();await page.getByRole('button',{name:'建立戰隊',exact:true}).click();
+ const form=page.locator('[data-team-form="create"]');await form.locator('[name="customEmblem"]').setInputFiles(require('node:path').join(__dirname,'fixtures/team-emblem.jpg'));
+ const result=await page.evaluate(async()=>{
+  const blob=await BXHTeamEmblem.prepare(document.querySelector('[name="customEmblem"]').files[0]);
+  const url=URL.createObjectURL(blob),image=new Image();try{image.src=url;await image.decode();return {type:blob.type,width:image.naturalWidth,height:image.naturalHeight};}finally{URL.revokeObjectURL(url);}
+ });expect(result).toEqual({type:'image/webp',width:256,height:256});
 });

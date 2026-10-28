@@ -20,3 +20,16 @@ test('navigation cancels queued image requests and ignores late results',async()
  let current=true,calls=0;const result=await hydrate({items:Array.from({length:20},(_,i)=>({id:'t'+i,hasEmblem:true})),isCurrent:()=>current,read:async()=>{calls++;await new Promise(setImmediate);current=false;return {image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQ'}};}});
  assert.equal(calls,3);assert.ok(result.every(x=>!x.emblemSource));
 });
+test('native PNG fallback uses a real WebP encoder and still closes decoded pixels',async()=>{
+ let closed=0,encoded=0;const pixels={width:256,height:256,data:new Uint8ClampedArray(256*256*4)};
+ const canvas={getContext:()=>({clearRect(){},drawImage(){},getImageData:()=>pixels}),toBlob:cb=>cb({type:'image/png',size:1000})};
+ const blob=await prepare({type:'image/jpeg',size:100},{decode:async()=>({width:20,height:10,close:()=>closed++}),canvasFactory:()=>canvas,encodeWebP:async data=>{assert.equal(data,pixels);encoded++;return new Blob(['encoded'],{type:'image/webp'});}});
+ assert.equal(blob.type,'image/webp');assert.equal(encoded,1);assert.equal(closed,1);
+});
+test('native WebP never loads fallback and fallback cannot bypass output limits',async()=>{
+ const bitmap={width:1,height:1,close(){}};let native=true;
+ const canvas={getContext:()=>({clearRect(){},drawImage(){},getImageData:()=>({})}),toBlob:cb=>cb({type:native?'image/webp':'image/png',size:10})};
+ await prepare({type:'image/jpeg',size:100},{decode:async()=>bitmap,canvasFactory:()=>canvas,encodeWebP:()=>{throw Error('must not run');}});
+ native=false;
+ await assert.rejects(prepare({type:'image/jpeg',size:100},{decode:async()=>bitmap,canvasFactory:()=>canvas,encodeWebP:async()=>({type:'image/webp',size:MAX_OUTPUT+1})}),/image-processing-failed/);
+});
