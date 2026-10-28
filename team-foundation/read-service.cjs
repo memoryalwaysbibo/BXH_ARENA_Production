@@ -1,6 +1,7 @@
 'use strict';
 const {admissionPolicy}=require('./admission.cjs');
 const {progression}=require('./progression.cjs');
+const presets=require('./emblem-presets.js');
 const {historyView,mayReadReason}=require('./history.cjs');
 const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value);
 // actorUid MUST be provided by the server Auth boundary, not client JSON.
@@ -18,7 +19,7 @@ function createReadService({db}){
     const rank=progression(team.totalXp),role=team.captainUid===targetUid?'captain':team.roles?.[targetUid]||'member';
     if(!['captain','deputy','elite','member'].includes(role)||typeof team.name!=='string')throw Error('membership-unavailable');
     const hasEmblem=typeof team.emblemObject==='string'&&team.emblemObject.startsWith('teamEmblemsV1/'+member.teamId+'/')&&/^teamEmblemsV1\/[A-Za-z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/.test(team.emblemObject);
-    return {team:{id:member.teamId,name:team.name,role,level:rank.level,selectedFrame:rank.unlockedFrames.includes(team.selectedFrame)?team.selectedFrame:null,hasEmblem}};
+    return {team:{id:member.teamId,name:team.name,role,level:rank.level,selectedFrame:rank.unlockedFrames.includes(team.selectedFrame)?team.selectedFrame:null,preset:team.emblemObject?null:presets.normalize(team.emblemPreset??undefined),hasEmblem}};
    }
    if(action==='mine'){
     const member=await read(tx,'teamMembershipsV1/'+actorUid);
@@ -28,7 +29,7 @@ function createReadService({db}){
     if(!own||own.status==='dissolved'||!own.memberUids?.includes(actorUid))throw Error('membership-unavailable');
     const role=own.captainUid===actorUid?'captain':own.roles?.[actorUid]||'member';
     const rank=progression(own.totalXp);
-    return {team:{id:member.teamId,name:own.name,role,memberCount:own.memberUids.length,level:rank.level,capacity:rank.capacity,totalXp:rank.totalXp,currentXp:rank.currentXp,nextXp:rank.nextXp,unlockedFrames:rank.unlockedFrames,selectedFrame:own.selectedFrame??null,admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
+    return {team:{id:member.teamId,name:own.name,role,memberCount:own.memberUids.length,level:rank.level,capacity:rank.capacity,totalXp:rank.totalXp,currentXp:rank.currentXp,nextXp:rank.nextXp,unlockedFrames:rank.unlockedFrames,selectedFrame:own.selectedFrame??null,preset:own.emblemObject?null:presets.normalize(own.emblemPreset??undefined),admission:['captain','deputy'].includes(role)?admissionPolicy(own.admission):null}};
    }
    if(action==='members'){
     // Only a server-maintained public projection is exposed; raw team docs never returned.
@@ -36,7 +37,7 @@ function createReadService({db}){
     if(!data||!team||team.status==='dissolved')throw Error('team-not-found');
     if(!board?.generation||!ladder?.currentSeason||data.hunterGeneration!==board.generation||data.ladderSeason!==ladder.currentSeason)throw Error('projection-stale');
     if(!Array.isArray(data.members)||!Array.isArray(team.memberUids)||data.members.length!==team.memberUids.length||data.members.some((p,i)=>p.uid!==team.memberUids[i]||p.role!==(p.uid===team.captainUid?'captain':team.roles?.[p.uid]||'member')))throw Error('projection-stale');
-    return {id:teamId,name:data.name,members:(data.members||[]).map(p=>({uid:p.uid,name:p.name,role:p.role,ladderPoints:p.ladderPoints??null,hunterTier:p.hunterTier??null}))};
+    return {id:teamId,name:data.name,preset:team.emblemObject?null:presets.normalize(team.emblemPreset??undefined),members:(data.members||[]).map(p=>({uid:p.uid,name:p.name,role:p.role,ladderPoints:p.ladderPoints??null,hunterTier:p.hunterTier??null}))};
    }
    const team=await read(tx,'teamsV1/'+teamId),membership=await read(tx,'teamMembershipsV1/'+actorUid);
    if(action==='applications'){
