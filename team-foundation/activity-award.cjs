@@ -17,7 +17,7 @@ function createActivityAwarder({db,clock=Date.now}){
    let state;try{state=typeof tour.data==='string'?JSON.parse(tour.data):tour.data;}catch{return {status:'ineligible'};}
    const at=state?.archivedAt,results=tour.ladderResults;
    const official=(tour.eventAuthority==='official'||state?.meta?.eventAuthority==='official')&&(tour.ladderMode==='ranked'||state?.meta?.ladderMode==='ranked')&&tour.archiveStatus==='completed'&&tour.ladderPointsAwarded===true&&tour.ladderSeasonId===log.seasonId&&state?.archiveStatus==='completed'&&state?.ladderPointsAwarded===true&&state?.testMode!==true&&state?.meta?.testMode!==true&&tour.testMode!==true&&tour.eventCancelled!==true&&state?.meta?.eventCancelled!==true&&tour.tournamentPhase==='done'&&Number.isSafeInteger(at)&&at>=0;
-   const matching=Array.isArray(results)&&results.filter(r=>r&&r.playerUid===log.playerUid&&r.eventCode===log.eventCode&&r.seasonId===log.seasonId&&r.pointsEarned===log.pointsEarned).length===1;
+   const matching=Array.isArray(results)&&results.filter(r=>r&&(r.playerUid??r.playerId)===log.playerUid&&(r.playerUid===undefined||r.playerId===undefined||r.playerUid===r.playerId)&&(r.eventCode===undefined||r.eventCode===log.eventCode)&&(r.seasonId===undefined||r.seasonId===log.seasonId)&&r.pointsEarned===log.pointsEarned).length===1;
    if(!official||!matching||!Number.isSafeInteger(membership.joinedAt)||membership.joinedAt<0||membership.joinedAt>at)return {status:'ineligible'};
    const team=await read(tx,'teamsV1/'+membership.teamId);
    if(team?.status!=='active'||!team.memberUids?.includes(log.playerUid)||!Number.isSafeInteger(team.totalXp)||team.totalXp<0||team.totalXp>=Number.MAX_SAFE_INTEGER)return {status:'ineligible'};
