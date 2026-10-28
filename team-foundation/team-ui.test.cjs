@@ -115,3 +115,7 @@ test('solo dissolution warning separates Taiwan date and time and disappears aft
  assert.doesNotMatch(ui.myTeam({...team,memberCount:2}),/戰隊人數不足/);
  assert.match(ui.createTeam(null),/24 小時內招募至少 1 位隊員/);
 });
+
+test('management view includes authorized contribution and login details',()=>{
+ const html=ui.manageMembers({id:'t',viewerRole:'captain',viewerIsMember:true,members:[{uid:'a',name:'A',role:'member',experienceContribution:5,recentLogin:'2 小時前'}]});assert.match(html,/經驗貢獻（本次入隊）：5/);assert.match(html,/最近登入：2 小時前/);
+});
