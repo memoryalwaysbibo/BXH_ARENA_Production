@@ -67,3 +67,10 @@ test('award updates activity and XP atomically without double counting',async()=
  await award(id);await award(id);
  assert.deepEqual(recentActivity({dailyActivity:f.docs.get('teamsV1/t').dailyActivity,members:[uid],now:200}),{participations:1,activeMemberCount:1,days:30});
 });
+
+test('manual result IDs match only the canonical ledger; conflicting IDs and metadata fail closed',async()=>{
+ const f=fixture();f.docs.get('tournaments/'+code).ladderResults=[{playerId:uid,pointsEarned:12}];assert.equal((await f.award(id)).status,'awarded');
+ for(const row of [{playerId:uid,playerUid:'other',pointsEarned:12},{playerId:uid,pointsEarned:12,eventCode:'BXH-OTHER1'},{playerId:uid,pointsEarned:12,seasonId:'S2'}]){
+ const bad=fixture();bad.docs.get('tournaments/'+code).ladderResults=[row];assert.equal((await bad.award(id)).status,'ineligible');assert.equal(bad.docs.has('teamActivityReceiptsV1/'+id),false);
+ }
+});
