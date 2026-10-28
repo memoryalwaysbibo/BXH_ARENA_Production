@@ -3,6 +3,7 @@ const {randomUUID,createHash}=require('node:crypto');
 const {removalReason}=require('./history.cjs');
 const {admissionPolicy,requireEligible}=require('./admission.cjs');
 const {progression} = require('./progression.cjs');
+const presets=require('./emblem-presets.js');
 const {roster,assignRole,canManage,populationState,canDissolve,selectFrame}=require('./team-policy.cjs');
 const id = value => { if(typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) throw Error('invalid-id'); return value; };
 // Server-only candidate. actorUid MUST come from verified Auth, never request data.
@@ -11,14 +12,15 @@ const canonical=value=>value===null||typeof value!=='object'?JSON.stringify(valu
 function createMembershipService({db,clock=Date.now,readEligibility,readDisplayName}) {
  const ref = path => db.doc(path);
  const read = async(tx,r) => {const s=await tx.get(r); return s.exists?s.data():null;};
- return async function command({actorUid,action,teamId,targetUid,name,role,frame,policy,reasonCode,reasonNote,requestId}) {
+ return async function command({actorUid,action,teamId,targetUid,name,role,frame,policy,reasonCode,reasonNote,requestId,preset}) {
   id(actorUid); id(teamId);
-  if(!['create','apply','cancel','approve','reject','leave','remove','transfer','assign','frame','dissolve','admission'].includes(action)) throw Error('invalid-action');
+  if(!['create','apply','cancel','approve','reject','leave','remove','transfer','assign','frame','dissolve','admission','emblem-preset'].includes(action)) throw Error('invalid-action');
+  const selectedPreset=['create','emblem-preset'].includes(action)?presets.normalize(preset):null;
   if(['approve','reject','remove','transfer','assign'].includes(action)) id(targetUid);
   if(action==='create' && (typeof name!=='string'||name.trim().length<2||name.trim().length>24)) throw Error('invalid-name');
   if(typeof requestId!=='string'||!/^[A-Za-z0-9_-]{16,128}$/.test(requestId))throw Error('invalid-request-id');
   const receiptId=createHash('sha256').update(actorUid+'\0'+requestId).digest('hex');
-  const requestFields={action,teamId,targetUid:targetUid??null,name:name??null,role:role??null,frame:frame??null,policy:policy??null,reasonCode:reasonCode??null,reasonNote:reasonNote??null};
+  const requestFields={action,teamId,targetUid:targetUid??null,name:name??null,role:role??null,frame:frame??null,policy:policy??null,reasonCode:reasonCode??null,reasonNote:reasonNote??null,preset:selectedPreset};
   const requestHash=createHash('sha256').update(canonical(requestFields)).digest('hex');
   const historyId=randomUUID();
   const removal=action==='remove'?removalReason(reasonCode,reasonNote):null;
@@ -39,7 +41,7 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
    };
    if(action==='create') {
     if(actor) throw Error('already-in-team'); if(team) throw Error('team-id-taken');
-    const fresh={name:name.trim(),captainUid:actorUid,memberUids:[actorUid],roles:{[actorUid]:'captain'},totalXp:0,createdAt:now,selectedFrame:null,status:'active',admission:admissionPolicy()};
+    const fresh={name:name.trim(),captainUid:actorUid,memberUids:[actorUid],roles:{[actorUid]:'captain'},totalXp:0,createdAt:now,selectedFrame:null,status:'active',admission:admissionPolicy(),emblemPreset:selectedPreset,emblemObject:null};
     tx.create(tr,{...fresh,...populationState(fresh,now)});
     tx.create(ar,{teamId,joinedAt:now});log('create','captain'); return {ok:true};
    }
@@ -49,8 +51,9 @@ function createMembershipService({db,clock=Date.now,readEligibility,readDisplayN
    const roles=roster(team);
    const writeRoster=(next)=>{const cleaned={};for(const uid of next.memberUids)cleaned[uid]=uid===next.captainUid?'captain':(next.roles?.[uid]||'member');
     next={...next,roles:cleaned};roster(next);tx.update(tr,{memberUids:next.memberUids,captainUid:next.captainUid,roles:cleaned,...populationState(next,now)});};
-   if(['dissolve','frame'].includes(action)){
+   if(['dissolve','frame','emblem-preset'].includes(action)){
     if(actor?.teamId!==teamId||team.captainUid!==actorUid)throw Error('captain-required');
+    if(action==='emblem-preset'){tx.update(tr,{emblemPreset:selectedPreset,emblemObject:null,emblemUpdatedAt:now});return {ok:true};}
     if(action==='frame'){tx.update(tr,{selectedFrame:selectFrame(team,actorUid,frame).selectedFrame});return {ok:true};}
     if(!canDissolve(team,actorUid,now))throw Error('team-must-be-solo');
     tx.update(tr,{status:'dissolved',dissolvedAt:now,dissolvedBy:actorUid,dissolveAt:null});tx.delete(ar);log('dissolve','captain');return {ok:true};
