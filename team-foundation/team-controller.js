@@ -3,8 +3,8 @@
 // Transport is deliberately injected; no unverified production endpoint is assumed.
 function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},newRequestId=()=>{if(!root.crypto?.randomUUID)throw Error('secure-id-unavailable');return root.crypto.randomUUID();}}){
  if(!api||!['list','members','command','mine','applications','history'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
- const state={screen:'lobby',items:[],total:0,query:{},team:null,creationCapacity:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,managementTeamId:null,historyTeamId:null,historyNextCursor:null,historyPage:1,hasMore:false};
- let generation=0,disposed=false,pendingPayload=null,historyCursors=[null];
+ const state={screen:'lobby',items:[],total:0,query:{},team:null,creationCapacity:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,applicationsNextCursor:null,applicationsPage:1,managementTeamId:null,historyTeamId:null,historyNextCursor:null,historyPage:1,hasMore:false};
+ let generation=0,disposed=false,pendingPayload=null,historyCursors=[null],applicationCursors=[null];
  // Only known server rejections prove the transaction did not commit.
  const rejectionMessages={
   'already-in-team':'你已有戰隊，請先確認目前的戰隊。',
@@ -76,13 +76,26 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   try{
    const result=screen==='manage'?await (async()=>{const own=await api.mine();if(own.team?.id!==payload.teamId||!['captain','deputy'].includes(own.team.role))throw Error('leadership-required');const members=await api.members(payload);return {...members,viewerRole:own.team.role};})():await(screen==='applications'?api.applications(payload):screen==='history'?api.history(payload):screen==='members'?api.members(payload):(screen==='mine'||screen==='create')?api.mine():api.list(payload));
    if(disposed||ticket!==generation)return {ok:false,reason:'superseded'};
-   if(screen==='manage')state.team=result;else if(screen==='history'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.historyNextCursor=typeof result.nextCursor==='string'?result.nextCursor:null;}else if(screen==='applications'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.hasMore=result.hasMore===true;state.applicationsTeamId=payload.teamId;}else if(screen==='members')state.team=result;else if(screen==='mine'||screen==='create'){state.team=result.team;state.creationCapacity=result.creationCapacity??null;}else{
+   if(screen==='manage')state.team=result;else if(screen==='history'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.historyNextCursor=typeof result.nextCursor==='string'?result.nextCursor:null;}else if(screen==='applications'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.hasMore=result.hasMore===true;state.applicationsNextCursor=typeof result.nextCursor==='string'?result.nextCursor:null;state.applicationsTeamId=payload.teamId;}else if(screen==='members')state.team=result;else if(screen==='mine'||screen==='create'){state.team=result.team;state.creationCapacity=result.creationCapacity??null;}else{
     if(!Array.isArray(result.items)||!Number.isSafeInteger(result.total)||result.total<0)throw Error('invalid-response');
     state.items=result.items;state.total=result.total;state.partial=result.partial===true;state.totalIsUpperBound=result.totalIsUpperBound===true;state.staleCount=Number.isSafeInteger(result.staleCount)?result.staleCount:0;
    }
    state.loaded=true;if(['mine','members'].includes(screen)&&state.team?.id)void loadEmblem(state.team.id,ticket);if(screen==='lobby')void loadLobbyEmblems(ticket);return {ok:true};
   }catch(_){if(!disposed&&ticket===generation)state.error='資料暫時無法載入，請重試。';return {ok:false,reason:'load-failed'};}
   finally{if(!disposed&&ticket===generation){state.loading=false;emit();}}
+ }
+ async function applicationsStart(teamId){
+  if(disposed||state.loading||state.busy)return {ok:false,reason:'busy'};
+  const result=await load('applications',{teamId});
+  if(result.ok){applicationCursors=[null];state.applicationsPage=1;emit();}return result;
+ }
+ async function applicationsMove(direction){
+  if(disposed||state.loading||state.busy||state.screen!=='applications'||!state.loaded)return {ok:false,reason:'unavailable'};
+  const next=direction===1;
+  if(next?!state.applicationsNextCursor:applicationCursors.length<2)return {ok:false,reason:'unavailable'};
+  const cursor=next?state.applicationsNextCursor:applicationCursors[applicationCursors.length-2];
+  const result=await load('applications',{teamId:state.applicationsTeamId,...(cursor?{cursor}:{})});
+  if(result.ok){if(next)applicationCursors.push(cursor);else applicationCursors.pop();state.applicationsPage=applicationCursors.length;emit();}return result;
  }
  async function historyStart(teamId){
   if(disposed||state.loading)return {ok:false,reason:'busy'};
@@ -111,7 +124,7 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
    const result=action==='emblem'?await api.uploadEmblem(emblemPayload):await api.command(payload);
    if(result?.ok!==true)throw Error('command-failed');
    pendingPayload=null;state.pending=false;
-   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId});else if(payload.action==='admission'||payload.action==='frame'||payload.action==='emblem-preset'||payload.action==='emblem'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
+   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId,...(applicationCursors.at(-1)?{cursor:applicationCursors.at(-1)}:{})});else if(payload.action==='admission'||payload.action==='frame'||payload.action==='emblem-preset'||payload.action==='emblem'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
    return {ok:true};
   }catch(error){
    let rejected=rejection(error);
@@ -145,7 +158,7 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   return send(pendingPayload);
  }
 
- return {snapshot,search,mine:()=>load('mine',{}),create:()=>load('create',{}),clear:()=>search({}),view:teamId=>load('members',{teamId}),applications:teamId=>load('applications',{teamId}),manage:teamId=>load('manage',{teamId}),history:historyStart,historyNext,historyPrevious,operate,retryPending,dispose:()=>{disposed=true;generation++;}};
+ return {snapshot,search,mine:()=>load('mine',{}),create:()=>load('create',{}),clear:()=>search({}),view:teamId=>load('members',{teamId}),applications:applicationsStart,applicationsNext:()=>applicationsMove(1),applicationsPrevious:()=>applicationsMove(-1),manage:teamId=>load('manage',{teamId}),history:historyStart,historyNext,historyPrevious,operate,retryPending,dispose:()=>{disposed=true;generation++;}};
 }
 if(typeof module==='object'&&module.exports)module.exports={createTeamController};else root.BXHTeamController={createTeamController};
 })(typeof window==='object'?window:globalThis);
