@@ -17,3 +17,7 @@ test('ranking displays known frame variants without accepting arbitrary classes'
  const c=create({identity:()=> 'u',read:async()=>({items:[{rank:1,name:'A',captainName:'C',memberCount:2,strength:5,selectedFrame:4},{rank:2,name:'B',captainName:'C',memberCount:2,strength:4,selectedFrame:'evil'}],total:2,excluded:0})});
  c.render(esc);await new Promise(setImmediate);const html=c.render(esc);assert.match(html,/team-identity team-frame-4/);assert.doesNotMatch(html,/team-frame-evil/);
 });
+test('ranking hydrates current page images without rereading the ranking',async()=>{
+ let calls=0;const c=create({identity:()=>'u',emblems:require('./team-emblem.js'),readEmblem:async()=>({image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQ'}}),read:async()=>{calls++;return {items:[{id:'t',rank:1,name:'隊',captainName:'A',memberCount:2,strength:5,hasEmblem:true}],total:1,excluded:0};}});
+ c.render(esc);await new Promise(setImmediate);assert.match(c.render(esc),/alt="戰隊圖案"/);assert.equal(calls,1);
+});
