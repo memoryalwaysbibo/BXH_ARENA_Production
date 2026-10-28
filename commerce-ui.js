@@ -5,6 +5,8 @@ let state=null;
 const paymentLabels={pending:'待付款',reported:'待對帳',paid:'已確認收款',cancelled:'已取消',refund_pending:'退款處理中',refunded:'已退款'};
 const deliveryLabels={not_started:'尚未交付',pending:'交付處理中',failed:'交付待處理',delivered:'已交付',revoked:'已收回',cancelled:'已取消交付'};
 const kinds={room_quota:'開房次數',vip:'VIP 功能',skin:'Skin 外觀',item:'道具'};
+const storefrontKinds=new Set(['skin','item']);
+const storefrontProduct=p=>storefrontKinds.has(p?.delivery?.kind);
 const storageKey=()=> 'bxh.commerce.pending.v1:'+currentAuthUid();
 function context(){
  const session=currentAuthUid()+':'+engagementSessionEpoch;
@@ -66,11 +68,12 @@ function enter(view){const c=context();if(c.view!==view){c.view=view;c.generatio
 function shop(){
  const c=enter('shop');schedule('catalog',c.products===null);
  if(c.order)return orderDetail(c.order,c,false);
- const p=c.products?.find(p=>p.id===c.productId);
+ if(c.category&&c.category!=='all'&&!storefrontKinds.has(c.category))c.category='';
+ const p=c.products?.find(p=>p.id===c.productId&&storefrontProduct(p));
  let body;
  if(p)body=productDetails(p,c);
- else if(!c.category)body=`<div class="commerce-grid">${[['all','全部商品'],...Object.entries(kinds)].map(([id,name])=>`<button class="panel commerce-category" data-action="commerce-category" data-id="${id}"><strong>${name}</strong><span>查看商品 →</span></button>`).join('')}</div>`;
- else body=`<button class="btn btn-ghost" data-action="commerce-categories">返回商品分類</button><h3>${esc(kinds[c.category]||'全部商品')}</h3><div class="commerce-grid">${(c.products||[]).filter(p=>c.category==='all'||p.delivery.kind===c.category).map(p=>`<article class="panel commerce-card">${image(p.imageUrl)?`<img src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}" loading="lazy">`:''}<span class="hint">${esc(kinds[p.delivery.kind])}</span><h3>${esc(p.name)}</h3><strong class="commerce-price">${money(p.priceTwd)}</strong>${p.audience==='signed_organizer'?'<p class="hint">簽約主辦限定</p>':''}<button class="btn btn-ghost" data-action="commerce-product" data-id="${esc(p.id)}">查看商品</button></article>`).join('')||'<div class="empty-state">此分類目前沒有上架商品。</div>'}</div>${c.productsCursor?'<button class="btn btn-ghost" data-action="commerce-products-more">載入更多商品</button>':''}`;
+ else if(!c.category)body=`<div class="commerce-grid">${[['all','全部商品'],...Object.entries(kinds).filter(([id])=>storefrontKinds.has(id))].map(([id,name])=>`<button class="panel commerce-category" data-action="commerce-category" data-id="${id}"><strong>${name}</strong><span>查看商品 →</span></button>`).join('')}</div>`;
+ else body=`<button class="btn btn-ghost" data-action="commerce-categories">返回商品分類</button><h3>${esc(kinds[c.category]||'全部商品')}</h3><div class="commerce-grid">${(c.products||[]).filter(p=>storefrontProduct(p)&&(c.category==='all'||p.delivery.kind===c.category)).map(p=>`<article class="panel commerce-card">${image(p.imageUrl)?`<img src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}" loading="lazy">`:''}<span class="hint">${esc(kinds[p.delivery.kind])}</span><h3>${esc(p.name)}</h3><strong class="commerce-price">${money(p.priceTwd)}</strong>${p.audience==='signed_organizer'?'<p class="hint">簽約主辦限定</p>':''}<button class="btn btn-ghost" data-action="commerce-product" data-id="${esc(p.id)}">查看商品</button></article>`).join('')||'<div class="empty-state">此分類目前沒有上架商品。</div>'}</div>${c.productsCursor?'<button class="btn btn-ghost" data-action="commerce-products-more">載入更多商品</button>':''}`;
  return `<section class="commerce"><div class="panel-title"><h2>商城</h2><button class="btn btn-ghost" data-action="commerce-refresh-products">重新整理</button></div>${notices(c)}${c.storeOpen===false?'<p class="banner" role="status">商城準備中，目前尚未開放購買。</p>':''}${c.loading?'<p role="status">正在讀取商品……</p>':''}${body}</section>`;
 }
 function orderList(c,adminMode){return `${adminMode?`<label>付款狀態<select data-commerce-status>${[['reported','待對帳'],['pending','待付款'],['paid','已確認收款'],['refund_pending','退款處理中'],['refunded','已退款'],['cancelled','已取消'],['','全部']].map(([id,l])=>`<option value="${id}" ${c.status===id?'selected':''}>${l}</option>`).join('')}</select></label>`:''}<div class="commerce-orders">${(c.orders||[]).map(o=>`<button class="panel commerce-order" data-action="commerce-order" data-id="${esc(o.id)}"><span><strong>${esc(o.productSnapshot.name)}</strong><small>${esc(o.id)}<br>${date(o.createdAt)}${adminMode?'<br>'+esc(o.buyerName):''}</small></span><span><strong>${money(o.amountTwd)}</strong><small>${esc(paymentLabels[o.paymentStatus])}<br>${esc(deliveryLabels[o.deliveryStatus])}</small></span></button>`).join('')||'<div class="empty-state">目前沒有訂單。</div>'}</div>${c.ordersCursor?'<button class="btn btn-ghost" data-action="commerce-orders-more">載入更多訂單</button>':''}`;}
@@ -104,9 +107,9 @@ async function handle(action,target){
  if(action==='commerce-order')return readOrder(id);
  if(action==='commerce-refresh-order')return readOrder(c.order.id);
  if(action==='commerce-back-orders'){c.order=null;c.error='';c.success='';render();return;}
- if(action==='commerce-category'){c.category=id;c.order=null;c.productId='';render();return;}
+ if(action==='commerce-category'){if(id!=='all'&&!storefrontKinds.has(id))return;c.category=id;c.order=null;c.productId='';render();return;}
  if(action==='commerce-categories'){c.category='';render();return;}
- if(action==='commerce-product'){c.productId=id;render();return;}
+ if(action==='commerce-product'){if(!c.products?.some(p=>p.id===id&&storefrontProduct(p)))return;c.productId=id;render();return;}
  if(action==='commerce-back-products'){c.productId='';render();return;}
  if(action==='commerce-refresh-products')return load('catalog');
  if(action==='commerce-products-more')return load(adminMode?'admin-products':'catalog',true);
@@ -115,7 +118,7 @@ async function handle(action,target){
  if(action==='commerce-buy'){
   if(c.pending)return;
   if(!document.querySelector('[data-commerce-consent]')?.checked){c.error='請先閱讀並勾選購買說明。';render();return;}
-  const p=c.products?.find(p=>p.id===id);if(p?.purchasable)return mutate({action:'create-order',productId:p.id,expectedVersion:p.version});
+  const p=c.products?.find(p=>p.id===id);if(p?.purchasable&&storefrontProduct(p))return mutate({action:'create-order',productId:p.id,expectedVersion:p.version});
  }
  if(action==='commerce-cancel'&&confirm('確定取消這筆未付款訂單？'))return mutate({action:'cancel-order',orderId:c.order.id});
  if(!adminMode)return;
