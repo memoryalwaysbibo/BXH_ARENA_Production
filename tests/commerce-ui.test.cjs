@@ -43,3 +43,9 @@ test('a closed store is clearly labeled and does not create placeholder products
  const t=setup();t.ui.shop();t.sandbox.window.engagementService.commerce=async()=>({ok:true,products:[],nextCursor:null,storeOpen:false});
  await t.ui.load('catalog');assert.match(t.ui.shop(),/商城準備中，目前尚未開放購買/);assert.equal(t.ui.context().products.length,0);
 });
+
+ test('bank remittance fields opt out of the real application half-hour rounding',()=>{
+ const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+ assert.match(source,/name="transferredAt"[^>]*data-minute-precision="true"/);
+ assert.ok(core.includes('if(el.dataset.minutePrecision==="true") return;'));
+ });

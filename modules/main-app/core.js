@@ -24866,6 +24866,7 @@ document.addEventListener("change",(e)=>{
   const el=e.target;
   if(!(el instanceof HTMLInputElement)) return;
   if(el.type!=="time" && el.type!=="datetime-local") return;
+  if(el.dataset.minutePrecision==="true") return; // Bank remittance timestamps retain their actual minute.
   const snapped=snapToHalfHourValue(el.value,el.type);
   if(snapped && snapped!==el.value) el.value=snapped;
 }, true);

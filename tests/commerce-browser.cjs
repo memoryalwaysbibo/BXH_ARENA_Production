@@ -2,6 +2,9 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..');
+const appSource=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
+const timeGuard=appSource.match(/document\.addEventListener\("change",\(e\)=>\{\n  const el=e\.target;\n  if\(!\(el instanceof HTMLInputElement\)\) return;\n  if\(el\.type!=="time"[\s\S]*?\}, true\);/)?.[0];
+assert.ok(timeGuard,'Actual application time-change handler is required');
 (async()=>{
  const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox']});
  try{
@@ -38,18 +41,24 @@ const root=path.resolve(__dirname,'..');
    }};
    document.addEventListener('click',e=>{const t=e.target.closest('[data-action^="commerce-"]');if(t){e.preventDefault();void BXHCommerce.handle(t.dataset.action,t);}});
   });
-  await page.addScriptTag({content:fs.readFileSync(path.join(root,'commerce-ui.js'),'utf8')});await page.evaluate(()=>render());
+  await page.addScriptTag({content:fs.readFileSync(path.join(root,'commerce-ui.js'),'utf8')});
+  await page.addScriptTag({content:fs.readFileSync(path.join(root,'modules/main-app/domain-utils.js'),'utf8')});
+  await page.evaluate(()=>{window.snapToHalfHourValue=window.BXHDomainUtils.snapToHalfHourValue;});
+  await page.addScriptTag({content:timeGuard});await page.evaluate(()=>render());
   await page.locator('[data-action="commerce-category"][data-id="skin"]').click();
   await page.locator('[data-action="commerce-product"]').click();
   await page.locator('[data-commerce-consent]').check();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(process.env.COMMERCE_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.COMMERCE_SCREENSHOT_DIR,`commerce-product-${width}.png`),fullPage:true});
   await page.locator('[data-action="commerce-buy"]').click();
-  await page.locator('[name="lastFive"]').fill('12345');await page.locator('[name="transferredAt"]').fill('2026-10-28T14:30');
+  await page.locator('[name="lastFive"]').fill('12345');await page.locator('[name="transferredAt"]').fill('2026-10-28T14:37');
   await page.locator('[name="note"]').fill('測試回報');
+  assert.equal(await page.locator('[name="transferredAt"]').inputValue(),'2026-10-28T14:37');
+  assert.equal(await page.evaluate(()=>{const i=document.createElement('input');i.type='time';i.value='14:37';i.hidden=true;document.body.append(i);i.dispatchEvent(new Event('change',{bubbles:true}));const v=i.value;i.remove();return v;}),'14:30');
   await page.evaluate(()=>render());assert.equal(await page.locator('[name="lastFive"]').inputValue(),'12345');
   await page.locator('[data-commerce-form="report"] button:not([type="button"])').click();
   await page.getByText('匯款資料已送出，等待 BXH 核對。').waitFor();
+  assert.equal(await page.evaluate(()=>testCalls.find(p=>p.action==='report-payment').report.transferredAt),Date.parse('2026-10-28T14:37:00+08:00'));
   await page.evaluate(()=>{testView='orders';render();});await page.locator('[data-action="commerce-order"]').click();
   await page.getByText('訂單詳情',{exact:true}).waitFor();
   await page.evaluate(()=>{testView='admin';testAdmin=true;activeTab='commerce-admin';render();});
