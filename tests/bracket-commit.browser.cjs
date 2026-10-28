@@ -9,7 +9,7 @@ const {chromium}=require('playwright');
  const page=await browser.newPage({viewport:{width:390,height:844}});
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.addScriptTag({content:fs.readFileSync('modules/main-app/bracket-commit.js','utf8')});
- const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('// Bracket generation is detached'),b=core.indexOf('function canReshuffleBracket(){',a);
+ const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('// Bracket generation is detached'),b=core.indexOf('function currentRoundLabelForBoard(){',a);
  assert(a>0&&b>a);
  await page.addScriptTag({content:`
  let state={id:'r',cloudCode:'ROOM',meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'},firebaseUser={uid:'u'},currentRole='admin',activeTab='people';

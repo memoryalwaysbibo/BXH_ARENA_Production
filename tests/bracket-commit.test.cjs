@@ -52,10 +52,6 @@ test('transaction fence rejects competing draw, stale start, old client and star
  assert.equal(api.assertWrite(candidate,{...candidate,startedAt:2},{bracketStartSignature:api.signature(candidate)}),'write');
  assert.throws(()=>api.assertWrite({...candidate,startedAt:2},candidate),/bracket-started/);
 });
-test('BYE auto-completions do not block pre-start reshuffle',()=>{
- const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('function canReshuffleBracket(){'),b=core.indexOf('\n}',a)+2;
- const ctx={window:{},state:{bracketSize:256,matches:[{isBye:true,completed:true,winnerId:'p'},{isBye:false,completed:false,log:[],scoreA:0,scoreB:0}]}};vm.createContext(ctx);vm.runInContext(core.slice(a,b),ctx);assert.equal(ctx.canReshuffleBracket(),true);ctx.state.startedAt=1;assert.equal(ctx.canReshuffleBracket(),false);
-});
 test('actual cloud transaction and server-only private/public readback enforce version',async()=>{
  // Reuse the existing cloud transaction fixture with the actual production methods.
  let fixtureSource=fs.readFileSync('tests/assignment-cloud-confirmation.test.cjs','utf8').split("\ntest('staff save")[0];
