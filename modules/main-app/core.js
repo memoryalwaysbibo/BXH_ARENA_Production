@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.38";
+const APP_VERSION = "v14.3.39";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.39",date:"2026/10/29",timezone:"Asia/Taipei",title:"抽籤上傳等待提示",updateLevel:"patch",added:[],changed:["抽籤自動顯示資料上傳中與進度提示至少兩秒，完成後自動顯示成功或失敗"],fixed:[],publicSummary:"抽籤後清楚提示等待，無須手動確認上傳。"},
   {version:"v14.3.38",date:"2026/10/28",timezone:"Asia/Taipei",title:"抽籤上傳流程簡化",updateLevel:"patch",added:[],changed:["抽籤顯示上傳中、上傳成功或上傳失敗；失敗只保留單一重試操作","重試沿用原配對，雲端版本衝突時自動同步最新資料"],fixed:[],publicSummary:"簡化抽籤上傳與重試流程。"},
   {version:"v14.3.37",date:"2026/10/28",timezone:"Asia/Taipei",title:"商城與人工轉帳訂單基礎",updateLevel:"feature",added:["商城分類、商品照片與說明頁面","個人選單新增我的訂單","最高管理員新增商品、訂單與收款對帳管理"],changed:["付款確認與商品交付分開記錄，保留重試與退款紀錄"],fixed:[],security:["購買資格與確認收款由後端核實；商城初期維持未開放購買"],publicSummary:"商城基礎介面上線；商品及付款尚未開放。"},
   {version:"v14.3.34",date:"2026/10/20",timezone:"Asia/Taipei",title:"個人歷史整合與獵人執照 2.1",updateLevel:"minor",added:["個人總覽整合獵人旅程、正式戰績與可展開的生涯賽事紀錄","獵人執照 2.1 採最近 20 場有效對戰，顯示目前階級與歷史回算最高階級"],changed:["我的賽程集中顯示參賽中資訊；個人資料頁作為歷史查閱入口","已核對的測試賽獨立保留，從正式戰績與執照計算排除"],fixed:["讀取失敗可重試，部分資料缺失時暫停階級判定","手機里程碑縮排及長賽事名稱旁的展開提示"],security:[],publicSummary:"個人歷史集中查閱；生涯最高標示為歷史回算，永久授階將另行接入。"},
@@ -10514,9 +10515,9 @@ function bracketCommitBlocked(){return bracketCommitController()?.blocked()||fal
 function bracketCommitStatusHtml(){
  const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return '';
  const uploaded=s.result==='success',cloud=!!state.cloudCode;
- const title=s.busy?(cloud?'上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
- const message=s.busy?'正在儲存本次配對，請稍候。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
- return '<section class="panel" role="status" aria-live="polite"><b>'+title+'</b><p>'+message+'</p>'+
+ const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
+ const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
+ return '<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
  (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){

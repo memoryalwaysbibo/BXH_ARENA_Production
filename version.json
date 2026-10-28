@@ -1,6 +1,6 @@
 {
-  "build": "20261028.3",
-  "version": "v14.3.38",
-  "updatedAt": "2026-10-28T13:12:25.598533+00:00",
-  "releaseTrigger": "single-action-bracket-upload"
+  "build": "20261029.1",
+  "version": "v14.3.39",
+  "updatedAt": "2026-10-28T17:38:22.546362+00:00",
+  "releaseTrigger": "bracket-upload-wait-feedback"
 }
