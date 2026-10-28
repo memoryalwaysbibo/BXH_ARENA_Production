@@ -32,6 +32,7 @@ test('recruitment uses unset defaults and rank dropdowns',()=>{
 });
 test('create screen handles team membership and safely renders form',()=>{
  assert.ok(ui.createTeam(null).includes('data-team-form="create"'));assert.ok(ui.createTeam({id:'a'}).includes('已有所屬戰隊'));
+ const html=ui.createTeam(null);assert.equal((html.match(/<svg /g)||[]).length,6);assert.match(html,/name="presetColor"/);assert.match(html,/name="customEmblem"/);
 });
 
 test('pending application exposes its status and a cancel control',()=>{
