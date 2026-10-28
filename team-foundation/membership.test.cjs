@@ -138,3 +138,12 @@ test('automatic join retries do not duplicate history; rejoining resets personal
  await cmd(f.run,'a','leave');f.setTime(200);await cmd(f.run,'a','apply');
  assert.equal(f.data.get('teamMembershipsV1/a').experienceContribution??0,0);assert.equal(f.data.get('teamMembershipsV1/a').joinedAt,200);assert.equal(f.data.get('teamsV1/alpha').totalXp,5);
 });
+
+test('join and departure atomically open and close independent membership tenures',async()=>{
+ const f=fixture();await cmd(f.run,'captain','create',{name:'Alpha'});await cmd(f.run,'captain','admission',{policy:{mode:'auto'}});
+ f.setTime(200);await cmd(f.run,'a','apply');const first=f.data.get('teamMembershipsV1/a').tenureId;
+ assert.equal(f.data.get('teamsV1/alpha/tenures/'+first).leftAt,null);
+ f.setTime(300);await cmd(f.run,'a','leave');assert.equal(f.data.get('teamsV1/alpha/tenures/'+first).leftAt,300);
+ f.setTime(400);await cmd(f.run,'a','apply');const second=f.data.get('teamMembershipsV1/a').tenureId;assert.notEqual(first,second);assert.equal(f.data.get('teamsV1/alpha/tenures/'+second).joinedAt,400);
+ f.setTime(500);await cmd(f.run,'captain','remove',{targetUid:'a',reasonCode:'adjustment'});assert.equal(f.data.get('teamsV1/alpha/tenures/'+second).leftAt,500);
+});
