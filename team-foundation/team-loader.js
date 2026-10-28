@@ -2,7 +2,7 @@
 'use strict';
 // Candidate flag must be set before this script runs; disabled means no extra requests.
 if(root.BXH_TEAM_PREVIEW!==true)return;
-const files=['team-api.js','team-ui.js','team-emblem.js','team-controller.js','team-mount.js','team-host.js','team-ranking.js','team-card.js','team-main-integration.js'];
+const files=['team-api.js','emblem-presets.js','team-ui.js','team-emblem.js','team-controller.js','team-mount.js','team-host.js','team-ranking.js','team-card.js','team-main-integration.js'];
 async function load(){
  for(const file of files){
   if(root.BXH_TEAM_PREVIEW!==true)return;
