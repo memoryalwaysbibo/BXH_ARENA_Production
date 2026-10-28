@@ -1,0 +1,10 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const {create}=require('./team-full-integration.js');
+function setup(){let enabled=false,identity={uid:'a',active:true,role:'player'},slot=null,opens=0,closes=0,mounts=0;const doc={createElement:()=>({remove(){this.removed=true;}})};
+ const feature=create({getIdentity:()=>identity,isEnabled:()=>enabled,getSlot:()=>slot,apiFactory:()=>({}),component:{},hostFactory:options=>{mounts++;return {open(){opens++;return {ok:true};},sync(){assert.ok(options.getIdentity());},close(){closes++;}};}});
+ return {feature,enable:()=>{enabled=true;},identity:p=>{identity=p;},slot:()=>{slot={ownerDocument:doc,append(n){this.node=n;}};return slot;},leave:()=>{slot=null;},counts:()=>({opens,closes,mounts})};}
+test('disabled flow never mounts a component or exposes a page',()=>{const f=setup();f.slot();f.feature.bind();assert.equal(f.feature.page(),'');assert.deepEqual(f.counts(),{opens:0,closes:0,mounts:0});});
+test('active membership is required and test accounts are excluded',()=>{const f=setup();f.enable();for(const p of [null,{uid:'a',role:'player',active:false},{uid:'a',role:'player',active:true,isTestAccount:true},{uid:null,role:'player',active:true}]){f.identity(p);assert.equal(f.feature.visible(),false);}f.identity({uid:'a',role:'player',active:true});assert.equal(f.feature.visible(),true);});
+test('page rerender retains host; account change and leaving destroy it',()=>{const f=setup();f.enable();f.slot();f.feature.bind();f.slot();f.feature.bind();assert.equal(f.counts().mounts,1);f.identity({uid:'b',role:'player',active:true});f.feature.bind();assert.equal(f.counts().closes,1);assert.equal(f.counts().mounts,2);f.leave();f.feature.bind();assert.equal(f.counts().closes,2);});
+test('disabled loader makes no script requests',()=>{let requests=0;vm.runInNewContext(fs.readFileSync(__dirname+'/team-full-loader.js','utf8'),{window:{BXH_TEAM_FULL_ENABLED:false},document:{createElement:()=>{requests++;}}});assert.equal(requests,0);});

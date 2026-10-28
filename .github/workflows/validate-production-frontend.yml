@@ -85,10 +85,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify super-admin team read-only preview
+      - name: Verify teams and preview lifecycle
         run: |
-          node --check team-foundation/team-admin-preview.js
-          node --test team-foundation/team-admin-preview.test.cjs
+          for source in team-foundation/*.js; do node --check "$source"; done
+          node --test team-foundation/*.test.cjs
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
       - name: Verify QR camera lifecycle and existing check-in routing
