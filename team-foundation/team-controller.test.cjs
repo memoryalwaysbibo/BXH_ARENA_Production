@@ -60,6 +60,13 @@ test('review commands send the selected applicant and reload the pending list',a
  await c.applications('team');await c.operate('approve','team',{targetUid:'person'});
  assert.deepEqual(payload,{action:'approve',teamId:'team',targetUid:'person',requestId:'test-operation-00000001'});assert.equal(reads,2);assert.equal(c.snapshot().screen,'applications');
 });
+test('review pagination preserves the current page after a decision and refresh returns to page one',async()=>{
+ const calls=[];const c=setup({applications:async p=>{calls.push(p);return {items:[{uid:p.cursor?'later':'first'}],nextCursor:p.cursor?null:'anchor',hasMore:!p.cursor};}});
+ await c.applications('t');await c.applicationsNext();assert.equal(c.snapshot().applicationsPage,2);
+ await c.operate('reject','t',{targetUid:'later'});assert.equal(calls.at(-1).cursor,'anchor');assert.equal(c.snapshot().applicationsPage,2);
+ await c.applicationsPrevious();assert.equal(c.snapshot().applicationsPage,1);assert.equal(c.snapshot().items[0].uid,'first');
+ await c.applicationsNext();await c.applications('t');assert.equal(c.snapshot().applicationsPage,1);assert.equal(calls.at(-1).cursor,undefined);
+});
 
 test('review rejection identifies an applicant already in another team',async()=>{
  const c=setup({command:async()=>{throw Object.assign(Error('already-in-team'),{code:'functions/failed-precondition'});}});
