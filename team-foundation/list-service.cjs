@@ -29,7 +29,8 @@ function createListService({db}){
     if(fresh){try{const level=progression(team.totalXp);consistent=projection.name===team.name&&projection.level===level.level&&projection.capacity===level.capacity&&projection.memberCount===team.memberUids.length&&JSON.stringify(admissionPolicy(projection.admission))===JSON.stringify(admissionPolicy(team.admission));}catch{consistent=false;}}
     if(!consistent){stale++;continue;}
     const {projection:discard,...safe}=p;const unlocked=progression(team.totalXp).unlockedFrames;
-    items.push({...safe,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null});
+    const hasEmblem=typeof team.emblemObject==='string'&&team.emblemObject.startsWith('teamEmblemsV1/'+p.id+'/')&&/^teamEmblemsV1\/[A-Za-z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/.test(team.emblemObject);
+    items.push({...safe,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null,hasEmblem});
    }
    if(!membership?.teamId){
     const apps=await Promise.all(items.map(p=>read(tx,'teamsV1/'+p.id+'/applications/'+actorUid)));
