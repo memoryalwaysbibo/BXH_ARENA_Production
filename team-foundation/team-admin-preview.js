@@ -33,11 +33,13 @@ const api={create,view,allowed};
 if(typeof module==='object'&&module.exports){module.exports=api;return;}
 let host=null,controller=null,ownerUid=null;
 const identity=()=>{const p=typeof userProfile==='object'?userProfile:null;return p?{uid:typeof currentAuthUid==='function'?currentAuthUid():null,role:p.role,active:p.active,isTestAccount:p.isTestAccount}:null;};
-function visible(){return root.BXH_TEAM_ADMIN_PREVIEW===true&&allowed(identity());}
-function page(){return visible()?'<section class="panel" aria-label="戰隊管理員唯讀預覽"><div class="panel-title">戰隊</div><div data-team-admin-preview-page></div></section>':'';}
+function visible(){return root.BXHTeamFull?.visible()===true||root.BXH_TEAM_ADMIN_PREVIEW===true&&allowed(identity());}
+function page(){if(root.BXHTeamFull?.visible())return root.BXHTeamFull.page();return visible()?'<section class="panel" aria-label="戰隊管理員唯讀預覽"><div class="panel-title">戰隊</div><div data-team-admin-preview-page></div></section>':'';}
 function close(){controller?.dispose();controller=null;ownerUid=null;if(host)host.innerHTML='';host=null;}
 function draw(s){if(host&&visible()&&identity().uid===ownerUid&&host===document.querySelector('[data-team-admin-preview-page]'))host.innerHTML=view(s);}
 function bind(){
+ if(root.BXHTeamFull?.visible()){close();root.BXHTeamFull.bind();return;}
+ root.BXHTeamFull?.close();
  const next=document.querySelector('[data-team-admin-preview-page]');
  if(!visible()||!next){close();return;}
  if(controller&&ownerUid!==identity().uid)close();
