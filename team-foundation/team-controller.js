@@ -3,7 +3,7 @@
 // Transport is deliberately injected; no unverified production endpoint is assumed.
 function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},newRequestId=()=>{if(!root.crypto?.randomUUID)throw Error('secure-id-unavailable');return root.crypto.randomUUID();}}){
  if(!api||!['list','members','command','mine','applications','history'].every(k=>typeof api[k]==='function'))throw Error('team-api-required');
- const state={screen:'lobby',items:[],total:0,query:{},team:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,managementTeamId:null,historyTeamId:null,historyNextCursor:null,historyPage:1,hasMore:false};
+ const state={screen:'lobby',items:[],total:0,query:{},team:null,creationCapacity:null,partial:false,staleCount:0,totalIsUpperBound:false,loading:false,loaded:false,busy:false,error:null,pending:false,applicationsTeamId:null,managementTeamId:null,historyTeamId:null,historyNextCursor:null,historyPage:1,hasMore:false};
  let generation=0,disposed=false,pendingPayload=null,historyCursors=[null];
  // Only known server rejections prove the transaction did not commit.
  const rejectionMessages={
@@ -61,11 +61,11 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
  }
  async function load(screen,payload){
   if(disposed)return {ok:false,reason:'disposed'};
-  const ticket=++generation;if(screen==='manage')state.managementTeamId=payload.teamId;if(screen==='applications')state.applicationsTeamId=payload.teamId;if(screen==='history')state.historyTeamId=payload.teamId;state.screen=screen;state.loading=true;state.loaded=false;state.error=null;state.team=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
+  const ticket=++generation;if(screen==='manage')state.managementTeamId=payload.teamId;if(screen==='applications')state.applicationsTeamId=payload.teamId;if(screen==='history')state.historyTeamId=payload.teamId;state.screen=screen;state.loading=true;state.loaded=false;state.error=null;state.team=null;state.creationCapacity=null;state.items=[];state.total=0;state.partial=false;state.staleCount=0;state.totalIsUpperBound=false;emit();
   try{
    const result=screen==='manage'?await (async()=>{const own=await api.mine();if(own.team?.id!==payload.teamId||!['captain','deputy'].includes(own.team.role))throw Error('leadership-required');const members=await api.members(payload);return {...members,viewerRole:own.team.role};})():await(screen==='applications'?api.applications(payload):screen==='history'?api.history(payload):screen==='members'?api.members(payload):(screen==='mine'||screen==='create')?api.mine():api.list(payload));
    if(disposed||ticket!==generation)return {ok:false,reason:'superseded'};
-   if(screen==='manage')state.team=result;else if(screen==='history'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.historyNextCursor=typeof result.nextCursor==='string'?result.nextCursor:null;}else if(screen==='applications'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.hasMore=result.hasMore===true;state.applicationsTeamId=payload.teamId;}else if(screen==='members')state.team=result;else if(screen==='mine'||screen==='create')state.team=result.team;else{
+   if(screen==='manage')state.team=result;else if(screen==='history'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.historyNextCursor=typeof result.nextCursor==='string'?result.nextCursor:null;}else if(screen==='applications'){if(!Array.isArray(result.items))throw Error('invalid-response');state.items=result.items;state.hasMore=result.hasMore===true;state.applicationsTeamId=payload.teamId;}else if(screen==='members')state.team=result;else if(screen==='mine'||screen==='create'){state.team=result.team;state.creationCapacity=result.creationCapacity??null;}else{
     if(!Array.isArray(result.items)||!Number.isSafeInteger(result.total)||result.total<0)throw Error('invalid-response');
     state.items=result.items;state.total=result.total;state.partial=result.partial===true;state.totalIsUpperBound=result.totalIsUpperBound===true;state.staleCount=Number.isSafeInteger(result.staleCount)?result.staleCount:0;
    }
