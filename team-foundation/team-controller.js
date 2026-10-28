@@ -12,6 +12,8 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   'team-not-found':'找不到這支戰隊，請重新整理。',
   'team-dissolved':'這支戰隊已解散。',
   'team-full':'戰隊已滿員。',
+  'team-capacity-full':'戰隊數量已達上限，暫時無法建立新戰隊。',
+  'team-capacity-unavailable':'戰隊名額暫時無法確認，請稍後再試。',
   'ladder-tier-below-minimum':'未達戰隊設定的天梯排位條件。',
   'tier-below-minimum':'未達戰隊設定的獵人排位條件。',
   'captain-required':'此操作需要隊長權限。',
