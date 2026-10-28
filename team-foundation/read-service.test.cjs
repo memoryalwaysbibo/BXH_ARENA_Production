@@ -65,3 +65,7 @@ test('solo teams expose the server dissolution deadline only on mine; recovered 
  team.memberUids=['c','m'];assert.equal((await f.read({actorUid:'c',action:'mine'})).team.dissolution,null);
  team.memberUids=['c'];team.dissolveAt=null;assert.equal((await f.read({actorUid:'c',action:'mine'})).team.dissolution,null);
 });
+test('unaffiliated players receive server capacity status without control internals',async()=>{
+ const f=setup();let r=await f.read({actorUid:'outsider',action:'mine'});assert.equal(r.creationCapacity.status,'unavailable');
+ for(const [count,status] of [[199,'open'],[200,'full'],[-1,'unavailable']]){f.data.set('teamCapacityControlV1/current',{activeCount:count,privateNote:'secret'});r=await f.read({actorUid:'outsider',action:'mine'});assert.equal(r.creationCapacity.status,status);assert.equal(r.creationCapacity.limit,200);assert.ok(!JSON.stringify(r).includes('privateNote'));}
+});
