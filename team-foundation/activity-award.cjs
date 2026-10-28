@@ -20,6 +20,9 @@ function createActivityAwarder({db}){
    if(!official||!matching||!Number.isSafeInteger(membership.joinedAt)||membership.joinedAt<0||membership.joinedAt>at)return {status:'ineligible'};
    const team=await read(tx,'teamsV1/'+membership.teamId);
    if(team?.status!=='active'||!team.memberUids?.includes(log.playerUid)||!Number.isSafeInteger(team.totalXp)||team.totalXp<0||team.totalXp>=Number.MAX_SAFE_INTEGER)return {status:'ineligible'};
+   const contribution=membership.experienceContribution??0;
+   if(!Number.isSafeInteger(contribution)||contribution<0||contribution>=Number.MAX_SAFE_INTEGER)throw Error('invalid-contribution');
+   tx.update(db.doc('teamMembershipsV1/'+log.playerUid),{experienceContribution:contribution+1});
    tx.create(db.doc(receiptPath),{teamId:membership.teamId,eventId:log.eventCode,uid:log.playerUid,archivedAt:at,archived:true,ranked:true,completed:true,createdAt:at});
    tx.update(db.doc('teamsV1/'+membership.teamId),{totalXp:team.totalXp+1});
    return {status:'awarded',teamId:membership.teamId};
