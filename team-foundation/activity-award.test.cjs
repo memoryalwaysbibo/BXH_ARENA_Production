@@ -7,7 +7,8 @@ function fixture(){
  ['tournaments/'+code,{eventAuthority:'official',ladderMode:'ranked',archiveStatus:'completed',tournamentPhase:'done',ladderPointsAwarded:true,ladderSeasonId:'S1',ladderResults:[{eventCode:code,playerUid:uid,seasonId:'S1',pointsEarned:12}],data:JSON.stringify({archiveStatus:'completed',ladderPointsAwarded:true,archivedAt:200})}],
  ['teamMembershipsV1/'+uid,{teamId:'t',joinedAt:100}],['teamsV1/t',{status:'active',memberUids:[uid],totalXp:2}]
  ]);
- const db={doc:p=>p,runTransaction:async fn=>fn({get:async p=>({exists:docs.has(p),data:()=>docs.get(p)}),create:(p,v)=>{if(docs.has(p))throw Error('exists');docs.set(p,v);},update:(p,v)=>docs.set(p,{...docs.get(p),...v})})};
+ const emptyQuery={where(){return this},orderBy(){return this},limit(){return {query:true}}};
+ const db={collectionGroup:()=>emptyQuery,doc:p=>p,runTransaction:async fn=>fn({get:async p=>p?.query?{docs:[]}:({exists:docs.has(p),data:()=>docs.get(p)}),create:(p,v)=>{if(docs.has(p))throw Error('exists');docs.set(p,v);},update:(p,v)=>docs.set(p,{...docs.get(p),...v})})};
  return {docs,award:createActivityAwarder({db})};
 }
 test('completed official ledger awards once and records a deduplication receipt',async()=>{
