@@ -34,6 +34,7 @@ const functionNames = [
   'singleBracketPathRoom', 'singleBracketPathPlayer', 'singleBracketPlayerHtml',
   'singleBracketPlayerHistory', 'applySingleBracketPlayerPath', 'selectSingleBracketPlayerPath',
   'showSingleBracketPathDetails',
+  'boardSelfKey', 'boardSelfPlayerId', 'markBoardOwnPlayer', 'showBoardSelfPicker', 'boardSelfMatch', 'locateBoardSelf',
   'scheduleSeRelayout', 'renderBoardMode', 'currentRoundLabelForBoard',
   'tournamentMatchListGroup', 'renderTournamentMatchList', 'renderPrintBracket', 'wrapPrintWatermark',
   'clearBoardModeInteractions', 'bindBoardModeInteractions', 'setBoardZoom', 'setBoardPinchZoom',
@@ -85,6 +86,9 @@ function fixture(count, { completed = false, bronze = false, code = 'BXH-STAGES'
 
 const scaffold = `
   let state, bracketViewMode='board', singleBracketLayoutMode='full';
+  let firebaseUser=null, myRegistrationsOwner='', myRegistrationsCache=null, boardSelfSelection=null;
+  function lobbyAuthKey(){return firebaseUser?.uid||''}
+  function playerBracketNumber(id){return String(state.players.findIndex(p=>p.id===id)+1)}
   let singleBracketPathSelection=null;
   let boardZoom=1, boardPanX=0, boardPanY=0, boardTheme='gold', boardExportBusy=false;
   let boardModeInteractionCleanup=null, __bxhBoardTransformFrame=0, __seRelayoutQueued=false;
@@ -115,7 +119,7 @@ const scaffold = `
   function trophySvg(){return ''} function matchLegendHtml(){return ''}
   function bracketCommitStatusHtml(){return ''} function isAdminTierOrAbove(){return false}
   function tournamentStatus(){return state.championId?'done':'waiting'}
-  function showToast(){} function bindCompletedMatchCorrectionLongPress(){} function bindManualCourtAssignLongPress(){}
+  function showToast(value){window.__lastToast=value} function bindCompletedMatchCorrectionLongPress(){} function bindManualCourtAssignLongPress(){}
   function openModal(value){window.__pathModal=value}
   function saveBoardThemePreference(){} function render(){throw Error('stage switch unexpectedly replaced the app shell')}
   async function ensureHtml2Canvas(){}
@@ -152,6 +156,8 @@ const scaffold = `
     if(button.dataset.action==='set-board-stage')setBoardStage(Number(button.dataset.stage));
     if(button.dataset.action==='board-fullscreen')void toggleBoardFullscreen();
     if(button.dataset.action==='single-player-path')selectSingleBracketPlayerPath(button.dataset.playerId);
+    if(button.dataset.action==='board-locate-self')void locateBoardSelf();
+    if(button.dataset.action==='board-export-image'){button.closest('.board-share-menu')?.removeAttribute('open');void exportBoardAsImage();}
   });
 `;
 
@@ -193,8 +199,18 @@ async function snapshot(page) {
       const matrix=path.getScreenCTM();
       const start=path.getPointAtLength(0).matrixTransform(matrix);
       const end=path.getPointAtLength(path.getTotalLength()).matrixTransform(matrix);
-      if(Math.abs(start.x-sourceRect.right)>1||Math.abs(start.y-sourceRect.top-sourceRect.height/2)>1)violations.push('detached source '+path.dataset.sourceMatch);
+      const scale=Math.hypot(matrix.a,matrix.b);
+      if(Math.abs(start.x-sourceRect.right)>1||Math.abs(start.y-sourceRect.top-sourceRect.height/2)>3.01*scale+0.1)violations.push('detached source '+path.dataset.sourceMatch);
       if(Math.abs(end.x-targetRect.left)>1||Math.abs(end.y-rowRect.top-rowRect.height/2)>1)violations.push('detached target '+path.dataset.targetMatch);
+      if(path.getAttribute('d').includes(' V ')){
+        if(Math.abs(start.y-end.y)<=3*scale)violations.push('tiny staircase '+path.dataset.sourceMatch);
+        const nums=path.getAttribute('d').match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi).map(Number);
+        const turn=new DOMPoint(nums[2],nums[1]).matrixTransform(matrix);
+        const badge=target.querySelector('.match-order-badge')?.getBoundingClientRect();
+        if(badge&&turn.x>=badge.left-2*scale)violations.push('turn behind match badge');
+      }
+      const style=getComputedStyle(path);
+      if(style.vectorEffect!=='non-scaling-stroke'||parseFloat(style.strokeWidth)>2)violations.push('oversized/scaling route');
       const from=getMatch(path.dataset.sourceMatch),to=getMatch(path.dataset.targetMatch);
       const advanced=!!(from.completed&&from.winnerId===(path.dataset.targetSide==='A'?to.a:to.b)?.playerId&&from.winnerId);
       if(path.classList.contains('se-path-advanced')!==advanced)violations.push('unconfirmed winner route');
@@ -370,6 +386,82 @@ async function selectAndCheck(page, size, bracketSize) {
       return {double,roundrobin,team};
     });
     assert.deepEqual(excluded,{double:'',roundrobin:'',team:''});
+
+    const mine=fixture(128,{code:'BXH-SELF'});
+    mine.players[39].registrationUid='account-self';
+    mine.players[0].registrationUid='account-self';mine.players[0].familyPlayerId='child-other';
+    mine.players[39].name=mine.players[40].name='同名選手';
+    await page.setViewportSize({width:390,height:900});
+    await page.evaluate(model=>{firebaseUser={uid:'account-self'};mount(model)},mine);
+    assert.equal(await page.evaluate(()=>boardSelfPlayerId()),'p40','must not identify a guardian as their child');
+    await selectAndCheck(page,16,128);
+    let requests=0;page.on('request',()=>requests++);
+    const beforeRequests=requests;
+    await page.locator('[data-action="board-locate-self"]').click();
+    await page.waitForFunction(()=>selectedBoardStage()===0&&document.querySelector('.se-self-located'));
+    const located=await page.evaluate(()=>{
+      const b=document.querySelector('.se-self-located').getBoundingClientRect(),v=document.getElementById('board-viewport'),r=v.getBoundingClientRect();
+      const me=document.querySelector('.se-self-player'),name=me.querySelector('.nm'),style=getComputedStyle(name);
+      return {id:document.querySelector('.se-self-located').dataset.id,dx:Math.abs(b.left+b.width/2-r.left-v.clientLeft-v.clientWidth/2),
+        dy:Math.abs(b.top+b.height/2-r.top-v.clientTop-v.clientHeight/2),text:me.textContent,nameWeight:style.fontWeight,
+        unchanged:JSON.stringify(state)===window.__originalState,toast:window.__lastToast};
+    });
+    assert.equal(located.id,'m0_19');assert.ok(located.dx<1&&located.dy<1,JSON.stringify(located));
+    assert.ok(located.unchanged&&located.toast.includes('全部輪次')&&located.toast.includes('尚未派台'));
+    assert.equal(located.nameWeight,'900');assert.ok(!located.text.includes('我'),'own name adds no badge');
+    assert.equal(requests,beforeRequests,'locating must not request any network data');
+    await capture(page,'mobile-self-location.png');
+    await page.locator('.board-share-menu summary').click();
+    assert.equal(await page.locator('.board-share-menu [data-action="board-export-image"]').isVisible(),true);
+    assert.equal(await page.locator('.board-toolbar [data-action="board-export-image"]').count(),0);
+    await page.locator('.board-share-menu [data-action="board-export-image"]').click();
+    await page.waitForFunction(()=>!boardExportBusy);
+    assert.equal(await page.locator('.board-share-menu').getAttribute('open'),null);
+    console.log('PASS own identity excludes guardian children, same-name entries; locate unhides and centers match without network or state writes; export lives in share menu');passed++;
+
+    await page.evaluate(()=>{firebaseUser={uid:'unlinked-account'};markBoardOwnPlayer()});
+    assert.equal(await page.locator('.se-self-player').count(),0,'account change clears personal highlight');
+    await page.locator('[data-action="board-locate-self"]').click();
+    await page.getByRole('searchbox',{name:'搜尋號碼或姓名'}).fill('40');
+    await page.getByRole('button',{name:'40 號｜同名選手',exact:true}).click();
+    await page.waitForFunction(()=>!document.querySelector('.board-self-picker')&&boardSelfPlayerId()==='p40');
+    assert.equal(await page.evaluate(()=>JSON.stringify(state)===window.__originalState),true);
+    await page.evaluate(model=>mount(model),fixture(16,{code:'BXH-OTHER'}));
+    assert.equal(await page.evaluate(()=>boardSelfPlayerId()),null,'local selection must not leak into another room');
+    await page.evaluate(()=>{firebaseUser=null});
+    await page.locator('[data-action="board-locate-self"]').click();
+    assert.ok((await page.evaluate(()=>window.__lastToast)).includes('登入'));
+    console.log('PASS missing public identity uses explicit numbered selection; account/room isolation, no same-name inference, and guest prompt');passed++;
+
+    const done=fixture(32,{completed:true,code:'BXH-STATUS'});
+    await page.evaluate(model=>{firebaseUser={uid:'active-account'};model.players[0].registrationUid=firebaseUser.uid;mount(model)},done);
+    assert.equal(await page.evaluate(()=>boardSelfMatch('p1').id),'m4_0','finished player locates last match');
+    await page.evaluate(()=>{
+      getMatch('m3_0').completed=false;getMatch('m3_0').status='in_progress';getMatch('m3_0').winnerId=null;
+      getMatch('m4_0').completed=false;getMatch('m4_0').status='pending';
+      document.getElementById('board-canvas').innerHTML=renderSingleElimBracket(true);layoutSingleElimBracket();
+    });
+    assert.equal(await page.evaluate(()=>boardSelfMatch('p1').id),'m3_0','playing match takes priority over a future match');
+    await page.locator('[data-action="board-locate-self"]').click();await settle(page);
+    assert.ok((await page.evaluate(()=>window.__lastToast)).includes('正在比賽'));
+    for(const zoom of [.5,1,1.5]){
+      await page.evaluate(z=>{boardZoom=z;flushBoardTransform();layoutSingleElimBracket()},zoom);await settle(page);
+      const geometry=await snapshot(page);assert.deepEqual(geometry.violations,[],JSON.stringify(geometry.violations));
+    }
+    await capture(page,'mobile-150-percent-thin-routes.png');
+    const nearHorizontal=await page.evaluate(()=>{
+      const path=document.querySelector('#se-bracket-svg path'),source=document.querySelector('.match-box[data-id="'+path.dataset.sourceMatch+'"]');
+      const target=document.querySelector('.match-box[data-id="'+path.dataset.targetMatch+'"]');
+      const row=target.querySelector('.mb-row[data-side="'+path.dataset.targetSide+'"]');
+      const before=source.getBoundingClientRect(),to=row.getBoundingClientRect(),scale=boardZoom;
+      source.style.top=(parseFloat(source.style.top)+(to.top+to.height/2-before.top-before.height/2)/scale+2.25)+'px';
+      const outer=document.getElementById('se-bracket-outer');drawSingleElimConnectors(outer,[],numRoundsTotal()-1,'');
+      const route=[...document.querySelectorAll('#se-bracket-svg path')].find(p=>p.dataset.sourceMatch===source.dataset.id);
+      return route.getAttribute('d');
+    });
+    assert.ok(!nearHorizontal.includes(' V '),'near-level source docks flat instead of a tiny staircase: '+nearHorizontal);
+    console.log('PASS active/finished priority, thin non-scaling routes at 50/100/150%, turns outside badge gutter, and straight near-level docking');passed++;
+
     assert.deepEqual(errors,[]);
     console.log('PASS room/format changes reset scope and do not expose invalid stage controls');passed++;
     console.log('PASS '+passed+' focused bracket-stage browser groups');

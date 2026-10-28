@@ -10541,6 +10541,107 @@ function currentRoundLabelForBoard(){
 function boardStageContext(){
   return JSON.stringify([state.cloudCode||state.id||"",state.bracketSize,state.meta.formatType||"single",state.meta.battleMode||"individual"]);
 }
+// View-only identity and positioning. Never fetch registrations or infer identity from names.
+let boardSelfSelection=null;
+function boardSelfKey(){
+  return firebaseUser?.uid&&!firebaseUser.isAnonymous ? JSON.stringify([firebaseUser.uid,state.cloudCode||state.id||""]) : "";
+}
+function boardSelfPlayerId(){
+  const uid=firebaseUser?.uid;
+  if(!boardSelfKey())return null;
+  const players=state.players||[];
+  const linked=players.filter(p=>p.familyPlayerId
+    ? p.familyPlayerId===uid || p.accountUid===uid || p.playerUid===uid
+    : [p.registrationUid,p.accountUid,p.playerUid,p.uid].includes(uid));
+  if(linked.length===1)return linked[0].id;
+  const token=value=>String(value||"").replace(/[^a-zA-Z0-9_-]/g,"_");
+  const ids=new Set([uid,"reg_"+token(uid)]),regIds=new Set();
+  const code=String(state.cloudCode||"").toUpperCase();
+  const rows=myRegistrationsOwner===lobbyAuthKey()&&Array.isArray(myRegistrationsCache)?myRegistrationsCache:[];
+  for(const r of rows){
+    if(r.familyPlayerId||r.status!=="confirmed"||String(r.tournamentCode||"").toUpperCase()!==code||r.uid!==uid)continue;
+    for(const id of [r.localPlayerId,r.runtimePlayerId,r.participantId])if(id)ids.add(id);
+    const regId=r.registrationId||r.id;
+    if(regId){regIds.add(regId);ids.add("reg_"+token(regId));}
+  }
+  const exact=players.filter(p=>!p.familyPlayerId&&(ids.has(p.id)||(p.registrationId&&regIds.has(p.registrationId))));
+  if(linked.length===0&&exact.length===1)return exact[0].id;
+  const key=boardSelfKey();
+  let selected=boardSelfSelection;
+  if(selected?.key!==key){
+    try{selected=JSON.parse(sessionStorage.getItem("bxh_bracket_self_v1:"+key)||"null");}catch{selected=null;}
+  }
+  return selected?.key===key&&players.some(p=>p.id===selected.playerId&&p.name===selected.name)?selected.playerId:null;
+}
+function markBoardOwnPlayer(){
+  const own=boardSelfPlayerId();
+  document.querySelectorAll('#board-canvas .se-player-path-button').forEach(button=>{
+    button.classList.toggle("se-self-player",!!own&&button.getAttribute("data-player-id")===own);
+  });
+}
+function showBoardSelfPicker(){
+  const shell=document.getElementById("board-shell"),key=boardSelfKey();
+  if(!shell||!key||shell.querySelector(".board-self-picker"))return;
+  const dialog=document.createElement("dialog");
+  dialog.className="se-player-path-dialog board-self-picker";
+  dialog.innerHTML='<h3 id="board-self-heading">確認我的位置</h3><p>本場公開名單沒有可確認的帳號連結。請選擇你自己的號碼與姓名；只記住本機定位，不更動報名身分。</p><input type="search" aria-label="搜尋號碼或姓名" placeholder="搜尋號碼或姓名"><div class="board-self-options"></div><button type="button" class="btn btn-ghost board-self-cancel">取消</button>';
+  dialog.setAttribute("aria-labelledby","board-self-heading");
+  const input=dialog.querySelector("input"),list=dialog.querySelector(".board-self-options");
+  const entries=(state.players||[]).map(p=>({p,number:playerBracketNumber(p.id)}));
+  const populate=()=>{
+    const query=input.value.trim().toLocaleLowerCase();
+    const found=entries.filter(({p,number})=>!query||number===query||String(p.name||"").toLocaleLowerCase().includes(query));
+    list.replaceChildren();
+    for(const {p,number} of found.slice(0,20)){
+      const button=document.createElement("button");button.type="button";button.className="btn btn-ghost";
+      button.textContent=(number?number+" 號｜":"")+(p.name||"未命名");
+      button.addEventListener("click",()=>{
+        if(boardSelfKey()!==key)return dialog.close();
+        boardSelfSelection={key,playerId:p.id,name:p.name};
+        try{sessionStorage.setItem("bxh_bracket_self_v1:"+key,JSON.stringify(boardSelfSelection));}catch{}
+        dialog.close();markBoardOwnPlayer();void locateBoardSelf();
+      });
+      list.append(button);
+    }
+    if(found.length===0||found.length>20){const note=document.createElement("p");note.textContent=found.length?"請輸入號碼或姓名，縮小搜尋範圍。":"沒有符合的選手。";list.append(note);}
+  };
+  input.addEventListener("input",populate);
+  dialog.querySelector(".board-self-cancel").addEventListener("click",()=>dialog.close());
+  dialog.addEventListener("keydown",event=>{if(event.key==="Escape")event.stopPropagation();});
+  dialog.addEventListener("close",()=>dialog.remove(),{once:true});
+  shell.append(dialog);populate();dialog.showModal();
+}
+function boardSelfMatch(playerId){
+  const matches=(state.matches||[]).filter(m=>!m.isBye&&(m.a?.playerId===playerId||m.b?.playerId===playerId));
+  const order=(a,b)=>Number(a.round||0)-Number(b.round||0)||Number(a.seq||0)-Number(b.seq||0)||Number(a.indexInRound||0)-Number(b.indexInRound||0);
+  return matches.filter(m=>!m.completed&&["in_progress","paused"].includes(m.status)).sort(order)[0]
+    ||matches.filter(m=>!m.completed).sort(order)[0]||matches.sort(order).at(-1)||null;
+}
+async function locateBoardSelf(){
+  if(!boardSelfKey()){showToast("請先登入，再定位自己的場次");return;}
+  if(boardExportBusy){showToast("圖片產生中，請稍後再定位");return;}
+  const playerId=boardSelfPlayerId();
+  if(!playerId){showBoardSelfPicker();return;}
+  const match=boardSelfMatch(playerId);
+  if(!match){showToast("你目前尚未排入實際對戰場次");return;}
+  const key=boardSelfKey(),shell=document.getElementById("board-shell");
+  const find=()=>Array.from(shell?.querySelectorAll('.match-box[data-id]')||[]).find(box=>box.getAttribute("data-id")===match.id);
+  let box=find(),changed=false;
+  if(!box&&selectedBoardStage()){setBoardStage(0);layoutSingleElimBracket();changed=true;box=find();}
+  if(!box){showToast("目前檢視無法顯示這一場");return;}
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  if(boardSelfKey()!==key||!shell?.isConnected||getMatch(match.id)!==match)return;
+  const viewport=document.getElementById("board-viewport"),rect=box.getBoundingClientRect(),view=viewport.getBoundingClientRect();
+  boardPanX+=view.left+viewport.clientLeft+viewport.clientWidth/2-(rect.left+rect.width/2);
+  boardPanY+=view.top+viewport.clientTop+viewport.clientHeight/2-(rect.top+rect.height/2);
+  flushBoardTransform();markBoardOwnPlayer();
+  viewport.scrollIntoView({block:"nearest"});
+  box.classList.remove("se-self-located");void box.offsetWidth;box.classList.add("se-self-located");
+  const court=Object.entries(state.courtAssignments||{}).find(([,c])=>c&&(c.currentMatchId===match.id||c.nextMatchId===match.id));
+  const station=court?Number(court[0].replace("court","")):match.status==="in_progress"?Number(match.station):0;
+  const status=match.completed?"本場已結束":match.status==="in_progress"?"正在比賽":match.status==="paused"?"暫停中":"等待上場";
+  showToast((changed?"已切換為全部輪次・":"")+displayMatchLabel(match)+"・"+status+(match.completed?"":station?"・台 "+station:"・尚未派台"));
+}
 function availableBoardStage(size){
   const bracketSize=Number(state.bracketSize);
   return (state.meta.formatType||"single")==="single" && state.meta.battleMode!=="team"
@@ -10622,11 +10723,17 @@ function renderBoardMode(){
           <div class="board-sub"><span>${esc(FORMAT_LABELS[fmt]||"")}</span><span>${esc(currentRoundLabelForBoard())}</span><span class="board-status-chip status-${st}">${stLabel}</span>${availableBoardStage(0)?`<span id="board-stage-summary" role="status">${boardStageSummary()}</span>`:""}</div>
         </div>
       </div>
-      <button class="share-btn" data-action="open-share-modal" title="分享賽事" aria-label="分享賽事">${SHARE_ICON_SVG}</button>
+      <details class="board-share-menu">
+        <summary class="share-btn" title="分享與儲存對戰表" aria-label="分享與儲存對戰表">${SHARE_ICON_SVG}</summary>
+        <div class="board-share-options">
+          <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 儲存${boardExportLabel()}</button>
+          <button class="btn btn-ghost btn-sm" data-action="open-share-modal">分享連結與 QR</button>
+        </div>
+      </details>
     </div>
 
     <div class="board-toolbar">
-      <button class="btn btn-ghost btn-sm" data-action="board-export-image">${BOARD_ICON_EXPORT} 儲存${boardExportLabel()}</button>
+      ${availableBoardStage(0)?'<button type="button" class="btn btn-ghost btn-sm board-locate-self" data-action="board-locate-self">◎ 我在哪</button>':""}
       ${reshuffleAllowed?`<button class="btn btn-ghost btn-sm" data-action="board-reshuffle">${BOARD_ICON_SHUFFLE} 重新抽籤</button>`:""}
       <span class="board-zoom-group">
         <button class="btn btn-ghost btn-sm" data-action="board-zoom-out" aria-label="縮小對戰表">${BOARD_ICON_MINUS}</button>
@@ -10999,17 +11106,27 @@ function drawSingleElimConnectors(outer, allCols, maxRound, suffix){
         const rowRect=row?.getBoundingClientRect();
         const start=toLocal(sourceRect.right,sourceRect.top+sourceRect.height/2);
         const end=toLocal(curRect.left,rowRect?.height?rowRect.top+rowRect.height/2:curRect.top+curRect.height/2);
-        const joinX=(start.x+end.x)/2;
+        // A tiny height difference should dock straight into the source card,
+        // rather than draw a distracting one-to-three-pixel staircase.
+        const straight=Math.abs(start.y-end.y)<=3;
+        if(straight)start.y=end.y;
+        // The match-number badge owns the left gutter. Keep the vertical turn
+        // in the free space BEFORE that gutter, never hidden behind the badge.
+        const badge=curBox.querySelector(".match-order-badge");
+        const badgeRect=badge?.getBoundingClientRect();
+        const gutterLeft=badgeRect?.width?toLocal(badgeRect.left,badgeRect.top).x-3:end.x;
+        const joinX=(start.x+Math.max(start.x,gutterLeft))/2;
         const targetPlayer=(side===0?target.a:target.b)?.playerId;
         const advanced=!!(sourceMatch.completed&&sourceMatch.winnerId&&sourceMatch.winnerId===targetPlayer);
         // One continuous path per feeder: no separate horizontal/vertical
         // fragments, and each endpoint lands on its actual destination row.
-        paths += `<path class="${cls}${advanced?' se-path-advanced':''}" data-source-match="${esc(sourceMatch.id)}" data-target-match="${esc(target.id)}" data-target-side="${side===0?'A':'B'}" d="M ${start.x} ${start.y} H ${joinX} V ${end.y} H ${end.x}" fill="none" stroke="${stroke}"/>`;
+        paths += `<path class="${cls}${advanced?' se-path-advanced':''}" data-source-match="${esc(sourceMatch.id)}" data-target-match="${esc(target.id)}" data-target-side="${side===0?'A':'B'}" d="M ${start.x} ${start.y}${straight?' H '+end.x:' H '+joinX+' V '+end.y+' H '+end.x}" fill="none" stroke="${stroke}"/>`;
       });
     });
   }
   svg.innerHTML = paths;
   applySingleBracketPlayerPath(outer);
+  markBoardOwnPlayer();
 }
 
 let __seRelayoutQueued = false;
@@ -19679,7 +19796,7 @@ async function exportBoardAsImage(){
         copy.style.cssText='position:relative;inset:auto;display:block;width:'+width+'px;height:auto;max-height:none;overflow:visible;box-sizing:border-box;padding:18px';
         view.style.cssText='height:auto;min-height:0;overflow:visible;display:block';
         inner.style.transform='none';inner.style.transition='none';
-        copy.querySelectorAll('.board-toolbar,.board-stage-switch,.board-help,.share-btn,.event-title-bar').forEach(el=>el.style.display='none');
+        copy.querySelectorAll('.board-toolbar,.board-stage-switch,.board-help,.board-share-menu,.share-btn,.event-title-bar').forEach(el=>el.style.display='none');
       }
     });
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(Error('png-encode-failed')),'image/png'));
@@ -22857,7 +22974,9 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     openModal({ type:"generic", title:"重新抽籤", message:"重新抽籤將清除目前對戰編排並重新隨機安排選手，確定要繼續嗎？", danger:true, confirmLabel:"確認重新抽籤", onConfirm:()=>{ reshuffleBracket(); } });
     return;
   }
+  if(action==="board-locate-self"){void locateBoardSelf();return;}
   if(action==="board-export-image"){
+    target.closest('.board-share-menu')?.removeAttribute('open');
     exportBoardAsImage();
     return;
   }
