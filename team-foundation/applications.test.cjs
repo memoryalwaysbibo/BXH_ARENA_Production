@@ -7,8 +7,16 @@ function fixture(uidRole='deputy'){
  return {read:createReadService({db}),data,get queried(){return queried;}};
 }
 test('captain and deputy can retrieve bounded pending applications with only public fields',async()=>{
- for(const role of ['captain','deputy']){const f=fixture(role);if(role==='captain')f.data.get('teamsV1/t').captainUid='u';const result=await f.read({actorUid:'u',action:'applications',teamId:'t'});assert.deepEqual(result,{items:[{uid:'p',name:'小明',requestedAt:10}],hasMore:false});assert.equal(JSON.stringify(result).includes('private'),false);}
+ for(const role of ['captain','deputy']){const f=fixture(role);if(role==='captain')f.data.get('teamsV1/t').captainUid='u';const result=await f.read({actorUid:'u',action:'applications',teamId:'t'});assert.deepEqual(result,{items:[{uid:'p',name:'小明',requestedAt:10,hasTeam:false}],hasMore:false});assert.equal(JSON.stringify(result).includes('private'),false);}
 });
 test('non-leaders and former members cannot query applications',async()=>{
  for(const mode of ['member','removed']){const f=fixture(mode==='member'?'member':'deputy');if(mode==='removed')f.data.delete('teamMembershipsV1/u');await assert.rejects(f.read({actorUid:'u',action:'applications',teamId:'t'}),/permission-denied/);assert.equal(f.queried,false);}
+});
+test('review status follows current membership without disclosing its contents',async()=>{
+ const f=fixture();f.data.set('teamMembershipsV1/p',{teamId:'other-private-team',tenureId:'private-tenure',experienceContribution:999});
+ let result=await f.read({actorUid:'u',action:'applications',teamId:'t'});
+ assert.deepEqual(result.items[0],{uid:'p',name:'小明',requestedAt:10,hasTeam:true});
+ assert.ok(!JSON.stringify(result).includes('private'));assert.ok(!JSON.stringify(result).includes('999'));
+ f.data.delete('teamMembershipsV1/p');result=await f.read({actorUid:'u',action:'applications',teamId:'t'});
+ assert.equal(result.items[0].hasTeam,false);
 });
