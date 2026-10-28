@@ -8,7 +8,6 @@ async function open(page,mode='admin',ui='v2'){
  await page.route('**/*',route=>{
   const u=new URL(route.request().url());
   if(!['localhost','127.0.0.1'].includes(u.hostname))return route.abort('blockedbyclient');
-  if(u.pathname==='/index.html'||u.pathname==='/'){return route.fetch().then(async r=>route.fulfill({response:r,body:(await r.text()).replace('window.BXH_TEAM_FULL_ENABLED = false;','window.BXH_TEAM_FULL_ENABLED = true;')}));}
   if(u.pathname==='/modules/cloud/cloud-runtime.js')return route.fulfill({contentType:'text/javascript',body:'// Isolated team preview services.'});
   return route.continue();
  });
@@ -27,7 +26,7 @@ async function open(page,mode='admin',ui='v2'){
     throw Error('Unexpected test request '+name+':'+p.action);
    }};
  },{ui});
- await page.goto('/',{waitUntil:'load'});await page.waitForFunction(()=>window.teamFixture?.ready&&window.BXHTeamFull);
+ await page.goto('/',{waitUntil:'load'});expect(await page.evaluate(()=>window.BXH_TEAM_FULL_ENABLED)).toBe(true);await page.waitForFunction(()=>window.teamFixture?.ready&&window.BXHTeamFull);
  await page.evaluate(mode=>{
   firebaseUser={uid:'fixture-admin',email:'team@example.invalid'};
   userProfile={role:'super_admin',active:true,realName:'測試管理員',displayName:'測試管理員',email:'team@example.invalid'};

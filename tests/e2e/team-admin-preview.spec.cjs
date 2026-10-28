@@ -8,6 +8,8 @@ async function open(page,mode='admin',ui='v2'){
  await page.route('**/*',route=>{
   const u=new URL(route.request().url());
   if(!['localhost','127.0.0.1'].includes(u.hostname))return route.abort('blockedbyclient');
+  // Exercise the retained read-only fallback with the full feature disabled.
+  if(u.pathname==='/index.html'||u.pathname==='/')return route.fetch().then(async r=>route.fulfill({response:r,body:(await r.text()).replace('window.BXH_TEAM_FULL_ENABLED = true;','window.BXH_TEAM_FULL_ENABLED = false;')}));
   if(u.pathname==='/modules/cloud/cloud-runtime.js')return route.fulfill({contentType:'text/javascript',body:'// Isolated team preview services.'});
   return route.continue();
  });
