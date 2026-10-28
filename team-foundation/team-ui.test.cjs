@@ -9,6 +9,7 @@ test('lobby team frames render known variants and ignore arbitrary values',()=>{
  const item={id:'t',name:'隊伍',captainName:'隊長',memberCount:2,capacity:10,join:{label:'加入',disabled:false}};
  assert.match(ui.lobby({items:[{...item,selectedFrame:7}]}),/team-identity team-frame-7/);
  assert.doesNotMatch(ui.lobby({items:[{...item,selectedFrame:'evil'}]}),/team-frame-evil/);
+ assert.match(ui.lobby({items:[{...item,emblemSource:'data:image/webp;base64,UklGRgAAAABXRUJQ'}]}),/alt="戰隊圖案"/);
 });
 test('team detail displays only bounded WebP data images',()=>{
  const team={id:'t',name:'隊伍',members:[],role:'member',emblemSource:'data:image/webp;base64,UklGRgAAAABXRUJQ'};
