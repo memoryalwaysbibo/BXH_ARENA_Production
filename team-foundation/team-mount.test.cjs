@@ -58,3 +58,11 @@ test('image refresh of the same team preserves the captain preview',async()=>{
   await change({target:{hasAttribute:()=>true,files:[{}]}});render({screen:'mine',team,loaded:true,loading:false,busy:false});assert.equal(img.src,'blob:preview');assert.equal(button.disabled,false);assert.equal(revoked,0);mounted.destroy();assert.equal(revoked,1);
  }finally{global.BXHTeamEmblem=oldEmblem;global.URL.createObjectURL=oldCreate;global.URL.revokeObjectURL=oldRevoke;}
 });
+test('creation with a custom image prepares it before create and uploads to the new team',async()=>{
+ let submit,team=null;const calls=[],oldForm=global.FormData,oldEmblem=global.BXHTeamEmblem;
+ global.FormData=class{get(name){return {name:'新戰隊',presetId:'bolt',presetColor:'#11AA22',customEmblem:{size:3}}[name];}};global.BXHTeamEmblem={prepare:async()=>new Blob(['abc'],{type:'image/webp'})};
+ const controller={search:async()=>{},dispose(){},snapshot:()=>({team,screen:team?'mine':'create'}),operate:async(action,id,extra)=>{calls.push({action,id,extra});if(action==='create')team={id,role:'captain'};return {ok:true};}};
+ const container={contains:()=>true,addEventListener:(name,fn)=>{if(name==='submit')submit=fn;},removeEventListener(){},replaceChildren(){}};
+ try{mount({container,ui:{},controllers:{createTeamController:()=>controller},api:{}});const form={dataset:{teamForm:'create'},closest:()=>form};await submit({target:form,preventDefault(){}});assert.equal(calls.length,2);assert.equal(calls[0].action,'create');assert.deepEqual(calls[0].extra.preset,{id:'bolt',color:'#11AA22'});assert.equal(calls[1].action,'emblem');assert.equal(calls[1].id,calls[0].id);assert.equal(calls[1].extra.base64,'YWJj');}
+ finally{global.FormData=oldForm;global.BXHTeamEmblem=oldEmblem;}
+});
