@@ -25,3 +25,9 @@ test('ranking load failure removes prior rows and shows a retry message',async()
  let fail=false;const c=create({identity:()=> 'player',read:async()=>{if(fail)throw Error('unavailable');return {items:[{id:'a',name:'先前戰隊',rank:1,captainName:'隊長',memberCount:1,strength:10}],total:1,excluded:0};}});
  await c.refresh();assert.match(c.render(String),/先前戰隊/);fail=true;await c.refresh();const html=c.render(String);assert.doesNotMatch(html,/先前戰隊/);assert.match(html,/暫時無法載入/);assert.match(html,/重新整理/);
 });
+test('top ten team names use ladder rank colors and tied ranks share their color',async()=>{
+ const rows=[1,2,3,4,5,10,11,1].map((rank,i)=>({rank,id:'t'+i,name:'Team'+i,captainName:'A',memberCount:1,strength:100}));
+ const c=create({identity:()=> 'u',read:async()=>({items:rows,total:8,excluded:0})});await c.refresh();const html=c.render(String);
+ for(const [i,cls] of [[0,'1'],[1,'2'],[2,'3'],[3,'4'],[4,'elite'],[5,'elite'],[7,'1']])assert.match(html,new RegExp('team-name-rank-'+cls+'">Team'+i));
+ assert.match(html,/class="team-ranking-name">Team6/);
+});
