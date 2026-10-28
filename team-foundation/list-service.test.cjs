@@ -29,3 +29,7 @@ test('lobby frame comes from authoritative team and must be unlocked',async()=>{
  const allowed=await setup({frame:4})({actorUid:'u'});assert.equal(allowed.items.find(x=>x.id==='t0').selectedFrame,4);assert.equal(allowed.items.find(x=>x.id==='t0').hasEmblem,true);assert.ok(!JSON.stringify(allowed).includes('teamEmblemsV1'));
  const locked=await setup({frame:10})({actorUid:'u'});assert.equal(locked.items.find(x=>x.id==='t0').selectedFrame,null);
 });
+test('backend accepts lobby sort and applies it before paging',async()=>{
+ const list=setup({count:3});const asc=await list({actorUid:'u',query:{sort:'strength_asc',limit:2}});assert.deepEqual(asc.items.map(x=>x.id),['t1','t2']);
+ await assert.rejects(list({actorUid:'u',query:{sort:'bogus'}}),/invalid-filter/);
+});
