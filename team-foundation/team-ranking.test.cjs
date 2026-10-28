@@ -21,3 +21,7 @@ test('ranking hydrates current page images without rereading the ranking',async(
  let calls=0;const c=create({identity:()=>'u',emblems:require('./team-emblem.js'),readEmblem:async()=>({image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQ'}}),read:async()=>{calls++;return {items:[{id:'t',rank:1,name:'隊',captainName:'A',memberCount:2,strength:5,hasEmblem:true}],total:1,excluded:0};}});
  c.render(esc);await new Promise(setImmediate);assert.match(c.render(esc),/alt="戰隊圖案"/);assert.equal(calls,1);
 });
+test('ranking load failure removes prior rows and shows a retry message',async()=>{
+ let fail=false;const c=create({identity:()=> 'player',read:async()=>{if(fail)throw Error('unavailable');return {items:[{id:'a',name:'先前戰隊',rank:1,captainName:'隊長',memberCount:1,strength:10}],total:1,excluded:0};}});
+ await c.refresh();assert.match(c.render(String),/先前戰隊/);fail=true;await c.refresh();const html=c.render(String);assert.doesNotMatch(html,/先前戰隊/);assert.match(html,/暫時無法載入/);assert.match(html,/重新整理/);
+});
