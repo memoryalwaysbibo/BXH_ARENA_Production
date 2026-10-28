@@ -41,3 +41,29 @@ test('existing contribution increments and invalid counters do not award',async(
  const f=fixture();f.docs.get('teamMembershipsV1/'+uid).experienceContribution=7;await f.award(id);assert.equal(f.docs.get('teamMembershipsV1/'+uid).experienceContribution,8);
  const bad=fixture();bad.docs.get('teamMembershipsV1/'+uid).experienceContribution=-1;await assert.rejects(bad.award(id),/invalid-contribution/);assert.equal(bad.docs.has('teamActivityReceiptsV1/'+id),false);assert.equal(bad.docs.get('teamsV1/t').totalXp,2);
 });
+
+const {recentActivity,recordDailyActivity}=require('./activity.cjs');
+test('Taiwan calendar window expires old days and counts only current active members',()=>{
+ const now=Date.UTC(2026,9,28,2),day=86400000;
+ let bins=recordDailyActivity({uid:'a',members:['a','b'],archivedAt:now-29*day,now});
+ bins=recordDailyActivity({dailyActivity:bins,uid:'b',members:['a','b'],archivedAt:now,now});
+ assert.deepEqual(recentActivity({dailyActivity:bins,members:['b'],now}),{participations:2,activeMemberCount:1,days:30});
+ assert.deepEqual(recentActivity({dailyActivity:bins,members:['a','b'],now:now+day}),{participations:1,activeMemberCount:1,days:30});
+ bins=recordDailyActivity({dailyActivity:bins,uid:'b',members:['b'],archivedAt:now,now});
+ assert.ok(Object.values(bins).every(b=>!b.memberUids.includes('a')));
+ assert.equal(recentActivity({dailyActivity:bins,members:['b'],now}).participations,3);
+ assert.throws(()=>recordDailyActivity({uid:'b',members:['b'],archivedAt:now+1,now}),/future/);
+});
+test('Taiwan midnight starts a new day; late archives do not resurrect expired buckets',()=>{
+ const now=Date.UTC(2026,9,27,16),day=86400000;
+ let bins=recordDailyActivity({uid:'a',members:['a'],archivedAt:now-1,now});
+ bins=recordDailyActivity({dailyActivity:bins,uid:'a',members:['a'],archivedAt:now,now});
+ assert.equal(Object.keys(bins).length,2);
+ bins=recordDailyActivity({dailyActivity:bins,uid:'a',members:['a'],archivedAt:now-31*day,now});
+ assert.equal(recentActivity({dailyActivity:bins,members:['a'],now}).participations,2);
+});
+test('award updates activity and XP atomically without double counting',async()=>{
+ const f=fixture();const award=createActivityAwarder({db:{doc:p=>p,runTransaction:async fn=>fn({get:async p=>({exists:f.docs.has(p),data:()=>f.docs.get(p)}),create:(p,v)=>f.docs.set(p,v),update:(p,v)=>f.docs.set(p,{...f.docs.get(p),...v})})},clock:()=>200});
+ await award(id);await award(id);
+ assert.deepEqual(recentActivity({dailyActivity:f.docs.get('teamsV1/t').dailyActivity,members:[uid],now:200}),{participations:1,activeMemberCount:1,days:30});
+});
