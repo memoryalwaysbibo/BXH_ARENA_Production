@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createMembershipService}=require('./membership.cjs');
 function fixture(readEligibility){
- const data=new Map();let now=100;
+ const data=new Map([['teamCapacityControlV1/current',{activeCount:0}]]);let now=100;
  const db={doc:p=>p,runTransaction:async fn=>{
   const staged=[];let writing=false;
   const tx={get:async p=>{assert.equal(writing,false,'all reads before writes');return {exists:data.has(p),data:()=>structuredClone(data.get(p))};}};
@@ -147,3 +147,11 @@ test('join and departure atomically open and close independent membership tenure
  f.setTime(400);await cmd(f.run,'a','apply');const second=f.data.get('teamMembershipsV1/a').tenureId;assert.notEqual(first,second);assert.equal(f.data.get('teamsV1/alpha/tenures/'+second).joinedAt,400);
  f.setTime(500);await cmd(f.run,'captain','remove',{targetUid:'a',reasonCode:'adjustment'});assert.equal(f.data.get('teamsV1/alpha/tenures/'+second).leftAt,500);
 });
+test('team count is updated with create and dissolve and never exceeds capacity',async()=>{
+ const f=fixture();f.data.get('teamCapacityControlV1/current').activeCount=199;
+ await cmd(f.run,'captain','create',{name:'Alpha'});assert.equal(f.data.get('teamCapacityControlV1/current').activeCount,200);
+ await assert.rejects(cmd(f.run,'other','create',{teamId:'other',name:'Other'}),/team-capacity-full/);
+ f.data.set('teamsPublicV1/alpha',{name:'Alpha'});await cmd(f.run,'captain','dissolve');assert.equal(f.data.has('teamsPublicV1/alpha'),false);assert.equal(f.data.get('teamCapacityControlV1/current').activeCount,199);
+ await cmd(f.run,'other','create',{teamId:'other',name:'Other'});assert.equal(f.data.get('teamCapacityControlV1/current').activeCount,200);
+});
+test('missing capacity control prevents creation without writes',async()=>{const f=fixture();f.data.delete('teamCapacityControlV1/current');const before=JSON.stringify([...f.data]);await assert.rejects(cmd(f.run,'captain','create',{name:'Alpha'}),/team-capacity-unavailable/);assert.equal(JSON.stringify([...f.data]),before);});
