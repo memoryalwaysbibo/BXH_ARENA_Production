@@ -17,3 +17,8 @@ test('disabled flag and unavailable team lookup do not falsely show no team',asy
  const off=fixture(false);await off.window.BXHPlayerCardsFeature.handlePlayerCard('card-open',{getAttribute:()=> 'target'});off.window.BXHPlayerCardsFeature.renderPlayerCardOverlay();assert.equal(off.requests.length,0);assert.doesNotMatch(off.overlay.innerHTML,/尚未加入戰隊/);
  const denied=fixture(true);denied.window.engagementService.tournamentOperation=async()=>{throw Error('denied');};await denied.window.BXHPlayerCardsFeature.handlePlayerCard('card-open',{getAttribute:()=> 'target'});denied.window.BXHPlayerCardsFeature.renderPlayerCardOverlay();assert.doesNotMatch(denied.overlay.innerHTML,/尚未加入戰隊/);
 });
+test('account change during image download cannot attach the previous card image',async()=>{
+ const f=fixture(true);let resolveImage;f.window.engagementService.tournamentOperation=async(_name,p)=>p.action==='card-team'?{team:{id:'team',name:'星隊',role:'member',level:4,hasEmblem:true}}:new Promise(resolve=>{resolveImage=resolve;});
+ const pending=f.window.BXHPlayerCardsFeature.handlePlayerCard('card-open',{getAttribute:()=> 'target'});await new Promise(setImmediate);f.setUid('other');resolveImage({image:{contentType:'image/webp',base64:'UklGRgAAAABXRUJQ'}});await pending;
+ const current=f.window.BXHPlayerCardsFeature.cardContext();assert.equal(current.uid,'other');assert.equal(current.card,null);assert.equal(current.teamInfo,undefined);
+});
