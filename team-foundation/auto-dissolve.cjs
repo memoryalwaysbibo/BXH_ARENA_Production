@@ -1,5 +1,6 @@
 'use strict';
 const {randomUUID}=require('node:crypto');
+const {CONTROL,capacityAfter}=require('./team-capacity.cjs');
 const {canDissolve}=require('./team-policy.cjs');
 const BATCH_LIMIT=20,MAX_BATCHES=5;
 // Internal worker candidate. Must be invoked by a separately configured scheduler.
@@ -16,8 +17,11 @@ function createAutoDissolver({db,clock=Date.now,newId=randomUUID,documentId}){
    const profile=await tx.get(db.doc('publicPlayers/'+team.captainUid));
    const publicName=profile.exists&&typeof profile.data().publicName==='string'?profile.data().publicName.trim():'';
    if(!membership.exists||membership.data().teamId!==teamId)throw Error('membership-inconsistent');
+   const control=await tx.get(db.doc(CONTROL));const nextCount=capacityAfter(control.exists?control.data().activeCount:null,-1);
+   tx.update(db.doc(CONTROL),{activeCount:nextCount});
    tx.update(teamRef,{status:'dissolved',dissolvedAt:now,dissolvedBy:'system',dissolveAt:null});
    const tenureId=membership.data().tenureId;if(tenureId){if(typeof tenureId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(tenureId))throw Error('invalid-tenure');tx.update(db.doc('teamsV1/'+teamId+'/tenures/'+tenureId),{leftAt:now});}
+   tx.delete(db.doc('teamsPublicV1/'+teamId));
    tx.delete(membershipRef);
    tx.create(db.doc('teamsV1/'+teamId+'/history/'+historyId),{subjectUid:team.captainUid,subjectName:publicName||'隊長',actorUid:'system',actorName:'系統',actorRole:'system',method:'auto-dissolve',occurredAt:now});
    return true;
