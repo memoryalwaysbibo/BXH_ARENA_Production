@@ -1,0 +1,29 @@
+name: Commerce UI candidate
+on:
+  pull_request:
+    paths:
+      - 'commerce-ui.js'
+      - 'commerce.css'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'modules/management-v2/navigation.js'
+      - 'tests/commerce-*'
+      - '.github/workflows/commerce-ui.yml'
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/commerce-ui.test.cjs
+      - run: node scripts/verify-production-frontend.cjs
+      - run: npm install --no-package-lock --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/commerce-browser.cjs
