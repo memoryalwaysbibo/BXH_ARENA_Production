@@ -1,7 +1,7 @@
 'use strict';
 const {admissionPolicy}=require('./admission.cjs');
 const {progression}=require('./progression.cjs');
-const {recentActivity}=require('./activity.cjs');
+const {recentActivity,presenceView}=require('./activity.cjs');
 const presets=require('./emblem-presets.js');
 const {historyView,mayReadReason}=require('./history.cjs');
 const valid=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value);
@@ -38,7 +38,17 @@ function createReadService({db,clock=Date.now}){
     if(!data||!team||team.status==='dissolved')throw Error('team-not-found');
     if(!board?.generation||!ladder?.currentSeason||data.hunterGeneration!==board.generation||data.ladderSeason!==ladder.currentSeason)throw Error('projection-stale');
     if(!Array.isArray(data.members)||!Array.isArray(team.memberUids)||data.members.length!==team.memberUids.length||data.members.some((p,i)=>p.uid!==team.memberUids[i]||p.role!==(p.uid===team.captainUid?'captain':team.roles?.[p.uid]||'member')))throw Error('projection-stale');
-    return {id:teamId,name:data.name,preset:team.emblemObject?null:presets.normalize(team.emblemPreset??undefined),members:(data.members||[]).map(p=>({uid:p.uid,name:p.name,role:p.role,ladderPoints:p.ladderPoints??null,hunterTier:p.hunterTier??null}))};
+    if(team.memberUids.length>20||team.memberUids.some(uid=>!valid(uid)))throw Error('invalid-team-state');
+    const viewer=await read(tx,'teamMembershipsV1/'+actorUid);
+    const viewerIsMember=viewer?.teamId===teamId&&team.memberUids.includes(actorUid);
+    const now=clock();
+    // Private account documents are read only after canonical membership authorization.
+    const details=viewerIsMember?await Promise.all(data.members.map(async p=>{
+     const [account,membership]=await Promise.all([read(tx,'users/'+p.uid),p.uid===actorUid?Promise.resolve(viewer):read(tx,'teamMembershipsV1/'+p.uid)]);
+     const contribution=membership?.teamId===teamId?membership.experienceContribution??0:null;
+     return {recentLogin:presenceView({viewerIsMember:true,lastSeenAt:account?.lastLoginAt,now}).label,experienceContribution:Number.isSafeInteger(contribution)&&contribution>=0?contribution:null};
+    })):[];
+    return {id:teamId,name:data.name,viewerIsMember,preset:team.emblemObject?null:presets.normalize(team.emblemPreset??undefined),members:(data.members||[]).map((p,i)=>({uid:p.uid,name:p.name,role:p.role,ladderPoints:p.ladderPoints??null,hunterTier:p.hunterTier??null,...(viewerIsMember?details[i]:{})}))};
    }
    const team=await read(tx,'teamsV1/'+teamId),membership=await read(tx,'teamMembershipsV1/'+actorUid);
    if(action==='applications'){
