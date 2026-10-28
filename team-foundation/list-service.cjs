@@ -1,6 +1,7 @@
 'use strict';
 const {browseLobby}=require('./lobby.cjs');
 const {progression}=require('./progression.cjs');
+const presets=require('./emblem-presets.js');
 const {admissionPolicy}=require('./admission.cjs');
 // Bounded candidate for small installations; explicitly fails above cap instead of silently omitting teams.
 const MAX_SCAN=200;
@@ -30,7 +31,7 @@ function createListService({db}){
     if(!consistent){stale++;continue;}
     const {projection:discard,...safe}=p;const unlocked=progression(team.totalXp).unlockedFrames;
     const hasEmblem=typeof team.emblemObject==='string'&&team.emblemObject.startsWith('teamEmblemsV1/'+p.id+'/')&&/^teamEmblemsV1\/[A-Za-z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/.test(team.emblemObject);
-    items.push({...safe,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null,hasEmblem});
+    items.push({...safe,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null,preset:team.emblemObject?null:presets.normalize(team.emblemPreset??undefined),hasEmblem});
    }
    if(!membership?.teamId){
     const apps=await Promise.all(items.map(p=>read(tx,'teamsV1/'+p.id+'/applications/'+actorUid)));
