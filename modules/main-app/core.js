@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.39";
+const APP_VERSION = "v14.3.40";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.40",date:"2026/10/29",timezone:"Asia/Taipei",title:"抽籤單次操作自動確認",updateLevel:"patch",added:[],changed:["抽籤遇到暫時讀取或寫入失敗時，自動有限次重試同一份配對","雲端配對核對短暫未一致時持續等待，不要求再次點擊上傳"],fixed:["首次提交過早顯示失敗，需手動再次上傳才能完成"],publicSummary:"抽籤自動完成暫時失敗重試與雲端確認。"},
   {version:"v14.3.39",date:"2026/10/29",timezone:"Asia/Taipei",title:"抽籤上傳等待提示",updateLevel:"patch",added:[],changed:["抽籤自動顯示資料上傳中與進度提示至少兩秒，完成後自動顯示成功或失敗"],fixed:[],publicSummary:"抽籤後清楚提示等待，無須手動確認上傳。"},
   {version:"v14.3.38",date:"2026/10/28",timezone:"Asia/Taipei",title:"抽籤上傳流程簡化",updateLevel:"patch",added:[],changed:["抽籤顯示上傳中、上傳成功或上傳失敗；失敗只保留單一重試操作","重試沿用原配對，雲端版本衝突時自動同步最新資料"],fixed:[],publicSummary:"簡化抽籤上傳與重試流程。"},
   {version:"v14.3.37",date:"2026/10/28",timezone:"Asia/Taipei",title:"商城與人工轉帳訂單基礎",updateLevel:"feature",added:["商城分類、商品照片與說明頁面","個人選單新增我的訂單","最高管理員新增商品、訂單與收款對帳管理"],changed:["付款確認與商品交付分開記錄，保留重試與退款紀錄"],fixed:[],security:["購買資格與確認收款由後端核實；商城初期維持未開放購買"],publicSummary:"商城基礎介面上線；商品及付款尚未開放。"},
@@ -10504,6 +10505,7 @@ function bracketCommitController(){
   },
   read:()=>window.cloudSync.readBracketFromServer(code),
   write:(snapshot,options)=>enqueueCloudStateWrite(code,snapshot,{...options,isCurrent:current}),
+  writeFailureCode:()=>window.__BXH_LAST_CLOUD_ERROR_CODE||'',
   local:snapshot=>saveRecord(snapshot),
   apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
   changed:()=>{if(current())renderPreservingScroll();},

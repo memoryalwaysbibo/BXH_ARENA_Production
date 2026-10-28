@@ -14,10 +14,10 @@ const {chromium}=require('playwright');
  await page.addScriptTag({content:`
  let state={id:'r',cloudCode:'ROOM',meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'},firebaseUser={uid:'u'},currentRole='admin',activeTab='people';
  const clone=x=>JSON.parse(JSON.stringify(x));
- let serverState=clone(state),publicState=clone(state),generations=0,success=0,writeCount=0,release=null,fail=true;
+ let serverState=clone(state),publicState=clone(state),generations=0,success=0,writeCount=0,release=null,fail=true,failOnce=false,autoWrite=false,staleReads=0;
  window.cloudSync={
-  readBracketFromServer:async()=>({ok:true,data:clone(serverState),publicData:clone(publicState)}),
-  pushUpdate:async(code,snapshot,options)=>{writeCount++;if(fail)return false;await new Promise(r=>release=r);BXHBracketCommit.assertWrite(serverState,snapshot,options);serverState=clone(snapshot);publicState=clone(snapshot);return true;}
+  readBracketFromServer:async()=>({ok:true,data:clone(serverState),publicData:staleReads-->0?{...clone(publicState),matches:[]}:clone(publicState)}),
+  pushUpdate:async(code,snapshot,options)=>{writeCount++;if(failOnce){failOnce=false;return false;}if(fail)return false;if(!autoWrite)await new Promise(r=>release=r);BXHBracketCommit.assertWrite(serverState,snapshot,options);serverState=clone(snapshot);publicState=clone(snapshot);if(autoWrite)staleReads=1;return true;}
  };
  const enqueueCloudStateWrite=(code,snapshot,options)=>window.cloudSync.pushUpdate(code,snapshot,options);
  async function saveRecord(){return true;}
@@ -28,7 +28,7 @@ const {chromium}=require('playwright');
  ${core.slice(a,b)}
  function render(){document.querySelector('#app').innerHTML=bracketCommitStatusHtml()+bracketDrawButtonHtml()+'<button id="start" '+(bracketCommitBlocked()?'disabled':'')+'>開賽</button>';}
  document.addEventListener('click',e=>{if(e.target.dataset.action==='draw-bracket')bracketCommitController().submit();if(e.target.dataset.action==='bracket-commit-submit')bracketCommitController().submit();});
- window.fixture={stats:()=>({generations,success,writeCount,local:clone(state),server:clone(serverState)}),retry:()=>{fail=false;},release:()=>release(),canStart:()=>verifyBracketBeforeStart()};
+ window.fixture={stats:()=>({generations,success,writeCount,local:clone(state),server:clone(serverState)}),retry:()=>{fail=false;},release:()=>release(),autoRecover:()=>{fail=false;failOnce=true;autoWrite=true;},canStart:()=>verifyBracketBeforeStart()};
  render();
  `});
  await page.getByRole('button',{name:'抽籤',exact:true}).click();
@@ -54,6 +54,15 @@ const {chromium}=require('playwright');
  const after=await page.evaluate(()=>fixture.stats());assert.equal(after.generations,1);assert.equal(after.success,1);assert.equal(after.local.bracketDrawHistory.length,1);assert.equal(after.local.matches[0].id,after.server.matches[0].id);
  assert.equal(await page.evaluate(()=>fixture.canStart()),true);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.evaluate(()=>fixture.autoRecover());
+ const writesBefore=(await page.evaluate(()=>fixture.stats())).writeCount;
+ await page.getByRole('button',{name:'重新抽籤',exact:true}).click();
+ await page.getByRole('status').getByText('資料上傳中…',{exact:true}).waitFor();
+ assert.equal(await page.locator('#start').isDisabled(),true);
+ await page.getByRole('status').getByText('上傳成功',{exact:true}).waitFor({timeout:15000});
+ const recovered=await page.evaluate(()=>fixture.stats());
+ assert.equal(recovered.generations,2);assert.equal(recovered.success,2);assert.equal(recovered.writeCount-writesBefore,2);
+ assert.equal(await page.getByRole('button',{name:'重試上傳',exact:true}).count(),0);
  console.log('PASS single-action bracket UI and actual bridge: failed save, disabled start/redraw, delayed retry, same pairing, server confirmation and mobile width');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
