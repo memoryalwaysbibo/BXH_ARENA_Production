@@ -5570,11 +5570,7 @@ let findEventsFiltersOpen = false;
 let lobbySectionExpanded = { live:null, settling:false, registration:false, waiting:false, ended:false };
 const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","天梯排行"],["shop","商城"]];
 const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>renderPreservingScroll(),escape:esc});
-function playerVisibleTabs(){
-  const tabs=hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:[...PLAYER_TABS];
-  if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);
-  return tabs;
-}
+function playerVisibleTabs(){const tabs=hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:[...PLAYER_TABS];if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);return tabs;}
 
 let engagementSnapshot=null;
 let engagementSnapshotFetchedAt=0;
