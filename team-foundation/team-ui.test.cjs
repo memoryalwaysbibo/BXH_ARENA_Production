@@ -119,3 +119,10 @@ test('solo dissolution warning separates Taiwan date and time and disappears aft
 test('management view includes authorized contribution and login details',()=>{
  const html=ui.manageMembers({id:'t',viewerRole:'captain',viewerIsMember:true,members:[{uid:'a',name:'A',role:'member',experienceContribution:5,recentLogin:'2 小時前'}]});assert.match(html,/經驗貢獻（本次入隊）：5/);assert.match(html,/最近登入：2 小時前/);
 });
+
+test('lobby pagination uses requested page size even when stale rows were omitted',()=>{
+ const first=ui.lobby({items:[],total:45,offset:0,limit:20,totalIsUpperBound:true});assert.match(first,/lobby-next/);assert.doesNotMatch(first,/lobby-previous/);
+ const middle=ui.lobby({items:[],total:45,offset:20,limit:20,totalIsUpperBound:true});assert.match(middle,/lobby-next/);assert.match(middle,/lobby-previous/);
+ const last=ui.lobby({items:[],total:45,offset:40,limit:20});assert.doesNotMatch(last,/lobby-next/);assert.match(last,/lobby-previous/);
+ assert.doesNotMatch(ui.lobby({loading:true,total:45}),/lobby-next/);
+});
