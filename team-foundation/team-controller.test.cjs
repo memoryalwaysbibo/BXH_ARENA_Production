@@ -122,3 +122,7 @@ test('team image loads once per page load and late responses cannot cross naviga
 test('failed image lookup does not fail the team page',async()=>{
  const c=setup({mine:async()=>({team:{id:'t'}}),emblem:async()=>{throw Error('storage');}});await c.mine();await new Promise(setImmediate);assert.equal(c.snapshot().loaded,true);assert.equal(c.snapshot().team.emblemSource,undefined);
 });
+test('team cap rejection displays a clear message without retrying a successful operation',async()=>{
+ const c=setup({command:async()=>{throw Object.assign(Error('team-capacity-full'),{code:'functions/failed-precondition'});}});
+ const result=await c.operate('create','new',{name:'新隊'});assert.equal(result.reason,'rejected');assert.equal(c.snapshot().pending,false);assert.match(c.snapshot().error,/戰隊數量已達上限/);
+});
