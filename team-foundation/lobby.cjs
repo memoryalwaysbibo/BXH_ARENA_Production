@@ -30,13 +30,15 @@ function joinState(team,{membershipTeamId=null,pendingTeamIds=[],player=null}={}
 // Only filter already-public records. Real discovery requires a bounded server query adapter.
 function browseLobby(teams,{query='',recruitment='all',mode='all',eligibleOnly=false,minLevel=1,maxLevel=10,pendingOnly=false,sort='strength',offset=0,limit=20}={},viewer={}){
  if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>50||!Number.isInteger(minLevel)||!Number.isInteger(maxLevel)||minLevel<1||maxLevel>10||minLevel>maxLevel)throw Error('invalid-pagination-or-level');
- if(!['all','open','full'].includes(recruitment)||!['all','auto','review'].includes(mode)||!['strength','level','newest'].includes(sort))throw Error('invalid-filter');
+ if(!['all','open','full'].includes(recruitment)||!['all','auto','review'].includes(mode)||!['strength','level','newest','strength_desc','strength_asc','created_desc','created_asc','members_desc','members_asc','level_desc','level_asc'].includes(sort))throw Error('invalid-filter');
  const needle=query.trim().normalize('NFKC').toLocaleLowerCase();
  const filtered=teams.filter(t=>{
   const full=t.memberCount>=t.capacity;
   return (!needle||[t.name,t.captainName].some(s=>String(s).normalize('NFKC').toLocaleLowerCase().includes(needle)))&&(recruitment==='all'||(recruitment==='full'?full:!full))&&(mode==='all'||t.admission.mode===mode)&&t.level>=minLevel&&t.level<=maxLevel&&(!pendingOnly||viewer.pendingTeamIds?.includes(t.id))&&(!eligibleOnly||t.admission.mode==='auto'&&eligibility(t,viewer.player)===true);
  });
- filtered.sort((a,b)=>(sort==='strength'?((a.strength===null)-(b.strength===null)||((b.strength??0)-(a.strength??0))):sort==='level'?b.level-a.level:b.createdAt-a.createdAt)||a.id.localeCompare(b.id));
+ const sortSpec={strength:['strength',-1],strength_desc:['strength',-1],strength_asc:['strength',1],newest:['createdAt',-1],created_desc:['createdAt',-1],created_asc:['createdAt',1],members_desc:['memberCount',-1],members_asc:['memberCount',1],level:['level',-1],level_desc:['level',-1],level_asc:['level',1]};
+ const [field,direction]=sortSpec[sort];
+ filtered.sort((a,b)=>{const av=a[field],bv=b[field],aValid=Number.isFinite(av),bValid=Number.isFinite(bv);return (aValid===bValid?(aValid?(av-bv)*direction:0):aValid?-1:1)||a.id.localeCompare(b.id);});
  return {total:filtered.length,items:filtered.slice(offset,offset+limit).map(t=>({...t,join:joinState(t,viewer)}))};
 }
 module.exports={publicTeam,eligibility,joinState,browseLobby};
