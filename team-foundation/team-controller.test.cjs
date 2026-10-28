@@ -67,6 +67,18 @@ test('review pagination preserves the current page after a decision and refresh 
  await c.applicationsPrevious();assert.equal(c.snapshot().applicationsPage,1);assert.equal(c.snapshot().items[0].uid,'first');
  await c.applicationsNext();await c.applications('t');assert.equal(c.snapshot().applicationsPage,1);assert.equal(calls.at(-1).cursor,undefined);
 });
+test('failed review page cannot expose stale decisions and manual refresh restores navigation',async()=>{
+ let offline=false,commands=0;const c=setup({applications:async p=>{
+  if(offline)throw Error('network');return {items:[{uid:p.cursor?'later':'first'}],nextCursor:p.cursor?null:'anchor',hasMore:!p.cursor};
+ },command:async()=>{commands++;return {ok:true};}});
+ await c.applications('t');offline=true;
+ assert.equal((await c.applicationsNext()).reason,'load-failed');
+ assert.equal(c.snapshot().loaded,false);assert.deepEqual(c.snapshot().items,[]);assert.equal(c.snapshot().loading,false);
+ assert.equal((await c.applicationsNext()).reason,'unavailable');assert.equal(commands,0);
+ offline=false;assert.equal((await c.applications('t')).ok,true);assert.equal(c.snapshot().applicationsPage,1);
+ assert.equal(c.snapshot().error,null);assert.equal(c.snapshot().items[0].uid,'first');
+ assert.equal((await c.applicationsNext()).ok,true);assert.equal(c.snapshot().applicationsPage,2);
+});
 
 test('review rejection identifies an applicant already in another team',async()=>{
  const c=setup({command:async()=>{throw Object.assign(Error('already-in-team'),{code:'functions/failed-precondition'});}});
