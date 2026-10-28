@@ -13,8 +13,15 @@ function createRankingService({db}){
    const [board,ladder,docs]=await Promise.all([read(tx,'hunterLeaderboardMeta/current'),read(tx,'ladderSystem/current'),tx.get(db.collection('teamsPublicV1').limit(MAX_SCAN+1))]);
    if(!board?.generation||!ladder?.currentSeason)throw Error('source-unavailable');
    if(docs.docs.length>MAX_SCAN)throw Error('team-list-capacity-exceeded');
-   const rows=await Promise.all(docs.docs.map(async doc=>({id:doc.id,p:doc.data(),team:await read(tx,'teamsV1/'+doc.id)})));
-   let excluded=0;const valid=[];
+   // Reject unusable projections before spending an authoritative team read.
+   // Valid candidates still undergo the full canonical roster/level/name check.
+   let excluded=0;const candidates=[];
+   for(const doc of docs.docs){const p=doc.data();
+    const usable=p.hunterGeneration===board.generation&&p.ladderSeason===ladder.currentSeason&&p.strengthComplete===true&&Number.isFinite(p.strength)&&p.strength>=0&&Array.isArray(p.members)&&p.members.every(m=>m&&validId(m.uid)&&Number.isFinite(m.ladderPoints)&&m.ladderPoints>=0)&&p.strength===p.members.reduce((sum,m)=>sum+m.ladderPoints,0);
+    if(usable)candidates.push({id:doc.id,p});else excluded++;
+   }
+   const rows=await Promise.all(candidates.map(async row=>({...row,team:await read(tx,'teamsV1/'+row.id)})));
+   const valid=[];
    for(const {id,p,team} of rows){
     let ok=!!team&&team.status==='active'&&p.hunterGeneration===board.generation&&p.ladderSeason===ladder.currentSeason&&p.strengthComplete===true&&Number.isFinite(p.strength)&&p.strength>=0&&Array.isArray(p.members)&&Array.isArray(team.memberUids)&&p.members.length===team.memberUids.length;
     if(ok)ok=p.members.every((m,i)=>m.uid===team.memberUids[i]&&m.role===(m.uid===team.captainUid?'captain':team.roles?.[m.uid]||'member')&&Number.isFinite(m.ladderPoints)&&m.ladderPoints>=0);
