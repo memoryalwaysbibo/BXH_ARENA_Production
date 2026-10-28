@@ -52,9 +52,9 @@ function applicationDateTime(value){
  const get=k=>parts.find(x=>x.type===k)?.value||'';
  return {date:get('year')+'/'+get('month')+'/'+get('day'),time:get('hour')+':'+get('minute')};
 }
-function applications({items=[],hasMore=false,teamId}){
+function applications({items=[],hasMore=false,nextCursor=null,page=1,teamId}){
  const rows=items.map(a=>{const when=applicationDateTime(a.requestedAt);return '<li><span>'+esc(a.name)+'</span><div>申請日期：'+esc(when.date)+'</div><div>申請時間：'+esc(when.time)+'</div>'+(a.hasTeam===true?'<p>已有所屬戰隊，無法核准加入。</p>':'')+' <button type="button" data-team-action="approve" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'"'+(a.hasTeam===true?' disabled':'')+'>核准</button> <button type="button" data-team-action="reject" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">拒絕</button></li>';}).join('');
- return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button><button type="button" data-team-action="reload-applications">重新整理名單</button>'+(items.length?'<ul>'+rows+'</ul>':'<p>目前沒有待審核的申請。</p>')+(hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
+ return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button><button type="button" data-team-action="reload-applications">重新整理名單</button>'+(items.length?'<ul>'+rows+'</ul>':'<p>這一頁沒有待審核的申請。</p>')+'<p>第 '+esc(page)+' 頁</p>'+(page>1?'<button type="button" data-team-action="applications-previous">上一頁</button>':'')+(nextCursor?'<button type="button" data-team-action="applications-next">下一頁</button>':hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
 }
 function presetFields(value){let p;try{p=presets.normalize(value??undefined);}catch{p=presets.normalize();}return '<label>系統隊徽<select name="presetId">'+presets.choices.map(x=>option(x.id,x.name,p.id)).join('')+'</select></label><label>隊徽顏色<input type="color" name="presetColor" value="'+p.color+'"></label><div>'+presets.choices.map(x=>presets.render({id:x.id,color:p.color})).join('')+'</div>'; }
 function createTeam(team,capacity=null){
