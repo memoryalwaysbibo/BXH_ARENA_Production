@@ -43,12 +43,13 @@ function create(ctx){
       throw Error('bracket-version-conflict');
      }
      // Never regenerate on retry. The transaction rejects concurrent draws/starts.
-     const ok=await deadline(ctx.write(clone(pending.snapshot),{bracketCommit:{baseSignature:pending.baseSignature}}));
+     let writeError=null;
+     try{await deadline(ctx.write(clone(pending.snapshot),{bracketCommit:{baseSignature:pending.baseSignature}}));}catch(e){writeError=e;}
      keep();
      if(!ctx.current())return false;
-     if(ok!==true)throw Error('cloud-save-unconfirmed');
+     // Readback is authoritative even when the write acknowledgement was lost.
      latest=await deadline(ctx.read());
-     if(!matches(latest,pending.snapshot))throw Error('cloud-readback-unconfirmed');
+     if(!matches(latest,pending.snapshot))throw writeError||Error('cloud-readback-unconfirmed');
     }
     if(!ctx.current())return false;
     ctx.apply(latest.data);

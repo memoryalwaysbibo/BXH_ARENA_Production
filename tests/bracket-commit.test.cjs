@@ -25,7 +25,7 @@ test('failed save survives controller recreation and retries identical draw exac
 });
 test('commit with lost acknowledgement is recovered by readback without re-draw/write',async()=>{
  const h=fixture(),write=h.ctx.write;h.ctx.write=async(...args)=>{await write(...args);return false;};const c=h.make();
- assert.equal(await c.begin(),false);assert.equal(await c.retry(),true);assert.equal(h.count,1);assert.equal(h.writes.length,1);assert.equal(h.success,1);
+ assert.equal(await c.begin(),true);assert.equal(c.status().result,'success');assert(!c.blocked());assert.equal(h.count,1);assert.equal(h.writes.length,1);assert.equal(h.success,1);
 });
 test('mismatching public projection keeps the draw unconfirmed',async()=>{
  const h=fixture(),write=h.ctx.write;h.ctx.write=async(...args)=>{const ok=await write(...args);h.pub=room();return ok;};const c=h.make();
@@ -111,4 +111,9 @@ test('cloud draw visibly waits at least two seconds and completes without confir
  await tick();assert(c.busy());assert(c.blocked());assert.equal(h.success,0);
  await new Promise(r=>setTimeout(r,100));assert(c.busy());assert.equal(h.success,0);
  assert.equal(await p,true);assert(Date.now()-at>=1950);assert.equal(h.success,1);assert.equal(c.status().result,'success');assert(!c.busy());
+});
+
+test('lost write acknowledgement exception is automatically confirmed by matching private/public readback',async()=>{
+ const h=fixture(),write=h.ctx.write;h.ctx.write=async(...args)=>{await write(...args);throw Error('ack-lost');};
+ const c=h.make();assert.equal(await c.submit(),true);assert.equal(h.success,1);assert.equal(h.count,1);assert.equal(h.writes.length,1);assert(!c.blocked());
 });
