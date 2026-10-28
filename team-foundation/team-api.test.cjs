@@ -11,6 +11,11 @@ test('mine API uses authenticated context without a client-selected UID',async()
 });
 
 test('applications read sends only team ID to the callable',async()=>{let payload;const api=createTeamApi({functions:{},httpsCallable:()=>async p=>(payload=p,{data:{items:[]}})});await api.applications({teamId:'t'});assert.deepEqual(payload,{action:'applications',teamId:'t'});});
+test('both adapters forward application cursors without accepting viewer identity',async()=>{
+ const calls=[];const apis=[createTeamApi({functions:{},httpsCallable:()=>async p=>(calls.push(p),{data:{items:[]}})}),createTeamApiFromEngagement({engagementService:{tournamentOperation:async(_,p)=>(calls.push(p),{items:[]})}})];
+ for(const api of apis)await api.applications({teamId:'t',cursor:'anchor',actorUid:'forged'});
+ assert.deepEqual(calls,[{action:'applications',teamId:'t',cursor:'anchor'},{action:'applications',teamId:'t',cursor:'anchor'}]);
+});
 
 test('ARENA adapter reuses its callable bridge and preserves request IDs',async()=>{
  const calls=[];const api=createTeamApiFromEngagement({engagementService:{tournamentOperation:async(name,payload)=>(calls.push({name,payload}),{ok:true})}});
