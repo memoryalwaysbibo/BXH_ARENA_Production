@@ -17,6 +17,7 @@ function createAutoDissolver({db,clock=Date.now,newId=randomUUID,documentId}){
    const publicName=profile.exists&&typeof profile.data().publicName==='string'?profile.data().publicName.trim():'';
    if(!membership.exists||membership.data().teamId!==teamId)throw Error('membership-inconsistent');
    tx.update(teamRef,{status:'dissolved',dissolvedAt:now,dissolvedBy:'system',dissolveAt:null});
+   const tenureId=membership.data().tenureId;if(tenureId){if(typeof tenureId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(tenureId))throw Error('invalid-tenure');tx.update(db.doc('teamsV1/'+teamId+'/tenures/'+tenureId),{leftAt:now});}
    tx.delete(membershipRef);
    tx.create(db.doc('teamsV1/'+teamId+'/history/'+historyId),{subjectUid:team.captainUid,subjectName:publicName||'隊長',actorUid:'system',actorName:'系統',actorRole:'system',method:'auto-dissolve',occurredAt:now});
    return true;
