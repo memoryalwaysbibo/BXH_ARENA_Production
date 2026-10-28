@@ -56,11 +56,14 @@ function createReadService({db,clock=Date.now}){
     if(team?.status!=='active'||membership?.teamId!==teamId||!team.memberUids?.includes(actorUid)||!(team.captainUid===actorUid||team.roles?.[actorUid]==='deputy'))throw Error('permission-denied');
     // Read at most 20 profiles and memberships after leadership authorization.
     // Expose membership existence only, never the other team's ID or private data.
-    const snaps=await tx.get(db.collection('teamsV1/'+teamId+'/applications').where('status','==','pending').limit(21));
+    if(cursor!==undefined&&cursor!==null&&!valid(cursor))throw Error('invalid-application-cursor');
+    let query=db.collection('teamsV1/'+teamId+'/applications').where('status','==','pending').orderBy('__name__');
+    if(cursor)query=query.startAfter(cursor);
+    const snaps=await tx.get(query.limit(21));
     const page=snaps.docs.slice(0,20);
     const profiles=await Promise.all(page.map(s=>read(tx,'publicPlayers/'+s.id)));
     const memberships=await Promise.all(page.map(s=>read(tx,'teamMembershipsV1/'+s.id)));
-    return {items:page.map((s,i)=>({uid:s.id,name:typeof profiles[i]?.publicName==='string'&&profiles[i].publicName.trim()?profiles[i].publicName.trim():'玩家',requestedAt:s.data().requestedAt,hasTeam:memberships[i]!==null})),hasMore:snaps.docs.length>20};
+    return {items:page.map((s,i)=>({uid:s.id,name:typeof profiles[i]?.publicName==='string'&&profiles[i].publicName.trim()?profiles[i].publicName.trim():'玩家',requestedAt:s.data().requestedAt,hasTeam:memberships[i]!==null})),hasMore:snaps.docs.length>20,nextCursor:snaps.docs.length>20?page[page.length-1].id:null};
    }
    if(action==='history'){
     if(cursor!==undefined&&cursor!==null&&!valid(cursor))throw Error('invalid-history-cursor');
