@@ -43,3 +43,5 @@ test('card team lookup honors player card privacy and reveals only public fields
  f.data.set('playerPrivacy/solo',{cardPublic:true});assert.deepEqual(await f.read({actorUid:'outsider',action:'card-team',targetUid:'solo'}),{team:null});
  f.data.get('teamsV1/t').memberUids=f.data.get('teamsV1/t').memberUids.filter(x=>x!=='m');await assert.rejects(f.read({actorUid:'outsider',action:'card-team',targetUid:'m'}),/membership-unavailable/);
 });
+
+test('mine shows only the authenticated membership contribution',async()=>{const f=setup();f.data.get('teamMembershipsV1/c').experienceContribution=9;f.data.get('teamMembershipsV1/m').experienceContribution=2;assert.equal((await f.read({actorUid:'c',action:'mine'})).team.experienceContribution,9);assert.equal((await f.read({actorUid:'m',action:'mine'})).team.experienceContribution,2);assert.ok(!JSON.stringify(await f.read({actorUid:'outsider',action:'members',teamId:'t'})).includes('experienceContribution'));});
