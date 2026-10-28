@@ -26,6 +26,30 @@ function ownedPlayer(players,uid) {
   if(found.length!==1)fail(found.length?'ambiguous-player':'not-confirmed');
   return found[0];
 }
+// All relationship and registration inputs are read within the same transaction.
+function eligiblePlayer(player,uid,registration,profiles=[]) {
+  if(!player||['waitlist','cancelled','withdrawn','not_selected'].includes(player.status))return false;
+  if(player.familyPlayerId||player.guardianUid) {
+    if(!player.familyPlayerId||player.guardianUid!==uid||!player.registrationId)return false;
+    const matches=profiles.filter(p=>p&&p.id===player.familyPlayerId);
+    if(matches.length!==1)return false;
+    const child=matches[0];
+    if(child.guardianUid!==uid||child.archived||child.deleted||child.testMode||child.accountUid||child.transferStatus||child.pendingAccountUid)return false;
+    return registration?.status==='confirmed'&&registration.uid===uid&&registration.guardianUid===uid&&registration.familyPlayerId===player.familyPlayerId;
+  }
+  if(![player.registrationUid,player.uid,player.accountUid].includes(uid))return false;
+  return !player.registrationId||(registration?.status==='confirmed'&&registration.uid===uid&&!registration.familyPlayerId&&!registration.guardianUid);
+}
+function scanPlayer(players,uid,playerId) {
+  if(playerId===undefined)return ownedPlayer(players,uid);
+  if(typeof playerId!=='string'||!playerId||playerId.length>200)fail('not-confirmed');
+  const matches=(players||[]).filter(p=>p?.id===playerId);
+  if(matches.length!==1)fail('not-confirmed');
+  const p=matches[0];
+  if(p.familyPlayerId){if(p.guardianUid!==uid)fail('not-confirmed');}
+  else if(ownedPlayer(players,uid).id!==playerId)fail('not-confirmed');
+  return p;
+}
 function signToken(code,session,now,secret) {
   const body=Buffer.from(JSON.stringify({code,session,expiresAt:now+90000})).toString('base64url');
   return body+'.'+crypto.createHmac('sha256',secret).update(body).digest('base64url');
@@ -40,13 +64,13 @@ function verifyToken(token,code,session,now,secret) {
 }
 // Called only inside the adapter's Firestore transaction. All inputs except d
 // come from server reads; uid comes from verified Firebase Authentication.
-function transition({code,uid,user,parentUser,room,state,registration,receipt,operation,config,d,now,secret,newSession,onsiteReady=false}) {
+function transition({code,uid,user,parentUser,room,state,registration,registrations={},familyProfiles=[],receipt,operation,config,d,now,secret,newSession,onsiteReady=false}) {
   if(!uid)fail('auth-required');
   if(!active(user))fail('account-unavailable');
   if(config?.enabled!==true||config?.writerGuardsVerified!==true||!Array.isArray(config.roomCodes)||!config.roomCodes.includes(code))fail('feature-unavailable');
   const isManager=manager(user,uid,room,state,{parentUser,now});
-  if(!['scan','status','history','configure','manual','revoke'].includes(d.action))fail('invalid-action');
-  if(d.action!=='scan'&&!isManager)fail('permission-denied');
+  if(!['scan','candidates','status','history','configure','manual','revoke'].includes(d.action))fail('invalid-action');
+  if(!['scan','candidates'].includes(d.action)&&!isManager)fail('permission-denied');
   const settings=room.qrCheckin||{enabled:false,session:''};
   const allowOnsite=onsiteReady===true&&config.onsiteIntegrationVerified===true;
   if(d.action==='history')return {result:{ok:true}};
@@ -59,13 +83,20 @@ function transition({code,uid,user,parentUser,room,state,registration,receipt,op
     if(typeof d.enabled!=='boolean')fail('invalid-enabled');
     return {settings:{enabled:d.enabled,session:newSession},audit:{action:d.enabled?'open':'close',actorUid:uid,method:'manual',at:now},result:{ok:true,enabled:d.enabled}};
   }
+  if(d.action==='candidates') {
+    if(settings.enabled!==true)fail('checkin-closed');
+    verifyToken(d.token,code,settings.session,now,secret);
+    const self=(state.players||[]).filter(p=>p&&!p.familyPlayerId&&!p.guardianUid&&[p.registrationUid,p.uid,p.accountUid].includes(uid));
+    if(self.length>1)fail('ambiguous-player');
+    const players=(state.players||[]).filter(p=>eligiblePlayer(p,uid,registrations[p.registrationId],familyProfiles));
+    return {result:{ok:true,players:players.map(p=>({id:p.id,name:p.name,checkedIn:p.checkedIn===true,family:!!p.familyPlayerId}))}};
+  }
   let player;
   if(d.action==='scan') {
     if(settings.enabled!==true)fail('checkin-closed');
     verifyToken(d.token,code,settings.session,now,secret);
-    player=ownedPlayer(state.players,uid);
-    if(['waitlist','cancelled','withdrawn','not_selected'].includes(player.status))fail('not-confirmed');
-    if(player.registrationId && (!registration||registration.status!=='confirmed'||registration.uid!==uid||registration.familyPlayerId||registration.guardianUid))fail('not-confirmed');
+    player=scanPlayer(state.players,uid,d.playerId);
+    if(!eligiblePlayer(player,uid,registration,familyProfiles))fail('not-confirmed');
   } else {
     if(typeof d.operationId!=='string'||!/^[-a-zA-Z0-9]{16,80}$/.test(d.operationId))fail('invalid-operation');
     if(operation) {
@@ -95,4 +126,4 @@ function preserveCheckins(nextState,receipts) {
   }
   return nextState;
 }
-module.exports={transition,preserveCheckins,ownedPlayer,signToken,verifyToken,manager,digest,CheckinError};
+module.exports={transition,preserveCheckins,ownedPlayer,scanPlayer,eligiblePlayer,signToken,verifyToken,manager,digest,CheckinError};

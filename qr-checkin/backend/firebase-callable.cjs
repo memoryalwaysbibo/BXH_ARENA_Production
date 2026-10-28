@@ -3,7 +3,7 @@ const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {defineSecret}=require('firebase-functions/params');
 const {getFirestore,Timestamp}=require('firebase-admin/firestore');
 const crypto=require('node:crypto');
-const {transition,ownedPlayer,digest,CheckinError}=require('./core.cjs');
+const {transition,scanPlayer,digest,CheckinError}=require('./core.cjs');
 const onsite=require('./onsite-context.cjs');
 const signingKey=defineSecret('QR_CHECKIN_SIGNING_KEY');
 function createCheckinHandler(db,secretValue){return async request=>{
@@ -22,15 +22,24 @@ function createCheckinHandler(db,secretValue){return async request=>{
       if(!Number.isSafeInteger(room.qrCheckinRevision)||room.qrCheckinRevision<1||publicRoom.qrCheckinManaged!==true||publicRoom.qrCheckinRevision!==room.qrCheckinRevision||state.qrCheckinRevision!==room.qrCheckinRevision)throw new CheckinError('checkin-state-stale');
     }else if(publicRoom.qrCheckinManaged===true||state.qrCheckinManaged===true)throw new CheckinError('checkin-state-stale');
     let player;
-    if(d.action==='scan')player=ownedPlayer(state.players,uid);
+    if(d.action==='scan')player=scanPlayer(state.players,uid,d.playerId);
     else player=(state.players||[]).find(p=>p.id===d.playerId);
     const receiptRef=player?ref.collection('checkinReceipts').doc(digest(player.id)):null;
     const operationRef=typeof d.operationId==='string'?ref.collection('checkinOperations').doc(digest(uid+':'+d.operationId)):null;
     const registrationRef=player?.registrationId?ref.collection('registrations').doc(player.registrationId):null;
     const parentRef=room.eventStaffAssignments?.[uid]&&room.createdBy?db.doc('users/'+room.createdBy):null;
-    const [receiptSnap,operationSnap,registrationSnap,parentSnap]=await Promise.all([receiptRef?tx.get(receiptRef):null,operationRef?tx.get(operationRef):null,registrationRef?tx.get(registrationRef):null,parentRef?tx.get(parentRef):null]);
+    const candidateRows=d.action==='candidates'?(state.players||[]).filter(p=>p&&(p.familyPlayerId?p.guardianUid===uid:!p.guardianUid&&[p.registrationUid,p.uid,p.accountUid].includes(uid))):[];
+    const registrationIds=[...new Set(candidateRows.map(p=>p.registrationId).filter(Boolean))];
+    if(registrationIds.some(id=>typeof id!=='string'||id.includes('/')))throw new CheckinError('not-confirmed');
+    const [receiptSnap,operationSnap,registrationSnap,parentSnap,familySnap,...candidateSnaps]=await Promise.all([
+      receiptRef?tx.get(receiptRef):null,operationRef?tx.get(operationRef):null,registrationRef?tx.get(registrationRef):null,parentRef?tx.get(parentRef):null,
+      (d.action==='candidates'||d.action==='scan'&&player?.familyPlayerId)?tx.get(db.doc('familyPlayers/'+uid)):null,
+      ...registrationIds.map(id=>tx.get(ref.collection('registrations').doc(id)))
+    ]);
+    const registrations=Object.fromEntries(registrationIds.map((id,i)=>[id,candidateSnaps[i]?.data()]));
+    const familyProfiles=Array.isArray(familySnap?.data()?.profiles)?familySnap.data().profiles:[];
     const config=cfgSnap.data(),onsiteReady=room.onsiteWaitlistServerOwned===true&&config?.onsiteIntegrationVerified===true;
-    const output=transition({code,uid,user:userSnap.data(),parentUser:parentSnap?.data(),room,state,registration:registrationSnap?.data(),receipt:receiptSnap?.data(),operation:operationSnap?.data(),config,d,now,secret:secretValue(),newSession:session,onsiteReady});
+    const output=transition({code,uid,user:userSnap.data(),parentUser:parentSnap?.data(),room,state,registration:registrationSnap?.data(),registrations,familyProfiles,receipt:receiptSnap?.data(),operation:operationSnap?.data(),config,d,now,secret:secretValue(),newSession:session,onsiteReady});
     if(d.action==='history') {
       const history=await tx.get(ref.collection('checkinAudit').orderBy('at','desc').limit(100));
       return {ok:true,records:history.docs.map(s=>({...s.data(),at:s.data().at.toMillis()}))};
