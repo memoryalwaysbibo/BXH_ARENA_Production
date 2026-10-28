@@ -22,13 +22,24 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   'transfer-captain-first':'請先轉移隊長職位。',
   'team-must-be-solo':'解散前戰隊必須只剩隊長。',
   'application-not-pending':'這筆申請已不在待審核狀態。',
+  'cannot-target-self':'此操作不能以自己為對象。',
+  'use-captain-transfer':'變更隊長請使用轉交隊長功能。',
+  'removal-reason-required':'請選擇移除原因。',
+  'other-reason-required':'選擇其他時，請填寫原因說明。',
+  'reason-too-long':'原因說明最多 500 字，請縮短後再送出。',
+  'invalid-name':'戰隊名稱須為 2 至 24 字。',
+  'invalid-admission-mode':'請重新選擇加入方式。',
+  'invalid-ladder-tier':'請重新選擇天梯排位條件。',
+  'invalid-min-tier':'請重新選擇獵人排位條件。',
   'role-full':'此職位名額已滿。',
   'frame-locked':'尚未解鎖此戰隊框。',
   'invalid-emblem-preset':'請選擇有效的系統隊徽與顏色。',
   'invalid-emblem':'圖片格式或大小不符合要求。',
   'emblem-expired':'這筆圖片上傳已逾期，請重新選擇圖片再上傳。',
   'invalid-request':'上傳資料有誤，請重新選擇圖片。',
-  'operation-id-conflict':'這筆上傳與先前的操作不一致，請重新選擇圖片。',
+  'operation-id-conflict':'這筆操作與先前的請求不一致，請重新確認後送出。',
+  'account-unavailable':'目前無法確認帳號，請重新登入後再試。',
+  'app-check-required':'目前無法驗證應用程式，請重新載入後再試。',
   'account-disabled':'帳號無法使用此功能。',
   'sign-in-required':'請先登入。',
   'sign-in-again':'登入已過期，請重新登入。',
@@ -105,6 +116,7 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   }catch(error){
    let rejected=rejection(error);
    if(payload.action==='approve'&&rejectionMessage(error)==='already-in-team'&&rejected)rejected='申請者已有戰隊，無法核准加入。';
+   if(['remove','assign','transfer'].includes(payload.action)&&rejectionMessage(error)==='not-member'&&rejected)rejected='對方已不在這支戰隊，請重新載入成員名單。';
    if(!disposed){pendingPayload=rejected?null:payload;state.pending=!rejected;state.error=rejected||'操作結果尚未確認，可重試同一筆操作。';emit();}
    return {ok:false,reason:rejected?'rejected':'unconfirmed'};
   }finally{if(!disposed){state.busy=false;emit();}}
