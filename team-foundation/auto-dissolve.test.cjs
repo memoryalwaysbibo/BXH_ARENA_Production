@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createAutoDissolver,BATCH_LIMIT}=require('./auto-dissolve.cjs');
 function fixture(team,member={teamId:'t'}){
- const data=new Map([['teamsV1/t',structuredClone(team)],['teamMembershipsV1/c',member],['publicPlayers/c',{publicName:'黑爸',email:'private'}]]);
+ const data=new Map([['teamCapacityControlV1/current',{activeCount:1}],['teamsV1/t',structuredClone(team)],['teamMembershipsV1/c',member],['publicPlayers/c',{publicName:'黑爸',email:'private'}]]);
  const db={doc:p=>p,runTransaction:async fn=>{const writes=[];let writing=false;const tx={get:async p=>{assert.equal(writing,false);return {exists:data.has(p),data:()=>structuredClone(data.get(p))};}};for(const op of ['update','delete','create'])tx[op]=(p,v)=>{writing=true;writes.push([op,p,v]);};const result=await fn(tx);for(const [op,p,v]of writes){if(op==='delete')data.delete(p);else data.set(p,op==='update'?{...data.get(p),...v}:v);}return result;}};
  return {data,worker:createAutoDissolver({db,clock:()=>86400100,newId:()=> 'history'})};
 }
@@ -16,7 +16,7 @@ test('team recovered, before deadline, and inconsistent membership never dissolv
 });
 
 test('one invalid team cannot stop other due teams in the same batch',async()=>{
- const data=new Map([['teamsV1/bad',{...solo,captainUid:'bad',memberUids:['bad'],roles:{bad:'captain'}}],['teamMembershipsV1/bad',{teamId:'elsewhere'}],['teamsV1/good',solo],['teamMembershipsV1/c',{teamId:'good'}]]);
+ const data=new Map([['teamCapacityControlV1/current',{activeCount:2}],['teamsV1/bad',{...solo,captainUid:'bad',memberUids:['bad'],roles:{bad:'captain'}}],['teamMembershipsV1/bad',{teamId:'elsewhere'}],['teamsV1/good',solo],['teamMembershipsV1/c',{teamId:'good'}]]);
  const query={where(){return this;},orderBy(){return this;},limit(n){assert.equal(n,20);return this;},async get(){return {docs:[{id:'bad'},{id:'good'}]};}};
  const db={doc:p=>p,collection:()=>query,runTransaction:async fn=>{const writes=[],tx={get:async p=>({exists:data.has(p),data:()=>data.get(p)}),update:(p,v)=>writes.push(['update',p,v]),delete:p=>writes.push(['delete',p]),create:(p,v)=>writes.push(['create',p,v])};const result=await fn(tx);for(const [op,p,v] of writes){if(op==='delete')data.delete(p);else data.set(p,op==='update'?{...data.get(p),...v}:v);}return result;}};
  const worker=createAutoDissolver({db,clock:()=>86400100,newId:()=> 'h'});assert.deepEqual(await worker.runBatch(),{examined:2,dissolved:1,failed:1,mayHaveMore:false});assert.equal(data.get('teamsV1/good').status,'dissolved');assert.equal(data.get('teamsV1/bad').status,'active');
