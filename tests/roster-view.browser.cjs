@@ -15,7 +15,7 @@ const {chromium}=require(runtime?runtime+'/playwright':'playwright');
  window.state={id:'local',cloudCode:'BXH-TEST12',meta:{checkinRequired:true,registrationCapacity:160},players:[{id:'xie',name:'謝一',checkedIn:false},{id:'wang',name:'王一',checkedIn:false},{id:'chen',name:'陳一',checkedIn:true}]};
  let firebaseUser={uid:'manager'},peopleRosterSection='pending',peopleRosterBusy=false,adminRosterCode='BXH-TEST12',adminRegistrationsError='',adminRegistrationsCache=[],adminRegistrationsLoading=false;
  const onlineRows=[{registrationId:'online-wait',displayName:'謝候補'}],localRows=[{id:'local-wait',name:'王候補',source:'manual'}];
- function bracketCommitStatusHtml(){return '';}function bracketCommitBlocked(){return false;}
+ function bracketCommitStatusHtml(){return '';}function bracketDrawButtonHtml(){return '';}function bracketCommitBlocked(){return false;}
  function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
  function peopleRosterMutationLocked(){return false}function peopleRegistrationSelectionManaged(){return false}function canManageRegistrationRoster(){return true}function isCommunityQuickRegistration(){return false}
  function peopleOnlineWaitlistRows(){return onlineRows}function peopleRegistrationIdOf(r){return r.registrationId}function peopleLocalWaitlist(){return localRows}function peopleWaitlistShadow(){return null}
