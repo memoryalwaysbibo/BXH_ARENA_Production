@@ -12,7 +12,7 @@ function setup(){
  const db={doc:p=>p,collection:p=>({orderBy:()=>({limit:n=>({path:p,limit:n})})}),runTransaction:fn=>fn({get:async p=>{reads.push(p);if(typeof p==='object')return {docs:[{id:'h',data:()=>data.get('teamsV1/t/history/h')}]};return {exists:data.has(p),data:()=>data.get(p)};}})};
  return {read:createReadService({db}),data,reads};
 }
-test('public member endpoint excludes unexpected fields',async()=>{const f=setup();const r=await f.read({actorUid:'outsider',action:'members',teamId:'t'});assert.equal(JSON.stringify(r).includes('PRIVATE'),false);assert.equal(f.reads.length,4);});
+test('public member endpoint excludes unexpected fields',async()=>{const f=setup();const r=await f.read({actorUid:'outsider',action:'members',teamId:'t'});assert.equal(JSON.stringify(r).includes('PRIVATE'),false);assert.equal(f.reads.length,5);});
 test('history requires current membership and returns separate date/time without reason',async()=>{
  const f=setup();await assert.rejects(f.read({actorUid:'outsider',action:'history',teamId:'t'}),/permission/);
  const r=await f.read({actorUid:'m',action:'history',teamId:'t'});assert.ok(r.items[0].date);assert.ok(r.items[0].time);assert.equal(JSON.stringify(r).includes('私有說明'),false);assert.equal(r.pageLimit,50);
@@ -45,3 +45,15 @@ test('card team lookup honors player card privacy and reveals only public fields
 });
 
 test('mine shows only the authenticated membership contribution',async()=>{const f=setup();f.data.get('teamMembershipsV1/c').experienceContribution=9;f.data.get('teamMembershipsV1/m').experienceContribution=2;assert.equal((await f.read({actorUid:'c',action:'mine'})).team.experienceContribution,9);assert.equal((await f.read({actorUid:'m',action:'mine'})).team.experienceContribution,2);assert.ok(!JSON.stringify(await f.read({actorUid:'outsider',action:'members',teamId:'t'})).includes('experienceContribution'));});
+
+test('member-only login and contribution require matching canonical membership',async()=>{
+ const f=setup();f.data.set('users/c',{lastLoginAt:100,email:'PRIVATE_EMAIL'});f.data.get('teamMembershipsV1/c').experienceContribution=5;
+ let r=await f.read({actorUid:'m',action:'members',teamId:'t'});assert.equal(r.viewerIsMember,true);assert.equal(r.members[0].experienceContribution,5);assert.ok(r.members[0].recentLogin);assert.ok(!JSON.stringify(r).includes('PRIVATE_EMAIL'));
+ f.reads.length=0;r=await f.read({actorUid:'outsider',action:'members',teamId:'t'});assert.equal(r.viewerIsMember,false);assert.ok(!f.reads.some(p=>p.startsWith('users/')));assert.ok(!JSON.stringify(r).includes('recentLogin'));
+ f.data.get('teamsV1/t').memberUids=['c','d'];f.data.get('teamsPublicV1/t').members.pop();
+ r=await f.read({actorUid:'m',action:'members',teamId:'t'});assert.equal(r.viewerIsMember,false);
+});
+test('missing or future login timestamps never claim that a player is online',async()=>{
+ const f=setup();f.data.set('users/c',{lastLoginAt:Number.MAX_SAFE_INTEGER});
+ const r=await f.read({actorUid:'m',action:'members',teamId:'t'});assert.equal(r.members[0].recentLogin,'尚無紀錄');assert.equal(r.members[1].recentLogin,'尚無紀錄');
+});
