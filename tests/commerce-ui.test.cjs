@@ -1,0 +1,41 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../commerce-ui.js'),'utf8');
+function setup(){
+ const storage=new Map(),calls=[],listeners={};let uid='buyer',epoch=1,admin=false,fail=false;
+ const sandbox={window:{engagementService:{commerce:async p=>{calls.push(JSON.parse(JSON.stringify(p)));if(fail)throw Error('network-timeout');return {ok:true,order:{id:'ORDER_TEST'}};}}},currentAuthUid:()=>uid,get engagementSessionEpoch(){return epoch;},isSuperAdmin:()=>admin,render(){},setTimeout(){},URL,Date,crypto:{randomUUID:()=> 'same-operation'},confirm:()=>true,esc:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{addEventListener:(k,f)=>listeners[k]=f,querySelector:()=>({checked:true})}};
+ vm.createContext(sandbox);vm.runInContext(source,sandbox);
+ return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setFail:v=>fail=v};
+}
+test('pending order retries reuse original operation/payload even after a connection failure',async()=>{
+ const t=setup();t.ui.shop();const c=t.ui.context();c.products=[{id:'skin',version:1,purchasable:true}];
+ t.setFail(true);await t.ui.handle('commerce-buy',{dataset:{id:'skin'}});assert.ok(c.pending);assert.equal(t.calls.length,1);
+ t.setFail(false);await t.ui.handle('commerce-retry',{});assert.deepEqual(t.calls[0],t.calls[1]);assert.equal(c.pending,null);
+});
+test('account/session changes isolate products, orders, drafts and pending operations',async()=>{
+ const t=setup();t.ui.shop();const c=t.ui.context();c.products=[{id:'skin',version:1,purchasable:true}];c.order={id:'PRIVATE_ORDER'};
+ t.setFail(true);await t.ui.handle('commerce-buy',{dataset:{id:'skin'}});t.setUid('other');
+ const next=t.ui.context();assert.notEqual(c,next);assert.equal(next.order,null);assert.equal(next.products,null);assert.equal(next.pending,null);
+});
+test('admin product cache is discarded on entry to player shop and all content is escaped',()=>{
+ const t=setup();t.setAdmin(true);t.ui.adminPage();const c=t.ui.context();c.products=[{id:'draft_private',name:'draft'}];t.ui.shop();assert.equal(c.products,null);
+ c.products=[{id:'safe',name:'<script>unsafe</script>',priceTwd:100,imageUrl:'javascript:alert(1)',delivery:{kind:'skin'},description:'test',audience:'all'}];c.category='all';
+ const html=t.ui.shop();assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>unsafe'));assert.ok(!html.includes('src="javascript:'));
+});
+test('management UI and backend wrapper are wired without granting staff commerce access',()=>{
+ const root=path.join(__dirname,'..'),core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
+ assert.match(core,/if\(isSuperAdmin\(\)\)tabs\.splice\([^\n]+commerce-admin/);
+ assert.match(core,/targetTab==='commerce-admin'&&!isSuperAdmin/);
+ assert.match(core,/data-tab="orders">我的訂單/);
+ const s={window:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'modules/management-v2/navigation.js'),'utf8'),s);
+ assert.ok(s.window.BXH_MANAGEMENT_UI_V2.renderRails('commerce-admin',['commerce-admin']).includes('商城管理'));
+ assert.ok(!s.window.BXH_MANAGEMENT_UI_V2.renderRails('live',['live','duty']).includes('commerce-admin'));
+ assert.match(fs.readFileSync(path.join(root,'modules/cloud/cloud-runtime.js'),'utf8'),/commerce\(payload\).*commerceService/);
+});
+test('an old admin catalog response cannot populate the player shop after navigation',async()=>{
+ const t=setup();t.setAdmin(true);t.ui.adminPage();
+ let resolve;t.sandbox.window.engagementService.commerce=()=>new Promise(r=>resolve=r);
+ const pending=t.ui.load('admin-products');t.ui.shop();
+ resolve({ok:true,products:[{id:'private_draft'}],nextCursor:null});await pending;
+ assert.equal(t.ui.context().products,null);assert.equal(t.ui.context().loading,false);
+});

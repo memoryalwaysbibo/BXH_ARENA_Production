@@ -5567,7 +5567,7 @@ let findEventsFilters = { keyword:"", date:"", region:"", format:"all" };
 let findEventsExpanded = { ongoing:false, open:false, upcoming:false };
 let findEventsFiltersOpen = false;
 let lobbySectionExpanded = { live:null, settling:false, registration:false, waiting:false, ended:false };
-const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","天梯排行"]];
+const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","天梯排行"],["shop","商城"]];
 const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>renderPreservingScroll(),escape:esc});
 function playerVisibleTabs(){return hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:PLAYER_TABS;}
 
@@ -14867,6 +14867,8 @@ function renderPlayerCenterLoggedIn(){
   if(playerActiveTab==="clash"&&!hunterClashEntry?.visible())playerActiveTab="home";
   let content;
   if(mailboxContext().open) content = renderMailboxPage();
+  else if(playerActiveTab==="shop") content = window.BXHCommerce.shop();
+  else if(playerActiveTab==="orders") content = window.BXHCommerce.orders();
   else if(playerActiveTab==="items") content = renderInventoryPage();
   else if(playerActiveTab==="cards") content = renderCardAlbumPage();
   else if(playerActiveTab==="raffles") content = renderRafflePage();
@@ -18776,6 +18778,7 @@ function accountMenuItemsHtml(){
   if(currentRole!=="admin" && currentRole!=="player") return "";
   const isPlayerMode=currentRole==="player";
   return isPlayerMode ? `
+    <button data-action="player-switch-tab" data-tab="orders">我的訂單</button>
     <button data-action="player-switch-tab" data-tab="raffles">我的抽獎</button>
     <button data-action="player-switch-tab" data-tab="items">我的道具</button>
     <button data-action="player-switch-tab" data-tab="cards">我的卡冊</button>
@@ -19459,13 +19462,15 @@ function renderApp(){
   const allTabs = [["management","賽事管理"],["ladder","天梯排行"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
   let tabs = hasAdminAccess() ? allTabs : allTabs.filter(t=>!["management","referee","settings","registrations","people"].includes(t[0]));
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
-  if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"]);
+  if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"],["commerce-admin","商城管理"]);
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
   if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
+  if(activeTab==='commerce-admin'&&!isSuperAdmin())activeTab='live';
   let content = "";
   if(activeTab==="management") content = renderTournamentManagementTab();
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
+  else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
   else if(activeTab==="live") content = wrapBracketWatermark(renderLive());
   else if(activeTab==="bracket") content = renderBracket();
@@ -20266,6 +20271,7 @@ function handleAction(action, target){
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
+  if(action.startsWith("commerce-")){void window.BXHCommerce.handle(action,target);return;}
   if(action.startsWith("inventory-")){handleInventory(action,target);return;}
   if(action.startsWith("mood-")){handleMood(action,target);return;}
   if(action.startsWith("title-recipient-")){handleTitleRecipient(action,target);return;}
@@ -20616,6 +20622,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="switch-tab"){
     const targetTab = target.getAttribute("data-tab");
     if(targetTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles())){showToast('目前身分沒有此操作權限。',true);return;}
+    if(targetTab==='commerce-admin'&&!isSuperAdmin()){showToast('目前身分沒有商城管理權限。',true);return;}
     if(targetTab==='inventory-admin'&&!isSuperAdmin()){showToast('目前身分沒有道具管理權限。',true);return;}
     if((targetTab==="management" || targetTab==="referee" || targetTab==="settings" || targetTab==="registrations" || targetTab==="people") && !hasAdminAccess()){
       showToast("目前身分沒有此操作權限。", true);
