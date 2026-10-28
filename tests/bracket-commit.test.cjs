@@ -7,7 +7,7 @@ const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolv
 function room(){return {id:'r',cloudCode:'ROOM',updatedAt:1,meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'};}
 function fixture(){
  let local=room(),remote=clone(local),pub=clone(local),count=0,success=0,applied=0,active=true,writes=[];
- const storage=new Map(),ctx={minimumFeedbackMs:0,key:'u:ROOM',actorUid:'u',storage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},current:()=>active,state:()=>local,cloud:()=>true,operationId:()=> 'op'+count,
+ const storage=new Map(),ctx={minimumFeedbackMs:0,confirmationDelayMs:0,key:'u:ROOM',actorUid:'u',storage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},current:()=>active,state:()=>local,cloud:()=>true,operationId:()=> 'op'+count,
  generate:()=>({...clone(local),drawnAt:100+count++,bracketSize:2,matches:[{id:'m'+count,bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}]}),
  read:async()=>({ok:true,data:clone(remote),publicData:clone(pub)}),
  write:async(s,o)=>{writes.push(clone(s));api.assertWrite(remote,s,o);remote=clone(s);pub=clone(s);return true;},
@@ -73,7 +73,7 @@ test('actual cloud transaction and server-only private/public readback enforce v
 
 test('failed transaction cannot mutate the saved candidate fences before retry',async()=>{
  const h=fixture(),write=h.ctx.write;let first=true;h.ctx.write=async(s,o)=>{if(first){first=false;s.qrCheckinRevision=999;s.matches[0].id='mutated';return false;}return write(s,o);};
- const c=h.make();assert.equal(await c.begin(),false);assert.equal(await c.retry(),true);assert.equal(h.local.matches[0].id,'m1');assert.equal(h.local.qrCheckinRevision,undefined);assert.equal(h.count,1);
+ const c=h.make();assert.equal(await c.begin(),true);assert.equal(h.local.matches[0].id,'m1');assert.equal(h.local.qrCheckinRevision,undefined);assert.equal(h.count,1);
 });
 test('storage failure prevents the candidate from being sent',async()=>{
  const h=fixture();h.ctx.storage.setItem=()=>{throw Error('quota');};const c=h.make();assert.equal(await c.begin(),false);assert.equal(await c.retry(),false);assert.equal(h.writes.length,0);assert.equal(h.success,0);
@@ -116,4 +116,32 @@ test('cloud draw visibly waits at least two seconds and completes without confir
 test('lost write acknowledgement exception is automatically confirmed by matching private/public readback',async()=>{
  const h=fixture(),write=h.ctx.write;h.ctx.write=async(...args)=>{await write(...args);throw Error('ack-lost');};
  const c=h.make();assert.equal(await c.submit(),true);assert.equal(h.success,1);assert.equal(h.count,1);assert.equal(h.writes.length,1);assert(!c.blocked());
+});
+
+test('one click confirms after the first post-write server read is temporarily stale',async()=>{
+ const h=fixture(),read=h.ctx.read,write=h.ctx.write;let stale=false,afterWrite=false;
+ h.ctx.write=async(...args)=>{const ok=await write(...args);afterWrite=true;return ok;};
+ h.ctx.read=async()=>{if(afterWrite&&!stale){stale=true;return {ok:true,data:clone(h.remote),publicData:room()};}return read();};
+ const c=h.make();assert.equal(await c.submit(),true);assert.equal(h.success,1);assert.equal(h.count,1);assert.equal(h.writes.length,1);assert(!c.blocked());
+});
+test('one click recovers when the first server preflight fails transiently',async()=>{
+ const h=fixture(),read=h.ctx.read;let first=true;h.ctx.read=async()=>{if(first){first=false;return {ok:false};}return read();};
+ const c=h.make();assert.equal(await c.submit(),true);assert.equal(h.count,1);assert.equal(h.writes.length,1);
+});
+test('one click retries a rejected transient write with the identical operation and pairing',async()=>{
+ const h=fixture(),write=h.ctx.write,sent=[];let first=true;h.ctx.write=async(s,o)=>{sent.push(clone(s));if(first){first=false;return false;}return write(s,o);};
+ const c=h.make();assert.equal(await c.submit(),true);assert.equal(h.count,1);assert.equal(sent.length,2);assert.deepEqual(sent[0],sent[1]);assert.equal(h.success,1);
+});
+
+test('permission denial does not cause an automatic second write',async()=>{
+ const h=fixture();let writes=0;h.ctx.write=async()=>{writes++;return false;};h.ctx.writeFailureCode=()=> 'permission-denied';
+ const c=h.make();assert.equal(await c.submit(),false);assert.equal(writes,1);assert.equal(h.success,0);assert(c.blocked());
+});
+test('persistent unconfirmed public readback never rewrites a committed draw',async()=>{
+ const h=fixture(),write=h.ctx.write;let reads=0;h.ctx.read=async()=>{reads++;return {ok:true,data:clone(h.remote),publicData:room()};};h.ctx.write=write;
+ const c=h.make();assert.equal(await c.submit(),false);assert.equal(h.writes.length,1);assert.equal(reads,4);assert(c.blocked());
+});
+test('confirmation has an overall deadline instead of restarting a timeout for every retry',async()=>{
+ const h=fixture();h.ctx.totalTimeoutMs=10;h.ctx.timeoutMs=1000;h.ctx.read=()=>new Promise(()=>{});
+ const c=h.make(),at=Date.now();assert.equal(await c.submit(),false);assert(Date.now()-at<500);assert.equal(h.writes.length,0);assert.equal(c.status().error,'confirmation-timeout');
 });

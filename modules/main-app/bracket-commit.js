@@ -22,7 +22,7 @@ function create(ctx){
  const key='bxh-bracket-pending-v1:'+ctx.key;
  try{const saved=JSON.parse(ctx.storage?.getItem(key)||'null');if(saved?.snapshot?.bracketDraw?.id&&saved.baseSignature)pending=saved;}catch{}
  function keep(){if(pending){if(!ctx.storage)throw Error('pending-storage-unavailable');ctx.storage.setItem(key,JSON.stringify(pending));}else ctx.storage?.removeItem(key);}
- const deadline=p=>Promise.race([p,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('confirmation-timeout')),ctx.timeoutMs||20000);p.finally(()=>clearTimeout(timer)).catch(()=>{});})]);
+ const deadline=(p,budget=Infinity)=>Promise.race([p,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('confirmation-timeout')),Math.min(ctx.timeoutMs||20000,budget));p.finally(()=>clearTimeout(timer)).catch(()=>{});})]);
  function matches(result,snapshot){return result?.ok===true&&signature(result.data)===signature(snapshot)&&signature(result.publicData)===signature(snapshot)&&result.data.bracketDraw?.id===snapshot.bracketDraw?.id;}
  async function retry(){
   if(busy||!pending||!ctx.current())return false;
@@ -32,24 +32,48 @@ function create(ctx){
   try{
    keep();
    if(ctx.cloud()){
-    let latest=await deadline(ctx.read());
+    const expires=Date.now()+(ctx.totalTimeoutMs??25000);
+    const run=fn=>{const remaining=expires-Date.now();if(remaining<=0)throw Error('confirmation-timeout');return deadline(fn(),remaining);};
+    const pause=async attempt=>{await new Promise(resolve=>setTimeout(resolve,(ctx.confirmationDelayMs??500)*attempt));if(!ctx.current())throw Error('stale-context');};
+    const competing=latest=>latest?.ok===true&&!matches(latest,pending.snapshot)&&
+     latest.data.bracketDraw?.id!==pending.snapshot.bracketDraw.id&&
+     (signature(latest.data)!==pending.baseSignature||latest.data.startedAt);
+    async function readUntil(accept){
+     let latest={ok:false};
+     for(let attempt=0;attempt<3;attempt++){
+      if(!ctx.current())throw Error('stale-context');
+      try{latest=await run(()=>ctx.read());}catch(e){if(e.message==='confirmation-timeout')throw e;latest={ok:false};}
+      if(accept(latest)||competing(latest))return latest;
+      if(attempt<2)await pause(attempt+1);
+     }
+     return latest;
+    }
+    let latest=await readUntil(value=>value?.ok===true);
     if(!ctx.current())return false;
-    if(!matches(latest,pending.snapshot)){
+    for(let attempt=0;!matches(latest,pending.snapshot);attempt++){
      if(!latest?.ok)throw Error('cloud-readback-unconfirmed');
-     if(signature(latest.data)!==pending.baseSignature||latest.data.startedAt){
-      // Resolve a competing edit automatically; never overwrite or silently redraw.
-      // Unknown/unreadable cloud state keeps the pending draw for a later retry.
+     if(competing(latest)){
       ctx.apply(latest.data);pending=null;keep();
       throw Error('bracket-version-conflict');
      }
-     // Never regenerate on retry. The transaction rejects concurrent draws/starts.
-     let writeError=null;
-     try{await deadline(ctx.write(clone(pending.snapshot),{bracketCommit:{baseSignature:pending.baseSignature}}));}catch(e){writeError=e;}
-     keep();
-     if(!ctx.current())return false;
-     // Readback is authoritative even when the write acknowledgement was lost.
-     latest=await deadline(ctx.read());
-     if(!matches(latest,pending.snapshot))throw writeError||Error('cloud-readback-unconfirmed');
+     if(signature(latest.data)!==pending.baseSignature||latest.data.startedAt)throw Error('bracket-version-conflict');
+     // Both attempts use the persisted operation ID and identical pairing.
+     // The transaction still rejects a concurrent draw/start or stale roster.
+     let writeError=null,acknowledged=false;
+     try{acknowledged=await run(()=>ctx.write(clone(pending.snapshot),{bracketCommit:{baseSignature:pending.baseSignature}}));}catch(e){writeError=e;}
+     const failureCode=ctx.writeFailureCode?.()||writeError?.code||writeError?.message||'';
+     keep();if(!ctx.current())return false;
+     // Never flash failure while a committed private/public readback is settling.
+     latest=await readUntil(value=>matches(value,pending.snapshot));
+     if(matches(latest,pending.snapshot))break;
+     if(competing(latest)){ctx.apply(latest.data);pending=null;keep();throw Error('bracket-version-conflict');}
+     const permanent=/permission-denied|unauthenticated|stale|managed|bracket-version-conflict|bracket-started/.test(failureCode);
+     // Only retry a rejected write after an authoritative unchanged-base read.
+     // A timeout/unknown acknowledgement or a committed draw is read-only recovery.
+     if(attempt>=1||acknowledged!==false||writeError||permanent||!latest?.ok||
+       signature(latest.data)!==pending.baseSignature||latest.data.startedAt)
+      throw writeError||Error('cloud-readback-unconfirmed');
+     await pause(1);
     }
     if(!ctx.current())return false;
     ctx.apply(latest.data);
