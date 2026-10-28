@@ -1,7 +1,8 @@
 'use strict';
+const {recordDailyActivity}=require('./activity.cjs');
 const valid=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const eventCode=s=>typeof s==='string'&&/^BXH-[A-Z0-9]{6}$/.test(s);
-function createActivityAwarder({db}){
+function createActivityAwarder({db,clock=Date.now}){
  if(!db?.doc||!db?.runTransaction)throw Error('database-required');
  const read=async(tx,path)=>{const snap=await tx.get(db.doc(path));return snap.exists?snap.data():null;};
  return async function award(ledgerId){
@@ -22,9 +23,10 @@ function createActivityAwarder({db}){
    if(team?.status!=='active'||!team.memberUids?.includes(log.playerUid)||!Number.isSafeInteger(team.totalXp)||team.totalXp<0||team.totalXp>=Number.MAX_SAFE_INTEGER)return {status:'ineligible'};
    const contribution=membership.experienceContribution??0;
    if(!Number.isSafeInteger(contribution)||contribution<0||contribution>=Number.MAX_SAFE_INTEGER)throw Error('invalid-contribution');
+   const dailyActivity=recordDailyActivity({dailyActivity:team.dailyActivity,uid:log.playerUid,archivedAt:at,now:clock(),members:team.memberUids});
    tx.update(db.doc('teamMembershipsV1/'+log.playerUid),{experienceContribution:contribution+1});
    tx.create(db.doc(receiptPath),{teamId:membership.teamId,eventId:log.eventCode,uid:log.playerUid,archivedAt:at,archived:true,ranked:true,completed:true,createdAt:at});
-   tx.update(db.doc('teamsV1/'+membership.teamId),{totalXp:team.totalXp+1});
+   tx.update(db.doc('teamsV1/'+membership.teamId),{totalXp:team.totalXp+1,dailyActivity});
    return {status:'awarded',teamId:membership.teamId};
   });
  };
