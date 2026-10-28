@@ -23,6 +23,7 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   'role-full':'此職位名額已滿。',
   'frame-locked':'尚未解鎖此戰隊框。',
   'invalid-emblem':'圖片格式或大小不符合要求。',
+  'emblem-expired':'這筆圖片上傳已逾期，請重新選擇圖片再上傳。',
   'invalid-request':'上傳資料有誤，請重新選擇圖片。',
   'operation-id-conflict':'這筆上傳與先前的操作不一致，請重新選擇圖片。',
   'account-disabled':'帳號無法使用此功能。',
