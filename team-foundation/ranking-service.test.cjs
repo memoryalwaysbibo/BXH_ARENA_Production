@@ -29,3 +29,8 @@ test('projection prefilter never bypasses canonical roster and name checks',asyn
  const r=await fixture(null,[],mutate)({actorUid:'u'});assert.ok(!r.items.some(t=>t.id==='a'));assert.equal(r.excluded,3);assert.equal(r.items[0].rank,1);
  }
 });
+test('more than 200 projections fails closed instead of returning an incomplete ranking',async()=>{
+ const docs=Array.from({length:201},(_,i)=>({id:'team'+i,data:()=>({})}));let teamReads=0;
+ const db={doc:p=>p,collection:()=>({limit:()=>({query:true})}),runTransaction:fn=>fn({get:async p=>{if(typeof p==='object')return {docs};if(p.startsWith('teamsV1/'))teamReads++;return {exists:true,data:()=>p.startsWith('hunter')?{generation:'g'}:{currentSeason:'S1'}};}})};
+ await assert.rejects(createRankingService({db})({actorUid:'u'}),/team-list-capacity-exceeded/);assert.equal(teamReads,0);
+});
