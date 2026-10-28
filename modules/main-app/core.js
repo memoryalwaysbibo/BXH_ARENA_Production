@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.37";
+const APP_VERSION = "v14.3.38";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.38",date:"2026/10/28",timezone:"Asia/Taipei",title:"抽籤上傳流程簡化",updateLevel:"patch",added:[],changed:["抽籤顯示上傳中、上傳成功或上傳失敗；失敗只保留單一重試操作","重試沿用原配對，雲端版本衝突時自動同步最新資料"],fixed:[],publicSummary:"簡化抽籤上傳與重試流程。"},
   {version:"v14.3.37",date:"2026/10/28",timezone:"Asia/Taipei",title:"商城與人工轉帳訂單基礎",updateLevel:"feature",added:["商城分類、商品照片與說明頁面","個人選單新增我的訂單","最高管理員新增商品、訂單與收款對帳管理"],changed:["付款確認與商品交付分開記錄，保留重試與退款紀錄"],fixed:[],security:["購買資格與確認收款由後端核實；商城初期維持未開放購買"],publicSummary:"商城基礎介面上線；商品及付款尚未開放。"},
   {version:"v14.3.34",date:"2026/10/20",timezone:"Asia/Taipei",title:"個人歷史整合與獵人執照 2.1",updateLevel:"minor",added:["個人總覽整合獵人旅程、正式戰績與可展開的生涯賽事紀錄","獵人執照 2.1 採最近 20 場有效對戰，顯示目前階級與歷史回算最高階級"],changed:["我的賽程集中顯示參賽中資訊；個人資料頁作為歷史查閱入口","已核對的測試賽獨立保留，從正式戰績與執照計算排除"],fixed:["讀取失敗可重試，部分資料缺失時暫停階級判定","手機里程碑縮排及長賽事名稱旁的展開提示"],security:[],publicSummary:"個人歷史集中查閱；生涯最高標示為歷史回算，永久授階將另行接入。"},
   {version:"v14.3.32",date:"2026/10/07",timezone:"Asia/Taipei",title:"玩家房間名單同步修復",updateLevel:"patch",added:[],changed:["快速報名名單由伺服器同步並保留報到資料"],fixed:["一般玩家房主可即時收到正備取名單，並可手動重試同步","離開房間或切換帳號時停止舊名單讀取，避免舊結果覆蓋目前畫面"],security:[]},
@@ -10505,19 +10506,26 @@ function bracketCommitController(){
   local:snapshot=>saveRecord(snapshot),
   apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
   changed:()=>{if(current())renderPreservingScroll();},
-  success:()=>{activeTab='people';render();showToast(code?'對戰表已儲存雲端並核對完成':'對戰表已儲存完成');}
+  success:()=>{activeTab='people';render();showToast(code?'上傳成功':'儲存成功');}
  });
  bracketCommitContext={key,controller};return controller;
 }
 function bracketCommitBlocked(){return bracketCommitController()?.blocked()||false;}
 function bracketCommitStatusHtml(){
- const c=bracketCommitController(),s=c?.status();if(!s?.pending)return '';
- return '<section class="panel" role="status"><b>'+(s.busy?'正在儲存並核對對戰表…':'對戰表尚未確認儲存成功')+'</b><p>本次配對已保留；確認完成前無法重抽、重設或開賽。</p>'+
- (s.busy?'':'<p>請確認網路後重試。若其他裝置已修改配對或名單，請讀取雲端版本後重新編排。</p><div class="btn-row"><button class="btn btn-primary" data-action="bracket-commit-retry">重試儲存同一份配對</button><button class="btn btn-ghost" data-action="bracket-commit-discard">讀取雲端版本</button></div>')+'</section>';
+ const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return '';
+ const uploaded=s.result==='success',cloud=!!state.cloudCode;
+ const title=s.busy?(cloud?'上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
+ const message=s.busy?'正在儲存本次配對，請稍候。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
+ return '<section class="panel" role="status" aria-live="polite"><b>'+title+'</b><p>'+message+'</p>'+
+ (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+'</section>';
+}
+function bracketDrawButtonHtml(){
+ if(bracketCommitController()?.status().pending)return '';
+ return '<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
 }
 async function verifyBracketBeforeStart(){
  const c=bracketCommitController();if(!c)return true;
- const ok=await c.verify(state);if(!ok)showToast('對戰表尚未儲存完成，或雲端配對已變更；請先讀取雲端版本核對，暫不開賽',true);return ok;
+ const ok=await c.verify(state);if(!ok)showToast('對戰表尚未確認上傳，請先重試上傳後再開賽',true);return ok;
 }
 
 function canReshuffleBracket(){
@@ -12792,7 +12800,7 @@ function renderPeopleManagement(){
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
 
   const bracketPanel=`
-    ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row"><button class="btn ${state.bracketSize?'btn-ghost':'btn-primary'}" data-action="draw-bracket" ${state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':''}>${state.bracketSize?"重新抽籤並產生對戰表":"產生對戰表"}</button>${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()?'disabled':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
+    ${bracketCommitStatusHtml()}<div class="panel"><div class="panel-title">對戰表</div><div class="grid grid-3" style="margin-bottom:14px;"><div class="stat-box"><div class="label">對戰形式</div><div class="value small">${esc(BATTLE_MODE_LABELS[state.meta.battleMode]||"個人戰")}${state.meta.battleMode==="team"?" "+Math.max(3,Number(state.meta.teamSize)||3)+"V"+Math.max(3,Number(state.meta.teamSize)||3):""}</div></div><div class="stat-box"><div class="label">賽事制度</div><div class="value small">${esc(FORMAT_LABELS[state.meta.formatType]||"單淘汰賽")}</div></div><div class="stat-box"><div class="label">對戰表</div><div class="value small">${state.bracketSize?"已產生":"尚未產生"}</div></div></div><div class="btn-row">${bracketDrawButtonHtml()}${state.bracketSize&&!state.startedAt?'<button class="btn btn-danger" data-action="reset-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>重設對戰表</button>':''}${state.bracketSize&&!state.startedAt?'<button class="btn btn-primary" data-action="start-tournament" '+(bracketCommitBlocked()?'disabled':'')+'>賽事開始</button>':''}${state.startedAt?'<span class="badge badge-neon">'+(tournamentStatus()==="settling"?"🟠 結算中":tournamentStatus()==="done"?"⚪ 已結束":tournamentStatus()==="cancelled"?"🔴 已取消":"🟡 比賽中")+'</span>':''}</div></div>
     ${renderEntrySelection()}`;
 
   const panels={confirmed:confirmedPanel,pending:pendingPanel,waitlist:waitlistPanel,tools:toolsPanel,staff:staffPanel,bracket:bracketPanel};
@@ -20262,9 +20270,10 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
   if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}
-  if(['draw-bracket','board-reshuffle','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('請先完成本次對戰表儲存或讀取雲端版本',true);return;}
+  if(['draw-bracket','board-reshuffle','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('對戰表尚未上傳成功，請先重試上傳',true);return;}
   if(peopleOnsiteWaitlistManaged()){
     const rosterActions=['people-toggle-auto-fill','people-promote-waitlist','people-move-to-waitlist','people-delete-waitlist','delete-player','quick-add-players','random-test-roster','update-players','load-test','reg-add-quick','reg-mark-noshow','reg-promote','reg-cancel','reg-delete','import-roster-from-registrations','save-meta','save-registration-settings','close-checkin-early','set-registration-enabled','set-waitlist-enabled','set-checkin-required','unlock-roster','clear-data','import-data'];
     if(rosterActions.includes(action)||action.startsWith('entry-')){showToast("本場使用現場候補抽選，請由「人員管理 → 備取」處理名單。",true);return;}

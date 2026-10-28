@@ -1,6 +1,6 @@
 {
-  "build": "20261028.2",
-  "version": "v14.3.37",
-  "updatedAt": "2026-10-28T10:55:04.395Z",
-  "releaseTrigger": "commerce-hide-quota-vip"
+  "build": "20261028.3",
+  "version": "v14.3.38",
+  "updatedAt": "2026-10-28T13:12:25.598533+00:00",
+  "releaseTrigger": "single-action-bracket-upload"
 }

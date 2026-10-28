@@ -24,27 +24,32 @@ const {chromium}=require('playwright');
  function generateBracket(){generations++;state.drawnAt=100;state.bracketSize=2;state.matches=[{id:'m'+generations,bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}];return true;}
  function showToast(s){success++;document.querySelector('#notice').textContent=s;}
  function renderPreservingScroll(){render();}
+ function entryRosterValid(){return true;}
  ${core.slice(a,b)}
- function render(){document.querySelector('#app').innerHTML=bracketCommitStatusHtml()+'<button id="draw" '+(bracketCommitBlocked()?'disabled':'')+'>重抽</button><button id="start" '+(bracketCommitBlocked()?'disabled':'')+'>開賽</button>';document.querySelector('#draw').onclick=()=>bracketCommitController().begin();}
- document.addEventListener('click',e=>{if(e.target.dataset.action==='bracket-commit-retry')bracketCommitController().retry();if(e.target.dataset.action==='bracket-commit-discard')bracketCommitController().discard();});
+ function render(){document.querySelector('#app').innerHTML=bracketCommitStatusHtml()+bracketDrawButtonHtml()+'<button id="start" '+(bracketCommitBlocked()?'disabled':'')+'>開賽</button>';}
+ document.addEventListener('click',e=>{if(e.target.dataset.action==='draw-bracket')bracketCommitController().submit();if(e.target.dataset.action==='bracket-commit-submit')bracketCommitController().submit();});
  window.fixture={stats:()=>({generations,success,writeCount,local:clone(state),server:clone(serverState)}),retry:()=>{fail=false;},release:()=>release(),canStart:()=>verifyBracketBeforeStart()};
  render();
  `});
- await page.locator('#draw').click();
- await page.getByRole('button',{name:'重試儲存同一份配對'}).waitFor();
+ await page.getByRole('button',{name:'抽籤',exact:true}).click();
+ await page.getByRole('button',{name:'重試上傳'}).waitFor();
  assert.equal(await page.locator('#start').isDisabled(),true);
- assert.equal(await page.locator('#draw').isDisabled(),true);
+ assert.equal(await page.getByRole('button',{name:'抽籤',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'讀取雲端版本',exact:true}).count(),0);
+ assert.equal(await page.getByRole('status').getByRole('button').count(),1);
+ await page.getByRole('status').getByText('上傳失敗',{exact:true}).waitFor();
  assert.equal((await page.evaluate(()=>fixture.stats())).success,0);
  await page.evaluate(()=>fixture.retry());
- await page.getByRole('button',{name:'重試儲存同一份配對'}).click();
- await page.getByText('正在儲存並核對對戰表…',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'重試上傳'}).click();
+ await page.getByRole('button',{name:'上傳中…',exact:true}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'上傳中…',exact:true}).isDisabled(),true);
  const during=await page.evaluate(()=>fixture.stats());assert.equal(during.generations,1);assert.equal(during.success,0);assert.equal(during.local.matches.length,0);
  await page.evaluate(()=>fixture.release());
- await page.getByText('對戰表已儲存雲端並核對完成',{exact:true}).waitFor();
+ await page.locator('#notice').getByText('上傳成功',{exact:true}).waitFor();
  assert.equal(await page.locator('#start').isDisabled(),false);
  const after=await page.evaluate(()=>fixture.stats());assert.equal(after.generations,1);assert.equal(after.success,1);assert.equal(after.local.bracketDrawHistory.length,1);assert.equal(after.local.matches[0].id,after.server.matches[0].id);
  assert.equal(await page.evaluate(()=>fixture.canStart()),true);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
- console.log('PASS actual bracket commit bridge: failed save, disabled start/redraw, delayed retry, same pairing, server confirmation and mobile width');
+ console.log('PASS single-action bracket UI and actual bridge: failed save, disabled start/redraw, delayed retry, same pairing, server confirmation and mobile width');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

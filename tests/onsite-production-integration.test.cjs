@@ -108,7 +108,7 @@ test('roster exposes draw navigation and a direct shortcut only to eligible mana
   peopleRosterMutationLocked:()=>false,peopleRegistrationSelectionManaged:()=>false,canManageRegistrationRoster:()=>true,isCommunityQuickRegistration:()=>false,
   peopleOnlineWaitlistRows:()=>[],peopleLocalWaitlist:()=>[],peopleRegistrationIdOf:r=>r.registrationId,
   peopleOnsiteWaitlistAvailable:()=>true,peopleOnsiteWaitlistManaged:()=>false,
-  renderStaffAssignmentPanel:()=>'',renderRefereeStationAssignmentPanel:()=>'',bracketCommitStatusHtml:()=>'',bracketCommitBlocked:()=>false,entryRosterValid:()=>true,renderEntrySelection:()=>'',BATTLE_MODE_LABELS:{},FORMAT_LABELS:{}});
+  renderStaffAssignmentPanel:()=>'',renderRefereeStationAssignmentPanel:()=>'',bracketCommitStatusHtml:()=>'',bracketDrawButtonHtml:()=>'',bracketCommitBlocked:()=>false,entryRosterValid:()=>true,renderEntrySelection:()=>'',BATTLE_MODE_LABELS:{},FORMAT_LABELS:{}});
  vm.runInContext(fn(core,'renderPeopleManagement'),ctx);
  assert.match(ctx.renderPeopleManagement(),/前往備取／抽籤/);
  ctx.peopleRosterSection='waitlist';assert.doesNotMatch(ctx.renderPeopleManagement(),/前往備取／抽籤/);

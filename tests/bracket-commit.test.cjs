@@ -87,3 +87,21 @@ test('a redraw started during start verification keeps start blocked',async()=>{
  const h=fixture(),c=h.make();await c.begin();const read=h.ctx.read,wait=deferred();h.ctx.read=async()=>{await wait.promise;return read();};
  const verify=c.verify(h.local),draw=c.begin();wait.resolve();assert.equal(await verify,false);await draw;
 });
+
+test('single submit action retries the same persisted pairing after upload failure',async()=>{
+ const h=fixture(),write=h.ctx.write;h.ctx.write=async()=>false;const c=h.make();
+ assert.equal(await c.submit(),false);assert.equal(c.status().result,'failed');
+ const saved=[...h.storage.values()][0];h.ctx.write=write;
+ assert.equal(await c.submit(),true);assert.equal(h.count,1);assert.equal(h.writes.length,1);
+ assert.equal(h.local.bracketDraw.id,JSON.parse(saved).snapshot.bracketDraw.id);assert.equal(c.status().result,'success');
+});
+test('single submit automatically adopts a competing cloud version without overwriting it',async()=>{
+ const h=fixture();h.ctx.write=async()=>false;const c=h.make();await c.submit();
+ const latest={...room(),drawnAt:200,bracketSize:2,matches:[{id:'other-draw'}],bracketDraw:{id:'other'}};h.remote=clone(latest);h.pub=clone(latest);
+ assert.equal(await c.submit(),false);assert.equal(c.status().result,'failed');assert.equal(c.status().error,'bracket-version-conflict');
+ assert(!c.blocked());assert.equal(h.local.bracketDraw.id,'other');assert.equal(h.count,1);assert.equal(h.writes.length,0);assert.equal(h.success,0);assert.equal(h.storage.size,0);
+});
+test('unreadable cloud state keeps pending pairing instead of treating a read error as a competing edit',async()=>{
+ const h=fixture();h.ctx.write=async()=>false;const c=h.make();await c.submit();h.ctx.read=async()=>({ok:false});
+ assert.equal(await c.submit(),false);assert(c.blocked());assert.equal(c.status().error,'cloud-readback-unconfirmed');assert.equal(h.count,1);assert.equal(h.applied,0);assert.equal(h.storage.size,1);
+});

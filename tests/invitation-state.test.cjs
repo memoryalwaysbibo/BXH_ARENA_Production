@@ -6,7 +6,7 @@ function people(rows,error=null,online=true){
  const s={state:{id:'qa',cloudCode:'BXH-QA',players:[],waitlistPlayers:[],meta:{registrationEnabled:online,registrationCapacity:2}},adminRegistrationsCache:rows,adminRegistrationsError:error,adminRegistrationsLoading:false,adminRosterCode:'BXH-QA',peopleRosterSection:'waitlist',peopleRosterBusy:false,firebaseUser:{uid:'qa'},window:{},BATTLE_MODE_LABELS:{},FORMAT_LABELS:{},esc:String,setTimeout(){},startAdminRosterWatch(){},participantDisplayName:p=>p.name,peopleRegistrationIdOf:r=>r.id,peopleWaitlistShadow:()=>null};
  for(const k of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','isCommunityQuickRegistration','peopleOnsiteWaitlistAvailable','peopleOnsiteWaitlistManaged','bracketCommitBlocked'])s[k]=()=>false;
  for(const k of ['canManageRegistrationRoster','entryRosterValid'])s[k]=()=>true;
- for(const k of ['renderStaffAssignmentPanel','renderRefereeStationAssignmentPanel','bracketCommitStatusHtml','renderEntrySelection'])s[k]=()=>'';
+ for(const k of ['renderStaffAssignmentPanel','renderRefereeStationAssignmentPanel','bracketCommitStatusHtml','bracketDrawButtonHtml','renderEntrySelection'])s[k]=()=>'';
  s.peopleLocalWaitlist=()=>s.state.waitlistPlayers;s.peopleOnlineWaitlistRows=()=>Array.isArray(s.adminRegistrationsCache)?s.adminRegistrationsCache.filter(r=>r.status==='waitlist'):[];
  vm.createContext(s);vm.runInContext(block(core,'function renderPeopleManagement(){','function renderBxhEventTemplateSettingsSection('),s);return s;
 }
