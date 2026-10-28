@@ -7,7 +7,7 @@ const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolv
 function room(){return {id:'r',cloudCode:'ROOM',updatedAt:1,meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'};}
 function fixture(){
  let local=room(),remote=clone(local),pub=clone(local),count=0,success=0,applied=0,active=true,writes=[];
- const storage=new Map(),ctx={key:'u:ROOM',actorUid:'u',storage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},current:()=>active,state:()=>local,cloud:()=>true,operationId:()=> 'op'+count,
+ const storage=new Map(),ctx={minimumFeedbackMs:0,key:'u:ROOM',actorUid:'u',storage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},current:()=>active,state:()=>local,cloud:()=>true,operationId:()=> 'op'+count,
  generate:()=>({...clone(local),drawnAt:100+count++,bracketSize:2,matches:[{id:'m'+count,bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}]}),
  read:async()=>({ok:true,data:clone(remote),publicData:clone(pub)}),
  write:async(s,o)=>{writes.push(clone(s));api.assertWrite(remote,s,o);remote=clone(s);pub=clone(s);return true;},
@@ -104,4 +104,11 @@ test('single submit automatically adopts a competing cloud version without overw
 test('unreadable cloud state keeps pending pairing instead of treating a read error as a competing edit',async()=>{
  const h=fixture();h.ctx.write=async()=>false;const c=h.make();await c.submit();h.ctx.read=async()=>({ok:false});
  assert.equal(await c.submit(),false);assert(c.blocked());assert.equal(c.status().error,'cloud-readback-unconfirmed');assert.equal(h.count,1);assert.equal(h.applied,0);assert.equal(h.storage.size,1);
+});
+
+test('cloud draw visibly waits at least two seconds and completes without confirmation click',async()=>{
+ const h=fixture();delete h.ctx.minimumFeedbackMs;const c=h.make(),at=Date.now(),p=c.submit();
+ await tick();assert(c.busy());assert(c.blocked());assert.equal(h.success,0);
+ await new Promise(r=>setTimeout(r,100));assert(c.busy());assert.equal(h.success,0);
+ assert.equal(await p,true);assert(Date.now()-at>=1950);assert.equal(h.success,1);assert.equal(c.status().result,'success');assert(!c.busy());
 });

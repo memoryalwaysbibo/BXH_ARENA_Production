@@ -26,7 +26,9 @@ function create(ctx){
  function matches(result,snapshot){return result?.ok===true&&signature(result.data)===signature(snapshot)&&signature(result.publicData)===signature(snapshot)&&result.data.bracketDraw?.id===snapshot.bracketDraw?.id;}
  async function retry(){
   if(busy||!pending||!ctx.current())return false;
-  busy=true;error='';result='';ctx.changed();
+  busy=true;error='';result='';
+  const feedback=new Promise(resolve=>setTimeout(resolve,ctx.minimumFeedbackMs??(ctx.cloud()?2000:0)));
+  ctx.changed();
   try{
    keep();
    if(ctx.cloud()){
@@ -54,8 +56,9 @@ function create(ctx){
     if(await ctx.local(pending.snapshot)!==true)throw Error('local-save-unconfirmed');
     if(!ctx.current())return false;ctx.apply(pending.snapshot);
    }
+   await feedback;if(!ctx.current())return false;
    pending=null;keep();result='success';ctx.success();return true;
-  }catch(e){error=e.message||'cloud-save-unconfirmed';result='failed';return false;}
+  }catch(e){await feedback;error=e.message||'cloud-save-unconfirmed';result='failed';return false;}
   finally{busy=false;if(ctx.current())ctx.changed();}
  }
  async function begin(){
