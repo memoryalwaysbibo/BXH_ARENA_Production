@@ -1,6 +1,6 @@
 'use strict';
 const {createMembershipService}=require('./membership.cjs');
-const ACTION_FIELDS=Object.freeze({create:['name'],apply:[],cancel:[],approve:['targetUid'],reject:['targetUid'],leave:[],remove:['targetUid','reasonCode','reasonNote'],transfer:['targetUid'],assign:['targetUid','role'],frame:['frame'],dissolve:[],admission:['policy']});
+const ACTION_FIELDS=Object.freeze({create:['name','preset'],apply:[],cancel:[],approve:['targetUid'],reject:['targetUid'],leave:[],remove:['targetUid','reasonCode','reasonNote'],transfer:['targetUid'],assign:['targetUid','role'],frame:['frame'],'emblem-preset':['preset'],dissolve:[],admission:['policy']});
 function createCommandHandler({db,auth,enabled=false,readEligibility,readDisplayName,clock,HttpsError}){
  if(typeof HttpsError!=='function')throw Error('https-error-required');
  const command=createMembershipService({db,readEligibility,readDisplayName,clock});
@@ -25,7 +25,7 @@ function createCommandHandler({db,auth,enabled=false,readEligibility,readDisplay
    const precondition=['already-in-team','team-id-taken','team-not-found','team-dissolved','team-full','transfer-captain-first','team-must-be-solo','application-not-pending','cannot-target-self','use-captain-transfer','role-full','frame-locked','operation-id-conflict','ladder-tier-below-minimum','tier-below-minimum'];
    if(denied.includes(message))fail('permission-denied',message);
    if(precondition.includes(message))fail('failed-precondition',message);
-   if(/^invalid-(id|request-id|name|action|admission-mode|ladder-tier|min-tier)$/.test(message)||['removal-reason-required','other-reason-required','reason-too-long'].includes(message))fail('invalid-argument',message);
+   if(/^invalid-(id|request-id|name|action|admission-mode|ladder-tier|min-tier)$/.test(message)||['removal-reason-required','other-reason-required','reason-too-long','invalid-emblem-preset'].includes(message))fail('invalid-argument',message);
    fail('internal','team-command-unavailable');
   }
  };
