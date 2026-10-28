@@ -1,6 +1,6 @@
 {
-  "build": "20261029.2",
-  "version": "v14.3.40",
-  "updatedAt": "2026-10-28T18:31:09.668676+00:00",
-  "releaseTrigger": "bracket-single-click-auto-confirm"
+  "build": "20261029.3",
+  "version": "v14.3.41",
+  "updatedAt": "2026-10-28T19:20:36.190272+00:00",
+  "releaseTrigger": "remove-board-reshuffle"
 }

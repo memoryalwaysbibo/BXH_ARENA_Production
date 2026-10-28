@@ -370,9 +370,10 @@ let cloudTestResult = null;
 let offlineQueueStatus={pending:0,conflict:0,failed:0,total:0};
 
 /* ==== version tracking system ==== */
-const APP_VERSION = "v14.3.40";
+const APP_VERSION = "v14.3.41";
 const APP_VERSION_DISPLAY = "V14";
 const VERSION_HISTORY = [
+  {version:"v14.3.41",date:"2026/10/29",timezone:"Asia/Taipei",title:"移除樹狀圖重新抽籤",updateLevel:"patch",added:[],changed:["樹狀圖移除重新抽籤入口與事件處理，避免查看配對時直接重抽"],fixed:[],publicSummary:"移除樹狀圖的重新抽籤功能。"},
   {version:"v14.3.40",date:"2026/10/29",timezone:"Asia/Taipei",title:"抽籤單次操作自動確認",updateLevel:"patch",added:[],changed:["抽籤遇到暫時讀取或寫入失敗時，自動有限次重試同一份配對","雲端配對核對短暫未一致時持續等待，不要求再次點擊上傳"],fixed:["首次提交過早顯示失敗，需手動再次上傳才能完成"],publicSummary:"抽籤自動完成暫時失敗重試與雲端確認。"},
   {version:"v14.3.39",date:"2026/10/29",timezone:"Asia/Taipei",title:"抽籤上傳等待提示",updateLevel:"patch",added:[],changed:["抽籤自動顯示資料上傳中與進度提示至少兩秒，完成後自動顯示成功或失敗"],fixed:[],publicSummary:"抽籤後清楚提示等待，無須手動確認上傳。"},
   {version:"v14.3.38",date:"2026/10/28",timezone:"Asia/Taipei",title:"抽籤上傳流程簡化",updateLevel:"patch",added:[],changed:["抽籤顯示上傳中、上傳成功或上傳失敗；失敗只保留單一重試操作","重試沿用原配對，雲端版本衝突時自動同步最新資料"],fixed:[],publicSummary:"簡化抽籤上傳與重試流程。"},
@@ -5880,7 +5881,7 @@ const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data","archive-general-insufficient",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
-  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle","set-ladder-mode"
+  "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","set-ladder-mode"
 ]);
 
 const COMMUNITY_OWNER_ACTIONS = new Set([
@@ -5888,7 +5889,7 @@ const COMMUNITY_OWNER_ACTIONS = new Set([
   "toggle-checkin-btn","delete-player","archive-complete","save-pause","reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete",
   "load-online-roster","start-tournament","set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","goto-settings"
 ]);
-const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
+const COMMUNITY_OWNER_TIER_ACTIONS = new Set(["set-round-scoring-mode","correct-quick-result"]);
 const SUPER_ADMIN_ONLY_ACTIONS = new Set([
   "open-account-management","super-admin-page","create-managed-user-submit","set-user-role","toggle-user-active",
   "account-role-filter","account-search-apply","account-search-clear","account-clear-filters","account-summary-refresh","account-page-prev","account-page-next",
@@ -5898,13 +5899,13 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
-  "set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle",
+  "set-scoring-mode","set-round-scoring-mode","correct-quick-result",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
   "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack",
   "ai-create-suggestion-toggle","ai-create-suggestion-select-all","ai-create-suggestion-apply",
   "event-template-toggle","event-template-refresh","event-template-edit","event-template-cancel","event-template-save"
 ]);
-const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result","board-reshuffle"]);
+const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
 const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
@@ -10481,7 +10482,6 @@ function seMatchBoxHtml(m, roundIdx, boxIdx, headLabel){
 
 const BOARD_MEDAL_SVG = '<svg viewBox="0 0 40 56" width="18" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 L20 20 L8 16 Z M28 4 L20 20 L32 16 Z"/><circle cx="20" cy="34" r="14"/><circle cx="20" cy="34" r="8"/></svg>';
 const BOARD_ICON_EXPORT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M12 3 L12 15 M7 10 L12 15 L17 10"/><path d="M4 17 L4 20 L20 20 L20 17"/></svg>';
-const BOARD_ICON_SHUFFLE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M3 6 h4 l10 12 h4 M3 18 h4 l3.2 -3.8 M17 6 h4 M21 6 l-3 -3 M21 6 l-3 3 M21 18 l-3 3 M21 18 l-3 -3"/></svg>';
 const BOARD_ICON_MINUS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12 h14"/></svg>';
 const BOARD_ICON_PLUS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5 v14 M5 12 h14"/></svg>';
 const BOARD_ICON_FULLSCREEN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M4 9 V4 h5 M20 9 V4 h-5 M4 15 v5 h5 M20 15 v5 h-5"/></svg>';
@@ -10529,17 +10529,6 @@ function bracketDrawButtonHtml(){
 async function verifyBracketBeforeStart(){
  const c=bracketCommitController();if(!c)return true;
  const ok=await c.verify(state);if(!ok)showToast('對戰表尚未確認上傳，請先重試上傳後再開賽',true);return ok;
-}
-
-function canReshuffleBracket(){
-  if(state.startedAt || (window.BXHBracketCommit&&bracketCommitBlocked()) || !state.bracketSize || state.matches.length===0) return false;
-  return state.matches.filter(m=>!m.isBye).every(m => !m.completed && m.status!=="in_progress" && m.status!=="paused" && (!m.log || m.log.length===0) && !m.scoreA && !m.scoreB && !m.winnerId);
-}
-
-function reshuffleBracket(){
-  if(!isAdminTierOrAbove()){ showToast("只有 super_admin 或 admin 可以重新抽籤。", true); return; }
-  if(!canReshuffleBracket()){ showToast("賽事開始後不可重新抽籤", true); return; }
-  void bracketCommitController()?.begin();
 }
 
 function currentRoundLabelForBoard(){
@@ -10716,7 +10705,6 @@ function renderBoardMode(){
   const st = tournamentStatus();
   const stLabel = st==="waiting" ? "尚未開始" : (st==="done" ? "已完成" : "進行中");
   const boardCode = state.cloudCode || "本機賽事";
-  const reshuffleAllowed = isAdminTierOrAbove() && canReshuffleBracket();
   const standaloneChampionHtml = (fmt!=="single" && state.championId) ? `
     <div class="board-champion-area">
       <span class="board-trophy">${trophySvg()}</span>
@@ -10746,7 +10734,6 @@ function renderBoardMode(){
 
     <div class="board-toolbar">
       ${availableBoardStage(0)?'<button type="button" class="btn btn-ghost btn-sm board-locate-self" data-action="board-locate-self">◎ 我在哪</button>':""}
-      ${reshuffleAllowed?`<button class="btn btn-ghost btn-sm" data-action="board-reshuffle">${BOARD_ICON_SHUFFLE} 重新抽籤</button>`:""}
       <span class="board-zoom-group">
         <button class="btn btn-ghost btn-sm" data-action="board-zoom-out" aria-label="縮小對戰表">${BOARD_ICON_MINUS}</button>
         <span class="board-zoom-pct" id="board-zoom-pct">${Math.round(boardZoom*100)}%</span>
@@ -20276,7 +20263,7 @@ function handleAction(action, target){
   if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
   if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}
-  if(['draw-bracket','board-reshuffle','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('對戰表尚未上傳成功，請先重試上傳',true);return;}
+  if(['draw-bracket','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('對戰表尚未上傳成功，請先重試上傳',true);return;}
   if(peopleOnsiteWaitlistManaged()){
     const rosterActions=['people-toggle-auto-fill','people-promote-waitlist','people-move-to-waitlist','people-delete-waitlist','delete-player','quick-add-players','random-test-roster','update-players','load-test','reg-add-quick','reg-mark-noshow','reg-promote','reg-cancel','reg-delete','import-roster-from-registrations','save-meta','save-registration-settings','close-checkin-early','set-registration-enabled','set-waitlist-enabled','set-checkin-required','unlock-roster','clear-data','import-data'];
     if(rosterActions.includes(action)||action.startsWith('entry-')){showToast("本場使用現場候補抽選，請由「人員管理 → 備取」處理名單。",true);return;}
@@ -22997,11 +22984,6 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="board-zoom-out"){ setBoardZoom(boardZoom - 0.1); return; }
   if(action==="board-zoom-reset"){ setBoardZoom(1); boardPanX=0; boardPanY=0; applyBoardTransform(); return; }
   if(action==="board-fullscreen"){ toggleBoardFullscreen(); return; }
-  if(action==="board-reshuffle"){
-    if(!canReshuffleBracket()){ showToast("賽事開始後不可重新抽籤", true); return; }
-    openModal({ type:"generic", title:"重新抽籤", message:"重新抽籤將清除目前對戰編排並重新隨機安排選手，確定要繼續嗎？", danger:true, confirmLabel:"確認重新抽籤", onConfirm:()=>{ reshuffleBracket(); } });
-    return;
-  }
   if(action==="board-locate-self"){void locateBoardSelf();return;}
   if(action==="board-export-image"){
     target.closest('.board-share-menu')?.removeAttribute('open');
