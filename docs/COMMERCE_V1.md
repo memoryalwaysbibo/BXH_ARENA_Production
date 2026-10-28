@@ -1,6 +1,6 @@
 # 商城第一版：人工轉帳候選
 
-本變更是可審查的前端候選，尚未部署；配對後端為 `BXH_ARENA_Functions_Production/release/commerce`。沒有正式商品、價格、收款帳戶或交付能力設定。
+本變更是可審查的前端候選；配對後端為 `BXH_ARENA_Functions_Production/release/commerce`。版本為 v14.3.37／build 20261028.1，須先驗證後端閉店部署再發布前端。沒有正式商品、價格、收款帳戶或交付能力設定；未開放時清楚顯示「商城準備中，目前尚未開放購買」。
 
 ## 入口
 

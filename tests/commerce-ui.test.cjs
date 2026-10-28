@@ -39,3 +39,7 @@ test('an old admin catalog response cannot populate the player shop after naviga
  resolve({ok:true,products:[{id:'private_draft'}],nextCursor:null});await pending;
  assert.equal(t.ui.context().products,null);assert.equal(t.ui.context().loading,false);
 });
+test('a closed store is clearly labeled and does not create placeholder products',async()=>{
+ const t=setup();t.ui.shop();t.sandbox.window.engagementService.commerce=async()=>({ok:true,products:[],nextCursor:null,storeOpen:false});
+ await t.ui.load('catalog');assert.match(t.ui.shop(),/商城準備中，目前尚未開放購買/);assert.equal(t.ui.context().products.length,0);
+});
