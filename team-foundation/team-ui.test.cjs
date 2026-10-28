@@ -54,6 +54,16 @@ test('application date and time are displayed separately in Taipei time',()=>{
 test('application review offers a manual refresh for changes made by others',()=>{
  const html=ui.applications({teamId:'t'});assert.match(html,/data-team-action="reload-applications"/);assert.match(html,/重新整理名單/);
 });
+test('affiliated applicants cannot be approved but can still be rejected',()=>{
+ const html=ui.applications({teamId:'t',items:[{uid:'p',name:'小明',hasTeam:true}]});
+ assert.match(html,/已有所屬戰隊，無法核准加入/);
+ assert.match(html,/<button[^>]*data-team-action="approve"[^>]* disabled>核准/);
+ assert.match(html,/<button[^>]*data-team-action="reject"[^>]*>拒絕/);
+ assert.doesNotMatch(html,/<button[^>]*data-team-action="reject"[^>]* disabled/);
+ const refreshed=ui.applications({teamId:'t',items:[{uid:'p',name:'小明',hasTeam:false}]});
+ assert.doesNotMatch(refreshed,/<button[^>]*data-team-action="approve"[^>]* disabled/);
+ assert.doesNotMatch(refreshed,/已有所屬戰隊/);
+});
 
 test('history shows separate fields and escapes record content',()=>{
  const html=ui.history({items:[{name:'<小賈>',date:'2026/10/27',time:'18:10',method:'隊長移除'}]});
