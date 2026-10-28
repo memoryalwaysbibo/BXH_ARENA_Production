@@ -1,5 +1,6 @@
 'use strict';
 const {progression}=require('./progression.cjs');
+const presets=require('./emblem-presets.js');
 const MAX_SCAN=200,MAX_PAGE=50;
 const validId=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 function createRankingService({db}){
@@ -21,7 +22,7 @@ function createRankingService({db}){
     if(!ok){excluded++;continue;}
     const unlocked=progression(team.totalXp).unlockedFrames;
     const hasEmblem=typeof team.emblemObject==='string'&&team.emblemObject.startsWith('teamEmblemsV1/'+id+'/')&&/^teamEmblemsV1\/[A-Za-z0-9_-]{1,128}\/[a-f0-9]{64}\.webp$/.test(team.emblemObject);
-    valid.push({id,name:p.name,captainName:p.captainName,level:p.level,memberCount:p.memberCount,strength:p.strength,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null,hasEmblem});
+    valid.push({id,name:p.name,captainName:p.captainName,level:p.level,memberCount:p.memberCount,strength:p.strength,selectedFrame:unlocked.includes(team.selectedFrame)?team.selectedFrame:null,preset:team.emblemObject?null:presets.normalize(team.emblemPreset??undefined),hasEmblem});
    }
    valid.sort((a,b)=>b.strength-a.strength||a.id.localeCompare(b.id));
    for(let i=0;i<valid.length;i++)valid[i].rank=i>0&&valid[i].strength===valid[i-1].strength?valid[i-1].rank:i+1;
