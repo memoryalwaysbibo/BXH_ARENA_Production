@@ -83,7 +83,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
    await controller.operate('frame',team.id,{frame:raw===''?null:Number(raw)});return;
   }
   if(form.dataset.teamForm!=='search')return;
-  event.preventDefault();const data=new FormData(form);await controller.search({query:String(data.get('query')||''),mode:String(data.get('mode')||'all'),recruitment:String(data.get('recruitment')||'all')});
+  event.preventDefault();const data=new FormData(form);await controller.search({query:String(data.get('query')||''),mode:String(data.get('mode')||'all'),recruitment:String(data.get('recruitment')||'all'),sort:String(data.get('sort')||'strength_desc')});
  };
  const change=async event=>{const select=event.target;
   if(select.hasAttribute?.('data-team-emblem')){
