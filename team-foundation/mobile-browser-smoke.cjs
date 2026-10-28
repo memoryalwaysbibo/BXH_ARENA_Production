@@ -24,6 +24,15 @@ const {chromium}=require('playwright'),{createServer}=require('node:http'),fs=re
  assert.equal(await page.locator('[data-team-action="approve"]').count(),20);
  await page.getByRole('button',{name:'重新整理名單',exact:true}).click();assert.equal((await page.evaluate(()=>window.applicationQueries.at(-1))).cursor,undefined);
  assert.deepEqual((await page.evaluate(()=>window.calls.slice(1))).map(p=>[p.action,p.targetUid]),[['reject','p20'],['approve','p21'],['reject','p22']]);assert.deepEqual(pageErrors,[]);
- console.log('mobile mock flow passed: lobby search/sort/pagination, member view, creation capacity, preset creation, review pagination, affiliated applicant, approve/reject refresh, empty-page recovery; no page errors');
+
+ await page.evaluate(()=>{window.BXH_TEAM_ADMIN_PREVIEW=true;window.userProfile={role:'super_admin',active:true};window.currentAuthUid=()=> 'admin';window.render=()=>{};window.previewCalls=[];window.engagementService={tournamentOperation:async(name,p)=>{window.previewCalls.push({name,p});return p.action==='members'?{name:'預覽隊伍',members:[{uid:'x',name:'隊長A',role:'captain'}]}:{items:[{id:'preview',name:'預覽隊伍',strength:100}],total:1};}};});
+ await page.addScriptTag({path:path.join(source,'team-admin-preview.js')});
+ const adminPanel=page.getByRole('complementary',{name:'戰隊管理員預覽'});await adminPanel.getByRole('button',{name:'預覽隊伍',exact:true}).waitFor();
+ assert.equal(await adminPanel.locator('[data-team-action]').count(),0);
+ await adminPanel.getByRole('button',{name:'預覽隊伍',exact:true}).click();await adminPanel.getByText('隊長A｜隊長',{exact:true}).waitFor();
+ assert.ok((await page.evaluate(()=>window.previewCalls)).every(c=>c.name==='teamPreviewRead'));
+ await page.evaluate(()=>{window.userProfile.role='admin';window.render();});assert.equal(await adminPanel.count(),0);
+ assert.deepEqual(pageErrors,[]);
+ console.log('mobile mock flow passed: lobby search/sort/pagination, member view, creation capacity, preset creation, review pagination, affiliated applicant, approve/reject refresh, empty-page recovery; admin-only read-only preview and downgrade cleanup; no page errors');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
