@@ -12,3 +12,4 @@ match /teamOperationReceiptsV1/{receiptId} { allow read, write: if false; }
 match /teamActivityReceiptsV1/{receiptId} { allow read, write: if false; }
 match /teamProjectionControlV1/{controlId} { allow read, write: if false; }
 match /teamDissolutionControlV1/{controlId} { allow read, write: if false; }
+match /teamEmblemObjectsV1/{objectId} { allow read, write: if false; }
