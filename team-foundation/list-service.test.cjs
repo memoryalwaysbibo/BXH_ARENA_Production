@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');const {cr
 function setup({count=2,stale=false,membership=null,pending=false,restricted=false,reads=[],frame=null}={}){
  const data=new Map([['hunterLeaderboardMeta/current',{generation:'g'}],['ladderSystem/current',{currentSeason:'S1'}]]);
  if(membership)data.set('teamMembershipsV1/u',{teamId:membership});
- const docs=Array.from({length:count},(_,i)=>{const id='t'+i,xp=frame!==null&&i===0?12:0,p={name:'戰隊'+i,captainName:'隊長',level:xp?4:1,capacity:xp?13:10,memberCount:1,strength:i===0?null:100,createdAt:100,admission:{mode:'auto',minLadderTier:restricted?'黃金':null,minTier:null},hunterGeneration:stale&&i===0?'old':'g',ladderSeason:'S1',members:[{uid:'c',role:'captain'}],secret:'private',selectedFrame:10};data.set('teamsV1/'+id,{status:'active',name:'戰隊'+i,totalXp:xp,selectedFrame:i===0?frame:null,admission:{mode:'auto',minLadderTier:restricted?'黃金':null},captainUid:'c',memberUids:['c']});return{id,data:()=>p};});
+ const docs=Array.from({length:count},(_,i)=>{const id='t'+i,xp=frame!==null&&i===0?12:0,p={name:'戰隊'+i,captainName:'隊長',level:xp?4:1,capacity:xp?13:10,memberCount:1,strength:i===0?null:100,createdAt:100,admission:{mode:'auto',minLadderTier:restricted?'黃金':null,minTier:null},hunterGeneration:stale&&i===0?'old':'g',ladderSeason:'S1',members:[{uid:'c',role:'captain'}],secret:'private',selectedFrame:10};data.set('teamsV1/'+id,{status:'active',name:'戰隊'+i,totalXp:xp,selectedFrame:i===0?frame:null,emblemObject:i===0&&frame!==null?'teamEmblemsV1/'+id+'/'+('a'.repeat(64))+'.webp':null,admission:{mode:'auto',minLadderTier:restricted?'黃金':null},captainUid:'c',memberUids:['c']});return{id,data:()=>p};});
  if(pending)data.set('teamsV1/t1/applications/u',{status:'pending'});
  const db={doc:p=>p,collection:()=>({limit:n=>({kind:'query',n})}),runTransaction:fn=>fn({get:async p=>{reads.push(p);return typeof p==='object'?{docs:docs.slice(0,p.n)}:{exists:data.has(p),data:()=>data.get(p)};}})};
  return createListService({db});
@@ -26,6 +26,6 @@ test('restricted automatic admission remains actionable and relies on server val
  const r=await setup({restricted:true})({actorUid:'u'});assert.deepEqual(r.items[0].join,{label:'加入',disabled:false,action:'join'});
 });
 test('lobby frame comes from authoritative team and must be unlocked',async()=>{
- const allowed=await setup({frame:4})({actorUid:'u'});assert.equal(allowed.items.find(x=>x.id==='t0').selectedFrame,4);
+ const allowed=await setup({frame:4})({actorUid:'u'});assert.equal(allowed.items.find(x=>x.id==='t0').selectedFrame,4);assert.equal(allowed.items.find(x=>x.id==='t0').hasEmblem,true);assert.ok(!JSON.stringify(allowed).includes('teamEmblemsV1'));
  const locked=await setup({frame:10})({actorUid:'u'});assert.equal(locked.items.find(x=>x.id==='t0').selectedFrame,null);
 });
