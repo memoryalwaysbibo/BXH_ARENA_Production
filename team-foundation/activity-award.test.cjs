@@ -11,8 +11,8 @@ function fixture(){
  return {docs,award:createActivityAwarder({db})};
 }
 test('completed official ledger awards once and records a deduplication receipt',async()=>{
- const f=fixture();assert.deepEqual(await f.award(id),{status:'awarded',teamId:'t'});assert.equal(f.docs.get('teamsV1/t').totalXp,3);assert.equal(f.docs.get('teamActivityReceiptsV1/'+id).uid,uid);
- assert.deepEqual(await f.award(id),{status:'already-awarded'});assert.equal(f.docs.get('teamsV1/t').totalXp,3);
+ const f=fixture();assert.deepEqual(await f.award(id),{status:'awarded',teamId:'t'});assert.equal(f.docs.get('teamsV1/t').totalXp,3);assert.equal(f.docs.get('teamMembershipsV1/'+uid).experienceContribution,1);assert.equal(f.docs.get('teamActivityReceiptsV1/'+id).uid,uid);
+ assert.deepEqual(await f.award(id),{status:'already-awarded'});assert.equal(f.docs.get('teamsV1/t').totalXp,3);assert.equal(f.docs.get('teamMembershipsV1/'+uid).experienceContribution,1);
 });
 test('unarchived, mismatched and late membership cannot add experience',async()=>{
  for(const change of [f=>{f.docs.get('tournaments/'+code).archiveStatus='ongoing';},f=>{f.docs.get('tournaments/'+code).ladderResults[0].pointsEarned=99;},f=>{f.docs.get('teamMembershipsV1/'+uid).joinedAt=201;},f=>{f.docs.get('tournaments/'+code).eventAuthority='community';},f=>{f.docs.get('tournaments/'+code).testMode=true;},f=>{f.docs.delete('teamMembershipsV1/'+uid);}]){
@@ -35,4 +35,9 @@ test('cancelled events and invalid joining timestamps never award',async()=>{
  for(const change of [f=>{f.docs.get('tournaments/'+code).eventCancelled=true;},f=>{f.docs.get('teamMembershipsV1/'+uid).joinedAt=-1;}]){
   const f=fixture();change(f);assert.equal((await f.award(id)).status,'ineligible');assert.equal(f.docs.get('teamsV1/t').totalXp,2);
  }
+});
+
+test('existing contribution increments and invalid counters do not award',async()=>{
+ const f=fixture();f.docs.get('teamMembershipsV1/'+uid).experienceContribution=7;await f.award(id);assert.equal(f.docs.get('teamMembershipsV1/'+uid).experienceContribution,8);
+ const bad=fixture();bad.docs.get('teamMembershipsV1/'+uid).experienceContribution=-1;await assert.rejects(bad.award(id),/invalid-contribution/);assert.equal(bad.docs.has('teamActivityReceiptsV1/'+id),false);assert.equal(bad.docs.get('teamsV1/t').totalXp,2);
 });
