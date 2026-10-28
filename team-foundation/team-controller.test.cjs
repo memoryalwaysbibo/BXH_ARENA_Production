@@ -129,3 +129,30 @@ test('team cap rejection displays a clear message without retrying a successful 
 test('create carries server capacity state and replaces it on refresh',async()=>{
  let status='full';const c=setup({mine:async()=>({team:null,creationCapacity:{status,limit:200,activeCount:status==='full'?200:199}})});await c.create();assert.equal(c.snapshot().creationCapacity.status,'full');status='open';await c.create();assert.equal(c.snapshot().creationCapacity.activeCount,199);
 });
+
+test('rejected removal reason can be corrected and submitted as a new request',async()=>{
+ const calls=[];let sequence=0;
+ const c=createTeamController({newRequestId:()=>`request-${++sequence}-0000000000`,api:{list:async()=>({items:[],total:0}),members:async()=>({id:'t',members:[]}),mine:async()=>({team:{id:'t',role:'captain'}}),applications:async()=>({items:[]}),history:async()=>({items:[]}),command:async p=>{calls.push(p);if(calls.length===1)throw Object.assign(Error('other-reason-required'),{code:'functions/invalid-argument'});return {ok:true};}}});
+ await c.manage('t');
+ assert.equal((await c.operate('remove','t',{targetUid:'m',reasonCode:'other',reasonNote:''})).reason,'rejected');
+ assert.equal(c.snapshot().pending,false);assert.match(c.snapshot().error,/填寫原因/);
+ assert.equal((await c.retryPending()).reason,'no-pending-operation');
+ assert.equal((await c.operate('remove','t',{targetUid:'m',reasonCode:'other',reasonNote:'長期未參與'})).ok,true);
+ assert.notEqual(calls[0].requestId,calls[1].requestId);assert.equal(calls[1].reasonNote,'長期未參與');
+});
+
+test('departed management targets are distinguished from the viewer leaving',async()=>{
+ for(const action of ['remove','assign','transfer','leave']){
+  const c=setup({command:async()=>{throw Object.assign(Error('not-member'),{code:'functions/permission-denied'});}});
+  assert.equal((await c.operate(action,'t',{targetUid:'departed',role:'elite'})).reason,'rejected');
+  assert.match(c.snapshot().error,action==='leave'?/你目前不是/:/對方已不在/);assert.equal(c.snapshot().pending,false);
+ }
+});
+
+test('validation-looking transport failures still preserve the request for exact retry',async()=>{
+ for(const code of [undefined,'functions/internal','functions/unavailable']){
+  const calls=[];const c=setup({command:async p=>{calls.push(structuredClone(p));if(calls.length===1)throw Object.assign(Error('other-reason-required'),{code});return {ok:true};}});
+  assert.equal((await c.operate('remove','t',{targetUid:'m',reasonCode:'other',reasonNote:'原因'})).reason,'unconfirmed');
+  assert.equal(c.snapshot().pending,true);await c.retryPending();assert.deepEqual(calls[0],calls[1]);
+ }
+});
