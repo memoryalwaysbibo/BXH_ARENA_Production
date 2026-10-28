@@ -436,6 +436,14 @@ async function selectAndCheck(page, size, bracketSize) {
     const done=fixture(32,{completed:true,code:'BXH-STATUS'});
     await page.evaluate(model=>{firebaseUser={uid:'active-account'};model.players[0].registrationUid=firebaseUser.uid;mount(model)},done);
     assert.equal(await page.evaluate(()=>boardSelfMatch('p1').id),'m4_0','finished player locates last match');
+    const ownWinnerNames=await page.evaluate(()=>[...document.querySelectorAll('#board-canvas .mb-row.winner .se-self-player .nm')].map(name=>{
+      const style=getComputedStyle(name);return {color:style.color,weight:style.fontWeight};
+    }));
+    assert.equal(ownWinnerNames.length,5,'all five confirmed winning rows for this player must be marked');
+    assert.ok(ownWinnerNames.every(style=>style.color==='rgb(141, 231, 244)'&&style.weight==='900'),JSON.stringify(ownWinnerNames));
+    const others=await page.evaluate(()=>[...document.querySelectorAll('#board-canvas .mb-row.winner .se-player-path-button:not(.se-self-player) .nm')].map(name=>getComputedStyle(name).color));
+    assert.ok(others.length>0&&others.every(color=>color!=='rgb(141, 231, 244)'),'other winners must not inherit the personal highlight');
+    await capture(page,'mobile-self-winner-name.png');
     await page.evaluate(()=>{
       getMatch('m3_0').completed=false;getMatch('m3_0').status='in_progress';getMatch('m3_0').winnerId=null;
       getMatch('m4_0').completed=false;getMatch('m4_0').status='pending';
@@ -460,7 +468,7 @@ async function selectAndCheck(page, size, bracketSize) {
       return route.getAttribute('d');
     });
     assert.ok(!nearHorizontal.includes(' V '),'near-level source docks flat instead of a tiny staircase: '+nearHorizontal);
-    console.log('PASS active/finished priority, thin non-scaling routes at 50/100/150%, turns outside badge gutter, and straight near-level docking');passed++;
+    console.log('PASS own winner names retain cyan/bold, other winners remain distinct; active/finished priority, thin non-scaling routes at 50/100/150%, turns outside badge gutter, and straight near-level docking');passed++;
 
     assert.deepEqual(errors,[]);
     console.log('PASS room/format changes reset scope and do not expose invalid stage controls');passed++;
