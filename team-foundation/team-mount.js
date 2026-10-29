@@ -83,6 +83,12 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
    const teamId=root.crypto.randomUUID(),result=await controller.operate('create',teamId,{name,preset});if(result.ok&&base64&&controller.snapshot().team?.id===teamId)await controller.operate('emblem',teamId,{base64});return;
    }finally{creating=false;}
   }
+  if(form.dataset.teamForm==='rename'){
+   event.preventDefault();const team=controller.snapshot().team;
+   if(team?.role!=='captain'||team.rename?.canRename!==true)return;
+   const name=String(new FormData(form).get('name')||'').trim();if(name.length<2||name.length>24){form.reportValidity();return;}
+   await controller.operate('rename',team.id,{name});return;
+  }
   if(form.dataset.teamForm==='admission'){
    event.preventDefault();const data=new FormData(form),team=controller.snapshot().team;
    if(team?.id)await controller.operate('admission',team.id,{policy:{mode:String(data.get('mode')||''),minLadderTier:String(data.get('minLadderTier')||'')||null,minTier:String(data.get('minTier')||'')||null}});return;

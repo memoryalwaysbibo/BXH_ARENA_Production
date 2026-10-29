@@ -28,6 +28,9 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
   'other-reason-required':'選擇其他時，請填寫原因說明。',
   'reason-too-long':'原因說明最多 500 字，請縮短後再送出。',
   'invalid-name':'戰隊名稱須為 2 至 24 字。',
+  'name-unchanged':'新名稱與目前名稱相同，請輸入不同名稱。',
+  'rename-cooldown':'改名後須等待 7 天，請查看下次可修改時間。',
+  'rename-state-unavailable':'目前無法確認改名時間，請重新整理後再試。',
   'invalid-admission-mode':'請重新選擇加入方式。',
   'invalid-ladder-tier':'請重新選擇天梯排位條件。',
   'invalid-min-tier':'請重新選擇獵人排位條件。',
@@ -124,12 +127,13 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
    const result=action==='emblem'?await api.uploadEmblem(emblemPayload):await api.command(payload);
    if(result?.ok!==true)throw Error('command-failed');
    pendingPayload=null;state.pending=false;
-   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId,...(applicationCursors.at(-1)?{cursor:applicationCursors.at(-1)}:{})});else if(payload.action==='admission'||payload.action==='frame'||payload.action==='emblem-preset'||payload.action==='emblem'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
+   if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId,...(applicationCursors.at(-1)?{cursor:applicationCursors.at(-1)}:{})});else if(payload.action==='rename'||payload.action==='admission'||payload.action==='frame'||payload.action==='emblem-preset'||payload.action==='emblem'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
    return {ok:true};
   }catch(error){
    let rejected=rejection(error);
    if(payload.action==='approve'&&rejectionMessage(error)==='already-in-team'&&rejected)rejected='申請者已有戰隊，無法核准加入。';
    if(['remove','assign','transfer'].includes(payload.action)&&rejectionMessage(error)==='not-member'&&rejected)rejected='對方已不在這支戰隊，請重新載入成員名單。';
+   if(!disposed&&rejected&&payload.action==='rename'&&generation===requestGeneration)await load('mine',{});
    if(!disposed){pendingPayload=rejected?null:payload;state.pending=!rejected;state.error=rejected||'操作結果尚未確認，可重試同一筆操作。';emit();}
    return {ok:false,reason:rejected?'rejected':'unconfirmed'};
   }finally{if(!disposed){state.busy=false;emit();}}
@@ -137,10 +141,11 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
  async function operate(action,teamId,extra={}){
   if(disposed||state.busy||state.loading)return {ok:false,reason:'busy'};
   if(pendingPayload)return {ok:false,reason:'pending-confirmation'};
-  if(!['join','apply','cancel','leave','remove','admission','frame','emblem','emblem-preset','create','approve','reject','assign','transfer','dissolve'].includes(action))return {ok:false,reason:'invalid-action'};
+  if(!['join','apply','cancel','leave','remove','admission','frame','emblem','emblem-preset','create','approve','reject','assign','transfer','dissolve','rename'].includes(action))return {ok:false,reason:'invalid-action'};
   if(action==='emblem'&&(typeof api.uploadEmblem!=='function'||typeof extra.base64!=='string'||!extra.base64||extra.base64.length>174764))return {ok:false,reason:'invalid-emblem'};
   let requestId;try{requestId=newRequestId();}catch(_){state.error='目前無法安全執行操作，請重新載入再試。';emit();return {ok:false,reason:'secure-id-unavailable'};}
   const payload={action:action==='join'?'apply':action,teamId,requestId};
+  if(action==='rename')payload.name=extra.name;
   if(action==='admission')payload.policy=structuredClone(extra.policy);
   if(action==='frame')payload.frame=extra.frame;
   if(action==='emblem'){payload.contentType='image/webp';payload.base64=extra.base64;}
