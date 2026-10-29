@@ -7,6 +7,8 @@ async function open(page,mode='admin',ui='v2'){
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',route=>{
   const u=new URL(route.request().url());
+  // WebKit routes local object URLs too; keep image decoding inside this fixture.
+  if(u.protocol==='blob:'&&['localhost','127.0.0.1'].includes(new URL(u.origin).hostname))return route.continue();
   if(!['localhost','127.0.0.1'].includes(u.hostname))return route.abort('blockedbyclient');
   if(u.pathname==='/modules/cloud/cloud-runtime.js')return route.fulfill({contentType:'text/javascript',body:'// Isolated team preview services.'});
   return route.continue();
