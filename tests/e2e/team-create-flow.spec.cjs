@@ -111,19 +111,23 @@ test('team lobby stays readable on narrow phones and teams precede the shop in p
  await page.evaluate(()=>{userProfile.role='player';render();teamFixture.rows=[{id:'bxh',name:'BXH',captainName:'黑爸',strength:511,memberCount:1,capacity:10,preset:{id:'shield',color:'#EC536E'},join:{label:'我的戰隊',action:'mine',disabled:false}},{id:'long',name:'這是一支用來檢查手機排版的很長戰隊名稱',captainName:'這是一位名字較長的隊長',strength:123456,memberCount:10,capacity:10,preset:{id:'star',color:'#EC536E'},join:{label:'已滿員',disabled:true}}];});
  const tabs=await page.evaluate(()=>playerVisibleTabs().map(t=>t[0]));expect(tabs.indexOf('team-preview')+1).toBe(tabs.indexOf('shop'));
  await page.locator('.player-shell [data-tab="team-preview"]').first().click();
- const table=page.locator('.team-lobby-table');await expect(table.locator('tbody tr')).toHaveCount(2);
+ const list=page.locator('.team-lobby-list'),items=list.locator('.team-lobby-item');await expect(items).toHaveCount(2);
  const search=page.locator('[data-team-form="search"]');await expect(search.locator('[name="query"]')).toHaveValue('');
+ await expect(search.locator('[name="mode"]')).not.toBeVisible();await expect(search.locator('[name="sort"]')).not.toBeVisible();
+ await expect(items.first().getByRole('button',{name:'我的戰隊',exact:true})).not.toBeVisible();
  for(const width of [320,390,430,1280]){
   await page.setViewportSize({width,height:900});
-  const bounds=await table.evaluate(t=>({width:t.getBoundingClientRect().width,parent:t.parentElement.getBoundingClientRect().width,overflow:[...t.querySelectorAll('td')].filter(c=>c.scrollWidth>c.clientWidth+1).map(c=>c.dataset.label),mode:getComputedStyle(t.querySelector('tbody tr')).display}));
-  if(width<=640){expect(bounds.width).toBeLessThanOrEqual(bounds.parent+1);expect(bounds.mode).toBe('grid');expect(bounds.overflow).toEqual([]);}
-  else expect(bounds.mode).toBe('table-row');
-  if(width===390)await page.screenshot({path:testInfo.outputPath('team-lobby-390.png'),fullPage:true});
-  const oneLine=await table.locator('tbody tr').first().locator('[data-label="隊長"]').evaluate(td=>{const r=document.createRange();r.selectNodeContents(td);return r.getClientRects().length;});expect(oneLine).toBe(1);
+  const bounds=await list.evaluate(t=>({width:t.getBoundingClientRect().width,parent:t.parentElement.getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth,summary:t.querySelector('summary').getBoundingClientRect().height,toolbar:document.querySelector('.team-search-bar').getBoundingClientRect().height,firstTop:t.querySelector('summary').getBoundingClientRect().top}));
+  expect(bounds.width).toBeLessThanOrEqual(bounds.parent+1);expect(bounds.overflow).toBe(false);expect(bounds.toolbar).toBeLessThan(65);expect(bounds.firstTop).toBeLessThan(650);
+  if(width===390)await page.screenshot({path:testInfo.outputPath('team-lobby-simple-390.png'),fullPage:true});
  }
+ await items.first().locator('summary').click();await expect(items.first().getByText('黑爸',{exact:true})).toBeVisible();await expect(items.first().getByRole('button',{name:'我的戰隊',exact:true})).toBeVisible();
+ await items.first().locator('summary').press('Enter');await expect(items.first().getByText('黑爸',{exact:true})).not.toBeVisible();
+ await search.getByRole('button',{name:'設定',exact:true}).click();await expect(search.locator('[name="mode"]')).toBeVisible();
  await search.locator('[name="query"]').fill('BXH');await search.locator('[name="mode"]').selectOption('review');await search.getByRole('button',{name:'搜尋',exact:true}).click();
  await expect(search.locator('[name="query"]')).toHaveValue('BXH');await expect(search.locator('[name="mode"]')).toHaveValue('review');
  expect(await page.evaluate(()=>teamFixture.calls.filter(c=>c.name==='teamRead'&&c.p.action==='list').at(-1).p.query.query)).toBe('BXH');
+ if(await search.locator('#team-search-settings').isHidden())await search.getByRole('button',{name:'設定',exact:true}).click();
  await search.getByRole('button',{name:'清除篩選',exact:true}).click();await expect(search.locator('[name="query"]')).toHaveValue('');
  await page.evaluate(()=>{window.BXH_TEAM_FULL_ENABLED=false;render();});await expect(page.locator('[data-tab="team-preview"]')).toHaveCount(0);expect(errors).toEqual([]);
 });
@@ -138,4 +142,21 @@ test('pending applications mark team navigation and remain after reading mail un
  await page.evaluate(()=>BXHTeamAttention.refresh());await expect(page.locator('[data-team-pending-badge]')).toHaveCount(3);
  await page.evaluate(()=>{pending=false;return BXHTeamAttention.refresh()});await expect(page.locator('[data-team-pending-badge]')).toHaveCount(0);
  await page.evaluate(()=>{userProfile.active=false;BXHTeamAttention.sync()});await expect(page.locator('[data-team-pending-badge]')).toHaveCount(0);
+});
+
+test('my team settings stay collapsed until needed and the current second-level tab lights up',async({page})=>{
+ const errors=await open(page,'player');
+ await page.evaluate(()=>{teamFixture.created={id:'bxh',name:'BXH',role:'captain',memberCount:3,capacity:10,level:1,totalXp:0,currentXp:0,nextXp:3,unlockedFrames:[]};const original=engagementService.tournamentOperation;engagementService.tournamentOperation=async(name,p)=>{if(name==='teamRead'&&p.action==='members')return {id:'bxh',name:'BXH',members:[{uid:'fixture-admin',name:'黑爸',role:'captain'}]};if(name==='teamRead'&&['applications','history'].includes(p.action))return {items:[],hasMore:false};return original(name,p);};});
+ await page.locator('.player-shell [data-tab="team-preview"]').first().click();
+ const tabs=page.locator('.bxh-team-tabs'),mine=tabs.getByRole('button',{name:'我的戰隊',exact:true});
+ await expect(tabs.locator('[aria-current="page"]')).toHaveText('戰隊大廳');
+ await mine.click();await expect(page.getByRole('heading',{name:'我的戰隊',exact:true})).toBeVisible();await expect(tabs.locator('[aria-current="page"]')).toHaveCount(1);await expect(mine).toHaveAttribute('aria-pressed','true');expect(await mine.evaluate(b=>getComputedStyle(b).boxShadow)).not.toBe('none');
+ const settings=page.locator('.team-my-settings');await expect(settings).not.toHaveAttribute('open','');await expect(settings.locator('[data-team-form="frame"]')).not.toBeVisible();await expect(settings.locator('[data-team-emblem]')).not.toBeVisible();await expect(settings.locator('[data-team-form="admission"]')).not.toBeVisible();
+ await settings.locator('summary').click();await expect(settings.locator('[data-team-form="frame"]')).toBeVisible();await expect(settings.locator('[data-team-emblem]')).toBeVisible();await expect(settings.locator('[data-team-form="admission"]')).toBeVisible();
+ await mine.click();await expect(settings).toHaveAttribute('open','');await settings.locator('summary').press('Enter');await expect(settings).not.toHaveAttribute('open','');
+ await page.getByRole('button',{name:'查看戰隊成員',exact:true}).click();await expect(page.getByRole('heading',{name:'戰隊成員',exact:true})).toBeVisible();await expect(tabs.locator('[aria-current="page"]')).toHaveText('我的戰隊');await page.getByRole('button',{name:'返回我的戰隊',exact:true}).click();
+ await page.getByRole('button',{name:'查看加入申請',exact:true}).click();await expect(page.getByRole('heading',{name:'加入申請',exact:true})).toBeVisible();await expect(tabs.locator('[aria-current="page"]')).toHaveText('我的戰隊');await page.getByRole('button',{name:'返回我的戰隊',exact:true}).click();
+ await tabs.getByRole('button',{name:'建立戰隊',exact:true}).click();await expect(tabs.locator('[aria-current="page"]')).toHaveText('建立戰隊');
+ for(const width of [320,390,430]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+ expect(errors).toEqual([]);
 });

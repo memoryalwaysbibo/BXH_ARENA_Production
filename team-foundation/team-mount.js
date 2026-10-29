@@ -2,13 +2,22 @@
 'use strict';
 function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamController}){
  if(!container||!ui||!controllers)throw Error('team-components-required');
+ let membersTab='lobby',settingsTeamId=null,mineSettingsOpen=false;
  let previewVersion=0,previewUrl=null,previewBlob=null,previewTeam=null,creating=false,creationAlert=null;
  function clearPreview(){previewVersion++;previewBlob=null;previewTeam=null;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
+  const mineSettings=container.querySelector?.('details[data-team-settings-id]');
+  if(mineSettings?.dataset?.teamSettingsId){settingsTeamId=mineSettings.dataset.teamSettingsId;mineSettingsOpen=mineSettings.open===true;}
+  if(state.screen!=='mine'){settingsTeamId=null;mineSettingsOpen=false;}
+  const openTeams=new Set(Array.from(container.querySelectorAll?.('.team-lobby-item[open]')||[]).map(el=>el.dataset.teamId));
+  const settingsOpen=container.querySelector?.('[data-team-action="filters"]')?.getAttribute?.('aria-expanded')==='true';
   if(state.screen!=='mine'||state.team?.id!==previewTeam||state.busy)clearPreview();
-  container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':['mine','applications','history','manage'].includes(state.screen)?'mine':'lobby')+(state.screen==='manage'&&state.loading?'<p role="status">正在載入成員…</p>':state.screen==='manage'&&!state.loaded?'<section><h2>管理成員</h2><button type="button" data-team-action="reload-manage">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='manage'?ui.manageMembers(state.team):state.screen==='history'&&state.loading?'<p role="status">正在載入戰隊紀錄…</p>':state.screen==='history'&&!state.loaded?'<section><h2>戰隊紀錄</h2><button type="button" data-team-action="reload-history">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='history'?ui.history({items:state.items,nextCursor:state.historyNextCursor,page:state.historyPage}):state.screen==='applications'&&state.loading?'<p role="status">正在載入加入申請…</p>':state.screen==='applications'&&!state.loaded?'<section><h2>加入申請</h2><button type="button" data-team-action="reload-applications">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='applications'&&!state.loading&&state.loaded?ui.applications({items:state.items,hasMore:state.hasMore,nextCursor:state.applicationsNextCursor,page:state.applicationsPage,teamId:state.applicationsTeamId}):state.screen==='create'&&!state.loading&&state.loaded?ui.createTeam(state.team,state.creationCapacity):state.screen==='mine'&&!state.loading&&state.loaded?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&state.loaded&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query,query:typeof state.query?.query==='string'?state.query.query:'',error:state.loaded?null:state.error}));
+  container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':['mine','applications','history','manage'].includes(state.screen)?'mine':state.screen==='members'?membersTab:'lobby')+(state.screen==='manage'&&state.loading?'<p role="status">正在載入成員…</p>':state.screen==='manage'&&!state.loaded?'<section><h2>管理成員</h2><button type="button" data-team-action="reload-manage">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='manage'?ui.manageMembers(state.team):state.screen==='history'&&state.loading?'<p role="status">正在載入戰隊紀錄…</p>':state.screen==='history'&&!state.loaded?'<section><h2>戰隊紀錄</h2><button type="button" data-team-action="reload-history">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='history'?ui.history({items:state.items,nextCursor:state.historyNextCursor,page:state.historyPage}):state.screen==='applications'&&state.loading?'<p role="status">正在載入加入申請…</p>':state.screen==='applications'&&!state.loaded?'<section><h2>加入申請</h2><button type="button" data-team-action="reload-applications">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='applications'&&!state.loading&&state.loaded?ui.applications({items:state.items,hasMore:state.hasMore,nextCursor:state.applicationsNextCursor,page:state.applicationsPage,teamId:state.applicationsTeamId}):state.screen==='create'&&!state.loading&&state.loaded?ui.createTeam(state.team,state.creationCapacity):state.screen==='mine'&&!state.loading&&state.loaded?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&state.loaded&&state.team?'<button type="button" data-team-action="back">'+(membersTab==='mine'?'返回我的戰隊':'返回戰隊大廳')+'</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query,query:typeof state.query?.query==='string'?state.query.query:'',error:state.loaded?null:state.error}));
+  for(const el of container.querySelectorAll?.('.team-lobby-item')||[])if(openTeams.has(el.dataset.teamId))el.open=true;
+  if(settingsOpen){const panel=container.querySelector('#team-search-settings'),toggle=container.querySelector('[data-team-action="filters"]');if(panel&&toggle){panel.hidden=false;toggle.setAttribute('aria-expanded','true');}}
   if(previewUrl&&previewBlob){const img=container.querySelector('[data-emblem-preview]'),button=container.querySelector('[data-team-action="emblem-upload"]');if(img){img.src=previewUrl;img.hidden=false;}if(button)button.disabled=false;}
+  const currentSettings=container.querySelector?.('details[data-team-settings-id]');if(currentSettings&&mineSettingsOpen&&state.team?.id===settingsTeamId)currentSettings.open=true;
   root.BXHTeamAttention?.sync();
   if(state.busy)for(const button of container.querySelectorAll('button'))button.disabled=true;
   if(state.pending){const retry=container.ownerDocument.createElement('button');retry.type='button';retry.dataset.teamAction='retry';retry.textContent='重試上一筆操作';retry.disabled=state.busy||state.loading;container.append(retry);}
@@ -17,7 +26,9 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  const click=async event=>{
   const button=event.target.closest('[data-team-action]');if(!button||!container.contains(button)||button.disabled)return;
   const action=button.dataset.teamAction,id=button.dataset.teamId;
-  if(action==='retry')await controller.retryPending();
+  if(action==='filters'){const panel=container.querySelector('#team-search-settings');if(panel){panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));}return;}
+  if(action==='mine')await controller.mine();
+  else if(action==='retry')await controller.retryPending();
   else if(action==='emblem-upload'){
    const team=controller.snapshot().team,version=previewVersion,blob=previewBlob;if(!blob||team?.role!=='captain'||!team.id)return;
    button.disabled=true;
@@ -29,7 +40,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
   else if(action==='tab'&&button.dataset.value==='mine')await controller.mine();
   else if(action==='tab'&&button.dataset.value==='create')await controller.create();
   else if(action==='tab'&&button.dataset.value==='lobby')await controller.search(controller.snapshot().query);
-  else if(action==='view')await controller.view(id);
+  else if(action==='view'){membersTab=controller.snapshot().screen==='mine'?'mine':'lobby';await controller.view(id);}
   else if(action==='manage')await controller.manage(id);
   else if(action==='reload-manage')await controller.manage(controller.snapshot().managementTeamId);
   else if(action==='history')await controller.history(id);
@@ -45,7 +56,7 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
   else if(action==='transfer'){if(typeof root.confirm==='function'&&root.confirm('確定將隊長轉交給 '+button.dataset.targetName+'？轉交後你將成為一般隊員。'))await controller.operate('transfer',id,{targetUid:button.dataset.targetUid});}
   else if(action==='approve'||action==='reject'){await controller.operate(action,id,{targetUid:button.dataset.targetUid});void root.BXHTeamAttention?.refresh();}
   else if(action==='clear')await controller.clear();
-  else if(action==='back')await controller.search(controller.snapshot().query);
+  else if(action==='back'){if(membersTab==='mine')await controller.mine();else await controller.search(controller.snapshot().query);}
   else if(action==='join'||action==='apply'||action==='cancel')await controller.operate(action,id);
  };
  const submit=async event=>{
