@@ -127,6 +127,7 @@ function createTeamController({api,emblems=root.BXHTeamEmblem,onChange=()=>{},ne
    const result=action==='emblem'?await api.uploadEmblem(emblemPayload):await api.command(payload);
    if(result?.ok!==true)throw Error('command-failed');
    pendingPayload=null;state.pending=false;
+   if(typeof window!=='undefined'&&typeof window.dispatchEvent==='function')window.dispatchEvent(new Event('bxh-team-changed'));
    if(!disposed&&generation===requestGeneration){if(payload.action==='remove'||payload.action==='assign')await load('manage',{teamId:payload.teamId});else if(payload.action==='approve'||payload.action==='reject')await load('applications',{teamId:payload.teamId,...(applicationCursors.at(-1)?{cursor:applicationCursors.at(-1)}:{})});else if(payload.action==='rename'||payload.action==='admission'||payload.action==='frame'||payload.action==='emblem-preset'||payload.action==='emblem'||payload.action==='create'||payload.action==='transfer'||payload.action==='leave'||payload.action==='dissolve')await load('mine',{});else await search(state.query);}
    return {ok:true};
   }catch(error){
