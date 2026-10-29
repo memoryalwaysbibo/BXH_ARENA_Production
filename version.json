@@ -1,6 +1,6 @@
 {
-  "build": "20261029.3",
-  "version": "v14.3.41",
-  "updatedAt": "2026-10-28T19:20:36.190272+00:00",
-  "releaseTrigger": "remove-board-reshuffle"
+  "build": "20261029.4",
+  "version": "v14.3.42",
+  "updatedAt": "2026-10-28T23:51:18.444568+00:00",
+  "releaseTrigger": "onsite-settings-lock-feedback"
 }

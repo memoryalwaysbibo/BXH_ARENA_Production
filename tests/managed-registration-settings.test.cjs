@@ -86,3 +86,21 @@ test('failed completion preserves a newer same-room snapshot',async()=>{
  const {ctx,calls}=savingContext();let finish;ctx.saveState=()=>new Promise(r=>finish=r);vm.runInContext(fn('saveRegistrationSettingsAndReport'),ctx);
  const pending=ctx.saveRegistrationSettingsAndReport({name:'old'},'saved');ctx.state=clone(ctx.state);ctx.state.meta.name='remote';finish(false);assert.equal(await pending,false);assert.equal(ctx.state.meta.name,'remote');assert.equal(calls.reset,0);
 });
+
+test('active draw rejects stale settings and publish actions before state changes',()=>{
+ const a=core.indexOf('function handleAction(action, target){'),b=core.indexOf("  if(action==='bracket-commit-submit')",a);
+ const guard=core.slice(a,b)+'globalThis.reached=true;}';
+ for(const finalized of [false,true])for(const action of ['save-meta','save-registration-settings','open-registration-publish-preview','community-save-settings','toggle-event-cancelled']){
+  const state={onsiteWaitlistServerOwned:true,onsiteWaitlistFinalized:finalized,meta:{registrationCapacity:32}},before=clone(state),toasts=[];
+  const ctx=vm.createContext({state,showToast:x=>toasts.push(x),reached:false});
+  vm.runInContext(fn('onsiteRegistrationSettingsLocked')+'\n'+guard,ctx);ctx.handleAction(action,{});
+  assert.deepEqual(state,before);assert.equal(ctx.reached,finalized,action);assert.equal(toasts.length,finalized?0:1);
+ }
+});
+test('publish button stays visible but disabled until the managed draw is finalized',()=>{
+ const ctx=vm.createContext({state:{cloudCode:'ROOM',onsiteWaitlistServerOwned:true,onsiteWaitlistFinalized:false,meta:{publishedAt:1}}});
+ vm.runInContext(fn('onsiteRegistrationSettingsLocked')+'\n'+fn('renderTournamentPublishAction'),ctx);
+ assert.match(ctx.renderTournamentPublishAction(false),/disabled/);assert.match(ctx.renderTournamentPublishAction(false),/暫停發布/);
+ ctx.state.onsiteWaitlistFinalized=true;assert.doesNotMatch(ctx.renderTournamentPublishAction(false),/disabled/);
+ assert.equal(ctx.renderTournamentPublishAction(true),'');
+});
