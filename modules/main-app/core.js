@@ -12571,6 +12571,30 @@ async function peoplePromoteOnline(registrationId,name,expandBy=0){
     showToast(peopleMutationErrorMessage(e),true);render();
   }
 }
+async function peopleQuickAddPlayers(lines){
+  if(peopleRosterBusy||state.startedAt)return false;
+  const room=state,code=state.cloudCode,addedIds=new Set(),defaultChecked=!state.meta.checkinRequired;
+  peopleRosterBusy=true;
+  try{
+    lines.forEach(name=>{const id=uid("guest");addedIds.add(id);room.players.push({id,name:name.replace(/（現場）$/,""),checkedIn:defaultChecked,source:"onsite",participantType:"onsite_guest",accountLinked:false,playerUid:null,playerId:null,ladderEligible:false,activityEligible:false});});
+    render();
+    const saved=await saveState();
+    if(state!==room||state.cloudCode!==code)return false;
+    if(saved!==true){
+      const reason=String(window.__BXH_LAST_CLOUD_ERROR_CODE||"");
+      if(["permission-denied","registration-roster-stale","onsite-runtime-stale"].includes(reason)){
+        room.players=room.players.filter(p=>!addedIds.has(p.id));
+        await saveRecord(cloneStateForSave(room));
+      }
+      showToast("現場新增尚未確認儲存成功，請同步名單確認。",true);
+      return false;
+    }
+    const input=document.getElementById("quick-add-textarea");if(input)input.value="";
+    showToast("已新增 "+lines.length+" 位選手"+(defaultChecked?"，已完成報到":"，尚未報到"));
+    return true;
+  }catch(e){showToast("現場新增未完成，請同步名單確認。",true);return false;}
+  finally{peopleRosterBusy=false;render();}
+}
 async function peopleDemoteOnline(player){
   if(peopleRosterBusy)return;
   peopleRosterBusy=true;render();
@@ -23457,25 +23481,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const ta = document.getElementById("quick-add-textarea");
     const lines = ta.value.split(/\r\n|\r|\n/).map(s=>s.trim()).filter(Boolean);
     if(lines.length===0){ showToast("請至少輸入一位選手", true); return; }
-    const defaultChecked = !state.meta.checkinRequired;
-    lines.forEach(name=>{
-      state.players.push({
-        id:uid("guest"),
-        name:name.replace(/（現場）$/,""),
-        checkedIn:defaultChecked,
-        source:"onsite",
-        participantType:"onsite_guest",
-        accountLinked:false,
-        playerUid:null,
-        playerId:null,
-        ladderEligible:false,
-        activityEligible:false
-      });
-    });
-    if(document.getElementById("quick-add-textarea")) document.getElementById("quick-add-textarea").value = "";
-    state.testDataDismissed = true;
-    saveState(); render();
-    showToast("已新增 " + lines.length + " 位選手" + (defaultChecked ? "，已完成報到" : "，尚未報到"));
+    void peopleQuickAddPlayers(lines);
     return;
   }
   if(action==="toggle-checkin-btn"){

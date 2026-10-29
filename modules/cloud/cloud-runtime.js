@@ -1456,6 +1456,21 @@
         const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
         if(tourSnap.exists()&&pubSnap.exists()){
           const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+          if(tour.refereeSeatsV1?.version===1&&tour.eventAuthority==="official"&&tour.createdByRole!=="partner_organizer"&&tour.battleMode!=="team"&&pub.battleMode!=="team"){
+            // Seat Rules intentionally forbid non-creator browser runtime writes.
+            // Send intent only; the trusted transaction owns roster/counter changes.
+            try{
+              const result=await callEngagementFunction("promoteSeatedRegistration",{code:eventCode,registrationId:regId,expandBy,operationId:crypto.randomUUID()},60000);
+              if(result?.ok!==true||result?.verified!==true||!result.state)throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+              return result;
+            }catch(error){
+              const reason=String(error?.message||"");
+              for(const domain of ["capacity-full","not-waitlist","bracket-locked","selection-managed","onsite-waitlist-managed","registration-state-conflict","qr-checkin-stale","court-lifecycle-stale"]){
+                if(reason.includes(domain)){error.code=domain;break;}
+              }
+              throw error;
+            }
+          }
           unlimitedPromotion=tour.eventAuthority==="community"&&tour.communityQuickRegistration===true&&tour.capacity===null&&pub.eventAuthority==="community"&&pub.communityQuickRegistration===true&&pub.capacity===null;
         }
         if(unlimitedPromotion&&expandBy!==0)throw Object.assign(new Error("invalid-capacity-step"),{code:"invalid-capacity-step"});
