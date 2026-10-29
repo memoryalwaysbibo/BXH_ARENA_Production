@@ -153,3 +153,8 @@ test('lobby never stringifies a filter object into its search field',()=>{
  assert.doesNotMatch(ui.lobby({query:{}}),/\[object Object\]/);
  assert.match(ui.lobby({query:'BXH'}),/name="query"[^>]*value="BXH"/);
 });
+
+test('review-only real names are escaped, missing values are explicit, and public rosters exclude them',()=>{
+ const app=ui.applications({teamId:'t',items:[{uid:'a',name:'暱稱',realName:'<img onerror=bad>'},{uid:'b',name:'無本名'}]});assert.match(app,/本名：&lt;img/);assert.doesNotMatch(app,/<img onerror/);assert.match(app,/本名：尚未填寫/);
+ assert.doesNotMatch(ui.publicMembers({name:'隊伍',members:[{name:'暱稱',realName:'PRIVATE_NAME',role:'member'}]}),/PRIVATE_NAME/);
+});
