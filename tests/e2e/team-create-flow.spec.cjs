@@ -202,3 +202,21 @@ test('team member columns keep horizontal role labels and two-line headings on n
  }
  await table.locator('..').screenshot({path:'test-results/team-members-mobile.png'});expect(errors).toEqual([]);
 });
+
+test('captain renames inside settings then sees the server seven-day cooldown',async({page})=>{
+ const errors=await open(page);
+ await page.evaluate(()=>{
+  teamFixture.created={id:'bxh',name:'BXH',role:'captain',memberCount:2,capacity:10,level:1,totalXp:0,currentXp:0,nextXp:3,unlockedFrames:[],rename:{canRename:true,nextAllowedAt:null,cooldownDays:7}};
+  const original=engagementService.tournamentOperation;
+  engagementService.tournamentOperation=async(name,p)=>{
+   if(name==='teamCommand'&&p.action==='rename'){teamFixture.calls.push({name,p});teamFixture.created.name=p.name;teamFixture.created.rename={canRename:false,nextAllowedAt:Date.UTC(2026,10,5,4),cooldownDays:7};return {ok:true};}
+   return original(name,p);
+  };
+ });
+ await page.locator('[data-management-v2-group="team"]').click();await page.getByRole('button',{name:'我的戰隊',exact:true}).click();
+ const form=page.locator('[data-team-form="rename"]');await expect(form).toBeHidden();await page.locator('.team-my-settings>summary').click();await expect(form).toBeVisible();
+ await form.locator('[name="name"]').fill('BXH 新戰隊');await form.getByRole('button',{name:'修改名稱',exact:true}).click();
+ await expect(page.locator('#bxh-team-full-slot')).toContainText('BXH 新戰隊');await expect(page.locator('#bxh-team-full-slot')).toContainText('2026/11/05 12:00');await expect(form.getByRole('button',{name:'修改名稱',exact:true})).toBeDisabled();
+ const commands=await page.evaluate(()=>teamFixture.calls.filter(c=>c.name==='teamCommand'));expect(commands).toHaveLength(1);expect(commands[0].p.name).toBe('BXH 新戰隊');expect(commands[0].p.nameChangedAt).toBeUndefined();
+ await page.evaluate(()=>{teamFixture.created.role='deputy';});await page.getByRole('button',{name:'我的戰隊',exact:true}).click();await expect(page.locator('[data-team-form="rename"]')).toHaveCount(0);expect(errors).toEqual([]);
+});

@@ -158,3 +158,11 @@ test('review-only real names are escaped, missing values are explicit, and publi
  const app=ui.applications({teamId:'t',items:[{uid:'a',name:'暱稱',realName:'<img onerror=bad>'},{uid:'b',name:'無本名'}]});assert.match(app,/本名：&lt;img/);assert.doesNotMatch(app,/<img onerror/);assert.match(app,/本名：尚未填寫/);
  assert.doesNotMatch(ui.publicMembers({name:'隊伍',members:[{name:'暱稱',realName:'PRIVATE_NAME',role:'member'}]}),/PRIVATE_NAME/);
 });
+
+test('rename is captain-only, disabled without server readiness, and shows the Taipei cooldown deadline',()=>{
+ const team={id:'t',name:'BXH',role:'captain',memberCount:2};
+ assert.match(ui.myTeam({...team,rename:{canRename:true,nextAllowedAt:null,cooldownDays:7}}),/data-team-form="rename"/);
+ assert.match(ui.myTeam({...team,rename:{canRename:false,nextAllowedAt:Date.UTC(2026,10,5,4),cooldownDays:7}}),/2026\/11\/05 12:00/);
+ assert.match(ui.myTeam(team),/改名功能暫時無法確認/);
+ for(const role of ['deputy','member'])assert.doesNotMatch(ui.myTeam({...team,role,rename:{canRename:true}}),/data-team-form="rename"/);
+});
