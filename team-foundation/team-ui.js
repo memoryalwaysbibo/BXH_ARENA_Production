@@ -60,8 +60,12 @@ function applicationDateTime(value){
  return {date:get('year')+'/'+get('month')+'/'+get('day'),time:get('hour')+':'+get('minute')};
 }
 function applications({items=[],hasMore=false,nextCursor=null,page=1,teamId}){
- const rows=items.map(a=>{const when=applicationDateTime(a.requestedAt);return '<li><span>'+esc(a.name)+'</span><div class="team-applicant-real-name">本名：'+esc(typeof a.realName==='string'&&a.realName.trim()?a.realName.trim():'尚未填寫')+'</div> <button type="button" data-action="card-open" data-uid="'+esc(a.uid)+'" aria-label="查看 '+esc(a.name)+' 的玩家名片">查看名片</button><div>申請日期：'+esc(when.date)+'</div><div>申請時間：'+esc(when.time)+'</div>'+(a.hasTeam===true?'<p>已有所屬戰隊，無法核准加入。</p>':'')+' <button type="button" data-team-action="approve" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'"'+(a.hasTeam===true?' disabled':'')+'>核准</button> <button type="button" data-team-action="reject" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">拒絕</button></li>';}).join('');
- return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button><button type="button" data-team-action="reload-applications">重新整理名單</button>'+(items.length?'<ul>'+rows+'</ul>':'<p>這一頁沒有待審核的申請。</p>')+'<p>第 '+esc(page)+' 頁</p>'+(page>1?'<button type="button" data-team-action="applications-previous">上一頁</button>':'')+(nextCursor?'<button type="button" data-team-action="applications-next">下一頁</button>':hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
+ const rows=items.map((a,index)=>{
+  const when=applicationDateTime(a.requestedAt),realName=typeof a.realName==='string'&&a.realName.trim()?a.realName.trim():null;
+  const detailId='team-application-detail-'+esc(page)+'-'+index;
+  return '<li class="team-application-item"><div class="team-application-row"><span class="team-application-number">'+esc((page-1)*20+index+1)+'</span><span class="team-application-name">'+esc(realName||a.name)+(realName?'':'<small>（暱稱）</small>')+'</span><button type="button" data-team-action="approve" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'"'+(a.hasTeam===true?' disabled':'')+'>核准</button><button type="button" data-team-action="reject" data-team-id="'+esc(teamId)+'" data-target-uid="'+esc(a.uid)+'">拒絕</button><button type="button" data-team-action="application-details" aria-expanded="false" aria-controls="'+detailId+'" aria-label="查看 '+esc(realName||a.name)+' 的申請詳情">詳細<span aria-hidden="true">⌄</span></button></div><div class="team-application-detail" id="'+detailId+'" hidden><div>暱稱：'+esc(a.name)+'</div><div class="team-applicant-real-name">本名：'+esc(realName||'尚未填寫')+'</div><button type="button" data-action="card-open" data-uid="'+esc(a.uid)+'" aria-label="查看 '+esc(a.name)+' 的玩家名片">查看名片</button><div>申請日期：'+esc(when.date)+'</div><div>申請時間：'+esc(when.time)+'</div>'+(a.hasTeam===true?'<p>已有所屬戰隊，無法核准加入。</p>':'')+'</div></li>';
+ }).join('');
+ return '<section class="bxh-team-ui"><h2>加入申請</h2><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button><button type="button" data-team-action="reload-applications">重新整理名單</button>'+(items.length?'<div class="team-application-list" role="group" aria-label="待審核申請"><div class="team-application-head" aria-hidden="true"><span>No</span><span>姓名</span><span>核准</span><span>拒絕</span><span>詳細</span></div><ol>'+rows+'</ol></div>':'<p>這一頁沒有待審核的申請。</p>')+'<p>第 '+esc(page)+' 頁</p>'+(page>1?'<button type="button" data-team-action="applications-previous">上一頁</button>':'')+(nextCursor?'<button type="button" data-team-action="applications-next">下一頁</button>':hasMore?'<p>還有其他申請，處理目前名單後可繼續查看。</p>':'')+'</section>';
 }
 function presetFields(value){let p;try{p=presets.normalize(value??undefined);}catch{p=presets.normalize();}return '<label>系統隊徽<select name="presetId">'+presets.choices.map(x=>option(x.id,x.name,p.id)).join('')+'</select></label><label>隊徽顏色<input type="color" name="presetColor" value="'+p.color+'"></label><div>'+presets.choices.map(x=>presets.render({id:x.id,color:p.color})).join('')+'</div>'; }
 function createTeam(team,capacity=null){
@@ -79,6 +83,21 @@ const responsiveCss=`
 @media(max-width:360px){.bxh-team-ui .team-members-table{font-size:11px}}
 .bxh-team-ui .team-members-note{font-size:12px;opacity:.7;margin:8px 0}
 .bxh-team-ui .team-applicant-real-name{font-size:14px;overflow-wrap:anywhere}
+.bxh-team-ui .team-application-list{min-width:0;margin-top:16px}
+.bxh-team-ui .team-application-list ol{list-style:none;margin:0;padding:0}
+.bxh-team-ui .team-application-head,.bxh-team-ui .team-application-row{display:grid;grid-template-columns:24px minmax(0,1fr) 44px 44px 48px;gap:4px;align-items:center;min-width:0}
+.bxh-team-ui .team-application-head{padding:8px 6px;font-size:12px;opacity:.7;text-align:center}
+.bxh-team-ui .team-application-head span:nth-child(2){text-align:left}
+.bxh-team-ui .team-application-item{border-top:1px solid rgba(180,180,180,.25);padding:6px;min-width:0}
+.bxh-team-ui .team-application-row{font-size:13px}
+.bxh-team-ui .team-application-name{min-width:0;overflow-wrap:anywhere;font-weight:600}
+.bxh-team-ui .team-application-name small{display:block;font-size:11px;font-weight:400;opacity:.75}
+.bxh-team-ui .team-application-row button{min-width:0;width:100%;min-height:44px;padding:4px 2px;font-size:12px;white-space:nowrap}
+.bxh-team-ui .team-application-row [data-team-action="application-details"] span{margin-left:2px}
+.bxh-team-ui .team-application-row [aria-expanded="true"] span{display:inline-block;transform:rotate(180deg)}
+.bxh-team-ui .team-application-detail{padding:10px 6px 14px 28px;font-size:13px;overflow-wrap:anywhere}
+.bxh-team-ui .team-application-detail[hidden]{display:none}
+.bxh-team-ui .team-application-detail button{margin:6px 0}
 
 .bxh-team-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px;min-width:0}
 .bxh-team-tabs button{flex:1 1 auto;min-width:0;min-height:44px;padding:8px 12px;font:inherit;font-size:14px;line-height:1.4;white-space:nowrap}
@@ -115,3 +134,4 @@ const responsiveCss=`
 const api={tabs,rankingTabs,lobby,publicMembers,noTeam,myTeam,manageMembers,applications,history,createTeam,recruitmentSettings,css:css+responsiveCss};
 if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHTeamUI=api;
 })(typeof window==='object'?window:globalThis);
+

@@ -173,12 +173,20 @@ test('application reviewers open the correct public card without issuing a team 
  await page.locator('[data-management-v2-group="team"]').click();
  await page.getByRole('button',{name:'我的戰隊',exact:true}).click();
  await page.getByRole('button',{name:'查看加入申請',exact:true}).click();
- await expect(page.locator('#bxh-team-full-slot')).toContainText('本名：王小明');
+ const application=page.locator('.team-application-item');
+ await expect(application.locator('.team-application-number')).toHaveText('1');
+ await expect(application.locator('.team-application-name')).toHaveText('王小明');
+ await expect(application.locator('.team-application-detail')).toBeHidden();
+ await application.getByRole('button',{name:'查看 王小明 的申請詳情'}).click();
+ await expect(application.locator('.team-application-detail')).toContainText('本名：王小明');
  const card=page.getByRole('button',{name:'查看 申請玩家 的玩家名片',exact:true});await expect(card).toBeVisible();
  await card.click();await expect(page.getByRole('dialog',{name:'玩家名片'})).toContainText('BXH-00123');
  expect(await page.evaluate(()=>teamFixture.cardRequests)).toEqual([{action:'card',uid:'applicant-123'}]);
  await page.getByRole('button',{name:'關閉',exact:true}).click();
  await expect(page.getByRole('button',{name:'核准',exact:true})).toBeVisible();
+ await application.getByRole('button',{name:'查看 王小明 的申請詳情'}).click();
+ await expect(application.locator('.team-application-detail')).toBeHidden();
+ await application.getByRole('button',{name:'查看 王小明 的申請詳情'}).click();
  await page.evaluate(()=>{teamFixture.privateCard=true;});await page.getByRole('button',{name:'查看 申請玩家 的玩家名片',exact:true}).click();
  await expect(page.getByRole('dialog',{name:'玩家名片'})).toContainText('此玩家未公開名片');
  expect(await page.evaluate(()=>teamFixture.calls.filter(c=>c.name==='teamCommand'))).toEqual([]);expect(errors).toEqual([]);
@@ -220,3 +228,4 @@ test('captain renames inside settings then sees the server seven-day cooldown',a
  const commands=await page.evaluate(()=>teamFixture.calls.filter(c=>c.name==='teamCommand'));expect(commands).toHaveLength(1);expect(commands[0].p.name).toBe('BXH 新戰隊');expect(commands[0].p.nameChangedAt).toBeUndefined();
  await page.evaluate(()=>{teamFixture.created.role='deputy';});await page.getByRole('button',{name:'我的戰隊',exact:true}).click();await expect(page.locator('[data-team-form="rename"]')).toHaveCount(0);expect(errors).toEqual([]);
 });
+

@@ -26,6 +26,11 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  const click=async event=>{
   const button=event.target.closest('[data-team-action]');if(!button||!container.contains(button)||button.disabled)return;
   const action=button.dataset.teamAction,id=button.dataset.teamId;
+  if(action==='application-details'){
+   const detail=container.querySelector('#'+button.getAttribute('aria-controls'));
+   if(detail){detail.hidden=!detail.hidden;button.setAttribute('aria-expanded',String(!detail.hidden));}
+   return;
+  }
   if(action==='filters'){const panel=container.querySelector('#team-search-settings');if(panel){panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));}return;}
   if(action==='mine')await controller.mine();
   else if(action==='retry')await controller.retryPending();
@@ -122,3 +127,4 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
 }
 if(typeof module==='object'&&module.exports)module.exports={mount};else root.BXHTeamMount={mount};
 })(typeof window==='object'?window:globalThis);
+

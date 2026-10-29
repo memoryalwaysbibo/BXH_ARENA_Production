@@ -45,6 +45,23 @@ test('application list safely presents review actions and remaining count notice
  assert.ok(!html.includes('<script>'));assert.match(html,/data-team-action="approve"/);assert.match(html,/data-team-action="reject"/);assert.match(html,/還有其他申請/);
 });
 
+test('applications show numbered real names and collapsed details with accessible toggles',()=>{
+ const html=ui.applications({teamId:'t',page:2,items:[
+  {uid:'first',name:'CPK',realName:'陳霈楷',requestedAt:Date.parse('2026-10-29T07:39:00Z')},
+  {uid:'second',name:'玩家<二>',realName:null,hasTeam:true}
+ ]});
+ assert.match(html,/No<\/span><span>姓名<\/span><span>核准<\/span><span>拒絕<\/span><span>詳細/);
+ assert.match(html,/<span class="team-application-number">21<\/span><span class="team-application-name">陳霈楷<\/span>/);
+ assert.match(html,/<span class="team-application-number">22<\/span><span class="team-application-name">玩家&lt;二&gt;<small>（暱稱）<\/small>/);
+ assert.match(html,/aria-expanded="false" aria-controls="team-application-detail-2-0"/);
+ assert.match(html,/<div class="team-application-detail" id="team-application-detail-2-0" hidden>/);
+ assert.match(html,/暱稱：CPK/);
+ assert.match(html,/本名：陳霈楷/);
+ assert.match(html,/本名：尚未填寫/);
+ assert.match(html,/data-action="card-open" data-uid="first"/);
+ assert.ok(!html.includes('<二>'));
+});
+
 test('application date and time are displayed separately in Taipei time',()=>{
  const html=ui.applications({items:[{uid:'p',name:'小明',requestedAt:Date.parse('2026-10-27T07:30:00Z')}],teamId:'t'});
  assert.match(html,/申請日期：2026\/10\/27<\/div><div>申請時間：15:30/);
@@ -166,3 +183,4 @@ test('rename is captain-only, disabled without server readiness, and shows the T
  assert.match(ui.myTeam(team),/改名功能暫時無法確認/);
  for(const role of ['deputy','member'])assert.doesNotMatch(ui.myTeam({...team,role,rename:{canRename:true}}),/data-team-form="rename"/);
 });
+
