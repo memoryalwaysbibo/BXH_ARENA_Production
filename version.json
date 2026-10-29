@@ -1,6 +1,6 @@
 {
-  "build": "20261029.4",
+  "build": "20261030.1",
   "version": "v14.3.42",
-  "updatedAt": "2026-10-28T23:51:18.444568+00:00",
-  "releaseTrigger": "onsite-settings-lock-feedback"
+  "updatedAt": "2026-10-29T17:20:03.867Z",
+  "releaseTrigger": "ladder-team-display"
 }
