@@ -12644,7 +12644,7 @@ async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=sta
     }
     const normalizeName=name=>String(name||"").replace(/（現場）$/,"").normalize("NFKC").replace(/\s+/g,"").toLocaleLowerCase();
     const requested=new Set(lines.map(normalizeName));
-    const matches=(Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[])
+    const matches=(adminRosterCode===state.cloudCode&&Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[])
       .filter(row=>row&&!["cancelled","withdrawn"].includes(row.status)&&
         requested.has(normalizeName(row.realName||row.participantName||row.displayName||row.publicName)));
     const sameName=matches.length?Array.from(new Set(matches.map(row=>
