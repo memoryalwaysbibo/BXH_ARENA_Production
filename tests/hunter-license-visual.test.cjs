@@ -32,7 +32,7 @@ test('names and grade labels escape markup; unsafe avatar schemes fall back',()=
 });
 test('caller retains current grade and existing growth, with renderer before core',()=>{
  const core=fs.readFileSync('modules/main-app/core.js','utf8'),index=fs.readFileSync('index.html','utf8');
- assert.ok(core.includes('render({name:playerName,profile:p,currentGrade:licenseGrade})'));
+ assert.ok(core.includes('render({name:playerName,profile:p,currentGrade:licenseGrade,numberIdentity:hunterProfileCache?.numberIdentity,accountUid:currentAuthUid()})'));
  assert.ok(core.includes('displayGrade?.(licenseOverview,hunterProfileCache?.permanentLicense)||licenseOverview.grade'));
  assert.ok(core.includes('window.BXHArenaPK?.practiceGrowth?.(licenseOverview.growth)||licenseOverview.growth'));
  assert.ok(index.indexOf('hunter-license-visual.js?')<index.indexOf('modules/main-app/core.js?'));
