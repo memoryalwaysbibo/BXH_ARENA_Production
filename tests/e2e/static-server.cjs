@@ -18,6 +18,7 @@ const types = {
   '.svg':'image/svg+xml',
   '.png':'image/png',
   '.webp':'image/webp',
+  '.wasm':'application/wasm',
   '.ico':'image/x-icon',
   '.webmanifest':'application/manifest+json; charset=utf-8'
 };

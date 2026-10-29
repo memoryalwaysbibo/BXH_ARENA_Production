@@ -1,0 +1,33 @@
+name: Team emblem browser compatibility
+on:
+  pull_request:
+    paths:
+      - 'team-foundation/**'
+      - 'tests/e2e/team-create-flow.spec.cjs'
+      - 'tests/e2e/fixtures/team-emblem.jpg'
+      - 'tests/e2e/static-server.cjs'
+      - '.github/workflows/team-emblem.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  image-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated browser test runner
+        run: npm install --prefix /tmp/team-image-tests @playwright/test@1.55.0 --no-audit --no-fund
+      - name: Verify team image and create flows in desktop, WebKit iPhone and Android
+        env:
+          NODE_PATH: /tmp/team-image-tests/node_modules
+        run: node /tmp/team-image-tests/node_modules/playwright/cli.js test tests/e2e/team-create-flow.spec.cjs --project=desktop-chromium --project=iphone --project=android --retries=0
+      - name: Retain failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: team-image-failure
+          path: test-results/
+          retention-days: 7

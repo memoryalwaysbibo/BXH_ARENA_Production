@@ -2,7 +2,7 @@
 'use strict';
 function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamController}){
  if(!container||!ui||!controllers)throw Error('team-components-required');
- let previewVersion=0,previewUrl=null,previewBlob=null,previewTeam=null,creating=false;
+ let previewVersion=0,previewUrl=null,previewBlob=null,previewTeam=null,creating=false,creationAlert=null;
  function clearPreview(){previewVersion++;previewBlob=null;previewTeam=null;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
@@ -64,9 +64,9 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
    event.preventDefault();const data=new FormData(form),name=String(data.get('name')||'').trim();
    if(name.length<2||name.length>24){form.reportValidity();return;}
    if(!root.crypto?.randomUUID){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent='目前無法安全建立戰隊，請重新載入再試。';container.append(p);return;}
-   if(creating)return;creating=true;try{
+   if(creating)return;creationAlert?.remove?.();creationAlert=null;creating=true;try{
    const preset={id:String(data.get('presetId')||'shield'),color:String(data.get('presetColor')||'#EC536E')};
-   let base64=null;const file=data.get('customEmblem');if(file&&file.size>0){try{const blob=await root.BXHTeamEmblem.prepare(file),bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);base64=root.btoa(binary);}catch(_){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent='自訂圖片無法處理，請重新選擇。';container.append(p);return;}}
+   let base64=null;const file=data.get('customEmblem');if(file&&file.size>0){try{const blob=await root.BXHTeamEmblem.prepare(file),bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);base64=root.btoa(binary);}catch(_){const p=container.ownerDocument.createElement('p');p.setAttribute('role','alert');p.textContent='自訂圖片無法處理，請重新選擇。';creationAlert=p;container.append(p);return;}}
    if(controller.snapshot().screen!=='create'||controller.snapshot().team)return;
    const teamId=root.crypto.randomUUID(),result=await controller.operate('create',teamId,{name,preset});if(result.ok&&base64&&controller.snapshot().team?.id===teamId)await controller.operate('emblem',teamId,{base64});return;
    }finally{creating=false;}
