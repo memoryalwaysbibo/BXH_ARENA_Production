@@ -8,6 +8,8 @@ Scope: official, individual, seat-enabled non-partner rooms. Other rooms keep th
 
 Frontend onsite guest addition also waits for the save result before showing success; known permission/stale rejections remove only the IDs introduced by that operation.
 
-Validation: 24 local Firestore Emulator service cases; 33 frontend/new-route and existing roster cases. Synthetic data only. Local emulator v1.19.8; remote CI uses its own installed emulator. Production-room history has not been read or altered.
+Recovery: a session journal keeps the operation ID per account/room/registration/expansion across refreshes. Unknown results trigger a consistent read-only server transaction. A completed promotion syncs without another write; changed data requires cloud sync followed by explicit intent-only retry. Offline verification offers recheck or return and retains the intent. Cancelled/locked events and inconsistent mirrors cannot be overwritten. Superseded receipts require reconciliation. No whole-runtime force overwrite is offered.
+
+Validation: 26 local Firestore Emulator service cases; 44 frontend/recovery and existing roster cases, plus four reviewed Rules guard cases. Synthetic data only. Response loss and read failure are injected in tests; physical-device network throttling is not yet verified. Local emulator v1.19.8; remote CI uses its own installed emulator. Production-room history has not been read or altered.
 
 Release order: deploy only functions:registration-promotion using this directory's firebase.json, verify the exported callable is ACTIVE and rejects unauthenticated requests, then publish the frontend. The backend package is mirrored into BXH_ARENA_Functions_Production/release/registration-promotion for the deployment repository. Do not deploy historical referee-seat Rules or re-enable any release flags.

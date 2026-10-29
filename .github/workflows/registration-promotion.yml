@@ -1,7 +1,7 @@
 name: Seated registration promotion
 on:
   pull_request:
-    paths: ['registration-promotion/**', 'tests/seated-roster-promotion.test.cjs', 'tests/roster-sync-race.test.cjs', 'modules/cloud/cloud-runtime.js', 'modules/main-app/core.js', '.github/workflows/registration-promotion.yml']
+    paths: ['registration-promotion/**', 'tests/roster-recovery.test.cjs', 'tests/seated-roster-promotion.test.cjs', 'tests/roster-sync-race.test.cjs', 'modules/main-app/roster-recovery.js', 'modules/cloud/cloud-runtime.js', 'modules/main-app/core.js', '.github/workflows/registration-promotion.yml']
 permissions:
   contents: read
 jobs:
@@ -17,7 +17,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - run: node --test tests/seated-roster-promotion.test.cjs tests/roster-sync-race.test.cjs
+      - run: node --test tests/roster-recovery.test.cjs tests/seated-roster-promotion.test.cjs tests/roster-sync-race.test.cjs
       - run: npm install --prefix /tmp/promotion-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 @firebase/rules-unit-testing@4.0.1 firebase@11.10.0
       - name: Verify atomic promotion transactions
         env:

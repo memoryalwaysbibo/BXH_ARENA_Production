@@ -28,7 +28,15 @@ function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock()}={}){re
   if([t,pub].some(x=>x.systemClosed||x.eventCancelled||x.deletionStatus||x.tournamentPhase!=='waiting'||['completed','archived'].includes(x.archiveStatus))||state.meta?.eventCancelled||state.startedAt||state.bracketSize||['completed','archived'].includes(state.archiveStatus))fail('bracket-locked');
   if(t.registrationSelection||pub.registrationSelection||state.entrySelection?.mode==='registration')fail('selection-managed');
   if(t.onsiteWaitlistServerOwned||pub.onsiteWaitlistServerOwned||state.onsiteWaitlistServerOwned)fail('onsite-waitlist-managed');
-  if(os.exists){if(os.data().hash!==hash)fail('operation-conflict');return {...os.data().result,state,replayed:true};}
+  if(os.exists){
+   if(os.data().hash!==hash)fail('operation-conflict');
+   // A later demotion/cancellation supersedes this receipt. Never report an old
+   // success as the current result or silently promote again with the old intent.
+   const candidate=(state.players||[]).find(p=>String(p.registrationId||'')===d.registrationId);
+   const visible=candidate&&(mirror.players||[]).some(p=>String(p.id)===String(candidate.id));
+   if(reg.status!=='confirmed'||!visible||t.confirmedCount!==pub.confirmedCount||t.waitlistCount!==pub.waitlistCount)fail('operation-outdated');
+   return {...os.data().result,capacity:t.capacity,confirmedCount:t.confirmedCount,waitlistCount:t.waitlistCount,state,replayed:true};
+  }
   if(reg.status!=='waitlist')fail('not-waitlist');
   const capacity=t.capacity,confirmed=t.confirmedCount,waiting=t.waitlistCount;
   if(!Number.isSafeInteger(capacity)||capacity<1||!Number.isSafeInteger(confirmed)||confirmed<0||!Number.isSafeInteger(waiting)||waiting<1||pub.capacity!==capacity||pub.confirmedCount!==confirmed||pub.waitlistCount!==waiting||confirmed>capacity)fail('registration-state-conflict');

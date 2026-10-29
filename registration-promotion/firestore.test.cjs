@@ -49,3 +49,16 @@ test('concurrent promotions of the same candidate commit once',async()=>{
 test('existing online projection is moved once without duplicating the player',async()=>{
  const h=await fixture(),candidate=h.state.waitlistPlayers[0];h.state.players.push(candidate);await h.tr.update({data:JSON.stringify(h.state)});await h.run();const [t]=await h.snapshot(),s=JSON.parse(t.data);assert.equal(s.players.length,81);assert.equal(s.players.filter(p=>p.id==='candidate').length,1);assert.equal(s.waitlistPlayers.length,0);
 });
+test('lost success response retries the same receipt without a second admission',async()=>{
+ const h=await fixture();
+ await assert.rejects((async()=>{await h.run();throw Error('simulated response lost');})(),/response lost/);
+ const before=await h.snapshot(),result=await h.run();
+ assert.equal(result.replayed,true);assert.deepEqual(await h.snapshot(),before);assert.equal(result.confirmedCount,81);
+});
+test('a superseded receipt requires explicit reconciliation instead of replaying stale success',async()=>{
+ const h=await fixture();await h.run();
+ const [t,p]=await h.snapshot(),s=JSON.parse(t.data),m=JSON.parse(p.bracketView),candidate=s.players.pop();
+ s.waitlistPlayers.push(candidate);m.players=m.players.filter(p=>p.id!==candidate.id);
+ await Promise.all([h.tr.update({data:JSON.stringify(s),confirmedCount:80,waitlistCount:1}),h.pr.update({bracketView:JSON.stringify(m),confirmedCount:80,waitlistCount:1}),h.rr.update({status:'waitlist'})]);
+ const before=await h.snapshot();await assert.rejects(h.run(),/operation-outdated/);assert.deepEqual(await h.snapshot(),before);
+});

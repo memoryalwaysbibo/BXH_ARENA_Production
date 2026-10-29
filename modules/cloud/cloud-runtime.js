@@ -1437,6 +1437,31 @@
       return Object.assign({},result,{state:remoteState,verified:true});
     },
 
+    async readRegistrationRosterRecovery(code,registrationId){
+      const actor=authHandle?.currentUser?.uid;
+      if(!authReady||!actor)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
+      const eventCode=String(code||"").toUpperCase(),regId=String(registrationId||"");
+      if(!/^BXH-[A-Z0-9]{4,16}$/.test(eventCode)||!/^[A-Za-z0-9_-]{1,128}$/.test(regId))throw Error("invalid-request");
+      // A read-only transaction requires a server connection and one consistent
+      // snapshot. Cached or partially updated reads cannot resolve an unknown send.
+      const result=await fx.runTransaction(dbHandle,async tx=>{
+        const [ts,ps,rs]=await Promise.all([
+          tx.get(fx.doc(dbHandle,"tournaments",eventCode)),
+          tx.get(fx.doc(dbHandle,"publicTournaments",eventCode)),
+          tx.get(fx.doc(dbHandle,"tournaments",eventCode,"registrations",regId))
+        ]);
+        if(!ts.exists()||!ps.exists()||!rs.exists())throw Error("not-found");
+        const t=ts.data(),p=ps.data(),reg=rs.data();
+        let runtime,mirror;try{runtime=JSON.parse(t.data);mirror=JSON.parse(p.bracketView);}catch{throw Error("corrupt-state");}
+        const countsAgree=Number.isSafeInteger(t.confirmedCount)&&t.confirmedCount>=0&&Number.isSafeInteger(t.waitlistCount)&&t.waitlistCount>=0&&t.confirmedCount===p.confirmedCount&&t.waitlistCount===p.waitlistCount&&t.capacity===p.capacity;
+        const candidate=(runtime.players||[]).find(row=>String(row.registrationId||"")===regId);
+        const publicCandidate=!!candidate&&(mirror.players||[]).some(row=>String(row.id)===String(candidate.id));
+        const blocked=t.systemClosed||p.systemClosed||t.eventCancelled||p.eventCancelled||runtime.meta?.eventCancelled||runtime.startedAt||runtime.bracketSize||t.archiveStatus==="completed"||p.archiveStatus==="completed"||runtime.archiveStatus==="completed"||t.tournamentPhase!=="waiting"||p.tournamentPhase!=="waiting"||t.registrationSelection||p.registrationSelection||t.onsiteWaitlistServerOwned||p.onsiteWaitlistServerOwned||runtime.entrySelection?.mode==="registration";
+        return {state:runtime,registrationId:regId,status:reg.status,confirmedCount:t.confirmedCount,waitlistCount:t.waitlistCount,capacity:t.capacity,countsAgree,achieved:countsAgree&&reg.status==="confirmed"&&publicCandidate,retryable:countsAgree&&reg.status==="waitlist"&&!blocked,registrationChanges:[{registrationId:regId,status:reg.status}]};
+      });
+      if(actor!==authHandle?.currentUser?.uid)throw Error("stale-session");
+      return result;
+    },
     async mutateRegistrationRoster(code,registrationId,action,options={}){
       const staffUid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
       if(!staffUid)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
@@ -1460,12 +1485,12 @@
             // Seat Rules intentionally forbid non-creator browser runtime writes.
             // Send intent only; the trusted transaction owns roster/counter changes.
             try{
-              const result=await callEngagementFunction("promoteSeatedRegistration",{code:eventCode,registrationId:regId,expandBy,operationId:crypto.randomUUID()},60000);
+              const result=await callEngagementFunction("promoteSeatedRegistration",{code:eventCode,registrationId:regId,expandBy,operationId:options.operationId||crypto.randomUUID()},60000);
               if(result?.ok!==true||result?.verified!==true||!result.state)throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
               return result;
             }catch(error){
               const reason=String(error?.message||"");
-              for(const domain of ["capacity-full","not-waitlist","bracket-locked","selection-managed","onsite-waitlist-managed","registration-state-conflict","qr-checkin-stale","court-lifecycle-stale"]){
+              for(const domain of ["capacity-full","not-waitlist","bracket-locked","selection-managed","onsite-waitlist-managed","registration-state-conflict","qr-checkin-stale","court-lifecycle-stale","operation-outdated"]){
                 if(reason.includes(domain)){error.code=domain;break;}
               }
               throw error;
@@ -1478,7 +1503,7 @@
       // Unlimited promotions use the existing staff/admin-only trusted service.
       // The common server read-back below still verifies roster + both mirrors.
       const txResult=unlimitedPromotion
-        ?await callEngagementFunction("registrationRosterService",{action:"promote",code:eventCode,registrationId:regId,intent:"admin",operationId:crypto.randomUUID()},60000)
+        ?await callEngagementFunction("registrationRosterService",{action:"promote",code:eventCode,registrationId:regId,intent:"admin",operationId:options.operationId||crypto.randomUUID()},60000)
         :await fx.runTransaction(dbHandle,async tx=>{
         const tourSnap=await tx.get(tourRef);
         const pubSnap=await tx.get(pubRef);
