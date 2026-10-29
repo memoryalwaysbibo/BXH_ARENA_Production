@@ -12694,6 +12694,7 @@ function registrationSourceLabel(row){
   return "玩家自行報名";
 }
 function renderPeopleManagement(){
+  if(typeof staffRosterReadOnly==='function'&&staffRosterReadOnly())return renderStaffRegistrationRoster();
   const online=!!(state.meta&&state.meta.registrationEnabled);
   const needsCheckin=!!(state.meta&&state.meta.checkinRequired);
   const checkinClosed=!!state.meta.checkinClosedEarly;
@@ -15576,11 +15577,62 @@ let adminRegistrationsCache = null; // null = not yet fetched for the current to
 let adminRegistrationsLoading = false;
 let adminRegistrationsError = null;
 let adminRegistrationsBusy = false; // promote/cancel action in-flight guard
-function resetAdminRegistrationsCache(){ adminRegistrationsCache = null; adminRegistrationsError = null; }
+let staffRosterCache=null;
+function resetAdminRegistrationsCache(){ adminRegistrationsCache = null; adminRegistrationsError = null; staffRosterCache=null; }
 let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;
 let adminRosterSyncChain=Promise.resolve();
 let adminRosterContextKey="";
 let adminRosterManualContext=null;
+function staffRosterReadOnly(){
+  const uid=currentAuthUid(),user=userProfile;
+  if(!uid||!['admin','staff'].includes(currentRole)||user?.role!=='staff'||user.active!==true||
+    user.isTestAccount===true||user.deleted||['deleted','disabled','frozen'].includes(user.accountStatus)||
+    state.meta?.eventAuthority!=='official'||state.testMode===true)return false;
+  const assigned=state.meta?.assignedStaffUids??state.assignedStaffUids;
+  return Array.isArray(assigned)&&assigned.length>0&&!assigned.includes(uid);
+}
+async function loadStaffRegistrationRoster(){
+  if(!staffRosterReadOnly()||peopleRosterBusy||!state.cloudCode)return;
+  const context=captureRegistrationRosterContext();
+  const isCurrent=()=>registrationRosterContextIsCurrent(context)&&staffRosterReadOnly()&&registrationRosterPeopleView();
+  peopleRosterBusy=true;adminRosterManualContext=context;adminRegistrationsError=null;
+  render();
+  try{
+    if(window.cloudSync?.connect)await window.cloudSync.connect();
+    if(!isCurrent())return;
+    if(!window.cloudSync?.readStaffRegistrationRoster)throw Error('staff-roster-service-unavailable');
+    const result=await window.cloudSync.readStaffRegistrationRoster(context.code);
+    if(!isCurrent())return;
+    if(result?.ok!==true||result.code!==String(context.code).toUpperCase()||!Array.isArray(result.rows))throw Error('staff-roster-read-failed');
+    staffRosterCache={key:context.key,rows:result.rows};
+    adminRegistrationsError=null;
+    showToast('玩家名單已同步');
+  }catch(error){
+    if(isCurrent()){
+      const code=String(error?.code||error?.message||'');
+      adminRegistrationsError=code.includes('permission-denied')?'目前帳號無法讀取這場賽事名單，請確認工作人員身分。':
+        code.includes('not-found')||code.includes('unavailable')?'名單同步服務尚未就緒，請稍後重試。':'玩家名單同步失敗，請稍後重試。';
+    }
+  }finally{
+    if(adminRosterManualContext===context){peopleRosterBusy=false;adminRosterManualContext=null;}
+    if(isCurrent())render();
+  }
+}
+function renderStaffRegistrationRoster(){
+  if(adminRosterUnsub||adminRosterCode)stopAdminRosterWatch();
+  const rows=staffRosterCache?.key===registrationRosterContextKey()?staffRosterCache.rows:null;
+  if(!rows&&!peopleRosterBusy&&!adminRegistrationsError)setTimeout(loadStaffRegistrationRoster,0);
+  const status={confirmed:'正取',waitlist:'備取'};
+  const confirmed=rows?.filter(row=>row.status==='confirmed').length;
+  const waitlist=rows?.filter(row=>row.status==='waitlist').length;
+  const controls=window.BXHRosterView?.controls({contextKey:registrationRosterContextKey(),section:'confirmed'})||'';
+  return `<div id="people-roster-view">${controls}<div class="panel"><div class="panel-title">玩家名單</div>
+    <p class="hint">工作人員可同步查看正取、備取與報到狀態。</p>
+    <button class="btn btn-primary" data-action="load-staff-registration-roster" ${peopleRosterBusy?'disabled':''}>${peopleRosterBusy?'同步中…':'重新同步名單'}</button>
+    ${adminRegistrationsError?`<div class="banner warn" role="alert">${esc(adminRegistrationsError)}</div>`:''}
+    ${rows?`<p>正取 ${confirmed} 人 ／ 備取 ${waitlist} 人</p><div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>名單</th><th>報到</th></tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${index+1}</td><td class="people-col-name">${esc(row.name)}</td><td>${status[row.status]||'—'}</td><td>${row.status==='confirmed'?(state.meta?.checkinRequired?(row.checkedIn?'已報到':'未報到'):'免報到'):'—'}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state">${adminRegistrationsError?'尚未取得最新名單':'正在讀取玩家名單…'}</div>`}
+    </div></div>`;
+}
 function canManageRegistrationRoster(){
   if(!firebaseUser || userProfile?.active===false) return false;
   if(isCommunityRoomOwner() && state.createdBy===firebaseUser.uid) return true;
@@ -15649,6 +15701,7 @@ async function refreshBackendRegistrationRoster(context,catchup=false){
   return {ok:true,changed:before!==JSON.stringify(state.players||[]),confirmed:(state.players||[]).filter(p=>p.source==="online").length};
 }
 async function loadAdminRegistrationRows(){
+  if(staffRosterReadOnly())return loadStaffRegistrationRoster();
   if(adminRegistrationsLoading||!state.cloudCode||!canManageRegistrationRoster()) return;
   const context=captureRegistrationRosterContext();
   adminRegistrationsLoading=true;
@@ -15672,6 +15725,7 @@ async function loadAdminRegistrationRows(){
   }
 }
 async function startAdminRosterWatch(){
+  if(staffRosterReadOnly()){stopAdminRosterWatch();return;}
   reconcileRegistrationRosterContext();
   const code=state.cloudCode;
   if(!registrationRosterPeopleView() || !canManageRegistrationRoster() || (!state.meta?.registrationEnabled&&!isCommunityQuickRegistration(state)) || !code) return;
@@ -20293,6 +20347,7 @@ function handleAction(action, target){
 
   if(action.startsWith("team-lineup-")||action==="team-score-direct"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
+  if(action==='load-staff-registration-roster'){void loadStaffRegistrationRoster();return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
@@ -24424,6 +24479,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="load-online-roster"){
+    if(staffRosterReadOnly()){loadStaffRegistrationRoster();return;}
     if(!canManageRegistrationRoster()){showToast("目前身分沒有此操作權限。",true);return;}
     if(!state.meta.registrationEnabled&&!isCommunityQuickRegistration(state)){ showToast("此賽事未啟用線上報名", true); return; }
     if(!state.cloudCode){ showToast("此賽事尚未發布到雲端", true); return; }
@@ -25325,3 +25381,4 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+

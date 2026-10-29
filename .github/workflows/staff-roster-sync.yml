@@ -1,0 +1,18 @@
+name: Staff roster read permissions
+on:
+  pull_request:
+    paths: ['referee-seats/functions/staff-roster-service.cjs', 'referee-seats/functions/index.js', 'referee-seats/staff-roster.test.cjs', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'tests/community-host-roster-sync.test.cjs', '.github/workflows/staff-roster-sync.yml']
+permissions:
+  contents: read
+jobs:
+  staff-roster:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check referee-seats/functions/index.js
+      - run: node --check modules/main-app/core.js
+      - run: node --check modules/cloud/cloud-runtime.js
+      - run: node --test referee-seats/staff-roster.test.cjs tests/community-host-roster-sync.test.cjs tests/roster-view.test.cjs

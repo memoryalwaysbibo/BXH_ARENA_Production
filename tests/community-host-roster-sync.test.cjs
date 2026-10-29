@@ -338,3 +338,59 @@ test('a delayed manual query cannot replace registrations already advanced by th
  assert.equal(ctx.adminRegistrationsCache[0].registrationId,'latest');assert.equal(ctx.adminRegistrationsLoading,false);
 });
 
+function staffHarness(){
+ const h=harness(),{ctx}=h;
+ ctx.userProfile={role:'staff',active:true};ctx.currentRole='admin';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.state.meta.eventAuthority='official';ctx.state.meta.assignedStaffUids=['other-staff'];ctx.staffRosterCache=null;
+ return h;
+}
+test('unassigned official staff sync a limited display without opening private registrations or saving state',async()=>{
+ const {ctx,calls}=staffHarness(),before=clone(ctx.state);
+ const rows=[{name:'選手甲',status:'confirmed',checkedIn:true}];let reads=0;
+ ctx.window.cloudSync.readStaffRegistrationRoster=async()=>{reads++;return {ok:true,code:'ROOM-A',rows};};
+ assert.equal(ctx.staffRosterReadOnly(),true);
+ await ctx.startAdminRosterWatch();await ctx.loadAdminRegistrationRows();
+ assert.equal(reads,1);assert.equal(calls.subscribe.length,0);assert.equal(calls.list,0);assert.equal(calls.save,0);
+ assert.deepEqual(clone(ctx.state),before);assert.deepEqual(clone(ctx.staffRosterCache.rows),rows);
+ ctx.manualSync();await tick();assert.equal(reads,2);
+});
+test('staff retain existing management scope when assigned or when the legacy assignment list is empty',()=>{
+ const {ctx}=staffHarness();ctx.state.meta.assignedStaffUids=['host'];assert.equal(ctx.staffRosterReadOnly(),false);
+ ctx.state.meta.assignedStaffUids=[];assert.equal(ctx.staffRosterReadOnly(),false);
+ for(const role of ['admin','super_admin','player','tester']){ctx.userProfile.role=role;assert.equal(ctx.staffRosterReadOnly(),false);}
+});
+test('staff double clicks share one read and stale results are discarded after navigation or revocation',async()=>{
+ for(const changed of ['room','account','role','navigation','inactive']){
+  const {ctx}=staffHarness(),pending=deferred();let reads=0;
+  ctx.window.cloudSync.readStaffRegistrationRoster=()=>{reads++;return pending.promise;};
+  const first=ctx.loadStaffRegistrationRoster();await tick();await ctx.loadStaffRegistrationRoster();assert.equal(reads,1);
+  if(changed==='room')ctx.state.cloudCode='ROOM-B';
+  if(changed==='account')ctx.firebaseUser={uid:'other'};
+  if(changed==='role')ctx.userProfile.role='player';
+  if(changed==='navigation')ctx.activeTab='live';
+  if(changed==='inactive')ctx.userProfile.active=false;
+  pending.resolve({ok:true,code:'ROOM-A',rows:[{name:'STALE'}]});await first;
+  assert.equal(ctx.staffRosterCache,null,changed);assert.equal(ctx.peopleRosterBusy,false);
+ }
+});
+test('staff failed sync remains visible and retryable without retry loops',async()=>{
+ const {ctx}=staffHarness();ctx.window.cloudSync.readStaffRegistrationRoster=async()=>{throw Object.assign(Error('permission-denied'),{code:'functions/permission-denied'});};
+ await ctx.loadStaffRegistrationRoster();assert.match(ctx.adminRegistrationsError,/工作人員身分/);assert.equal(ctx.peopleRosterBusy,false);
+ ctx.window.cloudSync.readStaffRegistrationRoster=async()=>({ok:true,code:'ROOM-A',rows:[]});
+ await ctx.loadStaffRegistrationRoster();assert.equal(ctx.adminRegistrationsError,null);assert.deepEqual(clone(ctx.staffRosterCache.rows),[]);
+});
+
+test('staff roster screen escapes player names and offers only a read action, including played events',()=>{
+ const {ctx,calls}=staffHarness();
+ ctx.esc=value=>String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');ctx.setTimeout=()=>{};
+ ctx.state.startedAt=123;ctx.staffRosterCache={key:ctx.registrationRosterContextKey(),rows:[
+  {name:'<img src=x onerror=alert(1)>',status:'confirmed',checkedIn:true},{name:'備取甲',status:'waitlist'}]};
+ const html=ctx.renderStaffRegistrationRoster();
+ assert.match(html,/正取 1 人 ／ 備取 1 人/);assert.match(html,/data-action="load-staff-registration-roster"/);
+ assert(!html.includes('<img'));assert(!html.includes('data-action="toggle-checkin-btn"'));assert(!html.includes('data-action="delete-player"'));
+ assert.equal(calls.save,0);
+ const handle=block('function handleAction(action, target){','  if(action.startsWith(\'card-\'))');
+ assert(handle.indexOf("action==='load-staff-registration-roster'")<handle.indexOf("state.entrySelection?.status==='drawn'"));
+});
+
+
