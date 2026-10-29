@@ -1,0 +1,8 @@
+{
+  "name": "bxh-referee-certificates",
+  "private": true,
+  "version": "0.1.0",
+  "main": "index.js",
+  "engines": {"node": "22"},
+  "dependencies": {"firebase-admin": "13.10.0", "firebase-functions": "6.6.0"}
+}

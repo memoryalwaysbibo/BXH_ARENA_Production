@@ -1,0 +1,6 @@
+// Merge into the current deployed rules only after review; this is not a complete ruleset.
+// All reads and writes use the authenticated Callable, including self reads/photo changes.
+// Avoid exposing other referees, private source evidence, images, operation receipts or audit history.
+match /refereeCertificates/{document=**} { allow read, write: if false; }
+match /refereeCertificateSystem/{document=**} { allow read, write: if false; }
+match /refereeCertificateOperations/{document=**} { allow read, write: if false; }

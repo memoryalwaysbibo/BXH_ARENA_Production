@@ -5605,6 +5605,7 @@ function syncEngagementIdentity(uid){
   engagementAdminOverview=null; engagementAdminError=""; engagementDiagnostic=null;
   engagementBackfillCursor=""; engagementBackfillResult=null; engagementBackfillDone=false;
   engagementTitleDraft=null;
+  window.BXHRefereeLicense?.resetSession?.();
   clearTimeout(engagementDayTimer);
 }
 function scheduleEngagementDayRefresh(result){
@@ -5999,6 +6000,23 @@ function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==fal
 function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode() || isEventStaffMode())); }
 function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff" || isPartnerOrganizerMode())); }
 function currentAuthUid(){ return (firebaseUser&&firebaseUser.uid)||null; }
+function canManageRefereeCertificates(){
+  return !!(currentAuthUid()&&userProfile?.active===true&&userProfile.isTestAccount!==true&&userProfile.deleted!==true&&userProfile.role==='super_admin'&&!['deleted','disabled','frozen'].includes(userProfile.accountStatus));
+}
+function refereeLicenseContext(){
+  return {uid:currentAuthUid(),user:userProfile,epoch:engagementSessionEpoch,
+    isSuperAdmin:canManageRefereeCertificates(),rerender:renderPreservingScroll,
+    currentSession:()=>({uid:currentAuthUid(),epoch:engagementSessionEpoch,isSuperAdmin:canManageRefereeCertificates()}),
+    onRefereeAchievements:()=>{if(appPhase!=='player-center')return false;playerActiveTab='profile';playerProfileSection='achievements';renderPreservingScroll();return true;},
+    onHunterAchievements:()=>{playerActiveTab='stats';playerStatsSubTab='achievements';renderPreservingScroll();}};
+}
+function renderRefereeLicensePage(view){
+  if(window.BXH_REFEREE_CERTIFICATES_V1!==true)return '<div class="panel" role="status">裁判證功能尚未開放。</div>';
+  if(view==='admin'&&!canManageRefereeCertificates())return '<div class="panel" role="status">目前帳號無法管理裁判資料。</div>';
+  const method={duty:'renderDuty',achievements:'renderAchievements',admin:'renderAdmin'}[view];
+  if(!method||typeof window.BXHRefereeLicense?.[method]!=='function')return '<div class="panel" role="status">裁判證頁面暫時無法載入，請重新整理。</div>';
+  return window.BXHRefereeLicense[method](refereeLicenseContext());
+}
 function isCurrentOfficialTournamentCreator(){
   const uid=currentAuthUid();
   return !!(uid && state && state.meta && state.meta.eventAuthority!=="community" && state.createdBy===uid);
@@ -17784,6 +17802,8 @@ function renderPlayerCenterOverview(p){
 function renderPlayerProfileTab(p){
   const profileUid=currentAuthUid();
   if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="overview";playerCenterPeriod="season";playerCenterCareerVisibleCount=10;playerCenterHistoryVisibleCount=10;}
+  const refereeEnabled=window.BXH_REFEREE_CERTIFICATES_V1===true;
+  if(!refereeEnabled&&['duty','achievements'].includes(playerProfileSection))playerProfileSection='overview';
   if(['overview','career'].includes(playerProfileSection)){
     if(!hunterProfileCache&&!hunterProfileLoading&&!hunterProfileError)setTimeout(()=>loadHunterProfile(false),0);
     if(playerProfileSection==='overview'&&!myLadderProfileCache&&!myLadderProfileLoading&&playerCenterLadderRequestedUid!==profileUid){playerCenterLadderRequestedUid=profileUid;setTimeout(()=>loadMyLadderProfile(false),0);}
@@ -17793,7 +17813,10 @@ function renderPlayerProfileTab(p){
     <button class="btn ${playerProfileSection==='career'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='career'}" data-action="profile-section" data-section="career">生涯紀錄</button>
     <button class="btn ${playerProfileSection==='basic'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='basic'}" data-action="profile-section" data-section="basic">基本資料</button>
     <button class="btn ${playerProfileSection==='titles'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='titles'}" data-action="profile-section" data-section="titles">我的稱號</button>
+    ${refereeEnabled?`<button class="btn ${playerProfileSection==='duty'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='duty'}" data-action="profile-section" data-section="duty">我的執勤</button><button class="btn ${playerProfileSection==='achievements'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='achievements'}" data-action="profile-section" data-section="achievements">我的成就</button>`:''}
   </div>`;
+  if(refereeEnabled&&playerProfileSection==='duty')return sectionNav+renderRefereeLicensePage('duty');
+  if(refereeEnabled&&playerProfileSection==='achievements')return sectionNav+renderRefereeLicensePage('achievements');
   if(playerProfileSection==="overview") return sectionNav+renderPlayerCenterOverview(p);
   if(playerProfileSection==="career") return sectionNav+renderPlayerCenterCareer();
   if(playerProfileSection==="titles") return sectionNav+safeEngagementRender(()=>renderPlayerTitleCenter(p));
@@ -18432,11 +18455,13 @@ function restoreAuthenticatedView(uid,intent){
  }
  if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
-  appPhase='player-center';playerActiveTab=v.playerTab==='profile'?'profile':playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=['overview','career','basic','titles'].includes(v.profileSection)?v.profileSection:'overview';return true;
+  appPhase='player-center';playerActiveTab=v.playerTab==='profile'?'profile':playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=['overview','career','basic','titles','duty','achievements'].includes(v.profileSection)?v.profileSection:'overview';
+  if(window.BXH_REFEREE_CERTIFICATES_V1!==true&&['duty','achievements'].includes(playerProfileSection))playerProfileSection='overview';return true;
  }
  if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer'||intent==='event_staff')){
   appPhase='app';
-  activeTab=v.cloudCode===(state.cloudCode||'')&&['management','ladder','live','bracket','referee','duty','registrations','settings','people','operations','history','version'].includes(v.tab)?v.tab:'management';
+  activeTab=v.cloudCode===(state.cloudCode||'')&&['management','ladder','live','bracket','referee','duty','referee-admin','registrations','settings','people','operations','history','version'].includes(v.tab)?v.tab:'management';
+  if(activeTab==='referee-admin'&&(window.BXH_REFEREE_CERTIFICATES_V1!==true||!canManageRefereeCertificates()))activeTab='management';
   adminTournamentListLoaded=false;return true;
  }
  if(v.phase==='tournament-detail'&&v.detailCode){
@@ -19483,6 +19508,11 @@ function renderApp(){
   let tabs = hasAdminAccess() ? allTabs : allTabs.filter(t=>!["management","referee","settings","registrations","people"].includes(t[0]));
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
   if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"],["commerce-admin","商城管理"]);
+  if(window.BXH_REFEREE_CERTIFICATES_V1===true){
+    tabs=tabs.filter(t=>t[0]!=='duty');
+    if(canManageRefereeCertificates())tabs.splice(1,0,['referee-admin','裁判管理']);
+  }
+  if(activeTab==='referee-admin'&&(window.BXH_REFEREE_CERTIFICATES_V1!==true||!canManageRefereeCertificates()))activeTab='live';
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
   if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
   if(activeTab==='commerce-admin'&&!isSuperAdmin())activeTab='live';
@@ -19493,12 +19523,13 @@ function renderApp(){
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
+  else if(activeTab==="referee-admin") content = renderRefereeLicensePage('admin');
   else if(activeTab==="team-preview") content = window.BXHTeamAdminPreview.page();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
   else if(activeTab==="live") content = wrapBracketWatermark(renderLive());
   else if(activeTab==="bracket") content = renderBracket();
   else if(activeTab==="referee") content = wrapBracketWatermark(renderReferee());
-  else if(activeTab==="duty") content = wrapBracketWatermark(renderDutyLog());
+  else if(activeTab==="duty") content = window.BXH_REFEREE_CERTIFICATES_V1===true?renderRefereeLicensePage('duty'):wrapBracketWatermark(renderDutyLog());
   else if(activeTab==="registrations") content = wrapBracketWatermark(renderAdminRegistrationsTab());
   else if(activeTab==="people") content = wrapBracketWatermark(renderPeopleManagement());
   else if(activeTab==="operations") content = renderTournamentOperationsPage();
@@ -20299,6 +20330,10 @@ function handleAction(action, target){
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
   if(action.startsWith("commerce-")){void window.BXHCommerce.handle(action,target);return;}
+  if(action.startsWith('referee-license-')){
+    if(window.BXH_REFEREE_CERTIFICATES_V1===true&&currentAuthUid())void window.BXHRefereeLicense?.handleAction?.(action,target,refereeLicenseContext());
+    return;
+  }
   if(action.startsWith("inventory-")){handleInventory(action,target);return;}
   if(action.startsWith("mood-")){handleMood(action,target);return;}
   if(action.startsWith("title-recipient-")){handleTitleRecipient(action,target);return;}
@@ -20881,7 +20916,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="profile-section"){
     const section=target.getAttribute("data-section");
-    if(!['overview','career','basic','titles'].includes(section)) return;
+    if(!['overview','career','basic','titles','duty','achievements'].includes(section)) return;
+    if(['duty','achievements'].includes(section)&&window.BXH_REFEREE_CERTIFICATES_V1!==true)return;
     playerProfileSection=section;
     if(section==="titles")refreshVisibleTitleProgress(true);
     renderPreservingScroll(); return;
