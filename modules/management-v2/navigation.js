@@ -17,7 +17,7 @@
   const LABELS={
     management:"賽事管理",registrations:"報名管理",settings:"賽事設定",people:"人員管理",
     live:"即時戰況",bracket:"對戰表",referee:"裁判台",duty:"我的執勤",
-    ladder:"天梯排行","team-preview":"戰隊大廳","member-raffles":"會員抽獎管理","inventory-admin":"道具管理",
+    ladder:"排行榜","team-preview":"戰隊大廳","member-raffles":"會員抽獎管理","inventory-admin":"道具管理",
     "commerce-admin":"商城管理",operations:"抽獎與維護",history:"賽事紀錄",version:"版本更新"
   };
   function groupForTab(tab){return GROUPS.find(g=>g.tabs.includes(tab))||GROUPS[0];}
