@@ -6,8 +6,12 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  function clearPreview(){previewVersion++;previewBlob=null;previewTeam=null;if(previewUrl){root.URL?.revokeObjectURL(previewUrl);previewUrl=null;}}
  const controller=controllers.createTeamController({api,onChange:render});
  function render(state){
+  const openTeams=new Set(Array.from(container.querySelectorAll?.('.team-lobby-item[open]')||[]).map(el=>el.dataset.teamId));
+  const settingsOpen=container.querySelector?.('[data-team-action="filters"]')?.getAttribute?.('aria-expanded')==='true';
   if(state.screen!=='mine'||state.team?.id!==previewTeam||state.busy)clearPreview();
   container.innerHTML='<style>'+ui.css+'</style>'+ui.tabs(state.screen==='create'?'create':['mine','applications','history','manage'].includes(state.screen)?'mine':'lobby')+(state.screen==='manage'&&state.loading?'<p role="status">正在載入成員…</p>':state.screen==='manage'&&!state.loaded?'<section><h2>管理成員</h2><button type="button" data-team-action="reload-manage">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='manage'?ui.manageMembers(state.team):state.screen==='history'&&state.loading?'<p role="status">正在載入戰隊紀錄…</p>':state.screen==='history'&&!state.loaded?'<section><h2>戰隊紀錄</h2><button type="button" data-team-action="reload-history">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='history'?ui.history({items:state.items,nextCursor:state.historyNextCursor,page:state.historyPage}):state.screen==='applications'&&state.loading?'<p role="status">正在載入加入申請…</p>':state.screen==='applications'&&!state.loaded?'<section><h2>加入申請</h2><button type="button" data-team-action="reload-applications">重新載入</button><button type="button" data-team-action="tab" data-value="mine">返回我的戰隊</button></section>':state.screen==='applications'&&!state.loading&&state.loaded?ui.applications({items:state.items,hasMore:state.hasMore,nextCursor:state.applicationsNextCursor,page:state.applicationsPage,teamId:state.applicationsTeamId}):state.screen==='create'&&!state.loading&&state.loaded?ui.createTeam(state.team,state.creationCapacity):state.screen==='mine'&&!state.loading&&state.loaded?ui.myTeam(state.team):state.screen==='members'&&!state.loading&&state.loaded&&state.team?'<button type="button" data-team-action="back">返回戰隊大廳</button>'+ui.publicMembers(state.team):ui.lobby({...state,...state.query,query:typeof state.query?.query==='string'?state.query.query:'',error:state.loaded?null:state.error}));
+  for(const el of container.querySelectorAll?.('.team-lobby-item')||[])if(openTeams.has(el.dataset.teamId))el.open=true;
+  if(settingsOpen){const panel=container.querySelector('#team-search-settings'),toggle=container.querySelector('[data-team-action="filters"]');if(panel&&toggle){panel.hidden=false;toggle.setAttribute('aria-expanded','true');}}
   if(previewUrl&&previewBlob){const img=container.querySelector('[data-emblem-preview]'),button=container.querySelector('[data-team-action="emblem-upload"]');if(img){img.src=previewUrl;img.hidden=false;}if(button)button.disabled=false;}
   if(state.busy)for(const button of container.querySelectorAll('button'))button.disabled=true;
   if(state.pending){const retry=container.ownerDocument.createElement('button');retry.type='button';retry.dataset.teamAction='retry';retry.textContent='重試上一筆操作';retry.disabled=state.busy||state.loading;container.append(retry);}
@@ -16,7 +20,9 @@ function mount({container,api,ui=root.BXHTeamUI,controllers=root.BXHTeamControll
  const click=async event=>{
   const button=event.target.closest('[data-team-action]');if(!button||!container.contains(button)||button.disabled)return;
   const action=button.dataset.teamAction,id=button.dataset.teamId;
-  if(action==='retry')await controller.retryPending();
+  if(action==='filters'){const panel=container.querySelector('#team-search-settings');if(panel){panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));}return;}
+  if(action==='mine')await controller.mine();
+  else if(action==='retry')await controller.retryPending();
   else if(action==='emblem-upload'){
    const team=controller.snapshot().team,version=previewVersion,blob=previewBlob;if(!blob||team?.role!=='captain'||!team.id)return;
    button.disabled=true;
