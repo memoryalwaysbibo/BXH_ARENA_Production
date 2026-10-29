@@ -148,3 +148,8 @@ test('create screen shows capacity and replaces the form when full or unavailabl
  for(const status of ['full','unavailable']){const html=ui.createTeam(null,{status,activeCount:null,limit:200});assert.doesNotMatch(html,/data-team-form="create"/);assert.match(html,/重新整理名額/);assert.match(html,/前往戰隊大廳/);}
  assert.match(ui.createTeam(null,{status:'full',activeCount:200,limit:200}),/已達 200 支上限/);
 });
+
+test('lobby never stringifies a filter object into its search field',()=>{
+ assert.doesNotMatch(ui.lobby({query:{}}),/\[object Object\]/);
+ assert.match(ui.lobby({query:'BXH'}),/name="query"[^>]*value="BXH"/);
+});

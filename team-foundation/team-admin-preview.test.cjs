@@ -58,9 +58,9 @@ test('player primary tabs expose teams only through the current preview authoriz
  const core=fs.readFileSync(__dirname+'/../modules/main-app/core.js','utf8');
  const fn=core.slice(core.indexOf('function playerVisibleTabs(){'),core.indexOf('\n\nlet engagementSnapshot='));
  for(const enabled of [false,true]){
-  const f=entry(enabled),ctx={window:f.ctx.window,PLAYER_TABS:[['home','賽事大廳']],hunterClashEntry:{visible:()=>true}};
+  const f=entry(enabled),ctx={window:f.ctx.window,PLAYER_TABS:[['home','賽事大廳'],['shop','商城']],hunterClashEntry:{visible:()=>true}};
   vm.runInNewContext(fn+'; result=playerVisibleTabs();',ctx);
-  assert.equal(ctx.result.some(t=>t[0]==='team-preview'),enabled);assert.equal(ctx.result.some(t=>t[0]==='clash'),true);
+  assert.equal(ctx.result.some(t=>t[0]==='team-preview'),enabled);if(enabled)assert.equal(ctx.result.findIndex(t=>t[0]==='team-preview')+1,ctx.result.findIndex(t=>t[0]==='shop'));assert.equal(ctx.result.some(t=>t[0]==='clash'),true);
   f.ctx.userProfile.role='player';vm.runInNewContext('result=playerVisibleTabs()',ctx);assert.equal(ctx.result.some(t=>t[0]==='team-preview'),false);
  }
 });
