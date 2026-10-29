@@ -12545,31 +12545,116 @@ async function peopleApplyCloudRosterResult(result,successMessage){
   render();
   showToast(successMessage);
 }
+function peoplePromotionContextCurrent(context){
+  return state.id===context.roomId&&state.cloudCode===context.code&&
+    (typeof currentAuthUid==="function"?currentAuthUid():"")===context.uid;
+}
+async function peopleRecoverPromotion(context,name,error){
+  if(!peoplePromotionContextCurrent(context)||peopleRosterBusy)return;
+  peopleRosterBusy=true;render();
+  let latest,timer;
+  try{
+    if(!window.cloudSync?.readRegistrationRosterRecovery)throw Error("recovery-unavailable");
+    latest=await Promise.race([
+      window.cloudSync.readRegistrationRosterRecovery(context.code,context.registrationId),
+      new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error("recovery-timeout")),10000);})
+    ]);
+  }catch(readError){
+    if(!peoplePromotionContextCurrent(context))return;
+    openModal({type:"generic",title:"送出結果尚待確認",
+      message:"暫時無法確認雲端是否已收到。原操作已保留，請恢復連線後重新核對；請勿另外新增同一位玩家。",
+      cancelLabel:"保留操作，稍後處理",confirmLabel:"重新核對雲端",
+      onConfirm:()=>peopleRecoverPromotion(context,name,error)});
+    return;
+  }finally{clearTimeout(timer);peopleRosterBusy=false;render();}
+  if(!peoplePromotionContextCurrent(context))return;
+  if(latest.achieved){
+    window.BXHRosterRecovery?.finish(context,context.operationId);
+    await peopleApplyCloudRosterResult(latest,"雲端目前已是正取，已同步最新結果");
+    return;
+  }
+  const current=()=>peoplePromotionContextCurrent(context);
+  const remote=latest.state;
+  const comparison="原畫面名單 正／備："+context.players+"／"+context.waitlist+
+    "\n雲端名單 正／備："+(remote.players||[]).length+"／"+(remote.waitlistPlayers||[]).length+
+    "\n這位玩家目前："+({waitlist:"備取",confirmed:"正取",cancelled:"已取消"}[latest.status]||"待確認");
+  if(!latest.countsAgree){
+    openModal({type:"generic",title:"雲端資料尚未一致",message:comparison+"\n\n請稍後重新核對，這筆操作仍保留。",
+      cancelLabel:"稍後處理",confirmLabel:"重新核對雲端",onConfirm:()=>peopleRecoverPromotion(context,name,error)});
+    return;
+  }
+  openModal({type:"generic",title:"雲端名單已有更新",message:comparison+"\n\n先同步最新資料，再確認是否重新操作。",
+    cancelLabel:"保留操作，返回",confirmLabel:"同步雲端資料",
+    onConfirm:async()=>{
+      if(!current())return;
+      await peopleApplyCloudRosterResult(latest,"已同步雲端名單");
+      if(!current()||!latest.retryable)return;
+      openModal({type:"generic",title:"重新確認升正取",
+        message:"「"+name+"」目前仍是備取。是否依最新資料重新送出？系統會重新檢查權限、名額與賽事狀態。",
+        cancelLabel:"維持雲端資料",confirmLabel:"依最新資料重新操作",
+        onConfirm:()=>{
+          if(!current())return;
+          if(String(error?.code||"")==="operation-outdated")window.BXHRosterRecovery?.finish(context,context.operationId);
+          return peoplePromoteOnline(context.registrationId,name,context.expandBy);
+        }});
+    }});
+}
 async function peoplePromoteOnline(registrationId,name,expandBy=0){
   if(peopleRosterBusy)return;
+  const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():"",
+    registrationId,expandBy,players:state.players?.length||0,waitlist:state.waitlistPlayers?.length||0};
+  context.operationId=window.BXHRosterRecovery?.begin(context);
   peopleRosterBusy=true;render();
   try{
     if(!window.cloudSync||!window.cloudSync.mutateRegistrationRoster)throw Object.assign(new Error("network"),{code:"network"});
-    const result=await window.cloudSync.mutateRegistrationRoster(state.cloudCode,registrationId,"promote",{expandBy});
+    const result=await window.cloudSync.mutateRegistrationRoster(context.code,registrationId,"promote",{expandBy,operationId:context.operationId});
+    if(!peoplePromotionContextCurrent(context)){peopleRosterBusy=false;return;}
+    window.BXHRosterRecovery?.finish(context,context.operationId);
     const cap=Number(result.capacity||state.meta.registrationCapacity||0);
     await peopleApplyCloudRosterResult(result,(expandBy===8?"已加開至 "+cap+" 人；":"")+name+" 已升為正取");
   }catch(e){
     peopleRosterBusy=false;
+    if(!peoplePromotionContextCurrent(context))return;
     if(String(e&&e.code||e&&e.message||"").includes("capacity-full")&&expandBy!==8){
+      window.BXHRosterRecovery?.finish(context,context.operationId);
       const cap=Number(e.capacity||state.meta.registrationCapacity||0);
       openModal({
         type:"generic",
         title:"正取名額已滿",
         message:"目前正取上限為 "+cap+" 人。\n\n是否增加 8 個名額，並將「"+name+"」升為正取？\n調整後上限："+(cap+8)+" 人。\n\n每次固定增加 8 人，可重複加開。",
         confirmLabel:"增加 8 名並升正取",
-        onConfirm:()=>peoplePromoteOnline(registrationId,name,8)
+        onConfirm:()=>peoplePromotionContextCurrent(context)&&peoplePromoteOnline(registrationId,name,8)
       });
       render();
       return;
     }
-    if(String(e?.code||e?.message||"").includes("permission-denied")){render();await peopleReportRosterPermission(registrationId);return;}
-    showToast(peopleMutationErrorMessage(e),true);render();
+    await peopleRecoverPromotion(context,name,e);
   }
+}
+async function peopleQuickAddPlayers(lines){
+  if(peopleRosterBusy||state.startedAt)return false;
+  const room=state,code=state.cloudCode,addedIds=new Set(),defaultChecked=!state.meta.checkinRequired;
+  peopleRosterBusy=true;
+  try{
+    lines.forEach(name=>{const id=uid("guest");addedIds.add(id);room.players.push({id,name:name.replace(/（現場）$/,""),checkedIn:defaultChecked,source:"onsite",participantType:"onsite_guest",accountLinked:false,playerUid:null,playerId:null,ladderEligible:false,activityEligible:false});});
+    room.testDataDismissed=true;
+    render();
+    const saved=await saveState();
+    if(state!==room||state.cloudCode!==code)return false;
+    if(saved!==true){
+      const reason=String(window.__BXH_LAST_CLOUD_ERROR_CODE||"");
+      if(["permission-denied","registration-roster-stale","onsite-runtime-stale"].includes(reason)){
+        room.players=room.players.filter(p=>!addedIds.has(p.id));
+        await saveRecord(cloneStateForSave(room));
+      }
+      showToast("現場新增尚未確認儲存成功，請同步名單確認。",true);
+      return false;
+    }
+    const input=document.getElementById("quick-add-textarea");if(input)input.value="";
+    showToast("已新增 "+lines.length+" 位選手"+(defaultChecked?"，已完成報到":"，尚未報到"));
+    return true;
+  }catch(e){showToast("現場新增未完成，請同步名單確認。",true);return false;}
+  finally{peopleRosterBusy=false;render();}
 }
 async function peopleDemoteOnline(player){
   if(peopleRosterBusy)return;
@@ -23457,25 +23542,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const ta = document.getElementById("quick-add-textarea");
     const lines = ta.value.split(/\r\n|\r|\n/).map(s=>s.trim()).filter(Boolean);
     if(lines.length===0){ showToast("請至少輸入一位選手", true); return; }
-    const defaultChecked = !state.meta.checkinRequired;
-    lines.forEach(name=>{
-      state.players.push({
-        id:uid("guest"),
-        name:name.replace(/（現場）$/,""),
-        checkedIn:defaultChecked,
-        source:"onsite",
-        participantType:"onsite_guest",
-        accountLinked:false,
-        playerUid:null,
-        playerId:null,
-        ladderEligible:false,
-        activityEligible:false
-      });
-    });
-    if(document.getElementById("quick-add-textarea")) document.getElementById("quick-add-textarea").value = "";
-    state.testDataDismissed = true;
-    saveState(); render();
-    showToast("已新增 " + lines.length + " 位選手" + (defaultChecked ? "，已完成報到" : "，尚未報到"));
+    void peopleQuickAddPlayers(lines);
     return;
   }
   if(action==="toggle-checkin-btn"){
