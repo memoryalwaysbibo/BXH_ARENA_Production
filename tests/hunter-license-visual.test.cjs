@@ -37,3 +37,13 @@ test('caller retains current grade and existing growth, with renderer before cor
  assert.ok(core.includes('window.BXHArenaPK?.practiceGrowth?.(licenseOverview.growth)||licenseOverview.growth'));
  assert.ok(index.indexOf('hunter-license-visual.js?')<index.indexOf('modules/main-app/core.js?'));
 });
+
+test('license uses only padded Taipei calendar date and keeps original Auth milliseconds intact',()=>{
+ const v=setup().BXHHunterLicenseVisual;
+ for(const [raw,expected] of [['1788457487706','2026/09/04'],[String(Date.parse('2026-12-31T16:00:00Z')),'2027/01/01']]){
+  const record={uid:'owner',status:'assigned',source:'player-number-ledger',number:'1',authCreatedAtMilliseconds:raw};
+  const html=v.render({numberIdentity:record,accountUid:'owner'});
+  assert.ok(html.includes('<dd class="hl3-date">'+expected+'</dd>'));
+  assert.ok(html.includes('00001'));assert.equal(record.authCreatedAtMilliseconds,raw);
+ }
+});

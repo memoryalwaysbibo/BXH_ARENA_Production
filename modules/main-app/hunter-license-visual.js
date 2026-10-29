@@ -17,7 +17,8 @@
   if(typeof number!=='string'||!/^[1-9][0-9]*$/.test(number)||typeof raw!=='string'||!/^[0-9]{1,16}$/.test(raw))return {number:'待配號',joined:'待核對'};
   const ms=Number(raw),date=new Date(ms);
   if(!Number.isSafeInteger(ms)||ms<=0||!Number.isFinite(date.getTime()))return {number:'待配號',joined:'待核對'};
-  return {number:number.padStart(5,'0'),joined:date.toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})};
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).map(part=>[part.type,part.value]));
+  return {number:number.padStart(5,'0'),joined:parts.year+'/'+parts.month+'/'+parts.day};
  }
  function render({profile={},name='玩家',currentGrade,numberIdentity=null,accountUid=''}={}){
   const identity=identityText(numberIdentity,accountUid);
