@@ -160,3 +160,25 @@ test('my team settings stay collapsed until needed and the current second-level 
  for(const width of [320,390,430]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
  expect(errors).toEqual([]);
 });
+
+test('application reviewers open the correct public card without issuing a team command',async({page})=>{
+ const errors=await open(page);
+ await page.evaluate(()=>{
+  teamFixture.created={id:'bxh',name:'BXH',role:'captain',memberCount:2,capacity:10,level:1,totalXp:0,currentXp:0,nextXp:3,unlockedFrames:[]};
+  teamFixture.cardRequests=[];teamFixture.privateCard=false;
+  engagementService.playerCard=async p=>{teamFixture.cardRequests.push(p);return {ok:true,card:teamFixture.privateCard?null:{uid:p.uid,name:'申請玩家',playerId:'BXH-00123'}};};
+  const original=engagementService.tournamentOperation;
+  engagementService.tournamentOperation=async(name,p)=>name==='teamRead'&&p.action==='applications'?{items:[{uid:'applicant-123',name:'申請玩家',requestedAt:1793200000000}],hasMore:false}:original(name,p);
+ });
+ await page.locator('[data-management-v2-group="team"]').click();
+ await page.getByRole('button',{name:'我的戰隊',exact:true}).click();
+ await page.getByRole('button',{name:'查看加入申請',exact:true}).click();
+ const card=page.getByRole('button',{name:'查看 申請玩家 的玩家名片',exact:true});await expect(card).toBeVisible();
+ await card.click();await expect(page.getByRole('dialog',{name:'玩家名片'})).toContainText('BXH-00123');
+ expect(await page.evaluate(()=>teamFixture.cardRequests)).toEqual([{action:'card',uid:'applicant-123'}]);
+ await page.getByRole('button',{name:'關閉',exact:true}).click();
+ await expect(page.getByRole('button',{name:'核准',exact:true})).toBeVisible();
+ await page.evaluate(()=>{teamFixture.privateCard=true;});await page.getByRole('button',{name:'查看 申請玩家 的玩家名片',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'玩家名片'})).toContainText('此玩家未公開名片');
+ expect(await page.evaluate(()=>teamFixture.calls.filter(c=>c.name==='teamCommand'))).toEqual([]);expect(errors).toEqual([]);
+});
