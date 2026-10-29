@@ -12577,6 +12577,7 @@ async function peopleQuickAddPlayers(lines){
   peopleRosterBusy=true;
   try{
     lines.forEach(name=>{const id=uid("guest");addedIds.add(id);room.players.push({id,name:name.replace(/（現場）$/,""),checkedIn:defaultChecked,source:"onsite",participantType:"onsite_guest",accountLinked:false,playerUid:null,playerId:null,ladderEligible:false,activityEligible:false});});
+    room.testDataDismissed=true;
     render();
     const saved=await saveState();
     if(state!==room||state.cloudCode!==code)return false;

@@ -25,7 +25,7 @@ function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock()}={}){re
   // individual rooms whose browser runtime writes are protected by seat Rules.
   if(t.eventAuthority!=='official'||pub.eventAuthority!=='official'||t.createdByRole==='partner_organizer'||t.refereeSeatsV1?.version!==1)fail('promotion-route-not-supported');
   if([t.battleMode,pub.battleMode,state.meta?.battleMode].includes('team'))fail('team-roster-managed');
-  if([t,pub].some(x=>x.systemClosed||x.eventCancelled||x.deletionStatus||x.tournamentPhase!=='waiting'||['completed','archived'].includes(x.archiveStatus))||state.startedAt||state.bracketSize||['completed','archived'].includes(state.archiveStatus))fail('bracket-locked');
+  if([t,pub].some(x=>x.systemClosed||x.eventCancelled||x.deletionStatus||x.tournamentPhase!=='waiting'||['completed','archived'].includes(x.archiveStatus))||state.meta?.eventCancelled||state.startedAt||state.bracketSize||['completed','archived'].includes(state.archiveStatus))fail('bracket-locked');
   if(t.registrationSelection||pub.registrationSelection||state.entrySelection?.mode==='registration')fail('selection-managed');
   if(t.onsiteWaitlistServerOwned||pub.onsiteWaitlistServerOwned||state.onsiteWaitlistServerOwned)fail('onsite-waitlist-managed');
   if(os.exists){if(os.data().hash!==hash)fail('operation-conflict');return {...os.data().result,state,replayed:true};}
@@ -66,6 +66,7 @@ function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock()}={}){re
    const seq=t.courtLifecycleWriteSeq;
    if(!Number.isSafeInteger(seq)||seq<0||seq>=Number.MAX_SAFE_INTEGER||state.courtLifecycleEpoch!==t.courtLifecycleEpoch)fail('court-lifecycle-stale');
    fence.courtLifecycleWriteSeq=seq+1;
+   mirror.courtLifecycleEpoch=t.courtLifecycleEpoch;
   }
   // Preserve the sanitized public metadata; do not copy private runtime fields.
   mirror.players=state.players.map(p=>({id:p.id,name:p.name,checkedIn:p.checkedIn===true}));
