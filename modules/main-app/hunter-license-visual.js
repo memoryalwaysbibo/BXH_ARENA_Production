@@ -10,7 +10,17 @@
   if(/^data:image\/(?:jpeg|png|webp|gif);base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(raw)&&raw.split(',')[1])return raw;
   try{const url=new URL(raw);return ['https:','http:'].includes(url.protocol)?url.href:'';}catch{return '';}
  }
- function render({profile={},name='玩家',currentGrade}={}){
+ // numberIdentity must come from an authenticated server ledger reader, never users profile fields.
+ function identityText(record,uid){
+  if(!uid||record?.uid!==uid||record?.status!=='assigned'||record?.source!=='player-number-ledger')return {number:'待配號',joined:'待核對'};
+  const number=record.number,raw=record.authCreatedAtMilliseconds;
+  if(typeof number!=='string'||!/^[1-9][0-9]*$/.test(number)||typeof raw!=='string'||!/^[0-9]{1,16}$/.test(raw))return {number:'待配號',joined:'待核對'};
+  const ms=Number(raw),date=new Date(ms);
+  if(!Number.isSafeInteger(ms)||ms<=0||!Number.isFinite(date.getTime()))return {number:'待配號',joined:'待核對'};
+  return {number:number.padStart(5,'0'),joined:date.toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})};
+ }
+ function render({profile={},name='玩家',currentGrade,numberIdentity=null,accountUid=''}={}){
+  const identity=identityText(numberIdentity,accountUid);
   const tier=grades.includes(currentGrade?.tier)?currentGrade.tier:'pending';
   const label=tier==='pending'?(currentGrade?.label||'資料待核對'):labels[tier];
   const photo=avatarUrl(profile?.avatarUrl);
@@ -20,7 +30,7 @@
    '<div class="hl3-body"><div class="hl3-portrait">'+
    (photo?'<img data-hl3-image src="'+esc(photo)+'" alt="'+esc(name)+'的頭像" referrerpolicy="no-referrer" decoding="async">':'')+
    '<span role="img" aria-label="尚未設定頭像"'+(photo?' hidden':'')+'>'+esc(Array.from(name)[0]||'獵')+'</span></div>'+
-   '<div class="hl3-identity"><h4>'+esc(name)+'</h4><dl><div><dt>執照編號</dt><dd>待配號</dd></div><div><dt>加入日期</dt><dd class="hl3-date">待核對</dd></div></dl></div>'+
+   '<div class="hl3-identity"><h4>'+esc(name)+'</h4><dl><div><dt>執照編號</dt><dd>'+esc(identity.number)+'</dd></div><div><dt>加入日期</dt><dd class="hl3-date">'+esc(identity.joined)+'</dd></div></dl></div>'+
    '<div class="hl3-rank" data-tier="'+tier+'"><p>目前階級</p>'+
    (tier==='pending'?'<div class="hl3-pending">◇</div><strong>'+esc(label)+'</strong>':
     '<img data-hl3-image src="assets/hunter-ranks/license-v911/'+tier+'.png" alt="'+esc(label)+'" width="'+size[0]+'" height="'+size[1]+'" decoding="async">'+

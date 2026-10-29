@@ -885,6 +885,7 @@
     async getSnapshot(){ return callEngagementFunction("getEngagementSnapshot",{}); },
     async syncHunterAchievements(){ return callEngagementFunction("syncHunterAchievements",{},120000); },
     async syncHunterLicenseV21(){ return callEngagementFunction("syncHunterLicenseV21",{},120000); },
+    async readMyNumberIdentity(){ return callEngagementFunction("readMyNumberIdentity",{},30000); },
     async dailyCheckIn(){ return callEngagementFunction("dailyCheckIn",{}); },
     async setTitlePreferences(payload){ return callEngagementFunction("setTitlePreferences",payload); },
     async seedInitialTitles(){ return callEngagementFunction("seedInitialTitles",{}); },

@@ -17269,6 +17269,17 @@ async function loadHunterProfile(force=false){
     const loaded={records:canonicalRecords,skipped:skippedRecords,achievementCore:null,integrityAudit:null,permanentAwards:null,permanentLicense:null,loadedAt:Date.now()};
     hunterProfileCache=loaded;
     const profileUid=currentAuthUid();
+    // Optional read-only authenticated number service. Pair date and number in one response.
+    if(window.engagementService?.readMyNumberIdentity)setTimeout(async()=>{
+      try{
+        const identity=await window.engagementService.readMyNumberIdentity();
+        if(hunterProfileCache!==loaded||currentAuthUid()!==profileUid)return;
+        loaded.numberIdentity=identity?.uid===profileUid?identity:null;
+        renderPreservingScroll();
+      }catch(error){
+        if(hunterProfileCache===loaded&&currentAuthUid()===profileUid){loaded.numberIdentity=null;renderPreservingScroll();}
+      }
+    },0);
     if(window.engagementService?.syncHunterLicenseV21)setTimeout(async()=>{
       try{
         const license=await window.engagementService.syncHunterLicenseV21();
@@ -17356,7 +17367,7 @@ function renderPlayerStatsTab(p){
     const periodLabel={career:"生涯",season:"本季",month:"本月",week:"本週",today:"今日"}[hunterOverviewPeriod]||"生涯";
     const overviewPeriods=[["career","生涯",true],["season","本季",seasonAvailable],["month","本月",true],["week","本週",true],["today","今日",true]].map(([key,label,enabled])=>'<button class="btn '+(hunterOverviewPeriod===key?'btn-primary':'btn-ghost')+' btn-sm" '+(enabled?'data-action="hunter-overview-period" data-value="'+key+'"':'disabled title="賽季起始時間尚未載入"')+'>'+label+'</button>').join('');
     const growthRemaining=Math.max(0,growth.next-growth.xp);
-    const visualLicense=window.BXHHunterLicenseVisual?.render({name:playerName,profile:p,currentGrade:licenseGrade})||"";
+    const visualLicense=window.BXHHunterLicenseVisual?.render({name:playerName,profile:p,currentGrade:licenseGrade,numberIdentity:hunterProfileCache?.numberIdentity,accountUid:currentAuthUid()})||"";
     body=(visualLicense?visualLicense+'<section class="panel hunter-license-stats">':
       '<section class="panel hunter-license-card">'+
       '<div class="hunter-license-head"><div><div class="hunter-kicker">BXH HUNTER LICENSE</div><div class="panel-title">獵人執照</div></div><span class="badge badge-metal">2.1</span></div>'+
