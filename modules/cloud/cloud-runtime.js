@@ -813,7 +813,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload'].includes(name)){
+      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -847,6 +847,7 @@
     connectionInfo(){return {projectId:FIREBASE_CONFIG.projectId||'未設定',region:'asia-east1',signedIn:!!(authHandle&&authHandle.currentUser),sdkReady:!!fnx};},
     async changeManagedAccounts(payload){return callEngagementFunction("changeManagedAccounts",payload,30000);},
     async tournamentOperation(name,payload){return callEngagementFunction(name,payload,30000);},
+    async ladderTeamDisplay(payload){return callEngagementFunction("ladderTeamDisplay",payload,15000,payload?.action==="teams");},
     async playerCard(payload){return callEngagementFunction("playerCardService",payload,120000);},
     async hunterOpponentIdentity(payload){return callEngagementFunction("hunterOpponentIdentity",payload,30000);},
     async health(){return callEngagementFunction('getEngagementHealth',{});},
