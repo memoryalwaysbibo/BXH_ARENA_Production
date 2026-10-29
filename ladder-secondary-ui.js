@@ -131,6 +131,7 @@
     if(!rows.length){
       return myCard+ladderEmptyRankingHtml(ladderScoreMode);
     }
+    window.BXHLadderTeamDisplay?.ensure(ladderPublicData,rows.slice(0,ladderVisibleCount));
     var body=rows.slice(0,ladderVisibleCount).map(function(p){
       var rank=Number(p.__rank||0);
       var topClass=rank>=1&&rank<=3?" ladder-rank-top-"+rank:"";
@@ -202,6 +203,7 @@
         '<div class="ladder-rank-position">NO.'+rank+'</div>'+
         '<div class="ladder-player-block">'+
           '<button class="ladder-player-link'+(rank===1?' ladder-name-rank-1':rank===2?' ladder-name-rank-2':rank===3?' ladder-name-rank-3':rank===4?' ladder-name-rank-4':rank>=5&&rank<=10?' ladder-name-rank-elite':'')+'" data-action="card-open" data-uid="'+escLocal(p.uid||"")+'" title="'+escLocal(p.playerName||p.publicName||"—")+'">'+escLocal(p.playerName||p.publicName||"—")+'</button>'+
+          (window.BXHLadderTeamDisplay?.lineHtml(ladderPublicData,p.uid)||"")+
           title+
         '</div>'+
         '<div class="ladder-tier-cell">'+ladderTierEmblemHtml(p)+'</div>'+
@@ -611,6 +613,7 @@
     ".ladder-rank-top-3 .ladder-rank-position{color:#d9a574;}"+
     ".ladder-player-block{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;}"+
     ".ladder-player-link{display:block;width:100%;max-width:100%;padding:0;border:0;background:transparent;color:var(--ivory);font:800 17px/1.25 var(--font-d);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}"+
+    ".ladder-player-team{display:block;max-width:100%;font-size:11px;line-height:1.3;color:var(--metal);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"+
     ".ladder-player-link:focus-visible{outline:1px solid var(--gold);outline-offset:3px;border-radius:3px;}"+
     ".ladder-player-block .title-chip{display:block;max-width:100%;margin:0 auto;padding:2px 7px;font-size:9px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}"+
     ".ladder-player-block .title-chip.title-art-chip{width:155px;max-width:100%;padding:0;border:0;aspect-ratio:3/1;overflow:visible;line-height:0;}"+
