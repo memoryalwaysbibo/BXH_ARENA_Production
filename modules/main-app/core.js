@@ -5573,7 +5573,7 @@ let findEventsFilters = { keyword:"", date:"", region:"", format:"all" };
 let findEventsExpanded = { ongoing:false, open:false, upcoming:false };
 let findEventsFiltersOpen = false;
 let lobbySectionExpanded = { live:null, settling:false, registration:false, waiting:false, ended:false };
-const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","天梯排行"],["shop","商城"]];
+const PLAYER_TABS = [["home","賽事大廳"],["registered","我的賽程"],["host","我的房間"],["stats","獵人檔案"],["ladder","排行榜"],["shop","商城"]];
 const hunterClashEntry=window.BXHHunterClashEntry?.createEntry({changed:()=>renderPreservingScroll(),escape:esc});
 function playerVisibleTabs(){const tabs=hunterClashEntry?.visible()?[...PLAYER_TABS,["clash","獵人交鋒"]]:[...PLAYER_TABS];if(window.BXHTeamAdminPreview?.visible?.()){const shop=tabs.findIndex(([key])=>key==="shop");tabs.splice(shop<0?tabs.length:shop,0,["team-preview","戰隊"]);}return tabs;}
 
@@ -19468,7 +19468,7 @@ function renderAdminNoTournamentScreen(){
 
 function renderApp(){
   const app = document.getElementById("app");
-  const allTabs = [["management","賽事管理"],["ladder","天梯排行"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
+  const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
   let tabs = hasAdminAccess() ? allTabs : allTabs.filter(t=>!["management","referee","settings","registrations","people"].includes(t[0]));
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
   if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"],["commerce-admin","商城管理"]);

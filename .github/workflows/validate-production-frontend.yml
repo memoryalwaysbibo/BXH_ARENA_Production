@@ -204,7 +204,7 @@ jobs:
       - name: Verify Production frontend invariants
         run: node scripts/verify-production-frontend.cjs
       - name: Verify personal history and Hunter License 2.1
-        run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs tests/hunter-leaderboard.test.cjs
+        run: node --test tests/personal-scan-v21.test.cjs tests/player-center-integration.test.cjs tests/hunter-license-v21.test.cjs tests/hunter-b1-cloud.test.cjs tests/hunter-leaderboard.test.cjs tests/team-leaderboard.test.cjs
       - name: Verify frozen Hunter license artwork and runtime contracts
         run: node --test tests/hunter-license-visual.test.cjs
       - name: Verify public catalog evidence, projection, UI contract and artifact boundary

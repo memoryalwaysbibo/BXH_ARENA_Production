@@ -32,3 +32,29 @@ test('hunter board renders safe public rows and scrolls its table inside a mobil
  expect(dimensions.body).toBeLessThanOrEqual(dimensions.width);
  if(dimensions.width<650)expect(dimensions.table).toBeGreaterThan(dimensions.container);
 });
+
+test('rankings switch between ladder hunter and real team ranking read without mobile squeeze',async({page})=>{
+ await page.setContent('<style>*{box-sizing:border-box}body{margin:12px}.panel{padding:16px}.btn{padding:10px}.rank-scroll{overflow:auto}</style><main id="board"></main>');
+ await page.addStyleTag({content:fs.readFileSync(path.join(root,'modules/main-css/hunter-leaderboard.css'),'utf8')});
+ await page.evaluate(()=>{
+  window.calls=[];window.uid='player1';window.currentAuthUid=()=>uid;window.userProfile={active:true,role:'player'};window.BXH_TEAM_FULL_ENABLED=true;
+  window.esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  window.renderLadderLeaderboardPage=()=>'<h2>天梯資料</h2>';
+  window.BXHHunterLeaderboard={create:()=>({render:()=>'<h2>獵人資料</h2>'})};
+  window.engagementService={tournamentOperation:async(name,payload)=>{calls.push({name,payload});return {items:[{id:'bxh',name:'<img src=x>測試戰隊名稱很長很長也不能擠壓',captainName:'黑爸',rank:1,strength:511,memberCount:1,level:1}],total:1,partial:true,excluded:1,offset:0,limit:20};}};
+  window.renderPreservingScroll=()=>document.getElementById('board').innerHTML=renderLadderLeaderboardPage(false);
+ });
+ for(const file of ['team-leaderboard.js','hunter-leaderboard-integration.js'])await page.addScriptTag({content:fs.readFileSync(path.join(root,'modules/main-app',file),'utf8')});
+ await page.evaluate(()=>renderPreservingScroll());
+ for(const label of ['天梯榜','獵人榜','戰隊榜'])await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>calls.length)).toBe(0);
+ await page.getByRole('button',{name:'戰隊榜',exact:true}).click();
+ await expect(page.getByText('黑爸',{exact:true})).toBeVisible();
+ await expect(page.getByText(/另有 1 支尚未列榜/)).toBeVisible();
+ expect(await page.evaluate(()=>calls)).toEqual([{name:'teamRead',payload:{action:'ranking',query:{offset:0,limit:20}}}]);
+ await expect(page.locator('img')).toHaveCount(0);
+ for(const width of [320,390,430,1280]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+ await page.getByRole('button',{name:'獵人榜',exact:true}).click();await expect(page.getByRole('heading',{name:'獵人資料'})).toBeVisible();
+ await page.getByRole('button',{name:'天梯榜',exact:true}).click();await expect(page.getByRole('heading',{name:'天梯資料'})).toBeVisible();
+ await page.evaluate(()=>{uid=null;renderPreservingScroll()});await expect(page.getByRole('button',{name:'戰隊榜',exact:true})).toHaveCount(0);
+});
