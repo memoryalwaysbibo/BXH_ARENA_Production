@@ -12631,8 +12631,32 @@ async function peoplePromoteOnline(registrationId,name,expandBy=0){
     await peopleRecoverPromotion(context,name,e);
   }
 }
-async function peopleQuickAddPlayers(lines){
-  if(peopleRosterBusy||state.startedAt)return false;
+async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=state){
+  if(peopleRosterBusy||state.startedAt||state!==expectedRoom)return false;
+  if(!guestConfirmed){
+    if((state.meta?.registrationEnabled||isCommunityQuickRegistration(state))&&state.cloudCode){
+      if(!Array.isArray(adminRegistrationsCache)||adminRosterCode!==state.cloudCode||adminRegistrationsLoading||adminRegistrationsError){
+        openModal({type:"generic",title:"先同步線上報名名單",
+          message:"目前無法核對這場賽事的線上報名。請先同步正備取資料；若雲端操作結果不明，先核對名單，避免把同一人新增為現場訪客。",
+          confirmLabel:"關閉"});
+        return false;
+      }
+    }
+    const normalizeName=name=>String(name||"").replace(/（現場）$/,"").normalize("NFKC").replace(/\\s+/g,"").toLocaleLowerCase();
+    const requested=new Set(lines.map(normalizeName));
+    const matches=(Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[])
+      .filter(row=>row&&!["cancelled","withdrawn"].includes(row.status)&&
+        requested.has(normalizeName(row.realName||row.participantName||row.displayName||row.publicName)));
+    const sameName=matches.length?Array.from(new Set(matches.map(row=>
+      String(row.realName||row.participantName||row.displayName||row.publicName||"").trim()))).join("、"):"";
+    const room=state;
+    openModal({type:"generic",title:matches.length?"找到同名線上報名":"確認新增現場訪客",
+      message:(matches.length?"「"+sameName+"」已有線上報名。若是同一人，請在正備取名單操作或先同步雲端結果；不可再新增訪客。只有確認是同名不同人，才繼續。\\n\\n":"")+
+        "現場訪客不連結玩家帳號，結算後不會取得獵人榜或天梯賽事積分。已報名的玩家應走線上名單升正取與報到。",
+      cancelLabel:"返回核對名單",confirmLabel:matches.length?"確認同名不同人，新增訪客":"確認為訪客，新增",
+      onConfirm:()=>peopleQuickAddPlayers(lines,true,room)});
+    return false;
+  }
   const room=state,code=state.cloudCode,addedIds=new Set(),defaultChecked=!state.meta.checkinRequired;
   peopleRosterBusy=true;
   try{
@@ -12874,7 +12898,7 @@ function renderPeopleManagement(){
   const toolsPanel=`
     ${online||isCommunityQuickRegistration(state)?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt||peopleRosterBusy?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
     ${needsCheckin?`<div class="panel"><div class="panel-title">報到管理</div><div class="btn-row"><button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button></div><p class="hint">提前結束後，未報到正取不會進入對戰表。</p>${checkinClosed?`<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>`:''}</div>`:''}
-    <div class="panel"><div class="panel-title">現場新增選手</div><div class="field"><label>每行一位</label><textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea><div class="hint">${needsCheckin?'新增後先列為正取／未報到，玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入正取。'}現場玩家不需系統帳號。</div></div><div class="btn-row"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至正取待報到':'新增至正取'}</button></div></div>
+    <div class="panel"><div class="panel-title">現場新增選手</div><div class="field"><label>每行一位</label><textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea><div class="hint">${needsCheckin?'新增後先列為正取／未報到，玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入正取。'}此處新增為不連結帳號的現場訪客，不計入獵人榜與天梯賽事積分。已線上報名的玩家請從備取升正取，先核對雲端名單。</div></div><div class="btn-row"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至正取待報到':'新增至正取'}</button></div></div>
     <div class="panel"><div class="panel-title">測試名單</div><div class="hint" style="margin-bottom:10px;">建立指定人數的測試選手；會取代目前正取名單。</div><div class="btn-row"><button class="btn btn-ghost" data-action="random-test-roster" data-count="8" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 8 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="16" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 16 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="32" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 32 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="64" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 64 位</button></div></div>`;
 
   const staffPanel=`<details class="settings-accordion" open><summary><span>工作人員分派</span><span class="hint">賽事人力</span></summary><div class="settings-accordion-body">${renderStaffAssignmentPanel()}</div></details>${renderRefereeStationAssignmentPanel()}`;
