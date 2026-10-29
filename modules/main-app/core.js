@@ -12642,7 +12642,7 @@ async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=sta
         return false;
       }
     }
-    const normalizeName=name=>String(name||"").replace(/（現場）$/,"").normalize("NFKC").replace(/\\s+/g,"").toLocaleLowerCase();
+    const normalizeName=name=>String(name||"").replace(/（現場）$/,"").normalize("NFKC").replace(/\s+/g,"").toLocaleLowerCase();
     const requested=new Set(lines.map(normalizeName));
     const matches=(Array.isArray(adminRegistrationsCache)?adminRegistrationsCache:[])
       .filter(row=>row&&!["cancelled","withdrawn"].includes(row.status)&&
@@ -12651,7 +12651,7 @@ async function peopleQuickAddPlayers(lines,guestConfirmed=false,expectedRoom=sta
       String(row.realName||row.participantName||row.displayName||row.publicName||"").trim()))).join("、"):"";
     const room=state;
     openModal({type:"generic",title:matches.length?"找到同名線上報名":"確認新增現場訪客",
-      message:(matches.length?"「"+sameName+"」已有線上報名。若是同一人，請在正備取名單操作或先同步雲端結果；不可再新增訪客。只有確認是同名不同人，才繼續。\\n\\n":"")+
+      message:(matches.length?"「"+sameName+"」已有線上報名。若是同一人，請在正備取名單操作或先同步雲端結果；不可再新增訪客。只有確認是同名不同人，才繼續。\n\n":"")+
         "現場訪客不連結玩家帳號，結算後不會取得獵人榜或天梯賽事積分。已報名的玩家應走線上名單升正取與報到。",
       cancelLabel:"返回核對名單",confirmLabel:matches.length?"確認同名不同人，新增訪客":"確認為訪客，新增",
       onConfirm:()=>peopleQuickAddPlayers(lines,true,room)});
