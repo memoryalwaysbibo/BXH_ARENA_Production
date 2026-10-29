@@ -127,3 +127,15 @@ test('team lobby stays readable on narrow phones and teams precede the shop in p
  await search.getByRole('button',{name:'清除篩選',exact:true}).click();await expect(search.locator('[name="query"]')).toHaveValue('');
  await page.evaluate(()=>{window.BXH_TEAM_FULL_ENABLED=false;render();});await expect(page.locator('[data-tab="team-preview"]')).toHaveCount(0);expect(errors).toEqual([]);
 });
+
+test('pending applications mark team navigation and remain after reading mail until resolved',async({page})=>{
+ await page.setContent('<button data-action="player-switch-tab" data-tab="team-preview">戰隊</button><button data-team-action="tab" data-value="mine">我的戰隊</button><button data-team-action="applications">查看加入申請</button>');
+ await page.evaluate(()=>{window.userProfile={active:true,role:'player'};window.BXH_TEAM_FULL_ENABLED=true;window.currentAuthUid=()=> 'captain';window.pending=true;window.mailRefreshes=0;window.BXHMailbox={loadMailbox:async()=>{mailRefreshes++}};window.engagementService={tournamentOperation:async()=>({team:{role:'captain',hasPendingApplications:pending}})};});
+ await page.addScriptTag({content:require('node:fs').readFileSync(require('node:path').join(__dirname,'../../team-foundation/team-attention.js'),'utf8')});
+ await page.evaluate(()=>BXHTeamAttention.sync());
+ await expect(page.locator('[data-team-pending-badge]')).toHaveCount(3);
+ expect(await page.evaluate(()=>mailRefreshes)).toBe(1);
+ await page.evaluate(()=>BXHTeamAttention.refresh());await expect(page.locator('[data-team-pending-badge]')).toHaveCount(3);
+ await page.evaluate(()=>{pending=false;return BXHTeamAttention.refresh()});await expect(page.locator('[data-team-pending-badge]')).toHaveCount(0);
+ await page.evaluate(()=>{userProfile.active=false;BXHTeamAttention.sync()});await expect(page.locator('[data-team-pending-badge]')).toHaveCount(0);
+});

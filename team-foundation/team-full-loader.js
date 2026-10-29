@@ -2,11 +2,11 @@
 'use strict';
 // The full flow is staged independently from the deployed read-only preview.
 if(root.BXH_TEAM_FULL_ENABLED!==true)return;
-const files=['team-api.js','emblem-presets.js','team-ui.js','team-emblem.js','team-controller.js','team-mount.js','team-host.js','team-full-integration.js'];
+const files=['team-api.js','emblem-presets.js','team-ui.js','team-emblem.js','team-controller.js','team-mount.js','team-host.js','team-attention.js','team-full-integration.js'];
 async function load(){
  for(const file of files){
   if(root.BXH_TEAM_FULL_ENABLED!==true)return;
-  await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='team-foundation/'+file+'?v=20261029-team-layout-1';script.onload=resolve;script.onerror=()=>reject(Error('team-module-unavailable'));document.head.append(script);});
+  await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='team-foundation/'+file+'?v=20261029-team-attention-1';script.onload=resolve;script.onerror=()=>reject(Error('team-module-unavailable'));document.head.append(script);});
  }
  if(root.BXH_TEAM_FULL_ENABLED===true&&typeof render==='function')render();
 }
