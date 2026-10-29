@@ -15,7 +15,7 @@ function testRoom(room,state) {
 function validRoom(room,state) {
   if(testRoom(room,state)) return 'test-event';
   if(room.eventCancelled||state.meta?.eventCancelled||room.deletionStatus||state.deletionStatus
-    ||room.systemClosed||(state.systemClosure&&!state.systemClosure.restoredAt)||room.tournamentPhase==='cancelled') return 'cancelled-event';
+    ||room.systemClosed||(state.systemClosure&&!state.systemClosure.restoredAt)||room.tournamentPhase==='cancelled'||room.deleted||room.deletedAt||state.deleted||state.deletedAt) return 'cancelled-event';
   const authority=room.eventAuthority||state.meta?.eventAuthority;
   if(!authority||(room.eventAuthority&&state.meta?.eventAuthority&&room.eventAuthority!==state.meta.eventAuthority)) return 'event-authority-unresolved';
   if(authority!=='official') return 'non-official-event';
@@ -62,8 +62,7 @@ async function readSystemSources(tx,db,uid,limits=D.LIMITS) {
     const room=snap.exists?snap.data():null,state=parseState(room);
     rooms.set(code,{room,state});
   }));
-  const audits=new Map();let auditRooms=0;
-  const validEvents=new Map(),seen=new Set();
+  const seen=new Set();
   for(const log of logs) {
     const code=log.tournamentCode,matchId=log.matchId,key=String(code||'')+'_'+String(matchId||'');
     const row={id:log.docId,tournamentCode:typeof code==='string'?code:'',matchId:typeof matchId==='string'?matchId:'',status:'pending',reason:null};
@@ -83,36 +82,14 @@ async function readSystemSources(tx,db,uid,limits=D.LIMITS) {
     if(candidates.length!==1){pending('match-unresolved');continue;}
     const match=candidates[0];
     if(match.isBye){excluded('bye');continue;}
+    if(['revoked','revokedAt','cancelled','cancelledAt','voided','voidedAt','resultRevoked'].some(k=>match[k])||['revoked','cancelled','void'].includes(match.status)){excluded('revoked-result');continue;}
     if(match.completed!==true){excluded('current-result-not-completed');continue;}
     if(!match.a?.playerId||!match.b?.playerId||match.a.playerId===match.b.playerId||![match.a.playerId,match.b.playerId].includes(match.winnerId)){pending('current-result-invalid');continue;}
-    let verified=match.confirmedByUid===uid;
-    if(match.confirmedByUid&&match.confirmedByUid!==uid){excluded('different-confirming-referee');continue;}
-    if(!verified) {
-      if(!audits.has(code)) {
-        if(auditRooms>=limits.auditRooms){out.incomplete=true;out.incompleteReasons.push('audit-rooms-limit');audits.set(code,[]);}
-        else {
-          auditRooms++;
-          const snap=await tx.get(db.collection('tournaments/'+code+'/refereeScoreAudit').where('uid','==',uid).limit(limits.scoreAudits+1));
-          audits.set(code,limited(snap,limits.scoreAudits,out,'score-audit-limit').map(doc=>doc.data()));
-        }
-      }
-      verified=audits.get(code).some(audit=>trustworthyAudit(match,uid,audit));
-    }
-    if(!verified){pending('confirming-identity-unresolved');continue;}
-    out.decisions++;
-    const done=completedEvent(room,state);
-    row.status=done?'verified':'pending_event';
-    row.reason=done?null:'event-not-completed';
-    row.eventName=String(state.meta?.name||room.name||'').slice(0,160);
-    row.confirmedAt=Number(match.confirmedAt||match.completedAt)||null;
-    row.station=Number(match.confirmedStation||match.station)||null;
-    validEvents.set(code,{room,state,done});
-  }
-  for(const [code,{state,done}] of validEvents) {
-    if(!done){out.pendingEvents++;continue;}
-    const scale=actualSize(state);
-    D.addEvent(out,1,scale.size,scale.precision);
-    for(const row of out.systemRecords) if(row.tournamentCode===code&&row.status==='verified') Object.assign(row,{eventSize:scale.size,eventPrecision:scale.precision,eventSizeSource:scale.source});
+    // confirmedByUid and score-audit uid identify the operator, not the responsible referee.
+    // No existing production field establishes responsibility. Only explicit audited recognition counts.
+    pending('responsibility-unverified');
+    row.finalResultValid=true;row.operatorUid=typeof match.confirmedByUid==='string'?match.confirmedByUid:null;
+    continue;
   }
   out.incompleteReasons=[...new Set(out.incompleteReasons)];
   return out;

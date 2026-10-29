@@ -24,7 +24,7 @@ const executablePath = process.env.BXH_TEST_BROWSER || process.env.PLAYWRIGHT_CH
     await page.evaluate(() => {
       function make(uid, extra = {}) {
         const base = {uid, person: {realName: uid === 'self' ? '林以安' : '陳定宇', nickname: '驗證專用裁判'}, revision: 7,
-          certificate: {number: 'BXH-REF-000007', awardedLevel: 5, issuedAt: 1760000000000, photoDataUrl: '', isChief: false},
+          certificate: {number: 'BXH-REF-000007', awardedLevel: 5, status:'active', issuedAt: 1760000000000, photoDataUrl: '', isChief: false},
           stats: {decisions: 240, eventCount: 12, scales: {64: 10, 96: 3, 128: 1}, milestones: Object.fromEntries(Array.from({length: 10}, (_, i) => [(i + 1) * 100, i < 3 ? 1 : 0])), unknownScaleEvents: 0, pendingLogCount: 0, pendingEvents: 0, systemDecisions: 240, backfillDecisions: 0, knownMaxSize: 320, maxPrecision: 'exact'},
           eligibleLevel: 5, backfills: [], chiefRevision: 2, isChief: false, incomplete: false,
           systemRecords: [{eventName: '已完成正式賽', status: 'verified', confirmedAt: 1760000000000, station: 2}, {eventName: '撤回判決紀錄', status: 'excluded', reason: 'current-result-not-completed'}, {eventName: '進行中正式賽', status: 'pending_event'}, {eventName: '待確認活動', status: 'pending', reason: 'event-authority-unresolved'}]};
@@ -117,14 +117,14 @@ const executablePath = process.env.BXH_TEST_BROWSER || process.env.PLAYWRIGHT_CH
     await page.locator('[data-referee-form="search"] button').click();
     await page.locator('[data-action="referee-license-select"][data-uid="target"]').click();
     await page.locator('[data-referee-form="backfill"]').waitFor();
-    await page.locator('[name="decisions"]').fill('20'); await page.locator('[name="events"]').fill('1');
+    await page.locator('[name="kind"]').selectOption('event');await page.locator('[name="sourceKey"]').fill('historical:fixture-event');await page.locator('[name="basis"]').fill('fixture verified experience');await page.locator('[name="precision"]').selectOption('exact');await page.locator('[name="decisions"]').fill('0'); await page.locator('[name="events"]').fill('1');
     await page.locator('[name="size"]').fill('148'); await page.locator('[name="note"]').fill('系統開始前的執勤印象');
-    assert((await page.locator('[data-referee-impact]').textContent()).includes('240 → 260'));
+    assert((await page.locator('[data-referee-impact]').textContent()).includes('12 → 13'));
     await page.evaluate(() => {
       const next = structuredClone(fixture.snapshots.target);
       next.stats.decisions = 260; next.stats.backfillDecisions = 20; next.stats.eventCount = 13;
       next.stats.scales = {64: 11, 96: 4, 128: 2}; next.stats.milestones[100] = 2;
-      next.backfills = [{id: 'backfill-1', revision: 1, decisions: 20, events: 1, size: 148, precision: 'exact', period: '系統開始記錄前', note: '系統開始前的執勤印象', status: 'active', updatedBy: 'admin', updatedAt: 1760000000000, history: []}];
+      next.backfills = [{id: 'backfill-1', kind:'event',sourceKey:'historical:fixture-event',basis:'fixture verified experience',recognitionValid:true,revision: 1, decisions: 0, events: 1, size: 148, precision: 'exact', period: '系統開始記錄前', note: '系統開始前的執勤印象', status: 'active', updatedBy: 'admin', updatedAt: 1760000000000, history: []}];
       fixture.nextMutation = next; fixture.holdMutation = true;
     });
     await page.locator('[data-referee-form="backfill"] button[type="submit"]').click();
@@ -135,12 +135,12 @@ const executablePath = process.env.BXH_TEST_BROWSER || process.env.PLAYWRIGHT_CH
     await page.evaluate(() => fixture.release());
     await page.waitForFunction(() => document.querySelector('.rl-admin-totals')?.textContent.includes('260'));
     await page.locator('[data-action="referee-license-edit"]').click();
-    await page.locator('[name="events"]').fill('3'); await page.locator('[name="precision"]').selectOption('unknown');
+    await page.locator('[name="events"]').fill('1'); await page.locator('[name="precision"]').selectOption('unknown');
     assert.equal(await page.locator('[name="size"]').isDisabled(), true);
     await page.evaluate(() => {
       const next = structuredClone(fixture.snapshots.target); next.stats.eventCount = 15; next.stats.unknownScaleEvents = 3;
       next.stats.scales = {64: 10, 96: 3, 128: 1}; next.stats.milestones[100] = 1;
-      Object.assign(next.backfills[0], {events: 3, size: null, precision: 'unknown', revision: 2}); fixture.nextMutation = next;
+      Object.assign(next.backfills[0], {events: 1, size: null, precision: 'unknown', revision: 2}); fixture.nextMutation = next;
     });
     await page.locator('[data-referee-form="backfill"] button[type="submit"]').click();
     await page.waitForFunction(() => document.querySelector('.rl-admin-totals')?.textContent.includes('15'));

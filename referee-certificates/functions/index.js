@@ -13,3 +13,11 @@ exports.refereeCertificateService=onCall({region:'asia-east1',timeoutSeconds:60,
     throw new HttpsError('internal','referee-certificate-service-error');
   }
 });
+// Independently gated public projection; private get remains self/super_admin only.
+const publicSummary=require('./public-summary.cjs').createPublicSummary(getFirestore());
+exports.refereeCertificatePublicSummary=onCall({region:'asia-east1',timeoutSeconds:60,maxInstances:10,invoker:'public'},async request=>{
+  try{return await publicSummary(request);}catch(error){
+    if(['invalid-argument','failed-precondition'].includes(error.code))throw new HttpsError(error.code,error.message);
+    throw new HttpsError('internal','public-certificate-summary-unavailable');
+  }
+});

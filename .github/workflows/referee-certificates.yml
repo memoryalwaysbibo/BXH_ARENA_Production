@@ -10,6 +10,9 @@ on:
       - 'modules/management-v2/navigation.js'
       - 'tests/referee-certificate-*.cjs'
       - 'tests/referee-license-*.cjs'
+      - 'tests/referee-public-summary.browser.cjs'
+      - 'tests/referee-full-host.browser.cjs'
+      - 'modules/main-app/player-cards.js'
       - 'index.html'
       - '.github/workflows/referee-certificates.yml'
 
@@ -47,3 +50,11 @@ jobs:
         env:
           NODE_PATH: /tmp/referee-certificate-deps/node_modules
         run: node tests/referee-certificate-contract.browser.cjs
+      - name: Public summary boundary through the player-card module
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: node tests/referee-public-summary.browser.cjs
+      - name: Full index host navigation and actual callable adapters with local transport fixtures
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: node tests/referee-full-host.browser.cjs

@@ -14,7 +14,7 @@ const deferred = () => { let resolve, reject; const promise = new Promise((a, b)
 function snapshot(uid, changes = {}) {
   const base = {
     uid, person: {realName: '測試裁判', nickname: '驗證用'}, revision: 7,
-    certificate: {number: 'BXH-REF-0007', awardedLevel: 5, issuedAt: 1760000000000, photoDataUrl: '', isChief: false},
+    certificate: {number: 'BXH-REF-0007', awardedLevel: 5, status:'active', issuedAt: 1760000000000, photoDataUrl: '', isChief: false},
     stats: {decisions: 240, eventCount: 12, scales: {64: 10, 96: 3, 128: 1},
       milestones: Object.fromEntries(Array.from({length: 10}, (_, i) => [(i + 1) * 100, i < 3 ? 1 : 0])),
       unknownScaleEvents: 0, pendingLogCount: 0, pendingEvents: 0, systemDecisions: 240, backfillDecisions: 0, knownMaxSize: 320, maxPrecision: 'exact'},
@@ -49,17 +49,17 @@ function harness(handler) {
 test('inclusive scale previews, unknown sizes, exact limits and within-grade progress', () => {
   const h = harness(() => {}), D = h.domain, source = snapshot('u');
   assert.equal(D.progress(source).fraction, .16);
-  const entry = {decisions: 0, events: 1, size: 148, precision: 'exact', period: '系統開始記錄前', note: ''};
+  const entry = {kind:'event',sourceKey:'historical:event',basis:'核實依據',decisions: 0, events: 1, size: 148, precision: 'exact', period: '系統開始記錄前', note: ''};
   const impact = D.impact(source, entry);
   assert.deepEqual(plain(impact.eventCount), {current: 12, after: 13});
   assert.deepEqual(plain(impact.thresholds.map(item => item.size)), [64, 96, 128, 100]);
   assert.equal(D.impact(source, {...entry, size: 96}).thresholds.some(item => item.size === 100), false);
   assert.equal(D.impact(source, {...entry, size: 1000}).thresholds.filter(item => item.size % 100 === 0).length, 10);
-  const unknown = D.impact(source, {...entry, events: 3, size: null, precision: 'unknown'});
-  assert.equal(unknown.eventCount.after, 15); assert.equal(unknown.thresholds.length, 0);
+  const unknown = D.impact(source, {...entry, events: 1, size: null, precision: 'unknown'});
+  assert.equal(unknown.eventCount.after, 13); assert.equal(unknown.thresholds.length, 0);
   const existing = {...entry, id: 'old', status: 'active'};
-  const corrected = D.impact({...source, backfills: [existing]}, {...entry, id: 'old', events: 2});
-  assert.equal(corrected.eventCount.after, 13, 'editing replaces the original entry');
+  const corrected = D.impact({...source, backfills: [existing]}, {...entry, id: 'old', events: 1});
+  assert.equal(corrected.eventCount.after, 12, 'editing replaces the original entry');
   assert(D.validateEntry({...entry, decisions: 1000001}).length);
   assert(D.validateEntry({...entry, period: '期'.repeat(101)}).length);
   assert(D.validateEntry({...entry, note: '註'.repeat(501)}).length);
@@ -104,9 +104,9 @@ test('backfill keeps confirmed totals while saving and accepts only returned ser
   const saving = deferred(), base = snapshot('target');
   const h = harness(async payload => payload.action === 'search' ? {ok: true, items: [{uid: 'target'}]} : payload.action === 'get' ? {ok: true, snapshot: base} : saving.promise);
   const ctx = h.ctx('admin', true); await h.select(ctx, 'target');
-  h.field('decisions', '17'); h.field('note', '依記憶認列'); h.action('save-backfill', ctx);
+  h.field('sourceKey','historical:one');h.field('basis','核實責任');h.field('decisions', '1'); h.field('note', '依記憶認列'); h.action('save-backfill', ctx);
   const request = h.calls.find(item => item.action === 'saveBackfill');
-  assert.equal(request.expectedRevision, 7); assert.equal(request.entry.decisions, 17); assert.equal(request.entry.note, '依記憶認列');
+  assert.equal(request.expectedRevision, 7); assert.equal(request.entry.decisions, 1); assert.equal(request.entry.note, '依記憶認列');
   assert.match(request.operationId, /^[a-f0-9-]{36}$/);
   assert.match(h.api.renderAdmin(ctx), /累積判決 <strong>240<\/strong>/);
   assert.equal(base.stats.decisions, 240);
@@ -124,13 +124,13 @@ test('ambiguous write failure retries the identical operation, never adds duplic
     return {ok: true, snapshot: snapshot('target', {revision: 8, stats: {decisions: 270}})};
   });
   const ctx = h.ctx('admin', true); await h.select(ctx, 'target');
-  h.field('decisions', '30'); h.action('save-backfill', ctx); await tick();
+  h.field('sourceKey','historical:two');h.field('basis','核實責任');h.field('decisions', '1'); h.action('save-backfill', ctx); await tick();
   assert.match(h.api.renderAdmin(ctx), /重試原操作/);
   h.field('decisions', '99'); h.action('retry', ctx); await tick();
   const writes = h.calls.filter(item => item.action === 'saveBackfill');
-  assert.deepEqual(writes[1], writes[0]); assert.equal(writes[1].entry.decisions, 30);
+  assert.deepEqual(writes[1], writes[0]); assert.equal(writes[1].entry.decisions, 1);
   assert.doesNotMatch(h.api.renderAdmin(ctx), /重試原操作/);
-  h.field('decisions', '10'); h.action('save-backfill', ctx); await tick();
+  h.field('sourceKey','historical:three');h.field('basis','核實責任');h.field('decisions', '1'); h.action('save-backfill', ctx); await tick();
   assert.notEqual(h.calls.at(-1).operationId, writes[0].operationId);
   assert.equal(h.calls.at(-1).expectedRevision, 8);
 });
@@ -143,12 +143,12 @@ test('revision conflict rereads authoritative totals, preserves draft and requir
     if (++writes === 1) throw Object.assign(new Error('revision-conflict'), {code: 'aborted'});
     return {ok: true, snapshot: snapshot('target', {revision: 10, stats: {decisions: 255}})};
   });
-  const ctx = h.ctx('admin', true); await h.select(ctx, 'target'); h.field('decisions', '5'); h.action('save-backfill', ctx); await tick();
+  const ctx = h.ctx('admin', true); await h.select(ctx, 'target'); h.field('sourceKey','historical:four');h.field('basis','核實責任');h.field('decisions', '1'); h.action('save-backfill', ctx); await tick();
   assert.equal(writes, 1); assert.equal(gets, 2); assert.match(h.api.renderAdmin(ctx), /本次未自動重送/);
   assert.match(h.api.renderAdmin(ctx), /累積判決 <strong>250<\/strong>/);
   h.action('save-backfill', ctx); await tick();
   const requests = h.calls.filter(item => item.action === 'saveBackfill');
-  assert.equal(requests[1].expectedRevision, 9); assert.equal(requests[1].entry.decisions, 5);
+  assert.equal(requests[1].expectedRevision, 9); assert.equal(requests[1].entry.decisions, 1);
   assert.notEqual(requests[1].operationId, requests[0].operationId);
 });
 

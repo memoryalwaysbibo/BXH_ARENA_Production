@@ -848,6 +848,7 @@
     async changeManagedAccounts(payload){return callEngagementFunction("changeManagedAccounts",payload,30000);},
     async tournamentOperation(name,payload){return callEngagementFunction(name,payload,30000);},
     async playerCard(payload){return callEngagementFunction("playerCardService",payload,120000);},
+    async refereePublicSummary(payload){return callEngagementFunction("refereeCertificatePublicSummary",payload,15000);},
     async refereeLicense(payload){return callEngagementFunction("refereeCertificateService",payload,60000);},
     async hunterOpponentIdentity(payload){return callEngagementFunction("hunterOpponentIdentity",payload,30000);},
     async health(){return callEngagementFunction('getEngagementHealth',{});},

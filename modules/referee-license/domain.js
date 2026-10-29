@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   const RANKS = Object.freeze([
-    [1, '萌新裁判', 1, 0, 0, 0, '#40701D', '#85CE62'],
+    [1, '萌新裁判', 0, 0, 0, 0, '#40701D', '#85CE62'],
     [2, '青銅裁判', 20, 0, 0, 0, '#8B542F', '#C9956B'],
     [3, '白銀裁判', 50, 1, 0, 0, '#596775', '#C4CEDC'],
     [4, '黃金裁判', 100, 2, 1, 0, '#886300', '#EAC45A'],
@@ -36,7 +36,7 @@
     if (!target) return {target: null, fraction: 1, decisionGap: 0, gates: [], allMet: true};
     const stats = snapshot?.stats || {}, current = count(stats.decisions);
     const start = rank(awarded)?.decisions || 0;
-    const fraction = current === null ? null : Math.max(0, Math.min(1, (current - start) / (target.decisions - start)));
+    const fraction = target.level===1 ? 1 : current === null ? null : Math.max(0, Math.min(1, (current - start) / (target.decisions - start)));
     const gates = [64, 96, 128].map(size => ({size, required: target.scales[size], current: count(stats.scales?.[size])}));
     return {
       target, fraction, start, decisionGap: current === null ? null : Math.max(0, target.decisions - current),
@@ -49,7 +49,7 @@
     if (decisions === null) errors.push('判決場數請填 0 或正整數。');
     if (events === null) errors.push('參與賽事次數請填 0 或正整數。');
     if (decisions > 1000000 || events > 1000000) errors.push('單筆回補數量最多 1,000,000。');
-    if (decisions === 0 && events === 0) errors.push('請至少填入一項要回補的數量。');
+    if (decisions === 0 && events === 0 && !entry?.auxiliary) errors.push('請至少填入一項要回補的數量。');
     if (events !== null && events > 0) {
       if (!['exact', 'at_least', 'unknown'].includes(entry.precision)) errors.push('請選擇賽事規模的記憶方式。');
       if (entry.precision === 'unknown') {
@@ -59,6 +59,9 @@
     if (!text(entry?.period).trim()) errors.push('請填寫涵蓋期間；記不清日期可填「系統開始記錄前」。');
     if (text(entry?.period).length > 100) errors.push('涵蓋期間請限制在 100 字內。');
     if (text(entry?.note).length > 500) errors.push('備註請限制在 500 字內。');
+    if (!['decision','event','auxiliary'].includes(entry?.kind)) errors.push('請選擇正式判決、活動經歷或輔助經驗。');
+    if (!text(entry?.basis).trim() || !text(entry?.sourceKey).trim()&&!entry?.sourceKeys?.length) errors.push('請填寫責任認列依據與唯一來源關聯。');
+    if (entry?.kind==='decision' && (decisions<1 || decisions>200 || decisions!==(entry.sourceKeys?.length||1) || events || entry.auxiliary) || entry?.kind==='event' && (events!==1 || decisions || entry.auxiliary) || entry?.kind==='auxiliary' && (!count(entry.auxiliary) || decisions || events)) errors.push('判決場數須等於唯一來源鍵數（最多200），活動經歷每筆1場；輔助不得填判決或活動次數。');
     return errors;
   }
   function entryScale(entry) {

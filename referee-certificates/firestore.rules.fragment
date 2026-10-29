@@ -4,3 +4,7 @@
 match /refereeCertificates/{document=**} { allow read, write: if false; }
 match /refereeCertificateSystem/{document=**} { allow read, write: if false; }
 match /refereeCertificateOperations/{document=**} { allow read, write: if false; }
+match /refereeCertificatePersons/{document=**} { allow read, write: if false; }
+match /refereeCertificateUidBindings/{document=**} { allow read, write: if false; }
+
+match /refereeCertificateDecisionClaims/{document=**} { allow read, write: if false; }

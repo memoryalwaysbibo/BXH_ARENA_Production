@@ -1,52 +1,48 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),{createService}=require('../functions/service.cjs');
-const {MockDB,fixture}=require('./mock-db.cjs');
-const request={auth:{uid:'alice'},data:{action:'get'}};
-const read=async(seed,options={})=>{const db=new MockDB(seed),handle=createService(db,{clock:()=>10000,...options});return {db,handle,snapshot:(await handle(request)).snapshot};};
-function changeRoom(seed,callback){const room=seed['tournaments/BXH-AAAA'],state=JSON.parse(room.data);callback(state,room);room.data=JSON.stringify(state);return seed;}
-test('forged self logs cannot create credit for a match actually confirmed by someone else',async()=>{
-  const {snapshot}=await read(fixture({confirmedUid:'bob'}));assert.equal(snapshot.stats.decisions,0);assert.equal(snapshot.certificate,null);assert.equal(snapshot.systemRecords[0].reason,'different-confirming-referee');
+const test=require('node:test'),assert=require('node:assert/strict'),S=require('../functions/sources.cjs');
+const {MockDB,fixture}=require('./mock-db.cjs'),D=require('../functions/domain.cjs');
+async function source(seed,limits=D.LIMITS){const db=new MockDB(seed);return db.runTransaction(tx=>S.readSystemSources(tx,db,'alice',limits));}
+test('operator UID and exact score audit are not evidence of responsibility',async()=>{
+ const seed=fixture();seed['tournaments/BXH-AAAA/refereeScoreAudit/one']={uid:'alice',matchId:'m0',action:'confirm',at:1000,scoreRevision:1};
+ const s=await source(seed);assert.equal(s.decisions,0);assert.equal(s.pendingLogCount,1);assert.equal(s.systemRecords[0].reason,'responsibility-unverified');
 });
-test('old unavailable logs stay pending and are not silently deleted or counted',async()=>{
-  const seed=fixture();delete seed['tournaments/BXH-AAAA'];const {db,snapshot}=await read(seed);
-  assert.equal(snapshot.stats.pendingLogCount,1);assert.equal(snapshot.stats.decisions,0);assert.equal(snapshot.certificate,null);assert.ok(db.read('staffActivityLogs/alice/matches/BXH-AAAA_m0'));
-  const missingAuthority=await read(changeRoom(fixture(),(state,room)=>{delete room.eventAuthority;delete state.meta.eventAuthority;}));
-  assert.equal(missingAuthority.snapshot.stats.pendingLogCount,1);assert.equal(missingAuthority.snapshot.stats.excludedLogCount,0);assert.equal(missingAuthority.snapshot.systemRecords[0].reason,'event-authority-unresolved');
+test('final match in ongoing event remains eligible for explicit decision recognition',async()=>{
+ const seed=fixture({archived:false});const s=await source(seed);assert.equal(s.systemRecords[0].finalResultValid,true);assert.equal(s.decisions,0);
 });
-test('verified decisions count during play, while event size and achievements await completion',async()=>{
-  const {snapshot}=await read(fixture({size:320,archived:false}));assert.equal(snapshot.stats.systemDecisions,1);assert.equal(snapshot.stats.eventCount,0);assert.equal(snapshot.stats.pendingEvents,1);assert.equal(snapshot.stats.pendingLogCount,0);assert.equal(snapshot.systemRecords[0].status,'pending_event');assert.equal(snapshot.stats.milestones[300],0);
+test('test/cancelled/bye/revoked results excluded; role or seat never upgrades them',async()=>{
+ for(const [roomPatch,matchPatch] of [[{testMode:true},{}],[{eventCancelled:true},{}],[{}, {isBye:true}],[{}, {revokedAt:100}],[{}, {completed:false}]]){
+  const seed=fixture(),room=seed['tournaments/BXH-AAAA'],state=JSON.parse(room.data);Object.assign(state.matches[0],matchPatch);Object.assign(room,roomPatch,{data:JSON.stringify(state)});
+  const s=await source(seed);assert.equal(s.decisions,0);assert.equal(s.excludedLogCount,1);
+ }
 });
-test('320 actual entrants cover lower thresholds once; capacity and bracket size do not substitute',async()=>{
-  const {snapshot}=await read(fixture({size:320,decisions:3,roomExtra:{capacity:1000},stateExtra:{bracketSize:512}}));
-  assert.equal(snapshot.stats.decisions,3);assert.equal(snapshot.stats.eventCount,1);assert.deepEqual(snapshot.stats.scales,{64:1,96:1,128:1});assert.equal(snapshot.stats.milestones[300],1);assert.equal(snapshot.stats.milestones[400],0);assert.equal(snapshot.stats.knownMaxSize,320);
+test('unavailable and ambiguous authority stay pending, truncated logs mark incomplete',async()=>{
+ const seed=fixture();delete seed['tournaments/BXH-AAAA'];let s=await source(seed);assert.equal(s.pendingLogCount,1);
+ s=await source(fixture({decisions:2}),{...D.LIMITS,logs:1});assert.equal(s.incomplete,true);assert.equal(s.decisions,0);
 });
-test('unconfirmed event scale stays unknown rather than using room capacity',async()=>{
-  const {snapshot}=await read(changeRoom(fixture({roomExtra:{capacity:320}}),state=>{state.players=[];}));
-  assert.equal(snapshot.stats.eventCount,1);assert.equal(snapshot.stats.unknownScaleEvents,1);assert.equal(snapshot.stats.knownMaxSize,0);assert.equal(snapshot.stats.milestones[100],0);
+test('exact canonical scale, inclusive thresholds and event completion retain original rules',()=>{
+ const room=fixture({size:148})['tournaments/BXH-AAAA'],state=S.parseState(room);
+ assert.equal(S.actualSize(state).size,148);assert.equal(S.completedEvent(room,state),true);
+ state.archiveStatus='ongoing';assert.equal(S.completedEvent(room,state),false);
+ state.meta.battleMode='team';assert.equal(S.actualSize(state).precision,'unknown');
 });
-test('known test events, byes and withdrawn decisions do not become official credit',async()=>{
-  for(const mutate of [(s,r)=>{r.testMode=true;},s=>{s.matches[0].isBye=true;},s=>{s.matches[0].completed=false;},(s,r)=>{r.eventCancelled=true;}]){
-    const {snapshot}=await read(changeRoom(fixture(),mutate));assert.equal(snapshot.stats.decisions,0);assert.equal(snapshot.certificate,null);
-  }
+test('rooms and logs bounds report independent reasons; unread rooms remain pending',async()=>{
+ const seed={...fixture(),...fixture({code:'BXH-BBBB'})};
+ const r=await source(seed,{...D.LIMITS,rooms:1});assert.equal(r.incomplete,true);assert.ok(r.incompleteReasons.includes('rooms-limit'));assert.ok(r.systemRecords.some(x=>x.reason==='room-not-read'));
+ const l=await source(fixture({decisions:3}),{...D.LIMITS,logs:1});assert.ok(l.incompleteReasons.includes('logs-limit'));assert.equal(l.systemRecords.length,1);
 });
-test('trusted score audit fallback must match current confirmation time and score revision',async()=>{
-  const seed=changeRoom(fixture(),s=>{delete s.matches[0].confirmedByUid;});
-  seed['tournaments/BXH-AAAA/refereeScoreAudit/a1']={uid:'alice',action:'confirm',matchId:'m0',scoreRevision:1,at:1000};
-  assert.equal((await read(seed)).snapshot.stats.decisions,1);
-  seed['tournaments/BXH-AAAA/refereeScoreAudit/a1'].scoreRevision=0;
-  const stale=(await read(seed)).snapshot;assert.equal(stale.stats.decisions,0);assert.equal(stale.stats.pendingLogCount,1);
+test('missing authority invalid identity and duplicate logs remain distinguishable without deletion',async()=>{
+ const seed=fixture(),room=seed['tournaments/BXH-AAAA'],state=JSON.parse(room.data);delete room.eventAuthority;delete state.meta.eventAuthority;room.data=JSON.stringify(state);
+ let r=await source(seed);assert.equal(r.systemRecords[0].reason,'event-authority-unresolved');
+ const duplicated=fixture();duplicated['staffActivityLogs/alice/matches/duplicate']=duplicated['staffActivityLogs/alice/matches/BXH-AAAA_m0'];
+ r=await source(duplicated);assert.equal(r.excludedLogCount,1);assert.equal(r.pendingLogCount,1);
+ duplicated['staffActivityLogs/alice/matches/forged']={uid:'bob',tournamentCode:'BXH-AAAA',matchId:'m0'};
+ r=await source(duplicated);assert.ok(r.systemRecords.some(x=>x.reason==='invalid-log-identity'));
 });
-test('cross-document duplicate logs count one match only',async()=>{
-  const seed=fixture();seed['staffActivityLogs/alice/matches/duplicate']=seed['staffActivityLogs/alice/matches/BXH-AAAA_m0'];const {snapshot}=await read(seed);
-  assert.equal(snapshot.stats.decisions,1);assert.equal(snapshot.stats.eventCount,1);assert.equal(snapshot.stats.excludedLogCount,1);
+test('320 canonical entrants ignore capacity and padded bracket; unavailable roster never invents scale',()=>{
+ const room=fixture({size:320,roomExtra:{capacity:1000},stateExtra:{bracketSize:512}})['tournaments/BXH-AAAA'],state=S.parseState(room);
+ assert.equal(S.actualSize(state).size,320);state.players=[];assert.equal(S.actualSize(state).precision,'unknown');
 });
-test('source limits expose incomplete and prevent automatic L1 and official grant',async()=>{
-  const {db,handle,snapshot}=await read(fixture({decisions:20}),{limits:{logs:10}});
-  assert.equal(snapshot.incomplete,true);assert.ok(snapshot.incompleteReasons.includes('logs-limit'));assert.equal(snapshot.certificate,null);assert.equal(db.read('refereeCertificateSystem/numbering'),undefined);
-  db.put('refereeCertificates/alice',{number:'R000001',awardedLevel:1,revision:1,issuedAt:1});
-  await assert.rejects(handle({auth:{uid:'admin'},data:{action:'grant',targetUid:'alice',operationId:'incomplete_grant',expectedRevision:1,level:2}}),e=>e.message==='sources-incomplete');
-});
-test('archived ranked event does not depend on ladder payment; byes do not block completion',async()=>{
-  const seed=changeRoom(fixture(),s=>{s.meta.ladderMode='ranked';s.ladderPointsAwarded=false;s.matches.push({id:'bye',isBye:true,completed:false});});
-  const {snapshot}=await read(seed);assert.equal(snapshot.stats.eventCount,1);assert.equal(snapshot.stats.pendingEvents,0);
+test('completed ranked event ignores payment and bye completion, but unfinished real match blocks event',()=>{
+ const state=S.parseState(fixture()['tournaments/BXH-AAAA']);state.meta.ladderMode='ranked';state.ladderPointsAwarded=false;state.matches.push({id:'bye',isBye:true,completed:false});
+ assert.equal(S.completedEvent({},state),true);state.matches[0].completed=false;assert.equal(S.completedEvent({},state),false);
 });

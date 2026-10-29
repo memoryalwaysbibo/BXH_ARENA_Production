@@ -7,7 +7,7 @@ class CertificateError extends Error {
 }
 const fail = (code, reason) => { throw new CertificateError(code, reason); };
 const RANKS = Object.freeze([
-  [1,'萌新裁判',1,0,0,0,'#40701D','#85CE62'],
+  [1,'萌新裁判',0,0,0,0,'#40701D','#85CE62'],
   [2,'青銅裁判',20,0,0,0,'#8B542F','#C9956B'],
   [3,'白銀裁判',50,1,0,0,'#596775','#C4CEDC'],
   [4,'黃金裁判',100,2,1,0,'#886300','#EAC45A'],
@@ -48,7 +48,8 @@ function entryId(value) {
 function normalizeBackfill(value) {
   if(!value||typeof value!=='object'||Array.isArray(value)) fail('invalid-argument','backfill-invalid');
   const decisions=integer(value.decisions,'decisions',MAX_COUNT), events=integer(value.events,'events',MAX_COUNT);
-  if(!decisions&&!events) fail('invalid-argument','empty-backfill');
+  const auxiliary=integer(value.auxiliary??0,'auxiliary',MAX_COUNT);
+  if(!decisions&&!events&&!auxiliary) fail('invalid-argument','empty-backfill');
   let precision=value.precision||'unknown',size=value.size??null;
   if(!['exact','at_least','unknown'].includes(precision)) fail('invalid-argument','precision-invalid');
   if(!events) {size=null;precision='unknown';}
@@ -58,7 +59,19 @@ function normalizeBackfill(value) {
     integer(size,'size',MAX_COUNT);
     if(size===0) fail('invalid-argument','size-invalid');
   }
-  return {decisions,events,size,precision,period:text(value.period,'period',100,true),note:text(value.note??'','note',500)};
+  const base={decisions,events,size,precision,period:text(value.period,'period',100,true),note:text(value.note??'','note',500)};
+  if(!value.kind) return base; // Legacy records remain readable, but require re-recognition.
+  if(!['decision','event','auxiliary'].includes(value.kind)) fail('invalid-argument','recognition-kind-invalid');
+  if(value.kind==='decision'&&(!decisions||decisions>200||events||auxiliary)||value.kind==='event'&&(events!==1||decisions||auxiliary)||value.kind==='auxiliary'&&(!auxiliary||decisions||events)) fail('invalid-argument','recognition-count-invalid');
+  const keys=value.kind==='decision'&&Array.isArray(value.sourceKeys)?value.sourceKeys:[value.sourceKey];
+  if(keys.length>200||!keys.length||value.kind==='decision'&&keys.length!==decisions)fail('invalid-argument','source-keys-count-mismatch');
+  const sourceKeys=keys.map(k=>text(k,'source-key',160,true));
+  if(new Set(sourceKeys).size!==sourceKeys.length)fail('invalid-argument','duplicate-source-key');
+  for(const key of sourceKeys){
+    if(!/^(?:match:BXH-[A-Z0-9]{4,24}:[A-Za-z0-9_-]{1,100}|event:BXH-[A-Z0-9]{4,24}|historical:[A-Za-z0-9_-]{1,100})$/.test(key)) fail('invalid-argument','source-key-invalid');
+    if(value.kind==='decision'&&key.startsWith('event:')||value.kind==='event'&&key.startsWith('match:')) fail('invalid-argument','source-kind-conflict');
+  }
+  return {...base,kind:value.kind,auxiliary,sourceKey:sourceKeys[0],...(value.kind==='decision'?{sourceKeys}:{}),basis:text(value.basis,'recognition-basis',500,true),sourceUid:value.sourceUid?uid(value.sourceUid):null};
 }
 function active(profile) {
   return !!profile&&profile.active===true&&profile.isTestAccount!==true&&profile.role!=='tester'&&profile.deleted!==true
@@ -107,17 +120,25 @@ function addEvent(stats, events, size, precision) {
 }
 function aggregate(source,entries) {
   const out={...source,counts:{...source.counts}};
-  let backfillDecisions=0,backfillEvents=0;
+  let backfillDecisions=0,backfillEvents=0,auxiliaryCount=0,pendingBackfills=0;
+  const seen=new Set((source.systemRecords||[]).filter(r=>['verified','pending_event'].includes(r.status)).map(r=>'match:'+r.tournamentCode+':'+r.matchId));
+  for(const key of source.recognizedEventKeys||[]) seen.add(key);
   for(const entry of entries) {
     if(entry.status!=='active') continue;
+    if(!entry.kind||entry.recognitionValid!==true){pendingBackfills++;continue;}
     const row=normalizeBackfill(entry);
+    const keys=(row.sourceKeys||[row.sourceKey]).map(key=>(row.kind==='auxiliary'?'auxiliary:':'')+key);
+    const fresh=keys.filter(key=>!seen.has(key));if(!fresh.length)continue;
+    fresh.forEach(key=>seen.add(key));
+    if(row.kind==='decision')row.decisions=fresh.length;
+    if(row.kind==='auxiliary'){auxiliaryCount=add(auxiliaryCount,row.auxiliary);continue;}
     backfillDecisions=add(backfillDecisions,row.decisions);backfillEvents=add(backfillEvents,row.events);
     out.decisions=add(out.decisions,row.decisions);addEvent(out,row.events,row.size,row.precision);
   }
   return {decisions:out.decisions,eventCount:out.eventCount,scales:Object.fromEntries([64,96,128].map(n=>[n,out.counts[n]])),
     milestones:Object.fromEntries(MILESTONES.map(m=>[m.threshold,out.counts[m.threshold]])),unknownScaleEvents:out.unknownScaleEvents,
-    pendingLogCount:source.pendingLogCount,pendingEvents:source.pendingEvents,excludedLogCount:source.excludedLogCount,
-    systemDecisions:source.decisions,systemEventCount:source.eventCount,backfillDecisions,backfillEvents,
+    pendingLogCount:Math.max(0,source.pendingLogCount-(source.systemRecords||[]).filter(r=>r.reason==='responsibility-unverified'&&seen.has('match:'+r.tournamentCode+':'+r.matchId)).length),pendingEvents:source.pendingEvents,excludedLogCount:source.excludedLogCount,
+    systemDecisions:source.decisions,systemEventCount:source.eventCount,backfillDecisions,backfillEvents,auxiliaryCount,pendingBackfills,
     knownMaxSize:out.knownMaxSize,maxPrecision:out.knownMaxSize?out.maxPrecision:'unknown'};
 }
 function eligibleLevel(stats) {

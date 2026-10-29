@@ -1,7 +1,7 @@
 'use strict';
-const D=require('./domain.cjs'), S=require('./sources.cjs');
+const D=require('./domain.cjs'), S=require('./sources.cjs'), R=require('./recognition.cjs'), I=require('./identities.cjs');
 
-const MUTATIONS=new Set(['saveBackfill','revokeBackfill','restoreBackfill','grant','setChief','photo']);
+const MUTATIONS=new Set(['saveBackfill','revokeBackfill','restoreBackfill','grant','setChief','photo','disable','restoreQualification','linkAccount']);
 const ROOT='refereeCertificates';
 const SYSTEM='refereeCertificateSystem';
 function profileName(user) {return {realName:String(user.realName||'').slice(0,120),nickname:String(user.nickname||user.gameId||user.displayName||'').slice(0,120)};}
@@ -18,16 +18,22 @@ function normalizedRequest(request) {
   if(!MUTATIONS.has(action)) return out;
   if(typeof data.operationId!=='string'||! /^[A-Za-z0-9_-]{8,128}$/.test(data.operationId)) D.fail('invalid-argument','operation-id-invalid');
   Object.assign(out,{operationId:data.operationId,expectedRevision:D.integer(data.expectedRevision,'expected-revision')});
-  if(action==='saveBackfill') out.entry={...D.normalizeBackfill(data.entry),...(data.entry.id?{id:D.entryId(data.entry.id)}:{})};
+  if(action==='saveBackfill') {
+    if(!data.entry?.kind) D.fail('invalid-argument','recognition-kind-required');
+    out.entry={...D.normalizeBackfill(data.entry),...(data.entry.id?{id:D.entryId(data.entry.id)}:{})};
+  }
   if(action==='revokeBackfill'||action==='restoreBackfill') out.entryId=D.entryId(data.entryId);
   if(action==='grant') {
     out.level=D.integer(data.level,'level',9);
-    if(out.level<2) D.fail('invalid-argument','grant-level-must-be-2-to-9');
+    if(out.level<1) D.fail('invalid-argument','grant-level-must-be-1-to-9');
+    if(out.level===1){out.personId=D.entryId(data.personId);out.basis=D.text(data.basis,'identity-basis',500,true);}
   }
   if(action==='setChief') {
     if(typeof data.appointed!=='boolean') D.fail('invalid-argument','appointed-invalid');
     out.appointed=data.appointed;out.expectedChiefRevision=D.integer(data.expectedChiefRevision,'expected-chief-revision');
   }
+  if(['disable','restoreQualification','linkAccount'].includes(action)) out.basis=D.text(data.basis,'qualification-basis',500,true);
+  if(action==='linkAccount') out.aliasUid=D.uid(data.aliasUid);
   if(action==='photo') out.dataUrl=D.normalizePhoto(data.dataUrl);
   return out;
 }
@@ -35,7 +41,7 @@ function cleanRecord(row,id) {
   if(!['active','revoked'].includes(row.status)) D.fail('failed-precondition','stored-backfill-invalid');
   return {id,...D.normalizeBackfill(row),revision:revisionOf(row.revision),status:row.status,
     updatedBy:String(row.updatedBy||''),updatedAt:Number(row.updatedAt)||null,createdAt:Number(row.createdAt)||null,
-    source:'official-memory-estimate'};
+    sourceFingerprints:row.sourceFingerprints||{},source:row.kind?'explicit-recognition':'legacy-unreviewed'};
 }
 async function readEntries(tx,db,targetUid,limits) {
   const [rows,audits]=await Promise.all([
@@ -57,10 +63,10 @@ function snapshotOf(context) {
   const {targetUid,user,profile,chief,entries,history,source,incomplete,incompleteReasons,historyTruncated}=context;
   const stats=D.aggregate(source,entries),awardedLevel=Number(profile.awardedLevel)||0;
   const certificate=profile.number?{number:profile.number,awardedLevel,issuedAt:profile.issuedAt||null,photoDataUrl:profile.photoDataUrl||null,
-    isChief:chief.uid===targetUid,revision:revisionOf(profile.revision)}:null;
+    isChief:chief.uid===targetUid,revision:revisionOf(profile.revision),status:profile.qualificationStatus||'unverified',approvedBy:profile.approvedBy||null,approvedAt:profile.approvedAt||null,personId:profile.personId||null}:null;
   return {uid:targetUid,person:profileName(user),certificate,photoDataUrl:profile.photoDataUrl||null,revision:revisionOf(profile.revision),stats,eligibleLevel:D.eligibleLevel(stats),
-    ranks:D.RANKS,milestoneDefinitions:D.MILESTONES,backfills:entries.map(entry=>({...entry,history:historyFor(entry.id,history)})),
-    systemRecords:source.systemRecords,chiefRevision:revisionOf(chief.revision),isChief:chief.uid===targetUid,incomplete,
+    identityPersonId:profile.personId||I.requiredPersonId(targetUid),qualificationHistory:history.filter(x=>['grant','disable','restoreQualification','linkAccount'].includes(x.action)).sort((a,b)=>a.revision-b.revision),ranks:D.RANKS,milestoneDefinitions:D.MILESTONES,backfills:entries.map(entry=>({...entry,history:historyFor(entry.id,history)})),
+    systemRecords:source.systemRecords.map(r=>r.reason==='responsibility-unverified'&&entries.some(e=>e.kind==='decision'&&e.status==='active'&&e.recognitionValid&&(e.sourceKeys||[e.sourceKey]).includes('match:'+r.tournamentCode+':'+r.matchId))?{...r,status:'recognized_manual',reason:null}:r),chiefRevision:revisionOf(chief.revision),isChief:chief.uid===targetUid,incomplete,
     incompleteReasons:[...new Set(incompleteReasons)],historyTruncated:!!historyTruncated};
 }
 async function searchUsers(tx,db,query,limit) {
@@ -88,7 +94,8 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
     return db.runTransaction(async tx=>{
       const [actorSnap,configSnap]=await Promise.all([tx.get(db.doc('users/'+actorUid)),tx.get(db.doc('systemConfig/refereeCertificatesV1'))]);
       const actor=actorSnap.exists?actorSnap.data():null;
-      if(!D.active(actor)) D.fail('permission-denied','active-nontest-account-required');
+      if(!actor) D.fail('permission-denied','account-required');
+      if(MUTATIONS.has(action)&&!D.active(actor))D.fail('permission-denied','active-account-required');
       if(configSnap.data()?.enabled!==true) D.fail('failed-precondition','referee-certificates-disabled');
       if(action==='search') {
         if(!D.superAdmin(actor)) D.fail('permission-denied','super-admin-required');
@@ -114,18 +121,35 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
       if(replay&&receiptSnap.data().payloadHash!==payloadHash) D.fail('already-exists','operation-conflict');
       if(mutating&&!replay&&input.expectedRevision!==oldRevision) D.fail('aborted','revision-conflict');
       if(action==='setChief'&&!replay&&input.expectedChiefRevision!==chiefRevision) D.fail('aborted','chief-revision-conflict');
-      const correctiveAction=action==='revokeBackfill'||(action==='setChief'&&input.appointed===false);
-      if(mutating&&!replay&&!correctiveAction&&(user.role==='tester'||user.isTestAccount===true)) D.fail('failed-precondition','target-test-account');
-      if(action==='setChief'&&!replay&&input.appointed&&!D.active(user)) D.fail('failed-precondition','chief-target-inactive');
+      // Qualification does not derive from target role or account active status.
+      if(action==='setChief'&&!replay&&input.appointed&&(!oldProfile.number||oldProfile.qualificationStatus!=='active')) D.fail('failed-precondition','chief-certificate-not-active');
       const [ledger,source]=await Promise.all([readEntries(tx,db,targetUid,limits),S.readSystemSources(tx,db,targetUid,limits)]);
-      const incomplete=ledger.incomplete||source.incomplete,incompleteReasons=[...ledger.incompleteReasons,...source.incompleteReasons];
+      await R.resolve(tx,db,targetUid,ledger.entries);
+      const recognitionLimited=ledger.entries.some(e=>e.recognitionReason==='recognition-room-limit');
+      const incomplete=ledger.incomplete||source.incomplete||recognitionLimited,incompleteReasons=[...ledger.incompleteReasons,...source.incompleteReasons,...(recognitionLimited?['recognition-room-limit']:[])];
       const context={targetUid,user,profile:{...oldProfile,revision:oldRevision},chief:{...oldChief,revision:chiefRevision},entries:ledger.entries,
         history:ledger.history,historyTruncated:ledger.historyTruncated,source,incomplete,incompleteReasons};
       if(replay) return {ok:true,snapshot:snapshotOf(context),replayed:true};
 
+      let personRef=null,personSnap=null,bindingRef=null,bindingSnap=null,aliasRef=null;
+      if(action==='grant'&&input.level===1){
+        I.validatePrimary(targetUid,input.personId);
+        personRef=db.doc('refereeCertificatePersons/'+input.personId);bindingRef=db.doc('refereeCertificateUidBindings/'+targetUid);
+        [personSnap,bindingSnap]=await Promise.all([tx.get(personRef),tx.get(bindingRef)]);
+        if(personSnap.exists&&personSnap.data().primaryUid!==targetUid||bindingSnap.exists&&(bindingSnap.data().personId!==input.personId||bindingSnap.data().primaryUid!==targetUid)) D.fail('failed-precondition','person-already-bound');
+      }
+      if(action==='linkAccount'){
+        if(!oldProfile.number||!oldProfile.personId||input.aliasUid===targetUid)D.fail('failed-precondition','primary-certificate-required');
+        if(input.aliasUid===I.ALIAS&&targetUid!==I.OWNER)D.fail('failed-precondition','known-alias-owner-conflict');
+        if(I.requiredPersonId(input.aliasUid))D.fail('failed-precondition','initial-primary-cannot-be-alias');
+        aliasRef=db.doc('refereeCertificateUidBindings/'+input.aliasUid);
+        const [aliasUser,aliasCert,link]=await Promise.all([tx.get(db.doc('users/'+input.aliasUid)),tx.get(db.doc('refereeCertificates/'+input.aliasUid)),tx.get(aliasRef)]);
+        if(!aliasUser.exists)D.fail('not-found','alias-account-not-found');
+        if(aliasCert.data()?.number||link.exists&&link.data().primaryUid!==targetUid)D.fail('failed-precondition','alias-already-bound-or-issued');
+      }
       const now=clock();
       if(!Number.isFinite(now)||now<=0) D.fail('internal','clock-invalid');
-      let changed=false,entryWrite=null,audit=null,chiefChanged=false,numberChanged=false;
+      let changed=false,entryWrite=null,audit=null,chiefChanged=false,numberChanged=false,claimWrites=[];
       const nextRevision=oldRevision+1;
       D.integer(nextRevision,'next-revision');
       if(mutating) {
@@ -139,8 +163,11 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
           if(!previous&&context.entries.length>=limits.backfills) D.fail('failed-precondition','backfill-limit-reached');
           if(previous?.status==='revoked') D.fail('failed-precondition','restore-before-edit');
           const row={id,...D.normalizeBackfill(input.entry),status:'active',revision:previous?previous.revision+1:1,
-            createdAt:previous?.createdAt||now,updatedAt:now,updatedBy:actorUid,source:'official-memory-estimate'};
+            createdAt:previous?.createdAt||now,updatedAt:now,updatedBy:actorUid,source:'explicit-recognition'};
           context.entries=previous?context.entries.map(entry=>entry.id===id?row:entry):context.entries.concat(row);
+          R.unique(context.entries);await R.resolve(tx,db,targetUid,context.entries,row.id);
+          if(!row.recognitionValid)D.fail('failed-precondition',row.recognitionReason);
+          claimWrites=await R.claims(tx,db,targetUid,previous,row,actorUid,now);
           entryWrite=row;Object.assign(audit,{entryId:id,before:previous||null,after:row});
         } else if(action==='revokeBackfill'||action==='restoreBackfill') {
           const previous=context.entries.find(row=>row.id===input.entryId);
@@ -148,8 +175,18 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
           const status=action==='revokeBackfill'?'revoked':'active';
           if(previous.status===status) D.fail('failed-precondition','backfill-already-'+status);
           const row={...previous,status,revision:previous.revision+1,updatedBy:actorUid,updatedAt:now};
-          context.entries=context.entries.map(entry=>entry.id===row.id?row:entry);entryWrite=row;
+          context.entries=context.entries.map(entry=>entry.id===row.id?row:entry);
+          R.unique(context.entries);await R.resolve(tx,db,targetUid,context.entries);
+          if(status==='active'&&!row.recognitionValid)D.fail('failed-precondition',row.recognitionReason);entryWrite=row;
+          claimWrites=await R.claims(tx,db,targetUid,previous,row,actorUid,now);
           Object.assign(audit,{entryId:row.id,before:previous,after:row});
+        } else if(action==='disable'||action==='restoreQualification') {
+          if(!oldProfile.number||!oldProfile.approvedBy)D.fail('failed-precondition','approved-certificate-required');
+          const status=action==='disable'?'disabled':'active';
+          context.profile.qualificationStatus=status;
+          Object.assign(audit,{beforeStatus:oldProfile.qualificationStatus,afterStatus:status,basis:input.basis,unchanged:oldProfile.qualificationStatus===status});
+        } else if(action==='linkAccount') {
+          Object.assign(audit,{aliasUid:input.aliasUid,personId:oldProfile.personId,basis:input.basis,historyTransferred:false});
         } else if(action==='photo') {
           const previous=context.profile.photoDataUrl||null;
           context.profile.photoDataUrl=input.dataUrl;
@@ -163,33 +200,33 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
       }
       const stats=D.aggregate(source,context.entries),eligible=D.eligibleLevel(stats);
       if(action==='grant') {
-        if(incomplete) D.fail('failed-precondition','sources-incomplete');
-        if(input.level>eligible) D.fail('failed-precondition','rank-not-eligible');
-        if(input.level<=Number(oldProfile.awardedLevel||0)) D.fail('failed-precondition','rank-not-higher');
-        context.profile.awardedLevel=input.level;
-        context.profile.awardedAt=now;context.profile.awardedBy=actorUid;
-        Object.assign(audit,{fromLevel:Number(oldProfile.awardedLevel)||0,toLevel:input.level});
-      }
-      // Initial issuance is the only automatic award. Partial source reads never issue a certificate.
-      if(!context.profile.number&&stats.decisions>=1&&!incomplete&&user.role!=='tester'&&user.isTestAccount!==true) {
-        const last=D.integer(numberSnap.data()?.lastIssuedNumber??0,'number-counter');
-        const next=D.add(last,1);
-        context.profile.number='R'+String(next).padStart(6,'0');
-        context.profile.issuedAt=now;context.profile.awardedLevel=Math.max(1,Number(context.profile.awardedLevel)||0);
-        context.profile.awardedAt=context.profile.awardedAt||now;context.profile.awardedBy=context.profile.awardedBy||'system:L1';
-        numberChanged=true;changed=true;context.nextNumber=next;
-        if(!audit) audit={action:'autoIssueL1',uid:targetUid,updatedBy:'system:L1',updatedAt:now,revision:nextRevision,toLevel:1};
-        audit.issuedNumber=context.profile.number;
+        if(input.level===1){
+          if(oldProfile.number)D.fail('failed-precondition','certificate-already-issued');
+          const last=D.integer(numberSnap.data()?.lastIssuedNumber??0,'number-counter');
+          I.checkSequence(targetUid,last,configSnap.data()?.initialRosterApproved);
+          context.nextNumber=D.add(last,1);numberChanged=true;
+          Object.assign(context.profile,{number:'R'+String(context.nextNumber).padStart(6,'0'),issuedAt:now,
+            personId:input.personId,approvedBy:actorUid,approvedAt:now,qualificationStatus:'active',awardedLevel:1,awardedAt:now,awardedBy:actorUid});
+          Object.assign(audit,{personId:input.personId,basis:input.basis,issuedNumber:context.profile.number,toLevel:1});
+        } else {
+          if(!oldProfile.number||oldProfile.qualificationStatus!=='active')D.fail('failed-precondition','approved-active-certificate-required');
+          if(incomplete) D.fail('failed-precondition','sources-incomplete');
+          if(input.level>eligible) D.fail('failed-precondition','rank-not-eligible');
+          if(input.level<=Number(oldProfile.awardedLevel||0)) D.fail('failed-precondition','rank-not-higher');
+          context.profile.awardedLevel=input.level;context.profile.awardedAt=now;context.profile.awardedBy=actorUid;
+          Object.assign(audit,{fromLevel:Number(oldProfile.awardedLevel)||0,toLevel:input.level});
+        }
       }
       if(changed) {
         context.profile.revision=nextRevision;context.profile.updatedAt=now;context.profile.updatedBy=actorUid;
-        const auditKey=operationKey||'auto_'+D.hash(targetUid+':'+context.profile.number);
+        const auditKey=operationKey;
         context.history=context.history.concat({...audit,id:auditKey});
         if(context.history.length>limits.auditHistory) {
           context.history=context.history.sort((a,b)=>Number(b.revision)-Number(a.revision)).slice(0,limits.auditHistory);
           context.historyTruncated=true;
         }
         // All reads have completed. Profiles, backfills, receipts, and global uniqueness commit atomically.
+        for(const [ref,value] of claimWrites)tx.set(ref,value);
         tx.set(profileRef,context.profile);
         if(entryWrite) tx.set(db.doc(ROOT+'/'+targetUid+'/records/'+entryWrite.id),entryWrite);
         if(chiefChanged) {
@@ -197,7 +234,12 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
           tx.create(db.doc(SYSTEM+'/chief/audit/'+operationKey),{action:'setChief',previousUid:oldChief.uid||null,uid:context.chief.uid,
             revision:context.chief.revision,updatedBy:actorUid,updatedAt:now});
         }
-        if(numberChanged) tx.set(numberRef,{lastIssuedNumber:context.nextNumber,updatedAt:now});
+        if(numberChanged){
+          tx.set(numberRef,{lastIssuedNumber:context.nextNumber,updatedAt:now});
+          tx.set(personRef,{primaryUid:targetUid,personId:input.personId,approvedBy:actorUid,approvedAt:now,basis:input.basis});
+          tx.set(bindingRef,{primaryUid:targetUid,personId:input.personId,verifiedBy:actorUid,verifiedAt:now});
+        }
+        if(aliasRef)tx.set(aliasRef,{primaryUid:targetUid,personId:oldProfile.personId,verifiedBy:actorUid,verifiedAt:now,basis:input.basis});
         tx.create(db.doc(ROOT+'/'+targetUid+'/audit/'+auditKey),audit);
         if(mutating) tx.create(receiptRef,{actorUid,targetUid,action,payloadHash,revision:nextRevision,createdAt:now});
       }

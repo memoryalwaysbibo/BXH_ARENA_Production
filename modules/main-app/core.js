@@ -14190,6 +14190,7 @@ function renderAccountManagementScreen(){
                 <div class="account-detail-item"><div class="label">本名確認</div><div class="value">${user.realNameVerified===true?'已確認':'尚未確認'}</div></div>
                 <div class="account-detail-item"><div class="label">帳號 UID</div><div class="value">${esc(user.uid||"—")}</div></div>
               </div>
+              ${window.BXH_REFEREE_CERTIFICATES_V1===true&&canManageRefereeCertificates()?`<button type="button" class="btn btn-ghost" data-action="account-manage-referee" data-uid="${esc(user.uid)}">管理裁判資格</button>`:""}
               <div class="account-user-controls">
                 <div class="field"><label>帳號分類</label><select class="mgmt-role-select" data-uid="${esc(user.uid)}">${["super_admin","admin","staff","tester","player","viewer"].map(role=>`<option value="${role}" ${draft.role===role?'selected':''}>${roleDisplayLabel(role)}</option>`).join("")}</select></div>
                 ${user.role!=="player"?'<div class="field"><label>合作主辦權限</label><div class="hint">請先將帳號分類設為玩家並儲存，再開通合作主辦。</div></div>':""}
@@ -20330,6 +20331,12 @@ function handleAction(action, target){
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
   if(action.startsWith("commerce-")){void window.BXHCommerce.handle(action,target);return;}
+  if(action==='account-manage-referee'){
+    const uid=target.getAttribute('data-uid'),directory=accountDirectoryContext();
+    if(window.BXH_REFEREE_CERTIFICATES_V1!==true||!canManageRefereeCertificates()||appPhase!=='account-management'||!accountDirectoryCurrent(directory)||!directory.opened.has(uid)||!(accountMgmtUsers||[]).some(user=>user.uid===uid))return;
+    if(window.BXHRefereeLicense?.openAdminTarget?.(uid,refereeLicenseContext())!==true)return;
+    accountMenuOpen=false;appPhase='app';activeTab='referee-admin';render();return;
+  }
   if(action.startsWith('referee-license-')){
     if(window.BXH_REFEREE_CERTIFICATES_V1===true&&currentAuthUid())void window.BXHRefereeLicense?.handleAction?.(action,target,refereeLicenseContext());
     return;
