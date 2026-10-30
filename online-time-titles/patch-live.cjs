@@ -16,6 +16,14 @@ function patchLive(index, {evaluator = false, snapshot = false, definitionEditor
       '      return Number.isSafeInteger(ms) && ms >= 0 ? Math.floor(ms / 60000) : 0;\n' +
       '    }\n    case "total_checkins": return Number(stats.totalCheckInDays || 0);');
     changes.push('online-minutes-condition');
+    // The independent counter owns online progress and awards. Legacy generic
+    // evaluators must not write a stale stats snapshot over its newer progress.
+    const start=index.indexOf('async function evaluateTitles('),end=index.indexOf('\n}',start);
+    if(start<0||end<=start)throw Error('generic-evaluator-boundary-changed');
+    const evaluatorSource=once(index.slice(start,end),'      const def = doc.data();',
+      '      const def = doc.data();\n      if (def.conditionType === "total_online_minutes") continue;');
+    index=index.slice(0,start)+evaluatorSource+index.slice(end);
+    changes.push('independent-online-progress-owner');
   }
   if (snapshot) {
     const start = index.indexOf('function publicDefinition(id, definition) {');
