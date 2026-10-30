@@ -849,6 +849,8 @@
     async tournamentOperation(name,payload){return callEngagementFunction(name,payload,30000);},
     async ladderTeamDisplay(payload){return callEngagementFunction("ladderTeamDisplay",payload,15000,payload?.action==="teams");},
     async playerCard(payload){return callEngagementFunction("playerCardService",payload,120000);},
+    async refereePublicSummary(payload){return callEngagementFunction("refereeCertificatePublicSummary",payload,15000);},
+    async refereeLicense(payload){return callEngagementFunction("refereeCertificateService",payload,60000);},
     async hunterOpponentIdentity(payload){return callEngagementFunction("hunterOpponentIdentity",payload,30000);},
     async health(){return callEngagementFunction('getEngagementHealth',{});},
     async presence(payload){return callEngagementFunction("onlinePresence",payload,15000);},

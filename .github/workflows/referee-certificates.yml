@@ -1,0 +1,68 @@
+name: Referee certificate candidate
+
+on:
+  pull_request:
+    paths:
+      - 'referee-certificates/**'
+      - '.github/workflows/deploy-production-pages.yml'
+      - 'scripts/prepare-public-pages.cjs'
+      - 'tests/public-pages-artifact.test.cjs'
+      - 'modules/referee-license/**'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'modules/management-v2/navigation.js'
+      - 'tests/referee-certificate-*.cjs'
+      - 'tests/referee-license-*.cjs'
+      - 'tests/referee-public-summary.browser.cjs'
+      - 'tests/referee-full-host.browser.cjs'
+      - 'modules/main-app/player-cards.js'
+      - 'index.html'
+      - '.github/workflows/referee-certificates.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Business rules, authorization, replay and application wiring
+        run: node --test referee-certificates/test/*.test.cjs tests/referee-license-*.test.cjs tests/referee-certificate-wiring.test.cjs tests/player-center-integration.test.cjs
+      - name: Verify public Pages artifact excludes private identities and QA sources
+        run: |
+          node --test tests/public-pages-artifact.test.cjs
+          public_site="$(mktemp -d)"
+          node scripts/prepare-public-pages.cjs "$public_site"
+      - name: Install isolated validation dependencies
+        run: npm install --prefix /tmp/referee-certificate-deps --no-save --ignore-scripts playwright@1.55.0 firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11 firebase-admin@13.10.0
+      - name: Firestore transaction and client-access verification
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: /tmp/referee-certificate-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-referee-certificates --config referee-certificates/firebase.emulator.json 'node referee-certificates/emulator/service.emulator.cjs'
+      - name: Install Chromium
+        run: node /tmp/referee-certificate-deps/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Mobile forms, photos and session isolation with simulated data
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: node tests/referee-license-browser.cjs
+      - name: Real frontend to service contract with an isolated database
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: node tests/referee-certificate-contract.browser.cjs
+      - name: Public summary boundary through the player-card module
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: node tests/referee-public-summary.browser.cjs
+      - name: Full index host navigation and actual callable adapters with local transport fixtures
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: node tests/referee-full-host.browser.cjs
