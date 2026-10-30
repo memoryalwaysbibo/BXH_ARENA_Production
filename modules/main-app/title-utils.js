@@ -16,6 +16,11 @@ function titleArtworkPath(name,rarity){
     '戰場熟面孔':'assets/title-rare-familiar-face-v1.webp',
     '初來乍到':'assets/title-common-first-checkin-v1.webp',
     '微光初現':'assets/title-common-online-time-1h-v1.webp',
+    '星光漸明':'assets/title-common-online-time-10h-v1.webp',
+    '流光刻痕':'assets/title-rare-online-time-50h-v1.webp',
+    '百時星軌':'assets/title-rare-online-time-100h-v1.webp',
+    '歲月銘刻':'assets/title-epic-online-time-500h-v1.webp',
+    '千載流光':'assets/title-legendary-online-time-1000h-v1.webp',
     '七日常客':'assets/title-common-seven-day-guest-v1.webp',
     '三冠王':'assets/title-legendary-triple-crown-v3.webp',
     '二當家':'assets/title-limited-co-leader.webp',
@@ -62,11 +67,13 @@ function titleArtworkPath(name,rarity){
 function titleDisplayName(name){return name==='審判者'?'裁決者':name;}
 function onlineTimeArtworkPreviewHtml(canPreview){
   if(canPreview!==true)return '';
+  const titles=[['微光初現',1,'一般'],['星光漸明',10,'一般'],['流光刻痕',50,'稀有'],['百時星軌',100,'稀有'],['歲月銘刻',500,'史詩'],['千載流光',1000,'傳說']];
+  const artwork=(name)=>`<img src="${titleArtworkPath(name)}" alt="${name}稱號外觀預覽" width="768" height="270" style="display:block;width:100%;height:auto;max-width:768px;object-fit:contain;" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+'.png'">`;
   return `<section class="panel" data-online-time-art-preview style="margin-top:18px;">
-    <div class="panel-title">新稱號外觀預覽｜微光初現</div>
-    <p class="hint">最高管理員外觀驗收・一般｜永久・尚未開放取得</p>
-    <img src="assets/title-common-online-time-1h-v1.webp" alt="微光初現稱號外觀預覽" width="768" height="270" style="display:block;width:100%;height:auto;max-width:768px;object-fit:contain;" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+'.png'">
-    <p class="hint">預定條件：累積有效在線 1 小時。此區僅驗收圖片，不代表已取得稱號；計時與自動發放尚待接入。</p>
+    <div class="panel-title">新稱號外觀預覽｜6 款</div>
+    <p class="hint">最高管理員外觀驗收・全部永久・尚未開放取得</p>
+    <p class="hint">此區僅驗收圖片，不代表已取得稱號；計時與自動發放尚待接入。</p>
+    ${titles.map(([name,hours,tier],index)=>index===0?`<div data-online-title="online_time_${hours}h"><p><b>${name}</b>・${tier}｜永久・${hours} 小時</p>${artwork(name)}</div>`:`<details data-online-title="online_time_${hours}h" style="margin-top:14px;"><summary>${name}・${tier}｜永久・${hours} 小時</summary>${artwork(name)}</details>`).join('')}
   </section>`;
 }
 const TITLE_TIER_LABELS=Object.freeze({common:"一般",rare:"稀有",epic:"史詩",legendary:"傳說",eternal:"永恆",unrated:"待分級"});
