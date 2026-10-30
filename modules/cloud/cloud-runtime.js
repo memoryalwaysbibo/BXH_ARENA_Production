@@ -102,7 +102,7 @@
         fx = {
           doc: fsMod.doc, setDoc: fsMod.setDoc, getDoc: fsMod.getDoc, getDocFromServer: fsMod.getDocFromServer, deleteDoc: fsMod.deleteDoc,
           onSnapshot: fsMod.onSnapshot, serverTimestamp: fsMod.serverTimestamp,
-          collection: fsMod.collection, query: fsMod.query, where: fsMod.where, getDocs: fsMod.getDocs, updateDoc: fsMod.updateDoc,
+          collection: fsMod.collection, query: fsMod.query, where: fsMod.where, startAfter: fsMod.startAfter, getDocs: fsMod.getDocs, updateDoc: fsMod.updateDoc,
           runTransaction: fsMod.runTransaction, writeBatch: fsMod.writeBatch, deleteField: fsMod.deleteField,
           increment: fsMod.increment, collectionGroup: fsMod.collectionGroup, orderBy: fsMod.orderBy, limit: fsMod.limit, getCountFromServer: fsMod.getCountFromServer, or: fsMod.or
         };
@@ -2058,12 +2058,91 @@
       const partnerGrant=partnerSession?partnerOrganizerGrant():null;
       const partnerOrderCode=partnerGrant?.orderCode||partnerGrant?.contractOrderCode||userProfile?.partnerContractOrderCode||null;
       if(partnerGrant?.scope==="contract"&&!partnerOrderCode) throw new Error("partner-order-missing");
-      let docs=[];
+      // Progressive reads are opt-in so history's existing API remains unchanged.
+      // Default document-ID ordering includes legacy rooms without date fields.
+      const options=arguments[0]||{};
+      const progressive=typeof options.onPage==="function";
+      const read=(work,stage)=>progressive&&options.read?options.read(work,stage):work;
+      const check=()=>{
+        if(progressive&&options.shouldContinue&&!options.shouldContinue()){
+          throw Object.assign(new Error("admin-list-cancelled"),{code:"admin-list-cancelled"});
+        }
+      };
+      const toItems=docs=>{
+        const items = [];
+        docs.forEach(docSnap=>{
+          const d = docSnap.data() || {};
+          let savedState=null;
+          try{savedState=typeof d.data==="string"?JSON.parse(d.data):d.data;}catch(e){}
+          if(partnerSession&&(d.eventAuthority!=="official"||d.createdBy!==actorUid||d.createdByRole!=="partner_organizer"
+            ||d.partnerOrganizationCode!==partnerGrant.organizationId||(d.partnerContractOrderCode??null)!==partnerOrderCode))return;
+          if(eventStaffSession&&!((d.eventStaffAssignments||{})[actorUid]?.status==="accepted"))return;
+          items.push({
+            code: docSnap.id,
+            name: d.name || "",
+            eventDate: d.eventDate || "",
+            startAt: d.startAt || "",
+            location: d.location || "",
+            posterUrl: typeof d.posterUrl==="string" ? d.posterUrl : "",
+            battleMode:(d.battleMode||(savedState&&savedState.meta&&savedState.meta.battleMode))==="team"?"team":"individual",
+            teamSize:Math.max(3,Number(d.teamSize||(savedState&&savedState.meta&&savedState.meta.teamSize))||3),
+            formatType: d.formatType || "",
+            ladderMode: d.ladderMode === "ranked" ? "ranked" : "general",
+            testLadderEnabled: d.testLadderEnabled===true || savedState?.testLadderEnabled===true,
+            ladderPointsAwarded: d.ladderPointsAwarded === true,
+            ladderSeasonId: d.ladderSeasonId || null,
+            ladderSkippedPlayers: Array.isArray(d.ladderSkippedPlayers) ? d.ladderSkippedPlayers : [],
+            systemClosed:d.systemClosed===true,
+            systemClosure:d.systemClosure||null,
+            tournamentPhase: savedState?computeTournamentPhase(savedState):(d.tournamentPhase || "waiting"),
+            archiveStatus: d.archiveStatus || "ongoing",
+            registrationSelection:d.registrationSelection||null,registeredCount:Number(d.registeredCount||0),
+            registrationEnabled: !!d.registrationEnabled,
+            registrationStatus: d.registrationStatus || "",
+            communityQuickRegistration:d.eventAuthority==="community"&&d.communityQuickRegistration===true,
+            communityParticipantCount:d.communityParticipantCount,
+            capacity: d.eventAuthority==="community"&&d.communityQuickRegistration===true?d.capacity:(d.capacity||0),
+            confirmedCount: d.confirmedCount || 0,
+            waitlistEnabled: !!d.waitlistEnabled,
+            waitlistCapacity: d.waitlistCapacity || 0,
+            waitlistCount: d.waitlistCount || 0,
+            updatedAt: d.updatedAt || 0,
+            visibility: d.visibility || "private",
+            createdBy: d.createdBy || "",
+            createdByName: d.createdByName || "",
+            eventAuthority: d.eventAuthority || "official",
+            ownerUid: d.ownerUid || null,
+            partnerOrganizationCode:d.partnerOrganizationCode||null,
+            partnerContractOrderCode:d.partnerContractOrderCode||null,
+            expiresAt: d.expiresAt || null,
+            testMode: d.testMode===true,
+            testLabel: d.testLabel||null,
+            createdByRole: d.createdByRole||null,
+            testCreatedAt: d.testCreatedAt||null,
+            testExpiresAt: d.testExpiresAt||d.expiresAt||null
+          });
+        });
+        return items.sort((a,b)=>{
+          const ad = String(a.eventDate||""), bd = String(b.eventDate||"");
+          if(ad!==bd) return ad<bd ? 1 : -1;
+          return Number(b.updatedAt||0)-Number(a.updatedAt||0);
+        });
+      };
       if(eventStaffSession){
-        const access=await window.engagementService.eventStaff({action:"listMine"});
-        const codes=(access?.assignments||[]).filter(item=>item.status==="accepted"&&item.effective===true).map(item=>item.eventCode);
-        docs=(await Promise.all(codes.map(code=>fx.getDoc(fx.doc(dbHandle,"tournaments",code))))).filter(snap=>snap.exists());
-      }else{
+        const access=await read(window.engagementService.eventStaff({action:"listMine"}),"assignments");
+        check();
+        const codes=[...new Set((access?.assignments||[]).filter(item=>item.status==="accepted"&&item.effective===true).map(item=>item.eventCode))];
+        const batchSize=progressive?20:Math.max(1,codes.length);
+        let rows=[];
+        for(let offset=0;offset<codes.length;offset+=batchSize){
+          check();
+          const batch=await read(Promise.all(codes.slice(offset,offset+batchSize).map(code=>fx.getDoc(fx.doc(dbHandle,"tournaments",code)))),"query");
+          check();
+          rows.push(...toItems(batch.filter(snap=>snap.exists())));
+          if(progressive) options.onPage(sortItems(rows));
+        }
+        return sortItems(rows);
+      }
         const source=testerSession
           ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("eventAuthority","==","test"))
           : partnerSession
@@ -2072,66 +2151,28 @@
                 fx.where("eventAuthority","==","official"),fx.where("partnerOrganizationCode","==",partnerGrant.organizationId),
                 fx.where("partnerContractOrderCode","==",partnerOrderCode))
             : fx.collection(dbHandle,"tournaments");
-        docs=(await fx.getDocs(source)).docs;
+
+      if(!progressive) return toItems((await fx.getDocs(source)).docs);
+      let cursor=null,rows=[];
+      for(;;){
+        check();
+        const constraints=[fx.limit(20)];
+        if(cursor) constraints.push(fx.startAfter(cursor));
+        const snapshot=await read(fx.getDocs(fx.query(source,...constraints)),"query");
+        check();
+        const docs=snapshot.docs;
+        rows.push(...toItems(docs));
+        options.onPage(sortItems(rows));
+        if(docs.length<20) break;
+        cursor=docs[docs.length-1];
       }
-      const items = [];
-      docs.forEach(docSnap=>{
-        const d = docSnap.data() || {};
-        let savedState=null;
-        try{savedState=typeof d.data==="string"?JSON.parse(d.data):d.data;}catch(e){}
-        if(partnerSession&&(d.eventAuthority!=="official"||d.createdBy!==actorUid||d.createdByRole!=="partner_organizer"
-          ||d.partnerOrganizationCode!==partnerGrant.organizationId||(d.partnerContractOrderCode??null)!==partnerOrderCode))return;
-        if(eventStaffSession&&!((d.eventStaffAssignments||{})[actorUid]?.status==="accepted"))return;
-        items.push({
-          code: docSnap.id,
-          name: d.name || "",
-          eventDate: d.eventDate || "",
-          startAt: d.startAt || "",
-          location: d.location || "",
-          posterUrl: typeof d.posterUrl==="string" ? d.posterUrl : "",
-          battleMode:(d.battleMode||(savedState&&savedState.meta&&savedState.meta.battleMode))==="team"?"team":"individual",
-          teamSize:Math.max(3,Number(d.teamSize||(savedState&&savedState.meta&&savedState.meta.teamSize))||3),
-          formatType: d.formatType || "",
-          ladderMode: d.ladderMode === "ranked" ? "ranked" : "general",
-          testLadderEnabled: d.testLadderEnabled===true || savedState?.testLadderEnabled===true,
-          ladderPointsAwarded: d.ladderPointsAwarded === true,
-          ladderSeasonId: d.ladderSeasonId || null,
-          ladderSkippedPlayers: Array.isArray(d.ladderSkippedPlayers) ? d.ladderSkippedPlayers : [],
-          systemClosed:d.systemClosed===true,
-          systemClosure:d.systemClosure||null,
-          tournamentPhase: savedState?computeTournamentPhase(savedState):(d.tournamentPhase || "waiting"),
-          archiveStatus: d.archiveStatus || "ongoing",
-          registrationSelection:d.registrationSelection||null,registeredCount:Number(d.registeredCount||0),
-          registrationEnabled: !!d.registrationEnabled,
-          registrationStatus: d.registrationStatus || "",
-          communityQuickRegistration:d.eventAuthority==="community"&&d.communityQuickRegistration===true,
-          communityParticipantCount:d.communityParticipantCount,
-          capacity: d.eventAuthority==="community"&&d.communityQuickRegistration===true?d.capacity:(d.capacity||0),
-          confirmedCount: d.confirmedCount || 0,
-          waitlistEnabled: !!d.waitlistEnabled,
-          waitlistCapacity: d.waitlistCapacity || 0,
-          waitlistCount: d.waitlistCount || 0,
-          updatedAt: d.updatedAt || 0,
-          visibility: d.visibility || "private",
-          createdBy: d.createdBy || "",
-          createdByName: d.createdByName || "",
-          eventAuthority: d.eventAuthority || "official",
-          ownerUid: d.ownerUid || null,
-          partnerOrganizationCode:d.partnerOrganizationCode||null,
-          partnerContractOrderCode:d.partnerContractOrderCode||null,
-          expiresAt: d.expiresAt || null,
-          testMode: d.testMode===true,
-          testLabel: d.testLabel||null,
-          createdByRole: d.createdByRole||null,
-          testCreatedAt: d.testCreatedAt||null,
-          testExpiresAt: d.testExpiresAt||d.expiresAt||null
+      return sortItems(rows);
+      function sortItems(items){
+        return [...items].sort((a,b)=>{
+          const ad=String(a.eventDate||""),bd=String(b.eventDate||"");
+          return ad!==bd?(ad<bd?1:-1):Number(b.updatedAt||0)-Number(a.updatedAt||0);
         });
-      });
-      return items.sort((a,b)=>{
-        const ad = String(a.eventDate||""), bd = String(b.eventDate||"");
-        if(ad!==bd) return ad<bd ? 1 : -1;
-        return Number(b.updatedAt||0)-Number(a.updatedAt||0);
-      });
+      }
     },
 
     // Names are optional display enrichment, never a prerequisite for rooms.
