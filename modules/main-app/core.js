@@ -12088,6 +12088,7 @@ function renderTeamAdminRegistrations(list,registrationLocked){
 }
 
 function renderAdminRegistrationsTab(){
+  if(staffRosterReadOnly())return renderStaffRegistrationRoster();
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
     return `<div class="panel">
@@ -15730,7 +15731,8 @@ function staffRosterReadOnly(){
 async function loadStaffRegistrationRoster(){
   if(!staffRosterReadOnly()||peopleRosterBusy||!state.cloudCode)return;
   const context=captureRegistrationRosterContext();
-  const isCurrent=()=>registrationRosterContextIsCurrent(context)&&staffRosterReadOnly()&&registrationRosterPeopleView();
+  const isCurrent=()=>context.key===registrationRosterContextKey()&&context.generation===adminRosterGeneration&&staffRosterReadOnly()&&
+    (appPhase==='app'||appPhase==='community-room')&&['people','registrations'].includes(registrationRosterViewTab());
   peopleRosterBusy=true;adminRosterManualContext=context;adminRegistrationsError=null;
   render();
   try{
