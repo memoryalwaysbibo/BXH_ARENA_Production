@@ -50,3 +50,14 @@ test('duplicate taps share one in-flight write and readback disagreement is not 
  const j=harness();j.c.window.cloudSync.readStaffRegistrationRoster=async()=>({ok:true,code:'BXH-TEST12',checkinEnabled:true,rows:[{playerId:'child-row',status:'confirmed',checkedIn:false}]});
  await j.c.staffRosterCheckin(j.target(true));assert(j.toasts.every(x=>x[1]===true));
 });
+
+test('verified stale receipt is retired so the next explicit click creates a fresh operation',async()=>{
+ const h=harness();let serial=0;h.c.crypto.randomUUID=()=> 'operation-retry-'+String(++serial).padStart(5,'0');
+ h.c.window.cloudSync.readStaffRegistrationRoster=async()=>({ok:true,code:'BXH-TEST12',checkinEnabled:true,rows:[{name:'同名兒童',playerId:'child-row',status:'confirmed',checkedIn:false}]});
+ await h.c.staffRosterCheckin(h.target(true));
+ assert.equal(h.payloads.length,1);assert.equal(h.toasts[0][1],true);
+ h.c.window.cloudSync.readStaffRegistrationRoster=async()=>({ok:true,code:'BXH-TEST12',checkinEnabled:true,rows:[{name:'同名兒童',playerId:'child-row',status:'confirmed',checkedIn:true}]});
+ await h.c.staffRosterCheckin(h.target(true));
+ assert.equal(h.payloads.length,2);assert.notEqual(h.payloads[0].operationId,h.payloads[1].operationId);
+ assert.equal(h.toasts.at(-1)[0],'報到成功');
+});

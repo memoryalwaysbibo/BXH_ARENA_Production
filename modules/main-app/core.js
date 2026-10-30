@@ -15789,14 +15789,18 @@ async function staffRosterCheckin(target){
       if(fresh?.ok!==true||fresh.code!==String(context.code).toUpperCase()||!Array.isArray(fresh.rows))throw Error('checkin-readback-failed');
       staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true};
       const verified=fresh.rows.filter(row=>row.playerId===playerId&&row.status==='confirmed');
-      if(verified.length!==1||verified[0].checkedIn!==checkedIn)throw Error('checkin-state-changed');
+      if(verified.length!==1||verified[0].checkedIn!==checkedIn){
+        staffCheckinOperations.delete(key);try{sessionStorage.removeItem('bxh.staffCheckin.'+key);}catch{}
+        throw Error('checkin-state-changed');
+      }
       staffCheckinOperations.delete(key);try{sessionStorage.removeItem('bxh.staffCheckin.'+key);}catch{}
       adminRegistrationsError=null;showToast(checkedIn?'報到成功':'已取消報到');
     }catch(error){
       if(current()){
         const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
         adminRegistrationsError=reason.includes('permission-denied')?'目前帳號沒有本場報到操作權限，請重新同步名單。':
-          reason.includes('checkin-closed')?'目前報到已鎖定，請重新同步名單。':'報到結果尚未確認，請重新同步名單核對；重試相同操作會沿用原請求。';
+          reason.includes('checkin-closed')?'目前報到已鎖定，請重新同步名單。':
+          reason.includes('checkin-state-changed')?'報到狀態已有異動，已同步最新名單；請確認後再次操作。':'報到結果尚未確認，請重新同步名單核對；重試相同操作會沿用原請求。';
         showToast(adminRegistrationsError,true);
       }
     }finally{staffCheckinBusy=false;if(current())render();}
