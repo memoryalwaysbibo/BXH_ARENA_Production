@@ -3336,6 +3336,7 @@ async function ensureCloudRoomForTournament(){
 function cloudCreateRoomErrorMessage(prefix="建立失敗"){
   const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
   if(code==="partner-room-quota-exhausted" || (code==="permission-denied"&&isPartnerOrganizerMode()&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerOrganizerGrant()?.orderCode)===0))return prefix+"：合作方案開房次數已用完";
+  if(code==="permission-denied"&&isPartnerOrganizerMode()) return prefix+"：合作主辦建房授權未通過；請至賽事管理查看合約、有效期限與剩餘場次。若資料正常，請聯絡 BXH 協助核對；此訊息不代表場次已用完";
   if(code==="permission-denied") return prefix+"：Firestore 權限被拒絕，請重新整理後再試";
   if(code==="unauthenticated") return prefix+"：登入狀態已失效，請重新登入";
   if(code==="already-exists") return prefix+"：房間代碼重複，請再試一次";
@@ -19446,7 +19447,7 @@ function renderTournamentManagementTab(){
     }).join("")}</div>`;
   }
 
-  return `<div class="panel">
+  return `${isPartnerOrganizerMode()?window.BXHPartnerOrganizer?.renderOverview?.(userProfile)||'':''}<div class="panel">
     <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
     <div class="hint">正式賽事可依建立者快速分流；最高管理員與管理員可在「一般房間」整理玩家房間。工作人員無法查看或刪除一般房間。</div>
     ${filterBar}
