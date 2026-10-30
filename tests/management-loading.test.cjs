@@ -64,7 +64,7 @@ function setup(query = async () => [row()]) {
     partnerOrganizerGrant: () => sandbox.userProfile?.partnerOrganizer || {},
     cloudAvailable: () => true, canCreateOfficialTournament: () => false,
     registrationStatusLabel: () => '', esc: value => String(value ?? ''),
-    window: { cloudSync: { connect: async () => true, queryAdminTournaments: () => { calls.push('query'); return query(); } } },
+    window: { cloudSync: { connect: async () => true, queryAdminTournaments: options => { calls.push('query'); return options?.read ? options.read(query(options), 'query') : query(); } } },
     render() { sandbox.reconcileAdminTournamentListContext(); renders.push(sandbox.renderTournamentManagementTab()); }
   };
   vm.createContext(sandbox);
@@ -91,6 +91,109 @@ function installCloud(t, docs, getDoc = async () => ({ exists: () => false })) {
   t.evaluate(cloudDeadline + '\nObject.assign(window.cloudSync, {' + cloudMethods + '});');
   return reads;
 }
+
+// Exercise the real production cloud method, with document-ID cursors and
+// controllable transport waits. No Firebase credentials or production writes.
+function installPagedCloud(t, docs, transport) {
+  installCloud(t, []);
+  const reads=[];
+  t.sandbox.fx.limit=count=>({limit:count});
+  t.sandbox.fx.startAfter=snapshot=>({after:snapshot.id});
+  t.sandbox.fx.getDocs=async query=>{
+    reads.push(query);
+    const limit=query.find(part=>part?.limit)?.limit;
+    const after=query.find(part=>part?.after)?.after;
+    const page=[...docs].sort((a,b)=>a.code.localeCompare(b.code)).filter(item=>!after||item.code>after).slice(0,limit);
+    if(transport) await transport(reads.length,page);
+    return {docs:page.map(item=>({id:item.code,data:()=>clone(item)}))};
+  };
+  return reads;
+}
+const manyRows=count=>Array.from({length:count},(_,i)=>row('Room '+i,{code:'BXH-'+String(i).padStart(6,'0'),eventDate:i===0?'':'2026-10-'+String((i%28)+1).padStart(2,'0')}));
+
+test('slow multi-page transport publishes usable cards before completion and may exceed ten seconds overall', async()=>{
+  const t=setup(), gates=[deferred(),deferred(),deferred()];
+  const reads=installPagedCloud(t,manyRows(45),call=>gates[call-1].promise);
+  const request=t.load(); await t.timer.advance(6000);
+  gates[0].resolve(); await tick();
+  assert.equal(t.state().items.length,20); assert.equal(t.state().busy,true);
+  assert.match(t.view(),/Room 0/); assert.match(t.view(),/分類數量尚未完整/);
+  await t.timer.advance(6000); gates[1].resolve(); await tick();
+  assert.equal(t.state().items.length,40); assert.equal(t.state().error,'');
+  await t.timer.advance(6000); gates[2].resolve(); await request;
+  assert.equal(t.state().items.length,45); assert.equal(t.state().busy,false);
+  assert.equal(t.state().error,''); assert.equal(reads.length,3);
+  assert.ok(t.state().items.some(item=>item.eventDate===''),'legacy rooms without dates remain included');
+  assert.equal(t.state().items.at(-1).code,'BXH-000000','final order remains event date descending');
+});
+
+test('a later-page timeout keeps loaded cards and reports the failed stage; retry ignores late pages', async()=>{
+  const t=setup(), gate=deferred();
+  installPagedCloud(t,manyRows(25),call=>call===2?gate.promise:Promise.resolve());
+  const request=t.load(); await tick();
+  assert.equal(t.state().items.length,20);
+  await t.timer.advance(10000); await request;
+  assert.equal(t.state().items.length,20); assert.equal(t.state().busy,false);
+  assert.match(t.state().error,/賽事分批查詢/);
+  assert.match(t.view(),/部分賽事可能尚未更新/);
+  installPagedCloud(t,[row('Fresh retry')]); await t.load();
+  gate.resolve(); await tick();
+  assert.deepEqual(t.state().items.map(item=>item.name),['Fresh retry']);
+});
+
+test('connection and first page each receive their own deadline',async()=>{
+  const t=setup(), connection=deferred(), page=deferred();
+  t.sandbox.window.cloudSync.connect=()=>connection.promise;
+  installPagedCloud(t,[row()],()=>page.promise);
+  const request=t.load(); await t.timer.advance(6000); connection.resolve(); await tick();
+  await t.timer.advance(6000); page.resolve(); await request;
+  assert.equal(t.state().error,''); assert.equal(t.state().items.length,1);
+});
+
+test('switching identity during a later page prevents publishing or scheduling another page',async()=>{
+  const t=setup(), gate=deferred();
+  const reads=installPagedCloud(t,manyRows(45),call=>call===2?gate.promise:Promise.resolve());
+  const request=t.load(); await tick(); assert.equal(reads.length,2);
+  t.sandbox.firebaseUser={uid:'another-user'}; t.sandbox.reconcileAdminTournamentListContext();
+  gate.resolve(); await request;
+  assert.equal(reads.length,2); assert.equal(t.state().items.length,0);
+});
+
+test('progressive refresh retains previous cards until the completed scan removes absent rooms',async()=>{
+  const t=setup(); await t.load(); const gate=deferred();
+  installPagedCloud(t,manyRows(21),call=>call===2?gate.promise:Promise.resolve());
+  const request=t.load(); await tick();
+  assert.match(t.view(),/Fixture room/); assert.equal(t.state().items.length,21);
+  gate.resolve(); await request;
+  assert.equal(t.state().items.length,21); assert.doesNotMatch(t.view(),/Fixture room/);
+});
+
+test('progressive scoped queries retain tester and partner Firestore constraints',async()=>{
+  for(const mode of ['tester','partner_organizer']){
+    const t=setup();
+    if(mode==='tester'){t.sandbox.userProfile.role='tester';t.sandbox.currentRole='tester';}
+    else {t.sandbox.activeMode=mode;t.sandbox.userProfile.partnerOrganizer={organizationId:'org',scope:'contract',orderCode:'order'};}
+    const reads=installPagedCloud(t,[]); await t.load();
+    const source=reads[0][0];
+    assert.ok(source.some(part=>Array.isArray(part)&&part[0]==='createdBy'&&part[2]==='fixture-owner'));
+    assert.ok(source.some(part=>Array.isArray(part)&&part[0]==='eventAuthority'&&part[2]===(mode==='tester'?'test':'official')));
+    if(mode==='partner_organizer') assert.ok(source.some(part=>Array.isArray(part)&&part[0]==='partnerContractOrderCode'&&part[2]==='order'));
+  }
+});
+
+test('event staff reads only effective accepted assignments in bounded batches',async()=>{
+  const t=setup(), gate=deferred(), all=manyRows(41), reads=[];
+  t.sandbox.activeMode='event_staff'; installCloud(t,[]);
+  t.sandbox.window.engagementService={eventStaff:async()=>({assignments:[...all.map(item=>({eventCode:item.code,status:'accepted',effective:true})),{eventCode:'DENIED',status:'invited',effective:true},{eventCode:'EXPIRED',status:'accepted',effective:false}]})};
+  t.sandbox.fx.getDoc=async ref=>{
+    reads.push(ref.id); if(reads.length<=20) await gate.promise;
+    return {id:ref.id,exists:()=>true,data:()=>row(ref.id,{eventStaffAssignments:{'fixture-owner':{status:'accepted'}}})};
+  };
+  const request=t.load(); await tick(); assert.equal(reads.length,20);
+  gate.resolve(); await request;
+  assert.equal(reads.length,41); assert.equal(t.state().items.length,41);
+  assert.ok(!reads.includes('DENIED')&&!reads.includes('EXPIRED'));
+});
 
 test('base query publishes room cards without reading optional creator profiles', async () => {
   const t = setup(), pending = deferred();

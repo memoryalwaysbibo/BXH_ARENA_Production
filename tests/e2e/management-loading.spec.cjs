@@ -68,11 +68,15 @@ const cloudEnabled = true, dbHandle = {};
 const snapshot = rows => ({ docs: copy(rows).map(item => ({ id: item.code, data: () => item })) });
 const fx = {
   collection: (_, kind) => kind, query: (...parts) => parts, where: (...parts) => parts,
+  limit: count => ({ limit: count }), startAfter: snapshot => ({ after: snapshot.id }),
   doc: (_, kind, id) => ({ kind, id }),
-  getDocs: async () => {
+  getDocs: async query => {
     const call = { uid: currentAuthUid() }; fixture.queries.push(call);
-    if (!fixture.holdQuery) return snapshot(fixture.rows);
-    return new Promise((resolve, reject) => { call.resolve = rows => resolve(snapshot(rows)); call.reject = reject; });
+    const limit=query.find?.(part=>part?.limit)?.limit;
+    const after=query.find?.(part=>part?.after)?.after;
+    const result=rows=>snapshot([...rows].sort((a,b)=>a.code.localeCompare(b.code)).filter(item=>!after||item.code>after).slice(0,limit));
+    if (!fixture.holdQuery) return result(fixture.rows);
+    return new Promise((resolve, reject) => { call.resolve = rows => resolve(result(rows)); call.reject = reject; });
   },
   getDoc: async ref => {
     if (ref.kind !== 'users') throw Error('Unexpected mock document read: ' + ref.kind);
@@ -167,6 +171,22 @@ test('cards appear directly while creator lookup is pending, without switching t
   await testInfo.attach('Room cards before optional creator lookup finishes', { path: screenshot, contentType: 'image/png' });
   await page.evaluate(() => fixture.names[0].resolve('Resolved creator')); await settle(page);
   await expect(cards(page)).toContainText('Resolved creator'); expect(errors).toEqual([]);
+});
+
+test('slow pages publish cards and partial counts while the full scan exceeds ten seconds', async ({ page }) => {
+  const rows=Array.from({length:21},(_,i)=>row('Paged room '+i,{code:'BXH-'+String(i).padStart(6,'0')}));
+  await page.clock.install(); await openManagement(page,{holdQuery:true,rows});
+  await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(1);
+  await page.clock.fastForward(6000);
+  await page.evaluate(()=>fixture.queries[0].resolve(fixture.rows));
+  await expect(page.locator('.tournament-management-card')).toHaveCount(20);
+  await expect(page.getByText(/分類數量尚未完整/)).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(2);
+  await page.clock.fastForward(6000);
+  await page.evaluate(()=>fixture.queries[1].resolve(fixture.rows)); await settle(page);
+  await expect(page.locator('.tournament-management-card')).toHaveCount(21);
+  await expect(page.locator('.auth-error')).toHaveCount(0);
+  await expect(page.getByText(/分類數量尚未完整/)).toHaveCount(0);
 });
 
 test('repeated refresh and management-tab clicks share a pending query', async ({ page }) => {
