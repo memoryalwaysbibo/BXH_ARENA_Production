@@ -2887,8 +2887,12 @@
     // possible instead of both cases throwing the same opaque error).
     async joinRoom(code){
       if(!cloudEnabled || !code) return { ok:false, reason:"network" };
+      const options=arguments[1]||{};
       try{
-        const snap = await fx.getDoc(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()));
+        const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
+        // An explicit roster recovery must not silently fall back to cached data.
+        if(options.serverOnly===true&&!fx.getDocFromServer)return {ok:false,reason:"network"};
+        const snap = options.serverOnly===true?await fx.getDocFromServer(ref):await fx.getDoc(ref);
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
         const parsed = JSON.parse(d.data);
