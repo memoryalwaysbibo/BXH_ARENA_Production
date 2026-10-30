@@ -15743,7 +15743,7 @@ async function loadStaffRegistrationRoster(){
     const result=await window.cloudSync.readStaffRegistrationRoster(context.code);
     if(!isCurrent())return;
     if(result?.ok!==true||result.code!==String(context.code).toUpperCase()||!Array.isArray(result.rows))throw Error('staff-roster-read-failed');
-    staffRosterCache={key:context.key,rows:result.rows,checkinEnabled:result.checkinEnabled===true};
+    staffRosterCache={key:context.key,rows:result.rows,checkinEnabled:result.checkinEnabled===true,promotionEnabled:result.promotionEnabled===true};
     adminRegistrationsError=null;
     showToast('玩家名單已同步');
   }catch(error){
@@ -15760,7 +15760,7 @@ async function loadStaffRegistrationRoster(){
 let staffCheckinBusy=false;
 const staffCheckinOperations=new Map();
 async function staffRosterCheckin(target){
-  if(staffCheckinBusy||peopleRosterBusy||!staffRosterReadOnly())return;
+  if(staffCheckinBusy||staffPromotionBusy||peopleRosterBusy||!staffRosterReadOnly())return;
   const context=captureRegistrationRosterContext();
   const current=()=>context.key===registrationRosterContextKey()&&context.generation===adminRosterGeneration&&staffRosterReadOnly();
   const cache=staffRosterCache;
@@ -15787,7 +15787,7 @@ async function staffRosterCheckin(target){
       const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);
       if(!current())return;
       if(fresh?.ok!==true||fresh.code!==String(context.code).toUpperCase()||!Array.isArray(fresh.rows))throw Error('checkin-readback-failed');
-      staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true};
+      staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true,promotionEnabled:fresh.promotionEnabled===true};
       const verified=fresh.rows.filter(row=>row.playerId===playerId&&row.status==='confirmed');
       if(verified.length!==1||verified[0].checkedIn!==checkedIn){
         staffCheckinOperations.delete(key);try{sessionStorage.removeItem('bxh.staffCheckin.'+key);}catch{}
@@ -15808,6 +15808,57 @@ async function staffRosterCheckin(target){
   if(checkedIn){await submit();return;}
   openModal({type:'generic',title:'是否要取消報到？',message:player.name,danger:true,confirmLabel:'是',cancelLabel:'否',onConfirm:()=>{if(current())void submit();}});
 }
+let staffPromotionBusy=false;
+const staffPromotionOperations=new Map();
+async function staffRosterPromote(target){
+  if(staffPromotionBusy||staffCheckinBusy||peopleRosterBusy||!staffRosterReadOnly())return;
+  const context=captureRegistrationRosterContext();
+  const current=()=>context.key===registrationRosterContextKey()&&context.generation===adminRosterGeneration&&staffRosterReadOnly();
+  const cache=staffRosterCache;
+  if(cache?.key!==context.key||cache.promotionEnabled!==true)return;
+  const registrationId=target.getAttribute('data-registration-id'),playerId=target.getAttribute('data-player-id');
+  if(!!registrationId===!!playerId)return;
+  const key=registrationId?'promotionRegistrationId':'promotionPlayerId',id=registrationId||playerId;
+  const matches=cache.rows.filter(row=>row[key]===id&&row.status==='waitlist');
+  if(matches.length!==1)return;
+  const intent=context.key+':'+key+':'+id;
+  openModal({type:'generic',title:'確認升為正取？',message:'將「'+matches[0].name+'」由備取升為正取。系統會重新核對名額與賽事狀態。',
+   confirmLabel:'確認升正取',cancelLabel:'返回',onConfirm:async()=>{
+    if(!current()||staffPromotionBusy)return;
+    let operationId=staffPromotionOperations.get(intent);
+    if(!operationId){try{operationId=sessionStorage.getItem('bxh.staffPromotion.'+intent);}catch{}
+      if(!/^[-a-zA-Z0-9]{16,80}$/.test(operationId||''))operationId=crypto.randomUUID();
+      staffPromotionOperations.set(intent,operationId);
+      try{sessionStorage.setItem('bxh.staffPromotion.'+intent,operationId);}catch{}
+    }
+    staffPromotionBusy=true;render();
+    try{
+      const result=await window.engagementService.tournamentOperation('promoteSeatedRegistration',{
+       code:context.code,...(registrationId?{registrationId}:{playerId}),operationId,expandBy:0});
+      if(!current())return;
+      if(result?.ok!==true||result.verified!==true)throw Error('promotion-unconfirmed');
+      const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);
+      if(!current())return;
+      if(fresh?.ok!==true||fresh.code!==String(context.code).toUpperCase()||!Array.isArray(fresh.rows))throw Error('promotion-readback-failed');
+      staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true,promotionEnabled:fresh.promotionEnabled===true};
+      const confirmed=fresh.rows.filter(row=>row[key]===id&&row.status==='confirmed');
+      if(confirmed.length!==1){staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
+       throw Error('promotion-state-changed');}
+      staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
+      adminRegistrationsError=null;showToast('已升為正取');
+    }catch(error){if(current()){
+      const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
+      if(/not-waitlist|operation-outdated|bracket-locked|promotion-state-changed|capacity-full/.test(reason)){
+       staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
+      }
+      adminRegistrationsError=reason.includes('capacity-full')?'正取名額已滿，請由房主調整名額後重新同步。':
+       reason.includes('permission-denied')?'目前帳號沒有本場遞補權限，請重新同步名單。':
+       reason.includes('promotion-state-changed')?'名單已有異動，已同步最新狀態，請再次確認。':
+       '遞補結果尚未確認，請重新同步名單核對；網路重試會沿用原操作。';
+      showToast(adminRegistrationsError,true);
+    }}finally{staffPromotionBusy=false;if(current())render();}
+   }});
+}
 function renderStaffRegistrationRoster(){
   if(adminRosterUnsub||adminRosterCode)stopAdminRosterWatch();
   const rows=staffRosterCache?.key===registrationRosterContextKey()?staffRosterCache.rows:null;
@@ -15821,13 +15872,19 @@ function renderStaffRegistrationRoster(){
     if(!state.meta?.checkinRequired)return '免報到';
     const label=row.checkedIn?'已報到':'未報到';
     if(staffRosterCache?.checkinEnabled!==true||!row.playerId)return label;
-    return `<button class="btn btn-ghost btn-sm" data-action="staff-roster-checkin" data-player-id="${esc(row.playerId)}" data-checked-in="${row.checkedIn?'false':'true'}" ${staffCheckinBusy||peopleRosterBusy?'disabled':''}>${label}｜${row.checkedIn?'取消報到':'報到'}</button>`;
+    return `<button class="btn btn-ghost btn-sm" data-action="staff-roster-checkin" data-player-id="${esc(row.playerId)}" data-checked-in="${row.checkedIn?'false':'true'}" ${staffCheckinBusy||staffPromotionBusy||peopleRosterBusy?'disabled':''}>${label}｜${row.checkedIn?'取消報到':'報到'}</button>`;
+  };
+  const promotionLabel=row=>{
+    if(row.status!=='waitlist'||staffRosterCache?.promotionEnabled!==true)return '—';
+    const registrationId=row.promotionRegistrationId,playerId=row.promotionPlayerId;
+    if(!registrationId&&!playerId)return '—';
+    return `<button class="btn btn-primary btn-sm" data-action="staff-roster-promote" ${registrationId?`data-registration-id="${esc(registrationId)}"`:`data-player-id="${esc(playerId)}"`} ${staffPromotionBusy||peopleRosterBusy||staffCheckinBusy?'disabled':''}>升正取</button>`;
   };
   return `<div id="people-roster-view">${controls}<div class="panel"><div class="panel-title">玩家名單</div>
-    <p class="hint">${staffRosterCache?.checkinEnabled===true?'可為正取選手報到或取消報到；請依實際到場選手逐位操作。':'工作人員可同步查看正取、備取與報到狀態。'}</p>
-    <button class="btn btn-primary" data-action="load-staff-registration-roster" ${peopleRosterBusy||staffCheckinBusy?'disabled':''}>${peopleRosterBusy?'同步中…':'重新同步名單'}</button>
+    <p class="hint">${staffRosterCache?.promotionEnabled===true?'升正取會即時核對名額；名額已滿時請由房主調整。':staffRosterCache?.checkinEnabled===true?'可為正取選手報到或取消報到；請依實際到場選手逐位操作。':'工作人員可同步查看正取、備取與報到狀態。'}</p>
+    <button class="btn btn-primary" data-action="load-staff-registration-roster" ${peopleRosterBusy||staffCheckinBusy||staffPromotionBusy?'disabled':''}>${peopleRosterBusy?'同步中…':'重新同步名單'}</button>
     ${adminRegistrationsError?`<div class="banner warn" role="alert">${esc(adminRegistrationsError)}</div>`:''}
-    ${rows?`<p>正取 ${confirmed} 人 ／ 備取 ${waitlist} 人</p><div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>名單</th><th>報到</th></tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${index+1}</td><td class="people-col-name">${esc(row.name)}</td><td>${status[row.status]||'—'}</td><td>${checkinLabel(row)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state">${adminRegistrationsError?'尚未取得最新名單':'正在讀取玩家名單…'}</div>`}
+    ${rows?`<p>正取 ${confirmed} 人 ／ 備取 ${waitlist} 人</p><div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>名單</th><th>報到</th>${staffRosterCache?.promotionEnabled===true?'<th>遞補</th>':''}</tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${index+1}</td><td class="people-col-name">${esc(row.name)}</td><td>${status[row.status]||'—'}</td><td>${checkinLabel(row)}</td>${staffRosterCache?.promotionEnabled===true?`<td>${promotionLabel(row)}</td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty-state">${adminRegistrationsError?'尚未取得最新名單':'正在讀取玩家名單…'}</div>`}
     </div></div>`;
 }
 function canManageRegistrationRoster(){
@@ -20546,8 +20603,9 @@ function handleAction(action, target){
 
   if(action.startsWith("team-lineup-")||action==="team-score-direct"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
-  if(action==='load-staff-registration-roster'){if(!staffCheckinBusy)void loadStaffRegistrationRoster();return;}
+  if(action==='load-staff-registration-roster'){if(!staffCheckinBusy&&!staffPromotionBusy)void loadStaffRegistrationRoster();return;}
   if(action==='staff-roster-checkin'){void staffRosterCheckin(target);return;}
+  if(action==='staff-roster-promote'){void staffRosterPromote(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
