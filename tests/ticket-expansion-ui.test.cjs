@@ -34,6 +34,6 @@ test('core routes ticket promotions before the ordinary free-eight path and prov
  assert.match(core,/async function peoplePromoteOnline[^\n]+\n\s+if\(isTicketRoomState\(\)\)return peoplePromoteTicket/);
  assert.match(core,/async function peoplePromoteLocal[^\n]+\n\s+if\(isTicketRoomState\(\)\)/);
  assert.match(core,/data-ticket-candidate/);assert.match(core,/people-promote-ticket-selected/);assert.match(core,/engagementSessionEpoch===context.epoch&&activeMode===context.mode/);
- assert.match(core,/onsiteLocked\|\|isTicketRoomState\(\)\?'disabled'/);assert.match(cloud,/ticket-promotion-required/);
+ assert.match(core,/onsiteLocked\|\|ticketRoom\?'disabled'/);assert.match(cloud,/ticket-promotion-required/);
  assert.match(fs.readFileSync(__dirname+'/../index.html','utf8'),/ticket-expansion-ui.js/);
 });

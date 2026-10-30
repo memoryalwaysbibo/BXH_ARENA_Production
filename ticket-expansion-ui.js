@@ -33,7 +33,7 @@ async function promote(ctx,selected){
   }catch(e){
    if(permanent.test(String(e?.message||e)))try{sessionStorage.removeItem(key);}catch{}
    if(ctx.isCurrent())ctx.error(errorText(e));
-  }finally{active.delete(key);if(ctx.isCurrent())ctx.busy(false);}
+  }finally{active.delete(key);ctx.busy(false);}
  }
  try{
   let pending;try{pending=JSON.parse(sessionStorage.getItem(key)||'null');}catch{throw Error('storage-unavailable');}
@@ -51,7 +51,7 @@ async function promote(ctx,selected){
    message:'將增加 '+q.additionalSeats+' 個正取名額，每名額 NT$ '+q.unitPriceTwd+'，本次費用 NT$ '+q.amountTwd+'。\n\n正取上限：'+q.fromCapacity+' → '+q.toCapacity+' 人\n\n確認後列入待補繳，請於賽事結束後 7 天內繳清；下一次購券或啟動賽事前須先結清。',
    confirmLabel:'確認加購並升正取',onConfirm:()=>commit(payload)});
  }catch(e){if(ctx.isCurrent())ctx.error(errorText(e));}
- finally{active.delete(key);if(ctx.isCurrent())ctx.busy(false);}
+ finally{active.delete(key);ctx.busy(false);}
 }
 root.BXHTicketExpansion={promote,errorText};
 })(window);
