@@ -43,5 +43,18 @@ async function total(uid){return (await db.doc('playerStats/'+uid).get()).data()
   await service(event('midnight',midnight,midnight+45000));
   await service(event('midnight',midnight-45000,midnight));
   assert.equal(await total('midnight'),90000);
-  console.log('PASS real Firestore: five hours uncapped, preserved stats/points, concurrent duplicate, retry, cross-day out-of-order');
+  const {createBackfill}=require('../backfill.cjs');
+  const cutover=Date.parse('2026-11-01T00:00:00+08:00');
+  await db.doc('systemSettings/onlineTimeTitles').set({enabled:true,startAt:cutover,sourceSchema:'lastSeenAt-v1',
+    migrationStrategy:'C-once-v1',backfillEnabled:true,backfillBatchId:'emulator-once',historyStartDate:'2026-10-30'});
+  await setup('migration');
+  await db.doc('activityOnlineDaily/2026-10-30/players/migration').set({uid:'migration',dateKey:'2026-10-30',activeMs:3*D.HOUR});
+  const migrate=createBackfill(db,{awardTitle:native,clock:()=>cutover+100000});
+  await Promise.all([migrate('migration'),migrate('migration'),service(event('migration',cutover-30000,cutover+30000))]);
+  assert.equal(await total('migration'),3*D.HOUR+30000);
+  assert.equal((await db.doc('onlineTimeTitleBackfills/migration').get()).data().missingDays,1);
+  await migrate('migration');
+  assert.equal(await total('migration'),3*D.HOUR+30000);
+  assert.equal((await db.collection('users/migration/earnedTitles').get()).size,1);
+  console.log('PASS real Firestore: uncapped time, native grants, retry, cross-day and C backfill/live concurrency');
 })().finally(async()=>{await db.terminate();await deleteApp(app);}).catch(e=>{console.error(e);process.exitCode=1;});

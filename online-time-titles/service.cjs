@@ -64,6 +64,11 @@ function createService(db,{awardTitle,clock=Date.now}={}){
     });
     // Always retry awards after an already-counted interval. A failed award
     // must not be lost merely because the time transaction already committed.
+    await grantEligible(db,awardTitle,uid,result);
+    return result;
+  };
+}
+async function grantEligible(db,awardTitle,uid,result){
     if(result.awardsEnabled){
       for(const definition of D.DEFINITIONS){
         if(result.totalMs<definition.targetValue*D.MINUTE||result.confirmedTitleIds.includes(definition.id))continue;
@@ -82,7 +87,5 @@ function createService(db,{awardTitle,clock=Date.now}={}){
         }
       }
     }
-    return result;
-  };
 }
-module.exports={createService,RECEIPTS};
+module.exports={createService,grantEligible,RECEIPTS};

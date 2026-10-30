@@ -20,7 +20,7 @@ function install(source,destination){
     'exports.onlineTimeTitlePresenceWritten=onDocumentWritten({document:"onlinePresence/{uid}",region:REGION,retry:true},onlineTimeTitleService);\n';
   fs.cpSync(source,destination,{recursive:true});
   fs.mkdirSync(path.join(destination,'online-time-titles'));
-  for(const file of ['domain.cjs','service.cjs'])fs.copyFileSync(path.join(__dirname,file),path.join(destination,'online-time-titles',file));
+  for(const file of ['domain.cjs','service.cjs','backfill.cjs'])fs.copyFileSync(path.join(__dirname,file),path.join(destination,'online-time-titles',file));
   fs.writeFileSync(path.join(destination,'index.js'),index);
   return {candidateOnly:true,deployAllowed:false,newExport:'onlineTimeTitlePresenceWritten',historicalBackfill:false};
 }
