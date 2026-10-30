@@ -16,7 +16,10 @@ const core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
 const start=core.indexOf('function renderTournamentManagementTab(){');
 const end=core.indexOf('function renderAdminTournamentListModal(){',start);
 assert(start>=0&&end>start,'real management renderer not found');
-const renderSource=core.slice(start,end);
+const controlsStart=core.indexOf('function adminTournamentListControlsHtml(');
+const controlsEnd=core.indexOf('function changeAdminTournamentListQuery(',controlsStart);
+assert(controlsStart>=0&&controlsEnd>controlsStart,'real summary controls not found');
+const renderSource=core.slice(start,end)+'\n'+core.slice(controlsStart,controlsEnd);
 const results=[];
 
 async function mount(page){
@@ -32,6 +35,7 @@ async function mount(page){
     window.hasAdminAccess=()=>true;window.isAdminTierOrAbove=()=>false;window.canCreateOfficialTournament=()=>true;
     window.firebaseUser={uid:'host'};window.state={};
     window.adminTournamentListLoaded=true;window.adminTournamentListBusy=false;window.adminTournamentListError='';window.adminTournamentListFilter='all';window.adminTournamentListItems=[];
+    window.adminTournamentListSearch='';window.adminTournamentListSearchDraft='';window.adminTournamentListKind='official';window.adminTournamentListCounts=null;window.adminTournamentListHasMore=false;
     window.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     window.registrationStatusLabel=()=>'';
     window.mock={calls:0,used:2,fail:false,pending:false};
@@ -100,3 +104,4 @@ async function testViewport(browser,width){
   finally{await browser.close();fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(results,null,2));}
   console.log('PASS partner overview browser acceptance:',results.map(x=>x.viewport).join(', '));
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
