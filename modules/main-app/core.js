@@ -5872,7 +5872,7 @@ function isLineInAppBrowser(){
 const ADMIN_ONLY_ACTIONS = new Set([
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match",
   "draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
-  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster",
+  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-promote-ticket-selected","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster",
   "clear-data","import-data","export-data","goto-settings",
   "archive-complete","archive-general-insufficient","save-pause","unarchive-current",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility",
@@ -5887,7 +5887,7 @@ const ADMIN_ONLY_ACTIONS = new Set([
 const COMPLETED_TOURNAMENT_MUTATION_ACTIONS = new Set([
   "set-registration-draft-name-mode","set-registration-draft-target-group","set-registration-draft-visibility","community-save-settings","save-staff-assignment",
   "score","undo-score","rematch","confirm-result","correct-previous-score","retract-previous-match","draw-bracket","save-meta","update-players","load-test","quick-add-players","random-test-roster",
-  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data","archive-general-insufficient",
+  "toggle-checkin-btn","delete-player","people-promote-waitlist","people-promote-ticket-selected","people-move-to-waitlist","people-delete-waitlist","set-checkin-required","unlock-roster","clear-data","import-data","archive-general-insufficient",
   "set-registration-enabled","set-waitlist-enabled","set-registration-visibility","toggle-event-cancelled","save-registration-settings","open-registration-publish-preview",
   "reg-add-quick","reg-mark-noshow","reg-promote","reg-cancel","reg-delete","import-roster-from-registrations","toggle-checkin","load-online-roster","close-checkin-early","start-tournament",
   "set-match-in-progress","set-match-ready","pause-match-status","resume-match-status","skip-match","claim-skipped-match","court-swap-start","idle-court-claim","open-quick-confirm","set-scoring-mode","set-round-scoring-mode","correct-quick-result","set-ladder-mode"
@@ -12251,6 +12251,7 @@ function renderHalfHourDatetimeDraft(id, field, epoch){
 function renderRegistrationSettingsPanel(showModeSelector=true){
   ensureRegistrationFormDraft();
   const d = registrationFormDraft;
+  const ticketRoom=state.meta?.eventAuthority==="ticket"||state.meta?.ticketAccessV1?.version===1;
   const m = state.meta;
   const teamRegistrationMode=(settingsFormDraft&&settingsFormDraft.battleMode==="team")||(!settingsFormDraft&&m.battleMode==="team");
   const teamRegistrationSize=Math.max(3,Number((settingsFormDraft&&settingsFormDraft.teamSize)||m.teamSize)||3);
@@ -12297,7 +12298,7 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     <fieldset style="border:0;padding:0;margin:0;min-width:0;${onsiteLocked?'opacity:.5;cursor:not-allowed':''}" ${onsiteLocked?'disabled aria-describedby="onsite-registration-lock-notice"':''}><div class="grid grid-2" style="margin-top:14px;">
       <div class="field"><label>報名開放時間</label>${renderHalfHourDatetimeDraft("reg-open-at","registrationOpenAt",d.registrationOpenAt)}</div>
       <div class="field"><label>報名截止時間</label>${renderHalfHourDatetimeDraft("reg-close-at","registrationCloseAt",d.registrationCloseAt)}</div>
-      <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" ${onsiteLocked?'disabled aria-describedby="onsite-registration-lock-notice"':''} data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
+      <div class="field"><label>${teamRegistrationMode?"正取隊伍上限":"正取人數上限"}</label><input type="number" id="reg-capacity" ${onsiteLocked||ticketRoom?'disabled':''} data-draft-field="registrationCapacity" data-draft-type="int" min="1" value="${d.registrationCapacity||""}"></div>
     </div></fieldset><div class="grid grid-2">
       <div class="field"><label>報名費（元，選填）</label><input type="number" id="reg-fee" data-draft-field="registrationFee" data-draft-type="int-or-null" min="0" value="${d.registrationFee!=null?d.registrationFee:""}"></div>
     </div>
@@ -12624,7 +12625,24 @@ async function peopleRecoverPromotion(context,name,error){
         }});
     }});
 }
+function isTicketRoomState(st=state){
+  return st?.meta?.eventAuthority==="ticket"||st?.meta?.ticketAccessV1?.version===1;
+}
+async function peoplePromoteTicket(selected){
+  if(peopleRosterBusy||!isTicketRoomState())return;
+  if(!window.BXHTicketExpansion){showToast("票券房擴充功能尚未載入，請重新整理。",true);return;}
+  const context={roomId:state.id,code:state.cloudCode,uid:currentAuthUid(),epoch:engagementSessionEpoch,mode:activeMode};
+  const current=()=>peoplePromotionContextCurrent(context)&&engagementSessionEpoch===context.epoch&&activeMode===context.mode;
+  return window.BXHTicketExpansion.promote({code:context.code,uid:context.uid,isCurrent:current,
+    busy:value=>{
+      if(value){window.__bxhTicketPromotionOwner=context;peopleRosterBusy=true;}
+      else if(window.__bxhTicketPromotionOwner===context){window.__bxhTicketPromotionOwner=null;peopleRosterBusy=false;}
+      if(current())render();
+    },modal:openModal,
+    error:message=>showToast(message,true),apply:peopleApplyCloudRosterResult},selected);
+}
 async function peoplePromoteOnline(registrationId,name,expandBy=0){
+  if(isTicketRoomState())return peoplePromoteTicket([{kind:"registration",id:String(registrationId)}]);
   if(peopleRosterBusy)return;
   const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():"",
     registrationId,expandBy,players:state.players?.length||0,waitlist:state.waitlistPlayers?.length||0};
@@ -12745,6 +12763,7 @@ async function peopleToggleAutoFill(){
   }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 async function peoplePromoteLocal(waitId,name,expandCapacity){
+  if(isTicketRoomState()){const p=peopleLocalWaitlist().find(p=>String(p.id)===String(waitId));return peoplePromoteTicket([{kind:p?.registrationId?"registration":"local",id:String(p?.registrationId||waitId)}]);}
   const list=peopleLocalWaitlist(),idx=list.findIndex(p=>String(p.id)===String(waitId));
   if(idx<0)return;
   const p=list[idx];
@@ -12828,6 +12847,7 @@ function registrationSourceLabel(row){
   return "玩家自行報名";
 }
 function renderPeopleManagement(){
+  const ticketRoom=state.meta?.eventAuthority==="ticket"||state.meta?.ticketAccessV1?.version===1;
   if(typeof staffRosterReadOnly==='function'&&staffRosterReadOnly())return renderStaffRegistrationRoster();
   const online=!!(state.meta&&state.meta.registrationEnabled);
   const needsCheckin=!!(state.meta&&state.meta.checkinRequired);
@@ -12901,19 +12921,20 @@ function renderPeopleManagement(){
     const name=r.displayName||r.publicName||r.participantName||r.realName||"未命名選手";
     const rank=i+1;
     const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">線上報名</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消備取</button></div></details>`;
-    return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(name)}</td><td class="people-col-source"><span class="badge badge-neon">線上報名</span></td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
+    return `<tr><td class="people-col-index">${ticketRoom?`<input type="checkbox" data-ticket-candidate data-kind="registration" data-id="${esc(regId)}" aria-label="選取 ${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>`:""}<span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(name)}</td><td class="people-col-source"><span class="badge badge-neon">線上報名</span></td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const waitLocalRows=localWait.map((p,i)=>{
     const rank=onlineWait.length+i+1;
     const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
-    return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
+    return `<tr><td class="people-col-index">${ticketRoom?`<input type="checkbox" data-ticket-candidate data-kind="${p.registrationId?'registration':'local'}" data-id="${esc(p.registrationId||p.id)}" aria-label="選取 ${esc(participantDisplayName(p))}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>`:""}<span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const onsiteWaitlistPanel=peopleOnsiteWaitlistAvailable()
     ?window.BXHOnsiteWaitlistIntegration?.placeholder({code:state.cloudCode,actorId:firebaseUser?.uid})||"":"";
   const waitlistPanel=onsiteWaitlistPanel+(peopleOnsiteWaitlistManaged()?"":`
     <div class="panel">
-      <div class="people-capacity-banner"><div><div class="panel-title">備取區（${rosterUnresolved?rosterPendingLabel:waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
+      <div class="people-capacity-banner"><div><div class="panel-title">備取區（${rosterUnresolved?rosterPendingLabel:waitCount}）</div><p class="hint">${ticketRoom?"有空位時免費升正取；額滿時先確認加購費用，每名額 20 元，擴充上限依券種。自動補位不會加購。":"升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。"}</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
       <div class="btn-row" style="margin:12px 0;">
+        ${ticketRoom?`<button class="btn btn-primary" data-action="people-promote-ticket-selected" ${locked||selectionManaged||peopleRosterBusy||rosterUnresolved?'disabled':''}>勾選名單升正取</button>`:""}
         <button class="btn ${state.meta.registrationAutoFillEnabled===true?'btn-primary':'btn-ghost'}" role="switch" aria-checked="${state.meta.registrationAutoFillEnabled===true}" data-action="people-toggle-auto-fill" ${!state.cloudCode||locked||selectionManaged||state.meta.battleMode==='team'||peopleRosterBusy?'disabled':''}>自動補位：${state.meta.registrationAutoFillEnabled===true?'開啟':'關閉'}</button>
         <span class="hint">${selectionManaged||state.meta.battleMode==='team'?'此開關適用一般個人賽；本場依專用名額規則處理。':(state.meta.registrationAutoFillEnabled===true?'正取退出時，依備取順序自動遞補；不會增加名額。':'目前關閉：正取退出後不會自動遞補，建議開啟以保障備取順位。')}</span>
       </div>
@@ -20767,6 +20788,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     }
     return;
   }
+  if(action==="people-promote-ticket-selected"){
+    if(!isTicketRoomState()||peopleRosterBusy)return;
+    const selected=Array.from(document.querySelectorAll('[data-ticket-candidate]:checked'),el=>({kind:el.dataset.kind,id:el.dataset.id}));
+    if(!selected.length){showToast("請先勾選備取選手",true);return;}
+    return peoplePromoteTicket(selected);
+  }
   if(action==="people-promote-waitlist"){
     if(peopleRosterMutationLocked()){showToast("已產生對戰表或賽事已開始，請先重設對戰表後再調整名單",true);return;}
     if(peopleRegistrationSelectionManaged()){showToast("抽籤名額模式請由「參賽名額抽籤」調整正備取",true);return;}
@@ -24381,7 +24408,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.registrationOpenAt=rd.registrationOpenAt;
     state.meta.registrationCloseAt=rd.registrationCloseAt;
     state.meta.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? rd.registrationCloseAt+3*60*60*1000 : null);
-    state.meta.registrationCapacity=rd.registrationCapacity;
+    state.meta.registrationCapacity=(state.meta.eventAuthority==="ticket"||state.meta.ticketAccessV1?.version===1)?state.meta.registrationCapacity:rd.registrationCapacity;
     state.meta.registrationFee=rd.registrationFee;
     state.meta.targetGroup=rd.targetGroup;
     state.meta.participantNameMode=rd.participantNameMode==="gameId"?"gameId":"realName";
@@ -24527,7 +24554,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.registrationOpenAt=rd.registrationOpenAt;
       state.meta.registrationCloseAt=rd.registrationCloseAt;
       state.meta.cancellationDeadline=onsiteRegistrationSettingsLocked()?state.meta.cancellationDeadline:(rd.registrationCloseAt ? (rd.registrationCloseAt+3*60*60*1000) : null);
-      state.meta.registrationCapacity=rd.registrationCapacity;
+      state.meta.registrationCapacity=(state.meta.eventAuthority==="ticket"||state.meta.ticketAccessV1?.version===1)?state.meta.registrationCapacity:rd.registrationCapacity;
       state.meta.registrationFee=rd.registrationFee;
       state.meta.targetGroup=rd.targetGroup;
       state.meta.participantNameMode=rd.participantNameMode==="gameId"?"gameId":"realName";
@@ -25516,4 +25543,5 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
