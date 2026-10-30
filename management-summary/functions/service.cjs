@@ -120,6 +120,6 @@ function createSummaryHandler(db,{now=Date.now}={}){return async request=>{
   const items=rows.slice(0,PAGE_SIZE),hasMore=rows.length>PAGE_SIZE,last=items.at(-1);
   const nextCursor=hasMore?Buffer.from(JSON.stringify({scope:scopeKey,after:{code:last.code,eventDate:last.eventDate,updatedAt:last.updatedAt}})).toString('base64url'):null;
   return {ok:true,items,counts,hasMore,nextCursor,pageSize:PAGE_SIZE,asOf:at};
- });
+ },{readOnly:true});
 };}
 module.exports={FIELDS,PAGE_SIZE,registrationStatus,project,compare,createSummaryHandler};

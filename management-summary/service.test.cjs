@@ -8,7 +8,7 @@ const room=(code,extra={})=>({code,name:'賽事 '+code,eventDate:'2026-11-01',up
 const rooms=n=>Array.from({length:n},(_,i)=>room('BXH-'+String(i).padStart(6,'0'),{eventDate:'2026-11-'+String(i+1).padStart(2,'0')}));
 function fixture(user=profile,data=rooms(12),parents={}){
  const reads=[],selections=[],wheres=[];
- const db={doc:path=>({path}),collection:path=>{const q={path,filters:[],where(...args){wheres.push(args);this.filters.push(args);return this;},select(...fields){selections.push(fields);this.fields=fields;return this;}};return q;},runTransaction:fn=>fn({get:async ref=>{
+ const db={doc:path=>({path}),collection:path=>{const q={path,filters:[],where(...args){wheres.push(args);this.filters.push(args);return this;},select(...fields){selections.push(fields);this.fields=fields;return this;}};return q;},runTransaction:(fn,options)=>{assert.equal(options?.readOnly,true,'summary reads must use a lock-free read-only snapshot');return fn({get:async ref=>{
   reads.push(ref);
   if(ref.path.startsWith('users/')){const uid=ref.path.slice(6),value=uid==='actor'?user:parents[uid];return{exists:!!value,data:()=>value};}
   assert.ok(ref.fields,'all tournament reads must have an explicit Firestore projection');
@@ -20,7 +20,7 @@ function fixture(user=profile,data=rooms(12),parents={}){
     const parts=key.split('.');let target=projected;for(const part of parts.slice(0,-1))target=target[part]||=( {} );target[parts.at(-1)]=value;
    }return projected;
   }}))};
- }})};
+ }});}};
  const list=createSummaryHandler(db,{now:()=>NOW});
  return{reads,selections,wheres,call:(data={})=>list({auth:{uid:'actor'},data}),list};
 }
