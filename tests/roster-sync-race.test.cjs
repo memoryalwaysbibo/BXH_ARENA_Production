@@ -243,3 +243,64 @@ for(const unavailable of [false,true])test('server-only recovery never falls bac
  vm.createContext(s);vm.runInContext('api={'+block(cloud,'async joinRoom(code){','    // Guest/public use')+'}',s);
  const result=await s.api.joinRoom('BXH-LATE12',{serverOnly:true});assert.equal(cacheReads,0);assert.equal(serverReads,1);assert.equal(result.ok,!unavailable);
 });
+const candidateCompute=block(core,'function computeRegistrationStatus(','function publicationValidationErrors(');
+function schedule(h, {early=false}={}){
+ const setup={registrationOpenAt:1000,registrationCloseAt:9000,registrationStatus:'closed',checkinClosedEarly:early};
+ Object.assign(h.s.state.meta,setup);Object.assign(h.remote().meta,setup);
+ h.s.Date={now:()=>10000};
+ vm.runInContext(candidateCompute,h.s);
+ assert.equal(h.s.computeRegistrationStatus(h.s.state.meta,h.s.state),'closed');
+ h.s.state.meta.registrationCloseAt=20000;h.remote().meta.registrationCloseAt=20000;
+ h.s.state.meta.registrationStatus=h.s.computeRegistrationStatus(h.s.state.meta,h.s.state);
+ h.remote().meta.registrationStatus=h.s.state.meta.registrationStatus;
+ assert.equal(h.s.state.meta.registrationStatus,'open');
+}
+function manual(h,playerId){
+ return require('../qr-checkin/backend/core.cjs').transition({
+ code:'BXH-LATE12',uid:'admin',user:{active:true,role:'admin'},room:{},state:h.remote(),
+ config:{enabled:true,writerGuardsVerified:true,roomCodes:['BXH-LATE12']},
+ d:{action:'manual',playerId,operationId:'reopen-checkin-operation-001'},now:10000
+ });
+}
+test('deadline -> reopen -> 80 confirmed mock rows -> sync -> trusted manual checkin; existing 40 retained',async()=>{
+ const h=lateRosterHarness();schedule(h);await h.s.syncLatestOnlineRosterBeforeLock();
+ assert.equal(h.remote().players.length,80);assert.equal(h.remote().players.filter(p=>p.checkedIn).length,40);
+ const p=h.s.state.players.find(p=>p.registrationId==='r71');
+ assert.equal(p.name,'江佳恩');assert.equal(manual(h,p.id).result.checkedIn,true);
+ assert.equal(h.s.state.meta.registrationStatus,'open');
+});
+test('reopen with cloud rejection keeps canonical 68; no phantom check-in player',async()=>{
+ const h=lateRosterHarness({fail:true});schedule(h);
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/permission-denied/);
+ assert.equal(h.s.state.players.length,68);assert.equal(h.remote().players.length,68);
+ assert.equal(h.s.state.players.some(p=>p.registrationId==='r71'),false);
+});
+test('expired registration deadline alone does not close manual checkin of existing confirmed player',()=>{
+ const h=lateRosterHarness();schedule(h);
+ h.remote().meta.registrationCloseAt=9000;h.remote().meta.registrationStatus='closed';
+ assert.equal(manual(h,'canonical-50').result.checkedIn,true);
+});
+test('reopen registration does not clear deliberate checkin close flag',async()=>{
+ const h=lateRosterHarness();schedule(h,{early:true});await h.s.syncLatestOnlineRosterBeforeLock();
+ assert.equal(h.remote().meta.registrationStatus,'open');
+ assert.equal(h.remote().meta.checkinClosedEarly,true);
+ assert.throws(()=>manual(h,h.remote().players[71].id),e=>e.code==='checkin-closed');
+});
+test('reopen and readback failure followed by retry retains committed player IDs',async()=>{
+ const h=lateRosterHarness();schedule(h);let reads=0;const join=h.s.window.cloudSync.joinRoom;
+ h.s.window.cloudSync.joinRoom=async()=>++reads===2?{ok:false}:join();
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/roster-readback-failed/);
+ const id=h.remote().players[71].id;assert.equal(h.s.state.players.length,68);
+ await h.s.syncLatestOnlineRosterBeforeLock();
+ assert.equal(h.s.state.players[71].id,id);assert.equal(h.stats().writes,1);
+ assert.equal(manual(h,id).result.ok,true);
+});
+test('changing deadline after actual start cannot reopen registration or checkin',()=>{
+ const h=lateRosterHarness();schedule(h);h.remote().startedAt=8000;h.s.state.startedAt=8000;
+ assert.equal(h.s.computeRegistrationStatus(h.s.state.meta,h.s.state),'started');
+ assert.throws(()=>manual(h,'canonical-50'),e=>e.code==='checkin-closed');
+});
+test('trusted check-in missing canonical player reproduces not-confirmed regardless of open schedule',()=>{
+ const h=lateRosterHarness();schedule(h);
+ assert.throws(()=>manual(h,'phantom-jiang-id'),e=>e.code==='not-confirmed');
+});
