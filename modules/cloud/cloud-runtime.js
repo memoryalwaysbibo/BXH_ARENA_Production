@@ -1386,6 +1386,7 @@
         const pubSnap=await tx.get(pubRef);
         if(!tourSnap.exists()||!pubSnap.exists())throw Object.assign(new Error("not-found"),{code:"not-found"});
         const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+        if(tour.ticketAccessV1||tour.eventAuthority==="ticket"||pub.ticketAccessV1||pub.eventAuthority==="ticket")throw Object.assign(new Error("ticket-promotion-required"),{code:"ticket-promotion-required"});
         let runtime;
         try{runtime=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});}
         catch(e){throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});}
@@ -1428,6 +1429,7 @@
       const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
       if(!tourSnap.exists()||!pubSnap.exists())throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
       const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+        if(tour.ticketAccessV1||tour.eventAuthority==="ticket"||pub.ticketAccessV1||pub.eventAuthority==="ticket")throw Object.assign(new Error("ticket-promotion-required"),{code:"ticket-promotion-required"});
       let remoteState={},publicState={};
       try{
         remoteState=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});
@@ -1483,6 +1485,7 @@
         const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
         if(tourSnap.exists()&&pubSnap.exists()){
           const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+        if(tour.ticketAccessV1||tour.eventAuthority==="ticket"||pub.ticketAccessV1||pub.eventAuthority==="ticket")throw Object.assign(new Error("ticket-promotion-required"),{code:"ticket-promotion-required"});
           if(tour.refereeSeatsV1?.version===1&&tour.eventAuthority==="official"&&tour.createdByRole!=="partner_organizer"&&tour.battleMode!=="team"&&pub.battleMode!=="team"){
             // Seat Rules intentionally forbid non-creator browser runtime writes.
             // Send intent only; the trusted transaction owns roster/counter changes.
@@ -1513,6 +1516,7 @@
         if(!tourSnap.exists()||!pubSnap.exists()||!regSnap.exists())throw Object.assign(new Error("not-found"),{code:"not-found"});
 
         const tour=tourSnap.data()||{},pub=pubSnap.data()||{},reg=Object.assign({registrationId:regId},regSnap.data()||{});
+        if(tour.ticketAccessV1||tour.eventAuthority==="ticket"||pub.ticketAccessV1||pub.eventAuthority==="ticket")throw Object.assign(new Error("ticket-promotion-required"),{code:"ticket-promotion-required"});
         let runtime={};
         try{runtime=typeof tour.data==="string"?JSON.parse(tour.data):(tour.data||{});}catch(e){throw Object.assign(new Error("corrupt-state"),{code:"corrupt-state"});}
         runtime.meta=runtime.meta||{};
@@ -4013,4 +4017,5 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 
