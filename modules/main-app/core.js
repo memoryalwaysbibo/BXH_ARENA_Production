@@ -326,7 +326,13 @@ let adminTournamentListBusy = false;
 let adminTournamentListError = "";
 let adminTournamentListItems = [];
 let adminTournamentListLoaded = false;
-let adminTournamentListFilter = "all"; // all | mine | others | community
+let adminTournamentListFilter = "open"; // open | upcoming | closed | draft | all
+let adminTournamentListKind = "official";
+let adminTournamentListSearch = "";
+let adminTournamentListSearchDraft = "";
+let adminTournamentListCursor = null;
+let adminTournamentListHasMore = false;
+let adminTournamentListCounts = null;
 const ADMIN_TOURNAMENT_LIST_TIMEOUT_MS = 10000;
 let adminTournamentListPromise = null;
 let adminTournamentListGeneration = 0;
@@ -19387,24 +19393,13 @@ function renderTournamentManagementTab(){
     return `<div class="panel"><div class="empty-state">目前身分沒有賽事管理權限。</div></div>`;
   }
   if(!adminTournamentListLoaded && !adminTournamentListBusy){
-    setTimeout(()=>{ loadAdminTournamentList(); }, 0);
+    setTimeout(()=>{ if(!adminTournamentListLoaded&&!adminTournamentListBusy)loadAdminTournamentList(); }, 0);
   }
 
   const myUid=(firebaseUser&&firebaseUser.uid)||"";
-  const allItems=adminTournamentListItems.filter(t=>t.eventAuthority!=="community");
-  const communityItems=adminTournamentListItems.filter(t=>t.eventAuthority==="community");
   const isMine=t=>!!(myUid && t.createdBy===myUid);
-  const mineCount=allItems.filter(isMine).length;
-  const otherCount=allItems.length-mineCount;
-  const visibleItems=adminTournamentListFilter==="community"
-    ? communityItems
-    : allItems.filter(t=>adminTournamentListFilter==="mine"?isMine(t):adminTournamentListFilter==="others"?!isMine(t):true);
-  const filterBar=`<div class="tournament-owner-filter" role="tablist" aria-label="賽事建立者篩選">
-    <button class="${adminTournamentListFilter==='all'?'active':''}" data-action="admin-tournament-filter" data-filter="all">全部賽事 <b>${allItems.length}</b></button>
-    <button class="${adminTournamentListFilter==='mine'?'active':''}" data-action="admin-tournament-filter" data-filter="mine">我的賽事 <b>${mineCount}</b></button>
-    <button class="${adminTournamentListFilter==='others'?'active':''}" data-action="admin-tournament-filter" data-filter="others">其他賽事 <b>${otherCount}</b></button>
-    ${isAdminTierOrAbove()?`<button class="${adminTournamentListFilter==='community'?'active':''}" data-action="admin-tournament-filter" data-filter="community">一般房間 <b>${communityItems.length}</b></button>`:""}
-  </div>`;
+  const visibleItems=adminTournamentListItems;
+  const filterBar=adminTournamentListControlsHtml();
 
   let body = "";
   if(adminTournamentListBusy && !adminTournamentListLoaded && !adminTournamentListItems.length){
@@ -19412,8 +19407,8 @@ function renderTournamentManagementTab(){
   }else if(adminTournamentListError && !adminTournamentListItems.length){
     body = `<div class="panel"><div class="auth-error">${esc(adminTournamentListError)}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost" data-action="cloud-refresh-admin-list">重新整理</button></div></div>`;
   }else if(!visibleItems.length){
-    const emptyLabel=adminTournamentListBusy?"正在分批讀取賽事…":adminTournamentListFilter==="community"?"目前沒有玩家一般房間":adminTournamentListFilter==="mine"?"目前沒有自己建立的賽事":adminTournamentListFilter==="others"?"目前沒有其他人建立的可管理賽事":"目前沒有可管理的賽事";
-    body = `<div class="panel"><div class="empty-state"><div class="big">${emptyLabel}</div><div class="hint">切換上方分類即可查看其他賽事。</div></div></div>`;
+    const emptyLabel=adminTournamentListSearch?"找不到符合搜尋條件的賽事":"此分類目前沒有賽事";
+    body = `<div class="panel"><div class="empty-state"><div class="big">${emptyLabel}</div><div class="hint">可切換分類或調整搜尋條件。</div></div></div>`;
   }else{
     body = `<div style="display:flex;flex-direction:column;gap:10px;">${visibleItems.map(t=>{
       const confirmed = Number(t.confirmedCount||0), waiting = Number(t.waitlistCount||0), cap = Number(t.capacity||0);
@@ -19448,12 +19443,13 @@ function renderTournamentManagementTab(){
 
   return `<div class="panel">
     <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
-    <div class="hint">正式賽事可依建立者快速分流；最高管理員與管理員可在「一般房間」整理玩家房間。工作人員無法查看或刪除一般房間。</div>
+    <div class="hint">每次僅載入 5 場賽事摘要；需要更多時再按下方按鈕。搜尋涵蓋賽事名稱、房號與地點。</div>
     ${filterBar}
-    ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在分批讀取賽事，分類數量尚未完整；已顯示的賽事可先使用。</div>':""}
-    ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，部分賽事可能尚未更新。</div>`:""}
+    ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在讀取 5 場賽事摘要，已顯示的清單仍可使用。</div>':""}
+    ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
   </div>
   ${body}
+  ${adminTournamentListPaginationHtml()}
   ${canCreateOfficialTournament()?`<div class="panel" style="margin-top:12px;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}`;
 }
 
@@ -19499,15 +19495,49 @@ function renderAdminTournamentListModal(){
   return `<div class="modal-overlay" data-action="cloud-close-admin-list" ${pendingModal?'inert aria-hidden="true"':''}>
     <div class="modal-box" style="max-width:760px;width:min(760px,94vw);">
       <div class="cloud-list-heading">
-        <div class="cloud-list-heading-copy"><h3 style="margin-bottom:4px;">雲端賽事清單</h3><div class="hint">查看所有已建立賽事、正取／備取人數，並直接叫回管理後台。</div></div>
+        <div class="cloud-list-heading-copy"><h3 style="margin-bottom:4px;">雲端賽事清單</h3><div class="hint">每次讀取 5 場賽事摘要，可依狀態分類或搜尋。</div></div>
         <button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>
       </div>
-      ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在分批讀取賽事，分類數量尚未完整；已顯示的賽事可先使用。</div>':""}
-      ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，部分賽事可能尚未更新。</div>`:""}
+      ${adminTournamentListControlsHtml({modal:true})}
+      ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在讀取 5 場賽事摘要，已顯示的清單仍可使用。</div>':""}
+      ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
       <div style="margin-top:14px;">${body}</div>
+      ${adminTournamentListPaginationHtml()}
       <div class="btn-row" style="margin-top:14px;"><button class="btn btn-ghost btn-block" data-action="cloud-close-admin-list">關閉</button></div>
     </div>
   </div>`;
+}
+
+function adminTournamentListControlsHtml({modal=false}={}){
+  const count=key=>adminTournamentListCounts?String(adminTournamentListCounts[key]||0):"—";
+  return `<div role="search" aria-label="搜尋賽事" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+    <input id="${modal?'admin-tournament-search-modal':'admin-tournament-search'}" class="admin-tournament-search-input" type="search" maxlength="120" autocomplete="off" aria-label="搜尋賽事名稱、房號或地點" placeholder="搜尋賽事名稱、房號或地點" value="${esc(adminTournamentListSearchDraft)}" style="flex:1;min-width:180px;">
+    <button class="btn btn-ghost btn-sm" data-action="admin-tournament-search">搜尋</button>
+    ${adminTournamentListSearch?'<button class="btn btn-ghost btn-sm" data-action="admin-tournament-search-clear">清除</button>':""}
+  </div><div class="tournament-owner-filter" role="tablist" aria-label="報名狀態分類">
+    ${[["open","報名中"],["upcoming","即將開放"],["closed","已關閉"]].map(([key,label])=>`<button role="tab" aria-selected="${adminTournamentListFilter===key}" class="${adminTournamentListFilter===key?'active':''}" data-action="admin-tournament-filter" data-filter="${key}">${label} <b>${count(key)}</b></button>`).join("")}
+  </div><details style="margin:10px 0;"><summary>其他分類${adminTournamentListFilter==='draft'?'｜草稿':adminTournamentListFilter==='all'?'｜所有狀態':''}${adminTournamentListKind==='community'?'｜一般房間':''}</summary>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="draft">草稿 ${count('draft')}</button>
+      <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="all">所有狀態 ${count('all')}</button>
+      ${isAdminTierOrAbove()?`<button class="btn btn-ghost btn-sm" data-action="admin-tournament-kind" data-kind="${adminTournamentListKind==='community'?'official':'community'}">${adminTournamentListKind==='community'?'返回正式賽事':'一般房間'}</button>`:""}
+    </div></details>`;
+}
+function adminTournamentListPaginationHtml(){
+  if(!adminTournamentListLoaded)return "";
+  return `<div class="panel" style="text-align:center;margin-top:12px;">
+    <div class="hint" role="status">已載入 ${adminTournamentListItems.length} 場${adminTournamentListHasMore?'；其餘尚未下載':adminTournamentListError?'':'；此分類已全部載入'}</div>
+    ${adminTournamentListHasMore?`<button class="btn btn-ghost" style="margin-top:10px;" data-action="admin-tournament-load-more" ${adminTournamentListBusy?'disabled':''}>${adminTournamentListBusy?'讀取中…':adminTournamentListError?'重試載入 5 場':'＋ 再載入 5 場'}</button>`:""}
+  </div>`;
+}
+function changeAdminTournamentListQuery({status=adminTournamentListFilter,kind=adminTournamentListKind,search=adminTournamentListSearch}={}){
+  reconcileAdminTournamentListContext();
+  if(!["open","upcoming","closed","draft","all"].includes(status)||!["official","community"].includes(kind)||(kind==="community"&&!isAdminTierOrAbove()))return;
+  adminTournamentListGeneration++;adminTournamentListPromise=null;adminTournamentListBusy=false;
+  adminTournamentListItems=[];adminTournamentListLoaded=false;adminTournamentListError="";
+  adminTournamentListFilter=status;adminTournamentListKind=kind;adminTournamentListSearch=String(search).trim().slice(0,120);
+  adminTournamentListSearchDraft=adminTournamentListSearch;adminTournamentListCursor=null;adminTournamentListHasMore=false;adminTournamentListCounts=null;
+  return loadAdminTournamentList({force:true});
 }
 
 // Scope the in-memory list to this authenticated management context. Neither
@@ -19516,7 +19546,7 @@ function adminTournamentListIdentityKey(){
   const grant=typeof partnerOrganizerGrant==="function"?partnerOrganizerGrant():null;
   return JSON.stringify([(firebaseUser&&firebaseUser.uid)||"",currentRole,activeMode,
     userProfile&&userProfile.role,userProfile&&userProfile.active,userProfile&&userProfile.isTestAccount,
-    grant&&grant.organizationId,hasAdminAccess()]);
+    grant&&grant.organizationId,grant&&grant.orderCode,grant&&grant.contractOrderCode,userProfile&&userProfile.partnerContractOrderCode,hasAdminAccess()]);
 }
 function resetAdminTournamentListContext(){
   adminTournamentListGeneration++;
@@ -19525,6 +19555,8 @@ function resetAdminTournamentListContext(){
   adminTournamentListLoaded=false;
   adminTournamentListItems=[];
   adminTournamentListError="";
+  adminTournamentListCursor=null;adminTournamentListHasMore=false;adminTournamentListCounts=null;
+  adminTournamentListFilter="open";adminTournamentListKind="official";adminTournamentListSearch="";adminTournamentListSearchDraft="";
   adminTournamentListContextKey=adminTournamentListIdentityKey();
 }
 function reconcileAdminTournamentListContext(){
@@ -19544,107 +19576,43 @@ function adminTournamentListDeadline(work,stage="query"){
     throw error;
   }).finally(()=>clearTimeout(timer));
 }
-function loadAdminTournamentList({force=false}={}){
+function loadAdminTournamentList({force=false,append=false}={}){
   reconcileAdminTournamentListContext();
   if(!hasAdminAccess() || !currentAuthUid()) return Promise.resolve();
   if(adminTournamentListPromise && !force) return adminTournamentListPromise;
-  const generation=++adminTournamentListGeneration, key=adminTournamentListContextKey;
-  let active=true;
-  const current=()=>active && generation===adminTournamentListGeneration
-    && key===adminTournamentListIdentityKey() && hasAdminAccess();
-  const publish=(raw,{partial=false}={})=>{
-    if(!current()) return false;
-    let items=Array.isArray(raw)?raw:[];
-    // Keep the last complete list usable until all pages have arrived. Only a
-    // completed scan may remove cards absent from the new response.
-    if(partial){
-      const merged=new Map(adminTournamentListItems.map(item=>[item.code,item]));
-      items.forEach(item=>merged.set(item.code,item));
-      items=[...merged.values()].sort((a,b)=>String(b.eventDate||"").localeCompare(String(a.eventDate||""))||Number(b.updatedAt||0)-Number(a.updatedAt||0));
-    }
-    if(isTester()) items=items.filter(t=>t.testMode===true&&t.eventAuthority==="test"&&t.createdBy===currentAuthUid());
-    adminTournamentListItems=items.filter(t=>{
-      if(t.eventAuthority==="community") return isAdminTierOrAbove();
-      const hasIdentity=!!String(t.name||"").trim() || !!String(t.eventDate||"").trim() || !!String(t.location||"").trim();
-      const hasRegistration=!!t.registrationEnabled || Number(t.confirmedCount||0)>0 || Number(t.waitlistCount||0)>0;
-      const hasProgress=t.tournamentPhase && t.tournamentPhase!=="waiting";
-      return hasIdentity || hasRegistration || hasProgress || (state.cloudCode && t.code===state.cloudCode);
-    });
-    adminTournamentListLoaded=true;
-    render();
-    return true;
-  };
-  const enrich=async()=>{
-    if(!current() || !window.cloudSync.enrichAdminTournamentCreatorNames) return;
-    const items=adminTournamentListItems;
-    try{
-      const enriched=await adminTournamentListDeadline(window.cloudSync.enrichAdminTournamentCreatorNames(items),"names");
-      if(current() && adminTournamentListItems===items && Array.isArray(enriched)
-        && enriched.some((item,i)=>item.createdByName!==items[i]?.createdByName)){
-        adminTournamentListItems=enriched;
-        render();
-      }
-    }catch(e){ /* Optional labels never hide or fail a usable room list. */ }
-  };
-  // Assign the shared promise before rendering: multiple queued render callbacks
-  // and repeated refresh clicks all join this same load.
-  adminTournamentListBusy=true;
-  adminTournamentListError="";
+  if(append&&!adminTournamentListHasMore)return Promise.resolve();
+  const generation=++adminTournamentListGeneration,key=adminTournamentListContextKey;
+  const current=()=>generation===adminTournamentListGeneration&&key===adminTournamentListIdentityKey()&&hasAdminAccess();
+  const requestedCursor=append?adminTournamentListCursor:null;
+  const request={mode:isPartnerOrganizerMode()?"partner_organizer":isEventStaffMode()?"event_staff":"admin",
+    status:adminTournamentListFilter,kind:adminTournamentListKind,search:adminTournamentListSearch,cursor:requestedCursor};
+  adminTournamentListBusy=true;adminTournamentListError="";
   const promise=Promise.resolve().then(async()=>{
     try{
       render();
-      if(window.cloudSync && window.cloudSync.connect) await adminTournamentListDeadline(window.cloudSync.connect(),"connect");
-      if(!current()) return;
-      if(!cloudAvailable()) throw new Error("雲端尚未連線");
-      if(isTester() && window.cloudSync.cleanupMyExpiredTestRooms) await adminTournamentListDeadline(window.cloudSync.cleanupMyExpiredTestRooms(),"cleanup");
-      if(!current()) return;
-      // Each page owns its deadline. The overall list can take longer than ten
-      // seconds while ready cards remain visible and later pages make progress.
-      const queryOptions={onPage:items=>publish(items,{partial:true}),shouldContinue:current,
-        read:(work,stage)=>adminTournamentListDeadline(work,stage)};
-      let raw=await window.cloudSync.queryAdminTournaments(queryOptions);
-      if(isTester()) raw=(Array.isArray(raw)?raw:[]).filter(t=>t.testMode===true&&t.eventAuthority==="test"&&t.createdBy===currentAuthUid());
-      if(!publish(raw)) return;
-      const firstEnrichment=enrich();
-      // Preserve the existing lifecycle repair, but the usable list is already
-      // visible. Bound its wait and never let a late repair overwrite a retry.
-      const staleCompleted=(Array.isArray(raw)?raw:[]).filter(t=>t.archiveStatus==="completed" && t.tournamentPhase!=="done");
-      if(staleCompleted.length && window.cloudSync.repairTournamentLifecycle){
-        try{
-          const refreshed=await (async()=>{
-            await adminTournamentListDeadline(Promise.all(staleCompleted.map(t=>window.cloudSync.repairTournamentLifecycle(t.code))),"repair");
-            if(!current()) return null;
-            return window.cloudSync.queryAdminTournaments(queryOptions);
-          })();
-          if(current() && Array.isArray(refreshed)){
-            publicTournamentsCache=null;
-            myRegistrationsCache=null;
-            publish(refreshed);
-            await enrich();
-          }
-        }catch(e){
-          if(current()) adminTournamentListError="房間已載入，部分狀態更新未完成，請稍後重新整理";
-        }
-      }
-      await firstEnrichment;
+      if(window.cloudSync?.connect)await adminTournamentListDeadline(window.cloudSync.connect(),"connect");
+      if(!current())return;
+      if(!cloudAvailable()||!window.cloudSync?.queryAdminTournamentSummaries)throw Error("summary-unavailable");
+      const result=await adminTournamentListDeadline(window.cloudSync.queryAdminTournamentSummaries(request),"summaries");
+      if(!current())return;
+      if(!result||result.ok!==true||!Array.isArray(result.items)||result.items.length>5||result.pageSize!==5
+        ||typeof result.hasMore!=="boolean"||(result.hasMore&&typeof result.nextCursor!=="string")||!result.counts)throw Error("summary-invalid-response");
+      const merged=new Map((append?adminTournamentListItems:[]).map(item=>[item.code,item]));
+      result.items.forEach(item=>merged.set(item.code,item));
+      adminTournamentListItems=[...merged.values()];
+      adminTournamentListCursor=result.nextCursor||null;adminTournamentListHasMore=result.hasMore;
+      adminTournamentListCounts=result.counts;
     }catch(e){
       if(current()){
-        console.warn("[adminTournamentList] load failed",e);
-        adminTournamentListError=e&&e.code==="permission-denied"?"目前帳號沒有讀取賽事清單的權限"
-          :e&&e.code==="admin-list-timeout"?`讀取雲端賽事逾時（${({connect:"連線",cleanup:"測試房清理",assignments:"活動權限",query:"賽事分批查詢"})[e.stage]||"查詢"}），請重新整理再試`:"讀取雲端賽事清單失敗，請稍後再試";
+        console.warn("[adminTournamentList] summary read failed",{code:e?.code||e?.message||"unknown"});
+        adminTournamentListError=String(e?.code||"").includes("permission-denied")?"目前帳號沒有讀取這個賽事範圍的權限"
+          :e?.code==="admin-list-timeout"?"讀取賽事摘要逾時，請重試本次讀取":"讀取賽事摘要失敗，請稍後重試";
       }
     }finally{
-      if(current()){
-        adminTournamentListBusy=false;
-        adminTournamentListLoaded=true;
-        adminTournamentListPromise=null;
-        active=false;
-        render();
-      }else active=false;
+      if(current()){adminTournamentListBusy=false;adminTournamentListLoaded=true;adminTournamentListPromise=null;render();}
     }
   });
-  adminTournamentListPromise=promise;
-  return promise;
+  adminTournamentListPromise=promise;return promise;
 }
 
 function renderAdminNoTournamentScreen(){
@@ -20148,8 +20116,17 @@ function freezeArchivedControls(){
   });
   document.querySelectorAll('[data-settings-draft],[data-draft-field],.half-hour-date,.half-hour-hour,.half-hour-minute,.half-hour-clock select').forEach(el=>{el.disabled=true;});
 }
+function bindAdminTournamentSearchInput(){
+  document.querySelectorAll(".admin-tournament-search-input").forEach(input=>{
+    input.addEventListener("input",()=>{adminTournamentListSearchDraft=input.value;});
+    input.addEventListener("keydown",event=>{
+      if(event.key==="Enter"&&!event.isComposing){event.preventDefault();event.stopPropagation();changeAdminTournamentListQuery({search:input.value});}
+    });
+  });
+}
 function bindDynamicInputs(){
   try{
+    bindAdminTournamentSearchInput();
     if(typeof document.querySelectorAll === "function"){
       initHalfHourTimePickers(document);
       initHalfHourDatetimePickers(document);
@@ -20715,10 +20692,15 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="admin-tournament-filter"){
-    const f=target.getAttribute("data-filter");
-    if(["all","mine","others"].includes(f)||(f==="community"&&isAdminTierOrAbove())){ adminTournamentListFilter=f; render(); }
-    return;
+    changeAdminTournamentListQuery({status:target.getAttribute("data-filter")});return;
   }
+  if(action==="admin-tournament-kind"){
+    changeAdminTournamentListQuery({kind:target.getAttribute("data-kind")});return;
+  }
+  if(action==="admin-tournament-search"||action==="admin-tournament-search-clear"){
+    changeAdminTournamentListQuery({search:action==="admin-tournament-search-clear"?"":adminTournamentListSearchDraft});return;
+  }
+  if(action==="admin-tournament-load-more"){loadAdminTournamentList({append:true});return;}
   if(action==="load-duty-logs"){
     if(dutyLogsLoading) return;
     dutyLogsLoading=true; dutyLogsError=""; render();

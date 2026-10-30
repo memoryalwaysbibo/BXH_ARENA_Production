@@ -1,376 +1,94 @@
 'use strict';
-// Production management-list functions in a network-free VM. Every cloud call
-// is an in-memory mock; these tests never sign in, read real rooms, or write data.
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const root = path.join(__dirname, '..');
-const core = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8');
-const cloud = fs.readFileSync(path.join(root, 'modules/cloud/cloud-runtime.js'), 'utf8');
-function between(source, start, end) {
-  const a = source.indexOf(start), b = source.indexOf(end, a + start.length);
-  assert.ok(a >= 0 && b > a, 'Production integration seam missing: ' + start);
-  return source.slice(a, b);
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
+function between(start,end){const a=core.indexOf(start),b=core.indexOf(end,a+start.length);assert.ok(a>=0&&b>a);return core.slice(a,b);}
+const source=between('let adminTournamentListOpen = false;','let refereeDirectoryUsers = null;')+'\n'
+ +between('function renderTournamentManagementTab(){','\nfunction renderAdminNoTournamentScreen(){');
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{resolve,reject,promise};}
+function clock(){let time=0,id=0;const timers=new Map();return{setTimeout(fn,delay=0){const key=++id;timers.set(key,{at:time+delay,fn});return key;},clearTimeout:key=>timers.delete(key),async advance(ms){const end=time+ms;await tick();for(;;){const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;time=next[1].at;timers.delete(next[0]);next[1].fn();await tick();}time=end;await tick();}};}
+const row=(i=0,extra={})=>({code:'BXH-'+String(i).padStart(6,'0'),name:'Room '+i,eventDate:'2026-11-01',createdBy:'owner',createdByName:'Creator',eventAuthority:'official',registrationStatus:'open',registrationEnabled:true,tournamentPhase:'waiting',archiveStatus:'ongoing',...extra});
+const page=(start=0,size=5,hasMore=true)=>({ok:true,items:Array.from({length:size},(_,i)=>row(start+i)),pageSize:5,hasMore,nextCursor:hasMore?'cursor-'+(start+size):null,counts:{all:13,open:10,upcoming:2,closed:1,draft:0}});
+function setup(query=async()=>page()){
+ const timer=clock(),calls=[];const s={console:{log(){},warn(){}},setTimeout:timer.setTimeout,clearTimeout:timer.clearTimeout,
+ firebaseUser:{uid:'owner'},userProfile:{role:'admin',active:true},currentRole:'admin',activeMode:'admin',state:{cloudCode:null},pendingModal:null,
+ currentAuthUid:()=>s.firebaseUser?.uid||'',hasAdminAccess:()=>!!s.firebaseUser&&s.currentRole==='admin',isAdminTierOrAbove:()=>['admin','super_admin'].includes(s.userProfile?.role),isPartnerOrganizerMode:()=>s.activeMode==='partner_organizer',isEventStaffMode:()=>s.activeMode==='event_staff',partnerOrganizerGrant:()=>s.userProfile?.partnerOrganizer||{},cloudAvailable:()=>true,canCreateOfficialTournament:()=>false,
+ registrationStatusLabel:status=>({open:'報名中',full:'額滿',scheduled:'即將開放',closed:'已關閉'})[status]||status,esc:value=>String(value??''),
+ window:{cloudSync:{connect:async()=>true,queryAdminTournamentSummaries:request=>{calls.push(JSON.parse(JSON.stringify(request)));return query(request);},queryAdminTournaments:()=>{throw Error('full tournament downloads forbidden');},repairTournamentLifecycle:()=>{throw Error('list must not repair room state');},enrichAdminTournamentCreatorNames:()=>{throw Error('optional user-profile reads forbidden');}}},
+ render(){s.reconcileAdminTournamentListContext();}};
+ vm.createContext(s);vm.runInContext(source,s);const evaluate=code=>vm.runInContext(code,s);s.reconcileAdminTournamentListContext();
+ return{s,calls,timer,evaluate,state:()=>JSON.parse(JSON.stringify(evaluate('({items:adminTournamentListItems,busy:adminTournamentListBusy,loaded:adminTournamentListLoaded,error:adminTournamentListError,cursor:adminTournamentListCursor,more:adminTournamentListHasMore,counts:adminTournamentListCounts,filter:adminTournamentListFilter,search:adminTournamentListSearch})'))),view:()=>s.renderTournamentManagementTab(),load:options=>s.loadAdminTournamentList(options),query:fn=>{query=fn;}};
 }
-const declarations = between(core, 'let adminTournamentListOpen = false;', 'let refereeDirectoryUsers = null;');
-const renderer = between(core, 'function renderTournamentManagementTab(){', '\nfunction renderAdminTournamentListModal(){');
-const loading = between(core, 'function adminTournamentListIdentityKey()', '\nfunction renderAdminNoTournamentScreen(){');
-const modalRenderer = between(core, 'function renderAdminTournamentListModal(){', '\nfunction adminTournamentListIdentityKey()');
-const cloudMethods = between(cloud, '    async queryAdminTournaments(){', '\n    // v13.13.4：玩家');
-const cloudDeadline = between(cloud, '  function withTimeout(promise, ms, fallbackValue){', '\n  async function tryInitFirebase(){');
-const clone = value => JSON.parse(JSON.stringify(value));
-const tick = () => new Promise(resolve => setImmediate(resolve));
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
-  return { promise, resolve, reject };
-}
-function row(name = 'Fixture room', extra = {}) {
-  return { code: 'BXH-MOCK01', name, createdBy: 'fixture-owner', createdByName: 'Fixture creator',
-    eventAuthority: 'official', tournamentPhase: 'waiting', archiveStatus: 'ongoing', ...extra };
-}
-function clock() {
-  let now = 0, id = 0;
-  const timers = new Map();
-  return {
-    setTimeout(fn, delay = 0) { const key = ++id; timers.set(key, { at: now + Number(delay), fn }); return key; },
-    clearTimeout(key) { timers.delete(key); },
-    async advance(ms) {
-      const end = now + ms;
-      await tick();
-      for (;;) {
-        const next = [...timers].filter(([, t]) => t.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
-        if (!next) break;
-        now = next[1].at; timers.delete(next[0]); next[1].fn(); await tick();
-      }
-      now = end; await tick();
-    }
-  };
-}
-function setup(query = async () => [row()]) {
-  const timer = clock(), calls = [], renders = [];
-  const sandbox = {
-    console: { warn() {}, error() {}, log() {} }, setTimeout: timer.setTimeout, clearTimeout: timer.clearTimeout,
-    firebaseUser: { uid: 'fixture-owner' }, userProfile: { role: 'admin', active: true }, currentRole: 'admin', activeMode: 'admin',
-    pendingModal: null, state: { cloudCode: null }, activeTab: 'management', appPhase: 'app', publicTournamentsCache: {}, myRegistrationsCache: {},
-    currentAuthUid: () => sandbox.firebaseUser?.uid || '',
-    hasAdminAccess: () => ['admin', 'tester'].includes(sandbox.currentRole),
-    isTester: () => sandbox.userProfile?.role === 'tester',
-    isAdminTierOrAbove: () => ['admin', 'super_admin'].includes(sandbox.userProfile?.role),
-    isPartnerOrganizerMode: () => sandbox.activeMode === 'partner_organizer',
-    isEventStaffMode: () => sandbox.activeMode === 'event_staff',
-    partnerOrganizerGrant: () => sandbox.userProfile?.partnerOrganizer || {},
-    cloudAvailable: () => true, canCreateOfficialTournament: () => false,
-    registrationStatusLabel: () => '', esc: value => String(value ?? ''),
-    window: { cloudSync: { connect: async () => true, queryAdminTournaments: options => { calls.push('query'); return options?.read ? options.read(query(options), 'query') : query(); } } },
-    render() { sandbox.reconcileAdminTournamentListContext(); renders.push(sandbox.renderTournamentManagementTab()); }
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(declarations + '\n' + renderer + '\n' + modalRenderer + '\n' + loading, sandbox, { filename: 'management-core.js' });
-  const evaluate = source => vm.runInContext(source, sandbox);
-  return { sandbox, calls, renders, timer, evaluate,
-    state: () => clone(evaluate('({ busy: adminTournamentListBusy, loaded: adminTournamentListLoaded, error: adminTournamentListError, items: adminTournamentListItems })')),
-    view: () => sandbox.renderTournamentManagementTab(),
-    load: () => sandbox.loadAdminTournamentList(),
-    query: fn => { query = fn; }
-  };
-}
-function installCloud(t, docs, getDoc = async () => ({ exists: () => false })) {
-  const reads = [];
-  Object.assign(t.sandbox, {
-    cloudEnabled: true, dbHandle: {}, currentUserUidForWrites: () => t.sandbox.firebaseUser?.uid || '',
-    computeTournamentPhase: () => 'waiting',
-    fx: {
-      collection: (_, kind) => kind, query: (...parts) => parts, where: (...parts) => parts,
-      getDocs: async () => ({ docs: docs.map(item => ({ id: item.code, data: () => clone(item) })) }),
-      doc: (_, kind, id) => ({ kind, id }), getDoc: ref => { reads.push(ref); return getDoc(ref); }
-    }
-  });
-  t.evaluate(cloudDeadline + '\nObject.assign(window.cloudSync, {' + cloudMethods + '});');
-  return reads;
-}
-
-// Exercise the real production cloud method, with document-ID cursors and
-// controllable transport waits. No Firebase credentials or production writes.
-function installPagedCloud(t, docs, transport) {
-  installCloud(t, []);
-  const reads=[];
-  t.sandbox.fx.limit=count=>({limit:count});
-  t.sandbox.fx.startAfter=snapshot=>({after:snapshot.id});
-  t.sandbox.fx.getDocs=async query=>{
-    reads.push(query);
-    const limit=query.find(part=>part?.limit)?.limit;
-    const after=query.find(part=>part?.after)?.after;
-    const page=[...docs].sort((a,b)=>a.code.localeCompare(b.code)).filter(item=>!after||item.code>after).slice(0,limit);
-    if(transport) await transport(reads.length,page);
-    return {docs:page.map(item=>({id:item.code,data:()=>clone(item)}))};
-  };
-  return reads;
-}
-const manyRows=count=>Array.from({length:count},(_,i)=>row('Room '+i,{code:'BXH-'+String(i).padStart(6,'0'),eventDate:i===0?'':'2026-10-'+String((i%28)+1).padStart(2,'0')}));
-
-test('slow multi-page transport publishes usable cards before completion and may exceed ten seconds overall', async()=>{
-  const t=setup(), gates=[deferred(),deferred(),deferred()];
-  const reads=installPagedCloud(t,manyRows(45),call=>gates[call-1].promise);
-  const request=t.load(); await t.timer.advance(6000);
-  gates[0].resolve(); await tick();
-  assert.equal(t.state().items.length,20); assert.equal(t.state().busy,true);
-  assert.match(t.view(),/Room 0/); assert.match(t.view(),/分類數量尚未完整/);
-  await t.timer.advance(6000); gates[1].resolve(); await tick();
-  assert.equal(t.state().items.length,40); assert.equal(t.state().error,'');
-  await t.timer.advance(6000); gates[2].resolve(); await request;
-  assert.equal(t.state().items.length,45); assert.equal(t.state().busy,false);
-  assert.equal(t.state().error,''); assert.equal(reads.length,3);
-  assert.ok(t.state().items.some(item=>item.eventDate===''),'legacy rooms without dates remain included');
-  assert.equal(t.state().items.at(-1).code,'BXH-000000','final order remains event date descending');
+test('initial view fetches only five summaries and remains idle until another explicit action',async()=>{
+ const t=setup();await t.load();assert.equal(t.state().items.length,5);assert.equal(t.calls.length,1);assert.equal(t.calls[0].cursor,null);
+ t.view();t.view();await t.timer.advance(60000);assert.equal(t.calls.length,1);assert.match(t.view(),/再載入 5 場/);assert.match(t.view(),/其餘尚未下載/);
 });
-
-test('a later-page timeout keeps loaded cards and reports the failed stage; retry ignores late pages', async()=>{
-  const t=setup(), gate=deferred();
-  installPagedCloud(t,manyRows(25),call=>call===2?gate.promise:Promise.resolve());
-  const request=t.load(); await tick();
-  assert.equal(t.state().items.length,20);
-  await t.timer.advance(10000); await request;
-  assert.equal(t.state().items.length,20); assert.equal(t.state().busy,false);
-  assert.match(t.state().error,/賽事分批查詢/);
-  assert.match(t.view(),/部分賽事可能尚未更新/);
-  installPagedCloud(t,[row('Fresh retry')]); await t.load();
-  gate.resolve(); await tick();
-  assert.deepEqual(t.state().items.map(item=>item.name),['Fresh retry']);
+test('multiple initial render callbacks cannot refetch an already completed first page',async()=>{
+ const t=setup();t.view();t.view();t.view();await t.timer.advance(0);assert.equal(t.calls.length,1);assert.equal(t.state().items.length,5);
 });
-
-test('connection and first page each receive their own deadline',async()=>{
-  const t=setup(), connection=deferred(), page=deferred();
-  t.sandbox.window.cloudSync.connect=()=>connection.promise;
-  installPagedCloud(t,[row()],()=>page.promise);
-  const request=t.load(); await t.timer.advance(6000); connection.resolve(); await tick();
-  await t.timer.advance(6000); page.resolve(); await request;
-  assert.equal(t.state().error,''); assert.equal(t.state().items.length,1);
+test('each explicit expansion requests one next page and appends at most five rows',async()=>{
+ const t=setup(request=>Promise.resolve(request.cursor?page(5,5,false):page()));await t.load();await t.load({append:true});
+ assert.equal(t.calls.length,2);assert.equal(t.calls[1].cursor,'cursor-5');assert.equal(t.state().items.length,10);assert.equal(t.state().more,false);
+ await t.load({append:true});assert.equal(t.calls.length,2);assert.doesNotMatch(t.view(),/data-action="admin-tournament-load-more"/);
 });
-
-test('switching identity during a later page prevents publishing or scheduling another page',async()=>{
-  const t=setup(), gate=deferred();
-  const reads=installPagedCloud(t,manyRows(45),call=>call===2?gate.promise:Promise.resolve());
-  const request=t.load(); await tick(); assert.equal(reads.length,2);
-  t.sandbox.firebaseUser={uid:'another-user'}; t.sandbox.reconcileAdminTournamentListContext();
-  gate.resolve(); await request;
-  assert.equal(reads.length,2); assert.equal(t.state().items.length,0);
+test('a failed expansion preserves the five existing cards and cursor, and retries only that page',async()=>{
+ const t=setup();await t.load();const pending=deferred();t.query(()=>pending.promise);
+ const load=t.load({append:true});await t.timer.advance(10000);await load;
+ assert.equal(t.state().items.length,5);assert.equal(t.state().cursor,'cursor-5');assert.equal(t.state().busy,false);assert.match(t.view(),/重試載入 5 場/);
+ t.query(async()=>page(5,5,false));await t.load({append:true});assert.equal(t.calls[2].cursor,'cursor-5');assert.equal(t.state().items.length,10);assert.equal(t.state().error,'');
+ pending.resolve(page(100));await tick();assert.equal(t.state().items.length,10);
 });
-
-test('progressive refresh retains previous cards until the completed scan removes absent rooms',async()=>{
-  const t=setup(); await t.load(); const gate=deferred();
-  installPagedCloud(t,manyRows(21),call=>call===2?gate.promise:Promise.resolve());
-  const request=t.load(); await tick();
-  assert.match(t.view(),/Fixture room/); assert.equal(t.state().items.length,21);
-  gate.resolve(); await request;
-  assert.equal(t.state().items.length,21); assert.doesNotMatch(t.view(),/Fixture room/);
+test('repeated expansion clicks share one pending request',async()=>{
+ const t=setup();await t.load();const pending=deferred();t.query(()=>pending.promise);
+ const a=t.load({append:true}),b=t.load({append:true});assert.equal(a,b);await tick();assert.equal(t.calls.length,2);
+ pending.resolve(page(5));await a;
 });
-
-test('progressive scoped queries retain tester and partner Firestore constraints',async()=>{
-  for(const mode of ['tester','partner_organizer']){
-    const t=setup();
-    if(mode==='tester'){t.sandbox.userProfile.role='tester';t.sandbox.currentRole='tester';}
-    else {t.sandbox.activeMode=mode;t.sandbox.userProfile.partnerOrganizer={organizationId:'org',scope:'contract',orderCode:'order'};}
-    const reads=installPagedCloud(t,[]); await t.load();
-    const source=reads[0][0];
-    assert.ok(source.some(part=>Array.isArray(part)&&part[0]==='createdBy'&&part[2]==='fixture-owner'));
-    assert.ok(source.some(part=>Array.isArray(part)&&part[0]==='eventAuthority'&&part[2]===(mode==='tester'?'test':'official')));
-    if(mode==='partner_organizer') assert.ok(source.some(part=>Array.isArray(part)&&part[0]==='partnerContractOrderCode'&&part[2]==='order'));
-  }
+test('switching a status starts at page one and never mixes the previous category',async()=>{
+ const t=setup();await t.load();t.query(async()=>page(20,2,false));await t.s.changeAdminTournamentListQuery({status:'upcoming'});
+ assert.equal(t.calls[1].status,'upcoming');assert.equal(t.calls[1].cursor,null);assert.equal(t.state().items.length,2);assert.equal(t.state().items[0].name,'Room 20');
 });
-
-test('event staff reads only effective accepted assignments in bounded batches',async()=>{
-  const t=setup(), gate=deferred(), all=manyRows(41), reads=[];
-  t.sandbox.activeMode='event_staff'; installCloud(t,[]);
-  t.sandbox.window.engagementService={eventStaff:async()=>({assignments:[...all.map(item=>({eventCode:item.code,status:'accepted',effective:true})),{eventCode:'DENIED',status:'invited',effective:true},{eventCode:'EXPIRED',status:'accepted',effective:false}]})};
-  t.sandbox.fx.getDoc=async ref=>{
-    reads.push(ref.id); if(reads.length<=20) await gate.promise;
-    return {id:ref.id,exists:()=>true,data:()=>row(ref.id,{eventStaffAssignments:{'fixture-owner':{status:'accepted'}}})};
-  };
-  const request=t.load(); await tick(); assert.equal(reads.length,20);
-  gate.resolve(); await request;
-  assert.equal(reads.length,41); assert.equal(t.state().items.length,41);
-  assert.ok(!reads.includes('DENIED')&&!reads.includes('EXPIRED'));
+test('search is sent to the backend, resets pagination and is independent of loaded cards',async()=>{
+ const t=setup();await t.load();t.query(async()=>page(50,1,false));await t.s.changeAdminTournamentListQuery({search:'雪山貓'});
+ assert.equal(t.calls[1].search,'雪山貓');assert.equal(t.calls[1].cursor,null);assert.equal(t.state().items[0].name,'Room 50');assert.match(t.view(),/雪山貓/);
 });
-
-test('base query publishes room cards without reading optional creator profiles', async () => {
-  const t = setup(), pending = deferred();
-  const reads = installCloud(t, [row('Named'), row('Missing name', { code: 'BXH-MOCK02', createdByName: '' })], () => pending.promise);
-  const result = await t.sandbox.window.cloudSync.queryAdminTournaments();
-  assert.equal(result.length, 2); assert.equal(reads.length, 0);
-  assert.equal(result[0].createdByName, 'Fixture creator'); assert.equal(result[1].createdByName, '');
+for(const change of ['account','role','mode','contract'])test(change+' change discards a pending response and cached cursors',async()=>{
+ const t=setup();await t.load();const pending=deferred();t.query(()=>pending.promise);const request=t.load({append:true});await tick();
+ if(change==='account')t.s.firebaseUser={uid:'another'};
+ if(change==='role')t.s.userProfile.role='staff';
+ if(change==='mode')t.s.activeMode='event_staff';
+ if(change==='contract')t.s.userProfile.partnerOrganizer={organizationId:'org',orderCode:'different'};
+ t.s.reconcileAdminTournamentListContext();pending.resolve(page(5));await request;
+ assert.equal(t.state().items.length,0);assert.equal(t.state().cursor,null);assert.equal(t.state().more,false);
 });
-
-test('name enrichment reads only missing distinct creators, preserves names, and leaves source rows unchanged', async () => {
-  const t = setup(), rows = [row('Named'), row('Missing', { createdBy: 'missing', createdByName: '' }), row('Same creator', { createdBy: 'missing', createdByName: '' })];
-  const reads = installCloud(t, [], async () => ({ exists: () => true, data: () => ({ displayName: 'Resolved creator' }) }));
-  const result = await t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames(rows);
-  assert.deepEqual(reads, [{ kind: 'users', id: 'missing' }]);
-  assert.equal(result[0].createdByName, 'Fixture creator'); assert.equal(result[1].createdByName, 'Resolved creator');
-  assert.equal(result[2].createdByName, 'Resolved creator'); assert.equal(rows[1].createdByName, '');
+test('old append cannot repopulate a newer search result',async()=>{
+ const t=setup();await t.load();const pending=deferred();t.query(()=>pending.promise);const old=t.load({append:true});await tick();
+ t.query(async()=>page(80,1,false));await t.s.changeAdminTournamentListQuery({search:'new'});pending.resolve(page(5));await old;
+ assert.deepEqual(t.state().items.map(item=>item.name),['Room 80']);
 });
-
-test('hung or denied creator reads settle with UID fallback and never fail the list', async () => {
-  const t = setup(), pending = deferred(), rows = [row('Missing', { createdByName: '' })];
-  installCloud(t, [], () => pending.promise);
-  const result = t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames(rows);
-  await t.timer.advance(3000);
-  assert.equal((await result)[0].createdByName, '');
-  pending.resolve({ exists: () => true, data: () => ({ displayName: 'Too late' }) }); await tick();
-  assert.equal(rows[0].createdByName, '');
-  installCloud(t, [], async () => { throw { code: 'permission-denied' }; });
-  assert.equal((await t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames(rows))[0].createdByName, '');
+test('refresh returns to five rows and removes deleted cached cards only after success',async()=>{
+ const t=setup(request=>Promise.resolve(request.cursor?page(5):page()));await t.load();await t.load({append:true});assert.equal(t.state().items.length,10);
+ const pending=deferred();t.query(()=>pending.promise);const refresh=t.load();await tick();assert.equal(t.state().items.length,10);
+ pending.resolve(page(50,5,false));await refresh;assert.equal(t.state().items.length,5);assert.equal(t.state().items[0].name,'Room 50');assert.equal(t.calls.at(-1).cursor,null);
 });
-
-test('repeated renders and explicit refreshes share one active request', async () => {
-  const pending = deferred(), t = setup(() => pending.promise);
-  t.sandbox.render(); t.sandbox.render(); t.sandbox.render(); await t.timer.advance(0);
-  const first = t.load(), second = t.load(); await tick();
-  assert.equal(first, second); assert.equal(t.calls.length, 1);
-  pending.resolve([row()]); await first;
-  assert.equal(t.state().loaded, true); assert.equal(t.state().busy, false);
-  assert.match(t.view(), /Fixture room/);
+test('bad server responses never replace a usable list or trigger a full collection fallback',async()=>{
+ const t=setup();await t.load();t.query(async()=>({...page(),items:Array.from({length:6},(_,i)=>row(i))}));await t.load();
+ assert.equal(t.state().items.length,5);assert.ok(t.state().error);assert.equal(t.calls.length,2);
 });
-
-test('pending creator names cannot hide ready room cards or require a tab switch', async () => {
-  const pending = deferred(), t = setup(async () => [row('Ready immediately', { createdByName: '' })]);
-  t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames = () => pending.promise;
-  const request = t.load(); await tick();
-  assert.equal(t.state().loaded, true); assert.match(t.view(), /Ready immediately/);
-  assert.doesNotMatch(t.view(), /正在讀取雲端賽事/); assert.equal(t.sandbox.activeTab, 'management');
-  pending.resolve([row('Ready immediately', { createdByName: 'Enriched' })]); await request;
-  assert.match(t.view(), /Enriched/);
+test('first-page errors are retryable and never claim that the category is empty',async()=>{
+ const t=setup(async()=>{throw {code:'functions/permission-denied'};});await t.load();assert.match(t.view(),/權限/);assert.doesNotMatch(t.view(),/此分類目前沒有賽事/);
+ t.query(async()=>page(0,0,false));await t.load();assert.match(t.view(),/此分類目前沒有賽事/);assert.equal(t.state().error,'');
 });
-
-test('pending lifecycle repair cannot hide cards and settles after its bounded deadline', async () => {
-  const pending = deferred(), t = setup(async () => [row('Archived room', { archiveStatus: 'completed' })]);
-  const repairs = [];
-  t.sandbox.window.cloudSync.repairTournamentLifecycle = code => { repairs.push(code); return pending.promise; };
-  const request = t.load(); await tick();
-  assert.match(t.view(), /Archived room/); assert.equal(t.state().loaded, true);
-  assert.doesNotMatch(t.view(), /正在讀取雲端賽事/); assert.deepEqual(repairs, ['BXH-MOCK01']);
-  await t.timer.advance(10000); await request;
-  assert.equal(t.state().busy, false); assert.match(t.view(), /Archived room/);
+test('connection timeout ends loading without requesting summaries',async()=>{
+ const t=setup(),pending=deferred();t.s.window.cloudSync.connect=()=>pending.promise;
+ const request=t.load();await t.timer.advance(10000);await request;assert.equal(t.calls.length,0);assert.equal(t.state().busy,false);assert.match(t.state().error,/逾時/);
 });
-
-for (const stage of ['connect', 'cleanup', 'query']) {
-  test(stage + ' timeout ends the spinner and offers a working same-page retry', async () => {
-    const pending = deferred(), t = setup(stage === 'query' ? () => pending.promise : async () => [row()]);
-    if (stage === 'connect') t.sandbox.window.cloudSync.connect = () => pending.promise;
-    if (stage === 'cleanup') {
-      t.sandbox.userProfile.role = 'tester'; t.sandbox.currentRole = 'tester';
-      t.sandbox.window.cloudSync.cleanupMyExpiredTestRooms = () => pending.promise;
-    }
-    const request = t.load(); await t.timer.advance(10000); await request;
-    assert.equal(t.state().busy, false); assert.equal(t.state().loaded, true); assert.ok(t.state().error);
-    assert.doesNotMatch(t.view(), /正在讀取雲端賽事/); assert.match(t.view(), /cloud-refresh-admin-list/);
-    t.sandbox.window.cloudSync.connect = async () => true;
-    t.sandbox.window.cloudSync.cleanupMyExpiredTestRooms = async () => true;
-    t.query(async () => [row('Retried room', stage === 'cleanup' ? { testMode: true, eventAuthority: 'test' } : {})]);
-    await t.load(); assert.equal(t.state().error, ''); assert.match(t.view(), /Retried room/);
-    pending.resolve([row('Late old room')]); await tick();
-    assert.match(t.view(), /Retried room/); assert.doesNotMatch(t.view(), /Late old room/);
-  });
-}
-
-test('refresh and refresh failure retain the last known cards; retry replaces them', async () => {
-  const t = setup(); await t.load(); const pending = deferred(); t.query(() => pending.promise);
-  const request = t.load(); await tick();
-  assert.match(t.view(), /Fixture room/); assert.doesNotMatch(t.view(), /正在讀取雲端賽事/);
-  pending.reject(Error('fixture offline')); await request;
-  assert.ok(t.state().error); assert.match(t.view(), /Fixture room/);
-  t.query(async () => [row('Fresh room')]); await t.load();
-  assert.equal(t.state().error, ''); assert.match(t.view(), /Fresh room/); assert.doesNotMatch(t.view(), /Fixture room/);
+test('primary controls use status tabs and search rather than owner tabs; draft and community remain available',async()=>{
+ const t=setup();await t.load();const controls=t.s.adminTournamentListControlsHtml();
+ for(const label of ['報名中','即將開放','已關閉','草稿','一般房間','搜尋賽事名稱、房號或地點'])assert.match(controls,new RegExp(label));
+ assert.doesNotMatch(controls,/我的賽事|其他賽事|全部賽事/);assert.match(controls,/報名中 <b>10<\/b>/);
 });
-
-test('empty success is distinct from a failed request and does not refetch on render', async () => {
-  const t = setup(async () => []); await t.load();
-  assert.equal(t.state().error, ''); assert.match(t.view(), /目前沒有可管理的賽事/);
-  t.sandbox.render(); await t.timer.advance(0); assert.equal(t.calls.length, 1);
-});
-
-test('permission failure has a clear error and allows a subsequent successful refresh', async () => {
-  const t = setup(async () => { throw { code: 'permission-denied' }; }); await t.load();
-  assert.match(t.state().error, /權限/); assert.equal(t.state().busy, false);
-  t.query(async () => [row()]); await t.load(); assert.match(t.view(), /Fixture room/);
-});
-
-for (const change of ['logout', 'account', 'role', 'mode', 'grant']) {
-  test(change + ' change invalidates a pending response before it can repopulate the list', async () => {
-    const pending = deferred(), t = setup(() => pending.promise), request = t.load(); await tick();
-    if (change === 'logout') { t.sandbox.firebaseUser = null; t.sandbox.userProfile = null; t.sandbox.currentRole = null; }
-    if (change === 'account') t.sandbox.firebaseUser = { uid: 'different-owner' };
-    if (change === 'role') t.sandbox.userProfile.role = 'staff';
-    if (change === 'mode') t.sandbox.activeMode = 'event_staff';
-    if (change === 'grant') { t.sandbox.activeMode = 'partner_organizer'; t.sandbox.userProfile.partnerOrganizer = { organizationId: 'different-org' }; }
-    t.sandbox.reconcileAdminTournamentListContext();
-    assert.equal(t.state().items.length, 0); assert.equal(t.state().busy, false);
-    pending.resolve([row('Old private room')]); await request; await tick();
-    assert.equal(t.state().items.length, 0); assert.doesNotMatch(t.renders.at(-1) || '', /Old private room/);
-  });
-}
-
-test('an older identity response cannot overwrite a newer completed request', async () => {
-  const pending = deferred(), t = setup(() => pending.promise), old = t.load(); await tick();
-  t.sandbox.firebaseUser = { uid: 'new-owner' }; t.query(async () => [row('New owner room', { createdBy: 'new-owner' })]);
-  await t.load(); pending.resolve([row('Old owner room')]); await old;
-  assert.match(t.view(), /New owner room/); assert.doesNotMatch(t.view(), /Old owner room/);
-});
-
-test('late metadata from an old identity cannot replace the current list', async () => {
-  const metadata = deferred(), t = setup(async () => [row('Old owner room', { createdByName: '' })]);
-  t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames = () => metadata.promise;
-  const old = t.load(); await tick();
-  t.sandbox.firebaseUser = { uid: 'new-owner' }; delete t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames;
-  t.query(async () => [row('New owner room', { createdBy: 'new-owner' })]); await t.load();
-  metadata.resolve([row('Old owner room', { createdByName: 'Late name' })]); await old;
-  assert.match(t.view(), /New owner room/); assert.doesNotMatch(t.view(), /Old owner room|Late name/);
-});
-
-test('existing blank-room, tester and community permission filters remain enforced', async () => {
-  const t = setup(async () => [row('', { code: 'BLANK' }), row('Official'), row('Community', { eventAuthority: 'community', code: 'COMMUNITY' })]);
-  await t.load(); assert.deepEqual(t.state().items.map(item => item.name), ['Official', 'Community']);
-  t.sandbox.userProfile.role = 'staff'; await t.load(); assert.deepEqual(t.state().items.map(item => item.name), ['Official']);
-  t.sandbox.currentRole = 'tester'; t.sandbox.userProfile.role = 'tester';
-  t.query(async () => [row('Own test', { eventAuthority: 'test', testMode: true }), row('Other test', { eventAuthority: 'test', testMode: true, createdBy: 'other' }), row('Official')]);
-  await t.load(); assert.deepEqual(t.state().items.map(item => item.name), ['Own test']);
-});
-
-test('a forced post-mutation load supersedes in-flight metadata without restoring deleted cards', async () => {
-  const metadata = deferred(), t = setup(async () => [row('Deleted room', { createdByName: '' }), row('Remaining room', { code: 'BXH-MOCK02' })]);
-  t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames = () => metadata.promise;
-  const old = t.load(); await tick();
-  t.evaluate('adminTournamentListItems = adminTournamentListItems.filter(item => item.code !== "BXH-MOCK01");');
-  t.query(async () => [row('Remaining room', { code: 'BXH-MOCK02' })]);
-  delete t.sandbox.window.cloudSync.enrichAdminTournamentCreatorNames;
-  const replacement = t.sandbox.loadAdminTournamentList({ force: true });
-  assert.notEqual(replacement, old); await replacement;
-  metadata.resolve([row('Deleted room', { createdByName: 'Late creator' }), row('Remaining room', { code: 'BXH-MOCK02' })]); await old;
-  assert.equal(t.calls.length, 2); assert.deepEqual(t.state().items.map(item => item.name), ['Remaining room']);
-  assert.doesNotMatch(t.view(), /Deleted room|Late creator/);
-});
-
-test('tester lifecycle repair excludes hidden or foreign records before any mock mutation', async () => {
-  const t = setup(async () => [
-    row('Missing test marker', { archiveStatus: 'completed', eventAuthority: 'test', code: 'HIDDEN1' }),
-    row('Foreign test', { archiveStatus: 'completed', eventAuthority: 'test', testMode: true, createdBy: 'other', code: 'HIDDEN2' }),
-    row('Official', { archiveStatus: 'completed', code: 'HIDDEN3' }),
-    row('Own valid test', { eventAuthority: 'test', testMode: true, code: 'OWN' })
-  ]);
-  t.sandbox.userProfile.role = 'tester'; t.sandbox.currentRole = 'tester';
-  const repairs = []; t.sandbox.window.cloudSync.repairTournamentLifecycle = async code => { repairs.push(code); return { ok: true }; };
-  await t.load(); assert.deepEqual(repairs, []);
-  assert.deepEqual(t.state().items.map(item => item.code), ['OWN']);
-});
-
-test('the list modal retains cached cards and a visible timeout error with refresh available', async () => {
-  const t = setup(); await t.load(); t.evaluate('adminTournamentListOpen = true;');
-  const pending = deferred(); t.query(() => pending.promise); const refresh = t.load(); await tick();
-  assert.match(t.sandbox.renderAdminTournamentListModal(), /Fixture room/);
-  assert.doesNotMatch(t.sandbox.renderAdminTournamentListModal(), /正在讀取雲端賽事/);
-  await t.timer.advance(10000); await refresh;
-  const html = t.sandbox.renderAdminTournamentListModal();
-  assert.match(html, /Fixture room/); assert.match(html, /逾時/); assert.match(html, /cloud-refresh-admin-list/);
+test('staff cannot request the community-room scope from client controls',async()=>{
+ const t=setup();t.s.userProfile.role='staff';await t.load();assert.doesNotMatch(t.s.adminTournamentListControlsHtml(),/data-action="admin-tournament-kind"/);
+ const count=t.calls.length;await t.s.changeAdminTournamentListQuery({kind:'community'});assert.equal(t.calls.length,count);
 });
