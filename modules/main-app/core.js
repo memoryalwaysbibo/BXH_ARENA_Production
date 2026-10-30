@@ -15743,7 +15743,7 @@ async function loadStaffRegistrationRoster(){
     const result=await window.cloudSync.readStaffRegistrationRoster(context.code);
     if(!isCurrent())return;
     if(result?.ok!==true||result.code!==String(context.code).toUpperCase()||!Array.isArray(result.rows))throw Error('staff-roster-read-failed');
-    staffRosterCache={key:context.key,rows:result.rows};
+    staffRosterCache={key:context.key,rows:result.rows,checkinEnabled:result.checkinEnabled===true};
     adminRegistrationsError=null;
     showToast('玩家名單已同步');
   }catch(error){
@@ -15757,6 +15757,53 @@ async function loadStaffRegistrationRoster(){
     if(isCurrent())render();
   }
 }
+let staffCheckinBusy=false;
+const staffCheckinOperations=new Map();
+async function staffRosterCheckin(target){
+  if(staffCheckinBusy||peopleRosterBusy||!staffRosterReadOnly())return;
+  const context=captureRegistrationRosterContext();
+  const current=()=>context.key===registrationRosterContextKey()&&context.generation===adminRosterGeneration&&staffRosterReadOnly();
+  const cache=staffRosterCache;
+  if(cache?.key!==context.key||cache.checkinEnabled!==true)return;
+  const playerId=target.getAttribute('data-player-id'),checkedIn=target.getAttribute('data-checked-in')==='true';
+  const matches=cache.rows.filter(row=>row.playerId===playerId&&row.status==='confirmed');
+  if(!playerId||matches.length!==1||matches[0].checkedIn===checkedIn)return;
+  const player=matches[0];
+  const submit=async()=>{
+    if(!current()||staffCheckinBusy)return;
+    const action=checkedIn?'manual':'revoke',key=context.key+':'+playerId+':'+action;
+    let operationId=staffCheckinOperations.get(key);
+    if(!operationId){
+      try{operationId=sessionStorage.getItem('bxh.staffCheckin.'+key);}catch{}
+      if(!/^[-a-zA-Z0-9]{16,80}$/.test(operationId||''))operationId=crypto.randomUUID();
+      staffCheckinOperations.set(key,operationId);
+      try{sessionStorage.setItem('bxh.staffCheckin.'+key,operationId);}catch{}
+    }
+    staffCheckinBusy=true;render();
+    try{
+      const result=await window.engagementService.tournamentOperation('tournamentCheckin',{action,code:context.code,playerId,operationId});
+      if(!current())return;
+      if(result?.ok!==true)throw Error('checkin-unconfirmed');
+      const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);
+      if(!current())return;
+      if(fresh?.ok!==true||fresh.code!==String(context.code).toUpperCase()||!Array.isArray(fresh.rows))throw Error('checkin-readback-failed');
+      staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true};
+      const verified=fresh.rows.filter(row=>row.playerId===playerId&&row.status==='confirmed');
+      if(verified.length!==1||verified[0].checkedIn!==checkedIn)throw Error('checkin-state-changed');
+      staffCheckinOperations.delete(key);try{sessionStorage.removeItem('bxh.staffCheckin.'+key);}catch{}
+      adminRegistrationsError=null;showToast(checkedIn?'報到成功':'已取消報到');
+    }catch(error){
+      if(current()){
+        const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
+        adminRegistrationsError=reason.includes('permission-denied')?'目前帳號沒有本場報到操作權限，請重新同步名單。':
+          reason.includes('checkin-closed')?'目前報到已鎖定，請重新同步名單。':'報到結果尚未確認，請重新同步名單核對；重試相同操作會沿用原請求。';
+        showToast(adminRegistrationsError,true);
+      }
+    }finally{staffCheckinBusy=false;if(current())render();}
+  };
+  if(checkedIn){await submit();return;}
+  openModal({type:'generic',title:'是否要取消報到？',message:player.name,danger:true,confirmLabel:'是',cancelLabel:'否',onConfirm:()=>{if(current())void submit();}});
+}
 function renderStaffRegistrationRoster(){
   if(adminRosterUnsub||adminRosterCode)stopAdminRosterWatch();
   const rows=staffRosterCache?.key===registrationRosterContextKey()?staffRosterCache.rows:null;
@@ -15765,11 +15812,18 @@ function renderStaffRegistrationRoster(){
   const confirmed=rows?.filter(row=>row.status==='confirmed').length;
   const waitlist=rows?.filter(row=>row.status==='waitlist').length;
   const controls=window.BXHRosterView?.controls({contextKey:registrationRosterContextKey(),section:'confirmed'})||'';
+  const checkinLabel=row=>{
+    if(row.status!=='confirmed')return '—';
+    if(!state.meta?.checkinRequired)return '免報到';
+    const label=row.checkedIn?'已報到':'未報到';
+    if(staffRosterCache?.checkinEnabled!==true||!row.playerId)return label;
+    return `<button class="btn btn-ghost btn-sm" data-action="staff-roster-checkin" data-player-id="${esc(row.playerId)}" data-checked-in="${row.checkedIn?'false':'true'}" ${staffCheckinBusy||peopleRosterBusy?'disabled':''}>${label}｜${row.checkedIn?'取消報到':'報到'}</button>`;
+  };
   return `<div id="people-roster-view">${controls}<div class="panel"><div class="panel-title">玩家名單</div>
-    <p class="hint">工作人員可同步查看正取、備取與報到狀態。</p>
-    <button class="btn btn-primary" data-action="load-staff-registration-roster" ${peopleRosterBusy?'disabled':''}>${peopleRosterBusy?'同步中…':'重新同步名單'}</button>
+    <p class="hint">${staffRosterCache?.checkinEnabled===true?'可為正取選手報到或取消報到；請依實際到場選手逐位操作。':'工作人員可同步查看正取、備取與報到狀態。'}</p>
+    <button class="btn btn-primary" data-action="load-staff-registration-roster" ${peopleRosterBusy||staffCheckinBusy?'disabled':''}>${peopleRosterBusy?'同步中…':'重新同步名單'}</button>
     ${adminRegistrationsError?`<div class="banner warn" role="alert">${esc(adminRegistrationsError)}</div>`:''}
-    ${rows?`<p>正取 ${confirmed} 人 ／ 備取 ${waitlist} 人</p><div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>名單</th><th>報到</th></tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${index+1}</td><td class="people-col-name">${esc(row.name)}</td><td>${status[row.status]||'—'}</td><td>${row.status==='confirmed'?(state.meta?.checkinRequired?(row.checkedIn?'已報到':'未報到'):'免報到'):'—'}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state">${adminRegistrationsError?'尚未取得最新名單':'正在讀取玩家名單…'}</div>`}
+    ${rows?`<p>正取 ${confirmed} 人 ／ 備取 ${waitlist} 人</p><div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>名單</th><th>報到</th></tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${index+1}</td><td class="people-col-name">${esc(row.name)}</td><td>${status[row.status]||'—'}</td><td>${checkinLabel(row)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state">${adminRegistrationsError?'尚未取得最新名單':'正在讀取玩家名單…'}</div>`}
     </div></div>`;
 }
 function canManageRegistrationRoster(){
@@ -20488,7 +20542,8 @@ function handleAction(action, target){
 
   if(action.startsWith("team-lineup-")||action==="team-score-direct"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
-  if(action==='load-staff-registration-roster'){void loadStaffRegistrationRoster();return;}
+  if(action==='load-staff-registration-roster'){if(!staffCheckinBusy)void loadStaffRegistrationRoster();return;}
+  if(action==='staff-roster-checkin'){void staffRosterCheckin(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
