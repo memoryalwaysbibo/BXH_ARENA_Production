@@ -15366,6 +15366,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
           <div class="lobby-host">${esc(t.hostName)} 主辦</div>
         </div>
         <div class="lobby-card-right">
+          <span class="lobby-room-code">房號 ${esc(t.code)}</span>
           <span class="lobby-authority ${authorityClass}">${authorityLabel}</span>
           ${t.roomAccessMode==="password"?'<span class="badge badge-metal">🔒 密碼房</span>':""}
           ${t.systemClosure&&!t.systemClosure.restoredAt?'<span class="badge badge-metal">比賽結束（系統關閉）</span>':roomStatusHtml(displayPhase)}
