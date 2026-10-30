@@ -147,3 +147,99 @@ test('earliest individual promotion rejects a switch to team mode during the tra
 test('earliest team promotion rejects switched mode and divergent mirrors',async()=>{for(const mode of ['switch','counter']){const h=earliestHarness(0,0,2,true),run=h.fx.runTransaction;h.fx.runTransaction=async(db,fn)=>{if(mode==='switch')h.docs.pub.battleMode='individual';else h.docs.pub.confirmedCount=1;return run(db,fn);};await assert.rejects(h.promote(),e=>e.code==='registration-state-conflict');assert.equal(h.docs.reg.status,'waitlist');assert.equal(h.docs.tour.confirmedCount,0);}});
 test('earliest promotion rejects missing auth and empty queue without writes',async()=>{for(const mode of ['auth','empty']){const h=earliestHarness(0,0,2),before=JSON.stringify(h.docs);if(mode==='auth')h.sandbox.authHandle.currentUser=null;else h.fx.getDocs=async()=>({empty:true,docs:[]});await assert.rejects(h.promote(),e=>e.code===(mode==='auth'?'auth-required':'no-waitlist-candidate'));assert.equal(JSON.stringify(h.docs),before);}});
 for(const team of [false,true])test('registration screen applies canonical individual result without treating teams as individuals '+team,async()=>{let applied=0,toasts=[];const s={state:{cloudCode:'BXH-X',meta:{battleMode:team?'team':'individual'}},adminRegistrationsBusy:false,currentTournamentRegistrationLocked:()=>false,render(){},showToast:m=>toasts.push(m),publicTournamentsCache:{},resetAdminRegistrationsCache(){},peopleApplyCloudRosterResult:async()=>{applied++},window:{cloudSync:{promoteEarliestWaitlist:async()=>team?{ok:true}:{ok:true,state:{id:'room'}}}},mapRegistrationError:String};vm.createContext(s);vm.runInContext('function invoke(){const action="admin-promote-waitlist";'+block(core,'  if(action==="admin-promote-waitlist"){','  if(action==="admin-cancel-registration"){')+'}',s);s.invoke();await new Promise(resolve=>setImmediate(resolve));assert.equal(applied,team?0:1);assert.equal(toasts.length,team?1:0);assert.equal(s.adminRegistrationsBusy,false);});
+
+
+// Late online registrations must only become actionable after the cloud accepts
+// their canonical IDs. Exercise the actual family merge and QR write fence.
+function lateRosterHarness({qr=true,fail=false}={}){
+ const clone=x=>JSON.parse(JSON.stringify(x));let nextId=0,valid=true,reads=0,writes=0;
+ const regs=Array.from({length:80},(_,i)=>({registrationId:'r'+i,uid:'u'+i,displayName:i===71?'江佳恩':'Player '+i,status:'confirmed'}));
+ const initial={id:'late-room',cloudCode:'BXH-LATE12',updatedAt:1,meta:{registrationEnabled:true,checkinRequired:true,battleMode:'individual'},players:regs.slice(0,68).map((r,i)=>({id:'canonical-'+i,name:r.displayName,source:'online',registrationId:r.registrationId,registrationUid:r.uid,checkedIn:i<40})),teams:[],...(qr?{qrCheckinManaged:true,qrCheckinRevision:7}:{})};
+ let remote=clone(initial),readbackFail=false,writeGate=null;
+ const s={state:clone(initial),adminRegistrationsCache:null,peopleRosterBusy:false,publicTournamentsCache:null,myRegistrationsCache:null,
+  captureRegistrationRosterContext:()=>({code:'BXH-LATE12',roomId:'late-room'}),
+  requireRegistrationRosterContext:()=>{if(!valid)throw Error('context-changed');},registrationRosterContextIsCurrent:()=>valid,
+  isCommunityQuickRegistration:()=>false,peopleOnsiteWaitlistManaged:()=>false,cloneStateForSave:clone,
+  uid:()=> 'new-'+ ++nextId,computeRegistrationStatus:()=> 'open',touchCommunityActivity(){},cloudAvailable:()=>true,
+  saveState:()=>{throw Error('optimistic save forbidden');},
+  applyRemoteState:r=>{s.state=clone(r);},window:{cloudSync:{connect:async()=>{},getPublicTournamentFull:async()=>({}),listRegistrationsForAdmin:async()=>clone(regs),
+   joinRoom:async()=>{reads++;return readbackFail?{ok:false}:{ok:true,data:clone(remote)};}}},
+  enqueueCloudStateWrite:async(code,candidate,options)=>{
+   writes++;assert.equal(s.state.players.length,68,'candidate is not exposed before commit');
+   if(writeGate)await writeGate;
+   if(!options.isCurrent())return false;
+   if(fail){s.window.__BXH_LAST_CLOUD_ERROR_CODE='permission-denied';return false;}
+   if(qr)require('../modules/main-app/qr-checkin-fence.js').advance({qrCheckinManaged:true,qrCheckinRevision:remote.qrCheckinRevision,data:JSON.stringify(remote)},candidate);
+   remote=clone(candidate);return true;
+  }};
+ vm.createContext(s);
+ vm.runInContext(block(fs.readFileSync(path.join(root,'family-ui.js'),'utf8'),'function mergeFamilyOnlineRoster(','async function chooseFamilyRegistrationToCancel('),s);
+ vm.runInContext(block(core,'async function syncLatestOnlineRosterBeforeLock(','/* ==== render helpers ===='),s);
+ return {s,initial,clone,setValid:x=>{valid=x},setReadbackFail:x=>{readbackFail=x},setGate:x=>{writeGate=x},remote:()=>remote,stats:()=>({reads,writes})};
+}
+for(const qr of [false,true])test('68 to 80 sync rejects cloud failure without exposing phantom players; QR='+qr,async()=>{
+ const h=lateRosterHarness({qr,fail:true});await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/permission-denied/);
+ assert.equal(h.s.state.players.length,68);assert.equal(h.remote().players.length,68);assert.equal(h.s.state.players.filter(p=>p.checkedIn).length,40);
+});
+test('68 to 80 sync waits for commit, preserves check-ins and exposes only canonical IDs',async()=>{
+ const h=lateRosterHarness();let release;h.setGate(new Promise(r=>{release=r}));
+ const pending=h.s.syncLatestOnlineRosterBeforeLock();await new Promise(r=>setImmediate(r));assert.equal(h.s.state.players.length,68);release();
+ const result=await pending;assert.equal(result.changed,true);assert.equal(h.s.state.players.length,80);assert.equal(h.s.state.qrCheckinRevision,8);
+ assert.equal(h.s.state.players.filter(p=>p.checkedIn).length,40);assert.equal(h.s.state.players[71].name,'江佳恩');
+ assert.equal(h.s.state.players[71].id,h.remote().players[71].id);assert.equal(h.s.state.players[0].id,'canonical-0');
+ const ids=h.s.state.players.map(p=>p.id);await h.s.syncLatestOnlineRosterBeforeLock();assert.deepEqual(h.s.state.players.map(p=>p.id),ids);assert.equal(h.stats().writes,1,'an unchanged retry does not create another version');
+});
+test('fresh canonical QR state recovers a stale local revision before late roster sync',async()=>{
+ const h=lateRosterHarness();h.s.state.qrCheckinRevision=3;
+ await h.s.syncLatestOnlineRosterBeforeLock();assert.equal(h.s.state.qrCheckinRevision,8);assert.equal(h.s.state.players.length,80);
+});
+test('readback failure does not publish an unverified candidate; retry recovers committed IDs',async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let count=0;
+ h.s.window.cloudSync.joinRoom=async()=> ++count===2?{ok:false}:join();
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/roster-readback-failed/);
+ assert.equal(h.s.state.players.length,68);assert.equal(h.remote().players.length,80);
+ await h.s.syncLatestOnlineRosterBeforeLock();assert.equal(h.s.state.players[71].id,h.remote().players[71].id);assert.equal(h.stats().writes,1);
+});
+test('room or account switch while queued prevents the roster commit and publication',async()=>{
+ const h=lateRosterHarness();let release;h.setGate(new Promise(r=>{release=r}));const pending=h.s.syncLatestOnlineRosterBeforeLock();
+ await new Promise(r=>setImmediate(r));h.setValid(false);release();await assert.rejects(pending,/context-changed/);
+ assert.equal(h.s.state.players.length,68);assert.equal(h.remote().players.length,68);
+});
+test('QR revision outranks device clock and older check-in snapshots cannot undo it',()=>{
+ const s={state:{id:'room',cloudCode:'BXH-X',qrCheckinManaged:true,qrCheckinRevision:7,updatedAt:500,players:[{id:'p',checkedIn:false}]},remoteAppliedRoomId:'room',remoteAppliedAt:500,
+ defaultState:id=>({id}),saveRecord(){},render(){},getMatch(){},Date};vm.createContext(s);vm.runInContext(block(core,'function applyRemoteState(','// Phase 1:'),s);
+ s.applyRemoteState({id:'room',qrCheckinManaged:true,qrCheckinRevision:8,updatedAt:100,players:[{id:'p',checkedIn:true}]});
+ assert.equal(s.state.qrCheckinRevision,8);assert.equal(s.state.players[0].checkedIn,true);
+ s.applyRemoteState({id:'room',qrCheckinManaged:true,qrCheckinRevision:7,updatedAt:900,players:[{id:'p',checkedIn:false}]},true);
+ assert.equal(s.state.players[0].checkedIn,true);
+});
+test('successful detached writes adopt the committed QR revision for the next save',async()=>{
+ const s={state:{id:'room',cloudCode:'BXH-X',qrCheckinManaged:true,qrCheckinRevision:7,players:[{id:'p',checkedIn:false}]},currentAuthUid:()=> 'u',cloudWriteChain:Promise.resolve(true),cloudAvailable:()=>true,
+ window:{cloudSync:{pushUpdate:async(code,snapshot)=>{snapshot.qrCheckinRevision++;snapshot.players[0].checkedIn=true;snapshot.players[0].checkinAt=123;return true;}}}};
+ vm.createContext(s);vm.runInContext(block(core,'function enqueueCloudStateWrite(','async function flushCloudStateWrites('),s);
+ const snapshot=JSON.parse(JSON.stringify(s.state));await s.enqueueCloudStateWrite('BXH-X',snapshot);
+ assert.equal(s.state.qrCheckinRevision,8);assert.equal(s.state.players[0].checkedIn,true);assert.equal(s.state.players[0].checkinAt,123);
+});
+for(const change of ['account','room','newer-checkin'])test('write acknowledgment does not overwrite changed '+change,async()=>{
+ let uid='u',release;const gate=new Promise(r=>{release=r});
+ const s={state:{id:'room',cloudCode:'BXH-X',qrCheckinManaged:true,qrCheckinRevision:7,players:[{id:'p',checkedIn:true}]},currentAuthUid:()=>uid,cloudWriteChain:Promise.resolve(true),cloudAvailable:()=>true,
+ window:{cloudSync:{pushUpdate:async(code,snapshot)=>{await gate;snapshot.qrCheckinRevision=8;snapshot.players[0].checkedIn=false;return true;}}}};
+ vm.createContext(s);vm.runInContext(block(core,'function enqueueCloudStateWrite(','async function flushCloudStateWrites('),s);
+ const pending=s.enqueueCloudStateWrite('BXH-X',JSON.parse(JSON.stringify(s.state)));await new Promise(r=>setImmediate(r));
+ if(change==='account')uid='other';if(change==='room')s.state={...s.state,cloudCode:'BXH-OTHER1'};if(change==='newer-checkin')s.state.qrCheckinRevision=9;
+ release();await pending;assert.equal(s.state.players[0].checkedIn,true);assert.equal(s.state.qrCheckinRevision,change==='newer-checkin'?9:7);
+});
+test('newly synchronized Jiang Jia En is accepted by the trusted manual check-in transition',async()=>{
+ const h=lateRosterHarness();await h.s.syncLatestOnlineRosterBeforeLock();
+ const player=h.s.state.players.find(p=>p.registrationId==='r71');assert.equal(player.name,'江佳恩');
+ const output=require('../qr-checkin/backend/core.cjs').transition({code:'BXH-LATE12',uid:'admin',user:{active:true,role:'admin'},
+ room:{},state:h.remote(),config:{enabled:true,writerGuardsVerified:true,roomCodes:['BXH-LATE12']},
+ d:{action:'manual',playerId:player.id,operationId:'jiang-checkin-operation-001'},now:123456});
+ assert.equal(output.result.ok,true);assert.equal(output.result.checkedIn,true);assert.equal(output.playerId,player.id);
+});
+for(const unavailable of [false,true])test('server-only recovery never falls back to a cached roster; failure='+unavailable,async()=>{
+ let serverReads=0,cacheReads=0;
+ const s={cloudEnabled:true,dbHandle:{},console:{warn(){}},fx:{doc:()=> 'private-ref',getDoc:async()=>{cacheReads++;throw Error('cache must not be used');},getDocFromServer:async()=>{serverReads++;if(unavailable)throw Error('offline');return {exists:()=>true,data:()=>({data:JSON.stringify({id:'room',players:[]})})};}}};
+ vm.createContext(s);vm.runInContext('api={'+block(cloud,'async joinRoom(code){','    // Guest/public use')+'}',s);
+ const result=await s.api.joinRoom('BXH-LATE12',{serverOnly:true});assert.equal(cacheReads,0);assert.equal(serverReads,1);assert.equal(result.ok,!unavailable);
+});

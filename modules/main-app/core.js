@@ -3220,13 +3220,16 @@ function applyRemoteState(remote, authoritative=false){
     if(Object.entries(localExits).some(([n,c])=>Number(remoteExits[n]?.revision||0)<Number(c.revision||0)))return;
     const newerExit=Object.entries(remoteExits).some(([n,c])=>Number(c.revision||0)>Number(localExits[n]?.revision||0));
     if(remoteAppliedRoomId!==remote.id){remoteAppliedRoomId=remote.id;remoteAppliedAt=0;}
-    if(!newerExit&&(remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
+    const localQrRevision=Number(state.qrCheckinRevision||0),remoteQrRevision=Number(remote.qrCheckinRevision||0);
+    if(remoteQrRevision<localQrRevision)return;
+    const newerQr=remoteQrRevision>localQrRevision;
+    if(!newerQr&&!newerExit&&(remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
     if(Number(remote.onsiteWaitlistRuntimeRevision||0)<Number(state.onsiteWaitlistRuntimeRevision||0))return;
     const newerRuntime=Number(remote.onsiteWaitlistRuntimeRevision||0)>Number(state.onsiteWaitlistRuntimeRevision||0);
     const localRosterRevision=Number(state.registrationRosterRevision||0);
     const remoteRosterRevision=Number(remote.registrationRosterRevision||0);
     if(remoteRosterRevision<localRosterRevision) return;
-    const newerRoster=remoteRosterRevision>localRosterRevision||newerRuntime;
+    const newerRoster=remoteRosterRevision>localRosterRevision||newerRuntime||newerQr;
     const localUpdated = state.updatedAt || 0;
     const remoteUpdated = remote.updatedAt || 0;
     if(!authoritative&&!newerExit&&!newerRoster&&remoteUpdated<=localUpdated&&Number(remote.callRevision||0)<=Number(state.callRevision||0)&&Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0)&&isCommunityQuickRegistration(remote)&&Number.isSafeInteger(remote.communityParticipantCount)&&remote.communityParticipantCount>=0&&remote.communityParticipantCount!==state.communityParticipantCount){
@@ -5236,6 +5239,10 @@ const REGISTRATION_ERROR_MESSAGES = {
   "team-lottery-unavailable": "團體戰目前尚未開放超額抽籤報名",
 };
 function mapRegistrationError(e){
+  const reason=String(e?.code||e?.message||'');
+  if(['qr-checkin-state-stale','registration-roster-stale'].includes(reason))return '雲端名單或報到狀態已更新，請重新同步名單後再操作。';
+  if(reason==='roster-cloud-write-failed')return '名單尚未寫入雲端，請確認連線後重新同步。';
+  if(reason==='roster-readback-failed')return '無法確認雲端最新名單，請重新同步後再報到。';
   const code = (e && e.code) || (e && e.message) || "unknown";
   return REGISTRATION_ERROR_MESSAGES[code] || Object.entries(REGISTRATION_ERROR_MESSAGES).find(([key])=>String(e?.message||"").includes(key))?.[1] || "發生未知錯誤，請稍後再試";
 }
@@ -6487,12 +6494,27 @@ function cloneStateForSave(st){
 }
 function enqueueCloudStateWrite(code, snapshot, options={}){
   const normalizedCode = code;
+  const callerState=state,callerUid=currentAuthUid(),inputQrRevision=snapshot.qrCheckinRevision;
   cloudWriteChain = cloudWriteChain
     .catch(()=>false)
     .then(async ()=>{
       if(options.isCurrent&&!options.isCurrent())return false;
       if(!normalizedCode || !cloudAvailable() || !window.cloudSync || !window.cloudSync.pushUpdate) return false;
-      return await window.cloudSync.pushUpdate(normalizedCode, snapshot, options);
+      const ok=await window.cloudSync.pushUpdate(normalizedCode, snapshot, options);
+      if(ok===true&&state===callerState&&currentAuthUid()===callerUid&&state.cloudCode===normalizedCode&&
+         snapshot.qrCheckinManaged===true&&state.qrCheckinRevision===inputQrRevision&&
+         Number.isSafeInteger(snapshot.qrCheckinRevision)&&snapshot.qrCheckinRevision>inputQrRevision){
+        state.qrCheckinManaged=true;state.qrCheckinRevision=snapshot.qrCheckinRevision;
+        const checked=new Map((snapshot.players||[]).map(p=>[p.id,p]));
+        for(const player of state.players||[]){
+          const committed=checked.get(player.id);if(!committed)continue;
+          player.checkedIn=committed.checkedIn===true;
+          for(const field of ['checkinFirstAt','checkinAt','checkinMethod']){
+            if(Object.prototype.hasOwnProperty.call(committed,field))player[field]=committed[field];else delete player[field];
+          }
+        }
+      }
+      return ok;
     });
   return cloudWriteChain;
 }
@@ -6604,8 +6626,8 @@ async function saveState(options={}){
         cloudSyncPending = false;
         cloudStatus = "connected";
         cloudLastSyncAt = Date.now();
-        if(snapshot.onsiteWaitlistFinalized===true){
-          if(state.id===snapshot.id&&state.cloudCode===snapshot.cloudCode&&Number(state.onsiteWaitlistRuntimeRevision||0)<Number(snapshot.onsiteWaitlistRuntimeRevision||0))state.onsiteWaitlistRuntimeRevision=snapshot.onsiteWaitlistRuntimeRevision;
+        if(snapshot.onsiteWaitlistFinalized===true||snapshot.qrCheckinManaged===true){
+          if(snapshot.onsiteWaitlistFinalized===true&&state.id===snapshot.id&&state.cloudCode===snapshot.cloudCode&&Number(state.onsiteWaitlistRuntimeRevision||0)<Number(snapshot.onsiteWaitlistRuntimeRevision||0))state.onsiteWaitlistRuntimeRevision=snapshot.onsiteWaitlistRuntimeRevision;
           await saveRecord(snapshot);
         }
         return localOk ? true : false;
@@ -9619,23 +9641,57 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     return {ok:true,changed:false,confirmed:0};
   adminRegistrationsCache=regs;
   const confirmed=regs.filter(r=>r&&r.status==="confirmed");
+  // QR check-ins are transaction-owned. Recover the canonical player IDs and
+  // revision before merging late registrations, including after an earlier
+  // optimistic sync failed. Never publish the candidate before cloud acceptance.
+  let base=state;
+  if(state.qrCheckinManaged===true){
+    const latest=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
+    requireRegistrationRosterContext(context);
+    if(latest?.ok!==true||latest.data?.id!==context.roomId)throw new Error('roster-readback-failed');
+    if(latest.data.startedAt)throw new Error('bracket-locked');
+    base=latest.data;
+  }
+  const candidate=cloneStateForSave(base);
+  candidate.cloudCode=context.code;
   const before=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
     p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
   ]).sort(),teams:state.teams||[]});
-  if(state.meta.battleMode==="team"){
-    state.players=mergeTeamOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired);
-    state.teams=teamRegistrationRowsToTeams(confirmed);
+  const baseRoster=JSON.stringify({players:base.players||[],teams:base.teams||[]});
+  if(candidate.meta.battleMode==="team"){
+    candidate.players=mergeTeamOnlineRoster(candidate.players||[],confirmed,!!candidate.meta.checkinRequired);
+    candidate.teams=teamRegistrationRowsToTeams(confirmed);
   }else{
-    state.players=mergeFamilyOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired,()=>uid("p"));
-    state.teams=[];
+    candidate.players=mergeFamilyOnlineRoster(candidate.players||[],confirmed,!!candidate.meta.checkinRequired,()=>uid("p"));
+    candidate.teams=[];
+  }
+  const needsWrite=baseRoster!==JSON.stringify({players:candidate.players||[],teams:candidate.teams||[]});
+  if(needsWrite){
+    candidate.updatedAt=Date.now();
+    candidate.meta.registrationStatus=computeRegistrationStatus(candidate.meta,candidate);
+    touchCommunityActivity(candidate);
+    requireRegistrationRosterContext(context);
+    if(!cloudAvailable())throw new Error('network');
+    // A failed roster must never become a local cache or an automatic retry
+    // payload. pushUpdate retains Rules, ownership and check-in fences.
+    const ok=await enqueueCloudStateWrite(context.code,candidate,{isCurrent:()=>registrationRosterContextIsCurrent(context)});
+    requireRegistrationRosterContext(context);
+    if(ok!==true)throw new Error(window.__BXH_LAST_CLOUD_ERROR_CODE||'roster-cloud-write-failed');
+  }
+  if(needsWrite||base!==state){
+    const result=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
+    requireRegistrationRosterContext(context);
+    if(result?.ok!==true||result.data?.id!==context.roomId)throw new Error('roster-readback-failed');
+    if(needsWrite&&candidate.qrCheckinManaged===true&&Number(result.data.qrCheckinRevision||0)<candidate.qrCheckinRevision)throw new Error('roster-readback-failed');
+    applyRemoteState(result.data,true);
+    if(Number(state.qrCheckinRevision||0)<Number(result.data.qrCheckinRevision||0))throw new Error('roster-readback-failed');
   }
   const after=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
     p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
   ]).sort(),teams:state.teams||[]});
   const changed=before!==after;
-  if(changed && !(await saveState())) throw new Error("名單寫入雲端失敗；請重新整理後重試同步");
   requireRegistrationRosterContext(context);
   publicTournamentsCache=null;
   myRegistrationsCache=null;
