@@ -195,9 +195,10 @@ async function handleMailbox(action,target){
     try{
       if(!window.BXHTitleRewardUI||!window.engagementService?.claimTitleReward)throw Error('service-unavailable');
       await window.BXHTitleRewardUI.open(messageId,replay);
+      if(c!==mailboxContext())return;
       c.messages=null;c.busy=false;await loadMailbox(true);
-    }catch(error){c.error=mailboxError(error);}
-    finally{c.busy=false;render();}
+    }catch(error){if(c===mailboxContext())c.error=mailboxError(error);}
+    finally{if(c===mailboxContext()){c.busy=false;render();}}
     return;
   }
   if(action==='mailbox-open-contract'){openMailboxPartnerContract(target.getAttribute('data-order-code'));return;}
