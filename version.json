@@ -1,6 +1,6 @@
 {
-  "build": "20261030.2",
+  "build": "20261030.3",
   "version": "v14.3.42",
-  "updatedAt": "2026-10-30T00:54:07.393Z",
-  "releaseTrigger": "management-progressive-loading"
+  "updatedAt": "2026-10-30T02:53:03.472Z",
+  "releaseTrigger": "management-five-summary-search"
 }
