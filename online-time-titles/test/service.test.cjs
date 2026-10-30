@@ -121,3 +121,22 @@ test('changing activation date cannot silently relabel already-counted history',
   await assert.rejects(f.service(event(START+45000,START+90000)),/activation-changed/);
   assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,45000);
 });
+test('confirmed lifetime titles stop repeating the native award transaction on later heartbeats',async()=>{
+  const f=fixture({'playerStats/alice':{officialOnlineTimeMs:D.HOUR}});let calls=0;
+  const service=createService(f.db,{clock:()=>START,awardTitle:async()=>{calls++;return {awarded:false,reason:'already-earned'};}});
+  await service(event(START,START+45000));
+  await service(event(START+45000,START+90000));
+  assert.equal(calls,1);
+  assert.deepEqual(f.db.read('playerStats/alice').onlineTimeConfirmedTitleIds,['online_time_1h']);
+});
+test('failure saving the award acknowledgement retries safely without recounting the interval',async()=>{
+  const f=fixture({'playerStats/alice':{officialOnlineTimeMs:D.HOUR-45000}});let failAck=false,calls=0;
+  const tx=f.db.runTransaction.bind(f.db);
+  f.db.runTransaction=fn=>{if(failAck){failAck=false;throw Error('ack-write-failed');}return tx(fn);};
+  const service=createService(f.db,{awardTitle:async()=>{calls++;if(calls===1)failAck=true;return calls===1?{awarded:true}:{awarded:false,reason:'already-earned'};}});
+  const e=event(START,START+45000);
+  await assert.rejects(service(e),/ack-write-failed/);
+  await service(e);await service(e);
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,D.HOUR);
+  assert.equal(calls,2);
+});

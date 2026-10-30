@@ -59,16 +59,27 @@ function createService(db,{awardTitle,clock=Date.now}={}){
       }
       const flags=settings.data()||{};
       return {status:receipt.exists?'duplicate':'counted',totalMs:total,
+        confirmedTitleIds:Array.isArray(old.onlineTimeConfirmedTitleIds)?old.onlineTimeConfirmedTitleIds:[],
         awardsEnabled:flags.titlesEnabled===true&&flags.automaticTitleAwardsEnabled===true};
     });
     // Always retry awards after an already-counted interval. A failed award
     // must not be lost merely because the time transaction already committed.
     if(result.awardsEnabled){
       for(const definition of D.DEFINITIONS){
-        if(result.totalMs<definition.targetValue*D.MINUTE)continue;
+        if(result.totalMs<definition.targetValue*D.MINUTE||result.confirmedTitleIds.includes(definition.id))continue;
         const award=await awardTitle({uid,titleId:definition.id,sourceType:'online_time',
           sourceId:'online_time_v1',grantedBy:'system',grantReason:definition.description});
         if(award?.reason==='evaluation-error')throw Error('online-time-award-retry');
+        if(award?.awarded===true||award?.reason==='already-earned'){
+          // One acknowledgement per lifetime title avoids calling the native
+          // award transaction on every subsequent heartbeat. A failed ack is
+          // safe to retry: the native earned-title record remains authoritative.
+          await db.runTransaction(async tx=>{
+            const ref=db.doc(`playerStats/${uid}`),snap=await tx.get(ref);
+            const ids=Array.isArray(snap.data()?.onlineTimeConfirmedTitleIds)?snap.data().onlineTimeConfirmedTitleIds:[];
+            if(!ids.includes(definition.id))tx.set(ref,{onlineTimeConfirmedTitleIds:[...ids,definition.id]},{merge:true});
+          });
+        }
       }
     }
     return result;
