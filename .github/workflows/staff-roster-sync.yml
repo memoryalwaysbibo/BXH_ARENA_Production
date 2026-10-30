@@ -1,0 +1,18 @@
+name: Staff roster read permissions
+on:
+  pull_request:
+    paths: ['staff-roster/**', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/community-host-roster-sync.test.cjs', 'tests/staff-roster-cache.test.cjs', '.github/workflows/staff-roster-sync.yml']
+permissions:
+  contents: read
+jobs:
+  staff-roster:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check staff-roster/functions/index.js
+      - run: node --check modules/main-app/core.js
+      - run: node --check modules/cloud/cloud-runtime.js
+      - run: node --test staff-roster/*.test.cjs tests/staff-roster-cache.test.cjs tests/community-host-roster-sync.test.cjs tests/roster-view.test.cjs tests/roster-recovery.test.cjs tests/seated-roster-promotion.test.cjs

@@ -2429,6 +2429,9 @@
 
     // 管理端讀取完整 registration 文件；僅限 Rules 已授權的賽事管理者，
     // 因文件含聯絡資料，不可拿來實作「全體正式工作人員只看姓名」。
+    async readStaffRegistrationRoster(code){
+      return callEngagementFunction('readStaffRegistrationRoster',{code:String(code||'').trim().toUpperCase()},30000);
+    },
     async listRegistrationsForAdmin(code){
       const q = fx.collection(dbHandle, "tournaments", code, "registrations");
       const snap = await fx.getDocs(q);
@@ -3961,3 +3964,4 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
