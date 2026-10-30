@@ -1,7 +1,7 @@
 name: Staff roster read permissions
 on:
   pull_request:
-    paths: ['staff-roster/**', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/community-host-roster-sync.test.cjs', 'tests/staff-roster-cache.test.cjs', 'tests/staff-registration-tab.test.cjs', 'tests/staff-checkin-actions.test.cjs', '.github/workflows/staff-roster-sync.yml']
+    paths: ['staff-roster/**', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/community-host-roster-sync.test.cjs', 'tests/staff-roster-cache.test.cjs', 'tests/staff-registration-tab.test.cjs', 'tests/staff-checkin-actions.test.cjs', 'tests/staff-promotion-actions.test.cjs', '.github/workflows/staff-roster-sync.yml']
 permissions:
   contents: read
 jobs:
@@ -15,6 +15,6 @@ jobs:
       - run: node --check staff-roster/functions/index.js
       - run: node --check modules/main-app/core.js
       - run: node --check modules/cloud/cloud-runtime.js
-      - run: node --test tests/staff-checkin-actions.test.cjs
+      - run: node --test tests/staff-checkin-actions.test.cjs tests/staff-promotion-actions.test.cjs
       - run: node tests/staff-registration-tab.test.cjs
       - run: node --test staff-roster/*.test.cjs tests/staff-roster-cache.test.cjs tests/community-host-roster-sync.test.cjs tests/roster-view.test.cjs tests/roster-recovery.test.cjs tests/seated-roster-promotion.test.cjs
