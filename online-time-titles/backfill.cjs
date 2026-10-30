@@ -43,6 +43,10 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
         tx.get(db.doc('systemSettings/engagement')),...defRefs.map(ref=>tx.get(ref))
       ]);
       if(!D.eligible(user.data()))return {status:'ineligible'};
+      // The frozen collection contains every account present at the cutoff.
+      // An account created afterwards has no historical time to recover; use
+      // Firestore document metadata, never a client-controlled profile field.
+      const postCutoverAccount=p.partial&&D.milliseconds(user.createTime)>p.cutover;
       const old=stats.data()||{},oldTotal=D.integer(old.officialOnlineTimeMs??0,'stored-total');
       if(old.onlineTimeTrackedFrom!=null&&old.onlineTimeTrackedFrom!==p.liveStartAt)throw Error('online-time-activation-changed');
       const flags=settings.data()||{},base={confirmedTitleIds:old.onlineTimeConfirmedTitleIds||[],
@@ -59,8 +63,9 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
           :`activityOnlineDaily/${date}/players/${uid}`))));
       let historicalMs=0,presentDays=0;
       const evidence=p.dates.map((date,i)=>{
-        if(p.partial&&i===p.dates.length-1&&!days[i].exists)throw Error('cutover-checkpoint-missing');
+        if(p.partial&&i===p.dates.length-1&&!days[i].exists&&!postCutoverAccount)throw Error('cutover-checkpoint-missing');
         if(!days[i].exists)return {date,missing:true};
+        if(postCutoverAccount)throw Error('post-cutover-account-has-historical-source');
         const row=days[i].data();
         const isCheckpoint=p.partial&&i===p.dates.length-1;
         if(row.uid!==uid||row.dateKey!==date||
@@ -77,6 +82,7 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
       }
       if(dryRun)return {status:'dry-run',uid,batchId:p.batchId,cutoverAt:p.cutover,liveStartAt:p.liveStartAt,
         historicalMs,totalMs:total,presentDays,missingDays:p.dates.length-presentDays,evidence,
+        postCutoverAccount,
         qualifyingTitleIds:D.DEFINITIONS.filter(d=>total>=d.targetValue*D.MINUTE).map(d=>d.id)};
       for(const [i,definition] of D.DEFINITIONS.entries()){
         if(!defs[i].exists){
@@ -92,7 +98,7 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
         onlineTimeBackfillBatchId:p.batchId,onlineTimeTrackedFrom:p.liveStartAt,onlineTimeUpdatedAt:now},{merge:true});
       tx.create(receiptRef,{uid,batchId:p.batchId,strategy:'C-once-v1',cutoverAt:p.cutover,liveStartAt:p.liveStartAt,
         historyStartDate:config.data().historyStartDate,historicalMs,presentDays,missingDays:p.dates.length-presentDays,
-        source:'activityOnlineDaily.activeMs',evidence,
+        source:'activityOnlineDaily.activeMs',postCutoverAccount,evidence,
         evidenceSha256:createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),completedAt:now});
       return {...base,status:'completed',historicalMs,totalMs:total,presentDays,missingDays:p.dates.length-presentDays};
     });

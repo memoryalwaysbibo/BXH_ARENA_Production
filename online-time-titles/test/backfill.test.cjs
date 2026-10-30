@@ -100,3 +100,26 @@ test('historical cutoff and real live activation stay separate without manufactu
   assert.equal(f.db.read('onlineTimeTitleBackfills/alice').liveStartAt,liveStart);
   assert.throws(()=>plan({...CONFIG,historyCutoffAt:T+1},T+1000),/live-start-before-history-cutoff/);
 });
+test('accounts created after the frozen cutoff receive zero history with server creation proof',async()=>{
+  const cutover=Date.parse('2026-10-30T23:00:00+08:00'),liveStart=cutover+2*D.HOUR;
+  const cfg={...CONFIG,historyCutoffAt:cutover,startAt:liveStart,cutoverEvidenceSchema:'frozen-daily-v1'};
+  const f=fixture({'users/alice':{active:true,createdAt:cutover-1},
+    'systemSettings/onlineTimeTitles':cfg,
+    'activityOnlineDaily/2026-10-29/players/alice':undefined,
+    'activityOnlineDaily/2026-10-30/players/alice':undefined});
+  const original=f.db.runTransaction.bind(f.db);
+  f.db.runTransaction=fn=>original(tx=>fn({...tx,get:async ref=>{
+    const snap=await tx.get(ref);
+    return ref.path==='users/alice'?Object.assign(snap,{createTime:{toMillis:()=>cutover+1}}):snap;
+  }}));
+  const run=createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>liveStart+1});
+  const preview=await run('alice',{dryRun:true});
+  assert.equal(preview.postCutoverAccount,true);
+  assert.equal(preview.historicalMs,0);
+  await run('alice');
+  assert.equal(f.db.read('onlineTimeTitleBackfills/alice').postCutoverAccount,true);
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,0);
+  const g=fixture({'systemSettings/onlineTimeTitles':cfg,'users/alice':{active:true,createdAt:liveStart}});
+  await assert.rejects(createBackfill(g.db,{awardTitle:g.awardTitle,clock:()=>liveStart+1})('alice'),/checkpoint-missing/);
+  assert.equal(g.db.commits,0);
+});
