@@ -5771,6 +5771,7 @@ function titleConditionMeta(t){
     best_placement:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽最終名次計入。',task:`BXH 官方積分賽最佳名次達第 ${target} 名或更佳`},
     hosted_tournaments:{category:'event',label:'主辦成就',scope:'依系統認定且完成結算的 BXH 賽事主辦紀錄計入。',task:`成功完成主辦 ${target} 場 BXH 賽事`},
     first_match_exit_streak:{category:'fun',label:'賽事趣味成就',scope:'一般與官方賽事皆計入；首場實際對戰落敗且出局才計次，種子與輪空不算勝場。實際獲勝中斷連續紀錄；取消、未到與未對戰棄權不計次。取得後永久持有。',task:target===1?'完成 1 場賽事首戰出局':`連續 ${target} 場賽事首戰出局`},
+    total_online_minutes:{category:'activity',label:'在線時間',scope:'沿用有效在線心跳紀錄，跨日累積、沒有每日時數上限；活躍積分每日上限不影響稱號進度。',task:`累積有效在線 ${target/60} 小時`},
     total_checkins:{category:'activity',label:'每日簽到',scope:'由 BXH ARENA 每日簽到紀錄累積；與賽事報到完全分離。',task:`累積完成 ${target} 天每日簽到`},
     checkin_streak:{category:'activity',label:'每日簽到',scope:'依 BXH ARENA 連續每日簽到紀錄計算；中斷後重新累積。',task:`連續完成 ${target} 天每日簽到`},
     pioneer_registration:{category:'special',label:'封測限定',scope:'以 Firebase 帳號建立時間判定：台灣時間 2026/9/21 23:59 前註冊，不限人數。',task:'於 2026/9/21 23:59 前建立帳號；自動授予，逾期仍可補領'},
@@ -5787,6 +5788,7 @@ function titleGalleryProgressText(t,got){
   const progress=t&&t.progress||null;
   const current=Math.max(0,Number(progress&&progress.currentValue||0));
   const target=Math.max(1,Number(t&&t.targetValue||1));
+  if(t&&t.conditionType==='total_online_minutes')return (Math.floor(current/6)/10)+'／'+(target/60)+' 小時';
   if(t&&t.conditionType!=='first_match_exit_streak')return current+'／'+target;
   if(!progress||!Number(progress.updatedAt))return '連續紀錄尚未核對';
   const best=Math.max(current,Number(progress.bestValue||0));
