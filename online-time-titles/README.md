@@ -62,10 +62,10 @@ node online-time-titles/install.cjs CAPTURED_BACKEND_SOURCE NEW_CANDIDATE_DIRECT
 
 `backfill.cjs` 是僅供可信 Admin SDK 執行的內部服務，未暴露 HTTP／callable，沒有部署或寫入正式資料。
 
-- 全服使用同一個明確交接時間 `startAt`，必須為已到達的台灣午夜。不得將測試日期當正式啟用日期。
+- 使用者指定 2026-10-30 台灣時間 23:00 為歷史回補截止點；同一時刻作為新計時 `startAt`。23:00 不是午夜，因此當天資料必須有可信的固定截止紀錄 `onlineTimeTitleCutovers/{batchId}/players/{uid}`，含 `uid`、`dateKey`、`cutoverAt`、`sourceSchema: frozen-daily-v1`、`activeMs`。回補服務要求 `cutoverEvidenceSchema: frozen-daily-v1`，缺紀錄即拒絕，絕不在之後直接讀取可變動的 10/30 每日欄位當 23:00 快照。此固定紀錄的產生與正式可信度核對尚未完成，不能宣稱可以回補 10/30 的 23:00 前時數。
 - 設定 `migrationStrategy: C-once-v1`、`backfillEnabled: true`、固定 `backfillBatchId` 與 `historyStartDate`。歷史起日須依實際保存範圍盤點決定；單次最多 366 日，超過必須另行設計，不能截短。
 - 逐日讀取 `activityOnlineDaily/{YYYY-MM-DD}/players/{uid}.activeMs`，核對 UID、日期、非負整數與每日三小時上限。保留實際已記錄的不足半小時部分，避免將積分入帳延遲當作時數遺失。不從總積分或其他任務推算。
-- 歷史範圍為起日到交接前一天；當天及後續完全由新計時處理。新心跳橫跨交接時間時，只計交接後部分。
+- 歷史範圍為起日至 10/29 每日在線紀錄，加上 10/30 的 23:00 固定紀錄；之後完全由新計時處理。新心跳橫跨交接時間時，只計交接後部分。若新計時沒有在 23:00 起取得連續可靠的在線事件，缺口不得自動推算補入。
 - 每帳號 `onlineTimeTitleBackfills/{uid}` 固定收據，保留批次、界線、每日證據、雜湊、實存天數及缺漏天數。完成後不再補入後來變動的舊資料；改批次或起日也不能第二次加時。
 - 同一交易合併歷史時數到 `officialOnlineTimeMs`，並保留 `onlineTimeHistoricalMs`；與新計時並發透過交易重試保留兩者。其他玩家統計、每日任務與積分不變。
 - 回補後更新稱號進度並沿用原生授予；授予失敗可重跑，歷史時數不會再加一次。

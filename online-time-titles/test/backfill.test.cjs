@@ -56,9 +56,26 @@ test('invalid source, corrupt counters, marker drift and ineligible users cannot
   const f=fixture({'playerStats/alice':{onlineTimeHistoricalMs:1}});await assert.rejects(f.run('alice'),/marker-without-receipt/);
   const g=fixture({'users/alice':{active:false}});assert.equal((await g.run('alice')).status,'ineligible');assert.equal(g.db.commits,0);
 });
-test('cutover requires an explicit reached Taipei midnight and bounded valid history dates',()=>{
+test('cutover requires an explicit reached instant and bounded valid history dates',()=>{
   for(const change of [{startAt:T+1},{startAt:T+86400000},{historyStartDate:'2026-02-30'},{historyStartDate:'2026-11-01'},{historyStartDate:'2020-01-01'},{backfillEnabled:false},{migrationStrategy:'B'}])assert.throws(()=>plan({...CONFIG,...change},T+1000));
   assert.deepEqual(plan(CONFIG,T+1000).dates,['2026-10-29','2026-10-30','2026-10-31']);
+});
+test('23:00 cutover requires a frozen partial-day checkpoint, never a later mutable daily row',async()=>{
+  const at=Date.parse('2026-10-30T23:00:00+08:00');
+  const cfg={...CONFIG,startAt:at,cutoverEvidenceSchema:'frozen-daily-v1'};
+  assert.deepEqual(plan(cfg,at+1).dates,['2026-10-29','2026-10-30']);
+  const f=fixture({'systemSettings/onlineTimeTitles':cfg,
+    'activityOnlineDaily/2026-10-30/players/alice':{uid:'alice',dateKey:'2026-10-30',activeMs:3*D.HOUR}});
+  const run=createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>at+1});
+  await assert.rejects(run('alice'),/checkpoint-missing/);
+  assert.equal(f.db.commits,0);
+  f.db.put('onlineTimeTitleCutovers/test-cutover/players/alice',{
+    uid:'alice',dateKey:'2026-10-30',cutoverAt:at,sourceSchema:'frozen-daily-v1',activeMs:45*D.MINUTE});
+  const result=await run('alice');
+  assert.equal(result.historicalMs,225*D.MINUTE);
+  const live=createService(f.db,{awardTitle:f.awardTitle});
+  await live(event(at-30000,at+30000));
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE+30000);
 });
 test('dry run previews evidence and eligible titles without enabling migration or writing anything',async()=>{
   const f=fixture({'systemSettings/onlineTimeTitles':{...CONFIG,backfillEnabled:false}});

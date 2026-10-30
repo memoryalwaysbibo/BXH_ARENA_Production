@@ -15,10 +15,14 @@ function plan(config,now,{dryRun=false}={}){
   if(config.migrationStrategy!=='C-once-v1'||config.sourceSchema!=='lastSeenAt-v1')throw Error('invalid-migration-strategy');
   if(typeof config.backfillBatchId!=='string'||! /^[A-Za-z0-9_-]{1,80}$/.test(config.backfillBatchId))throw Error('invalid-backfill-batch');
   const cutover=D.integer(config.startAt,'cutover');
-  if(cutover<=0||(cutover+OFFSET)%DAY!==0||(!dryRun&&cutover>now))throw Error('cutover-must-be-reached-taipei-midnight');
-  const start=dateMs(config.historyStartDate),count=(cutover-start)/DAY;
+  if(cutover<=0||(!dryRun&&cutover>now))throw Error('cutover-not-reached');
+  const start=dateMs(config.historyStartDate),count=Math.ceil((cutover-start)/DAY);
   if(!Number.isInteger(count)||count<1||count>MAX_DAYS)throw Error('invalid-history-window');
-  return {cutover,batchId:config.backfillBatchId,dates:Array.from({length:count},(_,i)=>new Date(start+i*DAY+OFFSET).toISOString().slice(0,10))};
+  const partial=(cutover+OFFSET)%DAY!==0;
+  // A day's current tracker is mutable after 23:00. Never use it as evidence
+  // for the partial day; require an immutable server-side cutoff checkpoint.
+  if(partial&&config.cutoverEvidenceSchema!=='frozen-daily-v1')throw Error('partial-day-checkpoint-required');
+  return {cutover,partial,batchId:config.backfillBatchId,dates:Array.from({length:count},(_,i)=>new Date(start+i*DAY+OFFSET).toISOString().slice(0,10))};
 }
 // Internal Admin SDK operation only. No HTTP/callable export, no client hours,
 // no total point conversion. Enumerate every configured day, including gaps.
@@ -47,16 +51,23 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
         return {...base,status:'already-completed',totalMs:oldTotal,historicalMs:saved.historicalMs};
       }
       if(old.onlineTimeHistoricalMs!=null||old.onlineTimeBackfillBatchId!=null)throw Error('historical-marker-without-receipt');
-      const days=await Promise.all(p.dates.map(date=>tx.get(db.doc(`activityOnlineDaily/${date}/players/${uid}`))));
+      const days=await Promise.all(p.dates.map((date,i)=>tx.get(db.doc(
+        p.partial&&i===p.dates.length-1
+          ?`onlineTimeTitleCutovers/${p.batchId}/players/${uid}`
+          :`activityOnlineDaily/${date}/players/${uid}`))));
       let historicalMs=0,presentDays=0;
       const evidence=p.dates.map((date,i)=>{
+        if(p.partial&&i===p.dates.length-1&&!days[i].exists)throw Error('cutover-checkpoint-missing');
         if(!days[i].exists)return {date,missing:true};
         const row=days[i].data();
-        if(row.uid!==uid||row.dateKey!==date)throw Error('historical-source-mismatch');
+        const isCheckpoint=p.partial&&i===p.dates.length-1;
+        if(row.uid!==uid||row.dateKey!==date||
+           (isCheckpoint&&(row.cutoverAt!==p.cutover||row.sourceSchema!=='frozen-daily-v1')))
+          throw Error('historical-source-mismatch');
         const activeMs=D.integer(row.activeMs,'historical-active-ms');
         if(activeMs>3*D.HOUR)throw Error('historical-daily-cap-exceeded');
         historicalMs=D.totalAfter(historicalMs,activeMs);presentDays++;
-        return {date,activeMs};
+        return {date,activeMs,...(isCheckpoint?{checkpoint:true}:{} )};
       });
       const total=D.totalAfter(oldTotal,historicalMs),now=clock(),minutes=Math.floor(total/D.MINUTE);
       for(const [i,definition] of D.DEFINITIONS.entries()){
