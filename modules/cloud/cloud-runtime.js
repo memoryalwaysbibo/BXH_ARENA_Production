@@ -2198,6 +2198,12 @@
         ? {...item,createdByName:names[item.createdBy]} : item);
     },
 
+    // One explicit request returns five projected summaries. Never fall back to
+    // downloading full tournament documents if the new backend is unavailable.
+    async queryAdminTournamentSummaries(payload){
+      return callEngagementFunction("listManagementTournamentSummaries",payload,10000);
+    },
+
     // v13.13.4：玩家「已報名」改為「先列出公開賽事，再逐場 get 自己的 registration」。
     // 原本使用 collectionGroup('registrations') + where(uid==currentUid)，在正式 Firestore
     // 環境可能因 collection-group 索引/Rules 查詢可證明性而直接拋出 failed-precondition
