@@ -29,7 +29,7 @@ before(async()=>{
    const pathname=new URL(req.url,'http://127.0.0.1').pathname;
    if(req.method!=='GET'||!allowed.has(pathname)){res.writeHead(404).end();return;}
    res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
-   res.setHeader('Content-Type',pathname.endsWith('.html')?'text/html; charset=utf-8':pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript':pathname.endsWith('.json')?'application/json':'image/webp');
+   res.setHeader('Content-Type',pathname.endsWith('.html')?'text/html; charset=utf-8':pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript':pathname.endsWith('.json')?'application/json':pathname.endsWith('.png')?'image/png':'image/webp');
    if(pathname===dataPath){pendingRequests++;if(mode==='error'){res.writeHead(503).end();return;}if(mode==='stale'){res.end('{}');return;}}
    res.end(fs.readFileSync(path.join(ROOT,pathname)));
   });
@@ -151,10 +151,10 @@ test('manual image handoff reports success only after exact template copy',()=>s
 
 test('missing-image filter composes with series/search, preserves handoff and resets',()=>scenario('missing-image filter',async page=>{
  await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);await page.waitForFunction(()=>!document.getElementById('pending-image-filter').disabled);
- await page.selectOption('#pending-image-filter','missing');assert.equal(await page.locator('.pending-card').count(),285-candidateCount);assert.match(await page.locator('#pending-count').innerText(),/顯示 63／63 筆待補圖/);
- assert.equal(await page.locator('.pending-card img').count(),0);assert.equal(await page.locator('.manual-image-handoff').count(),63);
- await page.selectOption('#pending-series','BX');assert.equal(await page.locator('.pending-card').count(),1);assert.match(await page.locator('.pending-card').innerText(),/BX-54/);
- await page.fill('#pending-search','BX-01');assert.equal(await page.locator('.pending-card').count(),0);assert.match(await page.locator('#pending-count').innerText(),/顯示 0／63/);
+ await page.selectOption('#pending-image-filter','missing');assert.equal(await page.locator('.pending-card').count(),285-candidateCount);assert.match(await page.locator('#pending-count').innerText(),/顯示 0／0 筆待補圖/);
+ assert.equal(await page.locator('.pending-card img').count(),0);assert.equal(await page.locator('.manual-image-handoff').count(),0);
+ await page.selectOption('#pending-series','BX');assert.equal(await page.locator('.pending-card').count(),0);assert.match(await page.locator('#pending-results').innerText(),/沒有符合/);
+ await page.fill('#pending-search','BX-01');assert.equal(await page.locator('.pending-card').count(),0);assert.match(await page.locator('#pending-count').innerText(),/顯示 0／0/);
  await page.click('[data-catalog-view="verified"]');await page.goBack();assert.equal(await page.locator('#pending-image-filter').inputValue(),'missing');assert.equal(await page.locator('#pending-search').inputValue(),'BX-01');
  await page.click('#pending-reset');assert.equal(await page.locator('#pending-image-filter').inputValue(),'all');assert.equal(await page.locator('.pending-card').count(),285);
 }));
@@ -163,10 +163,27 @@ test('candidate delay and failure leave missing-image classification unavailable
  await page.route('**/candidate-images.*.json',async route=>{await wait;await route.fulfill({status:503,body:''});});
  await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);assert.equal(await page.locator('#pending-image-filter').isDisabled(),true);assert.match(await page.locator('.pending-image-placeholder').first().innerText(),/尚未確認/);assert.doesNotMatch(await page.locator('#pending-count').innerText(),/待補圖 285/);assert.equal(await page.locator('.manual-image-handoff').count(),0);
  release();await page.locator('#candidate-retry').waitFor({state:'visible'});assert.equal(await page.locator('#pending-image-filter').isDisabled(),true);assert.match(await page.locator('#candidate-status').innerText(),/待補圖篩選暫不可用/);
- await page.unroute('**/candidate-images.*.json');await page.click('#candidate-retry');await page.waitForFunction(()=>!document.getElementById('pending-image-filter').disabled);await page.selectOption('#pending-image-filter','missing');assert.equal(await page.locator('.pending-card').count(),63);
+ await page.unroute('**/candidate-images.*.json');await page.click('#candidate-retry');await page.waitForFunction(()=>!document.getElementById('pending-image-filter').disabled);await page.selectOption('#pending-image-filter','missing');assert.equal(await page.locator('.pending-card').count(),0);
 }));
 for(const width of [1280,375])test('missing-image filter is readable and usable at '+width,()=>scenario('missing-image visual '+width,async page=>{
- await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);await page.waitForFunction(()=>!document.getElementById('pending-image-filter').disabled);await page.selectOption('#pending-image-filter','missing');await page.fill('#pending-search','BXA-03');assert.equal(await page.locator('.pending-card').count(),2);
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);await page.waitForFunction(()=>!document.getElementById('pending-image-filter').disabled);await page.selectOption('#pending-image-filter','missing');await page.fill('#pending-search','BXA-03');assert.equal(await page.locator('.pending-card').count(),0);await page.selectOption('#pending-image-filter','all');assert.equal(await page.locator('.pending-card').count(),2);
  await page.locator('.manual-image-handoff summary').first().click();assert.match(await page.locator('.manual-image-handoff textarea').first().inputValue(),/supplied_20261014_0280/);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);await page.locator('#pending-image-filter').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'missing-image-filter-'+width+'.png'),fullPage:false});
+},{width,height:900}));
+
+for(const width of [1280,375])test('BX54 supplied PNG source and rights remain provisional at '+width,()=>scenario('BX54 supplied image '+width,async page=>{
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);await page.waitForFunction(()=>!document.getElementById('pending-image-filter').disabled);await page.fill('#pending-search','BX-54');
+ assert.equal(await page.locator('.pending-card').count(),1);assert.equal(await page.locator('.pending-card').getAttribute('data-supplied-id'),'supplied_20261014_0085');
+ const img=page.locator('.pending-card img');await img.scrollIntoViewIfNeeded();await img.evaluate(async e=>{await e.decode();if(e.naturalWidth!==600||e.naturalHeight!==600)throw Error('Wrong original dimensions');});
+ assert.match(await page.locator('.pending-card').innerText(),/使用者提供候選圖/);assert.match(await page.locator('.pending-card').innerText(),/圖片權利待核/);assert.equal(await page.locator('.candidate-image a').getAttribute('href'),'https://www.yodobashi.com/product/100000001010262959/');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);await page.screenshot({path:path.join(output,'bx54-user-image-'+width+'.png'),fullPage:false});
+ await page.selectOption('#pending-image-filter','missing');assert.equal(await page.locator('.pending-card').count(),0);assert.match(await page.locator('#pending-count').innerText(),/待補圖 0/);
+},{width,height:900}));
+
+for(const width of [1280,375])test('October16 references decode, retain individual duplicate-code images and provisional labels at '+width,()=>scenario('October16 image batch '+width,async page=>{
+ const audit=JSON.parse(fs.readFileSync(path.join(ROOT,'docs/bey-catalog/CANDIDATE_IMAGE_RESEARCH_20261016.json'))).entries;
+ await page.goto(base+'/bey-catalog.html?view=pending');await ready(page);await page.waitForFunction(()=>!document.getElementById('pending-image-filter').disabled);
+ for(const a of audit){const card=page.locator('[data-supplied-id="'+a.suppliedId+'"]');const img=card.locator('img');await img.scrollIntoViewIfNeeded();await page.waitForFunction(id=>{const img=document.querySelector('[data-supplied-id="'+id+'"] img');return img&&img.complete&&img.naturalWidth>0;},a.suppliedId);await img.evaluate(async e=>{await e.decode();if(!e.naturalWidth||!e.naturalHeight)throw Error('Empty candidate');});assert.match(await card.innerText(),/同商品參考圖/);assert.equal(await card.locator('.candidate-image a').getAttribute('href'),a.sourceURL);}
+ await page.fill('#pending-search','BXA-03');assert.equal(await page.locator('.pending-card img').count(),2);assert.equal(new Set(await page.locator('.pending-card img').evaluateAll(imgs=>imgs.map(e=>e.src))).size,2);await page.waitForFunction(()=>[...document.querySelectorAll('.pending-card img')].every(img=>img.complete&&img.naturalWidth>0));await page.locator('.pending-card img').evaluateAll(async imgs=>{await Promise.all(imgs.map(img=>img.decode()));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);await page.screenshot({path:path.join(output,'oct16-references-'+width+'.png'),fullPage:false});
 },{width,height:900}));
