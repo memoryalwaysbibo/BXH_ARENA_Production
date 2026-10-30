@@ -2,7 +2,7 @@ name: Online time artwork preview
 on:
   pull_request:
     paths:
-      - 'assets/title-common-online-time-1h-v1.*'
+      - 'assets/title-*-online-time-*-v1.*'
       - 'modules/main-app/title-utils.js'
       - 'modules/main-app/core.js'
       - 'ladder-secondary-ui.js'
