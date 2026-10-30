@@ -21,7 +21,7 @@ function harness(overrides={}){
  ctx.window.cloudSync={connect:async()=>true,subscribeRegistrationsForAdmin:(code,next,error)=>{calls.subscribe.push({code,next,error});return ()=>{calls.unsub++;};},syncCommunityRegistrationSummary:async()=>{calls.catchup++;return {ok:true,communityParticipantCount:2};},joinRoom:async()=>{calls.read++;return {ok:true,data:clone(ctx.remote)};},getPublicTournamentFull:async()=>{calls.publicRead++;return {};},listRegistrationsForAdmin:async()=>{calls.list++;return [];}};
  vm.runInContext(domain,ctx);Object.assign(ctx,ctx.window.BXHDomainUtils);
  vm.runInContext(block('let communityRoomSnapshotGeneration=0;','let remoteAppliedRoomId=null'),ctx);
- for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','applyRemoteState'])vm.runInContext(fn(name),ctx);
+ for(const name of ['bxhOfficialStaffManager','isBXHOfficialStaffManager','hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','applyRemoteState'])vm.runInContext(fn(name),ctx);
  vm.runInContext(block('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;','let myRegistrationsError = null;'),ctx);
  vm.runInContext(fn('syncLatestOnlineRosterBeforeLock'),ctx);
  vm.runInContext('globalThis.drainRoster=()=>adminRosterSyncChain;globalThis.rosterCode=()=>adminRosterCode;',ctx);
@@ -341,10 +341,10 @@ test('a delayed manual query cannot replace registrations already advanced by th
 function staffHarness(){
  const h=harness(),{ctx}=h;
  ctx.userProfile={role:'staff',active:true};ctx.currentRole='admin';ctx.appPhase='app';ctx.activeTab='people';
- ctx.state.meta.eventAuthority='official';ctx.state.meta.assignedStaffUids=['other-staff'];ctx.staffRosterCache=null;
+ ctx.state.createdByRole='partner_organizer';ctx.state.meta.eventAuthority='official';ctx.state.meta.assignedStaffUids=['other-staff'];ctx.staffRosterCache=null;
  return h;
 }
-test('unassigned official staff sync a limited display without opening private registrations or saving state',async()=>{
+test('legacy partner readonly staff sync a limited display without opening private registrations or saving state',async()=>{
  const {ctx,calls}=staffHarness(),before=clone(ctx.state);
  const rows=[{name:'選手甲',status:'confirmed',checkedIn:true}];let reads=0;
  ctx.window.cloudSync.readStaffRegistrationRoster=async()=>{reads++;return {ok:true,code:'ROOM-A',rows};};
@@ -392,5 +392,6 @@ test('staff roster screen escapes player names and offers only a read action, in
  const handle=block('function handleAction(action, target){','  if(action.startsWith(\'card-\'))');
  assert(handle.indexOf("action==='load-staff-registration-roster'")<handle.indexOf("state.entrySelection?.status==='drawn'"));
 });
+
 
 

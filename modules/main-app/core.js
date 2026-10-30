@@ -5914,6 +5914,7 @@ const ADMIN_TIER_ONLY_ACTIONS = new Set([
   "ai-create-suggestion-toggle","ai-create-suggestion-select-all","ai-create-suggestion-apply",
   "event-template-toggle","event-template-refresh","event-template-edit","event-template-cancel","event-template-save"
 ]);
+const BXH_OFFICIAL_STAFF_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result"]);
 const TESTER_TIER_ACTIONS = new Set(["set-scoring-mode","set-round-scoring-mode","correct-quick-result"]);
 const TESTER_CREATION_ACTIONS = new Set(["new-tournament-blank"]);
 const TOURNAMENT_LIVE_OPERATOR_ACTIONS = new Set([
@@ -5995,7 +5996,15 @@ function testSandboxBannerHtml(st=state){
   return `<div class="banner warn test-sandbox-banner"><span><b>封測沙盒（測試）</b>｜所有新增與操作皆為測試資料，不會進入正式天梯；預計 ${esc(label)} 自動清除。</span></div>`;
 }
 function canOperateCurrentTournament(){ return (hasAdminAccess() && (!isTester() || isOwnTestTournament())) || (hasPrivilegedTournamentProfile() && !isCommunityRoom()) || isCommunityRoomOwner(); }
-function canConfigureCurrentTournament(){ return isAdminTierOrAbove() || isOwnTestTournament() || isCommunityRoomOwner(); }
+function isBXHOfficialStaffManager(st=state){
+  return bxhOfficialStaffManager(userProfile,currentAuthUid(),{...st,eventAuthority:st?.meta?.eventAuthority});
+}
+function bxhOfficialStaffManager(user,uid,room){
+ return !!uid&&user?.active===true&&user.role==='staff'&&user.isTestAccount!==true&&!user.deleted&&
+  !['deleted','disabled','frozen'].includes(user.accountStatus)&&room?.eventAuthority==='official'&&
+  room.testMode!==true&&room.createdByRole!=='partner_organizer'&&!room.partnerOrganizationCode&&!room.partnerContractOrderCode;
+}
+function canConfigureCurrentTournament(){ return isBXHOfficialStaffManager() || isAdminTierOrAbove() || isOwnTestTournament() || isCommunityRoomOwner(); }
 function canJoinCloudRoom(){ return currentRole === "admin" || currentRole === "guest" || currentRole === "player"; }
 function isSuperAdmin(){ return !!(userProfile && userProfile.active!==false && userProfile.isTestAccount!==true && userProfile.role==="super_admin"); }
 function canLinkGoogleAccount(){
@@ -6035,6 +6044,7 @@ function canManageRefereeSeats(st=state){
   if(isPartnerRefereeSeatRoom(st)&&!PARTNER_REFEREE_SEATS_ROLLOUT)return false;
   if(userProfile?.active!==true||userProfile?.isTestAccount===true||userProfile?.deleted===true||['deleted','disabled','frozen'].includes(userProfile?.accountStatus)||st?.meta?.refereeSeatAccessRevoked)return false;
   if(isAdminTierOrAbove())return true;
+  if(isBXHOfficialStaffManager(st))return true;
   if(st?.createdBy!==currentAuthUid())return false;
   if(userProfile?.role==='staff')return true;
   const grant=partnerOrganizerGrant();
@@ -6057,7 +6067,7 @@ function canJoinRefereeSeats(st=state){
     &&Array.isArray(assignment.duties)&&assignment.duties.some(duty=>duty==='referee'||duty==='head_referee');
 }
 function canManageRefereeStationAssignments(){
-  return isAdminTierOrAbove() || isOwnTestTournament() || (isStaffTier() && isCurrentOfficialTournamentCreator());
+  return isBXHOfficialStaffManager() || isAdminTierOrAbove() || isOwnTestTournament() || (isStaffTier() && isCurrentOfficialTournamentCreator());
 }
 function refereeStationAssignmentsMap(st=state){
   const m=st&&st.meta&&st.meta.refereeStationAssignments;
@@ -6086,7 +6096,7 @@ function canOperateStation(stationNum, st=state){
   if(isCommunityRoomOwner()) return true;
   if(isOwnTestTournament(st)) return true;
   if(isTester()) return false;
-  if(isAdminTierOrAbove()) return true;
+  if(isAdminTierOrAbove()||isBXHOfficialStaffManager(st)) return true;
   if(st?.meta?.refereeSeatsV1?.version===1) return canManageRefereeSeats(st)||(canJoinRefereeSeats(st)&&!!window.BXHRefereeSeats?.canScore(st,stationNum,currentAuthUid()));
   if(isPartnerOrganizerMode()&&isCurrentOfficialTournamentCreator()) return true;
   if(!isStaffTier()) return hasAdminAccess();
@@ -12087,6 +12097,7 @@ function renderTeamAdminRegistrations(list,registrationLocked){
 }
 
 function renderAdminRegistrationsTab(){
+  if(staffRosterReadOnly())return renderStaffRegistrationRoster();
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
     return `<div class="panel">
@@ -12101,17 +12112,17 @@ function renderAdminRegistrationsTab(){
   if(!code){
     return `<div class="panel"><div class="empty-state">此賽事尚未同步至雲端，無法管理線上報名。</div></div>`;
   }
-  if(adminRegistrationsCache===null){
-    if(!adminRegistrationsLoading){
-      setTimeout(()=>{ handleAction("load-admin-registrations", {getAttribute:()=>null}); }, 0);
-    }
-    return `<div class="panel"><div class="empty-state">正在讀取報名名單……</div></div>`;
-  }
   if(adminRegistrationsError){
     return `<div class="panel">
       <div class="empty-state"><div class="big">${esc(adminRegistrationsError)}</div></div>
       <div class="btn-row" style="justify-content:center;margin-top:12px;"><button class="btn btn-ghost" data-action="load-admin-registrations">重新整理</button></div>
     </div>`;
+  }
+  if(adminRegistrationsCache===null){
+    if(!adminRegistrationsLoading){
+      setTimeout(()=>{ handleAction("load-admin-registrations", {getAttribute:()=>null}); }, 0);
+    }
+    return `<div class="panel"><div class="empty-state">正在讀取報名名單……</div></div>`;
   }
   const list = adminRegistrationsCache;
   if(state.meta.battleMode==="team") return renderTeamAdminRegistrations(list,registrationLocked);
@@ -12446,7 +12457,7 @@ async function handleEntrySelection(action){
 function canManageOnsiteWaitlist(){
   const user=userProfile,actorId=firebaseUser?.uid;
   if(!actorId||user?.active!==true||user.deleted||['deleted','disabled','frozen'].includes(user.accountStatus)||user.isTestAccount===true)return false;
-  if(['super_admin','admin'].includes(user.role))return true;
+  if(['super_admin','admin'].includes(user.role)||isBXHOfficialStaffManager())return true;
   if(user.role==='player'&&state.meta?.eventAuthority==='community'&&[state.ownerUid,state.createdBy].includes(actorId))return true;
   return ['staff','partner_organizer'].includes(user.role)&&
     ([...(state.assignedStaffUids||[]),...(state.meta?.assignedStaffUids||[])].includes(actorId)||[state.ownerUid,state.createdBy,state.meta?.ownerUid,state.meta?.createdBy].includes(actorId));
@@ -15719,6 +15730,7 @@ let adminRosterSyncChain=Promise.resolve();
 let adminRosterContextKey="";
 let adminRosterManualContext=null;
 function staffRosterReadOnly(){
+  if(isBXHOfficialStaffManager())return false;
   const uid=currentAuthUid(),user=userProfile;
   if(!uid||!['admin','staff'].includes(currentRole)||user?.role!=='staff'||user.active!==true||
     user.isTestAccount===true||user.deleted||['deleted','disabled','frozen'].includes(user.accountStatus)||
@@ -15770,6 +15782,7 @@ function renderStaffRegistrationRoster(){
 }
 function canManageRegistrationRoster(){
   if(!firebaseUser || userProfile?.active===false) return false;
+  if(isBXHOfficialStaffManager())return true;
   if(isCommunityRoomOwner() && state.createdBy===firebaseUser.uid) return true;
   return hasAdminAccess() && (!isTester() || isOwnTestTournament());
 }
@@ -20566,7 +20579,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   const aiCreateTierAllowed = ADMIN_TIER_ONLY_ACTIONS.has(action) && action.startsWith("ai-create-") && aiCreateBetaActorAllowed();
   const staffTemplateAllowed = (action==="event-template-toggle" || action==="event-template-refresh") && canUseBxhStandardTemplate();
-  if(ADMIN_TIER_ONLY_ACTIONS.has(action) && !isAdminTierOrAbove() && !aiCreateTierAllowed && !staffTemplateAllowed && !(isOwnTestTournament() && TESTER_TIER_ACTIONS.has(action)) && !(isCommunityRoomOwner() && COMMUNITY_OWNER_TIER_ACTIONS.has(action))){
+  if(ADMIN_TIER_ONLY_ACTIONS.has(action) && !isAdminTierOrAbove() && !aiCreateTierAllowed && !staffTemplateAllowed && !(isBXHOfficialStaffManager() && BXH_OFFICIAL_STAFF_TIER_ACTIONS.has(action)) && !(isOwnTestTournament() && TESTER_TIER_ACTIONS.has(action)) && !(isCommunityRoomOwner() && COMMUNITY_OWNER_TIER_ACTIONS.has(action))){
     showToast("目前身分沒有此操作權限。", true);
     return;
   }
@@ -25516,4 +25529,5 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 

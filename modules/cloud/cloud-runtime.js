@@ -1,3 +1,8 @@
+function bxhOfficialStaffManager(user,uid,room){
+ return !!uid&&user?.active===true&&user.role==='staff'&&user.isTestAccount!==true&&!user.deleted&&
+  !['deleted','disabled','frozen'].includes(user.accountStatus)&&room?.eventAuthority==='official'&&
+  room.testMode!==true&&room.createdByRole!=='partner_organizer'&&!room.partnerOrganizationCode&&!room.partnerContractOrderCode;
+}
 
   // ▼▼▼ 請將您在 Firebase Console 取得的設定值貼在這裡 ▼▼▼
   const FIREBASE_CONFIG = {
@@ -3531,7 +3536,7 @@ if(testerSession){
           const creator=docData.createdBy||remoteState.createdBy||null;
           const actorIsAdmin=actor.active===true&&actor.isTestAccount!==true&&(actor.role==="admin"||actor.role==="super_admin");
           const eventAuthority=docData.eventAuthority||(remoteState.meta&&remoteState.meta.eventAuthority)||"official";
-          const actorIsCreator=actor.active===true&&actor.isTestAccount!==true&&actor.role==="staff"&&creator===actorUid&&eventAuthority==="official";
+          const actorIsCreator=bxhOfficialStaffManager(actor,actorUid,docData)||(actor.active===true&&actor.isTestAccount!==true&&actor.role==="staff"&&creator===actorUid&&eventAuthority==="official");
           const partnerGrant=actor.partnerOrganizer||{};
           const partnerExpiryRaw=partnerGrant.expiresAtMs||partnerGrant.expiresAt||0;
           const partnerExpiry=Number(partnerExpiryRaw)||Date.parse(String(partnerExpiryRaw))||0;
@@ -3666,7 +3671,7 @@ if(testerSession){
           const creator=docData.createdBy||st.createdBy;
           const admin=actor.isTestAccount!==true&&["super_admin","admin"].includes(actor.role);
           const owner=st.meta?.eventAuthority==="community"&&st.ownerUid===uid;
-          const staff=actor.isTestAccount!==true&&actor.role==="staff"&&creator===uid&&st.meta?.eventAuthority==="official";
+          const staff=bxhOfficialStaffManager(actor,uid,docData)||(actor.isTestAccount!==true&&actor.role==="staff"&&creator===uid&&st.meta?.eventAuthority==="official");
           const tester=(actor.role==="tester"||actor.isTestAccount===true)&&st.testMode===true&&creator===uid&&st.ownerUid===uid;
           const grant=actor.partnerOrganizer||{};
           const partner=actor.role==="player"&&actor.isTestAccount!==true&&creator===uid&&docData.createdByRole==="partner_organizer"&&grant.status==="active"&&Number(grant.expiresAtMs)>Date.now()&&docData.partnerOrganizationCode===grant.organizationId;
@@ -3745,11 +3750,11 @@ if(testerSession){
           const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
             &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
             &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
-          if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && actorUid!==docData.createdBy){
+          if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && !bxhOfficialStaffManager(actor,actorUid,docData) && actorUid!==docData.createdBy){
             const court=docData.refereeSeatsV1.courts?.[String(Number(queueOptions.targetStation||station))];
             if(!["main","backup1","backup2"].some(slot=>court?.[slot]?.uid===actorUid))throw new Error("station-not-assigned");
           }
-          if((actor.role==="staff"||actorIsEventReferee) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
+          if((actor.role==="staff"||actorIsEventReferee) && !bxhOfficialStaffManager(actor,actorUid,docData) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
             const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
             const list=Array.isArray(map[String(Number(queueOptions.targetStation||station))])?map[String(Number(queueOptions.targetStation||station))]:[];
             if(!list.includes(actorUid)) throw new Error("station-not-assigned");
@@ -3871,11 +3876,11 @@ if(testerSession){
               const actorIsEventReferee=actor.active===true&&eventStaffAssignment&&eventStaffAssignment.status==="accepted"
                 &&eventStaffAssignment.targetUid===actorUid&&Array.isArray(eventStaffAssignment.duties)
                 &&eventStaffAssignment.duties.some(duty=>duty==="referee"||duty==="head_referee");
-              if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && actorUid!==docData.createdBy){
+              if(docData.refereeSeatsV1?.version===1 && actor.role==="staff" && !bxhOfficialStaffManager(actor,actorUid,docData) && actorUid!==docData.createdBy){
                 const court=docData.refereeSeatsV1.courts?.[String(Number(auditMeta.station))];
                 if(!["main","backup1","backup2"].some(slot=>court?.[slot]?.uid===actorUid))throw new Error("station-not-assigned");
               }
-              if((actor.role==="staff"||actorIsEventReferee) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
+              if((actor.role==="staff"||actorIsEventReferee) && !bxhOfficialStaffManager(actor,actorUid,docData) && !(docData.refereeSeatsV1?.version===1&&actorUid===docData.createdBy) && docData.refereeStationRestrictionEnabled===true){
                 const map=(docData.refereeStationAssignments&&typeof docData.refereeStationAssignments==="object")?docData.refereeStationAssignments:{};
                 const list=Array.isArray(map[String(Number(auditMeta.station))])?map[String(Number(auditMeta.station))]:[];
                 if(!list.includes(actorUid)) throw new Error("station-not-assigned");
@@ -4013,4 +4018,5 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 
