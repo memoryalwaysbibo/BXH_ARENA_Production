@@ -2,10 +2,11 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../commerce-ui.js'),'utf8');
 function setup(){
- const storage=new Map(),calls=[],listeners={};let uid='buyer',epoch=1,admin=false,fail=false;
+ const storage=new Map(),calls=[],listeners={};let uid='buyer',epoch=1,admin=false,fail=false,grant=null;
  const sandbox={window:{engagementService:{commerce:async p=>{calls.push(JSON.parse(JSON.stringify(p)));if(fail)throw Error('network-timeout');return {ok:true,order:{id:'ORDER_TEST'}};}}},currentAuthUid:()=>uid,get engagementSessionEpoch(){return epoch;},isSuperAdmin:()=>admin,render(){},setTimeout(){},URL,Date,crypto:{randomUUID:()=> 'same-operation'},confirm:()=>true,esc:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{addEventListener:(k,f)=>listeners[k]=f,querySelector:()=>({checked:true})}};
  vm.createContext(sandbox);vm.runInContext(source,sandbox);
- return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setFail:v=>fail=v};
+ sandbox.partnerOrganizerGrant=()=>grant;
+ return {ui:sandbox.window.BXHCommerce,calls,storage,listeners,sandbox,setUid:v=>{uid=v;epoch++;},setAdmin:v=>admin=v,setFail:v=>fail=v,setGrant:v=>grant=v};
 }
 test('pending order retries reuse original operation/payload even after a connection failure',async()=>{
  const t=setup();t.ui.shop();const c=t.ui.context();c.products=[{id:'skin',version:1,purchasable:true,delivery:{kind:'skin'}}];
@@ -60,3 +61,40 @@ test('storefront hides room quota and VIP categories, all-products results and c
  assert.equal(t.calls.length,0);
  c.category='vip';t.ui.shop();assert.equal(c.category,'');
 });
+
+const signedGrant=()=>({scope:'contract',orderCode:'CONTRACT_A',organizationId:'org',startsAtMs:1,expiresAtMs:Date.now()+86400000});
+const quota=(changes={})=>({id:'quota',name:'加購場次',priceTwd:100,version:3,purchasable:true,audience:'signed_organizer',delivery:{kind:'room_quota',quantity:2,durationDays:0},...changes});
+test('partner purchase requires a signed grant and shows only signed-organizer room quotas',async()=>{
+ const t=setup();assert.match(t.ui.partnerQuota(),/限合約有效/);assert.equal(t.calls.length,0);
+ t.setGrant({scope:'manual',orderCode:'MANUAL'});assert.match(t.ui.partnerQuota(),/限合約有效/);
+ t.setGrant(signedGrant());t.ui.partnerQuota();const c=t.ui.context();c.products=[quota(),quota({id:'vip',name:'HIDDEN_VIP',delivery:{kind:'vip'}}),quota({id:'skin',name:'HIDDEN_SKIN',delivery:{kind:'skin'}}),quota({id:'all',name:'INVALID_QUOTA',audience:'all'})];
+ const html=t.ui.partnerQuota();assert.match(html,/加購場次/);assert.match(html,/CONTRACT_A/);assert.match(html,/不會延長原合約期限/);assert.doesNotMatch(html,/HIDDEN_|INVALID_QUOTA/);
+ for(const id of ['vip','skin','all'])await t.ui.handle('commerce-buy',{dataset:{id}});
+ assert.equal(t.calls.length,0);
+ await t.ui.handle('commerce-buy',{dataset:{id:'quota'}});
+ assert.equal(t.calls.length,1);assert.deepEqual(t.calls[0],{action:'create-order',productId:'quota',expectedVersion:3,operationId:'same-operation'});
+});
+test('partner catalog respects readiness and retains pagination when the current page has no quotas',async()=>{
+ const t=setup();t.setGrant(signedGrant());t.ui.partnerQuota();const c=t.ui.context();c.products=[quota({purchasable:false,unavailableReason:'delivery-not-ready'})];c.productId='quota';
+ const detail=t.ui.partnerQuota();assert.match(detail,/交付功能尚未完成驗證/);assert.match(detail,/disabled>建立訂單/);
+ await t.ui.handle('commerce-buy',{dataset:{id:'quota'}});assert.equal(t.calls.length,0);
+ c.productId='';c.products=[];c.productsCursor={sort:50,id:'other'};assert.match(t.ui.partnerQuota(),/載入更多方案/);
+ c.storeOpen=false;assert.match(t.ui.partnerQuota(),/場次購買尚未開放/);
+});
+test('grant changes discard delayed catalog responses and never retry a quota order on another contract',async()=>{
+ const t=setup();t.setGrant(signedGrant());t.ui.partnerQuota();let resolve;
+ t.sandbox.window.engagementService.commerce=()=>new Promise(r=>resolve=r);
+ const pending=t.ui.load('catalog');t.setGrant({...signedGrant(),orderCode:'CONTRACT_B'});
+ resolve({ok:true,products:[quota()],nextCursor:null});await pending;assert.equal(t.ui.context().products,null);
+ t.setGrant(signedGrant());t.ui.partnerQuota();t.ui.context().products=[quota()];
+ t.sandbox.window.engagementService.commerce=async p=>{t.calls.push(p);throw Error('network-timeout');};
+ await t.ui.handle('commerce-buy',{dataset:{id:'quota'}});assert.equal(t.calls.length,1);
+ t.setGrant({...signedGrant(),orderCode:'CONTRACT_B'});t.ui.partnerQuota();await t.ui.handle('commerce-retry',{});
+ assert.equal(t.calls.length,1);assert.match(t.ui.context().error,/所屬合約已變更/);
+ t.setGrant(null);assert.match(t.ui.partnerQuota(),/限合約有效/);assert.equal(t.ui.context().products,null);
+});
+test('partner order navigation reuses owned orders without changing quota or exposing admin controls',()=>{
+ const t=setup();t.setGrant(signedGrant());const html=t.ui.partnerOrders();assert.match(html,/我的訂單/);assert.match(html,/data-tab="management"/);assert.match(html,/data-tab="partner-quota"/);assert.doesNotMatch(html,/核對銀行實際入帳/);
+ const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');assert.match(core,/targetTab\)&&\(!isPartnerOrganizerMode/);assert.match(core,/BXHCommerce\.partnerQuota\(\)/);
+});
+

@@ -7,9 +7,16 @@ const deliveryLabels={not_started:'尚未交付',pending:'交付處理中',faile
 const kinds={room_quota:'開房次數',vip:'VIP 功能',skin:'Skin 外觀',item:'道具'};
 const storefrontKinds=new Set(['skin','item']);
 const storefrontProduct=p=>storefrontKinds.has(p?.delivery?.kind);
+function quotaGrant(){
+ const g=typeof partnerOrganizerGrant==='function'?partnerOrganizerGrant():null;
+ return g?.scope==='contract'&&g.orderCode?g:null;
+}
+function partnerSession(){const g=quotaGrant();return g?JSON.stringify([g.orderCode,g.organizationId,g.startsAtMs??g.startsAt,g.expiresAtMs??g.expiresAt]):'';}
+const quotaProduct=p=>p?.delivery?.kind==='room_quota'&&p.audience==='signed_organizer';
+const visibleProduct=(p,c)=>c.view==='partner-quota'?!!quotaGrant()&&quotaProduct(p):c.view==='shop'&&storefrontProduct(p);
 const storageKey=()=> 'bxh.commerce.pending.v1:'+currentAuthUid();
 function context(){
- const session=currentAuthUid()+':'+engagementSessionEpoch;
+ const session=JSON.stringify([currentAuthUid(),engagementSessionEpoch,typeof activeMode==='undefined'?'':activeMode,partnerSession()]);
  if(!state||state.session!==session){
   let pending=null;try{pending=JSON.parse(sessionStorage.getItem(storageKey())||'null');if(pending?.uid!==currentAuthUid())pending=null;}catch{}
   state={session,products:null,productsCursor:null,orders:null,ordersCursor:null,config:null,capabilities:{},loading:false,busy:false,error:'',success:'',category:'',productId:'',order:null,adminZone:'orders',status:'reported',draft:null,configDraft:null,pending,formDrafts:{},generation:0,storeOpen:null};
@@ -46,7 +53,7 @@ async function mutate(payload){
  const view=c.view;c.busy=true;c.error='';c.success='';render();
  try{
   if(!c.pending){
-   const pending={uid:currentAuthUid(),payload:{...payload,operationId:crypto.randomUUID()}};
+   const pending={uid:currentAuthUid(),contractCode:view==='partner-quota'?quotaGrant()?.orderCode:null,payload:{...payload,operationId:crypto.randomUUID()}};
    try{sessionStorage.setItem(storageKey(),JSON.stringify(pending));}catch{throw Error('storage-unavailable');}c.pending=pending;
   }
   const r=await call(c.pending.payload);if(c!==context())return;
@@ -76,6 +83,20 @@ function shop(){
  else body=`<button class="btn btn-ghost" data-action="commerce-categories">返回商品分類</button><h3>${esc(kinds[c.category]||'全部商品')}</h3><div class="commerce-grid">${(c.products||[]).filter(p=>storefrontProduct(p)&&(c.category==='all'||p.delivery.kind===c.category)).map(p=>`<article class="panel commerce-card">${image(p.imageUrl)?`<img src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}" loading="lazy">`:''}<span class="hint">${esc(kinds[p.delivery.kind])}</span><h3>${esc(p.name)}</h3><strong class="commerce-price">${money(p.priceTwd)}</strong>${p.audience==='signed_organizer'?'<p class="hint">簽約主辦限定</p>':''}<button class="btn btn-ghost" data-action="commerce-product" data-id="${esc(p.id)}">查看商品</button></article>`).join('')||'<div class="empty-state">此分類目前沒有上架商品。</div>'}</div>${c.productsCursor?'<button class="btn btn-ghost" data-action="commerce-products-more">載入更多商品</button>':''}`;
  return `<section class="commerce"><div class="panel-title"><h2>商城</h2><button class="btn btn-ghost" data-action="commerce-refresh-products">重新整理</button></div>${notices(c)}${c.storeOpen===false?'<p class="banner" role="status">商城準備中，目前尚未開放購買。</p>':''}${c.loading?'<p role="status">正在讀取商品……</p>':''}${body}</section>`;
 }
+function partnerQuota(){
+ const g=quotaGrant();if(!g)return '<section class="panel" role="status">購買場次限合約有效的活動主辦使用。</section>';
+ const c=enter('partner-quota');
+ const nav='<div class="btn-row"><button class="btn btn-ghost" data-action="switch-tab" data-tab="management">返回我的合作方案</button><button class="btn btn-ghost" data-action="switch-tab" data-tab="partner-orders">我的訂單</button></div>';
+ if(c.order)return nav+orderDetail(c.order,c,false);
+ schedule('catalog',c.products===null);
+ const p=c.products?.find(p=>p.id===c.productId&&quotaProduct(p));
+ const body=p?productDetails(p,c):`<div class="commerce-grid">${(c.products||[]).filter(quotaProduct).map(p=>`<article class="panel commerce-card"><h3>${esc(p.name)}</h3><p>${Number(p.delivery.quantity)} 場</p><strong class="commerce-price">${money(p.priceTwd)}</strong><button class="btn btn-ghost" data-action="commerce-product" data-id="${esc(p.id)}">查看方案</button></article>`).join('')||(!c.loading&&!c.error?'<div class="empty-state">目前尚無開放購買的場次方案，請聯絡 BXH。</div>':'')}</div>${c.productsCursor?'<button class="btn btn-ghost" data-action="commerce-products-more">載入更多方案</button>':''}`;
+ return `<section class="commerce">${nav}<div class="panel-title"><h2>購買場次</h2><button class="btn btn-ghost" data-action="commerce-refresh-products">重新整理</button></div><p class="hint">適用合約：${esc(g.orderCode)}。加購不會延長原合約期限；可用場次以後端確認結果為準。</p><p class="hint">選擇方案 → 建立訂單 → 銀行轉帳 → 回報匯款 → BXH 確認收款與交付。未確認交付前不增加額度。</p>${notices(c)}${c.storeOpen===false?'<p class="banner" role="status">場次購買尚未開放，請聯絡 BXH。</p>':''}${c.loading?'<p role="status">正在讀取場次方案……</p>':''}${body}</section>`;
+}
+function partnerOrders(){
+ if(!quotaGrant())return '<section class="panel" role="status">請先確認活動主辦合約授權。</section>';
+ return '<div class="btn-row"><button class="btn btn-ghost" data-action="switch-tab" data-tab="management">返回我的合作方案</button><button class="btn btn-ghost" data-action="switch-tab" data-tab="partner-quota">購買場次</button></div>'+orders();
+}
 function orderList(c,adminMode){return `${adminMode?`<label>付款狀態<select data-commerce-status>${[['reported','待對帳'],['pending','待付款'],['paid','已確認收款'],['refund_pending','退款處理中'],['refunded','已退款'],['cancelled','已取消'],['','全部']].map(([id,l])=>`<option value="${id}" ${c.status===id?'selected':''}>${l}</option>`).join('')}</select></label>`:''}<div class="commerce-orders">${(c.orders||[]).map(o=>`<button class="panel commerce-order" data-action="commerce-order" data-id="${esc(o.id)}"><span><strong>${esc(o.productSnapshot.name)}</strong><small>${esc(o.id)}<br>${date(o.createdAt)}${adminMode?'<br>'+esc(o.buyerName):''}</small></span><span><strong>${money(o.amountTwd)}</strong><small>${esc(paymentLabels[o.paymentStatus])}<br>${esc(deliveryLabels[o.deliveryStatus])}</small></span></button>`).join('')||'<div class="empty-state">目前沒有訂單。</div>'}</div>${c.ordersCursor?'<button class="btn btn-ghost" data-action="commerce-orders-more">載入更多訂單</button>':''}`;}
 function orderDetail(o,c,adminMode){
  const pending=['pending','reported'].includes(o.paymentStatus),expired=o.paymentStatus==='pending'&&o.expiresAt<=Date.now(),draft=c.formDrafts[o.id]||{};
@@ -103,13 +124,13 @@ async function handle(action,target){
  const c=context(),adminMode=typeof activeTab!=='undefined'&&activeTab==='commerce-admin'&&isSuperAdmin();
  if(c.busy||c.loading)return;
  const id=target?.dataset?.id;
- if(action==='commerce-retry'){if(c.pending)return mutate(c.pending.payload);return;}
+ if(action==='commerce-retry'){if(c.pending){const code=c.pending.contractCode;if(code&&code!==quotaGrant()?.orderCode){c.error='原訂單所屬合約已變更，請先至我的訂單確認結果，或聯絡 BXH。';render();return;}return mutate(c.pending.payload);}return;}
  if(action==='commerce-order')return readOrder(id);
  if(action==='commerce-refresh-order')return readOrder(c.order.id);
  if(action==='commerce-back-orders'){c.order=null;c.error='';c.success='';render();return;}
  if(action==='commerce-category'){if(id!=='all'&&!storefrontKinds.has(id))return;c.category=id;c.order=null;c.productId='';render();return;}
  if(action==='commerce-categories'){c.category='';render();return;}
- if(action==='commerce-product'){if(!c.products?.some(p=>p.id===id&&storefrontProduct(p)))return;c.productId=id;render();return;}
+ if(action==='commerce-product'){if(!c.products?.some(p=>p.id===id&&visibleProduct(p,c)))return;c.productId=id;render();return;}
  if(action==='commerce-back-products'){c.productId='';render();return;}
  if(action==='commerce-refresh-products')return load('catalog');
  if(action==='commerce-products-more')return load(adminMode?'admin-products':'catalog',true);
@@ -118,7 +139,7 @@ async function handle(action,target){
  if(action==='commerce-buy'){
   if(c.pending)return;
   if(!document.querySelector('[data-commerce-consent]')?.checked){c.error='請先閱讀並勾選購買說明。';render();return;}
-  const p=c.products?.find(p=>p.id===id);if(p?.purchasable&&storefrontProduct(p))return mutate({action:'create-order',productId:p.id,expectedVersion:p.version});
+  const p=c.products?.find(p=>p.id===id);if(p?.purchasable&&visibleProduct(p,c))return mutate({action:'create-order',productId:p.id,expectedVersion:p.version});
  }
  if(action==='commerce-cancel'&&confirm('確定取消這筆未付款訂單？'))return mutate({action:'cancel-order',orderId:c.order.id});
  if(!adminMode)return;
@@ -152,5 +173,6 @@ document.addEventListener('input',e=>{
  if(form.dataset.commerceForm==='config')c.configDraft={...v,enabled:v.enabled==='on'};
 });
 document.addEventListener('change',e=>{if(!e.target.matches?.('[data-commerce-status]'))return;const c=context();if(c.loading||c.busy)return;c.status=e.target.value;c.orders=null;void load('admin-orders');});
-window.BXHCommerce={shop,orders,adminPage,handle,context,load};
+window.BXHCommerce={shop,orders,partnerQuota,partnerOrders,adminPage,handle,context,load};
 })();
+

@@ -53,7 +53,7 @@
       <p class="hint">合作期限（台灣時間）：${safe(dateLabel(value.startsAtMs??value.startsAt))} ～ ${safe(dateLabel(value.expiresAtMs??value.expiresAt))}</p>
       ${orderCode?`<p class="hint" style="overflow-wrap:anywhere">合約編號：${safe(orderCode)}</p>`:''}
       <p class="${quotaState.error?'auth-error':'hint'}" role="status">${safe(notice)}</p>
-      <div class="btn-row">${orderCode?`<button type="button" class="btn btn-ghost btn-sm" data-partner-quota-refresh ${quotaState.loading?'disabled':''}>重新整理場次</button><button type="button" class="btn btn-ghost btn-sm" data-partner-own-contract ${!contract||quotaState.loading||quotaState.error?'disabled':''}>查看合約</button>`:''}</div>`;
+      <div class="btn-row">${orderCode?`${value.scope==='contract'?'<button type="button" class="btn btn-primary btn-sm" data-action="switch-tab" data-tab="partner-quota">購買場次</button><button type="button" class="btn btn-ghost btn-sm" data-action="switch-tab" data-tab="partner-orders">我的訂單</button>':''}<button type="button" class="btn btn-ghost btn-sm" data-partner-quota-refresh ${quotaState.loading?'disabled':''}>重新整理場次</button><button type="button" class="btn btn-ghost btn-sm" data-partner-own-contract ${!contract||quotaState.loading||quotaState.error?'disabled':''}>查看合約</button>`:''}</div>`;
   }
   function renderOverview(profile){
     const value=grant(profile);if(!value)return '';
