@@ -5,7 +5,7 @@
 | ID | 名稱 | 時數 | 等級 |
 | --- | --- | ---: | --- |
 | online_time_1h | 微光初現 | 1 | 一般 |
-| online_time_10h | 星火漸明 | 10 | 一般 |
+| online_time_10h | 星光漸明 | 10 | 一般 |
 | online_time_50h | 流光刻痕 | 50 | 稀有 |
 | online_time_100h | 百時星軌 | 100 | 稀有 |
 | online_time_500h | 歲月銘刻 | 500 | 史詩 |

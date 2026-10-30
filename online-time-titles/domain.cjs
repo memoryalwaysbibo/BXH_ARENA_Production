@@ -1,7 +1,7 @@
 'use strict';
 const MINUTE=60000, HOUR=60*MINUTE, MAX_HEARTBEAT_GAP_MS=120000;
 const DEFINITIONS=Object.freeze([
-  [1,'微光初現','common'],[10,'星火漸明','common'],[50,'流光刻痕','rare'],
+  [1,'微光初現','common'],[10,'星光漸明','common'],[50,'流光刻痕','rare'],
   [100,'百時星軌','rare'],[500,'歲月銘刻','epic'],[1000,'千載流光','legendary']
 ].map(([hours,name,tier])=>Object.freeze({
   id:`online_time_${hours}h`,code:`ONLINE_TIME_${hours}H`,name,
