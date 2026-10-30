@@ -19636,10 +19636,13 @@ function renderApp(){
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
   if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
   if(activeTab==='commerce-admin'&&!isSuperAdmin())activeTab='live';
+  if(['partner-quota','partner-orders'].includes(activeTab)&&(!isPartnerOrganizerMode()||partnerOrganizerGrant()?.scope!=='contract'))activeTab='management';
   if(window.BXHTeamAdminPreview?.visible?.())tabs.push(["team-preview","戰隊"]);
   if(activeTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.())activeTab='live';
   let content = "";
   if(activeTab==="management") content = renderTournamentManagementTab();
+  else if(activeTab==="partner-quota") content = window.BXHCommerce.partnerQuota();
+  else if(activeTab==="partner-orders") content = window.BXHCommerce.partnerOrders();
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
@@ -20813,6 +20816,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="switch-tab"){
     const targetTab = target.getAttribute("data-tab");
+    if(['partner-quota','partner-orders'].includes(targetTab)&&(!isPartnerOrganizerMode()||partnerOrganizerGrant()?.scope!=='contract')){showToast('購買場次限合約有效的活動主辦使用。',true);return;}
     if(targetTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles())){showToast('目前身分沒有此操作權限。',true);return;}
     if(targetTab==='commerce-admin'&&!isSuperAdmin()){showToast('目前身分沒有商城管理權限。',true);return;}
     if(targetTab==='inventory-admin'&&!isSuperAdmin()){showToast('目前身分沒有道具管理權限。',true);return;}

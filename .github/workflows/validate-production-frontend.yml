@@ -89,6 +89,8 @@ jobs:
         run: |
           for source in team-foundation/*.js; do node --check "$source"; done
           node --test team-foundation/*.test.cjs
+      - name: Verify partner purchase eligibility and order isolation
+        run: node --test tests/commerce-ui.test.cjs tests/partner-overview.test.cjs
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
       - name: Verify QR camera lifecycle and existing check-in routing
