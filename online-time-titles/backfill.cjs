@@ -10,12 +10,12 @@ function dateMs(value){
   if(!Number.isSafeInteger(n)||new Date(n+OFFSET).toISOString().slice(0,10)!==value)throw Error('invalid-history-date');
   return n;
 }
-function plan(config,now){
-  if(!config||config.backfillEnabled!==true)throw Error('historical-backfill-disabled');
+function plan(config,now,{dryRun=false}={}){
+  if(!config||(!dryRun&&config.backfillEnabled!==true))throw Error('historical-backfill-disabled');
   if(config.migrationStrategy!=='C-once-v1'||config.sourceSchema!=='lastSeenAt-v1')throw Error('invalid-migration-strategy');
   if(typeof config.backfillBatchId!=='string'||! /^[A-Za-z0-9_-]{1,80}$/.test(config.backfillBatchId))throw Error('invalid-backfill-batch');
   const cutover=D.integer(config.startAt,'cutover');
-  if(cutover<=0||(cutover+OFFSET)%DAY!==0||cutover>now)throw Error('cutover-must-be-reached-taipei-midnight');
+  if(cutover<=0||(cutover+OFFSET)%DAY!==0||(!dryRun&&cutover>now))throw Error('cutover-must-be-reached-taipei-midnight');
   const start=dateMs(config.historyStartDate),count=(cutover-start)/DAY;
   if(!Number.isInteger(count)||count<1||count>MAX_DAYS)throw Error('invalid-history-window');
   return {cutover,batchId:config.backfillBatchId,dates:Array.from({length:count},(_,i)=>new Date(start+i*DAY+OFFSET).toISOString().slice(0,10))};
@@ -24,11 +24,12 @@ function plan(config,now){
 // no total point conversion. Enumerate every configured day, including gaps.
 function createBackfill(db,{awardTitle,clock=Date.now}={}){
   if(typeof awardTitle!=='function')throw Error('trusted-award-title-required');
-  return async function backfill(uid){
+  return async function backfill(uid,{dryRun=false}={}){
+    if(typeof dryRun!=='boolean')throw Error('invalid-dry-run');
     if(typeof uid!=='string'||! /^[A-Za-z0-9_-]{1,120}$/.test(uid))throw Error('invalid-backfill-uid');
     const result=await db.runTransaction(async tx=>{
       const config=await tx.get(db.doc('systemSettings/onlineTimeTitles'));
-      const p=plan(config.data(),clock());
+      const p=plan(config.data(),clock(),{dryRun});
       const statsRef=db.doc(`playerStats/${uid}`),receiptRef=db.doc(`${RECEIPTS}/${uid}`);
       const defRefs=D.DEFINITIONS.map(d=>db.doc(`titleDefinitions/${d.id}`));
       const [user,stats,receipt,settings,...defs]=await Promise.all([
@@ -61,6 +62,9 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
       for(const [i,definition] of D.DEFINITIONS.entries()){
         if(defs[i].exists&&!D.matchesDefinition(defs[i].data(),definition))throw Error('online-time-definition-conflict:'+definition.id);
       }
+      if(dryRun)return {status:'dry-run',uid,batchId:p.batchId,cutoverAt:p.cutover,
+        historicalMs,totalMs:total,presentDays,missingDays:p.dates.length-presentDays,evidence,
+        qualifyingTitleIds:D.DEFINITIONS.filter(d=>total>=d.targetValue*D.MINUTE).map(d=>d.id)};
       for(const [i,definition] of D.DEFINITIONS.entries()){
         if(!defs[i].exists){
           const row={...definition,version:1,recipientCount:0,createdAt:now,updatedAt:now,createdBy:'system'};
@@ -79,7 +83,7 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
         evidenceSha256:createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),completedAt:now});
       return {...base,status:'completed',historicalMs,totalMs:total,presentDays,missingDays:p.dates.length-presentDays};
     });
-    await grantEligible(db,awardTitle,uid,result);
+    if(!dryRun)await grantEligible(db,awardTitle,uid,result);
     return result;
   };
 }

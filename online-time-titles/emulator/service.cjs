@@ -50,6 +50,10 @@ async function total(uid){return (await db.doc('playerStats/'+uid).get()).data()
   await setup('migration');
   await db.doc('activityOnlineDaily/2026-10-30/players/migration').set({uid:'migration',dateKey:'2026-10-30',activeMs:3*D.HOUR});
   const migrate=createBackfill(db,{awardTitle:native,clock:()=>cutover+100000});
+  const preview=await migrate('migration',{dryRun:true});
+  assert.equal(preview.historicalMs,3*D.HOUR);
+  assert.equal(await total('migration'),0);
+  assert.equal((await db.doc('onlineTimeTitleBackfills/migration').get()).exists,false);
   await Promise.all([migrate('migration'),migrate('migration'),service(event('migration',cutover-30000,cutover+30000))]);
   assert.equal(await total('migration'),3*D.HOUR+30000);
   assert.equal((await db.doc('onlineTimeTitleBackfills/migration').get()).data().missingDays,1);

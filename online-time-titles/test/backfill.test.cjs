@@ -60,3 +60,12 @@ test('cutover requires an explicit reached Taipei midnight and bounded valid his
   for(const change of [{startAt:T+1},{startAt:T+86400000},{historyStartDate:'2026-02-30'},{historyStartDate:'2026-11-01'},{historyStartDate:'2020-01-01'},{backfillEnabled:false},{migrationStrategy:'B'}])assert.throws(()=>plan({...CONFIG,...change},T+1000));
   assert.deepEqual(plan(CONFIG,T+1000).dates,['2026-10-29','2026-10-30','2026-10-31']);
 });
+test('dry run previews evidence and eligible titles without enabling migration or writing anything',async()=>{
+  const f=fixture({'systemSettings/onlineTimeTitles':{...CONFIG,backfillEnabled:false}});
+  const run=createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>T-1});
+  const r=await run('alice',{dryRun:true});
+  assert.equal(r.status,'dry-run');assert.equal(r.historicalMs,225*D.MINUTE);
+  assert.deepEqual(r.qualifyingTitleIds,['online_time_1h']);assert.equal(r.missingDays,1);
+  assert.equal(f.db.commits,0);assert.equal(f.grants.length,0);
+  await assert.rejects(run('alice'),/disabled/);
+});
