@@ -11,7 +11,7 @@
 | online_time_500h | 歲月銘刻 | 500 | 史詩 |
 | online_time_1000h | 千載流光 | 1,000 | 傳說 |
 
-全部永久持有、`limitedType: none`、`isLimited: false`。先文字、圖片後補，尚未建立圖片路徑。
+全部永久持有、`limitedType: none`、`isLimited: false`。微光初現已接入第一張圖片（768×270，保留比例與透明背景的無損 WebP＋PNG 備援），其餘五張圖片待接入。更新了共用稱號與天梯顯示映射；未部署正式站。
 
 ## 已實作範圍
 
