@@ -44,6 +44,26 @@ test('a closed store is clearly labeled and does not create placeholder products
  await t.ui.load('catalog');assert.match(t.ui.shop(),/商城準備中，目前尚未開放購買/);assert.equal(t.ui.context().products.length,0);
 });
 
+test('five ticket previews remain visible with a closed store and cannot create orders',async()=>{
+ const t=setup();t.ui.shop();const c=t.ui.context();c.products=[];c.storeOpen=false;
+ const categories=t.ui.shop();assert.match(categories,/data-id="ticket"/);
+ await t.ui.handle('commerce-category',{dataset:{id:'ticket'}});
+ const listing=t.ui.shop();
+ for(const [capacity,color] of [[32,'green'],[64,'blue'],[96,'purple'],[128,'orange'],[160,'red']]){
+  assert.match(listing,new RegExp(`賽事啟動券｜${capacity} 人`));
+  assert.match(listing,new RegExp(`tournament-activation-${capacity}-${color}\\.jpg`));
+  assert.ok(fs.existsSync(path.join(__dirname,`../assets/commerce/tickets/tournament-activation-${capacity}-${color}.jpg`)));
+ }
+ assert.equal((listing.match(/暫停購買/g)||[]).length,5);
+ await t.ui.handle('commerce-product',{dataset:{id:'tournament_activation_64'}});
+ const detail=t.ui.shop();assert.match(detail,/基本正取上限 64 人/);
+ assert.match(detail,/<button class="btn btn-primary" disabled aria-disabled="true">暫停購買<\/button>/);
+ await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_64'}});
+ c.products=[{id:'tournament_activation_64',version:1,purchasable:true,delivery:{kind:'ticket'}}];
+ await t.ui.handle('commerce-buy',{dataset:{id:'tournament_activation_64'}});
+ assert.equal(t.calls.length,0);
+});
+
  test('bank remittance fields opt out of the real application half-hour rounding',()=>{
  const core=fs.readFileSync(path.join(__dirname,'../modules/main-app/core.js'),'utf8');
  assert.match(source,/name="transferredAt"[^>]*data-minute-precision="true"/);
@@ -60,3 +80,4 @@ test('storefront hides room quota and VIP categories, all-products results and c
  assert.equal(t.calls.length,0);
  c.category='vip';t.ui.shop();assert.equal(c.category,'');
 });
+
