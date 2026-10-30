@@ -51,8 +51,8 @@ test('five ticket previews remain visible with a closed store and cannot create 
  const listing=t.ui.shop();
  for(const [capacity,color] of [[32,'green'],[64,'blue'],[96,'purple'],[128,'orange'],[160,'red']]){
   assert.match(listing,new RegExp(`賽事啟動券｜${capacity} 人`));
-  assert.match(listing,new RegExp(`tournament-activation-${capacity}-${color}\\.jpg`));
-  assert.ok(fs.existsSync(path.join(__dirname,`../assets/commerce/tickets/tournament-activation-${capacity}-${color}.jpg`)));
+  assert.match(listing,new RegExp(`tournament-activation-${capacity}-${color}\\.png`));
+  assert.ok(fs.existsSync(path.join(__dirname,`../assets/commerce/tickets/tournament-activation-${capacity}-${color}.png`)));
  }
  assert.equal((listing.match(/暫停購買/g)||[]).length,5);
  await t.ui.handle('commerce-product',{dataset:{id:'tournament_activation_64'}});
