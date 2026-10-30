@@ -15,6 +15,7 @@ function titleArtworkPath(name,rarity){
     '新銳獵人':'assets/title-common-rookie-hunter-v1.webp',
     '戰場熟面孔':'assets/title-rare-familiar-face-v1.webp',
     '初來乍到':'assets/title-common-first-checkin-v1.webp',
+    '微光初現':'assets/title-common-online-time-1h-v1.webp',
     '七日常客':'assets/title-common-seven-day-guest-v1.webp',
     '三冠王':'assets/title-legendary-triple-crown-v3.webp',
     '二當家':'assets/title-limited-co-leader.webp',
@@ -59,6 +60,15 @@ function titleArtworkPath(name,rarity){
   return map[key]||'';
 }
 function titleDisplayName(name){return name==='審判者'?'裁決者':name;}
+function onlineTimeArtworkPreviewHtml(canPreview){
+  if(canPreview!==true)return '';
+  return `<section class="panel" data-online-time-art-preview style="margin-top:18px;">
+    <div class="panel-title">新稱號外觀預覽｜微光初現</div>
+    <p class="hint">最高管理員外觀驗收・一般｜永久・尚未開放取得</p>
+    <img src="assets/title-common-online-time-1h-v1.webp" alt="微光初現稱號外觀預覽" width="768" height="270" style="display:block;width:100%;height:auto;max-width:768px;object-fit:contain;" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+'.png'">
+    <p class="hint">預定條件：累積有效在線 1 小時。此區僅驗收圖片，不代表已取得稱號；計時與自動發放尚待接入。</p>
+  </section>`;
+}
 const TITLE_TIER_LABELS=Object.freeze({common:"一般",rare:"稀有",epic:"史詩",legendary:"傳說",eternal:"永恆",unrated:"待分級"});
 const TITLE_LIMITED_LABELS=Object.freeze({none:"",event:"活動限定",season:"賽季限定",identity:"身分限定",unique:"唯一限定",launch:"開服限定",beta:"封測限定",legacy:"限定（舊制）"});
 function titleRarityLabel(r){return r==="limited"?"待分級":TITLE_TIER_LABELS[r]||"一般";}
@@ -97,6 +107,6 @@ function formatTitleDisplay(realName,gameId,titleName,format,enabled=true){
   return `${real}${game!==real?`（${game}）`:""}・${titleName}`;
 }
 
-Object.assign(window.BXHTitleUtils||(window.BXHTitleUtils={}),{titleArtworkPath,titleDisplayName,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml});
+Object.assign(window.BXHTitleUtils||(window.BXHTitleUtils={}),{titleArtworkPath,titleDisplayName,onlineTimeArtworkPreviewHtml,TITLE_TIER_LABELS,TITLE_LIMITED_LABELS,titleRarityLabel,titleTierValue,titleTierClass,titleTierLabel,titleLimitedTypeValue,titleLimitedLabel,titlePermanentLabel,titleClassificationText,formatTitleDisplay,titleClassificationHtml});
 
 })();

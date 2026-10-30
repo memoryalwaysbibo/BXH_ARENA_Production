@@ -148,6 +148,7 @@
         "新銳獵人":"assets/title-common-rookie-hunter-v1.webp",
         "戰場熟面孔":"assets/title-rare-familiar-face-v1.webp",
         "初來乍到":"assets/title-common-first-checkin-v1.webp",
+        "微光初現":"assets/title-common-online-time-1h-v1.webp",
         "七日常客":"assets/title-common-seven-day-guest-v1.webp",
         "三冠王":"assets/title-legendary-triple-crown-v3.webp",
         "二當家":"assets/title-limited-co-leader.webp",
