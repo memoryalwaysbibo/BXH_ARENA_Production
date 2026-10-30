@@ -14,7 +14,9 @@ function plan(config,now,{dryRun=false}={}){
   if(!config||(!dryRun&&config.backfillEnabled!==true))throw Error('historical-backfill-disabled');
   if(config.migrationStrategy!=='C-once-v1'||config.sourceSchema!=='lastSeenAt-v1')throw Error('invalid-migration-strategy');
   if(typeof config.backfillBatchId!=='string'||! /^[A-Za-z0-9_-]{1,80}$/.test(config.backfillBatchId))throw Error('invalid-backfill-batch');
-  const cutover=D.integer(config.startAt,'cutover');
+  const liveStartAt=D.integer(config.startAt,'live-start');
+  const cutover=D.integer(config.historyCutoffAt??config.startAt,'cutover');
+  if(liveStartAt<cutover)throw Error('live-start-before-history-cutoff');
   if(cutover<=0||(!dryRun&&cutover>now))throw Error('cutover-not-reached');
   const start=dateMs(config.historyStartDate),count=Math.ceil((cutover-start)/DAY);
   if(!Number.isInteger(count)||count<1||count>MAX_DAYS)throw Error('invalid-history-window');
@@ -22,7 +24,7 @@ function plan(config,now,{dryRun=false}={}){
   // A day's current tracker is mutable after 23:00. Never use it as evidence
   // for the partial day; require an immutable server-side cutoff checkpoint.
   if(partial&&config.cutoverEvidenceSchema!=='frozen-daily-v1')throw Error('partial-day-checkpoint-required');
-  return {cutover,partial,batchId:config.backfillBatchId,dates:Array.from({length:count},(_,i)=>new Date(start+i*DAY+OFFSET).toISOString().slice(0,10))};
+  return {cutover,liveStartAt,partial,batchId:config.backfillBatchId,dates:Array.from({length:count},(_,i)=>new Date(start+i*DAY+OFFSET).toISOString().slice(0,10))};
 }
 // Internal Admin SDK operation only. No HTTP/callable export, no client hours,
 // no total point conversion. Enumerate every configured day, including gaps.
@@ -42,12 +44,12 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
       ]);
       if(!D.eligible(user.data()))return {status:'ineligible'};
       const old=stats.data()||{},oldTotal=D.integer(old.officialOnlineTimeMs??0,'stored-total');
-      if(old.onlineTimeTrackedFrom!=null&&old.onlineTimeTrackedFrom!==p.cutover)throw Error('online-time-activation-changed');
+      if(old.onlineTimeTrackedFrom!=null&&old.onlineTimeTrackedFrom!==p.liveStartAt)throw Error('online-time-activation-changed');
       const flags=settings.data()||{},base={confirmedTitleIds:old.onlineTimeConfirmedTitleIds||[],
         awardsEnabled:flags.titlesEnabled===true&&flags.automaticTitleAwardsEnabled===true};
       if(receipt.exists){
         const saved=receipt.data();
-        if(saved.batchId!==p.batchId||saved.cutoverAt!==p.cutover||saved.historyStartDate!==config.data().historyStartDate)throw Error('backfill-already-completed-with-different-plan');
+        if(saved.batchId!==p.batchId||saved.cutoverAt!==p.cutover||(saved.liveStartAt??saved.cutoverAt)!==p.liveStartAt||saved.historyStartDate!==config.data().historyStartDate)throw Error('backfill-already-completed-with-different-plan');
         return {...base,status:'already-completed',totalMs:oldTotal,historicalMs:saved.historicalMs};
       }
       if(old.onlineTimeHistoricalMs!=null||old.onlineTimeBackfillBatchId!=null)throw Error('historical-marker-without-receipt');
@@ -73,7 +75,7 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
       for(const [i,definition] of D.DEFINITIONS.entries()){
         if(defs[i].exists&&!D.matchesDefinition(defs[i].data(),definition))throw Error('online-time-definition-conflict:'+definition.id);
       }
-      if(dryRun)return {status:'dry-run',uid,batchId:p.batchId,cutoverAt:p.cutover,
+      if(dryRun)return {status:'dry-run',uid,batchId:p.batchId,cutoverAt:p.cutover,liveStartAt:p.liveStartAt,
         historicalMs,totalMs:total,presentDays,missingDays:p.dates.length-presentDays,evidence,
         qualifyingTitleIds:D.DEFINITIONS.filter(d=>total>=d.targetValue*D.MINUTE).map(d=>d.id)};
       for(const [i,definition] of D.DEFINITIONS.entries()){
@@ -87,8 +89,8 @@ function createBackfill(db,{awardTitle,clock=Date.now}={}){
         },{merge:true});
       }
       tx.set(statsRef,{officialOnlineTimeMs:total,onlineTimeHistoricalMs:historicalMs,
-        onlineTimeBackfillBatchId:p.batchId,onlineTimeTrackedFrom:p.cutover,onlineTimeUpdatedAt:now},{merge:true});
-      tx.create(receiptRef,{uid,batchId:p.batchId,strategy:'C-once-v1',cutoverAt:p.cutover,
+        onlineTimeBackfillBatchId:p.batchId,onlineTimeTrackedFrom:p.liveStartAt,onlineTimeUpdatedAt:now},{merge:true});
+      tx.create(receiptRef,{uid,batchId:p.batchId,strategy:'C-once-v1',cutoverAt:p.cutover,liveStartAt:p.liveStartAt,
         historyStartDate:config.data().historyStartDate,historicalMs,presentDays,missingDays:p.dates.length-presentDays,
         source:'activityOnlineDaily.activeMs',evidence,
         evidenceSha256:createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),completedAt:now});

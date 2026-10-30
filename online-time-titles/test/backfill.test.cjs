@@ -86,3 +86,17 @@ test('dry run previews evidence and eligible titles without enabling migration o
   assert.equal(f.db.commits,0);assert.equal(f.grants.length,0);
   await assert.rejects(run('alice'),/disabled/);
 });
+test('historical cutoff and real live activation stay separate without manufacturing the gap',async()=>{
+  const liveStart=T+2*D.HOUR;
+  const cfg={...CONFIG,historyCutoffAt:T,startAt:liveStart};
+  const f=fixture({'systemSettings/onlineTimeTitles':cfg});
+  await createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>liveStart})('alice');
+  assert.equal(f.db.read('playerStats/alice').onlineTimeTrackedFrom,liveStart);
+  const live=createService(f.db,{awardTitle:f.awardTitle});
+  assert.equal((await live(event(T,T+30000))).status,'before-activation');
+  await live(event(liveStart-30000,liveStart+30000));
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE+30000);
+  assert.equal(f.db.read('onlineTimeTitleBackfills/alice').cutoverAt,T);
+  assert.equal(f.db.read('onlineTimeTitleBackfills/alice').liveStartAt,liveStart);
+  assert.throws(()=>plan({...CONFIG,historyCutoffAt:T+1},T+1000),/live-start-before-history-cutoff/);
+});
