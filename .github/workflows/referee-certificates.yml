@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'referee-certificates/**'
+      - '.github/workflows/deploy-production-pages.yml'
+      - 'scripts/prepare-public-pages.cjs'
+      - 'tests/public-pages-artifact.test.cjs'
       - 'modules/referee-license/**'
       - 'modules/main-app/core.js'
       - 'modules/cloud/cloud-runtime.js'
@@ -34,6 +37,11 @@ jobs:
           java-version: 21
       - name: Business rules, authorization, replay and application wiring
         run: node --test referee-certificates/test/*.test.cjs tests/referee-license-*.test.cjs tests/referee-certificate-wiring.test.cjs tests/player-center-integration.test.cjs
+      - name: Verify public Pages artifact excludes private identities and QA sources
+        run: |
+          node --test tests/public-pages-artifact.test.cjs
+          public_site="$(mktemp -d)"
+          node scripts/prepare-public-pages.cjs "$public_site"
       - name: Install isolated validation dependencies
         run: npm install --prefix /tmp/referee-certificate-deps --no-save --ignore-scripts playwright@1.55.0 firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11 firebase-admin@13.10.0
       - name: Firestore transaction and client-access verification
