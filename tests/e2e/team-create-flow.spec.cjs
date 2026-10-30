@@ -151,13 +151,14 @@ test('my team settings stay collapsed until needed and the current second-level 
  const tabs=page.locator('.bxh-team-tabs'),mine=tabs.getByRole('button',{name:'我的戰隊',exact:true});
  await expect(tabs.locator('[aria-current="page"]')).toHaveText('戰隊大廳');
  await mine.click();await expect(page.getByRole('heading',{name:'我的戰隊',exact:true})).toBeVisible();await expect(tabs.locator('[aria-current="page"]')).toHaveCount(1);await expect(mine).toHaveAttribute('aria-pressed','true');expect(await mine.evaluate(b=>getComputedStyle(b).boxShadow)).not.toBe('none');
+ expect(await mine.evaluate(b=>parseFloat(getComputedStyle(b).borderTopLeftRadius)>=b.getBoundingClientRect().height/2)).toBe(true);
  const settings=page.locator('.team-my-settings');await expect(settings).not.toHaveAttribute('open','');await expect(settings.locator('[data-team-form="frame"]')).not.toBeVisible();await expect(settings.locator('[data-team-emblem]')).not.toBeVisible();await expect(settings.locator('[data-team-form="admission"]')).not.toBeVisible();
  await settings.locator('summary').click();await expect(settings.locator('[data-team-form="frame"]')).toBeVisible();await expect(settings.locator('[data-team-emblem]')).toBeVisible();await expect(settings.locator('[data-team-form="admission"]')).toBeVisible();
  await mine.click();await expect(settings).toHaveAttribute('open','');await settings.locator('summary').press('Enter');await expect(settings).not.toHaveAttribute('open','');
  await page.getByRole('button',{name:'查看戰隊成員',exact:true}).click();await expect(page.getByRole('heading',{name:'戰隊成員',exact:true})).toBeVisible();await expect(tabs.locator('[aria-current="page"]')).toHaveText('我的戰隊');await page.getByRole('button',{name:'返回我的戰隊',exact:true}).click();
  await page.getByRole('button',{name:'查看加入申請',exact:true}).click();await expect(page.getByRole('heading',{name:'加入申請',exact:true})).toBeVisible();await expect(tabs.locator('[aria-current="page"]')).toHaveText('我的戰隊');await page.getByRole('button',{name:'返回我的戰隊',exact:true}).click();
  await tabs.getByRole('button',{name:'建立戰隊',exact:true}).click();await expect(tabs.locator('[aria-current="page"]')).toHaveText('建立戰隊');
- for(const width of [320,390,430]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+ for(const width of [320,390,430]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await tabs.locator('button').evaluateAll(buttons=>buttons.every(b=>parseFloat(getComputedStyle(b).borderTopLeftRadius)>=b.getBoundingClientRect().height/2))).toBe(true);}
  expect(errors).toEqual([]);
 });
 
@@ -203,6 +204,8 @@ test('team member columns keep horizontal role labels and two-line headings on n
  const table=page.locator('.team-members-table');await expect(table).toBeVisible();
  for(const width of [320,390,430]){
   await page.setViewportSize({width,height:850});
+  const header=await page.locator('.team-members-heading').evaluate(el=>{const logo=el.querySelector('.team-members-emblem').getBoundingClientRect(),title=el.querySelector('.team-members-title').getBoundingClientRect(),heading=el.getBoundingClientRect(),table=el.nextElementSibling.getBoundingClientRect();return {beside:title.left>=logo.right,compact:table.top-heading.bottom<=24,bounded:document.documentElement.scrollWidth<=innerWidth+1};});
+  expect(header).toEqual({beside:true,compact:true,bounded:true});
   await expect(table.locator('tbody tr').nth(1).locator('td').nth(1)).toHaveText('菁英');await expect(table.locator('tbody tr').nth(2).locator('td').nth(1)).toHaveText('一般');
   expect(await table.locator('th span').allTextContents()).toEqual(['天梯','積分','獵人','排位','經驗','貢獻','最近','登入']);
   const shape=await table.evaluate(t=>({header:[...t.querySelectorAll('th span')].every(el=>el.getBoundingClientRect().height<=parseFloat(getComputedStyle(el).lineHeight)+1),roles:[...t.querySelectorAll('tbody tr')].every(tr=>{const c=tr.children[1];const range=document.createRange();range.selectNodeContents(c);const text=range.getBoundingClientRect(),cell=c.getBoundingClientRect();return getComputedStyle(c).whiteSpace==='nowrap'&&text.height<=parseFloat(getComputedStyle(c).lineHeight)+1&&text.right<=cell.right+1;}),bounded:document.documentElement.scrollWidth<=window.innerWidth+1,scrollable:t.parentElement.scrollWidth>t.parentElement.clientWidth}));

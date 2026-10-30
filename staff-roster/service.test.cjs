@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {activeStaff,projectStaffRoster,createStaffRosterHandler}=require('./functions/staff-roster-service.cjs');
+const {activeStaff,projectStaffRoster,createStaffRosterHandler}=require('./functions/service.cjs');
 const room=(state={},extra={})=>({eventAuthority:'official',assignedStaffUids:['someone-else'],data:JSON.stringify({meta:{checkinRequired:true},players:[],waitlistPlayers:[],...state}),...extra});
 function harness(user={role:'staff',active:true},event=room(),registrations=[]){
  const reads=[],records=new Map([['users/staff',user],['tournaments/BXH-EKPRMZ',event]]);
@@ -48,5 +48,40 @@ test('drawn, played, onsite and selection rosters use the authoritative particip
   const result=projectStaffRoster(room({...state,players:[{name:'實際正取',checkedIn:true}],waitlistPlayers:[{name:'實際備取'}]}),
    [{registrationId:'r',publicName:'不得重排',status:'confirmed'}]);
   assert.deepEqual(result.map(row=>row.name),['實際正取','實際備取']);
+ }
+});
+
+test('ordinary drawn and live rooms include registration-only waitlist without changing confirmed participants',()=>{
+ for(const lock of [{bracketSize:64},{startedAt:123},{matches:[{id:'m'}]}]){
+  const event=room({...lock,players:[{name:'原正取',registrationId:'c',checkedIn:true,source:'online'}]});
+  const before=JSON.stringify(event);
+  const result=projectStaffRoster(event,[{registrationId:'c',publicName:'不得覆蓋',status:'confirmed'},
+   {registrationId:'w',publicName:'線上備取',status:'waitlist'},
+   {registrationId:'x',publicName:'已取消',status:'cancelled'}]);
+  assert.deepEqual(result.map(row=>[row.name,row.status]),[['原正取','confirmed'],['線上備取','waitlist']]);
+  assert.equal(result[0].checkedIn,true);assert.equal(JSON.stringify(event),before);
+ }
+});
+test('locked room waitlist does not duplicate a stale runtime shadow or a confirmed participant',()=>{
+ const event=room({bracketSize:64,players:[{registrationId:'c',name:'正取甲',source:'online'}],
+  waitlistPlayers:[{registrationId:'w',name:'舊備取名',source:'online'},
+   {registrationId:'cancelled',name:'已取消',source:'online'},{name:'現場備取',source:'onsite'}]});
+ const result=projectStaffRoster(event,[{registrationId:'w',publicName:'新備取名',status:'waitlist'},
+  {registrationId:'c',publicName:'正取甲',status:'waitlist'},
+  {registrationId:'cancelled',publicName:'已取消',status:'cancelled'}]);
+ assert.deepEqual(result.map(row=>row.name),['正取甲','新備取名','現場備取']);
+});
+test('locked room expands waitlisted teams and family entries without revealing identifiers',()=>{
+ const result=projectStaffRoster(room({startedAt:10}),[
+  {registrationId:'secret-team',status:'waitlist',registrationKind:'team',teamMembers:[{name:'隊員甲',slot:1},{name:'隊員乙',slot:2}]},
+  {registrationId:'secret-child',status:'waitlist',familyPlayerId:'secret-family',publicName:'兒童甲'}]);
+ assert.equal(result.length,3);assert(result.every(row=>row.status==='waitlist'));
+ assert(!JSON.stringify(result).includes('secret'));
+});
+test('server-owned selection and onsite waitlists never resurrect registration-only candidates',()=>{
+ for(const extra of [{registrationSelection:{mode:'lottery'}},{onsiteWaitlistServerOwned:true}]){
+  const result=projectStaffRoster(room({players:[{name:'已抽定'}],waitlistPlayers:[]},extra),
+   [{registrationId:'w',status:'waitlist',publicName:'不得加入'}]);
+  assert.deepEqual(result.map(row=>row.name),['已抽定']);
  }
 });

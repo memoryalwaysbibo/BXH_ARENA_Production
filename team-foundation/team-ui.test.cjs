@@ -20,6 +20,13 @@ test('member screen never interpolates private supplied fields',()=>{
  const html=ui.publicMembers({name:'隊伍',members:[{name:'小A',role:'captain',ladderPoints:12,hunterTier:'b',lastSeenAt:'PRIVATE',reason:'SECRET',experienceContribution:'XPPRIVATE'}]});
  for(const value of ['PRIVATE','SECRET','XPPRIVATE'])assert.ok(!html.includes(value));assert.ok(html.includes('B級'));
 });
+test('member heading places emblem, team name and title together',()=>{
+ const html=ui.publicMembers({name:'BXH <隊>',members:[]});
+ assert.match(html,/<div class="team-members-heading"><span class="team-members-emblem">/);
+ assert.match(html,/<div class="team-members-title"><h2>BXH &lt;隊&gt;<\/h2><h3>戰隊成員<\/h3><\/div><\/div>/);
+ assert.match(ui.css,/team-members-heading\{display:flex/);
+ assert.match(ui.css,/\.bxh-team-tabs button\[aria-pressed="true"\][^}]*border-radius:999px!important/);
+});
 test('navigation provides three rankings and empty membership guidance',()=>{
  const html=ui.rankingTabs('team');for(const label of ['天梯','獵人','戰隊'])assert.ok(html.includes(label));
  assert.ok(ui.noTeam().includes('建立戰隊'));assert.ok(ui.tabs('lobby').includes('我的戰隊'));

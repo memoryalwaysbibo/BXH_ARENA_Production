@@ -13,19 +13,24 @@ function projectStaffRoster(room,registrations){
  const canonical=(items,status)=>(Array.isArray(items)?items:[]).filter(row=>row&&!['cancelled','withdrawn','not_selected'].includes(row.status)).map(row=>({
   name:nameOf(row),status,checkedIn:row.checkedIn===true,source:row.source==='online'?'online':'onsite'
  })).filter(row=>row.name);
- // Drawn, started, selection, and onsite-managed rosters must retain the
- // authoritative tournament result rather than reconstructing registrations.
- if(state.startedAt||state.bracketSize||state.matches?.length||state.entrySelection||room.registrationSelection||
-    room.onsiteWaitlistServerOwned===true||state.onsiteWaitlistFinalized===true||
+ // Selection and onsite services own both lists, including frozen eligibility.
+ // Ordinary brackets lock confirmed participants only: their online waitlist
+ // may still exist exclusively in registration documents.
+ if(state.entrySelection||room.registrationSelection||room.onsiteWaitlistServerOwned===true||
+    state.onsiteWaitlistServerOwned===true||state.onsiteWaitlistFinalized===true||
     state.meta?.registrationOnsiteWaitlistEnabled===true){
   return canonical(state.players,'confirmed').concat(canonical(state.waitlistPlayers,'waitlist'));
  }
+ const locked=!!(state.startedAt||state.bracketSize||state.matches?.length||room.startedAt||
+  ['live','settling','done'].includes(room.tournamentPhase));
+ const confirmedIds=new Set((state.players||[]).filter(Boolean).map(row=>String(row.registrationId||'')).filter(Boolean));
  const old=new Map((state.players||[]).filter(Boolean).map(row=>[
   String(row.registrationId||'')+':'+String(row.teamMemberSlot||''),row
  ]));
  const rows=[];
  for(const registration of [...registrations].sort((a,b)=>timeOf(a.createdAt)-timeOf(b.createdAt)||a.registrationId.localeCompare(b.registrationId))){
   if(!['confirmed','waitlist'].includes(registration.status))continue;
+  if(locked&&(registration.status!=='waitlist'||confirmedIds.has(registration.registrationId)))continue;
   const team=registration.registrationKind==='team'||(registration.teamId&&Array.isArray(registration.teamMembers));
   const members=team?registration.teamMembers:[registration];
   for(const [index,member]of (Array.isArray(members)?members:[]).entries()){
@@ -37,7 +42,8 @@ function projectStaffRoster(room,registrations){
   }
  }
  const locals=(items,status)=>canonical((items||[]).filter(row=>row&&row.source!=='online'&&!row.registrationId),status);
- return locals(state.players,'confirmed').concat(rows,locals(state.waitlistPlayers,'waitlist'));
+ return (locked?canonical(state.players,'confirmed'):locals(state.players,'confirmed'))
+  .concat(rows,locals(state.waitlistPlayers,'waitlist'));
 }
 
 function createStaffRosterHandler(db){return async request=>{
