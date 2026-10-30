@@ -5239,6 +5239,13 @@ const REGISTRATION_ERROR_MESSAGES = {
   "team-lottery-unavailable": "團體戰目前尚未開放超額抽籤報名",
 };
 function mapRegistrationError(e){
+  if(e?.rosterSyncStage){
+    const labels={'connect':'連線','read-public':'讀取賽事設定','read-registrations':'讀取報名名單','read-canonical':'讀取比賽名單','merge':'整理名單','write-roster':'儲存比賽名單','readback':'確認雲端名單'};
+    const label=labels[e.rosterSyncStage]||'同步名單';
+    const raw=String(e.code||e.message||'unknown').replace(new RegExp('^(firestore|functions)/'),'');
+    const code=/^[a-z][a-z0-9-]{0,63}$/.test(raw)?raw:'unknown';
+    return '名單同步失敗：'+label+'（'+code+'）。請保留此訊息供主辦查修。';
+  }
   const reason=String(e?.code||e?.message||'');
   if(['qr-checkin-state-stale','registration-roster-stale'].includes(reason))return '雲端名單或報到狀態已更新，請重新同步名單後再操作。';
   if(reason==='roster-cloud-write-failed')return '名單尚未寫入雲端，請確認連線後重新同步。';
@@ -9625,16 +9632,21 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
     return {ok:true,changed:false,confirmed:0};
   if((!state.meta?.registrationEnabled&&!isCommunityQuickRegistration(state)) || !state.cloudCode || state.startedAt) return {ok:true,changed:false,confirmed:0};
+  let rosterSyncStage='connect';
+  try{
   const context=captureRegistrationRosterContext();
   requireRegistrationRosterContext(context);
   if(window.cloudSync&&window.cloudSync.connect) await window.cloudSync.connect();
   requireRegistrationRosterContext(context);
-  if(peopleOnsiteWaitlistManaged()) return refreshBackendRegistrationRoster(context);
-  if(isCommunityQuickRegistration(state)) return refreshBackendRegistrationRoster(context,canCatchUpCommunityRegistrationRoster());
+  rosterSyncStage='read-canonical';
+  if(peopleOnsiteWaitlistManaged()) return await refreshBackendRegistrationRoster(context);
+  if(isCommunityQuickRegistration(state)) return await refreshBackendRegistrationRoster(context,canCatchUpCommunityRegistrationRoster());
   if(!window.cloudSync||!window.cloudSync.listRegistrationsForAdmin) throw new Error("registration api unavailable");
+  rosterSyncStage='read-public';
   const publicRoom=await window.cloudSync.getPublicTournamentFull(context.code);
   requireRegistrationRosterContext(context);
-  if(publicRoom?.registrationRosterSyncBackendEnabled===true) return refreshBackendRegistrationRoster(context);
+  if(publicRoom?.registrationRosterSyncBackendEnabled===true){rosterSyncStage='read-canonical';return await refreshBackendRegistrationRoster(context);}
+  rosterSyncStage='read-registrations';
   const regs=Array.isArray(registrationRows)?registrationRows:await window.cloudSync.listRegistrationsForAdmin(context.code);
   requireRegistrationRosterContext(context);
   if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
@@ -9646,12 +9658,14 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   // optimistic sync failed. Never publish the candidate before cloud acceptance.
   let base=state;
   if(state.qrCheckinManaged===true){
+    rosterSyncStage='read-canonical';
     const latest=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
     requireRegistrationRosterContext(context);
-    if(latest?.ok!==true||latest.data?.id!==context.roomId)throw new Error('roster-readback-failed');
+    if(latest?.ok!==true||latest.data?.id!==context.roomId)throw new Error(latest?.reason||'roster-readback-failed');
     if(latest.data.startedAt)throw new Error('bracket-locked');
     base=latest.data;
   }
+  rosterSyncStage='merge';
   const candidate=cloneStateForSave(base);
   candidate.cloudCode=context.code;
   const before=JSON.stringify({players:(state.players||[]).map(p=>[
@@ -9675,11 +9689,13 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     if(!cloudAvailable())throw new Error('network');
     // A failed roster must never become a local cache or an automatic retry
     // payload. pushUpdate retains Rules, ownership and check-in fences.
+    rosterSyncStage='write-roster';
     const ok=await enqueueCloudStateWrite(context.code,candidate,{isCurrent:()=>registrationRosterContextIsCurrent(context)});
     requireRegistrationRosterContext(context);
     if(ok!==true)throw new Error(window.__BXH_LAST_CLOUD_ERROR_CODE||'roster-cloud-write-failed');
   }
   if(needsWrite||base!==state){
+    rosterSyncStage='readback';
     const result=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
     requireRegistrationRosterContext(context);
     if(result?.ok!==true||result.data?.id!==context.roomId)throw new Error('roster-readback-failed');
@@ -9696,6 +9712,12 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
   publicTournamentsCache=null;
   myRegistrationsCache=null;
   return {ok:true,changed,confirmed:confirmed.length};
+  }catch(error){
+    const wrapped=new Error(String(error?.message||error||'unknown'));
+    wrapped.code=error?.code||error?.message||'unknown';
+    wrapped.rosterSyncStage=rosterSyncStage;
+    throw wrapped;
+  }
 }
 
 
@@ -24814,7 +24836,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         console.warn("[load-online-roster]",e);
         if(registrationRosterContextIsCurrent(context)){
           adminRegistrationsError=mapRegistrationError(e);
-          render();showToast("載入線上報名名單失敗，請稍後再試", true);
+          render();showToast(adminRegistrationsError, true);
         }
       }finally{
         if(adminRosterManualContext===context){peopleRosterBusy=false;adminRosterManualContext=null;}

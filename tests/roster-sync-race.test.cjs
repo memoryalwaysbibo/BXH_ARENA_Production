@@ -304,3 +304,29 @@ test('trusted check-in missing canonical player reproduces not-confirmed regardl
  const h=lateRosterHarness();schedule(h);
  assert.throws(()=>manual(h,'phantom-jiang-id'),e=>e.code==='not-confirmed');
 });
+
+for(const [stage,api] of [['connect','connect'],['read-public','getPublicTournamentFull'],['read-registrations','listRegistrationsForAdmin'],['read-canonical','joinRoom']]){
+ test('roster sync identifies denied stage '+stage+' without exposing candidate',async()=>{
+  const h=lateRosterHarness();h.s.window.cloudSync[api]=async()=>{throw Object.assign(new Error('private details'),{code:'permission-denied'});};
+  await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),e=>e.rosterSyncStage===stage&&e.code==='permission-denied');
+  assert.equal(h.s.state.players.length,68);
+ });
+}
+test('roster write failure identifies save stage and preserves existing 40 check-ins',async()=>{
+ const h=lateRosterHarness({fail:true});
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),e=>e.rosterSyncStage==='write-roster'&&e.code==='permission-denied');
+ assert.equal(h.s.state.players.filter(p=>p.checkedIn).length,40);
+});
+test('roster readback failure is distinguished from failed write',async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let n=0;
+ h.s.window.cloudSync.joinRoom=async()=>++n===2?{ok:false}:join();
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),e=>e.rosterSyncStage==='readback'&&e.code==='roster-readback-failed');
+ assert.equal(h.s.state.players.length,68);assert.equal(h.remote().players.length,80);
+});
+test('roster diagnostics show only fixed stage and safe code, never raw private error text',()=>{
+ const s={REGISTRATION_ERROR_MESSAGES:{}};vm.createContext(s);
+ vm.runInContext(block(core,'function mapRegistrationError(','let publicTournamentsLoading'),s);
+ assert.match(s.mapRegistrationError({rosterSyncStage:'write-roster',code:'firestore/permission-denied',message:'private player data'}),/儲存比賽名單（permission-denied）/);
+ const text=s.mapRegistrationError({rosterSyncStage:'unknown private data',code:'secret@example.com',message:'private player data'});
+ assert.match(text,/同步名單（unknown）/);assert.equal(text.includes('secret'),false);assert.equal(text.includes('private'),false);
+});
