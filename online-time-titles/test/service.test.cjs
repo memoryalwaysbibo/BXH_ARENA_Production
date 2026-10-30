@@ -29,7 +29,7 @@ test('six approved names, thresholds and independent classification fields',()=>
   assert.deepEqual(D.DEFINITIONS.map(d=>[d.name,d.targetValue/60,d.rarityTier]),[
     ['微光初現',1,'common'],['星光漸明',10,'common'],['流光刻痕',50,'rare'],
     ['百時星軌',100,'rare'],['歲月銘刻',500,'epic'],['千載流光',1000,'legendary']]);
-  for(const d of D.DEFINITIONS){assert.equal(d.isPermanent,true);assert.equal(d.isLimited,false);assert.equal(d.limitedType,'none');assert.equal(d.artwork,d.id==='online_time_1h'?'assets/title-common-online-time-1h-v1.webp':'');}
+  for(const d of D.DEFINITIONS){assert.equal(d.isPermanent,true);assert.equal(d.isLimited,false);assert.equal(d.limitedType,'none');assert.equal(d.artwork,`assets/title-${d.rarityTier}-online-time-${d.targetValue/60}h-v1.webp`);}
 });
 test('one account can accumulate five hours in one day without a point-wallet write',async()=>{
   const f=fixture();

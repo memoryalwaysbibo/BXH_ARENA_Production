@@ -10,7 +10,7 @@ const DEFINITIONS=Object.freeze([
   category:'activity',source:'在線時間',conditionType:'total_online_minutes',targetValue:hours*60,
   rarity:tier,rarityTier:tier,limitedType:'none',isLimited:false,isPermanent:true,
   isPublic:true,isActive:true,isHidden:false,isArchived:false,retroactiveEnabled:false,
-  artwork:hours===1?'assets/title-common-online-time-1h-v1.webp':''
+  artwork:`assets/title-${tier}-online-time-${hours}h-v1.webp`
 })));
 function integer(value,label){
   if(!Number.isSafeInteger(value)||value<0)throw Error('invalid-'+label);
