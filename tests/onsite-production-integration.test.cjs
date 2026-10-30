@@ -20,7 +20,7 @@ test('room/auth switch during checkin preview cannot submit a mutation',async()=
 test('actual managed checkin and legacy controls are guarded before optimistic mutation',()=>{
  assert.match(core,/if\(p && peopleOnsiteWaitlistManaged\(\)\)\{peopleSetOnsiteCheckIn\(p,!!target.checked\);return;\}/);
  assert.match(core,/if\(peopleOnsiteWaitlistManaged\(\)\)\{\s+if\(!p.checkedIn\)\{peopleSetOnsiteCheckIn\(p,true\)/);
- assert.match(core,/if\(peopleOnsiteWaitlistManaged\(\)\) return refreshBackendRegistrationRoster\(context\)/);
+ assert.match(core,/if\(peopleOnsiteWaitlistManaged\(\)\) return (?:await )?refreshBackendRegistrationRoster\(context\)/);
  assert.match(core,/完成抽選，再進行賽事編排/);
  assert.match(core,/Number\(remote.data.onsiteWaitlistDrawRevision\|\|0\)<Number\(result.committedRevision\|\|0\)/);
 });
