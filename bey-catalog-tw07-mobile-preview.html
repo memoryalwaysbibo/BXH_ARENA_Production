@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BXH ARENA｜台灣圖鑑審核 TW-07 預覽</title>
+<style>
+:root{color-scheme:dark;--bg:#090b0d;--panel:#171a1e;--border:#343941;--muted:#a8aeb6;--lime:#e9ff2e;--gold:#e3c36c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f5f6f4;font:15px/1.5 system-ui,-apple-system,"Noto Sans TC",sans-serif}
+main{max-width:480px;margin:auto;padding-bottom:35px}.head{border-bottom:2px solid var(--lime);padding:17px 17px 14px;background:linear-gradient(135deg,#181b1d,#080a0b)}
+.brand{font-size:20px;font-weight:900;letter-spacing:2px}.brand b{color:var(--lime)}.eyebrow{color:var(--gold);font-size:11px;letter-spacing:2px}
+.heading{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:13px}.heading h1{font-size:20px;margin:0}.tag{border:1px solid var(--gold);color:var(--gold);padding:4px 8px;border-radius:7px;font-size:11px}
+.notice{margin:14px 12px;padding:11px 12px;border:1px solid #66572c;border-radius:10px;background:#272417;color:#f0dc9b;font-size:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:13px 12px}.stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}.stat strong{font-size:25px;display:block;line-height:1.3}.stat small{font-size:11px;color:var(--muted)}
+.controls{padding:2px 12px 10px}input{background:#15181c;border:1px solid var(--border);border-radius:10px;color:white;width:100%;padding:12px;font:inherit}
+.tabs{display:flex;gap:6px;margin:12px 0}.tabs button{flex:1;background:#202329;border:1px solid var(--border);color:#d6d8dc;border-radius:9px;padding:9px 5px;font:inherit;font-size:12px;cursor:pointer}
+.tabs button.active{background:var(--lime);border-color:var(--lime);color:#10120c;font-weight:800}
+.caption{color:var(--muted);font-size:12px;margin:0 12px 10px}.list{margin:0 12px;display:grid;gap:10px}.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px}
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:9px}.prio{font-size:11px;padding:2px 8px;border-radius:5px;border:1px solid #8a7043;color:#f2c973}.prio.p0{border-color:#c66a64;color:#ff9b91}.prio.p2{border-color:#61768e;color:#abc6e5}
+.card h2{font-size:15px;margin:9px 0 4px}.card p{margin:4px 0 9px;color:#c7cbd0;font-size:13px}.sub{font-size:11px;color:var(--muted)}details{border-top:1px solid var(--border);padding-top:8px}summary{cursor:pointer;color:var(--lime);font-size:12px}
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.diff div{padding:9px;background:#0c0f11;border:1px solid #35393d;border-radius:8px;font-size:12px}.diff span{display:block;color:var(--muted);font-size:10px}
+.footer{color:var(--muted);text-align:center;padding:23px 14px;font-size:11px}
+</style></head><body><main>
+<header class="head"><div class="brand">BXH <b>ARENA</b></div><div class="eyebrow">BEYBLADE X DATABASE</div>
+<div class="heading"><h1>陀螺資料審核</h1><span class="tag">TW-07 模擬預覽</span></div></header>
+<div class="notice">僅展示介面與示例資料，不連線正式 Firebase。所有審核、儲存、發布功能均未啟用。</div>
+<div class="stats"><div class="stat"><strong>5</strong><small>P0 原配待核</small></div><div class="stat"><strong>15</strong><small>P1 名稱／來源</small></div><div class="stat"><strong>11</strong><small>P2 配色</small></div></div>
+<div class="controls"><label for="search" class="sub">搜尋編號、名稱或待核原因</label><input id="search" placeholder="例如 UX-18、Brush、配色" autocomplete="off">
+<div class="tabs" role="group" aria-label="優先級篩選"><button data-filter="all" class="active" aria-pressed="true">全部 31</button><button data-filter="P0" aria-pressed="false">P0</button><button data-filter="P1" aria-pressed="false">P1</button><button data-filter="P2" aria-pressed="false">P2</button></div></div>
+<p class="caption" id="count">以下展示 6 筆代表性示例，非完整 31 筆清單。</p>
+<div class="list" id="items"></div><footer class="footer">BXH ARENA · 台灣繁中圖鑑 · 僅供介面驗收</footer></main>
+<script>
+'use strict';
+const samples=[
+ {p:'P0',id:'group_000007',title:'UX-18-02｜古屍詛咒 4-60C',reason:'原配零件來源待原廠複核',before:'商家來源',after:'等待原廠包裝或說明書'},
+ {p:'P0',id:'group_000008',title:'UX-18-03｜天馬 Brush M3-85W',reason:'原配來源與台灣名稱待核',before:'台灣名稱未確認',after:'維持原文與待核標籤'},
+ {p:'P1',id:'part_000034',title:'Brush｜主刀刃',reason:'台灣零件名稱尚未確認',before:'九尾（舊譯）',after:'Brush（台灣名稱待核）'},
+ {p:'P1',id:'product_000009',title:'CX-00｜透明黑版特典',reason:'完整台灣商品名稱待核',before:'暫定翻譯',after:'待台灣官方來源'},
+ {p:'P1',id:'variant_000010',title:'1-50｜CX-13 候選',reason:'配色歸屬來源待核',before:'CX-07 圖示標示',after:'CX-13 來源候選，實物待核'},
+ {p:'P2',id:'variant_000002',title:'CX 配色候選',reason:'商品圖色系不等於實物配色認證',before:'圖片觀察',after:'等待實物照片及來源'}
+];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let filter='all';
+function draw(){
+ const q=document.getElementById('search').value.trim().toLocaleLowerCase('zh-TW');
+ const list=samples.filter(x=>(filter==='all'||x.p===filter)&&(!q||[x.id,x.title,x.reason].some(s=>s.toLocaleLowerCase('zh-TW').includes(q))));
+ document.getElementById('count').textContent='顯示 '+list.length+'／6 筆示例；實際待審核總數 31 筆。';
+ document.getElementById('items').innerHTML=list.length?list.map(x=>'<article class="card"><div class="cardhead"><span class="prio '+x.p.toLowerCase()+'">'+x.p+' · 待核對</span><span class="sub">'+esc(x.id)+'</span></div><h2>'+esc(x.title)+'</h2><p>'+esc(x.reason)+'</p><details><summary>查看修正前後</summary><div class="diff"><div><span>目前紀錄／舊稱</span>'+esc(x.before)+'</div><div><span>建議處理</span>'+esc(x.after)+'</div></div></details></article>').join(''):'<div class="card">沒有符合條件的示例。</div>';
+}
+document.getElementById('search').addEventListener('input',draw);
+document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b));});draw();}));
+draw();
+</script></body></html>
