@@ -3,10 +3,12 @@ on:
   pull_request:
     paths:
       - 'modules/main-app/admin-override.js'
+      - 'modules/main-app/admin-checkin.js'
       - 'modules/main-app/bracket-commit.js'
       - 'modules/main-app/core.js'
       - 'modules/cloud/cloud-runtime.js'
       - 'tests/admin-override.test.cjs'
+      - 'tests/admin-checkin*'
       - '.github/workflows/admin-override.yml'
 permissions:
   contents: read
@@ -20,3 +22,9 @@ jobs:
           node-version: '22'
       - run: node --check modules/main-app/core.js && node --check modules/cloud/cloud-runtime.js
       - run: node --test tests/admin-override.test.cjs tests/bracket-commit.test.cjs tests/roster-sync-race.test.cjs
+      - run: node --test tests/admin-checkin.test.cjs
+      - run: npm install --prefix /tmp/admin-checkin-browser --no-save playwright@1.56.1
+      - run: /tmp/admin-checkin-browser/node_modules/.bin/playwright install --with-deps chromium
+      - run: node tests/admin-checkin.browser.cjs
+        env:
+          NODE_PATH: /tmp/admin-checkin-browser/node_modules

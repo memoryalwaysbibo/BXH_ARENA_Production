@@ -813,7 +813,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
+      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -3071,6 +3071,10 @@
         window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:true,communityParticipantCount:result.communityParticipantCount};
         return window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized];
       }catch(e){window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:false};throw e;}
+    },
+
+    async adminOverrideCheckin(payload){
+      return callEngagementFunction('adminOverrideCheckin',payload,30000);
     },
 
     async readBracketFromServer(code){

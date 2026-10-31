@@ -5918,6 +5918,7 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
+  "admin-force-checkin",
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
   "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack",
@@ -10674,6 +10675,75 @@ async function executeAdminOperationalOverride(approval,baseSignature){
  }catch(e){console.warn('[admin operational override]',e);showToast('強制執行未確認成功（'+String(e.code||e.message||'unknown')+'），請核對雲端狀態',true);}
  finally{adminOperationalOverrideBusy=false;render();}
 }
+// Admin attendance changes use a dedicated server-owned, idempotent transaction.
+let adminCheckinContext=null;
+function adminCheckinController(){
+ if(!window.BXHAdminCheckin)return null;
+ const context=adminOverrideContext(),key=JSON.stringify(context);
+ if(adminCheckinContext?.key===key)return adminCheckinContext.controller;
+ let storage;try{storage=window.sessionStorage;}catch{}
+ const controller=window.BXHAdminCheckin.create({key,...context,storage,
+  current:()=>JSON.stringify(adminOverrideContext())===key,
+  allowed:()=>window.BXHAdminOverride?.allowed(userProfile)===true,
+  now:()=>Date.now(),operationId:()=>crypto.randomUUID(),
+  call:payload=>window.cloudSync.adminOverrideCheckin(payload),
+  read:code=>window.cloudSync.readBracketFromServer(code),
+  wait:ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  adopt:async fresh=>{state=JSON.parse(JSON.stringify(fresh));state.cloudCode=context.code;await saveRecord(state);}
+ });
+ adminCheckinContext={key,controller};return controller;
+}
+function canOfferAdminCheckin(){
+ if(!window.BXHAdminCheckin||!window.cloudSync?.adminOverrideCheckin||!state.cloudCode||
+  window.BXHAdminOverride?.allowed(userProfile)!==true||!currentAuthUid())return false;
+ return !!adminCheckinController()?.status().pending||
+  (canOfferAdminOperationalOverride()&&state.onsiteWaitlistServerOwned!==true);
+}
+function adminCheckinButtonHtml(p){
+ if(!canOfferAdminCheckin())return '';
+ const status=adminCheckinController()?.status();
+ const pending=status?.pending,other=pending&&pending.data.playerId!==p.id;
+ return '<button class="btn btn-danger btn-sm" data-action="admin-force-checkin" data-id="'+esc(p.id)+'" '+
+  (status?.busy||status?.corrupt||other||adminOperationalOverrideBusy||bracketCommitBlocked()?'disabled':'')+'>'+
+  (pending&&!other?'核實／重試報到操作':p.checkedIn?'管理員強制取消報到':'管理員強制報到')+'</button>';
+}
+function adminCheckinPendingHtml(){
+ if(!canOfferAdminCheckin())return '';
+ const status=adminCheckinController().status(),pending=status.pending;if(!pending)return '';
+ return '<div class="banner warn"><span>尚有一筆報到覆核待核實：'+esc(pending.name)+
+  '</span><button class="btn btn-danger btn-sm" data-action="admin-force-checkin" data-id="'+esc(pending.data.playerId)+'" '+
+  (status.busy?'disabled':'')+'>核實上一筆報到</button></div>';
+}
+function offerAdminCheckin(playerId){
+ if(!canOfferAdminCheckin()||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ const controller=adminCheckinController(),status=controller?.status();if(!controller||status.busy)return;
+ const prior=status.pending;
+ const p=(state.players||[]).find(p=>p.id===playerId)||
+  (prior?.data.playerId===playerId?{id:playerId,name:prior.name,checkedIn:prior.data.expectedCheckedIn}:null);if(!p)return;
+ try{
+  const approval=controller.prepare(p,'管理員已現場核對，要求逐筆覆核報到狀態');
+  if(approval.data.playerId!==playerId){showToast('請先核實上一筆報到操作結果',true);return;}
+  const desired=approval.data.checkedIn?'已報到':'未報到';
+  openModal({type:'generic',title:status.pending?'核實／重試同一筆報到':'管理員報到覆核',danger:true,
+   message:'房號：'+approval.data.code+'\n選手：'+approval.name+'\n指定狀態：'+desired+
+    '\n\n系統警告：將略過一般報到開關、提前關閉與報到版本差異。只變更這位正取選手，既有配對保持不變。'+
+    (status.pending?'\n重試使用同一操作編號；若先前已完成，僅核實結果，不會再次切換。':'')+
+    '\n\n確認後會記錄操作者與覆核內容，並核對雲端名單。',confirmLabel:'我已核對，強制執行',
+   onConfirm:()=>{void executeAdminCheckin(approval,controller);}});
+ }catch(e){showToast('無法準備覆核：'+String(e.message||e),true);}
+}
+async function executeAdminCheckin(approval,controller){
+ try{
+  const task=controller.execute(approval);render();
+  const result=await task;
+  const current=adminOverrideContext();
+  if(current.actorUid!==approval.actorUid||current.roomId!==approval.data.roomId||current.code!==approval.data.code)return;
+  showToast(result.superseded?'這筆操作已完成，但報到狀態之後已有變更，已載入最新名單':'管理員報到覆核已完成，雲端名單與紀錄已確認');
+ }catch(e){
+  if(adminOverrideContext().roomId!==approval.data.roomId||state.cloudCode!==approval.data.code||currentAuthUid()!==approval.actorUid)return;
+  showToast('報到覆核尚未確認成功（'+String(e.message||e)+'）。'+(controller.status().pending?'請使用「核實／重試報到操作」確認同一筆結果':'請讀取最新名單後重新核對'),true);
+ }finally{render();}
+}
 let bracketCommitContext=null;
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
@@ -13052,7 +13122,7 @@ function renderPeopleManagement(){
   const sourceText=p=>p.source==="online"?"線上報名":(p.source==="test"?"測試名單":"現場新增");
   const checkinActionLocked=peopleRosterBusy||!!state.startedAt||state.archiveStatus==="completed"||checkinClosed;
   const checkinToggle=p=>needsCheckin?`<button class="people-checkin-toggle ${p.checkedIn?'is-checked':'is-unchecked'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinActionLocked?'disabled':''} aria-label="${p.checkedIn?'已報到，點擊取消報到':'未報到，點擊完成報到'}"><span class="people-checkin-dot"></span>${p.checkedIn?'已報到':'未報到'}</button>`:"";
-  const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
+  const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div>${adminCheckinButtonHtml(p)}<button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
 
   const confirmedRow=(p,i)=>`
     <tr>
@@ -13121,7 +13191,7 @@ function renderPeopleManagement(){
   const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
   const waitlistShortcut=peopleOnsiteWaitlistAvailable()&&peopleRosterSection!=="waitlist"
     ?'<div class="panel"><div class="people-section-summary"><div><div class="panel-title">備取／現場抽籤</div><p class="hint">備取名單、抽選名額與加開名額，統一從這裡操作。</p></div><button class="btn btn-primary" data-action="people-section" data-section="waitlist">'+(state.onsiteWaitlistFinalized===true?'查看抽籤紀錄':'前往備取／抽籤')+'</button></div></div>':"";
-  return syncError+pendingBanner+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
+  return syncError+pendingBanner+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -23982,6 +24052,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     void peopleQuickAddPlayers(lines);
     return;
   }
+  if(action==="admin-force-checkin"){offerAdminCheckin(target.getAttribute('data-id'));return;}
   if(action==="toggle-checkin-btn"){
     const pid = target.getAttribute("data-id");
     const p = state.players.find(x=>x.id===pid);
