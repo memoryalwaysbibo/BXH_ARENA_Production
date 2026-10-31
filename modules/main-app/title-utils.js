@@ -71,8 +71,8 @@ function onlineTimeArtworkPreviewHtml(canPreview){
   const artwork=(name)=>`<img src="${titleArtworkPath(name)}" alt="${name}稱號外觀預覽" width="768" height="270" style="display:block;width:100%;height:auto;max-width:768px;object-fit:contain;" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+'.png'">`;
   return `<section class="panel" data-online-time-art-preview style="margin-top:18px;">
     <div class="panel-title">新稱號外觀預覽｜6 款</div>
-    <p class="hint">最高管理員外觀驗收・全部永久・尚未開放取得</p>
-    <p class="hint">此區僅驗收圖片，不代表已取得稱號；計時與自動發放尚待接入。</p>
+    <p class="hint">最高管理員外觀驗收・全部永久</p>
+    <p class="hint">此區僅預覽圖片，不代表已取得稱號；取得狀態與累積進度請以下方稱號圖鑑為準。</p>
     ${titles.map(([name,hours,tier],index)=>index===0?`<div data-online-title="online_time_${hours}h"><p><b>${name}</b>・${tier}｜永久・${hours} 小時</p>${artwork(name)}</div>`:`<details data-online-title="online_time_${hours}h" style="margin-top:14px;"><summary>${name}・${tier}｜永久・${hours} 小時</summary>${artwork(name)}</details>`).join('')}
   </section>`;
 }
