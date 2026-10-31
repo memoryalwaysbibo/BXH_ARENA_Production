@@ -10698,13 +10698,16 @@ function bracketCommitController(){
   },
   generate:(options={})=>{
    const prior=state;state=JSON.parse(JSON.stringify(prior));
+   const canonicalPlayers=state.players;
    try{
     if(options.adminOperationalOverride){
      if(!adminOverrideCurrent(options.adminOperationalOverride))return null;
      const selected=new Set(options.adminOperationalOverride.participantIds);
      state.players=(state.players||[]).map(p=>({...p,checkedIn:selected.has(String(p.id))}));
     }
-    if(!generateBracket(options))return null;return JSON.parse(JSON.stringify(state));}
+    if(!generateBracket(options))return null;
+    if(options.adminOperationalOverride)state.players=canonicalPlayers;
+    return JSON.parse(JSON.stringify(state));}
    finally{state=prior;}
   },
   read:()=>window.cloudSync.readBracketFromServer(code),

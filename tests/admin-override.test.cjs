@@ -97,3 +97,19 @@ test('forced start retries a stale public confirmation without repeating the wri
  await s.executeAdminOperationalOverride(grant,bracket.signature(initial));
  assert.equal(writes,1);assert.equal(reads,3);assert(s.state.startedAt);assert.match(toasts.at(-1),/強制開賽已完成/);
 });
+
+test('forced draw selection never clears or invents canonical check-ins',()=>{
+ const core=fs.readFileSync('modules/main-app/core.js','utf8');
+ const a=core.indexOf('let bracketCommitContext=null;'),b=core.indexOf('function bracketCommitBlocked()',a);
+ const initial={...clone(before),cloudCode:'BXH-X',players:[{id:'a',checkedIn:true,checkinAt:100},{id:'b',checkedIn:false}],meta:{}};
+ let captured;
+ const s={state:clone(initial),firebaseUser:{uid:'admin'},currentRole:'admin',currentAuthUid:()=> 'admin',adminOverrideCurrent:()=>true,
+  window:{BXHBracketCommit:{create:ctx=>{captured=ctx;return {};}},sessionStorage:{},crypto:{}},
+  generateBracket:()=>{assert(s.state.players.every(p=>p.checkedIn));s.state.bracketSize=2;s.state.matches=clone(after.matches);return true;},
+  saveRecord:async()=>true,render(){},renderPreservingScroll(){},showToast(){}};
+ vm.createContext(s);vm.runInContext(core.slice(a,b),s);s.bracketCommitController();
+ const snapshot=captured.generate({adminOperationalOverride:approval()});
+ assert.deepEqual(JSON.parse(JSON.stringify(snapshot.players)),initial.players);
+ assert.deepEqual(JSON.parse(JSON.stringify(s.state)),initial);
+ assert.equal(snapshot.matches.length,1);
+});
