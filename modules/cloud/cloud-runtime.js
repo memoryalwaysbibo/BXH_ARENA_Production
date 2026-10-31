@@ -813,7 +813,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
+      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -3073,6 +3073,25 @@
       }catch(e){window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:false};throw e;}
     },
 
+    async adminOverrideRoster(payload){
+      return callEngagementFunction('adminOverrideRoster',payload,60000);
+    },
+    async readAdminRosterFromServer(payload){
+      if(!cloudEnabled||!fx.getDocFromServer)return {ok:false};
+      try{
+        const code=String(payload.code).toUpperCase();
+        const [privateSnap,publicSnap,regSnap]=await Promise.all([
+          fx.getDocFromServer(fx.doc(dbHandle,'tournaments',code)),
+          fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',code)),
+          payload.registrationId?fx.getDocFromServer(fx.doc(dbHandle,'tournaments',code,'registrations',payload.registrationId)):null
+        ]);
+        if(!privateSnap.exists()||!publicSnap.exists())return {ok:false};
+        const a=privateSnap.data(),b=publicSnap.data(),data=JSON.parse(a.data),publicData=JSON.parse(b.bracketView);
+        for(const k of ['createdBy','ownerUid','createdByRole'])if(a[k])data[k]=a[k];data.cloudCode=code;
+        const counts=x=>({capacity:x.capacity,confirmedCount:x.confirmedCount,waitlistCount:x.waitlistCount});
+        return {ok:true,data,publicData,registration:regSnap?.exists()?regSnap.data():null,counts:{private:counts(a),public:counts(b)},fences:{privateQr:a.qrCheckinRevision,publicQr:b.qrCheckinRevision}};
+      }catch{return {ok:false};}
+    },
     async adminOverrideCheckin(payload){
       return callEngagementFunction('adminOverrideCheckin',payload,30000);
     },
