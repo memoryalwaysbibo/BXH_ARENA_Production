@@ -47,7 +47,7 @@
     "tournamentEligiblePlayers",
     "validateHunterRoundLedger"
   ],
-  "sourceFunctionSha256": "d5f3a39dda4bd2cfca5d4fa4e2c6b214c0cf52b826949bedbe83b9cc4920842e",
+  "sourceFunctionSha256": "25fc1a490acd80b8c143c6b6cbb8284bd09de197db8aaef03f4f31aa1197512d",
   "modules": {
     "double-elimination-core.js": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
     "referee-fault-core.js": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
