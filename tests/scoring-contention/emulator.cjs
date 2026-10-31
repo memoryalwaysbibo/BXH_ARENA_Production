@@ -56,7 +56,9 @@ async function executeCase(seed,refs,config,repetition){
    fx:{doc:F.doc,runTransaction:async(db,fn)=>{
     try{return await F.runTransaction(db,async tx=>{
      metric.attempts++;const first=metric.attempts===1;
-     return await fn({get:async ref=>{const snapshot=await tx.get(ref);metric.reads++;if(barrier&&first&&ref.path.startsWith('tournaments/'))await barrier.wait();return snapshot;},set:(...args)=>{metric.stagedWrites++;return tx.set(...args);}});
+     // VM literals have a different Object prototype. Normalize JSON-only lab
+     // payloads into this realm before the SDK validates them; values are unchanged.
+     return await fn({get:async ref=>{const snapshot=await tx.get(ref);metric.reads++;if(barrier&&first&&ref.path.startsWith('tournaments/'))await barrier.wait();return snapshot;},set:(ref,value,options)=>{metric.stagedWrites++;return tx.set(ref,clone(value),clone(options));}});
     });}catch(e){metric.sdkErrorCode=e.code||null;metric.sdkErrorMessage=e.message;throw e;}
    }}};
   vm.createContext(context);vm.runInContext('api={'+method+'}',context);

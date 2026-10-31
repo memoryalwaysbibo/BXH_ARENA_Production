@@ -12,6 +12,8 @@ The mutation callback adds one synthetic spin point. The original UI queue, roun
 
 Safety: exact `demo-bxh-scoring-contention` project and `127.0.0.1:8187` emulator required before clients are created. Every client explicitly connects to the Emulator. Synthetic identities and lab-only document IDs are used. Minimal lab Rules are deliberately not production Rules and must never be deployed. No Cloud SDK credentials, secrets, OIDC, deployment or production access is used.
 
+The original method executes in a Node VM. Its JSON-only write values and options are copied into the host realm before native SDK validation, avoiding a cross-realm Object prototype error. This preserves the lab payload values and document paths. The initial failed CI run hit this harness issue in the single-court control; it is not evidence of an application or contention failure.
+
 CI installs dependencies in `/tmp`, runs with read-only repository permissions, and uploads `results.json` plus logs even on failure. `PASS` means the diagnostic completed and persisted-score assertions passed; it does **not** mean the incident is explained, the current architecture meets 12-court requirements, or the issue is fixed.
 
 Follow-up: verify incident deployment and error logs, exercise actual UI/default helpers and full Rules, then test confirmation/advancement and isolated cloud-network behavior. Only after this baseline should a per-match storage candidate be compared under the same workload.
