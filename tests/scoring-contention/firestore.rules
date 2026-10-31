@@ -1,0 +1,10 @@
+// ISOLATED LAB ONLY. Never deploy. These intentionally minimal rules isolate contention.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function labActor() { return request.auth != null && request.auth.uid.matches('lab-(seed|ref[1-6])'); }
+    match /users/{uid} { allow read, write: if labActor() && uid.matches('lab-ref[1-6]'); }
+    match /tournaments/{code} { allow read, write: if labActor() && code.matches('BXH-LAB[A-Z0-9]+'); }
+    match /publicTournaments/{code} { allow read, write: if labActor() && code.matches('BXH-LAB[A-Z0-9]+'); }
+  }
+}
