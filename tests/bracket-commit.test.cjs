@@ -141,3 +141,31 @@ test('confirmation has an overall deadline instead of restarting a timeout for e
  const h=fixture();h.ctx.totalTimeoutMs=10;h.ctx.timeoutMs=1000;h.ctx.read=()=>new Promise(()=>{});
  const c=h.make(),at=Date.now();assert.equal(await c.submit(),false);assert(Date.now()-at<500);assert.equal(h.writes.length,0);assert.equal(c.status().error,'confirmation-timeout');
 });
+
+
+test('admin force confirmation survives a rejected write without generating a second pairing',async()=>{
+ const h=fixture(),grant={id:'force-confirmation',operation:'draw-bracket'};let allowed=true,calls=0;
+ h.ctx.authorizeOverride=()=>allowed;
+ const normalWrite=h.ctx.write;
+ h.ctx.writeFailureCode=()=> 'permission-denied';
+ h.ctx.write=async(s,o)=>{calls++;assert.deepEqual(o.adminOperationalOverride,grant);if(calls===1)return false;s.adminOperationOverrides=[grant];return normalWrite(s,o);};
+ const c=h.make();assert.equal(await c.begin({adminOperationalOverride:grant}),false);
+ assert.equal(h.count,1);assert.equal(c.status().pending,true);assert.equal(h.success,0);
+ allowed=false;assert.equal(await c.retry(),false);assert.equal(calls,1);
+ allowed=true;assert.equal(await c.retry(),true);assert.equal(h.count,1);assert.equal(h.success,1);
+ assert.equal(h.local.adminOperationOverrides[0].id,grant.id);
+});
+test('force draw cannot begin without current admin authorization',async()=>{
+ const h=fixture(),c=h.make();assert.equal(await c.begin({adminOperationalOverride:{id:'force'}}),false);
+ assert.equal(h.count,0);assert.equal(h.writes.length,0);
+});
+
+test('admin force rebases stale revisions while retaining the exact approved pairing',async()=>{
+ const h=fixture(),grant={id:'force-confirmation',operation:'draw-bracket'};let writes=0;
+ h.ctx.authorizeOverride=()=>true;h.ctx.writeFailureCode=()=> 'registration-roster-stale';
+ h.ctx.rebaseOverride=(fresh,old)=>({...clone(fresh),matches:clone(old.matches),drawnAt:old.drawnAt,bracketSize:old.bracketSize,bracketDraw:old.bracketDraw});
+ const normalWrite=h.ctx.write;
+ h.ctx.write=async(s,o)=>{writes++;if(writes===1){h.remote={...h.remote,registrationRosterRevision:2};h.pub=clone(h.remote);return false;}assert.equal(s.registrationRosterRevision,2);s.adminOperationOverrides=[grant];return normalWrite(s,o);};
+ const c=h.make();assert.equal(await c.begin({adminOperationalOverride:grant}),true);
+ assert.equal(writes,2);assert.equal(h.count,1);assert.equal(h.local.matches[0].id,'m1');
+});

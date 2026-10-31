@@ -3209,6 +3209,8 @@ if(testerSession){
         let syncSummary=community&&m.communityQuickRegistration===true&&options.syncCommunitySummary===true;
         await fx.runTransaction(dbHandle,async tx=>{
           const ref=fx.doc(dbHandle,"tournaments",normalized),snap=await tx.get(ref);
+          const overrideProfile=options.adminOperationalOverride
+            ?await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid)):null;
           if(snap.exists()){
             const remoteDoc=snap.data()||{};
             if(Number(remoteDoc.callRevision||0)!==Number(data.callRevision||0)) throw new Error("call-state-stale");
@@ -3329,6 +3331,17 @@ if(testerSession){
               delete privatePayload.refereeStationRestrictionEnabled;
             }
             publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
+          }
+          if(options.adminOperationalOverride){
+            const before=snap.exists()?JSON.parse(snap.data().data):null;
+            if(!window.BXHAdminOverride||!before||!overrideProfile?.exists())throw new Error('admin-override-not-authorized');
+            data.adminOperationOverrides=window.BXHAdminOverride.record(options.adminOperationalOverride,
+              {actorUid,code:normalized,roomId:before.id},overrideProfile.data(),before,data);
+          }else if(snap.exists()){
+            // Preserve committed audit history when an ordinary stale client saves.
+            const before=JSON.parse(snap.data().data);
+            if(Array.isArray(before.adminOperationOverrides))data.adminOperationOverrides=before.adminOperationOverrides;
+            else delete data.adminOperationOverrides;
           }
           const fencedDoc=snap.exists()?snap.data():{};
           if(fencedDoc.onsiteWaitlistFinalized===true){
@@ -4017,4 +4030,5 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 
