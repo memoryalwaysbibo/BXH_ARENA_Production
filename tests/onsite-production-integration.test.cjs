@@ -109,8 +109,9 @@ test('roster exposes draw navigation and a direct shortcut only to eligible mana
   peopleOnlineWaitlistRows:()=>[],peopleLocalWaitlist:()=>[],peopleRegistrationIdOf:r=>r.registrationId,
   peopleOnsiteWaitlistAvailable:()=>true,peopleOnsiteWaitlistManaged:()=>false,
   renderStaffAssignmentPanel:()=>'',renderRefereeStationAssignmentPanel:()=>'',bracketCommitStatusHtml:()=>'',bracketDrawButtonHtml:()=>'',bracketCommitBlocked:()=>false,entryRosterValid:()=>true,renderEntrySelection:()=>'',BATTLE_MODE_LABELS:{},FORMAT_LABELS:{}});
- vm.runInContext(fn(core,'renderPeopleManagement'),ctx);
+ for(const name of ['canOfferAdminCheckin','adminCheckinButtonHtml','adminCheckinPendingHtml','renderPeopleManagement'])vm.runInContext(fn(core,name),ctx);
  assert.match(ctx.renderPeopleManagement(),/前往備取／抽籤/);
  ctx.peopleRosterSection='waitlist';assert.doesNotMatch(ctx.renderPeopleManagement(),/前往備取／抽籤/);
  ctx.peopleRosterSection='confirmed';ctx.peopleOnsiteWaitlistAvailable=()=>false;assert.doesNotMatch(ctx.renderPeopleManagement(),/前往備取／抽籤|備取／抽籤/);
 });
+
