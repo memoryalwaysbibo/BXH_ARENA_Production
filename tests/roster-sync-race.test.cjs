@@ -102,7 +102,7 @@ test('old roster snapshot cannot replace committed state even with a newer clock
 test('queued registration snapshot cannot reconcile after cache advances',async()=>{
  const sandbox={state:{meta:{registrationEnabled:true},cloudCode:'BXH-X'},window:{cloudSync:{connect:async()=>true,listRegistrationsForAdmin(){throw Error('unexpected read');}}},adminRegistrationsCache:[],peopleRosterBusy:false};
  vm.createContext(sandbox);
- vm.runInContext(block(core,'async function syncLatestOnlineRosterBeforeLock(','/* ==== render helpers ===='),sandbox);
+ vm.runInContext(block(core,'async function readVerifiedOnlineRoster(','/* ==== render helpers ===='),sandbox);
  const result=await sandbox.syncLatestOnlineRosterBeforeLock([{status:'confirmed'}]);
  assert.equal(result.changed,false);
 });
@@ -174,7 +174,7 @@ function lateRosterHarness({qr=true,fail=false}={}){
   }};
  vm.createContext(s);
  vm.runInContext(block(fs.readFileSync(path.join(root,'family-ui.js'),'utf8'),'function mergeFamilyOnlineRoster(','async function chooseFamilyRegistrationToCancel('),s);
- vm.runInContext(block(core,'async function syncLatestOnlineRosterBeforeLock(','/* ==== render helpers ===='),s);
+ vm.runInContext(block(core,'async function readVerifiedOnlineRoster(','/* ==== render helpers ===='),s);
  return {s,initial,clone,setValid:x=>{valid=x},setReadbackFail:x=>{readbackFail=x},setGate:x=>{writeGate=x},remote:()=>remote,stats:()=>({reads,writes})};
 }
 for(const qr of [false,true])test('68 to 80 sync rejects cloud failure without exposing phantom players; QR='+qr,async()=>{
@@ -195,7 +195,7 @@ test('fresh canonical QR state recovers a stale local revision before late roste
 });
 test('readback failure does not publish an unverified candidate; retry recovers committed IDs',async()=>{
  const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let count=0;
- h.s.window.cloudSync.joinRoom=async()=> ++count===2?{ok:false}:join();
+ h.s.window.cloudSync.joinRoom=async()=> (++count>=2&&count<=4)?{ok:false}:join();
  await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/roster-readback-failed/);
  assert.equal(h.s.state.players.length,68);assert.equal(h.remote().players.length,80);
  await h.s.syncLatestOnlineRosterBeforeLock();assert.equal(h.s.state.players[71].id,h.remote().players[71].id);assert.equal(h.stats().writes,1);
@@ -288,7 +288,7 @@ test('reopen registration does not clear deliberate checkin close flag',async()=
 });
 test('reopen and readback failure followed by retry retains committed player IDs',async()=>{
  const h=lateRosterHarness();schedule(h);let reads=0;const join=h.s.window.cloudSync.joinRoom;
- h.s.window.cloudSync.joinRoom=async()=>++reads===2?{ok:false}:join();
+ h.s.window.cloudSync.joinRoom=async()=>(++reads>=2&&reads<=4)?{ok:false}:join();
  await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/roster-readback-failed/);
  const id=h.remote().players[71].id;assert.equal(h.s.state.players.length,68);
  await h.s.syncLatestOnlineRosterBeforeLock();
@@ -304,3 +304,45 @@ test('trusted check-in missing canonical player reproduces not-confirmed regardl
  const h=lateRosterHarness();schedule(h);
  assert.throws(()=>manual(h,'phantom-jiang-id'),e=>e.code==='not-confirmed');
 });
+
+test('one stale QR readback is retried without writing the roster twice',async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let calls=0;
+ h.s.window.cloudSync.joinRoom=async()=>{calls++;if(calls===2)return {ok:true,data:h.clone(h.initial)};return join();};
+ const r=await h.s.syncLatestOnlineRosterBeforeLock();
+ assert.equal(r.ok,true);assert.equal(calls,3);assert.equal(h.stats().writes,1);
+ assert.equal(h.s.state.players.length,80);assert.equal(h.s.state.qrCheckinRevision,8);
+ assert.equal(h.s.state.players.filter(p=>p.checkedIn).length,40);
+});
+test('a transient failed server read is retried without a second commit',async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let calls=0;
+ h.s.window.cloudSync.joinRoom=async()=>++calls===2?{ok:false,reason:'network'}:join();
+ assert.equal((await h.s.syncLatestOnlineRosterBeforeLock()).ok,true);
+ assert.equal(calls,3);assert.equal(h.stats().writes,1);
+});
+test('persistent stale readback remains an error with expected and observed QR revisions',async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let calls=0;
+ h.s.window.cloudSync.joinRoom=async()=>++calls===1?join():{ok:true,data:h.clone(h.initial)};
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),e=>e.code==='roster-readback-failed'&&e.expectedQrRevision===8&&e.observedQrRevision===7);
+ assert.equal(calls,4);assert.equal(h.stats().writes,1);assert.equal(h.s.state.players.length,68);
+ assert.equal(h.remote().players.length,80);
+ h.s.window.cloudSync.joinRoom=join;
+ await h.s.syncLatestOnlineRosterBeforeLock();assert.equal(h.stats().writes,1);assert.equal(h.s.state.players.length,80);
+});
+test('newer concurrent checkin readback is accepted and retained',async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let calls=0;
+ h.s.window.cloudSync.joinRoom=async()=>{if(++calls===2){h.remote().qrCheckinRevision=9;h.remote().players[71].checkedIn=true;}return join();};
+ await h.s.syncLatestOnlineRosterBeforeLock();assert.equal(h.s.state.qrCheckinRevision,9);
+ assert.equal(h.s.state.players[71].checkedIn,true);assert.equal(calls,2);assert.equal(h.stats().writes,1);
+});
+for(const failure of ['private','not-found','wrong-room'])test('readback stops immediately on '+failure,async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let calls=0;
+ h.s.window.cloudSync.joinRoom=async()=>++calls===1?join():failure==='wrong-room'?{ok:true,data:{id:'other',qrCheckinRevision:99}}:{ok:false,reason:failure};
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/roster-readback-failed/);
+ assert.equal(calls,2);assert.equal(h.s.state.players.length,68);
+});
+test('account or room change during stale readback stops recovery',async()=>{
+ const h=lateRosterHarness(),join=h.s.window.cloudSync.joinRoom;let calls=0;
+ h.s.window.cloudSync.joinRoom=async()=>{if(++calls===2){h.setValid(false);return {ok:true,data:h.clone(h.initial)};}return join();};
+ await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/context-changed/);assert.equal(calls,2);assert.equal(h.s.state.players.length,68);
+});
+
