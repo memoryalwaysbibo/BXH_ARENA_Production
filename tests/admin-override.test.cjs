@@ -82,3 +82,18 @@ test('UI offers an explicit confirmation and a revoked role cannot execute it',a
  s.userProfile.role='staff';dialog.onConfirm();await new Promise(r=>setImmediate(r));assert.equal(reads,0);
  assert.equal(s.offerAdminOperationalOverride('draw-bracket','名單未確認'),false);
 });
+
+test('forced start retries a stale public confirmation without repeating the write',async()=>{
+ const source=fs.readFileSync('modules/main-app/core.js','utf8');
+ const a=source.indexOf('let adminOperationalOverrideBusy=false;'),b=source.indexOf('let bracketCommitContext=null;',a);
+ const initial={...clone(before),cloudCode:'BXH-X',meta:{battleMode:'individual'},bracketSize:2,matches:clone(after.matches)};
+ let remote=clone(initial),reads=0,writes=0,toasts=[];
+ const grant={...approval(),operation:'start-tournament'};
+ const s={state:clone(initial),userProfile:actor,currentAuthUid:()=> 'admin',window:{BXHAdminOverride:override,BXHBracketCommit:bracket,cloudSync:{readBracketFromServer:async()=>{
+  reads++;return {ok:true,data:clone(remote),publicData:reads===2?clone(initial):clone(remote)};
+ }}},cloneStateForSave:clone,render(){},saveRecord:async()=>true,showToast:m=>toasts.push(m),console,setTimeout:fn=>{fn();},
+ enqueueCloudStateWrite:async(code,snapshot)=>{writes++;remote={...clone(snapshot),adminOperationOverrides:[{id:grant.id}]};return true;}};
+ vm.createContext(s);vm.runInContext(source.slice(a,b),s);
+ await s.executeAdminOperationalOverride(grant,bracket.signature(initial));
+ assert.equal(writes,1);assert.equal(reads,3);assert(s.state.startedAt);assert.match(toasts.at(-1),/強制開賽已完成/);
+});

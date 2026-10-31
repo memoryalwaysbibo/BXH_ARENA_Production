@@ -10646,14 +10646,19 @@ async function executeAdminOperationalOverride(approval,baseSignature){
    const ok=await enqueueCloudStateWrite(approval.code,candidate,{adminOperationalOverride:approval,
     bracketStartSignature:baseSignature,isCurrent:()=>adminOverrideCurrent(approval)});
    if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
-   const verified=await window.cloudSync.readBracketFromServer(approval.code);
-   if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
-   if(verified?.ok!==true||verified.data?.id!==approval.roomId||
-    !verified.data.adminOperationOverrides?.some(r=>r.id===approval.id)||
-    verified.data.startedAt!==candidate.startedAt||!verified.publicData?.startedAt||
-    window.BXHBracketCommit.signature(verified.data)!==baseSignature||
-    window.BXHBracketCommit.signature(verified.publicData)!==baseSignature)
-     throw Error(ok===false?window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-write-rejected':'cloud-readback-unconfirmed');
+   let verified=null,confirmed=false;
+   for(let attempt=0;attempt<3;attempt++){
+    verified=await window.cloudSync.readBracketFromServer(approval.code);
+    if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
+    confirmed=verified?.ok===true&&verified.data?.id===approval.roomId&&
+     verified.data.adminOperationOverrides?.some(r=>r.id===approval.id)&&
+     verified.data.startedAt===candidate.startedAt&&verified.publicData?.startedAt&&
+     window.BXHBracketCommit.signature(verified.data)===baseSignature&&
+     window.BXHBracketCommit.signature(verified.publicData)===baseSignature;
+    if(confirmed)break;
+    if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));
+   }
+   if(!confirmed)throw Error(ok===false?window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-write-rejected':'cloud-readback-unconfirmed');
    state=verified.data;state.cloudCode=approval.code;await saveRecord(state);
    activeTab='referee';showToast('管理員強制開賽已完成，操作紀錄已儲存');
   }
