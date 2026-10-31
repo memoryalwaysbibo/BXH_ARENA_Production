@@ -154,6 +154,7 @@
   "百時星軌":"assets/title-rare-online-time-100h-v1.webp",
   "歲月銘刻":"assets/title-epic-online-time-500h-v1.webp",
   "千載流光":"assets/title-legendary-online-time-1000h-v1.webp",
+        "月度獵人":"assets/title-rare-monthly-hunter-moon-phases-v1.webp",
         "七日常客":"assets/title-common-seven-day-guest-v1.webp",
         "三冠王":"assets/title-legendary-triple-crown-v3.webp",
         "二當家":"assets/title-limited-co-leader.webp",
