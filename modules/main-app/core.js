@@ -7276,9 +7276,10 @@ function generateTeamBracket(){
 }
 
 /* ==== dispatcher: generate bracket ==== */
-function generateBracket(){
+function generateBracket(options={}){
+  const forced=adminOverrideCurrent(options.adminOperationalOverride);
   if(state.meta&&state.meta.battleMode==="team") return generateTeamBracket();
-  if(!entryRosterValid()){showToast("請先完成名額抽籤，並保持抽中的正式名單",true);return false;}
+  if(!forced&&!entryRosterValid()){showToast("請先完成名額抽籤，並保持抽中的正式名單",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   const fmt = state.meta.formatType || "single";
   let ok;
@@ -10592,6 +10593,87 @@ const BOARD_ICON_PLUS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="n
 const BOARD_ICON_FULLSCREEN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M4 9 V4 h5 M20 9 V4 h-5 M4 15 v5 h5 M20 15 v5 h-5"/></svg>';
 
 // Bracket generation is detached until persistence and server readback agree.
+let adminOperationalOverrideBusy=false;
+function adminOverrideContext(){return {actorUid:currentAuthUid(),roomId:state.id,code:state.cloudCode};}
+function adminOverrideCurrent(approval){return window.BXHAdminOverride?.current(approval,adminOverrideContext(),userProfile)===true;}
+function canOfferAdminOperationalOverride(){
+ return window.BXHAdminOverride?.allowed(userProfile)===true&&!!currentAuthUid()&&!!state.cloudCode&&
+  state.meta?.battleMode!=='team'&&!state.startedAt&&state.archiveStatus!=='completed';
+}
+function adminOverrideButtonsHtml(){
+ if(!canOfferAdminOperationalOverride())return '';
+ const disabled=adminOperationalOverrideBusy||bracketCommitController()?.blocked();
+ return '<button class="btn btn-danger" data-action="admin-force-draw" '+(disabled?'disabled':'')+'>管理員強制抽籤</button>'+
+  (state.bracketSize?'<button class="btn btn-danger" data-action="admin-force-start" '+(disabled?'disabled':'')+'>管理員強制開賽</button>':'');
+}
+function offerAdminOperationalOverride(operation,reason){
+ if(!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy||bracketCommitBlocked())return false;
+ const participantIds=operation==='draw-bracket'?eligiblePlayers().map(p=>String(p.id)):Array.from(currentBracketParticipantIds());
+ if(participantIds.length<2){showToast('至少需要兩位參賽者，請先確認名單',true);return true;}
+ const approval={id:crypto.randomUUID(),operation,...adminOverrideContext(),at:Date.now(),reason:String(reason).slice(0,500),
+  participantIds,warnings:['略過一般線上名單同步檢查',...(operation==='draw-bracket'?['以本次確認的參賽者抽籤']:['以既有對戰表開賽，忽略報到名單差異'])]};
+ const baseSignature=window.BXHBracketCommit.signature(state);
+ const selected=new Set(participantIds),names=(state.players||[]).filter(p=>selected.has(String(p.id))).map(p=>p.name);
+ openModal({type:'generic',title:operation==='draw-bracket'?'管理員強制抽籤確認':'管理員強制開賽確認',danger:true,
+  message:'系統警告：'+approval.reason+'\n\n房號：'+approval.code+'\n採用參賽者：'+participantIds.length+' 人\n'+names.join('、')+
+   '\n\n'+approval.warnings.join('\n')+'\n\n確認後將以這份名單執行，並記錄操作者、警告與確認時間。雲端仍須確認寫入成功。',
+  confirmLabel:'我已核對，強制執行',onConfirm:()=>{void executeAdminOperationalOverride(approval,baseSignature);}});
+ return true;
+}
+function reconfirmPendingAdminOverride(){
+ const controller=bracketCommitController(),status=controller?.status(),prior=status?.override;
+ if(status?.busy||!prior||!adminOverrideCurrent(prior))return;
+ const approval={...prior,at:Date.now()};
+ openModal({type:'generic',title:'重新確認強制抽籤',danger:true,
+  message:'將保留已產生的同一份配對，不會重新抽籤。\n\n房號：'+approval.code+'\n參賽人數：'+approval.participantIds.length+
+   ' 人\n原警告：'+approval.reason+'\n\n若先前已寫入，會先讀回確認；尚未寫入才重試。',
+  confirmLabel:'我已重新核對，重試同一配對',onConfirm:()=>{void controller.renewOverride(approval);}});
+}
+async function executeAdminOperationalOverride(approval,baseSignature){
+ if(adminOperationalOverrideBusy||!adminOverrideCurrent(approval))return;
+ adminOperationalOverrideBusy=true;render();
+ try{
+  const latest=await window.cloudSync.readBracketFromServer(approval.code);
+  if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
+  if(latest?.ok!==true||latest.data?.id!==approval.roomId)throw Error('cloud-readback-unconfirmed');
+  const fresh=latest.data;
+  if(fresh.startedAt||fresh.archiveStatus==='completed')throw Error('bracket-started');
+  if(window.BXHBracketCommit.signature(fresh)!==baseSignature)throw Error('bracket-version-conflict');
+  if(fresh.onsiteWaitlistServerOwned===true&&fresh.onsiteWaitlistFinalized!==true)throw Error('onsite-waitlist-managed');
+  const known=new Set((fresh.players||[]).map(p=>String(p.id)));
+  if(approval.participantIds.some(id=>!known.has(id)))throw Error('admin-override-roster-changed');
+  if(approval.operation==='draw-bracket'){
+   state=JSON.parse(JSON.stringify(fresh));state.cloudCode=approval.code;
+   // The commit controller retains this exact pairing and approval for retries.
+   if(await bracketCommitController().begin({adminOperationalOverride:approval})!==true)
+    showToast('強制抽籤尚未確認成功，請查看上傳狀態；重試會保留同一配對',true);
+  }else{
+   const candidate=cloneStateForSave(fresh);candidate.cloudCode=approval.code;
+   candidate.startedAt=Date.now();candidate.rosterLocked=true;candidate.meta.registrationStatus='started';
+   if(candidate.meta.checkinRequired){candidate.meta.checkinClosedEarly=true;candidate.meta.checkinClosedAt=candidate.startedAt;}
+   candidate.updatedAt=Date.now();
+   const ok=await enqueueCloudStateWrite(approval.code,candidate,{adminOperationalOverride:approval,
+    bracketStartSignature:baseSignature,isCurrent:()=>adminOverrideCurrent(approval)});
+   if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
+   let verified=null,confirmed=false;
+   for(let attempt=0;attempt<3;attempt++){
+    verified=await window.cloudSync.readBracketFromServer(approval.code);
+    if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
+    confirmed=verified?.ok===true&&verified.data?.id===approval.roomId&&
+     verified.data.adminOperationOverrides?.some(r=>r.id===approval.id)&&
+     verified.data.startedAt===candidate.startedAt&&verified.publicData?.startedAt&&
+     window.BXHBracketCommit.signature(verified.data)===baseSignature&&
+     window.BXHBracketCommit.signature(verified.publicData)===baseSignature;
+    if(confirmed)break;
+    if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));
+   }
+   if(!confirmed)throw Error(ok===false?window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-write-rejected':'cloud-readback-unconfirmed');
+   state=verified.data;state.cloudCode=approval.code;await saveRecord(state);
+   activeTab='referee';showToast('管理員強制開賽已完成，操作紀錄已儲存');
+  }
+ }catch(e){console.warn('[admin operational override]',e);showToast('強制執行未確認成功（'+String(e.code||e.message||'unknown')+'），請核對雲端狀態',true);}
+ finally{adminOperationalOverrideBusy=false;render();}
+}
 let bracketCommitContext=null;
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
@@ -10603,9 +10685,29 @@ function bracketCommitController(){
  const controller=window.BXHBracketCommit.create({key,actorUid,storage,current,
   state:()=>state,cloud:()=>!!code,
   operationId:()=>window.crypto.randomUUID(),
-  generate:()=>{
+  authorizeOverride:approval=>adminOverrideCurrent(approval),
+  rebaseOverride:(fresh,snapshot,approval)=>{
+   if(!adminOverrideCurrent(approval))throw Error('admin-override-not-authorized');
+   const known=new Set((fresh.players||[]).map(p=>String(p.id)));
+   if(approval.participantIds.some(id=>!known.has(id)))throw Error('admin-override-roster-changed');
+   const rebased=cloneStateForSave(fresh);rebased.cloudCode=code;
+   for(const field of ['matches','bracketSize','drawnAt','currentMatchId','championId','runnerUpId','thirdId','fourthId','courtAssignments','bracketDraw','bracketDrawHistory']){
+    if(Object.prototype.hasOwnProperty.call(snapshot,field))rebased[field]=JSON.parse(JSON.stringify(snapshot[field]));
+   }
+   rebased.updatedAt=Date.now();rebased.rosterLocked=false;return rebased;
+  },
+  generate:(options={})=>{
    const prior=state;state=JSON.parse(JSON.stringify(prior));
-   try{if(!generateBracket())return null;return JSON.parse(JSON.stringify(state));}
+   const canonicalPlayers=state.players;
+   try{
+    if(options.adminOperationalOverride){
+     if(!adminOverrideCurrent(options.adminOperationalOverride))return null;
+     const selected=new Set(options.adminOperationalOverride.participantIds);
+     state.players=(state.players||[]).map(p=>({...p,checkedIn:selected.has(String(p.id))}));
+    }
+    if(!generateBracket(options))return null;
+    if(options.adminOperationalOverride)state.players=canonicalPlayers;
+    return JSON.parse(JSON.stringify(state));}
    finally{state=prior;}
   },
   read:()=>window.cloudSync.readBracketFromServer(code),
@@ -10625,15 +10727,16 @@ function bracketCommitStatusHtml(){
  const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
  return '<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
- (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+'</section>';
+ (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
+ (s.override&&!s.busy&&adminOverrideCurrent(s.override)?'<button class="btn btn-danger" data-action="admin-force-reconfirm">重新確認並重試同一配對</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
- return '<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
+ return adminOverrideButtonsHtml()+'<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
 }
 async function verifyBracketBeforeStart(){
  const c=bracketCommitController();if(!c)return true;
- const ok=await c.verify(state);if(!ok)showToast('對戰表尚未確認上傳，請先重試上傳後再開賽',true);return ok;
+ const ok=await c.verify(state);if(!ok){if(!offerAdminOperationalOverride('start-tournament','對戰表尚未通過一般開賽驗證'))showToast('對戰表尚未確認上傳，請先重試上傳後再開賽',true);}return ok;
 }
 
 function currentRoundLabelForBoard(){
@@ -20674,6 +20777,10 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(action==='admin-force-reconfirm'){reconfirmPendingAdminOverride();return;}
+  if(action==='admin-force-draw'||action==='admin-force-start'){
+    offerAdminOperationalOverride(action==='admin-force-draw'?'draw-bracket':'start-tournament','管理員要求略過一般名單同步檢查');return;
+  }
   if(onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true&&['save-meta','save-registration-settings','open-registration-publish-preview','community-save-settings','toggle-event-cancelled'].includes(action)){
     showToast('候補抽選尚未完成，房間設定暫停儲存與發布；請至「人員管理 → 備取／現場抽籤」完成抽選後再操作。',true);return;
   }
@@ -24942,7 +25049,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               }
             }catch(e){
               console.warn("[start-tournament roster sync]",e);
-              showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
+              if(!offerAdminOperationalOverride("start-tournament",mapRegistrationError(e)))showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
               return;
             }
             if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
@@ -25004,7 +25111,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         });
       }catch(e){
         console.warn("[start-tournament roster preflight]",e);
-        showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
+        if(!offerAdminOperationalOverride("start-tournament",mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
       }
     })();
     return;
@@ -25051,7 +25158,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         doCheckThenDraw();
       }catch(e){
         console.warn("[draw-bracket roster sync]",e);
-        showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
+        if(!offerAdminOperationalOverride("draw-bracket",mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
       }
     };
     if(state.bracketSize){
@@ -25723,4 +25830,5 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
