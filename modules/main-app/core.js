@@ -8547,6 +8547,7 @@ function normalizeHunterRoundEvent(raw,index,matchId){
   };
 }
 function validateHunterRoundLedger(match){
+  if(match?.scoreBackfill?.excludeFromRoundAbilityStatistics===true || (match?.log||[]).some(e=>e.synthetic===true)) return {ok:false,events:[],roundCount:0,scoreA:null,scoreB:null,errors:[{reason:'administrative-backfill'}]};
   const raw=Array.isArray(match&&match.log)?match.log:[];
   const events=[];
   const errors=[];
@@ -20594,9 +20595,19 @@ function bindDynamicInputs(){
       const file = e.target.files[0];
       if(!file) return;
       const reader = new FileReader();
-      reader.onload = ()=>{
+      reader.onload = async ()=>{
         try{
           let data = JSON.parse(reader.result);
+          if(data.type==='bxh-score-backfill-plan-v1'){
+            if(userProfile?.role!=='super_admin'||!currentAuthUid()||!state.cloudCode||!window.cloudSync?.confirmMatchTransaction)throw Error('backfill-admin-required');
+            await import('/modules/main-app/score-backfill.js?v=20261031.1');
+            const code=state.cloudCode,roomId=state.id,actorUid=currentAuthUid(),audit={actorUid,at:Date.now()};
+            showToast('正在核對雲端並補登比分，請稍候');
+            const result=await window.cloudSync.confirmMatchTransaction(code,remote=>({ok:true,state:window.BXHScoreBackfill.apply(remote,data,audit).state}));
+            if(!result?.ok)throw Error(result?.reason||'backfill-unconfirmed');
+            if(state.cloudCode!==code||state.id!==roomId||currentAuthUid()!==actorUid)return;
+            applyRemoteState(result.state,true);await saveRecord(cloneStateForSave(state));render();showToast('比分補登已由雲端確認；勝負與晉級保留');return;
+          }
           if(data.type==="bxh-single-record" && data.record) data = data.record;
           if(!data.players || !Array.isArray(data.players)) throw new Error("格式錯誤");
           const keepId = state.id;

@@ -889,6 +889,7 @@ function tournamentEligiblePlayers(players,meta,matches){
 }
 
 function validateHunterRoundLedger(match){
+  if(match?.scoreBackfill?.excludeFromRoundAbilityStatistics===true || (match?.log||[]).some(e=>e.synthetic===true)) return {ok:false,events:[],roundCount:0,scoreA:null,scoreB:null,errors:[{reason:'administrative-backfill'}]};
   const raw=Array.isArray(match&&match.log)?match.log:[];
   const events=[];
   const errors=[];
