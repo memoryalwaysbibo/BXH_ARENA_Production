@@ -9623,6 +9623,25 @@ function bracketRosterIsCurrent(){
   if(state.meta?.battleMode==="team"){const teams=eligibleBracketTeams();if(!teams)return false;return sameStringSet(new Set(state.matches.flatMap(m=>m.teamIds||[]).filter(Boolean).map(String)),new Set(teams.map(t=>String(t.id))));}
   return sameStringSet(currentBracketParticipantIds(),eligibleRosterIds());
 }
+async function readVerifiedOnlineRoster(context, expectedQrRevision=0){
+  let observedQrRevision=null;
+  for(let attempt=1;attempt<=3;attempt++){
+    requireRegistrationRosterContext(context);
+    const result=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
+    requireRegistrationRosterContext(context);
+    if(result?.ok===true&&result.data?.id===context.roomId){
+      observedQrRevision=Number(result.data.qrCheckinRevision||0);
+      if(Number.isSafeInteger(observedQrRevision)&&observedQrRevision>=expectedQrRevision)return result.data;
+    }else if(result?.ok===true||result?.reason==="private"||result?.reason==="not-found"){
+      break;
+    }
+  }
+  throw Object.assign(new Error('roster-readback-failed'),{
+    code:'roster-readback-failed',rosterSyncStage:'readback',
+    expectedQrRevision,observedQrRevision
+  });
+}
+
 async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
     return {ok:true,changed:false,confirmed:0};
@@ -9682,12 +9701,10 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     if(ok!==true)throw new Error(window.__BXH_LAST_CLOUD_ERROR_CODE||'roster-cloud-write-failed');
   }
   if(needsWrite||base!==state){
-    const result=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
-    requireRegistrationRosterContext(context);
-    if(result?.ok!==true||result.data?.id!==context.roomId)throw new Error('roster-readback-failed');
-    if(needsWrite&&candidate.qrCheckinManaged===true&&Number(result.data.qrCheckinRevision||0)<candidate.qrCheckinRevision)throw new Error('roster-readback-failed');
-    applyRemoteState(result.data,true);
-    if(Number(state.qrCheckinRevision||0)<Number(result.data.qrCheckinRevision||0))throw new Error('roster-readback-failed');
+    const expectedQrRevision=Number(candidate.qrCheckinManaged===true?candidate.qrCheckinRevision||0:0);
+    const verified=await readVerifiedOnlineRoster(context,expectedQrRevision);
+    applyRemoteState(verified,true);
+    if(Number(state.qrCheckinRevision||0)<Number(verified.qrCheckinRevision||0))throw new Error('roster-readback-failed');
   }
   const after=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
