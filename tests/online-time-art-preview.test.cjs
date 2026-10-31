@@ -7,7 +7,8 @@ test('preview is explicitly authorized and cannot impersonate an earned title',(
   for(const value of [false,undefined,null,'true',1])assert.equal(api.onlineTimeArtworkPreviewHtml(value),'');
   const html=api.onlineTimeArtworkPreviewHtml(true);
   assert.match(html,/微光初現/);assert.match(html,/最高管理員外觀驗收/);
-  assert.match(html,/尚未開放取得/);assert.match(html,/不代表已取得稱號/);
+  assert.match(html,/以下方稱號圖鑑為準/);assert.match(html,/不代表已取得稱號/);
+  assert.doesNotMatch(html,/尚未開放取得|尚待接入/);
   assert.doesNotMatch(html,/button|input|select|fetch\(|httpsCallable|localStorage/);
   assert.match(html,/width:100%;height:auto/);
 });
