@@ -169,3 +169,15 @@ test('admin force rebases stale revisions while retaining the exact approved pai
  const c=h.make();assert.equal(await c.begin({adminOperationalOverride:grant}),true);
  assert.equal(writes,2);assert.equal(h.count,1);assert.equal(h.local.matches[0].id,'m1');
 });
+
+test('expired force confirmation can be renewed without a new operation or pairing',async()=>{
+ const h=fixture(),grant={id:'force-confirmation',operation:'draw-bracket',participantIds:['a','b'],at:1};let accepted=false;
+ h.ctx.authorizeOverride=()=>true;const normalWrite=h.ctx.write;
+ h.ctx.writeFailureCode=()=> 'permission-denied';
+ h.ctx.write=async(s,o)=>{if(!accepted)return false;s.adminOperationOverrides=[{id:o.adminOperationalOverride.id}];return normalWrite(s,o);};
+ const c=h.make();assert.equal(await c.begin({adminOperationalOverride:grant}),false);
+ assert.equal(await c.renewOverride({...grant,id:'new-operation',at:2}),false);
+ assert.equal(await c.renewOverride({...grant,participantIds:['other'],at:2}),false);
+ accepted=true;assert.equal(await c.renewOverride({...grant,at:2}),true);
+ assert.equal(h.count,1);assert.equal(h.local.bracketDraw.id,'op1');assert.equal(h.local.adminOperationOverrides[0].id,grant.id);
+});

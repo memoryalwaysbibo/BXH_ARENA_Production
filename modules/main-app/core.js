@@ -10620,6 +10620,15 @@ function offerAdminOperationalOverride(operation,reason){
   confirmLabel:'我已核對，強制執行',onConfirm:()=>{void executeAdminOperationalOverride(approval,baseSignature);}});
  return true;
 }
+function reconfirmPendingAdminOverride(){
+ const controller=bracketCommitController(),status=controller?.status(),prior=status?.override;
+ if(status?.busy||!prior||!adminOverrideCurrent(prior))return;
+ const approval={...prior,at:Date.now()};
+ openModal({type:'generic',title:'重新確認強制抽籤',danger:true,
+  message:'將保留已產生的同一份配對，不會重新抽籤。\n\n房號：'+approval.code+'\n參賽人數：'+approval.participantIds.length+
+   ' 人\n原警告：'+approval.reason+'\n\n若先前已寫入，會先讀回確認；尚未寫入才重試。',
+  confirmLabel:'我已重新核對，重試同一配對',onConfirm:()=>{void controller.renewOverride(approval);}});
+}
 async function executeAdminOperationalOverride(approval,baseSignature){
  if(adminOperationalOverrideBusy||!adminOverrideCurrent(approval))return;
  adminOperationalOverrideBusy=true;render();
@@ -10715,7 +10724,8 @@ function bracketCommitStatusHtml(){
  const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
  return '<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
- (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+'</section>';
+ (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
+ (s.override&&!s.busy&&adminOverrideCurrent(s.override)?'<button class="btn btn-danger" data-action="admin-force-reconfirm">重新確認並重試同一配對</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
@@ -20764,6 +20774,7 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(action==='admin-force-reconfirm'){reconfirmPendingAdminOverride();return;}
   if(action==='admin-force-draw'||action==='admin-force-start'){
     offerAdminOperationalOverride(action==='admin-force-draw'?'draw-bracket':'start-tournament','管理員要求略過一般名單同步檢查');return;
   }

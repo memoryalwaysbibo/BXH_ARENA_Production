@@ -114,7 +114,13 @@ function create(ctx){
   }catch(e){error=e.message;}
   finally{busy=false;if(ctx.current())ctx.changed();}
  }
- return {begin,retry,discard,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,error,result}),async verify(snapshot){
+ async function renewOverride(approval){
+  const prior=pending?.adminOperationalOverride;
+  if(busy||!prior||!ctx.current()||!ctx.authorizeOverride?.(approval)||approval.id!==prior.id||
+   approval.operation!==prior.operation||JSON.stringify([...(approval.participantIds||[])].sort())!==JSON.stringify([...(prior.participantIds||[])].sort()))return false;
+  pending.adminOperationalOverride=clone(approval);keep();return retry();
+ }
+ return {begin,retry,discard,renewOverride,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,error,result,override:pending?.adminOperationalOverride?clone(pending.adminOperationalOverride):null}),async verify(snapshot){
   if(busy||pending)return false;if(!ctx.cloud())return true;
   try{const latest=await deadline(ctx.read());return ctx.current()&&!busy&&!pending&&signature(ctx.state())===signature(snapshot)&&latest?.ok===true&&!latest.data.startedAt&&signature(latest.data)===signature(snapshot)&&signature(latest.publicData)===signature(snapshot);}catch{return false;}
  }};
