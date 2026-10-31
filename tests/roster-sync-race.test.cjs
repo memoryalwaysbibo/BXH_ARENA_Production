@@ -154,7 +154,7 @@ for(const team of [false,true])test('registration screen applies canonical indiv
 function lateRosterHarness({qr=true,fail=false}={}){
  const clone=x=>JSON.parse(JSON.stringify(x));let nextId=0,valid=true,reads=0,writes=0;
  const regs=Array.from({length:80},(_,i)=>({registrationId:'r'+i,uid:'u'+i,displayName:i===71?'江佳恩':'Player '+i,status:'confirmed'}));
- const initial={id:'late-room',cloudCode:'BXH-LATE12',updatedAt:1,meta:{registrationEnabled:true,checkinRequired:true,battleMode:'individual'},players:regs.slice(0,68).map((r,i)=>({id:'canonical-'+i,name:r.displayName,source:'online',registrationId:r.registrationId,registrationUid:r.uid,checkedIn:i<40})),teams:[],...(qr?{qrCheckinManaged:true,qrCheckinRevision:7}:{})};
+ const initial={id:'late-room',cloudCode:'BXH-LATE12',updatedAt:1,meta:{registrationEnabled:true,checkinRequired:true,battleMode:'individual'},players:regs.slice(0,68).map((r,i)=>({id:'canonical-'+i,name:r.displayName,source:'online',registrationId:r.registrationId,registrationUid:r.uid,checkedIn:i<40,...(i<40?{checkinFirstAt:100+i,checkinAt:200+i,checkinMethod:'manual'}:{})})),teams:[],...(qr?{qrCheckinManaged:true,qrCheckinRevision:7}:{})};
  let remote=clone(initial),readbackFail=false,writeGate=null;
  const s={state:clone(initial),adminRegistrationsCache:null,peopleRosterBusy:false,publicTournamentsCache:null,myRegistrationsCache:null,
   captureRegistrationRosterContext:()=>({code:'BXH-LATE12',roomId:'late-room'}),
@@ -346,3 +346,35 @@ test('account or room change during stale readback stops recovery',async()=>{
  await assert.rejects(h.s.syncLatestOnlineRosterBeforeLock(),/context-changed/);assert.equal(calls,2);assert.equal(h.s.state.players.length,68);
 });
 
+
+function auditRosterMerge(players,rows){
+ const s={};vm.createContext(s);
+ const family=fs.readFileSync(path.join(root,'family-ui.js'),'utf8');
+ vm.runInContext(block(family,'function mergeFamilyOnlineRoster(','async function chooseFamilyRegistrationToCancel('),s);
+ return JSON.parse(JSON.stringify(s.mergeFamilyOnlineRoster(players,rows,true,()=> 'new-player-id')));
+}
+for(const child of [false,true])test('check-in audit survives family roster merge; child='+child,()=>{
+ const old={id:'p1',name:'Player',source:'online',registrationUid:'guardian',registrationId:'registration',checkedIn:true};
+ if(child)Object.assign(old,{familyPlayerId:'child',participantId:'child',guardianUid:'guardian'});
+ Object.assign(old,{checkinFirstAt:100,checkinAt:200,checkinMethod:'manual'});
+ const row={status:'confirmed',uid:'guardian',registrationId:'registration',displayName:'Player',...(child?{familyPlayerId:'child',guardianUid:'guardian'}:{})};
+ const merged=auditRosterMerge([old],[row]);
+ assert.deepEqual(merged,[old]);
+ assert.equal(merged[0].id,'p1');
+});
+test('unchanged QR roster stays clean after the real QR write fence',()=>{
+ const rows=[{status:'confirmed',uid:'guardian',registrationId:'registration',displayName:'Player'}];
+ const canonical={qrCheckinManaged:true,qrCheckinRevision:7,players:[{id:'p1',name:'Player',source:'online',registrationUid:'guardian',registrationId:'registration',checkedIn:true,checkinFirstAt:100,checkinAt:200,checkinMethod:'manual'}]};
+ let candidate={...canonical,players:auditRosterMerge(canonical.players,rows)};
+ assert.deepEqual(candidate.players,canonical.players);
+ const fence=require('../modules/main-app/qr-checkin-fence.js');
+ fence.advance({qrCheckinManaged:true,qrCheckinRevision:7,data:JSON.stringify(canonical)},candidate,7);
+ assert.deepEqual(auditRosterMerge(candidate.players,rows),candidate.players);
+ assert.equal(candidate.qrCheckinRevision,8);
+});
+test('new registration cannot supply check-in audit or inherit another player audit',()=>{
+ const rows=[{status:'confirmed',uid:'new',registrationId:'new-reg',displayName:'New',checkinAt:900,checkinFirstAt:900,checkinMethod:'qr'}];
+ const merged=auditRosterMerge([],rows);
+ assert.equal(merged[0].checkedIn,false);
+ for(const k of ['checkinAt','checkinFirstAt','checkinMethod'])assert.equal(Object.hasOwn(merged[0],k),false);
+});
