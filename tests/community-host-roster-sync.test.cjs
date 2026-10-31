@@ -313,7 +313,7 @@ test('disabled quick room shows one authoritative waitlist row and visible sync 
  const {ctx}=harness();ctx.state.meta.registrationEnabled=false;
  ctx.state.waitlistPlayers=[{id:'shadow',registrationId:'waiting',source:'online',name:'Waiter'}];ctx.adminRegistrationsCache=[{registrationId:'waiting',status:'waitlist',publicName:'Waiter'}];ctx.adminRegistrationsError='offline';
  Object.assign(ctx,{setTimeout(){},esc:value=>String(value??''),peopleRosterSection:'waitlist',participantDisplayName:p=>p.name,normalizeDateTime:()=>0,renderStaffAssignmentPanel:()=>'',renderRefereeStationAssignmentPanel:()=>'',BATTLE_MODE_LABELS:{},FORMAT_LABELS:{},entryRosterValid:()=>true,renderEntrySelection:()=>'',bracketDrawButtonHtml:()=>''});
- for(const name of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','canManageOnsiteWaitlist','peopleOnsiteWaitlistAvailable','renderPeopleManagement'])vm.runInContext(fn(name),ctx);
+ for(const name of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','canManageOnsiteWaitlist','peopleOnsiteWaitlistAvailable','canOfferAdminCheckin','adminCheckinButtonHtml','adminCheckinPendingHtml','renderPeopleManagement'])vm.runInContext(fn(name),ctx);
  const html=ctx.renderPeopleManagement();assert.match(html,/備取區（1）/);assert.match(html,/role="alert"/);assert.match(html,/線上名單尚未同步：offline/);assert.match(html,/data-action="load-online-roster"/);
 });
 
@@ -392,5 +392,6 @@ test('staff roster screen escapes player names and offers only a read action, in
  const handle=block('function handleAction(action, target){','  if(action.startsWith(\'card-\'))');
  assert(handle.indexOf("action==='load-staff-registration-roster'")<handle.indexOf("state.entrySelection?.status==='drawn'"));
 });
+
 
 
