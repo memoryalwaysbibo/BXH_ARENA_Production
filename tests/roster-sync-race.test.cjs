@@ -154,7 +154,7 @@ for(const team of [false,true])test('registration screen applies canonical indiv
 function lateRosterHarness({qr=true,fail=false}={}){
  const clone=x=>JSON.parse(JSON.stringify(x));let nextId=0,valid=true,reads=0,writes=0;
  const regs=Array.from({length:80},(_,i)=>({registrationId:'r'+i,uid:'u'+i,displayName:i===71?'江佳恩':'Player '+i,status:'confirmed'}));
- const initial={id:'late-room',cloudCode:'BXH-LATE12',updatedAt:1,meta:{registrationEnabled:true,checkinRequired:true,battleMode:'individual'},players:regs.slice(0,68).map((r,i)=>({id:'canonical-'+i,name:r.displayName,source:'online',registrationId:r.registrationId,registrationUid:r.uid,checkedIn:i<40})),teams:[],...(qr?{qrCheckinManaged:true,qrCheckinRevision:7}:{})};
+ const initial={id:'late-room',cloudCode:'BXH-LATE12',updatedAt:1,meta:{registrationEnabled:true,checkinRequired:true,battleMode:'individual'},players:regs.slice(0,68).map((r,i)=>({id:'canonical-'+i,name:r.displayName,source:'online',registrationId:r.registrationId,registrationUid:r.uid,checkedIn:i<40,...(i<40?{checkinFirstAt:100+i,checkinAt:200+i,checkinMethod:'manual'}:{})})),teams:[],...(qr?{qrCheckinManaged:true,qrCheckinRevision:7}:{})};
  let remote=clone(initial),readbackFail=false,writeGate=null;
  const s={state:clone(initial),adminRegistrationsCache:null,peopleRosterBusy:false,publicTournamentsCache:null,myRegistrationsCache:null,
   captureRegistrationRosterContext:()=>({code:'BXH-LATE12',roomId:'late-room'}),
