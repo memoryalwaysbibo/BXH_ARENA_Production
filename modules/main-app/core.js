@@ -5200,6 +5200,8 @@ const PUBLIC_TOURNAMENTS_ERROR_MESSAGES = {
 // 無法歸類的 permission-denied 才顯示「操作未完成，請重新整理後再試」，
 // 不再籠統翻譯成單一句話。
 const REGISTRATION_ERROR_MESSAGES = {
+  "registration-result-pending":"報名結果尚未確認，請使用畫面上的「查詢報名結果」，不要重新送出。",
+  "registration-preparation-timeout":"報名前置確認等候過久，尚未送出報名，請稍後重試。",
   "registration-state-conflict": "報名設定或人數尚未同步，請聯絡主辦重新儲存設定。",
   "invalid-registration-capacity": "報名人數上限設定無效，請聯絡主辦修正。",
   "community-quick-individual-only": "快速報名適用個人賽；團體賽請使用既有排程報名設定。",
@@ -5254,6 +5256,12 @@ function mapRegistrationError(e){
   const code = (e && e.code) || (e && e.message) || "unknown";
   return REGISTRATION_ERROR_MESSAGES[code] || Object.entries(REGISTRATION_ERROR_MESSAGES).find(([key])=>String(e?.message||"").includes(key))?.[1] || "發生未知錯誤，請稍後再試";
 }
+window.addEventListener('bxh-registration-recovered',event=>{
+  const code=event.detail?.code;
+  publicTournamentsCache=null;invalidateMyRegistrationsCache();
+  if(appPhase==='tournament-detail'&&tournamentDetailCode===code)void loadTournamentDetail(code);
+  else requestLobbyRender();
+});
 let publicTournamentsLoading = false;
 let publicTournamentsLastRefreshAt = 0;
 let publicTournamentsRealtimeUnsub = null;
@@ -19382,6 +19390,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
 }
 function render(){
   syncQrScannerModal();
+  window.cloudSync?.restoreRegistrationFeedback?.();
   clearBoardModeInteractions();
   window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,
     operator:()=>canOperateCurrentTournament()||(state?.meta?.refereeSeatsV1?.version===1&&userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role)),
