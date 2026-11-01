@@ -1,0 +1,29 @@
+name: Profile completion reminder
+on:
+  pull_request:
+    paths:
+      - modules/main-app/profile-reminder.js
+      - modules/main-app/core.js
+      - index.html
+      - tests/profile-reminder.*.cjs
+      - tests/module-seam-contracts.test.cjs
+      - tests/e2e/lobby-stable-updates.spec.cjs
+      - .github/workflows/profile-reminder.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check modules/main-app/core.js && node --test tests/profile-reminder.test.cjs tests/module-seam-contracts.test.cjs
+      - run: npm install --ignore-scripts --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium webkit
+      - run: node tests/profile-reminder.browser.cjs
+      - name: Full page reminder on desktop, iPhone and Android
+        run: npx playwright test --config=playwright.config.cjs tests/e2e/lobby-stable-updates.spec.cjs --grep 'incomplete old player|confirm opens|reminder deferral'
