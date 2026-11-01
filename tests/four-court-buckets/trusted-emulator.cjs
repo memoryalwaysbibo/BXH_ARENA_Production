@@ -5,11 +5,14 @@ assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-four-court-buckets');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore}=require('firebase-admin/firestore');
 const B=require('../../referee-seats/functions/bucket-state.cjs'),{createBucketScoringHandler}=require('../../referee-seats/functions/bucket-scoring-service.cjs');
 const {createScoringHandler}=require('../../referee-seats/functions/scoring-service.cjs');
+const {createHandler:createSeatHandler}=require('../../referee-seats/functions/service.cjs');
+const {createPromotionHandler}=require('../../registration-promotion/functions/service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {createBucketCutover}=require('../../referee-seats/functions/bucket-cutover.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'trusted-bucket-lab'),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
 const oldCommit=createScoringHandler(db);
+const oldSeat=createSeatHandler(db),oldPromotion=createPromotionHandler(db);
 const cutover=createBucketCutover(db);
 const report={kind:'trusted-scoring-bucket-emulator',productionWrites:0,cases:[]};let serial=0;
 function phase(name){report.phase=name;console.log('TRUSTED PHASE '+name);}
@@ -96,10 +99,15 @@ async function send(root,id,action,extra={}){
    const before=await root.get(),publicBefore=await pub.get();
    const d=request(state,room,'m1','score',operation(),{side:'A',finish:'spin'});
    await assert.rejects(oldCommit({auth:{uid:'ref1'},data:d}),/bucket-scoring-required/);
+   await assert.rejects(oldSeat({auth:{uid:'ref1'},data:{code:'BXH-OLDFENCE',action:'claim',station:1,slot:'backup1',operationId:operation()}}),/bucket-scoring-required/);
+   await root.collection('registrations').doc('waitlist-1').set({status:'waitlist'});
+   await assert.rejects(oldPromotion({auth:{uid:'ref1'},data:{code:'BXH-OLDFENCE',registrationId:'waitlist-1',operationId:operation()}}),/bucket-scoring-required/);
    assert((await root.get()).updateTime.isEqual(before.updateTime));
    assert((await pub.get()).updateTime.isEqual(publicBefore.updateTime));
    assert.equal((await root.collection('refereeScoreOperations').get()).size,0);
-   report.cases.push({name:'legacy-admin-sdk-fence',rejected:true,rootUnchanged:true,publicUnchanged:true});
+   assert.equal((await root.collection('refereeSeatOperations').get()).size,0);
+   assert.equal((await root.collection('rosterPromotionOperations').get()).size,0);
+   report.cases.push({name:'legacy-admin-sdk-fence',scoring:true,seats:true,promotion:true,rootUnchanged:true,publicUnchanged:true});
   }
   for(const count of [6,12]){
    phase('concurrent-'+count);
