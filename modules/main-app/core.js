@@ -12007,7 +12007,7 @@ function previousMatchCorrectionHtml(stationNum,currentId){
 }
 function refereeWorkstationHeader(m, stationNum){
   const closed=state.forcedCourtExits?.[stationNum]?.closed;
-  const exitButton=(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<button class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'強制退場'}</button>`:"";
+  const exitButton=state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
   const assigned=refereeDisplayForStation(stationNum);
   const status=refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
@@ -12042,7 +12042,7 @@ function courtAtmosphereStyle(stationNum){
 function renderCourtCard(stationNum){
   const court = state.courtAssignments && state.courtAssignments[courtKey(stationNum)];
   if(!court){
-    return `<div class="panel court-card court-card-idle referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">${refereeWorkstationHeader(null,stationNum)}<div class="empty-state">尚未初始化</div></div>`;
+    return renderWaitingRefereeCourt(stationNum);
   }
   if(state.forcedCourtExits?.[stationNum]?.closed)return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}">${refereeWorkstationHeader(null,stationNum)}<div class="empty-state">本台已強制退場，停止接新場。未完成場次保留於待接管清單。</div></div>`;
   const m = court.currentMatchId ? getMatch(court.currentMatchId) : null;
@@ -12059,6 +12059,7 @@ function renderCourtCard(stationNum){
       ${refereeWorkstationHeader(null,stationNum)}
       <div class="empty-state"><div class="big">${canReceiveSkipped ? "本台閒置，可承接跳過場次" : stationHasFutureWork ? "等待晉級結果" : "本台賽程已完成"}</div>${canReceiveSkipped?'<div>請至上方「待承接場次」選擇安排。</div>':''}</div>
       ${claimButtons?`<div class="msc-btns" style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:8px">${claimButtons}</div>`:""}
+      ${refereeWaitingControls(stationNum)}
     </div>`;
   }
 
@@ -12243,11 +12244,27 @@ function renderCourtRetirementPanel(){
   }).join('');
   return `<section class="panel"><div class="panel-title">安全退場｜目標保留 ${p.targetCount} 台</div><div class="hint">保留台照常運作。退場狀態與場次保存在賽事資料中，重新開啟可接續。</div>${rows}</section>`;
 }
+function refereeWaitingControls(stationNum){
+  return `<fieldset disabled class="ref-waiting-controls" aria-label="台${stationNum}計分區，等待對戰">
+      <legend>等待對戰｜計分尚未開放</legend>
+      <div class="ref-waiting-sides">${['A','B'].map(side=>`<div><b>選手 ${side}｜—</b><div class="side-score">—</div><div class="ref-waiting-buttons">${['旋轉','擊飛','爆裂','極限','失誤'].map(label=>`<button type="button" disabled>${label}</button>`).join('')}</div></div>`).join('')}</div>
+      <div class="ref-waiting-buttons">${['撤銷得分','本局重賽','確認比賽結果'].map(label=>`<button type="button" disabled>${label}</button>`).join('')}</div>
+    </fieldset>`;
+}
+function renderWaitingRefereeCourt(stationNum){
+  const seatsEnabled=state.meta?.refereeSeatsV1?.version===1;
+  return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
+    ${refereeWorkstationHeader(null,stationNum)}
+    <div class="ref-waiting-status" role="status">${state.bracketSize?'等待對戰安排':'等待抽籤／對戰安排'}${seatsEnabled?'，可先加入裁判席。':'。本場尚未啟用三席裁判制。'}</div>
+    ${refereeWaitingControls(stationNum)}
+  </div>`;
+}
 function renderReferee(){
   if(state.meta?.battleMode==="team")return renderTeamReferee();
   const quickNav = refereeBracketRoundtripNav("bracket");
   if(!state.bracketSize){
-    return quickNav+`<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請先至「賽事設定」產生對戰表</div></div></div>`;
+    const n=Math.max(1,Math.min(32,Number(state.meta.stations)||1));
+    return quickNav+`<div class="court-grid ${n===1?'court-grid-1':n===2?'court-grid-2':'court-grid-many'}">${Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1)).join('')}</div>`;
   }
   const rm = refereeMatches();
   if(rm.length===0){
@@ -18709,11 +18726,26 @@ const WINNER_CROWN_SVG = '<svg viewBox="0 0 64 40" width="20" height="14" fill="
 /* ==== modal ==== */
 // v13.19.2: generic confirmation modal must sit above admin tournament-list/switch overlays.
 // Otherwise clicking Delete creates the confirmation behind the list and it only appears after closing the list.
+function courtForceExitConfirmation(change,m){
+  const roomId=state.id,code=state.cloudCode;
+  const pair=m?`${m.a?.playerId?playerName(m.a.playerId):'未定'} vs ${m.b?.playerId?playerName(m.b.playerId):'未定'}｜${Number(m.scoreA)||0}：${Number(m.scoreB)||0}`:'目前沒有對戰';
+  return {type:'court-force-exit',station:change.station,danger:true,focusCancel:true,
+    title:`台${change.station}｜裁判台強制退場`,
+    message:`台${change.station}｜${pair}\n本裁判台將停止接收賽事自動指派／編排。\n這與裁判個人的入席／退出不同。\n解除本台目前場次、下一場與派場鎖，停止接新場。未完成場次保留雲端比分，移至待接管清單；已完成結果保留。原裝置尚未上傳的資料請保留。`,
+    confirmLabel:`確認台${change.station}裁判台退場`,onConfirm:()=>{
+      if(state.id!==roomId||state.cloudCode!==code){showToast('賽事已切換，未執行停用，請重新確認。',true);return;}
+      return executeCourtForceAction(change);
+    }};
+}
 function renderModal(){
   if(!pendingModal) return "";
   const mm = pendingModal;
   let body = mm.messageIsHtml ? `<div class="modal-rich-content">${mm.message||""}</div>` : `<p>${esc(mm.message).replace(/\n/g,"<br>")}</p>`;
   mm.confirmDisabled = false;
+  if(mm.type==='court-force-exit'){
+    mm.confirmDisabled=mm.acknowledged!==true;
+    body+=`<label class="ref-force-exit-ack"><input type="checkbox" id="court-force-exit-ack" ${mm.acknowledged?'checked':''}>我確認讓台${Number(mm.station)}裁判台退場，停止接收賽事自動指派／編排。</label>`;
+  }
   if(mm.type==="confirm-result"){
     const m = getMatch(mm.matchId);
     if(!m || !m.a || !m.b){
@@ -18804,7 +18836,7 @@ function renderModal(){
   </div>`;
 }
 
-function openModal(cfg){ pendingModal = cfg; render(); }
+function openModal(cfg){ pendingModal = cfg; render(); if(cfg.focusCancel)document.getElementById('modal-cancel-btn')?.focus({preventScroll:true}); }
 function closeModal(){ pendingModal = null; render(); }
 
 /* ==== tab: history ==== */
@@ -20798,6 +20830,13 @@ function bindDynamicInputs(){
   }catch(e){ /* no-op outside a real browser DOM */ }
 
   const modalConfirmBtn = document.getElementById("modal-confirm-btn");
+  const forceExitAck=document.getElementById('court-force-exit-ack');
+  if(forceExitAck)forceExitAck.addEventListener('change',()=>{
+    if(pendingModal?.type!=='court-force-exit')return;
+    pendingModal.acknowledged=forceExitAck.checked;
+    pendingModal.confirmDisabled=!forceExitAck.checked;
+    if(modalConfirmBtn)modalConfirmBtn.disabled=!forceExitAck.checked;
+  });
   if(modalConfirmBtn&&shouldBindLobbyInput(modalConfirmBtn,"confirm")){
     modalConfirmBtn.addEventListener("click", (ev)=>{
       ev.preventDefault();
@@ -25001,7 +25040,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const current=state.courtAssignments?.[courtKey(station)]?.currentMatchId||null;
     const m=getMatch(action==="court-force-claim"?id:current);
     const change=action==="court-force-exit"?{kind:"force-exit",station,matchId:current,revision:Number(m?.dispatchRevision||0),exitRevision:Number(state.forcedCourtExits?.[station]?.revision||0)}:action==="court-force-reopen"?{kind:"reopen",station,exitRevision:Number(state.forcedCourtExits?.[station]?.revision||0)}:{kind:"claim-detached",matchId:id,to:station,revision:Number(m?.dispatchRevision||0)};
-    openModal({type:"generic",title:action==="court-force-exit"?"強制退場｜台"+station:action==="court-force-reopen"?"重新啟用裁判台":"接管退場場次",message:action==="court-force-exit"?"立即解除本台目前場次、下一場與派場鎖，停止接新場。未完成場次保留雲端比分，移至待接管清單；已完成結果保留。原裝置尚未上傳的資料請保留。":"保留比分與紀錄。重新啟用不會自動綁回待接管場次。",confirmLabel:"確認",onConfirm:()=>executeCourtForceAction(change)});return;
+    openModal(action==="court-force-exit"?courtForceExitConfirmation(change,m):{type:"generic",title:action==="court-force-reopen"?"重新啟用裁判台":"接管退場場次",message:"保留比分與紀錄。重新啟用不會自動綁回待接管場次。",confirmLabel:"確認",onConfirm:()=>executeCourtForceAction(change)});return;
   }
   if(action==="court-retirement-transfer"){
     openModal({type:"generic",title:"接管退場台場次",message:"保留雲端比分與紀錄，將場次移至保留台；原台後續送分將因派場版本變更而停止。請先確認原裁判已停止操作。",confirmLabel:"確認接管",onConfirm:()=>transferRetiringCourtMatch(id,Number(target.getAttribute("data-station")))});return;
@@ -25445,6 +25484,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="modal-confirm"){
     const mm = pendingModal;
     if(!mm){ return; }
+    if(mm.type==='court-force-exit'&&mm.acknowledged!==true)return;
     if(mm.type==="confirm-result"){
       if(mm.confirmDisabled || mm.confirmBusy){ return; }
       mm.confirmBusy = true;
