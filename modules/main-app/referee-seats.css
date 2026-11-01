@@ -3,13 +3,10 @@
 .ref-court-maintenance summary{cursor:pointer;font-size:12px;min-height:36px;display:list-item;align-content:center;list-style-position:inside;color:#b6bac6}
 .ref-court-maintenance>div{padding:8px 0;max-width:240px}.ref-court-maintenance p{font-size:11px;line-height:1.5;margin:0 0 10px;color:#b6bac6}
 .ref-court-maintenance .ref-court-exit-btn{min-height:44px;font-size:12px;padding:8px 10px;white-space:normal}
-.ref-waiting-status{padding:16px;color:#b6bac6;text-align:center;line-height:1.6}
-.ref-waiting-controls{margin:0 14px 16px;padding:12px;border:1px solid #555;border-radius:10px;background:#242424;color:#aaa;min-width:0}
-.ref-waiting-controls legend{font-size:12px}.ref-waiting-sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;text-align:center}
-.ref-waiting-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.ref-waiting-buttons button{flex:1 1 60px;min-height:40px;border:1px solid #555;border-radius:6px;background:#333;color:#999;cursor:not-allowed}
 .ref-force-exit-ack{display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid #92535b;border-radius:8px;font-size:14px;line-height:1.6}.ref-force-exit-ack input{width:22px;height:22px;flex:none;margin-top:2px}
 .ref-seat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .ref-seat-button{min-height:76px;min-width:0;padding:10px 5px;border-radius:10px;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.25);color:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font:inherit}
 .ref-seat-button span{font-size:12px;color:#b6bac6}.ref-seat-button strong{font-size:14px;overflow-wrap:anywhere;line-height:1.4}.ref-seat-button small{font-size:10px;color:#dfc879}.ref-seat-button.mine{border-color:#dfc879;background:rgba(223,200,121,.1)}.ref-seat-button:disabled{cursor:default;opacity:.65}.ref-seat-button:focus-visible{outline:2px solid #dfc879;outline-offset:2px}
 .ref-seat-wait{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px;font-size:12px;color:#dfc879}
 .ref-seat-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.75)}.ref-seat-dialog{width:min(100%,380px);padding:22px;box-sizing:border-box;border:1px solid #dfc879;border-radius:16px;background:#191b22;color:#f5f5f5;box-shadow:0 15px 50px #000;display:grid;gap:10px}.ref-seat-dialog p{margin:0 0 12px;line-height:1.7;overflow-wrap:anywhere}.ref-seat-dialog .btn{min-height:44px}
+.referee-workstation-waiting>.ref-vs-arena,.referee-workstation-waiting>.ref-result-actions,.referee-workstation-waiting>.score-log,.referee-workstation-waiting>.ref-match-toolbar{filter:grayscale(1);opacity:.55}

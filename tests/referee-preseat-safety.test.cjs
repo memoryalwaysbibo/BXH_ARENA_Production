@@ -8,12 +8,13 @@ function fixture(){
  const c={state:{id:'test',cloudCode:'BXH-TEST',meta:{stations:6},bracketSize:0,matches:[]},pendingModal:null,courtRetirementBusy:false,
   window:{BXHRefereeSeats:{render:(st,n)=>`<button data-seat-action="seat" data-station="${n}">加入裁判席</button>`}},
   esc:v=>String(v??'').replace(/[<>&"']/g,''),refereeBracketRoundtripNav:()=>'',courtAtmosphereStyle:()=>'',
+  POINT_LABELS:{spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation:()=>true,checkWinnerSide:()=>null,refereeFaultWritePending:()=>false,refereeFaultCount:()=>0,refereeFaultLast:()=>null,refereeViewClass:()=>'',refereeCourtSwapButton:()=>'',matchStatusBarHtml:()=> '準備中',
   refereeDisplayForStation:()=> '測試裁判',refereeStationStatus:()=>({label:'等待中',cls:'waiting'}),
   stationCompletedCount:()=>0,refereeStationRestrictionEnabled:()=>true,canForceExitCourt:()=>true,canManageCourtRetirement:()=>true,
   playerName:id=>({a:'選手甲',b:'選手乙'})[id]||id,executed:[],toasts:[],render:()=>{},document:{getElementById:()=>({focus(){c.focused=true;}})}};
  c.executeCourtForceAction=change=>c.executed.push(change);c.showToast=m=>c.toasts.push(m);
  vm.createContext(c);
- for(const name of ['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeWaitingControls','renderWaitingRefereeCourt','renderReferee','courtForceExitConfirmation','renderModal','openModal','closeModal'])vm.runInContext(fn(name),c);
+ for(const name of ['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeSwapControl','renderRefereeScorePanel','refereeWaitingControls','renderWaitingRefereeCourt','renderReferee','courtForceExitConfirmation','renderModal','openModal','closeModal'])vm.runInContext(fn(name),c);
  return c;
 }
 test('6 and 12 pre-draw courts render seats outside disabled scoring, without mutating state',()=>{
@@ -21,8 +22,8 @@ test('6 and 12 pre-draw courts render seats outside disabled scoring, without mu
  for(const n of [1,6,12]){
   c.state.meta.stations=n;const before=JSON.stringify(c.state),html=c.renderReferee();
   assert.equal((html.match(/data-seat-action="seat"/g)||[]).length,n);
-  assert.equal((html.match(/<fieldset disabled/g)||[]).length,n);
-  for(const card of html.split('<fieldset disabled').slice(1))assert(!card.split('</fieldset>')[0].includes('data-seat-action'));
+  assert.equal((html.match(/class="ref-vs-arena standard"/g)||[]).length,n);
+  for(const button of html.matchAll(/<button\b[^>]*>/g))if(!button[0].includes('data-seat-action'))assert.match(button[0],/disabled/);
   assert(!html.includes('data-action="score"'));assert(!html.includes('court-force-exit'));
   assert.equal(JSON.stringify(c.state),before);
  }
@@ -63,4 +64,18 @@ test('pre-draw claims survive actual single-elimination generation',()=>{
  vm.runInContext(fn('generateSingleElim'),c);assert.equal(c.generateSingleElim(),true);
  assert.equal(c.state.bracketSize,4);assert.equal(JSON.stringify(c.state.meta),before);
  assert.equal(c.state.meta.refereeSeatsV1.courts[1].main.uid,'host');
+});
+
+test('waiting and live scoring share the same layout, with inert placeholders only while waiting',()=>{
+ const c=fixture(),m={id:'real-match',a:{playerId:'a'},b:{playerId:'b'},scoreA:0,scoreB:0,log:[],status:'ready'};
+ const before=JSON.stringify(c.state),waiting=c.renderRefereeScorePanel(null,1);
+ assert.equal(JSON.stringify(c.state),before);assert(!waiting.includes('data-action='));
+ const live=c.renderRefereeScorePanel(m,1);
+ const classes=html=>[...html.matchAll(/class="([^"]*)"/g)].map(x=>x[1]).filter(x=>x!=='banner warn');
+ assert.deepEqual(classes(waiting),classes(live),'same score panels, toolbar, swap, log and result action layout');
+ assert.match(waiting,/<div class="side-name">—<\/div>/);assert.match(waiting,/<div class="side-score">0<\/div>/);
+ for(const action of ['score','fault','undo-score','rematch','confirm-result','referee-swap-view'])assert(live.includes('data-action="'+action+'"'));
+ c.state.startedAt=1;const active=c.renderRefereeScorePanel(m,1);assert.match(active,/<button data-action="score"[^>]*data-type="spin" >/);
+ const idle=c.renderRefereeScorePanel(null,1);for(const b of idle.matchAll(/<button\b[^>]*>/g))assert.match(b[0],/disabled/);
+ c.canOperateStation=()=>false;const other=c.renderRefereeScorePanel(m,1);assert.match(other,/<button data-action="score"[^>]*disabled/);
 });
