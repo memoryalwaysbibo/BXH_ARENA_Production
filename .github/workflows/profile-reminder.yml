@@ -3,7 +3,10 @@ on:
   pull_request:
     paths:
       - modules/main-app/profile-reminder.js
+      - modules/main-app/core.js
+      - index.html
       - tests/profile-reminder.*.cjs
+      - tests/module-seam-contracts.test.cjs
       - .github/workflows/profile-reminder.yml
   workflow_dispatch:
 permissions:
@@ -17,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check modules/main-app/core.js && node --test tests/profile-reminder.test.cjs
+      - run: node --check modules/main-app/core.js && node --test tests/profile-reminder.test.cjs tests/module-seam-contracts.test.cjs
       - run: npm install --ignore-scripts --no-save --package-lock=false playwright@1.55.0
       - run: npx playwright install --with-deps chromium
       - run: node tests/profile-reminder.browser.cjs
