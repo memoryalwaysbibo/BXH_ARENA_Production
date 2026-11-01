@@ -289,6 +289,9 @@ let dutyLogsCache = null;
 let dutyLogsLoading = false;
 let dutyLogsError = "";
 let celebrationOpen = false;
+// Archive work is shared per room; showing results is local to this browser.
+const tournamentArchiveTasks = new Map();
+const shownTournamentResults = new Set();
 let shareModalOpen = false;
 let shareTarget = "event";
 let eventEntryModalOpen = false;
@@ -3244,6 +3247,8 @@ function applyRemoteState(remote, authoritative=false){
       if(!previous||revision>previousRevision||revision===previousRevision&&(Number(remote.updatedAt||0)>=Number(previous.updatedAt||0)||Number(remote.callRevision||0)>Number(previous.callRevision||0)||Number(remote.teamResultRevision||0)>Number(previous.teamResultRevision||0)||Object.entries(remoteExits).some(([n,c])=>Number(c.revision||0)>Number(previous.forcedCourtExits?.[n]?.revision||0))))settingsGate.remote=JSON.parse(JSON.stringify(remote));
       return;
     }
+    const wasDecided = isTournamentFullyDecided();
+    const wasArchived = state.archiveStatus === "completed";
     remoteAppliedAt=remoteUpdated;
     const keepCode = state.cloudCode;
     // joinRoom hydrates the verified top-level creator, while older room JSON
@@ -3273,6 +3278,9 @@ function applyRemoteState(remote, authoritative=false){
     render();
     if(typeof window!=="undefined" && window.scrollTo){
       try{ window.scrollTo(0, scrollY); }catch(e){}
+    }
+    if((!wasDecided && isTournamentFullyDecided()) || (!wasArchived && state.archiveStatus==="completed")){
+      finishTournament().catch(e=>console.warn("[tournament completion]",e));
     }
   }catch(e){ /* ignore malformed remote payloads */ }
 }
@@ -6186,6 +6194,7 @@ async function executeRefereeSeatCommand(matchId,command){
     if(["score","fault"].includes(command.action)&&current&&!current.completed&&checkWinnerSide(current))openModal({type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"});
     else render();
     showToast(command.action==="fault"?"失誤紀錄已由雲端確認":command.action==="confirm"||command.action==="quick"?"結果已由雲端確認並晉級":"本台操作已由雲端確認");
+    if(["confirm","quick"].includes(command.action)) await finishTournament();
     return true;
   }catch(error){if(state.id===roomId&&currentAuthUid()===actorUid)showToast("本次操作尚未確認，請重連後核對雲端比分。",true);return false;}
   finally{refereeSeatCommandBusy.delete(key);}
@@ -6542,6 +6551,11 @@ function queueCloudSyncRetry(tournamentId, code){
       clearInterval(cloudSyncQueueTimer); cloudSyncQueueTimer=null; return;
     }
     try{
+      if(state.settlementPhase==="sync-pending" && isTournamentFullyDecided()){
+        const ok=await finishTournament();
+        if(ok){clearInterval(cloudSyncQueueTimer);cloudSyncQueueTimer=null;}
+        return;
+      }
       cloudStatus = "connecting";
       const ok = await enqueueCloudStateWrite(code, cloneStateForSave(state));
       if(ok){
@@ -6694,8 +6708,55 @@ async function writeArchiveStateToCloud(snapshot){
 
 // Idempotent: safe to call multiple times for the same tournament (re-opened celebration
 // screen, page refresh, remote-state re-application) — only performs the archive write once.
-async function performAutoArchive(){
-  if(state.archiveStatus==="completed" && state.archivedAt) return true;
+function tournamentCompletionKey(st){ return String(st.id)+"|"+String(st.cloudCode||""); }
+function tournamentResultSignature(st){
+  return JSON.stringify([st.startedAt,st.meta?.formatType,st.meta?.bronzeMatch,st.meta?.ladderMode,
+    st.championId,st.runnerUpId,st.thirdId,st.fourthId,
+    (st.matches||[]).map(m=>[m.id,m.completed,m.winnerId,m.loserId,m.scoreA,m.scoreB])]);
+}
+
+async function finishTournament(){
+  const target=state,key=tournamentCompletionKey(target),signature=tournamentResultSignature(target);
+  if(currentRole==="guest" || publicWatchReturnContext || !canOperateCurrentTournament() || !isTournamentFullyDecided(target)) return false;
+  const ok=await performAutoArchive();
+  // A cloud response may arrive after navigation. Never open another room's results.
+  if(tournamentCompletionKey(state)!==key) return ok;
+  if(tournamentResultSignature(state)!==signature) return false;
+  if(!ok){ render(); return false; }
+  // Listeners can replace the state object while the archive request is pending.
+  // Copy only acknowledged lifecycle fields, never stale scores or registrations.
+  if(state!==target){
+    for(const field of ["archiveStatus","archivedAt","completedAt","settlementPhase","settlementCompletedAt","settlementError","settlementErrorCode","ladderPointsAwarded","ladderAwardedAt","ladderSeasonId","ladderResults"]){
+      if(Object.prototype.hasOwnProperty.call(target,field)) state[field]=target[field];
+    }
+  }
+  publicTournamentsCache=null; publicTournamentsError=null; historyCloudSyncLoaded=false;
+  if(!shownTournamentResults.has(key)){
+    celebrationData=buildCelebrationData(state);
+    shownTournamentResults.add(key);
+    celebrationOpen=true;
+  }
+  render();
+  return true;
+}
+
+function performAutoArchive(){
+  const target=state,key=tournamentCompletionKey(target);
+  if(tournamentArchiveTasks.has(key)) return tournamentArchiveTasks.get(key);
+  const task=performAutoArchiveState(target).finally(()=>tournamentArchiveTasks.delete(key));
+  tournamentArchiveTasks.set(key,task);
+  return task;
+}
+
+async function performAutoArchiveState(state){
+  if(state.archiveStatus==="completed" && state.archivedAt && state.settlementPhase!=="sync-pending") return true;
+  if(!isTournamentFullyDecided(state)){
+    state.settlementPhase="failed";
+    state.settlementErrorCode="incomplete-placements";
+    state.settlementError="賽程或最終名次尚未完整；請完成剩餘場次後再結算。";
+    await saveRecord(state);
+    return false;
+  }
 
   const settlementRoute=settlementRouteForTournament(state);
   state.settlementRoute=settlementRoute;
@@ -6840,107 +6901,67 @@ async function performAutoArchive(){
   }
 
   state.settlementPhase="archive";
-  try{ await saveRecord(state); }catch(e){}
-  const wasAlreadyIndexed = recordIndex.some(r=>r.id===state.id);
-  const previousCompletedAt = state.completedAt || null;
-  state.archiveStatus = "completed";
-  state.settlementError = null;
-  state.settlementCompletedAt = Date.now();
-  state.archivedAt = Date.now();
-  if(!state.completedAt) state.completedAt = Date.now();
-  state.updatedAt = Date.now();
+  state.archiveStatus="ongoing";
+  state.settlementError=null;
+  state.settlementErrorCode=null;
+  await saveRecord(state);
 
-  const localResult = await saveRecordDetailed(state);
-  const hadCloudRoom = !!state.cloudCode;
-  let cloudArchiveReady = hadCloudRoom ? await ensureCloudAvailableForArchive() : false;
-
-  if(localResult.recordOk && localResult.indexOk){
-    recordIndex = await loadIndex();
-    showToast(wasAlreadyIndexed ? "既有賽事紀錄已更新" : "賽事紀錄建立成功");
-  }else{
-    addRecordSummaryToMemoryIndex(state);
-    if(!hadCloudRoom){
-      state.archiveStatus = "ongoing";
-      state.archivedAt = null;
-      state.settlementCompletedAt = null;
-      state.settlementError = "本機儲存失敗，且此賽事沒有雲端房間";
-      showToast("封存失敗：本機儲存空間不足或無法寫入，而且此賽事沒有雲端房間可作後援。請釋放瀏覽器儲存空間後重試。", true);
-      return false;
-    }
-    if(!cloudArchiveReady){
-      state.archiveStatus = "ongoing";
-      state.archivedAt = null;
-      state.settlementCompletedAt = null;
-      state.completedAt = previousCompletedAt;
-      state.settlementError = "本機寫入失敗，雲端重新連線也失敗";
-      showToast("封存尚未完成：本機儲存寫入失敗，Firebase 重新連線也未成功。請確認網路後重試；賽事資料仍保留在目前畫面。", true);
-      return false;
-    }
-    showToast(localResult.recordOk
-      ? "本機賽事索引寫入失敗，將以 Firebase 雲端紀錄完成封存"
-      : "本機儲存空間不足，將改以 Firebase 雲端紀錄完成封存", true);
-  }
-
-  if(hadCloudRoom && cloudArchiveReady && currentRole!=="guest"){
+  // Keep the completion candidate detached until the authoritative store accepts it.
+  // A general room must not report success merely because localStorage worked.
+  const completedAt=state.completedAt||Date.now();
+  const candidate=cloneStateForSave(state);
+  Object.assign(candidate,{archiveStatus:"completed",archivedAt:Date.now(),completedAt,
+    settlementPhase:"completed",settlementCompletedAt:Date.now(),settlementError:null,
+    settlementErrorCode:null,updatedAt:Date.now()});
+  const hadCloudRoom=!!state.cloudCode;
+  if(hadCloudRoom){
+    let accepted=false;
     try{
-      const ok = await writeArchiveStateToCloud(cloneStateForSave(state));
-      if(ok){
-        cloudSyncPending = false;
-        state.settlementError = null;
-        showToast((localResult.recordOk && localResult.indexOk) ? "已同步雲端" : "雲端封存完成；本機歷史將於下次同步時重建");
+      if(currentRole!=="guest" && await ensureCloudAvailableForArchive()){
+        accepted=await writeArchiveStateToCloud(candidate)===true;
       }
-      else {
-        queueCloudSyncRetry(state.id, state.cloudCode);
-        if(!localResult.recordOk){
-          state.archiveStatus="ongoing";
-          state.archivedAt=null;
-          state.settlementCompletedAt=null;
-          state.completedAt=previousCompletedAt;
-          state.settlementError="本機與雲端皆未能完成封存";
-          showToast("封存失敗：本機與雲端都沒有成功保存完成狀態，請確認網路或清理瀏覽器空間後重試",true);
-          return false;
-        }
-        if(settlementRoute==="official-ranked"){
-          state.archiveStatus="ongoing"; state.archivedAt=null; state.completedAt=previousCompletedAt;
-          await saveRecord(state);
-          showToast("天梯積分已入帳，但賽事完成狀態尚未同步成功；請重新執行完成賽事",true);
-          return false;
-        }
-        state.settlementPhase="sync-pending";
-      showToast("已儲存本機，等待雲端同步");
-      }
-    }catch(e){
-      queueCloudSyncRetry(state.id, state.cloudCode);
-      if(!localResult.recordOk){
-        state.archiveStatus="ongoing";
-        state.archivedAt=null;
-        state.settlementCompletedAt=null;
-        state.completedAt=previousCompletedAt;
-        state.settlementError="本機與雲端皆未能完成封存";
-        showToast("封存失敗：本機與雲端都沒有成功保存完成狀態，請確認網路或清理瀏覽器空間後重試",true);
-        return false;
-      }
-      if(settlementRoute==="official-ranked"){
-        state.archiveStatus="ongoing"; state.archivedAt=null; state.completedAt=previousCompletedAt;
-        await saveRecord(state);
-        showToast("天梯積分已入帳，但賽事完成狀態尚未同步成功；請重新執行完成賽事",true);
-        return false;
-      }
-      showToast("已儲存本機，等待雲端同步");
+    }catch(e){ console.warn("[archive] cloud completion pending",e); }
+    if(!accepted){
+      state.settlementPhase="sync-pending";
+      state.settlementErrorCode="archive-sync-pending";
+      state.settlementError=state.ladderPointsAwarded===true
+        ? "積分已完成結算，賽事封存仍等待雲端確認；可安全重試，不會重複加分。"
+        : "賽果已保留，賽事封存仍等待雲端確認；請確認連線後重試。";
+      await saveRecord(state);
+      queueCloudSyncRetry(state.id,state.cloudCode);
+      showToast(state.settlementError,true);
+      return false;
     }
   }
 
-  if(state.cloudCode && cloudAvailable() && window.cloudSync && window.cloudSync.repairTournamentLifecycle){
+  const localResult=await saveRecordDetailed(candidate);
+  if(!hadCloudRoom && !localResult.recordOk){
+    state.settlementPhase="failed";
+    state.settlementErrorCode="archive-local-failed";
+    state.settlementError="本機賽果保存失敗，且沒有雲端房間；請釋放儲存空間後重試。";
+    showToast(state.settlementError,true);
+    return false;
+  }
+  Object.assign(state,candidate);
+  if(localResult.indexOk){ recordIndex=await loadIndex(); }
+  else { addRecordSummaryToMemoryIndex(state); }
+  if(hadCloudRoom) cloudSyncPending=false;
+  showToast(hadCloudRoom ? "賽事已完成並同步雲端" : "賽事紀錄建立成功");
+
+  if(state.cloudCode && cloudAvailable() && window.cloudSync?.repairTournamentLifecycle){
     try{ await window.cloudSync.repairTournamentLifecycle(state.cloudCode); }catch(e){}
     publicTournamentsCache=null;
     myRegistrationsCache=null;
   }
-  if(isCommunityRoom() && state.cloudCode && cloudAvailable() && window.cloudSync && window.cloudSync.saveCommunityHistory){
-    try{ touchCommunityActivity(state); state.expiresAtMs=Number(state.completedAt||Date.now())+COMMUNITY_COMPLETED_FULL_MS; await window.cloudSync.saveCommunityHistory(state); await saveState(); }catch(e){ console.warn("[community history]",e); }
+  if(state.meta?.eventAuthority==="community" && state.cloudCode && cloudAvailable() && window.cloudSync?.saveCommunityHistory){
+    try{
+      touchCommunityActivity(state);
+      state.expiresAtMs=Number(state.completedAt||Date.now())+COMMUNITY_COMPLETED_FULL_MS;
+      await window.cloudSync.saveCommunityHistory(state);
+      await saveRecord(state);
+    }catch(e){ console.warn("[community history]",e); }
     communityHistoryCache=null;
   }
-  state.settlementPhase="completed";
-  state.settlementErrorCode=null;
   return true;
 }
 
@@ -8939,13 +8960,7 @@ function confirmResult(matchId){
   saveState(); render();
   showToast("比賽結果已確認");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    performAutoArchive();
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) finishTournament().catch(e=>console.warn("[tournament completion]",e));
   return true;
 }
 
@@ -9039,15 +9054,7 @@ async function confirmResultWithCloudGuard(matchId){
   render();
   showToast("比賽結果已確認");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    const archivedOk = await performAutoArchive();
-    publicTournamentsCache=null; publicTournamentsError=null;
-    if(!archivedOk){ state.celebrationShown=false; render(); return true; }
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) await finishTournament();
   return true;
 }
 
@@ -9111,13 +9118,7 @@ function confirmQuickDecision(matchId, selectedWinnerId){
   saveState(); render();
   showToast("已確認獲勝並晉級");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    performAutoArchive();
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) finishTournament().catch(e=>console.warn("[tournament completion]",e));
   return true;
 }
 
@@ -9198,33 +9199,27 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   render();
   showToast("已確認獲勝並晉級");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    const archivedOk = await performAutoArchive();
-    publicTournamentsCache=null; publicTournamentsError=null;
-    if(!archivedOk){ state.celebrationShown=false; render(); return true; }
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) await finishTournament();
   return true;
 }
 
-function isTournamentFullyDecided(){
-  const fmt = state.meta.formatType||"single";
-  if(!state.championId || !state.runnerUpId) return false;
-  if(fmt==="single" && state.meta.bronzeMatch){
-    if(!state.thirdId || !state.fourthId) return false;
+function isTournamentFullyDecided(st=state){
+  const fmt = st.meta.formatType||"single";
+  if(!st.championId || !st.runnerUpId) return false;
+  if(fmt==="single" && st.meta.bronzeMatch){
+    const n=tournamentEligiblePlayers(st.players,st.meta,st.matches).length;
+    if(n>=3 && !st.thirdId) return false;
+    if(n>=4 && !st.fourthId) return false;
   }
   if(fmt==="double"){
-    const n=tournamentEligiblePlayers(state.players,state.meta,state.matches).length;
-    if(n>=3 && !state.thirdId) return false;
-    if(n>=4 && !state.fourthId) return false;
+    const n=tournamentEligiblePlayers(st.players,st.meta,st.matches).length;
+    if(n>=3 && !st.thirdId) return false;
+    if(n>=4 && !st.fourthId) return false;
   }
   if(fmt==="roundrobin"){
-    const n = state.players.length;
-    if(n>=3 && !state.thirdId) return false;
-    if(n>=4 && !state.fourthId) return false;
+    const n = st.players.length;
+    if(n>=3 && !st.thirdId) return false;
+    if(n>=4 && !st.fourthId) return false;
   }
   return true;
 }
@@ -9802,6 +9797,7 @@ function renderArchiveControls(){
   if(!hasData) return "";
   if(state.archiveStatus==="completed"){
     return `<div class="banner" style="margin-top:14px;"><span>${state.testLadderSettlementNote?esc(state.testLadderSettlementNote)+"。":""}此賽事已自動封存為唯讀歷史紀錄（完成於 ${state.completedAt?new Date(state.completedAt).toLocaleString():""}）。${isSuperAdmin()?"":" 如需更正，請由最高管理員處理。"}</span>
+      <button class="btn btn-primary btn-sm" data-action="view-celebration" data-id="${esc(state.id)}">查看最終結果</button>
       ${isSuperAdmin()?`<button class="btn btn-ghost btn-sm" data-action="unarchive-current">解除封存並編輯</button>`:""}</div>`;
   }
   const canArchive = tournamentStatus()==="settling";
@@ -9809,7 +9805,7 @@ function renderArchiveControls(){
   if(canArchive && phase==="idle"){
     setTimeout(()=>{
       if(state.archiveStatus!=="completed" && tournamentStatus()==="settling" && (state.settlementPhase||"idle")==="idle"){
-        performAutoArchive().then(async ok=>{
+        finishTournament().then(async ok=>{
           if(ok){
             recordIndex = await loadIndex();
             historyCloudSyncLoaded = false;
@@ -23849,7 +23845,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="archive-complete"){
     (async()=>{
-      const ok=await performAutoArchive();
+      const ok=await finishTournament();
       recordIndex = await loadIndex();
       historyCloudSyncLoaded = false;
       render();
@@ -23869,7 +23865,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.generalClosureBy=currentAuthUid();
     state.originalLadderMode="ranked";
     (async()=>{
-      const ok=await performAutoArchive();
+      const ok=await finishTournament();
       recordIndex=await loadIndex(); historyCloudSyncLoaded=false; render();
       if(!ok) showToast("一般賽事結案尚未完成，請依畫面錯誤訊息處理。",true);
     })();
