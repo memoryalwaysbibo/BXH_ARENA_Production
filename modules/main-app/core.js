@@ -10603,7 +10603,15 @@ const BOARD_ICON_FULLSCREEN = '<svg viewBox="0 0 24 24" width="16" height="16" f
 
 // Bracket generation is detached until persistence and server readback agree.
 let adminOperationalOverrideBusy=false;
+let adminOperationalFailure=null;
 function adminOverrideContext(){return {actorUid:currentAuthUid(),roomId:state.id,code:state.cloudCode};}
+function noteAdminOperationalFailure(operation,reason){
+ adminOperationalFailure={...adminOverrideContext(),operation,reason:String(reason||'cloud-readback-unconfirmed')};
+}
+function currentAdminOperationalFailure(){
+ const f=adminOperationalFailure,c=adminOverrideContext();
+ return f&&f.actorUid===c.actorUid&&f.roomId===c.roomId&&f.code===c.code?f:null;
+}
 function adminOverrideCurrent(approval){return window.BXHAdminOverride?.current(approval,adminOverrideContext(),userProfile)===true;}
 function canOfferAdminOperationalOverride(){
  return window.BXHAdminOverride?.allowed(userProfile)===true&&!!currentAuthUid()&&!!state.cloudCode&&
@@ -10611,11 +10619,14 @@ function canOfferAdminOperationalOverride(){
 }
 function adminOverrideButtonsHtml(){
  if(!canOfferAdminOperationalOverride())return '';
+ const failure=currentAdminOperationalFailure();if(!failure)return '';
  const disabled=adminOperationalOverrideBusy||bracketCommitController()?.blocked();
- return '<button class="btn btn-danger" data-action="admin-force-draw" '+(disabled?'disabled':'')+'>管理員強制抽籤</button>'+
-  (state.bracketSize?'<button class="btn btn-danger" data-action="admin-force-start" '+(disabled?'disabled':'')+'>管理員強制開賽</button>':'');
+ const start=failure.operation==='start-tournament';
+ if(start&&!state.bracketSize)return '';
+ return '<button class="btn btn-danger" data-action="'+(start?'admin-force-start':'admin-force-draw')+'" '+(disabled?'disabled':'')+'>'+(start?'管理員強制開賽':'管理員強制抽籤')+'</button>';
 }
 function offerAdminOperationalOverride(operation,reason){
+ noteAdminOperationalFailure(operation,reason);
  if(!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy||bracketCommitBlocked())return false;
  const participantIds=operation==='draw-bracket'?eligiblePlayers().map(p=>String(p.id)):Array.from(currentBracketParticipantIds());
  if(participantIds.length<2){showToast('至少需要兩位參賽者，請先確認名單',true);return true;}
@@ -10631,12 +10642,16 @@ function offerAdminOperationalOverride(operation,reason){
 }
 function reconfirmPendingAdminOverride(){
  const controller=bracketCommitController(),status=controller?.status(),prior=status?.override;
- if(status?.busy||!prior||!adminOverrideCurrent(prior))return;
- const approval={...prior,at:Date.now()};
- openModal({type:'generic',title:'重新確認強制抽籤',danger:true,
+ if(status?.busy||!status?.pending||status.result!=='failed'||!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy)return;
+ if(prior&&!adminOverrideCurrent(prior))return;
+ const selected=controller.selection();if(selected.length<2)return;
+ const approval=prior?{...prior,at:Date.now()}:{id:crypto.randomUUID(),operation:'draw-bracket',...adminOverrideContext(),at:Date.now(),
+  reason:String(status.error||'cloud-readback-unconfirmed').slice(0,500),participantIds:selected.map(p=>p.id),
+  warnings:['保留原配對，不重新抽籤','核對最新房間資料後提交本次確認的參賽者']};
+ openModal({type:'generic',title:'管理員強制提交原配對',danger:true,
   message:'將保留已產生的同一份配對，不會重新抽籤。\n\n房號：'+approval.code+'\n參賽人數：'+approval.participantIds.length+
-   ' 人\n原警告：'+approval.reason+'\n\n若先前已寫入，會先讀回確認；尚未寫入才重試。',
-  confirmLabel:'我已重新核對，重試同一配對',onConfirm:()=>{void controller.renewOverride(approval);}});
+   ' 人\n'+selected.map(p=>p.name).join('、')+'\n\n失敗原因：'+approval.reason+'\n\n確認後會先讀取雲端；已儲存則確認結果，尚未儲存才核對最新資料並提交。操作會留下紀錄；成功前不會開賽。',
+  confirmLabel:'我已核對，強制提交原配對',onConfirm:()=>{void controller.forceSubmit(approval);}});
 }
 async function executeAdminOperationalOverride(approval,baseSignature){
  if(adminOperationalOverrideBusy||!adminOverrideCurrent(approval))return;
@@ -10678,7 +10693,7 @@ async function executeAdminOperationalOverride(approval,baseSignature){
    }
    if(!confirmed)throw Error(ok===false?window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-write-rejected':'cloud-readback-unconfirmed');
    state=verified.data;state.cloudCode=approval.code;await saveRecord(state);
-   activeTab='referee';showToast('管理員強制開賽已完成，操作紀錄已儲存');
+   adminOperationalFailure=null;activeTab='referee';showToast('管理員強制開賽已完成，操作紀錄已儲存');
   }
  }catch(e){console.warn('[admin operational override]',e);showToast('強制執行未確認成功（'+String(e.code||e.message||'unknown')+'），請核對雲端狀態',true);}
  finally{adminOperationalOverrideBusy=false;render();}
@@ -10952,7 +10967,7 @@ function bracketCommitController(){
   local:snapshot=>saveRecord(snapshot),
   apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
   changed:()=>{if(current())renderPreservingScroll();},
-  success:()=>{activeTab='people';render();showToast(code?'上傳成功':'儲存成功');}
+  success:()=>{adminOperationalFailure=null;activeTab='people';render();showToast(code?'上傳成功':'儲存成功');}
  });
  bracketCommitContext={key,controller};return controller;
 }
@@ -10969,9 +10984,11 @@ function bracketCommitStatusHtml(){
  const uploaded=s.result==='success',cloud=!!state.cloudCode;
  const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
+ const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
  return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
+ failureDetail+
  (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
- (s.override&&!s.busy&&adminOverrideCurrent(s.override)?'<button class="btn btn-danger" data-action="admin-force-reconfirm">重新確認並重試同一配對</button>':'')+'</section>';
+ (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
@@ -25422,7 +25439,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             }
 
             const synced=await saveState();
-            if(synced===false){state=beforeStart;await saveRecord(state);render();showToast('雲端未確認開賽，本次未開始，請核對網路與對戰表後重試',true);return;}
+            if(synced===false){state=beforeStart;await saveRecord(state);noteAdminOperationalFailure('start-tournament',window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-readback-unconfirmed');render();showToast('雲端未確認開賽，本次未開始，請核對網路與對戰表後重試',true);return;}
             publicTournamentsCache=null;
             myRegistrationsCache=null;
             resetAdminRegistrationsCache();
@@ -25493,7 +25510,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="draw-bracket"){
-    const doDraw = ()=>{void bracketCommitController()?.begin();};
+    const doDraw = ()=>{adminOperationalFailure=null;void bracketCommitController()?.begin();};
     const doCheckThenDraw = ()=>{
       if(state.meta.battleMode==="team"){doDraw();return;}
       const total = state.players.length;
@@ -26189,5 +26206,6 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
 
