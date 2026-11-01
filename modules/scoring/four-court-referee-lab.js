@@ -1,16 +1,17 @@
 (function(root){
  'use strict';
- function mount(element,{transport,code,uid,station=1,manager=false,onView=()=>{},executeCommand=null}){
+ function mount(element,{transport,code,uid,station=1,manager=false,onView=()=>{},executeCommand=null,clientFactory=null,autoConnect=true}){
   if(!['127.0.0.1','localhost'].includes(root.location.hostname)||transport.projectId!=='demo-bxh-four-court-buckets')throw Error('emulator-lab-only');
   const original=root.cloudSync,listeners=new Set();let view={status:'offline',state:null,pending:[]};
   element.innerHTML='<div class="lab-status" role="status"></div><label>戰鬥台 <select class="lab-court"></select></label><div class="lab-seats"></div><div class="lab-score" aria-live="polite"></div><div class="lab-actions"><button class="lab-a">A +1</button><button class="lab-b">B +1</button><button class="lab-retry">重新確認</button><button class="lab-connection">中斷同步</button></div><p class="lab-toast" role="status"></p>';
   const el=selector=>element.querySelector(selector),toast=text=>el('.lab-toast').textContent=text;
-  const client=root.BXHFourCourtClient.create({transport,code,uid,operationId:()=>root.crypto.randomUUID(),canManage:()=>manager,onView:next=>{
+  const receive=next=>{
    view=next;
    onView(next);
    if(next.state)for(const listener of listeners)listener({model:next.state.meta.refereeSeatsV1,projection:{refereeSeatNames:next.state.meta.refereeSeatNames}});
    render();
-  }});
+  };
+  const client=clientFactory?clientFactory(receive):root.BXHFourCourtClient.create({transport,code,uid,operationId:()=>root.crypto.randomUUID(),canManage:()=>manager,onView:receive});
   root.cloudSync={manageRefereeSeats:data=>client.manageRefereeSeats(data),subscribeRefereeSeats:(_code,callback)=>{listeners.add(callback);return ()=>listeners.delete(callback);}};
   const current=()=>view.state?.matches.find(m=>m.station===station&&!m.completed);
   function render(){
@@ -31,7 +32,7 @@
   el('.lab-court').onchange=event=>{station=Number(event.target.value);render();};
   el('.lab-connection').onclick=()=>view.status==='offline'?client.connect():client.disconnect();
   el('.lab-retry').onclick=async()=>{for(const key of [...view.pending]){const result=await client.retry(key);toast(result?.ok?'已確認操作結果':'結果尚未確認，請再次重試。');}};
-  render();client.connect();
+  render();if(autoConnect)client.connect();
   return {client,dispose(){client.disconnect();root.BXHRefereeSeats.bind({state:()=>null,uid:()=>null,operator:()=>false,render:()=>{}});root.cloudSync=original;element.replaceChildren();}};
  }
  root.BXHFourCourtLab={mount};
