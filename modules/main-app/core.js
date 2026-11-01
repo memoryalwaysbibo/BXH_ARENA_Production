@@ -15546,6 +15546,7 @@ function renderPlayerCenterLoggedIn(){
     ${renderSwitchTournamentModal()}
     ${renderAdminTournamentListModal()}
     ${renderPlayerProfileEditModal()}
+    ${renderPlayerProfileReminder()}
   </div>`;
 }
 
@@ -18367,6 +18368,28 @@ function profileCompletionPercent(p){
 let playerProfileEditOpen=false;
 let playerProfileEditBusy=false;
 let playerProfileEditError="";
+const playerProfileReminder=window.BXHProfileReminder?.create({
+  storage:()=>window.sessionStorage,gameId:p=>effectiveGameId(p)
+});
+function playerProfileReminderVisible(){
+  return appPhase==="player-center"&&playerActiveTab==="home"&&currentRole==="player"
+    &&!authVerifying&&!guestReadOnlyMode&&!mailboxContext().open&&!playerProfileEditOpen
+    &&!pendingModal&&!cloudJoinModalOpen&&!eventEntryModalOpen
+    &&playerProfileReminder?.shouldPrompt(firebaseUser?.uid,userProfile)===true;
+}
+function renderPlayerProfileReminder(){
+  if(!playerProfileReminderVisible())return "";
+  return `<div class="modal-overlay" id="player-profile-reminder">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="profile-reminder-title" aria-describedby="profile-reminder-description">
+      <div class="panel-title" id="profile-reminder-title">請完善用戶資料</div>
+      <p id="profile-reminder-description">請補齊尚未填寫的${esc(playerProfileReminder.missing(userProfile).join("與"))}。</p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" data-action="player-profile-reminder-edit" data-profile-reminder-session="${esc(playerProfileReminder.session())}">確定</button>
+        <button type="button" class="btn btn-ghost" data-action="player-profile-reminder-later" data-profile-reminder-session="${esc(playerProfileReminder.session())}">下一次</button>
+      </div>
+    </div>
+  </div>`;
+}
 let googleLinkBusy=false;
 let googleLinkError="";
 
@@ -22805,6 +22828,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     render();
     return;
   }
+  if(action==="player-profile-reminder-edit"||action==="player-profile-reminder-later"){
+    if(!playerProfileReminderVisible()||target.getAttribute("data-profile-reminder-session")!==playerProfileReminder.session())return;
+    playerProfileReminder.defer();
+    if(action==="player-profile-reminder-edit"){
+      playerActiveTab="profile";
+      playerProfileSection="overview";
+      playerProfileEditError="";
+      playerProfileEditOpen=true;
+    }
+    render();
+    if(playerProfileEditOpen)document.getElementById(!String(userProfile.phone||"").trim()?"profile-phone":"profile-gameid")?.focus({preventScroll:true});
+    return;
+  }
   if(action==="player-close-profile-edit"){
     if(playerProfileEditBusy) return;
     // 只有點擊取消按鈕或遮罩本身才關閉。
@@ -25936,6 +25972,9 @@ async function init(){
           let authStateGeneration=0;
           let googleLinkRedirectOutcomePending=null;
           async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
+            if(playerProfileReminder?.syncAuth(fbUser)){
+              playerProfileEditOpen=false;playerProfileEditError="";
+            }
             if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
             lobbyAuthEpoch++;
@@ -26014,6 +26053,7 @@ async function init(){
                   }
 
                   userProfile = profile;
+                  playerProfileReminder?.acceptProfile(fbUser.uid);
                   restoreAccountInterfaceTheme(fbUser.uid,profile);
                   if((profile.role==="staff"||profile.role==="admin"||profile.role==="super_admin"||(profile.role==="tester"||profile.isTestAccount===true)) && window.cloudAuth.ensureMyStaffDirectory){ window.cloudAuth.ensureMyStaffDirectory().catch(()=>{}); }
                   if((profile.role==="admin"||profile.role==="super_admin") && window.cloudAuth.syncManagedStaffDirectory){
@@ -26189,5 +26229,6 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
 

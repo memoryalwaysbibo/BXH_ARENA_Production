@@ -1,0 +1,23 @@
+name: Profile completion reminder
+on:
+  pull_request:
+    paths:
+      - modules/main-app/profile-reminder.js
+      - tests/profile-reminder.*.cjs
+      - .github/workflows/profile-reminder.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check modules/main-app/core.js && node --test tests/profile-reminder.test.cjs
+      - run: npm install --ignore-scripts --no-save --package-lock=false playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/profile-reminder.browser.cjs
