@@ -91,6 +91,10 @@ jobs:
           node --test team-foundation/*.test.cjs
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
+      - name: Verify tournament completion, archive retry and results display
+        run: |
+          node --test tests/tournament-completion-flow.cjs
+          node tests/ladder-settlement.cjs
       - name: Verify QR camera lifecycle and existing check-in routing
         run: node --test tests/qr-scanner-lifecycle.test.cjs qr-checkin/ui.test.cjs
       - name: Verify latest member location and regional leaderboard states

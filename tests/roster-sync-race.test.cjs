@@ -91,7 +91,7 @@ test('committed result retains other waitlist rows and patches promoted status',
  assert.equal(sandbox.adminRegistrationsCache[1].status,'waitlist');
 });
 test('old roster snapshot cannot replace committed state even with a newer clock',()=>{
- const sandbox={state:{id:'room',updatedAt:100,registrationRosterRevision:5,players:[{id:'new'}]},remoteAppliedRoomId:'room',remoteAppliedAt:0,defaultState:id=>({id}),saveRecord(){},render(){},getMatch(){},Date};
+ const sandbox={state:{id:'room',updatedAt:100,registrationRosterRevision:5,players:[{id:'new'}]},remoteAppliedRoomId:'room',remoteAppliedAt:0,isTournamentFullyDecided:()=>false,finishTournament:async()=>false,defaultState:id=>({id}),saveRecord(){},render(){},getMatch(){},Date};
  vm.createContext(sandbox);
  vm.runInContext(block(core,'function applyRemoteState(','// Phase 1:'),sandbox);
  sandbox.applyRemoteState({id:'room',updatedAt:200,registrationRosterRevision:4,players:[]},true);
@@ -207,7 +207,7 @@ test('room or account switch while queued prevents the roster commit and publica
 });
 test('QR revision outranks device clock and older check-in snapshots cannot undo it',()=>{
  const s={state:{id:'room',cloudCode:'BXH-X',qrCheckinManaged:true,qrCheckinRevision:7,updatedAt:500,players:[{id:'p',checkedIn:false}]},remoteAppliedRoomId:'room',remoteAppliedAt:500,
- defaultState:id=>({id}),saveRecord(){},render(){},getMatch(){},Date};vm.createContext(s);vm.runInContext(block(core,'function applyRemoteState(','// Phase 1:'),s);
+ isTournamentFullyDecided:()=>false,finishTournament:async()=>false,defaultState:id=>({id}),saveRecord(){},render(){},getMatch(){},Date};vm.createContext(s);vm.runInContext(block(core,'function applyRemoteState(','// Phase 1:'),s);
  s.applyRemoteState({id:'room',qrCheckinManaged:true,qrCheckinRevision:8,updatedAt:100,players:[{id:'p',checkedIn:true}]});
  assert.equal(s.state.qrCheckinRevision,8);assert.equal(s.state.players[0].checkedIn,true);
  s.applyRemoteState({id:'room',qrCheckinManaged:true,qrCheckinRevision:7,updatedAt:900,players:[{id:'p',checkedIn:false}]},true);
