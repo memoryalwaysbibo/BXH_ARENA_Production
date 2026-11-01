@@ -30,10 +30,11 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.55.0-noble
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci --ignore-scripts
+      - run: npm install --prefix /tmp/feedback-browser-deps --no-save --ignore-scripts playwright@1.55.0
       - run: mkdir -p test-results/registration-feedback
       - run: node --test tests/registration-feedback.browser.cjs
         env:
+          NODE_PATH: /tmp/feedback-browser-deps/node_modules
           FEEDBACK_SCREENSHOT: test-results/registration-feedback/mobile.png
       - uses: actions/upload-artifact@v4
         if: always()
