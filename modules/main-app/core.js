@@ -10894,6 +10894,8 @@ function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
  if(!fresh||!snapshot||fresh.id!==snapshot.id||fresh.startedAt||fresh.archiveStatus==='completed'||
    fresh.meta?.battleMode==='team'||snapshot.meta?.battleMode==='team'||
    fresh.meta?.checkinRequired!==true||snapshot.meta?.checkinRequired!==true)return null;
+ const layoutSettings=s=>JSON.stringify([s.meta?.formatType||'single',Number(s.meta?.stations||1),!!s.meta?.bronzeMatch]);
+ if(layoutSettings(fresh)!==layoutSettings(snapshot))return null;
  const entrants=(players)=>{
   const ids=(players||[]).filter(p=>p?.checkedIn===true).map(p=>String(p.id||''));
   return ids.length===new Set(ids).size&&ids.every(Boolean)?ids.sort():null;
@@ -10903,7 +10905,7 @@ function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
  if(!before||!after||paired.length<2||JSON.stringify(before)!==JSON.stringify(paired)||
    JSON.stringify(after)!==JSON.stringify(paired))return null;
  const rebased=cloneStateForSave(fresh);
- for(const field of ['matches','bracketSize','drawnAt','currentMatchId','championId','runnerUpId','thirdId','fourthId','courtAssignments','bracketDraw','bracketDrawHistory']){
+ for(const field of ['matches','bracketSize','drawnAt','currentMatchId','championId','runnerUpId','thirdId','fourthId','gfMatchId','gfResetMatchId','bronzeMatchId','rrRounds','celebrationShown','courtAssignments','bracketDraw','bracketDrawHistory']){
   if(Object.prototype.hasOwnProperty.call(snapshot,field))rebased[field]=JSON.parse(JSON.stringify(snapshot[field]));
  }
  rebased.updatedAt=Date.now();return rebased;

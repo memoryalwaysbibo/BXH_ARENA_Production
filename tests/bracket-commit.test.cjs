@@ -213,6 +213,16 @@ test('cancelled ninth player stays out of an eight-player redraw while current r
  assert(!rebased.matches.some(m=>m.a?.playerId==='p1'||m.b?.playerId==='p1'));
  const changed=clone(fresh);changed.players[0].checkedIn=true;assert.equal(rosterRebase(changed,snapshot),null);
 });
+test('ordinary fence refresh retains generated round references and rejects changed layout settings',()=>{
+ const snapshot={id:'room',meta:{checkinRequired:true,formatType:'double',stations:2,bronzeMatch:false},players:[{id:'a',checkedIn:true},{id:'b',checkedIn:true}],matches:[{id:'m',a:{playerId:'a'},b:{playerId:'b'}}],gfMatchId:'new-final',gfResetMatchId:null,bronzeMatchId:null,rrRounds:3,celebrationShown:false};
+ const fresh={...clone(snapshot),gfMatchId:'old-final',gfResetMatchId:'old-reset',bronzeMatchId:'old-bronze',rrRounds:8,celebrationShown:true};
+ const rebased=rosterRebase(fresh,snapshot);
+ assert(rebased);assert.equal(rebased.gfMatchId,'new-final');assert.equal(rebased.gfResetMatchId,null);
+ assert.equal(rebased.bronzeMatchId,null);assert.equal(rebased.rrRounds,3);assert.equal(rebased.celebrationShown,false);
+ for(const [key,value] of [['formatType','roundrobin'],['stations',3],['bronzeMatch',true]]){
+  const changed=clone(fresh);changed.meta[key]=value;assert.equal(rosterRebase(changed,snapshot),null,key);
+ }
+});
 
 test('expired force confirmation can be renewed without a new operation or pairing',async()=>{
  const h=fixture(),grant={id:'force-confirmation',operation:'draw-bracket',participantIds:['a','b'],at:1};let accepted=false;
