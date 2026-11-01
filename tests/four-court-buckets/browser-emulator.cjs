@@ -41,7 +41,7 @@ async function read(){const room=(await root.get()).data(),base=JSON.parse(room.
     subscriptions.set(key,stop);stops.add(stop);
    });
    await page.exposeFunction('labStop',key=>{const stop=subscriptions.get(key);if(stop){stop();stops.delete(stop);subscriptions.delete(key);}});
-   await page.exposeFunction('labCommand',async({type,data,drop})=>{const result=await(type==='score'?commit:seat)({auth:{uid},data});if(drop)throw Error('simulated-lost-reply');return result;});
+   await page.exposeFunction('labCommand',async({type,data,drop})=>{let result;try{result=await(type==='score'?commit:seat)({auth:{uid},data});}catch(error){return {ok:false,reason:error.message};}if(drop)throw Error('simulated-lost-reply');return result;});
    await page.goto('http://127.0.0.1:'+server.address().port+'/lab/index.html');
    await page.evaluate(({code,uid})=>{
     const callbacks=new Map();let serial=0;

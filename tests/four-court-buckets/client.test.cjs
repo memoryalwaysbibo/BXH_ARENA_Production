@@ -15,6 +15,7 @@ test('client waits for all authoritative buckets, uses root seat model and rejec
  current.next({bucket:{...bucket,revision:1,matches:JSON.stringify(rows)}});assert.equal(h.client.getView().state.matches[0].scoreA,2);
  current.next({bucket});assert.equal(h.client.getView().state.matches[0].scoreA,2);
  current.next({bucket:null});assert.equal(h.client.getView().status,'syncing');assert.equal(h.client.canScore(1),false);
+ current.next({bucket});assert.equal(h.client.getView().status,'syncing');assert.equal(h.client.getView().state.matches[0].scoreA,2);
 });
 test('offline, cached and old lifecycle callbacks cannot enable scoring; reconnect reads current buckets',async()=>{
  const h=setup();h.client.connect();h.ready();const old=h.watches[0];h.client.disconnect();

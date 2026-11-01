@@ -10,10 +10,10 @@
  function create({transport,code,uid,onView=()=>{},operationId,canManage=()=>false}){
   if(!B||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!uid||typeof operationId!=='function')throw Error('invalid-client');
   let rootRoom=null,base=null,manifest=null,rootVersion=null,state=null,status='offline',generation=0,bucketGeneration=0,roomStop=null,bucketStops=[],active=false,viewVersion=0,subscriptionFailed=false;
-  const buckets=new Map(),pending=new Map();
+  const buckets=new Map(),bucketWatermarks=new Map(),pending=new Map();
   const retryable=()=>[...pending].filter(([,record])=>!record.running).map(([key])=>key);
   function emit(next,reason=null){status=next;onView({status,reason,state:state?clone(state):null,viewVersion:++viewVersion,pending:[...pending.keys()],retryable:retryable()});}
-  function stopBuckets(){bucketGeneration++;for(const stop of bucketStops)stop();bucketStops=[];buckets.clear();}
+  function stopBuckets(){bucketGeneration++;for(const stop of bucketStops)stop();bucketStops=[];buckets.clear();bucketWatermarks.clear();}
   function assemble(){
    if(!active||!manifest)return;
    if(subscriptionFailed)return emit('error','subscription-unavailable');
@@ -42,11 +42,11 @@
        bucketStops.push(transport.watchBucket(code,id,event=>{
         if(!active||token!==generation||bucketToken!==bucketGeneration||event.fromCache||event.pending)return;
         const value=event.bucket;
-        if(!value||value.bucketId!==id||value.epoch!==manifest.epoch){buckets.delete(id);return emit('syncing','bucket-context');}
-        const previous=buckets.get(id);
+        if(!value||value.bucketId!==id||value.epoch!==manifest.epoch||value.code!==manifest.code||value.roomId!==manifest.roomId||value.schema!==B.schema||!Number.isSafeInteger(value.revision)||value.revision<0){buckets.delete(id);return emit('syncing','bucket-context');}
+        const previous=bucketWatermarks.get(id);
         if(previous&&value.revision<previous.revision)return;
         if(previous&&value.revision===previous.revision&&JSON.stringify(value)!==JSON.stringify(previous)){subscriptionFailed=true;return emit('error','bucket-version-conflict');}
-        buckets.set(id,clone(value));assemble();
+        bucketWatermarks.set(id,clone(value));buckets.set(id,clone(value));assemble();
        },()=>{if(active&&token===generation&&bucketToken===bucketGeneration){subscriptionFailed=true;emit('error','subscription-unavailable');}}));
       }
      }
