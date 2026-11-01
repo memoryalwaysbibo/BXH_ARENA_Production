@@ -13,7 +13,7 @@ function fixture(){
   playerName:id=>({a:'選手甲',b:'選手乙'})[id]||id,executed:[],toasts:[],render:()=>{},document:{getElementById:()=>({focus(){c.focused=true;}})}};
  c.executeCourtForceAction=change=>c.executed.push(change);c.showToast=m=>c.toasts.push(m);
  vm.createContext(c);
- for(const name of ['refereeWorkstationHeader','refereeWaitingControls','renderWaitingRefereeCourt','renderReferee','courtForceExitConfirmation','renderModal','openModal','closeModal'])vm.runInContext(fn(name),c);
+ for(const name of ['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeWaitingControls','renderWaitingRefereeCourt','renderReferee','courtForceExitConfirmation','renderModal','openModal','closeModal'])vm.runInContext(fn(name),c);
  return c;
 }
 test('6 and 12 pre-draw courts render seats outside disabled scoring, without mutating state',()=>{

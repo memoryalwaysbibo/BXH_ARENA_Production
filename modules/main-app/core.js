@@ -6169,6 +6169,7 @@ function stationMutationErrorMessage(reason){
 
 const refereeSeatCommandBusy=new Set();
 async function executeRefereeSeatCommand(matchId,command){
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再操作。",true);return false;}
   const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(matchId);
   if(!code||!m||!canOperateCurrentTournament()||!requireStationPermission(m))return false;
   if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
@@ -6231,6 +6232,7 @@ async function executeRefereeDispatchCommand(command){
 }
 
 function persistRefereeMatchMutation(matchId, mutateRemoteFn){
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在保留本機備份並讀取雲端，請稍候再操作。",true);return Promise.resolve({ok:false,reason:"sync-recovery-in-progress"});}
   const m=getMatch(matchId);
   state.updatedAt=Date.now();
   const localSnapshot=cloneStateForSave(state);
@@ -6507,6 +6509,7 @@ function cloneStateForSave(st){
   }
 }
 function enqueueCloudStateWrite(code, snapshot, options={}){
+  if(window.BXHRefereeSyncRecovery?.isBusy())return Promise.resolve(false);
   const normalizedCode = code;
   const callerState=state,callerUid=currentAuthUid(),inputQrRevision=snapshot.qrCheckinRevision;
   cloudWriteChain = cloudWriteChain
@@ -6545,6 +6548,7 @@ function queueCloudSyncRetry(tournamentId, code){
   cloudSyncPending = true;
   if(cloudSyncQueueTimer) return;
   cloudSyncQueueTimer = setInterval(async ()=>{
+    if(window.BXHRefereeSyncRecovery?.isBusy())return;
     if(window.BXHBracketCommit&&bracketCommitBlocked())return;
     if(communitySettingsWriteGate&&communitySettingsWriteGate.isCurrent()&&communitySettingsWriteGate.roomId===tournamentId&&communitySettingsWriteGate.roomCode===code)return;
     if(!cloudSyncPending || state.id!==tournamentId || state.cloudCode!==code || !cloudAvailable()){
@@ -8681,6 +8685,7 @@ function refereeFaultLast(m){
 }
 function addScore(matchId, side, type){
   if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"score",side,finish:type});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再計分。",true);return;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   // The existing round ledger only accepts unmodified BXH points. Until the
@@ -8980,6 +8985,7 @@ async function queueOfflineMatchConfirmation(matchId,mode,selectedWinnerId){
 
 async function confirmResultWithCloudGuard(matchId){
   if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"confirm"});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再確認結果。",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -9010,7 +9016,7 @@ async function confirmResultWithCloudGuard(matchId){
   if(!preSyncOk){
     cloudStatus = "error";
     render();
-    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請重試連線後再確認結果。", true);
+    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請使用裁判台「同步復原」，核對雲端比分後再操作。", true);
     return false;
   }
   const result = await window.cloudSync.confirmMatchTransaction(state.cloudCode, (remoteState)=>{
@@ -9124,6 +9130,7 @@ function confirmQuickDecision(matchId, selectedWinnerId){
 
 async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"quick",winnerId:selectedWinnerId});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再送出判定。",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -9154,7 +9161,7 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(!preSyncOk){
     cloudStatus = "error";
     render();
-    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請重試連線後再確認結果。", true);
+    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請使用裁判台「同步復原」，核對雲端比分後再操作。", true);
     return false;
   }
   const result = await window.cloudSync.confirmMatchTransaction(state.cloudCode, (remoteState)=>{
@@ -12259,9 +12266,55 @@ function renderWaitingRefereeCourt(stationNum){
     ${refereeWaitingControls(stationNum)}
   </div>`;
 }
+function canUseRefereeSyncRecovery(){
+  return !!(state?.cloudCode&&state.id&&state.startedAt&&state.meta?.battleMode!=="team"&&currentAuthUid()&&canOperateCurrentTournament());
+}
+function refereeSyncRecoveryControlsHtml(){
+  if(!canUseRefereeSyncRecovery())return "";
+  const busy=window.BXHRefereeSyncRecovery?.isBusy();
+  return `<div class="panel"><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="referee-sync-recovery" ${busy?'disabled':''}>${busy?'復原中…':'同步復原'}</button><button class="btn btn-ghost btn-sm" data-action="referee-export-recovery" ${busy?'disabled':''}>匯出復原備份</button></div>${cloudStatus==="error"?'<div class="hint">若送分持續失敗，可先保留本機備份，再讀取雲端比分。</div>':''}</div>`;
+}
+function requestRefereeSyncRecovery(){
+  if(!canUseRefereeSyncRecovery()||window.BXHRefereeSyncRecovery?.isBusy())return;
+  const context={uid:currentAuthUid(),id:state.id,code:state.cloudCode};
+  openModal({type:"generic",title:"恢復雲端計分？",message:"將先保留這台裝置的本機比分備份，再重新讀取雲端並重新載入頁面。尚未獲雲端確認的比分與設定不會自動補送，請核對後再操作。備份可從裁判台匯出。",confirmLabel:"備份並重新載入",onConfirm:()=>{void performRefereeSyncRecovery(context);}});
+}
+async function performRefereeSyncRecovery(context){
+  if(!canUseRefereeSyncRecovery()||context.uid!==currentAuthUid()||context.id!==state.id||context.code!==state.cloudCode)return;
+  const api=window.BXHRefereeSyncRecovery;
+  if(!api){showToast("復原功能尚未載入，請稍後再試。",true);return;}
+  const snapshot=JSON.parse(JSON.stringify(state)),signature=JSON.stringify(snapshot);
+  const isCurrent=()=>canUseRefereeSyncRecovery()&&context.uid===currentAuthUid()&&context.id===state.id&&context.code===state.cloudCode&&JSON.stringify(state)===signature;
+  const readRemote=async()=>{
+    let timer;
+    try{
+      const read=(async()=>{if(window.cloudSync?.connect)await window.cloudSync.connect();if(!isCurrent())return {ok:false,reason:"context-changed"};return await window.cloudSync.joinRoom(context.code,{serverOnly:true});})();
+      return await Promise.race([read,new Promise(resolve=>{timer=setTimeout(()=>resolve({ok:false,reason:"timeout"}),8000);})]);
+    }
+    finally{clearTimeout(timer);}
+  };
+  const recovery=api.backupAndReload({snapshot,uid:context.uid,code:context.code,storage:window.storage,isCurrent,readRemote,cacheRemote:remote=>saveRecord(remote),reload:()=>{rememberRefereeWorkstation();window.location.reload();}});
+  render();
+  const result=await recovery;
+  if(!result.ok&&context.uid===currentAuthUid()&&context.id===state.id&&context.code===state.cloudCode){
+    const message=result.reason==="context-changed"?"賽事資料或登入身分已變更，已停止重新載入，請核對後再試。":result.reason==="remote-read-failed"?"無法讀取雲端最新比分，本機資料已保留，請確認網路後重試。":"本機備份或雲端資料未能確認，已停止重新載入；請先匯出賽事資料。";
+    showToast(message,true);render();
+  }
+}
+async function exportRefereeSyncRecovery(){
+  if(!canUseRefereeSyncRecovery())return;
+  const uid=currentAuthUid(),code=state.cloudCode,id=state.id;
+  try{
+    const backup=await window.BXHRefereeSyncRecovery?.latest({uid,code,storage:window.storage});
+    if(uid!==currentAuthUid()||code!==state.cloudCode||id!==state.id)return;
+    if(!backup){showToast("目前沒有這場賽事的本機復原備份。",true);return;}
+    const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=code+"-local-recovery-"+backup.savedAt+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){showToast("本機復原備份無法讀取，請先匯出目前賽事資料。",true);}
+}
 function renderReferee(){
   if(state.meta?.battleMode==="team")return renderTeamReferee();
-  const quickNav = refereeBracketRoundtripNav("bracket");
+  const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml();
   if(!state.bracketSize){
     const n=Math.max(1,Math.min(32,Number(state.meta.stations)||1));
     return quickNav+`<div class="court-grid ${n===1?'court-grid-1':n===2?'court-grid-2':'court-grid-many'}">${Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1)).join('')}</div>`;
@@ -23431,9 +23484,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="goto-settings"){ activeTab="settings"; render(); return; }
   if(action==="goto-history"){ activeTab="history"; viewingRecordId=null; viewingRecordData=null; render(); return; }
 
+  if(action==="referee-sync-recovery"){requestRefereeSyncRecovery();return;}
+  if(action==="referee-export-recovery"){void exportRefereeSyncRecovery();return;}
   if(action==="cloud-retry-connect"){
     if(!hasAdminAccess()){ showToast("目前身分沒有此操作權限。", true); return; }
     if(state.cloudCode){
+      if(canUseRefereeSyncRecovery()){requestRefereeSyncRecovery();return;}
       (async ()=>{
         cloudStatus = "connecting"; render();
         if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
