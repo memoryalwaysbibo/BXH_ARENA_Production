@@ -67,6 +67,20 @@ async function send(root,id,action,extra={}){
    report.cases.push({name:'atomic-cutover-rollback',courts:count,buckets:rollback.buckets,restoredScores:count,orphanBuckets:0});
   }
   {
+   phase('score-versus-rollback');
+   const code='BXH-ROLLRACE',{root,pub}=await seedLegacy(code,6),before=await root.get();
+   const {epoch}=await cutover.activate(code,{expectedUpdateTime:before.updateTime});
+   const {room,state}=await read(root),d=request(state,room,'m1','score',operation(),{side:'A',finish:'spin'});
+   const [scored,rolled]=await Promise.allSettled([commit({auth:{uid:'ref1'},data:d}),cutover.rollback(code,{expectedEpoch:epoch})]);
+   if(rolled.status==='rejected')await cutover.rollback(code,{expectedEpoch:epoch});
+   const restored=(await root.get()).data(),actual=JSON.parse(restored.data).matches.find(m=>m.id==='m1').scoreA;
+   assert.equal(restored.scoreStorage,undefined);
+   assert.equal(actual,scored.status==='fulfilled'?1:0,'rollback lost an acknowledged score');
+   assert.equal(JSON.parse((await pub.get()).data().bracketView).matches.find(m=>m.id==='m1').scoreA,actual);
+   assert.equal((await root.collection('matchBuckets').get()).size,0);
+   report.cases.push({name:'score-versus-rollback',acknowledged:scored.status==='fulfilled',restoredScore:actual,passed:true});
+  }
+  {
    phase('partial-migration-fails-closed');
    const code='BXH-PARTIAL1',{root,pub}=await seedLegacy(code,6),before=await root.get(),publicBefore=await pub.get();
    await root.collection('matchBuckets').doc('court-1').set({orphan:true});
