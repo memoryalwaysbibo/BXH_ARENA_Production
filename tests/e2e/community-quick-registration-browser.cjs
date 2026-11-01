@@ -163,21 +163,21 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    assert.equal(await page.getByRole('cell',{name:'新報名選手',exact:true}).count(),1);
    await page.screenshot({path:path.join(output,size.name+'-host-roster.png'),fullPage:true,animations:'disabled'});
    await page.evaluate(()=>{peopleRosterSection='tools';render();fixture.originalJoin=window.cloudSync.joinRoom;window.cloudSync.joinRoom=async(...args)=>{await new Promise(resolve=>fixture.releaseRosterRead=resolve);return fixture.originalJoin(...args)};});
-   await page.locator('[data-action="load-online-roster"]').click();
+   await page.locator('.btn-primary[data-action="load-online-roster"]').click();
    await page.waitForFunction(()=>typeof fixture.releaseRosterRead==='function');
-   assert.equal(await page.locator('[data-action="load-online-roster"]').isDisabled(),true);
-   assert.match(await page.locator('[data-action="load-online-roster"]').innerText(),/名單處理中/);
+   assert.equal(await page.locator('.btn-primary[data-action="load-online-roster"]').isDisabled(),true);
+   assert.match(await page.locator('.btn-primary[data-action="load-online-roster"]').innerText(),/名單處理中/);
    assert.match(await page.getByRole('status').innerText(),/正在同步並確認雲端名單/);
    await page.evaluate(()=>{window.cloudSync.joinRoom=fixture.originalJoin;fixture.releaseRosterRead();});
    await page.waitForFunction(()=>!peopleRosterBusy);
    assert.match(await page.getByRole('status').innerText(),/同步確認完成：正取 1 人/);
    await page.evaluate(()=>fixture.failSync=true);
-   await page.locator('[data-action="load-online-roster"]').click();
+   await page.locator('.btn-primary[data-action="load-online-roster"]').click();
    await page.waitForFunction(()=>!peopleRosterBusy);
    assert.match(await page.getByRole('status').innerText(),/同步未完成/);
-   assert.equal(await page.locator('[data-action="load-online-roster"]').isEnabled(),true);
+   assert.equal(await page.locator('.btn-primary[data-action="load-online-roster"]').isEnabled(),true);
    await page.evaluate(()=>fixture.failSync=false);
-   await page.locator('[data-action="load-online-roster"]').click();
+   await page.locator('.btn-primary[data-action="load-online-roster"]').click();
    await page.waitForFunction(()=>!peopleRosterBusy&&!adminRegistrationsError);
    assert.match(await page.getByRole('status').innerText(),/同步確認完成：正取 1 人/);
 
