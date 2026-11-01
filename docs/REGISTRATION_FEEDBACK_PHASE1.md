@@ -32,6 +32,8 @@ node scripts/verify-production-frontend.cjs
 
 本機執行時可用 BROWSER_EXECUTABLE 指定測試用 Chromium，CI 使用與 Playwright 版本相符的容器。只有隔離測試與既有 CI 全部通過，才具備發布條件；正式部署成功與否仍以部署工作及實際版本確認為準。
 
-資料庫整合測試使用官方 Firestore Emulator，以及儲存庫既有的歷史部署 handler 樣本，逐檔核對 SHA256；它證明候選前端與該樣本的互通及冪等性，不代表已核對目前正式後端版本，也不代表雲端承載量測試。
+資料庫整合測試使用官方 Firestore Emulator 與 2026-11-02 03:27（台灣時間）只讀取得的正式 familyRegistration 來源。Functions 稽核工作 41341741095 固定來源 generation 1793041271889373，函式更新時間為 2026-10-26T19:02:23.114496382Z。測試 fixture 保留 handler、實際報到保護 adapter、操作憑證模組與啟用旗標，逐檔核對 SHA256；不讀寫正式玩家資料，也不代表雲端承載量測試。
 
 本次本機驗證：18 項狀態／恢復測試、7 項 Chromium 瀏覽器測試、3 項 Firestore Emulator 整合測試及 39 組既有 critical 回歸皆通過。重新整理案例會阻擋舊頁的結果查詢，確保測到的是新頁從紀錄恢復，而不是舊頁在卸載前已完成確認。重送原請求後另讀目前有效紀錄，避免把取消前的歷史成功憑證誤顯示成有效報名。
+
+接手驗證：整合 main 0669fa33；307 項 Node 測試、7 項 Chromium 隔離瀏覽器測試及 39 組 critical 回歸通過。CI 瀏覽器工作採獨立目錄安裝固定 playwright@1.55.0，避免對不存在的 lockfile 執行 npm ci。發布工作新增 registration-feedback.js/css 的正式站精確雜湊核對。

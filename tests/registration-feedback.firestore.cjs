@@ -2,14 +2,14 @@
 const {test,after}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8093');assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration-feedback');
 require('firebase-admin/app').initializeApp({projectId:'demo-bxh-registration-feedback'});
-const db=require('firebase-admin/firestore').getFirestore();
 const {create}=require('../modules/main-app/registration-feedback.js');
-const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../qr-checkin/reference/writer-handlers.json'))),cache=new Map();
+const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/registration-feedback-current-source.json'))),cache=new Map();
 function load(file){
- if(cache.has(file))return cache.get(file).exports;const digest=fixture.files['familyRegistration/'+file],source=fixture.blobs[digest];assert(source);assert.equal(crypto.createHash('sha256').update(source).digest('hex'),digest);
- const module={exports:{}};cache.set(file,module);new Function('require','module','exports',source)(name=>name.startsWith('.')?load(path.posix.normalize(path.posix.join(path.posix.dirname(file),name))+(/\.js$/.test(name)?'':'.js')):require(name),module,module.exports);return module.exports;
+ if(cache.has(file))return cache.get(file).exports;const digest=fixture.files[file],source=fixture.blobs[digest];assert(source);assert.equal(crypto.createHash('sha256').update(source).digest('hex'),digest);
+ const module={exports:{}};cache.set(file,module);new Function('require','module','exports',source)(name=>name.startsWith('.')?load(path.posix.normalize(path.posix.join(path.posix.dirname(file),name))+(/\.(?:cjs|js)$/.test(name)?'':'.js')):require(name),module,module.exports);return module.exports;
 }
-const handle=load('family-registration.js').createFamilyRegistration(db);
+const db=load('_qr_checkin/admin-firestore.cjs').getFirestore();
+const handle=load('family-registration.js').createFamilyRegistration(db,Date.now,{myEventsProofEnabled:load('my-events-writer-flags.cjs').familyRegistrationProof===true});
 function memory(){const map=new Map();return {get length(){return map.size;},key:i=>[...map.keys()][i],getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};}
 let serial=0;
 async function seed(){

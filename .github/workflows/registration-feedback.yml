@@ -7,6 +7,7 @@ on:
       - 'modules/cloud/cloud-runtime.js'
       - 'tests/registration-feedback*'
       - 'tests/helpers/registration-feedback.emulator.json'
+      - 'tests/fixtures/registration-feedback-current-source.json'
       - 'index.html'
       - '.github/workflows/registration-feedback.yml'
 permissions:
