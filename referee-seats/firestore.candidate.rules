@@ -75,6 +75,31 @@ service cloud.firestore {
     }
 
 
+
+    // Read-only bucket access follows existing official staff private-room access.
+    // Seats control scoring; they do not remove staff read access.
+    function scoreBucketReadable(code, id) {
+      let room = get(tourPath(code)).data;
+      let storage = room.get('scoreStorage', {});
+      let config = get(/databases/$(database)/documents/systemConfig/fourCourtScoreBuckets).data;
+      return isStaffOrAbove()
+        && room.get('eventAuthority', '') == 'official'
+        && room.get('createdByRole', '') != 'partner_organizer'
+        && config.get('privateReadsEnabled', false) == true
+        && storage.get('schema', '') == 'bxh-match-buckets-v1'
+        && storage.get('status', '') == 'active'
+        && storage.get('code', '') == code
+        && storage.get('epoch', '') is string && storage.get('epoch', '').size() > 0
+        && storage.get('roomId', '') is string && storage.get('roomId', '').size() > 0
+        && id.matches('court-[1-9][0-9]*')
+        && resource.data.get('schema', '') == storage.schema
+        && resource.data.get('code', '') == code
+        && resource.data.get('roomId', '') == storage.roomId
+        && resource.data.get('epoch', '') == storage.epoch
+        && resource.data.get('bucketId', '') == id
+        && resource.data.get('revision', -1) is int && resource.data.get('revision', -1) >= 0
+        && resource.data.get('matches', null) is string;
+    }
     // Seat ownership / request changes are callable-only, including administrator changes.
     function refereeSeatWriteValid(code, privateDoc) {
       let room = get(tourPath(code)).data;
@@ -990,7 +1015,10 @@ service cloud.firestore {
       match /refereeSeatOperations/{id} { allow read, write: if false; }
       match /refereeScoreOperations/{id} { allow read, write: if false; }
       match /refereeScoreAudit/{id} { allow read, write: if false; }
-      match /matchBuckets/{id} { allow read, write: if false; }
+      match /matchBuckets/{id} {
+        allow get: if isSignedIn() && scoreBucketReadable(code, id);
+        allow list, write: if false;
+      }
       match /bucketScoreOperations/{id} { allow read, write: if false; }
       match /bucketScoreAudit/{id} { allow read, write: if false; }
       match /bucketSeatOperations/{id} { allow read, write: if false; }
