@@ -13017,8 +13017,9 @@ function peopleOnlineWaitlistRows(){
 function peopleWaitlistShadow(registrationId){
   return peopleLocalWaitlist().find(p=>String(p.registrationId||"")===String(registrationId||""))||null;
 }
-function peopleMutationErrorMessage(e){
+function peopleMutationErrorMessage(e,operation=''){
   const code=String((e&&e.code)||(e&&e.message)||"");
+  if(operation==='cancel'&&[code,e?.message,e?.details?.reason].some(value=>/bracket-locked|roster-locked/.test(String(value||''))))return '賽事已開始、結束或已有比賽紀錄，無法刪除選手。';
   if(code.includes("team-roster-managed")) return "團體賽請使用整隊報名管理；此開關適用一般個人賽。";
   if(code.includes("selection-managed")) return "本場使用抽籤名額模式，請先在「參賽名額抽籤」完成名額調整。";
   if(code.includes("bracket-locked")) return "已產生對戰表或賽事已開始；請先重設對戰表後再調整正備取。";
@@ -13224,7 +13225,7 @@ async function peopleCancelOnline(registrationId,name){
       ? await window.cloudSync.staffCancelRegistration(state.cloudCode,registrationId)
       : await window.cloudSync.cancelRoster(state.cloudCode,registrationId,"","admin");
     await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
-  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e,'cancel'),true);render();}
 }
 async function peopleCancelLocal(localId,name){
   if(peopleRosterBusy)return;
@@ -13232,7 +13233,7 @@ async function peopleCancelLocal(localId,name){
   try{
     const result=await window.cloudSync.cancelRoster(state.cloudCode,"",localId,"admin");
     await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
-  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e,'cancel'),true);render();}
 }
 async function peopleToggleAutoFill(){
   if(peopleRosterBusy)return;
@@ -24379,15 +24380,15 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="people-toggle-auto-fill"){ peopleToggleAutoFill(); return; }
   if(action==="delete-player"){
-    if(state.startedAt){ showToast("賽事開始後無法刪除選手", true); return; }
+    if(state.startedAt||state.archiveStatus==='completed'){ showToast("賽事開始或結束後無法刪除選手", true); return; }
     const pid = target.getAttribute("data-id");
     const p = state.players.find(x=>x.id===pid);
     if(!p) return;
-    if(isPlayerInBracket(pid)){
-      openModal({ type:"generic", title:"無法刪除選手", message:"此選手已進入賽事編排，無法直接刪除。請先重設對戰表。", confirmLabel:"我知道了", onConfirm:()=>{} });
-      return;
-    }
-    openModal({ type:"generic", title:"刪除選手", message:"確定要刪除選手『"+p.name+"』嗎？\n刪除後將從本場賽事名單中移除。線上報名選手會同步取消報名，不會只刪本機名單。", danger:true, confirmLabel:"確認刪除", onConfirm:()=>{
+    const roomId=state.id,code=state.cloudCode;
+    openModal({ type:"generic", title:"刪除選手", message:"確定要刪除選手『"+p.name+"』嗎？\n刪除後將從本場賽事名單中移除。線上報名選手會同步取消報名，不會只刪本機名單。"+(isPlayerInBracket(pid)?"\n此選手已在對戰表內，刪除後請依最新名單重新抽籤。":""), danger:true, confirmLabel:"確認刪除", onConfirm:()=>{
+      if(state.id!==roomId||state.cloudCode!==code)return;
+      if(state.startedAt||state.archiveStatus==='completed'){showToast("賽事開始或結束後無法刪除選手",true);return;}
+      if(bracketCommitBlocked()){showToast("對戰表正在確認儲存，請完成後再調整名單",true);return;}
       if(p.source==="online"){
         if(!p.registrationId){showToast("線上報名識別資料不足，請先同步最新名單",true);return;}
         peopleCancelOnline(p.registrationId,p.name);

@@ -118,6 +118,22 @@ test('guarded original roster service preserves attendance during configuration'
  assert.equal(JSON.parse(t.data).players.find(p=>p.id==='p1').checkedIn,true);
  assert.equal(t.qrCheckinRevision,2);assert.equal(p.qrCheckinRevision,2);
 });
+test('manager deletes a paired entrant before start and keeps both saved brackets for redraw',async()=>{
+ const x=await seed();await x.scan('u1');
+ const t=(await x.ref.get()).data(),s=JSON.parse(t.data);
+ s.players=s.players.map(p=>({...p,source:'online'}));
+ s.matches=[{id:'pending-match',a:{playerId:'p1'},b:{playerId:'p2'},status:'ready',scoreA:0,scoreB:0,log:[]}];s.bracketSize=2;s.drawnAt=123;s.bracketDraw={id:'original'};
+ await x.ref.update({data:JSON.stringify(s)});await x.pub.update({bracketView:JSON.stringify(s)});
+ const {guardFirestore}=require('./guard-firestore.cjs'),{createRosterService}=require('./overlays/roster-service.js'),{FieldValue}=require('firebase-admin/firestore');
+ const run=createRosterService(guardFirestore(db),FieldValue);
+ const r=await run({auth:{uid:'manager'},data:{action:'cancel',code:x.code,registrationId:'r1',intent:'admin',operationId:'pending-delete-001'}});
+ const after=(await x.ref.get()).data(),pub=(await x.pub.get()).data();
+ assert(r.ok);assert.equal((await x.ref.collection('registrations').doc('r1').get()).data().status,'cancelled');
+ assert.equal(JSON.parse(after.data).players.length,1);assert.equal(JSON.parse(pub.bracketView).players.length,1);
+ assert.deepEqual(JSON.parse(after.data).matches,s.matches);assert.deepEqual(JSON.parse(pub.bracketView).matches,s.matches);
+ assert.equal(after.qrCheckinRevision,2);assert.equal(pub.qrCheckinRevision,2);
+ assert.equal((await x.ref.collection('checkinAudit').get()).size,1);
+});
 test('guard rolls back an incomplete private-only original backend write',async()=>{
  const x=await seed();await x.scan('u1');const before=(await x.ref.get()).data();
  const {guardFirestore}=require('./guard-firestore.cjs');

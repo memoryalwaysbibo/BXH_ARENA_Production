@@ -22,8 +22,8 @@ function promotionManager(user,uid,t){
  return user.role==='staff'&&(!Object.prototype.hasOwnProperty.call(t,'assignedStaffUids')||
   Array.isArray(t.assignedStaffUids)&&(t.assignedStaffUids.length===0||t.assignedStaffUids.includes(uid)));
 }
-function mutable(t,p,s){
- if(t.systemClosed||t.eventCancelled||p.eventCancelled||s.meta?.eventCancelled||s.startedAt||s.bracketSize||s.archiveStatus==='completed'||t.archiveStatus==='completed'||['live','settling','done','cancelled'].includes(t.tournamentPhase)||['live','settling','done','cancelled'].includes(p.tournamentPhase))throw Error('bracket-locked');
+function mutable(t,p,s,prestartCancellation=false){
+ if(t.systemClosed||p.systemClosed||t.eventCancelled||p.eventCancelled||s.meta?.eventCancelled||s.startedAt||t.startedAt||p.startedAt||(!prestartCancellation&&s.bracketSize)||s.archiveStatus==='completed'||t.archiveStatus==='completed'||p.archiveStatus==='completed'||['live','settling','done','cancelled'].includes(t.tournamentPhase)||['live','settling','done','cancelled'].includes(p.tournamentPhase))throw Error('bracket-locked');
  if(t.registrationSelection||p.registrationSelection||s.entrySelection?.mode==='registration')throw Error('selection-managed');
  if((t.battleMode||s.meta?.battleMode)==='team')throw Error('team-roster-managed');
 }
@@ -90,8 +90,10 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   const finalized=t.onsiteWaitlistFinalized===true&&pub.onsiteWaitlistFinalized===true&&s.onsiteWaitlistFinalized===true;
   if(managed&&(d.action==='configure'||localId&&!finalized))throw Error('onsite-waitlist-managed');
   if(os.exists){if(os.data().requestHash!==hash)throw Error('operation-conflict');return {...os.data().result,state:s,replayed:true};}
-  mutable(t,pub,s);
-  if(quick)assertPendingBracketOnly(s,parse(pub.bracketView));
+  const prestartCancellation=d.action==='cancel'&&intent==='admin'&&isManager&&!managed;
+  mutable(t,pub,s,prestartCancellation);
+  if(quick||prestartCancellation)assertPendingBracketOnly(s,parse(pub.bracketView));
+  const pendingBracket=!!s.bracketSize||(s.matches||[]).length>0;
   const now=clock();
   if(d.action==='configure'){
    s.meta.registrationAutoFillEnabled=d.enabled;
@@ -159,7 +161,7 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   let promoted=null;
   const capacity=quick?quick.capacity:Number(t.capacity??s.meta.registrationCapacity??0);
   const participantCount=()=>quick?quickParticipants(s,rows).count:s.players.length;
-  if(oldStatus==='confirmed'&&s.meta.registrationAutoFillEnabled===true&&(capacity===null||!capacity||participantCount()<capacity)){
+  if(!pendingBracket&&oldStatus==='confirmed'&&s.meta.registrationAutoFillEnabled===true&&(capacity===null||!capacity||participantCount()<capacity)){
    const queue=rows.filter(r=>r.status==='waitlist').sort((a,b)=>epoch(a.createdAt)-epoch(b.createdAt)||a.registrationId.localeCompare(b.registrationId));
    if(queue.length){promoted=queue[0];promoted.status='confirmed';reconcile(s,rows,quick,code);}
    else{
@@ -170,8 +172,8 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   const confirmed=rows.filter(r=>r.status==='confirmed').length,waitlist=rows.filter(r=>r.status==='waitlist').length;
   s.registrationRosterRevision=Number(s.registrationRosterRevision||0)+1;s.updatedAt=now;
   let status=String(t.registrationStatus||pub.registrationStatus||s.meta.registrationStatus||'open');
-  if(status==='full'&&(capacity===null||!capacity||participantCount()<capacity))status='open';
-  if(['open','full'].includes(status)&&capacity>0&&participantCount()>=capacity)status='full';
+  if(!pendingBracket&&status==='full'&&(capacity===null||!capacity||participantCount()<capacity))status='open';
+  if(!pendingBracket&&['open','full'].includes(status)&&capacity>0&&participantCount()>=capacity)status='full';
   s.meta.registrationStatus=status;
   const participantPatch=quick?{communityParticipantCount:participantCount()}:{};
   if(quick)s.communityParticipantCount=participantPatch.communityParticipantCount;
