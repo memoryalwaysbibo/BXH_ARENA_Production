@@ -20,7 +20,7 @@ function assertWrite(remote,incoming,options={}){
 function create(ctx){
  let busy=false,pending=null,error='',result='';
  const key='bxh-bracket-pending-v1:'+ctx.key;
- try{const saved=JSON.parse(ctx.storage?.getItem(key)||'null');if(saved?.snapshot?.bracketDraw?.id&&saved.baseSignature)pending=saved;}catch{}
+ try{const saved=JSON.parse(ctx.storage?.getItem(key)||'null');if(saved?.snapshot?.bracketDraw?.id&&saved.baseSignature){pending=saved;result='failed';error='pending-upload-unconfirmed';}}catch{}
  function keep(){if(pending){if(!ctx.storage)throw Error('pending-storage-unavailable');ctx.storage.setItem(key,JSON.stringify(pending));}else ctx.storage?.removeItem(key);}
  const deadline=(p,budget=Infinity)=>Promise.race([p,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('confirmation-timeout')),Math.min(ctx.timeoutMs||20000,budget));p.finally(()=>clearTimeout(timer)).catch(()=>{});})]);
  function matches(result,snapshot){return (!pending?.adminOperationalOverride||result?.data?.adminOperationOverrides?.some(r=>r.id===pending.adminOperationalOverride.id))&&result?.ok===true&&signature(result.data)===signature(snapshot)&&signature(result.publicData)===signature(snapshot)&&result.data.bracketDraw?.id===snapshot.bracketDraw?.id;}
@@ -76,7 +76,7 @@ function create(ctx){
      // A timeout/unknown acknowledgement or a committed draw is read-only recovery.
      if(attempt>=(pending.adminOperationalOverride?2:1)||acknowledged!==false||writeError||permanent||!latest?.ok||
        signature(latest.data)!==pending.baseSignature||latest.data.startedAt)
-      throw writeError||Error('cloud-readback-unconfirmed');
+      throw writeError||Error(failureCode||'cloud-readback-unconfirmed');
      await pause(1);
     }
     if(!ctx.current())return false;
@@ -120,11 +120,48 @@ function create(ctx){
    approval.operation!==prior.operation||JSON.stringify([...(approval.participantIds||[])].sort())!==JSON.stringify([...(prior.participantIds||[])].sort()))return false;
   pending.adminOperationalOverride=clone(approval);keep();return retry();
  }
- return {begin,retry,discard,renewOverride,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,error,result,override:pending?.adminOperationalOverride?clone(pending.adminOperationalOverride):null}),async verify(snapshot){
+ function selection(){
+  const ids=[...new Set((pending?.snapshot.matches||[]).flatMap(m=>[m.a?.playerId,m.b?.playerId]).filter(Boolean).map(String))];
+  return ids.map(id=>({id,name:(pending.snapshot.players||[]).find(p=>String(p.id)===id)?.name||id}));
+ }
+ async function forceSubmit(approval){
+  if(busy||!pending||!ctx.current()||!ctx.authorizeOverride?.(approval)||approval.operation!=='draw-bracket')return false;
+  const ids=selection().map(p=>p.id).sort(),approved=[...(approval.participantIds||[])].sort();
+  if(JSON.stringify(ids)!==JSON.stringify(approved)||ids.length<2)return false;
+  if(pending.adminOperationalOverride&&pending.adminOperationalOverride.id!==approval.id)return false;
+  busy=true;error='';ctx.changed();let resume=false;
+  try{
+   // Read before promoting: a lost acknowledgement must not create a second draw.
+   const latest=await deadline(ctx.read());
+   if(!ctx.current())throw Error('stale-context');
+   if(!ctx.authorizeOverride?.(approval))throw Error('admin-override-not-authorized');
+   if(!latest?.ok)throw Error('cloud-readback-unconfirmed');
+   if(latest.data.id!==pending.snapshot.id)throw Error('admin-override-room-changed');
+   if(latest.data.startedAt||latest.data.archiveStatus==='completed')throw Error('bracket-started');
+   if(matches(latest,pending.snapshot)){
+    ctx.apply(latest.data);pending=null;keep();result='success';ctx.success();return true;
+   }
+   // A private commit awaiting its public mirror is read-only recovery.
+   if(latest.data.bracketDraw?.id===pending.snapshot.bracketDraw.id)throw Error('cloud-readback-unconfirmed');
+   if(signature(latest.data)!==pending.baseSignature)throw Error('bracket-version-conflict');
+   if(latest.data.onsiteWaitlistServerOwned===true&&latest.data.onsiteWaitlistFinalized!==true)throw Error('onsite-waitlist-managed');
+   const known=new Set((latest.data.players||[]).map(p=>String(p.id)));
+   if(ids.some(id=>!known.has(id)))throw Error('admin-override-roster-changed');
+   if(!ctx.rebaseOverride)throw Error('admin-override-rebase-unavailable');
+   const rebased=clone(ctx.rebaseOverride(latest.data,clone(pending.snapshot),approval));
+   if(signature(rebased)!==signature(pending.snapshot)||rebased.bracketDraw?.id!==pending.snapshot.bracketDraw.id||rebased.startedAt)
+    throw Error('admin-override-pairing-changed');
+   pending.snapshot=rebased;pending.adminOperationalOverride=clone(approval);keep();resume=true;
+  }catch(e){error=e.code||e.message||'cloud-save-unconfirmed';result='failed';}
+  finally{busy=false;if(ctx.current())ctx.changed();}
+  return resume?retry():false;
+ }
+ return {begin,retry,discard,renewOverride,forceSubmit,selection,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,error,result,override:pending?.adminOperationalOverride?clone(pending.adminOperationalOverride):null}),async verify(snapshot){
   if(busy||pending)return false;if(!ctx.cloud())return true;
   try{const latest=await deadline(ctx.read());return ctx.current()&&!busy&&!pending&&signature(ctx.state())===signature(snapshot)&&latest?.ok===true&&!latest.data.startedAt&&signature(latest.data)===signature(snapshot)&&signature(latest.publicData)===signature(snapshot);}catch{return false;}
  }};
 }
 const api={signature,assertWrite,create};if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHBracketCommit=api;
 })(typeof window==='object'?window:globalThis);
+
 
