@@ -6,5 +6,6 @@ service cloud.firestore {
     match /users/{uid} { allow read, write: if labActor() && uid.matches('lab-ref[1-6]'); }
     match /tournaments/{code} { allow read, write: if labActor() && code.matches('BXH-LAB[A-Z0-9]+'); }
     match /publicTournaments/{code} { allow read, write: if labActor() && code.matches('BXH-LAB[A-Z0-9]+'); }
+    match /staffActivityLogs/{uid}/matches/{id} { allow read, write: if labActor() && request.auth.uid == uid && id.matches('BXH-LAB[A-Z0-9]+_m[1-6]'); }
   }
 }
