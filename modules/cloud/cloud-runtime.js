@@ -3428,7 +3428,7 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = ["registration-roster-stale","bracket-version-conflict","bracket-started"].includes(e&&e.message) ? e.message : (e&&e.code)||"unknown";
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||(e&&e.message)||"unknown";
         console.warn("雲端同步寫入失敗", e);
         return false;
       }
@@ -4071,5 +4071,6 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 
 
