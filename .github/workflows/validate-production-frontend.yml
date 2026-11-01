@@ -89,6 +89,8 @@ jobs:
         run: |
           for source in team-foundation/*.js; do node --check "$source"; done
           node --test team-foundation/*.test.cjs
+      - name: Verify release manifest and private Pages artifact boundaries
+        run: node --test tests/release-manifest.test.cjs tests/public-pages-artifact.test.cjs
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
       - name: Verify tournament completion, archive retry and results display
@@ -445,5 +447,6 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
 
 
