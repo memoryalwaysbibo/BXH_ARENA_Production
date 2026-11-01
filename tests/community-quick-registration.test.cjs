@@ -35,7 +35,7 @@ function extractFunction(source, name) {
 }
 
 function context(extra = {}) {
-  const ctx = vm.createContext({ console, Date: FixedDate, window: {}, publicTournamentsFreshness: "server", esc, communitySettingsSaving: false, communityCreateSaving: false, communitySettingsWriteGate: null, ...extra });
+  const ctx = vm.createContext({ console, Date: FixedDate, window: {}, isTournamentFullyDecided: () => false, finishTournament: async () => false, publicTournamentsFreshness: "server", esc, communitySettingsSaving: false, communityCreateSaving: false, communitySettingsWriteGate: null, ...extra });
   for (const [name, source] of [['domain', domain], ['registration', registration], ['input', input]]) {
     vm.runInContext(source, ctx, { filename: name + '-utils.js' });
   }

@@ -35,7 +35,7 @@ console.log('PASS forced exit, all assignment/lock release, score preservation, 
 const vm=require('node:vm'),fs=require('node:fs');
 const core=fs.readFileSync(require('node:path').join(__dirname,'../modules/main-app/core.js'),'utf8');
 const remoteFn=core.slice(core.indexOf('function applyRemoteState('),core.indexOf('// Phase 1: tournaments connect to the cloud automatically'));
-const ctx={state:{id:'clock-room',cloudCode:'BXH-CLOCK',updatedAt:999999},remoteAppliedRoomId:'clock-room',remoteAppliedAt:999999,courtSwapDraft:null,refereeAssignmentDraftEnabled:null,cloudLastSyncAt:0,defaultState:id=>({id}),saveRecord:()=>{},render:()=>{},renderPreservingScroll:()=>{},isCommunityQuickRegistration:()=>false};vm.createContext(ctx);vm.runInContext(remoteFn,ctx);
+const ctx={state:{id:'clock-room',cloudCode:'BXH-CLOCK',updatedAt:999999},remoteAppliedRoomId:'clock-room',remoteAppliedAt:999999,courtSwapDraft:null,refereeAssignmentDraftEnabled:null,cloudLastSyncAt:0,defaultState:id=>({id}),saveRecord:()=>{},render:()=>{},renderPreservingScroll:()=>{},isCommunityQuickRegistration:()=>false,isTournamentFullyDecided:()=>false,finishTournament:async()=>false};vm.createContext(ctx);vm.runInContext(remoteFn,ctx);
 ctx.applyRemoteState({id:'clock-room',updatedAt:10,forcedCourtExits:{1:{closed:true,revision:1}}});assert.equal(ctx.state.forcedCourtExits[1].closed,true);
 ctx.applyRemoteState({id:'clock-room',updatedAt:9999999});assert.equal(ctx.state.forcedCourtExits[1].revision,1);
 ctx.applyRemoteState({id:'clock-room',updatedAt:11,forcedCourtExits:{1:{closed:false,revision:2}}});assert.equal(ctx.state.forcedCourtExits[1].closed,false);
