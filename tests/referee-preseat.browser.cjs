@@ -12,7 +12,7 @@ const confirmEnd=core.indexOf('// v13.14.2',confirmStart);
 const ackStart=core.indexOf('  const modalConfirmBtn = document.getElementById("modal-confirm-btn");',core.indexOf('function bindDynamicInputs('));
 const ackEnd=core.indexOf('  const ta = document.getElementById("player-textarea");',ackStart);
 assert(confirmStart>0&&confirmEnd>confirmStart&&ackStart>0&&ackEnd>ackStart);
-const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeWaitingControls','renderWaitingRefereeCourt','renderReferee','courtForceExitConfirmation','renderModal','openModal','closeModal'].map(fn).join('\n');
+const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryControlsHtml','refereeWorkstationHeader','refereeSwapControl','renderRefereeScorePanel','refereeWaitingControls','renderWaitingRefereeCourt','renderReferee','courtForceExitConfirmation','renderModal','openModal','closeModal'].map(fn).join('\n');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  try{
@@ -27,6 +27,7 @@ const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryContr
     var pendingModal=null,courtRetirementBusy=false,executed=[],seatWrites=[],toasts=[];
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const refereeBracketRoundtripNav=()=>'',courtAtmosphereStyle=()=>'',refereeDisplayForStation=()=> '測試裁判',refereeStationStatus=()=>({label:'等待中',cls:'waiting'}),stationCompletedCount=()=>0,refereeStationRestrictionEnabled=()=>true,canForceExitCourt=()=>true,canManageCourtRetirement=()=>true;
+    const POINT_LABELS={spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation=()=>true,checkWinnerSide=()=>null,refereeFaultWritePending=()=>false,refereeFaultCount=()=>0,refereeFaultLast=()=>null,refereeViewClass=()=>'',refereeCourtSwapButton=()=>'',matchStatusBarHtml=()=> '準備中';
     const playerName=id=>({a:'測試選手甲',b:'測試選手乙'})[id]||id,showToast=m=>toasts.push(m),executeCourtForceAction=change=>executed.push(change),shouldBindLobbyInput=()=>true;
     ${productionFunctions}
     function handleAction(action){
@@ -49,18 +50,18 @@ const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryContr
     render();
   `});
   assert.equal(await page.locator('.ref-seat-button').count(),18);
-  assert.equal(await page.locator('.ref-waiting-controls button:not(:disabled)').count(),0);
+  assert.equal(await page.locator('.referee-workstation-waiting .ref-vs-arena button:not(:disabled),.referee-workstation-waiting .ref-result-actions button:not(:disabled)').count(),0);
   await page.locator('[data-station="1"][data-slot="main"]').tap();
   await page.waitForFunction(()=>state.meta.refereeSeatsV1.courts[1]?.main?.uid==='judge');
   assert.equal(await page.locator('.ref-seat-button.mine').count(),1);
-  assert.equal(await page.locator('.ref-waiting-controls button:not(:disabled)').count(),0);
+  assert.equal(await page.locator('.referee-workstation-waiting .ref-vs-arena button:not(:disabled),.referee-workstation-waiting .ref-result-actions button:not(:disabled)').count(),0);
   for(const width of [320,390,430,960]){
     await page.setViewportSize({width,height:900});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'pre-draw overflow at '+width);
   }
   await page.evaluate(()=>{state.meta.stations=12;render();});
   assert.equal(await page.locator('.ref-seat-button').count(),36);
-  assert.equal(await page.locator('.ref-waiting-controls').count(),12);
+  assert.equal(await page.locator('.ref-vs-arena.standard').count(),12);
   // Simulated draw replaces displayed match state without resetting the seat model.
   await page.evaluate(()=>{state.bracketSize=4;render();});
   assert.equal(await page.locator('.ref-seat-button.mine').count(),1);
@@ -96,6 +97,34 @@ const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryContr
   assert.equal(await page.evaluate(()=>executed.length),1);
   assert.equal(await page.getByRole('dialog').count(),0);
   assert.equal(await page.evaluate(()=>seatWrites.length),1,'court maintenance cannot remove referee seats');
+  // Compare real rendered geometry, not just markup: waiting and normal panels
+  // must keep the same player, score, button, swap and result-action dimensions.
+  await page.evaluate(()=>{
+    window.showNormalPanel=false;
+    window.drawComparison=()=>{
+      const match={id:'fixture-match',a:{playerId:'a'},b:{playerId:'b'},scoreA:0,scoreB:0,log:[],status:'ready'};
+      document.getElementById('app').innerHTML='<div class="court-grid court-grid-1">'+(showNormalPanel?'<div class="panel court-card referee-workstation">'+refereeWorkstationHeader(null,1)+renderRefereeScorePanel(match,1)+'</div>':renderWaitingRefereeCourt(1))+'</div>';
+    };
+    state.startedAt=1;drawComparison();
+  });
+  const geometry=()=>page.evaluate(()=>{
+    const origin=document.querySelector('.ref-vs-arena').getBoundingClientRect();
+    return [...document.querySelectorAll('.side-panel,.side-name,.side-score,.score-btns,.score-btns button,.ref-swap,.ref-result-actions,.ref-result-actions button')].map(el=>{
+      const r=el.getBoundingClientRect();return {className:el.className,x:r.x-origin.x,y:r.y-origin.y,width:r.width,height:r.height};
+    });
+  });
+  for(const width of [320,390,430,960]){
+    await page.setViewportSize({width,height:1000});
+    await page.evaluate(()=>{showNormalPanel=false;drawComparison();});
+    const waiting=await geometry();
+    assert.equal(await page.locator('.ref-vs-arena button:not(:disabled),.ref-result-actions button:not(:disabled)').count(),0);
+    assert.equal(await page.locator('.ref-seat-button:not(:disabled)').count(),3);
+    assert.match(await page.locator('.ref-vs-arena').evaluate(el=>getComputedStyle(el).filter),/grayscale/);
+    await page.evaluate(()=>{showNormalPanel=true;drawComparison();});
+    assert.deepEqual(await geometry(),waiting,'normal and gray waiting geometry at '+width);
+    assert.equal(await page.locator('[data-action="score"]:not(:disabled)').count(),8);
+    assert.equal(await page.locator('.ref-vs-arena').evaluate(el=>getComputedStyle(el).filter),'none');
+  }
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   console.log('PASS pre-draw seats, disabled scoring, retained seats, collapsed court maintenance, cancel focus, acknowledgment, touch confirmation and 320/390/430/960 layouts (isolated transport)');
  }finally{await browser.close();}
