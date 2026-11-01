@@ -5926,6 +5926,7 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
+  "admin-force-roster","admin-roster-retry",
   "admin-force-checkin",
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
@@ -10740,6 +10741,87 @@ async function executeAdminCheckin(approval,controller){
   showToast('報到覆核尚未確認成功（'+String(e.message||e)+'）。'+(controller.status().pending?'請使用「核實／重試報到操作」確認同一筆結果':'請讀取最新名單後重新核對'),true);
  }finally{render();}
 }
+// Admin roster override: preview exact server-owned effects before confirmation.
+let adminRosterContext=null;
+function adminRosterController(){
+ if(!window.BXHAdminRoster)return null;
+ const context=adminOverrideContext(),key=JSON.stringify(context);
+ if(adminRosterContext?.key===key)return adminRosterContext.controller;
+ let storage;try{storage=window.sessionStorage;}catch{}
+ const controller=window.BXHAdminRoster.create({key,...context,storage,current:()=>JSON.stringify(adminOverrideContext())===key,
+  allowed:()=>window.BXHAdminOverride?.allowed(userProfile)===true,now:()=>Date.now(),operationId:()=>crypto.randomUUID(),
+  call:payload=>window.cloudSync.adminOverrideRoster(payload),read:payload=>window.cloudSync.readAdminRosterFromServer(payload),wait:ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  adopt:async(latest,approval)=>{
+   state=JSON.parse(JSON.stringify(latest.data));state.cloudCode=context.code;
+   const id=approval.data.registrationId;
+   if(id&&Array.isArray(adminRegistrationsCache))adminRegistrationsCache=latest.registration?
+    adminRegistrationsCache.map(row=>peopleRegistrationIdOf(row)===id?{...row,status:latest.registration.status}:row):adminRegistrationsCache.filter(row=>peopleRegistrationIdOf(row)!==id);
+   publicTournamentsCache=null;myRegistrationsCache=null;resetRegistrationFormDraft();await saveRecord(state);
+  }});
+ adminRosterContext={key,controller};return controller;
+}
+function canOfferAdminRoster(){
+ if(!window.BXHAdminRoster||!window.cloudSync?.adminOverrideRoster||!state.cloudCode||!currentAuthUid()||window.BXHAdminOverride?.allowed(userProfile)!==true)return false;
+ return !!adminRosterController()?.status().pending||canOfferAdminOperationalOverride()&&state.onsiteWaitlistServerOwned!==true&&
+  !state.entrySelection&&!state.registrationSelection&&state.createdByRole!=='partner_organizer'&&!state.partnerOrganizationCode&&!state.partnerContractOrderCode;
+}
+function adminRosterBusyOrPending(){
+ if(!window.BXHAdminRoster||!state.cloudCode||window.BXHAdminOverride?.allowed(userProfile)!==true)return false;
+ const s=adminRosterController()?.status();return !!(s?.busy||s?.pending);
+}
+function adminRosterButtonsHtml(row,operation,onlineRow=false){
+ if(!canOfferAdminRoster())return '';
+ const registrationId=String(row.registrationId||(onlineRow?peopleRegistrationIdOf(row):'')),playerId=registrationId?null:row.id;
+ if(!registrationId&&(!playerId||row.source==='online'))return '';
+ const status=adminRosterController().status(),d=status.pending?.data;
+ const other=d&&(d.operation!==operation||d.registrationId!==(registrationId||undefined)||d.playerId!==(playerId||undefined));
+ return '<button class="btn btn-danger btn-sm" data-action="admin-force-roster" data-operation="'+operation+'" '+
+  (registrationId?'data-registration-id="'+esc(registrationId)+'"':'data-player-id="'+esc(playerId)+'"')+' '+
+  (status.busy||status.corrupt||other||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked()?'disabled':'')+'>'+
+  (d&&!other?'核實／重試名單覆核':operation==='promote'?'管理員強制升正取':'管理員強制移回備取')+'</button>';
+}
+function adminRosterPendingHtml(){
+ if(!canOfferAdminRoster())return '';
+ const s=adminRosterController().status();if(!s.pending)return '';
+ return '<div class="banner warn" role="status"><span>名單覆核'+(s.busy?'核實中':'待核實')+'：'+esc(s.pending.preview.name)+
+  '</span><button class="btn btn-danger btn-sm" data-action="admin-roster-retry" '+(s.busy?'disabled':'')+'>核實上一筆名單覆核</button></div>';
+}
+function adminRosterErrorMessage(error){
+ const raw=String(error?.message||error||'');
+ const messages={'preview-changed':'雲端名單、名額或配對已有更新，請重新核對影響','results-recorded':'已有比分或比賽結果，需使用成績更正流程',
+  'event-locked':'賽事已開賽、結束或關閉','participant-status-changed':'選手的正備取狀態已改變，已核對最新資料','identity-conflict':'報名身分有衝突，請先核對帳號與家庭資料',
+  'special-roster-managed':'本場使用專用抽籤或團體流程','partner-roster-managed':'合作主辦票券房需使用專用名額流程','permission-denied':'帳號權限已變更',
+  'confirmation-expired':'本次確認已逾時，請重新核對','pending-operation-conflict':'請先核實上一筆名單覆核','invalid-capacity':'雲端名額設定需要先核對'};
+ return Object.keys(messages).find(k=>raw.includes(k))?messages[Object.keys(messages).find(k=>raw.includes(k))]:'雲端結果尚待核實，請恢復連線後重試同一筆操作';
+}
+async function offerAdminRoster(intent){
+ if(!canOfferAdminRoster()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ const context=adminOverrideContext(),controller=adminRosterController(),prior=controller.status();if(prior.busy)return;
+ if(!prior.pending&&adminCheckinController()?.status().pending){showToast('請先核實上一筆報到操作',true);return;}
+ try{
+  const task=controller.prepare(intent);render();const approval=await task;
+  const d=approval.data;
+  if(intent&&(d.operation!==intent.operation||d.registrationId!==intent.registrationId||d.playerId!==intent.playerId)){showToast('請先核實上一筆名單覆核',true);return;}
+  const p=approval.preview;
+  openModal({type:'generic',title:prior.pending?'核實／重試同一筆名單覆核':'管理員正備取覆核',danger:true,
+   message:'房號：'+d.code+'\n選手：'+p.name+'\n變更：'+(p.from==='waitlist'?'備取 → 正取':'正取 → 備取')+
+    '\n名額上限：'+(p.capacity===null?'不限':p.capacity)+' → '+(p.nextCapacity===null?'不限':p.nextCapacity)+
+    '\n\n'+p.warnings.join('\n')+(prior.pending?'\n\n使用原操作編號核實；已完成的異動不會再次執行。':'')+
+    '\n\n確認後會保存操作紀錄，並核對報名、私有及公開名單。',confirmLabel:prior.pending?'核實／重試同一筆':'我已核對，強制執行',
+   onConfirm:()=>{void executeAdminRoster(approval,controller);}});
+ }catch(e){if(JSON.stringify(adminOverrideContext())===JSON.stringify(context))showToast(adminRosterErrorMessage(e),true);}
+ finally{render();}
+}
+async function executeAdminRoster(approval,controller){
+ const current=()=>{const c=adminOverrideContext();return c.actorUid===approval.actorUid&&c.roomId===approval.data.roomId&&c.code===approval.data.code;};
+ if(!current()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ try{
+  const task=controller.execute(approval);render();const result=await task;if(!current())return;
+  showToast(result.superseded?'這筆名單覆核已完成，後續狀態已有變更；已載入最新名單':
+   '管理員名單覆核已完成，報名與雙名單已確認'+(result.bracketReset?'；請重新抽籤':''));
+ }catch(e){if(current())showToast(adminRosterErrorMessage(e)+(controller.status().pending?'；請核實／重試同一筆操作':''),true);}
+ finally{render();}
+}
 let bracketCommitContext=null;
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
@@ -13118,7 +13200,7 @@ function renderPeopleManagement(){
   const sourceText=p=>p.source==="online"?"線上報名":(p.source==="test"?"測試名單":"現場新增");
   const checkinActionLocked=peopleRosterBusy||!!state.startedAt||state.archiveStatus==="completed"||checkinClosed;
   const checkinToggle=p=>needsCheckin?`<button class="people-checkin-toggle ${p.checkedIn?'is-checked':'is-unchecked'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinActionLocked?'disabled':''} aria-label="${p.checkedIn?'已報到，點擊取消報到':'未報到，點擊完成報到'}"><span class="people-checkin-dot"></span>${p.checkedIn?'已報到':'未報到'}</button>`:"";
-  const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div>${adminCheckinButtonHtml(p)}<button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
+  const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div>${adminCheckinButtonHtml(p)}${typeof adminRosterButtonsHtml==='function'?adminRosterButtonsHtml(p,'demote'):''}<button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
 
   const confirmedRow=(p,i)=>`
     <tr>
@@ -13147,12 +13229,12 @@ function renderPeopleManagement(){
     const regId=peopleRegistrationIdOf(r),shadow=peopleWaitlistShadow(regId);
     const name=r.displayName||r.publicName||r.participantName||r.realName||"未命名選手";
     const rank=i+1;
-    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">線上報名</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消備取</button></div></details>`;
+    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">線上報名</div>${typeof adminRosterButtonsHtml==='function'?adminRosterButtonsHtml(r,'promote',true):''}<button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消備取</button></div></details>`;
     return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(name)}</td><td class="people-col-source"><span class="badge badge-neon">線上報名</span></td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const waitLocalRows=localWait.map((p,i)=>{
     const rank=onlineWait.length+i+1;
-    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
+    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div>${typeof adminRosterButtonsHtml==='function'?adminRosterButtonsHtml(p,'promote'):''}<button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
     return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const onsiteWaitlistPanel=peopleOnsiteWaitlistAvailable()
@@ -13187,7 +13269,7 @@ function renderPeopleManagement(){
   const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
   const waitlistShortcut=peopleOnsiteWaitlistAvailable()&&peopleRosterSection!=="waitlist"
     ?'<div class="panel"><div class="people-section-summary"><div><div class="panel-title">備取／現場抽籤</div><p class="hint">備取名單、抽選名額與加開名額，統一從這裡操作。</p></div><button class="btn btn-primary" data-action="people-section" data-section="waitlist">'+(state.onsiteWaitlistFinalized===true?'查看抽籤紀錄':'前往備取／抽籤')+'</button></div></div>':"";
-  return syncError+pendingBanner+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
+  return syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -20853,6 +20935,7 @@ function handleAction(action, target){
   if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
   if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}
+  if(['draw-bracket','reset-bracket','start-tournament','admin-force-draw','admin-force-start'].includes(action)&&typeof adminRosterBusyOrPending==='function'&&adminRosterBusyOrPending()){showToast('請先核實上一筆名單覆核，再操作對戰表',true);return;}
   if(['draw-bracket','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('對戰表尚未上傳成功，請先重試上傳',true);return;}
   if(peopleOnsiteWaitlistManaged()){
     const rosterActions=['people-toggle-auto-fill','people-promote-waitlist','people-move-to-waitlist','people-delete-waitlist','delete-player','quick-add-players','random-test-roster','update-players','load-test','reg-add-quick','reg-mark-noshow','reg-promote','reg-cancel','reg-delete','import-roster-from-registrations','save-meta','save-registration-settings','close-checkin-early','set-registration-enabled','set-waitlist-enabled','set-checkin-required','unlock-roster','clear-data','import-data'];
@@ -24047,6 +24130,11 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(lines.length===0){ showToast("請至少輸入一位選手", true); return; }
     void peopleQuickAddPlayers(lines);
     return;
+  }
+  if(action==="admin-roster-retry"){void offerAdminRoster(null);return;}
+  if(action==="admin-force-roster"){
+    const registrationId=target.getAttribute('data-registration-id'),playerId=target.getAttribute('data-player-id');
+    void offerAdminRoster({operation:target.getAttribute('data-operation'),...(registrationId?{registrationId}:{playerId})});return;
   }
   if(action==="admin-force-checkin"){offerAdminCheckin(target.getAttribute('data-id'));return;}
   if(action==="toggle-checkin-btn"){
