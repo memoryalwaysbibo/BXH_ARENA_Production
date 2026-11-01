@@ -51,11 +51,11 @@ test('backup export is account- and room-scoped, and rejects a tampered payload'
 const core=fs.readFileSync('modules/main-app/core.js','utf8');
 function extract(name){let a=core.indexOf('function '+name+'(');const b=core.indexOf('\n}',a);assert(a>=0&&b>a,name);if(core.slice(a-6,a)==='async ')a-=6;return core.slice(a,b+2);}
 test('recovery integration uses server-only read, preserves cloud data, and resets failed promise only by reload',async()=>{
- const h=harness();let cached,serverOnly,cloudWrites=0,reloads=0;
- const c={state:copy(h.options.snapshot),window:{storage:h.options.storage,BXHRefereeSyncRecovery:api,cloudSync:{joinRoom:async(code,options)=>{serverOnly=options.serverOnly;return {ok:true,data:h.remote};},pushUpdate:async()=>cloudWrites++},location:{reload:()=>reloads++}},currentAuthUid:()=>h.options.uid,canOperateCurrentTournament:()=>true,saveRecord:async s=>{cached=copy(s);return true;},rememberRefereeWorkstation:()=>{},showToast:()=>{},render:()=>{},setTimeout,clearTimeout,cloudWriteChain:Promise.resolve(false)};
+ const h=harness();let cached,serverOnly,cloudWrites=0,reloads=0;const order=[];
+ const c={state:copy(h.options.snapshot),window:{storage:h.options.storage,BXHRefereeSyncRecovery:api,cloudSync:{connect:async()=>{order.push("connect");},joinRoom:async(code,options)=>{order.push("read");serverOnly=options.serverOnly;return {ok:true,data:h.remote};},pushUpdate:async()=>cloudWrites++},location:{reload:()=>reloads++}},currentAuthUid:()=>h.options.uid,canOperateCurrentTournament:()=>true,saveRecord:async s=>{cached=copy(s);return true;},rememberRefereeWorkstation:()=>{},showToast:()=>{},render:()=>{},setTimeout,clearTimeout,cloudWriteChain:Promise.resolve(false)};
  vm.createContext(c);vm.runInContext(extract('canUseRefereeSyncRecovery')+'\n'+extract('performRefereeSyncRecovery'),c);
  await c.performRefereeSyncRecovery({uid:h.options.uid,id:c.state.id,code:c.state.cloudCode});
- assert.equal(serverOnly,true);assert.deepEqual(cached,h.remote);assert.equal(cloudWrites,0);assert.equal(reloads,1);assert.equal(await c.cloudWriteChain,false,'running context must not bypass old write barrier');
+ assert.equal(serverOnly,true);assert.deepEqual(order,["connect","read"]);assert.deepEqual(cached,h.remote);assert.equal(cloudWrites,0);assert.equal(reloads,1);assert.equal(await c.cloudWriteChain,false,'running context must not bypass old write barrier');
  const fresh={cloudWriteChain:Promise.resolve()};vm.createContext(fresh);vm.runInContext(extract('flushCloudStateWrites'),fresh);assert.equal(await fresh.flushCloudStateWrites(),true);
 });
 test('public/non-operating users have no recovery controls',()=>{

@@ -12218,7 +12218,10 @@ async function performRefereeSyncRecovery(context){
   const isCurrent=()=>canUseRefereeSyncRecovery()&&context.uid===currentAuthUid()&&context.id===state.id&&context.code===state.cloudCode&&JSON.stringify(state)===signature;
   const readRemote=async()=>{
     let timer;
-    try{return await Promise.race([window.cloudSync.joinRoom(context.code,{serverOnly:true}),new Promise(resolve=>{timer=setTimeout(()=>resolve({ok:false,reason:"timeout"}),8000);})]);}
+    try{
+      const read=(async()=>{if(window.cloudSync?.connect)await window.cloudSync.connect();if(!isCurrent())return {ok:false,reason:"context-changed"};return await window.cloudSync.joinRoom(context.code,{serverOnly:true});})();
+      return await Promise.race([read,new Promise(resolve=>{timer=setTimeout(()=>resolve({ok:false,reason:"timeout"}),8000);})]);
+    }
     finally{clearTimeout(timer);}
   };
   const recovery=api.backupAndReload({snapshot,uid:context.uid,code:context.code,storage:window.storage,isCurrent,readRemote,cacheRemote:remote=>saveRecord(remote),reload:()=>{rememberRefereeWorkstation();window.location.reload();}});
