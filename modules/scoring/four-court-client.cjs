@@ -14,6 +14,14 @@
   const retryable=()=>[...pending].filter(([,record])=>!record.running&&!record.awaiting).map(([key])=>key);
   function emit(next,reason=null){status=next;onView({status,reason,state:state?clone(state):null,viewVersion:++viewVersion,pending:[...pending.keys()],retryable:retryable()});}
   function stopBuckets(){bucketGeneration++;for(const stop of bucketStops)stop();bucketStops=[];buckets.clear();bucketWatermarks.clear();}
+  function subscriptionError(error){
+   const reason=error?.code||error?.message;
+   subscriptionFailed=true;
+   if(['auth-changed','profile-access-revoked','permission-denied'].includes(reason)){
+    active=false;generation++;roomStop?.();roomStop=null;stopBuckets();state=null;rootRoom=null;base=null;manifest=null;
+    emit('error',reason);
+   }else emit('error','subscription-unavailable');
+  }
   function assemble(){
    if(!active||!manifest)return;
    if(subscriptionFailed)return emit('error','subscription-unavailable');
@@ -49,12 +57,12 @@
         if(previous&&value.revision<previous.revision)return;
         if(previous&&value.revision===previous.revision&&JSON.stringify(value)!==JSON.stringify(previous)){subscriptionFailed=true;return emit('error','bucket-version-conflict');}
         bucketWatermarks.set(id,clone(value));buckets.set(id,clone(value));assemble();
-       },()=>{if(active&&token===generation&&bucketToken===bucketGeneration){subscriptionFailed=true;emit('error','subscription-unavailable');}}));
+       },error=>{if(active&&token===generation&&bucketToken===bucketGeneration)subscriptionError(error);}));
       }
      }
      assemble();
     }catch(error){stopBuckets();manifest=null;emit('error',error.message);}
-   },()=>{if(active&&token===generation){subscriptionFailed=true;emit('error','subscription-unavailable');}});
+   },error=>{if(active&&token===generation)subscriptionError(error);});
   }
   function disconnect(){active=false;generation++;roomStop?.();roomStop=null;stopBuckets();emit('offline');}
   const allowed=station=>!rootRoom?.systemClosed&&!rootRoom?.eventCancelled&&!rootRoom?.deletionStatus&&!['completed','archived'].includes(state?.archiveStatus)&&!['completed','archived'].includes(rootRoom?.archiveStatus)&&!state?.forcedCourtExits?.[station]?.closed&&(canManage(state,station)||['main','backup1','backup2'].some(slot=>state?.meta?.refereeSeatsV1?.courts?.[station]?.[slot]?.uid===uid));

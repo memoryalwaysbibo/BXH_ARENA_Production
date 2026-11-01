@@ -1,12 +1,13 @@
 (function(root){
  'use strict';
- function mount(element,{transport,code,uid,station=1,manager=false}){
+ function mount(element,{transport,code,uid,station=1,manager=false,onView=()=>{},executeCommand=null}){
   if(!['127.0.0.1','localhost'].includes(root.location.hostname)||transport.projectId!=='demo-bxh-four-court-buckets')throw Error('emulator-lab-only');
   const original=root.cloudSync,listeners=new Set();let view={status:'offline',state:null,pending:[]};
   element.innerHTML='<div class="lab-status" role="status"></div><label>戰鬥台 <select class="lab-court"></select></label><div class="lab-seats"></div><div class="lab-score" aria-live="polite"></div><div class="lab-actions"><button class="lab-a">A +1</button><button class="lab-b">B +1</button><button class="lab-retry">重新確認</button><button class="lab-connection">中斷同步</button></div><p class="lab-toast" role="status"></p>';
   const el=selector=>element.querySelector(selector),toast=text=>el('.lab-toast').textContent=text;
   const client=root.BXHFourCourtClient.create({transport,code,uid,operationId:()=>root.crypto.randomUUID(),canManage:()=>manager,onView:next=>{
    view=next;
+   onView(next);
    if(next.state)for(const listener of listeners)listener({model:next.state.meta.refereeSeatsV1,projection:{refereeSeatNames:next.state.meta.refereeSeatNames}});
    render();
   }});
@@ -25,7 +26,7 @@
    el('.lab-retry').hidden=!view.retryable?.length;el('.lab-retry').disabled=view.status!=='ready';
    el('.lab-connection').textContent=view.status==='offline'?'重新連線':'中斷同步';
   }
-  async function score(side){const match=current();if(!match)return;const result=await client.score(match.id,'score',{side,finish:'spin'});if(!result?.ok)toast(result?.reason==='cloud-unavailable'?'結果待確認，請按重新確認':'未完成計分，請確認同步狀態。');}
+  async function score(side){const match=current();if(!match)return;const result=executeCommand?{ok:await executeCommand(match.id,{action:'score',side,finish:'spin'})}:await client.score(match.id,'score',{side,finish:'spin'});if(!result?.ok)toast(result?.reason==='cloud-unavailable'?'結果待確認，請按重新確認':'未完成計分，請確認同步狀態。');}
   el('.lab-a').onclick=()=>score('A');el('.lab-b').onclick=()=>score('B');
   el('.lab-court').onchange=event=>{station=Number(event.target.value);render();};
   el('.lab-connection').onclick=()=>view.status==='offline'?client.connect():client.disconnect();

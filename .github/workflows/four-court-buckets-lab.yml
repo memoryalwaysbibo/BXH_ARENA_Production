@@ -4,6 +4,7 @@ on:
     paths:
       - 'modules/scoring/four-court-buckets.cjs'
       - 'modules/scoring/four-court-client.cjs'
+      - 'modules/scoring/four-court-app-bridge.cjs'
       - 'modules/scoring/four-court-firestore-transport.cjs'
       - 'modules/scoring/four-court-referee-lab.js'
       - 'referee-seats/functions/bucket-*.cjs'
@@ -13,6 +14,7 @@ on:
       - 'referee-seats/firestore.candidate.rules'
       - 'referee-seats/build-rules.py'
       - 'referee-seats/firebase.buckets-lab.json'
+      - 'referee-seats/firebase.buckets-auth-lab.json'
       - 'qr-checkin/backend/firebase-callable.cjs'
       - 'qr-checkin/backend/overlays/roster-service.js'
       - 'qr-checkin/backend/overlays/room-access-service.js'
@@ -40,9 +42,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Verify routing and isolation
-        run: node --test referee-seats/scoring.test.cjs tests/four-court-buckets/unit.test.cjs tests/four-court-buckets/trusted.test.cjs tests/four-court-buckets/legacy-fence.test.cjs tests/four-court-buckets/client.test.cjs tests/four-court-buckets/transport.test.cjs
+        run: node --test referee-seats/scoring.test.cjs tests/four-court-buckets/unit.test.cjs tests/four-court-buckets/trusted.test.cjs tests/four-court-buckets/legacy-fence.test.cjs tests/four-court-buckets/client.test.cjs tests/four-court-buckets/transport.test.cjs tests/four-court-buckets/app-bridge.test.cjs
       - name: Install isolated emulator dependencies
-        run: npm install --prefix /tmp/bxh-four-court-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0 playwright@1.55.0 firebase@12 @firebase/rules-unit-testing@5
+        run: npm install --prefix /tmp/bxh-four-court-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0 playwright@1.55.0 esbuild@0.25.0 firebase@12 @firebase/rules-unit-testing@5
       - name: Reject legacy client writes for bucket rooms
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
@@ -70,6 +72,11 @@ jobs:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
         run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/browser-emulator.cjs'
+      - name: Verify real browser Auth and existing referee command bridge
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-auth-lab.json 'node tests/four-court-buckets/auth-browser-emulator.cjs'
       - name: Retain measured results
         if: always()
         uses: actions/upload-artifact@v4

@@ -23,8 +23,12 @@ test('offline, cached and old lifecycle callbacks cannot enable scoring; reconne
  h.client.connect();old.next({bucket:B.encode(h.f.state,h.f.room.scoreStorage)[0]});assert.equal(h.client.getView().status,'syncing');
  h.rooms.at(-1).next({room:h.f.room,version:'2',fromCache:true});assert.equal(h.watches.filter(w=>!w.stopped).length,0);
  h.f.state.matches[0].scoreA=3;h.ready(h.f.room,'3');assert.equal(h.client.getView().state.matches[0].scoreA,3);
- h.watches.filter(w=>!w.stopped)[0].error(Error('permission-denied'));assert.equal(h.client.getView().status,'error');
+ h.watches.filter(w=>!w.stopped)[0].error(Error('network-unavailable'));assert.equal(h.client.getView().status,'error');
  h.watches.filter(w=>!w.stopped)[1].next({bucket:B.encode(h.f.state,h.f.room.scoreStorage)[1]});assert.equal(h.client.getView().status,'error');
+});
+test('authorization failures clear private data and stop all existing listeners',()=>{
+ const h=setup();h.client.connect();h.ready();h.watches[0].error(Error('profile-access-revoked'));
+ assert.equal(h.client.getView().state,null);assert.equal(h.client.getView().status,'error');assert(h.rooms.every(w=>w.stopped));assert(h.watches.every(w=>w.stopped));
 });
 test('lost replies retain the exact operation for retry and never optimistically change scores',async()=>{
  const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost-reply');});

@@ -40,7 +40,7 @@ async function until(check,message){const start=Date.now();while(!check()){if(Da
    await admin(db=>setDoc(doc(db,'users','ref1'),{active:false,role:'staff'}));
    await until(()=>client.getView().status==='error','deactivation did not terminate subscription');
    await assertFails(getDocFromServer(doc(env.authenticatedContext('ref1').firestore(),'tournaments',code,'matchBuckets','court-1')));
-   assert.equal((await transport.commitScore({})).reason,'profile-access-revoked');
+   const blocked=await transport.commitScore({});assert.equal(blocked.ok,false);assert(['profile-access-revoked','not-synchronized'].includes(blocked.reason));
    await admin(db=>setDoc(doc(db,'users','ref1'),{active:true,role:'staff'}));client.connect();
    await until(()=>client.getView().status==='ready','reactivated reconnect failed');
    auth.currentUser=null;for(const callback of [...authListeners])callback(null);
