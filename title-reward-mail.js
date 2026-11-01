@@ -10,7 +10,10 @@ window.BXHTitleRewardUI={
   return '<section class="title-reward-mail-card"><div class="title-reward-mail-kicker">TITLE REWARD ATTACHMENT</div>'+(art?'<img src="'+esc(art)+'" alt="'+esc(r.titleName||'稱號')+'">':'')+'<div class="title-reward-mail-meta"><strong>'+esc(r.titleName||'榮譽稱號')+'</strong><span>'+esc(labelTier(r.rarityTier))+(labelLimited(r.limitedType)?'・'+esc(labelLimited(r.limitedType)):'')+'</span></div><button class="btn btn-primary" data-action="mailbox-title-reward" data-message-id="'+esc(message.id)+'" data-replay="'+(opened?'1':'0')+'" '+(busy?'disabled':'')+'>'+(opened?'再次觀看授勳':'接受稱號')+'</button></section>';
  },
  async open(messageId,replay){
+  const actor=firebaseUser?.uid||'',epoch=engagementSessionEpoch;
   const result=await window.engagementService.claimTitleReward({messageId,action:replay?'replay':'open'});
+  // Bind the reply to its original login, including same-account relogin.
+  if(actor!==(firebaseUser?.uid||'')||epoch!==engagementSessionEpoch)return result;
   if(!result?.ok||!result.title)throw Error('title-reward-open-failed');
   const t=result.title;
   const url=t.id==='s2_champion'?'title-ceremony-s2-demo.html':t.id==='s3_champion'?'title-ceremony-s3-demo.html':'';

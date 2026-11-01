@@ -126,7 +126,7 @@ jobs:
           verified=false
           for attempt in {1..12}; do
             verified=true
-            for path in release.json version.json index.html modules/main-app/core.js modules/cloud/cloud-runtime.js modules/main-app/qr-checkin.js modules/main-app/qr-checkin-fence.js modules/main-app/roster-view.js modules/main-app/bracket-commit.js modules/main-app/player-cards.js modules/referee-license/ui.js modules/referee-license/domain.js modules/referee-license/styles.css modules/referee-license/fonts/bxh-kai-subset.ttf; do
+            for path in release.json version.json index.html modules/main-app/core.js modules/cloud/cloud-runtime.js modules/main-app/registration-feedback.js modules/main-app/registration-feedback.css modules/main-app/qr-checkin.js modules/main-app/qr-checkin-fence.js modules/main-app/roster-view.js modules/main-app/bracket-commit.js modules/main-app/player-cards.js modules/referee-license/ui.js modules/referee-license/domain.js modules/referee-license/styles.css modules/referee-license/fonts/bxh-kai-subset.ttf; do
               expected="$(sha256sum "$PUBLIC_SITE/$path" | cut -d ' ' -f 1)"
               status="$(curl --silent --show-error --location --compressed --max-time 12 --output "$scratch/served" --write-out '%{http_code}' "$base/$path?deployment_check=$EXPECTED_COMMIT" 2>/dev/null || true)"
               actual="$(sha256sum "$scratch/served" 2>/dev/null | cut -d ' ' -f 1 || true)"
