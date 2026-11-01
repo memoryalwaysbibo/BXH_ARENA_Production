@@ -6,9 +6,11 @@ const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore}=req
 const B=require('../../referee-seats/functions/bucket-state.cjs'),{createBucketScoringHandler}=require('../../referee-seats/functions/bucket-scoring-service.cjs');
 const {createScoringHandler}=require('../../referee-seats/functions/scoring-service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
+const {createBucketCutover}=require('../../referee-seats/functions/bucket-cutover.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'trusted-bucket-lab'),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
 const oldCommit=createScoringHandler(db);
+const cutover=createBucketCutover(db);
 const report={kind:'trusted-scoring-bucket-emulator',productionWrites:0,cases:[]};let serial=0;
 function phase(name){report.phase=name;console.log('TRUSTED PHASE '+name);}
 const operation=()=> 'trusted-operation-'+String(++serial).padStart(6,'0');
@@ -16,6 +18,14 @@ async function seed(code,count=6,bracket=true){
  const f=fixture(code,count,bracket),root=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
  await root.set(f.room);await pub.set({bracketView:JSON.stringify(f.state),updatedAt:1});
  for(const b of B.encode(f.state,f.room.scoreStorage))await root.collection('matchBuckets').doc(b.bucketId).set(b);
+ for(let i=1;i<=count;i++)await db.doc('users/ref'+i).set(f.user);
+ await db.doc('systemConfig/fourCourtScoreBuckets').set({enabled:true});
+ return {root,pub};
+}
+async function seedLegacy(code,count){
+ const f=fixture(code,count,false),root=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
+ delete f.room.scoreStorage;
+ await root.set(f.room);await pub.set({bracketView:JSON.stringify(f.state),updatedAt:1});
  for(let i=1;i<=count;i++)await db.doc('users/ref'+i).set(f.user);
  await db.doc('systemConfig/fourCourtScoreBuckets').set({enabled:true});
  return {root,pub};
@@ -31,6 +41,40 @@ async function send(root,id,action,extra={}){
 (async()=>{
  const deadline=setTimeout(()=>{console.error('trusted-lab-timeout');process.exit(2);},240000);
  try{
+  for(const count of [6,12]){
+   phase('atomic-cutover-and-rollback-'+count);
+   const code='BXH-MIGRATE'+count,{root,pub}=await seedLegacy(code,count),original=await root.get();
+   await assert.rejects(cutover.activate(code,{expectedUpdateTime:{isEqual:()=>false}}),/room-changed/);
+   assert.equal((await root.get()).data().scoreStorage,undefined);
+   const result=await cutover.activate(code,{expectedUpdateTime:original.updateTime,epoch:'migration-'+count});
+   assert.equal(result.buckets,Math.ceil(count/4));
+   await assert.rejects(cutover.activate(code,{expectedUpdateTime:original.updateTime}),/room-changed|already-bucketed/);
+   const {room,state}=await read(root);
+   const scored=await Promise.all(state.matches.map(match=>commit({auth:{uid:'ref'+match.station},data:request(state,room,match.id,'score',operation(),{side:'A',finish:'spin'})})));
+   assert.equal(scored.length,count);
+   await assert.rejects(cutover.rollback(code,{expectedEpoch:'wrong'}),/epoch-mismatch/);
+   const previous=await root.get(),oldSnapshot=JSON.parse(previous.data().data);
+   assert(oldSnapshot.matches.every(m=>m.scoreA===0),'root snapshot must be stale before rollback');
+   const rollback=await cutover.rollback(code,{expectedEpoch:result.epoch});
+   assert.equal(rollback.buckets,Math.ceil(count/4));
+   const restored=(await root.get()).data(),publicData=(await pub.get()).data();
+   assert.equal(restored.scoreStorage,undefined);
+   assert.equal(publicData.scoreBucketProjection,undefined);
+   assert(JSON.parse(restored.data).matches.every(m=>m.scoreA===1&&m.log.length===1));
+   assert(JSON.parse(publicData.bracketView).matches.every(m=>m.scoreA===1));
+   assert.equal((await root.collection('matchBuckets').get()).size,0);
+   await assert.rejects(publish(code),/bucket-not-ready/);
+   report.cases.push({name:'atomic-cutover-rollback',courts:count,buckets:rollback.buckets,restoredScores:count,orphanBuckets:0});
+  }
+  {
+   phase('partial-migration-fails-closed');
+   const code='BXH-PARTIAL1',{root,pub}=await seedLegacy(code,6),before=await root.get(),publicBefore=await pub.get();
+   await root.collection('matchBuckets').doc('court-1').set({orphan:true});
+   await assert.rejects(cutover.activate(code,{expectedUpdateTime:before.updateTime}),/partial-bucket-set/);
+   assert.equal((await root.get()).data().scoreStorage,undefined);
+   assert((await pub.get()).updateTime.isEqual(publicBefore.updateTime));
+   report.cases.push({name:'partial-migration-fails-closed',passed:true});
+  }
   {
    phase('legacy-admin-sdk-fence');
    const {root,pub}=await seed('BXH-OLDFENCE'),{room,state}=await read(root);
