@@ -10890,6 +10890,24 @@ async function executeAdminOnsiteRecovery(a,controller){
 }
 
 let bracketCommitContext=null;
+function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
+ if(!fresh||!snapshot||fresh.id!==snapshot.id||fresh.startedAt||fresh.archiveStatus==='completed'||
+   fresh.meta?.battleMode==='team'||snapshot.meta?.battleMode==='team'||
+   fresh.meta?.checkinRequired!==true||snapshot.meta?.checkinRequired!==true)return null;
+ const entrants=(players)=>{
+  const ids=(players||[]).filter(p=>p?.checkedIn===true).map(p=>String(p.id||''));
+  return ids.length===new Set(ids).size&&ids.every(Boolean)?ids.sort():null;
+ };
+ const paired=[...new Set((snapshot.matches||[]).flatMap(m=>[m.a?.playerId,m.b?.playerId]).filter(Boolean).map(String))].sort();
+ const before=entrants(snapshot.players),after=entrants(fresh.players);
+ if(!before||!after||paired.length<2||JSON.stringify(before)!==JSON.stringify(paired)||
+   JSON.stringify(after)!==JSON.stringify(paired))return null;
+ const rebased=cloneStateForSave(fresh);
+ for(const field of ['matches','bracketSize','drawnAt','currentMatchId','championId','runnerUpId','thirdId','fourthId','courtAssignments','bracketDraw','bracketDrawHistory']){
+  if(Object.prototype.hasOwnProperty.call(snapshot,field))rebased[field]=JSON.parse(JSON.stringify(snapshot[field]));
+ }
+ rebased.updatedAt=Date.now();return rebased;
+}
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
  const key=String(firebaseUser?.uid||currentRole||'local')+':'+String(state.cloudCode||state.id);
@@ -10901,6 +10919,7 @@ function bracketCommitController(){
   state:()=>state,cloud:()=>!!code,
   operationId:()=>window.crypto.randomUUID(),
   authorizeOverride:approval=>adminOverrideCurrent(approval),
+  rebaseRosterFence:rebaseOrdinaryBracketRosterFence,
   rebaseOverride:(fresh,snapshot,approval)=>{
    if(!adminOverrideCurrent(approval))throw Error('admin-override-not-authorized');
    const known=new Set((fresh.players||[]).map(p=>String(p.id)));
