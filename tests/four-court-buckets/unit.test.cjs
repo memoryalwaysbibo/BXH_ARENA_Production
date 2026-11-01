@@ -9,6 +9,7 @@ test('auto allocation covers 1 through 21 courts without configured bucket count
  }
  assert.throws(()=>B.bucketForCourt(0),/invalid-station/);
  assert.throws(()=>B.route(B.manifest('BXH-LAB1','room',6),7),/invalid-route/);
+ assert.throws(()=>B.route({...B.manifest('BXH-LAB1','room',6),bucketCount:1},5),/invalid-route/);
 });
 test('same bucket has per-match revision and rejects stale scores without touching other matches',()=>{
  const m=B.manifest('BXH-LAB1','room',6),b=B.initialBucket(m,B.route(m,1),[{id:'m1',station:1},{id:'m2',station:2},{id:'m5',station:5}]);
@@ -16,6 +17,7 @@ test('same bucket has per-match revision and rejects stale scores without touchi
  assert.equal(b.matches.m1.scoreA,0);assert.equal(result.bucket.matches.m2.scoreA,0);assert.equal(result.bucket.matches.m1.scoreA,1);
  assert.throws(()=>B.applyScore(result.bucket,{bucketId:'court-1',matchId:'m1',station:1,expectedRevision:0,side:'A',points:1}),/score-stale/);
  assert.throws(()=>B.applyScore(result.bucket,{bucketId:'court-2',matchId:'m1',station:1,expectedRevision:1,side:'A',points:1}),/bucket-mismatch/);
+ assert.throws(()=>B.applyScore({...b,matches:{m1:{...b.matches.m1,scoreA:-1}}},{bucketId:'court-1',matchId:'m1',station:1,expectedRevision:0,side:'A',points:1,operationId:'test-operation-0001'}),/bucket-corrupt/);
 });
 test('projection requires complete room-bound bucket set and never mutates base',()=>{
  const m=B.manifest('BXH-LAB1','room',6),base={id:'room',cloudCode:m.code,matches:Array.from({length:6},(_,i)=>({id:'m'+(i+1),station:i+1,scoreA:0,scoreB:0}))};
@@ -24,4 +26,5 @@ test('projection requires complete room-bound bucket set and never mutates base'
  assert.equal(B.compose(base,m,buckets).matches[4].scoreB,2);assert.equal(base.matches[4].scoreB,0);
  assert.throws(()=>B.compose(base,m,buckets.slice(0,1)),/projection-context/);
  assert.throws(()=>B.compose(base,m,[buckets[0],{...buckets[1],roomId:'other'}]),/projection-bucket/);
+ assert.throws(()=>B.compose(base,m,[{...buckets[0],matches:{...buckets[0].matches,m1:{...buckets[0].matches.m1,scoreA:-2}}},buckets[1]]),/projection-corrupt/);
 });
