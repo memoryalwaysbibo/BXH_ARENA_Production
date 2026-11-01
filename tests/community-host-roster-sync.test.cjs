@@ -13,7 +13,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function harness(overrides={}){
  const calls={subscribe:[],unsub:0,catchup:0,read:0,publicRead:0,list:0,save:0,render:0,toasts:[]};
  const state={id:'room-a',cloudCode:'ROOM-A',createdBy:'host',ownerUid:'host',updatedAt:1,registrationRosterRevision:0,communityQuickRegistration:true,meta:{eventAuthority:'community',battleMode:'individual',registrationEnabled:true,communityQuickRegistration:true},players:[{id:'host-player',name:'Host',source:'host'}],waitlistPlayers:[],matches:[]};
- const ctx=vm.createContext({console:{warn(){}},Date,JSON,window:{},isTournamentFullyDecided:()=>false,finishTournament:async()=>false,bracketCommitBlocked:()=>false,bracketCommitStatusHtml:()=>'',firebaseUser:{uid:'host'},userProfile:{role:'player',active:true},currentRole:'player',appPhase:'community-room',communityRoomActiveTab:'people',activeTab:'live',state,peopleRosterBusy:false,adminRegistrationsCache:null,adminRegistrationsError:null,adminRegistrationsLoading:false,publicTournamentsCache:[],myRegistrationsCache:[],remoteAppliedRoomId:null,remoteAppliedAt:0,courtSwapDraft:null,refereeAssignmentDraftEnabled:null,cloudLastSyncAt:0,
+ const ctx=vm.createContext({console:{warn(){}},Date,JSON,window:{},isTournamentFullyDecided:()=>false,finishTournament:async()=>false,bracketCommitBlocked:()=>false,bracketCommitStatusHtml:()=>'',firebaseUser:{uid:'host'},userProfile:{role:'player',active:true},currentRole:'player',appPhase:'community-room',communityRoomActiveTab:'people',activeTab:'live',state,peopleRosterBusy:false,peopleRosterSyncStatus:null,adminRegistrationsCache:null,adminRegistrationsError:null,adminRegistrationsLoading:false,publicTournamentsCache:[],myRegistrationsCache:[],remoteAppliedRoomId:null,remoteAppliedAt:0,courtSwapDraft:null,refereeAssignmentDraftEnabled:null,cloudLastSyncAt:0,
  currentAuthUid:()=>ctx.firebaseUser?.uid||'',cloudAvailable:()=>true,isOwnTestTournament:()=>ctx.state.meta.eventAuthority==='test'&&ctx.state.ownerUid===ctx.firebaseUser?.uid&&ctx.state.createdBy===ctx.firebaseUser?.uid,
  resetAdminRegistrationsCache:()=>{ctx.adminRegistrationsCache=null;ctx.adminRegistrationsError=null;},defaultState:id=>({id}),saveRecord:async()=>true,saveState:async()=>{calls.save++;return true;},mapRegistrationError:error=>String(error.message||error.code),showToast:(message,error)=>calls.toasts.push({message,error}),bracketRosterIsCurrent:()=>true,
  render:()=>{calls.render++;ctx.reconcileRegistrationRosterContext();},renderPreservingScroll:()=>{calls.render++;ctx.reconcileRegistrationRosterContext();},
@@ -21,7 +21,7 @@ function harness(overrides={}){
  ctx.window.cloudSync={connect:async()=>true,subscribeRegistrationsForAdmin:(code,next,error)=>{calls.subscribe.push({code,next,error});return ()=>{calls.unsub++;};},syncCommunityRegistrationSummary:async()=>{calls.catchup++;return {ok:true,communityParticipantCount:2};},joinRoom:async()=>{calls.read++;return {ok:true,data:clone(ctx.remote)};},getPublicTournamentFull:async()=>{calls.publicRead++;return {};},listRegistrationsForAdmin:async()=>{calls.list++;return [];}};
  vm.runInContext(domain,ctx);Object.assign(ctx,ctx.window.BXHDomainUtils);
  vm.runInContext(block('let communityRoomSnapshotGeneration=0;','let remoteAppliedRoomId=null'),ctx);
- for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','applyRemoteState'])vm.runInContext(fn(name),ctx);
+ for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','peopleRosterSyncStatusHtml','applyRemoteState'])vm.runInContext(fn(name),ctx);
  vm.runInContext(block('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;','let myRegistrationsError = null;'),ctx);
  vm.runInContext(fn('syncLatestOnlineRosterBeforeLock'),ctx);
  vm.runInContext('globalThis.drainRoster=()=>adminRosterSyncChain;globalThis.rosterCode=()=>adminRosterCode;',ctx);
@@ -395,3 +395,23 @@ test('staff roster screen escapes player names and offers only a read action, in
 
 
 
+
+test('manual sync exposes pending, retained confirmation and retryable failure states',async()=>{
+ const {ctx}=harness(),pending=deferred();
+ ctx.esc=value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+ ctx.window.cloudSync.joinRoom=()=>pending.promise;
+ ctx.manualSync();await tick();
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/正在同步並確認雲端名單/);
+ assert.equal(ctx.peopleRosterBusy,true);
+ pending.resolve({ok:true,data:clone(ctx.remote)});await tick();
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/同步確認完成：正取 2 人/);
+ assert.equal(ctx.peopleRosterBusy,false);
+ ctx.window.cloudSync.joinRoom=async()=>({ok:false,reason:'network'});
+ ctx.manualSync();await tick();
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/同步未完成/);
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/重試/);
+ assert(!ctx.peopleRosterSyncStatusHtml().includes('同步確認完成'));
+ assert.equal(ctx.peopleRosterBusy,false);
+ ctx.state.cloudCode='ROOM-B';ctx.reconcileRegistrationRosterContext();
+ assert.equal(ctx.peopleRosterSyncStatusHtml(),'');
+});
