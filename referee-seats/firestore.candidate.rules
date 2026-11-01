@@ -993,6 +993,8 @@ service cloud.firestore {
       match /matchBuckets/{id} { allow read, write: if false; }
       match /bucketScoreOperations/{id} { allow read, write: if false; }
       match /bucketScoreAudit/{id} { allow read, write: if false; }
+      match /bucketSeatOperations/{id} { allow read, write: if false; }
+      match /bucketSeatAudit/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 
       match /checkinReceipts/{id} { allow read, write: if false; }

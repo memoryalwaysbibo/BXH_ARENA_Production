@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {initializeTestEnvironment,assertFails}=require('@firebase/rules-unit-testing');
-const {doc,updateDoc,setDoc}=require('firebase/firestore');
+const {doc,updateDoc,setDoc,getDoc}=require('firebase/firestore');
 
 async function main(){
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-four-court-buckets');
@@ -24,7 +24,11 @@ async function main(){
     await assertFails(updateDoc(doc(db,'publicTournaments',code),{bracketView:'{"forged":true}'}));
     await assertFails(setDoc(doc(db,'tournaments','BXH-FENCE2'),{scoreStorage:{status:'active'}}));
     await assertFails(setDoc(doc(db,'tournaments',code,'matchBuckets','court-1'),{matches:'[]'}));
-    console.log(JSON.stringify({kind:'bucket-legacy-rules-fence',activePrivateDenied:true,manifestTamperDenied:true,activePublicDenied:true,clientCreateDenied:true,clientBucketDenied:true}));
+    for(const collection of ['bucketSeatOperations','bucketSeatAudit']){
+      await assertFails(setDoc(doc(db,'tournaments',code,collection,'forged'),{uid:'admin'}));
+      await assertFails(getDoc(doc(db,'tournaments',code,collection,'forged')));
+    }
+    console.log(JSON.stringify({kind:'bucket-legacy-rules-fence',activePrivateDenied:true,manifestTamperDenied:true,activePublicDenied:true,clientCreateDenied:true,clientBucketDenied:true,clientSeatReceiptsDenied:true}));
   } finally {await env.cleanup();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

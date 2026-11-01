@@ -35,6 +35,8 @@ assert s.count(anchor)==1;s=s.replace(anchor,anchor+'''
       match /matchBuckets/{id} { allow read, write: if false; }
       match /bucketScoreOperations/{id} { allow read, write: if false; }
       match /bucketScoreAudit/{id} { allow read, write: if false; }
+      match /bucketSeatOperations/{id} { allow read, write: if false; }
+      match /bucketSeatAudit/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 ''')
 
