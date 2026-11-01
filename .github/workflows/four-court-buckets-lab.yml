@@ -1,0 +1,42 @@
+name: Four-court score buckets lab
+on:
+  pull_request:
+    paths:
+      - 'modules/scoring/four-court-buckets.cjs'
+      - 'tests/four-court-buckets/**'
+      - 'docs/four-court-buckets.md'
+      - '.github/workflows/four-court-buckets-lab.yml'
+permissions:
+  contents: read
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Verify routing and isolation
+        run: node --test tests/four-court-buckets/unit.test.cjs
+      - name: Install isolated emulator dependencies
+        run: npm install --prefix /tmp/bxh-four-court-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0
+      - name: Simulate 6 and 12 courts against Firestore Emulator
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/emulator.cjs'
+      - name: Retain measured results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-court-buckets-lab
+          path: test-results/four-court-buckets/
+          if-no-files-found: warn
+          retention-days: 14
