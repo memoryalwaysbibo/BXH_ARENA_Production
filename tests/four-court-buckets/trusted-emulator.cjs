@@ -4,9 +4,11 @@ assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8188');
 assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-four-court-buckets');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore}=require('firebase-admin/firestore');
 const B=require('../../referee-seats/functions/bucket-state.cjs'),{createBucketScoringHandler}=require('../../referee-seats/functions/bucket-scoring-service.cjs');
+const {createScoringHandler}=require('../../referee-seats/functions/scoring-service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'trusted-bucket-lab'),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
+const oldCommit=createScoringHandler(db);
 const report={kind:'trusted-scoring-bucket-emulator',productionWrites:0,cases:[]};let serial=0;
 function phase(name){report.phase=name;console.log('TRUSTED PHASE '+name);}
 const operation=()=> 'trusted-operation-'+String(++serial).padStart(6,'0');
@@ -29,6 +31,18 @@ async function send(root,id,action,extra={}){
 (async()=>{
  const deadline=setTimeout(()=>{console.error('trusted-lab-timeout');process.exit(2);},240000);
  try{
+  {
+   phase('legacy-admin-sdk-fence');
+   const {root,pub}=await seed('BXH-OLDFENCE'),{room,state}=await read(root);
+   await db.doc('systemConfig/refereeSeatsV1').set({enabled:true,perCourtScoringVerified:true});
+   const before=await root.get(),publicBefore=await pub.get();
+   const d=request(state,room,'m1','score',operation(),{side:'A',finish:'spin'});
+   await assert.rejects(oldCommit({auth:{uid:'ref1'},data:d}),/bucket-scoring-required/);
+   assert((await root.get()).updateTime.isEqual(before.updateTime));
+   assert((await pub.get()).updateTime.isEqual(publicBefore.updateTime));
+   assert.equal((await root.collection('refereeScoreOperations').get()).size,0);
+   report.cases.push({name:'legacy-admin-sdk-fence',rejected:true,rootUnchanged:true,publicUnchanged:true});
+  }
   for(const count of [6,12]){
    phase('concurrent-'+count);
    const {root,pub}=await seed('BXH-TRUST'+count,count,false),before=await root.get(),publicBefore=await pub.get(),{room,state}=await read(root);

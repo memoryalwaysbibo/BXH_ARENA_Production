@@ -5,6 +5,9 @@ on:
       - 'modules/scoring/four-court-buckets.cjs'
       - 'referee-seats/functions/bucket-*.cjs'
       - 'referee-seats/functions/scoring-core.cjs'
+      - 'referee-seats/functions/scoring-service.cjs'
+      - 'referee-seats/functions/bucket-legacy-fence.cjs'
+      - 'referee-seats/firestore.candidate.rules'
       - 'tests/four-court-buckets/**'
       - 'docs/four-court-buckets.md'
       - '.github/workflows/four-court-buckets-lab.yml'
@@ -26,9 +29,14 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Verify routing and isolation
-        run: node --test referee-seats/scoring.test.cjs tests/four-court-buckets/unit.test.cjs tests/four-court-buckets/trusted.test.cjs
+        run: node --test referee-seats/scoring.test.cjs tests/four-court-buckets/unit.test.cjs tests/four-court-buckets/trusted.test.cjs tests/four-court-buckets/legacy-fence.test.cjs
       - name: Install isolated emulator dependencies
-        run: npm install --prefix /tmp/bxh-four-court-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0
+        run: npm install --prefix /tmp/bxh-four-court-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase@12 @firebase/rules-unit-testing@5
+      - name: Reject legacy client writes for bucket rooms
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/fence-firebase.json 'node tests/four-court-buckets/rules-fence.cjs'
       - name: Simulate 6 and 12 courts against Firestore Emulator
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
