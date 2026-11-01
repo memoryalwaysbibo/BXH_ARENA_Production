@@ -6160,6 +6160,7 @@ function stationMutationErrorMessage(reason){
 
 const refereeSeatCommandBusy=new Set();
 async function executeRefereeSeatCommand(matchId,command){
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再操作。",true);return false;}
   const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(matchId);
   if(!code||!m||!canOperateCurrentTournament()||!requireStationPermission(m))return false;
   if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
@@ -8661,8 +8662,8 @@ function refereeFaultLast(m){
   return api?api.lastPending(m):null;
 }
 function addScore(matchId, side, type){
-  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再計分。",true);return;}
   if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"score",side,finish:type});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再計分。",true);return;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   // The existing round ledger only accepts unmodified BXH points. Until the
@@ -8967,8 +8968,8 @@ async function queueOfflineMatchConfirmation(matchId,mode,selectedWinnerId){
 }
 
 async function confirmResultWithCloudGuard(matchId){
-  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再確認結果。",true);return false;}
   if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"confirm"});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再確認結果。",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -9126,8 +9127,8 @@ function confirmQuickDecision(matchId, selectedWinnerId){
 }
 
 async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
-  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再送出判定。",true);return false;}
   if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"quick",winnerId:selectedWinnerId});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再送出判定。",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
