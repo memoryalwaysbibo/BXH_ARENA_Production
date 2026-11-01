@@ -1,0 +1,1797 @@
+{
+  "scope": "62 additional candidate references; existing223 preserved",
+  "entries": [
+    {
+      "suppliedId": "supplied_20261014_0173",
+      "series": "BXG",
+      "code": "BXG-01",
+      "suppliedNameConfiguration": "烈焰飛鳳 S3-80T",
+      "seriesId": "SR-PRD-910503-00",
+      "sourceName": "BXG-01 烈焰飛鳳 S3-80T",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-ds.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG01_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "513bf1e1f9172d3a42342b21e287e5241efe7b354a5a1aaaf978efcfa37ad06b",
+      "imageURL": "assets/bey-catalog/candidates/1f95e75b31a6521a4924961565ea9cae76bf6d4d8848a01309126d4dcaf1cfe4.webp",
+      "imageSha256": "1f95e75b31a6521a4924961565ea9cae76bf6d4d8848a01309126d4dcaf1cfe4",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0182",
+      "series": "BXG",
+      "code": "BXG-11",
+      "suppliedNameConfiguration": "堅甲戰龜 S7-60D",
+      "seriesId": "SR-PRD-945567-00",
+      "sourceName": "BXG-11 堅甲戰龜 S7-60D",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-drsh.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG11_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "d0e6acb83417fcab8467f8a8e2afcc85028eec4eefc94aea71f2066dbf5bc669",
+      "imageURL": "assets/bey-catalog/candidates/2cab98d64df110a8d320750a28368589da495263b0ff07e04b430ec735ec8168.webp",
+      "imageSha256": "2cab98d64df110a8d320750a28368589da495263b0ff07e04b430ec735ec8168",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0183",
+      "series": "BXG",
+      "code": "BXG-12-01",
+      "suppliedNameConfiguration": "龍騎士 S4-60RA",
+      "seriesId": "SR-PRD-946816-01",
+      "sourceName": "BXG-12-01 龍騎士 S4-60RA",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-25set.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG00_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "296cc54364a78d1f8a709a4a847dde52fb968832ce673484db3ace54c806baf7",
+      "imageURL": "assets/bey-catalog/candidates/1f9fe7b39b6c178142f87e1587d81206a412827147061a24d91f2b9809f1d4dc.webp",
+      "imageSha256": "1f9fe7b39b6c178142f87e1587d81206a412827147061a24d91f2b9809f1d4dc",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0188",
+      "series": "BXG",
+      "code": "BXG-14",
+      "suppliedNameConfiguration": "蒼龍利刃 2-80GP（金屬塗層：闇黑，巨人隊版）",
+      "seriesId": "SR-PRD-946830-00",
+      "sourceName": "BXG-14 蒼龍利刃 2-80GP 金屬塗層:闇黑 巨人隊版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-dd.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG09_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "8253ad5add5ae9c3e50b4d724d4a86793252215908acf387c1f284d06b3d0a82",
+      "imageURL": "assets/bey-catalog/candidates/bb7a7a8ae9da30e300516141ee5604ce8f1477ea5f7faacd5edcb5df7f8e0dfc.webp",
+      "imageSha256": "bb7a7a8ae9da30e300516141ee5604ce8f1477ea5f7faacd5edcb5df7f8e0dfc",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0189",
+      "series": "BXG",
+      "code": "BXG-15",
+      "suppliedNameConfiguration": "烈焰飛鳳 S3-80T（闇黑版）",
+      "seriesId": "SR-PRD-947110-00",
+      "sourceName": "BXG-15 烈焰飛鳳 S3-80T 闇黑版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-ds3.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG15_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "76fcfbce08225df9718edd2c939e7b2c2d512f9dfa57819c8d0c3e0549e33054",
+      "imageURL": "assets/bey-catalog/candidates/6bb3406d2cfcdb80beb11dabf4ee64d18a22eb8b0d53eca44d9fbda7d61034de.webp",
+      "imageSha256": "6bb3406d2cfcdb80beb11dabf4ee64d18a22eb8b0d53eca44d9fbda7d61034de",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0190",
+      "series": "BXG",
+      "code": "BXG-16",
+      "suppliedNameConfiguration": "忍者刺刀 4-60LF（金屬塗層：水藍）",
+      "seriesId": "SR-PRD-946847-00",
+      "sourceName": "BXG-16 忍者刺刀 4-60LF 金屬塗層:水藍",
+      "sourceURL": "https://www.cs.furyu.jp/beyblade2024/guide/",
+      "sourceImageURL": "https://www.cs.furyu.jp/beyblade2024/assets/img/guide/special_bey.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "8c1f69d0ecea2d07d6a9073f9806c41f392493c70a7e6254ee497beb25b92b21",
+      "imageURL": "assets/bey-catalog/candidates/ef18142726ba03e1f4dc7102e7a22c76bd3447649abfdd15fdfcd9ad0a330934.webp",
+      "imageSha256": "ef18142726ba03e1f4dc7102e7a22c76bd3447649abfdd15fdfcd9ad0a330934",
+      "sourceDimensions": [
+        559,
+        469
+      ],
+      "outputDimensions": [
+        559,
+        469
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0191",
+      "series": "BXG",
+      "code": "BXG-18",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（金屬塗層：藍，FC 巴塞隆納版）",
+      "seriesId": "SR-PRD-952312-00",
+      "sourceName": "BXG-18 蒼龍爆刃 1-60A 金屬塗層:藍 FC 巴塞隆納版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux00-db_bc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG18_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "d95d141b211c61ee08653307c7106b24e22bf418ff0d717b374ee39f7dcfb77e",
+      "imageURL": "assets/bey-catalog/candidates/00f30566e93169c449e71d2b8c46aac1fb19ee79c99ab01806c0b91386f6e233.webp",
+      "imageSha256": "00f30566e93169c449e71d2b8c46aac1fb19ee79c99ab01806c0b91386f6e233",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0192",
+      "series": "BXG",
+      "code": "BXG-19",
+      "suppliedNameConfiguration": "惡魔重錘 3-70H（金屬塗層：紅，FC 巴塞隆納版）",
+      "seriesId": "SR-PRD-952329-00",
+      "sourceName": "BXG-19 惡魔重錘 3-70H 金屬塗層:紅 FC 巴塞隆納版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux00-hs_bc.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG19_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "39aa4ecab5d30cb690a471b63774159f108468395ac92119e921172fd4e028ba",
+      "imageURL": "assets/bey-catalog/candidates/1d6997080a3420e098f77993ef7adbc99d372da02ee736c43e609bc7a6555c6e.webp",
+      "imageSha256": "1d6997080a3420e098f77993ef7adbc99d372da02ee736c43e609bc7a6555c6e",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0195",
+      "series": "BXG",
+      "code": "BXG-22",
+      "suppliedNameConfiguration": "龍騎士 S4-60RA",
+      "seriesId": "SR-PRD-099468-00",
+      "sourceName": "BXG-22 龍騎士 S4-60RA",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-drgs.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG22_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "78721eed59460375450902efc937fc8774bda54640593b69636d254b8a891af6",
+      "imageURL": "assets/bey-catalog/candidates/daddb36486a57f2c66ed3508b8754ecde9bad49fb5018b51e88d3260841cacd9.webp",
+      "imageSha256": "daddb36486a57f2c66ed3508b8754ecde9bad49fb5018b51e88d3260841cacd9",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0201",
+      "series": "BXG",
+      "code": "BXG-29-01",
+      "suppliedNameConfiguration": "鋼鐵人 4-80B",
+      "seriesId": "SR-PRD-980841-01",
+      "sourceName": "BXG-29-01 鋼鐵人 4-80B",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-980841-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-980841-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "cff3d947307cb59641432b267e441d17da6021c03d32ae0247172f1c4944fa39",
+      "imageURL": "assets/bey-catalog/candidates/342b505fbac7bcfe37542909fefcd5577020546ad895ffc10387b1f7a3315c2f.webp",
+      "imageSha256": "342b505fbac7bcfe37542909fefcd5577020546ad895ffc10387b1f7a3315c2f",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0202",
+      "series": "BXG",
+      "code": "BXG-29-02",
+      "suppliedNameConfiguration": "薩諾斯 4-60P",
+      "seriesId": "SR-PRD-980841-02",
+      "sourceName": "BXG-29-02 薩諾斯 4-60P",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-980841-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-980841-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "32feefe9aee3dc24870e63dd9e895f13cd8deb0529cb94c2c52b46ca81222c36",
+      "imageURL": "assets/bey-catalog/candidates/76ee0107c3eb16b4ad75ad29bfbe0b573fef04ecda6d602b3cda1748db6bfb99.webp",
+      "imageSha256": "76ee0107c3eb16b4ad75ad29bfbe0b573fef04ecda6d602b3cda1748db6bfb99",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0203",
+      "series": "BXG",
+      "code": "BXG-30-01",
+      "suppliedNameConfiguration": "蜘蛛人 3-60F",
+      "seriesId": "SR-PRD-980858-01",
+      "sourceName": "BXG-30-01 蜘蛛人 3-60F",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-980858-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-980858-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "bb17995eba3ba224ae8aefe7101d88f589b8b31c98a149ab463399234a6aa1a8",
+      "imageURL": "assets/bey-catalog/candidates/1e985ba02fc129c2120a5af4b91cb3df3957f012e3c1a0811e5d0e2c83768a6f.webp",
+      "imageSha256": "1e985ba02fc129c2120a5af4b91cb3df3957f012e3c1a0811e5d0e2c83768a6f",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0204",
+      "series": "BXG",
+      "code": "BXG-30-02",
+      "suppliedNameConfiguration": "猛毒 3-80N",
+      "seriesId": "SR-PRD-980858-02",
+      "sourceName": "BXG-30-02 猛毒 3-80N",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-980858-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-980858-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "226e7c259a069bb7da4a8ee7396fc12cd64ed07eaf9d3d7d7c547380a001d5e9",
+      "imageURL": "assets/bey-catalog/candidates/bb297f2b1879cd6eea81ea55ed6d90646e42a996a742b2eab00c28514dbe04e1.webp",
+      "imageSha256": "bb297f2b1879cd6eea81ea55ed6d90646e42a996a742b2eab00c28514dbe04e1",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0209",
+      "series": "BXG",
+      "code": "BXG-33-01",
+      "suppliedNameConfiguration": "路克天行者 4-80B",
+      "seriesId": "SR-PRD-982340-01",
+      "sourceName": "BXG-33-01 路克天行者 4-80B",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982340-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982340-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "b874f0fd9a83506f2179e7d2997a825c2a6802dd3857a90dae2323da11afdc88",
+      "imageURL": "assets/bey-catalog/candidates/3905506844257fe5f4456ee65f7f20e686c9a9135acdd90344913b7331d3af1d.webp",
+      "imageSha256": "3905506844257fe5f4456ee65f7f20e686c9a9135acdd90344913b7331d3af1d",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0210",
+      "series": "BXG",
+      "code": "BXG-33-02",
+      "suppliedNameConfiguration": "達斯維達 4-60P",
+      "seriesId": "SR-PRD-982340-02",
+      "sourceName": "BXG-33-02 達斯維達 4-60P",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982340-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982340-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "44712072f14ad415dce9efc2d58f7cb1445c42db4cebff201a3257c291298de4",
+      "imageURL": "assets/bey-catalog/candidates/84de060f707286c44df031c1f41e3aee3cd3c30ee125311f7a1b1589b4bce872.webp",
+      "imageSha256": "84de060f707286c44df031c1f41e3aee3cd3c30ee125311f7a1b1589b4bce872",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0211",
+      "series": "BXG",
+      "code": "BXG-34-01",
+      "suppliedNameConfiguration": "曼達洛人 3-60F",
+      "seriesId": "SR-PRD-982357-01",
+      "sourceName": "BXG-34-01 曼達洛人 3-60F",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982357-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982357-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "4f77222d8e2fda69b7c34c5be64510e5ab4872300809401d4b18540146a14572",
+      "imageURL": "assets/bey-catalog/candidates/2036db15d656506ae1ccdf4a1c38ae86a9471d004716b252a7a9bc91c0ad6f56.webp",
+      "imageSha256": "2036db15d656506ae1ccdf4a1c38ae86a9471d004716b252a7a9bc91c0ad6f56",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0212",
+      "series": "BXG",
+      "code": "BXG-34-02",
+      "suppliedNameConfiguration": "星區長吉迪恩 3-80N",
+      "seriesId": "SR-PRD-982357-02",
+      "sourceName": "BXG-34-02 星區長吉迪恩 3-80N",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982357-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982357-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "496c60a245a5167bbb4b4db8f614836df81d2685e03ffbd5993789f68bff6788",
+      "imageURL": "assets/bey-catalog/candidates/1694a02b895052c2eb9a106572f30f9f34956096eb2d3dd0eb62553132ced172.webp",
+      "imageSha256": "1694a02b895052c2eb9a106572f30f9f34956096eb2d3dd0eb62553132ced172",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0213",
+      "series": "BXG",
+      "code": "BXG-35",
+      "suppliedNameConfiguration": "鳳凰飛翼 9-60GF（金屬塗層：闇黑，木谷龍也版）",
+      "seriesId": "SR-PRD-982128-00",
+      "sourceName": "BXG-35 鳳凰飛翼 9-60GF 金屬塗層:闇黑 木谷龍也版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-pw.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG35_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "14d7dd7c9889e7a8c79501a8ed0cb14ffee2e60a4c09d95391f322d2c77a07fe",
+      "imageURL": "assets/bey-catalog/candidates/f25f401ecc0afb1d05a63e59132d75392e55362d0a282ac4ea995b1286fbd198.webp",
+      "imageSha256": "f25f401ecc0afb1d05a63e59132d75392e55362d0a282ac4ea995b1286fbd198",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0214",
+      "series": "BXG",
+      "code": "BXG-36-01",
+      "suppliedNameConfiguration": "柯博文 4-60P",
+      "seriesId": "SR-PRD-982456-01",
+      "sourceName": "BXG-36-01 柯博文 4-60P",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982456-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982456-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "bc503df3985685796648dad0be56d8ae1ec1d63d4e64a9ed0d0a4630a529a5a0",
+      "imageURL": "assets/bey-catalog/candidates/7fc20d4eb418ea5162ded5ad5855570b9e9324023d52c0bdade898691ec30050.webp",
+      "imageSha256": "7fc20d4eb418ea5162ded5ad5855570b9e9324023d52c0bdade898691ec30050",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0215",
+      "series": "BXG",
+      "code": "BXG-36-02",
+      "suppliedNameConfiguration": "密卡登 4-80B",
+      "seriesId": "SR-PRD-982456-02",
+      "sourceName": "BXG-36-02 密卡登 4-80B",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982456-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982456-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "cb7c2ce1224b7ad5f63157220124008112c72934b8881d688b12a9323b1bfdae",
+      "imageURL": "assets/bey-catalog/candidates/b22018b77c2c768ce8ffa453ef9f708646eae73d61bb0f2574f718212a269182.webp",
+      "imageSha256": "b22018b77c2c768ce8ffa453ef9f708646eae73d61bb0f2574f718212a269182",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0216",
+      "series": "BXG",
+      "code": "BXG-37-01",
+      "suppliedNameConfiguration": "金剛王 3-60F",
+      "seriesId": "SR-PRD-982487-01",
+      "sourceName": "BXG-37-01 金剛王 3-60F",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982487-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982487-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "2328d45fe3cb11367e27e517d2139c38fe96310c3a7c5f4e6e35ed4e8da29fcc",
+      "imageURL": "assets/bey-catalog/candidates/85207d3f16a7c7a0dd511a56e660971ed7d24065ab80da4646d51be458b148b3.webp",
+      "imageSha256": "85207d3f16a7c7a0dd511a56e660971ed7d24065ab80da4646d51be458b148b3",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0217",
+      "series": "BXG",
+      "code": "BXG-37-02",
+      "suppliedNameConfiguration": "天王星 3-80N",
+      "seriesId": "SR-PRD-982487-02",
+      "sourceName": "BXG-37-02 天王星 3-80N",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-982487-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-982487-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "c77e460991e54a54f38199b68c5ea33d57f2901af2fad863eab26a0ee316e7b0",
+      "imageURL": "assets/bey-catalog/candidates/10713353d85ab07c5627faecef6ba62caa46a70bea6f6e27ffdb4c68ac01bef6.webp",
+      "imageSha256": "10713353d85ab07c5627faecef6ba62caa46a70bea6f6e27ffdb4c68ac01bef6",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0218",
+      "series": "BXG",
+      "code": "BXG-38",
+      "suppliedNameConfiguration": "雄獅獠牙 T4-60A（火紅版）",
+      "seriesId": "SR-PRD-994350-00",
+      "sourceName": "BXG-38 雄獅獠牙 T4-60A 火紅版",
+      "sourceURL": "https://www.cs.furyu.jp/beyblade2025",
+      "sourceImageURL": "https://www.cs.furyu.jp/beyblade2025/wp/wp-content/themes/beyblade25v3/assets/webp/home/img_leonfang.webp?2",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "e3cb1c22af9978da82bc2e23a71fb591d3fc4b5215404bfdb7e2af47a81acae4",
+      "imageURL": "assets/bey-catalog/candidates/cb28b8cc3df8bfa801e89dc579a2f7698199f3348e5caa5c744b938ba59bb5be.webp",
+      "imageSha256": "cb28b8cc3df8bfa801e89dc579a2f7698199f3348e5caa5c744b938ba59bb5be",
+      "sourceDimensions": [
+        648,
+        563
+      ],
+      "outputDimensions": [
+        648,
+        563
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0219",
+      "series": "BXG",
+      "code": "BXG-39",
+      "suppliedNameConfiguration": "飛龍凌空 2-80GN（金屬塗層：紫，DMM 抽獎最後獎）",
+      "seriesId": "SR-PRD-993643-00",
+      "sourceName": "BXG-39 飛龍凌空 2-80GN 金屬塗層:紫 DMM 抽獎最後獎",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-993643-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-993643-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "bef5139458433bda720e17a826df05bd37346ff0cbde75c359138a233f3ab349",
+      "imageURL": "assets/bey-catalog/candidates/c5cdce24aa7284023829ff8b328824d8450354f69bb6750c1c09bc6331da9b9a.webp",
+      "imageSha256": "c5cdce24aa7284023829ff8b328824d8450354f69bb6750c1c09bc6331da9b9a",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0220",
+      "series": "BXG",
+      "code": "BXG-39-01",
+      "suppliedNameConfiguration": "飛龍凌空 2-80GN（DMM 抽獎 A 獎）",
+      "seriesId": "SR-PRD-993636-00",
+      "sourceName": "BXG-39-01 飛龍凌空 2-80GN DMM 抽獎 A 獎",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-993636-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-993636-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "bd8df872d0d877bdfd71b42f9eeaaefa955f27e4c673c4d145216aef5c3cd65e",
+      "imageURL": "assets/bey-catalog/candidates/184ca8cf6007b6aa1606793a704c6eb807300eaeab08ee1a7b2047236f06cd61.webp",
+      "imageSha256": "184ca8cf6007b6aa1606793a704c6eb807300eaeab08ee1a7b2047236f06cd61",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0221",
+      "series": "BXG",
+      "code": "BXG-40-01",
+      "suppliedNameConfiguration": "暴龍 1-80GB",
+      "seriesId": "SR-PRD-749987-01",
+      "sourceName": "BXG-40-01 暴龍 1-80GB",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-749987-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-749987-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "6bc9215622a8d5daf2f438ae2a3f199d88a6c7023811a9210dc6bccd9f5f8f07",
+      "imageURL": "assets/bey-catalog/candidates/7552476f3fbd1cb1abfc9d5c7b595d24829a1bdf3122ccac175178f4764d47fc.webp",
+      "imageSha256": "7552476f3fbd1cb1abfc9d5c7b595d24829a1bdf3122ccac175178f4764d47fc",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0222",
+      "series": "BXG",
+      "code": "BXG-40-02",
+      "suppliedNameConfiguration": "滄龍 9-60U",
+      "seriesId": "SR-PRD-749987-02",
+      "sourceName": "BXG-40-02 滄龍 9-60U",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-749987-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-749987-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "b344e99b2b6e9d0c29f7f2014a95097a0aa66a674658fd95283aa7ef150b629f",
+      "imageURL": "assets/bey-catalog/candidates/6745ad5bdfde9fbe07cb82c08beaab592eb026cf85cfc403f96374b001cde322.webp",
+      "imageSha256": "6745ad5bdfde9fbe07cb82c08beaab592eb026cf85cfc403f96374b001cde322",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0223",
+      "series": "BXG",
+      "code": "BXG-41-01",
+      "suppliedNameConfiguration": "棘龍 3-85A",
+      "seriesId": "SR-PRD-989002-01",
+      "sourceName": "BXG-41-01 棘龍 3-85A",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-989002-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-989002-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "8e1cca06b32f22db34f5cbea2d501a4f9a02df175e282f122a47c61d965d055f",
+      "imageURL": "assets/bey-catalog/candidates/c0697e72edc43645063d0bfb588a103c99c95498ea2659e49dd308f829a5259c.webp",
+      "imageSha256": "c0697e72edc43645063d0bfb588a103c99c95498ea2659e49dd308f829a5259c",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0224",
+      "series": "BXG",
+      "code": "BXG-41-02",
+      "suppliedNameConfiguration": "翼龍 4-55D",
+      "seriesId": "SR-PRD-989002-02",
+      "sourceName": "BXG-41-02 翼龍 4-55D",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-989002-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-989002-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "c59cf66a88643082b3f14b32afccd4e23ad98c66760ec33c25c4e6cf63f1dfb4",
+      "imageURL": "assets/bey-catalog/candidates/a06bb1b0a2df9887f8c0e0cb28c8284ff25901f45689870f34200326a5e2d2e5.webp",
+      "imageSha256": "a06bb1b0a2df9887f8c0e0cb28c8284ff25901f45689870f34200326a5e2d2e5",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0231",
+      "series": "BXG",
+      "code": "BXG-52",
+      "suppliedNameConfiguration": "蒼龍神劍 1-60V（金屬塗層：闇黑，日本職業足球聯盟版）",
+      "seriesId": "SR-PRD-090960-00",
+      "sourceName": "BXG-52 蒼龍神劍 1-60V 金屬塗層:闇黑 日本職業足球聯盟版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-ds_black.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG52_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "b269ee2db4076b1ab33cc82f5ce90fa9e89cd220bf3feedc76d5b2fa4d9783b4",
+      "imageURL": "assets/bey-catalog/candidates/7bd200e66b02c4bfa7e325f9c7c829a21a8269c7af9cc38e19e61d47e4ec22a6.webp",
+      "imageSha256": "7bd200e66b02c4bfa7e325f9c7c829a21a8269c7af9cc38e19e61d47e4ec22a6",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0232",
+      "series": "BXG",
+      "code": "BXG-53",
+      "suppliedNameConfiguration": "蒼穹龍騎士 9-60F（金屬塗層：白，日本職業足球聯盟版）",
+      "seriesId": "SR-PRD-098843-00",
+      "sourceName": "BXG-53 蒼穹龍騎士 9-60F 金屬塗層:白 日本職業足球聯盟版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/bx00-cd_white.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG53_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "7ffb5d2f7780b09b43ec0833545f5d95ddf0b20773e89f4e8ca692a1aede1b55",
+      "imageURL": "assets/bey-catalog/candidates/3136d06eb98cfc7d4e57507c3b8da42b5e5cce2b9e7a4686c642b2f305bb9ebd.webp",
+      "imageSha256": "3136d06eb98cfc7d4e57507c3b8da42b5e5cce2b9e7a4686c642b2f305bb9ebd",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0233",
+      "series": "BXG",
+      "code": "BXG-54",
+      "suppliedNameConfiguration": "武士星劍 5-60K（金屬塗層：武士藍，足球日本代表版）",
+      "seriesId": "SR-PRD-085515-00",
+      "sourceName": "BXG-54 武士星劍 5-60K 金屬塗層:武士藍 足球日本代表版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/ux00-samurai.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG54_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "24f8bb1987440612b1bd17aa9cfbc57860d31f7e1543fcae24d130217e6770a9",
+      "imageURL": "assets/bey-catalog/candidates/6768629b3740fb8fcfdbf92f6f0e4c57b264a9935893ae81917a31ed55dd57b3.webp",
+      "imageSha256": "6768629b3740fb8fcfdbf92f6f0e4c57b264a9935893ae81917a31ed55dd57b3",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0234",
+      "series": "BXG",
+      "code": "BXG-55",
+      "suppliedNameConfiguration": "鮫鯊鋒鰭 2-60GP（金屬塗層：闇黑，釣魚魂 Wonder 版）",
+      "seriesId": "SR-PRD-085706-00",
+      "sourceName": "BXG-55 鮫鯊鋒鰭 2-60GP 金屬塗層:闇黑 釣魚魂 Wonder 版",
+      "sourceURL": "https://corocoro-news.jp/news/399068/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2025/11/ffa922810e98c8f245f5a2f52d470c71.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "b82cd28e81b64ec22dd15547fd97b6bbafd63cfd6481bb65322911d45ca8b562",
+      "imageURL": "assets/bey-catalog/candidates/204f29ee10742e452091a52dbe1580d348f45cb6466c3b88d89b5f6c667688c5.webp",
+      "imageSha256": "204f29ee10742e452091a52dbe1580d348f45cb6466c3b88d89b5f6c667688c5",
+      "sourceDimensions": [
+        700,
+        595
+      ],
+      "outputDimensions": [
+        700,
+        595
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0235",
+      "series": "BXG",
+      "code": "BXG-56",
+      "suppliedNameConfiguration": "巨鯨怒濤 1-80GF（金屬塗層：藍，釣魚魂 Wonder 版）",
+      "seriesId": "SR-PRD-085690-00",
+      "sourceName": "BXG-56 巨鯨怒濤 1-80GF 金屬塗層:藍 釣魚魂 Wonder 版",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-085690-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-085690-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "f20edda81f8188ccd7c5820c5332ed7fb4ccf142c60de81999fa67c80398b63f",
+      "imageURL": "assets/bey-catalog/candidates/2b47b3e62611357e05dea7a04bc29afc22e8678e98e4276456203e8b35e92655.webp",
+      "imageSha256": "2b47b3e62611357e05dea7a04bc29afc22e8678e98e4276456203e8b35e92655",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0236",
+      "series": "BXG",
+      "code": "BXG-57-01",
+      "suppliedNameConfiguration": "新世紀福音戰士至尊 B0-70E（金屬塗層：橘，零號機版）",
+      "seriesId": "SR-PRD-085683-01",
+      "sourceName": "BXG-57-01 新世紀福音戰士至尊 B0-70E 金屬塗層:橘 零號機版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-eva.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG57_08@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "ccf6e8f6e4a5b4403bcb945887ad5cd2d03553820f7efa87d3446a38614fced0",
+      "imageURL": "assets/bey-catalog/candidates/686a2b938cd724670aa8c2a9347081f1d40b61eb517198b943a16f090c7819f5.webp",
+      "imageSha256": "686a2b938cd724670aa8c2a9347081f1d40b61eb517198b943a16f090c7819f5",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0237",
+      "series": "BXG",
+      "code": "BXG-57-02",
+      "suppliedNameConfiguration": "新世紀福音戰士勇氣 A1-70V（金屬塗層：紫，初號機版）",
+      "seriesId": "SR-PRD-085683-02",
+      "sourceName": "BXG-57-02 新世紀福音戰士勇氣 A1-70V 金屬塗層:紫 初號機版",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-eva.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG57_01@1.png",
+      "ambiguous": false,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "a6e73311de2ba1e0148be2de00f9818f2ebb72930eb6e44690b3f5d0955ad098",
+      "imageURL": "assets/bey-catalog/candidates/35e884cd4ffab0fbe9727aa2c7b85cd3fca1b48cdcb7101656609bb41f8541cf.webp",
+      "imageSha256": "35e884cd4ffab0fbe9727aa2c7b85cd3fca1b48cdcb7101656609bb41f8541cf",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0238",
+      "series": "BXG",
+      "code": "BXG-57-03",
+      "suppliedNameConfiguration": "新世紀福音戰士九尾 T2-70A（金屬塗層：紅，2 號機版）",
+      "seriesId": "SR-PRD-085683-03",
+      "sourceName": "BXG-57-03 新世紀福音戰士九尾 T2-70A 金屬塗層:紅 2 號機版",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-085683-03.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-085683-03.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "2fa503c0d9f29f4c7b4df34e965073416c845d9284fa2cd0800b7849f909416f",
+      "imageURL": "assets/bey-catalog/candidates/36d53381f3b1749916a72d233a0b3385df5d7407351bcf5cc61b103a04effd84.webp",
+      "imageSha256": "36d53381f3b1749916a72d233a0b3385df5d7407351bcf5cc61b103a04effd84",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0241",
+      "series": "BXG",
+      "code": "BXG-70",
+      "suppliedNameConfiguration": "迪卡狂怒 FT3-60T",
+      "seriesId": "SR-PRD-080640-00",
+      "sourceName": "BXG-70 迪卡狂怒 FT3-60T",
+      "sourceURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx00-tiga.html",
+      "sourceImageURL": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/BXG70_01@1.png",
+      "ambiguous": true,
+      "sourceType": "manufacturer",
+      "coverage": "product_reference",
+      "sourceImageSha256": "8c9e0f08f11208a8acfa445c9ac30d882d0b122ce66a9b761ef5f0738c0e52c4",
+      "imageURL": "assets/bey-catalog/candidates/39268ff107d69c2275c4dbfd7609e9e51d6fe09acdea4d0e0e9bd3bfc2deb055.webp",
+      "imageSha256": "39268ff107d69c2275c4dbfd7609e9e51d6fe09acdea4d0e0e9bd3bfc2deb055",
+      "sourceDimensions": [
+        586,
+        709
+      ],
+      "outputDimensions": [
+        586,
+        709
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": "Same name has three source variants; standard product reference only, not a color selection"
+    },
+    {
+      "suppliedId": "supplied_20261014_0242",
+      "series": "BXG",
+      "code": "BXG-71-01",
+      "suppliedNameConfiguration": "英勇野牛 DB（DMM 抽獎 A 獎）",
+      "seriesId": "SR-PRD-065180-00",
+      "sourceName": "BXG-71-01 英勇野牛 DB DMM 抽獎 A 獎",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-065180-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-065180-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "06d98b7ead004d96b259744f93381a73eabc763b8018ed34d09bd3df12451224",
+      "imageURL": "assets/bey-catalog/candidates/8bb2891cb77564033f0784cf7c42bfb8f69c2b43c486f1599f973155fd25eeac.webp",
+      "imageSha256": "8bb2891cb77564033f0784cf7c42bfb8f69c2b43c486f1599f973155fd25eeac",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0243",
+      "series": "BXG",
+      "code": "BXG-71-02",
+      "suppliedNameConfiguration": "英勇野牛 DB（金屬塗層：白，DMM 抽獎最後獎）",
+      "seriesId": "SR-PRD-065173-00",
+      "sourceName": "BXG-71-02 英勇野牛 DB 金屬塗層:白 DMM 抽獎最後獎",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-065173-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-065173-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "8c6dee0a82e94b153214f5965ef09d16a651924f35ed181d39a5161945bab634",
+      "imageURL": "assets/bey-catalog/candidates/419705ed2e1aff1833a4ceba3370f676d7afdc2cc82cb80aaaa028e802a013c4.webp",
+      "imageSha256": "419705ed2e1aff1833a4ceba3370f676d7afdc2cc82cb80aaaa028e802a013c4",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0251",
+      "series": "BXH",
+      "code": "BXH-02",
+      "suppliedNameConfiguration": "騎士重盾 3-80N（金屬塗層：燦金）",
+      "seriesId": "SR-EVE-910879-01",
+      "sourceName": "BXH-02 騎士重盾 3-80N 金屬塗層:燦金",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-EVE-910879-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-EVE-910879-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "046c50f6663473f280b714c87627eccb43591782f117b54f5e2459d0af2f0dea",
+      "imageURL": "assets/bey-catalog/candidates/1ec0e59c3ec79c1d0d02bccb0d57b4ee70fbeaf938f978e9fa389074193a5905.webp",
+      "imageSha256": "1ec0e59c3ec79c1d0d02bccb0d57b4ee70fbeaf938f978e9fa389074193a5905",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0252",
+      "series": "BXH",
+      "code": "BXH-09",
+      "suppliedNameConfiguration": "魔導神杖 5-70DB（金屬塗層：燦金）",
+      "sourceURL": "https://beyblade.phstudy.org/?search=BXH-09",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/products/BXH-09/936138_01.png",
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "06131c0ec465ef538301aa58195345736588ee4d31763de37704faa12d9c2c1d",
+      "imageURL": "assets/bey-catalog/candidates/34882d19e039711408757bac34abf894728a9145a519ec4d287ec5696e6cd449.webp",
+      "imageSha256": "34882d19e039711408757bac34abf894728a9145a519ec4d287ec5696e6cd449",
+      "sourceDimensions": [
+        265,
+        368
+      ],
+      "outputDimensions": [
+        265,
+        368
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0255",
+      "series": "BXH",
+      "code": "BXH-15",
+      "suppliedNameConfiguration": "英仙幽冥 B6-80W（金屬塗層：燦金）",
+      "sourceURL": "https://beyblade.phstudy.org/?search=BXH-15",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/products/BXH-15/958772_01.png",
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "d0fbfcbe96ba1aa228d1fe1e4c9439cac3c0548a1a10f91e3de57e6248151bde",
+      "imageURL": "assets/bey-catalog/candidates/aca6dcaddc954b7d32bb772431433366a9b3640cd1e0dc9ac4a96e2b10a46a1a.webp",
+      "imageSha256": "aca6dcaddc954b7d32bb772431433366a9b3640cd1e0dc9ac4a96e2b10a46a1a",
+      "sourceDimensions": [
+        333,
+        463
+      ],
+      "outputDimensions": [
+        333,
+        463
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0259",
+      "series": "BXH",
+      "code": "BXH-22",
+      "suppliedNameConfiguration": "邪神狂怒 FE4-55Y（金屬塗層：燦金）",
+      "seriesId": "SR-EVE-088899-00",
+      "sourceName": "BXH-22 邪神狂怒 FE4-55Y 金屬塗層:燦金",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-EVE-088899-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-EVE-088899-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "f340dbe5493450278fd430c0a896bc3105858e667f5264dd2df2418c9881e1cb",
+      "imageURL": "assets/bey-catalog/candidates/8bdf3a4e3c3613c76da9b94040c5a78548fa1f065c2b89455b7a5c0ca8270637.webp",
+      "imageSha256": "8bdf3a4e3c3613c76da9b94040c5a78548fa1f065c2b89455b7a5c0ca8270637",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0268",
+      "series": "BXC",
+      "code": "BXC-02",
+      "suppliedNameConfiguration": "惡魔紅鐮 3-80F（特別合體陀螺）",
+      "seriesId": "SR-PRD-932970-00",
+      "sourceName": "BXC-02 惡魔紅鐮 3-80F 特別合體陀螺",
+      "sourceURL": "https://corocoro-news.jp/news/377976/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2023/12/f919dd35dc468956f947d2d2ab3551d1.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "851f1510243f81fa54bf5845a4279112c4ee9430276cb765337eaf14610b23b4",
+      "imageURL": "assets/bey-catalog/candidates/280815e725be0264677cdfa74868b2b6b1b61d15cce53392be4e71415d1f0930.webp",
+      "imageSha256": "280815e725be0264677cdfa74868b2b6b1b61d15cce53392be4e71415d1f0930",
+      "sourceDimensions": [
+        450,
+        348
+      ],
+      "outputDimensions": [
+        450,
+        348
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0269",
+      "series": "BXC",
+      "code": "BXC-03",
+      "suppliedNameConfiguration": "蒼龍爆刃 1-60A（金屬塗層：火紅）",
+      "seriesId": "SR-PRD-941460-00",
+      "sourceName": "BXC-03 蒼龍爆刃 1-60A 金屬塗層:火紅",
+      "sourceURL": "https://corocoro-news.jp/news/383499/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2024/04/418a6e727e7c6f873c107bdba5e981f2.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "b3e26233132a6f5bbfc20ffe160bc1edb3b82f2a9abbd132628edf0f094217e7",
+      "imageURL": "assets/bey-catalog/candidates/8fc1bde983371f670d68b000d477a06f044365801c1f01c44a9728bcec9cd552.webp",
+      "imageSha256": "8fc1bde983371f670d68b000d477a06f044365801c1f01c44a9728bcec9cd552",
+      "sourceDimensions": [
+        500,
+        527
+      ],
+      "outputDimensions": [
+        500,
+        527
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0270",
+      "series": "BXC",
+      "code": "BXC-05",
+      "suppliedNameConfiguration": "鳳凰飛翼 9-80DB（金屬塗層：夜藍）",
+      "seriesId": "SR-PRD-953654-00",
+      "sourceName": "BXC-05 鳳凰飛翼 9-80DB 金屬塗層:夜藍",
+      "sourceURL": "https://corocoro-news.jp/news/390251/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2024/09/b3fa3d712ef3a4c871f0dc8206d4704c.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "c372942862018e451866969d30550ac9643918b81f9c85bdc6ca0644c7b0f119",
+      "imageURL": "assets/bey-catalog/candidates/35fe2f60deda51db27d02bd7ba54bb5aabaad50f89179162edfb9fc4e6dda48b.webp",
+      "imageSha256": "35fe2f60deda51db27d02bd7ba54bb5aabaad50f89179162edfb9fc4e6dda48b",
+      "sourceDimensions": [
+        500,
+        500
+      ],
+      "outputDimensions": [
+        500,
+        500
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0271",
+      "series": "BXC",
+      "code": "BXC-07",
+      "suppliedNameConfiguration": "鱷魚粉碎 2-60Q（金屬塗層：綠）",
+      "seriesId": "SR-PRD-953678-00",
+      "sourceName": "BXC-07 鱷魚粉碎 2-60Q 金屬塗層:綠",
+      "sourceURL": "https://corocoro-news.jp/news/393959/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2025/01/077a8d70f963739b153ad864b87cc523.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "68d1e025b025ebb1ca8ec5c00d8200490e86fdb40aafd0ea4eaf8cd932915d85",
+      "imageURL": "assets/bey-catalog/candidates/7d6cb19303de06c6637367e8726429e77a1c691a76faf80a8d7500c56fbcb993.webp",
+      "imageSha256": "7d6cb19303de06c6637367e8726429e77a1c691a76faf80a8d7500c56fbcb993",
+      "sourceDimensions": [
+        500,
+        500
+      ],
+      "outputDimensions": [
+        500,
+        500
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0272",
+      "series": "BXC",
+      "code": "BXC-11",
+      "suppliedNameConfiguration": "武士鋼鐵 5-70GF（金屬塗層：白）",
+      "seriesId": "SR-PRD-993766-00",
+      "sourceName": "BXC-11 武士鋼鐵 5-70GF 金屬塗層:白",
+      "sourceURL": "https://corocoro-news.jp/news/396091/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2025/05/e6e8ddcc7cb6cff13e0e5da085df884a.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "ee3bf0705967d8225c4455c178b43160827d9f0fed453966a1e919db5766f20d",
+      "imageURL": "assets/bey-catalog/candidates/7d59654cd98a4efeaff98a416028b648f4686fb3c2b544350b1ec7e5359c49ef.webp",
+      "imageSha256": "7d59654cd98a4efeaff98a416028b648f4686fb3c2b544350b1ec7e5359c49ef",
+      "sourceDimensions": [
+        500,
+        500
+      ],
+      "outputDimensions": [
+        500,
+        500
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0273",
+      "series": "BXC",
+      "code": "BXC-12",
+      "suppliedNameConfiguration": "武士星劍 2-70L（金屬塗層：橘）",
+      "seriesId": "SR-PRD-993773-00",
+      "sourceName": "BXC-12 武士星劍 2-70L 金屬塗層:橘",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-993773-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-993773-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "a0e38cc9573959c526e18104e3eaee8573fc03574235e13317511c29cfec8f9b",
+      "imageURL": "assets/bey-catalog/candidates/9e4df140852c0871bcb7f9c2bf616637eb51ffa3c1d15af720a908288bfd1e99.webp",
+      "imageSha256": "9e4df140852c0871bcb7f9c2bf616637eb51ffa3c1d15af720a908288bfd1e99",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0274",
+      "series": "BXC",
+      "code": "BXC-13",
+      "suppliedNameConfiguration": "蒼龍至尊 S2-70K（金屬塗層：水藍）",
+      "seriesId": "SR-PRD-993872-00",
+      "sourceName": "BXC-13 蒼龍至尊 S2-70K 金屬塗層:水藍",
+      "sourceURL": "https://corocoro-news.jp/news/396610/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2025/06/b61d708490db02d179cd94c70d761563.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "242f5c29b6d3a8b2f26877789acc5746c76f823707072c5206b6ce1a9e1e825a",
+      "imageURL": "assets/bey-catalog/candidates/1e4653c67245374fddd31d869da3085b45f8d3782f082c341c4bf1f2d711884b.webp",
+      "imageSha256": "1e4653c67245374fddd31d869da3085b45f8d3782f082c341c4bf1f2d711884b",
+      "sourceDimensions": [
+        500,
+        500
+      ],
+      "outputDimensions": [
+        500,
+        500
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0275",
+      "series": "BXC",
+      "code": "BXC-15",
+      "suppliedNameConfiguration": "大蛇簇擁 6-60LF",
+      "seriesId": "SR-PRD-997023-00",
+      "sourceName": "BXC-15 大蛇簇擁 6-60LF",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-997023-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-997023-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "9482790ad4a3f660958df8fa718a2151cc7876a04ba711f9b3de5d84b84d9402",
+      "imageURL": "assets/bey-catalog/candidates/2c63ac4723a7351a40e4b743b0b83fc821cdecf0d39d9ada7058b385ccb6dbcf.webp",
+      "imageSha256": "2c63ac4723a7351a40e4b743b0b83fc821cdecf0d39d9ada7058b385ccb6dbcf",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0276",
+      "series": "BXC",
+      "code": "BXC-19",
+      "suppliedNameConfiguration": "龍王閃擊 BK1-50I（金屬塗層：黃）",
+      "seriesId": "SR-PRD-072447-00",
+      "sourceName": "BXC-19 龍王閃擊 BK1-50I 金屬塗層:黃",
+      "sourceURL": "https://corocoro-news.jp/news/400506/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2026/04/e7a4018d2663d61305cda3bacb9397de.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "21708caa93ef35aab1d8ee65ed50c31a8142367c5f9180865702bdb6b3af72c4",
+      "imageURL": "assets/bey-catalog/candidates/c1e30e2a7c4f0b180defc65a7e8943161435523dd0adb1a923536dfbad2460d4.webp",
+      "imageSha256": "c1e30e2a7c4f0b180defc65a7e8943161435523dd0adb1a923536dfbad2460d4",
+      "sourceDimensions": [
+        600,
+        600
+      ],
+      "outputDimensions": [
+        600,
+        600
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0277",
+      "series": "BXC",
+      "code": "BXC-20",
+      "suppliedNameConfiguration": "時鐘幻象 4-55S（金屬塗層：闇黑，命運的倒帶士版）",
+      "seriesId": "SR-PRD-067900-00",
+      "sourceName": "BXC-20 時鐘幻象 4-55S 金屬塗層:闇黑 命運的倒帶士版",
+      "sourceURL": "https://corocoro-news.jp/news/401960/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2026/08/ed5a364829b0bc2dfadcbd41ea0bbe01.jpg",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "61e559a2ace7307515004426f53dd05953859f943e928978891870a19e5f6d06",
+      "imageURL": "assets/bey-catalog/candidates/39519e4496450a2a13384b56cdfc37bb6f8a84af2e39108205a70f74dd7cafdd.webp",
+      "imageSha256": "39519e4496450a2a13384b56cdfc37bb6f8a84af2e39108205a70f74dd7cafdd",
+      "sourceDimensions": [
+        600,
+        535
+      ],
+      "outputDimensions": [
+        600,
+        535
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0278",
+      "series": "BXC",
+      "code": "BXC-21",
+      "suppliedNameConfiguration": "基德狩獵 K4-70TK（金屬塗層：白）",
+      "seriesId": "SR-PRD-056225-00",
+      "sourceName": "BXC-21 基德狩獵 K4-70TK 金屬塗層:白",
+      "sourceURL": "https://corocoro-news.jp/news/402435/",
+      "sourceImageURL": "https://corocoro-news.jp/wp-content/uploads/2026/09/e2323e9779b8d5784dfc00fea8b8c739.png",
+      "ambiguous": false,
+      "sourceType": "publisher",
+      "coverage": "product_reference",
+      "sourceImageSha256": "8b22899ed14ff821448be1093580e938eb57e6d54c8b5928a2a14403b1d26964",
+      "imageURL": "assets/bey-catalog/candidates/162d6ea92c02fbe12fa4d143ace09c62b37809fed3f71268a826e2c0ac341b48.webp",
+      "imageSha256": "162d6ea92c02fbe12fa4d143ace09c62b37809fed3f71268a826e2c0ac341b48",
+      "sourceDimensions": [
+        600,
+        500
+      ],
+      "outputDimensions": [
+        600,
+        500
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0279",
+      "series": "BXA",
+      "code": "BXA-01",
+      "suppliedNameConfiguration": "蒼龍神劍 3-60F（壽司郎聯名版）",
+      "seriesId": "SR-PRD-939672-00",
+      "sourceName": "BXA-01 蒼龍神劍 3-60F 壽司郎聯名版",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-939672-00.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-939672-00.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "2c3d95eeecb79e7c9dff6905b2ce6a03087b25936f7b10547b291461039f5cca",
+      "imageURL": "assets/bey-catalog/candidates/6284596f72d9c037101054e184631da539b8142453dc384efb7a58a3e92e1577.webp",
+      "imageSha256": "6284596f72d9c037101054e184631da539b8142453dc384efb7a58a3e92e1577",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0280",
+      "series": "BXA",
+      "code": "BXA-03",
+      "suppliedNameConfiguration": "美國隊長 4-70GB",
+      "seriesId": "SR-PRD-305718-01",
+      "sourceName": "BXA-03 美國隊長 4-70GB",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-305718-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-305718-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "cd1185b34e4424bd0e1a3437f58be57e64e686316754af5699102b3e1c482b71",
+      "imageURL": "assets/bey-catalog/candidates/a9b3d939181b509424fc97eaeafc993cf4b4f8f85d1172189534f9a83b580bdd.webp",
+      "imageSha256": "a9b3d939181b509424fc97eaeafc993cf4b4f8f85d1172189534f9a83b580bdd",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0281",
+      "series": "BXA",
+      "code": "BXA-03",
+      "suppliedNameConfiguration": "紅浩克 1-80R",
+      "seriesId": "SR-PRD-305718-02",
+      "sourceName": "BXA-03 紅浩克 1-80R",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-305718-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-305718-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "94d278b7c1c55e47ec6eceda5ce07e3c5af05d51cdcbeafc6109f5f765b9d0e7",
+      "imageURL": "assets/bey-catalog/candidates/71d5470c31093ed1fcd98570beba705a1fc9793620811b30c0098fde05fbd4d0.webp",
+      "imageSha256": "71d5470c31093ed1fcd98570beba705a1fc9793620811b30c0098fde05fbd4d0",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0282",
+      "series": "BXA",
+      "code": "BXA-04",
+      "suppliedNameConfiguration": "終極蜘蛛人 1-60GN",
+      "seriesId": "SR-PRD-305725-01",
+      "sourceName": "BXA-04 終極蜘蛛人 1-60GN",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-305725-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-305725-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "75e6379787581a1df8c37c21410e6d39207ea4d143336aaa0ea9423e18eb6847",
+      "imageURL": "assets/bey-catalog/candidates/1374b92f531c004487224de0ee7665c7ceac8aed4794fe5a9a3dac03991ae4b6.webp",
+      "imageSha256": "1374b92f531c004487224de0ee7665c7ceac8aed4794fe5a9a3dac03991ae4b6",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0283",
+      "series": "BXA",
+      "code": "BXA-04",
+      "suppliedNameConfiguration": "綠惡魔 9-80HT",
+      "seriesId": "SR-PRD-305725-02",
+      "sourceName": "BXA-04 綠惡魔 9-80HT",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-305725-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-305725-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "1d73f6609582bb13044457248662644fc7bfa5bc1d999b07a5c5264e94fa423d",
+      "imageURL": "assets/bey-catalog/candidates/74b67d547c8647843cbf4eed0f8fd001a1e40fb49e8ab41ccce8e0d4a649e3e6.webp",
+      "imageSha256": "74b67d547c8647843cbf4eed0f8fd001a1e40fb49e8ab41ccce8e0d4a649e3e6",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0284",
+      "series": "BXA",
+      "code": "BXA-05",
+      "suppliedNameConfiguration": "歐比王肯諾比 4-60P",
+      "seriesId": "SR-PRD-305732-01",
+      "sourceName": "BXA-05 歐比王肯諾比 4-60P",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-305732-01.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-305732-01.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "762cf9d5ff483891a270de9bb99f594b33a3b013f0caefb143271eab5f86e335",
+      "imageURL": "assets/bey-catalog/candidates/bd703eb775ec5e16fac4d725f48a787c0d69ae049730d40e2ff3191351d7fe9b.webp",
+      "imageSha256": "bd703eb775ec5e16fac4d725f48a787c0d69ae049730d40e2ff3191351d7fe9b",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    },
+    {
+      "suppliedId": "supplied_20261014_0285",
+      "series": "BXA",
+      "code": "BXA-05",
+      "suppliedNameConfiguration": "葛里維斯將軍 3-80HN",
+      "seriesId": "SR-PRD-305732-02",
+      "sourceName": "BXA-05 葛里維斯將軍 3-80HN",
+      "sourceURL": "https://beyblade.phstudy.org/p/zh-TW/Series/SR-PRD-305732-02.html",
+      "sourceImageURL": "https://beyblade.phstudy.org/images/site/Blade/BL-PRD-305732-02.png",
+      "ambiguous": false,
+      "sourceType": "community",
+      "coverage": "blade_reference",
+      "sourceImageSha256": "347af0ea3ac46c21c3721e253ddda0c2f021d87c91cd35bd4da091c664d872b1",
+      "imageURL": "assets/bey-catalog/candidates/6a3ccd084cc3972dfd934cad82c78fa00fd86d8bb70a254d2964d1b3eaa0c107.webp",
+      "imageSha256": "6a3ccd084cc3972dfd934cad82c78fa00fd86d8bb70a254d2964d1b3eaa0c107",
+      "sourceDimensions": [
+        512,
+        512
+      ],
+      "outputDimensions": [
+        512,
+        512
+      ],
+      "transformation": "Full frame WebP conversion, max side 1000; no crop, recoloring or removal of labels",
+      "rightsStatus": "unverified",
+      "checkedAt": "2026-10-16",
+      "verification": "Name/configuration cross-check and visual reference review; does not verify underside, full BOM or Taiwan release",
+      "ambiguityNote": ""
+    }
+  ]
+}
