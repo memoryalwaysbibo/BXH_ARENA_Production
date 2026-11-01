@@ -44,7 +44,7 @@ async function send(root,id,action,extra={}){
    const publicState=JSON.parse((await pub.get()).data().bracketView);assert(publicState.matches.every(m=>m.scoreA===1&&m.log.length===1));
    assert((await root.get()).updateTime.isEqual(before.updateTime),'publication rewrote root');
    phase('new-score-projection-'+count);
-   await send(root,'m1','score',{side:'B',finish:'burst'});await publish(state.cloudCode);
+   await Promise.all([send(root,'m1','score',{side:'B',finish:'burst'}),publish(state.cloudCode)]);await publish(state.cloudCode);
    const newest=JSON.parse((await pub.get()).data().bracketView);assert.equal(newest.matches[0].scoreB,2);
    assert(newest.matches.slice(1).every(m=>m.scoreA===1&&m.scoreB===0),'publication lost another court');
    assert((await publish(state.cloudCode)).skipped,'unchanged generations should not republish');
@@ -55,14 +55,14 @@ async function send(root,id,action,extra={}){
    assert.equal(JSON.parse((await pub.get()).data().bracketView).courtAssignments.court1.status,'in_progress');
    assert((await root.get()).updateTime.isEqual(before.updateTime));
    report.cases.push({name:'trusted-concurrent',courts:count,buckets:Math.ceil(count/4),success:result.length,rootUnchanged:true,publicUnchanged:true});
-   report.cases.push({name:'public-projection',courts:count,concurrentWritersDeduplicated:true,newScoresVisible:true,rootUnchanged:true});
+   report.cases.push({name:'public-projection',courts:count,concurrentWritersDeduplicated:true,concurrentScoreConverges:true,newScoresVisible:true,rootUnchanged:true});
   }
   {
    phase('cross-bucket-confirm');
    const {root,pub}=await seed('BXH-CROSS1');
    for(const id of ['m1','m2']){await send(root,id,'score',{side:'A',finish:'extreme'});await send(root,id,'score',{side:'A',finish:'spin'});}
    const before=await read(root),commands=['m1','m2'].map(id=>{const d=request(before.state,before.room,id,'confirm',operation());return {auth:{uid:'ref'+d.station},data:d};});
-   await Promise.all(commands.map(d=>commit(d)));
+   await Promise.all([...commands.map(d=>commit(d)),publish('BXH-CROSS1')]);await publish('BXH-CROSS1');
    const after=await read(root),final=after.state.matches.find(m=>m.id==='final');
    assert.equal(final.a.playerId,'a');assert.equal(final.b.playerId,'c');assert.equal(final.station,5);
    const publicState=JSON.parse((await pub.get()).data().bracketView);
@@ -71,7 +71,7 @@ async function send(root,id,action,extra={}){
    await send(root,'final','score',{side:'B',finish:'extreme'});await send(root,'final','score',{side:'B',finish:'spin'});await send(root,'final','confirm');
    const complete=await read(root);assert.equal(complete.state.championId,'c');assert.equal(complete.state.runnerUpId,'a');
    assert.equal((await db.collection('staffActivityLogs/ref5/matches').where('tournamentCode','==','BXH-CROSS1').get()).size,2);
-   report.cases.push({name:'cross-bucket-confirm-and-final',passed:true,champion:'c',sourceBuckets:2});
+   report.cases.push({name:'cross-bucket-confirm-and-final',passed:true,champion:'c',sourceBuckets:2,concurrentPublicWorker:true});
   }
   {
    phase('replay-and-authority');
