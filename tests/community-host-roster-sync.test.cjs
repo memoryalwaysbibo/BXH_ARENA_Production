@@ -13,7 +13,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function harness(overrides={}){
  const calls={subscribe:[],unsub:0,catchup:0,read:0,publicRead:0,list:0,save:0,render:0,toasts:[]};
  const state={id:'room-a',cloudCode:'ROOM-A',createdBy:'host',ownerUid:'host',updatedAt:1,registrationRosterRevision:0,communityQuickRegistration:true,meta:{eventAuthority:'community',battleMode:'individual',registrationEnabled:true,communityQuickRegistration:true},players:[{id:'host-player',name:'Host',source:'host'}],waitlistPlayers:[],matches:[]};
- const ctx=vm.createContext({console:{warn(){}},Date,JSON,window:{},bracketCommitBlocked:()=>false,bracketCommitStatusHtml:()=>'',firebaseUser:{uid:'host'},userProfile:{role:'player',active:true},currentRole:'player',appPhase:'community-room',communityRoomActiveTab:'people',activeTab:'live',state,peopleRosterBusy:false,adminRegistrationsCache:null,adminRegistrationsError:null,adminRegistrationsLoading:false,publicTournamentsCache:[],myRegistrationsCache:[],remoteAppliedRoomId:null,remoteAppliedAt:0,courtSwapDraft:null,refereeAssignmentDraftEnabled:null,cloudLastSyncAt:0,
+ const ctx=vm.createContext({console:{warn(){}},Date,JSON,window:{},isTournamentFullyDecided:()=>false,finishTournament:async()=>false,bracketCommitBlocked:()=>false,bracketCommitStatusHtml:()=>'',firebaseUser:{uid:'host'},userProfile:{role:'player',active:true},currentRole:'player',appPhase:'community-room',communityRoomActiveTab:'people',activeTab:'live',state,peopleRosterBusy:false,peopleRosterSyncStatus:null,adminRegistrationsCache:null,adminRegistrationsError:null,adminRegistrationsLoading:false,publicTournamentsCache:[],myRegistrationsCache:[],remoteAppliedRoomId:null,remoteAppliedAt:0,courtSwapDraft:null,refereeAssignmentDraftEnabled:null,cloudLastSyncAt:0,
  currentAuthUid:()=>ctx.firebaseUser?.uid||'',cloudAvailable:()=>true,isOwnTestTournament:()=>ctx.state.meta.eventAuthority==='test'&&ctx.state.ownerUid===ctx.firebaseUser?.uid&&ctx.state.createdBy===ctx.firebaseUser?.uid,
  resetAdminRegistrationsCache:()=>{ctx.adminRegistrationsCache=null;ctx.adminRegistrationsError=null;},defaultState:id=>({id}),saveRecord:async()=>true,saveState:async()=>{calls.save++;return true;},mapRegistrationError:error=>String(error.message||error.code),showToast:(message,error)=>calls.toasts.push({message,error}),bracketRosterIsCurrent:()=>true,
  render:()=>{calls.render++;ctx.reconcileRegistrationRosterContext();},renderPreservingScroll:()=>{calls.render++;ctx.reconcileRegistrationRosterContext();},
@@ -21,7 +21,7 @@ function harness(overrides={}){
  ctx.window.cloudSync={connect:async()=>true,subscribeRegistrationsForAdmin:(code,next,error)=>{calls.subscribe.push({code,next,error});return ()=>{calls.unsub++;};},syncCommunityRegistrationSummary:async()=>{calls.catchup++;return {ok:true,communityParticipantCount:2};},joinRoom:async()=>{calls.read++;return {ok:true,data:clone(ctx.remote)};},getPublicTournamentFull:async()=>{calls.publicRead++;return {};},listRegistrationsForAdmin:async()=>{calls.list++;return [];}};
  vm.runInContext(domain,ctx);Object.assign(ctx,ctx.window.BXHDomainUtils);
  vm.runInContext(block('let communityRoomSnapshotGeneration=0;','let remoteAppliedRoomId=null'),ctx);
- for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','applyRemoteState'])vm.runInContext(fn(name),ctx);
+ for(const name of ['hasAdminAccess','isCommunityRoom','isCommunityRoomOwner','isTester','peopleOnsiteWaitlistManaged','peopleRosterSyncStatusHtml','applyRemoteState'])vm.runInContext(fn(name),ctx);
  vm.runInContext(block('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;','let myRegistrationsError = null;'),ctx);
  vm.runInContext(fn('syncLatestOnlineRosterBeforeLock'),ctx);
  vm.runInContext('globalThis.drainRoster=()=>adminRosterSyncChain;globalThis.rosterCode=()=>adminRosterCode;',ctx);
@@ -313,7 +313,7 @@ test('disabled quick room shows one authoritative waitlist row and visible sync 
  const {ctx}=harness();ctx.state.meta.registrationEnabled=false;
  ctx.state.waitlistPlayers=[{id:'shadow',registrationId:'waiting',source:'online',name:'Waiter'}];ctx.adminRegistrationsCache=[{registrationId:'waiting',status:'waitlist',publicName:'Waiter'}];ctx.adminRegistrationsError='offline';
  Object.assign(ctx,{setTimeout(){},esc:value=>String(value??''),peopleRosterSection:'waitlist',participantDisplayName:p=>p.name,normalizeDateTime:()=>0,renderStaffAssignmentPanel:()=>'',renderRefereeStationAssignmentPanel:()=>'',BATTLE_MODE_LABELS:{},FORMAT_LABELS:{},entryRosterValid:()=>true,renderEntrySelection:()=>'',bracketDrawButtonHtml:()=>''});
- for(const name of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','canManageOnsiteWaitlist','peopleOnsiteWaitlistAvailable','renderPeopleManagement'])vm.runInContext(fn(name),ctx);
+ for(const name of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','canManageOnsiteWaitlist','peopleOnsiteWaitlistAvailable','canOfferAdminCheckin','adminCheckinButtonHtml','adminCheckinPendingHtml','renderPeopleManagement'])vm.runInContext(fn(name),ctx);
  const html=ctx.renderPeopleManagement();assert.match(html,/備取區（1）/);assert.match(html,/role="alert"/);assert.match(html,/線上名單尚未同步：offline/);assert.match(html,/data-action="load-online-roster"/);
 });
 
@@ -338,3 +338,80 @@ test('a delayed manual query cannot replace registrations already advanced by th
  assert.equal(ctx.adminRegistrationsCache[0].registrationId,'latest');assert.equal(ctx.adminRegistrationsLoading,false);
 });
 
+function staffHarness(){
+ const h=harness(),{ctx}=h;
+ ctx.userProfile={role:'staff',active:true};ctx.currentRole='admin';ctx.appPhase='app';ctx.activeTab='people';
+ ctx.state.meta.eventAuthority='official';ctx.state.meta.assignedStaffUids=['other-staff'];ctx.staffRosterCache=null;
+ return h;
+}
+test('unassigned official staff sync a limited display without opening private registrations or saving state',async()=>{
+ const {ctx,calls}=staffHarness(),before=clone(ctx.state);
+ const rows=[{name:'選手甲',status:'confirmed',checkedIn:true}];let reads=0;
+ ctx.window.cloudSync.readStaffRegistrationRoster=async()=>{reads++;return {ok:true,code:'ROOM-A',rows};};
+ assert.equal(ctx.staffRosterReadOnly(),true);
+ await ctx.startAdminRosterWatch();await ctx.loadAdminRegistrationRows();
+ assert.equal(reads,1);assert.equal(calls.subscribe.length,0);assert.equal(calls.list,0);assert.equal(calls.save,0);
+ assert.deepEqual(clone(ctx.state),before);assert.deepEqual(clone(ctx.staffRosterCache.rows),rows);
+ ctx.manualSync();await tick();assert.equal(reads,2);
+});
+test('staff retain existing management scope when assigned or when the legacy assignment list is empty',()=>{
+ const {ctx}=staffHarness();ctx.state.meta.assignedStaffUids=['host'];assert.equal(ctx.staffRosterReadOnly(),false);
+ ctx.state.meta.assignedStaffUids=[];assert.equal(ctx.staffRosterReadOnly(),false);
+ for(const role of ['admin','super_admin','player','tester']){ctx.userProfile.role=role;assert.equal(ctx.staffRosterReadOnly(),false);}
+});
+test('staff double clicks share one read and stale results are discarded after navigation or revocation',async()=>{
+ for(const changed of ['room','account','role','navigation','inactive']){
+  const {ctx}=staffHarness(),pending=deferred();let reads=0;
+  ctx.window.cloudSync.readStaffRegistrationRoster=()=>{reads++;return pending.promise;};
+  const first=ctx.loadStaffRegistrationRoster();await tick();await ctx.loadStaffRegistrationRoster();assert.equal(reads,1);
+  if(changed==='room')ctx.state.cloudCode='ROOM-B';
+  if(changed==='account')ctx.firebaseUser={uid:'other'};
+  if(changed==='role')ctx.userProfile.role='player';
+  if(changed==='navigation')ctx.activeTab='live';
+  if(changed==='inactive')ctx.userProfile.active=false;
+  pending.resolve({ok:true,code:'ROOM-A',rows:[{name:'STALE'}]});await first;
+  assert.equal(ctx.staffRosterCache,null,changed);assert.equal(ctx.peopleRosterBusy,false);
+ }
+});
+test('staff failed sync remains visible and retryable without retry loops',async()=>{
+ const {ctx}=staffHarness();ctx.window.cloudSync.readStaffRegistrationRoster=async()=>{throw Object.assign(Error('permission-denied'),{code:'functions/permission-denied'});};
+ await ctx.loadStaffRegistrationRoster();assert.match(ctx.adminRegistrationsError,/工作人員身分/);assert.equal(ctx.peopleRosterBusy,false);
+ ctx.window.cloudSync.readStaffRegistrationRoster=async()=>({ok:true,code:'ROOM-A',rows:[]});
+ await ctx.loadStaffRegistrationRoster();assert.equal(ctx.adminRegistrationsError,null);assert.deepEqual(clone(ctx.staffRosterCache.rows),[]);
+});
+
+test('staff roster screen escapes player names and offers only a read action, including played events',()=>{
+ const {ctx,calls}=staffHarness();
+ ctx.esc=value=>String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');ctx.setTimeout=()=>{};
+ ctx.state.startedAt=123;ctx.staffRosterCache={key:ctx.registrationRosterContextKey(),rows:[
+  {name:'<img src=x onerror=alert(1)>',status:'confirmed',checkedIn:true},{name:'備取甲',status:'waitlist'}]};
+ const html=ctx.renderStaffRegistrationRoster();
+ assert.match(html,/正取 1 人 ／ 備取 1 人/);assert.match(html,/data-action="load-staff-registration-roster"/);
+ assert(!html.includes('<img'));assert(!html.includes('data-action="toggle-checkin-btn"'));assert(!html.includes('data-action="delete-player"'));
+ assert.equal(calls.save,0);
+ const handle=block('function handleAction(action, target){','  if(action.startsWith(\'card-\'))');
+ assert(handle.indexOf("action==='load-staff-registration-roster'")<handle.indexOf("state.entrySelection?.status==='drawn'"));
+});
+
+
+
+
+test('manual sync exposes pending, retained confirmation and retryable failure states',async()=>{
+ const {ctx}=harness(),pending=deferred();
+ ctx.esc=value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+ ctx.window.cloudSync.joinRoom=()=>pending.promise;
+ ctx.manualSync();await tick();
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/正在同步並確認雲端名單/);
+ assert.equal(ctx.peopleRosterBusy,true);
+ pending.resolve({ok:true,data:clone(ctx.remote)});await tick();
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/同步確認完成：正取 2 人/);
+ assert.equal(ctx.peopleRosterBusy,false);
+ ctx.window.cloudSync.joinRoom=async()=>({ok:false,reason:'network'});
+ ctx.manualSync();await tick();
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/同步未完成/);
+ assert.match(ctx.peopleRosterSyncStatusHtml(),/重試/);
+ assert(!ctx.peopleRosterSyncStatusHtml().includes('同步確認完成'));
+ assert.equal(ctx.peopleRosterBusy,false);
+ ctx.state.cloudCode='ROOM-B';ctx.reconcileRegistrationRosterContext();
+ assert.equal(ctx.peopleRosterSyncStatusHtml(),'');
+});

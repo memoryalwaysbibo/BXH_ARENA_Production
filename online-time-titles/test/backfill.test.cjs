@@ -1,0 +1,125 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const D=require('../domain.cjs'),{createBackfill,plan}=require('../backfill.cjs'),{createService}=require('../service.cjs');
+const {MockDB}=require('../../referee-certificates/test/mock-db.cjs');
+const T=Date.parse('2026-11-01T00:00:00+08:00');
+const CONFIG={migrationStrategy:'C-once-v1',sourceSchema:'lastSeenAt-v1',startAt:T,
+  backfillEnabled:true,backfillBatchId:'test-cutover',historyStartDate:'2026-10-29',enabled:true};
+function fixture(extra={}){
+  const db=new MockDB({'users/alice':{active:true},'systemSettings/onlineTimeTitles':CONFIG,
+    'systemSettings/engagement':{titlesEnabled:true,automaticTitleAwardsEnabled:true},
+    'playerStats/alice':{totalCheckInDays:20},
+    'activityOnlineDaily/2026-10-29/players/alice':{uid:'alice',dateKey:'2026-10-29',activeMs:3*D.HOUR},
+    'activityOnlineDaily/2026-10-30/players/alice':{uid:'alice',dateKey:'2026-10-30',activeMs:45*D.MINUTE},
+    // The live day must never be included in the historical portion.
+    'activityOnlineDaily/2026-11-01/players/alice':{uid:'alice',dateKey:'2026-11-01',activeMs:3*D.HOUR},...extra});
+  const original=db.runTransaction.bind(db);
+  db.runTransaction=fn=>original(tx=>fn({...tx,set(ref,value,options){tx.set(ref,options?.merge?{...(db.read(ref.path)||{}),...value}:value);}}));
+  const grants=[],held=new Set();let fail=false;
+  const awardTitle=async ({titleId})=>{if(fail){fail=false;throw Error('retry-award');}if(held.has(titleId))return {reason:'already-earned'};held.add(titleId);grants.push(titleId);return {awarded:true};};
+  return {db,grants,awardTitle,run:createBackfill(db,{awardTitle,clock:()=>T+1000}),fail(){fail=true;}};
+}
+function event(from,to){const snap=t=>({exists:true,ref:{path:'onlinePresence/alice'},data:()=>({lastSeenAt:t})});return {params:{uid:'alice'},data:{before:snap(from),after:snap(to)}};}
+test('C credits exact historical active time once and audits missing days without using point balances',async()=>{
+  const f=fixture();const r=await f.run('alice');
+  assert.equal(r.historicalMs,225*D.MINUTE);assert.equal(r.missingDays,1);
+  assert.equal(f.db.read('playerStats/alice').totalCheckInDays,20);
+  assert.equal(f.db.read('users/alice/titleProgress/online_time_10h').currentValue,225);
+  assert.equal(f.db.read('onlineTimeTitleBackfills/alice').evidence.length,3);
+  await f.run('alice');assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE);
+  assert.deepEqual(f.grants,['online_time_1h']);
+});
+test('concurrent migration and live heartbeat preserve both disjoint portions exactly once',async()=>{
+  const f=fixture(),live=createService(f.db,{awardTitle:f.awardTitle,clock:()=>T+1000});
+  await Promise.all([f.run('alice'),f.run('alice'),live(event(T-30000,T+30000))]);
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE+30000);
+  assert.equal(f.db.read('playerStats/alice').onlineTimeHistoricalMs,225*D.MINUTE);
+  await live(event(T-30000,T+30000));await f.run('alice');
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE+30000);
+});
+test('native award failure after backfill commit retries without adding historical hours twice',async()=>{
+  const f=fixture();f.fail();await assert.rejects(f.run('alice'),/retry-award/);
+  await f.run('alice');await f.run('alice');
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE);assert.equal(f.grants.length,1);
+});
+test('changing batch or history window cannot run a second migration',async()=>{
+  for(const change of [{backfillBatchId:'second'},{historyStartDate:'2026-10-28'}]){
+    const f=fixture();await f.run('alice');f.db.put('systemSettings/onlineTimeTitles',{...CONFIG,...change});
+    await assert.rejects(f.run('alice'),/different-plan/);
+    assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE);
+  }
+});
+test('invalid source, corrupt counters, marker drift and ineligible users cannot write a backfill',async()=>{
+  for(const row of [{uid:'bob',dateKey:'2026-10-29',activeMs:1},{uid:'alice',dateKey:'2026-10-29',activeMs:3*D.HOUR+1},{uid:'alice',dateKey:'2026-10-29',activeMs:-1}]){
+    const f=fixture({'activityOnlineDaily/2026-10-29/players/alice':row});await assert.rejects(f.run('alice'));assert.equal(f.db.commits,0);
+  }
+  const f=fixture({'playerStats/alice':{onlineTimeHistoricalMs:1}});await assert.rejects(f.run('alice'),/marker-without-receipt/);
+  const g=fixture({'users/alice':{active:false}});assert.equal((await g.run('alice')).status,'ineligible');assert.equal(g.db.commits,0);
+});
+test('cutover requires an explicit reached instant and bounded valid history dates',()=>{
+  for(const change of [{startAt:T+1},{startAt:T+86400000},{historyStartDate:'2026-02-30'},{historyStartDate:'2026-11-01'},{historyStartDate:'2020-01-01'},{backfillEnabled:false},{migrationStrategy:'B'}])assert.throws(()=>plan({...CONFIG,...change},T+1000));
+  assert.deepEqual(plan(CONFIG,T+1000).dates,['2026-10-29','2026-10-30','2026-10-31']);
+});
+test('23:00 cutover requires a frozen partial-day checkpoint, never a later mutable daily row',async()=>{
+  const at=Date.parse('2026-10-30T23:00:00+08:00');
+  const cfg={...CONFIG,startAt:at,cutoverEvidenceSchema:'frozen-daily-v1'};
+  assert.deepEqual(plan(cfg,at+1).dates,['2026-10-29','2026-10-30']);
+  const f=fixture({'systemSettings/onlineTimeTitles':cfg,
+    'activityOnlineDaily/2026-10-30/players/alice':{uid:'alice',dateKey:'2026-10-30',activeMs:3*D.HOUR}});
+  const run=createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>at+1});
+  await assert.rejects(run('alice'),/checkpoint-missing/);
+  assert.equal(f.db.commits,0);
+  f.db.put('onlineTimeTitleCutovers/test-cutover/players/alice',{
+    uid:'alice',dateKey:'2026-10-30',cutoverAt:at,sourceSchema:'frozen-daily-v1',activeMs:45*D.MINUTE});
+  const result=await run('alice');
+  assert.equal(result.historicalMs,225*D.MINUTE);
+  const live=createService(f.db,{awardTitle:f.awardTitle});
+  await live(event(at-30000,at+30000));
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE+30000);
+});
+test('dry run previews evidence and eligible titles without enabling migration or writing anything',async()=>{
+  const f=fixture({'systemSettings/onlineTimeTitles':{...CONFIG,backfillEnabled:false}});
+  const run=createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>T-1});
+  const r=await run('alice',{dryRun:true});
+  assert.equal(r.status,'dry-run');assert.equal(r.historicalMs,225*D.MINUTE);
+  assert.deepEqual(r.qualifyingTitleIds,['online_time_1h']);assert.equal(r.missingDays,1);
+  assert.equal(f.db.commits,0);assert.equal(f.grants.length,0);
+  await assert.rejects(run('alice'),/disabled/);
+});
+test('historical cutoff and real live activation stay separate without manufacturing the gap',async()=>{
+  const liveStart=T+2*D.HOUR;
+  const cfg={...CONFIG,historyCutoffAt:T,startAt:liveStart};
+  const f=fixture({'systemSettings/onlineTimeTitles':cfg});
+  await createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>liveStart})('alice');
+  assert.equal(f.db.read('playerStats/alice').onlineTimeTrackedFrom,liveStart);
+  const live=createService(f.db,{awardTitle:f.awardTitle});
+  assert.equal((await live(event(T,T+30000))).status,'before-activation');
+  await live(event(liveStart-30000,liveStart+30000));
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,225*D.MINUTE+30000);
+  assert.equal(f.db.read('onlineTimeTitleBackfills/alice').cutoverAt,T);
+  assert.equal(f.db.read('onlineTimeTitleBackfills/alice').liveStartAt,liveStart);
+  assert.throws(()=>plan({...CONFIG,historyCutoffAt:T+1},T+1000),/live-start-before-history-cutoff/);
+});
+test('accounts created after the frozen cutoff receive zero history with server creation proof',async()=>{
+  const cutover=Date.parse('2026-10-30T23:00:00+08:00'),liveStart=cutover+2*D.HOUR;
+  const cfg={...CONFIG,historyCutoffAt:cutover,startAt:liveStart,cutoverEvidenceSchema:'frozen-daily-v1'};
+  const f=fixture({'users/alice':{active:true,createdAt:cutover-1},
+    'systemSettings/onlineTimeTitles':cfg,
+    'activityOnlineDaily/2026-10-29/players/alice':undefined,
+    'activityOnlineDaily/2026-10-30/players/alice':undefined});
+  const original=f.db.runTransaction.bind(f.db);
+  f.db.runTransaction=fn=>original(tx=>fn({...tx,get:async ref=>{
+    const snap=await tx.get(ref);
+    return ref.path==='users/alice'?Object.assign(snap,{createTime:{toMillis:()=>cutover+1}}):snap;
+  }}));
+  const run=createBackfill(f.db,{awardTitle:f.awardTitle,clock:()=>liveStart+1});
+  const preview=await run('alice',{dryRun:true});
+  assert.equal(preview.postCutoverAccount,true);
+  assert.equal(preview.historicalMs,0);
+  await run('alice');
+  assert.equal(f.db.read('onlineTimeTitleBackfills/alice').postCutoverAccount,true);
+  assert.equal(f.db.read('playerStats/alice').officialOnlineTimeMs,0);
+  const g=fixture({'systemSettings/onlineTimeTitles':cfg,'users/alice':{active:true,createdAt:liveStart}});
+  await assert.rejects(createBackfill(g.db,{awardTitle:g.awardTitle,clock:()=>liveStart+1})('alice'),/checkpoint-missing/);
+  assert.equal(g.db.commits,0);
+});

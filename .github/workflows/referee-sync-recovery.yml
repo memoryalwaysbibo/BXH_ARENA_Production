@@ -1,0 +1,32 @@
+name: Referee sync recovery
+on:
+  pull_request:
+    paths: ['modules/main-app/referee-sync-recovery.js', 'modules/main-app/core.js', 'tests/referee-sync-recovery*', 'index.html', '.github/workflows/referee-sync-recovery.yml']
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify recovery boundaries
+        run: node --test tests/referee-sync-recovery.test.cjs
+      - name: Install isolated browser runner
+        run: npm install --prefix /tmp/recovery-test-deps --no-save --ignore-scripts playwright@1.55.0
+      - name: Verify real reload, backup export and failed recovery
+        env:
+          NODE_PATH: /tmp/recovery-test-deps/node_modules
+        run: node tests/referee-sync-recovery.browser.cjs
+      - name: Retain browser results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: referee-sync-recovery-results
+          path: test-results/referee-sync-recovery/
+          if-no-files-found: warn
+          retention-days: 14

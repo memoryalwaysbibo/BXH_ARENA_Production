@@ -9,15 +9,19 @@ const {chromium}=require('playwright');
  const page=await browser.newPage({viewport:{width:390,height:844}});
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.addScriptTag({content:fs.readFileSync('modules/main-app/bracket-commit.js','utf8')});
+ await page.addScriptTag({content:fs.readFileSync('modules/main-app/admin-override.js','utf8')});
  const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('// Bracket generation is detached'),b=core.indexOf('function currentRoundLabelForBoard(){',a);
  assert(a>0&&b>a);
  await page.addScriptTag({content:`
- let state={id:'r',cloudCode:'ROOM',meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'},firebaseUser={uid:'u'},currentRole='admin',activeTab='people';
+ let state={id:'r',cloudCode:'ROOM',meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'},firebaseUser={uid:'u'},currentRole='admin',activeTab='people',userProfile={active:true,role:'player'},pendingModal=null;
+ const currentAuthUid=()=>firebaseUser.uid,eligiblePlayers=()=>state.players.filter(p=>p.checkedIn===true),currentBracketParticipantIds=()=>new Set(state.matches.flatMap(m=>[m.a?.playerId,m.b?.playerId]).filter(Boolean));
+ const cloneStateForSave=x=>JSON.parse(JSON.stringify(x));
+ function openModal(cfg){pendingModal=cfg;render();}
  const clone=x=>JSON.parse(JSON.stringify(x));
  let serverState=clone(state),publicState=clone(state),generations=0,success=0,writeCount=0,release=null,fail=true,failOnce=false,autoWrite=false,staleReads=0;
  window.cloudSync={
   readBracketFromServer:async()=>({ok:true,data:clone(serverState),publicData:staleReads-->0?{...clone(publicState),matches:[]}:clone(publicState)}),
-  pushUpdate:async(code,snapshot,options)=>{writeCount++;if(failOnce){failOnce=false;return false;}if(fail)return false;if(!autoWrite)await new Promise(r=>release=r);BXHBracketCommit.assertWrite(serverState,snapshot,options);serverState=clone(snapshot);publicState=clone(snapshot);if(autoWrite)staleReads=1;return true;}
+  pushUpdate:async(code,snapshot,options)=>{writeCount++;if(failOnce){failOnce=false;return false;}if(fail)return false;if(!autoWrite)await new Promise(r=>release=r);BXHBracketCommit.assertWrite(serverState,snapshot,options);if(options.adminOperationalOverride)snapshot.adminOperationOverrides=BXHAdminOverride.record(options.adminOperationalOverride,{actorUid:'u',code,roomId:serverState.id},userProfile,serverState,snapshot);serverState=clone(snapshot);publicState=clone(snapshot);if(autoWrite)staleReads=1;return true;}
  };
  const enqueueCloudStateWrite=(code,snapshot,options)=>window.cloudSync.pushUpdate(code,snapshot,options);
  async function saveRecord(){return true;}
@@ -25,10 +29,13 @@ const {chromium}=require('playwright');
  function showToast(s){success++;document.querySelector('#notice').textContent=s;}
  function renderPreservingScroll(){render();}
  function entryRosterValid(){return true;}
+ const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ function bracketRosterIsCurrent(){return state.players.filter(p=>!state.meta.checkinRequired||p.checkedIn===true).map(p=>p.id).sort().join(',')===[...currentBracketParticipantIds()].sort().join(',');}
+ function canOperateCurrentTournament(){return userProfile.role==='admin';}
  ${core.slice(a,b)}
- function render(){document.querySelector('#app').innerHTML=bracketCommitStatusHtml()+bracketDrawButtonHtml()+'<button id="start" '+(bracketCommitBlocked()?'disabled':'')+'>開賽</button>';}
- document.addEventListener('click',e=>{if(e.target.dataset.action==='draw-bracket')bracketCommitController().submit();if(e.target.dataset.action==='bracket-commit-submit')bracketCommitController().submit();});
- window.fixture={stats:()=>({generations,success,writeCount,local:clone(state),server:clone(serverState)}),retry:()=>{fail=false;},release:()=>release(),autoRecover:()=>{fail=false;failOnce=true;autoWrite=true;},canStart:()=>verifyBracketBeforeStart()};
+ function render(){document.querySelector('#app').innerHTML=bracketCommitStatusHtml()+bracketDrawButtonHtml()+'<button id="start" '+(bracketCommitBlocked()?'disabled':'')+'>開賽</button>'+(pendingModal?'<section role="dialog"><h2>'+pendingModal.title+'</h2><p>'+pendingModal.message+'</p><button data-action="fixture-force-confirm">'+pendingModal.confirmLabel+'</button></section>':'');}
+ document.addEventListener('click',e=>{if(e.target.dataset.action==='admin-force-reconfirm')reconfirmPendingAdminOverride();if(e.target.dataset.action==='admin-force-draw')offerAdminOperationalOverride('draw-bracket','現場名單已核對，要求略過同步檢查');if(e.target.dataset.action==='admin-force-start')offerAdminOperationalOverride('start-tournament','現場對戰表已核對，要求略過同步檢查');if(e.target.dataset.action==='fixture-force-confirm'){const m=pendingModal;pendingModal=null;m.onConfirm();render();}if(e.target.dataset.action==='draw-bracket')bracketCommitController().submit();if(e.target.dataset.action==='bracket-commit-submit')bracketCommitController().submit();});
+ window.fixture={pending:()=>JSON.parse(sessionStorage.getItem('bxh-bracket-pending-v1:u:BXH-X')),failUpload:()=>{fail=true;autoWrite=true;},failStart:()=>{noteAdminOperationalFailure('start-tournament','cloud-readback-unconfirmed');render();},changeCheckin:(id,value)=>{state.meta.checkinRequired=true;state.players.find(p=>p.id===id).checkedIn=value;render();},enableAdmin:()=>{userProfile.role='admin';state.cloudCode='BXH-X';state.players.forEach(p=>{p.name=p.id;p.checkedIn=true;});serverState=clone(state);publicState=clone(state);render();},revokeAdmin:()=>{userProfile.role='staff';render();},stats:()=>({generations,success,writeCount,local:clone(state),server:clone(serverState)}),retry:()=>{fail=false;},release:()=>release(),autoRecover:()=>{fail=false;failOnce=true;autoWrite=true;},canStart:()=>verifyBracketBeforeStart()};
  render();
  `});
  await page.getByRole('button',{name:'抽籤',exact:true}).click();
@@ -63,6 +70,60 @@ const {chromium}=require('playwright');
  const recovered=await page.evaluate(()=>fixture.stats());
  assert.equal(recovered.generations,2);assert.equal(recovered.success,2);assert.equal(recovered.writeCount-writesBefore,2);
  assert.equal(await page.getByRole('button',{name:'重試上傳',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'管理員強制抽籤',exact:true}).count(),0,'A player profile cannot see override controls');
+ 
+ await page.evaluate(()=>{fixture.changeCheckin('b',true);fixture.changeCheckin('a',false);});
+ await page.getByRole('alert').getByText('對戰表待更新',{exact:true}).waitFor();
+ assert.equal(await page.getByRole('status').count(),0,'Old upload success must not mask roster changes');
+ assert.equal(await page.getByRole('button',{name:'依最新名單重新抽籤',exact:true}).count(),0,'Observers cannot redraw');
+ assert.equal((await page.evaluate(()=>fixture.stats())).generations,2,'Check-in changes do not automatically redraw');
+ await page.evaluate(()=>fixture.enableAdmin());
+ assert.equal(await page.getByRole('alert').count(),0,'Restoring the original entry roster clears the warning');
+ await page.evaluate(()=>fixture.changeCheckin('a',false));
+ await page.getByRole('alert').getByRole('button',{name:'依最新名單重新抽籤',exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.evaluate(()=>fixture.changeCheckin('a',true));
+ assert.equal(await page.getByRole('button',{name:'管理員強制抽籤',exact:true}).count(),0,'No force action before normal failure');
+ await page.evaluate(()=>fixture.failUpload());
+ await page.getByRole('button',{name:'重新抽籤',exact:true}).click();
+ await page.getByRole('button',{name:'管理員強制提交原配對',exact:true}).waitFor();
+ const pending=await page.evaluate(()=>fixture.stats());
+ const pendingDraw=await page.evaluate(()=>fixture.pending());
+ assert.equal(pending.generations,3);
+ const forcedWrites=pending.writeCount;
+ await page.getByRole('button',{name:'管理員強制提交原配對',exact:true}).click();
+ await page.getByRole('dialog').getByRole('heading',{name:'管理員強制提交原配對'}).waitFor();
+ assert.equal((await page.evaluate(()=>fixture.stats())).writeCount,forcedWrites,'Opening warning does not execute');
+ await page.evaluate(()=>fixture.retry());
+ await page.getByRole('button',{name:'我已核對，強制提交原配對',exact:true}).click();
+ await page.waitForFunction(()=>fixture.stats().local.adminOperationOverrides?.length===1);
+ await page.getByRole('status').getByText('上傳成功',{exact:true}).waitFor();
+ const forced=await page.evaluate(()=>fixture.stats());assert.equal(forced.generations,3);assert.equal(forced.local.adminOperationOverrides[0].operation,'draw-bracket');
+ assert.deepEqual(forced.local.matches,pendingDraw.snapshot.matches);
+ assert.equal(forced.local.bracketDraw.id,pendingDraw.snapshot.bracketDraw.id);
+ assert.equal(await page.getByRole('button',{name:'管理員強制開賽',exact:true}).count(),0,'No force start before start failure');
+ await page.evaluate(()=>fixture.failStart());
+ await page.getByRole('button',{name:'管理員強制開賽',exact:true}).click();
+ await page.evaluate(()=>fixture.revokeAdmin());
+ const beforeRevoke=(await page.evaluate(()=>fixture.stats())).writeCount;
+ await page.getByRole('button',{name:'我已核對，強制執行',exact:true}).click();
+ await page.waitForTimeout(100);
+ assert.equal((await page.evaluate(()=>fixture.stats())).writeCount,beforeRevoke,'Role revocation invalidates confirmation');
+ assert.equal(await page.getByRole('button',{name:'管理員強制開賽',exact:true}).count(),0);
+ await page.evaluate(()=>fixture.enableAdmin());
+ await page.getByRole('button',{name:'管理員強制開賽',exact:true}).click();
+ await page.getByRole('dialog').getByRole('heading',{name:'管理員強制開賽確認'}).waitFor();
+ await page.getByRole('button',{name:'我已核對，強制執行',exact:true}).click();
+ await page.waitForFunction(()=>fixture.stats().local.startedAt&&fixture.stats().local.adminOperationOverrides?.length===2);
+ assert.equal((await page.evaluate(()=>fixture.stats())).local.adminOperationOverrides[1].operation,'start-tournament');
+ await page.evaluate(()=>fixture.changeCheckin('a',false));
+ assert.equal(await page.getByRole('alert').count(),0,'Started matches never offer roster redraw');
+ assert.equal(await page.getByRole('button',{name:'重新抽籤',exact:true}).isDisabled(),true);
+ assert.equal(await page.getByRole('button',{name:'管理員強制抽籤',exact:true}).count(),0);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ console.log('PASS admin mobile confirmation, player exclusion, role revocation, forced draw/start and audit readback');
  console.log('PASS single-action bracket UI and actual bridge: failed save, disabled start/redraw, delayed retry, same pairing, server confirmation and mobile width');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+

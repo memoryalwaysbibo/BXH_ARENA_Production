@@ -81,23 +81,21 @@ jobs:
         if: steps.freshness.outputs.deploy == 'true'
         uses: actions/configure-pages@v5
 
-      - name: Keep QR backend snapshots and QA data outside the public site
+      - name: Build private-data-free public Pages artifact
         if: steps.freshness.outputs.deploy == 'true'
+        id: public_site
         shell: bash
         run: |
           set -euo pipefail
-          test -s modules/main-app/qr-checkin.js
-          test -s modules/main-app/qr-checkin-fence.js
-          test -s modules/main-app/roster-view.js
-          test -s modules/main-app/bracket-commit.js
-          rm -rf -- qr-checkin
-          test ! -e qr-checkin
+          public_site="$(mktemp -d)"
+          node scripts/prepare-public-pages.cjs "$public_site"
+          echo "path=$public_site" >> "$GITHUB_OUTPUT"
 
       - name: Upload exact validated site artifact
         if: steps.freshness.outputs.deploy == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
-          path: '.'
+          path: ${{ steps.public_site.outputs.path }}
 
       - name: Deploy to GitHub Pages
         if: steps.freshness.outputs.deploy == 'true'
@@ -123,7 +121,7 @@ jobs:
           verified=false
           for attempt in {1..12}; do
             verified=true
-            for path in version.json index.html modules/main-app/core.js modules/cloud/cloud-runtime.js modules/main-app/qr-checkin.js modules/main-app/qr-checkin-fence.js modules/main-app/roster-view.js modules/main-app/bracket-commit.js; do
+            for path in version.json index.html modules/main-app/core.js modules/cloud/cloud-runtime.js modules/main-app/qr-checkin.js modules/main-app/qr-checkin-fence.js modules/main-app/roster-view.js modules/main-app/bracket-commit.js modules/main-app/player-cards.js modules/referee-license/ui.js modules/referee-license/domain.js modules/referee-license/styles.css modules/referee-license/fonts/bxh-kai-subset.ttf; do
               expected="$(sha256sum "$path" | cut -d ' ' -f 1)"
               status="$(curl --silent --show-error --location --compressed --max-time 12 --output "$scratch/served" --write-out '%{http_code}' "$base/$path?deployment_check=$EXPECTED_COMMIT" 2>/dev/null || true)"
               actual="$(sha256sum "$scratch/served" 2>/dev/null | cut -d ' ' -f 1 || true)"
@@ -140,11 +138,13 @@ jobs:
             echo "Production Pages is not serving the exact validated build $EXPECTED_COMMIT." >&2
             exit 1
           fi
-          private_status="$(curl --silent --show-error --location --max-time 12 --output /dev/null --write-out '%{http_code}' "$base/qr-checkin/reference/writer-handlers.json?deployment_check=$EXPECTED_COMMIT")"
-          if [[ "$private_status" != "404" ]]; then
-            echo "QR server fixtures must be absent from the public artifact: http=$private_status" >&2
-            exit 1
-          fi
+          for private_path in qr-checkin/reference/writer-handlers.json referee-certificates/functions/initial-preview.json referee-certificates/functions/identities.cjs referee-certificates/REVIEW-REGRESSION-MAP.md scripts/preview-referee-initialization.cjs tests/room-host-identity-regression.test.cjs; do
+            private_status="$(curl --silent --show-error --location --max-time 12 --output /dev/null --write-out '%{http_code}' "$base/$private_path?deployment_check=$EXPECTED_COMMIT")"
+            if [[ "$private_status" != "404" ]]; then
+              echo "Private source must be absent from public artifact: path=$private_path http=$private_status" >&2
+              exit 1
+            fi
+          done
           echo "Production Pages serves the exact validated artifacts for $EXPECTED_COMMIT."
           build="$(jq -er '.build' version.json)"
           version="$(jq -er '.version' version.json)"
@@ -157,5 +157,5 @@ jobs:
             printf '| Version | `%s` |\n' "$version"
             printf '| Source commit | `%s` |\n' "$EXPECTED_COMMIT"
             printf '| Public site | https://%s/ |\n' "$host"
-            echo "| Artifact parity | Exact SHA-256 match: version.json, index.html, Core, cloud runtime, QR UI and fence; QR server fixtures absent |"
+            echo "| Artifact parity | Exact SHA-256 match: version.json, index.html, Core, cloud runtime, QR, player cards and referee runtime; private backend, identity and QA sources absent |"
           } >> "$GITHUB_STEP_SUMMARY"

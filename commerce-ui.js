@@ -4,9 +4,16 @@
 let state=null;
 const paymentLabels={pending:'待付款',reported:'待對帳',paid:'已確認收款',cancelled:'已取消',refund_pending:'退款處理中',refunded:'已退款'};
 const deliveryLabels={not_started:'尚未交付',pending:'交付處理中',failed:'交付待處理',delivered:'已交付',revoked:'已收回',cancelled:'已取消交付'};
-const kinds={room_quota:'開房次數',vip:'VIP 功能',skin:'Skin 外觀',item:'道具'};
-const storefrontKinds=new Set(['skin','item']);
+const kinds={room_quota:'開房次數',vip:'VIP 功能',skin:'Skin 外觀',item:'道具',ticket:'賽事啟動券'};
+const storefrontKinds=new Set(['skin','item','ticket']);
 const storefrontProduct=p=>storefrontKinds.has(p?.delivery?.kind);
+const ticketPreviews=[32,64,96,128,160].map((capacity,index)=>({
+ id:`tournament_activation_${capacity}`,name:`賽事啟動券｜${capacity} 人`,capacity,
+ imageUrl:`assets/commerce/tickets/tournament-activation-${capacity}-${['green','blue','purple','orange','red'][index]}.png`,
+ previewOnly:true,delivery:{kind:'ticket'}
+}));
+const ticketPreviewIds=new Set(ticketPreviews.map(p=>p.id));
+const visibleProducts=c=>[...ticketPreviews,...(c.products||[]).filter(p=>storefrontProduct(p)&&p.delivery.kind!=='ticket'&&!ticketPreviewIds.has(p.id))];
 const storageKey=()=> 'bxh.commerce.pending.v1:'+currentAuthUid();
 function context(){
  const session=currentAuthUid()+':'+engagementSessionEpoch;
@@ -25,7 +32,7 @@ function errorMessage(e){
 const permanentErrors=/store-closed|delivery-not-ready|product-changed|version-conflict|contract-required|contract-expired|unpaid-order-exists|already-owned|bank-receipt-used|amount-mismatch|payment-window-closed|invalid-|refund-needs-review|transition-forbidden|cancel-unavailable|account-inactive|super-admin-required|order-unavailable/;
 const money=n=>'NT$ '+Number(n||0).toLocaleString('zh-TW');
 const date=n=>n?new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
-function image(url){try{const u=new URL(url);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}}
+function image(url){if(/^assets\/commerce\/tickets\/tournament-activation-(32-green|64-blue|96-purple|128-orange|160-red)\.png$/.test(url))return url;try{const u=new URL(url);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}}
 function notices(c){return `${c.error?`<p class="commerce-error" role="alert">${esc(c.error)}</p>`:''}${c.success?`<p class="commerce-success" role="status">${esc(c.success)}</p>`:''}${c.pending?`<div class="banner"><span>有一筆操作尚待確認。</span><button class="btn btn-primary" data-action="commerce-retry" ${c.busy?'disabled':''}>確認原操作結果</button></div>`:''}`;}
 async function call(payload){if(!window.engagementService?.commerce)throw Error('service-unavailable');const r=await window.engagementService.commerce(payload);if(!r?.ok)throw Error(r?.error||'request-failed');return r;}
 async function load(kind,more=false){
@@ -62,6 +69,7 @@ async function mutate(payload){
 }
 function schedule(kind,empty){const c=context();if(empty&&!c.loading&&!c.busy&&!c.error)setTimeout(()=>load(kind),0);}
 function productDetails(p,c){
+ if(p.previewOnly)return `<section class="panel commerce-detail"><button class="btn btn-ghost" data-action="commerce-back-products">返回商品清單</button><img class="commerce-hero" src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}"><h2>${esc(p.name)}</h2><p class="commerce-ticket-status" role="status">暫停購買</p><p class="commerce-price">價格待公告</p><p class="commerce-copy">單場積分賽適用，基本正取上限 ${p.capacity} 人。備取人數不計入基本上限；開房時選券並綁定房間，開賽後使用一張券。</p><dl class="commerce-facts"><dt>購買資格</dt><dd>符合資格的玩家；購買及交付成功後開通活動主辦權限</dd><dt>有效期限</dt><dd>待公告</dd></dl><p class="hint">目前僅供瀏覽，尚未開放付款、建立訂單或發券。價格與期限確認後另行公告。</p><button class="btn btn-primary" disabled aria-disabled="true">暫停購買</button></section>`;
  return `<section class="panel commerce-detail"><button class="btn btn-ghost" data-action="commerce-back-products">返回商品清單</button>${image(p.imageUrl)?`<img class="commerce-hero" src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}">`:''}<h2>${esc(p.name)}</h2><p class="commerce-price">${money(p.priceTwd)}</p><p class="commerce-copy">${esc(p.description)}</p><dl class="commerce-facts"><dt>商品類型</dt><dd>${esc(kinds[p.delivery.kind])}</dd><dt>購買資格</dt><dd>${p.audience==='signed_organizer'?'已簽約且授權有效的活動主辦':'符合資格的會員'}</dd><dt>內容數量</dt><dd>${Number(p.delivery.quantity)}</dd><dt>持有／使用期限</dt><dd>${p.delivery.kind==='room_quota'?'依主辦合約與商品條款':p.delivery.durationDays?Number(p.delivery.durationDays)+' 天':'永久持有'}</dd></dl><h3>購買說明</h3><p class="commerce-copy">${esc(p.terms)}</p><p class="hint">銀行轉帳後，請至我的訂單回報匯款資訊。BXH 確認收款後交付；有期限的權益從成功開通起計算。</p>${!p.purchasable?`<p role="status">${esc(errorMessage(p.unavailableReason))}</p>`:''}<label class="commerce-consent"><input type="checkbox" data-commerce-consent> 我已閱讀商品內容、資格、期限與購買說明</label><button class="btn btn-primary" data-action="commerce-buy" data-id="${esc(p.id)}" ${c.busy||c.loading||c.pending||!p.purchasable?'disabled':''}>建立訂單｜${money(p.priceTwd)}</button></section>`;
 }
 function enter(view){const c=context();if(c.view!==view){c.view=view;c.generation++;c.loading=false;c.storeOpen=null;c.products=null;c.orders=null;c.order=null;c.error='';c.success='';}return c;}
@@ -69,11 +77,11 @@ function shop(){
  const c=enter('shop');schedule('catalog',c.products===null);
  if(c.order)return orderDetail(c.order,c,false);
  if(c.category&&c.category!=='all'&&!storefrontKinds.has(c.category))c.category='';
- const p=c.products?.find(p=>p.id===c.productId&&storefrontProduct(p));
+ const p=visibleProducts(c).find(p=>p.id===c.productId);
  let body;
  if(p)body=productDetails(p,c);
  else if(!c.category)body=`<div class="commerce-grid">${[['all','全部商品'],...Object.entries(kinds).filter(([id])=>storefrontKinds.has(id))].map(([id,name])=>`<button class="panel commerce-category" data-action="commerce-category" data-id="${id}"><strong>${name}</strong><span>查看商品 →</span></button>`).join('')}</div>`;
- else body=`<button class="btn btn-ghost" data-action="commerce-categories">返回商品分類</button><h3>${esc(kinds[c.category]||'全部商品')}</h3><div class="commerce-grid">${(c.products||[]).filter(p=>storefrontProduct(p)&&(c.category==='all'||p.delivery.kind===c.category)).map(p=>`<article class="panel commerce-card">${image(p.imageUrl)?`<img src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}" loading="lazy">`:''}<span class="hint">${esc(kinds[p.delivery.kind])}</span><h3>${esc(p.name)}</h3><strong class="commerce-price">${money(p.priceTwd)}</strong>${p.audience==='signed_organizer'?'<p class="hint">簽約主辦限定</p>':''}<button class="btn btn-ghost" data-action="commerce-product" data-id="${esc(p.id)}">查看商品</button></article>`).join('')||'<div class="empty-state">此分類目前沒有上架商品。</div>'}</div>${c.productsCursor?'<button class="btn btn-ghost" data-action="commerce-products-more">載入更多商品</button>':''}`;
+ else body=`<button class="btn btn-ghost" data-action="commerce-categories">返回商品分類</button><h3>${esc(kinds[c.category]||'全部商品')}</h3><div class="commerce-grid">${visibleProducts(c).filter(p=>c.category==='all'||p.delivery.kind===c.category).map(p=>`<article class="panel commerce-card${p.previewOnly?' commerce-ticket-card':''}">${image(p.imageUrl)?`<img src="${esc(image(p.imageUrl))}" alt="${esc(p.name)}" loading="lazy">`:''}<span class="hint">${esc(kinds[p.delivery.kind])}</span><h3>${esc(p.name)}</h3><strong class="commerce-price">${p.previewOnly?'價格待公告':money(p.priceTwd)}</strong>${p.previewOnly?'<p class="commerce-ticket-status">暫停購買</p>':p.audience==='signed_organizer'?'<p class="hint">簽約主辦限定</p>':''}<button class="btn btn-ghost" data-action="commerce-product" data-id="${esc(p.id)}">查看商品</button></article>`).join('')||'<div class="empty-state">此分類目前沒有上架商品。</div>'}</div>${c.productsCursor?'<button class="btn btn-ghost" data-action="commerce-products-more">載入更多商品</button>':''}`;
  return `<section class="commerce"><div class="panel-title"><h2>商城</h2><button class="btn btn-ghost" data-action="commerce-refresh-products">重新整理</button></div>${notices(c)}${c.storeOpen===false?'<p class="banner" role="status">商城準備中，目前尚未開放購買。</p>':''}${c.loading?'<p role="status">正在讀取商品……</p>':''}${body}</section>`;
 }
 function orderList(c,adminMode){return `${adminMode?`<label>付款狀態<select data-commerce-status>${[['reported','待對帳'],['pending','待付款'],['paid','已確認收款'],['refund_pending','退款處理中'],['refunded','已退款'],['cancelled','已取消'],['','全部']].map(([id,l])=>`<option value="${id}" ${c.status===id?'selected':''}>${l}</option>`).join('')}</select></label>`:''}<div class="commerce-orders">${(c.orders||[]).map(o=>`<button class="panel commerce-order" data-action="commerce-order" data-id="${esc(o.id)}"><span><strong>${esc(o.productSnapshot.name)}</strong><small>${esc(o.id)}<br>${date(o.createdAt)}${adminMode?'<br>'+esc(o.buyerName):''}</small></span><span><strong>${money(o.amountTwd)}</strong><small>${esc(paymentLabels[o.paymentStatus])}<br>${esc(deliveryLabels[o.deliveryStatus])}</small></span></button>`).join('')||'<div class="empty-state">目前沒有訂單。</div>'}</div>${c.ordersCursor?'<button class="btn btn-ghost" data-action="commerce-orders-more">載入更多訂單</button>':''}`;}
@@ -109,16 +117,17 @@ async function handle(action,target){
  if(action==='commerce-back-orders'){c.order=null;c.error='';c.success='';render();return;}
  if(action==='commerce-category'){if(id!=='all'&&!storefrontKinds.has(id))return;c.category=id;c.order=null;c.productId='';render();return;}
  if(action==='commerce-categories'){c.category='';render();return;}
- if(action==='commerce-product'){if(!c.products?.some(p=>p.id===id&&storefrontProduct(p)))return;c.productId=id;render();return;}
+ if(action==='commerce-product'){if(!visibleProducts(c).some(p=>p.id===id))return;c.productId=id;render();return;}
  if(action==='commerce-back-products'){c.productId='';render();return;}
  if(action==='commerce-refresh-products')return load('catalog');
  if(action==='commerce-products-more')return load(adminMode?'admin-products':'catalog',true);
  if(action==='commerce-refresh-orders')return load('my-orders');
  if(action==='commerce-orders-more')return load(adminMode?'admin-orders':'my-orders',true);
  if(action==='commerce-buy'){
+  if(ticketPreviewIds.has(id))return;
   if(c.pending)return;
   if(!document.querySelector('[data-commerce-consent]')?.checked){c.error='請先閱讀並勾選購買說明。';render();return;}
-  const p=c.products?.find(p=>p.id===id);if(p?.purchasable&&storefrontProduct(p))return mutate({action:'create-order',productId:p.id,expectedVersion:p.version});
+  const p=c.products?.find(p=>p.id===id);if(p?.purchasable&&p.delivery?.kind!=='ticket'&&storefrontProduct(p))return mutate({action:'create-order',productId:p.id,expectedVersion:p.version});
  }
  if(action==='commerce-cancel'&&confirm('確定取消這筆未付款訂單？'))return mutate({action:'cancel-order',orderId:c.order.id});
  if(!adminMode)return;

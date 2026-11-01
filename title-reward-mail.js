@@ -12,7 +12,7 @@ window.BXHTitleRewardUI={
  async open(messageId,replay){
   const actor=firebaseUser?.uid||'',epoch=engagementSessionEpoch;
   const result=await window.engagementService.claimTitleReward({messageId,action:replay?'replay':'open'});
-  // The claim belongs to the session that sent it, even after same-UID relogin.
+  // Bind the reply to its original login, including same-account relogin.
   if(actor!==(firebaseUser?.uid||'')||epoch!==engagementSessionEpoch)return result;
   if(!result?.ok||!result.title)throw Error('title-reward-open-failed');
   const t=result.title;

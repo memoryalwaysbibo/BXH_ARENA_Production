@@ -1,0 +1,43 @@
+name: Admin operational override candidate
+on:
+  pull_request:
+    paths:
+      - 'modules/main-app/admin-override.js'
+      - 'modules/main-app/admin-checkin.js'
+      - 'modules/main-app/admin-roster.js'
+      - 'modules/main-app/admin-onsite-recovery.js'
+      - 'modules/main-app/bracket-commit.js'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'tests/admin-override.test.cjs'
+      - 'tests/admin-checkin*'
+      - 'tests/admin-roster*'
+      - 'tests/admin-onsite-recovery*'
+      - '.github/workflows/admin-override.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check modules/main-app/core.js && node --check modules/cloud/cloud-runtime.js
+      - run: node --test tests/admin-override.test.cjs tests/bracket-commit.test.cjs tests/roster-sync-race.test.cjs
+      - run: node --test tests/admin-checkin.test.cjs
+      - run: node --test tests/admin-roster.test.cjs
+      - run: npm install --prefix /tmp/admin-checkin-browser --no-save playwright@1.56.1
+      - run: /tmp/admin-checkin-browser/node_modules/.bin/playwright install --with-deps chromium
+      - run: node tests/admin-checkin.browser.cjs
+        env:
+          NODE_PATH: /tmp/admin-checkin-browser/node_modules
+      - run: node tests/admin-roster.browser.cjs
+        env:
+          NODE_PATH: /tmp/admin-checkin-browser/node_modules
+
+      - run: node --test tests/admin-onsite-recovery.test.cjs
+      - run: node tests/admin-onsite-recovery.browser.cjs
+        env:
+          NODE_PATH: /tmp/admin-checkin-browser/node_modules

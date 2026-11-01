@@ -91,6 +91,10 @@ jobs:
           node --test team-foundation/*.test.cjs
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
+      - name: Verify tournament completion, archive retry and results display
+        run: |
+          node --test tests/tournament-completion-flow.cjs
+          node tests/ladder-settlement.cjs
       - name: Verify QR camera lifecycle and existing check-in routing
         run: node --test tests/qr-scanner-lifecycle.test.cjs qr-checkin/ui.test.cjs
       - name: Verify latest member location and regional leaderboard states
@@ -249,6 +253,17 @@ jobs:
       - name: Install UI test runner
         id: install_ui
         run: npm install --no-package-lock --ignore-scripts
+      - name: Verify partner organizer contract and quota in desktop and mobile Chromium
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/partner-overview-browser.cjs
+      - name: Upload partner organizer acceptance screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-partner-overview-${{ github.run_id }}
+          path: test-results/partner-overview/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Run isolated browser smoke tests (one controlled retry)
         shell: bash
         run: |
@@ -430,4 +445,5 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
 

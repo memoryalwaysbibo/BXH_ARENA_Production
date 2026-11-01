@@ -289,6 +289,9 @@ let dutyLogsCache = null;
 let dutyLogsLoading = false;
 let dutyLogsError = "";
 let celebrationOpen = false;
+// Archive work is shared per room; showing results is local to this browser.
+const tournamentArchiveTasks = new Map();
+const shownTournamentResults = new Set();
 let shareModalOpen = false;
 let shareTarget = "event";
 let eventEntryModalOpen = false;
@@ -326,7 +329,13 @@ let adminTournamentListBusy = false;
 let adminTournamentListError = "";
 let adminTournamentListItems = [];
 let adminTournamentListLoaded = false;
-let adminTournamentListFilter = "all"; // all | mine | others | community
+let adminTournamentListFilter = "open"; // open | upcoming | closed | draft | all
+let adminTournamentListKind = "official";
+let adminTournamentListSearch = "";
+let adminTournamentListSearchDraft = "";
+let adminTournamentListCursor = null;
+let adminTournamentListHasMore = false;
+let adminTournamentListCounts = null;
 const ADMIN_TOURNAMENT_LIST_TIMEOUT_MS = 10000;
 let adminTournamentListPromise = null;
 let adminTournamentListGeneration = 0;
@@ -3214,13 +3223,16 @@ function applyRemoteState(remote, authoritative=false){
     if(Object.entries(localExits).some(([n,c])=>Number(remoteExits[n]?.revision||0)<Number(c.revision||0)))return;
     const newerExit=Object.entries(remoteExits).some(([n,c])=>Number(c.revision||0)>Number(localExits[n]?.revision||0));
     if(remoteAppliedRoomId!==remote.id){remoteAppliedRoomId=remote.id;remoteAppliedAt=0;}
-    if(!newerExit&&(remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
+    const localQrRevision=Number(state.qrCheckinRevision||0),remoteQrRevision=Number(remote.qrCheckinRevision||0);
+    if(remoteQrRevision<localQrRevision)return;
+    const newerQr=remoteQrRevision>localQrRevision;
+    if(!newerQr&&!newerExit&&(remote.updatedAt||0)<remoteAppliedAt && Number(remote.callRevision||0)<=Number(state.callRevision||0) && Number(remote.registrationRosterRevision||0)<=Number(state.registrationRosterRevision||0)) return;
     if(Number(remote.onsiteWaitlistRuntimeRevision||0)<Number(state.onsiteWaitlistRuntimeRevision||0))return;
     const newerRuntime=Number(remote.onsiteWaitlistRuntimeRevision||0)>Number(state.onsiteWaitlistRuntimeRevision||0);
     const localRosterRevision=Number(state.registrationRosterRevision||0);
     const remoteRosterRevision=Number(remote.registrationRosterRevision||0);
     if(remoteRosterRevision<localRosterRevision) return;
-    const newerRoster=remoteRosterRevision>localRosterRevision||newerRuntime;
+    const newerRoster=remoteRosterRevision>localRosterRevision||newerRuntime||newerQr;
     const localUpdated = state.updatedAt || 0;
     const remoteUpdated = remote.updatedAt || 0;
     if(!authoritative&&!newerExit&&!newerRoster&&remoteUpdated<=localUpdated&&Number(remote.callRevision||0)<=Number(state.callRevision||0)&&Number(remote.entrySelectionRevision||0)<=Number(state.entrySelectionRevision||0)&&isCommunityQuickRegistration(remote)&&Number.isSafeInteger(remote.communityParticipantCount)&&remote.communityParticipantCount>=0&&remote.communityParticipantCount!==state.communityParticipantCount){
@@ -3235,6 +3247,8 @@ function applyRemoteState(remote, authoritative=false){
       if(!previous||revision>previousRevision||revision===previousRevision&&(Number(remote.updatedAt||0)>=Number(previous.updatedAt||0)||Number(remote.callRevision||0)>Number(previous.callRevision||0)||Number(remote.teamResultRevision||0)>Number(previous.teamResultRevision||0)||Object.entries(remoteExits).some(([n,c])=>Number(c.revision||0)>Number(previous.forcedCourtExits?.[n]?.revision||0))))settingsGate.remote=JSON.parse(JSON.stringify(remote));
       return;
     }
+    const wasDecided = isTournamentFullyDecided();
+    const wasArchived = state.archiveStatus === "completed";
     remoteAppliedAt=remoteUpdated;
     const keepCode = state.cloudCode;
     // joinRoom hydrates the verified top-level creator, while older room JSON
@@ -3264,6 +3278,9 @@ function applyRemoteState(remote, authoritative=false){
     render();
     if(typeof window!=="undefined" && window.scrollTo){
       try{ window.scrollTo(0, scrollY); }catch(e){}
+    }
+    if((!wasDecided && isTournamentFullyDecided()) || (!wasArchived && state.archiveStatus==="completed")){
+      finishTournament().catch(e=>console.warn("[tournament completion]",e));
     }
   }catch(e){ /* ignore malformed remote payloads */ }
 }
@@ -3336,6 +3353,7 @@ async function ensureCloudRoomForTournament(){
 function cloudCreateRoomErrorMessage(prefix="建立失敗"){
   const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
   if(code==="partner-room-quota-exhausted" || (code==="permission-denied"&&isPartnerOrganizerMode()&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerOrganizerGrant()?.orderCode)===0))return prefix+"：合作方案開房次數已用完";
+  if(code==="permission-denied"&&isPartnerOrganizerMode()) return prefix+"：合作主辦建房授權未通過；請至賽事管理查看合約、有效期限與剩餘場次。若資料正常，請聯絡 BXH 協助核對；此訊息不代表場次已用完";
   if(code==="permission-denied") return prefix+"：Firestore 權限被拒絕，請重新整理後再試";
   if(code==="unauthenticated") return prefix+"：登入狀態已失效，請重新登入";
   if(code==="already-exists") return prefix+"：房間代碼重複，請再試一次";
@@ -5229,6 +5247,10 @@ const REGISTRATION_ERROR_MESSAGES = {
   "team-lottery-unavailable": "團體戰目前尚未開放超額抽籤報名",
 };
 function mapRegistrationError(e){
+  const reason=String(e?.code||e?.message||'');
+  if(['qr-checkin-state-stale','registration-roster-stale'].includes(reason))return '雲端名單或報到狀態已更新，請重新同步名單後再操作。';
+  if(reason==='roster-cloud-write-failed')return '名單尚未寫入雲端，請確認連線後重新同步。';
+  if(reason==='roster-readback-failed')return '無法確認雲端最新名單，請重新同步後再報到。';
   const code = (e && e.code) || (e && e.message) || "unknown";
   return REGISTRATION_ERROR_MESSAGES[code] || Object.entries(REGISTRATION_ERROR_MESSAGES).find(([key])=>String(e?.message||"").includes(key))?.[1] || "發生未知錯誤，請稍後再試";
 }
@@ -5605,6 +5627,7 @@ function syncEngagementIdentity(uid){
   engagementAdminOverview=null; engagementAdminError=""; engagementDiagnostic=null;
   engagementBackfillCursor=""; engagementBackfillResult=null; engagementBackfillDone=false;
   engagementTitleDraft=null;
+  window.BXHRefereeLicense?.resetSession?.();
   clearTimeout(engagementDayTimer);
 }
 function scheduleEngagementDayRefresh(result){
@@ -5763,6 +5786,7 @@ function titleConditionMeta(t){
     best_placement:{category:'official',label:'官方積分賽',scope:'僅 BXH 官方積分賽最終名次計入。',task:`BXH 官方積分賽最佳名次達第 ${target} 名或更佳`},
     hosted_tournaments:{category:'event',label:'主辦成就',scope:'依系統認定且完成結算的 BXH 賽事主辦紀錄計入。',task:`成功完成主辦 ${target} 場 BXH 賽事`},
     first_match_exit_streak:{category:'fun',label:'賽事趣味成就',scope:'一般與官方賽事皆計入；首場實際對戰落敗且出局才計次，種子與輪空不算勝場。實際獲勝中斷連續紀錄；取消、未到與未對戰棄權不計次。取得後永久持有。',task:target===1?'完成 1 場賽事首戰出局':`連續 ${target} 場賽事首戰出局`},
+    total_online_minutes:{category:'activity',label:'在線時間',scope:'沿用有效在線心跳紀錄，跨日累積、沒有每日時數上限；活躍積分每日上限不影響稱號進度。',task:`累積有效在線 ${target/60} 小時`},
     total_checkins:{category:'activity',label:'每日簽到',scope:'由 BXH ARENA 每日簽到紀錄累積；與賽事報到完全分離。',task:`累積完成 ${target} 天每日簽到`},
     checkin_streak:{category:'activity',label:'每日簽到',scope:'依 BXH ARENA 連續每日簽到紀錄計算；中斷後重新累積。',task:`連續完成 ${target} 天每日簽到`},
     pioneer_registration:{category:'special',label:'封測限定',scope:'以 Firebase 帳號建立時間判定：台灣時間 2026/9/21 23:59 前註冊，不限人數。',task:'於 2026/9/21 23:59 前建立帳號；自動授予，逾期仍可補領'},
@@ -5779,6 +5803,7 @@ function titleGalleryProgressText(t,got){
   const progress=t&&t.progress||null;
   const current=Math.max(0,Number(progress&&progress.currentValue||0));
   const target=Math.max(1,Number(t&&t.targetValue||1));
+  if(t&&t.conditionType==='total_online_minutes')return (Math.floor(current/6)/10)+'／'+(target/60)+' 小時';
   if(t&&t.conditionType!=='first_match_exit_streak')return current+'／'+target;
   if(!progress||!Number(progress.updatedAt))return '連續紀錄尚未核對';
   const best=Math.max(current,Number(progress.bestValue||0));
@@ -5819,6 +5844,7 @@ function renderPlayerTitleCenter(p){
     <div class="title-preview"><div class="label">目前預覽</div><div class="title-preview-name">${esc(preview)}</div></div>
     <div class="btn-row" style="margin-top:12px;"><button class="btn btn-primary" data-action="player-save-title-settings" ${engagementActionBusy?'disabled':''}>${engagementActionBusy?'儲存中…':'儲存稱號設定'}</button></div>
     ${engagementError?`<div class="hint">${esc(engagementError)}；已確認儲存的設定不受影響。<button class="btn btn-ghost btn-sm" data-action="player-refresh-engagement">重新連線</button></div>`:''}
+    ${window.BXHTitleUtils.onlineTimeArtworkPreviewHtml?.(isSuperAdmin())||''}
     <div class="panel-title" style="margin-top:20px;">稱號圖鑑</div>
     ${catalog.length?(()=>{const filters=[['all','全部'],['earned','已取得'],['official','官方積分賽'],['event','主辦成就'],['fun','趣味成就'],['activity','每日簽到'],['special','限定／特殊']];const shown=catalog.filter(t=>{if(titleGalleryFilter==='all')return true;if(titleGalleryFilter==='earned')return earnedIds.has(t.id);return titleConditionMeta(t).category===titleGalleryFilter;});return `<div class="btn-row" style="margin:10px 0 12px;gap:6px;flex-wrap:wrap;">${filters.map(([k,v])=>`<button type="button" class="btn ${titleGalleryFilter===k?'btn-primary':'btn-ghost'} btn-sm" onclick="titleGalleryFilter='${k}';render();">${v}</button>`).join('')}</div>${shown.length?`<div class="title-gallery">${shown.map(t=>{const got=earnedIds.has(t.id);const hidden=t.isHidden&&!got;const current=Number((t.progress&&t.progress.currentValue)||0),target=Math.max(1,Number(t.targetValue||1));const pct=got?100:Math.min(100,Math.round(current/target*100));return `<article class="title-card rarity-${esc(titleTierClass(t))} ${got?'':'locked'}">${!hidden&&titleArtworkPath(t.name,titleTierClass(t))?`<img class="title-gallery-art" src="${titleArtworkPath(t.name,titleTierClass(t))}" alt="${esc(titleDisplayName(t.name))}" loading="lazy" decoding="async" onerror="if(this.dataset.fallback==='png'){this.style.display='none';return;}this.dataset.fallback='png';this.src=this.src.slice(0,-5)+String.fromCharCode(46,112,110,103)">`:''}<div class="title-card-name"><span>${esc(hidden?'？？？':titleDisplayName(t.name))}</span><span>${titleClassificationHtml(t)}</span></div><details class="title-card-details"><summary>稱號說明與取得條件</summary><div class="title-card-desc">${esc(hidden?(t.hint||'達成特殊條件後解鎖'):(t.description||t.hint||'榮譽稱號'))}</div>${!hidden?titleConditionBadge(t):''}${!hidden&&t.source?`<div class="hint">來源：${esc(t.source)}</div>`:''}</details><div class="title-progress"><span style="width:${pct}%"></span></div><div class="hint" style="margin-top:5px;">${esc(titleGalleryProgressText(t,got))}${t.isActive===false?'・籌備中':''}${titleLimitedTypeValue(t)!=='none'?'・'+titleLimitedLabel(t):''}${t.isPermanent===false?'・期間制':'・永久'}${t.isArchived?'・已絕版':''}</div></article>`;}).join('')}</div>`:`<div class="empty-state">此分類目前沒有稱號。</div>`}`;})():`<div class="empty-state">稱號圖鑑尚未發布；已取得紀錄不會受到影響。</div>`}
   </section>`;
@@ -5900,6 +5926,9 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
+  "admin-recover-onsite",
+  "admin-force-roster","admin-roster-retry",
+  "admin-force-checkin",
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result",
   "view-changelog","download-changelog","load-staff-assignment-list","save-staff-assignment",
   "ai-create-open","ai-create-close","ai-create-close-overlay","ai-create-parse","ai-create-select-event","ai-create-apply","ai-create-review-ack",
@@ -5999,6 +6028,23 @@ function isAdminTierOrAbove(){ return !!(userProfile && userProfile.active!==fal
 function isStaffTier(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="staff" || isPartnerOrganizerMode() || isEventStaffMode())); }
 function canCreateOfficialTournament(){ return !!(userProfile && userProfile.active!==false && !isTester() && (userProfile.role==="super_admin" || userProfile.role==="admin" || userProfile.role==="staff" || isPartnerOrganizerMode())); }
 function currentAuthUid(){ return (firebaseUser&&firebaseUser.uid)||null; }
+function canManageRefereeCertificates(){
+  return !!(currentAuthUid()&&userProfile?.active===true&&userProfile.isTestAccount!==true&&userProfile.deleted!==true&&userProfile.role==='super_admin'&&!['deleted','disabled','frozen'].includes(userProfile.accountStatus));
+}
+function refereeLicenseContext(){
+  return {uid:currentAuthUid(),user:userProfile,epoch:engagementSessionEpoch,
+    isSuperAdmin:canManageRefereeCertificates(),rerender:renderPreservingScroll,
+    currentSession:()=>({uid:currentAuthUid(),epoch:engagementSessionEpoch,isSuperAdmin:canManageRefereeCertificates()}),
+    onRefereeAchievements:()=>{if(appPhase!=='player-center')return false;playerActiveTab='profile';playerProfileSection='achievements';renderPreservingScroll();return true;},
+    onHunterAchievements:()=>{playerActiveTab='stats';playerStatsSubTab='achievements';renderPreservingScroll();}};
+}
+function renderRefereeLicensePage(view){
+  if(window.BXH_REFEREE_CERTIFICATES_V1!==true)return '<div class="panel" role="status">裁判證功能尚未開放。</div>';
+  if(view==='admin'&&!canManageRefereeCertificates())return '<div class="panel" role="status">目前帳號無法管理裁判資料。</div>';
+  const method={duty:'renderDuty',achievements:'renderAchievements',admin:'renderAdmin'}[view];
+  if(!method||typeof window.BXHRefereeLicense?.[method]!=='function')return '<div class="panel" role="status">裁判證頁面暫時無法載入，請重新整理。</div>';
+  return window.BXHRefereeLicense[method](refereeLicenseContext());
+}
 function isCurrentOfficialTournamentCreator(){
   const uid=currentAuthUid();
   return !!(uid && state && state.meta && state.meta.eventAuthority!=="community" && state.createdBy===uid);
@@ -6123,6 +6169,7 @@ function stationMutationErrorMessage(reason){
 
 const refereeSeatCommandBusy=new Set();
 async function executeRefereeSeatCommand(matchId,command){
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再操作。",true);return false;}
   const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(matchId);
   if(!code||!m||!canOperateCurrentTournament()||!requireStationPermission(m))return false;
   if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
@@ -6148,6 +6195,7 @@ async function executeRefereeSeatCommand(matchId,command){
     if(["score","fault"].includes(command.action)&&current&&!current.completed&&checkWinnerSide(current))openModal({type:"confirm-result",matchId,title:"確認比賽結果",confirmLabel:"確認比分並送出結果"});
     else render();
     showToast(command.action==="fault"?"失誤紀錄已由雲端確認":command.action==="confirm"||command.action==="quick"?"結果已由雲端確認並晉級":"本台操作已由雲端確認");
+    if(["confirm","quick"].includes(command.action)) await finishTournament();
     return true;
   }catch(error){if(state.id===roomId&&currentAuthUid()===actorUid)showToast("本次操作尚未確認，請重連後核對雲端比分。",true);return false;}
   finally{refereeSeatCommandBusy.delete(key);}
@@ -6184,6 +6232,7 @@ async function executeRefereeDispatchCommand(command){
 }
 
 function persistRefereeMatchMutation(matchId, mutateRemoteFn){
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在保留本機備份並讀取雲端，請稍候再操作。",true);return Promise.resolve({ok:false,reason:"sync-recovery-in-progress"});}
   const m=getMatch(matchId);
   state.updatedAt=Date.now();
   const localSnapshot=cloneStateForSave(state);
@@ -6460,13 +6509,29 @@ function cloneStateForSave(st){
   }
 }
 function enqueueCloudStateWrite(code, snapshot, options={}){
+  if(window.BXHRefereeSyncRecovery?.isBusy())return Promise.resolve(false);
   const normalizedCode = code;
+  const callerState=state,callerUid=currentAuthUid(),inputQrRevision=snapshot.qrCheckinRevision;
   cloudWriteChain = cloudWriteChain
     .catch(()=>false)
     .then(async ()=>{
       if(options.isCurrent&&!options.isCurrent())return false;
       if(!normalizedCode || !cloudAvailable() || !window.cloudSync || !window.cloudSync.pushUpdate) return false;
-      return await window.cloudSync.pushUpdate(normalizedCode, snapshot, options);
+      const ok=await window.cloudSync.pushUpdate(normalizedCode, snapshot, options);
+      if(ok===true&&state===callerState&&currentAuthUid()===callerUid&&state.cloudCode===normalizedCode&&
+         snapshot.qrCheckinManaged===true&&state.qrCheckinRevision===inputQrRevision&&
+         Number.isSafeInteger(snapshot.qrCheckinRevision)&&snapshot.qrCheckinRevision>inputQrRevision){
+        state.qrCheckinManaged=true;state.qrCheckinRevision=snapshot.qrCheckinRevision;
+        const checked=new Map((snapshot.players||[]).map(p=>[p.id,p]));
+        for(const player of state.players||[]){
+          const committed=checked.get(player.id);if(!committed)continue;
+          player.checkedIn=committed.checkedIn===true;
+          for(const field of ['checkinFirstAt','checkinAt','checkinMethod']){
+            if(Object.prototype.hasOwnProperty.call(committed,field))player[field]=committed[field];else delete player[field];
+          }
+        }
+      }
+      return ok;
     });
   return cloudWriteChain;
 }
@@ -6483,12 +6548,18 @@ function queueCloudSyncRetry(tournamentId, code){
   cloudSyncPending = true;
   if(cloudSyncQueueTimer) return;
   cloudSyncQueueTimer = setInterval(async ()=>{
+    if(window.BXHRefereeSyncRecovery?.isBusy())return;
     if(window.BXHBracketCommit&&bracketCommitBlocked())return;
     if(communitySettingsWriteGate&&communitySettingsWriteGate.isCurrent()&&communitySettingsWriteGate.roomId===tournamentId&&communitySettingsWriteGate.roomCode===code)return;
     if(!cloudSyncPending || state.id!==tournamentId || state.cloudCode!==code || !cloudAvailable()){
       clearInterval(cloudSyncQueueTimer); cloudSyncQueueTimer=null; return;
     }
     try{
+      if(state.settlementPhase==="sync-pending" && isTournamentFullyDecided()){
+        const ok=await finishTournament();
+        if(ok){clearInterval(cloudSyncQueueTimer);cloudSyncQueueTimer=null;}
+        return;
+      }
       cloudStatus = "connecting";
       const ok = await enqueueCloudStateWrite(code, cloneStateForSave(state));
       if(ok){
@@ -6578,8 +6649,8 @@ async function saveState(options={}){
         cloudSyncPending = false;
         cloudStatus = "connected";
         cloudLastSyncAt = Date.now();
-        if(snapshot.onsiteWaitlistFinalized===true){
-          if(state.id===snapshot.id&&state.cloudCode===snapshot.cloudCode&&Number(state.onsiteWaitlistRuntimeRevision||0)<Number(snapshot.onsiteWaitlistRuntimeRevision||0))state.onsiteWaitlistRuntimeRevision=snapshot.onsiteWaitlistRuntimeRevision;
+        if(snapshot.onsiteWaitlistFinalized===true||snapshot.qrCheckinManaged===true){
+          if(snapshot.onsiteWaitlistFinalized===true&&state.id===snapshot.id&&state.cloudCode===snapshot.cloudCode&&Number(state.onsiteWaitlistRuntimeRevision||0)<Number(snapshot.onsiteWaitlistRuntimeRevision||0))state.onsiteWaitlistRuntimeRevision=snapshot.onsiteWaitlistRuntimeRevision;
           await saveRecord(snapshot);
         }
         return localOk ? true : false;
@@ -6641,8 +6712,55 @@ async function writeArchiveStateToCloud(snapshot){
 
 // Idempotent: safe to call multiple times for the same tournament (re-opened celebration
 // screen, page refresh, remote-state re-application) — only performs the archive write once.
-async function performAutoArchive(){
-  if(state.archiveStatus==="completed" && state.archivedAt) return true;
+function tournamentCompletionKey(st){ return String(st.id)+"|"+String(st.cloudCode||""); }
+function tournamentResultSignature(st){
+  return JSON.stringify([st.startedAt,st.meta?.formatType,st.meta?.bronzeMatch,st.meta?.ladderMode,
+    st.championId,st.runnerUpId,st.thirdId,st.fourthId,
+    (st.matches||[]).map(m=>[m.id,m.completed,m.winnerId,m.loserId,m.scoreA,m.scoreB])]);
+}
+
+async function finishTournament(){
+  const target=state,key=tournamentCompletionKey(target),signature=tournamentResultSignature(target);
+  if(currentRole==="guest" || publicWatchReturnContext || !canOperateCurrentTournament() || !isTournamentFullyDecided(target)) return false;
+  const ok=await performAutoArchive();
+  // A cloud response may arrive after navigation. Never open another room's results.
+  if(tournamentCompletionKey(state)!==key) return ok;
+  if(tournamentResultSignature(state)!==signature) return false;
+  if(!ok){ render(); return false; }
+  // Listeners can replace the state object while the archive request is pending.
+  // Copy only acknowledged lifecycle fields, never stale scores or registrations.
+  if(state!==target){
+    for(const field of ["archiveStatus","archivedAt","completedAt","settlementPhase","settlementCompletedAt","settlementError","settlementErrorCode","ladderPointsAwarded","ladderAwardedAt","ladderSeasonId","ladderResults"]){
+      if(Object.prototype.hasOwnProperty.call(target,field)) state[field]=target[field];
+    }
+  }
+  publicTournamentsCache=null; publicTournamentsError=null; historyCloudSyncLoaded=false;
+  if(!shownTournamentResults.has(key)){
+    celebrationData=buildCelebrationData(state);
+    shownTournamentResults.add(key);
+    celebrationOpen=true;
+  }
+  render();
+  return true;
+}
+
+function performAutoArchive(){
+  const target=state,key=tournamentCompletionKey(target);
+  if(tournamentArchiveTasks.has(key)) return tournamentArchiveTasks.get(key);
+  const task=performAutoArchiveState(target).finally(()=>tournamentArchiveTasks.delete(key));
+  tournamentArchiveTasks.set(key,task);
+  return task;
+}
+
+async function performAutoArchiveState(state){
+  if(state.archiveStatus==="completed" && state.archivedAt && state.settlementPhase!=="sync-pending") return true;
+  if(!isTournamentFullyDecided(state)){
+    state.settlementPhase="failed";
+    state.settlementErrorCode="incomplete-placements";
+    state.settlementError="賽程或最終名次尚未完整；請完成剩餘場次後再結算。";
+    await saveRecord(state);
+    return false;
+  }
 
   const settlementRoute=settlementRouteForTournament(state);
   state.settlementRoute=settlementRoute;
@@ -6787,107 +6905,67 @@ async function performAutoArchive(){
   }
 
   state.settlementPhase="archive";
-  try{ await saveRecord(state); }catch(e){}
-  const wasAlreadyIndexed = recordIndex.some(r=>r.id===state.id);
-  const previousCompletedAt = state.completedAt || null;
-  state.archiveStatus = "completed";
-  state.settlementError = null;
-  state.settlementCompletedAt = Date.now();
-  state.archivedAt = Date.now();
-  if(!state.completedAt) state.completedAt = Date.now();
-  state.updatedAt = Date.now();
+  state.archiveStatus="ongoing";
+  state.settlementError=null;
+  state.settlementErrorCode=null;
+  await saveRecord(state);
 
-  const localResult = await saveRecordDetailed(state);
-  const hadCloudRoom = !!state.cloudCode;
-  let cloudArchiveReady = hadCloudRoom ? await ensureCloudAvailableForArchive() : false;
-
-  if(localResult.recordOk && localResult.indexOk){
-    recordIndex = await loadIndex();
-    showToast(wasAlreadyIndexed ? "既有賽事紀錄已更新" : "賽事紀錄建立成功");
-  }else{
-    addRecordSummaryToMemoryIndex(state);
-    if(!hadCloudRoom){
-      state.archiveStatus = "ongoing";
-      state.archivedAt = null;
-      state.settlementCompletedAt = null;
-      state.settlementError = "本機儲存失敗，且此賽事沒有雲端房間";
-      showToast("封存失敗：本機儲存空間不足或無法寫入，而且此賽事沒有雲端房間可作後援。請釋放瀏覽器儲存空間後重試。", true);
-      return false;
-    }
-    if(!cloudArchiveReady){
-      state.archiveStatus = "ongoing";
-      state.archivedAt = null;
-      state.settlementCompletedAt = null;
-      state.completedAt = previousCompletedAt;
-      state.settlementError = "本機寫入失敗，雲端重新連線也失敗";
-      showToast("封存尚未完成：本機儲存寫入失敗，Firebase 重新連線也未成功。請確認網路後重試；賽事資料仍保留在目前畫面。", true);
-      return false;
-    }
-    showToast(localResult.recordOk
-      ? "本機賽事索引寫入失敗，將以 Firebase 雲端紀錄完成封存"
-      : "本機儲存空間不足，將改以 Firebase 雲端紀錄完成封存", true);
-  }
-
-  if(hadCloudRoom && cloudArchiveReady && currentRole!=="guest"){
+  // Keep the completion candidate detached until the authoritative store accepts it.
+  // A general room must not report success merely because localStorage worked.
+  const completedAt=state.completedAt||Date.now();
+  const candidate=cloneStateForSave(state);
+  Object.assign(candidate,{archiveStatus:"completed",archivedAt:Date.now(),completedAt,
+    settlementPhase:"completed",settlementCompletedAt:Date.now(),settlementError:null,
+    settlementErrorCode:null,updatedAt:Date.now()});
+  const hadCloudRoom=!!state.cloudCode;
+  if(hadCloudRoom){
+    let accepted=false;
     try{
-      const ok = await writeArchiveStateToCloud(cloneStateForSave(state));
-      if(ok){
-        cloudSyncPending = false;
-        state.settlementError = null;
-        showToast((localResult.recordOk && localResult.indexOk) ? "已同步雲端" : "雲端封存完成；本機歷史將於下次同步時重建");
+      if(currentRole!=="guest" && await ensureCloudAvailableForArchive()){
+        accepted=await writeArchiveStateToCloud(candidate)===true;
       }
-      else {
-        queueCloudSyncRetry(state.id, state.cloudCode);
-        if(!localResult.recordOk){
-          state.archiveStatus="ongoing";
-          state.archivedAt=null;
-          state.settlementCompletedAt=null;
-          state.completedAt=previousCompletedAt;
-          state.settlementError="本機與雲端皆未能完成封存";
-          showToast("封存失敗：本機與雲端都沒有成功保存完成狀態，請確認網路或清理瀏覽器空間後重試",true);
-          return false;
-        }
-        if(settlementRoute==="official-ranked"){
-          state.archiveStatus="ongoing"; state.archivedAt=null; state.completedAt=previousCompletedAt;
-          await saveRecord(state);
-          showToast("天梯積分已入帳，但賽事完成狀態尚未同步成功；請重新執行完成賽事",true);
-          return false;
-        }
-        state.settlementPhase="sync-pending";
-      showToast("已儲存本機，等待雲端同步");
-      }
-    }catch(e){
-      queueCloudSyncRetry(state.id, state.cloudCode);
-      if(!localResult.recordOk){
-        state.archiveStatus="ongoing";
-        state.archivedAt=null;
-        state.settlementCompletedAt=null;
-        state.completedAt=previousCompletedAt;
-        state.settlementError="本機與雲端皆未能完成封存";
-        showToast("封存失敗：本機與雲端都沒有成功保存完成狀態，請確認網路或清理瀏覽器空間後重試",true);
-        return false;
-      }
-      if(settlementRoute==="official-ranked"){
-        state.archiveStatus="ongoing"; state.archivedAt=null; state.completedAt=previousCompletedAt;
-        await saveRecord(state);
-        showToast("天梯積分已入帳，但賽事完成狀態尚未同步成功；請重新執行完成賽事",true);
-        return false;
-      }
-      showToast("已儲存本機，等待雲端同步");
+    }catch(e){ console.warn("[archive] cloud completion pending",e); }
+    if(!accepted){
+      state.settlementPhase="sync-pending";
+      state.settlementErrorCode="archive-sync-pending";
+      state.settlementError=state.ladderPointsAwarded===true
+        ? "積分已完成結算，賽事封存仍等待雲端確認；可安全重試，不會重複加分。"
+        : "賽果已保留，賽事封存仍等待雲端確認；請確認連線後重試。";
+      await saveRecord(state);
+      queueCloudSyncRetry(state.id,state.cloudCode);
+      showToast(state.settlementError,true);
+      return false;
     }
   }
 
-  if(state.cloudCode && cloudAvailable() && window.cloudSync && window.cloudSync.repairTournamentLifecycle){
+  const localResult=await saveRecordDetailed(candidate);
+  if(!hadCloudRoom && !localResult.recordOk){
+    state.settlementPhase="failed";
+    state.settlementErrorCode="archive-local-failed";
+    state.settlementError="本機賽果保存失敗，且沒有雲端房間；請釋放儲存空間後重試。";
+    showToast(state.settlementError,true);
+    return false;
+  }
+  Object.assign(state,candidate);
+  if(localResult.indexOk){ recordIndex=await loadIndex(); }
+  else { addRecordSummaryToMemoryIndex(state); }
+  if(hadCloudRoom) cloudSyncPending=false;
+  showToast(hadCloudRoom ? "賽事已完成並同步雲端" : "賽事紀錄建立成功");
+
+  if(state.cloudCode && cloudAvailable() && window.cloudSync?.repairTournamentLifecycle){
     try{ await window.cloudSync.repairTournamentLifecycle(state.cloudCode); }catch(e){}
     publicTournamentsCache=null;
     myRegistrationsCache=null;
   }
-  if(isCommunityRoom() && state.cloudCode && cloudAvailable() && window.cloudSync && window.cloudSync.saveCommunityHistory){
-    try{ touchCommunityActivity(state); state.expiresAtMs=Number(state.completedAt||Date.now())+COMMUNITY_COMPLETED_FULL_MS; await window.cloudSync.saveCommunityHistory(state); await saveState(); }catch(e){ console.warn("[community history]",e); }
+  if(state.meta?.eventAuthority==="community" && state.cloudCode && cloudAvailable() && window.cloudSync?.saveCommunityHistory){
+    try{
+      touchCommunityActivity(state);
+      state.expiresAtMs=Number(state.completedAt||Date.now())+COMMUNITY_COMPLETED_FULL_MS;
+      await window.cloudSync.saveCommunityHistory(state);
+      await saveRecord(state);
+    }catch(e){ console.warn("[community history]",e); }
     communityHistoryCache=null;
   }
-  state.settlementPhase="completed";
-  state.settlementErrorCode=null;
   return true;
 }
 
@@ -7226,9 +7304,10 @@ function generateTeamBracket(){
 }
 
 /* ==== dispatcher: generate bracket ==== */
-function generateBracket(){
+function generateBracket(options={}){
+  const forced=adminOverrideCurrent(options.adminOperationalOverride);
   if(state.meta&&state.meta.battleMode==="team") return generateTeamBracket();
-  if(!entryRosterValid()){showToast("請先完成名額抽籤，並保持抽中的正式名單",true);return false;}
+  if(!forced&&!entryRosterValid()){showToast("請先完成名額抽籤，並保持抽中的正式名單",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   const fmt = state.meta.formatType || "single";
   let ok;
@@ -7983,6 +8062,9 @@ function tournamentEligiblePlayers(players,meta,matches){
 }
 
 function eligiblePlayers(){
+  // Before start, zero checked-in players means an empty entry list. The
+  // historical bracket fallback is only valid after the tournament is locked.
+  if(!state.startedAt&&state.meta?.checkinRequired)return (state.players||[]).filter(p=>p&&p.checkedIn===true);
   return tournamentEligiblePlayers(state.players,state.meta,state.matches);
 }
 
@@ -8496,6 +8578,7 @@ function normalizeHunterRoundEvent(raw,index,matchId){
   };
 }
 function validateHunterRoundLedger(match){
+  if(match?.scoreBackfill?.excludeFromRoundAbilityStatistics===true || (match?.log||[]).some(e=>e.synthetic===true)) return {ok:false,events:[],roundCount:0,scoreA:null,scoreB:null,errors:[{reason:'administrative-backfill'}]};
   const raw=Array.isArray(match&&match.log)?match.log:[];
   const events=[];
   const errors=[];
@@ -8605,6 +8688,7 @@ function refereeFaultLast(m){
 }
 function addScore(matchId, side, type){
   if(state.meta?.refereeSeatsV1?.version===1) return void executeRefereeSeatCommand(matchId,{action:"score",side,finish:type});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再計分。",true);return;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return; }
   if(!requireTournamentStartedForMatchAction()) return;
   // The existing round ledger only accepts unmodified BXH points. Until the
@@ -8884,13 +8968,7 @@ function confirmResult(matchId){
   saveState(); render();
   showToast("比賽結果已確認");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    performAutoArchive();
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) finishTournament().catch(e=>console.warn("[tournament completion]",e));
   return true;
 }
 
@@ -8910,6 +8988,7 @@ async function queueOfflineMatchConfirmation(matchId,mode,selectedWinnerId){
 
 async function confirmResultWithCloudGuard(matchId){
   if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"confirm"});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再確認結果。",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -8940,7 +9019,7 @@ async function confirmResultWithCloudGuard(matchId){
   if(!preSyncOk){
     cloudStatus = "error";
     render();
-    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請重試連線後再確認結果。", true);
+    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請使用裁判台「同步復原」，核對雲端比分後再操作。", true);
     return false;
   }
   const result = await window.cloudSync.confirmMatchTransaction(state.cloudCode, (remoteState)=>{
@@ -8984,15 +9063,7 @@ async function confirmResultWithCloudGuard(matchId){
   render();
   showToast("比賽結果已確認");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    const archivedOk = await performAutoArchive();
-    publicTournamentsCache=null; publicTournamentsError=null;
-    if(!archivedOk){ state.celebrationShown=false; render(); return true; }
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) await finishTournament();
   return true;
 }
 
@@ -9056,18 +9127,13 @@ function confirmQuickDecision(matchId, selectedWinnerId){
   saveState(); render();
   showToast("已確認獲勝並晉級");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    performAutoArchive();
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) finishTournament().catch(e=>console.warn("[tournament completion]",e));
   return true;
 }
 
 async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(state.meta?.refereeSeatsV1?.version===1) return await executeRefereeSeatCommand(matchId,{action:"quick",winnerId:selectedWinnerId});
+  if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再送出判定。",true);return false;}
   if(!canOperateCurrentTournament()){ showToast("目前身分沒有此操作權限。", true); return false; }
   if(!requireTournamentStartedForMatchAction()) return false;
   if(state.meta&&state.meta.playMode==="enchantment"){
@@ -9098,7 +9164,7 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   if(!preSyncOk){
     cloudStatus = "error";
     render();
-    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請重試連線後再確認結果。", true);
+    showToast("雲端賽事資料尚未同步完成，已保留目前比分。請使用裁判台「同步復原」，核對雲端比分後再操作。", true);
     return false;
   }
   const result = await window.cloudSync.confirmMatchTransaction(state.cloudCode, (remoteState)=>{
@@ -9143,33 +9209,27 @@ async function confirmQuickDecisionWithCloudGuard(matchId, selectedWinnerId){
   render();
   showToast("已確認獲勝並晉級");
 
-  if(!state.celebrationShown && isTournamentFullyDecided()){
-    state.celebrationShown = true;
-    const archivedOk = await performAutoArchive();
-    publicTournamentsCache=null; publicTournamentsError=null;
-    if(!archivedOk){ state.celebrationShown=false; render(); return true; }
-    celebrationData = buildCelebrationData(state);
-    celebrationOpen = true;
-    render();
-  }
+  if(isTournamentFullyDecided()) await finishTournament();
   return true;
 }
 
-function isTournamentFullyDecided(){
-  const fmt = state.meta.formatType||"single";
-  if(!state.championId || !state.runnerUpId) return false;
-  if(fmt==="single" && state.meta.bronzeMatch){
-    if(!state.thirdId || !state.fourthId) return false;
+function isTournamentFullyDecided(st=state){
+  const fmt = st.meta.formatType||"single";
+  if(!st.championId || !st.runnerUpId) return false;
+  if(fmt==="single" && st.meta.bronzeMatch){
+    const n=tournamentEligiblePlayers(st.players,st.meta,st.matches).length;
+    if(n>=3 && !st.thirdId) return false;
+    if(n>=4 && !st.fourthId) return false;
   }
   if(fmt==="double"){
-    const n=tournamentEligiblePlayers(state.players,state.meta,state.matches).length;
-    if(n>=3 && !state.thirdId) return false;
-    if(n>=4 && !state.fourthId) return false;
+    const n=tournamentEligiblePlayers(st.players,st.meta,st.matches).length;
+    if(n>=3 && !st.thirdId) return false;
+    if(n>=4 && !st.fourthId) return false;
   }
   if(fmt==="roundrobin"){
-    const n = state.players.length;
-    if(n>=3 && !state.thirdId) return false;
-    if(n>=4 && !state.fourthId) return false;
+    const n = st.players.length;
+    if(n>=3 && !st.thirdId) return false;
+    if(n>=4 && !st.fourthId) return false;
   }
   return true;
 }
@@ -9573,6 +9633,25 @@ function bracketRosterIsCurrent(){
   if(state.meta?.battleMode==="team"){const teams=eligibleBracketTeams();if(!teams)return false;return sameStringSet(new Set(state.matches.flatMap(m=>m.teamIds||[]).filter(Boolean).map(String)),new Set(teams.map(t=>String(t.id))));}
   return sameStringSet(currentBracketParticipantIds(),eligibleRosterIds());
 }
+async function readVerifiedOnlineRoster(context, expectedQrRevision=0){
+  let observedQrRevision=null;
+  for(let attempt=1;attempt<=3;attempt++){
+    requireRegistrationRosterContext(context);
+    const result=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
+    requireRegistrationRosterContext(context);
+    if(result?.ok===true&&result.data?.id===context.roomId){
+      observedQrRevision=Number(result.data.qrCheckinRevision||0);
+      if(Number.isSafeInteger(observedQrRevision)&&observedQrRevision>=expectedQrRevision)return result.data;
+    }else if(result?.ok===true||result?.reason==="private"||result?.reason==="not-found"){
+      break;
+    }
+  }
+  throw Object.assign(new Error('roster-readback-failed'),{
+    code:'roster-readback-failed',rosterSyncStage:'readback',
+    expectedQrRevision,observedQrRevision
+  });
+}
+
 async function syncLatestOnlineRosterBeforeLock(registrationRows){
   if(Array.isArray(registrationRows) && (registrationRows!==adminRegistrationsCache || peopleRosterBusy))
     return {ok:true,changed:false,confirmed:0};
@@ -9593,23 +9672,55 @@ async function syncLatestOnlineRosterBeforeLock(registrationRows){
     return {ok:true,changed:false,confirmed:0};
   adminRegistrationsCache=regs;
   const confirmed=regs.filter(r=>r&&r.status==="confirmed");
+  // QR check-ins are transaction-owned. Recover the canonical player IDs and
+  // revision before merging late registrations, including after an earlier
+  // optimistic sync failed. Never publish the candidate before cloud acceptance.
+  let base=state;
+  if(state.qrCheckinManaged===true){
+    const latest=await window.cloudSync.joinRoom(context.code,{serverOnly:true});
+    requireRegistrationRosterContext(context);
+    if(latest?.ok!==true||latest.data?.id!==context.roomId)throw new Error('roster-readback-failed');
+    if(latest.data.startedAt)throw new Error('bracket-locked');
+    base=latest.data;
+  }
+  const candidate=cloneStateForSave(base);
+  candidate.cloudCode=context.code;
   const before=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
     p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
   ]).sort(),teams:state.teams||[]});
-  if(state.meta.battleMode==="team"){
-    state.players=mergeTeamOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired);
-    state.teams=teamRegistrationRowsToTeams(confirmed);
+  const baseRoster=JSON.stringify({players:base.players||[],teams:base.teams||[]});
+  if(candidate.meta.battleMode==="team"){
+    candidate.players=mergeTeamOnlineRoster(candidate.players||[],confirmed,!!candidate.meta.checkinRequired);
+    candidate.teams=teamRegistrationRowsToTeams(confirmed);
   }else{
-    state.players=mergeFamilyOnlineRoster(state.players||[],confirmed,!!state.meta.checkinRequired,()=>uid("p"));
-    state.teams=[];
+    candidate.players=mergeFamilyOnlineRoster(candidate.players||[],confirmed,!!candidate.meta.checkinRequired,()=>uid("p"));
+    candidate.teams=[];
+  }
+  const needsWrite=baseRoster!==JSON.stringify({players:candidate.players||[],teams:candidate.teams||[]});
+  if(needsWrite){
+    candidate.updatedAt=Date.now();
+    candidate.meta.registrationStatus=computeRegistrationStatus(candidate.meta,candidate);
+    touchCommunityActivity(candidate);
+    requireRegistrationRosterContext(context);
+    if(!cloudAvailable())throw new Error('network');
+    // A failed roster must never become a local cache or an automatic retry
+    // payload. pushUpdate retains Rules, ownership and check-in fences.
+    const ok=await enqueueCloudStateWrite(context.code,candidate,{isCurrent:()=>registrationRosterContextIsCurrent(context)});
+    requireRegistrationRosterContext(context);
+    if(ok!==true)throw new Error(window.__BXH_LAST_CLOUD_ERROR_CODE||'roster-cloud-write-failed');
+  }
+  if(needsWrite||base!==state){
+    const expectedQrRevision=Number(candidate.qrCheckinManaged===true?candidate.qrCheckinRevision||0:0);
+    const verified=await readVerifiedOnlineRoster(context,expectedQrRevision);
+    applyRemoteState(verified,true);
+    if(Number(state.qrCheckinRevision||0)<Number(verified.qrCheckinRevision||0))throw new Error('roster-readback-failed');
   }
   const after=JSON.stringify({players:(state.players||[]).map(p=>[
     String(p.id||""),String(p.registrationUid||""),String(p.registrationId||""),
     p.checkedIn===true?"1":"0",String(p.name||""),String(p.teamId||""),String(p.teamMemberSlot||"")
   ]).sort(),teams:state.teams||[]});
   const changed=before!==after;
-  if(changed && !(await saveState())) throw new Error("名單寫入雲端失敗；請重新整理後重試同步");
   requireRegistrationRosterContext(context);
   publicTournamentsCache=null;
   myRegistrationsCache=null;
@@ -9696,6 +9807,7 @@ function renderArchiveControls(){
   if(!hasData) return "";
   if(state.archiveStatus==="completed"){
     return `<div class="banner" style="margin-top:14px;"><span>${state.testLadderSettlementNote?esc(state.testLadderSettlementNote)+"。":""}此賽事已自動封存為唯讀歷史紀錄（完成於 ${state.completedAt?new Date(state.completedAt).toLocaleString():""}）。${isSuperAdmin()?"":" 如需更正，請由最高管理員處理。"}</span>
+      <button class="btn btn-primary btn-sm" data-action="view-celebration" data-id="${esc(state.id)}">查看最終結果</button>
       ${isSuperAdmin()?`<button class="btn btn-ghost btn-sm" data-action="unarchive-current">解除封存並編輯</button>`:""}</div>`;
   }
   const canArchive = tournamentStatus()==="settling";
@@ -9703,7 +9815,7 @@ function renderArchiveControls(){
   if(canArchive && phase==="idle"){
     setTimeout(()=>{
       if(state.archiveStatus!=="completed" && tournamentStatus()==="settling" && (state.settlementPhase||"idle")==="idle"){
-        performAutoArchive().then(async ok=>{
+        finishTournament().then(async ok=>{
           if(ok){
             recordIndex = await loadIndex();
             historyCloudSyncLoaded = false;
@@ -10338,7 +10450,7 @@ function renderTeamReferee(){
   return refereeBracketRoundtripNav('bracket')+'<div class="banner"><span>團體裁判模式｜排陣確認、公開與即時計分僅在此操作。</span></div>'+renderTeamMatchList(true);
 }
 function renderBracket(){
-  if(state.meta?.battleMode==="team"&&state.bracketSize)return renderTeamBracket();
+  if(state.meta?.battleMode==="team"&&state.bracketSize)return bracketCommitStatusHtml()+renderTeamBracket();
   const refreshBtn=bracketRefreshButtonHtml();
   if(!state.bracketSize){
     const refreshOnly=refreshBtn ? `<div class="bracket-top-controls bracket-top-controls-refresh-only">${refreshBtn}</div>` : "";
@@ -10358,7 +10470,7 @@ function renderBracket(){
   if(bracketViewMode==="board"){
     return swapBanner + quickNav + topControls + renderBoardMode();
   }
-  return swapBanner + quickNav + topControls + matchLegendHtml() + renderTournamentMatchList();
+  return swapBanner + quickNav + topControls + bracketCommitStatusHtml() + matchLegendHtml() + renderTournamentMatchList();
 }
 
 function tournamentMatchListGroup(m, fmt){
@@ -10490,7 +10602,329 @@ const BOARD_ICON_PLUS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="n
 const BOARD_ICON_FULLSCREEN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M4 9 V4 h5 M20 9 V4 h-5 M4 15 v5 h5 M20 15 v5 h-5"/></svg>';
 
 // Bracket generation is detached until persistence and server readback agree.
+let adminOperationalOverrideBusy=false;
+let adminOperationalFailure=null;
+function adminOverrideContext(){return {actorUid:currentAuthUid(),roomId:state.id,code:state.cloudCode};}
+function noteAdminOperationalFailure(operation,reason){
+ adminOperationalFailure={...adminOverrideContext(),operation,reason:String(reason||'cloud-readback-unconfirmed')};
+}
+function currentAdminOperationalFailure(){
+ const f=adminOperationalFailure,c=adminOverrideContext();
+ return f&&f.actorUid===c.actorUid&&f.roomId===c.roomId&&f.code===c.code?f:null;
+}
+function adminOverrideCurrent(approval){return window.BXHAdminOverride?.current(approval,adminOverrideContext(),userProfile)===true;}
+function canOfferAdminOperationalOverride(){
+ return window.BXHAdminOverride?.allowed(userProfile)===true&&!!currentAuthUid()&&!!state.cloudCode&&
+  state.meta?.battleMode!=='team'&&!state.startedAt&&state.archiveStatus!=='completed';
+}
+function adminOverrideButtonsHtml(){
+ if(!canOfferAdminOperationalOverride())return '';
+ const failure=currentAdminOperationalFailure();if(!failure)return '';
+ const disabled=adminOperationalOverrideBusy||bracketCommitController()?.blocked();
+ const start=failure.operation==='start-tournament';
+ if(start&&!state.bracketSize)return '';
+ return '<button class="btn btn-danger" data-action="'+(start?'admin-force-start':'admin-force-draw')+'" '+(disabled?'disabled':'')+'>'+(start?'管理員強制開賽':'管理員強制抽籤')+'</button>';
+}
+function offerAdminOperationalOverride(operation,reason){
+ noteAdminOperationalFailure(operation,reason);
+ if(!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy||bracketCommitBlocked())return false;
+ const participantIds=operation==='draw-bracket'?eligiblePlayers().map(p=>String(p.id)):Array.from(currentBracketParticipantIds());
+ if(participantIds.length<2){showToast('至少需要兩位參賽者，請先確認名單',true);return true;}
+ const approval={id:crypto.randomUUID(),operation,...adminOverrideContext(),at:Date.now(),reason:String(reason).slice(0,500),
+  participantIds,warnings:['略過一般線上名單同步檢查',...(operation==='draw-bracket'?['以本次確認的參賽者抽籤']:['以既有對戰表開賽，忽略報到名單差異'])]};
+ const baseSignature=window.BXHBracketCommit.signature(state);
+ const selected=new Set(participantIds),names=(state.players||[]).filter(p=>selected.has(String(p.id))).map(p=>p.name);
+ openModal({type:'generic',title:operation==='draw-bracket'?'管理員強制抽籤確認':'管理員強制開賽確認',danger:true,
+  message:'系統警告：'+approval.reason+'\n\n房號：'+approval.code+'\n採用參賽者：'+participantIds.length+' 人\n'+names.join('、')+
+   '\n\n'+approval.warnings.join('\n')+'\n\n確認後將以這份名單執行，並記錄操作者、警告與確認時間。雲端仍須確認寫入成功。',
+  confirmLabel:'我已核對，強制執行',onConfirm:()=>{void executeAdminOperationalOverride(approval,baseSignature);}});
+ return true;
+}
+function reconfirmPendingAdminOverride(){
+ const controller=bracketCommitController(),status=controller?.status(),prior=status?.override;
+ if(status?.busy||!status?.pending||status.result!=='failed'||!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy)return;
+ if(prior&&!adminOverrideCurrent(prior))return;
+ const selected=controller.selection();if(selected.length<2)return;
+ const approval=prior?{...prior,at:Date.now()}:{id:crypto.randomUUID(),operation:'draw-bracket',...adminOverrideContext(),at:Date.now(),
+  reason:String(status.error||'cloud-readback-unconfirmed').slice(0,500),participantIds:selected.map(p=>p.id),
+  warnings:['保留原配對，不重新抽籤','核對最新房間資料後提交本次確認的參賽者']};
+ openModal({type:'generic',title:'管理員強制提交原配對',danger:true,
+  message:'將保留已產生的同一份配對，不會重新抽籤。\n\n房號：'+approval.code+'\n參賽人數：'+approval.participantIds.length+
+   ' 人\n'+selected.map(p=>p.name).join('、')+'\n\n失敗原因：'+approval.reason+'\n\n確認後會先讀取雲端；已儲存則確認結果，尚未儲存才核對最新資料並提交。操作會留下紀錄；成功前不會開賽。',
+  confirmLabel:'我已核對，強制提交原配對',onConfirm:()=>{void controller.forceSubmit(approval);}});
+}
+async function executeAdminOperationalOverride(approval,baseSignature){
+ if(adminOperationalOverrideBusy||!adminOverrideCurrent(approval))return;
+ adminOperationalOverrideBusy=true;render();
+ try{
+  const latest=await window.cloudSync.readBracketFromServer(approval.code);
+  if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
+  if(latest?.ok!==true||latest.data?.id!==approval.roomId)throw Error('cloud-readback-unconfirmed');
+  const fresh=latest.data;
+  if(fresh.startedAt||fresh.archiveStatus==='completed')throw Error('bracket-started');
+  if(window.BXHBracketCommit.signature(fresh)!==baseSignature)throw Error('bracket-version-conflict');
+  if(fresh.onsiteWaitlistServerOwned===true&&fresh.onsiteWaitlistFinalized!==true)throw Error('onsite-waitlist-managed');
+  const known=new Set((fresh.players||[]).map(p=>String(p.id)));
+  if(approval.participantIds.some(id=>!known.has(id)))throw Error('admin-override-roster-changed');
+  if(approval.operation==='draw-bracket'){
+   state=JSON.parse(JSON.stringify(fresh));state.cloudCode=approval.code;
+   // The commit controller retains this exact pairing and approval for retries.
+   if(await bracketCommitController().begin({adminOperationalOverride:approval})!==true)
+    showToast('強制抽籤尚未確認成功，請查看上傳狀態；重試會保留同一配對',true);
+  }else{
+   const candidate=cloneStateForSave(fresh);candidate.cloudCode=approval.code;
+   candidate.startedAt=Date.now();candidate.rosterLocked=true;candidate.meta.registrationStatus='started';
+   if(candidate.meta.checkinRequired){candidate.meta.checkinClosedEarly=true;candidate.meta.checkinClosedAt=candidate.startedAt;}
+   candidate.updatedAt=Date.now();
+   const ok=await enqueueCloudStateWrite(approval.code,candidate,{adminOperationalOverride:approval,
+    bracketStartSignature:baseSignature,isCurrent:()=>adminOverrideCurrent(approval)});
+   if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
+   let verified=null,confirmed=false;
+   for(let attempt=0;attempt<3;attempt++){
+    verified=await window.cloudSync.readBracketFromServer(approval.code);
+    if(!adminOverrideCurrent(approval))throw Error('room-context-changed');
+    confirmed=verified?.ok===true&&verified.data?.id===approval.roomId&&
+     verified.data.adminOperationOverrides?.some(r=>r.id===approval.id)&&
+     verified.data.startedAt===candidate.startedAt&&verified.publicData?.startedAt&&
+     window.BXHBracketCommit.signature(verified.data)===baseSignature&&
+     window.BXHBracketCommit.signature(verified.publicData)===baseSignature;
+    if(confirmed)break;
+    if(attempt<2)await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));
+   }
+   if(!confirmed)throw Error(ok===false?window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-write-rejected':'cloud-readback-unconfirmed');
+   state=verified.data;state.cloudCode=approval.code;await saveRecord(state);
+   adminOperationalFailure=null;activeTab='referee';showToast('管理員強制開賽已完成，操作紀錄已儲存');
+  }
+ }catch(e){console.warn('[admin operational override]',e);showToast('強制執行未確認成功（'+String(e.code||e.message||'unknown')+'），請核對雲端狀態',true);}
+ finally{adminOperationalOverrideBusy=false;render();}
+}
+// Admin attendance changes use a dedicated server-owned, idempotent transaction.
+let adminCheckinContext=null;
+function adminCheckinController(){
+ if(!window.BXHAdminCheckin)return null;
+ const context=adminOverrideContext(),key=JSON.stringify(context);
+ if(adminCheckinContext?.key===key)return adminCheckinContext.controller;
+ let storage;try{storage=window.sessionStorage;}catch{}
+ const controller=window.BXHAdminCheckin.create({key,...context,storage,
+  current:()=>JSON.stringify(adminOverrideContext())===key,
+  allowed:()=>window.BXHAdminOverride?.allowed(userProfile)===true,
+  now:()=>Date.now(),operationId:()=>crypto.randomUUID(),
+  call:payload=>window.cloudSync.adminOverrideCheckin(payload),
+  read:code=>window.cloudSync.readBracketFromServer(code),
+  wait:ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  adopt:async fresh=>{state=JSON.parse(JSON.stringify(fresh));state.cloudCode=context.code;await saveRecord(state);}
+ });
+ adminCheckinContext={key,controller};return controller;
+}
+function canOfferAdminCheckin(){
+ if(!window.BXHAdminCheckin||!window.cloudSync?.adminOverrideCheckin||!state.cloudCode||
+  window.BXHAdminOverride?.allowed(userProfile)!==true||!currentAuthUid())return false;
+ return !!adminCheckinController()?.status().pending||
+  (canOfferAdminOperationalOverride()&&state.onsiteWaitlistServerOwned!==true);
+}
+function adminCheckinButtonHtml(p){
+ if(!canOfferAdminCheckin())return '';
+ const status=adminCheckinController()?.status();
+ const pending=status?.pending,other=pending&&pending.data.playerId!==p.id;
+ return '<button class="btn btn-danger btn-sm" data-action="admin-force-checkin" data-id="'+esc(p.id)+'" '+
+  (status?.busy||status?.corrupt||other||adminOperationalOverrideBusy||bracketCommitBlocked()?'disabled':'')+'>'+
+  (pending&&!other?'核實／重試報到操作':p.checkedIn?'管理員強制取消報到':'管理員強制報到')+'</button>';
+}
+function adminCheckinPendingHtml(){
+ if(!canOfferAdminCheckin())return '';
+ const status=adminCheckinController().status(),pending=status.pending;if(!pending)return '';
+ return '<div class="banner warn"><span>尚有一筆報到覆核待核實：'+esc(pending.name)+
+  '</span><button class="btn btn-danger btn-sm" data-action="admin-force-checkin" data-id="'+esc(pending.data.playerId)+'" '+
+  (status.busy?'disabled':'')+'>核實上一筆報到</button></div>';
+}
+function offerAdminCheckin(playerId){
+ if(!canOfferAdminCheckin()||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ const controller=adminCheckinController(),status=controller?.status();if(!controller||status.busy)return;
+ const prior=status.pending;
+ const p=(state.players||[]).find(p=>p.id===playerId)||
+  (prior?.data.playerId===playerId?{id:playerId,name:prior.name,checkedIn:prior.data.expectedCheckedIn}:null);if(!p)return;
+ try{
+  const approval=controller.prepare(p,'管理員已現場核對，要求逐筆覆核報到狀態');
+  if(approval.data.playerId!==playerId){showToast('請先核實上一筆報到操作結果',true);return;}
+  const desired=approval.data.checkedIn?'已報到':'未報到';
+  openModal({type:'generic',title:status.pending?'核實／重試同一筆報到':'管理員報到覆核',danger:true,
+   message:'房號：'+approval.data.code+'\n選手：'+approval.name+'\n指定狀態：'+desired+
+    '\n\n系統警告：將略過一般報到開關、提前關閉與報到版本差異。只變更這位正取選手，既有配對保持不變。'+
+    (status.pending?'\n重試使用同一操作編號；若先前已完成，僅核實結果，不會再次切換。':'')+
+    '\n\n確認後會記錄操作者與覆核內容，並核對雲端名單。',confirmLabel:'我已核對，強制執行',
+   onConfirm:()=>{void executeAdminCheckin(approval,controller);}});
+ }catch(e){showToast('無法準備覆核：'+String(e.message||e),true);}
+}
+async function executeAdminCheckin(approval,controller){
+ try{
+  const task=controller.execute(approval);render();
+  const result=await task;
+  const current=adminOverrideContext();
+  if(current.actorUid!==approval.actorUid||current.roomId!==approval.data.roomId||current.code!==approval.data.code)return;
+  showToast(result.superseded?'這筆操作已完成，但報到狀態之後已有變更，已載入最新名單':'管理員報到覆核已完成，雲端名單與紀錄已確認');
+ }catch(e){
+  if(adminOverrideContext().roomId!==approval.data.roomId||state.cloudCode!==approval.data.code||currentAuthUid()!==approval.actorUid)return;
+  showToast('報到覆核尚未確認成功（'+String(e.message||e)+'）。'+(controller.status().pending?'請使用「核實／重試報到操作」確認同一筆結果':'請讀取最新名單後重新核對'),true);
+ }finally{render();}
+}
+// Admin roster override: preview exact server-owned effects before confirmation.
+let adminRosterContext=null;
+function adminRosterController(){
+ if(!window.BXHAdminRoster)return null;
+ const context=adminOverrideContext(),key=JSON.stringify(context);
+ if(adminRosterContext?.key===key)return adminRosterContext.controller;
+ let storage;try{storage=window.sessionStorage;}catch{}
+ const controller=window.BXHAdminRoster.create({key,...context,storage,current:()=>JSON.stringify(adminOverrideContext())===key,
+  allowed:()=>window.BXHAdminOverride?.allowed(userProfile)===true,now:()=>Date.now(),operationId:()=>crypto.randomUUID(),
+  call:payload=>window.cloudSync.adminOverrideRoster(payload),read:payload=>window.cloudSync.readAdminRosterFromServer(payload),wait:ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  adopt:async(latest,approval)=>{
+   state=JSON.parse(JSON.stringify(latest.data));state.cloudCode=context.code;
+   const id=approval.data.registrationId;
+   if(id&&Array.isArray(adminRegistrationsCache))adminRegistrationsCache=latest.registration?
+    adminRegistrationsCache.map(row=>peopleRegistrationIdOf(row)===id?{...row,status:latest.registration.status}:row):adminRegistrationsCache.filter(row=>peopleRegistrationIdOf(row)!==id);
+   publicTournamentsCache=null;myRegistrationsCache=null;resetRegistrationFormDraft();await saveRecord(state);
+  }});
+ adminRosterContext={key,controller};return controller;
+}
+function canOfferAdminRoster(){
+ if(!window.BXHAdminRoster||!window.cloudSync?.adminOverrideRoster||!state.cloudCode||!currentAuthUid()||window.BXHAdminOverride?.allowed(userProfile)!==true)return false;
+ return !!adminRosterController()?.status().pending||canOfferAdminOperationalOverride()&&state.onsiteWaitlistServerOwned!==true&&
+  !state.entrySelection&&!state.registrationSelection&&state.createdByRole!=='partner_organizer'&&!state.partnerOrganizationCode&&!state.partnerContractOrderCode;
+}
+function adminRosterBusyOrPending(){
+ if(!window.BXHAdminRoster||!state.cloudCode||window.BXHAdminOverride?.allowed(userProfile)!==true)return false;
+ const s=adminRosterController()?.status();return !!(s?.busy||s?.pending);
+}
+function adminRosterButtonsHtml(row,operation,onlineRow=false){
+ if(!canOfferAdminRoster())return '';
+ const registrationId=String(row.registrationId||(onlineRow?peopleRegistrationIdOf(row):'')),playerId=registrationId?null:row.id;
+ if(!registrationId&&(!playerId||row.source==='online'))return '';
+ const status=adminRosterController().status(),d=status.pending?.data;
+ const other=d&&(d.operation!==operation||d.registrationId!==(registrationId||undefined)||d.playerId!==(playerId||undefined));
+ return '<button class="btn btn-danger btn-sm" data-action="admin-force-roster" data-operation="'+operation+'" '+
+  (registrationId?'data-registration-id="'+esc(registrationId)+'"':'data-player-id="'+esc(playerId)+'"')+' '+
+  (status.busy||status.corrupt||other||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked()?'disabled':'')+'>'+
+  (d&&!other?'核實／重試名單覆核':operation==='promote'?'管理員強制升正取':'管理員強制移回備取')+'</button>';
+}
+function adminRosterPendingHtml(){
+ if(!canOfferAdminRoster())return '';
+ const s=adminRosterController().status();if(!s.pending)return '';
+ return '<div class="banner warn" role="status"><span>名單覆核'+(s.busy?'核實中':'待核實')+'：'+esc(s.pending.preview.name)+
+  '</span><button class="btn btn-danger btn-sm" data-action="admin-roster-retry" '+(s.busy?'disabled':'')+'>核實上一筆名單覆核</button></div>';
+}
+function adminRosterErrorMessage(error){
+ const raw=String(error?.message||error||'');
+ const messages={'preview-changed':'雲端名單、名額或配對已有更新，請重新核對影響','results-recorded':'已有比分或比賽結果，需使用成績更正流程',
+  'event-locked':'賽事已開賽、結束或關閉','participant-status-changed':'選手的正備取狀態已改變，已核對最新資料','identity-conflict':'報名身分有衝突，請先核對帳號與家庭資料',
+  'special-roster-managed':'本場使用專用抽籤或團體流程','partner-roster-managed':'合作主辦票券房需使用專用名額流程','permission-denied':'帳號權限已變更',
+  'confirmation-expired':'本次確認已逾時，請重新核對','pending-operation-conflict':'請先核實上一筆名單覆核','invalid-capacity':'雲端名額設定需要先核對'};
+ return Object.keys(messages).find(k=>raw.includes(k))?messages[Object.keys(messages).find(k=>raw.includes(k))]:'雲端結果尚待核實，請恢復連線後重試同一筆操作';
+}
+async function offerAdminRoster(intent){
+ if(!canOfferAdminRoster()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ const context=adminOverrideContext(),controller=adminRosterController(),prior=controller.status();if(prior.busy)return;
+ if(!prior.pending&&adminCheckinController()?.status().pending){showToast('請先核實上一筆報到操作',true);return;}
+ try{
+  const task=controller.prepare(intent);render();const approval=await task;
+  const d=approval.data;
+  if(intent&&(d.operation!==intent.operation||d.registrationId!==intent.registrationId||d.playerId!==intent.playerId)){showToast('請先核實上一筆名單覆核',true);return;}
+  const p=approval.preview;
+  openModal({type:'generic',title:prior.pending?'核實／重試同一筆名單覆核':'管理員正備取覆核',danger:true,
+   message:'房號：'+d.code+'\n選手：'+p.name+'\n變更：'+(p.from==='waitlist'?'備取 → 正取':'正取 → 備取')+
+    '\n名額上限：'+(p.capacity===null?'不限':p.capacity)+' → '+(p.nextCapacity===null?'不限':p.nextCapacity)+
+    '\n\n'+p.warnings.join('\n')+(prior.pending?'\n\n使用原操作編號核實；已完成的異動不會再次執行。':'')+
+    '\n\n確認後會保存操作紀錄，並核對報名、私有及公開名單。',confirmLabel:prior.pending?'核實／重試同一筆':'我已核對，強制執行',
+   onConfirm:()=>{void executeAdminRoster(approval,controller);}});
+ }catch(e){if(JSON.stringify(adminOverrideContext())===JSON.stringify(context))showToast(adminRosterErrorMessage(e),true);}
+ finally{render();}
+}
+async function executeAdminRoster(approval,controller){
+ const current=()=>{const c=adminOverrideContext();return c.actorUid===approval.actorUid&&c.roomId===approval.data.roomId&&c.code===approval.data.code;};
+ if(!current()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ try{
+  const task=controller.execute(approval);render();const result=await task;if(!current())return;
+  showToast(result.superseded?'這筆名單覆核已完成，後續狀態已有變更；已載入最新名單':
+   '管理員名單覆核已完成，報名與雙名單已確認'+(result.bracketReset?'；請重新抽籤':''));
+ }catch(e){if(current())showToast(adminRosterErrorMessage(e)+(controller.status().pending?'；請核實／重試同一筆操作':''),true);}
+ finally{render();}
+}
+// Administrative recovery never generates or replaces onsite draw results.
+let adminOnsiteRecoveryContext=null;
+function adminOnsiteRecoveryController(){
+ if(!window.BXHAdminOnsiteRecovery)return null;
+ const context=adminOverrideContext(),key=JSON.stringify(context);
+ if(adminOnsiteRecoveryContext?.key===key)return adminOnsiteRecoveryContext.controller;
+ let storage;try{storage=window.sessionStorage;}catch{}
+ const controller=window.BXHAdminOnsiteRecovery.create({key,...context,storage,current:()=>JSON.stringify(adminOverrideContext())===key,
+  allowed:()=>window.BXHAdminOverride?.allowed(userProfile)===true,now:()=>Date.now(),operationId:()=>crypto.randomUUID(),
+  call:payload=>window.cloudSync.adminRecoverOnsiteWaitlist(payload),read:code=>window.cloudSync.readAdminOnsiteRecoveryFromServer(code),wait:ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  adopt:async latest=>{state=JSON.parse(JSON.stringify(latest.data));state.cloudCode=context.code;await saveRecord(state);}
+ });
+ adminOnsiteRecoveryContext={key,controller};return controller;
+}
+function canOfferAdminOnsiteRecovery(){
+ if(!window.BXHAdminOnsiteRecovery||!window.cloudSync?.adminRecoverOnsiteWaitlist||!state.cloudCode||!currentAuthUid()||window.BXHAdminOverride?.allowed(userProfile)!==true)return false;
+ return !!adminOnsiteRecoveryController()?.status().pending||!state.startedAt&&!['completed','archived'].includes(state.archiveStatus)&&
+  state.onsiteWaitlistFinalized!==true&&state.meta?.battleMode!=='team'&&(state.onsiteWaitlistServerOwned===true||state.meta?.registrationOnsiteWaitlistEnabled===true);
+}
+function adminOnsiteRecoveryPanelHtml(){
+ if(!canOfferAdminOnsiteRecovery())return '';
+ const status=adminOnsiteRecoveryController().status();
+ return '<div class="panel" id="admin-onsite-recovery-panel"><div class="panel-title">管理員抽籤同步覆核</div><p class="hint">人數、版本或鎖定異常時，先核對同步與鎖定資料。保留既有中選及遞補紀錄；完成後重新確認抽選名單。</p><button class="btn btn-danger" data-action="admin-recover-onsite" '+
+  (status.busy||status.corrupt||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked()?'disabled':'')+'>'+
+  (status.busy?'雲端核實中…':status.pending?'核實／重試同一筆抽籤覆核':'預覽同步／解鎖覆核')+'</button></div>';
+}
+function adminOnsiteRecoveryError(error){
+ const s=String(error?.message||error||'');
+ const messages={'preview-changed':'抽選名單、鎖定或紀錄已有更新，請重新核對','permission-denied':'帳號權限已變更','recovery-not-authorized':'目前帳號無法執行這項覆核',
+  'draw-finalized':'本場已完成抽選移交，請使用後續賽事流程','bracket-locked':'賽事已開賽、結束或關閉','not-onsite-managed':'本場不是專用候補抽籤模式',
+  'invalid-history':'抽選紀錄不完整，請先核對輪次與遞補資料','registration-state-conflict':'參賽身分或名單仍有衝突，無法只修復同步資料',
+  'duplicate-participant':'參賽身分重複，請先核對報名','partner-room-managed':'合作主辦票券房需使用專用流程','confirmation-expired':'本次確認已逾時，請重新核對'};
+ const code=Object.keys(messages).find(k=>s.includes(k));return code?messages[code]:'雲端結果尚待核實，請恢復連線後核實同一筆操作';
+}
+async function offerAdminOnsiteRecovery(){
+ if(!canOfferAdminOnsiteRecovery()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ const context=adminOverrideContext(),controller=adminOnsiteRecoveryController(),status=controller.status();if(status.busy)return;
+ try{
+  const task=controller.prepare();render();const a=await task,p=a.preview;
+  openModal({type:'generic',title:status.pending?'核實／重試抽籤同步覆核':'管理員抽籤同步覆核',danger:true,
+   message:'房號：'+a.data.code+'\n雲端線上正／備取：'+p.confirmedCount+'／'+p.waitlistCount+'\n現有抽選紀錄：'+p.roundCount+' 輪'+
+    (p.hasLock?'\n目前鎖定名單：'+(p.lockNames.length?p.lockNames.join('、'):'鎖定資料不完整，將保留原快照'):'\n目前沒有鎖定名單')+
+    '\n\n'+p.warnings.join('\n')+(status.pending?'\n\n沿用原操作編號，已完成的覆核不會再次解鎖。':'')+'\n\n確認後保存紀錄，並核對雙份雲端資料。',
+   confirmLabel:status.pending?'核實／重試同一筆':p.hasLock?'已核對，同步並解鎖':'已核對，修復同步',onConfirm:()=>{void executeAdminOnsiteRecovery(a,controller);}});
+ }catch(e){if(JSON.stringify(adminOverrideContext())===JSON.stringify(context))showToast(adminOnsiteRecoveryError(e),true);}
+ finally{render();}
+}
+async function executeAdminOnsiteRecovery(a,controller){
+ const current=()=>{const c=adminOverrideContext();return c.actorUid===a.actorUid&&c.roomId===a.data.roomId&&c.code===a.data.code;};
+ if(!current()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ try{const task=controller.execute(a);render();const r=await task;if(!current())return;
+  showToast(r.superseded?'這筆覆核已完成，抽選流程後續已有更新；已載入最新資料':'抽籤同步覆核已完成；請回到原抽選流程重新核對名單');
+ }catch(e){if(current())showToast(adminOnsiteRecoveryError(e)+(controller.status().pending?'；請核實／重試同一筆操作':''),true);}
+ finally{render();}
+}
+
 let bracketCommitContext=null;
+function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
+ if(!fresh||!snapshot||fresh.id!==snapshot.id||fresh.startedAt||fresh.archiveStatus==='completed'||
+   fresh.meta?.battleMode==='team'||snapshot.meta?.battleMode==='team'||
+   fresh.meta?.checkinRequired!==true||snapshot.meta?.checkinRequired!==true)return null;
+ const layoutSettings=s=>JSON.stringify([s.meta?.formatType||'single',Number(s.meta?.stations||1),!!s.meta?.bronzeMatch]);
+ if(layoutSettings(fresh)!==layoutSettings(snapshot))return null;
+ const entrants=(players)=>{
+  const ids=(players||[]).filter(p=>p?.checkedIn===true).map(p=>String(p.id||''));
+  return ids.length===new Set(ids).size&&ids.every(Boolean)?ids.sort():null;
+ };
+ const paired=[...new Set((snapshot.matches||[]).flatMap(m=>[m.a?.playerId,m.b?.playerId]).filter(Boolean).map(String))].sort();
+ const before=entrants(snapshot.players),after=entrants(fresh.players);
+ if(!before||!after||paired.length<2||JSON.stringify(before)!==JSON.stringify(paired)||
+   JSON.stringify(after)!==JSON.stringify(paired))return null;
+ const rebased=cloneStateForSave(fresh);
+ for(const field of ['matches','bracketSize','drawnAt','currentMatchId','championId','runnerUpId','thirdId','fourthId','gfMatchId','gfResetMatchId','bronzeMatchId','rrRounds','celebrationShown','courtAssignments','bracketDraw','bracketDrawHistory']){
+  if(Object.prototype.hasOwnProperty.call(snapshot,field))rebased[field]=JSON.parse(JSON.stringify(snapshot[field]));
+ }
+ rebased.updatedAt=Date.now();return rebased;
+}
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
  const key=String(firebaseUser?.uid||currentRole||'local')+':'+String(state.cloudCode||state.id);
@@ -10501,9 +10935,30 @@ function bracketCommitController(){
  const controller=window.BXHBracketCommit.create({key,actorUid,storage,current,
   state:()=>state,cloud:()=>!!code,
   operationId:()=>window.crypto.randomUUID(),
-  generate:()=>{
+  authorizeOverride:approval=>adminOverrideCurrent(approval),
+  rebaseRosterFence:rebaseOrdinaryBracketRosterFence,
+  rebaseOverride:(fresh,snapshot,approval)=>{
+   if(!adminOverrideCurrent(approval))throw Error('admin-override-not-authorized');
+   const known=new Set((fresh.players||[]).map(p=>String(p.id)));
+   if(approval.participantIds.some(id=>!known.has(id)))throw Error('admin-override-roster-changed');
+   const rebased=cloneStateForSave(fresh);rebased.cloudCode=code;
+   for(const field of ['matches','bracketSize','drawnAt','currentMatchId','championId','runnerUpId','thirdId','fourthId','courtAssignments','bracketDraw','bracketDrawHistory']){
+    if(Object.prototype.hasOwnProperty.call(snapshot,field))rebased[field]=JSON.parse(JSON.stringify(snapshot[field]));
+   }
+   rebased.updatedAt=Date.now();rebased.rosterLocked=false;return rebased;
+  },
+  generate:(options={})=>{
    const prior=state;state=JSON.parse(JSON.stringify(prior));
-   try{if(!generateBracket())return null;return JSON.parse(JSON.stringify(state));}
+   const canonicalPlayers=state.players;
+   try{
+    if(options.adminOperationalOverride){
+     if(!adminOverrideCurrent(options.adminOperationalOverride))return null;
+     const selected=new Set(options.adminOperationalOverride.participantIds);
+     state.players=(state.players||[]).map(p=>({...p,checkedIn:selected.has(String(p.id))}));
+    }
+    if(!generateBracket(options))return null;
+    if(options.adminOperationalOverride)state.players=canonicalPlayers;
+    return JSON.parse(JSON.stringify(state));}
    finally{state=prior;}
   },
   read:()=>window.cloudSync.readBracketFromServer(code),
@@ -10512,26 +10967,36 @@ function bracketCommitController(){
   local:snapshot=>saveRecord(snapshot),
   apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
   changed:()=>{if(current())renderPreservingScroll();},
-  success:()=>{activeTab='people';render();showToast(code?'上傳成功':'儲存成功');}
+  success:()=>{adminOperationalFailure=null;activeTab='people';render();showToast(code?'上傳成功':'儲存成功');}
  });
  bracketCommitContext={key,controller};return controller;
 }
 function bracketCommitBlocked(){return bracketCommitController()?.blocked()||false;}
+function bracketRosterUpdateHtml(){
+ if(state.startedAt||state.archiveStatus==='completed'||!state.bracketSize||!(state.matches||[]).length||bracketRosterIsCurrent())return '';
+ const action=canOperateCurrentTournament()?'<button class="btn btn-primary" data-action="draw-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>依最新名單重新抽籤</button>':'<p>請主辦更新對戰表。</p>';
+ return '<section class="panel banner warn" role="alert"><div><b>對戰表待更新</b><p>報到或參賽名單已有異動，目前顯示的是先前配對。開賽前請依最新名單重新抽籤並確認儲存；重新抽籤會更動配對。</p>'+action+'</div></section>';
+}
 function bracketCommitStatusHtml(){
- const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return '';
+ const rosterUpdate=bracketRosterUpdateHtml();
+ const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return rosterUpdate;
+ if(rosterUpdate&&s.result==='success'&&!s.pending&&!s.busy)return rosterUpdate;
  const uploaded=s.result==='success',cloud=!!state.cloudCode;
  const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
- return '<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
- (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+'</section>';
+ const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
+ return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
+ failureDetail+
+ (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
+ (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
- return '<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
+ return adminOverrideButtonsHtml()+'<button class="btn '+(state.bracketSize?'btn-ghost':'btn-primary')+'" data-action="draw-bracket" '+(state.startedAt||bracketCommitBlocked()||(state.meta.battleMode!=="team"&&!entryRosterValid())?'disabled':'')+'>'+(state.bracketSize?'重新抽籤':'抽籤')+'</button>';
 }
 async function verifyBracketBeforeStart(){
  const c=bracketCommitController();if(!c)return true;
- const ok=await c.verify(state);if(!ok)showToast('對戰表尚未確認上傳，請先重試上傳後再開賽',true);return ok;
+ const ok=await c.verify(state);if(!ok){if(!offerAdminOperationalOverride('start-tournament','對戰表尚未通過一般開賽驗證'))showToast('對戰表尚未確認上傳，請先重試上傳後再開賽',true);}return ok;
 }
 
 function currentRoundLabelForBoard(){
@@ -11597,7 +12062,7 @@ function previousMatchCorrectionHtml(stationNum,currentId){
 }
 function refereeWorkstationHeader(m, stationNum){
   const closed=state.forcedCourtExits?.[stationNum]?.closed;
-  const exitButton=(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<button class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'強制退場'}</button>`:"";
+  const exitButton=state.bracketSize&&(closed?canManageCourtRetirement():canForceExitCourt(stationNum))&&state.archiveStatus!=="completed"?`<details class="ref-court-maintenance"><summary>更多操作</summary><div><p>整台管理操作，與裁判入席／退出無關。</p><button type="button" class="btn btn-sm ref-court-exit-btn" data-action="${closed?'court-force-reopen':'court-force-exit'}" data-station="${stationNum}" ${courtRetirementBusy?'disabled':''}>${closed?'重新啟用本台':'裁判台強制退場'}</button></div></details>`:"";
   const assigned=refereeDisplayForStation(stationNum);
   const status=refereeStationStatus(m);
   const matchMeta=m?`${esc(refereeStageLabel(m))} · 第 ${m.indexInRound+1} 場`:"等待安排場次";
@@ -11632,7 +12097,7 @@ function courtAtmosphereStyle(stationNum){
 function renderCourtCard(stationNum){
   const court = state.courtAssignments && state.courtAssignments[courtKey(stationNum)];
   if(!court){
-    return `<div class="panel court-card court-card-idle referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">${refereeWorkstationHeader(null,stationNum)}<div class="empty-state">尚未初始化</div></div>`;
+    return renderWaitingRefereeCourt(stationNum);
   }
   if(state.forcedCourtExits?.[stationNum]?.closed)return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}">${refereeWorkstationHeader(null,stationNum)}<div class="empty-state">本台已強制退場，停止接新場。未完成場次保留於待接管清單。</div></div>`;
   const m = court.currentMatchId ? getMatch(court.currentMatchId) : null;
@@ -11649,6 +12114,7 @@ function renderCourtCard(stationNum){
       ${refereeWorkstationHeader(null,stationNum)}
       <div class="empty-state"><div class="big">${canReceiveSkipped ? "本台閒置，可承接跳過場次" : stationHasFutureWork ? "等待晉級結果" : "本台賽程已完成"}</div>${canReceiveSkipped?'<div>請至上方「待承接場次」選擇安排。</div>':''}</div>
       ${claimButtons?`<div class="msc-btns" style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:8px">${claimButtons}</div>`:""}
+      ${refereeWaitingControls(stationNum)}
     </div>`;
   }
 
@@ -11833,11 +12299,73 @@ function renderCourtRetirementPanel(){
   }).join('');
   return `<section class="panel"><div class="panel-title">安全退場｜目標保留 ${p.targetCount} 台</div><div class="hint">保留台照常運作。退場狀態與場次保存在賽事資料中，重新開啟可接續。</div>${rows}</section>`;
 }
+function refereeWaitingControls(stationNum){
+  return `<fieldset disabled class="ref-waiting-controls" aria-label="台${stationNum}計分區，等待對戰">
+      <legend>等待對戰｜計分尚未開放</legend>
+      <div class="ref-waiting-sides">${['A','B'].map(side=>`<div><b>選手 ${side}｜—</b><div class="side-score">—</div><div class="ref-waiting-buttons">${['旋轉','擊飛','爆裂','極限','失誤'].map(label=>`<button type="button" disabled>${label}</button>`).join('')}</div></div>`).join('')}</div>
+      <div class="ref-waiting-buttons">${['撤銷得分','本局重賽','確認比賽結果'].map(label=>`<button type="button" disabled>${label}</button>`).join('')}</div>
+    </fieldset>`;
+}
+function renderWaitingRefereeCourt(stationNum){
+  const seatsEnabled=state.meta?.refereeSeatsV1?.version===1;
+  return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
+    ${refereeWorkstationHeader(null,stationNum)}
+    <div class="ref-waiting-status" role="status">${state.bracketSize?'等待對戰安排':'等待抽籤／對戰安排'}${seatsEnabled?'，可先加入裁判席。':'。本場尚未啟用三席裁判制。'}</div>
+    ${refereeWaitingControls(stationNum)}
+  </div>`;
+}
+function canUseRefereeSyncRecovery(){
+  return !!(state?.cloudCode&&state.id&&state.startedAt&&state.meta?.battleMode!=="team"&&currentAuthUid()&&canOperateCurrentTournament());
+}
+function refereeSyncRecoveryControlsHtml(){
+  if(!canUseRefereeSyncRecovery())return "";
+  const busy=window.BXHRefereeSyncRecovery?.isBusy();
+  return `<div class="panel"><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="referee-sync-recovery" ${busy?'disabled':''}>${busy?'復原中…':'同步復原'}</button><button class="btn btn-ghost btn-sm" data-action="referee-export-recovery" ${busy?'disabled':''}>匯出復原備份</button></div>${cloudStatus==="error"?'<div class="hint">若送分持續失敗，可先保留本機備份，再讀取雲端比分。</div>':''}</div>`;
+}
+function requestRefereeSyncRecovery(){
+  if(!canUseRefereeSyncRecovery()||window.BXHRefereeSyncRecovery?.isBusy())return;
+  const context={uid:currentAuthUid(),id:state.id,code:state.cloudCode};
+  openModal({type:"generic",title:"恢復雲端計分？",message:"將先保留這台裝置的本機比分備份，再重新讀取雲端並重新載入頁面。尚未獲雲端確認的比分與設定不會自動補送，請核對後再操作。備份可從裁判台匯出。",confirmLabel:"備份並重新載入",onConfirm:()=>{void performRefereeSyncRecovery(context);}});
+}
+async function performRefereeSyncRecovery(context){
+  if(!canUseRefereeSyncRecovery()||context.uid!==currentAuthUid()||context.id!==state.id||context.code!==state.cloudCode)return;
+  const api=window.BXHRefereeSyncRecovery;
+  if(!api){showToast("復原功能尚未載入，請稍後再試。",true);return;}
+  const snapshot=JSON.parse(JSON.stringify(state)),signature=JSON.stringify(snapshot);
+  const isCurrent=()=>canUseRefereeSyncRecovery()&&context.uid===currentAuthUid()&&context.id===state.id&&context.code===state.cloudCode&&JSON.stringify(state)===signature;
+  const readRemote=async()=>{
+    let timer;
+    try{
+      const read=(async()=>{if(window.cloudSync?.connect)await window.cloudSync.connect();if(!isCurrent())return {ok:false,reason:"context-changed"};return await window.cloudSync.joinRoom(context.code,{serverOnly:true});})();
+      return await Promise.race([read,new Promise(resolve=>{timer=setTimeout(()=>resolve({ok:false,reason:"timeout"}),8000);})]);
+    }
+    finally{clearTimeout(timer);}
+  };
+  const recovery=api.backupAndReload({snapshot,uid:context.uid,code:context.code,storage:window.storage,isCurrent,readRemote,cacheRemote:remote=>saveRecord(remote),reload:()=>{rememberRefereeWorkstation();window.location.reload();}});
+  render();
+  const result=await recovery;
+  if(!result.ok&&context.uid===currentAuthUid()&&context.id===state.id&&context.code===state.cloudCode){
+    const message=result.reason==="context-changed"?"賽事資料或登入身分已變更，已停止重新載入，請核對後再試。":result.reason==="remote-read-failed"?"無法讀取雲端最新比分，本機資料已保留，請確認網路後重試。":"本機備份或雲端資料未能確認，已停止重新載入；請先匯出賽事資料。";
+    showToast(message,true);render();
+  }
+}
+async function exportRefereeSyncRecovery(){
+  if(!canUseRefereeSyncRecovery())return;
+  const uid=currentAuthUid(),code=state.cloudCode,id=state.id;
+  try{
+    const backup=await window.BXHRefereeSyncRecovery?.latest({uid,code,storage:window.storage});
+    if(uid!==currentAuthUid()||code!==state.cloudCode||id!==state.id)return;
+    if(!backup){showToast("目前沒有這場賽事的本機復原備份。",true);return;}
+    const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=code+"-local-recovery-"+backup.savedAt+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){showToast("本機復原備份無法讀取，請先匯出目前賽事資料。",true);}
+}
 function renderReferee(){
   if(state.meta?.battleMode==="team")return renderTeamReferee();
-  const quickNav = refereeBracketRoundtripNav("bracket");
+  const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml();
   if(!state.bracketSize){
-    return quickNav+`<div class="panel"><div class="empty-state"><div class="big">尚未產生對戰表</div><div>請先至「賽事設定」產生對戰表</div></div></div>`;
+    const n=Math.max(1,Math.min(32,Number(state.meta.stations)||1));
+    return quickNav+`<div class="court-grid ${n===1?'court-grid-1':n===2?'court-grid-2':'court-grid-many'}">${Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1)).join('')}</div>`;
   }
   const rm = refereeMatches();
   if(rm.length===0){
@@ -12062,6 +12590,7 @@ function renderTeamAdminRegistrations(list,registrationLocked){
 }
 
 function renderAdminRegistrationsTab(){
+  if(staffRosterReadOnly())return renderStaffRegistrationRoster();
   const registrationLocked=currentTournamentRegistrationLocked();
   if(!state.meta || !state.meta.registrationEnabled){
     return `<div class="panel">
@@ -12384,6 +12913,18 @@ function shuffledCopy(arr){
 let entryUI={key:'',busy:false,preview:null,message:''};
 let peopleRosterSection="confirmed";
 let peopleRosterBusy=false;
+let peopleRosterSyncStatus=null;
+function peopleRosterSyncStatusHtml(){
+  const progress=peopleRosterSyncStatus;
+  if(!progress||progress.key!==registrationRosterContextKey())return "";
+  let message="";
+  if(progress.status==="loading")message="正在同步並確認雲端名單，請稍候…";
+  else if(progress.status==="success")message="同步確認完成：正取 "+progress.count+" 人（"+new Date(progress.at).toLocaleTimeString("zh-TW",{hour12:false})+"）";
+  else if(progress.status==="error")message="同步未完成："+progress.message+"；可再次按下同步重試。";
+  else return "";
+  return '<p class="hint" role="status" aria-live="polite">'+esc(message)+'</p>';
+}
+
 function entryContext(){const key=currentAuthUid()+':'+engagementSessionEpoch+':'+state.cloudCode;if(entryUI.key!==key)entryUI={key,busy:false,preview:null,message:''};return entryUI;}
 function entryRosterValid(){const e=state.entrySelection;if(!e)return true;if(e.status!=='drawn'||Number(e.vacancies||0)>0)return false;const ids=e.selected.map(x=>x.playerId).sort();return JSON.stringify(ids)===JSON.stringify(state.players.map(x=>String(x.id)).sort());}
 function renderEntrySelection(){
@@ -12803,6 +13344,7 @@ function registrationSourceLabel(row){
   return "玩家自行報名";
 }
 function renderPeopleManagement(){
+  if(typeof staffRosterReadOnly==='function'&&staffRosterReadOnly())return renderStaffRegistrationRoster();
   const online=!!(state.meta&&state.meta.registrationEnabled);
   const needsCheckin=!!(state.meta&&state.meta.checkinRequired);
   const checkinClosed=!!state.meta.checkinClosedEarly;
@@ -12845,7 +13387,7 @@ function renderPeopleManagement(){
   const sourceText=p=>p.source==="online"?"線上報名":(p.source==="test"?"測試名單":"現場新增");
   const checkinActionLocked=peopleRosterBusy||!!state.startedAt||state.archiveStatus==="completed"||checkinClosed;
   const checkinToggle=p=>needsCheckin?`<button class="people-checkin-toggle ${p.checkedIn?'is-checked':'is-unchecked'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinActionLocked?'disabled':''} aria-label="${p.checkedIn?'已報到，點擊取消報到':'未報到，點擊完成報到'}"><span class="people-checkin-dot"></span>${p.checkedIn?'已報到':'未報到'}</button>`:"";
-  const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
+  const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div>${adminCheckinButtonHtml(p)}${typeof adminRosterButtonsHtml==='function'?adminRosterButtonsHtml(p,'demote'):''}<button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
 
   const confirmedRow=(p,i)=>`
     <tr>
@@ -12874,17 +13416,17 @@ function renderPeopleManagement(){
     const regId=peopleRegistrationIdOf(r),shadow=peopleWaitlistShadow(regId);
     const name=r.displayName||r.publicName||r.participantName||r.realName||"未命名選手";
     const rank=i+1;
-    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">線上報名</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消備取</button></div></details>`;
+    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">線上報名</div>${typeof adminRosterButtonsHtml==='function'?adminRosterButtonsHtml(r,'promote',true):''}<button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>取消備取</button></div></details>`;
     return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(name)}</td><td class="people-col-source"><span class="badge badge-neon">線上報名</span></td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-registration-id="${esc(regId)}" data-name="${esc(name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const waitLocalRows=localWait.map((p,i)=>{
     const rank=onlineWait.length+i+1;
-    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div><button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
+    const more=`<details class="people-more-menu"><summary aria-label="更多備取操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div>${typeof adminRosterButtonsHtml==='function'?adminRosterButtonsHtml(p,'promote'):''}<button class="btn btn-danger btn-sm" data-action="people-delete-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除備取</button></div></details>`;
     return `<tr><td class="people-col-index"><span class="people-wait-rank">備${String(rank).padStart(2,"0")}</span></td><td class="rank-name people-col-name">${esc(participantDisplayName(p))}</td><td class="people-col-source">${sourceBadge(p)}</td><td class="people-col-checkin"><button class="btn btn-primary btn-sm people-primary-inline" data-action="people-promote-waitlist" data-local-id="${esc(p.id)}" data-name="${esc(p.name)}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>升正取</button></td><td class="people-col-actions">${more}</td></tr>`;
   }).join('');
   const onsiteWaitlistPanel=peopleOnsiteWaitlistAvailable()
     ?window.BXHOnsiteWaitlistIntegration?.placeholder({code:state.cloudCode,actorId:firebaseUser?.uid})||"":"";
-  const waitlistPanel=onsiteWaitlistPanel+(peopleOnsiteWaitlistManaged()?"":`
+  const waitlistPanel=(typeof adminOnsiteRecoveryPanelHtml==='function'?adminOnsiteRecoveryPanelHtml():'')+onsiteWaitlistPanel+(peopleOnsiteWaitlistManaged()?"":`
     <div class="panel">
       <div class="people-capacity-banner"><div><div class="panel-title">備取區（${rosterUnresolved?rosterPendingLabel:waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
       <div class="btn-row" style="margin:12px 0;">
@@ -12896,7 +13438,7 @@ function renderPeopleManagement(){
     </div>`);
 
   const toolsPanel=`
-    ${online||isCommunityQuickRegistration(state)?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" ${!state.cloudCode||state.startedAt||peopleRosterBusy?'disabled':''}>同步最新正取名單</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
+    ${online||isCommunityQuickRegistration(state)?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" aria-busy="${peopleRosterBusy?'true':'false'}" ${!state.cloudCode||state.startedAt||peopleRosterBusy?'disabled':''}>${peopleRosterBusy?'名單處理中…':'同步最新正取名單'}</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div>${peopleRosterSyncStatusHtml()}</div>`:''}
     ${needsCheckin?`<div class="panel"><div class="panel-title">報到管理</div><div class="btn-row"><button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button></div><p class="hint">提前結束後，未報到正取不會進入對戰表。</p>${checkinClosed?`<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>`:''}</div>`:''}
     <div class="panel"><div class="panel-title">現場新增選手</div><div class="field"><label>每行一位</label><textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea><div class="hint">${needsCheckin?'新增後先列為正取／未報到，玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入正取。'}此處新增為不連結帳號的現場訪客，不計入獵人榜與天梯賽事積分。已線上報名的玩家請從備取升正取，先核對雲端名單。</div></div><div class="btn-row"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至正取待報到':'新增至正取'}</button></div></div>
     <div class="panel"><div class="panel-title">測試名單</div><div class="hint" style="margin-bottom:10px;">建立指定人數的測試選手；會取代目前正取名單。</div><div class="btn-row"><button class="btn btn-ghost" data-action="random-test-roster" data-count="8" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 8 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="16" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 16 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="32" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 32 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="64" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 64 位</button></div></div>`;
@@ -12914,7 +13456,7 @@ function renderPeopleManagement(){
   const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
   const waitlistShortcut=peopleOnsiteWaitlistAvailable()&&peopleRosterSection!=="waitlist"
     ?'<div class="panel"><div class="people-section-summary"><div><div class="panel-title">備取／現場抽籤</div><p class="hint">備取名單、抽選名額與加開名額，統一從這裡操作。</p></div><button class="btn btn-primary" data-action="people-section" data-section="waitlist">'+(state.onsiteWaitlistFinalized===true?'查看抽籤紀錄':'前往備取／抽籤')+'</button></div></div>':"";
-  return syncError+pendingBanner+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
+  return (peopleRosterSection==="bracket"?"":bracketCommitStatusHtml())+syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -14063,8 +14605,8 @@ function renderTitleEditor(inline=false){
  <div class="field"><label>榮譽等級</label><select id="title-editor-rarity-tier">${Object.entries({common:'一般',rare:'稀有',epic:'史詩',legendary:'傳說',eternal:'永恆',...(titleTierValue(d)==='unrated'?{unrated:'待分級（舊制）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleTierValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">決定稱號本身的榮譽層級與視覺規格：一般 → 稀有 → 史詩 → 傳說 → 永恆。</div></div>
  <div class="field"><label>取得標籤</label><select id="title-editor-limited-type">${Object.entries({none:'常態取得',event:'活動限定',season:'賽季限定',identity:'身分限定',unique:'唯一限定',launch:'開服限定',beta:'封測限定',...(titleLimitedTypeValue(d)==='legacy'?{legacy:'限定（舊制待整理）'}:{})}).map(([k,v])=>`<option value="${k}" ${titleLimitedTypeValue(d)===k?'selected':''}>${v}｜${k}</option>`).join('')}</select><div class="hint">描述「為什麼難以取得」，不影響榮譽等級；唯一限定會自動限制正式持有人數為 1。</div></div>
  <label><input id="title-editor-permanent" type="checkbox" ${d.isPermanent!==false?'checked':''}> 永久持有（取消則標記為期間制）</label>
- <div class="field"><label>達成條件</label><select id="title-editor-condition">${Object.entries({manual:'指定 UID 人工授予',profile_completion:'個人資料完成度達100%',hosted_tournaments:'成功完成主辦場數',official_matches:'官方積分賽正式對戰場數',completed_tournaments:'正式賽事完成場數',championships:'正式賽事冠軍次數',best_placement:'正式賽事名次不大於',total_checkins:'正式累積簽到天數',checkin_streak:'正式連續簽到天數',...(['first_exit_1','first_exit_3','first_exit_5'].includes(d.titleId)?{first_match_exit_streak:'連續賽事首戰出局場數'}:{}),...(d.titleId==='top8_debut'?{verified_top8_debut:'首次正式賽事八強（至少32位實際出賽）'}:{}),...(d.titleId==='top16_debut'?{verified_top16_debut:'首次正式賽事十六強'}:{}),...(d.titleId==='top8_wall'?{verified_top8_exit_count:'累計五次八強（至少32位實際出賽）'}:{}),...(d.titleId==='pioneer'?{pioneer_registration:'開拓者：9/21 23:59 前註冊自動授予'}:{})}).map(([k,v])=>`<option value="${k}" ${d.conditionType===k?'selected':''}>${v}</option>`).join('')}</select></div>
- <div class="field"><label>門檻數值（人工授予填1，資料完成度填100）</label><input id="title-editor-target" type="number" min="1" max="100000" value="${Number(d.targetValue)||1}"></div>
+ <div class="field"><label>達成條件</label><select id="title-editor-condition">${Object.entries({manual:'指定 UID 人工授予',profile_completion:'個人資料完成度達100%',hosted_tournaments:'成功完成主辦場數',official_matches:'官方積分賽正式對戰場數',completed_tournaments:'正式賽事完成場數',championships:'正式賽事冠軍次數',best_placement:'正式賽事名次不大於',total_checkins:'正式累積簽到天數',total_online_minutes:'累積有效在線分鐘（無每日上限）',checkin_streak:'正式連續簽到天數',...(['first_exit_1','first_exit_3','first_exit_5'].includes(d.titleId)?{first_match_exit_streak:'連續賽事首戰出局場數'}:{}),...(d.titleId==='top8_debut'?{verified_top8_debut:'首次正式賽事八強（至少32位實際出賽）'}:{}),...(d.titleId==='top16_debut'?{verified_top16_debut:'首次正式賽事十六強'}:{}),...(d.titleId==='top8_wall'?{verified_top8_exit_count:'累計五次八強（至少32位實際出賽）'}:{}),...(d.titleId==='pioneer'?{pioneer_registration:'開拓者：9/21 23:59 前註冊自動授予'}:{})}).map(([k,v])=>`<option value="${k}" ${d.conditionType===k?'selected':''}>${v}</option>`).join('')}</select></div>
+ <div class="field"><label>門檻數值（人工授予填1，資料完成度填100，在線填分鐘）</label><input id="title-editor-target" type="number" min="1" max="100000" value="${Number(d.targetValue)||1}"></div>
  <div class="field"><label>說明</label><textarea id="title-editor-description" maxlength="500">${esc(d.description||'')}</textarea></div>
  <label><input id="title-editor-active" type="checkbox" ${d.isActive?'checked':''}>啟用</label>
  <label><input id="title-editor-hidden" type="checkbox" ${d.isHidden?'checked':''}>隱藏（不在公開圖鑑顯示）</label>
@@ -14281,6 +14823,7 @@ function renderAccountManagementScreen(){
                 <div class="account-detail-item"><div class="label">本名確認</div><div class="value">${user.realNameVerified===true?'已確認':'尚未確認'}</div></div>
                 <div class="account-detail-item"><div class="label">帳號 UID</div><div class="value">${esc(user.uid||"—")}</div></div>
               </div>
+              ${window.BXH_REFEREE_CERTIFICATES_V1===true&&canManageRefereeCertificates()?`<button type="button" class="btn btn-ghost" data-action="account-manage-referee" data-uid="${esc(user.uid)}">管理裁判資格</button>`:""}
               <div class="account-user-controls">
                 <div class="field"><label>帳號分類</label><select class="mgmt-role-select" data-uid="${esc(user.uid)}">${["super_admin","admin","staff","tester","player","viewer"].map(role=>`<option value="${role}" ${draft.role===role?'selected':''}>${roleDisplayLabel(role)}</option>`).join("")}</select></div>
                 ${user.role!=="player"?'<div class="field"><label>合作主辦權限</label><div class="hint">請先將帳號分類設為玩家並儲存，再開通合作主辦。</div></div>':""}
@@ -15196,6 +15739,7 @@ function lobbySummary(raw){
     raw, communityQuickRegistration:isCommunityQuickRegistration(raw), registrationEnabled:raw.registrationEnabled, registrationStatus:raw.registrationStatus, code:raw.code, name:m.name||raw.name||"未命名賽事", date:m.date||raw.eventDate||"", startAt:m.startTime||raw.startAt||"",
     location:m.location||raw.location||"", phase:canonicalPublicTournamentPhase(raw), regStatus,
     authority, hostName, systemClosure:raw.systemClosure||pd.systemClosure||null,
+    ladderMode:(raw.ladderMode??m.ladderMode)==="ranked"?"ranked":"general",
     registrationSelection:raw.registrationSelection||null,registeredCount:Number(raw.registeredCount||0),capacity:raw.capacity??null, confirmedCount:communityRegistrationParticipantCount(raw), waitlistEnabled:!!raw.waitlistEnabled,
     waitlistCapacity:raw.waitlistCapacity||0, waitlistCount:raw.waitlistCount||0,
     closeAt:normalizeDateTime(raw.registrationCloseAt), openAt:normalizeDateTime(raw.registrationOpenAt),
@@ -15338,6 +15882,8 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
           <div class="lobby-host">${esc(t.hostName)} 主辦</div>
         </div>
         <div class="lobby-card-right">
+          <span class="lobby-room-code">房號 ${esc(t.code)}</span>
+          <span class="badge ${t.ladderMode==="ranked"?"badge-neon":"badge-metal"}" style="white-space:nowrap;flex-shrink:0">${t.ladderMode==="ranked"?"積分賽事":"一般賽事"}</span>
           <span class="lobby-authority ${authorityClass}">${authorityLabel}</span>
           ${t.roomAccessMode==="password"?'<span class="badge badge-metal">🔒 密碼房</span>':""}
           ${t.systemClosure&&!t.systemClosure.restoredAt?'<span class="badge badge-metal">比賽結束（系統關閉）</span>':roomStatusHtml(displayPhase)}
@@ -15685,11 +16231,178 @@ let adminRegistrationsCache = null; // null = not yet fetched for the current to
 let adminRegistrationsLoading = false;
 let adminRegistrationsError = null;
 let adminRegistrationsBusy = false; // promote/cancel action in-flight guard
-function resetAdminRegistrationsCache(){ adminRegistrationsCache = null; adminRegistrationsError = null; }
+let staffRosterCache=null;
+function resetAdminRegistrationsCache(){ adminRegistrationsCache = null; adminRegistrationsError = null; staffRosterCache=null; }
 let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;
 let adminRosterSyncChain=Promise.resolve();
 let adminRosterContextKey="";
 let adminRosterManualContext=null;
+function staffRosterReadOnly(){
+  const uid=currentAuthUid(),user=userProfile;
+  if(!uid||!['admin','staff'].includes(currentRole)||user?.role!=='staff'||user.active!==true||
+    user.isTestAccount===true||user.deleted||['deleted','disabled','frozen'].includes(user.accountStatus)||
+    state.meta?.eventAuthority!=='official'||state.testMode===true)return false;
+  const assigned=state.meta?.assignedStaffUids??state.assignedStaffUids;
+  return Array.isArray(assigned)&&assigned.length>0&&!assigned.includes(uid);
+}
+async function loadStaffRegistrationRoster(){
+  if(!staffRosterReadOnly()||peopleRosterBusy||!state.cloudCode)return;
+  const context=captureRegistrationRosterContext();
+  const isCurrent=()=>context.key===registrationRosterContextKey()&&context.generation===adminRosterGeneration&&staffRosterReadOnly()&&
+    (appPhase==='app'||appPhase==='community-room')&&['people','registrations'].includes(registrationRosterViewTab());
+  peopleRosterBusy=true;adminRosterManualContext=context;adminRegistrationsError=null;
+  render();
+  try{
+    if(window.cloudSync?.connect)await window.cloudSync.connect();
+    if(!isCurrent())return;
+    if(!window.cloudSync?.readStaffRegistrationRoster)throw Error('staff-roster-service-unavailable');
+    const result=await window.cloudSync.readStaffRegistrationRoster(context.code);
+    if(!isCurrent())return;
+    if(result?.ok!==true||result.code!==String(context.code).toUpperCase()||!Array.isArray(result.rows))throw Error('staff-roster-read-failed');
+    staffRosterCache={key:context.key,rows:result.rows,checkinEnabled:result.checkinEnabled===true,promotionEnabled:result.promotionEnabled===true};
+    adminRegistrationsError=null;
+    showToast('玩家名單已同步');
+  }catch(error){
+    if(isCurrent()){
+      const code=String(error?.code||error?.message||'');
+      adminRegistrationsError=code.includes('permission-denied')?'目前帳號無法讀取這場賽事名單，請確認工作人員身分。':
+        code.includes('not-found')||code.includes('unavailable')?'名單同步服務尚未就緒，請稍後重試。':'玩家名單同步失敗，請稍後重試。';
+    }
+  }finally{
+    if(adminRosterManualContext===context){peopleRosterBusy=false;adminRosterManualContext=null;}
+    if(isCurrent())render();
+  }
+}
+let staffCheckinBusy=false;
+const staffCheckinOperations=new Map();
+async function staffRosterCheckin(target){
+  if(staffCheckinBusy||staffPromotionBusy||peopleRosterBusy||!staffRosterReadOnly())return;
+  const context=captureRegistrationRosterContext();
+  const current=()=>context.key===registrationRosterContextKey()&&context.generation===adminRosterGeneration&&staffRosterReadOnly();
+  const cache=staffRosterCache;
+  if(cache?.key!==context.key||cache.checkinEnabled!==true)return;
+  const playerId=target.getAttribute('data-player-id'),checkedIn=target.getAttribute('data-checked-in')==='true';
+  const matches=cache.rows.filter(row=>row.playerId===playerId&&row.status==='confirmed');
+  if(!playerId||matches.length!==1||matches[0].checkedIn===checkedIn)return;
+  const player=matches[0];
+  const submit=async()=>{
+    if(!current()||staffCheckinBusy)return;
+    const action=checkedIn?'manual':'revoke',key=context.key+':'+playerId+':'+action;
+    let operationId=staffCheckinOperations.get(key);
+    if(!operationId){
+      try{operationId=sessionStorage.getItem('bxh.staffCheckin.'+key);}catch{}
+      if(!/^[-a-zA-Z0-9]{16,80}$/.test(operationId||''))operationId=crypto.randomUUID();
+      staffCheckinOperations.set(key,operationId);
+      try{sessionStorage.setItem('bxh.staffCheckin.'+key,operationId);}catch{}
+    }
+    staffCheckinBusy=true;render();
+    try{
+      const result=await window.engagementService.tournamentOperation('tournamentCheckin',{action,code:context.code,playerId,operationId});
+      if(!current())return;
+      if(result?.ok!==true)throw Error('checkin-unconfirmed');
+      const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);
+      if(!current())return;
+      if(fresh?.ok!==true||fresh.code!==String(context.code).toUpperCase()||!Array.isArray(fresh.rows))throw Error('checkin-readback-failed');
+      staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true,promotionEnabled:fresh.promotionEnabled===true};
+      const verified=fresh.rows.filter(row=>row.playerId===playerId&&row.status==='confirmed');
+      if(verified.length!==1||verified[0].checkedIn!==checkedIn){
+        staffCheckinOperations.delete(key);try{sessionStorage.removeItem('bxh.staffCheckin.'+key);}catch{}
+        throw Error('checkin-state-changed');
+      }
+      staffCheckinOperations.delete(key);try{sessionStorage.removeItem('bxh.staffCheckin.'+key);}catch{}
+      adminRegistrationsError=null;showToast(checkedIn?'報到成功':'已取消報到');
+    }catch(error){
+      if(current()){
+        const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
+        adminRegistrationsError=reason.includes('permission-denied')?'目前帳號沒有本場報到操作權限，請重新同步名單。':
+          reason.includes('checkin-closed')?'目前報到已鎖定，請重新同步名單。':
+          reason.includes('checkin-state-changed')?'報到狀態已有異動，已同步最新名單；請確認後再次操作。':'報到結果尚未確認，請重新同步名單核對；重試相同操作會沿用原請求。';
+        showToast(adminRegistrationsError,true);
+      }
+    }finally{staffCheckinBusy=false;if(current())render();}
+  };
+  if(checkedIn){await submit();return;}
+  openModal({type:'generic',title:'是否要取消報到？',message:player.name,danger:true,confirmLabel:'是',cancelLabel:'否',onConfirm:()=>{if(current())void submit();}});
+}
+let staffPromotionBusy=false;
+const staffPromotionOperations=new Map();
+async function staffRosterPromote(target){
+  if(staffPromotionBusy||staffCheckinBusy||peopleRosterBusy||!staffRosterReadOnly())return;
+  const context=captureRegistrationRosterContext();
+  const current=()=>context.key===registrationRosterContextKey()&&context.generation===adminRosterGeneration&&staffRosterReadOnly();
+  const cache=staffRosterCache;
+  if(cache?.key!==context.key||cache.promotionEnabled!==true)return;
+  const registrationId=target.getAttribute('data-registration-id'),playerId=target.getAttribute('data-player-id');
+  if(!!registrationId===!!playerId)return;
+  const key=registrationId?'promotionRegistrationId':'promotionPlayerId',id=registrationId||playerId;
+  const matches=cache.rows.filter(row=>row[key]===id&&row.status==='waitlist');
+  if(matches.length!==1)return;
+  const intent=context.key+':'+key+':'+id;
+  openModal({type:'generic',title:'確認升為正取？',message:'將「'+matches[0].name+'」由備取升為正取。系統會重新核對名額與賽事狀態。',
+   confirmLabel:'確認升正取',cancelLabel:'返回',onConfirm:async()=>{
+    if(!current()||staffPromotionBusy)return;
+    let operationId=staffPromotionOperations.get(intent);
+    if(!operationId){try{operationId=sessionStorage.getItem('bxh.staffPromotion.'+intent);}catch{}
+      if(!/^[-a-zA-Z0-9]{16,80}$/.test(operationId||''))operationId=crypto.randomUUID();
+      staffPromotionOperations.set(intent,operationId);
+      try{sessionStorage.setItem('bxh.staffPromotion.'+intent,operationId);}catch{}
+    }
+    staffPromotionBusy=true;render();
+    try{
+      const result=await window.engagementService.tournamentOperation('promoteSeatedRegistration',{
+       code:context.code,...(registrationId?{registrationId}:{playerId}),operationId,expandBy:0});
+      if(!current())return;
+      if(result?.ok!==true||result.verified!==true)throw Error('promotion-unconfirmed');
+      const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);
+      if(!current())return;
+      if(fresh?.ok!==true||fresh.code!==String(context.code).toUpperCase()||!Array.isArray(fresh.rows))throw Error('promotion-readback-failed');
+      staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true,promotionEnabled:fresh.promotionEnabled===true};
+      const confirmed=fresh.rows.filter(row=>row[key]===id&&row.status==='confirmed');
+      if(confirmed.length!==1){staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
+       throw Error('promotion-state-changed');}
+      staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
+      adminRegistrationsError=null;showToast('已升為正取');
+    }catch(error){if(current()){
+      const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
+      if(/not-waitlist|operation-outdated|bracket-locked|promotion-state-changed|capacity-full/.test(reason)){
+       staffPromotionOperations.delete(intent);try{sessionStorage.removeItem('bxh.staffPromotion.'+intent);}catch{}
+      }
+      adminRegistrationsError=reason.includes('capacity-full')?'正取名額已滿，請由房主調整名額後重新同步。':
+       reason.includes('permission-denied')?'目前帳號沒有本場遞補權限，請重新同步名單。':
+       reason.includes('promotion-state-changed')?'名單已有異動，已同步最新狀態，請再次確認。':
+       '遞補結果尚未確認，請重新同步名單核對；網路重試會沿用原操作。';
+      showToast(adminRegistrationsError,true);
+    }}finally{staffPromotionBusy=false;if(current())render();}
+   }});
+}
+function renderStaffRegistrationRoster(){
+  if(adminRosterUnsub||adminRosterCode)stopAdminRosterWatch();
+  const rows=staffRosterCache?.key===registrationRosterContextKey()?staffRosterCache.rows:null;
+  if(!rows&&!peopleRosterBusy&&!adminRegistrationsError)setTimeout(loadStaffRegistrationRoster,0);
+  const status={confirmed:'正取',waitlist:'備取'};
+  const confirmed=rows?.filter(row=>row.status==='confirmed').length;
+  const waitlist=rows?.filter(row=>row.status==='waitlist').length;
+  const controls=window.BXHRosterView?.controls({contextKey:registrationRosterContextKey(),section:'confirmed'})||'';
+  const checkinLabel=row=>{
+    if(row.status!=='confirmed')return '—';
+    if(!state.meta?.checkinRequired)return '免報到';
+    const label=row.checkedIn?'已報到':'未報到';
+    if(staffRosterCache?.checkinEnabled!==true||!row.playerId)return label;
+    return `<button class="btn btn-ghost btn-sm" data-action="staff-roster-checkin" data-player-id="${esc(row.playerId)}" data-checked-in="${row.checkedIn?'false':'true'}" ${staffCheckinBusy||staffPromotionBusy||peopleRosterBusy?'disabled':''}>${label}｜${row.checkedIn?'取消報到':'報到'}</button>`;
+  };
+  const promotionLabel=row=>{
+    if(row.status!=='waitlist'||staffRosterCache?.promotionEnabled!==true)return '—';
+    const registrationId=row.promotionRegistrationId,playerId=row.promotionPlayerId;
+    if(!registrationId&&!playerId)return '—';
+    return `<button class="btn btn-primary btn-sm" data-action="staff-roster-promote" ${registrationId?`data-registration-id="${esc(registrationId)}"`:`data-player-id="${esc(playerId)}"`} ${staffPromotionBusy||peopleRosterBusy||staffCheckinBusy?'disabled':''}>升正取</button>`;
+  };
+  return `<div id="people-roster-view">${controls}<div class="panel"><div class="panel-title">玩家名單</div>
+    <p class="hint">${staffRosterCache?.promotionEnabled===true?'升正取會即時核對名額；名額已滿時請由房主調整。':staffRosterCache?.checkinEnabled===true?'可為正取選手報到或取消報到；請依實際到場選手逐位操作。':'工作人員可同步查看正取、備取與報到狀態。'}</p>
+    <button class="btn btn-primary" data-action="load-staff-registration-roster" ${peopleRosterBusy||staffCheckinBusy||staffPromotionBusy?'disabled':''}>${peopleRosterBusy?'同步中…':'重新同步名單'}</button>
+    ${adminRegistrationsError?`<div class="banner warn" role="alert">${esc(adminRegistrationsError)}</div>`:''}
+    ${rows?`<p>正取 ${confirmed} 人 ／ 備取 ${waitlist} 人</p><div class="table-scroll"><table class="rank-table people-roster-table"><thead><tr><th>#</th><th>姓名</th><th>名單</th><th>報到</th>${staffRosterCache?.promotionEnabled===true?'<th>遞補</th>':''}</tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${index+1}</td><td class="people-col-name">${esc(row.name)}</td><td>${status[row.status]||'—'}</td><td>${checkinLabel(row)}</td>${staffRosterCache?.promotionEnabled===true?`<td>${promotionLabel(row)}</td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty-state">${adminRegistrationsError?'尚未取得最新名單':'正在讀取玩家名單…'}</div>`}
+    </div></div>`;
+}
 function canManageRegistrationRoster(){
   if(!firebaseUser || userProfile?.active===false) return false;
   if(isCommunityRoomOwner() && state.createdBy===firebaseUser.uid) return true;
@@ -15717,6 +16430,7 @@ function stopAdminRosterWatch(){
 function reconcileRegistrationRosterContext(){
   const key=registrationRosterContextKey();
   if(key!==adminRosterContextKey){
+    peopleRosterSyncStatus=null;
     stopAdminRosterWatch();
     resetAdminRegistrationsCache();
     adminRegistrationsLoading=false;
@@ -15758,6 +16472,7 @@ async function refreshBackendRegistrationRoster(context,catchup=false){
   return {ok:true,changed:before!==JSON.stringify(state.players||[]),confirmed:(state.players||[]).filter(p=>p.source==="online").length};
 }
 async function loadAdminRegistrationRows(){
+  if(staffRosterReadOnly())return loadStaffRegistrationRoster();
   if(adminRegistrationsLoading||!state.cloudCode||!canManageRegistrationRoster()) return;
   const context=captureRegistrationRosterContext();
   adminRegistrationsLoading=true;
@@ -15781,6 +16496,7 @@ async function loadAdminRegistrationRows(){
   }
 }
 async function startAdminRosterWatch(){
+  if(staffRosterReadOnly()){stopAdminRosterWatch();return;}
   reconcileRegistrationRosterContext();
   const code=state.cloudCode;
   if(!registrationRosterPeopleView() || !canManageRegistrationRoster() || (!state.meta?.registrationEnabled&&!isCommunityQuickRegistration(state)) || !code) return;
@@ -17893,6 +18609,8 @@ function renderPlayerCenterOverview(p){
 function renderPlayerProfileTab(p){
   const profileUid=currentAuthUid();
   if(playerProfileSectionUid!==profileUid){playerProfileSectionUid=profileUid;playerProfileSection="overview";playerCenterPeriod="season";playerCenterCareerVisibleCount=10;playerCenterHistoryVisibleCount=10;}
+  const refereeEnabled=window.BXH_REFEREE_CERTIFICATES_V1===true;
+  if(!refereeEnabled&&['duty','achievements'].includes(playerProfileSection))playerProfileSection='overview';
   if(['overview','career'].includes(playerProfileSection)){
     if(!hunterProfileCache&&!hunterProfileLoading&&!hunterProfileError)setTimeout(()=>loadHunterProfile(false),0);
     if(playerProfileSection==='overview'&&!myLadderProfileCache&&!myLadderProfileLoading&&playerCenterLadderRequestedUid!==profileUid){playerCenterLadderRequestedUid=profileUid;setTimeout(()=>loadMyLadderProfile(false),0);}
@@ -17902,7 +18620,10 @@ function renderPlayerProfileTab(p){
     <button class="btn ${playerProfileSection==='career'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='career'}" data-action="profile-section" data-section="career">生涯紀錄</button>
     <button class="btn ${playerProfileSection==='basic'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='basic'}" data-action="profile-section" data-section="basic">基本資料</button>
     <button class="btn ${playerProfileSection==='titles'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='titles'}" data-action="profile-section" data-section="titles">我的稱號</button>
+    ${refereeEnabled?`<button class="btn ${playerProfileSection==='duty'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='duty'}" data-action="profile-section" data-section="duty">我的執勤</button><button class="btn ${playerProfileSection==='achievements'?'btn-primary':'btn-ghost'}" role="tab" aria-selected="${playerProfileSection==='achievements'}" data-action="profile-section" data-section="achievements">我的成就</button>`:''}
   </div>`;
+  if(refereeEnabled&&playerProfileSection==='duty')return sectionNav+renderRefereeLicensePage('duty');
+  if(refereeEnabled&&playerProfileSection==='achievements')return sectionNav+renderRefereeLicensePage('achievements');
   if(playerProfileSection==="overview") return sectionNav+renderPlayerCenterOverview(p);
   if(playerProfileSection==="career") return sectionNav+renderPlayerCenterCareer();
   if(playerProfileSection==="titles") return sectionNav+safeEngagementRender(()=>renderPlayerTitleCenter(p));
@@ -18106,11 +18827,26 @@ const WINNER_CROWN_SVG = '<svg viewBox="0 0 64 40" width="20" height="14" fill="
 /* ==== modal ==== */
 // v13.19.2: generic confirmation modal must sit above admin tournament-list/switch overlays.
 // Otherwise clicking Delete creates the confirmation behind the list and it only appears after closing the list.
+function courtForceExitConfirmation(change,m){
+  const roomId=state.id,code=state.cloudCode;
+  const pair=m?`${m.a?.playerId?playerName(m.a.playerId):'未定'} vs ${m.b?.playerId?playerName(m.b.playerId):'未定'}｜${Number(m.scoreA)||0}：${Number(m.scoreB)||0}`:'目前沒有對戰';
+  return {type:'court-force-exit',station:change.station,danger:true,focusCancel:true,
+    title:`台${change.station}｜裁判台強制退場`,
+    message:`台${change.station}｜${pair}\n本裁判台將停止接收賽事自動指派／編排。\n這與裁判個人的入席／退出不同。\n解除本台目前場次、下一場與派場鎖，停止接新場。未完成場次保留雲端比分，移至待接管清單；已完成結果保留。原裝置尚未上傳的資料請保留。`,
+    confirmLabel:`確認台${change.station}裁判台退場`,onConfirm:()=>{
+      if(state.id!==roomId||state.cloudCode!==code){showToast('賽事已切換，未執行停用，請重新確認。',true);return;}
+      return executeCourtForceAction(change);
+    }};
+}
 function renderModal(){
   if(!pendingModal) return "";
   const mm = pendingModal;
   let body = mm.messageIsHtml ? `<div class="modal-rich-content">${mm.message||""}</div>` : `<p>${esc(mm.message).replace(/\n/g,"<br>")}</p>`;
   mm.confirmDisabled = false;
+  if(mm.type==='court-force-exit'){
+    mm.confirmDisabled=mm.acknowledged!==true;
+    body+=`<label class="ref-force-exit-ack"><input type="checkbox" id="court-force-exit-ack" ${mm.acknowledged?'checked':''}>我確認讓台${Number(mm.station)}裁判台退場，停止接收賽事自動指派／編排。</label>`;
+  }
   if(mm.type==="confirm-result"){
     const m = getMatch(mm.matchId);
     if(!m || !m.a || !m.b){
@@ -18201,7 +18937,7 @@ function renderModal(){
   </div>`;
 }
 
-function openModal(cfg){ pendingModal = cfg; render(); }
+function openModal(cfg){ pendingModal = cfg; render(); if(cfg.focusCancel)document.getElementById('modal-cancel-btn')?.focus({preventScroll:true}); }
 function closeModal(){ pendingModal = null; render(); }
 
 /* ==== tab: history ==== */
@@ -18541,11 +19277,13 @@ function restoreAuthenticatedView(uid,intent){
  }
  if(v.phase==='partner-organizer'&&intent==='partner_organizer'&&roleAllowsMode(userProfile.role,intent,userProfile)){currentRole='admin';appPhase='app';activeTab='management';adminTournamentListLoaded=false;return true;}
  if(v.phase==='player-center'&&intent==='player'&&userProfile.realName){
-  appPhase='player-center';playerActiveTab=v.playerTab==='profile'?'profile':playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=['overview','career','basic','titles'].includes(v.profileSection)?v.profileSection:'overview';return true;
+  appPhase='player-center';playerActiveTab=v.playerTab==='profile'?'profile':playerVisibleTabs().some(([key])=>key===v.playerTab)?v.playerTab:'home';playerProfileSectionUid=uid;playerProfileSection=['overview','career','basic','titles','duty','achievements'].includes(v.profileSection)?v.profileSection:'overview';
+  if(window.BXH_REFEREE_CERTIFICATES_V1!==true&&['duty','achievements'].includes(playerProfileSection))playerProfileSection='overview';return true;
  }
  if(v.phase==='app'&&(intent==='admin'||intent==='partner_organizer'||intent==='event_staff')){
   appPhase='app';
-  activeTab=v.cloudCode===(state.cloudCode||'')&&['management','ladder','live','bracket','referee','duty','registrations','settings','people','operations','history','version'].includes(v.tab)?v.tab:'management';
+  activeTab=v.cloudCode===(state.cloudCode||'')&&['management','ladder','live','bracket','referee','duty','referee-admin','registrations','settings','people','operations','history','version'].includes(v.tab)?v.tab:'management';
+  if(activeTab==='referee-admin'&&(window.BXH_REFEREE_CERTIFICATES_V1!==true||!canManageRefereeCertificates()))activeTab='management';
   adminTournamentListLoaded=false;return true;
  }
  if(v.phase==='tournament-detail'&&v.detailCode){
@@ -19333,24 +20071,13 @@ function renderTournamentManagementTab(){
     return `<div class="panel"><div class="empty-state">目前身分沒有賽事管理權限。</div></div>`;
   }
   if(!adminTournamentListLoaded && !adminTournamentListBusy){
-    setTimeout(()=>{ loadAdminTournamentList(); }, 0);
+    setTimeout(()=>{ if(!adminTournamentListLoaded&&!adminTournamentListBusy)loadAdminTournamentList(); }, 0);
   }
 
   const myUid=(firebaseUser&&firebaseUser.uid)||"";
-  const allItems=adminTournamentListItems.filter(t=>t.eventAuthority!=="community");
-  const communityItems=adminTournamentListItems.filter(t=>t.eventAuthority==="community");
   const isMine=t=>!!(myUid && t.createdBy===myUid);
-  const mineCount=allItems.filter(isMine).length;
-  const otherCount=allItems.length-mineCount;
-  const visibleItems=adminTournamentListFilter==="community"
-    ? communityItems
-    : allItems.filter(t=>adminTournamentListFilter==="mine"?isMine(t):adminTournamentListFilter==="others"?!isMine(t):true);
-  const filterBar=`<div class="tournament-owner-filter" role="tablist" aria-label="賽事建立者篩選">
-    <button class="${adminTournamentListFilter==='all'?'active':''}" data-action="admin-tournament-filter" data-filter="all">全部賽事 <b>${allItems.length}</b></button>
-    <button class="${adminTournamentListFilter==='mine'?'active':''}" data-action="admin-tournament-filter" data-filter="mine">我的賽事 <b>${mineCount}</b></button>
-    <button class="${adminTournamentListFilter==='others'?'active':''}" data-action="admin-tournament-filter" data-filter="others">其他賽事 <b>${otherCount}</b></button>
-    ${isAdminTierOrAbove()?`<button class="${adminTournamentListFilter==='community'?'active':''}" data-action="admin-tournament-filter" data-filter="community">一般房間 <b>${communityItems.length}</b></button>`:""}
-  </div>`;
+  const visibleItems=adminTournamentListItems;
+  const filterBar=adminTournamentListControlsHtml();
 
   let body = "";
   if(adminTournamentListBusy && !adminTournamentListLoaded && !adminTournamentListItems.length){
@@ -19358,8 +20085,8 @@ function renderTournamentManagementTab(){
   }else if(adminTournamentListError && !adminTournamentListItems.length){
     body = `<div class="panel"><div class="auth-error">${esc(adminTournamentListError)}</div><div class="btn-row" style="margin-top:12px;"><button class="btn btn-ghost" data-action="cloud-refresh-admin-list">重新整理</button></div></div>`;
   }else if(!visibleItems.length){
-    const emptyLabel=adminTournamentListFilter==="community"?"目前沒有玩家一般房間":adminTournamentListFilter==="mine"?"目前沒有自己建立的賽事":adminTournamentListFilter==="others"?"目前沒有其他人建立的可管理賽事":"目前沒有可管理的賽事";
-    body = `<div class="panel"><div class="empty-state"><div class="big">${emptyLabel}</div><div class="hint">切換上方分類即可查看其他賽事。</div></div></div>`;
+    const emptyLabel=adminTournamentListSearch?"找不到符合搜尋條件的賽事":"此分類目前沒有賽事";
+    body = `<div class="panel"><div class="empty-state"><div class="big">${emptyLabel}</div><div class="hint">可切換分類或調整搜尋條件。</div></div></div>`;
   }else{
     body = `<div style="display:flex;flex-direction:column;gap:10px;">${visibleItems.map(t=>{
       const confirmed = Number(t.confirmedCount||0), waiting = Number(t.waitlistCount||0), cap = Number(t.capacity||0);
@@ -19392,14 +20119,15 @@ function renderTournamentManagementTab(){
     }).join("")}</div>`;
   }
 
-  return `<div class="panel">
+  return `${isPartnerOrganizerMode()?window.BXHPartnerOrganizer?.renderOverview?.(userProfile)||'':''}<div class="panel">
     <div class="panel-title"><span>賽事管理中心</span><div class="btn-row"><button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>${canCreateOfficialTournament()?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:""}</div></div>
-    <div class="hint">正式賽事可依建立者快速分流；最高管理員與管理員可在「一般房間」整理玩家房間。工作人員無法查看或刪除一般房間。</div>
+    <div class="hint">每次僅載入 5 場賽事摘要；需要更多時再按下方按鈕。搜尋涵蓋賽事名稱、房號與地點。</div>
     ${filterBar}
-    ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在更新雲端賽事，現有清單仍可使用。</div>':""}
-    ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；目前保留上次成功載入的清單。</div>`:""}
+    ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在讀取 5 場賽事摘要，已顯示的清單仍可使用。</div>':""}
+    ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
   </div>
   ${body}
+  ${adminTournamentListPaginationHtml()}
   ${canCreateOfficialTournament()?`<div class="panel" style="margin-top:12px;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}`;
 }
 
@@ -19410,6 +20138,8 @@ function renderAdminTournamentListModal(){
     body = `<div class="empty-state"><div class="big">正在讀取雲端賽事…</div></div>`;
   } else if(adminTournamentListError && !adminTournamentListItems.length){
     body = `<div class="auth-error">${esc(adminTournamentListError)}</div>`;
+  } else if(adminTournamentListBusy && !adminTournamentListItems.filter(t=>t.eventAuthority!=="community").length){
+    body = `<div class="empty-state"><div class="big">正在分批讀取賽事…</div></div>`;
   } else if(!adminTournamentListItems.filter(t=>t.eventAuthority!=="community").length){
     body = `<div class="empty-state"><div class="big">目前沒有可管理的賽事</div><div class="hint">空白／未完成設定的雲端賽事已自動隱藏。</div><div class="btn-row" style="justify-content:center;margin-top:14px;">${canCreateOfficialTournament()?`<button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:`<span class="hint">目前帳號沒有可建立或管理的賽事。</span>`}</div></div>`;
   } else {
@@ -19443,15 +20173,49 @@ function renderAdminTournamentListModal(){
   return `<div class="modal-overlay" data-action="cloud-close-admin-list" ${pendingModal?'inert aria-hidden="true"':''}>
     <div class="modal-box" style="max-width:760px;width:min(760px,94vw);">
       <div class="cloud-list-heading">
-        <div class="cloud-list-heading-copy"><h3 style="margin-bottom:4px;">雲端賽事清單</h3><div class="hint">查看所有已建立賽事、正取／備取人數，並直接叫回管理後台。</div></div>
+        <div class="cloud-list-heading-copy"><h3 style="margin-bottom:4px;">雲端賽事清單</h3><div class="hint">每次讀取 5 場賽事摘要，可依狀態分類或搜尋。</div></div>
         <button class="btn btn-ghost btn-sm" data-action="cloud-refresh-admin-list">重新整理</button>
       </div>
-      ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在更新雲端賽事，現有清單仍可使用。</div>':""}
-      ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；目前保留上次成功載入的清單。</div>`:""}
+      ${adminTournamentListControlsHtml({modal:true})}
+      ${adminTournamentListBusy && adminTournamentListItems.length?'<div class="hint" role="status">正在讀取 5 場賽事摘要，已顯示的清單仍可使用。</div>':""}
+      ${adminTournamentListError && adminTournamentListItems.length?`<div class="auth-error" role="status">${esc(adminTournamentListError)}；保留已載入的清單，可重試本次讀取。</div>`:""}
       <div style="margin-top:14px;">${body}</div>
+      ${adminTournamentListPaginationHtml()}
       <div class="btn-row" style="margin-top:14px;"><button class="btn btn-ghost btn-block" data-action="cloud-close-admin-list">關閉</button></div>
     </div>
   </div>`;
+}
+
+function adminTournamentListControlsHtml({modal=false}={}){
+  const count=key=>adminTournamentListCounts?String(adminTournamentListCounts[key]||0):"—";
+  return `<div role="search" aria-label="搜尋賽事" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+    <input id="${modal?'admin-tournament-search-modal':'admin-tournament-search'}" class="admin-tournament-search-input" type="search" maxlength="120" autocomplete="off" aria-label="搜尋賽事名稱、房號或地點" placeholder="搜尋賽事名稱、房號或地點" value="${esc(adminTournamentListSearchDraft)}" style="flex:1;min-width:180px;">
+    <button class="btn btn-ghost btn-sm" data-action="admin-tournament-search">搜尋</button>
+    ${adminTournamentListSearch?'<button class="btn btn-ghost btn-sm" data-action="admin-tournament-search-clear">清除</button>':""}
+  </div><div class="tournament-owner-filter" role="tablist" aria-label="報名狀態分類">
+    ${[["open","報名中"],["upcoming","即將開放"],["closed","已關閉"]].map(([key,label])=>`<button role="tab" aria-selected="${adminTournamentListFilter===key}" class="${adminTournamentListFilter===key?'active':''}" data-action="admin-tournament-filter" data-filter="${key}">${label} <b>${count(key)}</b></button>`).join("")}
+  </div><details style="margin:10px 0;"><summary>其他分類${adminTournamentListFilter==='draft'?'｜草稿':adminTournamentListFilter==='all'?'｜所有狀態':''}${adminTournamentListKind==='community'?'｜一般房間':''}</summary>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="draft">草稿 ${count('draft')}</button>
+      <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="all">所有狀態 ${count('all')}</button>
+      ${isAdminTierOrAbove()?`<button class="btn btn-ghost btn-sm" data-action="admin-tournament-kind" data-kind="${adminTournamentListKind==='community'?'official':'community'}">${adminTournamentListKind==='community'?'返回正式賽事':'一般房間'}</button>`:""}
+    </div></details>`;
+}
+function adminTournamentListPaginationHtml(){
+  if(!adminTournamentListLoaded)return "";
+  return `<div class="panel" style="text-align:center;margin-top:12px;">
+    <div class="hint" role="status">已載入 ${adminTournamentListItems.length} 場${adminTournamentListHasMore?'；其餘尚未下載':adminTournamentListError?'':'；此分類已全部載入'}</div>
+    ${adminTournamentListHasMore?`<button class="btn btn-ghost" style="margin-top:10px;" data-action="admin-tournament-load-more" ${adminTournamentListBusy?'disabled':''}>${adminTournamentListBusy?'讀取中…':adminTournamentListError?'重試載入 5 場':'＋ 再載入 5 場'}</button>`:""}
+  </div>`;
+}
+function changeAdminTournamentListQuery({status=adminTournamentListFilter,kind=adminTournamentListKind,search=adminTournamentListSearch}={}){
+  reconcileAdminTournamentListContext();
+  if(!["open","upcoming","closed","draft","all"].includes(status)||!["official","community"].includes(kind)||(kind==="community"&&!isAdminTierOrAbove()))return;
+  adminTournamentListGeneration++;adminTournamentListPromise=null;adminTournamentListBusy=false;
+  adminTournamentListItems=[];adminTournamentListLoaded=false;adminTournamentListError="";
+  adminTournamentListFilter=status;adminTournamentListKind=kind;adminTournamentListSearch=String(search).trim().slice(0,120);
+  adminTournamentListSearchDraft=adminTournamentListSearch;adminTournamentListCursor=null;adminTournamentListHasMore=false;adminTournamentListCounts=null;
+  return loadAdminTournamentList({force:true});
 }
 
 // Scope the in-memory list to this authenticated management context. Neither
@@ -19460,7 +20224,7 @@ function adminTournamentListIdentityKey(){
   const grant=typeof partnerOrganizerGrant==="function"?partnerOrganizerGrant():null;
   return JSON.stringify([(firebaseUser&&firebaseUser.uid)||"",currentRole,activeMode,
     userProfile&&userProfile.role,userProfile&&userProfile.active,userProfile&&userProfile.isTestAccount,
-    grant&&grant.organizationId,hasAdminAccess()]);
+    grant&&grant.organizationId,grant&&grant.orderCode,grant&&grant.contractOrderCode,userProfile&&userProfile.partnerContractOrderCode,hasAdminAccess()]);
 }
 function resetAdminTournamentListContext(){
   adminTournamentListGeneration++;
@@ -19469,110 +20233,64 @@ function resetAdminTournamentListContext(){
   adminTournamentListLoaded=false;
   adminTournamentListItems=[];
   adminTournamentListError="";
+  adminTournamentListCursor=null;adminTournamentListHasMore=false;adminTournamentListCounts=null;
+  adminTournamentListFilter="open";adminTournamentListKind="official";adminTournamentListSearch="";adminTournamentListSearchDraft="";
   adminTournamentListContextKey=adminTournamentListIdentityKey();
 }
 function reconcileAdminTournamentListContext(){
   if(adminTournamentListContextKey!==adminTournamentListIdentityKey()) resetAdminTournamentListContext();
 }
-function adminTournamentListDeadline(work){
+function adminTournamentListDeadline(work,stage="query"){
   let timer;
+  const startedAt=Date.now();
   return Promise.race([
     Promise.resolve(work),
-    new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error("admin-list-timeout"),{code:"admin-list-timeout"})),ADMIN_TOURNAMENT_LIST_TIMEOUT_MS);})
-  ]).finally(()=>clearTimeout(timer));
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error("admin-list-timeout"),{code:"admin-list-timeout",stage})),ADMIN_TOURNAMENT_LIST_TIMEOUT_MS);})
+  ]).then(result=>{
+    console.log("[adminTournamentList] stage",{stage,elapsedMs:Date.now()-startedAt,ok:true});
+    return result;
+  },error=>{
+    console.warn("[adminTournamentList] stage",{stage,elapsedMs:Date.now()-startedAt,ok:false,code:error?.code||"unknown"});
+    throw error;
+  }).finally(()=>clearTimeout(timer));
 }
-function loadAdminTournamentList({force=false}={}){
+function loadAdminTournamentList({force=false,append=false}={}){
   reconcileAdminTournamentListContext();
   if(!hasAdminAccess() || !currentAuthUid()) return Promise.resolve();
   if(adminTournamentListPromise && !force) return adminTournamentListPromise;
-  const generation=++adminTournamentListGeneration, key=adminTournamentListContextKey;
-  let active=true;
-  const current=()=>active && generation===adminTournamentListGeneration
-    && key===adminTournamentListIdentityKey() && hasAdminAccess();
-  const publish=raw=>{
-    if(!current()) return false;
-    let items=Array.isArray(raw)?raw:[];
-    if(isTester()) items=items.filter(t=>t.testMode===true&&t.eventAuthority==="test"&&t.createdBy===currentAuthUid());
-    adminTournamentListItems=items.filter(t=>{
-      if(t.eventAuthority==="community") return isAdminTierOrAbove();
-      const hasIdentity=!!String(t.name||"").trim() || !!String(t.eventDate||"").trim() || !!String(t.location||"").trim();
-      const hasRegistration=!!t.registrationEnabled || Number(t.confirmedCount||0)>0 || Number(t.waitlistCount||0)>0;
-      const hasProgress=t.tournamentPhase && t.tournamentPhase!=="waiting";
-      return hasIdentity || hasRegistration || hasProgress || (state.cloudCode && t.code===state.cloudCode);
-    });
-    adminTournamentListLoaded=true;
-    render();
-    return true;
-  };
-  const enrich=async()=>{
-    if(!current() || !window.cloudSync.enrichAdminTournamentCreatorNames) return;
-    const items=adminTournamentListItems;
-    try{
-      const enriched=await adminTournamentListDeadline(window.cloudSync.enrichAdminTournamentCreatorNames(items));
-      if(current() && adminTournamentListItems===items && Array.isArray(enriched)
-        && enriched.some((item,i)=>item.createdByName!==items[i]?.createdByName)){
-        adminTournamentListItems=enriched;
-        render();
-      }
-    }catch(e){ /* Optional labels never hide or fail a usable room list. */ }
-  };
-  // Assign the shared promise before rendering: multiple queued render callbacks
-  // and repeated refresh clicks all join this same load.
-  adminTournamentListBusy=true;
-  adminTournamentListError="";
+  if(append&&!adminTournamentListHasMore)return Promise.resolve();
+  const generation=++adminTournamentListGeneration,key=adminTournamentListContextKey;
+  const current=()=>generation===adminTournamentListGeneration&&key===adminTournamentListIdentityKey()&&hasAdminAccess();
+  const requestedCursor=append?adminTournamentListCursor:null;
+  const request={mode:isPartnerOrganizerMode()?"partner_organizer":isEventStaffMode()?"event_staff":"admin",
+    status:adminTournamentListFilter,kind:adminTournamentListKind,search:adminTournamentListSearch,cursor:requestedCursor};
+  adminTournamentListBusy=true;adminTournamentListError="";
   const promise=Promise.resolve().then(async()=>{
     try{
       render();
-      let raw=await adminTournamentListDeadline((async()=>{
-        if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
-        if(!current()) return [];
-        if(!cloudAvailable()) throw new Error("雲端尚未連線");
-        if(isTester() && window.cloudSync.cleanupMyExpiredTestRooms) await window.cloudSync.cleanupMyExpiredTestRooms();
-        if(!current()) return [];
-        return window.cloudSync.queryAdminTournaments();
-      })());
-      if(isTester()) raw=(Array.isArray(raw)?raw:[]).filter(t=>t.testMode===true&&t.eventAuthority==="test"&&t.createdBy===currentAuthUid());
-      if(!publish(raw)) return;
-      const firstEnrichment=enrich();
-      // Preserve the existing lifecycle repair, but the usable list is already
-      // visible. Bound its wait and never let a late repair overwrite a retry.
-      const staleCompleted=(Array.isArray(raw)?raw:[]).filter(t=>t.archiveStatus==="completed" && t.tournamentPhase!=="done");
-      if(staleCompleted.length && window.cloudSync.repairTournamentLifecycle){
-        try{
-          const refreshed=await adminTournamentListDeadline((async()=>{
-            await Promise.all(staleCompleted.map(t=>window.cloudSync.repairTournamentLifecycle(t.code)));
-            if(!current()) return null;
-            return window.cloudSync.queryAdminTournaments();
-          })());
-          if(current() && Array.isArray(refreshed)){
-            publicTournamentsCache=null;
-            myRegistrationsCache=null;
-            publish(refreshed);
-            await enrich();
-          }
-        }catch(e){
-          if(current()) adminTournamentListError="房間已載入，部分狀態更新未完成，請稍後重新整理";
-        }
-      }
-      await firstEnrichment;
+      if(window.cloudSync?.connect)await adminTournamentListDeadline(window.cloudSync.connect(),"connect");
+      if(!current())return;
+      if(!cloudAvailable()||!window.cloudSync?.queryAdminTournamentSummaries)throw Error("summary-unavailable");
+      const result=await adminTournamentListDeadline(window.cloudSync.queryAdminTournamentSummaries(request),"summaries");
+      if(!current())return;
+      if(!result||result.ok!==true||!Array.isArray(result.items)||result.items.length>5||result.pageSize!==5
+        ||typeof result.hasMore!=="boolean"||(result.hasMore&&typeof result.nextCursor!=="string")||!result.counts)throw Error("summary-invalid-response");
+      const merged=new Map((append?adminTournamentListItems:[]).map(item=>[item.code,item]));
+      result.items.forEach(item=>merged.set(item.code,item));
+      adminTournamentListItems=[...merged.values()];
+      adminTournamentListCursor=result.nextCursor||null;adminTournamentListHasMore=result.hasMore;
+      adminTournamentListCounts=result.counts;
     }catch(e){
       if(current()){
-        console.warn("[adminTournamentList] load failed",e);
-        adminTournamentListError=e&&e.code==="permission-denied"?"目前帳號沒有讀取賽事清單的權限"
-          :e&&e.code==="admin-list-timeout"?"讀取雲端賽事逾時，請重新整理再試":"讀取雲端賽事清單失敗，請稍後再試";
+        console.warn("[adminTournamentList] summary read failed",{code:e?.code||e?.message||"unknown"});
+        adminTournamentListError=String(e?.code||"").includes("permission-denied")?"目前帳號沒有讀取這個賽事範圍的權限"
+          :e?.code==="admin-list-timeout"?"讀取賽事摘要逾時，請重試本次讀取":"讀取賽事摘要失敗，請稍後重試";
       }
     }finally{
-      if(current()){
-        adminTournamentListBusy=false;
-        adminTournamentListLoaded=true;
-        adminTournamentListPromise=null;
-        active=false;
-        render();
-      }else active=false;
+      if(current()){adminTournamentListBusy=false;adminTournamentListLoaded=true;adminTournamentListPromise=null;render();}
     }
   });
-  adminTournamentListPromise=promise;
-  return promise;
+  adminTournamentListPromise=promise;return promise;
 }
 
 function renderAdminNoTournamentScreen(){
@@ -19592,6 +20310,11 @@ function renderApp(){
   let tabs = hasAdminAccess() ? allTabs : allTabs.filter(t=>!["management","referee","settings","registrations","people"].includes(t[0]));
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
   if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"],["commerce-admin","商城管理"]);
+  if(window.BXH_REFEREE_CERTIFICATES_V1===true){
+    tabs=tabs.filter(t=>t[0]!=='duty');
+    if(canManageRefereeCertificates())tabs.splice(1,0,['referee-admin','裁判管理']);
+  }
+  if(activeTab==='referee-admin'&&(window.BXH_REFEREE_CERTIFICATES_V1!==true||!canManageRefereeCertificates()))activeTab='live';
   if(activeTab==='member-raffles'&&(!hasAdminAccess()||!canManageMemberRaffles()))activeTab='live';
   if(activeTab==='inventory-admin'&&!isSuperAdmin())activeTab='live';
   if(activeTab==='commerce-admin'&&!isSuperAdmin())activeTab='live';
@@ -19602,12 +20325,13 @@ function renderApp(){
   else if(activeTab==="member-raffles") content = renderRafflePage();
   else if(activeTab==="inventory-admin") content = renderInventoryAdminPage();
   else if(activeTab==="commerce-admin") content = window.BXHCommerce.adminPage();
+  else if(activeTab==="referee-admin") content = renderRefereeLicensePage('admin');
   else if(activeTab==="team-preview") content = window.BXHTeamAdminPreview.page();
   else if(activeTab==="ladder") content = wrapBracketWatermark(renderLadderLeaderboardPage(hasAdminAccess()));
   else if(activeTab==="live") content = wrapBracketWatermark(renderLive());
   else if(activeTab==="bracket") content = renderBracket();
   else if(activeTab==="referee") content = wrapBracketWatermark(renderReferee());
-  else if(activeTab==="duty") content = wrapBracketWatermark(renderDutyLog());
+  else if(activeTab==="duty") content = window.BXH_REFEREE_CERTIFICATES_V1===true?renderRefereeLicensePage('duty'):wrapBracketWatermark(renderDutyLog());
   else if(activeTab==="registrations") content = wrapBracketWatermark(renderAdminRegistrationsTab());
   else if(activeTab==="people") content = wrapBracketWatermark(renderPeopleManagement());
   else if(activeTab==="operations") content = renderTournamentOperationsPage();
@@ -20076,8 +20800,17 @@ function freezeArchivedControls(){
   });
   document.querySelectorAll('[data-settings-draft],[data-draft-field],.half-hour-date,.half-hour-hour,.half-hour-minute,.half-hour-clock select').forEach(el=>{el.disabled=true;});
 }
+function bindAdminTournamentSearchInput(){
+  document.querySelectorAll(".admin-tournament-search-input").forEach(input=>{
+    input.addEventListener("input",()=>{adminTournamentListSearchDraft=input.value;});
+    input.addEventListener("keydown",event=>{
+      if(event.key==="Enter"&&!event.isComposing){event.preventDefault();event.stopPropagation();changeAdminTournamentListQuery({search:input.value});}
+    });
+  });
+}
 function bindDynamicInputs(){
   try{
+    bindAdminTournamentSearchInput();
     if(typeof document.querySelectorAll === "function"){
       initHalfHourTimePickers(document);
       initHalfHourDatetimePickers(document);
@@ -20198,6 +20931,13 @@ function bindDynamicInputs(){
   }catch(e){ /* no-op outside a real browser DOM */ }
 
   const modalConfirmBtn = document.getElementById("modal-confirm-btn");
+  const forceExitAck=document.getElementById('court-force-exit-ack');
+  if(forceExitAck)forceExitAck.addEventListener('change',()=>{
+    if(pendingModal?.type!=='court-force-exit')return;
+    pendingModal.acknowledged=forceExitAck.checked;
+    pendingModal.confirmDisabled=!forceExitAck.checked;
+    if(modalConfirmBtn)modalConfirmBtn.disabled=!forceExitAck.checked;
+  });
   if(modalConfirmBtn&&shouldBindLobbyInput(modalConfirmBtn,"confirm")){
     modalConfirmBtn.addEventListener("click", (ev)=>{
       ev.preventDefault();
@@ -20233,9 +20973,19 @@ function bindDynamicInputs(){
       const file = e.target.files[0];
       if(!file) return;
       const reader = new FileReader();
-      reader.onload = ()=>{
+      reader.onload = async ()=>{
         try{
           let data = JSON.parse(reader.result);
+          if(data.type==='bxh-score-backfill-plan-v1'){
+            if(userProfile?.role!=='super_admin'||!currentAuthUid()||!state.cloudCode||!window.cloudSync?.confirmMatchTransaction)throw Error('backfill-admin-required');
+            await import('/modules/main-app/score-backfill.js?v=20261031.1');
+            const code=state.cloudCode,roomId=state.id,actorUid=currentAuthUid(),audit={actorUid,at:Date.now()};
+            showToast('正在核對雲端並補登比分，請稍候');
+            const result=await window.cloudSync.confirmMatchTransaction(code,remote=>({ok:true,state:window.BXHScoreBackfill.apply(remote,data,audit).state}));
+            if(!result?.ok)throw Error(result?.reason||'backfill-unconfirmed');
+            if(state.cloudCode!==code||state.id!==roomId||currentAuthUid()!==actorUid)return;
+            applyRemoteState(result.state,true);await saveRecord(cloneStateForSave(state));render();showToast('比分補登已由雲端確認；勝負與晉級保留');return;
+          }
           if(data.type==="bxh-single-record" && data.record) data = data.record;
           if(!data.players || !Array.isArray(data.players)) throw new Error("格式錯誤");
           const keepId = state.id;
@@ -20387,12 +21137,17 @@ async function handleTeamMatchAction(action,target){
   finally{teamMatchActionsBusy.delete(busyKey);}
 }
 function handleAction(action, target){
+  if(action==='admin-force-reconfirm'){reconfirmPendingAdminOverride();return;}
+  if(action==='admin-force-draw'||action==='admin-force-start'){
+    offerAdminOperationalOverride(action==='admin-force-draw'?'draw-bracket':'start-tournament','管理員要求略過一般名單同步檢查');return;
+  }
   if(onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true&&['save-meta','save-registration-settings','open-registration-publish-preview','community-save-settings','toggle-event-cancelled'].includes(action)){
     showToast('候補抽選尚未完成，房間設定暫停儲存與發布；請至「人員管理 → 備取／現場抽籤」完成抽選後再操作。',true);return;
   }
   if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
   if(action==='bracket-commit-discard'){void bracketCommitController()?.discard();return;}
+  if(['draw-bracket','reset-bracket','start-tournament','admin-force-draw','admin-force-start'].includes(action)&&typeof adminRosterBusyOrPending==='function'&&adminRosterBusyOrPending()){showToast('請先核實上一筆名單覆核，再操作對戰表',true);return;}
   if(['draw-bracket','reset-bracket','start-tournament'].includes(action)&&window.BXHBracketCommit&&bracketCommitBlocked()){showToast('對戰表尚未上傳成功，請先重試上傳',true);return;}
   if(peopleOnsiteWaitlistManaged()){
     const rosterActions=['people-toggle-auto-fill','people-promote-waitlist','people-move-to-waitlist','people-delete-waitlist','delete-player','quick-add-players','random-test-roster','update-players','load-test','reg-add-quick','reg-mark-noshow','reg-promote','reg-cancel','reg-delete','import-roster-from-registrations','save-meta','save-registration-settings','close-checkin-early','set-registration-enabled','set-waitlist-enabled','set-checkin-required','unlock-roster','clear-data','import-data'];
@@ -20402,12 +21157,25 @@ function handleAction(action, target){
 
   if(action.startsWith("team-lineup-")||action==="team-score-direct"){handleTeamMatchAction(action,target);return;}
   if(action==="header-refresh"){refreshLatestFromHeaderLogo(target);return;}
+  if(action==='load-staff-registration-roster'){if(!staffCheckinBusy&&!staffPromotionBusy)void loadStaffRegistrationRoster();return;}
+  if(action==='staff-roster-checkin'){void staffRosterCheckin(target);return;}
+  if(action==='staff-roster-promote'){void staffRosterPromote(target);return;}
   if(action==="venue-navigation-open"){openVenueNavigation(publicVenueFromTournament(tournamentDetailData));return;}
   if(action==='family-open'){openFamilyPlayers();return;}
   if(action.startsWith("court-call-")){handleCourtCall(action,target);return;}
   if(action.startsWith("raffle-")){handleRaffle(action,target);return;}
   if(action.startsWith("mailbox-")){handleMailbox(action,target);return;}
   if(action.startsWith("commerce-")){void window.BXHCommerce.handle(action,target);return;}
+  if(action==='account-manage-referee'){
+    const uid=target.getAttribute('data-uid'),directory=accountDirectoryContext();
+    if(window.BXH_REFEREE_CERTIFICATES_V1!==true||!canManageRefereeCertificates()||appPhase!=='account-management'||!accountDirectoryCurrent(directory)||!directory.opened.has(uid)||!(accountMgmtUsers||[]).some(user=>user.uid===uid))return;
+    if(window.BXHRefereeLicense?.openAdminTarget?.(uid,refereeLicenseContext())!==true)return;
+    accountMenuOpen=false;appPhase='app';activeTab='referee-admin';render();return;
+  }
+  if(action.startsWith('referee-license-')){
+    if(window.BXH_REFEREE_CERTIFICATES_V1===true&&currentAuthUid())void window.BXHRefereeLicense?.handleAction?.(action,target,refereeLicenseContext());
+    return;
+  }
   if(action.startsWith("inventory-")){handleInventory(action,target);return;}
   if(action.startsWith("mood-")){handleMood(action,target);return;}
   if(action.startsWith("title-recipient-")){handleTitleRecipient(action,target);return;}
@@ -20642,10 +21410,15 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="admin-tournament-filter"){
-    const f=target.getAttribute("data-filter");
-    if(["all","mine","others"].includes(f)||(f==="community"&&isAdminTierOrAbove())){ adminTournamentListFilter=f; render(); }
-    return;
+    changeAdminTournamentListQuery({status:target.getAttribute("data-filter")});return;
   }
+  if(action==="admin-tournament-kind"){
+    changeAdminTournamentListQuery({kind:target.getAttribute("data-kind")});return;
+  }
+  if(action==="admin-tournament-search"||action==="admin-tournament-search-clear"){
+    changeAdminTournamentListQuery({search:action==="admin-tournament-search-clear"?"":adminTournamentListSearchDraft});return;
+  }
+  if(action==="admin-tournament-load-more"){loadAdminTournamentList({append:true});return;}
   if(action==="load-duty-logs"){
     if(dutyLogsLoading) return;
     dutyLogsLoading=true; dutyLogsError=""; render();
@@ -20990,7 +21763,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="profile-section"){
     const section=target.getAttribute("data-section");
-    if(!['overview','career','basic','titles'].includes(section)) return;
+    if(!['overview','career','basic','titles','duty','achievements'].includes(section)) return;
+    if(['duty','achievements'].includes(section)&&window.BXH_REFEREE_CERTIFICATES_V1!==true)return;
     playerProfileSection=section;
     if(section==="titles")refreshVisibleTitleProgress(true);
     renderPreservingScroll(); return;
@@ -22758,9 +23532,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="goto-settings"){ activeTab="settings"; render(); return; }
   if(action==="goto-history"){ activeTab="history"; viewingRecordId=null; viewingRecordData=null; render(); return; }
 
+  if(action==="referee-sync-recovery"){requestRefereeSyncRecovery();return;}
+  if(action==="referee-export-recovery"){void exportRefereeSyncRecovery();return;}
   if(action==="cloud-retry-connect"){
     if(!hasAdminAccess()){ showToast("目前身分沒有此操作權限。", true); return; }
     if(state.cloudCode){
+      if(canUseRefereeSyncRecovery()){requestRefereeSyncRecovery();return;}
       (async ()=>{
         cloudStatus = "connecting"; render();
         if(window.cloudSync && window.cloudSync.connect){ await window.cloudSync.connect(); }
@@ -23224,7 +24001,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   }
   if(action==="archive-complete"){
     (async()=>{
-      const ok=await performAutoArchive();
+      const ok=await finishTournament();
       recordIndex = await loadIndex();
       historyCloudSyncLoaded = false;
       render();
@@ -23244,7 +24021,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.generalClosureBy=currentAuthUid();
     state.originalLadderMode="ranked";
     (async()=>{
-      const ok=await performAutoArchive();
+      const ok=await finishTournament();
       recordIndex=await loadIndex(); historyCloudSyncLoaded=false; render();
       if(!ok) showToast("一般賽事結案尚未完成，請依畫面錯誤訊息處理。",true);
     })();
@@ -23569,6 +24346,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     void peopleQuickAddPlayers(lines);
     return;
   }
+  if(action==="admin-recover-onsite"){void offerAdminOnsiteRecovery();return;}
+  if(action==="admin-roster-retry"){void offerAdminRoster(null);return;}
+  if(action==="admin-force-roster"){
+    const registrationId=target.getAttribute('data-registration-id'),playerId=target.getAttribute('data-player-id');
+    void offerAdminRoster({operation:target.getAttribute('data-operation'),...(registrationId?{registrationId}:{playerId})});return;
+  }
+  if(action==="admin-force-checkin"){offerAdminCheckin(target.getAttribute('data-id'));return;}
   if(action==="toggle-checkin-btn"){
     const pid = target.getAttribute("data-id");
     const p = state.players.find(x=>x.id===pid);
@@ -24360,7 +25144,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const current=state.courtAssignments?.[courtKey(station)]?.currentMatchId||null;
     const m=getMatch(action==="court-force-claim"?id:current);
     const change=action==="court-force-exit"?{kind:"force-exit",station,matchId:current,revision:Number(m?.dispatchRevision||0),exitRevision:Number(state.forcedCourtExits?.[station]?.revision||0)}:action==="court-force-reopen"?{kind:"reopen",station,exitRevision:Number(state.forcedCourtExits?.[station]?.revision||0)}:{kind:"claim-detached",matchId:id,to:station,revision:Number(m?.dispatchRevision||0)};
-    openModal({type:"generic",title:action==="court-force-exit"?"強制退場｜台"+station:action==="court-force-reopen"?"重新啟用裁判台":"接管退場場次",message:action==="court-force-exit"?"立即解除本台目前場次、下一場與派場鎖，停止接新場。未完成場次保留雲端比分，移至待接管清單；已完成結果保留。原裝置尚未上傳的資料請保留。":"保留比分與紀錄。重新啟用不會自動綁回待接管場次。",confirmLabel:"確認",onConfirm:()=>executeCourtForceAction(change)});return;
+    openModal(action==="court-force-exit"?courtForceExitConfirmation(change,m):{type:"generic",title:action==="court-force-reopen"?"重新啟用裁判台":"接管退場場次",message:"保留比分與紀錄。重新啟用不會自動綁回待接管場次。",confirmLabel:"確認",onConfirm:()=>executeCourtForceAction(change)});return;
   }
   if(action==="court-retirement-transfer"){
     openModal({type:"generic",title:"接管退場台場次",message:"保留雲端比分與紀錄，將場次移至保留台；原台後續送分將因派場版本變更而停止。請先確認原裁判已停止操作。",confirmLabel:"確認接管",onConfirm:()=>transferRetiringCourtMatch(id,Number(target.getAttribute("data-station")))});return;
@@ -24515,18 +25299,22 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="load-online-roster"){
+    if(staffRosterReadOnly()){loadStaffRegistrationRoster();return;}
     if(!canManageRegistrationRoster()){showToast("目前身分沒有此操作權限。",true);return;}
     if(!state.meta.registrationEnabled&&!isCommunityQuickRegistration(state)){ showToast("此賽事未啟用線上報名", true); return; }
     if(!state.cloudCode){ showToast("此賽事尚未發布到雲端", true); return; }
     if(state.startedAt){ showToast("賽事開始後參賽名單已鎖定", true); return; }
     if(peopleRosterBusy)return;
     const context=captureRegistrationRosterContext();
+    peopleRosterSyncStatus={key:context.key,status:"loading"};
     peopleRosterBusy=true;adminRosterManualContext=context;target.disabled=true;
+    renderPreservingScroll();
     (async ()=>{
       try{
         const result=await syncLatestOnlineRosterBeforeLock();
         if(!registrationRosterContextIsCurrent(context))return;
         adminRegistrationsError=null;
+        peopleRosterSyncStatus={key:context.key,status:"success",count:state.players.length,at:Date.now()};
         render();
         if(state.bracketSize && !bracketRosterIsCurrent()){
           showToast("線上名單已更新；對戰表已過期，請重新產生對戰表", true);
@@ -24537,6 +25325,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         console.warn("[load-online-roster]",e);
         if(registrationRosterContextIsCurrent(context)){
           adminRegistrationsError=mapRegistrationError(e);
+          peopleRosterSyncStatus={key:context.key,status:"error",message:adminRegistrationsError};
           render();showToast("載入線上報名名單失敗，請稍後再試", true);
         }
       }finally{
@@ -24635,7 +25424,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
               }
             }catch(e){
               console.warn("[start-tournament roster sync]",e);
-              showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
+              if(!offerAdminOperationalOverride("start-tournament",mapRegistrationError(e)))showToast("無法確認最新報名名單，為避免漏人，本次未開始賽事", true);
               return;
             }
             if(window.BXHBracketCommit&&!(await verifyBracketBeforeStart()))return;
@@ -24650,7 +25439,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             }
 
             const synced=await saveState();
-            if(synced===false){state=beforeStart;await saveRecord(state);render();showToast('雲端未確認開賽，本次未開始，請核對網路與對戰表後重試',true);return;}
+            if(synced===false){state=beforeStart;await saveRecord(state);noteAdminOperationalFailure('start-tournament',window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-readback-unconfirmed');render();showToast('雲端未確認開賽，本次未開始，請核對網路與對戰表後重試',true);return;}
             publicTournamentsCache=null;
             myRegistrationsCache=null;
             resetAdminRegistrationsCache();
@@ -24697,7 +25486,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         });
       }catch(e){
         console.warn("[start-tournament roster preflight]",e);
-        showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
+        if(!offerAdminOperationalOverride("start-tournament",mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，本次未開始賽事", true);
       }
     })();
     return;
@@ -24721,7 +25510,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="draw-bracket"){
-    const doDraw = ()=>{void bracketCommitController()?.begin();};
+    const doDraw = ()=>{adminOperationalFailure=null;void bracketCommitController()?.begin();};
     const doCheckThenDraw = ()=>{
       if(state.meta.battleMode==="team"){doDraw();return;}
       const total = state.players.length;
@@ -24744,7 +25533,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         doCheckThenDraw();
       }catch(e){
         console.warn("[draw-bracket roster sync]",e);
-        showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
+        if(!offerAdminOperationalOverride("draw-bracket",mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
       }
     };
     if(state.bracketSize){
@@ -24799,6 +25588,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="modal-confirm"){
     const mm = pendingModal;
     if(!mm){ return; }
+    if(mm.type==='court-force-exit'&&mm.acknowledged!==true)return;
     if(mm.type==="confirm-result"){
       if(mm.confirmDisabled || mm.confirmBusy){ return; }
       mm.confirmBusy = true;
@@ -25416,3 +26206,6 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
+
+

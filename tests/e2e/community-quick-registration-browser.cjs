@@ -20,7 +20,7 @@ assert(saveStart>=0&&saveEnd>saveStart,'Missing community settings action seam')
 const manualStart=core.indexOf('  if(action==="load-online-roster"){'),manualEnd=core.indexOf('  if(action==="close-checkin-early"){',manualStart);
 const watchStart=core.indexOf('let adminRosterUnsub=null, adminRosterCode="", adminRosterGeneration=0;'),watchEnd=core.indexOf('let myRegistrationsError = null;',watchStart);
 const action='function handleFixtureAction(action,target){if(action==="people-section"){peopleRosterSection=target.dataset.section;render();return;}'+core.slice(saveStart,saveEnd)+core.slice(manualStart,manualEnd)+'}';
-const rosterSource=core.slice(watchStart,watchEnd)+'\n'+['canManageOnsiteWaitlist','peopleOnsiteWaitlistManaged','peopleOnsiteWaitlistAvailable','hasAdminAccess','isCommunityRoom','isTester','syncLatestOnlineRosterBeforeLock','peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','bracketCommitController','bracketCommitBlocked','bracketCommitStatusHtml','bracketDrawButtonHtml','renderPeopleManagement'].map(fn).join('\n');
+const rosterSource=core.slice(watchStart,watchEnd)+'\n'+['canManageOnsiteWaitlist','peopleOnsiteWaitlistManaged','peopleOnsiteWaitlistAvailable','hasAdminAccess','isCommunityRoom','isTester','syncLatestOnlineRosterBeforeLock','peopleRosterMutationLocked','peopleRegistrationSelectionManaged','peopleLocalWaitlist','peopleRegistrationIdOf','peopleOnlineWaitlistRows','peopleWaitlistShadow','bracketCommitController','bracketCommitBlocked','bracketRosterUpdateHtml','bracketCommitStatusHtml','bracketDrawButtonHtml','canOfferAdminOperationalOverride','adminOverrideButtonsHtml','canOfferAdminCheckin','adminCheckinButtonHtml','adminCheckinPendingHtml','peopleRosterSyncStatusHtml','renderPeopleManagement'].map(fn).join('\n');
 const state={id:'fixture-room',cloudCode:'LOCAL-ONLY',ownerUid:'fixture-user',createdBy:'fixture-user',players:[],matches:[],startedAt:null,archiveStatus:'ongoing',meta:{name:'一般玩家的房間',date:'2026-10-05',location:'玩家即時對戰',startTime:'10:00',formatType:'single',format:'單淘汰賽',stations:1,eventAuthority:'community',ladderMode:'general',registrationEnabled:false,registrationStatus:'closed',registrationCapacity:16,waitlistCapacity:2,roomAccessMode:'public'}};
 const bootstrap=`
 window.fixture={state:${JSON.stringify(state)},cloud:null,local:null,saves:0,fail:false,toasts:[],screen:'settings'};
@@ -29,7 +29,7 @@ if(typeof window.crypto.randomUUID!=='function')window.crypto.randomUUID=()=> 'l
 let state=fixture.state,communitySettingsSaving=false,communitySettingsWriteGate=null,communityCreateSaving=false,cloudSyncPending=false,cloudSyncQueueTimer=null,cloudStatus='connected',cloudLastSyncAt=0,cloudAccessLimited=false,cloudAccessMessage='',currentRole='player';
 let publicTournamentsCache=[],communityEventsCache=[],myRegistrationsCache=[];
 let communitySettingsRenderedContext=null,communityRoomSnapshotGeneration=0;
-let appPhase='community-room',communityRoomActiveTab='settings',activeTab='live',peopleRosterSection='confirmed',peopleRosterBusy=false;
+let appPhase='community-room',communityRoomActiveTab='settings',activeTab='live',peopleRosterSection='confirmed',peopleRosterBusy=false,peopleRosterSyncStatus=null;
 let adminRegistrationsCache=null,adminRegistrationsLoading=false,adminRegistrationsError=null;
 const resetAdminRegistrationsCache=()=>{adminRegistrationsCache=null;adminRegistrationsError=null;};
 const participantDisplayName=p=>p.name,BATTLE_MODE_LABELS={individual:'個人戰'},entryRosterValid=()=>true,renderEntrySelection=()=>'',renderStaffAssignmentPanel=()=>'',renderRefereeStationAssignmentPanel=()=>'';
@@ -76,7 +76,7 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    try{
    await page.setContent('<!doctype html><html lang="zh-Hant"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+styles+'</style></head><body><div id="app"></div></body></html>');
    await page.addScriptTag({content:bootstrap});
-   for(const file of ['domain-utils','registration-utils','input-utils','community-host'])await page.addScriptTag({content:read('modules/main-app/'+file+'.js')});
+   for(const file of ['domain-utils','registration-utils','input-utils','community-host','admin-override'])await page.addScriptTag({content:read('modules/main-app/'+file+'.js')});
    await page.addScriptTag({content:'const {isCommunityQuickRegistration,isUnlimitedCommunityRegistration,parseCommunityRegistrationCapacity,communityRegistrationCapacity,communityRegistrationParticipantCount,communityLocalParticipantCount,communityRegistrationLocked,canCancelCommunityRegistration,publicTournamentRegistrationLocked,canonicalPublicTournamentPhase,roomStatusDescriptor}=window.BXHDomainUtils;const {normalizeDateTime,normalizeRegistrationStatusValue}=window.BXHRegistrationUtils;const {communityDateTimeValue,formatTournamentDetailDateTime,tournamentBattleMode,tournamentTeamSize}=window.BXHInputUtils;'+['onsiteRegistrationSettingsLocked','managedRegistrationSettingsChanged','managedRegistrationSettingsNotice','reportManagedRegistrationSettings','communitySettingsDraftContext','communitySettingsInputs','communitySettingBadInput','setCommunitySettingsInputsSaving','captureCommunitySettingsInputs','restoreCommunitySettingsInputs','renderCommunityRoomPreservingSettings','cloneStateForSave','computeRegistrationStatus','saveState','getEffectiveRegistrationStatus','publicEventLifecycleStatus','renderTournamentDetailScreen'].map(fn).join('\n')+'\n'+rosterSource+'\n'+action+'\nrender();'});
    assert.deepEqual(errors,[],'Settings fixture must render without missing production dependencies');
    await page.locator('#cset-capacity').fill('');await page.locator('#cset-registration-enabled').check();
@@ -162,6 +162,25 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
    assert.equal(await page.evaluate(()=>fixture.catchups),caughtUp,'repeat snapshots must not loop owner writes');
    assert.equal(await page.getByRole('cell',{name:'新報名選手',exact:true}).count(),1);
    await page.screenshot({path:path.join(output,size.name+'-host-roster.png'),fullPage:true,animations:'disabled'});
+   await page.evaluate(()=>{peopleRosterSection='tools';render();fixture.originalJoin=window.cloudSync.joinRoom;window.cloudSync.joinRoom=async(...args)=>{await new Promise(resolve=>fixture.releaseRosterRead=resolve);return fixture.originalJoin(...args)};});
+   await page.locator('.btn-primary[data-action="load-online-roster"]').click();
+   await page.waitForFunction(()=>typeof fixture.releaseRosterRead==='function');
+   assert.equal(await page.locator('.btn-primary[data-action="load-online-roster"]').isDisabled(),true);
+   assert.match(await page.locator('.btn-primary[data-action="load-online-roster"]').innerText(),/名單處理中/);
+   assert.match(await page.getByRole('status').innerText(),/正在同步並確認雲端名單/);
+   await page.evaluate(()=>{window.cloudSync.joinRoom=fixture.originalJoin;fixture.releaseRosterRead();});
+   await page.waitForFunction(()=>!peopleRosterBusy);
+   assert.match(await page.getByRole('status').innerText(),/同步確認完成：正取 1 人/);
+   await page.evaluate(()=>fixture.failSync=true);
+   await page.locator('.btn-primary[data-action="load-online-roster"]').click();
+   await page.waitForFunction(()=>!peopleRosterBusy);
+   assert.match(await page.getByRole('status').innerText(),/同步未完成/);
+   assert.equal(await page.locator('.btn-primary[data-action="load-online-roster"]').isEnabled(),true);
+   await page.evaluate(()=>fixture.failSync=false);
+   await page.locator('.btn-primary[data-action="load-online-roster"]').click();
+   await page.waitForFunction(()=>!peopleRosterBusy&&!adminRegistrationsError);
+   assert.match(await page.getByRole('status').innerText(),/同步確認完成：正取 1 人/);
+
    await page.evaluate(()=>showDetail());
    assert.equal(await page.evaluate(()=>fixture.unsubscribed),1);
    await page.evaluate(()=>fixture.onRegistrationSnapshot([{registrationId:'stale',status:'confirmed'}]));
@@ -180,3 +199,4 @@ const styles=['core-competition','auth-player','player-center-hunter','lobby-com
  }finally{if(browser)await browser.close()}
  console.log(checks.join('\n'));console.log('Screenshots and results: '+output);
 })().catch(error=>{console.error(error);process.exitCode=1});
+

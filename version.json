@@ -1,6 +1,6 @@
 {
-  "build": "20261030.1",
+  "build": "20261030.3",
   "version": "v14.3.42",
-  "updatedAt": "2026-10-29T17:20:03.867Z",
-  "releaseTrigger": "ladder-team-display"
+  "updatedAt": "2026-10-30T02:53:03.472Z",
+  "releaseTrigger": "management-five-summary-search"
 }

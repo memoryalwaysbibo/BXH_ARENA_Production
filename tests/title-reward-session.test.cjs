@@ -51,3 +51,4 @@ test('blocked popup falls back only for the current session',async()=>{
  const f=setup();f.s.window.open=()=>null;const job=f.claim();f.pending.resolve({ok:true,title:{id:'s3_champion'}});await job;
  assert.equal(f.s.location.href,'title-ceremony-s3-demo.html?ceremony=1');
 });
+
