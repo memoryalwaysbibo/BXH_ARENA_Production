@@ -35,10 +35,12 @@ async function until(check,message){const start=Date.now();while(!check()){if(Da
    await admin(db=>setDoc(doc(db,'tournaments',code),f.room));
    await until(()=>client.getView().state?.meta.refereeSeatsV1.courts['1'].main===null,'seat revocation missed');
    assert.equal(client.canScore(1),false);assert.equal(client.getView().state.matches[0].scoreA,2);
-   // Account deactivation invalidates the actual Rules-based listener.
+   // Explicit profile subscription closes existing reads, including an SDK
+   // target that can briefly reuse a previously server-confirmed snapshot.
    await admin(db=>setDoc(doc(db,'users','ref1'),{active:false,role:'staff'}));
-   await assertFails(getDocFromServer(doc(db,'tournaments',code,'matchBuckets','court-1')));
    await until(()=>client.getView().status==='error','deactivation did not terminate subscription');
+   await assertFails(getDocFromServer(doc(env.authenticatedContext('ref1').firestore(),'tournaments',code,'matchBuckets','court-1')));
+   assert.equal((await transport.commitScore({})).reason,'profile-access-revoked');
    await admin(db=>setDoc(doc(db,'users','ref1'),{active:true,role:'staff'}));client.connect();
    await until(()=>client.getView().status==='ready','reactivated reconnect failed');
    auth.currentUser=null;for(const callback of [...authListeners])callback(null);
