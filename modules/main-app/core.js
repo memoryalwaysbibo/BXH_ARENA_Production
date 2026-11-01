@@ -12795,6 +12795,18 @@ function shuffledCopy(arr){
 let entryUI={key:'',busy:false,preview:null,message:''};
 let peopleRosterSection="confirmed";
 let peopleRosterBusy=false;
+let peopleRosterSyncStatus=null;
+function peopleRosterSyncStatusHtml(){
+  const progress=peopleRosterSyncStatus;
+  if(!progress||progress.key!==registrationRosterContextKey())return "";
+  let message="";
+  if(progress.status==="loading")message="正在同步並確認雲端名單，請稍候…";
+  else if(progress.status==="success")message="同步確認完成：正取 "+progress.count+" 人（"+new Date(progress.at).toLocaleTimeString("zh-TW",{hour12:false})+"）";
+  else if(progress.status==="error")message="同步未完成："+progress.message+"；可再次按下同步重試。";
+  else return "";
+  return '<p class="hint" role="status" aria-live="polite">'+esc(message)+'</p>';
+}
+
 function entryContext(){const key=currentAuthUid()+':'+engagementSessionEpoch+':'+state.cloudCode;if(entryUI.key!==key)entryUI={key,busy:false,preview:null,message:''};return entryUI;}
 function entryRosterValid(){const e=state.entrySelection;if(!e)return true;if(e.status!=='drawn'||Number(e.vacancies||0)>0)return false;const ids=e.selected.map(x=>x.playerId).sort();return JSON.stringify(ids)===JSON.stringify(state.players.map(x=>String(x.id)).sort());}
 function renderEntrySelection(){
@@ -13308,7 +13320,7 @@ function renderPeopleManagement(){
     </div>`);
 
   const toolsPanel=`
-    ${online||isCommunityQuickRegistration(state)?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" aria-busy="${peopleRosterBusy?'true':'false'}" ${!state.cloudCode||state.startedAt||peopleRosterBusy?'disabled':''}>${peopleRosterBusy?'名單處理中…':'同步最新正取名單'}</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div></div>`:''}
+    ${online||isCommunityQuickRegistration(state)?`<div class="panel"><div class="panel-title">線上名單同步</div><p class="hint">線上報名會自動更新正取與備取名單，並保留已完成的報到狀態；下方按鈕可手動重試。</p><div class="btn-row"><button class="btn btn-primary" data-action="load-online-roster" aria-busy="${peopleRosterBusy?'true':'false'}" ${!state.cloudCode||state.startedAt||peopleRosterBusy?'disabled':''}>${peopleRosterBusy?'名單處理中…':'同步最新正取名單'}</button><button class="btn btn-ghost" data-action="load-admin-registrations" ${!state.cloudCode?'disabled':''}>同步正備取資料</button></div>${peopleRosterSyncStatusHtml()}</div>`:''}
     ${needsCheckin?`<div class="panel"><div class="panel-title">報到管理</div><div class="btn-row"><button class="btn btn-danger" data-action="close-checkin-early" ${checkinClosed||state.startedAt?'disabled':''}>提前結束報到</button></div><p class="hint">提前結束後，未報到正取不會進入對戰表。</p>${checkinClosed?`<div class="banner warn"><span>報到已於 ${state.meta.checkinClosedAt?esc(new Date(state.meta.checkinClosedAt).toLocaleString()):'稍早'} 提前結束。</span></div>`:''}</div>`:''}
     <div class="panel"><div class="panel-title">現場新增選手</div><div class="field"><label>每行一位</label><textarea id="quick-add-textarea" placeholder="黑爸&#10;小宇"></textarea><div class="hint">${needsCheckin?'新增後先列為正取／未報到，玩家到場繳費後再按「報到」。':'本場免報到，新增後直接列入正取。'}此處新增為不連結帳號的現場訪客，不計入獵人榜與天梯賽事積分。已線上報名的玩家請從備取升正取，先核對雲端名單。</div></div><div class="btn-row"><button class="btn btn-primary" data-action="quick-add-players" ${state.startedAt?'disabled':''}>${needsCheckin?'新增至正取待報到':'新增至正取'}</button></div></div>
     <div class="panel"><div class="panel-title">測試名單</div><div class="hint" style="margin-bottom:10px;">建立指定人數的測試選手；會取代目前正取名單。</div><div class="btn-row"><button class="btn btn-ghost" data-action="random-test-roster" data-count="8" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 8 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="16" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 16 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="32" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 32 位</button><button class="btn btn-ghost" data-action="random-test-roster" data-count="64" ${state.startedAt||state.bracketSize?'disabled':''}>隨機 64 位</button></div></div>`;
@@ -16300,6 +16312,7 @@ function stopAdminRosterWatch(){
 function reconcileRegistrationRosterContext(){
   const key=registrationRosterContextKey();
   if(key!==adminRosterContextKey){
+    peopleRosterSyncStatus=null;
     stopAdminRosterWatch();
     resetAdminRegistrationsCache();
     adminRegistrationsLoading=false;
@@ -25150,6 +25163,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(state.startedAt){ showToast("賽事開始後參賽名單已鎖定", true); return; }
     if(peopleRosterBusy)return;
     const context=captureRegistrationRosterContext();
+    peopleRosterSyncStatus={key:context.key,status:"loading"};
     peopleRosterBusy=true;adminRosterManualContext=context;target.disabled=true;
     renderPreservingScroll();
     (async ()=>{
@@ -25157,6 +25171,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         const result=await syncLatestOnlineRosterBeforeLock();
         if(!registrationRosterContextIsCurrent(context))return;
         adminRegistrationsError=null;
+        peopleRosterSyncStatus={key:context.key,status:"success",count:state.players.length,at:Date.now()};
         render();
         if(state.bracketSize && !bracketRosterIsCurrent()){
           showToast("線上名單已更新；對戰表已過期，請重新產生對戰表", true);
@@ -25167,6 +25182,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         console.warn("[load-online-roster]",e);
         if(registrationRosterContextIsCurrent(context)){
           adminRegistrationsError=mapRegistrationError(e);
+          peopleRosterSyncStatus={key:context.key,status:"error",message:adminRegistrationsError};
           render();showToast("載入線上報名名單失敗，請稍後再試", true);
         }
       }finally{
