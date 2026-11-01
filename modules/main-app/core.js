@@ -8062,6 +8062,9 @@ function tournamentEligiblePlayers(players,meta,matches){
 }
 
 function eligiblePlayers(){
+  // Before start, zero checked-in players means an empty entry list. The
+  // historical bracket fallback is only valid after the tournament is locked.
+  if(!state.startedAt&&state.meta?.checkinRequired)return (state.players||[]).filter(p=>p&&p.checkedIn===true);
   return tournamentEligiblePlayers(state.players,state.meta,state.matches);
 }
 
@@ -10447,7 +10450,7 @@ function renderTeamReferee(){
   return refereeBracketRoundtripNav('bracket')+'<div class="banner"><span>團體裁判模式｜排陣確認、公開與即時計分僅在此操作。</span></div>'+renderTeamMatchList(true);
 }
 function renderBracket(){
-  if(state.meta?.battleMode==="team"&&state.bracketSize)return renderTeamBracket();
+  if(state.meta?.battleMode==="team"&&state.bracketSize)return bracketCommitStatusHtml()+renderTeamBracket();
   const refreshBtn=bracketRefreshButtonHtml();
   if(!state.bracketSize){
     const refreshOnly=refreshBtn ? `<div class="bracket-top-controls bracket-top-controls-refresh-only">${refreshBtn}</div>` : "";
@@ -10467,7 +10470,7 @@ function renderBracket(){
   if(bracketViewMode==="board"){
     return swapBanner + quickNav + topControls + renderBoardMode();
   }
-  return swapBanner + quickNav + topControls + matchLegendHtml() + renderTournamentMatchList();
+  return swapBanner + quickNav + topControls + bracketCommitStatusHtml() + matchLegendHtml() + renderTournamentMatchList();
 }
 
 function tournamentMatchListGroup(m, fmt){
@@ -10933,12 +10936,19 @@ function bracketCommitController(){
  bracketCommitContext={key,controller};return controller;
 }
 function bracketCommitBlocked(){return bracketCommitController()?.blocked()||false;}
+function bracketRosterUpdateHtml(){
+ if(state.startedAt||state.archiveStatus==='completed'||!state.bracketSize||!(state.matches||[]).length||bracketRosterIsCurrent())return '';
+ const action=canOperateCurrentTournament()?'<button class="btn btn-primary" data-action="draw-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>依最新名單重新抽籤</button>':'<p>請主辦更新對戰表。</p>';
+ return '<section class="panel banner warn" role="alert"><div><b>對戰表待更新</b><p>報到或參賽名單已有異動，目前顯示的是先前配對。開賽前請依最新名單重新抽籤並確認儲存；重新抽籤會更動配對。</p>'+action+'</div></section>';
+}
 function bracketCommitStatusHtml(){
- const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return '';
+ const rosterUpdate=bracketRosterUpdateHtml();
+ const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return rosterUpdate;
+ if(rosterUpdate&&s.result==='success'&&!s.pending&&!s.busy)return rosterUpdate;
  const uploaded=s.result==='success',cloud=!!state.cloudCode;
  const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
- return '<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
+ return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
  (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
  (s.override&&!s.busy&&adminOverrideCurrent(s.override)?'<button class="btn btn-danger" data-action="admin-force-reconfirm">重新確認並重試同一配對</button>':'')+'</section>';
 }
@@ -13408,7 +13418,7 @@ function renderPeopleManagement(){
   const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
   const waitlistShortcut=peopleOnsiteWaitlistAvailable()&&peopleRosterSection!=="waitlist"
     ?'<div class="panel"><div class="people-section-summary"><div><div class="panel-title">備取／現場抽籤</div><p class="hint">備取名單、抽選名額與加開名額，統一從這裡操作。</p></div><button class="btn btn-primary" data-action="people-section" data-section="waitlist">'+(state.onsiteWaitlistFinalized===true?'查看抽籤紀錄':'前往備取／抽籤')+'</button></div></div>':"";
-  return syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
+  return (peopleRosterSection==="bracket"?"":bracketCommitStatusHtml())+syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
