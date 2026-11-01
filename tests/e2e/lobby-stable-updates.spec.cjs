@@ -602,7 +602,11 @@ test('confirm opens the existing profile editor with old account values intact',
   await page.getByRole('button', { name: '確定', exact: true }).click();
   await expect(page.locator('#profile-realname')).toHaveValue('Synthetic player');
   await expect(page.locator('#profile-gameid')).toHaveValue('');
-  await expect(page.locator('#profile-phone')).toBeFocused();
+  await expect(page.locator('#profile-phone')).toBeEditable();
+  await page.locator('#profile-phone').fill('0900000000');
+  await page.locator('#profile-gameid').fill('補填測試角色');
+  await expect(page.locator('#profile-phone')).toHaveValue('0900000000');
+  await expect(page.locator('#profile-gameid')).toHaveValue('補填測試角色');
   await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await page.evaluate(() => { playerActiveTab = 'home'; render(); });
