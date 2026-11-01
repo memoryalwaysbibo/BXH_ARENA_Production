@@ -813,7 +813,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
+      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -3071,6 +3071,24 @@
         window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:true,communityParticipantCount:result.communityParticipantCount};
         return window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized];
       }catch(e){window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:false};throw e;}
+    },
+
+    async adminRecoverOnsiteWaitlist(payload){
+      return callEngagementFunction('adminRecoverOnsiteWaitlist',payload,60000);
+    },
+    async readAdminOnsiteRecoveryFromServer(code){
+      if(!cloudEnabled||!fx.getDocFromServer)return {ok:false};
+      try{
+        const normalized=String(code).toUpperCase();
+        const [a,b]=await Promise.all([fx.getDocFromServer(fx.doc(dbHandle,'tournaments',normalized)),fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',normalized))]);
+        if(!a.exists()||!b.exists())return {ok:false};const t=a.data(),p=b.data(),data=JSON.parse(t.data),publicData=JSON.parse(p.bracketView);
+        for(const k of ['createdBy','ownerUid','createdByRole'])if(t[k])data[k]=t[k];data.cloudCode=normalized;
+        const counts=x=>({capacity:x.capacity,confirmedCount:x.confirmedCount,waitlistCount:x.waitlistCount});
+        return {ok:true,data,publicData,counts:{private:counts(t),public:counts(p)},versions:{
+          privateOwned:t.onsiteWaitlistServerOwned===true,publicOwned:p.onsiteWaitlistServerOwned===true,stateOwned:data.onsiteWaitlistServerOwned===true,viewOwned:publicData.onsiteWaitlistServerOwned===true,
+          privateRuntime:t.onsiteWaitlistRuntimeRevision,publicRuntime:p.onsiteWaitlistRuntimeRevision,stateRuntime:data.onsiteWaitlistRuntimeRevision,viewRuntime:publicData.onsiteWaitlistRuntimeRevision,
+          drawRevision:t.onsiteWaitlistDraw?.revision,stateDrawRevision:data.onsiteWaitlistDrawRevision,qrManaged:t.qrCheckinManaged===true,publicQrManaged:p.qrCheckinManaged===true,privateQr:t.qrCheckinRevision,publicQr:p.qrCheckinRevision}};
+      }catch{return {ok:false};}
     },
 
     async adminOverrideRoster(payload){
