@@ -71,7 +71,15 @@ function create(ctx){
       ctx.rebaseOverride&&['registration-roster-stale','qr-checkin-state-stale','call-state-stale'].includes(failureCode)&&
       acknowledged===false&&!writeError&&latest?.ok&&signature(latest.data)===pending.baseSignature&&!latest.data.startedAt;
      if(canRebase){pending.snapshot=clone(ctx.rebaseOverride(latest.data,pending.snapshot,pending.adminOperationalOverride));keep();}
-     const permanent=!canRebase&&/permission-denied|unauthenticated|stale|managed|bracket-version-conflict|bracket-started/.test(failureCode);
+     const canRefreshNormal=!pending.adminOperationalOverride&&ctx.rebaseRosterFence&&
+      ['registration-roster-stale','qr-checkin-state-stale'].includes(failureCode)&&
+      acknowledged===false&&!writeError&&latest?.ok&&signature(latest.data)===pending.baseSignature&&!latest.data.startedAt;
+     if(canRefreshNormal){
+      const refreshed=ctx.rebaseRosterFence(latest.data,pending.snapshot);
+      if(refreshed){pending.snapshot=clone(refreshed);keep();}
+      else throw Error('bracket-roster-changed');
+     }
+     const permanent=!canRebase&&!canRefreshNormal&&/permission-denied|unauthenticated|stale|managed|bracket-version-conflict|bracket-started/.test(failureCode);
      // Only retry a rejected write after an authoritative unchanged-base read.
      // A timeout/unknown acknowledgement or a committed draw is read-only recovery.
      if(attempt>=(pending.adminOperationalOverride?2:1)||acknowledged!==false||writeError||permanent||!latest?.ok||
