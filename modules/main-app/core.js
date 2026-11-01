@@ -5918,6 +5918,7 @@ const SUPER_ADMIN_ONLY_ACTIONS = new Set([
 
 ]);
 const ADMIN_TIER_ONLY_ACTIONS = new Set([
+  "admin-recover-onsite",
   "admin-force-roster","admin-roster-retry",
   "admin-force-checkin",
   "set-scoring-mode","set-round-scoring-mode","correct-quick-result",
@@ -10826,6 +10827,62 @@ async function executeAdminRoster(approval,controller){
  }catch(e){if(current())showToast(adminRosterErrorMessage(e)+(controller.status().pending?'；請核實／重試同一筆操作':''),true);}
  finally{render();}
 }
+// Administrative recovery never generates or replaces onsite draw results.
+let adminOnsiteRecoveryContext=null;
+function adminOnsiteRecoveryController(){
+ if(!window.BXHAdminOnsiteRecovery)return null;
+ const context=adminOverrideContext(),key=JSON.stringify(context);
+ if(adminOnsiteRecoveryContext?.key===key)return adminOnsiteRecoveryContext.controller;
+ let storage;try{storage=window.sessionStorage;}catch{}
+ const controller=window.BXHAdminOnsiteRecovery.create({key,...context,storage,current:()=>JSON.stringify(adminOverrideContext())===key,
+  allowed:()=>window.BXHAdminOverride?.allowed(userProfile)===true,now:()=>Date.now(),operationId:()=>crypto.randomUUID(),
+  call:payload=>window.cloudSync.adminRecoverOnsiteWaitlist(payload),read:code=>window.cloudSync.readAdminOnsiteRecoveryFromServer(code),wait:ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  adopt:async latest=>{state=JSON.parse(JSON.stringify(latest.data));state.cloudCode=context.code;await saveRecord(state);}
+ });
+ adminOnsiteRecoveryContext={key,controller};return controller;
+}
+function canOfferAdminOnsiteRecovery(){
+ if(!window.BXHAdminOnsiteRecovery||!window.cloudSync?.adminRecoverOnsiteWaitlist||!state.cloudCode||!currentAuthUid()||window.BXHAdminOverride?.allowed(userProfile)!==true)return false;
+ return !!adminOnsiteRecoveryController()?.status().pending||!state.startedAt&&!['completed','archived'].includes(state.archiveStatus)&&
+  state.onsiteWaitlistFinalized!==true&&state.meta?.battleMode!=='team'&&(state.onsiteWaitlistServerOwned===true||state.meta?.registrationOnsiteWaitlistEnabled===true);
+}
+function adminOnsiteRecoveryPanelHtml(){
+ if(!canOfferAdminOnsiteRecovery())return '';
+ const status=adminOnsiteRecoveryController().status();
+ return '<div class="panel" id="admin-onsite-recovery-panel"><div class="panel-title">管理員抽籤同步覆核</div><p class="hint">人數、版本或鎖定異常時，先核對同步與鎖定資料。保留既有中選及遞補紀錄；完成後重新確認抽選名單。</p><button class="btn btn-danger" data-action="admin-recover-onsite" '+
+  (status.busy||status.corrupt||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked()?'disabled':'')+'>'+
+  (status.busy?'雲端核實中…':status.pending?'核實／重試同一筆抽籤覆核':'預覽同步／解鎖覆核')+'</button></div>';
+}
+function adminOnsiteRecoveryError(error){
+ const s=String(error?.message||error||'');
+ const messages={'preview-changed':'抽選名單、鎖定或紀錄已有更新，請重新核對','permission-denied':'帳號權限已變更','recovery-not-authorized':'目前帳號無法執行這項覆核',
+  'draw-finalized':'本場已完成抽選移交，請使用後續賽事流程','bracket-locked':'賽事已開賽、結束或關閉','not-onsite-managed':'本場不是專用候補抽籤模式',
+  'invalid-history':'抽選紀錄不完整，請先核對輪次與遞補資料','registration-state-conflict':'參賽身分或名單仍有衝突，無法只修復同步資料',
+  'duplicate-participant':'參賽身分重複，請先核對報名','partner-room-managed':'合作主辦票券房需使用專用流程','confirmation-expired':'本次確認已逾時，請重新核對'};
+ const code=Object.keys(messages).find(k=>s.includes(k));return code?messages[code]:'雲端結果尚待核實，請恢復連線後核實同一筆操作';
+}
+async function offerAdminOnsiteRecovery(){
+ if(!canOfferAdminOnsiteRecovery()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ const context=adminOverrideContext(),controller=adminOnsiteRecoveryController(),status=controller.status();if(status.busy)return;
+ try{
+  const task=controller.prepare();render();const a=await task,p=a.preview;
+  openModal({type:'generic',title:status.pending?'核實／重試抽籤同步覆核':'管理員抽籤同步覆核',danger:true,
+   message:'房號：'+a.data.code+'\n雲端線上正／備取：'+p.confirmedCount+'／'+p.waitlistCount+'\n現有抽選紀錄：'+p.roundCount+' 輪'+
+    (p.hasLock?'\n目前鎖定名單：'+(p.lockNames.length?p.lockNames.join('、'):'鎖定資料不完整，將保留原快照'):'\n目前沒有鎖定名單')+
+    '\n\n'+p.warnings.join('\n')+(status.pending?'\n\n沿用原操作編號，已完成的覆核不會再次解鎖。':'')+'\n\n確認後保存紀錄，並核對雙份雲端資料。',
+   confirmLabel:status.pending?'核實／重試同一筆':p.hasLock?'已核對，同步並解鎖':'已核對，修復同步',onConfirm:()=>{void executeAdminOnsiteRecovery(a,controller);}});
+ }catch(e){if(JSON.stringify(adminOverrideContext())===JSON.stringify(context))showToast(adminOnsiteRecoveryError(e),true);}
+ finally{render();}
+}
+async function executeAdminOnsiteRecovery(a,controller){
+ const current=()=>{const c=adminOverrideContext();return c.actorUid===a.actorUid&&c.roomId===a.data.roomId&&c.code===a.data.code;};
+ if(!current()||peopleRosterBusy||adminOperationalOverrideBusy||bracketCommitBlocked())return;
+ try{const task=controller.execute(a);render();const r=await task;if(!current())return;
+  showToast(r.superseded?'這筆覆核已完成，抽選流程後續已有更新；已載入最新資料':'抽籤同步覆核已完成；請回到原抽選流程重新核對名單');
+ }catch(e){if(current())showToast(adminOnsiteRecoveryError(e)+(controller.status().pending?'；請核實／重試同一筆操作':''),true);}
+ finally{render();}
+}
+
 let bracketCommitContext=null;
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
@@ -13243,7 +13300,7 @@ function renderPeopleManagement(){
   }).join('');
   const onsiteWaitlistPanel=peopleOnsiteWaitlistAvailable()
     ?window.BXHOnsiteWaitlistIntegration?.placeholder({code:state.cloudCode,actorId:firebaseUser?.uid})||"":"";
-  const waitlistPanel=onsiteWaitlistPanel+(peopleOnsiteWaitlistManaged()?"":`
+  const waitlistPanel=(typeof adminOnsiteRecoveryPanelHtml==='function'?adminOnsiteRecoveryPanelHtml():'')+onsiteWaitlistPanel+(peopleOnsiteWaitlistManaged()?"":`
     <div class="panel">
       <div class="people-capacity-banner"><div><div class="panel-title">備取區（${rosterUnresolved?rosterPendingLabel:waitCount}）</div><p class="hint">升正取時若正取已滿，系統會詢問是否固定加開 8 個名額；可不限次數加開。</p></div>${capacity?'<span class="badge badge-metal">正取上限 '+capacity+'</span>':''}</div>
       <div class="btn-row" style="margin:12px 0;">
@@ -24137,6 +24194,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     void peopleQuickAddPlayers(lines);
     return;
   }
+  if(action==="admin-recover-onsite"){void offerAdminOnsiteRecovery();return;}
   if(action==="admin-roster-retry"){void offerAdminRoster(null);return;}
   if(action==="admin-force-roster"){
     const registrationId=target.getAttribute('data-registration-id'),playerId=target.getAttribute('data-player-id');
