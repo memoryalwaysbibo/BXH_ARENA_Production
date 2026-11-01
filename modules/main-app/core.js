@@ -19389,8 +19389,8 @@ function renderAuthFormPreservingInputs(app,html,phase){
   if(focusTarget&&!focusTarget.disabled)focusTarget.focus({preventScroll:true});
 }
 function render(){
-  window.cloudSync?.restoreRegistrationFeedback?.();
   syncQrScannerModal();
+  window.cloudSync?.restoreRegistrationFeedback?.();
   clearBoardModeInteractions();
   window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,
     operator:()=>canOperateCurrentTournament()||(state?.meta?.refereeSeatsV1?.version===1&&userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role)),
