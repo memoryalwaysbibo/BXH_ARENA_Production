@@ -25,3 +25,8 @@ test('full match buckets reject partial epochs and restore full score ledger',()
  const paused=B.encode(complete,m,[changed,buckets[1]]);
  assert.equal(B.materialize(f.state,m,paused).courtAssignments.court1.status,'paused');
 });
+
+test('bucket seat adapter refuses a production database',()=>{
+ const {createBucketSeatHandler}=require('../../referee-seats/functions/bucket-seat-service.cjs');
+ assert.throws(()=>createBucketSeatHandler({projectId:'bxh-arena'}),/emulator-only/);
+});

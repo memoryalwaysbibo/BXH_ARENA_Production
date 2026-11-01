@@ -9,6 +9,7 @@ const {createHandler:createSeatHandler}=require('../../referee-seats/functions/s
 const {createPromotionHandler}=require('../../registration-promotion/functions/service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {createBucketCutover}=require('../../referee-seats/functions/bucket-cutover.cjs');
+const {createBucketSeatHandler}=require('../../referee-seats/functions/bucket-seat-service.cjs');
 const {createRosterService}=require('../../qr-checkin/backend/overlays/roster-service.js');
 const {createRoomAccessService}=require('../../qr-checkin/backend/overlays/room-access-service.js');
 const {FirestoreStore}=require('../../qr-checkin/backend/onsite/firestore-store.cjs');
@@ -16,7 +17,7 @@ const {guardFirestore}=require('../../qr-checkin/backend/guard-firestore.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT}),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
 const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
-const oldCommit=createScoringHandler(db);
+const oldCommit=createScoringHandler(db),bucketSeat=createBucketSeatHandler(db);
 const oldSeat=createSeatHandler(db),oldPromotion=createPromotionHandler(db);
 const cutover=createBucketCutover(db),oldQR=createCheckinHandler(db,()=> 'lab-signing-key'),oldRoster=createRosterService(db,require('firebase-admin/firestore').FieldValue),oldRoomAccess=createRoomAccessService(db);
 const report={kind:'trusted-scoring-bucket-emulator',productionWrites:0,cases:[]};let serial=0;
@@ -132,6 +133,66 @@ async function send(root,id,action,extra={}){
    assert.equal((await root.collection('onsiteWaitlistOperations').get()).size,0);
    assert.equal((await root.collection('checkinOperations').get()).size,0);
    report.cases.push({name:'qr-onsite-and-pinned-writer-fence',qr:true,roster:true,access:true,onsite:true,wrapper:true,rootUnchanged:true,publicUnchanged:true});
+  }
+
+  {
+   phase('bucket-seat-handover-preserves-scores');
+   const code='BXH-HANDOVER',{root,pub}=await seed(code,6,false);
+   const initial=(await root.get()).data().refereeSeatsV1;
+   await root.update({refereeSeatsV1:{...initial,revision:0,requests:{}}});
+   await db.doc('systemConfig/refereeSeatsV1').set({enabled:true,perCourtScoringVerified:true});
+   await db.doc('users/relief').set({active:true,role:'staff',realName:'交接裁判'});
+   await db.doc('users/host').set({active:true,role:'staff',realName:'房主'});
+   await send(root,'m1','score',{side:'A',finish:'spin'});
+   await send(root,'m5','score',{side:'B',finish:'burst'});
+   const scored=await read(root),oldRequest=request(scored.state,scored.room,'m1','score',operation(),{side:'A',finish:'spin'});
+   const bucketsBefore=await root.collection('matchBuckets').orderBy('__name__').get();
+   const seat=(uid,data)=>bucketSeat({auth:{uid},data:{code,operationId:operation(),...data}});
+   const claim={code,action:'claim',station:1,slot:'backup1',expectedCourtRevision:1,operationId:operation()};
+   await bucketSeat({auth:{uid:'relief'},data:claim});
+   const claimSnapshot=await root.get();
+   await bucketSeat({auth:{uid:'relief'},data:claim});
+   assert((await root.get()).updateTime.isEqual(claimSnapshot.updateTime),'seat replay rewrote room');
+   await assert.rejects(bucketSeat({auth:{uid:'relief'},data:{...claim,slot:'backup2'}}),/operation-conflict/);
+   const asked=await seat('relief',{action:'request',station:1,slot:'main',expectedUid:'ref1',expectedCourtRevision:2});
+   await seat('ref1',{action:'respond',station:1,slot:'main',requestId:asked.requestId,response:'accept'});
+   const after=await read(root);
+   assert.equal(after.room.refereeSeatsV1.courts['1'].main.uid,'relief');
+   assert.equal(after.room.refereeSeatsV1.courts['1'].backup1.uid,'ref1');
+   assert.equal(after.state.matches.find(m=>m.id==='m1').scoreA,1);
+   assert.equal(after.state.matches.find(m=>m.id==='m5').scoreB,2);
+   const bucketsAfter=await root.collection('matchBuckets').orderBy('__name__').get();
+   bucketsBefore.docs.forEach((snap,i)=>assert(snap.updateTime.isEqual(bucketsAfter.docs[i].updateTime),'seat change rewrote a bucket'));
+   const publicState=JSON.parse((await pub.get()).data().bracketView);
+   assert.equal(publicState.matches.find(m=>m.id==='m1').scoreA,1);
+   assert.equal(publicState.matches.find(m=>m.id==='m5').scoreB,2);
+   assert.equal(publicState.meta.refereeSeatNames['1'].main.name,'交接裁判');
+   for(const key of ['refereeSeatsV1','refereeStationUids','refereeStationAssignments','assignedStaffUids'])assert.equal(publicState.meta[key],undefined);
+   await assert.rejects(commit({auth:{uid:'ref1'},data:oldRequest}),/seat-stale/);
+   const fresh=request(after.state,after.room,'m1','score',operation(),{side:'A',finish:'spin'});
+   await commit({auth:{uid:'relief'},data:fresh});
+   await seat('host',{action:'revoke',station:1,slot:'backup1',expectedUid:'ref1',expectedCourtRevision:3});
+   const revoked=await read(root);
+   await assert.rejects(commit({auth:{uid:'ref1'},data:request(revoked.state,revoked.room,'m1','score',operation(),{side:'A',finish:'spin'})}),/station-not-assigned/);
+   assert.equal(revoked.state.matches.find(m=>m.id==='m1').scoreA,2);
+   assert.equal(revoked.state.matches.find(m=>m.id==='m1').log.length,2);
+   report.cases.push({name:'bucket-seat-handover',scoresPreserved:true,bucketsUnchangedBySeats:true,replayDeduplicated:true,staleSeatRejected:true,revokedSeatRejected:true,publicPrivateFieldsAbsent:true});
+  }
+  {
+   phase('bucket-seat-versus-score');
+   const code='BXH-SEATRACE',{root}=await seed(code,6,false),initial=(await root.get()).data().refereeSeatsV1;
+   await root.update({refereeSeatsV1:{...initial,revision:0,requests:{}}});
+   const {state,room}=await read(root),d=request(state,room,'m1','score',operation(),{side:'A',finish:'spin'});
+   const [scored,seated]=await Promise.allSettled([
+    commit({auth:{uid:'ref1'},data:d}),
+    bucketSeat({auth:{uid:'relief'},data:{code,action:'claim',station:1,slot:'backup1',expectedCourtRevision:1,operationId:operation()}})
+   ]);
+   assert.equal(seated.status,'fulfilled');
+   if(scored.status==='rejected')assert.match(scored.reason.message,/seat-stale/);
+   const latest=await read(root),match=latest.state.matches.find(m=>m.id==='m1');
+   assert.equal(match.scoreA,scored.status==='fulfilled'?1:0);
+   assert.equal(match.log.length,scored.status==='fulfilled'?1:0);
+   report.cases.push({name:'bucket-seat-versus-score',acknowledged:scored.status==='fulfilled',score:match.scoreA,passed:true});
   }
   for(const count of [6,12]){
    phase('concurrent-'+count);
