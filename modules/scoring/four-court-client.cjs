@@ -11,7 +11,7 @@
   if(!B||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!uid||typeof operationId!=='function')throw Error('invalid-client');
   let rootRoom=null,base=null,manifest=null,rootVersion=null,state=null,status='offline',generation=0,bucketGeneration=0,roomStop=null,bucketStops=[],active=false,viewVersion=0,subscriptionFailed=false;
   const buckets=new Map(),bucketWatermarks=new Map(),pending=new Map();
-  const retryable=()=>[...pending].filter(([,record])=>!record.running).map(([key])=>key);
+  const retryable=()=>[...pending].filter(([,record])=>!record.running&&!record.awaiting).map(([key])=>key);
   function emit(next,reason=null){status=next;onView({status,reason,state:state?clone(state):null,viewVersion:++viewVersion,pending:[...pending.keys()],retryable:retryable()});}
   function stopBuckets(){bucketGeneration++;for(const stop of bucketStops)stop();bucketStops=[];buckets.clear();bucketWatermarks.clear();}
   function assemble(){
@@ -21,7 +21,9 @@
    try{
     const combined=B.materialize(base,manifest,[...buckets.values()]);
     combined.meta={...combined.meta,refereeSeatsV1:rootRoom.refereeSeatsV1,refereeSeatNames:rootRoom.refereeSeatNames||{},refereeStationAssignments:rootRoom.refereeStationAssignments||{},refereeStationNames:rootRoom.refereeStationNames||{},assignedStaffUids:rootRoom.assignedStaffUids||[]};
-    state=combined;emit('ready');
+    state=combined;
+    for(const [key,record] of pending)if(record.awaiting&&(record.epoch!==manifest.epoch||Number(state.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=record.confirmedRevision))pending.delete(key);
+    emit('ready');
    }catch(error){emit('syncing',error.message);}
   }
   function connect(){
@@ -63,7 +65,10 @@
    record.running=true;pending.set(key,record);emit(status);
    try{
     const result=await (record.type==='score'?transport.commitScore:transport.manageSeats)(clone(record.data));
-    if(result?.ok||result?.ok===false&&typeof result.reason==='string'&&!uncertain.has(result.reason))pending.delete(key);
+    if(result?.ok&&record.type==='score'&&Number.isSafeInteger(result.scoreRevision)){
+     record.awaiting=true;record.confirmedRevision=result.scoreRevision;
+     if(Number(state?.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=result.scoreRevision)pending.delete(key);
+    }else if(result?.ok||result?.ok===false&&typeof result.reason==='string'&&!uncertain.has(result.reason))pending.delete(key);
     return result||{ok:false,reason:'cloud-unavailable'};
    }catch{return {ok:false,reason:'cloud-unavailable'};}
    finally{record.running=false;emit(status);}

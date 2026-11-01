@@ -41,3 +41,11 @@ test('new epoch blocks retries and delayed old bucket callbacks; revoked seats c
  assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'station-not-assigned');
  h.rooms.at(-1).next({room:h.f.room,version:'1'});assert.equal(h.client.canScore(1),false);
 });
+test('successful reply keeps scoring locked until subscription confirms its score revision',async()=>{
+ const h=setup();h.client.connect();h.ready();h.setSend(async()=>({ok:true,scoreRevision:1}));
+ assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).ok,true);
+ assert.equal((await h.client.score('m1','score',{side:'A',finish:'spin'})).reason,'operation-pending');assert.equal(h.client.getView().retryable.length,0);
+ h.f.state.matches[0].scoreA=1;h.f.state.matches[0].refereeSeatScoreRevision=1;
+ const bucket=B.encode(h.f.state,h.f.room.scoreStorage)[0];h.watches[0].next({bucket:{...bucket,revision:1}});
+ assert.equal(h.client.getView().pending.length,0);assert.equal(h.client.getView().state.matches[0].scoreA,1);
+});
