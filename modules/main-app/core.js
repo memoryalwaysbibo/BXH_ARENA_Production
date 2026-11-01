@@ -15474,6 +15474,7 @@ function lobbySummary(raw){
     raw, communityQuickRegistration:isCommunityQuickRegistration(raw), registrationEnabled:raw.registrationEnabled, registrationStatus:raw.registrationStatus, code:raw.code, name:m.name||raw.name||"未命名賽事", date:m.date||raw.eventDate||"", startAt:m.startTime||raw.startAt||"",
     location:m.location||raw.location||"", phase:canonicalPublicTournamentPhase(raw), regStatus,
     authority, hostName, systemClosure:raw.systemClosure||pd.systemClosure||null,
+    ladderMode:(raw.ladderMode??m.ladderMode)==="ranked"?"ranked":"general",
     registrationSelection:raw.registrationSelection||null,registeredCount:Number(raw.registeredCount||0),capacity:raw.capacity??null, confirmedCount:communityRegistrationParticipantCount(raw), waitlistEnabled:!!raw.waitlistEnabled,
     waitlistCapacity:raw.waitlistCapacity||0, waitlistCount:raw.waitlistCount||0,
     closeAt:normalizeDateTime(raw.registrationCloseAt), openAt:normalizeDateTime(raw.registrationOpenAt),
@@ -15617,6 +15618,7 @@ function lobbyCard(t, kind, loggedIn, expanded=false){
         </div>
         <div class="lobby-card-right">
           <span class="lobby-room-code">房號 ${esc(t.code)}</span>
+          <span class="badge ${t.ladderMode==="ranked"?"badge-neon":"badge-metal"}" style="white-space:nowrap;flex-shrink:0">${t.ladderMode==="ranked"?"積分賽事":"一般賽事"}</span>
           <span class="lobby-authority ${authorityClass}">${authorityLabel}</span>
           ${t.roomAccessMode==="password"?'<span class="badge badge-metal">🔒 密碼房</span>':""}
           ${t.systemClosure&&!t.systemClosure.restoredAt?'<span class="badge badge-metal">比賽結束（系統關閉）</span>':roomStatusHtml(displayPhase)}
