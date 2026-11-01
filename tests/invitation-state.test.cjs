@@ -3,12 +3,12 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),vm=requir
 const root=path.join(__dirname,'..'),core=fs.readFileSync(path.join(root,'modules/main-app/core.js'),'utf8');
 function block(src,start,end){const a=src.indexOf(start),b=src.indexOf(end,a);assert.ok(a>=0&&b>a);return src.slice(a,b);}
 function people(rows,error=null,online=true){
- const s={state:{id:'qa',cloudCode:'BXH-QA',players:[],waitlistPlayers:[],meta:{registrationEnabled:online,registrationCapacity:2}},adminRegistrationsCache:rows,adminRegistrationsError:error,adminRegistrationsLoading:false,adminRosterCode:'BXH-QA',peopleRosterSection:'waitlist',peopleRosterBusy:false,firebaseUser:{uid:'qa'},window:{},BATTLE_MODE_LABELS:{},FORMAT_LABELS:{},esc:String,setTimeout(){},startAdminRosterWatch(){},participantDisplayName:p=>p.name,peopleRegistrationIdOf:r=>r.id,peopleWaitlistShadow:()=>null};
+ const s={state:{id:'qa',cloudCode:'BXH-QA',players:[],waitlistPlayers:[],meta:{registrationEnabled:online,registrationCapacity:2}},adminRegistrationsCache:rows,adminRegistrationsError:error,adminRegistrationsLoading:false,adminRosterCode:'BXH-QA',peopleRosterSection:'waitlist',peopleRosterBusy:false,peopleRosterSyncStatus:null,firebaseUser:{uid:'qa'},window:{},BATTLE_MODE_LABELS:{},FORMAT_LABELS:{},esc:String,setTimeout(){},startAdminRosterWatch(){},participantDisplayName:p=>p.name,peopleRegistrationIdOf:r=>r.id,peopleWaitlistShadow:()=>null};
  for(const k of ['peopleRosterMutationLocked','peopleRegistrationSelectionManaged','isCommunityQuickRegistration','peopleOnsiteWaitlistAvailable','peopleOnsiteWaitlistManaged','bracketCommitBlocked'])s[k]=()=>false;
  for(const k of ['canManageRegistrationRoster','entryRosterValid'])s[k]=()=>true;
  for(const k of ['renderStaffAssignmentPanel','renderRefereeStationAssignmentPanel','bracketCommitStatusHtml','bracketDrawButtonHtml','renderEntrySelection'])s[k]=()=>'';
  s.peopleLocalWaitlist=()=>s.state.waitlistPlayers;s.peopleOnlineWaitlistRows=()=>Array.isArray(s.adminRegistrationsCache)?s.adminRegistrationsCache.filter(r=>r.status==='waitlist'):[];
- vm.createContext(s);vm.runInContext(block(core,'function renderPeopleManagement(){','function renderBxhEventTemplateSettingsSection('),s);return s;
+ vm.createContext(s);vm.runInContext(block(core,'function peopleRosterSyncStatusHtml(){','function entryContext('),s);vm.runInContext(block(core,'function renderPeopleManagement(){','function renderBxhEventTemplateSettingsSection('),s);return s;
 }
 test('initial registration read never advertises an empty waitlist',()=>{
  const s=people(null),html=s.renderPeopleManagement();assert.match(html,/<strong>備取<\/strong><span>讀取中<\/span>/);assert.doesNotMatch(html,/目前沒有備取選手/);
