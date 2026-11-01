@@ -12,7 +12,7 @@ function createBucketScoringHandler(db,{clock=Date.now}={}){
   const root=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
   const key=createHash('sha256').update(uid+':'+d.operationId).digest('hex'),hash=createHash('sha256').update(JSON.stringify(d)).digest('hex'),receiptRef=root.collection('bucketScoreOperations').doc(key);
   return db.runTransaction(async tx=>{
-   const now=clock(),[rootSnap,userSnap,configSnap,receipt]=await Promise.all([tx.get(root),tx.get(db.doc('users/'+uid)),tx.get(db.doc('systemConfig/fourCourtScoreBuckets')),tx.get(receiptRef)]);
+   const now=clock(),[rootSnap,userSnap,configSnap,receipt]=await tx.getAll(root,db.doc('users/'+uid),db.doc('systemConfig/fourCourtScoreBuckets'),receiptRef);
    if(!rootSnap.exists)throw Error('not-found');
    if(configSnap.data()?.enabled!==true)throw Error('release-not-ready');
    const room=rootSnap.data(),user=userSnap.data(),authority={now,partnerEnabled:false};
@@ -22,7 +22,7 @@ function createBucketScoringHandler(db,{clock=Date.now}={}){
    if(m.code!==code)throw Error('room-mismatch');
    if(!C.eligible(room,user,uid,authority)||!S.allowed(room,user,uid,Number(d.station),authority))throw Error('station-not-assigned');
    const ids=local?[bucketId]:Array.from({length:m.bucketCount},(_,i)=>'court-'+(i+1));
-   const snaps=await Promise.all(ids.map(id=>tx.get(root.collection('matchBuckets').doc(id))));
+   const snaps=await tx.getAll(...ids.map(id=>root.collection('matchBuckets').doc(id)));
    const buckets=snaps.map(s=>s.exists?s.data():null),state=B.materialize(base,m,buckets,local?bucketId:null);
    // Recheck current authority even for a replay; an old receipt cannot restore a revoked seat.
    if(receipt.exists){if(receipt.data().hash!==hash||receipt.data().epoch!==m.epoch)throw Error('operation-conflict');return {...receipt.data().result,replayed:true,buckets};}

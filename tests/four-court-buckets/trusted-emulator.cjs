@@ -8,6 +8,7 @@ const {createBucketPublicProjection}=require('../../referee-seats/functions/buck
 const {fixture,request}=require('./trusted-fixture.cjs');
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'trusted-bucket-lab'),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
 const report={kind:'trusted-scoring-bucket-emulator',productionWrites:0,cases:[]};let serial=0;
+function phase(name){report.phase=name;console.log('TRUSTED PHASE '+name);}
 const operation=()=> 'trusted-operation-'+String(++serial).padStart(6,'0');
 async function seed(code,count=6,bracket=true){
  const f=fixture(code,count,bracket),root=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
@@ -29,6 +30,7 @@ async function send(root,id,action,extra={}){
  const deadline=setTimeout(()=>{console.error('trusted-lab-timeout');process.exit(2);},240000);
  try{
   for(const count of [6,12]){
+   phase('concurrent-'+count);
    const {root,pub}=await seed('BXH-TRUST'+count,count,false),before=await root.get(),publicBefore=await pub.get(),{room,state}=await read(root);
    const result=await Promise.all(state.matches.map(match=>commit({auth:{uid:'ref'+match.station},data:request(state,room,match.id,'score',operation(),{side:'A',finish:'spin'})})));
    assert(result.every(r=>r.ok&&!r.structural&&!r.state));
@@ -36,14 +38,17 @@ async function send(root,id,action,extra={}){
    assert((await root.get()).updateTime.isEqual(before.updateTime),'local score rewrote shared root');
    assert((await pub.get()).updateTime.isEqual(publicBefore.updateTime),'local score rewrote public mirror');
    assert.equal((await root.collection('bucketScoreAudit').get()).size,count);
+   phase('concurrent-projection-'+count);
    const projections=await Promise.all([publish(state.cloudCode),publish(state.cloudCode)]);
    assert.equal(projections.filter(x=>!x.skipped).length,1,'same generation must only be materialized once');
    const publicState=JSON.parse((await pub.get()).data().bracketView);assert(publicState.matches.every(m=>m.scoreA===1&&m.log.length===1));
    assert((await root.get()).updateTime.isEqual(before.updateTime),'publication rewrote root');
+   phase('new-score-projection-'+count);
    await send(root,'m1','score',{side:'B',finish:'burst'});await publish(state.cloudCode);
    const newest=JSON.parse((await pub.get()).data().bracketView);assert.equal(newest.matches[0].scoreB,2);
    assert(newest.matches.slice(1).every(m=>m.scoreA===1&&m.scoreB===0),'publication lost another court');
    assert((await publish(state.cloudCode)).skipped,'unchanged generations should not republish');
+   phase('pause-resume-projection-'+count);
    await send(root,'m1','pause');await publish(state.cloudCode);
    assert.equal(JSON.parse((await pub.get()).data().bracketView).courtAssignments.court1.status,'paused');
    await send(root,'m1','resume');await publish(state.cloudCode);
@@ -53,6 +58,7 @@ async function send(root,id,action,extra={}){
    report.cases.push({name:'public-projection',courts:count,concurrentWritersDeduplicated:true,newScoresVisible:true,rootUnchanged:true});
   }
   {
+   phase('cross-bucket-confirm');
    const {root,pub}=await seed('BXH-CROSS1');
    for(const id of ['m1','m2']){await send(root,id,'score',{side:'A',finish:'extreme'});await send(root,id,'score',{side:'A',finish:'spin'});}
    const before=await read(root),commands=['m1','m2'].map(id=>{const d=request(before.state,before.room,id,'confirm',operation());return {auth:{uid:'ref'+d.station},data:d};});
@@ -68,6 +74,7 @@ async function send(root,id,action,extra={}){
    report.cases.push({name:'cross-bucket-confirm-and-final',passed:true,champion:'c',sourceBuckets:2});
   }
   {
+   phase('replay-and-authority');
    const {root}=await seed('BXH-REPLAY1'),{room,state}=await read(root),d=request(state,room,'m1','score',operation(),{side:'A',finish:'spin'}),req={auth:{uid:'ref1'},data:d};
    const replies=await Promise.all([commit(req),commit(req)]);
    assert(replies.some(x=>x.replayed===true));assert.equal((await read(root)).state.matches[0].scoreA,1);assert.equal((await root.collection('bucketScoreAudit').get()).size,1);
@@ -79,6 +86,7 @@ async function send(root,id,action,extra={}){
    report.cases.push({name:'lost-reply-conflict-stale-revoked-seat',passed:true});
   }
   {
+   phase('epoch-and-release');
    const {root}=await seed('BXH-EPOCH1'),{room,state}=await read(root),d=request(state,room,'m1','score',operation(),{side:'A',finish:'spin'});
    await root.collection('matchBuckets').doc('court-1').update({epoch:'wrong-generation'});
    await assert.rejects(commit({auth:{uid:'ref1'},data:d}),/bucket-context/);

@@ -7,12 +7,12 @@ function createBucketPublicProjection(db,{clock=Date.now}={}){
   if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))throw Error('invalid-request');
   const root=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
   return db.runTransaction(async tx=>{
-   const [roomSnap,pubSnap,config]=await Promise.all([tx.get(root),tx.get(pub),tx.get(db.doc('systemConfig/fourCourtScoreBuckets'))]);
+   const [roomSnap,pubSnap,config]=await tx.getAll(root,pub,db.doc('systemConfig/fourCourtScoreBuckets'));
    if(config.data()?.enabled!==true)throw Error('release-not-ready');
    if(!roomSnap.exists||!pubSnap.exists)throw Error('not-found');
    let base,previous;try{base=JSON.parse(roomSnap.data().data);previous=JSON.parse(pubSnap.data().bracketView);}catch{throw Error('corrupt-data');}
    const m=B.context(roomSnap.data(),base);if(m.code!==code)throw Error('room-mismatch');
-   const snaps=await Promise.all(Array.from({length:m.bucketCount},(_,i)=>tx.get(root.collection('matchBuckets').doc('court-'+(i+1)))));
+   const snaps=await tx.getAll(...Array.from({length:m.bucketCount},(_,i)=>root.collection('matchBuckets').doc('court-'+(i+1))));
    const buckets=snaps.map(s=>s.exists?s.data():null),state=B.materialize(base,m,buckets);
    const versions=Object.fromEntries(buckets.map(b=>[b.bucketId,b.revision])),projection={epoch:m.epoch,versions};
    const previousVector=pubSnap.data().scoreBucketProjection;
