@@ -9,11 +9,16 @@ const {createHandler:createSeatHandler}=require('../../referee-seats/functions/s
 const {createPromotionHandler}=require('../../registration-promotion/functions/service.cjs');
 const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {createBucketCutover}=require('../../referee-seats/functions/bucket-cutover.cjs');
+const {createRosterService}=require('../../qr-checkin/backend/overlays/roster-service.js');
+const {createRoomAccessService}=require('../../qr-checkin/backend/overlays/room-access-service.js');
+const {FirestoreStore}=require('../../qr-checkin/backend/onsite/firestore-store.cjs');
+const {guardFirestore}=require('../../qr-checkin/backend/guard-firestore.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
-const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'trusted-bucket-lab'),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
+const app=initializeApp({projectId:process.env.GCLOUD_PROJECT}),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
+const {createCheckinHandler}=require('../../qr-checkin/backend/firebase-callable.cjs');
 const oldCommit=createScoringHandler(db);
 const oldSeat=createSeatHandler(db),oldPromotion=createPromotionHandler(db);
-const cutover=createBucketCutover(db);
+const cutover=createBucketCutover(db),oldQR=createCheckinHandler(db,()=> 'lab-signing-key'),oldRoster=createRosterService(db,require('firebase-admin/firestore').FieldValue),oldRoomAccess=createRoomAccessService(db);
 const report={kind:'trusted-scoring-bucket-emulator',productionWrites:0,cases:[]};let serial=0;
 function phase(name){report.phase=name;console.log('TRUSTED PHASE '+name);}
 const operation=()=> 'trusted-operation-'+String(++serial).padStart(6,'0');
@@ -108,6 +113,25 @@ async function send(root,id,action,extra={}){
    assert.equal((await root.collection('refereeSeatOperations').get()).size,0);
    assert.equal((await root.collection('rosterPromotionOperations').get()).size,0);
    report.cases.push({name:'legacy-admin-sdk-fence',scoring:true,seats:true,promotion:true,rootUnchanged:true,publicUnchanged:true});
+  }
+  {
+   phase('qr-onsite-and-pinned-writer-fence');
+   const {root,pub}=await seed('BXH-QRBUCKET'),before=await root.get(),publicBefore=await pub.get();
+   await assert.rejects(oldQR({auth:{uid:'ref1'},data:{code:'BXH-QRBUCKET',action:'status'}}),/bucket-scoring-required/);
+   await assert.rejects(oldRoster({auth:{uid:'ref1'},data:{code:'BXH-QRBUCKET',action:'configure',enabled:true,operationId:operation()}}),/bucket-scoring-required/);
+   await assert.rejects(oldRoomAccess({auth:{uid:'ref1'},data:{code:'BXH-QRBUCKET',action:'configure',mode:'open',operationId:operation()}}),/bucket-scoring-required/);
+   let callbackReached=false;
+   await assert.rejects(new FirestoreStore(db).transact({code:'BXH-QRBUCKET',uid:'ref1',operationId:operation()},async()=>{callbackReached=true;return {commit:null,result:{ok:true}};}),/bucket-scoring-required/);
+   assert.equal(callbackReached,false);
+   const guarded=guardFirestore(db);
+   await assert.rejects(guarded.runTransaction(async tx=>{const snap=await tx.get(root);tx.update(root,{data:snap.data().data});}),/bucket-scoring-required/);
+   assert((await root.get()).updateTime.isEqual(before.updateTime));
+   assert((await pub.get()).updateTime.isEqual(publicBefore.updateTime));
+   assert.equal((await root.collection('rosterActions').get()).size,0);
+   assert.equal((await root.collection('accessActions').get()).size,0);
+   assert.equal((await root.collection('onsiteWaitlistOperations').get()).size,0);
+   assert.equal((await root.collection('checkinOperations').get()).size,0);
+   report.cases.push({name:'qr-onsite-and-pinned-writer-fence',qr:true,roster:true,access:true,onsite:true,wrapper:true,rootUnchanged:true,publicUnchanged:true});
   }
   for(const count of [6,12]){
    phase('concurrent-'+count);
