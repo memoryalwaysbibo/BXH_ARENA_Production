@@ -8,6 +8,8 @@ on:
       - 'referee-seats/functions/scoring-service.cjs'
       - 'referee-seats/functions/bucket-legacy-fence.cjs'
       - 'referee-seats/firestore.candidate.rules'
+      - 'referee-seats/build-rules.py'
+      - 'referee-seats/firebase.buckets-lab.json'
       - 'tests/four-court-buckets/**'
       - 'docs/four-court-buckets.md'
       - '.github/workflows/four-court-buckets-lab.yml'
@@ -36,7 +38,7 @@ jobs:
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
-        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/fence-firebase.json 'node tests/four-court-buckets/rules-fence.cjs'
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-lab.json 'node tests/four-court-buckets/rules-fence.cjs'
       - name: Simulate 6 and 12 courts against Firestore Emulator
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules

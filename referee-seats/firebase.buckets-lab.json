@@ -1,6 +1,6 @@
 {
   "firestore": {
-    "rules": "../../referee-seats/firestore.candidate.rules"
+    "rules": "firestore.candidate.rules"
   },
   "emulators": {
     "firestore": {"host": "127.0.0.1", "port": 8188},
