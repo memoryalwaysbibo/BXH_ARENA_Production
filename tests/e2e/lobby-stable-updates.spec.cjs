@@ -102,6 +102,7 @@ async function openLobby(page, options = {}) {
       hasSuperAdmin: async () => true,
       onAuthChange: callback => { fixture.authCallback = callback; return () => {}; },
       getUserProfile: async uid => ({ uid, role: 'player', active: true, realName: 'Synthetic player',
+        gameId: fixture.incompleteProfile ? '' : 'Synthetic player', phone: fixture.incompleteProfile ? '' : '0900000000',
         displayName: 'Synthetic player', playerId: 'P-FIXTURE', email: 'fixture@example.invalid' }),
       touchLastLogin: () => {},
       signOutUser: async () => {},
@@ -117,8 +118,9 @@ async function openLobby(page, options = {}) {
   });
   await page.goto('/', { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.lobbyFixture.authCallback === 'function');
-  await page.evaluate(async ({ cached, missingRegistrations }) => {
+  await page.evaluate(async ({ cached, missingRegistrations, incompleteProfile }) => {
     const fixture = window.lobbyFixture;
+    fixture.incompleteProfile = !!incompleteProfile;
     const now = Date.now();
     fixture.rows = Array.from({ length: 7 }, (_, index) => {
       const code = 'BXH-FIXTURE-' + String(index + 1);
@@ -575,3 +577,53 @@ test('user scrolling after a stable update is not undone by delayed legacy resto
   await page.waitForTimeout(250);
   expect(await page.evaluate(() => window.scrollY)).toBe(expected);
 });
+
+
+// The actual shipped auth callback, home renderer and delegated actions are used.
+test('incomplete old player can defer the reminder for one login and is reminded after logout', async ({ page }) => {
+  await openLobby(page, { incompleteProfile: true });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  await expect(page.locator('#profile-reminder-description')).toContainText('電話與ARENA 角色名稱');
+  await page.getByRole('button', { name: '下一次', exact: true }).click();
+  await page.evaluate(() => { render(); render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  await expandCard(page);
+  await page.evaluate(async () => {
+    await lobbyFixture.authCallback(null);
+    pendingLoginIntent = 'player';
+    await lobbyFixture.authCallback({ uid: 'fixture-player', email: 'fixture@example.invalid' });
+  });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+});
+
+test('confirm opens the existing profile editor with old account values intact', async ({ page }) => {
+  await openLobby(page, { incompleteProfile: true });
+  await page.getByRole('button', { name: '確定', exact: true }).click();
+  await expect(page.locator('#profile-realname')).toHaveValue('Synthetic player');
+  await expect(page.locator('#profile-gameid')).toHaveValue('');
+  await expect(page.locator('#profile-phone')).toBeFocused();
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.evaluate(() => { playerActiveTab = 'home'; render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+});
+
+test('reminder deferral is isolated across accounts and complete data removes it', async ({ page }) => {
+  await openLobby(page, { incompleteProfile: true });
+  await page.getByRole('button', { name: '下一次', exact: true }).click();
+  await page.evaluate(async () => {
+    pendingLoginIntent = 'player';
+    await lobbyFixture.authCallback({ uid: 'other-fixture-player', email: 'other@example.invalid' });
+    appPhase = 'player-center'; playerActiveTab = 'home'; render();
+  });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  await page.evaluate(() => {
+    userProfile = { ...userProfile, phone: '0900000000', gameId: 'Synthetic player' };
+    render();
+  });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+});
+
