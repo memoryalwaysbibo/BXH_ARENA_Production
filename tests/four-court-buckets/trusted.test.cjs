@@ -21,4 +21,7 @@ test('full match buckets reject partial epochs and restore full score ledger',()
  assert.equal(complete.matches[0].scoreB,2);assert.equal(complete.matches[0].log.length,1);assert.equal(changed.revision,1);
  assert.throws(()=>B.materialize(f.state,m,[{...changed,epoch:'stale'},buckets[1]]),/bucket-context/);
  assert.throws(()=>B.materialize(f.state,m,[changed]),/bucket-missing/);
+ S.transitionLocal({room:f.room,state:complete,user:f.user,uid:'ref1',d:request(complete,f.room,'m1','pause','local-operation-0003'),now:1001});
+ const paused=B.encode(complete,m,[changed,buckets[1]]);
+ assert.equal(B.materialize(f.state,m,paused).courtAssignments.court1.status,'paused');
 });

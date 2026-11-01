@@ -4,8 +4,9 @@ assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8188');
 assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-four-court-buckets');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore}=require('firebase-admin/firestore');
 const B=require('../../referee-seats/functions/bucket-state.cjs'),{createBucketScoringHandler}=require('../../referee-seats/functions/bucket-scoring-service.cjs');
+const {createBucketPublicProjection}=require('../../referee-seats/functions/bucket-public-projection.cjs');
 const {fixture,request}=require('./trusted-fixture.cjs');
-const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'trusted-bucket-lab'),db=getFirestore(app),commit=createBucketScoringHandler(db);
+const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'trusted-bucket-lab'),db=getFirestore(app),commit=createBucketScoringHandler(db),publish=createBucketPublicProjection(db);
 const report={kind:'trusted-scoring-bucket-emulator',productionWrites:0,cases:[]};let serial=0;
 const operation=()=> 'trusted-operation-'+String(++serial).padStart(6,'0');
 async function seed(code,count=6,bracket=true){
@@ -35,7 +36,21 @@ async function send(root,id,action,extra={}){
    assert((await root.get()).updateTime.isEqual(before.updateTime),'local score rewrote shared root');
    assert((await pub.get()).updateTime.isEqual(publicBefore.updateTime),'local score rewrote public mirror');
    assert.equal((await root.collection('bucketScoreAudit').get()).size,count);
+   const projections=await Promise.all([publish(state.cloudCode),publish(state.cloudCode)]);
+   assert.equal(projections.filter(x=>!x.skipped).length,1,'same generation must only be materialized once');
+   const publicState=JSON.parse((await pub.get()).data().bracketView);assert(publicState.matches.every(m=>m.scoreA===1&&m.log.length===1));
+   assert((await root.get()).updateTime.isEqual(before.updateTime),'publication rewrote root');
+   await send(root,'m1','score',{side:'B',finish:'burst'});await publish(state.cloudCode);
+   const newest=JSON.parse((await pub.get()).data().bracketView);assert.equal(newest.matches[0].scoreB,2);
+   assert(newest.matches.slice(1).every(m=>m.scoreA===1&&m.scoreB===0),'publication lost another court');
+   assert((await publish(state.cloudCode)).skipped,'unchanged generations should not republish');
+   await send(root,'m1','pause');await publish(state.cloudCode);
+   assert.equal(JSON.parse((await pub.get()).data().bracketView).courtAssignments.court1.status,'paused');
+   await send(root,'m1','resume');await publish(state.cloudCode);
+   assert.equal(JSON.parse((await pub.get()).data().bracketView).courtAssignments.court1.status,'in_progress');
+   assert((await root.get()).updateTime.isEqual(before.updateTime));
    report.cases.push({name:'trusted-concurrent',courts:count,buckets:Math.ceil(count/4),success:result.length,rootUnchanged:true,publicUnchanged:true});
+   report.cases.push({name:'public-projection',courts:count,concurrentWritersDeduplicated:true,newScoresVisible:true,rootUnchanged:true});
   }
   {
    const {root,pub}=await seed('BXH-CROSS1');

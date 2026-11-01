@@ -37,6 +37,10 @@ function materialize(base,m,buckets,partialId=null){
   }
  }
  state.matches=state.matches.map(x=>replacements.get(x.id)||x);
+ for(const court of Object.values(state.courtAssignments||{})){
+  const current=state.matches.find(x=>x.id===court.currentMatchId);
+  if(current&&!current.completed)court.status=current.status||'pending';
+ }
  return state;
 }
 module.exports={schema,route,context,makeManifest,encode,materialize};
