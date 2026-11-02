@@ -239,7 +239,7 @@
     getCurrentUser(){
       try{
         const u = authHandle && authHandle.currentUser;
-        return u ? { uid: u.uid, email: u.email, providers:(u.providerData||[]).map(p=>p.providerId) } : null;
+        return u ? { uid: u.uid, email: u.email, providers:(u.providerData||[]).map(p=>p.providerId), metadata:{lastSignInTime:u.metadata?.lastSignInTime||null} } : null;
       }catch(e){ return null; }
     },
 
@@ -347,7 +347,7 @@
           if(!functionsHandle||!fnx)throw Error("functions-unavailable");
           const ensure=fnx.httpsCallable(functionsHandle,"ensureGooglePlayerProfile",{timeout:30000});
           const result=await ensure({});
-          if(authHandle.currentUser!==user||result.data?.uid!==expectedUid)throw Error("stale-google-session");
+          if(authHandle.currentUser!==user||result.data?.ok!==true||result.data?.uid!==expectedUid)throw Error("stale-google-session");
           const snapshot=await fx.getDocFromServer(fx.doc(dbHandle,USERS_COLLECTION,expectedUid));
           if(authHandle.currentUser!==user||!snapshot.exists())throw Error("google-profile-not-confirmed");
           const profile=snapshot.data();

@@ -38,6 +38,12 @@ test('Google popup starts synchronously in the tap and returns the same Firebase
   assert.equal(calls.callable, 0, 'auth callback owns profile creation');
 });
 
+test('manual session recovery keeps the login identity used by reminder deferral', () => {
+  const { api, user } = harness();
+  user.metadata = { lastSignInTime: 'fixed-login-time' };
+  assert.equal(api.getCurrentUser().metadata.lastSignInTime, 'fixed-login-time');
+});
+
 test('blocked popup uses the separate player redirect marker', async () => {
   const { api, context, calls, storage } = harness();
   context.ax.signInWithPopup = async () => { throw { code: 'auth/popup-blocked' }; };
