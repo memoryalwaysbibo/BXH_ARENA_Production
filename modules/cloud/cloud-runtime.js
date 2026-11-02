@@ -136,7 +136,9 @@
         let redirectContext = null;
         try{
           const raw = sessionStorage.getItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);
-          if(raw) redirectContext = JSON.parse(raw);
+          const playerSignInPending=sessionStorage.getItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY)==="player";
+          if(raw && !playerSignInPending) redirectContext = JSON.parse(raw);
+          else if(raw && playerSignInPending) sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);
         }catch(e){}
         if(redirectContext){
           try{
@@ -268,6 +270,7 @@
         }catch(popupError){
           if(popupError?.code!=="auth/popup-blocked" && popupError?.code!=="auth/operation-not-supported-in-this-environment") throw popupError;
           try{
+            sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);
             sessionStorage.setItem(GOOGLE_LINK_REDIRECT_SESSION_KEY,JSON.stringify({uid,email:oldEmail}));
             await ax.linkWithRedirect(user,provider,ax.browserPopupRedirectResolver);
             return {ok:true,redirecting:true};
@@ -318,6 +321,7 @@
           result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
         }catch(e){
           if(e?.code!=="auth/popup-blocked"&&e?.code!=="auth/operation-not-supported-in-this-environment")throw e;
+          sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);
           sessionStorage.setItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY,"player");
           try{
             await ax.signInWithRedirect(authHandle,provider,ax.browserPopupRedirectResolver);
