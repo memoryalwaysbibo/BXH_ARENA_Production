@@ -15,7 +15,7 @@ function prepare({action,code,epoch,room,publicDocument,buckets,versions}){
  if(action==='activate'){
   if(Object.hasOwn(room,'scoreStorage')||Object.hasOwn(base,'scoreStorage'))throw Error('already-bucketed');
   if(Object.hasOwn(room,'bucketMigration'))throw Error('migration-metadata-exists');
-  if(room.eventAuthority!=='official'||base.meta.eventAuthority!=='official'||room.createdByRole==='partner_organizer'||base.meta.formatType!=='single'||!['standard',undefined].includes(base.meta.scoringMode)||!['individual',undefined].includes(base.meta.battleMode)||!['standard',undefined].includes(base.meta.playMode)||room.refereeSeatsV1?.version!==1)throw Error('unsupported-migration-room');
+  if(room.eventAuthority!=='official'||base.meta.eventAuthority!=='official'||room.createdByRole==='partner_organizer'||base.meta.formatType!=='single'||!['standard',undefined].includes(base.meta.scoringMode)||!['individual',undefined].includes(base.meta.battleMode)||!['standard',undefined].includes(base.meta.playMode)||room.refereeSeatsV1?.version!==1||base.courtRetirementPlan&&Number(base.courtRetirementPlan.targetCount)!==base.meta.stations)throw Error('unsupported-migration-room');
   if(room.eventCancelled||room.systemClosed||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(base.archiveStatus))throw Error('room-read-only');
   if(buckets.length)throw Error('orphan-bucket-set');
   manifest=B.makeManifest(base,epoch);encoded=B.encode(base,manifest);state=B.materialize(base,manifest,encoded);

@@ -27,4 +27,7 @@ test('dispatch and retry success wait for the root lifecycle revision rather tha
  const first=bridge.cloud.commitRefereeCommand({code:state.cloudCode,action:'reopen',station:1}).then(r=>{done=true;return r;});await Promise.resolve();assert.equal(done,false);state.courtLifecycleEpoch=1;bridge.publish({status:'ready',state});assert.equal((await first).state.courtLifecycleEpoch,1);
  done=false;const retry=bridge.cloud.retryBucketOperation({code:state.cloudCode,key:'dispatch'}).then(r=>{done=true;return r;});await Promise.resolve();assert.equal(done,false);state.courtLifecycleEpoch=2;bridge.publish({status:'ready',state});assert.equal((await retry).state.courtLifecycleEpoch,2);assert.equal(sent[1],'dispatch');bridge.close();
 });
+test('a match literally named dispatch still waits for its score revision',async()=>{
+ const h=setup();h.state.matches[0].id='dispatch';const pending=h.bridge.cloud.commitRefereeCommand({code:h.state.cloudCode,action:'score',matchId:'dispatch'});await Promise.resolve();h.state.matches[0].refereeSeatScoreRevision=1;h.bridge.publish({status:'ready',state:h.state});assert.equal((await pending).ok,true);h.bridge.close();
+});
 

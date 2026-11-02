@@ -5,6 +5,7 @@
  const clone=x=>JSON.parse(JSON.stringify(x));
  const actions=new Set(['score','fault','undo','rematch','pause','resume','confirm','quick']);
  const dispatches=new Set(['idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer']);
+ const dispatchRevision=Symbol('dispatch-revision');
  function create({client,code,uid,getUid,legacy={},timeoutMs=8000}){
   let view=client.getView(),closed=false,lastSignature=null;const states=new Set(),seats=new Set(),waiters=new Set();
   const current=()=>!closed&&getUid()===uid;
@@ -19,7 +20,7 @@
   }
   async function settle(result,matchId=null){
    if(!result?.ok)return result;
-   const confirmed=()=>ready()&&(matchId==='dispatch'?Number.isSafeInteger(result.lifecycleRevision)&&Number(view.state.courtLifecycleEpoch||0)>=result.lifecycleRevision:matchId?Number(view.state.matches.find(m=>m.id===matchId)?.refereeSeatScoreRevision||0)>=Number(result.scoreRevision):Number(view.state.meta.refereeSeatsV1?.revision||0)>=Number(result.revision));
+   const confirmed=()=>ready()&&(matchId===dispatchRevision?Number.isSafeInteger(result.lifecycleRevision)&&Number(view.state.courtLifecycleEpoch||0)>=result.lifecycleRevision:matchId?Number(view.state.matches.find(m=>m.id===matchId)?.refereeSeatScoreRevision||0)>=Number(result.scoreRevision):Number(view.state.meta.refereeSeatsV1?.revision||0)>=Number(result.revision));
    if(!confirmed())await new Promise(resolve=>{
     let timer;const check=()=>{if(confirmed()||!current()||view.status==='error'||view.status==='offline'){clearTimeout(timer);waiters.delete(check);resolve();}};
     timer=setTimeout(()=>{waiters.delete(check);resolve();},timeoutMs);waiters.add(check);check();
@@ -31,7 +32,7 @@
    if(!current()||data.code!==code)return {ok:false,reason:'bucket-session-mismatch'};
    if(!actions.has(data.action)&&!dispatches.has(data.action))return {ok:false,reason:'unsupported-bucket-action'};
    if(!ready())return {ok:false,reason:'not-synchronized'};
-   return dispatches.has(data.action)?settle(await client.dispatch(data),'dispatch'):settle(await client.score(data.matchId,data.action,data),data.matchId);
+   return dispatches.has(data.action)?settle(await client.dispatch(data),dispatchRevision):settle(await client.score(data.matchId,data.action,data),data.matchId);
   }
   const cloud={...legacy,
    commitRefereeCommand:commit,
@@ -39,7 +40,7 @@
     if(!current()||data.code!==code)return {ok:false,reason:'bucket-session-mismatch'};
     if(!ready())return {ok:false,reason:'not-synchronized'};
     if(!client.getView().retryable?.includes(data.key))return {ok:false,reason:'nothing-to-retry'};
-    return settle(await client.retry(data.key),data.key==='dispatch'?'dispatch':data.key==='seat'?null:data.key.slice(6));
+    return settle(await client.retry(data.key),data.key==='dispatch'?dispatchRevision:data.key==='seat'?null:data.key.slice(6));
    },
    manageRefereeSeats:data=>current()&&data.code===code?client.manageRefereeSeats(data):Promise.resolve({ok:false,reason:'bucket-session-mismatch'}),
    joinRoom:async requested=>requested===code&&ready()?{ok:true,data:clone(view.state)}:{ok:false,reason:'not-synchronized'},

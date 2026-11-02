@@ -6177,6 +6177,8 @@ function stationMutationErrorMessage(reason){
     "station-not-assigned":"此戰鬥台未指派給你，無法修改本台資料。",
     "station-mismatch":"場次已改派，請以最新戰鬥台資料操作。",
     "dispatch-stale":"場次已被承接或狀態已改變，請依最新清單操作。",
+    "bucket-court-count-change-required":"此房間目前使用固定台數分桶；增減台數尚未開放，請保留現有台數。",
+    "unsupported-bucket-action":"目前分桶模式尚未支援這項賽務操作。",
     "score-stale":"另一位裁判已更新本場，請確認最新比分後再操作。",
     "not-found":"雲端找不到此場比賽。",
     "already-completed":"本場已由其他裁判完成判定。",

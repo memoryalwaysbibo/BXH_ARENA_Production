@@ -17,6 +17,7 @@ test('activation refuses unrelated orphan buckets, unsupported modes and duplica
  assert.throws(()=>P.prepare({...x,room:{...x.room,createdByRole:'partner_organizer'}}),/unsupported-migration-room/);
  const state=JSON.parse(x.room.data);state.meta.formatType='double';assert.throws(()=>P.prepare({...x,room:{...x.room,data:JSON.stringify(state)}}),/unsupported-migration-room/);
  state.meta.formatType='single';state.matches[1].id=state.matches[0].id;assert.throws(()=>P.prepare({...x,room:{...x.room,data:JSON.stringify(state)}}),/invalid-match-identity/);
+ const draining=JSON.parse(x.room.data);draining.courtRetirementPlan={targetCount:4};assert.throws(()=>P.prepare({...x,room:{...x.room,data:JSON.stringify(draining)}}),/unsupported-migration-room/);
  assert.throws(()=>P.prepare({...x,room:{...x.room,scoreStorage:null}}),/already-bucketed/);
 });
 test('rollback planning materializes complete bucket scores and ledger instead of stale root JSON',()=>{
