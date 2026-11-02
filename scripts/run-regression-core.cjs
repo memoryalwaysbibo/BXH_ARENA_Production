@@ -26,6 +26,7 @@ const suites = {
     { name: 'hunter B2 source categories and enchantment base scoring', args: ['--test', 'tests/hunter-b2-modes.test.cjs'] },
     { name: 'hunter B1 statistics and partial-read states', args: ['--test', 'tests/hunter-b1-statistics.test.cjs', 'tests/hunter-b1-cloud.test.cjs'] },
     { name: 'inline mailbox reading and stable refresh', args: ['--test', 'tests/mailbox-inline.test.cjs'] },
+    { name: 'title reward claims and login-session isolation', args: ['--test', 'tests/title-reward-session.test.cjs'] },
     { name: 'claimed-card album refresh and session isolation', args: ['--test', 'tests/card-album-claim-refresh.test.cjs'] },
     { name: 'Core module exports, shared state, and stale callback guards', args: ['--test', 'tests/module-seam-contracts.test.cjs'] },
     { name: 'public lobby ordering utility and Core seam', args: ['--test', 'tests/lobby-ordering.test.cjs'] },
@@ -89,4 +90,5 @@ if (failures.length) {
   for (const failure of failures) console.error('-', failure.name);
   process.exit(1);
 }
+
 

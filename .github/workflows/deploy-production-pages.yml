@@ -84,11 +84,15 @@ jobs:
       - name: Build private-data-free public Pages artifact
         if: steps.freshness.outputs.deploy == 'true'
         id: public_site
+        env:
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          VALIDATION_RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
           public_site="$(mktemp -d)"
           node scripts/prepare-public-pages.cjs "$public_site"
+          node scripts/write-release-manifest.cjs "$public_site"
           echo "path=$public_site" >> "$GITHUB_OUTPUT"
 
       - name: Upload exact validated site artifact
@@ -107,6 +111,7 @@ jobs:
         if: steps.freshness.outputs.deploy == 'true'
         env:
           EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          PUBLIC_SITE: ${{ steps.public_site.outputs.path }}
         shell: bash
         run: |
           set -euo pipefail
@@ -121,8 +126,8 @@ jobs:
           verified=false
           for attempt in {1..12}; do
             verified=true
-            for path in version.json index.html modules/main-app/core.js modules/cloud/cloud-runtime.js modules/main-app/qr-checkin.js modules/main-app/qr-checkin-fence.js modules/main-app/roster-view.js modules/main-app/bracket-commit.js modules/main-app/player-cards.js modules/referee-license/ui.js modules/referee-license/domain.js modules/referee-license/styles.css modules/referee-license/fonts/bxh-kai-subset.ttf; do
-              expected="$(sha256sum "$path" | cut -d ' ' -f 1)"
+            for path in release.json version.json index.html modules/main-app/core.js modules/cloud/cloud-runtime.js modules/main-app/registration-feedback.js modules/main-app/registration-feedback.css modules/main-app/qr-checkin.js modules/main-app/qr-checkin-fence.js modules/main-app/roster-view.js modules/main-app/bracket-commit.js modules/main-app/player-cards.js modules/referee-license/ui.js modules/referee-license/domain.js modules/referee-license/styles.css modules/referee-license/fonts/bxh-kai-subset.ttf; do
+              expected="$(sha256sum "$PUBLIC_SITE/$path" | cut -d ' ' -f 1)"
               status="$(curl --silent --show-error --location --compressed --max-time 12 --output "$scratch/served" --write-out '%{http_code}' "$base/$path?deployment_check=$EXPECTED_COMMIT" 2>/dev/null || true)"
               actual="$(sha256sum "$scratch/served" 2>/dev/null | cut -d ' ' -f 1 || true)"
               if [[ "$status" != "200" || "$actual" != "$expected" ]]; then
@@ -146,6 +151,7 @@ jobs:
             fi
           done
           echo "Production Pages serves the exact validated artifacts for $EXPECTED_COMMIT."
+          artifact_created="$(jq -er .artifactCreatedAt "$PUBLIC_SITE/release.json")"
           build="$(jq -er '.build' version.json)"
           version="$(jq -er '.version' version.json)"
           {
@@ -153,9 +159,11 @@ jobs:
             echo ""
             echo "| Field | Value |"
             echo "| --- | --- |"
-            printf '| Build | `%s` |\n' "$build"
-            printf '| Version | `%s` |\n' "$version"
+            printf '| Artifact created (UTC; before publication) | `%s` |\n' "$artifact_created"
+            printf '| Legacy build label | `%s` |\n' "$build"
+            printf '| Legacy version label | `%s` |\n' "$version"
             printf '| Source commit | `%s` |\n' "$EXPECTED_COMMIT"
             printf '| Public site | https://%s/ |\n' "$host"
-            echo "| Artifact parity | Exact SHA-256 match: version.json, index.html, Core, cloud runtime, QR, player cards and referee runtime; private backend, identity and QA sources absent |"
+            echo "| Artifact parity | Exact SHA-256 match: release.json, version.json, index.html, Core, cloud runtime, QR, player cards and referee runtime; private backend, identity and QA sources absent |"
           } >> "$GITHUB_STEP_SUMMARY"
+

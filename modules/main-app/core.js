@@ -5211,6 +5211,8 @@ const PUBLIC_TOURNAMENTS_ERROR_MESSAGES = {
 // 無法歸類的 permission-denied 才顯示「操作未完成，請重新整理後再試」，
 // 不再籠統翻譯成單一句話。
 const REGISTRATION_ERROR_MESSAGES = {
+  "registration-result-pending":"報名結果尚未確認，請使用畫面上的「查詢報名結果」，不要重新送出。",
+  "registration-preparation-timeout":"報名前置確認等候過久，尚未送出報名，請稍後重試。",
   "registration-state-conflict": "報名設定或人數尚未同步，請聯絡主辦重新儲存設定。",
   "invalid-registration-capacity": "報名人數上限設定無效，請聯絡主辦修正。",
   "community-quick-individual-only": "快速報名適用個人賽；團體賽請使用既有排程報名設定。",
@@ -5265,6 +5267,12 @@ function mapRegistrationError(e){
   const code = (e && e.code) || (e && e.message) || "unknown";
   return REGISTRATION_ERROR_MESSAGES[code] || Object.entries(REGISTRATION_ERROR_MESSAGES).find(([key])=>String(e?.message||"").includes(key))?.[1] || "發生未知錯誤，請稍後再試";
 }
+window.addEventListener('bxh-registration-recovered',event=>{
+  const code=event.detail?.code;
+  publicTournamentsCache=null;invalidateMyRegistrationsCache();
+  if(appPhase==='tournament-detail'&&tournamentDetailCode===code)void loadTournamentDetail(code);
+  else requestLobbyRender();
+});
 let publicTournamentsLoading = false;
 let publicTournamentsLastRefreshAt = 0;
 let publicTournamentsRealtimeUnsub = null;
@@ -8075,6 +8083,9 @@ function tournamentEligiblePlayers(players,meta,matches){
 }
 
 function eligiblePlayers(){
+  // Before start, zero checked-in players means an empty entry list. The
+  // historical bracket fallback is only valid after the tournament is locked.
+  if(!state.startedAt&&state.meta?.checkinRequired)return (state.players||[]).filter(p=>p&&p.checkedIn===true);
   return tournamentEligiblePlayers(state.players,state.meta,state.matches);
 }
 
@@ -10460,7 +10471,7 @@ function renderTeamReferee(){
   return refereeBracketRoundtripNav('bracket')+'<div class="banner"><span>團體裁判模式｜排陣確認、公開與即時計分僅在此操作。</span></div>'+renderTeamMatchList(true);
 }
 function renderBracket(){
-  if(state.meta?.battleMode==="team"&&state.bracketSize)return renderTeamBracket();
+  if(state.meta?.battleMode==="team"&&state.bracketSize)return bracketCommitStatusHtml()+renderTeamBracket();
   const refreshBtn=bracketRefreshButtonHtml();
   if(!state.bracketSize){
     const refreshOnly=refreshBtn ? `<div class="bracket-top-controls bracket-top-controls-refresh-only">${refreshBtn}</div>` : "";
@@ -10480,7 +10491,7 @@ function renderBracket(){
   if(bracketViewMode==="board"){
     return swapBanner + quickNav + topControls + renderBoardMode();
   }
-  return swapBanner + quickNav + topControls + matchLegendHtml() + renderTournamentMatchList();
+  return swapBanner + quickNav + topControls + bracketCommitStatusHtml() + matchLegendHtml() + renderTournamentMatchList();
 }
 
 function tournamentMatchListGroup(m, fmt){
@@ -10613,7 +10624,15 @@ const BOARD_ICON_FULLSCREEN = '<svg viewBox="0 0 24 24" width="16" height="16" f
 
 // Bracket generation is detached until persistence and server readback agree.
 let adminOperationalOverrideBusy=false;
+let adminOperationalFailure=null;
 function adminOverrideContext(){return {actorUid:currentAuthUid(),roomId:state.id,code:state.cloudCode};}
+function noteAdminOperationalFailure(operation,reason){
+ adminOperationalFailure={...adminOverrideContext(),operation,reason:String(reason||'cloud-readback-unconfirmed')};
+}
+function currentAdminOperationalFailure(){
+ const f=adminOperationalFailure,c=adminOverrideContext();
+ return f&&f.actorUid===c.actorUid&&f.roomId===c.roomId&&f.code===c.code?f:null;
+}
 function adminOverrideCurrent(approval){return window.BXHAdminOverride?.current(approval,adminOverrideContext(),userProfile)===true;}
 function canOfferAdminOperationalOverride(){
  return window.BXHAdminOverride?.allowed(userProfile)===true&&!!currentAuthUid()&&!!state.cloudCode&&
@@ -10621,11 +10640,14 @@ function canOfferAdminOperationalOverride(){
 }
 function adminOverrideButtonsHtml(){
  if(!canOfferAdminOperationalOverride())return '';
+ const failure=currentAdminOperationalFailure();if(!failure)return '';
  const disabled=adminOperationalOverrideBusy||bracketCommitController()?.blocked();
- return '<button class="btn btn-danger" data-action="admin-force-draw" '+(disabled?'disabled':'')+'>管理員強制抽籤</button>'+
-  (state.bracketSize?'<button class="btn btn-danger" data-action="admin-force-start" '+(disabled?'disabled':'')+'>管理員強制開賽</button>':'');
+ const start=failure.operation==='start-tournament';
+ if(start&&!state.bracketSize)return '';
+ return '<button class="btn btn-danger" data-action="'+(start?'admin-force-start':'admin-force-draw')+'" '+(disabled?'disabled':'')+'>'+(start?'管理員強制開賽':'管理員強制抽籤')+'</button>';
 }
 function offerAdminOperationalOverride(operation,reason){
+ noteAdminOperationalFailure(operation,reason);
  if(!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy||bracketCommitBlocked())return false;
  const participantIds=operation==='draw-bracket'?eligiblePlayers().map(p=>String(p.id)):Array.from(currentBracketParticipantIds());
  if(participantIds.length<2){showToast('至少需要兩位參賽者，請先確認名單',true);return true;}
@@ -10641,12 +10663,16 @@ function offerAdminOperationalOverride(operation,reason){
 }
 function reconfirmPendingAdminOverride(){
  const controller=bracketCommitController(),status=controller?.status(),prior=status?.override;
- if(status?.busy||!prior||!adminOverrideCurrent(prior))return;
- const approval={...prior,at:Date.now()};
- openModal({type:'generic',title:'重新確認強制抽籤',danger:true,
+ if(status?.busy||!status?.pending||status.result!=='failed'||!canOfferAdminOperationalOverride()||adminOperationalOverrideBusy)return;
+ if(prior&&!adminOverrideCurrent(prior))return;
+ const selected=controller.selection();if(selected.length<2)return;
+ const approval=prior?{...prior,at:Date.now()}:{id:crypto.randomUUID(),operation:'draw-bracket',...adminOverrideContext(),at:Date.now(),
+  reason:String(status.error||'cloud-readback-unconfirmed').slice(0,500),participantIds:selected.map(p=>p.id),
+  warnings:['保留原配對，不重新抽籤','核對最新房間資料後提交本次確認的參賽者']};
+ openModal({type:'generic',title:'管理員強制提交原配對',danger:true,
   message:'將保留已產生的同一份配對，不會重新抽籤。\n\n房號：'+approval.code+'\n參賽人數：'+approval.participantIds.length+
-   ' 人\n原警告：'+approval.reason+'\n\n若先前已寫入，會先讀回確認；尚未寫入才重試。',
-  confirmLabel:'我已重新核對，重試同一配對',onConfirm:()=>{void controller.renewOverride(approval);}});
+   ' 人\n'+selected.map(p=>p.name).join('、')+'\n\n失敗原因：'+approval.reason+'\n\n確認後會先讀取雲端；已儲存則確認結果，尚未儲存才核對最新資料並提交。操作會留下紀錄；成功前不會開賽。',
+  confirmLabel:'我已核對，強制提交原配對',onConfirm:()=>{void controller.forceSubmit(approval);}});
 }
 async function executeAdminOperationalOverride(approval,baseSignature){
  if(adminOperationalOverrideBusy||!adminOverrideCurrent(approval))return;
@@ -10688,7 +10714,7 @@ async function executeAdminOperationalOverride(approval,baseSignature){
    }
    if(!confirmed)throw Error(ok===false?window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-write-rejected':'cloud-readback-unconfirmed');
    state=verified.data;state.cloudCode=approval.code;await saveRecord(state);
-   activeTab='referee';showToast('管理員強制開賽已完成，操作紀錄已儲存');
+   adminOperationalFailure=null;activeTab='referee';showToast('管理員強制開賽已完成，操作紀錄已儲存');
   }
  }catch(e){console.warn('[admin operational override]',e);showToast('強制執行未確認成功（'+String(e.code||e.message||'unknown')+'），請核對雲端狀態',true);}
  finally{adminOperationalOverrideBusy=false;render();}
@@ -10900,6 +10926,26 @@ async function executeAdminOnsiteRecovery(a,controller){
 }
 
 let bracketCommitContext=null;
+function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
+ if(!fresh||!snapshot||fresh.id!==snapshot.id||fresh.startedAt||fresh.archiveStatus==='completed'||
+   fresh.meta?.battleMode==='team'||snapshot.meta?.battleMode==='team'||
+   fresh.meta?.checkinRequired!==true||snapshot.meta?.checkinRequired!==true)return null;
+ const layoutSettings=s=>JSON.stringify([s.meta?.formatType||'single',Number(s.meta?.stations||1),!!s.meta?.bronzeMatch]);
+ if(layoutSettings(fresh)!==layoutSettings(snapshot))return null;
+ const entrants=(players)=>{
+  const ids=(players||[]).filter(p=>p?.checkedIn===true).map(p=>String(p.id||''));
+  return ids.length===new Set(ids).size&&ids.every(Boolean)?ids.sort():null;
+ };
+ const paired=[...new Set((snapshot.matches||[]).flatMap(m=>[m.a?.playerId,m.b?.playerId]).filter(Boolean).map(String))].sort();
+ const before=entrants(snapshot.players),after=entrants(fresh.players);
+ if(!before||!after||paired.length<2||JSON.stringify(before)!==JSON.stringify(paired)||
+   JSON.stringify(after)!==JSON.stringify(paired))return null;
+ const rebased=cloneStateForSave(fresh);
+ for(const field of ['matches','bracketSize','drawnAt','currentMatchId','championId','runnerUpId','thirdId','fourthId','gfMatchId','gfResetMatchId','bronzeMatchId','rrRounds','celebrationShown','courtAssignments','bracketDraw','bracketDrawHistory']){
+  if(Object.prototype.hasOwnProperty.call(snapshot,field))rebased[field]=JSON.parse(JSON.stringify(snapshot[field]));
+ }
+ rebased.updatedAt=Date.now();return rebased;
+}
 function bracketCommitController(){
  if(!window.BXHBracketCommit)return null;
  const key=String(firebaseUser?.uid||currentRole||'local')+':'+String(state.cloudCode||state.id);
@@ -10911,6 +10957,7 @@ function bracketCommitController(){
   state:()=>state,cloud:()=>!!code,
   operationId:()=>window.crypto.randomUUID(),
   authorizeOverride:approval=>adminOverrideCurrent(approval),
+  rebaseRosterFence:rebaseOrdinaryBracketRosterFence,
   rebaseOverride:(fresh,snapshot,approval)=>{
    if(!adminOverrideCurrent(approval))throw Error('admin-override-not-authorized');
    const known=new Set((fresh.players||[]).map(p=>String(p.id)));
@@ -10941,19 +10988,28 @@ function bracketCommitController(){
   local:snapshot=>saveRecord(snapshot),
   apply:snapshot=>{if(!current())return;state=JSON.parse(JSON.stringify(snapshot));state.cloudCode=code;void saveRecord(state).catch(e=>console.warn('[bracket local cache]',e));},
   changed:()=>{if(current())renderPreservingScroll();},
-  success:()=>{activeTab='people';render();showToast(code?'上傳成功':'儲存成功');}
+  success:()=>{adminOperationalFailure=null;activeTab='people';render();showToast(code?'上傳成功':'儲存成功');}
  });
  bracketCommitContext={key,controller};return controller;
 }
 function bracketCommitBlocked(){return bracketCommitController()?.blocked()||false;}
+function bracketRosterUpdateHtml(){
+ if(state.startedAt||state.archiveStatus==='completed'||!state.bracketSize||!(state.matches||[]).length||bracketRosterIsCurrent())return '';
+ const action=canOperateCurrentTournament()?'<button class="btn btn-primary" data-action="draw-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>依最新名單重新抽籤</button>':'<p>請主辦更新對戰表。</p>';
+ return '<section class="panel banner warn" role="alert"><div><b>對戰表待更新</b><p>報到或參賽名單已有異動，目前顯示的是先前配對。開賽前請依最新名單重新抽籤並確認儲存；重新抽籤會更動配對。</p>'+action+'</div></section>';
+}
 function bracketCommitStatusHtml(){
- const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return '';
+ const rosterUpdate=bracketRosterUpdateHtml();
+ const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return rosterUpdate;
+ if(rosterUpdate&&s.result==='success'&&!s.pending&&!s.busy)return rosterUpdate;
  const uploaded=s.result==='success',cloud=!!state.cloudCode;
  const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
  const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
- return '<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
+ const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
+ return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
+ failureDetail+
  (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
- (s.override&&!s.busy&&adminOverrideCurrent(s.override)?'<button class="btn btn-danger" data-action="admin-force-reconfirm">重新確認並重試同一配對</button>':'')+'</section>';
+ (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){
  if(bracketCommitController()?.status().pending)return '';
@@ -11748,7 +11804,7 @@ function wrapPrintWatermark(innerHtml){
 const refereeSwappedViews = new Set();
 function refereeViewKey(m){ return String(state.id)+":"+String(m.id); }
 function refereeViewClass(m){ return refereeSwappedViews.has(refereeViewKey(m))?" swapped":""; }
-function refereeSwapControl(m){ return `<div class="ref-vs-mark"><button class="btn btn-ghost ref-swap" data-action="referee-swap-view" data-id="${esc(m.id)}" aria-label="交換玩家位置" title="交換左右顯示位置">⇄</button></div>`; }
+function refereeSwapControl(m,disabled=false){ return `<div class="ref-vs-mark"><button class="btn btn-ghost ref-swap" ${disabled?'disabled':`data-action="referee-swap-view" data-id="${esc(m.id)}"`} aria-label="交換玩家位置" title="交換左右顯示位置">⇄</button></div>`; }
 
 function canCourtSwapSource(m){
   return !!(m&&!m.isBye&&!m.completed&&m.a&&m.b&&!m.skippedAt&&!m.callPass&&!matchHasDecisionData(m)&&m.status!=="paused");
@@ -12075,7 +12131,7 @@ function renderCourtCard(stationNum){
     const canReceiveSkipped = state.matches.some(mm=>!mm.isBye&&!mm.completed&&mm.skippedAt&&!mm.resumeQueuedAt&&mm.a&&mm.b);
     const available=state.startedAt&&canOperateStation(stationNum)?idleCourtCandidates(state,stationNum):[];
     const claimButtons=available.slice(0,5).map(candidate=>`<button class="btn btn-ghost btn-sm" data-action="idle-court-claim" data-id="${esc(candidate.id)}" data-station="${stationNum}">接手｜${esc(displayMatchLabel(candidate))} ${esc(playerName(candidate.a.playerId))} vs ${esc(playerName(candidate.b.playerId))}</button>`).join("");
-    return `<div class="panel court-card court-card-idle referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
+    return `<div class="panel court-card court-card-idle referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
       ${refereeWorkstationHeader(null,stationNum)}
       <div class="empty-state"><div class="big">${canReceiveSkipped ? "本台閒置，可承接跳過場次" : stationHasFutureWork ? "等待晉級結果" : "本台賽程已完成"}</div>${canReceiveSkipped?'<div>請至上方「待承接場次」選擇安排。</div>':''}</div>
       ${claimButtons?`<div class="msc-btns" style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:8px">${claimButtons}</div>`:""}
@@ -12084,14 +12140,12 @@ function renderCourtCard(stationNum){
   }
 
   if(!m.a || !m.b){
-    return `<div class="panel court-card court-card-idle referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
+    return `<div class="panel court-card court-card-idle referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
       ${refereeWorkstationHeader(m,stationNum)}${renderCourtCallReferee(m)}
       ${liveNextMatchCardHtml(court, stationNum)}
       <div class="empty-state"><div class="big">此對戰尚未確定選手</div><div>請等待前面輪次的比賽完成</div></div>
     </div>`;
   }
-
-  const aName = playerName(m.a.playerId), bName = playerName(m.b.playerId);
 
   if(state.meta?.playMode==="enchantment"){
     return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
@@ -12103,23 +12157,34 @@ function renderCourtCard(stationNum){
     return renderQuickDecisionPanel(m, court, stationNum);
   }
 
-  const winSide = checkWinnerSide(m);
+  return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
+    ${refereeWorkstationHeader(m,stationNum)}${renderCourtCallReferee(m)}
+    ${renderRefereeScorePanel(m,stationNum)}
+  </div>`;
+}
+
+function renderRefereeScorePanel(match,stationNum){
+  // A display-only placeholder: never inserted into state.matches or court assignments.
+  const waiting=!match;
+  const m=match||{id:'',scoreA:0,scoreB:0,log:[],status:'pending',completed:false};
+  const aName=waiting?'—':playerName(m.a.playerId),bName=waiting?'—':playerName(m.b.playerId);
+  const winSide = waiting?null:checkWinnerSide(m);
   const warnBanner = m.completed ? `<div class="banner warn"><span>此對戰已完成確認，任何得分或重賽操作將修改已確認的比賽結果，請謹慎操作。</span></div>` : "";
   const locked = !!(pendingModal && pendingModal.type==="confirm-result" && pendingModal.matchId===m.id);
   const preStartLocked=!state.startedAt;
-  const stationLocked=!canOperateStation(stationNum);
+  const stationLocked=waiting||!canOperateStation(stationNum);
   const enchantmentPending=state.meta&&state.meta.playMode==="enchantment";
-  const faultSaving=refereeFaultWritePending(m);
-  const scoreLocked=locked || faultSaving || preStartLocked || stationLocked || !!winSide || enchantmentPending;
+  const faultSaving=!waiting&&refereeFaultWritePending(m);
+  const scoreLocked=waiting || locked || faultSaving || preStartLocked || stationLocked || !!winSide || enchantmentPending;
 
-  const scoreBtn = (side, type) => `<button data-action="score" data-id="${m.id}" data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
+  const scoreBtn = (side, type) => `<button ${waiting?'':`data-action="score" data-id="${m.id}"`} data-side="${side}" data-type="${type}" ${scoreLocked?'disabled':''}>${POINT_LABELS[type]}</button>`;
   const faultBtn = (side) => {
-    const count=refereeFaultCount(m,side);
-    return `<button class="fault-btn ${count>0?'has-fault':''}" data-action="fault" data-id="${m.id}" data-side="${side}" data-type="fault" ${scoreLocked?'disabled':''}>失誤 ${count}/2</button>`;
+    const count=waiting?0:refereeFaultCount(m,side);
+    return `<button class="fault-btn ${count>0?'has-fault':''}" ${waiting?'':`data-action="fault" data-id="${m.id}"`} data-side="${side}" data-type="fault" ${scoreLocked?'disabled':''}>失誤 ${count}/2</button>`;
   };
 
   const lastLog = m.log.length ? m.log[m.log.length-1] : null;
-  const pendingFault=refereeFaultLast(m);
+  const pendingFault=waiting?null:refereeFaultLast(m);
   const pendingFaultName=pendingFault?(pendingFault.side==='A'?aName:bName):"";
   const undoLabel = pendingFault
     ? `撤銷上一筆失誤（${esc(pendingFaultName)}）`
@@ -12127,23 +12192,21 @@ function renderCourtCard(stationNum){
   const undoAvailable=!!pendingFault||!!lastLog;
 
   return `
-  <div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
-    ${refereeWorkstationHeader(m,stationNum)}${renderCourtCallReferee(m)}
-    ${stationLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>唯讀｜你未被指派 Court ${stationNum}，本台所有比分與判定操作已鎖定。</span></div>`:""}
+    ${!waiting&&stationLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>唯讀｜你未被指派 Court ${stationNum}，本台所有比分與判定操作已鎖定。</span></div>`:""}
     ${enchantmentPending?'<div class="banner warn" style="margin:12px 16px 0;"><span>附魔之戰尚在串接選手手機抽卡與裁判計分，此場暫不可送分。</span></div>':""}
     ${warnBanner}
     ${faultSaving?'<div class="banner warn"><span>失誤判定儲存中，請稍候。</span></div>':""}
-    ${preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
+    ${!waiting&&preStartLocked?`<div class="banner warn" style="margin:12px 16px 0;"><span>賽事尚未開始。比分、判定與場次控制目前鎖定。</span></div>`:""}
     <div class="match-status-controls ref-match-toolbar">
-      <span class="msc-label">場次狀態：${matchStatusBarHtml(m, true)}</span>
+      <span class="msc-label">場次狀態：${waiting?'等待對戰｜計分尚未開放':matchStatusBarHtml(m, true)}</span>
       <div class="msc-btns">
-        ${state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>暫停比賽</button>` : ""}
-        ${state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>恢復比賽</button>` : ""}
-        ${state.startedAt&&m.status!=="completed" ? `<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${stationLocked?'disabled':''}>跳過</button>` : ""}
-        ${refereeCourtSwapButton(m,stationNum,stationLocked)}
+        ${!waiting&&state.startedAt&&m.status==="in_progress" ? `<button class="btn btn-ghost btn-sm" data-action="pause-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>暫停比賽</button>` : ""}
+        ${!waiting&&state.startedAt&&m.status==="paused" ? `<button class="btn btn-ghost btn-sm" data-action="resume-match-status" data-id="${m.id}" ${stationLocked?'disabled':''}>恢復比賽</button>` : ""}
+        ${!waiting&&state.startedAt&&m.status!=="completed" ? `<button class="btn btn-ghost btn-sm" data-action="skip-match" data-id="${m.id}" ${stationLocked?'disabled':''}>跳過</button>` : ""}
+        ${waiting?"":refereeCourtSwapButton(m,stationNum,stationLocked)}
       </div>
     </div>
-    <div class="ref-vs-arena standard${refereeViewClass(m)}">
+    <div class="ref-vs-arena standard${waiting?"":refereeViewClass(m)}">
       <div class="side-panel ${winSide==='A'?'leading':''}">
         <div class="side-name">${esc(aName)}</div>
         <div class="side-score">${m.scoreA}</div>
@@ -12151,7 +12214,7 @@ function renderCourtCard(stationNum){
           ${scoreBtn('A','spin')}${scoreBtn('A','knockout')}${scoreBtn('A','burst')}${scoreBtn('A','extreme')}${faultBtn('A')}
         </div>
       </div>
-      ${refereeSwapControl(m)}
+      ${refereeSwapControl(m,waiting)}
       <div class="side-panel ${winSide==='B'?'leading':''}">
         <div class="side-name">${esc(bName)}</div>
         <div class="side-score">${m.scoreB}</div>
@@ -12164,12 +12227,12 @@ function renderCourtCard(stationNum){
     <div class="score-log">${m.log.map(l=>`<span>${l.side==='A'?esc(aName):esc(bName)} ${POINT_LABELS[l.type]}</span>`).join("") || '<span>尚無得分紀錄</span>'}</div>
 
     <div class="btn-row ref-result-actions" style="margin-top:16px;">
-      <button class="btn btn-ghost ref-undo-score" data-action="undo-score" data-id="${m.id}" ${!undoAvailable||locked||faultSaving||stationLocked?'disabled':''}>${undoLabel}</button>
-      <button class="btn btn-ghost ref-rematch" data-action="rematch" data-id="${m.id}" ${locked||faultSaving||stationLocked?'disabled':''}>本局重賽</button>
-      <button class="btn btn-primary ref-confirm-result" data-action="confirm-result" data-id="${m.id}" ${winSide&&!faultSaving&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
+      <button class="btn btn-ghost ref-undo-score" ${waiting?'':`data-action="undo-score" data-id="${m.id}"`} ${!undoAvailable||locked||faultSaving||stationLocked?'disabled':''}>${undoLabel}</button>
+      <button class="btn btn-ghost ref-rematch" ${waiting?'':`data-action="rematch" data-id="${m.id}"`} ${locked||faultSaving||stationLocked?'disabled':''}>本局重賽</button>
+      <button class="btn btn-primary ref-confirm-result" ${waiting?'':`data-action="confirm-result" data-id="${m.id}"`} ${winSide&&!faultSaving&&!stationLocked?'':'disabled'}>確認比賽結果${winSide?`（建議：${winSide==='A'?esc(aName):esc(bName)} 勝）`:''}</button>
     </div>
 
-  </div>`;
+  `;
 }
 
 
@@ -12265,17 +12328,13 @@ function renderCourtRetirementPanel(){
   return `<section class="panel"><div class="panel-title">安全退場｜目標保留 ${p.targetCount} 台</div><div class="hint">保留台照常運作。退場狀態與場次保存在賽事資料中，重新開啟可接續。</div>${rows}</section>`;
 }
 function refereeWaitingControls(stationNum){
-  return `<fieldset disabled class="ref-waiting-controls" aria-label="台${stationNum}計分區，等待對戰">
-      <legend>等待對戰｜計分尚未開放</legend>
-      <div class="ref-waiting-sides">${['A','B'].map(side=>`<div><b>選手 ${side}｜—</b><div class="side-score">—</div><div class="ref-waiting-buttons">${['旋轉','擊飛','爆裂','極限','失誤'].map(label=>`<button type="button" disabled>${label}</button>`).join('')}</div></div>`).join('')}</div>
-      <div class="ref-waiting-buttons">${['撤銷得分','本局重賽','確認比賽結果'].map(label=>`<button type="button" disabled>${label}</button>`).join('')}</div>
-    </fieldset>`;
+  return renderRefereeScorePanel(null,stationNum);
 }
 function renderWaitingRefereeCourt(stationNum){
   const seatsEnabled=state.meta?.refereeSeatsV1?.version===1;
-  return `<div class="panel court-card referee-workstation" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
+  return `<div class="panel court-card referee-workstation referee-workstation-waiting" id="court-card-${stationNum}" style="${courtAtmosphereStyle(stationNum)}">
     ${refereeWorkstationHeader(null,stationNum)}
-    <div class="ref-waiting-status" role="status">${state.bracketSize?'等待對戰安排':'等待抽籤／對戰安排'}${seatsEnabled?'，可先加入裁判席。':'。本場尚未啟用三席裁判制。'}</div>
+    ${seatsEnabled?"":'<div class="hint" role="status">本場尚未啟用三席裁判制。</div>'}
     ${refereeWaitingControls(stationNum)}
   </div>`;
 }
@@ -12330,7 +12389,7 @@ function renderReferee(){
   const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml();
   if(!state.bracketSize){
     const n=Math.max(1,Math.min(32,Number(state.meta.stations)||1));
-    return quickNav+`<div class="court-grid ${n===1?'court-grid-1':n===2?'court-grid-2':'court-grid-many'}">${Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1)).join('')}</div>`;
+    return quickNav+`<div class="court-grid ${n===1?'court-grid-1':n===2?'court-grid-2':n===4?'court-grid-many court-grid-4fit':'court-grid-many'}">${Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1)).join('')}</div>`;
   }
   const rm = refereeMatches();
   if(rm.length===0){
@@ -13421,7 +13480,7 @@ function renderPeopleManagement(){
   const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
   const waitlistShortcut=peopleOnsiteWaitlistAvailable()&&peopleRosterSection!=="waitlist"
     ?'<div class="panel"><div class="people-section-summary"><div><div class="panel-title">備取／現場抽籤</div><p class="hint">備取名單、抽選名額與加開名額，統一從這裡操作。</p></div><button class="btn btn-primary" data-action="people-section" data-section="waitlist">'+(state.onsiteWaitlistFinalized===true?'查看抽籤紀錄':'前往備取／抽籤')+'</button></div></div>':"";
-  return syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
+  return (peopleRosterSection==="bracket"?"":bracketCommitStatusHtml())+syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -14954,11 +15013,11 @@ function renderPlayerApplyScreen(){
       <div class="field"><label>密碼（必填，至少 8 碼）</label><input type="password" id="apply-password" autocomplete="new-password"></div>
       <div class="field"><label>再次輸入密碼（必填）</label><input type="password" id="apply-password2" autocomplete="new-password"></div>
       <div class="field">
-        <label>遊戲 ID（選填）</label>
-        <input type="text" id="apply-nickname">
-        <div class="hint">遊戲 ID 為選填；未設定時會使用本名。正式賽事顯示方式由主辦的名稱設定決定。</div>
+        <label for="apply-nickname">遊戲 ID／ARENA 角色名稱（必填）</label>
+        <input type="text" id="apply-nickname" maxlength="24" required>
+        <div class="hint">請填寫在 ARENA 使用的角色名稱；正式賽事顯示方式由主辦的名稱設定決定。</div>
       </div>
-      <div class="field"><label>手機號碼（選填）</label><input type="tel" id="apply-phone"></div>
+      <div class="field"><label for="apply-phone">手機號碼（必填）</label><input type="tel" id="apply-phone" autocomplete="tel" required></div>
       <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
         <input type="checkbox" id="apply-agree" style="width:18px;height:18px;">
         <label style="margin:0;font-size:13px;">我同意 BXH ARENA 的資料使用說明</label>
@@ -14989,11 +15048,11 @@ function renderPlayerCompleteProfileScreen(){
         <div class="hint">BXH 賽事長期採用本名制，請填寫與報名資料一致的真實姓名。</div>
       </div>
       <div class="field">
-        <label>遊戲 ID（選填）</label>
-        <input type="text" id="complete-nickname">
-        <div class="hint">遊戲 ID 為選填；未設定時會使用本名。正式賽事顯示方式由主辦的名稱設定決定。</div>
+        <label for="complete-nickname">遊戲 ID／ARENA 角色名稱（${p?'必填':'選填'}）</label>
+        <input type="text" id="complete-nickname" maxlength="24" ${p?'required':''}>
+        <div class="hint">${p?'請填寫在 ARENA 使用的角色名稱。 ':'既有帳號可登入後再補齊。 '}正式賽事顯示方式由主辦的名稱設定決定。</div>
       </div>
-      <div class="field"><label>手機號碼（選填）</label><input type="tel" id="complete-phone"></div>
+      <div class="field"><label for="complete-phone">手機號碼（${p?'必填':'選填'}）</label><input type="tel" id="complete-phone" autocomplete="tel" ${p?'required':''}></div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-complete-profile-submit" ${playerApplyBusy?'disabled':''}>${playerApplyBusy?'處理中……':'完成設定'}</button>
     </div>
   ` + authShellClose();
@@ -15528,6 +15587,7 @@ function renderPlayerCenterLoggedIn(){
     ${renderSwitchTournamentModal()}
     ${renderAdminTournamentListModal()}
     ${renderPlayerProfileEditModal()}
+    ${renderPlayerProfileReminder()}
   </div>`;
 }
 
@@ -18349,6 +18409,28 @@ function profileCompletionPercent(p){
 let playerProfileEditOpen=false;
 let playerProfileEditBusy=false;
 let playerProfileEditError="";
+const playerProfileReminder=window.BXHProfileReminder?.create({
+  storage:()=>window.sessionStorage,gameId:p=>effectiveGameId(p)
+});
+function playerProfileReminderVisible(){
+  return appPhase==="player-center"&&playerActiveTab==="home"&&currentRole==="player"
+    &&!authVerifying&&!guestReadOnlyMode&&!mailboxContext().open&&!playerProfileEditOpen
+    &&!pendingModal&&!cloudJoinModalOpen&&!eventEntryModalOpen
+    &&playerProfileReminder?.shouldPrompt(firebaseUser?.uid,userProfile)===true;
+}
+function renderPlayerProfileReminder(){
+  if(!playerProfileReminderVisible())return "";
+  return `<div class="modal-overlay" id="player-profile-reminder">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="profile-reminder-title" aria-describedby="profile-reminder-description">
+      <div class="panel-title" id="profile-reminder-title">請完善用戶資料</div>
+      <p id="profile-reminder-description">請補齊尚未填寫的${esc(playerProfileReminder.missing(userProfile).join("與"))}。</p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" data-action="player-profile-reminder-edit" data-profile-reminder-session="${esc(playerProfileReminder.session())}">確定</button>
+        <button type="button" class="btn btn-ghost" data-action="player-profile-reminder-later" data-profile-reminder-session="${esc(playerProfileReminder.session())}">下一次</button>
+      </div>
+    </div>
+  </div>`;
+}
 let googleLinkBusy=false;
 let googleLinkError="";
 
@@ -19321,6 +19403,7 @@ function renderAuthFormPreservingInputs(app,html,phase){
 }
 function render(){
   syncQrScannerModal();
+  window.cloudSync?.restoreRegistrationFeedback?.();
   clearBoardModeInteractions();
   window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,
     operator:()=>canOperateCurrentTournament()||(state?.meta?.refereeSeatsV1?.version===1&&userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role)),
@@ -21682,6 +21765,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!email){ playerApplyError="請輸入 Email"; render(); return; }
     if(password.length<8){ playerApplyError="密碼至少需要 8 碼"; render(); return; }
     if(password!==password2){ playerApplyError="兩次輸入的密碼不一致"; render(); return; }
+    if(!nickname){ playerApplyError="請填寫 ARENA 角色名稱"; render(); return; }
+    if(!phone){ playerApplyError="請填寫手機號碼"; render(); return; }
     if(!agree){ playerApplyError="請同意資料使用說明後再送出"; render(); return; }
     playerApplyBusy = true; playerApplyError=""; render();
     (async ()=>{
@@ -21699,7 +21784,21 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const realName = document.getElementById("complete-realname")?.value.trim() || "";
     const nickname = document.getElementById("complete-nickname")?.value.trim() || "";
     const phone = document.getElementById("complete-phone")?.value.trim() || "";
-    if(!realName){ playerApplyError="請輸入真實姓名"; render(); return; }
+    const showMissing = (message, fieldId) => {
+      playerApplyError = message;
+      const card = document.querySelector(".auth-card");
+      let error = card?.querySelector(".auth-error");
+      if(!error && card){
+        error = document.createElement("div");
+        error.className = "auth-error";
+        card.querySelector(".auth-card-sub")?.after(error);
+      }
+      if(error) error.textContent = message;
+      document.getElementById(fieldId)?.focus();
+    };
+    if(!realName){ showMissing("請輸入真實姓名", "complete-realname"); return; }
+    if(pendingNewPlayerProfile && !nickname){ showMissing("請填寫 ARENA 角色名稱", "complete-nickname"); return; }
+    if(pendingNewPlayerProfile && !phone){ showMissing("請填寫手機號碼", "complete-phone"); return; }
     playerApplyBusy = true; playerApplyError=""; render();
     (async ()=>{
       const isExistingAccount = !!pendingExistingAccountProfile;
@@ -22785,6 +22884,19 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     playerProfileEditError="";
     playerProfileEditOpen=true;
     render();
+    return;
+  }
+  if(action==="player-profile-reminder-edit"||action==="player-profile-reminder-later"){
+    if(!playerProfileReminderVisible()||target.getAttribute("data-profile-reminder-session")!==playerProfileReminder.session())return;
+    playerProfileReminder.defer();
+    if(action==="player-profile-reminder-edit"){
+      playerActiveTab="profile";
+      playerProfileSection="overview";
+      playerProfileEditError="";
+      playerProfileEditOpen=true;
+    }
+    render();
+    if(playerProfileEditOpen)document.getElementById(!String(userProfile.phone||"").trim()?"profile-phone":"profile-gameid")?.focus({preventScroll:true});
     return;
   }
   if(action==="player-close-profile-edit"){
@@ -25404,7 +25516,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
             }
 
             const synced=await saveState();
-            if(synced===false){state=beforeStart;await saveRecord(state);render();showToast('雲端未確認開賽，本次未開始，請核對網路與對戰表後重試',true);return;}
+            if(synced===false){state=beforeStart;await saveRecord(state);noteAdminOperationalFailure('start-tournament',window.__BXH_LAST_CLOUD_ERROR_CODE||'cloud-readback-unconfirmed');render();showToast('雲端未確認開賽，本次未開始，請核對網路與對戰表後重試',true);return;}
             publicTournamentsCache=null;
             myRegistrationsCache=null;
             resetAdminRegistrationsCache();
@@ -25475,7 +25587,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     return;
   }
   if(action==="draw-bracket"){
-    const doDraw = ()=>{void bracketCommitController()?.begin();};
+    const doDraw = ()=>{adminOperationalFailure=null;void bracketCommitController()?.begin();};
     const doCheckThenDraw = ()=>{
       if(state.meta.battleMode==="team"){doDraw();return;}
       const total = state.players.length;
@@ -25918,6 +26030,9 @@ async function init(){
           let authStateGeneration=0;
           let googleLinkRedirectOutcomePending=null;
           async function processAuthStateChangeImpl(fbUser,googleLinkRedirectOutcome){
+            if(playerProfileReminder?.syncAuth(fbUser)){
+              playerProfileEditOpen=false;playerProfileEditError="";
+            }
             if(googleLinkRedirectOutcome)googleLinkRedirectOutcomePending=googleLinkRedirectOutcome;
             const authGeneration=++authStateGeneration;
             lobbyAuthEpoch++;
@@ -25996,6 +26111,7 @@ async function init(){
                   }
 
                   userProfile = profile;
+                  playerProfileReminder?.acceptProfile(fbUser.uid);
                   restoreAccountInterfaceTheme(fbUser.uid,profile);
                   if((profile.role==="staff"||profile.role==="admin"||profile.role==="super_admin"||(profile.role==="tester"||profile.isTestAccount===true)) && window.cloudAuth.ensureMyStaffDirectory){ window.cloudAuth.ensureMyStaffDirectory().catch(()=>{}); }
                   if((profile.role==="admin"||profile.role==="super_admin") && window.cloudAuth.syncManagedStaffDirectory){
@@ -26171,5 +26287,7 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
+
 
 

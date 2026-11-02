@@ -63,7 +63,9 @@
    const entry=active;
    if(!entry||entry.code!==data.code||!current(entry))return {ok:false,reason:'bucket-session-mismatch'};
    if(entry.view?.status!=='ready'||!entry.session)return {ok:false,reason:entry.view?.reason||'not-synchronized'};
-   return entry.host.cloudSync[method](data);
+   const result=await entry.host.cloudSync[method](data);
+   if(!current(entry))return {ok:false,reason:'bucket-session-mismatch'};
+   return result?.state?{...result,state:{...result.state,scoreStorage:clone(entry.manifest)}}:result;
   }
   return {observe,subscribe,read,command,isBucket:code=>markers.has(code),view:code=>active?.code===code?active.view:null,
    suspend(){resumeContext=active?{code:active.code,uid:active.uid}:null;stop();},

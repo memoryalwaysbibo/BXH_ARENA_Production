@@ -831,6 +831,27 @@
       const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
   }
+  let playerRegistrationFeedback=null;
+  function getPlayerRegistrationFeedback(){
+    if(!window.BXHRegistrationFeedback)return null;
+    if(!playerRegistrationFeedback){
+      let storage=null;try{storage=window.localStorage;}catch{}
+      let draw=()=>{};
+      playerRegistrationFeedback=window.BXHRegistrationFeedback.create({
+        getUid:()=>authReady&&authHandle?.currentUser?.uid===firebaseUser?.uid?firebaseUser?.uid:null,
+        storage,visible:()=>!document.hidden,
+        read:code=>window.engagementService.familyRegistration({action:'mine',code}),
+        retry:request=>window.engagementService.familyRegistration(request),
+        onChange:rows=>draw(rows),
+        onRecovered:({code})=>window.dispatchEvent(new CustomEvent('bxh-registration-recovered',{detail:{code}}))
+      });
+      draw=window.BXHRegistrationFeedback.mount(playerRegistrationFeedback,document);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)playerRegistrationFeedback.resume();});
+      window.addEventListener('online',()=>playerRegistrationFeedback.resume());
+      window.addEventListener('storage',event=>{if(event.key?.startsWith(window.BXHRegistrationFeedback.PREFIX))playerRegistrationFeedback.restore(true);});
+    }
+    return playerRegistrationFeedback;
+  }
   function runMyEventsPlayerOperation(route,code,send){
     if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)return send(crypto.randomUUID());
     if(!window.BXHMyEventsPlayerOperation?.execute)throw Error('membership-receipt-unavailable');
@@ -1299,8 +1320,11 @@
     async joinTournamentAsPlayer(code,childEligibilityConfirmed,participantMode="self"){
       const uid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
       if(!uid)throw{code:"auth-required"};
+      const feedback=getPlayerRegistrationFeedback();
+      const submit=async progress=>{
+      const assertCurrent=()=>{progress?.assertCurrent();if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');};
       const selectionDoc=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
-      if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
+      assertCurrent();
       if(selectionDoc.exists()&&selectionDoc.data().roomAccessMode==="password"){
         const access=await window.engagementService.roomAccess({action:"status",code});
         if(!access?.hasAccess)throw Error("room-password-required");
@@ -1308,14 +1332,20 @@
       const mode=participantMode==='children'?'children':'self';
       if(selectionDoc.exists()&&selectionDoc.data().registrationSelection){
         if(mode==='children')throw Error('child-registration-unavailable');
+        assertCurrent();progress?.submitting([uid]);
         return window.engagementService.lotteryRegistration({code,action:'join',childEligibilityConfirmed});
       }
       const selection=await chooseFamilyParticipant(selectionDoc.exists()?selectionDoc.data():{},code,childEligibilityConfirmed,mode);
-      if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
+      assertCurrent();
       const request=JSON.parse(JSON.stringify({action:'join',code,childIds:selection.childIds,allocation:selection.allocation,childEligibilityConfirmed:childEligibilityConfirmed===true}));
-      if(selectionDoc.exists()&&selectionDoc.data().battleMode==='team')return window.engagementService.familyRegistration({...request,operationId:crypto.randomUUID()});
-      return runMyEventsPlayerOperation('family',code,operationId=>window.engagementService.familyRegistration({...request,operationId}));
+      const send=operationId=>{assertCurrent();const payload={...request,operationId};progress?.submitting(selection.childIds.map(id=>id===null?uid:'family_'+id),payload);return window.engagementService.familyRegistration(payload);};
+      if(selectionDoc.exists()&&selectionDoc.data().battleMode==='team')return send(crypto.randomUUID());
+      return runMyEventsPlayerOperation('family',code,send);
+      };
+      return feedback?feedback.run(code,submit):submit(null);
     },
+
+    restoreRegistrationFeedback(){getPlayerRegistrationFeedback()?.restore();},
 
     async cancelRegistrationAsPlayer(code){
       const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
@@ -3449,7 +3479,7 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = ["registration-roster-stale","bracket-version-conflict","bracket-started"].includes(e&&e.message) ? e.message : (e&&e.code)||"unknown";
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||(e&&e.message)||"unknown";
         console.warn("雲端同步寫入失敗", e);
         return false;
       }
@@ -4107,5 +4137,6 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 
 
