@@ -74,3 +74,12 @@ test('room or account changes discard old replies without unlocking a newer oper
   h.room.players[0].checkedIn=true;releases[1]({ok:true});await next;assert(!h.ui.busy());assert.equal(h.toasts.length,1);
  }
 });
+
+test('legacy rooms use the scoped transaction and the same server-confirmed feedback',async()=>{
+ const h=harness(),writes=[];h.env.window.cloudSync.setLegacyCheckin=async(code,roomId,id,checked)=>{writes.push({code,id,checked});h.room.players[0].checkedIn=checked;return {ok:true};};
+ await h.ui.manual({id:'p1'},true,{legacy:true});assert.equal(writes.length,1);assert.equal(h.calls.length,0);assert.equal(h.reads[0].options.serverOnly,true);assert.equal(h.toasts.at(-1)[0],'報到成功');
+});
+test('a rejected legacy write never reports success or mutates the local roster',async()=>{
+ const h=harness();h.env.window.cloudSync.setLegacyCheckin=async()=>{throw Error('network');};
+ await h.ui.manual({id:'p1'},true,{legacy:true});assert.equal(h.room.players[0].checkedIn,false);assert(h.toasts.at(-1)[1]);assert(!h.ui.busy());
+});

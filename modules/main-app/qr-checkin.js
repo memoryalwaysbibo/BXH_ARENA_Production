@@ -13,6 +13,7 @@
     if(raw.includes('app-check-unavailable'))return '網站驗證未完成，請重新整理後再掃描現場 QR；若仍無法報到，請洽工作人員協助。';
     if(raw.includes('permission-denied')&&action==='scan')return '報到請求未通過驗證，請重新整理後再掃描現場 QR；若仍無法報到，請洽工作人員協助。';
     for(const [key,label] of Object.entries({
+      'managed-checkin-required':'本場已改用專用報到流程，請重新讀取房間後再操作。',
       'not-confirmed':'您目前不在正取名單，請洽現場工作人員協助。',
       'ambiguous-player':'帳號對應多位選手，請洽工作人員人工報到。',
       'qr-expired':'報到 QR 已過期，請重新掃描現場 QR。',
@@ -77,11 +78,11 @@
     catch(e){if(key()===k)message=errorText(e);}
     finally{if(key()===k){busy=false;ctx.render();}}
   }
-  async function manual(player,checkedIn){
+  async function manual(player,checkedIn,options={}){
     if(busy){ctx.toast('正在處理上一筆報到，請等候結果。',true);return;}
     const k=key(),epoch=manualEpoch,code=ctx.state().cloudCode;
     const current=()=>key()===k&&manualEpoch===epoch;
-    const operationKey=k+':'+player.id+':'+checkedIn,storageKey='bxh.manualCheckin.'+operationKey;
+    const operationKey=k+':'+player.id+':'+checkedIn+':'+(options.legacy?'legacy':'managed'),storageKey='bxh.manualCheckin.'+operationKey;
     let operationId=manualOperations.get(operationKey);
     if(!operationId){try{operationId=sessionStorage.getItem(storageKey);}catch{}}
     if(!/^[-a-zA-Z0-9]{16,80}$/.test(operationId||''))operationId=crypto.randomUUID();
@@ -92,12 +93,14 @@
     try{
       let sendError=null;
       try{
-        const r=await deadline(call({action:checkedIn?'manual':'revoke',code,playerId:player.id,operationId}),45000);
+        const r=await deadline(options.legacy
+          ?window.cloudSync.setLegacyCheckin(code,ctx.state().id,player.id,checkedIn)
+          :call({action:checkedIn?'manual':'revoke',code,playerId:player.id,operationId}),45000);
         if(r?.ok!==true)throw Error('not-confirmed');
       }catch(error){sendError=error;}
       if(!current())return;
       // A rejected verification is not a committed attendance. Never resend automatically.
-      if(sendError&&/app-check-unavailable|permission-denied|checkin-closed|not-confirmed/.test([sendError.message,sendError.code,JSON.stringify(sendError.details)].join(' ')))throw sendError;
+      if(sendError&&/app-check-unavailable|permission-denied|checkin-closed|not-confirmed|managed-checkin-required|room-context-changed|stale-session|checkin-unavailable|not-found/.test([sendError.message,sendError.code,JSON.stringify(sendError.details)].join(' ')))throw sendError;
       // Reload server state; never save an old local snapshot after success.
       manualStatus='正在核對伺服器最新報到狀態…';ctx.render();
       const remote=await deadline(window.cloudSync.joinRoom(code,{serverOnly:true}),10000);
