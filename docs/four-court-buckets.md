@@ -2,7 +2,7 @@
 
 The current score and confirmation transactions update both `tournaments/{code}.data` and `publicTournaments/{code}.bracketView`. The three-seat callable does too. Therefore a court-to-bucket label alone cannot reduce contention: all operations would still write the two shared room documents. The 2026-10-31 incident cause remains unproven. See the baseline in PR #679.
 
-This PR contains a routing and Firestore Emulator candidate plus closed-by-default formal Functions registration. It does not alter the app entrypoint, deployed Rules/Functions, production flags, rooms or deployed scoring. It creates no production collections. An emulator pass is evidence for partition behavior, not certification of a six- or twelve-court live event.
+This PR contains a routing and Firestore Emulator candidate plus closed-by-default formal Functions registration. It adds closed client lifecycle wiring to the app entrypoint, but does not alter deployed Rules/Functions, production flags, rooms or deployed scoring. It creates no production collections. An emulator pass is evidence for partition behavior, not certification of a six- or twelve-court live event.
 
 ## Mapping
 
@@ -114,3 +114,17 @@ Every production score, seat and publication transaction additionally requires `
 
 The demo Callable package now exercises the same registration module with explicitly selected Emulator mode; it retains exact demo/project/Firestore/Auth checks. Unit tests verify closed discovery, zero database access on disabled production requests, environment/project rejection, and transactional room/epoch authorization. No production flags, allowlist entries, rooms or data are changed. Do not enable these gates until the remaining rollout requirements above are complete.
 
+
+## Formal private-room lifecycle wiring (closed)
+
+The real index now loads a reproducible `four-court-browser.js` asset before the app/cloud runtime. `scripts/build-four-court-browser.cjs --check` verifies it matches the shared bucket state and five client modules. Importing it initializes no Firebase services. The .js asset avoids depending on the static host's MIME handling of .cjs source files.
+
+The formal cloud runtime's private join/subscription methods identify the top-level server-owned scoreStorage field before parsing the root's stale score JSON. Marked roots never pass through as ordinary full-room snapshots. The client rollout constant remains false: no session or App Check request starts while closed; private bucket join returns a failure, and a marked room subscription clears the active private view and disables commands. Unmarked rooms retain the legacy data path; private subscriptions additionally wait for server-confirmed snapshots.
+
+When explicitly enabled in a future verified release, `four-court-lifecycle.cjs` obtains App Check using the existing Enterprise provider, creates a native Callable session on an isolated facade, and sends authoritative composed states through the existing callback. It does not replace the global cloud API. Score/seat commands for known bucket rooms route through that session; join/recovery reads use its composed state. Other-room previews use temporary isolated sessions, so cancelling a preview does not interrupt the active scorer. The server release, private Rules and production room/epoch gates remain independent and required.
+
+Primary unsubscribe closes the session even if a seat listener remains. Epoch/room changes, account changes, failed asynchronous startup, old callbacks, pagehide and bfcache restoration are gated by context; restoration requires a fresh subscribed session before commands. Profile loss or sign-out clears the main app's private view. Existing saved recovery records are preserved. A disconnected/cached saved bucket view cannot grant command permission, including to administrators. Removing a marker still needs controlled rollback/reload; a stale legacy callback cannot replace a bucket-marked active view.
+
+CI adds lifecycle cancellation/default-off/preview/bundle tests, and runs the actual formal cloud methods and actual main status handler inside an isolated browser harness with real Auth/Firestore/Functions Emulators for 6/12 courts. The surrounding renderer and initialization are fixtures, not a full production-page acceptance. The positive App Check fixture remains emulator-only protocol/context evidence, not real Enterprise attestation. Normal existing Auth/seat/browser suites remain required.
+
+Still required before activation: real full-page navigation/score UI and App Check acceptance; explicit retry UX for ambiguous commands; dispatch/retirement and other room operations; production cutover/rollback and all server writer fences; candidate Rules deployment; production deployment connection and a supervised live test. This commit does not flip any rollout constant or touch a production room.

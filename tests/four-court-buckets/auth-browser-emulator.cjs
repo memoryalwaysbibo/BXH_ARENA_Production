@@ -7,9 +7,14 @@ const {fixture}=require('./trusted-fixture.cjs'),B=require('../../referee-seats/
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'bucket-auth-browser'),db=getFirestore(app),auth=getAuth(app),commit=createBucketScoringHandler(db),seat=createBucketSeatHandler(db),rootPath=path.resolve(__dirname,'../..');
 const sdk=esbuild.buildSync({stdin:{contents:"export {initializeApp} from 'firebase/app';export {getAuth,connectAuthEmulator,setPersistence,inMemoryPersistence,signInWithEmailAndPassword,signOut,onAuthStateChanged} from 'firebase/auth';export {getFirestore,connectFirestoreEmulator,doc,onSnapshot,getDocFromServer} from 'firebase/firestore';export {getFunctions,connectFunctionsEmulator,httpsCallable} from 'firebase/functions';export {initializeAppCheck,CustomProvider} from 'firebase/app-check';",resolveDir:rootPath},bundle:true,write:false,format:'iife',globalName:'BXHBrowserSDK',platform:'browser',nodePaths:(process.env.NODE_PATH||'').split(path.delimiter).filter(Boolean)}).outputFiles[0].text;
 const core=fs.readFileSync(path.join(rootPath,'modules/main-app/core.js'),'utf8'),begin=core.indexOf('const refereeSeatCommandBusy='),end=core.indexOf('\n\nasync function executeRefereeDispatchCommand(',begin);assert(begin>=0&&end>begin);
+const routeSource=require('./cloud-route-source.cjs').build(fs.readFileSync(path.join(rootPath,'modules/cloud/cloud-runtime.js'),'utf8'),core);
 const assets={
  '/auth/index.html':['text/html',fs.readFileSync(path.join(__dirname,'auth-fixture.html'),'utf8')],
  '/auth/sdk.js':['text/javascript',sdk],
+ '/auth/lifecycle.html':['text/html',fs.readFileSync(path.join(__dirname,'lifecycle-fixture.html'),'utf8')],
+ '/auth/lifecycle-boot.js':['text/javascript',fs.readFileSync(path.join(__dirname,'lifecycle-fixture.js'),'utf8')],
+ '/auth/browser-bundle.js':['text/javascript',fs.readFileSync(path.join(rootPath,'modules/scoring/four-court-browser.js'),'utf8')],
+ '/auth/cloud-route.js':['text/javascript',routeSource],
  '/auth/buckets.js':['text/javascript','(function(){const module={exports:{}};'+fs.readFileSync(path.join(rootPath,'referee-seats/functions/bucket-state.cjs'),'utf8')+';window.BXHMatchBuckets=module.exports;})();'],
  '/auth/client.js':['text/javascript',fs.readFileSync(path.join(rootPath,'modules/scoring/four-court-client.cjs'),'utf8')],
  '/auth/transport.js':['text/javascript',fs.readFileSync(path.join(rootPath,'modules/scoring/four-court-firestore-transport.cjs'),'utf8')],
@@ -51,6 +56,27 @@ const server=http.createServer(async(req,res)=>{
    if(native){const result=await page.evaluate(()=>testPlayerCallable());assert.equal(result.ok,false);assert.equal(result.code,'functions/permission-denied');assert.equal(result.reason,'station-not-assigned');}
    const bucket=(await db.doc('tournaments/BXH-AUTH'+count+'/matchBuckets/court-1').get()).data(),matches=JSON.parse(bucket.matches);assert.equal(matches[0].scoreA,1);assert.equal(matches[0].log.length,1);
    report.cases.push({courts:count,buckets:Math.ceil(count/4),emailPasswordAuth:true,existingCommandCore:true,seatClaimPreservesScores:true,accountSwitchClearsView:true,profileRevocationClearsView:true,revokedNewLoginDenied:true,signOutClearsView:true,playerReadDenied:true,legacyReadFallbacks:0,...(native?{missingAppCheckDenied:true,missingAuthDenied:true,playerCallableDenied:true,nativeCallable:true,nativeSeatCallable:true}:{})});await page.close();
+  }
+  if(native){
+   const lifecycleCases=[];
+   async function routePage(count,enabled=true){const page=await browser.newPage();await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());await page.goto('http://127.0.0.1:'+server.address().port+'/auth/lifecycle.html?code=BXH-AUTH'+count);await page.evaluate(async enabled=>{await lifecycleTest.login('ref1');lifecycleTest.install(enabled);lifecycleTest.subscribe();},enabled);return page;}
+   const closed=await routePage(6,false);await closed.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);assert.equal((await closed.evaluate(()=>cloudSync.joinRoom(lifecycleTest.code))).reason,'bucket-client-disabled');await closed.close();
+   for(const count of [6,12]){
+    const page=await routePage(count);await page.waitForFunction(count=>cloudStatus==='connected'&&state.matches.length===count,count);
+    const code='BXH-AUTH'+count,rootBefore=await db.doc('tournaments/'+code).get();
+    const joined=await page.evaluate(()=>cloudSync.joinRoom(lifecycleTest.code));assert.equal(joined.ok,true);assert(joined.data.scoreStorage);assert.equal(joined.data.matches[0].scoreA,1);
+    const result=await page.evaluate(()=>lifecycleTest.score());assert.equal(result.ok,true);await page.waitForFunction(()=>state.matches[0].scoreB===1&&cloudStatus==='connected');assert((await db.doc('tournaments/'+code).get()).updateTime.isEqual(rootBefore.updateTime));
+    const other=count===6?12:6,preview=await page.evaluate(other=>cloudSync.joinRoom('BXH-AUTH'+other),other);assert.equal(preview.ok,true);assert.equal(await page.evaluate(()=>cloudSync.bucketView(lifecycleTest.code).status),'ready');
+    await page.evaluate(()=>lifecycleTest.unsubscribe());assert.equal(await page.evaluate(()=>cloudSync.bucketView(lifecycleTest.code)),null);
+    await page.evaluate(()=>lifecycleTest.subscribe());await page.waitForFunction(()=>cloudStatus==='connected'&&cloudSync.bucketView(lifecycleTest.code)?.status==='ready');
+    await db.doc('users/ref1').update({active:false});await page.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);assert.equal((await page.evaluate(()=>cloudSync.commitRefereeCommand({code:lifecycleTest.code}))).ok,false);
+    await db.doc('users/ref1').update({active:true});await page.evaluate(()=>lifecycleTest.subscribe());await page.waitForFunction(()=>cloudStatus==='connected'&&state.matches.length>0);
+    await page.evaluate(()=>lifecycleTest.login('ref5'));await page.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);
+    await page.evaluate(()=>lifecycleTest.subscribe());await page.waitForFunction(()=>cloudStatus==='connected'&&state.matches.length>0);
+    await page.evaluate(()=>lifecycleTest.sdk.signOut(lifecycleTest.auth));await page.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);
+    lifecycleCases.push({courts:count,buckets:Math.ceil(count/4),formalCloudMethods:true,joinedComposedScores:true,nativeScore:true,rootUnchanged:true,previewPreservesSession:true,unsubscribeStops:true,profileRevocationClearsMainView:true,accountSwitchClearsMainView:true,signOutClearsMainView:true});await page.close();
+   }
+   report.formalLifecycle={closedDefaultDenied:true,cases:lifecycleCases};
   }
   if(native)assert.equal(httpCommands,0,'native Callable test used the legacy HTTP adapter');
   const dir=path.join(rootPath,'test-results/four-court-buckets');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,native?'callable-browser.json':'auth-browser.json'),JSON.stringify(report,null,2)+'\n');console.log((native?'PASS native Callable browser: ':'PASS real browser Auth: ')+JSON.stringify(report));

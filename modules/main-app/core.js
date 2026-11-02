@@ -310,6 +310,16 @@ let cloudStatus = "local"; // 'local' | 'connecting' | 'connected' | 'error'
 let cloudAccessLimited = false;
 let cloudAccessMessage = "";
 let cloudUnsub = null;
+window.addEventListener('bxh-four-court-status',event=>{
+  const detail=event.detail||{};
+  if(detail.code!==state.cloudCode)return;
+  cloudStatus=detail.status==='ready'?'connected':detail.status==='error'?'error':'connecting';
+  if(detail.clear&&detail.status==='error'){
+    // Clear the active private view; keep saved recovery records untouched.
+    state=Object.assign(defaultState(state.id),{cloudCode:detail.code,scoreStorage:{status:'unavailable'}});
+  }
+  render();
+});
 let cloudJoinModalOpen = false;
 let cloudJoinBusy = false;
 let cloudJoinError = "";
@@ -3218,6 +3228,7 @@ let remoteAppliedRoomId=null, remoteAppliedAt=0;
 function applyRemoteState(remote, authoritative=false){
   try{
     if(!remote || !remote.id) return;
+    if(Object.hasOwn(state,"scoreStorage")&&!Object.hasOwn(remote,"scoreStorage"))return;
     if(remote.id !== state.id) return; // safety: only accept updates for the room we're actually in
     const localExits=state.forcedCourtExits||{},remoteExits=remote.forcedCourtExits||{};
     if(Object.entries(localExits).some(([n,c])=>Number(remoteExits[n]?.revision||0)<Number(c.revision||0)))return;
@@ -6103,6 +6114,8 @@ function refereeDisplayForStation(stationNum, st=state){
   return window.BXHFormatUtils.refereeNamesLabel(refereeNamesForStation(stationNum,st));
 }
 function canOperateStation(stationNum, st=state){
+  const bucketView=st.cloudCode&&window.cloudSync?.bucketView?.(st.cloudCode);
+  if((Object.hasOwn(st,"scoreStorage")||bucketView)&&bucketView?.status!=="ready")return false;
   if(Number(stationNum)<1||st.forcedCourtExits?.[stationNum]?.closed)return false;
   if(isCommunityRoomOwner()) return true;
   if(isOwnTestTournament(st)) return true;
