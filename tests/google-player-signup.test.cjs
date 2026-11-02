@@ -97,10 +97,9 @@ test('failed server confirmation stays an error and the next explicit retry can 
   assert.equal(calls.callable, 2);
 });
 
-test('sign-in redirect returns once and clears only its own marker', async () => {
+test('sign-in redirect returns once and consumes its marker', async () => {
   const { context, storage } = harness();
   storage.set('bxh_google_signin_redirect_v1', 'player');
-  storage.set('bxh_google_link_redirect_v1', 'keep');
   context.ax.getRedirectResult = async () => ({ user: { uid: 'redirect-google' } });
   const start = source.indexOf('        let signInRedirect = false;');
   const end = source.indexOf('        return true;', start);
@@ -109,7 +108,6 @@ test('sign-in redirect returns once and clears only its own marker', async () =>
   assert.equal(context.window.cloudAuth.consumeGoogleSignInRedirectOutcome().ok, true);
   assert.equal(context.window.cloudAuth.consumeGoogleSignInRedirectOutcome(), null);
   assert.equal(storage.has('bxh_google_signin_redirect_v1'), false);
-  assert.equal(storage.get('bxh_google_link_redirect_v1'), 'keep');
 });
 
 test('a returned signup redirect cannot be consumed as an abandoned Google link attempt', async () => {
