@@ -577,6 +577,52 @@ test('finite and unmarked legacy promotions keep the existing client transaction
 });
 
 
+function trustedIdleRoomFixture({visibility='private',capacity=160,stations=6,role='super_admin',ladderMode='general'}={}){
+ const h=harness(),{createHandler}=require('../referee-seats/auto-create-service.cjs');
+ h.ctx.generateRoomCode=()=> 'BXH-IDLE01';
+ h.ctx.userProfile={role,active:true,displayName:'Local Admin'};
+ h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=true;h.ctx.functionsHandle={};
+ const docs=new Map([
+  ['users/local-host',{active:true,role,realName:'Local Admin'}],
+  ['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true,autoCreateEnabled:true}]
+ ]);
+ const db={doc:path=>({path}),runTransaction:async fn=>{
+  const writes=[],out=await fn({get:async ref=>({exists:docs.has(ref.path),data:()=>clone(docs.get(ref.path))}),create:(ref,value)=>writes.push([ref.path,clone(value)])});
+  for(const [key,value] of writes){assert(!docs.has(key));docs.set(key,value);}return out;
+ }};
+ const handler=createHandler(db,{clock:()=>NOW}),requests=[];
+ h.ctx.fnx={httpsCallable:()=>async payload=>{requests.push(clone(payload));return {data:await handler({auth:{uid:'local-host'},data:payload})};}};
+ const data=state({eventAuthority:'official',communityQuickRegistration:false,registrationVisibility:visibility,registrationCapacity:capacity,stations,ladderMode,battleMode:'individual',playMode:'standard'});
+ data.courtAssignments=Object.fromEntries(Array.from({length:stations},(_,i)=>['court'+(i+1),{currentMatchId:null,nextMatchId:null,status:'idle',lockedBy:null,lockedAt:null,updatedAt:null}]));
+ return {h,data,docs,requests};
+}
+for(const visibility of ['public','private'])for(const capacity of [32,160])for(const stations of [1,6])test(`new saved idle draft creates once: ${visibility}, ${capacity} players, ${stations} courts`,async()=>{
+ const {h,data,docs,requests}=trustedIdleRoomFixture({visibility,capacity,stations}),before=clone(data.courtAssignments);
+ assert.equal(await h.api.createRoom(data),'BXH-IDLE01');
+ assert.equal(requests.length,1);assert.equal(h.writes.length,0);
+ const saved=docs.get('tournaments/BXH-IDLE01'),pub=docs.get('publicTournaments/BXH-IDLE01');
+ assert.equal(saved.visibility,visibility);assert.equal(pub.visibility,visibility);assert.equal(saved.capacity,capacity);
+ assert.equal(Object.keys(saved.refereeSeatsV1.courts).length,stations);
+ assert.deepEqual(JSON.parse(saved.data).courtAssignments,{});
+ assert.deepEqual(JSON.parse(pub.bracketView).courtAssignments,{});
+ assert.deepEqual(data.courtAssignments,before,'caller keeps its local idle UI slots');
+});
+for(const [label,change] of [
+ ['current match',d=>d.courtAssignments.court1.currentMatchId='m-live'],
+ ['next match',d=>d.courtAssignments.court1.nextMatchId='m-next'],
+ ['locked court',d=>d.courtAssignments.court1.lockedBy='other-user'],
+ ['unknown field',d=>d.courtAssignments.court1.hiddenAuthority=true],
+ ['invalid court key',d=>{d.courtAssignments.court99=d.courtAssignments.court1;}],
+ ['existing player',d=>d.players.push({id:'p'})],
+ ['existing match',d=>d.matches.push({id:'m'})],
+ ['already started',d=>d.startedAt=123],
+])test('idle draft normalization cannot erase '+label,async()=>{
+ const {h,data,docs,requests}=trustedIdleRoomFixture();change(data);
+ assert.equal(await h.api.createRoom(data),null);
+ assert(!docs.has('tournaments/BXH-IDLE01'));assert(!docs.has('publicTournaments/BXH-IDLE01'));
+ assert.deepEqual(JSON.parse(requests[0].privatePayload.data).courtAssignments,data.courtAssignments);
+});
+
 test('actual production official createRoom payload is accepted by trusted three-seat candidate',async()=>{
   const h=harness();
   h.ctx.generateRoomCode=()=> 'BXH-AUTO1';
@@ -684,4 +730,26 @@ test('permission denied never retries or falls back to browser batch',async()=>{
  assert.equal(await h.api.createRoom(data),null);
  assert.equal(calls.length,1);
  assert.equal(h.writes.length,0);
+});
+
+for(const ladderMode of ['general','ranked'])for(const stations of [1,6])test(`actual staff public ${ladderMode} draft creates paired room with ${stations} courts`,async()=>{
+ const {h,data,docs}=trustedIdleRoomFixture({visibility:'public',role:'staff',ladderMode,stations});
+ assert.equal(await h.api.createRoom(data),'BXH-IDLE01');
+ for(const [path,field]of [['tournaments/BXH-IDLE01','data'],['publicTournaments/BXH-IDLE01','bracketView']]){
+  const doc=docs.get(path);assert.equal(doc.ladderMode,ladderMode);assert.equal(JSON.parse(doc[field]).meta.ladderMode,ladderMode);
+ }
+ const saved=docs.get('tournaments/BXH-IDLE01');assert.equal(saved.createdBy,'local-host');
+ assert.deepEqual(saved.assignedStaffUids,['local-host']);assert.equal(Object.keys(saved.refereeSeatsV1.courts).length,stations);
+ assert.equal(h.writes.length,0,'trusted create must not fall back to client writes');
+});
+test('callable failure retains only known room-create reasons and clears them on retry',async()=>{
+ const {h,data,docs}=trustedIdleRoomFixture({visibility:'public',role:'staff',ladderMode:'ranked'});
+ const real=h.ctx.fnx.httpsCallable;
+ h.ctx.fnx.httpsCallable=()=>async()=>{throw Object.assign(new Error('unsupported-mode'),{code:'functions/failed-precondition'});};
+ assert.equal(await h.api.createRoom(data),null);assert.equal(h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON,'unsupported-mode');
+ assert(!docs.has('tournaments/BXH-IDLE01'));assert.equal(h.writes.length,0);
+ h.ctx.fnx.httpsCallable=()=>async()=>{throw Object.assign(new Error('secret server payload'),{code:'functions/internal'});};
+ assert.equal(await h.api.createRoom(data),null);assert.equal(h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON,null);
+ h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON='unsupported-mode';h.ctx.fnx.httpsCallable=real;
+ assert.equal(await h.api.createRoom(data),'BXH-IDLE01');assert.equal(h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON,null);
 });

@@ -18,6 +18,7 @@ let appPhase='player-center',playerActiveTab='home',currentRole='player',authVer
 let playerProfileEditOpen=false,playerProfileEditBusy=false,playerProfileEditError='',playerProfileSection='overview';
 let pendingModal=null,cloudJoinModalOpen=false,eventEntryModalOpen=false;
 let firebaseUser={uid:'a'},userProfile={uid:'a',active:true,realName:'本名',gameId:'舊角色',phone:''};
+const currentAuthUid=()=>firebaseUser?.uid||null;
 let playerProfileReminder=window.BXHProfileReminder.create({storage:()=>sessionStorage,gameId:effectiveGameId});
 const mailboxContext=()=>({open:false});
 const profileLocationParts=()=>({city:'',region:''});

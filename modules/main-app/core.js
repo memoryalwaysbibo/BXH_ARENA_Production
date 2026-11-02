@@ -3362,10 +3362,15 @@ async function ensureCloudRoomForTournament(){
 }
 
 function cloudCreateRoomErrorMessage(prefix="建立失敗"){
-  const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
+  const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"").replace(/^functions\//,"");
+  const reason=String((typeof window!=="undefined"&&window.__BXH_LAST_ROOM_CREATE_REASON)||"");
+  if(reason==="unsupported-mode")return prefix+"：雲端建房服務尚未支援目前的賽事模式，請聯絡 BXH 核對後端版本";
+  if(["auto-create-not-enabled","release-not-ready","auto-seat-create-unavailable"].includes(reason))return prefix+"：雲端建房服務尚未就緒，請聯絡 BXH 核對服務狀態";
+  if(reason==="room-code-conflict")return prefix+"：房間代碼重複，請再試一次";
+  if(["mirror-mismatch","not-empty-room","protected-create-field","unverified-staff-assignment","legacy-assignments-exist"].includes(reason))return prefix+"：建房草稿資料驗證未通過，請聯絡 BXH 協助檢查";
   if(code==="partner-room-quota-exhausted" || (code==="permission-denied"&&isPartnerOrganizerMode()&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerOrganizerGrant()?.orderCode)===0))return prefix+"：合作方案開房次數已用完";
   if(code==="permission-denied"&&isPartnerOrganizerMode()) return prefix+"：合作主辦建房授權未通過；請至賽事管理查看合約、有效期限與剩餘場次。若資料正常，請聯絡 BXH 協助核對；此訊息不代表場次已用完";
-  if(code==="permission-denied") return prefix+"：Firestore 權限被拒絕，請重新整理後再試";
+  if(code==="permission-denied") return prefix+"：目前帳號或建房設定未通過授權，請聯絡 BXH 協助核對";
   if(code==="unauthenticated") return prefix+"：登入狀態已失效，請重新登入";
   if(code==="already-exists") return prefix+"：房間代碼重複，請再試一次";
   if(code==="unavailable" || code==="deadline-exceeded") return prefix+"：雲端服務暫時無法連線";
@@ -9563,6 +9568,13 @@ async function saveRegistrationSettingsAndReport(previousMeta,message,resetSetti
 }
 
 async function publishRegistrationConfig(){
+  const publishingRoom=state;
+  const publicationBefore={publishedAt:state.cloudCode?state.meta.publishedAt:null,registrationStatus:state.cloudCode?state.meta.registrationStatus:'draft'};
+  const restoreUnpublishedDraft=async()=>{
+    if(state!==publishingRoom||state.cloudCode)return;
+    Object.assign(state.meta,publicationBefore);
+    await saveRecord(state);
+  };
   state.meta.publishedAt = Date.now();
   state.meta.registrationStatus = computeRegistrationStatus(state.meta);
   if(!state.cloudCode)await saveRecord(state); // New-room drafts are local; existing-room edits wait for cloud confirmation.
@@ -9570,13 +9582,16 @@ async function publishRegistrationConfig(){
   if(!state.cloudCode){
     if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
     if(!cloudAvailable()){
+      await restoreUnpublishedDraft();
       render();
       showToast("已保存草稿，但目前無法連上雲端，因此尚未正式發布", true);
       return;
     }
     cloudStatus = "connecting"; render();
-    const code = await window.cloudSync.createRoom(state);
+    let code;
+    try{code=await window.cloudSync.createRoom(state);}catch(e){code=null;}
     if(!code){
+      await restoreUnpublishedDraft();
       cloudStatus = "error"; render();
       showToast(cloudCreateRoomErrorMessage("發布失敗")+"；草稿仍已保留", true);
       return;
@@ -15073,23 +15088,27 @@ function renderPlayerApplyScreen(){
 
 function renderPlayerCompleteProfileScreen(){
   const p = pendingNewPlayerProfile;
+  const pending=p||(typeof pendingExistingAccountProfile!=="undefined"?pendingExistingAccountProfile:null);
+  const previous=document.getElementById("complete-profile-form");
+  const draft=pending?.uid&&previous?.getAttribute("data-profile-uid")===pending.uid?previous:null;
+  const value=id=>draft?.querySelector("#"+id)?.value??"";
   return authShellOpen() + `
     ${authBrandHeader()}
-    <div class="auth-card">
+    <div class="auth-card" id="complete-profile-form" data-profile-uid="${esc(pending?.uid||'')}">
       <div class="auth-card-title">完成玩家資料</div>
       <div class="auth-card-sub">${p?esc(p.email):""}</div>
       ${playerApplyError ? `<div class="auth-error">${esc(playerApplyError)}</div>` : ""}
       <div class="field">
         <label>真實姓名（必填）</label>
-        <input type="text" id="complete-realname">
+        <input type="text" id="complete-realname" value="${esc(value('complete-realname'))}">
         <div class="hint">BXH 賽事長期採用本名制，請填寫與報名資料一致的真實姓名。</div>
       </div>
       <div class="field">
         <label for="complete-nickname">遊戲 ID／ARENA 角色名稱（${p?'必填':'選填'}）</label>
-        <input type="text" id="complete-nickname" maxlength="24" ${p?'required':''}>
+        <input type="text" id="complete-nickname" maxlength="24" value="${esc(value('complete-nickname'))}" ${p?'required':''}>
         <div class="hint">${p?'請填寫在 ARENA 使用的角色名稱。 ':'既有帳號可登入後再補齊。 '}正式賽事顯示方式由主辦的名稱設定決定。</div>
       </div>
-      <div class="field"><label for="complete-phone">手機號碼（${p?'必填':'選填'}）</label><input type="tel" id="complete-phone" autocomplete="tel" ${p?'required':''}></div>
+      <div class="field"><label for="complete-phone">手機號碼（${p?'必填':'選填'}）</label><input type="tel" id="complete-phone" autocomplete="tel" value="${esc(value('complete-phone'))}" ${p?'required':''}></div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-complete-profile-submit" ${playerApplyBusy?'disabled':''}>${playerApplyBusy?'處理中……':'完成設定'}</button>
     </div>
   ` + authShellClose();
@@ -18482,11 +18501,22 @@ document.addEventListener("keydown",(ev)=>{
 });
 function renderPlayerProfileEditModal(){
   if(!playerProfileEditOpen || !userProfile) return "";
-  const p=userProfile;
-  const game=effectiveGameId(p);
-  const pref=p.preferredNameMode==="gameId"?"gameId":"realName";
+  const previous=document.querySelector(".profile-edit-modal");
+  const draft=previous?.getAttribute("data-profile-uid")===currentAuthUid()?previous:null;
+  const value=(id,fallback)=>draft?.querySelector("#"+id)?.value??fallback;
+  const location=profileLocationParts(userProfile);
+  const city=value("profile-city",location.city),district=value("profile-region",location.region);
+  const p={...userProfile,
+    realName:value("profile-realname",userProfile.realName||""),
+    phone:value("profile-phone",userProfile.phone||""),
+    birthDate:value("profile-birthdate",userProfile.birthDate||""),
+    gender:value("profile-gender",userProfile.gender||""),
+    region:city?(city+(district?" "+district:"")):""
+  };
+  const game=value("profile-gameid",effectiveGameId(userProfile));
+  const pref=value("profile-preferred-name-mode",p.preferredNameMode)==="gameId"?"gameId":"realName";
   return `<div class="modal-overlay profile-edit-overlay" data-action="player-close-profile-edit">
-    <div class="modal-box profile-edit-modal">
+    <div class="modal-box profile-edit-modal" data-profile-uid="${esc(currentAuthUid())}">
       <div class="panel-title">編輯我的資料</div>
       ${playerProfileEditError?`<div class="auth-error">${esc(playerProfileEditError)}</div>`:""}
       <div class="field"><label>本名（必填）</label><input id="profile-realname" type="text" value="${esc(p.realName||"")}"><div class="hint">提供 BXH 後台核對本人。若修改本名，狀態會自動改為「待確認」。</div></div>
@@ -19380,19 +19410,49 @@ function restoreAuthenticatedView(uid,intent){
 function captureRenderViewport(){
   const key = currentRenderViewportKey();
   const canReadWindow = typeof window!=="undefined";
+  const focused=typeof document!=="undefined"?document.activeElement:null;
+  const profileEditor=focused?.closest?.(".profile-edit-modal");
+  const profileFocus=typeof playerProfileEditOpen!=="undefined"&&playerProfileEditOpen&&typeof currentAuthUid==="function"&&profileEditor?.getAttribute("data-profile-uid")===currentAuthUid()&&focused?.id
+    ? {uid:currentAuthUid(),id:focused.id,start:focused.selectionStart,end:focused.selectionEnd}:null;
+  const completionUid=(typeof pendingNewPlayerProfile!=="undefined"&&pendingNewPlayerProfile?.uid)||(typeof pendingExistingAccountProfile!=="undefined"&&pendingExistingAccountProfile?.uid);
+  const completionEditor=focused?.closest?.("#complete-profile-form");
+  const completionFocus=typeof appPhase!=="undefined"&&appPhase==='player-complete-profile'&&completionUid&&completionEditor?.getAttribute("data-profile-uid")===completionUid&&focused?.id
+    ? {uid:completionUid,id:focused.id,start:focused.selectionStart,end:focused.selectionEnd}:null;
   return {
     key,
     preserve: __lastRenderedViewportKey!==null && __lastRenderedViewportKey===key,
     x: canReadWindow ? (window.scrollX || 0) : 0,
     y: canReadWindow ? (window.scrollY || 0) : 0,
     navScroll: captureHorizontalNavPositions(),
-    mailbox: canReadWindow ? window.BXHMailbox?.captureViewport?.() : null
+    mailbox: canReadWindow ? window.BXHMailbox?.captureViewport?.() : null,
+    profileFocus,completionFocus
   };
 }
 function finishRenderViewport(snapshot){
   if(!snapshot) return;
   __lastRenderedViewportKey = snapshot.key;
   if(typeof window==="undefined") return;
+  const focus=snapshot.profileFocus;
+  if(focus&&typeof document!=="undefined"&&typeof currentAuthUid==="function"&&currentAuthUid()===focus.uid){
+    const editor=document.querySelector(".profile-edit-modal"),field=document.getElementById(focus.id);
+    if(editor?.getAttribute("data-profile-uid")===focus.uid&&field&&editor.contains(field)){
+      field.focus({preventScroll:true});
+      if(typeof focus.start==="number"&&typeof focus.end==="number"){
+        try{field.setSelectionRange(focus.start,focus.end);}catch(e){}
+      }
+    }
+  }
+  const completion=snapshot.completionFocus;
+  const completionUid=(typeof pendingNewPlayerProfile!=="undefined"&&pendingNewPlayerProfile?.uid)||(typeof pendingExistingAccountProfile!=="undefined"&&pendingExistingAccountProfile?.uid);
+  if(completion&&typeof document!=="undefined"&&typeof appPhase!=="undefined"&&appPhase==='player-complete-profile'&&completionUid===completion.uid){
+    const editor=document.getElementById("complete-profile-form"),field=document.getElementById(completion.id);
+    if(editor?.getAttribute("data-profile-uid")===completion.uid&&field&&editor.contains(field)){
+      field.focus({preventScroll:true});
+      if(typeof completion.start==='number'&&typeof completion.end==='number'){
+        try{field.setSelectionRange(completion.start,completion.end);}catch(e){}
+      }
+    }
+  }
 
   const token = ++__viewportRestoreToken;
   const restoreNav = ()=>{

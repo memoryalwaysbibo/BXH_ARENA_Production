@@ -188,3 +188,19 @@ test('Admin retains existing private official-room creation permission',async()=
   privatePayload:{...p.privatePayload,visibility:'private'},publicPayload:{...p.publicPayload,visibility:'private'}
  })).ok,true);
 });
+
+for(const ladderMode of ['general','ranked'])test(`staff creates official ${ladderMode} room idempotently and owns it`,async()=>{
+ const h=harness(),p=h.payload,state=JSON.parse(p.privatePayload.data),mirror=JSON.parse(p.publicPayload.bracketView);
+ state.createdBy='staff';state.meta.ladderMode=ladderMode;mirror.meta.ladderMode=ladderMode;
+ const override={privatePayload:{...p.privatePayload,createdBy:'staff',ladderMode,data:JSON.stringify(state)},publicPayload:{...p.publicPayload,ladderMode,bracketView:JSON.stringify(mirror)}};
+ assert.equal((await h.run('staff',override)).ok,true);assert.equal((await h.run('staff',override)).idempotent,true);
+ const doc=h.docs.get('tournaments/BXH-ABCD12');assert.equal(doc.createdBy,'staff');assert.equal(doc.ladderMode,ladderMode);
+ assert.deepEqual(doc.assignedStaffUids,['staff']);assert.equal(doc.refereeSeatsV1.version,1);
+ assert.equal(h.docs.get('publicTournaments/BXH-ABCD12').ladderMode,ladderMode);
+});
+for(const profile of [{active:false},{isTestAccount:true},{deleted:true},{accountStatus:'frozen'},{role:'player'}])test(`ranked create still rejects ineligible staff ${JSON.stringify(profile)}`,async()=>{
+ const h=harness(),p=h.payload,state=JSON.parse(p.privatePayload.data);state.createdBy='staff';state.meta.ladderMode='ranked';
+ Object.assign(h.docs.get('users/staff'),profile);
+ await assert.rejects(h.run('staff',{privatePayload:{...p.privatePayload,createdBy:'staff',data:JSON.stringify(state)}}),/permission-denied/);
+ assert(![...h.docs.keys()].some(k=>/^(tournaments|publicTournaments|roomCreationOperations)\//.test(k)));
+});
