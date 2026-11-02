@@ -8,3 +8,9 @@ function getHandlers(){
  return handlers||(handlers={score:createBucketScoringHandler(getFirestore()),seat:createBucketSeatHandler(getFirestore())});
 }
 Object.assign(exports,createBucketCallableDefinitions({onCall,HttpsError,scoreHandler:request=>getHandlers().score(request),seatHandler:request=>getHandlers().seat(request)}));
+
+const {onDocumentWritten}=require('firebase-functions/v2/firestore'),{createBucketPublicProjection}=require('./bucket-public-projection.cjs'),{createBucketProjectionDefinition}=require('./bucket-projection-trigger.cjs');let projection;
+exports.projectBucketPublicScore=createBucketProjectionDefinition({onDocumentWritten,publish:(code,options)=>{
+ if(process.env.GCLOUD_PROJECT!=='demo-bxh-four-court-buckets'||process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8188'||process.env.FIREBASE_AUTH_EMULATOR_HOST!=='127.0.0.1:9198')throw Error('emulator-only');
+ projection=projection||createBucketPublicProjection(getFirestore());return projection(code,options);
+}});
