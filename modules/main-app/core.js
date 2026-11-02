@@ -15036,23 +15036,27 @@ function renderPlayerApplyScreen(){
 
 function renderPlayerCompleteProfileScreen(){
   const p = pendingNewPlayerProfile;
+  const pending=p||(typeof pendingExistingAccountProfile!=="undefined"?pendingExistingAccountProfile:null);
+  const previous=document.getElementById("complete-profile-form");
+  const draft=pending?.uid&&previous?.getAttribute("data-profile-uid")===pending.uid?previous:null;
+  const value=id=>draft?.querySelector("#"+id)?.value??"";
   return authShellOpen() + `
     ${authBrandHeader()}
-    <div class="auth-card">
+    <div class="auth-card" id="complete-profile-form" data-profile-uid="${esc(pending?.uid||'')}">
       <div class="auth-card-title">完成玩家資料</div>
       <div class="auth-card-sub">${p?esc(p.email):""}</div>
       ${playerApplyError ? `<div class="auth-error">${esc(playerApplyError)}</div>` : ""}
       <div class="field">
         <label>真實姓名（必填）</label>
-        <input type="text" id="complete-realname">
+        <input type="text" id="complete-realname" value="${esc(value('complete-realname'))}">
         <div class="hint">BXH 賽事長期採用本名制，請填寫與報名資料一致的真實姓名。</div>
       </div>
       <div class="field">
         <label for="complete-nickname">遊戲 ID／ARENA 角色名稱（${p?'必填':'選填'}）</label>
-        <input type="text" id="complete-nickname" maxlength="24" ${p?'required':''}>
+        <input type="text" id="complete-nickname" maxlength="24" value="${esc(value('complete-nickname'))}" ${p?'required':''}>
         <div class="hint">${p?'請填寫在 ARENA 使用的角色名稱。 ':'既有帳號可登入後再補齊。 '}正式賽事顯示方式由主辦的名稱設定決定。</div>
       </div>
-      <div class="field"><label for="complete-phone">手機號碼（${p?'必填':'選填'}）</label><input type="tel" id="complete-phone" autocomplete="tel" ${p?'required':''}></div>
+      <div class="field"><label for="complete-phone">手機號碼（${p?'必填':'選填'}）</label><input type="tel" id="complete-phone" autocomplete="tel" value="${esc(value('complete-phone'))}" ${p?'required':''}></div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-complete-profile-submit" ${playerApplyBusy?'disabled':''}>${playerApplyBusy?'處理中……':'完成設定'}</button>
     </div>
   ` + authShellClose();
@@ -19358,6 +19362,10 @@ function captureRenderViewport(){
   const profileEditor=focused?.closest?.(".profile-edit-modal");
   const profileFocus=typeof playerProfileEditOpen!=="undefined"&&playerProfileEditOpen&&typeof currentAuthUid==="function"&&profileEditor?.getAttribute("data-profile-uid")===currentAuthUid()&&focused?.id
     ? {uid:currentAuthUid(),id:focused.id,start:focused.selectionStart,end:focused.selectionEnd}:null;
+  const completionUid=(typeof pendingNewPlayerProfile!=="undefined"&&pendingNewPlayerProfile?.uid)||(typeof pendingExistingAccountProfile!=="undefined"&&pendingExistingAccountProfile?.uid);
+  const completionEditor=focused?.closest?.("#complete-profile-form");
+  const completionFocus=typeof appPhase!=="undefined"&&appPhase==='player-complete-profile'&&completionUid&&completionEditor?.getAttribute("data-profile-uid")===completionUid&&focused?.id
+    ? {uid:completionUid,id:focused.id,start:focused.selectionStart,end:focused.selectionEnd}:null;
   return {
     key,
     preserve: __lastRenderedViewportKey!==null && __lastRenderedViewportKey===key,
@@ -19365,7 +19373,7 @@ function captureRenderViewport(){
     y: canReadWindow ? (window.scrollY || 0) : 0,
     navScroll: captureHorizontalNavPositions(),
     mailbox: canReadWindow ? window.BXHMailbox?.captureViewport?.() : null,
-    profileFocus
+    profileFocus,completionFocus
   };
 }
 function finishRenderViewport(snapshot){
@@ -19379,6 +19387,17 @@ function finishRenderViewport(snapshot){
       field.focus({preventScroll:true});
       if(typeof focus.start==="number"&&typeof focus.end==="number"){
         try{field.setSelectionRange(focus.start,focus.end);}catch(e){}
+      }
+    }
+  }
+  const completion=snapshot.completionFocus;
+  const completionUid=(typeof pendingNewPlayerProfile!=="undefined"&&pendingNewPlayerProfile?.uid)||(typeof pendingExistingAccountProfile!=="undefined"&&pendingExistingAccountProfile?.uid);
+  if(completion&&typeof document!=="undefined"&&typeof appPhase!=="undefined"&&appPhase==='player-complete-profile'&&completionUid===completion.uid){
+    const editor=document.getElementById("complete-profile-form"),field=document.getElementById(completion.id);
+    if(editor?.getAttribute("data-profile-uid")===completion.uid&&field&&editor.contains(field)){
+      field.focus({preventScroll:true});
+      if(typeof completion.start==='number'&&typeof completion.end==='number'){
+        try{field.setSelectionRange(completion.start,completion.end);}catch(e){}
       }
     }
   }
