@@ -46,6 +46,7 @@ test('manual session recovery keeps the login identity used by reminder deferral
 
 test('blocked popup uses the separate player redirect marker', async () => {
   const { api, context, calls, storage } = harness();
+  storage.set('bxh_google_link_redirect_v1', JSON.stringify({ uid: 'old-user', email: 'old@example.invalid' }));
   context.ax.signInWithPopup = async () => { throw { code: 'auth/popup-blocked' }; };
   assert.equal((await api.signInWithGoogle()).redirecting, true);
   assert.equal(calls.redirect, 1);
@@ -96,10 +97,9 @@ test('failed server confirmation stays an error and the next explicit retry can 
   assert.equal(calls.callable, 2);
 });
 
-test('sign-in redirect returns once and clears only its own marker', async () => {
+test('sign-in redirect returns once and consumes its marker', async () => {
   const { context, storage } = harness();
   storage.set('bxh_google_signin_redirect_v1', 'player');
-  storage.set('bxh_google_link_redirect_v1', 'keep');
   context.ax.getRedirectResult = async () => ({ user: { uid: 'redirect-google' } });
   const start = source.indexOf('        let signInRedirect = false;');
   const end = source.indexOf('        return true;', start);
@@ -108,5 +108,20 @@ test('sign-in redirect returns once and clears only its own marker', async () =>
   assert.equal(context.window.cloudAuth.consumeGoogleSignInRedirectOutcome().ok, true);
   assert.equal(context.window.cloudAuth.consumeGoogleSignInRedirectOutcome(), null);
   assert.equal(storage.has('bxh_google_signin_redirect_v1'), false);
-  assert.equal(storage.get('bxh_google_link_redirect_v1'), 'keep');
+});
+
+test('a returned signup redirect cannot be consumed as an abandoned Google link attempt', async () => {
+  const { context, storage } = harness();
+  storage.set('bxh_google_signin_redirect_v1', 'player');
+  storage.set('bxh_google_link_redirect_v1', JSON.stringify({ uid: 'old-user', email: 'old@example.invalid' }));
+  let reads = 0;
+  context.ax.getRedirectResult = async () => { reads++; return { user: { uid: 'new-google' } }; };
+  const start = source.indexOf('        let redirectContext = null;');
+  const end = source.indexOf('        return true;', start);
+  assert.ok(start >= 0 && end > start);
+  await vm.runInContext('(async () => {' + source.slice(start, end) + '})()', context);
+  assert.equal(reads, 1);
+  assert.equal(context.window.cloudAuth.consumeGoogleSignInRedirectOutcome().ok, true);
+  assert.equal(storage.has('bxh_google_link_redirect_v1'), false);
+  assert.equal(storage.has('bxh_google_signin_redirect_v1'), false);
 });
