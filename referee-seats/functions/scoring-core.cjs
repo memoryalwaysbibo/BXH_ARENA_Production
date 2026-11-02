@@ -8,7 +8,7 @@ function allowed(room,user,uid,station,authority={}){
  return C.SLOTS.some(slot=>room.refereeSeatsV1?.courts?.[station]?.[slot]?.uid===uid);
 }
 function passProtected(state,m){return !!m.callPass||(state.matches||[]).some(x=>x.callPass?.waitFor?.includes(m.id)&&!x.completed);}
-function transition({room,state,user,uid,d,now,authority={}}){
+function perform({room,state,user,uid,d,now,authority={}},propagate){
  if(room.refereeSeatsV1?.version!==1)fail('not-enabled');
  if(room.eventAuthority!=='official'||state.meta?.eventAuthority!=='official'||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
  if(room.eventCancelled||room.systemClosed||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');
@@ -64,7 +64,7 @@ function transition({room,state,user,uid,d,now,authority={}}){
  }
  m.updatedAt=now;m.updatedBy=identity.name;m.refereeSeatScoreRevision=Number(m.refereeSeatScoreRevision||0)+1;
  // Trusted progression updates downstream players, bronze/final gates and queues.
- engine.rebuildPropagationForState(state);
+ if(propagate)engine.rebuildPropagationForState(state);
  return {state,matchId:m.id,station,scoreRevision:m.refereeSeatScoreRevision,completed:!!m.completed};
 }
 function publicProjection(state,previous){
@@ -76,4 +76,10 @@ function publicProjection(state,previous){
  for(const key of ['championId','runnerUpId','thirdId','fourthId','gfMatchId','gfResetMatchId','bronzeMatchId','rrRounds','updatedAt'])mirror[key]=state[key]??null;
  return mirror;
 }
-module.exports={transition,allowed,publicProjection};
+function transition(context){return perform(context,true);}
+function transitionLocal(context){
+ if(!['score','fault','undo','rematch','pause','resume'].includes(context?.d?.action))fail('structural-command-required');
+ return perform(context,false);
+}
+module.exports={transition,transitionLocal,allowed,publicProjection};
+

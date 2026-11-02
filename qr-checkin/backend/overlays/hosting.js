@@ -8,7 +8,9 @@ const db=getFirestore();
 async function keepAndCount(code){
  return db.runTransaction(async tx=>{
   const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;
-  const t=snap.data(),s=stateOf(t),uid=t.createdBy;
+  const t=snap.data();
+  if(Object.prototype.hasOwnProperty.call(t,'scoreStorage'))return null;
+  const s=stateOf(t),uid=t.createdBy;
   if(!uid||typeof uid!=='string'||uid.includes('/'))return null;
   const ledger=db.doc(`hostCompletionLedger/${code}`),stats=db.doc(`hostStats/${uid}`);
   const [profile,prior,publicRoom]=await Promise.all([tx.get(db.doc(`users/${uid}`)),tx.get(ledger),tx.get(db.doc(`publicTournaments/${code}`))]);

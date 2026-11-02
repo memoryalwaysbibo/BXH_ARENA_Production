@@ -75,12 +75,37 @@ service cloud.firestore {
     }
 
 
+
+    // Read-only bucket access follows existing official staff private-room access.
+    // Seats control scoring; they do not remove staff read access.
+    function scoreBucketReadable(code, id) {
+      let room = get(tourPath(code)).data;
+      let storage = room.get('scoreStorage', {});
+      let config = get(/databases/$(database)/documents/systemConfig/fourCourtScoreBuckets).data;
+      return isStaffOrAbove()
+        && room.get('eventAuthority', '') == 'official'
+        && room.get('createdByRole', '') != 'partner_organizer'
+        && config.get('privateReadsEnabled', false) == true
+        && storage.get('schema', '') == 'bxh-match-buckets-v1'
+        && storage.get('status', '') == 'active'
+        && storage.get('code', '') == code
+        && storage.get('epoch', '') is string && storage.get('epoch', '').size() > 0
+        && storage.get('roomId', '') is string && storage.get('roomId', '').size() > 0
+        && id.matches('court-[1-9][0-9]*')
+        && resource.data.get('schema', '') == storage.schema
+        && resource.data.get('code', '') == code
+        && resource.data.get('roomId', '') == storage.roomId
+        && resource.data.get('epoch', '') == storage.epoch
+        && resource.data.get('bucketId', '') == id
+        && resource.data.get('revision', -1) is int && resource.data.get('revision', -1) >= 0
+        && resource.data.get('matches', null) is string;
+    }
     // Seat ownership / request changes are callable-only, including administrator changes.
     function refereeSeatWriteValid(code, privateDoc) {
       let room = get(tourPath(code)).data;
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let enabled = room.get('refereeSeatsV1', {}).get('version', 0) == 1;
-      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames'])
+      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
           || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
@@ -956,7 +981,7 @@ service cloud.firestore {
             && (!changed.hasAny(['data','bracketView','registrationStatus','onsiteWaitlistRuntimeRevision'])
               || onsiteWaitlistFence(code, privateWrite, peer))));
     }
-    function noOperationsCreate(d) { return !d.keys().hasAny(['refereeSeatsV1','refereeSeatNames','qrCheckin','qrCheckinManaged','qrCheckinRevision','systemClosed','systemClosure','entrySelectionRevision','callRevision','onsiteWaitlistServerOwned','onsiteWaitlistFinalized','onsiteWaitlistDrawEnabled','onsiteWaitlistDraw','onsiteWaitlistRuntimeRevision']); }
+    function noOperationsCreate(d) { return !d.keys().hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration','qrCheckin','qrCheckinManaged','qrCheckinRevision','systemClosed','systemClosure','entrySelectionRevision','callRevision','onsiteWaitlistServerOwned','onsiteWaitlistFinalized','onsiteWaitlistDrawEnabled','onsiteWaitlistDraw','onsiteWaitlistRuntimeRevision']); }
     function completedRoomExpiryValid() { return resource.data.get('eventAuthority','') != 'community' || resource.data.get('archiveStatus','') != 'completed' || request.resource.data.get('expiresAt',null) == null; }
     function noOperationsChange() { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['systemClosed','systemClosure','registrationSelection','registeredCount']); }
     function lotteryRuntimeWritable() { return !('registrationSelection' in resource.data) || (!(resource.data.registrationSelection.status in ['drawing','deleting']) && request.resource.data.get('capacity',null) == resource.data.get('capacity',null)); }
@@ -990,6 +1015,17 @@ service cloud.firestore {
       match /refereeSeatOperations/{id} { allow read, write: if false; }
       match /refereeScoreOperations/{id} { allow read, write: if false; }
       match /refereeScoreAudit/{id} { allow read, write: if false; }
+      match /matchBuckets/{id} {
+        allow get: if isSignedIn() && scoreBucketReadable(code, id);
+        allow list, write: if false;
+      }
+      match /bucketScoreOperations/{id} { allow read, write: if false; }
+      match /bucketScoreAudit/{id} { allow read, write: if false; }
+      match /bucketSeatOperations/{id} { allow read, write: if false; }
+      match /bucketSeatAudit/{id} { allow read, write: if false; }
+      match /bucketMigrationBackups/{id} { allow read, write: if false; }
+      match /bucketMigrationOperations/{id} { allow read, write: if false; }
+      match /bucketMigrationEpochs/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 
       match /checkinReceipts/{id} { allow read, write: if false; }
@@ -998,14 +1034,15 @@ service cloud.firestore {
 
       allow get: if isSignedIn() && (canReadTournamentPrivate(resource.data) || isCommunityOwnerData(resource.data) || (isTester() && isTesterOwnedTestData(myProfile(), resource.data)));
       allow list: if isSignedIn() && (canReadTournamentPrivate(resource.data) || isCommunityOwnerData(resource.data) || (isTester() && isTesterOwnedTestData(myProfile(), resource.data)));
-      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount','eventStaffAssignments']) && noOperationsCreate(request.resource.data) && (
+      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount','eventStaffAssignments','scoreStorage']) && noOperationsCreate(request.resource.data) && (
 isTournamentAdminEquivalent() || (isStaffOfficialCreatorData(request.resource.data) && partnerQuotaValidForCreate(code, request.resource.data)) || validTesterTestCreate(request.resource.data) || (isSignedIn() && myProfile().get('active', true) == true && validCommunityInvariant(request.resource.data))
         );
-      allow delete: if resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data) || resource.data.get('onsiteWaitlistFinalized', false) == true) && operationsUnlocked(resource.data) && (
+      allow delete: if !('scoreStorage' in resource.data) && resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data) || resource.data.get('onsiteWaitlistFinalized', false) == true) && operationsUnlocked(resource.data) && (
 isAdminOrAbove() || (isSignedIn() && isCommunityOwnerData(resource.data)) || (isTester() && isTesterOwnedTestData(myProfile(), resource.data))
         );
 
-      allow update: if refereeSeatWriteValid(code, true) && qrCheckinWriteValid(code) && onsiteWaitlistWriteValid(code, true) && courtLifecycleWriteValid() && (
+      // Bucket rooms reject every legacy browser edit; migration is Admin SDK only.
+      allow update: if !('scoreStorage' in resource.data) && !('scoreStorage' in request.resource.data) && refereeSeatWriteValid(code, true) && qrCheckinWriteValid(code) && onsiteWaitlistWriteValid(code, true) && courtLifecycleWriteValid() && (
         ((resource.data.get('onsiteWaitlistServerOwned', false) == true || (myProfile().get('role','') in ['staff','admin','super_admin'] && request.resource.data.diff(resource.data).affectedKeys().hasAny(['data','bracketView']) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['confirmedCount','waitlistCount','lastRegistrationMutationUid','lastRegistrationMutationType']))) && (myProfile().get('role','') in ['staff','player'] ? (lotteryRuntimeWritable() && completedRoomExpiryValid() && operationsUnlocked(resource.data) && noOperationsChange() && preservesTestSource() && entrySelectionWriteValid() && callWriteValid() && (
 (
           (isSignedIn() && isAssignedStaffData(myProfile(), resource.data))
@@ -1535,7 +1572,7 @@ isAdminOrAbove()
 
       // v13.40.3: community 公開鏡像以自身不可偽造的 owner 欄位授權刪除。
       // 不再讀取同一 batch 內也會被刪除的 tournaments 文件，避免合法房主遭 permission-denied。
-      allow delete: if resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data) || resource.data.get('onsiteWaitlistFinalized', false) == true) && operationsUnlocked(resource.data) && (
+      allow delete: if !('scoreStorage' in get(tourPath(code)).data) && resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data) || resource.data.get('onsiteWaitlistFinalized', false) == true) && operationsUnlocked(resource.data) && (
 isAdminOrAbove()
         || (
           isSignedIn()
@@ -1545,7 +1582,7 @@ isAdminOrAbove()
         || (isTester() && tournamentExistsFor(code) && isTesterOwnedTestData(myProfile(), tournamentDataFor(code)))
         );
 
-      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount']) && noOperationsCreate(request.resource.data) && tournamentExistsAfterFor(code) && (
+      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount']) && noOperationsCreate(request.resource.data) && tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataAfterFor(code)) && (
 (
         isTournamentAdminEquivalent()
         && tournamentExistsAfterFor(code)
@@ -1616,7 +1653,7 @@ isAdminOrAbove()
       )
         );
 
-      allow update: if refereeSeatWriteValid(code, false) && qrCheckinWriteValid(code) && onsiteWaitlistWriteValid(code, false) && courtLifecycleMirrorValid(code) && (
+      allow update: if tournamentExistsFor(code) && tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataFor(code)) && !('scoreStorage' in tournamentDataAfterFor(code)) && refereeSeatWriteValid(code, false) && qrCheckinWriteValid(code) && onsiteWaitlistWriteValid(code, false) && courtLifecycleMirrorValid(code) && (
         ((resource.data.get('onsiteWaitlistServerOwned', false) == true || (myProfile().get('role','') in ['staff','admin','super_admin'] && request.resource.data.diff(resource.data).affectedKeys().hasAny(['data','bracketView']) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['confirmedCount','waitlistCount','lastRegistrationMutationUid','lastRegistrationMutationType']))) && (myProfile().get('role','') in ['staff','player'] ? (lotteryRuntimeWritable() && completedRoomExpiryValid() && operationsUnlocked(resource.data) && noOperationsChange() && preservesTestSource() && tournamentOperationsUnlocked(code) && callMirrorValid(code) && (
 (
           tournamentExistsFor(code) && (isSignedIn() && isAssignedStaffData(myProfile(), tournamentDataFor(code)))

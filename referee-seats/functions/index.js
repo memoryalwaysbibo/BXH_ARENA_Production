@@ -21,3 +21,9 @@ exports.commitRefereeCommand=onCall({region:'asia-east1',timeoutSeconds:30,maxIn
   throw new HttpsError(error.message==='unauthenticated'?'unauthenticated':denied.includes(error.message)?'permission-denied':'failed-precondition',error.seatCode||error.message);
  }
 });
+
+// Definitions are discoverable while the bucket runtime remains closed by default.
+const {onDocumentWritten}=require('firebase-functions/v2/firestore');
+const {createBucketRuntimeDefinitions}=require('./bucket-runtime-entry.cjs');
+Object.assign(exports,createBucketRuntimeDefinitions({db:getFirestore(),onCall,HttpsError,onDocumentWritten}));
+

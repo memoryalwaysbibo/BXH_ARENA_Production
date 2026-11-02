@@ -1,5 +1,6 @@
 'use strict';
 const {createHash}=require('node:crypto'),C=require('./core.cjs'),S=require('./scoring-core.cjs'),D=require('./dispatch-core.cjs');
+const {assertLegacyScoringWritable}=require('./bucket-legacy-fence.cjs');
 function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
  const uid=request.auth?.uid,d=request.data||{},code=String(d.code||'').trim().toUpperCase();
  if(!uid)throw Error('unauthenticated');
@@ -12,6 +13,7 @@ function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
   if(!roomSnap.exists||!pubSnap.exists)throw Error('not-found');
   if(releaseSnap.data()?.enabled!==true||releaseSnap.data()?.perCourtScoringVerified!==true)throw Error('release-not-ready');
   const room=roomSnap.data(),user=userSnap.data();
+  assertLegacyScoringWritable(room);
   const authority={now,partnerEnabled:releaseSnap.data()?.partnerSeatsEnabled===true};
   if(C.partnerRoom(room)){
    if(!authority.partnerEnabled)throw Error('partner-release-not-ready');

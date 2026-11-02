@@ -1,0 +1,132 @@
+name: Four-court score buckets lab
+on:
+  pull_request:
+    paths:
+      - 'modules/scoring/four-court-buckets.cjs'
+      - 'modules/scoring/four-court-client.cjs'
+      - 'modules/scoring/four-court-app-bridge.cjs'
+      - 'modules/scoring/four-court-session.cjs'
+      - 'modules/scoring/four-court-lifecycle.cjs'
+      - 'modules/scoring/four-court-browser.js'
+      - 'scripts/build-four-court-browser.cjs'
+      - 'scripts/bucket-migration-operator.cjs'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'modules/main-app/core.js'
+      - 'index.html'
+      - 'modules/scoring/four-court-firestore-transport.cjs'
+      - 'modules/scoring/four-court-referee-lab.js'
+      - 'referee-seats/functions/bucket-*.cjs'
+      - 'referee-seats/functions/index.js'
+      - 'referee-seats/functions/scoring-core.cjs'
+      - 'referee-seats/functions/scoring-service.cjs'
+      - 'referee-seats/functions/bucket-legacy-fence.cjs'
+      - 'referee-seats/firestore.candidate.rules'
+      - 'referee-seats/build-rules.py'
+      - 'referee-seats/firebase.buckets-lab.json'
+      - 'referee-seats/firebase.buckets-auth-lab.json'
+      - 'referee-seats/firebase.buckets-callable-lab.json'
+      - 'qr-checkin/backend/firebase-callable.cjs'
+      - 'qr-checkin/backend/overlays/roster-service.js'
+      - 'qr-checkin/backend/overlays/room-access-service.js'
+      - 'qr-checkin/backend/onsite/firestore-store.cjs'
+      - 'qr-checkin/backend/overlays/hosting.js'
+      - 'qr-checkin/backend/guard-firestore.cjs'
+      - 'tests/four-court-buckets/**'
+      - 'docs/four-court-buckets.md'
+      - '.github/workflows/four-court-buckets-lab.yml'
+permissions:
+  contents: read
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Verify generated browser asset
+        run: node scripts/build-four-court-browser.cjs --check
+      - name: Verify routing and isolation
+        run: node --test referee-seats/scoring.test.cjs tests/four-court-buckets/unit.test.cjs tests/four-court-buckets/trusted.test.cjs tests/four-court-buckets/legacy-fence.test.cjs tests/four-court-buckets/client.test.cjs tests/four-court-buckets/transport.test.cjs tests/four-court-buckets/app-bridge.test.cjs tests/four-court-buckets/callable.test.cjs tests/four-court-buckets/session.test.cjs tests/four-court-buckets/projection-trigger.test.cjs tests/four-court-buckets/runtime.test.cjs tests/four-court-buckets/lifecycle.test.cjs tests/four-court-buckets/migration.test.cjs tests/four-court-buckets/operator.test.cjs tests/four-court-buckets/full-page-source.test.cjs
+      - name: Install isolated emulator dependencies
+        run: npm install --prefix /tmp/bxh-four-court-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0 playwright@1.55.0 esbuild@0.25.0 firebase@12 @firebase/rules-unit-testing@5
+      - name: Reject legacy client writes for bucket rooms
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-lab.json 'node tests/four-court-buckets/rules-fence.cjs'
+      - name: Verify Web SDK read permissions and revoked subscriptions
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-lab.json 'node tests/four-court-buckets/reader-rules.cjs'
+      - name: Simulate 6 and 12 courts against Firestore Emulator
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/emulator.cjs'
+      - name: Verify trusted scoring, replay and cross-bucket advancement
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/trusted-emulator.cjs'
+      - name: Verify reviewed migration, backups and closed-release rollback
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/migration-emulator.cjs'
+      - name: Verify authenticated migration CLI and identity-bound review files
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-auth-lab.json 'node tests/four-court-buckets/operator-emulator.cjs'
+      - name: Install isolated browser
+        run: node /tmp/bxh-four-court-deps/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Verify referee handover and reconnect with Emulator subscriptions
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/firebase.json 'node tests/four-court-buckets/browser-emulator.cjs'
+      - name: Verify real browser Auth and existing referee command bridge
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-auth-lab.json 'node tests/four-court-buckets/auth-browser-emulator.cjs'
+      - name: Prepare isolated Callable source package
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: node tests/four-court-buckets/prepare-callable-lab.cjs
+      - name: Verify native Callable protocol and explicitly enabled frontend session
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+          BUCKET_NATIVE_CALLABLES: '1'
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-callable-lab.json 'node tests/four-court-buckets/auth-browser-emulator.cjs'
+      - name: Verify full ARENA page scoring and recovery buttons
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-callable-lab.json 'node tests/four-court-buckets/full-page-emulator.cjs'
+      - name: Verify automatic public projection from real Firestore events
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-callable-lab.json 'node tests/four-court-buckets/projection-trigger-emulator.cjs'
+      - name: Retain measured results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-court-buckets-lab
+          path: test-results/four-court-buckets/
+          if-no-files-found: warn
+          retention-days: 14
+
+

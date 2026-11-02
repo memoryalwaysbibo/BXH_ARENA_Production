@@ -14,6 +14,8 @@
   // Release switch: flip only after the isolated Callable source is verified
   // and systemConfig/refereeSeatsV1.autoCreateEnabled is enabled.
   const AUTO_SEAT_ROOM_CREATE_ROLLOUT = true;
+  // Source rollout stays closed until Rules, migration and real-site acceptance.
+  const FOUR_COURT_CLIENT_ROLLOUT = false;
 
   const ROOM_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 排除易混淆字元 O 0 I 1 L
   const ROOM_CODE_LENGTH = 6;
@@ -1131,6 +1133,21 @@
   }
   function cloudNextSeasonId(cur){ const m=String(cur||"S1").match(/^(?:S)?(\d+)$/i); return "S"+((m?parseInt(m[1],10):1)+1); }
   function cloudSafeTimestampMs(v){ try{ if(v&&typeof v.toMillis==="function") return v.toMillis(); }catch(e){} return typeof v==="number"?v:0; }
+
+  let fourCourtLifecycle = null;
+  function reportFourCourtStatus(detail){
+    window.dispatchEvent(new CustomEvent('bxh-four-court-status',{detail}));
+  }
+  function getFourCourtLifecycle(){
+    if(!fourCourtLifecycle&&window.BXHFourCourtLifecycle&&authReady&&dbHandle){
+      fourCourtLifecycle=window.BXHFourCourtLifecycle.create({enabled:FOUR_COURT_CLIENT_ROLLOUT,auth:authHandle,authApi:ax,
+        sessionOptions:{db:dbHandle,fs:fx,functions:functionsHandle,functionsApi:fnx},ensureAppCheck:ensureHunterClashAppCheck,onStatus:reportFourCourtStatus});
+    }
+    return fourCourtLifecycle;
+  }
+
+  window.addEventListener('pagehide',()=>fourCourtLifecycle?.suspend());
+  window.addEventListener('pageshow',()=>fourCourtLifecycle?.resume());
 
   window.cloudSync = {
     async connect(){ return await tryInitFirebase(); },
@@ -2925,6 +2942,12 @@
         const snap = options.serverOnly===true?await fx.getDocFromServer(ref):await fx.getDoc(ref);
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
+        if(Object.hasOwn(d,'scoreStorage')){
+          const confirmed=options.serverOnly===true?snap:await fx.getDocFromServer(ref);
+          if(!confirmed.exists()||!Object.hasOwn(confirmed.data(),'scoreStorage'))return {ok:false,reason:'not-synchronized'};
+          const lifecycle=getFourCourtLifecycle();
+          return lifecycle?await lifecycle.read(String(code).toUpperCase(),confirmed.data().scoreStorage||{}):{ok:false,reason:'bucket-client-disabled'};
+        }
         const parsed = JSON.parse(d.data);
         if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
         if(d.ladderPointsAwarded===true) parsed.ladderPointsAwarded=true;
@@ -3789,20 +3812,26 @@ if(testerSession){
     },
 
     async commitRefereeCommand(data){
+      if(fourCourtLifecycle?.isBucket(data.code))return fourCourtLifecycle.command(data,"commitRefereeCommand");
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"commitRefereeCommand")(data);return result.data;}
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
     },
     async manageRefereeSeats(data){
+      if(fourCourtLifecycle?.isBucket(data.code))return fourCourtLifecycle.command(data,"manageRefereeSeats");
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
     },
+    async retryBucketOperation(data){return fourCourtLifecycle?.isBucket(data.code)?fourCourtLifecycle.command(data,'retryBucketOperation'):{ok:false,reason:'bucket-session-mismatch'};},
+    reconnectBucketRoom(code){return fourCourtLifecycle?.reconnect(String(code).toUpperCase())||{ok:false,reason:'bucket-session-mismatch'};},
+    bucketView(code){return fourCourtLifecycle?.view(String(code).toUpperCase())||null;},
     subscribeRefereeSeats(code,callback){
+      if(fourCourtLifecycle?.isBucket(String(code).toUpperCase()))return fourCourtLifecycle.subscribe(String(code).toUpperCase(),state=>callback({model:state.meta.refereeSeatsV1,projection:state.meta}),{primary:false});
       if(!cloudEnabled||!code)return ()=>{};
       return fx.onSnapshot(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()),snap=>{
         if(!snap.exists()||snap.metadata.hasPendingWrites)return;
-        const d=snap.data();if(d.refereeSeatsV1?.version!==1)return;
+        const d=snap.data();if(Object.hasOwn(d,'scoreStorage'))return;if(d.refereeSeatsV1?.version!==1)return;
         callback({model:d.refereeSeatsV1,projection:{
           ...(d.createdByRole==='partner_organizer'?{refereeSeatActivityAssignment:d.eventStaffAssignments?.[authHandle?.currentUser?.uid]||null,refereeSeatAccessRevoked:false}:{}),
           assignedStaffUids:d.assignedStaffUids||[],refereeStationAssignments:d.refereeStationAssignments||{},
@@ -4007,12 +4036,22 @@ if(testerSession){
     // Admin/staff use only — subscribes to the FULL tournament document.
     subscribe(code, callback){
       if(!cloudEnabled || !code) return ()=>{};
+      let active=true,stopBucket=()=>{},bucketAttached=false,bucketUid=null,lastRootVersion=-1;
       try{
         const ref = fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
         const unsub = fx.onSnapshot(ref, { includeMetadataChanges:true }, (snap)=>{
-          if(!snap.exists()) return;
-          if(snap.metadata.hasPendingWrites) return; // 略過自己剛寫入、尚未確認的本地回音
+          if(!active||!snap.exists()) return;
+          if(snap.metadata.hasPendingWrites||snap.metadata.fromCache) return; // 略過自己剛寫入、尚未確認的本地回音
           const d = snap.data();
+          if(Number.isSafeInteger(d.updatedAt)){if(d.updatedAt<lastRootVersion)return;lastRootVersion=d.updatedAt;}
+          if(Object.hasOwn(d,'scoreStorage')){
+            if(bucketAttached&&bucketUid!==authHandle?.currentUser?.uid)return;
+            const lifecycle=getFourCourtLifecycle();
+            if(!lifecycle){reportFourCourtStatus({code:String(code).toUpperCase(),status:'error',reason:'bucket-client-disabled',clear:true});return;}
+            if(!bucketAttached){bucketAttached=true;bucketUid=authHandle?.currentUser?.uid;stopBucket=lifecycle.subscribe(String(code).toUpperCase(),(state,authoritative)=>{if(active)callback(state,authoritative);});}
+            lifecycle.observe(String(code).toUpperCase(),d.scoreStorage||{});return;
+          }
+          if(bucketAttached){fourCourtLifecycle.observe(String(code).toUpperCase(),null);stopBucket();stopBucket=()=>{};bucketAttached=false;}
           try{
             const parsed = JSON.parse(d.data);
             if(d.refereeSeatsV1?.version===1)parsed.meta={...parsed.meta,refereeSeatsV1:d.refereeSeatsV1,refereeSeatNames:d.refereeSeatNames||{},refereeStationAssignments:d.refereeStationAssignments||{},refereeStationNames:d.refereeStationNames||{},refereeStationRestrictionEnabled:true,assignedStaffUids:d.assignedStaffUids||[]};
@@ -4022,7 +4061,7 @@ if(testerSession){
         }, (err)=>{
           console.warn("雲端同步監聽發生錯誤，可能已離線", err);
         });
-        return unsub;
+        return ()=>{active=false;unsub();stopBucket();};
       }catch(e){
         console.warn("建立雲端監聽失敗", e);
         return ()=>{};

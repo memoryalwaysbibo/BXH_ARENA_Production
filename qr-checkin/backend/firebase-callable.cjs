@@ -17,7 +17,10 @@ function createCheckinHandler(db,secretValue){return async request=>{
   try{return await db.runTransaction(async tx=>{
     const [roomSnap,userSnap,cfgSnap,pubSnap]=await Promise.all([tx.get(ref),tx.get(db.doc('users/'+uid)),tx.get(db.doc('systemConfig/qrCheckin')),tx.get(pub)]);
     if(!roomSnap.exists||!pubSnap.exists)throw new CheckinError('room-missing');
-    const room=roomSnap.data(),publicRoom=pubSnap.data();let state=JSON.parse(room.data||'{}');
+    const room=roomSnap.data(),publicRoom=pubSnap.data();
+    // All QR actions are unavailable until the bucket-aware room flow is wired.
+    if(Object.prototype.hasOwnProperty.call(room,'scoreStorage'))throw new CheckinError('bucket-scoring-required');
+    let state=JSON.parse(room.data||'{}');
     if(room.qrCheckinManaged===true){
       if(!Number.isSafeInteger(room.qrCheckinRevision)||room.qrCheckinRevision<1||publicRoom.qrCheckinManaged!==true||publicRoom.qrCheckinRevision!==room.qrCheckinRevision||state.qrCheckinRevision!==room.qrCheckinRevision)throw new CheckinError('checkin-state-stale');
     }else if(publicRoom.qrCheckinManaged===true||state.qrCheckinManaged===true)throw new CheckinError('checkin-state-stale');
