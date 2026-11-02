@@ -142,6 +142,10 @@ describe('real Chromium public catalog isolation and behavior', {concurrency: fa
     } finally {
       session.dataRequests = state.dataRequests;
       session.intentional404s = state.intentional404s;
+      // Drain interception handlers before closing their page/context. Errors
+      // remain visible; do not suppress a late handler rejection during teardown.
+      await page.unrouteAll({behavior: 'wait'});
+      await context.unrouteAll({behavior: 'wait'});
       await context.close();
       await new Promise(resolve => server.close(resolve));
       saveReport();
