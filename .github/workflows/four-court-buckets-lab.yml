@@ -110,6 +110,11 @@ jobs:
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
           BUCKET_NATIVE_CALLABLES: '1'
         run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-callable-lab.json 'node tests/four-court-buckets/auth-browser-emulator.cjs'
+      - name: Verify full ARENA page scoring and recovery buttons
+        env:
+          NODE_PATH: /tmp/bxh-four-court-deps/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bxh-four-court-deps/node_modules/.bin/firebase emulators:exec --only firestore,auth,functions --project demo-bxh-four-court-buckets --config referee-seats/firebase.buckets-callable-lab.json 'node tests/four-court-buckets/full-page-emulator.cjs'
       - name: Verify automatic public projection from real Firestore events
         env:
           NODE_PATH: /tmp/bxh-four-court-deps/node_modules
@@ -123,4 +128,5 @@ jobs:
           path: test-results/four-court-buckets/
           if-no-files-found: warn
           retention-days: 14
+
 
