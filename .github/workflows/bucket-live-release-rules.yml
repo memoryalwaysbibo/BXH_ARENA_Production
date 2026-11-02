@@ -1,0 +1,35 @@
+name: Bucket live Rules reconciliation
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/**'
+      - 'scripts/build-bucket-release-rules.py'
+      - 'referee-seats/reference/firestore.production-20261102.rules'
+      - 'referee-seats/firestore.candidate.rules'
+      - 'tests/four-court-buckets/live-release-rules.py'
+      - '.github/workflows/bucket-live-release-rules.yml'
+permissions:
+  contents: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify exact live baseline composition
+        run: python3 -B scripts/build-bucket-release-rules.py --check
+      - name: Obtain Firestore Emulator via isolated CLI
+        run: |
+          npm install --prefix /tmp/bucket-release-tools --no-save --ignore-scripts firebase-tools@14
+          /tmp/bucket-release-tools/node_modules/.bin/firebase setup:emulators:firestore
+      - name: Check live and candidate permissions against real Emulator
+        run: python3 -B tests/four-court-buckets/live-release-rules.py
