@@ -124,6 +124,7 @@
           linkWithRedirect: authMod.linkWithRedirect,
           getRedirectResult: authMod.getRedirectResult,
           signInWithPopup: authMod.signInWithPopup,
+          signInWithRedirect: authMod.signInWithRedirect,
           unlink: authMod.unlink,
           browserPopupRedirectResolver: authMod.browserPopupRedirectResolver
         };
@@ -169,6 +170,20 @@
             try{sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);}catch(e){}
           }
         }
+        let signInRedirect = false;
+        try{ signInRedirect = sessionStorage.getItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY)==="player"; }catch(e){}
+        if(signInRedirect){
+          try{
+            const result=await ax.getRedirectResult(authHandle,ax.browserPopupRedirectResolver);
+            pendingGoogleSignInRedirectOutcome=result?.user
+              ? {ok:true}
+              : {ok:false,error:"沒有取得 Google 登入結果，請重新選擇 Google 帳號。"};
+          }catch(e){
+            pendingGoogleSignInRedirectOutcome={ok:false,error:googleSignInError(e)};
+          }finally{
+            try{sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);}catch(e){}
+          }
+        }
         return true;
       }catch(e){
         console.warn("BXH ARENA 雲端同步：Firebase 初始化失敗，自動退回僅本機模式。", e);
@@ -197,6 +212,17 @@
   const googleLinkProfileCache = new Map();
   const GOOGLE_LINK_REDIRECT_SESSION_KEY = "bxh_google_link_redirect_v1";
   let pendingGoogleLinkRedirectOutcome = null;
+  const GOOGLE_SIGNIN_REDIRECT_SESSION_KEY = "bxh_google_signin_redirect_v1";
+  let pendingGoogleSignInRedirectOutcome = null;
+  let googleProfileCreation = null;
+
+  function googleSignInError(e){
+    if(e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request")return "已取消 Google 登入。";
+    if(e?.code==="auth/account-exists-with-different-credential")return "此信箱已有 ARENA 帳號，請先以原帳密登入並在我的資料綁定 Google。";
+    if(e?.code==="auth/popup-blocked"||e?.code==="auth/operation-not-supported-in-this-environment")return "請使用 Safari 或 Chrome 開啟 ARENA，再使用 Google 登入。";
+    if(e?.code==="auth/permission-denied"||e?.code==="auth/internal-error")return "Google 註冊或登入暫時無法完成，請稍後再試。";
+    return "Google 登入失敗："+String(e?.code||"請稍後再試");
+  }
 
   window.cloudAuth = {
     isReady(){ return authReady; },
@@ -213,7 +239,7 @@
     getCurrentUser(){
       try{
         const u = authHandle && authHandle.currentUser;
-        return u ? { uid: u.uid, email: u.email, providers:(u.providerData||[]).map(p=>p.providerId) } : null;
+        return u ? { uid: u.uid, email: u.email, providers:(u.providerData||[]).map(p=>p.providerId), metadata:{lastSignInTime:u.metadata?.lastSignInTime||null} } : null;
       }catch(e){ return null; }
     },
 
@@ -276,20 +302,65 @@
       }
     },
 
-    async signInWithLinkedGoogle(){
+    consumeGoogleSignInRedirectOutcome(){
+      const result=pendingGoogleSignInRedirectOutcome;
+      pendingGoogleSignInRedirectOutcome=null;
+      return result;
+    },
+
+    async signInWithGoogle(){
       if(!authReady)return {ok:false,error:"雲端服務尚未連線。"};
       try{
         const provider=new ax.GoogleAuthProvider();
         provider.setCustomParameters({prompt:"select_account"});
-        const result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
+        let result;
+        try{
+          result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
+        }catch(e){
+          if(e?.code!=="auth/popup-blocked"&&e?.code!=="auth/operation-not-supported-in-this-environment")throw e;
+          sessionStorage.setItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY,"player");
+          try{
+            await ax.signInWithRedirect(authHandle,provider,ax.browserPopupRedirectResolver);
+            return {ok:true,redirecting:true};
+          }catch(redirectError){
+            try{sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);}catch(e){}
+            throw redirectError;
+          }
+        }
         if(!result.user.providerData.some(p=>p.providerId==="google.com"))throw Error("google-provider-missing");
         return {ok:true,uid:result.user.uid};
       }catch(e){
-        if(e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request")return {ok:false,error:"已取消 Google 登入。"};
-        if(e?.code==="auth/permission-denied"||e?.code==="auth/internal-error")return {ok:false,error:"此 Google 帳號尚未綁定 ARENA；請先用原帳密登入並完成綁定。"};
-        if(e?.code==="auth/account-exists-with-different-credential")return {ok:false,error:"請先以原帳密登入，並在我的資料綁定 Google 帳號。"};
-        return {ok:false,error:"Google 登入失敗："+String(e?.code||"請稍後再試")};
+        return {ok:false,error:googleSignInError(e)};
       }
+    },
+
+    // Compatibility for retained callers; identity routing stays in onAuthChange.
+    signInWithLinkedGoogle(){ return this.signInWithGoogle(); },
+
+    async ensureGooglePlayerProfile(expectedUid){
+      const user=authHandle?.currentUser;
+      if(!authReady||!expectedUid||user?.uid!==expectedUid||!user.providerData?.some(p=>p.providerId==="google.com"))
+        return {ok:false,error:"Google 登入狀態已變更，請重新登入。"};
+      if(googleProfileCreation?.user===user)return googleProfileCreation.promise;
+      const promise=(async()=>{
+        try{
+          if(!functionsHandle||!fnx)throw Error("functions-unavailable");
+          const ensure=fnx.httpsCallable(functionsHandle,"ensureGooglePlayerProfile",{timeout:30000});
+          const result=await ensure({});
+          if(authHandle.currentUser!==user||result.data?.ok!==true||result.data?.uid!==expectedUid)throw Error("stale-google-session");
+          const snapshot=await fx.getDocFromServer(fx.doc(dbHandle,USERS_COLLECTION,expectedUid));
+          if(authHandle.currentUser!==user||!snapshot.exists())throw Error("google-profile-not-confirmed");
+          const profile=snapshot.data();
+          googleLinkProfileCache.set(expectedUid,{profile,loadedAt:Date.now()});
+          return {ok:true,profile,created:result.data.created===true};
+        }catch(e){
+          const collision=e?.code==="functions/already-exists";
+          return {ok:false,error:collision?"此信箱已有 ARENA 資料，請先以原帳密登入並綁定 Google。":"建立玩家資料暫時失敗，請按重新驗證後再試。"};
+        }
+      })();
+      googleProfileCreation={user,promise};
+      try{return await promise;}
+      finally{if(googleProfileCreation?.promise===promise)googleProfileCreation=null;}
     },
 
     async hasSuperAdmin(){

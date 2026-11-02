@@ -662,6 +662,91 @@ test('new player application requires ARENA name and phone before creating an ac
   });
 });
 
+async function openGoogleSignup(page, options = {}) {
+  await openLobby(page);
+  await page.evaluate(async options => {
+    await lobbyFixture.authCallback(null);
+    lobbyFixture.googleUser = null;
+    lobbyFixture.googleProfile = options.existing ? {
+      uid: 'google-fixture', email: 'google@example.invalid', active: true, role: 'player',
+      realName: '既有玩家', gameId: '既有角色', phone: '0900000000', provider: 'password', playerId: 'P-KEEP',
+    } : null;
+    lobbyFixture.googleCreates = 0;
+    lobbyFixture.googleSaves = [];
+    lobbyFixture.googleFailOnce = !!options.failOnce;
+    cloudAuth.getCurrentUser = () => lobbyFixture.googleUser && ({ ...lobbyFixture.googleUser, providers: ['google.com'] });
+    cloudAuth.getUserProfile = async () => lobbyFixture.googleProfile;
+    cloudAuth.ensureGooglePlayerProfile = async uid => {
+      lobbyFixture.googleCreates++;
+      if (lobbyFixture.googleFailOnce) {
+        lobbyFixture.googleFailOnce = false;
+        return { ok: false, error: '建立玩家資料暫時失敗，請按重新驗證後再試。' };
+      }
+      const profile = { uid, email: 'google@example.invalid', active: true, role: 'player', provider: 'google.com',
+        realName: '', gameId: '', nickname: '', displayName: '', phone: '', profileCompleted: false };
+      lobbyFixture.googleProfile = profile;
+      return { ok: true, profile, created: true };
+    };
+    cloudAuth.updateMyPlayerProfile = async (uid, data) => {
+      lobbyFixture.googleSaves.push({ uid, data });
+      lobbyFixture.googleProfile = { ...lobbyFixture.googleProfile, ...data, profileCompleted: true };
+      return { ok: true, profile: lobbyFixture.googleProfile };
+    };
+    cloudAuth.signInWithGoogle = async () => {
+      lobbyFixture.googleUser = { uid: 'google-fixture', email: 'google@example.invalid',
+        providerData: [{ providerId: 'google.com' }], metadata: { lastSignInTime: 'google-fixture-login' } };
+      await lobbyFixture.authCallback(lobbyFixture.googleUser);
+      return { ok: true, uid: 'google-fixture' };
+    };
+    appPhase = options.fromApply ? 'player-apply' : 'player-login';
+    playerLoginError = ''; playerApplyError = ''; playerActiveTab = 'home';
+    render();
+  }, options);
+  await page.locator('[data-action="player-google-signin"]').click();
+}
+
+test('first Google signup enters the homepage and can defer incomplete data for this login', async ({ page }) => {
+  await openGoogleSignup(page, { fromApply: true });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  await expect(page.locator('#profile-reminder-description')).toContainText('電話與ARENA 角色名稱');
+  expect(await page.evaluate(() => ({ phase: appPhase, uid: firebaseUser.uid, creates: lobbyFixture.googleCreates })))
+    .toEqual({ phase: 'player-center', uid: 'google-fixture', creates: 1 });
+  await page.getByRole('button', { name: '下一次', exact: true }).click();
+  await page.evaluate(async () => { await lobbyFixture.authCallback(lobbyFixture.googleUser); render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.googleCreates)).toBe(1);
+});
+
+test('Google signup reminder opens profile editing and saved details remove the reminder', async ({ page }) => {
+  await openGoogleSignup(page);
+  await page.getByRole('button', { name: '確定', exact: true }).click();
+  await expect(page.locator('#profile-realname')).toHaveValue('');
+  await expect(page.locator('#profile-gameid')).toHaveValue('');
+  await page.locator('#profile-realname').fill('測試玩家');
+  await page.locator('#profile-gameid').fill('Google 新角色');
+  await page.locator('#profile-phone').fill('0912345678');
+  await page.locator('[data-action="player-save-profile"]').click();
+  await expect.poll(() => page.evaluate(() => lobbyFixture.googleSaves.length)).toBe(1);
+  await page.evaluate(() => { playerActiveTab = 'home'; render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.googleSaves[0].uid)).toBe('google-fixture');
+});
+
+test('existing linked Google login preserves the UID and skips account creation', async ({ page }) => {
+  await openGoogleSignup(page, { existing: true });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => ({ uid: firebaseUser.uid, name: userProfile.gameId, number: userProfile.playerId, creates: lobbyFixture.googleCreates })))
+    .toEqual({ uid: 'google-fixture', name: '既有角色', number: 'P-KEEP', creates: 0 });
+});
+
+test('a failed Google profile creation can retry the retained session without another OAuth popup', async ({ page }) => {
+  await openGoogleSignup(page, { failOnce: true });
+  await expect(page.locator('.auth-error')).toContainText('建立玩家資料暫時失敗');
+  await page.getByRole('button', { name: '重新驗證', exact: true }).click();
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  expect(await page.evaluate(() => lobbyFixture.googleCreates)).toBe(2);
+});
+
 test('first profile creation requires both fields while an existing account can defer', async ({ page }) => {
   await openLobby(page);
   await page.evaluate(() => {
