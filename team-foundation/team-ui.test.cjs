@@ -20,6 +20,13 @@ test('member screen never interpolates private supplied fields',()=>{
  const html=ui.publicMembers({name:'隊伍',members:[{name:'小A',role:'captain',ladderPoints:12,hunterTier:'b',lastSeenAt:'PRIVATE',reason:'SECRET',experienceContribution:'XPPRIVATE'}]});
  for(const value of ['PRIVATE','SECRET','XPPRIVATE'])assert.ok(!html.includes(value));assert.ok(html.includes('B級'));
 });
+test('member heading places emblem, team name and title together',()=>{
+ const html=ui.publicMembers({name:'BXH <隊>',members:[]});
+ assert.match(html,/<div class="team-members-heading"><span class="team-members-emblem">/);
+ assert.match(html,/<div class="team-members-title"><h2>BXH &lt;隊&gt;<\/h2><h3>戰隊成員<\/h3><\/div><\/div>/);
+ assert.match(ui.css,/team-members-heading\{display:flex/);
+ assert.match(ui.css,/\.bxh-team-tabs button\[aria-pressed="true"\][^}]*border-radius:999px!important/);
+});
 test('navigation provides three rankings and empty membership guidance',()=>{
  const html=ui.rankingTabs('team');for(const label of ['天梯','獵人','戰隊'])assert.ok(html.includes(label));
  assert.ok(ui.noTeam().includes('建立戰隊'));assert.ok(ui.tabs('lobby').includes('我的戰隊'));
@@ -43,6 +50,23 @@ test('pending application exposes its status and a cancel control',()=>{
 test('application list safely presents review actions and remaining count notice',()=>{
  const html=ui.applications({items:[{uid:'p',name:'<script>'}],teamId:'t',hasMore:true});
  assert.ok(!html.includes('<script>'));assert.match(html,/data-team-action="approve"/);assert.match(html,/data-team-action="reject"/);assert.match(html,/還有其他申請/);
+});
+
+test('applications show numbered real names and collapsed details with accessible toggles',()=>{
+ const html=ui.applications({teamId:'t',page:2,items:[
+  {uid:'first',name:'CPK',realName:'陳霈楷',requestedAt:Date.parse('2026-10-29T07:39:00Z')},
+  {uid:'second',name:'玩家<二>',realName:null,hasTeam:true}
+ ]});
+ assert.match(html,/No<\/span><span>姓名<\/span><span>核准<\/span><span>拒絕<\/span><span>詳細/);
+ assert.match(html,/<span class="team-application-number">21<\/span><span class="team-application-name">陳霈楷<\/span>/);
+ assert.match(html,/<span class="team-application-number">22<\/span><span class="team-application-name">玩家&lt;二&gt;<small>（暱稱）<\/small>/);
+ assert.match(html,/aria-expanded="false" aria-controls="team-application-detail-2-0"/);
+ assert.match(html,/<div class="team-application-detail" id="team-application-detail-2-0" hidden>/);
+ assert.match(html,/暱稱：CPK/);
+ assert.match(html,/本名：陳霈楷/);
+ assert.match(html,/本名：尚未填寫/);
+ assert.match(html,/data-action="card-open" data-uid="first"/);
+ assert.ok(!html.includes('<二>'));
 });
 
 test('application date and time are displayed separately in Taipei time',()=>{
@@ -153,3 +177,17 @@ test('lobby never stringifies a filter object into its search field',()=>{
  assert.doesNotMatch(ui.lobby({query:{}}),/\[object Object\]/);
  assert.match(ui.lobby({query:'BXH'}),/name="query"[^>]*value="BXH"/);
 });
+
+test('review-only real names are escaped, missing values are explicit, and public rosters exclude them',()=>{
+ const app=ui.applications({teamId:'t',items:[{uid:'a',name:'暱稱',realName:'<img onerror=bad>'},{uid:'b',name:'無本名'}]});assert.match(app,/本名：&lt;img/);assert.doesNotMatch(app,/<img onerror/);assert.match(app,/本名：尚未填寫/);
+ assert.doesNotMatch(ui.publicMembers({name:'隊伍',members:[{name:'暱稱',realName:'PRIVATE_NAME',role:'member'}]}),/PRIVATE_NAME/);
+});
+
+test('rename is captain-only, disabled without server readiness, and shows the Taipei cooldown deadline',()=>{
+ const team={id:'t',name:'BXH',role:'captain',memberCount:2};
+ assert.match(ui.myTeam({...team,rename:{canRename:true,nextAllowedAt:null,cooldownDays:7}}),/data-team-form="rename"/);
+ assert.match(ui.myTeam({...team,rename:{canRename:false,nextAllowedAt:Date.UTC(2026,10,5,4),cooldownDays:7}}),/2026\/11\/05 12:00/);
+ assert.match(ui.myTeam(team),/改名功能暫時無法確認/);
+ for(const role of ['deputy','member'])assert.doesNotMatch(ui.myTeam({...team,role,rename:{canRename:true}}),/data-team-form="rename"/);
+});
+

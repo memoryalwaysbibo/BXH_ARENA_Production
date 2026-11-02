@@ -74,7 +74,9 @@ function createRosterService(db,FieldValue,clock=Date.now){return async req=>{
   const [us,ts,ps,os]=await Promise.all([tx.get(db.doc('users/'+uid)),tx.get(tr),tx.get(pr),tx.get(op)]);
   const user=us.data();if(!active(user))throw Error('auth-required');
   if(!ts.exists||!ps.exists)throw Error('not-found');
-  const t=ts.data(),pub=ps.data(),s=parse(t.data),quick=quickPolicy(t,pub);
+  const t=ts.data(),pub=ps.data();
+  if(Object.prototype.hasOwnProperty.call(t,'scoreStorage'))throw Error('bucket-scoring-required');
+  const s=parse(t.data),quick=quickPolicy(t,pub);
   if(quick&&(!s||typeof s!=='object'||Array.isArray(s)||!Array.isArray(s.players)))throw Error('corrupt-state');
   s.meta=s.meta||{};
   if(quick&&Number.isSafeInteger(t.communityParticipantCount)&&t.communityParticipantCount>=0)s.communityParticipantCount=t.communityParticipantCount;

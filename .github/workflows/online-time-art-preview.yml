@@ -1,0 +1,25 @@
+name: Online time artwork preview
+on:
+  pull_request:
+    paths:
+      - 'assets/title-*-online-time-*-v1.*'
+      - 'modules/main-app/title-utils.js'
+      - 'modules/main-app/core.js'
+      - 'ladder-secondary-ui.js'
+      - 'index.html'
+      - 'tests/online-time-art-preview.test.cjs'
+      - '.github/workflows/online-time-art-preview.yml'
+permissions:
+  contents: read
+jobs:
+  artwork:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/online-time-art-preview.test.cjs
+      - run: node tests/title-host-3-art.test.cjs
+      - run: node scripts/verify-production-frontend.cjs

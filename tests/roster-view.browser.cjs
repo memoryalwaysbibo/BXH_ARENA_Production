@@ -7,6 +7,7 @@ const {chromium}=require(runtime?runtime+'/playwright':'playwright');
  const core=fs.readFileSync(process.env.ROSTER_CORE_PATH||__dirname+'/../modules/main-app/core.js','utf8');
  const start=core.indexOf('function renderPeopleManagement(){'),end=core.indexOf('\nfunction renderBxhEventTemplateSettingsSection',start);
  assert.ok(start>=0&&end>start);const renderPeople=core.slice(start,end);
+ const attendanceHelpers=['canOfferAdminCheckin','adminCheckinButtonHtml','adminCheckinPendingHtml'].map(name=>{const a=core.indexOf('function '+name+'('),b=core.indexOf('\n}',a);assert(a>0&&b>a);return core.slice(a,b+2);}).join('\n');
  const module=fs.readFileSync(__dirname+'/../modules/main-app/roster-view.js','utf8');
  const page=await browser.newPage({viewport:{width:390,height:844}});
  await page.setContent('<!doctype html><meta charset="utf-8"><style>input,select{max-width:100%;box-sizing:border-box}.people-col-source{display:none}table{width:100%}</style><div id="app"></div>');
@@ -22,7 +23,7 @@ const {chromium}=require(runtime?runtime+'/playwright':'playwright');
  function participantDisplayName(p){return p.name}function peopleOnsiteWaitlistAvailable(){return false}function peopleOnsiteWaitlistManaged(){return false}
  function renderStaffAssignmentPanel(){return ''}function renderRefereeStationAssignmentPanel(){return ''}function entryRosterValid(){return true}function renderEntrySelection(){return ''}
  const BATTLE_MODE_LABELS={},FORMAT_LABELS={};
- ${renderPeople}
+ ${attendanceHelpers}\n ${renderPeople}
  function renderPreservingScroll(){document.querySelector('#app').innerHTML=renderPeopleManagement();}
  renderPreservingScroll();
  `});
@@ -54,3 +55,4 @@ const {chromium}=require(runtime?runtime+'/playwright':'playwright');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
  await browser.close();console.log('PASS actual personnel renderer: pending, confirmed, mixed waitlist, IDs/ranks, search, reset and mobile width');
 })().catch(e=>{console.error(e);process.exit(1)});
+

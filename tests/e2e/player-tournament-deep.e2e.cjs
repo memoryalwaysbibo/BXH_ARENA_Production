@@ -98,6 +98,8 @@ test('four-player community event reaches first confirmed referee result', async
   await expect(page.getByText('現場新增選手', { exact: true })).toBeVisible();
   await page.locator('#quick-add-textarea').fill('BOT Alpha\nBOT Beta\nBOT Gamma');
   await page.locator('[data-action="quick-add-players"]').click();
+  await expect(page.getByText('確認新增現場訪客', {exact:true})).toBeVisible();
+  await page.locator('[data-action="modal-confirm"]').click();
 
   await page.locator('[data-action="people-section"][data-section="confirmed"]').click();
   await expect(page.getByText('BOT Alpha（現場）', { exact: true })).toBeVisible();

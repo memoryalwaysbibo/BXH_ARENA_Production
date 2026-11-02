@@ -1,9 +1,16 @@
 'use strict';
+
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const api=require('../modules/main-app/bracket-commit.js');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(r=>setImmediate(r));
 const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:x=>resolve(x)};};
+const rosterRebase=(()=>{
+ const source=fs.readFileSync('modules/main-app/core.js','utf8');
+ const start=source.indexOf('function rebaseOrdinaryBracketRosterFence('),end=source.indexOf('\nfunction bracketCommitController()',start);
+ assert(start>=0&&end>start);
+ return vm.runInNewContext(source.slice(start,end)+'\nrebaseOrdinaryBracketRosterFence',{cloneStateForSave:clone});
+})();
 function room(){return {id:'r',cloudCode:'ROOM',updatedAt:1,meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'};}
 function fixture(){
  let local=room(),remote=clone(local),pub=clone(local),count=0,success=0,applied=0,active=true,writes=[];
@@ -140,4 +147,145 @@ test('persistent unconfirmed public readback never rewrites a committed draw',as
 test('confirmation has an overall deadline instead of restarting a timeout for every retry',async()=>{
  const h=fixture();h.ctx.totalTimeoutMs=10;h.ctx.timeoutMs=1000;h.ctx.read=()=>new Promise(()=>{});
  const c=h.make(),at=Date.now();assert.equal(await c.submit(),false);assert(Date.now()-at<500);assert.equal(h.writes.length,0);assert.equal(c.status().error,'confirmation-timeout');
+});
+
+
+test('admin force confirmation survives a rejected write without generating a second pairing',async()=>{
+ const h=fixture(),grant={id:'force-confirmation',operation:'draw-bracket'};let allowed=true,calls=0;
+ h.ctx.authorizeOverride=()=>allowed;
+ const normalWrite=h.ctx.write;
+ h.ctx.writeFailureCode=()=> 'permission-denied';
+ h.ctx.write=async(s,o)=>{calls++;assert.deepEqual(o.adminOperationalOverride,grant);if(calls===1)return false;s.adminOperationOverrides=[grant];return normalWrite(s,o);};
+ const c=h.make();assert.equal(await c.begin({adminOperationalOverride:grant}),false);
+ assert.equal(h.count,1);assert.equal(c.status().pending,true);assert.equal(h.success,0);
+ allowed=false;assert.equal(await c.retry(),false);assert.equal(calls,1);
+ allowed=true;assert.equal(await c.retry(),true);assert.equal(h.count,1);assert.equal(h.success,1);
+ assert.equal(h.local.adminOperationOverrides[0].id,grant.id);
+});
+test('force draw cannot begin without current admin authorization',async()=>{
+ const h=fixture(),c=h.make();assert.equal(await c.begin({adminOperationalOverride:{id:'force'}}),false);
+ assert.equal(h.count,0);assert.equal(h.writes.length,0);
+});
+
+test('admin force rebases stale revisions while retaining the exact approved pairing',async()=>{
+ const h=fixture(),grant={id:'force-confirmation',operation:'draw-bracket'};let writes=0;
+ h.ctx.authorizeOverride=()=>true;h.ctx.writeFailureCode=()=> 'registration-roster-stale';
+ h.ctx.rebaseOverride=(fresh,old)=>({...clone(fresh),matches:clone(old.matches),drawnAt:old.drawnAt,bracketSize:old.bracketSize,bracketDraw:old.bracketDraw});
+ const normalWrite=h.ctx.write;
+ h.ctx.write=async(s,o)=>{writes++;if(writes===1){h.remote={...h.remote,registrationRosterRevision:2};h.pub=clone(h.remote);return false;}assert.equal(s.registrationRosterRevision,2);s.adminOperationOverrides=[grant];return normalWrite(s,o);};
+ const c=h.make();assert.equal(await c.begin({adminOperationalOverride:grant}),true);
+ assert.equal(writes,2);assert.equal(h.count,1);assert.equal(h.local.matches[0].id,'m1');
+});
+test('ordinary redraw refreshes a stale QR fence only for identical checked-in entrants',async()=>{
+ const h=fixture(),base={...room(),meta:{...room().meta,checkinRequired:true,refereeSeatsEnabled:true},players:[{id:'a',checkedIn:true},{id:'b',checkedIn:true}],qrCheckinRevision:5};
+ h.remote=clone(base);h.pub=clone(base);h.ctx.state=()=>base;
+ h.ctx.generate=()=>({...clone(base),drawnAt:100,bracketSize:2,matches:[{id:'one-pairing',bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}]});
+ h.ctx.rebaseRosterFence=rosterRebase;h.ctx.writeFailureCode=()=> 'qr-checkin-state-stale';
+ const write=h.ctx.write;let calls=0;
+ h.ctx.write=async(s,o)=>{
+  calls++;
+  if(calls===1){h.remote={...h.remote,qrCheckinRevision:6,meta:{...h.remote.meta,refereeSeatsEnabled:false}};h.pub=clone(h.remote);return false;}
+  assert.equal(s.qrCheckinRevision,6);assert.equal(s.meta.refereeSeatsEnabled,false);
+  return write(s,o);
+ };
+ const c=h.make();assert.equal(await c.begin(),true);assert.equal(calls,2);
+ assert.equal(h.count,0);assert.equal(h.remote.matches[0].id,'one-pairing');
+ assert.equal(h.remote.bracketDraw.id,'op0');assert.equal(h.remote.players.length,2);
+});
+test('ordinary redraw refuses a fence refresh if checked-in membership changed',async()=>{
+ const h=fixture(),base={...room(),meta:{...room().meta,checkinRequired:true},players:[{id:'a',checkedIn:true},{id:'b',checkedIn:true}],qrCheckinRevision:5};
+ h.remote=clone(base);h.pub=clone(base);h.ctx.state=()=>base;
+ h.ctx.generate=()=>({...clone(base),drawnAt:100,bracketSize:2,matches:[{id:'original',bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}]});
+ h.ctx.rebaseRosterFence=rosterRebase;h.ctx.writeFailureCode=()=> 'qr-checkin-state-stale';
+ let calls=0;h.ctx.write=async()=>{calls++;h.remote={...h.remote,qrCheckinRevision:6,players:[...h.remote.players,{id:'c',checkedIn:true}]};h.pub=clone(h.remote);return false;};
+ const c=h.make();assert.equal(await c.begin(),false);assert.equal(c.status().error,'bracket-roster-changed');
+ assert.equal(calls,1);assert(c.blocked());assert.equal(h.remote.matches.length,0);
+});
+test('cancelled ninth player stays out of an eight-player redraw while current room fields survive',()=>{
+ const players=Array.from({length:9},(_,i)=>({id:'p'+(i+1),checkedIn:i!==0}));
+ const snapshot={id:'room',meta:{battleMode:'individual',checkinRequired:true,refereeSeatsEnabled:true},players,
+  matches:Array.from({length:4},(_,i)=>({id:'m'+i,a:{playerId:'p'+(2*i+2)},b:{playerId:'p'+(2*i+3)}})),
+  bracketDraw:{id:'same-operation'},bracketSize:8,drawnAt:100,qrCheckinRevision:5};
+ const fresh={...clone(snapshot),matches:[],drawnAt:null,bracketSize:0,qrCheckinRevision:6,meta:{...snapshot.meta,refereeSeatsEnabled:false}};
+ const rebased=rosterRebase(fresh,snapshot);
+ assert(rebased);assert.equal(rebased.qrCheckinRevision,6);assert.equal(rebased.meta.refereeSeatsEnabled,false);
+ assert.equal(rebased.bracketDraw.id,'same-operation');assert.equal(rebased.matches.length,4);
+ assert(!rebased.matches.some(m=>m.a?.playerId==='p1'||m.b?.playerId==='p1'));
+ const changed=clone(fresh);changed.players[0].checkedIn=true;assert.equal(rosterRebase(changed,snapshot),null);
+});
+test('ordinary fence refresh retains generated round references and rejects changed layout settings',()=>{
+ const snapshot={id:'room',meta:{checkinRequired:true,formatType:'double',stations:2,bronzeMatch:false},players:[{id:'a',checkedIn:true},{id:'b',checkedIn:true}],matches:[{id:'m',a:{playerId:'a'},b:{playerId:'b'}}],gfMatchId:'new-final',gfResetMatchId:null,bronzeMatchId:null,rrRounds:3,celebrationShown:false};
+ const fresh={...clone(snapshot),gfMatchId:'old-final',gfResetMatchId:'old-reset',bronzeMatchId:'old-bronze',rrRounds:8,celebrationShown:true};
+ const rebased=rosterRebase(fresh,snapshot);
+ assert(rebased);assert.equal(rebased.gfMatchId,'new-final');assert.equal(rebased.gfResetMatchId,null);
+ assert.equal(rebased.bronzeMatchId,null);assert.equal(rebased.rrRounds,3);assert.equal(rebased.celebrationShown,false);
+ for(const [key,value] of [['formatType','roundrobin'],['stations',3],['bronzeMatch',true]]){
+  const changed=clone(fresh);changed.meta[key]=value;assert.equal(rosterRebase(changed,snapshot),null,key);
+ }
+});
+
+test('expired force confirmation can be renewed without a new operation or pairing',async()=>{
+ const h=fixture(),grant={id:'force-confirmation',operation:'draw-bracket',participantIds:['a','b'],at:1};let accepted=false;
+ h.ctx.authorizeOverride=()=>true;const normalWrite=h.ctx.write;
+ h.ctx.writeFailureCode=()=> 'permission-denied';
+ h.ctx.write=async(s,o)=>{if(!accepted)return false;s.adminOperationOverrides=[{id:o.adminOperationalOverride.id}];return normalWrite(s,o);};
+ const c=h.make();assert.equal(await c.begin({adminOperationalOverride:grant}),false);
+ assert.equal(await c.renewOverride({...grant,id:'new-operation',at:2}),false);
+ assert.equal(await c.renewOverride({...grant,participantIds:['other'],at:2}),false);
+ accepted=true;assert.equal(await c.renewOverride({...grant,at:2}),true);
+ assert.equal(h.count,1);assert.equal(h.local.bracketDraw.id,'op1');assert.equal(h.local.adminOperationOverrides[0].id,grant.id);
+});
+
+
+const productionCore=fs.readFileSync('modules/main-app/core.js','utf8');
+function coreFunction(name){
+ const start=productionCore.indexOf('function '+name+'(');
+ assert(start>=0,name);
+ const end=productionCore.indexOf('\nfunction ',start+1);
+ return productionCore.slice(start,end<0?undefined:end);
+}
+function rosterFixture(){
+ const c={state:{id:'r',meta:{checkinRequired:true,stations:2,refereeSeatsV1:{version:1,courts:{1:{revision:3,main:{uid:'ref'},backup1:{uid:'backup'}}}}},players:['a','b','c','d'].map(id=>({id,checkedIn:true})),bracketSize:4,matches:[{id:'old',a:{playerId:'a'},b:{playerId:'b'}},{id:'old2',a:{playerId:'c'},b:{playerId:'d'}}]},
+  window:{},canOperateCurrentTournament:()=>true,bracketCommitBlocked:()=>false,
+  bracketCommitController:()=>({status:()=>({result:'success',pending:false,busy:false})}),
+  sameStringSet:(a,b)=>a.size===b.size&&[...a].every(id=>b.has(id)),
+  shuffle:xs=>[...xs].reverse(),nextPow2:n=>2**Math.ceil(Math.log2(n)),seedOrder:n=>Array.from({length:n},(_,i)=>i+1),
+  uid:()=>String(Math.random()),applyChallongeSingleElimOrder:()=>{},rebuildPropagationSingle:()=>{},syncMatchStatuses:()=>{},showToast:()=>{}};
+ c.orderedMatches=()=>c.state.matches;
+ vm.createContext(c);
+ for(const name of ['tournamentEligiblePlayers','eligiblePlayers','currentBracketParticipantIds','eligibleRosterIds','bracketRosterIsCurrent','bracketRosterUpdateHtml','bracketCommitStatusHtml','generateSingleElim'])vm.runInContext(coreFunction(name),c);
+ return c;
+}
+test('check-in cancellation replaces saved-success with stale warning until the new roster is drawn',()=>{
+ const c=rosterFixture();assert.match(c.bracketCommitStatusHtml(),/儲存成功/);
+ const prior=JSON.stringify(c.state.matches);c.state.players[0].checkedIn=false;
+ const html=c.bracketCommitStatusHtml();assert.match(html,/對戰表待更新/);assert.match(html,/依最新名單重新抽籤/);
+ assert(!html.includes('儲存成功'));assert.equal(JSON.stringify(c.state.matches),prior,'Rendering must not redraw or hide the persisted pairing');
+ assert.equal(c.generateSingleElim(),true);assert(!c.currentBracketParticipantIds().has('a'));assert(c.bracketRosterIsCurrent());
+ assert(!c.bracketCommitStatusHtml().includes('對戰表待更新'));
+ c.state.players[0].checkedIn=true;assert.match(c.bracketCommitStatusHtml(),/對戰表待更新/);
+ assert.equal(c.generateSingleElim(),true);assert(c.currentBracketParticipantIds().has('a'));assert(c.bracketRosterIsCurrent());
+});
+test('all check-ins revoked before start never resurrect the saved bracket roster',()=>{
+ const c=rosterFixture();c.state.players.forEach(p=>p.checkedIn=false);
+ assert.equal(c.eligiblePlayers().length,0);assert(!c.bracketRosterIsCurrent());assert.match(c.bracketCommitStatusHtml(),/對戰表待更新/);
+ const prior=JSON.stringify(c.state.matches);assert.equal(c.generateSingleElim(),false);assert.equal(JSON.stringify(c.state.matches),prior);
+ c.state.startedAt=123;assert.equal(c.eligiblePlayers().length,4,'Keep legacy history fallback after start');assert.equal(c.bracketRosterUpdateHtml(),'');
+});
+test('stale warning survives a refresh without an upload controller and gives observers no redraw action',()=>{
+ const c=rosterFixture();c.state.players.push({id:'late',checkedIn:true});c.bracketCommitController=()=>null;
+ assert.match(c.bracketCommitStatusHtml(),/對戰表待更新/);
+ c.canOperateCurrentTournament=()=>false;const html=c.bracketCommitStatusHtml();assert.match(html,/請主辦更新對戰表/);assert(!html.includes('data-action="draw-bracket"'));
+ c.canOperateCurrentTournament=()=>true;c.bracketCommitBlocked=()=>true;assert.match(c.bracketCommitStatusHtml(),/data-action="draw-bracket" disabled/);
+ c.state.archiveStatus='completed';assert.equal(c.bracketCommitStatusHtml(),'');
+});
+test('cancel, redraw, late check-in and redraw retain existing referee main and backup seats',()=>{
+ const c=rosterFixture(),before=JSON.stringify(c.state.meta);
+ c.state.players[0].checkedIn=false;assert(c.generateSingleElim());assert.equal(JSON.stringify(c.state.meta),before);
+ c.state.players.push({id:'late',checkedIn:true});assert(c.generateSingleElim());assert(c.currentBracketParticipantIds().has('late'));
+ assert.equal(JSON.stringify(c.state.meta),before);assert.equal(c.state.meta.refereeSeatsV1.courts[1].main.uid,'ref');
+});
+test('draw controller rejects any new draw after start without writing or replacing matches',async()=>{
+ const h=fixture();h.ctx.state=()=>({...room(),startedAt:123,bracketSize:2,matches:[{id:'locked'}]});
+ const c=h.make();assert.equal(await c.begin(),false);assert.equal(h.count,0);assert.equal(h.writes.length,0);
 });

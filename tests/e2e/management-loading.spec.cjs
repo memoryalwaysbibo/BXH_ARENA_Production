@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 // Isolated browser smoke: real management renderer, list loader, cloud query,
-// creator-name enrichment and V2 navigation; mocked identity and Firestore.
+// summary pagination and V2 navigation; mocked identity and callable transport.
 // No Firebase SDK, real-account login, production reads, or real-room writes.
 test.use({ contextOptions: { reducedMotion: 'reduce' }, serviceWorkers: 'block' });
 const root = path.join(__dirname, '../..');
@@ -21,13 +21,15 @@ const loading = between(core, 'function adminTournamentListIdentityKey()', '\nfu
 const app = between(core, 'function renderApp(){', '\nfunction startLockoutCountdown(){');
 const switchAction = between(core, '  if(action==="switch-tab"){', '\n  if(action==="force-refresh-version"){');
 const refreshAction = between(core, '  if(action==="cloud-refresh-admin-list"){', '\n  if(action==="cloud-admin-copy-code"){');
+const managementActions = between(core, '  if(action==="admin-tournament-filter"){', '\n  if(action==="load-duty-logs"){');
+const searchBinding = between(core, 'function bindAdminTournamentSearchInput(){', '\nfunction bindDynamicInputs(){');
 const cloudMethods = between(cloud, '    async queryAdminTournaments(){', '\n    // v13.13.4：玩家');
 const cloudDeadline = between(cloud, '  function withTimeout(promise, ms, fallbackValue){', '\n  async function tryInitFirebase(){');
 const styles = ['core-competition', 'auth-player', 'player-center-hunter', 'lobby-community', 'call-admin-tail', 'referee-tail', 'tail-p7'];
 const scripts = ['/modules/management-v2/navigation.js', '/modules/management-v2/adapter.js'];
 function row(name = 'Fixture room', extra = {}) {
   return { code: 'BXH-MOCK01', name, createdBy: 'fixture-owner', createdByName: 'Fixture creator',
-    eventAuthority: 'official', tournamentPhase: 'waiting', archiveStatus: 'ongoing', ...extra };
+    eventAuthority: 'official', tournamentPhase: 'waiting', archiveStatus: 'ongoing', registrationStatus:'open',registrationEnabled:true, ...extra };
 }
 function html(options) {
   const seed = { rows: [row()], holdQuery: false, holdNames: false, holdRepair: false, ...options };
@@ -57,30 +59,31 @@ const isPartnerOrganizerMode = () => activeMode === 'partner_organizer';
 const isEventStaffMode = () => activeMode === 'event_staff';
 const partnerOrganizerGrant = () => userProfile?.partnerOrganizer || {};
 const cloudAvailable = () => true, canCreateOfficialTournament = () => false, canManageMemberRaffles = () => false;
-const registrationStatusLabel = () => '尚未開始';
+const registrationStatusLabel = status => ({open:'報名中',scheduled:'即將開放',closed:'已關閉',full:'額滿'})[status]||status;
 const computeTournamentPhase = data => data.tournamentPhase || 'waiting';
 const LOGO_SRC = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 const topbarConnectionRailHtml = () => '', accountMenuHtml = () => '<span>管理身分（隔離測試）</span>', accountMenuOverlayHtml = () => '';
 const tournamentViewContextHeaderHtml = () => '', renderSystemClosureNotice = () => '', adminManagementContextHtml = () => '', testSandboxBannerHtml = () => '';
 const renderPrintBracket = () => '', renderModal = () => '', renderCloudJoinModal = () => '', renderEventEntryModal = () => '', renderQrScannerModal = () => '', renderSwitchTournamentModal = () => '', renderCloudTestResultModal = () => '';
-const bindDynamicInputs = () => {}, resetRegistrationFormDraft = () => {}, stopAdminRosterWatch = () => {}, showToast = () => {};
-const cloudEnabled = true, dbHandle = {};
-const snapshot = rows => ({ docs: copy(rows).map(item => ({ id: item.code, data: () => item })) });
-const fx = {
-  collection: (_, kind) => kind, query: (...parts) => parts, where: (...parts) => parts,
-  doc: (_, kind, id) => ({ kind, id }),
-  getDocs: async () => {
-    const call = { uid: currentAuthUid() }; fixture.queries.push(call);
-    if (!fixture.holdQuery) return snapshot(fixture.rows);
-    return new Promise((resolve, reject) => { call.resolve = rows => resolve(snapshot(rows)); call.reject = reject; });
-  },
-  getDoc: async ref => {
-    if (ref.kind !== 'users') throw Error('Unexpected mock document read: ' + ref.kind);
-    const call = { id: ref.id }; fixture.names.push(call);
-    if (!fixture.holdNames) return { exists: () => true, data: () => ({ displayName: 'Resolved creator' }) };
-    return new Promise((resolve, reject) => { call.resolve = name => resolve({ exists: () => true, data: () => ({ displayName: name }) }); call.reject = reject; });
-  }
-};
+const bindDynamicInputs = () => bindAdminTournamentSearchInput(), resetRegistrationFormDraft = () => {}, stopAdminRosterWatch = () => {}, showToast = () => {};
+// Summary transport only. Full Firestore reads are forbidden in this fixture.
+const cloudEnabled=true,dbHandle={},fx={getDocs(){throw Error('full-collection-read-forbidden');},getDoc(){throw Error('extra-document-read-forbidden');}};
+function callEngagementFunction(name,request){
+ if(name!=="listManagementTournamentSummaries")throw Error('unexpected callable');
+ const call={...request,uid:currentAuthUid()};fixture.queries.push(call);
+ const result=rows=>{
+  const search=String(request.search||'').toLowerCase();
+  const group=row=>row.registrationStatus==='scheduled'?'upcoming':['closed','cancelled'].includes(row.registrationStatus)?'closed':row.registrationStatus==='draft'?'draft':'open';
+  const all=copy(rows).filter(row=>(request.kind==='community'?row.eventAuthority==='community':row.eventAuthority!=='community')&&(!search||[row.name,row.code,row.location||''].some(value=>value.toLowerCase().includes(search))));
+  const counts={all:all.length,open:0,upcoming:0,closed:0,draft:0};all.forEach(row=>counts[group(row)]++);
+  const filtered=all.filter(row=>request.status==='all'||group(row)===request.status).sort((a,b)=>a.code.localeCompare(b.code));
+  const offset=Number(request.cursor||0),items=filtered.slice(offset,offset+5),hasMore=offset+5<filtered.length;
+  return {ok:true,items,counts,pageSize:5,hasMore,nextCursor:hasMore?String(offset+5):null};
+ };
+ if(!fixture.holdQuery)return Promise.resolve(result(fixture.rows));
+ return new Promise((resolve,reject)=>{call.resolve=rows=>resolve(result(rows));call.reject=reject;});
+}
+${searchBinding}
 ${cloudDeadline}
 window.cloudSync = {
   connect: async () => true,
@@ -109,6 +112,7 @@ function handleAction(action, target) {
   if (action === 'switch-tab' && target.getAttribute('data-tab') !== 'management') throw Error('Unrelated navigation forbidden in this fixture');
   ${switchAction}
   ${refreshAction}
+  ${managementActions}
   throw Error('Unexpected fixture action: ' + action);
 }
 fixture.enter = () => {
@@ -119,7 +123,7 @@ fixture.logout = () => { firebaseUser = null; userProfile = null; currentRole = 
 fixture.changeAccount = () => { firebaseUser = { uid: 'next-owner' }; render(); };
 fixture.demote = () => { userProfile = { role: 'staff', active: true }; render(); };
 fixture.refresh = () => loadAdminTournamentList();
-fixture.state = () => ({ busy: adminTournamentListBusy, loaded: adminTournamentListLoaded, error: adminTournamentListError, items: copy(adminTournamentListItems), activeTab });
+fixture.state = () => ({ busy: adminTournamentListBusy, loaded: adminTournamentListLoaded, error: adminTournamentListError, items: copy(adminTournamentListItems), activeTab, more:adminTournamentListHasMore });
 document.addEventListener('click', event => {
   if (event.target.closest('[data-fixture-enter]')) return fixture.enter();
   const target = event.target.closest('[data-action]');
@@ -154,97 +158,59 @@ const getState = page => page.evaluate(() => fixture.state());
 async function settle(page) { await expect.poll(() => getState(page).then(state => state.busy)).toBe(false); }
 
 // All tests stay inside Management identity → Events → Tournament Management.
-test('cards appear directly while creator lookup is pending, without switching tabs', async ({ page }, testInfo) => {
-  const errors = await openManagement(page, { rows: [row('Immediately usable room', { createdByName: '' })], holdNames: true });
-  await expect(cards(page)).toContainText('Immediately usable room');
-  await expect(cards(page)).toContainText('fixture-owner');
-  await expect(page.getByText('正在讀取雲端賽事…', { exact: true })).toHaveCount(0);
-  expect((await getState(page)).activeTab).toBe('management');
-  expect(await page.evaluate(() => fixture.names.length)).toBe(1);
-  expect(await page.evaluate(() => fixture.queries.length)).toBe(1);
-  const screenshot = testInfo.outputPath('management-cards-pending-name.png');
-  await page.screenshot({ path: screenshot });
-  await testInfo.attach('Room cards before optional creator lookup finishes', { path: screenshot, contentType: 'image/png' });
-  await page.evaluate(() => fixture.names[0].resolve('Resolved creator')); await settle(page);
-  await expect(cards(page)).toContainText('Resolved creator'); expect(errors).toEqual([]);
+const manyRows=()=>Array.from({length:12},(_,i)=>row('Paged room '+i,{code:'BXH-'+String(i).padStart(6,'0')}));
+test('only five cards load until the explicit expansion; each click adds five',async({page})=>{
+ await page.clock.install();const errors=await openManagement(page,{rows:manyRows()});await settle(page);
+ await expect(cards(page)).toHaveCount(5);await page.clock.fastForward(30000);
+ expect(await page.evaluate(()=>fixture.queries.length)).toBe(1);
+ await page.locator('[data-action="admin-tournament-load-more"]').click();await settle(page);await expect(cards(page)).toHaveCount(10);
+ expect(await page.evaluate(()=>fixture.queries.length)).toBe(2);expect(errors).toEqual([]);
 });
-
-test('repeated refresh and management-tab clicks share a pending query', async ({ page }) => {
-  await openManagement(page, { holdQuery: true });
-  for (let i = 0; i < 3; i++) { await refresh(page).click(); await page.locator('[data-management-v2-tab="management"]').click(); }
-  await page.evaluate(() => { render(); render(); });
-  expect(await page.evaluate(() => fixture.queries.length)).toBe(1);
-  await page.evaluate(() => fixture.queries[0].resolve(fixture.rows)); await settle(page);
-  await expect(cards(page)).toContainText('Fixture room');
-  expect((await getState(page)).activeTab).toBe('management');
+test('a later-page timeout preserves cards and retry requests the same cursor',async({page})=>{
+ await page.clock.install();await openManagement(page,{rows:manyRows()});await settle(page);
+ await page.evaluate(()=>fixture.holdQuery=true);await page.locator('[data-action="admin-tournament-load-more"]').click();
+ await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(2);await page.clock.fastForward(10001);
+ await expect(cards(page)).toHaveCount(5);await expect(page.locator('.auth-error')).toContainText('逾時');
+ await page.evaluate(()=>fixture.holdQuery=false);await page.locator('[data-action="admin-tournament-load-more"]').click();await settle(page);
+ await expect(cards(page)).toHaveCount(10);expect(await page.evaluate(()=>fixture.queries[2].cursor)).toBe('5');
+ await page.evaluate(()=>fixture.queries[1].resolve(fixture.rows));await expect(cards(page)).toHaveCount(10);
 });
-
-test('a hung primary query times out and retry works in place; late old data is ignored', async ({ page }) => {
-  await page.clock.install(); await openManagement(page, { holdQuery: true });
-  await expect.poll(() => page.evaluate(() => fixture.queries.length)).toBe(1);
-  await page.clock.fastForward(10001);
-  await expect(page.locator('.auth-error')).toContainText('逾時');
-  await expect(page.getByText('正在讀取雲端賽事…', { exact: true })).toHaveCount(0);
-  await page.evaluate(() => { fixture.holdQuery = false; fixture.rows = [{ ...fixture.rows[0], name: 'Retried room' }]; });
-  await refresh(page).click(); await settle(page); await expect(cards(page)).toContainText('Retried room');
-  await page.evaluate(() => fixture.queries[0].resolve([{ ...fixture.rows[0], name: 'Late old room' }]));
-  await expect(cards(page)).toContainText('Retried room'); await expect(cards(page)).not.toContainText('Late old room');
-  expect((await getState(page)).activeTab).toBe('management');
+test('status tabs replace owner tabs and reset the current page',async({page})=>{
+ const rows=[...manyRows(),row('Upcoming event',{code:'UPCOMING',registrationStatus:'scheduled'}),row('Closed event',{code:'CLOSED',registrationStatus:'closed'})];
+ await openManagement(page,{rows});await settle(page);await expect(page.locator('[data-filter="mine"]')).toHaveCount(0);
+ await page.locator('[data-filter="upcoming"]').click();await settle(page);await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toContainText('Upcoming event');
+ await page.locator('[data-filter="closed"]').click();await settle(page);await expect(cards(page)).toContainText('Closed event');
+ expect(await page.evaluate(()=>fixture.queries.at(-1).cursor)).toBeNull();
 });
-
-test('refreshing and a failed refresh keep last-known cards visible', async ({ page }) => {
-  await openManagement(page); await settle(page); await expect(cards(page)).toContainText('Fixture room');
-  await page.evaluate(() => { fixture.holdQuery = true; }); await refresh(page).click();
-  await expect(cards(page)).toContainText('Fixture room');
-  await expect.poll(() => page.evaluate(() => fixture.queries.length)).toBe(2);
-  await page.evaluate(() => fixture.queries[1].reject(Error('fixture offline')));
-  await expect(page.locator('.auth-error')).toBeVisible(); await expect(cards(page)).toContainText('Fixture room');
-  await page.evaluate(() => { fixture.holdQuery = false; fixture.rows[0].name = 'Fresh room'; });
-  await refresh(page).click(); await settle(page);
-  await expect(cards(page)).toContainText('Fresh room'); await expect(page.locator('.auth-error')).toHaveCount(0);
+test('search finds an unloaded event and clearing restores the first five cards',async({page})=>{
+ const rows=manyRows();rows[11].name='雪山貓交流賽';await openManagement(page,{rows});await settle(page);
+ await page.locator('#admin-tournament-search').fill('雪山貓');await page.locator('[data-action="admin-tournament-search"]').click();await settle(page);
+ await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toContainText('雪山貓交流賽');
+ await page.locator('[data-action="admin-tournament-search-clear"]').click();await settle(page);await expect(cards(page)).toHaveCount(5);
 });
-
-test('hung lifecycle repair leaves cards usable and releases refresh after its deadline', async ({ page }) => {
-  await page.clock.install();
-  await openManagement(page, { rows: [row('Archived room', { archiveStatus: 'completed' })], holdRepair: true });
-  await expect(cards(page)).toContainText('Archived room');
-  await expect.poll(() => page.evaluate(() => fixture.repairs.length)).toBe(1);
-  await expect(page.getByText('正在讀取雲端賽事…', { exact: true })).toHaveCount(0);
-  await page.clock.fastForward(10001); await settle(page);
-  await expect(cards(page)).toContainText('Archived room'); await expect(page.locator('.auth-error')).toContainText('狀態更新');
-  await page.evaluate(() => { fixture.rows[0].tournamentPhase = 'done'; fixture.holdRepair = false; });
-  await refresh(page).click(); await settle(page);
-  await expect(page.locator('.auth-error')).toHaveCount(0); await expect(cards(page)).toContainText('已結束');
+test('Enter submits search without automatic downloads while typing',async({page})=>{
+ await openManagement(page,{rows:manyRows()});await settle(page);await page.locator('#admin-tournament-search').fill('Paged room 11');
+ expect(await page.evaluate(()=>fixture.queries.length)).toBe(1);await page.locator('#admin-tournament-search').press('Enter');await settle(page);
+ await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toContainText('Paged room 11');
 });
-
-test('logout and another identity cannot receive a late old response', async ({ page }) => {
-  await openManagement(page, { holdQuery: true });
-  await expect.poll(() => page.evaluate(() => fixture.queries.length)).toBe(1);
-  await page.evaluate(() => fixture.logout());
-  await expect(page.locator('[data-fixture-enter]')).toBeVisible(); await expect(cards(page)).toHaveCount(0);
-  await page.evaluate(() => fixture.queries[0].resolve([{ ...fixture.rows[0], name: 'Private old room' }]));
-  expect((await getState(page)).items).toEqual([]);
-  await page.evaluate(() => { fixture.holdQuery = false; fixture.rows[0].name = 'New identity room'; fixture.enter(); fixture.changeAccount(); });
-  await settle(page); await expect(cards(page)).toContainText('New identity room');
-  await expect(cards(page)).not.toContainText('Private old room');
+test('changing status while another response is pending cannot mix categories',async({page})=>{
+ const rows=[...manyRows(),row('Upcoming event',{code:'UPCOMING',registrationStatus:'scheduled'})];await openManagement(page,{rows});await settle(page);
+ await page.evaluate(()=>fixture.holdQuery=true);await page.locator('[data-action="admin-tournament-load-more"]').click();await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(2);
+ await page.evaluate(()=>fixture.holdQuery=false);await page.locator('[data-filter="upcoming"]').click();await settle(page);
+ await page.evaluate(()=>fixture.queries[1].resolve(fixture.rows));await expect(cards(page)).toHaveCount(1);await expect(cards(page)).toContainText('Upcoming event');
 });
-
-test('role change immediately clears privileged cached rooms before its replacement query', async ({ page }) => {
-  await openManagement(page, { rows: [row(), row('Private community room', { eventAuthority: 'community', code: 'BXH-MOCK02' })] });
-  await settle(page); expect((await getState(page)).items).toHaveLength(2);
-  await page.evaluate(() => { fixture.holdQuery = true; fixture.demote(); });
-  await expect(cards(page)).toHaveCount(0); expect((await getState(page)).items).toEqual([]);
-  await expect.poll(() => page.evaluate(() => fixture.queries.length)).toBe(2);
-  await page.evaluate(() => fixture.queries[1].resolve(fixture.rows)); await settle(page);
-  await expect(cards(page)).toHaveCount(1); expect((await getState(page)).items.map(item => item.name)).toEqual(['Fixture room']);
+test('refresh failure keeps the last five cards and offers an in-place retry',async({page})=>{
+ await openManagement(page);await settle(page);await page.evaluate(()=>fixture.holdQuery=true);await refresh(page).click();
+ await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(2);await page.evaluate(()=>fixture.queries[1].reject(Error('offline')));
+ await expect(page.locator('.auth-error')).toBeVisible();await expect(cards(page)).toHaveCount(1);
+ await page.evaluate(()=>fixture.holdQuery=false);await refresh(page).click();await settle(page);await expect(page.locator('.auth-error')).toHaveCount(0);
 });
-
-test('empty rooms and denied reads leave a retryable page without navigation workarounds', async ({ page }) => {
-  await openManagement(page, { rows: [] }); await settle(page);
-  await expect(page.getByText('目前沒有可管理的賽事', { exact: true })).toBeVisible();
-  await page.evaluate(() => { fixture.holdQuery = true; }); await refresh(page).click();
-  await expect.poll(() => page.evaluate(() => fixture.queries.length)).toBe(2);
-  await page.evaluate(() => fixture.queries[1].reject({ code: 'permission-denied' })); await settle(page);
-  await expect(page.locator('.auth-error')).toContainText('權限');
-  await expect(refresh(page)).toBeVisible(); expect((await getState(page)).activeTab).toBe('management');
+test('logout clears cards and rejects pending previous-account responses',async({page})=>{
+ await openManagement(page,{holdQuery:true});await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(1);
+ await page.evaluate(()=>fixture.logout());await page.evaluate(()=>fixture.queries[0].resolve(fixture.rows));await expect(cards(page)).toHaveCount(0);
+});
+test('empty category differs from a denied first read and remains retryable',async({page})=>{
+ await openManagement(page,{holdQuery:true});await expect.poll(()=>page.evaluate(()=>fixture.queries.length)).toBe(1);
+ await page.evaluate(()=>fixture.queries[0].reject({code:'functions/permission-denied'}));await expect(page.locator('.auth-error')).toContainText('權限');
+ await page.evaluate(()=>{fixture.holdQuery=false;fixture.rows=[];});await refresh(page).click();await settle(page);await expect(page.getByText('此分類目前沒有賽事',{exact:true})).toBeVisible();
 });

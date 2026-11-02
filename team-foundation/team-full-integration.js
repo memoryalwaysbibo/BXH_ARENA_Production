@@ -7,6 +7,7 @@ function create({getIdentity,isEnabled,getSlot,apiFactory,component,hostFactory}
  function close(){host?.close();host=null;node?.remove();node=null;uid=null;}
  function page(){return visible()?'<section class="panel" aria-label="戰隊"><div id="bxh-team-full-slot"></div></section>':'';}
  function bind(){
+  root.BXHTeamAttention?.sync();
   const slot=getSlot();if(!visible()||!slot){close();return;}
   const nextUid=getIdentity().uid;if(host&&uid!==nextUid)close();
   if(!host){node=slot.ownerDocument.createElement('div');uid=nextUid;host=hostFactory({container:node,isEnabled:visible,getIdentity:()=>visible()?getIdentity().uid:null,apiFactory,component});}

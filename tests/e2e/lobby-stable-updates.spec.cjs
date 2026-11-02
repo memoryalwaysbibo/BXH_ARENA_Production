@@ -102,6 +102,7 @@ async function openLobby(page, options = {}) {
       hasSuperAdmin: async () => true,
       onAuthChange: callback => { fixture.authCallback = callback; return () => {}; },
       getUserProfile: async uid => ({ uid, role: 'player', active: true, realName: 'Synthetic player',
+        gameId: fixture.incompleteProfile ? '' : 'Synthetic player', phone: fixture.incompleteProfile ? '' : '0900000000',
         displayName: 'Synthetic player', playerId: 'P-FIXTURE', email: 'fixture@example.invalid' }),
       touchLastLogin: () => {},
       signOutUser: async () => {},
@@ -117,8 +118,9 @@ async function openLobby(page, options = {}) {
   });
   await page.goto('/', { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.lobbyFixture.authCallback === 'function');
-  await page.evaluate(async ({ cached, missingRegistrations }) => {
+  await page.evaluate(async ({ cached, missingRegistrations, incompleteProfile }) => {
     const fixture = window.lobbyFixture;
+    fixture.incompleteProfile = !!incompleteProfile;
     const now = Date.now();
     fixture.rows = Array.from({ length: 7 }, (_, index) => {
       const code = 'BXH-FIXTURE-' + String(index + 1);
@@ -574,4 +576,223 @@ test('user scrolling after a stable update is not undone by delayed legacy resto
   // Covers both existing 80 ms and 180 ms legacy restore callbacks.
   await page.waitForTimeout(250);
   expect(await page.evaluate(() => window.scrollY)).toBe(expected);
+});
+
+
+// The actual shipped auth callback, home renderer and delegated actions are used.
+test('incomplete old player can defer the reminder for one login and is reminded after logout', async ({ page }) => {
+  await openLobby(page, { incompleteProfile: true });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  await expect(page.locator('#profile-reminder-description')).toContainText('電話與ARENA 角色名稱');
+  await page.getByRole('button', { name: '下一次', exact: true }).click();
+  await page.evaluate(() => { render(); render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  await expandCard(page);
+  await page.evaluate(async () => {
+    await lobbyFixture.authCallback(null);
+    pendingLoginIntent = 'player';
+    await lobbyFixture.authCallback({ uid: 'fixture-player', email: 'fixture@example.invalid' });
+  });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+});
+
+test('confirm opens the existing profile editor with old account values intact', async ({ page }) => {
+  await openLobby(page, { incompleteProfile: true });
+  await page.getByRole('button', { name: '確定', exact: true }).click();
+  await expect(page.locator('#profile-realname')).toHaveValue('Synthetic player');
+  await expect(page.locator('#profile-gameid')).toHaveValue('');
+  await expect(page.locator('#profile-phone')).toBeEditable();
+  await page.locator('#profile-phone').fill('0900000000');
+  await page.locator('#profile-gameid').fill('補填測試角色');
+  await expect(page.locator('#profile-phone')).toHaveValue('0900000000');
+  await expect(page.locator('#profile-gameid')).toHaveValue('補填測試角色');
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.evaluate(() => { playerActiveTab = 'home'; render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+});
+
+test('reminder deferral is isolated across accounts and complete data removes it', async ({ page }) => {
+  await openLobby(page, { incompleteProfile: true });
+  await page.getByRole('button', { name: '下一次', exact: true }).click();
+  await page.evaluate(async () => {
+    pendingLoginIntent = 'player';
+    await lobbyFixture.authCallback({ uid: 'other-fixture-player', email: 'other@example.invalid' });
+    appPhase = 'player-center'; playerActiveTab = 'home'; render();
+  });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  await page.evaluate(() => {
+    userProfile = { ...userProfile, phone: '0900000000', gameId: 'Synthetic player' };
+    render();
+  });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
+});
+
+
+test('new player application requires ARENA name and phone before creating an account', async ({ page }) => {
+  await openLobby(page);
+  await page.evaluate(() => {
+    lobbyFixture.applications = [];
+    cloudAuth.applyPlayerAccount = async payload => {
+      lobbyFixture.applications.push(payload);
+      return { ok: false, error: 'Synthetic account creation stopped' };
+    };
+    appPhase = 'player-apply'; render();
+  });
+  await page.locator('#apply-realname').fill('測試玩家');
+  await page.locator('#apply-email').fill('player@example.invalid');
+  await page.locator('#apply-password').fill('password123');
+  await page.locator('#apply-password2').fill('password123');
+  await page.locator('#apply-agree').check();
+  await page.getByRole('button', { name: '申請帳號', exact: true }).click();
+  await expect(page.locator('.auth-error')).toContainText('ARENA 角色名稱');
+  expect(await page.evaluate(() => lobbyFixture.applications)).toEqual([]);
+  await page.locator('#apply-nickname').fill('ARENA 戰士');
+  await page.getByRole('button', { name: '申請帳號', exact: true }).click();
+  await expect(page.locator('.auth-error')).toContainText('手機號碼');
+  expect(await page.evaluate(() => lobbyFixture.applications)).toEqual([]);
+  await page.locator('#apply-phone').fill('0912345678');
+  await page.getByRole('button', { name: '申請帳號', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => lobbyFixture.applications.length)).toBe(1);
+  expect(await page.evaluate(() => lobbyFixture.applications[0])).toMatchObject({
+    nickname: 'ARENA 戰士', phone: '0912345678',
+  });
+});
+
+async function openGoogleSignup(page, options = {}) {
+  await openLobby(page);
+  await page.evaluate(async options => {
+    await lobbyFixture.authCallback(null);
+    lobbyFixture.googleUser = null;
+    lobbyFixture.googleProfile = options.existing ? {
+      uid: 'google-fixture', email: 'google@example.invalid', active: true, role: 'player',
+      realName: '既有玩家', gameId: '既有角色', phone: '0900000000', provider: 'password', playerId: 'P-KEEP',
+    } : null;
+    lobbyFixture.googleCreates = 0;
+    lobbyFixture.googleSaves = [];
+    lobbyFixture.googleFailOnce = !!options.failOnce;
+    cloudAuth.getCurrentUser = () => lobbyFixture.googleUser && ({ ...lobbyFixture.googleUser, providers: ['google.com'] });
+    cloudAuth.getUserProfile = async () => lobbyFixture.googleProfile;
+    cloudAuth.ensureGooglePlayerProfile = async uid => {
+      lobbyFixture.googleCreates++;
+      if (lobbyFixture.googleFailOnce) {
+        lobbyFixture.googleFailOnce = false;
+        return { ok: false, error: '建立玩家資料暫時失敗，請按重新驗證後再試。' };
+      }
+      const profile = { uid, email: 'google@example.invalid', active: true, role: 'player', provider: 'google.com',
+        realName: '', gameId: '', nickname: '', displayName: '', phone: '', profileCompleted: false };
+      lobbyFixture.googleProfile = profile;
+      return { ok: true, profile, created: true };
+    };
+    cloudAuth.updateMyPlayerProfile = async (uid, data) => {
+      lobbyFixture.googleSaves.push({ uid, data });
+      lobbyFixture.googleProfile = { ...lobbyFixture.googleProfile, ...data, profileCompleted: true };
+      return { ok: true, profile: lobbyFixture.googleProfile };
+    };
+    cloudAuth.signInWithGoogle = async () => {
+      lobbyFixture.googleUser = { uid: 'google-fixture', email: 'google@example.invalid',
+        providerData: [{ providerId: 'google.com' }], metadata: { lastSignInTime: 'google-fixture-login' } };
+      await lobbyFixture.authCallback(lobbyFixture.googleUser);
+      return { ok: true, uid: 'google-fixture' };
+    };
+    appPhase = options.fromApply ? 'player-apply' : 'player-login';
+    playerLoginError = ''; playerApplyError = ''; playerActiveTab = 'home';
+    render();
+  }, options);
+  await page.locator('[data-action="player-google-signin"]').click();
+}
+
+test('first Google signup enters the homepage and can defer incomplete data for this login', async ({ page }) => {
+  await openGoogleSignup(page, { fromApply: true });
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  await expect(page.locator('#profile-reminder-description')).toContainText('電話與ARENA 角色名稱');
+  expect(await page.evaluate(() => ({ phase: appPhase, uid: firebaseUser.uid, creates: lobbyFixture.googleCreates })))
+    .toEqual({ phase: 'player-center', uid: 'google-fixture', creates: 1 });
+  await page.getByRole('button', { name: '下一次', exact: true }).click();
+  await page.evaluate(async () => { await lobbyFixture.authCallback(lobbyFixture.googleUser); render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.googleCreates)).toBe(1);
+});
+
+test('Google signup reminder opens profile editing and saved details remove the reminder', async ({ page }) => {
+  await openGoogleSignup(page);
+  await page.getByRole('button', { name: '確定', exact: true }).click();
+  await expect(page.locator('#profile-realname')).toHaveValue('');
+  await expect(page.locator('#profile-gameid')).toHaveValue('');
+  await page.locator('#profile-realname').fill('測試玩家');
+  await page.evaluate(() => render());
+  await expect(page.locator('#profile-realname')).toHaveValue('測試玩家');
+  await expect(page.locator('#profile-realname')).toBeFocused();
+  await page.locator('#profile-gameid').fill('Google 新角色');
+  await page.evaluate(() => render());
+  await expect(page.locator('#profile-realname')).toHaveValue('測試玩家');
+  await expect(page.locator('#profile-gameid')).toHaveValue('Google 新角色');
+  await expect(page.locator('#profile-gameid')).toBeFocused();
+  await page.locator('#profile-phone').fill('0912345678');
+  await page.evaluate(() => render());
+  await expect(page.locator('#profile-phone')).toHaveValue('0912345678');
+  await expect(page.locator('#profile-phone')).toBeFocused();
+  await page.locator('[data-action="player-save-profile"]').click();
+  await expect.poll(() => page.evaluate(() => lobbyFixture.googleSaves.length)).toBe(1);
+  await page.evaluate(() => { playerActiveTab = 'home'; render(); });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => lobbyFixture.googleSaves[0].uid)).toBe('google-fixture');
+});
+
+test('existing linked Google login preserves the UID and skips account creation', async ({ page }) => {
+  await openGoogleSignup(page, { existing: true });
+  await expect(page.locator('#player-profile-reminder')).toHaveCount(0);
+  expect(await page.evaluate(() => ({ uid: firebaseUser.uid, name: userProfile.gameId, number: userProfile.playerId, creates: lobbyFixture.googleCreates })))
+    .toEqual({ uid: 'google-fixture', name: '既有角色', number: 'P-KEEP', creates: 0 });
+});
+
+test('a failed Google profile creation can retry the retained session without another OAuth popup', async ({ page }) => {
+  await openGoogleSignup(page, { failOnce: true });
+  await expect(page.locator('.auth-error')).toContainText('建立玩家資料暫時失敗');
+  await page.getByRole('button', { name: '重新驗證', exact: true }).click();
+  await expect(page.locator('#player-profile-reminder')).toBeVisible();
+  expect(await page.evaluate(() => lobbyFixture.googleCreates)).toBe(2);
+});
+
+test('first profile creation requires both fields while an existing account can defer', async ({ page }) => {
+  await openLobby(page);
+  await page.evaluate(() => {
+    lobbyFixture.completions = [];
+    cloudAuth.completeNewPlayerProfile = async (...args) => {
+      lobbyFixture.completions.push(args); return { ok: false, error: 'Synthetic completion stopped' };
+    };
+    pendingNewPlayerProfile = { uid: 'new-fixture', email: 'new@example.invalid' };
+    pendingExistingAccountProfile = null;
+    appPhase = 'player-complete-profile'; render();
+  });
+  await page.locator('#complete-realname').fill('測試玩家');
+  await page.evaluate(() => render());
+  await expect(page.locator('#complete-realname')).toHaveValue('測試玩家');
+  await expect(page.locator('#complete-realname')).toBeFocused();
+  await page.getByRole('button', { name: '完成設定' }).click();
+  await expect(page.locator('.auth-error')).toContainText('ARENA 角色名稱');
+  await page.locator('#complete-nickname').fill('新角色');
+  await page.evaluate(() => render());
+  await expect(page.locator('#complete-realname')).toHaveValue('測試玩家');
+  await expect(page.locator('#complete-nickname')).toHaveValue('新角色');
+  await expect(page.locator('#complete-nickname')).toBeFocused();
+  await page.getByRole('button', { name: '完成設定' }).click();
+  await expect(page.locator('.auth-error')).toContainText('手機號碼');
+  expect(await page.evaluate(() => lobbyFixture.completions)).toEqual([]);
+  await page.locator('#complete-phone').fill('0912345678');
+  await page.evaluate(() => render());
+  await expect(page.locator('#complete-phone')).toHaveValue('0912345678');
+  await expect(page.locator('#complete-phone')).toBeFocused();
+  await page.getByRole('button', { name: '完成設定' }).click();
+  await expect.poll(() => page.evaluate(() => lobbyFixture.completions.length)).toBe(1);
+  await page.evaluate(() => {
+    pendingNewPlayerProfile = null;
+    pendingExistingAccountProfile = { uid: 'old-fixture', email: 'old@example.invalid' };
+    playerApplyBusy = false; playerApplyError = ''; render();
+  });
+  await expect(page.locator('#complete-nickname')).not.toHaveAttribute('required', '');
+  await expect(page.locator('#complete-phone')).not.toHaveAttribute('required', '');
 });

@@ -175,3 +175,10 @@ test('validation-looking transport failures still preserve the request for exact
   assert.equal(c.snapshot().pending,true);await c.retryPending();assert.deepEqual(calls[0],calls[1]);
  }
 });
+
+test('rename forwards only the name and reloads server state; cooldown rejection is definitive',async()=>{
+ let payload,reads=0,reject=false;
+ const c=setup({mine:async()=>{reads++;return {team:{id:'t',name:'新名稱',role:'captain',rename:{canRename:false,nextAllowedAt:200,cooldownDays:7}}};},command:async p=>{payload=p;if(reject)throw Object.assign(Error('rename-cooldown'),{code:'functions/failed-precondition'});return {ok:true};}});
+ await c.mine();await c.operate('rename','t',{name:'新名稱',nameChangedAt:0,cooldownDays:0});assert.deepEqual(payload,{action:'rename',teamId:'t',requestId:'test-operation-00000001',name:'新名稱'});assert.equal(c.snapshot().screen,'mine');assert.equal(reads,2);
+ reject=true;const r=await c.operate('rename','t',{name:'其他名稱'});assert.equal(r.reason,'rejected');assert.equal(c.snapshot().pending,false);assert.match(c.snapshot().error,/7 天/);assert.equal(reads,3);
+});

@@ -1,4 +1,4 @@
-"""Compose seat ownership protection with an explicitly supplied current rules file.
+"""Compose seat and bucket ownership guards with an explicitly supplied rules baseline.
 Never deploy this file without first reconciling the live rules baseline.
 """
 import argparse,pathlib
@@ -6,12 +6,37 @@ p=argparse.ArgumentParser();p.add_argument('--source',required=True);p.add_argum
 s=pathlib.Path(a.source).read_text()
 assert 'function refereeSeatWriteValid(' not in s,'seat guard already present'
 helper='''
+
+    // Read-only bucket access follows existing official staff private-room access.
+    // Seats control scoring; they do not remove staff read access.
+    function scoreBucketReadable(code, id) {
+      let room = get(tourPath(code)).data;
+      let storage = room.get('scoreStorage', {});
+      let config = get(/databases/$(database)/documents/systemConfig/fourCourtScoreBuckets).data;
+      return isStaffOrAbove()
+        && room.get('eventAuthority', '') == 'official'
+        && room.get('createdByRole', '') != 'partner_organizer'
+        && config.get('privateReadsEnabled', false) == true
+        && storage.get('schema', '') == 'bxh-match-buckets-v1'
+        && storage.get('status', '') == 'active'
+        && storage.get('code', '') == code
+        && storage.get('epoch', '') is string && storage.get('epoch', '').size() > 0
+        && storage.get('roomId', '') is string && storage.get('roomId', '').size() > 0
+        && id.matches('court-[1-9][0-9]*')
+        && resource.data.get('schema', '') == storage.schema
+        && resource.data.get('code', '') == code
+        && resource.data.get('roomId', '') == storage.roomId
+        && resource.data.get('epoch', '') == storage.epoch
+        && resource.data.get('bucketId', '') == id
+        && resource.data.get('revision', -1) is int && resource.data.get('revision', -1) >= 0
+        && resource.data.get('matches', null) is string;
+    }
     // Seat ownership / request changes are callable-only, including administrator changes.
     function refereeSeatWriteValid(code, privateDoc) {
       let room = get(tourPath(code)).data;
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let enabled = room.get('refereeSeatsV1', {}).get('version', 0) == 1;
-      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames'])
+      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
           || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
@@ -21,19 +46,44 @@ helper='''
 '''
 anchor='    // ==== 路徑輔助函式 ===='
 assert s.count(anchor)==1;s=s.replace(anchor,helper+'\n'+anchor)
-# Preserve all baseline predicates; only add a conjunct at both tournament update entrypoints.
 for kind in ('true','false'):
  old='allow update: if qrCheckinWriteValid(code) && onsiteWaitlistWriteValid(code, '+kind+')'
  assert s.count(old)==1,old
  s=s.replace(old,'allow update: if refereeSeatWriteValid(code, '+kind+') && qrCheckinWriteValid(code) && onsiteWaitlistWriteValid(code, '+kind+')')
 old="function noOperationsCreate(d) { return !d.keys().hasAny(["
-assert s.count(old)==1;s=s.replace(old,old+"'refereeSeatsV1','refereeSeatNames',")
+assert s.count(old)==1;s=s.replace(old,old+"'refereeSeatsV1','refereeSeatNames','bucketMigration',")
 anchor='    match /tournaments/{code} {'
 assert s.count(anchor)==1;s=s.replace(anchor,anchor+'''
       match /refereeSeatOperations/{id} { allow read, write: if false; }
       match /refereeScoreOperations/{id} { allow read, write: if false; }
       match /refereeScoreAudit/{id} { allow read, write: if false; }
+      match /matchBuckets/{id} {
+        allow get: if isSignedIn() && scoreBucketReadable(code, id);
+        allow list, write: if false;
+      }
+      match /bucketScoreOperations/{id} { allow read, write: if false; }
+      match /bucketScoreAudit/{id} { allow read, write: if false; }
+      match /bucketSeatOperations/{id} { allow read, write: if false; }
+      match /bucketSeatAudit/{id} { allow read, write: if false; }
+      match /bucketMigrationBackups/{id} { allow read, write: if false; }
+      match /bucketMigrationOperations/{id} { allow read, write: if false; }
+      match /bucketMigrationEpochs/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 ''')
+
+def once(value,old,new):
+ assert value.count(old)==1,old
+ return value.replace(old,new)
+
+private,tournament_anchor,public=s.partition('    match /tournaments/{code} {')
+assert tournament_anchor and public.count('    match /publicTournaments/{code} {')==1
+room,public_anchor,mirror=public.partition('    match /publicTournaments/{code} {')
+room=once(room,"      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount','eventStaffAssignments']) && noOperationsCreate(request.resource.data) && (","      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount','eventStaffAssignments','scoreStorage']) && noOperationsCreate(request.resource.data) && (")
+room=once(room,"      allow delete: if resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data)","      allow delete: if !('scoreStorage' in resource.data) && resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data)")
+room=once(room,"      allow update: if refereeSeatWriteValid(code, true) && qrCheckinWriteValid(code)","      // Bucket rooms reject every legacy browser edit; migration is Admin SDK only.\n      allow update: if !('scoreStorage' in resource.data) && !('scoreStorage' in request.resource.data) && refereeSeatWriteValid(code, true) && qrCheckinWriteValid(code)")
+mirror=once(mirror,"      allow delete: if resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data)","      allow delete: if !('scoreStorage' in get(tourPath(code)).data) && resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data)")
+mirror=once(mirror,"      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount']) && noOperationsCreate(request.resource.data) && tournamentExistsAfterFor(code) && (","      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount']) && noOperationsCreate(request.resource.data) && tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataAfterFor(code)) && (")
+mirror=once(mirror,"      allow update: if refereeSeatWriteValid(code, false) && qrCheckinWriteValid(code)","      allow update: if tournamentExistsFor(code) && tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataFor(code)) && !('scoreStorage' in tournamentDataAfterFor(code)) && refereeSeatWriteValid(code, false) && qrCheckinWriteValid(code)")
+s=private+tournament_anchor+room+public_anchor+mirror
 pathlib.Path(a.output).write_text(s)
-print('Seat rules candidate generated; no deployment performed.')
+print('Seat and bucket rules candidate generated; no deployment performed.')

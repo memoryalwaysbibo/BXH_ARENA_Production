@@ -102,8 +102,8 @@ test('active schedule excludes completed and cancelled entries, keeps family par
  assert.ok(c.renderPlayerRegisteredTab().includes('清單可能不完整'));
 });
 test('profile keeps basic data and title paths while new account defaults to overview',()=>{
- assert.ok(core.includes('playerProfileSection="overview"'));assert.ok(core.includes("['overview','career','basic','titles'].includes(section)"));assert.ok(core.includes("v.playerTab==='profile'?'profile'"));
- for(const section of ['overview','career','basic','titles'])assert.ok(core.includes('data-section="'+section+'"'));
+ assert.ok(core.includes('playerProfileSection="overview"'));assert.ok(core.includes("['overview','career','basic','titles','duty','achievements'].includes(section)"));assert.ok(core.includes("v.playerTab==='profile'?'profile'"));
+ for(const section of ['overview','career','basic','titles','duty','achievements'])assert.ok(core.includes('data-section="'+section+'"'));
  assert.ok(extract('renderPlayerProfileTab').includes('data-action="family-open"'));assert.ok(extract('renderPlayerProfileTab').includes('renderPlayerTitleCenter(p)'));
 });
 test('settled evidence preserves real zero points and exact placement rather than guessing',()=>{

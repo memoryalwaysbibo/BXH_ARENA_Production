@@ -26,13 +26,14 @@ const suites = {
     { name: 'hunter B2 source categories and enchantment base scoring', args: ['--test', 'tests/hunter-b2-modes.test.cjs'] },
     { name: 'hunter B1 statistics and partial-read states', args: ['--test', 'tests/hunter-b1-statistics.test.cjs', 'tests/hunter-b1-cloud.test.cjs'] },
     { name: 'inline mailbox reading and stable refresh', args: ['--test', 'tests/mailbox-inline.test.cjs'] },
+    { name: 'title reward claims and login-session isolation', args: ['--test', 'tests/title-reward-session.test.cjs'] },
     { name: 'claimed-card album refresh and session isolation', args: ['--test', 'tests/card-album-claim-refresh.test.cjs'] },
     { name: 'Core module exports, shared state, and stale callback guards', args: ['--test', 'tests/module-seam-contracts.test.cjs'] },
     { name: 'public lobby ordering utility and Core seam', args: ['--test', 'tests/lobby-ordering.test.cjs'] },
     { name: 'idle court dispatch', args: ['tests/idle-court-dispatch.test.cjs'] },
     { name: 'safe court expansion, reserved queues and transaction retry fences', args: ['--test', 'tests/court-expansion.test.cjs', 'tests/court-retirement.test.cjs'] },
     { name: 'event staff permission boundary', args: ['--test', 'tests/event-staff-permission.test.cjs'] },
-    { name: 'partner authorization identity, time and revocation boundaries', args: ['--test', 'tests/partner-organizer-ui.test.cjs', 'tests/partner-legacy-revocation.test.cjs', 'tests/partner-workspace-access.test.cjs', 'tests/partner-contract-review-ui.test.cjs'] },
+    { name: 'partner authorization identity, time and revocation boundaries', args: ['--test', 'tests/partner-organizer-ui.test.cjs', 'tests/partner-legacy-revocation.test.cjs', 'tests/partner-workspace-access.test.cjs', 'tests/partner-contract-review-ui.test.cjs', 'tests/partner-overview.test.cjs'] },
     { name: 'staff assignment real-name display', args: ['--test', 'tests/staff-assignment-realname.test.cjs'] },
     { name: 'assignment commit / confirmation separation', args: ['--test', 'tests/assignment-cloud-confirmation.test.cjs'] },
     { name: 'offline queue render dedupe', args: ['tests/offline-queue-render-dedupe.test.cjs'] },
@@ -89,3 +90,5 @@ if (failures.length) {
   for (const failure of failures) console.error('-', failure.name);
   process.exit(1);
 }
+
+

@@ -11,9 +11,9 @@ const css=fs.readFileSync(path.join(root,'referee-score-v2.css'),'utf8');
 
 assert(html.includes('referee-score-v2.css?v=14.2.38-score-fault'),'V2 stylesheet is not cache-busted into Production');
 assert(source.includes('class="btn-row ref-result-actions"'),'result action layout hook missing');
-assert(source.includes('class="btn btn-ghost ref-undo-score" data-action="undo-score"'),'undo action hook or handler changed');
-assert(source.includes('class="btn btn-ghost ref-rematch" data-action="rematch"'),'rematch action hook or handler changed');
-assert(source.includes('class="btn btn-primary ref-confirm-result" data-action="confirm-result"'),'confirm action hook or handler changed');
+assert(source.includes('class="btn btn-ghost ref-undo-score"')&&source.includes('data-action="undo-score"'),'undo action hook or handler changed');
+assert(source.includes('class="btn btn-ghost ref-rematch"')&&source.includes('data-action="rematch"'),'rematch action hook or handler changed');
+assert(source.includes('class="btn btn-primary ref-confirm-result"')&&source.includes('data-action="confirm-result"'),'confirm action hook or handler changed');
 assert(source.includes('data-action="score"')&&source.includes('data-type="${type}"'),'score action contract must remain data-driven');
 assert(source.includes('data-action="referee-swap-view"'),'referee view swap action must remain intact');
 

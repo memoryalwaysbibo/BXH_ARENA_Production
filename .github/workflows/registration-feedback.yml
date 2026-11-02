@@ -1,0 +1,61 @@
+name: Registration feedback phase 1
+on:
+  pull_request:
+    paths:
+      - 'modules/main-app/registration-feedback.*'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'tests/registration-feedback*'
+      - 'tests/helpers/registration-feedback.emulator.json'
+      - 'tests/fixtures/registration-feedback-current-source.json'
+      - 'index.html'
+      - '.github/workflows/registration-feedback.yml'
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check modules/main-app/registration-feedback.js && node --check modules/cloud/cloud-runtime.js && node --check modules/main-app/core.js
+      - run: node --test tests/registration-feedback.test.cjs tests/lobby-stable-updates.test.cjs tests/player-center-integration.test.cjs tests/managed-registration-settings.test.cjs tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/ranked-registration-preopen-ui.test.cjs tests/team-registration-ui.test.cjs tests/registration-mode-draft.test.cjs
+      - run: node scripts/verify-production-frontend.cjs
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install --prefix /tmp/feedback-browser-deps --no-save --ignore-scripts playwright@1.55.0
+      - run: mkdir -p test-results/registration-feedback
+      - run: node --test tests/registration-feedback.browser.cjs
+        env:
+          NODE_PATH: /tmp/feedback-browser-deps/node_modules
+          FEEDBACK_SCREENSHOT: test-results/registration-feedback/mobile.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: registration-feedback-browser
+          path: test-results/registration-feedback/
+          if-no-files-found: ignore
+  firestore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install --prefix /tmp/feedback-deps --no-save --ignore-scripts firebase-tools@13.35.1 firebase-admin@14.5.0
+      - run: /tmp/feedback-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-registration-feedback --config tests/helpers/registration-feedback.emulator.json 'node --test tests/registration-feedback.firestore.cjs'
+        env:
+          NODE_PATH: /tmp/feedback-deps/node_modules

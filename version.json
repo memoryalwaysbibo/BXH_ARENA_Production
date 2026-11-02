@@ -1,6 +1,6 @@
 {
-  "build": "20261029.4",
+  "build": "20261030.3",
   "version": "v14.3.42",
-  "updatedAt": "2026-10-28T23:51:18.444568+00:00",
-  "releaseTrigger": "onsite-settings-lock-feedback"
+  "updatedAt": "2026-10-30T02:53:03.472Z",
+  "releaseTrigger": "management-five-summary-search"
 }

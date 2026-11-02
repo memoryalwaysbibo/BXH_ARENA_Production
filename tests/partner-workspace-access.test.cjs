@@ -13,7 +13,10 @@ test('active partner organizer enters the operational tournament workspace',()=>
 });
 
 test('partner organizer room-list query proves every Firestore read-rule field',()=>{
-  const query=cloud.slice(cloud.indexOf('async queryAdminTournaments(){'),cloud.indexOf('async queryAdminTournaments(){')+3000);
+  const start=cloud.indexOf('async queryAdminTournaments(){');
+  const end=cloud.indexOf('\n    async enrichAdminTournamentCreatorNames(',start);
+  assert.ok(start>=0&&end>start,'management query integration seam must exist');
+  const query=cloud.slice(start,end);
   assert.match(query,/fx\.where\("createdBy","==",actorUid\)/);
   assert.match(query,/fx\.where\("createdByRole","==","partner_organizer"\)/);
   assert.match(query,/fx\.where\("eventAuthority","==","official"\)/);

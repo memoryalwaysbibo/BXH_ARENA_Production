@@ -105,7 +105,9 @@ function createHandler(db,{clock=Date.now}={}){
    if(original.eventAuthority!=='official'||state.meta.eventAuthority!=='official'||publicOriginal.eventAuthority!=='official')err('unsupported-mode');
    if(original.battleMode!=='individual'||original.playMode!=='standard'||publicOriginal.battleMode!=='individual')err('unsupported-mode');
    if(original.createdByRole==='partner_organizer'||state.createdByRole==='partner_organizer'||original.partnerContractOrderCode)err('partner-path-not-supported');
-   if(original.testMode||state.testMode||state.meta.ladderMode==='ranked'&&user.role==='staff')err('unsupported-mode');
+   // Active official staff may host ranked events, as the existing create
+   // Rules already allow. Test identities and test rooms remain excluded.
+   if(original.testMode||state.testMode)err('unsupported-mode');
    if(state.startedAt||state.bracketSize||state.matches?.length||state.players?.length||original.confirmedCount||original.waitlistCount)err('not-empty-room');
    if(mirror.cloudCode&&mirror.cloudCode!==code)err('mirror-mismatch');
    if(mirror.meta.eventAuthority!=='official'||mirror.meta.battleMode!=='individual'||mirror.meta.stations!==state.meta.stations)err('mirror-mismatch');

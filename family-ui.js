@@ -88,6 +88,12 @@ function mergeFamilyOnlineRoster(players,registrations,checkinRequired,newId){
   const stableId=old&&old.id?old.id:(r.familyPlayerId?'family_'+r.familyPlayerId:newId());
   const p={id:stableId,name,source:'online',registrationUid:guardian,registrationId:participant,checkedIn:priorChecked===null?!checkinRequired:priorChecked};
   if(r.familyPlayerId)Object.assign(p,{familyPlayerId:r.familyPlayerId,participantId:r.familyPlayerId,guardianUid:guardian});
+  // Keep canonical check-in audit fields. The QR writer restores these fields
+  // after every save; dropping them here makes an unchanged roster look dirty
+  // forever and causes unnecessary whole-room transactions.
+  for(const field of ['checkinFirstAt','checkinAt','checkinMethod']){
+   if(old&&Object.prototype.hasOwnProperty.call(old,field))p[field]=old[field];
+  }
   if(i<0)result.push(p);else result[i]=p;
  }
  return result;

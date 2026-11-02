@@ -1,0 +1,20 @@
+name: Online time title candidate
+on:
+  pull_request:
+    paths:
+      - 'online-time-titles/**'
+      - 'modules/main-app/core.js'
+      - '.github/workflows/online-time-titles.yml'
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test online-time-titles/test/*.test.cjs
+      - run: node scripts/verify-production-frontend.cjs

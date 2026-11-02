@@ -1,0 +1,34 @@
+name: Google player signup candidate
+on:
+  pull_request:
+    paths:
+      - modules/cloud/cloud-runtime.js
+      - modules/main-app/core.js
+      - tests/google-player-signup.test.cjs
+      - tests/e2e/lobby-stable-updates.spec.cjs
+      - index.html
+      - .github/workflows/google-player-signup.yml
+permissions:
+  contents: read
+jobs:
+  google:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check modules/cloud/cloud-runtime.js && node --check modules/main-app/core.js
+      - run: node --test tests/google-player-signup.test.cjs tests/profile-reminder.test.cjs tests/module-seam-contracts.test.cjs
+      - run: npm install --no-package-lock --ignore-scripts
+      - name: Shipped Google signup and profile reminder on desktop, iPhone and Android
+        run: npx playwright test --config=playwright.config.cjs tests/e2e/lobby-stable-updates.spec.cjs --grep 'Google'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: google-player-signup-browser
+          path: test-results/
+          if-no-files-found: ignore

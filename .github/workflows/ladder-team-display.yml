@@ -1,0 +1,25 @@
+name: Ladder team display
+on:
+  pull_request:
+    paths:
+      - 'modules/main-app/ladder-team-display.js'
+      - 'modules/main-app/player-cards.js'
+      - 'ladder-secondary-ui.js'
+      - 'tests/ladder-team-display*'
+      - '.github/workflows/ladder-team-display.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  display:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/ladder-team-display.test.cjs tests/ladder-ranking-ui.test.cjs tests/ladder-find-me-no-rerender.test.cjs tests/ladder-find-me-scroll.test.cjs team-foundation/team-controller.test.cjs
+      - run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: node --test tests/ladder-team-display-browser.test.cjs

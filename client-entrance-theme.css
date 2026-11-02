@@ -4379,3 +4379,29 @@ button.btn-primary,
     white-space:nowrap;
   }
 }
+
+/* Lobby cards: reserve the title row, use the space below for room metadata. */
+.lobby-compact-card .lobby-card-main{
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:10px!important;
+}
+.lobby-compact-card .lobby-room-name{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  overflow-wrap:anywhere;
+}
+.lobby-compact-card .lobby-card-right{
+  width:100%;
+  max-width:none!important;
+  min-width:0;
+  justify-content:flex-end!important;
+}
+.lobby-compact-card .lobby-room-code{
+  flex-basis:100%;
+  text-align:right;
+  color:var(--metal-dim);
+  font-size:10px;
+  line-height:1.4;
+  overflow-wrap:anywhere;
+}

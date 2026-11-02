@@ -14,6 +14,8 @@
   // Release switch: flip only after the isolated Callable source is verified
   // and systemConfig/refereeSeatsV1.autoCreateEnabled is enabled.
   const AUTO_SEAT_ROOM_CREATE_ROLLOUT = true;
+  // Source rollout stays closed until Rules, migration and real-site acceptance.
+  const FOUR_COURT_CLIENT_ROLLOUT = false;
 
   const ROOM_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 排除易混淆字元 O 0 I 1 L
   const ROOM_CODE_LENGTH = 6;
@@ -102,7 +104,7 @@
         fx = {
           doc: fsMod.doc, setDoc: fsMod.setDoc, getDoc: fsMod.getDoc, getDocFromServer: fsMod.getDocFromServer, deleteDoc: fsMod.deleteDoc,
           onSnapshot: fsMod.onSnapshot, serverTimestamp: fsMod.serverTimestamp,
-          collection: fsMod.collection, query: fsMod.query, where: fsMod.where, getDocs: fsMod.getDocs, updateDoc: fsMod.updateDoc,
+          collection: fsMod.collection, query: fsMod.query, where: fsMod.where, startAfter: fsMod.startAfter, getDocs: fsMod.getDocs, updateDoc: fsMod.updateDoc,
           runTransaction: fsMod.runTransaction, writeBatch: fsMod.writeBatch, deleteField: fsMod.deleteField,
           increment: fsMod.increment, collectionGroup: fsMod.collectionGroup, orderBy: fsMod.orderBy, limit: fsMod.limit, getCountFromServer: fsMod.getCountFromServer, or: fsMod.or
         };
@@ -124,6 +126,7 @@
           linkWithRedirect: authMod.linkWithRedirect,
           getRedirectResult: authMod.getRedirectResult,
           signInWithPopup: authMod.signInWithPopup,
+          signInWithRedirect: authMod.signInWithRedirect,
           unlink: authMod.unlink,
           browserPopupRedirectResolver: authMod.browserPopupRedirectResolver
         };
@@ -135,7 +138,9 @@
         let redirectContext = null;
         try{
           const raw = sessionStorage.getItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);
-          if(raw) redirectContext = JSON.parse(raw);
+          const playerSignInPending=sessionStorage.getItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY)==="player";
+          if(raw && !playerSignInPending) redirectContext = JSON.parse(raw);
+          else if(raw && playerSignInPending) sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);
         }catch(e){}
         if(redirectContext){
           try{
@@ -169,6 +174,20 @@
             try{sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);}catch(e){}
           }
         }
+        let signInRedirect = false;
+        try{ signInRedirect = sessionStorage.getItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY)==="player"; }catch(e){}
+        if(signInRedirect){
+          try{
+            const result=await ax.getRedirectResult(authHandle,ax.browserPopupRedirectResolver);
+            pendingGoogleSignInRedirectOutcome=result?.user
+              ? {ok:true}
+              : {ok:false,error:"沒有取得 Google 登入結果，請重新選擇 Google 帳號。"};
+          }catch(e){
+            pendingGoogleSignInRedirectOutcome={ok:false,error:googleSignInError(e)};
+          }finally{
+            try{sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);}catch(e){}
+          }
+        }
         return true;
       }catch(e){
         console.warn("BXH ARENA 雲端同步：Firebase 初始化失敗，自動退回僅本機模式。", e);
@@ -197,6 +216,17 @@
   const googleLinkProfileCache = new Map();
   const GOOGLE_LINK_REDIRECT_SESSION_KEY = "bxh_google_link_redirect_v1";
   let pendingGoogleLinkRedirectOutcome = null;
+  const GOOGLE_SIGNIN_REDIRECT_SESSION_KEY = "bxh_google_signin_redirect_v1";
+  let pendingGoogleSignInRedirectOutcome = null;
+  let googleProfileCreation = null;
+
+  function googleSignInError(e){
+    if(e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request")return "已取消 Google 登入。";
+    if(e?.code==="auth/account-exists-with-different-credential")return "此信箱已有 ARENA 帳號，請先以原帳密登入並在我的資料綁定 Google。";
+    if(e?.code==="auth/popup-blocked"||e?.code==="auth/operation-not-supported-in-this-environment")return "請使用 Safari 或 Chrome 開啟 ARENA，再使用 Google 登入。";
+    if(e?.code==="auth/permission-denied"||e?.code==="auth/internal-error")return "Google 註冊或登入暫時無法完成，請稍後再試。";
+    return "Google 登入失敗："+String(e?.code||"請稍後再試");
+  }
 
   window.cloudAuth = {
     isReady(){ return authReady; },
@@ -213,7 +243,7 @@
     getCurrentUser(){
       try{
         const u = authHandle && authHandle.currentUser;
-        return u ? { uid: u.uid, email: u.email, providers:(u.providerData||[]).map(p=>p.providerId) } : null;
+        return u ? { uid: u.uid, email: u.email, providers:(u.providerData||[]).map(p=>p.providerId), metadata:{lastSignInTime:u.metadata?.lastSignInTime||null} } : null;
       }catch(e){ return null; }
     },
 
@@ -242,6 +272,7 @@
         }catch(popupError){
           if(popupError?.code!=="auth/popup-blocked" && popupError?.code!=="auth/operation-not-supported-in-this-environment") throw popupError;
           try{
+            sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);
             sessionStorage.setItem(GOOGLE_LINK_REDIRECT_SESSION_KEY,JSON.stringify({uid,email:oldEmail}));
             await ax.linkWithRedirect(user,provider,ax.browserPopupRedirectResolver);
             return {ok:true,redirecting:true};
@@ -276,20 +307,66 @@
       }
     },
 
-    async signInWithLinkedGoogle(){
+    consumeGoogleSignInRedirectOutcome(){
+      const result=pendingGoogleSignInRedirectOutcome;
+      pendingGoogleSignInRedirectOutcome=null;
+      return result;
+    },
+
+    async signInWithGoogle(){
       if(!authReady)return {ok:false,error:"雲端服務尚未連線。"};
       try{
         const provider=new ax.GoogleAuthProvider();
         provider.setCustomParameters({prompt:"select_account"});
-        const result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
+        let result;
+        try{
+          result=await ax.signInWithPopup(authHandle,provider,ax.browserPopupRedirectResolver);
+        }catch(e){
+          if(e?.code!=="auth/popup-blocked"&&e?.code!=="auth/operation-not-supported-in-this-environment")throw e;
+          sessionStorage.removeItem(GOOGLE_LINK_REDIRECT_SESSION_KEY);
+          sessionStorage.setItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY,"player");
+          try{
+            await ax.signInWithRedirect(authHandle,provider,ax.browserPopupRedirectResolver);
+            return {ok:true,redirecting:true};
+          }catch(redirectError){
+            try{sessionStorage.removeItem(GOOGLE_SIGNIN_REDIRECT_SESSION_KEY);}catch(e){}
+            throw redirectError;
+          }
+        }
         if(!result.user.providerData.some(p=>p.providerId==="google.com"))throw Error("google-provider-missing");
         return {ok:true,uid:result.user.uid};
       }catch(e){
-        if(e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request")return {ok:false,error:"已取消 Google 登入。"};
-        if(e?.code==="auth/permission-denied"||e?.code==="auth/internal-error")return {ok:false,error:"此 Google 帳號尚未綁定 ARENA；請先用原帳密登入並完成綁定。"};
-        if(e?.code==="auth/account-exists-with-different-credential")return {ok:false,error:"請先以原帳密登入，並在我的資料綁定 Google 帳號。"};
-        return {ok:false,error:"Google 登入失敗："+String(e?.code||"請稍後再試")};
+        return {ok:false,error:googleSignInError(e)};
       }
+    },
+
+    // Compatibility for retained callers; identity routing stays in onAuthChange.
+    signInWithLinkedGoogle(){ return this.signInWithGoogle(); },
+
+    async ensureGooglePlayerProfile(expectedUid){
+      const user=authHandle?.currentUser;
+      if(!authReady||!expectedUid||user?.uid!==expectedUid||!user.providerData?.some(p=>p.providerId==="google.com"))
+        return {ok:false,error:"Google 登入狀態已變更，請重新登入。"};
+      if(googleProfileCreation?.user===user)return googleProfileCreation.promise;
+      const promise=(async()=>{
+        try{
+          if(!functionsHandle||!fnx)throw Error("functions-unavailable");
+          const ensure=fnx.httpsCallable(functionsHandle,"ensureGooglePlayerProfile",{timeout:30000});
+          const result=await ensure({});
+          if(authHandle.currentUser!==user||result.data?.ok!==true||result.data?.uid!==expectedUid)throw Error("stale-google-session");
+          const snapshot=await fx.getDocFromServer(fx.doc(dbHandle,USERS_COLLECTION,expectedUid));
+          if(authHandle.currentUser!==user||!snapshot.exists())throw Error("google-profile-not-confirmed");
+          const profile=snapshot.data();
+          googleLinkProfileCache.set(expectedUid,{profile,loadedAt:Date.now()});
+          return {ok:true,profile,created:result.data.created===true};
+        }catch(e){
+          const collision=e?.code==="functions/already-exists";
+          return {ok:false,error:collision?"此信箱已有 ARENA 資料，請先以原帳密登入並綁定 Google。":"建立玩家資料暫時失敗，請按重新驗證後再試。"};
+        }
+      })();
+      googleProfileCreation={user,promise};
+      try{return await promise;}
+      finally{if(googleProfileCreation?.promise===promise)googleProfileCreation=null;}
     },
 
     async hasSuperAdmin(){
@@ -813,7 +890,7 @@
     if(!allowAnonymous&&(!authReady || !authHandle || !authHandle.currentUser)) throw new Error("auth-required");
     if(!functionsHandle || !fnx) throw new Error("service-unavailable");
     try{
-      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload'].includes(name)){
+      if(['hunterClashCommand','manageOnsiteWaitlist','tournamentCheckin','adminOverrideCheckin','adminOverrideRoster','adminRecoverOnsiteWaitlist','teamPreviewRead','teamRead','teamCommand','teamEmblemUpload','ladderTeamDisplay'].includes(name)){
         const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);
         if(!verified){const err=new Error('網站驗證未完成，請重新嘗試。');err.code='functions/permission-denied';err.details={reason:'app-check-unavailable'};throw err;}
         if(epoch!==engagementSessionEpoch || uid!==(firebaseUser&&firebaseUser.uid)) throw new Error('stale-session');
@@ -828,6 +905,27 @@
       const normalized=raw.includes("feature-disabled")?"feature-disabled":raw.includes("title-not-earned")?"title-not-earned":raw||"request-failed";
       const err=new Error(normalized); err.code=String((e&&e.code)||"functions/unknown"); err.details=e&&e.details; throw err;
     }
+  }
+  let playerRegistrationFeedback=null;
+  function getPlayerRegistrationFeedback(){
+    if(!window.BXHRegistrationFeedback)return null;
+    if(!playerRegistrationFeedback){
+      let storage=null;try{storage=window.localStorage;}catch{}
+      let draw=()=>{};
+      playerRegistrationFeedback=window.BXHRegistrationFeedback.create({
+        getUid:()=>authReady&&authHandle?.currentUser?.uid===firebaseUser?.uid?firebaseUser?.uid:null,
+        storage,visible:()=>!document.hidden,
+        read:code=>window.engagementService.familyRegistration({action:'mine',code}),
+        retry:request=>window.engagementService.familyRegistration(request),
+        onChange:rows=>draw(rows),
+        onRecovered:({code})=>window.dispatchEvent(new CustomEvent('bxh-registration-recovered',{detail:{code}}))
+      });
+      draw=window.BXHRegistrationFeedback.mount(playerRegistrationFeedback,document);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)playerRegistrationFeedback.resume();});
+      window.addEventListener('online',()=>playerRegistrationFeedback.resume());
+      window.addEventListener('storage',event=>{if(event.key?.startsWith(window.BXHRegistrationFeedback.PREFIX))playerRegistrationFeedback.restore(true);});
+    }
+    return playerRegistrationFeedback;
   }
   function runMyEventsPlayerOperation(route,code,send){
     if(window.BXH_MY_EVENTS_PLAYER_READ_SLICE!==true)return send(crypto.randomUUID());
@@ -847,7 +945,10 @@
     connectionInfo(){return {projectId:FIREBASE_CONFIG.projectId||'未設定',region:'asia-east1',signedIn:!!(authHandle&&authHandle.currentUser),sdkReady:!!fnx};},
     async changeManagedAccounts(payload){return callEngagementFunction("changeManagedAccounts",payload,30000);},
     async tournamentOperation(name,payload){return callEngagementFunction(name,payload,30000);},
+    async ladderTeamDisplay(payload){return callEngagementFunction("ladderTeamDisplay",payload,15000,payload?.action==="teams");},
     async playerCard(payload){return callEngagementFunction("playerCardService",payload,120000);},
+    async refereePublicSummary(payload){return callEngagementFunction("refereeCertificatePublicSummary",payload,15000);},
+    async refereeLicense(payload){return callEngagementFunction("refereeCertificateService",payload,60000);},
     async hunterOpponentIdentity(payload){return callEngagementFunction("hunterOpponentIdentity",payload,30000);},
     async health(){return callEngagementFunction('getEngagementHealth',{});},
     async presence(payload){return callEngagementFunction("onlinePresence",payload,15000);},
@@ -885,6 +986,7 @@
     async getSnapshot(){ return callEngagementFunction("getEngagementSnapshot",{}); },
     async syncHunterAchievements(){ return callEngagementFunction("syncHunterAchievements",{},120000); },
     async syncHunterLicenseV21(){ return callEngagementFunction("syncHunterLicenseV21",{},120000); },
+    async readMyNumberIdentity(){ return callEngagementFunction("readMyNumberIdentity",{},30000); },
     async dailyCheckIn(){ return callEngagementFunction("dailyCheckIn",{}); },
     async setTitlePreferences(payload){ return callEngagementFunction("setTitlePreferences",payload); },
     async seedInitialTitles(){ return callEngagementFunction("seedInitialTitles",{}); },
@@ -1107,6 +1209,21 @@
   function cloudNextSeasonId(cur){ const m=String(cur||"S1").match(/^(?:S)?(\d+)$/i); return "S"+((m?parseInt(m[1],10):1)+1); }
   function cloudSafeTimestampMs(v){ try{ if(v&&typeof v.toMillis==="function") return v.toMillis(); }catch(e){} return typeof v==="number"?v:0; }
 
+  let fourCourtLifecycle = null;
+  function reportFourCourtStatus(detail){
+    window.dispatchEvent(new CustomEvent('bxh-four-court-status',{detail}));
+  }
+  function getFourCourtLifecycle(){
+    if(!fourCourtLifecycle&&window.BXHFourCourtLifecycle&&authReady&&dbHandle){
+      fourCourtLifecycle=window.BXHFourCourtLifecycle.create({enabled:FOUR_COURT_CLIENT_ROLLOUT,auth:authHandle,authApi:ax,
+        sessionOptions:{db:dbHandle,fs:fx,functions:functionsHandle,functionsApi:fnx},ensureAppCheck:ensureHunterClashAppCheck,onStatus:reportFourCourtStatus});
+    }
+    return fourCourtLifecycle;
+  }
+
+  window.addEventListener('pagehide',()=>fourCourtLifecycle?.suspend());
+  window.addEventListener('pageshow',()=>fourCourtLifecycle?.resume());
+
   window.cloudSync = {
     async connect(){ return await tryInitFirebase(); },
     isConfigured(){ return isConfigPresent(); },
@@ -1278,8 +1395,11 @@
     async joinTournamentAsPlayer(code,childEligibilityConfirmed,participantMode="self"){
       const uid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
       if(!uid)throw{code:"auth-required"};
+      const feedback=getPlayerRegistrationFeedback();
+      const submit=async progress=>{
+      const assertCurrent=()=>{progress?.assertCurrent();if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');};
       const selectionDoc=await fx.getDoc(fx.doc(dbHandle,"publicTournaments",code));
-      if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
+      assertCurrent();
       if(selectionDoc.exists()&&selectionDoc.data().roomAccessMode==="password"){
         const access=await window.engagementService.roomAccess({action:"status",code});
         if(!access?.hasAccess)throw Error("room-password-required");
@@ -1287,14 +1407,20 @@
       const mode=participantMode==='children'?'children':'self';
       if(selectionDoc.exists()&&selectionDoc.data().registrationSelection){
         if(mode==='children')throw Error('child-registration-unavailable');
+        assertCurrent();progress?.submitting([uid]);
         return window.engagementService.lotteryRegistration({code,action:'join',childEligibilityConfirmed});
       }
       const selection=await chooseFamilyParticipant(selectionDoc.exists()?selectionDoc.data():{},code,childEligibilityConfirmed,mode);
-      if(authHandle?.currentUser?.uid!==uid)throw Error('auth-required');
+      assertCurrent();
       const request=JSON.parse(JSON.stringify({action:'join',code,childIds:selection.childIds,allocation:selection.allocation,childEligibilityConfirmed:childEligibilityConfirmed===true}));
-      if(selectionDoc.exists()&&selectionDoc.data().battleMode==='team')return window.engagementService.familyRegistration({...request,operationId:crypto.randomUUID()});
-      return runMyEventsPlayerOperation('family',code,operationId=>window.engagementService.familyRegistration({...request,operationId}));
+      const send=operationId=>{assertCurrent();const payload={...request,operationId};progress?.submitting(selection.childIds.map(id=>id===null?uid:'family_'+id),payload);return window.engagementService.familyRegistration(payload);};
+      if(selectionDoc.exists()&&selectionDoc.data().battleMode==='team')return send(crypto.randomUUID());
+      return runMyEventsPlayerOperation('family',code,send);
+      };
+      return feedback?feedback.run(code,submit):submit(null);
     },
+
+    restoreRegistrationFeedback(){getPlayerRegistrationFeedback()?.restore();},
 
     async cancelRegistrationAsPlayer(code){
       const uid = (authReady && authHandle && authHandle.currentUser) ? authHandle.currentUser.uid : null;
@@ -1435,6 +1561,31 @@
       return Object.assign({},result,{state:remoteState,verified:true});
     },
 
+    async readRegistrationRosterRecovery(code,registrationId){
+      const actor=authHandle?.currentUser?.uid;
+      if(!authReady||!actor)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
+      const eventCode=String(code||"").toUpperCase(),regId=String(registrationId||"");
+      if(!/^BXH-[A-Z0-9]{4,16}$/.test(eventCode)||!/^[A-Za-z0-9_-]{1,128}$/.test(regId))throw Error("invalid-request");
+      // A read-only transaction requires a server connection and one consistent
+      // snapshot. Cached or partially updated reads cannot resolve an unknown send.
+      const result=await fx.runTransaction(dbHandle,async tx=>{
+        const [ts,ps,rs]=await Promise.all([
+          tx.get(fx.doc(dbHandle,"tournaments",eventCode)),
+          tx.get(fx.doc(dbHandle,"publicTournaments",eventCode)),
+          tx.get(fx.doc(dbHandle,"tournaments",eventCode,"registrations",regId))
+        ]);
+        if(!ts.exists()||!ps.exists()||!rs.exists())throw Error("not-found");
+        const t=ts.data(),p=ps.data(),reg=rs.data();
+        let runtime,mirror;try{runtime=JSON.parse(t.data);mirror=JSON.parse(p.bracketView);}catch{throw Error("corrupt-state");}
+        const countsAgree=Number.isSafeInteger(t.confirmedCount)&&t.confirmedCount>=0&&Number.isSafeInteger(t.waitlistCount)&&t.waitlistCount>=0&&t.confirmedCount===p.confirmedCount&&t.waitlistCount===p.waitlistCount&&t.capacity===p.capacity;
+        const candidate=(runtime.players||[]).find(row=>String(row.registrationId||"")===regId);
+        const publicCandidate=!!candidate&&(mirror.players||[]).some(row=>String(row.id)===String(candidate.id));
+        const blocked=t.systemClosed||p.systemClosed||t.eventCancelled||p.eventCancelled||runtime.meta?.eventCancelled||runtime.startedAt||runtime.bracketSize||t.archiveStatus==="completed"||p.archiveStatus==="completed"||runtime.archiveStatus==="completed"||t.tournamentPhase!=="waiting"||p.tournamentPhase!=="waiting"||t.registrationSelection||p.registrationSelection||t.onsiteWaitlistServerOwned||p.onsiteWaitlistServerOwned||runtime.entrySelection?.mode==="registration";
+        return {state:runtime,registrationId:regId,status:reg.status,confirmedCount:t.confirmedCount,waitlistCount:t.waitlistCount,capacity:t.capacity,countsAgree,achieved:countsAgree&&reg.status==="confirmed"&&publicCandidate,retryable:countsAgree&&reg.status==="waitlist"&&!blocked,registrationChanges:[{registrationId:regId,status:reg.status}]};
+      });
+      if(actor!==authHandle?.currentUser?.uid)throw Error("stale-session");
+      return result;
+    },
     async mutateRegistrationRoster(code,registrationId,action,options={}){
       const staffUid=(authReady&&authHandle&&authHandle.currentUser)?authHandle.currentUser.uid:null;
       if(!staffUid)throw Object.assign(new Error("auth-required"),{code:"auth-required"});
@@ -1454,6 +1605,21 @@
         const [tourSnap,pubSnap]=await Promise.all([fx.getDoc(tourRef),fx.getDoc(pubRef)]);
         if(tourSnap.exists()&&pubSnap.exists()){
           const tour=tourSnap.data()||{},pub=pubSnap.data()||{};
+          if(tour.refereeSeatsV1?.version===1&&tour.eventAuthority==="official"&&tour.createdByRole!=="partner_organizer"&&tour.battleMode!=="team"&&pub.battleMode!=="team"){
+            // Seat Rules intentionally forbid non-creator browser runtime writes.
+            // Send intent only; the trusted transaction owns roster/counter changes.
+            try{
+              const result=await callEngagementFunction("promoteSeatedRegistration",{code:eventCode,registrationId:regId,expandBy,operationId:options.operationId||crypto.randomUUID()},60000);
+              if(result?.ok!==true||result?.verified!==true||!result.state)throw Object.assign(new Error("roster-sync-mismatch"),{code:"roster-sync-mismatch"});
+              return result;
+            }catch(error){
+              const reason=String(error?.message||"");
+              for(const domain of ["capacity-full","not-waitlist","bracket-locked","selection-managed","onsite-waitlist-managed","registration-state-conflict","qr-checkin-stale","court-lifecycle-stale","operation-outdated"]){
+                if(reason.includes(domain)){error.code=domain;break;}
+              }
+              throw error;
+            }
+          }
           unlimitedPromotion=tour.eventAuthority==="community"&&tour.communityQuickRegistration===true&&tour.capacity===null&&pub.eventAuthority==="community"&&pub.communityQuickRegistration===true&&pub.capacity===null;
         }
         if(unlimitedPromotion&&expandBy!==0)throw Object.assign(new Error("invalid-capacity-step"),{code:"invalid-capacity-step"});
@@ -1461,7 +1627,7 @@
       // Unlimited promotions use the existing staff/admin-only trusted service.
       // The common server read-back below still verifies roster + both mirrors.
       const txResult=unlimitedPromotion
-        ?await callEngagementFunction("registrationRosterService",{action:"promote",code:eventCode,registrationId:regId,intent:"admin",operationId:crypto.randomUUID()},60000)
+        ?await callEngagementFunction("registrationRosterService",{action:"promote",code:eventCode,registrationId:regId,intent:"admin",operationId:options.operationId||crypto.randomUUID()},60000)
         :await fx.runTransaction(dbHandle,async tx=>{
         const tourSnap=await tx.get(tourRef);
         const pubSnap=await tx.get(pubRef);
@@ -2016,12 +2182,91 @@
       const partnerGrant=partnerSession?partnerOrganizerGrant():null;
       const partnerOrderCode=partnerGrant?.orderCode||partnerGrant?.contractOrderCode||userProfile?.partnerContractOrderCode||null;
       if(partnerGrant?.scope==="contract"&&!partnerOrderCode) throw new Error("partner-order-missing");
-      let docs=[];
+      // Progressive reads are opt-in so history's existing API remains unchanged.
+      // Default document-ID ordering includes legacy rooms without date fields.
+      const options=arguments[0]||{};
+      const progressive=typeof options.onPage==="function";
+      const read=(work,stage)=>progressive&&options.read?options.read(work,stage):work;
+      const check=()=>{
+        if(progressive&&options.shouldContinue&&!options.shouldContinue()){
+          throw Object.assign(new Error("admin-list-cancelled"),{code:"admin-list-cancelled"});
+        }
+      };
+      const toItems=docs=>{
+        const items = [];
+        docs.forEach(docSnap=>{
+          const d = docSnap.data() || {};
+          let savedState=null;
+          try{savedState=typeof d.data==="string"?JSON.parse(d.data):d.data;}catch(e){}
+          if(partnerSession&&(d.eventAuthority!=="official"||d.createdBy!==actorUid||d.createdByRole!=="partner_organizer"
+            ||d.partnerOrganizationCode!==partnerGrant.organizationId||(d.partnerContractOrderCode??null)!==partnerOrderCode))return;
+          if(eventStaffSession&&!((d.eventStaffAssignments||{})[actorUid]?.status==="accepted"))return;
+          items.push({
+            code: docSnap.id,
+            name: d.name || "",
+            eventDate: d.eventDate || "",
+            startAt: d.startAt || "",
+            location: d.location || "",
+            posterUrl: typeof d.posterUrl==="string" ? d.posterUrl : "",
+            battleMode:(d.battleMode||(savedState&&savedState.meta&&savedState.meta.battleMode))==="team"?"team":"individual",
+            teamSize:Math.max(3,Number(d.teamSize||(savedState&&savedState.meta&&savedState.meta.teamSize))||3),
+            formatType: d.formatType || "",
+            ladderMode: d.ladderMode === "ranked" ? "ranked" : "general",
+            testLadderEnabled: d.testLadderEnabled===true || savedState?.testLadderEnabled===true,
+            ladderPointsAwarded: d.ladderPointsAwarded === true,
+            ladderSeasonId: d.ladderSeasonId || null,
+            ladderSkippedPlayers: Array.isArray(d.ladderSkippedPlayers) ? d.ladderSkippedPlayers : [],
+            systemClosed:d.systemClosed===true,
+            systemClosure:d.systemClosure||null,
+            tournamentPhase: savedState?computeTournamentPhase(savedState):(d.tournamentPhase || "waiting"),
+            archiveStatus: d.archiveStatus || "ongoing",
+            registrationSelection:d.registrationSelection||null,registeredCount:Number(d.registeredCount||0),
+            registrationEnabled: !!d.registrationEnabled,
+            registrationStatus: d.registrationStatus || "",
+            communityQuickRegistration:d.eventAuthority==="community"&&d.communityQuickRegistration===true,
+            communityParticipantCount:d.communityParticipantCount,
+            capacity: d.eventAuthority==="community"&&d.communityQuickRegistration===true?d.capacity:(d.capacity||0),
+            confirmedCount: d.confirmedCount || 0,
+            waitlistEnabled: !!d.waitlistEnabled,
+            waitlistCapacity: d.waitlistCapacity || 0,
+            waitlistCount: d.waitlistCount || 0,
+            updatedAt: d.updatedAt || 0,
+            visibility: d.visibility || "private",
+            createdBy: d.createdBy || "",
+            createdByName: d.createdByName || "",
+            eventAuthority: d.eventAuthority || "official",
+            ownerUid: d.ownerUid || null,
+            partnerOrganizationCode:d.partnerOrganizationCode||null,
+            partnerContractOrderCode:d.partnerContractOrderCode||null,
+            expiresAt: d.expiresAt || null,
+            testMode: d.testMode===true,
+            testLabel: d.testLabel||null,
+            createdByRole: d.createdByRole||null,
+            testCreatedAt: d.testCreatedAt||null,
+            testExpiresAt: d.testExpiresAt||d.expiresAt||null
+          });
+        });
+        return items.sort((a,b)=>{
+          const ad = String(a.eventDate||""), bd = String(b.eventDate||"");
+          if(ad!==bd) return ad<bd ? 1 : -1;
+          return Number(b.updatedAt||0)-Number(a.updatedAt||0);
+        });
+      };
       if(eventStaffSession){
-        const access=await window.engagementService.eventStaff({action:"listMine"});
-        const codes=(access?.assignments||[]).filter(item=>item.status==="accepted"&&item.effective===true).map(item=>item.eventCode);
-        docs=(await Promise.all(codes.map(code=>fx.getDoc(fx.doc(dbHandle,"tournaments",code))))).filter(snap=>snap.exists());
-      }else{
+        const access=await read(window.engagementService.eventStaff({action:"listMine"}),"assignments");
+        check();
+        const codes=[...new Set((access?.assignments||[]).filter(item=>item.status==="accepted"&&item.effective===true).map(item=>item.eventCode))];
+        const batchSize=progressive?20:Math.max(1,codes.length);
+        let rows=[];
+        for(let offset=0;offset<codes.length;offset+=batchSize){
+          check();
+          const batch=await read(Promise.all(codes.slice(offset,offset+batchSize).map(code=>fx.getDoc(fx.doc(dbHandle,"tournaments",code)))),"query");
+          check();
+          rows.push(...toItems(batch.filter(snap=>snap.exists())));
+          if(progressive) options.onPage(sortItems(rows));
+        }
+        return sortItems(rows);
+      }
         const source=testerSession
           ? fx.query(fx.collection(dbHandle,"tournaments"),fx.where("createdBy","==",actorUid),fx.where("eventAuthority","==","test"))
           : partnerSession
@@ -2030,66 +2275,28 @@
                 fx.where("eventAuthority","==","official"),fx.where("partnerOrganizationCode","==",partnerGrant.organizationId),
                 fx.where("partnerContractOrderCode","==",partnerOrderCode))
             : fx.collection(dbHandle,"tournaments");
-        docs=(await fx.getDocs(source)).docs;
+
+      if(!progressive) return toItems((await fx.getDocs(source)).docs);
+      let cursor=null,rows=[];
+      for(;;){
+        check();
+        const constraints=[fx.limit(20)];
+        if(cursor) constraints.push(fx.startAfter(cursor));
+        const snapshot=await read(fx.getDocs(fx.query(source,...constraints)),"query");
+        check();
+        const docs=snapshot.docs;
+        rows.push(...toItems(docs));
+        options.onPage(sortItems(rows));
+        if(docs.length<20) break;
+        cursor=docs[docs.length-1];
       }
-      const items = [];
-      docs.forEach(docSnap=>{
-        const d = docSnap.data() || {};
-        let savedState=null;
-        try{savedState=typeof d.data==="string"?JSON.parse(d.data):d.data;}catch(e){}
-        if(partnerSession&&(d.eventAuthority!=="official"||d.createdBy!==actorUid||d.createdByRole!=="partner_organizer"
-          ||d.partnerOrganizationCode!==partnerGrant.organizationId||(d.partnerContractOrderCode??null)!==partnerOrderCode))return;
-        if(eventStaffSession&&!((d.eventStaffAssignments||{})[actorUid]?.status==="accepted"))return;
-        items.push({
-          code: docSnap.id,
-          name: d.name || "",
-          eventDate: d.eventDate || "",
-          startAt: d.startAt || "",
-          location: d.location || "",
-          posterUrl: typeof d.posterUrl==="string" ? d.posterUrl : "",
-          battleMode:(d.battleMode||(savedState&&savedState.meta&&savedState.meta.battleMode))==="team"?"team":"individual",
-          teamSize:Math.max(3,Number(d.teamSize||(savedState&&savedState.meta&&savedState.meta.teamSize))||3),
-          formatType: d.formatType || "",
-          ladderMode: d.ladderMode === "ranked" ? "ranked" : "general",
-          testLadderEnabled: d.testLadderEnabled===true || savedState?.testLadderEnabled===true,
-          ladderPointsAwarded: d.ladderPointsAwarded === true,
-          ladderSeasonId: d.ladderSeasonId || null,
-          ladderSkippedPlayers: Array.isArray(d.ladderSkippedPlayers) ? d.ladderSkippedPlayers : [],
-          systemClosed:d.systemClosed===true,
-          systemClosure:d.systemClosure||null,
-          tournamentPhase: savedState?computeTournamentPhase(savedState):(d.tournamentPhase || "waiting"),
-          archiveStatus: d.archiveStatus || "ongoing",
-          registrationSelection:d.registrationSelection||null,registeredCount:Number(d.registeredCount||0),
-          registrationEnabled: !!d.registrationEnabled,
-          registrationStatus: d.registrationStatus || "",
-          communityQuickRegistration:d.eventAuthority==="community"&&d.communityQuickRegistration===true,
-          communityParticipantCount:d.communityParticipantCount,
-          capacity: d.eventAuthority==="community"&&d.communityQuickRegistration===true?d.capacity:(d.capacity||0),
-          confirmedCount: d.confirmedCount || 0,
-          waitlistEnabled: !!d.waitlistEnabled,
-          waitlistCapacity: d.waitlistCapacity || 0,
-          waitlistCount: d.waitlistCount || 0,
-          updatedAt: d.updatedAt || 0,
-          visibility: d.visibility || "private",
-          createdBy: d.createdBy || "",
-          createdByName: d.createdByName || "",
-          eventAuthority: d.eventAuthority || "official",
-          ownerUid: d.ownerUid || null,
-          partnerOrganizationCode:d.partnerOrganizationCode||null,
-          partnerContractOrderCode:d.partnerContractOrderCode||null,
-          expiresAt: d.expiresAt || null,
-          testMode: d.testMode===true,
-          testLabel: d.testLabel||null,
-          createdByRole: d.createdByRole||null,
-          testCreatedAt: d.testCreatedAt||null,
-          testExpiresAt: d.testExpiresAt||d.expiresAt||null
+      return sortItems(rows);
+      function sortItems(items){
+        return [...items].sort((a,b)=>{
+          const ad=String(a.eventDate||""),bd=String(b.eventDate||"");
+          return ad!==bd?(ad<bd?1:-1):Number(b.updatedAt||0)-Number(a.updatedAt||0);
         });
-      });
-      return items.sort((a,b)=>{
-        const ad = String(a.eventDate||""), bd = String(b.eventDate||"");
-        if(ad!==bd) return ad<bd ? 1 : -1;
-        return Number(b.updatedAt||0)-Number(a.updatedAt||0);
-      });
+      }
     },
 
     // Names are optional display enrichment, never a prerequisite for rooms.
@@ -2111,6 +2318,12 @@
       }));
       return rows.map(item=>!String(item.createdByName||"").trim()&&names[item.createdBy]
         ? {...item,createdByName:names[item.createdBy]} : item);
+    },
+
+    // One explicit request returns five projected summaries. Never fall back to
+    // downloading full tournament documents if the new backend is unavailable.
+    async queryAdminTournamentSummaries(payload){
+      return callEngagementFunction("listManagementTournamentSummaries",payload,10000);
     },
 
     // v13.13.4：玩家「已報名」改為「先列出公開賽事，再逐場 get 自己的 registration」。
@@ -2387,6 +2600,9 @@
 
     // 管理端讀取完整 registration 文件；僅限 Rules 已授權的賽事管理者，
     // 因文件含聯絡資料，不可拿來實作「全體正式工作人員只看姓名」。
+    async readStaffRegistrationRoster(code){
+      return callEngagementFunction('readStaffRegistrationRoster',{code:String(code||'').trim().toUpperCase()},30000);
+    },
     async listRegistrationsForAdmin(code){
       const q = fx.collection(dbHandle, "tournaments", code, "registrations");
       const snap = await fx.getDocs(q);
@@ -2591,6 +2807,7 @@
     },
 
     async createRoom(data){
+      if(typeof window!=="undefined")window.__BXH_LAST_ROOM_CREATE_REASON=null;
       if(!cloudEnabled) return null;
       try{
         // Generate the code locally. Do not preflight-read tournaments/{code}:
@@ -2708,8 +2925,28 @@
           partnerOrganizationCode:partnerGrant.organizationId,
           partnerContractOrderCode:data.partnerContractOrderCode
         }:{};
+        // Saving a new draft preallocates idle courts. They are UI placeholders,
+        // not dispatch history: omit only strictly inert slots from the paired
+        // create payload, which the trusted new-room endpoint requires empty.
+        // Never erase active, locked, malformed or unknown court data.
+        const initialCourts=data.courtAssignments;
+        const inertCourtKeys=new Set(['currentMatchId','nextMatchId','status','lockedBy','lockedAt','updatedAt']);
+        const emptyNewOfficialRoom=!partnerSession&&!testerSession&&m.eventAuthority==='official'&&m.battleMode!=='team'&&m.playMode!=='enchantment'
+          &&Array.isArray(data.players)&&data.players.length===0&&Array.isArray(data.matches)&&data.matches.length===0
+          &&(!data.teams||(Array.isArray(data.teams)&&data.teams.length===0))
+          &&!data.startedAt&&!data.completedAt&&!data.archivedAt&&!data.bracketSize
+          &&(!data.archiveStatus||data.archiveStatus==='ongoing');
+        const onlyIdleCourts=initialCourts&&typeof initialCourts==='object'&&!Array.isArray(initialCourts)
+          &&Object.entries(initialCourts).every(([key,c])=>{
+            const match=/^court([1-9][0-9]*)$/.exec(key);
+            return match&&Number(match[1])<=Number(m.stations||1)&&c&&typeof c==='object'&&!Array.isArray(c)
+              &&Object.keys(c).every(k=>inertCourtKeys.has(k))&&c.status==='idle'
+              &&c.currentMatchId==null&&c.nextMatchId==null&&c.lockedBy==null&&c.lockedAt==null
+              &&(c.updatedAt==null||(Number.isFinite(c.updatedAt)&&c.updatedAt>=0));
+          });
+        const createData=emptyNewOfficialRoom&&onlyIdleCourts?Object.assign({},data,{courtAssignments:{}}):data;
         const privatePayload=Object.assign({
-          data: JSON.stringify(data),
+          data: JSON.stringify(createData),
           updatedAt: Date.now(),
           visibility: lobbyVisibility,
           createdBy: currentUserUidForWrites(),
@@ -2721,7 +2958,7 @@
           ladderSeasonId: (data && data.ladderSeasonId) || null
         }, registrationFields, testFields, partnerPrivate);
         const publicPayload=Object.assign({
-          bracketView: JSON.stringify(buildPublicMirrorFields(data)),
+          bracketView: JSON.stringify(buildPublicMirrorFields(createData)),
           updatedAt: Date.now(),
           visibility: lobbyVisibility
         }, publicRegistrationFields, testFields);
@@ -2775,6 +3012,10 @@
         return code;
       }catch(e){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||"unknown";
+        // Keep only known service reasons for user-facing diagnostics. Never
+        // display arbitrary SDK messages, request payloads or server details.
+        const knownReasons=['unsupported-mode','auto-create-not-enabled','release-not-ready','auto-seat-create-unavailable','room-code-conflict','mirror-mismatch','not-empty-room','protected-create-field','unverified-staff-assignment','legacy-assignments-exist'];
+        if(typeof window!=="undefined")window.__BXH_LAST_ROOM_CREATE_REASON=knownReasons.includes(e?.message)?e.message:null;
         console.warn("建立雲端賽事代碼失敗", e);
         return null;
       }
@@ -2793,10 +3034,20 @@
     // possible instead of both cases throwing the same opaque error).
     async joinRoom(code){
       if(!cloudEnabled || !code) return { ok:false, reason:"network" };
+      const options=arguments[1]||{};
       try{
-        const snap = await fx.getDoc(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()));
+        const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
+        // An explicit roster recovery must not silently fall back to cached data.
+        if(options.serverOnly===true&&!fx.getDocFromServer)return {ok:false,reason:"network"};
+        const snap = options.serverOnly===true?await fx.getDocFromServer(ref):await fx.getDoc(ref);
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
+        if(Object.hasOwn(d,'scoreStorage')){
+          const confirmed=options.serverOnly===true?snap:await fx.getDocFromServer(ref);
+          if(!confirmed.exists()||!Object.hasOwn(confirmed.data(),'scoreStorage'))return {ok:false,reason:'not-synchronized'};
+          const lifecycle=getFourCourtLifecycle();
+          return lifecycle?await lifecycle.read(String(code).toUpperCase(),confirmed.data().scoreStorage||{}):{ok:false,reason:'bucket-client-disabled'};
+        }
         const parsed = JSON.parse(d.data);
         if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
         if(d.ladderPointsAwarded===true) parsed.ladderPointsAwarded=true;
@@ -2975,6 +3226,47 @@
       }catch(e){window.__BXH_COMMUNITY_SUMMARY_STATUS[normalized]={ok:false};throw e;}
     },
 
+    async adminRecoverOnsiteWaitlist(payload){
+      return callEngagementFunction('adminRecoverOnsiteWaitlist',payload,60000);
+    },
+    async readAdminOnsiteRecoveryFromServer(code){
+      if(!cloudEnabled||!fx.getDocFromServer)return {ok:false};
+      try{
+        const normalized=String(code).toUpperCase();
+        const [a,b]=await Promise.all([fx.getDocFromServer(fx.doc(dbHandle,'tournaments',normalized)),fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',normalized))]);
+        if(!a.exists()||!b.exists())return {ok:false};const t=a.data(),p=b.data(),data=JSON.parse(t.data),publicData=JSON.parse(p.bracketView);
+        for(const k of ['createdBy','ownerUid','createdByRole'])if(t[k])data[k]=t[k];data.cloudCode=normalized;
+        const counts=x=>({capacity:x.capacity,confirmedCount:x.confirmedCount,waitlistCount:x.waitlistCount});
+        return {ok:true,data,publicData,counts:{private:counts(t),public:counts(p)},versions:{
+          privateOwned:t.onsiteWaitlistServerOwned===true,publicOwned:p.onsiteWaitlistServerOwned===true,stateOwned:data.onsiteWaitlistServerOwned===true,viewOwned:publicData.onsiteWaitlistServerOwned===true,
+          privateRuntime:t.onsiteWaitlistRuntimeRevision,publicRuntime:p.onsiteWaitlistRuntimeRevision,stateRuntime:data.onsiteWaitlistRuntimeRevision,viewRuntime:publicData.onsiteWaitlistRuntimeRevision,
+          drawRevision:t.onsiteWaitlistDraw?.revision,stateDrawRevision:data.onsiteWaitlistDrawRevision,qrManaged:t.qrCheckinManaged===true,publicQrManaged:p.qrCheckinManaged===true,privateQr:t.qrCheckinRevision,publicQr:p.qrCheckinRevision}};
+      }catch{return {ok:false};}
+    },
+
+    async adminOverrideRoster(payload){
+      return callEngagementFunction('adminOverrideRoster',payload,60000);
+    },
+    async readAdminRosterFromServer(payload){
+      if(!cloudEnabled||!fx.getDocFromServer)return {ok:false};
+      try{
+        const code=String(payload.code).toUpperCase();
+        const [privateSnap,publicSnap,regSnap]=await Promise.all([
+          fx.getDocFromServer(fx.doc(dbHandle,'tournaments',code)),
+          fx.getDocFromServer(fx.doc(dbHandle,'publicTournaments',code)),
+          payload.registrationId?fx.getDocFromServer(fx.doc(dbHandle,'tournaments',code,'registrations',payload.registrationId)):null
+        ]);
+        if(!privateSnap.exists()||!publicSnap.exists())return {ok:false};
+        const a=privateSnap.data(),b=publicSnap.data(),data=JSON.parse(a.data),publicData=JSON.parse(b.bracketView);
+        for(const k of ['createdBy','ownerUid','createdByRole'])if(a[k])data[k]=a[k];data.cloudCode=code;
+        const counts=x=>({capacity:x.capacity,confirmedCount:x.confirmedCount,waitlistCount:x.waitlistCount});
+        return {ok:true,data,publicData,registration:regSnap?.exists()?regSnap.data():null,counts:{private:counts(a),public:counts(b)},fences:{privateQr:a.qrCheckinRevision,publicQr:b.qrCheckinRevision}};
+      }catch{return {ok:false};}
+    },
+    async adminOverrideCheckin(payload){
+      return callEngagementFunction('adminOverrideCheckin',payload,30000);
+    },
+
     async readBracketFromServer(code){
       if(!cloudEnabled||!fx.getDocFromServer)return {ok:false};
       try{
@@ -3111,6 +3403,8 @@ if(testerSession){
         let syncSummary=community&&m.communityQuickRegistration===true&&options.syncCommunitySummary===true;
         await fx.runTransaction(dbHandle,async tx=>{
           const ref=fx.doc(dbHandle,"tournaments",normalized),snap=await tx.get(ref);
+          const overrideProfile=options.adminOperationalOverride
+            ?await tx.get(fx.doc(dbHandle,USERS_COLLECTION,actorUid)):null;
           if(snap.exists()){
             const remoteDoc=snap.data()||{};
             if(Number(remoteDoc.callRevision||0)!==Number(data.callRevision||0)) throw new Error("call-state-stale");
@@ -3232,6 +3526,17 @@ if(testerSession){
             }
             publicPayload.bracketView=JSON.stringify(buildPublicMirrorFields(data));
           }
+          if(options.adminOperationalOverride){
+            const before=snap.exists()?JSON.parse(snap.data().data):null;
+            if(!window.BXHAdminOverride||!before||!overrideProfile?.exists())throw new Error('admin-override-not-authorized');
+            data.adminOperationOverrides=window.BXHAdminOverride.record(options.adminOperationalOverride,
+              {actorUid,code:normalized,roomId:before.id},overrideProfile.data(),before,data);
+          }else if(snap.exists()){
+            // Preserve committed audit history when an ordinary stale client saves.
+            const before=JSON.parse(snap.data().data);
+            if(Array.isArray(before.adminOperationOverrides))data.adminOperationOverrides=before.adminOperationOverrides;
+            else delete data.adminOperationOverrides;
+          }
           const fencedDoc=snap.exists()?snap.data():{};
           if(fencedDoc.onsiteWaitlistFinalized===true){
             const canonical=typeof fencedDoc.data==="string"?JSON.parse(fencedDoc.data):fencedDoc.data;
@@ -3276,7 +3581,7 @@ if(testerSession){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = null;
         return true;
       }catch(e){
-        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = ["registration-roster-stale","bracket-version-conflict","bracket-started"].includes(e&&e.message) ? e.message : (e&&e.code)||"unknown";
+        if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||(e&&e.message)||"unknown";
         console.warn("雲端同步寫入失敗", e);
         return false;
       }
@@ -3607,20 +3912,26 @@ if(testerSession){
     },
 
     async commitRefereeCommand(data){
+      if(fourCourtLifecycle?.isBucket(data.code))return fourCourtLifecycle.command(data,"commitRefereeCommand");
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"commitRefereeCommand")(data);return result.data;}
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
     },
     async manageRefereeSeats(data){
+      if(fourCourtLifecycle?.isBucket(data.code))return fourCourtLifecycle.command(data,"manageRefereeSeats");
       if(!cloudEnabled||!fnx||!functionsHandle)return {ok:false,reason:"cloud-unavailable"};
       try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
     },
+    async retryBucketOperation(data){return fourCourtLifecycle?.isBucket(data.code)?fourCourtLifecycle.command(data,'retryBucketOperation'):{ok:false,reason:'bucket-session-mismatch'};},
+    reconnectBucketRoom(code){return fourCourtLifecycle?.reconnect(String(code).toUpperCase())||{ok:false,reason:'bucket-session-mismatch'};},
+    bucketView(code){return fourCourtLifecycle?.view(String(code).toUpperCase())||null;},
     subscribeRefereeSeats(code,callback){
+      if(fourCourtLifecycle?.isBucket(String(code).toUpperCase()))return fourCourtLifecycle.subscribe(String(code).toUpperCase(),state=>callback({model:state.meta.refereeSeatsV1,projection:state.meta}),{primary:false});
       if(!cloudEnabled||!code)return ()=>{};
       return fx.onSnapshot(fx.doc(dbHandle,"tournaments",String(code).toUpperCase()),snap=>{
         if(!snap.exists()||snap.metadata.hasPendingWrites)return;
-        const d=snap.data();if(d.refereeSeatsV1?.version!==1)return;
+        const d=snap.data();if(Object.hasOwn(d,'scoreStorage'))return;if(d.refereeSeatsV1?.version!==1)return;
         callback({model:d.refereeSeatsV1,projection:{
           ...(d.createdByRole==='partner_organizer'?{refereeSeatActivityAssignment:d.eventStaffAssignments?.[authHandle?.currentUser?.uid]||null,refereeSeatAccessRevoked:false}:{}),
           assignedStaffUids:d.assignedStaffUids||[],refereeStationAssignments:d.refereeStationAssignments||{},
@@ -3825,12 +4136,22 @@ if(testerSession){
     // Admin/staff use only — subscribes to the FULL tournament document.
     subscribe(code, callback){
       if(!cloudEnabled || !code) return ()=>{};
+      let active=true,stopBucket=()=>{},bucketAttached=false,bucketUid=null,lastRootVersion=-1;
       try{
         const ref = fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
         const unsub = fx.onSnapshot(ref, { includeMetadataChanges:true }, (snap)=>{
-          if(!snap.exists()) return;
-          if(snap.metadata.hasPendingWrites) return; // 略過自己剛寫入、尚未確認的本地回音
+          if(!active||!snap.exists()) return;
+          if(snap.metadata.hasPendingWrites||snap.metadata.fromCache) return; // 略過自己剛寫入、尚未確認的本地回音
           const d = snap.data();
+          if(Number.isSafeInteger(d.updatedAt)){if(d.updatedAt<lastRootVersion)return;lastRootVersion=d.updatedAt;}
+          if(Object.hasOwn(d,'scoreStorage')){
+            if(bucketAttached&&bucketUid!==authHandle?.currentUser?.uid)return;
+            const lifecycle=getFourCourtLifecycle();
+            if(!lifecycle){reportFourCourtStatus({code:String(code).toUpperCase(),status:'error',reason:'bucket-client-disabled',clear:true});return;}
+            if(!bucketAttached){bucketAttached=true;bucketUid=authHandle?.currentUser?.uid;stopBucket=lifecycle.subscribe(String(code).toUpperCase(),(state,authoritative)=>{if(active)callback(state,authoritative);});}
+            lifecycle.observe(String(code).toUpperCase(),d.scoreStorage||{});return;
+          }
+          if(bucketAttached){fourCourtLifecycle.observe(String(code).toUpperCase(),null);stopBucket();stopBucket=()=>{};bucketAttached=false;}
           try{
             const parsed = JSON.parse(d.data);
             if(d.refereeSeatsV1?.version===1)parsed.meta={...parsed.meta,refereeSeatsV1:d.refereeSeatsV1,refereeSeatNames:d.refereeSeatNames||{},refereeStationAssignments:d.refereeStationAssignments||{},refereeStationNames:d.refereeStationNames||{},refereeStationRestrictionEnabled:true,assignedStaffUids:d.assignedStaffUids||[]};
@@ -3840,7 +4161,7 @@ if(testerSession){
         }, (err)=>{
           console.warn("雲端同步監聽發生錯誤，可能已離線", err);
         });
-        return unsub;
+        return ()=>{active=false;unsub();stopBucket();};
       }catch(e){
         console.warn("建立雲端監聽失敗", e);
         return ()=>{};
@@ -3919,3 +4240,7 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
+
+
+

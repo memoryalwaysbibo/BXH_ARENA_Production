@@ -1,0 +1,36 @@
+'use strict';
+const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict');const {chromium}=require('playwright');
+(async()=>{
+ const server=http.createServer((_,r)=>r.end('<!doctype html><meta charset="utf-8"><style>body{margin:12px}button{max-width:100%;white-space:normal}section{white-space:pre-wrap;overflow-wrap:anywhere}</style><main id="app"></main><p id="notice"></p>'));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:390,height:844}});await page.goto('http://127.0.0.1:'+server.address().port);
+  for(const name of ['admin-override.js','admin-roster.js'])await page.addScriptTag({content:fs.readFileSync('modules/main-app/'+name,'utf8')});
+  const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('// Admin roster override:'),b=core.indexOf('let bracketCommitContext=null;',a);assert(a>0&&b>a);
+  await page.addScriptTag({content:`
+   let state={id:'r',cloudCode:'BXH-TEST01',meta:{battleMode:'individual',registrationCapacity:1},players:[{id:'p1',name:'甲',registrationId:'r1',checkedIn:true}],waitlistPlayers:[{id:'p2',name:'乙',registrationId:'r2',checkedIn:true,checkinFirstAt:50}],bracketSize:2,matches:[{id:'m'}]},userProfile={active:true,role:'admin'},uid='u',modal=null;
+   let peopleRosterBusy=false,adminOperationalOverrideBusy=false,adminRegistrationsCache=[{registrationId:'r2',status:'waitlist'}],publicTournamentsCache=[],myRegistrationsCache=[],saves=0,commits=0,writes=0,fail=false;
+   const serverState=structuredClone(state),ops=new Map();let registrationStatus='waitlist';
+   const adminOverrideContext=()=>({actorUid:uid,roomId:state.id,code:state.cloudCode}),currentAuthUid=()=>uid;
+   const canOfferAdminOperationalOverride=()=>BXHAdminOverride.allowed(userProfile)&&!state.startedAt,bracketCommitBlocked=()=>false,adminCheckinController=()=>null;
+   const peopleRegistrationIdOf=row=>String(row.registrationId||row.id||''),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+   function resetRegistrationFormDraft(){}async function saveRecord(){saves++;}function showToast(s){document.querySelector('#notice').textContent=s;}function openModal(m){modal=m;render();}
+   window.cloudSync={adminOverrideRoster:async d=>{
+    if(d.action==='preview')return {ok:true,signature:'a'.repeat(64),code:d.code,roomId:d.roomId,operation:d.operation,registrationId:d.registrationId??null,playerId:d.playerId||'p2',name:'乙',from:'waitlist',to:'confirmed',capacity:1,nextCapacity:9,expansion:8,resetBracket:true,warnings:['增加 8 個名額，上限改為 9 人','清除尚未開賽配對，異動後必須重新抽籤']};
+    commits++;if(!ops.has(d.operationId)){writes++;ops.set(d.operationId,true);const p=serverState.waitlistPlayers.shift();serverState.players.push(p);registrationStatus='confirmed';serverState.matches=[];serverState.bracketSize=0;serverState.qrCheckinRevision=1;serverState.adminOperationOverrides=[{id:d.operationId,actorUid:'u',playerId:'p2',to:'confirmed',bracketReset:true}];}if(fail)throw Error('lost-ack');return {ok:true};
+   },readAdminRosterFromServer:async()=>fail?{ok:false}:{ok:true,data:structuredClone(serverState),publicData:{players:serverState.players.map(p=>({id:p.id,name:p.name,checkedIn:p.checkedIn}))},registration:{status:registrationStatus},counts:{private:{capacity:9,confirmedCount:serverState.players.length,waitlistCount:serverState.waitlistPlayers.length},public:{capacity:9,confirmedCount:serverState.players.length,waitlistCount:serverState.waitlistPlayers.length}},fences:{privateQr:1,publicQr:1}}};
+   ${core.slice(a,b)}
+   function render(){document.querySelector('#app').innerHTML=adminRosterPendingHtml()+adminRosterButtonsHtml({registrationId:'r2',name:'乙'},'promote',true)+(modal?'<section role="dialog"><h2>'+modal.title+'</h2><p>'+modal.message+'</p><button id="confirm">'+modal.confirmLabel+'</button></section>':'');}
+   document.addEventListener('click',e=>{if(e.target.dataset.action==='admin-force-roster')offerAdminRoster({operation:'promote',registrationId:'r2'});if(e.target.dataset.action==='admin-roster-retry')offerAdminRoster(null);if(e.target.id==='confirm'){const m=modal;modal=null;m.onConfirm();render();}});
+   window.fixture={stats:()=>({commits,writes,saves,local:structuredClone(state),server:structuredClone(serverState),busy:adminRosterController().status().busy}),revoke:()=>{userProfile.role='staff';render();},admin:()=>{userProfile.role='super_admin';render();},lose:()=>fail=true,restore:()=>fail=false,laterDemote:()=>{serverState.waitlistPlayers.push(serverState.players.pop());registrationStatus='waitlist';},localButton:()=>adminRosterButtonsHtml({id:'local',name:'現場',source:'onsite'},'promote')};render();
+  `});
+  await page.getByRole('button',{name:'管理員強制升正取',exact:true}).click();await page.getByRole('heading',{name:'管理員正備取覆核'}).waitFor();assert.match(await page.getByRole('dialog').innerText(),/增加 8 個名額/);assert.match(await page.getByRole('dialog').innerText(),/清除尚未開賽配對/);assert.equal((await page.evaluate(()=>fixture.stats())).commits,0);
+  assert.match(await page.evaluate(()=>fixture.localButton()),/data-player-id="local"/);assert.doesNotMatch(await page.evaluate(()=>fixture.localButton()),/data-registration-id/);
+  await page.evaluate(()=>fixture.revoke());await page.getByRole('button',{name:'我已核對，強制執行'}).click();await page.waitForTimeout(50);assert.equal((await page.evaluate(()=>fixture.stats())).commits,0);assert.equal(await page.locator('[data-action="admin-force-roster"]').count(),0);
+  await page.evaluate(()=>fixture.admin());await page.getByRole('button',{name:'管理員強制升正取',exact:true}).click();await page.getByRole('dialog').waitFor();await page.evaluate(()=>fixture.lose());await page.getByRole('button',{name:'我已核對，強制執行'}).click();await page.waitForFunction(()=>fixture.stats().commits===1&&!fixture.stats().busy);
+  const before=await page.evaluate(()=>fixture.stats());assert.equal(before.local.players.length,1);assert.equal(before.local.matches.length,1);assert.equal(before.server.matches.length,0);assert.equal(before.writes,1);
+  await page.evaluate(()=>{fixture.laterDemote();fixture.restore();});await page.getByRole('button',{name:'核實上一筆名單覆核',exact:true}).click();await page.getByRole('heading',{name:'核實／重試同一筆名單覆核'}).waitFor();await page.getByRole('button',{name:'核實／重試同一筆',exact:true}).click();await page.getByText('這筆名單覆核已完成，後續狀態已有變更；已載入最新名單',{exact:true}).waitFor();
+  const after=await page.evaluate(()=>fixture.stats());assert.equal(after.commits,2);assert.equal(after.writes,1);assert.equal(after.local.players.length,1);assert.equal(after.local.matches.length,0);assert.equal(after.local.waitlistPlayers[0].checkinFirstAt,50);assert.equal(after.saves,1);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  console.log('PASS actual roster bridge: server preview, explicit expansion/reset consent, local target identity, role revocation, lost acknowledgement, stable retry and later demotion preservation on mobile');
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,169 @@
+{
+  "mode": "preview-only-no-writes",
+  "requiresEmptyNumberingAndExplicitOwnerInitialization": true,
+  "people": [
+    {
+      "order": 1,
+      "name": "吳健凱",
+      "uid": "dFNwrNCZKASxabKsOCcQoMJkryA2",
+      "personId": "initial-01",
+      "proposedNumber": "R000001",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 2,
+      "name": "葉淳宇",
+      "uid": "8Q36wDgmUHfkgP9Qbue47JiSJ8Z2",
+      "personId": "initial-02",
+      "proposedNumber": "R000002",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 3,
+      "name": "劉育嘉",
+      "uid": "TZbaxXLmqIalY1GXWR04itGpQ1j2",
+      "personId": "initial-03",
+      "proposedNumber": "R000003",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 4,
+      "name": "姚翔宇",
+      "uid": "PPW5moDMXqZ1bWpc3QGATd6f1653",
+      "personId": "initial-04",
+      "proposedNumber": "R000004",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 5,
+      "name": "蔡旭哲",
+      "uid": "1lpbl7r2yuVMJ9hfhmhuvp9kMIz2",
+      "personId": "initial-05",
+      "proposedNumber": "R000005",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 6,
+      "name": "盧力豪",
+      "uid": "ZNzObiFtYdfC54JqhWZzeEllkaf2",
+      "personId": "initial-06",
+      "proposedNumber": "R000006",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 7,
+      "name": "吳沂叡",
+      "uid": "MJowVElwdqQnHG6eFFWGKbqc7Nz1",
+      "personId": "initial-07",
+      "proposedNumber": "R000007",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 8,
+      "name": "儲光延",
+      "uid": "9inXV9AMLdh4eFiZIJbnv8JX2pz2",
+      "personId": "initial-08",
+      "proposedNumber": "R000008",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 9,
+      "name": "林一棟",
+      "uid": "TC1LlZ8Ox4fDUT5oN7x6EiPUtlk1",
+      "personId": "initial-09",
+      "proposedNumber": "R000009",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 10,
+      "name": "黃啟睿",
+      "uid": "7j70omUwepZ7paVnAiCRYJWfEUo1",
+      "personId": "initial-10",
+      "proposedNumber": "R000010",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 11,
+      "name": "陳霈楷",
+      "uid": "bQSFo5UNXmRGaGrQbMjqz64tFR43",
+      "personId": "initial-11",
+      "proposedNumber": "R000011",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 12,
+      "name": "邱子瑋",
+      "uid": "s4kpra1pP7YzUQbno0s6eHpJSyG2",
+      "personId": "initial-12",
+      "proposedNumber": "R000012",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 13,
+      "name": "穆丹尼",
+      "uid": "iSpjURRng5eS0AaUIuk9OYwKWlB2",
+      "personId": "initial-13",
+      "proposedNumber": "R000013",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 14,
+      "name": "張吉榮",
+      "uid": "8Qqgl1wybpWP4HS7u4EN66qAl5l1",
+      "personId": "initial-14",
+      "proposedNumber": "R000014",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 15,
+      "name": "呂岳勳",
+      "uid": "Wq8UfTzwH0ghf1hzkCXoKZnK3Wg2",
+      "personId": "initial-15",
+      "proposedNumber": "R000015",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 16,
+      "name": "林鼎皓",
+      "uid": "Gn0W92nnAmcAWkq5UXkgzyDd9my2",
+      "personId": "initial-16",
+      "proposedNumber": "R000016",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 17,
+      "name": "張大為",
+      "uid": "P0sYWSTp2LYMQegckgZwiGBJD9B3",
+      "personId": "initial-17",
+      "proposedNumber": "R000017",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    },
+    {
+      "order": 18,
+      "name": "張竣能",
+      "uid": "dEAWw0ZQUNSDjDce8d1RWIeKjxI3",
+      "personId": "initial-18",
+      "proposedNumber": "R000018",
+      "approvedCandidate": true,
+      "experienceAssumed": false
+    }
+  ],
+  "excludedAliasUid": "nDBFtNYOgjfkBK0E2lpUoreJYwM2"
+}

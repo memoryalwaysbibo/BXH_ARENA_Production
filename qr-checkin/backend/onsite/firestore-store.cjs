@@ -33,6 +33,7 @@ class FirestoreStore {
         replacements: replacements.docs.map(doc => doc.data()),
         operations: operation?.exists ? {[operationId]: operation.data()} : {},
       };
+      if (aggregate.tournament && Object.prototype.hasOwnProperty.call(aggregate.tournament, 'scoreStorage')) throw new DrawError('bucket-scoring-required', 409);
       const output = await callback(aggregate);
       const change = output.commit;
       const attendance=await prepare({tx,ref:tr,aggregate,output,uid,code});

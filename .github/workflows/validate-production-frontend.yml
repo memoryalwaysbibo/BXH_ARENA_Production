@@ -89,8 +89,14 @@ jobs:
         run: |
           for source in team-foundation/*.js; do node --check "$source"; done
           node --test team-foundation/*.test.cjs
+      - name: Verify release manifest and private Pages artifact boundaries
+        run: node --test tests/release-manifest.test.cjs tests/public-pages-artifact.test.cjs
       - name: Verify Safety Gate risk classifier
         run: node --test tests/safety-gate-risk.test.cjs
+      - name: Verify tournament completion, archive retry and results display
+        run: |
+          node --test tests/tournament-completion-flow.cjs
+          node tests/ladder-settlement.cjs
       - name: Verify QR camera lifecycle and existing check-in routing
         run: node --test tests/qr-scanner-lifecycle.test.cjs qr-checkin/ui.test.cjs
       - name: Verify latest member location and regional leaderboard states
@@ -171,7 +177,7 @@ jobs:
       - name: Verify roster mutation and snapshot races
         run: node --test tests/roster-sync-race.test.cjs
       - name: Verify community quick registration and cloud contract
-        run: node --test tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/community-host-roster-sync.test.cjs tests/community-summary-fixture.test.cjs tests/community-client-cleanup-disabled.test.cjs
+        run: node --test tests/community-quick-registration.test.cjs tests/community-quick-registration-cloud.test.cjs tests/new-room-publication.test.cjs tests/community-host-roster-sync.test.cjs tests/community-summary-fixture.test.cjs tests/community-client-cleanup-disabled.test.cjs
       - name: Verify managed registration settings and draft save boundary
         run: node --test tests/managed-registration-settings.test.cjs tests/registration-mode-draft.test.cjs
       - name: Verify family roster check-in preservation
@@ -249,6 +255,17 @@ jobs:
       - name: Install UI test runner
         id: install_ui
         run: npm install --no-package-lock --ignore-scripts
+      - name: Verify partner organizer contract and quota in desktop and mobile Chromium
+        if: ${{ !cancelled() && steps.install_ui.outcome == 'success' }}
+        run: node tests/partner-overview-browser.cjs
+      - name: Upload partner organizer acceptance screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bxh-arena-partner-overview-${{ github.run_id }}
+          path: test-results/partner-overview/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Run isolated browser smoke tests (one controlled retry)
         shell: bash
         run: |
@@ -430,4 +447,6 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+
 

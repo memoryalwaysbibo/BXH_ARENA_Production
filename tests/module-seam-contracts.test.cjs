@@ -41,6 +41,8 @@ function authHarness(getUserProfile) {
     myEventsPlayerSlice: null,
     firebaseUser: null,
     userProfile: null,
+    playerProfileEditOpen: false,
+    playerProfileEditError: '',
     currentRole: 'admin',
     appPhase: 'app',
     activeTab: 'live',
@@ -75,6 +77,8 @@ function authHarness(getUserProfile) {
     console,
   };
   vm.createContext(context);
+  vm.runInContext(read('modules/main-app/profile-reminder.js'), context);
+  context.playerProfileReminder = context.window.BXHProfileReminder.create({ storage: () => null, gameId: p => p.gameId || p.nickname || '' });
   vm.runInContext(source, context);
   return context;
 }
@@ -306,3 +310,4 @@ test('an old Admin room read cannot update state after switching rooms', async (
   assert.equal(publicReads, 1, 'a stale subscription cannot start another room read');
   assert.equal(renders, 0, 'a stale result cannot render over the new room');
 });
+

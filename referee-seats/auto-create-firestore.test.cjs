@@ -69,3 +69,43 @@ test('concurrent creation of same code commits only once',async()=>{
  assert(a.exists&&b.exists);
  assert.equal(a.data().createdBy,results[0].status==='fulfilled'?'owner':'other');
 });
+
+test('saved frontend idle drafts create real paired Firestore documents across visibility, capacity and courts',async()=>{
+ const fs=require('node:fs'),path=require('node:path'),{createRequire}=require('node:module');
+ const file=path.resolve('tests/community-quick-registration-cloud.test.cjs'),source=fs.readFileSync(file,'utf8');
+ // Reuse only the existing client SDK fixture, not its test registrations.
+ const {harness,state}=new Function('require','__dirname',source.slice(0,source.indexOf('\ntest('))+'\nreturn {harness,state};')(createRequire(file),path.dirname(file));
+ await db.doc('users/local-host').set({active:true,role:'super_admin',realName:'Synthetic Admin'});
+ let serial=0;
+ for(const visibility of ['public','private'])for(const capacity of [32,160])for(const stations of [1,6]){
+  const h=harness(),code='BXH-IDLE'+(++serial),operationId='idle-real-create-operation-'+serial;
+  h.ctx.generateRoomCode=()=>code;h.ctx.crypto.randomUUID=()=>operationId;
+  h.ctx.userProfile={active:true,role:'super_admin'};h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=true;h.ctx.functionsHandle={};
+  h.ctx.fnx={httpsCallable:()=>async payload=>({data:await create({auth:{uid:'local-host'},data:payload})})};
+  const data=state({eventAuthority:'official',communityQuickRegistration:false,registrationVisibility:visibility,registrationCapacity:capacity,stations,battleMode:'individual',playMode:'standard'});
+  data.courtAssignments=Object.fromEntries(Array.from({length:stations},(_,i)=>['court'+(i+1),{currentMatchId:null,nextMatchId:null,status:'idle',lockedBy:null,lockedAt:null,updatedAt:null}]));
+  assert.equal(await h.api.createRoom(data),code);
+  const [a,b]=await Promise.all([db.doc('tournaments/'+code).get(),db.doc('publicTournaments/'+code).get()]);
+  assert(a.exists&&b.exists);assert.equal(a.data().visibility,visibility);assert.equal(b.data().visibility,visibility);
+  assert.equal(a.data().capacity,capacity);assert.equal(Object.keys(a.data().refereeSeatsV1.courts).length,stations);
+  assert.deepEqual(JSON.parse(a.data().data).courtAssignments,{});assert.deepEqual(JSON.parse(b.data().bracketView).courtAssignments,{});
+  assert.equal(h.writes.length,0,'no fallback client writes');
+ }
+});
+
+test('active staff ranked room persists both documents and idempotent receipt in Firestore',async()=>{
+ const code='BXH-STAFFRANK',req=request(code,'staff-ranked-emulator-op-001');
+ const s=JSON.parse(req.data.privatePayload.data),m=JSON.parse(req.data.publicPayload.bracketView);
+ s.meta.ladderMode='ranked';m.meta.ladderMode='ranked';
+ Object.assign(req.data.privatePayload,{ladderMode:'ranked',data:JSON.stringify(s)});
+ Object.assign(req.data.publicPayload,{ladderMode:'ranked',bracketView:JSON.stringify(m)});
+ assert.deepEqual(await create(req),{ok:true,code,idempotent:false});
+ assert.deepEqual(await create(req),{ok:true,code,idempotent:true});
+ const [a,b]=await Promise.all([db.doc('tournaments/'+code).get(),db.doc('publicTournaments/'+code).get()]);
+ assert.equal(a.data().createdBy,'owner');assert.deepEqual(a.data().assignedStaffUids,['owner']);
+ for(const [snap,key]of [[a,'data'],[b,'bracketView']]){
+  assert.equal(snap.data().ladderMode,'ranked');assert.equal(JSON.parse(snap.data()[key]).meta.ladderMode,'ranked');
+ }
+ assert.equal(Object.keys(a.data().refereeSeatsV1.courts).length,3);
+ assert(!b.data().bracketView.includes('"uid"'));
+});

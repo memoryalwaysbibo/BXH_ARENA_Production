@@ -65,6 +65,32 @@ for (const [name, expected] of Object.entries(expectedArtwork)) {
   assert.equal(artworkPath(name), expected, `Artwork mapping changed for ${name}`);
 }
 assert.equal(artworkPath('未知稱號'), '', 'Unknown titles do not receive artwork');
+// Reject partially uploaded monthly artwork before it can reach Pages.
+const monthly = 'assets/title-rare-monthly-hunter-moon-phases-v2';
+assert.equal(artworkPath('月度獵人'), monthly + '.webp');
+assert(ladder.includes('"月度獵人":"' + monthly + '.webp"'));
+const monthlyPng = fs.readFileSync(path.join(root, monthly + '.png'));
+assert.equal(monthlyPng.readUInt32BE(16), 768);
+assert.equal(monthlyPng.readUInt32BE(20), 256);
+assert.equal(monthlyPng[25], 6, 'Monthly PNG must retain RGBA');
+let monthlyOffset = 8, monthlyEnded = false;
+const monthlyIdat = [];
+while (monthlyOffset < monthlyPng.length) {
+  const length = monthlyPng.readUInt32BE(monthlyOffset);
+  const end = monthlyOffset + length + 12;
+  assert(end <= monthlyPng.length, 'Monthly PNG chunk truncated');
+  const kind = monthlyPng.toString('ascii', monthlyOffset + 4, monthlyOffset + 8);
+  if (kind === 'IDAT') monthlyIdat.push(monthlyPng.subarray(monthlyOffset + 8, end - 4));
+  if (kind === 'IEND') { monthlyEnded = true; assert.equal(end, monthlyPng.length); }
+  monthlyOffset = end;
+}
+assert(monthlyEnded, 'Monthly PNG IEND missing');
+assert.equal(require('node:zlib').inflateSync(Buffer.concat(monthlyIdat)).length, (768 * 4 + 1) * 256, 'Monthly PNG must decode every row');
+const monthlyWebp = fs.readFileSync(path.join(root, monthly + '.webp'));
+assert.equal(monthlyWebp.toString('ascii', 0, 4), 'RIFF');
+assert.equal(monthlyWebp.toString('ascii', 8, 12), 'WEBP');
+assert.equal(monthlyWebp.readUInt32LE(4) + 8, monthlyWebp.length, 'Monthly WebP truncated');
+assert(monthlyWebp.length < 400000, 'Monthly WebP exceeds website budget');
 assert.equal(artworkPath('對戰召集人', 'common'), 'assets/title-rare-host-3.webp', 'Legacy rarity argument remains behaviorally ignored');
 assert(ladder.includes('"對戰召集人":"assets/title-rare-host-3.webp"'), 'Host-3 ladder artwork mapping missing');
 const png = fs.readFileSync(path.join(root, 'assets/title-rare-host-3.png'));

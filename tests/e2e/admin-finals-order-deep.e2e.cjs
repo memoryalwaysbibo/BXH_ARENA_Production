@@ -83,6 +83,8 @@ test('official single elimination enforces bronze before championship final', as
   await page.locator('[data-action="people-section"][data-section="tools"]').click();
   await page.locator('#quick-add-textarea').fill('Final A\nFinal B\nFinal C\nFinal D');
   await page.locator('[data-action="quick-add-players"]').click();
+  await expect(page.getByText('確認新增現場訪客', {exact:true})).toBeVisible();
+  await page.locator('[data-action="modal-confirm"]').click();
 
   await page.locator('[data-action="people-section"][data-section="confirmed"]').click();
   await expect(page.locator('.people-roster-table .people-col-name')).toHaveCount(4);

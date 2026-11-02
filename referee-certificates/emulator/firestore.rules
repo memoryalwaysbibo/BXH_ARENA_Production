@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /refereeCertificates/{document=**} { allow read, write: if false; }
+    match /refereeCertificateSystem/{document=**} { allow read, write: if false; }
+    match /refereeCertificateOperations/{document=**} { allow read, write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,7 @@
+.registration-feedback-panel{position:fixed;right:16px;bottom:16px;z-index:10020;width:min(360px,calc(100vw - 32px));max-height:45vh;overflow:auto;box-sizing:border-box;border:1px solid #b59a60;border-radius:12px;background:#171820;color:#fff;padding:14px;box-shadow:0 8px 28px #0008;font-size:14px}
+.registration-feedback-panel[hidden]{display:none}
+.registration-feedback-item+.registration-feedback-item{border-top:1px solid #ffffff30;margin-top:12px;padding-top:12px}
+.registration-feedback-item strong{font-size:16px;color:#f4d58b}
+.registration-feedback-item p{margin:8px 0;line-height:1.6;overflow-wrap:anywhere}
+.registration-feedback-item button{min-height:40px;font:inherit}
+@media(max-width:480px){.registration-feedback-panel{right:10px;bottom:calc(10px + env(safe-area-inset-bottom));width:calc(100vw - 20px)}}
