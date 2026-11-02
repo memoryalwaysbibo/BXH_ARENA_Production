@@ -7,7 +7,7 @@ const {createService}=require('../referee-certificates/functions/service.cjs');
 const {createPublicSummary}=require('../referee-certificates/functions/public-summary.cjs');
 const root=path.join(__dirname,'..'),origin='https://full-host.fixture.test';
 const db=new MockDB({...fixture(),'users/admin':user('super_admin',{realName:'測試管理員',displayName:'測試管理員',email:'admin@example.invalid'}),'users/bob':user('player',{realName:'延遲回應甲'}),'users/carol':user('player',{realName:'目前對象乙'}),'users/alice':user('player',{realName:'測試裁判',gameId:'測試裁判'}),'systemConfig/refereeCertificatesV1':{enabled:true,publicSummaryEnabled:true},'refereeCertificateSystem/numbering':{lastIssuedNumber:18},'ladderSystem/current':{currentSeason:'S1',startAt:Date.parse('2026-10-01T00:00:00+08:00'),endAt:Date.parse('2027-01-31T23:59:59.999+08:00'),seasonLengthMonths:4,status:'active'},'ladderSeasons/S1':{seasonId:'S1',status:'active'}});
-let gate=true,holdUid=null,releaseHeld=null,notifyHeld;let heldStarted;
+let gate=true,publicGate=true,holdUid=null,releaseHeld=null,notifyHeld;let heldStarted;
 const service=createService(db),pub=createPublicSummary(db),calls=[],errors=[],external=[],served=new Set();
 const sdk=`
 const auth={currentUser:{uid:'admin',email:'admin@example.invalid',getIdToken:async()=> 'local-fixture'}};
@@ -50,7 +50,7 @@ export class ReCaptchaEnterpriseProvider{};
   let file=path.join(root,u.pathname==='/'?'index.html':decodeURIComponent(u.pathname));
   if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile())return route.fulfill({status:404,body:''});
   served.add(path.relative(root,file));let body=fs.readFileSync(file);
-  if(file.endsWith('/index.html')&&gate)body=body.toString().replace(/(BXH_REFEREE_CERTIFICATES_V1\s*=\s*)false/g,'$1true').replace(/(BXH_REFEREE_PUBLIC_SUMMARY_V1\s*=\s*)false/g,'$1true');
+  if(file.endsWith('/index.html'))body=body.toString().replace(/(BXH_REFEREE_CERTIFICATES_V1\s*=\s*)(?:false|true)/g,'$1'+gate).replace(/(BXH_REFEREE_PUBLIC_SUMMARY_V1\s*=\s*)(?:false|true)/g,'$1'+publicGate);
   return route.fulfill({headers:{date:new Date().toUTCString()},body,contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.html')?'text/html':file.endsWith('.ttf')?'font/ttf':'application/octet-stream'});
  });
  await page.goto(origin,{waitUntil:'load'});
@@ -102,6 +102,21 @@ export class ReCaptchaEnterpriseProvider{};
  await openDetails('carol');await page.waitForFunction(()=>document.getElementById('app').textContent.includes('UID：carol'));
  releaseHeld();holdUid=null;await page.waitForFunction(()=>window.__fixtureCompletions?.some(c=>c.name==='refereeCertificateService'&&c.payload.action==='get'&&c.payload.targetUid==='bob'));
  const panel=await page.locator('#app').textContent();assert.ok(panel.includes('UID：carol'));assert.ok(!panel.includes('UID：bob'));
+ // Selected private-first release: same real host, public summary gated off.
+ publicGate=false;db.put('systemConfig/refereeCertificatesV1',{enabled:true,publicSummaryEnabled:false,initialRosterApproved:false});
+ await page.reload({waitUntil:'load'});await page.waitForFunction(()=>currentAuthUid()==='admin'&&appPhase==='app');
+ await openDetails('alice');await page.waitForFunction(()=>activeTab==='referee-admin'&&document.getElementById('app').textContent.includes('UID：alice'));
+ await page.locator('[data-action="switch-tab"][data-tab="ladder"]').click();
+ await page.waitForFunction(()=>ladderPublicLoaded&&!ladderPublicLoading);
+ await page.locator('details:has(#player-card-query)>summary').press('Enter');
+ await page.locator('#player-card-query').fill('測試裁判');await page.locator('[data-action="card-search"]').click();
+ await page.locator('[data-action="card-open"][data-uid="alice"]').waitFor({state:'attached'});
+ const privateSearch=page.locator('details:has(#player-card-query)');if(await privateSearch.getAttribute('open')===null)await privateSearch.locator('summary').press('Enter');
+ const privateStart=calls.length;await page.locator('[data-action="card-open"][data-uid="alice"]').click();
+ await page.waitForFunction(()=>document.getElementById('player-card-overlay')?.textContent.includes('測試裁判'));
+ assert.equal(await page.locator('#player-card-overlay .rl-section').count(),0);
+ assert.ok(!calls.slice(privateStart).some(c=>c.name==='refereeCertificatePublicSummary'||c.name==='refereeCertificateService'));
+ await page.locator('#player-card-overlay [data-action="card-close"]').click();
  // Actual host reloaded with closed gate / non-super roles: no entry and forged action is inert.
  for(const role of ['super_admin','admin','player']){
   gate=role!=='super_admin';db.put('users/admin',user(role,{realName:'測試操作者',email:'admin@example.invalid'}));
@@ -116,7 +131,7 @@ export class ReCaptchaEnterpriseProvider{};
   await page.waitForTimeout(50);assert.equal(calls.filter(c=>c.name==='refereeCertificateService').length,before);
  }
  assert.deepEqual(errors,[]);
- console.log('PASS full index/auth/main navigation -> account player details -> direct exact-UID referee qualification (no search) -> zero-experience L1 approval -> leaderboard player search -> real card overlay/public summary -> close. Real core/router/engagement SDK adapters; local Firebase transport; late target response isolated; closed gate/admin/player entry denied; no production requests.');
+ console.log('PASS full index/auth/main navigation -> account player details -> direct exact-UID referee qualification (no search) -> zero-experience L1 approval -> leaderboard player search -> real card overlay/public summary -> close. Real core/router/engagement SDK adapters; local Firebase transport; late target response isolated; private-only entry works without public summary calls; closed gate/admin/player entry denied; no production requests.');
 
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});

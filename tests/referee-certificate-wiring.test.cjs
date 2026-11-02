@@ -51,7 +51,8 @@ test('closed rollout falls back to overview without issuing a certificate reques
   assert.equal(c.playerProfileSection,'overview');assert.match(html,/overview/);
   assert.doesNotMatch(html,/data-section="(?:duty|achievements)"/);assert.equal(c.calls.length,0);
   const index=fs.readFileSync('index.html','utf8');
-  assert.match(index,/window\.BXH_REFEREE_CERTIFICATES_V1\s*=\s*false/);
+  assert.match(index,/window\.BXH_REFEREE_CERTIFICATES_V1\s*=\s*true/);
+  assert.match(index,/window\.BXH_REFEREE_PUBLIC_SUMMARY_V1\s*=\s*false/);
   assert.ok(index.indexOf('modules/referee-license/domain.js')<index.indexOf('modules/referee-license/ui.js'));
   assert.ok(index.indexOf('modules/referee-license/ui.js')<index.indexOf('id="bxh-main-app-m7"'));
 });
