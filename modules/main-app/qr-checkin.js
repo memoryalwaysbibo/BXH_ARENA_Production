@@ -1,6 +1,12 @@
 (function(){
   'use strict';
   let ctx=null,boundKey='',modal=false,busy=false,settings=null,rows=[],message='',timer=null,scanStarted='',scanResult=null,scanBusy=false,scanPlayers=null;
+  let manualEpoch=0,manualStatus='';
+  const manualOperations=new Map();
+  function deadline(promise,ms){
+    let timer;
+    return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('checkin-result-unconfirmed')),ms);})]).finally(()=>clearTimeout(timer));
+  }
   const errorText=(e,action='manage')=>{
     const reason=e?.details&&typeof e.details==='object'?e.details.reason:e?.details;
     const raw=[e?.message||e,reason,e?.code].filter(Boolean).map(String).join(' ');
@@ -65,26 +71,50 @@
     ctx.render();
   }
   async function configure(enabled){
+    if(busy)return;
     const k=key();busy=true;ctx.render();
     try{await call({action:'configure',code:ctx.state().cloudCode,enabled});if(key()!==k)return;await refresh();message='';}
     catch(e){if(key()===k)message=errorText(e);}
-    finally{busy=false;ctx.render();}
+    finally{if(key()===k){busy=false;ctx.render();}}
   }
   async function manual(player,checkedIn){
-    if(busy)return;
-    const k=key(),code=ctx.state().cloudCode,operationId=crypto.randomUUID();
-    busy=true;ctx.render();
+    if(busy){ctx.toast('正在處理上一筆報到，請等候結果。',true);return;}
+    const k=key(),epoch=manualEpoch,code=ctx.state().cloudCode;
+    const current=()=>key()===k&&manualEpoch===epoch;
+    const operationKey=k+':'+player.id+':'+checkedIn,storageKey='bxh.manualCheckin.'+operationKey;
+    let operationId=manualOperations.get(operationKey);
+    if(!operationId){try{operationId=sessionStorage.getItem(storageKey);}catch{}}
+    if(!/^[-a-zA-Z0-9]{16,80}$/.test(operationId||''))operationId=crypto.randomUUID();
+    manualOperations.set(operationKey,operationId);
+    try{sessionStorage.setItem(storageKey,operationId);}catch{}
+    const retire=()=>{manualOperations.delete(operationKey);try{sessionStorage.removeItem(storageKey);}catch{}};
+    busy=true;manualStatus='正在處理報到，請等候伺服器確認…';ctx.render();
     try{
-      const r=await call({action:checkedIn?'manual':'revoke',code,playerId:player.id,operationId});
-      if(key()!==k)return;
-      if(r.ok!==true)throw Error('not-confirmed');
+      let sendError=null;
+      try{
+        const r=await deadline(call({action:checkedIn?'manual':'revoke',code,playerId:player.id,operationId}),45000);
+        if(r?.ok!==true)throw Error('not-confirmed');
+      }catch(error){sendError=error;}
+      if(!current())return;
+      // A rejected verification is not a committed attendance. Never resend automatically.
+      if(sendError&&/app-check-unavailable|permission-denied|checkin-closed|not-confirmed/.test([sendError.message,sendError.code,JSON.stringify(sendError.details)].join(' ')))throw sendError;
       // Reload server state; never save an old local snapshot after success.
-      const remote=await window.cloudSync.joinRoom(code);
-      if(key()!==k)return;
-      if(remote?.ok!==true)throw Error('readback-failed');
-      ctx.applyRemote(remote.data);ctx.toast(checkedIn?'報到成功':'已撤銷報到');
-    }catch(e){if(key()===k)ctx.toast(errorText(e),true);}
-    finally{busy=false;ctx.render();}
+      manualStatus='正在核對伺服器最新報到狀態…';ctx.render();
+      const remote=await deadline(window.cloudSync.joinRoom(code,{serverOnly:true}),10000);
+      if(!current())return;
+      if(remote?.ok!==true||remote.data?.cloudCode!==code||!Array.isArray(remote.data.players))throw Error('readback-failed');
+      const matches=remote.data.players.filter(p=>p.id===player.id);
+      ctx.applyRemote(remote.data);
+      if(matches.length!==1||matches[0].checkedIn!==checkedIn){
+        if(!sendError)retire();
+        throw Error('checkin-state-changed');
+      }
+      retire();manualStatus='';ctx.toast(checkedIn?'報到成功':'已撤銷報到');
+    }catch(e){if(current()){
+      manualStatus=String(e?.message).includes('checkin-state-changed')?'伺服器報到狀態與本次操作不一致，請核對最新名單後再操作。':errorText(e);
+      ctx.toast(manualStatus,true);
+    }}
+    finally{if(current()){busy=false;ctx.render();}}
   }
   async function scan(force=false,playerId){
     const e=entry(),uid=identity();if(!e||!uid||scanBusy)return;
@@ -149,10 +179,11 @@
       const loginNotice=document.getElementById('qr-checkin-login-notice');
       if(loginNotice)loginNotice.hidden=!entry()||!!identity();
       const nextKey=key();
-      if(boundKey!==nextKey){modal=false;settings=null;scanStarted='';scanResult=null;scanPlayers=null;clearTimeout(timer);boundKey=nextKey;}
+      if(boundKey!==nextKey){manualEpoch++;busy=false;manualStatus='';modal=false;settings=null;scanStarted='';scanResult=null;scanPlayers=null;clearTimeout(timer);boundKey=nextKey;}
       if(entry()&&identity()&&!scanBusy)setTimeout(()=>scan(),0);
     },
-    button(){return '<button class="btn btn-primary" data-qr-checkin="open">現場報到 QR／紀錄</button>';},
+    button(){return '<button class="btn btn-primary" data-qr-checkin="open">現場報到 QR／紀錄</button>'+(manualStatus?'<p role="status" aria-live="polite">'+esc(manualStatus)+'</p>':'');},
+    busy(){return busy;},
     renderEntry,renderModal,manual,parseUrl,acceptUrl,
     managed(){return ctx?.state().qrCheckinManaged===true;}
   };
