@@ -3351,10 +3351,15 @@ async function ensureCloudRoomForTournament(){
 }
 
 function cloudCreateRoomErrorMessage(prefix="建立失敗"){
-  const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"");
+  const code=String((typeof window!=="undefined"&&window.__BXH_LAST_CLOUD_ERROR_CODE)||"").replace(/^functions\//,"");
+  const reason=String((typeof window!=="undefined"&&window.__BXH_LAST_ROOM_CREATE_REASON)||"");
+  if(reason==="unsupported-mode")return prefix+"：雲端建房服務尚未支援目前的賽事模式，請聯絡 BXH 核對後端版本";
+  if(["auto-create-not-enabled","release-not-ready","auto-seat-create-unavailable"].includes(reason))return prefix+"：雲端建房服務尚未就緒，請聯絡 BXH 核對服務狀態";
+  if(reason==="room-code-conflict")return prefix+"：房間代碼重複，請再試一次";
+  if(["mirror-mismatch","not-empty-room","protected-create-field","unverified-staff-assignment","legacy-assignments-exist"].includes(reason))return prefix+"：建房草稿資料驗證未通過，請聯絡 BXH 協助檢查";
   if(code==="partner-room-quota-exhausted" || (code==="permission-denied"&&isPartnerOrganizerMode()&&window.BXHPartnerOrganizer?.remainingRooms?.(partnerOrganizerGrant()?.orderCode)===0))return prefix+"：合作方案開房次數已用完";
   if(code==="permission-denied"&&isPartnerOrganizerMode()) return prefix+"：合作主辦建房授權未通過；請至賽事管理查看合約、有效期限與剩餘場次。若資料正常，請聯絡 BXH 協助核對；此訊息不代表場次已用完";
-  if(code==="permission-denied") return prefix+"：Firestore 權限被拒絕，請重新整理後再試";
+  if(code==="permission-denied") return prefix+"：目前帳號或建房設定未通過授權，請聯絡 BXH 協助核對";
   if(code==="unauthenticated") return prefix+"：登入狀態已失效，請重新登入";
   if(code==="already-exists") return prefix+"：房間代碼重複，請再試一次";
   if(code==="unavailable" || code==="deadline-exceeded") return prefix+"：雲端服務暫時無法連線";

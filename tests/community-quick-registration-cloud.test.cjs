@@ -577,13 +577,13 @@ test('finite and unmarked legacy promotions keep the existing client transaction
 });
 
 
-function trustedIdleRoomFixture({visibility='private',capacity=160,stations=6}={}){
+function trustedIdleRoomFixture({visibility='private',capacity=160,stations=6,role='super_admin',ladderMode='general'}={}){
  const h=harness(),{createHandler}=require('../referee-seats/auto-create-service.cjs');
  h.ctx.generateRoomCode=()=> 'BXH-IDLE01';
- h.ctx.userProfile={role:'super_admin',active:true,displayName:'Local Admin'};
+ h.ctx.userProfile={role,active:true,displayName:'Local Admin'};
  h.ctx.AUTO_SEAT_ROOM_CREATE_ROLLOUT=true;h.ctx.functionsHandle={};
  const docs=new Map([
-  ['users/local-host',{active:true,role:'super_admin',realName:'Local Admin'}],
+  ['users/local-host',{active:true,role,realName:'Local Admin'}],
   ['systemConfig/refereeSeatsV1',{enabled:true,perCourtScoringVerified:true,autoCreateEnabled:true}]
  ]);
  const db={doc:path=>({path}),runTransaction:async fn=>{
@@ -592,7 +592,7 @@ function trustedIdleRoomFixture({visibility='private',capacity=160,stations=6}={
  }};
  const handler=createHandler(db,{clock:()=>NOW}),requests=[];
  h.ctx.fnx={httpsCallable:()=>async payload=>{requests.push(clone(payload));return {data:await handler({auth:{uid:'local-host'},data:payload})};}};
- const data=state({eventAuthority:'official',communityQuickRegistration:false,registrationVisibility:visibility,registrationCapacity:capacity,stations,battleMode:'individual',playMode:'standard'});
+ const data=state({eventAuthority:'official',communityQuickRegistration:false,registrationVisibility:visibility,registrationCapacity:capacity,stations,ladderMode,battleMode:'individual',playMode:'standard'});
  data.courtAssignments=Object.fromEntries(Array.from({length:stations},(_,i)=>['court'+(i+1),{currentMatchId:null,nextMatchId:null,status:'idle',lockedBy:null,lockedAt:null,updatedAt:null}]));
  return {h,data,docs,requests};
 }
@@ -730,4 +730,26 @@ test('permission denied never retries or falls back to browser batch',async()=>{
  assert.equal(await h.api.createRoom(data),null);
  assert.equal(calls.length,1);
  assert.equal(h.writes.length,0);
+});
+
+for(const ladderMode of ['general','ranked'])for(const stations of [1,6])test(`actual staff public ${ladderMode} draft creates paired room with ${stations} courts`,async()=>{
+ const {h,data,docs}=trustedIdleRoomFixture({visibility:'public',role:'staff',ladderMode,stations});
+ assert.equal(await h.api.createRoom(data),'BXH-IDLE01');
+ for(const [path,field]of [['tournaments/BXH-IDLE01','data'],['publicTournaments/BXH-IDLE01','bracketView']]){
+  const doc=docs.get(path);assert.equal(doc.ladderMode,ladderMode);assert.equal(JSON.parse(doc[field]).meta.ladderMode,ladderMode);
+ }
+ const saved=docs.get('tournaments/BXH-IDLE01');assert.equal(saved.createdBy,'local-host');
+ assert.deepEqual(saved.assignedStaffUids,['local-host']);assert.equal(Object.keys(saved.refereeSeatsV1.courts).length,stations);
+ assert.equal(h.writes.length,0,'trusted create must not fall back to client writes');
+});
+test('callable failure retains only known room-create reasons and clears them on retry',async()=>{
+ const {h,data,docs}=trustedIdleRoomFixture({visibility:'public',role:'staff',ladderMode:'ranked'});
+ const real=h.ctx.fnx.httpsCallable;
+ h.ctx.fnx.httpsCallable=()=>async()=>{throw Object.assign(new Error('unsupported-mode'),{code:'functions/failed-precondition'});};
+ assert.equal(await h.api.createRoom(data),null);assert.equal(h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON,'unsupported-mode');
+ assert(!docs.has('tournaments/BXH-IDLE01'));assert.equal(h.writes.length,0);
+ h.ctx.fnx.httpsCallable=()=>async()=>{throw Object.assign(new Error('secret server payload'),{code:'functions/internal'});};
+ assert.equal(await h.api.createRoom(data),null);assert.equal(h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON,null);
+ h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON='unsupported-mode';h.ctx.fnx.httpsCallable=real;
+ assert.equal(await h.api.createRoom(data),'BXH-IDLE01');assert.equal(h.ctx.window.__BXH_LAST_ROOM_CREATE_REASON,null);
 });

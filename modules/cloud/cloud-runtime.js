@@ -2790,6 +2790,7 @@
     },
 
     async createRoom(data){
+      if(typeof window!=="undefined")window.__BXH_LAST_ROOM_CREATE_REASON=null;
       if(!cloudEnabled) return null;
       try{
         // Generate the code locally. Do not preflight-read tournaments/{code}:
@@ -2994,6 +2995,10 @@
         return code;
       }catch(e){
         if(typeof window!=="undefined") window.__BXH_LAST_CLOUD_ERROR_CODE = (e&&e.code)||"unknown";
+        // Keep only known service reasons for user-facing diagnostics. Never
+        // display arbitrary SDK messages, request payloads or server details.
+        const knownReasons=['unsupported-mode','auto-create-not-enabled','release-not-ready','auto-seat-create-unavailable','room-code-conflict','mirror-mismatch','not-empty-room','protected-create-field','unverified-staff-assignment','legacy-assignments-exist'];
+        if(typeof window!=="undefined")window.__BXH_LAST_ROOM_CREATE_REASON=knownReasons.includes(e?.message)?e.message:null;
         console.warn("建立雲端賽事代碼失敗", e);
         return null;
       }
