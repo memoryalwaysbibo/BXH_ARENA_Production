@@ -12,3 +12,12 @@ test('recovery reads the composed view and unsupported dispatch never falls back
 test('account switch drops a delayed success and does not expose state through recovery',async()=>{
  const h=setup(),promise=h.bridge.cloud.commitRefereeCommand({code:h.state.cloudCode,matchId:'m1',action:'score'});await Promise.resolve();h.setUid('other');h.bridge.publish({status:'ready',state:h.state});assert.equal((await promise).ok,false);assert.equal((await h.bridge.cloud.joinRoom(h.state.cloudCode)).ok,false);h.bridge.close();
 });
+test('retry forwards the retained key and waits for the authoritative score or seat revision',async()=>{
+ const state={cloudCode:'BXH-RETRY6',meta:{refereeSeatsV1:{revision:0}},matches:[{id:'m1',refereeSeatScoreRevision:0}]},keys=[];
+ const client={getView:()=>({status:'ready',state,retryable:['score:m1','seat']}),retry:async key=>{keys.push(key);return key==='seat'?{ok:true,revision:1}:{ok:true,scoreRevision:1};}};
+ const bridge=create({client,code:state.cloudCode,uid:'ref',getUid:()=> 'ref',timeoutMs:1000});
+ let done=false;const score=bridge.cloud.retryBucketOperation({code:state.cloudCode,key:'score:m1'}).then(result=>{done=true;return result;});await Promise.resolve();assert.equal(done,false);state.matches[0].refereeSeatScoreRevision=1;bridge.publish({status:'ready',state});assert.equal((await score).ok,true);
+ done=false;const seat=bridge.cloud.retryBucketOperation({code:state.cloudCode,key:'seat'}).then(result=>{done=true;return result;});await Promise.resolve();assert.equal(done,false);state.meta.refereeSeatsV1.revision=1;bridge.publish({status:'ready',state});assert.equal((await seat).ok,true);assert.deepEqual(keys,['score:m1','seat']);
+ assert.equal((await bridge.cloud.retryBucketOperation({code:state.cloudCode,key:'score:missing'})).reason,'nothing-to-retry');assert.equal((await bridge.cloud.retryBucketOperation({code:'BXH-OTHER6',key:'seat'})).reason,'bucket-session-mismatch');bridge.close();
+});
+

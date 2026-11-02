@@ -3823,6 +3823,8 @@ if(testerSession){
       try{const result=await fnx.httpsCallable(functionsHandle,"manageRefereeSeats")(data);return result.data;}
       catch(error){return {ok:false,reason:error?.message||"cloud-unavailable"};}
     },
+    async retryBucketOperation(data){return fourCourtLifecycle?.isBucket(data.code)?fourCourtLifecycle.command(data,'retryBucketOperation'):{ok:false,reason:'bucket-session-mismatch'};},
+    reconnectBucketRoom(code){return fourCourtLifecycle?.reconnect(String(code).toUpperCase())||{ok:false,reason:'bucket-session-mismatch'};},
     bucketView(code){return fourCourtLifecycle?.view(String(code).toUpperCase())||null;},
     subscribeRefereeSeats(code,callback){
       if(fourCourtLifecycle?.isBucket(String(code).toUpperCase()))return fourCourtLifecycle.subscribe(String(code).toUpperCase(),state=>callback({model:state.meta.refereeSeatsV1,projection:state.meta}),{primary:false});

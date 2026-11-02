@@ -66,6 +66,12 @@ const server=http.createServer(async(req,res)=>{
     const code='BXH-AUTH'+count,rootBefore=await db.doc('tournaments/'+code).get();
     const joined=await page.evaluate(()=>cloudSync.joinRoom(lifecycleTest.code));assert.equal(joined.ok,true);assert(joined.data.scoreStorage);assert.equal(joined.data.matches[0].scoreA,1);
     const result=await page.evaluate(()=>lifecycleTest.score());assert.equal(result.ok,true);await page.waitForFunction(()=>state.matches[0].scoreB===1&&cloudStatus==='connected');assert((await db.doc('tournaments/'+code).get()).updateTime.isEqual(rootBefore.updateTime));
+    const lost=await page.evaluate(()=>{window.dropNextBucketReply=true;return lifecycleTest.score();});assert.equal(lost.ok,false);
+    await page.waitForFunction(()=>state.matches[0].scoreB===2&&cloudSync.bucketView(lifecycleTest.code)?.retryable.length===1);
+    await page.locator('[data-action="referee-sync-recovery"]').click();await page.waitForFunction(()=>cloudStatus==='connected'&&cloudSync.bucketView(lifecycleTest.code)?.retryable.length===1);
+    await page.locator('[data-action="referee-bucket-retry"]').click();await page.evaluate(()=>retryRefereeBucketOperations());await page.waitForFunction(()=>cloudSync.bucketView(lifecycleTest.code)?.pending.length===0);
+    const wire=await page.evaluate(()=>bucketWireCommands);assert.equal(wire.length,3);assert.deepEqual(wire[1],wire[2]);assert.equal(await page.evaluate(()=>state.matches[0].scoreB),2);
+    const scored=JSON.parse((await db.doc('tournaments/'+code+'/matchBuckets/court-1').get()).data().matches)[0];assert.equal(scored.scoreB,2);assert.equal(scored.log.length,3);assert((await db.doc('tournaments/'+code).get()).updateTime.isEqual(rootBefore.updateTime));assert.equal(await page.locator('[data-action="referee-bucket-retry"]').count(),0);
     const other=count===6?12:6,preview=await page.evaluate(other=>cloudSync.joinRoom('BXH-AUTH'+other),other);assert.equal(preview.ok,true);assert.equal(await page.evaluate(()=>cloudSync.bucketView(lifecycleTest.code).status),'ready');
     await page.evaluate(()=>lifecycleTest.unsubscribe());assert.equal(await page.evaluate(()=>cloudSync.bucketView(lifecycleTest.code)),null);
     await page.evaluate(()=>lifecycleTest.subscribe());await page.waitForFunction(()=>cloudStatus==='connected'&&cloudSync.bucketView(lifecycleTest.code)?.status==='ready');
@@ -74,7 +80,7 @@ const server=http.createServer(async(req,res)=>{
     await page.evaluate(()=>lifecycleTest.login('ref5'));await page.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);
     await page.evaluate(()=>lifecycleTest.subscribe());await page.waitForFunction(()=>cloudStatus==='connected'&&state.matches.length>0);
     await page.evaluate(()=>lifecycleTest.sdk.signOut(lifecycleTest.auth));await page.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);
-    lifecycleCases.push({courts:count,buckets:Math.ceil(count/4),formalCloudMethods:true,joinedComposedScores:true,nativeScore:true,rootUnchanged:true,previewPreservesSession:true,unsubscribeStops:true,profileRevocationClearsMainView:true,accountSwitchClearsMainView:true,signOutClearsMainView:true});await page.close();
+    lifecycleCases.push({courts:count,buckets:Math.ceil(count/4),formalCloudMethods:true,joinedComposedScores:true,nativeScore:true,rootUnchanged:true,lostReplyRealButtonRetry:true,reconnectPreservesOperation:true,identicalOperationPayload:true,noDuplicateScore:true,previewPreservesSession:true,unsubscribeStops:true,profileRevocationClearsMainView:true,accountSwitchClearsMainView:true,signOutClearsMainView:true});await page.close();
    }
    report.formalLifecycle={closedDefaultDenied:true,cases:lifecycleCases};
   }
@@ -82,3 +88,4 @@ const server=http.createServer(async(req,res)=>{
   const dir=path.join(rootPath,'test-results/four-court-buckets');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,native?'callable-browser.json':'auth-browser.json'),JSON.stringify(report,null,2)+'\n');console.log((native?'PASS native Callable browser: ':'PASS real browser Auth: ')+JSON.stringify(report));
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));await deleteApp(app);}
 })().catch(error=>{console.error(error);process.exitCode=1;});
+

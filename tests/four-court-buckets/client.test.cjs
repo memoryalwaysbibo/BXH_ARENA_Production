@@ -53,3 +53,8 @@ test('successful reply keeps scoring locked until subscription confirms its scor
  const bucket=B.encode(h.f.state,h.f.room.scoreStorage)[0];h.watches[0].next({bucket:{...bucket,revision:1}});
  assert.equal(h.client.getView().pending.length,0);assert.equal(h.client.getView().state.matches[0].scoreA,1);
 });
+test('connection loss and reconnect retain the original command and operation id for retry',async()=>{
+ const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost-reply');});await h.client.score('m1','score',{side:'A',finish:'spin'});h.rooms.at(-1).error(Error('unavailable'));assert.equal(h.client.getView().status,'error');
+ h.client.connect();h.ready(h.f.room,'2');h.setSend(async()=>({ok:true,replayed:true,scoreRevision:1}));await h.client.retry('score:m1');assert.deepEqual(h.sent[0],h.sent[1]);assert.equal(h.client.getView().pending.length,1);h.client.disconnect();
+});
+
