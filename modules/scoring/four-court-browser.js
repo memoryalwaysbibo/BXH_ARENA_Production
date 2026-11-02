@@ -77,6 +77,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
    if(buckets.size!==manifest.bucketCount)return emit('syncing');
    try{
     const combined=B.materialize(base,manifest,[...buckets.values()]);
+    combined.createdBy=typeof rootRoom.createdBy==='string'?rootRoom.createdBy:null;
     combined.meta={...combined.meta,refereeSeatsV1:rootRoom.refereeSeatsV1,refereeSeatNames:rootRoom.refereeSeatNames||{},refereeStationAssignments:rootRoom.refereeStationAssignments||{},refereeStationNames:rootRoom.refereeStationNames||{},assignedStaffUids:rootRoom.assignedStaffUids||[]};
     state=combined;
     for(const [key,record] of pending)if(record.awaiting&&(record.epoch!==manifest.epoch||(record.type==='dispatch'?Number(state.courtLifecycleEpoch||0)>=record.confirmedRevision:Number(state.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=record.confirmedRevision)))pending.delete(key);

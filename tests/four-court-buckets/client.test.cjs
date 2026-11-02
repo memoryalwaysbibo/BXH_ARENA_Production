@@ -11,6 +11,7 @@ function setup(){
 }
 test('client waits for all authoritative buckets, uses root seat model and rejects old revisions',()=>{
  const h=setup();h.client.connect();h.ready();assert.equal(h.client.getView().status,'ready');
+ assert.equal(h.client.getView().state.createdBy,'host');
  const current=h.watches[0],bucket=B.encode(h.f.state,h.f.room.scoreStorage)[0],rows=JSON.parse(bucket.matches);rows[0].scoreA=2;rows[0].refereeSeatScoreRevision=1;
  current.next({bucket:{...bucket,revision:1,matches:JSON.stringify(rows)}});assert.equal(h.client.getView().state.matches[0].scoreA,2);
  current.next({bucket});assert.equal(h.client.getView().state.matches[0].scoreA,2);
