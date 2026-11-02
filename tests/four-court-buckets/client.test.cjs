@@ -57,4 +57,16 @@ test('connection loss and reconnect retain the original command and operation id
  const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost-reply');});await h.client.score('m1','score',{side:'A',finish:'spin'});h.rooms.at(-1).error(Error('unavailable'));assert.equal(h.client.getView().status,'error');
  h.client.connect();h.ready(h.f.room,'2');h.setSend(async()=>({ok:true,replayed:true,scoreRevision:1}));await h.client.retry('score:m1');assert.deepEqual(h.sent[0],h.sent[1]);assert.equal(h.client.getView().pending.length,1);h.client.disconnect();
 });
+test('uncertain dispatch blocks new intentions, retries identical payload, and waits for root lifecycle revision',async()=>{
+ const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost');});
+ const data={code:h.f.state.cloudCode,action:'swap',matchId:'m1',targetMatchId:'m5',station:1};
+ assert.equal((await h.client.dispatch(data)).ok,false);assert.deepEqual(h.client.getView().retryable,['dispatch']);assert.equal(h.client.canScore(1),false);
+ assert.equal((await h.client.score('m1','score')).reason,'operation-pending');assert.equal((await h.client.manageRefereeSeats({})).reason,'operation-pending');assert.equal((await h.client.dispatch(data)).reason,'operation-pending');
+ h.client.disconnect();h.client.connect();h.ready(h.f.room,'2');h.setSend(async()=>({ok:true,lifecycleRevision:1}));await h.client.retry('dispatch');assert.deepEqual(h.sent[0],h.sent[1]);assert.deepEqual(h.client.getView().pending,['dispatch']);assert.deepEqual(h.client.getView().retryable,[]);
+ const root=structuredClone(h.f.room),state=JSON.parse(root.data);state.courtLifecycleEpoch=1;root.data=JSON.stringify(state);h.rooms.at(-1).next({room:root,version:'3'});assert.deepEqual(h.client.getView().pending,[]);assert.equal(h.client.canScore(1),true);h.client.disconnect();
+});
+test('dispatch cannot overtake an unresolved score and malformed success retains its intention',async()=>{
+ const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost');});await h.client.score('m1','score');assert.equal((await h.client.dispatch({action:'reopen'})).reason,'operation-pending');
+ const fresh=setup();fresh.client.connect();fresh.ready();fresh.setSend(async()=>({ok:true}));assert.equal((await fresh.client.dispatch({action:'reopen',station:1})).reason,'cloud-unavailable');assert.deepEqual(fresh.client.getView().retryable,['dispatch']);h.client.disconnect();fresh.client.disconnect();
+});
 

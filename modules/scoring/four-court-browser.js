@@ -79,7 +79,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
     const combined=B.materialize(base,manifest,[...buckets.values()]);
     combined.meta={...combined.meta,refereeSeatsV1:rootRoom.refereeSeatsV1,refereeSeatNames:rootRoom.refereeSeatNames||{},refereeStationAssignments:rootRoom.refereeStationAssignments||{},refereeStationNames:rootRoom.refereeStationNames||{},assignedStaffUids:rootRoom.assignedStaffUids||[]};
     state=combined;
-    for(const [key,record] of pending)if(record.awaiting&&(record.epoch!==manifest.epoch||Number(state.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=record.confirmedRevision))pending.delete(key);
+    for(const [key,record] of pending)if(record.awaiting&&(record.epoch!==manifest.epoch||(record.type==='dispatch'?Number(state.courtLifecycleEpoch||0)>=record.confirmedRevision:Number(state.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=record.confirmedRevision)))pending.delete(key);
     emit('ready');
    }catch(error){emit('syncing',error.message);}
   }
@@ -121,10 +121,12 @@ globalThis.BXHMatchBuckets=module.exports;})();
    if(record.running)return {ok:false,reason:'operation-pending'};
    record.running=true;pending.set(key,record);emit(status);
    try{
-    const result=await (record.type==='score'?transport.commitScore:transport.manageSeats)(clone(record.data));
-    if(result?.ok&&record.type==='score'&&Number.isSafeInteger(result.scoreRevision)){
-     record.awaiting=true;record.confirmedRevision=result.scoreRevision;
-     if(Number(state?.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=result.scoreRevision)pending.delete(key);
+    const result=await (record.type==='seat'?transport.manageSeats:transport.commitScore)(clone(record.data));
+    const revision=record.type==='dispatch'?result?.lifecycleRevision:result?.scoreRevision;
+    if(result?.ok&&record.type==='dispatch'&&(!Number.isSafeInteger(revision)||revision<1))return {ok:false,reason:'cloud-unavailable'};
+    if(result?.ok&&record.type!=='seat'&&Number.isSafeInteger(revision)){
+     record.awaiting=true;record.confirmedRevision=revision;
+     if((record.type==='dispatch'?Number(state?.courtLifecycleEpoch||0):Number(state?.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0))>=revision)pending.delete(key);
     }else if(result?.ok||result?.ok===false&&typeof result.reason==='string'&&!uncertain.has(result.reason))pending.delete(key);
     return result||{ok:false,reason:'cloud-unavailable'};
    }catch{return {ok:false,reason:'cloud-unavailable'};}
@@ -132,7 +134,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
   }
   async function score(matchId,action,extra={}){
    const key='score:'+matchId;
-   if(pending.has(key))return {ok:false,reason:'operation-pending'};
+   if(pending.has(key)||pending.has('dispatch'))return {ok:false,reason:'operation-pending'};
    if(!active||status!=='ready')return {ok:false,reason:'not-synchronized'};
    const match=state.matches.find(m=>m.id===matchId),court=state.meta.refereeSeatsV1?.courts?.[match?.station];
    if(!match||!allowed(match.station))return {ok:false,reason:'station-not-assigned'};
@@ -140,11 +142,16 @@ globalThis.BXHMatchBuckets=module.exports;})();
    return deliver(key,{type:'score',data,running:false,epoch:manifest.epoch});
   }
   function manageRefereeSeats(data){
-   if(pending.has('seat'))return Promise.resolve({ok:false,reason:'operation-pending'});
+   if(pending.has('seat')||pending.has('dispatch'))return Promise.resolve({ok:false,reason:'operation-pending'});
    return deliver('seat',{type:'seat',data:{...data,code,operationId:data.operationId||operationId()},running:false,epoch:manifest?.epoch});
   }
+  function dispatch(data){
+   if(pending.size)return Promise.resolve({ok:false,reason:'operation-pending'});
+   if(!active||status!=='ready')return Promise.resolve({ok:false,reason:'not-synchronized'});
+   return deliver('dispatch',{type:'dispatch',data:{...data,code,operationId:data.operationId||operationId()},running:false,epoch:manifest.epoch});
+  }
   function retry(key){const record=pending.get(key);return record?deliver(key,record):Promise.resolve({ok:false,reason:'nothing-to-retry'});}
-  return {connect,disconnect,score,manageRefereeSeats,retry,getView:()=>({status,state:state?clone(state):null,pending:[...pending.keys()],retryable:retryable()}),canScore:station=>status==='ready'&&allowed(station)};
+  return {connect,disconnect,score,dispatch,manageRefereeSeats,retry,getView:()=>({status,state:state?clone(state):null,pending:[...pending.keys()],retryable:retryable()}),canScore:station=>status==='ready'&&!pending.has('dispatch')&&allowed(station)};
  }
  return {create};
 });
@@ -218,6 +225,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
  'use strict';
  const clone=x=>JSON.parse(JSON.stringify(x));
  const actions=new Set(['score','fault','undo','rematch','pause','resume','confirm','quick']);
+ const dispatches=new Set(['idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer']);
  function create({client,code,uid,getUid,legacy={},timeoutMs=8000}){
   let view=client.getView(),closed=false,lastSignature=null;const states=new Set(),seats=new Set(),waiters=new Set();
   const current=()=>!closed&&getUid()===uid;
@@ -232,7 +240,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
   }
   async function settle(result,matchId=null){
    if(!result?.ok)return result;
-   const confirmed=()=>ready()&&(matchId?Number(view.state.matches.find(m=>m.id===matchId)?.refereeSeatScoreRevision||0)>=Number(result.scoreRevision):Number(view.state.meta.refereeSeatsV1?.revision||0)>=Number(result.revision));
+   const confirmed=()=>ready()&&(matchId==='dispatch'?Number.isSafeInteger(result.lifecycleRevision)&&Number(view.state.courtLifecycleEpoch||0)>=result.lifecycleRevision:matchId?Number(view.state.matches.find(m=>m.id===matchId)?.refereeSeatScoreRevision||0)>=Number(result.scoreRevision):Number(view.state.meta.refereeSeatsV1?.revision||0)>=Number(result.revision));
    if(!confirmed())await new Promise(resolve=>{
     let timer;const check=()=>{if(confirmed()||!current()||view.status==='error'||view.status==='offline'){clearTimeout(timer);waiters.delete(check);resolve();}};
     timer=setTimeout(()=>{waiters.delete(check);resolve();},timeoutMs);waiters.add(check);check();
@@ -242,9 +250,9 @@ globalThis.BXHMatchBuckets=module.exports;})();
   }
   async function commit(data){
    if(!current()||data.code!==code)return {ok:false,reason:'bucket-session-mismatch'};
-   if(!actions.has(data.action))return {ok:false,reason:'unsupported-bucket-action'};
+   if(!actions.has(data.action)&&!dispatches.has(data.action))return {ok:false,reason:'unsupported-bucket-action'};
    if(!ready())return {ok:false,reason:'not-synchronized'};
-   return settle(await client.score(data.matchId,data.action,data),data.matchId);
+   return dispatches.has(data.action)?settle(await client.dispatch(data),'dispatch'):settle(await client.score(data.matchId,data.action,data),data.matchId);
   }
   const cloud={...legacy,
    commitRefereeCommand:commit,
@@ -252,7 +260,7 @@ globalThis.BXHMatchBuckets=module.exports;})();
     if(!current()||data.code!==code)return {ok:false,reason:'bucket-session-mismatch'};
     if(!ready())return {ok:false,reason:'not-synchronized'};
     if(!client.getView().retryable?.includes(data.key))return {ok:false,reason:'nothing-to-retry'};
-    return settle(await client.retry(data.key),data.key==='seat'?null:data.key.slice(6));
+    return settle(await client.retry(data.key),data.key==='dispatch'?'dispatch':data.key==='seat'?null:data.key.slice(6));
    },
    manageRefereeSeats:data=>current()&&data.code===code?client.manageRefereeSeats(data):Promise.resolve({ok:false,reason:'bucket-session-mismatch'}),
    joinRoom:async requested=>requested===code&&ready()?{ok:true,data:clone(view.state)}:{ok:false,reason:'not-synchronized'},

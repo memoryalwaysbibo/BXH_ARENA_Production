@@ -30,7 +30,7 @@
     const combined=B.materialize(base,manifest,[...buckets.values()]);
     combined.meta={...combined.meta,refereeSeatsV1:rootRoom.refereeSeatsV1,refereeSeatNames:rootRoom.refereeSeatNames||{},refereeStationAssignments:rootRoom.refereeStationAssignments||{},refereeStationNames:rootRoom.refereeStationNames||{},assignedStaffUids:rootRoom.assignedStaffUids||[]};
     state=combined;
-    for(const [key,record] of pending)if(record.awaiting&&(record.epoch!==manifest.epoch||Number(state.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=record.confirmedRevision))pending.delete(key);
+    for(const [key,record] of pending)if(record.awaiting&&(record.epoch!==manifest.epoch||(record.type==='dispatch'?Number(state.courtLifecycleEpoch||0)>=record.confirmedRevision:Number(state.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=record.confirmedRevision)))pending.delete(key);
     emit('ready');
    }catch(error){emit('syncing',error.message);}
   }
@@ -72,10 +72,12 @@
    if(record.running)return {ok:false,reason:'operation-pending'};
    record.running=true;pending.set(key,record);emit(status);
    try{
-    const result=await (record.type==='score'?transport.commitScore:transport.manageSeats)(clone(record.data));
-    if(result?.ok&&record.type==='score'&&Number.isSafeInteger(result.scoreRevision)){
-     record.awaiting=true;record.confirmedRevision=result.scoreRevision;
-     if(Number(state?.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0)>=result.scoreRevision)pending.delete(key);
+    const result=await (record.type==='seat'?transport.manageSeats:transport.commitScore)(clone(record.data));
+    const revision=record.type==='dispatch'?result?.lifecycleRevision:result?.scoreRevision;
+    if(result?.ok&&record.type==='dispatch'&&(!Number.isSafeInteger(revision)||revision<1))return {ok:false,reason:'cloud-unavailable'};
+    if(result?.ok&&record.type!=='seat'&&Number.isSafeInteger(revision)){
+     record.awaiting=true;record.confirmedRevision=revision;
+     if((record.type==='dispatch'?Number(state?.courtLifecycleEpoch||0):Number(state?.matches.find(m=>m.id===record.data.matchId)?.refereeSeatScoreRevision||0))>=revision)pending.delete(key);
     }else if(result?.ok||result?.ok===false&&typeof result.reason==='string'&&!uncertain.has(result.reason))pending.delete(key);
     return result||{ok:false,reason:'cloud-unavailable'};
    }catch{return {ok:false,reason:'cloud-unavailable'};}
@@ -83,7 +85,7 @@
   }
   async function score(matchId,action,extra={}){
    const key='score:'+matchId;
-   if(pending.has(key))return {ok:false,reason:'operation-pending'};
+   if(pending.has(key)||pending.has('dispatch'))return {ok:false,reason:'operation-pending'};
    if(!active||status!=='ready')return {ok:false,reason:'not-synchronized'};
    const match=state.matches.find(m=>m.id===matchId),court=state.meta.refereeSeatsV1?.courts?.[match?.station];
    if(!match||!allowed(match.station))return {ok:false,reason:'station-not-assigned'};
@@ -91,11 +93,17 @@
    return deliver(key,{type:'score',data,running:false,epoch:manifest.epoch});
   }
   function manageRefereeSeats(data){
-   if(pending.has('seat'))return Promise.resolve({ok:false,reason:'operation-pending'});
+   if(pending.has('seat')||pending.has('dispatch'))return Promise.resolve({ok:false,reason:'operation-pending'});
    return deliver('seat',{type:'seat',data:{...data,code,operationId:data.operationId||operationId()},running:false,epoch:manifest?.epoch});
   }
+  function dispatch(data){
+   if(pending.size)return Promise.resolve({ok:false,reason:'operation-pending'});
+   if(!active||status!=='ready')return Promise.resolve({ok:false,reason:'not-synchronized'});
+   return deliver('dispatch',{type:'dispatch',data:{...data,code,operationId:data.operationId||operationId()},running:false,epoch:manifest.epoch});
+  }
   function retry(key){const record=pending.get(key);return record?deliver(key,record):Promise.resolve({ok:false,reason:'nothing-to-retry'});}
-  return {connect,disconnect,score,manageRefereeSeats,retry,getView:()=>({status,state:state?clone(state):null,pending:[...pending.keys()],retryable:retryable()}),canScore:station=>status==='ready'&&allowed(station)};
+  return {connect,disconnect,score,dispatch,manageRefereeSeats,retry,getView:()=>({status,state:state?clone(state):null,pending:[...pending.keys()],retryable:retryable()}),canScore:station=>status==='ready'&&!pending.has('dispatch')&&allowed(station)};
  }
  return {create};
 });
+

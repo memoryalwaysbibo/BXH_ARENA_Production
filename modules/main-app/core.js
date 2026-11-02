@@ -6124,6 +6124,7 @@ function refereeDisplayForStation(stationNum, st=state){
 function canOperateStation(stationNum, st=state){
   const bucketView=st.cloudCode&&window.cloudSync?.bucketView?.(st.cloudCode);
   if((Object.hasOwn(st,"scoreStorage")||bucketView)&&bucketView?.status!=="ready")return false;
+  if(bucketView?.pending?.includes("dispatch"))return false;
   if(Number(stationNum)<1||st.forcedCourtExits?.[stationNum]?.closed)return false;
   if(isCommunityRoomOwner()) return true;
   if(isOwnTestTournament(st)) return true;
