@@ -20,6 +20,7 @@ function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock()}={}){re
   if(!ts.exists||!ps.exists||!rs.exists)fail('not-found');
   const t=ts.data(),pub=ps.data(),reg=rs.data();
   if(!authorized(us.data(),uid,t))fail('permission-denied');
+  if(Object.prototype.hasOwnProperty.call(t,'scoreStorage'))fail('bucket-scoring-required');
   const state=parse(t.data),mirror=parse(pub.bracketView);
   // This server-owned path is deliberately limited to the seat-enabled official
   // individual rooms whose browser runtime writes are protected by seat Rules.

@@ -16,6 +16,11 @@ function guardFirestore(db){
     const [ref,patch]=args,path=roomPath(ref);
     if(!path||!patch||typeof patch!=='object')return args;
     const [collection,code]=path.split('/');
+    // Pinned backend writers use this wrapper; prevent a stale room transaction
+    // from writing a bucket-marked root even when its patch is metadata-only.
+    const snapshot=snapshots.get('tournaments/'+code);
+    if(snapshot?.exists&&Object.prototype.hasOwnProperty.call(snapshot.data()||{},'scoreStorage'))fail('bucket-scoring-required');
+    if(collection==='publicTournaments'&&snapshots.get(path)?.data()?.scoreBucketProjection!==undefined)fail('bucket-scoring-required');
     if(collection==='tournaments'&&typeof patch.data==='string'){
      const snapshot=snapshots.get(path);
      if(!snapshot)fail('qr-checkin-transaction-read-required');
