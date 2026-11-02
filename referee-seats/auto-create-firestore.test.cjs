@@ -92,3 +92,20 @@ test('saved frontend idle drafts create real paired Firestore documents across v
   assert.equal(h.writes.length,0,'no fallback client writes');
  }
 });
+
+test('active staff ranked room persists both documents and idempotent receipt in Firestore',async()=>{
+ const code='BXH-STAFFRANK',req=request(code,'staff-ranked-emulator-op-001');
+ const s=JSON.parse(req.data.privatePayload.data),m=JSON.parse(req.data.publicPayload.bracketView);
+ s.meta.ladderMode='ranked';m.meta.ladderMode='ranked';
+ Object.assign(req.data.privatePayload,{ladderMode:'ranked',data:JSON.stringify(s)});
+ Object.assign(req.data.publicPayload,{ladderMode:'ranked',bracketView:JSON.stringify(m)});
+ assert.deepEqual(await create(req),{ok:true,code,idempotent:false});
+ assert.deepEqual(await create(req),{ok:true,code,idempotent:true});
+ const [a,b]=await Promise.all([db.doc('tournaments/'+code).get(),db.doc('publicTournaments/'+code).get()]);
+ assert.equal(a.data().createdBy,'owner');assert.deepEqual(a.data().assignedStaffUids,['owner']);
+ for(const [snap,key]of [[a,'data'],[b,'bracketView']]){
+  assert.equal(snap.data().ladderMode,'ranked');assert.equal(JSON.parse(snap.data()[key]).meta.ladderMode,'ranked');
+ }
+ assert.equal(Object.keys(a.data().refereeSeatsV1.courts).length,3);
+ assert(!b.data().bracketView.includes('"uid"'));
+});

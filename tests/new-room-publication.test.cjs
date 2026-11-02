@@ -23,3 +23,24 @@ test('a thrown create failure also leaves a persisted unpublished draft',async()
  const f=fixture();f.ctx.window.cloudSync.createRoom=async()=>{throw Error('unavailable');};await f.run();
  assert.equal(f.saves.at(-1).meta.publishedAt,null);assert.equal(f.room.cloudCode,undefined);
 });
+
+function errorMessage(code,reason){
+ const begin=source.indexOf('function cloudCreateRoomErrorMessage('),stop=source.indexOf('\nasync function cloudStartRoom',begin);
+ assert(begin>=0&&stop>begin);
+ const ctx=vm.createContext({window:{__BXH_LAST_CLOUD_ERROR_CODE:code,__BXH_LAST_ROOM_CREATE_REASON:reason},isPartnerOrganizerMode:()=>false});
+ vm.runInContext(source.slice(begin,stop),ctx);return ctx.cloudCreateRoomErrorMessage('發布失敗');
+}
+for(const [code,reason,expected]of [
+ ['functions/failed-precondition','unsupported-mode','賽事模式'],
+ ['functions/failed-precondition','auto-create-not-enabled','尚未就緒'],
+ ['functions/permission-denied',null,'未通過授權'],
+ ['functions/unauthenticated',null,'重新登入'],
+ ['functions/unavailable',null,'暫時無法連線'],
+ ['functions/failed-precondition','mirror-mismatch','草稿資料驗證未通過'],
+ ['functions/failed-precondition','room-code-conflict','房間代碼重複']
+])test(`room-create diagnostic explains ${reason||code}`,()=>{
+ const message=errorMessage(code,reason);assert(message.startsWith('發布失敗：'));assert(message.includes(expected));
+});
+test('unknown service detail is never exposed to the room creator',()=>{
+ assert(!errorMessage('functions/internal','secret server payload').includes('secret'));
+});
