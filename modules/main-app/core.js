@@ -19444,7 +19444,7 @@ function render(){
   if(appPhase==="player-home"){ app.innerHTML = renderPlayerHomeScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-login"){ renderAuthFormPreservingInputs(app,renderPlayerLoginScreen(),appPhase); return; }
   if(appPhase==="player-apply"){ renderAuthFormPreservingInputs(app,renderPlayerApplyScreen(),appPhase); return; }
-  if(appPhase==="player-complete-profile"){ renderAuthFormPreservingInputs(app,renderPlayerCompleteProfileScreen(),appPhase); return; }
+  if(appPhase==="player-complete-profile"){ app.innerHTML = renderPlayerCompleteProfileScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-lookup"){ app.innerHTML = renderPlayerLookupScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-center"){
     if(playerActiveTab==='registered'&&!mailboxContext().open)__viewportSnapshot.lobbyPatched=window.BXHQueueDashboard.renderStable(app,renderPlayerCenterScreen(),currentRenderViewportKey()+'|'+lobbyContextKey());
@@ -21771,9 +21771,21 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const realName = document.getElementById("complete-realname")?.value.trim() || "";
     const nickname = document.getElementById("complete-nickname")?.value.trim() || "";
     const phone = document.getElementById("complete-phone")?.value.trim() || "";
-    if(!realName){ playerApplyError="請輸入真實姓名"; render(); return; }
-    if(pendingNewPlayerProfile && !nickname){ playerApplyError="請填寫 ARENA 角色名稱"; render(); return; }
-    if(pendingNewPlayerProfile && !phone){ playerApplyError="請填寫手機號碼"; render(); return; }
+    const showMissing = (message, fieldId) => {
+      playerApplyError = message;
+      const card = document.querySelector(".auth-card");
+      let error = card?.querySelector(".auth-error");
+      if(!error && card){
+        error = document.createElement("div");
+        error.className = "auth-error";
+        card.querySelector(".auth-card-sub")?.after(error);
+      }
+      if(error) error.textContent = message;
+      document.getElementById(fieldId)?.focus();
+    };
+    if(!realName){ showMissing("請輸入真實姓名", "complete-realname"); return; }
+    if(pendingNewPlayerProfile && !nickname){ showMissing("請填寫 ARENA 角色名稱", "complete-nickname"); return; }
+    if(pendingNewPlayerProfile && !phone){ showMissing("請填寫手機號碼", "complete-phone"); return; }
     playerApplyBusy = true; playerApplyError=""; render();
     (async ()=>{
       const isExistingAccount = !!pendingExistingAccountProfile;
