@@ -9546,6 +9546,13 @@ async function saveRegistrationSettingsAndReport(previousMeta,message,resetSetti
 }
 
 async function publishRegistrationConfig(){
+  const publishingRoom=state;
+  const publicationBefore={publishedAt:state.cloudCode?state.meta.publishedAt:null,registrationStatus:state.cloudCode?state.meta.registrationStatus:'draft'};
+  const restoreUnpublishedDraft=async()=>{
+    if(state!==publishingRoom||state.cloudCode)return;
+    Object.assign(state.meta,publicationBefore);
+    await saveRecord(state);
+  };
   state.meta.publishedAt = Date.now();
   state.meta.registrationStatus = computeRegistrationStatus(state.meta);
   if(!state.cloudCode)await saveRecord(state); // New-room drafts are local; existing-room edits wait for cloud confirmation.
@@ -9553,13 +9560,16 @@ async function publishRegistrationConfig(){
   if(!state.cloudCode){
     if(window.cloudSync && window.cloudSync.connect) await window.cloudSync.connect();
     if(!cloudAvailable()){
+      await restoreUnpublishedDraft();
       render();
       showToast("已保存草稿，但目前無法連上雲端，因此尚未正式發布", true);
       return;
     }
     cloudStatus = "connecting"; render();
-    const code = await window.cloudSync.createRoom(state);
+    let code;
+    try{code=await window.cloudSync.createRoom(state);}catch(e){code=null;}
     if(!code){
+      await restoreUnpublishedDraft();
       cloudStatus = "error"; render();
       showToast(cloudCreateRoomErrorMessage("發布失敗")+"；草稿仍已保留", true);
       return;

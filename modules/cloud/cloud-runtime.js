@@ -2907,8 +2907,28 @@
           partnerOrganizationCode:partnerGrant.organizationId,
           partnerContractOrderCode:data.partnerContractOrderCode
         }:{};
+        // Saving a new draft preallocates idle courts. They are UI placeholders,
+        // not dispatch history: omit only strictly inert slots from the paired
+        // create payload, which the trusted new-room endpoint requires empty.
+        // Never erase active, locked, malformed or unknown court data.
+        const initialCourts=data.courtAssignments;
+        const inertCourtKeys=new Set(['currentMatchId','nextMatchId','status','lockedBy','lockedAt','updatedAt']);
+        const emptyNewOfficialRoom=!partnerSession&&!testerSession&&m.eventAuthority==='official'&&m.battleMode!=='team'&&m.playMode!=='enchantment'
+          &&Array.isArray(data.players)&&data.players.length===0&&Array.isArray(data.matches)&&data.matches.length===0
+          &&(!data.teams||(Array.isArray(data.teams)&&data.teams.length===0))
+          &&!data.startedAt&&!data.completedAt&&!data.archivedAt&&!data.bracketSize
+          &&(!data.archiveStatus||data.archiveStatus==='ongoing');
+        const onlyIdleCourts=initialCourts&&typeof initialCourts==='object'&&!Array.isArray(initialCourts)
+          &&Object.entries(initialCourts).every(([key,c])=>{
+            const match=/^court([1-9][0-9]*)$/.exec(key);
+            return match&&Number(match[1])<=Number(m.stations||1)&&c&&typeof c==='object'&&!Array.isArray(c)
+              &&Object.keys(c).every(k=>inertCourtKeys.has(k))&&c.status==='idle'
+              &&c.currentMatchId==null&&c.nextMatchId==null&&c.lockedBy==null&&c.lockedAt==null
+              &&(c.updatedAt==null||(Number.isFinite(c.updatedAt)&&c.updatedAt>=0));
+          });
+        const createData=emptyNewOfficialRoom&&onlyIdleCourts?Object.assign({},data,{courtAssignments:{}}):data;
         const privatePayload=Object.assign({
-          data: JSON.stringify(data),
+          data: JSON.stringify(createData),
           updatedAt: Date.now(),
           visibility: lobbyVisibility,
           createdBy: currentUserUidForWrites(),
@@ -2920,7 +2940,7 @@
           ladderSeasonId: (data && data.ladderSeasonId) || null
         }, registrationFields, testFields, partnerPrivate);
         const publicPayload=Object.assign({
-          bracketView: JSON.stringify(buildPublicMirrorFields(data)),
+          bracketView: JSON.stringify(buildPublicMirrorFields(createData)),
           updatedAt: Date.now(),
           visibility: lobbyVisibility
         }, publicRegistrationFields, testFields);
