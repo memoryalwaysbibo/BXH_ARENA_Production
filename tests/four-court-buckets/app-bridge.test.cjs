@@ -7,7 +7,7 @@ test('existing command bridge returns full state only after authoritative revisi
 });
 test('recovery reads the composed view and unsupported dispatch never falls back',async()=>{
  const h=setup();assert.equal((await h.bridge.cloud.joinRoom(h.state.cloudCode)).data.matches[0].scoreA,0);assert.equal(h.legacyReads(),0);
- assert.equal((await h.bridge.cloud.commitRefereeCommand({code:h.state.cloudCode,action:'resize'})).reason,'unsupported-bucket-action');assert.equal(h.calls(),0);
+ assert.equal((await h.bridge.cloud.commitRefereeCommand({code:h.state.cloudCode,action:'unknown-dispatch'})).reason,'unsupported-bucket-action');assert.equal(h.calls(),0);
 });
 test('account switch drops a delayed success and does not expose state through recovery',async()=>{
  const h=setup(),promise=h.bridge.cloud.commitRefereeCommand({code:h.state.cloudCode,matchId:'m1',action:'score'});await Promise.resolve();h.setUid('other');h.bridge.publish({status:'ready',state:h.state});assert.equal((await promise).ok,false);assert.equal((await h.bridge.cloud.joinRoom(h.state.cloudCode)).ok,false);h.bridge.close();

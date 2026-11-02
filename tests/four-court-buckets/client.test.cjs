@@ -70,4 +70,11 @@ test('dispatch cannot overtake an unresolved score and malformed success retains
  const h=setup();h.client.connect();h.ready();h.setSend(async()=>{throw Error('lost');});await h.client.score('m1','score');assert.equal((await h.client.dispatch({action:'reopen'})).reason,'operation-pending');
  const fresh=setup();fresh.client.connect();fresh.ready();fresh.setSend(async()=>({ok:true}));assert.equal((await fresh.client.dispatch({action:'reopen',station:1})).reason,'cloud-unavailable');assert.deepEqual(fresh.client.getView().retryable,['dispatch']);h.client.disconnect();fresh.client.disconnect();
 });
+test('court-count changes reset bucket subscriptions and wait for the new set before scoring',()=>{
+ const h=setup();h.client.connect();h.ready();const previous=h.watches.slice(),room=structuredClone(h.f.room),state=structuredClone(h.f.state);
+ state.meta.stations=9;room.scoreStorage=B.makeManifest(state,room.scoreStorage.epoch);room.data=JSON.stringify(state);
+ h.rooms.at(-1).next({room,version:'2'});assert(previous.every(w=>w.stopped));assert.equal(h.client.getView().status,'syncing');assert.equal(h.client.canScore(1),false);
+ const encoded=B.encode(state,room.scoreStorage);for(const b of encoded.slice(0,2))h.watches.filter(w=>!w.stopped&&w.id===b.bucketId).at(-1).next({bucket:b});assert.equal(h.client.getView().status,'syncing');
+ previous[0].next({bucket:encoded[0]});assert.equal(h.client.getView().status,'syncing');h.watches.filter(w=>!w.stopped&&w.id==='court-3').at(-1).next({bucket:encoded[2]});assert.equal(h.client.getView().status,'ready');assert.equal(h.client.getView().state.meta.stations,9);
+});
 

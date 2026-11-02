@@ -14,7 +14,7 @@ function makeManifest(state,epoch){return {schema,status:'active',epoch,roomId:s
 function encode(state,m,previous=[]){
  const old=new Map(previous.map(b=>[b.bucketId,b]));
  return Array.from({length:m.bucketCount},(_,i)=>{
-  const bucketId='court-'+(i+1),matches=JSON.stringify(state.matches.filter(x=>Number(x.station)>0&&route(Number(x.station),m.courtCount)===bucketId));
+  const bucketId='court-'+(i+1),matches=JSON.stringify(state.matches.filter(x=>Number(x.station)>0&&Number(x.station)<=m.courtCount&&route(Number(x.station),m.courtCount)===bucketId));
   const before=old.get(bucketId),revision=before?before.revision+(before.matches===matches?0:1):0;
   return {schema,code:m.code,roomId:m.roomId,epoch:m.epoch,bucketId,revision,matches};
  });
@@ -27,7 +27,7 @@ function materialize(base,m,buckets,partialId=null){
   if(!bucket||bucket.schema!==schema||bucket.code!==m.code||bucket.roomId!==m.roomId||bucket.epoch!==m.epoch||!expected.includes(bucket.bucketId)||seen.has(bucket.bucketId)||!Number.isSafeInteger(bucket.revision)||bucket.revision<0)throw Error('bucket-context');
   seen.add(bucket.bucketId);let rows;try{rows=JSON.parse(bucket.matches);}catch{throw Error('bucket-corrupt');}
   if(!Array.isArray(rows))throw Error('bucket-corrupt');
-  const originals=state.matches.filter(x=>Number(x.station)>0&&route(Number(x.station),m.courtCount)===bucket.bucketId);
+  const originals=state.matches.filter(x=>Number(x.station)>0&&Number(x.station)<=m.courtCount&&route(Number(x.station),m.courtCount)===bucket.bucketId);
   if(rows.length!==originals.length)throw Error('bucket-match-set');
   for(const match of rows){
    const original=originals.find(x=>x.id===match.id);
@@ -44,3 +44,4 @@ function materialize(base,m,buckets,partialId=null){
  return state;
 }
 module.exports={schema,route,context,makeManifest,encode,materialize};
+

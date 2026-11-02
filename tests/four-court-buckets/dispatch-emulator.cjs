@@ -21,7 +21,7 @@ async function score(root,id,finish='spin'){const f=await read(root),d=request(f
  }
  {
   const root=await seed('BXH-DSWAP6',6);await score(root,'m2','burst');const original=await read(root),d=command(original,'swap','m1',op(),{targetMatchId:'m5'});await send('host',d);const latest=await read(root);assert.equal(latest.state.matches[0].station,5);assert.equal(latest.state.matches.find(m=>m.id==='m5').station,1);assert.equal(latest.state.matches.find(m=>m.id==='m2').scoreA,2);assert.equal(latest.state.matches.find(m=>m.id==='m2').log.length,1);
-  const before=await root.get();await assert.rejects(send('host',{...d,operationId:op()}),/score-stale|station-mismatch|dispatch-stale/);await assert.rejects(dispatch(root,'resize',null,{station:1,count:4}),/unsupported-bucket-action/);assert((await root.get()).updateTime.isEqual(before.updateTime));report.crossBucketSwap={untouchedCourtScorePreserved:true,staleCommandDenied:true,resizeStillClosed:true};
+  const before=await root.get();await assert.rejects(send('host',{...d,operationId:op()}),/score-stale|station-mismatch|dispatch-stale/);await assert.rejects(dispatch(root,'resize',null,{station:1,count:0}),/invalid-court-count/);assert((await root.get()).updateTime.isEqual(before.updateTime));report.crossBucketSwap={untouchedCourtScorePreserved:true,staleCommandDenied:true,invalidResizeDenied:true};
  }
  {
   const root=await seed('BXH-DRACE6',6),f=await read(root),s=request(f.state,f.room,'m1','score',op(),{side:'A',finish:'spin'}),d=command(f,'force-exit','m1',op(),{expectedExitRevision:0});
@@ -30,7 +30,11 @@ async function score(root,id,finish='spin'){const f=await read(root),d=request(f
  }
  {
   const root=await seed('BXH-DCOUNT6',6),f=await read(root);for(const m of f.state.matches.filter(m=>m.station>=5))m.status='paused';f.state.courtRetirementPlan={targetCount:4,revision:1,courts:{5:{status:'draining'},6:{status:'draining'}}};await root.update({data:JSON.stringify(f.state)});for(const b of B.encode(f.state,f.room.scoreStorage))await root.collection('matchBuckets').doc(b.bucketId).set(b);
-  await dispatch(root,'retirement-transfer','m5',{targetStation:1});const before=await root.get(),buckets=await root.collection('matchBuckets').get(),pub=await db.doc('publicTournaments/'+root.id).get();await assert.rejects(dispatch(root,'retirement-transfer','m6',{targetStation:1}),/bucket-court-count-change-required/);assert((await root.get()).updateTime.isEqual(before.updateTime));assert((await db.doc('publicTournaments/'+root.id).get()).updateTime.isEqual(pub.updateTime));const after=await root.collection('matchBuckets').get();buckets.docs.forEach((b,i)=>assert(b.updateTime.isEqual(after.docs[i].updateTime)));report.manifestCountChange={refused:true,rootBucketsAndPublicUnchanged:true};
+  await dispatch(root,'retirement-transfer','m5',{targetStation:1});await dispatch(root,'retirement-transfer','m6',{targetStation:1});const after=await read(root);assert.equal(after.state.meta.stations,4);assert.equal(after.room.scoreStorage.bucketCount,1);assert.equal((await root.collection('matchBuckets').doc('court-2').get()).exists,false);assert.equal((await db.doc('publicTournaments/'+root.id).get()).data().scoreBucketProjection.versions['court-2'],undefined);report.manifestCountChange={drained:true,removedBucketAndUpdatedPublic:true};
+ }
+ for(const count of [4,8]){
+  const root=await seed('BXH-DGROW'+count,count),f=await read(root),request=command(f,'resize',null,op(),{count:count+1,expectedTarget:count,expectedPlanRevision:0});
+  await send('host',request);const after=await read(root);assert.equal(after.state.meta.stations,count+1);assert.equal(after.room.scoreStorage.bucketCount,Math.ceil((count+1)/4));assert.equal((await send('host',request)).replayed,true);report.cases.push({growth:count+'→'+(count+1),newBucketCreated:true,replaySafe:true});
  }
  fs.mkdirSync('test-results/four-court-buckets',{recursive:true});fs.writeFileSync(path.resolve('test-results/four-court-buckets/dispatch.json'),JSON.stringify(report,null,2)+'\n');console.log('PASS bucket dispatch: '+JSON.stringify(report));
 }finally{await deleteApp(app);}})().catch(error=>{console.error(error);process.exitCode=1;});

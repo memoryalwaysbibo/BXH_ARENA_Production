@@ -1,5 +1,11 @@
 # Four-court scoring buckets: isolated candidate
 
+## Dynamic physical court count (current candidate)
+
+The trusted `resize` dispatch now changes the manifest in the same Firestore transaction as the root, public projection, receipt, and bucket creation/deletion. An active court count of 1–4 uses one bucket; 5–8 uses two; 9–12 uses three. Growing beyond a boundary creates the new bucket only after checking that its document does not already exist. Shrinking deletes buckets outside the new physical count only after the retirement engine has moved or finished all pending matches there. A match already completed on a retired court keeps its original station and full score history in the authoritative root; re-expansion moves that history back into its court bucket. Detached station-0 matches also stay in the root.
+
+The browser client stops old bucket subscriptions and waits for all buckets under the new manifest before allowing scoring, including court-count changes within the same group of four. An uncertain dispatch keeps its operation ID for receipt replay. The room and public projection update the physical court count and referee station projection. Firestore Emulator tests cover growth across 4→5 and 8→9 and completion of a draining 6→4 retirement; local tests additionally cover 12→8→4→8→12 with historical scores. Release flags and all production rooms remain closed. A live mixed-version and Rules subscription test during bucket deletion, App Check validation and operational rollback still remain release gates.
+
 The current score and confirmation transactions update both `tournaments/{code}.data` and `publicTournaments/{code}.bracketView`. The three-seat callable does too. Therefore a court-to-bucket label alone cannot reduce contention: all operations would still write the two shared room documents. The 2026-10-31 incident cause remains unproven. See the baseline in PR #679.
 
 This PR contains a routing and Firestore Emulator candidate plus closed-by-default formal Functions registration. It adds closed client lifecycle wiring to the app entrypoint, but does not alter deployed Rules/Functions, production flags, rooms or deployed scoring. It creates no production collections. An emulator pass is evidence for partition behavior, not certification of a six- or twelve-court live event.

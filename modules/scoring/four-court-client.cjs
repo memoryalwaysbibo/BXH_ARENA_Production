@@ -44,7 +44,7 @@
      const nextRoom=clone(event.room),nextBase=JSON.parse(nextRoom.data),nextManifest=B.context(nextRoom,nextBase);
      if(nextManifest.code!==code)throw Error('room-mismatch');
      if(rootVersion===nextVersion&&JSON.stringify(nextRoom)!==JSON.stringify(rootRoom))throw Error('room-version-conflict');
-     const reset=!manifest||nextManifest.epoch!==manifest.epoch||nextManifest.bucketCount!==manifest.bucketCount;
+     const reset=!manifest||nextManifest.epoch!==manifest.epoch||nextManifest.courtCount!==manifest.courtCount||nextManifest.bucketCount!==manifest.bucketCount;
      rootRoom=nextRoom;base=nextBase;manifest=nextManifest;rootVersion=nextVersion;
      if(reset){
       stopBuckets();const bucketToken=bucketGeneration;emit('syncing');

@@ -4,7 +4,7 @@
  'use strict';
  const clone=x=>JSON.parse(JSON.stringify(x));
  const actions=new Set(['score','fault','undo','rematch','pause','resume','confirm','quick']);
- const dispatches=new Set(['idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer']);
+ const dispatches=new Set(['idle-claim','claim-skipped','manual-assign','swap','force-exit','reopen','claim-detached','retirement-transfer','resize']);
  const dispatchRevision=Symbol('dispatch-revision');
  function create({client,code,uid,getUid,legacy={},timeoutMs=8000}){
   let view=client.getView(),closed=false,lastSignature=null;const states=new Set(),seats=new Set(),waiters=new Set();
