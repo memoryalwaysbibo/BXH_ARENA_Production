@@ -141,7 +141,7 @@ The native Emulator browser suite deliberately discards a successful score reply
 
 ## Reviewed operator migration candidate
 
-`bucket-migration-plan.cjs` and `bucket-migration-service.cjs` add an internal operator factory with read-only preflight and atomic commit. They are not exported by the formal Functions index, have no CLI/public endpoint, and do not enable a production room. The caller must supply an already verified operator identity; reading an active non-test super_admin profile is an additional check, not an external identity verifier. A protected operator entry/identity integration and the remaining rollout checks are still required.
+`bucket-migration-plan.cjs` and `bucket-migration-service.cjs` add an internal operator factory with read-only preflight and atomic commit. They are not exported by the formal Functions index and do not enable a production room. The separately gated operator CLI below wraps this internal factory without adding a public endpoint. The caller must supply an already verified operator identity; reading an active non-test super_admin profile is an additional check, not an external identity verifier. The CLI provides a verified identity boundary; production IAM/identity acceptance and the remaining rollout checks are still required.
 
 Preflight reads a consistent root, complete bucket query, public mirror and configuration, then returns only identifiers/counts, source versions, conservative size estimates and a SHA-256 digest. It writes no marker, receipt or backup. Commit rereads all sources in the same lock order as scoring/projection and requires that exact digest; a score, room/public/config change invalidates the plan. Activation rejects every existing bucket, including IDs beyond the expected bucket count, and rejects non-official, partner, team, nonstandard, non-single-elimination, closed and malformed rooms. The local transaction policy allows at most 100 buckets, 750,000 serialized bytes per checked document and 5,000,000 aggregate checked bytes; these are conservative application budgets, not claims about unlimited Firestore capacity.
 
@@ -154,3 +154,25 @@ Production construction requires a separate `BXH_BUCKET_MIGRATION_ENABLED=true` 
 Candidate Rules explicitly deny every client get/list/write of bucketMigrationBackups, bucketMigrationOperations and bucketMigrationEpochs, including a browser signed in as super_admin. The root migration metadata is server-owned. These remain undeployed candidate Rules and must be reconciled against live Rules before release.
 
 The dedicated Emulator suite covers reviewed 6/12-court cutover, concurrent score writes, stale-plan refusal, rollback after scorer/config shutdown, newest score/ledger preservation, receipt replay, revoked operators, generation reuse, a score/rollback race, corrupted backups and an out-of-range orphan. It uses only the exact demo project/loopback host. This prepares a reviewable migration boundary; it does not certify the full production page, all trusted writers or an operational rollout.
+
+## Verified migration operator CLI
+
+`scripts/bucket-migration-operator.cjs` provides three explicit commands: preflight, inspect and commit. It adds no HTTP endpoint or browser management API. The script requires Node 22+ and access to the pinned Admin SDK dependencies; the repository functions directory dependencies can be supplied through NODE_PATH. No command changes environment gates, project settings or room allowlists.
+
+Both network commands require an explicit project/runtime and a local ID-token file. Before reading credentials or initializing Firebase, the script checks project/environment agreement, the closed migration runtime gate and exact Emulator hosts for a lab run. Production additionally uses Application Default Credentials and the existing project IAM permissions. An emulator/debug environment cannot be used with production runtime. These gates do not make this candidate production-ready.
+
+`bucket-migration-operator.cjs` in the Functions source verifies the ID token with checkRevoked=true, verifies its project issuer/audience/UID, then derives actorUid from the verified result. It does not accept a caller's actorUid. The migration service independently rechecks the current non-test, active super_admin profile inside each transaction, including receipt replay. Production token validation and IAM access still need real-environment acceptance; Emulator tests cannot certify production cryptographic verification or IAM policy.
+
+Preflight creates a new private review file with the source plan, verified actor, project, one operation ID and a review checksum. Existing files are never overwritten. Inspect is offline/read-only and prints only room/action/epoch/counts/project/checksum. Commit requires the review file and the separately supplied expected review checksum; it verifies the current token again and requires the same actor/project. Repeating commit with the same file reuses the operation ID, including when the first result was lost. The review checksum detects a file changed since review; it is not a secret, signature or authorization grant. Server-side source revalidation remains authoritative.
+
+Token/review input must be a regular, privately readable file owned by the current OS user; symlinks, group/world permissions and oversized input are rejected in the tested Linux environment. Tokens never appear in command arguments, review output, stdout or error details. Use a trusted sign-in flow to obtain the token directly into an appropriate local file; do not paste it into chat or logs. The CLI uses a bounded deadline; a timed-out commit reports outcome unknown and must be resolved by retrying the same review, not by inventing a new operation.
+
+Command shapes (no production enablement flags are provided here):
+
+```text
+node scripts/bucket-migration-operator.cjs preflight --runtime MODE --project PROJECT --token-file LOCAL_FILE --action activate|rollback --code ROOM_CODE --epoch UNIQUE_EPOCH --out NEW_REVIEW_FILE
+node scripts/bucket-migration-operator.cjs inspect --plan REVIEW_FILE
+node scripts/bucket-migration-operator.cjs commit --runtime MODE --project PROJECT --token-file LOCAL_FILE --plan REVIEW_FILE --expect-digest REVIEW_CHECKSUM
+```
+
+The dedicated Auth/Firestore Emulator suite invokes real child CLI processes for 6/12-court preflight, inspection, activation/replay and rollback/replay after scoring is disabled. It uses real Email/password Emulator ID tokens, rejects a disabled Auth user, player profile, manually supplied UID, another operator and changed review, verifies no preflight writes or duplicate migration, preserves the latest accepted score, and checks that credential files never enter reports. Temporary tokens/reviews are deleted; CI retains only the synthetic result summary.
