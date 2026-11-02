@@ -18435,11 +18435,22 @@ document.addEventListener("keydown",(ev)=>{
 });
 function renderPlayerProfileEditModal(){
   if(!playerProfileEditOpen || !userProfile) return "";
-  const p=userProfile;
-  const game=effectiveGameId(p);
-  const pref=p.preferredNameMode==="gameId"?"gameId":"realName";
+  const previous=document.querySelector(".profile-edit-modal");
+  const draft=previous?.getAttribute("data-profile-uid")===currentAuthUid()?previous:null;
+  const value=(id,fallback)=>draft?.querySelector("#"+id)?.value??fallback;
+  const location=profileLocationParts(userProfile);
+  const city=value("profile-city",location.city),district=value("profile-region",location.region);
+  const p={...userProfile,
+    realName:value("profile-realname",userProfile.realName||""),
+    phone:value("profile-phone",userProfile.phone||""),
+    birthDate:value("profile-birthdate",userProfile.birthDate||""),
+    gender:value("profile-gender",userProfile.gender||""),
+    region:city?(city+(district?" "+district:"")):""
+  };
+  const game=value("profile-gameid",effectiveGameId(userProfile));
+  const pref=value("profile-preferred-name-mode",p.preferredNameMode)==="gameId"?"gameId":"realName";
   return `<div class="modal-overlay profile-edit-overlay" data-action="player-close-profile-edit">
-    <div class="modal-box profile-edit-modal">
+    <div class="modal-box profile-edit-modal" data-profile-uid="${esc(currentAuthUid())}">
       <div class="panel-title">編輯我的資料</div>
       ${playerProfileEditError?`<div class="auth-error">${esc(playerProfileEditError)}</div>`:""}
       <div class="field"><label>本名（必填）</label><input id="profile-realname" type="text" value="${esc(p.realName||"")}"><div class="hint">提供 BXH 後台核對本人。若修改本名，狀態會自動改為「待確認」。</div></div>
@@ -19333,19 +19344,34 @@ function restoreAuthenticatedView(uid,intent){
 function captureRenderViewport(){
   const key = currentRenderViewportKey();
   const canReadWindow = typeof window!=="undefined";
+  const focused=typeof document!=="undefined"?document.activeElement:null;
+  const profileEditor=focused?.closest?.(".profile-edit-modal");
+  const profileFocus=typeof playerProfileEditOpen!=="undefined"&&playerProfileEditOpen&&typeof currentAuthUid==="function"&&profileEditor?.getAttribute("data-profile-uid")===currentAuthUid()&&focused?.id
+    ? {uid:currentAuthUid(),id:focused.id,start:focused.selectionStart,end:focused.selectionEnd}:null;
   return {
     key,
     preserve: __lastRenderedViewportKey!==null && __lastRenderedViewportKey===key,
     x: canReadWindow ? (window.scrollX || 0) : 0,
     y: canReadWindow ? (window.scrollY || 0) : 0,
     navScroll: captureHorizontalNavPositions(),
-    mailbox: canReadWindow ? window.BXHMailbox?.captureViewport?.() : null
+    mailbox: canReadWindow ? window.BXHMailbox?.captureViewport?.() : null,
+    profileFocus
   };
 }
 function finishRenderViewport(snapshot){
   if(!snapshot) return;
   __lastRenderedViewportKey = snapshot.key;
   if(typeof window==="undefined") return;
+  const focus=snapshot.profileFocus;
+  if(focus&&typeof document!=="undefined"&&typeof currentAuthUid==="function"&&currentAuthUid()===focus.uid){
+    const editor=document.querySelector(".profile-edit-modal"),field=document.getElementById(focus.id);
+    if(editor?.getAttribute("data-profile-uid")===focus.uid&&field&&editor.contains(field)){
+      field.focus({preventScroll:true});
+      if(typeof focus.start==="number"&&typeof focus.end==="number"){
+        try{field.setSelectionRange(focus.start,focus.end);}catch(e){}
+      }
+    }
+  }
 
   const token = ++__viewportRestoreToken;
   const restoreNav = ()=>{
