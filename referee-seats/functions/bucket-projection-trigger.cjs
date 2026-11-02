@@ -11,7 +11,7 @@ function createBucketProjectionEventHandler({publish,wait=ms=>new Promise(resolv
   await wait(150);
   try{return await publish(code,{automatic:true,expectedEpoch:bucket.epoch});}
   catch(error){
-   if(['release-not-ready','not-found','bucket-not-ready'].includes(error.message))return {ok:true,skipped:true,reason:error.message};
+   if(['release-not-ready','not-found','bucket-not-ready','bucket-room-not-enabled'].includes(error.message))return {ok:true,skipped:true,reason:error.message};
    throw error;
   }
  };

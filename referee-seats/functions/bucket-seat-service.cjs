@@ -2,9 +2,9 @@
 const {createHash,randomUUID}=require('node:crypto');
 const C=require('./core.cjs');
 const B=require('./bucket-state.cjs'),S=require('./scoring-core.cjs');
-// Internal candidate only; never exported as a Firebase callable.
-function createBucketSeatHandler(db,{clock=Date.now,uuid=randomUUID}={}){
- if(db.projectId!=='demo-bxh-four-court-buckets'||process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8188')throw Error('emulator-only');
+// Production access requires both runtime and room gates.
+function createBucketSeatHandler(db,{clock=Date.now,uuid=randomUUID,runtime='emulator'}={}){
+ const gate=require('./bucket-runtime.cjs').createBucketRuntime(db,{runtime});
  return async request=>{
  const uid=request.auth?.uid,d=request.data||{},code=String(d.code||'').trim().toUpperCase();
  if(!uid)throw new Error('unauthenticated');
@@ -24,6 +24,7 @@ function createBucketSeatHandler(db,{clock=Date.now,uuid=randomUUID}={}){
 
   let base;try{base=JSON.parse(room.data);}catch{throw new Error('corrupt-data');}
   const manifest=B.context(room,base);if(manifest.code!==code)throw Error('room-mismatch');
+  gate.assertRoom(bucketRelease.data(),manifest);
   const bucketSnaps=await tx.getAll(...Array.from({length:manifest.bucketCount},(_,i)=>ref.collection('matchBuckets').doc('court-'+(i+1))));
   const buckets=bucketSnaps.map(s=>s.exists?s.data():null),state=B.materialize(base,manifest,buckets);
   const publicSnap=await tx.get(pub);if(!publicSnap.exists)throw Error('public-mirror-missing');
@@ -52,3 +53,4 @@ function createBucketSeatHandler(db,{clock=Date.now,uuid=randomUUID}={}){
  });
 };}
 module.exports={createBucketSeatHandler};
+

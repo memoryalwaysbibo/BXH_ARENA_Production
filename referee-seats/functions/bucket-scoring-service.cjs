@@ -1,9 +1,9 @@
 'use strict';
-// Candidate adapter, not exported as a Firebase callable. Never accepts production DBs.
+// Shared trusted adapter. Production access requires both runtime and room gates.
 const {createHash}=require('node:crypto'),C=require('./core.cjs'),S=require('./scoring-core.cjs'),B=require('./bucket-state.cjs');
 const LOCAL=new Set(['score','fault','undo','rematch','pause','resume']);
-function createBucketScoringHandler(db,{clock=Date.now}={}){
- if(db.projectId!=='demo-bxh-four-court-buckets'||process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8188')throw Error('emulator-only');
+function createBucketScoringHandler(db,{clock=Date.now,runtime='emulator'}={}){
+ const gate=require('./bucket-runtime.cjs').createBucketRuntime(db,{runtime});
  return async request=>{
   const uid=request.auth?.uid,d=request.data||{},code=String(d.code||'').trim().toUpperCase();
   if(!uid)throw Error('unauthenticated');
@@ -20,6 +20,7 @@ function createBucketScoringHandler(db,{clock=Date.now}={}){
    let base;try{base=JSON.parse(room.data);}catch{throw Error('corrupt-data');}
    const m=B.context(room,base),bucketId=B.route(Number(d.station),m.courtCount),local=LOCAL.has(d.action);
    if(m.code!==code)throw Error('room-mismatch');
+   gate.assertRoom(configSnap.data(),m);
    if(!C.eligible(room,user,uid,authority)||!S.allowed(room,user,uid,Number(d.station),authority))throw Error('station-not-assigned');
    const ids=local?[bucketId]:Array.from({length:m.bucketCount},(_,i)=>'court-'+(i+1));
    const snaps=await tx.getAll(...ids.map(id=>root.collection('matchBuckets').doc(id)));
@@ -50,3 +51,4 @@ function createBucketScoringHandler(db,{clock=Date.now}={}){
  };
 }
 module.exports={createBucketScoringHandler};
+

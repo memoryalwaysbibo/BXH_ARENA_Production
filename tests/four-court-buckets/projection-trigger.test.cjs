@@ -13,6 +13,6 @@ test('deletion and malformed identity do not invoke the projection writer',async
  const wrong=event();wrong.params.code='BXH-OTHER1';assert.equal((await handle(wrong)).reason,'invalid-bucket-event');assert.equal(count,0);
 });
 test('closed releases/removed rooms are skipped, while integrity and transient errors remain failures',async()=>{
- for(const reason of ['release-not-ready','not-found','bucket-not-ready'])assert.equal((await createBucketProjectionEventHandler({wait:async()=>{},publish:async()=>{throw Error(reason);}})(event())).reason,reason);
+ for(const reason of ['release-not-ready','not-found','bucket-not-ready','bucket-room-not-enabled'])assert.equal((await createBucketProjectionEventHandler({wait:async()=>{},publish:async()=>{throw Error(reason);}})(event())).reason,reason);
  for(const reason of ['bucket-context','unavailable'])await assert.rejects(createBucketProjectionEventHandler({wait:async()=>{},publish:async()=>{throw Error(reason);}})(event()),new RegExp(reason));
 });
