@@ -19,6 +19,7 @@ let playerProfileEditOpen=false,playerProfileEditBusy=false,playerProfileEditErr
 let pendingModal=null,cloudJoinModalOpen=false,eventEntryModalOpen=false;
 let firebaseUser={uid:'a'},userProfile={uid:'a',active:true,realName:'本名',gameId:'舊角色',phone:''};
 let playerProfileReminder=window.BXHProfileReminder.create({storage:()=>sessionStorage,gameId:effectiveGameId});
+const currentAuthUid=()=>firebaseUser&&firebaseUser.uid;
 const mailboxContext=()=>({open:false});
 const profileLocationParts=()=>({city:'',region:''});
 const profileCityOptionsHtml=()=>'',profileDistrictOptionsHtml=()=>'';
@@ -48,7 +49,9 @@ login();
       await page.evaluate(()=>fixture.reload());assert.equal(await page.getByRole('dialog').count(),0);
       await page.evaluate(()=>fixture.login('a','two'));assert.equal(await page.getByRole('dialog').count(),1);
       await page.getByRole('button',{name:'確定',exact:true}).click();
+      assert.deepEqual(errors,[]);
       assert.equal(await page.locator('#profile-phone').count(),1);
+      assert.equal(await page.locator('.profile-edit-modal').getAttribute('data-profile-uid'),'a');
       assert.equal(await page.locator('#profile-gameid').inputValue(),'舊角色');
       assert.equal(await page.locator('#profile-realname').inputValue(),'本名');
       assert.equal(await page.evaluate(()=>document.activeElement.id),'profile-phone');
