@@ -63,16 +63,19 @@ must(/authDomain:\s*["']bxh-arena\.firebaseapp\.com["']/, 'Production authDomain
 must(/async\s+applyPlayerAccount\([\s\S]*?role:\s*["']player["'][\s\S]*?provider:\s*["']password["']/, 'Self-service signup must create role=player with password provider');
 must(/async\s+completeNewPlayerProfile\([\s\S]*?role:\s*["']player["'][\s\S]*?provider:\s*["']password["']/, 'Missing-profile recovery must create role=player with password provider');
 must(/function\s+canCreateOfficialTournament\(\)\{[^\n]*!isTester\(\)/, 'Tester must be excluded from official tournament creation');
-must(/if\(action==="player-google-signin"\)[\s\S]*?window\.cloudAuth\.signInWithLinkedGoogle\(\)/, 'Linked Google sign-in action missing');
-must(/async\s+signInWithLinkedGoogle\s*\(\)[\s\S]*?ax\.signInWithPopup\(authHandle,provider,ax\.browserPopupRedirectResolver\)/, 'Linked Google popup sign-in missing');
-must(/if\(fbUser\.providerData\?\.some\(p=>p\.providerId==="google\.com"\)\)[\s\S]*?await window\.cloudAuth\.signOutUser\(\)/, 'Missing Google profile must fail closed');
+must(/if\(action==="player-google-signin"\)[\s\S]*?window\.cloudAuth\.signInWithGoogle\(\)/, 'Google sign-in and signup action missing');
+must(/async\s+signInWithGoogle\s*\(\)[\s\S]*?ax\.signInWithPopup\(authHandle,provider,ax\.browserPopupRedirectResolver\)/, 'Google popup sign-in missing');
+must(/const signup=await window\.cloudAuth\.ensureGooglePlayerProfile\(fbUser.uid\);[\s\S]*?if\(!authStateIsCurrent\(\)\)return;[\s\S]*?if\(!signup.ok\)/, 'Missing Google profile must use server provisioning and preserve auth generation checks');
+must(/async\s+ensureGooglePlayerProfile\(expectedUid\)[\s\S]*?user\?\.uid!==expectedUid[\s\S]*?fnx\.httpsCallable\(functionsHandle,"ensureGooglePlayerProfile"[\s\S]*?result.data\?\.ok!==true[\s\S]*?result.data\?\.uid!==expectedUid[\s\S]*?fx\.getDocFromServer/, 'Google signup must verify the current UID, callable result and authoritative profile read', cloudRuntime);
+const googleSignupMethod=cloudRuntime.slice(cloudRuntime.indexOf('async ensureGooglePlayerProfile('),cloudRuntime.indexOf('async hasSuperAdmin()'));
+if(/fx\.(?:setDoc|updateDoc|deleteDoc)/.test(googleSignupMethod))throw new Error('Google signup must not create or overwrite profiles directly in the browser');
 must(/GoogleAuthProvider:\s*authMod\.GoogleAuthProvider/, 'Google account linking must import the provider');
 must(/linkWithRedirect:\s*authMod\.linkWithRedirect/, 'Google account linking fallback must import linkWithRedirect');
 must(/getRedirectResult:\s*authMod\.getRedirectResult/, 'Google account linking fallback must import getRedirectResult');
 if(/GOOGLE_LINK_PILOT_EMAILS/.test(core)||/pilotEmails/.test(cloudRuntime)) throw new Error('Legacy Google-link pilot allowlist remains');
 must(/function\s+canLinkGoogleAccount\(\)[\s\S]*?userProfile\.active===true[\s\S]*?userProfile\.isTestAccount!==true[\s\S]*?email===authEmail/, 'Google link UI must allow active non-test accounts with matching auth email');
 must(/async\s+getUserProfile\(uid\)[\s\S]*?googleLinkProfileCache\.set\(uid,\{profile,loadedAt:Date\.now\(\)\}\)/, 'Google link profile must be cached before the button is tapped');
-const googleLinkMethod=cloudRuntime.slice(cloudRuntime.indexOf('async linkMyGoogleAccount()'),cloudRuntime.indexOf('async signInWithLinkedGoogle()'));
+const googleLinkMethod=cloudRuntime.slice(cloudRuntime.indexOf('async linkMyGoogleAccount()'),cloudRuntime.indexOf('consumeGoogleSignInRedirectOutcome()'));
 const executableGoogleLinkMethod=googleLinkMethod.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,'');
 const googlePopupCall=executableGoogleLinkMethod.indexOf('ax.linkWithPopup(');
 const googleFirstAwait=executableGoogleLinkMethod.indexOf('await ');
@@ -562,4 +565,5 @@ mustInclude('if(settlementRoute==="official-ranked")','Official ranked route gat
 mustInclude('正式積分賽至少需要兩位有效 BXH 玩家帳號','Official ranked minimum-player error missing');
 must(/function isSystemSyntheticTestRoster[\s\S]*?p\.source!==["']test["'][\s\S]*?\^T\\d\{3\}\$[\s\S]*?accountLinked!==true/, 'Synthetic roster classifier must require system TEST identity and no linked account');
 console.log('PASS settlement preflight routing / synthetic TEST isolation');
+
 
