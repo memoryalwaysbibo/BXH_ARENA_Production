@@ -10,7 +10,7 @@ function parse(argv){
  if(mode!=='inspect'&&!['production','emulator'].includes(options.runtime))throw Error('invalid-bucket-runtime');return options;
 }
 function readSecure(file,maxBytes){
- let fd;try{fd=fs.openSync(file,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW||0));const stat=fs.fstatSync(fd);if(!stat.isFile()||stat.size<1||stat.size>maxBytes||(stat.mode&0o077)!==0||typeof process.getuid==='function'&&stat.uid!==process.getuid())throw Error('unsafe-operator-file');return fs.readFileSync(fd,'utf8');}
+ let fd;try{fd=fs.openSync(file,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW||0)|(fs.constants.O_NONBLOCK||0));const stat=fs.fstatSync(fd);if(!stat.isFile()||stat.size<1||stat.size>maxBytes||(stat.mode&0o077)!==0||typeof process.getuid==='function'&&stat.uid!==process.getuid())throw Error('unsafe-operator-file');return fs.readFileSync(fd,'utf8');}
  catch(error){throw Error(error.message==='unsafe-operator-file'?'unsafe-operator-file':'operator-file-unreadable');}finally{if(fd!==undefined)fs.closeSync(fd);}
 }
 function readReview(file){let review;try{review=JSON.parse(readSecure(file,131072));}catch(error){if(['unsafe-operator-file','operator-file-unreadable'].includes(error.message))throw error;throw Error('invalid-migration-review');}return validateReview(review);}

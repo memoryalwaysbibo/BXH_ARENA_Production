@@ -30,6 +30,7 @@ test('project issuer, environment and Auth Emulator boundaries fail closed',asyn
 test('credential/review files require private ownership/permissions and reject symlinks; summaries redact identity and token',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'bxh-operator-unit-'));try{
   const file=path.join(dir,'credential');fs.writeFileSync(file,'test-token',{mode:0o600});assert.equal(CLI.readSecure(file,100),'test-token');fs.chmodSync(file,0o644);assert.throws(()=>CLI.readSecure(file,100),/unsafe-operator-file/);fs.chmodSync(file,0o600);fs.symlinkSync(file,path.join(dir,'link'));assert.throws(()=>CLI.readSecure(path.join(dir,'link'),100),/operator-file-unreadable|unsafe-operator-file/);
+  if(process.platform==='linux'){const fifo=path.join(dir,'pipe');assert.equal(spawnSync('mkfifo',[fifo]).status,0);assert.throws(()=>CLI.readSecure(fifo,100),/unsafe-operator-file/);}
   const h=setup(),review=await h.operator.preflight({token:'secret-token',action:'activate',code:h.plan.code,epoch:h.plan.epoch}),summary=JSON.stringify(CLI.summary(review,'inspect'));assert(!summary.includes('secret-token'));assert(!summary.includes('verified-user'));assert(!summary.includes('actorUid'));assert.equal(CLI.reason(Error('backend secret-token details')),'migration-operator-failed');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
