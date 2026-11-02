@@ -616,11 +616,13 @@
     "https://beyblade.takaratomy.co.jp/beyblade-x/news/_image/news240712_2_1@2x.png",
     "https://beyblade.takaratomy.co.jp/beyblade-x/news/_image/news240930_2.png",
     "https://beyblade.takaratomy.co.jp/beyblade-x/news/news240712_2.html",
-    "https://beyblade.takaratomy.co.jp/beyblade-x/news/news240930.html"
+    "https://beyblade.takaratomy.co.jp/beyblade-x/news/news240930.html",
+    "https://www.yodobashi.com/product/100000001010262959/",
+    "https://image.yodobashi.com/product/100/000/001/010/262/959/100000001010262959_10204.jpg"
   ],
-  "sha256": "36061318cf77a96c7e68d7c8c26b5429e26eec64136d1244ca2f0e9407599118",
-  "bytes": 137570,
-  "dataURL": "./data/bey-catalog-pending/candidate-images.36061318cf77a96c7e68d7c8c26b5429e26eec64136d1244ca2f0e9407599118.json",
+  "sha256": "117ecc88dde1ed85319d34c295fc92a391159483c0ffcb26f13e1cce56f9d46b",
+  "bytes": 138282,
+  "dataURL": "./data/bey-catalog-pending/candidate-images.117ecc88dde1ed85319d34c295fc92a391159483c0ffcb26f13e1cce56f9d46b.json",
   "imageURLs": [
     "assets/bey-catalog/candidates/b6fee6c0f3c71cb060aa8bd0246d1a9c6c53fa8bc9d1c8e8399f85b9b0441bbb.webp",
     "assets/bey-catalog/candidates/0e67efaced05dc38199fd8efaaa45d5f7b72479dd10e7ed95ed6c6c2e7aa14db.webp",
@@ -706,6 +708,7 @@
     "assets/bey-catalog/candidates/6ab09797d59a88b91a24679b02b9448f674146d1b320b42599b894ea1fef89d0.webp",
     "assets/bey-catalog/candidates/1ab954ac3a1bc4667d2347520e1067371bc2fb7b80d308ec6385588cc5cd2789.webp",
     "assets/bey-catalog/candidates/dac6ff922465f1adb6551033bf388ede5dd4e044137ab7c0af3e08ba0132d712.webp",
+    "assets/bey-catalog/candidates/948062cf8f37cdaecad243aaca25874c8dc1104536bb06d86489b3fef4ebf82c.png",
     "assets/bey-catalog/candidates/348f95712fae87e72fefde79aa1e15c7facf5a10e0f994cd406ccdf0ea4a7e8f.webp",
     "assets/bey-catalog/candidates/65cac2b19a22ff4aa00a83fc8d09e664070b87032c032d09529fe8072393a253.webp",
     "assets/bey-catalog/candidates/be2736c078dfcde9e8bc28d15b16780bd6e20a057d4109437ae5f57d9cc38b13.webp",
