@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {initializeTestEnvironment,assertFails}=require('@firebase/rules-unit-testing');
-const {doc,updateDoc,setDoc,getDoc}=require('firebase/firestore');
+const {doc,updateDoc,setDoc,getDoc,getDocs,collection}=require('firebase/firestore');
 
 async function main(){
   assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-four-court-buckets');
@@ -17,6 +17,8 @@ async function main(){
       await setDoc(doc(db,'users','admin'),{active:true,role:'super_admin'});
       await setDoc(doc(db,'tournaments',code),{data:'{}',scoreStorage:{schema:'bxh-match-buckets-v1',status:'active',epoch:1},createdBy:'admin',eventAuthority:'official'});
       await setDoc(doc(db,'publicTournaments',code),{bracketView:'{}',visibility:'public'});
+      for(const name of ['bucketMigrationBackups','bucketMigrationOperations','bucketMigrationEpochs'])await setDoc(doc(db,'tournaments',code,name,'forged'),{privateSnapshot:'admin-only-backup'});
+      await setDoc(doc(db,'tournaments','BXH-MFENCE'),{data:'{}',createdBy:'admin',eventAuthority:'official'});
     });
     const db=env.authenticatedContext('admin').firestore();
     await assertFails(updateDoc(doc(db,'tournaments',code),{data:'{"forged":true}'}));
@@ -24,11 +26,13 @@ async function main(){
     await assertFails(updateDoc(doc(db,'publicTournaments',code),{bracketView:'{"forged":true}'}));
     await assertFails(setDoc(doc(db,'tournaments','BXH-FENCE2'),{scoreStorage:{status:'active'}}));
     await assertFails(setDoc(doc(db,'tournaments',code,'matchBuckets','court-1'),{matches:'[]'}));
-    for(const collection of ['bucketSeatOperations','bucketSeatAudit']){
+    for(const collection of ['bucketSeatOperations','bucketSeatAudit','bucketMigrationBackups','bucketMigrationOperations','bucketMigrationEpochs']){
       await assertFails(setDoc(doc(db,'tournaments',code,collection,'forged'),{uid:'admin'}));
       await assertFails(getDoc(doc(db,'tournaments',code,collection,'forged')));
     }
-    console.log(JSON.stringify({kind:'bucket-legacy-rules-fence',activePrivateDenied:true,manifestTamperDenied:true,activePublicDenied:true,clientCreateDenied:true,clientBucketDenied:true,clientSeatReceiptsDenied:true}));
+    for(const name of ['bucketMigrationBackups','bucketMigrationOperations','bucketMigrationEpochs'])await assertFails(getDocs(collection(db,'tournaments',code,name)));
+    await assertFails(updateDoc(doc(db,'tournaments','BXH-MFENCE'),{bucketMigration:{version:1}}));
+    console.log(JSON.stringify({kind:'bucket-legacy-rules-fence',activePrivateDenied:true,manifestTamperDenied:true,activePublicDenied:true,clientCreateDenied:true,clientBucketDenied:true,clientSeatReceiptsDenied:true,clientMigrationBackupsDenied:true,clientMigrationMetadataDenied:true}));
   } finally {await env.cleanup();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

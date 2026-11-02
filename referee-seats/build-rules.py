@@ -36,7 +36,7 @@ helper='''
       let room = get(tourPath(code)).data;
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let enabled = room.get('refereeSeatsV1', {}).get('version', 0) == 1;
-      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames'])
+      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
           || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
@@ -51,7 +51,7 @@ for kind in ('true','false'):
  assert s.count(old)==1,old
  s=s.replace(old,'allow update: if refereeSeatWriteValid(code, '+kind+') && qrCheckinWriteValid(code) && onsiteWaitlistWriteValid(code, '+kind+')')
 old="function noOperationsCreate(d) { return !d.keys().hasAny(["
-assert s.count(old)==1;s=s.replace(old,old+"'refereeSeatsV1','refereeSeatNames',")
+assert s.count(old)==1;s=s.replace(old,old+"'refereeSeatsV1','refereeSeatNames','bucketMigration',")
 anchor='    match /tournaments/{code} {'
 assert s.count(anchor)==1;s=s.replace(anchor,anchor+'''
       match /refereeSeatOperations/{id} { allow read, write: if false; }
@@ -65,6 +65,9 @@ assert s.count(anchor)==1;s=s.replace(anchor,anchor+'''
       match /bucketScoreAudit/{id} { allow read, write: if false; }
       match /bucketSeatOperations/{id} { allow read, write: if false; }
       match /bucketSeatAudit/{id} { allow read, write: if false; }
+      match /bucketMigrationBackups/{id} { allow read, write: if false; }
+      match /bucketMigrationOperations/{id} { allow read, write: if false; }
+      match /bucketMigrationEpochs/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 ''')
 

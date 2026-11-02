@@ -105,7 +105,7 @@ service cloud.firestore {
       let room = get(tourPath(code)).data;
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       let enabled = room.get('refereeSeatsV1', {}).get('version', 0) == 1;
-      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames'])
+      return !changed.hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
           || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
@@ -981,7 +981,7 @@ service cloud.firestore {
             && (!changed.hasAny(['data','bracketView','registrationStatus','onsiteWaitlistRuntimeRevision'])
               || onsiteWaitlistFence(code, privateWrite, peer))));
     }
-    function noOperationsCreate(d) { return !d.keys().hasAny(['refereeSeatsV1','refereeSeatNames','qrCheckin','qrCheckinManaged','qrCheckinRevision','systemClosed','systemClosure','entrySelectionRevision','callRevision','onsiteWaitlistServerOwned','onsiteWaitlistFinalized','onsiteWaitlistDrawEnabled','onsiteWaitlistDraw','onsiteWaitlistRuntimeRevision']); }
+    function noOperationsCreate(d) { return !d.keys().hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration','qrCheckin','qrCheckinManaged','qrCheckinRevision','systemClosed','systemClosure','entrySelectionRevision','callRevision','onsiteWaitlistServerOwned','onsiteWaitlistFinalized','onsiteWaitlistDrawEnabled','onsiteWaitlistDraw','onsiteWaitlistRuntimeRevision']); }
     function completedRoomExpiryValid() { return resource.data.get('eventAuthority','') != 'community' || resource.data.get('archiveStatus','') != 'completed' || request.resource.data.get('expiresAt',null) == null; }
     function noOperationsChange() { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['systemClosed','systemClosure','registrationSelection','registeredCount']); }
     function lotteryRuntimeWritable() { return !('registrationSelection' in resource.data) || (!(resource.data.registrationSelection.status in ['drawing','deleting']) && request.resource.data.get('capacity',null) == resource.data.get('capacity',null)); }
@@ -1023,6 +1023,9 @@ service cloud.firestore {
       match /bucketScoreAudit/{id} { allow read, write: if false; }
       match /bucketSeatOperations/{id} { allow read, write: if false; }
       match /bucketSeatAudit/{id} { allow read, write: if false; }
+      match /bucketMigrationBackups/{id} { allow read, write: if false; }
+      match /bucketMigrationOperations/{id} { allow read, write: if false; }
+      match /bucketMigrationEpochs/{id} { allow read, write: if false; }
       match /refereeSeatAudit/{id} { allow read, write: if false; }
 
       match /checkinReceipts/{id} { allow read, write: if false; }
