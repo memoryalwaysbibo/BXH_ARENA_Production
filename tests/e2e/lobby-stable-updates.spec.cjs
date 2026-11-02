@@ -769,9 +769,14 @@ test('first profile creation requires both fields while an existing account can 
     appPhase = 'player-complete-profile'; render();
   });
   await page.locator('#complete-realname').fill('測試玩家');
+  await page.evaluate(() => render());
+  await expect(page.locator('#complete-realname')).toHaveValue('測試玩家');
   await page.getByRole('button', { name: '完成設定' }).click();
   await expect(page.locator('.auth-error')).toContainText('ARENA 角色名稱');
   await page.locator('#complete-nickname').fill('新角色');
+  await page.evaluate(() => render());
+  await expect(page.locator('#complete-realname')).toHaveValue('測試玩家');
+  await expect(page.locator('#complete-nickname')).toHaveValue('新角色');
   await page.getByRole('button', { name: '完成設定' }).click();
   await expect(page.locator('.auth-error')).toContainText('手機號碼');
   expect(await page.evaluate(() => lobbyFixture.completions)).toEqual([]);
@@ -785,4 +790,6 @@ test('first profile creation requires both fields while an existing account can 
   });
   await expect(page.locator('#complete-nickname')).not.toHaveAttribute('required', '');
   await expect(page.locator('#complete-phone')).not.toHaveAttribute('required', '');
+  await expect(page.locator('#complete-realname')).toHaveValue('');
+  await expect(page.locator('#complete-phone')).toHaveValue('');
 });

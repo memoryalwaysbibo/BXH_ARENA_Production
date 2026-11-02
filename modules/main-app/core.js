@@ -19437,7 +19437,7 @@ function render(){
     manager:()=>canManageRefereeSeats(),render,toast:showToast});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
-  if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
+  if(appPhase!=="player-login"&&appPhase!=="player-apply"&&appPhase!=="player-complete-profile")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
   if(!communitySettingsDraftContext())communitySettingsRenderedContext=null;
   reconcileRegistrationRosterContext();
@@ -19483,7 +19483,7 @@ function render(){
   if(appPhase==="player-home"){ app.innerHTML = renderPlayerHomeScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-login"){ renderAuthFormPreservingInputs(app,renderPlayerLoginScreen(),appPhase); return; }
   if(appPhase==="player-apply"){ renderAuthFormPreservingInputs(app,renderPlayerApplyScreen(),appPhase); return; }
-  if(appPhase==="player-complete-profile"){ app.innerHTML = renderPlayerCompleteProfileScreen(); bindAuthInputs(); return; }
+  if(appPhase==="player-complete-profile"){ renderAuthFormPreservingInputs(app,renderPlayerCompleteProfileScreen(),appPhase+":"+(pendingNewPlayerProfile?.uid||pendingExistingAccountProfile?.uid||"")); return; }
   if(appPhase==="player-lookup"){ app.innerHTML = renderPlayerLookupScreen(); bindAuthInputs(); return; }
   if(appPhase==="player-center"){
     if(playerActiveTab==='registered'&&!mailboxContext().open)__viewportSnapshot.lobbyPatched=window.BXHQueueDashboard.renderStable(app,renderPlayerCenterScreen(),currentRenderViewportKey()+'|'+lobbyContextKey());

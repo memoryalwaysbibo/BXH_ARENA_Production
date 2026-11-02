@@ -25,7 +25,7 @@ jobs:
       - run: node --test tests/google-player-signup.test.cjs tests/profile-reminder.test.cjs tests/module-seam-contracts.test.cjs
       - run: npm install --no-package-lock --ignore-scripts
       - name: Shipped Google signup and profile reminder on desktop, iPhone and Android
-        run: npx playwright test --config=playwright.config.cjs tests/e2e/lobby-stable-updates.spec.cjs --grep 'Google'
+        run: npx playwright test --config=playwright.config.cjs tests/e2e/lobby-stable-updates.spec.cjs --grep 'Google|first profile creation'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
