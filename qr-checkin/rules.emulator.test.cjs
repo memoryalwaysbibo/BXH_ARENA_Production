@@ -66,7 +66,10 @@ test('real legacy attendance transaction preserves sanitized mirrors and existin
   b.update(doc(db,'publicTournaments/'+x.code),{bracketView:JSON.stringify(mirror)});await b.commit();});
  const source=fs.readFileSync(__dirname+'/../modules/cloud/cloud-runtime.js','utf8');
  const a=source.indexOf('    async setLegacyCheckin('),b=source.indexOf('    async readStaffRegistrationRoster(',a);assert(a>0&&b>a);
- const api=uid=>vm.runInNewContext('({'+source.slice(a,b)+'})',{cloudEnabled:true,currentUserUidForWrites:()=>uid,dbHandle:env.authenticatedContext(uid).firestore(),fx:{doc,runTransaction}});
+ // Firebase validates plain objects in its own realm. Normalize only the VM
+ // boundary; keep the real SDK transaction and every Rules check unchanged.
+ const transact=(db,fn)=>runTransaction(db,tx=>fn({get:ref=>tx.get(ref),update:(ref,patch)=>tx.update(ref,JSON.parse(JSON.stringify(patch)))}));
+ const api=uid=>vm.runInNewContext('({'+source.slice(a,b)+'})',{cloudEnabled:true,currentUserUidForWrites:()=>uid,dbHandle:env.authenticatedContext(uid).firestore(),fx:{doc,runTransaction:transact}});
  await assertFails(api('player').setLegacyCheckin(x.code,roomId,'p1',true));
  await assertSucceeds(api('manager').setLegacyCheckin(x.code,roomId,'p1',true));
  const privateState=JSON.parse((await getDoc(doc(x.db,'tournaments/'+x.code))).data().data);
