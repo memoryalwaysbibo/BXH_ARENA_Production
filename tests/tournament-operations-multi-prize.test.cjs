@@ -1,6 +1,9 @@
 'use strict';
 const fs=require('node:fs');
-const src=fs.readFileSync('index.html','utf8');
+// The production UI is split across the shell, feature module and action router.
+const src=['index.html','modules/main-app/tournament-operations.js','modules/main-app/core.js']
+  .map(file=>fs.readFileSync(file,'utf8')).join('\n');
+const release=JSON.parse(fs.readFileSync('version.json','utf8'));
 
 function must(pattern,label){
   if(!pattern.test(src))throw new Error('Missing '+label);
@@ -21,8 +24,8 @@ must(/同一次抽獎合計最多 100 位得獎者/,'100 winner cap copy');
 must(/payload=\{code,mode:o\.draft\.mode,excludePrevious:o\.draft\.excludePrevious,prizes,operationId:/,'multi-prize draw payload');
 must(/renderTournamentRaffleRecord\(r,modes,statuses,locked\)/,'grouped raffle history');
 must(/prizeIndex/,'prize grouped winner rendering');
-must(/const APP_VERSION = "v14\.2\.40"/,'release version');
-must(/bxh-build" content="20260926\.13"/,'release build');
+if(!release.version||!src.includes('const APP_VERSION = "'+release.version+'";'))throw new Error('Missing current release version');
+if(!release.build||!src.includes('bxh-build" content="'+release.build+'"'))throw new Error('Missing current release build');
 mustNot(/id="ops-title"/,'legacy single prize name field');
 mustNot(/id="ops-description"/,'legacy single prize description field');
 mustNot(/id="ops-count"/,'legacy single winner count field');
