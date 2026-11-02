@@ -15005,6 +15005,7 @@ function renderPlayerLoginScreen(){
     <div class="auth-card">
       <div class="auth-card-title">玩家登入</div>
       ${playerLoginError ? `<div class="auth-error">${esc(playerLoginError)}${(!verifying)?`<div class="hint" style="margin-top:6px;">請重新點擊下方按鈕再試一次。</div>`:""}</div>`:""}
+      ${!verifying&&playerLoginError&&firebaseUser&&!userProfile&&window.cloudAuth?.getCurrentUser?.()?.providers?.includes("google.com")?'<button class="hoc-btn btn-block" data-action="player-google-retry-profile">重新驗證</button>':""}
       ${verifying ? `<div class="auth-verifying">${verifyingMessage}<button class="link-btn" data-action="cancel-verifying" style="margin-left:8px;">取消並重試</button></div>`:""}
       <div class="field"><label>Gmail 帳號或完整 Email</label><input type="text" inputmode="email" id="player-login-email" value="${esc(bxhPlayerLoginIdentifierDraft)}" placeholder="例如：bxhplayer" ${verifying?'disabled':''} autocomplete="username" autocapitalize="none" spellcheck="false"><div class="hint" style="margin-top:5px;">只輸入 @ 前的帳號即可；完整 Email 也能登入</div></div>
       <label class="player-remember-row" for="player-remember-account">
@@ -15019,8 +15020,8 @@ function renderPlayerLoginScreen(){
         </div>
       </div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-email-signin" ${verifying?'disabled':''}>${verifying?(googlePopupPending?'請先完成 Google 驗證':'正在驗證帳號權限……'):'登入'}</button>
-      <button class="hoc-btn btn-block" style="width:100%;margin-top:10px;" data-action="player-google-signin" ${verifying?'disabled':''}>使用已綁定的 Google 帳號登入</button>
-      <div class="hint" style="margin-top:6px;">僅限先前已在 ARENA 綁定的 Google 帳號；未綁定者請先以原帳密登入。</div>
+      <button class="hoc-btn btn-block" style="width:100%;margin-top:10px;" data-action="player-google-signin" ${verifying?'disabled':''}>使用 Google 登入／註冊</button>
+      <div class="hint" style="margin-top:6px;">首次使用會建立玩家帳號，登入後可補齊個人資料。註冊即表示同意 BXH ARENA 的資料使用說明。</div>
       <div class="auth-links">
         <button class="link-btn" data-action="player-forgot-password">忘記密碼</button>
         <button class="link-btn" data-action="player-goto-apply">還沒有帳號？申請帳號</button>
@@ -15057,6 +15058,8 @@ function renderPlayerApplyScreen(){
         <label style="margin:0;font-size:13px;">我同意 BXH ARENA 的資料使用說明</label>
       </div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-apply-submit" ${playerApplyBusy?'disabled':''}>${playerApplyBusy?'處理中……':'申請帳號'}</button>
+      <button class="hoc-btn btn-block" style="width:100%;margin-top:10px;" data-action="player-google-signin" ${playerLoginBusy||authVerifying?'disabled':''}>使用 Google 註冊／登入</button>
+      <div class="hint" style="margin-top:6px;">使用 Google 註冊即表示同意 BXH ARENA 的資料使用說明；個人資料可在登入後補齊。</div>
       <div class="auth-links">
         <button class="link-btn" data-action="player-goto-login">已經有帳號？前往登入</button>
       </div>
@@ -21701,19 +21704,29 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
   if(action==="player-goto-login"){ playerLoginError=""; appPhase="player-login"; render(); return; }
   if(action==="player-goto-apply"){ playerApplyError=""; appPhase="player-apply"; render(); return; }
   if(action==="player-goto-lookup"){ playerLookupQuery=""; playerLookupResult=null; appPhase="player-lookup"; render(); return; }
+  if(action==="player-google-retry-profile"){
+    const current=window.cloudAuth?.getCurrentUser?.();
+    if(playerLoginBusy||authVerifying||!current?.providers?.includes("google.com"))return;
+    void reconcileExistingAuthSession(current.email,"player").catch(()=>{
+      authVerifying=false;playerLoginBusy=false;playerLoginError="重新驗證失敗，請稍後再試。";render();
+    });
+    return;
+  }
   if(action==="player-google-signin"){
     if(playerLoginBusy||authVerifying)return;
     if(!(window.cloudAuth&&window.cloudAuth.isReady())){playerLoginError="雲端服務尚未連線，請稍後再試";render();return;}
-    playerLoginBusy=true;googlePopupPending=true;playerLoginError="";pendingLoginIntent="player";render();
+    playerLoginBusy=true;googlePopupPending=true;playerLoginError="";pendingLoginIntent="player";guestReadOnlyMode=false;appPhase="player-login";render();
     const attempt=++loginAttemptGeneration;
-    window.cloudAuth.signInWithLinkedGoogle().then(result=>{
+    window.cloudAuth.signInWithGoogle().then(result=>{
       if(attempt!==loginAttemptGeneration)return;
       googlePopupPending=false;
+      if(result.redirecting)return;
       if(!result.ok){
         playerLoginBusy=false;pendingLoginIntent=null;
         playerLoginError=result.error||"Google 登入失敗";render();return;
       }
       if(appPhase==="player-login"){
+        if(playerLoginError){render();return;}
         authVerifying=true;startVerifyingTimeout();startFastAuthRecovery();render();
       }
     }).catch(()=>{
@@ -22305,7 +22318,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async ()=>{
       await saveActiveMode("player");
       currentRole="player";
-      appPhase=userProfile.realName?"player-center":"player-complete-profile";
+      appPhase=userProfile.realName||userProfile.provider==="google.com"?"player-center":"player-complete-profile";
       render();
       window.scrollTo(0,0);
     })();
@@ -23045,12 +23058,12 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     (async ()=>{
       await saveActiveMode("player");
       currentRole = "player";
-      if(!userProfile.realName){
+      if(!userProfile.realName && userProfile.provider!=="google.com"){
         pendingExistingAccountProfile = { uid: firebaseUser.uid, email: firebaseUser.email };
         appPhase = "player-complete-profile";
       } else {
         appPhase = "player-center";
-        if(window.cloudAuth.ensurePublicPlayerDoc){
+        if(window.cloudAuth.ensurePublicPlayerDoc && (userProfile.realName||effectiveGameId(userProfile))){
           window.cloudAuth.ensurePublicPlayerDoc(firebaseUser.uid, { publicName: userProfile.displayName||userProfile.nickname||userProfile.realName, avatarUrl: userProfile.avatarUrl||null });
         }
       }
@@ -26050,6 +26063,13 @@ async function init(){
         }
 
         if(window.cloudAuth && window.cloudAuth.isReady()){
+          const googleRedirect=window.cloudAuth.consumeGoogleSignInRedirectOutcome?.();
+          if(googleRedirect){
+            guestReadOnlyMode=false;
+            appPhase="player-login";
+            if(googleRedirect.ok)pendingLoginIntent="player";
+            else playerLoginError=googleRedirect.error||"Google 登入未完成，請重試。";
+          }
           window.cloudAuth.hasSuperAdmin().then(value=>{superAdminExists=value;render();}).catch(()=>{});
           if(authUnsub){ try{ authUnsub(); }catch(e){} }
           // Single-authority auth-state handler, extracted into a named,
@@ -26102,6 +26122,18 @@ async function init(){
                 }
                 if(!authStateIsCurrent()) return;
                 let profile = profileRead.value;
+                if(!profile && (fbUser.providerData?.some(p=>p.providerId==="google.com")||fbUser.providers?.includes("google.com"))){
+                  const signup=await window.cloudAuth.ensureGooglePlayerProfile(fbUser.uid);
+                  if(!authStateIsCurrent())return;
+                  if(!signup.ok){
+                    userProfile=null;currentRole=null;pendingLoginIntent=null;
+                    playerLoginError=signup.error||"建立玩家資料暫時失敗，請按重新驗證後再試。";
+                    appPhase="player-login";
+                    return;
+                  }
+                  profile=signup.profile;
+                  if(signup.created)playerActiveTab="home";
+                }
                 if(profile?.active===true && profile.familyTransferPending===true && profile.accountStatus==="pending_family_transfer"){
                   const transfer=window.BXHFamilyTransferClaim
                     ? await window.BXHFamilyTransferClaim.complete({
@@ -26196,7 +26228,7 @@ async function init(){
                     // (very likely true the first time an existing staff member
                     // tries player mode), route to completion instead of a
                     // player center with blank name fields.
-                    if(!profile.realName){
+                    if(!profile.realName && profile.provider!=="google.com"){
                       pendingExistingAccountProfile = { uid: fbUser.uid, email: fbUser.email };
                       appPhase = "player-complete-profile";
                     } else {
@@ -26210,7 +26242,7 @@ async function init(){
                         appPhase = "player-center";
                         activeTab = "live";
                       }
-                      if(window.cloudAuth.ensurePublicPlayerDoc){
+                      if(window.cloudAuth.ensurePublicPlayerDoc && (profile.realName||effectiveGameId(profile))){
                         window.cloudAuth.ensurePublicPlayerDoc(fbUser.uid, { publicName: profile.displayName||profile.nickname||profile.realName, avatarUrl: profile.avatarUrl||null });
                       }
                     }
@@ -26220,13 +26252,6 @@ async function init(){
                   }
                   if(authStateIsCurrent())resumeCommunityRoomStateSubscription(communityRoomAuthContext);
                 } else if(!profile){
-                  if(fbUser.providerData?.some(p=>p.providerId==="google.com")){
-                    userProfile=null;currentRole=null;firebaseUser=null;pendingLoginIntent=null;
-                    await window.cloudAuth.signOutUser();
-                    playerLoginError="找不到這個 Google 帳號原有的 ARENA 玩家資料，請聯絡管理員。";
-                    appPhase="player-login";
-                    return;
-                  }
                   // No users/{uid} document yet — for example, a prior Email/Password sign-up
                   // whose Firestore profile write failed. Never re-create the Auth
                   // account here; let the user complete the profile on the SAME session.
@@ -26322,6 +26347,7 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
 
 
