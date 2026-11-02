@@ -723,8 +723,18 @@ test('Google signup reminder opens profile editing and saved details remove the 
   await expect(page.locator('#profile-realname')).toHaveValue('');
   await expect(page.locator('#profile-gameid')).toHaveValue('');
   await page.locator('#profile-realname').fill('測試玩家');
+  await page.evaluate(() => render());
+  await expect(page.locator('#profile-realname')).toHaveValue('測試玩家');
+  await expect(page.locator('#profile-realname')).toBeFocused();
   await page.locator('#profile-gameid').fill('Google 新角色');
+  await page.evaluate(() => render());
+  await expect(page.locator('#profile-realname')).toHaveValue('測試玩家');
+  await expect(page.locator('#profile-gameid')).toHaveValue('Google 新角色');
+  await expect(page.locator('#profile-gameid')).toBeFocused();
   await page.locator('#profile-phone').fill('0912345678');
+  await page.evaluate(() => render());
+  await expect(page.locator('#profile-phone')).toHaveValue('0912345678');
+  await expect(page.locator('#profile-phone')).toBeFocused();
   await page.locator('[data-action="player-save-profile"]').click();
   await expect.poll(() => page.evaluate(() => lobbyFixture.googleSaves.length)).toBe(1);
   await page.evaluate(() => { playerActiveTab = 'home'; render(); });
