@@ -2939,12 +2939,14 @@
         const ref=fx.doc(dbHandle,"tournaments",String(code).toUpperCase());
         // An explicit roster recovery must not silently fall back to cached data.
         if(options.serverOnly===true&&!fx.getDocFromServer)return {ok:false,reason:"network"};
-        const snap = options.serverOnly===true||FOUR_COURT_CLIENT_ROLLOUT?await fx.getDocFromServer(ref):await fx.getDoc(ref);
+        const snap = options.serverOnly===true?await fx.getDocFromServer(ref):await fx.getDoc(ref);
         if(!snap.exists()) return { ok:false, reason:"not-found" };
         const d = snap.data();
         if(Object.hasOwn(d,'scoreStorage')){
+          const confirmed=options.serverOnly===true?snap:await fx.getDocFromServer(ref);
+          if(!confirmed.exists()||!Object.hasOwn(confirmed.data(),'scoreStorage'))return {ok:false,reason:'not-synchronized'};
           const lifecycle=getFourCourtLifecycle();
-          return lifecycle?await lifecycle.read(String(code).toUpperCase(),d.scoreStorage||{}):{ok:false,reason:'bucket-client-disabled'};
+          return lifecycle?await lifecycle.read(String(code).toUpperCase(),confirmed.data().scoreStorage||{}):{ok:false,reason:'bucket-client-disabled'};
         }
         const parsed = JSON.parse(d.data);
         if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
@@ -4047,8 +4049,7 @@ if(testerSession){
             if(!bucketAttached){bucketAttached=true;bucketUid=authHandle?.currentUser?.uid;stopBucket=lifecycle.subscribe(String(code).toUpperCase(),(state,authoritative)=>{if(active)callback(state,authoritative);});}
             lifecycle.observe(String(code).toUpperCase(),d.scoreStorage||{});return;
           }
-          fourCourtLifecycle?.observe(String(code).toUpperCase(),null);
-          stopBucket();stopBucket=()=>{};bucketAttached=false;
+          if(bucketAttached){fourCourtLifecycle.observe(String(code).toUpperCase(),null);stopBucket();stopBucket=()=>{};bucketAttached=false;}
           try{
             const parsed = JSON.parse(d.data);
             if(d.refereeSeatsV1?.version===1)parsed.meta={...parsed.meta,refereeSeatsV1:d.refereeSeatsV1,refereeSeatNames:d.refereeSeatNames||{},refereeStationAssignments:d.refereeStationAssignments||{},refereeStationNames:d.refereeStationNames||{},refereeStationRestrictionEnabled:true,assignedStaffUids:d.assignedStaffUids||[]};
