@@ -21679,6 +21679,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         playerLoginError=result.error||"Google 登入失敗";render();return;
       }
       if(appPhase==="player-login"){
+        if(playerLoginError){render();return;}
         authVerifying=true;startVerifyingTimeout();startFastAuthRecovery();render();
       }
     }).catch(()=>{
