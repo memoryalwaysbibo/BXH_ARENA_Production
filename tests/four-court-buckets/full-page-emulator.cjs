@@ -53,7 +53,7 @@ const server=http.createServer((req,res)=>{
    await page.locator('[data-action="referee-bucket-retry"]').click();await page.waitForFunction(()=>cloudSync.bucketView(state.cloudCode)?.pending.length===0);
    assert.equal(page.url(),navigation);assert.equal(await page.locator('[data-action="referee-bucket-retry"]').count(),0);
    const wire=await page.evaluate(()=>BXHFullPageLab.wire.filter(w=>w.name==='commitBucketRefereeCommand'));
-   assert.equal(wire.length,3);assert.deepEqual(wire[1],wire[2]);assert.equal(await page.evaluate(()=>state.matches.find(m=>m.id==='m1').scoreA),2);
+   assert.equal(wire.length,3);assert.deepEqual(wire[1],wire[2]);assert.equal(await page.locator('#court-card-1 .side-score').first().innerText(),'2');assert.equal(await page.evaluate(()=>state.matches.find(m=>m.id==='m1').scoreA),2);
    const scored=JSON.parse((await db.doc('tournaments/'+code+'/matchBuckets/court-1').get()).data().matches).find(m=>m.id==='m1');assert.equal(scored.scoreA,2);assert.equal(scored.log.length,2);
    assert((await db.doc('tournaments/'+code).get()).updateTime.isEqual(rootBefore.updateTime),'ordinary scoring rewrote root');assert((await db.doc('publicTournaments/'+code).get()).updateTime.isEqual(pubBefore.updateTime),'ordinary scoring rewrote public mirror');
    assert.equal(await page.evaluate(()=>BXHFullPageLab.wire.filter(w=>['commitRefereeCommand','manageRefereeSeats'].includes(w.name)).length),0);
@@ -61,7 +61,7 @@ const server=http.createServer((req,res)=>{
    await db.doc('users/ref1').update({active:false});await page.waitForFunction(()=>cloudStatus==='error'&&state.matches.length===0);assert.equal(await page.locator('[data-action="score"]').count(),0);await db.doc('users/ref1').update({active:true});
    assert.deepEqual(errors,[],'uncaught full-page errors');report.cases.push({courts:count,buckets:Math.ceil(count/4),fullPageBoot:true,realAuthRouting:true,composedJoin:true,realScoreButton:true,reconnectButton:true,sameOperationRetryButton:true,noDuplicateScore:true,rootAndPublicUnchanged:true,legacyCallableCalls:0,revocationClearsPage:true,uncaughtPageErrors:0});await context.close();page=null;
   }
-  report.missingLocalAssets=[...missing];fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log('PASS full ARENA page: '+JSON.stringify(report));
+  assert.deepEqual([...missing].filter(p=>/\.(js|css)$/.test(p)),[],'full page required asset missing');report.missingLocalAssets=[...missing];fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log('PASS full ARENA page: '+JSON.stringify(report));
  }catch(error){if(page){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});const diagnostic={message:error.message,missing:[...missing],page:await page.evaluate(()=>({text:document.body.innerText.slice(-6000),phase:typeof appPhase==='undefined'?null:appPhase,role:typeof currentRole==='undefined'?null:currentRole})).catch(()=>null)};fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify(diagnostic,null,2));console.error('full-page diagnostic '+JSON.stringify(diagnostic));}throw error;}
  finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));await deleteApp(app);}
 })().catch(error=>{console.error(error);process.exitCode=1;});
