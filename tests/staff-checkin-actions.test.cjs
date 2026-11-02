@@ -5,7 +5,7 @@ const start=src.indexOf('let staffCheckinBusy=false;'),end=src.indexOf('function
 function harness(){
  const payloads=[],toasts=[],modals=[],row={name:'同名兒童',status:'confirmed',checkedIn:false,playerId:'child-row'};
  const context={key:'room-user-tab',generation:1,code:'BXH-TEST12'};
- const c={staffRosterReadOnly:()=>true,peopleRosterBusy:false,captureRegistrationRosterContext:()=>context,
+ const c={setTimeout,clearTimeout,staffRosterReadOnly:()=>true,peopleRosterBusy:false,captureRegistrationRosterContext:()=>context,
   registrationRosterContextKey:()=>context.key,adminRosterGeneration:1,
   staffRosterCache:{key:context.key,checkinEnabled:true,rows:[row,{name:'同名兒童',status:'confirmed',checkedIn:false,playerId:'sibling'}]},
   crypto:{randomUUID:()=> 'operation-123456789'},render:()=>{},showToast:(...x)=>toasts.push(x),openModal:x=>modals.push(x),
@@ -60,4 +60,21 @@ test('verified stale receipt is retired so the next explicit click creates a fre
  await h.c.staffRosterCheckin(h.target(true));
  assert.equal(h.payloads.length,2);assert.notEqual(h.payloads[0].operationId,h.payloads[1].operationId);
  assert.equal(h.toasts.at(-1)[0],'報到成功');
+});
+
+test('App Check denial is distinct from event permissions and never changes attendance',async()=>{
+ const h=harness();h.c.window.engagementService.tournamentOperation=async()=>{throw Object.assign(Error('verification failed'),{code:'functions/permission-denied',details:{reason:'app-check-unavailable'}});};
+ await h.c.staffRosterCheckin(h.target(true));assert.match(h.toasts[0][0],/網站驗證未完成/);assert.doesNotMatch(h.toasts[0][0],/沒有本場報到操作權限/);assert.equal(h.c.staffRosterCache.rows[0].checkedIn,false);
+});
+test('a stalled staff read restores controls and a late result cannot change the roster',async()=>{
+ const h=harness(),timers=new Map();let serial=0,release;
+ h.c.setTimeout=(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;};h.c.clearTimeout=id=>timers.delete(id);
+ h.c.window.cloudSync.readStaffRegistrationRoster=()=>new Promise(r=>release=r);
+ const pending=h.c.staffRosterCheckin(h.target(true));await new Promise(r=>setImmediate(r));
+ [...timers.values()].find(t=>t.ms===10000).fn();await pending;
+ assert.equal(h.c.staffRosterCache.rows[0].checkedIn,false);assert(h.toasts.at(-1)[1]);
+ release({ok:true,code:'BXH-TEST12',checkinEnabled:true,rows:[{playerId:'child-row',status:'confirmed',checkedIn:true}]});await new Promise(r=>setImmediate(r));
+ assert.equal(h.c.staffRosterCache.rows[0].checkedIn,false);
+ h.c.window.cloudSync.readStaffRegistrationRoster=async()=>({ok:true,code:'BXH-TEST12',rows:[{playerId:'child-row',status:'confirmed',checkedIn:true}]});
+ await h.c.staffRosterCheckin(h.target(true));assert.equal(h.toasts.at(-1)[0],'報到成功');
 });

@@ -2600,6 +2600,33 @@
 
     // 管理端讀取完整 registration 文件；僅限 Rules 已授權的賽事管理者，
     // 因文件含聯絡資料，不可拿來實作「全體正式工作人員只看姓名」。
+    async setLegacyCheckin(code,roomId,playerId,checkedIn){
+      const actor=currentUserUidForWrites(),normalized=String(code||'').toUpperCase();
+      if(!cloudEnabled||!actor||!roomId||typeof playerId!=='string'||!playerId||typeof checkedIn!=='boolean')throw Error('checkin-unavailable');
+      return fx.runTransaction(dbHandle,async tx=>{
+        const ref=fx.doc(dbHandle,'tournaments',normalized),pub=fx.doc(dbHandle,'publicTournaments',normalized);
+        const [a,b]=await Promise.all([tx.get(ref),tx.get(pub)]);
+        if(!a.exists()||!b.exists())throw Error('not-found');
+        const privateDoc=a.data(),publicDoc=b.data(),runtime=JSON.parse(privateDoc.data),mirror=JSON.parse(publicDoc.bracketView);
+        if(runtime.id!==roomId||(mirror.id&&mirror.id!==roomId))throw Error('room-context-changed');
+        if([privateDoc,publicDoc,runtime,mirror].some(s=>s.qrCheckinManaged===true||s.onsiteWaitlistServerOwned===true||Object.hasOwn(s,'scoreStorage')))throw Error('managed-checkin-required');
+        if([privateDoc,publicDoc,runtime,mirror].some(s=>s.systemClosed===true||s.eventCancelled===true||s.deletionStatus||s.startedAt||['completed','archived'].includes(s.archiveStatus)||['live','settling','done','cancelled'].includes(s.tournamentPhase)||s.meta?.eventCancelled||s.meta?.checkinClosedEarly===true)||runtime.meta?.checkinRequired!==true)throw Error('checkin-closed');
+        const rows=(runtime.players||[]).filter(p=>p.id===playerId),publicRows=(mirror.players||[]).filter(p=>p.id===playerId);
+        if(rows.length!==1||publicRows.length!==1||['waitlist','cancelled','withdrawn','not_selected'].includes(rows[0].status))throw Error('not-confirmed');
+        const player=rows[0];
+        if(player.registrationId){
+          const registration=await tx.get(fx.doc(dbHandle,'tournaments',normalized,'registrations',player.registrationId));
+          if(!registration.exists()||registration.data().status!=='confirmed')throw Error('not-confirmed');
+        }else if(player.source==='online')throw Error('not-confirmed');
+        if(actor!==currentUserUidForWrites())throw Error('stale-session');
+        if((player.checkedIn===true)!==(publicRows[0].checkedIn===true))throw Error('checkin-state-changed');
+        if((player.checkedIn===true)===checkedIn)return {ok:true,already:true};
+        const now=Date.now();player.checkedIn=checkedIn;publicRows[0].checkedIn=checkedIn;runtime.updatedAt=mirror.updatedAt=now;
+        tx.update(ref,{data:JSON.stringify(runtime),updatedAt:now});
+        tx.update(pub,{bracketView:JSON.stringify(mirror),updatedAt:now});
+        return {ok:true};
+      });
+    },
     async readStaffRegistrationRoster(code){
       return callEngagementFunction('readStaffRegistrationRoster',{code:String(code||'').trim().toUpperCase()},30000);
     },
@@ -3049,6 +3076,7 @@
           return lifecycle?await lifecycle.read(String(code).toUpperCase(),confirmed.data().scoreStorage||{}):{ok:false,reason:'bucket-client-disabled'};
         }
         const parsed = JSON.parse(d.data);
+        parsed.cloudCode=String(code).toUpperCase();
         if(d.eventAuthority==="community"&&d.communityQuickRegistration===true&&Number.isSafeInteger(d.communityParticipantCount)&&d.communityParticipantCount>=0)parsed.communityParticipantCount=d.communityParticipantCount;
         if(d.ladderPointsAwarded===true) parsed.ladderPointsAwarded=true;
         if(d.ladderSeasonId) parsed.ladderSeasonId=d.ladderSeasonId;

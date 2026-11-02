@@ -3,7 +3,8 @@ const {test,before,after}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
-const {doc,setDoc,getDoc,writeBatch,deleteDoc}=require('firebase/firestore');
+const {doc,setDoc,getDoc,writeBatch,deleteDoc,runTransaction}=require('firebase/firestore');
+const vm=require('node:vm');
 if(process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:8091')throw Error('Dedicated local emulator required');
 let env,serial=0;
 before(async()=>{env=await initializeTestEnvironment({projectId:'demo-qr-checkin',firestore:{host:'127.0.0.1',port:8091,rules:fs.readFileSync(__dirname+'/firestore.candidate.rules','utf8')}});});
@@ -54,3 +55,26 @@ test('receipt, audit and operation documents remain server-only even for adminis
  }
 });
 test('managed room cannot bypass audit protection through direct client deletion',async()=>{const x=await fixture();await assertFails(deleteDoc(doc(x.db,'tournaments/'+x.code)));await assertFails(deleteDoc(doc(x.db,'publicTournaments/'+x.code)));});
+
+
+test('real legacy attendance transaction preserves sanitized mirrors and existing Rules authorization',async()=>{
+ const x=await fixture(false),roomId='legacy-'+x.code;
+ const state={id:roomId,cloudCode:x.code,meta:{checkinRequired:true},players:[{id:'p1',name:'測試選手',checkedIn:false}]};
+ const mirror={players:[{id:'p1',name:'測試選手',checkedIn:false}]};
+ await env.withSecurityRulesDisabled(async c=>{const db=c.firestore(),b=writeBatch(db);
+  b.update(doc(db,'tournaments/'+x.code),{data:JSON.stringify(state)});
+  b.update(doc(db,'publicTournaments/'+x.code),{bracketView:JSON.stringify(mirror)});await b.commit();});
+ const source=fs.readFileSync(__dirname+'/../modules/cloud/cloud-runtime.js','utf8');
+ const a=source.indexOf('    async setLegacyCheckin('),b=source.indexOf('    async readStaffRegistrationRoster(',a);assert(a>0&&b>a);
+ // Firebase validates plain objects in its own realm. Normalize only the VM
+ // boundary; keep the real SDK transaction and every Rules check unchanged.
+ const transact=(db,fn)=>runTransaction(db,tx=>fn({get:ref=>tx.get(ref),update:(ref,patch)=>tx.update(ref,JSON.parse(JSON.stringify(patch)))}));
+ const api=uid=>vm.runInNewContext('({'+source.slice(a,b)+'})',{cloudEnabled:true,currentUserUidForWrites:()=>uid,dbHandle:env.authenticatedContext(uid).firestore(),fx:{doc,runTransaction:transact}});
+ await assertFails(api('player').setLegacyCheckin(x.code,roomId,'p1',true));
+ await assertSucceeds(api('manager').setLegacyCheckin(x.code,roomId,'p1',true));
+ const privateState=JSON.parse((await getDoc(doc(x.db,'tournaments/'+x.code))).data().data);
+ const publicState=JSON.parse((await getDoc(doc(x.db,'publicTournaments/'+x.code))).data().bracketView);
+ assert.equal(privateState.players[0].checkedIn,true);assert.equal(publicState.players[0].checkedIn,true);assert.equal(publicState.id,undefined);
+ await assertSucceeds(api('manager').setLegacyCheckin(x.code,roomId,'p1',false));
+ assert.equal(JSON.parse((await getDoc(doc(x.db,'tournaments/'+x.code))).data().data).players[0].checkedIn,false);
+});

@@ -13458,8 +13458,9 @@ function renderPeopleManagement(){
     ?'<span class="badge badge-neon">線上報名</span>'
     :(p.source==="test"?'<span class="badge badge-metal">測試名單</span>':'<span class="badge badge-metal">現場新增</span>');
   const sourceText=p=>p.source==="online"?"線上報名":(p.source==="test"?"測試名單":"現場新增");
-  const checkinActionLocked=peopleRosterBusy||!!state.startedAt||state.archiveStatus==="completed"||checkinClosed;
-  const checkinToggle=p=>needsCheckin?`<button class="people-checkin-toggle ${p.checkedIn?'is-checked':'is-unchecked'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinActionLocked?'disabled':''} aria-label="${p.checkedIn?'已報到，點擊取消報到':'未報到，點擊完成報到'}"><span class="people-checkin-dot"></span>${p.checkedIn?'已報到':'未報到'}</button>`:"";
+  const checkinProcessing=window.BXHQrCheckin?.busy?.()===true;
+  const checkinActionLocked=peopleRosterBusy||!!state.startedAt||state.archiveStatus==="completed"||checkinClosed||checkinProcessing;
+  const checkinToggle=p=>needsCheckin?`<button class="people-checkin-toggle ${p.checkedIn?'is-checked':'is-unchecked'}" data-action="toggle-checkin-btn" data-id="${p.id}" ${checkinActionLocked?'disabled':''} aria-label="${p.checkedIn?'已報到，點擊取消報到':'未報到，點擊完成報到'}"><span class="people-checkin-dot"></span>${checkinProcessing?'處理中…':p.checkedIn?'已報到':'未報到'}</button>`:"";
   const confirmedMoreMenu=p=>`<details class="people-more-menu"><summary aria-label="更多選手操作">⋯</summary><div class="people-more-popover"><div class="people-more-meta">${esc(sourceText(p))}</div>${adminCheckinButtonHtml(p)}${typeof adminRosterButtonsHtml==='function'?adminRosterButtonsHtml(p,'demote'):''}<button class="btn btn-ghost btn-sm" data-action="people-move-to-waitlist" data-id="${p.id}" ${locked||selectionManaged||peopleRosterBusy?'disabled':''}>移至備取</button><button class="btn btn-danger btn-sm" data-action="delete-player" data-id="${p.id}" ${state.startedAt||peopleRosterBusy?'disabled':''}>刪除選手</button></div></details>`;
 
   const confirmedRow=(p,i)=>`
@@ -16356,6 +16357,10 @@ async function loadStaffRegistrationRoster(){
 }
 let staffCheckinBusy=false;
 const staffCheckinOperations=new Map();
+function staffCheckinDeadline(promise,ms){
+  let timer;
+  return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('checkin-result-unconfirmed')),ms);})]).finally(()=>clearTimeout(timer));
+}
 async function staffRosterCheckin(target){
   if(staffCheckinBusy||staffPromotionBusy||peopleRosterBusy||!staffRosterReadOnly())return;
   const context=captureRegistrationRosterContext();
@@ -16378,10 +16383,10 @@ async function staffRosterCheckin(target){
     }
     staffCheckinBusy=true;render();
     try{
-      const result=await window.engagementService.tournamentOperation('tournamentCheckin',{action,code:context.code,playerId,operationId});
+      const result=await staffCheckinDeadline(window.engagementService.tournamentOperation('tournamentCheckin',{action,code:context.code,playerId,operationId}),45000);
       if(!current())return;
       if(result?.ok!==true)throw Error('checkin-unconfirmed');
-      const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);
+      const fresh=await staffCheckinDeadline(window.cloudSync.readStaffRegistrationRoster(context.code),10000);
       if(!current())return;
       if(fresh?.ok!==true||fresh.code!==String(context.code).toUpperCase()||!Array.isArray(fresh.rows))throw Error('checkin-readback-failed');
       staffRosterCache={key:context.key,rows:fresh.rows,checkinEnabled:fresh.checkinEnabled===true,promotionEnabled:fresh.promotionEnabled===true};
@@ -16394,8 +16399,8 @@ async function staffRosterCheckin(target){
       adminRegistrationsError=null;showToast(checkedIn?'報到成功':'已取消報到');
     }catch(error){
       if(current()){
-        const reason=[error?.message,error?.code,error?.details].map(String).join(' ');
-        adminRegistrationsError=reason.includes('permission-denied')?'目前帳號沒有本場報到操作權限，請重新同步名單。':
+        const reason=[error?.message,error?.code,typeof error?.details==='object'?error.details?.reason:error?.details].map(String).join(' ');
+        adminRegistrationsError=reason.includes('app-check-unavailable')?'網站驗證未完成，此筆報到尚未確認；請稍後再試或聯絡管理員。':reason.includes('permission-denied')?'目前帳號沒有本場報到操作權限，請重新同步名單。':
           reason.includes('checkin-closed')?'目前報到已鎖定，請重新同步名單。':
           reason.includes('checkin-state-changed')?'報到狀態已有異動，已同步最新名單；請確認後再次操作。':'報到結果尚未確認，請重新同步名單核對；重試相同操作會沿用原請求。';
         showToast(adminRegistrationsError,true);
@@ -16469,7 +16474,7 @@ function renderStaffRegistrationRoster(){
     if(!state.meta?.checkinRequired)return '免報到';
     const label=row.checkedIn?'已報到':'未報到';
     if(staffRosterCache?.checkinEnabled!==true||!row.playerId)return label;
-    return `<button class="btn btn-ghost btn-sm" data-action="staff-roster-checkin" data-player-id="${esc(row.playerId)}" data-checked-in="${row.checkedIn?'false':'true'}" ${staffCheckinBusy||staffPromotionBusy||peopleRosterBusy?'disabled':''}>${label}｜${row.checkedIn?'取消報到':'報到'}</button>`;
+    return `<button class="btn btn-ghost btn-sm" data-action="staff-roster-checkin" data-player-id="${esc(row.playerId)}" data-checked-in="${row.checkedIn?'false':'true'}" ${staffCheckinBusy||staffPromotionBusy||peopleRosterBusy?'disabled':''}>${staffCheckinBusy?'報到處理中…':label+'｜'+(row.checkedIn?'取消報到':'報到')}</button>`;
   };
   const promotionLabel=row=>{
     if(row.status!=='waitlist'||staffRosterCache?.promotionEnabled!==true)return '—';
@@ -24557,6 +24562,13 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       openModal({type:"generic",title:"是否要取消報到？",message:"「"+p.name+"」目前為已報到狀態。是否要取消報到？",danger:true,confirmLabel:"是",cancelLabel:"否",onConfirm:()=>{
         if(state.cloudCode===context.code&&state.id===context.id&&firebaseUser?.uid===context.uid)peopleSetOnsiteCheckIn(p,false);
       }});return;
+    }
+    if(state.cloudCode){
+      const context=captureRegistrationRosterContext(),desired=p.checkedIn!==true;
+      const submit=()=>{if(registrationRosterContextIsCurrent(context))void window.BXHQrCheckin.manual(p,desired,{legacy:true});};
+      if(!p.checkedIn){submit();return;}
+      openModal({type:"generic",title:"是否要取消報到？",message:p.name,danger:true,confirmLabel:"是",cancelLabel:"否",onConfirm:submit});
+      return;
     }
     if(!p.checkedIn){
       p.checkedIn = true;

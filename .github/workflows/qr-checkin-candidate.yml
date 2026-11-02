@@ -1,7 +1,7 @@
 name: QR Check-in Candidate Tests
 on:
   pull_request:
-    paths: ['qr-checkin/**', 'modules/main-app/qr-checkin*.js', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/community-quick-registration-cloud.test.cjs', 'tests/family-roster-checkin.test.cjs', '.github/workflows/qr-checkin-candidate.yml']
+    paths: ['qr-checkin/**', 'modules/main-app/qr-checkin*.js', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/community-quick-registration-cloud.test.cjs', 'tests/family-roster-checkin.test.cjs', 'tests/qr-manual-confirmation.test.cjs', 'tests/legacy-checkin-transaction.test.cjs', 'tests/staff-checkin-actions.test.cjs', '.github/workflows/qr-checkin-candidate.yml']
 permissions:
   contents: read
 jobs:
@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
       - name: Test QR policy, UI flow, write protection and existing roster behavior
-        run: node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/onsite.test.cjs qr-checkin/backend/cleanup.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
+        run: node --test qr-checkin/backend/core.test.cjs qr-checkin/backend/onsite.test.cjs qr-checkin/backend/cleanup.test.cjs qr-checkin/backend/guard-firestore.test.cjs qr-checkin/ui.test.cjs tests/qr-manual-confirmation.test.cjs tests/legacy-checkin-transaction.test.cjs tests/staff-checkin-actions.test.cjs qr-checkin/fence.test.cjs tests/community-quick-registration-cloud.test.cjs tests/family-roster-checkin.test.cjs
       - name: Test pinned source packaging refuses changed baselines
         run: python3 qr-checkin/build-writer-packages.test.py
       - name: Install browser test dependency
