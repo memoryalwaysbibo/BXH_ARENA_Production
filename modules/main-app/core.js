@@ -15000,11 +15000,11 @@ function renderPlayerApplyScreen(){
       <div class="field"><label>密碼（必填，至少 8 碼）</label><input type="password" id="apply-password" autocomplete="new-password"></div>
       <div class="field"><label>再次輸入密碼（必填）</label><input type="password" id="apply-password2" autocomplete="new-password"></div>
       <div class="field">
-        <label>遊戲 ID（選填）</label>
-        <input type="text" id="apply-nickname">
-        <div class="hint">遊戲 ID 為選填；未設定時會使用本名。正式賽事顯示方式由主辦的名稱設定決定。</div>
+        <label for="apply-nickname">遊戲 ID／ARENA 角色名稱（必填）</label>
+        <input type="text" id="apply-nickname" maxlength="24" required>
+        <div class="hint">請填寫在 ARENA 使用的角色名稱；正式賽事顯示方式由主辦的名稱設定決定。</div>
       </div>
-      <div class="field"><label>手機號碼（選填）</label><input type="tel" id="apply-phone"></div>
+      <div class="field"><label for="apply-phone">手機號碼（必填）</label><input type="tel" id="apply-phone" autocomplete="tel" required></div>
       <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
         <input type="checkbox" id="apply-agree" style="width:18px;height:18px;">
         <label style="margin:0;font-size:13px;">我同意 BXH ARENA 的資料使用說明</label>
@@ -15035,11 +15035,11 @@ function renderPlayerCompleteProfileScreen(){
         <div class="hint">BXH 賽事長期採用本名制，請填寫與報名資料一致的真實姓名。</div>
       </div>
       <div class="field">
-        <label>遊戲 ID（選填）</label>
-        <input type="text" id="complete-nickname">
-        <div class="hint">遊戲 ID 為選填；未設定時會使用本名。正式賽事顯示方式由主辦的名稱設定決定。</div>
+        <label for="complete-nickname">遊戲 ID／ARENA 角色名稱（${p?'必填':'選填'}）</label>
+        <input type="text" id="complete-nickname" maxlength="24" ${p?'required':''}>
+        <div class="hint">${p?'請填寫在 ARENA 使用的角色名稱。 ':'既有帳號可登入後再補齊。 '}正式賽事顯示方式由主辦的名稱設定決定。</div>
       </div>
-      <div class="field"><label>手機號碼（選填）</label><input type="tel" id="complete-phone"></div>
+      <div class="field"><label for="complete-phone">手機號碼（${p?'必填':'選填'}）</label><input type="tel" id="complete-phone" autocomplete="tel" ${p?'required':''}></div>
       <button class="hoc-btn hoc-btn-primary btn-block" style="width:100%;" data-action="player-complete-profile-submit" ${playerApplyBusy?'disabled':''}>${playerApplyBusy?'處理中……':'完成設定'}</button>
     </div>
   ` + authShellClose();
@@ -21752,6 +21752,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(!email){ playerApplyError="請輸入 Email"; render(); return; }
     if(password.length<8){ playerApplyError="密碼至少需要 8 碼"; render(); return; }
     if(password!==password2){ playerApplyError="兩次輸入的密碼不一致"; render(); return; }
+    if(!nickname){ playerApplyError="請填寫 ARENA 角色名稱"; render(); return; }
+    if(!phone){ playerApplyError="請填寫手機號碼"; render(); return; }
     if(!agree){ playerApplyError="請同意資料使用說明後再送出"; render(); return; }
     playerApplyBusy = true; playerApplyError=""; render();
     (async ()=>{
@@ -21769,7 +21771,21 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const realName = document.getElementById("complete-realname")?.value.trim() || "";
     const nickname = document.getElementById("complete-nickname")?.value.trim() || "";
     const phone = document.getElementById("complete-phone")?.value.trim() || "";
-    if(!realName){ playerApplyError="請輸入真實姓名"; render(); return; }
+    const showMissing = (message, fieldId) => {
+      playerApplyError = message;
+      const card = document.querySelector(".auth-card");
+      let error = card?.querySelector(".auth-error");
+      if(!error && card){
+        error = document.createElement("div");
+        error.className = "auth-error";
+        card.querySelector(".auth-card-sub")?.after(error);
+      }
+      if(error) error.textContent = message;
+      document.getElementById(fieldId)?.focus();
+    };
+    if(!realName){ showMissing("請輸入真實姓名", "complete-realname"); return; }
+    if(pendingNewPlayerProfile && !nickname){ showMissing("請填寫 ARENA 角色名稱", "complete-nickname"); return; }
+    if(pendingNewPlayerProfile && !phone){ showMissing("請填寫手機號碼", "complete-phone"); return; }
     playerApplyBusy = true; playerApplyError=""; render();
     (async ()=>{
       const isExistingAccount = !!pendingExistingAccountProfile;

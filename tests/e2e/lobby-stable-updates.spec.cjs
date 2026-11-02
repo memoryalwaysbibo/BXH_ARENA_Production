@@ -631,3 +631,63 @@ test('reminder deferral is isolated across accounts and complete data removes it
   expect(await page.evaluate(() => lobbyFixture.writes)).toEqual([]);
 });
 
+
+test('new player application requires ARENA name and phone before creating an account', async ({ page }) => {
+  await openLobby(page);
+  await page.evaluate(() => {
+    lobbyFixture.applications = [];
+    cloudAuth.applyPlayerAccount = async payload => {
+      lobbyFixture.applications.push(payload);
+      return { ok: false, error: 'Synthetic account creation stopped' };
+    };
+    appPhase = 'player-apply'; render();
+  });
+  await page.locator('#apply-realname').fill('測試玩家');
+  await page.locator('#apply-email').fill('player@example.invalid');
+  await page.locator('#apply-password').fill('password123');
+  await page.locator('#apply-password2').fill('password123');
+  await page.locator('#apply-agree').check();
+  await page.getByRole('button', { name: '申請帳號', exact: true }).click();
+  await expect(page.locator('.auth-error')).toContainText('ARENA 角色名稱');
+  expect(await page.evaluate(() => lobbyFixture.applications)).toEqual([]);
+  await page.locator('#apply-nickname').fill('ARENA 戰士');
+  await page.getByRole('button', { name: '申請帳號', exact: true }).click();
+  await expect(page.locator('.auth-error')).toContainText('手機號碼');
+  expect(await page.evaluate(() => lobbyFixture.applications)).toEqual([]);
+  await page.locator('#apply-phone').fill('0912345678');
+  await page.getByRole('button', { name: '申請帳號', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => lobbyFixture.applications.length)).toBe(1);
+  expect(await page.evaluate(() => lobbyFixture.applications[0])).toMatchObject({
+    nickname: 'ARENA 戰士', phone: '0912345678',
+  });
+});
+
+test('first profile creation requires both fields while an existing account can defer', async ({ page }) => {
+  await openLobby(page);
+  await page.evaluate(() => {
+    lobbyFixture.completions = [];
+    cloudAuth.completeNewPlayerProfile = async (...args) => {
+      lobbyFixture.completions.push(args); return { ok: false, error: 'Synthetic completion stopped' };
+    };
+    pendingNewPlayerProfile = { uid: 'new-fixture', email: 'new@example.invalid' };
+    pendingExistingAccountProfile = null;
+    appPhase = 'player-complete-profile'; render();
+  });
+  await page.locator('#complete-realname').fill('測試玩家');
+  await page.getByRole('button', { name: '完成設定' }).click();
+  await expect(page.locator('.auth-error')).toContainText('ARENA 角色名稱');
+  await page.locator('#complete-nickname').fill('新角色');
+  await page.getByRole('button', { name: '完成設定' }).click();
+  await expect(page.locator('.auth-error')).toContainText('手機號碼');
+  expect(await page.evaluate(() => lobbyFixture.completions)).toEqual([]);
+  await page.locator('#complete-phone').fill('0912345678');
+  await page.getByRole('button', { name: '完成設定' }).click();
+  await expect.poll(() => page.evaluate(() => lobbyFixture.completions.length)).toBe(1);
+  await page.evaluate(() => {
+    pendingNewPlayerProfile = null;
+    pendingExistingAccountProfile = { uid: 'old-fixture', email: 'old@example.invalid' };
+    playerApplyBusy = false; playerApplyError = ''; render();
+  });
+  await expect(page.locator('#complete-nickname')).not.toHaveAttribute('required', '');
+  await expect(page.locator('#complete-phone')).not.toHaveAttribute('required', '');
+});
