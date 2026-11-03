@@ -1,0 +1,41 @@
+name: Offline confirmation recovery
+on:
+  pull_request:
+    paths:
+      - 'offline-resilience.js'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'index.html'
+      - 'tests/offline-confirmation.*.cjs'
+      - 'tests/offline-resilience-v2-wiring.test.cjs'
+      - '.github/workflows/offline-confirmation-recovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated test dependencies
+        run: npm install --prefix /tmp/bxh-offline-deps --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 playwright@1.55.0
+      - name: Install Chromium
+        run: node /tmp/bxh-offline-deps/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Verify queue concurrency, reload and lost acknowledgement
+        env:
+          NODE_PATH: /tmp/bxh-offline-deps/node_modules
+        run: node --test tests/offline-confirmation.browser.cjs tests/offline-queue-render-dedupe.test.cjs tests/offline-resilience-v2-wiring.test.cjs
+      - name: Verify real Firestore acknowledgement recovery is read-only
+        env:
+          NODE_PATH: /tmp/bxh-offline-deps/node_modules
+        run: /tmp/bxh-offline-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-offline-confirmation-fix --config qr-checkin/firebase.emulator.json 'node --test tests/offline-confirmation.firestore.cjs'

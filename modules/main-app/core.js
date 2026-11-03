@@ -26094,10 +26094,11 @@ async function init(){
     if(currentAuthUid()!==op.actorUid)return {ok:false,reason:"permission-denied"};
     return await window.cloudSync.confirmMatchTransaction(op.tournamentCode,(remoteState)=>{
       rebuildPropagationForState(remoteState);const m=(remoteState.matches||[]).find(x=>x.id===op.matchId);if(!m)return{ok:false,reason:"not-found"};
-      if(m.completed||m.winnerId)return{ok:false,reason:"already-completed"};if(Number(m.station||0)!==Number(op.station||0))return{ok:false,reason:"station-mismatch"};
+      if(m.completed||m.winnerId)return window.BXHOfflineQueue?.matchesConfirmationReceipt(op,m)?{ok:true,alreadyApplied:true,state:remoteState}:{ok:false,reason:"already-completed"};if(Number(m.station||0)!==Number(op.station||0))return{ok:false,reason:"station-mismatch"};
       if((m.dispatchRevision||0)!==(op.dispatchRevision||0))return{ok:false,reason:"dispatch-stale"};if(!m.a||!m.b||m.a.playerId!==op.playerAId||m.b.playerId!==op.playerBId)return{ok:false,reason:"player-mismatch"};
       let ev;if(op.mode==="quick_decision")ev=evaluateQuickDecision(m,op.selectedWinnerId);else{m.scoreA=op.scoreA;m.scoreB=op.scoreB;m.log=Array.isArray(op.log)?op.log:[];m.faultActions=Array.isArray(op.faultActions)?op.faultActions:[];ev=evaluateMatchCompletion(m);}
       if(!ev.ok||ev.winnerId!==op.selectedWinnerId)return{ok:false,reason:(ev&&ev.reason)||"validation-failed"};if(op.mode==="quick_decision")applyQuickDecisionFields(m,ev,op.actorName);else applyMatchCompletionFields(m,ev,op.actorName);
+      if(window.BXHOfflineQueue?.confirmationReceipt)m.offlineConfirmationReceipt=window.BXHOfflineQueue.confirmationReceipt(op,m);
       delete m.offlinePendingSync;delete m.offlineOperationQueuedAt;rebuildPropagationForState(remoteState);return{ok:true,state:remoteState};
     },op.auditMeta||{});
   };
