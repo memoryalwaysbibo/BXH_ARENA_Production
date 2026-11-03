@@ -38,3 +38,10 @@ jobs:
           NODE_PATH: /tmp/bucket-completion/node_modules
           GCLOUD_PROJECT: demo-bxh-four-court-buckets
         run: /tmp/bucket-completion/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/completion/native.firebase.json 'node tests/four-court-buckets/completion/native-emulator.cjs'
+      - name: Install exact captured host-sync dependency versions
+        run: npm install --prefix /tmp/bucket-hostsync-sdk --no-save --ignore-scripts firebase-admin@14.4.0 firebase-functions@7.3.2
+      - name: Repeat native completion and hosting on captured SDK versions
+        env:
+          NODE_PATH: /tmp/bucket-hostsync-sdk/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bucket-completion/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/completion/native.firebase.json 'node tests/four-court-buckets/completion/native-emulator.cjs'

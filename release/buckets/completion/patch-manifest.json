@@ -142,7 +142,7 @@
     "protocol/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a"
   },
   "helperFiles": {
-    "README.md": "2774184ad3431d1c2b228e379e633233a2543f7b54c552b5665f2ad014e76532",
+    "README.md": "3fad7471ede0577ffd9762ec57e8bdd4b1680144cbea291fb8f39ebc86241f99",
     "certificate.cjs": "8303d0ebe31752c7edb21bfecec08d1a9d3870bb509bab0dbfff7cd6a2bd5152",
     "general-completion.cjs": "2eea28a22f6815cc63787b960aa4701a52d6157536773b1e4fa4b5bf11c2faed",
     "hosting/15/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
@@ -169,6 +169,7 @@
     "fixtures/host-sync/_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
     "fixtures/host-sync/_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
     "fixtures/host-sync/hosting.js": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
+    "fixtures/host-sync/package.json": "c91d10364c4fc66b6241cd2848de9c2cb736ef8195a3f50b0de0c23599c71509",
     "fixtures/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680"
   },
   "protocolSource": {
@@ -227,6 +228,12 @@
         "sha256": "17b908d68524e8637108d1902ff71bae2995ba9287ca73cbdacaf289851e9b6e",
         "size": 4743
       }
-    ]
+    ],
+    "dependencyManifest": {
+      "path": "fixtures/host-sync/package.json",
+      "node": "22",
+      "firebase-admin": "14.4.0",
+      "firebase-functions": "7.3.2"
+    }
   }
 }

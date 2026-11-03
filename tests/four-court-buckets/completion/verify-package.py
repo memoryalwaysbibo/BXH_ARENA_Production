@@ -21,6 +21,7 @@ assert hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()==m['p
 assert (R/'hosting/15/hosting-core.js').read_bytes()==(R/'hosting/16/hosting-core.js').read_bytes()==(T/'fixtures/hosting-core.js').read_bytes()
 assert not m['missingExactSource']
 capture=m['hostSyncCapture'];assert capture['function']['name']=='syncMyHostingProgress' and capture['verifiedFiles']==92
+assert capture['dependencyManifest']['firebase-admin']=='14.4.0' and capture['dependencyManifest']['firebase-functions']=='7.3.2'
 for f in capture['closureFiles']:
     target=R/'hosting/host-sync/hosting-core.js' if f['path']=='hosting-core.js' else T/'fixtures/host-sync'/f['path']
     assert sha(target)==f['sha256'],f['path']
