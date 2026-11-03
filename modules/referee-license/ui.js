@@ -284,13 +284,86 @@
       (ownDraft ? button('儲存照片', 'photo-save', attr, disabled) + button('取消更換', 'photo-cancel', attr, disabled) : '') +
       (savedPhoto(snapshot) && !ownDraft ? button('移除照片', 'photo-remove', attr, disabled) : '') + '</div></div></div></details>';
   }
+  function legacyState(s) {
+    if (!s.legacy) {
+      let report = null;
+      try { report = JSON.parse(root.localStorage.getItem(root.BXHRefereeLegacyImport?.KEY) || 'null'); } catch {}
+      s.legacy = {plan: null, report, loading: false, generation: 0, message: ''};
+    }
+    return s.legacy;
+  }
+  function legacyError(error) {
+    const reason = String(error?.code || error?.message || '');
+    if (/sha-mismatch|plan-|roster-|source-|batch-|entry-/.test(reason)) return '這不是本次核對完成的原始計畫，請選擇原本下載的 referee-backfill-plan.json。';
+    if (/prior-run/.test(reason)) return '這份計畫已有執行紀錄，不能再次送出。請下載結果核對。';
+    if (/another-tab/.test(reason)) return '另一個分頁正在處理這份計畫，請回到原分頁。';
+    if (/session|permission|owner-login/.test(reason)) return '登入身分或管理權限已變更，操作已停止。';
+    return '處理已停止，請保留結果供核對；不要重新送出或清除瀏覽器紀錄。';
+  }
+  function legacyHtml(s) {
+    const api = root.BXHRefereeLegacyImport;
+    if (!api || root.BXH_REFEREE_CERTIFICATES_V1 !== true) return '';
+    const state = legacyState(s), disabled = s.busy || !!s.pending || state.loading;
+    const status = state.report?.status;
+    const result = status === 'verified' ? '已完成並回讀確認：20 批、1,966 場。' : state.report ? '已有執行紀錄；未確認完成前，請勿重複送出。' : '';
+    return '<section class="panel rl-section" data-referee-legacy-import><h3>原18人歷史判決匯入</h3>' +
+      '<p class="rl-small">選取本次核對完成的原始計畫。只增加歷史判決，不變更階級、照片、參與賽事或賽事規模；零場者不補造。</p>' +
+      '<label class="rl-field"><span>選取回補計畫（JSON）</span><input type="file" accept=".json,application/json" data-referee-legacy-file '+(disabled?'disabled':'')+'></label>' +
+      (state.plan ? '<p>18 人 · 17 人有紀錄 · 20 批 · 1,966 場</p><div class="rl-legacy-preview">'+state.plan.people.map(p=>'<div class="rl-spread"><span>'+esc(p.name)+'</span><span>'+num(p.count)+' 場／'+num(p.batches.length)+' 批</span></div>').join('')+'</div>' : '') +
+      '<p role="status" aria-live="polite">'+esc(state.loading?'正在核對原始計畫…':state.message||result)+'</p>' +
+      (state.plan && !state.report ? button('送出20批歷史回補','legacy-run','',disabled) : '') +
+      (state.report ? button('下載執行結果','legacy-download','',s.busy) : '') +
+      '<p class="rl-small">送出期間請保持此頁開啟，不切換帳號。遇到錯誤會停止，不會自動重送。既有「待認列」提示可能仍顯示，本次不改動新紀錄的計算規則。</p></section>';
+  }
+  async function legacyFile(s, file) {
+    if (!allowedAdmin(s) || s.busy || s.pending || !file || !root.BXHRefereeLegacyImport) return;
+    const state=legacyState(s), generation=++state.generation;
+    state.plan=null;state.message='';state.loading=true;redraw(s);
+    try {
+      if (file.size>8*1024*1024) throw new Error('plan-too-large');
+      const plan=await root.BXHRefereeLegacyImport.validatePlan(await file.arrayBuffer());
+      if (!allowedAdmin(s) || generation!==state.generation) return;
+      state.plan=plan;state.message='原始計畫與逐場來源核對通過。請核對下方送出範圍。';
+    } catch(error) {if(allowedAdmin(s)&&generation===state.generation)state.message=legacyError(error);}
+    finally {if(allowedAdmin(s)&&generation===state.generation){state.loading=false;redraw(s);}}
+  }
+  async function legacyRun(s) {
+    const api=root.BXHRefereeLegacyImport,state=legacyState(s);
+    if (!api || !allowedAdmin(s) || s.busy || s.pending || state.loading || !state.plan || state.report) return;
+    if (!root.navigator?.locks) {state.message='此瀏覽器無法保護同時送出，請使用最新版 Chrome 或 Safari。';redraw(s);return;}
+    s.busy=true;state.message='正在檢查18人的最新資料…';redraw(s);
+    try {
+      await root.navigator.locks.request(api.KEY,{ifAvailable:true},async lock=>{
+        if(!lock)throw new Error('another-tab-running');
+        state.report=await api.execute(state.plan,async payload=>{
+          if(!allowedAdmin(s))throw new Error('session-changed');
+          const result=await call(payload);
+          if(!allowedAdmin(s))throw new Error('session-changed');
+          return result;
+        },root.localStorage,text=>{if(allowedAdmin(s)){state.message=text;redraw(s);}});
+      });
+    } catch(error) {if(allowedAdmin(s))state.message=legacyError(error);}
+    finally {
+      if(current(s)){
+        s.busy=false;
+        for(const item of s.cache.values()){item.snapshot=null;item.error='';item.generation++;item.loading=false;}
+        redraw(s);
+      }
+    }
+  }
+  function legacyDownload(s) {
+    if(!allowedAdmin(s)||s.busy||!legacyState(s).report)return;
+    const url=URL.createObjectURL(new Blob([JSON.stringify(s.legacy.report,null,2)],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download='referee-backfill-result.json';a.click();
+    root.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
   function admin(s) {
     if (!allowedAdmin(s)) return '<section class="panel rl-section"><p role="alert">只有具裁判管理權限的最高管理員可以開啟此頁。</p></section>';
     const selected = s.targetUid ? ensure(s, s.targetUid) : null, snapshot = selected?.snapshot;
     return '<div class="rl-root" data-referee-view="admin"><div class="rl-heading"><h2>裁判管理</h2>' + (s.targetUid ? button('重新整理', 'refresh', 'data-uid="' + esc(s.targetUid) + '"', s.busy) : '') + '</div>' +
       '<section class="panel rl-section"><form class="rl-search" data-referee-form="search"><label class="rl-field"><span>搜尋姓名、暱稱或 UID</span><input class="rl-input" type="search" name="query" data-referee-query value="' + esc(s.query) + '" maxlength="80" placeholder="輸入裁判資料" ' + (s.searching || s.busy || s.pending ? 'disabled' : '') + '></label><button type="submit" class="btn btn-primary rl-button" ' + (s.searching || s.busy || s.pending ? 'disabled' : '') + '>' + (s.searching ? '搜尋中…' : '搜尋') + '</button></form>' +
       (s.items ? '<div class="rl-search-results">' + (s.items.length ? s.items.map(person => '<button type="button" class="rl-person-result" data-action="referee-license-select" data-uid="' + esc(person.uid) + '" ' + (s.busy || s.pending ? 'disabled' : '') + '><strong>' + esc(person.realName || '本名未填') + '</strong><span>' + esc(person.nickname || '未填暱稱') + '</span>' + (person.active === false ? '<span class="rl-small">' + (person.accountStatus === 'deleted' ? '已刪除帳號' : person.accountStatus === 'test' ? '測試帳號' : '已停用帳號') + ' · 歷史資料</span>' : '') + '<small>' + esc(person.uid) + '</small></button>').join('') : '<p class="rl-small">找不到符合的裁判。</p>') + '</div>' : '') + (s.searchIncomplete ? '<p class="rl-small">結果較多，請輸入更完整姓名／UID。</p>' : '') + '</section>' +
-      feedback(s) + (selected ? loadingHtml(selected, s.targetUid) : '<p class="rl-small">先搜尋並選擇要管理的裁判。</p>') +
+      legacyHtml(s) + feedback(s) + (selected ? loadingHtml(selected, s.targetUid) : '<p class="rl-small">先搜尋並選擇要管理的裁判。</p>') +
       (snapshot ? '<section class="panel rl-section"><div class="rl-heading"><div><h3>' + esc(snapshot.person?.realName || '本名待確認') + '</h3><p class="rl-small">' + esc(snapshot.person?.nickname || '') + '</p></div>' + rankHtml(snapshot.certificate?.awardedLevel) + '</div><p class="rl-small rl-uid">UID：' + esc(snapshot.uid) + '</p><div class="rl-admin-totals"><span>累積判決 <strong>' + num(snapshot.stats.decisions) + '</strong></span><span>參與賽事 <strong>' + num(snapshot.stats.eventCount) + '</strong></span></div>' + notices(snapshot) + '</section>' + awardHtml(snapshot, s) + backfillForm(s, snapshot) + photoSection(snapshot, s) + backfillsHtml(snapshot, s) + sourceHtml(snapshot, s) : '') + '</div>';
   }
   async function search(s) {
@@ -417,6 +490,8 @@
     }
     if (!allowedAdmin(s)) {s.error = '目前沒有裁判管理權限。'; redraw(s); return true;}
     if (s.busy || s.pending) return true;
+    if (key === 'legacy-run') {void legacyRun(s);return true;}
+    if (key === 'legacy-download') {legacyDownload(s);return true;}
     if (key === 'search') {void search(s); return true;}
     if (key === 'select') {
       if (!(s.items || []).some(person => person.uid === data.uid)) return true;
@@ -472,6 +547,7 @@
     if (!el?.dataset || !s) return;
     if ('refereePhotoInput' in el.dataset) {void preparePhoto(s, el.files?.[0], el.dataset.uid || s.ctx.uid); return;}
     if (!allowedAdmin(s)) return;
+    if ('refereeLegacyFile' in el.dataset) {void legacyFile(s, el.files?.[0]);return;}
     if ('refereeApproval' in el.dataset) {const keys={personId:'approvalPersonId',basis:'approvalBasis',aliasUid:'aliasUid'};const key=keys[el.dataset.refereeApproval];if(key)s[key]=el.value;}
     if ('refereeField' in el.dataset) updateEditor(el);
     if ('refereeGrantLevel' in el.dataset) s.grantLevel = Number(el.value);
