@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "c28eed29fa59fa1c4c13c3d553e7087faf8b27bd",
+  "baseMain": "542323c631e07ef455c2b17f3213346ecee53f3a",
   "components": [
     {
       "pr": 707,
@@ -59,7 +59,7 @@
       ]
     },
     "index.html": {
-      "blob": "deb80c0950964d2f9938533a5e2d98d33e874a8b",
+      "blob": "0157ce44315b65a727e52786de28a0b5fe2b9d52",
       "components": [
         707,
         714
@@ -73,7 +73,7 @@
       ]
     },
     "modules/main-app/core.js": {
-      "blob": "13e7e1eca16c9aa4082f344882141af707420f19",
+      "blob": "76d819003af9ca353b999067c6ff87a1a7c5f7de",
       "components": [
         707,
         714
@@ -1953,7 +1953,8 @@
       "new-room-idle": "20261102.1",
       "staff-ranked-create": "20261102.1",
       "profile-complete-draft": "20261102.1",
-      "offline-confirmation": "20261103.1"
+      "offline-confirmation": "20261103.1",
+      "archive-status-hint": "20261103.1"
     },
     "modules/main-app/public-watch-isolation.js": {
       "v": "20261005-captain-isolation-1"
@@ -2057,7 +2058,7 @@
       "v": "20261001-ui-v2"
     }
   },
-  "mainCoreBlob": "1ab06e56f8e928531166225075c957ef4cee45e7",
+  "mainCoreBlob": "3c77c4c3b17679c9d83726fdc43cab2e9156a1cf",
   "resolutions": {
     "index.html": "preserve every current-main script query value; union component cache tokens and insert settlement script after bucket browser",
     "modules/main-app/core.js": "reconstruct/verify exact current-main blob; apply 707 and 714 hunks with unique context, retaining main 716 offline confirmation",

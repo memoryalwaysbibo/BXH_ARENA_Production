@@ -9885,6 +9885,7 @@ function renderArchiveControls(){
       ${isSuperAdmin()?`<button class="btn btn-ghost btn-sm" data-action="unarchive-current">解除封存並編輯</button>`:""}</div>`;
   }
   const canArchive = tournamentStatus()==="settling";
+  if(!canArchive) return "";
   const phase=state.settlementPhase||"idle";
   if(canArchive && phase==="idle"){
     setTimeout(()=>{
