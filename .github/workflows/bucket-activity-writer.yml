@@ -5,6 +5,7 @@ on:
       - 'release/buckets/activity/**'
       - 'tests/four-court-buckets/activity/**'
       - '.github/workflows/bucket-activity-writer.yml'
+      - 'scripts/bucketcaptureactivitybackfill.py'
 permissions:
   contents: read
 jobs:
@@ -20,6 +21,8 @@ jobs:
           node-version: 22
       - name: Verify captured module and exact patch scope
         run: python3 -B tests/four-court-buckets/activity/verify-package.py
+      - name: Read-only backfill capture helper offline checks
+        run: python3 -B tests/four-court-buckets/activity/capture-backfill.py
       - name: Captured baseline, stale delivery and bucket activity regressions
         run: node tests/four-court-buckets/activity/probe.cjs
       - uses: actions/checkout@v4

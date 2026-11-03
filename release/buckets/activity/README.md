@@ -52,7 +52,10 @@ settlement contract, not a claim that either PR is deployed.
 - 12 bridge checks run the actual pinned PR713/PR715 settlement handlers for
   4/6/12 courts with/without QR, then feed their generated certificates to the
   activity handler. These use synthetic Firestore/auth boundaries.
-- The native Firestore SDK workflow is pending. It uses only the loopback
+- 51 native Firestore SDK checks passed at code commit
+  `e2eaef3e361d8c9715a430b7b86968c053973919`, workflow run
+  [41606427056](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/41606427056).
+  They use only the loopback
   `demo-bxh-bucket-activity` project, injected business clock and synthetic events
   and accounts. It is not real Auth/Eventarc or production timing acceptance.
 - Awards remain separate per-user transactions, as in the captured implementation.
@@ -80,3 +83,15 @@ exact live archive verified or deployed by this work.
 No merge, upload, deployment, runtime flag, room activation or production data
 write is performed. Broader writer classification, derived consumers, complete
 candidate integration and six-court cutover/rollback acceptance remain open.
+
+## Independent scheduled backfill source
+
+`scripts/bucketcaptureactivitybackfill.py prepare` captures only the independently
+deployed `activityCompletedTournamentBackfill` archive from its pinned regional
+inventory pointer. It reuses the already verified maintenance helper, requires
+project `bxh-arena` and closed rollout gates, filters secrets and dependencies
+from the exported code bundle, checks source metadata before and after capture,
+and exports no room documents. Three offline tests exercise successful filtered
+capture, metadata drift rejection and path traversal rejection. This is a
+read-only evidence request; it does not deploy the activity patch. If metadata
+has changed, stop and reconcile the new pointer instead of relaxing verification.
