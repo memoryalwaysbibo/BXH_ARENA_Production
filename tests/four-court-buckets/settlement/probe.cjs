@@ -34,7 +34,7 @@ function load(spec,candidate,m){
  }
  const exports=moduleAt(path.join(base,spec.path)),db=moduleAt(path.join(base,'_qr_checkin/admin-firestore.cjs')).getFirestore(),options={db,clock:()=>NOW,now:()=>NOW,serverTimestamp:()=>NOW,FieldValue:sdk.FieldValue,bucketRuntime:'emulator',bucketEnv:{FIRESTORE_EMULATOR_HOST:'127.0.0.1:8188'}};
  const fn=spec.function==='ladderAutoSettlement'?exports._ladderAutoSettlementTest.createSettlementService(options).settle:exports.createLadderSettlement(options);
- return {invoke:()=>spec.function==='ladderAutoSettlement'?fn(code):fn({code,actor:{uid:'admin',name:'Admin'}}),module:exports};
+ return {invoke:(overrides={})=>spec.function==='ladderAutoSettlement'?fn(code):fn({code,actor:{uid:'admin',name:'Admin'},...(candidate&&m.rows.get('tournaments/'+code)?.scoreStorage?{expectedRoom:{roomId:m.rows.get('tournaments/'+code).scoreStorage.roomId,epoch:m.rows.get('tournaments/'+code).scoreStorage.epoch}}:{}),...overrides}),module:exports};
 }
 function fixture({bucket=true,qr=false,courts=6}={}){
  const m=memory(),B=require(path.join(release,'bucket-settlement/state.cjs'));
@@ -139,6 +139,17 @@ if(require.main===module)(async()=>{let checks=0;
  }
  for(const spec of specs)for(const key of ['testMode','systemClosed','eventCancelled','notStarted']){
   const f=fixture(),p='tournaments/'+code,t=f.m.rows.get(p),s=JSON.parse(t.data);if(key==='eventCancelled')s.meta.eventCancelled=true;else if(key==='notStarted')delete s.startedAt;else s[key]=true;f.m.put(p,{...t,data:JSON.stringify(s)});const r=await load(spec,true,f.m).invoke();assert.equal(r.ok,false);assert.equal(f.m.writes.length,0);checks++;
+ }
+ const boundManual=specs.find(s=>s.function==='settleLadderTournament');
+ for(const expectedRoom of [null,{}, {roomId:'wrong',epoch:'epoch-1'}, {roomId:'room-1',epoch:'old'}, {roomId:'room-1',epoch:'epoch-1',extra:1}]){
+  const f=fixture(),before=JSON.stringify([...f.m.rows]);const result=await load(boundManual,true,f.m).invoke({expectedRoom});assert.equal(result.ok,false);assert.equal(JSON.stringify([...f.m.rows]),before);checks++;
+ }
+ {const f=fixture();assert((await load(boundManual,true,f.m).invoke()).ok);f.m.put('users/admin',{active:false,role:'admin'});const before=JSON.stringify([...f.m.rows]);const result=await load(boundManual,true,f.m).invoke();assert.equal(result.ok,false);assert.equal(JSON.stringify([...f.m.rows]),before);checks++;}
+ {const f=fixture({bucket:false}),before=JSON.stringify([...f.m.rows]);const result=await load(boundManual,true,f.m).invoke({expectedRoom:{roomId:'room-1',epoch:'epoch-1'}});assert.equal(result.ok,false);assert.equal(JSON.stringify([...f.m.rows]),before);checks++;}
+ // Execute the real captured callable assignment; do not infer forwarding from factory tests.
+ {const src=fs.readFileSync(path.join(release,'candidate/21/index.js'),'utf8'),a=src.indexOf('exports.settleLadderTournament = onCall('),b=src.indexOf('\n});',a)+4,ex={},binding={roomId:'browser-room',epoch:'browser-epoch'};let forwarded;
+  vm.runInNewContext(src.slice(a,b),{exports:ex,REGION:'asia-east1',onCall:(_,fn)=>fn,requireAdminTier:async()=>({uid:'admin',data:{realName:'Admin'}}),settleOfficialLadder:async value=>{forwarded=value;return {ok:true};},HttpsError:Error});
+  await ex.settleLadderTournament({data:{code,expectedRoom:binding}});assert.deepEqual(JSON.parse(JSON.stringify(forwarded.expectedRoom)),binding);checks++;
  }
  console.log(JSON.stringify({settlementChecks:checks,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

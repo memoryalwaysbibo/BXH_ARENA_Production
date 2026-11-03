@@ -13,7 +13,7 @@ function handler(spec,candidate,{production=false}={}){const key=spec.function+c
  const mod=require(path.join(dir,spec.path)),guarded=require(path.join(dir,'_qr_checkin/admin-firestore.cjs')).getFirestore();
  const options={db:guarded,FieldValue,clock:()=>NOW,now:()=>NOW,serverTimestamp:()=>FieldValue.serverTimestamp(),bucketRuntime:production?'production':'emulator'};
  const fn=spec.function==='ladderAutoSettlement'?mod._ladderAutoSettlementTest.createSettlementService(options).settle:mod.createLadderSettlement(options);
- const invoke=()=>spec.function==='ladderAutoSettlement'?fn(code):fn({code,actor:{uid:'admin',name:'Admin'}});cache.set(key,invoke);return invoke;
+ const invoke=async(overrides={})=>{if(spec.function==='ladderAutoSettlement')return fn(code);const root=(await db.doc('tournaments/'+code).get()).data();return fn({code,actor:{uid:'admin',name:'Admin'},...(candidate&&root?.scoreStorage?{expectedRoom:{roomId:root.scoreStorage.roomId,epoch:root.scoreStorage.epoch}}:{}),...overrides});};cache.set(key,invoke);return invoke;
 }
 async function clear(){for(const name of collections)await db.recursiveDelete(db.collection(name));}
 async function seed(f){await clear();const rows=[...f.m.rows];for(let i=0;i<rows.length;i+=400){const b=db.batch();for(const [p,v]of rows.slice(i,i+400))b.set(db.doc(p),v);await b.commit();}}
@@ -64,6 +64,10 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
   }
   // Both services read the same buckets and contend on the same ledger/root.
   for(const qr of [false,true]){await seed(fixture({qr}));const r=await Promise.all(specs.map(s=>handler(s,true)()));assert(r.every(x=>x.ok));assert.equal((await db.doc('ladderPlayers/u1').get()).data().seasonPoints,105);assert.equal((await db.collection('ladderTransactions').get()).size,4);if(qr)assert.equal((await db.doc('tournaments/'+code).get()).data().qrCheckinRevision,2);checks++;}
-  console.log(JSON.stringify({nativeSettlementChecks:checks,project,productionWrites:0,productionRequests:0,scope:'real SDK, QR proxy, 160-player awards and cross-service contention; synthetic auth and injected business clock'}));
+  const boundManual=specs.find(s=>s.function==='settleLadderTournament');
+ for(const expectedRoom of [null,{}, {roomId:'wrong',epoch:'epoch-1'}, {roomId:'room-1',epoch:'old'}, {roomId:'room-1',epoch:'epoch-1',extra:1}]){await seed(fixture());const before=await state();const r=await handler(boundManual,true)({expectedRoom});assert.equal(r.ok,false);assert.deepEqual(await state(),before);checks++;}
+ {await seed(fixture());assert((await handler(boundManual,true)()).ok);await db.doc('users/admin').update({active:false});const before=await state();assert.equal((await handler(boundManual,true)()).ok,false);assert.deepEqual(await state(),before);checks++;}
+ {await seed(fixture({bucket:false}));const before=await state();assert.equal((await handler(boundManual,true)({expectedRoom:{roomId:'room-1',epoch:'epoch-1'}})).ok,false);assert.deepEqual(await state(),before);checks++;}
+ console.log(JSON.stringify({nativeSettlementChecks:checks,project,productionWrites:0,productionRequests:0,scope:'real SDK, QR proxy, 160-player awards and cross-service contention; synthetic auth and injected business clock'}));
  }finally{await clear();await db.terminate();await deleteApp(app);fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

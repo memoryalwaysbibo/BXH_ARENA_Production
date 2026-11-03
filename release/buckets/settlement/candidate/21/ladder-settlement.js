@@ -155,7 +155,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
     return {resolved, skipped};
   }
 
-  return async function settle({code, actor}) {
+  return async function settle({code, actor, expectedRoom}) {
     const normalized = String(code || "").trim().toUpperCase();
     if (!/^BXH-[A-Z0-9]{5,12}$/.test(normalized)) return result(false, "invalid-code", "賽事代碼格式錯誤");
     const tournamentRef = db.doc(`tournaments/${normalized}`);
@@ -165,11 +165,12 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
     const publicRef=db.doc(`publicTournaments/${normalized}`),sourcePublic=await publicRef.get(),observed={};
     let sourceInput=null;
     if(A.ownership(source,sourcePublic.data())){
+      if(!expectedRoom||typeof expectedRoom.roomId!=='string'||!expectedRoom.roomId||typeof expectedRoom.epoch!=='string'||!expectedRoom.epoch||JSON.stringify(expectedRoom).length>2000||Object.keys(expectedRoom).some(k=>!['roomId','epoch'].includes(k)))return result(false,'bucket-expected-room-required','請重新載入分桶房間後再結算');
       try{
-        const initial=await db.runTransaction(async tx=>{const [r,p]=await Promise.all([tx.get(tournamentRef),tx.get(publicRef)]);if(!r.exists)A.fail('bucket-room-changed');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');return {r,input};});
+        const initial=await db.runTransaction(async tx=>{const [r,p,user]=await Promise.all([tx.get(tournamentRef),tx.get(publicRef),tx.get(db.doc('users/'+actor.uid))]);if(!r.exists)A.fail('bucket-room-changed');if(!A.validProfile(user.data())||!['admin','super_admin'].includes(user.data().role))A.fail('admin-required');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');if(input.m.roomId!==expectedRoom.roomId||input.m.epoch!==expectedRoom.epoch)A.fail('bucket-room-changed');return {r,input};});
         sourceSnapshot=initial.r;source=initial.r.data();sourceInput=initial.input;
       }catch(e){if(e.bucketSettlement)return result(false,e.message,'分桶結算資料尚未符合驗收條件');throw e;}
-    }
+    }else if(expectedRoom!==undefined)return result(false,'bucket-mode-changed','房間儲存模式已變更，請重新讀取');
     if (source.ladderPointsAwarded === true) {
       return {ok: true, alreadyAwarded: true, seasonId: source.ladderSeasonId || null, results: source.ladderResults || [], skippedPlayers: source.ladderSkippedPlayers || [],...(sourceInput?A.publicReceipt(sourceInput):{})};
     }

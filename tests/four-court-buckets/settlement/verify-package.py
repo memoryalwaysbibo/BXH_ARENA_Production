@@ -19,6 +19,14 @@ for s in m['patches']:
         text=text.replace(e['before'],e['after'],1)
     target=RELEASE/'candidate'/str(s['sourceSet'])/s['path']
     assert target.read_text()==text and sha(target)==s['patchedFileSha256']
+wrapper=m['wrapperPatch']
+source=TEST/'fixtures/21/index.js';target=RELEASE/'candidate/21/index.js'
+assert sha(source)==wrapper['baselineFileSha256']
+text=source.read_text()
+for e in wrapper['edits']:
+    assert text.count(e['before'])==1
+    text=text.replace(e['before'],e['after'],1)
+assert target.read_text()==text and sha(target)==wrapper['patchedFileSha256']
 for name,digest in m['helperFiles'].items():assert sha(RELEASE/name)==digest,name
 assert blob(RELEASE/'bucket-settlement/state.cjs')==m['protocolSource']['stateGitBlob']
 source=TEST/'source/b82-scoring-core.cjs'

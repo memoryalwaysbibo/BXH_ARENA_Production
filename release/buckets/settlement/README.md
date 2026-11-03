@@ -95,3 +95,7 @@ only the two named entrypoints, preserve runtime/trigger/identity/configuration,
 and read back both source and settings. Leave settlement/runtime gates closed
 until all other writers, ordinary/general completion, hosting, permissions,
 capacity, multi-referee cutover and rollback/recovery acceptance is complete.
+
+## Bound browser settlement requests
+
+Marked rooms now require `expectedRoom: {roomId, epoch}` on the manual callable. The exact captured source21 `index.js` wrapper forwards this optional field while retaining its existing `requireAdminTier`. The manual factory rejects missing/mismatched bindings before any award, rechecks the active admin profile in the initial certified read (including replay), and carries the SDK parent identity/epoch across the later award transaction. A bound bucket request cannot fall back to an unmarked replacement room. Unmarked legacy clients may continue sending code alone; auto settlement remains a server-only path. Deploy only the named callable from source21 with both pinned root files (`index.js`, `ladder-settlement.js`) and helper overlay; do not deploy unrelated sibling exports.
