@@ -1,0 +1,35 @@
+name: Bucket completion activity writer
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/activity/**'
+      - 'tests/four-court-buckets/activity/**'
+      - '.github/workflows/bucket-activity-writer.yml'
+permissions:
+  contents: read
+jobs:
+  activity-writer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify captured module and exact patch scope
+        run: python3 -B tests/four-court-buckets/activity/verify-package.py
+      - name: Captured baseline, stale delivery and bucket activity regressions
+        run: node tests/four-court-buckets/activity/probe.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated SDK and emulator dependencies
+        run: npm install --prefix /tmp/bucket-activity --no-save --ignore-scripts firebase-tools@14 firebase-admin@14.4.0 firebase-functions@7.3.2
+      - name: Native transaction authority, generation and retry acceptance
+        env:
+          NODE_PATH: /tmp/bucket-activity/node_modules
+          GCLOUD_PROJECT: demo-bxh-bucket-activity
+        run: /tmp/bucket-activity/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-activity --config tests/four-court-buckets/activity/firebase.json 'node tests/four-court-buckets/activity/native-emulator.cjs'

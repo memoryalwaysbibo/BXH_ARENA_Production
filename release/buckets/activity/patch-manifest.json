@@ -1,0 +1,107 @@
+{
+  "status": "candidate-not-deployed",
+  "deploymentTarget": "activityTournamentCompleted",
+  "runtimeEnabled": false,
+  "productionWrites": 0,
+  "captureObservedAt": "20261103T014221Z",
+  "capturedMetadata": {
+    "name": "activityTournamentCompleted",
+    "entryPoint": "activityTournamentCompleted",
+    "runtime": "nodejs22",
+    "updateTime": "2026-09-27T18:36:58.345377291Z",
+    "storageSource": {
+      "bucket": "gcf-v2-sources-87261141693-asia-east1",
+      "object": "activityTournamentCompleted/function-source.zip",
+      "generation": "1790534210033858"
+    },
+    "codebase": null,
+    "eventTrigger": {
+      "eventType": "google.cloud.firestore.document.v1.written",
+      "eventFilters": [
+        {
+          "attribute": "database",
+          "value": "(default)"
+        },
+        {
+          "attribute": "namespace",
+          "value": "(default)"
+        },
+        {
+          "attribute": "document",
+          "value": "tournaments/{code}",
+          "operator": "match-path-pattern"
+        }
+      ]
+    },
+    "sourceSet": 0,
+    "classification": "pending-source-review"
+  },
+  "archiveSha256": "6d694db6b355627c2fc1ee622e27884a83be11df0e2d4525699cd34c16fe4a48",
+  "edits": [
+    {
+      "before": "const {backgroundJobsEnabled}=require(\"./release-controls\");",
+      "after": "const {backgroundJobsEnabled}=require(\"./release-controls\");\nconst TournamentGuard=require(\"./activity-tournament-guard.cjs\");"
+    },
+    {
+      "before": "cap=null,metadata={}}){",
+      "after": "cap=null,metadata={},tournamentGuard=null}){"
+    },
+    {
+      "before": "const [seen,w,d]=await Promise.all([tx.get(entry),tx.get(wallet),tx.get(dailyRef)]);if(seen.exists)return {awarded:0,duplicate:true};",
+      "after": "const [seen,w,d]=await Promise.all([tx.get(entry),tx.get(wallet),tx.get(dailyRef)]);\n  if(tournamentGuard&&!await TournamentGuard.authorize({db,tx,guard:tournamentGuard,uid,active}))return {awarded:0,skipped:\"tournament-or-account-changed\"};\n  if(seen.exists)return {awarded:0,duplicate:true,...(tournamentGuard?TournamentGuard.existingReceipt(seen.data(),tournamentGuard):{})};\n  if(tournamentGuard)metadata={...metadata,...tournamentGuard.receipt};"
+    },
+    {
+      "before": "async function processCompletedTournament(code,t){\n const s=tournamentState(t);",
+      "after": "async function processCompletedTournament(code,t,sourceSnapshot=null){\n const current=await TournamentGuard.capture({db,code,sourceSnapshot});\n if(!current)return {ok:false,reason:\"tournament-fenced-or-changed\"};\n t=current.top;const tournamentGuard=current.guard;\n const s=tournamentState(t);"
+    },
+    {
+      "before": "occurredAt:completedAt||Date.now(),metadata:{tournamentCode:code,ruleset:\"v2\"}",
+      "after": "occurredAt:completedAt||Date.now(),tournamentGuard,metadata:{tournamentCode:code,ruleset:\"v2\"}"
+    },
+    {
+      "before": "metadata:{tournamentCode:code,matchId:String(m.id||\"\"),playerIds:[a,b],ruleset:\"legacy\"}",
+      "after": "tournamentGuard,metadata:{tournamentCode:code,matchId:String(m.id||\"\"),playerIds:[a,b],ruleset:\"legacy\"}"
+    },
+    {
+      "before": "occurredAt:completedAt||Date.now(),cap:useV2?null:30,metadata:",
+      "after": "occurredAt:completedAt||Date.now(),cap:useV2?null:30,tournamentGuard,metadata:"
+    },
+    {
+      "before": "try{await processCompletedTournament(event.params.code,t);}catch(e){console.error(\"activity-tournament-award-failed\",event.params.code,e);}",
+      "after": "try{await processCompletedTournament(event.params.code,t,after);}catch(e){console.error(\"activity-tournament-award-failed\",event.params.code,e);throw e;}"
+    }
+  ],
+  "certificateSource": {
+    "commit": "c461dd031d65648524089ab6366e697ad0f296b0",
+    "path": "release/buckets/completion/certificate.cjs"
+  },
+  "baselineSha256": "74bab36a2482b11a71bc0c086e00e90187138359b9e2d84fd950f895157a65e3",
+  "candidateSha256": "447f2a2ee0ca67c31672b62188fbc790d2644054100eec5ffec267dd891934e9",
+  "helperFiles": {
+    "activity-tournament-guard.cjs": "059b21e9cd191ffb4dfc3cf92032f3bf38052027778ae5fb514da7ba60ed431f",
+    "certificate.cjs": "8303d0ebe31752c7edb21bfecec08d1a9d3870bb509bab0dbfff7cd6a2bd5152",
+    "protocol/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a"
+  },
+  "fixtureFiles": {
+    "fixtures/activity-points.js": "74bab36a2482b11a71bc0c086e00e90187138359b9e2d84fd950f895157a65e3",
+    "fixtures/package.json": "9d0debdfd6c7ad1491f8a64f95071dd8c9c5422ebafe671c4009fe6b99d075a9",
+    "fixtures/release-controls.js": "f7b2ea90058bf4c817afdb8690d7e0d26c07f35359a059df0f80d910f360d6c2"
+  },
+  "capturedClosure": [
+    {
+      "path": "activity-points.js",
+      "sha256": "74bab36a2482b11a71bc0c086e00e90187138359b9e2d84fd950f895157a65e3",
+      "size": 15096
+    },
+    {
+      "path": "package.json",
+      "sha256": "9d0debdfd6c7ad1491f8a64f95071dd8c9c5422ebafe671c4009fe6b99d075a9",
+      "size": 3914
+    },
+    {
+      "path": "release-controls.js",
+      "sha256": "f7b2ea90058bf4c817afdb8690d7e0d26c07f35359a059df0f80d910f360d6c2",
+      "size": 860
+    }
+  ]
+}
