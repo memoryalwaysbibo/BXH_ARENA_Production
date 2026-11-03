@@ -6,7 +6,9 @@ const {getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {createHash,randomUUID}=require('node:crypto');
 const {completion}=require('./hosting-core');
 const {canDeleteTournament}=require('./tournament-delete-core');
-const db=getFirestore(),REGION='asia-east1';
+const REGION='asia-east1';
+function createDeletionService({authorize=canDeleteTournament,allowOrphanCleanup=true,normalize,validOperation}={}){
+const db=getFirestore();
 const CODE_PATTERN=/^BXH-[A-Z0-9_-]{4,24}$/,OPERATION_PATTERN=/^[A-Za-z0-9_-]{8,100}$/;
 function fail(status,message){throw new HttpsError(status,message);}
 const has=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
@@ -21,6 +23,7 @@ function identity(snapshot){
 const token=(uid,operationId,created)=>createHash('sha256').update(JSON.stringify([uid,operationId,created])).digest('hex');
 const own=(marker,expected)=>marker?.version===1&&marker.status==='deleting'&&marker.token===expected;
 function actorValid(snapshot){return snapshot.exists&&snapshot.data()?.active===true;}
+normalize=normalize||normalizeCode;validOperation=validOperation||OPERATION_PATTERN;
 async function claim({uid,code,operationId}){
  const root=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code),activity=db.doc('tournamentActivity/'+code),requestAudit=db.doc('tournamentDeletionAudit/'+operationId);
  let observed;const workerToken=randomUUID();
@@ -36,26 +39,29 @@ async function claim({uid,code,operationId}){
    return {orphan:true,result:{ok:true,deleted:true,code,replayed:true}};
   }
   if(!r.exists){
-   if(!['super_admin','admin'].includes(profile.role)||profile.isTestAccount===true)fail('not-found','tournament-not-found');
+   if(!allowOrphanCleanup||!['super_admin','admin'].includes(profile.role)||profile.isTestAccount===true)fail('not-found','tournament-not-found');
    if(has(publicData,'bucketMigration'))fail('failed-precondition','deletion-orphan-lease-requires-review');
    if(p.exists)tx.delete(pub);tx.delete(activity);
    tx.set(audit,{code,actorUid:uid,actorRole:profile.role,status:'completed',deletedAt:FieldValue.serverTimestamp(),orphanCleanup:true});
    return {orphan:true,result:{ok:true,deleted:true,code,replayed:true}};
   }
-  if(!canDeleteTournament(profile,uid,t,Date.now()))fail('permission-denied','tournament-delete-denied');
   // The same authorized operator may recover a paused operation after losing
   // the response or local storage. An active worker is never started twice.
   const prior=t.bucketMigration;
-  if(prior?.version===1&&prior.status==='deleting'&&prior.actorUid===uid&&prior.sourceCreatedAt===created&&OPERATION_PATTERN.test(prior.operationId||'')&&prior.operationId!==operationId){
+  if(prior?.version===1&&prior.status==='deleting'&&prior.actorUid===uid&&prior.sourceCreatedAt===created&&/^[A-Za-z0-9_-]{1,100}$/.test(prior.operationId||'')&&prior.operationId!==operationId){
    if(existing)fail('failed-precondition','operation-conflict');
    effectiveOperationId=prior.operationId;audit=db.doc('tournamentDeletionAudit/'+effectiveOperationId);
    const canonical=await tx.get(audit);existing=canonical.exists?canonical.data():null;
    if(!existing||existing.actorUid!==uid||existing.code!==code)fail('failed-precondition','operation-conflict');
   }
   const leaseToken=token(uid,effectiveOperationId,created);
+  // An old selector worker may still be traversing children outside a lease.
+  // Never adopt that job or delete/reuse its parent without operator review.
+  if([t,publicData].some(doc=>doc.registrationSelection?.status==='deleting')&&!own(t.bucketMigration,leaseToken))fail('failed-precondition','deletion-legacy-worker-requires-review');
   if(existing&&(existing.sourceCreatedAt!==created||existing.leaseToken!==leaseToken||existing.status!=='deleting'))fail('failed-precondition','operation-conflict');
   for(const doc of [t,publicData])if(has(doc,'bucketMigration')&&!own(doc.bucketMigration,leaseToken))fail('failed-precondition','bucket-migration-in-progress');
-  if(has(t,'deletionStatus')&&!(t.deletionStatus?.kind==='legacy-delete'&&t.deletionStatus.token===leaseToken))fail('failed-precondition','deletion-in-progress');
+  if([t,publicData].some(doc=>has(doc,'deletionStatus')&&!(doc.deletionStatus?.kind==='legacy-delete'&&doc.deletionStatus.token===leaseToken)))fail('failed-precondition','deletion-in-progress');
+  if(!authorize(profile,uid,t,Date.now(),publicData))fail('permission-denied','tournament-delete-denied');
   if(existing?.workerStatus==='active')return {pending:true,result:{ok:false,deleted:false,pending:true,code,operationId:effectiveOperationId}};
   if(existing&&existing.workerStatus!=='paused')fail('failed-precondition','deletion-worker-requires-review');
   const previousClosed=own(t.bucketMigration,leaseToken)?t.bucketMigration.previousSystemClosed:t.systemClosed===true;
@@ -102,7 +108,7 @@ async function deleteEventStaffAssignments(code,job){
 async function finish(job,{uid,code,operationId,hostRecordPreserved,assignmentCount}){
  return db.runTransaction(async tx=>{
   const [r,p,u,a]=await Promise.all([tx.get(job.root),tx.get(job.pub),tx.get(db.doc('users/'+uid)),tx.get(job.audit)]);
-  if(!actorValid(u)||!r.exists||!canDeleteTournament(u.data(),uid,r.data(),Date.now()))fail('permission-denied','tournament-delete-denied');
+  if(!actorValid(u)||!r.exists||!authorize(u.data(),uid,r.data(),Date.now(),p.exists?p.data():{}))fail('permission-denied','tournament-delete-denied');
   if(identity(r)!==job.created||marked(r.data())||!own(r.data().bucketMigration,job.leaseToken)||r.data().systemClosed!==true||r.data().registrationEnabled!==false||!a.exists||a.data().leaseToken!==job.leaseToken||a.data().status!=='deleting'||a.data().workerStatus!=='active'||a.data().workerToken!==job.workerToken)fail('failed-precondition','deletion-lease-lost');
   if(p.exists&&(marked(p.data())||!own(p.data().bucketMigration,job.leaseToken)))fail('failed-precondition','deletion-public-lease-lost');
   tx.delete(job.root);if(p.exists)tx.delete(job.pub);tx.delete(job.activity);
@@ -119,10 +125,10 @@ async function pause(job){
   if(r.exists&&identity(r)===job.created&&own(r.data().bucketMigration,job.leaseToken)&&a.exists&&a.data().status==='deleting'&&a.data().workerStatus==='active'&&a.data().workerToken===job.workerToken)tx.update(job.audit,{workerStatus:'paused',pausedAt:FieldValue.serverTimestamp()});
  });
 }
-exports.deleteTournamentSafely=onCall({region:REGION,cors:true,invoker:'public',timeoutSeconds:540,memory:'512MiB',maxInstances:3},async request=>{
+async function execute(request){
  if(process.env.GCLOUD_PROJECT!=='bxh-arena'&&process.env.GOOGLE_CLOUD_PROJECT!=='bxh-arena')fail('failed-precondition','production-only');
- const uid=request.auth?.uid;if(!uid)fail('unauthenticated','auth-required');const code=normalizeCode(request.data?.code),operationId=String(request.data?.operationId||'');
- if(!OPERATION_PATTERN.test(operationId))fail('invalid-argument','invalid-operation-id');
+ const uid=request.auth?.uid;if(!uid)fail('unauthenticated','auth-required');const code=normalize(request.data?.code),operationId=String(request.data?.operationId||'');
+ if(!validOperation.test(operationId))fail('invalid-argument','invalid-operation-id');
  const job=await claim({uid,code,operationId});if(job.orphan||job.pending)return job.result;
  try{
   const hostRecordPreserved=await preserveCompletedHostRecord(code,job.tournament);
@@ -134,5 +140,10 @@ exports.deleteTournamentSafely=onCall({region:REGION,cors:true,invoker:'public',
   try{await pause(job);}catch(_){} // Failure to release remains safely active.
   throw error;
  }
-});
-exports._private={normalizeCode,claim,finish,pause,assertLease,deleteChildren,preserveCompletedHostRecord,deleteEventStaffAssignments};
+}
+return {execute,_private:{normalizeCode,claim,finish,pause,assertLease,deleteChildren,preserveCompletedHostRecord,deleteEventStaffAssignments}};
+}
+const service=createDeletionService();
+exports.deleteTournamentSafely=onCall({region:REGION,cors:true,invoker:'public',timeoutSeconds:540,memory:'512MiB',maxInstances:3},service.execute);
+exports._private=service._private;
+exports.createDeletionService=createDeletionService;

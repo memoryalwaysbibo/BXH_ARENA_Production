@@ -13,6 +13,49 @@ own captured archive; never substitute the restore archive for it. `manifest.jso
 candidate modules, Rules, and synthetic test dependency fixtures. No environment
 file, credential, or production room data is included.
 
+The selector candidate is based separately on source set 13 captured on
+2026-11-03 (`93b4e9e1d5c7605b98474ce3d192c0623bc94dd170e977bc1be638e182805014`).
+`registration-selection.patch` is the exact diff against that deployed module.
+It replaces the alternate `manageRegistrationSelection(action=delete)` recursive
+parent deletion with the same audited worker as `deleteTournamentSafely`.
+The selector supplies its original `operations-core.canManage` policy, original
+code/operation-ID syntax, lottery-enabled/drawing restrictions, and onsite
+ownership checks. It does not gain the ordinary endpoint's orphan cleanup.
+Its original staff scope is retained, including unassigned staff where the
+existing selector policy permits them; ordinary deletion authorization is unchanged.
+
+The shared worker checks foreign ownership markers before parsing selector state,
+and reauthorizes before final deletion. Both endpoints share canonical operation
+IDs and worker tokens, including cross-endpoint retries. A legacy
+`registrationSelection.status=deleting` with no matching audited lease stops with
+`deletion-legacy-worker-requires-review`; it is never assumed safe to restart.
+The public marker omits actor/operation information. Selector configure, draw,
+promotion, lottery admission/cancellation, each draw chunk/finalization, and draw
+lease cleanup also reject bucket/deletion ownership in their write transactions.
+Cleanup leaves the old draw lease untouched if ownership has transferred.
+
+Deploy only the named selector function from its own exact archive, overlaying
+`registration-selection.js`, `tournament-delete.js`, `hosting-core.js`, and
+`tournament-delete-core.js` with the pinned package bytes. Keep the original
+`operations-core`, onsite/QR guards, package lock and every other dependency.
+Do not deploy the sibling `lotteryRegistration` export merely because it shares
+this source file: that endpoint needs its own exact deployed-source review.
+The additional guarded code in this module does not prove its live deployment.
+Inventory/drain old selector deletion requests before updating this endpoint;
+never infer absence of a still-running old worker from a successful source update.
+Update this alternate endpoint before treating the main deletion rollout as safe.
+The prior Cloud Shell preflight helper predates these changes and is insufficient
+to validate or deploy this expanded package. No new deployment helper is supplied.
+
+Validation adds 415 selector cases (ownership presence, original authorization,
+onsite policy, cross-endpoint pending/retry, reused room codes, and migration
+injected after freeze/plan/row chunks). `selection-native.cjs` uses the real Admin
+SDK and captured QR transaction proxy on a loopback demo Emulator, with synthetic
+auth context. The full-host browser tests continue to cover the ordinary delete
+UI; there is no selector-delete button in the reviewed current UI, and server
+compatibility is retained for older or direct callers. Neither synthetic auth
+nor Admin SDK tests establish real production Auth/App Check acceptance.
+
 ## Behavior
 
 - A transaction authorizes the operator and claims the original room's creation

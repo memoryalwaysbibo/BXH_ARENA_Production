@@ -33,3 +33,12 @@ i = access.rindex(a)
 access = access[:i] + access[i:].replace(a, "   const t=ts.data();\n   if([t,ps.data()].some(x=>x&&['bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))return {error:'room-deletion-or-migration-in-progress'};\n   const mode=C.normalizeMode(t.roomAccessMode);", 1)
 assert access == (RELEASE / 'room-access-service.js').read_text()
 print('PASS exact roomAccess lease guards; no deployment')
+
+import difflib
+selection = (TEST / 'fixtures/selection/registration-selection.js').read_text()
+candidate = (RELEASE / 'registration-selection.js').read_text()
+patch = ''.join(difflib.unified_diff(selection.splitlines(True), candidate.splitlines(True),
+    fromfile='a/registration-selection.js', tofile='b/registration-selection.js'))
+assert patch == (RELEASE / 'registration-selection.patch').read_text()
+assert 'db.recursiveDelete(tr)' not in candidate
+print('PASS exact captured selector patch and pinned shared deletion worker; no deployment')

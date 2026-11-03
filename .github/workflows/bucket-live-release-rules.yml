@@ -33,7 +33,7 @@ jobs:
         run: python3 -B scripts/build-bucket-release-rules.py --check
       - name: Obtain Firestore Emulator via isolated CLI
         run: |
-          npm install --prefix /tmp/bucket-release-tools --no-save --ignore-scripts firebase-tools@14
+          npm install --prefix /tmp/bucket-release-tools --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0
           /tmp/bucket-release-tools/node_modules/.bin/firebase setup:emulators:firestore
       - name: Check live and candidate permissions against real Emulator
         run: python3 -B tests/four-court-buckets/live-release-rules.py
@@ -41,12 +41,18 @@ jobs:
         run: |
           python3 -B tests/four-court-buckets/deletion/verify-package.py
           node tests/four-court-buckets/deletion/deletion-probe.cjs
+          node tests/four-court-buckets/deletion/selection-probe.cjs
           node tests/four-court-buckets/deletion/restore-probe.cjs
           node tests/four-court-buckets/deletion/client-probe.cjs
           node tests/four-court-buckets/deletion/access-probe.cjs
       - name: Check deletion leases against real demo Emulator
         run: |
           FIRESTORE_EMULATOR_JAR="$HOME/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar" python3 -B tests/four-court-buckets/deletion/rules-emulator.py
+      - name: Native SDK cross-entrypoint deletion worker checks
+        env:
+          NODE_PATH: /tmp/bucket-release-tools/node_modules
+          GCLOUD_PROJECT: demo-bxh-bucket-delete-native
+        run: /tmp/bucket-release-tools/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-delete-native --config tests/four-court-buckets/deletion/native.firebase.json 'node tests/four-court-buckets/deletion/selection-native.cjs'
       - name: Install isolated full-host browser dependencies
         run: |
           npm install --prefix /tmp/bucket-browser --no-save --ignore-scripts playwright@1.55.0
