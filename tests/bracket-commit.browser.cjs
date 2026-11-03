@@ -24,6 +24,7 @@ const {chromium}=require('playwright');
   pushUpdate:async(code,snapshot,options)=>{writeCount++;if(failOnce){failOnce=false;return false;}if(fail)return false;if(!autoWrite)await new Promise(r=>release=r);BXHBracketCommit.assertWrite(serverState,snapshot,options);if(options.adminOperationalOverride)snapshot.adminOperationOverrides=BXHAdminOverride.record(options.adminOperationalOverride,{actorUid:'u',code,roomId:serverState.id},userProfile,serverState,snapshot);serverState=clone(snapshot);publicState=clone(snapshot);if(autoWrite)staleReads=1;return true;}
  };
  const enqueueCloudStateWrite=(code,snapshot,options)=>window.cloudSync.pushUpdate(code,snapshot,options);
+ async function flushCloudStateWrites(){return true;}
  async function saveRecord(){return true;}
  function generateBracket(){generations++;state.drawnAt=100;state.bracketSize=2;state.matches=[{id:'m'+generations,bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}];return true;}
  function showToast(s){success++;document.querySelector('#notice').textContent=s;}
@@ -39,7 +40,7 @@ const {chromium}=require('playwright');
  render();
  `});
  await page.getByRole('button',{name:'抽籤',exact:true}).click();
- await page.getByRole('status').getByText('資料上傳中…',{exact:true}).waitFor();
+ await page.getByRole('status').getByText(/等待前一筆儲存完成|核對雲端配對中|提交本次配對中|確認雲端儲存結果中/).waitFor();
  await page.getByRole('progressbar',{name:'資料上傳中'}).waitFor();
  await page.waitForTimeout(250);
  assert.equal(await page.getByRole('status').getAttribute('aria-busy'),'true');
@@ -64,7 +65,7 @@ const {chromium}=require('playwright');
  await page.evaluate(()=>fixture.autoRecover());
  const writesBefore=(await page.evaluate(()=>fixture.stats())).writeCount;
  await page.getByRole('button',{name:'重新抽籤',exact:true}).click();
- await page.getByRole('status').getByText('資料上傳中…',{exact:true}).waitFor();
+ await page.getByRole('status').getByText(/等待前一筆儲存完成|核對雲端配對中|提交本次配對中|確認雲端儲存結果中/).waitFor();
  assert.equal(await page.locator('#start').isDisabled(),true);
  await page.getByRole('status').getByText('上傳成功',{exact:true}).waitFor({timeout:15000});
  const recovered=await page.evaluate(()=>fixture.stats());

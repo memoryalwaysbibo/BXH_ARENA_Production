@@ -88,3 +88,21 @@ test('start failure exposes only forced start for the same room and actor',()=>{
  assert.match(s.adminOverrideButtonsHtml(),/管理員強制開賽/);assert(!s.adminOverrideButtonsHtml().includes('admin-force-draw'));
  s.state.cloudCode='BXH-OTHER';assert.equal(s.adminOverrideButtonsHtml(),'');
 });
+test('draw UI separates unsent queue/preflight timeouts from unknown commit results',()=>{
+ const h=uiFixture();
+ for(const [error,phase,title] of [
+  ['queue-wait-timeout','waiting','等待儲存，尚未送出'],
+  ['confirmation-timeout','checking','雲端核對逾時，尚未送出'],
+  ['confirmation-timeout','confirming','儲存結果尚未確認']
+ ]){
+  h.status={busy:false,pending:true,result:'failed',error,phase};
+  const html=h.s.bracketCommitStatusHtml();assert(html.includes('<b>'+title+'</b>'));
+  assert(!html.includes('<b>上傳失敗</b>'));assert(html.includes('重試上傳'));
+  assert.equal(h.s.bracketDrawButtonHtml(),'');
+ }
+ for(const phase of ['waiting','checking','writing','confirming']){
+  h.status={busy:true,pending:true,result:'',phase};
+  const html=h.s.bracketCommitStatusHtml();assert(html.includes('aria-busy="true"'));
+  assert(html.includes('disabled'));assert(!html.includes('admin-force-reconfirm'));
+ }
+});

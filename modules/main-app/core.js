@@ -11002,6 +11002,8 @@ function bracketCommitController(){
    finally{state=prior;}
   },
   read:()=>window.cloudSync.readBracketFromServer(code),
+  waitForWrites:()=>flushCloudStateWrites(),
+  trace:detail=>console.info('[bracket commit timing]',detail),
   write:(snapshot,options)=>enqueueCloudStateWrite(code,snapshot,{...options,isCurrent:current}),
   writeFailureCode:()=>window.__BXH_LAST_CLOUD_ERROR_CODE||'',
   local:snapshot=>saveRecord(snapshot),
@@ -11022,8 +11024,10 @@ function bracketCommitStatusHtml(){
  const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return rosterUpdate;
  if(rosterUpdate&&s.result==='success'&&!s.pending&&!s.busy)return rosterUpdate;
  const uploaded=s.result==='success',cloud=!!state.cloudCode;
- const title=s.busy?(cloud?'資料上傳中…':'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):(cloud?'上傳失敗':'儲存失敗');
- const message=s.busy?'請稍候，正在上傳並確認本次配對，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
+ const queued=s.error==='queue-wait-timeout',uncertain=s.error==='confirmation-timeout',preflightTimeout=uncertain&&s.phase==='checking';
+ const phaseLabels={waiting:'等待前一筆儲存完成…',checking:'核對雲端配對中…',writing:'提交本次配對中…',confirming:'確認雲端儲存結果中…'};
+ const title=s.busy?(cloud?(phaseLabels[s.phase]||'資料上傳中…'):'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):queued?'等待儲存，尚未送出':preflightTimeout?'雲端核對逾時，尚未送出':uncertain?'儲存結果尚未確認':(cloud?'上傳失敗':'儲存失敗');
+ const message=s.busy?'請稍候，本次配對已保留，完成後會自動顯示結果。':uploaded?'對戰表已確認儲存。':queued?'前一筆儲存仍在處理，本次配對尚未重新送出。稍後按重試會沿用相同配對。':preflightTimeout?'送出前未能讀取完整雲端資料，本次配對尚未送出。請保留此頁，稍後按重試會沿用相同配對。':uncertain?'尚未取得完整雲端確認，不能判定上傳失敗。請保留此頁；提交回覆後會自動查證，重試也會沿用相同配對。':s.error==='bracket-version-conflict'?'已同步雲端最新資料，請確認後再抽籤。':'本次配對已保留，重試時不會重新抽籤。';
  const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
  return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
  failureDetail+
