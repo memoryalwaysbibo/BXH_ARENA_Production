@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require(require.resolve('playwright',{paths:[process.env.NODE_PATH||'.']}));
 const {fixture,hostScenario}=require('./probe.cjs'),{harness}=require('./host-harness.cjs');
 const root=path.resolve(__dirname,'../../..');
-(async()=>{const browser=await chromium.launch({headless:true});let checks=0;
+(async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.BXH_TEST_BROWSER});let checks=0;
  try{for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
   const context=await browser.newContext({viewport,serviceWorkers:'block'}),page=await context.newPage();
   await page.route('https://settlement.fixture.test/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Isolated settlement app functions</title>'}));
