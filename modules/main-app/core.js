@@ -23869,13 +23869,21 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }catch(e){
           console.warn("[deleteTournament] failed", e);
           const raw=String((e&&e.message)||"");
-          const message=(e&&e.code)==="permission-denied"||raw.includes("tournament-access-denied")
-            ? "目前帳號沒有刪除這場賽事的權限"
-            : raw.includes("delete-not-confirmed")||raw.includes("delete-verification-failed")
-              ? "雲端尚未確認刪除完成；已停止顯示成功，請稍後重試"
-              : raw.includes("delete-service-unavailable")
-                ? "安全刪除服務尚未就緒，請稍後再試"
-                : "刪除失敗，房間仍保留；請稍後再試";
+          const message=raw.includes("delete-account-changed")||raw.includes("stale-session")
+            ? "登入帳號已變更，已停止確認刪除結果；請切回原帳號核對"
+            : raw.includes("delete-intent-storage-unavailable")
+              ? "無法保存刪除操作編號，本次未送出刪除；請允許瀏覽器儲存後再試"
+              : raw.includes("deletion-operation-outdated")
+                ? "房號對應的房間已變更，本次未刪除新房間；請重新核對後操作"
+                : raw.includes("deletion-in-progress")
+                  ? "刪除作業仍在處理中，操作編號已保留；請稍後重試"
+                  : raw.includes("deletion-worker-requires-review")||raw.includes("deletion-lease-lost")||raw.includes("deletion-public-lease-lost")||raw.includes("deletion-worker-lost")
+                    ? "刪除作業需要管理員核對，請保留操作編號並停止重試"
+                    : String((e&&e.code)||"").includes("permission-denied")||raw.includes("tournament-access-denied")||raw.includes("tournament-delete-denied")
+                      ? "目前帳號沒有刪除這場賽事的權限"
+                      : raw.includes("delete-service-unavailable")
+                        ? "安全刪除服務尚未就緒，請稍後再試"
+                        : "尚未確認刪除完成，操作編號已保留；請以原帳號稍後重試";
           showToast(message, true);
         }
       })();
@@ -26407,6 +26415,7 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
 
 

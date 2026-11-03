@@ -38,7 +38,14 @@ def build(source, reviewed):
         raise ValueError('Delete guard anchors changed')
     private = private.replace(old, "allow delete: if !('scoreStorage' in resource.data) && resource.data.get('qrCheckinManaged', false) != true")
     public = public.replace(old, "allow delete: if (!exists(tourPath(code)) || !('scoreStorage' in get(tourPath(code)).data)) && resource.data.get('qrCheckinManaged', false) != true")
-    return private + anchor + public
+    source = private + anchor + public
+    # Hold client writes while the authorized deletion worker owns the parent.
+    deletion_edits = [("allow delete: if !('scoreStorage' in resource.data) &&", "allow delete: if !('bucketMigration' in resource.data) && !('scoreStorage' in resource.data) &&"), ("allow update: if !('scoreStorage' in resource.data) &&", "allow update: if !('bucketMigration' in resource.data) && !('scoreStorage' in resource.data) &&"), ("allow delete: if (!exists(tourPath(code)) || !('scoreStorage' in get(tourPath(code)).data)) &&", "allow delete: if !('bucketMigration' in resource.data) && (!exists(tourPath(code)) || !('bucketMigration' in get(tourPath(code)).data)) && (!exists(tourPath(code)) || !('scoreStorage' in get(tourPath(code)).data)) &&"), ("&& tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataAfterFor(code)) && (", "&& tournamentExistsAfterFor(code) && !('bucketMigration' in tournamentDataAfterFor(code)) && !('scoreStorage' in tournamentDataAfterFor(code)) && ("), ("allow update: if tournamentExistsFor(code) && tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataFor(code))", "allow update: if tournamentExistsFor(code) && tournamentExistsAfterFor(code) && !('bucketMigration' in resource.data) && !('bucketMigration' in tournamentDataFor(code)) && !('bucketMigration' in tournamentDataAfterFor(code)) && !('scoreStorage' in tournamentDataFor(code))")]
+    for old, new in deletion_edits:
+        if source.count(old) != 1:
+            raise ValueError("Deletion lease anchor changed: " + old)
+        source = source.replace(old, new, 1)
+    return source
 
 
 if __name__ == '__main__':
@@ -54,4 +61,4 @@ if __name__ == '__main__':
     else:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(result)
-    print('PASS: live baseline preserved with bucket-only guards; no deployment')
+    print('PASS: live baseline preserved with bucket and deletion-lease guards; no deployment')
