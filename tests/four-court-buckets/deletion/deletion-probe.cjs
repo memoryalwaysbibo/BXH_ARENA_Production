@@ -51,7 +51,8 @@ function migration(){
  return module.exports;
 }
 const request={auth:{uid},data:{code,operationId}},intent={uid,code,operationId};
-(async()=>{
+module.exports={fixture,load,code,uid,operationId};
+if(require.main===module)(async()=>{
  let n=0;
  for(const key of ['scoreStorage','scoreBucketProjection','bucketMigration'])for(const value of [null,false,{}, {status:'active'}, {status:'migrating'}])for(const side of ['tournaments','publicTournaments']){
   const m=fixture(),p=side+'/'+code;m.put(p,{...m.rows.get(p).data,[key]:value});const mod=load(m);

@@ -9,6 +9,8 @@ on:
       - 'tests/four-court-buckets/live-release-rules.py'
       - 'tests/four-court-buckets/deletion/**'
       - 'modules/cloud/cloud-runtime.js'
+      - 'modules/main-app/core.js'
+      - 'index.html'
       - '.github/workflows/bucket-live-release-rules.yml'
 permissions:
   contents: read
@@ -45,3 +47,11 @@ jobs:
       - name: Check deletion leases against real demo Emulator
         run: |
           FIRESTORE_EMULATOR_JAR="$HOME/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar" python3 -B tests/four-court-buckets/deletion/rules-emulator.py
+      - name: Install isolated full-host browser dependencies
+        run: |
+          npm install --prefix /tmp/bucket-browser --no-save --ignore-scripts playwright@1.55.0
+          node /tmp/bucket-browser/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Actual index and deletion modal through local Firebase transport
+        env:
+          NODE_PATH: /tmp/bucket-browser/node_modules
+        run: node tests/four-court-buckets/deletion/full-host.browser.cjs
