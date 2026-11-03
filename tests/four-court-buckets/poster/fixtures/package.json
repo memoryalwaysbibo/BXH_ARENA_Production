@@ -1,0 +1,20 @@
+{
+  "name": "bxh-arena-engagement-functions",
+  "version": "13.37.0-production-rc1",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "check": "node --check tournament-delete-core.js && node --check tournament-delete.js && node tournament-delete-core.test.js && node --check accounts-core.js && node --check accounts.js && node --check activity-points.js && node --check court-call-core.js && node --check court-call-push-service.js && node --check court-call-push.js && node --check court-call-service.js && node --check court-call.js && node --check daily-checkin-core.js && node --check entry-selection.js && node --check family-registration.js && node --check family-service.js && node --check family.js && node --check team-registration-core.js && node --check team-registration-service.js && node --check team-registration.js && node team-registration-core.test.js && node --check team-life-core.js && node team-life-core.test.js && node --check team-bracket-core.js && node team-bracket-core.test.js && node --check team-lineup-core.js && node team-lineup-core.test.js && node --check team-lineup-service.js && node team-lineup-service.test.js && node --check team-scoring-service.js && node team-scoring-service.test.js && node --check team-scoring.js && node --check team-lineup.js && node --check hosting-core.js && node --check hosting.js && node --check index.js && node --check registration-roster-core.js && node --check registration-roster-sync.js && node registration-roster-core.test.js && node registration-roster-sync.test.js && node --check inventory-core.js && node --check ladder-settlement-core.js && node --check ladder-auto-settlement.js && node --check inventory-service.js && node --check inventory.js && node --check mailbox-core.js && node --check mailbox.js && node --check migrate-completed.js && node --check mood-core.js && node --check mood-station.js && node --check operations-core.js && node --check operations.js && node operations-core.test.js && node --check pioneer.js && node --check player-cards.js && node --check presence-core.js && node --check presence.js && node --check profile-completion.js && node --check raffle-core.js && node --check raffle-service.js && node --check raffle.js && node --check reward-rules-core.js && node --check reward-rules-engine.js && node --check reward-rules-service.js && node --check reward-rules.js && node --check registration-invitations.js && node --check registration-selection.js && node --check release-controls.js && node --check room-access-core.js && node --check room-access-service.js && node --check room-access.js && node daily-checkin-core.test.js && node reward-rules-core.test.js && node reward-rules-engine.test.js && node reward-rules-service.test.js && node room-access-core.test.js && node court-call-service.test.js && node ladder-settlement-core.test.js && node ladder-auto-settlement.test.js && node --check partner-plan-catalog.js && node --test partner-plan-catalog.test.js && node --check partner-contract-core.js && node --test partner-contract-core.test.js && node --check partner-signature-evidence.js && node --test partner-signature-evidence.test.js && node --check partner-contracts.js && node --test partner-contracts.test.js && node --check partner-sign-contract.js && node --test partner-sign-contract.test.js && node --check partner-activate-contract.js && node --test partner-activate-contract.test.js && node --check partner-send-contract.js && node --test partner-send-contract.test.js && node --check partner-read-contract.js && node --test partner-read-contract.test.js && node --check mailbox-attachments.js && node --test mailbox-attachments.test.js && node --check event-template-core.js && node --check event-template.js && node --test event-template-core.test.js",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.4.0",
+    "firebase-functions": "^7.3.2"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

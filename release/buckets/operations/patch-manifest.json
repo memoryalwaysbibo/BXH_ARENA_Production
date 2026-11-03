@@ -1,0 +1,126 @@
+{
+  "status": "candidate-not-deployed",
+  "runtimeEnabled": false,
+  "productionWrites": 0,
+  "patches": [
+    {
+      "functions": [
+        "eventStaffService"
+      ],
+      "sourceSet": 7,
+      "path": "event-staff.js",
+      "archiveSha256": "e0578dbc102e5bf08f71a36d2090144d995b63858491ed1859c3fd1f6c84749c",
+      "baselineFileSha256": "b71a1c54f280f68e85d1df4e5dd458362703ac4b25efd7e73caee9884916351b",
+      "patchedFileSha256": "b80e1b8adf413874e9cc47537db77c395d89cf0f8e711ee8e32883696ea8a753",
+      "edits": [
+        {
+          "before": "async function loadOrganizerEvent(uid,eventCode,tx=null){",
+          "after": "const owns=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);\nconst bucketOwned=(...rows)=>rows.some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>owns(x,k)));\nfunction created(snapshot){\n const time=snapshot?.createTime;\n if(!snapshot?.exists||!Number.isSafeInteger(time?.seconds)||!Number.isSafeInteger(time?.nanoseconds))throw Error('room-identity-missing');\n return {seconds:time.seconds,nanoseconds:time.nanoseconds};\n}\nconst identity=snapshot=>{const time=created(snapshot);return time.seconds+':'+time.nanoseconds;};\nconst precedes=(a,b)=>a.seconds<b.seconds||a.seconds===b.seconds&&a.nanoseconds<b.nanoseconds;\nfunction assertChildRoom(parent,child){\n if(!child.exists)return;\n const data=child.data();\n if(owns(data,'sourceCreatedAt')){if(data.sourceCreatedAt!==identity(parent))throw Error('room-generation-changed');}\n else if(precedes(created(child),created(parent)))throw Error('room-generation-changed');\n}\nfunction assertRoom(parent,pub,observed){\n if(!parent.exists)throw Error('event-not-found');\n if(bucketOwned(parent.data(),pub.data()))throw Error('bucket-scoring-required');\n const id=identity(parent);\n if(observed&&observed.id!==undefined&&observed.id!==id)throw Error('room-generation-changed');\n if(observed)observed.id=id;\n return id;\n}\nasync function loadOrganizerEvent(uid,eventCode,tx=null,observed=null){"
+        },
+        {
+          "before": "  const [actor,event]=await Promise.all([read(actorRef),read(eventRef)]);",
+          "after": "  const [actor,event,pub]=await Promise.all([read(actorRef),read(eventRef),...(tx?[read(db.doc(`publicTournaments/${code}`))]:[])]);\n  if(tx)assertRoom(event,pub,observed);"
+        },
+        {
+          "before": "return {code,actorRef,eventRef,actor:actor.data()||{},eventData};",
+          "after": "return {code,actorRef,eventRef,event,actor:actor.data()||{},eventData};"
+        },
+        {
+          "before": "const id=assignmentId(code,targetUid),messageId=mailId(code,targetUid),now=Date.now();",
+          "after": "const id=assignmentId(code,targetUid),messageId=mailId(code,targetUid),now=Date.now(),observed={};"
+        },
+        {
+          "before": "const base=await loadOrganizerEvent(uid,code,tx);",
+          "after": "const base=await loadOrganizerEvent(uid,code,tx,observed);"
+        },
+        {
+          "before": "tournament:base.eventData,duties,displayName,now}),eventName:",
+          "after": "tournament:base.eventData,duties,displayName,now}),sourceCreatedAt:identity(base.event),eventName:"
+        },
+        {
+          "before": "const id=assignmentId(code,uid),now=Date.now();",
+          "after": "const id=assignmentId(code,uid),now=Date.now(),observed={};"
+        },
+        {
+          "before": "const [user,event,assignment]=await Promise.all([tx.get(userRef),tx.get(eventRef),tx.get(assignmentRef)]);",
+          "after": "const [user,event,assignment,pub]=await Promise.all([tx.get(userRef),tx.get(eventRef),tx.get(assignmentRef),tx.get(db.doc(`publicTournaments/${code}`))]);\n    assertRoom(event,pub,observed);\n    if(assignment.exists)assertChildRoom(event,assignment);"
+        },
+        {
+          "before": "const code=C.normalizeEventCode(data.eventCode),targetUid=C.normalizeUid(data.targetUid),id=assignmentId(code,targetUid),now=Date.now();",
+          "after": "const code=C.normalizeEventCode(data.eventCode),targetUid=C.normalizeUid(data.targetUid),id=assignmentId(code,targetUid),now=Date.now(),observed={};"
+        },
+        {
+          "before": "const base=await loadOrganizerEvent(uid,code,tx),assignmentRef=",
+          "after": "const base=await loadOrganizerEvent(uid,code,tx,observed),assignmentRef="
+        },
+        {
+          "before": "    const next=C.transition(assignment.data(),'revoke',uid,now)",
+          "after": "    assertChildRoom(base.event,assignment);\n    const next=C.transition(assignment.data(),'revoke',uid,now)"
+        },
+        {
+          "before": "const precondition=['event-not-found','event-completed','assignment-not-found','recipient-inactive','cannot-invite-self'];",
+          "after": "const precondition=['event-not-found','event-completed','assignment-not-found','recipient-inactive','cannot-invite-self','bucket-scoring-required','room-generation-changed','room-identity-missing'];"
+        },
+        {
+          "before": "    assertRoom(event,pub,observed);",
+          "after": "    if(!user.exists||!activeProfile(user.data()))throw Error('account-inactive');\n    assertRoom(event,pub,observed);"
+        }
+      ]
+    },
+    {
+      "functions": [
+        "drawTournamentRaffle",
+        "updateTournamentRaffleWinner",
+        "trackTournamentActivity",
+        "trackTournamentRegistrationActivity"
+      ],
+      "sourceSet": 5,
+      "path": "operations.js",
+      "archiveSha256": "8eafc6a293c6d23719bbce59d2b059495e9e4ca1589c358667ce662164f00f51",
+      "baselineFileSha256": "0b948bdc0a14e2a526e13066a3fc284e348a2e2171def51ae6a79a498bca6500",
+      "patchedFileSha256": "82c288f9546bd282bdebe39c91e987b60728b3f3c2b91efe41d1820336130cc9",
+      "edits": [
+        {
+          "before": "async function updateActivity(",
+          "after": "const owns=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);\nconst bucketOwned=(...rows)=>rows.some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>owns(x,k)));\nfunction created(snapshot){\n const time=snapshot?.createTime;\n if(!snapshot?.exists||!Number.isSafeInteger(time?.seconds)||!Number.isSafeInteger(time?.nanoseconds))throw Error('room-identity-missing');\n return {seconds:time.seconds,nanoseconds:time.nanoseconds};\n}\nconst identity=snapshot=>{const time=created(snapshot);return time.seconds+':'+time.nanoseconds;};\nconst precedes=(a,b)=>a.seconds<b.seconds||a.seconds===b.seconds&&a.nanoseconds<b.nanoseconds;\nfunction assertChildRoom(parent,child){\n if(!child.exists)return;\n const data=child.data();\n if(owns(data,'sourceCreatedAt')){if(data.sourceCreatedAt!==identity(parent))throw Error('room-generation-changed');}\n else if(precedes(created(child),created(parent)))throw Error('room-generation-changed');\n}\nfunction assertRoom(parent,pub,observed){\n if(!parent.exists)throw Error('event-not-found');\n if(bucketOwned(parent.data(),pub.data()))throw Error('bucket-scoring-required');\n const id=identity(parent);\n if(observed&&observed.id!==undefined&&observed.id!==id)throw Error('room-generation-changed');\n if(observed)observed.id=id;\n return id;\n}\nasync function updateActivity("
+        },
+        {
+          "before": "async function updateActivity(code,at){const ref=db.doc(`tournamentActivity/${code}`);await db.runTransaction(async tx=>{const snap=await tx.get(ref),d=snap.exists?snap.data():{};if(at>C.ms(d.lastAt))tx.set(ref,{lastAt:at},{merge:true});});}\nexports.trackTournamentActivity=onDocumentWritten({document:'tournaments/{code}',region},async event=>{\n const after=event.data&&event.data.after,before=event.data&&event.data.before;if(!after||!after.exists)return;\n try{const a=after.data();if(a.systemClosed===true)return;if(before.exists&&C.fingerprint(before.data())===C.fingerprint(a))return;await updateActivity(event.params.code,after.updateTime.toMillis());}catch(e){console.warn('activity-data-skipped',event.params.code,e.message);}\n});\nexports.trackTournamentRegistrationActivity=onDocumentWritten({document:'tournaments/{code}/registrations/{uid}',region},async event=>{\n const a=event.data?.after,b=event.data?.before;if(!a)return;\n if(a.exists&&b?.exists&&JSON.stringify(a.data())===JSON.stringify(b.data()))return;\n const at=a.exists?a.updateTime.toMillis():event.time?Date.parse(event.time):0;\n if(at>0)await updateActivity(event.params.code,at);\n});\n",
+          "after": "async function updateActivity(code,at,eventRoot=null,registration=null){\n const ref=db.doc(`tournamentActivity/${code}`),root=db.doc(`tournaments/${code}`),pub=db.doc(`publicTournaments/${code}`);\n await db.runTransaction(async tx=>{\n  const [current,p,snap,reg]=await Promise.all([tx.get(root),tx.get(pub),tx.get(ref),...(registration?[tx.get(db.doc(`tournaments/${code}/registrations/${registration.uid}`))]:[])]);\n  if(!current.exists||current.data().systemClosed===true||bucketOwned(current.data(),p.data()))return;\n  if(eventRoot&&identity(current)!==identity(eventRoot))return;\n  if(registration){\n   const source=registration.after.exists?registration.after:registration.before;\n   if(!source?.exists||precedes(created(source),created(current)))return;\n   if(registration.after.exists){\n    if(!reg.exists||identity(reg)!==identity(source)||reg.updateTime.seconds!==source.updateTime.seconds||reg.updateTime.nanoseconds!==source.updateTime.nanoseconds)return;\n   }else if(reg.exists)return;\n  }\n  const d=snap.exists?snap.data():{};if(at>C.ms(d.lastAt))tx.set(ref,{lastAt:at},{merge:true});\n });\n}\nexports.trackTournamentActivity=onDocumentWritten({document:'tournaments/{code}',region},async event=>{\n const after=event.data&&event.data.after,before=event.data&&event.data.before;if(!after||!after.exists)return;\n try{const a=after.data();if(a.systemClosed===true)return;if(before.exists&&C.fingerprint(before.data())===C.fingerprint(a))return;await updateActivity(event.params.code,after.updateTime.toMillis(),after);}catch(e){console.warn('activity-data-skipped',event.params.code,e.message);}\n});\nexports.trackTournamentRegistrationActivity=onDocumentWritten({document:'tournaments/{code}/registrations/{uid}',region},async event=>{\n const a=event.data?.after,b=event.data?.before;if(!a)return;\n if(a.exists&&b?.exists&&JSON.stringify(a.data())===JSON.stringify(b.data()))return;\n const at=a.exists?a.updateTime.toMillis():event.time?Date.parse(event.time):0;\n if(at>0)await updateActivity(event.params.code,at,null,{after:a,before:b,uid:event.params.uid});\n});\n"
+        },
+        {
+          "before": "  const [u,t,r,l]=await Promise.all([tx.get(a.ref),tx.get(ref),tx.get(raffle),tx.get(control)]);if(!t.exists)throw Error('tournament-not-found');ensureManager({...a,data:u.data()||{}},t.data());",
+          "after": "  const [u,t,r,l,p]=await Promise.all([tx.get(a.ref),tx.get(ref),tx.get(raffle),tx.get(control),tx.get(db.doc(`publicTournaments/${code}`))]);if(!t.exists)throw Error('tournament-not-found');ensureManager({...a,data:u.data()||{}},t.data());\n  assertRoom(t,p,observed);assertChildRoom(t,r);assertChildRoom(t,l);"
+        },
+        {
+          "before": " const ref=db.doc(`tournaments/${code}`),raffle=db.doc(`tournaments/${code}/raffles/${op}`),control=",
+          "after": " const observed={};\n const ref=db.doc(`tournaments/${code}`),raffle=db.doc(`tournaments/${code}/raffles/${op}`),control="
+        },
+        {
+          "before": " const ref=db.doc(`tournaments/${code}`),raffle=db.doc(`tournaments/${code}/raffles/${rid}`),control=",
+          "after": " const observed={};\n const ref=db.doc(`tournaments/${code}`),raffle=db.doc(`tournaments/${code}/raffles/${rid}`),control="
+        },
+        {
+          "before": "  const [u,t,r,l,o]=await Promise.all([tx.get(a.ref),tx.get(ref),tx.get(raffle),tx.get(control),tx.get(operation)]);if(!t.exists)throw Error('tournament-not-found');ensureManager({...a,data:u.data()||{}},t.data());",
+          "after": "  const [u,t,r,l,o,p]=await Promise.all([tx.get(a.ref),tx.get(ref),tx.get(raffle),tx.get(control),tx.get(operation),tx.get(db.doc(`publicTournaments/${code}`))]);if(!t.exists)throw Error('tournament-not-found');ensureManager({...a,data:u.data()||{}},t.data());\n  assertRoom(t,p,observed);assertChildRoom(t,r);assertChildRoom(t,l);assertChildRoom(t,o);"
+        },
+        {
+          "before": "testMode:t.data().testMode===true,revision:0}",
+          "after": "testMode:t.data().testMode===true,revision:0,sourceCreatedAt:identity(t)}"
+        },
+        {
+          "before": "tx.set(control,{winnerKeys:keys},{merge:true})",
+          "after": "tx.set(control,{winnerKeys:keys,sourceCreatedAt:identity(t)},{merge:true})"
+        },
+        {
+          "before": "tx.set(control,{winnerKeys:[...new Set([...all,replacement.key])]},{merge:true})",
+          "after": "tx.set(control,{winnerKeys:[...new Set([...all,replacement.key])],sourceCreatedAt:identity(t)},{merge:true})"
+        },
+        {
+          "before": "tx.create(operation,{type:'raffle-winner',action:",
+          "after": "tx.create(operation,{sourceCreatedAt:identity(t),type:'raffle-winner',action:"
+        }
+      ]
+    }
+  ]
+}

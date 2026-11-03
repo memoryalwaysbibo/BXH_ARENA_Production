@@ -1,0 +1,44 @@
+{
+  "status": "candidate-not-deployed",
+  "capturedSourceDate": "2026-11-02",
+  "project": "bxh-arena",
+  "region": "asia-east1",
+  "sourceOnlyUpdateMask": "buildConfig.source,labels",
+  "deletionOriginalArchiveSha256": "e0867763eff8c701fe0acedacb328ae6a2db4383462f48f8ce1d32e07c59ced5",
+  "restoreOriginalArchiveSha256": "db681d734ce96f889bb75d583e575a780dbae13a9e9f3c371b6223f22a00cd33",
+  "currentRulesSha256": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
+  "candidateRulesSha256": "3b225ddc8121ffdce95062c4ea230f24882887e7768cd445f876e4484d212101",
+  "candidates": {
+    "tournament-delete.js": "e7d7ca76374aa059900858a52c96e3e9a4f6679ca98b742e4bb66540361532a6",
+    "restore-operations.js": "e06723e7366281d707938f8df2b19c576c18b0d5d97b818c0c7e44bb4a5ab224",
+    "room-access-service.js": "79cfc71d52290610fd5a7e82a1d2ec569ed618cff9782221d5360233b29b0a62",
+    "registration-selection.js": "8d1c76303001f9a2ef7c4c656b61b7fabd9f7eafd3bed9dd8923d070e2e40eec",
+    "tournament-delete-core.js": "4188f63a98d9a8adb56d9e3fe84c9e1256e408abb6e524c94883fdb9d8c3ed51",
+    "hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "registration-selection.patch": "a8146df85172206d572bbd269b583d2cb9e029dd86e10a00809f9b79c3dbb5c2"
+  },
+  "testFixtures": {
+    "fixtures/bucket-migration-plan.cjs": "9a564f3780f7326baafae1d463493eb41e89f7bd6d34ed63dd36351e0d012c65",
+    "fixtures/baseline.rules": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
+    "fixtures/restore/operations.js": "bd2ea0a3bffd81357a95a6fb004c4de340ce54f82e356da41f344bca7f36408d",
+    "fixtures/restore/operations-core.js": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
+    "fixtures/restore/release-controls.js": "4cf9d4ed474b9ebf12accbd67f108de3b6b9c7aaad177ceaec13269937311c2a",
+    "fixtures/delete/tournament-delete-core.js": "4188f63a98d9a8adb56d9e3fe84c9e1256e408abb6e524c94883fdb9d8c3ed51",
+    "fixtures/delete/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "fixtures/access/room-access-core.js": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+    "fixtures/access/room-access-service.js": "895f3f0ad875df28c642af0142c87cf60efd1a9eb1cf168b65e3d61310dca7e2",
+    "fixtures/selection/operations-core.js": "87db6a51c6d218ee861b3c5f39a59dbfb58514b401cd253047f6deca43473705",
+    "fixtures/selection/onsite-waitlist-writer-guards.js": "d35d101cab964d9210df2159e93a49d20aed39f0bdf6f6217a3e648db4141dba",
+    "fixtures/selection/registration-selection.js": "026833cc060963c12f475151a2d4c96537c179f1eccafa70d7271d761d0ec02b",
+    "fixtures/selection/onsite-waitlist/owned.js": "649d5b78be40b89b88743b30c9ea4181957be6e1be0c6ef28aed5015e1c60433",
+    "fixtures/selection/_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+    "fixtures/selection/_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+    "fixtures/selection/_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+    "fixtures/selection/onsite-waitlist/core.js": "0ddf2d490daf8cd416cf299bdc7acfb3f98dd02e61d3df0dbbf3b3c2f2dfa39c"
+  },
+  "roomAccessOriginalArchiveSha256": "55001b0015fd786e18bc416dfee5acca5f638c3368daa84d5de023559fee6b85",
+  "selectionSourceSet": {
+    "id": 13,
+    "archiveSha256": "93b4e9e1d5c7605b98474ce3d192c0623bc94dd170e977bc1be638e182805014"
+  }
+}

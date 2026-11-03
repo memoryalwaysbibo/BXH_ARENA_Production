@@ -1,0 +1,51 @@
+name: Bucket integrated candidate
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/**'
+      - 'tests/four-court-buckets/**'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'modules/scoring/four-court-settlement.js'
+      - 'index.html'
+      - '.github/workflows/bucket-integrated-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  integrated-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify every pinned component and preserve current main cache keys
+        run: python3 -B tests/four-court-buckets/integration/verify-integration.py
+      - name: Verify independently captured backend overlays
+        run: |
+          for family in deletion interactions admissions operations settlement completion poster activity; do
+            python3 -B "tests/four-court-buckets/$family/verify-package.py"
+          done
+      - name: Same-checkout activity and settlement bridge
+        run: |
+          mkdir -p .integration
+          ln -s .. .integration/completion
+          ln -s .. .integration/settlement
+          node tests/four-court-buckets/activity/backend-bridge.cjs
+      - name: Install isolated browser dependencies
+        run: |
+          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1
+          /tmp/bucket-integrated/node_modules/.bin/playwright install --with-deps chromium
+      - name: Integrated full-host deletion, settlement handoff and main offline recovery
+        env:
+          NODE_PATH: /tmp/bucket-integrated/node_modules
+          BXH_RANKED_SOURCE: ${{ github.workspace }}
+          BXH_GENERAL_SOURCE: ${{ github.workspace }}
+        run: |
+          node tests/four-court-buckets/deletion/full-host.browser.cjs
+          node tests/four-court-buckets/settlement-ui/backend-bridge.cjs
+          node tests/offline-confirmation.browser.cjs
+          node tests/offline-resilience-v2-wiring.test.cjs
