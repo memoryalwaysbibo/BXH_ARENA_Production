@@ -1,0 +1,211 @@
+{
+  "status": "candidate-not-deployed",
+  "bucketSettlementEnabled": false,
+  "productionWrites": 0,
+  "patches": [
+    {
+      "function": "ladderAutoSettlement",
+      "sourceSet": 10,
+      "path": "ladder-auto-settlement.js",
+      "archiveSha256": "81063c0fc575378a75639e625f93c74e7e0daaf3aebf4baf1f4b9c2645d1c5c9",
+      "baselineFileSha256": "4b7944b6c239aff6bedf7cc1ddd16e8be915d7abdbcbd2e1c61ccd5454e0a258",
+      "patchedFileSha256": "990ba39df0706cbb0c7d958b0b3b0a7b75bf8981f5078fa7c4cf32d907485940",
+      "edits": [
+        {
+          "before": "const core=require('./ladder-settlement-core');",
+          "after": "const core=require('./ladder-settlement-core');\nconst A=require('./bucket-settlement/input.cjs');"
+        },
+        {
+          "before": "clock=()=>Date.now()}={})",
+          "after": "clock=()=>Date.now(),bucketRuntime='production',bucketEnv=process.env}={})"
+        },
+        {
+          "before": "    return db.runTransaction(async tx=>{",
+          "after": "    const observed={};\n    return db.runTransaction(async tx=>{"
+        },
+        {
+          "before": "      const top=tourSnap.data()||{},st=parseState(top);",
+          "after": "      let input;try{input=await A.load({tx,db,root:tourSnap,pub:publicSnap,observed,runtime:bucketRuntime,env:bucketEnv});}catch(e){if(e.bucketSettlement)return {ok:false,reason:e.message,permanent:true};throw e;}\n      const top=tourSnap.data()||{},st=input.bucket?input.state:parseState(top);"
+        },
+        {
+          "before": "      const results=[];",
+          "after": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))return {ok:false,reason:'bucket-settlement-requires-review',permanent:true};\n      const results=[];"
+        },
+        {
+          "before": "          type:'event',actorUid:SYSTEM_ACTOR",
+          "after": "          ...(input.bucket?{sourceCreatedAt:input.sourceCreatedAt,bucketEpoch:input.m.epoch}:{}),type:'event',actorUid:SYSTEM_ACTOR"
+        },
+        {
+          "before": "      tx.set(tourRef,topPatch,{merge:true});\n      const pubPatch=publicFinalPatch(publicSnap,now);if(pubPatch)tx.set(publicRef,pubPatch,{merge:true});",
+          "after": "      if(input.bucket){const patches=A.finalPatches(input,completed,{now,seasonId:plan.seasonId,results,skipped:plan.skipped,actorUid:SYSTEM_ACTOR});tx.set(tourRef,{...topPatch,...patches.privatePatch},{merge:true});tx.set(publicRef,patches.publicPatch,{merge:true});}\n      else{tx.set(tourRef,topPatch,{merge:true});const pubPatch=publicFinalPatch(publicSnap,now);if(pubPatch)tx.set(publicRef,pubPatch,{merge:true});}"
+        },
+        {
+          "before": "    });\n  }\n  return {settle};",
+          "after": "    }).catch(e=>{if(e.bucketSettlement)return {ok:false,reason:e.message,permanent:true};throw e;});\n  }\n  return {settle};"
+        },
+        {
+          "before": "const top=after.data()||{},st=parseState(top),eligible=core.tournamentEligible(top,st);",
+          "after": "const top=after.data()||{},st=parseState(top),eligible=A.ownership(top)?{ok:true}:core.tournamentEligible(top,st);"
+        },
+        {
+          "before": "if(PERMANENT.has(result.reason))",
+          "after": "if(result.permanent===true||PERMANENT.has(result.reason))"
+        },
+        {
+          "before": "scored.players.map(x=>core.candidateUid(x.player))",
+          "after": "scored.players.map(x=>input.bucket?A.playerUid(x.player):core.candidateUid(x.player))"
+        },
+        {
+          "before": "if(snap.exists)profiles[candidates[i]]=snap.data()||{};",
+          "after": "if(snap.exists&&(!input.bucket||A.validProfile(snap.data())))profiles[candidates[i]]=snap.data()||{};"
+        },
+        {
+          "before": "      const results=[];",
+          "after": "      if(input.bucket){const registrations=await Promise.all(plan.rows.map(row=>row.player.source==='online'?tx.get(tourRef.collection('registrations').doc(row.uid)):null));if(registrations.some((s,i)=>plan.rows[i].player.source==='online'&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}\n      const results=[];"
+        },
+        {
+          "before": "      const control=controlSnap.data()||{};",
+          "after": "      const control=controlSnap.data()||{};if(input.bucket)A.checkSeason(control,now);"
+        },
+        {
+          "before": "if(input.bucket){const registrations=await Promise.all(plan.rows.map(row=>row.player.source==='online'?tx.get(tourRef.collection('registrations').doc(row.uid)):null));if(registrations.some((s,i)=>plan.rows[i].player.source==='online'&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}",
+          "after": "if(input.bucket){const registrations=await Promise.all(scored.players.map(row=>row.player.source==='online'&&A.playerUid(row.player)?tx.get(tourRef.collection('registrations').doc(A.playerUid(row.player))):null));if(registrations.some((s,i)=>scored.players[i].player.source==='online'&&A.playerUid(scored.players[i].player)&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}"
+        },
+        {
+          "before": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))",
+          "after": "      if(input.bucket&&playerSnaps.some(s=>s.exists&&s.data().currentSeason&&s.data().currentSeason!==plan.seasonId))return {ok:false,reason:'player-season-mismatch',permanent:true};\n      if(input.bucket&&priorTxSnaps.some(s=>s.exists))"
+        }
+      ]
+    },
+    {
+      "function": "settleLadderTournament",
+      "sourceSet": 21,
+      "path": "ladder-settlement.js",
+      "archiveSha256": "cc20aa806d03ceffad1888fc40383b02585cbf45c47ddad29d6cb55d6fc168cc",
+      "baselineFileSha256": "3ea58fe50263ed20e2d7fa7e2415d83b44a28b80d75ee84dc05bc515def95d29",
+      "patchedFileSha256": "c43e7f3fa78e18273ab65219d3eee7c05ac34df12d9fa4f26157e88865ea01d0",
+      "edits": [
+        {
+          "before": "const V1 = require(\"./ladder-v1\");",
+          "after": "const V1 = require(\"./ladder-v1\");\nconst A = require(\"./bucket-settlement/input.cjs\");"
+        },
+        {
+          "before": "function createLadderSettlement({db, FieldValue, now = () => Date.now()})",
+          "after": "function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketRuntime = 'production', bucketEnv = process.env})"
+        },
+        {
+          "before": "    const sourceSnapshot = await tournamentRef.get();",
+          "after": "    let sourceSnapshot = await tournamentRef.get();"
+        },
+        {
+          "before": "    const source = sourceSnapshot.data() || {};",
+          "after": "    let source = sourceSnapshot.data() || {};\n    const publicRef=db.doc(`publicTournaments/${normalized}`),sourcePublic=await publicRef.get(),observed={};\n    let sourceInput=null;\n    if(A.ownership(source,sourcePublic.data())){\n      try{\n        const initial=await db.runTransaction(async tx=>{const [r,p]=await Promise.all([tx.get(tournamentRef),tx.get(publicRef)]);if(!r.exists)A.fail('bucket-room-changed');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');return {r,input};});\n        sourceSnapshot=initial.r;source=initial.r.data();sourceInput=initial.input;\n      }catch(e){if(e.bucketSettlement)return result(false,e.message,'\u5206\u6876\u7d50\u7b97\u8cc7\u6599\u5c1a\u672a\u7b26\u5408\u9a57\u6536\u689d\u4ef6');throw e;}\n    }"
+        },
+        {
+          "before": "      state = typeof source.data === \"string\" ? JSON.parse(source.data) : source.data;",
+          "after": "      state = sourceInput?sourceInput.state:(typeof source.data === \"string\" ? JSON.parse(source.data) : source.data);"
+        },
+        {
+          "before": "    const sourceFingerprint = typeof source.data === \"string\" ? source.data : JSON.stringify(source.data);",
+          "after": "    const sourceFingerprint = sourceInput?sourceInput.fingerprint:(typeof source.data === \"string\" ? source.data : JSON.stringify(source.data));"
+        },
+        {
+          "before": "      const [tournamentSnapshot, controlSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef)]);",
+          "after": "      const [tournamentSnapshot, controlSnapshot,publicSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef),transaction.get(publicRef)]);"
+        },
+        {
+          "before": "      const tournament = tournamentSnapshot.data() || {};",
+          "after": "      const tournament = tournamentSnapshot.data() || {};\n      const currentInput=await A.load({tx:transaction,db,root:tournamentSnapshot,pub:publicSnapshot,observed,runtime:bucketRuntime,env:bucketEnv});\n      if(currentInput.bucket!==!!sourceInput)return result(false,'bucket-mode-changed','\u623f\u9593\u5132\u5b58\u6a21\u5f0f\u5df2\u8b8a\u66f4\uff0c\u8acb\u91cd\u65b0\u8b80\u53d6');\n      if(currentInput.bucket){const currentActor=await transaction.get(db.doc('users/'+actor.uid));const p=currentActor.data();if(!p||p.active!==true||!['admin','super_admin'].includes(p.role)||p.isTestAccount===true)return result(false,'admin-required','\u7ba1\u7406\u6b0a\u9650\u5df2\u8b8a\u66f4');}"
+        },
+        {
+          "before": "      const currentFingerprint = typeof tournament.data === \"string\" ? tournament.data : JSON.stringify(tournament.data);",
+          "after": "      const currentFingerprint = currentInput.bucket?currentInput.fingerprint:(typeof tournament.data === \"string\" ? tournament.data : JSON.stringify(tournament.data));"
+        },
+        {
+          "before": "          type: \"event\",",
+          "after": "          ...(currentInput.bucket?{sourceCreatedAt:currentInput.sourceCreatedAt,bucketEpoch:currentInput.m.epoch}:{}),type: \"event\","
+        },
+        {
+          "before": "      transaction.update(tournamentRef, {",
+          "after": "      if(currentInput.bucket&&results.length<2)A.fail(\"bucket-insufficient-eligible-players\");\n      transaction.update(tournamentRef, {"
+        },
+        {
+          "before": "      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime};",
+          "after": "      if(currentInput.bucket){const patches=A.finalPatches(currentInput,currentInput.state,{now:currentTime,seasonId,results,skipped:skippedPlayers,actorUid:actor.uid});transaction.set(tournamentRef,patches.privatePatch,{merge:true});transaction.set(publicRef,patches.publicPatch,{merge:true});}\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime};"
+        },
+        {
+          "before": "    });\n  };\n}",
+          "after": "    }).catch(e=>{if(e.bucketSettlement)return result(false,e.message,\"\u5206\u6876\u7d50\u7b97\u8cc7\u6599\u5df2\u8b8a\u66f4\u6216\u9700\u8981\u4eba\u5de5\u6838\u5c0d\");throw e;});\n  };\n}"
+        },
+        {
+          "before": "  async function resolvePlayers(payload) {",
+          "after": "  async function resolvePlayers(payload, {allowNameLookup=true}={}) {"
+        },
+        {
+          "before": "      if (!uid) {\n        const matches =",
+          "after": "      if (!uid && allowNameLookup) {\n        const matches ="
+        },
+        {
+          "before": "      payload = buildLadderSettlementPayload(state);",
+          "after": "      payload = buildLadderSettlementPayload(state);\n      if(sourceInput)for(const row of payload.participants)row.playerUid=A.playerUid(state.players.find(p=>p.id===row.localPlayerId))||null;"
+        },
+        {
+          "before": "    const {resolved, skipped} = await resolvePlayers(payload);",
+          "after": "    const {resolved, skipped} = await resolvePlayers(payload,{allowNameLookup:!sourceInput});"
+        },
+        {
+          "before": "if(!p||p.active!==true||!['admin','super_admin'].includes(p.role)||p.isTestAccount===true)",
+          "after": "if(!A.validProfile(p)||!['admin','super_admin'].includes(p.role))"
+        },
+        {
+          "before": "      const control = controlSnapshot.data() || {};",
+          "after": "      const control = controlSnapshot.data() || {};\n      if(currentInput.bucket&&control.status!=='active')return result(false,'season-unavailable','\u8cfd\u5b63\u5c1a\u672a\u958b\u653e');\n      if(currentInput.bucket&&resolved.length>240)return result(false,'eligible-player-limit','\u672c\u5834\u8d85\u904e\u53ef\u4e00\u6b21\u7d50\u7b97\u7684\u6709\u6548\u5e33\u865f\u4e0a\u9650');"
+        },
+        {
+          "before": "      const trial = seasonId.toUpperCase() === \"S0\" || control.isTrialSeason === true;",
+          "after": "      const trial = seasonId.toUpperCase() === \"S0\" || control.isTrialSeason === true;\n      const countsTowardCareer=currentInput.bucket?(control.countsTowardCareer===undefined?!trial:control.countsTowardCareer===true):!trial;"
+        },
+        {
+          "before": "if (!profile || profile.active !== true || profile.role === \"tester\" || profile.isTestAccount === true)",
+          "after": "if (!profile || profile.active !== true || profile.role === \"tester\" || profile.isTestAccount === true || currentInput.bucket&&!A.validProfile(profile))"
+        },
+        {
+          "before": "const careerPoints = trial ? oldCareer : oldCareer + points;",
+          "after": "const careerPoints = countsTowardCareer ? oldCareer + points : oldCareer;"
+        },
+        {
+          "before": "const highestRankTier = trial ? oldHighest : (tierIndex(rankTier) > tierIndex(oldHighest) ? rankTier : oldHighest);",
+          "after": "const highestRankTier = !countsTowardCareer ? oldHighest : (tierIndex(rankTier) > tierIndex(oldHighest) ? rankTier : oldHighest);"
+        },
+        {
+          "before": "countsTowardCareer: !trial,",
+          "after": "countsTowardCareer,"
+        },
+        {
+          "before": "ladderCountsTowardCareer: !trial,",
+          "after": "ladderCountsTowardCareer: countsTowardCareer,"
+        },
+        {
+          "before": "      if(currentInput.bucket&&resolved.length>240)return result(false,'eligible-player-limit','\u672c\u5834\u8d85\u904e\u53ef\u4e00\u6b21\u7d50\u7b97\u7684\u6709\u6548\u5e33\u865f\u4e0a\u9650');",
+          "after": ""
+        },
+        {
+          "before": "      const results = [];",
+          "after": "      if(currentInput.bucket&&profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>240)return result(false,'eligible-player-limit','\u672c\u5834\u8d85\u904e\u53ef\u4e00\u6b21\u7d50\u7b97\u7684\u6709\u6548\u5e33\u865f\u4e0a\u9650');\n      const results = [];"
+        }
+      ]
+    }
+  ],
+  "helperFiles": {
+    "bucket-settlement/public-view.cjs": "0bda68eb58adf93c53f29bfb2d726d7d10cf6486b711de840a6526a177359499",
+    "bucket-settlement/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
+    "bucket-settlement/input.cjs": "faf690dd79270e7e08305c0ed93e6c04e93ca6fd9d3cb10fa4687f8f09609f2e",
+    "bucket-settlement/runtime.cjs": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+    "_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab"
+  },
+  "protocolSource": {
+    "commit": "b82e8d393ab14c6146575ebf28ccedb0c02b3ed9",
+    "projectionSourceSha256": "b88a284308980512707d179a7b755d9e85026c9abb6bd4901f667530ce9ecd36",
+    "stateGitBlob": "da457b44c6694293470efa3ce71699ada100b8b1"
+  }
+}
