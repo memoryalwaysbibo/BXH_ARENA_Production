@@ -30,7 +30,7 @@ function prepare(root,destination,files){
   if(uids.some(uid=>data.includes(Buffer.from(uid))))throw Error('private-referee-identity-in-public-file: '+relative);
   fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,data);count++;
  }
- for(const f of ['index.html','modules/main-app/core.js','modules/cloud/cloud-runtime.js','modules/main-app/qr-checkin.js','modules/main-app/qr-checkin-fence.js','modules/main-app/roster-view.js','modules/main-app/bracket-commit.js','modules/referee-license/ui.js','modules/referee-license/domain.js','modules/referee-license/styles.css','modules/referee-license/fonts/bxh-kai-subset.ttf'])if(!fs.existsSync(path.join(destination,f)))throw Error('missing-public-runtime: '+f);
+ for(const f of ['index.html','modules/main-app/core.js','modules/cloud/cloud-runtime.js','modules/main-app/qr-checkin.js','modules/main-app/qr-checkin-fence.js','modules/main-app/roster-view.js','modules/main-app/bracket-commit.js','modules/referee-license/ui.js','modules/referee-license/domain.js','modules/referee-license/legacy-import.js','modules/referee-license/styles.css','modules/referee-license/fonts/bxh-kai-subset.ttf'])if(!fs.existsSync(path.join(destination,f)))throw Error('missing-public-runtime: '+f);
  for(const f of ['referee-certificates','tests','qr-checkin','scripts/preview-referee-initialization.cjs'])if(fs.existsSync(path.join(destination,f)))throw Error('private-path-in-artifact');
  return {files:count,privateIdentityScan:'passed',refereeFlags,privateTreesAbsent:true};
 }

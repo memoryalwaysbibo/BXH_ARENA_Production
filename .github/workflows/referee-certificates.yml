@@ -58,6 +58,10 @@ jobs:
         env:
           NODE_PATH: /tmp/referee-certificate-deps/node_modules
         run: node tests/referee-certificate-contract.browser.cjs
+      - name: Legacy import preview, batch readback and session interruption
+        env:
+          NODE_PATH: /tmp/referee-certificate-deps/node_modules
+        run: node tests/referee-license-legacy-import.browser.cjs
       - name: Public summary boundary through the player-card module
         env:
           NODE_PATH: /tmp/referee-certificate-deps/node_modules
