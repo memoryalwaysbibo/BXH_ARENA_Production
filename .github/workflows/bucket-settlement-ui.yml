@@ -1,0 +1,46 @@
+name: Bucket settlement frontend handoff
+on:
+  pull_request:
+    paths:
+      - 'modules/scoring/four-court-settlement.js'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'tests/four-court-buckets/settlement-ui/**'
+      - '.github/workflows/bucket-settlement-ui.yml'
+permissions:
+  contents: read
+jobs:
+  settlement-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Certificate, lost response and actual app adapter regressions
+        run: node tests/four-court-buckets/settlement-ui/probe.cjs
+      - name: Install isolated browser dependencies
+        run: |
+          npm install --prefix /tmp/settlement-ui --no-save --ignore-scripts playwright@1.56.1
+          /tmp/settlement-ui/node_modules/.bin/playwright install --with-deps chromium
+      - name: Desktop and mobile Chromium handoff and reload
+        env:
+          NODE_PATH: /tmp/settlement-ui/node_modules
+        run: node tests/four-court-buckets/settlement-ui/browser.cjs
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: f31da1e78b1ca9319b67dad534e644955c54fba1
+          path: .integration/ranked
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: 17dabf692e703abf6858aeb98d692af0aff9b700
+          path: .integration/general
+      - name: Browser app functions with pinned actual candidate backend handlers
+        env:
+          NODE_PATH: /tmp/settlement-ui/node_modules
+        run: node tests/four-court-buckets/settlement-ui/backend-bridge.cjs
