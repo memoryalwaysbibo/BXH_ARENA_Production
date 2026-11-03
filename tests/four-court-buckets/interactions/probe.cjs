@@ -20,7 +20,7 @@ function memory(){
 }
 function load(spec,patched,m){
  const base=path.join(original,String(spec.sourceSet)),cache=new Map();class FixedDate extends Date{static now(){return NOW;}}
- const sdk={FieldValue:{serverTimestamp:()=>NOW,increment:n=>({__increment:n}),delete:()=>({__delete:true})}};
+ const sdk=m.sdk||{FieldValue:{serverTimestamp:()=>NOW,increment:n=>({__increment:n}),delete:()=>({__delete:true})}};
  function moduleAt(filename){if(cache.has(filename))return cache.get(filename).exports;const module={exports:{}};cache.set(filename,module);const actual=patched&&filename===path.join(base,spec.path)?path.resolve(root,'../../../release/buckets/interactions/candidate',String(spec.sourceSet),spec.path):filename;
   function req(n){if(n==='./_qr_checkin/admin-firestore.cjs'||n==='firebase-admin/firestore')return sdk;if(n==='node:crypto')return {...require(n),randomInt:()=>0,randomUUID:()=> 'synthetic-operation-id'};if(n.startsWith('.')){const p=path.resolve(path.dirname(filename),n),resolved=[p,p+'.js',p+'.cjs'].find(x=>fs.existsSync(x));if(!resolved||!resolved.startsWith(base+path.sep))throw Error('unexpected dependency '+n);return moduleAt(resolved);}return require(n);}
   vm.runInNewContext('(function(require,module,exports){'+fs.readFileSync(actual,'utf8')+'\n})',{Date:FixedDate,structuredClone,Buffer,process:{env:{GCLOUD_PROJECT:'bxh-arena'}},console},{filename:actual})(req,module,module.exports);return module.exports;

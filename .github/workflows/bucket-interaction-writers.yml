@@ -11,7 +11,7 @@ permissions:
 jobs:
   isolated-source-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,3 +23,15 @@ jobs:
         run: python3 -B tests/four-court-buckets/interactions/verify-package.py
       - name: Check marked-room denial, transaction races and unchanged legacy writes
         run: node tests/four-court-buckets/interactions/probe.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated native Emulator validation dependencies
+        run: npm install --prefix /tmp/bucket-interactions --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0
+      - name: Real Admin SDK transaction checks in a loopback demo project
+        env:
+          NODE_PATH: /tmp/bucket-interactions/node_modules
+          GCLOUD_PROJECT: demo-bxh-bucket-interactions
+          CI: true
+        run: /tmp/bucket-interactions/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-interactions --config tests/four-court-buckets/interactions/firebase.emulator.json 'node tests/four-court-buckets/interactions/native-emulator.cjs'
