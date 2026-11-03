@@ -41,6 +41,7 @@ jobs:
           node tests/four-court-buckets/deletion/deletion-probe.cjs
           node tests/four-court-buckets/deletion/restore-probe.cjs
           node tests/four-court-buckets/deletion/client-probe.cjs
+          node tests/four-court-buckets/deletion/access-probe.cjs
       - name: Check deletion leases against real demo Emulator
         run: |
           FIRESTORE_EMULATOR_JAR="$HOME/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar" python3 -B tests/four-court-buckets/deletion/rules-emulator.py

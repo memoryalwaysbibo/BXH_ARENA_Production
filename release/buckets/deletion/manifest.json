@@ -10,7 +10,8 @@
   "candidateRulesSha256": "3b225ddc8121ffdce95062c4ea230f24882887e7768cd445f876e4484d212101",
   "candidates": {
     "tournament-delete.js": "60f8fcf4d55da1922a40ca8500d4c716ed5d0da563315857f11a64aab155f865",
-    "restore-operations.js": "e06723e7366281d707938f8df2b19c576c18b0d5d97b818c0c7e44bb4a5ab224"
+    "restore-operations.js": "e06723e7366281d707938f8df2b19c576c18b0d5d97b818c0c7e44bb4a5ab224",
+    "room-access-service.js": "79cfc71d52290610fd5a7e82a1d2ec569ed618cff9782221d5360233b29b0a62"
   },
   "testFixtures": {
     "fixtures/bucket-migration-plan.cjs": "9a564f3780f7326baafae1d463493eb41e89f7bd6d34ed63dd36351e0d012c65",
@@ -19,6 +20,9 @@
     "fixtures/restore/operations-core.js": "c8ba02a5e3ff7edde5f6d0586346400be8bb5e0c9b857432babd49a27cadffc7",
     "fixtures/restore/release-controls.js": "4cf9d4ed474b9ebf12accbd67f108de3b6b9c7aaad177ceaec13269937311c2a",
     "fixtures/delete/tournament-delete-core.js": "4188f63a98d9a8adb56d9e3fe84c9e1256e408abb6e524c94883fdb9d8c3ed51",
-    "fixtures/delete/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680"
-  }
+    "fixtures/delete/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
+    "fixtures/access/room-access-core.js": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+    "fixtures/access/room-access-service.js": "895f3f0ad875df28c642af0142c87cf60efd1a9eb1cf168b65e3d61310dca7e2"
+  },
+  "roomAccessOriginalArchiveSha256": "55001b0015fd786e18bc416dfee5acca5f638c3368daa84d5de023559fee6b85"
 }

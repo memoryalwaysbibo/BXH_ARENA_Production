@@ -8,7 +8,8 @@ The handler is based on the exact captured `deleteTournamentSafely` deployment,
 with its `hosting-core.js` and `tournament-delete-core.js` dependencies preserved.
 `restore-operations.js` changes only the early ownership check in
 `restoreIdleTournament`; deploy only that named function, never the other exports
-in this shared archive. `manifest.json` pins the original source archives,
+in this shared archive. The roomAccess candidate is separately pinned to its
+own captured archive; never substitute the restore archive for it. `manifest.json` pins the original source archives,
 candidate modules, Rules, and synthetic test dependency fixtures. No environment
 file, credential, or production room data is included.
 
@@ -41,10 +42,11 @@ python3 -B tests/four-court-buckets/deletion/verify-package.py
 node tests/four-court-buckets/deletion/deletion-probe.cjs
 node tests/four-court-buckets/deletion/restore-probe.cjs
 node tests/four-court-buckets/deletion/client-probe.cjs
+node tests/four-court-buckets/deletion/access-probe.cjs
 FIRESTORE_EMULATOR_JAR=/path/to/cloud-firestore-emulator-v1.19.8.jar python3 -B tests/four-court-buckets/deletion/rules-emulator.py
 ```
 
-The 47 deletion and 16 restore checks use mocked Firestore SDKs and captured pure
+The 47 deletion, 16 restore and 34 room-access checks use mocked Firestore SDKs and captured pure
 helpers; they are not full deployed SDK acceptance. The 16 client checks execute
 the actual runtime method in a VM with synthetic transport/storage, not a full
 browser UI. The real Emulator runner uses only a fixed loopback demo project and
@@ -59,7 +61,12 @@ compares the captured currently deployed Rules against the candidate. It checks
 2. Deploy and read back the candidate Rules first. Then update only
    `restoreIdleTournament` with its expanded lease guard, preserving the current
    fenced source and every dependency/configuration. Verify exact source readback.
-3. Update only `deleteTournamentSafely`, replacing its reviewed module in its own
+3. Before the deletion handler, update only `roomAccess` from its own current
+   fenced archive using `room-access-service.js`. This also blocks password
+   verification from adding accessGrants/attempts during a retained deletion or
+   migration lease; normal unmarked verification remains unchanged, with one
+   extra public-document read in its transaction. Verify source/config readback.
+   Then update only `deleteTournamentSafely`, replacing its reviewed module in its own
    exact deployed archive. Preserve runtime, environment, trigger, service account,
    scaling and dependency bytes; read back the source and configuration.
 4. Release the browser intent change through the normal frontend validation path.
