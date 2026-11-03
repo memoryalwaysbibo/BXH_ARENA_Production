@@ -175,3 +175,11 @@
   .rl-root .rl-photo-editor { grid-template-columns: 72px minmax(0,1fr); gap: 12px; }
   .rl-root .rl-form-grid { grid-template-columns: 1fr; }
 }
+
+/* Host themes paint generic .panel surfaces with !important. Keep this
+   private module's surface and ink together, independent of the host skin. */
+.rl-root .panel.rl-section { background:var(--rl-bg)!important; color:var(--rl-ink)!important; border-color:var(--rl-line)!important; }
+.rl-root .rl-section :is(h2,h3,h4,label,summary), .rl-root .rl-admin-totals { color:var(--rl-ink)!important; }
+.rl-root .rl-small { color:var(--rl-muted)!important; }
+.rl-root .rl-input { background:var(--rl-paper)!important; color:var(--rl-ink)!important; -webkit-text-fill-color:var(--rl-ink); }
+.rl-root .rl-input::placeholder { color:var(--rl-muted); opacity:1; }

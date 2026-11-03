@@ -70,6 +70,32 @@ export class ReCaptchaEnterpriseProvider{};
  await page.locator('[data-action="referee-license-grant"]').click();
  await page.waitForFunction(()=>document.getElementById('app').textContent.includes('正式階級已授予。'),null,{timeout:8000});
  assert.equal(db.read('refereeCertificates/alice').awardedLevel,1);
+ // The real admin route must list existing certificates without a user search.
+ await page.locator('[data-action="referee-license-roster-refresh"]').click();
+ await page.locator('.rl-search-results [data-action="referee-license-select"][data-uid="alice"]').click();
+ assert.ok(!calls.some(c=>c.name==='refereeCertificateService'&&c.payload.action==='search'));
+ // Exact approved legacy tuples recover canonical event experience. The normal
+ // UI refresh automatically commits the highest eligible rank through service.
+ const D=require('../referee-certificates/functions/domain.cjs');
+ const keys=['historical:legacy_'+D.hash(JSON.stringify(['alice','BXH-AAAA','m0'])),...Array.from({length:49},(_,i)=>'historical:fixture_'+i)];
+ db.put('tournaments/BXH-AAAA',fixture({size:128})['tournaments/BXH-AAAA']);
+ db.put('refereeCertificates/alice/records/legacy',{kind:'decision',decisions:50,events:0,auxiliary:0,size:null,precision:'unknown',sourceKey:keys[0],sourceKeys:keys,sourceUid:null,basis:'fixture verified legacy decisions',period:'fixture',note:'',status:'active',revision:1});
+ await page.locator('.rl-root > .rl-heading [data-action="referee-license-refresh"]').click();
+ await page.waitForFunction(()=>document.querySelector('.rl-award-current')?.textContent.includes('L3'));
+ assert.equal(db.read('refereeCertificates/alice').awardedLevel,3);
+ assert.equal(db.list('refereeCertificates/alice/audit').filter(([,a])=>a.action==='syncProgress').length,1);
+ assert.ok(!calls.some(c=>c.name==='refereeCertificateService'&&c.payload.action==='grant'&&c.payload.level>1));
+ for(const scheme of ['light','dark']) {
+  await page.emulateMedia({colorScheme:scheme});await page.setViewportSize({width:390,height:900});
+  const colors=await page.locator('.rl-root .panel.rl-section').first().evaluate(el=>({bg:getComputedStyle(el).backgroundColor,ink:getComputedStyle(el).color}));
+  const rgb=c=>c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});
+  const lum=c=>rgb(c).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+  assert.ok((Math.max(lum(colors.bg),lum(colors.ink))+.05)/(Math.min(lum(colors.bg),lum(colors.ink))+.05)>=4.5,'host panel contrast '+scheme);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'/tmp/referee-repair-admin-'+scheme+'.png',fullPage:true});
+ }
+ await page.setViewportSize({width:960,height:900});
+
  await page.locator('[data-action="switch-tab"][data-tab="ladder"]').click();
  await page.waitForFunction(()=>ladderPublicLoaded&&!ladderPublicLoading);
  await page.locator('details:has(#player-card-query)>summary').press('Enter');

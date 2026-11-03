@@ -70,6 +70,7 @@ async function readSystemSources(tx,db,uid,limits=D.LIMITS) {
     const pending=reason=>{row.reason=reason;out.pendingLogCount++;};
     const excluded=reason=>{row.status='excluded';row.reason=reason;out.excludedLogCount++;};
     if(log.uid!==uid||typeof matchId!=='string'||!matchId||matchId.includes('/')||!/^BXH-[A-Z0-9]{4,24}$/.test(code||'')){pending('invalid-log-identity');continue;}
+    row.identityValid=true;row.sourceUid=uid;
     if(seen.has(key)){excluded('duplicate-source-key');continue;}
     seen.add(key);
     const context=rooms.get(code);
@@ -85,6 +86,8 @@ async function readSystemSources(tx,db,uid,limits=D.LIMITS) {
     if(['revoked','revokedAt','cancelled','cancelledAt','voided','voidedAt','resultRevoked'].some(k=>match[k])||['revoked','cancelled','void'].includes(match.status)){excluded('revoked-result');continue;}
     if(match.completed!==true){excluded('current-result-not-completed');continue;}
     if(!match.a?.playerId||!match.b?.playerId||match.a.playerId===match.b.playerId||![match.a.playerId,match.b.playerId].includes(match.winnerId)){pending('current-result-invalid');continue;}
+    if(completedEvent(room,state))row.eventEvidence={...actualSize(state),basis:'retained-completed-canonical-event'};
+    else row.eventPending=true;
     // confirmedByUid and score-audit uid identify the operator, not the responsible referee.
     // No existing production field establishes responsibility. Only explicit audited recognition counts.
     pending('responsibility-unverified');

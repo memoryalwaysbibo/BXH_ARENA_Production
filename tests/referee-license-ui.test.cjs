@@ -26,7 +26,7 @@ function harness(handler) {
   const listeners = {}, calls = [];
   const h = {handler, calls, live: {uid: '', epoch: 0, isSuperAdmin: false}, renders: 0};
   const document = {addEventListener: (name, callback) => {listeners[name] = callback;}};
-  const window = {crypto: {randomUUID}, engagementService: {refereeLicense(payload) {calls.push(plain(payload)); return h.handler(payload);}}};
+  const window = {crypto: {randomUUID}, engagementService: {refereeLicense(payload) {calls.push(plain(payload)); return payload.action==='list' ? (h.listHandler ? h.listHandler(payload) : Promise.resolve({ok:true,items:[],nextCursor:null})) : h.handler(payload);}}};
   const sandbox = vm.createContext({window, document, console, setTimeout, clearTimeout});
   for (const source of sources) vm.runInContext(source, sandbox);
   h.api = window.BXHRefereeLicense; h.domain = window.BXHRefereeLicenseDomain;
@@ -213,4 +213,31 @@ test('host achievement navigation keeps the real duty tab authoritative and rese
   assert.equal(navigated, 1); assert.match(h.api.renderDuty(ctx), /data-referee-view="duty"/);
   assert.match(h.api.renderAchievements(ctx), /data-referee-view="achievements"/);
   h.api.resetSession(); h.api.renderDuty(ctx); await tick(); assert.equal(h.calls.length, 2);
+});
+
+
+test('admin automatically lists certificates and selects without searching; account change discards late roster', async()=>{
+ const h=harness(async p=>({ok:true,snapshot:snapshot(p.targetUid)}));
+ h.listHandler=async()=>({ok:true,items:[{uid:'target',realName:'清單裁判',number:'R000019',level:3,status:'active'}],nextCursor:null});
+ const ctx=h.ctx('admin',true);h.api.renderAdmin(ctx);await tick();
+ assert.match(h.api.renderAdmin(ctx),/清單裁判/);h.action('select',ctx,{uid:'target'});await tick();
+ assert.match(h.api.renderAdmin(ctx),/累積判決/);assert.equal(h.calls.filter(p=>p.action==='search').length,0);
+ const late=deferred();h.listHandler=()=>late.promise;h.action('roster-refresh',ctx);
+ const player=h.ctx('player',false,2);h.api.renderAdmin(player);
+ late.resolve({ok:true,items:[{uid:'secret',realName:'私密清單'}]});await tick();
+ assert.doesNotMatch(h.api.renderAdmin(player),/私密清單/);
+});
+
+test('eligible self progresses automatically through the server and ambiguous reply retries the same operation',async()=>{
+ let tries=0;
+ const h=harness(async p=>{
+  if(p.action==='get')return {ok:true,snapshot:snapshot('self',{autoPromotionEnabled:true,eligibleLevel:6})};
+  assert.equal(p.action,'syncProgress');
+  if(++tries===1)throw Object.assign(new Error('lost'),{code:'deadline-exceeded'});
+  return {ok:true,snapshot:snapshot('self',{autoPromotionEnabled:true,revision:8,eligibleLevel:6,certificate:{number:'R000019',awardedLevel:6,status:'active'}})};
+ });
+ const ctx=h.ctx('self');h.api.renderDuty(ctx);await tick();await tick();
+ assert.match(h.api.renderDuty(ctx),/重試原操作/);h.action('retry',ctx);await tick();
+ const writes=h.calls.filter(p=>p.action==='syncProgress');assert.equal(writes.length,2);assert.deepEqual(writes[0],writes[1]);
+ assert.match(h.api.renderDuty(ctx),/鑽石裁判/);assert.doesNotMatch(h.api.renderDuty(ctx),/重試原操作/);
 });

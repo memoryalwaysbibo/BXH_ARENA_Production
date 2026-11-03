@@ -120,6 +120,11 @@ function addEvent(stats, events, size, precision) {
 }
 function aggregate(source,entries) {
   const out={...source,counts:{...source.counts}};
+  // The approved legacy importer hashed the exact account/event/match tuple.
+  // Alias only keys backed by that account's actual log, never arbitrary history.
+  const aliases=new Map((source.systemRecords||[]).filter(r=>r.identityValid).map(r=>[
+    'historical:legacy_'+hash(JSON.stringify([r.sourceUid,r.tournamentCode,r.matchId])),
+    'match:'+r.tournamentCode+':'+r.matchId]));
   let backfillDecisions=0,backfillEvents=0,auxiliaryCount=0,pendingBackfills=0;
   const seen=new Set((source.systemRecords||[]).filter(r=>['verified','pending_event'].includes(r.status)).map(r=>'match:'+r.tournamentCode+':'+r.matchId));
   for(const key of source.recognizedEventKeys||[]) seen.add(key);
@@ -127,7 +132,7 @@ function aggregate(source,entries) {
     if(entry.status!=='active') continue;
     if(!entry.kind||entry.recognitionValid!==true){pendingBackfills++;continue;}
     const row=normalizeBackfill(entry);
-    const keys=(row.sourceKeys||[row.sourceKey]).map(key=>(row.kind==='auxiliary'?'auxiliary:':'')+key);
+    const keys=(row.sourceKeys||[row.sourceKey]).map(key=>(row.kind==='auxiliary'?'auxiliary:':'')+(aliases.get(key)||key));
     const fresh=keys.filter(key=>!seen.has(key));if(!fresh.length)continue;
     fresh.forEach(key=>seen.add(key));
     if(row.kind==='decision')row.decisions=fresh.length;
@@ -135,11 +140,36 @@ function aggregate(source,entries) {
     backfillDecisions=add(backfillDecisions,row.decisions);backfillEvents=add(backfillEvents,row.events);
     out.decisions=add(out.decisions,row.decisions);addEvent(out,row.events,row.size,row.precision);
   }
+  // An approved decision proves participation, but completion and actual size
+  // must still come from the retained canonical event. Explicit event records
+  // and multiple matches share one event key.
+  const pendingEventKeys=new Set(),unresolvedEventKeys=new Set();
+  let recoveredEvents=0;
+  for(const row of source.systemRecords||[]) {
+    if(!row.identityValid||!row.eventEvidence||!seen.has('match:'+row.tournamentCode+':'+row.matchId))continue;
+    const key='event:'+row.tournamentCode;
+    if(seen.has(key))continue;
+    seen.add(key);addEvent(out,1,row.eventEvidence.size,row.eventEvidence.precision);recoveredEvents++;
+  }
+  for(const row of source.systemRecords||[]) {
+    const key='event:'+row.tournamentCode;
+    if(!row.identityValid||seen.has(key)||!seen.has('match:'+row.tournamentCode+':'+row.matchId))continue;
+    if(row.eventPending)pendingEventKeys.add(key);
+    else if(row.status==='pending')unresolvedEventKeys.add(key);
+  }
   return {decisions:out.decisions,eventCount:out.eventCount,scales:Object.fromEntries([64,96,128].map(n=>[n,out.counts[n]])),
     milestones:Object.fromEntries(MILESTONES.map(m=>[m.threshold,out.counts[m.threshold]])),unknownScaleEvents:out.unknownScaleEvents,
-    pendingLogCount:Math.max(0,source.pendingLogCount-(source.systemRecords||[]).filter(r=>r.reason==='responsibility-unverified'&&seen.has('match:'+r.tournamentCode+':'+r.matchId)).length),pendingEvents:source.pendingEvents,excludedLogCount:source.excludedLogCount,
+    pendingLogCount:Math.max(0,source.pendingLogCount-(source.systemRecords||[]).filter(r=>r.identityValid&&r.status==='pending'&&seen.has('match:'+r.tournamentCode+':'+r.matchId)).length),pendingEvents:Math.max(source.pendingEvents,pendingEventKeys.size),unresolvedEventCount:unresolvedEventKeys.size,recoveredEvents,excludedLogCount:source.excludedLogCount,
     systemDecisions:source.decisions,systemEventCount:source.eventCount,backfillDecisions,backfillEvents,auxiliaryCount,pendingBackfills,
     knownMaxSize:out.knownMaxSize,maxPrecision:out.knownMaxSize?out.maxPrecision:'unknown'};
+}
+function recognizedLogs(source,entries) {
+  const keys=new Set(entries.filter(e=>e.kind==='decision'&&e.status==='active'&&e.recognitionValid===true)
+    .flatMap(e=>e.sourceKeys||[e.sourceKey]));
+  return (source.systemRecords||[]).map(r=>r.identityValid&&r.status==='pending'&&(
+    keys.has('match:'+r.tournamentCode+':'+r.matchId)||
+    keys.has('historical:legacy_'+hash(JSON.stringify([r.sourceUid,r.tournamentCode,r.matchId]))))?
+    {...r,status:'recognized_manual',reason:null}:r);
 }
 function eligibleLevel(stats) {
   let level=0;
@@ -148,4 +178,4 @@ function eligibleLevel(stats) {
 }
 
 module.exports={CertificateError,fail,RANKS,MILESTONES,THRESHOLDS,LIMITS,PHOTO_LIMIT,PHOTO_BYTES,MAX_COUNT,integer,add,text,uid,entryId,
-  normalizeBackfill,active,superAdmin,canonical,hash,normalizePhoto,emptySource,addEvent,aggregate,eligibleLevel};
+  normalizeBackfill,active,superAdmin,canonical,hash,normalizePhoto,emptySource,addEvent,aggregate,recognizedLogs,eligibleLevel};

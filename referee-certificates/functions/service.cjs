@@ -1,7 +1,7 @@
 'use strict';
 const D=require('./domain.cjs'), S=require('./sources.cjs'), R=require('./recognition.cjs'), I=require('./identities.cjs');
 
-const MUTATIONS=new Set(['saveBackfill','revokeBackfill','restoreBackfill','grant','setChief','photo','disable','restoreQualification','linkAccount']);
+const MUTATIONS=new Set(['saveBackfill','revokeBackfill','restoreBackfill','grant','setChief','photo','disable','restoreQualification','linkAccount','syncProgress']);
 const ROOT='refereeCertificates';
 const SYSTEM='refereeCertificateSystem';
 function profileName(user) {return {realName:String(user.realName||'').slice(0,120),nickname:String(user.nickname||user.gameId||user.displayName||'').slice(0,120)};}
@@ -12,8 +12,13 @@ function normalizedRequest(request) {
   const actorUid=D.uid(request.auth.uid),data=request.data;
   if(!data||typeof data!=='object'||Array.isArray(data)) D.fail('invalid-argument','request-invalid');
   const action=data.action;
-  if(!['get','search',...MUTATIONS].includes(action)) D.fail('invalid-argument','action-invalid');
+  if(!['get','search','list',...MUTATIONS].includes(action)) D.fail('invalid-argument','action-invalid');
   if(action==='search') return {action,actorUid,query:D.text(data.query,'query',80,true)};
+  if(action==='list') {
+    const cursor=data.cursor??'';
+    if(typeof cursor!=='string'||cursor&&!/^R\d{6,}$/.test(cursor))D.fail('invalid-argument','cursor-invalid');
+    return {action,actorUid,cursor};
+  }
   const out={action,actorUid,targetUid:data.targetUid==null?actorUid:D.uid(data.targetUid)};
   if(!MUTATIONS.has(action)) return out;
   if(typeof data.operationId!=='string'||! /^[A-Za-z0-9_-]{8,128}$/.test(data.operationId)) D.fail('invalid-argument','operation-id-invalid');
@@ -65,8 +70,9 @@ function snapshotOf(context) {
   const certificate=profile.number?{number:profile.number,awardedLevel,issuedAt:profile.issuedAt||null,photoDataUrl:profile.photoDataUrl||null,
     isChief:chief.uid===targetUid,revision:revisionOf(profile.revision),status:profile.qualificationStatus||'unverified',approvedBy:profile.approvedBy||null,approvedAt:profile.approvedAt||null,personId:profile.personId||null}:null;
   return {uid:targetUid,person:profileName(user),certificate,photoDataUrl:profile.photoDataUrl||null,revision:revisionOf(profile.revision),stats,eligibleLevel:D.eligibleLevel(stats),
-    identityPersonId:profile.personId||I.requiredPersonId(targetUid),qualificationHistory:history.filter(x=>['grant','disable','restoreQualification','linkAccount'].includes(x.action)).sort((a,b)=>a.revision-b.revision),ranks:D.RANKS,milestoneDefinitions:D.MILESTONES,backfills:entries.map(entry=>({...entry,history:historyFor(entry.id,history)})),
-    systemRecords:source.systemRecords.map(r=>r.reason==='responsibility-unverified'&&entries.some(e=>e.kind==='decision'&&e.status==='active'&&e.recognitionValid&&(e.sourceKeys||[e.sourceKey]).includes('match:'+r.tournamentCode+':'+r.matchId))?{...r,status:'recognized_manual',reason:null}:r),chiefRevision:revisionOf(chief.revision),isChief:chief.uid===targetUid,incomplete,
+    autoPromotionEnabled:true,
+    identityPersonId:profile.personId||I.requiredPersonId(targetUid),qualificationHistory:history.filter(x=>['grant','syncProgress','disable','restoreQualification','linkAccount'].includes(x.action)).sort((a,b)=>a.revision-b.revision),ranks:D.RANKS,milestoneDefinitions:D.MILESTONES,backfills:entries.map(entry=>({...entry,history:historyFor(entry.id,history)})),
+    systemRecords:D.recognizedLogs(source,entries),chiefRevision:revisionOf(chief.revision),isChief:chief.uid===targetUid,incomplete,
     incompleteReasons:[...new Set(incompleteReasons)],historyTruncated:!!historyTruncated};
 }
 async function searchUsers(tx,db,query,limit) {
@@ -101,9 +107,19 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
         if(!D.superAdmin(actor)) D.fail('permission-denied','super-admin-required');
         return searchUsers(tx,db,input.query,limits.searchPerField);
       }
+      if(action==='list') {
+        if(!D.superAdmin(actor))D.fail('permission-denied','super-admin-required');
+        let query=db.collection(ROOT).orderBy('number');
+        if(input.cursor)query=query.where('number','>',input.cursor);
+        const page=await tx.get(query.limit(41)),docs=page.docs.slice(0,40);
+        const users=await Promise.all(docs.map(doc=>tx.get(db.doc('users/'+doc.id))));
+        return {ok:true,items:docs.map((doc,i)=>({uid:doc.id,...profileName(users[i].data()||{}),
+          number:doc.data().number,level:Number(doc.data().awardedLevel)||0,status:doc.data().qualificationStatus||'unverified'})),
+          nextCursor:page.docs.length>40?docs.at(-1).data().number:null};
+      }
       const {targetUid}=input,superActor=D.superAdmin(actor),mutating=MUTATIONS.has(action);
       if(action==='get'&&targetUid!==actorUid&&!superActor) D.fail('permission-denied','self-only');
-      if(mutating&&!(action==='photo'&&targetUid===actorUid)&&!superActor) D.fail('permission-denied','super-admin-required');
+      if(mutating&&!(['photo','syncProgress'].includes(action)&&targetUid===actorUid)&&!superActor) D.fail('permission-denied','super-admin-required');
       const profileRef=db.doc(ROOT+'/'+targetUid),chiefRef=db.doc(SYSTEM+'/chief'),numberRef=db.doc(SYSTEM+'/numbering');
       // One receipt namespace per actor prevents reusing an operation id against a different target/action.
       const operationKey=mutating?D.hash(actorUid+':'+input.operationId):null;
@@ -199,6 +215,17 @@ function createService(db,{clock=Date.now,limits:overrides={}}={}) {
         }
       }
       const stats=D.aggregate(source,context.entries),eligible=D.eligibleLevel(stats);
+      if(action==='syncProgress') {
+        if(!oldProfile.number||!oldProfile.personId||!oldProfile.approvedBy||oldProfile.qualificationStatus!=='active'||!D.active(user))
+          D.fail('failed-precondition','approved-active-certificate-required');
+        if(oldProfile.expiresAt&&oldProfile.expiresAt<=now)D.fail('failed-precondition','certificate-expired');
+        if(incomplete||stats.pendingBackfills)D.fail('failed-precondition','sources-incomplete');
+        const fromLevel=Number(oldProfile.awardedLevel)||0;
+        if(eligible>fromLevel) {
+          Object.assign(context.profile,{awardedLevel:eligible,awardedAt:now,awardedBy:'system:auto-progression'});
+          Object.assign(audit,{fromLevel,toLevel:eligible,automatic:true,basis:'完整已認列經歷符合九階條件',stats});
+        } else Object.assign(audit,{fromLevel,toLevel:fromLevel,automatic:true,unchanged:true});
+      }
       if(action==='grant') {
         if(input.level===1){
           if(oldProfile.number)D.fail('failed-precondition','certificate-already-issued');
