@@ -40,7 +40,7 @@ async function claim({uid,code,operationId}){
   }
   if(!r.exists){
    if(!allowOrphanCleanup||!['super_admin','admin'].includes(profile.role)||profile.isTestAccount===true)fail('not-found','tournament-not-found');
-   if(has(publicData,'bucketMigration'))fail('failed-precondition','deletion-orphan-lease-requires-review');
+   if(has(publicData,'bucketMigration')||has(publicData,'deletionStatus')||publicData.registrationSelection?.status==='deleting')fail('failed-precondition','deletion-orphan-lease-requires-review');
    if(p.exists)tx.delete(pub);tx.delete(activity);
    tx.set(audit,{code,actorUid:uid,actorRole:profile.role,status:'completed',deletedAt:FieldValue.serverTimestamp(),orphanCleanup:true});
    return {orphan:true,result:{ok:true,deleted:true,code,replayed:true}};

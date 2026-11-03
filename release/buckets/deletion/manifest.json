@@ -9,7 +9,7 @@
   "currentRulesSha256": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
   "candidateRulesSha256": "3b225ddc8121ffdce95062c4ea230f24882887e7768cd445f876e4484d212101",
   "candidates": {
-    "tournament-delete.js": "9e9c7597285f4f86a348fff4b0609a5b66802001cd1c07a232b41242bb6cd44e",
+    "tournament-delete.js": "e7d7ca76374aa059900858a52c96e3e9a4f6679ca98b742e4bb66540361532a6",
     "restore-operations.js": "e06723e7366281d707938f8df2b19c576c18b0d5d97b818c0c7e44bb4a5ab224",
     "room-access-service.js": "79cfc71d52290610fd5a7e82a1d2ec569ed618cff9782221d5360233b29b0a62",
     "registration-selection.js": "8d1c76303001f9a2ef7c4c656b61b7fabd9f7eafd3bed9dd8923d070e2e40eec",

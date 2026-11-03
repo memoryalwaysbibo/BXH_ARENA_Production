@@ -47,7 +47,7 @@ Update this alternate endpoint before treating the main deletion rollout as safe
 The prior Cloud Shell preflight helper predates these changes and is insufficient
 to validate or deploy this expanded package. No new deployment helper is supplied.
 
-Validation adds 415 selector cases (ownership presence, original authorization,
+Validation adds 417 selector cases (ownership presence, original authorization,
 onsite policy, cross-endpoint pending/retry, reused room codes, and migration
 injected after freeze/plan/row chunks). `selection-native.cjs` uses the real Admin
 SDK and captured QR transaction proxy on a loopback demo Emulator, with synthetic

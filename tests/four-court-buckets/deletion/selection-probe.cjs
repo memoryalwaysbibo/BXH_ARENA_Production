@@ -62,6 +62,10 @@ if(require.main===module)(async()=>{
  }
  // No selector orphan cleanup, and no adoption of a previously unleased worker.
  {const m=room();m.rows.delete('tournaments/'+code);await assert.rejects(run(m,'delete'),/tournament-not-found/);assert.equal(m.writes.length,0);checks++;}
+ for(const fragment of [{deletionStatus:null},{registrationSelection:{status:'deleting'}}]){
+  const m=room();m.rows.delete('tournaments/'+code);m.put('publicTournaments/'+code,{...m.rows.get('publicTournaments/'+code).data,...fragment});
+  await assert.rejects(load(m).deleteTournamentSafely({auth:{uid},data:{code,operationId}}),/orphan-lease-requires-review/);assert.equal(m.writes.length,0);checks++;
+ }
  for(const side of ['tournaments','publicTournaments']){const m=room(),p=side+'/'+code;m.put('tournaments/'+code,{...m.rows.get('tournaments/'+code).data,data:'{invalid'});m.put(p,{...m.rows.get(p).data,registrationSelection:{status:'deleting'}});
   await assert.rejects(run(m,'delete'),/legacy-worker-requires-review/);assert.equal(m.writes.length,0);checks++;
  }
