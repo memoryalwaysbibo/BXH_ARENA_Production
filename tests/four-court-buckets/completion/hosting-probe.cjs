@@ -5,7 +5,7 @@ const FieldValue={serverTimestamp:()=>NOW,increment:n=>({__increment:n})},option
 function load(f,i,candidate){const file=path.join(candidate?release:__dirname,candidate?'hosting/'+i+'/hosting.js':'fixtures/'+i+'/hosting.js'),exports={};vm.runInNewContext(fs.readFileSync(file,'utf8'),{exports,process:{env:{GCLOUD_PROJECT:'bxh-arena'}},console,require:name=>{
  if(name==='firebase-functions/v2/firestore')return {onDocumentWritten:(_,fn)=>fn};if(name==='firebase-functions/v2/https')return {onCall:(_,fn)=>fn,HttpsError:Error};if(name==='firebase-functions/v2/scheduler')return {onSchedule:(_,fn)=>fn};
  if(name==='./_qr_checkin/admin-firestore.cjs')return {getFirestore:()=>f.m.db,FieldValue,FieldPath:{documentId:()=> '__name__'}};
- if(name==='./hosting-core')return {completion,stateOf};if(name==='../../hosting-guard.cjs')return H;throw Error(name);
+ if(name==='./hosting-core')return {completion,stateOf};if(name==='./bucket-completion/hosting-guard.cjs')return H;throw Error(name);
  }},{filename:file});return exports;}
 (async()=>{let checks=0;
  for(const i of [15,16]){

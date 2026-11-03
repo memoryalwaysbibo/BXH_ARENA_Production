@@ -5,7 +5,7 @@ const {onSchedule}=require('firebase-functions/v2/scheduler');
 const {getFirestore,FieldValue,FieldPath}=require("./_qr_checkin/admin-firestore.cjs");
 const {stateOf,completion}=require('./hosting-core');
 const db=getFirestore();
-const Bucket=require('../../hosting-guard.cjs');
+const Bucket=require('./bucket-completion/hosting-guard.cjs');
 async function keepAndCount(code,expectedBirth=null){
  return db.runTransaction(async tx=>{
   const ref=db.doc(`tournaments/${code}`),snap=await tx.get(ref);if(!snap.exists)return null;

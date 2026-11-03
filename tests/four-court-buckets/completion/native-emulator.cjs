@@ -1,10 +1,22 @@
 'use strict';
-const assert=require('node:assert/strict'),path=require('node:path');
+const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),os=require('node:os');
 const project='demo-bxh-four-court-buckets';assert.equal(process.env.GCLOUD_PROJECT,project);assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8188');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {fixture,NOW,code}=require('./fixture.cjs'),{request}=require('./probe.cjs'),release=path.resolve(__dirname,'../../../release/buckets/completion'),A=require(path.join(release,'certificate.cjs')),H=require(path.join(release,'hosting-guard.cjs')),{createGeneralCompletion}=require(path.join(release,'general-completion.cjs')),{completion,stateOf}=require('./fixtures/hosting-core.js');
 const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
 const names=['users','tournaments','publicTournaments','systemConfig','ladderPlayers','ladderTransactions','ladderSystem','hostCompletionLedger','hostStats','hostAwardQueue'];
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-hosting-native-'));
+function hosting(i){
+ const dir=path.join(temp,String(i));fs.mkdirSync(path.join(dir,'_qr_checkin'),{recursive:true});
+ fs.copyFileSync(path.join(release,'hosting',String(i),'hosting.js'),path.join(dir,'hosting.js'));
+ fs.copyFileSync(path.join(release,'hosting',String(i),'hosting-core.js'),path.join(dir,'hosting-core.js'));
+ fs.mkdirSync(path.join(dir,'bucket-completion'),{recursive:true});
+ for(const name of ['certificate.cjs','hosting-guard.cjs'])fs.copyFileSync(path.join(release,name),path.join(dir,'bucket-completion',name));
+ fs.cpSync(path.join(release,'protocol'),path.join(dir,'bucket-completion/protocol'),{recursive:true});
+ globalThis.__bxhHostingNativeDb=db;
+ fs.writeFileSync(path.join(dir,'_qr_checkin/admin-firestore.cjs'),"module.exports={...require('firebase-admin/firestore'),getFirestore:()=>globalThis.__bxhHostingNativeDb};");
+ return require(path.join(dir,'hosting.js'));
+}
 const handle=createGeneralCompletion(db,{runtime:'emulator',clock:()=>NOW});
 async function seed(f){for(const name of names)await db.recursiveDelete(db.collection(name));const b=db.batch();for(const [p,v]of f.m.rows)b.set(db.doc(p),v);await b.commit();}
 async function count(){return db.runTransaction(async tx=>{const root=await tx.get(db.doc('tournaments/'+code)),pub=await tx.get(db.doc('publicTournaments/'+code)),profile=await tx.get(db.doc('users/admin')),ledger=db.doc('hostCompletionLedger/'+code),prior=await tx.get(ledger);return H.countCertified({db,tx,root,pub,profile,prior,ledger,stats:db.doc('hostStats/admin'),FieldValue,completion});});}
@@ -19,6 +31,11 @@ async function all(){const out=[];async function walk(col){for(const ref of awai
   const after=await db.getAll(...refs);assert(before.every((s,i)=>s.updateTime.isEqual(after[i].updateTime)));const snap=await all();assert((await handle(request(f))).alreadyCompleted);assert.deepEqual(await all(),snap);checks++;
   await Promise.all([count(),count(),rebuild()]);assert.equal((await db.doc('hostStats/admin').get()).data().completedHostedCount,1);assert((await db.doc('hostAwardQueue/admin').get()).exists);assert.equal((await db.collection('hostCompletionLedger').get()).size,1);checks++;
   await db.doc('hostStats/admin').update({completedHostedCount:999});assert.equal(await rebuild(),1);checks++;
+ }
+ for(const i of [15,16])for(const qr of [false,true]){
+  const f=fixture({qr});await seed(f);await handle(request(f));const fn=hosting(i).preserveCompletedRoomAndCountHost;
+  assert.equal(typeof fn.run,'function');const event={params:{code},data:{after:await db.doc('tournaments/'+code).get()}};
+  await fn.run(event);await fn.run(event);assert.equal((await db.doc('hostStats/admin').get()).data().completedHostedCount,1);checks++;
  }
  for(const side of ['tournaments','publicTournaments'])for(const marker of ['bucketMigration','deletionStatus'])for(const value of [null,false,{}]){const f=fixture();await seed(f);await db.doc(side+'/'+code).update({[marker]:value});const before=await all();await assert.rejects(()=>handle(request(f)));assert.deepEqual(await all(),before);checks++;}
  const changes={
@@ -45,5 +62,5 @@ async function all(){const out=[];async function walk(col){for(const ref of awai
  // New root physical generation cannot inherit the old root's children/certificate.
  {const f=fixture();await seed(f);await handle(request(f));const top=(await db.doc('tournaments/'+code).get()).data();await db.doc('tournaments/'+code).delete();await db.doc('tournaments/'+code).set(top);const before=await all();await assert.rejects(()=>handle(request(f)));assert.deepEqual(await all(),before);checks++;}
  console.log(JSON.stringify({nativeCompletionChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Firestore SDK transactions, synthetic auth and clock; no browser/Eventarc'}));
- }finally{await deleteApp(app);}
+ }finally{await deleteApp(app);fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
