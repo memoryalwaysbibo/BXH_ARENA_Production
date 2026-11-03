@@ -70,6 +70,23 @@ async function hook(f,change,{afterCommit=false}={}){
  {const f=await seed(),event=await ev();const s=structuredClone(f.state);s.matches[0].forfeit=true;await db.doc('tournaments/'+code).update({data:JSON.stringify(s)});await invoke(f,event);assert.equal(await count(),0);checks++;}
  // Parent recreate in one transaction must not inherit an old event identity.
  {const f=await seed(),event=await ev();await db.doc('tournaments/'+code).delete();await db.doc('tournaments/'+code).set(f.top);await invoke(f,event);assert.equal(await count(),0);checks++;}
+
+ let scheduledChecks=0;
+ const scheduled=f=>load(f,true,{db,project:'bxh-arena'}).activityCompletedTournamentBackfill();
+ for(const bucket of [false,true]){
+  const f=await seed({bucket});await scheduled(f);assert.equal(await count(),3);await scheduled(f);assert.equal(await count(),3);scheduledChecks+=2;
+  const g=await seed({bucket}),run=db.runTransaction.bind(db);let first=true;
+  db.runTransaction=async(...args)=>{if(first){first=false;const root=db.doc('tournaments/'+code);await root.delete();await root.set(g.top);}return run(...args);};
+  try{await scheduled(g);}finally{db.runTransaction=run;}
+  assert.equal(await count(),0);scheduledChecks++;
+  const h=await seed({bucket});let calls=0;db.runTransaction=async(...args)=>{if(++calls===2)await db.doc('users/a').update({active:false});return run(...args);};
+  try{await scheduled(h);}finally{db.runTransaction=run;}
+  assert.equal(await balance(),0);scheduledChecks++;
+  const i=await seed({bucket});calls=0;db.runTransaction=async(...args)=>{const r=await run(...args);if(++calls===2)throw Error('synthetic-scheduled-response-lost');return r;};
+  try{await scheduled(i);}finally{db.runTransaction=run;}
+  assert.equal(await count(),1);await scheduled(i);assert.equal(await count(),3);assert.equal(await balance(),10);scheduledChecks++;
+ }
+ console.log(JSON.stringify({nativeBackfillChecks:scheduledChecks,productionWrites:0,scope:'real Firestore SDK scheduled scan, current-room authority and retry; synthetic project/account/event boundaries'}));
  console.log(JSON.stringify({nativeActivityChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Firestore SDK transactions; synthetic events/accounts and injected business clock; no live Auth/Eventarc or production endpoint'}));
  await db.terminate();
 })().catch(e=>{console.error(e);process.exitCode=1;});

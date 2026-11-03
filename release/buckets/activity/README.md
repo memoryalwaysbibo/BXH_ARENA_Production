@@ -1,4 +1,4 @@
-# Completed-tournament activity awards — candidate, rollout closed
+# Completed-tournament activity awards and scheduled backfill — candidate, rollout closed
 
 The captured `activityTournamentCompleted` consumes a delivered tournament
 snapshot and awards wallets without reading the current tournament in its award
@@ -9,9 +9,12 @@ reproductions, not evidence that those incidents occurred in production.
 
 This overlay changes only tournament-derived calls to the existing grant helper.
 It keeps the legacy ruleset cutoff, amounts, daily caps, participant/guardian
-mapping, host awards and permanent ledger IDs. Daily check-in, online-time,
-inactivity and other exported handlers retain their original bodies. Their
-separate live sources are not authorized deployment targets of this package.
+mapping, host awards and permanent ledger IDs. Daily check-in, online-time, inactivity and other exported handlers retain
+their original bodies. The independent scheduled backfill archive was then
+captured at 2026-11-03 09:03:40 UTC: all 133 selected files passed size/hash checks,
+and its raw archive SHA and activity/dependency bytes exactly match this baseline.
+The backfill now passes each query snapshot to the same guarded processing path.
+Other siblings remain outside the deployment scope.
 
 ## Transaction boundary
 
@@ -49,9 +52,12 @@ settlement contract, not a claim that either PR is deployed.
 - 59 local checks cover baseline equivalence for old/new rulesets, the baseline
   bugs, marker presence, SDK generation changes, account races, general/ranked
   bucket certificates, canonical score loading, idempotence and concurrency.
-- 12 bridge checks run the actual pinned PR713/PR715 settlement handlers for
-  4/6/12 courts with/without QR, then feed their generated certificates to the
-  activity handler. These use synthetic Firestore/auth boundaries.
+- 27 scheduled-flow checks cover legacy/bucket awards, stale scans, deletion,
+  code reuse, account revocation, concurrent scans, source-read failure and lost
+  commit-response recovery.
+- 24 bridge checks run the actual pinned PR713/PR715 settlement handlers for
+  4/6/12 courts with/without QR, then feed their generated certificates to both the event and scheduled
+  activity handlers. These use synthetic Firestore/auth boundaries.
 - 51 native Firestore SDK checks passed at code commit
   `e2eaef3e361d8c9715a430b7b86968c053973919`, workflow run
   [41606427056](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/actions/runs/41606427056).
@@ -72,13 +78,14 @@ settlement contract, not a claim that either PR is deployed.
 
 ## Release boundary
 
-Draft source-only overlay. Future target is **activityTournamentCompleted only**,
+Draft source-only overlay. Future targets are **activityTournamentCompleted** and
+**activityCompletedTournamentBackfill** only,
 using its freshly recaptured archive/configuration, replacing `activity-points.js`
 and adding `activity-tournament-guard.cjs`, `certificate.cjs` and
 `protocol/state.cjs` at the indicated relative paths. This review directory is
 not a deployable archive: do not deploy old siblings from the captured package.
-In particular, the independent scheduled activity backfill has not had its own
-exact live archive verified or deployed by this work.
+Both named source captures are independently verified, but neither candidate
+function has been deployed by this work.
 
 No merge, upload, deployment, runtime flag, room activation or production data
 write is performed. Broader writer classification, derived consumers, complete
@@ -91,7 +98,15 @@ deployed `activityCompletedTournamentBackfill` archive from its pinned regional
 inventory pointer. It reuses the already verified maintenance helper, requires
 project `bxh-arena` and closed rollout gates, filters secrets and dependencies
 from the exported code bundle, checks source metadata before and after capture,
-and exports no room documents. Three offline tests exercise successful filtered
+and exports no room documents. The uploaded capture completed this source gap;
+the helper remains available for repeat drift verification. Three offline tests exercise successful filtered
 capture, metadata drift rejection and path traversal rejection. This is a
 read-only evidence request; it does not deploy the activity patch. If metadata
 has changed, stop and reconcile the new pointer instead of relaxing verification.
+
+The scheduled wrapper keeps the captured hourly schedule, `limit(500)` selection
+and per-room error logging/continuation. It may require a later scheduled run to
+resume an interrupted room; this does not solve historical pagination/starvation
+or promise that every archived room is processed in a single run. SDK query
+snapshot birth is now bound before awarding, so same-code replacement after
+selection cannot inherit that scan.

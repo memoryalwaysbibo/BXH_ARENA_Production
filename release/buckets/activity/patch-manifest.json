@@ -1,6 +1,5 @@
 {
   "status": "candidate-not-deployed",
-  "deploymentTarget": "activityTournamentCompleted",
   "runtimeEnabled": false,
   "productionWrites": 0,
   "captureObservedAt": "20261103T014221Z",
@@ -69,6 +68,10 @@
     {
       "before": "try{await processCompletedTournament(event.params.code,t);}catch(e){console.error(\"activity-tournament-award-failed\",event.params.code,e);}",
       "after": "try{await processCompletedTournament(event.params.code,t,after);}catch(e){console.error(\"activity-tournament-award-failed\",event.params.code,e);throw e;}"
+    },
+    {
+      "before": "try{await processCompletedTournament(doc.id,doc.data());}",
+      "after": "try{await processCompletedTournament(doc.id,doc.data(),doc);}"
     }
   ],
   "certificateSource": {
@@ -76,7 +79,7 @@
     "path": "release/buckets/completion/certificate.cjs"
   },
   "baselineSha256": "74bab36a2482b11a71bc0c086e00e90187138359b9e2d84fd950f895157a65e3",
-  "candidateSha256": "447f2a2ee0ca67c31672b62188fbc790d2644054100eec5ffec267dd891934e9",
+  "candidateSha256": "c757d85c174d48ad3a195bb479d2d97f78c5570ef62199d4275a75b4d9ff9891",
   "helperFiles": {
     "activity-tournament-guard.cjs": "d6858c60df50fb9782def4b685de83535f38297d11efe81f41f65c0519c2586e",
     "certificate.cjs": "8303d0ebe31752c7edb21bfecec08d1a9d3870bb509bab0dbfff7cd6a2bd5152",
@@ -103,5 +106,33 @@
       "sha256": "f7b2ea90058bf4c817afdb8690d7e0d26c07f35359a059df0f80d910f360d6c2",
       "size": 860
     }
-  ]
+  ],
+  "deploymentTargets": [
+    "activityTournamentCompleted",
+    "activityCompletedTournamentBackfill"
+  ],
+  "backfillCapture": {
+    "observedAt": "20261103T090340Z",
+    "metadata": {
+      "name": "activityCompletedTournamentBackfill",
+      "entryPoint": "activityCompletedTournamentBackfill",
+      "runtime": "nodejs22",
+      "updateTime": "2026-09-27T18:37:00.508530064Z",
+      "storageSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "activityCompletedTournamentBackfill/function-source.zip",
+        "generation": "1790534209770356"
+      },
+      "codebase": null,
+      "eventTrigger": {
+        "eventType": null,
+        "eventFilters": []
+      },
+      "sourceSet": 0,
+      "classification": "pending-source-review"
+    },
+    "archiveSha256": "6d694db6b355627c2fc1ee622e27884a83be11df0e2d4525699cd34c16fe4a48",
+    "verifiedSelectedFiles": 133,
+    "baselineClosureMatched": true
+  }
 }

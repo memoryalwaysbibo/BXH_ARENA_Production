@@ -25,10 +25,10 @@ function certify(f,{ranked=false}={}){
  m.put('tournaments/'+code,top);m.put('publicTournaments/'+code,pub);
 }
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:[NOW]));}static now(){return NOW;}}
-function load(f,candidate=true,{db=f.m.db,logs=[],guard=undefined}={}){
+function load(f,candidate=true,{db=f.m.db,logs=[],guard=undefined,project='demo-bxh-bucket-activity'}={}){
  const mod={exports:{}};const plain=(_,fn)=>fn;
  const context={
-  module:mod,exports:mod.exports,console:{error:(...a)=>logs.push(a.map(String).join(' '))},Date:FixedDate,process:{env:{GCLOUD_PROJECT:'demo-bxh-bucket-activity'}},require:n=>{
+  module:mod,exports:mod.exports,console:{error:(...a)=>logs.push(a.map(String).join(' '))},Date:FixedDate,process:{env:{GCLOUD_PROJECT:project}},require:n=>{
    if(n==='firebase-functions/v2/https')return {onCall:plain,HttpsError:Error};
    if(n==='firebase-functions/v2/scheduler')return {onSchedule:plain};
    if(n==='firebase-functions/v2/firestore')return {onDocumentWritten:plain};

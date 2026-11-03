@@ -24,7 +24,9 @@ jobs:
       - name: Read-only backfill capture helper offline checks
         run: python3 -B tests/four-court-buckets/activity/capture-backfill.py
       - name: Captured baseline, stale delivery and bucket activity regressions
-        run: node tests/four-court-buckets/activity/probe.cjs
+        run: |
+          node tests/four-court-buckets/activity/probe.cjs
+          node tests/four-court-buckets/activity/backfill-probe.cjs
       - uses: actions/checkout@v4
         with:
           ref: c461dd031d65648524089ab6366e697ad0f296b0

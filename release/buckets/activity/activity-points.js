@@ -230,7 +230,7 @@ exports.activityCompletedTournamentBackfill=onSchedule(
   if(process.env.GCLOUD_PROJECT!=="bxh-arena")return;
   const snap=await db.collection("tournaments").where("archiveStatus","==","completed").limit(500).get();
   for(const doc of snap.docs){
-   try{await processCompletedTournament(doc.id,doc.data());}
+   try{await processCompletedTournament(doc.id,doc.data(),doc);}
    catch(e){console.error("activity-backfill-failed",doc.id,e);}
   }
  }
