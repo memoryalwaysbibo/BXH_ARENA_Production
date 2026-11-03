@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),os=require('node:os');
 const project='demo-bxh-four-court-buckets';assert.equal(process.env.GCLOUD_PROJECT,project);assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8188');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore,FieldValue}=require('firebase-admin/firestore');
-const {fixture,NOW,code}=require('./fixture.cjs'),{request}=require('./probe.cjs'),release=path.resolve(__dirname,'../../../release/buckets/completion'),A=require(path.join(release,'certificate.cjs')),H=require(path.join(release,'hosting-guard.cjs')),{createGeneralCompletion}=require(path.join(release,'general-completion.cjs')),{completion,stateOf}=require('./fixtures/hosting-core.js');
+const {fixture,largeFixture,NOW,code}=require('./fixture.cjs'),{request}=require('./probe.cjs'),release=path.resolve(__dirname,'../../../release/buckets/completion'),A=require(path.join(release,'certificate.cjs')),H=require(path.join(release,'hosting-guard.cjs')),{createGeneralCompletion}=require(path.join(release,'general-completion.cjs')),{completion,stateOf}=require('./fixtures/hosting-core.js');
 const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
 const names=['users','tournaments','publicTournaments','systemConfig','ladderPlayers','ladderTransactions','ladderSystem','hostCompletionLedger','hostStats','hostAwardQueue'];
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-hosting-native-'));
@@ -32,6 +32,7 @@ async function all(){const out=[];async function walk(col){for(const ref of awai
   await Promise.all([count(),count(),rebuild()]);assert.equal((await db.doc('hostStats/admin').get()).data().completedHostedCount,1);assert((await db.doc('hostAwardQueue/admin').get()).exists);assert.equal((await db.collection('hostCompletionLedger').get()).size,1);checks++;
   await db.doc('hostStats/admin').update({completedHostedCount:999});assert.equal(await rebuild(),1);checks++;
  }
+ {const f=largeFixture(160);await seed(f);assert((await handle(request(f))).ok);assert.equal(JSON.parse((await db.doc('tournaments/'+code).get()).data().data).players.length,160);assert.equal((await db.collection('ladderTransactions').get()).size,0);await Promise.all([count(),rebuild()]);assert.equal((await db.doc('hostStats/admin').get()).data().completedHostedCount,1);checks++;}
  for(const i of [15,16])for(const qr of [false,true]){
   const f=fixture({qr});await seed(f);await handle(request(f));const fn=hosting(i).preserveCompletedRoomAndCountHost;
   assert.equal(typeof fn.run,'function');const event={params:{code},data:{after:await db.doc('tournaments/'+code).get()}};

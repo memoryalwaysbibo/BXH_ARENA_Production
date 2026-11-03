@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),path=require('node:path');
-const {fixture,NOW,code}=require('./fixture.cjs'),release=path.resolve(__dirname,'../../../release/buckets/completion');
+const {fixture,largeFixture,NOW,code}=require('./fixture.cjs'),release=path.resolve(__dirname,'../../../release/buckets/completion');
 const {createGeneralCompletion}=require(path.join(release,'general-completion.cjs')),A=require(path.join(release,'certificate.cjs')),H=require(path.join(release,'hosting-guard.cjs'));
 const {completion}=require(path.join(__dirname,'fixtures/hosting-core.js'));
 const request=f=>({auth:{uid:'admin'},data:{code,roomId:f.state.id,epoch:f.manifest.epoch}});
@@ -14,6 +14,7 @@ if(require.main===module)(async()=>{let checks=0;
   const before=dump(f);assert((await invoke(f)).alreadyCompleted);assert.equal(dump(f),before);checks++;
   assert.equal(await count(f),'admin');assert.equal(f.m.rows.get('hostStats/admin').completedHostedCount,1);assert(f.m.rows.has('hostAwardQueue/admin'));await count(f);assert.equal(f.m.rows.get('hostStats/admin').completedHostedCount,1);checks++;
  }
+ {const f=largeFixture(160);const r=await invoke(f);assert(r.ok);assert.equal(JSON.parse(f.m.rows.get('tournaments/'+code).data).players.length,160);assert.equal(f.m.writes.filter(w=>/ladderPlayers|ladderTransactions/.test(w.path)).length,0);checks++;}
  const failures={
   missing:f=>f.m.remove('tournaments/'+code+'/matchBuckets/court-2'),
   epoch:f=>f.m.put('tournaments/'+code+'/matchBuckets/court-1',{...f.buckets[0],epoch:'other'}),
