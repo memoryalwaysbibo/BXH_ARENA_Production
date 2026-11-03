@@ -1005,6 +1005,7 @@
     async manageEntrySelection(payload){return callEngagementFunction("manageEntrySelection",payload,60000);},
     async deleteTournamentSafely(payload){return callEngagementFunction("deleteTournamentSafely",payload,540000);},
     async settleLadder(payload){return callEngagementFunction("settleLadderTournament",payload,120000);},
+    async completeBucket(payload){return callEngagementFunction("completeBucketTournament",payload,120000);},
     async deleteTitleDefinition(payload){return callEngagementFunction("deleteTitleDefinition",payload);},
     async previewPioneerAwards(){return callEngagementFunction("previewPioneerAwards",{},120000);},
     async executePioneerAwards(payload){return callEngagementFunction("executePioneerAwards",payload,120000);},
@@ -2024,7 +2025,7 @@
     async settleBucketTournament(expected){
       const service=window.BXHFourCourtSettlement;
       if(!cloudEnabled||!service||!fx?.runTransaction||!window.crypto?.subtle)return {ok:false,reason:"bucket-client-disabled"};
-      const binding={code:String(expected.cloudCode||"").toUpperCase(),id:expected.id,epoch:expected.scoreStorage?.epoch};
+      const binding={code:String(expected.cloudCode||"").toUpperCase(),id:expected.id,epoch:expected.scoreStorage?.epoch,mode:expected.meta?.ladderMode};
       if(!binding.code||!binding.id||!binding.epoch)return {ok:false,reason:"bucket-room-changed"};
       return service.settle({expected:binding,getUid:()=>authHandle?.currentUser?.uid,
         read:()=>fx.runTransaction(dbHandle,async tx=>{
@@ -2035,7 +2036,7 @@
           const snaps=await Promise.all(Array.from({length:m.bucketCount},(_,i)=>tx.get(fx.doc(dbHandle,"tournaments",binding.code,"matchBuckets","court-"+(i+1)))));
           return {top,pub,buckets:snaps.map(s=>s.exists()?s.data():null)};
         }),
-        call:code=>window.engagementService.settleLadder({code}),
+        call:({code,roomId,epoch,mode})=>mode==='general'?window.engagementService.completeBucket({code,roomId,epoch}):window.engagementService.settleLadder({code,expectedRoom:{roomId,epoch}}),
         hash:async text=>Array.from(new Uint8Array(await window.crypto.subtle.digest("SHA-256",new TextEncoder().encode(text))),b=>b.toString(16).padStart(2,"0")).join("")
       });
     },
