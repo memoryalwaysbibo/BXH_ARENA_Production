@@ -17,6 +17,7 @@ function checkSeason(control,now){
 function identity(s){const t=s.createTime;if(!s.exists||!Number.isSafeInteger(t?.seconds)||!Number.isSafeInteger(t?.nanoseconds))fail('bucket-room-identity-missing');return t.seconds+':'+t.nanoseconds;}
 function validateResults(state){
  if(!Array.isArray(state.players)||!Array.isArray(state.matches)||!state.matches.length)fail('bucket-invalid-results');
+ if(state.players.some(p=>!p||typeof p!=='object'||Array.isArray(p)))fail('bucket-invalid-results');
  const reserved=['__proto__','constructor','prototype'];
  const players=new Set(state.players.map(p=>p.id));if(state.players.some(p=>typeof p.id!=='string'||!p.id||reserved.includes(p.id))||players.size!==state.players.length||players.size<2)fail('bucket-invalid-results');
  const linked=state.players.map(playerUid).filter(Boolean);if(new Set(linked).size!==linked.length)fail('bucket-duplicate-account');
@@ -24,7 +25,7 @@ function validateResults(state){
  const matches=new Set();
  for(const m of state.matches){
   if(!m||typeof m.id!=='string'||!m.id||matches.has(m.id))fail('bucket-invalid-results');matches.add(m.id);
-  if(!['SE','BZ'].includes(m.bracket)||!Number.isSafeInteger(Number(m.round))||Number(m.round)<0)fail('bucket-invalid-results');
+  if(!['SE','BZ'].includes(m.bracket)||!Number.isSafeInteger(m.round)||m.round<0)fail('bucket-invalid-results');
   if(m.isBye){const sides=[m.a?.playerId,m.b?.playerId].filter(Boolean);if(sides.length>1||sides.some(id=>!players.has(id))||m.winnerId!==(sides[0]||null)||m.loserId)fail('bucket-invalid-results');continue;}
   const a=m.a?.playerId,b=m.b?.playerId;
   if(!players.has(a)||!players.has(b)||a===b)fail('bucket-invalid-results');
@@ -56,6 +57,8 @@ async function load({tx,db,root,pub,observed={},runtime='production',env=process
  if(top.systemClosed||top.eventCancelled||top.testMode||top.createdByRole==='partner_organizer')fail('bucket-room-read-only');
  if((top.qrCheckinManaged===true)!==(publicData.qrCheckinManaged===true)||top.qrCheckinManaged===true&&(!Number.isSafeInteger(top.qrCheckinRevision)||top.qrCheckinRevision<1||publicData.qrCheckinRevision!==top.qrCheckinRevision))fail('bucket-qr-mirror-stale');
  let base;try{base=JSON.parse(top.data);}catch{fail('bucket-corrupt');}
+ if(!base||typeof base!=='object'||Array.isArray(base)||!base.meta||typeof base.meta!=='object'||!Array.isArray(base.players)||!Array.isArray(base.matches))fail('bucket-corrupt');
+ if(base.testMode||base.systemClosed||base.meta?.eventCancelled||top.tournamentPhase==='cancelled'||base.systemClosure&&!base.systemClosure.restoredAt||!Number.isSafeInteger(base.startedAt)||base.startedAt<=0)fail('bucket-room-read-only');
  if(top.eventAuthority!=='official'||base.meta?.eventAuthority!=='official'||base.meta?.formatType!=='single'||!['standard',undefined].includes(base.meta?.scoringMode)||!['standard',undefined].includes(base.meta?.playMode)||!['individual',undefined].includes(base.meta?.battleMode)||top.refereeSeatsV1?.version!==1)fail('bucket-unsupported-room');
  if(top.ladderMode!=='ranked'||base.meta.ladderMode!=='ranked')fail('bucket-not-ranked');
  let m,gate;try{m=B.context(top,base);gate=createBucketRuntime(db,{runtime,env});}catch(e){fail(e.message);}
@@ -77,7 +80,7 @@ async function load({tx,db,root,pub,observed={},runtime='production',env=process
  validateResults(state);
  const fingerprint=digest(state),receipt=top.bucketSettlement;
  if(has(top,'bucketSettlement')||top.ladderPointsAwarded===true||state.ladderPointsAwarded===true){
-  if(receipt?.version!==1||receipt.status!=='completed'||receipt.sourceCreatedAt!==sourceCreatedAt||receipt.epoch!==m.epoch||digest(receipt.versions)!==digest(versions)||receipt.stateDigest!==fingerprint||top.ladderPointsAwarded!==true||state.ladderPointsAwarded!==true||top.archiveStatus!=='completed'||state.archiveStatus!=='completed'||top.ladderSeasonId!==state.ladderSeasonId||!Array.isArray(top.ladderResults)||top.ladderResults.length<2||digest(top.ladderResults)!==digest(state.ladderResults)||!Array.isArray(top.ladderSkippedPlayers)||digest(top.ladderSkippedPlayers)!==digest(state.ladderSkippedPlayers))fail('bucket-settlement-requires-review');
+  if(receipt?.version!==1||receipt.status!=='completed'||receipt.sourceCreatedAt!==sourceCreatedAt||receipt.epoch!==m.epoch||digest(receipt.versions)!==digest(versions)||receipt.stateDigest!==fingerprint||!Number.isSafeInteger(receipt.completedAt)||receipt.completedAt<=0||receipt.completedAt!==state.settlementCompletedAt||top.ladderPointsAwarded!==true||state.ladderPointsAwarded!==true||top.archiveStatus!=='completed'||state.archiveStatus!=='completed'||top.ladderSeasonId!==state.ladderSeasonId||!Array.isArray(top.ladderResults)||top.ladderResults.length<2||digest(top.ladderResults)!==digest(state.ladderResults)||!Array.isArray(top.ladderSkippedPlayers)||digest(top.ladderSkippedPlayers)!==digest(state.ladderSkippedPlayers))fail('bucket-settlement-requires-review');
  }
  return {bucket:true,top,state,m,versions,sourceCreatedAt,fingerprint,previous:publicData.bracketView,publicDocument:publicData,alreadyAwarded:!!receipt};
 }
@@ -97,4 +100,5 @@ function finalPatches(input,state,{now,seasonId,results,skipped,actorUid}){
  if([{...input.top,...privatePatch,ladderResults:results,ladderSkippedPlayers:skipped},{...input.publicDocument,...publicPatch}].some(x=>Buffer.byteLength(JSON.stringify(x))>750000))fail('bucket-settlement-size-budget');
  return {privatePatch,publicPatch};
 }
-module.exports={ownership,load,finalPatches,identity,digest,validateResults,fail,playerUid,validProfile,checkSeason};
+const publicReceipt=(input,completedAt=input.top.bucketSettlement?.completedAt)=>({archived:true,bucketSettlement:{version:1,status:'completed',epoch:input.m.epoch,versions:input.versions,completedAt}});
+module.exports={ownership,load,finalPatches,identity,digest,validateResults,fail,playerUid,validProfile,checkSeason,publicReceipt};

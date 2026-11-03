@@ -48,6 +48,10 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
     sizeBudget:async()=>db.doc('tournaments/'+code).update({largeMetadata:'x'.repeat(760000)}),
     badPublicView:async()=>db.doc('publicTournaments/'+code).update({bracketView:'{invalid'}),
     replacedParent:async()=>{const ref=db.doc('tournaments/'+code),d=(await ref.get()).data();await ref.delete();await ref.set(d);},
+    stateCancelled:async()=>{const ref=db.doc('tournaments/'+code),d=(await ref.get()).data(),s=JSON.parse(d.data);s.meta.eventCancelled=true;await ref.update({data:JSON.stringify(s)});},
+    stateTest:async()=>{const ref=db.doc('tournaments/'+code),d=(await ref.get()).data(),s=JSON.parse(d.data);s.testMode=true;await ref.update({data:JSON.stringify(s)});},
+    stateClosed:async()=>{const ref=db.doc('tournaments/'+code),d=(await ref.get()).data(),s=JSON.parse(d.data);s.systemClosed=true;await ref.update({data:JSON.stringify(s)});},
+    notStarted:async()=>{const ref=db.doc('tournaments/'+code),d=(await ref.get()).data(),s=JSON.parse(d.data);delete s.startedAt;await ref.update({data:JSON.stringify(s)});},
    };
    for(const [name,mutate]of Object.entries(failures)){await seed(fixture());await mutate();const before=await state(),r=await handler(spec,true)();assert.equal(r.ok,false,spec.function+' '+name);assert.deepEqual(await state(),before,spec.function+' '+name+' partial writes');checks++;}
    // The production constructor never inherits the Emulator bypass.
@@ -55,7 +59,7 @@ async function state(){const out=[];async function walk(col){for(const ref of aw
    // Preserve career totals for S0 and explicitly non-career seasons.
    for(const currentSeason of ['S0','S1']){const f=fixture();f.m.put('ladderSystem/current',{status:'active',currentSeason,countsTowardCareer:false,isTrialSeason:currentSeason==='S0'});for(let i=1;i<=4;i++)f.m.put('ladderPlayers/u'+i,{...f.m.rows.get('ladderPlayers/u'+i),currentSeason});await seed(f);const r=await handler(spec,true)();assert(r.ok,r.reason);assert.equal((await db.doc('ladderPlayers/u1').get()).data().careerPoints,10);checks++;}
    // Six-court / 160-player transaction: real points + ledger + archive writes.
-   {const f=largeFixture(160);await seed(f);const r=await handler(spec,true)();assert(r.ok,r.reason);assert.equal((await db.collection('ladderTransactions').get()).size,160);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,201);assert.equal((await db.doc('tournaments/'+code).get()).data().archiveStatus,'completed');checks++;}
+   {const f=largeFixture(160);await seed(f);const r=await handler(spec,true)();assert(r.ok,r.reason);assert.equal((await db.collection('ladderTransactions').get()).size,160);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,246);assert.equal((await db.doc('tournaments/'+code).get()).data().archiveStatus,'completed');checks++;}
    {const f=largeFixture(256);await seed(f);const r=await handler(spec,true)();assert.equal(r.ok,false);assert.equal(r.reason,'eligible-player-limit');assert.equal((await db.collection('ladderTransactions').get()).size,0);assert.equal((await db.doc('ladderPlayers/u0').get()).data().seasonPoints,0);checks++;}
   }
   // Both services read the same buckets and contend on the same ledger/root.

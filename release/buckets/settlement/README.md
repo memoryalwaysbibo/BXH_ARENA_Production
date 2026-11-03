@@ -30,6 +30,10 @@ digest. It never rewrites score buckets. Existing source/ledger conflicts withou
 a matching completed certificate require review; there is no automatic adoption,
 ledger deletion, points reset or duplicate credit. Manual and automatic services
 contend on the same room and event ledger IDs. A valid completed replay is read-only.
+Bucket manual responses explicitly confirm archival and return the public
+certificate epoch/vector/time. The existing browser still has a local archive
+write flow: its canonical-root handoff/subscription behavior must be updated and
+accepted before rollout, rather than sending the local snapshot back after success.
 Closing the root also makes competing scorer transactions retry against its
 completed/archive state.
 

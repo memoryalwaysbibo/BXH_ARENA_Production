@@ -68,7 +68,7 @@ function bracket(count){
  return state;
 }
 function largeFixture(count=160){
- const f=fixture(),A=require(path.join(release,'bucket-settlement/input.cjs')),B=require(path.join(release,'bucket-settlement/state.cjs')),state=A.validateResults(bracket(count));
+ const f=fixture(),A=require(path.join(release,'bucket-settlement/input.cjs')),B=require(path.join(release,'bucket-settlement/state.cjs')),state=A.validateResults(bracket(count));state.startedAt=NOW-1000;
  for(const p of [...f.m.rows.keys()])if((p.startsWith('users/')&&p!=='users/admin')||p.startsWith('ladderPlayers/')||p.includes('/registrations/')||p.includes('/matchBuckets/'))f.m.remove(p);
  for(let i=0;i<count;i++){f.m.put('users/u'+i,{active:true,role:'player',realName:'P'+i});f.m.put('ladderPlayers/u'+i,{currentSeason:'S1',seasonPoints:0,careerPoints:0});f.m.put('tournaments/'+code+'/registrations/u'+i,{status:'confirmed'});}
  const manifest=B.makeManifest(state,'epoch-1'),buckets=B.encode(state,manifest).map(b=>({...b,revision:7}));
@@ -134,7 +134,11 @@ if(require.main===module)(async()=>{let checks=0;
  for(const count of [2,3,4,5,8,12,16,32,64,96,128,160,192,240,256,320,512]){
   const state=A.validateResults(bracket(count)),a=core.analyze(state),b=manual.buildLadderSettlementPayload(state);
   assert.equal(a.count,count);assert.equal(b.effectiveCount,count);assert.equal(a.weight,b.multiplier);
+  if(count===160){assert.equal(a.weight,2.625);assert.equal(a.players.find(x=>x.placement===1).pointsEarned,246);}
   assert.deepEqual(a.players.map(x=>[x.player.id,x.placement,x.pointsEarned,x.wins,x.losses,x.scoring]),b.participants.map(x=>[x.localPlayerId,x.placement,x.pointsEarned,x.wins,x.losses,x.scoring]));checks++;
+ }
+ for(const spec of specs)for(const key of ['testMode','systemClosed','eventCancelled','notStarted']){
+  const f=fixture(),p='tournaments/'+code,t=f.m.rows.get(p),s=JSON.parse(t.data);if(key==='eventCancelled')s.meta.eventCancelled=true;else if(key==='notStarted')delete s.startedAt;else s[key]=true;f.m.put(p,{...t,data:JSON.stringify(s)});const r=await load(spec,true,f.m).invoke();assert.equal(r.ok,false);assert.equal(f.m.writes.length,0);checks++;
  }
  console.log(JSON.stringify({settlementChecks:checks,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

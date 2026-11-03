@@ -171,7 +171,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
       }catch(e){if(e.bucketSettlement)return result(false,e.message,'分桶結算資料尚未符合驗收條件');throw e;}
     }
     if (source.ladderPointsAwarded === true) {
-      return {ok: true, alreadyAwarded: true, seasonId: source.ladderSeasonId || null, results: source.ladderResults || [], skippedPlayers: source.ladderSkippedPlayers || []};
+      return {ok: true, alreadyAwarded: true, seasonId: source.ladderSeasonId || null, results: source.ladderResults || [], skippedPlayers: source.ladderSkippedPlayers || [],...(sourceInput?A.publicReceipt(sourceInput):{})};
     }
     if (source.testMode === true || source.eventAuthority !== "official" || source.ladderMode !== "ranked") {
       return result(false, "not-ranked", "只有正式積分賽可以結算天梯積分");
@@ -205,7 +205,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
       if(currentInput.bucket!==!!sourceInput)return result(false,'bucket-mode-changed','房間儲存模式已變更，請重新讀取');
       if(currentInput.bucket){const currentActor=await transaction.get(db.doc('users/'+actor.uid));const p=currentActor.data();if(!A.validProfile(p)||!['admin','super_admin'].includes(p.role))return result(false,'admin-required','管理權限已變更');}
       if (tournament.ladderPointsAwarded === true) {
-        return {ok: true, alreadyAwarded: true, seasonId: tournament.ladderSeasonId || null, results: tournament.ladderResults || [], skippedPlayers: tournament.ladderSkippedPlayers || []};
+        return {ok: true, alreadyAwarded: true, seasonId: tournament.ladderSeasonId || null, results: tournament.ladderResults || [], skippedPlayers: tournament.ladderSkippedPlayers || [],...(currentInput.bucket?A.publicReceipt(currentInput):{})};
       }
       const currentFingerprint = currentInput.bucket?currentInput.fingerprint:(typeof tournament.data === "string" ? tournament.data : JSON.stringify(tournament.data));
       if (currentFingerprint !== sourceFingerprint) return result(false, "v1-state-changed", "賽事資料已更新，請重新讀取後再結算");
@@ -322,7 +322,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
         ladderAwardedBy: actor.uid,
       });
       if(currentInput.bucket){const patches=A.finalPatches(currentInput,currentInput.state,{now:currentTime,seasonId,results,skipped:skippedPlayers,actorUid:actor.uid});transaction.set(tournamentRef,patches.privatePatch,{merge:true});transaction.set(publicRef,patches.publicPatch,{merge:true});}
-      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime};
+      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime,...(currentInput.bucket?A.publicReceipt(currentInput,currentTime):{})};
     }).catch(e=>{if(e.bucketSettlement)return result(false,e.message,"分桶結算資料已變更或需要人工核對");throw e;});
   };
 }
