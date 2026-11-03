@@ -5,6 +5,7 @@ on:
       - 'release/buckets/completion/**'
       - 'tests/four-court-buckets/completion/**'
       - '.github/workflows/bucket-general-completion.yml'
+      - 'scripts/bucketcapturehostsync.py'
 permissions:
   contents: read
 jobs:
@@ -24,6 +25,7 @@ jobs:
         run: |
           node tests/four-court-buckets/completion/probe.cjs
           node tests/four-court-buckets/completion/hosting-probe.cjs
+          python3 -B tests/four-court-buckets/completion/capture-host-sync.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
