@@ -22,6 +22,18 @@ jobs:
         run: python3 -B tests/four-court-buckets/activity/verify-package.py
       - name: Captured baseline, stale delivery and bucket activity regressions
         run: node tests/four-court-buckets/activity/probe.cjs
+      - uses: actions/checkout@v4
+        with:
+          ref: c461dd031d65648524089ab6366e697ad0f296b0
+          path: .integration/completion
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: f31da1e78b1ca9319b67dad534e644955c54fba1
+          path: .integration/settlement
+          persist-credentials: false
+      - name: Actual pinned general and ranked settlement handoff
+        run: node tests/four-court-buckets/activity/backend-bridge.cjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

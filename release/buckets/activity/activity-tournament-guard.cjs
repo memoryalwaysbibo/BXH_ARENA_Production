@@ -25,7 +25,7 @@ async function current({db,tx,code,sourceSnapshot=null}){
 }
 async function safeCurrent(args){try{return await current(args);}catch(e){if(e.completionCode)return null;throw e;}}
 async function capture({db,code,sourceSnapshot=null}){
- if(!/^BXH-[A-Z0-9]{5,12}$/.test(code||''))return null;
+ if(typeof code!=='string'||!code||code.includes('/'))return null;
  // Triggers must pass their SDK snapshot; callers which intentionally scan
  // current rooms can omit it, but still get a fresh, physically bound source.
  return db.runTransaction(tx=>safeCurrent({db,tx,code,sourceSnapshot}));

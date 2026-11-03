@@ -46,9 +46,12 @@ settlement contract, not a claim that either PR is deployed.
   `6d694db6b355627c2fc1ee622e27884a83be11df0e2d4525699cd34c16fe4a48`.
   Exact metadata, selected dependency hashes and single-occurrence edits are
   recorded in `patch-manifest.json` and checked independently in CI.
-- 57 local checks cover baseline equivalence for old/new rulesets, the baseline
+- 59 local checks cover baseline equivalence for old/new rulesets, the baseline
   bugs, marker presence, SDK generation changes, account races, general/ranked
   bucket certificates, canonical score loading, idempotence and concurrency.
+- 12 bridge checks run the actual pinned PR713/PR715 settlement handlers for
+  4/6/12 courts with/without QR, then feed their generated certificates to the
+  activity handler. These use synthetic Firestore/auth boundaries.
 - The native Firestore SDK workflow is pending. It uses only the loopback
   `demo-bxh-bucket-activity` project, injected business clock and synthetic events
   and accounts. It is not real Auth/Eventarc or production timing acceptance.

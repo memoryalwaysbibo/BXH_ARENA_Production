@@ -27,7 +27,7 @@ function certify(f,{ranked=false}={}){
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:[NOW]));}static now(){return NOW;}}
 function load(f,candidate=true,{db=f.m.db,logs=[],guard=undefined}={}){
  const mod={exports:{}};const plain=(_,fn)=>fn;
- vm.runInNewContext(fs.readFileSync(candidate?R+'/activity-points.js':__dirname+'/fixtures/activity-points.js','utf8'),{
+ const context={
   module:mod,exports:mod.exports,console:{error:(...a)=>logs.push(a.map(String).join(' '))},Date:FixedDate,process:{env:{GCLOUD_PROJECT:'demo-bxh-bucket-activity'}},require:n=>{
    if(n==='firebase-functions/v2/https')return {onCall:plain,HttpsError:Error};
    if(n==='firebase-functions/v2/scheduler')return {onSchedule:plain};
@@ -37,13 +37,17 @@ function load(f,candidate=true,{db=f.m.db,logs=[],guard=undefined}={}){
    if(n==='./activity-tournament-guard.cjs')return guard||require(R+'/activity-tournament-guard.cjs');
    throw Error('unexpected module '+n);
   }
- });return mod.exports;
+ };
+ const filename=candidate?R+'/activity-points.js':__dirname+'/fixtures/activity-points.js';
+ vm.runInThisContext('(function(module,exports,console,Date,process,require){'+fs.readFileSync(filename,'utf8')+'\n})',{filename})(...['module','exports','console','Date','process','require'].map(k=>context[k]));
+ return mod.exports;
 }
 const event=f=>({params:{code},data:{after:f.m.snapshot('tournaments/'+code)}});
 const invoke=(f,candidate=true,ev=event(f),options={})=>load(f,candidate,options).activityTournamentCompleted(ev);
 const awards=f=>[...f.m.rows].filter(([p])=>p.startsWith('activityPointLedgers/')).length;
 const balance=(f,uid='a')=>f.m.rows.get('activityPointWallets/'+uid)?.balance||0;
 async function main(){let checks=0;
+ for(const alt of ['BXH-ABCD','BXH-ABCDEFGHIJKLMNOP']){const f=fixture();f.m.put('tournaments/'+alt,f.top);f.m.put('publicTournaments/'+alt,f.pub);await invoke(f,true,{params:{code:alt},data:{after:f.m.snapshot('tournaments/'+alt)}});assert.equal(balance(f),10);checks++;}
  for(const legacy of [false,true]){
   const a=fixture({legacy}),b=fixture({legacy});await invoke(a,false);await invoke(b);assert.deepEqual([...a.m.rows],[...b.m.rows].map(([p,v])=>{if(p.startsWith('activityPointLedgers/')){v=clone(v);delete v.metadata.roomSourceCreatedAt;delete v.metadata.bucketEpoch;delete v.metadata.completionDigest;}return[p,v];}));assert.equal(balance(b),legacy?3:10);checks++;
   const before=JSON.stringify([...b.m.rows]);await invoke(b);assert.equal(JSON.stringify([...b.m.rows]),before);checks++;

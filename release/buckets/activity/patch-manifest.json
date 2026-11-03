@@ -78,7 +78,7 @@
   "baselineSha256": "74bab36a2482b11a71bc0c086e00e90187138359b9e2d84fd950f895157a65e3",
   "candidateSha256": "447f2a2ee0ca67c31672b62188fbc790d2644054100eec5ffec267dd891934e9",
   "helperFiles": {
-    "activity-tournament-guard.cjs": "059b21e9cd191ffb4dfc3cf92032f3bf38052027778ae5fb514da7ba60ed431f",
+    "activity-tournament-guard.cjs": "d6858c60df50fb9782def4b685de83535f38297d11efe81f41f65c0519c2586e",
     "certificate.cjs": "8303d0ebe31752c7edb21bfecec08d1a9d3870bb509bab0dbfff7cd6a2bd5152",
     "protocol/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a"
   },
