@@ -9,7 +9,7 @@ const {specs,fixture,NOW,code,uid}=require('./probe.cjs');
 const app=initializeApp({projectId:project}),db=getFirestore(app);
 db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-admissions-native-'));
-const nativeNow=Date.now;Date.now=()=>NOW; // deterministic business clock in this isolated process
+const started=Date.now(); // Keep SDK/gRPC deadlines on the real process clock.
 const handlers=new Map(),collections=['tournaments','publicTournaments','users','userMail','mailboxStats'];
 function handler(spec,candidate){const key=spec.function+candidate;if(handlers.has(key))return handlers.get(key);
  const dest=path.join(directory,key);fs.mkdirSync(dest,{recursive:true});fs.cpSync(path.join(__dirname,'fixtures',String(spec.sourceSet)),dest,{recursive:true});
@@ -18,12 +18,13 @@ function handler(spec,candidate){const key=spec.function+candidate;if(handlers.h
  const fn=spec.function==='registrationInvitations'?mod.createRegistrationInvitationService(db,()=>NOW):mod[spec.function].run;handlers.set(key,fn);return fn;
 }
 async function clear(){for(const name of collections)await db.recursiveDelete(db.collection(name));}
-async function seed(f){await clear();const b=db.batch();for(const [p,v]of f.m.rows)b.set(db.doc(p),v);await b.commit();}
-function normalized(value){
+async function seed(f){await clear();const b=db.batch();for(const [p,v]of f.m.rows)b.set(db.doc(p),p==='publicTournaments/'+code?{...v,registrationOpenAt:started-60000,registrationCloseAt:started+3600000}:v);await b.commit();}
+function normalized(value,key=''){
+ if(typeof value==='number'&&['updatedAt','configuredAt','createdAt'].includes(key)&&value>=started-1000&&value<=Date.now()+10000)return '<business-wallclock>';
  if(value&&typeof value.toMillis==='function')return '<server-timestamp>';
  if(typeof value==='string'&&/^[\[{]/.test(value)){try{return normalized(JSON.parse(value));}catch{}}
- if(Array.isArray(value))return value.map(normalized);
- if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>k!=='sourceCreatedAt').map(([k,v])=>[k,normalized(v)]));return value;
+ if(Array.isArray(value))return value.map(v=>normalized(v));
+ if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>k!=='sourceCreatedAt').map(([k,v])=>[k,normalized(v,k)]));return value;
 }
 async function state(){const rows=[];
  async function walk(col){for(const ref of await col.listDocuments()){const snap=await ref.get();if(snap.exists)rows.push([ref.path,normalized(snap.data())]);for(const child of await ref.listCollections())await walk(child);}}
@@ -55,6 +56,6 @@ async function state(){const rows=[];
    assert.equal((await db.doc('mailboxStats/target').get()).data().unreadCount,1);
    const record=await root.collection('registrationInvitations').doc('target').get(),r=await root.get();assert.equal(record.data().sourceCreatedAt,r.createTime.seconds+':'+r.createTime.nanoseconds);checks++;
   }
-  console.log(JSON.stringify({nativeAdmissionChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Admin SDK and captured QR proxy; synthetic request auth and fixed business clock'}));
- }finally{Date.now=nativeNow;await clear();await db.terminate();await deleteApp(app);fs.rmSync(directory,{recursive:true,force:true});}
+  console.log(JSON.stringify({nativeAdmissionChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Admin SDK, QR proxy and transport clock; synthetic request auth and injected invitation clock'}));
+ }finally{await clear();await db.terminate();await deleteApp(app);fs.rmSync(directory,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
