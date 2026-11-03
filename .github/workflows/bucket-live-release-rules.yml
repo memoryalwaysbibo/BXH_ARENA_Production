@@ -7,13 +7,15 @@ on:
       - 'referee-seats/reference/firestore.production-20261102.rules'
       - 'referee-seats/firestore.candidate.rules'
       - 'tests/four-court-buckets/live-release-rules.py'
+      - 'tests/four-court-buckets/deletion/**'
+      - 'modules/cloud/cloud-runtime.js'
       - '.github/workflows/bucket-live-release-rules.yml'
 permissions:
   contents: read
 jobs:
   reconcile:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,3 +35,12 @@ jobs:
           /tmp/bucket-release-tools/node_modules/.bin/firebase setup:emulators:firestore
       - name: Check live and candidate permissions against real Emulator
         run: python3 -B tests/four-court-buckets/live-release-rules.py
+      - name: Verify pinned deletion package and worker/client recovery
+        run: |
+          python3 -B tests/four-court-buckets/deletion/verify-package.py
+          node tests/four-court-buckets/deletion/deletion-probe.cjs
+          node tests/four-court-buckets/deletion/restore-probe.cjs
+          node tests/four-court-buckets/deletion/client-probe.cjs
+      - name: Check deletion leases against real demo Emulator
+        run: |
+          FIRESTORE_EMULATOR_JAR="$HOME/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar" python3 -B tests/four-court-buckets/deletion/rules-emulator.py
