@@ -2021,6 +2021,25 @@
       return {ok:true,seasonId:"TEST-S1",awardedAt:Date.now(),alreadyAwarded:newWrites===0,results};
     },
 
+    async settleBucketTournament(expected){
+      const service=window.BXHFourCourtSettlement;
+      if(!cloudEnabled||!service||!fx?.runTransaction||!window.crypto?.subtle)return {ok:false,reason:"bucket-client-disabled"};
+      const binding={code:String(expected.cloudCode||"").toUpperCase(),id:expected.id,epoch:expected.scoreStorage?.epoch};
+      if(!binding.code||!binding.id||!binding.epoch)return {ok:false,reason:"bucket-room-changed"};
+      return service.settle({expected:binding,getUid:()=>authHandle?.currentUser?.uid,
+        read:()=>fx.runTransaction(dbHandle,async tx=>{
+          const root=fx.doc(dbHandle,"tournaments",binding.code),publicRef=fx.doc(dbHandle,"publicTournaments",binding.code);
+          const [privateSnap,publicSnap]=await Promise.all([tx.get(root),tx.get(publicRef)]);
+          if(!privateSnap.exists()||!publicSnap.exists())throw Error("bucket-room-changed");
+          const top=privateSnap.data(),pub=publicSnap.data(),{m}=service.context(top,pub,binding);
+          const snaps=await Promise.all(Array.from({length:m.bucketCount},(_,i)=>tx.get(fx.doc(dbHandle,"tournaments",binding.code,"matchBuckets","court-"+(i+1)))));
+          return {top,pub,buckets:snaps.map(s=>s.exists()?s.data():null)};
+        }),
+        call:code=>window.engagementService.settleLadder({code}),
+        hash:async text=>Array.from(new Uint8Array(await window.crypto.subtle.digest("SHA-256",new TextEncoder().encode(text))),b=>b.toString(16).padStart(2,"0")).join("")
+      });
+    },
+
     async settleLadderTournament(code,payload){
       if(!cloudEnabled||!code) return {ok:false,reason:"network"};
       const actorUid=authHandle&&authHandle.currentUser&&authHandle.currentUser.uid;
@@ -4240,6 +4259,7 @@ window.addEventListener("bxh-offline-operation-failed",()=>{cloudStatus="error";
   tryInitFirebase().then((ok)=>{
     window.dispatchEvent(new CustomEvent("bxh-cloud-ready", { detail:{ enabled: ok, configured: isConfigPresent() } }));
   });
+
 
 
 

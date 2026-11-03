@@ -6755,7 +6755,7 @@ async function finishTournament(){
   const ok=await performAutoArchive();
   // A cloud response may arrive after navigation. Never open another room's results.
   if(tournamentCompletionKey(state)!==key) return ok;
-  if(tournamentResultSignature(state)!==signature) return false;
+  if(tournamentResultSignature(state)!==signature && !(ok&&target.scoreStorage?.epoch&&state.bucketSettlement?.epoch===target.scoreStorage.epoch&&state.bucketSettlement.status==="completed")) return false;
   if(!ok){ render(); return false; }
   // Listeners can replace the state object while the archive request is pending.
   // Copy only acknowledged lifecycle fields, never stale scores or registrations.
@@ -6782,7 +6782,34 @@ function performAutoArchive(){
   return task;
 }
 
+// Bucket completion is acknowledged only by a fresh, certified cloud snapshot.
+// This path never enters the legacy local-state archive writer, including errors.
+async function performBucketArchive(target){
+  const key=tournamentCompletionKey(target),epoch=target.scoreStorage?.epoch,uid=window.cloudAuth?.getCurrentUser?.()?.uid;
+  const current=()=>!!uid&&window.cloudAuth?.getCurrentUser?.()?.uid===uid&&tournamentCompletionKey(state)===key&&state.scoreStorage?.epoch===epoch;
+  if(!uid||!isAdminTierOrAbove()||!window.cloudSync?.settleBucketTournament){
+    showToast("分桶積分賽需由管理員連線完成結算。",true);return false;
+  }
+  const result=await window.cloudSync.settleBucketTournament(target);
+  if(!current())return false;
+  if(!result?.ok||!result.data){
+    showToast(result?.reason==="auth-changed"?"登入帳號已變更，請重新載入房間確認結算。":"雲端結算尚待確認；可安全重試，頁面不會覆寫賽果。",true);
+    return false;
+  }
+  Object.assign(target,result.data);
+  if(state!==target)Object.assign(state,result.data);
+  // saveRecordDetailed writes the local record/index only. No pushUpdate or retry queue.
+  const saved=await saveRecordDetailed(result.data);
+  if(!current())return false;
+  if(saved.indexOk){const index=await loadIndex();if(!current())return false;recordIndex=index;}else addRecordSummaryToMemoryIndex(state);
+  ladderPublicLoaded=false;ladderAdminLogsLoaded=false;myLadderProfileCache=null;
+  cloudSyncPending=false;
+  showToast(saved.recordOk?"積分與賽事封存已由雲端確認":"雲端已完成封存；本機儲存不足，重新整理可讀回結果",!saved.recordOk);
+  render();return true;
+}
+
 async function performAutoArchiveState(state){
+  if(Object.hasOwn(state,"scoreStorage"))return performBucketArchive(state);
   if(state.archiveStatus==="completed" && state.archivedAt && state.settlementPhase!=="sync-pending") return true;
   if(!isTournamentFullyDecided(state)){
     state.settlementPhase="failed";
@@ -26407,6 +26434,7 @@ document.addEventListener("visibilitychange",()=>{
     setQrScannerStatus('相機已暫停，返回後請按重新啟動相機。');
   }
 });
+
 
 
 
