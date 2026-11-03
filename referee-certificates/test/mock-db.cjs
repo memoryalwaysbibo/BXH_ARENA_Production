@@ -35,6 +35,7 @@ class MockDB {
             rows=rows.filter(([,value])=>ref.filters.every(f=>{
               const v=value[f.field];if(v===undefined)return false;
               if(f.op==='==')return v===f.value;
+              if(f.op==='>')return v>f.value;
               if(f.op==='>=')return v>=f.value;
               if(f.op==='<=')return v<=f.value;
               throw Error('unsupported-query');

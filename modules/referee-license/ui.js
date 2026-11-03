@@ -19,13 +19,13 @@
     return typeof s.ctx.currentSession !== 'function' || s.ctx.currentSession().isSuperAdmin === true;
   }
   function allowedMutation(s, payload) {
-    return current(s) && !!payload?.targetUid && (allowedAdmin(s) || payload.action === 'photo' && payload.targetUid === s.ctx.uid);
+    return current(s) && !!payload?.targetUid && (allowedAdmin(s) || ['photo','syncProgress'].includes(payload.action) && payload.targetUid === s.ctx.uid);
   }
   function context(ctx) {
     if (!session || session.key !== stamp(ctx)) {
       session = {key: stamp(ctx), ctx, cache: new Map(), targetUid: '', query: '', items: null, searching: false,
         searchGeneration: 0, searchIncomplete: false, error: '', success: '', busy: false, pending: null, editor: null,
-        editorRevision: null, photoDraft: null, photoRevision: null, photoTargetUid: '', photoGeneration: 0, photoBusy: false, selfView: 'duty', recordLimit: 20};
+        editorRevision: null, photoDraft: null, photoRevision: null, photoTargetUid: '', photoGeneration: 0, photoBusy: false, selfView: 'duty', recordLimit: 20, roster: null, rosterLoading: false, rosterError: '', rosterCursor: null};
     } else session.ctx = ctx;
     return session;
   }
@@ -100,8 +100,34 @@
     } catch (error) {
       if (current(s) && item.generation === generation) item.error = message(error);
     } finally {
-      if (current(s) && item.generation === generation) { item.loading = false; redraw(s); }
+      if (current(s) && item.generation === generation) { item.loading = false; autoPromote(s,uid); redraw(s); }
     }
+  }
+  function autoPromote(s,uid) {
+    const snapshot=record(s,uid).snapshot;
+    if(!current(s)||s.busy||s.pending||!snapshot?.autoPromotionEnabled||snapshot.incomplete||snapshot.stats.pendingBackfills||
+       snapshot.certificate?.status!=='active'||snapshot.eligibleLevel<=snapshot.certificate.awardedLevel)return;
+    mutation(s,{action:'syncProgress'},snapshot.revision,uid);
+  }
+  async function loadRoster(s,more=false) {
+    if(!allowedAdmin(s)||s.rosterLoading)return;
+    s.rosterLoading=true;s.rosterError='';
+    try {
+      const result=await call({action:'list',...(more&&s.rosterCursor?{cursor:s.rosterCursor}:{})});
+      if(!allowedAdmin(s))return;
+      if(!Array.isArray(result.items))throw new Error('snapshot-invalid');
+      s.roster=more?[...(s.roster||[]),...result.items]:result.items;
+      s.rosterCursor=result.nextCursor||null;
+    } catch(error) {if(allowedAdmin(s))s.rosterError=message(error);}
+    finally {if(current(s)){s.rosterLoading=false;redraw(s);}}
+  }
+  function rosterHtml(s) {
+    if(s.roster===null&&!s.rosterLoading&&!s.rosterError)void loadRoster(s);
+    return '<section class="panel rl-section"><div class="rl-heading"><h3>裁判清單</h3>'+button('更新清單','roster-refresh','',s.rosterLoading||s.busy||!!s.pending)+'</div>'+
+      (s.rosterLoading?'<p class="rl-small" role="status">正在讀取裁判清單…</p>':'')+errorHtml(s.rosterError)+
+      '<div class="rl-search-results">'+(s.roster||[]).map(p=>'<button class="rl-person-result" type="button" data-action="referee-license-select" data-uid="'+esc(p.uid)+'" '+(s.busy||s.pending?'disabled':'')+'><strong>'+esc(p.realName||'姓名待核對')+'</strong><span>'+esc(p.number)+' · '+esc(p.status==='active'?'有效':'已停用')+'</span><span>'+esc(p.nickname||'')+'</span>'+rankHtml(p.level)+'</button>').join('')+'</div>'+
+      (s.roster&&s.roster.length===0?'<p class="rl-small">目前沒有已發證裁判；可用下方搜尋新增核定。</p>':'')+
+      (s.rosterCursor?button('載入更多裁判','roster-more','',s.rosterLoading||s.busy||!!s.pending):'')+'</section>';
   }
   function ensure(s, uid) {
     const item = record(s, uid);
@@ -133,6 +159,7 @@
     if (stats.pendingLogCount > 0) pieces.push(num(stats.pendingLogCount) + ' 筆判決待認列。');
     if (stats.pendingEvents > 0) pieces.push(num(stats.pendingEvents) + ' 場執勤尚待賽事完成；已確認判決照常累積。');
     if (stats.unknownScaleEvents > 0) pieces.push(num(stats.unknownScaleEvents) + ' 場已認列執勤的規模待確認。');
+    if (stats.unresolvedEventCount > 0) pieces.push(num(stats.unresolvedEventCount) + ' 場歷史賽事的完成狀態或名單尚待核對，尚未補入賽事及規模經歷。');
     if ((snapshot.certificate?.awardedLevel || 0) > snapshot.eligibleLevel) pieces.push('既有授予保留，經歷資料待核對。');
     return pieces.length ? '<div class="rl-notice" role="status">' + pieces.map(esc).join('<br>') + '</div>' : '';
   }
@@ -168,7 +195,7 @@
       '<div class="rl-progress" role="progressbar" aria-label="本階判決場數進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round((p.fraction || 0) * 100) + '"><div style="width:' + Math.round((p.fraction || 0) * 100) + '%"></div></div>' +
       '<div class="rl-spread rl-small"><span>本階 ' + num(Math.max(0, Math.min(decisions - p.start, p.target.decisions - p.start))) + '／' + num(p.target.decisions - p.start) + '</span><span>' + (p.decisionGap ? '尚差 ' + num(p.decisionGap) + ' 場判決' : '判決場數已達標') + '</span></div>' +
       '<ul class="rl-gates"><li><span>累積判決</span><span>' + num(decisions) + '／' + num(p.target.decisions) + '</span></li>' + p.gates.filter(g => g.required > 0).map(g => '<li><span>' + g.size + ' 人以上賽事</span><span>' + num(g.current) + '／' + g.required + ' 次 ' + (g.current !== null && g.current >= g.required ? '✓' : '') + '</span></li>').join('') + '</ul>' +
-      (snapshot.eligibleLevel > awarded ? '<p class="rl-notice">' + (snapshot.incomplete ? '依已核對資料已達 ' : '已符合 ') + esc(D.rank(snapshot.eligibleLevel)?.name || '較高階級') + (snapshot.incomplete ? ' 門檻；完整資料核對後才可授予。' : ' 條件，等待官方授予。') + '</p>' : '') + '</section>';
+      (snapshot.eligibleLevel > awarded ? '<p class="rl-notice">' + (snapshot.incomplete ? '依已核對資料已達 ' : '已符合 ') + esc(D.rank(snapshot.eligibleLevel)?.name || '較高階級') + (snapshot.incomplete ? ' 門檻；完整資料核對後才可授予。' : (snapshot.autoPromotionEnabled?' 條件，系統自動更新階級。':' 條件，等待官方授予。')) + '</p>' : '') + '</section>';
   }
   function rulesHtml() {
     return '<details class="panel rl-section rl-fold"><summary>九階晉升條件</summary><p class="rl-small">終身累積；判決與所有賽事經歷條件須同時達成。</p><ol class="rl-rules">' + D.RANKS.map(rank => '<li><div class="rl-heading">' + rankHtml(rank.level) + '<span>' + num(rank.decisions) + ' 場判決</span></div><p class="rl-small">' + [64,96,128].filter(size => rank.scales[size] > 0).map(size => size + ' 人以上 ' + rank.scales[size] + ' 次').join(' · ').replace(/^$/, '無大型賽事經歷要求') + '</p></li>').join('') + '</ol></details>';
@@ -266,10 +293,10 @@
   function awardHtml(snapshot, s) {
     const currentLevel = snapshot.certificate?.awardedLevel || 0;
     const eligible = D.count(snapshot.eligibleLevel) ?? 0;
-    const options = D.RANKS.filter(rank => rank.level > currentLevel && rank.level >= 1 && rank.level <= (currentLevel?eligible:1));
+    const options = D.RANKS.filter(rank => !(currentLevel && snapshot.autoPromotionEnabled) && rank.level > currentLevel && rank.level >= 1 && rank.level <= (currentLevel?eligible:1));
     const disabled = s.busy || !!s.pending, grantDisabled = disabled || currentLevel>0 && (snapshot.incomplete === true || snapshot.certificate.status!=='active');
     if (!options.some(rank => rank.level === s.grantLevel)) s.grantLevel = options.at(-1)?.level || null;
-    return '<section class="panel rl-section"><h3>正式授予</h3><p>資格與帳號角色／active獨立。核定、停用與恢復不改單場三席權限；永久號不回收。</p>' +
+    return '<section class="panel rl-section"><h3>裁判資格</h3>'+(snapshot.autoPromotionEnabled&&currentLevel?'<p class="rl-notice">完整已認列經歷達標後自動升級，無須管理員審核；既有階級不自動降低。</p>':'')+'<p>資格與帳號角色／active獨立。核定、停用與恢復不改單場三席權限；永久號不回收。</p>' +
       '<label class="rl-field">核定人員識別碼<input class="rl-input" data-referee-approval="personId" value="'+esc(s.approvalPersonId||snapshot.identityPersonId||'')+'"></label><label class="rl-field">核實／變更依據（必填）<input class="rl-input" data-referee-approval="basis" value="'+esc(s.approvalBasis||'')+'"></label>' +
       (snapshot.certificate ? button(snapshot.certificate.status==='disabled'?'恢復資格':'停用資格','qualification','',disabled) + '<label class="rl-field">已核實同人小號UID<input class="rl-input" data-referee-approval="aliasUid" value="'+esc(s.aliasUid||'')+'"></label>'+button('核實帳號關聯（不移轉經歷）','link-account','',disabled) : '') + '<div class="rl-award-current"><span>目前授予</span>' + rankHtml(currentLevel) + '</div><p class="rl-small">' + (snapshot.incomplete ? '依已核對資料推估資格：' : '系統判定資格：') + (eligible ? 'L' + eligible + ' ' + esc(D.rank(eligible)?.name || '') : '尚未符合 L1') + '</p>' +
       (snapshot.incomplete ? '<p class="rl-notice">資料待完整核對，暫停授予 L2 以上階級；L1 仍可明確核定。</p>' : '') +
@@ -361,9 +388,9 @@
     if (!allowedAdmin(s)) return '<section class="panel rl-section"><p role="alert">只有具裁判管理權限的最高管理員可以開啟此頁。</p></section>';
     const selected = s.targetUid ? ensure(s, s.targetUid) : null, snapshot = selected?.snapshot;
     return '<div class="rl-root" data-referee-view="admin"><div class="rl-heading"><h2>裁判管理</h2>' + (s.targetUid ? button('重新整理', 'refresh', 'data-uid="' + esc(s.targetUid) + '"', s.busy) : '') + '</div>' +
-      '<section class="panel rl-section"><form class="rl-search" data-referee-form="search"><label class="rl-field"><span>搜尋姓名、暱稱或 UID</span><input class="rl-input" type="search" name="query" data-referee-query value="' + esc(s.query) + '" maxlength="80" placeholder="輸入裁判資料" ' + (s.searching || s.busy || s.pending ? 'disabled' : '') + '></label><button type="submit" class="btn btn-primary rl-button" ' + (s.searching || s.busy || s.pending ? 'disabled' : '') + '>' + (s.searching ? '搜尋中…' : '搜尋') + '</button></form>' +
+      rosterHtml(s) + '<section class="panel rl-section"><form class="rl-search" data-referee-form="search"><label class="rl-field"><span>搜尋姓名、暱稱或 UID</span><input class="rl-input" type="search" name="query" data-referee-query value="' + esc(s.query) + '" maxlength="80" placeholder="輸入裁判資料" ' + (s.searching || s.busy || s.pending ? 'disabled' : '') + '></label><button type="submit" class="btn btn-primary rl-button" ' + (s.searching || s.busy || s.pending ? 'disabled' : '') + '>' + (s.searching ? '搜尋中…' : '搜尋') + '</button></form>' +
       (s.items ? '<div class="rl-search-results">' + (s.items.length ? s.items.map(person => '<button type="button" class="rl-person-result" data-action="referee-license-select" data-uid="' + esc(person.uid) + '" ' + (s.busy || s.pending ? 'disabled' : '') + '><strong>' + esc(person.realName || '本名未填') + '</strong><span>' + esc(person.nickname || '未填暱稱') + '</span>' + (person.active === false ? '<span class="rl-small">' + (person.accountStatus === 'deleted' ? '已刪除帳號' : person.accountStatus === 'test' ? '測試帳號' : '已停用帳號') + ' · 歷史資料</span>' : '') + '<small>' + esc(person.uid) + '</small></button>').join('') : '<p class="rl-small">找不到符合的裁判。</p>') + '</div>' : '') + (s.searchIncomplete ? '<p class="rl-small">結果較多，請輸入更完整姓名／UID。</p>' : '') + '</section>' +
-      legacyHtml(s) + feedback(s) + (selected ? loadingHtml(selected, s.targetUid) : '<p class="rl-small">先搜尋並選擇要管理的裁判。</p>') +
+      legacyHtml(s) + feedback(s) + (selected ? loadingHtml(selected, s.targetUid) : '<p class="rl-small">從裁判清單選擇人員，或搜尋其他帳號。</p>') +
       (snapshot ? '<section class="panel rl-section"><div class="rl-heading"><div><h3>' + esc(snapshot.person?.realName || '本名待確認') + '</h3><p class="rl-small">' + esc(snapshot.person?.nickname || '') + '</p></div>' + rankHtml(snapshot.certificate?.awardedLevel) + '</div><p class="rl-small rl-uid">UID：' + esc(snapshot.uid) + '</p><div class="rl-admin-totals"><span>累積判決 <strong>' + num(snapshot.stats.decisions) + '</strong></span><span>參與賽事 <strong>' + num(snapshot.stats.eventCount) + '</strong></span></div>' + notices(snapshot) + '</section>' + awardHtml(snapshot, s) + backfillForm(s, snapshot) + photoSection(snapshot, s) + backfillsHtml(snapshot, s) + sourceHtml(snapshot, s) : '') + '</div>';
   }
   async function search(s) {
@@ -383,7 +410,7 @@
       if (current(s) && generation === s.searchGeneration) {s.searching = false; redraw(s);}
     }
   }
-  const successText = {saveBackfill: '歷史回補已認列，累積與資格已更新。', revokeBackfill: '這筆回補已撤銷，修改紀錄保留。', restoreBackfill: '這筆回補已恢復認列。', grant: '正式階級已授予。', setChief: '裁判長指定已更新。', photo: '裁判照片已更新。'};
+  const successText = {syncProgress:'階級已依完整認列經歷自動更新。',saveBackfill: '歷史回補已認列，累積與資格已更新。', revokeBackfill: '這筆回補已撤銷，修改紀錄保留。', restoreBackfill: '這筆回補已恢復認列。', grant: '正式階級已授予。', setChief: '裁判長指定已更新。', photo: '裁判照片已更新。'};
   async function performPending(s) {
     if (!s.pending || !allowedMutation(s, s.pending.payload) || s.busy) return;
     const pending = s.pending, uid = pending.payload.targetUid;
@@ -393,6 +420,8 @@
       if (!allowedMutation(s, pending.payload) || s.pending !== pending) return;
       const snapshot = validateSnapshot(result.snapshot, uid);
       const item = record(s, uid); item.generation++; item.loading = false; item.error = ''; item.snapshot = snapshot;
+      if(s.roster&&snapshot.certificate)s.roster=s.roster.map(person=>person.uid===uid?
+        {...person,number:snapshot.certificate.number,level:snapshot.certificate.awardedLevel,status:snapshot.certificate.status}:person);
       s.pending = null;
       if (s.targetUid === uid) {
         if (pending.payload.action === 'saveBackfill') s.editor = blankEditor();
@@ -415,7 +444,7 @@
         }
       }
     } finally {
-      if (current(s)) {s.busy = false; redraw(s);}
+      if (current(s)) {s.busy = false; if(pending.payload.action!=='syncProgress'&&!s.error)autoPromote(s,uid); redraw(s);}
     }
   }
   function mutation(s, payload, revision, targetUid) {
@@ -490,11 +519,12 @@
     }
     if (!allowedAdmin(s)) {s.error = '目前沒有裁判管理權限。'; redraw(s); return true;}
     if (s.busy || s.pending) return true;
+    if (key === 'roster-refresh' || key === 'roster-more') {void loadRoster(s,key==='roster-more');return true;}
     if (key === 'legacy-run') {void legacyRun(s);return true;}
     if (key === 'legacy-download') {legacyDownload(s);return true;}
     if (key === 'search') {void search(s); return true;}
     if (key === 'select') {
-      if (!(s.items || []).some(person => person.uid === data.uid)) return true;
+      if (![...(s.items || []),...(s.roster || [])].some(person => person.uid === data.uid)) return true;
       return selectAdminTarget(s, data.uid);
     }
     const snapshot = record(s, s.targetUid).snapshot;
