@@ -15,7 +15,7 @@ function handler(spec,candidate){const key=spec.function+candidate;if(handlers.h
  const dest=path.join(directory,key);fs.mkdirSync(dest,{recursive:true});fs.cpSync(path.join(__dirname,'fixtures',String(spec.sourceSet)),dest,{recursive:true});
  if(candidate)fs.copyFileSync(path.resolve(__dirname,'../../../release/buckets/admissions/candidate',String(spec.sourceSet),spec.path),path.join(dest,spec.path));
  const mod=require(path.join(dest,spec.path));
- const fn=spec.function==='registrationInvitations'?mod.createRegistrationInvitationService(db,()=>NOW):mod[spec.function].run;handlers.set(key,fn);return fn;
+ const fn=spec.function==='registrationInvitations'?mod.createRegistrationInvitationService(require(path.join(dest,'_qr_checkin/admin-firestore.cjs')).getFirestore(),()=>NOW):mod[spec.function].run;handlers.set(key,fn);return fn;
 }
 async function clear(){for(const name of collections)await db.recursiveDelete(db.collection(name));}
 async function seed(f){await clear();const b=db.batch();for(const [p,v]of f.m.rows)b.set(db.doc(p),p==='publicTournaments/'+code?{...v,registrationOpenAt:started-60000,registrationCloseAt:started+3600000}:v);await b.commit();}
