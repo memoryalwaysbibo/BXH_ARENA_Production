@@ -20,14 +20,17 @@ module.exports={...A,countCertified};
 
 // Each host is rebuilt from a fresh transactional query, never an earlier global
 // scan's absolute totals. Reading stats also serializes concurrent increments.
-async function rebuildHost({db,uid,FieldValue,completion,stateOf}){
+async function rebuildHost({db,uid,FieldValue,completion,stateOf,requireActiveActor=false}){
  if(typeof uid!=='string'||!uid||uid.includes('/'))A.fail('invalid-host');
  return db.runTransaction(async tx=>{
   const stats=db.doc('hostStats/'+uid),[profile,oldStats,rooms]=await Promise.all([tx.get(db.doc('users/'+uid)),tx.get(stats),tx.get(db.collection('tournaments').where('createdBy','==',uid))]);
+  if(requireActiveActor&&(!profile.exists||profile.data().active!==true))A.fail('inactive-account');
   if(rooms.size>200)A.fail('bucket-host-rebuild-size-budget');
-  let count=0,bytes=0;const creates=[];
-  for(const root of rooms.docs){
-   const top=root.data(),[pub,prior]=await Promise.all([tx.get(db.doc('publicTournaments/'+root.id)),tx.get(db.doc('hostCompletionLedger/'+root.id))]);
+  let count=0,bytes=0;const creates=[],retention=[];
+  for(const listed of rooms.docs){
+   const root=await tx.get(listed.ref);if(!root.exists)A.fail('host-room-changed');
+   const top=root.data();if(top.createdBy!==uid)A.fail('host-room-changed');
+   const [pub,prior]=await Promise.all([tx.get(db.doc('publicTournaments/'+root.id)),tx.get(db.doc('hostCompletionLedger/'+root.id))]);
    bytes+=Buffer.byteLength(JSON.stringify([top,pub.data()]));if(bytes>5000000)A.fail('bucket-host-rebuild-size-budget');
    let state=stateOf(top),binding={};
    if(A.marked(top,pub.data())){
@@ -37,10 +40,18 @@ async function rebuildHost({db,uid,FieldValue,completion,stateOf}){
     state=input.state;binding={sourceCreatedAt:input.sourceCreatedAt,bucketEpoch:input.m.epoch,bucketCompletedAt:done.receipt.completedAt};
     if(prior.exists){const p=prior.data();if(p.ownerUid!==uid||Object.entries(binding).some(([k,v])=>p[k]!==v))A.fail('bucket-host-ledger-requires-review');}
    }
+   // Preserve the original unmarked community-room retention repair. Every
+   // point read above also lets the captured QR proxy bind this paired write.
+   if(!A.marked(top,pub.data())&&top.eventAuthority==='community'&&state.archiveStatus==='completed'&&top.expiresAt!=null){
+    state.expiresAtMs=null;retention.push([root.ref,{expiresAt:null,data:JSON.stringify(state)}]);
+    if(pub.exists)retention.push([pub.ref,{expiresAt:null}]);
+   }
    const summary=completion({...top,data:JSON.stringify(state)},profile.data());if(!summary)continue;
    count++;
    if(!prior.exists)creates.push([db.doc('hostCompletionLedger/'+root.id),{...summary,...binding,ownerUid:uid,eventCode:root.id,verifiedAt:FieldValue.serverTimestamp()}]);
   }
+  if(creates.length+retention.length+2>450)A.fail('bucket-host-rebuild-size-budget');
+  for(const [ref,value]of retention)tx.update(ref,value);
   for(const [ref,value]of creates)tx.create(ref,value);
   tx.set(stats,{completedHostedCount:count,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});
   tx.set(db.doc('hostAwardQueue/'+uid),{updatedAt:FieldValue.serverTimestamp(),source:'transactional_history_rebuild'},{merge:true});

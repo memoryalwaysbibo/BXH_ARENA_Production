@@ -33,8 +33,13 @@ exports.preserveCompletedRoomAndCountHost=onDocumentWritten({document:'tournamen
 exports.syncMyHostingProgress=onCall({region:'asia-east1',cors:true,timeoutSeconds:540},async req=>{
  const uid=req.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','auth-required');
  const p=await db.doc(`users/${uid}`).get();if(!p.exists||p.data().active!==true)throw new HttpsError('permission-denied','inactive-account');
- const count=await Bucket.rebuildHost({db,uid,FieldValue,completion,stateOf});
- return {ok:true,completedHostedCount:count};
+ try{
+  const count=await Bucket.rebuildHost({db,uid,FieldValue,completion,stateOf,requireActiveActor:true});
+  return {ok:true,completedHostedCount:count};
+ }catch(error){
+  if(error.completionCode==='inactive-account')throw new HttpsError('permission-denied','inactive-account');
+  throw error;
+ }
 });
 // Rebuilds host progress exactly from all valid completed rooms on/after the title-history baseline.
 exports.preserveExistingCompletedRooms=onSchedule({schedule:'every 24 hours',timeZone:'Asia/Taipei',region:'asia-east1',timeoutSeconds:540,maxInstances:1},async()=>{

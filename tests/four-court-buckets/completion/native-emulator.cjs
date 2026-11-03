@@ -6,15 +6,14 @@ const {fixture,largeFixture,NOW,code}=require('./fixture.cjs'),{request}=require
 const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
 const names=['users','tournaments','publicTournaments','systemConfig','ladderPlayers','ladderTransactions','ladderSystem','hostCompletionLedger','hostStats','hostAwardQueue'];
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-hosting-native-'));
-function hosting(i){
- const dir=path.join(temp,String(i));fs.mkdirSync(path.join(dir,'_qr_checkin'),{recursive:true});
- fs.copyFileSync(path.join(release,'hosting',String(i),'hosting.js'),path.join(dir,'hosting.js'));
+function hosting(i,original=false){
+ const dir=path.join(temp,String(i)+(original?'-original':'-candidate'));fs.mkdirSync(path.join(dir,'_qr_checkin'),{recursive:true});
+ fs.copyFileSync(original?path.join(__dirname,'fixtures',String(i),'hosting.js'):path.join(release,'hosting',String(i),'hosting.js'),path.join(dir,'hosting.js'));
  fs.copyFileSync(path.join(release,'hosting',String(i),'hosting-core.js'),path.join(dir,'hosting-core.js'));
  fs.mkdirSync(path.join(dir,'bucket-completion'),{recursive:true});
  for(const name of ['certificate.cjs','hosting-guard.cjs'])fs.copyFileSync(path.join(release,name),path.join(dir,'bucket-completion',name));
  fs.cpSync(path.join(release,'protocol'),path.join(dir,'bucket-completion/protocol'),{recursive:true});
- globalThis.__bxhHostingNativeDb=db;
- fs.writeFileSync(path.join(dir,'_qr_checkin/admin-firestore.cjs'),"module.exports={...require('firebase-admin/firestore'),getFirestore:()=>globalThis.__bxhHostingNativeDb};");
+ for(const name of ['admin-firestore.cjs','guard-firestore.cjs','qr-checkin-fence.cjs'])fs.copyFileSync(path.join(__dirname,'fixtures/host-sync/_qr_checkin',name),path.join(dir,'_qr_checkin',name));
  return require(path.join(dir,'hosting.js'));
 }
 const handle=createGeneralCompletion(db,{runtime:'emulator',clock:()=>NOW});
@@ -62,6 +61,39 @@ async function all(){const out=[];async function walk(col){for(const ref of awai
  {const f=fixture();await seed(f);await db.doc('hostStats/admin').set({completedHostedCount:9});assert.equal(await rebuild(),0);assert.equal((await db.collection('hostCompletionLedger').get()).size,0);checks++;}
  // New root physical generation cannot inherit the old root's children/certificate.
  {const f=fixture();await seed(f);await handle(request(f));const top=(await db.doc('tournaments/'+code).get()).data();await db.doc('tournaments/'+code).delete();await db.doc('tournaments/'+code).set(top);const before=await all();await assert.rejects(()=>handle(request(f)));assert.deepEqual(await all(),before);checks++;}
+ // Exercise the independently captured callable and the original QR proxy.
+ for(const qr of [false,true])for(const community of [false,true]){
+  let golden;
+  for(const original of [true,false]){
+   const f=fixture({bucket:false,qr}),state={...f.state,archiveStatus:'completed',completedAt:NOW};
+   if(community){state.meta={...state.meta,eventAuthority:'community'};state.expiresAtMs=NOW+5000;}
+   f.m.put('tournaments/'+code,{...f.top,data:JSON.stringify(state),...(community?{eventAuthority:'community',expiresAt:NOW+5000}:{})});
+   if(community)f.m.put('publicTournaments/'+code,{...f.pub,expiresAt:NOW+5000});
+   await seed(f);const result=await hosting('host-sync',original).syncMyHostingProgress.run({auth:{uid:'admin'},data:{uid:'other'}});assert.equal(result.completedHostedCount,1);
+   const rows=(await all()).filter(([p])=>!p.startsWith('hostAwardQueue/'));
+   if(original)golden=rows;else assert.deepEqual(rows,golden);
+   assert.equal((await db.doc('hostStats/other').get()).exists,false);
+  }
+  checks++;
+ }
+ for(const qr of [false,true]){
+  const f=fixture({qr});await seed(f);await handle(request(f));const sync=hosting('host-sync').syncMyHostingProgress.run;
+  await Promise.all([count(),sync({auth:{uid:'admin'}}),sync({auth:{uid:'admin'}})]);assert.equal((await db.doc('hostStats/admin').get()).data().completedHostedCount,1);assert.equal((await db.collection('hostCompletionLedger').get()).size,1);checks++;
+ }
+ for(const bad of ['no-auth','inactive','revoked-after-preflight','certificate','migration','ledger']){
+  const f=fixture();await seed(f);await handle(request(f));await db.doc('hostStats/admin').set({completedHostedCount:7});
+  if(bad==='inactive')await db.doc('users/admin').update({active:false});
+  if(bad==='certificate')await db.doc('tournaments/'+code).update({'bucketCompletion.stateDigest':'bad'});
+  if(bad==='migration')await db.doc('tournaments/'+code).update({bucketMigration:null});
+  if(bad==='ledger')await db.doc('hostCompletionLedger/'+code).set({ownerUid:'other'});
+  const before=await all(),sync=hosting('host-sync').syncMyHostingProgress.run,run=db.runTransaction.bind(db);
+  try{
+   if(bad==='revoked-after-preflight'){let first=true;db.runTransaction=async(...args)=>{if(first){first=false;await db.doc('users/admin').update({active:false});}return run(...args);};}
+   await assert.rejects(()=>sync(bad==='no-auth'?{}:{auth:{uid:'admin'}}));
+  }finally{db.runTransaction=run;}
+  const expected=JSON.parse(JSON.stringify(before));if(bad==='revoked-after-preflight')expected.find(([p])=>p==='users/admin')[1].active=false;
+  assert.deepEqual(await all(),expected);checks++;
+ }
  console.log(JSON.stringify({nativeCompletionChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Firestore SDK transactions, synthetic auth and clock; no browser/Eventarc'}));
  }finally{await deleteApp(app);fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

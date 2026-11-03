@@ -25,6 +25,7 @@ jobs:
         run: |
           node tests/four-court-buckets/completion/probe.cjs
           node tests/four-court-buckets/completion/hosting-probe.cjs
+          node tests/four-court-buckets/completion/host-sync-probe.cjs
           python3 -B tests/four-court-buckets/completion/capture-host-sync.py
       - uses: actions/setup-java@v4
         with:
