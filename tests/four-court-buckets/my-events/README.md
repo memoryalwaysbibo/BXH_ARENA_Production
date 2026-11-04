@@ -157,5 +157,27 @@ seal explicitly has `approved:false`. A local review composition added the
 lockfile, applied the eight pinned overlays and added three bucket verifier
 dependencies. All 29 candidate files passed the source-set verifier with an
 approval flag supplied only in memory; the review ZIP retains `approved:false`.
-This confirms file completeness and hash consistency, not dependency install,
-native Emulator behavior, runtime configuration or release approval.
+This confirms file completeness and hash consistency, not runtime
+configuration or release approval. On 2026-11-05, the isolated 29-file review
+candidate installed 249 locked dependencies with `npm ci --ignore-scripts`
+and loaded its 10 Cloud Function exports. The host used Node 24, so the
+installation emitted an engine warning for the pinned Node 22 runtime.
+
+`native-emulator.cjs` additionally runs against a local Firestore Emulator
+using the extracted review candidate. It checks a six-court split lifecycle,
+one-room bootstrap page and cursor, root-only forged completion, and a missing
+bucket. The demo project makes no production calls. To reproduce after
+extracting the review ZIP and installing its locked dependencies:
+
+```sh
+export BXH_MY_EVENTS_CANDIDATE_DIR=/absolute/path/to/extracted/candidate
+firebase emulators:exec --only firestore \
+  --project demo-bxh-my-events-review \
+  --config tests/four-court-buckets/my-events/firebase.json \
+  'node tests/four-court-buckets/my-events/native-emulator.cjs'
+```
+
+The 2026-11-05 local run passed 14 assertions. It uses open local emulator
+rules and does not cover Auth, App Check, Eventarc progression, latency,
+production configuration, browser recovery or a live release. The candidate
+seal remains `approved:false`.
