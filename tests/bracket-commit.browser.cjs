@@ -111,7 +111,7 @@ const {chromium}=require('playwright');
  assert.equal(await page.locator('#start').isEnabled(),true);
  assert.equal(await page.evaluate(()=>fixture.canStart()),true);
  assert.equal((await page.evaluate(()=>fixture.stats())).local.bracketDraw.id,forced.local.bracketDraw.id);
- await page.evaluate(()=>fixture.failStart());
+ await page.evaluate(()=>{fixture.retry();fixture.failStart();});
  await page.getByRole('button',{name:'管理員強制開賽',exact:true}).click();
  await page.evaluate(()=>fixture.revokeAdmin());
  const beforeRevoke=(await page.evaluate(()=>fixture.stats())).writeCount;
