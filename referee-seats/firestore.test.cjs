@@ -17,6 +17,52 @@ before(async()=>{
  await handle(request('host','enable'));
 });
 after(async()=>{await deleteApp(app);});
+test('community invitation, main/backup handoff and staff support commit atomically on two courts',async()=>{
+ const {createScoringHandler}=require('./functions/scoring-service.cjs'),score=createScoringHandler(db);
+ const roomCode='BXH-COMMTEST',tour=db.doc('tournaments/'+roomCode),pub=db.doc('publicTournaments/'+roomCode);
+ const players=['p1','p2','p3','p4'].map(id=>({id,name:id}));
+ const matches=[1,2].map(station=>({id:'m'+station,station,bracket:'RR',round:0,seq:station-1,a:{playerId:players[(station-1)*2].id},b:{playerId:players[(station-1)*2+1].id},scoreA:0,scoreB:0,log:[],faultActions:[],completed:false,status:'in_progress'}));
+ const state={id:'community-emulator',cloudCode:roomCode,meta:{eventAuthority:'community',ladderMode:'general',formatType:'roundrobin',stations:2,scoringMode:'standard'},startedAt:1,players,matches};
+ await Promise.all([
+  tour.set({createdBy:'community-host',ownerUid:'community-host',eventAuthority:'community',ladderMode:'general',data:JSON.stringify(state),updatedAt:1}),
+  pub.set({bracketView:JSON.stringify(state)}),
+  db.doc('systemConfig/refereeSeatsV1').set({enabled:true,perCourtScoringVerified:true,communitySeatsEnabled:true}),
+  ...['community-host','community-main','community-backup'].map(uid=>db.doc('users/'+uid).set({active:true,role:'player',realName:uid,gameId:uid}))
+ ]);
+ const req=(uid,action,args={})=>({auth:{uid},data:{code:roomCode,operationId:'community-emulator-op-'+(++seq),action,...args}});
+ await handle(req('community-host','enable'));
+ const invite=async(slot,targetGameId)=>{
+  const request=req('community-host','invite',{station:1,slot,targetGameId,expectedCourtRevision:0});
+  const result=await handle(request);assert.deepEqual(await handle(request),result,'retry must not send another invitation');return result;
+ };
+ const [main,backup]=await Promise.all([invite('main','community-main'),invite('backup1','community-backup')]);
+ const inbox=await handle(req('community-main','invite-mail-list'));assert.equal(inbox.messages.length,1);
+ assert.equal((await handle(req('community-backup','invite-mail-list'))).messages.length,1);
+ await handle(req('community-main','accept-invite',{station:1,slot:'main',requestId:main.requestId}));
+ await handle(req('community-backup','accept-invite',{station:1,slot:'backup1',requestId:backup.requestId}));
+ // Official staff assist a different court without an invitation.
+ await handle(req('c','claim',{station:2,slot:'main',expectedCourtRevision:0}));
+ const scoreReq=async(uid,station)=>{
+  const room=(await tour.get()).data(),st=JSON.parse(room.data),m=st.matches.find(m=>m.station===station);
+  return req(uid,'score',{station,matchId:m.id,side:'A',finish:'spin',expectedCourtRevision:room.refereeSeatsV1.courts[station].revision,expectedScoreRevision:m.refereeSeatScoreRevision||0,expectedDispatchRevision:m.dispatchRevision||0,playerAId:m.a.playerId,playerBId:m.b.playerId});
+ };
+ const first=await scoreReq('community-main',1);await score(first);await score(first);
+ await assert.rejects(score(await scoreReq('community-backup',1)),/station-not-assigned/);
+ const room=(await tour.get()).data(),handoff=await handle(req('community-backup','request',{station:1,slot:'main',expectedCourtRevision:room.refereeSeatsV1.courts[1].revision,expectedUid:'community-main'}));
+ await handle(req('community-main','respond',{station:1,slot:'main',requestId:handoff.requestId,response:'accept'}));
+ await assert.rejects(score(await scoreReq('community-main',1)),/station-not-assigned/);
+ await score(await scoreReq('community-backup',1));await score(await scoreReq('c',2));
+ let saved=(await tour.get()).data(),parsed=JSON.parse(saved.data);
+ assert.deepEqual(parsed.matches.map(m=>m.scoreA),[2,1]);
+ assert.deepEqual(parsed.matches.map(m=>m.log.length),[2,1]);
+ await handle(req('community-host','revoke',{station:1,slot:'main',expectedCourtRevision:saved.refereeSeatsV1.courts[1].revision,expectedUid:'community-backup'}));
+ await assert.rejects(score(await scoreReq('community-backup',1)),/station-not-assigned/);
+ assert.equal((await db.doc('users/community-main/communityRefereeInbox/ref-invite-'+main.requestId).get()).data().refereeInviteStatus,'accepted');
+ const mirror=JSON.parse((await pub.get()).data().bracketView);assert.deepEqual(mirror.matches.map(m=>m.scoreA),[2,1]);assert(!JSON.stringify(mirror).includes('"uid"'));
+ // An invitation opened after completion cannot write a seat or accepted mail.
+ await tour.update({tournamentPhase:'done'});
+ await assert.rejects(handle(req('community-main','accept-invite',{station:1,slot:'main',requestId:main.requestId})),/community-result-available/);
+});
 test('real Firestore retries produce one claim and atomic swap with immutable match data',async()=>{
  const results=await Promise.allSettled(['a','b'].map(uid=>handle(request(uid,'claim',{station:1,slot:'main',expectedCourtRevision:0}))));
  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
