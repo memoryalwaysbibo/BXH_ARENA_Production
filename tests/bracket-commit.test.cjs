@@ -349,3 +349,42 @@ test('draw controller rejects any new draw after start without writing or replac
  const h=fixture();h.ctx.state=()=>({...room(),startedAt:123,bracketSize:2,matches:[{id:'locked'}]});
  const c=h.make();assert.equal(await c.begin(),false);assert.equal(h.count,0);assert.equal(h.writes.length,0);
 });
+
+test('discard a timed out redraw, start the confirmed draw, and reject the late write',async()=>{
+ const h=fixture(),c=h.make(),write=h.ctx.write,gate=deferred();
+ assert.equal(await c.begin(),true);
+ const first=clone(h.local);
+ h.ctx.timeoutMs=5;
+ h.ctx.write=async(...args)=>{await gate.promise;return write(...args);};
+ assert.equal(await c.begin(),false);
+ assert(c.blocked());
+ await c.discard();
+ assert(!c.blocked());
+ assert.equal(h.local.bracketDraw.id,first.bracketDraw.id);
+ assert.equal(await c.verify(h.local),true);
+ const started={...h.local,startedAt:123};
+ assert.equal(api.assertWrite(h.remote,started,{bracketStartSignature:api.signature(first)}),'write');
+ h.remote=clone(started);h.pub=clone(started);
+ gate.resolve();await tick();await tick();
+ assert.equal(h.remote.startedAt,123);
+ assert.equal(h.remote.bracketDraw.id,first.bracketDraw.id);
+ assert.equal(h.success,1);
+});
+
+test('cancel a redraw waiting in the upload queue without ever submitting it',async()=>{
+ const h=fixture(),c=h.make(),queue=deferred();
+ assert.equal(await c.begin(),true);
+ const first=h.local.bracketDraw.id;
+ h.ctx.waitForWrites=()=>queue.promise;
+ const redraw=c.begin();
+ await tick();
+ assert.equal(c.status().canDiscard,true);
+ await c.discard();
+ assert.equal(await redraw,false);
+ assert.equal(c.blocked(),false);
+ assert.equal(h.local.bracketDraw.id,first);
+ queue.resolve();
+ await tick();
+ assert.equal(h.writes.length,1);
+ assert.equal(await c.verify(h.local),true);
+});

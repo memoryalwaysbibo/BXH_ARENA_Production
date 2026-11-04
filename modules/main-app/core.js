@@ -11032,6 +11032,7 @@ function bracketCommitStatusHtml(){
  return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
  failureDetail+
  (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
+ (cloud&&s.canDiscard?'<button class="btn btn-ghost" data-action="bracket-commit-discard">取消上傳</button>':'')+
  (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
 }
 function bracketDrawButtonHtml(){
@@ -25716,11 +25717,25 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       }
     };
     const syncThenDraw=async()=>{
+      const rosterSyncStartedAt=Date.now();
+      let rosterSynced=false;
       try{
-        await syncLatestOnlineRosterBeforeLock();
+        const roster=await syncLatestOnlineRosterBeforeLock();
+        rosterSynced=true;
+        console.info?.("[bracket roster sync timing]",{
+          elapsedMs:Date.now()-rosterSyncStartedAt,
+          confirmed:roster?.confirmed,
+          changed:roster?.changed
+        });
         render();
         doCheckThenDraw();
       }catch(e){
+        if(!rosterSynced){
+          console.info?.("[bracket roster sync timing]",{
+            elapsedMs:Date.now()-rosterSyncStartedAt,
+            errorCode:e?.code||"roster-sync-failed"
+          });
+        }
         console.warn("[draw-bracket roster sync]",e);
         if(!offerAdminOperationalOverride("draw-bracket",mapRegistrationError(e)))showToast("無法取得最新線上報名名單，為避免漏人，暫不產生對戰表", true);
       }

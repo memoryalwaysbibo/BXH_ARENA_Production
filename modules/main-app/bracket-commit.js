@@ -19,7 +19,7 @@ function assertWrite(remote,incoming,options={}){
 }
 function create(ctx){
  let busy=false,pending=null,error='',result='',phase='',inFlightWrite=null;
- let phaseAt=0,timings=[];
+ let phaseAt=0,timings=[],cancelRetry=null;
  function progress(next){
   const now=Date.now();if(phaseAt)timings.push({phase,elapsedMs:now-phaseAt});
   phase=next;phaseAt=now;
@@ -47,7 +47,14 @@ function create(ctx){
  async function retry(){
   if(busy||!pending||!ctx.current())return false;
   busy=true;error='';result='';phaseAt=0;timings=[];
-  let lateWrite=null;
+  let lateWrite=null,cancelled=false;
+  let stopWaiting;
+  const stop=new Promise(resolve=>{stopWaiting=resolve;});
+  cancelRetry=()=>{cancelled=true;stopWaiting();};
+  const wait=promise=>Promise.race([promise,stop]).then(value=>{
+   if(cancelled)throw Error('upload-cancelled');
+   return value;
+  });
   const feedback=new Promise(resolve=>setTimeout(resolve,ctx.minimumFeedbackMs??(ctx.cloud()?2000:0)));
   ctx.changed();
   try{
@@ -56,17 +63,17 @@ function create(ctx){
     // Drain earlier state saves before starting the draw's network budget.
     // No draw write is enqueued if this independent queue wait expires.
     progress('waiting');
-    try{if(ctx.waitForWrites)await deadline(Promise.resolve(ctx.waitForWrites()));}
+    try{if(ctx.waitForWrites)await wait(deadline(Promise.resolve(ctx.waitForWrites())));}
     catch(e){if(e.message==='confirmation-timeout')throw Error('queue-wait-timeout');throw e;}
     // Also serialize explicit retries with a transaction that outlived its UI.
     if(inFlightWrite){
-     try{await deadline(inFlightWrite);}catch(e){if(e.message==='confirmation-timeout')throw Error('queue-wait-timeout');}
+     try{await wait(deadline(inFlightWrite));}catch(e){if(e.message==='confirmation-timeout')throw Error('queue-wait-timeout');}
     }
-    if(!ctx.current())return false;
+    if(cancelled||!ctx.current())return false;
     progress('checking');
     const expires=Date.now()+(ctx.totalTimeoutMs??25000);
-    const run=fn=>{const remaining=expires-Date.now();if(remaining<=0)throw Error('confirmation-timeout');return deadline(fn(),remaining);};
-    const pause=async attempt=>{await new Promise(resolve=>setTimeout(resolve,(ctx.confirmationDelayMs??500)*attempt));if(!ctx.current())throw Error('stale-context');};
+    const run=fn=>{const remaining=expires-Date.now();if(remaining<=0)throw Error('confirmation-timeout');return wait(deadline(fn(),remaining));};
+    const pause=async attempt=>{await wait(new Promise(resolve=>setTimeout(resolve,(ctx.confirmationDelayMs??500)*attempt)));if(!ctx.current())throw Error('stale-context');};
     const competing=latest=>latest?.ok===true&&!matches(latest,pending.snapshot)&&
      latest.data.bracketDraw?.id!==pending.snapshot.bracketDraw.id&&
      (signature(latest.data)!==pending.baseSignature||latest.data.startedAt);
@@ -74,14 +81,14 @@ function create(ctx){
      let latest={ok:false};
      for(let attempt=0;attempt<3;attempt++){
       if(!ctx.current())throw Error('stale-context');
-      try{latest=await run(()=>ctx.read());}catch(e){if(e.message==='confirmation-timeout')throw e;latest={ok:false};}
+      try{latest=await run(()=>ctx.read());}catch(e){if(cancelled||e.message==='confirmation-timeout')throw e;latest={ok:false};}
       if(accept(latest)||competing(latest))return latest;
       if(attempt<2)await pause(attempt+1);
      }
      return latest;
     }
     let latest=await readUntil(value=>value?.ok===true);
-    if(!ctx.current())return false;
+    if(cancelled||!ctx.current())return false;
     for(let attempt=0;!matches(latest,pending.snapshot);attempt++){
      if(!latest?.ok)throw Error('cloud-readback-unconfirmed');
      if(competing(latest)){
@@ -103,7 +110,7 @@ function create(ctx){
       });
      }catch(e){writeError=e;}
      const failureCode=ctx.writeFailureCode?.()||writeError?.code||writeError?.message||'';
-     keep();if(!ctx.current())return false;
+     keep();if(cancelled||!ctx.current())return false;
      // Never flash failure while a committed private/public readback is settling.
      progress('confirming');latest=await readUntil(value=>matches(value,pending.snapshot));
      if(matches(latest,pending.snapshot))break;
@@ -128,21 +135,25 @@ function create(ctx){
       throw writeError||Error(failureCode||'cloud-readback-unconfirmed');
      await pause(1);
     }
-    if(!ctx.current())return false;
+    if(cancelled||!ctx.current())return false;
     ctx.apply(latest.data);
    }else{
     if(await ctx.local(pending.snapshot)!==true)throw Error('local-save-unconfirmed');
-    if(!ctx.current())return false;ctx.apply(pending.snapshot);
+    if(cancelled||!ctx.current())return false;ctx.apply(pending.snapshot);
    }
-   await feedback;if(!ctx.current())return false;
+   await wait(feedback);if(cancelled||!ctx.current())return false;
    pending=null;keep();result='success';progress('success');ctx.success();return true;
   }catch(e){
-   await feedback;error=e.message||'cloud-save-unconfirmed';result='failed';
+   if(cancelled)return false;
+   try{await wait(feedback);}catch{return false;}
+   error=e.message||'cloud-save-unconfirmed';result='failed';
    try{ctx.trace?.({phase,error,elapsedMs:Date.now()-phaseAt,timings:timings.slice()});}catch{}
    return false;
   }
   finally{
+   cancelRetry=null;
    busy=false;
+   if(cancelled)await discard();
    if(pending&&error==='confirmation-timeout'&&lateWrite){
     const candidate=pending;
     lateWrite.then(()=>reconcileLate(candidate),()=>reconcileLate(candidate)).catch(()=>{});
@@ -166,10 +177,13 @@ function create(ctx){
   return retry();
  }
  async function discard(){
-  if(busy||!pending||!ctx.current())return;
+  if(!pending||!ctx.current())return;
+  if(busy){cancelRetry?.();return;}
   busy=true;ctx.changed();
   try{
-   if(ctx.cloud()){const latest=await deadline(ctx.read());if(!latest?.ok)throw Error('cloud-readback-unconfirmed');if(!ctx.current())return;ctx.apply(latest.data);}
+   if(ctx.cloud()){const latest=await deadline(ctx.read());if(!latest?.ok||!latest.publicData||signature(latest.data)!==signature(latest.publicData)||
+    (latest.data.bracketDraw?.id||null)!==(latest.publicData.bracketDraw?.id||null))throw Error('cloud-readback-unconfirmed');
+    if(!ctx.current())return;ctx.apply(latest.data);}
    pending=null;keep();error='';result='';
   }catch(e){error=e.message;}
   finally{busy=false;if(ctx.current())ctx.changed();}
@@ -216,7 +230,7 @@ function create(ctx){
   finally{busy=false;if(ctx.current())ctx.changed();}
   return resume?retry():false;
  }
- return {begin,retry,discard,renewOverride,forceSubmit,selection,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,error,result,phase,timings:timings.slice(),override:pending?.adminOperationalOverride?clone(pending.adminOperationalOverride):null}),async verify(snapshot){
+ return {begin,retry,discard,renewOverride,forceSubmit,selection,submit:()=>pending?retry():begin(),blocked:()=>busy||!!pending,busy:()=>busy,status:()=>({busy,pending:!!pending,canDiscard:!!pending&&(!busy||!!cancelRetry),error,result,phase,timings:timings.slice(),override:pending?.adminOperationalOverride?clone(pending.adminOperationalOverride):null}),async verify(snapshot){
   if(busy||pending)return false;if(!ctx.cloud())return true;
   try{const latest=await deadline(ctx.read());return ctx.current()&&!busy&&!pending&&signature(ctx.state())===signature(snapshot)&&latest?.ok===true&&!latest.data.startedAt&&signature(latest.data)===signature(snapshot)&&signature(latest.publicData)===signature(snapshot);}catch{return false;}
  }};
