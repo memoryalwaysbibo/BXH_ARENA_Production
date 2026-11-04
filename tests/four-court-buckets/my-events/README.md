@@ -92,3 +92,12 @@ The engine calls `target(room)` in registration ingest, room intent and page
 processing; rebuild and bootstrap also use root-only target/discovery checks.
 All of these must be reconciled, with reads before writes and stale leases
 preserved, before bucket rooms can use My Events repair.
+
+`release/buckets/my-events/patch-repair-engine.cjs` pins that exact engine
+source and replaces the three engine call sites with an awaited resolver inside
+their existing transactions. Five offline checks cover the active six-court
+target, missing-bucket refusal, legacy behavior, registration ingest and a
+bucket changed between page claim and execution. The patch is a candidate;
+the deployed engine and its bootstrap/rebuild companions have not been changed.
+The service still needs a verified resolver wired into each factory and an
+authenticated list/detail/rebuild acceptance before deployment.
