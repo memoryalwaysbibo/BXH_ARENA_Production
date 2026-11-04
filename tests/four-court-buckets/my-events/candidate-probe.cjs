@@ -3,7 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {fixture,load,specs,code}=require('../settlement/probe.cjs');
 const {normalizeLifecycle}=require('./deployed-lifecycle.cjs');
-const {readBucketLifecycle}=require('../../../release/buckets/my-events/lifecycle.cjs');
+const {readBucketLifecycle,readRoomLifecycle}=require('../../../release/buckets/my-events/lifecycle.cjs');
 const B=require('../../../release/buckets/settlement/bucket-settlement/state.cjs');
 async function status(f){
  return f.m.db.runTransaction(tx=>readBucketLifecycle({db:f.m.db,tx,code,normalizeRoom:normalizeLifecycle}));
@@ -60,4 +60,38 @@ test('root-only forged done phase cannot hide an active bucket room',async()=>{
  const f=fixture({courts:6}),p='tournaments/'+code;
  f.m.put(p,{...f.m.rows.get(p),tournamentPhase:'done'});
  const life=await status(f);assert.equal(life.status,'invalid');assert.equal(life.reason,'bucket-phase-conflict');
+});
+
+async function readerStatus(f,roomPath='tournaments/'+code){
+ return f.m.db.runTransaction(async tx=>{
+  const room=await tx.get(f.m.db.doc(roomPath));
+  return readRoomLifecycle({db:f.m.db,tx,room,code,normalizeRoom:normalizeLifecycle});
+ });
+}
+test('reader seam preserves the legacy room normalizer without bucket reads',async()=>{
+ const f=fixture({bucket:false,courts:6}),p='tournaments/'+code,top=f.m.rows.get(p),state=JSON.parse(top.data);
+ state.matches[0].completed=false;f.m.put(p,{...top,data:JSON.stringify(state)});
+ const life=await readerStatus(f);
+ assert.deepEqual(life,normalizeLifecycle(f.m.rows.get(p)));
+ assert.equal(life.status,'supported');assert.equal(life.phase,'live');
+ assert.equal(f.m.writes.length,0);
+});
+test('reader seam uses the same transaction root and authoritative buckets',async()=>{
+ const f=fixture({courts:6}),life=await readerStatus(f);
+ assert.equal(life.status,'supported');assert.equal(life.source,'verified-buckets');
+ assert.equal(life.phase,'settling');assert.equal(f.m.writes.length,0);
+});
+test('reader seam rejects missing room and incomplete ownership',async()=>{
+ const missing=fixture({courts:6});missing.m.remove('tournaments/'+code);
+ assert.deepEqual(await readerStatus(missing),{status:'invalid',reason:'room-lifecycle-input'});
+ const partial=fixture({bucket:false,courts:6}),p='tournaments/'+code;
+ partial.m.put(p,{...partial.m.rows.get(p),deletionStatus:null});
+ const life=await readerStatus(partial);
+ assert.equal(life.status,'invalid');assert.equal(life.reason,'bucket-lifecycle-unverified');
+ assert.equal(partial.m.writes.length,0);
+});
+test('reader seam rejects a room snapshot from a different path',async()=>{
+ const f=fixture({courts:6});
+ const life=await readerStatus(f,'tournaments/OTHER');
+ assert.deepEqual(life,{status:'invalid',reason:'room-lifecycle-input'});
 });
