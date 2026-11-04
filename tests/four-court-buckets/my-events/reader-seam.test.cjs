@@ -23,8 +23,8 @@ test('legacy room keeps original phase and reads no buckets',async()=>{
  assert.equal(life.status,'supported');assert.equal(life.phase,'live');
  assert.deepEqual(f.reads,[rootPath,pubPath]);
 });
-test('split room derives settling from complete matches for 4/6/12 courts',async()=>{
- for(const n of [4,6,12]){const f=harness(n),life=await f.read();
+test('split room derives settling through the 32-court protocol bound',async()=>{
+ for(const n of [4,6,12,32]){const f=harness(n),life=await f.read();
   assert.equal(life.status,'supported');assert.equal(life.phase,'settling');
   assert.equal(life.source,'verified-buckets');
   assert.equal(f.reads.length,2+Math.ceil(n/4));
