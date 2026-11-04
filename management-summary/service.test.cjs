@@ -56,10 +56,10 @@ test('deleted cursor anchor does not skip the next remaining room',async()=>{
  const data=rooms(12),t=fixture(profile,data),first=await t.call();const anchor=first.items.at(-1).code;
  data.splice(data.findIndex(row=>row.code===anchor),1);const second=await t.call({cursor:first.nextCursor});assert.equal(second.items.length,5);assert.ok(!second.items.some(item=>first.items.some(old=>old.code===item.code)));
 });
-test('only administrators can list general community rooms; staff retain formal event visibility',async()=>{
+test('active staff and administrators can list community rooms separately',async()=>{
  const data=[room('OFFICIAL'),room('COMMUNITY',{eventAuthority:'community'})];
  assert.deepEqual((await fixture(profile,data).call({kind:'community'})).items.map(row=>row.code),['COMMUNITY']);
- const t=fixture({role:'staff',active:true},data);await assert.rejects(t.call({kind:'community'}),/permission-denied/);assert.equal((await t.call()).items.length,1);
+ const t=fixture({role:'staff',active:true},data);assert.deepEqual((await t.call({kind:'community'})).items.map(row=>row.code),['COMMUNITY']);assert.equal((await t.call()).items.length,1);
 });
 test('ordinary, disabled, deleted, frozen and inactive accounts cannot read summaries',async()=>{
  for(const user of [{role:'player',active:true},{role:'admin',active:false},{role:'admin',active:true,deleted:true},{role:'admin',active:true,accountStatus:'frozen'}]){

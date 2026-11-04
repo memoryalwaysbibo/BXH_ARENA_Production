@@ -12,6 +12,7 @@ before(async()=>{
  function tourPath(code){return /databases/$(database)/documents/tournaments/$(code);}
  function isSignedIn(){return request.auth!=null;}
  function isAdminOrAbove(){return request.auth!=null && request.auth.token.admin==true;}
+ function isCommunityOwnerData(room){return false;}
  function isStaffOfficialCreatorExistingData(room){return request.auth!=null&&room.createdBy==request.auth.uid;}
  ${helper}
  match /tournaments/{code}{allow read:if isSignedIn();allow update:if isSignedIn()&&refereeSeatWriteValid(code,true);}

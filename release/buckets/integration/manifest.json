@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "e1f8604ac2619fba29eba719d981c0e4eef1f09a",
+  "baseMain": "2abbd2a28497d14648f98dc7843e0461e639807b",
   "components": [
     {
       "pr": 707,
@@ -64,7 +64,7 @@
       ]
     },
     "index.html": {
-      "blob": "257d750c0f04a66b883788275764e9ff20c15083",
+      "blob": "d9208fe0e6c6a3e87f0bc97b762c11f8dc6824d5",
       "components": [
         707,
         714
@@ -78,7 +78,7 @@
       ]
     },
     "modules/main-app/core.js": {
-      "blob": "83aadf4e4ec233fe95a1c156a821c46b893741bf",
+      "blob": "607bafef82706d8532263e0847305c06f34847a6",
       "components": [
         707,
         714
@@ -1982,7 +1982,7 @@
       "v": "20261102-phase1-1"
     },
     "modules/main-app/referee-seats.js": {
-      "v": "20261027-2"
+      "v": "20261104-community-1"
     },
     "modules/referee-license/domain.js": {
       "v": "20261029.1"
@@ -2105,7 +2105,8 @@
       "staff-ranked-create": "20261102.1",
       "profile-complete-draft": "20261102.1",
       "offline-confirmation": "20261103.1",
-      "archive-status-hint": "20261103.1"
+      "archive-status-hint": "20261103.1",
+      "community-referee": "20261104.1"
     },
     "modules/main-app/public-watch-isolation.js": {
       "v": "20261005-captain-isolation-1"
@@ -2209,10 +2210,10 @@
       "v": "20261001-ui-v2"
     }
   },
-  "mainCoreBlob": "3c77c4c3b17679c9d83726fdc43cab2e9156a1cf",
+  "mainCoreBlob": "bfe6cf771f74c93e5b5d3f6f35a66670d8b80c6c",
   "resolutions": {
     "index.html": "preserve every current-main script query value; union component cache tokens and insert settlement script after bucket browser",
-    "modules/main-app/core.js": "reconstruct/verify exact current-main blob; apply 707 and 714 hunks with unique context, retaining main 716 offline confirmation",
+    "modules/main-app/core.js": "merge current main community referee changes with integrated 707/714 bucket changes; verify merged blob and regressions",
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context"
   }
 }

@@ -37,3 +37,65 @@ test('double elimination propagates lower-bracket bye and creates/resolves grand
 test('prototype names cannot masquerade as finish types',()=>{for(const finish of ['__proto__','constructor','toString']){const f=fixture();assert.throws(()=>f.run('score',{side:'A',finish}),/invalid-finish/);assert.equal(f.state.matches[0].scoreA,0);}});
 
 test('deferred PASS blocks quick judgement, confirmation and status changes until every predecessor finishes',()=>{for(const action of ['score','fault','quick','confirm','start','ready','resume','rematch','undo']){const f=fixture();const m=f.state.matches[0];m.callPass={waitFor:['m2']};m.scoringMode='quick';const before=JSON.stringify(f.state);assert.throws(()=>f.run(action,{winnerId:'a',side:'A',finish:'spin'}),/pass-protected/);assert.equal(JSON.stringify(f.state),before);}const f=fixture();f.state.matches[0].callPass={waitFor:['m2']};f.state.matches[0].scoringMode='quick';f.state.matches[1].completed=true;f.run('quick',{winnerId:'a'});assert.equal(f.state.matches[0].completed,true);});
+
+test('community scoring admits active BXH staff only behind the community release flag',()=>{
+ const {room,state,user,request}=fixture();
+ Object.assign(room,{eventAuthority:'community',ladderMode:'general'});
+ state.meta.eventAuthority='community';
+ const input={room,state,user,uid:'support',now:1000,d:request('score',{side:'A',finish:'spin'})};
+ const authority={communitySeatsEnabled:true};
+ assert.throws(()=>S.transition(input),/unsupported-mode/);
+ assert.throws(()=>S.transition({...input,authority,user:{...user,accountStatus:'frozen'}}),/unsupported-mode/);
+ assert.throws(()=>S.transition({...input,authority,user:{...user,role:'player'}}),/unsupported-mode/);
+ S.transition({...input,authority});
+ assert.equal(state.matches[0].scoreA,1);
+});
+
+test('community player host can score only in the room they own and created',()=>{
+ const {room,state,request}=fixture();
+ Object.assign(room,{eventAuthority:'community',ladderMode:'general',ownerUid:'host'});
+ state.meta.eventAuthority='community';
+ const input={room,state,user:{active:true,role:'player'},now:1000,authority:{communitySeatsEnabled:true},d:request('score',{side:'A',finish:'spin'})};
+ assert.throws(()=>S.transition({...input,uid:'other'}),/unsupported-mode/);
+ S.transition({...input,uid:'host'});
+ assert.equal(state.matches[0].scoreA,1);
+});
+
+test('community player scoring follows the authoritative main seat and stops on revocation',()=>{
+ const {room,state,request}=fixture();
+ Object.assign(room,{eventAuthority:'community',ladderMode:'general'});
+ state.meta.eventAuthority='community';
+ const input={room,state,user:{active:true,role:'player'},now:1000,authority:{communitySeatsEnabled:true}};
+ const score=(uid,args={})=>S.transition({...input,uid,d:request('score',{side:'A',finish:'spin',...args})});
+ assert.throws(()=>score('backup'),/unsupported-mode/);
+ assert.throws(()=>score('main',{matchId:'m2'}),/unsupported-mode/);
+ score('main');
+ room.refereeSeatsV1.courts[1].main=null;
+ assert.throws(()=>score('main'),/unsupported-mode/);
+ assert.equal(state.matches[0].scoreA,1);
+});
+
+test('community main referee can ready and start their match without changing the other court',()=>{
+ const {room,state,request}=fixture();
+ Object.assign(room,{eventAuthority:'community',ladderMode:'general'});
+ state.meta.eventAuthority='community';
+ state.matches[0].status='pending';
+ const other=clone(state.matches[1]);
+ const input={room,state,user:{active:true,role:'player'},uid:'main',now:1000,authority:{communitySeatsEnabled:true}};
+ for(const action of ['ready','start']){
+  assert.throws(()=>S.transition({...input,d:request(action,{matchId:'m2'})}),/unsupported-mode/);
+  S.transition({...input,d:request(action)});
+ }
+ assert.equal(state.matches[0].status,'in_progress');
+ for(const [key,value] of Object.entries(other))assert.deepEqual(state.matches[1][key],value);
+});
+
+test('active community administrators can assist both courts; disabled administrators cannot',()=>{
+ for(const role of ['admin','super_admin']){
+  const {room,state,request}=fixture();Object.assign(room,{eventAuthority:'community',ladderMode:'general'});state.meta.eventAuthority='community';
+  const input={room,state,user:{active:true,role},uid:'admin',now:1000,authority:{communitySeatsEnabled:true}};
+  for(const matchId of ['m1','m2'])S.transition({...input,d:request('score',{matchId,side:'A',finish:'spin'})});
+  assert.equal(state.matches[0].scoreA,1);assert.equal(state.matches[1].scoreA,1);
+  assert.throws(()=>S.transition({...input,user:{active:true,role,accountStatus:'disabled'},d:request('score',{side:'A',finish:'spin'})}),/unsupported-mode/);
+ }
+});

@@ -7,6 +7,7 @@ const {fixture}=require('./trusted-fixture.cjs'),B=require('../../referee-seats/
 const app=initializeApp({projectId:process.env.GCLOUD_PROJECT},'bucket-auth-browser'),db=getFirestore(app),auth=getAuth(app),commit=createBucketScoringHandler(db),seat=createBucketSeatHandler(db),rootPath=path.resolve(__dirname,'../..');
 const sdk=esbuild.buildSync({stdin:{contents:"export {initializeApp} from 'firebase/app';export {getAuth,connectAuthEmulator,setPersistence,inMemoryPersistence,signInWithEmailAndPassword,signOut,onAuthStateChanged} from 'firebase/auth';export {getFirestore,connectFirestoreEmulator,doc,onSnapshot,getDoc,getDocFromServer} from 'firebase/firestore';export {getFunctions,connectFunctionsEmulator,httpsCallable} from 'firebase/functions';export {initializeAppCheck,CustomProvider} from 'firebase/app-check';",resolveDir:rootPath},bundle:true,write:false,format:'iife',globalName:'BXHBrowserSDK',platform:'browser',nodePaths:(process.env.NODE_PATH||'').split(path.delimiter).filter(Boolean)}).outputFiles[0].text;
 const core=fs.readFileSync(path.join(rootPath,'modules/main-app/core.js'),'utf8'),begin=core.indexOf('const refereeSeatCommandBusy='),end=core.indexOf('\n\nasync function executeRefereeDispatchCommand(',begin);assert(begin>=0&&end>begin);
+const permissionBegin=core.indexOf('function canUseRefereeSeatCommands('),permissionEnd=core.indexOf('\nfunction ',permissionBegin+1);assert(permissionBegin>=0&&permissionEnd>permissionBegin);
 const routeSource=require('./cloud-route-source.cjs').build(fs.readFileSync(path.join(rootPath,'modules/cloud/cloud-runtime.js'),'utf8'),core);
 const assets={
  '/auth/index.html':['text/html',fs.readFileSync(path.join(__dirname,'auth-fixture.html'),'utf8')],
@@ -23,7 +24,7 @@ const assets={
  '/auth/panel.js':['text/javascript',fs.readFileSync(path.join(rootPath,'modules/scoring/four-court-referee-lab.js'),'utf8')],
  '/auth/seats.js':['text/javascript',fs.readFileSync(path.join(rootPath,'modules/main-app/referee-seats.js'),'utf8')],
  '/auth/seats.css':['text/css',fs.readFileSync(path.join(rootPath,'modules/main-app/referee-seats.css'),'utf8')],
- '/auth/core-command.js':['text/javascript',core.slice(begin,end)],
+ '/auth/core-command.js':['text/javascript',core.slice(permissionBegin,permissionEnd)+'\n'+core.slice(begin,end)],
  '/auth/boot.js':['text/javascript',fs.readFileSync(path.join(__dirname,'auth-fixture.js'),'utf8')]
 };
 const server=http.createServer(async(req,res)=>{

@@ -88,7 +88,17 @@ test('primary controls use status tabs and search rather than owner tabs; draft 
  for(const label of ['報名中','即將開放','已關閉','草稿','一般房間','搜尋賽事名稱、房號或地點'])assert.match(controls,new RegExp(label));
  assert.doesNotMatch(controls,/我的賽事|其他賽事|全部賽事/);assert.match(controls,/報名中 <b>10<\/b>/);
 });
-test('staff cannot request the community-room scope from client controls',async()=>{
- const t=setup();t.s.userProfile.role='staff';await t.load();assert.doesNotMatch(t.s.adminTournamentListControlsHtml(),/data-action="admin-tournament-kind"/);
- const count=t.calls.length;await t.s.changeAdminTournamentListQuery({kind:'community'});assert.equal(t.calls.length,count);
+test('active staff can request the community-room scope from client controls',async()=>{
+ const t=setup();Object.assign(t.s.userProfile,{role:'staff',active:true});await t.load();
+ assert.match(t.s.adminTournamentListControlsHtml(),/data-action="admin-tournament-kind"/);
+ await t.s.changeAdminTournamentListQuery({kind:'community'});
+ assert.equal(t.calls.at(-1).kind,'community');
+});
+test('community room cards expose management entry to admins and active staff',async()=>{
+ for(const role of ['admin','staff']){
+  const t=setup(async()=>({...page(0,1,false),items:[row(0,{code:'BXH-HBWFHS',eventAuthority:'community'})]}));
+  t.s.userProfile.role=role;
+  await t.s.changeAdminTournamentListQuery({kind:'community'});
+  assert.match(t.view(),/data-action="cloud-admin-open-tournament" data-code="BXH-HBWFHS">開啟管理/);
+ }
 });
