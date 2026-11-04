@@ -60,3 +60,16 @@ then uses the original normalizer for unmarked legacy rooms and verifies the
 private/public/bucket context for marked rooms. Offline tests cover the seam,
 including incomplete ownership and wrong room path. This is an integration
 interface only: no deployed reader, detail or repair handler calls it yet.
+
+## Pinned list and detail source patch
+
+`release/buckets/my-events/patch-readers.cjs` accepts only the exact captured
+list reader (`647956d1477f3916981259a188928e962c2f04ab3779c383aa47205efecf7201`)
+and detail reader (`4a50f20ec750089f312fc4e7f7f453eb4654e7044f8f71ecfa1bd27d5107876c`)
+source hashes. It changes their factory to require a transaction lifecycle
+resolver and replaces only the root-only `normalizeRoom(room.data())` call with
+an awaited resolver in the existing read-only transaction. The exact deployed
+reader fixtures and a synthetic account/rollout/membership path prove that the
+list calls the resolver after authorization, while detail treats an ended room
+as inactive. Drift or a missing resolver fails closed. These are source patch
+and offline tests; no production reader function or repair writer was updated.
