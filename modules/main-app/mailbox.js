@@ -4,7 +4,7 @@
 let mailboxState=null;
 function mailboxContext(){
   const key=currentAuthUid()+':'+engagementSessionEpoch;
-  if(!mailboxState||mailboxState.key!==key)mailboxState={key,open:false,loading:false,busy:false,messages:null,unreadCount:0,selectedId:'',error:'',lastSent:null};
+  if(!mailboxState||mailboxState.key!==key)mailboxState={key,open:false,loading:false,busy:false,messages:null,unreadCount:0,selectedId:'',deleting:false,deleteSelection:new Set(),canDelete:false,error:'',lastSent:null};
   return mailboxState;
 }
 
@@ -32,6 +32,8 @@ async function loadMailbox(force=false){
           if(c.reloadRequested)continue;
           if(!result?.ok)throw Error('load-failed');
           c.messages=Array.isArray(result.messages)?result.messages:[];
+          c.canDelete=result.canDelete===true;
+          c.deleteSelection=new Set(c.messages.filter(m=>m.deletable===true&&c.deleteSelection.has(m.id)).map(m=>m.id));
           c.unreadCount=Math.max(0,Number(result.unreadCount)||0);
           if(c.selectedId&&!c.messages.some(m=>m.id===c.selectedId))c.selectedId='';
         }catch(error){if(c===mailboxContext()&&!c.reloadRequested)c.error=mailboxError(error);}
@@ -62,6 +64,10 @@ function renderMailboxDetail(selected,c){
 // Keep .panel on the expanded article only: invitation controls mount there.
 function renderMailboxEntry(message,c){
   const expanded=message.id===c.selectedId,id=mailboxDomId(message.id);
+  if(c.deleting){
+    const checked=c.deleteSelection.has(message.id);
+    return `<div class="mailbox-entry"><button type="button" class="mailbox-item" data-action="mailbox-delete-toggle" data-message-id="${esc(message.id)}" aria-pressed="${checked}" ${c.busy||message.deletable!==true?'disabled':''}><span class="mailbox-item-heading"><span class="mailbox-item-title">${checked?'☑':'☐'} ${esc(message.subject||'系統通知')}</span><span>${message.deletable===true?'':'請先領取獎勵'}</span></span><span class="mailbox-item-meta"><span>${esc(message.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(message.createdAt))}</span></span></button></div>`;
+  }
   return `<div class="mailbox-entry"><button type="button" id="${id}" class="mailbox-item ${message.readAt?'':'unread'} ${expanded?'active':''}" data-action="mailbox-select" data-message-id="${esc(message.id)}" aria-expanded="${expanded}" aria-controls="${id}-detail"><span class="mailbox-item-heading"><span class="mailbox-item-title">${message.readAt?'':'● '}${esc(message.subject||'系統通知')}</span><span class="mailbox-item-toggle" aria-hidden="true">${expanded?'收合 ▴':'展開 ▾'}</span></span><span class="mailbox-item-meta"><span>${esc(message.senderName||'BXH ARENA')}</span><span>${esc(mailboxDate(message.createdAt))}</span></span></button><article id="${id}-detail" class="${expanded?'panel ':''}mailbox-detail" aria-labelledby="${id}" ${expanded?'':'hidden'}>${expanded?renderMailboxDetail(message,c):''}</article></div>`;
 }
 // Core replaces the entire screen on each render. Keep the selected row and
@@ -95,8 +101,16 @@ function restoreViewport(snapshot){
 }
 function renderMailboxPage(){
   const c=mailboxContext(),messages=c.messages||[];
+  const selectable=messages.filter(m=>m.deletable===true).length;
+  const selected=c.deleteSelection.size,allSelected=selectable>0&&selectable===selected;
   return `<section class="panel" data-mailbox-page><div class="panel-title"><span>✉️ 站內信</span><div class="btn-row">${isSuperAdmin()?`<button class="btn btn-primary btn-sm" data-action="mailbox-self-card-test" ${c.busy?"disabled":""}>🎴 發送測試卡給我</button>`:""}<button class="btn btn-ghost btn-sm" data-action="mailbox-refresh" ${c.loading||c.busy?'disabled':''}>重新整理</button><button class="btn btn-ghost btn-sm" data-action="mailbox-close">返回賽事大廳</button></div></div>
     <p class="hint">未讀 ${c.unreadCount} 封｜系統通知、活動及中獎訊息會集中在這裡。</p>
+    ${c.canDelete&&(messages.length||c.deleting)?`<div class="btn-row">
+      <button type="button" class="btn btn-ghost btn-sm" data-action="mailbox-delete-mode" ${c.busy?'disabled':''}>${c.deleting?'取消選擇':'選擇'}</button>
+      ${c.deleting?`<button type="button" class="btn btn-ghost btn-sm" data-action="mailbox-delete-all" ${c.busy||!selectable?'disabled':''}>${allSelected?'取消全選':'全部選擇'}</button>
+      <button type="button" class="btn btn-primary btn-sm" data-action="mailbox-delete" ${c.busy||!selected?'disabled':''}>刪除${selected?'（'+selected+'）':''}</button>
+      <span class="hint">全選範圍為目前顯示的可刪除信件。</span>`:''}
+    </div>`:''}
     ${c.error?`<div class="auth-error" role="alert">${esc(c.error)}</div>`:''}
     ${c.loading&&!c.messages?'<div class="empty-state">正在載入站內信……</div>':`<div class="mailbox-layout"><div class="mailbox-list" aria-busy="${c.loading}">${messages.length?messages.map(message=>renderMailboxEntry(message,c)).join(''):'<div class="empty-state">目前沒有站內信。</div>'}</div></div>`}
     ${isSuperAdmin()?`<details class="panel" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">最高管理員｜發送測試信</summary><div class="grid grid-2 mailbox-compose-grid" style="margin-top:14px"><div class="field"><label>玩家 UID</label><input id="mailbox-recipient" maxlength="128" placeholder="貼上 Firebase UID"></div><div class="field"><label>信件標題</label><input id="mailbox-subject" maxlength="80" placeholder="例如：站內信測試"></div><div class="field" style="grid-column:1/-1"><label>信件內容</label><textarea id="mailbox-body" maxlength="2000" placeholder="輸入通知內容"></textarea></div></div><button class="btn btn-primary" data-action="mailbox-send-test" ${c.busy?'disabled':''}>發送測試信</button><p class="hint">本階段以 UID 測試寄送；活動中獎通知會在抽獎模組串接。</p>${c.lastSent?`<div class="panel" style="margin-top:14px"><strong>為剛寄出的信件新增附件</strong><p class="hint">收件者 ${esc(c.lastSent.targetUid)}｜信件 ${esc(c.lastSent.messageId)}｜PDF、PNG、JPG、TXT，單檔最多 2 MB</p><input id="mailbox-attachment-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"><button class="btn btn-ghost btn-sm" data-action="mailbox-upload-attachment" ${c.busy?'disabled':''}>上傳附件</button></div>`:''}</details>`:''}
@@ -143,8 +157,24 @@ async function openMailboxPartnerContract(orderCode){
 async function handleMailbox(action,target){
   const c=mailboxContext();if(!firebaseUser?.uid||c.busy)return;
   if(action==='mailbox-open'){c.open=true;accountMenuOpen=false;render();loadMailbox(true);return;}
-  if(action==='mailbox-close'){c.open=false;c.selectedId='';render();return;}
+  if(action==='mailbox-close'){c.open=false;c.selectedId='';c.deleting=false;c.deleteSelection.clear();render();return;}
   if(action==='mailbox-refresh'){loadMailbox(true);return;}
+  if(action==='mailbox-delete-mode'){
+    if(!c.canDelete)return;
+    c.deleting=!c.deleting;c.selectedId='';c.deleteSelection.clear();render();return;
+  }
+  if(action==='mailbox-delete-all'||action==='mailbox-delete-toggle'){
+    if(!c.canDelete||!c.deleting)return;
+    const ids=(c.messages||[]).filter(m=>m.deletable===true).map(m=>m.id);
+    if(action==='mailbox-delete-all')c.deleteSelection=new Set(c.deleteSelection.size===ids.length?[]:ids);
+    else{
+      const id=target.getAttribute('data-message-id');
+      if(!ids.includes(id))return;
+      if(c.deleteSelection.has(id))c.deleteSelection.delete(id);
+      else c.deleteSelection.add(id);
+    }
+    render();return;
+  }
   if(action==='mailbox-select'){
     const selectedId=target.getAttribute('data-message-id')||'';
     const message=(c.messages||[]).find(m=>m.id===selectedId);if(!message)return;
@@ -254,7 +284,12 @@ async function handleMailbox(action,target){
     return;
   }
   let payload;
-  if(action==='mailbox-toggle-read')payload={action:target.getAttribute('data-read')==='1'?'markUnread':'markRead',messageId:target.getAttribute('data-message-id'),operationId:crypto.randomUUID()};
+  if(action==='mailbox-delete'){
+    if(!c.canDelete||!c.deleting||!c.deleteSelection.size)return;
+    const messageIds=[...c.deleteSelection];
+    if(!confirm(`確定刪除選取的 ${messageIds.length} 封站內信？`))return;
+    payload={action:'delete',messageIds};
+  }else if(action==='mailbox-toggle-read')payload={action:target.getAttribute('data-read')==='1'?'markUnread':'markRead',messageId:target.getAttribute('data-message-id'),operationId:crypto.randomUUID()};
   else if(action==='mailbox-send-test'){
     const targetUid=(document.getElementById('mailbox-recipient')?.value||'').trim(),subject=(document.getElementById('mailbox-subject')?.value||'').trim(),body=(document.getElementById('mailbox-body')?.value||'').trim();
     if(!targetUid||!subject||!body){showToast('請完整填寫玩家 UID、標題與內容',true);return;}
@@ -266,6 +301,13 @@ async function handleMailbox(action,target){
     if(!window.engagementService?.mailbox)throw Error('service-unavailable');
     const result=await window.engagementService.mailbox(payload);if(c!==mailboxContext())return;if(!result?.ok)throw Error('operation-failed');
     if(action==='mailbox-send-test'){c.lastSent={targetUid:payload.targetUid,messageId:result.messageId};showToast(result.replayed?'這封測試信先前已送出':'測試信已送出');}
+    if(action==='mailbox-delete'){
+      const removed=new Set(result.removedIds);
+      c.messages=(c.messages||[]).filter(message=>!removed.has(message.id));
+      c.unreadCount=Math.max(0,Number(result.unreadCount)||0);
+      c.deleteSelection.clear();c.deleting=false;
+      showToast(result.protectedCount?'已處理刪除，未領取獎勵的信件已保留':'已刪除選取的信件');
+    }
     c.busy=false;const refresh=loadMailbox(true);c.busy=true;
     await refresh;
   }catch(error){if(c===mailboxContext())c.error=mailboxError(error);}

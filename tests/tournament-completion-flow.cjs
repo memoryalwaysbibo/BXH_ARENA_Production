@@ -198,3 +198,38 @@ test('three-seat scored and quick confirmations both reach the shared completion
     assert.equal(r.ctx.state.archiveStatus,'completed');assert.equal(r.results(),1);
   }
 });
+
+const archiveControls = section('function renderArchiveControls(){', '\n/* ==== tab: live ==== */');
+const statusSource = section('function tournamentStatus(){', '\nfunction currentTournamentRegistrationLocked');
+function archiveView(target) {
+  const timers=[];
+  const ctx={state:target,Number,Date,
+    esc:x=>String(x),isSuperAdmin:()=>false,isAdminTierOrAbove:()=>true,
+    settlementRouteForTournament:()=> 'no-ladder',setTimeout:fn=>timers.push(fn)};
+  vm.createContext(ctx);vm.runInContext(statusSource+archiveControls,ctx);
+  return {html:ctx.renderArchiveControls(),timers};
+}
+test('archive hint stays absent before start, after drawing, and during a four-court first round',()=>{
+  for(const target of [
+    room({matches:[],startedAt:null,championId:null,runnerUpId:null}),
+    room({matches:[{id:'m',completed:false}],startedAt:null}),
+    room({matches:Array.from({length:7},(_,i)=>({id:'m'+i,completed:false,station:i<4?i+1:null})),startedAt:1}),
+    room({meta:{eventCancelled:true},startedAt:1})
+  ]){
+    const view=archiveView(target);assert.equal(view.html,'');assert.equal(view.timers.length,0);
+  }
+});
+test('finished matches retain the pending archive hint and automatic archive scheduling',()=>{
+  const view=archiveView(room({startedAt:1}));
+  assert.match(view.html,/對戰已完成/);assert.match(view.html,/自動封存準備中/);assert.equal(view.timers.length,1);
+});
+test('failed and pending archive states retain their safe retry controls after matches finish',()=>{
+  for(const phase of ['failed','sync-pending']){
+    const view=archiveView(room({startedAt:1,settlementPhase:phase}));
+    assert.match(view.html,/data-action="archive-complete"/);assert.equal(view.timers.length,0);
+  }
+});
+test('archived rooms retain the final-results control without scheduling more work',()=>{
+  const view=archiveView(room({archiveStatus:'completed',completedAt:1,startedAt:1}));
+  assert.match(view.html,/查看最終結果/);assert.doesNotMatch(view.html,/自動封存準備中/);assert.equal(view.timers.length,0);
+});
