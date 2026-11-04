@@ -79,3 +79,16 @@ certificate adapter: the authenticated list returns a six-court `settling`
 card, the detail reader sees the same phase, and a missing bucket yields an
 unresolved notice without a card. Drift or a missing resolver fails closed. These are source patch
 and offline tests; no production reader function or repair writer was updated.
+
+## Repair target reproduction
+
+`deployed-engine.cjs` is the exact captured engine source (SHA-256
+`3b5f36dc1e0419284c9301a50f3f0eedba67c5f9d5b31921b473e306557afe86`).
+The synthetic six-court `done` root lacks a sealed bucket completion receipt.
+Its synchronous `target(room)` returns `inactive`, while the transaction
+bucket verifier returns `invalid/bucket-lifecycle-unverified`. This proves a
+repair classification gap in the captured source, not an observed live room.
+The engine calls `target(room)` in registration ingest, room intent and page
+processing; rebuild and bootstrap also use root-only target/discovery checks.
+All of these must be reconciled, with reads before writes and stale leases
+preserved, before bucket rooms can use My Events repair.
