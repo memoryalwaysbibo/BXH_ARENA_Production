@@ -1,8 +1,21 @@
 'use strict';
 const C=require('./core.cjs'),Fault=require('./engine/fault.cjs'),{createEngine}=require('./engine/index.cjs');
+const EventStaff=require('./event-staff-core.cjs');
 const POINTS=Object.freeze({spin:1,knockout:2,burst:2,extreme:3});
 const fail=reason=>{throw Object.assign(new Error(reason),{seatCode:reason});};
+function communitySupport(room,user,uid,authority={}){
+ return authority.communitySeatsEnabled===true&&room.eventAuthority==='community'&&room.ladderMode==='general'
+  &&EventStaff.activeAccount(user)
+  &&(['staff','admin','super_admin'].includes(user.role)||(user.role==='player'&&!!uid&&room.ownerUid===uid&&room.createdBy===uid));
+}
+function communitySeatedPlayer(room,user,uid,station,authority={}){
+ return authority.communitySeatsEnabled===true&&room.eventAuthority==='community'&&room.ladderMode==='general'
+  &&user?.role==='player'&&EventStaff.activeAccount(user)
+  &&!!uid&&room.refereeSeatsV1?.courts?.[station]?.main?.uid===uid;
+}
 function allowed(room,user,uid,station,authority={}){
+ if(communitySupport(room,user,uid,authority)||communitySeatedPlayer(room,user,uid,station,authority))return true;
+ if(C.communityRoom(room,authority))return false;
  if(!C.eligible(room,user,uid,authority))return false;
  if(C.manager(room,user,uid,authority))return true;
  return C.SLOTS.some(slot=>room.refereeSeatsV1?.courts?.[station]?.[slot]?.uid===uid);
@@ -10,7 +23,7 @@ function allowed(room,user,uid,station,authority={}){
 function passProtected(state,m){return !!m.callPass||(state.matches||[]).some(x=>x.callPass?.waitFor?.includes(m.id)&&!x.completed);}
 function perform({room,state,user,uid,d,now,authority={}},propagate){
  if(room.refereeSeatsV1?.version!==1)fail('not-enabled');
- if(room.eventAuthority!=='official'||state.meta?.eventAuthority!=='official'||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
+ if((room.eventAuthority!==state.meta?.eventAuthority||(room.eventAuthority!=='official'&&!communitySupport(room,user,uid,authority)&&!communitySeatedPlayer(room,user,uid,Number(d.station),authority)))||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
  if(room.eventCancelled||room.systemClosed||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');
  if(!state.startedAt)fail('not-started');
  const m=state.matches?.find(m=>m.id===d.matchId);if(!m)fail('not-found');
@@ -82,6 +95,6 @@ function transitionLocal(context){
  if(!['score','fault','undo','rematch','pause','resume'].includes(context?.d?.action))fail('structural-command-required');
  return perform(context,false);
 }
-module.exports={transition,transitionLocal,allowed,publicProjection};
+module.exports={communitySeatedPlayer,communitySupport,transition,transitionLocal,allowed,publicProjection};
 
 

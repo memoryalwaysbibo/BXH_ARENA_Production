@@ -366,6 +366,29 @@ test('real registration invitation extension mounts controls in the selected vis
   assert.equal(nodes.has('mailbox-invitation-actions'), false, 'ordinary mail never inherits invitation controls');
 });
 
+test('general referee invitations accept through the seat service and expose a court entry',async()=>{
+ const invite=message(1,{type:'community_referee_invitation',eventCode:'BXH-ROOM',station:2,slot:'backup1',requestId:'invitation-123',refereeInviteStatus:'pending'});
+ const h=setup([invite]),calls=[];h.sandbox.window.cloudSync={manageRefereeSeats:async d=>{calls.push(d);return {ok:true};}};
+ await h.select(invite.id);assert(h.view().includes('接受裁判邀請'));
+ await h.api.handleMailbox('mailbox-community-referee-accept',h.target(invite.id));
+ assert.equal(calls.at(-1).action,'accept-invite');assert.equal(calls.at(-1).station,2);assert.equal(calls.at(-1).slot,'backup1');
+ assert(h.view().includes('進入裁判台'));assert(!h.view().includes('查看賽果'));
+ let opened;h.sandbox.openCommunityRefereeRoom=async(...args)=>{opened=args;};
+ await h.api.handleMailbox('mailbox-community-referee-open',h.target(invite.id));assert.deepEqual(opened,['BXH-ROOM',2]);
+});
+test('ended referee invitations only show existing result and confirmation, which collapses mail',async()=>{
+ const invite=message(1,{type:'community_referee_invitation',eventCode:'BXH-ROOM',station:1,slot:'main',requestId:'invitation-123',refereeInviteStatus:'pending'});
+ const h=setup([invite]);h.sandbox.window.cloudSync={manageRefereeSeats:async()=>({ok:false,reason:'community-result-available'})};
+ await h.select(invite.id);await h.api.handleMailbox('mailbox-community-referee-accept',h.target(invite.id));
+ assert(h.view().includes('比賽已有結果'));assert(h.view().includes('mailbox-community-referee-dismiss'));assert(!h.view().includes('進入裁判台'));assert(!h.view().includes('接受裁判邀請'));assert(!h.view().includes('查看賽果'));
+ await h.api.handleMailbox('mailbox-community-referee-dismiss',h.target(invite.id));assert.equal(h.state.selectedId,'');
+});
+test('an accepted invitation becomes finished if the room ends before court entry',async()=>{
+ const h=setup([message(1,{type:'community_referee_invitation',eventCode:'BXH-ROOM',refereeInviteStatus:'accepted'})]);
+ h.sandbox.openCommunityRefereeRoom=async()=>{throw Error('community-result-available');};
+ await h.select('mail-1');await h.api.handleMailbox('mailbox-community-referee-open',h.target('mail-1'));
+ assert(h.view().includes('比賽已有結果'));assert(!h.view().includes('進入裁判台'));
+});
 test('bulk selection excludes protected rewards and refreshes the unread badge after deletion', async () => {
   const ordinary = message(1, { deletable: true, readAt: null });
   const reward = message(2, { deletable: false, readAt: null });

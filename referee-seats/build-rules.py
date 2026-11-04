@@ -6,6 +6,21 @@ p=argparse.ArgumentParser();p.add_argument('--source',required=True);p.add_argum
 s=pathlib.Path(a.source).read_text()
 assert 'function refereeSeatWriteValid(' not in s,'seat guard already present'
 helper='''
+    // General-room referees receive private read access only while seated.
+    function communityRefereeReadable(room) {
+      let actor = get(userPath(request.auth.uid)).data;
+      let release = get(/databases/$(database)/documents/systemConfig/refereeSeatsV1).data;
+      return release.get('enabled', false) == true
+        && release.get('communitySeatsEnabled', false) == true
+        && release.get('perCourtScoringVerified', false) == true
+        && room.get('eventAuthority', '') == 'community'
+        && room.get('ladderMode', '') == 'general'
+        && room.get('refereeSeatsV1', {}).get('version', 0) == 1
+        && actor.get('role', '') == 'player' && actor.get('active', false) == true
+        && actor.get('isTestAccount', false) != true && actor.get('deleted', false) != true
+        && !(actor.get('accountStatus', '') in ['deleted','disabled','frozen'])
+        && request.auth.uid in room.get('refereeStationUids', []);
+    }
 
     // Read-only bucket access follows existing official staff private-room access.
     // Seats control scoring; they do not remove staff read access.
@@ -39,9 +54,9 @@ helper='''
       return !changed.hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
-          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room) || isCommunityOwnerData(room))
         && (!enabled || privateDoc || !changed.hasAny(['bracketView'])
-          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room));
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room) || isCommunityOwnerData(room));
     }
 '''
 anchor='    // ==== 路徑輔助函式 ===='
@@ -84,6 +99,7 @@ room=once(room,"      allow update: if refereeSeatWriteValid(code, true) && qrCh
 mirror=once(mirror,"      allow delete: if resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data)","      allow delete: if !('scoreStorage' in get(tourPath(code)).data) && resource.data.get('qrCheckinManaged', false) != true && (!onsiteWaitlistOwned(resource.data)")
 mirror=once(mirror,"      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount']) && noOperationsCreate(request.resource.data) && tournamentExistsAfterFor(code) && (","      allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount']) && noOperationsCreate(request.resource.data) && tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataAfterFor(code)) && (")
 mirror=once(mirror,"      allow update: if refereeSeatWriteValid(code, false) && qrCheckinWriteValid(code)","      allow update: if tournamentExistsFor(code) && tournamentExistsAfterFor(code) && !('scoreStorage' in tournamentDataFor(code)) && !('scoreStorage' in tournamentDataAfterFor(code)) && refereeSeatWriteValid(code, false) && qrCheckinWriteValid(code)")
+room=once(room,"allow get: if isSignedIn() && (canReadTournamentPrivate(resource.data)","allow get: if isSignedIn() && (communityRefereeReadable(resource.data) || canReadTournamentPrivate(resource.data)")
 s=private+tournament_anchor+room+public_anchor+mirror
 pathlib.Path(a.output).write_text(s)
 print('Seat and bucket rules candidate generated; no deployment performed.')

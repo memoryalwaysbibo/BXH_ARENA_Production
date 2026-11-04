@@ -192,6 +192,40 @@ test('ordinary redraw refreshes a stale QR fence only for identical checked-in e
  assert.equal(h.count,0);assert.equal(h.remote.matches[0].id,'one-pairing');
  assert.equal(h.remote.bracketDraw.id,'op0');assert.equal(h.remote.players.length,2);
 });
+test('community redraw without required check-in refreshes only for the same entrants',()=>{
+ const base={...room(),meta:{eventAuthority:'community',checkinRequired:false},players:[{id:'a'},{id:'b'}]};
+ const snapshot={...clone(base),matches:[{a:{playerId:'a'},b:{playerId:'b'}}]};
+ const fresh={...clone(base),registrationRosterRevision:2};
+ assert.equal(rosterRebase(fresh,snapshot).registrationRosterRevision,2);
+ assert.equal(rosterRebase({...fresh,players:[{id:'a'},{id:'c'}]},snapshot),null);
+ assert.equal(rosterRebase({...fresh,meta:{...fresh.meta,checkinRequired:true}},snapshot),null);
+});
+test('community room uploads a second draw after refreshing a stale roster revision',async()=>{
+ const h=fixture();
+ const base={...room(),meta:{...room().meta,eventAuthority:'community',checkinRequired:false},registrationRosterRevision:1};
+ h.remote=clone(base);h.pub=clone(base);h.ctx.apply(base);
+ h.ctx.rebaseRosterFence=rosterRebase;
+ h.ctx.writeFailureCode=()=> 'registration-roster-stale';
+ const c=h.make();
+ assert.equal(await c.begin(),true);
+ const first=h.remote.bracketDraw.id;
+ const write=h.ctx.write;
+ let rejected=false;
+ h.ctx.write=async(s,o)=>{
+  if(!rejected){
+   rejected=true;
+   h.remote={...h.remote,registrationRosterRevision:2};
+   h.pub=clone(h.remote);
+   return false;
+  }
+  assert.equal(s.registrationRosterRevision,2);
+  return write(s,o);
+ };
+ assert.equal(await c.begin(),true);
+ assert.notEqual(h.remote.bracketDraw.id,first);
+ assert.equal(h.remote.matches[0].id,'m2');
+ assert.equal(h.count,2);
+});
 test('ordinary redraw refuses a fence refresh if checked-in membership changed',async()=>{
  const h=fixture(),base={...room(),meta:{...room().meta,checkinRequired:true},players:[{id:'a',checkedIn:true},{id:'b',checkedIn:true}],qrCheckinRevision:5};
  h.remote=clone(base);h.pub=clone(base);h.ctx.state=()=>base;

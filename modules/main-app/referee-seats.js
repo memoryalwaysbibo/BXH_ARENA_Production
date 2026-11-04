@@ -6,7 +6,7 @@
  const notified=new Set();let incomingId=null;
  const state=()=>ctx?.state(),model=()=>state()?.meta?.refereeSeatsV1,uid=()=>ctx?.uid();
  const enabled=st=>st?.meta?.refereeSeatsV1?.version===1;
- function canScore(st,station,actor){return enabled(st)&&slots.some(slot=>st.meta.refereeSeatsV1.courts?.[station]?.[slot]?.uid===actor);}
+ function canScore(st,station,actor){return enabled(st)&&(st.meta.eventAuthority==='community'?['main']:slots).some(slot=>st.meta.refereeSeatsV1.courts?.[station]?.[slot]?.uid===actor);}
  const eligible=()=>ctx?.eligible()===true;
  const manager=()=>ctx?.manager()===true;
  const locked=()=>!state()?.cloudCode||state()?.archiveStatus==='completed'||state()?.meta?.eventCancelled===true;
@@ -33,7 +33,7 @@
    const result=await root.cloudSync?.manageRefereeSeats?.({...data,code,operationId});
    if(!isCurrent(k))return;
    if(!result?.ok)throw new Error(result?.reason||'cloud-unavailable');
-   ctx.toast(data.action==='request'?'已提出交接申請，等待對方確認':data.action==='respond'?(data.response==='accept'?'交接完成':'已取消交接'):data.action==='cancel'?'已取消交接申請':data.action==='enable'?'三席裁判制已啟用':data.action==='leave'?'已退出本台':data.action==='revoke'?'已撤銷該席位權限':'已加入本台');
+   ctx.toast(data.action==='invite'?'已建立裁判邀請':data.action==='request'?'已提出交接申請，等待對方確認':data.action==='respond'?(data.response==='accept'?'交接完成':'已取消交接'):data.action==='cancel'?'已取消交接申請':data.action==='enable'?'三席裁判制已啟用':data.action==='leave'?'已退出本台':data.action==='revoke'?'已撤銷該席位權限':'已加入本台');
   }catch(error){if(isCurrent(k))ctx.toast(messages[error.message]||'裁判席位未完成變更，請確認網路或服務狀態後重試。',true);}
   finally{if(isCurrent(k)){busy=false;ctx.render();}}
  }
@@ -76,23 +76,31 @@
   if(!enabled(st))return '';
   const court=st.meta.refereeSeatsV1.courts?.[station]||{},readOnly=locked()||st.forcedCourtExits?.[station]?.closed;
   const buttons=slots.map(slot=>{
-   const seat=court[slot],mine=seat?.uid===uid(),disabled=busy||readOnly||!eligible();
-   return `<button type="button" class="ref-seat-button${mine?' mine':''}" data-seat-action="seat" data-station="${station}" data-slot="${slot}" ${disabled?'disabled':''}><span>${labels[slot]}</span><strong>${escape(seat?.name||'點此加入')}</strong>${mine?'<small>我的席位 · 點擊退出</small>':''}</button>`;
+   const seat=court[slot],mine=seat?.uid===uid(),disabled=busy||readOnly||!eligible()||(!seat&&st.meta.eventAuthority==='community'&&!ctx?.inviter?.()&&!ctx?.support?.());
+   return `<button type="button" class="ref-seat-button${mine?' mine':''}" data-seat-action="seat" data-station="${station}" data-slot="${slot}" ${disabled?'disabled':''}><span>${labels[slot]}</span><strong>${escape(seat?.name||(st.meta.eventAuthority==='community'?(ctx?.inviter?.()?'邀請裁判':ctx?.support?.()?'點此加入':'空席'):'點此加入'))}</strong>${mine?'<small>我的席位 · 點擊退出</small>':''}</button>`;
   }).join('');
   const pending=Object.values(st.meta.refereeSeatsV1.requests||{}).filter(r=>r.station===station&&r.fromUid===uid()&&r.status==='pending');
   return `<div class="ref-seat-section"><div class="ref-seat-grid">${buttons}</div>${pending.map(r=>`<div class="ref-seat-wait" role="status">${r.expiresAt>Date.now()?'等待對方確認中':'交接申請已逾時'}<button type="button" class="btn btn-ghost btn-sm" data-seat-action="cancel" data-station="${station}" data-slot="${r.slot}" data-request="${escape(r.id)}" ${busy?'disabled':''}>取消申請</button></div>`).join('')}</div>`;
  }
  function settings(){
+  if(enabled(state())&&state()?.meta?.eventAuthority==='community')return '<div class="panel"><div class="panel-title">三席裁判制</div><p class="hint">房主可點選空席邀請玩家；主裁負責計分，備裁經確認交接後接手。BXH 工作人員可直接協助。</p></div>';
   if(enabled(state()))return '<div class="panel"><div class="panel-title">三席裁判制</div><p class="hint">請在裁判台點選主裁判、備用裁判 1 或備用裁判 2 加入。未取得席位的工作人員僅能查看。</p></div>';
-  if(!manager()||state()?.meta?.eventAuthority!=='official'||['team'].includes(state()?.meta?.battleMode)||state()?.meta?.playMode==='enchantment'||locked())return '';
+  if(!manager()||!['official','community'].includes(state()?.meta?.eventAuthority)||['team'].includes(state()?.meta?.battleMode)||state()?.meta?.playMode==='enchantment'||locked())return '';
+  if(state()?.meta?.eventAuthority==='community')return '<div class="panel"><div class="panel-title">三席裁判制</div><p class="hint">每台可配置一位主裁判與兩位備用裁判。</p><button type="button" class="btn btn-primary" data-seat-action="enable">啟用三席裁判制</button></div>';
   return '<div class="panel"><div class="panel-title">三席裁判制</div><p class="hint">每台一位主裁、兩位備裁自行加入，三位共同擁有該台操作權。合作活動裁判須先接受本場裁判邀請；啟用前請清空舊版裁判台分配。</p><button type="button" class="btn btn-primary" data-seat-action="enable">啟用三席裁判制</button></div>';
  }
  function click(action,station,slot,requestId){
   if(locked()||busy)return;
-  if(action==='enable')return modal('啟用三席裁判制後，工作人員須加入該台席位才能計分。是否啟用？',[{label:'確定',run:()=>send({action:'enable'})},{label:'取消'}]);
+  if(action==='enable')return modal(state()?.meta?.eventAuthority==='community'?'是否為本房各戰鬥台建立三個裁判席位？':'啟用三席裁判制後，工作人員須加入該台席位才能計分。是否啟用？',[{label:'確定',run:()=>send({action:'enable'})},{label:'取消'}]);
   if(!eligible())return ctx.toast('帳號尚未具備本場有效裁判資格，請聯絡主辦或管理員。',true);
   if(action==='cancel')return send({action:'cancel',station,slot,requestId,expectedCourtRevision:model()?.courts?.[station]?.revision||0});
   const court=model()?.courts?.[station]||{},seat=court[slot],base={station,slot,expectedCourtRevision:court.revision||0,expectedUid:seat?.uid||null};
+  if(!seat&&state()?.meta?.eventAuthority==='community'){
+   if(!ctx?.inviter?.())return ctx?.support?.()?send({...base,action:'claim'}):undefined;
+   const targetGameId=root.prompt('輸入受邀玩家的完整遊戲 ID')?.trim();
+   if(targetGameId)return send({...base,action:'invite',targetGameId});
+   return;
+  }
   if(!seat)return send({...base,action:'claim'});
   if(seat.uid===uid())return modal(`是否退出 ${station} 號台${labels[slot]}？`,[{label:'確定',run:()=>send({...base,action:'leave'})},{label:'取消'}]);
   const choices=[{label:'提出權限交接',run:()=>send({...base,action:'request'})}];

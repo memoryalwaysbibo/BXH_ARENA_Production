@@ -88,7 +88,7 @@ function createSummaryHandler(db,{now=Date.now}={}){return async request=>{
   }else if(tester){scope='tester';query=query.where('createdBy','==',uid).where('eventAuthority','==','test');}
   else if(admin||staff)scope=user.role;
   else throw Error('permission-denied');
-  if(opt.kind==='community'&&!admin)throw Error('permission-denied');
+  if(opt.kind==='community'&&!(opt.mode==='admin'&&(admin||staff)))throw Error('permission-denied');
   const ownerProfile=grant?{...user,partnerOrganizer:{...user.partnerOrganizer,orderCode:grant.order}}:user;
   const fields=opt.mode==='event_staff'?[...FIELDS,'eventStaffAssignments.'+uid]:FIELDS;
   const snapshot=await tx.get(query.select(...fields));

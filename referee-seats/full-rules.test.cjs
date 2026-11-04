@@ -22,3 +22,26 @@ test('full composed rules block seated, unseated and ordinary player direct scor
 test('full composed rules preserve host and administrator management writes',async()=>{for(const uid of ['host','admin'])await assertSucceeds(batch(uid));});
 test('full composed rules protect canonical seats and assignment projection from managers',async()=>{for(const uid of ['host','admin']){const db=dbFor(uid);await assertFails(updateDoc(doc(db,'tournaments/'+code),{refereeSeatsV1:{version:1,revision:999}}));await assertFails(updateDoc(doc(db,'tournaments/'+code),{refereeStationAssignments:{1:['intruder']}}));}});
 test('full composed rules keep receipts and audits inaccessible to all client roles',async()=>{for(const uid of ['seated','host','admin'])for(const collection of ['refereeSeatOperations','refereeScoreOperations','refereeSeatAudit','refereeScoreAudit']){const ref=doc(dbFor(uid),'tournaments/'+code+'/'+collection+'/forged');await assertFails(setDoc(ref,{uid}));await assertFails(getDoc(ref));}});
+
+test('community private reads follow current seats; player referees cannot forge seats or submit JSON',async()=>{
+ const roomCode='BXH-COMMUNITY',state={id:'community-rules',meta:{eventAuthority:'community',ladderMode:'general',stations:1},players:[],matches:[]};
+ await env.withSecurityRulesDisabled(async c=>{
+  const db=c.firestore();
+  await setDoc(doc(db,'systemConfig/refereeSeatsV1'),{enabled:true,perCourtScoringVerified:true,communitySeatsEnabled:true});
+  for(const uid of ['community-host','community-main','community-backup','community-outsider','community-frozen'])
+   await setDoc(doc(db,'users/'+uid),{active:true,role:'player',isTestAccount:false,...(uid==='community-frozen'?{accountStatus:'frozen'}:{})});
+  await setDoc(doc(db,'tournaments/'+roomCode),{...common,eventAuthority:'community',createdBy:'community-host',ownerUid:'community-host',createdByRole:'player',ladderPointsAwarded:false,data:JSON.stringify(state),refereeSeatsV1:{version:1,courts:{1:{revision:1,main:{uid:'community-main'},backup1:{uid:'community-backup'},backup2:{uid:'community-frozen'}}}},refereeStationUids:['community-main','community-backup','community-frozen']});
+  await setDoc(doc(db,'publicTournaments/'+roomCode),{...common,eventAuthority:'community',createdBy:'community-host',ownerUid:'community-host',createdByRole:'player',bracketView:JSON.stringify(state)});
+ });
+ for(const uid of ['community-main','community-backup']){
+  const room=doc(dbFor(uid),'tournaments/'+roomCode);await assertSucceeds(getDoc(room));
+  await assertFails(updateDoc(room,{data:JSON.stringify({...state,forged:true})}));
+  await assertFails(updateDoc(room,{refereeStationUids:[uid]}));
+ }
+ for(const uid of ['community-outsider','community-frozen'])await assertFails(getDoc(doc(dbFor(uid),'tournaments/'+roomCode)));
+ await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'tournaments/'+roomCode),{refereeStationUids:['community-backup']}));
+ await assertFails(getDoc(doc(dbFor('community-main'),'tournaments/'+roomCode)));
+ await assertSucceeds(getDoc(doc(dbFor('community-backup'),'tournaments/'+roomCode)));
+ await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'systemConfig/refereeSeatsV1'),{communitySeatsEnabled:false}));
+ await assertFails(getDoc(doc(dbFor('community-backup'),'tournaments/'+roomCode)));
+});

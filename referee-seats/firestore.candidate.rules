@@ -75,6 +75,21 @@ service cloud.firestore {
     }
 
 
+    // General-room referees receive private read access only while seated.
+    function communityRefereeReadable(room) {
+      let actor = get(userPath(request.auth.uid)).data;
+      let release = get(/databases/$(database)/documents/systemConfig/refereeSeatsV1).data;
+      return release.get('enabled', false) == true
+        && release.get('communitySeatsEnabled', false) == true
+        && release.get('perCourtScoringVerified', false) == true
+        && room.get('eventAuthority', '') == 'community'
+        && room.get('ladderMode', '') == 'general'
+        && room.get('refereeSeatsV1', {}).get('version', 0) == 1
+        && actor.get('role', '') == 'player' && actor.get('active', false) == true
+        && actor.get('isTestAccount', false) != true && actor.get('deleted', false) != true
+        && !(actor.get('accountStatus', '') in ['deleted','disabled','frozen'])
+        && request.auth.uid in room.get('refereeStationUids', []);
+    }
 
     // Read-only bucket access follows existing official staff private-room access.
     // Seats control scoring; they do not remove staff read access.
@@ -108,9 +123,9 @@ service cloud.firestore {
       return !changed.hasAny(['refereeSeatsV1','refereeSeatNames','bucketMigration'])
         && (!enabled || !privateDoc || !changed.hasAny(['refereeStationAssignments','refereeStationNames','refereeStationUids','refereeStationRestrictionEnabled']))
         && (!enabled || !privateDoc || !changed.hasAny(['data'])
-          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room))
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room) || isCommunityOwnerData(room))
         && (!enabled || privateDoc || !changed.hasAny(['bracketView'])
-          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room));
+          || isAdminOrAbove() || isStaffOfficialCreatorExistingData(room) || isCommunityOwnerData(room));
     }
 
     // ==== 路徑輔助函式 ====
@@ -1032,7 +1047,7 @@ service cloud.firestore {
       match /checkinAudit/{id} { allow read, write: if false; }
       match /checkinOperations/{id} { allow read, write: if false; }
 
-      allow get: if isSignedIn() && (canReadTournamentPrivate(resource.data) || isCommunityOwnerData(resource.data) || (isTester() && isTesterOwnedTestData(myProfile(), resource.data)));
+      allow get: if isSignedIn() && (communityRefereeReadable(resource.data) || canReadTournamentPrivate(resource.data) || isCommunityOwnerData(resource.data) || (isTester() && isTesterOwnedTestData(myProfile(), resource.data)));
       allow list: if isSignedIn() && (canReadTournamentPrivate(resource.data) || isCommunityOwnerData(resource.data) || (isTester() && isTesterOwnedTestData(myProfile(), resource.data)));
       allow create: if !request.resource.data.keys().hasAny(['registrationSelection','registeredCount','eventStaffAssignments','scoreStorage']) && noOperationsCreate(request.resource.data) && (
 isTournamentAdminEquivalent() || (isStaffOfficialCreatorData(request.resource.data) && partnerQuotaValidForCreate(code, request.resource.data)) || validTesterTestCreate(request.resource.data) || (isSignedIn() && myProfile().get('active', true) == true && validCommunityInvariant(request.resource.data))
