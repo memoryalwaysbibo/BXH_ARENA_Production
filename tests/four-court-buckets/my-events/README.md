@@ -24,3 +24,13 @@ markers, and derive the phase from authoritative bucket matches. Validate
 waiting/live/settling/done and 4/6/12-court changes, stale jobs, retries,
 room deletion and code reuse in the read and repair paths before a live cutover.
 No source deployment or runtime activation follows from this reproduction.
+
+The offline candidate `release/buckets/my-events/lifecycle.cjs` uses the
+existing bucket completion loader and certificate checks inside the caller's
+single read-only transaction. It materializes the authoritative matches,
+permits `live` root phase while completed buckets await settlement, and
+requires both private and public completion certificates for `done`.
+`node tests/four-court-buckets/my-events/candidate-probe.cjs` covers 4/6/12
+courts, settlement, partial ownership and missing/corrupt buckets. It is not
+wired into the deployed My Events reader, detail reader or repair engine.
+Those integrations and their latency, retry and user-facing tests remain open.
