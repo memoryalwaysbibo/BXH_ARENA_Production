@@ -75,7 +75,7 @@ test('room changed before checkpoint retries the page without advancing cursor',
  assert.equal(run.roomDiscoveryCursor,null);
  assert.equal(run.leaseToken,null);
 });
-test('six-court discovery reads real bucket and public proof in the same read-only transactions',async()=>{
+function sixCourtFixture({omitBucket=false}={}){
  const code='SIX',roomPath='tournaments/'+code,rows=new Map(),reads=[],queued=[];
  const ref=p=>({path:p,id:p.split('/').at(-1),collection:x=>({doc:y=>ref(p+'/'+x+'/'+y)})});
  const snap=(p,data)=>({id:p.split('/').at(-1),ref:ref(p),exists:data!==null,data:()=>data,createTime:tick(p===roomPath?1:2),updateTime:tick(p===roomPath?1:2)});
@@ -83,7 +83,7 @@ test('six-court discovery reads real bucket and public proof in the same read-on
  const m=B.makeManifest(state,'epoch-1'),buckets=B.encode(state,m);
  rows.set(roomPath,snap(roomPath,{data:JSON.stringify(state),scoreStorage:m,tournamentPhase:'live'}));
  rows.set('publicTournaments/'+code,snap('publicTournaments/'+code,{scoreBucketProjection:{epoch:m.epoch,versions:Object.fromEntries(buckets.map(b=>[b.bucketId,b.revision]))}}));
- for(const b of buckets)rows.set(roomPath+'/matchBuckets/'+b.bucketId,snap(roomPath+'/matchBuckets/'+b.bucketId,b));
+ for(const b of buckets)if(!omitBucket||b.bucketId!=='court-2')rows.set(roomPath+'/matchBuckets/'+b.bucketId,snap(roomPath+'/matchBuckets/'+b.bucketId,b));
  const query=p=>({path:p,isQuery:true,orderBy(){return this},limit(){return this},startAfter(){return this}});
  const bridge={doc:ref,collection:query,collectionGroup:query,run:async (_name,fn)=>{
   let wrote=false;
@@ -91,9 +91,24 @@ test('six-court discovery reads real bucket and public proof in the same read-on
   return {value:await fn(tx)};
  }};
  const bootstrap=candidate().createBootstrap({enabled:true,bridge,clock:()=>1000,rebuilder:{beginRoom:async input=>{queued.push(input);return {status:'queued'}}},resolveRoomLifecycle:readRoomLifecycle});
+ return {bootstrap,rows,reads,queued,roomPath,code};
+}
+test('six-court discovery reads real bucket and public proof in the same read-only transactions',async()=>{
+ const {bootstrap,reads,queued,roomPath,code}=sixCourtFixture();
  assert.equal((await bootstrap.beginRun({runId:'real-six'})).status,'started');
  assert.equal((await bootstrap.processPage('real-six')).status,'page');
  assert.equal(queued[0].expectedTarget,'active');
  assert(reads.includes('publicTournaments/'+code));
  assert(reads.includes(roomPath+'/matchBuckets/court-2'));
+});
+test('missing six-court bucket blocks discovery without advancing the cursor',async()=>{
+ const {bootstrap,rows,queued,roomPath}=sixCourtFixture({omitBucket:true});
+ assert.equal((await bootstrap.beginRun({runId:'missing-six'})).status,'started');
+ const result=await bootstrap.processPage('missing-six');
+ assert.equal(result.status,'needs-repair');
+ assert.equal(result.reason,'unresolved-room-scope');
+ assert.equal(queued.length,0);
+ assert.equal(rows.get('runs/missing-six').data().roomDiscoveryCursor,null);
+ assert.equal(rows.get('runs/missing-six').data().state,'needs-repair');
+ assert.equal(rows.has(roomPath+'/matchBuckets/court-2'),false);
 });
