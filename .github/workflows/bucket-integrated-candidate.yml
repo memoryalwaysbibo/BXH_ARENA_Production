@@ -26,9 +26,11 @@ jobs:
         run: python3 -B tests/four-court-buckets/integration/verify-integration.py
       - name: Verify independently captured backend overlays
         run: |
-          for family in deletion interactions admissions operations settlement completion poster activity; do
+          for family in deletion interactions admissions operations settlement completion poster activity derived; do
             python3 -B "tests/four-court-buckets/$family/verify-package.py"
           done
+      - name: Check derived official-match event against captured deployed source
+        run: node tests/four-court-buckets/derived/probe.cjs
       - name: Same-checkout activity and settlement bridge
         run: |
           mkdir -p .integration
