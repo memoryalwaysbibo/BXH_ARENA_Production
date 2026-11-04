@@ -453,11 +453,11 @@ async function processOfficialEventLog(log, sourceLogId, sourceType = "official_
   const tour = tourSnap.data();
   if (tour.eventAuthority !== "official" || tour.ladderMode !== "ranked" || tour.testMode === true || tour.eventCancelled === true || tour.ladderPointsAwarded !== true) return {status: "skipped", reason: "not-eligible-official-event"};
   const state = tournamentState(tour);
-  if (Object.prototype.hasOwnProperty.call(tour, "scoreStorage")) {
+  if (["scoreStorage", "scoreBucketProjection", "bucketMigration", "deletionStatus"].some(key => Object.prototype.hasOwnProperty.call(tour, key))) {
     const receipt = tour.bucketSettlement;
     const createdAt = tourSnap.createTime;
     const sourceCreatedAt = Number.isSafeInteger(createdAt?.seconds) && Number.isSafeInteger(createdAt?.nanoseconds) ? `${createdAt.seconds}:${createdAt.nanoseconds}` : null;
-    if (receipt?.version !== 1 || receipt.status !== "completed" || receipt.epoch !== log.bucketEpoch || !sourceCreatedAt || log.sourceCreatedAt !== sourceCreatedAt || state.archiveStatus !== "completed") {
+    if (Object.prototype.hasOwnProperty.call(tour, "bucketMigration") || Object.prototype.hasOwnProperty.call(tour, "deletionStatus") || !Object.prototype.hasOwnProperty.call(tour, "scoreStorage") || receipt?.version !== 1 || receipt.status !== "completed" || receipt.epoch !== log.bucketEpoch || !sourceCreatedAt || log.sourceCreatedAt !== sourceCreatedAt || state.archiveStatus !== "completed") {
       return {status: "skipped", reason: "bucket-settlement-source-mismatch"};
     }
   }
