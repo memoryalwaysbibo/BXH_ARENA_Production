@@ -5,6 +5,66 @@ const api=require('../modules/main-app/bracket-commit.js');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(r=>setImmediate(r));
 const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:x=>resolve(x)};};
+test('queue wait has its own budget and does not consume draw confirmation time',async()=>{
+ const h=fixture(),gate=deferred();h.ctx.waitForWrites=()=>gate.promise;
+ h.ctx.timeoutMs=100;h.ctx.totalTimeoutMs=20;
+ const c=h.make(),p=c.begin();await tick();assert.equal(c.status().phase,'waiting');
+ await new Promise(r=>setTimeout(r,35));assert.equal(h.writes.length,0);
+ gate.resolve(true);assert.equal(await p,true);assert.equal(h.writes.length,1);
+ assert(c.status().timings.some(t=>t.phase==='waiting'&&t.elapsedMs>=30));
+});
+test('production state-write queue drains before draw submission and timeout budget',async()=>{
+ const source=fs.readFileSync('modules/main-app/core.js','utf8');
+ const a=source.indexOf('function enqueueCloudStateWrite('),b=source.indexOf('\nfunction queueCloudSyncRetry(',a);
+ assert(a>0&&b>a);const h=fixture(),gate=deferred(),write=h.ctx.write,order=[];
+ const context={state:h.local,currentAuthUid:()=> 'u',cloudAvailable:()=>true,window:{cloudSync:{pushUpdate:async(code,s,o)=>{
+  if(s.blocker){order.push('prior-start');await gate.promise;order.push('prior-end');return true;}
+  order.push('draw-write');return write(s,o);
+ }}}};
+ vm.createContext(context);vm.runInContext('let cloudWriteChain=Promise.resolve();\n'+source.slice(a,b),context);
+ context.enqueueCloudStateWrite('ROOM',{blocker:true});
+ h.ctx.waitForWrites=()=>context.flushCloudStateWrites();
+ h.ctx.write=(s,o)=>context.enqueueCloudStateWrite('ROOM',s,o);
+ h.ctx.timeoutMs=100;h.ctx.totalTimeoutMs=20;
+ const c=h.make(),p=c.begin();await new Promise(r=>setTimeout(r,35));
+ assert.deepEqual(order,['prior-start']);assert.equal(c.status().error,'');
+ gate.resolve();assert.equal(await p,true);assert.deepEqual(order,['prior-start','prior-end','draw-write']);
+ assert.equal(h.writes.length,1);
+});
+test('queue timeout never enqueues a draw that can execute later',async()=>{
+ const h=fixture(),gate=deferred();h.ctx.waitForWrites=()=>gate.promise;h.ctx.timeoutMs=10;
+ const c=h.make();assert.equal(await c.begin(),false);assert.equal(c.status().error,'queue-wait-timeout');
+ assert.equal(h.writes.length,0);gate.resolve(true);await tick();assert.equal(h.writes.length,0);
+ assert.equal(await c.retry(),true);assert.equal(h.count,1);assert.equal(h.writes.length,1);
+});
+test('a timed out transaction is automatically confirmed when its delayed reply arrives',async()=>{
+ const h=fixture(),gate=deferred(),write=h.ctx.write;h.ctx.timeoutMs=5;
+ h.ctx.write=async(...args)=>{await gate.promise;return write(...args);};
+ const c=h.make();assert.equal(await c.begin(),false);assert.equal(c.status().error,'confirmation-timeout');
+ assert.equal(h.success,0);gate.resolve();await tick();await tick();
+ assert.equal(c.status().result,'success');assert.equal(h.success,1);assert.equal(h.writes.length,1);assert.equal(h.count,1);
+});
+test('retry while the original transaction is pending never submits it twice',async()=>{
+ const h=fixture(),gate=deferred(),write=h.ctx.write;h.ctx.timeoutMs=5;let submissions=0;
+ h.ctx.write=async(...args)=>{submissions++;await gate.promise;return write(...args);};
+ const c=h.make();assert.equal(await c.begin(),false);
+ assert.equal(await c.retry(),false);assert.equal(submissions,1);
+ gate.resolve();await tick();await tick();assert.equal(h.success,1);assert.equal(h.writes.length,1);
+});
+test('late acknowledgement cannot accept an unconfirmed public mirror or a departed context',async()=>{
+ for(const leave of [false,true]){
+  const h=fixture(),gate=deferred(),write=h.ctx.write;h.ctx.timeoutMs=5;
+  h.ctx.write=async(...args)=>{await gate.promise;const ok=await write(...args);h.pub=room();return ok;};
+  const c=h.make();assert.equal(await c.begin(),false);if(leave)h.leave();
+  gate.resolve();await tick();await tick();assert.equal(h.success,0);assert(c.status().pending);
+ }
+});
+test('a late confirmation never rolls an already started room back to pre-start',async()=>{
+ const h=fixture(),gate=deferred(),write=h.ctx.write;h.ctx.timeoutMs=5;
+ h.ctx.write=async(...args)=>{await gate.promise;await write(...args);h.remote={...h.remote,startedAt:123};h.pub=clone(h.remote);return true;};
+ const c=h.make();assert.equal(await c.begin(),false);gate.resolve();await tick();await tick();
+ assert.equal(h.success,0);assert.equal(h.applied,0);assert.equal(h.remote.startedAt,123);
+});
 const rosterRebase=(()=>{
  const source=fs.readFileSync('modules/main-app/core.js','utf8');
  const start=source.indexOf('function rebaseOrdinaryBracketRosterFence('),end=source.indexOf('\nfunction bracketCommitController()',start);
@@ -322,4 +382,43 @@ test('cancel, redraw, late check-in and redraw retain existing referee main and 
 test('draw controller rejects any new draw after start without writing or replacing matches',async()=>{
  const h=fixture();h.ctx.state=()=>({...room(),startedAt:123,bracketSize:2,matches:[{id:'locked'}]});
  const c=h.make();assert.equal(await c.begin(),false);assert.equal(h.count,0);assert.equal(h.writes.length,0);
+});
+
+test('discard a timed out redraw, start the confirmed draw, and reject the late write',async()=>{
+ const h=fixture(),c=h.make(),write=h.ctx.write,gate=deferred();
+ assert.equal(await c.begin(),true);
+ const first=clone(h.local);
+ h.ctx.timeoutMs=5;
+ h.ctx.write=async(...args)=>{await gate.promise;return write(...args);};
+ assert.equal(await c.begin(),false);
+ assert(c.blocked());
+ await c.discard();
+ assert(!c.blocked());
+ assert.equal(h.local.bracketDraw.id,first.bracketDraw.id);
+ assert.equal(await c.verify(h.local),true);
+ const started={...h.local,startedAt:123};
+ assert.equal(api.assertWrite(h.remote,started,{bracketStartSignature:api.signature(first)}),'write');
+ h.remote=clone(started);h.pub=clone(started);
+ gate.resolve();await tick();await tick();
+ assert.equal(h.remote.startedAt,123);
+ assert.equal(h.remote.bracketDraw.id,first.bracketDraw.id);
+ assert.equal(h.success,1);
+});
+
+test('cancel a redraw waiting in the upload queue without ever submitting it',async()=>{
+ const h=fixture(),c=h.make(),queue=deferred();
+ assert.equal(await c.begin(),true);
+ const first=h.local.bracketDraw.id;
+ h.ctx.waitForWrites=()=>queue.promise;
+ const redraw=c.begin();
+ await tick();
+ assert.equal(c.status().canDiscard,true);
+ await c.discard();
+ assert.equal(await redraw,false);
+ assert.equal(c.blocked(),false);
+ assert.equal(h.local.bracketDraw.id,first);
+ queue.resolve();
+ await tick();
+ assert.equal(h.writes.length,1);
+ assert.equal(await c.verify(h.local),true);
 });
