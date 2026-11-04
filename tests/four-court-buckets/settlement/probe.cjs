@@ -79,6 +79,18 @@ function largeFixture(count=160){
 }
 module.exports={memory,load,fixture,specs,NOW,code,bracket,largeFixture};
 if(require.main===module)(async()=>{let checks=0;
+ {
+  const f=fixture({courts:6}),spec=specs.find(x=>x.function==='settleLadderTournament');
+  const name='PRIVATE_PROFILE_NAME';
+  f.m.put('users/u1',{...f.m.rows.get('users/u1'),realName:'  '+name+'  '});
+  const result=await load(spec,true,f.m).invoke();
+  assert(result.ok,result.reason);
+  assert.equal(f.m.rows.get('ladderPlayers/u1').playerName,name);
+  assert.equal(result.results.find(x=>x.playerId==='u1').playerName,name);
+  assert(!JSON.stringify(result.bucketSettlement).includes(name));
+  assert(!JSON.stringify(f.m.rows.get('publicTournaments/'+code)).includes(name));
+  checks++;
+ }
  for(const spec of specs){
   for(const qr of [false,true]){
    const a=fixture({bucket:false,qr}),b=fixture({bucket:false,qr}),ra=await load(spec,false,a.m).invoke(),rb=await load(spec,true,b.m).invoke();assert(ra.ok,spec.function+': '+ra.reason);assert.deepEqual(normalized(b.m,rb),normalized(a.m,ra));checks++;

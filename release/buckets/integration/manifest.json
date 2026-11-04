@@ -1004,19 +1004,19 @@
       ]
     },
     "release/buckets/settlement/candidate/21/ladder-settlement.js": {
-      "blob": "3270e954ea67f0002a6cb89d3f7a90cc10751723",
+      "blob": "1b2f9c34be3e53f6785879d7ca5e22c24a65ac7f",
       "components": [
         713
       ]
     },
     "release/buckets/settlement/patch-manifest.json": {
-      "blob": "7d162c2d3f1dbb3c49073ab0156f37c3f5f6a6f5",
+      "blob": "f9fac7ee6e8038ab7f8fccbb0311cd9ca08f4b56",
       "components": [
         713
       ]
     },
     "tests/four-court-buckets/settlement/fixture-sha256.json": {
-      "blob": "f9cdf6f5c7f57d374043050559d21e8f1366b89e",
+      "blob": "26beeae0a2137b94c4832c8c059e223937ef2222",
       "components": [
         713
       ]
@@ -1076,7 +1076,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/fixtures/21/ladder-settlement.js": {
-      "blob": "88c4b81422399ca422fd60fe1223bb756c965f36",
+      "blob": "aed4210cef3597364c7079ddf1996f3037c7d5b5",
       "components": [
         713
       ]
@@ -1100,7 +1100,7 @@
       ]
     },
     "tests/four-court-buckets/settlement/probe.cjs": {
-      "blob": "8aa73ee96f34d4cfdc8442d0754b8277e42db7cb",
+      "blob": "430e9911c47f5a29287e190bb08df00ec12436df",
       "components": [
         713
       ]

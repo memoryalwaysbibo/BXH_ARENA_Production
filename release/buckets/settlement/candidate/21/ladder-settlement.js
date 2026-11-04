@@ -254,6 +254,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
           if (!skippedPlayers.includes(item.playerName)) skippedPlayers.push(item.playerName);
           continue;
         }
+        const playerName = typeof profile.realName === "string" ? profile.realName.trim() || "—" : "—";
         const old = playerSnapshots[index].exists ? playerSnapshots[index].data() : {};
         const oldSeason = Number(old.seasonPoints || 0);
         const oldCareer = Number(old.careerPoints || 0);
@@ -267,7 +268,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
         const placement = Number(item.placement || 0) || null;
         transaction.set(playerRefs[index], {
           uid: item.playerUid,
-          playerName: item.playerName || old.playerName || "",
+          playerName,
           region: String(profile.region || "").trim(),
           seasonPoints,
           careerPoints,
@@ -291,7 +292,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
           eventDate: payload.eventDate || tournament.eventDate || "",
           formatType: payload.formatType || tournament.formatType || "single",
           playerUid: item.playerUid,
-          playerName: item.playerName || "",
+          playerName,
           placement,
           wins: Number(item.wins || 0),
           losses: Number(item.losses || 0),
@@ -309,7 +310,7 @@ function createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketR
           actorName: String(actor.name || ""),
           createdAt: FieldValue.serverTimestamp(),
         });
-        results.push({playerId: item.playerUid, playerName: item.playerName || "", placement, pointsEarned: points, scoring: item.scoring});
+        results.push({playerId: item.playerUid, playerName, placement, pointsEarned: points, scoring: item.scoring});
       }
       if(currentInput.bucket&&results.length<2)A.fail("bucket-insufficient-eligible-players");
       transaction.update(tournamentRef, {
