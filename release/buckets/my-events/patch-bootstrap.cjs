@@ -11,6 +11,9 @@ function patchBootstrap(source){
   "const {SCHEMA,RELEASE}=require('./engine.cjs');",
   "const {SCHEMA,RELEASE,stamp,same}=require('./engine.cjs');");
  out=once(out,
+  "const BOOTSTRAP_SCHEMA=26,SCOPE='individual-family',PAGE=32,LEASE_MS=15000;",
+  "const BOOTSTRAP_SCHEMA=26,SCOPE='individual-family',PAGE=1,LEASE_MS=60000;");
+ out=once(out,
   'function discoveryScope(raw){const life=normalizeLifecycle(raw);',
   'function discoveryScope(raw,life=normalizeLifecycle(raw)){');
  out=once(out,

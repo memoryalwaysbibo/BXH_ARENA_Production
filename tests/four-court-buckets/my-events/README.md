@@ -118,17 +118,17 @@ not a deployed bootstrap or rebuild fix.
 source and replaces its root-only target calls with the transaction-owned
 bucket lifecycle resolver. The engine patch passes that resolver to dual-write
 reconciliation. Local tests reject source drift, verify resolver use on the
-stale-generation path, and require it for an enabled rebuilder. Bootstrap
-discovery and capture still need a bounded, transaction-consistent adapter;
-service factory wiring and authenticated/live acceptance also remain open.
+stale-generation path, and require it for an enabled rebuilder.
 
 `release/buckets/my-events/patch-bootstrap.cjs` pins the captured deployed
 bootstrap source. It resolves room and buckets within one read-only transaction
 for discovery/capture, checks the source timestamp and target when enqueueing,
 and revalidates a room page before advancing its cursor. A changed room releases
-the lease for a retry. Local tests cover a six-court room and a changed page.
-The 32-room page read budget and real backend latency still need acceptance;
-no bootstrap or rebuild source has been deployed.
+the lease for a retry. The candidate uses one room per page and a 60-second
+lease, bounding the number of buckets rechecked in one transaction. Local
+tests cover a six-court room, a changed page and a full-page cursor continuation.
+Real backend latency and progression under Eventarc still need acceptance; no
+bootstrap or rebuild source has been deployed.
 
 The captured deployed service (`2588227c6dc3fa0fe8a80a0898eb7fdec6b2a52251d6c3ad139c8988cfb2dc89`)
 constructs all four factories without a resolver. The pinned source patch in
