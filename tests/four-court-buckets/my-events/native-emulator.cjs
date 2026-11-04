@@ -13,6 +13,7 @@ const {normalizeLifecycle} = require(path.join(candidate, 'vendor/backend/lifecy
 const {createAdminBridge} = require(path.join(candidate, 'vendor/backend/service.cjs'));
 const {createBootstrap, PATHS} = require(path.join(candidate, 'vendor/backend/bootstrap.cjs'));
 const {createAuthenticatedReader} = require(path.join(candidate, 'vendor/reader/auth-reader.cjs'));
+const {createDetailReader} = require(path.join(candidate, 'vendor/details/detail-reader.cjs'));
 
 async function main() {
   assert.equal(process.env.GCLOUD_PROJECT, 'demo-bxh-my-events-review');
@@ -56,6 +57,9 @@ async function main() {
     const root = await db.doc(rootPath).get();
     const uid = 'native-reader';
     await db.doc('users/' + uid).set({active: true});
+    await db.doc(rootPath + '/registrations/' + uid).set({
+      uid, tournamentCode: code, status: 'confirmed', displayName: 'Native Reader',
+    });
     await db.doc('users/' + uid + '/myEventRooms/' + code).set({
       code, ownerUid: uid, schemaVersion: 24, release: 'individual-family-v24',
       candidate: true, state: 'ready', roomIncarnation: root.createTime,
@@ -82,6 +86,14 @@ async function main() {
     const readerMs = Math.round(performance.now() - started);
     assert.equal(list.status, 'ready', JSON.stringify(list));
     assert.deepEqual(list.cards.map(x => [x.code, x.phase]), [[code, 'settling']]);
+    const detail = createDetailReader({
+      enabled: true, bridge, verifyAuth: async () => ({uid}),
+      resolveRoomLifecycle: readRoomLifecycle,
+    });
+    const detailResult = await detail({data: {code}});
+    assert.equal(detailResult.status, 'ready', JSON.stringify(detailResult));
+    assert.equal(detailResult.phase, 'settling');
+    assert.deepEqual(detailResult.rows.map(x => x.registrationId), [uid]);
     await db.doc(rootPath).update({tournamentPhase: 'done'});
     life = await lifecycle();
     assert.equal(life.status, 'invalid');
@@ -99,7 +111,14 @@ async function main() {
     assert.equal(missingList.status, 'synchronizing', JSON.stringify(missingList));
     assert.equal(missingList.cards.length, 0);
     assert.ok(missingList.notices.includes('room-unavailable'));
-    console.log(JSON.stringify({checks: 22, project: process.env.GCLOUD_PROJECT, sixCourtLifecycle: true, bootstrapCursor: run.roomDiscoveryCursor, nativeReaderMs: readerMs, phaseConflictRejected: true, missingBucketRejected: true, productionWrites: 0}));
+    const missingDetail = createDetailReader({
+      enabled: true, bridge, verifyAuth: async () => ({uid}),
+      resolveRoomLifecycle: readRoomLifecycle,
+    });
+    const missingDetailResult = await missingDetail({data: {code}});
+    assert.equal(missingDetailResult.status, 'synchronizing', JSON.stringify(missingDetailResult));
+    assert.ok(missingDetailResult.notices.includes('unsupported-room'));
+    console.log(JSON.stringify({checks: 27, project: process.env.GCLOUD_PROJECT, sixCourtLifecycle: true, bootstrapCursor: run.roomDiscoveryCursor, nativeReaderMs: readerMs, phaseConflictRejected: true, missingBucketRejected: true, productionWrites: 0}));
   } finally { await deleteApp(app); }
 }
 main().catch(e => {console.error(e); process.exitCode = 1;});

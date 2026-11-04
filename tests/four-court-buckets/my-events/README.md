@@ -177,11 +177,12 @@ firebase emulators:exec --only firestore \
   'node tests/four-court-buckets/my-events/native-emulator.cjs'
 ```
 
-The 2026-11-05 local run passed 22 assertions, including the real Firestore
-query used by the authenticated list reader with synthetic verified identity:
-it returned a `settling` card, and a fresh reader instance returned a
-`room-unavailable` synchronizing notice after a bucket was removed. One
-local reader call took 109 ms; this is not a production latency or capacity
-measurement. The test uses open local emulator rules and does not cover real
-Auth, App Check, Eventarc progression, production configuration, browser
-recovery or a live release. The candidate seal remains `approved:false`.
+The 2026-11-05 local run passed 27 assertions, including the real Firestore
+queries used by the list and detail readers with synthetic verified identity.
+The list returned a `settling` card and detail returned the confirmed self
+registration. After a bucket was removed, fresh reader instances returned
+synchronizing notices without exposing a ready card or detail. One local list
+call took 137 ms; this is not a production latency or capacity measurement.
+The test uses open local emulator rules and does not cover real Auth, App
+Check, Eventarc progression, production configuration, browser recovery or a
+live release. The candidate seal remains `approved:false`.
