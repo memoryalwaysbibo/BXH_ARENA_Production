@@ -19,3 +19,4 @@ jobs:
       - run: node tests/four-court-buckets/my-events/probe.cjs
       - run: node tests/four-court-buckets/my-events/candidate-probe.cjs
       - run: node --test tests/four-court-buckets/my-events/reader-seam.test.cjs
+      - run: node --test tests/four-court-buckets/my-events/patch-readers.test.cjs
