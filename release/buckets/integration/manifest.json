@@ -59,7 +59,7 @@
       ]
     },
     "index.html": {
-      "blob": "0157ce44315b65a727e52786de28a0b5fe2b9d52",
+      "blob": "3925d5aa5897bcfea7a73446737bfdfeb3bf6e29",
       "components": [
         707,
         714
@@ -1765,7 +1765,7 @@
       "v": "20261016-candidate-2"
     },
     "modules/main-app/mailbox.js": {
-      "v": "20261102-title-session-guard",
+      "v": "20261104-bulk-delete",
       "invitation-state": "20261027.1"
     },
     "modules/main-app/mood-station.js": {
