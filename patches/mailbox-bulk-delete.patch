@@ -1,0 +1,67 @@
+diff --git a/mailbox.js b/mailbox.js
+index 806faa0..1be7b98 100644
+--- a/mailbox.js
++++ b/mailbox.js
+@@ -6,6 +6,12 @@ const C=require('./mailbox-core');
+ const db=getFirestore();
+ const fail=(code,message)=>{throw new HttpsError(code,message);};
+ const validId=value=>typeof value==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(value);
++function deletable(message){
++ const reward=message.reward;
++ if(message.type==='card_reward')return reward?.status==='claimed';
++ if(message.type==='title_reward')return reward?.status==='opened'||reward?.openedAt!=null;
++ return true;
++}
+ exports.mailboxService=onCall({region:'asia-east1',cors:true,maxInstances:5,timeoutSeconds:540},async request=>{
+  if(process.env.GCLOUD_PROJECT!=='bxh-arena')fail('failed-precondition','production-only');
+  const uid=request.auth?.uid;if(!uid)fail('unauthenticated','auth-required');
+@@ -14,15 +20,46 @@ exports.mailboxService=onCall({region:'asia-east1',cors:true,maxInstances:5,time
+  if(!C.active(actorSnap.data()))fail('permission-denied','account-inactive');
+  const statsRef=db.doc(`mailboxStats/${uid}`),box=db.collection(`userMail/${uid}/messages`);
+  if(action==='list'){
+-  const [stats,rows]=await Promise.all([statsRef.get(),box.orderBy('createdAt','desc').limit(50).get()]);
+-  return {ok:true,unreadCount:Math.max(0,Number(stats.data()?.unreadCount)||0),messages:rows.docs.map(doc=>({id:doc.id,subject:doc.data().subject,body:doc.data().body,senderName:doc.data().senderName,type:doc.data().type,orderCode:doc.id===`partner_${doc.data().orderCode}`?doc.data().orderCode||null:null,createdAt:doc.data().createdAt,readAt:doc.data().readAt||null,eventCode:doc.data().eventCode||null,eventName:doc.data().eventName||null,invitationStatus:doc.data().invitationStatus||null,expiresAt:doc.data().expiresAt||null,attachments:Array.isArray(doc.data().attachments)?doc.data().attachments.map(a=>({id:a.id,name:a.name,mime:a.mime,size:a.size})):[]}))};
++  const statsPromise=statsRef.get();
++  const query=box.orderBy('createdAt','desc').limit(50),messages=[];
++  const [,stats]=await Promise.all([(async()=>{
++   let page=await query.get();
++   while(true){
++    for(const doc of page.docs){
++     if(doc.data().recipientDeletedAt==null)messages.push(doc);
++     if(messages.length===50)return;
++    }
++    if(page.size<50)return;
++    page=await query.startAfter(page.docs.at(-1)).get();
++   }
++  })(),statsPromise]);
++  return {ok:true,canDelete:true,unreadCount:Math.max(0,Number(stats.data()?.unreadCount)||0),messages:messages.map(doc=>({id:doc.id,deletable:validId(doc.id)&&deletable(doc.data()),subject:doc.data().subject,body:doc.data().body,senderName:doc.data().senderName,type:doc.data().type,orderCode:doc.id===`partner_${doc.data().orderCode}`?doc.data().orderCode||null:null,createdAt:doc.data().createdAt,readAt:doc.data().readAt||null,eventCode:doc.data().eventCode||null,eventName:doc.data().eventName||null,invitationStatus:doc.data().invitationStatus||null,expiresAt:doc.data().expiresAt||null,attachments:Array.isArray(doc.data().attachments)?doc.data().attachments.map(a=>({id:a.id,name:a.name,mime:a.mime,size:a.size})):[]}))};
++ }
++ if(action==='delete'){
++  if(!Array.isArray(data.messageIds)||data.messageIds.length<1||data.messageIds.length>50||!data.messageIds.every(validId))fail('invalid-argument','invalid-message-ids');
++  const ids=[...new Set(data.messageIds)];
++  return db.runTransaction(async tx=>{
++   const [stats,...messages]=await tx.getAll(statsRef,...ids.map(id=>box.doc(id)));
++   const now=Date.now(),removedIds=[];
++   let unreadCount=Math.max(0,Number(stats.data()?.unreadCount)||0),protectedCount=0,changed=false;
++   messages.forEach((doc,index)=>{
++    const message=doc.data();
++    if(!message||message.recipientDeletedAt!=null){removedIds.push(ids[index]);return;}
++    if(!deletable(message)){protectedCount++;return;}
++    if(message.readAt==null)unreadCount=Math.max(0,unreadCount-1);
++    tx.update(doc.ref,{recipientDeletedAt:now,updatedAt:now});
++    removedIds.push(ids[index]);changed=true;
++   });
++   if(changed)tx.set(statsRef,{unreadCount,updatedAt:now},{merge:true});
++   return {ok:true,removedIds,protectedCount,unreadCount};
++  });
+  }
+  if(action==='markRead'||action==='markUnread'){
+   if(!validId(data.messageId))fail('invalid-argument','invalid-message-id');
+   const ref=box.doc(data.messageId),makeRead=action==='markRead',now=Date.now();
+   try{const result=await db.runTransaction(async tx=>{
+    const [message,stats]=await Promise.all([tx.get(ref),tx.get(statsRef)]);
+-   if(!message.exists)throw Error('mail-not-found');
++   if(!message.exists||message.data().recipientDeletedAt!=null)throw Error('mail-not-found');
+    const wasRead=message.data().readAt!=null;
+    if(wasRead===makeRead)return {changed:false,unreadCount:Math.max(0,Number(stats.data()?.unreadCount)||0)};
+    const unread=Math.max(0,(Number(stats.data()?.unreadCount)||0)+(makeRead?-1:1));

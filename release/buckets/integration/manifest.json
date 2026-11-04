@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "542323c631e07ef455c2b17f3213346ecee53f3a",
+  "baseMain": "c8b46a3c4d744e7c0f8de7bffa3ddf8b3978c6a6",
   "components": [
     {
       "pr": 707,
@@ -59,7 +59,7 @@
       ]
     },
     "index.html": {
-      "blob": "3925d5aa5897bcfea7a73446737bfdfeb3bf6e29",
+      "blob": "c6b82d28990bfbd55c11385f76cb399a6230e5fa",
       "components": [
         707,
         714
@@ -73,7 +73,7 @@
       ]
     },
     "modules/main-app/core.js": {
-      "blob": "76d819003af9ca353b999067c6ff87a1a7c5f7de",
+      "blob": "83aadf4e4ec233fe95a1c156a821c46b893741bf",
       "components": [
         707,
         714
@@ -1741,7 +1741,7 @@
       "v": "20261002-p2a-1"
     },
     "modules/main-app/bracket-commit.js": {
-      "v": "20261101.1"
+      "v": "20261104.1"
     },
     "modules/main-app/roster-view.js": {
       "v": "20261018.1"
@@ -1894,7 +1894,7 @@
       "direct-registration": "20261014.1",
       "qr-checkin": "20261017.3",
       "roster-view": "20261018.1",
-      "bracket-commit": "20261101.1",
+      "bracket-commit": "20261104.1",
       "admin-override": "20261101.1",
       "admin-checkin": "20261101.1",
       "admin-roster": "20261101.1",

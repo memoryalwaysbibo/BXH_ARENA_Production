@@ -67,7 +67,7 @@ function uiFixture(){
  const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('// Bracket generation is detached'),b=core.indexOf('function currentRoundLabelForBoard(){',a);
  let status={busy:false,pending:false,result:''},dialog=null,forceCalls=0;
  const controller={status:()=>status,blocked:()=>status.busy||status.pending,selection:()=>[{id:'a',name:'A'},{id:'b',name:'B'}],forceSubmit:async()=>{forceCalls++;}};
- const s={state:{id:'r',cloudCode:'BXH-X',players:[],matches:[],meta:{battleMode:'individual'}},userProfile:{active:true,role:'admin'},currentAuthUid:()=> 'admin',
+ const s={appPhase:'app',state:{id:'r',cloudCode:'BXH-X',players:[],matches:[],meta:{battleMode:'individual'}},userProfile:{active:true,role:'admin'},currentAuthUid:()=> 'admin',
   window:{BXHAdminOverride:require('../modules/main-app/admin-override.js')},crypto:{randomUUID:()=> 'confirmation-00001'},esc:x=>String(x).replace(/</g,'&lt;'),
   render(){},openModal:m=>dialog=m,showToast(){},entryRosterValid:()=>true,eligiblePlayers:()=>[],currentBracketParticipantIds:()=>new Set()};
  vm.createContext(s);vm.runInContext(core.slice(a,b),s);s.bracketCommitController=()=>controller;
@@ -87,4 +87,22 @@ test('start failure exposes only forced start for the same room and actor',()=>{
  const h=uiFixture(),s=h.s;s.state.bracketSize=2;s.noteAdminOperationalFailure('start-tournament','cloud-readback-unconfirmed');
  assert.match(s.adminOverrideButtonsHtml(),/管理員強制開賽/);assert(!s.adminOverrideButtonsHtml().includes('admin-force-draw'));
  s.state.cloudCode='BXH-OTHER';assert.equal(s.adminOverrideButtonsHtml(),'');
+});
+test('draw UI separates unsent queue/preflight timeouts from unknown commit results',()=>{
+ const h=uiFixture();
+ for(const [error,phase,title] of [
+  ['queue-wait-timeout','waiting','等待儲存，尚未送出'],
+  ['confirmation-timeout','checking','雲端核對逾時，尚未送出'],
+  ['confirmation-timeout','confirming','儲存結果尚未確認']
+ ]){
+  h.status={busy:false,pending:true,result:'failed',error,phase};
+  const html=h.s.bracketCommitStatusHtml();assert(html.includes('<b>'+title+'</b>'));
+  assert(!html.includes('<b>上傳失敗</b>'));assert(html.includes('重試上傳'));
+  assert.equal(h.s.bracketDrawButtonHtml(),'');
+ }
+ for(const phase of ['waiting','checking','writing','confirming']){
+  h.status={busy:true,pending:true,result:'',phase};
+  const html=h.s.bracketCommitStatusHtml();assert(html.includes('aria-busy="true"'));
+  assert(html.includes('disabled'));assert(!html.includes('admin-force-reconfirm'));
+ }
 });
