@@ -13,7 +13,7 @@ const {chromium}=require('playwright');
  const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('// Bracket generation is detached'),b=core.indexOf('function currentRoundLabelForBoard(){',a);
  assert(a>0&&b>a);
  await page.addScriptTag({content:`
- let state={id:'r',cloudCode:'ROOM',meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'},firebaseUser={uid:'u'},currentRole='admin',activeTab='people',userProfile={active:true,role:'player'},pendingModal=null;
+ let appPhase='app',state={id:'r',cloudCode:'ROOM',meta:{formatType:'single'},players:[{id:'a'},{id:'b'}],matches:[],archiveStatus:'ongoing'},firebaseUser={uid:'u'},currentRole='admin',activeTab='people',userProfile={active:true,role:'player'},pendingModal=null;
  const currentAuthUid=()=>firebaseUser.uid,eligiblePlayers=()=>state.players.filter(p=>p.checkedIn===true),currentBracketParticipantIds=()=>new Set(state.matches.flatMap(m=>[m.a?.playerId,m.b?.playerId]).filter(Boolean));
  const cloneStateForSave=x=>JSON.parse(JSON.stringify(x));
  function openModal(cfg){pendingModal=cfg;render();}
@@ -48,7 +48,7 @@ const {chromium}=require('playwright');
  assert.equal(await page.locator('#start').isDisabled(),true);
  assert.equal(await page.getByRole('button',{name:'抽籤',exact:true}).count(),0);
  assert.equal(await page.getByRole('button',{name:'讀取雲端版本',exact:true}).count(),0);
- assert.equal(await page.getByRole('status').getByRole('button').count(),2);
+ assert.equal(await page.getByRole('status').getByRole('button').count(),3);
  await page.getByRole('status').getByText('上傳失敗',{exact:true}).waitFor();
  assert.equal((await page.evaluate(()=>fixture.stats())).success,0);
  await page.evaluate(()=>fixture.retry());

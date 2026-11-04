@@ -67,7 +67,7 @@ function uiFixture(){
  const core=fs.readFileSync('modules/main-app/core.js','utf8'),a=core.indexOf('// Bracket generation is detached'),b=core.indexOf('function currentRoundLabelForBoard(){',a);
  let status={busy:false,pending:false,result:''},dialog=null,forceCalls=0;
  const controller={status:()=>status,blocked:()=>status.busy||status.pending,selection:()=>[{id:'a',name:'A'},{id:'b',name:'B'}],forceSubmit:async()=>{forceCalls++;}};
- const s={state:{id:'r',cloudCode:'BXH-X',players:[],matches:[],meta:{battleMode:'individual'}},userProfile:{active:true,role:'admin'},currentAuthUid:()=> 'admin',
+ const s={appPhase:'app',state:{id:'r',cloudCode:'BXH-X',players:[],matches:[],meta:{battleMode:'individual'}},userProfile:{active:true,role:'admin'},currentAuthUid:()=> 'admin',
   window:{BXHAdminOverride:require('../modules/main-app/admin-override.js')},crypto:{randomUUID:()=> 'confirmation-00001'},esc:x=>String(x).replace(/</g,'&lt;'),
   render(){},openModal:m=>dialog=m,showToast(){},entryRosterValid:()=>true,eligiblePlayers:()=>[],currentBracketParticipantIds:()=>new Set()};
  vm.createContext(s);vm.runInContext(core.slice(a,b),s);s.bracketCommitController=()=>controller;
