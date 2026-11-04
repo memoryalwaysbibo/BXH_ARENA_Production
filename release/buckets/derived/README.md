@@ -5,7 +5,7 @@ The captured deployed `onLadderTransactionCreated` source archive is SHA-256
 Its official ranked event path references an undeclared `state`, so it fails
 before creating `playerEventResults` and updating `playerStats`. The fixture
 retains the exact selected deployed `index.js`; `index.patch` changes only that
-file. The eight local checks reproduce the failure and cover the proposed path.
+file. The ten local checks reproduce the failure and cover the proposed path.
 
 The candidate reads the committed room state after settlement. The bucket
 settlement candidate materializes canonical matches into the private root
@@ -17,6 +17,9 @@ archived, with a completed settlement phase. Partial bucket markers
 and active migration/deletion markers fail closed. Reused room codes and
 unfinished bucket settlement cannot create a derived result. Legacy ranked
 events retain their existing eligibility and award policy.
+The player-result transaction reads the current bucket room and registration
+again, then checks its receipt and digest before writing. A changed room skips
+both player statistics and title evaluation for that event attempt.
 
 This is source review, not a production fix. Before updating only
 `onLadderTransactionCreated`, re-read its live source and complete function
