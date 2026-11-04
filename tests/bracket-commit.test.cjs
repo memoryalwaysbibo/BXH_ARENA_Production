@@ -5,6 +5,41 @@ const api=require('../modules/main-app/bracket-commit.js');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const tick=()=>new Promise(r=>setImmediate(r));
 const deferred=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:x=>resolve(x)};};
+// Use the production whitelist, rather than a private-state clone, for readback.
+const publicProjection=(()=>{
+ const source=fs.readFileSync('modules/cloud/cloud-runtime.js','utf8');
+ const start=source.indexOf('  function buildPublicMirrorFields(state){');
+ const end=source.indexOf('\n  function currentUserUidForWrites()',start);
+ assert(start>=0&&end>start);
+ return vm.runInNewContext(source.slice(start,end)+'\nbuildPublicMirrorFields',{buildPublicEventInfo:()=>({})});
+})();
+test('cancel redraw against the real public projection restores the confirmed draw without another write',async()=>{
+ const h=fixture(),c=h.make();assert.equal(await c.begin(),true);
+ const first=clone(h.local);h.ctx.write=async()=>false;
+ assert.equal(await c.begin(),false);h.pub=publicProjection(h.remote);
+ assert.equal(h.remote.bracketDraw.id,first.bracketDraw.id);
+ assert.equal(publicProjection(h.remote).bracketDraw,undefined);
+ const writes=h.writes.length;await c.discard();
+ assert.equal(c.blocked(),false);assert.equal(h.storage.size,0);
+ assert.equal(h.local.bracketDraw.id,first.bracketDraw.id);assert.equal(h.writes.length,writes);
+ assert.equal(await c.verify(h.local),true);
+});
+test('cancel during queue wait works with an existing production public projection',async()=>{
+ const h=fixture(),c=h.make(),queue=deferred();assert.equal(await c.begin(),true);
+ const first=clone(h.local);h.pub=publicProjection(h.remote);h.ctx.waitForWrites=()=>queue.promise;
+ const redraw=c.begin();await tick();await c.discard();assert.equal(await redraw,false);
+ assert.equal(c.blocked(),false);assert.equal(h.local.bracketDraw.id,first.bracketDraw.id);
+ queue.resolve();await tick();assert.equal(h.writes.length,1);
+});
+test('cancel still rejects conflicting public pairings and explicit mismatched operation IDs',async()=>{
+ for(const conflict of ['pairing','id']){
+  const h=fixture(),c=h.make();assert.equal(await c.begin(),true);h.ctx.write=async()=>false;await c.begin();
+  const pub=publicProjection(h.remote);
+  if(conflict==='pairing')pub.matches[0].a.playerId='other';else pub.bracketDraw={id:'other'};
+  h.pub=pub;await c.discard();assert.equal(c.blocked(),true);
+  assert.equal(c.status().error,'cloud-readback-unconfirmed');assert.equal(h.writes.length,1);
+ }
+});
 test('queue wait has its own budget and does not consume draw confirmation time',async()=>{
  const h=fixture(),gate=deferred();h.ctx.waitForWrites=()=>gate.promise;
  h.ctx.timeoutMs=100;h.ctx.totalTimeoutMs=20;
@@ -422,3 +457,4 @@ test('cancel a redraw waiting in the upload queue without ever submitting it',as
  assert.equal(h.writes.length,1);
  assert.equal(await c.verify(h.local),true);
 });
+
