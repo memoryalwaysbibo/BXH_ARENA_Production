@@ -10,11 +10,13 @@ function phaseOf(top,state){
  const real=state.matches.filter(m=>!m.isBye);
  return !state.startedAt||real.length===0?'waiting':real.every(m=>m.completed)?'settling':'live';
 }
-async function readBucketLifecycle({db,tx,code,normalizeRoom}){
+async function readBucketLifecycle({db,tx,code,normalizeRoom,root:existingRoot}){
  if(!db?.doc||!tx?.get||typeof code!=='string'||!/^[-A-Za-z0-9_]{1,100}$/.test(code)||typeof normalizeRoom!=='function')return result('invalid','bucket-input-missing');
  let input,complete;
  try{
-  const [root,pub]=await Promise.all([tx.get(db.doc('tournaments/'+code)),tx.get(db.doc('publicTournaments/'+code))]);
+  const root=existingRoot||await tx.get(db.doc('tournaments/'+code));
+  if(root?.ref?.path!=='tournaments/'+code)return result('invalid','bucket-room-path-mismatch');
+  const pub=await tx.get(db.doc('publicTournaments/'+code));
   input=await C.load({db,tx,root,pub});
   complete=C.completed(input);
  }catch{return result('invalid','bucket-lifecycle-unverified');}
@@ -28,4 +30,14 @@ async function readBucketLifecycle({db,tx,code,normalizeRoom}){
  if(life.status!=='supported')return life;
  return Object.freeze({...life,source:'verified-buckets',epoch:input.m.epoch,roomIncarnation:input.sourceCreatedAt});
 }
-module.exports={readBucketLifecycle};
+// Reader and detail adapter. The already-read root belongs to the caller's
+// transaction; legacy rooms keep their original normalizer and read budget.
+async function readRoomLifecycle({db,tx,room,code,normalizeRoom}){
+ if(!room?.exists||room.ref?.path!=='tournaments/'+code||typeof normalizeRoom!=='function')return result('invalid','room-lifecycle-input');
+ const top=room.data();
+ if(!C.marked(top)){
+  try{return normalizeRoom(top);}catch{return result('invalid','legacy-lifecycle-unverified');}
+ }
+ return readBucketLifecycle({db,tx,code,normalizeRoom,root:room});
+}
+module.exports={readBucketLifecycle,readRoomLifecycle};
