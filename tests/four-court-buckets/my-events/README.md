@@ -126,7 +126,8 @@ for discovery/capture, checks the source timestamp and target when enqueueing,
 and revalidates a room page before advancing its cursor. A changed room releases
 the lease for a retry. The candidate uses one room per page and a 60-second
 lease, bounding the number of buckets rechecked in one transaction. Local
-tests cover a six-court room, a changed page and a full-page cursor continuation.
+tests cover a six-court room, a changed page, full-page cursor continuation and
+the Eventarc predicate that schedules the next page after each checkpoint.
 Real backend latency and progression under Eventarc still need acceptance; no
 bootstrap or rebuild source has been deployed.
 

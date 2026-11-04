@@ -43,6 +43,7 @@ test('capture and room page enqueue a verified split room with pinned source',as
  const {bootstrap,queued,observed,sourceData}=fixture();
  assert.equal((await bootstrap.beginRun({runId:'run1'})).status,'started');
  assert.equal((await bootstrap.captureRoom({code:'SIX'})).status,'queued');
+ const beforeFirstPage=sourceData.get('runs/run1');
  const page=await bootstrap.processPage('run1');
  assert.equal(page.status,'page');
  assert.equal(page.phase,'rooms');
@@ -52,6 +53,9 @@ test('capture and room page enqueue a verified split room with pinned source',as
  assert.equal(queued[1].expectedTarget,'active');
  assert.deepEqual(queued[1].expectedSourceUpdateTime,tick(1));
  assert.ok(observed.length>=3);
+ const firstPage=sourceData.get('runs/run1');
+ assert.equal(candidate().shouldProcessBootstrap({data:{before:beforeFirstPage,after:firstPage}},1000),true);
+ assert.equal(candidate().shouldProcessBootstrap({data:{before:firstPage,after:firstPage}},1000),false);
  const next=await bootstrap.processPage('run1');
  assert.equal(next.status,'phase-complete');
  assert.equal(next.phase,'rooms');
@@ -59,6 +63,7 @@ test('capture and room page enqueue a verified split room with pinned source',as
  assert.equal(sourceData.get('runs/run1').data().phase,'summaries');
  assert.equal(sourceData.get('runs/run1').data().roomDiscoveryCursor,'SIX');
  assert.equal(queued.length,2);
+ assert.equal(candidate().shouldProcessBootstrap({data:{before:firstPage,after:sourceData.get('runs/run1')}},1000),true);
 });
 test('room changed before checkpoint retries the page without advancing cursor',async()=>{
  const {bootstrap,queued,sourceData}=fixture({changeBeforeCheckpoint:true});
