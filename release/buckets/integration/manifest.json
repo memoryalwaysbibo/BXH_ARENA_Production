@@ -1675,7 +1675,7 @@
       ]
     },
     "tests/four-court-buckets/my-events/README.md": {
-      "blob": "c51ab653ee1cbcdeb8669b8ce48908fff2ca535b",
+      "blob": "84c3855cfaaa1e54ce6dbdf7e62bdc30ea43a1e8",
       "components": []
     },
     "release/buckets/my-events/patch-repair-engine.cjs": {
@@ -1696,7 +1696,7 @@
     },
     "release/buckets/my-events/patch-rebuild.cjs": {
       "components": [],
-      "blob": "740d2a499899a55eee18fe19c0fbd9d2952bf869"
+      "blob": "e6bd7289ce41a2875f70a940a6c1c2bfb23e8ba8"
     },
     "tests/four-court-buckets/my-events/deployed-rebuild.cjs": {
       "components": [],
@@ -1704,15 +1704,23 @@
     },
     "tests/four-court-buckets/my-events/rebuild-patch.test.cjs": {
       "components": [],
-      "blob": "a10feea94fce3c0ab5cd3d6653b7a4db11589deb"
+      "blob": "02be699e31605af927df2f03b2688a3c7a2f7f03"
     },
     ".github/workflows/bucket-my-events-proof.yml": {
       "components": [],
-      "blob": "bccedbbf5ff48aac4a51304741f43111758ad579"
+      "blob": "2e6023ca16814a8b05585e112b6a507baa7927ce"
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "0be2de1d65fb7606462f53e07ef12e2b4c632351"
+      "blob": "6fe477c2a004049943b90709e7331bd4afddfac7"
+    },
+    "release/buckets/my-events/patch-bootstrap.cjs": {
+      "components": [],
+      "blob": "0ce7909945ef89c70649710be75a07d928e29584"
+    },
+    "tests/four-court-buckets/my-events/bootstrap-patch.test.cjs": {
+      "components": [],
+      "blob": "b38fe8914e511e9e6a0bfc6f17edbc273ff8a162"
     }
   },
   "mainScriptQueryParameters": {

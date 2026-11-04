@@ -36,3 +36,15 @@ test('enabled rebuilder requires a bucket lifecycle resolver',()=>{
  const {createRebuilder}=candidate();
  assert.throws(()=>createRebuilder({enabled:true,bridge:{run(){},collectionGroup(){}},engine:{ingestRegistration(){}}}),/rebuild-dependencies/);
 });
+test('beginRoom rejects a stale root or changed bucket target before writes',async()=>{
+ const {createRebuilder}=candidate();
+ const tx={get:async ref=>ref.path==='tournaments/SIX'?{exists:true,ref,createTime:{seconds:1,nanoseconds:0},updateTime:{seconds:2,nanoseconds:0},data:()=>({})}:{exists:false,ref,data:()=>null},set(){throw Error('unexpected-write')}};
+ const b={doc:path=>({path}),collectionGroup(){return {}},run:async (_name,fn)=>({value:await fn(tx)})};
+ const engine={ingestRegistration(){}};
+ let resolved=0;
+ const rebuilder=createRebuilder({enabled:true,bridge:b,engine,clock:()=>100,resolveRoomLifecycle:async()=>{resolved++;return {status:'supported',active:false}}});
+ assert.equal((await rebuilder.beginRoom({code:'SIX',expectedSourceUpdateTime:{seconds:1,nanoseconds:0},expectedTarget:'active'})).status,'stale-source');
+ assert.equal(resolved,0);
+ assert.equal((await rebuilder.beginRoom({code:'SIX',expectedSourceUpdateTime:{seconds:2,nanoseconds:0},expectedTarget:'active'})).status,'stale-source');
+ assert.equal(resolved,1);
+});

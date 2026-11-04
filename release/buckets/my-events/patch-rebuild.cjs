@@ -23,6 +23,12 @@ function patchRebuild(source){
   "if(!b?.run||!b?.collectionGroup||!engine?.ingestRegistration)throw Error('rebuild-dependencies');",
   "if(!b?.run||!b?.collectionGroup||!engine?.ingestRegistration||typeof resolveRoomLifecycle!=='function')throw Error('rebuild-dependencies');");
  out=once(out,
+  'async function beginRoom({code,runId=null}){',
+  'async function beginRoom({code,runId=null,expectedSourceUpdateTime=null,expectedTarget=null}){');
+ out=once(out,
+  "if(runId&&(!r||r.state!=='running'||r.engineVersion!==ENGINE_VERSION))return {status:'invalid-run'};",
+  "if(expectedSourceUpdateTime!==null&&!same(stamp(room.updateTime),expectedSourceUpdateTime))return {status:'stale-source'};if(expectedTarget!==null&&await verifiedTarget(resolveRoomLifecycle,b,tx,code,room)!==expectedTarget)return {status:'stale-source'};\n  if(runId&&(!r||r.state!=='running'||r.engineVersion!==ENGINE_VERSION))return {status:'invalid-run'};");
+ out=once(out,
   'target:target(room),publishTarget:j.publishTarget',
   'target:await verifiedTarget(resolveRoomLifecycle,b,tx,code,room),publishTarget:j.publishTarget');
  out=once(out,

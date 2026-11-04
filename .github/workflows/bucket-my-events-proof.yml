@@ -23,4 +23,5 @@ jobs:
       - run: node --test tests/four-court-buckets/my-events/repair-target.test.cjs
       - run: node --test tests/four-court-buckets/my-events/repair-engine-patch.test.cjs
       - run: node --test tests/four-court-buckets/my-events/bootstrap-target.test.cjs
+      - run: node --test tests/four-court-buckets/my-events/bootstrap-patch.test.cjs
       - run: node --test tests/four-court-buckets/my-events/rebuild-patch.test.cjs
