@@ -74,5 +74,8 @@ resolver and replaces only the root-only `normalizeRoom(room.data())` call with
 an awaited resolver in the existing read-only transaction. The exact deployed
 reader fixtures and a synthetic account/rollout/membership path prove that the
 list calls the resolver after authorization, while detail treats an ended room
-as inactive. Drift or a missing resolver fails closed. These are source patch
+as inactive. An additional same-transaction test uses the real bucket
+certificate adapter: the authenticated list returns a six-court `settling`
+card, the detail reader sees the same phase, and a missing bucket yields an
+unresolved notice without a card. Drift or a missing resolver fails closed. These are source patch
 and offline tests; no production reader function or repair writer was updated.
