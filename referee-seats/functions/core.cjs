@@ -22,7 +22,8 @@ function communityRoom(room,authority={}){
  return authority.communitySeatsEnabled===true&&room.eventAuthority==='community'&&room.ladderMode==='general';
 }
 function communityOwner(room,user,uid,authority={}){
- return communityRoom(room,authority)&&EventStaff.activeAccount(user)&&user.role==='player'
+ return communityRoom(room,authority)&&EventStaff.activeAccount(user)
+  &&['player','staff','admin','super_admin'].includes(user.role)
   &&!!uid&&room.ownerUid===uid&&room.createdBy===uid;
 }
 function manager(room,user,uid,authority={}){
@@ -72,7 +73,7 @@ function canEnableCommunity(room,state,user,uid,d,authority){
  return d.action==='enable'&&authority.communitySeatsEnabled===true
   &&room.eventAuthority==='community'&&state.meta?.eventAuthority==='community'
   &&room.ladderMode==='general'&&state.meta.ladderMode==='general'
-  &&EventStaff.activeAccount(user)&&user.role==='player'&&room.createdBy===uid&&room.ownerUid===uid;
+  &&communityOwner(room,user,uid,authority);
 }
 function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,authority={}}){
  const communityEnable=canEnableCommunity(room,state,user,uid,d,authority);
@@ -110,7 +111,7 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
   }else if(action==='accept-invite'){
    const req=model.requests[d.requestId];
    if(!communityAccept||!req||req.kind!=='invite'||req.status!=='pending'||req.toUid!==uid||req.station!==station||req.slot!==slot)fail('request-unavailable');
-   if(req.expiresAt<=now||req.courtRevision!==court.revision||seat||req.fromUid!==room.ownerUid||req.fromUid!==room.createdBy||!EventStaff.activeAccount(requesterUser)||requesterUser.role!=='player')fail('request-stale');
+   if(req.expiresAt<=now||req.courtRevision!==court.revision||seat||req.fromUid!==room.ownerUid||req.fromUid!==room.createdBy||!communityOwner(room,requesterUser,req.fromUid,authority))fail('request-stale');
    if(SLOTS.some(s=>court[s]?.uid===uid))fail('already-seated');
    court[slot]={uid,name:display(user),joinedAt:now};court.revision++;
    req.status='accepted';req.resolvedAt=now;invalidate(model,station,now);
