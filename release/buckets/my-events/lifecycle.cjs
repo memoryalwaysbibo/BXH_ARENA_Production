@@ -1,6 +1,6 @@
 'use strict';
-// Offline candidate. Call inside the same Firestore read-only transaction used
-// by the membership reader or repair engine; do not trust a caller's snapshot.
+// Offline candidate. Call inside the Firestore read-only transaction used by
+// the membership reader or repair engine; acquire every document in that tx.
 const C=require('../completion/certificate.cjs');
 const result=(status,reason)=>Object.freeze({status,reason});
 function phaseOf(top,state){
@@ -10,10 +10,11 @@ function phaseOf(top,state){
  const real=state.matches.filter(m=>!m.isBye);
  return !state.startedAt||real.length===0?'waiting':real.every(m=>m.completed)?'settling':'live';
 }
-async function readBucketLifecycle({db,tx,root,pub,normalizeRoom}){
- if(!db||!tx||!root||!pub||typeof normalizeRoom!=='function')return result('invalid','bucket-input-missing');
+async function readBucketLifecycle({db,tx,code,normalizeRoom}){
+ if(!db?.doc||!tx?.get||typeof code!=='string'||!/^[-A-Za-z0-9_]{1,100}$/.test(code)||typeof normalizeRoom!=='function')return result('invalid','bucket-input-missing');
  let input,complete;
  try{
+  const [root,pub]=await Promise.all([tx.get(db.doc('tournaments/'+code)),tx.get(db.doc('publicTournaments/'+code))]);
   input=await C.load({db,tx,root,pub});
   complete=C.completed(input);
  }catch{return result('invalid','bucket-lifecycle-unverified');}
