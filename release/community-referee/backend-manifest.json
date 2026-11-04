@@ -1,0 +1,86 @@
+{
+  "project": "bxh-arena",
+  "capturedAt": "2026-11-04T07:40:10.419023+00:00",
+  "sourceArchiveSha256": "5aadefa74c746c674cd251fe4d532148403646baeda641238ce2f5085612ad48",
+  "rulesBaselineSha256": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
+  "rulesCandidateSha256": "dbdb8dc9ba46a110d6f8786cdc7ee4b9badc6bd3120769f4393bf51f31cbc9c3",
+  "functions": [
+    "manageRefereeSeats",
+    "commitRefereeCommand"
+  ],
+  "changedFiles": [
+    "core.cjs",
+    "dispatch-core.cjs",
+    "scoring-core.cjs",
+    "scoring-service.cjs",
+    "service.cjs"
+  ],
+  "preservedLiveIndexAndEngine": true,
+  "productionWrites": 0,
+  "files": {
+    "bucket-legacy-fence.cjs": {
+      "baselineSha256": "acea05f6d0af5a7016e8d0875836f420a32a877810c34a2e86bb2fbe4faf462c",
+      "candidateSha256": "acea05f6d0af5a7016e8d0875836f420a32a877810c34a2e86bb2fbe4faf462c"
+    },
+    "core.cjs": {
+      "baselineSha256": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
+      "candidateSha256": "fd0011e096c31594322e164a1864fe08c3e96486a737cbba8511956fe4126635"
+    },
+    "dispatch-core.cjs": {
+      "baselineSha256": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
+      "candidateSha256": "4be700ad894bf35b95e1da39585544ad14d596df5c12d00362d0ec93a90efe3b"
+    },
+    "engine/court-retirement.cjs": {
+      "baselineSha256": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
+      "candidateSha256": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0"
+    },
+    "engine/double-elimination.cjs": {
+      "baselineSha256": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
+      "candidateSha256": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c"
+    },
+    "engine/fault.cjs": {
+      "baselineSha256": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
+      "candidateSha256": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266"
+    },
+    "engine/index.cjs": {
+      "baselineSha256": "81dda03aae3ee16c0cb09f0acbf17e9ffaba80e52d02c751569a0b8ea2952a4d",
+      "candidateSha256": "81dda03aae3ee16c0cb09f0acbf17e9ffaba80e52d02c751569a0b8ea2952a4d"
+    },
+    "engine/manifest.json": {
+      "baselineSha256": "531e5b4c0c77c689ae55b5bfd04d6f2f2a6a9f60fc3d4125e5da7832e7f06842",
+      "candidateSha256": "531e5b4c0c77c689ae55b5bfd04d6f2f2a6a9f60fc3d4125e5da7832e7f06842"
+    },
+    "engine/match-utils.cjs": {
+      "baselineSha256": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53",
+      "candidateSha256": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53"
+    },
+    "event-staff-core.cjs": {
+      "baselineSha256": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+      "candidateSha256": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6"
+    },
+    "index.js": {
+      "baselineSha256": "e1f84ecfd8b98cce686f5adc4d12d723adadc25b44b0a88c71e1dc53fd7da4f4",
+      "candidateSha256": "e1f84ecfd8b98cce686f5adc4d12d723adadc25b44b0a88c71e1dc53fd7da4f4"
+    },
+    "package-lock.json": {
+      "baselineSha256": "40af37152bb937436e5e87b0f0f8b3f834aee597da89db0b2e85138b79c52661",
+      "candidateSha256": "40af37152bb937436e5e87b0f0f8b3f834aee597da89db0b2e85138b79c52661"
+    },
+    "package.json": {
+      "baselineSha256": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
+      "candidateSha256": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7"
+    },
+    "scoring-core.cjs": {
+      "baselineSha256": "790274ea86481c82bca7a9a22fb36a7c07a0b4c12defe2d076626628130b89bd",
+      "candidateSha256": "6d4007a738fcaaede5eb2a3db672b5a8b51e0ab68a1c00cab9c460beec6e9631"
+    },
+    "scoring-service.cjs": {
+      "baselineSha256": "4e2db96a5bfbfd4e9def103b6f53dac70588260895744111b53c78e92509dc6c",
+      "candidateSha256": "866fadf8a809632731aa65c5b1812d9e2f3a683b812f892e12704fc95f52dfa2"
+    },
+    "service.cjs": {
+      "baselineSha256": "f782b2a67f2485c643f08a1e0cb48786a7772d7bc248411c8ccb4634a3861903",
+      "candidateSha256": "a562e06c05b71594d732fa28545e04dba8c52bf63941c19e085276a782a1270a"
+    }
+  }
+}

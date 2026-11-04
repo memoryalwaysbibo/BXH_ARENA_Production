@@ -18,7 +18,7 @@ import urllib.request
 
 PROJECT = 'bxh-arena'
 FUNCTIONS = ('manageRefereeSeats', 'commitRefereeCommand')
-REVIEWED_RULES_HASH = 'cc92f06579800bd9dcbd7fca3af36fcbd4a80989f795164ec847b0211fe694a9'
+REVIEWED_RULES_HASH = '580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e'
 
 
 def command(args):

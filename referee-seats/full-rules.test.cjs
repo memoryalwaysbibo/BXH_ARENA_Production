@@ -61,3 +61,21 @@ test('community private reads follow current seats; player referees cannot forge
  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'systemConfig/refereeSeatsV1'),{communitySeatsEnabled:false}));
  await assertFails(getDoc(doc(dbFor('community-backup'),'tournaments/'+roomCode)));
 });
+
+test('release owner JSON writes preserve closure, lottery, CALL, onsite and bucket fences',
+ {skip:!process.env.REFEREE_RULES_PATH},async()=>{
+ const roomCode='BXH-COMMGATES',state={id:'community-gates',meta:{eventAuthority:'community',stations:1},matches:[],players:[]};
+ const expiry=Timestamp.fromMillis(Date.now()+86400000);
+ const base={...common,eventAuthority:'community',createdBy:'community-host',ownerUid:'community-host',createdByRole:'player',ladderPointsAwarded:false,expiresAt:expiry};
+ const owner=dbFor('community-host');
+ async function seed(extra){await env.withSecurityRulesDisabled(async c=>{
+  await setDoc(doc(c.firestore(),'tournaments/'+roomCode),{...base,...extra,data:JSON.stringify(state),refereeSeatsV1:{version:1,courts:{},requests:{}}});
+  await setDoc(doc(c.firestore(),'publicTournaments/'+roomCode),{...base,...extra,bracketView:JSON.stringify(state)});
+ });}
+ async function save(){const b=writeBatch(owner);b.update(doc(owner,'tournaments/'+roomCode),{data:JSON.stringify({...state,ownerManaged:true}),updatedAt:2});b.update(doc(owner,'publicTournaments/'+roomCode),{bracketView:JSON.stringify({...state,ownerManaged:true}),updatedAt:2});return b.commit();}
+ await seed({});await assertSucceeds(save());
+ for(const extra of [{systemClosed:true},{registrationSelection:{status:'drawing'}},{callRevision:1},
+                    {onsiteWaitlistServerOwned:true,onsiteWaitlistFinalized:false},{scoreStorage:{schema:'bxh-match-buckets-v1'}}]){
+  await seed(extra);await assertFails(save());
+ }
+});

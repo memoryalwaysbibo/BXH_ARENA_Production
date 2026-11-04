@@ -1,7 +1,8 @@
 'use strict';
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore}=require('firebase-admin/firestore');
-const {createHandler}=require('./functions/service.cjs');
+const functionsRoot=process.env.REFEREE_FUNCTIONS_ROOT||__dirname+'/functions';
+const {createHandler}=require(functionsRoot+'/service.cjs');
 let app,db,handle,seq=0;
 const code='BXH-SEATTEST',ref=()=>db.doc('tournaments/'+code);
 const request=(uid,action,args={})=>({auth:{uid},data:{code,operationId:'emulator-operation-'+(++seq),action,...args}});
@@ -18,7 +19,7 @@ before(async()=>{
 });
 after(async()=>{await deleteApp(app);});
 test('community invitation, main/backup handoff and staff support commit atomically on two courts',async()=>{
- const {createScoringHandler}=require('./functions/scoring-service.cjs'),score=createScoringHandler(db);
+ const {createScoringHandler}=require(functionsRoot+'/scoring-service.cjs'),score=createScoringHandler(db);
  const roomCode='BXH-COMMTEST',tour=db.doc('tournaments/'+roomCode),pub=db.doc('publicTournaments/'+roomCode);
  const players=['p1','p2','p3','p4'].map(id=>({id,name:id}));
  const matches=[1,2].map(station=>({id:'m'+station,station,bracket:'RR',round:0,seq:station-1,a:{playerId:players[(station-1)*2].id},b:{playerId:players[(station-1)*2+1].id},scoreA:0,scoreB:0,log:[],faultActions:[],completed:false,status:'in_progress'}));
@@ -78,7 +79,7 @@ test('real Firestore retries produce one claim and atomic swap with immutable ma
 });
 
 test('trusted scoring commits once, rejects stale concurrent score and revoked/off-court referee',async()=>{
- const {createScoringHandler}=require('./functions/scoring-service.cjs'),C=require('./functions/core.cjs'),score=createScoringHandler(db);
+ const {createScoringHandler}=require(functionsRoot+'/scoring-service.cjs'),C=require(functionsRoot+'/core.cjs'),score=createScoringHandler(db);
  const scoreCode='BXH-SCORETEST',scoreRef=db.doc('tournaments/'+scoreCode);
  const model={version:1,revision:1,requests:{},courts:{'1':{revision:1,main:{uid:'a',name:'A'},backup1:{uid:'b',name:'B'},backup2:null}}};
  const st={id:'score-room',cloudCode:scoreCode,meta:{eventAuthority:'official',formatType:'single',stations:1,scoringMode:'standard'},bracketSize:2,startedAt:1,players:[{id:'p1',name:'P1'},{id:'p2',name:'P2'}],matches:[{id:'m',bracket:'SE',round:0,indexInRound:0,station:1,a:{playerId:'p1'},b:{playerId:'p2'},scoreA:0,scoreB:0,log:[],faultActions:[],completed:false,status:'in_progress'}]};
@@ -98,7 +99,7 @@ test('trusted scoring commits once, rejects stale concurrent score and revoked/o
 });
 
 test('pinned CALL/PASS service survives seat replacement and recalls after trusted predecessor confirmation',async()=>{
- const {loadWriter}=require('../qr-checkin/backend/writer-fixtures.cjs'),{createScoringHandler}=require('./functions/scoring-service.cjs'),C=require('./functions/core.cjs');
+ const {loadWriter}=require('../qr-checkin/backend/writer-fixtures.cjs'),{createScoringHandler}=require(functionsRoot+'/scoring-service.cjs'),C=require(functionsRoot+'/core.cjs');
  let now=20000;const call=loadWriter('courtCallService','court-call-service.js',db).createCourtCallService(db,()=>now+=11000),score=createScoringHandler(db);
  const passCode='BXH-PASSTEST',tour=db.doc('tournaments/'+passCode),model={version:1,revision:1,requests:{},courts:{1:{revision:1,main:{uid:'a',name:'A'},backup1:null,backup2:null}}};
  const players=['p1','p2','p3','p4'].map(id=>({id,name:id,playerUid:id}));
@@ -122,7 +123,7 @@ test('pinned CALL/PASS service survives seat replacement and recalls after trust
 });
 
 test('actual dispatch exit, retry, reopen and detached recovery preserve scores and faults',async()=>{
- const {createScoringHandler}=require('./functions/scoring-service.cjs'),C=require('./functions/core.cjs'),dispatch=createScoringHandler(db),dispatchCode='BXH-DISPATCH',tour=db.doc('tournaments/'+dispatchCode);
+ const {createScoringHandler}=require(functionsRoot+'/scoring-service.cjs'),C=require(functionsRoot+'/core.cjs'),dispatch=createScoringHandler(db),dispatchCode='BXH-DISPATCH',tour=db.doc('tournaments/'+dispatchCode);
  const model={version:1,revision:1,requests:{},courts:{1:{revision:1,main:{uid:'a',name:'A'},backup1:null,backup2:null}}};
  const state={id:'dispatch-room',cloudCode:dispatchCode,meta:{eventAuthority:'official',formatType:'roundrobin',stations:1},startedAt:1,players:[{id:'p1',name:'P1'},{id:'p2',name:'P2'}],matches:[{id:'m',station:1,bracket:'RR',round:0,seq:0,a:{playerId:'p1'},b:{playerId:'p2'},scoreA:2,scoreB:1,log:[{test:'preserve'}],faultActions:[{offender:'A'}],completed:false,status:'in_progress'}],courtAssignments:{court1:{currentMatchId:'m',nextMatchId:null}}};
  await Promise.all([tour.set({createdBy:'host',eventAuthority:'official',assignedStaffUids:['a','host'],refereeSeatsV1:model,...C.project(model,'host',1),data:JSON.stringify(state)}),db.doc('publicTournaments/'+dispatchCode).set({bracketView:JSON.stringify(state)})]);

@@ -4,9 +4,11 @@ on:
     paths:
       - 'release/community-referee/**'
       - 'scripts/build-community-referee-rules.py'
+      - 'scripts/build-community-referee-backend.py'
       - 'tests/community-referee-rules.test.py'
       - 'scripts/community-referee-readonly-preflight.py'
       - 'tests/community-referee-preflight.test.py'
+      - 'tests/community-referee-backend.test.py'
       - 'referee-seats/**'
       - '.github/workflows/community-referee.yml'
 permissions:
@@ -31,10 +33,13 @@ jobs:
           python3 -B scripts/build-community-referee-rules.py --check
           python3 -B tests/community-referee-rules.test.py
           python3 -B tests/community-referee-preflight.test.py
+          python3 -B tests/community-referee-backend.test.py
+          python3 -B scripts/build-community-referee-backend.py --check --output /tmp/community-referee-source
       - name: Install isolated Emulator dependencies
         run: npm install --prefix /tmp/community-referee-deps --no-save --ignore-scripts firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11 firebase-admin@13.10.0
       - name: Compile release Rules and exercise actual community transactions
         env:
           NODE_PATH: /tmp/community-referee-deps/node_modules
           REFEREE_RULES_PATH: release/community-referee/firestore.rules
+          REFEREE_FUNCTIONS_ROOT: /tmp/community-referee-source/functions
         run: /tmp/community-referee-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-referee-seat-compile --config referee-seats/firebase.emulator.json 'node --test referee-seats/full-rules.test.cjs referee-seats/firestore.test.cjs'

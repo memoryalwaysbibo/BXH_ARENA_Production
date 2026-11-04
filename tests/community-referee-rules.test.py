@@ -25,8 +25,13 @@ class Composition(unittest.TestCase):
         restored = self.result.replace(helper, '', 1)
         restored = restored.replace('|| isCommunityOwnerData(room) ', '')
         restored = restored.replace('communityRefereeReadable(resource.data) || ', '', 1)
+        _, reorders = builder.prioritize_owners(self.base)
+        for before, after in reversed(reorders):
+            self.assertIn(after, restored)
+            restored = restored.replace(after, before, 1)
         self.assertEqual(restored, self.base)
-        self.assertNotIn('function scoreBucketReadable(', self.result)
+        self.assertIn('function scoreBucketReadable(', self.result)
+        self.assertIn("!('scoreStorage' in resource.data)", self.result)
 
     def test_changed_live_capture_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'differ from reviewed capture'):

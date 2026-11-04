@@ -193,6 +193,7 @@ test('three-seat scored and quick confirmations both reach the shared completion
       pendingModal:{},cloudStatus:'connected',cloudLastSyncAt:0,
       applyRemoteState:s=>{r.ctx.state=s;},checkWinnerSide:()=>null});
     r.ctx.window.cloudSync.commitRefereeCommand=async()=>({ok:true,state:structuredClone(target)});
+    vm.runInContext(section('function canUseRefereeSeatCommands(', '\nfunction canOperateStation('),r.ctx);
     vm.runInContext('const refereeSeatCommandBusy=new Set();'+seats,r.ctx);
     assert.equal(await r.ctx.executeRefereeSeatCommand('final',{action}),true);
     assert.equal(r.ctx.state.archiveStatus,'completed');assert.equal(r.results(),1);
