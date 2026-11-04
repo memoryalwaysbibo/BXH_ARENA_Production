@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const {fixture,load,specs,code}=require('../settlement/probe.cjs');
 const {normalizeLifecycle}=require('./deployed-lifecycle.cjs');
 const {readBucketLifecycle}=require('../../../release/buckets/my-events/lifecycle.cjs');
+const B=require('../../../release/buckets/settlement/bucket-settlement/state.cjs');
 async function status(f){
  return f.m.db.runTransaction(async tx=>{
   const root=await tx.get(f.m.db.doc('tournaments/'+code));
@@ -23,6 +24,31 @@ test('completed private and public certificates close the verified room',async()
  const f=fixture({courts:6}),spec=specs.find(x=>x.function==='settleLadderTournament');
  const done=await load(spec,true,f.m).invoke();assert.equal(done.ok,true,done.reason);
  const life=await status(f);assert.equal(life.status,'supported');assert.equal(life.phase,'done');assert.equal(life.active,false);
+});
+test('waiting, live and added-court phases use current bucket context',async()=>{
+ const waiting=fixture({courts:6}),rp='tournaments/'+code,pp='publicTournaments/'+code;
+ const root=waiting.m.rows.get(rp),base=JSON.parse(root.data);
+ delete base.startedAt;base.matches=[];
+ const w={...root,data:JSON.stringify(base),tournamentPhase:'waiting'};
+ waiting.m.put(rp,w);
+ for(const bucket of B.encode(base,w.scoreStorage))waiting.m.put(rp+'/matchBuckets/'+bucket.bucketId,bucket);
+ let life=await status(waiting);assert.equal(life.phase,'waiting');assert.equal(life.active,true);
+
+ const live=fixture({courts:6}),old=live.m.rows.get(rp),state=JSON.parse(old.data);
+ state.matches[0].completed=false;live.m.put(rp,{...old,data:JSON.stringify(state)});
+ const bucketPath=rp+'/matchBuckets/court-1',bucket=live.m.rows.get(bucketPath),matches=JSON.parse(bucket.matches);
+ matches.find(m=>m.id===state.matches[0].id).completed=false;
+ live.m.put(bucketPath,{...bucket,matches:JSON.stringify(matches)});
+ life=await status(live);assert.equal(life.phase,'live');assert.equal(life.active,true);
+
+ const expanded=fixture({courts:6}),prior=expanded.m.rows.get(rp),newState=JSON.parse(prior.data);
+ newState.meta.stations=12;
+ const manifest=B.makeManifest(newState,prior.scoreStorage.epoch);
+ expanded.m.put(rp,{...prior,data:JSON.stringify(newState),scoreStorage:manifest});
+ expanded.m.put(rp+'/matchBuckets/court-3',B.encode(newState,manifest).find(b=>b.bucketId==='court-3'));
+ const pub=expanded.m.rows.get(pp);
+ expanded.m.put(pp,{...pub,scoreBucketProjection:{epoch:manifest.epoch,versions:{...pub.scoreBucketProjection.versions,'court-3':0}}});
+ life=await status(expanded);assert.equal(life.phase,'settling');assert.equal(life.active,true);
 });
 test('partial ownership, migration, missing or corrupted bucket fail closed',async()=>{
  const variants=[
