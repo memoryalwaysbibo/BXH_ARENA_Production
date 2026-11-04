@@ -11019,11 +11019,12 @@ function bracketRosterUpdateHtml(){
  const action=canOperateCurrentTournament()?'<button class="btn btn-primary" data-action="draw-bracket" '+(bracketCommitBlocked()?'disabled':'')+'>依最新名單重新抽籤</button>':'<p>請主辦更新對戰表。</p>';
  return '<section class="panel banner warn" role="alert"><div><b>對戰表待更新</b><p>報到或參賽名單已有異動，目前顯示的是先前配對。開賽前請依最新名單重新抽籤並確認儲存；重新抽籤會更動配對。</p>'+action+'</div></section>';
 }
-function bracketCommitStatusHtml(){
+function bracketCommitStatusHtml(inRosterOverview=false){
  const rosterUpdate=bracketRosterUpdateHtml();
  const c=bracketCommitController(),s=c?.status();if(!s||(!s.pending&&!s.error&&s.result!=='success'))return rosterUpdate;
  if(rosterUpdate&&s.result==='success'&&!s.pending&&!s.busy)return rosterUpdate;
  const uploaded=s.result==='success',cloud=!!state.cloudCode;
+ if(inRosterOverview&&s.pending)return rosterUpdate+'<section class="panel" role="status"><p>本次配對已保留，儲存結果待確認。</p><button class="btn btn-ghost" data-action="bracket-commit-manage" data-section="bracket">查看配對狀態</button></section>';
  const queued=s.error==='queue-wait-timeout',uncertain=s.error==='confirmation-timeout',preflightTimeout=uncertain&&s.phase==='checking';
  const phaseLabels={waiting:'等待前一筆儲存完成…',checking:'核對雲端配對中…',writing:'提交本次配對中…',confirming:'確認雲端儲存結果中…'};
  const title=s.busy?(cloud?(phaseLabels[s.phase]||'資料上傳中…'):'儲存中…'):uploaded?(cloud?'上傳成功':'儲存成功'):queued?'等待儲存，尚未送出':preflightTimeout?'雲端核對逾時，尚未送出':uncertain?'儲存結果尚未確認':(cloud?'上傳失敗':'儲存失敗');
@@ -11031,6 +11032,7 @@ function bracketCommitStatusHtml(){
  const failureDetail=!s.busy&&!uploaded&&s.error?'<p>原因：'+esc(s.error)+'</p>':'';
  return rosterUpdate+'<section class="panel" role="status" aria-live="polite" aria-busy="'+s.busy+'"><b>'+title+'</b>'+(s.busy?'<p><progress aria-label="資料上傳中" style="width:100%;max-width:320px"></progress></p>':'')+'<p>'+message+'</p>'+
  failureDetail+
+ (s.pending&&(appPhase==='app'||appPhase==='community-room')?'<button class="btn btn-ghost" data-action="bracket-commit-manage" data-section="confirmed">停止等待，返回管理</button>':'')+
  (s.pending?'<button class="btn btn-primary" data-action="bracket-commit-submit" '+(s.busy?'disabled':'')+'>'+(s.busy?(cloud?'上傳中…':'儲存中…'):(cloud?'重試上傳':'重試儲存'))+'</button>':'')+
  (cloud&&s.canDiscard?'<button class="btn btn-ghost" data-action="bracket-commit-discard">取消上傳</button>':'')+
  (s.pending&&!s.busy&&s.result==='failed'&&canOfferAdminOperationalOverride()&&!adminOperationalOverrideBusy?'<button class="btn btn-danger" data-action="admin-force-reconfirm">管理員強制提交原配對</button>':'')+'</section>';
@@ -13534,7 +13536,7 @@ function renderPeopleManagement(){
   const rosterTools=window.BXHRosterView?.controls({contextKey:(firebaseUser?.uid||"")+":"+(state.cloudCode||state.id||"local"),section:peopleRosterSection,enabled:peopleRosterSection!=="waitlist"||!peopleOnsiteWaitlistManaged()})||"";
   const waitlistShortcut=peopleOnsiteWaitlistAvailable()&&peopleRosterSection!=="waitlist"
     ?'<div class="panel"><div class="people-section-summary"><div><div class="panel-title">備取／現場抽籤</div><p class="hint">備取名單、抽選名額與加開名額，統一從這裡操作。</p></div><button class="btn btn-primary" data-action="people-section" data-section="waitlist">'+(state.onsiteWaitlistFinalized===true?'查看抽籤紀錄':'前往備取／抽籤')+'</button></div></div>':"";
-  return (peopleRosterSection==="bracket"?"":bracketCommitStatusHtml())+syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
+  return (peopleRosterSection==="bracket"?"":bracketCommitStatusHtml(true))+syncError+pendingBanner+(typeof adminRosterPendingHtml==='function'?adminRosterPendingHtml():'')+adminCheckinPendingHtml()+subnav+waitlistShortcut+(state.cloudCode&&needsCheckin&&canManageRegistrationRoster()?window.BXHQrCheckin?.button()||"":"")+'<div id="people-roster-view">'+rosterTools+(panels[peopleRosterSection]||confirmedPanel)+'</div>';
 }
 
 function renderBxhEventTemplateSettingsSection(readOnly){
@@ -21293,6 +21295,12 @@ function handleAction(action, target){
   }
   if(onsiteRegistrationSettingsLocked()&&state.onsiteWaitlistFinalized!==true&&['save-meta','save-registration-settings','open-registration-publish-preview','community-save-settings','toggle-event-cancelled'].includes(action)){
     showToast('候補抽選尚未完成，房間設定暫停儲存與發布；請至「人員管理 → 備取／現場抽籤」完成抽選後再操作。',true);return;
+  }
+  if(action==='bracket-commit-manage'){
+    if((appPhase!=='app'&&appPhase!=='community-room')||!bracketCommitController()?.status().pending)return;
+    if(appPhase==='community-room')communityRoomActiveTab='people';else activeTab='people';
+    peopleRosterSection=target.getAttribute('data-section')==='bracket'?'bracket':'confirmed';
+    render();return;
   }
   if(action==='bracket-commit-submit'){void bracketCommitController()?.submit();return;}
   if(action==='bracket-commit-retry'){void bracketCommitController()?.retry();return;}
