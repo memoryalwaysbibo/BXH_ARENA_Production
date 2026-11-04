@@ -147,3 +147,15 @@ named-run, explicit execute and source-seal gates. An offline composition of
 the captured source set and candidate overlays constructed all 14 exports with
 zero cloud calls. The package is missing a reviewed candidate source seal and
 live App Check/Firestore/Eventarc/latency acceptance.
+
+The fixed-generation deployed archive for `myEventsMaintenanceRepair` has
+SHA-256 `18969f340bd0d654076395935f9b0e6a8f50ec9a1569b09006e2d62cdbcc700f`.
+Its separately captured lockfile has SHA-256
+`069ecab6c23a838571c8bd073aea34a8abd9f2c5607fcd92cc482c4911c228d7`;
+all 25 selected source hashes match the archived baseline seal. The baseline
+seal explicitly has `approved:false`. A local review composition added the
+lockfile, applied the eight pinned overlays and added three bucket verifier
+dependencies. All 29 candidate files passed the source-set verifier with an
+approval flag supplied only in memory; the review ZIP retains `approved:false`.
+This confirms file completeness and hash consistency, not dependency install,
+native Emulator behavior, runtime configuration or release approval.
