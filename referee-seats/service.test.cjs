@@ -94,6 +94,29 @@ function communityFixture(){
  h.docs.get('systemConfig/refereeSeatsV1').communitySeatsEnabled=true;
  return h;
 }
+test('a super admin who created a community room can invite by game ID and the player can accept',async()=>{
+ const h=communityFixture();
+ h.docs.get('users/host').role='super_admin';
+ h.docs.get('users/main').gameId='PLAYER-123';
+ h.docs.set('users/other-admin',{active:true,role:'super_admin',gameId:'OTHER'});
+ await h.run('host','enable');
+ const invite={station:1,slot:'main',targetGameId:'PLAYER-123',expectedCourtRevision:0};
+ await assert.rejects(h.run('other-admin','invite',invite),/permission-denied/);
+ const {requestId}=await h.run('host','invite',invite);
+ assert.equal(h.docs.get('users/main/communityRefereeInbox/ref-invite-'+requestId).refereeInviteStatus,'pending');
+ await h.run('main','accept-invite',{station:1,slot:'main',requestId});
+ assert.equal(h.doc().refereeSeatsV1.courts[1].main.uid,'main');
+ assert.equal(h.docs.get('users/main/communityRefereeInbox/ref-invite-'+requestId).refereeInviteStatus,'accepted');
+});
+test('staff room owner may invite, but a disabled room owner cannot issue new invitations',async()=>{
+ const h=communityFixture();
+ h.docs.get('users/host').role='staff';
+ await h.run('host','enable');
+ await h.run('host','invite',{station:1,slot:'backup1',targetUid:'backup',expectedCourtRevision:0});
+ h.docs.get('users/host').active=false;
+ await assert.rejects(h.run('host','invite',{station:1,slot:'main',targetUid:'main',expectedCourtRevision:0}),/room-read-only/);
+ assert.equal(Object.keys(h.doc().refereeSeatsV1.requests).length,1);
+});
 test('three simultaneous invitations on one court remain usable after another seat accepts',async()=>{
  const h=communityFixture();h.docs.set('users/third',{active:true,role:'player'});await h.run('host','enable');
  const invites=[];

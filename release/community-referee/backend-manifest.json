@@ -24,7 +24,7 @@
     },
     "core.cjs": {
       "baselineSha256": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
-      "candidateSha256": "fd0011e096c31594322e164a1864fe08c3e96486a737cbba8511956fe4126635"
+      "candidateSha256": "49b60f3b40a1c5dffad71850a14d7207b636cc748ae8654ece346c9a014ec237"
     },
     "dispatch-core.cjs": {
       "baselineSha256": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
@@ -80,7 +80,7 @@
     },
     "service.cjs": {
       "baselineSha256": "f782b2a67f2485c643f08a1e0cb48786a7772d7bc248411c8ccb4634a3861903",
-      "candidateSha256": "a562e06c05b71594d732fa28545e04dba8c52bf63941c19e085276a782a1270a"
+      "candidateSha256": "85ee42439caf548ea15209c696bc8e653a086aae1a70b5960768941637ae7e49"
     }
   }
 }
