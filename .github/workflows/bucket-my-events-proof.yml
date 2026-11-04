@@ -5,6 +5,7 @@ on:
       - 'tests/four-court-buckets/my-events/**'
       - 'tests/four-court-buckets/settlement/**'
       - 'release/buckets/settlement/**'
+      - 'release/buckets/my-events/**'
       - '.github/workflows/bucket-my-events-proof.yml'
   workflow_dispatch:
 jobs:
@@ -16,3 +17,4 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/four-court-buckets/my-events/probe.cjs
+      - run: node tests/four-court-buckets/my-events/candidate-probe.cjs
