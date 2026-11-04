@@ -6,11 +6,7 @@ const {normalizeLifecycle}=require('./deployed-lifecycle.cjs');
 const {readBucketLifecycle}=require('../../../release/buckets/my-events/lifecycle.cjs');
 const B=require('../../../release/buckets/settlement/bucket-settlement/state.cjs');
 async function status(f){
- return f.m.db.runTransaction(async tx=>{
-  const root=await tx.get(f.m.db.doc('tournaments/'+code));
-  const pub=await tx.get(f.m.db.doc('publicTournaments/'+code));
-  return readBucketLifecycle({db:f.m.db,tx,root,pub,normalizeRoom:normalizeLifecycle});
- });
+ return f.m.db.runTransaction(tx=>readBucketLifecycle({db:f.m.db,tx,code,normalizeRoom:normalizeLifecycle}));
 }
 test('4, 6 and 12 courts stay active while authoritative matches wait for settlement',async()=>{
  for(const courts of [4,6,12]){
