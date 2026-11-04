@@ -71,7 +71,11 @@ def main():
         for old in ref['functions']:
             entry = receipt.get('functions', {}).get(old['entryPoint'], {})
             operator.need(entry.get('verified') is True, 'function deployment not verified')
-            info = deployment.check_function(old, entry.get('source'))
+            # A successful source deployment creates a new Cloud Run revision.
+            # Pin that revision to the verified receipt, while retaining every
+            # other captured service setting as the expected configuration.
+            expected = dict(old, service=dict(old['service'], revision=entry.get('revision')))
+            info = deployment.check_function(expected, entry.get('source'))
             operator.need(info.get('serviceConfig', {}).get('revision') == entry.get('revision'),
                           'function revision changed after deployment')
             deployment.verify_source(old['entryPoint'], info)
