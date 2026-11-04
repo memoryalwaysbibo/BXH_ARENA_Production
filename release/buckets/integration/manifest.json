@@ -1675,7 +1675,7 @@
       ]
     },
     "tests/four-court-buckets/my-events/README.md": {
-      "blob": "59d7d72bd96597aae7c6e68afc6c9f2f56bd9d07",
+      "blob": "6976b03f78fe0623b9481616efaecf262e3eb1d3",
       "components": []
     },
     "release/buckets/my-events/patch-repair-engine.cjs": {
@@ -1684,6 +1684,14 @@
     },
     "tests/four-court-buckets/my-events/repair-engine-patch.test.cjs": {
       "blob": "29d377d8033be5e1e01658745218e5355759929a",
+      "components": []
+    },
+    "tests/four-court-buckets/my-events/deployed-bootstrap.cjs": {
+      "blob": "3a72200123954a3c048e8b4d97aa834a7ea2e1c1",
+      "components": []
+    },
+    "tests/four-court-buckets/my-events/bootstrap-target.test.cjs": {
+      "blob": "0dd06d5ac57c6424560a9bcb414c99eb4de5a00b",
       "components": []
     }
   },

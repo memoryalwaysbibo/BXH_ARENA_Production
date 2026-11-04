@@ -101,3 +101,15 @@ bucket changed between page claim and execution. The patch is a candidate;
 the deployed engine and its bootstrap/rebuild companions have not been changed.
 The service still needs a verified resolver wired into each factory and an
 authenticated list/detail/rebuild acceptance before deployment.
+
+The 2026-11-04 source archive also pins the deployed bootstrap module
+(`8ff7a99e0b571aa56052f1774029c693c0001622115b674f8bc5fc6daf8b71d2`)
+and rebuild module (`abf972f4c72278b82823a750a09c18b41689ff8eb26127bce7d19992f57bb1ef`).
+`bootstrap-target.test.cjs` demonstrates the exact bootstrap discovery scope
+returns `unresolved` for a valid active six-court split room, while the
+transactional bucket resolver returns `supported/settling`. Bootstrap also
+classifies discovered room pages outside the room's transaction; that path
+needs a bounded consistent read with a source-version check before enqueueing.
+Rebuild imports the root-only target in dual-write reconciliation, listing,
+advance and publish. This baseline reproduction is an explicit release gate,
+not a deployed bootstrap or rebuild fix.
