@@ -177,7 +177,7 @@ firebase emulators:exec --only firestore \
   'node tests/four-court-buckets/my-events/native-emulator.cjs'
 ```
 
-The 2026-11-05 local run passed 14 assertions. It uses open local emulator
+The 2026-11-05 local run passed 17 assertions. It uses open local emulator
 rules and does not cover Auth, App Check, Eventarc progression, latency,
 production configuration, browser recovery or a live release. The candidate
 seal remains `approved:false`.

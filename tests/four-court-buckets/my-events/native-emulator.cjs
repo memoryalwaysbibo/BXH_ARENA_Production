@@ -61,7 +61,7 @@ async function main() {
     life = await lifecycle();
     assert.equal(life.status, 'invalid');
     assert.equal(life.reason, 'bucket-lifecycle-unverified');
-    console.log(JSON.stringify({checks: 14, project: process.env.GCLOUD_PROJECT, sixCourtLifecycle: true, bootstrapCursor: run.roomDiscoveryCursor, phaseConflictRejected: true, missingBucketRejected: true, productionWrites: 0}));
+    console.log(JSON.stringify({checks: 17, project: process.env.GCLOUD_PROJECT, sixCourtLifecycle: true, bootstrapCursor: run.roomDiscoveryCursor, phaseConflictRejected: true, missingBucketRejected: true, productionWrites: 0}));
   } finally { await deleteApp(app); }
 }
 main().catch(e => {console.error(e); process.exitCode = 1;});
