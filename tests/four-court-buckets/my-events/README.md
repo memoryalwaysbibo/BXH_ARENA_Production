@@ -34,3 +34,24 @@ requires both private and public completion certificates for `done`.
 courts, settlement, partial ownership and missing/corrupt buckets. It is not
 wired into the deployed My Events reader, detail reader or repair engine.
 Those integrations and their latency, retry and user-facing tests remain open.
+
+## Exact reader integration points
+
+The captured deployed `vendor/reader/auth-reader.cjs` runs a read-only
+transaction and currently calls `normalizeRoom(room.data())` after checking
+the membership incarnation. The detail reader does the same after checking
+room create/update/read times. A bucket-aware adapter must run *inside those
+same transactions*, using the already-read root, and must preserve the
+existing account, bootstrap, membership, pagination and stale-room checks.
+Legacy rooms still use the deployed normalizer. An invalid split-state proof
+must produce an unresolved result, never a ready card or an inactive room.
+
+The list path can examine 16 candidates per page and has a 5-second request
+budget. Reading up to 32 buckets for each candidate can exceed that budget;
+measure actual transaction reads and latency before enabling the path. The
+maintenance engine additionally uses the root-only `target(room)` decision
+in `vendor/backend/engine.cjs` and `rebuild.cjs`; update those transaction
+paths without introducing reads after writes. Acceptance must cover the list,
+detail and repair/rebuild outputs with stale jobs, room deletion and code
+reuse, using the exact deployed source fixtures. No reader or repair handler
+is patched by this offline candidate yet.
