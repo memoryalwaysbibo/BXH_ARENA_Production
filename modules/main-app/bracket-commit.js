@@ -182,7 +182,10 @@ function create(ctx){
   busy=true;ctx.changed();
   try{
    if(ctx.cloud()){const latest=await deadline(ctx.read());if(!latest?.ok||!latest.publicData||signature(latest.data)!==signature(latest.publicData)||
-    (latest.data.bracketDraw?.id||null)!==(latest.publicData.bracketDraw?.id||null))throw Error('cloud-readback-unconfirmed');
+    // The production public whitelist intentionally omits bracketDraw (it
+    // contains the actor UID). Compare public pairing structure; only check
+    // the operation ID when a projection explicitly includes it.
+    (latest.publicData.bracketDraw?.id!=null&&latest.data.bracketDraw?.id!==latest.publicData.bracketDraw.id))throw Error('cloud-readback-unconfirmed');
     if(!ctx.current())return;ctx.apply(latest.data);}
    pending=null;keep();error='';result='';
   }catch(e){error=e.message;}
@@ -237,5 +240,6 @@ function create(ctx){
 }
 const api={signature,assertWrite,create};if(typeof module==='object'&&module.exports)module.exports=api;else root.BXHBracketCommit=api;
 })(typeof window==='object'?window:globalThis);
+
 
 

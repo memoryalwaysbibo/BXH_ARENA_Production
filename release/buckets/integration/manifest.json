@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "c8b46a3c4d744e7c0f8de7bffa3ddf8b3978c6a6",
+  "baseMain": "e1f8604ac2619fba29eba719d981c0e4eef1f09a",
   "components": [
     {
       "pr": 707,
@@ -64,7 +64,7 @@
       ]
     },
     "index.html": {
-      "blob": "c6b82d28990bfbd55c11385f76cb399a6230e5fa",
+      "blob": "257d750c0f04a66b883788275764e9ff20c15083",
       "components": [
         707,
         714
@@ -1973,7 +1973,7 @@
       "direct-registration": "20261014.1",
       "qr-checkin": "20261017.3",
       "roster-view": "20261018.1",
-      "bracket-commit": "20261104.1",
+      "bracket-commit": "20261104.2",
       "admin-override": "20261101.1",
       "admin-checkin": "20261101.1",
       "admin-roster": "20261101.1",
