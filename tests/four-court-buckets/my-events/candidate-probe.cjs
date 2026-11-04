@@ -95,3 +95,10 @@ test('reader seam rejects a room snapshot from a different path',async()=>{
  const life=await readerStatus(f,'tournaments/OTHER');
  assert.deepEqual(life,{status:'invalid',reason:'room-lifecycle-input'});
 });
+test('reader seam rejects a public-only bucket marker instead of using legacy phase',async()=>{
+ const f=fixture({bucket:false,courts:6}),p='publicTournaments/'+code;
+ f.m.put(p,{...f.m.rows.get(p),scoreBucketProjection:{epoch:'orphan',versions:{}}});
+ const life=await readerStatus(f);
+ assert.equal(life.status,'invalid');assert.equal(life.reason,'bucket-lifecycle-unverified');
+ assert.equal(f.m.writes.length,0);
+});
