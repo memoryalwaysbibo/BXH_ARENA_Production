@@ -40,10 +40,9 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   if(d.action==='accept-invite'&&room.eventAuthority==='community'
    &&(room.tournamentPhase==='done'||state.completedAt||[room.archiveStatus,state.archiveStatus].some(status=>['completed','archived'].includes(status))))
    throw Error('community-result-available');
-  const communityReceipt=room.eventAuthority==='community'&&authority.communitySeatsEnabled
-   &&activeAccount(user)&&user.role==='player'&&(
-    (['invite','revoke'].includes(d.action)&&room.ownerUid===uid&&room.createdBy===uid)
-    ||(d.action==='accept-invite'&&room.refereeSeatsV1?.requests?.[d.requestId]?.toUid===uid));
+  const communityReceipt=(['invite','revoke'].includes(d.action)&&C.communityOwner(room,user,uid,authority))
+   ||(d.action==='accept-invite'&&C.communityRoom(room,authority)&&activeAccount(user)
+    &&user.role==='player'&&room.refereeSeatsV1?.requests?.[d.requestId]?.toUid===uid);
   if(receiptSnap.exists&&!communityReceipt&&!C.eligible(room,user,uid,authority)&&!C.canEnableCommunity(room,state,user,uid,d,authority))throw new Error('not-event-staff');
   const hash=createHash('sha256').update(JSON.stringify(d)).digest('hex');
   if(receiptSnap.exists){const receipt=receiptSnap.data();if(receipt.hash!==hash)throw new Error('operation-conflict');return receipt.result;}
