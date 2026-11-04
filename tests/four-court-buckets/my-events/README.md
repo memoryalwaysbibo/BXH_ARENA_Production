@@ -129,3 +129,10 @@ and revalidates a room page before advancing its cursor. A changed room releases
 the lease for a retry. Local tests cover a six-court room and a changed page.
 The 32-room page read budget and real backend latency still need acceptance;
 no bootstrap or rebuild source has been deployed.
+
+The captured deployed service (`2588227c6dc3fa0fe8a80a0898eb7fdec6b2a52251d6c3ad139c8988cfb2dc89`)
+constructs all four factories without a resolver. The pinned source patch in
+`release/buckets/my-events/patch-service.cjs` forwards one resolver to the
+engine, rebuilder, bootstrap and authenticated list reader. Enabled deployment
+must package `bucket-lifecycle.cjs` with its verified completion dependency;
+the current source patch is not a deployable bundle or live acceptance.

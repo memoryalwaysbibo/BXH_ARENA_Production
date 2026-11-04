@@ -32,7 +32,7 @@ jobs:
       - name: Check derived official-match event against captured deployed source
         run: node tests/four-court-buckets/derived/probe.cjs
       - name: Check My Events repair target against captured deployed engine
-        run: node --test tests/four-court-buckets/my-events/repair-engine-patch.test.cjs tests/four-court-buckets/my-events/bootstrap-target.test.cjs tests/four-court-buckets/my-events/bootstrap-patch.test.cjs tests/four-court-buckets/my-events/rebuild-patch.test.cjs
+        run: node --test tests/four-court-buckets/my-events/repair-engine-patch.test.cjs tests/four-court-buckets/my-events/bootstrap-target.test.cjs tests/four-court-buckets/my-events/bootstrap-patch.test.cjs tests/four-court-buckets/my-events/rebuild-patch.test.cjs tests/four-court-buckets/my-events/service-patch.test.cjs
       - name: Same-checkout activity and settlement bridge
         run: |
           mkdir -p .integration
