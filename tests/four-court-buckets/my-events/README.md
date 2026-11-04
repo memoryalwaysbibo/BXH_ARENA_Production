@@ -136,3 +136,12 @@ constructs all four factories without a resolver. The pinned source patch in
 engine, rebuilder, bootstrap and authenticated list reader. Enabled deployment
 must package `bucket-lifecycle.cjs` with its verified completion dependency;
 the current source patch is not a deployable bundle or live acceptance.
+
+The captured `assembly.cjs` separately constructs the authenticated list and
+detail readers. The pinned assembly patch forwards the same resolver to both.
+The operator-only `bootstrap-start.cjs` also constructs engine, rebuild and
+bootstrap directly; its pinned patch forwards the resolver and retains the
+named-run, explicit execute and source-seal gates. An offline composition of
+the captured source set and candidate overlays constructed all 14 exports with
+zero cloud calls. The package is missing a reviewed candidate source seal and
+live App Check/Firestore/Eventarc/latency acceptance.

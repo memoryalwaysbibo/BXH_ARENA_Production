@@ -1675,7 +1675,7 @@
       ]
     },
     "tests/four-court-buckets/my-events/README.md": {
-      "blob": "7fd66d6e53e53bafe3cb4c6f0ae229fdf78924c1",
+      "blob": "726807565e1ba65d7a37c9ecf618cfd1d216acc0",
       "components": []
     },
     "release/buckets/my-events/patch-repair-engine.cjs": {
@@ -1708,11 +1708,11 @@
     },
     ".github/workflows/bucket-my-events-proof.yml": {
       "components": [],
-      "blob": "80acbb8a148c82bb682dbcc3f622695a093499c7"
+      "blob": "0aa4e3c3f4160b8cb0bb5a58db67fd9b42e86f4e"
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "ee150fc16876929844eb1fa79c3cf7d63e21b51d"
+      "blob": "779275d541e693f96ff9cc72779749133147fb12"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1733,6 +1733,30 @@
     "tests/four-court-buckets/my-events/service-patch.test.cjs": {
       "components": [],
       "blob": "abe051a7fee0e190ccfe02baa098ae413e354e76"
+    },
+    "release/buckets/my-events/patch-assembly.cjs": {
+      "components": [],
+      "blob": "a21fce1dd06881eb3cbee84a7684f63cd50c9d57"
+    },
+    "release/buckets/my-events/patch-bootstrap-start.cjs": {
+      "components": [],
+      "blob": "b53a5f9a5918fed468f6b68f80ef7ff5b24156a1"
+    },
+    "tests/four-court-buckets/my-events/deployed-assembly.cjs": {
+      "components": [],
+      "blob": "8bf8b47340606dd57b0f9c345377ffde4134d0da"
+    },
+    "tests/four-court-buckets/my-events/deployed-bootstrap-start.cjs": {
+      "components": [],
+      "blob": "7d6dd8b166da6a991fcce7883b66e36c9120c1cd"
+    },
+    "tests/four-court-buckets/my-events/assembly-patch.test.cjs": {
+      "components": [],
+      "blob": "49f38681966643499a9c5a594e6e9d46bf8e35ee"
+    },
+    "tests/four-court-buckets/my-events/bootstrap-start-patch.test.cjs": {
+      "components": [],
+      "blob": "18340e8975928dac8a344bda8190a66de7420d24"
     }
   },
   "mainScriptQueryParameters": {

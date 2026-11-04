@@ -25,4 +25,5 @@ jobs:
       - run: node --test tests/four-court-buckets/my-events/bootstrap-target.test.cjs
       - run: node --test tests/four-court-buckets/my-events/bootstrap-patch.test.cjs
       - run: node --test tests/four-court-buckets/my-events/service-patch.test.cjs
+      - run: node --test tests/four-court-buckets/my-events/assembly-patch.test.cjs tests/four-court-buckets/my-events/bootstrap-start-patch.test.cjs
       - run: node --test tests/four-court-buckets/my-events/rebuild-patch.test.cjs
