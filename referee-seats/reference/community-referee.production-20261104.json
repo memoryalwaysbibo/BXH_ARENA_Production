@@ -1,0 +1,111 @@
+{
+  "project": "bxh-arena",
+  "capturedAt": "2026-11-04T07:40:10.419023+00:00",
+  "rulesetName": "projects/bxh-arena/rulesets/83f9bc18-64b9-4c62-aac7-2ff34fa55556",
+  "rulesSha256": "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e",
+  "readOnly": true,
+  "productionWrites": 0,
+  "functions": [
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/manageRefereeSeats",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-02T10:30:09.554039830Z",
+      "runtime": "nodejs22",
+      "entryPoint": "manageRefereeSeats",
+      "storageSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "generation": "1793615353126950",
+        "object": "manageRefereeSeats/function-source.zip"
+      },
+      "service": {
+        "service": "projects/bxh-arena/locations/asia-east1/services/managerefereeseats",
+        "revision": "managerefereeseats-00004-lad",
+        "uri": "https://managerefereeseats-jv4au2zfla-de.a.run.app",
+        "timeoutSeconds": 30,
+        "availableMemory": "256Mi",
+        "availableCpu": "1",
+        "serviceAccountEmail": "87261141693-compute@developer.gserviceaccount.com",
+        "ingressSettings": "ALLOW_ALL",
+        "maxInstanceCount": 10,
+        "minInstanceCount": null
+      },
+      "environmentVariableNames": [
+        "EVENTARC_CLOUD_EVENT_SOURCE",
+        "FIREBASE_CONFIG",
+        "FUNCTION_REGION",
+        "FUNCTION_TARGET",
+        "GCLOUD_PROJECT",
+        "LOG_EXECUTION_ID"
+      ],
+      "archiveSha256": "5aadefa74c746c674cd251fe4d532148403646baeda641238ce2f5085612ad48"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/commitRefereeCommand",
+      "state": "ACTIVE",
+      "updateTime": "2026-11-02T10:30:21.862171232Z",
+      "runtime": "nodejs22",
+      "entryPoint": "commitRefereeCommand",
+      "storageSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "generation": "1793615410519703",
+        "object": "commitRefereeCommand/function-source.zip"
+      },
+      "service": {
+        "service": "projects/bxh-arena/locations/asia-east1/services/commitrefereecommand",
+        "revision": "commitrefereecommand-00004-mev",
+        "uri": "https://commitrefereecommand-jv4au2zfla-de.a.run.app",
+        "timeoutSeconds": 30,
+        "availableMemory": "256Mi",
+        "availableCpu": "1",
+        "serviceAccountEmail": "87261141693-compute@developer.gserviceaccount.com",
+        "ingressSettings": "ALLOW_ALL",
+        "maxInstanceCount": 10,
+        "minInstanceCount": null
+      },
+      "environmentVariableNames": [
+        "EVENTARC_CLOUD_EVENT_SOURCE",
+        "FIREBASE_CONFIG",
+        "FUNCTION_REGION",
+        "FUNCTION_SIGNATURE_TYPE",
+        "FUNCTION_TARGET",
+        "GCLOUD_PROJECT",
+        "LOG_EXECUTION_ID"
+      ],
+      "archiveSha256": "5aadefa74c746c674cd251fe4d532148403646baeda641238ce2f5085612ad48"
+    }
+  ],
+  "runtimeFlags": {
+    "updateTime": "2026-10-27T10:10:46.009393Z",
+    "flags": {
+      "enabled": {
+        "booleanValue": true
+      },
+      "perCourtScoringVerified": {
+        "booleanValue": true
+      },
+      "communitySeatsEnabled": null,
+      "partnerSeatsEnabled": {
+        "booleanValue": true
+      }
+    }
+  },
+  "sourceFile": "community-referee.production-20261104.source.zip",
+  "sourceFiles": {
+    "event-staff-core.cjs": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+    "bucket-legacy-fence.cjs": "acea05f6d0af5a7016e8d0875836f420a32a877810c34a2e86bb2fbe4faf462c",
+    "index.js": "e1f84ecfd8b98cce686f5adc4d12d723adadc25b44b0a88c71e1dc53fd7da4f4",
+    "package-lock.json": "40af37152bb937436e5e87b0f0f8b3f834aee597da89db0b2e85138b79c52661",
+    "core.cjs": "f20226850b30dc6d2d800d11f49d45b36c03b6ca7447863c1923d2e83114a9e6",
+    "service.cjs": "f782b2a67f2485c643f08a1e0cb48786a7772d7bc248411c8ccb4634a3861903",
+    "scoring-core.cjs": "790274ea86481c82bca7a9a22fb36a7c07a0b4c12defe2d076626628130b89bd",
+    "package.json": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
+    "scoring-service.cjs": "4e2db96a5bfbfd4e9def103b6f53dac70588260895744111b53c78e92509dc6c",
+    "dispatch-core.cjs": "49afa1d4792cdbf4e151435ce2c176021a75565ac2534f6a6b4ad5dccb17f6a1",
+    "engine/double-elimination.cjs": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
+    "engine/manifest.json": "531e5b4c0c77c689ae55b5bfd04d6f2f2a6a9f60fc3d4125e5da7832e7f06842",
+    "engine/fault.cjs": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
+    "engine/court-retirement.cjs": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
+    "engine/match-utils.cjs": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53",
+    "engine/index.cjs": "81dda03aae3ee16c0cb09f0acbf17e9ffaba80e52d02c751569a0b8ea2952a4d"
+  }
+}

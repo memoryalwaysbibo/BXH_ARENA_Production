@@ -32,7 +32,7 @@ async function mount(page){
     window.currentAuthUid=()=>window.actor;
     window.partnerOrganizerGrant=()=>window.activeMode==='partner_organizer'?window.BXHPartnerOrganizer?.grant(window.userProfile):null;
     window.isPartnerOrganizerMode=()=>!!window.partnerOrganizerGrant();
-    window.hasAdminAccess=()=>true;window.isAdminTierOrAbove=()=>false;window.canCreateOfficialTournament=()=>true;
+    window.hasAdminAccess=()=>true;window.isAdminTierOrAbove=()=>false;window.canCreateOfficialTournament=()=>true;window.canSupportCommunityRooms=()=>false;
     window.firebaseUser={uid:'host'};window.state={};
     window.adminTournamentListLoaded=true;window.adminTournamentListBusy=false;window.adminTournamentListError='';window.adminTournamentListFilter='all';window.adminTournamentListItems=[];
     window.adminTournamentListSearch='';window.adminTournamentListSearchDraft='';window.adminTournamentListKind='official';window.adminTournamentListCounts=null;window.adminTournamentListHasMore=false;
@@ -57,6 +57,7 @@ async function testViewport(browser,width){
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   try{
     await mount(page);
+    assert.deepEqual(errors,[],'partner overview renderer must initialize without page errors');
     const panel=page.getByRole('region',{name:'我的合作方案'});
     await expect(panel.getByText('8 場',{exact:true})).toBeVisible();
     assert.equal(await page.evaluate(()=>window.mock.calls),1);

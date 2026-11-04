@@ -26,7 +26,7 @@ const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryContr
     var state={id:'fixture',cloudCode:'BXH-TEST',meta:{stations:6,refereeSeatsV1:{version:1,revision:1,courts:{},requests:{}}},matches:[],bracketSize:0};
     var pendingModal=null,courtRetirementBusy=false,executed=[],seatWrites=[],toasts=[];
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    const refereeBracketRoundtripNav=()=>'',courtAtmosphereStyle=()=>'',refereeDisplayForStation=()=> '測試裁判',refereeStationStatus=()=>({label:'等待中',cls:'waiting'}),stationCompletedCount=()=>0,refereeStationRestrictionEnabled=()=>true,canForceExitCourt=()=>true,canManageCourtRetirement=()=>true;
+    const isCommunityRoomOwner=()=>false,refereeBracketRoundtripNav=()=>'',courtAtmosphereStyle=()=>'',refereeDisplayForStation=()=> '測試裁判',refereeStationStatus=()=>({label:'等待中',cls:'waiting'}),stationCompletedCount=()=>0,refereeStationRestrictionEnabled=()=>true,canForceExitCourt=()=>true,canManageCourtRetirement=()=>true;
     const POINT_LABELS={spin:'旋轉',knockout:'擊飛',burst:'爆裂',extreme:'極限'},canOperateStation=()=>true,checkWinnerSide=()=>null,refereeFaultWritePending=()=>false,refereeFaultCount=()=>0,refereeFaultLast=()=>null,refereeViewClass=()=>'',refereeCourtSwapButton=()=>'',matchStatusBarHtml=()=> '準備中';
     const playerName=id=>({a:'測試選手甲',b:'測試選手乙'})[id]||id,showToast=m=>toasts.push(m),executeCourtForceAction=change=>executed.push(change),shouldBindLobbyInput=()=>true;
     ${productionFunctions}
@@ -49,6 +49,7 @@ const productionFunctions=['canUseRefereeSyncRecovery','refereeSyncRecoveryContr
     }};
     render();
   `});
+  assert.deepEqual(errors,[],'pre-draw renderer must initialize without page errors');
   assert.equal(await page.locator('.ref-seat-button').count(),18);
   assert.equal(await page.locator('.referee-workstation-waiting .ref-vs-arena button:not(:disabled),.referee-workstation-waiting .ref-result-actions button:not(:disabled)').count(),0);
   await page.locator('[data-station="1"][data-slot="main"]').tap();

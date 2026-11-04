@@ -10,7 +10,7 @@ function mailboxContext(){
 
 function mailboxError(error){
   const raw=String(error?.message||error||'');
-  const map={'mail-not-found':'找不到這封信，可能已被移除。','recipient-not-found':'找不到指定玩家帳號。','recipient-inactive':'指定玩家帳號目前不可使用。','super-admin-required':'只有最高管理員可以發送系統信。','invalid-subject':'信件標題請輸入 1～80 字。','invalid-body':'信件內容請輸入 1～2000 字。','operation-conflict':'這次寄送識別碼與先前內容不一致，請重新操作。','auth-required':'請重新登入後再查看站內信。','service-unavailable':'站內信服務尚未部署。'};
+  const map={'mail-not-found':'找不到這封信，可能已被移除。','recipient-not-found':'找不到指定玩家帳號。','recipient-inactive':'指定玩家帳號目前不可使用。','super-admin-required':'只有最高管理員可以發送系統信。','invalid-subject':'信件標題請輸入 1～80 字。','invalid-body':'信件內容請輸入 1～2000 字。','operation-conflict':'這次寄送識別碼與先前內容不一致，請重新操作。','auth-required':'請重新登入後再查看站內信。','service-unavailable':'站內信服務尚未部署。','referee-room-unavailable':'目前無法進入裁判台，請確認席位是否仍有效。','request-stale':'裁判邀請已失效，請房主重新邀請。','request-unavailable':'裁判邀請已失效，請房主重新邀請。'};
   for(const [key,value] of Object.entries(map))if(raw.includes(key))return value;
   return '站內信暫時無法連線，請稍後重試。';
 }
@@ -28,13 +28,16 @@ async function loadMailbox(force=false){
         try{
           if(!window.engagementService?.mailbox)throw Error('service-unavailable');
           const result=await window.engagementService.mailbox({action:'list'});
+          const refereeMail=await window.cloudSync?.manageRefereeSeats?.({action:'invite-mail-list'});
           if(c!==mailboxContext())return;
           if(c.reloadRequested)continue;
           if(!result?.ok)throw Error('load-failed');
           c.messages=Array.isArray(result.messages)?result.messages:[];
+          const invitations=refereeMail?.ok&&Array.isArray(refereeMail.messages)?refereeMail.messages:[];
+          if(invitations.length)c.messages=[...invitations,...c.messages].sort((a,b)=>Number(b.createdAt)-Number(a.createdAt));
           c.canDelete=result.canDelete===true;
           c.deleteSelection=new Set(c.messages.filter(m=>m.deletable===true&&c.deleteSelection.has(m.id)).map(m=>m.id));
-          c.unreadCount=Math.max(0,Number(result.unreadCount)||0);
+          c.unreadCount=Math.max(0,Number(result.unreadCount)||0)+invitations.filter(item=>!item.readAt).length;
           if(c.selectedId&&!c.messages.some(m=>m.id===c.selectedId))c.selectedId='';
         }catch(error){if(c===mailboxContext()&&!c.reloadRequested)c.error=mailboxError(error);}
       }while(c===mailboxContext()&&c.reloadRequested);
@@ -59,7 +62,13 @@ function mailboxDomId(messageId){
   return 'mailbox-message-'+Array.from(String(messageId)).map(char=>char.codePointAt(0).toString(16)).join('-');
 }
 function renderMailboxDetail(selected,c){
-  return `<div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(window.BXHCardRewardUI?.bodyText?.(selected)??selected.body??'')}</div>${window.BXHTitleRewardUI?.card(selected,c.busy)||''}${window.BXHCardRewardUI?.card(selected,c.busy)||''}${mailboxVisibleAttachments(selected).length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${mailboxVisibleAttachments(selected).map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}${selected.eventCode&&selected.invitationStatus==='invited'?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="accept">接受工作人員（活動）邀請</button><button class="btn btn-ghost" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="reject">拒絕</button></div>`:selected.type!=='tournament_invitation'&&selected.eventCode&&selected.invitationStatus?`<div class="banner" style="margin-top:12px"><span>邀請狀態：${esc(({accepted:'已接受',rejected:'已拒絕',revoked:'已撤銷'})[selected.invitationStatus]||selected.invitationStatus)}</span></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div>`;
+  const refereeInvite=selected.type==='community_referee_invitation';
+  const refereeAction=refereeInvite&&selected.refereeInviteStatus==='finished'
+    ? '<p class="hint">比賽已有結果</p><div class="btn-row"><button type="button" class="btn btn-primary" data-action="mailbox-community-referee-dismiss">確認</button></div>'
+    : refereeInvite&&selected.refereeInviteStatus!=='accepted'
+    ? `<div class="btn-row"><button class="btn btn-primary" data-action="mailbox-community-referee-accept" data-message-id="${esc(selected.id)}" ${c.busy?'disabled':''}>接受裁判邀請</button></div>`
+    : refereeInvite?`<p class="hint">已接受裁判邀請</p><button type="button" class="btn btn-primary" data-action="mailbox-community-referee-open" data-message-id="${esc(selected.id)}" ${c.busy?'disabled':''}>進入裁判台</button>`:'';
+  return `<div class="panel-title">${esc(selected.subject||'系統通知')}</div><p class="hint">${esc(selected.senderName||'BXH ARENA')}｜${esc(mailboxDate(selected.createdAt))}</p><div class="mailbox-body">${esc(window.BXHCardRewardUI?.bodyText?.(selected)??selected.body??'')}</div>${window.BXHTitleRewardUI?.card(selected,c.busy)||''}${window.BXHCardRewardUI?.card(selected,c.busy)||''}${mailboxVisibleAttachments(selected).length?`<div class="mailbox-attachments" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><p class="hint" style="width:100%;margin:0">附件</p>${mailboxVisibleAttachments(selected).map(item=>`<button class="btn btn-ghost btn-sm" data-action="mailbox-download-attachment" data-message-id="${esc(selected.id)}" data-attachment-id="${esc(item.id)}" ${c.busy?'disabled':''}>⬇ ${esc(item.name||'下載附件')} (${Math.ceil((Number(item.size)||0)/1024)} KB)</button>`).join('')}</div>`:''}${selected.orderCode&&selected.id==='partner_'+selected.orderCode?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-open-contract" data-order-code="${esc(selected.orderCode)}">閱讀合約與簽名</button></div>`:''}${refereeAction}${!refereeInvite&&selected.eventCode&&selected.invitationStatus==='invited'?`<div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="accept">接受工作人員（活動）邀請</button><button class="btn btn-ghost" data-action="mailbox-event-staff-respond" data-event-code="${esc(selected.eventCode)}" data-response="reject">拒絕</button></div>`:selected.type!=='tournament_invitation'&&selected.eventCode&&selected.invitationStatus?`<div class="banner" style="margin-top:12px"><span>邀請狀態：${esc(({accepted:'已接受',rejected:'已拒絕',revoked:'已撤銷'})[selected.invitationStatus]||selected.invitationStatus)}</span></div>`:''}<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-action="mailbox-toggle-read" data-message-id="${esc(selected.id)}" data-read="${selected.readAt?'1':'0'}" ${c.busy?'disabled':''}>標記為${selected.readAt?'未讀':'已讀'}</button></div>`;
 }
 // Keep .panel on the expanded article only: invitation controls mount there.
 function renderMailboxEntry(message,c){
@@ -181,6 +190,16 @@ async function handleMailbox(action,target){
     c.viewportAnchorId=selectedId;
     if(c.selectedId===selectedId){c.selectedId='';render();return;}
     c.selectedId=selectedId;render();
+    if(message.type==='community_referee_invitation'){
+      window.cloudSync?.joinRoomPublic?.(message.eventCode)?.then(result=>{
+        if(c!==mailboxContext()||c.selectedId!==selectedId||!result?.ok)return;
+        if(result.data?.completedAt||['completed','archived'].includes(result.data?.archiveStatus)){
+          const current=c.messages?.find(item=>item.id===selectedId);
+          if(current)current.refereeInviteStatus='finished';
+          render();
+        }
+      }).catch(()=>{});
+    }
     if(message&&message.type==='card_reward'&&!message.reward&&window.engagementService?.getCardRewardMessage){
       const selectedId=c.selectedId;
       window.engagementService.getCardRewardMessage({messageId:selectedId}).then(result=>{
@@ -232,6 +251,39 @@ async function handleMailbox(action,target){
     return;
   }
   if(action==='mailbox-open-contract'){openMailboxPartnerContract(target.getAttribute('data-order-code'));return;}
+  if(action==='mailbox-community-referee-dismiss'){
+    c.selectedId='';render();return;
+  }
+  if(action==='mailbox-community-referee-open'){
+    const message=(c.messages||[]).find(item=>item.id===target.getAttribute('data-message-id'));
+    if(message?.type!=='community_referee_invitation'||message.refereeInviteStatus!=='accepted')return;
+    c.busy=true;c.error='';render();
+    try{await openCommunityRefereeRoom(message.eventCode,message.station);}
+    catch(error){if(c===mailboxContext()){
+      if(String(error?.message||'').includes('community-result-available'))message.refereeInviteStatus='finished';
+      else c.error=mailboxError(error);
+    }}finally{if(c===mailboxContext()){c.busy=false;render();}}
+    return;
+  }
+  if(action==='mailbox-community-referee-accept'){
+    const message=(c.messages||[]).find(item=>item.id===target.getAttribute('data-message-id'));
+    if(message?.type!=='community_referee_invitation'||['accepted','finished'].includes(message.refereeInviteStatus))return;
+    c.busy=true;c.error='';render();
+    try{
+      const result=await window.cloudSync?.manageRefereeSeats?.({action:'accept-invite',code:message.eventCode,
+        station:message.station,slot:message.slot,requestId:message.requestId,operationId:'mail-accept-'+message.requestId});
+      if(c!==mailboxContext())return;
+      if(!result?.ok&&String(result?.reason||'').includes('community-result-available')){
+        message.refereeInviteStatus='finished';
+        return;
+      }
+      if(!result?.ok)throw Error(result?.reason||'service-unavailable');
+      message.refereeInviteStatus='accepted';
+      showToast('已接受裁判邀請');
+    }catch(error){if(c===mailboxContext())c.error=mailboxError(error);}
+    finally{if(c===mailboxContext()){c.busy=false;render();}}
+    return;
+  }
   if(action==='mailbox-event-staff-respond'){
     const eventCode=target.getAttribute('data-event-code'),response=target.getAttribute('data-response');
     c.busy=true;c.error='';render();
@@ -299,7 +351,11 @@ async function handleMailbox(action,target){
   c.busy=true;c.error='';render();
   try{
     if(!window.engagementService?.mailbox)throw Error('service-unavailable');
-    const result=await window.engagementService.mailbox(payload);if(c!==mailboxContext())return;if(!result?.ok)throw Error('operation-failed');
+    const invitation=c.messages?.find(item=>item.id===payload.messageId&&item.type==='community_referee_invitation');
+    const result=invitation
+      ? await window.cloudSync?.manageRefereeSeats?.({action:'invite-mail-read',messageId:invitation.id,unread:payload.action==='markUnread'})
+      : await window.engagementService.mailbox(payload);
+    if(c!==mailboxContext())return;if(!result?.ok)throw Error('operation-failed');
     if(action==='mailbox-send-test'){c.lastSent={targetUid:payload.targetUid,messageId:result.messageId};showToast(result.replayed?'這封測試信先前已送出':'測試信已送出');}
     if(action==='mailbox-delete'){
       const removed=new Set(result.removedIds);

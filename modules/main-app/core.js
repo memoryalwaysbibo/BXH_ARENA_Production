@@ -3547,6 +3547,22 @@ async function ensureRoomAccessGrant(code){
   try{return await window.engagementService.roomAccess({action:"status",code});}
   catch(e){return {ok:false,error:String(e?.message||e||"room-access-unavailable")};}
 }
+async function openCommunityRefereeRoom(code,station){
+  const actor=currentAuthUid();
+  if(!actor)throw Error('auth-required');
+  const result=await window.cloudSync?.joinRoom?.(code);
+  if(currentAuthUid()!==actor)return;
+  if(!result?.ok)throw Error('referee-room-unavailable');
+  const room=result.data;
+  if(room?.meta?.eventAuthority!=='community'||!canJoinRefereeSeats(room))throw Error('referee-room-unavailable');
+  if(room.completedAt||['completed','archived'].includes(room.archiveStatus))throw Error('community-result-available');
+  await commitJoinedTournamentData(code,room,false);
+  if(currentAuthUid()!==actor)return;
+  mailboxContext().open=false;guestReadOnlyMode=false;appPhase='app';activeTab='referee';
+  const match=state.matches?.find(m=>Number(m.station)===Number(station)&&!m.completed);
+  if(match)state.currentMatchId=match.id;
+  render();
+}
 async function cloudJoinRoomByCode(rawCode){
   cloudJoinBusy = true; cloudJoinError=""; render();
   const normalized=normalizeRoomCodeInput(rawCode);
@@ -6080,6 +6096,7 @@ function canManageRefereeSeats(st=state){
   if(isPartnerRefereeSeatRoom(st)&&!PARTNER_REFEREE_SEATS_ROLLOUT)return false;
   if(userProfile?.active!==true||userProfile?.isTestAccount===true||userProfile?.deleted===true||['deleted','disabled','frozen'].includes(userProfile?.accountStatus)||st?.meta?.refereeSeatAccessRevoked)return false;
   if(isAdminTierOrAbove())return true;
+  if(st?.meta?.eventAuthority==='community')return userProfile.role==='player'&&!!currentAuthUid()&&st.ownerUid===currentAuthUid()&&st.createdBy===currentAuthUid();
   if(st?.createdBy!==currentAuthUid())return false;
   if(userProfile?.role==='staff')return true;
   const grant=partnerOrganizerGrant();
@@ -6092,6 +6109,10 @@ function canJoinRefereeSeats(st=state){
   if(isPartnerRefereeSeatRoom(st)&&!PARTNER_REFEREE_SEATS_ROLLOUT)return false;
   if(['staff','admin','super_admin'].includes(userProfile?.role))return true;
   if(canManageRefereeSeats(st))return true;
+  if(st?.meta?.eventAuthority==='community'&&userProfile.role==='player'){
+    return Object.values(st.meta.refereeSeatsV1?.courts||{}).some(court=>
+      ['main','backup1','backup2'].some(slot=>court[slot]?.uid===currentAuthUid()));
+  }
   if(!isPartnerRefereeSeatRoom(st)||!isEventStaffMode()||userProfile?.role!=='player')return false;
   const assignment=Object.prototype.hasOwnProperty.call(st.meta||{},'refereeSeatActivityAssignment')
     ?st.meta.refereeSeatActivityAssignment:currentEventStaffMembership(st);
@@ -6126,12 +6147,23 @@ function refereeNamesForStation(stationNum, st=state){
 function refereeDisplayForStation(stationNum, st=state){
   return window.BXHFormatUtils.refereeNamesLabel(refereeNamesForStation(stationNum,st));
 }
+function canSupportCommunityCourt(st=state){
+  return st?.meta?.eventAuthority==='community'&&st.meta.ladderMode==='general'
+    &&!!currentAuthUid()&&userProfile?.active===true&&userProfile?.isTestAccount!==true
+    &&userProfile?.deleted!==true&&!['deleted','disabled','frozen'].includes(userProfile?.accountStatus)
+    &&['staff','admin','super_admin'].includes(userProfile?.role);
+}
+function canUseRefereeSeatCommands(st=state){
+  return canOperateCurrentTournament()||(st?.meta?.eventAuthority==='community'
+    &&st.meta.refereeSeatsV1?.version===1&&canJoinRefereeSeats(st));
+}
 function canOperateStation(stationNum, st=state){
   const bucketView=st.cloudCode&&window.cloudSync?.bucketView?.(st.cloudCode);
   if((Object.hasOwn(st,"scoreStorage")||bucketView)&&bucketView?.status!=="ready")return false;
   if(bucketView?.pending?.includes("dispatch"))return false;
   if(Number(stationNum)<1||st.forcedCourtExits?.[stationNum]?.closed)return false;
   if(isCommunityRoomOwner()) return true;
+  if(canSupportCommunityCourt(st)) return true;
   if(isOwnTestTournament(st)) return true;
   if(isTester()) return false;
   if(isAdminTierOrAbove()) return true;
@@ -6201,7 +6233,7 @@ const refereeSeatCommandBusy=new Set();
 async function executeRefereeSeatCommand(matchId,command){
   if(window.BXHRefereeSyncRecovery?.isBusy()){showToast("正在讀取雲端，請稍候再操作。",true);return false;}
   const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(matchId);
-  if(!code||!m||!canOperateCurrentTournament()||!requireStationPermission(m))return false;
+  if(!code||!m||!canUseRefereeSeatCommands()||!requireStationPermission(m))return false;
   if(typeof navigator!=="undefined"&&navigator.onLine===false){showToast("三席裁判計分需要連線確認；本次操作尚未送出，請連線後重試。",true);return false;}
   const key=code+":"+actorUid+":"+matchId;if(refereeSeatCommandBusy.has(key))return false;
   refereeSeatCommandBusy.add(key);
@@ -6236,7 +6268,7 @@ async function executeRefereeDispatchCommand(command){
   const code=state.cloudCode,actorUid=currentAuthUid(),roomId=state.id,m=getMatch(command.matchId),targetCurrentId=state.courtAssignments?.["court"+command.targetStation]?.currentMatchId||null,other=getMatch(command.targetMatchId||(command.action==="manual-assign"?targetCurrentId:null));
   const targetActions=["idle-claim","claim-skipped","claim-detached","retirement-transfer","manual-assign"];
   const station=m?Number(m.station):Number(command.station||0),authority=targetActions.includes(command.action)?Number(command.targetStation):station;
-  if(!code||!canOperateCurrentTournament())return false;
+  if(!code||!canUseRefereeSeatCommands())return false;
   if(command.action==="resize"||command.action==="reopen"){
     if(!canManageCourtRetirement()){showToast("此操作需由場主或管理員處理。",true);return false;}
   }else if(!canOperateStation(authority)){showToast("你目前沒有此戰鬥台的調度權限。",true);return false;}
@@ -10949,11 +10981,11 @@ let bracketCommitContext=null;
 function rebaseOrdinaryBracketRosterFence(fresh,snapshot){
  if(!fresh||!snapshot||fresh.id!==snapshot.id||fresh.startedAt||fresh.archiveStatus==='completed'||
    fresh.meta?.battleMode==='team'||snapshot.meta?.battleMode==='team'||
-   fresh.meta?.checkinRequired!==true||snapshot.meta?.checkinRequired!==true)return null;
+   Boolean(fresh.meta?.checkinRequired)!==Boolean(snapshot.meta?.checkinRequired))return null;
  const layoutSettings=s=>JSON.stringify([s.meta?.formatType||'single',Number(s.meta?.stations||1),!!s.meta?.bronzeMatch]);
  if(layoutSettings(fresh)!==layoutSettings(snapshot))return null;
  const entrants=(players)=>{
-  const ids=(players||[]).filter(p=>p?.checkedIn===true).map(p=>String(p.id||''));
+  const ids=(players||[]).filter(p=>p&&(!snapshot.meta?.checkinRequired||p.checkedIn===true)).map(p=>String(p.id||''));
   return ids.length===new Set(ids).size&&ids.every(Boolean)?ids.sort():null;
  };
  const paired=[...new Set((snapshot.matches||[]).flatMap(m=>[m.a?.playerId,m.b?.playerId]).filter(Boolean).map(String))].sort();
@@ -12443,7 +12475,8 @@ async function exportRefereeSyncRecovery(){
 }
 function renderReferee(){
   if(state.meta?.battleMode==="team")return renderTeamReferee();
-  const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml();
+  const quickNav = refereeBracketRoundtripNav("bracket")+refereeSyncRecoveryControlsHtml()
+    +(isCommunityRoomOwner()&&!window.BXHRefereeSeats?.enabled(state)?window.BXHRefereeSeats?.settings()||"":"");
   if(!state.bracketSize){
     const n=Math.max(1,Math.min(32,Number(state.meta.stations)||1));
     return quickNav+`<div class="court-grid ${n===1?'court-grid-1':n===2?'court-grid-2':n===4?'court-grid-many court-grid-4fit':'court-grid-many'}">${Array.from({length:n},(_,i)=>renderWaitingRefereeCourt(i+1)).join('')}</div>`;
@@ -19511,8 +19544,9 @@ function render(){
   window.cloudSync?.restoreRegistrationFeedback?.();
   clearBoardModeInteractions();
   window.BXHRefereeSeats?.bind({state:()=>state,uid:currentAuthUid,
-    operator:()=>canOperateCurrentTournament()||(state?.meta?.refereeSeatsV1?.version===1&&userProfile?.active===true&&userProfile?.isTestAccount!==true&&['staff','admin','super_admin'].includes(userProfile?.role)),
+    operator:()=>canUseRefereeSeatCommands(),
     eligible:()=>canJoinRefereeSeats(),
+    inviter:()=>isCommunityRoomOwner()&&!isTester(),support:()=>canSupportCommunityCourt(),
     manager:()=>canManageRefereeSeats(),render,toast:showToast});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
   reconcileLobbyContext();
@@ -20264,7 +20298,7 @@ function renderTournamentManagementTab(){
           <div class="stat-box"><div class="label">賽事狀態</div><div class="value small">${esc(phaseLabel)}</div></div>
         </div>
         <div class="btn-row" style="margin-top:12px;">
-          ${isCommunity?"":done?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}" data-open-history="true">查看紀錄</button>`:(isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`)}
+          ${isCommunity&&!canSupportCommunityRooms()?"":done?`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}" data-open-history="true">查看紀錄</button>`:(isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`)}
           <button class="btn btn-ghost btn-sm" data-action="cloud-admin-copy-code" data-code="${esc(t.code)}">複製代碼</button>
           ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}" data-community="${isCommunity?'true':'false'}">${isCommunity?'刪除房間':'刪除賽事'}</button>`:""}
         </div>
@@ -20286,17 +20320,18 @@ function renderTournamentManagementTab(){
 
 function renderAdminTournamentListModal(){
   if(!adminTournamentListOpen) return "";
+  const items = adminTournamentListItems.filter(t=>t.eventAuthority!=="community"||canSupportCommunityRooms());
   let body = "";
   if(adminTournamentListBusy && !adminTournamentListItems.length){
     body = `<div class="empty-state"><div class="big">正在讀取雲端賽事…</div></div>`;
   } else if(adminTournamentListError && !adminTournamentListItems.length){
     body = `<div class="auth-error">${esc(adminTournamentListError)}</div>`;
-  } else if(adminTournamentListBusy && !adminTournamentListItems.filter(t=>t.eventAuthority!=="community").length){
+  } else if(adminTournamentListBusy && !items.length){
     body = `<div class="empty-state"><div class="big">正在分批讀取賽事…</div></div>`;
-  } else if(!adminTournamentListItems.filter(t=>t.eventAuthority!=="community").length){
+  } else if(!items.length){
     body = `<div class="empty-state"><div class="big">目前沒有可管理的賽事</div><div class="hint">空白／未完成設定的雲端賽事已自動隱藏。</div><div class="btn-row" style="justify-content:center;margin-top:14px;">${canCreateOfficialTournament()?`<button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button>`:`<span class="hint">目前帳號沒有可建立或管理的賽事。</span>`}</div></div>`;
   } else {
-    body = `<div style="display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto;padding-right:2px;">${adminTournamentListItems.filter(t=>t.eventAuthority!=="community").map(t=>{
+    body = `<div style="display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto;padding-right:2px;">${items.map(t=>{
       const confirmed = Number(t.confirmedCount||0);
       const waiting = Number(t.waitlistCount||0);
       const cap = Number(t.capacity||0);
@@ -20304,7 +20339,7 @@ function renderAdminTournamentListModal(){
       return `<div class="panel" style="padding:14px;margin:0;">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
           <div style="min-width:0;flex:1;">
-            <div style="font-family:var(--font-d);font-weight:700;font-size:17px;">${esc(t.name||"未命名賽事")} ${isCurrent?'<span class="badge badge-neon">目前賽事</span>':''} <span class="badge ${t.ladderMode==='ranked'?'badge-neon':'badge-metal'}">${t.testLadderEnabled?'🧪 測試積分賽事':t.ladderMode==='ranked'?'積分賽事':'一般賽事'}</span></div>
+            <div style="font-family:var(--font-d);font-weight:700;font-size:17px;">${esc(t.name||"未命名賽事")} ${isCurrent?'<span class="badge badge-neon">目前賽事</span>':''} <span class="badge ${t.ladderMode==='ranked'?'badge-neon':'badge-metal'}">${t.eventAuthority==="community"?"玩家一般房間":t.testLadderEnabled?'🧪 測試積分賽事':t.ladderMode==='ranked'?'積分賽事':'一般賽事'}</span></div>
             <div class="hint" style="margin-top:5px;">${esc(t.eventDate||"日期未設定")}　${esc(t.location||"")}　代碼 ${esc(t.code)}</div>
             <div class="hint" style="margin-top:4px;">建立者：${esc(t.createdByName || t.createdBy || "舊版未記錄")}</div>
           </div>
@@ -20318,7 +20353,7 @@ function renderAdminTournamentListModal(){
         <div class="btn-row" style="margin-top:12px;">
           ${isCurrent?'<button class="btn btn-ghost btn-sm" disabled>目前已開啟</button>':`<button class="btn btn-primary btn-sm" data-action="cloud-admin-open-tournament" data-code="${esc(t.code)}">開啟管理</button>`}
           <button class="btn btn-ghost btn-sm" data-action="cloud-admin-copy-code" data-code="${esc(t.code)}">複製代碼</button>
-          ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}">刪除賽事</button>`:""}
+          ${isAdminTierOrAbove()?`<button class="btn btn-danger btn-sm" data-action="cloud-admin-delete-tournament" data-community="${t.eventAuthority==="community"}" data-code="${esc(t.code)}" data-name="${esc(t.name||"未命名賽事")}">刪除賽事</button>`:""}
         </div>
       </div>`;
     }).join("")}${canCreateOfficialTournament()?`<div class="panel" style="padding:18px;margin:0;border-style:dashed;text-align:center;"><div style="font-family:var(--font-d);font-weight:700;font-size:16px;margin-bottom:8px;">建立下一場賽事</div><div class="hint" style="margin-bottom:12px;">直接建立空白賽事並進入賽事設定。</div><button class="btn btn-primary" data-action="cloud-admin-new-tournament">＋ 新增賽事</button></div>`:""}</div>`;
@@ -20339,6 +20374,10 @@ function renderAdminTournamentListModal(){
   </div>`;
 }
 
+function canSupportCommunityRooms(){
+  return isAdminTierOrAbove() || (userProfile?.role==="staff" && userProfile.active===true && userProfile.isTestAccount!==true);
+}
+
 function adminTournamentListControlsHtml({modal=false}={}){
   const count=key=>adminTournamentListCounts?String(adminTournamentListCounts[key]||0):"—";
   return `<div role="search" aria-label="搜尋賽事" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
@@ -20351,7 +20390,7 @@ function adminTournamentListControlsHtml({modal=false}={}){
     <div class="btn-row" style="margin-top:8px;">
       <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="draft">草稿 ${count('draft')}</button>
       <button class="btn btn-ghost btn-sm" data-action="admin-tournament-filter" data-filter="all">所有狀態 ${count('all')}</button>
-      ${isAdminTierOrAbove()?`<button class="btn btn-ghost btn-sm" data-action="admin-tournament-kind" data-kind="${adminTournamentListKind==='community'?'official':'community'}">${adminTournamentListKind==='community'?'返回正式賽事':'一般房間'}</button>`:""}
+      ${canSupportCommunityRooms()?`<button class="btn btn-ghost btn-sm" data-action="admin-tournament-kind" data-kind="${adminTournamentListKind==='community'?'official':'community'}">${adminTournamentListKind==='community'?'返回正式賽事':'一般房間'}</button>`:""}
     </div></details>`;
 }
 function adminTournamentListPaginationHtml(){
@@ -20363,7 +20402,7 @@ function adminTournamentListPaginationHtml(){
 }
 function changeAdminTournamentListQuery({status=adminTournamentListFilter,kind=adminTournamentListKind,search=adminTournamentListSearch}={}){
   reconcileAdminTournamentListContext();
-  if(!["open","upcoming","closed","draft","all"].includes(status)||!["official","community"].includes(kind)||(kind==="community"&&!isAdminTierOrAbove()))return;
+  if(!["open","upcoming","closed","draft","all"].includes(status)||!["official","community"].includes(kind)||(kind==="community"&&!canSupportCommunityRooms()))return;
   adminTournamentListGeneration++;adminTournamentListPromise=null;adminTournamentListBusy=false;
   adminTournamentListItems=[];adminTournamentListLoaded=false;adminTournamentListError="";
   adminTournamentListFilter=status;adminTournamentListKind=kind;adminTournamentListSearch=String(search).trim().slice(0,120);
@@ -20461,6 +20500,7 @@ function renderApp(){
   const app = document.getElementById("app");
   const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
   let tabs = hasAdminAccess() ? allTabs : allTabs.filter(t=>!["management","referee","settings","registrations","people"].includes(t[0]));
+  if(!hasAdminAccess()&&state.meta?.eventAuthority==='community'&&canUseRefereeSeatCommands())tabs.splice(2,0,['referee','裁判台']);
   if(hasAdminAccess()&&canManageMemberRaffles())tabs.splice(1,0,["member-raffles","會員抽獎管理"]);
   if(isSuperAdmin())tabs.splice(1,0,["inventory-admin","道具管理"],["commerce-admin","商城管理"]);
   if(window.BXH_REFEREE_CERTIFICATES_V1===true){
@@ -21389,7 +21429,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     showToast("封測帳號只能在自己的測試賽事啟用測試天梯。", true);
     return;
   }
-  const profileCanOperateLive = hasPrivilegedTournamentProfile() && !isCommunityRoom() && TOURNAMENT_LIVE_OPERATOR_ACTIONS.has(action);
+  const profileCanOperateLive = ((hasPrivilegedTournamentProfile() && !isCommunityRoom())
+    || (isCommunityRoom() && canUseRefereeSeatCommands() && action!=='archive-complete')) && TOURNAMENT_LIVE_OPERATOR_ACTIONS.has(action);
   if(ADMIN_ONLY_ACTIONS.has(action) && !hasAdminAccess() && !profileCanOperateLive && !(isCommunityRoomOwner() && COMMUNITY_OWNER_ACTIONS.has(action))){
     showToast("目前身分沒有此操作權限。", true);
     return;
@@ -22151,6 +22192,14 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         cloudUnsub=subscribeCommunityRoomState(code); cloudStatus="connected";
         communityRoomActiveTab="people"; appPhase="community-room"; communityEventsCache=null; publicTournamentsCache=null; publicTournamentsError=null; render();
         showToast("一般賽事已建立｜代碼 "+code);
+        if(st.meta.playMode!=="enchantment"&&window.cloudSync.manageRefereeSeats){
+          // The room already exists. Seat activation is optional and must not
+          // cause a failed-create message or create another room on retry.
+          void Promise.resolve().then(()=>{
+            if(currentAuthUid()!==actorUid||state.cloudCode!==code)return;
+            return window.cloudSync.manageRefereeSeats({code,action:"enable",operationId:"community-auto-enable-"+code});
+          }).catch(error=>console.warn("[community referee seat activation]",error?.code||error?.message));
+        }
       }catch(e){
         if(currentAuthUid()!==actorUid||appPhase!=="community-create")return;
         console.warn("[community create]",e);
@@ -23901,15 +23950,20 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     const code = target.getAttribute("data-code") || "";
     const openHistory = target.getAttribute("data-open-history")==="true";
     if(!code) return;
-    adminTournamentListBusy = true; render();
+    adminTournamentListBusy = true; adminTournamentListError = ""; render();
     (async ()=>{
-      const result = await previewTournamentByCode(code);
-      adminTournamentListBusy = false;
-      if(!result.ok){
-        adminTournamentListError = CODE_ENTRY_ERROR_MESSAGES[result.reason] || "無法開啟此賽事";
-        render(); return;
-      }
       try{
+        const result = await previewTournamentByCode(code,{forcePrivate:canSupportCommunityRooms()});
+        adminTournamentListBusy = false;
+        if(!result.ok){
+          adminTournamentListError = CODE_ENTRY_ERROR_MESSAGES[result.reason] || "無法開啟此賽事";
+          render(); return;
+        }
+        const community = result.rawData?.meta?.eventAuthority==="community" || result.rawData?.eventAuthority==="community";
+        if(community && (!canSupportCommunityRooms() || result.usePublic)){
+          adminTournamentListError = "目前無法讀取一般房間的管理資料";
+          render(); return;
+        }
         await commitJoinedTournamentData(result.code, result.rawData, result.usePublic);
         publicWatchReturnContext = null;
         publicWatchUsesPrivateData = false;
@@ -23927,6 +23981,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
         }
         render();
       }catch(e){
+        adminTournamentListBusy = false;
         adminTournamentListError = "開啟賽事時發生錯誤，請稍後再試";
         render();
       }

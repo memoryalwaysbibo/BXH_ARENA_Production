@@ -8,9 +8,9 @@ function protectedPass(s,m){return !!(m&&(m.callPass&&!m.completed||(s.matches||
 function transition({room,state,user,uid,d,now,authority={}}){
  if(!ACTIONS.has(d.action))fail('invalid-action');
  if(room.refereeSeatsV1?.version!==1)fail('not-enabled');
- if(room.eventAuthority!=='official'||state.meta?.eventAuthority!=='official'||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
+ if((room.eventAuthority!==state.meta?.eventAuthority||(room.eventAuthority!=='official'&&!S.communitySupport(room,user,uid,authority)&&!S.communitySeatedPlayer(room,user,uid,authorizationStation(d),authority)))||state.meta?.battleMode==='team'||state.meta?.playMode==='enchantment')fail('unsupported-mode');
  if(room.eventCancelled||room.systemClosed||room.deletionStatus||['completed','archived'].includes(room.archiveStatus)||['completed','archived'].includes(state.archiveStatus))fail('room-read-only');
- if(!C.eligible(room,user,uid,authority))fail('station-not-assigned');
+ if(!S.communitySupport(room,user,uid,authority)&&!C.eligible(room,user,uid,authority))fail('station-not-assigned');
  const manager=C.manager(room,user,uid,authority),action=d.action,station=Number(d.station),to=Number(d.targetStation),m=state.matches?.find(m=>m.id===d.matchId);
  const identity={uid,name:String(user.realName||user.gameId||user.displayName||'裁判').slice(0,80)},engine=createEngine(state,identity,now,d.operationId);
  function permission(n){if(!Number.isInteger(n)||n<1||n>32)fail('invalid-court');if(!S.allowed(room,user,uid,n,authority))fail('station-not-assigned');if(d.expectedCourtRevisions?.[n]!==Number(room.refereeSeatsV1.courts?.[n]?.revision||0))fail('seat-stale');}

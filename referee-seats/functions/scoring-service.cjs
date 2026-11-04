@@ -14,7 +14,7 @@ function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
   if(releaseSnap.data()?.enabled!==true||releaseSnap.data()?.perCourtScoringVerified!==true)throw Error('release-not-ready');
   const room=roomSnap.data(),user=userSnap.data();
   assertLegacyScoringWritable(room);
-  const authority={now,partnerEnabled:releaseSnap.data()?.partnerSeatsEnabled===true};
+  const authority={now,communitySeatsEnabled:releaseSnap.data()?.communitySeatsEnabled===true,partnerEnabled:releaseSnap.data()?.partnerSeatsEnabled===true};
   if(C.partnerRoom(room)){
    if(!authority.partnerEnabled)throw Error('partner-release-not-ready');
    const parent=await tx.get(db.doc('users/'+room.createdBy));
@@ -23,7 +23,7 @@ function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
   let state,previous;
   try{state=JSON.parse(room.data);previous=JSON.parse(pubSnap.data().bracketView);}catch{throw Error('corrupt-data');}
   const dispatch=D.ACTIONS.has(d.action),authorizationStation=dispatch?D.authorizationStation(d):Number(d.station);
-  if(!C.eligible(room,user,uid,authority)||!(dispatch&&d.action==='resize'?C.manager(room,user,uid,authority):S.allowed(room,user,uid,authorizationStation,authority)))throw Error('station-not-assigned');
+  if(!(dispatch&&d.action==='resize'?C.manager(room,user,uid,authority):S.allowed(room,user,uid,authorizationStation,authority)))throw Error('station-not-assigned');
   // Deduplicate before score-version validation; retries return current authoritative state.
   if(receipt.exists){if(receipt.data().hash!==hash)throw Error('operation-conflict');return {...receipt.data().result,state};}
   const result=(dispatch?D:S).transition({room,state,user,uid,d,now,authority});
@@ -37,7 +37,7 @@ function createScoringHandler(db,{clock=Date.now}={}){return async request=>{
   tx.update(pub,{bracketView:JSON.stringify(S.publicProjection(state,previous)),updatedAt:state.updatedAt});
   tx.create(receiptRef,{uid,hash,at:now,result:response});
   tx.create(ref.collection('refereeScoreAudit').doc(opKey),{uid,at:now,action:d.action,station:result.station,matchId:result.matchId,scoreRevision:result.scoreRevision,scoreA:changed?.scoreA??null,scoreB:changed?.scoreB??null});
-  if(['confirm','quick'].includes(d.action))tx.set(db.doc('staffActivityLogs/'+uid+'/matches/'+code+'_'+result.matchId),{uid,tournamentCode:code,tournamentName:state.meta.name||'',matchId:result.matchId,station:result.station,confirmedAt:now,resultMethod:d.action==='quick'?'quick_decision':'score',eventAuthority:'official'},{merge:true});
+  if(room.eventAuthority==='official'&&['confirm','quick'].includes(d.action))tx.set(db.doc('staffActivityLogs/'+uid+'/matches/'+code+'_'+result.matchId),{uid,tournamentCode:code,tournamentName:state.meta.name||'',matchId:result.matchId,station:result.station,confirmedAt:now,resultMethod:d.action==='quick'?'quick_decision':'score',eventAuthority:'official'},{merge:true});
   return {...response,state};
  });
 };}

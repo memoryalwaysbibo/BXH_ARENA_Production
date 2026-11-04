@@ -41,7 +41,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --depth=1
+            # checkout above already fetched full history. Do not re-shallow
+            # main here: that hides the merge base when main advances mid-run.
+            git fetch origin "${{ github.base_ref }}"
             files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
             override=auto
           elif [[ "${{ github.event_name }}" == "push" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then

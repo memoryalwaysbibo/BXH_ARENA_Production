@@ -15,3 +15,15 @@ test('unsupported rooms are untouched',()=>{for(const state of [room(2,{eventAut
 test('invalid counts and legacy allocations are rejected',()=>{for(const n of [0,33,1.5,'6'])assert.equal(initialize({state:room(n),ownerUid:'owner',release}).reason,'invalid-stations');assert.equal(initialize({state:room(2,{refereeStationAssignments:{1:['legacy']}}),ownerUid:'owner',release}).reason,'legacy-assignments-exist');});
 test('already enabled room cannot be reinitialized',()=>{const state=room(2,{refereeSeatsV1:{version:1,courts:{1:{main:{uid:'staff'}}}}});assert.equal(initialize({state,ownerUid:'owner',release}).reason,'already-enabled');assert.equal(state.meta.refereeSeatsV1.courts[1].main.uid,'staff');});
 test('owner is included without replacing existing staff',()=>{const r=initialize({state:room(2,{assignedStaffUids:['staff']}),ownerUid:'owner',release});assert.deepEqual(r.privateFields.assignedStaffUids,['staff','owner']);});
+
+test('general community rooms require the community release gate and initialize both courts',()=>{
+ const state=room(2,{eventAuthority:'community',ladderMode:'general'});
+ assert.equal(initialize({state,ownerUid:'owner',release}).reason,'unsupported-mode');
+ const communityRelease={...release,communitySeatsEnabled:true};
+ const result=initialize({state,ownerUid:'owner',release:communityRelease});
+ assert.equal(result.ok,true);
+ assert.deepEqual(Object.keys(result.model.courts),['1','2']);
+ assert.deepEqual(result.privateFields.assignedStaffUids,[]);
+ assert.equal(Object.hasOwn(result.publicMeta,'refereeSeatsV1'),false);
+ assert.equal(initialize({state:room(2,{eventAuthority:'community',ladderMode:'ranked'}),ownerUid:'owner',release:communityRelease}).reason,'unsupported-mode');
+});
