@@ -47,8 +47,11 @@ Legacy rooms still use the deployed normalizer. An invalid split-state proof
 must produce an unresolved result, never a ready card or an inactive room.
 
 The list path can examine 16 candidates per page and has a 5-second request
-budget. Reading up to 32 buckets for each candidate can exceed that budget;
-measure actual transaction reads and latency before enabling the path. The
+budget. The bucket protocol caps a room at 32 courts, with one bucket per four
+courts: at most eight buckets per room. The adapter also reads the public
+projection, yielding at most 160 room/public/bucket documents for 16 fully
+bucketed rooms, plus existing account, membership and control reads. Measure
+actual transaction latency and total reads before enabling the path. The
 maintenance engine additionally uses the root-only `target(room)` decision
 in `vendor/backend/engine.cjs` and `rebuild.cjs`; update those transaction
 paths without introducing reads after writes. Acceptance must cover the list,
