@@ -1,0 +1,66 @@
+diff --git a/card-album-core.js b/card-album-core.js
+index c42a3fe..344790a 100644
+--- a/card-album-core.js
++++ b/card-album-core.js
+@@ -18,13 +18,16 @@ function dateKey(value){
+  if(value&&typeof value.toMillis==='function')return dateKey(value.toMillis());
+  return '';
+ }
+-function eligibleEvent(top,state){
++function octoberDay(day){return day>='2026-10-01'&&day<'2026-11-01';}
++function eligibleEvent(top,state,now=Date.now()){
+  if(!top||!state)return false;
+  if(top.eventAuthority!=='official'&&state.meta?.eventAuthority!=='official')return false;
+  if(top.testMode||state.testMode||top.eventCancelled||state.meta?.eventCancelled||state.systemClosed)return false;
+  if(top.archiveStatus!=='completed'&&state.archiveStatus!=='completed')return false;
+  const day=dateKey(top.eventDate||state.meta?.date||state.meta?.eventDate||state.eventDate);
+- return day>='2026-10-01'&&day<='2026-10-31';
++ const completed=state.completedAt??top.completedAt;
++ const completedAt=typeof completed==='string'?Date.parse(completed):completed;
++ return octoberDay(day)&&octoberDay(dateKey(completedAt))&&octoberDay(dateKey(now));
+ }
+ function eligiblePlayerIds(state){
+  const ids=new Set();
+diff --git a/card-album-core.test.js b/card-album-core.test.js
+index 6043bfb..c8b6557 100644
+--- a/card-album-core.test.js
++++ b/card-album-core.test.js
+@@ -16,11 +16,15 @@ test('the bonus runs only at the twelfth completion',()=>{
+  const b=C.award(a.counts,13,()=>3);assert.deepEqual(b.bonus,[]);
+ });
+ test('only official completed October events qualify',()=>{
+- const state={meta:{},archiveStatus:'completed',players:[],matches:[]};
+- assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-10-17'},state),true);
+- assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-09-30'},state),false);
+- assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-10-17',testMode:true},state),false);
+- assert.equal(C.eligibleEvent({eventAuthority:'partner',eventDate:'2026-10-17'},state),false);
++ const now=Date.parse('2026-10-31T15:59:59.999Z');
++ const state={meta:{},archiveStatus:'completed',completedAt:now,players:[],matches:[]};
++ assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-10-17'},state,now),true);
++ assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-09-30'},state,now),false);
++ assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-10-17',testMode:true},state,now),false);
++ assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-10-31'},state,now+1),false);
++ assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-10-31'},{...state,completedAt:now+1},now),false);
++ assert.equal(C.eligibleEvent({eventAuthority:'official',eventDate:'2026-10-31'},{...state,completedAt:null},now),false);
++ assert.equal(C.eligibleEvent({eventAuthority:'partner',eventDate:'2026-10-17'},state,now),false);
+ });
+ test('bye and test participants do not earn participation',()=>{
+  const state={players:[{id:'a',uid:'a'},{id:'b',uid:'b',isTestData:true},{id:'c',uid:'c'}],matches:[{completed:true,a:{playerId:'a'},b:{playerId:'c'}},{completed:true,isBye:true,a:{playerId:'b'},b:{playerId:'c'}}]};
+diff --git a/card-album.js b/card-album.js
+index 631d4a2..b9155a4 100644
+--- a/card-album.js
++++ b/card-album.js
+@@ -57,10 +57,11 @@ async function awardPlayer(code,player){
+   const [tour,user,a,prior]=await Promise.all([tx.get(tourRef),tx.get(userRef),tx.get(ref),tx.get(resultRef)]);
+   if(prior.exists)return {replayed:true,uid};
+   const top=tour.data(),state=stateOf(top||{});
+-  if(!C.eligibleEvent(top,state))return {skipped:'event-not-eligible'};
++  const now=Date.now();
++  if(!C.eligibleEvent(top,state,now))return {skipped:'event-not-eligible'};
+   if(!C.active(user.data()))return {skipped:'account-inactive'};
+   if(!C.eligiblePlayerIds(state).some(p=>p.id===player.id&&String(p.registrationUid||p.accountUid||p.playerUid||p.userUid||p.authUid||p.uid||'')===uid))return {skipped:'participant-not-eligible'};
+-  const now=Date.now(),log={kind:'october-event',eventCode:code,createdAt:now};
++  const log={kind:'october-event',eventCode:code,createdAt:now};
+   // October event reward is delivered as an unopened system-mail card pack.
+   // Do not write the drawn card into the album until the player claims the pack.
+   const messageId=`gods_pack_${code}`;

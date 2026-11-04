@@ -365,3 +365,27 @@ test('real registration invitation extension mounts controls in the selected vis
   await t.select('mail-0'); resetDom(); t.sandbox.mailboxInvitationPanel();
   assert.equal(nodes.has('mailbox-invitation-actions'), false, 'ordinary mail never inherits invitation controls');
 });
+
+test('bulk selection excludes protected rewards and refreshes the unread badge after deletion', async () => {
+  const ordinary = message(1, { deletable: true, readAt: null });
+  const reward = message(2, { deletable: false, readAt: null });
+  const t = setup([ordinary, reward]);
+  t.sandbox.confirm = () => true;
+  let messages = [ordinary, reward];
+  t.sandbox.window.engagementService.mailbox = async payload => {
+    if (payload.action === 'list') return { ok: true, canDelete: true, messages, unreadCount: messages.length };
+    assert.deepEqual(clone(payload), { action: 'delete', messageIds: [ordinary.id] });
+    messages = [reward];
+    return { ok: true, removedIds: [ordinary.id], unreadCount: 1 };
+  };
+  await t.api.loadMailbox(true);
+  await t.api.handleMailbox('mailbox-delete-mode');
+  await t.api.handleMailbox('mailbox-delete-toggle', t.target(reward.id));
+  assert.equal(t.state.deleteSelection.size, 0);
+  await t.api.handleMailbox('mailbox-delete-all');
+  assert.deepEqual([...t.state.deleteSelection], [ordinary.id]);
+  await t.api.handleMailbox('mailbox-delete');
+  assert.equal(t.state.unreadCount, 1);
+  assert.doesNotMatch(t.view(), /Message 1/);
+  assert.match(t.view(), /Message 2/);
+});
