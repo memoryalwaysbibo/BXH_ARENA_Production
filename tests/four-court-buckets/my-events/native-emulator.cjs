@@ -12,6 +12,7 @@ const {readRoomLifecycle} = require(path.join(candidate, 'vendor/backend/bucket-
 const {normalizeLifecycle} = require(path.join(candidate, 'vendor/backend/lifecycle.js'));
 const {createAdminBridge} = require(path.join(candidate, 'vendor/backend/service.cjs'));
 const {createBootstrap, PATHS} = require(path.join(candidate, 'vendor/backend/bootstrap.cjs'));
+const {createAuthenticatedReader} = require(path.join(candidate, 'vendor/reader/auth-reader.cjs'));
 
 async function main() {
   assert.equal(process.env.GCLOUD_PROJECT, 'demo-bxh-my-events-review');
@@ -52,6 +53,35 @@ async function main() {
     assert.equal(queued[0].expectedTarget, 'active');
     const run = (await db.doc(PATHS.runs + '/native-six').get()).data();
     assert.equal(run.roomDiscoveryCursor, code);
+    const root = await db.doc(rootPath).get();
+    const uid = 'native-reader';
+    await db.doc('users/' + uid).set({active: true});
+    await db.doc('users/' + uid + '/myEventRooms/' + code).set({
+      code, ownerUid: uid, schemaVersion: 24, release: 'individual-family-v24',
+      candidate: true, state: 'ready', roomIncarnation: root.createTime,
+      counts: {selfConfirmed: 1, selfWaitlist: 0, familyConfirmed: 0, familyWaitlist: 0, unsupported: 0},
+    });
+    await db.doc('myEventBootstrapRunsV26/native-reader').set({
+      schemaVersion: 26, runId: 'native-reader', engineVersion: 'membership-v26-generation-1',
+      scope: 'individual-family', state: 'complete', phase: 'complete', pending: false,
+      roomDiscoveryDone: true, summaryDiscoveryDone: true, queuedRooms: 1, completedRooms: 1,
+      failedRooms: 0, rebuiltRooms: 1, quarantinedRooms: 0, disposition: 'clean',
+      completedAt: 1, captureMode: 'same-service-engine',
+    });
+    await db.doc('myEventsMembershipControl/rollout').set({
+      schemaVersion: 24, release: 'individual-family-v24', scope: 'individual-family',
+      enabled: true, baselineComplete: true,
+      bootstrap: {schemaVersion: 26, runId: 'native-reader', engineVersion: 'membership-v26-generation-1'},
+    });
+    const reader = createAuthenticatedReader({
+      enabled: true, bridge, verifyAuth: async () => ({uid}),
+      resolveRoomLifecycle: readRoomLifecycle,
+    });
+    const started = performance.now();
+    const list = await reader({data: {}});
+    const readerMs = Math.round(performance.now() - started);
+    assert.equal(list.status, 'ready', JSON.stringify(list));
+    assert.deepEqual(list.cards.map(x => [x.code, x.phase]), [[code, 'settling']]);
     await db.doc(rootPath).update({tournamentPhase: 'done'});
     life = await lifecycle();
     assert.equal(life.status, 'invalid');
@@ -61,7 +91,15 @@ async function main() {
     life = await lifecycle();
     assert.equal(life.status, 'invalid');
     assert.equal(life.reason, 'bucket-lifecycle-unverified');
-    console.log(JSON.stringify({checks: 17, project: process.env.GCLOUD_PROJECT, sixCourtLifecycle: true, bootstrapCursor: run.roomDiscoveryCursor, phaseConflictRejected: true, missingBucketRejected: true, productionWrites: 0}));
+    const missingReader = createAuthenticatedReader({
+      enabled: true, bridge, verifyAuth: async () => ({uid}),
+      resolveRoomLifecycle: readRoomLifecycle,
+    });
+    const missingList = await missingReader({data: {}});
+    assert.equal(missingList.status, 'synchronizing', JSON.stringify(missingList));
+    assert.equal(missingList.cards.length, 0);
+    assert.ok(missingList.notices.includes('room-unavailable'));
+    console.log(JSON.stringify({checks: 22, project: process.env.GCLOUD_PROJECT, sixCourtLifecycle: true, bootstrapCursor: run.roomDiscoveryCursor, nativeReaderMs: readerMs, phaseConflictRejected: true, missingBucketRejected: true, productionWrites: 0}));
   } finally { await deleteApp(app); }
 }
 main().catch(e => {console.error(e); process.exitCode = 1;});
