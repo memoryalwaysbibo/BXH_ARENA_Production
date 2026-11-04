@@ -55,7 +55,8 @@ paths without introducing reads after writes. Acceptance must cover the list,
 detail and repair/rebuild outputs with stale jobs, room deletion and code
 reuse, using the exact deployed source fixtures. The library now exposes `readRoomLifecycle({db,tx,room,code,normalizeRoom})`
 for the existing read-only transaction. It reuses the caller's root snapshot,
-uses the original normalizer for unmarked legacy rooms, and verifies the
+reads the public projection to detect public-only partial migration,
+then uses the original normalizer for unmarked legacy rooms and verifies the
 private/public/bucket context for marked rooms. Offline tests cover the seam,
 including incomplete ownership and wrong room path. This is an integration
 interface only: no deployed reader, detail or repair handler calls it yet.
