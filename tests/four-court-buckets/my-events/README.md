@@ -113,3 +113,11 @@ needs a bounded consistent read with a source-version check before enqueueing.
 Rebuild imports the root-only target in dual-write reconciliation, listing,
 advance and publish. This baseline reproduction is an explicit release gate,
 not a deployed bootstrap or rebuild fix.
+
+`release/buckets/my-events/patch-rebuild.cjs` pins the exact deployed rebuild
+source and replaces its root-only target calls with the transaction-owned
+bucket lifecycle resolver. The engine patch passes that resolver to dual-write
+reconciliation. Local tests reject source drift, verify resolver use on the
+stale-generation path, and require it for an enabled rebuilder. Bootstrap
+discovery and capture still need a bounded, transaction-consistent adapter;
+service factory wiring and authenticated/live acceptance also remain open.

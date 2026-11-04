@@ -31,6 +31,9 @@ function patchRepairEngine(source){
  out=once(out,
   'const replacement=makeJob(code,room,j,at);',
   'const replacement=await makeJob(tx,code,room,j,at);');
+ out=once(out,
+  'expectedRebuildGeneration,rebuildLease});',
+  'expectedRebuildGeneration,rebuildLease,resolveRoomLifecycle});');
  return out;
 }
 module.exports={PIN,patchRepairEngine};
