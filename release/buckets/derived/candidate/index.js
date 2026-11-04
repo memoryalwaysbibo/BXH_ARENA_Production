@@ -1,6 +1,6 @@
 "use strict";
 const {countOfficialMatches}=require("./official-match-titles-core.cjs");
-const {randomUUID} = require('node:crypto');
+const {randomUUID, createHash} = require('node:crypto');
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
@@ -445,6 +445,8 @@ exports.setTitlePreferences = onCall({region: REGION, cors: true}, async (reques
 });
 
 function tournamentState(t){try{return typeof t?.data==="string"?JSON.parse(t.data):t?.data||{};}catch{return {};}}
+const stableBucketState = value => Array.isArray(value) ? value.map(stableBucketState) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stableBucketState(value[key])])) : value;
+const bucketStateDigest = state => createHash("sha256").update(JSON.stringify(stableBucketState(state))).digest("hex");
 
 async function processOfficialEventLog(log, sourceLogId, sourceType = "official_tournament", dryRun = false) {
   if (!log || log.isTestData === true || log.testMode === true || log.type !== "event" || !log.playerUid || !log.eventCode) return {status: "skipped", reason: "not-event"};
@@ -457,7 +459,7 @@ async function processOfficialEventLog(log, sourceLogId, sourceType = "official_
     const receipt = tour.bucketSettlement;
     const createdAt = tourSnap.createTime;
     const sourceCreatedAt = Number.isSafeInteger(createdAt?.seconds) && Number.isSafeInteger(createdAt?.nanoseconds) ? `${createdAt.seconds}:${createdAt.nanoseconds}` : null;
-    if (Object.prototype.hasOwnProperty.call(tour, "bucketMigration") || Object.prototype.hasOwnProperty.call(tour, "deletionStatus") || !Object.prototype.hasOwnProperty.call(tour, "scoreStorage") || receipt?.version !== 1 || receipt.status !== "completed" || receipt.epoch !== log.bucketEpoch || !sourceCreatedAt || log.sourceCreatedAt !== sourceCreatedAt || state.archiveStatus !== "completed") {
+    if (Object.prototype.hasOwnProperty.call(tour, "bucketMigration") || Object.prototype.hasOwnProperty.call(tour, "deletionStatus") || !Object.prototype.hasOwnProperty.call(tour, "scoreStorage") || receipt?.version !== 1 || receipt.status !== "completed" || receipt.epoch !== log.bucketEpoch || !sourceCreatedAt || receipt.sourceCreatedAt !== sourceCreatedAt || log.sourceCreatedAt !== sourceCreatedAt || !Number.isSafeInteger(receipt.completedAt) || receipt.completedAt <= 0 || receipt.completedAt !== state.settlementCompletedAt || receipt.stateDigest !== bucketStateDigest(state) || tour.archiveStatus !== "completed" || state.archiveStatus !== "completed" || state.settlementPhase !== "completed") {
       return {status: "skipped", reason: "bucket-settlement-source-mismatch"};
     }
   }
