@@ -9,7 +9,7 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import subprocess
 import tempfile
 import time
@@ -153,7 +153,10 @@ def source_files(source):
         need(result.returncode == 0, 'deployed source unavailable')
         with zipfile.ZipFile(path) as archive:
             names = [item.filename for item in archive.infolist() if not item.is_dir()]
-            need(len(names) == len(set(names)) and all('/' not in name for name in names),
+            need(len(names) == len(set(names)) and all(
+                name and not name.startswith('/') and '\\' not in name
+                and '..' not in PurePosixPath(name).parts
+                and PurePosixPath(name).as_posix() == name for name in names),
                  'deployed source scope mismatch')
             return {name: archive.read(name) for name in names}
 
