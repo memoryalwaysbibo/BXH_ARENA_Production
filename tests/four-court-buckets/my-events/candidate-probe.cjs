@@ -62,16 +62,18 @@ test('root-only forged done phase cannot hide an active bucket room',async()=>{
  const life=await status(f);assert.equal(life.status,'invalid');assert.equal(life.reason,'bucket-phase-conflict');
 });
 
-async function readerStatus(f,roomPath='tournaments/'+code){
+async function readerStatus(f,roomPath='tournaments/'+code,reads=[]){
  return f.m.db.runTransaction(async tx=>{
-  const room=await tx.get(f.m.db.doc(roomPath));
-  return readRoomLifecycle({db:f.m.db,tx,room,code,normalizeRoom:normalizeLifecycle});
+  const tracked={get:ref=>{reads.push(ref.path);return tx.get(ref);}};
+  const room=await tracked.get(f.m.db.doc(roomPath));
+  return readRoomLifecycle({db:f.m.db,tx:tracked,room,code,normalizeRoom:normalizeLifecycle});
  });
 }
 test('reader seam preserves the legacy room normalizer without bucket reads',async()=>{
  const f=fixture({bucket:false,courts:6}),p='tournaments/'+code,top=f.m.rows.get(p),state=JSON.parse(top.data);
  state.matches[0].completed=false;f.m.put(p,{...top,data:JSON.stringify(state)});
- const life=await readerStatus(f);
+ const reads=[],life=await readerStatus(f,'tournaments/'+code,reads);
+ assert.deepEqual(reads,['tournaments/'+code,'publicTournaments/'+code]);
  assert.deepEqual(life,normalizeLifecycle(f.m.rows.get(p)));
  assert.equal(life.status,'supported');assert.equal(life.phase,'live');
  assert.equal(f.m.writes.length,0);
