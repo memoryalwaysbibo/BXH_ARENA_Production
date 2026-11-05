@@ -8,15 +8,26 @@ const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({h
 let fixtureNumber=0,transactionNumber=0;
 const runTransaction=db.runTransaction.bind(db);
 db.runTransaction=async function(callback,...options){
- const transaction=++transactionNumber,fixture=fixtureNumber,started=Date.now();let attempts=0;
+ const transaction=++transactionNumber,fixture=fixtureNumber,started=Date.now();let attempts=0,lastReads=[];
  try{
   const result=await runTransaction(async tx=>{
-   attempts++;
-   try{return await callback(tx);}
-   catch(error){console.error(JSON.stringify({event:'completion-transaction-attempt-failed',fixture,transaction,attempt:attempts,elapsedMs:Date.now()-started,code:error.code??null,message:error.message}));throw error;}
+   attempts++;const reads=[];lastReads=reads;
+   const observed=new Proxy(tx,{get(target,key){
+    if(key==='get'||key==='getAll')return async(...args)=>{
+     const read={method:key,paths:args.filter(x=>typeof x?.path==='string').map(x=>x.path),startedMs:Date.now()-started,status:'pending'};
+     // Queries expose no public path; their method and timing still identify the phase.
+     reads.push(read);
+     try{const value=await target[key](...args);read.status='ok';return value;}
+     catch(error){read.status='failed';read.code=error.code??null;throw error;}
+     finally{read.elapsedMs=Date.now()-started-read.startedMs;}
+    };
+    const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+   }});
+   try{return await callback(observed);}
+   catch(error){console.error(JSON.stringify({event:'completion-transaction-attempt-failed',fixture,transaction,attempt:attempts,elapsedMs:Date.now()-started,code:error.code??null,message:error.message,reads}));throw error;}
   },...options);
   return result;
- }catch(error){console.error(JSON.stringify({event:'completion-transaction-failed',fixture,transaction,attempts,elapsedMs:Date.now()-started,code:error.code??null,message:error.message}));throw error;}
+ }catch(error){console.error(JSON.stringify({event:'completion-transaction-failed',fixture,transaction,attempts,elapsedMs:Date.now()-started,code:error.code??null,message:error.message,reads:lastReads}));throw error;}
 };
 const names=['users','tournaments','publicTournaments','systemConfig','ladderPlayers','ladderTransactions','ladderSystem','hostCompletionLedger','hostStats','hostAwardQueue'];
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-hosting-native-'));
@@ -92,6 +103,7 @@ async function all(){const out=[];async function walk(col){for(const ref of awai
  }
  for(const qr of [false,true]){
   const f=fixture({qr});await seed(f);await handle(request(f));const sync=hosting('host-sync').syncMyHostingProgress.run;
+  console.log(JSON.stringify({event:'completion-host-sync-contention',fixture:fixtureNumber,qr,operations:['count','sync','sync']}));
   await Promise.all([count(),sync({auth:{uid:'admin'}}),sync({auth:{uid:'admin'}})]);assert.equal((await db.doc('hostStats/admin').get()).data().completedHostedCount,1);assert.equal((await db.collection('hostCompletionLedger').get()).size,1);checks++;
  }
  for(const bad of ['no-auth','inactive','revoked-after-preflight','certificate','migration','ledger']){
