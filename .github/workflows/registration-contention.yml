@@ -22,7 +22,7 @@ jobs:
           java-version: 17
       - run: node --test release/registration-contention/admission.test.cjs
       - run: python3 -m unittest discover -s release/registration-contention -p collector_test.py
-      - run: npm install --prefix /tmp/registration40-deps --no-save --ignore-scripts firebase-tools@13.35.1 firebase-admin@14.4.0
+      - run: npm install --prefix /tmp/registration40-deps --no-save --ignore-scripts firebase-tools@13.35.1 firebase-admin@14.4.0 firebase-functions@7.3.2
       - run: /tmp/registration40-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-registration40 --config release/registration-contention/emulator.json 'node release/registration-contention/verify.cjs'
         env:
           NODE_PATH: /tmp/registration40-deps/node_modules
