@@ -15,10 +15,12 @@ under `$HOME/bxh-bucket-live-readonly-*`. The printed `reportFile` points to
 `report.json`; the directory also contains `firestore.live.rules`, source ZIPs,
 and full per-function metadata JSON. Treat it as sensitive source material.
 
-`readyForHumanReview` only means that the old reviewed Rules checksum still
-matches, all selected Functions were captured without errors, and the three
+`readyForHumanReview` only means that the reviewed community-referee Rules
+checksum matches, all selected Functions were captured without errors, and the three
 new bucket Functions report their runtime disabled. It **does not** authorize
-deployment or activation. A changed Rules hash, a missing Function, a read
+deployment or activation. The earlier bucket deletion baseline has a different
+Rules checksum; its candidate must be reconciled with the live community-referee
+release before any Rules deployment. A changed Rules hash, a missing Function, a read
 error or an enabled bucket runtime causes a nonzero exit. Review the complete
 source/configuration diff against the actual deployment candidates and reconcile
 every change before a controlled release.
