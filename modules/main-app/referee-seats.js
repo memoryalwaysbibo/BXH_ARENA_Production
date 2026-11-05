@@ -97,9 +97,7 @@
   const court=model()?.courts?.[station]||{},seat=court[slot],base={station,slot,expectedCourtRevision:court.revision||0,expectedUid:seat?.uid||null};
   if(!seat&&state()?.meta?.eventAuthority==='community'){
    if(!ctx?.inviter?.())return ctx?.support?.()?send({...base,action:'claim'}):undefined;
-   const targetGameId=root.prompt('輸入受邀玩家的完整遊戲 ID')?.trim();
-   if(targetGameId)return send({...base,action:'invite',targetGameId});
-   return;
+   return root.BXHCommunityRefereeInvite?.open(base);
   }
   if(!seat)return send({...base,action:'claim'});
   if(seat.uid===uid())return modal(`是否退出 ${station} 號台${labels[slot]}？`,[{label:'確定',run:()=>send({...base,action:'leave'})},{label:'取消'}]);

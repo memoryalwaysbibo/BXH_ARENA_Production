@@ -1,5 +1,5 @@
 'use strict';
-const {createHash,randomUUID}=require('node:crypto');
+const {createHash,randomUUID,randomBytes}=require('node:crypto');
 const C=require('./core.cjs');
 const {activeAccount}=require('./event-staff-core.cjs');
 const {assertLegacyScoringWritable}=require('./bucket-legacy-fence.cjs');
@@ -19,7 +19,7 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   return {ok:true};
  }
  if(!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!/^[-a-zA-Z0-9]{16,80}$/.test(d.operationId||''))throw new Error('invalid-request');
- const id=uuid(),ref=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
+ const id=uuid(),qrToken=randomBytes(32).toString('base64url'),ref=db.doc('tournaments/'+code),pub=db.doc('publicTournaments/'+code);
  const operationRef=ref.collection('refereeSeatOperations').doc(createHash('sha256').update(uid+':'+d.operationId).digest('hex'));
  return db.runTransaction(async tx=>{
   const d={...request.data};
@@ -37,16 +37,50 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
   }
 
   let state;try{state=JSON.parse(room.data);}catch{throw new Error('corrupt-data');}
-  if(d.action==='accept-invite'&&room.eventAuthority==='community'
+  const qrAction=['inspect-qr','accept-qr'].includes(d.action);
+  if(['accept-invite','create-qr','find-invite-player', 'inspect-qr','accept-qr'].includes(d.action)&&room.eventAuthority==='community'
    &&(room.tournamentPhase==='done'||state.completedAt||[room.archiveStatus,state.archiveStatus].some(status=>['completed','archived'].includes(status))))
    throw Error('community-result-available');
-  const communityReceipt=(['invite','revoke'].includes(d.action)&&C.communityOwner(room,user,uid,authority))
+  if(d.action==='find-invite-player'){
+   if(!C.canEnableCommunity(room,state,user,uid,{action:'enable'},authority))throw Error('permission-denied');
+   // Reuse all room/mode/seat fences before querying the private player directory.
+   C.transition({room,state,user,uid,d:{action:'create-qr',station:d.station,slot:d.slot,expectedCourtRevision:d.expectedCourtRevision,tokenHash:'search-only'},now,id,authority});
+   const query=typeof d.query==='string'?d.query.trim():'';
+   if(query.length<1||query.length>80)throw Error('invalid-request');
+   const rows=new Map();
+   for(const field of ['realName','displayName','gameId']){
+    const found=await tx.get(db.collection('users').where(field,'==',query).limit(6));
+    for(const row of found.docs){const player=row.data();if(row.id!==uid&&activeAccount(player)&&player.role==='player')rows.set(row.id,{uid:row.id,name:String(player.realName||player.displayName||player.gameId||'玩家').slice(0,80),gameId:String(player.gameId||'').slice(0,80)});}
+   }
+   return {ok:true,players:[...rows.values()].slice(0,10)};
+  }
+  let qrOwner;
+  if(qrAction){
+   if(typeof d.qrToken!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(d.qrToken)||typeof d.requestId!=='string')throw Error('invalid-qr');
+   d.tokenHash=createHash('sha256').update(d.qrToken).digest('hex');
+   const invitation=room.refereeSeatsV1?.requests?.[d.requestId];
+   if(!C.communityRoom(room,authority)||!activeAccount(user)||user.role!=='player')throw Error('permission-denied');
+   if(!invitation||invitation.kind!=='qr'||invitation.tokenHash!==d.tokenHash)throw Error('invalid-qr');
+   qrOwner=(await tx.get(db.doc('users/'+invitation.fromUid))).data();
+   if(!C.communityOwner(room,qrOwner,invitation.fromUid,authority))throw Error('permission-denied');
+   d.station=invitation.station;d.slot=invitation.slot;
+   // A receipt can be replayed only while this player still holds this QR's seat.
+   if(receiptSnap.exists&&d.action==='accept-qr'){
+    if(invitation.toUid!==uid||room.refereeSeatsV1.courts[d.station]?.[d.slot]?.uid!==uid)throw Error('qr-expired');
+   }else{
+    C.transition({room,state,user,uid,d:{...d,action:'accept-qr'},now,id,requesterUser:qrOwner,authority});
+    if(d.action==='inspect-qr')return {ok:true,station:d.station,slot:d.slot,expiresAt:invitation.expiresAt,ownerName:String(qrOwner.gameId||qrOwner.displayName||'房主').slice(0,80)};
+   }
+  }
+  const communityReceipt=(['invite','create-qr','revoke'].includes(d.action)&&C.communityOwner(room,user,uid,authority))
+   ||qrAction
    ||(d.action==='accept-invite'&&C.communityRoom(room,authority)&&activeAccount(user)
     &&user.role==='player'&&room.refereeSeatsV1?.requests?.[d.requestId]?.toUid===uid);
   if(receiptSnap.exists&&!communityReceipt&&!C.eligible(room,user,uid,authority)&&!C.canEnableCommunity(room,state,user,uid,d,authority))throw new Error('not-event-staff');
-  const hash=createHash('sha256').update(JSON.stringify(d)).digest('hex');
+  // Hash the original client intent, independent of resolved UID/seat or generated token.
+  const hash=createHash('sha256').update(JSON.stringify(request.data)).digest('hex');
   if(receiptSnap.exists){const receipt=receiptSnap.data();if(receipt.hash!==hash)throw new Error('operation-conflict');return receipt.result;}
-  let targetUser,requesterUser;
+  let targetUser,requesterUser=qrOwner;
   const targetUid=room.refereeSeatsV1?.courts?.[d.station]?.[d.slot]?.uid;
   const requesterUid=room.refereeSeatsV1?.requests?.[d.requestId]?.fromUid;
   if(d.action==='invite'&&typeof d.targetUid==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(d.targetUid))targetUser=(await tx.get(db.doc('users/'+d.targetUid))).data();
@@ -61,7 +95,9 @@ function createHandler(db,{clock=Date.now,uuid=randomUUID}={}){return async requ
    targetUser=targets.docs[0].data();
    d.targetUid=targets.docs[0].id;
   }
+  if(d.action==='create-qr')d.tokenHash=createHash('sha256').update(qrToken).digest('hex');
   const out=C.transition({room,state,user,uid,d,now,id,targetUser,requesterUser,authority});
+  if(d.action==='create-qr')Object.assign(out.result,{qrToken,expiresAt:now+300000});
   const projection=C.project(out.model,room.createdBy,state.meta.stations),staff=room.eventAuthority==='community'?(room.assignedStaffUids||[]):[...new Set([...(room.assignedStaffUids||[]),room.createdBy,...projection.refereeStationUids].filter(Boolean))];
   state.meta={...state.meta,...projection,assignedStaffUids:staff,refereeSeatsV1:out.model};
   const updatedAt=Math.max(now,Number(room.updatedAt||0)+1,Number(state.updatedAt||0)+1);state.updatedAt=updatedAt;

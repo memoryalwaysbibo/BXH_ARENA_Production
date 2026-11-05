@@ -77,8 +77,8 @@ function canEnableCommunity(room,state,user,uid,d,authority){
 }
 function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,authority={}}){
  const communityEnable=canEnableCommunity(room,state,user,uid,d,authority);
- const communityHost=['invite','revoke'].includes(d.action)&&canEnableCommunity(room,state,user,uid,{action:'enable'},authority);
- const communityAccept=d.action==='accept-invite'&&authority.communitySeatsEnabled===true
+ const communityHost=['invite','create-qr','revoke'].includes(d.action)&&canEnableCommunity(room,state,user,uid,{action:'enable'},authority);
+ const communityAccept=['accept-invite','accept-qr'].includes(d.action)&&authority.communitySeatsEnabled===true
   &&room.eventAuthority==='community'&&state.meta?.eventAuthority==='community'
   &&room.ladderMode==='general'&&state.meta.ladderMode==='general'
   &&EventStaff.activeAccount(user)&&user.role==='player';
@@ -103,7 +103,21 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
   // Courts added after activation are initialized only for a valid physical court.
   const court=model.courts[String(station)]||(model.courts[String(station)]={revision:0,main:null,backup1:null,backup2:null});
   const seat=court[slot];
-  if(action==='invite'){
+  if(action==='create-qr'){
+   if(!communityHost)fail('permission-denied');
+   if(seat||d.expectedCourtRevision!==court.revision)fail('seat-stale');
+   // Generating a new code replaces previous QR invitations for this seat.
+   for(const r of Object.values(model.requests))if(r.kind==='qr'&&r.station===station&&r.slot===slot&&r.status==='pending')r.status='cancelled';
+   model.requests[id]={id,kind:'qr',station,slot,fromUid:uid,tokenHash:d.tokenHash,courtRevision:court.revision,status:'pending',createdAt:now,expiresAt:now+300000};
+  }else if(action==='accept-qr'){
+   const req=model.requests[d.requestId];
+   if(!communityAccept||!req||req.kind!=='qr'||req.tokenHash!==d.tokenHash)fail('invalid-qr');
+   if(req.status!=='pending'||req.expiresAt<=now||req.station!==station||req.slot!==slot||req.courtRevision!==court.revision||seat)fail('qr-expired');
+   if(req.fromUid===uid||!communityOwner(room,requesterUser,req.fromUid,authority))fail('permission-denied');
+   if(SLOTS.some(s=>court[s]?.uid===uid))fail('already-seated');
+   court[slot]={uid,name:display(user),joinedAt:now};court.revision++;
+   req.status='accepted';req.toUid=uid;req.resolvedAt=now;invalidate(model,station,now);
+  }else if(action==='invite'){
    if(!communityHost||!EventStaff.activeAccount(targetUser)||targetUser.role!=='player'||d.targetUid===uid)fail('target-ineligible');
    if(seat||d.expectedCourtRevision!==court.revision)fail('seat-stale');
    if(Object.values(model.requests).some(r=>r.kind==='invite'&&r.station===station&&r.slot===slot&&r.status==='pending'&&r.expiresAt>now&&r.courtRevision===court.revision))fail('request-pending');
@@ -156,6 +170,6 @@ function transition({room,state,user,uid,d,now,id,targetUser,requesterUser,autho
  // Keep pending requests plus a bounded recent result list for reconnect notifications.
  const recent=Object.values(model.requests).sort((a,b)=>b.createdAt-a.createdAt);
  model.requests=Object.fromEntries(recent.filter((r,i)=>r.status==='pending'&&r.expiresAt>now||i<50).map(r=>[r.id,r]));
- return {model,projection:project(model),result:{ok:true,revision:model.revision,...(['request','invite'].includes(action)?{requestId:id}:{}),...(action==='respond'?{status:model.requests[d.requestId]?.status}:{})}};
+ return {model,projection:project(model),result:{ok:true,revision:model.revision,...(['request','invite','create-qr'].includes(action)?{requestId:id}:{}),...(action==='respond'?{status:model.requests[d.requestId]?.status}:{})}};
 }
 module.exports={communityRoom,communityOwner,canEnableCommunity,SLOTS,LABELS,admin,manager,eligible,partnerRoom,transition,project};
