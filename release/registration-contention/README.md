@@ -10,7 +10,9 @@ This directory is an **offline source candidate**, not the active Functions impl
 - Batch initial document reads and selected registration reads with transaction `getAll`; the existing QR guard captures these snapshots.
 - The module shares a bounded admission scheduler for join/cancel/syncSummary per room in one process. Only one mutation per room enters its database work at a time. Auth, time, capacity, operation receipts and allocations are evaluated after admission.
 - The original database transaction remains authoritative across processes. Same-operation receipts, family identities, capacity, public/private counts, explicit allocation checks and cancellation behavior remain unchanged.
-- A waiter expires after 45 seconds before executing and pending admissions are bounded at 128. Timeout/full raise `ABORTED` before invoking its mutation. Failure/timeout cannot remove a predecessor's fence or poison later requests. No new durable queue or guaranteed global FIFO is claimed.
+- A waiter expires after 45 seconds before executing and pending admissions are bounded at 128. Timeout/full return `registration-admission-pending`, retaining the frontend's unconfirmed status and same-operation recovery instead of claiming a definitive failed registration. Failure/timeout cannot remove a predecessor's fence or poison later requests. No new durable queue or guaranteed global FIFO is claimed.
+- Identical user/room/operation/payload requests in the same module share the pending execution; conflicting payloads are refused. No result is cached after completion: a later replay still authenticates and consults the database receipt, and the frontend reads current registrations after cancellation. Separate instances retain database idempotency and conservative pending/readback semantics.
+- The business clock is refreshed after the initial transactional reads on each SDK attempt, so an admission/read wait cannot reuse an expired pre-wait deadline check.
 
 ## Evidence and limits
 
@@ -19,6 +21,10 @@ The source is pinned to `tests/fixtures/registration-feedback-current-source.jso
 The comparison reproduced lock timeouts with the captured original source: 40 requests, 5 successful and 35 ABORTED in that sample. Candidate single-scheduler waves completed 40/40 with zero retries, and a four-scheduler sample completed 40/40 with five transaction retries. See `evidence.json` for timings and revalidation; local timing is not production latency or a capacity guarantee. Earlier preview/getAll-only candidate failed the 40-client sample and was rejected.
 
 Tests assert count conservation, capacity and mirror agreement. Scarce-capacity previews may become stale: `allocation-changed` is preserved, not silently converted to waitlist. Additional checks exercise explicit waitlist acceptance, full rejection, same-operation duplicates and conflicting payloads, cancellation then historical receipt replay, inactive accounts and independent family registrations. Admission tests cover unrelated rooms, failures, overflow and a timed-out waiter between an active predecessor and a later request.
+
+Hardening adds eight admission unit checks and six real Emulator/frontend-controller integration checks for overflow/timeout recovery, a peer committing after another scheduler timed out, shared execution across factories, cancellation after coalescing, deadline expiry after waiting and account disablement while queued. Test-only queue wait uses 25ms; the controller clock advances past its existing 3-second query throttle. They do not measure actual 45-second wall-clock behavior or a live callable adapter. Each test process now uses a fresh random room namespace to prevent cross-suite fixture collisions.
+
+The earlier `evidence.json` and `benchmark100-results.json` describe the previous candidate hashes. Current-head CI artifacts `results.json` / `results100.json` and the hardening report describe this hardened candidate. Do not apply historical latency numbers to a new handler hash.
 
 ## Run
 
