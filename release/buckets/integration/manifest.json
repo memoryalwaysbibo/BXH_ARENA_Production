@@ -91,7 +91,7 @@
       ]
     },
     "release/buckets/deletion/README.md": {
-      "blob": "6c2371fd998c7dbc843fad2c3421117ba7dbbed7",
+      "blob": "4006c1f49ab77fb1d7be173b51cf4e9fec30a9a6",
       "components": [
         707
       ]
@@ -103,7 +103,7 @@
       ]
     },
     "release/buckets/deletion/manifest.json": {
-      "blob": "ec0f675dcc0d3bbe266e557a82e212e6d8887cfe",
+      "blob": "0e6370ed2e0c28171695b7c87def1b8058d0b0fe",
       "components": [
         707
       ]
@@ -157,7 +157,7 @@
       ]
     },
     "tests/four-court-buckets/deletion/access-probe.cjs": {
-      "blob": "760b00d8099b1eb669149466eb6f2d855da3a401",
+      "blob": "33a6e5fb299acfd3d5adef9dee7db94de6728309",
       "components": [
         707
       ]
@@ -181,7 +181,7 @@
       ]
     },
     "tests/four-court-buckets/deletion/fixtures/access/room-access-service.js": {
-      "blob": "88d5b79f37cb73aad60f2c585ff0124a08aad862",
+      "blob": "fd6ec1b62761a501160920113b8720c898ab4001",
       "components": [
         707
       ]
@@ -217,7 +217,7 @@
       ]
     },
     "tests/four-court-buckets/deletion/fixtures/restore/operations.js": {
-      "blob": "c269b4d27b0a5c17515f6a10ec14fa19af9ffd3d",
+      "blob": "c131cc9f9f55379dfb74862aabbb0b968daf31bd",
       "components": [
         707
       ]
@@ -295,7 +295,7 @@
       ]
     },
     "tests/four-court-buckets/deletion/restore-probe.cjs": {
-      "blob": "393431cffe77019106cc9b01ef80ad0cacd9ed9a",
+      "blob": "3ebeeb8aa4775567c244ce53c07a33570db03457",
       "components": [
         707
       ]
@@ -319,7 +319,7 @@
       ]
     },
     "tests/four-court-buckets/deletion/verify-package.py": {
-      "blob": "1ef973895434031cbf88f1e16ab2130b6286aebc",
+      "blob": "fe5dad11643378b3c8979df22c854e1ccbba9d8b",
       "components": [
         707
       ]
@@ -1765,6 +1765,12 @@
     "tests/four-court-buckets/my-events/native-emulator.cjs": {
       "blob": "1840421d8866b2eb612efbc91046872cd229bc6d",
       "components": []
+    },
+    "tests/four-court-buckets/deletion/fixtures/access/room-access.js": {
+      "components": [
+        707
+      ],
+      "blob": "8699da62776cbc9e3413087c213d2d4239525a46"
     }
   },
   "mainScriptQueryParameters": {
@@ -2217,6 +2223,8 @@
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Add fixture and SDK transaction failure diagnostics; preserve transaction options, error identity, SDK retry policy and all existing assertions.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
-    ".github/workflows/bucket-integrated-candidate.yml": "Run the desktop snapshot-burst regression without retries after the existing same-checkout browser contracts; use matching isolated Playwright runner/browser versions."
+    ".github/workflows/bucket-integrated-candidate.yml": "Run the desktop snapshot-burst regression without retries after the existing same-checkout browser contracts; use matching isolated Playwright runner/browser versions.",
+    "release/buckets/deletion/manifest.json": "Refresh only restore/access deployed archive and source-closure provenance against the uploaded 2026-11-05 read-only capture; runtime candidate files retain their accepted hashes.",
+    "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks."
   }
 }

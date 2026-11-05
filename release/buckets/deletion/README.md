@@ -126,3 +126,31 @@ operation receipt, function request/log state and all in-flight cleanup first;
 no reset, expiry-based takeover, or destructive un-fence command is supplied.
 Clearing an active lease requires a separate reviewed recovery plan. Do not
 replace this with an operator instruction to retry arbitrary new operation IDs.
+
+
+## Deployed restore/access source reconciliation — 2026-11-05
+
+The uploaded read-only capture observed at 2026-11-05 01:14:50 UTC
+(09:14:50 Taiwan) pins restoreIdleTournament revision
+`restoreidletournament-00009-zej` and roomAccess revision
+`roomaccess-00034-red`. Their complete archive, build configuration and service
+configuration hashes match the capture report. Exact source generations,
+configuration digests and dependency/QR-guard hashes are recorded in
+`manifest.json.deployedSourceReadback`; no environment values are published.
+
+Both deployed entrypoints already reject scoreStorage/scoreBucketProjection.
+The refreshed fixtures retain these guards byte-for-byte. The candidate restore
+patch expands the marker list with bucketMigration/deletionStatus; room access
+also reads the public peer and rejects a retained migration/deletion lease before
+issuing a password grant. The candidate runtime files did not change in this
+reconciliation. Existing operations-core, room-access-core, release controls and
+all three QR proxy dependencies match their pinned fixture hashes.
+
+The package verifier now derives each patch from its exact deployed guarded
+baseline. The 41 restore and 58 access Node checks preserve deployed score fences,
+deny lease-marked writes, and compare ordinary unmarked behavior. These are local
+synthetic checks, not real Auth/App Check, production latency or cutover acceptance.
+The candidate is still not deployed or activated. Preserve each target's complete
+live archive and configuration during later source-only packaging; the older Rules
+fixture is not a live Rules deployment target. Use the separately reconciled
+current community Rules boundary for release planning.

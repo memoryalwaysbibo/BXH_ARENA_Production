@@ -25,6 +25,7 @@ function createRoomAccessService(db,clock=Date.now){
     const [ts,ps,us]=await Promise.all([tx.get(tr),tx.get(pr),tx.get(ur)]);
     if(!ts.exists||!ps.exists)throw Error('room-not-found');if(!C.active(us.data()))throw Error('auth-required');
     const t=ts.data();if(!C.canBypass(uid,us.data(),t))throw Error('room-access-denied');
+    if([t, ps.data()].some(x=>x&&['scoreStorage','scoreBucketProjection'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');
     if(t.eventAuthority!=='community')throw Error('community-room-only');
     if(!C.roomUnlockedForConfig(t))throw Error('room-access-locked');
     const op=tr.collection('accessActions').doc(hash(uid+'|'+d.operationId)),prior=await tx.get(op);

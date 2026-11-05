@@ -11,6 +11,11 @@ function load(m,candidate){
 function setup(){const m=memory();m.rows.set('users/admin',{active:true,role:'player'});Object.assign(m.rows.get('tournaments/'+code),{roomAccessMode:'password',roomAccessVersion:1,roomAccessSalt:'0123456789abcdef0123456789abcdef',roomAccessHash:''});const t=m.rows.get('tournaments/'+code);t.roomAccessHash=require('node:crypto').scryptSync('test-password',Buffer.from(t.roomAccessSalt,'hex'),32).toString('hex');return m;}
 const request=action=>({auth:{uid:'admin'},data:{action,code,password:'test-password',operationId:'operation-access-001',mode:'public'}});
 (async()=>{let checks=0;
+ // Preserve the deployed configure fence while extending migration/deletion isolation.
+ for(const marker of ['scoreStorage','scoreBucketProjection'])for(const value of [null,false,{}])for(const side of ['tournaments','publicTournaments'])for(const candidate of [false,true]){
+  const m=memory();m.rows.get(side+'/'+code)[marker]=value;
+  await assert.rejects(load(m,candidate)(request('configure')),/bucket-scoring-required/);assert.equal(m.writes,0);checks++;
+ }
  for(const marker of ['bucketMigration','deletionStatus'])for(const value of [null,false,{}, {status:'deleting'}])for(const side of ['tournaments','publicTournaments']){
   const m=setup();m.rows.get(side+'/'+code)[marker]=value;
   await assert.rejects(load(m,true)(request('verify')),/room-deletion-or-migration-in-progress/);assert.equal(m.writes,0);checks++;

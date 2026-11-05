@@ -1,4 +1,4 @@
-"""Check pinned release fixtures and the single reviewed restore guard edit."""
+"""Check pinned release fixtures and exact edits over the captured deployed guards."""
 import hashlib
 import json
 from pathlib import Path
@@ -15,16 +15,18 @@ for name, expected in m['testFixtures'].items():
 assert sha(ROOT / 'release/buckets/firestore.rules') == m['candidateRulesSha256']
 assert sha(TEST / 'fixtures/baseline.rules') == m['currentRulesSha256']
 baseline = (TEST / 'fixtures/restore/operations.js').read_text()
-anchor = "  if(!t.exists||t.data().systemClosed!==true)throw Error('not-system-closed');"
+anchor = "  if([t.data(), p.data()].some(x=>x&&['scoreStorage','scoreBucketProjection'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n"
 guard = "  if([t.data(), p.data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n"
 assert baseline.count(anchor) == 1
-assert baseline.replace(anchor, guard + anchor, 1) == (RELEASE / 'restore-operations.js').read_text()
+assert baseline.replace(anchor, guard, 1) == (RELEASE / 'restore-operations.js').read_text()
 print('PASS pinned package and exact restore-only edit; no deployment')
 
 access = (TEST / 'fixtures/access/room-access-service.js').read_text()
 a = "    if(!ts.exists||!ps.exists)throw Error('room-not-found');if(!C.active(us.data()))throw Error('auth-required');\n    const t=ts.data();if(!C.canBypass(uid,us.data(),t))throw Error('room-access-denied');\n"
 assert access.count(a) == 1
-access = access.replace(a, a + "    if([t, ps.data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n", 1)
+guard = "    if([t, ps.data()].some(x=>x&&['scoreStorage','scoreBucketProjection'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n"
+assert access.count(guard) == 1
+access = access.replace(guard, guard.replace("'scoreBucketProjection'", "'scoreBucketProjection','bucketMigration','deletionStatus'"), 1)
 a = "const [ts,us,grant,attempt]=await Promise.all([tx.get(tr),tx.get(ur),tx.get(grantRef),tx.get(attemptRef)]);"
 assert access.count(a) == 1
 access = access.replace(a, "const [ts,ps,us,grant,attempt]=await Promise.all([tx.get(tr),tx.get(pr),tx.get(ur),tx.get(grantRef),tx.get(attemptRef)]);", 1)
@@ -42,3 +44,9 @@ patch = ''.join(difflib.unified_diff(selection.splitlines(True), candidate.split
 assert patch == (RELEASE / 'registration-selection.patch').read_text()
 assert 'db.recursiveDelete(tr)' not in candidate
 print('PASS exact captured selector patch and pinned shared deletion worker; no deployment')
+
+for item in m["deployedSourceReadback"]["functions"]:
+    assert m[item["archiveManifestField"]] == item["archiveSha256"]
+    for source, fixture in item["closureFixtures"].items():
+        assert sha(TEST / fixture) == item["sourceFileSha256"][source], (item["name"], source)
+print("PASS deployed restore/access source closures and metadata provenance; no deployment")
