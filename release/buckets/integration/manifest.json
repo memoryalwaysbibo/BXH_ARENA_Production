@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "edffb839a73747dc1364c313fac10ab3f997785e"
+      "blob": "c59aaaea1762fe6c6ec8ccbe69eebc261c5daee8"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1827,6 +1827,30 @@
     "release/buckets/integration/live-priority-writers-20261105.json": {
       "components": [],
       "blob": "77a652551b523f3fce6656d1217a93b114c709eb"
+    },
+    "release/buckets/raffle/input.cjs": {
+      "components": [],
+      "blob": "41075a63702f2e404d944675f8335ee53d0fa24a"
+    },
+    "release/buckets/raffle/README.md": {
+      "components": [],
+      "blob": "5f269c92b1b236f18ce00a861b09f98fc272d1ed"
+    },
+    "tests/four-court-buckets/raffle/input-probe.cjs": {
+      "components": [],
+      "blob": "ad8d3801b23a7bc8b971e043c8131c684b30afd4"
+    },
+    "scripts/bucket-raffle-readonly.py": {
+      "components": [],
+      "blob": "fb48fcf7c7df58fd9fc3df9b3be26fb2b43c7292"
+    },
+    "scripts/bucket-raffle-readonly.md": {
+      "components": [],
+      "blob": "9a90792b286b7510598943a70bb0937a25802577"
+    },
+    "tests/four-court-buckets/raffle-readonly.py": {
+      "components": [],
+      "blob": "d15377f0d5d41e41f30f247de64a7b5ec8cf227d"
     }
   },
   "mainScriptQueryParameters": {
