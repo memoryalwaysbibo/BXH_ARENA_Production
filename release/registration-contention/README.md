@@ -6,8 +6,8 @@ This directory is an **offline source candidate**, not the active Functions impl
 
 ## Change
 
-- Preview uses a read-only transaction. It does not take read/write transaction locks and never allocates capacity.
-- Batch initial document reads and selected registration reads with transaction `getAll`; the existing QR guard captures these snapshots.
+- Preserve the captured live read-only preview; this optimization already exists in generation 1793592677411039.
+- Preserve the live initial getAll and reuse of the self-registration snapshot; selected child reads and the QR adapter remain unchanged.
 - The module shares a bounded admission scheduler for join/cancel/syncSummary per room in one process. Only one mutation per room enters its database work at a time. Auth, time, capacity, operation receipts and allocations are evaluated after admission.
 - The original database transaction remains authoritative across processes. Same-operation receipts, family identities, capacity, public/private counts, explicit allocation checks and cancellation behavior remain unchanged.
 - A waiter expires after 45 seconds before executing and pending admissions are bounded at 128. Timeout/full return `registration-admission-pending`, retaining the frontend's unconfirmed status and same-operation recovery instead of claiming a definitive failed registration. Failure/timeout cannot remove a predecessor's fence or poison later requests. No new durable queue or guaranteed global FIFO is claimed.
@@ -16,15 +16,13 @@ This directory is an **offline source candidate**, not the active Functions impl
 
 ## Evidence and limits
 
-The source is pinned to `tests/fixtures/registration-feedback-current-source.json`, generation `1793041271889373`, captured on 2026-11-02. The loader verifies every fixture SHA-256. Emulator tests use real Admin SDK/Firestore and synthetic identities; they bypass live Auth, App Check, callable routing, regional latency and scaling. Four independently loaded module graphs approximate four admission schedulers in one local process; these are **not four deployed Cloud Run instances**.
-
-The comparison reproduced lock timeouts with the captured original source: 40 requests, 5 successful and 35 ABORTED in that sample. Candidate single-scheduler waves completed 40/40 with zero retries, and a four-scheduler sample completed 40/40 with five transaction retries. See `evidence.json` for timings and revalidation; local timing is not production latency or a capacity guarantee. Earlier preview/getAll-only candidate failed the 40-client sample and was rejected.
+The current baseline is live-source-20261105.json, generation 1793592677411039, verified from the user capture. See LIVE_REBASE.md for archive/config hashes and exact differences. It includes the actual family.js error wrapper. The benchmark compares one and five independent module graphs with real Emulator/SDK and synthetic Auth/project/onCall transport. These are not deployed Cloud Run instances. Prior evidence.json, benchmark100-results.json and hardening-results.json refer to older source/candidate hashes and are historical; their old/new success rates must not be attributed to this current live baseline.
 
 Tests assert count conservation, capacity and mirror agreement. Scarce-capacity previews may become stale: `allocation-changed` is preserved, not silently converted to waitlist. Additional checks exercise explicit waitlist acceptance, full rejection, same-operation duplicates and conflicting payloads, cancellation then historical receipt replay, inactive accounts and independent family registrations. Admission tests cover unrelated rooms, failures, overflow and a timed-out waiter between an active predecessor and a later request.
 
 Hardening adds eight admission unit checks and six real Emulator/frontend-controller integration checks for overflow/timeout recovery, a peer committing after another scheduler timed out, shared execution across factories, cancellation after coalescing, deadline expiry after waiting and account disablement while queued. Test-only queue wait uses 25ms; the controller clock advances past its existing 3-second query throttle. They do not measure actual 45-second wall-clock behavior or a live callable adapter. Each test process now uses a fresh random room namespace to prevent cross-suite fixture collisions.
 
-The earlier `evidence.json` and `benchmark100-results.json` describe the previous candidate hashes. Current-head CI artifacts `results.json` / `results100.json` and the hardening report describe this hardened candidate. Do not apply historical latency numbers to a new handler hash.
+Exact-head CI artifacts results.json / results100.json describe the current rebase. LIVE_REBASE.md documents source provenance; earlier hardening/benchmark reports remain historical. Do not apply old latency numbers to the new source hash.
 
 ## Run
 
