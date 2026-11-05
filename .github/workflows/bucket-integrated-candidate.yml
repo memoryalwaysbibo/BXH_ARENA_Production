@@ -4,6 +4,7 @@ on:
     paths:
       - 'release/buckets/**'
       - 'scripts/bucket-writer-discovery*'
+      - 'scripts/bucket-writer-followup.py'
       - 'tests/four-court-buckets/**'
       - 'tests/e2e/lobby-stable-updates.spec.cjs'
       - 'modules/main-app/core.js'
@@ -27,7 +28,9 @@ jobs:
       - name: Verify every pinned component and preserve current main cache keys
         run: python3 -B tests/four-court-buckets/integration/verify-integration.py
       - name: Verify read-only writer discovery boundaries
-        run: python3 -B tests/four-court-buckets/writer-discovery.py
+        run: |
+          python3 -B tests/four-court-buckets/writer-discovery.py
+          python3 -B tests/four-court-buckets/writer-followup.py
       - name: Verify independently captured backend overlays
         run: |
           for family in deletion interactions admissions operations settlement completion poster activity derived; do

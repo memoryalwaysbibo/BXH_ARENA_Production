@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "28641c707c4b9275330b554d560d01cf9c6a7876"
+      "blob": "edffb839a73747dc1364c313fac10ab3f997785e"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1799,6 +1799,18 @@
     "release/buckets/integration/README.md": {
       "components": [],
       "blob": "ecbce2e680a3854f8eb85c90fcc751428abe0783"
+    },
+    "scripts/bucket-writer-followup.py": {
+      "components": [],
+      "blob": "a436c58503ee8d5e6d0b04d7ffa8e1f85ce0e285"
+    },
+    "tests/four-court-buckets/writer-followup.py": {
+      "components": [],
+      "blob": "f40fbfd0bdb543b0a71d66818ef9fc9adbce6f46"
+    },
+    "release/buckets/integration/writer-discovery-20261105.md": {
+      "components": [],
+      "blob": "0f9cb891a4d74f4d2081ec6d35360cdaa7ef0acd"
     }
   },
   "mainScriptQueryParameters": {
@@ -2263,6 +2275,8 @@
     "scripts/bucket-writer-discovery.py": "Read-only cross-region v1/v2 Function and per-region Cloud Run service/job metadata discovery; hashed configurations, no raw environment values, fail-closed pagination/identity/gap checks; source/IAM review and release acceptance remain incomplete.",
     "release/buckets/integration/README.md": "Correct the selected main baseline and avoid stale component counts; document metadata discovery limits.",
     "release/buckets/completion/hosting-guard.cjs": "Move rebuild's hostStats conflict read after room/ledger/bucket validation and before all writes, avoiding the early-stats/ledger lock inversion observed during count/sync/sync contention; retain transaction conflict detection, authorization and SDK retry behavior.",
-    "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails."
+    "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails.",
+    "scripts/bucket-writer-followup.py": "Target only me-central2 failed service/job reads and four Function GETs; capture current immutable manageRefereeSeats/familyRegistration sources with before/after config checks; retain safe HTTP error codes without raw environment values/messages.",
+    "release/buckets/integration/writer-discovery-20261105.md": "Record the received cross-region discovery snapshot, both unresolved regional errors, 157 matched Run services and the newer referee/registration source baselines; do not claim metadata/source completeness."
   }
 }
