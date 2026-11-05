@@ -58,7 +58,7 @@
   "roomActivationPerformed": false,
   "files": {
     ".github/workflows/bucket-live-release-rules.yml": {
-      "blob": "186d42688d2af55cb584e898dd647a994108b868",
+      "blob": "d0d3aa48feff8ed5268f0b26037d5c35acd465f3",
       "components": [
         707
       ]
@@ -301,7 +301,7 @@
       ]
     },
     "tests/four-court-buckets/deletion/rules-emulator.py": {
-      "blob": "8e2f1a88c01e333798f2e8523c6a1ee06fa34759",
+      "blob": "099375c6c371112f7a15f2d4266b4037f7eaaf20",
       "components": [
         707
       ]
