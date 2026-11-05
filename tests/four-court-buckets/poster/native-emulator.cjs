@@ -4,6 +4,22 @@ const project='demo-bxh-bucket-posters';assert.equal(process.env.GCLOUD_PROJECT,
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {fixture,storage,load,request,assigned,code,oldPoster,oldCover}=require('./probe.cjs');
 const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({host:'127.0.0.1:8188',ssl:false});
+const traces=[],nativeRunTransaction=db.runTransaction.bind(db);let transactionSequence=0,nativePhase='baseline';
+// Observe existing SDK attempts without changing clocks, retry policy or errors.
+db.runTransaction=(callback,...options)=>{
+ const trace={transaction:++transactionSequence,phase:nativePhase,attempts:[]};traces.push(trace);if(traces.length>12)traces.shift();
+ return nativeRunTransaction(async native=>{
+  const attempt={attempt:trace.attempts.length+1,reads:[]};trace.attempts.push(attempt);
+  const tx=new Proxy(native,{get(target,key){
+   if(key==='get'||key==='getAll')return async(...args)=>{
+    const read={method:key,paths:args.filter(x=>typeof x?.path==='string').map(x=>x.path),startedAt:Date.now()};attempt.reads.push(read);
+    try{return await target[key](...args);}catch(error){read.errorCode=error.code;throw error;}finally{read.durationMs=Date.now()-read.startedAt;}
+   };
+   const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+  }});
+  try{const result=await callback(tx);attempt.callbackReturned=true;return result;}catch(error){attempt.errorCode=error.code;throw error;}
+ },...options).catch(error=>{trace.errorCode=error.code;throw error;});
+};
 const collections=['tournaments','publicTournaments','users','eventStaffAssignments'];
 async function seed(f){for(const c of collections)await db.recursiveDelete(db.collection(c));const b=db.batch();for(const [p,v]of f.m.rows)b.set(db.doc(p),v);await b.commit();}
 async function all(){const result=[];for(const c of collections){const q=await db.collection(c).get();for(const s of q.docs)result.push([s.ref.path,s.data()]);}return JSON.stringify(result.sort(([a],[b])=>a.localeCompare(b)));}
@@ -51,10 +67,13 @@ const run=(s,action,{candidate=true,uid='owner',project='bxh-arena',uuid=null}={
   }
   {const f=assigned();await seed(f);const root=db.doc('tournaments/'+code),snap=await root.get(),t=snap.createTime,birth=t.seconds+':'+t.nanoseconds;await db.doc(f.assignmentRef).update({sourceCreatedAt:birth});await root.update({['eventStaffAssignments.'+f.uid+'.sourceCreatedAt']:birth});assert((await run(storage(),'savePoster',{uid:f.uid})).ok);checks++;}
   {await seed(fixture());const s=storage(),before=await all();await assert.rejects(()=>run(s,'savePoster',{project:'demo-bxh-bucket-posters'}));assert.equal(await all(),before);assert.equal(s.calls.length,0);checks++;}
-  for(const action of ['saveCover','savePoster']){
-   await seed(fixture(true));const s=storage();const results=await Promise.all([run(s,action,{uuid:crypto.randomUUID}),run(s,action,{uuid:crypto.randomUUID})]);assert(results.every(r=>r.ok));
+  for(const action of ['saveCover','savePoster'])for(let round=1;round<=20;round++){
+   nativePhase='concurrent-'+action+'-'+round;
+   await seed(fixture(true));const s=storage();const settled=await Promise.allSettled([run(s,action,{uuid:crypto.randomUUID}),run(s,action,{uuid:crypto.randomUUID})]);
+   const failed=settled.find(x=>x.status==='rejected');if(failed)throw failed.reason;
+   const results=settled.map(x=>x.value);assert(results.every(r=>r.ok));
    const top=(await db.doc('tournaments/'+code).get()).data(),pub=(await db.doc('publicTournaments/'+code).get()).data();assert(s.rows.has(top.coverPath));if(action==='savePoster')assert(s.rows.has(top.posterPath));assert.equal(pub.coverUrl,top.coverUrl);checks++;
   }
-  console.log(JSON.stringify({nativePosterChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Firestore SDK transactions; mocked Storage, synthetic auth and injected business project/clock; no real GCS/Auth/Eventarc'}));
+  console.log(JSON.stringify({nativePosterChecks:checks,concurrentRoundsPerAction:20,project,productionRequests:0,productionWrites:0,scope:'real Firestore SDK transactions; mocked Storage, synthetic auth and injected business project/clock; no real GCS/Auth/Eventarc'}));
  }finally{await deleteApp(app);}
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(e=>{console.error(JSON.stringify({nativePosterDiagnostic:{phase:nativePhase,transactions:traces.slice(-6)}}));console.error(e);process.exitCode=1;});

@@ -33,3 +33,13 @@ jobs:
           NODE_PATH: /tmp/bucket-poster/node_modules
           GCLOUD_PROJECT: demo-bxh-bucket-posters
         run: /tmp/bucket-poster/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-posters --config tests/four-court-buckets/poster/firebase.json 'node tests/four-court-buckets/poster/native-emulator.cjs'
+      - name: Preserve native poster transaction diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-poster-native-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            firestore-debug.log
+            firebase-debug.log
+          if-no-files-found: ignore
+          retention-days: 7
