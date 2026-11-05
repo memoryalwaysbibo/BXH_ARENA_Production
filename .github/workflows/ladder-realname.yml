@@ -1,0 +1,19 @@
+name: Ladder real-name candidate
+on:
+  pull_request:
+    paths:
+      - 'release/ladder-realname/**'
+      - '.github/workflows/ladder-realname.yml'
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test release/ladder-realname/test.cjs
