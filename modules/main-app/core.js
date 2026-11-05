@@ -3707,6 +3707,8 @@ async function routeTournamentEntry(rawCode, rawEntry){
 
 function parseScannedTournamentEntry(value){
   const raw=String(value||"").trim();
+  const referee=window.BXHCommunityRefereeInvite?.parseUrl(raw);
+  if(referee)return {...referee,entry:'referee-invite'};
   const checkin=window.BXHQrCheckin?.parseUrl(raw);
   if(checkin)return {...checkin,entry:"checkin"};
   const direct=normalizeRoomCodeInput(raw);
@@ -3752,6 +3754,10 @@ async function acceptScannedQrValue(value){
   if(!parsed){setQrScannerStatus('這不是有效的 BXH ARENA 賽事 QR，請重新對準。',true);return false;}
   stopQrScanner();qrScannerOpen=false;
   try{if(navigator.vibrate)navigator.vibrate(80);}catch(e){}
+  if(parsed.entry==='referee-invite'){
+    if(!firebaseUser||userProfile?.active!==true){currentRole='player';guestReadOnlyMode=false;appPhase='player-home';}
+    return window.BXHCommunityRefereeInvite?.acceptUrl(value)===true;
+  }
   if(parsed.entry==='checkin'){
     if(!firebaseUser||userProfile?.active!==true){currentRole='player';guestReadOnlyMode=false;appPhase='player-home';}
     if(!window.BXHQrCheckin?.acceptUrl(value)){render();showToast('目前無法讀取報到 QR，請重試。',true);return false;}
@@ -19583,6 +19589,8 @@ function render(){
     inviter:()=>isCommunityRoomOwner()&&!isTester(),support:()=>canSupportCommunityCourt(),
     manager:()=>canManageRefereeSeats(),render,toast:showToast});
   window.BXHQrCheckin?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,render,qr:renderQrCodeInto,applyRemote:data=>applyRemoteState(data,true),toast:showToast});
+  window.BXHCommunityRefereeInvite?.bind({state:()=>state,uid:()=>userProfile?.active===true?firebaseUser?.uid:null,
+    inviter:()=>isCommunityRoomOwner()&&!isTester(),render,qr:renderQrCodeInto,toast:showToast,open:openCommunityRefereeRoom});
   reconcileLobbyContext();
   if(appPhase!=="player-login"&&appPhase!=="player-apply")authFormRenderContext=null;
   hunterClashEntry?.session(firebaseUser,userProfile);
@@ -19610,6 +19618,8 @@ function render(){
       return;
     }
   const qrCheckinEntry=window.BXHQrCheckin?.renderEntry();
+  const refereeInviteEntry=window.BXHCommunityRefereeInvite?.renderEntry();
+  if(firebaseUser&&userProfile?.active===true&&refereeInviteEntry){app.innerHTML=refereeInviteEntry;return;}
   if(firebaseUser&&userProfile?.active===true&&qrCheckinEntry){app.innerHTML=qrCheckinEntry;return;}
   if(appPhase==='raffle-public'){app.innerHTML=authShellOpen()+authBrandHeader()+'<button class="btn btn-ghost" data-action="raffle-home">返回首頁</button>'+renderRafflePage()+authShellClose();return;}
   if(appPhase==="partner-organizer"){ if(!roleAllowsMode(userProfile?.role,"partner_organizer",userProfile)){appPhase="landing";currentRole=null;} else {currentRole="admin";appPhase="app";activeTab="management";} }

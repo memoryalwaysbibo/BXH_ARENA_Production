@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "63a6f395d2c6f2742f7f319a4ef7c95ed576b588",
+  "baseMain": "5a760cf7f61f77dffd9d4ec64d8db0f0de1ecff4",
   "components": [
     {
       "pr": 707,
@@ -64,7 +64,7 @@
       ]
     },
     "index.html": {
-      "blob": "d9208fe0e6c6a3e87f0bc97b762c11f8dc6824d5",
+      "blob": "cd65dfb688aba38a5fbbec94c070d653651d2348",
       "components": [
         707,
         714
@@ -78,7 +78,7 @@
       ]
     },
     "modules/main-app/core.js": {
-      "blob": "1562335664596acf33e30d0c4a6e01a74bafab5c",
+      "blob": "9c2914a2af7bd68d63ca1c8faca4c1332479328d",
       "components": [
         707,
         714
@@ -1784,7 +1784,7 @@
     "ladder-v1.js": {
       "v": "20260921.9"
     },
-    "/ajax/libs/qrcodejs/1.0.0/qrcode.min.js": {},
+    "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js": {},
     "modules/main-app/ladder-location.js": {
       "v": "20261019.1"
     },
@@ -1898,7 +1898,7 @@
       "v": "20261002-p2a-1"
     },
     "modules/main-app/bracket-commit.js": {
-      "v": "20261104.1"
+      "v": "20261104.2"
     },
     "modules/main-app/roster-view.js": {
       "v": "20261018.1"
@@ -1923,7 +1923,8 @@
     },
     "modules/main-app/mailbox.js": {
       "v": "20261104-bulk-delete",
-      "invitation-state": "20261027.1"
+      "invitation-state": "20261027.1",
+      "community-referee": "20261105-qr.1"
     },
     "modules/main-app/mood-station.js": {
       "v": "20261002-p2b-1"
@@ -1987,8 +1988,11 @@
     "modules/main-app/registration-feedback.js": {
       "v": "20261102-phase1-1"
     },
+    "modules/main-app/community-referee-invite.js": {
+      "v": "20261105-invite-1"
+    },
     "modules/main-app/referee-seats.js": {
-      "v": "20261104-community-1"
+      "v": "20261105-invite-1"
     },
     "modules/referee-license/domain.js": {
       "v": "20261029.1"
@@ -2112,7 +2116,7 @@
       "profile-complete-draft": "20261102.1",
       "offline-confirmation": "20261103.1",
       "archive-status-hint": "20261103.1",
-      "community-referee": "20261104.1"
+      "community-referee": "20261105-qr.1"
     },
     "modules/main-app/public-watch-isolation.js": {
       "v": "20261005-captain-isolation-1"
@@ -2216,10 +2220,10 @@
       "v": "20261001-ui-v2"
     }
   },
-  "mainCoreBlob": "f97c0609e3323c82dd700d8b9641912d0aaaa41f",
+  "mainCoreBlob": "cfa6bf1a0a4564547bb8e83a039366519e82250f",
   "resolutions": {
-    "index.html": "preserve every current-main script query value; union component cache tokens and insert settlement script after bucket browser",
-    "modules/main-app/core.js": "merge current main community referee changes with integrated 707/714 bucket changes; verify merged blob and regressions",
+    "index.html": "Three-way merge with current main 5a760cf; preserve all current-main script query values, QR invite module ordering, and candidate delete-intent/bucket-settlement cache tokens.",
+    "modules/main-app/core.js": "Clean three-way merge of main's community-referee QR invite hooks with existing bucket deletion/settlement changes; exact merged blob pinned.",
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Add fixture and SDK transaction failure diagnostics; preserve transaction options, error identity, SDK retry policy and all existing assertions.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
