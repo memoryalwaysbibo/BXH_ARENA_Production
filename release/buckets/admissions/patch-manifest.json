@@ -37,7 +37,7 @@
       "path": "registration-invitations.js",
       "archiveSha256": "8403011af43301c2610f6b7e53fca0bc462562bfd3b2ba4585c1aa8a8240a03a",
       "baselineFileSha256": "c655efe635e6278bb1060840871f16e32ef78659b7b360f88152480ecf6ba9ef",
-      "patchedFileSha256": "85b12537ff3233e2fb5efa4e68a0ea59b33cbeb0c47a141bfb617ecdb4557e5e",
+      "patchedFileSha256": "1ba36ffcf697b67f6879194edc3982daa18471f450027e2ce5dba48b6ce72421",
       "edits": [
         {
           "before": "function createRegistrationInvitationService(db,clock=Date.now){return async req=>{",
@@ -53,11 +53,7 @@
         },
         {
           "before": "   const [fresh,pub,actorNow,targetNow,prior,reg,ss]=await Promise.all([tx.get(tr),tx.get(db.doc('publicTournaments/'+code)),tx.get(db.doc('users/'+uid)),tx.get(db.doc('users/'+targetUid)),tx.get(ir),tx.get(tr.collection('registrations').doc(targetUid)),tx.get(stats)]);",
-          "after": "   const [fresh,pub,actorNow,targetNow,prior,reg]=await Promise.all([tx.get(tr),tx.get(db.doc('publicTournaments/'+code)),tx.get(db.doc('users/'+uid)),tx.get(db.doc('users/'+targetUid)),tx.get(ir),tx.get(tr.collection('registrations').doc(targetUid))]);"
-        },
-        {
-          "before": "   if(prior.exists&&prior.data().status==='pending'&&ms(prior.data().expiresAt)>now)throw Error('invite-pending');\n",
-          "after": "   if(prior.exists&&prior.data().status==='pending'&&ms(prior.data().expiresAt)>now)throw Error('invite-pending');\n   // Keep the counter lock after invitation validation, before all writes.\n   // Pending duplicates return without acquiring a mailbox counter lock.\n   const ss=await tx.get(stats);\n"
+          "after": "   const [fresh,pub,actorNow,targetNow,prior,reg,ss]=await tx.getAll(tr,db.doc('publicTournaments/'+code),db.doc('users/'+uid),db.doc('users/'+targetUid),ir,tr.collection('registrations').doc(targetUid),stats);"
         }
       ]
     }

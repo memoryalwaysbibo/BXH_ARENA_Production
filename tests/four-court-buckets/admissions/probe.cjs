@@ -110,20 +110,21 @@ if(require.main===module)(async()=>{let checks=0;
   await assert.rejects(load(inv,true,f.m)(f.request),/auth-required|permission-denied|player-not-found|invitation-room-changed/);assert.equal(f.m.writes.length,0);checks++;
  }
  {const f=fixture(inv,'invite'),handle=load(inv,true,f.m);await handle(f.request);assert.match(f.m.rows.get(rp+'/registrationInvitations/target').sourceCreatedAt,/^\d+:\d+$/);checks++;}
- // Read the mailbox counter only after the invitation lock and denial checks.
- // A pending duplicate must not acquire the unrelated counter lock at all.
+ // Invitation reads use one native batch rather than independently acquiring
+ // seven overlapping document locks. Retain the same read set and transaction.
  for(const pending of [false,true]){
-  const f=fixture(inv,'invite'),reads=[],run=f.m.db.runTransaction.bind(f.m.db);
+  const f=fixture(inv,'invite'),batches=[],run=f.m.db.runTransaction.bind(f.m.db);
   if(pending)f.m.put(rp+'/registrationInvitations/target',{targetUid:'target',status:'pending',expiresAt:NOW+100000});
   f.m.db.runTransaction=callback=>run(tx=>callback(new Proxy(tx,{get(target,key){
-   if(key==='get')return async ref=>{reads.push(ref.path);return target.get(ref);};
+   if(key==='get')return async()=>{throw Error('invite used a separate point read');};
+   if(key==='getAll')return async(...refs)=>{batches.push(refs.map(r=>r.path));return target.getAll(...refs);};
    const value=target[key];return typeof value==='function'?value.bind(target):value;
   }})));
   const fn=load(inv,true,f.m);
-  if(pending){await assert.rejects(fn(f.request),/invite-pending/);assert(!reads.includes('mailboxStats/target'),'pending duplicate read mailbox counter');assert.equal(f.m.writes.length,0);}
-  else{await fn(f.request);assert.equal(reads.at(-1),'mailboxStats/target','counter must be the final read');assert.equal(f.m.rows.get('mailboxStats/target').unreadCount,1);}
-  checks++;
+  if(pending){await assert.rejects(fn(f.request),/invite-pending/);assert.equal(f.m.writes.length,0);}
+  else{await fn(f.request);assert.equal(f.m.rows.get('mailboxStats/target').unreadCount,1);}
+  assert.deepEqual(batches,[[rp,'publicTournaments/'+code,'users/'+uid,'users/target',rp+'/registrationInvitations/target',rp+'/registrations/target','mailboxStats/target']]);checks++;
  }
- {const f=fixture(inv,'invite');f.m.put('mailboxStats/target',{unreadCount:7});f.m.interfere=()=>f.m.put('mailboxStats/target',{unreadCount:20});await load(inv,true,f.m)(f.request);assert.equal(f.m.rows.get('mailboxStats/target').unreadCount,21,'late counter read lost concurrent mail');assert.equal(f.m.writes.filter(x=>x.path==='mailboxStats/target').length,1);checks++;}
+ {const f=fixture(inv,'invite');f.m.put('mailboxStats/target',{unreadCount:7});f.m.interfere=()=>f.m.put('mailboxStats/target',{unreadCount:20});await load(inv,true,f.m)(f.request);assert.equal(f.m.rows.get('mailboxStats/target').unreadCount,21,'batch counter read lost concurrent mail');assert.equal(f.m.writes.filter(x=>x.path==='mailboxStats/target').length,1);checks++;}
  console.log(JSON.stringify({admissionChecks:checks,functions:specs.length,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
