@@ -931,7 +931,7 @@
       ]
     },
     "tests/four-court-buckets/operations/native-emulator.cjs": {
-      "blob": "216889d96d9441c0adaa549873f2de0178cff49c",
+      "blob": "72c3c3827bb5ee4a73ccde9a607a429af2672956",
       "components": [
         712
       ]
@@ -943,7 +943,7 @@
       ]
     },
     "tests/four-court-buckets/operations/probe.cjs": {
-      "blob": "c0bd7e8d362a27afb98241423172d389f176dd37",
+      "blob": "4ff93b21194b7fe8a9a29a8d891c8df14d22e415",
       "components": [
         712
       ]

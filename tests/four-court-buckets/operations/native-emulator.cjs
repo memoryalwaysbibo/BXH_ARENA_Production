@@ -6,7 +6,7 @@ assert(/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST
 const {initializeApp,deleteApp}=require('firebase-admin/app');
 const {getFirestore}=require('firebase-admin/firestore');
 require('firebase-functions/v2/https');require('firebase-functions/v2/firestore');require('firebase-functions/v2/scheduler');
-const {specs,actions,fixture,code,uid}=require('./probe.cjs');
+const {specs,actions,fixture,bucket,code,uid}=require('./probe.cjs');
 const app=initializeApp({projectId:project}),db=getFirestore(app);
 db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
 // Only the existing callable guard sees this synthetic environment. Every SDK
@@ -67,6 +67,28 @@ async function state(){const rows=[];async function walk(col){for(const ref of a
   {const spec=specs.find(s=>s.function==='eventStaffService');for(const action of ['accept','reject'])for(const missing of [false,true]){
    const f=fixture(spec,action);await seed(f);if(missing)await db.doc('users/target').delete();else await db.doc('users/target').update({active:false});const before=await state();await assert.rejects(handler(spec,true)(f.request),/account-inactive/);assert.deepEqual(await state(),before);checks++;
   }}
-  console.log(JSON.stringify({nativeOperationsChecks:checks,project,productionWrites:0,productionRequests:0,scope:'real Admin SDK, captured QR proxy and Firestore snapshots; synthetic auth/events and deterministic business RNG'}));
+  // Exercise the metadata-only bucket path with real SDK createTime snapshots.
+  {const spec=specs.find(s=>s.function==='eventStaffService');for(const action of ['invite','accept','reject','revoke']){
+   const f=fixture(spec,action);bucket(f);await seed(f);
+   const tr=db.doc('tournaments/'+code),pr=db.doc('publicTournaments/'+code),beforePrivate=(await tr.get()).data(),beforePublic=(await pr.get()).data();
+   const result=await handler(spec,true)(f.request);assert(result.ok);
+   const afterPrivate=(await tr.get()).data(),afterPublic=(await pr.get()).data();
+   assert.equal(afterPrivate.data,beforePrivate.data);assert.deepEqual(afterPrivate.scoreStorage,beforePrivate.scoreStorage);assert.deepEqual(afterPublic,beforePublic);
+   assert.deepEqual(Object.keys(afterPrivate).filter(k=>JSON.stringify(afterPrivate[k])!==JSON.stringify(beforePrivate[k])).sort(),['eventStaffAssignments','updatedAt']);checks++;
+  }}
+  // Inject one SDK ABORTED attempt, then replace the peer before the next read.
+  // This deterministically tests retry binding; it is not a natural contention claim.
+  {const spec=specs.find(s=>s.function==='eventStaffService');for(const action of ['invite','accept','reject','revoke']){
+   const f=fixture(spec,action);bucket(f);await seed(f);const before=await state(),publicRef=db.doc('publicTournaments/'+code),saved=(await publicRef.get()).data();
+   const native=db.runTransaction;let attempts=0;
+   db.runTransaction=function(callback,...options){return native.call(this,async tx=>{
+    attempts++;if(attempts===2){await publicRef.delete();await publicRef.set(saved);}
+    const result=await callback(tx);if(attempts===1)throw Object.assign(new Error('synthetic-retry-boundary'),{code:10});return result;
+   },...options);};
+   try{await assert.rejects(handler(spec,true)(f.request),/room-generation-changed/);assert.equal(attempts,2);}
+   finally{db.runTransaction=native;}
+   assert.deepEqual(await state(),before);checks++;
+  }}
+  console.log(JSON.stringify({nativeOperationsChecks:checks,project,productionWrites:0,productionRequests:0,scope:'real Admin SDK, captured QR proxy and Firestore snapshots; synthetic auth/events, injected retry and deterministic business RNG'}));
  }finally{await clear();await db.terminate();await deleteApp(app);fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

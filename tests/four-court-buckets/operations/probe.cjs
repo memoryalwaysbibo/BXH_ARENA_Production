@@ -76,7 +76,7 @@ function fixture(spec,action){
 const tracker=s=>s.function.startsWith('track');
 const actions=s=>s.function==='eventStaffService'?['invite','accept','reject','revoke']:s.function==='updateTournamentRaffleWinner'?['claim','forfeit','replace']:s.function==='trackTournamentRegistrationActivity'?['write','delete']:['default'];
 function normalized(m,result){return JSON.parse(JSON.stringify({rows:[...m.rows],writes:m.writes,result},(k,v)=>k==='sourceCreatedAt'?undefined:v));}
-module.exports={memory,load,fixture,specs,actions,NOW,code,uid};
+module.exports={memory,load,fixture,bucket,specs,actions,NOW,code,uid};
 function bucket(f){
  const tr='tournaments/'+code,pr='publicTournaments/'+code,t=f.m.rows.get(tr),p=f.m.rows.get(pr),s=JSON.parse(t.data);
  s.id='physical-room-1';s.cloudCode=code;s.meta.stations=6;
