@@ -14,8 +14,8 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parent
 PROJECT = 'demo-bxh-bucket-delete'
-PORT = 18189
-BASE = f'http://127.0.0.1:{PORT}'
+PORT = None
+BASE = None
 DOCS = f'projects/{PROJECT}/databases/(default)/documents'
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -184,12 +184,21 @@ def contention_check():
     assert status in (400,409,412),(status,'stale lease write unexpectedly accepted')
 
 
-def main():
+def configure_endpoint():
+    # Each invocation owns a fresh loopback endpoint. A previous JVM's socket
+    # may remain in TIME_WAIT after it exits; never attach to an existing server.
     import socket
+    global PORT, BASE
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        PORT = sock.getsockname()[1]
+    BASE = f'http://127.0.0.1:{PORT}'
+
+
+def main():
     jar=Path(os.environ['FIRESTORE_EMULATOR_JAR'])
     assert jar.is_file()
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1',PORT))
+    configure_endpoint()
     with tempfile.TemporaryFile() as log:
         process=subprocess.Popen(['java','-Xmx512m','-jar',str(jar),'--host','127.0.0.1','--port',str(PORT),'--project_id',PROJECT],stdout=log,stderr=log)
         try:

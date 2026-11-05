@@ -301,7 +301,7 @@
       ]
     },
     "tests/four-court-buckets/deletion/rules-emulator.py": {
-      "blob": "099375c6c371112f7a15f2d4266b4037f7eaaf20",
+      "blob": "80081c88d70132d4901af735e9d3a1062d484ef7",
       "components": [
         707
       ]
@@ -2215,6 +2215,7 @@
     "index.html": "preserve every current-main script query value; union component cache tokens and insert settlement script after bucket browser",
     "modules/main-app/core.js": "merge current main community referee changes with integrated 707/714 bucket changes; verify merged blob and regressions",
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
-    "tests/four-court-buckets/completion/native-emulator.cjs": "Add fixture and SDK transaction failure diagnostics; preserve transaction options, error identity, SDK retry policy and all existing assertions."
+    "tests/four-court-buckets/completion/native-emulator.cjs": "Add fixture and SDK transaction failure diagnostics; preserve transaction options, error identity, SDK retry policy and all existing assertions.",
+    "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions."
   }
 }
