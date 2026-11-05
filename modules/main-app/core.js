@@ -1001,7 +1001,7 @@ const VERSION_HISTORY = [
   },
   {
     version:"v13.20.4", date:"2026/09/08", time:"17:42", title:"再次修復首頁三入口消失並固定共享常數位置", updateLevel:"patch", updateLevelLabel:"緊急修正",
-    added:["確認 v13.20.3 重寫 renderSettings 時再次把 renderSettings 與下一函式之間的共享常數區塊一起刪除，導致 ROLE_ICON_ADMIN 等常數不存在、首頁 renderLandingScreen 執行失敗","恢復 ROLE_ICON_ADMIN／ROLE_ICON_PLAYER／ROLE_ICON_GUEST、EYE_TOGGLE_SVG／EYE_OFF_SVG、HOC_GOLD_DEFS、__fxAutoPlayed","將這組共���常數改放到 renderLandingScreen 前的固定位置，避免未來再因重寫 renderSettings 而被誤刪","本次除 node --check 外，另外確認首頁 renderLandingScreen 所需的三個 ROLE_ICON 常數均已存在且宣告位置早於函式使用"],
+    added:["確認 v13.20.3 重寫 renderSettings 時再次把 renderSettings 與下一函式之間的共享常數區塊一起刪除，導致 ROLE_ICON_ADMIN 等常數不存在、首頁 renderLandingScreen 執行失敗","恢復 ROLE_ICON_ADMIN／ROLE_ICON_PLAYER／ROLE_ICON_GUEST、EYE_TOGGLE_SVG／EYE_OFF_SVG、HOC_GOLD_DEFS、__fxAutoPlayed","將這組共享常數改放到 renderLandingScreen 前的固定位置，避免未來再因重寫 renderSettings 而被誤刪","本次除 node --check 外，另外確認首頁 renderLandingScreen 所需的三個 ROLE_ICON 常數均已存在且宣告位置早於函式使用"],
     environment:"BXH ARENA 單檔 HTML + Firebase", deployStatus:"請以 v13.20.4 index.html 覆蓋 GitHub Pages；沿用 v13.19.2 Firestore Rules", firebaseImpact:"無。", securityRulesImpact:"無需修改 Rules。", permissionImpact:"無。", publicSummary:"修復首頁再次只剩背景的執行期錯誤，並把入口共用常數移到不會被設定頁改版誤刪的位置。"
   },
   {
@@ -1729,7 +1729,7 @@ const VERSION_HISTORY = [
       "publicTournaments/{code} 的 create/update 規則，從「檢查是否可操作對應的 tournaments/{code} 賽事」改為「直接檢查寫入者是否為在職工作人員以上」，不再需要跨文件讀取"
     ],
     fixed: [
-      "**根本原因**：上一輪安全性審查修正時，把 publicTournaments 的寫入權限改成 canManageTournament(get(.../tournaments/{code}).data)——但 createRoom() 建立新賽事���碼時，是先寫入 tournaments/{code}、再另外寫入 publicTournaments/{code}，這是兩次獨立、非交易（non-transactional）的寫入，而不是同一個原子操作。第二次寫入的規則卻要求讀取第一次寫入的文件；這種跨文件、跨寫入的相依性在 Firestore 規則引擎的實際執行時序下並不保證絕對可靠，一旦第二次寫入的規則評估讀不到（或還讀不到）剛寫入的文件，整次寫入就會被拒絕，導致 createRoom() 拋出例外、回傳 null，前端顯示「雲端連線失敗，暫時使用本機模式」——這是我在上一輪修正時引入的問題，不是本次新發現的舊有漏洞",
+      "**根本原因**：上一輪安全性審查修正時，把 publicTournaments 的寫入權限改成 canManageTournament(get(.../tournaments/{code}).data)——但 createRoom() 建立新賽事代碼時，是先寫入 tournaments/{code}、再另外寫入 publicTournaments/{code}，這是兩次獨立、非交易（non-transactional）的寫入，而不是同一個原子操作。第二次寫入的規則卻要求讀取第一次寫入的文件；這種跨文件、跨寫入的相依性在 Firestore 規則引擎的實際執行時序下並不保證絕對可靠，一旦第二次寫入的規則評估讀不到（或還讀不到）剛寫入的文件，整次寫入就會被拒絕，導致 createRoom() 拋出例外、回傳 null，前端顯示「雲端連線失敗，暫時使用本機模式」——這是我在上一輪修正時引入的問題，不是本次新發現的舊有漏洞",
       "修正後，publicTournaments 的權限判斷不再依賴讀取平行的 tournaments 文件：真正「是否為此賽事的被指派人員」這一層保護，本來就已經由 tournaments/{code} 本身的規則把關（staff 若沒有權限操作某場賽事，一開始就不會、也不能先成功寫入 tournaments/{code}，自然不會走到寫入 publicTournaments 這一步），因此 publicTournaments 只需確認寫入者是有效在職工作人員即可，安全性並未因此降低"
     ],
     removed: [],
@@ -2787,7 +2787,7 @@ const CHANGELOG_TEXT = "" +
 "- **日期**：2026/09/06\n" +
 "- **時間**：時間待確認\n" +
 "- **時區**：Asia/Taipei（UTC+8）\n" +
-"- **更��環境**：Claude 開發環境\n" +
+"- **更新環境**：Claude 開發環境\n" +
 "- **部署狀態**：尚未部署\n\n" +
 "### 修改位置\n- 玩家中心（完整重建為五分頁介面）\n- 雲端同步模組（新增 queryPublicTournaments）\n- Firebase 即時更新（修正捲動位置）\n\n" +
 "## 系統升級\n" +
@@ -4437,7 +4437,7 @@ async function runAiCreateParse(){
     aiCreateStructuredResult=candidate;
     aiCreateParsedContext=context;
     aiCreateSelectedEventKey=candidate.events[0].key;
-    aiCreateAssistantNotice=context.poster?"海報已辨識。請核對預覽與辨識文字；圖文衝突不會自���選邊。套入草稿後，仍可勾選 BXH 公版，並須完成房主審核。":"文案已解析。請選擇賽事並套入草稿；仍須由房主確認，不會自動發布。";
+    aiCreateAssistantNotice=context.poster?"海報已辨識。請核對預覽與辨識文字；圖文衝突不會自動選邊。套入草稿後，仍可勾選 BXH 公版，並須完成房主審核。":"文案已解析。請選擇賽事並套入草稿；仍須由房主確認，不會自動發布。";
   }catch(error){
     if(!aiCreateContextValid(context))return;
     aiCreateAssistantNotice=context.poster&&window.BxhPoster?window.BxhPoster.errorMessage(error):"AI Parser 連線失敗；未變更賽事草稿，請確認登入與服務狀態後重試。";
