@@ -155,6 +155,11 @@ def lease_checks(candidate):
             check('seed lease update',commit([update('tournaments/BXH-LEASE',room),update('publicTournaments/BXH-LEASE',public)]),True)
             check('lease update '+path,commit([update(path,patch,True)],'admin'),not candidate)
     if candidate:
+        # Public mirror update cannot accompany a client-introduced private
+        # migration marker, even though its optimized guard reads current root.
+        check('same-batch lease introduction denied',commit([
+            update('tournaments/BXH-PLAIN',{'bucketMigration':{'status':'deleting'}},True),
+            update('publicTournaments/BXH-PLAIN',{'bracketView':'{}','updatedAt':9},True)],'admin'),False)
         # A retained public lease must remain protected even if an old failure removed the parent.
         check('orphan lease seed',commit([{'delete':DOCS+'/tournaments/BXH-LEASE'},update('publicTournaments/BXH-LEASE',{'eventAuthority':'community','ownerUid':'player','createdBy':'player','bracketView':'{}','bucketMigration':{'status':'deleting'}})]),True)
         check('orphan lease delete denied',commit([{'delete':DOCS+'/publicTournaments/BXH-LEASE'}],'player'),False)
@@ -193,7 +198,9 @@ def main():
                 try:api('GET','/');break
                 except urllib.error.URLError:time.sleep(.1)
             else:raise RuntimeError('Private emulator startup deadline exceeded')
-            for label,path in [('baseline',ROOT/'fixtures/baseline.rules'),('candidate',ROOT.parents[2]/'release/buckets/firestore.rules')]:
+            baseline=Path(os.environ.get('BASELINE_RULES_PATH',str(ROOT/'fixtures/baseline.rules')))
+            candidate=Path(os.environ.get('CANDIDATE_RULES_PATH',str(ROOT.parents[2]/'release/buckets/firestore.rules')))
+            for label,path in [('baseline',baseline),('candidate',candidate)]:
                 compiled=api('PUT',f'/emulator/v1/projects/{PROJECT}:securityRules',{'rules':{'files':[{'name':'firestore.rules','content':path.read_text()}]}})
                 check(label+' compilation',compiled,True)
                 assert not [i for i in json.loads(compiled[1]).get('issues',[]) if i.get('severity')=='ERROR']
