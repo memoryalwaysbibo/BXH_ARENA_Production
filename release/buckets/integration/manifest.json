@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "779275d541e693f96ff9cc72779749133147fb12"
+      "blob": "85deacbb740ed74a040dc02721172ffa269b42d3"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -2216,6 +2216,7 @@
     "modules/main-app/core.js": "merge current main community referee changes with integrated 707/714 bucket changes; verify merged blob and regressions",
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Add fixture and SDK transaction failure diagnostics; preserve transaction options, error identity, SDK retry policy and all existing assertions.",
-    "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions."
+    "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
+    ".github/workflows/bucket-integrated-candidate.yml": "Run the desktop snapshot-burst regression without retries after the existing same-checkout browser contracts; use matching isolated Playwright runner/browser versions."
   }
 }

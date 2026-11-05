@@ -4,6 +4,7 @@ on:
     paths:
       - 'release/buckets/**'
       - 'tests/four-court-buckets/**'
+      - 'tests/e2e/lobby-stable-updates.spec.cjs'
       - 'modules/main-app/core.js'
       - 'modules/cloud/cloud-runtime.js'
       - 'modules/scoring/four-court-settlement.js'
@@ -41,7 +42,7 @@ jobs:
           node tests/four-court-buckets/activity/backend-bridge.cjs
       - name: Install isolated browser dependencies
         run: |
-          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1
+          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1 @playwright/test@1.56.1
           /tmp/bucket-integrated/node_modules/.bin/playwright install --with-deps chromium
       - name: Integrated full-host deletion, settlement handoff and main offline recovery
         env:
@@ -53,3 +54,7 @@ jobs:
           node tests/four-court-buckets/settlement-ui/backend-bridge.cjs
           node tests/offline-confirmation.browser.cjs
           node tests/offline-resilience-v2-wiring.test.cjs
+      - name: Snapshot burst coalescing after native gesture release
+        env:
+          NODE_PATH: /tmp/bucket-integrated/node_modules
+        run: /tmp/bucket-integrated/node_modules/.bin/playwright test --config=playwright.config.cjs tests/e2e/lobby-stable-updates.spec.cjs --project=desktop-chromium --grep "snapshot bursts coalesce" --retries=0
