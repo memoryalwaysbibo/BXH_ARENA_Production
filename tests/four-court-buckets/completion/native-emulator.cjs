@@ -3,6 +3,9 @@ const assert=require('node:assert/strict'),path=require('node:path'),fs=require(
 const project='demo-bxh-four-court-buckets';assert.equal(process.env.GCLOUD_PROJECT,project);assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8188');
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {fixture,largeFixture,NOW,code}=require('./fixture.cjs'),{request}=require('./probe.cjs'),release=path.resolve(__dirname,'../../../release/buckets/completion'),A=require(path.join(release,'certificate.cjs')),H=require(path.join(release,'hosting-guard.cjs')),{createGeneralCompletion}=require(path.join(release,'general-completion.cjs')),{completion,stateOf}=require('./fixtures/hosting-core.js');
+// Repeated fresh fixtures increase contention coverage without retrying failures.
+const contentionRounds=Number(process.env.BUCKET_HOST_SYNC_CONTENTION_ROUNDS??'1');
+assert(Number.isSafeInteger(contentionRounds)&&contentionRounds>=1&&contentionRounds<=50,'invalid-contention-rounds');
 const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
 // Diagnostic only: keep the SDK's own retry policy and every assertion intact.
 let fixtureNumber=0,transactionNumber=0;
@@ -101,9 +104,9 @@ async function all(){const out=[];async function walk(col){for(const ref of awai
   }
   checks++;
  }
- for(const qr of [false,true]){
+ for(const qr of [false,true])for(let round=1;round<=contentionRounds;round++){
   const f=fixture({qr});await seed(f);await handle(request(f));const sync=hosting('host-sync').syncMyHostingProgress.run;
-  console.log(JSON.stringify({event:'completion-host-sync-contention',fixture:fixtureNumber,qr,operations:['count','sync','sync']}));
+  console.log(JSON.stringify({event:'completion-host-sync-contention',fixture:fixtureNumber,qr,round,rounds:contentionRounds,operations:['count','sync','sync']}));
   await Promise.all([count(),sync({auth:{uid:'admin'}}),sync({auth:{uid:'admin'}})]);assert.equal((await db.doc('hostStats/admin').get()).data().completedHostedCount,1);assert.equal((await db.collection('hostCompletionLedger').get()).size,1);checks++;
  }
  for(const bad of ['no-auth','inactive','revoked-after-preflight','certificate','migration','ledger']){
@@ -120,6 +123,6 @@ async function all(){const out=[];async function walk(col){for(const ref of awai
   const expected=JSON.parse(JSON.stringify(before));if(bad==='revoked-after-preflight')expected.find(([p])=>p==='users/admin')[1].active=false;
   assert.deepEqual(await all(),expected);checks++;
  }
- console.log(JSON.stringify({nativeCompletionChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Firestore SDK transactions, synthetic auth and clock; no browser/Eventarc'}));
+ console.log(JSON.stringify({nativeCompletionChecks:checks,contentionRounds,project,productionRequests:0,productionWrites:0,scope:'real Firestore SDK transactions, synthetic auth and clock; no browser/Eventarc'}));
  }finally{await deleteApp(app);fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

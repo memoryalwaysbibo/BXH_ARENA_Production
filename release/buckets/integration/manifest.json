@@ -1165,7 +1165,7 @@
       ]
     },
     ".github/workflows/bucket-general-completion.yml": {
-      "blob": "6280f6b474d4f7d5a3a767445034c8a07b98f406",
+      "blob": "e96ee087c32ee987c41d5d24b43915ce180e9969",
       "components": [
         715
       ]
@@ -1375,7 +1375,7 @@
       ]
     },
     "tests/four-court-buckets/completion/native-emulator.cjs": {
-      "blob": "5073ccd748a6a8f9f08bf0b33d270fc3d7428dd8",
+      "blob": "3a98041a2d9c5b5d01e9199391612aba98a6c179",
       "components": [
         715
       ]
@@ -2237,12 +2237,12 @@
     "index.html": "Three-way merge with current main 5a760cf; preserve all current-main script query values, QR invite module ordering, and candidate delete-intent/bucket-settlement cache tokens.",
     "modules/main-app/core.js": "Clean three-way merge of main's community-referee QR invite hooks with existing bucket deletion/settlement changes; exact merged blob pinned.",
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
-    "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve concurrent count/sync workload, SDK retry policy, transaction options, error identity and all assertions; trace native read phases on failure to investigate captured-SDK invalid/closed transaction recurrence.",
+    "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve all prior checks and default single-round workload; permit bounded fresh count/sync/sync contention rounds (1-50) without retrying failures, with QR/round labels and native read diagnostics.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
     ".github/workflows/bucket-integrated-candidate.yml": "Run the desktop snapshot-burst regression without retries after the existing same-checkout browser contracts; use matching isolated Playwright runner/browser versions.",
     "release/buckets/deletion/manifest.json": "Refresh only restore/access deployed archive and source-closure provenance against the uploaded 2026-11-05 read-only capture; runtime candidate files retain their accepted hashes.",
     "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks.",
     "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls.",
-    ".github/workflows/bucket-general-completion.yml": "Retain separate SDK13/SDK14 emulator diagnostics as artifacts, including failed runs; no continue-on-error or blanket rerun."
+    ".github/workflows/bucket-general-completion.yml": "Run captured SDK14 with 20 fresh count/sync/sync rounds per QR mode, preserve SDK13 baseline and both debug artifacts, print failure debug tail; no continue-on-error or blanket rerun."
   }
 }
