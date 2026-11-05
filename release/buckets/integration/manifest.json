@@ -1822,7 +1822,11 @@
     },
     "tests/four-court-buckets/integration/verify-integration.py": {
       "components": [],
-      "blob": "7785616f5351f15bd744edd1c6c23bdb7e44503a"
+      "blob": "ade0c223246f5e03223810f9844b73ed130392d9"
+    },
+    "release/buckets/integration/live-priority-writers-20261105.json": {
+      "components": [],
+      "blob": "77a652551b523f3fce6656d1217a93b114c709eb"
     }
   },
   "mainScriptQueryParameters": {

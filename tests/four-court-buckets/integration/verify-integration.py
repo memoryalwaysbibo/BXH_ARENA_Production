@@ -24,4 +24,37 @@ assert readback['familyReviewSource']['baselineArchiveSha256']==family['archiveS
 assert readback['familyReviewSource']['candidateFileSha256']==family['patchedFileSha256']
 assert readback['familyReviewSource']['changedMembers']==['family-registration.js'] and readback['familyReviewSource']['unchangedMembers']==103
 assert readback['familyReviewSource']['verifiedClosureFiles']==family['deployedSourceReadback']['verifiedClosureFiles']
+priority=json.loads((R/'release/buckets/integration/live-priority-writers-20261105.json').read_text())
+assert priority['status']=='review-only-not-deployed' and priority['productionWrites']==0
+assert priority['deploymentPerformed'] is False and priority['roomActivationPerformed'] is False
+assert priority['writerInventoryComplete'] is False and priority['acceptanceCompleted'] is False
+assert priority['captureArchiveSha256']=='37b6017285474d756ecd2eb9751ed5145aa8c53a4b978502163811de602ca6ef'
+assert priority['captureReportSha256']=='26e05d0f4b148ab4cc956ecda3a2d215207f1540917d2ab03fe731b74b3b0c40'
+expected_priority={
+ 'syncMyHostingProgress':('completion','tests/four-court-buckets/completion/fixtures/host-sync/hosting.js'),
+ 'manageRegistrationSelection':('deletion','tests/four-court-buckets/deletion/fixtures/selection/registration-selection.js'),
+ 'lotteryRegistration':('admissions','tests/four-court-buckets/admissions/fixtures/11/registration-selection.js'),
+ 'settleLadderTournament':('settlement','tests/four-court-buckets/settlement/fixtures/21/ladder-settlement.js'),
+}
+assert {x['name'] for x in priority['sources']}==set(expected_priority) and len(priority['sources'])==4
+admission=json.loads((R/'release/buckets/admissions/patch-manifest.json').read_text())
+completion=json.loads((R/'release/buckets/completion/patch-manifest.json').read_text())
+deletion=json.loads((R/'release/buckets/deletion/manifest.json').read_text())
+settlement=json.loads((R/'release/buckets/settlement/patch-manifest.json').read_text())
+for row in priority['sources']:
+ name=row['name'];family,fixture=expected_priority[name]
+ assert row['candidateFamily']==family and row['stableDuringCapture'] is True and row['writerClassification']=='reviewed-path-only'
+ assert row['source']['generation'].isdecimal() and row['source']['object']==name+'/function-source.zip'
+ assert hashlib.sha256((R/fixture).read_bytes()).hexdigest()==row['reviewedBaselineFileSha256'],name
+ if name=='syncMyHostingProgress':
+  patch=next(x for x in completion['hostingPatches'] if x['function']==name)
+  assert patch['archiveSha256']==row['sourceArchiveSha256'] and patch['baselineSha256']==row['reviewedBaselineFileSha256']
+  assert completion['hostSyncCapture']['function']['storageSource']==row['source']
+ elif name=='manageRegistrationSelection':
+  assert deletion['selectionSourceSet']['archiveSha256']==row['sourceArchiveSha256']
+  assert deletion['testFixtures']['fixtures/selection/registration-selection.js']==row['reviewedBaselineFileSha256']
+ else:
+  group=admission if name=='lotteryRegistration' else settlement
+  patch=next(x for x in group['patches'] if x['function']==name)
+  assert patch['archiveSha256']==row['sourceArchiveSha256'] and patch['baselineFileSha256']==row['reviewedBaselineFileSha256']
 print(json.dumps({'componentFilesVerified':len(m['files']),'components':len(m['components']),'currentMainScriptParametersPreserved':True,'productionWrites':0}))
