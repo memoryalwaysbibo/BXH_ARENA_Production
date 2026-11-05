@@ -4,7 +4,7 @@ assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8196');
 assert.equal(process.env.GCLOUD_PROJECT,'demo-bxh-registration40');
 const {initializeApp}=require('firebase-admin/app');
 initializeApp({projectId:process.env.GCLOUD_PROJECT});
-const fixture=require('../../tests/fixtures/registration-feedback-current-source.json');
+const fixture=require('./live-source-20261105.json');
 for(const [file,digest]of Object.entries(fixture.files))assert.equal(crypto.createHash('sha256').update(fixture.blobs[digest]).digest('hex'),digest,file);
 function handler(candidate,metrics,{clock=Date.now,admissionOptions,beforeTransaction}={}){
  const cache=new Map();
@@ -99,7 +99,7 @@ if(require.main===module)(async()=>{
  for(const n of process.env.CANDIDATE_ONLY?[]:[1,10,40]){results.push(await wave(false,n));results.push(await wave(true,n));}
  if(!process.env.SEMANTICS_ONLY){
   results.push(await wave(true,40));
-  results.push(await wave(true,40,64,16,4));
+  results.push(await wave(true,40,64,16,5));
   results.push(await wave(true,40,24,8));
  }
  await semantics();
