@@ -1,9 +1,9 @@
 # Integrated bucket candidate — rollout remains closed
 
 This branch assembles reviewed candidates #707, #709, #711, #712, #713,
-#714, #715, #717 and #718 on current main
-`c28eed29fa59fa1c4c13c3d553e7087faf8b27bd`. The exact component heads,
-merge bases and resulting 260 component-file Git blob hashes are recorded in
+#714, #715, #717 and #718 on selected main
+`5a760cf7f61f77dffd9d4ec64d8db0f0de1ecff4`. The exact component heads,
+merge bases and resulting component-file Git blob hashes are recorded in
 `manifest.json`. This is an integration review, not a deployment archive or a
 replacement for the component source/configuration provenance requirements.
 
@@ -14,10 +14,11 @@ against its exact Git blob before component hunks were applied with unique
 context. Script URLs preserve every current-main query value, append component
 cache parameters and load the settlement module after the bucket browser and
 before the application. The integration verifier pins these resolutions.
-All other component files retain their candidate bytes; unrelated main files
-remain inherited from the selected base tree.
+Component bytes and subsequent integration updates are pinned by the manifest,
+with explicit resolutions for refreshed sources and test fixes. Unrelated main
+files remain inherited from the selected base tree.
 
-Local verification on this combination passed all eight backend package
+Local verification on this combination passed the backend package
 provenance checks, the component Node suites, the settlement UI suite and main's
 offline wiring gate. Browser checks passed 20 full-host deletion scenarios,
 24 actual integrated settlement/backend handoffs and 11 offline confirmation
@@ -27,7 +28,7 @@ These boundaries use synthetic accounts/Firebase transport/business clocks;
 real Chromium and backend business handlers do not constitute real Auth,
 App Check, Storage, Eventarc or live production timing acceptance.
 
-The new integration workflow verifies all 260 hashes and runs those same-checkout
+The new integration workflow verifies all pinned hashes and runs those same-checkout
 bridges and browser regressions. Existing component workflows also run against
 the integrated tree for their native SDK/Rules/Emulator suites. The component
 workflows' separately pinned bridge checkouts remain useful component evidence,
@@ -45,3 +46,12 @@ No main merge, backend/Rules deployment, runtime flag or room activation is
 performed by this branch. Keep production rollout gates closed. A later release
 must use the controlled per-target source-only plan and reconciled current live
 Rules, preserving unrelated configuration and permanent awards.
+
+## Writer metadata discovery
+
+`scripts/bucket-writer-discovery.py` lists Functions across all regions and
+Cloud Run services/jobs in every discovered supported region. Its offline
+boundary checks run in the integration workflow. This prepares the missing
+cross-region inventory; it does not classify source code, inspect IAM or establish
+writer completeness. See `scripts/bucket-writer-discovery.md` for the exact
+read-only scope and Cloud Shell procedure. The report never enables a release.

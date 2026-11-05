@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "85deacbb740ed74a040dc02721172ffa269b42d3"
+      "blob": "28641c707c4b9275330b554d560d01cf9c6a7876"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1783,6 +1783,22 @@
         707
       ],
       "blob": "8e6c99fddfe780943c15f55f9ccd80e87ca27335"
+    },
+    "scripts/bucket-writer-discovery.py": {
+      "components": [],
+      "blob": "fd130d6a2d7a3c53872eea114e3a39a4612aac4d"
+    },
+    "scripts/bucket-writer-discovery.md": {
+      "components": [],
+      "blob": "0f319fde54d394ae03d8207e5b2f58c8cefb8f3e"
+    },
+    "tests/four-court-buckets/writer-discovery.py": {
+      "components": [],
+      "blob": "5e3046b2c99c98346a4abbc22d113f86be555bd5"
+    },
+    "release/buckets/integration/README.md": {
+      "components": [],
+      "blob": "ecbce2e680a3854f8eb85c90fcc751428abe0783"
     }
   },
   "mainScriptQueryParameters": {
@@ -2239,10 +2255,12 @@
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve all prior checks and default single-round workload; permit bounded fresh count/sync/sync contention rounds (1-50) without retrying failures, with QR/round labels and native read diagnostics.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
-    ".github/workflows/bucket-integrated-candidate.yml": "Run the desktop snapshot-burst regression without retries after the existing same-checkout browser contracts; use matching isolated Playwright runner/browser versions.",
+    ".github/workflows/bucket-integrated-candidate.yml": "Run the writer metadata discovery offline boundary suite with every pinned integration check.",
     "release/buckets/deletion/manifest.json": "Refresh only restore/access deployed archive and source-closure provenance against the uploaded 2026-11-05 read-only capture; runtime candidate files retain their accepted hashes.",
     "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks.",
     "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls.",
-    ".github/workflows/bucket-general-completion.yml": "Run captured SDK14 with 20 fresh count/sync/sync rounds per QR mode, preserve SDK13 baseline and both debug artifacts, print failure debug tail; no continue-on-error or blanket rerun."
+    ".github/workflows/bucket-general-completion.yml": "Run captured SDK14 with 20 fresh count/sync/sync rounds per QR mode, preserve SDK13 baseline and both debug artifacts, print failure debug tail; no continue-on-error or blanket rerun.",
+    "scripts/bucket-writer-discovery.py": "Read-only cross-region v1/v2 Function and per-region Cloud Run service/job metadata discovery; hashed configurations, no raw environment values, fail-closed pagination/identity/gap checks; source/IAM review and release acceptance remain incomplete.",
+    "release/buckets/integration/README.md": "Correct the selected main baseline and avoid stale component counts; document metadata discovery limits."
   }
 }
