@@ -10,6 +10,12 @@ on:
       - 'tests/community-referee-preflight.test.py'
       - 'tests/community-referee-backend.test.py'
       - 'referee-seats/**'
+      - 'modules/main-app/community-referee-invite.js'
+      - 'modules/main-app/referee-seats.js'
+      - 'modules/main-app/referee-seats.css'
+      - 'modules/main-app/core.js'
+      - 'index.html'
+      - 'tests/community-referee-invite.browser.cjs'
       - 'operator/community_referee_owner_repair.py'
       - 'operator/community_referee_owner_repair_test.py'
       - '.github/workflows/community-referee.yml'
@@ -38,6 +44,8 @@ jobs:
           python3 -B tests/community-referee-backend.test.py
           python3 -B operator/community_referee_owner_repair_test.py
           python3 -B scripts/build-community-referee-backend.py --check --output /tmp/community-referee-source
+      - name: Check seat transitions and invitation service
+        run: node --test referee-seats/core.test.cjs referee-seats/service.test.cjs referee-seats/partner-ui.test.cjs referee-seats/invite-ui.test.cjs
       - name: Install isolated Emulator dependencies
         run: npm install --prefix /tmp/community-referee-deps --no-save --ignore-scripts firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11 firebase-admin@13.10.0
       - name: Compile release Rules and exercise actual community transactions
@@ -46,3 +54,20 @@ jobs:
           REFEREE_RULES_PATH: release/community-referee/firestore.rules
           REFEREE_FUNCTIONS_ROOT: /tmp/community-referee-source/functions
         run: /tmp/community-referee-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-referee-seat-compile --config referee-seats/firebase.emulator.json 'node --test referee-seats/full-rules.test.cjs referee-seats/firestore.test.cjs'
+
+  invitation-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --prefix /tmp/invitation-browser --no-save --ignore-scripts playwright@1.55.0
+      - run: /tmp/invitation-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Exercise actual invitation UI with Callable handler at phone and desktop widths
+        env:
+          CODEX_PRIMARY_RUNTIME_NODE_MODULES: /tmp/invitation-browser/node_modules
+        run: node tests/community-referee-invite.browser.cjs

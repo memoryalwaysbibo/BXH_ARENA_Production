@@ -134,3 +134,23 @@ test('actual dispatch exit, retry, reopen and detached recovery preserve scores 
  await dispatch(req('host','claim-detached',{station:0,targetStation:1,expectedScoreRevision:1,expectedDispatchRevision:1}));
  s=JSON.parse((await tour.get()).data().data);assert.equal(s.matches[0].station,1);assert.equal(s.matches[0].scoreA,2);assert.equal(s.matches[0].scoreB,1);assert.equal(s.matches[0].faultActions.length,1);assert.deepEqual(s.matches[0].log,[{test:'preserve'}]);
 });
+
+test('QR/name invitation uses real transactional queries, single-use acceptance and idempotent receipts',async()=>{
+ const roomCode='BXH-QRTEST',tour=db.doc('tournaments/'+roomCode),pub=db.doc('publicTournaments/'+roomCode);
+ const state={cloudCode:roomCode,meta:{eventAuthority:'community',ladderMode:'general',stations:2},matches:[]};
+ await Promise.all([tour.set({createdBy:'qr-host',ownerUid:'qr-host',eventAuthority:'community',ladderMode:'general',data:JSON.stringify(state)}),pub.set({bracketView:JSON.stringify(state)}),
+  db.doc('systemConfig/refereeSeatsV1').set({enabled:true,perCourtScoringVerified:true,communitySeatsEnabled:true}),
+  ...['qr-host','qr-a','qr-b'].map(uid=>db.doc('users/'+uid).set({active:true,role:uid==='qr-host'?'super_admin':'player',realName:uid==='qr-host'?'房主':'同名測試',gameId:uid}))]);
+ const req=(uid,action,args={})=>({auth:{uid},data:{code:roomCode,operationId:'qr-emulator-operation-'+(++seq),action,...args}});
+ await handle(req('qr-host','enable'));const base={station:1,slot:'main',expectedCourtRevision:0};
+ const found=await handle(req('qr-host','find-invite-player',{...base,query:'同名測試'}));assert.equal(found.players.length,2);
+ await assert.rejects(handle(req('qr-a','find-invite-player',{...base,query:'同名測試'})),/permission-denied/);
+ const issue=req('qr-host','create-qr',base),q=await handle(issue);assert.deepEqual(await handle(issue),q);
+ const args={requestId:q.requestId,qrToken:q.qrToken};
+ await handle(req('qr-a','inspect-qr',args));assert.equal((await tour.get()).data().refereeSeatsV1.courts[1].main,null);
+ const requests=['qr-a','qr-b'].map(uid=>req(uid,'accept-qr',args));
+ const results=await Promise.allSettled(requests.map(handle));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+ const i=results.findIndex(r=>r.status==='fulfilled');assert.deepEqual(await handle(requests[i]),results[i].value);
+ const saved=(await tour.get()).data();assert.equal(saved.refereeStationUids.length,1);assert(!JSON.stringify(saved).includes(q.qrToken));assert(!(await pub.get()).data().bracketView.includes('tokenHash'));
+ await tour.update({tournamentPhase:'done'});await assert.rejects(handle(req('qr-a','inspect-qr',args)),/community-result-available/);
+});
