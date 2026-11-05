@@ -55,3 +55,28 @@ route; this candidate must only update `lotteryRegistration`. PR707's separate
 selector/deletion candidate remains necessary and must not be overwritten by
 this archive. Runtime remains disabled; other writers, settlement/archival,
 six-court cutover/rollback and real operator recovery acceptance remain required.
+
+## Invitation counter read order candidate
+
+Native run42012313416 reproduced the prior invalid/closed transaction failure
+at duplicate round13: transaction416's mailboxStats/target read failed with
+SDK code3 after9553ms, while the invitation and room reads had completed. The
+preserved Emulator artifact13407616943 records repeated transaction lock timeouts
+before invalid/closed errors. This supports a lock-order hypothesis; it does not
+prove that every code3 failure shares one cause or describe a production incident.
+
+The invite candidate now reads the mailbox counter after room/account/generation,
+registration and pending-invitation validation, immediately before all writes.
+A pending duplicate rejects without acquiring a counter lock. The counter remains
+inside the same transaction, so a concurrent mailbox update still causes a retry
+and increments the current value. No SDK retry, authority, expiry, operation result,
+mail schema or counter semantics are changed. The patch preserves the captured
+independent archive and dependency closure.
+
+Three fixture regressions verify duplicate denial without a counter read, the
+final counter-read order, and retry after a concurrent counter update without
+lost unread mail. The original candidate fails the new duplicate-read regression;
+the revised candidate passes542 fixture checks and exact patch verification.
+Native CI retains20 fresh simultaneous duplicate rounds with one winner,
+one invite-pending rejection and exactly one counter increment per fixture.
+No deployment or production acceptance is inferred from this candidate.

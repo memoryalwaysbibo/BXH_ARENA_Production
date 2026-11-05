@@ -637,7 +637,7 @@
       ]
     },
     "release/buckets/admissions/README.md": {
-      "blob": "01f62bdc548f9d84667b3431d0de4a834f1127b0",
+      "blob": "c0d37a3135fefd6c945d700ad2a6e818b2432c24",
       "components": [
         711
       ]
@@ -655,13 +655,13 @@
       ]
     },
     "release/buckets/admissions/candidate/19/registration-invitations.js": {
-      "blob": "d6c768d91a693a6057410ac0363f696e0d899c4f",
+      "blob": "d80c3c94707851fb74433f5b7887311b1272a5dc",
       "components": [
         711
       ]
     },
     "release/buckets/admissions/patch-manifest.json": {
-      "blob": "aeff833e660eb8dc2f216a98a914b34941562beb",
+      "blob": "0f437b5eabb77a790af97824f3a0b750f37207b3",
       "components": [
         711
       ]
@@ -835,7 +835,7 @@
       ]
     },
     "tests/four-court-buckets/admissions/probe.cjs": {
-      "blob": "d0c32fe61d95f1370501a3b3f0d4a5d02fa6daa7",
+      "blob": "858a9bddf2b409151915a0cb205c55f9a787322e",
       "components": [
         711
       ]

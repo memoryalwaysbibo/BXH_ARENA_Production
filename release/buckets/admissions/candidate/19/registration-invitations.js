@@ -53,7 +53,7 @@ function createRegistrationInvitationService(db,clock=Date.now){return async req
   const observed=await tr.get();if(!observed.exists)throw Error('not-found');const sourceCreatedAt=identity(observed);
   const expiresAt=now+30*60*1000,mail=db.doc('userMail/'+targetUid+'/messages/tournament_invite_'+code),stats=db.doc('mailboxStats/'+targetUid);
   await db.runTransaction(async tx=>{
-   const [fresh,pub,actorNow,targetNow,prior,reg,ss]=await Promise.all([tx.get(tr),tx.get(db.doc('publicTournaments/'+code)),tx.get(db.doc('users/'+uid)),tx.get(db.doc('users/'+targetUid)),tx.get(ir),tx.get(tr.collection('registrations').doc(targetUid)),tx.get(stats)]);
+   const [fresh,pub,actorNow,targetNow,prior,reg]=await Promise.all([tx.get(tr),tx.get(db.doc('publicTournaments/'+code)),tx.get(db.doc('users/'+uid)),tx.get(db.doc('users/'+targetUid)),tx.get(ir),tx.get(tr.collection('registrations').doc(targetUid))]);
    const t=roomData(fresh,pub),currentActor=actorNow.data(),target=targetNow.data();
    if(identity(fresh)!==sourceCreatedAt)throw Error('invitation-room-changed');
    if(!active(currentActor))throw Error('auth-required');if(!active(target))throw Error('player-not-found');
@@ -62,6 +62,9 @@ function createRegistrationInvitationService(db,clock=Date.now){return async req
    if(prior.exists)assertInvitationRoom(fresh,prior);
    if(reg.exists&&['confirmed','waitlist'].includes(reg.data().status))throw Error('already-registered');
    if(prior.exists&&prior.data().status==='pending'&&ms(prior.data().expiresAt)>now)throw Error('invite-pending');
+   // Keep the counter lock after invitation validation, before all writes.
+   // Pending duplicates return without acquiring a mailbox counter lock.
+   const ss=await tx.get(stats);
    const title=t.name||code,record={code,eventName:title,targetUid,targetName:target.gameId||target.nickname||target.realName||'玩家',targetPlayerId:target.playerId||'',invitedByUid:uid,invitedByName:currentActor.gameId||currentActor.nickname||currentActor.realName||'主辦',status:'pending',createdAt:now,updatedAt:now,expiresAt,sourceCreatedAt};
    tx.set(ir,record);tx.set(mail,{subject:'賽事參加邀請',body:(currentActor.gameId||currentActor.nickname||currentActor.realName||'主辦')+' 邀請你參加「'+title+'」。請進入 BXH ARENA 接受或拒絕。',type:'tournament_invitation',senderName:'BXH ARENA',senderUid:uid,createdAt:now,updatedAt:now,readAt:null,eventCode:code,invitationStatus:'pending'},{merge:true});
    tx.set(stats,{unreadCount:Math.max(0,Number(ss.data()?.unreadCount)||0)+1,updatedAt:now},{merge:true});
