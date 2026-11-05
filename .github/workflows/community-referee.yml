@@ -10,6 +10,8 @@ on:
       - 'tests/community-referee-preflight.test.py'
       - 'tests/community-referee-backend.test.py'
       - 'referee-seats/**'
+      - 'operator/community_referee_owner_repair.py'
+      - 'operator/community_referee_owner_repair_test.py'
       - '.github/workflows/community-referee.yml'
 permissions:
   contents: read
@@ -34,6 +36,7 @@ jobs:
           python3 -B tests/community-referee-rules.test.py
           python3 -B tests/community-referee-preflight.test.py
           python3 -B tests/community-referee-backend.test.py
+          python3 -B operator/community_referee_owner_repair_test.py
           python3 -B scripts/build-community-referee-backend.py --check --output /tmp/community-referee-source
       - name: Install isolated Emulator dependencies
         run: npm install --prefix /tmp/community-referee-deps --no-save --ignore-scripts firebase-tools@14 @firebase/rules-unit-testing@4 firebase@11 firebase-admin@13.10.0
