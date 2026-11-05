@@ -8,6 +8,23 @@ const {getFirestore}=require('firebase-admin/firestore');
 const {specs,fixture,NOW,code,uid}=require('./probe.cjs');
 const app=initializeApp({projectId:project}),db=getFirestore(app);
 db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
+// Observe the real SDK's existing attempts without adding retries or replacing
+// its clock. Only synthetic document paths, timings and safe error codes are kept.
+const traces=[],nativeRunTransaction=db.runTransaction.bind(db);let transactionSequence=0,duplicateRound=null;
+db.runTransaction=(callback,...options)=>{
+ const trace={transaction:++transactionSequence,attempts:[]};traces.push(trace);if(traces.length>12)traces.shift();
+ return nativeRunTransaction(async native=>{
+  const attempt={attempt:trace.attempts.length+1,reads:[]};trace.attempts.push(attempt);
+  const tx=new Proxy(native,{get(target,key){
+   if(key==='get'||key==='getAll')return async(...args)=>{
+    const read={method:key,paths:args.filter(x=>typeof x?.path==='string').map(x=>x.path),startedAt:Date.now()};attempt.reads.push(read);
+    try{return await target[key](...args);}catch(error){read.errorCode=error.code;throw error;}finally{read.durationMs=Date.now()-read.startedAt;}
+   };
+   const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+  }});
+  try{const result=await callback(tx);attempt.callbackReturned=true;return result;}catch(error){attempt.errorCode=error.code;throw error;}
+ },...options).catch(error=>{trace.errorCode=error.code;throw error;});
+};
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-admissions-native-'));
 const started=Date.now(); // Keep SDK/gRPC deadlines on the real process clock.
 const handlers=new Map(),collections=['tournaments','publicTournaments','users','userMail','mailboxStats'];
@@ -51,11 +68,11 @@ async function state(){const rows=[];
    const before=await state();await assert.rejects(handler(inv,true)(f.request),/not-found|invitation-room-changed/);assert.deepEqual(await state(),before);checks++;
   }
   // Two native transactions for the same invitation must create one mail/counter.
-  {const f=fixture(inv,'invite');await seed(f);const fn=handler(inv,true),out=await Promise.allSettled([fn(f.request),fn(f.request)]);
+  for(duplicateRound=1;duplicateRound<=20;duplicateRound++){const f=fixture(inv,'invite');await seed(f);const fn=handler(inv,true),out=await Promise.allSettled([fn(f.request),fn(f.request)]);
    assert.equal(out.filter(x=>x.status==='fulfilled').length,1);assert.match(out.find(x=>x.status==='rejected').reason.message,/invite-pending/);
    assert.equal((await db.doc('mailboxStats/target').get()).data().unreadCount,1);
    const record=await root.collection('registrationInvitations').doc('target').get(),r=await root.get();assert.equal(record.data().sourceCreatedAt,r.createTime.seconds+':'+r.createTime.nanoseconds);checks++;
   }
-  console.log(JSON.stringify({nativeAdmissionChecks:checks,project,productionRequests:0,productionWrites:0,scope:'real Admin SDK, QR proxy and transport clock; synthetic request auth and injected invitation clock'}));
+  console.log(JSON.stringify({nativeAdmissionChecks:checks,duplicateInvitationRounds:20,project,productionRequests:0,productionWrites:0,scope:'real Admin SDK, QR proxy and transport clock; synthetic request auth and injected invitation clock'}));
  }finally{await clear();await db.terminate();await deleteApp(app);fs.rmSync(directory,{recursive:true,force:true});}
-})().catch(e=>{console.error(e);process.exitCode=1;});
+})().catch(e=>{console.error(JSON.stringify({nativeAdmissionDiagnostic:{duplicateRound,transactions:traces.slice(-6)}}));console.error(e);process.exitCode=1;});

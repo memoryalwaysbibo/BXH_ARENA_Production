@@ -34,3 +34,13 @@ jobs:
           GCLOUD_PROJECT: demo-bxh-bucket-admissions
           CI: true
         run: /tmp/bucket-admissions/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-bucket-admissions --config tests/four-court-buckets/admissions/native.firebase.json 'node tests/four-court-buckets/admissions/native-emulator.cjs'
+      - name: Preserve native transaction failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-admissions-native-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            firestore-debug.log
+            firebase-debug.log
+          if-no-files-found: ignore
+          retention-days: 7
