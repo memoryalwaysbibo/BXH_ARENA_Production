@@ -140,7 +140,7 @@ async function revoke(uid,data){
       ...((target.data()?.eventStaffMemberships||{})[code]||{}),status:'revoked',revokedAt:now,updatedAt:now}};
     tx.set(base.eventRef,{eventStaffAssignments:eventAssignments,updatedAt:now},{merge:true});
     tx.set(assignmentRef,{...next,history:FieldValue.arrayUnion({action:'revoked',by:uid,at:now})},{merge:true});
-    tx.set(targetRef,{eventStaffMemberships:memberships},{merge:true});
+    if(target.exists)tx.set(targetRef,{eventStaffMemberships:memberships},{merge:true});
     tx.set(db.doc(`userMail/${targetUid}/messages/${mailId(code,targetUid)}`),{invitationStatus:'revoked',updatedAt:now},{merge:true});
     return {ok:true,assignment:publicAssignment(next)};
   });

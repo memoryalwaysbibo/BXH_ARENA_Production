@@ -89,6 +89,20 @@ async function state(){const rows=[];async function walk(col){for(const ref of a
    finally{db.runTransaction=native;}
    assert.deepEqual(await state(),before);checks++;
   }}
+  // A deleted recipient must not be recreated by its membership projection.
+  {const spec=specs.find(s=>s.function==='eventStaffService');for(const marked of [false,true])for(const duringRetry of [false,true]){
+   const f=fixture(spec,'revoke');if(marked)bucket(f);await seed(f);
+   const target=db.doc('users/target'),native=db.runTransaction;let attempts=0;
+   if(!duringRetry)await target.delete();
+   else db.runTransaction=function(callback,...options){return native.call(this,async tx=>{
+    attempts++;if(attempts===2)await target.delete();
+    const result=await callback(tx);if(attempts===1)throw Object.assign(new Error('synthetic-account-deletion-retry'),{code:10});return result;
+   },...options);};
+   try{const result=await handler(spec,true)(f.request);assert(result.ok);if(duringRetry)assert.equal(attempts,2);}
+   finally{db.runTransaction=native;}
+   assert.equal((await target.get()).exists,false,'revocation recreated deleted account');
+   assert.equal((await db.doc('tournaments/'+code).get()).data().eventStaffAssignments.target.status,'revoked');checks++;
+  }}
   console.log(JSON.stringify({nativeOperationsChecks:checks,project,productionWrites:0,productionRequests:0,scope:'real Admin SDK, captured QR proxy and Firestore snapshots; synthetic auth/events, injected retry and deterministic business RNG'}));
  }finally{await clear();await db.terminate();await deleteApp(app);fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

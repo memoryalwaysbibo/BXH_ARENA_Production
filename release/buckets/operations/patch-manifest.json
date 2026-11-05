@@ -11,7 +11,7 @@
       "path": "event-staff.js",
       "archiveSha256": "e0578dbc102e5bf08f71a36d2090144d995b63858491ed1859c3fd1f6c84749c",
       "baselineFileSha256": "b71a1c54f280f68e85d1df4e5dd458362703ac4b25efd7e73caee9884916351b",
-      "patchedFileSha256": "10921c91fe213424be6c617f48589b65fcd86e463f1ce83ef3335600322741bf",
+      "patchedFileSha256": "332b923729437e40fada87afac804b1667d8b5733875377146e6b4c06dd1ad60",
       "edits": [
         {
           "before": "async function loadOrganizerEvent(uid,eventCode,tx=null){",
@@ -76,6 +76,10 @@
         {
           "before": " return JSON.stringify(['bucket',m.roomId,m.epoch,m.courtCount,m.bucketCount]);",
           "after": " return JSON.stringify(['bucket',m.roomId,m.epoch,m.courtCount,m.bucketCount,identity(pub)]);"
+        },
+        {
+          "before": "    tx.set(assignmentRef,{...next,history:FieldValue.arrayUnion({action:'revoked',by:uid,at:now})},{merge:true});\n    tx.set(targetRef,{eventStaffMemberships:memberships},{merge:true});",
+          "after": "    tx.set(assignmentRef,{...next,history:FieldValue.arrayUnion({action:'revoked',by:uid,at:now})},{merge:true});\n    if(target.exists)tx.set(targetRef,{eventStaffMemberships:memberships},{merge:true});"
         }
       ]
     },

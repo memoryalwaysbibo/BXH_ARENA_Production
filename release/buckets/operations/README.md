@@ -85,6 +85,13 @@ Missing/malformed marker pairs, unknown phases, deletion and migration stop
 before any writes. All four staff transitions succeed in a consistent synthetic
 six-court room. A retry after either private/public root replacement or epoch change rejects
 before writes; a score revision advance retries and preserves the metadata edit. The
-existing 681 operations checks still pass, plus 19 bucket staff checks (700 total).
+existing 681 operations checks still pass, plus 23 staff regression checks (704 total).
 This only resolves this one staff metadata route; real operator/browser and
 permission acceptance remains separate.
+
+Revoking an assignment after the recipient account was deleted still revokes
+the room and external assignment records, but skips the missing account's
+membership projection instead of recreating a partial users document. An existing
+inactive account retains its membership update. Legacy and bucket fixtures cover
+deletion before the request and during a retry; matching real SDK cases are in
+the native suite. Mail status keeps its existing projection policy.

@@ -853,7 +853,7 @@
       ]
     },
     "release/buckets/operations/README.md": {
-      "blob": "c9ce86c8c42dfa94f9d7be2a2c9ebe1eaeb9e352",
+      "blob": "16a8d0ebbb977b8825ddf2300b72b0b00d2779fb",
       "components": [
         712
       ]
@@ -865,13 +865,13 @@
       ]
     },
     "release/buckets/operations/candidate/7/event-staff.js": {
-      "blob": "017f50096730d0e868c04c145aed43176179083d",
+      "blob": "9528ccb4240165c3439229339be54d2c65ee368c",
       "components": [
         712
       ]
     },
     "release/buckets/operations/patch-manifest.json": {
-      "blob": "5778dd50eb9ccf1509a29a945dea26f5604a31f3",
+      "blob": "159923c1b09c35a7fb553fcf0e480cb8e00e00a0",
       "components": [
         712
       ]
@@ -931,7 +931,7 @@
       ]
     },
     "tests/four-court-buckets/operations/native-emulator.cjs": {
-      "blob": "72c3c3827bb5ee4a73ccde9a607a429af2672956",
+      "blob": "ff595cb6c1ee6575832e69e99d830d3818437e75",
       "components": [
         712
       ]
@@ -943,7 +943,7 @@
       ]
     },
     "tests/four-court-buckets/operations/probe.cjs": {
-      "blob": "4ff93b21194b7fe8a9a29a8d891c8df14d22e415",
+      "blob": "48cf45529da1899404a92ad6980791c1407c5143",
       "components": [
         712
       ]

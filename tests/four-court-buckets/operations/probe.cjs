@@ -156,5 +156,14 @@ if(require.main===module)(async()=>{let checks=0;
  }
  {const f=fixture(s,'invite'),{pr}=bucket(f);f.m.interfere=()=>{const p=f.m.rows.get(pr);f.m.put(pr,{...p,scoreBucketProjection:{...p.scoreBucketProjection,versions:{'court-1':1,'court-2':0}}});};const result=await load(s,true,f.m)(f.request);assert(result.ok);checks++;}
  }
+ // Revocation must still remove the grant after recipient deletion, without
+ // recreating an account from the membership projection.
+ {const s=specs.find(x=>x.function==='eventStaffService');for(const marked of [false,true])for(const duringRetry of [false,true]){
+  const f=fixture(s,'revoke');if(marked)bucket(f);
+  if(duringRetry)f.m.interfere=()=>f.m.remove('users/target');else f.m.remove('users/target');
+  const result=await load(s,true,f.m)(f.request);assert(result.ok);
+  assert.equal(f.m.rows.has('users/target'),false,'revocation recreated deleted account');
+  assert.equal(f.m.rows.get('tournaments/'+code).eventStaffAssignments.target.status,'revoked');checks++;
+ }}
  console.log(JSON.stringify({operationsChecks:checks,functions:specs.length,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
