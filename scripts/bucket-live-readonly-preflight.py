@@ -22,7 +22,9 @@ import urllib.request
 PROJECT = "bxh-arena"
 REGION = "asia-east1"
 ROOT = f"projects/{PROJECT}/locations/{REGION}"
-REVIEWED_RULES_SHA = "580da8c9dbde90e936ff7ddd88543b3370ff2f3cd9c27c749b6aecc11802977e"
+# Pinned to release/community-referee/firestore.rules. The older bucket
+# deletion package's 580da8c9... baseline predates that separate release.
+REVIEWED_RULES_SHA = "dbdb8dc9ba46a110d6f8786cdc7ee4b9badc6bd3120769f4393bf51f31cbc9c3"
 TARGETS = (
     "commitBucketRefereeCommand", "manageBucketRefereeSeats", "projectBucketPublicScore",
     "commitRefereeCommand", "manageRefereeSeats", "deleteTournamentSafely",
@@ -122,6 +124,7 @@ def capture(destination):
         "project": PROJECT, "region": REGION, "productionWrites": 0,
         "deploymentPerformed": False, "roomActivationPerformed": False,
         "rulesetName": ruleset_name, "rulesSha256": sha(rules),
+        "reviewedRulesSource": "release/community-referee/firestore.rules",
         "rulesMatchReviewedBaseline": sha(rules) == REVIEWED_RULES_SHA,
         "regionalFunctionCount": len(region_names),
         "regionalFunctionNames": region_names,
