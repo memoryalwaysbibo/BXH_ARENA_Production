@@ -2,6 +2,7 @@
 const {test,after}=require('node:test'),assert=require('node:assert/strict');
 const {handler,seed,audit}=require('./check.cjs');
 const {create,definitive}=require('../../modules/main-app/registration-feedback.js');
+const {wrap}=require('./callable-fixture.cjs');
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
 const tick=()=>new Promise(setImmediate);
 const join=(uid,code,operationId)=>({auth:{uid},data:{action:'join',code,childIds:[null],childEligibilityConfirmed:true,operationId}});
@@ -12,12 +13,13 @@ for(const reason of ['queue-full','queue-timeout'])test(reason+' retains fronten
  const block=blocker(),metrics=[],service=handler(true,metrics,{admissionOptions:{maxPending:reason==='queue-full'?1:128,waitMs:25},beforeTransaction:block.hook});
  const {code,ids:[one,two]}=await seed(service.db,2),first=service.call(join(one,code,'blocking-first-01'));
  await block.entered.promise;
- const request=join(two,code,'retry-original-01').data,storage=memory();let observed;
- const read=()=>service.call({auth:{uid:two},data:{action:'mine',code}});
- const control=create({getUid:()=>two,storage,read,retry:data=>service.call({auth:{uid:two},data}),slowMs:100000,deadlineMs:100000});
+ const request=join(two,code,'retry-original-01').data,storage=memory();let observed,serverObserved;
+ const wire=wrap(async req=>{try{return await service.call(req);}catch(error){serverObserved=error;throw error;}});
+ const read=()=>wire({auth:{uid:two},data:{action:'mine',code}});
+ const control=create({getUid:()=>two,storage,read,retry:data=>wire({auth:{uid:two},data}),slowMs:100000,deadlineMs:100000});
  try{
-  await assert.rejects(control.run(code,async progress=>{progress.submitting([two],request);try{return await service.call({auth:{uid:two},data:request});}catch(error){observed=error;throw error;}}),/registration-result-pending/);
-  assert(observed.message.includes(reason));assert.equal(definitive(observed),false);assert.equal(control.snapshot()[0].state,'unconfirmed');assert.equal(storage.length,1);
+  await assert.rejects(control.run(code,async progress=>{progress.submitting([two],request);try{return await wire({auth:{uid:two},data:request});}catch(error){observed=error;throw error;}}),/registration-result-pending/);
+  assert.equal(serverObserved.details.reason,reason);assert.equal(observed.code,'functions/internal');assert.equal(definitive(observed),false);assert.equal(control.snapshot()[0].state,'unconfirmed');assert.equal(storage.length,1);
   block.release.resolve();await first;await tick();assert.equal((await control.retryOriginal(code)).status,'confirmed');assert.equal(control.snapshot()[0].state,'confirmed');assert.equal(storage.length,0);await audit(service.db,code,2);
  }finally{block.release.resolve();await first.catch(()=>{});control.dispose();}
 });
@@ -26,9 +28,10 @@ test('independent scheduler timeout does not report an operation failed while pe
  const {code,ids:[user,other]}=await seed(peer.db,2),request=join(user,code,'cross-scheduler-01'),original=peer.call(request);
  await peerBlock.entered.promise;const busy=local.call(join(other,code,'other-blocker-01'));await localBlock.entered.promise;
  let feedbackNow=Date.now();
- const storage=memory(),control=create({getUid:()=>user,storage,read:()=>local.call({auth:{uid:user},data:{action:'mine',code}}),now:()=>feedbackNow,slowMs:100000,deadlineMs:100000});
+ const wire=wrap(req=>local.call(req));
+ const storage=memory(),control=create({getUid:()=>user,storage,read:()=>wire({auth:{uid:user},data:{action:'mine',code}}),now:()=>feedbackNow,slowMs:100000,deadlineMs:100000});
  try{
-  await assert.rejects(control.run(code,async progress=>{progress.submitting([user],request.data);return local.call(request);}),/registration-result-pending/);
+  await assert.rejects(control.run(code,async progress=>{progress.submitting([user],request.data);return wire(request);}),/registration-result-pending/);
   assert.equal(control.snapshot()[0].state,'unconfirmed');peerBlock.release.resolve();await original;await tick();feedbackNow+=3001;
   assert.equal((await control.recheck(code)).status,'confirmed');assert.equal(control.snapshot()[0].state,'confirmed');await audit(peer.db,code,1);
  }finally{peerBlock.release.resolve();localBlock.release.resolve();await Promise.allSettled([original,busy]);control.dispose();}
