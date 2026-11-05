@@ -1,12 +1,12 @@
 'use strict';
-const fs=require('node:fs'),path=require('node:path');
-const {wave}=require('./check.cjs');
-const percentile=(values,p)=>values.slice().sort((a,b)=>a-b)[Math.min(values.length-1,Math.ceil(values.length*p)-1)]||0;
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const {wave,sourceGeneration}=require('./check.cjs');
 (async()=>{
  const results=[];
  const cases=[{capacity:128,waitlistCapacity:0},{capacity:64,waitlistCapacity:36}];
  const output=path.join(__dirname,'results100.json');
- const save=()=>fs.writeFileSync(output,JSON.stringify({scope:'Local real Firestore Emulator; synthetic authenticated users; not live Cloud Run capacity',count:100,repetitions:2,sourceGeneration:'1793041271889373',method:'All clients begin preview together, then immediately join with preview allocation. No manual retries, no frontend polling. Independent module graphs simulate per-process schedulers, in one Node process.',results},null,2)+'\n');
+ const candidateSha256=Object.fromEntries(['family-registration.js','registration-admission.cjs'].map(file=>[file,crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname,'candidate',file))).digest('hex')]));
+ const save=()=>fs.writeFileSync(output,JSON.stringify({scope:'Local real Firestore Emulator; synthetic authenticated users; not live Cloud Run capacity',count:100,repetitions:2,sourceGeneration,candidateSha256,method:'All clients begin preview together, then immediately join with preview allocation. No manual retries, no frontend polling. Independent module graphs simulate per-process schedulers, in one Node process.',results},null,2)+'\n');
  for(const scenario of cases){
   for(let repetition=1;repetition<=2;repetition++){
    const modes=repetition===1?[[false,1],[true,1],[true,4]]:[[true,4],[true,1],[false,1]];
