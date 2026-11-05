@@ -1171,7 +1171,7 @@
       ]
     },
     "release/buckets/completion/README.md": {
-      "blob": "416d574b1f7c42e40a7f2b584c81325702b68401",
+      "blob": "b393f6f1c948fce490c82976a9364457283428b9",
       "components": [
         715
       ]
@@ -1189,7 +1189,7 @@
       ]
     },
     "release/buckets/completion/hosting-guard.cjs": {
-      "blob": "240e03412543c2e6e4eae7cf27f1a3877855b951",
+      "blob": "b143d56b998d0a258935ae2bf9c8c0020b6711f5",
       "components": [
         715
       ]
@@ -1243,7 +1243,7 @@
       ]
     },
     "release/buckets/completion/patch-manifest.json": {
-      "blob": "15761889b8f19e47e1e24423026eb22116f86ba0",
+      "blob": "2b74647706a594c805d06585ed31bc4d2543549f",
       "components": [
         715
       ]
@@ -1369,7 +1369,7 @@
       ]
     },
     "tests/four-court-buckets/completion/hosting-probe.cjs": {
-      "blob": "b1a355a67fb5f08c497b2ff101f55f5d3dae7550",
+      "blob": "49d9fe9e285d533b83420dc77b045cc456bc453d",
       "components": [
         715
       ]
@@ -2261,6 +2261,8 @@
     "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls.",
     ".github/workflows/bucket-general-completion.yml": "Run captured SDK14 with 20 fresh count/sync/sync rounds per QR mode, preserve SDK13 baseline and both debug artifacts, print failure debug tail; no continue-on-error or blanket rerun.",
     "scripts/bucket-writer-discovery.py": "Read-only cross-region v1/v2 Function and per-region Cloud Run service/job metadata discovery; hashed configurations, no raw environment values, fail-closed pagination/identity/gap checks; source/IAM review and release acceptance remain incomplete.",
-    "release/buckets/integration/README.md": "Correct the selected main baseline and avoid stale component counts; document metadata discovery limits."
+    "release/buckets/integration/README.md": "Correct the selected main baseline and avoid stale component counts; document metadata discovery limits.",
+    "release/buckets/completion/hosting-guard.cjs": "Move rebuild's hostStats conflict read after room/ledger/bucket validation and before all writes, avoiding the early-stats/ledger lock inversion observed during count/sync/sync contention; retain transaction conflict detection, authorization and SDK retry behavior.",
+    "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails."
   }
 }

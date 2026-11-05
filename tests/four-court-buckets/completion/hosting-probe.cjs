@@ -24,6 +24,32 @@ if(require.main===module)(async()=>{let checks=0;
  {const f=fixture();f.m.put('hostStats/admin',{completedHostedCount:4});f.m.put('tournaments/'+code,{...f.top,bucketMigration:null});await assert.rejects(()=>H.rebuildHost(options(f)));assert.equal(f.m.rows.get('hostStats/admin').completedHostedCount,4);checks++;}
  {const f=fixture();f.m.put('hostStats/admin',{completedHostedCount:4});assert.equal(await H.rebuildHost(options(f)),0);assert.equal(f.m.rows.get('hostStats/admin').completedHostedCount,0);assert(!f.m.rows.has('hostCompletionLedger/'+code));checks++;}
  {const f=fixture();await invoke(f);f.m.put('hostCompletionLedger/'+code,{ownerUid:'other'});f.m.put('hostStats/admin',{completedHostedCount:9});await assert.rejects(()=>H.rebuildHost(options(f)));assert.equal(f.m.rows.get('hostStats/admin').completedHostedCount,9);checks++;}
+ // The conflict barrier must remain transactional but cannot precede ledger
+ // validation. This order prevents a stats-reader/ledger-writer lock inversion.
+ for(const qr of [false,true])for(const existingLedger of [false,true]){
+  const f=fixture({qr});await invoke(f);if(existingLedger)await count(f);
+  const run=f.m.db.runTransaction.bind(f.m.db);let attempts=0;
+  f.m.db.runTransaction=(callback,...args)=>run(tx=>{
+   attempts++;const reads=[];let writing=false;
+   return callback(new Proxy(tx,{get(target,key){
+    if(key==='get'||key==='getAll')return async(...refs)=>{
+     assert(!writing,'all rebuild reads must precede writes');
+     reads.push(...refs.map(ref=>ref.path));return target[key](...refs);
+    };
+    if(['set','create','update','delete'].includes(key))return(...params)=>{
+     assert.equal(reads.at(-1),'hostStats/admin','stats conflict barrier must be the final read');
+     assert(reads.indexOf('hostCompletionLedger/'+code)<reads.length-1,'ledger must precede stats');
+     assert(f.buckets.every(b=>reads.includes('tournaments/'+code+'/matchBuckets/'+b.bucketId)),'bucket validation must precede stats');
+     writing=true;return target[key](...params);
+    };
+    const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+   }}));
+  },...args);
+  // A concurrent stats change still invalidates the read and retries normally.
+  f.m.interfere=()=>f.m.put('hostStats/admin',{completedHostedCount:999});
+  assert.equal(await H.rebuildHost(options(f)),1);assert.equal(attempts,2);
+  assert.equal(f.m.rows.get('hostStats/admin').completedHostedCount,1);checks++;
+ }
  console.log(JSON.stringify({hostingChecks:checks,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
 

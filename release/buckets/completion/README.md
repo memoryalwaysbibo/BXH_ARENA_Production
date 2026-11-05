@@ -17,3 +17,16 @@ When assembling a hosting source archive, replace its root `hosting.js` with the
 Validation includes local synthetic transactions, the actual captured hosting trigger with fixture SDK boundaries, and a real Firestore SDK Emulator workflow. They are not real Auth/App Check, Eventarc delivery or browser acceptance. PR714 contains the complementary general/ranked frontend handoff and bound ranked request candidate; integrate the exact reviewed backend/frontend commits and complete combined acceptance before enabling rooms. Broader writer inventory, derived consumers and six-court cutover/rollback acceptance remain required.
 
 The captured host-sync package declares Node22, firebase-admin14.4.0 and firebase-functions7.3.2. CI repeats the native suite on those exact declared versions in addition to the existing13.10.0/6.6.0 validation SDK. This checks declared-source compatibility; it does not inspect the production build's installed node_modules or constitute a live deployment smoke test.
+
+The 2026-11-05 captured-SDK contention run reproduced a ledger read failure
+after transaction lock timeouts (QR off, round 9). Rebuilds previously acquired
+the host stats read before validating room ledgers, while certified counts
+validated ledgers before committing a stats increment. The candidate now reads
+stats as the final transactional read after room/ledger/bucket validation and
+before any writes, removing that early stats lock. The read remains a conflict
+barrier; authorization, atomic ledger/count/outbox writes and SDK retries are
+unchanged. Regression checks cover both QR modes and existing/missing ledgers,
+and inject a concurrent stats change to require a real fixture transaction retry.
+Native validation retains 20 fresh count/sync/sync rounds per QR mode on the
+captured SDK. The change is a candidate lock-order correction, not a production
+deployment receipt or proof that every emulator/SDK contention failure is solved.

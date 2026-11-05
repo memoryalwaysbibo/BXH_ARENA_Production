@@ -19,11 +19,13 @@ async function countCertified({db,tx,root,pub,profile,prior,ledger,stats,FieldVa
 module.exports={...A,countCertified};
 
 // Each host is rebuilt from a fresh transactional query, never an earlier global
-// scan's absolute totals. Reading stats also serializes concurrent increments.
+// scan's absolute totals. Read the stats conflict barrier after room/ledger
+// validation, immediately before writes: an early stats lock can block a
+// certified count's commit while this rebuild waits for that count's ledger.
 async function rebuildHost({db,uid,FieldValue,completion,stateOf,requireActiveActor=false}){
  if(typeof uid!=='string'||!uid||uid.includes('/'))A.fail('invalid-host');
  return db.runTransaction(async tx=>{
-  const stats=db.doc('hostStats/'+uid),[profile,oldStats,rooms]=await Promise.all([tx.get(db.doc('users/'+uid)),tx.get(stats),tx.get(db.collection('tournaments').where('createdBy','==',uid))]);
+  const stats=db.doc('hostStats/'+uid),[profile,rooms]=await Promise.all([tx.get(db.doc('users/'+uid)),tx.get(db.collection('tournaments').where('createdBy','==',uid))]);
   if(requireActiveActor&&(!profile.exists||profile.data().active!==true))A.fail('inactive-account');
   if(rooms.size>200)A.fail('bucket-host-rebuild-size-budget');
   let count=0,bytes=0;const creates=[],retention=[];
@@ -51,6 +53,7 @@ async function rebuildHost({db,uid,FieldValue,completion,stateOf,requireActiveAc
    if(!prior.exists)creates.push([db.doc('hostCompletionLedger/'+root.id),{...summary,...binding,ownerUid:uid,eventCode:root.id,verifiedAt:FieldValue.serverTimestamp()}]);
   }
   if(creates.length+retention.length+2>450)A.fail('bucket-host-rebuild-size-budget');
+  await tx.get(stats);
   for(const [ref,value]of retention)tx.update(ref,value);
   for(const [ref,value]of creates)tx.create(ref,value);
   tx.set(stats,{completedHostedCount:count,titleHistoryStartDate:'2026-09-21',updatedAt:FieldValue.serverTimestamp()},{merge:true});

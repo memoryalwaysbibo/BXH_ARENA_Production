@@ -142,7 +142,7 @@
     "protocol/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a"
   },
   "helperFiles": {
-    "README.md": "3fad7471ede0577ffd9762ec57e8bdd4b1680144cbea291fb8f39ebc86241f99",
+    "README.md": "a49ec4fa7a6eb1cb56b22914ac36f829058844432cd5d0e591611eacd219e0c8",
     "certificate.cjs": "8303d0ebe31752c7edb21bfecec08d1a9d3870bb509bab0dbfff7cd6a2bd5152",
     "general-completion.cjs": "2eea28a22f6815cc63787b960aa4701a52d6157536773b1e4fa4b5bf11c2faed",
     "hosting/15/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
@@ -151,7 +151,7 @@
     "hosting/16/hosting.js": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
     "hosting/host-sync/hosting-core.js": "10be2ab437fa20d0115405eca13fe47f56736a9808a8d6e6812b56b2d4562680",
     "hosting/host-sync/hosting.js": "fc95a285d1dac35ab9a3190ff8061146cc799d6ca97947cb7d4ddf186f03af8d",
-    "hosting-guard.cjs": "14f6ffe9fef25050f5b9e212211dd15318a57c808ed496892460051e75a301be",
+    "hosting-guard.cjs": "706522ddef93377b6bb9535b354d84cc2e5a55e66424f7ba6bf0d9134981daf4",
     "index.js": "cabc41a95fff794252a1df078c3cf862272b26acc71e4351eb06b8c34e949a6c",
     "package.json": "4b3a67b85f1e1a41f37e6133347009266c33e0d39168bdd4dc4648c181091806",
     "protocol/core.cjs": "a83eb0af577420f256802e4d0a8ece7b45c1efbc6433047cf4931d034be23713",
