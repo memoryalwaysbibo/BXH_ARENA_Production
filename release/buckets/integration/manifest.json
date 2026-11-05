@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "a87eba51f2d667a28409519600c49db0af10de7e",
+  "baseMain": "63a6f395d2c6f2742f7f319a4ef7c95ed576b588",
   "components": [
     {
       "pr": 707,
@@ -78,7 +78,7 @@
       ]
     },
     "modules/main-app/core.js": {
-      "blob": "607bafef82706d8532263e0847305c06f34847a6",
+      "blob": "1562335664596acf33e30d0c4a6e01a74bafab5c",
       "components": [
         707,
         714
@@ -2210,7 +2210,7 @@
       "v": "20261001-ui-v2"
     }
   },
-  "mainCoreBlob": "bfe6cf771f74c93e5b5d3f6f35a66670d8b80c6c",
+  "mainCoreBlob": "f97c0609e3323c82dd700d8b9641912d0aaaa41f",
   "resolutions": {
     "index.html": "preserve every current-main script query value; union component cache tokens and insert settlement script after bucket browser",
     "modules/main-app/core.js": "merge current main community referee changes with integrated 707/714 bucket changes; verify merged blob and regressions",
