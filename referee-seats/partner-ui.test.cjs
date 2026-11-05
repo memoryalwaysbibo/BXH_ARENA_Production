@@ -30,3 +30,14 @@ test('general room players score only as main, while active staff can assist wit
  assert(!c.window.BXHRefereeSeats.canScore(h.state,1,'backup'));
  c.userProfile.role='staff';assert(c.canOperateStation(2));c.userProfile.accountStatus='frozen';assert(!c.canOperateStation(2));
 });
+
+test('accepted community referee can return from live view; unseated player cannot open referee or management',()=>{
+ const h=harness();Object.assign(h.state.meta,{eventAuthority:'community',ladderMode:'general'});
+ const c=h.c;Object.assign(c,{hasAdminAccess:()=>false,canOperateCurrentTournament:()=>false,showToast:message=>{c.toast=message},render:()=>{},resetRegistrationFormDraft:()=>{},stopAdminRosterWatch:()=>{},resetAdminRegistrationsCache:()=>{},activeTab:'live',registrationFormDraftDirty:false,historyCloudSyncBusy:false,adminTournamentListBusy:false});
+ const start=source.indexOf('function canSupportCommunityCourt('),end=source.indexOf('function canOperateMatchStation(',start);vm.runInContext(source.slice(start,end),c);
+ const nav=source.slice(source.indexOf('  if(action==="switch-tab"){'),source.indexOf('  if(action==="force-refresh-version"){'));
+ vm.runInContext('navigate=function(tab){const action="switch-tab",target={getAttribute:()=>tab};'+nav+'}',c);
+ c.navigate('referee');assert.equal(c.activeTab,'referee');
+ c.activeTab='live';c.navigate('settings');assert.equal(c.activeTab,'live');assert.equal(c.toast,'目前身分沒有此操作權限。');
+ delete h.state.meta.refereeSeatsV1.courts[1].main;c.toast='';c.navigate('referee');assert.equal(c.activeTab,'live');assert.equal(c.toast,'目前身分沒有此操作權限。');
+});
