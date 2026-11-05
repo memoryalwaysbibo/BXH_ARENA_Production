@@ -21734,7 +21734,8 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     if(targetTab==='commerce-admin'&&!isSuperAdmin()){showToast('目前身分沒有商城管理權限。',true);return;}
     if(targetTab==='inventory-admin'&&!isSuperAdmin()){showToast('目前身分沒有道具管理權限。',true);return;}
     if(targetTab==='team-preview'&&!window.BXHTeamAdminPreview?.visible?.()){showToast('目前身分沒有戰隊預覽權限。',true);return;}
-    if((targetTab==="management" || targetTab==="referee" || targetTab==="settings" || targetTab==="registrations" || targetTab==="people") && !hasAdminAccess()){
+    if((targetTab==="management" || targetTab==="settings" || targetTab==="registrations" || targetTab==="people"
+      || (targetTab==="referee" && !canUseRefereeSeatCommands())) && !hasAdminAccess()){
       showToast("目前身分沒有此操作權限。", true);
       return;
     }
