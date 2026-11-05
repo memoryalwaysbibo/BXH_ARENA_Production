@@ -2,7 +2,7 @@
 
 This branch assembles reviewed candidates #707, #709, #711, #712, #713,
 #714, #715, #717 and #718 on selected main
-`5a760cf7f61f77dffd9d4ec64d8db0f0de1ecff4`. The exact component heads,
+`d35d960e08d207a9b06a088d5de990a2f8201a1f`. The exact component heads,
 merge bases and resulting component-file Git blob hashes are recorded in
 `manifest.json`. This is an integration review, not a deployment archive or a
 replacement for the component source/configuration provenance requirements.

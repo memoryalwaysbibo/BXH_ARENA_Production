@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "5a760cf7f61f77dffd9d4ec64d8db0f0de1ecff4",
+  "baseMain": "d35d960e08d207a9b06a088d5de990a2f8201a1f",
   "components": [
     {
       "pr": 707,
@@ -64,7 +64,7 @@
       ]
     },
     "index.html": {
-      "blob": "cd65dfb688aba38a5fbbec94c070d653651d2348",
+      "blob": "2e6cb3e7e8b60eff0ec5f0e6d7832843da9a26d4",
       "components": [
         707,
         714
@@ -1798,7 +1798,7 @@
     },
     "release/buckets/integration/README.md": {
       "components": [],
-      "blob": "ecbce2e680a3854f8eb85c90fcc751428abe0783"
+      "blob": "10c5a459d46dbd0901cac4b8b7dd778a63f22eb5"
     },
     "scripts/bucket-writer-followup.py": {
       "components": [],
@@ -2042,7 +2042,7 @@
     },
     "my-events-player-slice.js": {},
     "modules/main-app/registration-feedback.js": {
-      "v": "20261102-phase1-1"
+      "v": "20261105-confirming-copy-1"
     },
     "modules/main-app/community-referee-invite.js": {
       "v": "20261105-invite-1"
@@ -2278,7 +2278,7 @@
   },
   "mainCoreBlob": "cfa6bf1a0a4564547bb8e83a039366519e82250f",
   "resolutions": {
-    "index.html": "Three-way merge with current main 5a760cf; preserve all current-main script query values, QR invite module ordering, and candidate delete-intent/bucket-settlement cache tokens.",
+    "index.html": "Three-way merge with main d35d960e; preserve its registration confirmation wording/cache token and every existing main query parameter, QR module order, plus candidate delete-intent/bucket-settlement tokens.",
     "modules/main-app/core.js": "Clean three-way merge of main's community-referee QR invite hooks with existing bucket deletion/settlement changes; exact merged blob pinned.",
     "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve all prior checks and default single-round workload; permit bounded fresh count/sync/sync contention rounds (1-50) without retrying failures, with QR/round labels and native read diagnostics.",

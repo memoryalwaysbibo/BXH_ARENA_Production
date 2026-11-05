@@ -171,10 +171,10 @@
       panel.replaceChildren();panel.hidden=!rows.length;
       for(const row of rows){
         const box=document.createElement('div');box.className='registration-feedback-item';
-        const title=document.createElement('strong');title.textContent=row.state==='confirmed'?'報名狀態已確認':row.state==='failed'?'本次報名未完成':row.state==='preparing'?'正在確認報名資格':row.state==='submitting'?'報名送出中':row.state==='checking'?'正在查詢報名結果':'報名結果尚未確認';
+        const title=document.createElement('strong');title.textContent=row.state==='confirmed'?'報名狀態已確認':row.state==='failed'?'本次報名未完成':row.state==='preparing'?'正在確認報名資格':row.state==='submitting'?'報名送出中':row.state==='checking'?'正在查詢報名結果':'報名結果確認中';
         const detail=document.createElement('p');detail.setAttribute('role','status');detail.setAttribute('aria-live','polite');
         const statuses=row.statuses.map(s=>({confirmed:'正取',waitlist:'備取',pending_draw:'等待抽籤'}[s]));
-        detail.textContent=row.code+'｜'+(row.state==='confirmed'?statuses.join('、'):row.state==='failed'?row.message:row.state==='preparing'?'尚未取得名額，請稍候。':row.state==='submitting'?'請勿重複點擊；送出不代表已取得名額。':'正在確認是否報名成功，請勿重新送出。');
+        detail.textContent=row.code+'｜'+(row.state==='confirmed'?statuses.join('、'):row.state==='failed'?row.message:row.state==='preparing'?'尚未取得名額，請稍候。':row.state==='submitting'?'請勿重複點擊；送出不代表已取得名額。':'尚在確認是否已取得名額，請稍候。');
         box.append(title,detail);
         if(ACTIVE.includes(row.state)&&row.submitted){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='查詢報名結果';button.disabled=row.state==='checking';button.onclick=()=>void controller.recheck(row.code);box.appendChild(button);}
         if(row.canRetry){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='重送原報名';button.onclick=()=>{void controller.retryOriginal(row.code).catch(()=>{});};box.appendChild(button);const hint=document.createElement('p');hint.textContent='沿用同一筆報名確認結果，不會另建新請求；名額仍依伺服器判定。';box.appendChild(hint);}
