@@ -9,7 +9,7 @@ const {wave,sourceGeneration}=require('./check.cjs');
  const save=()=>fs.writeFileSync(output,JSON.stringify({scope:'Local real Firestore Emulator; synthetic authenticated users; not live Cloud Run capacity',count:100,repetitions:2,sourceGeneration,candidateSha256,method:'All clients begin preview together, then immediately join with preview allocation. No manual retries, no frontend polling. Independent module graphs simulate per-process schedulers, in one Node process.',results},null,2)+'\n');
  for(const scenario of cases){
   for(let repetition=1;repetition<=2;repetition++){
-   const modes=repetition===1?[[false,1],[true,1],[true,4]]:[[true,4],[true,1],[false,1]];
+   const modes=repetition===1?[[false,1],[true,1],[true,5]]:[[true,5],[true,1],[false,1]];
    for(const [candidate,instances]of modes){
     const result=await wave(candidate,100,scenario.capacity,scenario.waitlistCapacity,instances);
     result.repetition=repetition;
