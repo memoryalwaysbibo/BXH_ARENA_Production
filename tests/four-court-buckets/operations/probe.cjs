@@ -77,6 +77,14 @@ const tracker=s=>s.function.startsWith('track');
 const actions=s=>s.function==='eventStaffService'?['invite','accept','reject','revoke']:s.function==='updateTournamentRaffleWinner'?['claim','forfeit','replace']:s.function==='trackTournamentRegistrationActivity'?['write','delete']:['default'];
 function normalized(m,result){return JSON.parse(JSON.stringify({rows:[...m.rows],writes:m.writes,result},(k,v)=>k==='sourceCreatedAt'?undefined:v));}
 module.exports={memory,load,fixture,specs,actions,NOW,code,uid};
+function bucket(f){
+ const tr='tournaments/'+code,pr='publicTournaments/'+code,t=f.m.rows.get(tr),p=f.m.rows.get(pr),s=JSON.parse(t.data);
+ s.id='physical-room-1';s.cloudCode=code;s.meta.stations=6;
+ const m={schema:'bxh-match-buckets-v1',status:'active',epoch:'epoch-1',roomId:s.id,code,courtCount:6,bucketCount:2};
+ f.m.put(tr,{...t,data:JSON.stringify(s),scoreStorage:m});
+ f.m.put(pr,{...p,scoreBucketProjection:{epoch:m.epoch,versions:{'court-1':0,'court-2':0}}});
+ return {tr,pr};
+}
 if(require.main===module)(async()=>{let checks=0;
  for(const spec of specs)for(const action of actions(spec)){
   const a=fixture(spec,action),b=fixture(spec,action),ra=await load(spec,false,a.m)(a.request),rb=await load(spec,true,b.m)(b.request);
@@ -116,5 +124,31 @@ if(require.main===module)(async()=>{let checks=0;
  {const s=specs.find(s=>s.function==='eventStaffService');for(const action of ['accept','reject'])for(const missing of [false,true]){
   const f=fixture(s,action);if(missing)f.m.remove('users/target');else f.m.put('users/target',{active:false});await assert.rejects(load(s,true,f.m)(f.request),/account-inactive/);assert.equal(f.m.writes.length,0);checks++;
  }}
+ { const s=specs.find(x=>x.function==='eventStaffService');assert(s);
+ for(const action of ['invite','accept','reject','revoke']){
+  const f=fixture(s,action);bucket(f);const result=await load(s,true,f.m)(f.request);
+  assert(result.ok&&f.m.writes.length>0,action);checks++;
+ }
+ for(const change of ['private-marker','public-marker','private-vector','public-vector','epoch','migration','deletion','stale-root']){
+  const f=fixture(s,'invite'),{tr,pr}=bucket(f),t=f.m.rows.get(tr),p=f.m.rows.get(pr);
+  if(change==='private-marker'){delete t.scoreStorage;f.m.put(tr,t);}
+  if(change==='public-marker'){delete p.scoreBucketProjection;f.m.put(pr,p);}
+  if(change==='private-vector'){t.scoreBucketProjection={};f.m.put(tr,t);}
+  if(change==='public-vector'){p.scoreBucketProjection.versions['court-2']=-1;f.m.put(pr,p);}
+  if(change==='epoch'){p.scoreBucketProjection.epoch='other';f.m.put(pr,p);}
+  if(change==='migration'){t.bucketMigration=null;f.m.put(tr,t);}
+  if(change==='deletion'){p.deletionStatus=false;f.m.put(pr,p);}
+  if(change==='stale-root'){t.scoreStorage.roomId='other';f.m.put(tr,t);}
+  await assert.rejects(load(s,true,f.m)(f.request),/bucket-scoring-required/,change);
+  assert.equal(f.m.writes.length,0,change);checks++;
+ }
+ for(const change of ['epoch','birth']){
+  const f=fixture(s,'invite'),{tr}=bucket(f);
+  f.m.interfere=()=>{const t=f.m.rows.get(tr);if(change==='epoch')f.m.put(tr,{...t,scoreStorage:{...t.scoreStorage,epoch:'epoch-2'}});else{f.m.remove(tr);f.m.put(tr,t);}};
+  await assert.rejects(load(s,true,f.m)(f.request),/room-generation-changed|bucket-scoring-required/,change);
+  assert.equal(f.m.writes.length,0,change);checks++;
+ }
+ {const f=fixture(s,'invite'),{pr}=bucket(f);f.m.interfere=()=>{const p=f.m.rows.get(pr);f.m.put(pr,{...p,scoreBucketProjection:{...p.scoreBucketProjection,versions:{'court-1':1,'court-2':0}}});};const result=await load(s,true,f.m)(f.request);assert(result.ok);checks++;}
+ }
  console.log(JSON.stringify({operationsChecks:checks,functions:specs.length,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

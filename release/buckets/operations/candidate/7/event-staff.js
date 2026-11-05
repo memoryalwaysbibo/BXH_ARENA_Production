@@ -26,7 +26,22 @@ function mapError(error){
   throw error;
 }
 const owns=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
-const bucketOwned=(...rows)=>rows.some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>owns(x,k)));
+// Staff assignments change metadata only. Validate both score owners before any
+// write and remember the physical room/epoch across Firestore transaction retries.
+function staffRoomContext(parent,pub){
+ const t=parent.data()||{},p=pub.data()||{};
+ if([t,p].some(x=>owns(x,'bucketMigration')||owns(x,'deletionStatus')))throw Error('bucket-scoring-required');
+ const privateMarked=owns(t,'scoreStorage'),publicMarked=owns(p,'scoreBucketProjection');
+ if(!privateMarked&&!publicMarked){
+  if(owns(t,'scoreBucketProjection')||owns(p,'scoreStorage'))throw Error('bucket-scoring-required');
+  return 'legacy';
+ }
+ if(!privateMarked||!publicMarked||!pub.exists||owns(t,'scoreBucketProjection')||owns(p,'scoreStorage'))throw Error('bucket-scoring-required');
+ let s;try{s=JSON.parse(t.data);}catch{throw Error('bucket-scoring-required');}
+ const m=t.scoreStorage,v=p.scoreBucketProjection,count=Number(s?.meta?.stations);
+ if(m?.schema!=='bxh-match-buckets-v1'||m.status!=='active'||typeof m.epoch!=='string'||!m.epoch||typeof m.roomId!=='string'||!m.roomId||m.code!==parent.id||s.id!==m.roomId||s.cloudCode!==m.code||!Number.isSafeInteger(count)||count<1||count>32||m.courtCount!==count||m.bucketCount!==Math.ceil(count/4)||v?.epoch!==m.epoch||!v.versions||Object.keys(v.versions).length!==m.bucketCount||Array.from({length:m.bucketCount},(_,i)=>v.versions['court-'+(i+1)]).some(x=>!Number.isSafeInteger(x)||x<0))throw Error('bucket-scoring-required');
+ return JSON.stringify(['bucket',m.roomId,m.epoch,m.courtCount,m.bucketCount]);
+}
 function created(snapshot){
  const time=snapshot?.createTime;
  if(!snapshot?.exists||!Number.isSafeInteger(time?.seconds)||!Number.isSafeInteger(time?.nanoseconds))throw Error('room-identity-missing');
@@ -42,10 +57,10 @@ function assertChildRoom(parent,child){
 }
 function assertRoom(parent,pub,observed){
  if(!parent.exists)throw Error('event-not-found');
- if(bucketOwned(parent.data(),pub.data()))throw Error('bucket-scoring-required');
+ const context=staffRoomContext(parent,pub);
  const id=identity(parent);
- if(observed&&observed.id!==undefined&&observed.id!==id)throw Error('room-generation-changed');
- if(observed)observed.id=id;
+ if(observed&&observed.id!==undefined&&(observed.id!==id||observed.context!==context))throw Error('room-generation-changed');
+ if(observed){observed.id=id;observed.context=context;}
  return id;
 }
 async function loadOrganizerEvent(uid,eventCode,tx=null,observed=null){

@@ -853,7 +853,7 @@
       ]
     },
     "release/buckets/operations/README.md": {
-      "blob": "16e48e4cd5c408b1e3a9cb4e52e96809def53c2b",
+      "blob": "b082f10ecb6d547a3b0858b88a626adeea7056bf",
       "components": [
         712
       ]
@@ -865,13 +865,13 @@
       ]
     },
     "release/buckets/operations/candidate/7/event-staff.js": {
-      "blob": "3311352fbd4b7f8d5b6893f06f317e06d803c621",
+      "blob": "8baf20e9f1eb250a2fe30331a5ed78da0f7a3c7f",
       "components": [
         712
       ]
     },
     "release/buckets/operations/patch-manifest.json": {
-      "blob": "74e354f43157626be5265b208e6a4d229ad8f37e",
+      "blob": "02c9b404d1f91947dd62f549e4389b35067154b7",
       "components": [
         712
       ]
@@ -943,7 +943,7 @@
       ]
     },
     "tests/four-court-buckets/operations/probe.cjs": {
-      "blob": "088e582593b5de9a3ec8d7dc736368baff2218eb",
+      "blob": "c628c7a07831d70dc1f3f0d42c37f77202e63d68",
       "components": [
         712
       ]

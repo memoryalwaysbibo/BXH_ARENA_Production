@@ -14,12 +14,16 @@ the four set-5 functions were independently inventoried then deduplicated by the
 actual archive bytes. A shared module does not authorize a shared-codebase rollout.
 Each deployed function still needs its own current metadata/configuration check.
 
-All mutation paths reject presence of `scoreStorage`, `scoreBucketProjection`,
-`bucketMigration`, or `deletionStatus` on either room root, including malformed,
-null, false and unknown values. Background activity events skip such rooms instead
-of recreating trackers. Staff read-only lists/search and raffle preview remain
-unchanged. Missing public mirrors remain permitted for ordinary private-only
-metadata operations, matching the captured implementation.
+Raffle/activity mutation paths still reject presence of `scoreStorage`,
+`scoreBucketProjection`, `bucketMigration`, or `deletionStatus` on either root,
+including malformed, null, false and unknown values. Background activity events
+skip such rooms instead of recreating trackers. Staff read-only lists/search and
+raffle preview remain unchanged. Ordinary legacy staff mutations still permit a
+missing public mirror, matching the captured implementation. Staff assignment
+mutations now permit an active, consistent private manifest/public projection
+while rejecting migration/deletion markers and malformed or partial bucket
+ownership. Their transaction rechecks physical room birth and bucket epoch;
+score revision advancement may retry without blocking a metadata-only edit.
 
 Staff invitations store `sourceCreatedAt` in the private assignment map and
 external assignment record. Responses and revocations reject records from an
@@ -49,11 +53,12 @@ reuse retry and then skip, rather than recreate an activity record afterward.
 Activity payloads remain the original monotonic `lastAt` merge.
 
 This is fail-closed **legacy isolation**, not complete bucket feature support.
-Staff assignment/revocation needs a supported bucket-aware path before enabling
-bucket rooms; blocking revocation alone is not acceptable rollout completion.
-Raffle consumers likewise need authoritative bucket state, especially first-round
-eligibility. Bucket-aware activity/idle behavior, other writers, settlement,
-archival and six-court cutover/rollback acceptance remain open.
+Staff invite/accept/reject/revoke now have a source-only bucket-aware metadata
+candidate; this does not grant new referee or scoring authority. It has not been
+deployed or accepted with real Auth/App Check. Raffle consumers still need
+authoritative bucket state, especially first-round eligibility. Bucket-aware
+activity/idle behavior, other writers, settlement, archival and six-court
+cutover/rollback acceptance remain open.
 
 Tests compare original/candidate behavior on synthetic ordinary rooms, use
 transaction retry interference, and exercise delayed events and room reuse.
@@ -69,3 +74,17 @@ five named entrypoints. Do not deploy the older set-5 restore/idle-close or any
 other sibling exports: those have separately fenced live implementations.
 Reconcile/drain older in-flight writers before any cutover. No deployment helper,
 Rules update, flag change or room activation is included in this package.
+
+## Bucket staff metadata candidate
+
+The same transaction that writes assignments reads both room roots and requires
+an active manifest with the exact physical room ID, code, epoch, court count and
+complete nonnegative public revision-vector shape. It does not read bucket scores
+or change the score manifest, projection vector, roster or serialized state.
+Missing/malformed marker pairs, unknown phases, deletion and migration stop
+before any writes. All four staff transitions succeed in a consistent synthetic
+six-court room. A retry after parent replacement or epoch change rejects before
+writes; a score revision advance retries and preserves the metadata edit. The
+existing 681 operations checks still pass, plus 15 bucket staff checks (696 total).
+This only resolves this one staff metadata route; real operator/browser and
+permission acceptance remains separate.
