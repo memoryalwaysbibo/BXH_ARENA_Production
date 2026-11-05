@@ -90,7 +90,8 @@ async function semantics(){
  }
  console.log(JSON.stringify({semantics:'PASS',sameOperationUnique:true,currentCancellationPreserved:true,inactiveDenied:true}));
 }
-(async()=>{
+module.exports={wave,semantics};
+if(require.main===module)(async()=>{
  const results=[];
  // Alternate order to make warmup effects visible. Emulator timings are not cloud latency.
  for(const n of process.env.CANDIDATE_ONLY?[]:[1,10,40]){results.push(await wave(false,n));results.push(await wave(true,n));}
