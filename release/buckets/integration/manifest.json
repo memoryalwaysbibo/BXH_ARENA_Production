@@ -91,7 +91,7 @@
       ]
     },
     "release/buckets/deletion/README.md": {
-      "blob": "4006c1f49ab77fb1d7be173b51cf4e9fec30a9a6",
+      "blob": "df507f321076f7fb6d5f814ff9ff33d926cce446",
       "components": [
         707
       ]
@@ -1771,6 +1771,18 @@
         707
       ],
       "blob": "8699da62776cbc9e3413087c213d2d4239525a46"
+    },
+    "scripts/build-bucket-restore-access-review.py": {
+      "components": [
+        707
+      ],
+      "blob": "12f1048c0bb3e403f90e6c69e36e26260c96f2d8"
+    },
+    "release/buckets/deletion/review-source-manifest.json": {
+      "components": [
+        707
+      ],
+      "blob": "8e6c99fddfe780943c15f55f9ccd80e87ca27335"
     }
   },
   "mainScriptQueryParameters": {
@@ -2229,6 +2241,7 @@
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
     ".github/workflows/bucket-integrated-candidate.yml": "Run the desktop snapshot-burst regression without retries after the existing same-checkout browser contracts; use matching isolated Playwright runner/browser versions.",
     "release/buckets/deletion/manifest.json": "Refresh only restore/access deployed archive and source-closure provenance against the uploaded 2026-11-05 read-only capture; runtime candidate files retain their accepted hashes.",
-    "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks."
+    "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks.",
+    "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls."
   }
 }

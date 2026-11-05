@@ -154,3 +154,29 @@ The candidate is still not deployed or activated. Preserve each target's complet
 live archive and configuration during later source-only packaging; the older Rules
 fixture is not a live Rules deployment target. Use the separately reconciled
 current community Rules boundary for release planning.
+
+## Reproduce the two review source archives
+
+Run from this exact candidate tree, using the original uploaded capture and a new
+output directory:
+
+```sh
+python3 -B scripts/build-bucket-restore-access-review.py \
+  --capture /absolute/path/bxh-719-review.zip \
+  --output /absolute/path/new-review-directory
+```
+
+The builder makes no cloud requests. It checks the complete capture digest,
+target identity, revision, immutable source generation, build/service/trigger
+digests, captured dependency hashes and candidate file hash before writing output.
+It preserves the member list and bytes of every other archived file. Restore
+changes only operations.js (75 members unchanged); access changes only
+room-access-service.js (96 members unchanged). No deployment/configuration/Rules
+action or runtime activation is included. The output directory must not exist.
+
+The recorded review-source-manifest.json contains only source/provenance hashes
+and review status. A second local build produced byte-identical ZIPs and manifest;
+a modified capture was rejected before creating output. This proves the two
+review packages are reproducible in the tested environment, not that release-time
+live source/configuration or authenticated cutover acceptance has passed. Fresh
+live drift checks and the remaining broader release gates still apply.
