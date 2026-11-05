@@ -5518,7 +5518,7 @@ window.addEventListener("offline",markLobbySourceUnknown);
 function publicTournamentListSignature(items){
   return JSON.stringify((Array.isArray(items)?items:[]).filter(t=>t&&t.code).map(raw=>{
     const summary=lobbySummary(raw);const {raw:ignored,...view}=summary;
-    return {...view,players:lobbyPublicPlayers(summary)};
+    return {...view,roster:lobbyRosterView(summary)};
   }).sort((a,b)=>String(a.code).localeCompare(String(b.code))));
 }
 function applyPublicTournamentItems(items,{renderIfChanged=true,source=null}={}){
@@ -15959,23 +15959,32 @@ function publicEventLifecycleStatus(t){
   const d=roomStatusDescriptor(phase);
   return {key:d.key,label:d.label,dot:d.dot,phase};
 }
-function lobbyPublicPlayers(t){
-  const players=t&&t.raw&&t.raw.parsedData&&Array.isArray(t.raw.parsedData.players)?t.raw.parsedData.players:[];
-  return players.filter(p=>p&&p.name).map(p=>({
-    id:String(p.id||""),
-    name:String(p.name||"").trim(),
-    checkedIn:p.checkedIn===true
-  })).filter(p=>p.name);
+function lobbyRosterView(t){
+  const raw=t?.raw||{},state=raw.parsedData||{};
+  const clean=rows=>(Array.isArray(rows)?rows:[]).filter(p=>p&&p.name).map(p=>({
+    id:String(p.id||""),name:String(p.name||""),checkedIn:p.checkedIn===true
+  }));
+  const original=clean(state.players),snapshot=raw.publicRegistrationRoster;
+  const prestart=t?.registrationEnabled===true&&t.phase==="waiting"&&t.battleMode!=="team"&&
+    !t.registrationSelection&&!state.startedAt&&!(state.matches||[]).length;
+  const valid=prestart&&snapshot?.version===1&&Array.isArray(snapshot.players)&&
+    snapshot.sourceUpdatedAt===raw.updatedAt&&snapshot.confirmedCount===raw.confirmedCount&&
+    snapshot.waitlistCount===raw.waitlistCount&&JSON.stringify(snapshot.sourcePlayers)===JSON.stringify(original);
+  const players=clean(valid?snapshot.players:original).map(p=>({...p,name:p.name.trim()})).filter(p=>p.name);
+  const confirmed=Number(t?.confirmedCount||0);
+  const pending=prestart&&!valid&&players.length!==confirmed;
+  return {players,pending,count:pending?confirmed:(players.length||confirmed)};
 }
+function lobbyPublicPlayers(t){return lobbyRosterView(t).players;}
 function lobbyPlayerRosterHtml(t){
-  const players=lobbyPublicPlayers(t);
+  const {players,pending,count}=lobbyRosterView(t);
   const confirmed=Number(t&&t.confirmedCount||0);
   const checked=players.filter(p=>p.checkedIn).length;
-  const count=players.length||confirmed;
-  const countText=count+" 人"+(players.length&&checked?" · 已報到 "+checked:"");
+  const cardIds=new Set((t?.raw?.parsedData?.players||[]).map(p=>String(p.id||"")));
+  const countText=(pending?"正取 ":"")+count+" 人"+(pending?" · 名單更新中":players.length&&checked?" · 已報到 "+checked:"");
   const body=players.length
-    ? `<div class="lobby-roster-list">${players.map((p,i)=>`<div class="lobby-roster-player"><span class="lobby-roster-index">${String(i+1).padStart(2,"0")}</span><button type="button" class="lobby-roster-name lobby-roster-card-link" data-action="card-event-open" data-code="${esc(t.code)}" data-player-id="${esc(p.id)}" aria-label="查看 ${esc(p.name)} 的公開玩家名片">${esc(p.name)}</button>${p.checkedIn?'<span class="badge badge-ok">已報到</span>':""}</div>`).join("")}</div>
-       <div class="lobby-roster-note">僅顯示公開名稱與報到狀態；點名稱可查看公開名片。電話、Email 與帳號識別資料不會顯示。</div>`
+    ? `<div class="lobby-roster-list">${players.map((p,i)=>`<div class="lobby-roster-player"><span class="lobby-roster-index">${String(i+1).padStart(2,"0")}</span>${cardIds.has(p.id)?`<button type="button" class="lobby-roster-name lobby-roster-card-link" data-action="card-event-open" data-code="${esc(t.code)}" data-player-id="${esc(p.id)}" aria-label="查看 ${esc(p.name)} 的公開玩家名片">${esc(p.name)}</button>`:`<span class="lobby-roster-name">${esc(p.name)}</span>`}${p.checkedIn?'<span class="badge badge-ok">已報到</span>':""}</div>`).join("")}</div>
+       <div class="lobby-roster-note">${pending?"已顯示 "+players.length+" 位，名單更新後會自動顯示。":""}僅顯示公開名稱與報到狀態；點名稱可查看公開名片。電話、Email 與帳號識別資料不會顯示。</div>`
     : `<div class="lobby-roster-empty">${confirmed>0?"已有正取玩家，但正式公開名單尚未同步。":"目前尚無公開參賽名單。"}</div>`;
   return `<details class="lobby-roster-block">
     <summary class="lobby-roster-head"><span>👥 參賽玩家</span><span class="lobby-roster-count">${countText}</span></summary>

@@ -113,7 +113,7 @@ function harness() {
 }
 
 test('presentation signature ignores raw match bookkeeping but retains the newest raw cache', () => {
-  const h = harness(), first = [row()];
+  const h = harness(), first = [row({ confirmedCount: 1 })];
   h.apply(first, { source: fresh(first) }); h.frame();
   const next = clone(first);
   next[0].updatedAt++;

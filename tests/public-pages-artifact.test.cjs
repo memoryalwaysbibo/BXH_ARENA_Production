@@ -29,3 +29,5 @@ test('public-only, duplicate, missing and nonliteral flags fail closed',t=>{
  }
 });
 test('missing public runtime and unsafe staging destination prevent upload',t=>{const f=fixture(t);assert.throws(()=>prepare(f.root,f.root,f.files),/outside-checkout/);assert.throws(()=>prepare(f.root,f.out,f.files.filter(x=>!x.endsWith('styles.css'))),/missing-public-runtime/);});
+
+test('public registration backend and tests never enter the Pages artifact',t=>{const f=fixture(t);f.put('public-registration-roster/functions/service.cjs',f.uid+'0');f.put('public-registration-roster/firestore.emulator.test.cjs',f.uid+'0');prepare(f.root,f.out,f.files);assert.equal(fs.existsSync(path.join(f.out,'public-registration-roster')),false);});
