@@ -40,7 +40,7 @@ function staffRoomContext(parent,pub){
  let s;try{s=JSON.parse(t.data);}catch{throw Error('bucket-scoring-required');}
  const m=t.scoreStorage,v=p.scoreBucketProjection,count=Number(s?.meta?.stations);
  if(m?.schema!=='bxh-match-buckets-v1'||m.status!=='active'||typeof m.epoch!=='string'||!m.epoch||typeof m.roomId!=='string'||!m.roomId||m.code!==parent.id||s.id!==m.roomId||s.cloudCode!==m.code||!Number.isSafeInteger(count)||count<1||count>32||m.courtCount!==count||m.bucketCount!==Math.ceil(count/4)||v?.epoch!==m.epoch||!v.versions||Object.keys(v.versions).length!==m.bucketCount||Array.from({length:m.bucketCount},(_,i)=>v.versions['court-'+(i+1)]).some(x=>!Number.isSafeInteger(x)||x<0))throw Error('bucket-scoring-required');
- return JSON.stringify(['bucket',m.roomId,m.epoch,m.courtCount,m.bucketCount]);
+ return JSON.stringify(['bucket',m.roomId,m.epoch,m.courtCount,m.bucketCount,identity(pub)]);
 }
 function created(snapshot){
  const time=snapshot?.createTime;

@@ -11,7 +11,7 @@
       "path": "event-staff.js",
       "archiveSha256": "e0578dbc102e5bf08f71a36d2090144d995b63858491ed1859c3fd1f6c84749c",
       "baselineFileSha256": "b71a1c54f280f68e85d1df4e5dd458362703ac4b25efd7e73caee9884916351b",
-      "patchedFileSha256": "4549259b0a68cb57e1fb06aa289dbe4a997d54eedddc56b935a4accc764aa5d6",
+      "patchedFileSha256": "10921c91fe213424be6c617f48589b65fcd86e463f1ce83ef3335600322741bf",
       "edits": [
         {
           "before": "async function loadOrganizerEvent(uid,eventCode,tx=null){",
@@ -72,6 +72,10 @@
         {
           "before": "function assertRoom(parent,pub,observed){\n if(!parent.exists)throw Error('event-not-found');\n if(bucketOwned(parent.data(),pub.data()))throw Error('bucket-scoring-required');\n const id=identity(parent);\n if(observed&&observed.id!==undefined&&observed.id!==id)throw Error('room-generation-changed');\n if(observed)observed.id=id;\n return id;\n}",
           "after": "function assertRoom(parent,pub,observed){\n if(!parent.exists)throw Error('event-not-found');\n const context=staffRoomContext(parent,pub);\n const id=identity(parent);\n if(observed&&observed.id!==undefined&&(observed.id!==id||observed.context!==context))throw Error('room-generation-changed');\n if(observed){observed.id=id;observed.context=context;}\n return id;\n}"
+        },
+        {
+          "before": " return JSON.stringify(['bucket',m.roomId,m.epoch,m.courtCount,m.bucketCount]);",
+          "after": " return JSON.stringify(['bucket',m.roomId,m.epoch,m.courtCount,m.bucketCount,identity(pub)]);"
         }
       ]
     },

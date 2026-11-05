@@ -148,6 +148,12 @@ if(require.main===module)(async()=>{let checks=0;
   await assert.rejects(load(s,true,f.m)(f.request),/room-generation-changed|bucket-scoring-required/,change);
   assert.equal(f.m.writes.length,0,change);checks++;
  }
+ for(const action of ['invite','accept','reject','revoke']){
+  const f=fixture(s,action),{pr}=bucket(f);
+  f.m.interfere=()=>{const p=f.m.rows.get(pr);f.m.remove(pr);f.m.put(pr,p);};
+  await assert.rejects(load(s,true,f.m)(f.request),/room-generation-changed/,action+' public root replaced');
+  assert.equal(f.m.writes.length,0,action+' public root replaced');checks++;
+ }
  {const f=fixture(s,'invite'),{pr}=bucket(f);f.m.interfere=()=>{const p=f.m.rows.get(pr);f.m.put(pr,{...p,scoreBucketProjection:{...p.scoreBucketProjection,versions:{'court-1':1,'court-2':0}}});};const result=await load(s,true,f.m)(f.request);assert(result.ok);checks++;}
  }
  console.log(JSON.stringify({operationsChecks:checks,functions:specs.length,productionWrites:0,deploymentPerformed:false}));

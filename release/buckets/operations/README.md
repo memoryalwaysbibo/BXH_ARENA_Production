@@ -22,7 +22,7 @@ raffle preview remain unchanged. Ordinary legacy staff mutations still permit a
 missing public mirror, matching the captured implementation. Staff assignment
 mutations now permit an active, consistent private manifest/public projection
 while rejecting migration/deletion markers and malformed or partial bucket
-ownership. Their transaction rechecks physical room birth and bucket epoch;
+ownership. Their transaction rechecks both physical room births and bucket epoch;
 score revision advancement may retry without blocking a metadata-only edit.
 
 Staff invitations store `sourceCreatedAt` in the private assignment map and
@@ -83,8 +83,8 @@ complete nonnegative public revision-vector shape. It does not read bucket score
 or change the score manifest, projection vector, roster or serialized state.
 Missing/malformed marker pairs, unknown phases, deletion and migration stop
 before any writes. All four staff transitions succeed in a consistent synthetic
-six-court room. A retry after parent replacement or epoch change rejects before
-writes; a score revision advance retries and preserves the metadata edit. The
-existing 681 operations checks still pass, plus 15 bucket staff checks (696 total).
+six-court room. A retry after either private/public root replacement or epoch change rejects
+before writes; a score revision advance retries and preserves the metadata edit. The
+existing 681 operations checks still pass, plus 19 bucket staff checks (700 total).
 This only resolves this one staff metadata route; real operator/browser and
 permission acceptance remains separate.
