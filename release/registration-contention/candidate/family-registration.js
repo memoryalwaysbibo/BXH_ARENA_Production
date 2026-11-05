@@ -33,7 +33,7 @@ function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}
  if(!['preview','join','cancel','syncSummary'].includes(d.action)||d.action!=='preview'&&!/^[a-zA-Z0-9_-]{8,100}$/.test(d.operationId||''))throw Error('invalid-operation');
  return db.runTransaction(async tx=>{
   const ar=fr.collection('registrationActions').doc(hash(d.operationId||'preview'));
-  const [ts,ps,us,fs,op]=await tx.getAll(tr,pr,db.doc('users/'+uid),fr,...(d.action==='preview'?[]:[ar]));if(!active(us.data()))throw Error('auth-required');if(!ts.exists||!ps.exists)throw Error('not-found');
+  const [ts,ps,us,fs,op]=await tx.getAll(tr,pr,db.doc('users/'+uid),fr,ar);if(!active(us.data()))throw Error('auth-required');if(!ts.exists||!ps.exists)throw Error('not-found');
   const now=clock(); // Revalidate deadlines after admission, lock waits and SDK retries.
   const t=ts.data(),pub=ps.data(),u=us.data(),s=state(t),requestHash=hash(JSON.stringify(d)),profiles=fs.data()?.profiles||[];
   if(['preview','join'].includes(d.action)&&Access.normalizeMode(t.roomAccessMode)==='password'&&!Access.canBypass(uid,u,t)){const grant=await tx.get(tr.collection('accessGrants').doc(uid));if(!Access.grantValid(grant.data(),t,now))throw Error('room-password-required');}
@@ -94,7 +94,7 @@ function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}
   // Legacy v13.37 put a child in the guardian's registration slot. Move that document atomically, without changing counters.
   const legacyRef=tr.collection('registrations').doc(uid),legacy=await tx.get(legacyRef),old=legacy.data();const migrating=old?.familyPlayerId?old:null;
   const keys=[...new Set([...people.map(x=>x.key),...(migrating?[childKey(migrating.familyPlayerId)]:[])])];
-  const snapshots=await tx.getAll(...keys.map(k=>tr.collection('registrations').doc(k)));const existing=new Map(keys.map((k,i)=>[k,snapshots[i].data()]));
+  const snapshots=await Promise.all(keys.map(k=>k===uid?legacy:tx.get(tr.collection('registrations').doc(k))));const existing=new Map(keys.map((k,i)=>[k,snapshots[i].data()]));
   if(migrating){const target=childKey(migrating.familyPlayerId);if(existing.get(target))throw Error('registration-state-conflict');existing.set(target,migrating);existing.delete(uid);}
   const participants=quick?quickParticipants(s,quickRows):null;
   let occupied=participants?participants.count:0;
