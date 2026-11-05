@@ -6,29 +6,31 @@ const {initializeApp}=require('firebase-admin/app');
 initializeApp({projectId:process.env.GCLOUD_PROJECT});
 const fixture=require('../../tests/fixtures/registration-feedback-current-source.json');
 for(const [file,digest]of Object.entries(fixture.files))assert.equal(crypto.createHash('sha256').update(fixture.blobs[digest]).digest('hex'),digest,file);
-function handler(candidate,metrics){
+function handler(candidate,metrics,{clock=Date.now,admissionOptions,beforeTransaction}={}){
  const cache=new Map();
  function load(file){
   if(cache.has(file))return cache.get(file).exports;
   const source=candidate&&['family-registration.js','registration-admission.cjs'].includes(file)?fs.readFileSync(path.join(__dirname,'candidate',file),'utf8'):fixture.blobs[fixture.files[file]];
   assert(source,file);const module={exports:{}};cache.set(file,module);
   new Function('require','module','exports',source)(name=>name.startsWith('.')?load(path.posix.normalize(path.posix.join(path.posix.dirname(file),name))+(/\.(?:js|cjs)$/.test(name)?'':'.js')):require(name),module,module.exports);
+  if(candidate&&file==='registration-admission.cjs'&&admissionOptions){const original=module.exports.createAdmission;module.exports.createAdmission=options=>original({...options,...admissionOptions});}
   return module.exports;
  }
  const native=load('_qr_checkin/admin-firestore.cjs').getFirestore();
  const db=new Proxy(native,{get(target,key){
   if(key==='runTransaction')return async(callback,options)=>{
    const start=performance.now();let attempts=0;
-   try{return await target.runTransaction(async tx=>{attempts++;return callback(tx);},options);}
+   try{if(beforeTransaction)await beforeTransaction(options);return await target.runTransaction(async tx=>{attempts++;return callback(tx);},options);}
    finally{metrics.push({readOnly:options?.readOnly===true,attempts,ms:performance.now()-start});}
   };
   const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
  }});
- return {db:native,call:load('family-registration.js').createFamilyRegistration(db,Date.now,{myEventsProofEnabled:true})};
+ const factory=()=>load('family-registration.js').createFamilyRegistration(db,clock,{myEventsProofEnabled:true});
+ return {db:native,call:factory(),newFactory:factory};
 }
-let serial=0;
+let serial=0;const runId=crypto.randomBytes(3).toString('hex').toUpperCase();
 async function seed(db,count,capacity=64,waitlistCapacity=16){
- const code='BXH-C'+String(++serial).padStart(6,'0'),now=Date.now();
+ const code='BXH-C'+runId+String(++serial).padStart(6,'0'),now=Date.now();
  const room={capacity,waitlistEnabled:true,waitlistCapacity,confirmedCount:0,waitlistCount:0,tournamentPhase:'waiting',registrationEnabled:true,registrationVisibility:'public',visibility:'public',publishedAt:now-1000,registrationOpenAt:now-1000,registrationCloseAt:now+3600000,cancellationDeadline:now+3600000,data:JSON.stringify({meta:{},players:[]})};
  const batch=db.batch();batch.set(db.doc('tournaments/'+code),room);batch.set(db.doc('publicTournaments/'+code),room);
  const ids=Array.from({length:count},(_,i)=>'synthetic-'+code+'-'+i);
@@ -90,7 +92,7 @@ async function semantics(){
  }
  console.log(JSON.stringify({semantics:'PASS',sameOperationUnique:true,currentCancellationPreserved:true,inactiveDenied:true}));
 }
-module.exports={wave,semantics};
+module.exports={wave,semantics,handler,seed,audit,sourceGeneration:fixture.sourceGeneration};
 if(require.main===module)(async()=>{
  const results=[];
  // Alternate order to make warmup effects visible. Emulator timings are not cloud latency.
