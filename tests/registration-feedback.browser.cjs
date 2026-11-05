@@ -83,7 +83,7 @@ test('unconfirmed request can resend its exact original operation, including aft
 });
 test('mobile panel stays inside the viewport and presents uncertainty without claiming failure',async t=>{
  const {page}=await fixture(t,{mobile:true,mode:'empty-drop'});await page.click('#lobby');await waitFor(page,()=>failures.length===1);
- const panel=page.locator('.registration-feedback-panel');assert.match(await panel.innerText(),/結果尚未確認/);const box=await panel.boundingBox();assert(box.x>=0&&box.x+box.width<=390&&box.y>=0&&box.y+box.height<=844);
+ const panel=page.locator('.registration-feedback-panel');assert.match(await panel.innerText(),/報名結果確認中/);const box=await panel.boundingBox();assert(box.x>=0&&box.x+box.width<=390&&box.y>=0&&box.y+box.height<=844);
  if(process.env.FEEDBACK_SCREENSHOT){await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:process.env.FEEDBACK_SCREENSHOT});}
 });
 test('another account cannot restore or read the previous account pending submission',async t=>{
