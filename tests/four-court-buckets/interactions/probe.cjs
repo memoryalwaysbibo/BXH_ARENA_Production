@@ -23,7 +23,7 @@ function load(spec,patched,m){
  const sdk=m.sdk||{FieldValue:{serverTimestamp:()=>NOW,increment:n=>({__increment:n}),delete:()=>({__delete:true})}};
  function moduleAt(filename){if(cache.has(filename))return cache.get(filename).exports;const module={exports:{}};cache.set(filename,module);const actual=patched&&filename===path.join(base,spec.path)?path.resolve(root,'../../../release/buckets/interactions/candidate',String(spec.sourceSet),spec.path):filename;
   function req(n){if(n==='./_qr_checkin/admin-firestore.cjs'||n==='firebase-admin/firestore')return sdk;if(n==='node:crypto')return {...require(n),randomInt:()=>0,randomUUID:()=> 'synthetic-operation-id'};if(n.startsWith('.')){const p=path.resolve(path.dirname(filename),n),resolved=[p,p+'.js',p+'.cjs'].find(x=>fs.existsSync(x));if(!resolved||!resolved.startsWith(base+path.sep))throw Error('unexpected dependency '+n);return moduleAt(resolved);}return require(n);}
-  vm.runInNewContext('(function(require,module,exports){'+fs.readFileSync(actual,'utf8')+'\n})',{Date:FixedDate,structuredClone,Buffer,process:{env:{GCLOUD_PROJECT:'bxh-arena'}},console},{filename:actual})(req,module,module.exports);return module.exports;
+  vm.runInNewContext('(function(require,module,exports){'+fs.readFileSync(actual,'utf8')+'\n})',{Date:FixedDate,structuredClone,Buffer,setTimeout,clearTimeout,process:{env:{GCLOUD_PROJECT:'bxh-arena'}},console},{filename:actual})(req,module,module.exports);return module.exports;
  }
  return moduleAt(path.join(base,spec.path))[factories[spec.function]](m.db,()=>NOW);
 }
@@ -72,6 +72,50 @@ if(require.main===module)(async()=>{
    const a=await outcome(spec,false,null,true),b=await outcome(spec,true,null,true);assert.equal(a.error,undefined,spec.function+' replay fixture');assert.deepEqual(b.view,a.view,spec.function+' unmarked replay changed');checks++;
    const f=fixture(spec),handle=load(spec,true,f.m);await handle(f.request);f.m.put('tournaments/'+code,{...f.m.rows.get('tournaments/'+code),scoreStorage:false});const committed=f.m.writes.length;await assert.rejects(handle(f.request),/bucket-scoring-required/);assert.equal(f.m.writes.length,committed);checks++;
   }
+ }
+ // Preserve the independently deployed registration admission behavior while
+ // adding the ownership fence to its exact current source.
+ const family=specs.find(s=>s.function==='familyRegistration');
+ {
+  const f=fixture(family),run=f.m.db.runTransaction.bind(f.m.db);let transactions=0;
+  f.m.db.runTransaction=(...args)=>{transactions++;return run(...args);};
+  const handle=load(family,true,f.m),first=handle(f.request),second=handle(clone(f.request));
+  assert.strictEqual(first,second,'same in-flight operation must coalesce');
+  const [a,b]=await Promise.all([first,second]);assert.deepEqual(a,b);
+  assert.equal(transactions,1);assert.equal(f.m.rows.get('tournaments/'+code).confirmedCount,1);checks++;
+ }
+ {
+  const f=fixture(family),handle=load(family,true,f.m),first=handle(f.request);
+  const changed=clone(f.request);changed.data.nameMode='gameId';
+  await assert.rejects(handle(changed),/operation-conflict/);await first;
+  assert.equal(f.m.rows.get('tournaments/'+code).confirmedCount,1);checks++;
+ }
+ {
+  const f=fixture(family),run=f.m.db.runTransaction.bind(f.m.db);let active=0,maximum=0;
+  f.m.db.runTransaction=async(...args)=>{
+   maximum=Math.max(maximum,++active);
+   try{await new Promise(resolve=>setTimeout(resolve,2));return await run(...args);}
+   finally{active--;}
+  };
+  f.m.put('users/other',{...f.m.rows.get('users/admin'),realName:'Other'});
+  f.m.put('familyPlayers/other',{profiles:[]});
+  const handle=load(family,true,f.m),second=clone(f.request);
+  second.auth.uid='other';second.data.operationId='operation-000002';
+  await Promise.all([handle(f.request),handle(second)]);
+  assert.equal(maximum,1,'same-room mutations must retain admission serialization');
+  assert.equal(f.m.rows.get('tournaments/'+code).confirmedCount,2);checks++;
+ }
+ {
+  const f=fixture(family),run=f.m.db.runTransaction.bind(f.m.db);let options;
+  f.m.db.runTransaction=(callback,provided)=>{options=provided;return run(callback,provided);};
+  f.request.data.action='preview';await load(family,true,f.m)(f.request);
+  assert.equal(options.readOnly,true);assert.equal(f.m.writes.length,0);checks++;
+ }
+ for(const side of ['tournaments','publicTournaments'])for(const marker of ['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus']){
+  const f=fixture(family);f.request.data.action='preview';
+  f.m.put(side+'/'+code,{...f.m.rows.get(side+'/'+code),[marker]:null});
+  await assert.rejects(load(family,true,f.m)(f.request),/bucket-scoring-required/);
+  assert.equal(f.m.writes.length,0);checks++;
  }
  console.log(JSON.stringify({checks,functions:specs.length,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

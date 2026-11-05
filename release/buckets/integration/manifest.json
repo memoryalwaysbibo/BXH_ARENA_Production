@@ -331,7 +331,7 @@
       ]
     },
     "release/buckets/interactions/README.md": {
-      "blob": "117ec225da4649d8bb07fe31fb7a0a8d0e884237",
+      "blob": "ef4906aaa39e560547d71e2a78d6cf6d8609daff",
       "components": [
         709
       ]
@@ -367,13 +367,13 @@
       ]
     },
     "release/buckets/interactions/candidate/9/family-registration.js": {
-      "blob": "71bcb6b6dbd50f102ac53f6a966c27528a947ea3",
+      "blob": "a27e58316d9888ecd4686caa26e72f7abb58c0ec",
       "components": [
         709
       ]
     },
     "release/buckets/interactions/patch-manifest.json": {
-      "blob": "99070e3bb6de580875dc2d9de5d6900b7390bcec",
+      "blob": "f25962d8db26451684417b46edb7c808aafc8d26",
       "components": [
         709
       ]
@@ -391,7 +391,7 @@
       ]
     },
     "tests/four-court-buckets/interactions/fixture-sha256.json": {
-      "blob": "df5a1229baa3c2d4de3cf5aabb3b7d6c616a14e1",
+      "blob": "803c7355c711a8d6224e7e0d56e57d5df7073864",
       "components": [
         709
       ]
@@ -577,7 +577,7 @@
       ]
     },
     "tests/four-court-buckets/interactions/fixtures/9/family-registration.js": {
-      "blob": "a2c403eef90377dc52211d211392be2b4b4b1ef1",
+      "blob": "8acf1dbdd57c5a67e8709de99db5861c6401e85a",
       "components": [
         709
       ]
@@ -619,13 +619,13 @@
       ]
     },
     "tests/four-court-buckets/interactions/probe.cjs": {
-      "blob": "fe00c2b8e04037c0479775ce1faf334f7fac451a",
+      "blob": "a82b47df2ad8b2a9bebf0c4f1bc844acaab96d82",
       "components": [
         709
       ]
     },
     "tests/four-court-buckets/interactions/verify-package.py": {
-      "blob": "7082d3b8627530dda880bfa4853fc4234f3e88c0",
+      "blob": "2c3b3d67d06778c232b9570f4987e131c63dee6b",
       "components": [
         709
       ]
@@ -1810,7 +1810,19 @@
     },
     "release/buckets/integration/writer-discovery-20261105.md": {
       "components": [],
-      "blob": "0f9cb891a4d74f4d2081ec6d35360cdaa7ef0acd"
+      "blob": "966ff8e90a95ced2f7727df3e0607d0338d07094"
+    },
+    "tests/four-court-buckets/interactions/fixtures/9/registration-admission.cjs": {
+      "components": [],
+      "blob": "c64bdd2a4e562fdca46fbf87e164bf9edcc5944e"
+    },
+    "release/buckets/integration/live-followup-20261105.json": {
+      "components": [],
+      "blob": "7af449506ae1287572933614cb770923d8786232"
+    },
+    "tests/four-court-buckets/integration/verify-integration.py": {
+      "components": [],
+      "blob": "7785616f5351f15bd744edd1c6c23bdb7e44503a"
     }
   },
   "mainScriptQueryParameters": {
@@ -2277,6 +2289,9 @@
     "release/buckets/completion/hosting-guard.cjs": "Move rebuild's hostStats conflict read after room/ledger/bucket validation and before all writes, avoiding the early-stats/ledger lock inversion observed during count/sync/sync contention; retain transaction conflict detection, authorization and SDK retry behavior.",
     "tests/four-court-buckets/completion/hosting-probe.cjs": "Regress final stats conflict-barrier ordering with existing/missing ledgers and both QR modes; inject concurrent stats changes and require transaction retry; previous early-read implementation fails.",
     "scripts/bucket-writer-followup.py": "Target only me-central2 failed service/job reads and four Function GETs; capture current immutable manageRefereeSeats/familyRegistration sources with before/after config checks; retain safe HTTP error codes without raw environment values/messages.",
-    "release/buckets/integration/writer-discovery-20261105.md": "Record the received cross-region discovery snapshot, both unresolved regional errors, 157 matched Run services and the newer referee/registration source baselines; do not claim metadata/source completeness."
+    "release/buckets/integration/writer-discovery-20261105.md": "Record the received cross-region discovery snapshot, both unresolved regional errors, 157 matched Run services and the newer referee/registration source baselines; do not claim metadata/source completeness.",
+    "release/buckets/interactions/candidate/9/family-registration.js": "Reapply the original single bucket-ownership guard to the exact 2026-11-05 deployed familyRegistration source, preserving PR730 admission/coalescing, deadline revalidation, getAll and read-only previews.",
+    "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
+    "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference."
   }
 }

@@ -15,4 +15,12 @@ for s in specs:
   text=text.replace(edit['before'],edit['after'],1)
  target=RELEASE/'candidate'/str(s['sourceSet'])/s['path']
  assert target.read_text()==text and sha(target)==s['patchedFileSha256']
+ if s['function']=='familyRegistration':
+  capture=s['deployedSourceReadback']
+  assert capture['name']==s['function'] and capture['entryPoint']==s['function']
+  assert capture['stableDuringCapture'] is True and capture['sourceArchiveSha256']==s['archiveSha256']
+  assert str(capture['source']['generation']).isdecimal()
+  closure=capture['verifiedClosureFiles']
+  assert 'registration-admission.cjs' in closure and len(closure)==12
+  for name,digest in closure.items():assert sha(TEST/'fixtures'/str(s['sourceSet'])/name)==digest,name
 print('PASS exact six patches and pinned deployed dependencies; no deployment')

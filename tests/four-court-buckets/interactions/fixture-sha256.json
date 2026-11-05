@@ -1,5 +1,5 @@
 {
-  "fixtures/9/family-registration.js": "d988ad76a0d02e82546d316a240449dc925e3c1dafd82a298345f1f5d3519145",
+  "fixtures/9/family-registration.js": "7a34234e26668025cda14538f030b6c4ef14daa96388a36ac01e9904c87f0b56",
   "fixtures/9/community-registration-roster.js": "99af7082c103026e970bb7f85e02dbf8fc12ff4fda05f133c3fba71e2c43cc56",
   "fixtures/9/community-registration-policy.js": "93b6a5d2871a0f9b9908d91c0fa0d9f2a5c04b787ed50640570ad0c049d053e3",
   "fixtures/9/onsite-waitlist-writer-guards.js": "d35d101cab964d9210df2159e93a49d20aed39f0bdf6f6217a3e648db4141dba",
@@ -34,5 +34,6 @@
   "fixtures/6/court-call-core.js": "a8d2d48eda77dc144be9c0d129928189f55ea345f24de50385410f2c36da8bfd",
   "fixtures/23/team-lineup-service.js": "042d1431f189402e3c1ee7f10312c879c1e8dc64bc0ce74087cde6aeb2b28a36",
   "fixtures/23/court-call-core.js": "a8d2d48eda77dc144be9c0d129928189f55ea345f24de50385410f2c36da8bfd",
-  "fixtures/23/team-lineup-core.js": "50e43a9a19fd0c981c7b4b1b2a6104ebf66267d885a219ecc2bc638a665f7a49"
+  "fixtures/23/team-lineup-core.js": "50e43a9a19fd0c981c7b4b1b2a6104ebf66267d885a219ecc2bc638a665f7a49",
+  "fixtures/9/registration-admission.cjs": "c9a69f9ff882f160b64128994fa3c31773a8c31e65ed92bae85e2b2a9871f859"
 }

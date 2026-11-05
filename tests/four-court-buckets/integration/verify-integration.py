@@ -13,4 +13,15 @@ for path,query in m['mainScriptQueryParameters'].items():
 assert index.index('modules/scoring/four-court-browser.js')<index.index('modules/scoring/four-court-settlement.js')<index.index('modules/main-app/core.js')
 assert scripts['modules/main-app/core.js']['delete-intent']=='20261103.1'
 assert scripts['modules/main-app/core.js']['bucket-settlement']=='20261103.2'
+readback=json.loads((R/'release/buckets/integration/live-followup-20261105.json').read_text())
+assert readback['status']=='review-only-not-deployed' and readback['productionWrites']==0 and readback['deploymentPerformed'] is False and readback['roomActivationPerformed'] is False
+assert readback['writerInventoryComplete'] is False and readback['acceptanceCompleted'] is False
+referee=json.loads((R/'release/community-referee/backend-manifest.json').read_text())
+assert set(readback['refereeCandidateFileMatches'])==set(referee['files'])
+for name,digest in readback['refereeCandidateFileMatches'].items():assert referee['files'][name]['candidateSha256']==digest,name
+family=next(x for x in json.loads((R/'release/buckets/interactions/patch-manifest.json').read_text())['patches'] if x['function']=='familyRegistration')
+assert readback['familyReviewSource']['baselineArchiveSha256']==family['archiveSha256']
+assert readback['familyReviewSource']['candidateFileSha256']==family['patchedFileSha256']
+assert readback['familyReviewSource']['changedMembers']==['family-registration.js'] and readback['familyReviewSource']['unchangedMembers']==103
+assert readback['familyReviewSource']['verifiedClosureFiles']==family['deployedSourceReadback']['verifiedClosureFiles']
 print(json.dumps({'componentFilesVerified':len(m['files']),'components':len(m['components']),'currentMainScriptParametersPreserved':True,'productionWrites':0}))

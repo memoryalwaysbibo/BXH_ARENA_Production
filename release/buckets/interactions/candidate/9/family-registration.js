@@ -11,7 +11,11 @@ const active=p=>p?.active===true&&!p.deleted&&!['deleted','disabled','frozen'].i
 const ms=x=>x?.toMillis?x.toMillis():Number(x)||0;
 function state(t){try{return JSON.parse(t.data||'{}');}catch{return {};}}
 const childKey=id=>'family_'+id;
-function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}={}){return async req=>{
+// Admission only: the existing database transaction remains authoritative across
+// processes. Sharing this module-level scheduler also covers per-request factories.
+const {createAdmission}=require('./registration-admission.cjs');
+const admit=createAdmission();
+function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}={}){const handle=async req=>{
  const uid=req.auth?.uid,d=req.data||{},now=clock();if(!uid)throw Error('auth-required');
  const user=await db.doc('users/'+uid).get();if(!active(user.data()))throw Error('auth-required');
  const code=String(d.code||'').toUpperCase();
@@ -30,6 +34,7 @@ function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}
  return db.runTransaction(async tx=>{
   const ar=fr.collection('registrationActions').doc(hash(d.operationId||'preview'));
   const [ts,ps,us,fs,op]=await tx.getAll(tr,pr,db.doc('users/'+uid),fr,ar);if(!active(us.data()))throw Error('auth-required');if(!ts.exists||!ps.exists)throw Error('not-found');
+  const now=clock(); // Revalidate deadlines after admission, lock waits and SDK retries.
   const t=ts.data(),pub=ps.data(),u=us.data();
   if([t,pub].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');
   const s=state(t),requestHash=hash(JSON.stringify(d)),profiles=fs.data()?.profiles||[];
@@ -118,5 +123,9 @@ function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}
   const proofFields=myEventsProofEnabled===true?operationFields(uid,code,'join',ts.createTime,[...(migrating?[{id:uid,mode:'delete'},{id:childKey(migrating.familyPlayerId),mode:'write'}]:[]),...rows.map(row=>({id:row.registrationId,mode:'write'}))],now):{};
   const result={ok:true,rows,status:rows[0].status};tx.create(ar,{action:'join',code,actorUid:uid,requestHash,result,createdAt:now,...proofFields});return result;
  },d.action==='preview'?{readOnly:true}:undefined);
+};return req=>{
+ const d=req.data||{},code=String(d.code||'').toUpperCase();
+ if(!req.auth?.uid||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['join','cancel','syncSummary'].includes(d.action)||!/^[a-zA-Z0-9_-]{8,100}$/.test(d.operationId||''))return handle(req);
+ return admit(code,()=>handle(req),{key:JSON.stringify([req.auth.uid,d.operationId]),fingerprint:hash(JSON.stringify(d))});
 };}
 module.exports={createFamilyRegistration};

@@ -4,15 +4,52 @@
       "function": "familyRegistration",
       "sourceSet": 9,
       "path": "family-registration.js",
-      "archiveSha256": "87362c9e7ffd86109338781d05f3e2dca95bcdfbee5f8646fd9a242843d299ec",
-      "baselineFileSha256": "d988ad76a0d02e82546d316a240449dc925e3c1dafd82a298345f1f5d3519145",
-      "patchedFileSha256": "c2c01133fef9f149926e5f652bb17198cc03e3fab71a8e047b1ab771b4340e05",
+      "archiveSha256": "db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d",
+      "baselineFileSha256": "7a34234e26668025cda14538f030b6c4ef14daa96388a36ac01e9904c87f0b56",
+      "patchedFileSha256": "9df6fa63266aa476e361603b631c906959401da5880f50c665b1f99bdcf8da6b",
       "edits": [
         {
           "before": "  const t=ts.data(),pub=ps.data(),u=us.data(),s=state(t),requestHash=hash(JSON.stringify(d)),profiles=fs.data()?.profiles||[];",
           "after": "  const t=ts.data(),pub=ps.data(),u=us.data();\n  if([t,pub].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n  const s=state(t),requestHash=hash(JSON.stringify(d)),profiles=fs.data()?.profiles||[];"
         }
-      ]
+      ],
+      "deployedSourceReadback": {
+        "name": "familyRegistration",
+        "environment": "GEN_2",
+        "updateTime": "2026-11-05T05:00:50.576366270Z",
+        "revision": "familyregistration-00041-ded",
+        "runtime": "nodejs22",
+        "entryPoint": "familyRegistration",
+        "metadataSha256": "3261009a034d10c5bc06c475b411820024059f84982d17cfd6c9b943725e0868",
+        "buildConfigSha256": "b7b97f72a4b5f8164349f66c86e1b04696872a908f7ea2a7838943e1bc1dcaf3",
+        "serviceConfigSha256": "57cc85b581e63469e638f187a878c5f6a7705c5e992a8b0f50cce3f12aeb4ce5",
+        "eventTriggerSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "sourceStorageSha256": "d5e48bb019cf9dde749ca96393ea16306183be547bfdb68560892c7be00401f2",
+        "source": {
+          "bucket": "gcf-v2-sources-87261141693-asia-east1",
+          "object": "familyRegistration/function-source.zip",
+          "generation": "1793854788506302"
+        },
+        "sourceArchiveFile": "familyRegistration.source.zip",
+        "sourceArchiveSha256": "db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d",
+        "stableDuringCapture": true,
+        "observedAt": "2026-11-05T07:53:45.252565+00:00",
+        "followupArchiveSha256": "1823f0f702b86eb1ad95c4c96db255791e965219bf2def208bb4771069043712",
+        "verifiedClosureFiles": {
+          "family-registration.js": "7a34234e26668025cda14538f030b6c4ef14daa96388a36ac01e9904c87f0b56",
+          "community-registration-roster.js": "99af7082c103026e970bb7f85e02dbf8fc12ff4fda05f133c3fba71e2c43cc56",
+          "community-registration-policy.js": "93b6a5d2871a0f9b9908d91c0fa0d9f2a5c04b787ed50640570ad0c049d053e3",
+          "onsite-waitlist-writer-guards.js": "d35d101cab964d9210df2159e93a49d20aed39f0bdf6f6217a3e648db4141dba",
+          "onsite-waitlist/owned.js": "649d5b78be40b89b88743b30c9ea4181957be6e1be0c6ef28aed5015e1c60433",
+          "onsite-waitlist/core.js": "0ddf2d490daf8cd416cf299bdc7acfb3f98dd02e61d3df0dbbf3b3c2f2dfa39c",
+          "room-access-core.js": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+          "my-events-operation-proof.cjs": "e33b8d08f8653a546a7656fd529478f4938b258046a88a4fae3e4b337017d5a9",
+          "_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+          "_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+          "_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+          "registration-admission.cjs": "c9a69f9ff882f160b64128994fa3c31773a8c31e65ed92bae85e2b2a9871f859"
+        }
+      }
     },
     {
       "function": "teamRegistration",

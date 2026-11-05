@@ -63,3 +63,13 @@ python3 -B tests/four-court-buckets/writer-followup.py
 Source/dependency classification, IAM/external Admin writers, fresh full release
 source/configuration reconciliation and real cutover acceptance remain open.
 No production writes, deployment or room activation occurred in this review.
+
+## Targeted follow-up received
+
+The follow-up capture at 2026-11-05 07:53:24–07:53:45 UTC confirms HTTP 403 / PERMISSION_DENIED / LOCATION_POLICY_VIOLATED for both me-central2 lists. They remain unverified; no location policy was changed and that region is not declared empty. All four targeted Function GETs completed; observeNumberAccount is GEN_1.
+
+manageRefereeSeats archive SHA-256 581406375e1833a4768302d931371549b52f24337a9ca97c26638fb651a4ba05 matches all 16 current community-referee candidate file hashes. No referee source changes are needed to preserve its deployed QR behavior.
+
+familyRegistration archive SHA-256 db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d contains the deployed admission scheduler. The interaction guard is now reapplied to that exact source, retaining the scheduler and other 11 closure files. A review-only archive changes one member and preserves the other 103 members. Exact captures and hashes are in live-followup-20261105.json.
+
+The fresh trackTournamentRegistrationActivity GET trigger digest still differs from the older GET digest despite an unchanged update time and matching build/service hashes. Its cause remains unresolved; trigger-field/readback and delivery acceptance are required before treating its configuration as reconciled. No trigger or routing change was made by this review.

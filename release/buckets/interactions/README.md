@@ -35,7 +35,7 @@ python3 -B tests/four-court-buckets/interactions/verify-package.py
 node tests/four-court-buckets/interactions/probe.cjs
 ```
 
-363 local SDK-fixture checks exercise original and candidate service factories:
+375 local SDK-fixture checks exercise original and candidate service factories:
 normal successful writes (including a completed team match/root update), inactive
 actor denials, exact unmarked replay behavior, markers on both roots, malformed
 serialized state, transaction retry after a marker appears, receipt replay after
@@ -53,3 +53,28 @@ A future deployment helper must enforce named-function-only source changes and
 verify source/configuration readback. Do not infer deployment from these tests.
 The full 32-function assessment and remaining blockers are in
 [../writer-review-20261103.md](../writer-review-20261103.md).
+
+## 2026-11-05 family source reconciliation
+
+The fixture directory label `9` now holds the factory closure from the fresh
+`familyRegistration` deployment, revision `familyregistration-00041-ded`, source
+generation `1793854788506302`, archive SHA-256
+`db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d`.
+The targeted capture remained unchanged across its before/after metadata reads.
+All 12 closure files match that archive, including its already deployed
+`registration-admission.cjs`. Other dependency fixture bytes are unchanged.
+
+The candidate applies the same single ownership guard to this newer factory.
+It preserves per-room admission, in-flight operation coalescing, conflicting
+fingerprint rejection, post-admission deadline checks, bulk transaction reads
+and read-only preview transactions. Added fixture tests exercise coalescing,
+same-room serialization, conflict rejection and preview ownership checks. The
+VM fixture exposes native timers for the exact deployed admission module.
+
+An offline source-review ZIP built from the supplied complete archive changes
+only `family-registration.js`; its other 103 members are byte-for-byte unchanged.
+The source/metadata hashes and review ZIP digest are recorded in
+`../integration/live-followup-20261105.json`. That file also records the separate
+16-file referee candidate match and unresolved activity trigger digest change.
+This is not an authorization to deploy or activate bucket rooms; source-only
+release readback and all remaining rollout gates still apply.
