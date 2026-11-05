@@ -105,6 +105,18 @@ if(require.main===module)(async()=>{let checks=0;
  for(const value of [{code,posterPath:oldPoster,coverPath:oldCover},{code:'bad',posterPath:oldPoster},{code,posterPath:'room-posters/BXH-OTHER/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg'},{code,coverPath:'room-covers/'+code+'/../wrong.jpg'}]){
   const f=fixture(),s=storage(),before=dump(f);await load(true,f,s).roomPosterCoverCleanup({params:{code:value.code},data:{data:()=>value}});assert.equal(dump(f),before);if(value.code===code&&value.posterPath===oldPoster)assert.equal(s.rows.size,0);else assert.equal(s.rows.size,2);checks++;
  }
+ for(const action of ['saveCover','savePoster']){
+  const f=fixture(true),s=storage(),batches=[],run=f.m.db.runTransaction.bind(f.m.db);
+  f.m.db.runTransaction=callback=>run(tx=>callback(new Proxy(tx,{get(target,key){
+   if(key==='get')return async()=>{throw Error('image metadata used a separate point read');};
+   if(key==='getAll')return async(...refs)=>{batches.push(refs.map(r=>r.path));return target.getAll(...refs);};
+   const value=target[key];return typeof value==='function'?value.bind(target):value;
+  }})));
+  assert((await invoke(f,s,action)).ok);
+  const room='tournaments/'+code,pub='publicTournaments/'+code,actor='users/owner';
+  assert.deepEqual(batches,[action==='saveCover'?[room,pub,actor]:[actor,room,pub]]);
+  assert.equal(f.m.rows.get(room).data,f.top.data);assert.equal(f.m.writes.length,2);checks++;
+ }
  console.log(JSON.stringify({posterChecks:checks,productionWrites:0,deploymentPerformed:false}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
 module.exports={fixture,storage,load,request,invoke,code,NOW,oldPoster,oldCover,images,assigned};

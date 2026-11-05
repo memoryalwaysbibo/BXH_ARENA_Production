@@ -63,7 +63,7 @@ function coverPathValid(path,code){
 async function loadPosterAccess(uid,code,{db=getFirestore(),tx=null}={}){
   const get=ref=>tx?tx.get(ref):ref.get();
   const userRef=db.doc('users/'+uid),privateRef=db.doc('tournaments/'+code),publicRef=db.doc('publicTournaments/'+code);
-  const [actorSnap,roomSnap,pubSnap]=await Promise.all([get(userRef),get(privateRef),get(publicRef)]);
+  const [actorSnap,roomSnap,pubSnap]=tx?await tx.getAll(userRef,privateRef,publicRef):await Promise.all([get(userRef),get(privateRef),get(publicRef)]);
   const actor=actorSnap.exists?actorSnap.data()||{}:null;
   const room=roomSnap.exists?roomSnap.data()||{}:null;
   const pub=pubSnap.exists?pubSnap.data()||{}:null;
@@ -180,7 +180,7 @@ async function saveCover(request,{db=getFirestore(),bucket=getStorage().bucket(B
   let oldPath,prepared=false;
   try{
     await db.runTransaction(async tx=>{
-      const [room,pub,currentActor]=await Promise.all([tx.get(privateRef),tx.get(publicRef),tx.get(db.doc('users/'+uid))]);
+      const [room,pub,currentActor]=await tx.getAll(privateRef,publicRef,db.doc('users/'+uid));
       const current=currentActor.data();
       if(!betaActorAllowed(current)||current?.deleted===true||['deleted','frozen','disabled'].includes(current?.accountStatus))throw new HttpsError('permission-denied','cover-not-allowed');
       if(!room.exists||!pub.exists||room.data().createdBy!==uid||

@@ -11,3 +11,26 @@ New objects use existing server-generated UUID paths. An upload whose Storage re
 Validation runs the actual captured decoder, authorization helpers and candidate business functions. Unit fixtures cover legacy parity, 4-field fences, both physical roots, actor/owner/grant changes, bucket metadata, attempted uploads, lost commit responses, unknown outcomes, rollback and cleanup scope. Native tests use real Firestore SDK transactions in demo-bxh-bucket-posters, with synthetic auth, injected business project/clock and mocked Storage. They include concurrent uploads and preserve current database-referenced assets. They are not real Storage, Auth/App Check, Eventarc or full browser acceptance. Source-set20 declares SDK ranges ^14.4.0 / ^7.3.2; CI pins those lower-bound versions, not a claimed production lockfile resolution.
 
 This closes the reviewed priority image-metadata writer gap. Wider Admin/non-Functions inventory, derived consumers, candidate integration, live source/configuration readback and controlled six-court cutover/rollback remain outstanding before bucket activation.
+
+## Native image metadata read strategy
+
+Diagnostic run42015506049 reproduced the failure at concurrent-saveCover-4:
+transaction44's publicTournaments read waited8656ms before code3 invalid/closed,
+while its peer transaction retried and committed. The source used parallel
+transactional point reads for actor/private/public snapshots. This is evidence
+for changing the read request strategy, not proof of every code3 cause or a
+production incident.
+
+Cover finalization and transactional poster authorization now obtain those same
+three snapshots with one tx.getAll request. Nontransactional preflight reads,
+conditional staff/organizer checks, physical generation/epoch binding, Storage
+paths/cleanup, commit-outcome recovery, write payloads and SDK retry policy retain
+their existing behavior. The source still writes only image metadata, never
+serialized score state or bucket vectors.
+
+Two fixture regressions require the exact three-document batch for each image
+route and preserve paired writes/state. The previous parallel-read candidate
+fails this regression; the revised candidate passes78 checks and exact source/
+protocol verification. Native CI retains20 fresh concurrent workloads per action,
+requiring both calls to succeed and final referenced assets to remain present.
+Native outcome is pending; no deployment or production acceptance is claimed.

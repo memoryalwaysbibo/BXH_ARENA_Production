@@ -58,7 +58,7 @@
   ],
   "archiveSha256": "668657471b49be8fab9a0a7e77984f243a8e4b6629c9a3daf8262635d1ce8665",
   "baselineSha256": "ad0df32e3c6a5fb52311b08d2f4097a0e6454daeea2d3d42eff5a11cbf0d8b55",
-  "candidateSha256": "88bd5b340e8487acac2417f78f6616d24b61474e9d1435e2a8e6974a494ef8c4",
+  "candidateSha256": "372471129d64285848999672cfc95ac10871fcfd45a107c97238669ed7c701b2",
   "edits": [
     {
       "before": "const {imageSize}=require('./ai-create-poster-core');\nconst EventStaff=require('./event-staff-core');\n\n\n",
@@ -95,6 +95,14 @@
     {
       "before": "     privateSnap.data().eventAuthority!=='official'||!publicSnap.data().publishedAt)\n    throw new HttpsError('permission-denied','room-owner-required');\n  const token=randomUUID(),path='room-covers/'+code+'/'+randomUUID()+'.jpg';\n  const url=pathUrl(path,token);\n  const file=bucket.file(path);\n  await file.save(bytes,{resumable:false,contentType:'image/jpeg',metadata:{cacheControl:'public,max-age=86400',metadata:{firebaseStorageDownloadTokens:token}}});\n  let oldPath;\n  try{\n    await db.runTransaction(async tx=>{\n      const [room,pub]=await Promise.all([tx.get(privateRef),tx.get(publicRef)]);\n      if(!room.exists||!pub.exists||room.data().createdBy!==uid||\n         room.data().eventAuthority!=='official'||!pub.data().publishedAt)\n        throw new HttpsError('permission-denied','room-owner-required');\n      oldPath=room.data().coverPath;\n      tx.update(privateRef,{coverPath:path,coverUrl:url,coverUpdatedAt:Date.now()});\n      tx.update(publicRef,{coverUrl:url});\n    });\n  }catch(error){await file.delete({ignoreNotFound:true}).catch(()=>{});throw error;}\n  if(coverPathValid(oldPath,code)&&oldPath!==path)await bucket.file(oldPath).delete({ignoreNotFound:true}).catch(()=>{});\n  return {ok:true,url};\n",
       "after": "     privateSnap.data().eventAuthority!=='official'||!publicSnap.data().publishedAt)\n    throw new HttpsError('permission-denied','room-owner-required');\n  const binding=Fence.binding(privateSnap,publicSnap,code);\n  const token=randomUUID(),path='room-covers/'+code+'/'+randomUUID()+'.jpg';\n  const url=pathUrl(path,token);\n  const file=bucket.file(path);\n  try{\n  await file.save(bytes,{resumable:false,contentType:'image/jpeg',metadata:{cacheControl:'public,max-age=86400',metadata:{firebaseStorageDownloadTokens:token}}});\n  }catch(error){await file.delete({ignoreNotFound:true}).catch(()=>{});throw error;}\n  let oldPath,prepared=false;\n  try{\n    await db.runTransaction(async tx=>{\n      const [room,pub,currentActor]=await Promise.all([tx.get(privateRef),tx.get(publicRef),tx.get(db.doc('users/'+uid))]);\n      const current=currentActor.data();\n      if(!betaActorAllowed(current)||current?.deleted===true||['deleted','frozen','disabled'].includes(current?.accountStatus))throw new HttpsError('permission-denied','cover-not-allowed');\n      if(!room.exists||!pub.exists||room.data().createdBy!==uid||\n         room.data().eventAuthority!=='official'||!pub.data().publishedAt)\n        throw new HttpsError('permission-denied','room-owner-required');\n      Fence.same(binding,Fence.binding(room,pub,code));\n      oldPath=room.data().coverPath;\n      tx.update(privateRef,{coverPath:path,coverUrl:url,coverUpdatedAt:Date.now()});\n      tx.update(publicRef,{coverUrl:url});\n      prepared=true;\n    });\n  }catch(error){\n    const result=prepared?await Fence.outcome(db,privateRef,publicRef,code,binding,{coverPath:path,coverUrl:url}):'unreferenced';\n    if(result==='unreferenced'){await file.delete({ignoreNotFound:true}).catch(()=>{});throw error;}\n    if(result!=='confirmed')throw new HttpsError('unavailable','poster-commit-outcome-unknown');\n  }\n  if(coverPathValid(oldPath,code)&&oldPath!==path)await bucket.file(oldPath).delete({ignoreNotFound:true}).catch(()=>{});\n  return {ok:true,url};\n"
+    },
+    {
+      "before": "  const [actorSnap,roomSnap,pubSnap]=await Promise.all([get(userRef),get(privateRef),get(publicRef)]);",
+      "after": "  const [actorSnap,roomSnap,pubSnap]=tx?await tx.getAll(userRef,privateRef,publicRef):await Promise.all([get(userRef),get(privateRef),get(publicRef)]);"
+    },
+    {
+      "before": "      const [room,pub,currentActor]=await Promise.all([tx.get(privateRef),tx.get(publicRef),tx.get(db.doc('users/'+uid))]);",
+      "after": "      const [room,pub,currentActor]=await tx.getAll(privateRef,publicRef,db.doc('users/'+uid));"
     }
   ],
   "fixtureFiles": {
@@ -138,10 +146,10 @@
     }
   ],
   "helperFiles": {
-    "README.md": "0e0993354f60eb4b13800998439fb3a863a1cea1197280bd9ea8614d7168064a",
+    "README.md": "a78c15248cc50f0b65c3e0694bdb68473d3b59aca3a5db333be02cb69efdc604",
     "bucket-poster-fence.cjs": "364552a7f24dfd1a816dabbf3497aa43bb43c8d67b9f90103100fa4271cfd65e",
     "bucket-state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
-    "room-poster-cover.js": "88bd5b340e8487acac2417f78f6616d24b61474e9d1435e2a8e6974a494ef8c4"
+    "room-poster-cover.js": "372471129d64285848999672cfc95ac10871fcfd45a107c97238669ed7c701b2"
   },
   "protocolSource": {
     "referenceCommit": "b82e8d393ab14c6146575ebf28ccedb0c02b3ed9",

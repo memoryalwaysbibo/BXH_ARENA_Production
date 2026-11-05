@@ -1405,7 +1405,7 @@
       ]
     },
     "release/buckets/poster/README.md": {
-      "blob": "25cd7f7b60d8e0a83d52658afe0c241f280a46c4",
+      "blob": "65ce34152914a649f205c4924c0c324179a59030",
       "components": [
         717
       ]
@@ -1423,13 +1423,13 @@
       ]
     },
     "release/buckets/poster/patch-manifest.json": {
-      "blob": "3f604b532e1d1152fbb26fcd50a34f15fb95633a",
+      "blob": "8e20ff26c1b396ec57b260fde18bac46d6d1b157",
       "components": [
         717
       ]
     },
     "release/buckets/poster/room-poster-cover.js": {
-      "blob": "ba2013507364fd471b67274ac02de91907476b0d",
+      "blob": "30656d0b089c09664f8735d91768d1fa175b1ff6",
       "components": [
         717
       ]
@@ -1495,7 +1495,7 @@
       ]
     },
     "tests/four-court-buckets/poster/probe.cjs": {
-      "blob": "0b8ea475ed2ef9b7e8e5bd349528fe41de8af5e4",
+      "blob": "3f5d2b65ccd83fd2d3c00ab50deab7430cd6e66e",
       "components": [
         717
       ]
