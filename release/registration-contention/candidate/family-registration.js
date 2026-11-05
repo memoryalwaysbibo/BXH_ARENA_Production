@@ -34,6 +34,7 @@ function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}
  return db.runTransaction(async tx=>{
   const ar=fr.collection('registrationActions').doc(hash(d.operationId||'preview'));
   const [ts,ps,us,fs,op]=await tx.getAll(tr,pr,db.doc('users/'+uid),fr,...(d.action==='preview'?[]:[ar]));if(!active(us.data()))throw Error('auth-required');if(!ts.exists||!ps.exists)throw Error('not-found');
+  const now=clock(); // Revalidate deadlines after admission, lock waits and SDK retries.
   const t=ts.data(),pub=ps.data(),u=us.data(),s=state(t),requestHash=hash(JSON.stringify(d)),profiles=fs.data()?.profiles||[];
   if(['preview','join'].includes(d.action)&&Access.normalizeMode(t.roomAccessMode)==='password'&&!Access.canBypass(uid,u,t)){const grant=await tx.get(tr.collection('accessGrants').doc(uid));if(!Access.grantValid(grant.data(),t,now))throw Error('room-password-required');}
   if(d.action!=='preview'&&op.exists){if(op.data().requestHash!==requestHash)throw Error('operation-conflict');return {...op.data().result,ok:true,replayed:true};}
@@ -122,7 +123,7 @@ function createFamilyRegistration(db,clock=Date.now,{myEventsProofEnabled=false}
  },d.action==='preview'?{readOnly:true}:undefined);
 };return req=>{
  const d=req.data||{},code=String(d.code||'').toUpperCase();
- if(!req.auth?.uid||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['join','cancel','syncSummary'].includes(d.action))return handle(req);
- return admit(code,()=>handle(req));
+ if(!req.auth?.uid||!/^BXH-[A-Z0-9]{4,16}$/.test(code)||!['join','cancel','syncSummary'].includes(d.action)||!/^[a-zA-Z0-9_-]{8,100}$/.test(d.operationId||''))return handle(req);
+ return admit(code,()=>handle(req),{key:JSON.stringify([req.auth.uid,d.operationId]),fingerprint:hash(JSON.stringify(d))});
 };}
 module.exports={createFamilyRegistration};
