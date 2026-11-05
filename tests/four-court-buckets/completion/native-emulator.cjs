@@ -4,6 +4,20 @@ const project='demo-bxh-four-court-buckets';assert.equal(process.env.GCLOUD_PROJ
 const {initializeApp,deleteApp}=require('firebase-admin/app'),{getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {fixture,largeFixture,NOW,code}=require('./fixture.cjs'),{request}=require('./probe.cjs'),release=path.resolve(__dirname,'../../../release/buckets/completion'),A=require(path.join(release,'certificate.cjs')),H=require(path.join(release,'hosting-guard.cjs')),{createGeneralCompletion}=require(path.join(release,'general-completion.cjs')),{completion,stateOf}=require('./fixtures/hosting-core.js');
 const app=initializeApp({projectId:project}),db=getFirestore(app);db.settings({host:process.env.FIRESTORE_EMULATOR_HOST,ssl:false});
+// Diagnostic only: keep the SDK's own retry policy and every assertion intact.
+let fixtureNumber=0,transactionNumber=0;
+const runTransaction=db.runTransaction.bind(db);
+db.runTransaction=async function(callback,...options){
+ const transaction=++transactionNumber,fixture=fixtureNumber,started=Date.now();let attempts=0;
+ try{
+  const result=await runTransaction(async tx=>{
+   attempts++;
+   try{return await callback(tx);}
+   catch(error){console.error(JSON.stringify({event:'completion-transaction-attempt-failed',fixture,transaction,attempt:attempts,elapsedMs:Date.now()-started,code:error.code??null,message:error.message}));throw error;}
+  },...options);
+  return result;
+ }catch(error){console.error(JSON.stringify({event:'completion-transaction-failed',fixture,transaction,attempts,elapsedMs:Date.now()-started,code:error.code??null,message:error.message}));throw error;}
+};
 const names=['users','tournaments','publicTournaments','systemConfig','ladderPlayers','ladderTransactions','ladderSystem','hostCompletionLedger','hostStats','hostAwardQueue'];
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'bucket-hosting-native-'));
 function hosting(i,original=false){
@@ -17,7 +31,7 @@ function hosting(i,original=false){
  return require(path.join(dir,'hosting.js'));
 }
 const handle=createGeneralCompletion(db,{runtime:'emulator',clock:()=>NOW});
-async function seed(f){for(const name of names)await db.recursiveDelete(db.collection(name));const b=db.batch();for(const [p,v]of f.m.rows)b.set(db.doc(p),v);await b.commit();}
+async function seed(f){console.log(JSON.stringify({event:'completion-fixture-start',fixture:++fixtureNumber}));for(const name of names)await db.recursiveDelete(db.collection(name));const b=db.batch();for(const [p,v]of f.m.rows)b.set(db.doc(p),v);await b.commit();}
 async function count(){return db.runTransaction(async tx=>{const root=await tx.get(db.doc('tournaments/'+code)),pub=await tx.get(db.doc('publicTournaments/'+code)),profile=await tx.get(db.doc('users/admin')),ledger=db.doc('hostCompletionLedger/'+code),prior=await tx.get(ledger);return H.countCertified({db,tx,root,pub,profile,prior,ledger,stats:db.doc('hostStats/admin'),FieldValue,completion});});}
 const rebuild=()=>H.rebuildHost({db,uid:'admin',FieldValue,completion,stateOf});
 function normalize(v){if(v?.toMillis)return '<timestamp>';if(Array.isArray(v))return v.map(normalize);if(v&&typeof v==='object')return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,normalize(x)]));return v;}

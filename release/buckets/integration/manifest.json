@@ -1375,7 +1375,7 @@
       ]
     },
     "tests/four-court-buckets/completion/native-emulator.cjs": {
-      "blob": "6712e38ce312747d766d079b62beaeea3d70e1f5",
+      "blob": "ad7b16e5c83dd91299abf0cbbca36c6db7a4c44a",
       "components": [
         715
       ]
@@ -2214,6 +2214,7 @@
   "resolutions": {
     "index.html": "preserve every current-main script query value; union component cache tokens and insert settlement script after bucket browser",
     "modules/main-app/core.js": "merge current main community referee changes with integrated 707/714 bucket changes; verify merged blob and regressions",
-    "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context"
+    "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
+    "tests/four-court-buckets/completion/native-emulator.cjs": "Add fixture and SDK transaction failure diagnostics; preserve transaction options, error identity, SDK retry policy and all existing assertions."
   }
 }
