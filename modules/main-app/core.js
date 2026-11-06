@@ -4991,6 +4991,15 @@ function syncSettingsDraftFromDom(){
   if(lead) settingsFormDraft.checkinLeadMinutes=parseInt(lead.value,10)===30?30:60;
 }
 
+// Ranked events temporarily require real names. Keep the game-ID option available in general mode.
+function registrationGameIdDisabled(){
+  const mode=settingsFormDraft ? settingsFormDraft.ladderMode : state.meta.ladderMode;
+  return mode==="ranked" || (!settingsFormDraft && state.testLadderEnabled===true);
+}
+function registrationParticipantNameMode(value){
+  return !registrationGameIdDisabled() && value==="gameId" ? "gameId" : "realName";
+}
+
 function ensureRegistrationFormDraft(){
   if(registrationFormDraft) return;
   const m = state.meta;
@@ -5006,7 +5015,7 @@ function ensureRegistrationFormDraft(){
     registrationNotes: m.registrationNotes || "",
     registrationVisibility: m.registrationVisibility || "public",
     targetGroup: m.targetGroup || "open",
-    participantNameMode: m.participantNameMode==="gameId" ? "gameId" : "realName",
+    participantNameMode: registrationParticipantNameMode(m.participantNameMode),
   };
   registrationFormDraftDirty = false;
 }
@@ -12876,6 +12885,8 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
   ensureRegistrationFormDraft();
   const d = registrationFormDraft;
   const m = state.meta;
+  const gameIdDisabled=registrationGameIdDisabled();
+  const participantNameMode=registrationParticipantNameMode(d.participantNameMode);
   const teamRegistrationMode=(settingsFormDraft&&settingsFormDraft.battleMode==="team")||(!settingsFormDraft&&m.battleMode==="team");
   const teamRegistrationSize=Math.max(3,Number((settingsFormDraft&&settingsFormDraft.teamSize)||m.teamSize)||3);
   const status = (!m || !m.registrationEnabled) ? null : (m.eventCancelled ? "cancelled" : (state.bracketSize>0 ? "closed" : getEffectiveRegistrationStatus({
@@ -12905,10 +12916,10 @@ function renderRegistrationSettingsPanel(showModeSelector=true){
     ${teamRegistrationMode?`<div class="banner" style="margin-top:14px;"><span><b>${teamRegistrationSize}V${teamRegistrationSize} 團體戰</b>｜報名與正備取名額都以「隊伍」計算；玩家端先填隊名，再完整填入 ${teamRegistrationSize} 位隊員。</span></div>`:`<div class="field" style="margin-top:14px;">
       <label>參賽名稱顯示</label>
       <div class="btn-row">
-        <button class="btn ${d.participantNameMode==='realName'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-name-mode" data-value="realName">使用本名</button>
-        <button class="btn ${d.participantNameMode==='gameId'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-name-mode" data-value="gameId">使用遊戲 ID</button>
+        <button class="btn ${participantNameMode==='realName'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-name-mode" data-value="realName">使用本名</button>
+        <button class="btn ${participantNameMode==='gameId'?'btn-primary':'btn-ghost'}" data-action="set-registration-draft-name-mode" data-value="gameId" ${gameIdDisabled?'disabled aria-disabled="true" style="opacity:.45;filter:grayscale(1);cursor:not-allowed" title="積分模式暫不開放遊戲 ID"':''}>使用遊戲 ID</button>
       </div>
-      <p class="hint" style="margin-top:6px;">預設使用本名。若選擇「遊戲 ID」，沒有設定遊戲 ID 的玩家會自動使用本名。</p>
+      <p class="hint" style="margin-top:6px;">${gameIdDisabled?"積分模式固定使用本名，遊戲 ID 功能暫不開放。":"預設使用本名。若選擇「遊戲 ID」，沒有設定遊戲 ID 的玩家會自動使用本名。"}</p>
     </div>
     <div class="field" style="margin-top:14px;">
       <label>活動組別</label>
@@ -24945,6 +24956,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     ensureRegistrationFormDraft();
     const val=target.getAttribute("data-value");
     if(val!=="realName" && val!=="gameId") return;
+    if(val==="gameId" && registrationGameIdDisabled()) return;
     registrationFormDraft.participantNameMode=val;
     registrationFormDraftDirty=true;
     if(aiCreateLastApplied) aiCreateReviewAcknowledged=false;
@@ -25263,7 +25275,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.registrationCapacity = d.registrationCapacity;
     state.meta.registrationFee = d.registrationFee;
     state.meta.targetGroup = d.targetGroup;
-    state.meta.participantNameMode = d.participantNameMode==="gameId" ? "gameId" : "realName";
+    state.meta.participantNameMode = registrationParticipantNameMode(d.participantNameMode);
     const waitlistCapacity = Math.max(0, parseInt(d.waitlistCapacity,10)||0);
     state.meta.waitlistCapacity = waitlistCapacity;
     state.meta.waitlistEnabled = waitlistCapacity > 0;
@@ -25334,7 +25346,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
     state.meta.registrationCapacity=rd.registrationCapacity;
     state.meta.registrationFee=rd.registrationFee;
     state.meta.targetGroup=rd.targetGroup;
-    state.meta.participantNameMode=rd.participantNameMode==="gameId"?"gameId":"realName";
+    state.meta.participantNameMode=registrationParticipantNameMode(rd.participantNameMode);
     state.meta.waitlistCapacity=Math.max(0,parseInt(rd.waitlistCapacity,10)||0);
     state.meta.waitlistEnabled=state.meta.waitlistCapacity>0;
     state.meta.eventDescription=rd.eventDescription;
@@ -25480,7 +25492,7 @@ if(isTester() && ADMIN_ONLY_ACTIONS.has(action) && !testerCanOperateAction && !T
       state.meta.registrationCapacity=rd.registrationCapacity;
       state.meta.registrationFee=rd.registrationFee;
       state.meta.targetGroup=rd.targetGroup;
-      state.meta.participantNameMode=rd.participantNameMode==="gameId"?"gameId":"realName";
+      state.meta.participantNameMode=registrationParticipantNameMode(rd.participantNameMode);
       state.meta.waitlistCapacity=rd.waitlistCapacity;
       state.meta.waitlistEnabled=rd.waitlistEnabled;
       state.meta.eventDescription=rd.eventDescription;
