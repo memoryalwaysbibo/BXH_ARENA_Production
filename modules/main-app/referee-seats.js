@@ -66,7 +66,10 @@
      if(canonical?.accessRevoked){state().meta={...state().meta,refereeSeatAccessRevoked:true};dismiss();ctx.render();return;}
      if(!canonical?.model)return;
      if(Number(canonical.model.revision)<Number(model()?.revision||0))return;
-     state().meta={...state().meta,...canonical.projection,refereeSeatsV1:canonical.model};
+     const nextMeta={...state().meta,...canonical.projection,refereeSeatsV1:canonical.model};
+     // Equal revisions alone do not imply equal permissions/projections.
+     if(JSON.stringify(nextMeta)===JSON.stringify(state().meta))return;
+     state().meta=nextMeta;
      ctx.render();
     });
   }

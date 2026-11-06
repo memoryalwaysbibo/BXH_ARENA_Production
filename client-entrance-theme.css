@@ -4405,3 +4405,13 @@ button.btn-primary,
   line-height:1.4;
   overflow-wrap:anywhere;
 }
+
+/* A referee card contains live controls and glass panels. Applying the global
+   card hover filter to that entire subtree crashes Linux WebKit during score /
+   undo interactions. Keep its border/background feedback without filtering the
+   live subtree. This also covers touch browsers that retain :hover after a tap. */
+.court-grid .referee-workstation,
+.court-grid .referee-workstation:hover,
+.court-grid .referee-workstation:focus-within{
+  filter:none!important;
+}

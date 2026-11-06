@@ -158,7 +158,12 @@ async function openLobby(page, options = {}) {
     fixture.readState = () => ({ phase: appPhase, uid: currentAuthUid(), code: tournamentDetailCode,
       cache: publicTournamentsCache, registrations: myRegistrationsCache, loading: publicTournamentsLoading });
     const originalFlush = flushLobbyRender;
-    flushLobbyRender = function (...args) { fixture.flushes++; return originalFlush.apply(this, args); };
+    flushLobbyRender = function (...args) {
+      // A queued frame may call flush after another path already consumed the
+      // work. Count committed render attempts, not the production no-op guard.
+      if(lobbyRenderPending && isTournamentLobbyVisible()) fixture.flushes++;
+      return originalFlush.apply(this, args);
+    };
   }, options);
   await expect(page.locator('[data-lobby-root]')).toBeVisible();
   await expect(page.locator('[data-lobby-code]')).toHaveCount(7);
@@ -262,6 +267,9 @@ test('keyboard focus remains usable across a public update', async ({ page }) =>
 test('snapshot bursts coalesce to one flush and keep the last count', async ({ page }) => {
   await openLobby(page);
   await expandCard(page);
+  // The details toggle queues its own render. Finish that interaction before
+  // counting renders caused by the following synchronous snapshot burst.
+  await settle(page);
   const flushes = await page.evaluate(() => {
     const before = lobbyFixture.flushes;
     for (let count = 3; count <= 12; count++) {
