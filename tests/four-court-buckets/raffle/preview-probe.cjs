@@ -14,7 +14,7 @@ function family(f){const top=f.m.rows.get(root),s=JSON.parse(top.data);s.players
   const f=fixture({bucket}),s=family(f),before=JSON.stringify([...f.m.rows]);
   const value=await create(f)(request());assert.equal(value.count,4);assert.equal(value.candidateHash,core.poolHash(value.candidates));assert.equal(JSON.stringify([...f.m.rows]),before);assert.equal(f.m.writes.length,0);checks++;
   f.m.put(ledger,{winnerKeys:['uid:u1']});assert.equal((await create(f)(request())).count,2);checks++;
-  f.m.put(ledger,{identityVersion:'participant-v1',sourceCreatedAt:String(f.m.snapshot(root).createTime.seconds)+':0',winnerKeys:[participantKey(s.players[0])]});
+  f.m.put(ledger,{identityVersion:'participant-v1',sourceCreatedAt:String(f.m.snapshot(root).createTime.seconds)+':0',sourcePublicCreatedAt:String(f.m.snapshot('publicTournaments/'+code).createTime.seconds)+':0',sourceBucketEpoch:f.top.scoreStorage?.epoch||null,winnerKeys:[participantKey(s.players[0])]});
   const value2=await create(f)(request());assert.equal(value2.count,3);assert(value2.candidates.some(x=>x.playerId==='p2'));assert(!value2.candidates.some(x=>x.playerId==='p1'));checks++;
   assert.equal((await create(f)(request({excludePrevious:false}))).count,4);checks++;
  }

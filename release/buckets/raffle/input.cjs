@@ -3,12 +3,9 @@
 // observed object, which must live outside its SDK retry callback.
 const Certificate=require('../completion/certificate.cjs');
 const {participantPool}=require('./identity.cjs');
-function createRaffleInput(core,{identityVersion='legacy'}={}){
- if(!core||['parseState','candidates','poolHash'].some(k=>typeof core[k]!=='function'))throw Error('raffle-core-required');
+async function readRaffleState(core,{db,tx,root,pub,code,observed},identityVersion='legacy'){
  if(!['legacy','participant-v1'].includes(identityVersion))throw Error('raffle-identity-version');
- return async function read({db,tx,root,pub,code,mode,excluded=[],observed}){
   if(!db?.doc||!tx?.get||!root?.exists||root.ref?.path!=='tournaments/'+code||pub?.ref?.path!=='publicTournaments/'+code||typeof code!=='string'||!/^[-A-Za-z0-9_]{1,100}$/.test(code)||!observed||typeof observed!=='object')throw Error('raffle-input-context');
-  if(!Array.isArray(excluded)||excluded.length>2000||excluded.some(x=>typeof x!=='string'))throw Error('raffle-exclusion-context');
   const top=root.data(),publicData=pub.data();
   let state,context;
   if(Certificate.marked(top,publicData)){
@@ -26,10 +23,19 @@ function createRaffleInput(core,{identityVersion='legacy'}={}){
   const binding=JSON.stringify([...context,identityVersion]);
   if(Object.hasOwn(observed,'binding')&&observed.binding!==binding)throw Error('raffle-room-changed');
   observed.binding=binding;
+  return state;
+}
+function createRaffleInput(core,{identityVersion='legacy'}={}){
+ if(!core||['parseState','candidates','poolHash'].some(k=>typeof core[k]!=='function'))throw Error('raffle-core-required');
+ if(!['legacy','participant-v1'].includes(identityVersion))throw Error('raffle-identity-version');
+ return async function read(args){
+  const {mode,excluded=[]}=args;
+  if(!Array.isArray(excluded)||excluded.length>2000||excluded.some(x=>typeof x!=='string'))throw Error('raffle-exclusion-context');
+  const state=await readRaffleState(core,args,identityVersion);
   const pool=identityVersion==='participant-v1'?participantPool(core,state,mode,excluded):core.candidates(state,mode,excluded);
   if(pool.length>1000)throw Error('candidate-limit-1000');
   // Keep SDK birth, epoch, vector and score state out of the existing public pool.
   return {pool,candidateHash:core.poolHash(pool)};
  };
 }
-module.exports={createRaffleInput};
+module.exports={createRaffleInput,readRaffleState};

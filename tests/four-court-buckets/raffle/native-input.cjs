@@ -68,8 +68,8 @@ async function unchanged(fn){const before=await contents();await fn();assert.equ
   await unchanged(async()=>{const value=await preview(request);assert.equal(value.count,4);assert.equal(value.candidateHash,core.poolHash(value.candidates));});
   await db.doc(rootPath+'/raffleControl/current').set({winnerKeys:['uid:u1']});
   await unchanged(async()=>assert.equal((await preview(request)).count,2));
-  const born=(await db.doc(rootPath).get()).createTime;
-  await db.doc(rootPath+'/raffleControl/current').set({identityVersion:'participant-v1',sourceCreatedAt:born.seconds+':'+born.nanoseconds,winnerKeys:[participantKey(s.players[0])]});
+  const born=(await db.doc(rootPath).get()).createTime,publicBorn=(await db.doc(pubPath).get()).createTime;
+  await db.doc(rootPath+'/raffleControl/current').set({identityVersion:'participant-v1',sourceCreatedAt:born.seconds+':'+born.nanoseconds,sourcePublicCreatedAt:publicBorn.seconds+':'+publicBorn.nanoseconds,sourceBucketEpoch:f.top.scoreStorage?.epoch||null,winnerKeys:[participantKey(s.players[0])]});
   await unchanged(async()=>{const value=await preview(request);assert.equal(value.count,3);assert(value.candidates.some(x=>x.playerId==='p2'));assert(!value.candidates.some(x=>x.playerId==='p1'));});
  }
  // Synthetic ABORTED retry on the real SDK: role removal occurs before callback

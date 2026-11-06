@@ -153,3 +153,48 @@ or deployment archive is wired by this change.
 python3 -B tests/four-court-buckets/raffle/verify-provenance.py
 node tests/four-court-buckets/raffle/preview-probe.cjs
 ```
+
+
+## Unwired draw and winner transaction services
+
+createRaffleWriters(options) now supplies matching draw/update bodies for the
+preview candidate. All three use context.cjs for authorization, ledger version
+selection and physical room checks. New draw and control records persist
+identityVersion plus private/public root creation identity and bucket epoch.
+Winner-operation receipts carry the same context. New participant ledgers with
+incomplete seals reject; unversioned legacy ledgers/records keep legacy behavior
+without clearing or migrating existing winners. No caller export is wired.
+
+Draw revalidates the preview hash and candidate limit before selection. It
+preserves captured prize normalization/assignment and secure core.draw default;
+tests alone inject a deterministic server-owned selector. Selection cannot expand
+the pool. Identical operation IDs replay the saved result without another draw,
+ledger append or audit entry; changed actor/payload/hash rejects. A writer SDK
+retry may observe a ledger created by a competing duplicate, so writers bind
+the saved room/version seal rather than require continued ledger absence.
+
+Claim/forfeit are pending-only. Replacement requires forfeiture and selects
+from the ORIGINAL saved candidate pool, excluding the global previous-winner
+ledger and every winner already in that raffle. Prize assignment is preserved.
+Receipts bind actor/raffle/action/key/reason, support no-write replay and reject
+conflicts. Claim-versus-forfeit on one pending winner permits one transition.
+System-closed rooms reject new work but may replay matching prior receipts;
+current authorization and room context still apply. Corrupt saved pools, missing
+winner-ledger keys and private/public recreation reject without further writes.
+
+The only proposed mutation paths are raffles, raffleControl/current,
+tournamentActivity and operationLog. Private/public bracket and match buckets
+are unchanged. 48 writer fixture scenarios cover these semantics in both storage
+formats. The native writer suite tests duplicate transaction contention and
+claim/forfeit contention in legacy-storage and4/6/12-court bucket demo rooms,
+plus prize-preserving replacement, exclusions and generation rejection. These
+are isolated SDK transactions with fixture authentication, not live endpoints or
+production acceptance. Existing native input/preview suite remains39 checks.
+
+Remaining work is per-entrypoint callable/archive assembly, frontend identity-key
+compatibility, authenticated acceptance and explicit release/rollback review.
+Do not deploy helpers alone or automatically migrate old raffle generations.
+
+```sh
+node tests/four-court-buckets/raffle/writer-probe.cjs
+```

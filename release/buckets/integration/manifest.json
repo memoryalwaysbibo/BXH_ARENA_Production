@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "742131913fbe996dac9e5d1f89a1a892730acdb0"
+      "blob": "c5091a309b5b39efdfa4071eca5bbd31649005d8"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1830,11 +1830,11 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "79e8eb2dc0c24ab7f67f6da74302a77ff49136a9"
+      "blob": "b71dfc7a90988f0869865f5d49d7706268642a9e"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
-      "blob": "b7f09d2394f156c9b3d84d2bbbc49d446ceb22ea"
+      "blob": "52cb960a27e6edf44629e35577aba68ac3dff059"
     },
     "scripts/bucket-raffle-readonly.md": {
       "components": [],
@@ -1853,7 +1853,7 @@
       "blob": "ad8d3801b23a7bc8b971e043c8131c684b30afd4"
     },
     "tests/four-court-buckets/raffle/native-input.cjs": {
-      "blob": "052a211b633516d014ca408a2f6c2f42f5100a2e",
+      "blob": "c35739b48f2e42b9ed52db350365a6880584f1b3",
       "components": [
         718
       ]
@@ -1865,7 +1865,7 @@
       ]
     },
     ".github/workflows/bucket-raffle-input.yml": {
-      "blob": "d0dbf40954a53f22b7d7d54208a41e16d4d854ac",
+      "blob": "3d4616d10a18ffa006d6614148c80d59b1829c61",
       "components": [
         718
       ]
@@ -1886,7 +1886,7 @@
       "components": [
         718
       ],
-      "blob": "a05a5953d68f793f8cc564efa93c55f71ccac3a9"
+      "blob": "5420609ce69e0d4db554c6db17941e22806791f3"
     },
     "release/buckets/raffle/live-provenance-20261107.json": {
       "components": [
@@ -1898,13 +1898,37 @@
       "components": [
         718
       ],
-      "blob": "538ad320fe84d8184971e285d3141a430e27feb2"
+      "blob": "3d580d81dc979aeca285c252bdf83aef9d244c61"
     },
     "tests/four-court-buckets/raffle/verify-provenance.py": {
       "components": [
         718
       ],
       "blob": "98c97138be8d814295e33c71b7d6a69d3f02a20a"
+    },
+    "release/buckets/raffle/context.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "6d4ff2feaf34188ac5b3bc87fcc11b49e0c26db8"
+    },
+    "release/buckets/raffle/writers.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "2ff16fa6b013ace51b3e2b92ad72e6a5ff2e1a22"
+    },
+    "tests/four-court-buckets/raffle/writer-probe.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "668b3c1ae2e6eefee536540d37eb2f45ba9351e7"
+    },
+    "tests/four-court-buckets/raffle/native-writers.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "e8b8b101d3eb5532e88e6fc0a8be8d73ec1daf7c"
     }
   },
   "mainScriptQueryParameters": {
@@ -2380,6 +2404,7 @@
     "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
     ".github/workflows/bucket-raffle-input.yml": "Validate source-only raffle reader against Admin SDK14.4.0, demo-only Emulator snapshots, physical root replacement and deterministic ABORTED callback retry; no callable wiring or deployment.",
     "release/buckets/raffle/identity.cjs": "Source-only server-selected participant-v1 identity: canonical account/playerId tuples preserve captured eligibility without uid-only family collapse; reject legacy exclusions, missing/conflicting IDs and excluded-account reassignment. Existing generations retain legacy mode until separately reviewed migration.",
-    "release/buckets/raffle/preview.cjs": "Unwired transactional preview service: same-transaction actor/root/ledger/bucket reads, authorization on every callback, ledger birth/version checks, existing legacy-ledger preservation and server-selected new participant identity; zero writes. Must ship with future matching draw/update receipt versioning, never preview alone."
+    "release/buckets/raffle/preview.cjs": "Unwired transactional preview service: same-transaction actor/root/ledger/bucket reads, authorization on every callback, ledger birth/version checks, existing legacy-ledger preservation and server-selected new participant identity; zero writes. Must ship with future matching draw/update receipt versioning, never preview alone.",
+    "release/buckets/raffle/writers.cjs": "Unwired transaction bodies for draw/claim/forfeit/replacement; shared authorization and immutable room/version seals, preview hash, frozen saved pools, legacy ledger preservation, no-write replay and per-operation conflicts. Runtime exports/deployment remain unchanged."
   }
 }
