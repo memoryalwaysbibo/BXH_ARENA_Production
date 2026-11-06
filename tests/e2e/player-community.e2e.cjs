@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('node:crypto');
 
-test('player can create account and open a community room on isolated emulators', async ({ page }) => {
+test('player can create account, sign in again and open a community room on isolated emulators', async ({ page }) => {
   const externalFirebaseRequests = [];
 
   await page.route(/^https?:\/\/(?:firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|[^/]+\.firebaseio\.com|[^/]+\.cloudfunctions\.net)(?:[/:])/,  async route => {
@@ -59,6 +59,19 @@ test('player can create account and open a community room on isolated emulators'
   await expect(hostTab).toBeVisible();
 
   await page.waitForFunction(()=>!playerApplyBusy,null,{timeout:30000});
+  // Exercise password login explicitly; signup's automatic sign-in is not a
+  // substitute for verifying an existing account can authenticate again.
+  const registeredUid=await page.evaluate(()=>firebaseUser.uid);
+  await page.evaluate(()=>window.cloudAuth.signOutUser());
+  await page.waitForFunction(()=>document.querySelector('[data-action="select-role-player"]')||document.querySelector('[data-action="player-goto-login"]'));
+  if(await page.locator('[data-action="select-role-player"]').isVisible().catch(()=>false))await page.locator('[data-action="select-role-player"]').click();
+  await page.locator('[data-action="player-goto-login"]').first().click();
+  await page.locator('#player-login-email').fill(email);
+  await page.locator('#player-login-password').fill(secret);
+  await page.locator('[data-action="player-email-signin"]').click();
+  await expect(page.locator('.player-shell')).toBeVisible({timeout:30000});
+  expect(await page.evaluate(()=>firebaseUser.uid)).toBe(registeredUid);
+
   await hostTab.click();
   await expect(page.locator('.community-host-hero')).toBeVisible({ timeout: 20000 });
 
@@ -73,3 +86,5 @@ test('player can create account and open a community room on isolated emulators'
 
   expect(externalFirebaseRequests).toEqual([]);
 });
+
+require('./firestore-diagnostics.cjs').install(test);

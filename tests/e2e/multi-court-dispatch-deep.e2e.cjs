@@ -223,3 +223,5 @@ test('two courts preserve independent work and queue a skipped match onto a busy
 
   expect(externalFirebaseRequests).toEqual([]);
 });
+
+require('./firestore-diagnostics.cjs').install(test);

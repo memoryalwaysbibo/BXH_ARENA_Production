@@ -93,6 +93,42 @@ function injectFirebaseEmulators(source) {
     if(!out.includes('const FIREBASE_SDK_VERSION = "10.13.0";'))throw Error('Runtime SDK version changed');
     out=out.replaceAll('https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/','/__firebase_sdk__/');
   }
+  if(process.env.BXH_TEST_EMULATOR_APP_CHECK==='1'){
+    out=replaceOnce(out,'provider: new mod.ReCaptchaEnterpriseProvider(ARENA_APP_CHECK_SITE_KEY),',`provider: new mod.CustomProvider({getToken:async()=>{
+      if(location.hostname!=="127.0.0.1" || FIREBASE_CONFIG.projectId!=="demo-bxh-arena-e2e" || new URLSearchParams(location.search).get("bxh_e2e")!=="1")throw Error('emulator-app-check-only');
+      return {token:'synthetic-emulator-app-check',expireTimeMillis:Date.now()+3600000};
+    }}),`,'emulator-app-check');
+  }
+  if(process.env.BXH_TEST_TRACE_FIRESTORE==='1'){
+    out=out.replace('const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);', '(window.__appCheckEvents||=[]).push({event:"caller",name,at:Math.round(performance.now())}); const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);');
+    out=out.replace('async function ensureHunterClashAppCheck(){', 'async function ensureHunterClashAppCheck(){ (window.__appCheckEvents||=[]).push({event:"ensure",at:Math.round(performance.now())});');
+    out=out.replace('const result = await appCheckModule.getToken(appCheckHandle, false);', '(window.__appCheckEvents||=[]).push({event:"token-request",at:Math.round(performance.now())}); const result = await appCheckModule.getToken(appCheckHandle, false); window.__appCheckEvents.push({event:"token-resolved",at:Math.round(performance.now())});');
+    out=out.replace('// Select durable storage at initialization;', `
+      window.__firestoreOperations=[];
+      for(const method of ['setDoc','updateDoc','getDoc','getDocFromServer','getDocs','runTransaction']){
+        const original=fx[method];
+        fx[method]=async(...args)=>{
+          const item={method,path:args[0]?.path||'',start:Math.round(performance.now()),status:'pending'};
+          window.__firestoreOperations.push(item);
+          if(method==='runTransaction'){
+            const callback=args[1];item.steps=[];
+            args[1]=async tx=>{
+              item.steps.push('callback');
+              const traced=new Proxy(tx,{get(target,key){
+                if(key==='get')return async ref=>{item.steps.push('get:'+ref.path);try{const snap=await target.get(ref);item.steps.push('read:'+ref.path);return snap;}catch(e){item.steps.push('read-error:'+e.code);throw e;}};
+                if(['set','update','delete'].includes(key))return(...values)=>{item.steps.push(key+':'+values[0].path);return target[key](...values);};
+                return Reflect.get(target,key);
+              }});
+              const result=await callback(traced);item.steps.push('callback-complete');return result;
+            };
+          }
+          try{const value=await original(...args);item.status='ok';return value;}
+          catch(e){item.status='error';item.code=e.code||e.message;throw e;}
+          finally{item.end=Math.round(performance.now());}
+        };
+      }
+      // Select durable storage at initialization;`);
+  }
   return out;
 }
 

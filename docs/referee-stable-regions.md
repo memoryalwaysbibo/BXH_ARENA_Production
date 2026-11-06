@@ -40,8 +40,8 @@ sources and the same test-only SDK server, browser configuration and test fixes.
 | Referee recovery browser suite | 8 cases passed | `candidate-recovery-system.log` |
 | Stable regions browser fixture | Passed | 12 courts, 200 other-court updates; zero local mutations, draft/focus preserved; score/undo, permission/global locks, revisions and binding dedup |
 | Twelve independent browser pages + actual scoring transactions | Passed | Main also completes operations but replaces local DOM and loses focus; candidate preserves both |
-| Authenticated critical emulator E2E, fresh emulator 1.22.0 | 0/1 passed | Main also 0/1, same signup completion timeout |
-| Deep emulator E2E, fresh emulator 1.22.0 | 1/3 passed | Main also 1/3, same settings-save and draw timeouts |
+| Authenticated critical emulator E2E, fresh emulator 1.22.0 | 1/1 passed with test App Check provider | Main 1/1; see follow-up diagnosis |
+| Deep emulator E2E, fresh emulator 1.22.0 | 3/3 passed with test App Check provider | Main 3/3; settings/draw/scoring complete |
 
 The original six smoke cases were two hunter leaderboard cases and four account/
 profile cases (existing profile editor, signup required fields, Google profile
@@ -75,9 +75,14 @@ Seat/court handoff behavior is additionally covered by the existing seat browser
 suite; the 12-context test's switch is a navigation tab switch. Team/enchantment,
 mobile gestures, production network latency and a sustained load soak are not
 claimed. Community-specific route is included in the implementation and affected
-regressions; its full authenticated E2E remains blocked before scoring.
+regressions; its authenticated emulator E2E now passes through scoring with the test App Check provider.
 
-## Remaining failures and reproduction
+## Historical failures and reproduction
+
+**Follow-up:** The three emulator timeouts below are now isolated to an unresolved
+App Check token after blocked reCAPTCHA loading. Main and candidate pass with the
+explicit emulator-only provider. See [diagnosis and latest acceptance scope](referee-emulator-diagnosis.md).
+The historical failures below are retained as investigation evidence.
 
 Firebase's CDN is blocked by the environment network policy (HTTP 403). The
 optional test server serves locally bundled, version-checked Firebase 10.13.0
@@ -136,5 +141,6 @@ The original broad Node run was 1681 passed/24 failed with environment and
 extracted-fixture problems; a follow-up broad run stalled and was terminated.
 The scoped 608 tests and critical regression passed afterward. Full 324-case
 multi-viewport smoke and broad Node acceptance have not completed cleanly.
-This branch is reviewable but not release-ready while integration failures and
-remaining acceptance scope are unresolved.
+The specific emulator flow failures are resolved in the test environment.
+Remaining production attestation, full smoke and broader acceptance scope still
+prevent claiming complete release acceptance.

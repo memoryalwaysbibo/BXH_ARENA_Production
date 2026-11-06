@@ -270,3 +270,5 @@ test('four-player community event reaches first confirmed referee result', async
 
   expect(externalFirebaseRequests).toEqual([]);
 });
+
+require('./firestore-diagnostics.cjs').install(test);
