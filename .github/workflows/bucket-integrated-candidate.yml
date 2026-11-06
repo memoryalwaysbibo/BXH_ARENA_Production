@@ -40,6 +40,8 @@ jobs:
           for family in deletion interactions admissions operations settlement completion poster activity derived; do
             python3 -B "tests/four-court-buckets/$family/verify-package.py"
           done
+      - name: Preserve inherited registration recovery and ranked-name policy
+        run: node --test tests/registration-feedback.test.cjs tests/ranked-real-name-only.test.cjs
       - name: Check derived official-match event against captured deployed source
         run: node tests/four-court-buckets/derived/probe.cjs
       - name: Check My Events repair target against captured deployed engine

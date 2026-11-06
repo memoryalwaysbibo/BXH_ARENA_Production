@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"_registrationQueueJobsV2","queryScope":"COLLECTION","fields":[{"fieldPath":"state","order":"ASCENDING"},{"fieldPath":"acceptedAt","order":"ASCENDING"}]}],"fieldOverrides":[]}

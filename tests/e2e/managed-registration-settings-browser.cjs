@@ -16,11 +16,11 @@ const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replac
 const ensureRegistrationFormDraft=()=>{},canManageOnsiteWaitlist=()=>true,getEffectiveRegistrationStatus=()=>null,REGISTRATION_STATUS_LABELS={};
 const renderHalfHourDatetimeDraft=id=>'<input id="'+id+'" type="datetime-local">';
 const communityDateTimeValue=()=>'',showToast=()=>toastCount++,render=()=>{},syncSettingsDraftFromDom=()=>{};
-${['onsiteRegistrationSettingsLocked','managedRegistrationSettingsNotice','reportManagedRegistrationSettings','renderRegistrationSettingsPanel'].map(n=>fn(core,n)).join('\n')}
+${['registrationGameIdDisabled','registrationParticipantNameMode','onsiteRegistrationSettingsLocked','managedRegistrationSettingsNotice','reportManagedRegistrationSettings','renderRegistrationSettingsPanel'].map(n=>fn(core,n)).join('\n')}
 ${fn(community,'renderCommunitySettings')}
-function handle(action,target){${action('open-registration-waitlist')} ${action('set-registration-enabled')}}
+function handle(action,target){${action('open-registration-waitlist')} ${action('set-registration-enabled')} ${action('set-registration-draft-name-mode')}}
 document.addEventListener('click',e=>{const target=e.target.closest('[data-action]');if(target)handle(target.dataset.action,target);});
-window.fixture={render(kind,locked=true,finalized=false){state.onsiteWaitlistServerOwned=locked;state.onsiteWaitlistFinalized=finalized;document.body.innerHTML=kind==='community'?renderCommunitySettings():renderRegistrationSettingsPanel();},read(){return {activeTab,communityRoomActiveTab,peopleRosterSection,toastCount,enabled:registrationFormDraft.registrationEnabled};},phase(value){appPhase=value;},staleToggle(){handle('set-registration-enabled',{getAttribute:()=> 'false'});}};
+window.fixture={nameMode(mode,draftMode=null){state.meta.ladderMode=mode;settingsFormDraft=draftMode?{ladderMode:draftMode}:null;registrationFormDraft.participantNameMode='gameId';},render(kind,locked=true,finalized=false){state.onsiteWaitlistServerOwned=locked;state.onsiteWaitlistFinalized=finalized;document.body.innerHTML=kind==='community'?renderCommunitySettings():renderRegistrationSettingsPanel();},read(){return {activeTab,communityRoomActiveTab,peopleRosterSection,toastCount,enabled:registrationFormDraft.registrationEnabled,nameMode:registrationFormDraft.participantNameMode};},phase(value){appPhase=value;},staleToggle(){handle('set-registration-enabled',{getAttribute:()=> 'false'});}};
 `;
 (async()=>{
  const options={headless:true};
@@ -30,6 +30,9 @@ window.fixture={render(kind,locked=true,finalized=false){state.onsiteWaitlistSer
  try{
   const page=await browser.newPage();
   for(const width of [390,960]){
+   // setContent preserves the JavaScript global scope; start a fresh document
+   // so fixture declarations and click listeners cannot leak across viewports.
+   await page.goto('about:blank');
    await page.setViewportSize({width,height:844});
    await page.route('**/*',route=>route.abort());
    await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');
@@ -59,7 +62,26 @@ window.fixture={render(kind,locked=true,finalized=false){state.onsiteWaitlistSer
     for(const id of protectedIds)assert(await page.locator('#'+id).isEnabled(),`${kind} ${id} unlocked`);
     assert.equal(await page.getByRole('status').count(),0);
    }
-   console.log(`PASS managed settings DOM and routing at ${width}px`);
+
+   // Verify the production name-mode helpers and actual disabled button in both viewports.
+   for(const [mode,draftMode,disabled] of [['ranked',null,true],['general','ranked',true],['general',null,false]]){
+    await page.evaluate(({mode,draftMode})=>{window.fixture.nameMode(mode,draftMode);window.fixture.render('official',false);},{mode,draftMode});
+    const gameId=page.locator('[data-action="set-registration-draft-name-mode"][data-value="gameId"]');
+    assert.equal(await gameId.isDisabled(),disabled,'ranked game-ID availability');
+    if(disabled){
+     assert.equal(await gameId.getAttribute('aria-disabled'),'true');
+     assert.equal(await gameId.evaluate(el=>getComputedStyle(el).opacity),'0.45');
+     assert(await page.locator('[data-value="realName"][data-action="set-registration-draft-name-mode"]').evaluate(el=>el.classList.contains('btn-primary')));
+     // A dispatched event cannot switch to game ID, even with a stale draft.
+     await page.locator('[data-value="realName"][data-action="set-registration-draft-name-mode"]').click();
+     await gameId.dispatchEvent('click');
+     assert.equal((await page.evaluate(()=>window.fixture.read())).nameMode,'realName');
+    }else{
+     await gameId.click();
+     assert.equal((await page.evaluate(()=>window.fixture.read())).nameMode,'gameId');
+    }
+   }
+   console.log(`PASS managed settings DOM, routing and ranked real-name policy at ${width}px`);
   }
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

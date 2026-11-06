@@ -65,7 +65,7 @@ test('logout fences delayed preflight and a different account cannot see its jou
 });
 test('hung recovery reads time out and automatic rechecks are bounded',async()=>{
  const f=fixture({read:()=>new Promise(()=>{})}),p=deferred();const flight=f.api.run(CODE,async progress=>{progress.submitting(['user1']);return p.promise;});flight.catch(()=>{});await flush();await f.advance(250000);
- assert.equal(f.queries.length,5);assert.equal(f.api.snapshot()[0].state,'unconfirmed');assert.equal(f.timers.size,0);f.api.dispose();
+ assert.equal(f.queries.length,1,'UI timeout must not stack uncancelled callable requests');assert.equal(f.api.snapshot()[0].state,'unconfirmed');assert.equal(f.api.snapshot()[0].autoPaused,true);assert.equal(f.timers.size,0);f.api.dispose();
 });
 test('multiple manual checks coalesce into one read and query failures remain unknown',async()=>{
  const pending=deferred(),f=fixture({read:()=>pending.promise}),p=deferred();const flight=f.api.run(CODE,async progress=>{progress.submitting(['user1']);return p.promise;});flight.catch(()=>{});await flush();
@@ -89,4 +89,32 @@ test('an old successful receipt cannot resurrect a subsequently cancelled regist
  storage.setItem(PREFIX+'user1:'+CODE,JSON.stringify({version:1,uid:'user1',code:CODE,ids:['user1'],createdAt:1,retry:request}));
  const f=fixture({storage,read:async()=>({ok:true,rows:[{registrationId:'user1',status:'cancelled'}]}),retry:async()=>({ok:true,status:'confirmed'})});f.api.restore();await f.advance(0);
  await assert.rejects(f.api.retryOriginal(CODE),/no-longer-active/);assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(storage.length,0);assert.equal(f.recoveries.length,0);f.api.dispose();
+});
+test('ten-minute unresolved result can leave the panel without deleting the journal or cancelling',async()=>{
+ const f=fixture(),p=deferred();let sends=0;
+ const flight=f.api.run(CODE,async progress=>{sends++;progress.submitting(['user1']);return p.promise;});flight.catch(()=>{});
+ await flush();await f.advance(600000);await assert.rejects(flight,/result-pending/);
+ assert.equal(f.api.snapshot()[0].autoPaused,true);assert.equal(f.api.snapshot()[0].deadlineReached,true);
+ f.api.dismiss(CODE);assert.equal(f.api.snapshot()[0].hidden,true);assert.equal(f.storage.length,1);assert.equal(sends,1);
+ await assert.rejects(f.api.run(CODE,()=>{sends++;}),/result-pending/);assert.equal(sends,1);assert.equal(f.api.snapshot()[0].hidden,false);f.api.dispose();
+});
+test('accepted durable operation remains pending until current registration is read back',async()=>{
+ let committed=false;const f=fixture({read:async()=>({ok:true,operation:{state:committed?'completed':'queued'},rows:committed?[{registrationId:'user1',status:'confirmed'}]:[]})});let settled=false;
+ const request={action:'join',code:CODE,childIds:[null],childEligibilityConfirmed:true,operationId:'queued-operation-01'};
+ const flight=f.api.run(CODE,async p=>{p.submitting(['user1'],request);return {ok:true,operation:{state:'queued'}};});flight.then(()=>{settled=true;});
+ await flush();assert.equal(settled,false);assert.equal(f.api.snapshot()[0].queueState,'queued');
+ committed=true;await f.advance(8000);assert.equal((await flight).status,'confirmed');assert.equal(f.storage.length,0);f.api.dispose();
+});
+test('asynchronous queue business rejection ends waiting and permits a new operation',async()=>{
+ const f=fixture({read:async()=>({ok:true,rows:[],operation:{state:'rejected',reason:'full'}})});
+ const request={action:'join',code:CODE,childIds:[null],childEligibilityConfirmed:true,operationId:'queued-full-operation'};
+ await assert.rejects(f.api.run(CODE,async p=>{p.submitting(['user1'],request);return {ok:true,operation:{state:'queued'}};}),/full/);
+ assert.equal(f.api.snapshot()[0].state,'failed');assert.equal(f.storage.length,0);f.api.dispose();
+});
+test('retry acceptance is not misreported as registration-no-longer-active while worker is queued',async()=>{
+ const storage=memory(),request={action:'join',code:CODE,childIds:[null],childEligibilityConfirmed:true,operationId:'queued-retry-operation'};
+ storage.setItem(PREFIX+'user1:'+CODE,JSON.stringify({version:1,uid:'user1',code:CODE,ids:['user1'],createdAt:1,retry:request}));
+ let committed=false;const f=fixture({storage,read:async()=>({ok:true,rows:committed?[{registrationId:'user1',status:'confirmed'}]:[],operation:{state:committed?'completed':'queued'}}),retry:async()=>({ok:true,operation:{state:'queued'}})});
+ f.api.restore();await f.advance(0);const retried=f.api.retryOriginal(CODE);await flush();assert.notEqual(f.api.snapshot()[0].state,'failed');
+ committed=true;await f.advance(8000);assert.equal((await retried).status,'confirmed');f.api.dispose();
 });

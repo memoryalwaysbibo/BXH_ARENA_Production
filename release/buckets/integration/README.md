@@ -2,7 +2,7 @@
 
 This branch assembles reviewed candidates #707, #709, #711, #712, #713,
 #714, #715, #717 and #718 on selected main
-`d35d960e08d207a9b06a088d5de990a2f8201a1f`. The exact component heads,
+`0471069df5a09a433c4c945aed119004043d82b6`. The exact component heads,
 merge bases and resulting component-file Git blob hashes are recorded in
 `manifest.json`. This is an integration review, not a deployment archive or a
 replacement for the component source/configuration provenance requirements.
@@ -55,3 +55,20 @@ boundary checks run in the integration workflow. This prepares the missing
 cross-region inventory; it does not classify source code, inspect IAM or establish
 writer completeness. See `scripts/bucket-writer-discovery.md` for the exact
 read-only scope and Cloud Shell procedure. The report never enables a release.
+
+## 2026-11-06 main reconciliation
+
+The selected main now includes the opt-in registration V2 code and recovery UI,
+ranked real-name restriction and updated client cache keys. All27 changed main
+paths are carried into the two-parent candidate merge. Core and cloud runtime
+merged cleanly; independent comparisons preserve the exact added/removed lines
+from both branches. Two index conflicts were script URLs: retain every current
+main query value and append the candidate deletion/settlement tokens. All92 main
+script mappings and settlement module order were checked.
+
+Local client recovery/name-policy tests pass28 cases; core/cloud syntax checks
+pass. The existing V2 isolated Emulator workflow supplies its native queue/wave
+validation in CI; it was not run locally without a loopback Emulator. Its client
+opt-in and server rollout gates remain as main defines them. This source merge
+does not perform a deployment, turn on V2/bucket room gates or satisfy fresh
+production source/configuration and operator acceptance.
