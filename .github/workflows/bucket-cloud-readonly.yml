@@ -30,9 +30,9 @@ jobs:
       contents: read
       id-token: write
     env:
-      CLOUDSDK_CONFIG: ${{ runner.temp }}/bucket-readonly-gcloud
+      CLOUDSDK_CONFIG: /tmp/bxh-bucket-readonly-gcloud
       CLOUDSDK_CORE_PROJECT: bxh-arena
-      CAPTURE_HOME: ${{ runner.temp }}/bucket-readonly-capture
+      CAPTURE_HOME: /tmp/bxh-bucket-readonly-capture
     steps:
       - uses: actions/checkout@v4
         with:
