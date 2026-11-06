@@ -915,7 +915,7 @@
       playerRegistrationFeedback=window.BXHRegistrationFeedback.create({
         getUid:()=>authReady&&authHandle?.currentUser?.uid===firebaseUser?.uid?firebaseUser?.uid:null,
         storage,visible:()=>!document.hidden,
-        read:code=>window.engagementService.familyRegistration({action:'mine',code}),
+        read:(code,operation)=>window.engagementService.familyRegistration({action:'mine',code,...operation}),
         retry:request=>window.engagementService.familyRegistration(request),
         onChange:rows=>draw(rows),
         onRecovered:({code})=>window.dispatchEvent(new CustomEvent('bxh-registration-recovered',{detail:{code}}))
@@ -963,7 +963,17 @@
     async getPartnerContract(payload){return callEngagementFunction("getPartnerContract",payload,30000);},
     async signPartnerContract(payload){return callEngagementFunction("signPartnerContract",payload,60000);},
     async activatePartnerContract(payload){return callEngagementFunction("activatePartnerContract",payload,60000);},
-    async familyRegistration(payload){return callEngagementFunction("familyRegistration",payload,60000);},
+    async familyRegistration(payload){
+      // Candidate opt-in only. A client flag never bypasses the server rollout
+      // gate. This allowlist must remain empty until ALL writers are routed and
+      // fresh production source/config/rules readback is approved.
+      const enabled=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(payload?.code);
+      if(enabled&&['join','mine','preview'].includes(payload?.action)){
+        if(payload.action==='join')return callEngagementFunction('registrationQueueV2',{action:'submit',code:payload.code,operation:{code:payload.code,route:'family',operationId:payload.operationId,payload}},20000);
+        return callEngagementFunction('registrationQueueV2',payload,20000);
+      }
+      return callEngagementFunction("familyRegistration",payload,60000);
+    },
     async teamRegistration(payload){return callEngagementFunction("teamRegistration",payload,60000);},
     async teamLineup(payload){return callEngagementFunction("teamLineup",payload,60000);},
     async hunterClash(payload){return callEngagementFunction("hunterClashCommand",payload,30000);},

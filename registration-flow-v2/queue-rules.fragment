@@ -1,0 +1,7 @@
+// Insert into the authoritative complete Rules only after inspecting every
+// overlapping match: Firestore allow rules are additive. This fragment alone
+// cannot revoke an existing broad allow. Never deploy this as complete Rules.
+match /_registrationQueueV2/{code} {
+  allow read, write: if false;
+  match /_registrationQueueJobsV2/{operation} { allow read, write: if false; }
+}

@@ -1,6 +1,6 @@
 {
   "status": "integrated-candidate-not-deployed",
-  "baseMain": "d35d960e08d207a9b06a088d5de990a2f8201a1f",
+  "baseMain": "0471069df5a09a433c4c945aed119004043d82b6",
   "components": [
     {
       "pr": 707,
@@ -64,21 +64,21 @@
       ]
     },
     "index.html": {
-      "blob": "2e6cb3e7e8b60eff0ec5f0e6d7832843da9a26d4",
+      "blob": "8a526703de1ee3e2dadca65c78901ef499ca577c",
       "components": [
         707,
         714
       ]
     },
     "modules/cloud/cloud-runtime.js": {
-      "blob": "2d449bcad44a9609ee46e7127a7b4261bbee3d5e",
+      "blob": "a1a14dcaf0e32b51b26a681b833c1a8741016a4b",
       "components": [
         707,
         714
       ]
     },
     "modules/main-app/core.js": {
-      "blob": "9c2914a2af7bd68d63ca1c8faca4c1332479328d",
+      "blob": "db58928852321b0bc4ae1123d2f7cfad2b2aa6c1",
       "components": [
         707,
         714
@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "edffb839a73747dc1364c313fac10ab3f997785e"
+      "blob": "cd25d8103acbd4017a50b7a95f864098aa7cd89c"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1798,7 +1798,7 @@
     },
     "release/buckets/integration/README.md": {
       "components": [],
-      "blob": "10c5a459d46dbd0901cac4b8b7dd778a63f22eb5"
+      "blob": "f2486a685a594fe38e90ac220c786b6740669421"
     },
     "scripts/bucket-writer-followup.py": {
       "components": [],
@@ -1840,7 +1840,7 @@
     "ladder-v1.js": {
       "v": "20260921.9"
     },
-    "/ajax/libs/qrcodejs/1.0.0/qrcode.min.js": {},
+    "ajax/libs/qrcodejs/1.0.0/qrcode.min.js": {},
     "modules/main-app/ladder-location.js": {
       "v": "20261019.1"
     },
@@ -1880,6 +1880,7 @@
     },
     "family-ui.js": {
       "v": "20261006-registration-1",
+      "registration-flow-v2": "20261106.1",
       "quick-registration": "20261006.6",
       "direct-registration": "20261014.1",
       "checkin-audit": "20261031.1"
@@ -2042,7 +2043,7 @@
     },
     "my-events-player-slice.js": {},
     "modules/main-app/registration-feedback.js": {
-      "v": "20261105-confirming-copy-1"
+      "v": "20261106-recovery-2"
     },
     "modules/main-app/community-referee-invite.js": {
       "v": "20261105-invite-1"
@@ -2172,7 +2173,8 @@
       "profile-complete-draft": "20261102.1",
       "offline-confirmation": "20261103.1",
       "archive-status-hint": "20261103.1",
-      "community-referee": "20261105-qr.1"
+      "community-referee": "20261105-qr.1",
+      "ranked-real-name-only": "20261106.1"
     },
     "modules/main-app/public-watch-isolation.js": {
       "v": "20261005-captain-isolation-1"
@@ -2182,6 +2184,7 @@
     },
     "modules/cloud/cloud-runtime.js": {
       "v": "20261006-roster-promotion-1",
+      "registration-flow-v2": "20261106.1",
       "quick-registration": "20261006.6",
       "hunter21": "20261020-r18",
       "account-perf": "20261025.1",
@@ -2276,14 +2279,14 @@
       "v": "20261001-ui-v2"
     }
   },
-  "mainCoreBlob": "cfa6bf1a0a4564547bb8e83a039366519e82250f",
+  "mainCoreBlob": "83e89e6784d09b92c629e96dc9505daa615632d3",
   "resolutions": {
-    "index.html": "Three-way merge with main d35d960e; preserve its registration confirmation wording/cache token and every existing main query parameter, QR module order, plus candidate delete-intent/bucket-settlement tokens.",
-    "modules/main-app/core.js": "Clean three-way merge of main's community-referee QR invite hooks with existing bucket deletion/settlement changes; exact merged blob pinned.",
-    "modules/cloud/cloud-runtime.js": "apply 707 and 714 hunks to exact current-main content with unique context",
+    "index.html": "Three-way merge with main0471069d: preserve registration V2/recovery/ranked-name query tokens, all92 main script mappings and settlement module order; append both candidate delete-intent and bucket-settlement tokens.",
+    "modules/main-app/core.js": "Clean three-way merge of current main ranked-name restriction with existing bucket deletion/settlement changes; complete added/removed lines from both branches independently verified.",
+    "modules/cloud/cloud-runtime.js": "Clean three-way merge preserving main V2 opt-in dispatch/recovery operation binding and candidate certified settlement/deletion methods; exact combined blob verified.",
     "tests/four-court-buckets/completion/native-emulator.cjs": "Preserve all prior checks and default single-round workload; permit bounded fresh count/sync/sync contention rounds (1-50) without retrying failures, with QR/round labels and native read diagnostics.",
     "tests/four-court-buckets/deletion/rules-emulator.py": "Select a fresh OS-assigned loopback port for each private demo Emulator invocation; preserve baseline/candidate permissions and deletion assertions.",
-    ".github/workflows/bucket-integrated-candidate.yml": "Run the writer metadata discovery offline boundary suite with every pinned integration check.",
+    ".github/workflows/bucket-integrated-candidate.yml": "Run inherited registration-feedback recovery and ranked-name policy tests on the same merged checkout, in addition to existing component integration checks.",
     "release/buckets/deletion/manifest.json": "Refresh only restore/access deployed archive and source-closure provenance against the uploaded 2026-11-05 read-only capture; runtime candidate files retain their accepted hashes.",
     "tests/four-court-buckets/deletion/verify-package.py": "Derive lease guards from the exact deployed two-marker fences and verify captured closure hashes; retain all selector/deletion checks.",
     "scripts/build-bucket-restore-access-review.py": "Offline review-only packaging of two exact captured archives; replace one pinned source member per target, preserve all other source bytes and reject source/configuration drift. No deployment or cloud calls.",
