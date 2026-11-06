@@ -1,7 +1,7 @@
 # Referee stable DOM regions — isolated candidate
 
 Base: `0471069df5a09a433c4c945aed119004043d82b6` (fetched origin/main).
-Branch: `fix/referee-stable-regions`. No deployment, remote push, Rules/IAM changes,
+Branch: `fix/referee-stable-regions`; draft review: [PR #742](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/pull/742). No deployment, merge, Rules/IAM changes,
 production Firebase writes, bucket activation, or integration of PR #719.
 
 ## Implementation
@@ -160,8 +160,13 @@ missing in this managed host; packages were extracted into the scratch workspace
 and the cached launcher was made to preserve LD_LIBRARY_PATH. No system or
 product files were changed. Its ldconfig-only optional-library check cannot see
 scratch libraries, so host validation was skipped only after a real WebKit
-launch/input smoke verified runtime loading. Full phone smoke and isolated
-WebKit transaction results are pending at this intermediate commit.
+launch/input smoke verified runtime loading. Full phone smoke completed: 206 passed, 2 flaky (passed on retry), 8 existing
+WebKit entrance-skin skips. Together with desktop: 314 passed, 2 flaky, 8 skipped
+out of 324 configured cases. The two flaky cases concern lobby pointer-down and
+DOM/focus restoration and timed out on their first attempt; independent follow-up
+and isolated WebKit transaction results are recorded in the PR as they complete.
+The eight skips are inherited from main, whose entrance fixture explicitly skips
+WebKit due to a known fixture crash; this candidate adds no skip.
 
 The existing read-only referee CI workflow now runs the stable DOM browser test,
 emulator App Check boundary tests and twelve-context actual transaction test.
