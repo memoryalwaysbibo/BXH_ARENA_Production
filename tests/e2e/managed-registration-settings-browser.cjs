@@ -30,6 +30,9 @@ window.fixture={nameMode(mode,draftMode=null){state.meta.ladderMode=mode;setting
  try{
   const page=await browser.newPage();
   for(const width of [390,960]){
+   // setContent preserves the JavaScript global scope; start a fresh document
+   // so fixture declarations and click listeners cannot leak across viewports.
+   await page.goto('about:blank');
    await page.setViewportSize({width,height:844});
    await page.route('**/*',route=>route.abort());
    await page.setContent('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');
