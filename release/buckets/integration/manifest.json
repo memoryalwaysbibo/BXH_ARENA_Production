@@ -1830,7 +1830,7 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "5f269c92b1b236f18ce00a861b09f98fc272d1ed"
+      "blob": "dc049fe469895c589380726a94a66423cf70f551"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
@@ -1851,6 +1851,24 @@
     "tests/four-court-buckets/raffle/input-probe.cjs": {
       "components": [],
       "blob": "ad8d3801b23a7bc8b971e043c8131c684b30afd4"
+    },
+    "tests/four-court-buckets/raffle/native-input.cjs": {
+      "blob": "00a59dfa49705cd41e109fc3e20b8ac9b9d18858",
+      "components": [
+        718
+      ]
+    },
+    "tests/four-court-buckets/raffle/native.firebase.json": {
+      "blob": "8ac30a58da9c41843d09956f58068fe121a79881",
+      "components": [
+        718
+      ]
+    },
+    ".github/workflows/bucket-raffle-input.yml": {
+      "blob": "6efb6fd67b6eec7a8f582a2eeed9b5f77b1d35c4",
+      "components": [
+        718
+      ]
     }
   },
   "mainScriptQueryParameters": {
@@ -2323,6 +2341,7 @@
     "release/buckets/integration/writer-discovery-20261105.md": "Record the received cross-region discovery snapshot, both unresolved regional errors, 157 matched Run services and the newer referee/registration source baselines; do not claim metadata/source completeness.",
     "release/buckets/interactions/candidate/9/family-registration.js": "Reapply the original single bucket-ownership guard to the exact 2026-11-05 deployed familyRegistration source, preserving PR730 admission/coalescing, deadline revalidation, getAll and read-only previews.",
     "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
-    "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference."
+    "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
+    ".github/workflows/bucket-raffle-input.yml": "Validate source-only raffle reader against Admin SDK14.4.0, demo-only Emulator snapshots, physical root replacement and deterministic ABORTED callback retry; no callable wiring or deployment."
   }
 }

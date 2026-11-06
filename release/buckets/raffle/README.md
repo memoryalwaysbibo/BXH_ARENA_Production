@@ -43,3 +43,17 @@ live bytes. Then adapt their caller-owned transactions, preserve source-generati
 receipt rules and public response fields, and run native duplicate/claim/forfeit/
 replacement and authenticated browser acceptance. First-round usability remains
 open until those callable paths use the verified reader.
+
+Native SDK validation is defined in `Bucket raffle native input`. It uses Admin
+SDK14.4.0 and real Firestore Emulator snapshots, guarded to demo-bxh-bucket-raffle
+on 127.0.0.1:8198. The suite checks pools, corrupt sources, root creation
+identities, epoch/revision changes and deterministic SDK ABORTED callback retry.
+Seed/flush/replacement writes affect only that isolated demo. This does not prove
+natural contention, callable authorization, Auth/App Check or live acceptance.
+
+```sh
+GCLOUD_PROJECT=demo-bxh-bucket-raffle firebase emulators:exec --only firestore \
+  --project demo-bxh-bucket-raffle \
+  --config tests/four-court-buckets/raffle/native.firebase.json \
+  'node tests/four-court-buckets/raffle/native-input.cjs'
+```
