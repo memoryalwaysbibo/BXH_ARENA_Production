@@ -1,0 +1,68 @@
+name: Bucket integrated candidate
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/**'
+      - 'scripts/bucket-writer-discovery*'
+      - 'scripts/bucket-writer-followup.py'
+      - 'tests/four-court-buckets/**'
+      - 'tests/e2e/lobby-stable-updates.spec.cjs'
+      - 'modules/main-app/core.js'
+      - 'modules/cloud/cloud-runtime.js'
+      - 'modules/scoring/four-court-settlement.js'
+      - 'index.html'
+      - '.github/workflows/bucket-integrated-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  integrated-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify every pinned component and preserve current main cache keys
+        run: python3 -B tests/four-court-buckets/integration/verify-integration.py
+      - name: Verify read-only writer discovery boundaries
+        run: |
+          python3 -B tests/four-court-buckets/writer-discovery.py
+          python3 -B tests/four-court-buckets/writer-followup.py
+      - name: Verify independently captured backend overlays
+        run: |
+          for family in deletion interactions admissions operations settlement completion poster activity derived; do
+            python3 -B "tests/four-court-buckets/$family/verify-package.py"
+          done
+      - name: Preserve inherited registration recovery and ranked-name policy
+        run: node --test tests/registration-feedback.test.cjs tests/ranked-real-name-only.test.cjs
+      - name: Check derived official-match event against captured deployed source
+        run: node tests/four-court-buckets/derived/probe.cjs
+      - name: Check My Events repair target against captured deployed engine
+        run: node --test tests/four-court-buckets/my-events/repair-engine-patch.test.cjs tests/four-court-buckets/my-events/bootstrap-target.test.cjs tests/four-court-buckets/my-events/bootstrap-patch.test.cjs tests/four-court-buckets/my-events/rebuild-patch.test.cjs tests/four-court-buckets/my-events/service-patch.test.cjs tests/four-court-buckets/my-events/assembly-patch.test.cjs tests/four-court-buckets/my-events/bootstrap-start-patch.test.cjs
+      - name: Same-checkout activity and settlement bridge
+        run: |
+          mkdir -p .integration
+          ln -s .. .integration/completion
+          ln -s .. .integration/settlement
+          node tests/four-court-buckets/activity/backend-bridge.cjs
+      - name: Install isolated browser dependencies
+        run: |
+          npm install --prefix /tmp/bucket-integrated --no-save --ignore-scripts playwright@1.56.1 @playwright/test@1.56.1
+          /tmp/bucket-integrated/node_modules/.bin/playwright install --with-deps chromium
+      - name: Integrated full-host deletion, settlement handoff and main offline recovery
+        env:
+          NODE_PATH: /tmp/bucket-integrated/node_modules
+          BXH_RANKED_SOURCE: ${{ github.workspace }}
+          BXH_GENERAL_SOURCE: ${{ github.workspace }}
+        run: |
+          node tests/four-court-buckets/deletion/full-host.browser.cjs
+          node tests/four-court-buckets/settlement-ui/backend-bridge.cjs
+          node tests/offline-confirmation.browser.cjs
+          node tests/offline-resilience-v2-wiring.test.cjs
+      - name: Snapshot burst coalescing after native gesture release
+        env:
+          NODE_PATH: /tmp/bucket-integrated/node_modules
+        run: /tmp/bucket-integrated/node_modules/.bin/playwright test --config=playwright.config.cjs tests/e2e/lobby-stable-updates.spec.cjs --project=desktop-chromium --grep "snapshot bursts coalesce" --retries=0

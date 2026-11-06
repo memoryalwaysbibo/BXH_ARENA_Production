@@ -262,6 +262,11 @@ test('keyboard focus remains usable across a public update', async ({ page }) =>
 test('snapshot bursts coalesce to one flush and keep the last count', async ({ page }) => {
   await openLobby(page);
   await expandCard(page);
+  // The preceding native click has its own deferred gesture-release render.
+  // Start measuring only after it finishes; held-gesture deferral is covered
+  // separately and must not be counted as another snapshot-burst flush.
+  await page.waitForFunction(() => lobbyGestureTarget === null && lobbyReleaseTimer === null
+    && lobbyFrame === null && !lobbyRenderPending);
   const flushes = await page.evaluate(() => {
     const before = lobbyFixture.flushes;
     for (let count = 3; count <= 12; count++) {

@@ -1,0 +1,61 @@
+{
+  "status": "candidate-not-deployed",
+  "runtimeEnabled": false,
+  "productionWrites": 0,
+  "patches": [
+    {
+      "function": "manageEntrySelection",
+      "sourceSet": 12,
+      "path": "entry-selection.js",
+      "archiveSha256": "9157dcd2f754381284ffc99d170f62e159c67b2340f202291294af363fd41208",
+      "baselineFileSha256": "9a1e22d7bc7a525817451870a7ec785593f9e3f3a0ea03c0d8bc1a325e5bd064",
+      "patchedFileSha256": "45f802cef5dfe468b1b21274be394761460ac8e25923b1c68cb1e5b60c7f6dd2",
+      "edits": [
+        {
+          "before": "  const tour=t.data(),s=C.parseState(tour),old=r.data()||{},now=Date.now();if(tour.registrationSelection)throw Error('use-registration-selection');",
+          "after": "  const tour=t.data();\n  if([tour,p.data()].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n  const s=C.parseState(tour),old=r.data()||{},now=Date.now();if(tour.registrationSelection)throw Error('use-registration-selection');"
+        }
+      ]
+    },
+    {
+      "function": "lotteryRegistration",
+      "sourceSet": 11,
+      "path": "registration-selection.js",
+      "archiveSha256": "e3e622316d904f24833b9187d26f702defa95a664f9c848c74d831a7083406d2",
+      "baselineFileSha256": "d4fc39819cd27ffa27a97f3d7253737a16d66b672191c376b8ee94ceb15ee17d",
+      "patchedFileSha256": "d0355d503097d700c3d25c5cb01bf39223108384942f1a6c1cb1e7fc89d992f0",
+      "edits": [
+        {
+          "before": "  assertLegacyRosterWritable(t,p,C.parseState(t));",
+          "after": "  if([t,p].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>Object.prototype.hasOwnProperty.call(x,k))))throw Error('bucket-scoring-required');\n  assertLegacyRosterWritable(t,p,C.parseState(t));"
+        }
+      ]
+    },
+    {
+      "function": "registrationInvitations",
+      "sourceSet": 19,
+      "path": "registration-invitations.js",
+      "archiveSha256": "8403011af43301c2610f6b7e53fca0bc462562bfd3b2ba4585c1aa8a8240a03a",
+      "baselineFileSha256": "c655efe635e6278bb1060840871f16e32ef78659b7b360f88152480ecf6ba9ef",
+      "patchedFileSha256": "1ba36ffcf697b67f6879194edc3982daa18471f450027e2ce5dba48b6ce72421",
+      "edits": [
+        {
+          "before": "function createRegistrationInvitationService(db,clock=Date.now){return async req=>{",
+          "after": "const has=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);\nfunction roomData(snapshot,publicSnapshot){\n if(!snapshot.exists)throw Error('not-found');\n const t=snapshot.data(),p=publicSnapshot.data();\n if([t,p].some(x=>x&&['scoreStorage','scoreBucketProjection','bucketMigration','deletionStatus'].some(k=>has(x,k))))throw Error('bucket-scoring-required');\n return t;\n}\nfunction creation(snapshot){\n const time=snapshot.createTime;\n if(!snapshot.exists||!Number.isSafeInteger(time?.seconds)||!Number.isSafeInteger(time?.nanoseconds))throw Error('invitation-room-identity-missing');\n return {seconds:time.seconds,nanoseconds:time.nanoseconds};\n}\nconst identity=snapshot=>{const t=creation(snapshot);return t.seconds+':'+t.nanoseconds;};\nfunction assertInvitationRoom(room,invitation){\n const inv=invitation.data();\n if(has(inv,'sourceCreatedAt')){if(inv.sourceCreatedAt!==identity(room))throw Error('invitation-room-changed');return;}\n // Legacy invitations have no generation field. Their trusted SDK creation\n // timestamp must not predate the current parent; no client timestamp is trusted.\n const r=creation(room),i=creation(invitation);\n if(i.seconds<r.seconds||i.seconds===r.seconds&&i.nanoseconds<r.nanoseconds)throw Error('invitation-room-changed');\n}\nfunction createRegistrationInvitationService(db,clock=Date.now){return async req=>{"
+        },
+        {
+          "before": " if(d.action==='invite'){\n  const targetUid=clean(d.targetUid);if(!targetUid||targetUid===uid)throw Error('invalid-target');\n  const [ts,targetSnap]=await Promise.all([tr.get(),db.doc('users/'+targetUid).get()]);if(!ts.exists)throw Error('not-found');\n  const t=ts.data(),target=targetSnap.data();if(!active(target))throw Error('player-not-found');\n  const manager=['staff','admin','super_admin','tester'].includes(actor.role)||t.ownerUid===uid||t.createdBy===uid;if(!manager)throw Error('permission-denied');\n  if(t.systemClosed||t.eventCancelled||t.tournamentPhase!=='waiting')throw Error('tournament-started');\n  const expiresAt=now+30*60*1000,title=t.name||code,mail=db.doc('userMail/'+targetUid+'/messages/tournament_invite_'+code),stats=db.doc('mailboxStats/'+targetUid);\n  await db.runTransaction(async tx=>{const [prior,reg,ss]=await Promise.all([tx.get(ir),tx.get(tr.collection('registrations').doc(targetUid)),tx.get(stats)]);if(reg.exists&&['confirmed','waitlist'].includes(reg.data().status))throw Error('already-registered');if(prior.exists&&prior.data().status==='pending'&&ms(prior.data().expiresAt)>now)throw Error('invite-pending');const record={code,eventName:title,targetUid,targetName:target.gameId||target.nickname||target.realName||'玩家',targetPlayerId:target.playerId||'',invitedByUid:uid,invitedByName:actor.gameId||actor.nickname||actor.realName||'主辦',status:'pending',createdAt:now,updatedAt:now,expiresAt};tx.set(ir,record);tx.set(mail,{subject:'賽事參加邀請',body:(actor.gameId||actor.nickname||actor.realName||'主辦')+' 邀請你參加「'+title+'」。請進入 BXH ARENA 接受或拒絕。',type:'tournament_invitation',senderName:'BXH ARENA',senderUid:uid,createdAt:now,updatedAt:now,readAt:null,eventCode:code,invitationStatus:'pending'},{merge:true});tx.set(stats,{unreadCount:Math.max(0,Number(ss.data()?.unreadCount)||0)+1,updatedAt:now},{merge:true});});\n  return {ok:true,status:'pending',expiresAt};\n }\n",
+          "after": " if(d.action==='invite'){\n  const targetUid=clean(d.targetUid);if(!targetUid||targetUid===uid)throw Error('invalid-target');\n  const observed=await tr.get();if(!observed.exists)throw Error('not-found');const sourceCreatedAt=identity(observed);\n  const expiresAt=now+30*60*1000,mail=db.doc('userMail/'+targetUid+'/messages/tournament_invite_'+code),stats=db.doc('mailboxStats/'+targetUid);\n  await db.runTransaction(async tx=>{\n   const [fresh,pub,actorNow,targetNow,prior,reg,ss]=await Promise.all([tx.get(tr),tx.get(db.doc('publicTournaments/'+code)),tx.get(db.doc('users/'+uid)),tx.get(db.doc('users/'+targetUid)),tx.get(ir),tx.get(tr.collection('registrations').doc(targetUid)),tx.get(stats)]);\n   const t=roomData(fresh,pub),currentActor=actorNow.data(),target=targetNow.data();\n   if(identity(fresh)!==sourceCreatedAt)throw Error('invitation-room-changed');\n   if(!active(currentActor))throw Error('auth-required');if(!active(target))throw Error('player-not-found');\n   const manager=['staff','admin','super_admin','tester'].includes(currentActor.role)||t.ownerUid===uid||t.createdBy===uid;if(!manager)throw Error('permission-denied');\n   if(t.systemClosed||t.eventCancelled||t.tournamentPhase!=='waiting')throw Error('tournament-started');\n   if(prior.exists)assertInvitationRoom(fresh,prior);\n   if(reg.exists&&['confirmed','waitlist'].includes(reg.data().status))throw Error('already-registered');\n   if(prior.exists&&prior.data().status==='pending'&&ms(prior.data().expiresAt)>now)throw Error('invite-pending');\n   const title=t.name||code,record={code,eventName:title,targetUid,targetName:target.gameId||target.nickname||target.realName||'玩家',targetPlayerId:target.playerId||'',invitedByUid:uid,invitedByName:currentActor.gameId||currentActor.nickname||currentActor.realName||'主辦',status:'pending',createdAt:now,updatedAt:now,expiresAt,sourceCreatedAt};\n   tx.set(ir,record);tx.set(mail,{subject:'賽事參加邀請',body:(currentActor.gameId||currentActor.nickname||currentActor.realName||'主辦')+' 邀請你參加「'+title+'」。請進入 BXH ARENA 接受或拒絕。',type:'tournament_invitation',senderName:'BXH ARENA',senderUid:uid,createdAt:now,updatedAt:now,readAt:null,eventCode:code,invitationStatus:'pending'},{merge:true});\n   tx.set(stats,{unreadCount:Math.max(0,Number(ss.data()?.unreadCount)||0)+1,updatedAt:now},{merge:true});\n  });\n  return {ok:true,status:'pending',expiresAt};\n }\n"
+        },
+        {
+          "before": "return db.runTransaction(async tx=>{const [is,ts,ps]=await Promise.all([tx.get(ir),tx.get(tr),tx.get(db.doc('publicTournaments/'+code))]);if(!is.exists||is.data().targetUid!==uid)throw Error('invite-not-found');const inv=is.data();",
+          "after": "return db.runTransaction(async tx=>{const [is,ts,ps,us]=await Promise.all([tx.get(ir),tx.get(tr),tx.get(db.doc('publicTournaments/'+code)),tx.get(db.doc('users/'+uid))]);if(!active(us.data()))throw Error('auth-required');roomData(ts,ps);if(!is.exists||is.data().targetUid!==uid)throw Error('invite-not-found');assertInvitationRoom(ts,is);const inv=is.data();"
+        },
+        {
+          "before": "   const [fresh,pub,actorNow,targetNow,prior,reg,ss]=await Promise.all([tx.get(tr),tx.get(db.doc('publicTournaments/'+code)),tx.get(db.doc('users/'+uid)),tx.get(db.doc('users/'+targetUid)),tx.get(ir),tx.get(tr.collection('registrations').doc(targetUid)),tx.get(stats)]);",
+          "after": "   const [fresh,pub,actorNow,targetNow,prior,reg,ss]=await tx.getAll(tr,db.doc('publicTournaments/'+code),db.doc('users/'+uid),db.doc('users/'+targetUid),ir,tr.collection('registrations').doc(targetUid),stats);"
+        }
+      ]
+    }
+  ]
+}

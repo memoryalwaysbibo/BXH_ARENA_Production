@@ -1,0 +1,151 @@
+{
+  "status": "review-only-not-deployed",
+  "captureArchiveSha256": "1823f0f702b86eb1ad95c4c96db255791e965219bf2def208bb4771069043712",
+  "parentDiscoveryReportSha256": "88f19f67186a2e68244bcf260c082116d3e8d8473781421c61da397a0c73df5d",
+  "capturedAt": "2026-11-05T07:53:45.252565+00:00",
+  "toolSha256": "a826152183161292c44580cf6a9895693f486b05e0dbfc22d59a70d59b257ca3",
+  "productionWrites": 0,
+  "deploymentPerformed": false,
+  "roomActivationPerformed": false,
+  "writerInventoryComplete": false,
+  "acceptanceCompleted": false,
+  "unresolvedRegionalReads": [
+    {
+      "scope": "run-services:me-central2",
+      "kind": "http",
+      "httpStatus": 403,
+      "payloadSha256": "3a52b11b5042ff0772366a5d8feaa020a866bdca97b67d7016c1d353e20c8375",
+      "googleStatus": "PERMISSION_DENIED",
+      "reasons": [
+        "LOCATION_POLICY_VIOLATED"
+      ]
+    },
+    {
+      "scope": "run-jobs:me-central2",
+      "kind": "http",
+      "httpStatus": 403,
+      "payloadSha256": "a1365ec299d286723e5d81ffc34629e969c98deaaf0ad2975d9433001acdd1a5",
+      "googleStatus": "PERMISSION_DENIED",
+      "reasons": [
+        "LOCATION_POLICY_VIOLATED"
+      ]
+    }
+  ],
+  "targetFunctions": [
+    {
+      "name": "manageRefereeSeats",
+      "environment": "GEN_2",
+      "updateTime": "2026-11-05T04:24:27.153908967Z",
+      "revision": "managerefereeseats-00007-vel",
+      "runtime": "nodejs22",
+      "entryPoint": "manageRefereeSeats",
+      "metadataSha256": "3d5844e1b9b2fcbf17c9af182ad28efe52f0317cf1e30e03893dda8b7861708b",
+      "buildConfigSha256": "f4a0079f29488059ea74927c9682dab986bc901f467db5cab52928d29b1ffd35",
+      "serviceConfigSha256": "014afb61249755c3372f30d3213566612650aa5b98cb7e970e2767aba245d0af",
+      "eventTriggerSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "sourceStorageSha256": "cd5d3fcb4291216abad56f524e45eca31518f2b1ba28af31ff844f8a2af62a07",
+      "source": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "manageRefereeSeats/function-source.zip",
+        "generation": "1793852618454931"
+      },
+      "sourceArchiveFile": "manageRefereeSeats.source.zip",
+      "sourceArchiveSha256": "581406375e1833a4768302d931371549b52f24337a9ca97c26638fb651a4ba05",
+      "stableDuringCapture": true
+    },
+    {
+      "name": "familyRegistration",
+      "environment": "GEN_2",
+      "updateTime": "2026-11-05T05:00:50.576366270Z",
+      "revision": "familyregistration-00041-ded",
+      "runtime": "nodejs22",
+      "entryPoint": "familyRegistration",
+      "metadataSha256": "3261009a034d10c5bc06c475b411820024059f84982d17cfd6c9b943725e0868",
+      "buildConfigSha256": "b7b97f72a4b5f8164349f66c86e1b04696872a908f7ea2a7838943e1bc1dcaf3",
+      "serviceConfigSha256": "57cc85b581e63469e638f187a878c5f6a7705c5e992a8b0f50cce3f12aeb4ce5",
+      "eventTriggerSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "sourceStorageSha256": "d5e48bb019cf9dde749ca96393ea16306183be547bfdb68560892c7be00401f2",
+      "source": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "familyRegistration/function-source.zip",
+        "generation": "1793854788506302"
+      },
+      "sourceArchiveFile": "familyRegistration.source.zip",
+      "sourceArchiveSha256": "db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d",
+      "stableDuringCapture": true
+    },
+    {
+      "name": "trackTournamentRegistrationActivity",
+      "environment": "GEN_2",
+      "updateTime": "2026-09-27T05:58:53.209476372Z",
+      "revision": "tracktournamentregistrationactivity-00007-zoj",
+      "runtime": "nodejs22",
+      "entryPoint": "trackTournamentRegistrationActivity",
+      "metadataSha256": "926c21d3db097d69662e206acac76fdfe44180fef8ee4228649f4d5f951a22ae",
+      "buildConfigSha256": "25fcb86159e71219690719c7b4045502bd03abf26bd0fddefb4db91fb9e2401d",
+      "serviceConfigSha256": "cacf4c3643c3ceb383f583572fc3b24a211a142eb0ae16e3ea10da830c82859e",
+      "eventTriggerSha256": "ac1f10a47f42759b4009a9fe237858b509816facf4971044d6aafbc62f56d2a7",
+      "sourceStorageSha256": "60084d211a7d5fe05b7f3d2030be29996e687aadf3d495bccd695f5abee84db8"
+    },
+    {
+      "name": "observeNumberAccount",
+      "environment": "GEN_1",
+      "updateTime": "2026-11-02T09:15:59.458Z",
+      "revision": "4",
+      "runtime": "nodejs22",
+      "entryPoint": "observeNumberAccount",
+      "metadataSha256": "df9d19d7567c8813d3f2896ee2a37f1792597596b0e2c94572a913b20b18c3f9",
+      "buildConfigSha256": "3c485e04d4368e138d9fb4fa81e38606523e4083553c84c2b7a4fde4522e1208",
+      "serviceConfigSha256": "c1f3f6c550e65bacb44a5e499207272e045fd7cea9be454347972b1aa8973e29",
+      "eventTriggerSha256": "0dcf5e7d68b6047c4afc046b02f833bf02926bcc64d137a0037eb190de3dbf76",
+      "sourceStorageSha256": "81580c9860f8afbeb4e0de9b23fae9b0e5217075b285861b5526163439948684"
+    }
+  ],
+  "familyReviewSource": {
+    "baselineArchiveSha256": "db015fb8fa78db14fab41e1f5cc18d8aa9ac8e3a9bcadcf17b425171db64a55d",
+    "candidateArchiveSha256": "fbc2a9b424086d5a58f579cbb0f1360eee55805007f0efe826c42f298971c5a5",
+    "changedMembers": [
+      "family-registration.js"
+    ],
+    "unchangedMembers": 103,
+    "candidateFileSha256": "9df6fa63266aa476e361603b631c906959401da5880f50c665b1f99bdcf8da6b",
+    "verifiedClosureFiles": {
+      "family-registration.js": "7a34234e26668025cda14538f030b6c4ef14daa96388a36ac01e9904c87f0b56",
+      "community-registration-roster.js": "99af7082c103026e970bb7f85e02dbf8fc12ff4fda05f133c3fba71e2c43cc56",
+      "community-registration-policy.js": "93b6a5d2871a0f9b9908d91c0fa0d9f2a5c04b787ed50640570ad0c049d053e3",
+      "onsite-waitlist-writer-guards.js": "d35d101cab964d9210df2159e93a49d20aed39f0bdf6f6217a3e648db4141dba",
+      "onsite-waitlist/owned.js": "649d5b78be40b89b88743b30c9ea4181957be6e1be0c6ef28aed5015e1c60433",
+      "onsite-waitlist/core.js": "0ddf2d490daf8cd416cf299bdc7acfb3f98dd02e61d3df0dbbf3b3c2f2dfa39c",
+      "room-access-core.js": "1f078e3b9a83cfd80176e4a03e1820b1b4576bfafcb95ac9ac96c68044b2ffe2",
+      "my-events-operation-proof.cjs": "e33b8d08f8653a546a7656fd529478f4938b258046a88a4fae3e4b337017d5a9",
+      "_qr_checkin/admin-firestore.cjs": "3c8c2abf2cb2f4142e0e8ec727e232e703d60f0a9a2449867c25464e1d8f850e",
+      "_qr_checkin/guard-firestore.cjs": "b0d0027f0b79b845eb118c585bb8104d3590c1c18729737300f6fdf32d97d43b",
+      "_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab",
+      "registration-admission.cjs": "c9a69f9ff882f160b64128994fa3c31773a8c31e65ed92bae85e2b2a9871f859"
+    }
+  },
+  "refereeCandidateFileMatches": {
+    "bucket-legacy-fence.cjs": "acea05f6d0af5a7016e8d0875836f420a32a877810c34a2e86bb2fbe4faf462c",
+    "core.cjs": "da98bac597e199394a9ad9f02d8698534ce526f271d17b45387458f7b2fbac04",
+    "dispatch-core.cjs": "4be700ad894bf35b95e1da39585544ad14d596df5c12d00362d0ec93a90efe3b",
+    "engine/court-retirement.cjs": "597add4bf231a629e62385d61f970610ab59638055b45f3dfc834f04a5b447b0",
+    "engine/double-elimination.cjs": "db9a6b0d815a10c2853c2d48794f297385b23798ce441e904c24246ddf32ab1c",
+    "engine/fault.cjs": "26da0500abd88622bf9f49555287dd5ed7a7e311f232dc5adae027fce6e25266",
+    "engine/index.cjs": "81dda03aae3ee16c0cb09f0acbf17e9ffaba80e52d02c751569a0b8ea2952a4d",
+    "engine/manifest.json": "531e5b4c0c77c689ae55b5bfd04d6f2f2a6a9f60fc3d4125e5da7832e7f06842",
+    "engine/match-utils.cjs": "60fdd13744d49acc2c28b42d12ff8c975841b8f6e891bd80cbd6832ef0c3fb53",
+    "event-staff-core.cjs": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+    "index.js": "e1f84ecfd8b98cce686f5adc4d12d723adadc25b44b0a88c71e1dc53fd7da4f4",
+    "package-lock.json": "40af37152bb937436e5e87b0f0f8b3f834aee597da89db0b2e85138b79c52661",
+    "package.json": "58baa94158f07df2262cfc28db8b33236e5fd876274126a9f9a73219b051e4b7",
+    "scoring-core.cjs": "6d4007a738fcaaede5eb2a3db672b5a8b51e0ab68a1c00cab9c460beec6e9631",
+    "scoring-service.cjs": "866fadf8a809632731aa65c5b1812d9e2f3a683b812f892e12704fc95f52dfa2",
+    "service.cjs": "2587dbdd1e5663d05950b0f369ca4239e5fef8b9a51cd0cd762bc44661ae98d4"
+  },
+  "activityTriggerComparison": {
+    "oldGetSha256": "2eb93766c1791a2c06647df3053324b378955a3d42029ba2ec8ae3be3ede24fb",
+    "newGetSha256": "ac1f10a47f42759b4009a9fe237858b509816facf4971044d6aafbc62f56d2a7",
+    "matches": false,
+    "cause": "unresolved; full trigger fields and delivery acceptance still required"
+  }
+}

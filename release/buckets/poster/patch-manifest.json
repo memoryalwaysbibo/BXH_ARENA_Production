@@ -1,0 +1,159 @@
+{
+  "status": "candidate-not-deployed",
+  "runtimeEnabled": false,
+  "productionWrites": 0,
+  "deploymentTarget": "roomPosterCover",
+  "captureObservedAt": "20261103T014221Z",
+  "capturedMetadata": [
+    {
+      "name": "roomPosterCover",
+      "entryPoint": "roomPosterCover",
+      "runtime": "nodejs22",
+      "updateTime": "2026-10-04T07:53:13.727986350Z",
+      "storageSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "roomPosterCover/function-source.zip",
+        "generation": "1791100339508030"
+      },
+      "codebase": null,
+      "eventTrigger": {
+        "eventType": null,
+        "eventFilters": []
+      },
+      "sourceSet": 20,
+      "classification": "pending-source-review"
+    },
+    {
+      "name": "roomPosterCoverCleanup",
+      "entryPoint": "roomPosterCoverCleanup",
+      "runtime": "nodejs22",
+      "updateTime": "2026-10-04T07:53:16.995203041Z",
+      "storageSource": {
+        "bucket": "gcf-v2-sources-87261141693-asia-east1",
+        "object": "roomPosterCoverCleanup/function-source.zip",
+        "generation": "1791100339704918"
+      },
+      "codebase": null,
+      "eventTrigger": {
+        "eventType": "google.cloud.firestore.document.v1.deleted",
+        "eventFilters": [
+          {
+            "attribute": "database",
+            "value": "(default)"
+          },
+          {
+            "attribute": "namespace",
+            "value": "(default)"
+          },
+          {
+            "attribute": "document",
+            "value": "tournaments/{code}",
+            "operator": "match-path-pattern"
+          }
+        ]
+      },
+      "sourceSet": 20,
+      "classification": "pending-source-review"
+    }
+  ],
+  "archiveSha256": "668657471b49be8fab9a0a7e77984f243a8e4b6629c9a3daf8262635d1ce8665",
+  "baselineSha256": "ad0df32e3c6a5fb52311b08d2f4097a0e6454daeea2d3d42eff5a11cbf0d8b55",
+  "candidateSha256": "372471129d64285848999672cfc95ac10871fcfd45a107c97238669ed7c701b2",
+  "edits": [
+    {
+      "before": "const {imageSize}=require('./ai-create-poster-core');\nconst EventStaff=require('./event-staff-core');\n\n\n",
+      "after": "const {imageSize}=require('./ai-create-poster-core');\nconst EventStaff=require('./event-staff-core');\nconst Fence=require('./bucket-poster-fence.cjs');\n\n\n"
+    },
+    {
+      "before": "  const room=roomSnap.exists?roomSnap.data()||{}:null;\n  const pub=pubSnap.exists?pubSnap.data()||{}:null;\n  let allowed=false;\n  if(validActor(actor)&&room&&pub&&room.eventAuthority==='official'&&pub.publishedAt&&pub.visibility==='public'){\n",
+      "after": "  const room=roomSnap.exists?roomSnap.data()||{}:null;\n  const pub=pubSnap.exists?pubSnap.data()||{}:null;\n  const binding=room&&pub?Fence.binding(roomSnap,pubSnap,code):null;\n  let allowed=false;\n  if(validActor(actor)&&room&&pub&&room.eventAuthority==='official'&&pub.publishedAt&&pub.visibility==='public'){\n"
+    },
+    {
+      "before": "        const organizerSnap=await get(organizerRef);\n        const organizer=organizerSnap.exists?organizerSnap.data()||{}:null;\n        if(organizer)allowed=EventStaff.effective(assignment,Object.assign({uid},actor),\n          Object.assign({uid:assignment.organizerUid},organizer),room);\n      }\n    }\n  }\n  return {allowed,actor,room,pub,privateRef,publicRef};\n}\nasync function getPosterPermission(request,{db=getFirestore()}={}){\n",
+      "after": "        const organizerSnap=await get(organizerRef);\n        const organizer=organizerSnap.exists?organizerSnap.data()||{}:null;\n        if(organizer&&Fence.assignmentCurrent(roomSnap,assignmentSnap,embedded))allowed=EventStaff.effective(assignment,Object.assign({uid},actor),\n          Object.assign({uid:assignment.organizerUid},organizer),room);\n      }\n    }\n  }\n  return {allowed,actor,room,pub,privateRef,publicRef,binding};\n}\nasync function getPosterPermission(request,{db=getFirestore()}={}){\n"
+    },
+    {
+      "before": "  if(process.env.GCLOUD_PROJECT!=='bxh-arena')throw new HttpsError('failed-precondition','production-only');\n  const code=codeValue(request.data?.code);\n  const access=await loadPosterAccess(uid,code,{db});\n  return {ok:true,allowed:access.allowed,hasPoster:!!access.pub?.posterUrl,\n    posterUrl:access.pub?.posterUrl||'',coverUrl:access.pub?.coverUrl||''};\n",
+      "after": "  if(process.env.GCLOUD_PROJECT!=='bxh-arena')throw new HttpsError('failed-precondition','production-only');\n  const code=codeValue(request.data?.code);\n  let access;try{access=await loadPosterAccess(uid,code,{db});}catch(error){if(Fence.known(error))return {ok:true,allowed:false,hasPoster:false,posterUrl:'',coverUrl:''};throw error;}\n  return {ok:true,allowed:access.allowed,hasPoster:!!access.pub?.posterUrl,\n    posterUrl:access.pub?.posterUrl||'',coverUrl:access.pub?.coverUrl||''};\n"
+    },
+    {
+      "before": "  if(process.env.GCLOUD_PROJECT!=='bxh-arena')throw new HttpsError('failed-precondition','production-only');\n  const code=codeValue(request.data?.code);\n  const photo=decodePoster(request.data?.photo),cover=decodeCover(request.data?.cover);\n  const initial=await loadPosterAccess(uid,code,{db});\n  if(!initial.allowed)throw new HttpsError('permission-denied','poster-not-allowed');\n  const posterId=randomUUID(),coverId=randomUUID(),posterToken=randomUUID(),coverToken=randomUUID();\n  const posterPath='room-posters/'+code+'/'+posterId+'.'+photo.extension;\n",
+      "after": "  if(process.env.GCLOUD_PROJECT!=='bxh-arena')throw new HttpsError('failed-precondition','production-only');\n  const code=codeValue(request.data?.code);\n  const initial=await loadPosterAccess(uid,code,{db});\n  if(!initial.allowed)throw new HttpsError('permission-denied','poster-not-allowed');\n  const photo=decodePoster(request.data?.photo),cover=decodeCover(request.data?.cover);\n  const posterId=randomUUID(),coverId=randomUUID(),posterToken=randomUUID(),coverToken=randomUUID();\n  const posterPath='room-posters/'+code+'/'+posterId+'.'+photo.extension;\n"
+    },
+    {
+      "before": "  const cleanupUploaded=()=>Promise.all(uploaded.map(file=>file.delete({ignoreNotFound:true}).catch(()=>{})));\n  try{\n    await posterFile.save(photo.bytes,metadata(photo.mimeType,posterToken));uploaded.push(posterFile);\n  }catch(error){\n    await cleanupUploaded();\n",
+      "after": "  const cleanupUploaded=()=>Promise.all(uploaded.map(file=>file.delete({ignoreNotFound:true}).catch(()=>{})));\n  try{\n    uploaded.push(posterFile);await posterFile.save(photo.bytes,metadata(photo.mimeType,posterToken));\n  }catch(error){\n    await cleanupUploaded();\n"
+    },
+    {
+      "before": "  }\n  try{\n    await coverFile.save(cover,metadata('image/jpeg',coverToken));uploaded.push(coverFile);\n  }catch(error){\n    await cleanupUploaded();\n    internal('poster-thumbnail-upload',error);\n  }\n  let oldPosterPath=null,oldCoverPath=null;\n  try{\n    await db.runTransaction(async tx=>{\n      const access=await loadPosterAccess(uid,code,{db,tx});\n      if(!access.allowed||!access.room||!access.pub)throw new HttpsError('permission-denied','poster-not-allowed');\n      oldPosterPath=access.room.posterPath||null;\n      oldCoverPath=access.room.coverPath||null;\n",
+      "after": "  }\n  try{\n    uploaded.push(coverFile);await coverFile.save(cover,metadata('image/jpeg',coverToken));\n  }catch(error){\n    await cleanupUploaded();\n    internal('poster-thumbnail-upload',error);\n  }\n  let oldPosterPath=null,oldCoverPath=null,prepared=false;\n  try{\n    await db.runTransaction(async tx=>{\n      const access=await loadPosterAccess(uid,code,{db,tx});\n      if(!access.allowed||!access.room||!access.pub)throw new HttpsError('permission-denied','poster-not-allowed');\n      Fence.same(initial.binding,access.binding);\n      oldPosterPath=access.room.posterPath||null;\n      oldCoverPath=access.room.coverPath||null;\n"
+    },
+    {
+      "before": "      tx.update(access.publicRef,{posterUrl,posterMimeType:photo.mimeType,\n        posterWidth:photo.width,posterHeight:photo.height,posterUpdatedAt:updatedAt,coverUrl});\n    });\n  }catch(error){\n    await Promise.all(uploaded.map(file=>file.delete({ignoreNotFound:true}).catch(()=>{})));\n    internal('poster-commit',error);\n  }\n  const cleanup=[];\n",
+      "after": "      tx.update(access.publicRef,{posterUrl,posterMimeType:photo.mimeType,\n        posterWidth:photo.width,posterHeight:photo.height,posterUpdatedAt:updatedAt,coverUrl});\n      prepared=true;\n    });\n  }catch(error){\n    const result=prepared?await Fence.outcome(db,initial.privateRef,initial.publicRef,code,initial.binding,{posterPath,posterUrl,coverPath,coverUrl}):'unreferenced';\n    if(result==='unreferenced'){await cleanupUploaded();internal('poster-commit',error);}\n    if(result!=='confirmed')throw new HttpsError('unavailable','poster-commit-outcome-unknown');\n  }\n  const cleanup=[];\n"
+    },
+    {
+      "before": "     privateSnap.data().eventAuthority!=='official'||!publicSnap.data().publishedAt)\n    throw new HttpsError('permission-denied','room-owner-required');\n  const token=randomUUID(),path='room-covers/'+code+'/'+randomUUID()+'.jpg';\n  const url=pathUrl(path,token);\n  const file=bucket.file(path);\n  await file.save(bytes,{resumable:false,contentType:'image/jpeg',metadata:{cacheControl:'public,max-age=86400',metadata:{firebaseStorageDownloadTokens:token}}});\n  let oldPath;\n  try{\n    await db.runTransaction(async tx=>{\n      const [room,pub]=await Promise.all([tx.get(privateRef),tx.get(publicRef)]);\n      if(!room.exists||!pub.exists||room.data().createdBy!==uid||\n         room.data().eventAuthority!=='official'||!pub.data().publishedAt)\n        throw new HttpsError('permission-denied','room-owner-required');\n      oldPath=room.data().coverPath;\n      tx.update(privateRef,{coverPath:path,coverUrl:url,coverUpdatedAt:Date.now()});\n      tx.update(publicRef,{coverUrl:url});\n    });\n  }catch(error){await file.delete({ignoreNotFound:true}).catch(()=>{});throw error;}\n  if(coverPathValid(oldPath,code)&&oldPath!==path)await bucket.file(oldPath).delete({ignoreNotFound:true}).catch(()=>{});\n  return {ok:true,url};\n",
+      "after": "     privateSnap.data().eventAuthority!=='official'||!publicSnap.data().publishedAt)\n    throw new HttpsError('permission-denied','room-owner-required');\n  const binding=Fence.binding(privateSnap,publicSnap,code);\n  const token=randomUUID(),path='room-covers/'+code+'/'+randomUUID()+'.jpg';\n  const url=pathUrl(path,token);\n  const file=bucket.file(path);\n  try{\n  await file.save(bytes,{resumable:false,contentType:'image/jpeg',metadata:{cacheControl:'public,max-age=86400',metadata:{firebaseStorageDownloadTokens:token}}});\n  }catch(error){await file.delete({ignoreNotFound:true}).catch(()=>{});throw error;}\n  let oldPath,prepared=false;\n  try{\n    await db.runTransaction(async tx=>{\n      const [room,pub,currentActor]=await Promise.all([tx.get(privateRef),tx.get(publicRef),tx.get(db.doc('users/'+uid))]);\n      const current=currentActor.data();\n      if(!betaActorAllowed(current)||current?.deleted===true||['deleted','frozen','disabled'].includes(current?.accountStatus))throw new HttpsError('permission-denied','cover-not-allowed');\n      if(!room.exists||!pub.exists||room.data().createdBy!==uid||\n         room.data().eventAuthority!=='official'||!pub.data().publishedAt)\n        throw new HttpsError('permission-denied','room-owner-required');\n      Fence.same(binding,Fence.binding(room,pub,code));\n      oldPath=room.data().coverPath;\n      tx.update(privateRef,{coverPath:path,coverUrl:url,coverUpdatedAt:Date.now()});\n      tx.update(publicRef,{coverUrl:url});\n      prepared=true;\n    });\n  }catch(error){\n    const result=prepared?await Fence.outcome(db,privateRef,publicRef,code,binding,{coverPath:path,coverUrl:url}):'unreferenced';\n    if(result==='unreferenced'){await file.delete({ignoreNotFound:true}).catch(()=>{});throw error;}\n    if(result!=='confirmed')throw new HttpsError('unavailable','poster-commit-outcome-unknown');\n  }\n  if(coverPathValid(oldPath,code)&&oldPath!==path)await bucket.file(oldPath).delete({ignoreNotFound:true}).catch(()=>{});\n  return {ok:true,url};\n"
+    },
+    {
+      "before": "  const [actorSnap,roomSnap,pubSnap]=await Promise.all([get(userRef),get(privateRef),get(publicRef)]);",
+      "after": "  const [actorSnap,roomSnap,pubSnap]=tx?await tx.getAll(userRef,privateRef,publicRef):await Promise.all([get(userRef),get(privateRef),get(publicRef)]);"
+    },
+    {
+      "before": "      const [room,pub,currentActor]=await Promise.all([tx.get(privateRef),tx.get(publicRef),tx.get(db.doc('users/'+uid))]);",
+      "after": "      const [room,pub,currentActor]=await tx.getAll(privateRef,publicRef,db.doc('users/'+uid));"
+    }
+  ],
+  "fixtureFiles": {
+    "fixtures/ai-create-core.js": "31695e36f415ca5faabb17aa5f7d317c66906d1ccf90a2adaf9f759e9e692cbf",
+    "fixtures/ai-create-poster-core.js": "4f40206a7a8177d28a02b063a7c2bed4fd3073cdbfeb5c9ba95422f97d83cd57",
+    "fixtures/ai-create-provider.js": "506d6f7003f2e3f4bd86529888ac1aae4450e7fcd4a787371db170476af03462",
+    "fixtures/event-staff-core.js": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+    "fixtures/package.json": "7476b300c36d6532c8a084c58a29bee484bda3f045d5b8787c9a6477a33fd86f",
+    "fixtures/room-poster-cover.js": "ad0df32e3c6a5fb52311b08d2f4097a0e6454daeea2d3d42eff5a11cbf0d8b55"
+  },
+  "capturedClosure": [
+    {
+      "path": "ai-create-core.js",
+      "sha256": "31695e36f415ca5faabb17aa5f7d317c66906d1ccf90a2adaf9f759e9e692cbf",
+      "size": 8705
+    },
+    {
+      "path": "ai-create-poster-core.js",
+      "sha256": "4f40206a7a8177d28a02b063a7c2bed4fd3073cdbfeb5c9ba95422f97d83cd57",
+      "size": 9871
+    },
+    {
+      "path": "ai-create-provider.js",
+      "sha256": "506d6f7003f2e3f4bd86529888ac1aae4450e7fcd4a787371db170476af03462",
+      "size": 11807
+    },
+    {
+      "path": "event-staff-core.js",
+      "sha256": "1287fb6e3dbc43c03e56cc133888ee5d874846939addff79df3b6b7f215218c6",
+      "size": 5302
+    },
+    {
+      "path": "package.json",
+      "sha256": "7476b300c36d6532c8a084c58a29bee484bda3f045d5b8787c9a6477a33fd86f",
+      "size": 4032
+    },
+    {
+      "path": "room-poster-cover.js",
+      "sha256": "ad0df32e3c6a5fb52311b08d2f4097a0e6454daeea2d3d42eff5a11cbf0d8b55",
+      "size": 11852
+    }
+  ],
+  "helperFiles": {
+    "README.md": "a78c15248cc50f0b65c3e0694bdb68473d3b59aca3a5db333be02cb69efdc604",
+    "bucket-poster-fence.cjs": "364552a7f24dfd1a816dabbf3497aa43bb43c8d67b9f90103100fa4271cfd65e",
+    "bucket-state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
+    "room-poster-cover.js": "372471129d64285848999672cfc95ac10871fcfd45a107c97238669ed7c701b2"
+  },
+  "protocolSource": {
+    "referenceCommit": "b82e8d393ab14c6146575ebf28ccedb0c02b3ed9",
+    "path": "referee-seats/functions/bucket-state.cjs",
+    "gitBlob": "da457b44c6694293470efa3ce71699ada100b8b1"
+  }
+}

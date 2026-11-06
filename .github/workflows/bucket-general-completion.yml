@@ -1,0 +1,78 @@
+name: Bucket general completion and hosting
+on:
+  pull_request:
+    paths:
+      - 'release/buckets/completion/**'
+      - 'tests/four-court-buckets/completion/**'
+      - '.github/workflows/bucket-general-completion.yml'
+      - 'scripts/bucketcapturehostsync.py'
+permissions:
+  contents: read
+jobs:
+  completion-hosting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify captured hosting sources and exact patches
+        run: python3 -B tests/four-court-buckets/completion/verify-package.py
+      - name: General completion and hosting regressions
+        run: |
+          node tests/four-court-buckets/completion/probe.cjs
+          node tests/four-court-buckets/completion/hosting-probe.cjs
+          node tests/four-court-buckets/completion/host-sync-probe.cjs
+          python3 -B tests/four-court-buckets/completion/capture-host-sync.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated validation dependencies
+        run: npm install --prefix /tmp/bucket-completion --no-save --ignore-scripts firebase-tools@14 firebase-admin@13.10.0 firebase-functions@6.6.0
+      - name: Native atomic completion, host count and rebuild contention
+        id: native_sdk13
+        env:
+          NODE_PATH: /tmp/bucket-completion/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bucket-completion/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/completion/native.firebase.json 'node tests/four-court-buckets/completion/native-emulator.cjs'
+      - name: Preserve sdk13 emulator diagnostics
+        if: always() && steps.native_sdk13.outcome != 'skipped'
+        run: |
+          mkdir -p completion-diagnostics/sdk13
+          for log in firestore-debug.log firebase-debug.log; do
+            if [ -f "$log" ]; then cp "$log" completion-diagnostics/sdk13/; fi
+          done
+          if [ "${{ steps.native_sdk13.outcome }}" = failure ] && [ -f firestore-debug.log ]; then
+            tail -n 160 firestore-debug.log
+          fi
+      - name: Install exact captured host-sync dependency versions
+        run: npm install --prefix /tmp/bucket-hostsync-sdk --no-save --ignore-scripts firebase-admin@14.4.0 firebase-functions@7.3.2
+      - name: Captured SDK completion and 20 fresh contention rounds per QR mode
+        id: native_sdk14
+        env:
+          BUCKET_HOST_SYNC_CONTENTION_ROUNDS: 20
+          NODE_PATH: /tmp/bucket-hostsync-sdk/node_modules
+          GCLOUD_PROJECT: demo-bxh-four-court-buckets
+        run: /tmp/bucket-completion/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-four-court-buckets --config tests/four-court-buckets/completion/native.firebase.json 'node tests/four-court-buckets/completion/native-emulator.cjs'
+      - name: Preserve sdk14 emulator diagnostics
+        if: always() && steps.native_sdk14.outcome != 'skipped'
+        run: |
+          mkdir -p completion-diagnostics/sdk14
+          for log in firestore-debug.log firebase-debug.log; do
+            if [ -f "$log" ]; then cp "$log" completion-diagnostics/sdk14/; fi
+          done
+          if [ "${{ steps.native_sdk14.outcome }}" = failure ] && [ -f firestore-debug.log ]; then
+            tail -n 160 firestore-debug.log
+          fi
+      - name: Upload completion emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bucket-completion-emulator-diagnostics
+          path: completion-diagnostics/
+          retention-days: 7
+          if-no-files-found: warn
