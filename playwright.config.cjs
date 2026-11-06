@@ -8,7 +8,6 @@ module.exports = defineConfig({
   retries: 1,
   reporter: [['list']],
   use: {
-    ...(process.env.BXH_TEST_BROWSER ? {launchOptions:{executablePath:process.env.BXH_TEST_BROWSER}} : {}),
     baseURL: 'http://127.0.0.1:4173',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
@@ -22,7 +21,7 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+      use: { ...(process.env.BXH_TEST_BROWSER ? {launchOptions:{executablePath:process.env.BXH_TEST_BROWSER}} : {}), ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
     {
       name: 'iphone',
@@ -30,7 +29,7 @@ module.exports = defineConfig({
     },
     {
       name: 'android',
-      use: { ...devices['Pixel 7'] },
+      use: { ...(process.env.BXH_TEST_BROWSER ? {launchOptions:{executablePath:process.env.BXH_TEST_BROWSER}} : {}), ...devices['Pixel 7'] },
     },
   ],
 });

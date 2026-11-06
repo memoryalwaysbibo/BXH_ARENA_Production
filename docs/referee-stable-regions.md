@@ -144,3 +144,25 @@ multi-viewport smoke and broad Node acceptance have not completed cleanly.
 The specific emulator flow failures are resolved in the test environment.
 Remaining production attestation, full smoke and broader acceptance scope still
 prevent claiming complete release acceptance.
+
+## Mobile and review follow-up (2026-11-07 Asia/Taipei)
+
+Desktop smoke completed 108/108. Android touch-mode twelve-context transaction
+coverage passed (17 commands, preserved local DOM/focus, zero unchanged-court
+mutations, 412 px viewport with 412 px document width). The fixture now supports
+`BXH_TEST_DEVICE=iphone` (WebKit) and `android` (Chromium), native taps, duplicate
+touch activation and horizontal-overflow checks. The screenshot fixture includes
+indexInRound so labels represent valid generated match data.
+
+The optional Chromium executable override is scoped to Chromium projects; it
+must not launch Chromium for the iPhone WebKit project. WebKit dependencies were
+missing in this managed host; packages were extracted into the scratch workspace
+and the cached launcher was made to preserve LD_LIBRARY_PATH. No system or
+product files were changed. Its ldconfig-only optional-library check cannot see
+scratch libraries, so host validation was skipped only after a real WebKit
+launch/input smoke verified runtime loading. Full phone smoke and isolated
+WebKit transaction results are pending at this intermediate commit.
+
+The existing read-only referee CI workflow now runs the stable DOM browser test,
+emulator App Check boundary tests and twelve-context actual transaction test.
+No deployment trigger was added.
