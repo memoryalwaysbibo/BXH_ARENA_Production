@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 test('two courts preserve independent work and queue a skipped match onto a busy court', async ({ page }) => {
   const externalFirebaseRequests=[];
 
-  await page.route('**/*', async route=>{
+  await page.route(/^https?:\/\/(?:firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|[^/]+\.firebaseio\.com|[^/]+\.cloudfunctions\.net)(?:[/:])/,  async route=>{
     const url=new URL(route.request().url());
     const host=url.hostname;
     const blocked=
@@ -81,6 +81,7 @@ test('two courts preserve independent work and queue a skipped match onto a busy
 
   await expect(page.locator('.player-shell')).toBeVisible({timeout:60000});
 
+  await page.waitForFunction(()=>!playerApplyBusy,null,{timeout:30000});
   await page.locator('[data-action="player-switch-tab"][data-tab="host"]').first().click();
   await page.locator('[data-action="community-create-open"]').click();
   await page.locator('#community-format').selectOption('single');

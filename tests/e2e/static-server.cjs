@@ -8,6 +8,10 @@ const {CALLABLE_PATH,syncOnsiteCommunitySummary} = require('./community-summary-
 const root = path.resolve(__dirname, '..', '..');
 const port = Number(process.env.PORT || 4173);
 const emulatorMode = process.env.BXH_E2E_EMULATOR === '1';
+// Optional local, version-matched SDK for network-restricted emulator runs.
+const localSdk = emulatorMode && process.env.BXH_TEST_FIREBASE_SDK_DIR
+  ? path.resolve(process.env.BXH_TEST_FIREBASE_SDK_DIR) : null;
+if(localSdk && JSON.parse(fs.readFileSync(path.join(localSdk,'manifest.json'),'utf8')).version!=='10.13.0')throw Error('Local emulator SDK version mismatch');
 
 const types = {
   '.html':'text/html; charset=utf-8',
@@ -85,10 +89,22 @@ function injectFirebaseEmulators(source) {
       !out.includes('connectFunctionsEmulator')) {
     throw new Error('E2E emulator injection integrity check failed');
   }
+  if(localSdk){
+    if(!out.includes('const FIREBASE_SDK_VERSION = "10.13.0";'))throw Error('Runtime SDK version changed');
+    out=out.replaceAll('https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/','/__firebase_sdk__/');
+  }
   return out;
 }
 
 const server = http.createServer((req,res)=>{
+  const sdkName=(req.url||'').split('?')[0].slice('/__firebase_sdk__/'.length);
+  if(localSdk && (req.url||'').startsWith('/__firebase_sdk__/')){
+    if(!/^[a-zA-Z0-9_-]+\.js$/.test(sdkName)){res.writeHead(404);res.end();return;}
+    const sdkFile=path.join(localSdk,sdkName);
+    if(!fs.existsSync(sdkFile)){res.writeHead(404);res.end();return;}
+    res.writeHead(200,{'content-type':'text/javascript; charset=utf-8','cache-control':'no-store'});
+    fs.createReadStream(sdkFile).pipe(res);return;
+  }
   const file = safePath(req.url);
   if (!file) {
     res.writeHead(403); res.end('Forbidden'); return;

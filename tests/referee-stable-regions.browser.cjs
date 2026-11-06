@@ -4,7 +4,7 @@ const {chromium}=require('playwright');
 const core=fs.readFileSync('modules/main-app/core.js','utf8');
 const source=core.slice(core.indexOf('let refereeTemplates='),core.indexOf('function renderApp(){'));
 (async()=>{
- const browser=await chromium.launch({headless:true});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.BXH_TEST_BROWSER});
  try{
  const page=await browser.newPage();await page.route('**/*',r=>r.abort());
  await page.setContent('<main id="app"></main>');
@@ -15,7 +15,7 @@ const source=core.slice(core.indexOf('let refereeTemplates='),core.indexOf('func
  window.original=document.getElementById('court-card-0');window.button=original.querySelector('button');
  window.mutations=0;new MutationObserver(records=>{mutations+=records.length}).observe(original,{subtree:true,attributes:true,childList:true,characterData:true});
  `});
- await page.evaluate(()=>{const input=document.getElementById('draft-0');input.value='unsent';input.focus();input.dispatchEvent(new Event('input',{bubbles:true}));});
+ await page.locator('#draft-0').fill('unsent');await page.locator('#draft-0').focus();
  assert.equal(await page.locator('#draft-0').inputValue(),'unsent');
  await page.evaluate(()=>{for(let n=0;n<200;n++){scores[1+n%11]++;paint();}});
  assert.equal(await page.evaluate(()=>mutations),0);

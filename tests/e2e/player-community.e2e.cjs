@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 test('player can create account and open a community room on isolated emulators', async ({ page }) => {
   const externalFirebaseRequests = [];
 
-  await page.route('**/*', async route => {
+  await page.route(/^https?:\/\/(?:firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|[^/]+\.firebaseio\.com|[^/]+\.cloudfunctions\.net)(?:[/:])/,  async route => {
     const url = new URL(route.request().url());
     const host = url.hostname;
     const isExternalFirebase =
@@ -58,6 +58,7 @@ test('player can create account and open a community room on isolated emulators'
   const hostTab = page.locator('[data-action="player-switch-tab"][data-tab="host"]').first();
   await expect(hostTab).toBeVisible();
 
+  await page.waitForFunction(()=>!playerApplyBusy,null,{timeout:30000});
   await hostTab.click();
   await expect(page.locator('.community-host-hero')).toBeVisible({ timeout: 20000 });
 

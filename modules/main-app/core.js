@@ -3173,7 +3173,10 @@ function restoreCommunitySettingsInputs(draft){
 function renderCommunityRoomPreservingSettings(app){
   const context=communitySettingsDraftContext();
   const draft=!communitySettingsSaving && context && context===communitySettingsRenderedContext ? captureCommunitySettingsInputs() : null;
-  app.innerHTML=renderCommunityRoomApp();
+  const html=renderCommunityRoomApp();
+  if(communityRoomActiveTab==="referee"&&state.meta?.battleMode!=="team"&&state.meta?.playMode!=="enchantment"){
+    renderStableRefereeScreen(app,html,[appPhase,state.id,state.cloudCode,currentAuthUid()].join("|"));
+  }else{refereeRenderContext=null;app.innerHTML=html;}
   communitySettingsRenderedContext=context;
   bindDynamicInputs();
   restoreCommunitySettingsInputs(draft);
@@ -5415,7 +5418,7 @@ function invalidateMyRegistrationsCache(result){
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key){
-  if((typeof activeTab==="undefined"||activeTab!=="referee")&&!isTournamentLobbyVisible()&&!(appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open))return true;
+  if((typeof activeTab==="undefined"||activeTab!=="referee")&&(typeof communityRoomActiveTab==="undefined"||appPhase!=="community-room"||communityRoomActiveTab!=="referee")&&!isTournamentLobbyVisible()&&!(appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open))return true;
   let keys=lobbyInputBindings.get(element);
   if(!keys){keys=new Set();lobbyInputBindings.set(element,keys);}
   if(keys.has(key))return false;

@@ -1,71 +1,140 @@
-# Referee stable DOM regions (isolated candidate)
+# Referee stable DOM regions — isolated candidate
 
 Base: `0471069df5a09a433c4c945aed119004043d82b6` (fetched origin/main).
 Branch: `fix/referee-stable-regions`. No deployment, remote push, Rules/IAM changes,
 production Firebase writes, bucket activation, or integration of PR #719.
 
-The standard individual referee screen still computes fresh markup on every
-render, including permissions, connection notices and global tournament state.
-It compares generated templates and patches changed DOM nodes. Unchanged court
-subtrees retain their DOM identity, focused controls and native input drafts.
-Action keys include match/court/seat/request identifiers so a new action cannot
-reuse an old target. Room/user/view transitions remount; team and enchantment
-screens keep their existing rendering path. Confirmation and force-exit checkbox
-bindings are deduplicated for retained nodes.
+## Implementation
+
+Standard individual referee screens in both administrative and community rooms
+compute fresh markup on every render, including permissions, connection notices
+and global tournament state. Generated templates are compared and changed DOM
+nodes patched. Unchanged subtrees retain identity, focused controls, native
+input drafts and pending confirmations. Actions are keyed by match/court/seat/
+request identifiers. Room/user transitions remount; team and enchantment screens
+keep their existing rendering path. Retained confirmation/checkbox bindings are
+deduplicated.
 
 Seat callbacks suppress only byte-equivalent merged metadata. Equal revision
-with a changed permission projection still renders; explicit access revocation
+with changed permission projection still renders; explicit access revocation
 is handled before deduplication. Existing stale-model rejection remains intact.
 
 This reduces DOM replacement, not room snapshot bandwidth, HTML generation cost,
 backend contention, or Firebase write latency. No score update is delayed.
 
-## Verification
+## Follow-up verification (2026-11-06)
 
-- PASS: `node --check` on both changed production scripts; `git diff --check`.
-- PASS: `node scripts/verify-production-frontend.cjs`.
-- PASS: `node scripts/run-regression-core.cjs critical` (all suites).
-- PASS: 232 tests across referee tests, seat core/service/scoring/bridge, queue
-  dashboard and stable lobby regressions.
-- PASS: `PLAYWRIGHT_BROWSERS_PATH=/workspace/.cache/ms-playwright node tests/referee-stable-regions.browser.cjs`.
-  Real Chromium, all network blocked, production patch/score/confirmation/seat
-  code with simulated state/transport. Twelve courts, 200 other-court updates:
-  zero mutations under the unchanged local court. Checks focus, unsent input,
-  score/undo display, connection recovery, disabled permission/global-start
-  controls, changed action identity, duplicate/new seat revisions, equal-revision
-  permission changes, revocation, and one confirmation callback after 20 renders.
-- FAIL: existing referee-preseat browser test reads only newlines from the
-  confirmation text. Reproduced at the same assertion on pristine main in a
-  separate temporary fixture. Existing seat browser suite also fails its
-  handoff-dialog text assertion; baseline comparison for that suite not run.
-- INCOMPLETE/FAIL: full 324-case smoke stopped after 6 failures and 26 passes;
-  292 not run. Failures cover leaderboard and account/profile screens, not the
-  new isolated rendering test. Do not interpret this as full browser acceptance.
-- Firestore Rules suites could not run in the initial direct invocation because
-  firebase-admin and @firebase/rules-unit-testing are absent. No Rules changed.
+Evidence directory in this checkout environment:
+`/workspace/scratch/referee-stable-regions/`.
+Main comparisons used `/workspace/bxh-referee-main`, with unmodified main product
+sources and the same test-only SDK server, browser configuration and test fixes.
 
-Critical/deep emulator and broad test logs are supplied with the handoff. Initial
-emulator failures from cache paths and a shared test-server port were corrected
-by using FIREBASE_EMULATORS_PATH/XDG_CONFIG_HOME and serial emulator suites.
+| Check | Candidate | Main comparison / evidence |
+| --- | --- | --- |
+| Affected referee/community/settings/lobby/queue and seat/scoring tests | 608 passed | `final-affected-all.log` |
+| Critical regression core, production frontend invariants, artifact boundary | Passed | `followup-critical-regression.log`, `followup-invariants.log`, `followup-artifact-boundary.log` |
+| Original six failing smoke cases | 6 passed | 6 passed with system Chromium; 6 failed with bundled Chromium |
+| Full desktop smoke before final fixture fix | 107 passed, 1 failed | Snapshot burst counted unrelated/no-op flushes; reproduced on main |
+| Full affected lobby suite after fixture fix | 27 passed | `candidate-lobby-settled.log`; main burst 5/5 in `main-burst-settled.log` |
+| Existing preseat and seat browser suites | Passed | Both also pass on main with system Chromium |
+| Referee recovery browser suite | 8 cases passed | `candidate-recovery-system.log` |
+| Stable regions browser fixture | Passed | 12 courts, 200 other-court updates; zero local mutations, draft/focus preserved; score/undo, permission/global locks, revisions and binding dedup |
+| Twelve independent browser pages + actual scoring transactions | Passed | Main also completes operations but replaces local DOM and loses focus; candidate preserves both |
+| Authenticated critical emulator E2E, fresh emulator 1.22.0 | 0/1 passed | Main also 0/1, same signup completion timeout |
+| Deep emulator E2E, fresh emulator 1.22.0 | 1/3 passed | Main also 1/3, same settings-save and draw timeouts |
 
-## Remaining acceptance scope
+The original six smoke cases were two hunter leaderboard cases and four account/
+profile cases (existing profile editor, signup required fields, Google profile
+reminder, existing-account profile deferral). Minimal reproduction isolated the
+bundled Chromium 140 failure: filling a plain input left it empty and Chinese
+inline text had zero bounding boxes. System Chromium 154 renders and fills the
+same HTML correctly. `BXH_TEST_BROWSER=/usr/bin/chromium` is an optional test
+configuration; default browser selection is unchanged.
 
-The new browser fixture executes production rendering and binding functions but
-simulates score state changes; it is not an end-to-end callable transaction test.
-Full authenticated 12-device score/undo/switch workflows and viewport/gesture
-acceptance must pass before rollout. Existing score/callable transaction logic
-is unchanged. Global/keyed structural changes can legitimately remove focus or
-replace controls. The change is not production-ready while integration checks
-remain failing or incomplete.
+The lobby snapshot test now counts only pending, visible render work and settles
+the preceding details toggle before measuring the next synchronous burst. Its
+assertion remains exactly one flush and the final count 12; no production lobby
+behavior was changed. The initial counter-only fix was insufficient (26/27), so
+the final settle fix and full affected suite were rerun.
 
-The broad `node --test tests/*.test.cjs` first run completed with 1681 passed and
-24 failed (including missing browser binaries and one extracted binding fixture
-regression that was fixed and retested). A run with the correct browser path
-still showed catalog browser/admin cleanup failures and stopped making progress;
-it was terminated after approximately four minutes. This broad run is incomplete.
-The final 232 affected tests and Critical regression passed after the fix.
+## Transaction and browser coverage boundaries
 
-Final isolated emulator results: critical E2E 0/1 (signup title hidden); deep
-E2E 0/3 (all timeout waiting 90 seconds for cloudAuth.isReady before the tested
-competition flows). Emulators shut down normally. These failures did not reach
-referee scoring; full transaction acceptance remains unverified.
+`tests/referee-multidevice.emulator.cjs` loads the shipped frontend into 12
+independent Chromium contexts and invokes the unchanged scoring service against
+loopback Firestore. It checks 11 other-device scores, local score/undo, duplicate
+click prevention, two concurrent court transactions, unsent result confirmation,
+offline write gating/recovery, live/referee tab switching, and authoritative seat
+revocation in both UI and service. There are 17 callable invocations and no page
+errors. Main reports `same:false, focus:false`; candidate `same:true, focus:true,
+mutations:0`. Main's observer was attached to the detached old node, so its zero
+mutation count is not evidence of stability.
+
+Auth identities and callable transport are simulated in this test. This is real
+transaction coverage, not full authenticated multi-user end-to-end acceptance.
+Seat/court handoff behavior is additionally covered by the existing seat browser
+suite; the 12-context test's switch is a navigation tab switch. Team/enchantment,
+mobile gestures, production network latency and a sustained load soak are not
+claimed. Community-specific route is included in the implementation and affected
+regressions; its full authenticated E2E remains blocked before scoring.
+
+## Remaining failures and reproduction
+
+Firebase's CDN is blocked by the environment network policy (HTTP 403). The
+optional test server serves locally bundled, version-checked Firebase 10.13.0
+from an npm scratch directory instead. It never modifies shipping assets. Build
+with `node scripts/build-local-emulator-sdk.cjs <scratch npm directory>` after
+installing firebase@10.13.0 and esbuild there, then set
+`BXH_TEST_FIREBASE_SDK_DIR=<scratch>/browser-sdk`.
+
+Run each emulator suite against a fresh emulator, separately:
+
+```sh
+BXH_TEST_BROWSER=/usr/bin/chromium \
+BXH_TEST_FIREBASE_SDK_DIR=/workspace/scratch/bxh-test-sdk/browser-sdk \
+FIREBASE_EMULATORS_PATH=/workspace/.cache/firebase/emulators \
+XDG_CONFIG_HOME=/workspace/.config \
+/workspace/scratch/bxh-test-sdk/node_modules/.bin/firebase emulators:exec \
+  --only auth,firestore --project demo-bxh-arena-e2e \
+  --config tests/e2e/firebase.json \
+  'npx playwright test --config=playwright.e2e.config.cjs'
+# Repeat with playwright.deep-e2e.config.cjs in a fresh emulator.
+```
+
+- Critical: account shell appears but `playerApplyBusy` does not clear in 30s.
+  Main had one earlier successful run; latest same-version main and candidate
+  runs both fail at this exact completion wait. Shell visibility alone is not
+  signup-write completion, so tests now wait for the operation before navigation.
+- Deep multi-court: settings-save condition (`stations===2`, no saving flag or
+  write gate) times out after 30s. Controls remain disabled.
+- Deep tournament: four-player roster is present, but drawing never produces
+  `bracketSize>0` within 30s. Admin-finals-order passes on both branches.
+- Emulator logs contain `ArrayIndexOutOfBoundsException` in
+  `EmulatorRequest.permissionTracesAsJsonArray`; browser traces show unresolved
+  Firestore write channels. This is diagnostic evidence, not a proven root cause.
+  Narrowing route interception, forcing long polling experimentally, and using
+  emulator 1.22.0 instead of 1.19.8 did not resolve all failures. The long-polling
+  experiment was reverted. No Rules or production write logic were weakened.
+- Detailed failures, screenshots and traces: `main-critical-122*`,
+  `candidate-critical-122*`, `main-deep-122*`, `candidate-deep-122*`.
+
+For the transaction/browser fixture:
+
+```sh
+BXH_TEST_BROWSER=/usr/bin/chromium \
+NODE_PATH=/workspace/scratch/bxh-test-sdk/node_modules \
+FIREBASE_EMULATORS_PATH=/workspace/.cache/firebase/emulators \
+XDG_CONFIG_HOME=/workspace/.config \
+/workspace/scratch/bxh-test-sdk/node_modules/.bin/firebase emulators:exec \
+  --only firestore --project demo-bxh-dom12 --config tests/e2e/firebase.json \
+  'node tests/referee-multidevice.emulator.cjs'
+```
+
+Baseline uses the same driver with `BXH_TEST_REPO=/workspace/bxh-referee-main`
+and `BXH_EXPECT_STABLE=0` to record identity without expecting the new behavior.
+
+The original broad Node run was 1681 passed/24 failed with environment and
+extracted-fixture problems; a follow-up broad run stalled and was terminated.
+The scoped 608 tests and critical regression passed afterward. Full 324-case
+multi-viewport smoke and broad Node acceptance have not completed cleanly.
+This branch is reviewable but not release-ready while integration failures and
+remaining acceptance scope are unresolved.
