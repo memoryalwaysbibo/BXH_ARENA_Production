@@ -1,0 +1,181 @@
+{
+  "status": "candidate-not-deployed",
+  "bucketSettlementEnabled": false,
+  "productionWrites": 0,
+  "patches": [
+    {
+      "function": "ladderAutoSettlement",
+      "sourceSet": 10,
+      "path": "ladder-auto-settlement.js",
+      "archiveSha256": "81063c0fc575378a75639e625f93c74e7e0daaf3aebf4baf1f4b9c2645d1c5c9",
+      "baselineFileSha256": "4b7944b6c239aff6bedf7cc1ddd16e8be915d7abdbcbd2e1c61ccd5454e0a258",
+      "patchedFileSha256": "990ba39df0706cbb0c7d958b0b3b0a7b75bf8981f5078fa7c4cf32d907485940",
+      "edits": [
+        {
+          "before": "const core=require('./ladder-settlement-core');",
+          "after": "const core=require('./ladder-settlement-core');\nconst A=require('./bucket-settlement/input.cjs');"
+        },
+        {
+          "before": "clock=()=>Date.now()}={})",
+          "after": "clock=()=>Date.now(),bucketRuntime='production',bucketEnv=process.env}={})"
+        },
+        {
+          "before": "    return db.runTransaction(async tx=>{",
+          "after": "    const observed={};\n    return db.runTransaction(async tx=>{"
+        },
+        {
+          "before": "      const top=tourSnap.data()||{},st=parseState(top);",
+          "after": "      let input;try{input=await A.load({tx,db,root:tourSnap,pub:publicSnap,observed,runtime:bucketRuntime,env:bucketEnv});}catch(e){if(e.bucketSettlement)return {ok:false,reason:e.message,permanent:true};throw e;}\n      const top=tourSnap.data()||{},st=input.bucket?input.state:parseState(top);"
+        },
+        {
+          "before": "      const results=[];",
+          "after": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))return {ok:false,reason:'bucket-settlement-requires-review',permanent:true};\n      const results=[];"
+        },
+        {
+          "before": "          type:'event',actorUid:SYSTEM_ACTOR",
+          "after": "          ...(input.bucket?{sourceCreatedAt:input.sourceCreatedAt,bucketEpoch:input.m.epoch}:{}),type:'event',actorUid:SYSTEM_ACTOR"
+        },
+        {
+          "before": "      tx.set(tourRef,topPatch,{merge:true});\n      const pubPatch=publicFinalPatch(publicSnap,now);if(pubPatch)tx.set(publicRef,pubPatch,{merge:true});",
+          "after": "      if(input.bucket){const patches=A.finalPatches(input,completed,{now,seasonId:plan.seasonId,results,skipped:plan.skipped,actorUid:SYSTEM_ACTOR});tx.set(tourRef,{...topPatch,...patches.privatePatch},{merge:true});tx.set(publicRef,patches.publicPatch,{merge:true});}\n      else{tx.set(tourRef,topPatch,{merge:true});const pubPatch=publicFinalPatch(publicSnap,now);if(pubPatch)tx.set(publicRef,pubPatch,{merge:true});}"
+        },
+        {
+          "before": "    });\n  }\n  return {settle};",
+          "after": "    }).catch(e=>{if(e.bucketSettlement)return {ok:false,reason:e.message,permanent:true};throw e;});\n  }\n  return {settle};"
+        },
+        {
+          "before": "const top=after.data()||{},st=parseState(top),eligible=core.tournamentEligible(top,st);",
+          "after": "const top=after.data()||{},st=parseState(top),eligible=A.ownership(top)?{ok:true}:core.tournamentEligible(top,st);"
+        },
+        {
+          "before": "if(PERMANENT.has(result.reason))",
+          "after": "if(result.permanent===true||PERMANENT.has(result.reason))"
+        },
+        {
+          "before": "scored.players.map(x=>core.candidateUid(x.player))",
+          "after": "scored.players.map(x=>input.bucket?A.playerUid(x.player):core.candidateUid(x.player))"
+        },
+        {
+          "before": "if(snap.exists)profiles[candidates[i]]=snap.data()||{};",
+          "after": "if(snap.exists&&(!input.bucket||A.validProfile(snap.data())))profiles[candidates[i]]=snap.data()||{};"
+        },
+        {
+          "before": "      const results=[];",
+          "after": "      if(input.bucket){const registrations=await Promise.all(plan.rows.map(row=>row.player.source==='online'?tx.get(tourRef.collection('registrations').doc(row.uid)):null));if(registrations.some((s,i)=>plan.rows[i].player.source==='online'&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}\n      const results=[];"
+        },
+        {
+          "before": "      const control=controlSnap.data()||{};",
+          "after": "      const control=controlSnap.data()||{};if(input.bucket)A.checkSeason(control,now);"
+        },
+        {
+          "before": "if(input.bucket){const registrations=await Promise.all(plan.rows.map(row=>row.player.source==='online'?tx.get(tourRef.collection('registrations').doc(row.uid)):null));if(registrations.some((s,i)=>plan.rows[i].player.source==='online'&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}",
+          "after": "if(input.bucket){const registrations=await Promise.all(scored.players.map(row=>row.player.source==='online'&&A.playerUid(row.player)?tx.get(tourRef.collection('registrations').doc(A.playerUid(row.player))):null));if(registrations.some((s,i)=>scored.players[i].player.source==='online'&&A.playerUid(scored.players[i].player)&&(!s?.exists||s.data().status!=='confirmed')))return {ok:false,reason:'bucket-cancelled-players',permanent:true};}"
+        },
+        {
+          "before": "      if(input.bucket&&priorTxSnaps.some(s=>s.exists))",
+          "after": "      if(input.bucket&&playerSnaps.some(s=>s.exists&&s.data().currentSeason&&s.data().currentSeason!==plan.seasonId))return {ok:false,reason:'player-season-mismatch',permanent:true};\n      if(input.bucket&&priorTxSnaps.some(s=>s.exists))"
+        }
+      ]
+    },
+    {
+      "function": "settleLadderTournament",
+      "sourceSet": 21,
+      "path": "ladder-settlement.js",
+      "archiveSha256": "cc20aa806d03ceffad1888fc40383b02585cbf45c47ddad29d6cb55d6fc168cc",
+      "baselineFileSha256": "3ea58fe50263ed20e2d7fa7e2415d83b44a28b80d75ee84dc05bc515def95d29",
+      "patchedFileSha256": "ae867e637ef9245658fefe3e173dd04f3091c5f825bad7af2fb6bb7ea6745430",
+      "edits": [
+        {
+          "before": "\nconst V1 = require(\"./ladder-v1\");\n\nfunction timestampMillis(value) {\n",
+          "after": "\nconst V1 = require(\"./ladder-v1\");\nconst A = require(\"./bucket-settlement/input.cjs\");\n\nfunction timestampMillis(value) {\n"
+        },
+        {
+          "before": "}\n\nfunction createLadderSettlement({db, FieldValue, now = () => Date.now()}) {\n  async function resolvePlayers(payload) {\n    const resolved = [];\n    const skipped = [];\n",
+          "after": "}\n\nfunction createLadderSettlement({db, FieldValue, now = () => Date.now(), bucketRuntime = 'production', bucketEnv = process.env}) {\n  async function resolvePlayers(payload, {allowNameLookup=true}={}) {\n    const resolved = [];\n    const skipped = [];\n"
+        },
+        {
+          "before": "      }\n      let uid = item.playerUid || null;\n      if (!uid) {\n        const matches = await db.collection(\"users\").where(\"realName\", \"==\", item.playerName).limit(2).get();\n        const active = matches.docs.filter((doc) => doc.data()?.active === true && ![\"tester\"].includes(doc.data()?.role) && doc.data()?.isTestAccount !== true);\n",
+          "after": "      }\n      let uid = item.playerUid || null;\n      if (!uid && allowNameLookup) {\n        const matches = await db.collection(\"users\").where(\"realName\", \"==\", item.playerName).limit(2).get();\n        const active = matches.docs.filter((doc) => doc.data()?.active === true && ![\"tester\"].includes(doc.data()?.role) && doc.data()?.isTestAccount !== true);\n"
+        },
+        {
+          "before": "  }\n\n  return async function settle({code, actor}) {\n    const normalized = String(code || \"\").trim().toUpperCase();\n    if (!/^BXH-[A-Z0-9]{5,12}$/.test(normalized)) return result(false, \"invalid-code\", \"\u8cfd\u4e8b\u4ee3\u78bc\u683c\u5f0f\u932f\u8aa4\");\n    const tournamentRef = db.doc(`tournaments/${normalized}`);\n    const sourceSnapshot = await tournamentRef.get();\n    if (!sourceSnapshot.exists) return result(false, \"not-found\", \"\u627e\u4e0d\u5230\u9019\u5834\u8cfd\u4e8b\");\n    const source = sourceSnapshot.data() || {};\n    if (source.ladderPointsAwarded === true) {\n      return {ok: true, alreadyAwarded: true, seasonId: source.ladderSeasonId || null, results: source.ladderResults || [], skippedPlayers: source.ladderSkippedPlayers || []};\n    }\n    if (source.testMode === true || source.eventAuthority !== \"official\" || source.ladderMode !== \"ranked\") {\n",
+          "after": "  }\n\n  return async function settle({code, actor, expectedRoom}) {\n    const normalized = String(code || \"\").trim().toUpperCase();\n    if (!/^BXH-[A-Z0-9]{5,12}$/.test(normalized)) return result(false, \"invalid-code\", \"\u8cfd\u4e8b\u4ee3\u78bc\u683c\u5f0f\u932f\u8aa4\");\n    const tournamentRef = db.doc(`tournaments/${normalized}`);\n    let sourceSnapshot = await tournamentRef.get();\n    if (!sourceSnapshot.exists) return result(false, \"not-found\", \"\u627e\u4e0d\u5230\u9019\u5834\u8cfd\u4e8b\");\n    let source = sourceSnapshot.data() || {};\n    const publicRef=db.doc(`publicTournaments/${normalized}`),sourcePublic=await publicRef.get(),observed={};\n    let sourceInput=null;\n    if(A.ownership(source,sourcePublic.data())){\n      if(!expectedRoom||typeof expectedRoom.roomId!=='string'||!expectedRoom.roomId||typeof expectedRoom.epoch!=='string'||!expectedRoom.epoch||JSON.stringify(expectedRoom).length>2000||Object.keys(expectedRoom).some(k=>!['roomId','epoch'].includes(k)))return result(false,'bucket-expected-room-required','\u8acb\u91cd\u65b0\u8f09\u5165\u5206\u6876\u623f\u9593\u5f8c\u518d\u7d50\u7b97');\n      try{\n        const initial=await db.runTransaction(async tx=>{const [r,p,user]=await Promise.all([tx.get(tournamentRef),tx.get(publicRef),tx.get(db.doc('users/'+actor.uid))]);if(!r.exists)A.fail('bucket-room-changed');if(!A.validProfile(user.data())||!['admin','super_admin'].includes(user.data().role))A.fail('admin-required');const input=await A.load({tx,db,root:r,pub:p,observed,runtime:bucketRuntime,env:bucketEnv});if(!input.bucket)A.fail('bucket-mode-changed');if(input.m.roomId!==expectedRoom.roomId||input.m.epoch!==expectedRoom.epoch)A.fail('bucket-room-changed');return {r,input};});\n        sourceSnapshot=initial.r;source=initial.r.data();sourceInput=initial.input;\n      }catch(e){if(e.bucketSettlement)return result(false,e.message,'\u5206\u6876\u7d50\u7b97\u8cc7\u6599\u5c1a\u672a\u7b26\u5408\u9a57\u6536\u689d\u4ef6');throw e;}\n    }else if(expectedRoom!==undefined)return result(false,'bucket-mode-changed','\u623f\u9593\u5132\u5b58\u6a21\u5f0f\u5df2\u8b8a\u66f4\uff0c\u8acb\u91cd\u65b0\u8b80\u53d6');\n    if (source.ladderPointsAwarded === true) {\n      return {ok: true, alreadyAwarded: true, seasonId: source.ladderSeasonId || null, results: source.ladderResults || [], skippedPlayers: source.ladderSkippedPlayers || [],...(sourceInput?A.publicReceipt(sourceInput):{})};\n    }\n    if (source.testMode === true || source.eventAuthority !== \"official\" || source.ladderMode !== \"ranked\") {\n"
+        },
+        {
+          "before": "    let payload;\n    try {\n      state = typeof source.data === \"string\" ? JSON.parse(source.data) : source.data;\n      if (!state?.matches?.length || state.matches.some((match) => !match.isBye && !match.completed)) throw new Error(\"\u4ecd\u6709\u672a\u5b8c\u6210\u5c0d\u6230\uff0c\u4e0d\u80fd\u7d50\u7b97\u7a4d\u5206\");\n      payload = buildLadderSettlementPayload(state);\n      const topCount = payload.participants.filter((item) => item.placement >= 1 && item.placement <= 4).length;\n      if (topCount < Math.min(4, payload.participants.length)) throw new Error(\"\u524d\u56db\u540d\u5c1a\u672a\u5b8c\u6574\uff0c\u8acb\u5148\u5b8c\u6210\u540d\u6b21\u5224\u5b9a\");\n",
+          "after": "    let payload;\n    try {\n      state = sourceInput?sourceInput.state:(typeof source.data === \"string\" ? JSON.parse(source.data) : source.data);\n      if (!state?.matches?.length || state.matches.some((match) => !match.isBye && !match.completed)) throw new Error(\"\u4ecd\u6709\u672a\u5b8c\u6210\u5c0d\u6230\uff0c\u4e0d\u80fd\u7d50\u7b97\u7a4d\u5206\");\n      payload = buildLadderSettlementPayload(state);\n      if(sourceInput)for(const row of payload.participants)row.playerUid=A.playerUid(state.players.find(p=>p.id===row.localPlayerId))||null;\n      const topCount = payload.participants.filter((item) => item.placement >= 1 && item.placement <= 4).length;\n      if (topCount < Math.min(4, payload.participants.length)) throw new Error(\"\u524d\u56db\u540d\u5c1a\u672a\u5b8c\u6574\uff0c\u8acb\u5148\u5b8c\u6210\u540d\u6b21\u5224\u5b9a\");\n"
+        },
+        {
+          "before": "      return result(false, \"v1-invalid-results\", error.message || \"V1 \u7a4d\u5206\u8cc7\u6599\u4e0d\u5b8c\u6574\");\n    }\n    const sourceFingerprint = typeof source.data === \"string\" ? source.data : JSON.stringify(source.data);\n    const {resolved, skipped} = await resolvePlayers(payload);\n    const seen = new Set();\n    for (const item of resolved) {\n",
+          "after": "      return result(false, \"v1-invalid-results\", error.message || \"V1 \u7a4d\u5206\u8cc7\u6599\u4e0d\u5b8c\u6574\");\n    }\n    const sourceFingerprint = sourceInput?sourceInput.fingerprint:(typeof source.data === \"string\" ? source.data : JSON.stringify(source.data));\n    const {resolved, skipped} = await resolvePlayers(payload,{allowNameLookup:!sourceInput});\n    const seen = new Set();\n    for (const item of resolved) {\n"
+        },
+        {
+          "before": "    const controlRef = db.doc(\"ladderSystem/current\");\n    return db.runTransaction(async (transaction) => {\n      const [tournamentSnapshot, controlSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef)]);\n      if (!tournamentSnapshot.exists) return result(false, \"not-found\", \"\u627e\u4e0d\u5230\u9019\u5834\u8cfd\u4e8b\");\n      const tournament = tournamentSnapshot.data() || {};\n      if (tournament.ladderPointsAwarded === true) {\n        return {ok: true, alreadyAwarded: true, seasonId: tournament.ladderSeasonId || null, results: tournament.ladderResults || [], skippedPlayers: tournament.ladderSkippedPlayers || []};\n      }\n      const currentFingerprint = typeof tournament.data === \"string\" ? tournament.data : JSON.stringify(tournament.data);\n      if (currentFingerprint !== sourceFingerprint) return result(false, \"v1-state-changed\", \"\u8cfd\u4e8b\u8cc7\u6599\u5df2\u66f4\u65b0\uff0c\u8acb\u91cd\u65b0\u8b80\u53d6\u5f8c\u518d\u7d50\u7b97\");\n      if (tournament.systemClosed === true) return result(false, \"system-closed\", \"\u7cfb\u7d71\u95dc\u9589\u7684\u8cfd\u4e8b\u4e0d\u80fd\u7d50\u7b97\u7a4d\u5206\");\n",
+          "after": "    const controlRef = db.doc(\"ladderSystem/current\");\n    return db.runTransaction(async (transaction) => {\n      const [tournamentSnapshot, controlSnapshot,publicSnapshot] = await Promise.all([transaction.get(tournamentRef), transaction.get(controlRef),transaction.get(publicRef)]);\n      if (!tournamentSnapshot.exists) return result(false, \"not-found\", \"\u627e\u4e0d\u5230\u9019\u5834\u8cfd\u4e8b\");\n      const tournament = tournamentSnapshot.data() || {};\n      const currentInput=await A.load({tx:transaction,db,root:tournamentSnapshot,pub:publicSnapshot,observed,runtime:bucketRuntime,env:bucketEnv});\n      if(currentInput.bucket!==!!sourceInput)return result(false,'bucket-mode-changed','\u623f\u9593\u5132\u5b58\u6a21\u5f0f\u5df2\u8b8a\u66f4\uff0c\u8acb\u91cd\u65b0\u8b80\u53d6');\n      if(currentInput.bucket){const currentActor=await transaction.get(db.doc('users/'+actor.uid));const p=currentActor.data();if(!A.validProfile(p)||!['admin','super_admin'].includes(p.role))return result(false,'admin-required','\u7ba1\u7406\u6b0a\u9650\u5df2\u8b8a\u66f4');}\n      if (tournament.ladderPointsAwarded === true) {\n        return {ok: true, alreadyAwarded: true, seasonId: tournament.ladderSeasonId || null, results: tournament.ladderResults || [], skippedPlayers: tournament.ladderSkippedPlayers || [],...(currentInput.bucket?A.publicReceipt(currentInput):{})};\n      }\n      const currentFingerprint = currentInput.bucket?currentInput.fingerprint:(typeof tournament.data === \"string\" ? tournament.data : JSON.stringify(tournament.data));\n      if (currentFingerprint !== sourceFingerprint) return result(false, \"v1-state-changed\", \"\u8cfd\u4e8b\u8cc7\u6599\u5df2\u66f4\u65b0\uff0c\u8acb\u91cd\u65b0\u8b80\u53d6\u5f8c\u518d\u7d50\u7b97\");\n      if (tournament.systemClosed === true) return result(false, \"system-closed\", \"\u7cfb\u7d71\u95dc\u9589\u7684\u8cfd\u4e8b\u4e0d\u80fd\u7d50\u7b97\u7a4d\u5206\");\n"
+        },
+        {
+          "before": "      if (!controlSnapshot.exists) return result(false, \"season-not-initialized\", \"\u76ee\u524d\u5929\u68af\u8cfd\u5b63\u5c1a\u672a\u521d\u59cb\u5316\");\n      const control = controlSnapshot.data() || {};\n      if (control.rolloverInProgress === true) return result(false, \"season-rollover-in-progress\", \"\u8cfd\u5b63\u5207\u63db\u9032\u884c\u4e2d\uff0c\u8acb\u7a0d\u5f8c\u518d\u5b8c\u6210\u8cfd\u4e8b\");\n      const currentTime = now();\n",
+          "after": "      if (!controlSnapshot.exists) return result(false, \"season-not-initialized\", \"\u76ee\u524d\u5929\u68af\u8cfd\u5b63\u5c1a\u672a\u521d\u59cb\u5316\");\n      const control = controlSnapshot.data() || {};\n      if(currentInput.bucket&&control.status!=='active')return result(false,'season-unavailable','\u8cfd\u5b63\u5c1a\u672a\u958b\u653e');\n\n      if (control.rolloverInProgress === true) return result(false, \"season-rollover-in-progress\", \"\u8cfd\u5b63\u5207\u63db\u9032\u884c\u4e2d\uff0c\u8acb\u7a0d\u5f8c\u518d\u5b8c\u6210\u8cfd\u4e8b\");\n      const currentTime = now();\n"
+        },
+        {
+          "before": "      const seasonId = String(control.currentSeason || \"S1\");\n      const trial = seasonId.toUpperCase() === \"S0\" || control.isTrialSeason === true;\n\n      const playerRefs = resolved.map((item) => db.doc(`ladderPlayers/${item.playerUid}`));\n",
+          "after": "      const seasonId = String(control.currentSeason || \"S1\");\n      const trial = seasonId.toUpperCase() === \"S0\" || control.isTrialSeason === true;\n      const countsTowardCareer=currentInput.bucket?(control.countsTowardCareer===undefined?!trial:control.countsTowardCareer===true):!trial;\n\n      const playerRefs = resolved.map((item) => db.doc(`ladderPlayers/${item.playerUid}`));\n"
+        },
+        {
+          "before": "      }\n\n      const results = [];\n      const skippedPlayers = [...skipped];\n",
+          "after": "      }\n\n      if(currentInput.bucket&&profileSnapshots.filter(s=>s.exists&&A.validProfile(s.data())).length>240)return result(false,'eligible-player-limit','\u672c\u5834\u8d85\u904e\u53ef\u4e00\u6b21\u7d50\u7b97\u7684\u6709\u6548\u5e33\u865f\u4e0a\u9650');\n      const results = [];\n      const skippedPlayers = [...skipped];\n"
+        },
+        {
+          "before": "        const item = resolved[index];\n        const profile = profileSnapshots[index].exists ? profileSnapshots[index].data() : null;\n        if (!profile || profile.active !== true || profile.role === \"tester\" || profile.isTestAccount === true) {\n          if (!skippedPlayers.includes(item.playerName)) skippedPlayers.push(item.playerName);\n          continue;\n",
+          "after": "        const item = resolved[index];\n        const profile = profileSnapshots[index].exists ? profileSnapshots[index].data() : null;\n        if (!profile || profile.active !== true || profile.role === \"tester\" || profile.isTestAccount === true || currentInput.bucket&&!A.validProfile(profile)) {\n          if (!skippedPlayers.includes(item.playerName)) skippedPlayers.push(item.playerName);\n          continue;\n"
+        },
+        {
+          "before": "        const points = Number(item.pointsEarned || 0);\n        const seasonPoints = oldSeason + points;\n        const careerPoints = trial ? oldCareer : oldCareer + points;\n        const rankTier = V1.tier(seasonPoints);\n        const oldHighest = old.highestRankTier || \"\u672a\u5b9a\u7d1a\";\n        const tierIndex = (name) => Math.max(0, V1.tiers.findIndex((tier) => tier.name === name));\n        const highestRankTier = trial ? oldHighest : (tierIndex(rankTier) > tierIndex(oldHighest) ? rankTier : oldHighest);\n        const placement = Number(item.placement || 0) || null;\n        transaction.set(playerRefs[index], {\n",
+          "after": "        const points = Number(item.pointsEarned || 0);\n        const seasonPoints = oldSeason + points;\n        const careerPoints = countsTowardCareer ? oldCareer + points : oldCareer;\n        const rankTier = V1.tier(seasonPoints);\n        const oldHighest = old.highestRankTier || \"\u672a\u5b9a\u7d1a\";\n        const tierIndex = (name) => Math.max(0, V1.tiers.findIndex((tier) => tier.name === name));\n        const highestRankTier = !countsTowardCareer ? oldHighest : (tierIndex(rankTier) > tierIndex(oldHighest) ? rankTier : oldHighest);\n        const placement = Number(item.placement || 0) || null;\n        transaction.set(playerRefs[index], {\n"
+        },
+        {
+          "before": "        }, {merge: true});\n        transaction.create(logRefs[index], {\n          type: \"event\",\n          eventCode: normalized,\n          eventName: payload.eventName || tournament.name || \"\",\n",
+          "after": "        }, {merge: true});\n        transaction.create(logRefs[index], {\n          ...(currentInput.bucket?{sourceCreatedAt:currentInput.sourceCreatedAt,bucketEpoch:currentInput.m.epoch}:{}),type: \"event\",\n          eventCode: normalized,\n          eventName: payload.eventName || tournament.name || \"\",\n"
+        },
+        {
+          "before": "          seasonId,\n          isTrialSeason: trial,\n          countsTowardCareer: !trial,\n          beforeSeasonPoints: oldSeason,\n          afterSeasonPoints: seasonPoints,\n",
+          "after": "          seasonId,\n          isTrialSeason: trial,\n          countsTowardCareer,\n          beforeSeasonPoints: oldSeason,\n          afterSeasonPoints: seasonPoints,\n"
+        },
+        {
+          "before": "        results.push({playerId: item.playerUid, playerName: item.playerName || \"\", placement, pointsEarned: points, scoring: item.scoring});\n      }\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: !trial,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n",
+          "after": "        results.push({playerId: item.playerUid, playerName: item.playerName || \"\", placement, pointsEarned: points, scoring: item.scoring});\n      }\n      if(currentInput.bucket&&results.length<2)A.fail(\"bucket-insufficient-eligible-players\");\n      transaction.update(tournamentRef, {\n        ladderPointsAwarded: true,\n        ladderSeasonId: seasonId,\n        ladderTrialSeason: trial,\n        ladderCountsTowardCareer: countsTowardCareer,\n        ladderResults: results,\n        ladderSkippedPlayers: skippedPlayers,\n"
+        },
+        {
+          "before": "        ladderAwardedBy: actor.uid,\n      });\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime};\n    });\n  };\n}\n",
+          "after": "        ladderAwardedBy: actor.uid,\n      });\n      if(currentInput.bucket){const patches=A.finalPatches(currentInput,currentInput.state,{now:currentTime,seasonId,results,skipped:skippedPlayers,actorUid:actor.uid});transaction.set(tournamentRef,patches.privatePatch,{merge:true});transaction.set(publicRef,patches.publicPatch,{merge:true});}\n      return {ok: true, alreadyAwarded: false, seasonId, results, skippedPlayers, awardedAt: currentTime,...(currentInput.bucket?A.publicReceipt(currentInput,currentTime):{})};\n    }).catch(e=>{if(e.bucketSettlement)return result(false,e.message,\"\u5206\u6876\u7d50\u7b97\u8cc7\u6599\u5df2\u8b8a\u66f4\u6216\u9700\u8981\u4eba\u5de5\u6838\u5c0d\");throw e;});\n  };\n}\n"
+        }
+      ]
+    }
+  ],
+  "helperFiles": {
+    "bucket-settlement/public-view.cjs": "0bda68eb58adf93c53f29bfb2d726d7d10cf6486b711de840a6526a177359499",
+    "bucket-settlement/state.cjs": "e9fa3ae6cd379a94fda711070e4dc36bc311b62ff67e12e810f0db1caa407c3a",
+    "bucket-settlement/input.cjs": "bfa2edc4461ccf87f4d4ceb9af7c4fcf2ca3f95118513cba7708370694c06849",
+    "bucket-settlement/runtime.cjs": "b84daf88c3b5a4c93bc40d9a85c0eb6079d2f6cd46308e587dc4f9291d6e0df0",
+    "_qr_checkin/qr-checkin-fence.cjs": "556270ff967f083182c39b6ed6a331d06909ac66891fa9e3f7cd03356a257aab"
+  },
+  "protocolSource": {
+    "commit": "b82e8d393ab14c6146575ebf28ccedb0c02b3ed9",
+    "projectionSourceSha256": "b88a284308980512707d179a7b755d9e85026c9abb6bd4901f667530ce9ecd36",
+    "stateGitBlob": "da457b44c6694293470efa3ce71699ada100b8b1"
+  },
+  "wrapperPatch": {
+    "sourceSet": 21,
+    "function": "settleLadderTournament",
+    "path": "index.js",
+    "baselineFileSha256": "0be6d1f4c3032f5e582543201e9ddc4c75ed104c13ab9b126333644429a94394",
+    "patchedFileSha256": "addb486dc276a3b7c58ac08a9a8cb4e1c5c685948b6c29223a6d1513a8df7d13",
+    "edits": [
+      {
+        "before": "  return settleOfficialLadder({\n    code,\n    actor: {uid: actor.uid, name: actor.data.realName || actor.data.displayName || actor.uid},\n  });\n",
+        "after": "  return settleOfficialLadder({\n    code,\n    expectedRoom: request.data?.expectedRoom,\n    actor: {uid: actor.uid, name: actor.data.realName || actor.data.displayName || actor.uid},\n  });\n"
+      }
+    ],
+    "scope": "forward optional expectedRoom to factory; preserve original requireAdminTier and all unrelated exports; deploy only settleLadderTournament"
+  }
+}
