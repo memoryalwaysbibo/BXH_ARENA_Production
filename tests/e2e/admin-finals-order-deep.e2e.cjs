@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('node:crypto');
 
-test('official single elimination enforces bronze before championship final', async ({ page }) => {
+test('official single elimination defaults to bronze before championship final', async ({ page }) => {
   const externalFirebaseRequests=[];
 
   await page.route('**/*', async route=>{
@@ -154,12 +154,12 @@ test('official single elimination enforces bronze before championship final', as
   expect(gated.currentMatchId).toBe(gated.bronzeId);
   expect(gated.bronzeCompleted).toBe(false);
   expect(['pending','ready','in_progress']).toContain(gated.bronzeStatus);
-  expect(gated.finalStatus).toBe('pending');
+  expect(['pending','ready']).toContain(gated.finalStatus);
   expect(gated.finalStartedAt).toBeFalsy();
   expect(Number(gated.bronzeSeq)).toBeLessThan(Number(gated.finalSeq));
   await expect(page.locator('.ref-workstation-meta small').first()).toContainText('季殿',{timeout:20000});
 
-  // Bronze / fourth-place match must finish before final is released.
+  // Without a manual override, the default queue plays bronze then final.
   await winCurrentA(3);
 
   const released=await page.evaluate(()=>{

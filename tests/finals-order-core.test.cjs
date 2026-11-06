@@ -60,7 +60,7 @@ function scenario(opts={}){
   const gate=ctx.singleElimBronzeGatePhase(matches,meta);
   assert.equal(gate.kind,'bronze');
   assert.equal(gate.matchId,'BZ');
-  assert.equal(ctx.singleElimBronzeBeforeFinalBlocked(matches.find(m=>m.id==='F'),matches,meta),true);
+  assert.equal(ctx.singleElimBronzeBeforeFinalBlocked(matches.find(m=>m.id==='F'),matches,meta),false);
   assert.equal(ctx.singleElimBronzeBeforeFinalBlocked(matches.find(m=>m.id==='BZ'),matches,meta),false);
 }
 
@@ -68,7 +68,7 @@ function scenario(opts={}){
   const {matches,meta}=scenario({bronzePresent:false});
   const gate=ctx.singleElimBronzeGatePhase(matches,meta);
   assert.equal(gate.kind,'bronze-pending');
-  assert.equal(ctx.singleElimBronzeBeforeFinalBlocked(matches.find(m=>m.id==='F'),matches,meta),true);
+  assert.equal(ctx.singleElimBronzeBeforeFinalBlocked(matches.find(m=>m.id==='F'),matches,meta),false);
 }
 
 {
@@ -82,14 +82,54 @@ function scenario(opts={}){
   assert.equal(ctx.singleElimBronzeGatePhase(matches,meta),null);
 }
 
-for(const required of [
-  '季殿尚未完成，冠亞必須等待季殿結束後才能開始。',
-  '季殿尚未完成，冠亞不能進入預備或開賽狀態。',
-  'function canManualAssignMatch(m,st=state)',
-  'function canCourtSwapTarget(m,sourceMatch,st=state)',
-  'bronze.seq=bronzeSeq;'
-]){
-  assert.ok(html.includes(required),'Missing finals hard-gate invariant: '+required);
+// Exercise real automatic queues and both dispatch implementations before bronze finishes.
+for(const name of ['getMatch','orderedMatches','refereeMatches','stationExecutionQueue',
+  'activeSingleElimSchedulePhase','isInActiveSingleElimPhase','singleElimScheduleTier',
+  'canManualAssignMatch','canCourtSwapSource','canCourtSwapTarget','clearCourtAssignmentRefs',
+  'applyManualCourtAssign','applyCourtSwapMutation']){
+  vm.runInContext(extractFunction(name),ctx);
 }
-
-console.log('PASS bronze-before-final hard gate and release semantics');
+const utils=require('../referee-seats/functions/engine/match-utils.cjs');
+Object.assign(ctx,{window:{},matchHasDecisionData:utils.matchHasDecisionData,courtKey:utils.courtKey});
+function dispatchScenario(){
+  const st=scenario();st.meta.stations=1;
+  st.bronzeMatchId='BZ';
+  st.matches.find(m=>m.id==='F').indexInRound=0;
+  for(const m of st.matches){m.station=1;m.seq=m.id==='BZ'?2.5:m.id==='F'?3:0;m.status=m.completed?'completed':'pending';}
+  st.courtAssignments={court1:{currentMatchId:'BZ',nextMatchId:'F'}};
+  return st;
+}
+{
+  const st=dispatchScenario();ctx.state=st;
+  assert.deepEqual(Array.from(ctx.stationExecutionQueue(1),m=>m.id),['BZ','F']);
+  assert.equal(ctx.canManualAssignMatch(st.matches.find(m=>m.id==='F'),st),true);
+  assert.equal(ctx.applyCourtSwapMutation(st,'BZ','F').ok,true);
+  assert.equal(ctx.stationExecutionQueue(1)[0].id,'F');
+}
+const {createEngine}=require('../referee-seats/functions/engine/index.cjs');
+for(const server of [false,true]){
+  const st=dispatchScenario();ctx.state=st;
+  const api=server?createEngine(st,{name:'test'},1000,'finals-order'):ctx;
+  assert.equal(api.singleElimBronzeBeforeFinalBlocked(st.matches.find(m=>m.id==='F'),st.matches,st.meta),false);
+  assert.equal(api.applyManualCourtAssign(st,'F',1).ok,true);
+  assert.equal(st.courtAssignments.court1.currentMatchId,'F');
+  if(server){
+    // Rebuilds must preserve manual priority across subsequent score/dispatch commands.
+    st.players=['A','B','C','D'].map(id=>({id}));st.bracketSize=4;st.startedAt=1;
+    api.rebuildPropagationForState(st);
+    assert.equal(st.courtAssignments.court1.currentMatchId,'F');
+    assert.equal(st.matches.find(m=>m.id==='BZ').completed,false);
+    const final=st.matches.find(m=>m.id==='F');
+    Object.assign(final,{completed:true,winnerId:'A',loserId:'B',status:'completed'});
+    api.rebuildPropagationForState(st);
+    assert.equal(st.championId,'A');assert.equal(st.runnerUpId,'B');
+    assert.equal(st.thirdId,null);assert.equal(st.fourthId,null);
+    assert.equal(st.courtAssignments.court1.currentMatchId,'BZ');
+    Object.assign(st.matches.find(m=>m.id==='BZ'),{completed:true,winnerId:'C',loserId:'D',status:'completed'});
+    api.rebuildPropagationForState(st);
+    assert.equal(st.thirdId,'C');assert.equal(st.fourthId,'D');
+  }
+  const final=st.matches.find(m=>m.id==='F');final.scoreA=1;
+  assert.equal(api.applyManualCourtAssign(st,'F',1).ok,false,'scored match remains protected');
+}
+console.log('PASS bronze queue preference, manual override and trusted engine parity');
