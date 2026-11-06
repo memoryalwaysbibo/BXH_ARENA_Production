@@ -27,7 +27,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Check fixture contract
-        run: node tests/four-court-buckets/raffle/input-probe.cjs
+        run: |
+          node tests/four-court-buckets/raffle/input-probe.cjs
+          node tests/four-court-buckets/raffle/identity-probe.cjs
       - name: Install isolated SDK and emulator
         run: npm install --prefix /tmp/bucket-raffle-input --no-save --ignore-scripts firebase-tools@14 firebase-admin@14.4.0
       - name: Verify native snapshots and retry binding

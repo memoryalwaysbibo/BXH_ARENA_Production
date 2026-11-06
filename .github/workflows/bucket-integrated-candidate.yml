@@ -34,6 +34,7 @@ jobs:
       - name: Verify canonical raffle input and read-only capture boundaries
         run: |
           node tests/four-court-buckets/raffle/input-probe.cjs
+          node tests/four-court-buckets/raffle/identity-probe.cjs
           python3 -B tests/four-court-buckets/raffle-readonly.py
       - name: Verify independently captured backend overlays
         run: |

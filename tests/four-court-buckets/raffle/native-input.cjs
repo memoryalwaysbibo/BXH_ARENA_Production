@@ -8,6 +8,7 @@ const {getFirestore}=require('firebase-admin/firestore');
 const {fixture,code}=require('../completion/fixture.cjs');
 const core=require('../operations/fixtures/5/operations-core.js');
 const {createRaffleInput}=require('../../../release/buckets/raffle/input.cjs');
+const {participantKey}=require('../../../release/buckets/raffle/identity.cjs');
 const app=initializeApp({projectId:project}),db=getFirestore(app),read=createRaffleInput(core);
 const rootPath='tournaments/'+code,pubPath='publicTournaments/'+code;
 let checks=0;
@@ -21,12 +22,13 @@ async function contents(){
  const paths=[rootPath,pubPath,...Array.from({length:8},(_,i)=>rootPath+'/matchBuckets/court-'+(i+1))];
  return JSON.stringify((await db.getAll(...paths.map(p=>db.doc(p)))).map(s=>[s.ref.path,s.exists,s.data(),s.createTime]));
 }
-async function invoke({mode='first_round',excluded=[],observed={}}={},afterRead){
+async function invoke({mode='first_round',excluded=[],observed={},identityVersion='legacy'}={},afterRead){
  let attempts=0;
+ const selectedRead=identityVersion==='legacy'?read:createRaffleInput(core,{identityVersion});
  const value=await db.runTransaction(async tx=>{
   attempts++;
   const [root,pub]=await tx.getAll(db.doc(rootPath),db.doc(pubPath));
-  const result=await read({db,tx,root,pub,code,mode,excluded,observed});
+  const result=await selectedRead({db,tx,root,pub,code,mode,excluded,observed});
   if(afterRead)await afterRead(attempts);
   return result;
  });
@@ -46,6 +48,16 @@ async function unchanged(fn){const before=await contents();await fn();assert.equ
   await unchanged(async()=>assert.deepEqual((await invoke({mode})).value,{pool:core.candidates(f.state,mode),candidateHash:core.poolHash(core.candidates(f.state,mode))}));
  }
  await seed(fixture());await unchanged(async()=>{const {value}=await invoke({mode:'general',excluded:['uid:u2']});assert.equal(value.pool.length,3);assert(!value.pool.some(x=>x.key==='uid:u2'));});
+ for(const bucket of [false,true]){
+  const f=fixture({bucket}),top=f.m.rows.get(rootPath),state=JSON.parse(top.data);
+  state.players[1].registrationUid=state.players[0].registrationUid;state.players[1].name=state.players[0].name;
+  f.m.put(rootPath,{...top,data:JSON.stringify(state)});await seed(f);
+  const identityVersion='participant-v1',observed={},excluded=[participantKey(state.players[0])];
+  await unchanged(async()=>{const {value}=await invoke({mode:'general',identityVersion,observed});assert.equal(value.pool.length,4);assert.equal(new Set(value.pool.map(x=>x.key)).size,4);assert.equal(value.candidateHash,core.poolHash(value.pool));});
+  state.players[0].name='Renamed demo player';await db.doc(rootPath).update({data:JSON.stringify(state)});
+  await unchanged(async()=>{const {value}=await invoke({mode:'general',identityVersion,observed,excluded});assert.equal(value.pool.length,3);assert(!value.pool.some(x=>x.playerId==='p1'));assert(value.pool.some(x=>x.playerId==='p2'));});
+  await unchanged(()=>assert.rejects(invoke({mode:'general',identityVersion,excluded:['uid:u1']}),/raffle-exclusion-identity-version/));
+ }
  for(const change of [
   f=>f.m.remove(rootPath+'/matchBuckets/court-2'),
   f=>f.m.put(rootPath+'/matchBuckets/court-1',{...f.buckets[0],epoch:'wrong'}),

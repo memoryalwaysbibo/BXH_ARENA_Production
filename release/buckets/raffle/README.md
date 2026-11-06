@@ -8,7 +8,7 @@ captured operations core's parseState/candidates/poolHash functions; request dat
 cannot substitute those functions. Callable authorization remains the caller's
 responsibility. This directory is not an assembled deployment archive.
 
-Legacy rooms retain the exact captured candidate-list algorithm. Marked rooms
+The default legacy identity mode retains the exact captured candidate-list algorithm for both storage formats. Marked rooms
 read private/public roots and all active buckets through the existing pinned
 completion certificate reader. It checks root/bucket physical identity, manifest
 epoch, topology, public vector, paired QR and the existing 5 MB read budget.
@@ -56,4 +56,53 @@ GCLOUD_PROJECT=demo-bxh-bucket-raffle firebase emulators:exec --only firestore \
   --project demo-bxh-bucket-raffle \
   --config tests/four-court-buckets/raffle/native.firebase.json \
   'node tests/four-court-buckets/raffle/native-input.cjs'
+```
+
+
+## Versioned participant identity candidate
+
+The user selected UID plus stable playerId as the participant identity; PLAYERNAME
+is display only. The source-only factory supports a server-selected option:
+
+```js
+createRaffleInput(capturedCore, {identityVersion: 'participant-v1'})
+```
+
+This opt-in applies the captured eligibility/first-round rules after projecting
+in-memory account keys, so different player IDs sharing one account no longer
+collapse. Keys are versioned JSON tuples [registrationUid || uid || null, id].
+Names never determine uniqueness. Onsite players use null account plus stable ID.
+State/source documents are not mutated. Missing/invalid player IDs and one ID
+mapped to conflicting accounts reject. Duplicate listings of one identity count
+once; same-name participants with different IDs remain separate. The 1,000-pool
+limit still applies after participant expansion, and candidateHash covers the
+returned versioned keys and labels.
+
+Only a NEW, server-sealed raffle generation may opt into this scheme. It must
+persist the identity version together with the room-generation context and reuse
+that version for preview, draw, replay, replacement and prior-winner exclusions.
+Client request data must not choose or switch the scheme. The observed context
+binds the scheme across SDK retries. Legacy uid-only/onsite winner strings are
+rejected in participant mode; do not automatically migrate, clear or reinterpret
+existing draws or exclusions. Historical winners need verified playerId/room
+context before any separate, explicitly reviewed migration. An excluded player
+whose account mapping changed rejects instead of silently becoming eligible.
+
+19 identity fixture checks cover shared UID/same names, exact winner exclusions,
+renaming, reorder, growing sibling groups, duplicated/onsite entry lists,
+first-round losers, eligibility preservation, malformed/legacy keys, account
+changes, conflicting/missing IDs and both storage formats/context scheme changes.
+Six corresponding native SDK checks cover shared UID/name, rename-safe exclusion
+and legacy-ledger rejection in both storage formats. CI must establish their
+results on the current head. Existing 25 fixture and26 native checks remain.
+
+This is still not callable-wired or deployed. Independent live sources have now
+been hashed by Functions PR321/run42274492327; the public hash-only report is not
+source bytes or full metadata. Callable assembly, persisted player-ID stability,
+new-generation version binding, legacy-draw handling and authenticated acceptance
+remain required. The historical one/two-player discrepancy is not proven to have
+this cause merely because the synthetic collision reproduces it.
+
+```sh
+node tests/four-court-buckets/raffle/identity-probe.cjs
 ```

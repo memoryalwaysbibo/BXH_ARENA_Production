@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "a3c57909f958dae9b40c442f6ba46eb4a1b9fd5b"
+      "blob": "c4734fa2557246bd763da2d75fc1678021c5dd8e"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1830,11 +1830,11 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "dc049fe469895c589380726a94a66423cf70f551"
+      "blob": "a54b2748b2ce8b1a751a72ccb68e6ceacdbe5e0f"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
-      "blob": "41075a63702f2e404d944675f8335ee53d0fa24a"
+      "blob": "b7f09d2394f156c9b3d84d2bbbc49d446ceb22ea"
     },
     "scripts/bucket-raffle-readonly.md": {
       "components": [],
@@ -1853,7 +1853,7 @@
       "blob": "ad8d3801b23a7bc8b971e043c8131c684b30afd4"
     },
     "tests/four-court-buckets/raffle/native-input.cjs": {
-      "blob": "00a59dfa49705cd41e109fc3e20b8ac9b9d18858",
+      "blob": "d3202c54c7278f0769be463d2c75ce841094761f",
       "components": [
         718
       ]
@@ -1865,10 +1865,22 @@
       ]
     },
     ".github/workflows/bucket-raffle-input.yml": {
-      "blob": "6efb6fd67b6eec7a8f582a2eeed9b5f77b1d35c4",
+      "blob": "832dd9226e49fc129ce5b994b2f6a53ebf1e184a",
       "components": [
         718
       ]
+    },
+    "release/buckets/raffle/identity.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "42d589c86cc898c64040e48e5e1141e618f2dcaa"
+    },
+    "tests/four-court-buckets/raffle/identity-probe.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "b559fafd923a4054c0f3e831ed045a409a208e0a"
     }
   },
   "mainScriptQueryParameters": {
@@ -2342,6 +2354,7 @@
     "release/buckets/interactions/candidate/9/family-registration.js": "Reapply the original single bucket-ownership guard to the exact 2026-11-05 deployed familyRegistration source, preserving PR730 admission/coalescing, deadline revalidation, getAll and read-only previews.",
     "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
     "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
-    ".github/workflows/bucket-raffle-input.yml": "Validate source-only raffle reader against Admin SDK14.4.0, demo-only Emulator snapshots, physical root replacement and deterministic ABORTED callback retry; no callable wiring or deployment."
+    ".github/workflows/bucket-raffle-input.yml": "Validate source-only raffle reader against Admin SDK14.4.0, demo-only Emulator snapshots, physical root replacement and deterministic ABORTED callback retry; no callable wiring or deployment.",
+    "release/buckets/raffle/identity.cjs": "Source-only server-selected participant-v1 identity: canonical account/playerId tuples preserve captured eligibility without uid-only family collapse; reject legacy exclusions, missing/conflicting IDs and excluded-account reassignment. Existing generations retain legacy mode until separately reviewed migration."
   }
 }
