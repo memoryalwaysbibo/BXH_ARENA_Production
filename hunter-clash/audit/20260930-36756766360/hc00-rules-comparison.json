@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "status": "MISMATCH",
+  "sourceCommit": "462287fdb86f6df6b71a0966c25405ca925fcdc7",
+  "projectId": "bxh-arena",
+  "rulesMatch": false,
+  "runtimeReconciled": false,
+  "hcDeploymentVerified": false,
+  "blockers": [],
+  "observedAt": "2026-09-30T18:12:02.322Z",
+  "releaseNames": [
+    "projects/bxh-arena/releases/cloud.firestore"
+  ],
+  "rulesetName": "projects/bxh-arena/rulesets/e9014a09-8c33-4859-8e3a-a4b3b6e0ea1a",
+  "differences": [
+    {
+      "name": "firestore.rules",
+      "reason": "content-mismatch"
+    }
+  ]
+}

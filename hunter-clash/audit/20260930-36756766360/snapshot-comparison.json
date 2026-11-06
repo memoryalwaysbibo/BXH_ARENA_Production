@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "kind": "READ_ONLY_SNAPSHOT_COMPARISON",
+  "previousRunId": 36696307510,
+  "currentRunId": 36756766360,
+  "previousFunctionCount": 96,
+  "currentFunctionCount": 98,
+  "previousBuildCount": 36,
+  "currentBuildCount": 35,
+  "addedFunctions": [
+    "projects/bxh-arena/locations/asia-east1/functions/backfillOctoberCardReward",
+    "projects/bxh-arena/locations/asia-east1/functions/reconcileOctoberCardRewards"
+  ],
+  "removedFunctions": [],
+  "changedBuilds": [
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/activateLadderS1",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/autoAwardStaffTitle",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/claimCardReward",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/b5659218-ed30-4fee-9e84-68e61cada1c9",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/claimTitleReward",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/deleteTournamentSafely",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/getEngagementSnapshot",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/grantTitle",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/onLadderTransactionCreated",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/b5659218-ed30-4fee-9e84-68e61cada1c9",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/parseTournamentAnnouncementV1",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/prepareLadderS1Cutover",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/resetHunterPrelaunchData",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/setTitlePreferences",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    },
+    {
+      "name": "projects/bxh-arena/locations/asia-east1/functions/syncHunterAchievements",
+      "previousBuild": "projects/87261141693/locations/asia-east1/builds/535463e0-e6dc-42a2-8922-3ac88c81716c",
+      "currentBuild": "projects/87261141693/locations/asia-east1/builds/ef66bf87-45c0-492a-a962-13009889f204"
+    }
+  ],
+  "runtimeReconciled": false,
+  "hcDeploymentVerified": false
+}
