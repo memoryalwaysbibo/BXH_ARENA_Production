@@ -1864,7 +1864,7 @@
     "ladder-v1.js": {
       "v": "20260921.9"
     },
-    "ajax/libs/qrcodejs/1.0.0/qrcode.min.js": {},
+    "/ajax/libs/qrcodejs/1.0.0/qrcode.min.js": {},
     "modules/main-app/ladder-location.js": {
       "v": "20261019.1"
     },
