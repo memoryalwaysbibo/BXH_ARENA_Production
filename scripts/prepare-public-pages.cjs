@@ -1,7 +1,7 @@
 'use strict';
 // Build a tracked-file-only Pages artifact; never copy private referee identity/QA sources.
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
-const excluded=p=>p.split('/').some(x=>x.startsWith('.'))||['qr-checkin','referee-certificates','tests'].some(x=>p===x||p.startsWith(x+'/'))||p==='scripts/preview-referee-initialization.cjs';
+const excluded=p=>p.split('/').some(x=>x.startsWith('.'))||['qr-checkin','referee-certificates','tests','registration-flow-v2'].some(x=>p===x||p.startsWith(x+'/'))||p==='scripts/preview-referee-initialization.cjs';
 function prepare(root,destination,files){
  root=path.resolve(root);destination=path.resolve(destination);
  if(destination===root||destination.startsWith(root+path.sep))throw Error('artifact-destination-must-be-outside-checkout');

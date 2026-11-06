@@ -1,0 +1,32 @@
+{
+  "baseCommit": "d35d960e08d207a9b06a088d5de990a2f8201a1f",
+  "recordedAt": "2026-11-05T20:19:04.635893+00:00",
+  "runtime": {
+    "node": "v24.22.1",
+    "firebaseAdmin": "14.4.0",
+    "firebaseFunctions": "7.3.2",
+    "firebaseTools": "13.35.1"
+  },
+  "scope": "Local isolated candidate; not deployed; synthetic auth; no production writes",
+  "checks": {
+    "nodeRegressionTests": 115,
+    "queueRecoveryTests": 9,
+    "frontendWaves": [
+      50,
+      100,
+      150
+    ],
+    "backendWaves": 12,
+    "frontendVerifier": "PASS"
+  },
+  "sha256": {
+    "registration-flow-v2/backend/queue.cjs": "6861892d3c21e398c2ef52487271447d396c1503e865ae8e91c66dc2de43b12c",
+    "registration-flow-v2/backend/api.cjs": "55db0f82962561942bc2c807f685d28240fa5d40071d789b64a47dd5042e16d8",
+    "registration-flow-v2/backend/bindings.cjs": "dfdccc7b3147132ae6ea6d38fae748a04891cb9de293f7f874761c322b6f18ec",
+    "modules/main-app/registration-feedback.js": "d18654f2781bd531756201c46b98eed7269e256a4bae68a980be424630017b3b",
+    "modules/cloud/cloud-runtime.js": "22a13d145ac8497b0da61e6266902ab93684f48246a33cdf2d0b81517698a0d5",
+    "family-ui.js": "1b270dda06d23f3af3e9e99f530afbdba14b1be3e1c268c6eca10d1705c98fbd",
+    "registration-flow-v2/tests/captured-family-source.json": "cfc385fc153c54fa360f450d7dc63b63dba04b864454b2a23dbc1b16d3e8c818",
+    "qr-checkin/backend/overlays/roster-service.js": "1a399707833b55c6c77de555c1d2f9fd3b6b314b563499c5bdaa3a6561e58a87"
+  }
+}

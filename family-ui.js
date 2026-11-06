@@ -117,6 +117,16 @@ async function chooseFamilyParticipant(event,code,childEligibilityConfirmed,mode
  // Clicking self registration is the user's submission; preserve the server
  // allocation preflight without opening a second confirmation dialog.
  if(mode!=='children'){
+  const queued=Array.isArray(window.BXH_REGISTRATION_FLOW_V2_ROOMS)&&window.BXH_REGISTRATION_FLOW_V2_ROOMS.includes(code)&&event.battleMode!=='team';
+  // Use the already-read display allocation as consent; the authoritative
+  // queued transaction still rejects any allocation change. Do not silently
+  // convert a confirmed expectation to waitlist or weaken capacity checks.
+  if(queued&&Number.isSafeInteger(event.confirmedCount)&&event.confirmedCount>=0){
+   const unlimited=window.BXHDomainUtils?.isUnlimitedCommunityRegistration(event)===true;
+   const capacity=event.capacity;
+   if(unlimited||Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount<capacity)return {childIds:[null],allocation:[{registrationId:owner,status:'confirmed'}]};
+   if(Number.isSafeInteger(capacity)&&capacity>0&&event.confirmedCount>=capacity&&event.waitlistEnabled===true&&Number.isSafeInteger(event.waitlistCount)&&event.waitlistCount>=0&&event.waitlistCount<event.waitlistCapacity)return {childIds:[null],allocation:[{registrationId:owner,status:'waitlist'}]};
+  }
   const preview=await window.engagementService.familyRegistration({action:'preview',code,childIds:[null],childEligibilityConfirmed:childEligibilityConfirmed===true});
   if(currentAuthUid()!==owner||engagementSessionEpoch!==epoch)throw Error('auth-required');
   if(!preview?.ok)throw Error('preview-failed');

@@ -69,14 +69,16 @@
     }
     function snapshot(sync=true){if(sync)restore();return [...entries.values()].map(e=>({code:e.code,state:e.state,durable:e.durable,
       statuses:e.result?.rows?.map(r=>r.status)||(e.result?[e.result.status]:[]),createdAt:e.createdAt,submitted:!!e.ids,lastCheckAt:e.lastCheckAt,
-      canRetry:!!e.retry&&typeof retry==='function'&&!e.flight&&e.state==='unconfirmed',message:e.message||null}));}
+      canRetry:!!e.retry&&typeof retry==='function'&&!e.flight&&e.state==='unconfirmed',message:e.message||null,
+      autoPaused:e.autoPaused===true,deadlineReached:e.deadlineReached===true,hidden:e.hidden===true,queueState:e.queueState||null}));}
     function complete(e,result,recovered=false){
       if(!current(e)||!ACTIVE.includes(e.state))return;
       clearTimers(e);e.result=result;e.state='confirmed';remove(e);e.settle?.(result);
       if(recovered)onRecovered({code:e.code,result});emit();
     }
     function queueCheck(e){
-      if(!current(e)||!ACTIVE.includes(e.state)||!e.ids||e.attempts>delays.length)return;
+      if(!current(e)||!ACTIVE.includes(e.state)||!e.ids||e.hidden)return;
+      if(e.attempts>delays.length){e.autoPaused=true;emit();return;}
       if(e.autoTimer!==null){unschedule(e.autoTimer);e.timers.delete(e.autoTimer);}
       e.autoTimer=later(e,()=>{e.autoTimer=null;void recheck(e.code);},delays[Math.max(0,e.attempts-1)]||delays.at(-1)||12000);
     }
@@ -91,9 +93,19 @@
       e.query=(async()=>{
         let timer;
         try{
-          const response=await Promise.race([Promise.resolve().then(()=>read(code)),new Promise(resolve=>{timer=schedule(()=>resolve(null),readTimeoutMs);})]);
+          // A UI read timeout does not cancel the callable underneath it.
+          // Reuse that transport until it settles, instead of stacking another
+          // 60-second cloud request on each automatic recheck.
+          if(!e.transport){
+            const transport=Promise.resolve().then(()=>read(code,e.retry?{operationId:e.retry.operationId}:undefined));
+            e.transport=transport;
+            const clear=()=>{if(e.transport===transport)e.transport=null;};
+            void transport.then(clear,clear);
+          }
+          const response=await Promise.race([e.transport,new Promise(resolve=>{timer=schedule(()=>resolve(null),readTimeoutMs);})]);
           if(!current(e)||!ACTIVE.includes(e.state))return null;
           e.lastCheckAt=now();
+          e.queueState=response?.operation?.state||null;
           // Require every selected identity, never another family member or an empty read.
           const rows=Array.isArray(response?.rows)?response.rows:[];
           const selected=e.ids.map(id=>rows.find(r=>r.registrationId===id&&STATUS.includes(r.status)));
@@ -101,6 +113,9 @@
             const safeRows=selected.map(r=>({registrationId:r.registrationId,status:r.status}));
             const result={ok:true,status:safeRows[0].status,rows:safeRows,recovered:true};
             complete(e,result,true);return result;
+          }
+          if(response?.operation?.state==='rejected'&&typeof response.operation.reason==='string'){
+            const error=Error(response.operation.reason);clearTimers(e);remove(e);e.state='failed';e.message=failureMessage(error);e.settle?.(null,error);return null;
           }
           e.state='unconfirmed';return null;
         }catch{if(current(e)&&ACTIVE.includes(e.state))e.state='unconfirmed';return null;}
@@ -113,6 +128,7 @@
       if(!/^BXH-[A-Z0-9]{4,16}$/.test(code))return Promise.reject(Error('invalid-code'));
       const existing=entries.get(code);
       if(existing&&ACTIVE.includes(existing.state)){
+        existing.hidden=false;emit();
         if(existing.flight)return existing.flight;
         void recheck(code);return Promise.reject(Error('registration-result-pending'));
       }
@@ -123,9 +139,12 @@
         const assertCurrent=()=>{if(!current(e)||e.state==='failed')throw Error('stale-session');};
         const submitting=(ids,request)=>{assertCurrent();e.ids=[...ids];e.retry=originalRequest(e,request);persist(e);e.state='submitting';emit();};
         later(e,()=>{if(e.ids)void recheck(code);else{e.slow=true;emit();}},slowMs);
-        later(e,()=>{e.state=e.ids?'unconfirmed':'failed';if(!e.ids)e.message='前置確認逾時，尚未送出報名。';emit();e.settle(null,Error(e.ids?'registration-result-pending':'registration-preparation-timeout'));if(!e.ids)clearTimers(e);},deadlineMs);
+        later(e,()=>{e.deadlineReached=true;e.state=e.ids?'unconfirmed':'failed';if(!e.ids)e.message='前置確認逾時，尚未送出報名。';emit();e.settle(null,Error(e.ids?'registration-result-pending':'registration-preparation-timeout'));if(!e.ids)clearTimers(e);},deadlineMs);
         try{
           assertCurrent();const result=await send({submitting,assertCurrent});assertCurrent();
+          if(result?.ok===true&&['queued','running','attention'].includes(result.operation?.state)){
+            e.queueState=result.operation.state;e.state='unconfirmed';emit();void recheck(code);return;
+          }
           if(!result||result.ok===false||!STATUS.includes(result.status))throw Error('registration-empty-response');
           complete(e,result);
         }catch(error){
@@ -147,37 +166,41 @@
       if(previous.flight)return previous.flight;
       const request=clone(previous.retry),ids=[...previous.ids];clearTimers(previous);previous.state='failed';
       return run(code,async progress=>{
-        progress.submitting(ids,request);await retry(request);progress.assertCurrent();
+        progress.submitting(ids,request);const accepted=await retry(request);progress.assertCurrent();
         // An idempotent receipt may predate cancellation. Confirm CURRENT rows,
         // never show an old successful receipt as a fresh active registration.
-        const response=await read(code);progress.assertCurrent();
+        const response=await read(code,{operationId:request.operationId});progress.assertCurrent();
+        if(response?.operation?.state==='rejected')throw Error(response.operation.reason||'registration-result-pending');
+        if(accepted?.operation&&!['completed','rejected'].includes(response?.operation?.state))return accepted;
         if(response?.ok!==true||!Array.isArray(response.rows))throw Error('registration-empty-response');
         const rows=ids.map(id=>response.rows.find(r=>r.registrationId===id&&STATUS.includes(r.status)));
         if(!rows.every(Boolean))throw Error('registration-no-longer-active');
         return {ok:true,status:rows[0].status,rows:rows.map(r=>({registrationId:r.registrationId,status:r.status})),recovered:true};
       }).then(result=>{if(getUid()===previous.uid&&entries.get(code)?.state==='confirmed')onRecovered({code,result});return result;});
     }
-    function dismiss(code){const e=entries.get(code);if(e&&!ACTIVE.includes(e.state)){clearTimers(e);entries.delete(code);emit();}}
+    function dismiss(code){const e=entries.get(code);if(!e)return;if(e.state==='unconfirmed'&&!e.flight){clearTimers(e);e.hidden=true;emit();return;}if(!ACTIVE.includes(e.state)){clearTimers(e);entries.delete(code);emit();}}
     function refresh(force=false){restore(force);emit();}
-    function resume(){restore();for(const e of entries.values())if(e.ids&&ACTIVE.includes(e.state)&&e.attempts<=delays.length)void recheck(e.code);emit();}
+    function resume(){restore();for(const e of entries.values())if(!e.hidden&&e.ids&&ACTIVE.includes(e.state)&&e.attempts<=delays.length)void recheck(e.code);emit();}
     function dispose(){disposed=true;for(const e of entries.values()){clearTimers(e);e.settle?.(null,Error('stale-session'));}entries.clear();}
     return {run,recheck,retryOriginal,snapshot,restore:refresh,resume,dismiss,dispose};
   }
   function mount(controller,document){
     let panel=null,last='';
     function render(rows){
+      rows=rows.filter(row=>!row.hidden);
       const signature=JSON.stringify(rows);if(signature===last&&panel?.isConnected)return;last=signature;
       if(!panel){panel=document.createElement('section');panel.className='registration-feedback-panel';panel.setAttribute('aria-label','報名處理進度');document.body.appendChild(panel);}
       panel.replaceChildren();panel.hidden=!rows.length;
       for(const row of rows){
         const box=document.createElement('div');box.className='registration-feedback-item';
-        const title=document.createElement('strong');title.textContent=row.state==='confirmed'?'報名狀態已確認':row.state==='failed'?'本次報名未完成':row.state==='preparing'?'正在確認報名資格':row.state==='submitting'?'報名送出中':row.state==='checking'?'正在查詢報名結果':'報名結果確認中';
+        const title=document.createElement('strong');title.textContent=row.state==='confirmed'?'報名狀態已確認':row.state==='failed'?'本次報名未完成':row.autoPaused||row.deadlineReached?'報名結果待確認':row.state==='preparing'?'正在確認報名資格':row.state==='submitting'?'報名送出中':row.state==='checking'?'正在查詢報名結果':row.queueState==='queued'?'報名已受理，等待處理':row.queueState==='running'?'正在處理報名':'報名結果確認中';
         const detail=document.createElement('p');detail.setAttribute('role','status');detail.setAttribute('aria-live','polite');
         const statuses=row.statuses.map(s=>({confirmed:'正取',waitlist:'備取',pending_draw:'等待抽籤'}[s]));
-        detail.textContent=row.code+'｜'+(row.state==='confirmed'?statuses.join('、'):row.state==='failed'?row.message:row.state==='preparing'?'尚未取得名額，請稍候。':row.state==='submitting'?'請勿重複點擊；送出不代表已取得名額。':'尚在確認是否已取得名額，請稍候。');
+        detail.textContent=row.code+'｜'+(row.state==='confirmed'?statuses.join('、'):row.state==='failed'?row.message:row.autoPaused||row.deadlineReached?'目前尚未確認結果，可離開此提示，稍後查詢；離開不會取消報名。':row.state==='preparing'?'尚未取得名額，請稍候。':row.state==='submitting'?'請勿重複點擊；送出不代表已取得名額。':'尚在確認是否已取得名額，請稍候。');
         box.append(title,detail);
         if(ACTIVE.includes(row.state)&&row.submitted){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='查詢報名結果';button.disabled=row.state==='checking';button.onclick=()=>void controller.recheck(row.code);box.appendChild(button);}
         if(row.canRetry){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='重送原報名';button.onclick=()=>{void controller.retryOriginal(row.code).catch(()=>{});};box.appendChild(button);const hint=document.createElement('p');hint.textContent='沿用同一筆報名確認結果，不會另建新請求；名額仍依伺服器判定。';box.appendChild(hint);}
+        if(row.state==='unconfirmed'&&(row.autoPaused||row.deadlineReached)){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='稍後查詢';button.onclick=()=>controller.dismiss(row.code);box.appendChild(button);}
         if(!ACTIVE.includes(row.state)){const button=document.createElement('button');button.type='button';button.className='btn btn-sm';button.textContent='關閉提示';button.onclick=()=>controller.dismiss(row.code);box.appendChild(button);}
         if(row.submitted&&!row.durable&&ACTIVE.includes(row.state)){const warning=document.createElement('p');warning.textContent='此瀏覽器無法保存進度，請留在此頁確認結果。';box.appendChild(warning);}
         panel.appendChild(box);

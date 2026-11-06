@@ -1,0 +1,56 @@
+{
+  "scope": "Actual frontend self-registration functions + feedback controller + captured backend + local Firestore Emulator. Synthetic Auth/DOM-free VM; not browser, mobile, production networking or live Cloud Run.",
+  "results": [
+    {
+      "n": 50,
+      "workers": 5,
+      "confirmed": 50,
+      "failed": 0,
+      "duplicateRegistrations": 0,
+      "remainingJournalEntries": 0,
+      "traffic": {
+        "preview": 0,
+        "submit": 50,
+        "mine": 100
+      },
+      "p50Ms": 6123,
+      "p95Ms": 6132,
+      "maxMs": 6133,
+      "totalMs": 6168
+    },
+    {
+      "n": 100,
+      "workers": 5,
+      "confirmed": 100,
+      "failed": 0,
+      "duplicateRegistrations": 0,
+      "remainingJournalEntries": 0,
+      "traffic": {
+        "preview": 0,
+        "submit": 100,
+        "mine": 200
+      },
+      "p50Ms": 7874,
+      "p95Ms": 7962,
+      "maxMs": 7965,
+      "totalMs": 8021
+    },
+    {
+      "n": 150,
+      "workers": 5,
+      "confirmed": 150,
+      "failed": 0,
+      "duplicateRegistrations": 0,
+      "remainingJournalEntries": 0,
+      "traffic": {
+        "preview": 0,
+        "submit": 150,
+        "mine": 312
+      },
+      "p50Ms": 8462,
+      "p95Ms": 8801,
+      "maxMs": 8803,
+      "totalMs": 8829
+    }
+  ]
+}
