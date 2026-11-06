@@ -1,0 +1,15 @@
+{
+  "firestore": {"rules": "firestore.rules"},
+  "functions": {
+    "source": ".",
+    "codebase": "hc01-emulator-only",
+    "predeploy": ["node \"$RESOURCE_DIR/../../emulator/preflight.cjs\" --deny-deploy"]
+  },
+  "emulators": {
+    "auth": {"host": "127.0.0.1", "port": 9098},
+    "firestore": {"host": "127.0.0.1", "port": 8180},
+    "functions": {"host": "127.0.0.1", "port": 5003},
+    "ui": {"enabled": false},
+    "singleProjectMode": true
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "uids": [
+    "FsaD4nFYI5QAmYdUygDg6nzpKI22",
+    "dBTAoYkzHjgRdgtoOo7kLTOlyRt2"
+  ],
+  "rules": {
+    "version": "hc01-internal-test-v1",
+    "targetScore": 4
+  },
+  "pairingTtlMs": 120000
+}
