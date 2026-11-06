@@ -1712,7 +1712,7 @@
     },
     ".github/workflows/bucket-integrated-candidate.yml": {
       "components": [],
-      "blob": "c4734fa2557246bd763da2d75fc1678021c5dd8e"
+      "blob": "742131913fbe996dac9e5d1f89a1a892730acdb0"
     },
     "release/buckets/my-events/patch-bootstrap.cjs": {
       "components": [],
@@ -1830,7 +1830,7 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "a54b2748b2ce8b1a751a72ccb68e6ceacdbe5e0f"
+      "blob": "79e8eb2dc0c24ab7f67f6da74302a77ff49136a9"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
@@ -1853,7 +1853,7 @@
       "blob": "ad8d3801b23a7bc8b971e043c8131c684b30afd4"
     },
     "tests/four-court-buckets/raffle/native-input.cjs": {
-      "blob": "d3202c54c7278f0769be463d2c75ce841094761f",
+      "blob": "052a211b633516d014ca408a2f6c2f42f5100a2e",
       "components": [
         718
       ]
@@ -1865,7 +1865,7 @@
       ]
     },
     ".github/workflows/bucket-raffle-input.yml": {
-      "blob": "832dd9226e49fc129ce5b994b2f6a53ebf1e184a",
+      "blob": "d0dbf40954a53f22b7d7d54208a41e16d4d854ac",
       "components": [
         718
       ]
@@ -1874,13 +1874,37 @@
       "components": [
         718
       ],
-      "blob": "42d589c86cc898c64040e48e5e1141e618f2dcaa"
+      "blob": "64acb18aea170fc480d16982d59e05a70f9c3118"
     },
     "tests/four-court-buckets/raffle/identity-probe.cjs": {
       "components": [
         718
       ],
       "blob": "b559fafd923a4054c0f3e831ed045a409a208e0a"
+    },
+    "release/buckets/raffle/preview.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "a05a5953d68f793f8cc564efa93c55f71ccac3a9"
+    },
+    "release/buckets/raffle/live-provenance-20261107.json": {
+      "components": [
+        718
+      ],
+      "blob": "8262c8382aa698bb3b2e64919eb1eaeccad70277"
+    },
+    "tests/four-court-buckets/raffle/preview-probe.cjs": {
+      "components": [
+        718
+      ],
+      "blob": "538ad320fe84d8184971e285d3141a430e27feb2"
+    },
+    "tests/four-court-buckets/raffle/verify-provenance.py": {
+      "components": [
+        718
+      ],
+      "blob": "98c97138be8d814295e33c71b7d6a69d3f02a20a"
     }
   },
   "mainScriptQueryParameters": {
@@ -2355,6 +2379,7 @@
     "tests/four-court-buckets/interactions/probe.cjs": "Use native timer globals for the deployed admission module; verify coalescing, conflicting operation rejection, same-room serialization and read-only/marked previews, in addition to all original 363 checks.",
     "release/buckets/integration/live-followup-20261105.json": "Pin the received four-function follow-up, policy-blocked regional reads, 16-file referee match, exact family source closure/review archive and unresolved GET trigger digest difference.",
     ".github/workflows/bucket-raffle-input.yml": "Validate source-only raffle reader against Admin SDK14.4.0, demo-only Emulator snapshots, physical root replacement and deterministic ABORTED callback retry; no callable wiring or deployment.",
-    "release/buckets/raffle/identity.cjs": "Source-only server-selected participant-v1 identity: canonical account/playerId tuples preserve captured eligibility without uid-only family collapse; reject legacy exclusions, missing/conflicting IDs and excluded-account reassignment. Existing generations retain legacy mode until separately reviewed migration."
+    "release/buckets/raffle/identity.cjs": "Source-only server-selected participant-v1 identity: canonical account/playerId tuples preserve captured eligibility without uid-only family collapse; reject legacy exclusions, missing/conflicting IDs and excluded-account reassignment. Existing generations retain legacy mode until separately reviewed migration.",
+    "release/buckets/raffle/preview.cjs": "Unwired transactional preview service: same-transaction actor/root/ledger/bucket reads, authorization on every callback, ledger birth/version checks, existing legacy-ledger preservation and server-selected new participant identity; zero writes. Must ship with future matching draw/update receipt versioning, never preview alone."
   }
 }

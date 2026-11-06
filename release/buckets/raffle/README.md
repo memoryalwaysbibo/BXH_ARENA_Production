@@ -106,3 +106,50 @@ this cause merely because the synthetic collision reproduces it.
 ```sh
 node tests/four-court-buckets/raffle/identity-probe.cjs
 ```
+
+
+## Independently verified live source provenance
+
+The filtered report from Functions run42274492327 (2026-11-06T18:52:35Z) is
+pinned in live-provenance-20261107.json with the artifact ZIP digest. Independent
+GET/download/recheck for EACH of previewTournamentRaffle, drawTournamentRaffle
+and updateTournamentRaffleWinner yields archive SHA256
+8eafc6a293c6d23719bbce59d2b059495e9e4ca1589c358667ce662164f00f51,
+matching operations sourceSet5. Thus the captured operations/core/release-controls
+fixture is now supported for preview too. The verifier crosslinks archive,
+per-function metadata/config hashes, exact fixture bytes and the existing patch
+manifest. These are snapshot hashes, not complete deployable metadata/IAM or a
+continuing live drift guarantee. No source ZIP or runtime secrets are committed.
+
+## Transactional preview service candidate
+
+createRafflePreview({db,core,HttpsError}) implements the callable body as an
+unwired source-only service. It returns the existing ok/count/candidates/hash
+shape. Actor, private/public roots and exclusion ledger are read together by
+getAll in one transaction; bucket state is read in that same transaction. It
+rechecks active status/manager authority on every SDK callback. Closed rooms,
+stale room/ledger birth identity, schema changes and malformed exclusions reject.
+The caller-owned observed context persists across retries and rejects ledger
+replacement, while ordinary ledger updates recompute the pool.
+
+A missing ledger previews the server-selected participant-v1 scheme. Existing
+unversioned ledgers preview legacy keys; explicit participant-v1 ledgers use the
+new tuple keys. Even excludePrevious=false cannot reinterpret malformed/mixed
+ledger schemas. This service makes ZERO writes and does not initialize a ledger.
+The future draw implementation MUST transactionally persist identityVersion,
+room/ledger context and receipts consistently with preview before this body can
+replace the deployed callable. Replacement/replay must use that saved version.
+The existing deployed draw body would reject the new preview hash, so preview
+must not be released alone. Existing draw/update fences remain untouched here.
+
+20 preview fixtures cover family counts, both formats, old/new ledgers, excluded
+winners, authorization/active/closure, generation/schema checks and synthetic
+callback replay. Native SDK tests add both-format preview pools/exclusions and
+role revocation on an explicit ABORTED retry. Auth payloads are fixtures; no
+Auth/App Check endpoint or natural-contention claim is made. No callable export
+or deployment archive is wired by this change.
+
+```sh
+python3 -B tests/four-court-buckets/raffle/verify-provenance.py
+node tests/four-court-buckets/raffle/preview-probe.cjs
+```

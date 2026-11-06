@@ -7,7 +7,9 @@ on:
       - 'release/buckets/completion/protocol/**'
       - 'tests/four-court-buckets/raffle/**'
       - 'tests/four-court-buckets/completion/fixture.cjs'
-      - 'tests/four-court-buckets/operations/fixtures/5/operations-core.js'
+      - 'tests/four-court-buckets/operations/fixtures/5/**'
+      - 'tests/four-court-buckets/operations/fixture-sha256.json'
+      - 'release/buckets/operations/patch-manifest.json'
       - '.github/workflows/bucket-raffle-input.yml'
 permissions:
   contents: read
@@ -30,6 +32,8 @@ jobs:
         run: |
           node tests/four-court-buckets/raffle/input-probe.cjs
           node tests/four-court-buckets/raffle/identity-probe.cjs
+          node tests/four-court-buckets/raffle/preview-probe.cjs
+          python3 -B tests/four-court-buckets/raffle/verify-provenance.py
       - name: Install isolated SDK and emulator
         run: npm install --prefix /tmp/bucket-raffle-input --no-save --ignore-scripts firebase-tools@14 firebase-admin@14.4.0
       - name: Verify native snapshots and retry binding

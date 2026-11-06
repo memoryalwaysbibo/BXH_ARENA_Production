@@ -39,4 +39,4 @@ function participantPool(core,state,mode,excluded=[]){
   return {...row,key};
  }).filter(row=>!blocked.has(row.key)).sort((a,b)=>a.key.localeCompare(b.key));
 }
-module.exports={participantKey,participantPool};
+module.exports={participantKey,participantPool,parseParticipantKey:parseKey};

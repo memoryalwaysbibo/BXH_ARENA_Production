@@ -1,0 +1,52 @@
+{
+  "stage": "BUCKET_RAFFLE_SOURCES_READONLY",
+  "project": "bxh-arena",
+  "sources": [
+    {
+      "name": "previewTournamentRaffle",
+      "sourceArchiveSha256": "8eafc6a293c6d23719bbce59d2b059495e9e4ca1589c358667ce662164f00f51",
+      "metadataSha256": "aa9ea909a5113e4130547663748f248921942e2ddb4cece1f15605b5b4c7c22a",
+      "buildConfigSha256": "677b3ca35f9727a3aad425d09136531b63d8ea169bc83c205f5862093514f37d",
+      "serviceConfigSha256": "3247e3ec2018dc7244cc1b9b84f977b8243fb06eb6dd69d4dca0e60febedd04a",
+      "stableDuringCapture": true
+    },
+    {
+      "name": "drawTournamentRaffle",
+      "sourceArchiveSha256": "8eafc6a293c6d23719bbce59d2b059495e9e4ca1589c358667ce662164f00f51",
+      "metadataSha256": "84b24f53f175c41b498f16a7b8a2511613c972fb46fd24b5d0e90d3e89d0ef13",
+      "buildConfigSha256": "2e129323d96409c93180a4cc8a5c6d25536c54afd454606ad96645bd181696ed",
+      "serviceConfigSha256": "95186917fe656c6f467a360eec3e3411c4d308b60054019189a551dc6a744ded",
+      "stableDuringCapture": true
+    },
+    {
+      "name": "updateTournamentRaffleWinner",
+      "sourceArchiveSha256": "8eafc6a293c6d23719bbce59d2b059495e9e4ca1589c358667ce662164f00f51",
+      "metadataSha256": "da449dcf5f959fae84b150af4bf94275224211b00b440cc7eb17d67a00525bef",
+      "buildConfigSha256": "d2453e8368e6987e3a2ace33817ed1123806efad51b6d97e0748552755febe82",
+      "serviceConfigSha256": "c74d2b5a94de8598e04023f4bf3e12d31661ea1abe69f23ddc6f38a8fe8f865b",
+      "stableDuringCapture": true
+    }
+  ],
+  "captureComplete": true,
+  "errorCount": 0,
+  "productionWrites": 0,
+  "deploymentPerformed": false,
+  "writerInventoryComplete": false,
+  "acceptanceCompleted": false,
+  "evidence": {
+    "repository": "memoryalwaysbibo/BXH_ARENA_Functions_Production",
+    "runId": 42274492327,
+    "commit": "7f4c3b64bfdb98d7d514d08ba4ab06a603c08dc1",
+    "artifactId": 13531248795,
+    "artifactSha256": "46c26965d4f861e545d98468e1822db84dc742c9aeb9bd5b2d5434a85f44961a",
+    "capturedAt": "2026-11-06T18:52:35Z",
+    "sourceSet": 5,
+    "baselineOperationsSha256": "0b948bdc0a14e2a526e13066a3fc284e348a2e2171def51ae6a79a498bca6500",
+    "basis": "Three independent Function GETs and immutable source downloads, before/after full metadata stable; hash-only report, not deployment configuration or acceptance."
+  },
+  "targets": [
+    "previewTournamentRaffle",
+    "drawTournamentRaffle",
+    "updateTournamentRaffleWinner"
+  ]
+}

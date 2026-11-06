@@ -9,6 +9,8 @@ const {fixture,code}=require('../completion/fixture.cjs');
 const core=require('../operations/fixtures/5/operations-core.js');
 const {createRaffleInput}=require('../../../release/buckets/raffle/input.cjs');
 const {participantKey}=require('../../../release/buckets/raffle/identity.cjs');
+const {createRafflePreview}=require('../../../release/buckets/raffle/preview.cjs');
+class HttpsError extends Error{constructor(code,message){super(message);this.code=code;}}
 const app=initializeApp({projectId:project}),db=getFirestore(app),read=createRaffleInput(core);
 const rootPath='tournaments/'+code,pubPath='publicTournaments/'+code;
 let checks=0;
@@ -57,6 +59,27 @@ async function unchanged(fn){const before=await contents();await fn();assert.equ
   state.players[0].name='Renamed demo player';await db.doc(rootPath).update({data:JSON.stringify(state)});
   await unchanged(async()=>{const {value}=await invoke({mode:'general',identityVersion,observed,excluded});assert.equal(value.pool.length,3);assert(!value.pool.some(x=>x.playerId==='p1'));assert(value.pool.some(x=>x.playerId==='p2'));});
   await unchanged(()=>assert.rejects(invoke({mode:'general',identityVersion,excluded:['uid:u1']}),/raffle-exclusion-identity-version/));
+ }
+ for(const bucket of [false,true]){
+  const f=fixture({bucket}),top=f.m.rows.get(rootPath),s=JSON.parse(top.data);
+  s.players[1].registrationUid=s.players[0].registrationUid;s.players[1].name=s.players[0].name;
+  f.m.put(rootPath,{...top,data:JSON.stringify(s)});await seed(f);
+  const preview=createRafflePreview({db,core,HttpsError}),request={auth:{uid:'admin'},data:{code:code.toLowerCase(),mode:'general'}};
+  await unchanged(async()=>{const value=await preview(request);assert.equal(value.count,4);assert.equal(value.candidateHash,core.poolHash(value.candidates));});
+  await db.doc(rootPath+'/raffleControl/current').set({winnerKeys:['uid:u1']});
+  await unchanged(async()=>assert.equal((await preview(request)).count,2));
+  const born=(await db.doc(rootPath).get()).createTime;
+  await db.doc(rootPath+'/raffleControl/current').set({identityVersion:'participant-v1',sourceCreatedAt:born.seconds+':'+born.nanoseconds,winnerKeys:[participantKey(s.players[0])]});
+  await unchanged(async()=>{const value=await preview(request);assert.equal(value.count,3);assert(value.candidates.some(x=>x.playerId==='p2'));assert(!value.candidates.some(x=>x.playerId==='p1'));});
+ }
+ // Synthetic ABORTED retry on the real SDK: role removal occurs before callback
+ // two, outside the first callback's released read locks. Auth payload is a fixture.
+ {await seed(fixture());let callbacks=0;const bound={doc:db.doc.bind(db),runTransaction:cb=>db.runTransaction(async tx=>{
+   callbacks++;if(callbacks===2)await db.doc('users/admin').update({role:'player'});
+   const result=await cb(tx);if(callbacks===1)throw Object.assign(Error('test-only-aborted'),{code:10});return result;
+  })};
+  const preview=createRafflePreview({db:bound,core,HttpsError});
+  await assert.rejects(preview({auth:{uid:'admin'},data:{code,mode:'general'}}),e=>e.code==='permission-denied');assert.equal(callbacks,2);checks++;
  }
  for(const change of [
   f=>f.m.remove(rootPath+'/matchBuckets/court-2'),

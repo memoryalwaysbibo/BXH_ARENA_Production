@@ -35,6 +35,8 @@ jobs:
         run: |
           node tests/four-court-buckets/raffle/input-probe.cjs
           node tests/four-court-buckets/raffle/identity-probe.cjs
+          node tests/four-court-buckets/raffle/preview-probe.cjs
+          python3 -B tests/four-court-buckets/raffle/verify-provenance.py
           python3 -B tests/four-court-buckets/raffle-readonly.py
       - name: Verify independently captured backend overlays
         run: |
