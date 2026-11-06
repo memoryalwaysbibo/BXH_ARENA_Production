@@ -4,6 +4,10 @@ Base: `0471069df5a09a433c4c945aed119004043d82b6` (fetched origin/main).
 Branch: `fix/referee-stable-regions`; draft review: [PR #742](https://github.com/memoryalwaysbibo/BXH_ARENA_Production/pull/742). No deployment, merge, Rules/IAM changes,
 production Firebase writes, bucket activation, or integration of PR #719.
 
+Current follow-up: the reproducible Linux WebKit score/undo crash has a targeted
+CSS fix, with positive and negative controls. See **WebKit rendering fix** below;
+earlier failure entries are retained as historical evidence.
+
 ## Implementation
 
 Standard individual referee screens in both administrative and community rooms
@@ -259,3 +263,23 @@ A dedicated read-only WebKit CI job now runs that same transaction test and
 uploads its result and screenshot. It reports its mixed engine topology
 explicitly. Related theme/queue/module/referee UI tests: 76 passed; frontend
 invariants passed. Further final run results are recorded below/in the PR.
+
+Final local checks also passed on Android and desktop (each 12 contexts, 17
+calls, zero errors), and the 40-group critical regression suite passed in full.
+Logs: `fixed-android-twelve.log`, `fixed-desktop-twelve.log`,
+`filter-fix-critical.log`, `filter-fix-invariants.log`,
+`filter-fix-regressions.log` (76 tests). Core and seat-script cache keys were also
+refreshed so an eventual release cannot retain the pre-partition scripts.
+
+**Negative control:** with the current driver and candidate code, restoring the
+exact pre-fix entrance stylesheet reproduced the page crash at undo
+(`iphone-diagnostic-restored-filter-negative.log`). The only shipping stylesheet
+difference is the scoped referee filter override, making this a direct
+before/after comparison rather than an unexplained passing retry.
+
+The new `webkit-referee` CI job also passed on GitHub for `2881486`, independently
+of this host's scratch WebKit dependency setup. A pure twelve-WebKit run on the
+managed host still timed out loading station 9 before any transactions
+(`fixed-all-webkit.log`, no page errors). This is distinct from the repaired
+score/undo crash; twelve-WebKit-on-one-host acceptance is not claimed. The same
+main baseline control and final commit CI status are reported in PR #742.
