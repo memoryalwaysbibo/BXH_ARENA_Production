@@ -1,7 +1,7 @@
 name: Three-seat referee candidate
 on:
   pull_request:
-    paths: ['referee-seats/**', 'modules/main-app/referee-seats.*', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'index.html', 'tests/referee-preseat*', 'tests/referee-stable-regions.browser.cjs', 'tests/referee-multidevice.emulator.cjs', 'tests/e2e-emulator-app-check.test.cjs', 'tests/e2e/static-server.cjs', '.github/workflows/referee-seats.yml']
+    paths: ['referee-seats/**', 'modules/main-app/referee-seats.*', 'modules/main-app/core.js', 'modules/cloud/cloud-runtime.js', 'client-entrance-theme.css', 'index.html', 'tests/referee-preseat*', 'tests/referee-stable-regions.browser.cjs', 'tests/referee-multidevice.emulator.cjs', 'tests/e2e-emulator-app-check.test.cjs', 'tests/e2e/static-server.cjs', '.github/workflows/referee-seats.yml']
 permissions:
   contents: read
 jobs:
@@ -53,3 +53,30 @@ jobs:
         env:
           NODE_PATH: /tmp/seat-test-deps/node_modules
         run: /tmp/seat-test-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-dom12 --config tests/e2e/firebase.json 'node tests/referee-multidevice.emulator.cjs'
+  webkit-referee:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install isolated browser and emulator dependencies
+        run: npm install --prefix /tmp/seat-test-deps --no-save --ignore-scripts playwright@1.55.0 firebase-tools@14 firebase-admin@13.10.0
+      - name: Install Chromium and WebKit
+        run: node /tmp/seat-test-deps/node_modules/playwright/cli.js install --with-deps chromium webkit
+      - name: WebKit judge with eleven Chromium peers and actual scoring transactions
+        env:
+          NODE_PATH: /tmp/seat-test-deps/node_modules
+          BXH_TEST_DEVICE: iphone
+        run: /tmp/seat-test-deps/node_modules/.bin/firebase emulators:exec --only firestore --project demo-bxh-dom12 --config tests/e2e/firebase.json 'node tests/referee-multidevice.emulator.cjs'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webkit-referee-transactions
+          path: test-results/referee-multidevice
+          if-no-files-found: ignore

@@ -27,6 +27,11 @@ async function activate(locator){
  await locator.page().bringToFront();
  return locator.tap();
 }
+async function waitForCallCount(expected){
+ const deadline=Date.now()+10000;
+ while(calls<expected&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(calls,expected,'exactly one command must reach the held callable');
+}
 
 const model={version:1,revision:1,courts:{},requests:{}};
 const players=Array.from({length:24},(_,i)=>({id:'p'+i,name:'Player '+i}));
@@ -71,8 +76,11 @@ async function flush(){await delivery;const latest=await read();await Promise.al
  // must submit exactly once, even with DOM nodes retained.
  hold=new Promise(r=>release=r);const before=calls;
  const doubleTarget=first.locator('#court-card-1 [data-action="score"][data-side="A"][data-type="spin"]');
- if(mobile){await first.bringToFront();await doubleTarget.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));const box=await doubleTarget.boundingBox();await first.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);await first.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);}else await doubleTarget.click({clickCount:2});
- assert.equal(calls,before+1);release();hold=null;await first.waitForFunction(()=>getMatch('m1').scoreA===1);await flush();
+ // Use normal actionability for the first tap, then a second native touch while
+ // the response is held. Coordinate-only scrolling could miss the first tap.
+ if(mobile){await first.bringToFront();await doubleTarget.tap();const box=await doubleTarget.boundingBox();await first.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);}else await doubleTarget.click({clickCount:2});
+ await waitForCallCount(before+1);release();hold=null;await first.waitForFunction(()=>getMatch('m1').scoreA===1);await flush();
+ assert.equal(calls,before+1,'the second activation must not queue another command');
  await activate(first.locator('#court-card-1 [data-action="undo-score"]'));await first.waitForFunction(()=>getMatch('m1').scoreA===0);await flush();
  assert((await read()).matches.slice(1).every(m=>m.scoreA===1));results.push({scenario:'local double click and undo',passed:true});
  // Real connection gate: no transaction is allowed while offline.

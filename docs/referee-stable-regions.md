@@ -196,7 +196,7 @@ not resolve it. The `JSC_useJIT=0` diagnostic also failed, at undo
 Main's earlier mixed run completed all 17 calls (`main-iphone-mixed.log`), so the
 candidate failure cannot be dismissed as an established baseline failure.
 
-The draft remains blocked on this iPhone transaction acceptance discrepancy.
+At this stage, the draft remained blocked on this iPhone transaction discrepancy.
 Linux WebKit emulation is not physical iPhone Safari validation.
 
 Using the final driver, desktop and Android each again completed all 17 calls,
@@ -221,7 +221,41 @@ only `referee-score-v2.css` still produced the WebKit crash at undo
 provide a rendering/style interaction lead, not proof of a specific CSS defect.
 No CSS or product fallback was changed on this evidence.
 
-Latest verification summary: desktop/Android transaction suites pass; independent
+Pre-fix verification summary: desktop/Android transaction suites pass; independent
 lobby repeats pass on both revisions; iPhone mixed transaction acceptance remains
 failed on the candidate. Twelve-WebKit loading, physical Safari, real production
 attestation/network/Functions and broad Node acceptance remain unverified.
+
+## WebKit rendering fix (2026-11-07 Asia/Taipei)
+
+A reduced driver with one WebKit page and eleven direct emulator scoring clients
+reproduced the crash at undo. Removing only `client-entrance-theme.css` allowed all
+17 calls and the mobile width assertion to pass. Removing only the mobile
+overrides, referee score stylesheet, or the latter half of the entrance theme
+did not. The first half contains the global whole-card hover filter.
+
+A specific override disabling only the referee card's `filter` passed; disabling
+only the card/side-panel backdrop filters did not. The earlier universal
+no-effects diagnostic did not outrank the theme's more-specific `!important`
+selectors, so it did not establish that card filters were irrelevant.
+
+The shipping fix limits `filter:none!important` to `.court-grid
+.referee-workstation` (including hover/focus-within), retaining background, border,
+shadow and inner glass styling. It avoids filtering the live controls subtree.
+The stylesheet URL has a new cache key. No JavaScript scoring or Firebase
+behavior changed. This removes the observed trigger in Linux WebKit 2203; it is
+not a claim to have repaired the engine itself or tested physical Safari.
+
+The reduced fixture passed twice with the shipping CSS. The full mixed topology
+(one WebKit judge plus eleven Chromium peers) also passed twice with the shipping
+CSS, all 17 calls, zero page errors, retained local DOM/focus and no horizontal
+overflow (`fixed-iphone-twelve.log`, `fixed-iphone-twelve-repeat.log`). The native
+double-activation test now uses a normal actionable first tap, a second native
+touch while the response is held, and waits for actual callable arrival before
+asserting exactly one call. It checks the count again after completion, so the
+test neither misses the first tap nor overlooks a queued duplicate.
+
+A dedicated read-only WebKit CI job now runs that same transaction test and
+uploads its result and screenshot. It reports its mixed engine topology
+explicitly. Related theme/queue/module/referee UI tests: 76 passed; frontend
+invariants passed. Further final run results are recorded below/in the PR.
