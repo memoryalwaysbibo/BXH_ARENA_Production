@@ -175,6 +175,11 @@ header.topbar .brandtext .t-conn-dot.local{background:#7a8088;color:#7a8088;}
   100%{left:calc(100% - 7px);top:50%;opacity:.12}
 }
 @keyframes topbarLifeError{0%,100%{opacity:.28;transform:translate(54px,-50%) scale(.82)}50%{opacity:1;transform:translate(54px,-50%) scale(1.18)}}
+@media (prefers-reduced-motion:reduce){
+  /* Connection state remains visible through its label and static color. */
+  header.topbar .brandtext .t-rule::after,
+  header.topbar .brandtext .t-conn-dot{animation:none!important;}
+}
 header.topbar .spacer{flex:1;position:relative;z-index:1;}
 header.topbar .status-pill{position:relative;z-index:1;
   font-family:var(--font-d);font-weight:600;font-size:13px;

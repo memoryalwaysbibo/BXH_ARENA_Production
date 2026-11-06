@@ -281,5 +281,64 @@ The new `webkit-referee` CI job also passed on GitHub for `2881486`, independent
 of this host's scratch WebKit dependency setup. A pure twelve-WebKit run on the
 managed host still timed out loading station 9 before any transactions
 (`fixed-all-webkit.log`, no page errors). This is distinct from the repaired
-score/undo crash; twelve-WebKit-on-one-host acceptance is not claimed. The same
+score/undo crash; default-motion twelve-WebKit-on-one-host acceptance is not claimed. The same
 main baseline control and final commit CI status are reported in PR #742.
+
+## Same-host WebKit capacity and reduced-motion follow-up
+
+The latest checks on `6ab92f5` finished **22/22 successful**. Full CI smoke
+reported **316 passed, 8 existing skips, no flaky cases**. The roster workflow's
+first attempt exhausted its ten-minute timeout while downloading Ubuntu font
+packages during browser dependency installation; a targeted rerun passed. Its
+local browser test also passed. No quota bypass or resource setting change was
+used.
+
+The managed host has a four-CPU cgroup budget (`cpu.max=400000 100000`) and
+16 GiB memory limit. There were zero OOM/OOM-kill events. Controlled observations:
+
+| Fixture | Outcome | Evidence |
+| --- | --- | --- |
+| Twelve minimal WebKit pages, normal motion | All twelve navigate and tap, about 0.8–1.1s each | `webkit-minimal-twelve.log` |
+| Full app, normal motion, boot diagnostics | Seven ready; station eight timed out with no outstanding network requests and an unresponsive renderer; earlier candidate/main runs stopped at station nine | `webkit-boot-active.log` |
+| Full app, animations manually paused after each boot | All twelve and all 17 commands pass; diagnostic only | `webkit-boot-paused.log` |
+| Full app, browser reduced-motion preference before the header fix | Match pulses stop but `topbarLifeDot` remains; station ten fails before transactions | `webkit-boot-reduced-motion.log` |
+| Full app, browser reduced-motion preference after the header fix | Twelve WebKit contexts, all 17 commands, zero errors, 390px viewport/document | `reduced-motion-all-webkit.log` and `*-artifacts/results.json` |
+
+The active run had 13 ongoing animations per page. From boot four to the final
+attempt, every sampled CPU scheduling period was throttled; boot times rose to
+9–14s. Pausing animations brought all twelve boot times to about 2.7–6.2s and
+completed the same transaction flow. These controls strongly implicate rendering
+load competing for the shared CPU budget, rather than a fixed eight-context
+limit, outstanding Firebase traffic, or a new page crash. They do not identify a
+single native-engine bottleneck or reproduce twelve physical phones.
+
+The product improvement honors the existing `prefers-reduced-motion: reduce`
+setting for the topbar connection rail and status dots. Static color and text
+continue to indicate connection state. It does not disable normal-mode animation
+or pause animations from test code. The core stylesheet cache key is refreshed.
+The driver accepts `BXH_TEST_REDUCED_MOTION=reduce` and reports the motion setting
+and actual local/peer engines. In reduced mode it also asserts that the header
+has no running animations, so this regression is detected independently of host
+capacity.
+
+Reproduce using the earlier isolated emulator command with
+`BXH_TEST_DEVICE=iphone BXH_TEST_ALL_WEBKIT=1 BXH_TEST_REDUCED_MOTION=reduce`.
+The CI matrix retains the normal-motion WebKit judge plus eleven Chromium peers
+and adds twelve WebKit contexts with reduced motion. Both use the same pinned
+Playwright 1.55.0 container already used by the main UI workflow, avoiding a new
+Ubuntu font download on every matrix job. No production service settings change.
+
+Default-motion twelve-WebKit loading on this four-CPU host and physical iPhone
+Safari remain outside completed acceptance. Passing the reduced-motion case
+must not be presented as passing those cases. Auth/callable transport remains
+simulated; scoring transactions remain real and limited to the demo emulator.
+
+Local validation of this follow-up: all twelve WebKit contexts with reduced
+motion passed; the normal-motion mixed topology and reduced-motion Android
+(twelve Chromium contexts) also passed, each with 17 calls and zero page errors.
+The new header assertion fails immediately on unmodified main with
+`topbarLifeDot` still running (`main-motion-header-negative.log`), an expected
+negative control. Related tests: 13 passed; all 40 critical regression groups and
+frontend invariants passed. Evidence: `normal-mixed-motion-regression.log`,
+`reduced-motion-android.log`, `motion-fix-regressions.log`,
+`motion-fix-critical.log`, `motion-fix-invariants.log`.

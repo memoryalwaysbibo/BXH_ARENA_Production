@@ -8,6 +8,8 @@ const device=process.env.BXH_TEST_DEVICE||'desktop',mobile=device!=='desktop';
 // The mixed topology isolates one WebKit judge from Chromium peers. Opt in to
 // twelve WebKit contexts separately; report the actual engines in either case.
 const allWebKit=device==='iphone'&&process.env.BXH_TEST_ALL_WEBKIT==='1';
+const reducedMotion=process.env.BXH_TEST_REDUCED_MOTION||'no-preference';
+if(!['reduce','no-preference'].includes(reducedMotion))throw Error('Unknown BXH_TEST_REDUCED_MOTION');
 if(!['desktop','iphone','android'].includes(device))throw Error('Unknown BXH_TEST_DEVICE');
 const {initializeApp,deleteApp}=require('firebase-admin/app');
 const {getFirestore}=require('firebase-admin/firestore');
@@ -46,7 +48,7 @@ async function flush(){await delivery;const latest=await read();await Promise.al
  if(device==='iphone'&&!allWebKit)mobileBrowser=await webkit.launch({headless:true});
  for(let station=1;station<=12;station++){
   bootStation=station;
-  const uid='judge'+station,context=await (station===1&&mobileBrowser?mobileBrowser:browser).newContext({... (device==='iphone'?devices['iPhone 14']:device==='android'?devices['Pixel 7']:{viewport:{width:1280,height:900}}),serviceWorkers:'block'}),page=await context.newPage();pages.push(page);page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push({station,message:e.message}));page.on('crash',()=>errors.push({station,message:'WebKit/Chromium page crashed'}));
+  const uid='judge'+station,context=await (station===1&&mobileBrowser?mobileBrowser:browser).newContext({... (device==='iphone'?devices['iPhone 14']:device==='android'?devices['Pixel 7']:{viewport:{width:1280,height:900}}),reducedMotion,serviceWorkers:'block'}),page=await context.newPage();pages.push(page);page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push({station,message:e.message}));page.on('crash',()=>errors.push({station,message:'WebKit/Chromium page crashed'}));
   await page.exposeFunction('__readRoom',read);
   await page.exposeFunction('__commit',async data=>{calls++;if(hold)await hold;try{return await score({auth:{uid},data});}catch(e){return {ok:false,reason:e.message};}});
   await page.route('**/*',async route=>{
@@ -64,6 +66,7 @@ async function flush(){await delivery;const latest=await read();await Promise.al
   await page.goto(fixtureOrigin+'/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>typeof window.__authCallback==='function').catch(async e=>{console.error('BOOT',await page.evaluate(()=>({phase:typeof appPhase,render:typeof render,ready:window.cloudAuth?.isReady(),callback:typeof window.__authCallback,body:document.body.textContent.slice(-350)})));throw e;});
   await page.evaluate(({initial,uid})=>{firebaseUser={uid,email:uid+'@example.invalid'};userProfile={uid,active:true,role:'staff',realName:uid};state=initial;currentRole='admin';appPhase='app';activeTab='referee';cloudStatus='connected';render();},{initial:clone(state),uid});
   await page.locator('#court-card-'+station+' [data-action="score"]').first().waitFor();
+  if(reducedMotion==='reduce')assert.deepEqual(await page.evaluate(()=>document.getAnimations().filter(a=>a.playState==='running'&&a.effect?.target?.closest('header.topbar')).map(a=>a.animationName||'unnamed')),[],'the connection header must honor reduced motion');
  }
  unsubscribe=db.doc('tournaments/'+code).onSnapshot(snapshot=>{const remote=JSON.parse(snapshot.data().data);delivery=delivery.then(()=>Promise.all(pages.map(p=>p.evaluate(remote=>applyRemoteState(remote),remote))));});
  await flush();
@@ -105,6 +108,6 @@ async function flush(){await delivery;const latest=await read();await Promise.al
  assert.equal(await first.locator('#court-card-1 [data-action="score"]').first().isDisabled(),true);
  assert.equal(await first.locator('#court-card-1 [data-action="confirm-result"]').isDisabled(),true);
  const denied=await score({auth:{uid:'judge1'},data:{code,operationId:'revoked-operation-1234',action:'score',station:1,matchId:'m1'}}).then(()=>false,e=>e.message==='station-not-assigned');assert(denied);results.push({scenario:'offline/recovery, tab switch, authoritative seat revocation',passed:true});
- assert.deepEqual(errors,[]);const layout=await first.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth}));if(mobile)assert(layout.width<=layout.viewport,'referee screen must not overflow horizontally');const report={root,device,engines:{local:device==='iphone'?'webkit':'chromium',peers:allWebKit?'webkit':'chromium'},layout,results,calls,errors};const out=path.resolve(process.env.BXH_TEST_OUTPUT||'test-results/referee-multidevice');fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(report,null,2));await first.screenshot({path:path.join(out,'referee-after-revocation.png')});console.log(JSON.stringify(report,null,2));
+ assert.deepEqual(errors,[]);const layout=await first.evaluate(()=>({viewport:innerWidth,width:document.documentElement.scrollWidth}));if(mobile)assert(layout.width<=layout.viewport,'referee screen must not overflow horizontally');const report={root,device,reducedMotion,engines:{local:device==='iphone'?'webkit':'chromium',peers:allWebKit?'webkit':'chromium'},layout,results,calls,errors};const out=path.resolve(process.env.BXH_TEST_OUTPUT||'test-results/referee-multidevice');fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(report,null,2));await first.screenshot({path:path.join(out,'referee-after-revocation.png')});console.log(JSON.stringify(report,null,2));
  }finally{unsubscribe?.();await delivery.catch(()=>{});if(mobileBrowser)await mobileBrowser.close();if(browser)await browser.close();await deleteApp(admin);}
 })().catch(e=>{console.error(e);console.error(JSON.stringify({bootStation,results,errors}));process.exitCode=1;});
