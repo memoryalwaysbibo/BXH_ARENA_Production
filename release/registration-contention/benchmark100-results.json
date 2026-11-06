@@ -1,0 +1,294 @@
+{
+  "scope": "Local real Firestore Emulator; synthetic authenticated users; not live Cloud Run capacity",
+  "count": 100,
+  "repetitions": 2,
+  "sourceGeneration": "1793041271889373",
+  "method": "All clients begin preview together, then immediately join with preview allocation. No manual retries, no frontend polling. Independent module graphs simulate per-process schedulers, in one Node process.",
+  "results": [
+    {
+      "candidate": false,
+      "instances": 1,
+      "count": 100,
+      "capacity": 128,
+      "waitlistCapacity": 0,
+      "succeeded": 1,
+      "counts": {
+        "confirmed": 1,
+        "waitlist": 0,
+        "documents": 1
+      },
+      "totalMs": 33528,
+      "p50Ms": 30350,
+      "p95Ms": 32377,
+      "maxMs": 33451,
+      "transactions": 200,
+      "retries": 400,
+      "readOnlyTransactions": 0,
+      "repetition": 1,
+      "failureCounts": {
+        "10 ABORTED: Transaction lock timeout.": 99
+      }
+    },
+    {
+      "candidate": true,
+      "instances": 1,
+      "count": 100,
+      "capacity": 128,
+      "waitlistCapacity": 0,
+      "succeeded": 100,
+      "counts": {
+        "confirmed": 100,
+        "waitlist": 0,
+        "documents": 100
+      },
+      "totalMs": 2188,
+      "p50Ms": 1248,
+      "p95Ms": 2066,
+      "maxMs": 2159,
+      "transactions": 200,
+      "retries": 0,
+      "readOnlyTransactions": 100,
+      "repetition": 1,
+      "failureCounts": {}
+    },
+    {
+      "candidate": true,
+      "instances": 4,
+      "count": 100,
+      "capacity": 128,
+      "waitlistCapacity": 0,
+      "succeeded": 100,
+      "counts": {
+        "confirmed": 100,
+        "waitlist": 0,
+        "documents": 100
+      },
+      "totalMs": 10074,
+      "p50Ms": 5266,
+      "p95Ms": 9973,
+      "maxMs": 10054,
+      "transactions": 200,
+      "retries": 6,
+      "readOnlyTransactions": 100,
+      "repetition": 1,
+      "failureCounts": {}
+    },
+    {
+      "candidate": true,
+      "instances": 4,
+      "count": 100,
+      "capacity": 128,
+      "waitlistCapacity": 0,
+      "succeeded": 100,
+      "counts": {
+        "confirmed": 100,
+        "waitlist": 0,
+        "documents": 100
+      },
+      "totalMs": 9534,
+      "p50Ms": 5344,
+      "p95Ms": 9442,
+      "maxMs": 9516,
+      "transactions": 200,
+      "retries": 6,
+      "readOnlyTransactions": 100,
+      "repetition": 2,
+      "failureCounts": {}
+    },
+    {
+      "candidate": true,
+      "instances": 1,
+      "count": 100,
+      "capacity": 128,
+      "waitlistCapacity": 0,
+      "succeeded": 100,
+      "counts": {
+        "confirmed": 100,
+        "waitlist": 0,
+        "documents": 100
+      },
+      "totalMs": 1584,
+      "p50Ms": 870,
+      "p95Ms": 1483,
+      "maxMs": 1562,
+      "transactions": 200,
+      "retries": 0,
+      "readOnlyTransactions": 100,
+      "repetition": 2,
+      "failureCounts": {}
+    },
+    {
+      "candidate": false,
+      "instances": 1,
+      "count": 100,
+      "capacity": 128,
+      "waitlistCapacity": 0,
+      "succeeded": 15,
+      "counts": {
+        "confirmed": 15,
+        "waitlist": 0,
+        "documents": 15
+      },
+      "totalMs": 24959,
+      "p50Ms": 23194,
+      "p95Ms": 24821,
+      "maxMs": 24950,
+      "transactions": 200,
+      "retries": 373,
+      "readOnlyTransactions": 0,
+      "repetition": 2,
+      "failureCounts": {
+        "10 ABORTED: Transaction lock timeout.": 84,
+        "3 INVALID_ARGUMENT: Transaction is invalid or closed.": 1
+      }
+    },
+    {
+      "candidate": false,
+      "instances": 1,
+      "count": 100,
+      "capacity": 64,
+      "waitlistCapacity": 36,
+      "succeeded": 13,
+      "counts": {
+        "confirmed": 13,
+        "waitlist": 0,
+        "documents": 13
+      },
+      "totalMs": 23050,
+      "p50Ms": 21987,
+      "p95Ms": 22904,
+      "maxMs": 23039,
+      "transactions": 200,
+      "retries": 380,
+      "readOnlyTransactions": 0,
+      "repetition": 1,
+      "failureCounts": {
+        "10 ABORTED: Transaction lock timeout.": 87
+      }
+    },
+    {
+      "candidate": true,
+      "instances": 1,
+      "count": 100,
+      "capacity": 64,
+      "waitlistCapacity": 36,
+      "succeeded": 64,
+      "counts": {
+        "confirmed": 64,
+        "waitlist": 0,
+        "documents": 64
+      },
+      "totalMs": 1421,
+      "p50Ms": 821,
+      "p95Ms": 1349,
+      "maxMs": 1401,
+      "transactions": 200,
+      "retries": 0,
+      "readOnlyTransactions": 100,
+      "repetition": 1,
+      "failureCounts": {
+        "allocation-changed": 36
+      }
+    },
+    {
+      "candidate": true,
+      "instances": 4,
+      "count": 100,
+      "capacity": 64,
+      "waitlistCapacity": 36,
+      "succeeded": 64,
+      "counts": {
+        "confirmed": 64,
+        "waitlist": 0,
+        "documents": 64
+      },
+      "totalMs": 7376,
+      "p50Ms": 4989,
+      "p95Ms": 7304,
+      "maxMs": 7357,
+      "transactions": 200,
+      "retries": 5,
+      "readOnlyTransactions": 100,
+      "repetition": 1,
+      "failureCounts": {
+        "allocation-changed": 36
+      }
+    },
+    {
+      "candidate": true,
+      "instances": 4,
+      "count": 100,
+      "capacity": 64,
+      "waitlistCapacity": 36,
+      "succeeded": 64,
+      "counts": {
+        "confirmed": 64,
+        "waitlist": 0,
+        "documents": 64
+      },
+      "totalMs": 6982,
+      "p50Ms": 6098,
+      "p95Ms": 6908,
+      "maxMs": 6968,
+      "transactions": 200,
+      "retries": 7,
+      "readOnlyTransactions": 100,
+      "repetition": 2,
+      "failureCounts": {
+        "allocation-changed": 36
+      }
+    },
+    {
+      "candidate": true,
+      "instances": 1,
+      "count": 100,
+      "capacity": 64,
+      "waitlistCapacity": 36,
+      "succeeded": 64,
+      "counts": {
+        "confirmed": 64,
+        "waitlist": 0,
+        "documents": 64
+      },
+      "totalMs": 1447,
+      "p50Ms": 814,
+      "p95Ms": 1376,
+      "maxMs": 1425,
+      "transactions": 200,
+      "retries": 0,
+      "readOnlyTransactions": 100,
+      "repetition": 2,
+      "failureCounts": {
+        "allocation-changed": 36
+      }
+    },
+    {
+      "candidate": false,
+      "instances": 1,
+      "count": 100,
+      "capacity": 64,
+      "waitlistCapacity": 36,
+      "succeeded": 4,
+      "counts": {
+        "confirmed": 4,
+        "waitlist": 0,
+        "documents": 4
+      },
+      "totalMs": 21941,
+      "p50Ms": 19012,
+      "p95Ms": 20758,
+      "maxMs": 21918,
+      "transactions": 200,
+      "retries": 392,
+      "readOnlyTransactions": 0,
+      "repetition": 2,
+      "failureCounts": {
+        "10 ABORTED: Transaction lock timeout.": 96
+      }
+    }
+  ],
+  "candidateSha256": {
+    "family-registration.js": "e2c4d2ec12e0f46a709299a95775a341604fd34b4bdd215d7b83fc77cf661277",
+    "registration-admission.cjs": "9762047cfc4677f30cd247700b49488d2fa5da523e1194cc6b50a91c3e9247ed"
+  }
+}
