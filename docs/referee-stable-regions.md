@@ -72,9 +72,9 @@ mutation count is not evidence of stability.
 Auth identities and callable transport are simulated in this test. This is real
 transaction coverage, not full authenticated multi-user end-to-end acceptance.
 Seat/court handoff behavior is additionally covered by the existing seat browser
-suite; the 12-context test's switch is a navigation tab switch. Team/enchantment,
-mobile gestures, production network latency and a sustained load soak are not
-claimed. Community-specific route is included in the implementation and affected
+suite; the 12-context test's switch is a navigation tab switch. Team/enchantment, production network latency and a sustained load soak are not
+claimed. Mobile touch coverage and its remaining WebKit failure are recorded
+below. Community-specific route is included in the implementation and affected
 regressions; its authenticated emulator E2E now passes through scoring with the test App Check provider.
 
 ## Historical failures and reproduction
@@ -139,10 +139,11 @@ and `BXH_EXPECT_STABLE=0` to record identity without expecting the new behavior.
 
 The original broad Node run was 1681 passed/24 failed with environment and
 extracted-fixture problems; a follow-up broad run stalled and was terminated.
-The scoped 608 tests and critical regression passed afterward. Full 324-case
-multi-viewport smoke and broad Node acceptance have not completed cleanly.
+The scoped 608 tests and critical regression passed afterward. At that point full multi-viewport smoke and broad Node acceptance had not
+completed cleanly; the later 324-case smoke result is recorded below. Broad Node
+acceptance remains incomplete.
 The specific emulator flow failures are resolved in the test environment.
-Remaining production attestation, full smoke and broader acceptance scope still
+Remaining production attestation and broader acceptance scope still
 prevent claiming complete release acceptance.
 
 ## Mobile and review follow-up (2026-11-07 Asia/Taipei)
@@ -171,3 +172,56 @@ WebKit due to a known fixture crash; this candidate adds no skip.
 The existing read-only referee CI workflow now runs the stable DOM browser test,
 emulator App Check boundary tests and twelve-context actual transaction test.
 No deployment trigger was added.
+
+## Isolated mobile follow-up
+
+The two iPhone lobby flakes were repeated independently with one worker, three
+repetitions each and zero retries: candidate **6/6**, main **6/6**. Logs:
+`iphone-lobby-repeat.log`, `main-iphone-lobby-repeat.log`. This does not erase the
+two initial flaky results in the full smoke run.
+
+The iPhone transaction driver now explicitly reports its engine topology:
+`BXH_TEST_DEVICE=iphone` uses one WebKit local judge and eleven Chromium peers
+with mobile viewports/touch; add `BXH_TEST_ALL_WEBKIT=1` for twelve WebKit contexts.
+The earlier twelve-WebKit attempts stopped while loading station 9, before score
+transactions. Mixed topology is not evidence that twelve WebKit contexts pass.
+Crash events are captured separately from JavaScript page errors.
+
+The candidate mixed run `iphone-foreground.log` preserved local DOM/focus with
+zero mutations through eleven peer scores, and completed local double activation
+and undo. It then emitted a page crash event while Playwright waited for the
+extreme-score button to be visible/enabled/stable. Explicit foregrounding did
+not resolve it. The `JSC_useJIT=0` diagnostic also failed, at undo
+(`iphone-nojit.log`); no product change or default test setting disables JIT.
+Main's earlier mixed run completed all 17 calls (`main-iphone-mixed.log`), so the
+candidate failure cannot be dismissed as an established baseline failure.
+
+The draft remains blocked on this iPhone transaction acceptance discrepancy.
+Linux WebKit emulation is not physical iPhone Safari validation.
+
+Using the final driver, desktop and Android each again completed all 17 calls,
+with no page errors and all four scenario groups passing. Android document width
+matched its 412 px viewport. Evidence: `desktop-final-driver.log`,
+`android-final-driver.log` and their `*-artifacts/results.json`/screenshots.
+
+Main also passed all 17 commands with the final mixed driver
+(`main-iphone-final-driver.log`). A diagnostic candidate with the stable renderer
+replaced in memory by `app.innerHTML=html` still crashed at undo
+(`iphone-diagnostic-full-render.log`). Its `same:false, focus:false` result
+confirms the override actually ran. Therefore retained-node patching alone is
+not established as the cause. This diagnostic is a scratch-only control, not a
+shipping fallback and not an acceptance pass. The host cgroup reported zero OOM
+and OOM-kill events during this investigation.
+
+With all stylesheet responses emptied in a scratch-only control, the candidate
+completed every transaction scenario with no page errors, then correctly failed
+the horizontal-overflow assertion (`iphone-diagnostic-no-css.log`). Removing
+only `referee-score-v2.css` still produced the WebKit crash at undo
+(`iphone-diagnostic-no-referee-css.log`). Neither is an acceptance pass; they
+provide a rendering/style interaction lead, not proof of a specific CSS defect.
+No CSS or product fallback was changed on this evidence.
+
+Latest verification summary: desktop/Android transaction suites pass; independent
+lobby repeats pass on both revisions; iPhone mixed transaction acceptance remains
+failed on the candidate. Twelve-WebKit loading, physical Safari, real production
+attestation/network/Functions and broad Node acceptance remain unverified.
