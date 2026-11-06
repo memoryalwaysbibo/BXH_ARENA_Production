@@ -6,11 +6,14 @@ function options(args){
  const out={count:50,apply:false};
  for(let i=0;i<args.length;i++){
   const k=args[i];if(k==='--apply')out.apply=true;
+  else if(k==='--allow-production')out.allowProduction=true;
   else if(['--project','--run','--credentials-file','--count'].includes(k))out[k.slice(2)]=args[++i];
   else throw Error('unknown-option');
  }
  out.count=Number(out.count);
- if(!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(out.project||'')||out.project==='bxh-arena')throw Error('dedicated-test-project-required');
+ if(!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(out.project||''))throw Error('firebase-project-required');
+ if(out.project==='bxh-arena'&&!out.allowProduction)throw Error('production-needs-explicit-flag');
+ if(out.project!=='bxh-arena'&&out.allowProduction)throw Error('production-flag-project-mismatch');
  if(!/^[a-z0-9-]{4,30}$/.test(out.run||'')||!Number.isInteger(out.count)||out.count<1||out.count>150)throw Error('invalid-run-or-count');
  const ah=process.env.FIREBASE_AUTH_EMULATOR_HOST,fh=process.env.FIRESTORE_EMULATOR_HOST;
  if(ah||fh){if(!/^127\.0\.0\.1:\d+$/.test(ah||'')||!/^127\.0\.0\.1:\d+$/.test(fh||'')||!out.project.startsWith('demo-'))throw Error('both-loopback-emulators-required');}
@@ -48,7 +51,7 @@ async function main(args){
    if(after.disabled||after.email!==r.email||data?.active!==true||data?.role!=='player'||data?.loadTestRun!==o.run)throw Error('account-readback-mismatch');
    ready++;
   }
-  console.log(JSON.stringify({mode:emulated?'emulator-only':'test-cloud-project',project:o.project,run:o.run,created,ready,credentialsSaved:true,passwordsPrinted:false,tournamentWrites:0,cloudReady:!emulated}));
+  console.log(JSON.stringify({mode:emulated?'emulator-only':o.project==='bxh-arena'?'production-test-accounts':'test-cloud-project',project:o.project,run:o.run,created,ready,credentialsSaved:true,passwordsPrinted:false,tournamentWrites:0,cloudReady:!emulated}));
  }finally{await db.terminate();await deleteApp(app);}
 }
 module.exports={options,identities,main};
