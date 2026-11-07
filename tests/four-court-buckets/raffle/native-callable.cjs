@@ -50,6 +50,11 @@ async function accepted(method, data, token) {
 
 async function main() {
   try {
+    const reset = await fetch('http://127.0.0.1:8198/emulator/v1/projects/' + projectId +
+      '/databases/(default)/documents', {
+      method: 'DELETE', redirect: 'error', signal: AbortSignal.timeout(15000)
+    });
+    assert.equal(reset.status, 200, 'clear the isolated Firestore emulator before seeding');
     const [manager, player, inactive] = await Promise.all([
       signIn('manager@example.invalid'), signIn('player@example.invalid'), signIn('inactive@example.invalid')
     ]);
