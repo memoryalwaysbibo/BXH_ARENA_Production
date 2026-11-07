@@ -1830,7 +1830,7 @@
     },
     "release/buckets/raffle/README.md": {
       "components": [],
-      "blob": "53086fde5fbf25dc1f5884cd756257451e79d8f0"
+      "blob": "cdfec13bf51c017f80167b5139c26b2a16e11aff"
     },
     "release/buckets/raffle/input.cjs": {
       "components": [],
@@ -1934,13 +1934,13 @@
       "components": [
         718
       ],
-      "blob": "936ec5edce611402649934840419bf25a5c42eae"
+      "blob": "e9b5f5fb98e9080c07a93021a7585a9fa9cf25d2"
     },
     "tests/four-court-buckets/raffle/operations.browser.cjs": {
       "components": [
         718
       ],
-      "blob": "181a5f466dc4e017f2fa188c7e6418488513dd8a"
+      "blob": "07db0877ab33a85be68cd29bd741eff8f037405d"
     }
   },
   "mainScriptQueryParameters": {

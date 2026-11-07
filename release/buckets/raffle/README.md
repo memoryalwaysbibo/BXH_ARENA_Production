@@ -227,6 +227,31 @@ with fixture Firestore and drives the shipped tournament operations UI in
 Chromium. It exercises shared-UID same-name preview, a lost response after
 commit and same-operation retry, forfeiture, replacement and claim, including
 quote/HTML-character round trips in data-winner and name escaping. It runs with a fixture Auth context and Firestore. Runtime IAM,
-App Check, staged rollout and version-aware rollback still need release review.
-After participant-version receipts exist, rolling back to UID-only writers
-would invalidate exclusion semantics and needs a compatible rollback plan.
+App Check and the actual revision switch still need release acceptance.
+
+## Compatible fallback archive
+
+Build a second review ZIP from the same transfer with
+`--new-identity-version legacy` and a separate output directory. Its SHA256 is
+`534ca704c5800485392a8d310032f35b3fe6628efeb2205229b8c75f78f51dae`.
+Only the server-selected default for rooms without a ledger differs between
+the two archives. Both builds honor existing legacy and participant-v1 ledgers,
+receipts and winner keys. The compatibility build uses UID deduplication for
+rooms without a ledger. Rooms that need separate entries for shared accounts
+should wait for the participant-v1 build before making their first draw.
+
+Use the compatibility build as the fallback once a participant-v1 ledger
+exists. The captured UID-only preview and draw compare prior winner keys
+against UID keys, which would re-include winners saved with participant keys.
+Treat the three callables as one release unit. Pause new draws during a
+revision switch, verify all three revisions, then require a fresh preview
+before the first new draw. A preview from the other identity scheme cannot
+commit against a room without a ledger.
+
+The browser test swaps to the compatibility build after committing a draw
+and dropping its response. The same browser request recovers the original
+receipt. Exclusion, forfeiture, replacement and claim continue with the
+participant keys, and the candidate still recognizes those winners when
+read back. These checks cover the assembled code and saved data, with fixture
+auth and Firestore. Keep both ZIPs in private review and validate the target
+runtime, authentication and revision switch before any release.

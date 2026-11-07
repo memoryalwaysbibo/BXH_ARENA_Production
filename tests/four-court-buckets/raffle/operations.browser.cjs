@@ -16,9 +16,9 @@ const allowedMethods = new Set([
   'drawTournamentRaffle', 'updateTournamentRaffleWinner'
 ]);
 
-function loadAssembledOperations(directory, db) {
+function loadAssembledOperations(directory, db, newIdentityVersion = 'participant-v1') {
   execFileSync('python3', ['-B', path.join(root, 'scripts/build-bucket-raffle-review.py'),
-    '--fixture-tree', '--output', directory]);
+    '--fixture-tree', '--new-identity-version', newIdentityVersion, '--output', directory]);
   const originalLoad = Module._load;
   Module._load = function (name, parent, isMain) {
     if (name === 'firebase-admin/firestore' && parent?.filename?.startsWith(directory + path.sep)) {
@@ -46,10 +46,21 @@ async function main() {
     }
     room.m.put(roomPath, { ...top, data: JSON.stringify(state) });
     const operations = loadAssembledOperations(path.join(temporary, 'functions'), room.m.db);
+    const compatibility = loadAssembledOperations(path.join(temporary, 'compatibility'), room.m.db, 'legacy');
+    let activeOperations = operations;
     for (const method of [...allowedMethods].filter(name => name !== 'getTournamentOperations')) {
       assert.equal(typeof operations[method].run, 'function');
       await assert.rejects(operations[method].run({ data: { code } }), error => error.code === 'unauthenticated');
     }
+    const auth = { uid: 'admin' };
+    const previewData = { code, mode: 'general', excludePrevious: true };
+    const compatibilityPreview = await compatibility.previewTournamentRaffle.run({ auth, data: previewData });
+    assert.equal(compatibilityPreview.count, 3, 'a room without a ledger uses the compatibility default');
+    await assert.rejects(operations.drawTournamentRaffle.run({ auth, data: {
+      ...previewData, operationId: 'old-preview', candidateHash: compatibilityPreview.candidateHash,
+      prizes: [{ name: '測試獎品', quantity: 1 }]
+    } }), error => error.message === 'candidate-list-changed');
+    assert.equal(room.m.writes.length, 0, 'a preview from the other version cannot commit a draw');
 
     const coreSource = fs.readFileSync(path.join(root, 'modules/main-app/core.js'), 'utf8');
     const escapeFunction = coreSource.match(/^function esc\(s\)\{[\s\S]*?^\}/m)?.[0];
@@ -68,10 +79,11 @@ async function main() {
     await page.exposeFunction('fixtureOperation', async (method, data) => {
       assert(allowedMethods.has(method));
       calls.push({ method, data });
-      const result = await operations[method].run({ auth: { uid: 'admin' }, data });
+      const result = await activeOperations[method].run({ auth, data });
       if (method === 'drawTournamentRaffle') {
         if (lostDrawResponse) {
           lostDrawResponse = false;
+          activeOperations = compatibility;
           throw Error('fixture response lost after transaction commit');
         }
         replayedDraw = result.replayed === true;
@@ -113,6 +125,11 @@ async function main() {
     const records = [...room.m.rows].filter(([key]) => key.startsWith(roomPath + '/raffles/'));
     assert.equal(records.length, 1);
     const [recordPath, record] = records[0];
+    assert.equal(record.identityVersion, 'participant-v1');
+    const rollbackPreview = await compatibility.previewTournamentRaffle.run({ auth, data: previewData });
+    assert.equal(rollbackPreview.count, 1);
+    assert(!record.winners.some(winner => winner.key === rollbackPreview.candidates[0].key),
+      'the compatibility build still excludes every participant-version winner');
     const familyWinner = record.winners.find(winner => ['p1', 'p2'].includes(winner.playerId));
     assert(familyWinner, 'three winners from four include at least one of the two family participants');
     const winnerButtons = page.locator('[data-action="ops-forfeit"]');
@@ -133,10 +150,14 @@ async function main() {
       ['forfeit', familyWinner.key], ['replace', familyWinner.key], ['claim', replacement.key]
     ]);
     assert.equal(room.m.rows.get(recordPath).winners.at(-1).status, 'claimed');
+    const restoredPreview = await operations.previewTournamentRaffle.run({ auth, data: previewData });
+    assert.equal(restoredPreview.count, 0, 'the candidate still excludes wins recorded during compatibility mode');
+    assert.equal(room.m.rows.get(roomPath + '/raffleControl/current').identityVersion, 'participant-v1');
     assert.equal(room.m.writes.filter(write => write.kind === 'create' && write.path === recordPath).length, 1);
     assert.deepEqual(failures, []);
     console.log(JSON.stringify({ assembledCallableExports: 3, browserRaffleFlow: 'passed',
-      sameOperationReplay: true, exactWinnerKeyRoundTrip: true, productionRequests: 0, productionWrites: 0 }));
+      sameOperationReplay: true, exactWinnerKeyRoundTrip: true, versionAwareRollback: true,
+      productionRequests: 0, productionWrites: 0 }));
   } finally {
     if (browser) await browser.close();
     fs.rmSync(temporary, { recursive: true, force: true });

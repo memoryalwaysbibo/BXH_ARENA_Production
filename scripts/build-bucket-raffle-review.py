@@ -14,6 +14,7 @@ CLOSURE = (
     'completion/certificate.cjs', 'completion/protocol/state.cjs',
 )
 CALL_OPTIONS = "{region,cors:true,invoker:'public'}"
+IDENTITY_VERSIONS = ('participant-v1', 'legacy')
 
 
 def sha(data):
@@ -25,7 +26,7 @@ def source_spec():
     return next(row for row in manifest['patches'] if row['sourceSet'] == 5)
 
 
-def patch_operations(original):
+def patch_operations(original, new_identity_version):
     if sha(original) != source_spec()['baselineFileSha256']:
         raise ValueError('operations.js baseline hash mismatch')
     text = original.decode('utf-8')
@@ -36,10 +37,15 @@ def patch_operations(original):
     exports = [line.split('=', 1)[0][8:] for line in text[start:].splitlines() if line.startswith('exports.')]
     if exports != list(ENTRYPOINTS):
         raise ValueError('unexpected exports after raffle block')
+    if new_identity_version not in IDENTITY_VERSIONS:
+        raise ValueError('unsupported new raffle identity version')
+    options = 'db,core:C,HttpsError'
+    if new_identity_version == 'legacy':
+        options += ",newIdentityVersion:'legacy'"
     bindings = (
         "const {createRafflePreview}=require('./bucket-raffle/raffle/preview.cjs');\n"
         "const {createRaffleWriters}=require('./bucket-raffle/raffle/writers.cjs');\n"
-        "const raffleOptions={db,core:C,HttpsError};\n"
+        f"const raffleOptions={{{options}}};\n"
         "const raffleWriters=createRaffleWriters(raffleOptions);\n"
         f"{signatures[0]}createRafflePreview(raffleOptions));\n"
         f"{signatures[1]}raffleWriters.draw);\n"
@@ -48,9 +54,9 @@ def patch_operations(original):
     return (text[:start] + bindings).encode('utf-8')
 
 
-def assemble(baseline):
+def assemble(baseline, new_identity_version):
     result = dict(baseline)
-    result['operations.js'] = patch_operations(baseline['operations.js'])
+    result['operations.js'] = patch_operations(baseline['operations.js'], new_identity_version)
     for path in CLOSURE:
         member = 'bucket-raffle/' + path
         if member in result:
@@ -90,20 +96,20 @@ def read_transfer(path):
     return files
 
 
-def fixture_tree(output):
+def fixture_tree(output, new_identity_version):
     """Stage the public fixture closure for isolated entrypoint tests."""
     fixture = ROOT / 'tests/four-court-buckets/operations/fixtures/5'
     files = {name: (fixture / name).read_bytes() for name in ('operations.js', 'operations-core.js', 'release-controls.js')}
     output.mkdir(parents=True, exist_ok=False)
-    for name, data in assemble(files).items():
+    for name, data in assemble(files, new_identity_version).items():
         target = output / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
 
 
-def build(transfer, output):
+def build(transfer, output, new_identity_version):
     original = read_transfer(transfer)
-    files = assemble(original)
+    files = assemble(original, new_identity_version)
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     archive = output / 'raffle-source-review.zip'
     with zipfile.ZipFile(archive, 'x') as package:
@@ -117,6 +123,7 @@ def build(transfer, output):
         if package.namelist() != sorted(files) or any(package.read(name) != data for name, data in files.items()):
             raise ValueError('assembled ZIP verification failed')
     report = {'status': 'review-only', 'entrypoints': list(ENTRYPOINTS),
+              'newIdentityVersion': new_identity_version,
               'baselineArchiveSha256': source_spec()['archiveSha256'],
               'sourceTransferSha256': TRANSFER_SHA256, 'candidateZipSha256': sha(archive.read_bytes()),
               'candidateFileCount': len(files), 'preservedFiles': len(original) - 1,
@@ -132,8 +139,10 @@ if __name__ == '__main__':
     inputs.add_argument('--source-transfer', type=Path)
     inputs.add_argument('--fixture-tree', action='store_true')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--new-identity-version', choices=IDENTITY_VERSIONS,
+                        default='participant-v1', help='identity for rooms without a raffle ledger')
     args = parser.parse_args()
     if args.fixture_tree:
-        fixture_tree(args.output)
+        fixture_tree(args.output, args.new_identity_version)
     else:
-        print(json.dumps(build(args.source_transfer, args.output)))
+        print(json.dumps(build(args.source_transfer, args.output, args.new_identity_version)))
