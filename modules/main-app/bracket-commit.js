@@ -44,10 +44,10 @@ function create(ctx){
    }
   }catch{}finally{busy=false;if(ctx.current())ctx.changed();}
  }
- async function retry(){
+ async function retry(firstSubmission=false){
   if(busy||!pending||!ctx.current())return false;
   busy=true;error='';result='';phaseAt=0;timings=[];
-  let lateWrite=null,cancelled=false;
+  let lateWrite=null,cancelled=false,confirmedByTransaction=false;
   let stopWaiting;
   const stop=new Promise(resolve=>{stopWaiting=resolve;});
   cancelRetry=()=>{cancelled=true;stopWaiting();};
@@ -55,7 +55,8 @@ function create(ctx){
    if(cancelled)throw Error('upload-cancelled');
    return value;
   });
-  const feedback=new Promise(resolve=>setTimeout(resolve,ctx.minimumFeedbackMs??(ctx.cloud()?2000:0)));
+  const feedbackUntil=Date.now()+(ctx.minimumFeedbackMs??(ctx.cloud()?2000:0));
+  const waitForFeedback=()=>wait(new Promise(resolve=>setTimeout(resolve,Math.max(0,feedbackUntil-Date.now()))));
   ctx.changed();
   try{
    keep();
@@ -70,7 +71,6 @@ function create(ctx){
      try{await wait(deadline(inFlightWrite));}catch(e){if(e.message==='confirmation-timeout')throw Error('queue-wait-timeout');}
     }
     if(cancelled||!ctx.current())return false;
-    progress('checking');
     const expires=Date.now()+(ctx.totalTimeoutMs??25000);
     const run=fn=>{const remaining=expires-Date.now();if(remaining<=0)throw Error('confirmation-timeout');return wait(deadline(fn(),remaining));};
     const pause=async attempt=>{await wait(new Promise(resolve=>setTimeout(resolve,(ctx.confirmationDelayMs??500)*attempt)));if(!ctx.current())throw Error('stale-context');};
@@ -87,15 +87,21 @@ function create(ctx){
      }
      return latest;
     }
-    let latest=await readUntil(value=>value?.ok===true);
+    // A new draw has no earlier write to reconcile. The transaction checks
+    // its base pairing, room state and roster against the server itself.
+    let latest=null;
+    if(!firstSubmission){
+     progress('checking');
+     latest=await readUntil(value=>value?.ok===true);
+    }
     if(cancelled||!ctx.current())return false;
     for(let attempt=0;!matches(latest,pending.snapshot);attempt++){
-     if(!latest?.ok)throw Error('cloud-readback-unconfirmed');
+     if(latest&&!latest.ok)throw Error('cloud-readback-unconfirmed');
      if(competing(latest)){
       ctx.apply(latest.data);pending=null;keep();
       throw Error('bracket-version-conflict');
      }
-     if(signature(latest.data)!==pending.baseSignature||latest.data.startedAt)throw Error('bracket-version-conflict');
+     if(latest&&(signature(latest.data)!==pending.baseSignature||latest.data.startedAt))throw Error('bracket-version-conflict');
      // Both attempts use the persisted operation ID and identical pairing.
      // The transaction still rejects a concurrent draw/start or stale roster.
      let writeError=null,acknowledged=false;
@@ -109,9 +115,19 @@ function create(ctx){
        lateWrite=promise;return promise;
       });
      }catch(e){writeError=e;}
-     // A Firestore rejection is definitive for this transaction. Only
-     // acknowledged or ambiguous writes need post-submit reconciliation.
+     // A Firestore rejection is definitive for this transaction.
      if(['permission-denied','firestore/permission-denied'].includes(writeError?.code))throw Error('permission-denied');
+     if(cancelled||!ctx.current())return false;
+     if(acknowledged?.committed===true&&matches(acknowledged,pending.snapshot)){
+      const local=ctx.state();
+      const versionFields=['updatedAt','registrationRosterRevision','qrCheckinRevision','onsiteWaitlistRuntimeRevision','callRevision','entrySelectionRevision','teamResultRevision'];
+      if(!local.startedAt&&local.archiveStatus!=='completed'&&
+         versionFields.every(field=>Number(acknowledged.data[field]||0)>=Number(local[field]||0))){
+       confirmedByTransaction=true;
+       latest=acknowledged;
+       break;
+      }
+     }
      const failureCode=ctx.writeFailureCode?.()||writeError?.code||writeError?.message||'';
      keep();if(cancelled||!ctx.current())return false;
      // Never flash failure while a committed private/public readback is settling.
@@ -144,11 +160,12 @@ function create(ctx){
     if(await ctx.local(pending.snapshot)!==true)throw Error('local-save-unconfirmed');
     if(cancelled||!ctx.current())return false;ctx.apply(pending.snapshot);
    }
-   await wait(feedback);if(cancelled||!ctx.current())return false;
+   if(!confirmedByTransaction)await waitForFeedback();
+   if(cancelled||!ctx.current())return false;
    pending=null;keep();result='success';progress('success');ctx.success();return true;
   }catch(e){
    if(cancelled)return false;
-   try{await wait(feedback);}catch{return false;}
+   try{if(e.message!=='permission-denied')await waitForFeedback();}catch{return false;}
    error=e.message||'cloud-save-unconfirmed';result='failed';
    try{ctx.trace?.({phase,error,elapsedMs:Date.now()-phaseAt,timings:timings.slice()});}catch{}
    return false;
@@ -177,7 +194,7 @@ function create(ctx){
   snapshot.bracketDrawHistory=[...(base.bracketDrawHistory||[]),snapshot.bracketDraw].slice(-20);
   pending={baseSignature:signature(base),snapshot:clone(snapshot),...(override?{adminOperationalOverride:clone(override)}:{})};
   try{keep();}catch{error='pending-storage-unavailable';result='failed';ctx.changed();return false;}
-  return retry();
+  return retry(!override);
  }
  async function discard(){
   if(!pending||!ctx.current())return;

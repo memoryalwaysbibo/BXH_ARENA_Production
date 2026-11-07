@@ -121,6 +121,39 @@ test('delayed write blocks start/re-draw and never reports success before readba
  const c=h.make(),promise=c.begin();await tick();assert(c.blocked());assert.equal(h.success,0);assert.equal(h.local.matches.length,0);assert.equal(await c.begin(),false);assert.equal(await c.verify(h.local),false);
  wait.resolve();assert.equal(await promise,true);assert.equal(h.success,1);assert.equal(h.local.matches.length,1);assert(!c.blocked());assert.equal(h.local.bracketDrawHistory.length,1);assert(h.local.updatedAt>1);
 });
+test('normal draw accepts the atomic transaction receipt without extra reads or a minimum wait',async()=>{
+ const h=fixture(),write=h.ctx.write,gate=deferred(),c=h.make();
+ h.ctx.minimumFeedbackMs=60000;
+ h.ctx.read=async()=>assert.fail('A new confirmed draw needs no separate server read');
+ h.ctx.write=async(...args)=>{
+  await gate.promise;
+  await write(...args);
+  return {ok:true,committed:true,data:clone(h.remote),publicData:publicProjection(h.remote)};
+ };
+ const uploading=c.begin();await tick();
+ assert(c.blocked());assert.equal(h.success,0);
+ gate.resolve();
+ assert.equal(await uploading,true);
+ assert.equal(h.success,1);assert.equal(h.writes.length,1);assert.equal(h.local.bracketDraw.id,h.remote.bracketDraw.id);
+ assert.equal(h.storage.size,0);
+});
+test('a transaction receipt cannot overwrite a newer roster applied while the write was pending',async()=>{
+ const h=fixture(),write=h.ctx.write,read=h.ctx.read,c=h.make();
+ let reads=0;
+ h.ctx.read=async()=>{reads++;return read();};
+ h.ctx.write=async(...args)=>{
+  await write(...args);
+  const data=clone(h.remote);
+  h.remote={...h.remote,registrationRosterRevision:1};
+  h.pub=publicProjection(h.remote);
+  h.ctx.apply(h.remote);
+  return {ok:true,committed:true,data,publicData:publicProjection(data)};
+ };
+ assert.equal(await c.begin(),true);
+ assert.equal(reads,1);
+ assert.equal(h.local.registrationRosterRevision,1);
+ assert.equal(h.success,1);
+});
 test('failed save survives controller recreation and retries identical draw exactly once',async()=>{
  const h=fixture(),write=h.ctx.write;h.ctx.write=async()=>false;
  const c=h.make();assert.equal(await c.begin(),false);assert(c.blocked());const saved=[...h.storage.values()][0];assert(saved);h.ctx.write=write;const recovered=h.make();assert(recovered.blocked());assert.equal(await recovered.retry(),true);assert.equal(h.count,1);assert.equal(h.writes.length,1);assert.equal(h.writes[0].bracketDraw.id,JSON.parse(saved).snapshot.bracketDraw.id);assert.equal(h.storage.size,0);
@@ -162,7 +195,11 @@ test('actual cloud transaction and server-only private/public readback enforce v
  const h=outer.h;h.context.buildPublicMirrorFields=s=>clone(s);
  const old=clone(outer.initial),future=Date.now()+60000;h.docs.get('tournaments/ROOM').data=JSON.stringify({...old,updatedAt:future});
  const candidate={...clone(old),drawnAt:1,bracketSize:2,matches:[{id:'new',bracket:'SE',round:0,indexInRound:0,a:{playerId:'a'},b:{playerId:'b'}}],bracketDraw:{id:'draw-one'}};
- assert.equal(await h.api.pushUpdate('ROOM',candidate,{bracketCommit:{baseSignature:api.signature(old)}}),true);
+ const receipt=await h.api.pushUpdate('ROOM',candidate,{bracketCommit:{baseSignature:api.signature(old)}});
+ assert.equal(receipt.committed,true);
+ assert.equal(receipt.data.bracketDraw.id,'draw-one');
+ assert.equal(api.signature(receipt.data),api.signature(receipt.publicData));
+ assert.equal(h.reads.length,0);
  const read=await h.api.readBracketFromServer('ROOM');assert.equal(read.ok,true);assert(read.data.updatedAt>future);assert.equal(api.signature(read.data),api.signature(read.publicData));assert.deepEqual(Array.from(h.reads).slice(-2),['tournaments/ROOM','publicTournaments/ROOM']);
  const transact=h.context.fx.runTransaction;
  h.context.fx.runTransaction=async()=>{throw Object.assign(Error('Missing or insufficient permissions.'),{code:'permission-denied'});};
@@ -183,8 +220,13 @@ test('storage failure prevents the candidate from being sent',async()=>{
  const h=fixture();h.ctx.storage.setItem=()=>{throw Error('quota');};const c=h.make();assert.equal(await c.begin(),false);assert.equal(await c.retry(),false);assert.equal(h.writes.length,0);assert.equal(h.success,0);
 });
 
-test('account switch during server preflight never sends a write',async()=>{
- const h=fixture(),read=h.ctx.read,wait=deferred();h.ctx.read=async()=>{await wait.promise;return read();};const c=h.make(),p=c.begin();await tick();h.leave();wait.resolve();await p;assert.equal(h.writes.length,0);assert.equal(h.applied,0);
+test('account switch during retry preflight never sends a write',async()=>{
+ const h=fixture(),read=h.ctx.read,write=h.ctx.write,wait=deferred(),c=h.make();
+ h.ctx.write=async()=>false;
+ assert.equal(await c.begin(),false);
+ h.ctx.write=write;h.ctx.read=async()=>{await wait.promise;return read();};
+ const p=c.retry();await tick();h.leave();wait.resolve();await p;
+ assert.equal(h.writes.length,0);assert.equal(h.applied,0);
 });
 
 test('a redraw started during start verification keeps start blocked',async()=>{
@@ -228,7 +270,7 @@ test('one click confirms after the first post-write server read is temporarily s
  h.ctx.read=async()=>{if(afterWrite&&!stale){stale=true;return {ok:true,data:clone(h.remote),publicData:room()};}return read();};
  const c=h.make();assert.equal(await c.submit(),true);assert.equal(h.success,1);assert.equal(h.count,1);assert.equal(h.writes.length,1);assert(!c.blocked());
 });
-test('one click recovers when the first server preflight fails transiently',async()=>{
+test('one click recovers when the first server readback fails transiently',async()=>{
  const h=fixture(),read=h.ctx.read;let first=true;h.ctx.read=async()=>{if(first){first=false;return {ok:false};}return read();};
  const c=h.make();assert.equal(await c.submit(),true);assert.equal(h.count,1);assert.equal(h.writes.length,1);
 });
@@ -251,7 +293,7 @@ test('a rejected redraw reports permission denial before readback and retains th
  assert.equal(await controller.begin(),false);
  assert.equal(controller.status().error,'permission-denied');
  assert.equal(controller.status().phase,'writing');
- assert.equal(reads,1);
+ assert.equal(reads,0);
  assert.equal(writes,1);
  assert.deepEqual(h.local,confirmed);
  assert.notEqual(JSON.parse([...h.storage.values()][0]).snapshot.bracketDraw.id,confirmed.bracketDraw.id);
@@ -275,11 +317,11 @@ test('community bracket submission returns failure without waiting for the legac
 });
 test('persistent unconfirmed public readback never rewrites a committed draw',async()=>{
  const h=fixture(),write=h.ctx.write;let reads=0;h.ctx.read=async()=>{reads++;return {ok:true,data:clone(h.remote),publicData:room()};};h.ctx.write=write;
- const c=h.make();assert.equal(await c.submit(),false);assert.equal(h.writes.length,1);assert.equal(reads,4);assert(c.blocked());
+ const c=h.make();assert.equal(await c.submit(),false);assert.equal(h.writes.length,1);assert.equal(reads,3);assert(c.blocked());
 });
 test('confirmation has an overall deadline instead of restarting a timeout for every retry',async()=>{
  const h=fixture();h.ctx.totalTimeoutMs=10;h.ctx.timeoutMs=1000;h.ctx.read=()=>new Promise(()=>{});
- const c=h.make(),at=Date.now();assert.equal(await c.submit(),false);assert(Date.now()-at<500);assert.equal(h.writes.length,0);assert.equal(c.status().error,'confirmation-timeout');
+ const c=h.make(),at=Date.now();assert.equal(await c.submit(),false);assert(Date.now()-at<500);assert.equal(h.writes.length,1);assert.equal(c.status().error,'confirmation-timeout');
 });
 
 
