@@ -8,6 +8,10 @@ const {CALLABLE_PATH,syncOnsiteCommunitySummary} = require('./community-summary-
 const root = path.resolve(__dirname, '..', '..');
 const port = Number(process.env.PORT || 4173);
 const emulatorMode = process.env.BXH_E2E_EMULATOR === '1';
+// Optional local, version-matched SDK for network-restricted emulator runs.
+const localSdk = emulatorMode && process.env.BXH_TEST_FIREBASE_SDK_DIR
+  ? path.resolve(process.env.BXH_TEST_FIREBASE_SDK_DIR) : null;
+if(localSdk && JSON.parse(fs.readFileSync(path.join(localSdk,'manifest.json'),'utf8')).version!=='10.13.0')throw Error('Local emulator SDK version mismatch');
 
 const types = {
   '.html':'text/html; charset=utf-8',
@@ -85,10 +89,58 @@ function injectFirebaseEmulators(source) {
       !out.includes('connectFunctionsEmulator')) {
     throw new Error('E2E emulator injection integrity check failed');
   }
+  if(localSdk){
+    if(!out.includes('const FIREBASE_SDK_VERSION = "10.13.0";'))throw Error('Runtime SDK version changed');
+    out=out.replaceAll('https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/','/__firebase_sdk__/');
+  }
+  if(process.env.BXH_TEST_EMULATOR_APP_CHECK==='1'){
+    out=replaceOnce(out,'provider: new mod.ReCaptchaEnterpriseProvider(ARENA_APP_CHECK_SITE_KEY),',`provider: new mod.CustomProvider({getToken:async()=>{
+      if(location.hostname!=="127.0.0.1" || FIREBASE_CONFIG.projectId!=="demo-bxh-arena-e2e" || new URLSearchParams(location.search).get("bxh_e2e")!=="1")throw Error('emulator-app-check-only');
+      return {token:'synthetic-emulator-app-check',expireTimeMillis:Date.now()+3600000};
+    }}),`,'emulator-app-check');
+  }
+  if(process.env.BXH_TEST_TRACE_FIRESTORE==='1'){
+    out=out.replace('const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);', '(window.__appCheckEvents||=[]).push({event:"caller",name,at:Math.round(performance.now())}); const verified = await withTimeout(ensureHunterClashAppCheck().then(()=>true),15000,false);');
+    out=out.replace('async function ensureHunterClashAppCheck(){', 'async function ensureHunterClashAppCheck(){ (window.__appCheckEvents||=[]).push({event:"ensure",at:Math.round(performance.now())});');
+    out=out.replace('const result = await appCheckModule.getToken(appCheckHandle, false);', '(window.__appCheckEvents||=[]).push({event:"token-request",at:Math.round(performance.now())}); const result = await appCheckModule.getToken(appCheckHandle, false); window.__appCheckEvents.push({event:"token-resolved",at:Math.round(performance.now())});');
+    out=out.replace('// Select durable storage at initialization;', `
+      window.__firestoreOperations=[];
+      for(const method of ['setDoc','updateDoc','getDoc','getDocFromServer','getDocs','runTransaction']){
+        const original=fx[method];
+        fx[method]=async(...args)=>{
+          const item={method,path:args[0]?.path||'',start:Math.round(performance.now()),status:'pending'};
+          window.__firestoreOperations.push(item);
+          if(method==='runTransaction'){
+            const callback=args[1];item.steps=[];
+            args[1]=async tx=>{
+              item.steps.push('callback');
+              const traced=new Proxy(tx,{get(target,key){
+                if(key==='get')return async ref=>{item.steps.push('get:'+ref.path);try{const snap=await target.get(ref);item.steps.push('read:'+ref.path);return snap;}catch(e){item.steps.push('read-error:'+e.code);throw e;}};
+                if(['set','update','delete'].includes(key))return(...values)=>{item.steps.push(key+':'+values[0].path);return target[key](...values);};
+                return Reflect.get(target,key);
+              }});
+              const result=await callback(traced);item.steps.push('callback-complete');return result;
+            };
+          }
+          try{const value=await original(...args);item.status='ok';return value;}
+          catch(e){item.status='error';item.code=e.code||e.message;throw e;}
+          finally{item.end=Math.round(performance.now());}
+        };
+      }
+      // Select durable storage at initialization;`);
+  }
   return out;
 }
 
 const server = http.createServer((req,res)=>{
+  const sdkName=(req.url||'').split('?')[0].slice('/__firebase_sdk__/'.length);
+  if(localSdk && (req.url||'').startsWith('/__firebase_sdk__/')){
+    if(!/^[a-zA-Z0-9_-]+\.js$/.test(sdkName)){res.writeHead(404);res.end();return;}
+    const sdkFile=path.join(localSdk,sdkName);
+    if(!fs.existsSync(sdkFile)){res.writeHead(404);res.end();return;}
+    res.writeHead(200,{'content-type':'text/javascript; charset=utf-8','cache-control':'no-store'});
+    fs.createReadStream(sdkFile).pipe(res);return;
+  }
   const file = safePath(req.url);
   if (!file) {
     res.writeHead(403); res.end('Forbidden'); return;

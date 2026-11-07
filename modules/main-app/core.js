@@ -3173,7 +3173,10 @@ function restoreCommunitySettingsInputs(draft){
 function renderCommunityRoomPreservingSettings(app){
   const context=communitySettingsDraftContext();
   const draft=!communitySettingsSaving && context && context===communitySettingsRenderedContext ? captureCommunitySettingsInputs() : null;
-  app.innerHTML=renderCommunityRoomApp();
+  const html=renderCommunityRoomApp();
+  if(communityRoomActiveTab==="referee"&&state.meta?.battleMode!=="team"&&state.meta?.playMode!=="enchantment"){
+    renderStableRefereeScreen(app,html,[appPhase,state.id,state.cloudCode,currentAuthUid()].join("|"));
+  }else{refereeRenderContext=null;app.innerHTML=html;}
   communitySettingsRenderedContext=context;
   bindDynamicInputs();
   restoreCommunitySettingsInputs(draft);
@@ -5415,7 +5418,7 @@ function invalidateMyRegistrationsCache(result){
   myRegistrationsRequest++;myRegistrationsCache=null;myRegistrationsLoading=false;
 }
 function shouldBindLobbyInput(element,key){
-  if(!isTournamentLobbyVisible()&&!(appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open))return true;
+  if((typeof activeTab==="undefined"||activeTab!=="referee")&&(typeof communityRoomActiveTab==="undefined"||appPhase!=="community-room"||communityRoomActiveTab!=="referee")&&!isTournamentLobbyVisible()&&!(appPhase==="player-center"&&playerActiveTab==="registered"&&!mailboxContext().open))return true;
   let keys=lobbyInputBindings.get(element);
   if(!keys){keys=new Set();lobbyInputBindings.set(element,keys);}
   if(keys.has(key))return false;
@@ -20517,6 +20520,71 @@ function renderAdminNoTournamentScreen(){
   renderApp();
 }
 
+// Compare generated output, never room revisions: authorization and connection
+// rendering still runs on every notification. Templates are separate from live
+// DOM so native input drafts and focus survive unrelated court updates.
+let refereeTemplates=new WeakMap(),refereeRenderContext=null;
+function refereeNodeKey(node){
+  if(node.nodeType!==1)return "";
+  if(node.id)return "id:"+node.id;
+  const action=node.getAttribute("data-action")||node.getAttribute("data-seat-action");
+  if(action)return "action:"+action+":"+["data-id","data-station","data-court","data-slot","data-side","data-type","data-tab","data-request","data-code","data-value"].map(k=>node.getAttribute(k)||"").join(":");
+  return node.getAttribute("class")||"";
+}
+function rememberRefereeTemplate(node,template=node){
+  refereeTemplates.set(node,{html:template.nodeType===1?template.outerHTML:template.nodeValue,
+    attrs:template.nodeType===1?Object.fromEntries([...template.attributes].map(a=>[a.name,a.value])):{}});
+  [...node.childNodes].forEach((child,i)=>{if(template.childNodes[i])rememberRefereeTemplate(child,template.childNodes[i]);});
+}
+function patchRefereeNode(node,template,patch){
+  const prior=refereeTemplates.get(node);
+  const html=template.nodeType===1?template.outerHTML:template.nodeValue;
+  // Comparing generated templates, rather than the live DOM, preserves native
+  // details state and module-owned UI/event-hook flags.
+  if(prior&&prior.html===html)return;
+  if(node.nodeType!==1){if(node.nodeValue!==template.nodeValue)node.nodeValue=template.nodeValue;rememberRefereeTemplate(node,template);return;}
+  const before=prior?.attrs||{},after=Object.fromEntries([...template.attributes].map(a=>[a.name,a.value]));
+  for(const name of new Set([...Object.keys(before),...Object.keys(after)])){
+    if(name==="open"&&node.tagName==="DETAILS")continue;
+    if(before[name]===after[name])continue;
+    if(after[name]===undefined)node.removeAttribute(name);else node.setAttribute(name,after[name]);
+  }
+  // Form properties are user drafts; generated value attributes may change but
+  // an existing editor's current value/selection must never be overwritten.
+  const selectedValue=node.tagName==="SELECT"?node.value:null;
+  if(!["INPUT","TEXTAREA"].includes(node.tagName))patchRefereeChildren(node,template,patch);
+  if(selectedValue!==null&&[...node.options].some(option=>option.value===selectedValue))node.value=selectedValue;
+  refereeTemplates.set(node,{html,attrs:after});
+}
+function patchRefereeChildren(parent,template,patch){
+  const previous=[...parent.childNodes],used=new Set(),candidates=new Map();let cursor=parent.firstChild;
+  const matchKey=node=>node.nodeType+":"+node.nodeName+":"+refereeNodeKey(node);
+  for(const node of previous){const key=matchKey(node);if(!candidates.has(key))candidates.set(key,{nodes:[],index:0});candidates.get(key).nodes.push(node);}
+  for(const next of [...template.childNodes]){
+    const key=refereeNodeKey(next),queue=candidates.get(matchKey(next));
+    let node=queue?.nodes[queue.index++];
+    if(node){
+      used.add(node);
+      if(node!==cursor)parent.insertBefore(node,cursor);
+      patchRefereeNode(node,next,patch);
+      cursor=node.parentNode===parent?node.nextSibling:cursor;
+    }else{node=next.cloneNode(true);parent.insertBefore(node,cursor);used.add(node);rememberRefereeTemplate(node);cursor=node.nextSibling;}
+  }
+  for(const node of previous){
+    if(used.has(node)||node.parentNode!==parent)continue;
+    node.remove();
+  }
+}
+function renderStableRefereeScreen(app,html,key){
+  const fragment=document.createElement("template");fragment.innerHTML=html;
+  if(!refereeRenderContext||refereeRenderContext.key!==key||refereeRenderContext.root!==app.firstElementChild){
+    app.innerHTML=html;refereeTemplates=new WeakMap();rememberRefereeTemplate(app);
+    refereeRenderContext={key,root:app.firstElementChild};return;
+  }
+  patchRefereeChildren(app,fragment.content,{});
+  refereeRenderContext.root=app.firstElementChild;
+}
+
 function renderApp(){
   const app = document.getElementById("app");
   const allTabs = [["management","賽事管理"],["ladder","排行榜"],["live","即時戰況"],["bracket","對戰表"],["referee","裁判台"],["duty","我的執勤"],["registrations","報名管理"],["settings","賽事設定"],["people","人員管理"],["operations","抽獎與維護"],["history","賽事紀錄"],["version","版本更新"]];
@@ -20553,7 +20621,7 @@ function renderApp(){
   else if(activeTab==="version") content = wrapBracketWatermark(renderVersionPage());
   else content = wrapBracketWatermark(renderSettings());
 
-  app.innerHTML = `
+  const appHtml = `
     <div class="stickytop mode-shell">
       <header class="topbar">
         <button type="button" class="logo-wrap logo-refresh-button" data-action="header-refresh" aria-label="重新整理並讀取最新資訊" title="重新整理並讀取最新資訊"><div class="logo-glow"></div><img class="logo" src="${LOGO_SRC}" alt="BXH"></button>
@@ -20584,6 +20652,10 @@ function renderApp(){
     ${renderAdminTournamentListModal()}
     ${renderCloudTestResultModal()}
   `;
+
+  if(activeTab==="referee"&&state.meta?.battleMode!=="team"&&state.meta?.playMode!=="enchantment"){
+    renderStableRefereeScreen(app,appHtml,[appPhase,state.id,state.cloudCode,currentAuthUid()].join("|"));
+  }else{refereeRenderContext=null;app.innerHTML=appHtml;}
 
   bindDynamicInputs();
 
@@ -21146,7 +21218,7 @@ function bindDynamicInputs(){
 
   const modalConfirmBtn = document.getElementById("modal-confirm-btn");
   const forceExitAck=document.getElementById('court-force-exit-ack');
-  if(forceExitAck)forceExitAck.addEventListener('change',()=>{
+  if(forceExitAck&&shouldBindLobbyInput(forceExitAck,"force-exit-ack"))forceExitAck.addEventListener('change',()=>{
     if(pendingModal?.type!=='court-force-exit')return;
     pendingModal.acknowledged=forceExitAck.checked;
     pendingModal.confirmDisabled=!forceExitAck.checked;

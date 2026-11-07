@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 test('official single elimination enforces bronze before championship final', async ({ page }) => {
   const externalFirebaseRequests=[];
 
-  await page.route('**/*', async route=>{
+  await page.route(/^https?:\/\/(?:firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|[^/]+\.firebaseio\.com|[^/]+\.cloudfunctions\.net)(?:[/:])/,  async route=>{
     const url=new URL(route.request().url());
     const host=url.hostname;
     const blocked=

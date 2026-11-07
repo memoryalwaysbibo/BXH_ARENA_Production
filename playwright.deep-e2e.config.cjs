@@ -10,6 +10,7 @@ module.exports = defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
+    ...(process.env.BXH_TEST_BROWSER ? {launchOptions:{executablePath:process.env.BXH_TEST_BROWSER}} : {}),
     baseURL: 'http://127.0.0.1:4173',
     ...devices['Desktop Chrome'],
     viewport: { width: 1440, height: 900 },

@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 test('four-player community event reaches first confirmed referee result', async ({ page, browser }) => {
   const externalFirebaseRequests = [];
 
-  await page.route('**/*', async route => {
+  await page.route(/^https?:\/\/(?:firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|[^/]+\.firebaseio\.com|[^/]+\.cloudfunctions\.net)(?:[/:])/,  async route => {
     const url = new URL(route.request().url());
     const host = url.hostname;
     const blocked =
@@ -86,6 +86,7 @@ test('four-player community event reaches first confirmed referee result', async
   }
 
   await expect(page.locator('.player-shell')).toBeVisible({ timeout: 60000 });
+  await page.waitForFunction(()=>!playerApplyBusy,null,{timeout:30000});
   await page.locator('[data-action="player-switch-tab"][data-tab="host"]').first().click();
   await expect(page.locator('.community-host-hero')).toBeVisible();
 
@@ -269,3 +270,5 @@ test('four-player community event reaches first confirmed referee result', async
 
   expect(externalFirebaseRequests).toEqual([]);
 });
+
+require('./firestore-diagnostics.cjs').install(test);
