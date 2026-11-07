@@ -36,17 +36,52 @@ test('rechecks account and close time after acceptance, before allocation',async
  const a=await audit(code,0);assert.equal(a.summary.rejected,2);
  assert.deepEqual(a.jobs.map(j=>j.reason).sort(),['auth-required','closed']);
 });
-test('join, player cancellation and automatic fill share one room lease and preserve counts',async()=>{
+test('player cancellation through the V2 API and automatic fill share the join queue',async()=>{
  const {code,ids:[one,two,three]}=await seed(3,1,2),services=Array.from({length:5},()=>service());
  for(const uid of [one,two])await services[0].enqueue(uid,request(code,uid));
  await drainAll(services,code);let a=await audit(code,2);assert.equal(a.summary.confirmed,1);assert.equal(a.summary.waitlist,1);
  const cancel={code,route:'roster',operationId:'cancel-first-user',payload:{action:'cancel',code,intent:'player',registrationId:one,operationId:'cancel-first-user'}};
- await services[1].enqueue(one,cancel);await delay(2);await services[2].enqueue(three,request(code,three));
+ const api=createApi({queue:services[1],family:handlers.family(db),enabled:async c=>c===code});
+ const call=(uid,data)=>api({auth:{uid},data:{...data,code}});
+ const accepted=await call(one,{action:'submit',operation:cancel});
+ assert.equal(accepted.operation.state,'queued');
+ assert.equal(accepted.operation.result,undefined);
+ await delay(2);await services[2].enqueue(three,request(code,three));
  await drainAll(services,code);a=await audit(code,2);
  assert.equal(a.rows.find(r=>r.id===one).status,'cancelled');
  assert.equal(a.rows.find(r=>r.id===two).status,'confirmed');
  assert.equal(a.rows.find(r=>r.id===three).status,'waitlist');
  assert.equal(a.summary.jobs,4);assert.equal(a.summary.completed,4);
+ const status={action:'status',operationId:cancel.operationId};
+ const receipt=(await call(one,status)).operation;
+ assert.equal(receipt.state,'completed');
+ assert.equal(receipt.result.status,'cancelled');
+ assert.equal(receipt.result.autoPromoted,true);
+ assert.equal(receipt.result.promotedRegistrationId,undefined);
+ assert.equal(receipt.result.state,undefined);
+ assert.equal((await call(two,status)).operation.state,'not-found');
+});
+test('the player API refuses administrative mutations and the queue rejects another player’s cancellation',async()=>{
+ const {code,ids:[owner,other]}=await seed(2),s=service();
+ await s.enqueue(owner,request(code,owner));await s.drain(code);
+ const api=createApi({queue:s,family:handlers.family(db),enabled:async c=>c===code});
+ const call=data=>api({auth:{uid:other},data:{...data,code}});
+ const operationId='cancel-other-player';
+ const cancel={code,route:'roster',operationId,payload:{action:'cancel',code,intent:'player',registrationId:owner,operationId}};
+ await assert.rejects(call({action:'submit'}),/invalid-operation/);
+ for(const operation of [
+  {...cancel,payload:{...cancel.payload,intent:'admin'}},
+  {...cancel,payload:{...cancel.payload,action:'promote'}},
+  {...cancel,payload:{...cancel.payload,action:'configure',enabled:false}},
+  {...cancel,payload:{...cancel.payload,registrationId:'',localId:owner}},
+  {...cancel,route:'family',payload:{...cancel.payload,action:'syncSummary'}},
+ ])await assert.rejects(call({action:'submit',operation}),/invalid-operation/);
+ assert.equal((await audit(code,1)).summary.jobs,1);
+ await call({action:'submit',operation:cancel});await s.drain(code);
+ const receipt=(await call({action:'status',operationId})).operation;
+ assert.equal(receipt.state,'rejected');
+ assert.equal(receipt.reason,'permission-denied');
+ assert.equal((await audit(code,1)).summary.confirmed,1);
 });
 test('duplicate cancellation cannot decrement twice or promote twice',async()=>{
  const {code,ids:[one,two]}=await seed(2,1,1),s=service();
