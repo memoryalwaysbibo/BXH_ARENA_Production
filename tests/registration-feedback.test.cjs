@@ -195,3 +195,31 @@ test('My Events blocks a pending room and refreshes from the verified cancellati
  await slice.ensure();assert.equal(lists,2);assert.equal(slice.registration(CODE),null);
  assert.match(slice.render(),/沒有進行中的賽事/);assert.doesNotMatch(slice.render(),/缺少可追蹤憑證/);slice.reset();
 });
+
+test('management queue restores the same promotion receipt after a lost response and rollout close',async()=>{
+ const cloud=fs.readFileSync(require.resolve('../modules/cloud/cloud-runtime.js'),'utf8');
+ const helper=cloud.slice(cloud.indexOf('  const managementQueueOperations='),cloud.indexOf('  let playerRegistrationFeedback='));
+ const sessionStorage=memory(),requests=[];
+ const payload={code:CODE,action:'promote',registrationId:'candidate',expandBy:0};
+ function open(enabled){
+  const context={
+   window:{sessionStorage,BXH_REGISTRATION_FLOW_V2_ROOMS:enabled?[CODE]:[]},
+   authReady:true,authHandle:{currentUser:{uid:'staff1'}},
+   crypto:{randomUUID:()=>assert.fail('unexpected new operation ID')},
+   callEngagementFunction:async(name,request)=>{
+    assert.equal(name,'registrationRosterQueueV2');
+    requests.push(request);
+    if(request.action==='promote')throw Object.assign(Error('lost response'),{code:'functions/unavailable'});
+    return {operation:{operationId:request.operationId,state:'completed',result:{ok:true,status:'confirmed',registrationId:'candidate'}}};
+   }
+  };
+  return vm.runInNewContext(helper+'\nregistrationManagementOperation;',context);
+ }
+ assert.equal(await open(false)(payload,'original-promotion'),null);
+ await assert.rejects(open(true)(payload,'original-promotion'),/registration-management-pending/);
+ assert.equal(sessionStorage.length,1);
+ const result=await open(false)(payload,'different-retry-id');
+ assert.equal(result.status,'confirmed');assert.equal(result.verified,true);
+ assert.deepEqual(requests.map(({action,operationId})=>[action,operationId]),[['promote','original-promotion'],['status','original-promotion']]);
+ assert.equal(sessionStorage.length,0);
+});

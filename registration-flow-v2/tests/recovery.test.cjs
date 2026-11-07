@@ -128,3 +128,72 @@ test('API rollout is disabled by default and status acceptance is never reported
  const accepted=await api({auth:{uid},data:{action:'submit',code,operation:request(code,uid)}});assert.equal(accepted.operation.state,'queued');assert.equal(accepted.status,undefined);
  await q.drain(code);const mine=await api({auth:{uid},data:{action:'mine',code,operationId:request(code,uid).operationId}});assert.equal(mine.operation.state,'completed');assert.equal(mine.rows[0].status,'confirmed');
 });
+
+test('manager cancellation, manual promotion and new signup share the room lease',async()=>{
+ const {createManagementApi,createManagementAuthorizer,createQueuedPromotion}=require('../backend/management.cjs');
+ const {manager,promotionManager}=require('../../qr-checkin/backend/overlays/roster-service.js');
+ const {createPromotionHandler,authorized}=require('../../registration-promotion/functions/service.cjs');
+ const {code,ids:[first,second,third,late,admin,revoked]}=await seed(6,2,4);
+ for(const path of ['tournaments','publicTournaments']){
+  await db.doc(path+'/'+code).update({eventAuthority:'official'});
+ }
+ await db.doc('users/'+admin).update({role:'admin'});
+ await db.doc('users/'+revoked).update({role:'admin'});
+ const options={handlers:{...handlers,promotion:createQueuedPromotion({
+  roster:handlers.roster,promote:store=>createPromotionHandler(store,{timestamp:()=>FieldValue.serverTimestamp(),allowUnseatedOfficial:true})
+ })}};
+ const workers=Array.from({length:5},()=>service(options));
+ const authorize=createManagementAuthorizer({db,canCancel:manager,canPromote:authorized,canPromoteUnlimited:promotionManager});
+ const api=createManagementApi({queue:workers[0],authorize,enabled:async c=>c===code});
+ const send=(uid,data)=>api({auth:{uid},data:{...data,code}});
+ const [privateRef,publicRef]=['tournaments','publicTournaments'].map(path=>db.doc(path+'/'+code));
+ const privateRoom=(await privateRef.get()).data();
+ await privateRef.update({data:JSON.stringify({...JSON.parse(privateRoom.data),meta:{registrationAutoFillEnabled:false}})});
+ for(const uid of [first,second,third]){await workers[0].enqueue(uid,request(code,uid));await drainAll(workers,code);}
+ assert.equal((await audit(code,3)).rows.find(row=>row.id===third).status,'waitlist');
+
+ const cancellation={action:'cancel',registrationId:first,operationId:'admin-cancel-first'};
+ const promotion={action:'promote',registrationId:third,operationId:'admin-promote-third',expandBy:0};
+ await assert.rejects(send(late,cancellation),/permission-denied/);
+ await assert.rejects(send(late,promotion),/permission-denied/);
+ await assert.rejects(send(admin,{...promotion,intent:'player'}),/invalid-operation/);
+ assert.equal((await send(admin,cancellation)).operation.state,'queued');
+ await delay(2);
+ assert.equal((await send(admin,promotion)).operation.state,'queued');
+ await delay(2);
+ await Promise.all([send(admin,promotion),workers[1].enqueue(late,request(code,late))]);
+ const revokedRequest={action:'cancel',registrationId:second,operationId:'admin-revoked-cancel'};
+ await send(revoked,revokedRequest);
+ await db.doc('users/'+revoked).update({role:'player'});
+ await drainAll(workers,code);
+
+ const {rows,summary}=await audit(code,3);
+ assert.deepEqual(Object.fromEntries(rows.map(row=>[row.id,row.status])),{
+  [first]:'cancelled',[second]:'confirmed',[third]:'confirmed',[late]:'waitlist'
+ });
+ assert.deepEqual([summary.confirmed,summary.waitlist,summary.jobs,summary.rejected],[2,1,7,1]);
+ const privateState=JSON.parse((await privateRef.get()).data().data);
+ const publicState=JSON.parse((await publicRef.get()).data().bracketView);
+ assert.deepEqual(publicState.players.map(p=>p.id),privateState.players.map(p=>p.id));
+ const disabled=createManagementApi({queue:workers[1],authorize});
+ const status=(uid,operationId)=>disabled({auth:{uid},data:{action:'status',code,operationId}});
+ const result=(await status(admin,promotion.operationId)).operation;
+ assert.equal(result.state,'completed');
+ assert.equal(result.result.registrationId,third);
+ assert.equal(result.result.state,undefined);
+ assert.equal((await status(late,promotion.operationId)).operation.state,'not-found');
+ assert.equal((await status(revoked,revokedRequest.operationId)).operation.reason,'permission-denied');
+ await assert.rejects(disabled({auth:{uid:admin},data:{...promotion,code}}),/registration-queue-disabled/);
+
+ const full={...promotion,registrationId:late,operationId:'admin-promote-full'};
+ await send(admin,full);
+ await drainAll(workers,code);
+ assert.equal((await status(admin,full.operationId)).operation.reason,'capacity-full');
+ const expand={...full,operationId:'admin-promote-expand',expandBy:8};
+ await send(admin,expand);
+ await drainAll(workers,code);
+ const expanded=(await status(admin,expand.operationId)).operation.result;
+ assert.deepEqual([expanded.capacity,expanded.confirmedCount,expanded.waitlistCount],[10,3,0]);
+ const expandedAudit=await audit(code,3);
+ assert.deepEqual([expandedAudit.summary.confirmed,expandedAudit.summary.waitlist],[3,0]);
+});

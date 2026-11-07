@@ -13178,6 +13178,7 @@ function peopleMutationErrorMessage(e){
   if(code.includes("call-state-stale")||code.includes("entry-selection-stale")) return "雲端賽事狀態已更新，請重新整理後再試。";
   if(code.includes("not-waitlist")) return "這位玩家目前已不是備取，名單可能已被其他裝置更新。";
   if(code.includes("not-confirmed")) return "這位玩家目前已不是正取，名單可能已被其他裝置更新。";
+  if(code.includes("registration-management-pending")) return "名單異動尚待確認；請重試同一操作以查詢原請求。";
   if(code.includes("roster-sync-mismatch")) return "雲端已收到操作，但讀回資料尚未完全一致；請重新整理名單確認。";
   if(code.includes("permission-denied")) return "目前帳號沒有異動這場賽事名單的權限。";
   return mapRegistrationError(e)||"名單更新失敗，請重新整理後再試。";
@@ -13304,6 +13305,7 @@ async function peoplePromoteOnline(registrationId,name,expandBy=0){
       render();
       return;
     }
+    if(e?.code==="registration-management-pending"){showToast(peopleMutationErrorMessage(e),true);render();return;}
     await peopleRecoverPromotion(context,name,e);
   }
 }
@@ -13366,25 +13368,29 @@ async function peopleDemoteOnline(player){
   }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 function peopleCancellationMessage(result,name){
-  return "已取消「"+name+"」"+(result?.autoPromoted?"；「"+result.promotedName+"」已自動遞補正取":"");
+  return "已取消「"+name+"」"+(result?.autoPromoted?(result.promotedName?"；「"+result.promotedName+"」已自動遞補正取":"；備取已自動遞補正取"):"");
 }
 async function peopleCancelOnline(registrationId,name){
   if(peopleRosterBusy)return;
+  const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
   peopleRosterBusy=true;render();
   try{
     const result=state.meta.battleMode==="team"
       ? await window.cloudSync.staffCancelRegistration(state.cloudCode,registrationId)
       : await window.cloudSync.cancelRoster(state.cloudCode,registrationId,"","admin");
+    if(!peoplePromotionContextCurrent(context)){peopleRosterBusy=false;return;}
     await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
-  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+  }catch(e){peopleRosterBusy=false;if(!peoplePromotionContextCurrent(context))return;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 async function peopleCancelLocal(localId,name){
   if(peopleRosterBusy)return;
+  const context={roomId:state.id,code:state.cloudCode,uid:typeof currentAuthUid==="function"?currentAuthUid():""};
   peopleRosterBusy=true;render();
   try{
     const result=await window.cloudSync.cancelRoster(state.cloudCode,"",localId,"admin");
+    if(!peoplePromotionContextCurrent(context)){peopleRosterBusy=false;return;}
     await peopleApplyCloudRosterResult(result,peopleCancellationMessage(result,name));
-  }catch(e){peopleRosterBusy=false;showToast(peopleMutationErrorMessage(e),true);render();}
+  }catch(e){peopleRosterBusy=false;if(!peoplePromotionContextCurrent(context))return;showToast(peopleMutationErrorMessage(e),true);render();}
 }
 async function peopleToggleAutoFill(){
   if(peopleRosterBusy)return;
@@ -16492,8 +16498,9 @@ async function staffRosterPromote(target){
     }
     staffPromotionBusy=true;render();
     try{
-      const result=await window.engagementService.tournamentOperation('promoteSeatedRegistration',{
-       code:context.code,...(registrationId?{registrationId}:{playerId}),operationId,expandBy:0});
+      const request={code:context.code,...(registrationId?{registrationId}:{playerId}),expandBy:0};
+      const queued=registrationId&&await window.engagementService.registrationManagementOperation?.({action:'promote',...request},operationId);
+      const result=queued||await window.engagementService.tournamentOperation('promoteSeatedRegistration',{...request,operationId});
       if(!current())return;
       if(result?.ok!==true||result.verified!==true)throw Error('promotion-unconfirmed');
       const fresh=await window.cloudSync.readStaffRegistrationRoster(context.code);

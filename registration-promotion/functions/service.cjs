@@ -8,7 +8,7 @@ function authorized(user,uid,room){
  if(['admin','super_admin'].includes(user.role))return true;
  return user.role==='staff'&&(!Object.hasOwn(room,'assignedStaffUids')||Array.isArray(room.assignedStaffUids)&&(room.assignedStaffUids.length===0||room.assignedStaffUids.includes(uid)));
 }
-function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock()}={}){return async req=>{
+function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock(),allowUnseatedOfficial=false}={}){return async req=>{
  const uid=req.auth?.uid,d=req.data||{};
  if(!uid)fail('unauthenticated');
  if(Object.keys(d).some(k=>!['code','registrationId','expandBy','operationId'].includes(k))||!/^BXH-[A-Z0-9]{4,16}$/.test(d.code||'')||!/^[A-Za-z0-9_-]{1,128}$/.test(d.registrationId||'')||!/^[-A-Za-z0-9]{16,80}$/.test(d.operationId||'')||![0,8].includes(d.expandBy??0))fail('invalid-request');
@@ -22,11 +22,11 @@ function createPromotionHandler(db,{clock=Date.now,timestamp=()=>clock()}={}){re
   if(!authorized(us.data(),uid,t))fail('permission-denied');
   if(Object.prototype.hasOwnProperty.call(t,'scoreStorage'))fail('bucket-scoring-required');
   const state=parse(t.data),mirror=parse(pub.bracketView);
-  // This server-owned path is deliberately limited to the seat-enabled official
-  // individual rooms whose browser runtime writes are protected by seat Rules.
-  if(t.eventAuthority!=='official'||pub.eventAuthority!=='official'||t.createdByRole==='partner_organizer'||t.refereeSeatsV1?.version!==1)fail('promotion-route-not-supported');
+  // The existing callable remains limited to seat-enabled official rooms.
+  if(t.eventAuthority!=='official'||pub.eventAuthority!=='official'||t.createdByRole==='partner_organizer'||(!allowUnseatedOfficial&&t.refereeSeatsV1?.version!==1))fail('promotion-route-not-supported');
   if([t.battleMode,pub.battleMode,state.meta?.battleMode].includes('team'))fail('team-roster-managed');
   if([t,pub].some(x=>x.systemClosed||x.eventCancelled||x.deletionStatus||x.tournamentPhase!=='waiting'||['completed','archived'].includes(x.archiveStatus))||state.meta?.eventCancelled||state.startedAt||state.bracketSize||['completed','archived'].includes(state.archiveStatus))fail('bracket-locked');
+  if(allowUnseatedOfficial&&(t.createdByRole==='tester'||t.testMode===true||pub.testMode===true||[t,pub].some(room=>room.createdByRole==='partner_organizer'||room.partnerOrganizationCode||room.partnerContractOrderCode)))fail('promotion-route-not-supported');
   if(t.registrationSelection||pub.registrationSelection||state.entrySelection?.mode==='registration')fail('selection-managed');
   if(t.onsiteWaitlistServerOwned||pub.onsiteWaitlistServerOwned||state.onsiteWaitlistServerOwned)fail('onsite-waitlist-managed');
   if(os.exists){

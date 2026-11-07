@@ -4,24 +4,29 @@
 // Rules/indexes and the frontend together. Tests do not deploy these exports.
 const {createQueue}=require('./queue.cjs');
 const {createApi}=require('./api.cjs');
-function createBindings({db,FieldValue,familyFactory,rosterFactory,enabled=async()=>false}){
+const {createManagementApi}=require('./management.cjs');
+function createBindings({db,FieldValue,familyFactory,rosterFactory,promotionFactory,authorizeManagement,enabled=async()=>false}){
+ if(typeof promotionFactory!=='function')throw Error('queue-promotion-factory-required');
  const {onCall,HttpsError}=require('firebase-functions/v2/https');
  const {onDocumentCreated}=require('firebase-functions/v2/firestore');
  const {onSchedule}=require('firebase-functions/v2/scheduler');
- const queue=createQueue(db,{FieldValue,handlers:{family:familyFactory,roster:rosterFactory}});
+ const queue=createQueue(db,{FieldValue,handlers:{family:familyFactory,roster:rosterFactory,promotion:promotionFactory}});
  const api=createApi({queue,family:familyFactory(db),enabled});
- const registrationQueueV2=onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5},async req=>{
-  try{return await api(req);}catch(error){
+ const managementApi=createManagementApi({queue,enabled,authorize:authorizeManagement});
+ const bind=handler=>onCall({region:'asia-east1',cors:true,timeoutSeconds:30,maxInstances:5},async req=>{
+  try{return await handler(req);}catch(error){
    const m=String(error.message||'');
    if(m==='auth-required')throw new HttpsError('unauthenticated',m);
    if(m==='invalid-operation')throw new HttpsError('invalid-argument',m);
-   if(m==='permission-denied')throw new HttpsError('permission-denied',m);
+   if(m==='permission-denied'||m==='not-found')throw new HttpsError(m,m);
    if(['registration-queue-disabled','operation-conflict'].includes(m))throw new HttpsError('failed-precondition',m);
    throw new HttpsError('unavailable','registration-operation-unconfirmed');
   }
  });
+ const registrationQueueV2=bind(api);
+ const registrationRosterQueueV2=bind(managementApi);
  const registrationQueueV2Worker=onDocumentCreated({region:'asia-east1',document:'_registrationQueueV2/{code}/_registrationQueueJobsV2/{job}',timeoutSeconds:60,maxInstances:5,retry:true},event=>queue.drain(event.params.code,{limit:200,budgetMs:45000}));
  const registrationQueueV2Sweep=onSchedule({region:'asia-east1',schedule:'every 1 minutes',timeoutSeconds:540,maxInstances:1},()=>queue.sweep());
- return {registrationQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep};
+ return {registrationQueueV2,registrationRosterQueueV2,registrationQueueV2Worker,registrationQueueV2Sweep};
 }
 module.exports={createBindings};

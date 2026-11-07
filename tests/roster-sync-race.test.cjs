@@ -136,7 +136,8 @@ test('both online and onsite cancellation use one server call without client pro
  window:{cloudSync:{cancelRoster:async(...args)=>{calls.push(args);return {ok:true,autoPromoted:true};},promoteEarliestWaitlist:()=>{throw Error('must not double-promote');}}},
  peopleApplyCloudRosterResult:async()=>{sandbox.peopleRosterBusy=false;}};
  vm.createContext(sandbox);
- vm.runInContext(block(core,'async function peopleCancelOnline(','async function peopleToggleAutoFill('),sandbox);
+ vm.runInContext(block(core,'function peoplePromotionContextCurrent(','async function peopleRecoverPromotion(')+
+  block(core,'async function peopleCancelOnline(','async function peopleToggleAutoFill('),sandbox);
  await sandbox.peopleCancelOnline('r','Name');await sandbox.peopleCancelLocal('onsite','Local');
  assert.deepEqual(Array.from(calls[0]),['BXH-X','r','','admin']);assert.deepEqual(Array.from(calls[1]),['BXH-X','','onsite','admin']);
 });
