@@ -1100,6 +1100,7 @@
       courtLifecycleEpoch:Number(state.courtLifecycleEpoch||0),
       callRevision:Number(state.callRevision||0),
       registrationRosterRevision:Number(state.registrationRosterRevision||0),
+      ...(state.meta?.eventAuthority==="community"&&state.meta.communityQuickRegistration===true&&Number.isSafeInteger(state.communityParticipantCount)&&state.communityParticipantCount>=0?{communityParticipantCount:state.communityParticipantCount}:{}),
       ...(state.onsiteWaitlistServerOwned===true?{onsiteWaitlistRuntimeRevision:state.onsiteWaitlistRuntimeRevision}:{}),
       systemClosure:state.systemClosure?{reason:'idle-24h',label:state.systemClosure.label||'',closedAt:state.systemClosure.closedAt||null,lastActivityAt:state.systemClosure.lastActivityAt||null,restoredAt:state.systemClosure.restoredAt||null}:null,
       eventInfo:buildPublicEventInfo(state),
